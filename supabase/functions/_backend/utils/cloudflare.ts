@@ -3,7 +3,7 @@ import type { Context } from 'hono'
 import type { Database } from './supabase.types.ts'
 import dayjs from 'dayjs'
 import ky from 'ky'
-import { cloudlog, cloudlogErr } from './loggin.ts'
+import { cloudlog, cloudlogErr, serializeError } from './loggin.ts'
 import { DEFAULT_LIMIT, type DeviceWithoutCreatedAt, type ReadDevicesParams, type ReadStatsParams } from './types.ts'
 import { getEnv } from './utils.ts'
 
@@ -140,7 +140,7 @@ export async function trackDevicesCF(c: Context, device: DeviceWithoutCreatedAt)
     }
   }
   catch (e) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Error tracking device', error: JSON.stringify(e), query: upsertQuery })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error tracking device', error: serializeError(e), query: upsertQuery })
   }
 
   return Promise.resolve()
@@ -197,7 +197,7 @@ async function runQueryToCFA<T>(c: Context, query: string) {
       cloudlogErr({ requestId: c.get('requestId'), message: 'runQueryToCFA HTTPError', error: errorJson })
     }
     else {
-      cloudlogErr({ requestId: c.get('requestId'), message: 'runQueryToCFA error', error: JSON.stringify(e) })
+      cloudlogErr({ requestId: c.get('requestId'), message: 'runQueryToCFA error', error: serializeError(e) })
     }
     throw new Error('runQueryToCFA encountered an error')
   })
@@ -259,7 +259,7 @@ export async function readDeviceUsageCF(c: Context, app_id: string, period_start
     return result
   }
   catch (e) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Error reading device usage', error: JSON.stringify(e), query })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error reading device usage', error: serializeError(e), query })
   }
   return [] as DeviceUsageCF[]
 }
@@ -279,7 +279,7 @@ export async function rawAnalyticsQuery(c: Context, query: string) {
     return await runQueryToCFA<any>(c, query)
   }
   catch (e) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Error reading rawAnalyticsQuery', error: JSON.stringify(e) })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error reading rawAnalyticsQuery', error: serializeError(e) })
   }
   return []
 }
@@ -304,7 +304,7 @@ ORDER BY date, app_id`
     return await runQueryToCFA<BandwidthUsageCF>(c, query)
   }
   catch (e) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Error reading bandwidth usage', error: JSON.stringify(e), query })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error reading bandwidth usage', error: serializeError(e), query })
   }
   return [] as BandwidthUsageCF[]
 }
@@ -373,7 +373,7 @@ ORDER BY date`
     return await runQueryToCFA<VersionUsageCF>(c, query)
   }
   catch (e) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Error reading version usage', error: JSON.stringify(e), query })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error reading version usage', error: serializeError(e), query })
   }
   return [] as VersionUsageCF[]
 }
@@ -408,7 +408,7 @@ export async function countDevicesCF(c: Context, app_id: string) {
     return res
   }
   catch (e) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Error reading device list', error: JSON.stringify(e), query })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error reading device list', error: serializeError(e), query })
   }
   return [] as DeviceRowCF[]
 }
@@ -487,7 +487,7 @@ LIMIT ${rangeEnd} OFFSET ${rangeStart}`
     return res.results as DeviceRowCF[]
   }
   catch (e) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Error reading device list', error: JSON.stringify(e), query })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error reading device list', error: serializeError(e), query })
   }
   return [] as DeviceRowCF[]
 }
@@ -554,7 +554,7 @@ LIMIT ${params.limit ?? DEFAULT_LIMIT}`
     return await runQueryToCFA<StatRowCF>(c, query)
   }
   catch (e) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Error reading stats list', error: JSON.stringify(e), query })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error reading stats list', error: serializeError(e), query })
   }
   return [] as StatRowCF[]
 }
@@ -576,7 +576,7 @@ export async function getAppsFromCF(c: Context): Promise<{ app_id: string }[]> {
     return res.results as { app_id: string }[]
   }
   catch (e) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Error reading app list', error: JSON.stringify(e), query })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error reading app list', error: serializeError(e), query })
   }
   return []
 }
@@ -596,7 +596,7 @@ export async function countUpdatesFromStoreAppsCF(c: Context): Promise<number> {
     return res
   }
   catch (e) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Error counting updates from store apps', error: JSON.stringify(e) })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error counting updates from store apps', error: serializeError(e) })
   }
   return 0
 }
@@ -611,7 +611,7 @@ export async function countUpdatesFromLogsCF(c: Context): Promise<number> {
     return readAnalytics[0].count
   }
   catch (e) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Error counting updates from logs', error: JSON.stringify(e) })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error counting updates from logs', error: serializeError(e) })
   }
   return 0
 }
@@ -626,7 +626,7 @@ export async function countUpdatesFromLogsExternalCF(c: Context): Promise<number
     return readAnalytics[0].count
   }
   catch (e) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Error counting updates from external logs', error: JSON.stringify(e) })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error counting updates from external logs', error: serializeError(e) })
   }
   return 0
 }
@@ -643,7 +643,7 @@ export async function readActiveAppsCF(c: Context) {
     return unique
   }
   catch (e) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Error counting active apps', error: JSON.stringify(e) })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error counting active apps', error: serializeError(e) })
   }
   return []
 }
@@ -658,7 +658,7 @@ export async function readLastMonthUpdatesCF(c: Context) {
     return response[0].count ?? 0
   }
   catch (e) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Error reading last month updates', error: JSON.stringify(e) })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error reading last month updates', error: serializeError(e) })
   }
   return 0
 }
@@ -674,7 +674,7 @@ export async function readLastMonthDevicesCF(c: Context): Promise<number> {
     return res[0].total
   }
   catch (e) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Error reading last month devices', error: JSON.stringify(e) })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error reading last month devices', error: serializeError(e) })
   }
   return 0
 }
@@ -693,7 +693,7 @@ export async function getAppsToProcessCF(c: Context, flag: 'to_get_framework' | 
     return res.results as StoreApp[]
   }
   catch (e) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Error getting apps to process', error: JSON.stringify(e) })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error getting apps to process', error: serializeError(e) })
   }
   return [] as StoreApp[]
 }
@@ -738,7 +738,7 @@ export async function getTopAppsCF(c: Context, mode: string, limit: number): Pro
     return res.results as StoreApp[]
   }
   catch (e) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Error getting top apps', error: JSON.stringify(e) })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error getting top apps', error: serializeError(e) })
   }
   return [] as StoreApp[]
 }
@@ -775,7 +775,7 @@ export async function getTotalAppsByModeCF(c: Context, mode: string) {
     return res
   }
   catch (e) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Error getting total apps by mode', error: JSON.stringify(e) })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error getting total apps by mode', error: serializeError(e) })
   }
   return 0
 }
@@ -794,7 +794,7 @@ export async function getStoreAppByIdCF(c: Context, appId: string): Promise<Stor
     return res
   }
   catch (e) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Error getting store app by id', error: JSON.stringify(e) })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error getting store app by id', error: serializeError(e) })
   }
   return {} as StoreApp
 }
@@ -828,7 +828,7 @@ export async function createIfNotExistStoreInfo(c: Context, app: Partial<StoreAp
     }
   }
   catch (e) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Error creating store info', error: JSON.stringify(e) })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error creating store info', error: serializeError(e) })
   }
 
   return Promise.resolve()
@@ -854,7 +854,7 @@ export async function saveStoreInfoCF(c: Context, app: Partial<StoreApp>) {
     cloudlog({ requestId: c.get('requestId'), message: 'saveStoreInfoCF result', res })
   }
   catch (e) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Error saving store info', error: JSON.stringify(e) })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error saving store info', error: serializeError(e) })
   }
 
   return Promise.resolve()
@@ -889,7 +889,7 @@ export async function updateStoreApp(c: Context, appId: string, updates: number)
     cloudlog({ requestId: c.get('requestId'), message: 'updateStoreApp result', res })
   }
   catch (e) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Error updating StoreApp', error: JSON.stringify(e) })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error updating StoreApp', error: serializeError(e) })
   }
 
   return Promise.resolve()
@@ -964,7 +964,7 @@ export async function getUpdateStatsCF(c: Context): Promise<UpdateStats> {
     }
   }
   catch (e) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Error getting update stats', error: JSON.stringify(e) })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error getting update stats', error: serializeError(e) })
     return {
       apps: [],
       total: {

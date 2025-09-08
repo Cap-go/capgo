@@ -2,13 +2,13 @@ import type { Context } from 'hono'
 import type { SimpleErrorResponse } from './hono.ts'
 import { HTTPException } from 'hono/http-exception'
 import { sendDiscordAlert500 } from './discord.ts'
-import { cloudlogErr } from './loggin.ts'
+import { cloudlogErr, serializeError } from './loggin.ts'
 import { backgroundTask } from './utils.ts'
 
 export function onError(functionName: string) {
   return async (e: any, c: Context) => {
     c.get('sentry')?.captureException(e)
-    cloudlogErr({ requestId: c.get('requestId'), functionName, message: e?.message ?? 'app onError', error: JSON.stringify(e) })
+    cloudlogErr({ requestId: c.get('requestId'), functionName, message: e?.message ?? 'app onError', error: serializeError(e) })
 
     let body = 'N/A'
     try {
