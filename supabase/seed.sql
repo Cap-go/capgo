@@ -725,6 +725,44 @@ BEGIN
     END IF;
 END $$;
 
+-- Helper: central logging function to the PostgreSQL logs
+CREATE OR REPLACE FUNCTION public.pg_debug (event text, details jsonb DEFAULT '{}'::jsonb) RETURNS void LANGUAGE plpgsql SECURITY DEFINER
+SET
+  search_path = '' AS $$
+DECLARE
+  uid uuid;
+  req_id text;
+  role text;
+  jwt_claims text;
+BEGIN
+  uid := auth.uid();
+  req_id := current_setting('request.header.x-request-id', true);
+  role := current_setting('request.jwt.claim.role', true);
+  jwt_claims := current_setting('request.jwt.claims', true);
+
+  -- Trim overly large payloads to avoid noisy logs
+  IF length(coalesce(details::text, '{}')) > 2000 THEN
+    details := jsonb_build_object('truncated', true);
+  END IF;
+
+  RAISE LOG 'RLS DEBUG: %, uid=%, role=%, req_id=%, details=%'
+    , event
+    , uid
+    , coalesce(role, 'null')
+    , coalesce(req_id, 'null')
+    , coalesce(details::text, '{}');
+EXCEPTION WHEN OTHERS THEN
+  -- Never let logging break execution paths
+  NULL;
+END;
+$$;
+
+ALTER FUNCTION public.pg_debug (text, jsonb) OWNER TO postgres;
+
+REVOKE ALL ON FUNCTION public.pg_debug (text, jsonb)
+FROM
+  PUBLIC;
+
 -- Seed data
 DO $$
 BEGIN
