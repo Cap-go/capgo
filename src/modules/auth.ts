@@ -67,6 +67,22 @@ async function guard(next: NavigationGuardNext, to: RouteLocationNormalized, fro
 
   if (auth.user && !main.auth) {
     main.auth = auth.user
+
+    // Check if account is disabled (marked for deletion)
+    try {
+      const { data: isDisabled, error: disabledError } = await supabase
+        .rpc('is_account_disabled', { user_id: auth.user.id })
+
+      if (disabledError) {
+        console.error('Error checking account status:', disabledError)
+      } else if (isDisabled) {
+        // Account is disabled, redirect to account disabled page
+        return next('/accountDisabled')
+      }
+    } catch (error) {
+      console.error('Error checking if account is disabled:', error)
+    }
+
     if (!main.user) {
       await updateUser(main, supabase, next)
     }
@@ -98,6 +114,27 @@ async function guard(next: NavigationGuardNext, to: RouteLocationNormalized, fro
   else if (from.path !== 'login' && !auth.user) {
     main.auth = undefined
     next(`/login?to=${to.path}`)
+  }
+  else if (auth.user && main.auth) {
+    // User is already authenticated, but check if account got disabled
+    // (only if not already on account disabled page)
+    if (to.path !== '/accountDisabled') {
+      try {
+        const { data: isDisabled, error: disabledError } = await supabase
+          .rpc('is_account_disabled', { user_id: auth.user.id })
+
+        if (disabledError) {
+          console.error('Error checking account status:', disabledError)
+        } else if (isDisabled) {
+          // Account is disabled, redirect to account disabled page
+          return next('/accountDisabled')
+        }
+      } catch (error) {
+        console.error('Error checking if account is disabled:', error)
+      }
+    }
+    hideLoader()
+    next()
   }
   else {
     hideLoader()
