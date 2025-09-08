@@ -27,7 +27,6 @@ export async function post(c: Context, bodyRaw: any, apikey: Database['public'][
     .insert(newOrg)
 
   if (errorOrg) {
-    console.log('errorOrg', errorOrg, newOrg)
     throw simpleError('cannot_create_org', 'Cannot create org', { error: errorOrg?.message })
   }
   // We read with admin to avoid RLS issues as org_users are created asynchronously
@@ -38,7 +37,6 @@ export async function post(c: Context, bodyRaw: any, apikey: Database['public'][
     .eq('name', body.name)
     .single()
   if (errorOrg2 || !dataOrg) {
-    console.log('errorOrg2', errorOrg2, newOrg)
     throw simpleError('cannot_get_org', 'Cannot get created org', { error: errorOrg2?.message })
   }
   return c.json({ status: 'Organization created', id: dataOrg.id }, 200)
