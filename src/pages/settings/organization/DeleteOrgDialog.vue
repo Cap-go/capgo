@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { Organization } from '~/stores/organization'
-import { useI18n } from 'petite-vue-i18n'
 import { defineExpose, defineProps, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useOrganizationStore } from '~/stores/organization'

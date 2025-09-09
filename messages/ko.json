@@ -17,7 +17,7 @@
   "account-deleted-successfully": "계정이 성공적으로 삭제되었습니다.",
   "account-deletion-final-warning": "이 조치는 취소 할 수 없습니다. \n귀하의 계정 및 모든 관련 데이터는 영구적으로 삭제됩니다.",
   "account-deletion-requested": "귀하는 귀하의 계정을 삭제하도록 요청했습니다",
-  "account-deletion-restore": "<a href = 'https : //support.capgo.app/'target = '_ blank'class = 'text-blue-500 밑줄 호버 : Text-Blue-600'> Capgo Support </a> 연락하십시오.",
+  "account-deletion-restore": "{link}에 연락하십시오.",
   "account-deletion-timer": "귀하의 계정은 존재하지 않습니다",
   "account-deletion-timer-in": "귀하의 계정은 존재하지 않습니다",
   "account-deletion-very-soon": "곧",

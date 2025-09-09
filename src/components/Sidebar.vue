@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import type { Tab } from './comp_def'
 import { onClickOutside } from '@vueuse/core'
-import { useI18n } from 'petite-vue-i18n'
 import { ref, shallowRef } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
 import IconDoc from '~icons/gg/loadbar-doc'

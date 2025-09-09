@@ -9,9 +9,9 @@ import {
   PointElement,
   Tooltip,
 } from 'chart.js'
-import { useI18n } from 'petite-vue-i18n'
 import { computed, ref } from 'vue'
 import { Line } from 'vue-chartjs'
+import { useI18n } from 'vue-i18n'
 import { getCurrentDayMonth, getDaysInCurrentMonth } from '~/services/date'
 import { inlineAnnotationPlugin } from '../services/chartAnnotations'
 

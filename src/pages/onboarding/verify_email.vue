@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { User } from '@supabase/supabase-js'
-import { useI18n } from 'petite-vue-i18n'
 import { ref, watchEffect } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { autoAuth, useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'

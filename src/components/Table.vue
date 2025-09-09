@@ -3,8 +3,8 @@ import type { TableColumn } from './comp_def'
 import { FormKit } from '@formkit/vue'
 import { useDebounceFn } from '@vueuse/core'
 import DOMPurify from 'dompurify'
-import { useI18n } from 'petite-vue-i18n'
 import { computed, defineComponent, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import IconTrash from '~icons/heroicons/trash'
 import IconDown from '~icons/ic/round-keyboard-arrow-down'
 import IconPrev from '~icons/ic/round-keyboard-arrow-left'
@@ -121,6 +121,10 @@ function updateUrlParams() {
   const paramsString = params.toString() ? `?${params.toString()}` : ''
   window.history.pushState({}, '', `${window.location.pathname}${paramsString}`)
 }
+
+const isSelectAllEnabled = computed(() => {
+  return props.massSelect && selectedRows.value.find(val => val)
+})
 
 function loadFromUrlParams() {
   const params = new URLSearchParams(window.location.search)
@@ -347,10 +351,10 @@ const RenderCell = defineComponent<{ renderer?: (item: any) => any, item: any }>
           </ul>
         </div>
       </div>
-      <button v-if="props.massSelect && selectedRows.find(val => val)" class="inline-flex items-center self-end px-3 py-2 ml-auto mr-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-lg dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-hidden focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 cursor-pointer" type="button" @click="selectedRows = selectedRows.map(() => true); emit('selectRow', selectedRows)">
+      <button v-if="pisSelectAllEnabled" class="inline-flex items-center self-end px-3 py-2 ml-auto mr-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-lg dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-hidden focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 cursor-pointer" type="button" @click="selectedRows = selectedRows.map(() => true); emit('selectRow', selectedRows)">
         <span class="text-sm">{{ t('select_all') }}</span>
       </button>
-      <button v-if="props.massSelect && selectedRows.find(val => val)" class=" self-end mr-2 inline-flex items-center border border-gray-300 rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-hidden focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 cursor-pointer" type="button" @click="emit('massDelete')">
+      <button v-if="isSelectAllEnabled" class=" self-end mr-2 inline-flex items-center border border-gray-300 rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-hidden focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 cursor-pointer" type="button" @click="emit('massDelete')">
         <IconTrash class="text-red-500 h-[24px]" />
       </button>
       <div class="flex md:w-auto overflow-hidden">

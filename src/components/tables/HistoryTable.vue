@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import type { TableColumn, TableSort } from '~/components/comp_def'
 
-import { useI18n } from 'petite-vue-i18n'
 import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import { appIdToUrl } from '~/services/conversion'
 import { formatDate } from '~/services/date'

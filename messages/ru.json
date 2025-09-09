@@ -17,7 +17,7 @@
   "account-deleted-successfully": "Учетная запись успешно удалена",
   "account-deletion-final-warning": "Это действие не может быть отменено. \nВаша учетная запись и все связанные данные будут навсегда удалены.",
   "account-deletion-requested": "Вы попросили удалить свою учетную запись",
-  "account-deletion-restore": "Пожалуйста, свяжитесь с <a href = 'https://support.capgo.app/' target='_blank' class='text-blue-500 hover: text-blue-600'> поддержка Capgo </a> Если вы хотите его восстановить",
+  "account-deletion-restore": "Пожалуйста, свяжитесь с {link}, если вы хотите его восстановить",
   "account-deletion-timer": "Ваша учетная запись перестанет существовать",
   "account-deletion-timer-in": "Ваша учетная запись перестанет существовать в",
   "account-deletion-very-soon": "Очень скоро",

@@ -17,7 +17,7 @@
   "account-deleted-successfully": "Account deleted successfully",
   "account-deletion-final-warning": "This action cannot be undone. Your account and all associated data will be permanently deleted.",
   "account-deletion-requested": "You have requested your account to be deleted",
-  "account-deletion-restore": "Please contact <a href='https://support.capgo.app/' target='_blank' class='text-blue-500 underline hover:text-blue-600'>Capgo support</a> if you would like to restore it",
+  "account-deletion-restore": "Please contact {link} if you would like to restore it",
   "account-deletion-timer": "Your account will cease to exist",
   "account-deletion-timer-in": "Your account will cease to exist in",
   "account-deletion-very-soon": "Very soon",

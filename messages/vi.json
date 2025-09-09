@@ -17,7 +17,7 @@
   "account-deleted-successfully": "Đã xóa tài khoản thành công",
   "account-deletion-final-warning": "Hành động này không thể được hoàn tác. \nTài khoản của bạn và tất cả dữ liệu liên quan sẽ bị xóa vĩnh viễn.",
   "account-deletion-requested": "Bạn đã yêu cầu tài khoản của bạn bị xóa",
-  "account-deletion-restore": "Vui lòng liên hệ <a href = 'https://support.capgo.app/' target='_blank' class='text-blue-500 hover: text-blue-600'> Hỗ trợ capgo </a> Nếu bạn muốn khôi phục nó",
+  "account-deletion-restore": "Vui lòng liên hệ {link} nếu bạn muốn khôi phục nó",
   "account-deletion-timer": "Tài khoản của bạn sẽ không còn tồn tại",
   "account-deletion-timer-in": "Tài khoản của bạn sẽ không còn tồn tại trong",
   "account-deletion-very-soon": "Rất sớm",

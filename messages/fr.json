@@ -17,7 +17,7 @@
   "account-deleted-successfully": "Compte supprimé avec succès",
   "account-deletion-final-warning": "Cette action ne peut pas être annulée. \nVotre compte et toutes les données associées seront supprimées en permanence.",
   "account-deletion-requested": "Vous avez demandé à votre compte d'être supprimé",
-  "account-deletion-restore": "Veuillez contacter <a href='https://support.capgo.app/' target='_blank' class='text-blue-500 underline hover:text-blue-600'>Capgo Support</a> si vous souhaitez le restaurer",
+  "account-deletion-restore": "Veuillez contacter {link} si vous souhaitez le restaurer",
   "account-deletion-timer": "Votre compte cessera d'exister",
   "account-deletion-timer-in": "Votre compte cessera d'exister",
   "account-deletion-very-soon": "Très vite",

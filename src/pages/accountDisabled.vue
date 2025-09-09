@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { useI18n } from 'petite-vue-i18n'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useSupabase } from '~/services/supabase'
 import { useMainStore } from '~/stores/main'
@@ -21,28 +21,7 @@ const loading = ref(true)
 const error = ref<string | null>(null)
 let intervalId: NodeJS.Timeout | null = null
 
-// Extracts safe parts from a translated HTML string with a single anchor
-const restoreParts = computed(() => {
-  const html = t('account-deletion-restore') as unknown as string
-  const m = html.match(/([\s\S]*?)<a [^>]*>([\s\S]*?)<\/a>([\s\S]*)/i)
-  const hrefMatch = html.match(/href=['"]([^'"]+)['"]/i)
-  const href = hrefMatch?.[1] || 'https://support.capgo.app/'
-  const stripTags = (s: string) => s.replace(/<[^>]*>/g, '')
-  if (m) {
-    return {
-      before: stripTags(m[1]).trim(),
-      linkText: stripTags(m[2]).trim(),
-      after: stripTags(m[3]).trim(),
-      href,
-    }
-  }
-  return {
-    before: stripTags(html).trim(),
-    linkText: '',
-    after: '',
-    href,
-  }
-})
+// Use i18n component interpolation in the template; no HTML parsing here
 
 // Fetch removal date and start timer
 onMounted(async () => {
@@ -133,11 +112,16 @@ const timeRemaining = computed(() => {
         <h1 class="text-4xl font-bold text-gray-900 dark:text-white mb-6">
           {{ t('account-deletion-requested') }}
         </h1>
-        <p class="text-lg text-gray-600 dark:text-gray-300 mb-4">
-          {{ restoreParts.before }}
-          <a :href="restoreParts.href" target="_blank" rel="noopener noreferrer" class="text-blue-500 underline hover:text-blue-600">{{ restoreParts.linkText }}</a>
-          {{ restoreParts.after }}
-        </p>
+        <i18n-t keypath="account-deletion-restore" tag="p" class="text-lg text-gray-600 dark:text-gray-300 mb-4">
+          <template #link>
+            <a
+              href="https://support.capgo.app/"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="text-blue-500 underline hover:text-blue-600"
+            >Capgo support</a>
+          </template>
+        </i18n-t>
         <div class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 mt-6">
           <p class="text-red-800 dark:text-red-200 font-medium">
             {{ timeRemaining === t('account-deletion-very-soon') ? t('account-deletion-timer') : t('account-deletion-timer-in') }}

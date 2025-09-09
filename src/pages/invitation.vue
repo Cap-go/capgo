@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { Database } from '~/types/supabase.types'
-import { useI18n } from 'petite-vue-i18n'
 import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import VueTurnstile from 'vue-turnstile'
 import Toggle from '~/components/Toggle.vue'
 import { useSupabase } from '~/services/supabase'

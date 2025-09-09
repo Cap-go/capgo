@@ -17,7 +17,7 @@
   "account-deleted-successfully": "账户删除成功",
   "account-deletion-final-warning": "该动作不能撤消。\n您的帐户和所有相关数据将被永久删除。",
   "account-deletion-requested": "您已要求删除您的帐户",
-  "account-deletion-restore": "请联系<a href ='https：//support.capgo.app/'target ='_ blank'class'class ='text-blue-500下划线悬停：text-blue-600'> capgo支持</a>如果您想还原它",
+  "account-deletion-restore": "如果您想恢复，请联系 {link}",
   "account-deletion-timer": "您的帐户将不复存在",
   "account-deletion-timer-in": "您的帐户将不复存在",
   "account-deletion-very-soon": "很快",

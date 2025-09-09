@@ -17,7 +17,7 @@
   "account-deleted-successfully": "アカウントは正常に削除されました",
   "account-deletion-final-warning": "このアクションを元に戻すことはできません。\nアカウントと関連するすべてのデータは永久に削除されます。",
   "account-deletion-requested": "アカウントの削除を要求しました",
-  "account-deletion-restore": "<a href = 'https：//support.capgo.app/'ターゲット= '_ blank' class = 'text-blue-500 underline hover：text-blue-600'> capgoサポート</a>お問い合わせください",
+  "account-deletion-restore": "{link} にお問い合わせください",
   "account-deletion-timer": "あなたのアカウントは存在しなくなります",
   "account-deletion-timer-in": "あなたのアカウントは存在しなくなります",
   "account-deletion-very-soon": "すぐに",
