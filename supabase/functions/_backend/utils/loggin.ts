@@ -13,6 +13,19 @@ export function cloudlog(message: any) {
     console.log(message)
   }
 }
+
+export function serializeError(err: unknown) {
+  if (err instanceof Error) {
+    return { name: err.name, message: err.message, stack: err.stack, cause: err.cause ? String(err.cause) : undefined }
+  }
+  try {
+    return JSON.stringify(err, (_k, v) => (typeof v === 'bigint' ? v.toString() : v))
+  }
+  catch {
+    return String(err)
+  }
+}
+
 export function cloudlogErr(message: any) {
   if (getRuntimeKey() === 'workerd') {
     console.error(message)

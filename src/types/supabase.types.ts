@@ -754,6 +754,7 @@ export type Database = {
           paying_monthly: number | null
           paying_yearly: number | null
           stars: number
+          success_rate: number | null
           trial: number | null
           updates: number
           updates_external: number | null
@@ -774,6 +775,7 @@ export type Database = {
           paying_monthly?: number | null
           paying_yearly?: number | null
           stars: number
+          success_rate?: number | null
           trial?: number | null
           updates: number
           updates_external?: number | null
@@ -794,6 +796,7 @@ export type Database = {
           paying_monthly?: number | null
           paying_yearly?: number | null
           stars?: number
+          success_rate?: number | null
           trial?: number | null
           updates?: number
           updates_external?: number | null
@@ -1440,6 +1443,13 @@ export type Database = {
           count: number
         }[]
       }
+      delete_accounts_marked_for_deletion: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          deleted_count: number
+          deleted_user_ids: string[]
+        }[]
+      }
       delete_http_response: {
         Args: { request_id: number }
         Returns: undefined
@@ -1555,7 +1565,9 @@ export type Database = {
         }[]
       }
       get_identity: {
-        Args: Record<PropertyKey, never>
+        Args:
+          | Record<PropertyKey, never>
+          | { keymode: Database["public"]["Enums"]["key_mode"][] }
         Returns: string
       }
       get_identity_apikey_only: {
@@ -1898,6 +1910,10 @@ export type Database = {
       parse_step_pattern: {
         Args: { pattern: string }
         Returns: number
+      }
+      pg_log: {
+        Args: { decision: string; input?: Json }
+        Returns: undefined
       }
       process_admin_stats: {
         Args: Record<PropertyKey, never>
