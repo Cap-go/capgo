@@ -70,40 +70,39 @@ $$;
 
 
 CREATE OR REPLACE FUNCTION "public"."delete_user" () RETURNS "void" LANGUAGE "plpgsql"
-SET
-  search_path = '' SECURITY DEFINER AS $$
+SECURITY DEFINER AS $$
 DECLARE
   user_id_fn uuid;
   user_email text;
 BEGIN
   -- Get the current user ID and email
-  SELECT auth.uid() INTO user_id_fn;
-  SELECT email INTO user_email FROM auth.users WHERE id = user_id_fn;
+  SELECT "auth"."uid"() INTO user_id_fn;
+  SELECT "email" INTO user_email FROM "auth"."users" WHERE "id" = user_id_fn;
   
   -- Trigger the queue-based deletion process
   -- This cancels the subscriptions of the user's organizations
-  PERFORM pgmq.send(
+  PERFORM "pgmq"."send"(
     'on_user_delete'::text,
-    jsonb_build_object(
+    "jsonb_build_object"(
       'user_id', user_id_fn,
       'email', user_email
     )
   );
   
   -- Mark the user for deletion
-  INSERT INTO public.to_delete_accounts (
-    account_id, 
-    removal_date, 
-    removed_data
+  INSERT INTO "public"."to_delete_accounts" (
+    "account_id", 
+    "removal_date", 
+    "removed_data"
   ) VALUES 
   (
     user_id_fn, 
     NOW() + INTERVAL '30 days', 
-    jsonb_build_object('email', user_email, 'apikeys', (SELECT jsonb_agg(to_jsonb(a.*)) FROM public.apikeys a WHERE a.user_id = user_id_fn))
+    "jsonb_build_object"('email', user_email, 'apikeys', (SELECT "jsonb_agg"("to_jsonb"(a.*)) FROM "public"."apikeys" a WHERE a."user_id" = user_id_fn))
   );
 
   -- Delete the API keys
-  DELETE FROM public.apikeys WHERE public.apikeys.user_id = user_id_fn;
+  DELETE FROM "public"."apikeys" WHERE "public"."apikeys"."user_id" = user_id_fn;
 END;
 $$;
 
@@ -114,7 +113,6 @@ CREATE OR REPLACE FUNCTION "public"."delete_accounts_marked_for_deletion" ()
 RETURNS TABLE(deleted_count INTEGER, deleted_user_ids UUID[])
 LANGUAGE "plpgsql"
 SECURITY DEFINER
-SET search_path = public, auth
 AS $$
 DECLARE
   account_record RECORD;
@@ -123,22 +121,22 @@ DECLARE
 BEGIN
   -- Loop through all accounts marked for deletion where removal_date has passed
   FOR account_record IN 
-    SELECT account_id, removal_date, removed_data
-    FROM public.to_delete_accounts 
-    WHERE removal_date < NOW()
+    SELECT "account_id", "removal_date", "removed_data"
+    FROM "public"."to_delete_accounts" 
+    WHERE "removal_date" < NOW()
   LOOP
     BEGIN
       -- A: Delete from public.users table
-      DELETE FROM public.users WHERE id = account_record.account_id;
+      DELETE FROM "public"."users" WHERE "id" = account_record.account_id;
       
       -- B: Delete from auth.users table
-      DELETE FROM auth.users WHERE id = account_record.account_id;
+      DELETE FROM "auth"."users" WHERE "id" = account_record.account_id;
       
       -- C: Remove from to_delete_accounts table
-      DELETE FROM public.to_delete_accounts WHERE account_id = account_record.account_id;
+      DELETE FROM "public"."to_delete_accounts" WHERE "account_id" = account_record.account_id;
       
       -- Track the deleted user
-      deleted_users := array_append(deleted_users, account_record.account_id);
+      deleted_users := "array_append"(deleted_users, account_record.account_id);
       total_deleted := total_deleted + 1;
       
       -- Log the deletion (optional)
@@ -168,10 +166,10 @@ REVOKE ALL ON FUNCTION public.delete_accounts_marked_for_deletion() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.delete_accounts_marked_for_deletion() TO postgres;
 GRANT EXECUTE ON FUNCTION public.delete_accounts_marked_for_deletion() TO service_role;
 
--- Create a cron job to run the account deletion function every minute
--- This will process and permanently delete accounts that have passed their removal_date
-SELECT cron.schedule(
-  'delete-expired-accounts',           -- job name
-  '* * * * *',                        -- cron expression (every minute)
-  'SELECT public.delete_accounts_marked_for_deletion();'  -- SQL command
-);
+  -- Create a cron job to run the account deletion function every minute
+  -- This will process and permanently delete accounts that have passed their removal_date
+  SELECT "cron"."schedule"(
+    'delete-expired-accounts',           -- job name
+    '* * * * *',                        -- cron expression (every minute)
+    'SELECT "public"."delete_accounts_marked_for_deletion"();'  -- SQL command
+  );
