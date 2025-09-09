@@ -83,7 +83,7 @@ export async function post(c: Context, body: ChannelSet, apikey: Database['publi
 
     const channelId = channelData.id
 
-    if (body.public) {
+    if (body.public === true) {
       if (channel.ios) {
         const { error: dbError } = await supabaseApikey(c, apikey.key).from('apps').update({
           default_channel_ios: channelId,
@@ -106,7 +106,7 @@ export async function post(c: Context, body: ChannelSet, apikey: Database['publi
         return c.json({ status: 'error', error: 'Cannot mark channel as public, as it\'s not marked as either Android or iOS' }, 400)
       }
     }
-    else {
+    else if (body.public === false) {
       const { data: appData, error: appError } = await supabaseApikey(c, apikey.key).from('apps').select('default_channel_android, default_channel_ios').eq('app_id', body.app_id).single()
       if (appError) {
         cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot get app', error: appError })
