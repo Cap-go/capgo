@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { CapacitorUpdater, type DownloadEvent } from '@capgo/capacitor-updater'
+import type { DownloadEvent } from '@capgo/capacitor-updater'
+import { CapacitorUpdater } from '@capgo/capacitor-updater'
 import { CameraView } from 'capacitor-camera-view'
 import { onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
