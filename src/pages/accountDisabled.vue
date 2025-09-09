@@ -25,7 +25,7 @@ let intervalId: NodeJS.Timeout | null = null
 const restoreParts = computed(() => {
   const html = t('account-deletion-restore') as unknown as string
   const m = html.match(/([\s\S]*?)<a [^>]*>([\s\S]*?)<\/a>([\s\S]*)/i)
-  const hrefMatch = html.match(/href=['\"]([^'\"]+)['\"]/i)
+  const hrefMatch = html.match(/href=['"]([^'"]+)['"]/i)
   const href = hrefMatch?.[1] || 'https://support.capgo.app/'
   const stripTags = (s: string) => s.replace(/<[^>]*>/g, '')
   if (m) {
