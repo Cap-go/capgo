@@ -353,13 +353,15 @@ async function setDefaultUpdateChannel(type: 'android' | 'ios' | 'both') {
         // Check if channel supports the required platform(s)
         const needsIosSupport = (type === 'ios' || type === 'both') && !chann.ios
         const needsAndroidSupport = (type === 'android' || type === 'both') && !chann.android
-        
+
         if (needsIosSupport || needsAndroidSupport) {
           // Show confirmation dialog for enabling platform support
           const platformNames = []
-          if (needsIosSupport) platformNames.push('iOS')
-          if (needsAndroidSupport) platformNames.push('Android')
-          
+          if (needsIosSupport)
+            platformNames.push('iOS')
+          if (needsAndroidSupport)
+            platformNames.push('Android')
+
           dialogStore.openDialog({
             title: t('enable-platform-support'),
             description: t('enable-platform-support-message')
@@ -380,7 +382,8 @@ async function setDefaultUpdateChannel(type: 'android' | 'ios' | 'both') {
               },
             ],
           })
-        } else {
+        }
+        else {
           // Channel already supports the required platform(s)
           await handleChannelSelection(chann, type)
         }
@@ -709,37 +712,41 @@ async function handleNormalUnset(type: 'android' | 'ios' | 'both') {
 }
 
 async function handleChannelSelectionWithPlatformEnable(chann: any, type: 'android' | 'ios' | 'both', needsIosSupport: boolean, needsAndroidSupport: boolean) {
-  if (!appRef.value) return
-  
+  if (!appRef.value)
+    return
+
   try {
     // First, enable platform support on the channel
     const channelUpdate: any = {}
-    if (needsIosSupport) channelUpdate.ios = true
-    if (needsAndroidSupport) channelUpdate.android = true
-    
+    if (needsIosSupport)
+      channelUpdate.ios = true
+    if (needsAndroidSupport)
+      channelUpdate.android = true
+
     const { error: channelError } = await supabase
       .from('channels')
       .update(channelUpdate)
       .eq('id', chann.id)
-    
+
     if (channelError) {
       toast.error(t('cannot-change-update-channel'))
       console.error('Channel platform enable error:', channelError)
       return
     }
-    
+
     // Then set as default channel
     await handleChannelSelection(chann, type)
-    
-  } catch (error) {
+  }
+  catch (error) {
     console.error('Error in handleChannelSelectionWithPlatformEnable:', error)
     toast.error(t('cannot-change-update-channel'))
   }
 }
 
 async function handleChannelSelection(chann: any, type: 'android' | 'ios' | 'both') {
-  if (!appRef.value) return
-  
+  if (!appRef.value)
+    return
+
   try {
     let appError: any
     if (type !== 'both') {
@@ -760,7 +767,7 @@ async function handleChannelSelection(chann: any, type: 'android' | 'ios' | 'bot
       console.error('App update error:', appError)
       return
     }
-    
+
     if (appRef.value && type !== 'both') {
       appRef.value[`default_channel_${type}`] = {
         id: chann.id,
@@ -780,8 +787,8 @@ async function handleChannelSelection(chann: any, type: 'android' | 'ios' | 'bot
       forceBump.value += 1
     }
     toast.success(t('updated-default-update-channel'))
-    
-  } catch (error) {
+  }
+  catch (error) {
     console.error('Error in handleChannelSelection:', error)
     toast.error(t('cannot-change-update-channel'))
   }
