@@ -151,7 +151,7 @@ export async function updateOrCreateChannel(c: Context, update: Database['public
     .single()
 
   if (error) {
-    console.error({ requestId: c.get('requestId'), context: 'Error upserting channel', error })
+    cloudlogErr({ requestId: c.get('requestId'), context: 'Error upserting channel', error })
     return Promise.reject(new Error(error.message))
   }
 

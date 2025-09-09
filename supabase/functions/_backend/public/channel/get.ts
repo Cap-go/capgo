@@ -1,7 +1,8 @@
 import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { simpleError } from '../../utils/hono.ts'
-import { hasAppRightApikey, supabaseApikey } from '../../utils/supabase.ts'
+import { cloudlogErr } from '../../utils/loggin.ts'
+import { hasAppRightApikey, supabaseApikey, supabaseAdmin } from '../../utils/supabase.ts'
 import { fetchLimit } from '../../utils/utils.ts'
 
 interface GetDevice {
@@ -99,7 +100,7 @@ export async function get(c: Context, body: GetDevice, apikey: Database['public'
     .eq('app_id', body.app_id)
     .single()
   if (dbError || !dataApp) {
-    console.log('Cannot find app', dbError)
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot find app', error: dbError })
     return c.json({ status: 'Cannot find app', error: JSON.stringify(dbError) }, 400)
   }
 

@@ -63,7 +63,7 @@ export async function post(c: Context, body: ChannelSet, apikey: Database['publi
 
     const rawUpdateInfo = await updateOrCreateChannel(c, channel)
     if (rawUpdateInfo.error) {
-      console.log('Cannot create channel', rawUpdateInfo.error)
+      cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot create channel', error: rawUpdateInfo.error })
       return c.json({ status: 'Cannot create channel', error: JSON.stringify(rawUpdateInfo.error) }, 400)
     }
 
@@ -77,7 +77,7 @@ export async function post(c: Context, body: ChannelSet, apikey: Database['publi
       .single()
 
     if (channelError || !channelData) {
-      console.log('Cannot find created channel', channelError)
+      cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot find created channel', error: channelError })
       return c.json({ status: 'Cannot find created channel', error: JSON.stringify(channelError) }, 400)
     }
 
@@ -89,7 +89,7 @@ export async function post(c: Context, body: ChannelSet, apikey: Database['publi
           default_channel_ios: channelId,
         }).eq('app_id', body.app_id)
         if (dbError) {
-          console.log('Cannot update default channel', dbError)
+          cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot update default channel (iOS)', error: dbError })
           return c.json({ status: 'Cannot update default channel', error: JSON.stringify(dbError) }, 400)
         }
       }
@@ -98,7 +98,7 @@ export async function post(c: Context, body: ChannelSet, apikey: Database['publi
           default_channel_android: channelId,
         }).eq('app_id', body.app_id)
         if (dbError) {
-          console.log('Cannot update default channel', dbError)
+          cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot update default channel (Android)', error: dbError })
           return c.json({ status: 'Cannot update default channel', error: JSON.stringify(dbError) }, 400)
         }
       }
@@ -109,7 +109,7 @@ export async function post(c: Context, body: ChannelSet, apikey: Database['publi
     else {
       const { data: appData, error: appError } = await supabaseApikey(c, apikey.key).from('apps').select('default_channel_android, default_channel_ios').eq('app_id', body.app_id).single()
       if (appError) {
-        console.log('Cannot get app', appError)
+        cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot get app', error: appError })
         return c.json({ status: 'Cannot get app', error: JSON.stringify(appError) }, 400)
       }
       if (appData.default_channel_android === channelId) {
@@ -117,7 +117,7 @@ export async function post(c: Context, body: ChannelSet, apikey: Database['publi
           default_channel_android: null,
         }).eq('app_id', body.app_id)
         if (dbError) {
-          console.log('Cannot update default channel', dbError)
+          cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot update default channel (remove Android)', error: dbError })
           return c.json({ status: 'Cannot update default channel', error: JSON.stringify(dbError) }, 400)
         }
       }
@@ -126,7 +126,7 @@ export async function post(c: Context, body: ChannelSet, apikey: Database['publi
           default_channel_ios: null,
         }).eq('app_id', body.app_id)
         if (dbError) {
-          console.log('Cannot update default channel', dbError)
+          cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot update default channel (remove iOS)', error: dbError })
           return c.json({ status: 'Cannot update default channel', error: JSON.stringify(dbError) }, 400)
         }
       }
@@ -134,7 +134,7 @@ export async function post(c: Context, body: ChannelSet, apikey: Database['publi
     return c.json(BRES)
   }
   catch (e) {
-    console.log('Cannot create channel', e)
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot create channel', error: e })
     return c.json({ status: 'Cannot create channel', error: JSON.stringify(e) }, 500)
   }
 }
