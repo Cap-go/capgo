@@ -17,7 +17,7 @@
   "account-deleted-successfully": "Akun berhasil dihapus",
   "account-deletion-final-warning": "Tindakan ini tidak bisa dibatalkan. \nAkun Anda dan semua data terkait akan dihapus secara permanen.",
   "account-deletion-requested": "Anda telah meminta akun Anda untuk dihapus",
-  "account-deletion-restore": "Silakan hubungi <a href = 'https: //support.capgo.app/' target = '_ blank' class = 'text-blue-500 hover: text-blue-600'> dukungan capgo </a> Jika Anda ingin mengembalikannya",
+  "account-deletion-restore": "Silakan hubungi <a href = 'https://support.capgo.app/' target='_blank' class='text-blue-500 hover: text-blue-600'> dukungan capgo </a> Jika Anda ingin mengembalikannya",
   "account-deletion-timer": "Akun Anda akan berhenti ada",
   "account-deletion-timer-in": "Akun Anda akan berhenti ada di",
   "account-deletion-very-soon": "Segera",

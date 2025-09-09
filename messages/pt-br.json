@@ -17,7 +17,7 @@
   "account-deleted-successfully": "Conta excluída com sucesso",
   "account-deletion-final-warning": "Esta ação não pode ser desfeita. \nSua conta e todos os dados associados serão excluídos permanentemente.",
   "account-deletion-requested": "Você solicitou que sua conta fosse excluída",
-  "account-deletion-restore": "Entre em contato com <a href = 'https: //support.capgo.app/' Target = '_ Blank' class = 'text-blue-500 sublinhado Passe: Text-Blue-600'> Suporte ao capto </a> Se você quiser restaurá-lo",
+  "account-deletion-restore": "Entre em contato com <a href = 'https://support.capgo.app/' target='_blank' class='text-blue-500 hover: text-blue-600'> Suporte ao capto </a> Se você quiser restaurá-lo",
   "account-deletion-timer": "Sua conta deixará de existir",
   "account-deletion-timer-in": "Sua conta deixará de existir em",
   "account-deletion-very-soon": "Muito em breve",
