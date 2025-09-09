@@ -56,15 +56,15 @@ const columns = ref<TableColumn[]>([
     renderFunction: (item) => {
       const avatar = item.icon_url
         ? h('img', {
-          src: item.icon_url,
-          alt: `App icon ${item.name}`,
-          class: 'mr-2 rounded-sm shrink-0 sm:mr-3 d-mask d-mask-squircle',
-          width: 42,
-          height: 42,
-        })
+            src: item.icon_url,
+            alt: `App icon ${item.name}`,
+            class: 'mr-2 rounded-sm shrink-0 sm:mr-3 d-mask d-mask-squircle',
+            width: 42,
+            height: 42,
+          })
         : h('div', { class: 'p-2 mr-2 text-xl bg-gray-700 d-mask d-mask-squircle' }, [
-          h('span', { class: 'font-medium text-gray-300' }, (item.name?.slice(0, 2).toUpperCase() || 'AP')),
-        ])
+            h('span', { class: 'font-medium text-gray-300' }, (item.name?.slice(0, 2).toUpperCase() || 'AP')),
+          ])
 
       return h('div', { class: 'flex flex-wrap items-center text-slate-800 dark:text-white' }, [
         avatar,

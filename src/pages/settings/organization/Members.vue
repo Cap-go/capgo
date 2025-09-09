@@ -115,15 +115,15 @@ columns.value = [
     renderFunction: (member: ExtendedOrganizationMember) => {
       const avatar = member.image_url
         ? h('img', {
-          src: member.image_url,
-          alt: `Profile picture for ${member.email}`,
-          class: 'rounded-sm shrink-0 d-mask d-mask-squircle',
-          width: 42,
-          height: 42,
-        })
+            src: member.image_url,
+            alt: `Profile picture for ${member.email}`,
+            class: 'rounded-sm shrink-0 d-mask d-mask-squircle',
+            width: 42,
+            height: 42,
+          })
         : h('div', { class: 'flex items-center justify-center w-10 h-10 text-xl bg-gray-700 d-mask d-mask-squircle shrink-0' }, [
-          h('span', { class: 'font-medium text-gray-300' }, acronym(member.email)),
-        ])
+            h('span', { class: 'font-medium text-gray-300' }, acronym(member.email)),
+          ])
 
       return h('div', { class: 'flex items-center' }, [
         avatar,
