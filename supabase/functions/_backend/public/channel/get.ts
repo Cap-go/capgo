@@ -1,7 +1,7 @@
 import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { simpleError } from '../../utils/hono.ts'
-import { hasAppRightApikey, supabaseAdmin } from '../../utils/supabase.ts'
+import { hasAppRightApikey, supabaseApikey } from '../../utils/supabase.ts'
 import { fetchLimit } from '../../utils/utils.ts'
 
 interface GetDevice {
@@ -10,11 +10,11 @@ interface GetDevice {
   page?: number
 }
 
-async function getAll(c: Context, body: GetDevice, dataApp: { default_channel_android: number | null, default_channel_ios: number | null }) {
+async function getAll(c: Context, body: GetDevice, apikey: Database['public']['Tables']['apikeys']['Row'], dataApp: { default_channel_android: number | null, default_channel_ios: number | null }) {
   const fetchOffset = body.page ?? 0
   const from = fetchOffset * fetchLimit
   const to = (fetchOffset + 1) * fetchLimit - 1
-  const { data: dataChannels, error: dbError } = await supabaseAdmin(c)
+  const { data: dataChannels, error: dbError } = await supabaseApikey(c, apikey.key)
     .from('channels')
     .select(`
       id,
@@ -50,8 +50,8 @@ async function getAll(c: Context, body: GetDevice, dataApp: { default_channel_an
   }))
 }
 
-async function getOne(c: Context, body: GetDevice, dataApp: { default_channel_android: number | null, default_channel_ios: number | null }) {
-  const { data: dataChannel, error: dbError } = await supabaseAdmin(c)
+async function getOne(c: Context, body: GetDevice, apikey: Database['public']['Tables']['apikeys']['Row'], dataApp: { default_channel_android: number | null, default_channel_ios: number | null }) {
+  const { data: dataChannel, error: dbError } = await supabaseApikey(c, apikey.key)
     .from('channels')
     .select(`
     id,
@@ -105,7 +105,7 @@ export async function get(c: Context, body: GetDevice, apikey: Database['public'
 
   // get one channel or all channels
   if (body.channel) {
-    return getOne(c, body, dataApp)
+    return getOne(c, body, apikey, dataApp)
   }
-  return getAll(c, body, dataApp)
+  return getAll(c, body, apikey, dataApp)
 }

@@ -1,7 +1,7 @@
 import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { quickError, simpleError } from '../../utils/hono.ts'
-import { hasAppRightApikey, supabaseAdmin } from '../../utils/supabase.ts'
+import { hasAppRightApikey, supabaseApikey } from '../../utils/supabase.ts'
 import { fetchLimit } from '../../utils/utils.ts'
 
 export async function get(c: Context, appId: string, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
@@ -12,7 +12,7 @@ export async function get(c: Context, appId: string, apikey: Database['public'][
     throw quickError(401, 'cannot_access_app', 'You can\'t access this app', { app_id: appId })
   }
 
-  const { data, error: dbError } = await supabaseAdmin(c)
+  const { data, error: dbError } = await supabaseApikey(c, apikey.key)
     .from('apps')
     .select('*, default_channel_android (name), default_channel_ios (name)')
     .eq('app_id', appId)
@@ -40,14 +40,14 @@ export async function getAll(c: Context, apikey: Database['public']['Tables']['a
   const currentPage = page ?? 0
   const offset = currentPage * itemsPerPage
 
-  let query = supabaseAdmin(c)
+  let query = supabaseApikey(c, apikey.key)
     .from('apps')
     .select('*')
 
   // If a specific org_id is provided, filter by it
   if (orgId) {
     // Check if user has access to this organization
-    const hasOrgAccess = await supabaseAdmin(c)
+    const hasOrgAccess = await supabaseApikey(c, apikey.key)
       .rpc('is_member_of_org', {
         user_id: apikey.user_id,
         org_id: orgId,
@@ -71,7 +71,7 @@ export async function getAll(c: Context, apikey: Database['public']['Tables']['a
   // Otherwise, get all organizations the user is a member of and filter by those
   else {
     // Get list of orgs the user is a member of
-    const { data: userOrgs, error: orgsError } = await supabaseAdmin(c)
+    const { data: userOrgs, error: orgsError } = await supabaseApikey(c, apikey.key)
       .from('org_users')
       .select('org_id')
       .eq('user_id', apikey.user_id)

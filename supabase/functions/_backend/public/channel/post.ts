@@ -2,7 +2,7 @@ import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { BRES, simpleError } from '../../utils/hono.ts'
 import { cloudlogErr } from '../../utils/loggin.ts'
-import { hasAppRightApikey, supabaseAdmin, updateOrCreateChannel } from '../../utils/supabase.ts'
+import { hasAppRightApikey, supabaseApikey, updateOrCreateChannel } from '../../utils/supabase.ts'
 
 interface ChannelSet {
   app_id: string
@@ -18,8 +18,8 @@ interface ChannelSet {
   allow_dev?: boolean
 }
 
-async function findVersion(c: Context, appID: string, version: string, ownerOrg: string) {
-  const { data, error: vError } = await supabaseAdmin(c)
+async function findVersion(c: Context, appID: string, version: string, ownerOrg: string, apikey: Database['public']['Tables']['apikeys']['Row']) {
+  const { data, error: vError } = await supabaseApikey(c, apikey.key)
     .from('app_versions')
     .select('id')
     .eq('app_id', appID)
@@ -38,7 +38,7 @@ export async function post(c: Context, body: ChannelSet, apikey: Database['publi
   if (!(await hasAppRightApikey(c, body.app_id, apikey.user_id, 'write', apikey.key))) {
     throw simpleError('invalid_app_id', 'You can\'t access this app', { app_id: body.app_id })
   }
-  const { data: org, error } = await supabaseAdmin(c).from('apps').select('owner_org').eq('app_id', body.app_id).single()
+  const { data: org, error } = await supabaseApikey(c, apikey.key).from('apps').select('owner_org').eq('app_id', body.app_id).single()
   if (error || !org) {
     throw simpleError('invalid_app_id', 'You can\'t access this app', { app_id: body.app_id })
   }
@@ -59,7 +59,7 @@ export async function post(c: Context, body: ChannelSet, apikey: Database['publi
 
   try {
     // Use the existing findVersion function from main
-    channel.version = await findVersion(c, body.app_id, body.version ?? 'unknown', org.owner_org)
+    channel.version = await findVersion(c, body.app_id, body.version ?? 'unknown', org.owner_org, apikey)
 
     const rawUpdateInfo = await updateOrCreateChannel(c, channel)
     if (rawUpdateInfo.error) {
@@ -69,7 +69,7 @@ export async function post(c: Context, body: ChannelSet, apikey: Database['publi
 
     // Handle public channel logic from HEAD
     // Get the channel ID from the created/updated channel
-    const { data: channelData, error: channelError } = await supabaseAdmin(c)
+    const { data: channelData, error: channelError } = await supabaseApikey(c, apikey.key)
       .from('channels')
       .select('id')
       .eq('app_id', body.app_id)
@@ -85,7 +85,7 @@ export async function post(c: Context, body: ChannelSet, apikey: Database['publi
 
     if (body.public) {
       if (channel.ios) {
-        const { error: dbError } = await supabaseAdmin(c).from('apps').update({
+        const { error: dbError } = await supabaseApikey(c, apikey.key).from('apps').update({
           default_channel_ios: channelId,
         }).eq('app_id', body.app_id)
         if (dbError) {
@@ -94,7 +94,7 @@ export async function post(c: Context, body: ChannelSet, apikey: Database['publi
         }
       }
       if (channel.android) {
-        const { error: dbError } = await supabaseAdmin(c).from('apps').update({
+        const { error: dbError } = await supabaseApikey(c, apikey.key).from('apps').update({
           default_channel_android: channelId,
         }).eq('app_id', body.app_id)
         if (dbError) {
@@ -107,13 +107,13 @@ export async function post(c: Context, body: ChannelSet, apikey: Database['publi
       }
     }
     else {
-      const { data: appData, error: appError } = await supabaseAdmin(c).from('apps').select('default_channel_android, default_channel_ios').eq('app_id', body.app_id).single()
+      const { data: appData, error: appError } = await supabaseApikey(c, apikey.key).from('apps').select('default_channel_android, default_channel_ios').eq('app_id', body.app_id).single()
       if (appError) {
         console.log('Cannot get app', appError)
         return c.json({ status: 'Cannot get app', error: JSON.stringify(appError) }, 400)
       }
       if (appData.default_channel_android === channelId) {
-        const { error: dbError } = await supabaseAdmin(c).from('apps').update({
+        const { error: dbError } = await supabaseApikey(c, apikey.key).from('apps').update({
           default_channel_android: null,
         }).eq('app_id', body.app_id)
         if (dbError) {
@@ -122,7 +122,7 @@ export async function post(c: Context, body: ChannelSet, apikey: Database['publi
         }
       }
       if (appData.default_channel_ios === channelId) {
-        const { error: dbError } = await supabaseAdmin(c).from('apps').update({
+        const { error: dbError } = await supabaseApikey(c, apikey.key).from('apps').update({
           default_channel_ios: null,
         }).eq('app_id', body.app_id)
         if (dbError) {

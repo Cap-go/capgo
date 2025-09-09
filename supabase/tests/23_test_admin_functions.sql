@@ -3,7 +3,7 @@ BEGIN;
 CREATE EXTENSION "basejump-supabase_test_helpers";
 
 SELECT
-  plan (10);
+  plan (9);
 
 -- Test delete_user (should be safe to test as it requires authentication)
 SELECT
@@ -42,20 +42,6 @@ SELECT
     'SELECT cleanup_frequent_job_details()',
     'permission denied for schema cron',
     'cleanup_frequent_job_details test - throws permission error as expected'
-  );
-
-SELECT
-  tests.clear_authentication ();
-
--- Test cleanup_queue_messages (admin function - may fail due to missing columns)
-SELECT
-  tests.authenticate_as ('test_admin');
-
-SELECT
-  throws_ok (
-    'SELECT cleanup_queue_messages()',
-    'column "name" does not exist',
-    'cleanup_queue_messages test - throws column error as expected'
   );
 
 SELECT

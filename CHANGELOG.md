@@ -2,6 +2,55 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.23.1 (2025-09-08)
+
+## 12.23.0 (2025-09-08)
+
+
+### Features
+
+* update PostgrestVersion to 13.0.4 and add success_rate field to database types ([2ece160](https://github.com/Cap-go/capgo/commit/2ece160ba48f3111ae41026e879f603c06e4870e))
+
+### 12.22.5 (2025-09-08)
+
+### 12.22.4 (2025-09-06)
+
+### 12.22.3 (2025-09-06)
+
+### 12.22.2 (2025-09-06)
+
+
+### Bug Fixes
+
+* update cron job calls from CALL to SELECT for proper execution ([b64d49a](https://github.com/Cap-go/capgo/commit/b64d49ab302618e51628feab79df7031bad01f7e))
+
+### 12.22.1 (2025-09-05)
+
+
+### Bug Fixes
+
+* update notifications primary key constraint to include owner_org ([dad0de1](https://github.com/Cap-go/capgo/commit/dad0de1be3145c559574babad050d952ddfd6e11))
+
+## 12.22.0 (2025-09-04)
+
+
+### Features
+
+* add new enum values to stats_action and update get_identity_org_appid calls ([2dd5c0b](https://github.com/Cap-go/capgo/commit/2dd5c0b72e4a092d4eba5f05112a79b587365ad0))
+
+### 12.21.1 (2025-09-04)
+
+## 12.21.0 (2025-09-04)
+
+
+### Features
+
+* add error handling tests for /private/stats endpoint ([ff0a955](https://github.com/Cap-go/capgo/commit/ff0a9553bc7a30a07d6f4b86168504ae417949e5))
+
+### 12.20.5 (2025-09-04)
+
+### 12.20.4 (2025-09-04)
+
 ### 12.20.3 (2025-09-02)
 
 ### 12.20.2 (2025-09-02)

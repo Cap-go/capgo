@@ -1,7 +1,7 @@
 import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { quickError, simpleError } from '../../utils/hono.ts'
-import { hasOrgRightApikey, supabaseAdmin } from '../../utils/supabase.ts'
+import { hasOrgRightApikey, supabaseApikey } from '../../utils/supabase.ts'
 
 export interface CreateApp {
   app_id: string
@@ -29,7 +29,8 @@ export async function post(c: Context, body: CreateApp, apikey: Database['public
     retention: 2592000,
     default_upload_channel: 'dev',
   }
-  const { data, error: dbError } = await supabaseAdmin(c)
+  // Use anon client with capgkey header; RLS will authorize insert based on org rights
+  const { data, error: dbError } = await supabaseApikey(c, apikey.key)
     .from('apps')
     .insert(dataInsert)
     .select()
