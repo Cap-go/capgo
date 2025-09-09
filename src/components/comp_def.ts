@@ -37,6 +37,8 @@ export interface TableColumn {
   allowHtml?: boolean
   sanitizeHtml?: boolean
   displayFunction?: (item: any) => string | number
+  // Preferred way to render complex cell content without v-html
+  renderFunction?: (item: any) => any
 }
 
 export interface Tab {

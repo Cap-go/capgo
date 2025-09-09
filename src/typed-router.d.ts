@@ -19,6 +19,7 @@ declare module 'vue-router/auto-routes' {
    */
   export interface RouteNamedMap {
     '/[...all]': RouteRecordInfo<'/[...all]', '/:all(.*)', { all: ParamValue<true> }, { all: ParamValue<false> }>,
+    '/accountDisabled': RouteRecordInfo<'/accountDisabled', '/accountDisabled', Record<never, never>, Record<never, never>>,
     '/ApiKeys': RouteRecordInfo<'/ApiKeys', '/ApiKeys', Record<never, never>, Record<never, never>>,
     '/app/': RouteRecordInfo<'/app/', '/app', Record<never, never>, Record<never, never>>,
     '/app/modules': RouteRecordInfo<'/app/modules', '/app/modules', Record<never, never>, Record<never, never>>,
@@ -64,6 +65,10 @@ declare module 'vue-router/auto-routes' {
   export interface _RouteFileInfoMap {
     'src/pages/[...all].vue': {
       routes: '/[...all]'
+      views: never
+    }
+    'src/pages/accountDisabled.vue': {
+      routes: '/accountDisabled'
       views: never
     }
     'src/pages/ApiKeys.vue': {
