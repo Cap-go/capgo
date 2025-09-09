@@ -6,10 +6,11 @@ const dialogStore = useDialogV2Store()
 const route = useRoute()
 
 const sizeClasses = {
-  sm: 'max-w-sm',
-  md: 'max-w-md',
-  lg: 'max-w-lg',
-  xl: 'max-w-xl',
+  'sm': 'max-w-sm',
+  'md': 'max-w-md',
+  'lg': 'max-w-lg',
+  'xl': 'max-w-xl',
+  'max-w-3xl': 'max-w-3xl',
 }
 
 function close(button?: any) {

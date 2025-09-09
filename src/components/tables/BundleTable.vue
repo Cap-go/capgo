@@ -91,8 +91,14 @@ async function showDeletionMethodDialog(): Promise<DeletionMethod> {
   return cancelled ? null : method
 }
 
-async function showDeleteConfirmationDialog(name: string, isPlural = false, askForMethod = true, _method: 'normal' | 'unsafe' = 'unsafe'): Promise<boolean> {
+// Store deletion context for the Teleport
+const deletionContext = ref<{ method: 'normal' | 'unsafe', isPlural: boolean }>({ method: 'unsafe', isPlural: false })
+
+async function showDeleteConfirmationDialog(name: string, isPlural = false, askForMethod = true, method: 'normal' | 'unsafe' = 'unsafe'): Promise<boolean> {
   let message: string
+
+  // Store context for Teleport
+  deletionContext.value = { method, isPlural }
 
   if (isPlural) {
     message = `${t('alert-not-reverse-message')} ${t('alert-delete-message-plural')} ${t('bundles').toLowerCase()}?`
@@ -101,16 +107,7 @@ async function showDeleteConfirmationDialog(name: string, isPlural = false, askF
     message = `${t('alert-not-reverse-message')} ${t('alert-delete-message')} ${name} ${t('you-cannot-reuse')}.`
   }
   else {
-    const baseMessage = `${t('alert-not-reverse-message')} ${t('alert-delete-message')} ${name}?`
-    const unsafeWarning = isPlural
-      ? t('you-are-deleting-unsafely-plural')
-      : t('you-are-deleting-unsafely')
-    const formattedWarning = unsafeWarning
-      .replace('$1', '<b><u>')
-      .replace('$2', '</u></b>')
-      .replace('$3', '<a href="https://capgo.app/docs/webapp/bundles/#delete-a-bundle">')
-      .replace('$4', '</a>')
-    message = `${baseMessage}\n${formattedWarning}.`
+    message = `${t('alert-not-reverse-message')} ${t('alert-delete-message')} ${name}?`
   }
 
   dialogStore.openDialog({
@@ -581,6 +578,25 @@ watch(props, async () => {
           {{ t('select-style-of-deletion-recommendation') }}
         </p>
         <p class="text-sm">
+          {{ t('select-style-of-deletion-link') }}
+          <a
+            href="https://capgo.app/docs/webapp/bundles/#delete-a-bundle"
+            target="_blank"
+            class="text-blue-500 underline hover:text-blue-600 ml-1"
+          >
+            {{ t('here') }}
+          </a>
+        </p>
+      </div>
+    </Teleport>
+
+    <!-- Teleport Content for Unsafe Deletion Warning -->
+    <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('alert-confirm-delete') && deletionContext.method === 'unsafe'" defer to="#dialog-v2-content">
+      <div class="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+        <p class="text-sm text-red-800 dark:text-red-200">
+          <strong class="underline">{{ deletionContext.isPlural ? t('you-are-deleting-unsafely-plural') : t('you-are-deleting-unsafely') }}</strong>
+        </p>
+        <p class="text-sm text-red-600 dark:text-red-300 mt-2">
           {{ t('select-style-of-deletion-link') }}
           <a
             href="https://capgo.app/docs/webapp/bundles/#delete-a-bundle"

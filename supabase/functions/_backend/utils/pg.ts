@@ -125,7 +125,6 @@ export function requestInfosPostgres(
         ios: channelAlias.ios,
         android: channelAlias.android,
         allow_device_self_set: channelAlias.allow_device_self_set,
-        public: channelAlias.public,
       },
       manifestEntries: sql<{ file_name: string, file_hash: string, s3_path: string }[]>`array_agg(json_build_object(
         'file_name', ${schema.manifest.file_name},
@@ -168,7 +167,6 @@ export function requestInfosPostgres(
         ios: channelAlias.ios,
         android: channelAlias.android,
         allow_device_self_set: channelAlias.allow_device_self_set,
-        public: channelAlias.public,
       },
       manifestEntries: sql<{ file_name: string, file_hash: string, s3_path: string }[]>`array_agg(json_build_object(
         'file_name', ${schema.manifest.file_name},
@@ -181,11 +179,11 @@ export function requestInfosPostgres(
     .leftJoin(schema.manifest, eq(schema.manifest.app_version_id, versionAlias.id))
     .where(!defaultChannel
       ? and(
-          eq(channelAlias.public, true),
+          sql`(SELECT (apps.default_channel_android = ${channelAlias.id} OR apps.default_channel_ios = ${channelAlias.id}) FROM ${schema.apps} WHERE app_id = ${app_id}) = true`,
           eq(channelAlias.app_id, app_id),
           eq(platformQuery, true),
         )
-      : and (
+      : and(
           eq(channelAlias.app_id, app_id),
           eq(channelAlias.name, defaultChannel),
         ),
@@ -368,6 +366,7 @@ export async function getMainChannelsPg(
   drizzleCient: ReturnType<typeof getDrizzleClient>,
 ): Promise<{ name: string, ios: boolean, android: boolean }[]> {
   try {
+    // Get channels that are default channels (public channels are computed based on default channels)
     const channels = await drizzleCient
       .select({
         name: schema.channels.name,
@@ -375,9 +374,13 @@ export async function getMainChannelsPg(
         android: schema.channels.android,
       })
       .from(schema.channels)
+      .innerJoin(schema.apps, eq(schema.apps.app_id, appId))
       .where(and(
         eq(schema.channels.app_id, appId),
-        eq(schema.channels.public, true),
+        or(
+          eq(schema.channels.id, schema.apps.default_channel_android),
+          eq(schema.channels.id, schema.apps.default_channel_ios),
+        ),
       ))
     return channels
   }
@@ -443,26 +446,65 @@ export async function getChannelsPg(
   drizzleCient: ReturnType<typeof getDrizzleClient>,
 ): Promise<{ id: number, name: string, ios: boolean, android: boolean, public: boolean }[]> {
   try {
-    const whereConditions = [eq(schema.channels.app_id, appId)]
-
     if ('defaultChannel' in condition && condition.defaultChannel) {
-      whereConditions.push(eq(schema.channels.name, condition.defaultChannel))
+      // Simple case: get specific channel by name
+      const channels = await drizzleCient
+        .select({
+          id: schema.channels.id,
+          name: schema.channels.name,
+          ios: schema.channels.ios,
+          android: schema.channels.android,
+        })
+        .from(schema.channels)
+        .where(and(
+          eq(schema.channels.app_id, appId),
+          eq(schema.channels.name, condition.defaultChannel),
+        ))
+
+      return channels.map(channel => ({ ...channel, public: false })) // Computed later if needed
     }
     else if ('public' in condition) {
-      whereConditions.push(eq(schema.channels.public, condition.public))
+      // Get channels based on public status (computed from default channels)
+      const query = drizzleCient
+        .select({
+          id: schema.channels.id,
+          name: schema.channels.name,
+          ios: schema.channels.ios,
+          android: schema.channels.android,
+          default_channel_android: schema.apps.default_channel_android,
+          default_channel_ios: schema.apps.default_channel_ios,
+        })
+        .from(schema.channels)
+        .innerJoin(schema.apps, eq(schema.apps.app_id, appId))
+        .where(eq(schema.channels.app_id, appId))
+
+      const channels = await query
+      return channels
+        .filter((channel) => {
+          const isPublic = channel.id === channel.default_channel_android || channel.id === channel.default_channel_ios
+          return condition.public ? isPublic : !isPublic
+        })
+        .map(channel => ({
+          id: channel.id,
+          name: channel.name,
+          ios: channel.ios,
+          android: channel.android,
+          public: channel.id === channel.default_channel_android || channel.id === channel.default_channel_ios,
+        }))
     }
 
+    // Fallback: get all channels
     const channels = await drizzleCient
       .select({
         id: schema.channels.id,
         name: schema.channels.name,
         ios: schema.channels.ios,
         android: schema.channels.android,
-        public: schema.channels.public,
       })
       .from(schema.channels)
-      .where(and(...whereConditions))
-    return channels
+      .where(eq(schema.channels.app_id, appId))
+
+    return channels.map(channel => ({ ...channel, public: false }))
   }
   catch (e: any) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'getChannelsPg', error: e })
@@ -510,9 +552,11 @@ export async function getCompatibleChannelsPg(
         allow_dev: schema.channels.allow_dev,
         ios: schema.channels.ios,
         android: schema.channels.android,
-        public: schema.channels.public,
+        default_channel_android: schema.apps.default_channel_android,
+        default_channel_ios: schema.apps.default_channel_ios,
       })
       .from(schema.channels)
+      .innerJoin(schema.apps, eq(schema.apps.app_id, appId))
       .where(and(
         eq(schema.channels.app_id, appId),
         eq(schema.channels.allow_device_self_set, true),
@@ -520,7 +564,17 @@ export async function getCompatibleChannelsPg(
         eq(schema.channels.allow_dev, isProd),
         eq(platform === 'ios' ? schema.channels.ios : schema.channels.android, true),
       ))
-    return channels
+
+    return channels.map(channel => ({
+      id: channel.id,
+      name: channel.name,
+      allow_device_self_set: channel.allow_device_self_set,
+      allow_emulator: channel.allow_emulator,
+      allow_dev: channel.allow_dev,
+      ios: channel.ios,
+      android: channel.android,
+      public: channel.id === channel.default_channel_android || channel.id === channel.default_channel_ios,
+    }))
   }
   catch (e: any) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'getCompatibleChannelsPg', error: e })

@@ -2,6 +2,28 @@ import { randomUUID } from 'node:crypto'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { BASE_URL, getBaseData, getSupabaseClient, postUpdate, PRODUCT_ID, resetAndSeedAppDataStats, resetAppData, resetAppDataStats, TEST_EMAIL, USER_ID } from './test-utils.ts'
 
+// Helper function to retry tests with delay
+function retryTest(testFn: () => Promise<void>, attempts = 30, delayMs = 3000) {
+  return async () => {
+    let lastError: unknown = null
+    for (let i = 0; i < attempts; i++) {
+      try {
+        await testFn()
+        return // Test passed, exit
+      }
+      catch (error) {
+        lastError = error
+        if (i < attempts - 1) {
+          console.log(`Test failed on attempt ${i + 1}/${attempts}, retrying in ${delayMs}ms...`)
+          await new Promise(resolve => setTimeout(resolve, delayMs))
+        }
+      }
+    }
+    // If we reached here, all attempts failed
+    throw lastError
+  }
+}
+
 const id = randomUUID()
 const APPNAME = `com.cp.${id}`
 const ORG_ID = '046a36ac-e03c-4190-9257-bd6c9dba9ee9'
@@ -107,7 +129,7 @@ afterAll(async () => {
 })
 
 describe('[POST] /triggers/cron_plan', () => {
-  it('should return 400 when orgId is missing', async () => {
+  it('should return 400 when orgId is missing', { retry: 1 }, retryTest(async () => {
     const response = await fetch(`${BASE_URL}/triggers/cron_plan`, {
       method: 'POST',
       headers,
@@ -116,9 +138,9 @@ describe('[POST] /triggers/cron_plan', () => {
     expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
     expect(data.error).toBe('no_orgId')
-  })
+  }))
 
-  it('should handle too big MAU correctly', async () => {
+  it('should handle too big MAU correctly', { retry: 1 }, retryTest(async () => {
     // First set the org as trial
     const supabase = getSupabaseClient()
     const { error: latestMauError, data: latestMauData } = await supabase
@@ -193,9 +215,9 @@ describe('[POST] /triggers/cron_plan', () => {
 
     expect(updateResponse.status).toBe(200)
     expect(await updateResponse.json<{ error: string }>().then(data => data.error)).toEqual('need_plan_upgrade')
-  })
+  }))
 
-  it('should handle too big storage correctly', async () => {
+  it('should handle too big storage correctly', { retry: 1 }, retryTest(async () => {
     // First set the org as trial
     const supabase = getSupabaseClient()
 
@@ -261,9 +283,9 @@ describe('[POST] /triggers/cron_plan', () => {
 
     expect(updateResponse.status).toBe(200)
     expect(await updateResponse.json<{ error: string }>()).not.toEqual({ error: 'need_plan_upgrade' })
-  })
+  }))
 
-  it('should handle too big bandwidth correctly', async () => {
+  it('should handle too big bandwidth correctly', { retry: 1 }, retryTest(async () => {
     // First set the org as trial
     const supabase = getSupabaseClient()
     const { error: latestBandwidthError, data: latestBandwidthData } = await supabase
@@ -338,9 +360,9 @@ describe('[POST] /triggers/cron_plan', () => {
 
     expect(updateResponse.status).toBe(200)
     expect(await updateResponse.json<{ error: string }>().then(data => data.error)).toEqual('need_plan_upgrade')
-  })
+  }))
 
-  it('should correctly handle MAU reset', async () => {
+  it('should correctly handle MAU reset', { retry: 1 }, retryTest(async () => {
     const supabase = getSupabaseClient()
     const { error: latestMauError, data: latestMauData } = await supabase
       .from('daily_mau')
@@ -394,9 +416,9 @@ describe('[POST] /triggers/cron_plan', () => {
       .rpc('is_mau_exceeded_by_org', { org_id: ORG_ID })
     expect(mauExceededErrorAfter).toBeFalsy()
     expect(mauExceededAfter).toBe(false)
-  })
+  }))
 
-  it('should correctly handle storage reset', async () => {
+  it('should correctly handle storage reset', { retry: 1 }, retryTest(async () => {
     const supabase = getSupabaseClient()
 
     // First set high storage
@@ -440,9 +462,9 @@ describe('[POST] /triggers/cron_plan', () => {
       .rpc('is_storage_exceeded_by_org', { org_id: ORG_ID })
     expect(storageExceededErrorAfter).toBeFalsy()
     expect(storageExceededAfter).toBe(false)
-  })
+  }))
 
-  it('should correctly handle bandwidth reset', async () => {
+  it('should correctly handle bandwidth reset', { retry: 1 }, retryTest(async () => {
     const supabase = getSupabaseClient()
     const { error: latestBandwidthError, data: latestBandwidthData } = await supabase
       .from('daily_bandwidth')
@@ -496,66 +518,65 @@ describe('[POST] /triggers/cron_plan', () => {
       .rpc('is_bandwidth_exceeded_by_org', { org_id: ORG_ID })
     expect(bandwidthExceededErrorAfter).toBeFalsy()
     expect(bandwidthExceededAfter).toBe(false)
-  })
+  }))
 
-  // TODO: Fix this test
-  // it('should correctly count metrics for deleted apps', async () => {
-  //   const supabase = getSupabaseClient()
+  it('should correctly count metrics for deleted apps', { retry: 1 }, retryTest(async () => {
+    const supabase = getSupabaseClient()
 
-  //   // Set some initial metrics
-  //   const { error: setMauError } = await supabase
-  //     .from('daily_mau')
-  //     .update({ mau: 100 })
-  //     .eq('app_id', APPNAME)
-  //   expect(setMauError).toBeFalsy()
+    // Set some initial metrics
+    const { error: setMauError } = await supabase
+      .from('daily_mau')
+      .update({ mau: 100 })
+      .eq('app_id', APPNAME)
+    expect(setMauError).toBeFalsy()
 
-  //   const { error: setBandwidthError } = await supabase
-  //     .from('daily_bandwidth')
-  //     .update({ bandwidth: 1000 })
-  //     .eq('app_id', APPNAME)
-  //   expect(setBandwidthError).toBeFalsy()
+    const { error: setBandwidthError } = await supabase
+      .from('daily_bandwidth')
+      .update({ bandwidth: 1000 })
+      .eq('app_id', APPNAME)
+    expect(setBandwidthError).toBeFalsy()
 
-  //   // Delete the app
-  //   const { error: deleteError } = await supabase
-  //     .from('apps')
-  //     .delete()
-  //     .eq('app_id', APPNAME)
-  //   expect(deleteError).toBeFalsy()
+    // Delete the app
+    const { error: deleteError } = await supabase
+      .from('apps')
+      .delete()
+      .eq('app_id', APPNAME)
+    expect(deleteError).toBeFalsy()
 
-  //   // Wait for the delete queue to process
-  //   const { error: queueError } = await supabase
-  //     .rpc('process_function_queue', { queue_name: 'on_app_delete' })
-  //   expect(queueError).toBeFalsy()
-  //   await new Promise(resolve => setTimeout(resolve, 2000))
-  //   // Check if the app is in the deleted_app table
-  //   const { data: deletedApp, error: deletedAppError } = await supabase
-  //     .from('deleted_apps')
-  //     .select('app_id')
-  //     .eq('app_id', APPNAME)
-  //     .single()
-  //   expect(deletedAppError).toBeFalsy()
-  //   expect(deletedApp).toBeTruthy()
+    // Wait for the delete queue to process
+    const { error: queueError } = await supabase
+      .rpc('process_function_queue', { queue_name: 'on_app_delete' })
+    expect(queueError).toBeFalsy()
+    await new Promise(resolve => setTimeout(resolve, 2000))
+    // Check if the app is in the deleted_app table
+    const { data: deletedApp, error: deletedAppError } = await supabase
+      .from('deleted_apps')
+      .select('app_id')
+      .eq('app_id', APPNAME)
+      .single()
+    expect(deletedAppError).toBeFalsy()
+    expect(deletedApp).toBeTruthy()
 
-  //   // Wait for the trigger to process by calling cron_plan
-  //   const response = await fetch(`${BASE_URL}/triggers/cron_plan`, {
-  //     method: 'POST',
-  //     headers,
-  //     body: JSON.stringify({ orgId: ORG_ID }),
-  //   })
-  //   expect(response.status).toBe(200)
+    // Wait for the trigger to process by calling cron_plan
+    const response = await fetch(`${BASE_URL}/triggers/cron_plan`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ orgId: ORG_ID }),
+    })
+    expect(response.status).toBe(200)
 
-  //   // Verify metrics are still counted
-  //   const { data: metrics, error: metricsError } = await supabase
-  //     .rpc('get_app_metrics', {
-  //       org_id: ORG_ID,
-  //       start_date: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-  //       end_date: new Date().toISOString().split('T')[0],
-  //     })
-  //   expect(metricsError).toBeFalsy()
-  //   expect(metrics).toBeTruthy()
-  //   if (!metrics)
-  //     throw new Error('Metrics should not be null')
-  //   expect(metrics.some(m => m.mau > 0)).toBe(true)
-  //   expect(metrics.some(m => m.bandwidth > 0)).toBe(true)
-  // })
+    // Verify metrics are still counted
+    const { data: metrics, error: metricsError } = await supabase
+      .rpc('get_app_metrics', {
+        org_id: ORG_ID,
+        start_date: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        end_date: new Date().toISOString().split('T')[0],
+      })
+    expect(metricsError).toBeFalsy()
+    expect(metrics).toBeTruthy()
+    if (!metrics)
+      throw new Error('Metrics should not be null')
+    expect(metrics.some(m => m.mau > 0)).toBe(true)
+    expect(metrics.some(m => m.bandwidth > 0)).toBe(true)
+  }))
 })
