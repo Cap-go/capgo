@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { useI18n } from 'petite-vue-i18n'
 import { ref, watchEffect } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import arrowBack from '~icons/ion/arrow-back?width=2em&height=2em'
 import { pushEvent } from '~/services/posthog'

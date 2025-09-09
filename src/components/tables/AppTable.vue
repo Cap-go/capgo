@@ -2,8 +2,8 @@
 import type { TableColumn } from '~/components/comp_def'
 import type { Database } from '~/types/supabase.types'
 import { Capacitor } from '@capacitor/core'
-import { useI18n } from 'petite-vue-i18n'
-import { computed, ref, watchEffect } from 'vue'
+import { computed, h, ref, watchEffect } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import IconSettings from '~icons/heroicons/cog-8-tooth'
 import { appIdToUrl } from '~/services/conversion'
@@ -52,21 +52,24 @@ const columns = ref<TableColumn[]>([
     mobile: true,
     sortable: true,
     head: true,
-    allowHtml: true,
-    sanitizeHtml: true,
     onClick: item => openPackage(item),
-    displayFunction: (item) => {
-      return `
-        <div class="flex flex-wrap items-center text-slate-800 dark:text-white">
-          ${item.icon_url
-              ? `<img src="${item.icon_url}" alt="App icon ${item.name}" class="mr-2 rounded-sm shrink-0 sm:mr-3 d-mask d-mask-squircle" width="42" height="42">`
-              : `<div class="p-2 mr-2 text-xl bg-gray-700 d-mask d-mask-squircle">
-                <span class="font-medium text-gray-300">${item.name?.slice(0, 2).toUpperCase() || 'AP'}</span>
-              </div>`
-          }
-          <div class="max-w-max">${item.name}</div>
-        </div>
-      `
+    renderFunction: (item) => {
+      const avatar = item.icon_url
+        ? h('img', {
+            src: item.icon_url,
+            alt: `App icon ${item.name}`,
+            class: 'mr-2 rounded-sm shrink-0 sm:mr-3 d-mask d-mask-squircle',
+            width: 42,
+            height: 42,
+          })
+        : h('div', { class: 'p-2 mr-2 text-xl bg-gray-700 d-mask d-mask-squircle' }, [
+            h('span', { class: 'font-medium text-gray-300' }, (item.name?.slice(0, 2).toUpperCase() || 'AP')),
+          ])
+
+      return h('div', { class: 'flex flex-wrap items-center text-slate-800 dark:text-white' }, [
+        avatar,
+        h('div', { class: 'max-w-max' }, item.name),
+      ])
     },
   },
   {

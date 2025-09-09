@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import type { Database } from '~/types/supabase.types'
 import { Capacitor } from '@capacitor/core'
-import { useI18n } from 'petite-vue-i18n'
 import { storeToRefs } from 'pinia'
 import { computed, ref, watch, watchEffect } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { openCheckout } from '~/services/stripe'
 import { getCurrentPlanNameOrg } from '~/services/supabase'

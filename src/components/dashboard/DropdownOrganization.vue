@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import type { Organization } from '~/stores/organization'
-import { useI18n } from 'petite-vue-i18n'
 import { storeToRefs } from 'pinia'
 import { onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import IconDown from '~icons/material-symbols/keyboard-arrow-down-rounded'
 import { useSupabase } from '~/services/supabase'

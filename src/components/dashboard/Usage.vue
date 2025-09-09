@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import type { Database } from '~/types/supabase.types'
-import { useI18n } from 'petite-vue-i18n'
 import { storeToRefs } from 'pinia'
 import colors from 'tailwindcss/colors'
 import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { bytesToGb, getDaysBetweenDates } from '~/services/conversion'
 import { getPlans } from '~/services/supabase'
 import { useMainStore } from '~/stores/main'

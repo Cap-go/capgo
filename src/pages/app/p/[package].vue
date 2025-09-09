@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import type { Stat, Tab } from '~/components/comp_def'
 import type { Database } from '~/types/supabase.types'
-import { useI18n } from 'petite-vue-i18n'
 import { computed, ref, watchEffect } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import IconChart from '~icons/heroicons/chart-bar'
 import IconHistory from '~icons/heroicons/clock'

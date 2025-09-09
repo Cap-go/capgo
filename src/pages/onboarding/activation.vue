@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { Capacitor } from '@capacitor/core'
 import { PushNotifications } from '@capacitor/push-notifications'
-import { useI18n } from 'petite-vue-i18n'
 import { reactive, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'

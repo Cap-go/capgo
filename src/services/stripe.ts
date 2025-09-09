@@ -1,6 +1,6 @@
-import type { ComposerTranslation } from 'petite-vue-i18n'
+import type { ComposerTranslation } from 'vue-i18n'
 import { Capacitor } from '@capacitor/core'
-import { useI18n } from 'petite-vue-i18n'
+import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useSupabase } from './supabase'

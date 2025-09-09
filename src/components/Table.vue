@@ -3,8 +3,8 @@ import type { TableColumn } from './comp_def'
 import { FormKit } from '@formkit/vue'
 import { useDebounceFn } from '@vueuse/core'
 import DOMPurify from 'dompurify'
-import { useI18n } from 'petite-vue-i18n'
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, defineComponent, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import IconTrash from '~icons/heroicons/trash'
 import IconDown from '~icons/ic/round-keyboard-arrow-down'
 import IconPrev from '~icons/ic/round-keyboard-arrow-left'
@@ -121,6 +121,10 @@ function updateUrlParams() {
   const paramsString = params.toString() ? `?${params.toString()}` : ''
   window.history.pushState({}, '', `${window.location.pathname}${paramsString}`)
 }
+
+const isSelectAllEnabled = computed(() => {
+  return props.massSelect && selectedRows.value.find(val => val)
+})
 
 function loadFromUrlParams() {
   const params = new URLSearchParams(window.location.search)
@@ -291,6 +295,18 @@ function getSkeletonWidth(columnIndex?: number) {
   const remainingWidth = hasMassSelect ? `calc((100% - 60px) / ${totalVisibleColumns})` : `${100 / totalVisibleColumns}%`
   return remainingWidth
 }
+
+// Helper component to render VNode content from a column's renderFunction
+const RenderCell = defineComponent<{ renderer?: (item: any) => any, item: any }>({
+  name: 'RenderCell',
+  props: {
+    renderer: Function as unknown as () => ((item: any) => any) | undefined,
+    item: { type: Object as any, required: true },
+  },
+  setup(props) {
+    return () => (props.renderer ? (props.renderer as any)(props.item) : null)
+  },
+})
 </script>
 
 <template>
@@ -335,10 +351,10 @@ function getSkeletonWidth(columnIndex?: number) {
           </ul>
         </div>
       </div>
-      <button v-if="props.massSelect && selectedRows.find(val => val)" class="inline-flex items-center self-end px-3 py-2 ml-auto mr-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-lg dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-hidden focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 cursor-pointer" type="button" @click="selectedRows = selectedRows.map(() => true); emit('selectRow', selectedRows)">
+      <button v-if="pisSelectAllEnabled" class="inline-flex items-center self-end px-3 py-2 ml-auto mr-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-lg dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-hidden focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 cursor-pointer" type="button" @click="selectedRows = selectedRows.map(() => true); emit('selectRow', selectedRows)">
         <span class="text-sm">{{ t('select_all') }}</span>
       </button>
-      <button v-if="props.massSelect && selectedRows.find(val => val)" class=" self-end mr-2 inline-flex items-center border border-gray-300 rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-hidden focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 cursor-pointer" type="button" @click="emit('massDelete')">
+      <button v-if="isSelectAllEnabled" class=" self-end mr-2 inline-flex items-center border border-gray-300 rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-hidden focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 cursor-pointer" type="button" @click="emit('massDelete')">
         <IconTrash class="text-red-500 h-[24px]" />
       </button>
       <div class="flex md:w-auto overflow-hidden">
@@ -384,7 +400,7 @@ function getSkeletonWidth(columnIndex?: number) {
               </th>
               <template v-for="(col, _y) in columns" :key="`${i}_${_y}`">
                 <th v-if="col.head" :class="`${col.class ?? ''}${!col.mobile ? ' hidden md:table-cell' : ''} ${col.onClick ? 'cursor-pointer hover:underline clickable-cell' : ''}`" scope="row" class="py-2 md:py-4 px-4 md:px-6 font-medium text-gray-900 whitespace-nowrap dark:text-white" @click.stop="col.onClick ? col.onClick(elem) : () => {}">
-                  <div v-if="col.allowHtml" v-html="displayValueKey(elem, col)" />
+                  <RenderCell v-if="col.renderFunction" :renderer="col.renderFunction" :item="elem" />
                   <template v-else>
                     {{ displayValueKey(elem, col) }}
                   </template>
@@ -407,13 +423,14 @@ function getSkeletonWidth(columnIndex?: number) {
                       <button
                         class="p-2 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-600 dark:hover:text-gray-300 rounded-md cursor-pointer"
                         @click.stop="col.onClick ? col.onClick(elem) : () => {}"
-                        v-html="col.icon"
-                      />
+                      >
+                        <component :is="col.icon" />
+                      </button>
                     </template>
                   </div>
                 </td>
                 <td v-else :class="`${col.class ?? ''} ${!col.mobile ? 'hidden md:table-cell' : ''} ${col.onClick ? 'cursor-pointer hover:underline clickable-cell' : ''} overflow-hidden text-ellipsis whitespace-nowrap`" class="px-4 md:px-6 py-2 md:py-4" @click.stop="col.onClick ? col.onClick(elem) : () => {}">
-                  <div v-if="col.allowHtml" v-html="displayValueKey(elem, col)" />
+                  <RenderCell v-if="col.renderFunction" :renderer="col.renderFunction" :item="elem" />
                   <template v-else>
                     {{ displayValueKey(elem, col) }}
                   </template>

@@ -9,6 +9,8 @@ import { supabaseAdmin } from '../utils/supabase.ts'
 
 export const app = new Hono<MiddlewareKeyVariables>()
 
+// on_user_delete - this is called 30 days before the user is actually deleted
+// This function is used to cancel the subscriptions of the user's organizations
 async function deleteUser(c: Context, record: Database['public']['Tables']['users']['Row']) {
   // Process user deletion with timeout protection
   const startTime = Date.now()

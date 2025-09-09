@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import type { Tab } from '~/components/comp_def'
 import { Capacitor } from '@capacitor/core'
-import { useI18n } from 'petite-vue-i18n'
 import { ref, shallowRef, watch, watchEffect } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import IconPlans from '~icons/material-symbols/price-change'
 import IconNotification from '~icons/mdi/message-notification'

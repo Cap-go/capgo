@@ -4,8 +4,8 @@ import { Capacitor } from '@capacitor/core'
 import { setErrors } from '@formkit/core'
 import { FormKit, FormKitMessages, reset } from '@formkit/vue'
 import dayjs from 'dayjs'
-import { useI18n } from 'petite-vue-i18n'
 import { computed, onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import iconEmail from '~icons/oui/email?raw'
@@ -13,10 +13,11 @@ import iconFlag from '~icons/ph/flag?raw'
 import iconName from '~icons/ph/user?raw'
 import IconVersion from '~icons/radix-icons/update'
 import { pickPhoto, takePhoto } from '~/services/photos'
-import { useSupabase } from '~/services/supabase'
+import { getCurrentPlanNameOrg, isPayingOrg, useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
+import { useOrganizationStore } from '~/stores/organization'
 
 const version = import.meta.env.VITE_APP_VERSION
 const { t } = useI18n()
@@ -25,89 +26,226 @@ const displayStore = useDisplayStore()
 const router = useRouter()
 const main = useMainStore()
 const dialogStore = useDialogV2Store()
+const organizationStore = useOrganizationStore()
 const isLoading = ref(false)
 // mfa = 2fa
 const mfaEnabled = ref(false)
 const mfaFactorId = ref('')
 const mfaVerificationCode = ref('')
 const mfaQRCode = ref('')
+const organizationsToDelete = ref<string[]>([])
+const paidOrganizationsToDelete = ref<Array<{ name: string, planName: string }>>([])
 displayStore.NavTitle = t('account')
 
+async function checkOrganizationImpact() {
+  // Wait for organizations and main store to load
+  await Promise.all([
+    organizationStore.awaitInitialLoad(),
+    main.awaitInitialLoad(),
+  ])
+
+  // Get all organizations where user is super_admin
+  const superAdminOrgs = organizationStore.organizations.filter(org => org.role === 'super_admin')
+
+  if (superAdminOrgs.length === 0) {
+    return { orgsToBeDeleted: [], paidOrgsToBeDeleted: [], canProceed: true }
+  }
+
+  const orgsToBeDeleted: string[] = []
+  const paidOrgsToBeDeleted: Array<{ name: string, planName: string, orgId: string }> = []
+
+  // Check each organization to see if user is the only super_admin
+  for (const org of superAdminOrgs) {
+    try {
+      const { data: members, error } = await supabase
+        .rpc('get_org_members', { guild_id: org.gid })
+
+      if (error) {
+        console.error('Error getting org members:', error)
+        continue
+      }
+
+      // Count super_admins (excluding temporary users)
+      const superAdminCount = members.filter(member =>
+        member.role === 'super_admin' && !member.is_tmp,
+      ).length
+
+      // If user is the only super_admin, this org will be deleted
+      if (superAdminCount === 1) {
+        orgsToBeDeleted.push(org.name)
+
+        // Check if this organization has a paid subscription
+        try {
+          const isPaying = await isPayingOrg(org.gid)
+          if (isPaying) {
+            const planNameFromDb = await getCurrentPlanNameOrg(org.gid)
+            // Get the actual plan object to get the real plan name
+            const actualPlan = main.plans.find(p => p.name === planNameFromDb)
+            const planName = actualPlan?.name || planNameFromDb || 'Unknown Plan'
+
+            paidOrgsToBeDeleted.push({
+              name: org.name,
+              planName,
+              orgId: org.gid,
+            })
+          }
+        }
+        catch (error) {
+          console.error('Error checking payment status for org:', org.name, error)
+        }
+      }
+    }
+    catch (error) {
+      console.error('Error checking organization:', org.name, error)
+    }
+  }
+
+  return { orgsToBeDeleted, paidOrgsToBeDeleted, canProceed: true }
+}
+
 async function deleteAccount() {
+  // First, check organization impact
+  const { orgsToBeDeleted, paidOrgsToBeDeleted, canProceed } = await checkOrganizationImpact()
+
+  if (!canProceed) {
+    toast.error(t('something-went-wrong-try-again-later'))
+    return
+  }
+
+  // Show warning if organizations will be deleted
+  if (orgsToBeDeleted.length > 0) {
+    // Store the organizations list for the teleport
+    organizationsToDelete.value = orgsToBeDeleted
+
+    dialogStore.openDialog({
+      title: t('warning-organizations-will-be-deleted'),
+      description: t('warning-organizations-will-be-deleted-message'),
+      size: 'lg',
+      buttons: [
+        {
+          text: t('button-cancel'),
+          role: 'cancel',
+        },
+        {
+          text: t('understand-and-continue'),
+          role: 'danger',
+        },
+      ],
+    })
+
+    const cancelled = await dialogStore.onDialogDismiss()
+    if (cancelled) {
+      organizationsToDelete.value = []
+      return
+    }
+    organizationsToDelete.value = []
+  }
+
+  // Show subscription cancellation warning if there are paid organizations
+  if (paidOrgsToBeDeleted.length > 0) {
+    // Store the paid organizations list for the teleport
+    paidOrganizationsToDelete.value = paidOrgsToBeDeleted.map(org => ({
+      name: org.name,
+      planName: org.planName,
+    }))
+
+    dialogStore.openDialog({
+      title: t('warning-paid-subscriptions'),
+      description: t('warning-paid-subscriptions-message'),
+      size: 'lg',
+      buttons: [
+        {
+          text: t('button-cancel'),
+          role: 'cancel',
+        },
+        {
+          text: t('cancel-subscriptions-and-continue'),
+          role: 'danger',
+        },
+      ],
+    })
+
+    const cancelled = await dialogStore.onDialogDismiss()
+    if (cancelled) {
+      paidOrganizationsToDelete.value = []
+      return
+    }
+    paidOrganizationsToDelete.value = []
+
+    // TODO: Here we would implement subscription cancellation logic
+    // For now, we just continue to the final confirmation
+  }
+
+  // Show final confirmation
   dialogStore.openDialog({
     title: t('are-u-sure'),
+    description: '', // We'll use Teleport for custom content
     buttons: [
       {
         text: t('button-cancel'),
         role: 'cancel',
-        handler: () => {
-          console.log('Cancel clicked')
-        },
       },
       {
-        text: t('button-remove'),
+        text: t('i-am-sure'),
         role: 'danger',
         handler: async () => {
-          if (!main.auth || main.auth?.email == null)
-            return
-          const supabaseClient = useSupabase()
-
-          const authUser = await supabase.auth.getUser()
-          if (authUser.error)
-            return setErrors('update-account', [t('something-went-wrong-try-again-later')], {})
-
-          try {
-            const { data: user } = await supabaseClient
-              .from('users')
-              .select()
-              .eq('id', authUser.data.user.id)
-              .single()
-            if (!user)
-              return setErrors('update-account', [t('something-went-wrong-try-again-later')], {})
-
-            if (user.email.endsWith('review@capgo.app') && Capacitor.isNativePlatform()) {
-              const { error: banErr } = await supabase
-                .from('users')
-                .update({ ban_time: dayjs().add(5, 'minutes').toDate().toISOString() })
-                .eq('id', user.id)
-
-              if (banErr) {
-                console.error('Cannot set ban duration', banErr)
-                return setErrors('update-account', [t('something-went-wrong-try-again-later')], {})
-              }
-
-              await main.logout()
-              router.replace('/login')
-              return
-            }
-
-            // Delete user using RPC function
-            const { error: deleteError } = await supabase.rpc('delete_user')
-
-            if (deleteError) {
-              console.error('Delete error:', deleteError)
-              return setErrors('update-account', [t('something-went-wrong-try-again-later')], {})
-            }
-
-            // Delete auth user
-            const { error: authError } = await supabase.auth.admin.deleteUser(authUser.data.user.id)
-            if (authError) {
-              console.error('Auth delete error:', authError)
-              return setErrors('update-account', [t('something-went-wrong-try-again-later')], {})
-            }
-
-            await main.logout()
-            router.replace('/login')
-          }
-          catch (error) {
-            console.error(error)
-            return setErrors('update-account', [t('something-went-wrong-try-again-later')], {})
-          }
+          await performAccountDeletion()
         },
       },
     ],
   })
   return dialogStore.onDialogDismiss()
+}
+
+async function performAccountDeletion() {
+  if (!main.auth || main.auth?.email == null)
+    return
+  const supabaseClient = useSupabase()
+
+  const authUser = await supabase.auth.getUser()
+  if (authUser.error)
+    return setErrors('update-account', [t('something-went-wrong-try-again-later')], {})
+
+  try {
+    const { data: user } = await supabaseClient
+      .from('users')
+      .select()
+      .eq('id', authUser.data.user.id)
+      .single()
+    if (!user)
+      return setErrors('update-account', [t('something-went-wrong-try-again-later')], {})
+
+    if (user.email.endsWith('review@capgo.app') && Capacitor.isNativePlatform()) {
+      const { error: banErr } = await supabase
+        .from('users')
+        .update({ ban_time: dayjs().add(5, 'minutes').toDate().toISOString() })
+        .eq('id', user.id)
+
+      if (banErr) {
+        console.error('Cannot set ban duration', banErr)
+        return setErrors('update-account', [t('something-went-wrong-try-again-later')], {})
+      }
+
+      await main.logout()
+      router.replace('/login')
+      return
+    }
+
+    // Delete user using RPC function
+    const { error: deleteError } = await supabase.rpc('delete_user')
+
+    if (deleteError) {
+      console.error('Delete error:', deleteError)
+      return setErrors('update-account', [t('something-went-wrong-try-again-later')], {})
+    }
+
+    // Reload the web page after successful account deletion
+    window.location.reload()
+  }
+  catch (error) {
+    console.error(error)
+    return setErrors('update-account', [t('something-went-wrong-try-again-later')], {})
+  }
 }
 
 async function copyAccountId() {
@@ -551,6 +689,53 @@ onMounted(async () => {
           class="w-full p-3 border border-gray-300 rounded-lg dark:border-gray-600 dark:bg-gray-800 dark:text-white"
           @keydown.enter="$event.preventDefault()"
         >
+      </div>
+    </Teleport>
+
+    <!-- Teleport for Organization Deletion Warning -->
+    <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('warning-organizations-will-be-deleted')" to="#dialog-v2-content" defer>
+      <div class="mt-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+        <h4 class="font-semibold text-red-800 dark:text-red-200 mb-3">
+          {{ t('organizations-to-be-deleted') }}:
+        </h4>
+        <ul class="space-y-2">
+          <li v-for="orgName in organizationsToDelete" :key="orgName" class="flex items-center text-red-700 dark:text-red-300">
+            <span class="w-2 h-2 bg-red-500 rounded-full mr-3" />
+            <span class="font-medium">{{ orgName }}</span>
+          </li>
+        </ul>
+      </div>
+    </Teleport>
+
+    <!-- Teleport for Paid Subscriptions Warning -->
+    <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('warning-paid-subscriptions')" to="#dialog-v2-content" defer>
+      <div class="mt-4 p-4 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg">
+        <h4 class="font-semibold text-orange-800 dark:text-orange-200 mb-3">
+          {{ t('paid-subscriptions-to-cancel') }}:
+        </h4>
+        <ul class="space-y-3">
+          <li v-for="org in paidOrganizationsToDelete" :key="org.name" class="flex items-center justify-between text-orange-700 dark:text-orange-300">
+            <div class="flex items-center">
+              <span class="w-2 h-2 bg-orange-500 rounded-full mr-3" />
+              <span class="font-medium">{{ org.name }}</span>
+            </div>
+            <span class="text-sm bg-orange-100 dark:bg-orange-800 px-2 py-1 rounded-full">
+              {{ org.planName }}
+            </span>
+          </li>
+        </ul>
+      </div>
+    </Teleport>
+
+    <!-- Teleport for Final Account Deletion Warning -->
+    <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('are-u-sure')" to="#dialog-v2-content" defer>
+      <div class="text-base text-gray-500 dark:text-gray-400">
+        <p class="mb-4">
+          This action cannot be undone. Your account and all associated data will be permanently deleted.
+        </p>
+        <p class="font-medium text-gray-700 dark:text-gray-300">
+          Your account will be deleted after 30 days
+        </p>
       </div>
     </Teleport>
   </div>

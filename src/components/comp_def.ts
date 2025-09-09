@@ -1,5 +1,5 @@
-import type { ComposerTranslation } from 'petite-vue-i18n'
 import type { FunctionalComponent, Ref, ShallowRef } from 'vue'
+import type { ComposerTranslation } from 'vue-i18n'
 
 export type MobileColType = 'header' | 'title' | 'footer' | 'after' | 'none'
 
@@ -37,6 +37,8 @@ export interface TableColumn {
   allowHtml?: boolean
   sanitizeHtml?: boolean
   displayFunction?: (item: any) => string | number
+  // Preferred way to render complex cell content without v-html
+  renderFunction?: (item: any) => any
 }
 
 export interface Tab {
