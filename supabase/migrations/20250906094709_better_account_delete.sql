@@ -160,11 +160,14 @@ END;
 $$;
 
 -- Revoke all permissions from public (no one can execute by default)
-REVOKE ALL ON FUNCTION public.delete_accounts_marked_for_deletion() FROM PUBLIC;
+-- Revoke all permissions from public (default), anon, and authenticated users
+REVOKE ALL ON FUNCTION "public"."delete_accounts_marked_for_deletion"() FROM PUBLIC;
+REVOKE ALL ON FUNCTION "public"."delete_accounts_marked_for_deletion"() FROM anon;
+REVOKE ALL ON FUNCTION "public"."delete_accounts_marked_for_deletion"() FROM authenticated;
 
 -- Grant execution permission only to postgres superuser and service_role
-GRANT EXECUTE ON FUNCTION public.delete_accounts_marked_for_deletion() TO postgres;
-GRANT EXECUTE ON FUNCTION public.delete_accounts_marked_for_deletion() TO service_role;
+GRANT EXECUTE ON FUNCTION "public"."delete_accounts_marked_for_deletion"() TO postgres;
+GRANT EXECUTE ON FUNCTION "public"."delete_accounts_marked_for_deletion"() TO service_role;
 
   -- Create a cron job to run the account deletion function every minute
   -- This will process and permanently delete accounts that have passed their removal_date
