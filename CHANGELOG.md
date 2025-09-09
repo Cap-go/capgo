@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.23.4 (2025-09-09)
+
+
+### Bug Fixes
+
+* correct spelling of 'email' in set_org_email function and related tests ([e7bff6a](https://github.com/Cap-go/capgo/commit/e7bff6a6976c5c99dc9c3c8ec1c3c7978e1af6f7))
+
 ### 12.23.3 (2025-09-09)
 
 ### 12.23.2 (2025-09-08)
