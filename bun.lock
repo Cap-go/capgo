@@ -85,7 +85,7 @@
         "postgres": "^3.4.7",
         "posthog-js": "^1.259.0",
         "semver": "^7.7.2",
-        "stripe": "^18.4.0",
+        "stripe": "^18.5.0",
         "tailwind-capacitor": "1.0.9",
         "vite-plugin-devtools-json": "^0.4.1",
         "vue": "3.5.18",
