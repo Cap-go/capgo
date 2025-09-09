@@ -103,7 +103,7 @@ export async function post(c: Context, body: ChannelSet, apikey: Database['publi
         }
       }
       if (!channel.android && !channel.ios) {
-        return c.json({ status: 'error', error: "Cannot mark channel as public, as it's not marked as either Android or iOS" }, 400)
+        return c.json({ status: 'error', error: 'Cannot mark channel as public, as it\'s not marked as either Android or iOS' }, 400)
       }
     }
     else {
