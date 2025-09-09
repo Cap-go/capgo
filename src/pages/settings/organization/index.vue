@@ -97,7 +97,7 @@ async function updateEmail(form: { email: string }) {
 
   const { error } = await supabase.functions.invoke('private/set_org_email', {
     body: {
-      emial: form.email,
+      email: form.email,
       org_id: orgCopy.gid,
     },
   })

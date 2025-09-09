@@ -6,7 +6,7 @@ import { updateCustomerEmail } from '../utils/stripe.ts'
 import { supabaseAdmin as useSupabaseAdmin } from '../utils/supabase.ts'
 
 const bodySchema = z.object({
-  emial: z.email(),
+  email: z.email(),
   org_id: z.uuid(),
 })
 
@@ -56,11 +56,11 @@ app.post('/', middlewareV2(['all', 'write']), async (c) => {
     throw quickError(401, 'not_authorized', 'Not authorized', { userId: auth.userId, orgId: safeBody.org_id })
   }
 
-  await updateCustomerEmail(c, organization.customer_id, safeBody.emial)
+  await updateCustomerEmail(c, organization.customer_id, safeBody.email)
 
   // Update supabase
   const { error: updateOrgErr } = await supabaseAdmin.from('orgs')
-    .update({ management_email: safeBody.emial })
+    .update({ management_email: safeBody.email })
     .eq('id', safeBody.org_id)
 
   if (updateOrgErr) {

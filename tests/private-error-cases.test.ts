@@ -313,7 +313,7 @@ describe('[POST] /private/set_org_email - Error Cases', () => {
       },
       body: JSON.stringify({
         org_id: testOrgId,
-        emial: 'test@example.com',
+        email: 'test@example.com',
       }),
     })
     expect(response.status).toBe(401)
@@ -338,7 +338,7 @@ describe('[POST] /private/set_org_email - Error Cases', () => {
   //     headers,
   //     body: JSON.stringify({
   //       org_id: testOrgId,
-  //       emial: 'test@example.com',
+  //       email: 'test@example.com',
   //     }),
   //   })
 
@@ -353,7 +353,7 @@ describe('[POST] /private/set_org_email - Error Cases', () => {
       headers,
       body: JSON.stringify({
         org_id: NON_OWNER_ORG_ID,
-        emial: 'test@example.com',
+        email: 'test@example.com',
       }),
     })
 
