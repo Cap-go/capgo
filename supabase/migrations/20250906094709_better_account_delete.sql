@@ -7,6 +7,12 @@ CREATE TABLE public.to_delete_accounts (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Ensure only one pending delete per account and efficient scheduling
+CREATE UNIQUE INDEX IF NOT EXISTS to_delete_accounts_account_id_key
+  ON public.to_delete_accounts (account_id);
+CREATE INDEX IF NOT EXISTS to_delete_accounts_removal_date_idx
+  ON public.to_delete_accounts (removal_date);
+
 -- Enable Row Level Security
 ALTER TABLE public.to_delete_accounts ENABLE ROW LEVEL SECURITY;
 
@@ -69,7 +75,6 @@ SET
 DECLARE
   user_id_fn uuid;
   user_email text;
-  hashed_email text;
 BEGIN
   -- Get the current user ID and email
   SELECT auth.uid() INTO user_id_fn;

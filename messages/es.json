@@ -17,7 +17,7 @@
   "account-deleted-successfully": "Cuenta eliminada exitosamente",
   "account-deletion-final-warning": "",
   "account-deletion-requested": "",
-  "account-deletion-restore": "",
+  "account-deletion-restore": "Por favor contacta <a href='https://support.capgo.app/' target='_blank' class='text-blue-500 underline hover:text-blue-600'>Soporte de Capgo</a> si deseas restaurarla",
   "account-deletion-timer": "",
   "account-deletion-timer-in": "",
   "account-deletion-very-soon": "",
