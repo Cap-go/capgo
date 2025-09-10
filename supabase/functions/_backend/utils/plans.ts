@@ -1,4 +1,5 @@
 import type { Context } from 'hono'
+import type { PlanUsage } from './supabase.ts'
 import type { Database } from './supabase.types.ts'
 import { quickError } from './hono.ts'
 import { cloudlog, cloudlogErr } from './loggin.ts'
@@ -13,7 +14,6 @@ import {
   isOnboardedOrg,
   isOnboardingNeeded,
   isTrialOrg,
-  type PlanUsage,
   set_bandwidth_exceeded,
   set_mau_exceeded,
   set_storage_exceeded,
