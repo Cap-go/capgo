@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## 12.24.0 (2025-09-10)
+
+
+### Features
+
+* implement account deletion process with RLS and cron job ([f88d933](https://github.com/Cap-go/capgo/commit/f88d933f6c7a3c1ad602026d66318a30287494cb))
+
 ### 12.23.8 (2025-09-10)
 
 ### 12.23.7 (2025-09-09)
