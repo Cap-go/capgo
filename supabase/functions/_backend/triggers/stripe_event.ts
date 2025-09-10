@@ -1,15 +1,16 @@
 import type { Context } from 'hono'
 import type Stripe from 'stripe'
-import type { MiddlewareKeyVariables } from '../utils/hono.ts'
+import type { MiddlewareKeyVariablesStripe } from '../utils/hono_middleware_stripe.ts'
 import type { StripeData } from '../utils/stripe.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
 import { addTagBento, trackBentoEvent } from '../utils/bento.ts'
-import { BRES, middlewareStripeWebhook, quickError, simpleError } from '../utils/hono.ts'
+import { BRES, quickError, simpleError } from '../utils/hono.ts'
+import { middlewareStripeWebhook } from '../utils/hono_middleware_stripe.ts'
 import { logsnag } from '../utils/logsnag.ts'
 import { customerToSegmentOrg, supabaseAdmin } from '../utils/supabase.ts'
 
-export const app = new Hono<MiddlewareKeyVariables>()
+export const app = new Hono<MiddlewareKeyVariablesStripe>()
 
 interface Org {
   id: string

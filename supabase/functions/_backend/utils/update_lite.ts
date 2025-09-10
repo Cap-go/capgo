@@ -19,6 +19,7 @@ import { sendNotifOrg } from './notifications.ts'
 import { closeClient, getAppOwnerPostgres, getDrizzleClient, getPgClient, isAllowedActionOrgActionPg } from './pg.ts'
 import { getAppOwnerPostgresV2, getDrizzleClientD1Session, isAllowedActionOrgActionD1 } from './pg_d1.ts'
 import { requestInfosPostgresLite, requestInfosPostgresLiteV2 } from './pg_lite.ts'
+import { s3 } from './s3.ts'
 import { createStatsBandwidth, createStatsMau, createStatsVersion, opnPremStats, sendStatsAndDevice } from './stats.ts'
 import { resToVersion } from './update.ts'
 
@@ -139,11 +140,14 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
   let signedURL = version.external_url ?? ''
   let manifest: ManifestEntry[] = []
   if (version.r2_path && !version.external_url) {
-    const res = await getBundleUrl(c, version.id, version.r2_path, device_id)
-    if (res) {
-      signedURL = res.url
-      // only count the size of the bundle if it's not external
-      await backgroundTask(c, createStatsBandwidth(c, device_id, app_id, res.size ?? 0))
+    const url = await getBundleUrl(c, version.r2_path, device_id, version.checksum ?? '')
+    if (url) {
+      signedURL = url
+      // only count the size of the bundle if it's not external and zip for now
+      await backgroundTask(c, async () => {
+        const size = await s3.getSize(c, version.r2_path)
+        await createStatsBandwidth(c, device_id, app_id, size ?? 0)
+      })
     }
     if (greaterThan(parse(plugin_version), parse('6.2.0'))) {
       manifest = getManifestUrl(c, version.id, channelData.manifestEntries ?? [], device_id)

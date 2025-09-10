@@ -1,7 +1,8 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod/mini'
-import { middlewareV2, parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
+import { parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
+import { middlewareV2 } from '../utils/hono_middleware.ts'
 import { createStatsDevices } from '../utils/stats.ts'
 import { supabaseAdmin as useSupabaseAdmin } from '../utils/supabase.ts'
 

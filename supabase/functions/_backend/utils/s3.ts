@@ -4,7 +4,7 @@ import { S3Client } from '@bradenmacdonald/s3-lite-client'
 import { cloudlog } from './loggin.ts'
 import { getEnv } from './utils.ts'
 
-async function initS3(c: Context) {
+function initS3(c: Context) {
   const access_key_id = getEnv(c, 'S3_ACCESS_KEY_ID')
   const access_key_secret = getEnv(c, 'S3_SECRET_ACCESS_KEY')
   const storageEndpoint = getEnv(c, 'S3_ENDPOINT')
@@ -41,7 +41,7 @@ export async function getPath(c: Context, record: Database['public']['Tables']['
 }
 
 async function getUploadUrl(c: Context, fileId: string, expirySeconds = 1200) {
-  const client = await initS3(c)
+  const client = initS3(c)
   const url = await client.getPresignedUrl('PUT', fileId, {
     expirySeconds,
     parameters: {
@@ -53,7 +53,7 @@ async function getUploadUrl(c: Context, fileId: string, expirySeconds = 1200) {
 }
 
 async function deleteObject(c: Context, fileId: string) {
-  const client = await initS3(c)
+  const client = initS3(c)
   await client.deleteObject(fileId)
   return true
 }
@@ -62,7 +62,7 @@ async function checkIfExist(c: Context, fileId: string | null) {
   if (!fileId) {
     return false
   }
-  const client = await initS3(c)
+  const client = initS3(c)
 
   try {
     const file = await client.statObject(fileId)
@@ -76,7 +76,7 @@ async function checkIfExist(c: Context, fileId: string | null) {
 
 async function getSignedUrl(c: Context, fileId: string, expirySeconds: number) {
   // return getUploadUrl(c, fileId, expirySeconds)
-  const client = await initS3(c)
+  const client = initS3(c)
   const url = await client.getPresignedUrl('GET', fileId, {
     expirySeconds,
     parameters: {
@@ -88,7 +88,7 @@ async function getSignedUrl(c: Context, fileId: string, expirySeconds: number) {
 }
 
 async function getSize(c: Context, fileId: string) {
-  const client = await initS3(c)
+  const client = initS3(c)
   try {
     const file = await client.statObject(fileId)
     cloudlog({ requestId: c.get('requestId'), message: 'getSize', file, fileId, bucket: getEnv(c, 'S3_BUCKET'), endpoint: getEnv(c, 'S3_ENDPOINT') })

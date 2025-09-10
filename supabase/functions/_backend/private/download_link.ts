@@ -66,10 +66,10 @@ app.post('/', middlewareAuth, async (c) => {
     return c.json({ manifest: manifestEntries })
   }
   else {
-    const data = await getBundleUrl(c, bundle.id, bundle.r2_path, userId)
-    if (!data)
+    const url = await getBundleUrl(c, bundle.r2_path, userId, bundle.checksum ?? '')
+    if (!url)
       throw simpleError('cannot_get_bundle_url', 'Cannot get bundle url')
 
-    return c.json({ url: data.url })
+    return c.json({ url })
   }
 })

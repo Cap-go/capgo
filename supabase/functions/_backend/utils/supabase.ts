@@ -1,3 +1,4 @@
+import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Context } from 'hono'
 import type { AuthInfo, MiddlewareKeyVariables } from './hono.ts'
 import type { Database } from './supabase.types.ts'
@@ -940,5 +941,47 @@ export async function getUpdateStatsSB(c: Context): Promise<UpdateStats> {
       success_rate: Number(totalSuccessRate.toFixed(2)),
       healthy: totalSuccessRate >= 70,
     },
+  }
+}
+
+export async function checkKey(c: Context, authorization: string | undefined, supabase: SupabaseClient<Database>, allowed: Database['public']['Enums']['key_mode'][]): Promise<Database['public']['Tables']['apikeys']['Row'] | null> {
+  if (!authorization)
+    return null
+  try {
+    const { data, error } = await supabase
+      .from('apikeys')
+      .select()
+      .eq('key', authorization)
+      .in('mode', allowed)
+      .single()
+    if (!data || error) {
+      cloudlog({ requestId: c.get('requestId'), message: 'Invalid apikey', authorization, allowed, error })
+      return null
+    }
+    return data
+  }
+  catch (error) {
+    cloudlog({ requestId: c.get('requestId'), message: 'checkKey error', error })
+    return null
+  }
+}
+
+export async function checkKeyById(c: Context, id: number, supabase: SupabaseClient<Database>, allowed: Database['public']['Enums']['key_mode'][]): Promise<Database['public']['Tables']['apikeys']['Row'] | null> {
+  if (!id)
+    return null
+  try {
+    const { data, error } = await supabase
+      .from('apikeys')
+      .select('*')
+      .eq('id', id)
+      .in('mode', allowed)
+      .single()
+    if (!data || error)
+      return null
+    return data
+  }
+  catch (error) {
+    cloudlog({ requestId: c.get('requestId'), message: 'checkKeyById error', error })
+    return null
   }
 }
