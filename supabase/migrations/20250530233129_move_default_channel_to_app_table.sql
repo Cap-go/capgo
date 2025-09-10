@@ -93,11 +93,63 @@ AS $$
 DECLARE
     current_ios_public BOOLEAN;
     current_android_public BOOLEAN;
+    ios_channel_supports_android BOOLEAN;
+    android_channel_supports_ios BOOLEAN;
+    selected_ios_is_ios BOOLEAN;
+    selected_ios_name TEXT;
+    selected_android_is_android BOOLEAN;
+    selected_android_name TEXT;
 BEGIN
     -- Only proceed if the default channel values actually changed
     IF (OLD.default_channel_ios IS NOT DISTINCT FROM NEW.default_channel_ios) 
        AND (OLD.default_channel_android IS NOT DISTINCT FROM NEW.default_channel_android) THEN
         RETURN NEW;
+    END IF;
+
+    -- Validate platform conflicts before proceeding
+    IF NEW.default_channel_ios IS NOT NULL AND NEW.default_channel_android IS NOT NULL 
+       AND NEW.default_channel_ios != NEW.default_channel_android THEN
+        
+        -- Check if iOS channel also supports Android
+        SELECT android INTO ios_channel_supports_android
+        FROM public.channels
+        WHERE id = NEW.default_channel_ios AND app_id = NEW.app_id;
+        
+        -- Check if Android channel also supports iOS  
+        SELECT ios INTO android_channel_supports_ios
+        FROM public.channels
+        WHERE id = NEW.default_channel_android AND app_id = NEW.app_id;
+        
+        -- Reject if iOS channel supports Android but we're assigning a different Android channel
+        IF ios_channel_supports_android = TRUE THEN
+            RAISE EXCEPTION 'Cannot assign different channels for iOS and Android when the iOS channel (%) supports both platforms. Use the same channel for both platforms or choose an iOS-only channel.', 
+                (SELECT name FROM public.channels WHERE id = NEW.default_channel_ios);
+        END IF;
+        
+        -- Reject if Android channel supports iOS but we're assigning a different iOS channel
+        IF android_channel_supports_ios = TRUE THEN
+            RAISE EXCEPTION 'Cannot assign different channels for iOS and Android when the Android channel (%) supports both platforms. Use the same channel for both platforms or choose an Android-only channel.', 
+                (SELECT name FROM public.channels WHERE id = NEW.default_channel_android);
+        END IF;
+    END IF;
+
+    -- Validate selected defaults actually support their respective platforms
+    IF NEW.default_channel_ios IS NOT NULL THEN
+        SELECT ios, name INTO selected_ios_is_ios, selected_ios_name
+        FROM public.channels
+        WHERE id = NEW.default_channel_ios AND app_id = NEW.app_id;
+        IF COALESCE(selected_ios_is_ios, FALSE) = FALSE THEN
+            RAISE EXCEPTION 'Cannot assign iOS default to channel "%" that does not support iOS. Choose an iOS-capable channel.', selected_ios_name;
+        END IF;
+    END IF;
+
+    IF NEW.default_channel_android IS NOT NULL THEN
+        SELECT android, name INTO selected_android_is_android, selected_android_name
+        FROM public.channels
+        WHERE id = NEW.default_channel_android AND app_id = NEW.app_id;
+        IF COALESCE(selected_android_is_android, FALSE) = FALSE THEN
+            RAISE EXCEPTION 'Cannot assign Android default to channel "%" that does not support Android. Choose an Android-capable channel.', selected_android_name;
+        END IF;
     END IF;
 
     -- Check current public status of the channels we're about to update
@@ -151,8 +203,8 @@ ON public.apps
 FOR EACH ROW
 EXECUTE FUNCTION public.update_channel_public_from_app();
 
--- Create a trigger function that syncs channels.public changes to apps table and validates platform changes
-CREATE OR REPLACE FUNCTION public.sync_channel_public_to_apps()
+-- Create a trigger function that guards against making channels non-public when they're assigned as default channels
+CREATE OR REPLACE FUNCTION public.guard_channel_public()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -164,8 +216,6 @@ DECLARE
     new_ios BOOLEAN;
     old_android BOOLEAN;
     new_android BOOLEAN;
-    channel_ios BOOLEAN;
-    channel_android BOOLEAN;
     current_ios_default BIGINT;
     current_android_default BIGINT;
 BEGIN
@@ -192,80 +242,16 @@ BEGIN
         RAISE EXCEPTION 'Cannot remove Android platform support from channel "%" as it is assigned as default_channel_android in the apps table. Remove the channel from default_channel_android first.', NEW.name;
     END IF;
     
-    -- Only proceed with public status changes if public status actually changed
-    IF old_public = new_public THEN
-        RETURN NEW;
-    END IF;
-    
-    -- Get channel platform support
-    channel_ios := NEW.ios;
-    channel_android := NEW.android;
-    
-    -- Check current apps table state
-    SELECT default_channel_ios, default_channel_android 
-    INTO current_ios_default, current_android_default
-    FROM public.apps
-    WHERE app_id = NEW.app_id;
-    
-    -- If channel is being set to public (true)
-    IF new_public = TRUE THEN
-        -- Check if apps table already matches what we want to set
-        IF (NOT channel_ios OR current_ios_default = NEW.id)
-           AND (NOT channel_android OR current_android_default = NEW.id) THEN
-            RETURN NEW; -- Apps table already correct, no update needed
+    -- Validate public status changes
+    IF old_public = TRUE AND new_public = FALSE THEN
+        -- Prevent making channels non-public when they're assigned as default channels
+        IF current_ios_default = NEW.id OR current_android_default = NEW.id THEN
+            RAISE EXCEPTION 'Cannot make channel "%" non-public as it is assigned as a default channel in the apps table. Remove the channel from default channels first.', NEW.name;
         END IF;
-        
-        -- Update apps table to set this channel as default for supported platforms
-        IF channel_ios THEN
-            UPDATE public.apps
-            SET default_channel_ios = NEW.id
-            WHERE app_id = NEW.app_id;
-        END IF;
-        
-        IF channel_android THEN
-            UPDATE public.apps
-            SET default_channel_android = NEW.id
-            WHERE app_id = NEW.app_id;
-        END IF;
-        
-        -- Mark conflicting channels as non-public
-        IF channel_ios THEN
-            UPDATE public.channels
-            SET public = FALSE
-            WHERE app_id = NEW.app_id 
-            AND id != NEW.id 
-            AND ios = TRUE
-            AND public = TRUE;
-        END IF;
-        
-        IF channel_android THEN
-            UPDATE public.channels
-            SET public = FALSE
-            WHERE app_id = NEW.app_id 
-            AND id != NEW.id 
-            AND android = TRUE
-            AND public = TRUE;
-        END IF;
-        
-    -- If channel is being set to non-public (false)
-    ELSE
-        -- Check if apps table needs updating
-        IF (NOT channel_ios OR current_ios_default != NEW.id)
-           AND (NOT channel_android OR current_android_default != NEW.id) THEN
-            RETURN NEW; -- Apps table already correct, no update needed
-        END IF;
-        
-        -- Remove this channel as default from apps table
-        IF channel_ios AND current_ios_default = NEW.id THEN
-            UPDATE public.apps
-            SET default_channel_ios = NULL
-            WHERE app_id = NEW.app_id;
-        END IF;
-        
-        IF channel_android AND current_android_default = NEW.id THEN
-            UPDATE public.apps
-            SET default_channel_android = NULL
-            WHERE app_id = NEW.app_id;
+    ELSIF old_public = FALSE AND new_public = TRUE THEN
+        -- Prevent making channels public unless they're specifically set as default channels in the apps table
+        IF current_ios_default != NEW.id AND current_android_default != NEW.id THEN
+            RAISE EXCEPTION 'Cannot make channel "%" public unless it is specifically set as a default channel in the apps table. Set the channel as default_channel_ios or default_channel_android first.', NEW.name;
         END IF;
     END IF;
     
@@ -276,19 +262,13 @@ $$;
 -- Create triggers for the channels table
 DROP TRIGGER IF EXISTS manage_channel_public_status_trigger ON public.channels;
 DROP TRIGGER IF EXISTS sync_channel_public_to_apps_trigger ON public.channels;
-CREATE TRIGGER sync_channel_public_to_apps_trigger
+DROP TRIGGER IF EXISTS sync_channel_public_to_apps_insert_trigger ON public.channels;
+DROP TRIGGER IF EXISTS guard_channel_public_trigger ON public.channels;
+CREATE TRIGGER guard_channel_public_trigger
 AFTER UPDATE OF public, ios, android
 ON public.channels
 FOR EACH ROW
-EXECUTE FUNCTION public.sync_channel_public_to_apps();
-
--- Also create a trigger for INSERT to handle new channels marked as public
-CREATE TRIGGER sync_channel_public_to_apps_insert_trigger
-AFTER INSERT
-ON public.channels
-FOR EACH ROW
-WHEN (NEW.public = TRUE)
-EXECUTE FUNCTION public.sync_channel_public_to_apps();
+EXECUTE FUNCTION public.guard_channel_public();
 
 -- Procedure to sync all existing channels
 DO $$

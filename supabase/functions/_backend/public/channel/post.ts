@@ -135,6 +135,7 @@ export async function post(c: Context, body: ChannelSet, apikey: Database['publi
   }
   catch (e) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot create channel', error: e })
-    return c.json({ status: 'Cannot create channel', error: JSON.stringify(e) }, 500)
+    const message = (e && typeof e === 'object' && 'message' in e) ? (e as any).message : String(e)
+    return c.json({ status: 'Cannot create channel', error: JSON.stringify(e), errorMessage: message }, 500)
   }
 }
