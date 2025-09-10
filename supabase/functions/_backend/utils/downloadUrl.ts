@@ -28,7 +28,9 @@ export async function getBundleUrl(
       const signedUrl = await s3.getSignedUrl(c, r2_path, EXPIRATION_SECONDS)
       cloudlog({ requestId: c.get('requestId'), message: 'getBundleUrl', signedUrl })
       const url = signedUrl
-      return `${url}?key=${checksum}&device_id=${deviceId}`
+      // Since it's signed url we cannot add extra query params like checksum and device id
+      // TODO: swtich to our own file endpoint instead of direct s3 signed url
+      return url
     }
     catch (error) {
       cloudlogErr({ requestId: c.get('requestId'), message: 'getBundleUrl', error })
