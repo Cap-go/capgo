@@ -127,6 +127,12 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      # - name: Deploy Script to Bunny Edge Scripting
+      #   uses: BunnyWay/actions/deploy-script@latest
+      #   with:
+      #     script_id: ${{ secrets.BUNNY_SCRIPT_API_ID }}
+      #     deploy_key: ${{ secrets.BUNNY_API_DEPLOY_KEY }}
+      #     file: bunny/api/index.ts
 
   deploy_files:
     needs: supabase_deploy
@@ -152,6 +158,12 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      # - name: Deploy Script to Bunny Edge Scripting
+      #   uses: BunnyWay/actions/deploy-script@latest
+      #   with:
+      #     script_id: ${{ secrets.BUNNY_SCRIPT_FILES_ID }}
+      #     deploy_key: ${{ secrets.BUNNY_FILES_DEPLOY_KEY }}
+      #     file: bunny/files/index.ts
 
   deploy_plugin:
     needs: supabase_deploy
@@ -177,3 +189,9 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      # - name: Deploy Script to Bunny Edge Scripting
+      #   uses: BunnyWay/actions/deploy-script@latest
+      #   with:
+      #     script_id: ${{ secrets.BUNNY_SCRIPT_PLUGIN_ID }}
+      #     deploy_key: ${{ secrets.BUNNY_PLUGIN_DEPLOY_KEY }}
+      #     file: bunny/plugin/index.ts

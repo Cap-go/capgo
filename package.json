@@ -86,6 +86,7 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.884.0",
     "@bradenmacdonald/s3-lite-client": "npm:@jsr/bradenmacdonald__s3-lite-client@0.9.2",
+    "@bunny.net/edgescript-sdk": "^0.12.0",
     "@capacitor-community/in-app-review": "^7.0.1",
     "@capacitor-community/keep-awake": "^7.1.0",
     "@capacitor/action-sheet": "^7.0.2",
@@ -150,7 +151,6 @@
     "chart.js": "^4.5.0",
     "country-code-to-flag-emoji": "^2.0.0",
     "cron-schedule": "^5.0.4",
-    "crypto-random-string": "^5.0.0",
     "daisyui": "^5.1.9",
     "dayjs": "1.11.18",
     "dompurify": "^3.2.6",

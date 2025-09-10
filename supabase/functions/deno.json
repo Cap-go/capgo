@@ -21,9 +21,7 @@
     "drizzle-orm/postgres-js": "https://esm.sh/drizzle-orm@0.43.1/postgres-js?target=deno",
     "postgres": "https://deno.land/x/postgresjs@v3.4.7/mod.js",
     "__INFO_END__": "End of specials imports",
-    "adm-zip": "npm:adm-zip@0.5.16",
     "@supabase/supabase-js": "npm:@supabase/supabase-js@2.55.0",
-    "crypto-random-string": "npm:crypto-random-string@5.0.4",
     "@std/semver": "jsr:@std/semver@1.0.4",
     "@bradenmacdonald/s3-lite-client": "jsr:@bradenmacdonald/s3-lite-client@0.9.2",
     "discord-api-types/": "npm:/discord-api-types@^0.38.15/"
