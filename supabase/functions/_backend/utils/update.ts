@@ -20,6 +20,8 @@ import { getAppOwnerPostgresV2, getDrizzleClientD1Session, isAllowedActionOrgAct
 import { createStatsBandwidth, createStatsMau, createStatsVersion, opnPremStats, sendStatsAndDevice } from './stats.ts'
 import { backgroundTask, fixSemver } from './utils.ts'
 
+const PLAN_LIMIT: Array<'mau' | 'bandwidth' | 'storage'> = ['mau', 'bandwidth']
+
 export function resToVersion(plugin_version: string, signedURL: string, version: Database['public']['Tables']['app_versions']['Row'], manifest: ManifestEntry[]) {
   const res: {
     version: string
@@ -41,7 +43,24 @@ export function resToVersion(plugin_version: string, signedURL: string, version:
   return res
 }
 
-export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: ReturnType<typeof getDrizzleClient> | ReturnType<typeof getDrizzleClientD1>, isV2: boolean) {
+async function returnV2orV1<T>(
+  c: Context,
+  isV2: boolean,
+  runV1: () => Promise<T>,
+  runV2: () => Promise<T>,
+): Promise<T> {
+  // When v2 is enabled, only run v2 (D1) and do NOT touch v1 (PG)
+  if (isV2) {
+    return runV2()
+  }
+  // In the v1 case, use PG as the source of truth, but kick off v2 in the background
+  backgroundTask(c, runV2().then((res) => {
+    console.log('Response from V2 function:', res)
+  }))
+  return runV1()
+}
+
+export async function updateWithPG(c: Context, body: AppInfos, drizzleCientD1: ReturnType<typeof getDrizzleClientD1>, drizzleCient: ReturnType<typeof getDrizzleClient>, isV2: boolean) {
   cloudlog({ requestId: c.get('requestId'), message: 'body', body, date: new Date().toISOString() })
   const {
     version_name,
@@ -57,7 +76,12 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
     is_prod = true,
   } = body
   // if version_build is not semver, then make it semver
-  const appOwner = isV2 ? await getAppOwnerPostgresV2(c, app_id, drizzleCient as ReturnType<typeof getDrizzleClientD1>) : await getAppOwnerPostgres(c, app_id, drizzleCient as ReturnType<typeof getDrizzleClient>)
+  const appOwner = await returnV2orV1(
+    c,
+    isV2,
+    () => getAppOwnerPostgres(c, app_id, drizzleCient),
+    () => getAppOwnerPostgresV2(c, app_id, drizzleCientD1),
+  )
   const device: DeviceWithoutCreatedAt = {
     app_id,
     device_id,
@@ -98,7 +122,12 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
     throw simpleError('missing_info', 'Cannot find device_id or app_id', { body })
   }
 
-  const planValid = isV2 ? await isAllowedActionOrgActionD1(c, drizzleCient as ReturnType<typeof getDrizzleClientD1>, appOwner.orgs.id, ['mau', 'bandwidth']) : await isAllowedActionOrgActionPg(c, drizzleCient as ReturnType<typeof getDrizzleClient>, appOwner.orgs.id, ['mau', 'bandwidth'])
+  const planValid = await returnV2orV1(
+    c,
+    isV2,
+    () => isAllowedActionOrgActionPg(c, drizzleCient, appOwner.orgs.id, PLAN_LIMIT),
+    () => isAllowedActionOrgActionD1(c, drizzleCientD1, appOwner.orgs.id, PLAN_LIMIT),
+  )
   if (!planValid) {
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot update, upgrade plan to continue to update', id: app_id })
     await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
@@ -108,9 +137,12 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
 
   cloudlog({ requestId: c.get('requestId'), message: 'vals', platform, device })
 
-  const requestedInto = isV2
-    ? await requestInfosPostgresV2(c, platform, app_id, device_id, version_name, defaultChannel, drizzleCient as ReturnType<typeof getDrizzleClientD1>)
-    : await requestInfosPostgres(c, platform, app_id, device_id, version_name, defaultChannel, drizzleCient as ReturnType<typeof getDrizzleClient>)
+  const requestedInto = await returnV2orV1(
+    c,
+    isV2,
+    () => requestInfosPostgres(c, platform, app_id, device_id, version_name, defaultChannel, drizzleCient),
+    () => requestInfosPostgresV2(c, platform, app_id, device_id, version_name, defaultChannel, drizzleCientD1),
+  )
   const { versionData, channelOverride } = requestedInto
   let { channelData } = requestedInto
   cloudlog({ requestId: c.get('requestId'), message: `versionData exists ? ${versionData !== undefined}, channelData exists ? ${channelData !== undefined}, channelOverride exists ? ${channelOverride !== undefined}` })
@@ -327,7 +359,8 @@ export async function update(c: Context, body: AppInfos) {
 
   let res
   try {
-    res = await updateWithPG(c, body, isV2 ? getDrizzleClientD1Session(c) : getDrizzleClient(pgClient as any), !!isV2)
+    const drizzlePg = pgClient ? getDrizzleClient(pgClient) : (null as any)
+    res = await updateWithPG(c, body, getDrizzleClientD1Session(c), drizzlePg, !!isV2)
   }
   catch (e) {
     throw simpleError('unknow_error', `Error unknow`, { body }, e)
