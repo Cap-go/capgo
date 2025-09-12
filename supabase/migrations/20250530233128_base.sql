@@ -2044,6 +2044,10 @@ BEGIN
     -- If not found, try Authorization header
     IF api_key IS NULL OR api_key = '' THEN
       api_key := (headers_text::"json" ->> 'authorization'::"text");
+      -- Ignore Authorization when it starts with the Bearer scheme (JWT)
+      IF api_key IS NOT NULL AND api_key <> '' AND api_key ~* '^\s*bearer\s+' THEN
+        RETURN NULL;
+      END IF;
     END IF;
 
     RETURN api_key;
