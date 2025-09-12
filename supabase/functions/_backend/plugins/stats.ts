@@ -90,9 +90,16 @@ async function post(c: Context, drizzleCient: ReturnType<typeof getDrizzleClient
   if (version_name === 'builtin' || version_name === 'unknown') {
     allowedDeleted = true
   }
-  const appVersion = isV2 ? await getAppVersionPostgresV2(c, app_id, version_name, allowedDeleted, drizzleCient as ReturnType<typeof getDrizzleClientD1Session>) : await getAppVersionPostgres(c, app_id, version_name, allowedDeleted, drizzleCient as ReturnType<typeof getDrizzleClient>)
+  let appVersion = isV2 ? await getAppVersionPostgresV2(c, app_id, version_name, allowedDeleted, drizzleCient as ReturnType<typeof getDrizzleClientD1Session>) : await getAppVersionPostgres(c, app_id, version_name, allowedDeleted, drizzleCient as ReturnType<typeof getDrizzleClient>)
   if (!appVersion) {
-    throw quickError(404, 'version_not_found', 'Version not found', { app_id, version_name })
+    const appVersion2 = isV2 ? await getAppVersionPostgresV2(c, app_id, 'unknown', allowedDeleted, drizzleCient as ReturnType<typeof getDrizzleClientD1Session>) : await getAppVersionPostgres(c, app_id, 'unknown', allowedDeleted, drizzleCient as ReturnType<typeof getDrizzleClient>)
+    if (appVersion2) {
+      appVersion = appVersion2
+      cloudlog({ requestId: c.get('requestId'), message: `Version name ${version_name} not found, using unknown instead`, app_id, version_name })
+    }
+    else {
+      throw quickError(404, 'version_not_found', 'Version not found', { app_id, version_name })
+    }
   }
   const planValid = isV2 ? await isAllowedActionOrgActionD1(c, drizzleCient as ReturnType<typeof getDrizzleClientD1>, appOwner.orgs.id, ['mau', 'bandwidth']) : await isAllowedActionOrgActionPg(c, drizzleCient as ReturnType<typeof getDrizzleClient>, appOwner.orgs.id, ['mau', 'bandwidth'])
   if (!planValid) {

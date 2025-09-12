@@ -189,7 +189,7 @@ export function simpleError200(c: Context, errorCode: string, message: string, m
     message,
     ...moreInfo,
   }
-  cloudlogErr({ requestId: c.get('requestId'), message, errorCode, moreInfo })
+  cloudlog({ requestId: c.get('requestId'), message, errorCode, moreInfo })
   return c.json(res, status)
 }
 
