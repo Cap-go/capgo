@@ -56,7 +56,9 @@ async function returnV2orV1<T>(
   }
   // In the v1 case, use PG as the source of truth, but kick off v2 in the background
   backgroundTask(c, runV2().then((res) => {
-    console.log('Response from V2 function:', res)
+    cloudlog({ requestId: c.get('requestId'), message: 'Completed background V2 function', res })
+  }).catch((err) => {
+    cloudlog({ requestId: c.get('requestId'), message: 'Error in background V2 function', err })
   }))
   return runV1()
 }
