@@ -1,6 +1,7 @@
 import type { Context } from 'hono'
 import type { ManifestEntry } from './downloadUrl.ts'
 import type { getDrizzleClientD1 } from './pg_d1.ts'
+
 import type { Database } from './supabase.types.ts'
 import type { AppInfos, DeviceWithoutCreatedAt } from './types.ts'
 import {
@@ -10,6 +11,8 @@ import {
   parse,
   tryParse,
 } from '@std/semver'
+import { getRuntimeKey } from 'hono/adapter'
+import { HTTPException } from 'hono/http-exception'
 import { appIdToUrl } from './conversion.ts'
 import { getBundleUrl, getManifestUrl } from './downloadUrl.ts'
 import { getIsV2, simpleError, simpleError200 } from './hono.ts'
@@ -19,7 +22,7 @@ import { closeClient, getAppOwnerPostgres, getDrizzleClient, getPgClient, isAllo
 import { getAppOwnerPostgresV2, getDrizzleClientD1Session, isAllowedActionOrgActionD1, requestInfosPostgresV2 } from './pg_d1.ts'
 import { s3 } from './s3.ts'
 import { createStatsBandwidth, createStatsMau, createStatsVersion, opnPremStats, sendStatsAndDevice } from './stats.ts'
-import { backgroundTask, fixSemver } from './utils.ts'
+import { backgroundTask, existInEnv, fixSemver } from './utils.ts'
 
 const PLAN_LIMIT: Array<'mau' | 'bandwidth' | 'storage'> = ['mau', 'bandwidth']
 
@@ -55,15 +58,23 @@ async function returnV2orV1<T>(
     return runV2()
   }
   // In the v1 case, use PG as the source of truth, but kick off v2 in the background
-  backgroundTask(c, runV2().then((res) => {
-    cloudlog({ requestId: c.get('requestId'), message: 'Completed background V2 function', res })
-  }).catch((err) => {
-    cloudlog({ requestId: c.get('requestId'), message: 'Error in background V2 function', err })
-  }))
+  if (getRuntimeKey() === 'workerd' && existInEnv(c, 'DB_REPLICATE')) {
+    backgroundTask(c, runV2().then((res) => {
+      cloudlog({ requestId: c.get('requestId'), message: 'Completed background V2 function', res })
+    }).catch((err) => {
+      cloudlog({ requestId: c.get('requestId'), message: 'Error in background V2 function', err })
+    }))
+  }
   return runV1()
 }
 
-export async function updateWithPG(c: Context, body: AppInfos, drizzleCientD1: ReturnType<typeof getDrizzleClientD1>, drizzleCient: ReturnType<typeof getDrizzleClient>, isV2: boolean) {
+export async function updateWithPG(
+  c: Context,
+  body: AppInfos,
+  getDrizzleCientD1: () => ReturnType<typeof getDrizzleClientD1>,
+  drizzleCient: ReturnType<typeof getDrizzleClient>,
+  isV2: boolean,
+) {
   cloudlog({ requestId: c.get('requestId'), message: 'body', body, date: new Date().toISOString() })
   const {
     version_name,
@@ -83,7 +94,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCientD1: R
     c,
     isV2,
     () => getAppOwnerPostgres(c, app_id, drizzleCient),
-    () => getAppOwnerPostgresV2(c, app_id, drizzleCientD1),
+    () => getAppOwnerPostgresV2(c, app_id, getDrizzleCientD1()),
   )
   const device: DeviceWithoutCreatedAt = {
     app_id,
@@ -129,7 +140,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCientD1: R
     c,
     isV2,
     () => isAllowedActionOrgActionPg(c, drizzleCient, appOwner.orgs.id, PLAN_LIMIT),
-    () => isAllowedActionOrgActionD1(c, drizzleCientD1, appOwner.orgs.id, PLAN_LIMIT),
+    () => isAllowedActionOrgActionD1(c, getDrizzleCientD1(), appOwner.orgs.id, PLAN_LIMIT),
   )
   if (!planValid) {
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot update, upgrade plan to continue to update', id: app_id })
@@ -144,7 +155,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCientD1: R
     c,
     isV2,
     () => requestInfosPostgres(c, platform, app_id, device_id, version_name, defaultChannel, drizzleCient),
-    () => requestInfosPostgresV2(c, platform, app_id, device_id, version_name, defaultChannel, drizzleCientD1),
+    () => requestInfosPostgresV2(c, platform, app_id, device_id, version_name, defaultChannel, getDrizzleCientD1()),
   )
   const { versionData, channelOverride } = requestedInto
   let { channelData } = requestedInto
@@ -366,10 +377,14 @@ export async function update(c: Context, body: AppInfos) {
   let res
   try {
     const drizzlePg = pgClient ? getDrizzleClient(pgClient) : (null as any)
-    res = await updateWithPG(c, body, getDrizzleClientD1Session(c), drizzlePg, !!isV2)
+    // Lazily create D1 client inside updateWithPG when actually used
+    res = await updateWithPG(c, body, () => getDrizzleClientD1Session(c), drizzlePg, !!isV2)
   }
   catch (e) {
-    throw simpleError('unknow_error', `Error unknow`, { body }, e)
+    // Preserve structured HTTPExceptions; wrap only unknown/raw errors
+    if (e instanceof HTTPException)
+      throw e
+    throw simpleError('unknow_error', 'Unknown error', { body }, e)
   }
   if (isV2 && pgClient)
     await closeClient(c, pgClient)

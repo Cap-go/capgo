@@ -31,14 +31,28 @@ export function onError(functionName: string) {
     }
 
     if (e instanceof HTTPException) {
-      cloudlogErr({ requestId: c.get('requestId'), functionName, message: 'HTTPException found', status: e.status })
+      // Pull the JSON we attached to the HTTPException to improve logs
+      let res: SimpleErrorResponse = defaultResponse
+      try {
+        res = await e.getResponse().json<SimpleErrorResponse>()
+      }
+      catch {
+        // ignore JSON parse errors; fall back to default
+      }
+      cloudlogErr({
+        requestId: c.get('requestId'),
+        functionName,
+        message: 'HTTPException found',
+        status: e.status,
+        errorCode: res.error,
+        errorMessage: res.message,
+      })
       if (e.status === 429) {
         return c.json({ error: 'you are beeing rate limited' }, e.status)
       }
       if (e.status >= 500) {
         await backgroundTask(c, sendDiscordAlert500(c, functionName, body, e))
       }
-      const res: SimpleErrorResponse = await e.getResponse().json<SimpleErrorResponse>().catch(() => (defaultResponse))
       return c.json(res, e.status)
     }
     else {

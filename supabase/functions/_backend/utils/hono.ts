@@ -199,7 +199,12 @@ export function quickError(status: number, errorCode: string, message: string, m
     message,
     moreInfo,
   }
-  return new HTTPException(status as any, { res: new Response(JSON.stringify(res), { status }), cause })
+  // Provide an Error message so logs aren't empty and include our code/message
+  return new HTTPException(status as any, {
+    res: new Response(JSON.stringify(res), { status }),
+    message: `${errorCode}: ${message}`,
+    cause,
+  })
 }
 
 export function simpleError(errorCode: string, message: string, moreInfo: any = {}, cause?: any) {

@@ -3,6 +3,7 @@ import { and, eq, or, sql } from 'drizzle-orm'
 import { drizzle as drizzleD1 } from 'drizzle-orm/d1'
 import { alias as aliasV2 } from 'drizzle-orm/sqlite-core'
 import { existInEnv } from '../utils/utils.ts'
+import { quickError } from './hono.ts'
 import { cloudlog, cloudlogErr } from './loggin.ts'
 import * as schemaV2 from './sqlite_schema.ts'
 
@@ -29,14 +30,15 @@ export function parseManifestEntries(c: Context, data: any, source: string) {
 
 export function getDrizzleClientD1(c: Context) {
   if (!existInEnv(c, 'DB_REPLICATE')) {
-    throw new Error('DB_REPLICATE is not set')
+    // Server/configuration error: surface as structured HTTP error
+    throw quickError(500, 'missing_binding', 'DB_REPLICATE is not set', { binding: 'DB_REPLICATE' })
   }
   return drizzleD1(c.env.DB_REPLICATE)
 }
 
 export function getDrizzleClientD1Session(c: Context) {
   if (!existInEnv(c, 'DB_REPLICATE')) {
-    throw new Error('DB_REPLICATE is not set')
+    throw quickError(500, 'missing_binding', 'DB_REPLICATE is not set', { binding: 'DB_REPLICATE' })
   }
   const session = c.env.DB_REPLICATE.withSession('first-unconstrained')
   return drizzleD1(session)
