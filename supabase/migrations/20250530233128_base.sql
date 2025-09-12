@@ -2030,6 +2030,7 @@ SET
 DECLARE
   headers_text text;
   api_key text;
+  auth_header text;
 BEGIN
   headers_text := "current_setting"('request.headers'::"text", true);
 
@@ -2041,9 +2042,12 @@ BEGIN
     -- First try to get from capgkey header
     api_key := (headers_text::"json" ->> 'capgkey'::"text");
 
-    -- If not found, try Authorization header
+    -- If not found, try Authorization header ONLY if it looks like a UUID
     IF api_key IS NULL OR api_key = '' THEN
-      api_key := (headers_text::"json" ->> 'authorization'::"text");
+      auth_header := (headers_text::"json" ->> 'authorization'::"text");
+      IF auth_header IS NOT NULL AND auth_header ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN
+        api_key := auth_header;
+      END IF;
     END IF;
 
     RETURN api_key;

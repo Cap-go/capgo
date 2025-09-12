@@ -52,6 +52,70 @@ BEGIN
 END $$;
 
 
+-- Helper to atomically set a default channel for a platform, ensuring support
+-- Usage: SELECT public.set_default_channel('com.demo.app', 'production', 'ios');
+CREATE OR REPLACE FUNCTION public.set_default_channel(
+  p_app_id text,
+  p_channel_name text,
+  p_platform text
+) RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_channel_id bigint;
+  v_ios boolean;
+  v_android boolean;
+BEGIN
+  -- Defer constraint triggers so validations run on the final state
+  -- (callers retain strict per-statement checks by default; this function defers internally)
+  SET CONSTRAINTS update_default_channel_public_trigger, guard_channel_public_trigger DEFERRED;
+
+  IF p_platform IS NULL OR lower(p_platform) NOT IN ('ios','android','both') THEN
+    RAISE EXCEPTION 'Invalid platform: % (expected ios|android|both)', p_platform;
+  END IF;
+
+  SELECT id, ios, android INTO v_channel_id, v_ios, v_android
+  FROM public.channels
+  WHERE app_id = p_app_id AND name = p_channel_name
+  LIMIT 1;
+
+  IF v_channel_id IS NULL THEN
+    RAISE EXCEPTION 'Channel "%" not found for app_id "%"', p_channel_name, p_app_id;
+  END IF;
+
+  -- Ensure channel supports the requested platform(s) (enable if needed)
+  IF lower(p_platform) = 'ios' THEN
+    IF COALESCE(v_ios, false) = false THEN
+      UPDATE public.channels SET ios = true WHERE id = v_channel_id;
+    END IF;
+    -- Assign default on app
+    UPDATE public.apps SET default_channel_ios = v_channel_id WHERE app_id = p_app_id;
+  ELSIF lower(p_platform) = 'android' THEN
+    IF COALESCE(v_android, false) = false THEN
+      UPDATE public.channels SET android = true WHERE id = v_channel_id;
+    END IF;
+    -- Assign default on app
+    UPDATE public.apps SET default_channel_android = v_channel_id WHERE app_id = p_app_id;
+  ELSE
+    -- both: enable both flags if needed, then set both defaults in a single UPDATE
+    IF COALESCE(v_ios, false) = false THEN
+      UPDATE public.channels SET ios = true WHERE id = v_channel_id;
+    END IF;
+    IF COALESCE(v_android, false) = false THEN
+      UPDATE public.channels SET android = true WHERE id = v_channel_id;
+    END IF;
+    UPDATE public.apps
+      SET default_channel_ios = v_channel_id,
+          default_channel_android = v_channel_id
+      WHERE app_id = p_app_id;
+  END IF;
+
+  RETURN;
+END;
+$$;
+
+
 -- Drop the default_channel_ios column
 -- TODO at 2025-10-02: remove this public column
 -- Still used in the CLI during upload, removing it will break the upload
@@ -196,10 +260,12 @@ END;
 $$;
 
 -- Create a trigger for the apps table
+-- Recreate as DEFERRABLE CONSTRAINT TRIGGER (initially immediate)
 DROP TRIGGER IF EXISTS update_default_channel_public_trigger ON public.apps;
-CREATE TRIGGER update_default_channel_public_trigger
+CREATE CONSTRAINT TRIGGER update_default_channel_public_trigger
 AFTER INSERT OR UPDATE OF default_channel_ios, default_channel_android
 ON public.apps
+DEFERRABLE INITIALLY IMMEDIATE
 FOR EACH ROW
 EXECUTE FUNCTION public.update_channel_public_from_app();
 
@@ -263,10 +329,12 @@ $$;
 DROP TRIGGER IF EXISTS manage_channel_public_status_trigger ON public.channels;
 DROP TRIGGER IF EXISTS sync_channel_public_to_apps_trigger ON public.channels;
 DROP TRIGGER IF EXISTS sync_channel_public_to_apps_insert_trigger ON public.channels;
+-- Recreate as DEFERRABLE CONSTRAINT TRIGGER (initially immediate)
 DROP TRIGGER IF EXISTS guard_channel_public_trigger ON public.channels;
-CREATE TRIGGER guard_channel_public_trigger
+CREATE CONSTRAINT TRIGGER guard_channel_public_trigger
 AFTER UPDATE OF public, ios, android
 ON public.channels
+DEFERRABLE INITIALLY IMMEDIATE
 FOR EACH ROW
 EXECUTE FUNCTION public.guard_channel_public();
 

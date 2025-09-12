@@ -493,15 +493,17 @@ async function saveChannelChange(key: string, val: any) {
       const defaultChannelColumn = key === 'ios' ? 'default_channel_ios' : 'default_channel_android'
 
       if (val === true) {
-        // Enabling: Set this channel as the new default
-        const { error: appUpdateError } = await supabase
-          .from('apps')
-          .update({ [defaultChannelColumn]: id.value })
-          .eq('id', appData.id)
+        // Enabling: Set this channel as the new default using atomic helper (ensures platform support)
+        const { error: rpcError } = await supabase
+          .rpc('set_default_channel', {
+            p_app_id: appData.app_id,
+            p_channel_name: channel.value.name,
+            p_platform: key,
+          })
 
-        if (appUpdateError) {
+        if (rpcError) {
           toast.error(t('error-update-channel'))
-          console.error('Failed to update app default channel:', appUpdateError)
+          console.error('Failed to set default channel via set_default_channel:', rpcError)
           return
         }
       }
