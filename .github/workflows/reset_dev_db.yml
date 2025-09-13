@@ -44,7 +44,7 @@ jobs:
       - name: Reset development database
         run: |
           echo "Resetting capgo-dev database..."
-          supabase db reset --linked
+          supabase db reset --linked --yes
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_TOKEN }}
 
