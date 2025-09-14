@@ -1213,6 +1213,38 @@ export type Database = {
           },
         ]
       }
+      to_delete_accounts: {
+        Row: {
+          account_id: string
+          created_at: string
+          id: number
+          removal_date: string
+          removed_data: Json | null
+        }
+        Insert: {
+          account_id: string
+          created_at?: string
+          id?: number
+          removal_date: string
+          removed_data?: Json | null
+        }
+        Update: {
+          account_id?: string
+          created_at?: string
+          id?: number
+          removal_date?: string
+          removed_data?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "to_delete_accounts_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       users: {
         Row: {
           ban_time: string | null
@@ -1391,6 +1423,13 @@ export type Database = {
           plan_name: string
         }[]
       }
+      delete_accounts_marked_for_deletion: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          deleted_count: number
+          deleted_user_ids: string[]
+        }[]
+      }
       delete_http_response: {
         Args: { request_id: number }
         Returns: undefined
@@ -1422,6 +1461,10 @@ export type Database = {
         Returns: {
           name: string
         }[]
+      }
+      get_account_removal_date: {
+        Args: { user_id: string }
+        Returns: string
       }
       get_apikey: {
         Args: Record<PropertyKey, never>
@@ -1502,7 +1545,9 @@ export type Database = {
         }[]
       }
       get_identity: {
-        Args: Record<PropertyKey, never>
+        Args:
+          | Record<PropertyKey, never>
+          | { keymode: Database["public"]["Enums"]["key_mode"][] }
         Returns: string
       }
       get_identity_apikey_only: {
@@ -1714,6 +1759,10 @@ export type Database = {
         }
         Returns: string
       }
+      is_account_disabled: {
+        Args: { user_id: string }
+        Returns: boolean
+      }
       is_admin: {
         Args: Record<PropertyKey, never> | { userid: string }
         Returns: boolean
@@ -1845,6 +1894,10 @@ export type Database = {
       parse_step_pattern: {
         Args: { pattern: string }
         Returns: number
+      }
+      pg_log: {
+        Args: { decision: string; input?: Json }
+        Returns: undefined
       }
       process_admin_stats: {
         Args: Record<PropertyKey, never>

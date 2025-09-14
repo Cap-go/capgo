@@ -53,7 +53,7 @@ export function onError(functionName: string) {
         errorCode: res.error,
         errorMessage: res.message,
         moreInfo: res.moreInfo,
-        stack: (e as any)?.stack ?? serializeError(e)?.stack,
+        stack: serializeError(e)?.stack ?? 'N/A',
       })
       if (e.status === 429) {
         return c.json({ error: 'too_many_requests', message: 'You are being rate limited' }, e.status)
@@ -71,7 +71,7 @@ export function onError(functionName: string) {
       method: c.req.method,
       url: c.req.url,
       errorMessage: e?.message ?? 'Unknown error',
-      stack: (e as any)?.stack ?? serializeError(e)?.stack,
+      stack: serializeError(e)?.stack ?? 'N/A',
     })
     await backgroundTask(c, sendDiscordAlert500(c, functionName, body, e))
     return c.json(defaultResponse, 500)
