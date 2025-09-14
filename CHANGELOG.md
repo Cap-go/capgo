@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## 12.25.0 (2025-09-14)
+
+
+### Features
+
+* implement simpleRateLimit function and update error handling in stats, updates, and updates_lite plugins ([6411973](https://github.com/Cap-go/capgo/commit/64119733a143000b53e65638704fb47f1041b74f))
+
 ### 12.24.10 (2025-09-14)
 
 ### 12.24.9 (2025-09-14)
