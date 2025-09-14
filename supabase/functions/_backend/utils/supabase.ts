@@ -913,13 +913,13 @@ export async function getUpdateStatsSB(c: Context): Promise<UpdateStats> {
 
   const apps = data.map((app: any) => {
     const totalEvents = app.failed + app.install + app.get
-    const successRate = totalEvents > 0 ? ((app.install + app.get) / totalEvents) * 100 : 100
+    const successRate = Number((totalEvents > 0 ? ((app.install + app.get) / totalEvents) * 100 : 100).toFixed(2))
     return {
       app_id: app.app_id,
       failed: Number(app.failed),
       set: Number(app.install),
       get: Number(app.get),
-      success_rate: Number(successRate.toFixed(2)),
+      success_rate: successRate,
       healthy: successRate >= 70,
     }
   })

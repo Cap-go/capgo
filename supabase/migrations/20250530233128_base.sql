@@ -3689,7 +3689,7 @@ CREATE TABLE IF NOT EXISTS "public"."global_stats" (
   "paying_yearly" integer DEFAULT 0,
   "paying_monthly" integer DEFAULT 0,
   "updates_last_month" integer DEFAULT 0,
-  "success_rate" integer DEFAULT 0
+  "success_rate" FLOAT DEFAULT 0
 );
 
 ALTER TABLE "public"."global_stats" OWNER TO "postgres";

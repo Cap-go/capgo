@@ -933,14 +933,15 @@ export async function getUpdateStatsCF(c: Context): Promise<UpdateStats> {
   try {
     const result = await runQueryToCFA<{ app_id: string, failed: number, set: number, get: number }>(c, query)
 
+    cloudlog({ requestId: c.get('requestId'), message: 'getUpdateStatsCF result', result })
     const apps = result
       .filter(app => app.get > 0)
       .map((app) => {
         const totalEvents = app.set + app.get
-        const successRate = totalEvents > 0 ? (app.get / totalEvents) * 100 : 100
+        const successRate = Number(Number(totalEvents > 0 ? (app.get / totalEvents) * 100 : 100).toFixed(2))
         return {
           ...app,
-          success_rate: Number(successRate.toFixed(2)),
+          success_rate: successRate,
           healthy: successRate >= 70,
         }
       })
@@ -959,7 +960,7 @@ export async function getUpdateStatsCF(c: Context): Promise<UpdateStats> {
       apps,
       total: {
         ...total,
-        success_rate: Number(totalSuccessRate.toFixed(2)),
+        success_rate: Number(totalSuccessRate.toFixed(0)),
         healthy: totalSuccessRate >= 70,
       },
     }

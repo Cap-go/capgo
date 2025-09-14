@@ -80,7 +80,10 @@ function getStats(c: Context): GlobalStats {
 
       return total
     }),
-    success_rate: getUpdateStats(c).then(res => res.total.success_rate),
+    success_rate: getUpdateStats(c).then((res) => {
+      cloudlog({ requestId: c.get('requestId'), message: 'success_rate', success_rate: res.total.success_rate })
+      return res.total.success_rate
+    }),
     actives: readActiveAppsCF(c).then(async (app_ids) => {
       try {
         const res2 = await supabase.rpc('count_active_users', { app_ids }).single()
