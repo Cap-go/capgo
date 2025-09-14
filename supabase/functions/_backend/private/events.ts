@@ -16,7 +16,7 @@ app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
   const body = await parseBody<TrackOptions>(c)
   const supabase = supabaseWithAuth(c, c.get('auth')!)
   await backgroundTask(c, logsnag(c).track(body))
-  if (body.user_id && body.tags && typeof body.tags['app-id'] === 'string' && body.event === 'onboarding-step-10') {
+  if (body.user_id && body.tags && typeof body.tags['app-id'] === 'string' && body.event === 'onboarding-step-done') {
     const orgId = body.user_id
     const appId = body.tags['app-id']
     await backgroundTask(c, Promise.all([
