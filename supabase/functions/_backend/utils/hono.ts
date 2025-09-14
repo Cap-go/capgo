@@ -199,10 +199,10 @@ export function quickError(status: number, errorCode: string, message: string, m
     message,
     moreInfo,
   }
-  // Provide an Error message so logs aren't empty and include our code/message
+  // Throw an HTTPException carrying the JSON response; keep Error.message concise
   return new HTTPException(status as any, {
-    res: new Response(JSON.stringify(res), { status }),
-    message: `${errorCode}: ${message}`,
+    res: new Response(JSON.stringify(res), { status, headers: { 'content-type': 'application/json; charset=utf-8' } }),
+    message,
     cause,
   })
 }

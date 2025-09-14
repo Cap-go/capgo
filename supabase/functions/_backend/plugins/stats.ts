@@ -142,13 +142,7 @@ app.post('/', async (c) => {
   const pgClient = isV2 ? null : getPgClient(c)
 
   const bodyParsed = parsePluginBody<AppStats>(c, body, jsonRequestSchema)
-  let res
-  try {
-    res = await post(c, isV2 ? getDrizzleClientD1Session(c) : getDrizzleClient(pgClient as any), !!isV2, bodyParsed)
-  }
-  catch (e) {
-    throw simpleError('unknow_error', `Error unknow`, { body }, e)
-  }
+  const res = await post(c, isV2 ? getDrizzleClientD1Session(c) : getDrizzleClient(pgClient as any), !!isV2, bodyParsed)
   if (isV2 && pgClient)
     await closeClient(c, pgClient)
   return res

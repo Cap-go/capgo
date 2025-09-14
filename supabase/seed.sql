@@ -438,8 +438,8 @@ CREATE OR REPLACE FUNCTION "public"."reset_and_seed_app_data" ("p_app_id" charac
 SET
   search_path = '' SECURITY DEFINER AS $$
 DECLARE
-    org_id uuid := '046a36ac-e03c-4590-9257-bd6c9dba9ee8';
-    user_id uuid := '6aa76066-55ef-4238-ade6-0b32334a4097';
+    org_id uuid := '046a36ac-e03c-4590-9257-bd6c9dba9ee8'::uuid;
+    user_id uuid := '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid;
     builtin_version_id bigint;
     unknown_version_id bigint;
     v1_0_1_version_id bigint;
@@ -512,6 +512,9 @@ BEGIN
         (now() - interval '5 days', now() - interval '5 days', development_channel_id, p_app_id, v1_359_0_version_id, now() - interval '5 days', org_id, user_id),
         (now() - interval '3 days', now() - interval '3 days', no_access_channel_id, p_app_id, v1_361_0_version_id, now() - interval '3 days', org_id, user_id);
 
+    -- Mark possibly unused variables as used (for linter)
+    PERFORM builtin_version_id, unknown_version_id, v1_0_1_version_id, v1_360_0_version_id;
+
     -- Advisory lock is automatically released at transaction end
 END;
 $$;
@@ -565,12 +568,9 @@ DECLARE
   random_mau INTEGER;
   random_bandwidth BIGINT;
   random_storage BIGINT;
-  random_file_size BIGINT;
   random_uuid UUID;
-  random_fixed_uuid UUID := '00000000-0000-0000-0000-000000000000';
+  random_fixed_uuid UUID := '00000000-0000-0000-0000-000000000000'::uuid;
   random_version_id BIGINT := 3;
-  random_action VARCHAR(20);
-  random_timestamp TIMESTAMP;
 BEGIN  
   -- Use advisory lock to prevent concurrent execution for the same app
   PERFORM pg_advisory_xact_lock(hashtext(p_app_id || '_stats'));

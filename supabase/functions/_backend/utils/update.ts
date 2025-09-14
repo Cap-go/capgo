@@ -12,7 +12,6 @@ import {
   tryParse,
 } from '@std/semver'
 import { getRuntimeKey } from 'hono/adapter'
-import { HTTPException } from 'hono/http-exception'
 import { appIdToUrl } from './conversion.ts'
 import { getBundleUrl, getManifestUrl } from './downloadUrl.ts'
 import { getIsV2, simpleError, simpleError200 } from './hono.ts'
@@ -374,18 +373,9 @@ export async function update(c: Context, body: AppInfos) {
   const isV2 = getIsV2(c)
   const pgClient = isV2 ? null : getPgClient(c)
 
-  let res
-  try {
-    const drizzlePg = pgClient ? getDrizzleClient(pgClient) : (null as any)
-    // Lazily create D1 client inside updateWithPG when actually used
-    res = await updateWithPG(c, body, () => getDrizzleClientD1Session(c), drizzlePg, !!isV2)
-  }
-  catch (e) {
-    // Preserve structured HTTPExceptions; wrap only unknown/raw errors
-    if (e instanceof HTTPException)
-      throw e
-    throw simpleError('unknow_error', 'Unknown error', { body }, e)
-  }
+  const drizzlePg = pgClient ? getDrizzleClient(pgClient) : (null as any)
+  // Lazily create D1 client inside updateWithPG when actually used
+  const res = await updateWithPG(c, body, () => getDrizzleClientD1Session(c), drizzlePg, !!isV2)
   if (isV2 && pgClient)
     await closeClient(c, pgClient)
   return res

@@ -57,6 +57,14 @@ jobs:
         run: bun install
       # - name: Install playwright
       #   run: bunx playwright install
+      - name: Lint
+        run: bun lint && bun lint-backend
+      - name: Typecheck
+        run: bun typecheck
+      - name: Lint I18n
+        run: bunx @inlang/cli lint --project project.inlang
+      - name: Lint SQL
+        run: supabase db lint -s public --fail-on warning
       - uses: JarvusInnovations/background-action@v1
         name: Bootstrap Edge server
         with:

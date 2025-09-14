@@ -1,6 +1,5 @@
 import type { Context } from 'hono'
 import type { SimpleErrorResponse } from './hono.ts'
-import { HTTPException } from 'hono/http-exception'
 import { sendDiscordAlert500 } from './discord.ts'
 import { cloudlogErr, serializeError } from './loggin.ts'
 import { backgroundTask } from './utils.ts'
@@ -8,8 +7,6 @@ import { backgroundTask } from './utils.ts'
 export function onError(functionName: string) {
   return async (e: any, c: Context) => {
     c.get('sentry')?.captureException(e)
-    cloudlogErr({ requestId: c.get('requestId'), functionName, message: e?.message ?? 'app onError', error: serializeError(e) })
-
     let body = 'N/A'
     try {
       const clonedReq = c.req.raw.clone()
@@ -30,34 +27,53 @@ export function onError(functionName: string) {
       moreInfo: {},
     }
 
-    if (e instanceof HTTPException) {
-      // Pull the JSON we attached to the HTTPException to improve logs
+    const isHttpException = e && typeof e === 'object' && typeof e.status === 'number' && typeof e.getResponse === 'function'
+    if (isHttpException) {
+      // Pull the JSON we attached to the HTTPException to improve logs and response
       let res: SimpleErrorResponse = defaultResponse
       try {
-        res = await e.getResponse().json<SimpleErrorResponse>()
+        const parsed = await e.getResponse().json()
+        res = {
+          error: typeof parsed?.error === 'string' ? parsed.error : 'unknown_error',
+          message: typeof parsed?.message === 'string' ? parsed.message : 'Unknown error',
+          moreInfo: parsed?.moreInfo ?? (typeof parsed === 'object' ? parsed : {}),
+        }
       }
       catch {
         // ignore JSON parse errors; fall back to default
       }
+      // Single, structured error log entry
       cloudlogErr({
         requestId: c.get('requestId'),
         functionName,
-        message: 'HTTPException found',
+        kind: 'http_exception',
+        method: c.req.method,
+        url: c.req.url,
         status: e.status,
         errorCode: res.error,
         errorMessage: res.message,
+        moreInfo: res.moreInfo,
+        stack: (e as any)?.stack ?? serializeError(e)?.stack,
       })
       if (e.status === 429) {
-        return c.json({ error: 'you are beeing rate limited' }, e.status)
+        return c.json({ error: 'too_many_requests', message: 'You are being rate limited' }, e.status)
       }
       if (e.status >= 500) {
         await backgroundTask(c, sendDiscordAlert500(c, functionName, body, e))
       }
       return c.json(res, e.status)
     }
-    else {
-      await backgroundTask(c, sendDiscordAlert500(c, functionName, body, e))
-    }
+    // Non-HTTP errors: log with stack and return 500
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      functionName,
+      kind: 'unhandled_error',
+      method: c.req.method,
+      url: c.req.url,
+      errorMessage: e?.message ?? 'Unknown error',
+      stack: (e as any)?.stack ?? serializeError(e)?.stack,
+    })
+    await backgroundTask(c, sendDiscordAlert500(c, functionName, body, e))
     return c.json(defaultResponse, 500)
   }
 }
