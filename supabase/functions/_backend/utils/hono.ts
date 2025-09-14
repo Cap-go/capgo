@@ -207,6 +207,14 @@ export function quickError(status: number, errorCode: string, message: string, m
   })
 }
 
+export function simpleRateLimit(moreInfo: any = {}, cause?: any) {
+  const status = 429
+  const message = 'Too many requests'
+  const errorCode = 'too_many_requests'
+  cloudlog({ message, errorCode, moreInfo })
+  return quickError(status, errorCode, message, moreInfo, cause)
+}
+
 export function simpleError(errorCode: string, message: string, moreInfo: any = {}, cause?: any) {
   return quickError(400, errorCode, message, moreInfo, cause)
 }

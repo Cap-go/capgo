@@ -6,7 +6,7 @@ import type { AppStats, DeviceWithoutCreatedAt, StatsActions } from '../utils/ty
 import { Hono } from 'hono/tiny'
 import { z } from 'zod/mini'
 import { appIdToUrl } from '../utils/conversion.ts'
-import { BRES, getIsV2, parseBody, quickError, simpleError } from '../utils/hono.ts'
+import { BRES, getIsV2, parseBody, quickError, simpleError, simpleRateLimit } from '../utils/hono.ts'
 import { cloudlog } from '../utils/loggin.ts'
 import { sendNotifOrg } from '../utils/notifications.ts'
 import { closeClient, getAppOwnerPostgres, getAppVersionPostgres, getDrizzleClient, getPgClient, isAllowedActionOrgActionPg } from '../utils/pg.ts'
@@ -136,7 +136,7 @@ export const app = new Hono<MiddlewareKeyVariables>()
 app.post('/', async (c) => {
   const body = await parseBody<AppStats>(c)
   if (isLimited(c, body.app_id)) {
-    throw simpleError('too_many_requests', 'Too many requests')
+    throw simpleRateLimit(body)
   }
   const isV2 = getIsV2(c)
   const pgClient = isV2 ? null : getPgClient(c)
