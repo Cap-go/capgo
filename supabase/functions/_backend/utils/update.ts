@@ -111,6 +111,9 @@ export async function updateWithPG(
   if (!appOwner) {
     return opnPremStats(c, app_id, 'get', device)
   }
+  if (body.version_build === 'unknown') {
+    return simpleError200(c, 'unknown_version_build', 'Version build is unknown, cannot proceed with update', { body })
+  }
   const coerce = tryParse(fixSemver(body.version_build))
   if (!coerce) {
     // get app owner with app_id
