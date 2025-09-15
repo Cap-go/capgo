@@ -10,7 +10,6 @@ import iconPassword from '~icons/ph/key?raw'
 import { hideLoader } from '~/services/loader'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
-import { registerWebsiteDomain } from '~/utils/Utils'
 
 const supabase = useSupabase()
 const dialogStore = useDialogV2Store()
@@ -19,6 +18,7 @@ const { t } = useI18n()
 const router = useRouter()
 
 const version = import.meta.env.VITE_APP_VERSION
+const registerUrl = window.location.host === 'web.capgo.app' ? 'https://capgo.app/register/' : `/register/`
 
 async function deleteAccount() {
   dialogStore.openDialog({
@@ -175,7 +175,7 @@ onMounted (() => {
                 <div class="text-center">
                   <p class="text-base text-gray-600">
                     {{ t('dont-have-an-account') }} <br> <a
-                      :href="`${registerWebsiteDomain()}/register/`"
+                      :href="registerUrl"
                       class="font-medium text-orange-500 transition-all duration-200 hover:text-orange-600 hover:underline"
                     >
                       {{ t('create-a-free-accoun') }}

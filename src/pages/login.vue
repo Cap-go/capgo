@@ -16,7 +16,6 @@ import mfaIcon from '~icons/simple-icons/2fas?raw'
 import { hideLoader } from '~/services/loader'
 import { autoAuth, hashEmail, useSupabase } from '~/services/supabase'
 import { openSupport } from '~/services/support'
-import { registerWebsiteDomain } from '~/utils/Utils'
 
 const route = useRoute('/login')
 const supabase = useSupabase()
@@ -32,6 +31,8 @@ const { t } = useI18n()
 const captchaComponent = ref<InstanceType<typeof VueTurnstile> | null>(null)
 
 const version = import.meta.env.VITE_APP_VERSION
+
+const registerUrl = window.location.host === 'web.capgo.app' ? 'https://capgo.app/register/' : `/register/`
 
 async function nextLogin() {
   if (route.query.to && typeof route.query.to === 'string') {
@@ -381,7 +382,7 @@ onMounted(checkLogin)
                   </p>
                   <div class="">
                     <a
-                      :href="`${registerWebsiteDomain()}/register/`"
+                      :href="registerUrl"
                       data-test="register"
                       class="text-sm font-medium text-orange-500 transition-all duration-200 focus:text-orange-600 hover:text-orange-600 hover:underline"
                     >
