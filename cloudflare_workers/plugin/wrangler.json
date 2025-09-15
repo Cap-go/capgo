@@ -89,6 +89,10 @@
     {
       "binding": "HYPERDRIVE_DB",
       "id": "0f1d77550db142fbb17cb6b3ee659a06"
+    },
+    {
+      "binding": "HYPERDRIVE_DB_DIRECT",
+      "id": "20ce343dca144637bf8e141de18cd0d5"
     }
   ],
   "env": {
@@ -162,6 +166,10 @@
         {
           "binding": "HYPERDRIVE_DB",
           "id": "0f1d77550db142fbb17cb6b3ee659a06"
+        },
+        {
+          "binding": "HYPERDRIVE_DB_DIRECT",
+          "id": "20ce343dca144637bf8e141de18cd0d5"
         }
       ]
     },
@@ -235,6 +243,10 @@
         {
           "binding": "HYPERDRIVE_DB",
           "id": "0f1d77550db142fbb17cb6b3ee659a06"
+        },
+        {
+          "binding": "HYPERDRIVE_DB_DIRECT",
+          "id": "20ce343dca144637bf8e141de18cd0d5"
         }
       ]
     },

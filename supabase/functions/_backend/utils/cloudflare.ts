@@ -19,6 +19,7 @@ export type Bindings = {
   DB_STOREAPPS: D1Database
   DB_REPLICATE: D1Database
   HYPERDRIVE_DB: Hyperdrive
+  HYPERDRIVE_DB_DIRECT: Hyperdrive
   ATTACHMENT_UPLOAD_HANDLER: DurableObjectNamespace
 }
 

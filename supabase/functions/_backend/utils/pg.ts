@@ -15,8 +15,8 @@ export function getDatabaseURL(c: Context): string {
   if (existInEnv(c, 'CUSTOM_SUPABASE_DB_URL'))
     DEFAULT_DB_URL = getEnv(c, 'CUSTOM_SUPABASE_DB_URL')
 
-  if (existInEnv(c, 'HYPERDRIVE_DB'))
-    return (getEnv(c, 'HYPERDRIVE_DB') as any as Hyperdrive).connectionString
+  if (existInEnv(c, 'HYPERDRIVE_DB_DIRECT'))
+    return (getEnv(c, 'HYPERDRIVE_DB_DIRECT') as any as Hyperdrive).connectionString
 
   // // Default to Germany for any other cases
   return DEFAULT_DB_URL

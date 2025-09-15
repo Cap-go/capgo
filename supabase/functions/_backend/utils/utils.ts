@@ -42,6 +42,10 @@ export const INVALID_STRING_PLATFORM = 'Platform is not supported or invalid'
 
 // function to fix semver 1.0 to 1.0.0 any verssion missing . should add .0 also should work for 1
 export function fixSemver(version: string) {
+  if (version === 'builtin')
+    return '0.0.0'
+  if (version === 'unknown')
+    return '0.0.0'
   const nbPoint = (version?.match(/\./g) ?? []).length
   if (nbPoint === 0)
     return `${version}.0.0`
