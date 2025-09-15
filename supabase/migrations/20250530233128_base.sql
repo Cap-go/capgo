@@ -2559,43 +2559,26 @@ $$;
 
 ALTER FUNCTION "public"."is_paying_and_good_plan_org" ("orgid" "uuid") OWNER TO "postgres";
 
-CREATE OR REPLACE FUNCTION "public"."is_paying_and_good_plan_org_action" (
-  "orgid" "uuid",
-  "actions" "public"."action_type" []
-) RETURNS boolean LANGUAGE "plpgsql"
+CREATE OR REPLACE FUNCTION public.is_paying_and_good_plan_org_action (orgid uuid, actions public.action_type[]) RETURNS boolean LANGUAGE plpgsql
 SET
   search_path = '' SECURITY DEFINER AS $$
-DECLARE
-    org_customer_id text;
-    exceeded boolean := false;
+DECLARE org_customer_id text; result boolean;
 BEGIN
-    -- Get customer_id once
-    SELECT o.customer_id INTO org_customer_id
-    FROM public.orgs o WHERE o.id = orgid;
+  SELECT o.customer_id INTO org_customer_id FROM public.orgs o WHERE o.id = orgid;
 
-    -- Check if any action is exceeded
-    SELECT EXISTS (
-        SELECT 1 FROM public.stripe_info
-        WHERE customer_id = org_customer_id
-        AND (
-            ('mau' = ANY(actions) AND mau_exceeded)
-            OR ('storage' = ANY(actions) AND storage_exceeded)
-            OR ('bandwidth' = ANY(actions) AND bandwidth_exceeded)
-        )
-    ) INTO exceeded;
+  SELECT (si.trial_at > now())
+      OR (si.status = 'succeeded' AND NOT (
+            (si.mau_exceeded AND 'mau' = ANY(actions)) OR
+            (si.storage_exceeded AND 'storage' = ANY(actions)) OR
+            (si.bandwidth_exceeded AND 'bandwidth' = ANY(actions))
+          ))
+  INTO result
+  FROM public.stripe_info si
+  WHERE si.customer_id = org_customer_id
+  LIMIT 1;
 
-    -- Return final check
-    RETURN EXISTS (
-        SELECT 1
-        FROM public.stripe_info
-        WHERE customer_id = org_customer_id
-        AND (
-            trial_at::date - (now())::date > 0
-            OR (status = 'succeeded' AND NOT exceeded)
-        )
-    );
-END;
-$$;
+  RETURN COALESCE(result, false);
+END; $$;
 
 ALTER FUNCTION "public"."is_paying_and_good_plan_org_action" (
   "orgid" "uuid",
@@ -4018,6 +4001,16 @@ ADD CONSTRAINT "version_meta_pkey" PRIMARY KEY ("timestamp", "app_id", "version_
 
 ALTER TABLE ONLY "public"."version_usage"
 ADD CONSTRAINT "version_usage_pkey" PRIMARY KEY ("timestamp", "app_id", "version_id", "action");
+
+CREATE INDEX IF NOT EXISTS si_customer_status_trial_idx ON public.stripe_info (customer_id, status, trial_at) INCLUDE (
+  mau_exceeded,
+  storage_exceeded,
+  bandwidth_exceeded
+);
+
+CREATE INDEX IF NOT EXISTS orgs_updated_at_id_idx ON public.orgs (updated_at DESC) INCLUDE (id)
+WHERE
+  customer_id IS NOT NULL;
 
 CREATE INDEX "apikeys_key_idx" ON "public"."apikeys" USING "btree" ("key");
 
