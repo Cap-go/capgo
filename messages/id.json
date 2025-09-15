@@ -596,6 +596,8 @@
   "reset-spoofed-user": "Berhenti melakukan spoofing",
   "reset-your-password": "Atur ulang kata sandi Anda",
   "retention": "Hapus otomatis bundel yang tidak digunakan (setelah x detik)",
+  "retention-cannot-be-negative": "Retensi tidak bisa menjadi angka negatif",
+  "retention-to-big": "Retensi tidak bisa lebih besar dari 2147483647",
   "revert-channel-to-built-in-version": "Kembalikan Channel ke versi bawaan",
   "revert-to-builtin": "Kembali ke bawaan",
   "revert-to-builtin-confirm": "Apakah Anda yakin ingin kembali ke versi bawaan? Selama saluran dikembalikan, capgo tidak akan mendistribusikan pembaruan melaluinya.",

@@ -596,6 +596,8 @@
   "reset-spoofed-user": "停止欺骗",
   "reset-your-password": "重置你的密码",
   "retention": "自动删除未使用的捆绑包（在x秒后）",
+  "retention-cannot-be-negative": "保留不能是负数",
+  "retention-to-big": "保留不能大于2147483647",
   "revert-channel-to-built-in-version": "将频道恢复为内置版本",
   "revert-to-builtin": "还原为内置",
   "revert-to-builtin-confirm": "确定要恢复到内置版本吗？当通道恢复时，Capgo 将不会通过它分发更新。",

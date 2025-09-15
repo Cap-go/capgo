@@ -596,6 +596,8 @@
   "reset-spoofed-user": "Sahte yapmayı durdurun",
   "reset-your-password": "Şifrenizi sıfırlayın",
   "retention": "Kullanılmayan paketleri otomatik sil (x saniye sonra)",
+  "retention-cannot-be-negative": "Tutma negatif bir sayı olamaz",
+  "retention-to-big": "Tutma 2147483647'den daha büyük olamaz",
   "revert-channel-to-built-in-version": "Kanalı yerleşik sürüme geri döndürün",
   "revert-to-builtin": "Yerleşik duruma geri dön",
   "revert-to-builtin-confirm": "Yerleşik sürüme geri dönmek istediğinizden emin misiniz? Kanal geri alındığında, capgo güncellemeleri bu kanaldan dağıtmayacak.",

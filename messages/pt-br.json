@@ -596,6 +596,8 @@
   "reset-spoofed-user": "Pare de falsificar",
   "reset-your-password": "Redefina sua senha",
   "retention": "Excluir automaticamente pacotes não utilizados (após x segundos)",
+  "retention-cannot-be-negative": "A retenção não pode ser um número negativo",
+  "retention-to-big": "A retenção não pode ser maior que 2147483647",
   "revert-channel-to-built-in-version": "Reverter Canal para a versão integrada",
   "revert-to-builtin": "Reverter para embutido",
   "revert-to-builtin-confirm": "Você tem certeza de que deseja reverter para a versão integrada? Enquanto o canal estiver revertido, o capgo não distribuirá atualizações por ele.",

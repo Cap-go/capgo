@@ -596,6 +596,8 @@
   "reset-spoofed-user": "Dừng giả mạo",
   "reset-your-password": "Đặt lại mật khẩu của bạn",
   "retention": "Tự động xóa các gói không được sử dụng (sau x giây)",
+  "retention-cannot-be-negative": "Giữ lại không thể là một số âm",
+  "retention-to-big": "Việc duy trì không thể lớn hơn 2147483647",
   "revert-channel-to-built-in-version": "Đưa kênh trở lại phiên bản tích hợp sẵn",
   "revert-to-builtin": "Quay lại tính năng cơ bản",
   "revert-to-builtin-confirm": "Bạn có chắc chắn muốn quay lại phiên bản tích hợp không? Trong khi kênh đang được hoàn nguyên, capgo sẽ không phân phối cập nhật qua nó.",

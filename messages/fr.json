@@ -596,6 +596,8 @@
   "reset-spoofed-user": "Arrêtez le spoofing",
   "reset-your-password": "Réinitialisez votre mot de passe",
   "retention": "Supprimer automatiquement les lots non utilisés (après x secondes)",
+  "retention-cannot-be-negative": "La rétention ne peut pas être un nombre négatif",
+  "retention-to-big": "La rétention ne peut pas être supérieure à 2147483647",
   "revert-channel-to-built-in-version": "Revenir à la version intégrée du canal",
   "revert-to-builtin": "Revenir à intégré",
   "revert-to-builtin-confirm": "Êtes-vous sûr de vouloir revenir à la version intégrée ? Tant que la chaîne est rétablie, capgo ne distribuera pas de mises à jour par son intermédiaire.",
