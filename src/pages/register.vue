@@ -10,7 +10,6 @@ import iconPassword from '~icons/ph/key?raw'
 import iconName from '~icons/ph/user?raw'
 import { hashEmail, useSupabase } from '~/services/supabase'
 import { openSupport } from '~/services/support'
-import { registerWebsiteDomain } from '~/utils/Utils'
 
 const router = useRouter()
 const supabase = useSupabase()
@@ -19,7 +18,7 @@ const turnstileToken = ref('')
 const captchaKey = ref(import.meta.env.VITE_CAPTCHA_KEY)
 const isLoading = ref(false)
 
-if (registerWebsiteDomain() === 'https://capgo.app') {
+if (window.location.host === 'web.capgo.app') {
   // do not allow to register on webapp on production
   window.location.href = 'https://capgo.app/register/'
 }
