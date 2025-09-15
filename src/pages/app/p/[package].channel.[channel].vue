@@ -22,6 +22,7 @@ import { appIdToUrl, urlToAppId } from '~/services/conversion'
 import { formatDate } from '~/services/date'
 import { checkCompatibilityNativePackages, isCompatible, useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
+import { buildPlatformChangeWarnings, buildPlatformDisableWarnings, buildUnsetWarnings } from '~/utils/platformWarnings'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
@@ -59,6 +60,7 @@ const currentDefaultChannelName = ref('')
 const pendingPlatformChange = ref<'ios' | 'android' | null>(null)
 const localIosState = ref(false)
 const localAndroidState = ref(false)
+const confirmWarnings = ref<string[]>([])
 
 onClickOutside(autoUpdateDropdown, () => closeAutoUpdateDropdown())
 
@@ -330,53 +332,109 @@ async function confirmPlatformChange(platform: 'ios' | 'android', newValue: bool
     return true // Already the default, no confirmation needed
   }
 
-  // Get current default channel name if it exists
-  currentDefaultChannelName.value = t('none')
-  if (currentDefaultChannelId) {
-    try {
-      const { data: currentDefaultChannel } = await supabase
-        .from('channels')
-        .select('name')
-        .eq('id', currentDefaultChannelId)
-        .single()
+  // Fetch previous default channel names for both platforms (if applicable)
+  const iosDefaultId = appData.default_channel_ios as number | null
+  const androidDefaultId = appData.default_channel_android as number | null
+  let prevIosDefault: { id: number, name: string } | null = null
+  let prevAndroidDefault: { id: number, name: string } | null = null
 
-      if (currentDefaultChannel) {
-        currentDefaultChannelName.value = currentDefaultChannel.name
+  try {
+    if (iosDefaultId) {
+      if (iosDefaultId === id.value) {
+        prevIosDefault = { id: id.value, name: channel.value.name }
+      }
+      else {
+        const { data } = await supabase
+          .from('channels')
+          .select('name')
+          .eq('id', iosDefaultId)
+          .single()
+        if (data)
+          prevIosDefault = { id: iosDefaultId, name: data.name }
       }
     }
-    catch (error) {
-      console.error('Error fetching current default channel:', error)
+    if (androidDefaultId) {
+      if (androidDefaultId === id.value) {
+        prevAndroidDefault = { id: id.value, name: channel.value.name }
+      }
+      else {
+        const { data } = await supabase
+          .from('channels')
+          .select('name')
+          .eq('id', androidDefaultId)
+          .single()
+        if (data)
+          prevAndroidDefault = { id: androidDefaultId, name: data.name }
+      }
     }
   }
+  catch (error) {
+    console.error('Error fetching default channel names:', error)
+  }
+
+  currentDefaultChannelName.value = t('none')
+  if (platform === 'ios')
+    currentDefaultChannelName.value = prevIosDefault?.name ?? t('none')
+  else
+    currentDefaultChannelName.value = prevAndroidDefault?.name ?? t('none')
 
   // Store the pending platform change
   pendingPlatformChange.value = platform
 
-  // Show confirmation dialog
+  // Clear any previous warnings so first dialog isn't combined
+  confirmWarnings.value = []
+
+  // First dialog: existing confirmation message with placeholders
   dialogStore.openDialog({
     title: t('confirm-platform-change'),
     description: platform === 'ios'
       ? t('confirm-platform-change-ios-message')
-      : t('confirm-platform-change-android-message'),
+        .replace('$1', channel.value.name)
+        .replace('$2', getCurrentDefaultChannelName())
+      : t('confirm-platform-change-android-message')
+        .replace('$1', channel.value.name)
+        .replace('$2', getCurrentDefaultChannelName()),
     size: 'lg',
     buttons: [
-      {
-        text: t('button-cancel'),
-        role: 'cancel',
-      },
-      {
-        text: t('button-confirm'),
-        role: 'primary',
-      },
+      { text: t('button-cancel'), role: 'cancel' },
+      { text: t('button-confirm'), role: 'primary' },
     ],
   })
+  const cancelled1 = await dialogStore.onDialogDismiss()
+  if (cancelled1) {
+    pendingPlatformChange.value = null
+    return false
+  }
 
-  const cancelled = await dialogStore.onDialogDismiss()
+  // Second dialog: unified warnings list using shared builder
+  confirmWarnings.value = buildPlatformChangeWarnings({
+    t,
+    chann: { id: channel.value.id, name: channel.value.name, ios: channel.value.ios, android: channel.value.android },
+    type: platform,
+    prevIosDefault,
+    prevAndroidDefault,
+    options: { includePrimaryChangeMessage: false, includeEnableSupportMessage: true },
+  })
 
-  // Clear the pending platform change
+  if (confirmWarnings.value.length > 0) {
+    dialogStore.openDialog({
+      title: t('confirm-platform-change-warnings'),
+      description: '',
+      size: 'lg',
+      buttons: [
+        { text: t('button-cancel'), role: 'cancel' },
+        { text: t('button-confirm'), role: 'primary' },
+      ],
+    })
+    const cancelled2 = await dialogStore.onDialogDismiss()
+    pendingPlatformChange.value = null
+    confirmWarnings.value = []
+    return !cancelled2
+  }
+
   pendingPlatformChange.value = null
-
-  return !cancelled
+  confirmWarnings.value = []
+  return true
 }
 
 function getCurrentDefaultChannelName(): string {
@@ -388,7 +446,59 @@ async function confirmPlatformDisable(platform: 'ios' | 'android'): Promise<bool
     return true
   }
 
-  // Show confirmation dialog
+  const appData = channel.value.app_id as any
+  const isCurrentDefault = platform === 'ios' 
+    ? appData.default_channel_ios === channel.value.id
+    : appData.default_channel_android === channel.value.id
+
+  // If this channel is the current default, use unified unset warning system
+  if (isCurrentDefault) {
+    const warnings = buildUnsetWarnings({
+      t,
+      type: platform,
+      defaultChannelIos: appData.default_channel_ios ? { id: appData.default_channel_ios, name: channel.value.name } : null,
+      defaultChannelAndroid: appData.default_channel_android ? { id: appData.default_channel_android, name: channel.value.name } : null,
+      defaultChannelSync: false, // Channel page doesn't handle sync
+    })
+
+    // Always show a confirmation dialog for unsetting default channels
+    if (warnings.length > 0) {
+      // Show warnings in list format with proper description
+      confirmWarnings.value = warnings
+      dialogStore.openDialog({
+        title: t('confirm-platform-change'),
+        description: platform === 'ios'
+          ? t('confirm-platform-disable-ios-message')
+          : t('confirm-platform-disable-android-message'),
+        size: 'lg',
+        buttons: [
+          { text: t('button-cancel'), role: 'cancel' },
+          { text: t('button-confirm'), role: 'primary' },
+        ],
+      })
+    } else {
+      // Show standard disable message
+      confirmWarnings.value = []
+      dialogStore.openDialog({
+        title: t('confirm-platform-disable'),
+        description: platform === 'ios'
+          ? t('confirm-platform-disable-ios-message')
+          : t('confirm-platform-disable-android-message'),
+        size: 'lg',
+        buttons: [
+          { text: t('button-cancel'), role: 'cancel' },
+          { text: t('button-confirm'), role: 'primary' },
+        ],
+      })
+    }
+    const cancelled = await dialogStore.onDialogDismiss()
+    confirmWarnings.value = []
+    return !cancelled
+  }
+
+  // For non-default channels, use the original flow
+  // First dialog: existing confirmation description
+  confirmWarnings.value = []
   dialogStore.openDialog({
     title: t('confirm-platform-disable'),
     description: platform === 'ios'
@@ -396,19 +506,40 @@ async function confirmPlatformDisable(platform: 'ios' | 'android'): Promise<bool
       : t('confirm-platform-disable-android-message'),
     size: 'lg',
     buttons: [
-      {
-        text: t('button-cancel'),
-        role: 'cancel',
-      },
-      {
-        text: t('button-confirm'),
-        role: 'primary',
-      },
+      { text: t('button-cancel'), role: 'cancel' },
+      { text: t('button-confirm'), role: 'primary' },
     ],
   })
+  const cancelled1 = await dialogStore.onDialogDismiss()
+  if (cancelled1) {
+    confirmWarnings.value = []
+    return false
+  }
 
-  const cancelled = await dialogStore.onDialogDismiss()
-  return !cancelled
+  // Second dialog: warnings list
+  confirmWarnings.value = buildPlatformDisableWarnings({
+    t,
+    chann: { id: channel.value.id, name: channel.value.name, ios: channel.value.ios, android: channel.value.android },
+    platform,
+  })
+
+  if (confirmWarnings.value.length > 0) {
+    dialogStore.openDialog({
+      title: t('confirm-platform-change-warnings'),
+      description: '',
+      size: 'lg',
+      buttons: [
+        { text: t('button-cancel'), role: 'cancel' },
+        { text: t('button-confirm'), role: 'primary' },
+      ],
+    })
+    const cancelled2 = await dialogStore.onDialogDismiss()
+    confirmWarnings.value = []
+    return !cancelled2
+  }
+
+  confirmWarnings.value = []
+  return true
 }
 
 async function handlePlatformToggle(platform: 'ios' | 'android') {
@@ -434,7 +565,7 @@ async function handlePlatformToggle(platform: 'ios' | 'android') {
   try {
     // Show confirmation dialog for both enabling and disabling
     let confirmed = true
-    if (newValue) {
+    if (newValue && (channel.value.id === channel.value.app_id.default_channel_ios || channel.value.id === channel.value.app_id.default_channel_android)) {
       // Enabling platform
       confirmed = await confirmPlatformChange(platform, newValue)
     }
@@ -445,7 +576,7 @@ async function handlePlatformToggle(platform: 'ios' | 'android') {
         ? appData.default_channel_ios
         : appData.default_channel_android
 
-      if (currentDefaultChannelId === id.value) {
+      if (currentDefaultChannelId === id.value && (channel.value.id === channel.value.app_id.default_channel_ios || channel.value.id === channel.value.app_id.default_channel_android)) {
         // This channel is the current default, show confirmation
         confirmed = await confirmPlatformDisable(platform)
       }
@@ -492,7 +623,7 @@ async function saveChannelChange(key: string, val: any) {
       const appData = channel.value.app_id as any
       const defaultChannelColumn = key === 'ios' ? 'default_channel_ios' : 'default_channel_android'
 
-      if (val === true) {
+      if (val === true && (channel.value.id === channel.value.app_id.default_channel_ios || channel.value.id === channel.value.app_id.default_channel_android)) {
         // Enabling: Set this channel as the new default using atomic helper (ensures platform support)
         const { error: rpcError } = await supabase
           .rpc('set_default_channel', {
@@ -507,18 +638,19 @@ async function saveChannelChange(key: string, val: any) {
           return
         }
       }
-      else {
+      else if (val === false && (channel.value.id === channel.value.app_id.default_channel_ios || channel.value.id === channel.value.app_id.default_channel_android)) {
         // Disabling: Unset the default channel if this channel is currently the default
         const currentDefaultChannelId = appData[defaultChannelColumn]
         if (currentDefaultChannelId === id.value) {
-          const { error: appUpdateError } = await supabase
-            .from('apps')
-            .update({ [defaultChannelColumn]: null })
-            .eq('id', appData.id)
+          const { error: rpcError } = await supabase
+            .rpc('unset_default_channel', {
+              p_app_id: appData.app_id,
+              p_platform: key,
+            })
 
-          if (appUpdateError) {
+          if (rpcError) {
             toast.error(t('error-update-channel'))
-            console.error('Failed to unset app default channel:', appUpdateError)
+            console.error('Failed to unset default channel via unset_default_channel:', rpcError)
             return
           }
         }
@@ -910,7 +1042,7 @@ function redirectToAppSettings() {
             </InfoRow>
             <InfoRow :label="t('channel-is-public')">
               <div class="flex items-center flex-row gap-2">
-                {{ (channel.app_id.default_channel_android || channel.app_id.default_channel_ios) === id ? t('yes') : t('no') }}
+                {{ (channel.app_id.default_channel_android === id) || (channel.app_id.default_channel_ios === id) ? t('yes') : t('no') }}
                 <button @click="redirectToAppSettings()">
                   <IconRedirect class="w-6 h-6 text-[#3B82F6]" />
                 </button>
@@ -1100,13 +1232,14 @@ function redirectToAppSettings() {
       </div>
     </Teleport>
 
-    <!-- Teleport Content for Platform Change Confirmation -->
-    <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('confirm-platform-change')" defer to="#dialog-v2-content">
-      <div class="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-        <p class="text-sm text-blue-800 dark:text-blue-200">
-          <strong>{{ t('current-default-channel') }}:</strong>
-          <span class="ml-2">{{ getCurrentDefaultChannelName() }}</span>
-        </p>
+    <!-- Teleport Content for Platform Change Warnings (second dialog) -->
+    <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('confirm-platform-change-warnings')" defer to="#dialog-v2-content">
+      <div class="w-full">
+        <ul class="list-disc pl-5 space-y-2 text-base leading-relaxed text-slate-800 dark:text-slate-100">
+          <li v-for="(line, idx) in confirmWarnings" :key="idx">
+            {{ line }}
+          </li>
+        </ul>
       </div>
     </Teleport>
 

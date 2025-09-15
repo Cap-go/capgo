@@ -1999,6 +1999,10 @@ export type Database = {
         Args: { org_id: string; disabled: boolean }
         Returns: undefined
       }
+      set_default_channel: {
+        Args: { p_app_id: string; p_channel_name: string; p_platform: string }
+        Returns: undefined
+      }
       set_mau_exceeded_by_org: {
         Args: { org_id: string; disabled: boolean }
         Returns: undefined

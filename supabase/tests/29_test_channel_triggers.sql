@@ -3,7 +3,7 @@ BEGIN;
 CREATE EXTENSION "basejump-supabase_test_helpers";
 
 SELECT
-    plan (41);
+    plan (77);
 
 SELECT
     tests.authenticate_as ('test_user');
@@ -370,7 +370,13 @@ SELECT
 
 -- Test 21: set_default_channel can assign Android default after ensuring platform support
 -- Ensure iOS Only Channel Test has android=false initially
-UPDATE public.channels SET android = false WHERE app_id = 'com.demo.app' AND name = 'iOS Only Channel Test';
+UPDATE public.apps SET default_channel_ios = NULL, default_channel_android = NULL WHERE app_id = 'com.demo.app';
+UPDATE public.channels SET android = false, ios = true WHERE app_id = 'com.demo.app' AND name = 'iOS Only Channel Test';
+UPDATE public.channels SET android = true, ios = false WHERE app_id = 'com.demo.app' AND name = 'Android Only Channel Test';
+UPDATE public.apps SET 
+    default_channel_ios = (select id from public.channels where app_id = 'com.demo.app' and name = 'iOS Only Channel Test'), 
+    default_channel_android = (select id from public.channels where app_id = 'com.demo.app' and name = 'Android Only Channel Test') 
+WHERE app_id = 'com.demo.app';
 
 SELECT
     lives_ok (
@@ -397,6 +403,49 @@ SELECT
         (SELECT public FROM public.channels WHERE app_id = 'com.demo.app' AND name = 'iOS Only Channel Test'),
         true,
         'iOS Only Channel Test becomes public as default'
+    );
+
+SELECT
+    tests.authenticate_as ('test_user');
+
+-- Test 22: Guard enabling Android on iOS default when Android default differs
+-- Ensure defaults: iOS default = iOS Only Channel Test, Android default = Android Only Channel Test
+SELECT
+    throws_ok(
+        $$DO $b$
+        BEGIN
+          UPDATE public.apps SET default_channel_ios = NULL, default_channel_android = NULL WHERE app_id = 'com.demo.app';
+          UPDATE public.channels SET android = false, ios = true WHERE app_id = 'com.demo.app' AND name = 'iOS Only Channel Test';
+          UPDATE public.channels SET ios = false, android = true WHERE app_id = 'com.demo.app' AND name = 'Android Only Channel Test';
+          UPDATE public.apps 
+            SET default_channel_ios = (SELECT id FROM public.channels WHERE app_id = 'com.demo.app' AND name = 'iOS Only Channel Test'),
+                default_channel_android = (SELECT id FROM public.channels WHERE app_id = 'com.demo.app' AND name = 'Android Only Channel Test')
+            WHERE app_id = 'com.demo.app';
+          UPDATE public.channels SET android = true WHERE app_id = 'com.demo.app' AND name = 'iOS Only Channel Test';
+        END
+        $b$ LANGUAGE plpgsql$$,
+        'Cannot add Android platform support to channel "iOS Only Channel Test" as it is assigned as default_channel_ios and a different Android default is set. Use the same channel for both platforms or set Android default to this channel first.',
+        'Should reject enabling Android support on iOS default when Android default differs'
+    );
+
+-- Test 23: Guard enabling iOS on Android default when iOS default differs
+-- Ensure defaults: Android default = Android Only Channel Test, iOS default = iOS Only Channel Test
+SELECT
+    throws_ok(
+        $$DO $b$
+        BEGIN
+          UPDATE public.apps SET default_channel_ios = NULL, default_channel_android = NULL WHERE app_id = 'com.demo.app';
+          UPDATE public.channels SET android = false, ios = true WHERE app_id = 'com.demo.app' AND name = 'iOS Only Channel Test';
+          UPDATE public.channels SET ios = false, android = true WHERE app_id = 'com.demo.app' AND name = 'Android Only Channel Test';
+          UPDATE public.apps 
+            SET default_channel_ios = (SELECT id FROM public.channels WHERE app_id = 'com.demo.app' AND name = 'iOS Only Channel Test'),
+                default_channel_android = (SELECT id FROM public.channels WHERE app_id = 'com.demo.app' AND name = 'Android Only Channel Test')
+            WHERE app_id = 'com.demo.app';
+          UPDATE public.channels SET ios = true WHERE app_id = 'com.demo.app' AND name = 'Android Only Channel Test';
+        END
+        $b$ LANGUAGE plpgsql$$,
+        'Cannot add iOS platform support to channel "Android Only Channel Test" as it is assigned as default_channel_android and a different iOS default is set. Use the same channel for both platforms or set iOS default to this channel first.',
+        'Should reject enabling iOS support on Android default when iOS default differs'
     );
 
 -- Test 22: set_default_channel both — assign same channel for both platforms in one operation
@@ -442,6 +491,182 @@ SELECT
         true,
         'iOS Only Channel Test is public as both defaults'
     );
+
+-- Test 24: set_default_channel('ios') on a both-platform channel when Android default differs should disable android on the selected channel
+-- Prepare: defaults point to Both Platforms Channel Test for both
+UPDATE public.apps 
+SET default_channel_ios = (SELECT id FROM public.channels WHERE app_id = 'com.demo.app' AND name = 'Both Platforms Channel Test'), 
+    default_channel_android = (SELECT id FROM public.channels WHERE app_id = 'com.demo.app' AND name = 'Both Platforms Channel Test')
+WHERE app_id = 'com.demo.app';
+
+UPDATE public.channels SET android = true, ios = true WHERE app_id = 'com.demo.app' AND name = 'Both Platforms Channel Test';
+
+-- Create another both-platform channel for the edge case
+INSERT INTO public.channels (app_id, name, version, ios, android, public, created_by)
+VALUES ('com.demo.app', 'Both Two Channel Test', 3, true, true, false, tests.get_supabase_uid('test_user'))
+ON CONFLICT (app_id, name) DO NOTHING;
+
+-- Call set_default_channel to set iOS default to the new both-platform channel
+SELECT lives_ok($$SELECT public.set_default_channel('com.demo.app', 'Both Two Channel Test', 'ios')$$,
+  'set_default_channel ios should set iOS default and disable Android on selected channel if Android default differs');
+
+-- Assert flags and defaults
+SELECT is((SELECT default_channel_ios FROM public.apps WHERE app_id = 'com.demo.app'),
+          (SELECT id FROM public.channels WHERE app_id = 'com.demo.app' AND name = 'Both Two Channel Test'),
+          'iOS default now points to Both Two Channel Test');
+SELECT is((SELECT default_channel_android FROM public.apps WHERE app_id = 'com.demo.app'),
+          (SELECT id FROM public.channels WHERE app_id = 'com.demo.app' AND name = 'Both Platforms Channel Test'),
+          'Android default remains Both Platforms Channel Test');
+SELECT is((SELECT ios FROM public.channels WHERE app_id = 'com.demo.app' AND name = 'Both Two Channel Test'), true,
+          'Both Two Channel Test iOS flag remains true');
+SELECT is((SELECT android FROM public.channels WHERE app_id = 'com.demo.app' AND name = 'Both Two Channel Test'), false,
+          'Both Two Channel Test Android flag was disabled');
+SELECT is((SELECT ios FROM public.channels WHERE app_id = 'com.demo.app' AND name = 'Both Platforms Channel Test'), false,
+          'Both Platforms Channel Test iOS flag was disabled');
+SELECT is((SELECT android FROM public.channels WHERE app_id = 'com.demo.app' AND name = 'Both Platforms Channel Test'), true,
+          'Both Platforms Channel Test Android flag remains true');
+
+-- Test 25: set_default_channel('android') on a both-platform channel when iOS default differs should disable iOS on the selected channel
+-- Reset defaults back to Both Platforms Channel Test for both
+UPDATE public.apps SET default_channel_ios = NULL, default_channel_android = NULL WHERE app_id = 'com.demo.app';
+UPDATE public.channels SET ios = true, android = true WHERE app_id = 'com.demo.app' AND name = 'Both Platforms Channel Test';
+UPDATE public.channels SET ios = true, android = true WHERE app_id = 'com.demo.app' AND name = 'Both Two Channel Test';
+UPDATE public.apps 
+SET default_channel_ios = (SELECT id FROM public.channels WHERE app_id = 'com.demo.app' AND name = 'Both Platforms Channel Test'), 
+    default_channel_android = (SELECT id FROM public.channels WHERE app_id = 'com.demo.app' AND name = 'Both Platforms Channel Test')
+WHERE app_id = 'com.demo.app';
+
+-- Ensure Both Two flags are both true before calling
+UPDATE public.channels SET ios = true, android = true WHERE app_id = 'com.demo.app' AND name = 'Both Two Channel Test';
+
+SELECT lives_ok($$SELECT public.set_default_channel('com.demo.app', 'Both Two Channel Test', 'android')$$,
+  'set_default_channel android should set Android default and disable iOS on selected channel if iOS default differs');
+
+SELECT is((SELECT default_channel_android FROM public.apps WHERE app_id = 'com.demo.app'),
+          (SELECT id FROM public.channels WHERE app_id = 'com.demo.app' AND name = 'Both Two Channel Test'),
+          'Android default now points to Both Two Channel Test');
+SELECT is((SELECT default_channel_ios FROM public.apps WHERE app_id = 'com.demo.app'),
+          (SELECT id FROM public.channels WHERE app_id = 'com.demo.app' AND name = 'Both Platforms Channel Test'),
+          'iOS default remains Both Platforms Channel Test');
+SELECT is((SELECT android FROM public.channels WHERE app_id = 'com.demo.app' AND name = 'Both Two Channel Test'), true,
+          'Both Two Channel Test Android flag remains true');
+SELECT is((SELECT ios FROM public.channels WHERE app_id = 'com.demo.app' AND name = 'Both Two Channel Test'), false,
+          'Both Two Channel Test iOS flag was disabled');
+SELECT is((SELECT android FROM public.channels WHERE app_id = 'com.demo.app' AND name = 'Both Platforms Channel Test'), false,
+          'Both Platforms Channel Test Android flag was disabled');
+SELECT is((SELECT ios FROM public.channels WHERE app_id = 'com.demo.app' AND name = 'Both Platforms Channel Test'), true,
+          'Both Platforms Channel Test iOS flag remains true');
+
+
+-- Test 26: unset_default_channel('ios') unsets iOS default and updates public flags coherently
+-- Prepare: set iOS default to iOS Only Channel Test and Android default to Android Only Channel Test
+UPDATE public.apps SET default_channel_ios = NULL, default_channel_android = NULL WHERE app_id = 'com.demo.app';
+UPDATE public.channels SET ios = true, android = false WHERE app_id = 'com.demo.app' AND name = 'iOS Only Channel Test';
+UPDATE public.channels SET ios = false, android = true WHERE app_id = 'com.demo.app' AND name = 'Android Only Channel Test';
+UPDATE public.apps 
+  SET default_channel_ios = (SELECT id FROM public.channels WHERE app_id = 'com.demo.app' AND name = 'iOS Only Channel Test'),
+      default_channel_android = (SELECT id FROM public.channels WHERE app_id = 'com.demo.app' AND name = 'Android Only Channel Test')
+  WHERE app_id = 'com.demo.app';
+
+SELECT lives_ok($$SELECT public.unset_default_channel('com.demo.app', 'ios')$$,
+  'unset_default_channel ios should unset iOS default');
+
+SELECT is((SELECT default_channel_ios FROM public.apps WHERE app_id = 'com.demo.app'), NULL,
+  'iOS default is NULL after unset');
+
+SELECT is((SELECT default_channel_android FROM public.apps WHERE app_id = 'com.demo.app'),
+          (SELECT id FROM public.channels WHERE app_id = 'com.demo.app' AND name = 'Android Only Channel Test'),
+  'Android default remains unchanged');
+
+SELECT is((SELECT public FROM public.channels WHERE app_id = 'com.demo.app' AND name = 'iOS Only Channel Test'), false,
+  'Previous iOS default channel becomes non-public after unset');
+
+SELECT is((SELECT public FROM public.channels WHERE app_id = 'com.demo.app' AND name = 'Android Only Channel Test'), true,
+  'Android default remains public');
+
+-- Test 27: unset_default_channel('android') unsets Android default and updates public flags coherently
+-- Prepare: set defaults again
+UPDATE public.apps SET default_channel_ios = NULL, default_channel_android = NULL WHERE app_id = 'com.demo.app';
+UPDATE public.channels SET ios = true, android = false WHERE app_id = 'com.demo.app' AND name = 'iOS Only Channel Test';
+UPDATE public.channels SET ios = false, android = true WHERE app_id = 'com.demo.app' AND name = 'Android Only Channel Test';
+UPDATE public.apps 
+  SET default_channel_ios = (SELECT id FROM public.channels WHERE app_id = 'com.demo.app' AND name = 'iOS Only Channel Test'),
+      default_channel_android = (SELECT id FROM public.channels WHERE app_id = 'com.demo.app' AND name = 'Android Only Channel Test')
+  WHERE app_id = 'com.demo.app';
+
+SELECT lives_ok($$SELECT public.unset_default_channel('com.demo.app', 'android')$$,
+  'unset_default_channel android should unset Android default');
+
+SELECT is((SELECT default_channel_android FROM public.apps WHERE app_id = 'com.demo.app'), NULL,
+  'Android default is NULL after unset');
+
+SELECT is((SELECT default_channel_ios FROM public.apps WHERE app_id = 'com.demo.app'),
+          (SELECT id FROM public.channels WHERE app_id = 'com.demo.app' AND name = 'iOS Only Channel Test'),
+  'iOS default remains unchanged');
+
+SELECT is((SELECT public FROM public.channels WHERE app_id = 'com.demo.app' AND name = 'Android Only Channel Test'), false,
+  'Previous Android default channel becomes non-public after unset');
+
+SELECT is((SELECT public FROM public.channels WHERE app_id = 'com.demo.app' AND name = 'iOS Only Channel Test'), true,
+  'iOS default remains public');
+
+-- Test 28: unset_default_channel('both') unsets both defaults and marks all channels non-public for this app
+-- Prepare: set same channel for both defaults
+UPDATE public.apps SET default_channel_ios = NULL, default_channel_android = NULL WHERE app_id = 'com.demo.app';
+UPDATE public.channels SET ios = true, android = true WHERE app_id = 'com.demo.app' AND name = 'Both Platforms Channel Test';
+UPDATE public.apps 
+  SET default_channel_ios = (SELECT id FROM public.channels WHERE app_id = 'com.demo.app' AND name = 'Both Platforms Channel Test'),
+      default_channel_android = (SELECT id FROM public.channels WHERE app_id = 'com.demo.app' AND name = 'Both Platforms Channel Test')
+  WHERE app_id = 'com.demo.app';
+
+SELECT lives_ok($$SELECT public.unset_default_channel('com.demo.app', 'both')$$,
+  'unset_default_channel both should unset both defaults');
+
+SELECT is((SELECT default_channel_ios FROM public.apps WHERE app_id = 'com.demo.app'), NULL,
+  'iOS default is NULL after both unset');
+SELECT is((SELECT default_channel_android FROM public.apps WHERE app_id = 'com.demo.app'), NULL,
+  'Android default is NULL after both unset');
+
+-- Note: public flag behavior when both defaults are NULL is left unchanged by trigger; no assertion here
+
+-- Test 29: unset_default_channel invalid platform should throw
+SELECT throws_ok($$SELECT public.unset_default_channel('com.demo.app', 'windows')$$,
+  'Invalid platform: windows (expected ios|android|both)',
+  'Invalid platform rejected');
+
+-- Test 30: Unsetting iOS when both defaults are the same should disable iOS support on that channel
+-- Prepare: set Both Platforms Channel Test as both defaults with both supports
+UPDATE public.apps SET default_channel_ios = NULL, default_channel_android = NULL WHERE app_id = 'com.demo.app';
+UPDATE public.channels SET ios = true, android = true WHERE app_id = 'com.demo.app' AND name = 'Both Platforms Channel Test';
+UPDATE public.apps 
+  SET default_channel_ios = (SELECT id FROM public.channels WHERE app_id = 'com.demo.app' AND name = 'Both Platforms Channel Test'),
+      default_channel_android = (SELECT id FROM public.channels WHERE app_id = 'com.demo.app' AND name = 'Both Platforms Channel Test')
+  WHERE app_id = 'com.demo.app';
+
+SELECT lives_ok($$SELECT public.unset_default_channel('com.demo.app', 'ios')$$,
+  'unset_default_channel ios should work when both defaults are same');
+
+SELECT is((SELECT default_channel_ios FROM public.apps WHERE app_id = 'com.demo.app'), NULL,
+  'iOS default is NULL after unset');
+SELECT is((SELECT ios FROM public.channels WHERE app_id = 'com.demo.app' AND name = 'Both Platforms Channel Test'), false,
+  'iOS support disabled on channel that remains Android default');
+
+-- Test 31: Unsetting Android when both defaults are the same should disable Android support on that channel
+-- Prepare: set Both Platforms Channel Test as both defaults with both supports
+UPDATE public.apps SET default_channel_ios = NULL, default_channel_android = NULL WHERE app_id = 'com.demo.app';
+UPDATE public.channels SET ios = true, android = true WHERE app_id = 'com.demo.app' AND name = 'Both Platforms Channel Test';
+UPDATE public.apps 
+  SET default_channel_ios = (SELECT id FROM public.channels WHERE app_id = 'com.demo.app' AND name = 'Both Platforms Channel Test'),
+      default_channel_android = (SELECT id FROM public.channels WHERE app_id = 'com.demo.app' AND name = 'Both Platforms Channel Test')
+  WHERE app_id = 'com.demo.app';
+
+SELECT lives_ok($$SELECT public.unset_default_channel('com.demo.app', 'android')$$,
+  'unset_default_channel android should work when both defaults are same');
+
+SELECT is((SELECT default_channel_android FROM public.apps WHERE app_id = 'com.demo.app'), NULL,
+  'Android default is NULL after unset');
+SELECT is((SELECT android FROM public.channels WHERE app_id = 'com.demo.app' AND name = 'Both Platforms Channel Test'), false,
+  'Android support disabled on channel that remains iOS default');
 
 SELECT
     tests.clear_authentication ();

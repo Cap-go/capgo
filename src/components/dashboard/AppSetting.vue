@@ -14,6 +14,7 @@ import ArrowUpTray from '~icons/mingcute/upload-2-fill?raw'
 import gearSix from '~icons/ph/gear-six?raw'
 import iconName from '~icons/ph/user?raw'
 import { useSupabase } from '~/services/supabase'
+import { buildPlatformChangeWarnings, buildUnsetWarnings } from '~/utils/platformWarnings'
 import { useDialogV2Store } from '~/stores/dialogv2'
 
 const props = defineProps<{ appId: string }>()
@@ -31,6 +32,7 @@ const defaultChannelSync = ref(false)
 const transferAppIdInput = ref('')
 const selectedChannel = ref('')
 const availableChannels = ref<{ name: string }[]>([])
+const confirmWarnings = ref<string[]>([])
 
 onMounted(async () => {
   isLoading.value = true
@@ -147,9 +149,13 @@ async function setUpdateChannelSync(value: boolean) {
       defaultChannelSync.value = !value
       return
     }
-    const { error: appError } = await supabase.from('apps')
-      .update({ default_channel_ios: channel.id, default_channel_android: channel.id })
-      .eq('app_id', props.appId)
+    // Use atomic helper to set both defaults to the same channel
+    const { error: appError } = await supabase
+      .rpc('set_default_channel', {
+        p_app_id: props.appId,
+        p_channel_name: channel.name,
+        p_platform: 'both',
+      })
     if (appError) {
       toast.error(t('cannot-change-update-channel-sync'))
       console.error(appError)
@@ -354,39 +360,10 @@ async function setDefaultUpdateChannel(type: 'android' | 'ios' | 'both') {
         const needsIosSupport = (type === 'ios' || type === 'both') && !chann.ios
         const needsAndroidSupport = (type === 'android' || type === 'both') && !chann.android
 
-        if (needsIosSupport || needsAndroidSupport) {
-          // Show confirmation dialog for enabling platform support
-          const platformNames = []
-          if (needsIosSupport)
-            platformNames.push('iOS')
-          if (needsAndroidSupport)
-            platformNames.push('Android')
-
-          dialogStore.openDialog({
-            title: t('enable-platform-support'),
-            description: t('enable-platform-support-message')
-              .replaceAll('$CHANNEL', chann.name)
-              .replaceAll('$PLATFORMS', platformNames.join(' and ')),
-            size: 'lg',
-            buttons: [
-              {
-                text: t('button-cancel'),
-                role: 'cancel',
-              },
-              {
-                text: t('button-confirm'),
-                role: 'primary',
-                handler: async () => {
-                  await handleChannelSelectionWithPlatformEnable(chann, type, needsIosSupport, needsAndroidSupport)
-                },
-              },
-            ],
-          })
-        }
-        else {
-          // Channel already supports the required platform(s)
+        if (needsIosSupport || needsAndroidSupport)
+          await handleChannelSelectionWithPlatformEnable(chann, type, needsIosSupport, needsAndroidSupport)
+        else
           await handleChannelSelection(chann, type)
-        }
       },
     }
   })
@@ -397,38 +374,55 @@ async function setDefaultUpdateChannel(type: 'android' | 'ios' | 'both') {
       text: t('unset'),
       role: 'danger' as const,
       handler: async () => {
-        // Check if channels are synced but sync toggle is off, and if we're unsetting individual platforms
-        const channelsAreSynced = appRef.value?.default_channel_ios && appRef.value?.default_channel_android
-          && (appRef.value.default_channel_ios as any)?.id === (appRef.value.default_channel_android as any)?.id
-        const syncIsOff = !appRef.value?.default_channel_sync
+        // Unified warning system for unset via shared builder
+        const warnings: string[] = buildUnsetWarnings({
+          t,
+          type,
+          defaultChannelIos: (appRef.value?.default_channel_ios as any) || null,
+          defaultChannelAndroid: (appRef.value?.default_channel_android as any) || null,
+          defaultChannelSync: !!appRef.value?.default_channel_sync,
+        })
 
-        if (channelsAreSynced && syncIsOff && type !== 'both') {
-          // Show confirmation dialog
+        if (warnings.length > 0) {
+          confirmWarnings.value = warnings
           dialogStore.openDialog({
-            title: t('confirm-unset-synced-channel'),
-            description: type === 'ios'
-              ? t('confirm-unset-synced-channel-ios-message')
-              : t('confirm-unset-synced-channel-android-message'),
+            title: t('confirm-platform-change'),
+            description: '',
             size: 'lg',
             buttons: [
-              {
-                text: t('button-cancel'),
-                role: 'cancel',
-              },
-              {
-                text: t('button-confirm'),
-                role: 'danger',
-                handler: async () => {
-                  await handleUnsetWithChannelUpdate(type)
-                },
-              },
+              { text: t('button-cancel'), role: 'cancel' },
+              { text: t('button-confirm'), role: 'primary' },
             ],
           })
+          const cancelled = await dialogStore.onDialogDismiss()
+          if (cancelled)
+            return
+        }
+
+        // Call RPC to unset defaults atomically and let triggers adjust public/flags
+        const { error: rpcError } = await supabase
+          .rpc('unset_default_channel', {
+            p_app_id: appRef.value?.app_id,
+            p_platform: type,
+          })
+        if (rpcError) {
+          toast.error(t('cannot-change-update-channel'))
+          console.error('RPC unset_default_channel error:', rpcError)
           return
         }
 
-        // Normal unset behavior
-        await handleNormalUnset(type)
+        // Update local state
+        if (appRef.value) {
+          if (type === 'both') {
+            appRef.value.default_channel_android = null
+            appRef.value.default_channel_ios = null
+          }
+          else {
+            appRef.value[`default_channel_${type}`] = null as any
+          }
+          forceBump.value += 1
+        }
+        toast.success(t('updated-default-update-channel'))
       },
     },
     {
@@ -438,7 +432,7 @@ async function setDefaultUpdateChannel(type: 'android' | 'ios' | 'both') {
   ]
 
   dialogStore.openDialog({
-    title: t('select-default-update-channel-header').replace('$1', type === 'android' ? 'Android' : type === 'ios' ? 'iOS' : 'Android & iOS'),
+    title: t('select-default-update-channel-header').replaceAll('$1', type === 'android' ? 'Android' : type === 'ios' ? 'iOS' : 'Android & iOS'),
     description: t('select-default-update-channel'),
     size: 'xl',
     preventAccidentalClose: true,
@@ -572,7 +566,7 @@ function confirmTransferAppOwnership(org: Organization) {
 
   dialogStore.openDialog({
     title: t('confirm-transfer'),
-    description: `${t('app-will-be-transferred').replace('$ORG_ID', org.name).replace('$APP_ID', props.appId)}`,
+    description: `${t('app-will-be-transferred').replaceAll('$ORG_ID', org.name).replaceAll('$APP_ID', props.appId)}`,
     size: 'xl',
     preventAccidentalClose: true,
     buttons: [
@@ -716,26 +710,46 @@ async function handleChannelSelectionWithPlatformEnable(chann: any, type: 'andro
     return
 
   try {
-    // First, enable platform support on the channel
-    const channelUpdate: any = {}
-    if (needsIosSupport)
-      channelUpdate.ios = true
-    if (needsAndroidSupport)
-      channelUpdate.android = true
-
-    const { error: channelError } = await supabase
-      .from('channels')
-      .update(channelUpdate)
-      .eq('id', chann.id)
-
-    if (channelError) {
+    // Build warnings using shared helper
+    const prevIosDefault = (appRef.value.default_channel_ios as any) || null
+    const prevAndroidDefault = (appRef.value.default_channel_android as any) || null
+    const warnings = buildPlatformChangeWarnings({
+      t,
+      chann,
+      type,
+      prevIosDefault,
+      prevAndroidDefault,
+      options: { includePrimaryChangeMessage: true, includeEnableSupportMessage: true },
+    })
+    if (warnings.length > 0) {
+      confirmWarnings.value = warnings
+      dialogStore.openDialog({
+        title: t('confirm-platform-change'),
+        description: '',
+        size: 'lg',
+        buttons: [
+          { text: t('button-cancel'), role: 'cancel' },
+          { text: t('button-confirm'), role: 'primary' },
+        ],
+      })
+      const cancelled = await dialogStore.onDialogDismiss()
+      if (cancelled)
+        return
+    }
+    // Use atomic helper to enable needed platform(s) and set default(s)
+    const { error: rpcError } = await supabase
+      .rpc('set_default_channel', {
+        p_app_id: appRef.value.app_id,
+        p_channel_name: chann.name,
+        p_platform: type,
+      })
+    if (rpcError) {
       toast.error(t('cannot-change-update-channel'))
-      console.error('Channel platform enable error:', channelError)
+      console.error('RPC set_default_channel error:', rpcError)
       return
     }
-
-    // Then set as default channel
-    await handleChannelSelection(chann, type)
+    // Update defaults without re-showing warnings (already confirmed above)
+    await handleChannelSelection(chann, type, { skipConfirm: true })
   }
   catch (error) {
     console.error('Error in handleChannelSelectionWithPlatformEnable:', error)
@@ -743,28 +757,47 @@ async function handleChannelSelectionWithPlatformEnable(chann: any, type: 'andro
   }
 }
 
-async function handleChannelSelection(chann: any, type: 'android' | 'ios' | 'both') {
+async function handleChannelSelection(chann: any, type: 'android' | 'ios' | 'both', options?: { skipConfirm?: boolean }) {
   if (!appRef.value)
     return
 
   try {
-    let appError: any
-    if (type !== 'both') {
-      appError = await supabase.from('apps')
-        .update({ [`default_channel_${type}`]: chann.id })
-        .eq('app_id', appRef.value.app_id ?? '')
-        .then(x => x.error)
+    // Pre-confirm warnings when changing default via selection using shared helper
+    const prevIosDefault = (appRef.value.default_channel_ios as any) || null
+    const prevAndroidDefault = (appRef.value.default_channel_android as any) || null
+    const warnings = buildPlatformChangeWarnings({
+      t,
+      chann,
+      type,
+      prevIosDefault,
+      prevAndroidDefault,
+      options: { includePrimaryChangeMessage: true, includeEnableSupportMessage: false },
+    })
+    if (!options?.skipConfirm && warnings.length > 0) {
+      confirmWarnings.value = warnings
+      dialogStore.openDialog({
+        title: t('confirm-platform-change'),
+        description: '',
+        size: 'lg',
+        buttons: [
+          { text: t('button-cancel'), role: 'cancel' },
+          { text: t('button-confirm'), role: 'primary' },
+        ],
+      })
+      const cancelled = await dialogStore.onDialogDismiss()
+      if (cancelled)
+        return
     }
-    else {
-      appError = await supabase.from('apps')
-        .update({ default_channel_ios: chann.id, default_channel_android: chann.id })
-        .eq('app_id', appRef.value.app_id ?? '')
-        .then(x => x.error)
-    }
-
-    if (appError) {
+    // Call atomic helper to set default(s)
+    const { error: rpcError } = await supabase
+      .rpc('set_default_channel', {
+        p_app_id: appRef.value.app_id,
+        p_channel_name: chann.name,
+        p_platform: type,
+      })
+    if (rpcError) {
       toast.error(t('cannot-change-update-channel'))
-      console.error('App update error:', appError)
+      console.error('RPC set_default_channel error:', rpcError)
       return
     }
 
@@ -1152,6 +1185,17 @@ async function transferAppOwnership() {
             {{ t('no-channels-available') }}
           </div>
         </div>
+      </div>
+    </Teleport>
+
+    <!-- Teleport for multi-warning confirmation (platform/default changes) -->
+    <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('confirm-platform-change')" defer to="#dialog-v2-content">
+      <div class="w-full">
+        <ul class="list-disc pl-5 space-y-2 text-base leading-relaxed text-slate-800 dark:text-slate-100">
+          <li v-for="(line, idx) in confirmWarnings" :key="idx">
+            {{ line }}
+          </li>
+        </ul>
       </div>
     </Teleport>
   </div>
