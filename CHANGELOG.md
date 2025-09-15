@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## 12.26.0 (2025-09-15)
+
+
+### Features
+
+* prevent to large retention in frontend ([5bd635c](https://github.com/Cap-go/capgo/commit/5bd635c4496158b4fa77600066e1057b9a51b7b8))
+
+### 12.25.9 (2025-09-15)
+
 ### 12.25.8 (2025-09-15)
 
 

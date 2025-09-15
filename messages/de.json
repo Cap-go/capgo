@@ -596,6 +596,8 @@
   "reset-spoofed-user": "Hör auf zu fälschen",
   "reset-your-password": "Setzen Sie Ihr Passwort zurück",
   "retention": "Automatische Löschung von nicht genutzten Paketen (nach x Sekunden)",
+  "retention-cannot-be-negative": "Beibehaltung kann keine negative Zahl sein",
+  "retention-to-big": "Retention kann nicht größer sein als 2147483647",
   "revert-channel-to-built-in-version": "Kanal auf eingebaute Version zurücksetzen",
   "revert-to-builtin": "Zurück zu eingebaut",
   "revert-to-builtin-confirm": "Sind Sie sicher, dass Sie zur eingebauten Version zurückkehren möchten? Während der Kanal zurückgesetzt wird, verteilt capgo keine Updates darüber.",

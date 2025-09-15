@@ -596,6 +596,8 @@
   "reset-spoofed-user": "スプーフィングをやめてください",
   "reset-your-password": "パスワードをリセットしてください",
   "retention": "使用されていないバンドルを自動的に削除する（x秒後）",
+  "retention-cannot-be-negative": "保持は負の数になることはできません",
+  "retention-to-big": "保持は2147483647よりも大きくすることはできません",
   "revert-channel-to-built-in-version": "チャンネルを組み込みバージョンに戻す",
   "revert-to-builtin": "組み込みに戻す",
   "revert-to-builtin-confirm": "あなたは組み込みバージョンに戻すことを確認していますか？チャネルが元に戻される間、capgoはそれを通じて更新を配布しません。",

@@ -596,6 +596,8 @@
   "reset-spoofed-user": "Przestań podszywać się",
   "reset-your-password": "Zresetuj swoje hasło",
   "retention": "Automatyczne usuwanie pakietów nie używanych (po x sekundach)",
+  "retention-cannot-be-negative": "Zatrzymanie nie może być liczbą ujemną",
+  "retention-to-big": "Zatrzymanie nie może być większe niż 2147483647",
   "revert-channel-to-built-in-version": "Przywróć kanał do wbudowanej wersji",
   "revert-to-builtin": "Powróć do wbudowanego",
   "revert-to-builtin-confirm": "Czy na pewno chcesz powrócić do wbudowanej wersji? Kiedy kanał jest przywrócony, capgo nie będzie dystrybuować aktualizacji przez niego.",

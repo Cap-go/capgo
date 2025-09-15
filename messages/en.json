@@ -596,6 +596,8 @@
   "reset-spoofed-user": "Stop spoofing",
   "reset-your-password": "Reset your password",
   "retention": "Auto delete bundles not used (after x seconds)",
+  "retention-cannot-be-negative": "Retention cannot be a negative number",
+  "retention-to-big": "Retention cannot be bigger than 2147483647",
   "revert-channel-to-built-in-version": "Revert Channel to built in version",
   "revert-to-builtin": "Revert to builtin",
   "revert-to-builtin-confirm": "Are you sure that you want to revert to builtin version? While the channel is reverted, capgo will not distribute updates thru it.",

@@ -54,7 +54,7 @@
         "@intlify/unplugin-vue-i18n": "^11.0.0",
         "@logsnag/node": "1.0.1",
         "@netlify/functions": "^4.2.5",
-        "@revenuecat/purchases-capacitor": "11.2.0",
+        "@revenuecat/purchases-capacitor": "11.2.1",
         "@sentry/cli": "^2.53.0",
         "@std/semver": "npm:@jsr/std__semver@1.0.5",
         "@supabase/supabase-js": "2.57.4",
@@ -145,7 +145,7 @@
         "vite-plugin-vue-layouts": "0.11.0",
         "vite-plugin-webfont-dl": "^3.11.1",
         "vitest": "^3.2.4",
-        "vue-tsc": "3.0.6",
+        "vue-tsc": "3.0.7",
         "wrangler": "^4.35.0",
       },
     },
@@ -1123,9 +1123,9 @@
 
     "@quansync/fs": ["@quansync/fs@0.1.5", "", { "dependencies": { "quansync": "^0.2.11" } }, "sha512-lNS9hL2aS2NZgNW7BBj+6EBl4rOf8l+tQ0eRY6JWCI8jI2kc53gSoqbjojU0OnAWhzoXiOjFyGsHcDGePB3lhA=="],
 
-    "@revenuecat/purchases-capacitor": ["@revenuecat/purchases-capacitor@11.2.0", "", { "dependencies": { "@revenuecat/purchases-typescript-internal-esm": "17.5.0" }, "peerDependencies": { "@capacitor/core": ">=7.0.0" } }, "sha512-D64U5OCDRfRCDd7cz+mTGW+AD+IriWTCfdIrDRGEpbEoDp1TE/6qy4DI0j66TfDAVjvuj3bvmnV0LN28Xu2INw=="],
+    "@revenuecat/purchases-capacitor": ["@revenuecat/purchases-capacitor@11.2.1", "", { "dependencies": { "@revenuecat/purchases-typescript-internal-esm": "17.6.0" }, "peerDependencies": { "@capacitor/core": ">=7.0.0" } }, "sha512-Uhsy+e7np5SUFc2Xa048+3tmaMJOIAA9V2iLHKohhjWLYoW07wJzxDUVus1bN1CDzx/+T6+aqKh5Aiixn2L1NA=="],
 
-    "@revenuecat/purchases-typescript-internal-esm": ["@revenuecat/purchases-typescript-internal-esm@17.5.0", "", {}, "sha512-1u+gE1yWSHDkDcXjPPigTH7mq75q0Ip34vNqQkP0Sg4nXQ+jG5UrQiO7LedN4AzxCi9+fVJmr36cWNeYIYGskA=="],
+    "@revenuecat/purchases-typescript-internal-esm": ["@revenuecat/purchases-typescript-internal-esm@17.6.0", "", {}, "sha512-KXg2I64I8sflYfUsMwqilxQSSJQ7OkXeNfrRWIdQDF22ox083F1S2JmZjAMOLxYmI0PVnlfg1HoApHofRsqT3w=="],
 
     "@rolldown/binding-darwin-arm64": ["@rolldown/binding-darwin-arm64@1.0.0-beta.16", "", { "os": "darwin", "cpu": "arm64" }, "sha512-dzlvuodUFc/QX97jYSsPHtYysqeSeM5gBxiN+DpV93tXEYyFMWm3cECxNmShz4ZM+lrgm6eG2/txzLZ/z9qWLw=="],
 
@@ -3895,7 +3895,7 @@
 
     "vue-template-es2015-compiler": ["vue-template-es2015-compiler@1.9.1", "", {}, "sha512-4gDntzrifFnCEvyoO8PqyJDmguXgVPxKiIxrBKjIowvL9l+N66196+72XVYR8BBf1Uv1Fgt3bGevJ+sEmxfZzw=="],
 
-    "vue-tsc": ["vue-tsc@3.0.6", "", { "dependencies": { "@volar/typescript": "2.4.23", "@vue/language-core": "3.0.6" }, "peerDependencies": { "typescript": ">=5.0.0" }, "bin": { "vue-tsc": "./bin/vue-tsc.js" } }, "sha512-Tbs8Whd43R2e2nxez4WXPvvdjGbW24rOSgRhLOHXzWiT4pcP4G7KeWh0YCn18rF4bVwv7tggLLZ6MJnO6jXPBg=="],
+    "vue-tsc": ["vue-tsc@3.0.7", "", { "dependencies": { "@volar/typescript": "2.4.23", "@vue/language-core": "3.0.7" }, "peerDependencies": { "typescript": ">=5.0.0" }, "bin": { "vue-tsc": "./bin/vue-tsc.js" } }, "sha512-BSMmW8GGEgHykrv7mRk6zfTdK+tw4MBZY/x6fFa7IkdXK3s/8hQRacPjG9/8YKFDIWGhBocwi6PlkQQ/93OgIQ=="],
 
     "vue-turnstile": ["vue-turnstile@1.0.11", "", { "peerDependencies": { "vue": "^3.2.45" } }, "sha512-iaTBoZ5oUqtNRto6bmbn6FQvW0h/sK7mPUJc1Qn4em+cELXN59U2FQTcpWfKssV3OY6lEZzmCpcn/zrb7htK3A=="],
 
@@ -4750,6 +4750,8 @@
     "vue-router/@vue/devtools-api": ["@vue/devtools-api@6.6.4", "", {}, "sha512-sGhTPMuXqZ1rVOk32RylztWkfXTRhuS7vgAKv0zjqk8gbsHkJ7xfFf+jbySxt7tWObEJwyKaHMikV/WGDiQm8g=="],
 
     "vue-style-loader/hash-sum": ["hash-sum@1.0.2", "", {}, "sha512-fUs4B4L+mlt8/XAtSOGMUO1TXmAelItBPtJG7CyHJfYTdDjwisntGO2JQz7oUsatOY9o68+57eziUVNw/mRHmA=="],
+
+    "vue-tsc/@vue/language-core": ["@vue/language-core@3.0.7", "", { "dependencies": { "@volar/language-core": "2.4.23", "@vue/compiler-dom": "^3.5.0", "@vue/compiler-vue2": "^2.7.16", "@vue/shared": "^3.5.0", "alien-signals": "^2.0.5", "muggle-string": "^0.4.1", "path-browserify": "^1.0.1", "picomatch": "^4.0.2" }, "peerDependencies": { "typescript": "*" }, "optionalPeers": ["typescript"] }, "sha512-0sqqyqJ0Gn33JH3TdIsZLCZZ8Gr4kwlg8iYOnOrDDkJKSjFurlQY/bEFQx5zs7SX2C/bjMkmPYq/NiyY1fTOkw=="],
 
     "webpack/eslint-scope": ["eslint-scope@5.1.1", "", { "dependencies": { "esrecurse": "^4.3.0", "estraverse": "^4.1.1" } }, "sha512-2NxwbF/hZ0KpepYN0cNbo+FN6XoK7GaHlQhgx/hIZl6Va0bF45RQOOwhLIy8lQDbuCiadSLCBnH2CFYquit5bw=="],
 

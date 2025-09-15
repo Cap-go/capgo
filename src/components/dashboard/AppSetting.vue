@@ -162,6 +162,14 @@ async function updateAppRetention(newRetention: number) {
     return Promise.resolve()
   }
 
+  if (newRetention < 0) {
+    return Promise.reject(t('retention-cannot-be-negative'))
+  }
+
+  if (newRetention > 365) {
+    return Promise.reject(t('retention-to-big'))
+  }
+
   const { error } = await supabase.from('apps').update({ retention: newRetention }).eq('app_id', props.appId)
   if (error) {
     return Promise.reject(t('cannot-change-retention'))
