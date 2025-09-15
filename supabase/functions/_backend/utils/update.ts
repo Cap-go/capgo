@@ -21,7 +21,7 @@ import { closeClient, getAppOwnerPostgres, getDrizzleClient, getPgClient, isAllo
 import { getAppOwnerPostgresV2, getDrizzleClientD1Session, isAllowedActionOrgActionD1, requestInfosPostgresV2 } from './pg_d1.ts'
 import { s3 } from './s3.ts'
 import { createStatsBandwidth, createStatsMau, createStatsVersion, opnPremStats, sendStatsAndDevice } from './stats.ts'
-import { backgroundTask, existInEnv, fixSemver } from './utils.ts'
+import { backgroundTask, existInEnv, fixSemver, isInternalVersionName } from './utils.ts'
 
 const PLAN_LIMIT: Array<'mau' | 'bandwidth' | 'storage'> = ['mau', 'bandwidth']
 
@@ -187,7 +187,7 @@ export async function updateWithPG(
 
   // TODO: find better solution to check if device is from apple or google, currently not qworking in netlify-egde
 
-  if (!version.external_url && !version.r2_path && version.name !== 'builtin' && (!manifestEntries || manifestEntries.length === 0)) {
+  if (!version.external_url && !version.r2_path && !isInternalVersionName(version.name) && (!manifestEntries || manifestEntries.length === 0)) {
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot get bundle', id: app_id, version, manifestEntriesLength: manifestEntries ? manifestEntries.length : 0, channelData: channelData ? channelData.channels.name : 'no channel data', defaultChannel })
     await sendStatsAndDevice(c, device, [{ action: 'missingBundle' }])
     return simpleError200(c, 'no_bundle', 'Cannot get bundle')
@@ -220,7 +220,7 @@ export async function updateWithPG(
         old: version_name,
       })
     }
-    if (version.name !== 'builtin' && channelData?.channels.disable_auto_update === 'major' && parse(version.name).major > parse(version_build).major) {
+    if (!isInternalVersionName(version.name) && channelData?.channels.disable_auto_update === 'major' && parse(version.name).major > parse(version_build).major) {
       cloudlog({ requestId: c.get('requestId'), message: 'Cannot upgrade major version', id: device_id, date: new Date().toISOString() })
       await sendStatsAndDevice(c, device, [{ action: 'disableAutoUpdateToMajor' }])
       return simpleError200(c, 'disable_auto_update_to_major', 'Cannot upgrade major version', {
@@ -236,7 +236,7 @@ export async function updateWithPG(
       return simpleError200(c, 'cannot_update_via_private_channel', 'Cannot update via a private channel. Please ensure your defaultChannel has "Allow devices to self dissociate/associate" set to true')
     }
 
-    if (version.name !== 'builtin' && channelData.channels.disable_auto_update === 'minor' && parse(version.name).minor > parse(version_build).minor) {
+    if (!isInternalVersionName(version.name) && channelData.channels.disable_auto_update === 'minor' && parse(version.name).minor > parse(version_build).minor) {
       cloudlog({ requestId: c.get('requestId'), message: 'Cannot upgrade minor version', id: device_id, date: new Date().toISOString() })
       await sendStatsAndDevice(c, device, [{ action: 'disableAutoUpdateToMinor' }])
       return simpleError200(c, 'disable_auto_update_to_minor', 'Cannot upgrade minor version', {
@@ -247,7 +247,7 @@ export async function updateWithPG(
     }
 
     cloudlog({ requestId: c.get('requestId'), message: 'version', version: version.name, old: version_name })
-    if (version.name !== 'builtin' && channelData.channels.disable_auto_update === 'patch' && !(
+    if (!isInternalVersionName(version.name) && channelData.channels.disable_auto_update === 'patch' && !(
       parse(version.name).patch > parse(version_build).patch
       && parse(version.name).major === parse(version_build).major
       && parse(version.name).minor === parse(version_build).minor
@@ -261,7 +261,7 @@ export async function updateWithPG(
       })
     }
 
-    if (version.name !== 'builtin' && channelData.channels.disable_auto_update === 'version_number') {
+    if (!isInternalVersionName(version.name) && channelData.channels.disable_auto_update === 'version_number') {
       const minUpdateVersion = version.min_update_version
 
       // The channel is misconfigured
@@ -287,7 +287,7 @@ export async function updateWithPG(
     }
 
     // cloudlog(c.get('requestId'), 'check disableAutoUpdateUnderNative', device_id)
-    if (version.name !== 'builtin' && channelData.channels.disable_auto_update_under_native && lessThan(parse(version.name), parse(version_build))) {
+    if (!isInternalVersionName(version.name) && channelData.channels.disable_auto_update_under_native && lessThan(parse(version.name), parse(version_build))) {
       cloudlog({ requestId: c.get('requestId'), message: 'Cannot revert under native version', id: device_id, date: new Date().toISOString() })
       await sendStatsAndDevice(c, device, [{ action: 'disableAutoUpdateUnderNative' }])
       return simpleError200(c, 'disable_auto_update_under_native', 'Cannot revert under native version', {

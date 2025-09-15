@@ -20,6 +20,7 @@ import IconDown from '~icons/material-symbols/keyboard-arrow-down-rounded'
 import { appIdToUrl, urlToAppId } from '~/services/conversion'
 import { formatDate } from '~/services/date'
 import { checkCompatibilityNativePackages, isCompatible, useSupabase } from '~/services/supabase'
+import { isInternalVersionName } from '~/services/versions'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
@@ -715,7 +716,7 @@ async function handleRevert() {
               {{ channel.name }}
             </InfoRow>
             <!-- Bundle Number -->
-            <InfoRow :label="t('bundle-number')" :is-link="channel && channel.version.name !== 'builtin' && channel.version.name !== 'unknown'">
+            <InfoRow :label="t('bundle-number')" :is-link="channel && !isInternalVersionName((channel.version.name))">
               <div class="flex items-center gap-2">
                 <span @click="openBundle()">{{ channel.version.name }}</span>
                 <button

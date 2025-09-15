@@ -10,7 +10,7 @@ import {
   parse,
   tryParse,
 } from '@std/semver'
-import { backgroundTask, fixSemver } from '../utils/utils.ts'
+import { backgroundTask, fixSemver, isInternalVersionName } from '../utils/utils.ts'
 import { appIdToUrl } from './conversion.ts'
 import { getBundleUrl, getManifestUrl } from './downloadUrl.ts'
 import { getIsV2, simpleError, simpleError200 } from './hono.ts'
@@ -114,7 +114,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
   const version = channelData.version
   device.version = versionData ? versionData.id : version.id
 
-  if (!version.external_url && !version.r2_path && version.name !== 'builtin') {
+  if (!version.external_url && !version.r2_path && !isInternalVersionName(version.name)) {
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot get bundle', id: app_id, version })
     await sendStatsAndDevice(c, device, [{ action: 'missingBundle' }])
     return simpleError200(c, 'no_bundle', 'Cannot get bundle')

@@ -54,6 +54,12 @@ export function fixSemver(version: string) {
   return version
 }
 
+export function isInternalVersionName(version: string) {
+  if (!version)
+    return false
+  return version === 'builtin' || version === 'unknown'
+}
+
 interface LimitedApp {
   id: string
   ignore: number
