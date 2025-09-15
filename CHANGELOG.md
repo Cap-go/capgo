@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.25.8 (2025-09-15)
+
+
+### Bug Fixes
+
+* update registration URL handling in delete_account and login pages ([99f9bf9](https://github.com/Cap-go/capgo/commit/99f9bf97e44993d7371b0b6edeb4d7aa882d90e5))
+
 ### 12.25.7 (2025-09-15)
 
 ### 12.25.6 (2025-09-15)
