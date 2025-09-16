@@ -166,7 +166,7 @@ async function updateAppRetention(newRetention: number) {
     return Promise.reject(t('retention-cannot-be-negative'))
   }
 
-  if (newRetention > 365) {
+  if (newRetention >= 63113904) {
     return Promise.reject(t('retention-to-big'))
   }
 
