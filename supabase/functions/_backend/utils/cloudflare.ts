@@ -4,6 +4,7 @@ import type { Database } from './supabase.types.ts'
 import type { DeviceWithoutCreatedAt, ReadDevicesParams, ReadStatsParams } from './types.ts'
 import dayjs from 'dayjs'
 import ky from 'ky'
+import { hasComparableDeviceChanged, toComparableDevice } from './deviceComparison.ts'
 import { cloudlog, cloudlogErr, serializeError } from './loggin.ts'
 import { DEFAULT_LIMIT } from './types.ts'
 import { getEnv } from './utils.ts'
@@ -81,6 +82,7 @@ export async function trackDevicesCF(c: Context, device: DeviceWithoutCreatedAt)
 
   if (!c.env.DB_DEVICES)
     return Promise.resolve()
+
   const upsertQuery = `
   INSERT INTO devices (
     updated_at, device_id, version, app_id, platform, 
@@ -101,38 +103,29 @@ export async function trackDevicesCF(c: Context, device: DeviceWithoutCreatedAt)
   try {
     const updated_at = new Date().toISOString()
 
-    // First, try to select the existing row
+    const comparableDevice = toComparableDevice(device)
+
     const existingRow = await c.env.DB_DEVICES.prepare(`
       SELECT * FROM devices 
       WHERE device_id = ? AND app_id = ?
     `).bind(device.device_id, device.app_id).first()
 
-    if (!existingRow || (
-      existingRow.version !== device.version
-      || existingRow.platform !== device.platform
-      || existingRow.plugin_version !== device.plugin_version
-      || existingRow.os_version !== device.os_version
-      || existingRow.version_build !== device.version_build
-      || existingRow.custom_id !== device.custom_id
-      || !!existingRow.is_prod !== device.is_prod
-      || !!existingRow.is_emulator !== device.is_emulator
-    )) {
-      // If no existing row or update needed, perform upsert
+    if (!existingRow || hasComparableDeviceChanged(existingRow, device)) {
       cloudlog({ requestId: c.get('requestId'), message: existingRow ? 'Updating existing device' : 'Inserting new device' })
 
       const res = await c.env.DB_DEVICES.prepare(upsertQuery)
         .bind(
           updated_at,
           device.device_id,
-          device.version,
+          comparableDevice.version,
           device.app_id,
-          device.platform,
-          device.plugin_version,
-          device.os_version,
-          device.version_build,
-          device.custom_id,
-          device.is_prod,
-          device.is_emulator,
+          comparableDevice.platform,
+          comparableDevice.plugin_version,
+          comparableDevice.os_version,
+          comparableDevice.version_build,
+          comparableDevice.custom_id,
+          comparableDevice.is_prod ? 1 : 0,
+          comparableDevice.is_emulator ? 1 : 0,
         )
         .run()
       cloudlog({ requestId: c.get('requestId'), message: 'Upsert result:', res })

@@ -4,6 +4,7 @@ import type { AuthInfo, MiddlewareKeyVariables } from './hono.ts'
 import type { Database } from './supabase.types.ts'
 import type { DeviceWithoutCreatedAt, Order, ReadDevicesParams, ReadStatsParams } from './types.ts'
 import { createClient } from '@supabase/supabase-js'
+import { buildNormalizedDeviceForWrite, hasComparableDeviceChanged } from './deviceComparison.ts'
 import { simpleError } from './hono.ts'
 import { cloudlog, cloudlogErr } from './loggin.ts'
 import { createCustomer } from './stripe.ts'
@@ -696,26 +697,47 @@ export function trackMetaSB(
     })
 }
 
-export function trackDevicesSB(c: Context, device: DeviceWithoutCreatedAt) {
+export async function trackDevicesSB(c: Context, device: DeviceWithoutCreatedAt) {
   cloudlog({ requestId: c.get('requestId'), message: 'trackDevicesSB', device })
-  return supabaseAdmin(c)
+
+  const client = supabaseAdmin(c)
+
+  const { data: existingRow, error } = await client
     .from('devices')
-    .upsert(
-      {
-        app_id: device.app_id,
-        updated_at: new Date().toISOString(),
-        device_id: device.device_id,
-        platform: device.platform,
-        plugin_version: device.plugin_version,
-        os_version: device.os_version,
-        version_build: device.version_build,
-        custom_id: device.custom_id,
-        version: device.version,
-        is_prod: device.is_prod,
-        is_emulator: device.is_emulator,
-      },
-      { onConflict: 'device_id,app_id' },
-    )
+    .select('version, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator')
+    .eq('app_id', device.app_id)
+    .eq('device_id', device.device_id)
+    .maybeSingle()
+
+  if (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error fetching existing device', error })
+  }
+
+  if (existingRow && !hasComparableDeviceChanged(existingRow, device)) {
+    cloudlog({ requestId: c.get('requestId'), message: 'No Supabase upsert needed for device', device_id: device.device_id })
+    return Promise.resolve()
+  }
+
+  const normalizedDevice = buildNormalizedDeviceForWrite(device)
+  const updatedAt = new Date().toISOString()
+
+  const payload: Database['public']['Tables']['devices']['Insert'] = {
+    app_id: device.app_id,
+    updated_at: updatedAt,
+    device_id: device.device_id,
+    platform: normalizedDevice.platform ?? device.platform,
+    plugin_version: normalizedDevice.plugin_version ?? undefined,
+    os_version: normalizedDevice.os_version ?? undefined,
+    version_build: normalizedDevice.version_build ?? undefined,
+    custom_id: normalizedDevice.custom_id ?? undefined,
+    version: normalizedDevice.version ?? device.version,
+    is_prod: normalizedDevice.is_prod,
+    is_emulator: normalizedDevice.is_emulator,
+  }
+
+  return client
+    .from('devices')
+    .upsert(payload, { onConflict: 'device_id,app_id' })
 }
 
 export function trackLogsSB(c: Context, app_id: string, device_id: string, action: Database['public']['Enums']['stats_action'], version_id: number) {
