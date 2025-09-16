@@ -16,7 +16,8 @@ export async function put(c: Context, appId: string, body: UpdateApp, apikey: Da
 
   if (body.retention && body.retention >= 63113904) {
     throw quickError(400, 'retention_to_big', 'Retention cannot be bigger than 63113903 (2 years)', { retention: body.retention })
-  } else if (body.retention && body.retention < 0) {
+  }
+  else if (body.retention && body.retention < 0) {
     throw quickError(400, 'retention_to_small', 'Retention cannot be smaller than 0', { retention: body.retention })
   }
 
