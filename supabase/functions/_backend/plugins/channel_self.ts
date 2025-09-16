@@ -8,14 +8,15 @@ import { Hono } from 'hono/tiny'
 import { z } from 'zod/mini'
 import { BRES, getIsV2, parseBody, quickError, simpleError, simpleError200 } from '../utils/hono.ts'
 import { cloudlog } from '../utils/loggin.ts'
-import { closeClient, deleteChannelDevicePg, getAppByIdPg, getAppVersionsByAppIdPg, getChannelByNamePg, getChannelDeviceOverridePg, getChannelsPg, getCompatibleChannelsPg, getDrizzleClient, getMainChannelsPg, getPgClient, isAllowedActionOrgPg, upsertChannelDevicePg } from '../utils/pg.ts'
-import { getAppByIdD1, getAppVersionsByAppIdD1, getChannelByNameD1, getChannelDeviceOverrideD1, getChannelsD1, getCompatibleChannelsD1, getDrizzleClientD1Session, getMainChannelsD1, isAllowedActionOrgActionD1 } from '../utils/pg_d1.ts'
+import { closeClient, deleteChannelDevicePg, getAppByIdPg, getAppVersionsByAppIdPg, getChannelByNamePg, getChannelDeviceOverridePg, getChannelsPg, getCompatibleChannelsPg, getDrizzleClient, getMainChannelsPg, getPgClient, upsertChannelDevicePg } from '../utils/pg.ts'
+import { getAppByIdD1, getAppVersionsByAppIdD1, getChannelByNameD1, getChannelDeviceOverrideD1, getChannelsD1, getCompatibleChannelsD1, getDrizzleClientD1Session, getMainChannelsD1 } from '../utils/pg_d1.ts'
 import { convertQueryToBody, parsePluginBody } from '../utils/plugin_parser.ts'
 import { sendStatsAndDevice } from '../utils/stats.ts'
 import { deviceIdRegex, INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, MISSING_STRING_APP_ID, MISSING_STRING_DEVICE_ID, MISSING_STRING_VERSION_BUILD, MISSING_STRING_VERSION_NAME, NON_STRING_APP_ID, NON_STRING_DEVICE_ID, NON_STRING_VERSION_BUILD, NON_STRING_VERSION_NAME, reverseDomainRegex } from '../utils/utils.ts'
 
 z.config(z.locales.en())
 const devicePlatformScheme = z.literal(['ios', 'android'])
+const PLAN_MAU_ACTIONS: Array<'mau'> = ['mau']
 
 export const jsonRequestSchema = z.looseObject({
   app_id: z.string({
@@ -55,14 +56,15 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
 
   // Read operations can use v2 flag
   const versions = isV2
-    ? await getAppVersionsByAppIdD1(c, app_id, version_name, drizzleClient as ReturnType<typeof getDrizzleClientD1Session>)
-    : await getAppVersionsByAppIdPg(c, app_id, version_name, drizzleClient as ReturnType<typeof getDrizzleClient>)
+    ? await getAppVersionsByAppIdD1(c, app_id, version_name, drizzleClient as ReturnType<typeof getDrizzleClientD1Session>, PLAN_MAU_ACTIONS)
+    : await getAppVersionsByAppIdPg(c, app_id, version_name, drizzleClient as ReturnType<typeof getDrizzleClient>, PLAN_MAU_ACTIONS)
 
   if (!versions || versions.length === 0) {
     throw simpleError('version_error', `Version ${version_name} doesn't exist, and no builtin version`, { version_name, body })
   }
-  const owner_org = versions[0].owner_org
-
+  if (!versions[0].plan_valid) {
+    throw simpleError200(c, 'action_not_allowed', 'Action not allowed')
+  }
   const version = versions.length === 2
     ? versions.find((v: { name: string }) => v.name !== 'builtin')
     : versions[0]
@@ -70,12 +72,6 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
     throw simpleError('version_error', `Version ${version_name} doesn't exist, and no builtin version`, { versions })
   }
 
-  const planValid = isV2
-    ? await isAllowedActionOrgActionD1(c, drizzleClient as ReturnType<typeof getDrizzleClientD1Session>, owner_org, ['mau'])
-    : await isAllowedActionOrgPg(c, drizzleClient as ReturnType<typeof getDrizzleClient>, owner_org)
-  if (!planValid) {
-    throw simpleError200(c, 'action_not_allowed', 'Action not allowed')
-  }
   // find device
 
   const device: DeviceWithoutCreatedAt = {
@@ -207,14 +203,15 @@ async function put(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient
 
   // Read operations can use v2 flag
   const versions = isV2
-    ? await getAppVersionsByAppIdD1(c, app_id, version_name, drizzleClient as ReturnType<typeof getDrizzleClientD1Session>)
-    : await getAppVersionsByAppIdPg(c, app_id, version_name, drizzleClient as ReturnType<typeof getDrizzleClient>)
+    ? await getAppVersionsByAppIdD1(c, app_id, version_name, drizzleClient as ReturnType<typeof getDrizzleClientD1Session>, PLAN_MAU_ACTIONS)
+    : await getAppVersionsByAppIdPg(c, app_id, version_name, drizzleClient as ReturnType<typeof getDrizzleClient>, PLAN_MAU_ACTIONS)
 
   if (!versions || versions.length === 0) {
     throw simpleError('version_error', `Version ${version_name} doesn't exist, and no builtin version`, { version_name, body })
   }
-  const owner_org = versions[0].owner_org
-
+  if (!versions[0].plan_valid) {
+    throw simpleError('action_not_allowed', 'Action not allowed')
+  }
   const version = versions.length === 2
     ? versions.find((v: { name: string }) => v.name !== 'builtin')
     : versions[0]
@@ -222,12 +219,6 @@ async function put(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient
     throw simpleError('version_error', `Version ${version_name} doesn't exist, and no builtin version`, { versions })
   }
 
-  const planValid = isV2
-    ? await isAllowedActionOrgActionD1(c, drizzleClient as ReturnType<typeof getDrizzleClientD1Session>, owner_org, ['mau'])
-    : await isAllowedActionOrgPg(c, drizzleClient as ReturnType<typeof getDrizzleClient>, owner_org)
-  if (!planValid) {
-    throw simpleError('action_not_allowed', 'Action not allowed')
-  }
   const device: DeviceWithoutCreatedAt = {
     app_id,
     device_id,
@@ -324,17 +315,13 @@ async function listCompatibleChannels(c: Context, drizzleClient: ReturnType<type
 
   // Check if app exists and get owner_org for permission check - Read operation can use v2 flag
   const appData = isV2
-    ? await getAppByIdD1(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClientD1Session>)
-    : await getAppByIdPg(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>)
+    ? await getAppByIdD1(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClientD1Session>, PLAN_MAU_ACTIONS)
+    : await getAppByIdPg(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>, PLAN_MAU_ACTIONS)
 
   if (!appData) {
     throw quickError(404, 'app_not_found', `App ${app_id} not found`, { app_id })
   }
-
-  const planValid = isV2
-    ? await isAllowedActionOrgActionD1(c, drizzleClient as ReturnType<typeof getDrizzleClientD1Session>, appData.owner_org, ['mau'])
-    : await isAllowedActionOrgPg(c, drizzleClient as ReturnType<typeof getDrizzleClient>, appData.owner_org)
-  if (!planValid) {
+  if (!appData.plan_valid) {
     throw simpleError('action_not_allowed', 'Action not allowed')
   }
 

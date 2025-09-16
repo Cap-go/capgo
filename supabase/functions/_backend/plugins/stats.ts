@@ -1,6 +1,5 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
-import type { getDrizzleClientD1 } from '../utils/pg_d1.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import type { AppStats, DeviceWithoutCreatedAt, StatsActions } from '../utils/types.ts'
 import { Hono } from 'hono/tiny'
@@ -9,8 +8,8 @@ import { appIdToUrl } from '../utils/conversion.ts'
 import { BRES, getIsV2, parseBody, quickError, simpleError, simpleRateLimit } from '../utils/hono.ts'
 import { cloudlog } from '../utils/loggin.ts'
 import { sendNotifOrg } from '../utils/notifications.ts'
-import { closeClient, getAppOwnerPostgres, getAppVersionPostgres, getDrizzleClient, getPgClient, isAllowedActionOrgActionPg } from '../utils/pg.ts'
-import { getAppOwnerPostgresV2, getAppVersionPostgresV2, getDrizzleClientD1Session, isAllowedActionOrgActionD1 } from '../utils/pg_d1.ts'
+import { closeClient, getAppOwnerPostgres, getAppVersionPostgres, getDrizzleClient, getPgClient } from '../utils/pg.ts'
+import { getAppOwnerPostgresV2, getAppVersionPostgresV2, getDrizzleClientD1Session } from '../utils/pg_d1.ts'
 import { parsePluginBody } from '../utils/plugin_parser.ts'
 import { createStatsVersion, opnPremStats, sendStatsAndDevice } from '../utils/stats.ts'
 import { deviceIdRegex, INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, isLimited, MISSING_STRING_APP_ID, MISSING_STRING_DEVICE_ID, MISSING_STRING_PLATFORM, MISSING_STRING_VERSION_NAME, MISSING_STRING_VERSION_OS, NON_STRING_APP_ID, NON_STRING_DEVICE_ID, NON_STRING_PLATFORM, NON_STRING_VERSION_NAME, NON_STRING_VERSION_OS, reverseDomainRegex } from '../utils/utils.ts'
@@ -80,7 +79,10 @@ async function post(c: Context, drizzleCient: ReturnType<typeof getDrizzleClient
     custom_id,
     updated_at: new Date().toISOString(),
   }
-  const appOwner = isV2 ? await getAppOwnerPostgresV2(c, app_id, drizzleCient as ReturnType<typeof getDrizzleClientD1Session>) : await getAppOwnerPostgres(c, app_id, drizzleCient as ReturnType<typeof getDrizzleClient>)
+  const planActions: Array<'mau' | 'bandwidth'> = ['mau', 'bandwidth']
+  const appOwner = isV2
+    ? await getAppOwnerPostgresV2(c, app_id, drizzleCient as ReturnType<typeof getDrizzleClientD1Session>, planActions)
+    : await getAppOwnerPostgres(c, app_id, drizzleCient as ReturnType<typeof getDrizzleClient>, planActions)
   if (!appOwner) {
     return opnPremStats(c, app_id, action, device)
   }
@@ -101,8 +103,7 @@ async function post(c: Context, drizzleCient: ReturnType<typeof getDrizzleClient
       throw quickError(404, 'version_not_found', 'Version not found', { app_id, version_name })
     }
   }
-  const planValid = isV2 ? await isAllowedActionOrgActionD1(c, drizzleCient as ReturnType<typeof getDrizzleClientD1>, appOwner.orgs.id, ['mau', 'bandwidth']) : await isAllowedActionOrgActionPg(c, drizzleCient as ReturnType<typeof getDrizzleClient>, appOwner.orgs.id, ['mau', 'bandwidth'])
-  if (!planValid) {
+  if (!appOwner.plan_valid) {
     throw simpleError('action_not_allowed', 'Action not allowed', { appVersion, app_id, owner_org: appVersion.owner_org })
   }
   device.version = appVersion.id

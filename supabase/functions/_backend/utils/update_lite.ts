@@ -16,8 +16,8 @@ import { getBundleUrl, getManifestUrl } from './downloadUrl.ts'
 import { getIsV2, simpleError, simpleError200 } from './hono.ts'
 import { cloudlog } from './loggin.ts'
 import { sendNotifOrg } from './notifications.ts'
-import { closeClient, getAppOwnerPostgres, getDrizzleClient, getPgClient, isAllowedActionOrgActionPg } from './pg.ts'
-import { getAppOwnerPostgresV2, getDrizzleClientD1Session, isAllowedActionOrgActionD1 } from './pg_d1.ts'
+import { closeClient, getAppOwnerPostgres, getDrizzleClient, getPgClient } from './pg.ts'
+import { getAppOwnerPostgresV2, getDrizzleClientD1Session } from './pg_d1.ts'
 import { requestInfosPostgresLite, requestInfosPostgresLiteV2 } from './pg_lite.ts'
 import { s3 } from './s3.ts'
 import { createStatsBandwidth, createStatsMau, createStatsVersion, opnPremStats, sendStatsAndDevice } from './stats.ts'
@@ -41,7 +41,10 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
   } = body
   // if version_build is not semver, then make it semver
   const coerce = tryParse(fixSemver(version_build))
-  const appOwner = isV2 ? await getAppOwnerPostgresV2(c, app_id, drizzleCient as ReturnType<typeof getDrizzleClientD1>) : await getAppOwnerPostgres(c, app_id, drizzleCient as ReturnType<typeof getDrizzleClient>)
+  const planActions: Array<'mau' | 'bandwidth'> = ['mau', 'bandwidth']
+  const appOwner = isV2
+    ? await getAppOwnerPostgresV2(c, app_id, drizzleCient as ReturnType<typeof getDrizzleClientD1>, planActions)
+    : await getAppOwnerPostgres(c, app_id, drizzleCient as ReturnType<typeof getDrizzleClient>, planActions)
   const device: DeviceWithoutCreatedAt = {
     app_id,
     device_id,
@@ -83,8 +86,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
     cloudlog({ requestId: c.get('requestId'), message: 'missing_info', app_id, device_id, version_build, version_name, platform })
     return simpleError200(c, 'missing_info', 'Cannot find device_id or app_id')
   }
-  const planValid = isV2 ? await isAllowedActionOrgActionD1(c, drizzleCient as ReturnType<typeof getDrizzleClientD1>, appOwner.orgs.id, ['mau', 'bandwidth']) : await isAllowedActionOrgActionPg(c, drizzleCient as ReturnType<typeof getDrizzleClient>, appOwner.orgs.id, ['mau', 'bandwidth'])
-  if (!planValid) {
+  if (!appOwner.plan_valid) {
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot update, upgrade plan to continue to update', id: app_id })
     await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
     return simpleError200(c, 'need_plan_upgrade', 'Cannot update, upgrade plan to continue to update')

@@ -44,32 +44,6 @@ export function getDrizzleClientD1Session(c: Context) {
   return drizzleD1(session)
 }
 
-export async function isAllowedActionOrgActionD1(c: Context, drizzleCient: ReturnType<typeof getDrizzleClientD1>, orgId: string, actions: ('mau' | 'storage' | 'bandwidth')[]): Promise<boolean> {
-  try {
-    const conditions = actions.map(action => `${action}_exceeded = 0`).join(' AND ')
-    const subQuery = sql<boolean>`EXISTS (
-      SELECT 1
-      FROM ${schemaV2.stripe_info}
-      WHERE customer_id = (SELECT customer_id FROM ${schemaV2.orgs} WHERE id = ${orgId})
-      AND (
-        (date(trial_at) > date('now'))
-        OR (
-          status = 'succeeded'
-          AND is_good_plan = 1
-          ${conditions ? sql` AND ${sql.raw(conditions)}` : sql``}
-        )
-      )
-    )`
-    const fullQuery = drizzleCient.select({ is_allowed: subQuery }).from(sql`(SELECT 1)`)
-    const result = await fullQuery
-    return result[0]?.is_allowed ?? false
-  }
-  catch (error) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'isAllowedActionOrgActionD1', error })
-  }
-  return false
-}
-
 export function requestInfosPostgresV2(
   c: Context,
   platform: string,
@@ -210,20 +184,39 @@ export async function getAppOwnerPostgresV2(
   c: Context,
   appId: string,
   drizzleCient: ReturnType<typeof getDrizzleClientD1>,
-): Promise<{ owner_org: string, orgs: { created_by: string, id: string } } | null> {
+  actions: ('mau' | 'storage' | 'bandwidth')[] = [],
+): Promise<{ owner_org: string, orgs: { created_by: string, id: string }, plan_valid: boolean } | null> {
   try {
     cloudlog({ requestId: c.get('requestId'), message: 'appOwner', appId })
+    const orgAlias = aliasV2(schemaV2.orgs, 'orgs')
+    const conditions = actions.map(action => `${action}_exceeded = 0`).join(' AND ')
+    const planExpression = actions.length > 0
+      ? sql<boolean>`EXISTS (
+        SELECT 1
+        FROM ${schemaV2.stripe_info}
+        WHERE customer_id = (SELECT customer_id FROM ${schemaV2.orgs} WHERE id = ${schemaV2.apps.owner_org})
+        AND (
+          (date(trial_at) > date('now'))
+          OR (
+            status = 'succeeded'
+            AND is_good_plan = 1
+            ${conditions ? sql` AND ${sql.raw(conditions)}` : sql``}
+          )
+        )
+      )`
+      : sql<boolean>`true`
     const appOwner = await drizzleCient
       .select({
         owner_org: schemaV2.apps.owner_org,
+        plan_valid: planExpression,
         orgs: {
-          created_by: schemaV2.orgs.created_by,
-          id: schemaV2.orgs.id,
+          created_by: orgAlias.created_by,
+          id: orgAlias.id,
         },
       })
       .from(schemaV2.apps)
       .where(eq(schemaV2.apps.app_id, appId))
-      .innerJoin(aliasV2(schemaV2.orgs, 'orgs'), eq(schemaV2.apps.owner_org, schemaV2.orgs.id))
+      .innerJoin(orgAlias, eq(schemaV2.apps.owner_org, orgAlias.id))
       .limit(1)
       .then(data => data[0])
     cloudlog({ requestId: c.get('requestId'), message: 'appOwner result', appOwner })
@@ -265,13 +258,31 @@ export async function getAppVersionsByAppIdD1(
   appId: string,
   versionName: string,
   drizzleCient: ReturnType<typeof getDrizzleClientD1>,
-): Promise<{ id: number, owner_org: string, name: string }[]> {
+  actions: ('mau' | 'storage' | 'bandwidth')[] = [],
+): Promise<{ id: number, owner_org: string, name: string, plan_valid: boolean }[]> {
   try {
+    if (actions.length === 0)
+      return []
+    const conditions = actions.map(action => `${action}_exceeded = 0`).join(' AND ')
+    const planExpression = sql<boolean>`EXISTS (
+      SELECT 1
+      FROM ${schemaV2.stripe_info}
+      WHERE customer_id = (SELECT customer_id FROM ${schemaV2.orgs} WHERE id = ${schemaV2.app_versions.owner_org})
+      AND (
+        (date(trial_at) > date('now'))
+        OR (
+          status = 'succeeded'
+          AND is_good_plan = 1
+          ${conditions ? sql` AND ${sql.raw(conditions)}` : sql``}
+        )
+      )
+    )`
     const versions = await drizzleCient
       .select({
         id: schemaV2.app_versions.id,
         owner_org: schemaV2.app_versions.owner_org,
         name: schemaV2.app_versions.name,
+        plan_valid: planExpression,
       })
       .from(schemaV2.app_versions)
       .where(and(
@@ -426,11 +437,29 @@ export async function getAppByIdD1(
   c: Context,
   appId: string,
   drizzleCient: ReturnType<typeof getDrizzleClientD1>,
-): Promise<{ owner_org: string } | null> {
+  actions: ('mau' | 'storage' | 'bandwidth')[] = [],
+): Promise<{ owner_org: string, plan_valid: boolean } | null> {
   try {
+    if (actions.length === 0)
+      return null
+    const conditions = actions.map(action => `${action}_exceeded = 0`).join(' AND ')
+    const planExpression = sql<boolean>`EXISTS (
+      SELECT 1
+      FROM ${schemaV2.stripe_info}
+      WHERE customer_id = (SELECT customer_id FROM ${schemaV2.orgs} WHERE id = ${schemaV2.apps.owner_org})
+      AND (
+        (date(trial_at) > date('now'))
+        OR (
+          status = 'succeeded'
+          AND is_good_plan = 1
+          ${conditions ? sql` AND ${sql.raw(conditions)}` : sql``}
+        )
+      )
+    )`
     const app = await drizzleCient
       .select({
         owner_org: schemaV2.apps.owner_org,
+        plan_valid: planExpression,
       })
       .from(schemaV2.apps)
       .where(eq(schemaV2.apps.app_id, appId))

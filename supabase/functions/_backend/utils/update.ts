@@ -17,8 +17,8 @@ import { getBundleUrl, getManifestUrl } from './downloadUrl.ts'
 import { getIsV2, simpleError, simpleError200 } from './hono.ts'
 import { cloudlog } from './loggin.ts'
 import { sendNotifOrg } from './notifications.ts'
-import { closeClient, getAppOwnerPostgres, getDrizzleClient, getPgClient, isAllowedActionOrgActionPg, requestInfosPostgres } from './pg.ts'
-import { getAppOwnerPostgresV2, getDrizzleClientD1Session, isAllowedActionOrgActionD1, requestInfosPostgresV2 } from './pg_d1.ts'
+import { closeClient, getAppOwnerPostgres, getDrizzleClient, getPgClient, requestInfosPostgres } from './pg.ts'
+import { getAppOwnerPostgresV2, getDrizzleClientD1Session, requestInfosPostgresV2 } from './pg_d1.ts'
 import { s3 } from './s3.ts'
 import { createStatsBandwidth, createStatsMau, createStatsVersion, opnPremStats, sendStatsAndDevice } from './stats.ts'
 import { backgroundTask, existInEnv, fixSemver, isInternalVersionName } from './utils.ts'
@@ -92,8 +92,8 @@ export async function updateWithPG(
   const appOwner = await returnV2orV1(
     c,
     isV2,
-    () => getAppOwnerPostgres(c, app_id, drizzleCient),
-    () => getAppOwnerPostgresV2(c, app_id, getDrizzleCientD1()),
+    () => getAppOwnerPostgres(c, app_id, drizzleCient, PLAN_LIMIT),
+    () => getAppOwnerPostgresV2(c, app_id, getDrizzleCientD1(), PLAN_LIMIT),
   )
   const device: DeviceWithoutCreatedAt = {
     app_id,
@@ -138,13 +138,7 @@ export async function updateWithPG(
     throw simpleError('missing_info', 'Cannot find device_id or app_id', { body })
   }
 
-  const planValid = await returnV2orV1(
-    c,
-    isV2,
-    () => isAllowedActionOrgActionPg(c, drizzleCient, appOwner.orgs.id, PLAN_LIMIT),
-    () => isAllowedActionOrgActionD1(c, getDrizzleCientD1(), appOwner.orgs.id, PLAN_LIMIT),
-  )
-  if (!planValid) {
+  if (!appOwner.plan_valid) {
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot update, upgrade plan to continue to update', id: app_id })
     await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
     return simpleError200(c, 'need_plan_upgrade', 'Cannot update, upgrade plan to continue to update')
