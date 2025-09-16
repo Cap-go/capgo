@@ -14,6 +14,7 @@ interface DataDevice {
   devicesId?: string[]
   deviceIds?: string[] // TODO: remove when migration is done
   search?: string
+  customIdMode?: boolean
   order?: Order[]
   rangeStart?: number
   rangeEnd?: number
@@ -32,7 +33,7 @@ app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
   }
   const devicesIds = body.devicesId ?? body.deviceIds ?? []
   if (body.count)
-    return c.json({ count: await countDevices(c, body.appId) })
+    return c.json({ count: await countDevices(c, body.appId, body.customIdMode ?? false) })
   return c.json(await readDevices(c, {
     app_id: body.appId,
     rangeStart: body.rangeStart,
@@ -41,5 +42,5 @@ app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
     deviceIds: devicesIds,
     search: body.search,
     order: body.order,
-  }))
+  }, body.customIdMode ?? false))
 })

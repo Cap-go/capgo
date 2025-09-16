@@ -806,7 +806,7 @@ export async function readStatsSB(c: Context, params: ReadStatsParams) {
   return data ?? []
 }
 
-export async function readDevicesSB(c: Context, params: ReadDevicesParams) {
+export async function readDevicesSB(c: Context, params: ReadDevicesParams, customIdMode: boolean) {
   const supabase = supabaseAdmin(c)
 
   cloudlog({ requestId: c.get('requestId'), message: 'readDevicesSB', params })
@@ -816,6 +816,12 @@ export async function readDevicesSB(c: Context, params: ReadDevicesParams) {
     .eq('app_id', params.app_id)
     .range(params.rangeStart ?? 0, params.rangeEnd ?? DEFAULT_LIMIT)
     .limit(params.limit ?? DEFAULT_LIMIT)
+
+  if (customIdMode) {
+    query = query
+      .not('custom_id', 'is', null)
+      .neq('custom_id', '')
+  }
 
   if (params.deviceIds?.length) {
     cloudlog({ requestId: c.get('requestId'), message: 'deviceIds', deviceIds: params.deviceIds })
@@ -853,11 +859,24 @@ export async function readDevicesSB(c: Context, params: ReadDevicesParams) {
   return data ?? []
 }
 
-export async function countDevicesSB(c: Context, app_id: string) {
-  const { count } = await supabaseAdmin(c)
+export async function countDevicesSB(c: Context, app_id: string, customIdMode: boolean) {
+  const req = supabaseAdmin(c)
     .from('devices')
     .select('device_id', { count: 'exact', head: true })
     .eq('app_id', app_id)
+
+  if (customIdMode) {
+    req
+      .not('custom_id', 'is', null)
+      .neq('custom_id', '')
+  }
+
+  const { count, error } = await req
+
+  if (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error counting devices', error })
+    return 0
+  }
   return count ?? 0
 }
 
