@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## 12.27.0 (2025-09-16)
+
+
+### Features
+
+* enhance plan validation checks and streamline database queries across plugins ([bd5069c](https://github.com/Cap-go/capgo/commit/bd5069c00d2bce271a16386caadde23c06b18966))
+
 ### 12.26.8 (2025-09-16)
 
 ### 12.26.7 (2025-09-16)
