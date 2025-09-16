@@ -6,6 +6,7 @@
   "6-characters-minimum": "最低6文字、大文字1つ、小文字1つ、特殊文字1つ",
   "Bandwidth": "帯域幅",
   "Current": "現在の",
+  "CustomId": "カスタムID",
   "Filters": "フィルター",
   "Override": "オーバーライド",
   "Storage": "保管",

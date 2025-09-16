@@ -394,11 +394,15 @@ interface DeviceRowCF {
   updated_at: string
 }
 
-export async function countDevicesCF(c: Context, app_id: string) {
+export async function countDevicesCF(c: Context, app_id: string, customIdMode: boolean) {
   if (!c.env.DB_DEVICES)
     return 0
 
-  const query = `SELECT count(*) AS total FROM devices WHERE app_id = ?1`
+  let query = `SELECT count(*) AS total FROM devices WHERE app_id = ?1`
+
+  if (customIdMode) {
+    query = `SELECT count(*) AS total FROM devices WHERE app_id = ?1 AND custom_id IS NOT NULL AND custom_id != ''`
+  }
 
   cloudlog({ requestId: c.get('requestId'), message: 'countDevicesCF query', query })
   try {
@@ -415,13 +419,17 @@ export async function countDevicesCF(c: Context, app_id: string) {
   return [] as DeviceRowCF[]
 }
 
-export async function readDevicesCF(c: Context, params: ReadDevicesParams) {
+export async function readDevicesCF(c: Context, params: ReadDevicesParams, customIdMode: boolean) {
   if (!c.env.DB_DEVICES)
     return [] as DeviceRowCF[]
 
   let deviceFilter = ''
   let rangeStart = params.rangeStart ?? 0
   let rangeEnd = params.rangeEnd ?? DEFAULT_LIMIT
+
+  if (customIdMode) {
+    deviceFilter += `AND custom_id IS NOT NULL AND custom_id != ''`
+  }
   if (params.deviceIds?.length) {
     cloudlog({ requestId: c.get('requestId'), message: 'deviceIds', deviceIds: params.deviceIds })
     if (params.deviceIds.length === 1) {

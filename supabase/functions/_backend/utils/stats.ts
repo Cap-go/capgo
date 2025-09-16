@@ -105,16 +105,16 @@ export function readStats(c: Context, params: ReadStatsParams) {
   return readStatsCF(c, params)
 }
 
-export function countDevices(c: Context, app_id: string) {
+export function countDevices(c: Context, app_id: string, customIdMode: boolean) {
   if (!c.env.DB_DEVICES)
-    return countDevicesSB(c, app_id)
-  return countDevicesCF(c, app_id)
+    return countDevicesSB(c, app_id, customIdMode)
+  return countDevicesCF(c, app_id, customIdMode)
 }
 
-export function readDevices(c: Context, params: ReadDevicesParams) {
+export function readDevices(c: Context, params: ReadDevicesParams, customIdMode: boolean) {
   if (!c.env.DB_DEVICES)
-    return readDevicesSB(c, params)
-  return readDevicesCF(c, params)
+    return readDevicesSB(c, params, customIdMode)
+  return readDevicesCF(c, params, customIdMode)
 }
 
 export function sendStatsAndDevice(c: Context, device: DeviceWithoutCreatedAt, statsActions: StatsActions[]) {
