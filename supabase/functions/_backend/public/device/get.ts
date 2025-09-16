@@ -9,6 +9,7 @@ import { fetchLimit } from '../../utils/utils.ts'
 interface GetDevice {
   app_id: string
   device_id?: string
+  customIdMode?: boolean
   page?: number
 }
 
@@ -38,7 +39,7 @@ export async function get(c: Context, body: GetDevice, apikey: Database['public'
       rangeStart: 0,
       rangeEnd: 1,
       deviceIds: [body.device_id.toLowerCase()],
-    })
+    }, body.customIdMode ?? false)
     cloudlog({ requestId: c.get('requestId'), message: 'res', res })
 
     if (!res?.length) {
@@ -83,7 +84,7 @@ export async function get(c: Context, body: GetDevice, apikey: Database['public'
       app_id: body.app_id,
       rangeStart,
       rangeEnd,
-    })
+    }, body.customIdMode ?? false)
 
     if (!res) {
       throw quickError(404, 'devices_not_found', 'Cannot get devices')
