@@ -1,12 +1,15 @@
-import type { Context } from '@hono/hono'
+import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
+import { quickError, simpleError } from '../../utils/hono.ts'
+import { cloudlog } from '../../utils/loggin.ts'
 import { readDevices } from '../../utils/stats.ts'
-import { hasAppRightApikey, supabaseAdmin } from '../../utils/supabase.ts'
+import { hasAppRightApikey, supabaseApikey } from '../../utils/supabase.ts'
 import { fetchLimit } from '../../utils/utils.ts'
 
 interface GetDevice {
   app_id: string
   device_id?: string
+  customIdMode?: boolean
   page?: number
 }
 
@@ -19,8 +22,7 @@ export function filterDeviceKeys(devices: Database['public']['Tables']['devices'
 
 export async function get(c: Context, body: GetDevice, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
   if (!body.app_id || !(await hasAppRightApikey(c, body.app_id, apikey.user_id, 'read', apikey.key))) {
-    console.error('Cannot get device', 'You can\'t access this app', body.app_id)
-    return c.json({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
+    throw simpleError('invalid_app_id', 'You can\'t access this app', { app_id: body.app_id })
   }
 
   // start is 30 days ago
@@ -28,45 +30,69 @@ export async function get(c: Context, body: GetDevice, apikey: Database['public'
   // end is now
   const rangeEnd = (new Date()).toISOString()
 
-  console.log('rangeStart', rangeStart)
-  console.log('rangeEnd', rangeEnd)
+  cloudlog({ requestId: c.get('requestId'), message: 'rangeStart', rangeStart })
+  cloudlog({ requestId: c.get('requestId'), message: 'rangeEnd', rangeEnd })
   // if device_id get one device
   if (body.device_id) {
-    const res = await readDevices(c, body.app_id, 0, 1, undefined, [body.device_id.toLowerCase()])
-    console.log('res', res)
+    const res = await readDevices(c, {
+      app_id: body.app_id,
+      rangeStart: 0,
+      rangeEnd: 1,
+      deviceIds: [body.device_id.toLowerCase()],
+    }, body.customIdMode ?? false)
+    cloudlog({ requestId: c.get('requestId'), message: 'res', res })
 
-    if (!res || !res.length) {
-      console.error('Cannot find device', 'Cannot find device', body.device_id)
-      return c.json({ status: 'Cannot find device' }, 400)
+    if (!res?.length) {
+      throw quickError(404, 'device_not_found', 'Cannot find device', { device_id: body.device_id })
     }
     const dataDevice = filterDeviceKeys(res as any)[0]
     // get version from device
-    const { data: dataVersion, error: dbErrorVersion } = await supabaseAdmin(c)
+    const { data: dataVersion, error: dbErrorVersion } = await supabaseApikey(c, apikey.key)
       .from('app_versions')
       .select('id, name')
       .eq('id', dataDevice.version)
       .single()
     if (dbErrorVersion || !dataVersion) {
-      console.error('Cannot find version', 'Cannot find version', dataDevice.version)
-      return c.json({ status: 'Cannot find version', error: dbErrorVersion }, 400)
+      throw quickError(404, 'version_not_found', 'Cannot find version', { version: dataDevice.version })
     }
     dataDevice.version = dataVersion as any
+
+    // Check for channel override
+    const { data: channelOverride } = await supabaseApikey(c, apikey.key)
+      .from('channel_devices')
+      .select(`
+        channel_id,
+        channels (
+          name
+        )
+      `)
+      .eq('device_id', body.device_id.toLowerCase())
+      .eq('app_id', body.app_id)
+      .single()
+
+    if (channelOverride?.channels) {
+      (dataDevice as any).channel = channelOverride.channels.name
+    }
+
     return c.json(dataDevice)
   }
   else {
-    const fetchOffset = body.page == null ? 0 : body.page
-    const from = fetchOffset * fetchLimit
-    const to = (fetchOffset + 1) * fetchLimit - 1
-    const res = await readDevices(c, body.app_id, from, to, undefined)
+    const fetchOffset = body.page ?? 0
+    const rangeStart = fetchOffset * fetchLimit
+    const rangeEnd = (fetchOffset + 1) * fetchLimit - 1
+    const res = await readDevices(c, {
+      app_id: body.app_id,
+      rangeStart,
+      rangeEnd,
+    }, body.customIdMode ?? false)
 
     if (!res) {
-      console.error('Cannot get devices', 'Cannot get devices')
-      return c.json([])
+      throw quickError(404, 'devices_not_found', 'Cannot get devices')
     }
     const dataDevices = filterDeviceKeys(res as any)
     // get versions from all devices
     const versionIds = dataDevices.map(device => device.version)
-    const { data: dataVersions, error: dbErrorVersions } = await supabaseAdmin(c)
+    const { data: dataVersions, error: dbErrorVersions } = await supabaseApikey(c, apikey.key)
       .from('app_versions')
       .select(`
               id,
@@ -74,9 +100,8 @@ export async function get(c: Context, body: GetDevice, apikey: Database['public'
       `)
       .in('id', versionIds)
     // replace version with object from app_versions table
-    if (dbErrorVersions || !dataVersions || !dataVersions.length) {
-      console.error('Cannot get versions', 'Cannot get versions', dbErrorVersions)
-      return c.json([])
+    if (dbErrorVersions || !dataVersions?.length) {
+      throw quickError(404, 'versions_not_found', 'Cannot get versions', { dbErrorVersions, dataVersions })
     }
     dataDevices.forEach((device) => {
       const version = dataVersions.find((v: any) => v.id === device.version)
@@ -84,6 +109,31 @@ export async function get(c: Context, body: GetDevice, apikey: Database['public'
         device.version = version as any
       }
     })
+
+    // Get channel overrides for all devices
+    const deviceIds = dataDevices.map(device => device.device_id.toLowerCase())
+    const { data: channelOverrides } = await supabaseApikey(c, apikey.key)
+      .from('channel_devices')
+      .select(`
+        device_id,
+        channel_id,
+        channels (
+          name
+        )
+      `)
+      .in('device_id', deviceIds)
+      .eq('app_id', body.app_id)
+
+    // Add channel override to each device that has one
+    if (channelOverrides?.length) {
+      dataDevices.forEach((device) => {
+        const override = channelOverrides.find(o => o.device_id === device.device_id.toLowerCase())
+        if (override?.channels) {
+          (device as any).channel = override.channels.name
+        }
+      })
+    }
+
     return c.json(dataDevices)
   }
 }

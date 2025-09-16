@@ -1,10 +1,11 @@
 BEGIN;
+
 CREATE EXTENSION "basejump-supabase_test_helpers";
 
-SELECT plan(4);
+SELECT
+  plan (4);
 
-CREATE OR REPLACE FUNCTION my_tests(
-) RETURNS SETOF TEXT AS $$
+CREATE OR REPLACE FUNCTION my_tests () RETURNS SETOF TEXT AS $$
 DECLARE
   rls_failed BOOLEAN := false;
 BEGIN
@@ -58,7 +59,12 @@ RETURN NEXT IS((select invite_user_to_org('test@capgo.app', '046a36ac-e03c-4590-
 END;
 $$ LANGUAGE plpgsql;
 
-SELECT my_tests();
+SELECT
+  my_tests ();
 
-SELECT * FROM finish();
+SELECT
+  *
+FROM
+  finish ();
+
 ROLLBACK;

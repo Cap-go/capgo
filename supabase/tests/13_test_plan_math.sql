@@ -1,10 +1,11 @@
 BEGIN;
+
 CREATE EXTENSION "basejump-supabase_test_helpers";
 
-SELECT plan(12);
+SELECT
+  plan (12);
 
-CREATE OR REPLACE FUNCTION my_tests(
-) RETURNS SETOF TEXT AS $$
+CREATE OR REPLACE FUNCTION my_tests () RETURNS SETOF TEXT AS $$
 DECLARE
   app_metrics RECORD;
   usage RECORD;
@@ -65,7 +66,12 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-SELECT my_tests();
+SELECT
+  my_tests ();
 
-SELECT * FROM finish();
+SELECT
+  *
+FROM
+  finish ();
+
 ROLLBACK;

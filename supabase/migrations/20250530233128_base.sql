@@ -82,10 +82,6 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp"
 WITH
   SCHEMA "extensions";
 
-CREATE EXTENSION IF NOT EXISTS "wrappers"
-WITH
-  SCHEMA "extensions";
-
 CREATE TYPE "public"."action_type" AS ENUM('mau', 'storage', 'bandwidth');
 
 ALTER TYPE "public"."action_type" OWNER TO "postgres";
@@ -183,7 +179,9 @@ CREATE TYPE "public"."stats_action" AS ENUM(
   'NoChannelOrOverride',
   'setChannel',
   'getChannel',
-  'rateLimited'
+  'rateLimited',
+  'disableAutoUpdate',
+  'InvalidIp'
 );
 
 ALTER TYPE "public"."stats_action" OWNER TO "postgres";
@@ -237,7 +235,7 @@ ALTER TYPE "public"."version_action" OWNER TO "postgres";
 CREATE OR REPLACE FUNCTION "public"."accept_invitation_to_org" ("org_id" "uuid") RETURNS character varying LANGUAGE "plpgsql"
 SET
   search_path = '' SECURITY DEFINER AS $$
-Declare  
+Declare
  invite record;
 Begin
   SELECT org_users.* FROM public.org_users
@@ -306,7 +304,7 @@ BEGIN
           AND org_users.user_id != OLD.user_id
           AND org_users.org_id=orgs.id
       ) = 0
-  ) 
+  )
   AND orgs.id=OLD.org_id;
 
   RETURN OLD;
@@ -324,7 +322,7 @@ SET
   search_path = '' AS $$
 BEGIN
     RETURN check_min_rights(min_right, (select auth.uid()), org_id, app_id, channel_id);
-END;  
+END;
 $$;
 
 ALTER FUNCTION "public"."check_min_rights" (
@@ -344,15 +342,15 @@ CREATE OR REPLACE FUNCTION "public"."check_min_rights" (
 SET
   search_path = '' SECURITY DEFINER AS $$
 DECLARE
-    user_right_record RECORD; 
+    user_right_record RECORD;
 BEGIN
     IF user_id = NULL THEN
         RETURN false;
     END IF;
 
-    FOR user_right_record IN 
-        SELECT org_users.user_right, org_users.app_id, org_users.channel_id 
-        FROM public.org_users 
+    FOR user_right_record IN
+        SELECT org_users.user_right, org_users.app_id, org_users.channel_id
+        FROM public.org_users
         WHERE org_users.org_id = check_min_rights.org_id AND org_users.user_id = check_min_rights.user_id
     LOOP
         IF (user_right_record.user_right >= min_right AND user_right_record.app_id IS NULL AND user_right_record.channel_id IS NULL) OR
@@ -381,7 +379,7 @@ SET
   IF (select current_user) IS NOT DISTINCT FROM 'postgres' THEN
     RETURN NEW;
   END IF;
-  
+
   IF ("public"."check_min_rights"('super_admin'::"public"."user_min_right", (select auth.uid()), NEW.org_id, NULL::character varying, NULL::bigint))
   THEN
     RETURN NEW;
@@ -432,11 +430,11 @@ CREATE OR REPLACE FUNCTION "public"."cleanup_frequent_job_details" () RETURNS "v
 SET
   search_path = '' AS $$
 BEGIN
-    DELETE FROM cron.job_run_details 
+    DELETE FROM cron.job_run_details
     WHERE job_pid IN (
         SELECT jobid 
         FROM cron.job 
-        WHERE schedule = '5 seconds' OR schedule = '1 seconds'
+        WHERE schedule = '5 seconds' OR schedule = '1 seconds' OR schedule = '10 seconds'
     ) 
     AND end_time < now() - interval '1 hour';
 END;
@@ -452,12 +450,12 @@ DECLARE
 BEGIN
     -- Clean up messages older than 7 days from all queues
     FOR queue_name IN (
-        SELECT name FROM pgmq.list_queues()
+        SELECT q.queue_name FROM pgmq.list_queues() q
     ) LOOP
         -- Delete archived messages older than 7 days
         EXECUTE format('DELETE FROM pgmq.a_%I WHERE archived_at < $1', queue_name)
         USING (NOW() - INTERVAL '7 days')::timestamptz;
-        
+
         -- Delete failed messages that have been retried more than 5 times
         EXECUTE format('DELETE FROM pgmq.q_%I WHERE read_ct > 5', queue_name);
     END LOOP;
@@ -545,7 +543,7 @@ SET
   search_path = '' AS $$
 Begin
   RETURN (SELECT COUNT(*) FROM public.stripe_info WHERE is_good_plan = false AND status = 'succeeded');
-End;  
+End;
 $$;
 
 ALTER FUNCTION "public"."count_all_need_upgrade" () OWNER TO "postgres";
@@ -555,7 +553,7 @@ SET
   search_path = '' AS $$
 Begin
   RETURN (SELECT COUNT(DISTINCT owner_org) FROM public.apps);
-End;  
+End;
 $$;
 
 ALTER FUNCTION "public"."count_all_onboarded" () OWNER TO "postgres";
@@ -564,13 +562,13 @@ CREATE OR REPLACE FUNCTION "public"."count_all_plans_v2" () RETURNS TABLE ("plan
 SET
   search_path = '' AS $$
 BEGIN
-  RETURN QUERY 
+  RETURN QUERY
   WITH ActiveSubscriptions AS (
     SELECT DISTINCT ON (si.customer_id)
       p.name AS product_name,
       si.customer_id
     FROM public.stripe_info si
-    INNER JOIN public.plans p ON si.product_id = p.stripe_id 
+    INNER JOIN public.plans p ON si.product_id = p.stripe_id
     WHERE si.status = 'succeeded'
     ORDER BY si.customer_id, si.created_at DESC
   ),
@@ -579,14 +577,14 @@ BEGIN
       'Trial' AS product_name,
       si.customer_id
     FROM public.stripe_info si
-    WHERE si.trial_at > NOW() 
+    WHERE si.trial_at > NOW()
     AND si.status is NULL
     AND NOT EXISTS (
-      SELECT 1 FROM ActiveSubscriptions a 
+      SELECT 1 FROM ActiveSubscriptions a
       WHERE a.customer_id = si.customer_id
     )
   )
-  SELECT 
+  SELECT
     product_name as plan_name,
     COUNT(*) as count
   FROM (
@@ -604,7 +602,7 @@ CREATE OR REPLACE FUNCTION "public"."delete_http_response" ("request_id" bigint)
 SET
   search_path = '' AS $$
 BEGIN
-    DELETE FROM net._http_response 
+    DELETE FROM net._http_response
     WHERE id = request_id;
 END;
 $$;
@@ -633,22 +631,22 @@ BEGIN
   -- Get the current user ID and email
   SELECT auth.uid() INTO user_id;
   SELECT email INTO user_email FROM auth.users WHERE id = user_id;
-  
+
   -- Hash the email and store it in deleted_account table
-  hashed_email := encode(digest(user_email::text, 'sha256'::text)::bytea, 'hex'::text);
-  
+  hashed_email := encode(extensions.digest(user_email::text, 'sha256'::text), 'hex'::text);
+
   INSERT INTO public.deleted_account (email)
   VALUES (hashed_email);
-  
+
   -- Trigger the queue-based deletion process
   PERFORM pgmq.send(
-    'on_user_delete',
-    json_build_object(
+    'on_user_delete'::text,
+    jsonb_build_object(
       'user_id', user_id,
       'email', user_email
     )
   );
-  
+
   -- Delete the user from auth.users
   -- This will cascade to other tables due to foreign key constraints
   DELETE FROM auth.users WHERE id = user_id;
@@ -664,7 +662,7 @@ Begin
   RETURN (SELECT EXISTS (SELECT 1
   FROM public.apps
   WHERE app_id=appid));
-End;  
+End;
 $$;
 
 ALTER FUNCTION "public"."exist_app_v2" ("appid" character varying) OWNER TO "postgres";
@@ -681,7 +679,7 @@ Begin
   FROM public.app_versions
   WHERE app_id=appid
   AND name=name_version));
-End;  
+End;
 $$;
 
 ALTER FUNCTION "public"."exist_app_versions" (
@@ -706,7 +704,7 @@ Begin
     OR plans.name = 'Pay as you go'
     ORDER BY plans.mau
     LIMIT 1);
-End;  
+End;
 $$;
 
 ALTER FUNCTION "public"."find_best_plan_v3" (
@@ -807,10 +805,10 @@ DECLARE
     cycle_start timestamp with time zone;
     cycle_end timestamp with time zone;
 BEGIN
-    SELECT subscription_anchor_start, subscription_anchor_end 
+    SELECT subscription_anchor_start, subscription_anchor_end
     INTO cycle_start, cycle_end
     FROM public.get_cycle_info_org(org_id);
-    
+
     RETURN QUERY
     SELECT * FROM public.get_app_metrics(org_id, cycle_start::date, cycle_end::date);
 END;
@@ -852,7 +850,7 @@ BEGIN
         WHERE deleted_apps.owner_org = org_id
     ),
     deleted_metrics AS (
-        SELECT 
+        SELECT
             deleted_apps.app_id,
             deleted_apps.deleted_at::date as date,
             COUNT(*) as deleted_count
@@ -873,9 +871,9 @@ BEGIN
         COALESCE(SUM(dv.uninstall)::bigint, 0) AS uninstall
     FROM
         all_apps aa
-    CROSS JOIN 
+    CROSS JOIN
         DateSeries ds
-    LEFT JOIN 
+    LEFT JOIN
         public.daily_mau dm ON aa.app_id = dm.app_id AND ds.date = dm.date
     LEFT JOIN LATERAL (
         SELECT sh.size as storage
@@ -898,11 +896,11 @@ BEGIN
     ) dst ON true
     LEFT JOIN 
         public.daily_bandwidth db ON aa.app_id = db.app_id AND ds.date = db.date
-    LEFT JOIN 
+    LEFT JOIN
         public.daily_version dv ON aa.app_id = dv.app_id AND ds.date = dv.date
     LEFT JOIN
         deleted_metrics del ON aa.app_id = del.app_id AND ds.date = del.date
-    GROUP BY 
+    GROUP BY
         aa.app_id, ds.date, dm.mau, dst.storage, db.bandwidth, del.deleted_count
     ORDER BY
         aa.app_id, ds.date;
@@ -930,7 +928,7 @@ Begin
   AND owner_org=(select public.get_user_main_org_id_by_app_id(appid))
   AND public.is_member_of_org(public.get_user_id(apikey), (SELECT public.get_user_main_org_id_by_app_id(appid)))
   );
-End;  
+End;
 $$;
 
 ALTER FUNCTION "public"."get_app_versions" (
@@ -958,7 +956,7 @@ Begin
         FROM public.orgs
         where id=orgid)
   ));
-End;  
+End;
 $$;
 
 ALTER FUNCTION "public"."get_current_plan_max_org" ("orgid" "uuid") OWNER TO "postgres";
@@ -967,14 +965,14 @@ CREATE OR REPLACE FUNCTION "public"."get_current_plan_name_org" ("orgid" "uuid")
 SET
   search_path = '' SECURITY DEFINER AS $$
 Begin
-  RETURN 
+  RETURN
   (SELECT name
   FROM public.plans
     WHERE stripe_id=(SELECT product_id
     FROM public.stripe_info
     where customer_id=(SELECT customer_id FROM public.orgs where id=orgid)
     ));
-End;  
+End;
 $$;
 
 ALTER FUNCTION "public"."get_current_plan_name_org" ("orgid" "uuid") OWNER TO "postgres";
@@ -996,13 +994,13 @@ BEGIN
     ORDER BY customer_id, created_at DESC
   )
   SELECT
-    COUNT(CASE 
-      WHEN s.price_id IN (SELECT price_y_id FROM public.plans WHERE price_y_id IS NOT NULL) 
-      THEN 1 
+    COUNT(CASE
+      WHEN s.price_id IN (SELECT price_y_id FROM public.plans WHERE price_y_id IS NOT NULL)
+      THEN 1
     END) AS yearly,
-    COUNT(CASE 
-      WHEN s.price_id IN (SELECT price_m_id FROM public.plans WHERE price_m_id IS NOT NULL) 
-      THEN 1 
+    COUNT(CASE
+      WHEN s.price_id IN (SELECT price_m_id FROM public.plans WHERE price_m_id IS NOT NULL)
+      THEN 1
     END) AS monthly,
     COUNT(*) AS total
   FROM ActiveSubscriptions s;
@@ -1085,10 +1083,10 @@ DECLARE
     cycle_start timestamp with time zone;
     cycle_end timestamp with time zone;
 BEGIN
-    SELECT subscription_anchor_start, subscription_anchor_end 
+    SELECT subscription_anchor_start, subscription_anchor_end
     INTO cycle_start, cycle_end
     FROM public.get_cycle_info_org(org_id);
-    
+
     RETURN QUERY
     SELECT * FROM public.get_global_metrics(org_id, cycle_start::date, cycle_end::date);
 END;
@@ -1158,20 +1156,6 @@ $$;
 
 ALTER FUNCTION "public"."get_identity" () OWNER TO "postgres";
 
-CREATE OR REPLACE FUNCTION "public"."get_identity" ("keymode" "public"."key_mode" []) RETURNS "uuid" LANGUAGE "plpgsql"
-SET
-  search_path = '' SECURITY DEFINER AS $$
-DECLARE
-    auth_uid uuid;
-    api_key_text text;
-    api_key record;
-Begin
-  RAISE EXCEPTION 'get_identity called!';  
-End;
-$$;
-
-ALTER FUNCTION "public"."get_identity" ("keymode" "public"."key_mode" []) OWNER TO "postgres";
-
 CREATE OR REPLACE FUNCTION "public"."get_identity_apikey_only" ("keymode" "public"."key_mode" []) RETURNS "uuid" LANGUAGE "plpgsql"
 SET
   search_path = '' SECURITY DEFINER AS $$
@@ -1179,7 +1163,7 @@ DECLARE
     api_key_text text;
     api_key record;
 Begin
-  SELECT (("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text") into api_key_text;
+  SELECT "public"."get_apikey_header"() into api_key_text;
 
   -- No api key found in headers, return
   IF api_key_text IS NULL THEN
@@ -1187,7 +1171,7 @@ Begin
   END IF;
 
   -- Fetch the api key
-  select * FROM public.apikeys 
+  select * FROM public.apikeys
   where key=api_key_text AND
   mode=ANY(keymode)
   limit 1 into api_key;
@@ -1202,15 +1186,42 @@ $$;
 
 ALTER FUNCTION "public"."get_identity_apikey_only" ("keymode" "public"."key_mode" []) OWNER TO "postgres";
 
-CREATE OR REPLACE FUNCTION "public"."get_identity_org" ("keymode" "public"."key_mode" [], "org_id" "uuid") RETURNS "uuid" LANGUAGE "plpgsql"
+CREATE OR REPLACE FUNCTION "public"."get_identity" ("keymode" "public"."key_mode" []) RETURNS "uuid" LANGUAGE "plpgsql"
 SET
   search_path = '' SECURITY DEFINER AS $$
+DECLARE
+    auth_uid uuid;
+    api_key_text text;
+    api_key record;
 Begin
-  RAISE EXCEPTION 'get_identity_org is deprecated';
+  SELECT auth.uid() into auth_uid;
+
+  IF auth_uid IS NOT NULL THEN
+    RETURN auth_uid;
+  END IF;
+
+  SELECT "public"."get_apikey_header"() into api_key_text;
+
+  -- No api key found in headers, return
+  IF api_key_text IS NULL THEN
+    RETURN NULL;
+  END IF;
+
+  -- Fetch the api key
+  select * FROM public.apikeys
+  where key=api_key_text AND
+  mode=ANY(keymode)
+  limit 1 into api_key;
+
+  if api_key IS DISTINCT FROM  NULL THEN
+    RETURN api_key.user_id;
+  END IF;
+
+  RETURN NULL;
 End;
 $$;
 
-ALTER FUNCTION "public"."get_identity_org" ("keymode" "public"."key_mode" [], "org_id" "uuid") OWNER TO "postgres";
+ALTER FUNCTION "public"."get_identity" ("keymode" "public"."key_mode" []) OWNER TO "postgres";
 
 CREATE OR REPLACE FUNCTION "public"."get_identity_org_allowed" ("keymode" "public"."key_mode" [], "org_id" "uuid") RETURNS "uuid" LANGUAGE "plpgsql"
 SET
@@ -1226,7 +1237,7 @@ Begin
     RETURN auth_uid;
   END IF;
 
-  SELECT (("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text") into api_key_text;
+  SELECT "public"."get_apikey_header"() into api_key_text;
 
   -- No api key found in headers, return
   IF api_key_text IS NULL THEN
@@ -1234,13 +1245,13 @@ Begin
   END IF;
 
   -- Fetch the api key
-  select * FROM public.apikeys 
+  select * FROM public.apikeys
   where key=api_key_text AND
   mode=ANY(keymode)
   limit 1 into api_key;
 
   if api_key IS DISTINCT FROM  NULL THEN
-    IF api_key.limited_to_orgs IS DISTINCT FROM '{}' THEN
+    IF api_key.limited_to_orgs IS NOT NULL AND api_key.limited_to_orgs != '{}' THEN
       IF NOT (org_id = ANY(api_key.limited_to_orgs)) THEN
           RETURN NULL;
       END IF;
@@ -1272,7 +1283,7 @@ Begin
     RETURN auth_uid;
   END IF;
 
-  SELECT (("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text") into api_key_text;
+  SELECT "public"."get_apikey_header"() into api_key_text;
 
   -- No api key found in headers, return
   IF api_key_text IS NULL THEN
@@ -1280,13 +1291,13 @@ Begin
   END IF;
 
   -- Fetch the api key
-  select * FROM public.apikeys 
+  select * FROM public.apikeys
   where key=api_key_text AND
   mode=ANY(keymode)
   limit 1 into api_key;
 
   if api_key IS DISTINCT FROM  NULL THEN
-    IF api_key.limited_to_orgs IS DISTINCT FROM '{}' THEN
+    IF api_key.limited_to_orgs IS NOT NULL AND api_key.limited_to_orgs != '{}' THEN
       IF NOT (org_id = ANY(api_key.limited_to_orgs)) THEN
           RETURN NULL;
       END IF;
@@ -1315,7 +1326,7 @@ SET
   search_path = '' AS $$
 BEGIN
     RETURN public.get_metered_usage((select auth.uid()));
-END;  
+END;
 $$;
 
 ALTER FUNCTION "public"."get_metered_usage" () OWNER TO "postgres";
@@ -1381,7 +1392,7 @@ BEGIN
     );
 
     -- Calculate base next time
-    next_time := date_trunc('hour', p_timestamp) + 
+    next_time := date_trunc('hour', p_timestamp) +
                  make_interval(hours => next_hour - EXTRACT(HOUR FROM p_timestamp)::int,
                              mins => next_minute);
 
@@ -1482,7 +1493,7 @@ ALTER FUNCTION "public"."get_org_members" ("user_id" "uuid", "guild_id" "uuid") 
 CREATE OR REPLACE FUNCTION "public"."get_org_owner_id" ("apikey" "text", "app_id" "text") RETURNS "uuid" LANGUAGE "plpgsql"
 SET
   search_path = '' SECURITY DEFINER AS $$
-Declare  
+Declare
  org_owner_id uuid;
  real_user_id uuid;
  org_id uuid;
@@ -1501,7 +1512,7 @@ Begin
   END IF;
 
   RETURN org_owner_id;
-End;  
+End;
 $$;
 
 ALTER FUNCTION "public"."get_org_owner_id" ("apikey" "text", "app_id" "text") OWNER TO "postgres";
@@ -1510,7 +1521,7 @@ CREATE OR REPLACE FUNCTION "public"."get_org_perm_for_apikey" ("apikey" "text", 
 SET
   search_path = '' SECURITY DEFINER AS $$
 <<get_org_perm_for_apikey>>
-Declare  
+Declare
   apikey_user_id uuid;
   org_id uuid;
   user_perm "public"."user_min_right";
@@ -1605,37 +1616,38 @@ DECLARE
   api_key record;
   user_id uuid;
 BEGIN
-  SELECT (("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text") into api_key_text;
-  
-  -- Initialize user_id as NULL
+  SELECT "public"."get_apikey_header"() into api_key_text;
   user_id := NULL;
-  
+
   -- Check for API key first
   IF api_key_text IS NOT NULL THEN
     SELECT * FROM public.apikeys WHERE key=api_key_text into api_key;
-    IF api_key IS NOT NULL THEN
-      user_id := api_key.user_id;
-      
-      -- Check limited_to_orgs only if api_key exists and has restrictions
-      IF api_key.limited_to_orgs IS DISTINCT FROM '{}' THEN    
-        return query select orgs.* FROM public.get_orgs_v6(user_id) orgs 
-        where orgs.gid = ANY(api_key.limited_to_orgs::uuid[]);
-        RETURN;
-      END IF;
+
+    IF api_key IS NULL THEN
+      RAISE EXCEPTION 'Invalid API key provided';
+    END IF;
+
+    user_id := api_key.user_id;
+
+    -- Check limited_to_orgs only if api_key exists and has restrictions
+    IF api_key.limited_to_orgs IS NOT NULL AND api_key.limited_to_orgs != '{}' THEN
+      return query select orgs.* FROM public.get_orgs_v6(user_id) orgs
+      where orgs.gid = ANY(api_key.limited_to_orgs::uuid[]);
+      RETURN;
     END IF;
   END IF;
 
   -- If no valid API key user_id yet, try to get FROM public.identity
   IF user_id IS NULL THEN
     SELECT public.get_identity() into user_id;
-  END IF;
 
-  IF user_id IS NULL THEN
-    RAISE EXCEPTION 'Cannot do that as postgres!';
+    IF user_id IS NULL THEN
+      RAISE EXCEPTION 'No authentication provided - API key or valid session required';
+    END IF;
   END IF;
 
   return query select * FROM public.get_orgs_v6(user_id);
-END;  
+END;
 $$;
 
 ALTER FUNCTION "public"."get_orgs_v6" () OWNER TO "postgres";
@@ -1659,15 +1671,15 @@ CREATE OR REPLACE FUNCTION "public"."get_orgs_v6" ("userid" "uuid") RETURNS TABL
 SET
   search_path = '' SECURITY DEFINER AS $$
 BEGIN
-  RETURN QUERY 
-  SELECT 
-    sub.id AS gid, 
-    sub.created_by, 
-    sub.logo, 
-    sub.name, 
-    org_users.user_right::varchar AS role, 
+  RETURN QUERY
+  SELECT
+    sub.id AS gid,
+    sub.created_by,
+    sub.logo,
+    sub.name,
+    org_users.user_right::varchar AS role,
     public.is_paying_org(sub.id) AS paying,
-    public.is_trial_org(sub.id) AS trial_left, 
+    public.is_trial_org(sub.id) AS trial_left,
     public.is_allowed_action_org(sub.id) AS can_use_more,
     public.is_canceled_org(sub.id) AS is_canceled,
     (SELECT count(*) FROM public.apps WHERE owner_org = sub.id) AS app_count,
@@ -1679,7 +1691,7 @@ BEGIN
     SELECT public.get_cycle_info_org(o.id) AS f, o.* AS o FROM public.orgs AS o
   ) sub
   JOIN public.org_users ON (org_users."user_id" = get_orgs_v6.userid AND sub.id = org_users."org_id");
-END;  
+END;
 $$;
 
 ALTER FUNCTION "public"."get_orgs_v6" ("userid" "uuid") OWNER TO "postgres";
@@ -1700,7 +1712,7 @@ BEGIN
   SELECT subscription_anchor_start::date, subscription_anchor_end::date
   INTO cycle_start, cycle_end
   FROM public.get_cycle_info_org(orgid);
-  
+
   -- Call the function with billing cycle dates as parameters
   RETURN QUERY
   SELECT * FROM public.get_plan_usage_percent_detailed(orgid, cycle_start, cycle_end);
@@ -1730,12 +1742,12 @@ DECLARE
 BEGIN
   -- Get the maximum values for the user's current plan
   current_plan_max := public.get_current_plan_max_org(orgid);
-  
+
   -- Get the user's maximum usage stats for the specified billing cycle
   SELECT mau, bandwidth, storage
   INTO total_stats
   FROM public.get_total_metrics(orgid, cycle_start, cycle_end);
-  
+
   -- Calculate the percentage of usage for each stat
   percent_mau := public.convert_number_to_percent(total_stats.mau, current_plan_max.mau);
   percent_bandwidth := public.convert_number_to_percent(total_stats.bandwidth, current_plan_max.bandwidth);
@@ -1777,7 +1789,7 @@ BEGIN
         FROM cron.job
         WHERE jobname = 'process_cron_stats_jobs'
     )
-    SELECT 
+    SELECT
         COALESCE(last_run.start_time, CURRENT_TIMESTAMP - INTERVAL '1 day') AS last_run,
         public.get_next_cron_time(job_info.schedule, CURRENT_TIMESTAMP) AS next_run
     FROM job_info
@@ -1801,7 +1813,7 @@ BEGIN
     AND app_versions.deleted = false;
 
     RETURN total_size;
-END;  
+END;
 $$;
 
 ALTER FUNCTION "public"."get_total_app_storage_size_orgs" ("org_id" "uuid", "app_id" character varying) OWNER TO "postgres";
@@ -1821,10 +1833,10 @@ DECLARE
     cycle_start timestamp with time zone;
     cycle_end timestamp with time zone;
 BEGIN
-    SELECT subscription_anchor_start, subscription_anchor_end 
+    SELECT subscription_anchor_start, subscription_anchor_end
     INTO cycle_start, cycle_end
     FROM public.get_cycle_info_org(org_id);
-    
+
     RETURN QUERY
     SELECT * FROM public.get_total_metrics(org_id, cycle_start::date, cycle_end::date);
 END;
@@ -1881,7 +1893,7 @@ BEGIN
     AND app_versions.deleted = false;
 
     RETURN total_size;
-END;  
+END;
 $$;
 
 ALTER FUNCTION "public"."get_total_storage_size_org" ("org_id" "uuid") OWNER TO "postgres";
@@ -1939,7 +1951,7 @@ ALTER FUNCTION "public"."get_update_stats" () OWNER TO "postgres";
 CREATE OR REPLACE FUNCTION "public"."get_user_id" ("apikey" "text") RETURNS "uuid" LANGUAGE "plpgsql"
 SET
   search_path = '' SECURITY DEFINER AS $$
-Declare  
+Declare
  is_found uuid;
 Begin
   SELECT user_id
@@ -1947,7 +1959,7 @@ Begin
   FROM public.apikeys
   WHERE key=apikey;
   RETURN is_found;
-End;  
+End;
 $$;
 
 ALTER FUNCTION "public"."get_user_id" ("apikey" "text") OWNER TO "postgres";
@@ -1955,13 +1967,13 @@ ALTER FUNCTION "public"."get_user_id" ("apikey" "text") OWNER TO "postgres";
 CREATE OR REPLACE FUNCTION "public"."get_user_id" ("apikey" "text", "app_id" "text") RETURNS "uuid" LANGUAGE "plpgsql"
 SET
   search_path = '' SECURITY DEFINER AS $$
-Declare  
+Declare
  real_user_id uuid;
 Begin
   SELECT public.get_user_id(apikey) into real_user_id;
 
   RETURN real_user_id;
-End;  
+End;
 $$;
 
 ALTER FUNCTION "public"."get_user_id" ("apikey" "text", "app_id" "text") OWNER TO "postgres";
@@ -2028,6 +2040,42 @@ CREATE TABLE IF NOT EXISTS "public"."app_versions" (
 );
 
 ALTER TABLE "public"."app_versions" OWNER TO "postgres";
+
+CREATE OR REPLACE FUNCTION "public"."get_apikey_header" () RETURNS "text" LANGUAGE "plpgsql"
+SET
+  search_path = '' SECURITY DEFINER AS $$
+DECLARE
+  headers_text text;
+  api_key text;
+BEGIN
+  headers_text := "current_setting"('request.headers'::"text", true);
+
+  IF headers_text IS NULL OR headers_text = '' THEN
+    RETURN NULL;
+  END IF;
+
+  BEGIN
+    -- First try to get from capgkey header
+    api_key := (headers_text::"json" ->> 'capgkey'::"text");
+
+    -- If not found, try Authorization header
+    IF api_key IS NULL OR api_key = '' THEN
+      api_key := (headers_text::"json" ->> 'authorization'::"text");
+      -- Ignore Authorization when it starts with the Bearer scheme (JWT)
+      IF api_key IS NOT NULL AND api_key <> '' AND api_key ~* '^\s*bearer\s+' THEN
+        RETURN NULL;
+      END IF;
+    END IF;
+
+    RETURN api_key;
+  EXCEPTION
+    WHEN OTHERS THEN
+      RETURN NULL;
+  END;
+END;
+$$;
+
+ALTER FUNCTION "public"."get_apikey_header" () OWNER TO "postgres";
 
 CREATE OR REPLACE FUNCTION "public"."get_versions_with_no_metadata" () RETURNS SETOF "public"."app_versions" LANGUAGE "plpgsql"
 SET
@@ -2107,14 +2155,14 @@ CREATE OR REPLACE FUNCTION "public"."has_app_right_apikey" (
 ) RETURNS boolean LANGUAGE "plpgsql"
 SET
   search_path = '' SECURITY DEFINER AS $$
-DECLARE 
+DECLARE
   org_id uuid;
   api_key record;
 Begin
   org_id := public.get_user_main_org_id_by_app_id(appid);
 
   SELECT * FROM public.apikeys WHERE key = apikey INTO api_key;
-  IF api_key.limited_to_orgs IS DISTINCT FROM '{}' THEN
+  IF api_key.limited_to_orgs IS NOT NULL AND api_key.limited_to_orgs != '{}' THEN
       IF NOT (org_id = ANY(api_key.limited_to_orgs)) THEN
           RETURN false;
       END IF;
@@ -2144,7 +2192,7 @@ CREATE OR REPLACE FUNCTION "public"."has_app_right_userid" (
 ) RETURNS boolean LANGUAGE "plpgsql"
 SET
   search_path = '' SECURITY DEFINER AS $$
-DECLARE 
+DECLARE
   org_id uuid;
 Begin
   org_id := public.get_user_main_org_id_by_app_id(appid);
@@ -2166,7 +2214,7 @@ CREATE OR REPLACE FUNCTION "public"."invite_user_to_org" (
 ) RETURNS character varying LANGUAGE "plpgsql"
 SET
   search_path = '' SECURITY DEFINER AS $$
-Declare  
+Declare
   org record;
   invited_user record;
   current_record record;
@@ -2196,7 +2244,7 @@ Begin
     -- INSERT INTO publicorg_users (user_id, org_id, user_right)
     -- VALUES (invited_user.id, invite_user_to_org.org_id, invite_type);
 
-    SELECT org_users.id FROM public.org_users 
+    SELECT org_users.id FROM public.org_users
     INTO current_record
     WHERE org_users.user_id=invited_user.id
     AND org_users.org_id=invite_user_to_org.org_id;
@@ -2226,7 +2274,7 @@ SET
   search_path = '' AS $$
 BEGIN
     RETURN public.is_admin((select auth.uid()));
-END;  
+END;
 $$;
 
 ALTER FUNCTION "public"."is_admin" () OWNER TO "postgres";
@@ -2241,16 +2289,16 @@ DECLARE
 BEGIN
   -- Fetch the JSONB string of admin user IDs from the vault
   SELECT decrypted_secret INTO admin_ids_jsonb FROM vault.decrypted_secrets WHERE name = 'admin_users';
-  
+
   -- Check if the provided userid is within the JSONB array of admin user IDs
   is_admin_flag := (admin_ids_jsonb ? userid::text);
-  
+
   -- Verify MFA status for the user
   SELECT public.verify_mfa() INTO mfa_verified;
-  
+
   -- An admin with no logged 2FA should not have his admin perms granted
   RETURN is_admin_flag AND mfa_verified;
-END;  
+END;
 $$;
 
 ALTER FUNCTION "public"."is_admin" ("userid" "uuid") OWNER TO "postgres";
@@ -2299,7 +2347,7 @@ Begin
   FROM public.apikeys
   WHERE key=apikey
   AND mode=ANY(keymode)));
-End;  
+End;
 $$;
 
 ALTER FUNCTION "public"."is_allowed_capgkey" ("apikey" "text", "keymode" "public"."key_mode" []) OWNER TO "postgres";
@@ -2316,7 +2364,7 @@ Begin
   FROM public.apikeys
   WHERE key=apikey
   AND mode=ANY(keymode))) AND public.is_app_owner(public.get_user_id(apikey), app_id);
-End;  
+End;
 $$;
 
 ALTER FUNCTION "public"."is_allowed_capgkey" (
@@ -2330,7 +2378,7 @@ SET
   search_path = '' AS $$
 BEGIN
     RETURN public.is_app_owner((select auth.uid()), appid);
-END;  
+END;
 $$;
 
 ALTER FUNCTION "public"."is_app_owner" ("appid" character varying) OWNER TO "postgres";
@@ -2353,7 +2401,7 @@ Begin
   FROM public.apps
   WHERE app_id=appid
   AND user_id=userid));
-End;  
+End;
 $$;
 
 ALTER FUNCTION "public"."is_app_owner" ("userid" "uuid", "appid" character varying) OWNER TO "postgres";
@@ -2378,7 +2426,7 @@ Begin
   FROM public.stripe_info
   where customer_id=(SELECT customer_id FROM public.orgs where id=orgid)
   AND status = 'canceled'));
-End;  
+End;
 $$;
 
 ALTER FUNCTION "public"."is_canceled_org" ("orgid" "uuid") OWNER TO "postgres";
@@ -2392,14 +2440,14 @@ DECLARE
 BEGIN
   SELECT * INTO total_metrics FROM public.get_total_metrics(orgid);
   current_plan_name := (SELECT public.get_current_plan_name_org(orgid));
-  
+
   RETURN EXISTS (
-    SELECT 1 
+    SELECT 1
     FROM public.find_fit_plan_v3(
       total_metrics.mau,
       total_metrics.bandwidth,
       total_metrics.storage
-    ) 
+    )
     WHERE find_fit_plan_v3.name = current_plan_name
   );
 END;
@@ -2440,7 +2488,7 @@ ALTER FUNCTION "public"."is_member_of_org" ("user_id" "uuid", "org_id" "uuid") O
 CREATE OR REPLACE FUNCTION "public"."is_not_deleted" ("email_check" character varying) RETURNS boolean LANGUAGE "plpgsql"
 SET
   search_path = '' SECURITY DEFINER AS $$
-Declare  
+Declare
  is_found integer;
 Begin
   SELECT count(*)
@@ -2448,7 +2496,7 @@ Begin
   FROM public.deleted_account
   WHERE email=email_check;
   RETURN is_found = 0;
-End; 
+End;
 $$;
 
 ALTER FUNCTION "public"."is_not_deleted" ("email_check" character varying) OWNER TO "postgres";
@@ -2493,7 +2541,7 @@ SET
 DECLARE
     is_yearly boolean;
 BEGIN
-    SELECT 
+    SELECT
         CASE
             WHEN si.price_id = p.price_y_id THEN true
             ELSE false
@@ -2518,55 +2566,36 @@ Begin
   FROM public.stripe_info
   where customer_id=(SELECT customer_id FROM public.orgs where id=orgid)
   AND (
-    (status = 'succeeded' AND is_good_plan = true) -- is_good_plan = true AND <-- TODO: reenable is_good_plan in the future
-    OR (subscription_id = 'free') -- TODO: allow free plan again
-    -- OR (subscription_id = 'free' or subscription_id is null)
+    (status = 'succeeded' AND is_good_plan = true)
     OR (trial_at::date - (now())::date > 0)
   )
   )
 );
-End;  
+End;
 $$;
 
 ALTER FUNCTION "public"."is_paying_and_good_plan_org" ("orgid" "uuid") OWNER TO "postgres";
 
-CREATE OR REPLACE FUNCTION "public"."is_paying_and_good_plan_org_action" (
-  "orgid" "uuid",
-  "actions" "public"."action_type" []
-) RETURNS boolean LANGUAGE "plpgsql"
+CREATE OR REPLACE FUNCTION public.is_paying_and_good_plan_org_action (orgid uuid, actions public.action_type[]) RETURNS boolean LANGUAGE plpgsql
 SET
   search_path = '' SECURITY DEFINER AS $$
-DECLARE
-    org_customer_id text;
-    exceeded boolean := false;
+DECLARE org_customer_id text; result boolean;
 BEGIN
-    -- Get customer_id once
-    SELECT o.customer_id INTO org_customer_id
-    FROM public.orgs o WHERE o.id = orgid;
+  SELECT o.customer_id INTO org_customer_id FROM public.orgs o WHERE o.id = orgid;
 
-    -- Check if any action is exceeded
-    SELECT EXISTS (
-        SELECT 1 FROM public.stripe_info
-        WHERE customer_id = org_customer_id
-        AND (
-            ('mau' = ANY(actions) AND mau_exceeded)
-            OR ('storage' = ANY(actions) AND storage_exceeded)
-            OR ('bandwidth' = ANY(actions) AND bandwidth_exceeded)
-        )
-    ) INTO exceeded;
+  SELECT (si.trial_at > now())
+      OR (si.status = 'succeeded' AND NOT (
+            (si.mau_exceeded AND 'mau' = ANY(actions)) OR
+            (si.storage_exceeded AND 'storage' = ANY(actions)) OR
+            (si.bandwidth_exceeded AND 'bandwidth' = ANY(actions))
+          ))
+  INTO result
+  FROM public.stripe_info si
+  WHERE si.customer_id = org_customer_id
+  LIMIT 1;
 
-    -- Return final check
-    RETURN EXISTS (
-        SELECT 1
-        FROM public.stripe_info
-        WHERE customer_id = org_customer_id
-        AND (
-            trial_at::date - (now())::date > 0
-            OR (status = 'succeeded' AND NOT exceeded)
-        )
-    );
-END;
-$$;
+  RETURN COALESCE(result, false);
+END; $$;
 
 ALTER FUNCTION "public"."is_paying_and_good_plan_org_action" (
   "orgid" "uuid",
@@ -2581,7 +2610,7 @@ Begin
   FROM public.stripe_info
   where customer_id=(SELECT customer_id FROM public.orgs where id=orgid)
   AND status = 'succeeded'));
-End;  
+End;
 $$;
 
 ALTER FUNCTION "public"."is_paying_org" ("orgid" "uuid") OWNER TO "postgres";
@@ -2605,7 +2634,7 @@ Begin
   RETURN (SELECT GREATEST((trial_at::date - (now())::date), 0) AS days
   FROM public.stripe_info
   where customer_id=(SELECT customer_id FROM public.orgs where id=orgid));
-End;  
+End;
 $$;
 
 ALTER FUNCTION "public"."is_trial_org" ("orgid" "uuid") OWNER TO "postgres";
@@ -2728,16 +2757,16 @@ BEGIN
     SELECT DISTINCT av.app_id, av.owner_org
     FROM public.app_versions av
     WHERE av.created_at >= NOW() - INTERVAL '30 days'
-    
+
     UNION
-    
+
     SELECT DISTINCT dm.app_id, av.owner_org
     FROM public.daily_mau dm
     JOIN public.app_versions av ON dm.app_id = av.app_id
     WHERE dm.date >= NOW() - INTERVAL '30 days' AND dm.mau > 0
   )
   LOOP
-    PERFORM pgmq.send('cron_stats', 
+    PERFORM pgmq.send('cron_stats',
       jsonb_build_object(
         'function_name', 'cron_stats',
         'function_type', 'cloudflare',
@@ -2835,7 +2864,7 @@ DECLARE
 BEGIN
   -- Check if the queue has elements
   EXECUTE format('SELECT count(*) FROM pgmq.q_%I', queue_name) INTO queue_size;
-  
+
   -- Only make the HTTP request if the queue is not empty
   IF queue_size > 0 THEN
     headers := jsonb_build_object(
@@ -2856,10 +2885,10 @@ BEGIN
         timeout_milliseconds := 15000
       );
     END LOOP;
-    
+
     RETURN request_id;
   END IF;
-  
+
   RETURN NULL;
 END;
 $$;
@@ -2868,29 +2897,29 @@ ALTER FUNCTION "public"."process_function_queue" ("queue_name" "text") OWNER TO 
 
 CREATE OR REPLACE FUNCTION "public"."process_stats_email_monthly" () RETURNS "void" LANGUAGE "plpgsql"
 SET
-  search_path = '' AS $$                                                              
-DECLARE                                                            
-  app_record RECORD;                                               
-BEGIN                                                              
-  FOR app_record IN (                                              
-    SELECT a.app_id, o.management_email                            
-    FROM public.apps a                                                    
-    JOIN public.orgs o ON a.owner_org = o.id                              
+  search_path = '' AS $$
+DECLARE
+  app_record RECORD;
+BEGIN
+  FOR app_record IN (
+    SELECT a.app_id, o.management_email
+    FROM public.apps a
+    JOIN public.orgs o ON a.owner_org = o.id
   )
-  LOOP                                                             
-    PERFORM pgmq.send('cron_email',                                
-      jsonb_build_object(                                          
-        'function_name', 'cron_email',                             
-        'function_type', 'cloudflare',                             
-        'payload', jsonb_build_object(                             
-          'email', app_record.management_email,                    
-          'appId', app_record.app_id,                              
-          'type', 'monthly_create_stats'                           
-        )                                                          
-      )                                                            
-    );                                                             
+  LOOP
+    PERFORM pgmq.send('cron_email',
+      jsonb_build_object(
+        'function_name', 'cron_email',
+        'function_type', 'cloudflare',
+        'payload', jsonb_build_object(
+          'email', app_record.management_email,
+          'appId', app_record.app_id,
+          'type', 'monthly_create_stats'
+        )
+      )
+    );
   END LOOP;
-END;                                                               
+END;
 $$;
 
 ALTER FUNCTION "public"."process_stats_email_monthly" () OWNER TO "postgres";
@@ -2934,7 +2963,7 @@ BEGIN
     SELECT o.id, o.customer_id
     FROM public.orgs o
     JOIN public.stripe_info si ON o.customer_id = si.customer_id
-    WHERE si.status = 'succeeded' AND si.product_id != 'free'
+    WHERE si.status = 'succeeded'
   )
   LOOP
     PERFORM pgmq.send('cron_plan',
@@ -3101,9 +3130,9 @@ BEGIN
     IF OLD.version <> NEW.version THEN
         -- Insert new record
         INSERT INTO public.deploy_history (
-            channel_id, 
-            app_id, 
-            version_id, 
+            channel_id,
+            app_id,
+            version_id,
             owner_org,
             created_by
         )
@@ -3115,7 +3144,7 @@ BEGIN
             coalesce(public.get_identity()::uuid, NEW.created_by)
         );
     END IF;
-    
+
     RETURN NEW;
 END;
 $$;
@@ -3126,7 +3155,7 @@ CREATE OR REPLACE FUNCTION "public"."remove_old_jobs" () RETURNS "void" LANGUAGE
 SET
   search_path = '' AS $$
 BEGIN
-    DELETE FROM cron.job_run_details 
+    DELETE FROM cron.job_run_details
     WHERE end_time < now() - interval '1 day';
 END;
 $$;
@@ -3213,7 +3242,7 @@ END IF;
 
   -- Update the app's owner_org and user_id
   UPDATE public.apps
-  SET 
+  SET
       owner_org = p_new_org_id,
       updated_at = now(),
       transfer_history = COALESCE(transfer_history, '{}') || jsonb_build_object(
@@ -3264,22 +3293,22 @@ COMMENT ON FUNCTION "public"."transfer_app" (
 CREATE OR REPLACE FUNCTION "public"."trigger_http_queue_post_to_function" () RETURNS "trigger" LANGUAGE "plpgsql"
 SET
   search_path = '' SECURITY DEFINER AS $$
-DECLARE 
+DECLARE
   payload jsonb;
-BEGIN 
+BEGIN
   -- Build the base payload
   payload := jsonb_build_object(
     'function_name', TG_ARGV[0],
     'function_type', TG_ARGV[1],
     'payload', jsonb_build_object(
-      'old_record', OLD, 
-      'record', NEW, 
+      'old_record', OLD,
+      'record', NEW,
       'type', TG_OP,
       'table', TG_TABLE_NAME,
       'schema', TG_TABLE_SCHEMA
     )
   );
-  
+
   -- Also send to function-specific queue
   IF TG_ARGV[0] IS NOT NULL THEN
     PERFORM pgmq.send(TG_ARGV[0], payload);
@@ -3296,7 +3325,7 @@ SET
 BEGIN
     -- Queue the operation for batch processing
     IF public.get_d1_webhook_signature() IS NOT NULL THEN
-      PERFORM pgmq.send('replicate_data', 
+      PERFORM pgmq.send('replicate_data',
           jsonb_build_object(
               'record', to_jsonb(NEW),
               'old_record', to_jsonb(OLD),
@@ -3311,23 +3340,29 @@ $$;
 
 ALTER FUNCTION "public"."trigger_http_queue_post_to_function_d1" () OWNER TO "postgres";
 
-CREATE PROCEDURE "public"."update_app_versions_retention" () LANGUAGE "plpgsql"
+CREATE OR REPLACE FUNCTION "public"."update_app_versions_retention" () RETURNS void LANGUAGE "plpgsql"
 SET
   search_path = '' AS $$
 BEGIN
+    -- Use a more efficient approach with direct timestamp comparison
     UPDATE public.app_versions
     SET deleted = true
-    where extract(epoch from now()) - extract(epoch FROM public.app_versions.created_at) > ((select retention FROM public.apps where app_id=app_versions.app_id))
-    AND NOT EXISTS (
-        SELECT 1
-        FROM public.channels
-        WHERE app_id = app_versions.app_id
-          AND app_versions.id = channels.version
-    );
+    WHERE app_versions.deleted = false  -- Filter non-deleted first
+      AND app_versions.created_at < (
+          SELECT now() - make_interval(secs => apps.retention)
+          FROM public.apps
+          WHERE apps.app_id = app_versions.app_id
+      )
+      AND NOT EXISTS (
+          SELECT 1
+          FROM public.channels
+          WHERE channels.app_id = app_versions.app_id
+            AND channels.version = app_versions.id
+      );
 END;
 $$;
 
-ALTER PROCEDURE "public"."update_app_versions_retention" () OWNER TO "postgres";
+ALTER FUNCTION "public"."update_app_versions_retention" () OWNER TO "postgres";
 
 CREATE OR REPLACE FUNCTION "public"."verify_mfa" () RETURNS boolean LANGUAGE "plpgsql"
 SET
@@ -3344,9 +3379,12 @@ Begin
         where (select auth.uid()) = user_id and status = 'verified'
     )
   ) OR (
-    select array(select jsonb_path_query_array((select auth.jwt()), '$.amr[*].method')) @> ARRAY['"otp"'::jsonb]
+    EXISTS(
+      SELECT 1 FROM jsonb_array_elements((select auth.jwt())->'amr') AS amr_elem
+      WHERE amr_elem->>'method' = 'otp'
+    )
   );
-End;  
+End;
 $_$;
 
 ALTER FUNCTION "public"."verify_mfa" () OWNER TO "postgres";
@@ -3650,7 +3688,8 @@ CREATE TABLE IF NOT EXISTS "public"."global_stats" (
   "users_active" integer DEFAULT 0,
   "paying_yearly" integer DEFAULT 0,
   "paying_monthly" integer DEFAULT 0,
-  "updates_last_month" integer DEFAULT 0
+  "updates_last_month" integer DEFAULT 0,
+  "success_rate" FLOAT DEFAULT 0
 );
 
 ALTER TABLE "public"."global_stats" OWNER TO "postgres";
@@ -3936,7 +3975,7 @@ ALTER TABLE ONLY "public"."manifest"
 ADD CONSTRAINT "manifest_pkey" PRIMARY KEY ("id");
 
 ALTER TABLE ONLY "public"."notifications"
-ADD CONSTRAINT "notifications_pkey" PRIMARY KEY ("event", "uniq_id");
+ADD CONSTRAINT "notifications_pkey" PRIMARY KEY ("owner_org", "event", "uniq_id");
 
 ALTER TABLE ONLY "public"."org_users"
 ADD CONSTRAINT "org_users_pkey" PRIMARY KEY ("id");
@@ -3979,6 +4018,16 @@ ADD CONSTRAINT "version_meta_pkey" PRIMARY KEY ("timestamp", "app_id", "version_
 
 ALTER TABLE ONLY "public"."version_usage"
 ADD CONSTRAINT "version_usage_pkey" PRIMARY KEY ("timestamp", "app_id", "version_id", "action");
+
+CREATE INDEX IF NOT EXISTS si_customer_status_trial_idx ON public.stripe_info (customer_id, status, trial_at) INCLUDE (
+  mau_exceeded,
+  storage_exceeded,
+  bandwidth_exceeded
+);
+
+CREATE INDEX IF NOT EXISTS orgs_updated_at_id_idx ON public.orgs (updated_at DESC) INCLUDE (id)
+WHERE
+  customer_id IS NOT NULL;
 
 CREATE INDEX "apikeys_key_idx" ON "public"."apikeys" USING "btree" ("key");
 
@@ -4053,6 +4102,10 @@ CREATE INDEX "idx_app_versions_created_at" ON "public"."app_versions" USING "btr
 CREATE INDEX "idx_app_versions_created_at_app_id" ON "public"."app_versions" USING "btree" ("created_at", "app_id");
 
 CREATE INDEX "idx_app_versions_deleted" ON "public"."app_versions" USING "btree" ("deleted");
+
+CREATE INDEX "idx_app_versions_retention_cleanup" ON "public"."app_versions" USING "btree" ("deleted", "created_at", "app_id")
+WHERE
+  ("deleted" = false);
 
 CREATE INDEX "idx_app_versions_id" ON "public"."app_versions" USING "btree" ("id");
 
@@ -4452,22 +4505,23 @@ SELECT
   TO "anon" USING (
     "public"."is_allowed_capgkey" (
       (
-        (
-          (
-            SELECT
-              "current_setting" ('request.headers'::"text", true) AS "current_setting"
-          )
-        )::"json" ->> 'capgkey'::"text"
+        SELECT
+          "public"."get_apikey_header" ()
       ),
       '{all,write}'::"public"."key_mode" [],
       "app_id"
     )
   );
 
-CREATE POLICY "Allow delete for auth (write+)" ON "public"."channel_devices" FOR DELETE TO "authenticated" USING (
+CREATE POLICY "Allow delete for auth, api keys (write+)" ON "public"."channel_devices" FOR DELETE TO "authenticated",
+"anon" USING (
   "public"."check_min_rights" (
     'write'::"public"."user_min_right",
-    "public"."get_identity" (),
+    "public"."get_identity_org_appid" (
+      '{write,all}'::"public"."key_mode" [],
+      "owner_org",
+      "app_id"
+    ),
     "owner_org",
     "app_id",
     NULL::bigint
@@ -4600,12 +4654,17 @@ SELECT
     )
   );
 
-CREATE POLICY "Allow read for auth (read+)" ON "public"."channel_devices" FOR
+CREATE POLICY "Allow read for auth, api keys (read+)" ON "public"."channel_devices" FOR
 SELECT
-  TO "authenticated" USING (
+  TO "authenticated",
+  "anon" USING (
     "public"."check_min_rights" (
       'read'::"public"."user_min_right",
-      "public"."get_identity" (),
+      "public"."get_identity_org_appid" (
+        '{read,upload,write,all}'::"public"."key_mode" [],
+        "owner_org",
+        "app_id"
+      ),
       "owner_org",
       "app_id",
       NULL::bigint
@@ -4923,7 +4982,11 @@ FOR UPDATE
   "anon" USING (
     "public"."check_min_rights" (
       'write'::"public"."user_min_right",
-      "public"."get_identity" ('{write,all}'::"public"."key_mode" []),
+      "public"."get_identity_org_appid" (
+        '{write,all}'::"public"."key_mode" [],
+        "owner_org",
+        "app_id"
+      ),
       "owner_org",
       "app_id",
       NULL::bigint
@@ -4933,7 +4996,11 @@ WITH
   CHECK (
     "public"."check_min_rights" (
       'write'::"public"."user_min_right",
-      "public"."get_identity" ('{write,all}'::"public"."key_mode" []),
+      "public"."get_identity_org_appid" (
+        '{write,all}'::"public"."key_mode" [],
+        "owner_org",
+        "app_id"
+      ),
       "owner_org",
       "app_id",
       NULL::bigint
@@ -5751,12 +5818,6 @@ GRANT ALL ON FUNCTION "public"."get_identity_apikey_only" ("keymode" "public"."k
 
 GRANT ALL ON FUNCTION "public"."get_identity_apikey_only" ("keymode" "public"."key_mode" []) TO "service_role";
 
-GRANT ALL ON FUNCTION "public"."get_identity_org" ("keymode" "public"."key_mode" [], "org_id" "uuid") TO "anon";
-
-GRANT ALL ON FUNCTION "public"."get_identity_org" ("keymode" "public"."key_mode" [], "org_id" "uuid") TO "authenticated";
-
-GRANT ALL ON FUNCTION "public"."get_identity_org" ("keymode" "public"."key_mode" [], "org_id" "uuid") TO "service_role";
-
 GRANT ALL ON FUNCTION "public"."get_identity_org_allowed" ("keymode" "public"."key_mode" [], "org_id" "uuid") TO "anon";
 
 GRANT ALL ON FUNCTION "public"."get_identity_org_allowed" ("keymode" "public"."key_mode" [], "org_id" "uuid") TO "authenticated";
@@ -6525,11 +6586,11 @@ GRANT ALL ON FUNCTION "public"."trigger_http_queue_post_to_function_d1" () TO "a
 
 GRANT ALL ON FUNCTION "public"."trigger_http_queue_post_to_function_d1" () TO "service_role";
 
-GRANT ALL ON PROCEDURE "public"."update_app_versions_retention" () TO "anon";
+GRANT ALL ON FUNCTION "public"."update_app_versions_retention" () TO "anon";
 
-GRANT ALL ON PROCEDURE "public"."update_app_versions_retention" () TO "authenticated";
+GRANT ALL ON FUNCTION "public"."update_app_versions_retention" () TO "authenticated";
 
-GRANT ALL ON PROCEDURE "public"."update_app_versions_retention" () TO "service_role";
+GRANT ALL ON FUNCTION "public"."update_app_versions_retention" () TO "service_role";
 
 GRANT ALL ON FUNCTION "public"."verify_mfa" () TO "anon";
 
@@ -6846,7 +6907,7 @@ CREATE POLICY "All all users to act" ON "storage"."objects" USING (true)
 WITH
   CHECK (true);
 
-CREATE POLICY "All user to manage they own folder 1ffg0oo_0" ON "storage"."objects" FOR DELETE USING (
+CREATE POLICY "Allow user or apikey to delete they own folder in images" ON "storage"."objects" FOR DELETE USING (
   (
     ("bucket_id" = 'images'::"text")
     AND (
@@ -6861,20 +6922,13 @@ CREATE POLICY "All user to manage they own folder 1ffg0oo_0" ON "storage"."objec
       OR (
         (
           (
-            "public"."get_user_id" (
-              (
-                (
-                  "current_setting" ('request.headers'::"text", true)
-                )::"json" ->> 'capgkey'::"text"
-              )
-            )
+            "public"."get_user_id" (("public"."get_apikey_header" ()))
           )::"text" = ("storage"."foldername" ("name")) [0]
         )
         AND "public"."is_allowed_capgkey" (
           (
-            (
-              "current_setting" ('request.headers'::"text", true)
-            )::"json" ->> 'capgkey'::"text"
+            SELECT
+              "public"."get_apikey_header" ()
           ),
           '{all}'::"public"."key_mode" [],
           (("storage"."foldername" ("name")) [1])::character varying
@@ -6884,7 +6938,7 @@ CREATE POLICY "All user to manage they own folder 1ffg0oo_0" ON "storage"."objec
   )
 );
 
-CREATE POLICY "All user to manage they own folder 1ffg0oo_1" ON "storage"."objects"
+CREATE POLICY "Allow user or apikey to update they own folder in images" ON "storage"."objects"
 FOR UPDATE
   USING (
     (
@@ -6901,20 +6955,13 @@ FOR UPDATE
         OR (
           (
             (
-              "public"."get_user_id" (
-                (
-                  (
-                    "current_setting" ('request.headers'::"text", true)
-                  )::"json" ->> 'capgkey'::"text"
-                )
-              )
+              "public"."get_user_id" (("public"."get_apikey_header" ()))
             )::"text" = ("storage"."foldername" ("name")) [0]
           )
           AND "public"."is_allowed_capgkey" (
             (
-              (
-                "current_setting" ('request.headers'::"text", true)
-              )::"json" ->> 'capgkey'::"text"
+              SELECT
+                "public"."get_apikey_header" ()
             ),
             '{write,all}'::"public"."key_mode" [],
             (("storage"."foldername" ("name")) [1])::character varying
@@ -6924,7 +6971,7 @@ FOR UPDATE
     )
   );
 
-CREATE POLICY "All user to manage they own folder 1ffg0oo_2" ON "storage"."objects" FOR INSERT
+CREATE POLICY "Allow user or apikey to insert they own folder in images" ON "storage"."objects" FOR INSERT
 WITH
   CHECK (
     (
@@ -6943,18 +6990,16 @@ WITH
             (
               "public"."get_user_id" (
                 (
-                  (
-                    "current_setting" ('request.headers'::"text", true)
-                  )::"json" ->> 'capgkey'::"text"
+                  SELECT
+                    "public"."get_apikey_header" ()
                 )
               )
             )::"text" = ("storage"."foldername" ("name")) [0]
           )
           AND "public"."is_allowed_capgkey" (
             (
-              (
-                "current_setting" ('request.headers'::"text", true)
-              )::"json" ->> 'capgkey'::"text"
+              SELECT
+                "public"."get_apikey_header" ()
             ),
             '{write,all}'::"public"."key_mode" [],
             (("storage"."foldername" ("name")) [1])::character varying
@@ -6964,7 +7009,7 @@ WITH
     )
   );
 
-CREATE POLICY "All user to manage they own folder 1ffg0oo_3" ON "storage"."objects" FOR
+CREATE POLICY "Allow user or apikey to read they own folder in images" ON "storage"."objects" FOR
 SELECT
   USING (
     (
@@ -6981,20 +7026,13 @@ SELECT
         OR (
           (
             (
-              "public"."get_user_id" (
-                (
-                  (
-                    "current_setting" ('request.headers'::"text", true)
-                  )::"json" ->> 'capgkey'::"text"
-                )
-              )
+              "public"."get_user_id" ("public"."get_apikey_header" ())
             )::"text" = ("storage"."foldername" ("name")) [0]
           )
           AND "public"."is_allowed_capgkey" (
             (
-              (
-                "current_setting" ('request.headers'::"text", true)
-              )::"json" ->> 'capgkey'::"text"
+              SELECT
+                "public"."get_apikey_header" ()
             ),
             '{read,all}'::"public"."key_mode" [],
             (("storage"."foldername" ("name")) [1])::character varying
@@ -7004,32 +7042,137 @@ SELECT
     )
   );
 
-CREATE POLICY "Allow apikey to manage they folder" ON "storage"."objects" FOR
-SELECT
-  TO "anon" USING (
+CREATE POLICY "Allow user or apikey to delete they own folder in apps" ON "storage"."objects" FOR DELETE USING (
+  (
+    ("bucket_id" = 'apps'::"text")
+    AND (
+      (
+        (
+          (
+            SELECT
+              "auth"."uid" () AS "uid"
+          )
+        )::"text" = ("storage"."foldername" ("name")) [0]
+      )
+      OR (
+        (
+          (
+            "public"."get_user_id" (("public"."get_apikey_header" ()))
+          )::"text" = ("storage"."foldername" ("name")) [0]
+        )
+        AND "public"."is_allowed_capgkey" (
+          (
+            SELECT
+              "public"."get_apikey_header" ()
+          ),
+          '{all}'::"public"."key_mode" [],
+          (("storage"."foldername" ("name")) [1])::character varying
+        )
+      )
+    )
+  )
+);
+
+CREATE POLICY "Allow user or apikey to update they own folder in apps" ON "storage"."objects"
+FOR UPDATE
+  USING (
     (
       ("bucket_id" = 'apps'::"text")
-      AND "public"."check_min_rights" (
-        'read'::"public"."user_min_right",
-        "public"."get_identity" ('{read,upload,write,all}'::"public"."key_mode" []),
-        (("storage"."foldername" ("name")) [0])::"uuid",
-        (("storage"."foldername" ("name")) [1])::character varying,
-        NULL::bigint
+      AND (
+        (
+          (
+            (
+              SELECT
+                "auth"."uid" () AS "uid"
+            )
+          )::"text" = ("storage"."foldername" ("name")) [0]
+        )
+        OR (
+          (
+            (
+              "public"."get_user_id" (("public"."get_apikey_header" ()))
+            )::"text" = ("storage"."foldername" ("name")) [0]
+          )
+          AND "public"."is_allowed_capgkey" (
+            (
+              SELECT
+                "public"."get_apikey_header" ()
+            ),
+            '{write,all}'::"public"."key_mode" [],
+            (("storage"."foldername" ("name")) [1])::character varying
+          )
+        )
       )
     )
   );
 
-CREATE POLICY "Allow apikey to manage they folder 21" ON "storage"."objects" FOR INSERT TO "anon"
+CREATE POLICY "Allow user or apikey to insert they own folder in apps" ON "storage"."objects" FOR INSERT
 WITH
   CHECK (
     (
-      ("bucket_id" = 'images'::"text")
-      AND "public"."check_min_rights" (
-        'read'::"public"."user_min_right",
-        "public"."get_identity" ('{read,upload,write,all}'::"public"."key_mode" []),
-        (("storage"."foldername" ("name")) [0])::"uuid",
-        (("storage"."foldername" ("name")) [1])::character varying,
-        NULL::bigint
+      ("bucket_id" = 'apps'::"text")
+      AND (
+        (
+          (
+            (
+              SELECT
+                "auth"."uid" () AS "uid"
+            )
+          )::"text" = ("storage"."foldername" ("name")) [0]
+        )
+        OR (
+          (
+            (
+              "public"."get_user_id" (
+                (
+                  SELECT
+                    "public"."get_apikey_header" ()
+                )
+              )
+            )::"text" = ("storage"."foldername" ("name")) [0]
+          )
+          AND "public"."is_allowed_capgkey" (
+            (
+              SELECT
+                "public"."get_apikey_header" ()
+            ),
+            '{write,all}'::"public"."key_mode" [],
+            (("storage"."foldername" ("name")) [1])::character varying
+          )
+        )
+      )
+    )
+  );
+
+CREATE POLICY "Allow user or apikey to read they own folder in apps" ON "storage"."objects" FOR
+SELECT
+  USING (
+    (
+      ("bucket_id" = 'apps'::"text")
+      AND (
+        (
+          (
+            (
+              SELECT
+                "auth"."uid" () AS "uid"
+            )
+          )::"text" = ("storage"."foldername" ("name")) [0]
+        )
+        OR (
+          (
+            (
+              "public"."get_user_id" ("public"."get_apikey_header" ())
+            )::"text" = ("storage"."foldername" ("name")) [0]
+          )
+          AND "public"."is_allowed_capgkey" (
+            (
+              SELECT
+                "public"."get_apikey_header" ()
+            ),
+            '{read,all}'::"public"."key_mode" [],
+            (("storage"."foldername" ("name")) [1])::character varying
+          )
+        )
       )
     )
   );
@@ -7091,20 +7234,17 @@ SELECT
   pgmq.create ('on_manifest_create');
 
 SELECT
-  pgmq.create ('cron_plan_queue');
-
-SELECT
-  pgmq.create ('cron_email_queue');
-
-SELECT
   pgmq.create ('on_deploy_history_create');
+
+SELECT
+  pgmq.create ('admin_stats');
 
 -- CREATE ALL CRON JOBS
 SELECT
   cron.schedule (
     'Delete old app version',
     '40 0 * * *',
-    'CALL update_app_versions_retention();'
+    'SELECT update_app_versions_retention();'
   );
 
 SELECT
@@ -7165,6 +7305,13 @@ SELECT
 
 SELECT
   cron.schedule (
+    'create_admin_stats',
+    '0 14 1 * *',
+    'SELECT public.process_admin_stats()'
+  );
+
+SELECT
+  cron.schedule (
     'Send stats email every week',
     '0 12 * * 6',
     'SELECT process_stats_email_weekly();'
@@ -7181,14 +7328,14 @@ SELECT
   cron.schedule (
     'Cleanup frequent job details',
     '0 * * * *',
-    'CALL cleanup_frequent_job_details()'
+    'SELECT cleanup_frequent_job_details()'
   );
 
 SELECT
   cron.schedule (
     'Remove old jobs',
     '0 0 * * *',
-    'CALL remove_old_jobs()'
+    'SELECT remove_old_jobs()'
   );
 
 SELECT
@@ -7251,14 +7398,14 @@ SELECT
   cron.schedule (
     'process_cron_plan_queue',
     '0 */2 * * *',
-    'SELECT public.process_function_queue(''cron_plan_queue'')'
+    'SELECT public.process_function_queue(''cron_plan'')'
   );
 
 SELECT
   cron.schedule (
     'process_cron_email_queue',
     '0 */2 * * *',
-    'SELECT public.process_function_queue(''cron_email_queue'')'
+    'SELECT public.process_function_queue(''cron_email'')'
   );
 
 SELECT

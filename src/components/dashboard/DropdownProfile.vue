@@ -1,18 +1,18 @@
 <script setup lang="ts">
 import { Capacitor } from '@capacitor/core'
-import { useI18n } from 'petite-vue-i18n'
 import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import { isSpoofed, saveSpoof, unspoofUser, useSupabase } from '~/services/supabase'
 import { openSupport } from '~/services/support'
-import { useDisplayStore } from '~/stores/display'
+import { useDialogV2Store } from '~/stores/dialogv2'
 import { useMainStore } from '~/stores/main'
 
 const { t } = useI18n()
 const router = useRouter()
 const main = useMainStore()
-const displayStore = useDisplayStore()
+const dialogStore = useDialogV2Store()
 const isMobile = ref(Capacitor.isNativePlatform())
 const acronym = computed(() => {
   let res = 'MD'
@@ -25,12 +25,14 @@ const acronym = computed(() => {
   return res.toUpperCase()
 })
 const isLoading = ref(false)
+const logAsInput = ref('')
 
 async function openLogAsDialog() {
   let userId = ''
-  displayStore.dialogOption = {
-    header: t('log-as'),
-    input: true,
+  logAsInput.value = ''
+
+  dialogStore.openDialog({
+    title: t('log-as'),
     buttons: [
       {
         text: t('button-cancel'),
@@ -39,13 +41,12 @@ async function openLogAsDialog() {
       {
         text: t('log-as'),
         handler: () => {
-          userId = displayStore.dialogInputText
+          userId = logAsInput.value
         },
       },
     ],
-  }
-  displayStore.showDialog = true
-  await displayStore.onDialogDismiss()
+  })
+  await dialogStore.onDialogDismiss()
 
   if (userId) {
     isLoading.value = true
@@ -96,7 +97,9 @@ async function setLogAs(id: string) {
   saveSpoof(currentJwt, currentRefreshToken)
   toast.success('Spoofed, will reload')
   setTimeout(() => {
-    window.location.reload()
+    router.replace('/app').then(() => {
+      window.location.reload()
+    })
   }, 1000)
 }
 
@@ -104,14 +107,16 @@ function resetSpoofedUser() {
   if (unspoofUser()) {
     toast.error('Stop Spoofed, will reload')
     setTimeout(() => {
-      window.location.reload()
+      router.replace('/app').then(() => {
+        window.location.reload()
+      })
     }, 1000)
   }
 }
 
 async function logOut() {
-  displayStore.dialogOption = {
-    header: t('are-u-sure'),
+  dialogStore.openDialog({
+    title: t('are-u-sure'),
     buttons: [
       {
         text: t('button-cancel'),
@@ -126,9 +131,8 @@ async function logOut() {
         },
       },
     ],
-  }
-  displayStore.showDialog = true
-  await displayStore.onDialogDismiss()
+  })
+  await dialogStore.onDialogDismiss()
 }
 </script>
 
@@ -137,8 +141,8 @@ async function logOut() {
     <div class="relative text-gray-300">
       <div class="flex flex-col p-4 space-y-2">
         <div class="flex items-center mb-4">
-          <img v-if="main.user?.image_url" class="w-10 h-10 mr-3 mask mask-squircle" :src="main.user?.image_url" alt="User" width="32" height="32">
-          <div v-else class="p-2 mr-3 bg-gray-700 mask mask-squircle">
+          <img v-if="main.user?.image_url" class="w-10 h-10 mr-3 d-mask d-mask-squircle" :src="main.user?.image_url" alt="User" width="32" height="32">
+          <div v-else class="p-2 mr-3 bg-gray-700 d-mask d-mask-squircle">
             <span class="font-medium">
               {{ acronym }}
             </span>
@@ -161,7 +165,7 @@ async function logOut() {
         <router-link v-if="isMobile" to="/app/modules_test" class="block px-3 py-2 rounded-lg hover:bg-slate-700/50">
           {{ t('module-heading') }} {{ t('tests') }}
         </router-link>
-        <div class="block px-3 py-2 rounded-lg hover:bg-slate-700/50" @click="openSupport">
+        <div class="block px-3 py-2 rounded-lg hover:bg-slate-700/50 cursor-pointer" @click="openSupport">
           {{ t('support') }}
         </div>
         <div v-if="main.isAdmin && !isSpoofed()" class="block px-3 py-2 rounded-lg hover:bg-slate-700/50 cursor-pointer" :class="{ 'opacity-50 cursor-not-allowed': isLoading }" @click="openLogAsDialog">
@@ -171,13 +175,25 @@ async function logOut() {
             {{ t('loading') }}
           </span>
         </div>
-        <div v-if="isSpoofed()" class="block px-3 py-2 rounded-lg hover:bg-slate-700/50" @click="resetSpoofedUser">
+        <div v-if="isSpoofed()" class="block px-3 py-2 rounded-lg hover:bg-slate-700/50 cursor-pointer" @click="resetSpoofedUser">
           {{ t('reset-spoofed-user') }}
         </div>
-        <div class="block px-3 py-2 rounded-lg hover:bg-slate-700/50" @click="logOut">
+        <div class="block px-3 py-2 rounded-lg hover:bg-slate-700/50 cursor-pointer" @click="logOut">
           {{ t('sign-out') }}
         </div>
       </div>
     </div>
+
+    <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('log-as')" to="#dialog-v2-content" defer>
+      <div class="w-full">
+        <input
+          v-model="logAsInput"
+          type="text"
+          :placeholder="t('user-id')"
+          class="w-full p-3 border border-gray-300 rounded-lg dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+          @keydown.enter="$event.preventDefault()"
+        >
+      </div>
+    </Teleport>
   </div>
 </template>

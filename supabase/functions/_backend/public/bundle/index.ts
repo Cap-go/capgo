@@ -1,8 +1,11 @@
 import type { Database } from '../../utils/supabase.types.ts'
 import type { GetLatest } from './get.ts'
-import { getBody, honoFactory, middlewareKey } from '../../utils/hono.ts'
+import { getBodyOrQuery, honoFactory } from '../../utils/hono.ts'
+import { middlewareKey } from '../../utils/hono_middleware.ts'
+import { createBundle } from './create.ts'
 import { deleteBundle } from './delete.ts'
 import { get } from './get.ts'
+import { setChannel } from './set_channel.ts'
 import { app as updateMetadataApp } from './update_metadata.ts'
 
 export const app = honoFactory.createApp()
@@ -11,25 +14,25 @@ export const app = honoFactory.createApp()
 app.route('/metadata', updateMetadataApp)
 
 app.get('/', middlewareKey(['all', 'write', 'read']), async (c) => {
-  try {
-    const body = await getBody<GetLatest>(c as any)
-    const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
-    return get(c as any, body, apikey)
-  }
-  catch (e) {
-    console.error('Cannot get bundle', e)
-    return c.json({ status: 'Cannot get bundle', error: JSON.stringify(e) }, 500)
-  }
+  const body = await getBodyOrQuery<GetLatest>(c)
+  const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
+  return get(c, body, apikey)
 })
 
 app.delete('/', middlewareKey(['all', 'write']), async (c) => {
-  try {
-    const body = await getBody<GetLatest>(c as any)
-    const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
-    return deleteBundle(c as any, body, apikey)
-  }
-  catch (e) {
-    console.error('Cannot delete bundle', e)
-    return c.json({ status: 'Cannot delete bundle', error: JSON.stringify(e) }, 500)
-  }
+  const body = await getBodyOrQuery<GetLatest>(c)
+  const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
+  return deleteBundle(c, body, apikey)
+})
+
+app.put('/', middlewareKey(['all', 'write']), async (c) => {
+  const body = await getBodyOrQuery<any>(c)
+  const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
+  return setChannel(c, body, apikey)
+})
+
+app.post('/', middlewareKey(['all', 'write']), async (c) => {
+  const body = await getBodyOrQuery<any>(c)
+  const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
+  return createBundle(c, body, apikey)
 })

@@ -1,6 +1,7 @@
-import type { Context } from '@hono/hono'
+import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
-import { hasAppRightApikey, supabaseAdmin } from '../../utils/supabase.ts'
+import { quickError, simpleError } from '../../utils/hono.ts'
+import { hasAppRightApikey, supabaseApikey } from '../../utils/supabase.ts'
 
 interface UpdateApp {
   name?: string
@@ -9,37 +10,31 @@ interface UpdateApp {
 }
 
 export async function put(c: Context, appId: string, body: UpdateApp, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
-  if (!appId) {
-    console.error('Cannot update app', 'Missing app_id')
-    return c.json({ status: 'Missing app_id' }, 400)
-  }
-
   if (!(await hasAppRightApikey(c, appId, apikey.user_id, 'write', apikey.key))) {
-    console.error('Cannot update app', 'You can\'t access this app', appId)
-    return c.json({ status: 'You can\'t access this app', app_id: appId }, 400)
+    throw quickError(401, 'cannot_access_app', 'You can\'t access this app', { app_id: appId })
   }
 
-  try {
-    const { data, error: dbError } = await supabaseAdmin(c)
-      .from('apps')
-      .update({
-        name: body.name,
-        icon_url: body.icon,
-        retention: body.retention,
-      })
-      .eq('app_id', appId)
-      .select()
-      .single()
-
-    if (dbError || !data) {
-      console.error('Cannot update app', dbError)
-      return c.json({ status: 'Cannot update app', error: JSON.stringify(dbError) }, 400)
-    }
-
-    return c.json(data)
+  if (body.retention && body.retention >= 63113904) {
+    throw quickError(400, 'retention_to_big', 'Retention cannot be bigger than 63113903 (2 years)', { retention: body.retention })
   }
-  catch (e) {
-    console.error('Cannot update app', e)
-    return c.json({ status: 'Cannot update app', error: JSON.stringify(e) }, 500)
+  else if (body.retention && body.retention < 0) {
+    throw quickError(400, 'retention_to_small', 'Retention cannot be smaller than 0', { retention: body.retention })
   }
+
+  const { data, error: dbError } = await supabaseApikey(c, apikey.key)
+    .from('apps')
+    .update({
+      name: body.name,
+      icon_url: body.icon,
+      retention: body.retention,
+    })
+    .eq('app_id', appId)
+    .select()
+    .single()
+
+  if (dbError || !data) {
+    throw simpleError('cannot_update_app', 'Cannot update app', { supabaseError: dbError })
+  }
+
+  return c.json(data)
 }

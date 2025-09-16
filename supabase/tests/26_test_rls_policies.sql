@@ -64,9 +64,9 @@ SELECT
     'public',
     'channel_devices',
     ARRAY[
-      'Allow delete for auth (write+)',
+      'Allow delete for auth, api keys (write+)',
       'Allow insert for auth (write+)',
-      'Allow read for auth (read+)',
+      'Allow read for auth, api keys (read+)',
       'Allow update for auth, api keys (write+)',
       'Prevent non 2FA access'
     ],
@@ -79,10 +79,10 @@ SELECT
     'public',
     'orgs',
     ARRAY[
+      'Allow insert org for apikey or user',
       'Allow org delete for super_admin',
       'Allow select for auth, api keys (read+)',
       'Allow update for auth (admin+)',
-      'Allow webapp to insert',
       'Prevent non 2FA access'
     ],
     'orgs should have correct policies'
@@ -93,7 +93,11 @@ SELECT
   policies_are (
     'public',
     'devices',
-    ARRAY['Allow owner to update', 'Allow devices select'],
+    ARRAY[
+      'Allow org member to insert devices',
+      'Allow org member to select devices',
+      'Allow org member to update devices'
+    ],
     'devices should have correct policies'
   );
 
@@ -147,7 +151,12 @@ SELECT
   policies_are (
     'public',
     'users',
-    ARRAY['Allow self to modify self'],
+    ARRAY[
+      'Allow owner to insert own users',
+      'Allow owner to select own user',
+      'Allow owner to update own users',
+      'Disallow owner to delete own users'
+    ],
     'users should have correct policies'
   );
 
@@ -186,7 +195,7 @@ SELECT
   policies_are (
     'public',
     'stripe_info',
-    ARRAY['Allow user to self get'],
+    ARRAY['Allow org member to select stripe_info'],
     'stripe_info should have correct policies'
   );
 
@@ -278,7 +287,10 @@ SELECT
     'public',
     'apikeys',
     ARRAY[
-      'Enable all for user based on user_id',
+      'Allow owner to delete own apikeys',
+      'Allow owner to insert own apikeys',
+      'Allow owner to select own apikeys',
+      'Allow owner to update own apikeys',
       'Prevent non 2FA access'
     ],
     'apikeys should have correct policies'
@@ -318,12 +330,14 @@ SELECT
     'objects',
     ARRAY[
       'All all users to act',
-      'All user to manage they own folder 1ffg0oo_0',
-      'All user to manage they own folder 1ffg0oo_1',
-      'All user to manage they own folder 1ffg0oo_2',
-      'All user to manage they own folder 1ffg0oo_3',
-      'Allow apikey to manage they folder',
-      'Allow apikey to manage they folder 21'
+      'Allow user or apikey to delete they own folder in apps',
+      'Allow user or apikey to delete they own folder in images',
+      'Allow user or apikey to insert they own folder in apps',
+      'Allow user or apikey to insert they own folder in images',
+      'Allow user or apikey to read they own folder in apps',
+      'Allow user or apikey to read they own folder in images',
+      'Allow user or apikey to update they own folder in apps',
+      'Allow user or apikey to update they own folder in images'
     ],
     'storage.objects should have correct policies'
   );

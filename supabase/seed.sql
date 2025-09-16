@@ -24,20 +24,14 @@ CREATE OR REPLACE FUNCTION "public"."reset_and_seed_data" () RETURNS "void" LANG
 SET
   search_path = '' SECURITY DEFINER AS $_$
 BEGIN
-    -- Truncate tables
+    -- Suppress cascade notices during truncation
+    SET LOCAL client_min_messages = WARNING;
+
+    -- Truncate main parent tables - CASCADE will handle dependencies
     TRUNCATE TABLE "auth"."users" CASCADE;
-    TRUNCATE TABLE "public"."plans" CASCADE;
     TRUNCATE TABLE "storage"."buckets" CASCADE;
     TRUNCATE TABLE "public"."stripe_info" CASCADE;
-    TRUNCATE TABLE "public"."users" CASCADE;
-    TRUNCATE TABLE "public"."orgs" CASCADE;
-    TRUNCATE TABLE "public"."apikeys" CASCADE;
-    TRUNCATE TABLE "public"."apps" CASCADE;
-    TRUNCATE TABLE "public"."app_versions" CASCADE;
-    TRUNCATE TABLE "public"."app_versions_meta" CASCADE;
-    TRUNCATE TABLE "public"."channels" CASCADE;
-    TRUNCATE TABLE "public"."deploy_history" CASCADE;
-    TRUNCATE TABLE "public"."devices" CASCADE;
+    TRUNCATE TABLE "public"."plans" CASCADE;
     TRUNCATE TABLE "public"."capgo_credits_steps" CASCADE;
 
     -- Insert seed data
@@ -47,7 +41,8 @@ BEGIN
     INSERT INTO "auth"."users" ("instance_id", "id", "aud", "role", "email", "encrypted_password", "email_confirmed_at", "invited_at", "confirmation_token", "confirmation_sent_at", "recovery_token", "recovery_sent_at", "email_change_token_new", "email_change", "email_change_sent_at", "last_sign_in_at", "raw_app_meta_data", "raw_user_meta_data", "is_super_admin", "created_at", "updated_at", "phone", "phone_confirmed_at", "phone_change", "phone_change_token", "phone_change_sent_at", "email_change_token_current", "email_change_confirm_status", "banned_until", "reauthentication_token", "reauthentication_sent_at") VALUES
     ('00000000-0000-0000-0000-000000000000', 'c591b04e-cf29-4945-b9a0-776d0672061a', 'authenticated', 'authenticated', 'admin@capgo.app', '$2a$10$I4wgil64s1Kku/7aUnCOVuc1W5nCAeeKvHMiSKk10jo1J5fSVkK1S', now(), now(), 'oljikwwipqrkwilfsyto', now(), '', NULL, '', '', NULL, now(), '{"provider": "email", "providers": ["email"]}', '{"activation": {"legal": true, "formFilled": true, "optForNewsletters": true, "enableNotifications": true}, "test_identifier": "test_admin"}', 'f', now(), now(), NULL, NULL, '', '', NULL, '', 0, NULL, '', NULL),
     ('00000000-0000-0000-0000-000000000000', '6aa76066-55ef-4238-ade6-0b32334a4097', 'authenticated', 'authenticated', 'test@capgo.app', '$2a$10$0CErXxryZPucjJWq3O7qXeTJgN.tnNU5XCZy9pXKDWRi/aS9W7UFi', now(), now(), 'oljikwwipqrkwilfsyty', now(), '', NULL, '', '', NULL, now(), '{"provider": "email", "providers": ["email"]}', '{"activation": {"legal": true, "formFilled": true, "optForNewsletters": true, "enableNotifications": true}, "test_identifier": "test_user"}', 'f', now(), now(), NULL, NULL, '', '', NULL, '', 0, NULL, '', NULL),
-    ('00000000-0000-0000-0000-000000000000', '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5', 'authenticated', 'authenticated', 'test2@capgo.app', '$2a$10$0CErXxryZPucjJWq3O7qXeTJgN.tnNU5XCZy9pXKDWRi/aS9W7UFi', now(), now(), 'oljikwwipqrkwilfsytt', now(), '', NULL, '', '', NULL, now(), '{"provider": "email", "providers": ["email"]}', '{"activation": {"legal": true, "formFilled": true, "optForNewsletters": true, "enableNotifications": true}, "test_identifier": "test_user2"}', 'f', now(), now(), NULL, NULL, '', '', NULL, '', 0, NULL, '', NULL);
+    ('00000000-0000-0000-0000-000000000000', '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5', 'authenticated', 'authenticated', 'test2@capgo.app', '$2a$10$0CErXxryZPucjJWq3O7qXeTJgN.tnNU5XCZy9pXKDWRi/aS9W7UFi', now(), now(), 'oljikwwipqrkwilfsytt', now(), '', NULL, '', '', NULL, now(), '{"provider": "email", "providers": ["email"]}', '{"activation": {"legal": true, "formFilled": true, "optForNewsletters": true, "enableNotifications": true}, "test_identifier": "test_user2"}', 'f', now(), now(), NULL, NULL, '', '', NULL, '', 0, NULL, '', NULL),
+    ('00000000-0000-0000-0000-000000000000', '7a1b2c3d-4e5f-4a6b-7c8d-9e0f1a2b3c4d', 'authenticated', 'authenticated', 'stats@capgo.app', '$2a$10$0CErXxryZPucjJWq3O7qXeTJgN.tnNU5XCZy9pXKDWRi/aS9W7UFi', now(), now(), 'oljikwwipqrkwilfsyts', now(), '', NULL, '', '', NULL, now(), '{"provider": "email", "providers": ["email"]}', '{"activation": {"legal": true, "formFilled": true, "optForNewsletters": true, "enableNotifications": true}, "test_identifier": "test_stats"}', 'f', now(), now(), NULL, NULL, '', '', NULL, '', 0, NULL, '', NULL);
 
     INSERT INTO "public"."deleted_account" ("created_at", "email", "id") VALUES
     (now(), encode(extensions.digest('deleted@capgo.app'::bytea, 'sha256'::text)::bytea, 'hex'::text), '00000000-0000-0000-0000-000000000001');
@@ -185,14 +180,16 @@ BEGIN
     (now(), now(), 'sub_1', 'cus_Pa0k8TO6HVln6A', 'succeeded', 'prod_LQIregjtNduh4q', now() + interval '15 days', NULL, 't', 2, '{}', now() - interval '15 days', now() + interval '15 days'),
     (now(), now(), 'sub_2', 'cus_Q38uE91NP8Ufqc', 'succeeded', 'prod_LQIregjtNduh4q', now() + interval '15 days', NULL, 't', 2, '{}', now() - interval '15 days', now() + interval '15 days'),
     (now(), now(), 'sub_3', 'cus_Pa0f3M6UCQ8g5Q', 'succeeded', 'prod_LQIregjtNduh4q', now() + interval '15 days', NULL, 't', 2, '{}', now() - interval '15 days', now() + interval '15 days'),
-    (now(), now(), 'sub_4', 'cus_NonOwner', 'succeeded', 'prod_LQIregjtNduh4q', now() + interval '15 days', NULL, 't', 2, '{}', now() - interval '15 days', now() + interval '15 days');
+    (now(), now(), 'sub_4', 'cus_NonOwner', 'succeeded', 'prod_LQIregjtNduh4q', now() + interval '15 days', NULL, 't', 2, '{}', now() - interval '15 days', now() + interval '15 days'),
+    (now(), now(), 'sub_5', 'cus_StatsTest', 'succeeded', 'prod_LQIregjtNduh4q', now() + interval '15 days', NULL, 't', 2, '{}', now() - interval '15 days', now() + interval '15 days');
 
     -- Do not insert new orgs
     ALTER TABLE public.users DISABLE TRIGGER generate_org_on_user_create;
     INSERT INTO "public"."users" ("created_at", "image_url", "first_name", "last_name", "country", "email", "id", "updated_at", "enableNotifications", "optForNewsletters", "legalAccepted", "customer_id", "billing_email") VALUES
     ('2022-06-03 05:54:15+00', '', 'admin', 'Capgo', NULL, 'admin@capgo.app', 'c591b04e-cf29-4945-b9a0-776d0672061a', now(), 'f', 'f', 'f', NULL, NULL),
     ('2022-06-03 05:54:15+00', '', 'test', 'Capgo', NULL, 'test@capgo.app', '6aa76066-55ef-4238-ade6-0b32334a4097', now(), 'f', 'f', 'f', NULL, NULL),
-    ('2022-06-03 05:54:15+00', '', 'test2', 'Capgo', NULL, 'test2@capgo.app', '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5', now(), 'f', 'f', 'f', NULL, NULL);
+    ('2022-06-03 05:54:15+00', '', 'test2', 'Capgo', NULL, 'test2@capgo.app', '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5', now(), 'f', 'f', 'f', NULL, NULL),
+    ('2022-06-03 05:54:15+00', '', 'stats', 'Capgo', NULL, 'stats@capgo.app', '7a1b2c3d-4e5f-4a6b-7c8d-9e0f1a2b3c4d', now(), 'f', 'f', 'f', NULL, NULL);
     ALTER TABLE public.users ENABLE TRIGGER generate_org_on_user_create;
 
     ALTER TABLE public.orgs DISABLE TRIGGER generate_org_user_on_org_create;
@@ -200,7 +197,8 @@ BEGIN
     ('22dbad8a-b885-4309-9b3b-a09f8460fb6d', 'c591b04e-cf29-4945-b9a0-776d0672061a', now(), now(), '', 'Admin org', 'admin@capgo.app', 'cus_Pa0k8TO6HVln6A'),
     ('046a36ac-e03c-4590-9257-bd6c9dba9ee8', '6aa76066-55ef-4238-ade6-0b32334a4097', now(), now(), '', 'Demo org', 'test@capgo.app', 'cus_Q38uE91NP8Ufqc'),
     ('34a8c55d-2d0f-4652-a43f-684c7a9403ac', '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5', now(), now(), '', 'Test2 org', 'test2@capgo.app', 'cus_Pa0f3M6UCQ8g5Q'),
-    ('a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d', '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5', now(), now(), '', 'Non-Owner Org', 'test2@capgo.app', 'cus_NonOwner');
+    ('a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d', '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5', now(), now(), '', 'Non-Owner Org', 'test2@capgo.app', 'cus_NonOwner'),
+    ('b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e', '7a1b2c3d-4e5f-4a6b-7c8d-9e0f1a2b3c4d', now(), now(), '', 'Stats Test Org', 'stats@capgo.app', 'cus_StatsTest');
     ALTER TABLE public.orgs ENABLE TRIGGER generate_org_user_on_org_create;
 
     INSERT INTO "public"."org_users" ("org_id", "user_id", "user_right", "app_id", "channel_id") VALUES
@@ -208,7 +206,8 @@ BEGIN
     ('046a36ac-e03c-4590-9257-bd6c9dba9ee8', '6aa76066-55ef-4238-ade6-0b32334a4097', 'super_admin'::"public"."user_min_right", null, null),
     ('34a8c55d-2d0f-4652-a43f-684c7a9403ac', '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5', 'super_admin'::"public"."user_min_right", null, null),
     ('046a36ac-e03c-4590-9257-bd6c9dba9ee8', '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5', 'upload'::"public"."user_min_right", null, null),
-    ('a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d', '6aa76066-55ef-4238-ade6-0b32334a4097', 'read'::"public"."user_min_right", null, null);
+    ('a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d', '6aa76066-55ef-4238-ade6-0b32334a4097', 'read'::"public"."user_min_right", null, null),
+    ('b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e', '7a1b2c3d-4e5f-4a6b-7c8d-9e0f1a2b3c4d', 'super_admin'::"public"."user_min_right", null, null);
 
     INSERT INTO "public"."apikeys" ("id", "created_at", "user_id", "key", "mode", "updated_at", "name") VALUES
     (1, now(), 'c591b04e-cf29-4945-b9a0-776d0672061a', 'c591b04e-cf29-4945-b9a0-776d0672061e', 'upload', now(), 'admin upload'),
@@ -219,11 +218,19 @@ BEGIN
     (6, now(), '6aa76066-55ef-4238-ade6-0b32334a4097', 'ae6e7458-c46d-4c00-aa3b-153b0b8520ea', 'all', now(), 'test all'),
     (7, now(), '6aa76066-55ef-4238-ade6-0b32334a4097', '985640ce-4031-4cfd-8095-d1d1066b6b3b', 'write', now(), 'test write'),
     (8, now(), '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5', 'ab4d9a98-ec25-4af8-933c-2aae4aa52b85', 'upload', now(), 'test2 upload'),
-    (9, now(), '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5', 'ac4d9a98-ec25-4af8-933c-2aae4aa52b85', 'all', now(), 'test2 all');
+    (9, now(), '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5', 'ac4d9a98-ec25-4af8-933c-2aae4aa52b85', 'all', now(), 'test2 all'),
+    -- Dedicated test keys for apikeys.test.ts to avoid interference with other tests
+    (10, now(), '6aa76066-55ef-4238-ade6-0b32334a4097', '8b2c3d4e-5f6a-4c7b-8d9e-0f1a2b3c4d5f', 'upload', now(), 'apikey test get by id'),
+    (11, now(), '6aa76066-55ef-4238-ade6-0b32334a4097', '8b2c3d4e-5f6a-4c7b-8d9e-0f1a2b3c4d5g', 'read', now(), 'apikey test update name'),
+    (12, now(), '6aa76066-55ef-4238-ade6-0b32334a4097', '8b2c3d4e-5f6a-4c7b-8d9e-0f1a2b3c4d5a', 'all', now(), 'apikey test update mode'),
+    (13, now(), '6aa76066-55ef-4238-ade6-0b32334a4097', '8b2c3d4e-5f6a-4c7b-8d9e-0f1a2b3c4d5d', 'write', now(), 'apikey test update apps'),
+    -- Dedicated user and API key for statistics tests
+    (14, now(), '7a1b2c3d-4e5f-4a6b-7c8d-9e0f1a2b3c4d', '8b2c3d4e-5f6a-4c7b-8d9e-0f1a2b3c4d5e', 'all', now(), 'stats test all');
 
     INSERT INTO "public"."apps" ("created_at", "app_id", "icon_url", "name", "last_version", "updated_at", "owner_org", "user_id") VALUES
     (now(), 'com.demoadmin.app', '', 'Demo Admin app', '1.0.0', now(), '22dbad8a-b885-4309-9b3b-a09f8460fb6d', 'c591b04e-cf29-4945-b9a0-776d0672061a'),
-    (now(), 'com.demo.app', '', 'Demo app', '1.0.0', now(), '046a36ac-e03c-4590-9257-bd6c9dba9ee8', '6aa76066-55ef-4238-ade6-0b32334a4097');
+    (now(), 'com.demo.app', '', 'Demo app', '1.0.0', now(), '046a36ac-e03c-4590-9257-bd6c9dba9ee8', '6aa76066-55ef-4238-ade6-0b32334a4097'),
+    (now(), 'com.stats.app', '', 'Stats Test App', '1.0.0', now(), 'b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e', '7a1b2c3d-4e5f-4a6b-7c8d-9e0f1a2b3c4d');
 
     INSERT INTO "public"."app_versions" ("id", "created_at", "app_id", "name", "r2_path", "updated_at", "deleted", "external_url", "checksum", "session_key", "storage_provider", "owner_org", "user_id", "comment", "link") VALUES
     (1, now(), 'com.demo.app', 'builtin', NULL, now(), 't', NULL, NULL, NULL, 'supabase', '046a36ac-e03c-4590-9257-bd6c9dba9ee8', NULL, NULL, NULL),
@@ -235,7 +242,10 @@ BEGIN
     (7, now(), 'com.demo.app', '1.359.0', 'orgs/046a36ac-e03c-4590-9257-bd6c9dba9ee8/apps/com.demo.app/1.359.0.zip', now(), 'f', NULL, '9f74e70a', NULL, 'r2', '046a36ac-e03c-4590-9257-bd6c9dba9ee8', '6aa76066-55ef-4238-ade6-0b32334a4097', 'its a test', 'https://capgo.app'),
     (8, now(), 'com.demoadmin.app', 'builtin', NULL, now(), 't', NULL, NULL, NULL, 'supabase', '22dbad8a-b885-4309-9b3b-a09f8460fb6d', NULL, NULL, NULL),
     (9, now(), 'com.demoadmin.app', 'unknown', NULL, now(), 't', NULL, NULL, NULL, 'supabase', '22dbad8a-b885-4309-9b3b-a09f8460fb6d', NULL, NULL, NULL),
-    (10, now(), 'com.demoadmin.app', '1.0.0', 'orgs/22dbad8a-b885-4309-9b3b-a09f8460fb6d/apps/com.demoadmin.app/1.0.0.zip', now(), 'f', NULL, 'admin123', NULL, 'r2', '22dbad8a-b885-4309-9b3b-a09f8460fb6d', 'c591b04e-cf29-4945-b9a0-776d0672061a', 'admin app test version', 'https://capgo.app');
+    (10, now(), 'com.demoadmin.app', '1.0.0', 'orgs/22dbad8a-b885-4309-9b3b-a09f8460fb6d/apps/com.demoadmin.app/1.0.0.zip', now(), 'f', NULL, 'admin123', NULL, 'r2', '22dbad8a-b885-4309-9b3b-a09f8460fb6d', 'c591b04e-cf29-4945-b9a0-776d0672061a', 'admin app test version', 'https://capgo.app'),
+    (11, now(), 'com.stats.app', 'builtin', NULL, now(), 't', NULL, NULL, NULL, 'supabase', 'b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e', NULL, NULL, NULL),
+    (12, now(), 'com.stats.app', 'unknown', NULL, now(), 't', NULL, NULL, NULL, 'supabase', 'b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e', NULL, NULL, NULL),
+    (13, now(), 'com.stats.app', '1.0.0', 'orgs/b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e/apps/com.stats.app/1.0.0.zip', now(), 'f', NULL, 'stats123', NULL, 'r2', 'b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e', '7a1b2c3d-4e5f-4a6b-7c8d-9e0f1a2b3c4d', 'stats test version', 'https://capgo.app');
 
     INSERT INTO "public"."app_versions_meta" ("id", "created_at", "app_id", "updated_at", "checksum", "size", "devices") VALUES
     (3, now(), 'com.demo.app', now(), '3885ee49', 1012506, 10),
@@ -243,31 +253,35 @@ BEGIN
     (5, now(), 'com.demo.app', now(), '9d4f798a', 1012529, 20),
     (6, now(), 'com.demo.app', now(), '44913a9f', 1012541, 30),
     (7, now(), 'com.demo.app', now(), '9f74e70a', 1012548, 40),
-    (10, now(), 'com.demoadmin.app', now(), 'admin123', 1500000, 5);
+    (10, now(), 'com.demoadmin.app', now(), 'admin123', 1500000, 5),
+    (13, now(), 'com.stats.app', now(), 'stats123', 850000, 15);
 
     INSERT INTO "public"."channels" ("id", "created_at", "name", "app_id", "version", "updated_at", "public", "disable_auto_update_under_native", "disable_auto_update", "ios", "android", "allow_device_self_set", "allow_emulator", "allow_dev", "created_by") VALUES
     (1, now(), 'production', 'com.demo.app', 3, now(), 't', 't', 'major'::"public"."disable_update", 'f', 't', 't', 't', 't', '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid),
     (2, now(), 'no_access', 'com.demo.app', 5, now(), 'f', 't', 'major'::"public"."disable_update", 't', 't', 't', 't', 't', '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid),
-    (3, now(), 'two_default', 'com.demo.app', 3, now(), 't', 't', 'major'::"public"."disable_update", 't', 'f', 't', 't', 't', '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid);
+    (3, now(), 'two_default', 'com.demo.app', 3, now(), 't', 't', 'major'::"public"."disable_update", 't', 'f', 't', 't', 't', '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid),
+    (4, now(), 'production', 'com.stats.app', 13, now(), 't', 't', 'major'::"public"."disable_update", 'f', 't', 't', 't', 't', '7a1b2c3d-4e5f-4a6b-7c8d-9e0f1a2b3c4d'::uuid);
 
     INSERT INTO "public"."deploy_history" ("id", "created_at", "updated_at", "channel_id", "app_id", "version_id", "deployed_at", "owner_org", "created_by") VALUES
     (1, now() - interval '15 days', now() - interval '15 days', 1, 'com.demo.app', 3, now() - interval '15 days', '046a36ac-e03c-4590-9257-bd6c9dba9ee8'::uuid, '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid),
     (2, now() - interval '10 days', now() - interval '10 days', 1, 'com.demo.app', 5, now() - interval '10 days', '046a36ac-e03c-4590-9257-bd6c9dba9ee8'::uuid, '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid),
-    (3, now() - interval '5 days', now() - interval '5 days', 1, 'com.demo.app', 3, now() - interval '5 days', '046a36ac-e03c-4590-9257-bd6c9dba9ee8'::uuid, '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid);
+    (3, now() - interval '5 days', now() - interval '5 days', 1, 'com.demo.app', 3, now() - interval '5 days', '046a36ac-e03c-4590-9257-bd6c9dba9ee8'::uuid, '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid),
+    (4, now() - interval '7 days', now() - interval '7 days', 4, 'com.stats.app', 13, now() - interval '7 days', 'b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e'::uuid, '7a1b2c3d-4e5f-4a6b-7c8d-9e0f1a2b3c4d'::uuid);
 
     -- Insert test devices for RLS testing
     INSERT INTO "public"."devices" ("updated_at", "device_id", "version", "app_id", "platform", "plugin_version", "os_version", "version_build", "custom_id", "is_prod", "is_emulator") VALUES
     (now(), '00000000-0000-0000-0000-000000000001', 3, 'com.demo.app', 'ios', '4.15.3', '16.0', '1.0.0', 'test-device-1', 't', 'f'),
     (now(), '00000000-0000-0000-0000-000000000002', 4, 'com.demo.app', 'android', '4.15.3', '13', '1.0.1', 'test-device-2', 't', 'f'),
     (now(), '00000000-0000-0000-0000-000000000003', 5, 'com.demo.app', 'ios', '4.15.3', '15.0', '1.361.0', 'test-device-3', 'f', 't'),
-    (now(), '00000000-0000-0000-0000-000000000004', 10, 'com.demoadmin.app', 'android', '4.15.3', '12', '1.0.0', 'admin-test-device', 't', 'f');
+    (now(), '00000000-0000-0000-0000-000000000004', 10, 'com.demoadmin.app', 'android', '4.15.3', '12', '1.0.0', 'admin-test-device', 't', 'f'),
+    (now(), '00000000-0000-0000-0000-000000000005', 13, 'com.stats.app', 'android', '4.15.3', '11', '1.0.0', 'stats-test-device', 't', 'f');
 
     -- Drop replicated orgs but keet the the seed ones
     DELETE from "public"."orgs" where POSITION('organization' in orgs.name)=1;
-    PERFORM setval('public.apikeys_id_seq', 10, false);
-    PERFORM setval('public.app_versions_id_seq', 11, false);
-    PERFORM setval('public.channel_id_seq', 4, false);
-    PERFORM setval('public.deploy_history_id_seq', 4, false);
+    PERFORM setval('public.apikeys_id_seq', 15, false);
+    PERFORM setval('public.app_versions_id_seq', 14, false);
+    PERFORM setval('public.channel_id_seq', 5, false);
+    PERFORM setval('public.deploy_history_id_seq', 5, false);
 END;
 $_$;
 
@@ -424,8 +438,8 @@ CREATE OR REPLACE FUNCTION "public"."reset_and_seed_app_data" ("p_app_id" charac
 SET
   search_path = '' SECURITY DEFINER AS $$
 DECLARE
-    org_id uuid := '046a36ac-e03c-4590-9257-bd6c9dba9ee8';
-    user_id uuid := '6aa76066-55ef-4238-ade6-0b32334a4097';
+    org_id uuid := '046a36ac-e03c-4590-9257-bd6c9dba9ee8'::uuid;
+    user_id uuid := '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid;
     builtin_version_id bigint;
     unknown_version_id bigint;
     v1_0_1_version_id bigint;
@@ -498,6 +512,9 @@ BEGIN
         (now() - interval '5 days', now() - interval '5 days', development_channel_id, p_app_id, v1_359_0_version_id, now() - interval '5 days', org_id, user_id),
         (now() - interval '3 days', now() - interval '3 days', no_access_channel_id, p_app_id, v1_361_0_version_id, now() - interval '3 days', org_id, user_id);
 
+    -- Mark possibly unused variables as used (for linter)
+    PERFORM builtin_version_id, unknown_version_id, v1_0_1_version_id, v1_360_0_version_id;
+
     -- Advisory lock is automatically released at transaction end
 END;
 $$;
@@ -551,13 +568,10 @@ DECLARE
   random_mau INTEGER;
   random_bandwidth BIGINT;
   random_storage BIGINT;
-  random_file_size BIGINT;
   random_uuid UUID;
-  random_fixed_uuid UUID := '00000000-0000-0000-0000-000000000000';
+  random_fixed_uuid UUID := '00000000-0000-0000-0000-000000000000'::uuid;
   random_version_id BIGINT := 3;
-  random_action VARCHAR(20);
-  random_timestamp TIMESTAMP;
-BEGIN
+BEGIN  
   -- Use advisory lock to prevent concurrent execution for the same app
   PERFORM pg_advisory_xact_lock(hashtext(p_app_id || '_stats'));
   
@@ -640,16 +654,21 @@ Requires:
 - pgsql-http: https://github.com/pramsey/pgsql-http
 -- */
 DO $$
+DECLARE
+    internet_available BOOLEAN := FALSE;
+    connectivity_error TEXT;
 BEGIN
     -- Only attempt dbdev installation if extensions are available
     IF EXISTS (SELECT 1 FROM pg_available_extensions WHERE name = 'http') AND 
        EXISTS (SELECT 1 FROM pg_available_extensions WHERE name = 'pg_tle') THEN
         
+        -- Create extensions first
+        create extension if not exists http with schema extensions;
+        create extension if not exists pg_tle;
+        
+        -- Attempt dbdev installation directly, catching network errors
         BEGIN
-            create extension if not exists http with schema extensions;
-            create extension if not exists pg_tle;
             drop extension if exists "supabase-dbdev";
-            
             PERFORM pgtle.uninstall_extension_if_exists('supabase-dbdev');
             
             PERFORM pgtle.install_extension(
@@ -658,7 +677,7 @@ BEGIN
                 'PostgreSQL package manager',
                 resp.contents ->> 'sql'
             )
-            from http(
+            from extensions.http(
                 (
                     'GET',
                     'https://api.database.dev/rest/v1/'
@@ -686,11 +705,20 @@ BEGIN
                 drop extension if exists "supabase-dbdev";
                 create extension "supabase-dbdev";
                 PERFORM dbdev.install('basejump-supabase_test_helpers');
+                RAISE NOTICE 'supabase-dbdev extension installed successfully';
             END IF;
             
         EXCEPTION WHEN OTHERS THEN
-            -- Log the error but continue with seed data
-            RAISE NOTICE 'dbdev installation failed: %', SQLERRM;
+            -- Check if it's a network-related error
+            IF SQLERRM ILIKE '%could not connect%' OR 
+               SQLERRM ILIKE '%network%' OR 
+               SQLERRM ILIKE '%timeout%' OR 
+               SQLERRM ILIKE '%unreachable%' OR
+               SQLERRM ILIKE '%connection%' THEN
+                RAISE NOTICE 'No internet connection available - skipping supabase-dbdev installation';
+            ELSE
+                RAISE NOTICE 'dbdev installation failed: %', SQLERRM;
+            END IF;
         END;
     ELSE
         RAISE NOTICE 'Required extensions (http, pg_tle) not available for dbdev installation';
@@ -703,6 +731,7 @@ BEGIN
     -- Execute seeding functions
     PERFORM public.reset_and_seed_data();
     PERFORM public.reset_and_seed_stats_data();
+    PERFORM public.reset_and_seed_app_stats_data('com.stats.app');
 EXCEPTION WHEN OTHERS THEN
     RAISE NOTICE 'Seeding failed: %', SQLERRM;
     RAISE;

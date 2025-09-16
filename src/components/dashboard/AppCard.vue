@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { Database } from '~/types/supabase.types'
-import { useI18n } from 'petite-vue-i18n'
 import { computed, ref, watchEffect } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import IconSettings from '~icons/heroicons/cog-8-tooth'
 import { appIdToUrl } from '~/services/conversion'
@@ -41,11 +41,9 @@ function openPackage(appId: string) {
 }
 
 const acronym = computed(() => {
-  const words = props.app.name?.split(' ') || []
+  const words = props.app.name?.split(' ') ?? []
   let res = props.app.name?.slice(0, 2) || 'AP'
-  if (words?.length > 2)
-    res = words[0][0] + words[1][0]
-  else if (words?.length > 1)
+  if (words?.length > 1)
     res = words[0][0] + words[1][0]
   return res.toUpperCase()
 })
@@ -74,8 +72,8 @@ watchEffect(async () => {
   <!-- Row -->
   <tr class="text-gray-500 cursor-pointer md:table-row dark:text-gray-400 hover:bg-slate-200 dark:hover:bg-slate-700" @click="openPackage(app.app_id)">
     <td class="table-cell w-1/5 p-2 md:hidden">
-      <img v-if="app.icon_url" :src="app.icon_url" :alt="`App icon ${app.name}`" class="mr-2 rounded-sm shrink-0 sm:mr-3 mask mask-squircle" width="42" height="42">
-      <div v-else class="p-2 mr-2 text-xl bg-gray-700 mask mask-squircle">
+      <img v-if="app.icon_url" :src="app.icon_url" :alt="`App icon ${app.name}`" class="mr-2 rounded-sm shrink-0 sm:mr-3 d-mask d-mask-squircle" width="42" height="42">
+      <div v-else class="p-2 mr-2 text-xl bg-gray-700 d-mask d-mask-squircle">
         <span class="font-medium text-gray-300">
           {{ acronym }}
         </span>
@@ -83,8 +81,8 @@ watchEffect(async () => {
     </td>
     <td class="w-1/4 p-2">
       <div class="flex flex-wrap items-center text-slate-800 dark:text-white">
-        <img v-if="app.icon_url" :src="app.icon_url" :alt="`App icon ${app.name}`" class="hidden mr-2 rounded-sm md:block shrink-0 sm:mr-3 mask mask-squircle" width="42" height="42">
-        <div v-else class="p-2 mr-2 text-xl bg-gray-700 mask mask-squircle">
+        <img v-if="app.icon_url" :src="app.icon_url" :alt="`App icon ${app.name}`" class="hidden mr-2 rounded-sm md:block shrink-0 sm:mr-3 d-mask d-mask-squircle" width="42" height="42">
+        <div v-else class="p-2 mr-2 text-xl bg-gray-700 d-mask d-mask-squircle">
           <span class="font-medium text-gray-300">
             {{ acronym }}
           </span>

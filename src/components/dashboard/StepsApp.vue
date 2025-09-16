@@ -1,12 +1,15 @@
 <script setup lang="ts">
-import { useI18n } from 'petite-vue-i18n'
 import { ref, watchEffect } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import arrowBack from '~icons/ion/arrow-back?width=2em&height=2em'
 import { pushEvent } from '~/services/posthog'
 import { getLocalConfig, isLocal, useSupabase } from '~/services/supabase'
 import { sendEvent } from '~/services/tracking'
+import { useDialogV2Store } from '~/stores/dialogv2'
+import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
+import { useOrganizationStore } from '~/stores/organization'
 
 const props = defineProps<{
   onboarding: boolean
@@ -23,6 +26,7 @@ const supabase = useSupabase()
 const main = useMainStore()
 const { t } = useI18n()
 const organizationStore = useOrganizationStore()
+const dialogStore = useDialogV2Store()
 
 interface Step {
   title: string
@@ -32,10 +36,11 @@ interface Step {
 
 const config = getLocalConfig()
 
+const localCommand = isLocal(config.supaHost) ? ` --supa-host ${config.supaHost} --supa-anon ${config.supaKey}` : ``
 const steps = ref<Step[]>([
   {
     title: t('init-capgo-in-your-a'),
-    command: `npx @capgo/cli@latest i [APIKEY]${isLocal(config.supaHost) ? ` --supa-host ${config.supaHost} --supa-anon ${config.supaKey}` : ``}`,
+    command: `npx @capgo/cli@latest i [APIKEY]${localCommand}`,
     subtitle: '',
   },
   {
@@ -84,18 +89,17 @@ async function copyToast(allowed: boolean, id: string, text?: string) {
   catch (err) {
     console.error('Failed to copy: ', err)
     // Display a modal with the copied key
-    displayStore.dialogOption = {
-      header: t('cannot-copy'),
-      message: text,
+    dialogStore.openDialog({
+      title: t('cannot-copy'),
+      description: text,
       buttons: [
         {
           text: t('button-cancel'),
           role: 'cancel',
         },
       ],
-    }
-    displayStore.showDialog = true
-    await displayStore.onDialogDismiss()
+    })
+    await dialogStore.onDialogDismiss()
   }
   clicked.value += 1
   if (!realtimeListener.value || clicked.value === 3) {
@@ -141,7 +145,7 @@ async function getKey(retry = true): Promise<void> {
       await addNewApiKey()
       return getKey(false)
     }
-    steps.value[0].command = steps.value[0].command?.replace('[APIKEY]', data[0].key || '')
+    steps.value[0].command = steps.value[0].command?.replace('[APIKEY]', data[0].key ?? '')
   }
   else if (retry && main?.user?.id) {
     return getKey(false)
@@ -168,7 +172,7 @@ watchEffect(async () => {
         (payload) => {
           console.log('Change received step 1!', payload)
           step.value += 1
-          appId.value = payload.new.id || ''
+          appId.value = payload.new.id ?? ''
           realtimeListener.value = false
           mySubscription.value.unsubscribe()
           setLog()
@@ -184,10 +188,10 @@ watchEffect(async () => {
 </script>
 
 <template>
-  <section class="h-full py-12 overflow-y-auto max-h-fit bg-gray-50 dark:bg-gray-900 lg:py-20 sm:py-16">
+  <section class="h-full py-12 overflow-y-auto max-h-fit lg:py-20 sm:py-16">
     <div class="px-4 mx-auto max-w-7xl lg:px-8 sm:px-6">
       <div class="flex items-center justify-items-center place-content-center">
-        <button v-if="!onboarding" class="bg-gray-800 btn btn-outline mr-6" @click="emit('closeStep')">
+        <button v-if="!onboarding" class="bg-gray-800 text-white d-btn d-btn-outline mr-6" @click="emit('closeStep')">
           <arrowBack />
         </button>
         <div v-if="props.onboarding" class="text-center">

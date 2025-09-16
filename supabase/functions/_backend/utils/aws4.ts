@@ -34,8 +34,8 @@ export function presignUrl(options: PresignOptions): string {
     protocol = 'https:',
   } = options
 
-  const datetime = new Date().toISOString().replace(/[:\-]|\.\d{3}/g, '')
-  const date = datetime.substr(0, 8)
+  const datetime = new Date().toISOString().replace(/[:-]|\.\d{3}/g, '')
+  const date = datetime.substring(0, 8)
   const [resource, existingQuery] = path.split('?')
 
   const query = new URLSearchParams(existingQuery)

@@ -2,8 +2,8 @@
 import type { TableColumn } from '../comp_def'
 import type { Database } from '~/types/supabase.types'
 import ky from 'ky'
-import { useI18n } from 'petite-vue-i18n'
-import { computed, ref } from 'vue'
+import { computed, h, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { appIdToUrl } from '~/services/conversion'
 import { formatDate } from '~/services/date'
@@ -30,6 +30,7 @@ const isLoading = ref(false)
 const currentPage = ref(1)
 const filters = ref({
   Override: false,
+  CustomId: false,
 })
 const offset = 10
 const currentVersionsNumber = computed(() => {
@@ -44,13 +45,22 @@ const columns = ref<TableColumn[]>([
     sortable: true,
     head: true,
     onClick: (elem: Element) => openOne(elem),
+    renderFunction: (item) => {
+      const customId = item.custom_id?.trim()
+      return h('div', { class: 'flex flex-col text-slate-800 dark:text-white' }, [
+        h('div', { class: 'truncate font-medium' }, customId || item.device_id),
+        customId
+          ? h('div', { class: 'text-xs text-slate-500 dark:text-gray-400 truncate' }, item.device_id)
+          : null,
+      ])
+    },
   },
   {
     label: t('updated-at'),
     key: 'updated_at',
     mobile: false,
     sortable: 'desc',
-    displayFunction: (elem: Element) => formatDate(elem.updated_at || ''),
+    displayFunction: (elem: Element) => formatDate(elem.updated_at ?? ''),
   },
   {
     label: t('platform'),
@@ -82,7 +92,7 @@ async function getDevicesID() {
 
   const { data } = await req
 
-  const channelDev = data?.map(d => d.device_id) || []
+  const channelDev = data?.map(d => d.device_id) ?? []
   return [...channelDev]
 }
 
@@ -91,6 +101,7 @@ interface DeviceData {
   device_id: string
   version: number
   created_at: string
+  custom_id: string | null
 }
 
 async function countDevices() {
@@ -105,12 +116,13 @@ async function countDevices() {
     .post(`${defaultApiHost}/private/devices`, {
       headers: {
         'Content-Type': 'application/json',
-        'authorization': `Bearer ${currentJwt || ''}`,
+        'authorization': `Bearer ${currentJwt ?? ''}`,
       },
       body: JSON.stringify({
         count: true,
         // devicesId: props.ids?.length ? props.ids : undefined,
         appId: props.appId,
+        customIdMode: filters.value.CustomId,
       }),
     })
     .then(res => res.json<{ count: number }>())
@@ -138,7 +150,7 @@ async function getData() {
       .post(`${defaultApiHost}/private/devices`, {
         headers: {
           'Content-Type': 'application/json',
-          'authorization': `Bearer ${currentJwt || ''}`,
+          'authorization': `Bearer ${currentJwt ?? ''}`,
         },
         body: JSON.stringify({
           appId: props.appId,
@@ -148,6 +160,7 @@ async function getData() {
           order: columns.value.filter(elem => elem.sortable).map(elem => ({ key: elem.key as string, sortable: elem.sortable })),
           rangeStart: currentVersionsNumber.value,
           rangeEnd: currentVersionsNumber.value + offset - 1,
+          customIdMode: filters.value.CustomId,
         }),
       })
       .then(res => res.json<DeviceData[]>())
@@ -188,6 +201,7 @@ async function getData() {
 async function reload() {
   try {
     elements.value.length = 0
+    total.value = await countDevices()
     await getData()
   }
   catch (error) {

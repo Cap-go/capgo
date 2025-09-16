@@ -149,7 +149,7 @@ export default defineConfig({
 
     // https://github.com/intlify/bundle-tools/tree/main/packages/unplugin-vue-i18n
     VueI18n({
-      module: 'petite-vue-i18n',
+      module: 'vue-i18n',
       runtimeOnly: true,
       compositionOnly: true,
       fullInstall: true,

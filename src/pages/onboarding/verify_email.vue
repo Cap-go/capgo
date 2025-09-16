@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { User } from '@supabase/supabase-js'
-import { useI18n } from 'petite-vue-i18n'
 import { ref, watchEffect } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { autoAuth, useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
@@ -24,14 +24,14 @@ const user = ref<User | null>(null)
 async function updateDb() {
   // console.log('update db')
   const resSession = await supabase.auth.getSession()!
-  let session = resSession.data.session
+  const session = resSession.data.session
   if (!session) {
     const logSession = await autoAuth(route)
     if (!logSession)
       return
-    if (logSession.session)
-      session = logSession.session
-    if (logSession.user)
+    if (logSession.session?.user)
+      user.value = logSession.session.user
+    else if (logSession.user)
       user.value = logSession.user
   }
   else {
@@ -48,7 +48,7 @@ async function updateDb() {
         id: user.value?.id,
         first_name: user.value?.user_metadata.first_name,
         last_name: user.value?.user_metadata.last_name,
-        email: user.value?.email || '',
+        email: user.value?.email ?? '',
         image_url: '',
       },
     )

@@ -47,6 +47,7 @@ def capacitor_pods
   pod 'CapgoNativeAudio', :path => '../../node_modules/@capgo/native-audio'
   pod 'CapgoNativeMarket', :path => '../../node_modules/@capgo/native-market'
   pod 'RevenuecatPurchasesCapacitor', :path => '../../node_modules/@revenuecat/purchases-capacitor'
+  pod 'CapacitorCameraView', :path => '../../node_modules/capacitor-camera-view'
   pod 'CapacitorSecureStoragePlugin', :path => '../../node_modules/capacitor-secure-storage-plugin'
 end
 

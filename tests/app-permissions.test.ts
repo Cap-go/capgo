@@ -32,8 +32,8 @@ describe('app creation permission tests', () => {
       })
 
       expect(response.status).toBe(403)
-      const data = await response.json() as { status: string }
-      expect(data.status).toBe('You can\'t access this organization')
+      const data = await response.json() as { error: string }
+      expect(data.error).toBe('cannot_access_organization')
     })
   })
 
@@ -94,8 +94,8 @@ describe('app creation permission tests', () => {
       })
 
       expect(response.status).toBe(403)
-      const data = await response.json() as { status: string }
-      expect(data.status).toBe('You can\'t access this organization')
+      const data = await response.json() as { error: string }
+      expect(data.error).toBe('cannot_access_organization')
     })
   })
 
@@ -114,7 +114,8 @@ describe('app creation permission tests', () => {
         headers,
         body: JSON.stringify({
           owner_org: ORG_ID, // Using the default test org where the test user has permissions
-          name: appName,
+          name: `App ${appName}`,
+          app_id: appName,
           icon: 'test-icon',
         }),
       })

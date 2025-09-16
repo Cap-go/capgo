@@ -1,28 +1,28 @@
 <script setup lang="ts">
 import { setErrors } from '@formkit/core'
 import { FormKit, FormKitMessages } from '@formkit/vue'
-import { useI18n } from 'petite-vue-i18n'
 import { onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import iconEmail from '~icons/oui/email?raw'
 import iconPassword from '~icons/ph/key?raw'
 import { hideLoader } from '~/services/loader'
 import { useSupabase } from '~/services/supabase'
-import { useDisplayStore } from '~/stores/display'
-import { registerWebsiteDomain } from '~/utils/Utils'
+import { useDialogV2Store } from '~/stores/dialogv2'
 
 const supabase = useSupabase()
-const displayStore = useDisplayStore()
+const dialogStore = useDialogV2Store()
 const isLoading = ref(false)
 const { t } = useI18n()
 const router = useRouter()
 
 const version = import.meta.env.VITE_APP_VERSION
+const registerUrl = window.location.host === 'web.capgo.app' ? 'https://capgo.app/register/' : `/register/`
 
 async function deleteAccount() {
-  displayStore.dialogOption = {
-    header: t('are-u-sure'),
+  dialogStore.openDialog({
+    title: t('are-u-sure'),
     buttons: [
       {
         text: t('button-remove'),
@@ -81,9 +81,8 @@ async function deleteAccount() {
         },
       },
     ],
-  }
-  displayStore.showDialog = true
-  return displayStore.onDialogDismiss()
+  })
+  return dialogStore.onDialogDismiss()
 }
 
 async function submit(form: { email: string, password: string }) {
@@ -176,7 +175,7 @@ onMounted (() => {
                 <div class="text-center">
                   <p class="text-base text-gray-600">
                     {{ t('dont-have-an-account') }} <br> <a
-                      :href="`${registerWebsiteDomain()}/register/`"
+                      :href="registerUrl"
                       class="font-medium text-orange-500 transition-all duration-200 hover:text-orange-600 hover:underline"
                     >
                       {{ t('create-a-free-accoun') }}

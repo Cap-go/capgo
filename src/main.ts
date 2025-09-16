@@ -17,7 +17,7 @@ import { getRemoteConfig } from './services/supabase'
 // your custom styles here
 import './styles/style.css'
 
-const guestPath = ['/login', '/delete_account', '/forgot_password', '/resend_email', '/onboarding', '/register']
+const guestPath = ['/login', '/delete_account', '/confirm-signup', '/forgot_password', '/resend_email', '/onboarding', '/register', '/invitation', '/scan']
 
 getRemoteConfig()
 const app = createApp(App)
@@ -62,11 +62,10 @@ const router = createRouter({
 })
 app.use(router)
 
-// if (window.location.hostname !== 'localhost') {
 const config = getLocalConfig()
 initPlausible(import.meta.env.pls_domain as string)
 posthogLoader(config.supaHost)
-// }
+
 // install all modules under `modules/`
 type UserModule = (ctx: { app: typeof app, router: Router }) => void
 

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import dayjs from 'dayjs'
-import { useI18n } from 'petite-vue-i18n'
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import InformationInfo from '~icons/heroicons/information-circle'
 import ExclamationCircle from '~icons/heroicons/exclamation-circle'
 
@@ -48,7 +48,7 @@ const total = computed(() => {
   }
 
   if (!props.accumulated) {
-    return arrWithoutUndefined[arrWithoutUndefined.length - 1] || 0
+    return arrWithoutUndefined[arrWithoutUndefined.length - 1] ?? 0
   }
   return sum(arrWithoutUndefined)
 })
@@ -60,7 +60,7 @@ const lastDayEvolution = computed(() => {
     return 0
   }
 
-  const oldTotal = props.accumulated ? sum(arrWithoutUndefined.slice(0, -2)) : arrWithoutUndefined[arrWithoutUndefined.length - 2] || 0
+  const oldTotal = props.accumulated ? sum(arrWithoutUndefined.slice(0, -2)) : arrWithoutUndefined[arrWithoutUndefined.length - 2] ?? 0
   const diff = (total.value as number) - oldTotal
 
   // Prevent division by zero
@@ -76,15 +76,6 @@ const lastDayEvolution = computed(() => {
 
   return diff / denominator * 100
 })
-
-function lastRunDate() {
-  const lastRun = dayjs(main.statsTime.last_run).format('MMMM D, YYYY HH:mm')
-  return `${t('last-run')}: ${lastRun}`
-}
-function nextRunDate() {
-  const nextRun = dayjs(main.statsTime.next_run).format('MMMM D, YYYY HH:mm')
-  return `${t('next-run')}: ${nextRun}`
-}
 </script>
 
 <template>
@@ -94,20 +85,53 @@ function nextRunDate() {
         <h2 class="mb-2 mr-2 text-2xl font-semibold text-slate-800 dark:text-white">
           {{ props.title }}
         </h2>
-        <div class="tooltip tooltip-bottom mb-2">
-          <div class="tooltip-content bg-slate-800 text-white dark:bg-slate-200 dark:text-black">
-            <div class="max-w-xs whitespace-normal">
-              {{ lastRunDate() }}
-            </div>
-            <div class="max-w-xs whitespace-normal">
-              {{ nextRunDate() }}
-            </div>
-            <div class="max-w-xs whitespace-normal">
-              {{ t('billing-cycle') }} {{ subscription_anchor_start }} {{ t('to') }} {{ subscription_anchor_end }}
+        <div class="d-tooltip d-tooltip-bottom">
+          <div class="d-tooltip-content bg-white dark:bg-gray-800 text-gray-800 dark:text-white border border-gray-200 dark:border-gray-600 shadow-2xl rounded-lg p-4 min-w-[280px]">
+            <div class="space-y-3">
+              <!-- Last Run -->
+              <div class="flex items-start space-x-2">
+                <div class="w-2 h-2 bg-green-500 rounded-full mt-2 flex-shrink-0" />
+                <div>
+                  <div class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                    {{ t('last-run') }}
+                  </div>
+                  <div class="text-sm font-medium">
+                    {{ dayjs(main.statsTime.last_run).format('MMMM D, YYYY HH:mm') }}
+                  </div>
+                </div>
+              </div>
+
+              <!-- Next Run -->
+              <div class="flex items-start space-x-2">
+                <div class="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0" />
+                <div>
+                  <div class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                    {{ t('next-run') }}
+                  </div>
+                  <div class="text-sm font-medium">
+                    {{ dayjs(main.statsTime.next_run).format('MMMM D, YYYY HH:mm') }}
+                  </div>
+                </div>
+              </div>
+
+              <!-- Billing Cycle -->
+              <div class="pt-2 border-t border-gray-200 dark:border-gray-600">
+                <div class="flex items-start space-x-2">
+                  <div class="w-2 h-2 bg-purple-500 rounded-full mt-2 flex-shrink-0" />
+                  <div>
+                    <div class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                      {{ t('billing-cycle') }}
+                    </div>
+                    <div class="text-sm font-medium">
+                      {{ subscription_anchor_start }} {{ t('to') }} {{ subscription_anchor_end }}
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
           <div class="flex items-center justify-center w-5 h-5 cursor-pointer">
-            <InformationInfo class="hover:cursor-pointer hover:text-blue-500 hover:bg-blue-500 hover:text-white rounded-full" />
+            <InformationInfo class="text-gray-400 hover:text-blue-500 transition-colors duration-200" />
           </div>
         </div>
         <div v-if="props.storage" class="font-medium badge badge-error self-end ml-auto mb-2">

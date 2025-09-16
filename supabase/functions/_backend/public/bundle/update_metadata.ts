@@ -1,5 +1,6 @@
-import { getBody, honoFactory, middlewareKey } from '../../utils/hono.ts'
-import { supabaseAdmin } from '../../utils/supabase.ts'
+import { getBodyOrQuery, honoFactory, simpleError } from '../../utils/hono.ts'
+import { middlewareKey } from '../../utils/hono_middleware.ts'
+import { supabaseApikey } from '../../utils/supabase.ts'
 
 export const app = honoFactory.createApp()
 
@@ -11,55 +12,48 @@ interface UpdateMetadataBody {
 }
 
 app.post('/', middlewareKey(['all', 'write']), async (c) => {
-  try {
-    const body = await getBody<UpdateMetadataBody>(c as any)
-    // We don't need apikey for this endpoint as middleware handles permission checks
+  const body = await getBodyOrQuery<UpdateMetadataBody>(c)
+  const apikey = c.get('apikey')!
+  // We don't need apikey for this endpoint as middleware handles permission checks
 
-    if (!body.app_id || !body.version_id) {
-      return c.json({ status: 'Missing required fields', error: 'app_id and version_id are required' }, 400)
-    }
-
-    const { data: version, error: versionError } = await supabaseAdmin(c as any)
-      .from('app_versions')
-      .select('*')
-      .eq('app_id', body.app_id)
-      .eq('id', body.version_id)
-      .single()
-
-    if (versionError || !version) {
-      console.error('Cannot find version', versionError)
-      return c.json({ status: 'Cannot find version', error: versionError }, 400)
-    }
-
-    const updateData: any = {}
-
-    if (body.link !== undefined) {
-      updateData.link = body.link
-    }
-
-    if (body.comment !== undefined) {
-      updateData.comment = body.comment
-    }
-
-    if (Object.keys(updateData).length === 0) {
-      return c.json({ status: 'No fields to update' }, 400)
-    }
-
-    const { error: updateError } = await supabaseAdmin(c as any)
-      .from('app_versions')
-      .update(updateData)
-      .eq('app_id', body.app_id)
-      .eq('id', body.version_id)
-
-    if (updateError) {
-      console.error('Cannot update version metadata', updateError)
-      return c.json({ status: 'Cannot update version metadata', error: updateError }, 400)
-    }
-
-    return c.json({ status: 'success' })
+  if (!body.app_id || !body.version_id) {
+    throw simpleError('missing_required_fields', 'Missing required fields', { app_id: body.app_id, version_id: body.version_id })
   }
-  catch (error) {
-    console.error('Error updating version metadata', error)
-    return c.json({ status: 'Error updating version metadata', error }, 500)
+
+  const { data: version, error: versionError } = await supabaseApikey(c, apikey.key)
+    .from('app_versions')
+    .select('*')
+    .eq('app_id', body.app_id)
+    .eq('id', body.version_id)
+    .single()
+
+  if (versionError || !version) {
+    throw simpleError('cannot_find_version', 'Cannot find version', { supabaseError: versionError })
   }
+
+  const updateData: any = {}
+
+  if (body.link !== undefined) {
+    updateData.link = body.link
+  }
+
+  if (body.comment !== undefined) {
+    updateData.comment = body.comment
+  }
+
+  if (Object.keys(updateData).length === 0) {
+    throw simpleError('no_fields_to_update', 'No fields to update')
+  }
+
+  const { error: updateError } = await supabaseApikey(c, apikey.key)
+    .from('app_versions')
+    .update(updateData)
+    .eq('app_id', body.app_id)
+    .eq('id', body.version_id)
+
+  if (updateError) {
+    throw simpleError('cannot_update_version_metadata', 'Cannot update version metadata', { supabaseError: updateError })
+  }
+
+  return c.json({ status: 'success' })
 })

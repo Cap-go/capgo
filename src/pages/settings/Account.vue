@@ -4,8 +4,8 @@ import { Capacitor } from '@capacitor/core'
 import { setErrors } from '@formkit/core'
 import { FormKit, FormKitMessages, reset } from '@formkit/vue'
 import dayjs from 'dayjs'
-import { useI18n } from 'petite-vue-i18n'
 import { computed, onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import iconEmail from '~icons/oui/email?raw'
@@ -13,9 +13,11 @@ import iconFlag from '~icons/ph/flag?raw'
 import iconName from '~icons/ph/user?raw'
 import IconVersion from '~icons/radix-icons/update'
 import { pickPhoto, takePhoto } from '~/services/photos'
-import { useSupabase } from '~/services/supabase'
+import { getCurrentPlanNameOrg, isPayingOrg, useSupabase } from '~/services/supabase'
+import { useDialogV2Store } from '~/stores/dialogv2'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
+import { useOrganizationStore } from '~/stores/organization'
 
 const version = import.meta.env.VITE_APP_VERSION
 const { t } = useI18n()
@@ -23,86 +25,227 @@ const supabase = useSupabase()
 const displayStore = useDisplayStore()
 const router = useRouter()
 const main = useMainStore()
+const dialogStore = useDialogV2Store()
+const organizationStore = useOrganizationStore()
 const isLoading = ref(false)
 // mfa = 2fa
 const mfaEnabled = ref(false)
 const mfaFactorId = ref('')
+const mfaVerificationCode = ref('')
+const mfaQRCode = ref('')
+const organizationsToDelete = ref<string[]>([])
+const paidOrganizationsToDelete = ref<Array<{ name: string, planName: string }>>([])
+displayStore.NavTitle = t('account')
+
+async function checkOrganizationImpact() {
+  // Wait for organizations and main store to load
+  await Promise.all([
+    organizationStore.awaitInitialLoad(),
+    main.awaitInitialLoad(),
+  ])
+
+  // Get all organizations where user is super_admin
+  const superAdminOrgs = organizationStore.organizations.filter(org => org.role === 'super_admin')
+
+  if (superAdminOrgs.length === 0) {
+    return { orgsToBeDeleted: [], paidOrgsToBeDeleted: [], canProceed: true }
+  }
+
+  const orgsToBeDeleted: string[] = []
+  const paidOrgsToBeDeleted: Array<{ name: string, planName: string, orgId: string }> = []
+
+  // Check each organization to see if user is the only super_admin
+  for (const org of superAdminOrgs) {
+    try {
+      const { data: members, error } = await supabase
+        .rpc('get_org_members', { guild_id: org.gid })
+
+      if (error) {
+        console.error('Error getting org members:', error)
+        continue
+      }
+
+      // Count super_admins (excluding temporary users)
+      const superAdminCount = members.filter(member =>
+        member.role === 'super_admin' && !member.is_tmp,
+      ).length
+
+      // If user is the only super_admin, this org will be deleted
+      if (superAdminCount === 1) {
+        orgsToBeDeleted.push(org.name)
+
+        // Check if this organization has a paid subscription
+        try {
+          const isPaying = await isPayingOrg(org.gid)
+          if (isPaying) {
+            const planNameFromDb = await getCurrentPlanNameOrg(org.gid)
+            // Get the actual plan object to get the real plan name
+            const actualPlan = main.plans.find(p => p.name === planNameFromDb)
+            const planName = actualPlan?.name || planNameFromDb || 'Unknown Plan'
+
+            paidOrgsToBeDeleted.push({
+              name: org.name,
+              planName,
+              orgId: org.gid,
+            })
+          }
+        }
+        catch (error) {
+          console.error('Error checking payment status for org:', org.name, error)
+        }
+      }
+    }
+    catch (error) {
+      console.error('Error checking organization:', org.name, error)
+    }
+  }
+
+  return { orgsToBeDeleted, paidOrgsToBeDeleted, canProceed: true }
+}
+
 async function deleteAccount() {
-  displayStore.dialogOption = {
-    header: t('are-u-sure'),
+  // First, check organization impact
+  const { orgsToBeDeleted, paidOrgsToBeDeleted, canProceed } = await checkOrganizationImpact()
+
+  if (!canProceed) {
+    toast.error(t('something-went-wrong-try-again-later'))
+    return
+  }
+
+  // Show warning if organizations will be deleted
+  if (orgsToBeDeleted.length > 0) {
+    // Store the organizations list for the teleport
+    organizationsToDelete.value = orgsToBeDeleted
+
+    dialogStore.openDialog({
+      title: t('warning-organizations-will-be-deleted'),
+      description: t('warning-organizations-will-be-deleted-message'),
+      size: 'lg',
+      buttons: [
+        {
+          text: t('button-cancel'),
+          role: 'cancel',
+        },
+        {
+          text: t('understand-and-continue'),
+          role: 'danger',
+        },
+      ],
+    })
+
+    const cancelled = await dialogStore.onDialogDismiss()
+    if (cancelled) {
+      organizationsToDelete.value = []
+      return
+    }
+    organizationsToDelete.value = []
+  }
+
+  // Show subscription cancellation warning if there are paid organizations
+  if (paidOrgsToBeDeleted.length > 0) {
+    // Store the paid organizations list for the teleport
+    paidOrganizationsToDelete.value = paidOrgsToBeDeleted.map(org => ({
+      name: org.name,
+      planName: org.planName,
+    }))
+
+    dialogStore.openDialog({
+      title: t('warning-paid-subscriptions'),
+      description: t('warning-paid-subscriptions-message'),
+      size: 'lg',
+      buttons: [
+        {
+          text: t('button-cancel'),
+          role: 'cancel',
+        },
+        {
+          text: t('cancel-subscriptions-and-continue'),
+          role: 'danger',
+        },
+      ],
+    })
+
+    const cancelled = await dialogStore.onDialogDismiss()
+    if (cancelled) {
+      paidOrganizationsToDelete.value = []
+      return
+    }
+    paidOrganizationsToDelete.value = []
+
+    // TODO: Here we would implement subscription cancellation logic
+    // For now, we just continue to the final confirmation
+  }
+
+  // Show final confirmation
+  dialogStore.openDialog({
+    title: t('are-u-sure'),
+    description: '', // We'll use Teleport for custom content
     buttons: [
       {
         text: t('button-cancel'),
         role: 'cancel',
-        handler: () => {
-          console.log('Cancel clicked')
-        },
       },
       {
-        text: t('button-remove'),
+        text: t('i-am-sure'),
         role: 'danger',
         handler: async () => {
-          if (!main.auth || main.auth?.email == null)
-            return
-          const supabaseClient = useSupabase()
-
-          const authUser = await supabase.auth.getUser()
-          if (authUser.error)
-            return setErrors('update-account', [t('something-went-wrong-try-again-later')], {})
-
-          try {
-            const { data: user } = await supabaseClient
-              .from('users')
-              .select()
-              .eq('id', authUser.data.user.id)
-              .single()
-            if (!user)
-              return setErrors('update-account', [t('something-went-wrong-try-again-later')], {})
-
-            if (user.email.endsWith('review@capgo.app') && Capacitor.isNativePlatform()) {
-              const { error: banErr } = await supabase
-                .from('users')
-                .update({ ban_time: dayjs().add(5, 'minutes').toDate().toISOString() })
-                .eq('id', user.id)
-
-              if (banErr) {
-                console.error('Cannot set ban duration', banErr)
-                return setErrors('update-account', [t('something-went-wrong-try-again-later')], {})
-              }
-
-              await main.logout()
-              router.replace('/login')
-              return
-            }
-
-            // Delete user using RPC function
-            const { error: deleteError } = await supabase.rpc('delete_user')
-
-            if (deleteError) {
-              console.error('Delete error:', deleteError)
-              return setErrors('update-account', [t('something-went-wrong-try-again-later')], {})
-            }
-
-            // Delete auth user
-            const { error: authError } = await supabase.auth.admin.deleteUser(authUser.data.user.id)
-            if (authError) {
-              console.error('Auth delete error:', authError)
-              return setErrors('update-account', [t('something-went-wrong-try-again-later')], {})
-            }
-
-            await main.logout()
-            router.replace('/login')
-          }
-          catch (error) {
-            console.error(error)
-            return setErrors('update-account', [t('something-went-wrong-try-again-later')], {})
-          }
+          await performAccountDeletion()
         },
       },
     ],
+  })
+  return dialogStore.onDialogDismiss()
+}
+
+async function performAccountDeletion() {
+  if (!main.auth || main.auth?.email == null)
+    return
+  const supabaseClient = useSupabase()
+
+  const authUser = await supabase.auth.getUser()
+  if (authUser.error)
+    return setErrors('update-account', [t('something-went-wrong-try-again-later')], {})
+
+  try {
+    const { data: user } = await supabaseClient
+      .from('users')
+      .select()
+      .eq('id', authUser.data.user.id)
+      .single()
+    if (!user)
+      return setErrors('update-account', [t('something-went-wrong-try-again-later')], {})
+
+    if (user.email.endsWith('review@capgo.app') && Capacitor.isNativePlatform()) {
+      const { error: banErr } = await supabase
+        .from('users')
+        .update({ ban_time: dayjs().add(5, 'minutes').toDate().toISOString() })
+        .eq('id', user.id)
+
+      if (banErr) {
+        console.error('Cannot set ban duration', banErr)
+        return setErrors('update-account', [t('something-went-wrong-try-again-later')], {})
+      }
+
+      await main.logout()
+      router.replace('/login')
+      return
+    }
+
+    // Delete user using RPC function
+    const { error: deleteError } = await supabase.rpc('delete_user')
+
+    if (deleteError) {
+      console.error('Delete error:', deleteError)
+      return setErrors('update-account', [t('something-went-wrong-try-again-later')], {})
+    }
+
+    // Reload the web page after successful account deletion
+    window.location.reload()
   }
-  displayStore.showDialog = true
-  return displayStore.onDialogDismiss()
+  catch (error) {
+    console.error(error)
+    return setErrors('update-account', [t('something-went-wrong-try-again-later')], {})
+  }
 }
 
 async function copyAccountId() {
@@ -114,18 +257,17 @@ async function copyAccountId() {
   catch (err) {
     console.error('Failed to copy: ', err)
     // Display a modal with the copied key
-    displayStore.dialogOption = {
-      header: t('cannot-copy'),
-      message: main!.user!.id,
+    dialogStore.openDialog({
+      title: t('cannot-copy'),
+      description: main!.user!.id,
       buttons: [
         {
           text: t('button-cancel'),
           role: 'cancel',
         },
       ],
-    }
-    displayStore.showDialog = true
-    await displayStore.onDialogDismiss()
+    })
+    await dialogStore.onDialogDismiss()
   }
 }
 
@@ -141,8 +283,8 @@ const acronym = computed(() => {
 })
 
 async function presentActionSheet() {
-  displayStore.dialogOption = {
-    header: t('change-your-picture'),
+  dialogStore.openDialog({
+    title: t('change-your-picture'),
     buttons: [
       {
         text: t('button-cancel'),
@@ -153,27 +295,32 @@ async function presentActionSheet() {
       },
       {
         text: t('button-camera'),
+        role: 'primary',
         handler: () => {
           takePhoto('update-account', isLoading, 'user', t('something-went-wrong-try-again-later'))
         },
       },
       {
         text: t('button-browse'),
+        role: 'secondary',
         handler: () => {
           pickPhoto('update-account', isLoading, 'user', t('something-went-wrong-try-again-later'))
         },
       },
     ],
-  }
-  displayStore.showDialog = true
-  return displayStore.onDialogDismiss()
+  })
+  return dialogStore.onDialogDismiss()
 }
 
 async function submit(form: { first_name: string, last_name: string, email: string, country: string }) {
   if (isLoading.value || !main.user?.id)
     return
-  if (form.first_name === main.user?.first_name && form.last_name === main.user?.last_name && form.email === main.user?.email && form.country === main.user?.country)
+  if (form.first_name === main.user?.first_name
+    && form.last_name === main.user?.last_name
+    && form.email === main.user?.email
+    && form.country === main.user?.country) {
     return
+  }
   isLoading.value = true
 
   const updateData: Database['public']['Tables']['users']['Insert'] = {
@@ -215,142 +362,135 @@ async function submit(form: { first_name: string, last_name: string, email: stri
   isLoading.value = false
 }
 
-async function handleMfa() {
-  if (!mfaEnabled.value) {
-    const { data, error } = await supabase.auth.mfa.enroll({
-      factorType: 'totp',
-    })
+async function disableMfa() {
+  dialogStore.openDialog({
+    title: t('alert-2fa-disable'),
+    description: `${t('alert-not-reverse-message')} ${t('alert-disable-2fa-message')}?`,
+    buttons: [
+      {
+        text: t('button-cancel'),
+        role: 'cancel',
+      },
+      {
+        text: t('disable'),
+        role: 'danger',
+        id: 'confirm-button',
+      },
+    ],
+  })
+  const canceled = await dialogStore.onDialogDismiss()
 
-    if (error) {
-      toast.error(t('mfa-fail'))
-      console.error(error)
-      return
-    }
+  // User has changed his mind - keepin 2fa
+  if (canceled)
+    return
 
-    displayStore.dialogOption = {
-      header: t('enable-2FA'),
-      message: `${t('mfa-enable-instruction')}`,
-      image: data.totp.qr_code,
-      headerStyle: 'w-full text-center',
-      textStyle: 'w-full text-center',
-      size: 'max-w-lg',
-      buttonCenter: true,
-      preventAccidentalClose: true,
-      buttons: [
-        {
-          text: t('verify'),
-          id: 'verify',
-        },
-      ],
-    }
-    displayStore.showDialog = true
-    const didCancel = await displayStore.onDialogDismiss()
-
-    if (didCancel) {
-      // User closed the window, go ahead and unregister mfa
-      const { error: unregisterError } = await supabase.auth.mfa.unenroll({ factorId: data.id })
-      if (error)
-        console.error('Cannot unregister MFA', unregisterError)
-    }
-    else {
-      // User has scanned the code - verify his claim
-
-      // Open the dialog
-      displayStore.dialogOption = {
-        header: t('verify-2FA'),
-        message: `${t('mfa-enable-instruction-2')}`,
-        input: true,
-        headerStyle: 'w-full text-center',
-        textStyle: 'w-full text-center',
-        size: 'max-w-lg',
-        buttonCenter: true,
-        preventAccidentalClose: true,
-        buttons: [
-          {
-            text: t('verify'),
-            id: 'verify',
-            preventClose: true,
-            handler: async () => {
-              // User has clicked the "verify button - let's check"
-              const verifyCode = displayStore.dialogInputText.replace(' ', '')
-
-              const { data: challenge, error: challengeError } = await supabase.auth.mfa.challenge({ factorId: data.id })
-
-              if (challengeError) {
-                toast.error(t('mfa-fail'))
-                console.error('Cannot create MFA challange', challengeError)
-                displayStore.showDialog = false
-                return
-              }
-
-              const { data: _verify, error: verifyError } = await supabase.auth.mfa.verify({ factorId: data.id, challengeId: challenge.id, code: verifyCode.trim() })
-              if (verifyError) {
-                toast.error(t('mfa-invalid-code'))
-                return
-              }
-
-              toast.success(t('mfa-enabled'))
-              mfaEnabled.value = true
-              mfaFactorId.value = data.id
-              displayStore.showDialog = false
-            },
-          },
-        ],
-      }
-      displayStore.showDialog = true
-
-      // Check the cancel again
-      const didCancel = await displayStore.onDialogDismiss()
-      if (didCancel) {
-        // User closed the window, go ahead and unregister mfa
-        const { error: unregisterError } = await supabase.auth.mfa.unenroll({ factorId: data.id })
-        if (error)
-          console.error('Cannot unregister MFA', unregisterError)
-      }
-    }
+  // Remove 2fa
+  const factorId = mfaFactorId.value
+  if (!factorId) {
+    toast.error(t('mfa-fail'))
+    console.error('Factor id = null')
+    return
   }
-  else {
-    // disable mfa
-    displayStore.dialogOption = {
-      header: t('alert-2fa-disable'),
-      message: `${t('alert-not-reverse-message')} ${t('alert-disable-2fa-message')}?`,
-      buttons: [
-        {
-          text: t('button-cancel'),
-          role: 'cancel',
-        },
-        {
-          text: t('disable'),
-          role: 'danger',
-          id: 'confirm-button',
-        },
-      ],
-    }
-    displayStore.showDialog = true
-    const canceled = await displayStore.onDialogDismiss()
 
-    // User has changed his mind - keepin 2fa
-    if (canceled)
-      return
+  const { error: unregisterError } = await supabase.auth.mfa.unenroll({ factorId })
+  if (unregisterError) {
+    toast.error(t('mfa-fail'))
+    console.error('Cannot unregister MFA', unregisterError)
+    return
+  }
 
-    // Remove 2fa
-    const factorId = mfaFactorId.value
-    if (!factorId) {
-      toast.error(t('mfa-fail'))
-      console.error('Factor id = null')
-      return
-    }
+  mfaFactorId.value = ''
+  mfaEnabled.value = false
+  toast.success(t('2fa-disabled'))
+}
 
-    const { error: unregisterError } = await supabase.auth.mfa.unenroll({ factorId })
-    if (unregisterError) {
-      toast.error(t('mfa-fail'))
+async function handleMfa() {
+  if (mfaEnabled.value) {
+    await disableMfa()
+    return
+  }
+  const { data, error } = await supabase.auth.mfa.enroll({
+    factorType: 'totp',
+  })
+
+  if (error) {
+    toast.error(t('mfa-fail'))
+    console.error(error)
+    return
+  }
+
+  // Store QR code for display
+  mfaQRCode.value = data.totp.qr_code
+
+  // Step 1: Show QR code
+  dialogStore.openDialog({
+    title: t('enable-2FA'),
+    description: `${t('mfa-enable-instruction')}`,
+    size: 'lg',
+    preventAccidentalClose: true,
+    buttons: [
+      {
+        text: t('verify'),
+        id: 'verify',
+      },
+    ],
+  })
+  const didCancel = await dialogStore.onDialogDismiss()
+
+  if (didCancel) {
+    // User closed the window, go ahead and unregister mfa
+    const { error: unregisterError } = await supabase.auth.mfa.unenroll({ factorId: data.id })
+    if (error)
       console.error('Cannot unregister MFA', unregisterError)
-      return
-    }
+    mfaQRCode.value = ''
+    return
+  }
+  // Step 2: User has scanned the code - verify his claim
+  mfaVerificationCode.value = ''
+  mfaQRCode.value = ''
 
-    mfaFactorId.value = ''
-    mfaEnabled.value = false
-    toast.success(t('2fa-disabled'))
+  dialogStore.openDialog({
+    title: t('verify-2FA'),
+    description: `${t('mfa-enable-instruction-2')}`,
+    size: 'lg',
+    preventAccidentalClose: true,
+    buttons: [
+      {
+        text: t('verify'),
+        id: 'verify',
+        handler: async () => {
+          // User has clicked the "verify button - let's check"
+          const verifyCode = mfaVerificationCode.value.replace(' ', '')
+
+          const { data: challenge, error: challengeError } = await supabase.auth.mfa.challenge({ factorId: data.id })
+
+          if (challengeError) {
+            toast.error(t('mfa-fail'))
+            console.error('Cannot create MFA challange', challengeError)
+            return false
+          }
+
+          const { data: _verify, error: verifyError } = await supabase.auth.mfa.verify({ factorId: data.id, challengeId: challenge.id, code: verifyCode.trim() })
+          if (verifyError) {
+            toast.error(t('mfa-invalid-code'))
+            return false
+          }
+
+          toast.success(t('mfa-enabled'))
+          mfaEnabled.value = true
+          mfaFactorId.value = data.id
+        },
+      },
+    ],
+  })
+
+  // Check the cancel again
+  const didCancel2 = await dialogStore.onDialogDismiss()
+  if (didCancel2) {
+    // User closed the window, go ahead and unregister mfa
+    const { error: unregisterError } = await supabase.auth.mfa.unenroll({ factorId: data.id })
+    if (error)
+      console.error('Cannot unregister MFA', unregisterError)
   }
 }
 
@@ -394,16 +534,16 @@ onMounted(async () => {
             <div class="flex items-center">
               <div class="mr-4">
                 <img
-                  v-if="main.user?.image_url" class="object-cover w-20 h-20 mask mask-squircle" :src="main.user?.image_url"
+                  v-if="main.user?.image_url" class="object-cover w-20 h-20 d-mask d-mask-squircle" :src="main.user?.image_url"
                   width="80" height="80" alt="User upload"
                 >
-                <div v-else class="p-6 text-xl bg-gray-700 mask mask-squircle">
+                <div v-else class="p-6 text-xl bg-gray-700 d-mask d-mask-squircle">
                   <span class="font-medium text-gray-300">
                     {{ acronym }}
                   </span>
                 </div>
               </div>
-              <button id="change-org-pic" type="button" class="px-3 py-2 text-xs font-medium text-center text-gray-700 border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-white border-slate-500 focus:ring-4 focus:outline-hidden focus:ring-blue-300 dark:focus:ring-blue-800" @click="presentActionSheet">
+              <button id="change-org-pic" type="button" class="cursor-pointer px-3 py-2 text-xs font-medium text-center text-gray-700 border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-white border-slate-500 focus:ring-4 focus:outline-hidden focus:ring-blue-300 dark:focus:ring-blue-800" @click="presentActionSheet">
                 {{ t('change') }}
               </button>
             </div>
@@ -419,7 +559,7 @@ onMounted(async () => {
                   autocomplete="given-name"
                   :prefix-icon="iconName"
                   :disabled="isLoading"
-                  :value="main.user?.first_name || ''"
+                  :value="main.user?.first_name ?? ''"
                   validation="required:trim"
                   enterkeyhint="next"
                   autofocus
@@ -434,7 +574,7 @@ onMounted(async () => {
                   :prefix-icon="iconName"
                   :disabled="isLoading"
                   enterkeyhint="next"
-                  :value="main.user?.last_name || ''"
+                  :value="main.user?.last_name ?? ''"
                   validation="required:trim"
                   :label="t('last-name')"
                 />
@@ -458,7 +598,7 @@ onMounted(async () => {
                   name="country"
                   :prefix-icon="iconFlag"
                   :disabled="isLoading"
-                  :value="main.user?.country || ''"
+                  :value="main.user?.country ?? ''"
                   enterkeyhint="send"
                   validation="required:trim"
                   :label="t('country')"
@@ -471,7 +611,7 @@ onMounted(async () => {
             {{ t('settings') }}
           </h3>
           <!-- Language Info -->
-          <section class="flex flex-col text-slate-800 dark:text-white md:flex-row md:items-center items-left">
+          <section class="flex flex-col md:flex-row md:items-center items-left">
             <p class="">
               {{ t('language') }}:
             </p>
@@ -488,7 +628,7 @@ onMounted(async () => {
               <button
                 type="button"
                 data-test="setup-mfa"
-                class="px-3 py-2 text-xs font-medium text-center text-gray-700 border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-white focus:ring-4 focus:outline-hidden focus:ring-blue-300 dark:focus:ring-blue-800"
+                class="px-3 py-2 text-xs cursor-pointer font-medium text-center text-gray-700 border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-white focus:ring-4 focus:outline-hidden focus:ring-blue-300 dark:focus:ring-blue-800"
                 :class="{ 'border border-emerald-600 focus:ring-emerald-800': !mfaEnabled, 'border border-red-500 focus:ring-rose-600': mfaEnabled }"
                 @click="handleMfa"
               >
@@ -501,7 +641,7 @@ onMounted(async () => {
               {{ t('account-id') }}:
             </p>
             <div class="md:ml-6">
-              <button type="button" class="px-3 py-2 text-xs font-medium text-center text-gray-700 border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-white border-slate-500 focus:ring-4 focus:outline-hidden focus:ring-blue-300 dark:focus:ring-blue-800" @click.prevent="copyAccountId()">
+              <button type="button" class="px-3 cursor-pointer py-2 text-xs font-medium text-center text-gray-700 border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-white border-slate-500 focus:ring-4 focus:outline-hidden focus:ring-blue-300 dark:focus:ring-blue-800" @click.prevent="copyAccountId()">
                 {{ t('copy-account-id') }}
               </button>
             </div>
@@ -512,13 +652,13 @@ onMounted(async () => {
         </div>
         <!-- Panel footer -->
         <footer>
-          <div class="flex flex-col px-6 py-5 border-t border-slate-300">
+          <div class="flex flex-col px-2 md:px-6 py-5 border-t border-slate-300">
             <div class="flex self-end">
               <button type="button" class="p-2 text-red-600 border border-red-400 rounded-lg hover:bg-red-600 hover:text-white" @click="deleteAccount()">
                 {{ t('delete-account') }}
               </button>
               <button
-                class="p-2 ml-3 text-white bg-blue-500 rounded-lg btn hover:bg-blue-600"
+                class="p-2 ml-3 text-white bg-blue-500 rounded-lg d-btn hover:bg-blue-600"
                 type="submit"
                 color="secondary"
                 shape="round"
@@ -533,6 +673,71 @@ onMounted(async () => {
         </footer>
       </FormKit>
     </div>
+
+    <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('enable-2FA')" to="#dialog-v2-content" defer>
+      <!-- QR Code display for MFA setup -->
+      <div v-if="mfaQRCode" class="w-full text-center">
+        <img :src="mfaQRCode" alt="QR Code for 2FA setup" class="mx-auto mb-4">
+      </div>
+
+      <!-- MFA verification code input -->
+      <div v-if="!mfaQRCode" class="w-full">
+        <input
+          v-model="mfaVerificationCode"
+          type="text"
+          :placeholder="t('verification-code')"
+          class="w-full p-3 border border-gray-300 rounded-lg dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+          @keydown.enter="$event.preventDefault()"
+        >
+      </div>
+    </Teleport>
+
+    <!-- Teleport for Organization Deletion Warning -->
+    <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('warning-organizations-will-be-deleted')" to="#dialog-v2-content" defer>
+      <div class="mt-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+        <h4 class="font-semibold text-red-800 dark:text-red-200 mb-3">
+          {{ t('organizations-to-be-deleted') }}:
+        </h4>
+        <ul class="space-y-2">
+          <li v-for="orgName in organizationsToDelete" :key="orgName" class="flex items-center text-red-700 dark:text-red-300">
+            <span class="w-2 h-2 bg-red-500 rounded-full mr-3" />
+            <span class="font-medium">{{ orgName }}</span>
+          </li>
+        </ul>
+      </div>
+    </Teleport>
+
+    <!-- Teleport for Paid Subscriptions Warning -->
+    <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('warning-paid-subscriptions')" to="#dialog-v2-content" defer>
+      <div class="mt-4 p-4 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg">
+        <h4 class="font-semibold text-orange-800 dark:text-orange-200 mb-3">
+          {{ t('paid-subscriptions-to-cancel') }}:
+        </h4>
+        <ul class="space-y-3">
+          <li v-for="org in paidOrganizationsToDelete" :key="org.name" class="flex items-center justify-between text-orange-700 dark:text-orange-300">
+            <div class="flex items-center">
+              <span class="w-2 h-2 bg-orange-500 rounded-full mr-3" />
+              <span class="font-medium">{{ org.name }}</span>
+            </div>
+            <span class="text-sm bg-orange-100 dark:bg-orange-800 px-2 py-1 rounded-full">
+              {{ org.planName }}
+            </span>
+          </li>
+        </ul>
+      </div>
+    </Teleport>
+
+    <!-- Teleport for Final Account Deletion Warning -->
+    <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('are-u-sure')" to="#dialog-v2-content" defer>
+      <div class="text-base text-gray-500 dark:text-gray-400">
+        <p class="mb-4">
+          This action cannot be undone. Your account and all associated data will be permanently deleted.
+        </p>
+        <p class="font-medium text-gray-700 dark:text-gray-300">
+          Your account will be deleted after 30 days
+        </p>
+      </div>
+    </Teleport>
   </div>
 </template>
 

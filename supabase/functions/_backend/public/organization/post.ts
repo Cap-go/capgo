@@ -1,40 +1,43 @@
-import type { Context } from '@hono/hono'
+import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
-import { z } from 'zod'
-import { supabaseAdmin } from '../../utils/supabase.ts'
+import { z } from 'zod/mini'
+import { simpleError } from '../../utils/hono.ts'
+import { supabaseAdmin, supabaseApikey } from '../../utils/supabase.ts'
 
 const bodySchema = z.object({
-  name: z.string(),
+  name: z.string().check(z.minLength(3)),
+  email: z.optional(z.email()),
 })
 
 export async function post(c: Context, bodyRaw: any, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
   const bodyParsed = bodySchema.safeParse(bodyRaw)
   if (!bodyParsed.success) {
-    console.error('Invalid body', bodyParsed.error)
-    return c.json({ status: 'Invalid body', error: bodyParsed.error.message }, 400)
+    throw simpleError('invalid_body', 'Invalid body', { error: bodyParsed.error })
   }
   const body = bodyParsed.data
 
-  const userId = apikey.user_id
-  const { data, error } = await supabaseAdmin(c).from('users').select('*').eq('id', userId).single()
-  if (error) {
-    console.error('Cannot get user', error)
-    return c.json({ status: 'Cannot get user', error: error.message }, 500)
+  const supabase = supabaseApikey(c, apikey.key)
+  const { data: self, error: userErr } = await supabase.from('users').select('email').eq('id', apikey.user_id).single()
+  if (userErr || !self?.email) {
+    throw simpleError('cannot_get_user', 'Cannot get user', { error: userErr?.message })
   }
-
-  const { data: dataOrg, error: errorOrg } = await supabaseAdmin(c)
+  const newOrg = { name: body.name, created_by: apikey.user_id, management_email: body.email ?? self.email ?? '' }
+  const { error: errorOrg } = await supabase
     .from('orgs')
-    .insert({
-      name: body.name,
-      created_by: userId,
-      management_email: data.email,
-    })
-    .select()
-    .single()
+    .insert(newOrg)
 
   if (errorOrg) {
-    console.error('Error when creating org', errorOrg)
-    return c.json({ status: 'Cannot create org', error: errorOrg.message }, 500)
+    throw simpleError('cannot_create_org', 'Cannot create org', { error: errorOrg?.message })
+  }
+  // We read with admin to avoid RLS issues as org_users are created asynchronously
+  const { data: dataOrg, error: errorOrg2 } = await supabaseAdmin(c)
+    .from('orgs')
+    .select('id')
+    .eq('created_by', apikey.user_id)
+    .eq('name', body.name)
+    .single()
+  if (errorOrg2 || !dataOrg) {
+    throw simpleError('cannot_get_org', 'Cannot get created org', { error: errorOrg2?.message })
   }
   return c.json({ status: 'Organization created', id: dataOrg.id }, 200)
 }

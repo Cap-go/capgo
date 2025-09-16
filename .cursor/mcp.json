@@ -1,11 +1,8 @@
 {
   "mcpServers": {
-    "supabase-local": {
+    "context7": {
       "command": "bunx",
-      "args": [
-        "@modelcontextprotocol/server-postgres",
-        "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
-      ]
+      "args": ["-y", "@upstash/context7-mcp"]
     },
     "browser": {
       "command": "bunx",
@@ -14,12 +11,17 @@
       ],
       "env": {}
     },
-    "playwright-mcp": {
+    "claude-code": {
+      "command": "claude",
+      "args": ["mcp", "serve"],
+      "env": {}
+    },
+    "supabase-local": {
       "command": "bunx",
       "args": [
-        "playwright-mcp"
-      ],
-      "env": {}
+        "@modelcontextprotocol/server-postgres",
+        "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+      ]
     }
   }
 }

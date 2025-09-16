@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import type { Database } from '~/types/supabase.types'
-import { useI18n } from 'petite-vue-i18n'
 import { storeToRefs } from 'pinia'
 import { ref, watch, watchEffect } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { appIdToUrl } from '~/services/conversion'
 import { useSupabase } from '~/services/supabase'
@@ -72,7 +72,8 @@ displayStore.defaultBack = '/app'
       <div v-else class="h-full pb-4 overflow-hidden">
         <div class="w-full h-full px-4 pt-8 mx-auto mb-8 overflow-y-auto max-w-9xl max-h-fit lg:px-8 sm:px-6">
           <WelcomeBanner v-if="apps.length === 0" />
-          <Usage v-if="!isLoading" />
+          <FailedCard />
+          <Usage v-if="!isLoading && !organizationStore.currentOrganizationFailed" />
           <AppTable :apps="apps" :delete-button="true" @add-app="stepsOpen = !stepsOpen" />
         </div>
       </div>

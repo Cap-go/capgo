@@ -22,6 +22,10 @@
       "zone_name": "capgo.app"
     },
     {
+      "pattern": "plugin.usecapgo.com",
+      "custom_domain": true
+    },
+    {
       "pattern": "updater.spencer.co/*",
       "zone_name": "capgo.app"
     }
@@ -30,7 +34,8 @@
   "compatibility_date": "2025-04-01",
   "main": "./index.ts",
   "compatibility_flags": [
-    "nodejs_compat_v2"
+    "nodejs_compat_v2",
+    "nodejs_compat_populate_process_env"
   ],
   "workers_dev": false,
   "observability": {
@@ -84,6 +89,10 @@
     {
       "binding": "HYPERDRIVE_DB",
       "id": "0f1d77550db142fbb17cb6b3ee659a06"
+    },
+    {
+      "binding": "HYPERDRIVE_DB_DIRECT",
+      "id": "20ce343dca144637bf8e141de18cd0d5"
     }
   ],
   "env": {
@@ -157,6 +166,10 @@
         {
           "binding": "HYPERDRIVE_DB",
           "id": "0f1d77550db142fbb17cb6b3ee659a06"
+        },
+        {
+          "binding": "HYPERDRIVE_DB_DIRECT",
+          "id": "20ce343dca144637bf8e141de18cd0d5"
         }
       ]
     },
@@ -230,6 +243,10 @@
         {
           "binding": "HYPERDRIVE_DB",
           "id": "0f1d77550db142fbb17cb6b3ee659a06"
+        },
+        {
+          "binding": "HYPERDRIVE_DB_DIRECT",
+          "id": "20ce343dca144637bf8e141de18cd0d5"
         }
       ]
     },

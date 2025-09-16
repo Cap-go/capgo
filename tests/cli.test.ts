@@ -70,8 +70,8 @@ describe.concurrent('tests CLI upload options in parallel', () => {
       promises.push(prepareApp().then(app => fileTestApps.push(app)))
     }
 
-    // Only 2 apps for API tests (reduced from 4)
-    for (let i = 0; i < 2; i++) {
+    // Create enough API test apps to handle retries
+    for (let i = 0; i < 6; i++) {
       promises.push(prepareApp().then(app => apiTestApps.push(app)))
     }
 

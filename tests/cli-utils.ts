@@ -1,13 +1,9 @@
-import type { ExecSyncOptions } from 'node:child_process'
-import { exec, execSync, spawn } from 'node:child_process'
+import { spawn } from 'node:child_process'
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import process, { cwd, env } from 'node:process'
-import { promisify } from 'node:util'
 import { sync as rimrafSync } from 'rimraf'
 import { APIKEY_TEST_ALL, BASE_URL } from './test-utils'
-
-const execAsync = promisify(exec)
 
 export const TEMP_DIR_NAME = 'temp_cli_test'
 export const BASE_PACKAGE_JSON = `{
@@ -92,7 +88,7 @@ export function getSemver(semver = `1.0.${Date.now()}`) {
   return newSemver
 }
 
-export async function prepareCli(appId: string, old = false) {
+export async function prepareCli(appId: string, old = false, installDeps = false) {
   // Skip if already prepared
   if (preparedApps.has(appId)) {
     return
@@ -108,10 +104,63 @@ export async function prepareCli(appId: string, old = false) {
   mkdirSync(join(tempFileFolder(appId), 'dist'), { recursive: true })
   writeFileSync(join(tempFileFolder(appId), 'dist', 'index.js'), 'import { CapacitorUpdater } from \'@capgo/capacitor-updater\';\nconsole.log("Hello world!!!");\nCapacitorUpdater.notifyAppReady();')
   writeFileSync(join(tempFileFolder(appId), 'dist', 'index.html'), '')
+
+  // Create package.json for reference
   setDependencies(old ? BASE_DEPENDENCIES_OLD : BASE_DEPENDENCIES, appId)
 
-  await npmInstall(appId)
+  if (installDeps) {
+    // Only install dependencies for tests that specifically need them (like metadata tests)
+    await npmInstallMinimal(appId)
+  }
+  else {
+    // Create empty node_modules folder to satisfy CLI checks without installing
+    const nodeModulesPath = join(tempFileFolder(appId), 'node_modules')
+    mkdirSync(nodeModulesPath, { recursive: true })
+
+    // Create a minimal package.json in node_modules to indicate it's "installed"
+    writeFileSync(join(nodeModulesPath, '.package-lock.json'), '{"name": "temp", "lockfileVersion": 1}')
+  }
+
   preparedApps.add(appId)
+}
+
+// Minimal install that only gets essential dependencies
+async function npmInstallMinimal(appId: string) {
+  try {
+    // Use exec again but import it
+    const { exec } = await import('node:child_process')
+    const { promisify } = await import('node:util')
+    const execAsync = promisify(exec)
+
+    // First try bun install
+    await execAsync('bun install', {
+      cwd: tempFileFolder(appId),
+      timeout: 60000,
+    })
+  }
+  catch (error) {
+    console.error(`bun install failed for ${appId}, trying npm:`, error)
+
+    try {
+      const { exec } = await import('node:child_process')
+      const { promisify } = await import('node:util')
+      const execAsync = promisify(exec)
+
+      // Fallback to npm
+      await execAsync('npm install --silent --no-audit --no-fund', {
+        cwd: tempFileFolder(appId),
+        timeout: 60000,
+      })
+    }
+    catch (npmError) {
+      console.error(`Both bun and npm install failed for ${appId}:`, npmError)
+      // Create fake node_modules as fallback
+      const nodeModulesPath = join(tempFileFolder(appId), 'node_modules')
+      mkdirSync(nodeModulesPath, { recursive: true })
+      writeFileSync(join(nodeModulesPath, '.package-lock.json'), '{"name": "temp", "lockfileVersion": 1}')
+      throw npmError
+    }
+  }
 }
 
 // cleanup CLI
@@ -137,29 +186,44 @@ process.on('exit', cleanupAllProcesses)
 process.on('SIGINT', cleanupAllProcesses)
 process.on('SIGTERM', cleanupAllProcesses)
 
-export async function npmInstall(appId: string) {
-  try {
-    await execAsync('bun install', { cwd: tempFileFolder(appId) })
-  }
-  catch (error) {
-    console.error('bun install failed', error)
-    throw error
-  }
-}
-
 export async function runCli(params: string[], appId: string, logOutput = false, overwriteApiKey?: string, overwriteSupaHost?: boolean, noFolder?: boolean): Promise<string> {
   const basePath = noFolder ? cwd() : tempFileFolder(appId)
 
-  // When noFolder is true, always use bunx @capgo/cli@latest
-  // When noFolder is false, check for local CLI setup
+  // Use the main project's CLI directly - most reliable approach
+  const mainProjectCliPath = join(cwd(), 'node_modules', '@capgo', 'cli', 'dist', 'index.js')
+
   let localCliPath = env.LOCAL_CLI_PATH
-  if (!noFolder && localCliPath === 'true') {
+  if (localCliPath === 'true') {
+    // For easy local testing, we can set the LOCAL_CLI_PATH to true and the CLI folder will be used
     localCliPath = '../../../CLI/dist/index.js'
+  }
+  if (localCliPath) {
+    if (noFolder) {
+      // remove ../../ from the path as the running path is not in subfolder
+      localCliPath = localCliPath.replace('../../', '')
+    }
+  }
+
+  // Determine the command to use
+  let executable: string
+  let cliPath: string
+
+  if (localCliPath) {
+    executable = env.NODE_PATH ?? 'node'
+    cliPath = localCliPath
+  }
+  else if (existsSync(mainProjectCliPath)) {
+    // Use the main project's CLI installation directly - fastest and most reliable
+    executable = 'node'
+    cliPath = mainProjectCliPath
+  }
+  else {
+    throw new Error('CLI not available. Install @capgo/cli as devDependency')
   }
 
   const command = [
-    (!noFolder && localCliPath) ? (env.NODE_PATH ?? 'node') : 'bunx',
-    (!noFolder && localCliPath) ? localCliPath : '@capgo/cli@latest',
+    executable,
+    cliPath,
     ...params,
     ...((overwriteApiKey === undefined || overwriteApiKey.length > 0) ? ['--apikey', overwriteApiKey ?? APIKEY_TEST_ALL] : []),
     ...(overwriteSupaHost ? ['--supa-host', env.SUPABASE_URL ?? '', '--supa-anon', env.SUPABASE_ANON_KEY ?? ''] : []),
@@ -219,49 +283,6 @@ export async function runCli(params: string[], appId: string, logOutput = false,
       }
     })
   })
-}
-
-// Keep sync version for compatibility
-export function runCliSync(params: string[], appId: string, logOutput = false, overwriteApiKey?: string, overwriteSupaHost?: boolean, noFolder?: boolean): string {
-  const basePath = noFolder ? cwd() : tempFileFolder(appId)
-
-  // When noFolder is true, always use bunx @capgo/cli@latest
-  // When noFolder is false, check for local CLI setup
-  let localCliPath = env.LOCAL_CLI_PATH
-  if (!noFolder && localCliPath === 'true') {
-    localCliPath = '../../../CLI/dist/index.js'
-  }
-
-  const command = [
-    (!noFolder && localCliPath) ? (env.NODE_PATH ?? 'node') : 'bunx',
-    (!noFolder && localCliPath) ? localCliPath : '@capgo/cli@latest',
-    ...params,
-    ...((overwriteApiKey === undefined || overwriteApiKey.length > 0) ? ['--apikey', overwriteApiKey ?? APIKEY_TEST_ALL] : []),
-    ...(overwriteSupaHost ? ['--supa-host', env.SUPABASE_URL ?? '', '--supa-anon', env.SUPABASE_ANON_KEY ?? ''] : []),
-  ].join(' ')
-
-  const options: ExecSyncOptions = {
-    cwd: basePath,
-    encoding: 'utf-8',
-    stdio: ['pipe', 'pipe', 'pipe'],
-    env: { ...env, FORCE_COLOR: '1' },
-    timeout: 30000, // 30 second timeout
-  }
-
-  try {
-    const output = execSync(command, options)
-    if (logOutput) {
-      console.log(output)
-    }
-    return output.toString()
-  }
-  catch (error: any) {
-    if (logOutput) {
-      console.error('CLI execution failed')
-      console.error(error.stdout)
-    }
-    return error.stdout?.toString() ?? error.stderr?.toString() ?? error.message
-  }
 }
 
 // Batch CLI operations to reduce setup overhead

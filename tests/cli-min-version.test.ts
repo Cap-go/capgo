@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { cleanupCli, getSemver, prepareCli, runCli } from './cli-utils'
 import { getSupabaseClient, resetAndSeedAppData, resetAppData, resetAppDataStats } from './test-utils'
@@ -8,7 +9,7 @@ describe('tests min version', () => {
   const APPNAME = `com.cli_min_version_${id}`
   beforeAll(async () => {
     await resetAndSeedAppData(APPNAME)
-    await prepareCli(APPNAME)
+    await prepareCli(APPNAME, false, false) // Use main project dependencies instead
   })
   afterAll(async () => {
     await cleanupCli(APPNAME)
@@ -24,8 +25,10 @@ describe('tests min version', () => {
     const testId = Math.floor(Math.random() * 1000000)
     const semverDefault = `1.0.${testId}`
 
-    // Run CLI with increased timeout and dry upload
-    const output0 = await runCli(['bundle', 'upload', '-b', semverDefault, '-c', 'production', '--auto-min-update-version', '--ignore-checksum-check', '--dry-upload'], APPNAME, false, undefined, true, false)
+    // Run CLI with auto-min-update-version (needs metadata check enabled)
+    const tempPackageJson = join(process.cwd(), 'temp_cli_test', APPNAME, 'package.json')
+    const mainNodeModules = join(process.cwd(), 'node_modules')
+    const output0 = await runCli(['bundle', 'upload', '-b', semverDefault, '-c', 'production', '--auto-min-update-version', '--ignore-checksum-check', '--dry-upload', '--package-json', tempPackageJson, '--node-modules', mainNodeModules], APPNAME, false, undefined, true, false)
 
     // Debug output if test fails
     if (!output0.includes('Auto set min-update-version')) {
@@ -62,7 +65,7 @@ describe('tests min version', () => {
     // this CLI upload won't actually succeed.
     // After increaseSemver, setting the min_update_version and native_packages will required the previous semver
     const semverNew = getSemver(semverDefault)
-    const output = await runCli(['bundle', 'upload', '-b', semverNew, '-c', 'production', '--auto-min-update-version', '--ignore-checksum-check', '--dry-upload'], APPNAME, false, undefined, true, false)
+    const output = await runCli(['bundle', 'upload', '-b', semverNew, '-c', 'production', '--auto-min-update-version', '--ignore-checksum-check', '--dry-upload', '--package-json', tempPackageJson, '--node-modules', mainNodeModules], APPNAME, false, undefined, true, false)
     expect(output).toContain('skipping auto setting compatibility')
 
     const { data: dataNew, error: checkErrorNew } = await supabase
@@ -82,7 +85,7 @@ describe('tests min version', () => {
     expect(error2).toBeNull()
 
     const semverWithNull = `1.0.${testId + 2}`
-    const output2 = await runCli(['bundle', 'upload', '-b', semverWithNull, '-c', 'production', '--auto-min-update-version', '--ignore-checksum-check', '--dry-upload'], APPNAME, false, undefined, true, false)
+    const output2 = await runCli(['bundle', 'upload', '-b', semverWithNull, '-c', 'production', '--auto-min-update-version', '--ignore-checksum-check', '--dry-upload', '--package-json', tempPackageJson, '--node-modules', mainNodeModules], APPNAME, false, undefined, true, false)
     expect(output2).toContain('it\'s your first upload with compatibility check')
   }, 30000) // Reduce timeout to 30 seconds since dry uploads are faster
 })

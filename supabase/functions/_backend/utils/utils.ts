@@ -1,8 +1,5 @@
-import type { Context } from '@hono/hono'
-import type { SupabaseClient } from '@supabase/supabase-js'
-import type { Database } from './supabase.types.ts'
+import type { Context } from 'hono'
 import { env, getRuntimeKey } from 'hono/adapter'
-import { cloudlog } from './loggin.ts'
 
 declare const EdgeRuntime: { waitUntil?: (promise: Promise<any>) => void } | undefined
 
@@ -43,18 +40,13 @@ export const MISSING_STRING_PLUGIN_VERSION = 'plugin_version is required'
 // Constants for validation messages
 export const INVALID_STRING_PLATFORM = 'Platform is not supported or invalid'
 
-export function shallowCleanObject(obj: Record<string, unknown>) {
-  return Object.entries(obj).reduce((acc, [key, value]) => {
-    if (value ?? false)
-      acc[key] = value
-
-    return acc
-  }, {} as Record<string, unknown>)
-}
-
 // function to fix semver 1.0 to 1.0.0 any verssion missing . should add .0 also should work for 1
 export function fixSemver(version: string) {
-  const nbPoint = (version.match(/\./g) || []).length
+  if (version === 'builtin')
+    return '0.0.0'
+  if (version === 'unknown')
+    return '0.0.0'
+  const nbPoint = (version?.match(/\./g) ?? []).length
   if (nbPoint === 0)
     return `${version}.0.0`
   if (nbPoint === 1)
@@ -62,46 +54,10 @@ export function fixSemver(version: string) {
   return version
 }
 
-export async function checkKey(c: Context, authorization: string | undefined, supabase: SupabaseClient<Database>, allowed: Database['public']['Enums']['key_mode'][]): Promise<Database['public']['Tables']['apikeys']['Row'] | null> {
-  if (!authorization)
-    return null
-  try {
-    const { data, error } = await supabase
-      .from('apikeys')
-      .select()
-      .eq('key', authorization)
-      .in('mode', allowed)
-      .single()
-    if (!data || error) {
-      console.log('Invalid apikey', authorization, allowed, error)
-      return null
-    }
-    return data
-  }
-  catch (error) {
-    cloudlog({ requestId: c.get('requestId'), message: 'checkKey error', error })
-    return null
-  }
-}
-
-export async function checkKeyById(c: Context, id: number, supabase: SupabaseClient<Database>, allowed: Database['public']['Enums']['key_mode'][]): Promise<Database['public']['Tables']['apikeys']['Row'] | null> {
-  if (!id)
-    return null
-  try {
-    const { data, error } = await supabase
-      .from('apikeys')
-      .select('*')
-      .eq('id', id)
-      .in('mode', allowed)
-      .single()
-    if (!data || error)
-      return null
-    return data
-  }
-  catch (error) {
-    cloudlog({ requestId: c.get('requestId'), message: 'checkKeyById error', error })
-    return null
-  }
+export function isInternalVersionName(version: string) {
+  if (!version)
+    return false
+  return version === 'builtin' || version === 'unknown'
 }
 
 interface LimitedApp {
@@ -146,7 +102,7 @@ export function backgroundTask(c: Context, p: any) {
     c.executionCtx.waitUntil(p)
     return Promise.resolve(null)
   }
-  if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime?.waitUntil) {
+  if (EdgeRuntime?.waitUntil) {
     EdgeRuntime.waitUntil(p)
     return Promise.resolve(null)
   }
@@ -154,11 +110,11 @@ export function backgroundTask(c: Context, p: any) {
 }
 
 export function existInEnv(c: Context, key: string): boolean {
-  return key in env(c as any)
+  return key in env(c)
 }
 
 export function getEnv(c: Context, key: string): string {
-  if (key in env(c as any))
-    return env(c as any)[key] ?? ''
+  if (key in env(c))
+    return env(c)[key] ?? ''
   return ''
 }

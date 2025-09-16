@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { setErrors } from '@formkit/core'
 import { FormKit, FormKitMessages } from '@formkit/vue'
-import { useI18n } from 'petite-vue-i18n'
 import { ref, watchEffect } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import iconPassword from '~icons/ph/key?raw'
@@ -29,7 +29,7 @@ async function signInUser() {
     return
   }
   await supabase.auth.refreshSession({
-    refresh_token: refresh_token || '',
+    refresh_token: refresh_token ?? '',
   })
 }
 

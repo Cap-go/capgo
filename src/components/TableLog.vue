@@ -6,8 +6,8 @@ import { FormKit } from '@formkit/vue'
 import VueDatePicker from '@vuepic/vue-datepicker'
 import { useDark, useDebounceFn } from '@vueuse/core'
 import dayjs from 'dayjs'
-import { useI18n } from 'petite-vue-i18n'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import IconCalendar from '~icons/heroicons/calendar'
 import IconClock from '~icons/heroicons/clock'
 import IconFastBackward from '~icons/ic/round-keyboard-double-arrow-left'
@@ -54,7 +54,7 @@ function closeDropdown() {
 }
 const { t } = useI18n()
 const isDark = useDark()
-const searchVal = ref(props.search || '')
+const searchVal = ref(props.search ?? '')
 const currentSelected = ref<'general' | 'precise'>('general')
 type Minutes = 1 | 3 | 12
 const currentGeneralTime = ref<Minutes>(1)
@@ -185,7 +185,8 @@ function updateUrlParams() {
     if (col.sortable && col.sortable !== true)
       params.set(`sort_${col.key}`, col.sortable)
   })
-  window.history.pushState({}, '', `${window.location.pathname}?${params.toString()}`)
+  const paramsString = params.toString() ? `?${params.toString()}` : ''
+  window.history.pushState({}, '', `${window.location.pathname}${paramsString}`)
 }
 
 function openTimePicker() {
@@ -233,7 +234,8 @@ onUnmounted(() => {
   props.columns.forEach((col) => {
     params.delete(`sort_${col.key}`)
   })
-  window.history.pushState({}, '', `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ''}`)
+  const paramsString = params.toString() ? `?${params.toString()}` : ''
+  window.history.pushState({}, '', `${window.location.pathname}${paramsString}`)
 })
 
 // Add watches
@@ -274,7 +276,7 @@ onMounted(async () => {
         </button>
       </div>
       <div class="flex h-10 mr-2 md:mr-auto text-sm font-medium text-gray-500 border border-gray-200 divide-gray-100 rounded-md dark:divide-gray-300 md:ml-4 dark:border-gray-600 dark:bg-gray-800 dark:text-white focus:outline-hidden focus:ring-4">
-        <div ref="dropdown" class="dropdown dropdown-right">
+        <div ref="dropdown" class="d-dropdown d-dropdown-right">
           <button
             tabindex="0"
             class="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors rounded-l-md h-full"
@@ -285,13 +287,13 @@ onMounted(async () => {
               {{ currentGeneralTime === 1 ? t('last-hour') : (currentGeneralTime === 3 ? t('last-3-hours') : t('last-12-hours')) }}
             </span>
           </button>
-          <ul tabindex="0" class="p-2 bg-white shadow dropdown-content menu dark:bg-base-200 rounded-box z-1 w-52">
+          <ul class="p-2 bg-white shadow d-dropdown-content d-menu dark:bg-base-200 rounded-box z-1 w-52">
             <li><a :class="{ 'bg-gray-300 dark:bg-gray-400': currentGeneralTime === 1 }" @click="setTime(1)">{{ t('last-hour') }}</a></li>
             <li><a :class="{ 'bg-gray-300 dark:bg-gray-400': currentGeneralTime === 3 }" @click="setTime(3)">{{ t('last-3-hours') }}</a></li>
             <li><a :class="{ 'bg-gray-300 dark:bg-gray-400': currentGeneralTime === 12 }" @click="setTime(12)">{{ t('last-12-hours') }}</a></li>
           </ul>
         </div>
-        <div class="flex-auto flex items-center justify-center mx-0 w-[1px] bg-gray-200 dark:bg-gray-600" />
+        <div class="flex-auto flex items-center justify-center mx-0 w-px bg-gray-200 dark:bg-gray-600" />
         <div class="flex items-center justify-center flex-auto rounded-r-md cursor-pointer hover:bg-gray-300 dark:hover:bg-gray-700" :class="{ 'bg-gray-100 text-gray-600 dark:text-gray-300 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-900': currentSelected === 'precise' }" @click="clickRight">
           <div class="relative">
             <VueDatePicker
@@ -310,7 +312,7 @@ onMounted(async () => {
               @update:model-value="clickRight"
             >
               <template #trigger>
-                <div class="flex flex-row items-center justify-center h-10 px-3 md:px-1 md:px-6">
+                <div class="flex flex-row items-center justify-center h-10 px-3 md:px-6">
                   <IconCalendar class="mr-1" />
                   <p class="hidden md:block">
                     {{ t('custom') }}
@@ -318,7 +320,7 @@ onMounted(async () => {
                 </div>
               </template>
               <template #top-extra="{ value }">
-                <div class="flex items-center justify-center hover:bg-gray-300 dark:hover:bg-gray-700 mb-2 rounded-full" @click="openTimePicker">
+                <div class="flex items-center justify-center hover:bg-gray-300 dark:hover:bg-gray-700 md:mb-2 rounded-full" @click="openTimePicker">
                   <div class="flex items-center space-x-2 text-neutral-700 dark:text-neutral-200 bg-gray-300 dark:bg-gray-700 px-3 py-2 rounded-full">
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
@@ -414,7 +416,9 @@ onMounted(async () => {
               <th v-if="col.head" :class="`${col.class} ${!col.mobile ? 'hidden md:table-cell' : ''} ${col.onClick ? 'cursor-pointer hover:underline clickable-cell' : ''}`" scope="row" class="px-1 md:px-6 py-1 md:py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white" @click.stop="col.onClick ? col.onClick(elem) : () => {}">
                 {{ displayValueKey(elem, col) }}
               </th>
-              <td v-else-if="col.icon" :class="`${col.class} ${!col.mobile ? 'hidden md:table-cell' : ''}`" class="px-1 md:px-6 py-1 md:py-4 cursor-pointer" @click.stop="col.onClick ? col.onClick(elem) : () => {}" v-html="col.icon" />
+              <td v-else-if="col.icon" :class="`${col.class} ${!col.mobile ? 'hidden md:table-cell' : ''}`" class="px-1 md:px-6 py-1 md:py-4 cursor-pointer" @click.stop="col.onClick ? col.onClick(elem) : () => {}">
+                <component :is="col.icon" />
+              </td>
               <td v-else :class="`${col.class} ${!col.mobile ? 'hidden md:table-cell' : ''} ${col.onClick ? 'cursor-pointer hover:underline clickable-cell' : ''}`" class="px-1 md:px-6 py-1 md:py-4" @click.stop="col.onClick ? col.onClick(elem) : () => {}">
                 {{ displayValueKey(elem, col) }}
               </td>
@@ -450,7 +454,6 @@ onMounted(async () => {
 </template>
 
 <style>
-@plugin "daisyui";
 @reference "../styles/style.css";
 
 /* VueDatePicker theming using CSS variables - Capgo theme */
@@ -547,19 +550,17 @@ onMounted(async () => {
 
 /* Custom action buttons styling for Capgo */
 .custom-timepicker-button > .dp__action_row > .dp__action_buttons > .dp__action_cancel {
-  @apply btn btn-outline btn-sm;
+  @apply d-btn d-btn-outline d-btn-sm;
   width: 49%;
 }
 .custom-timepicker-button > .dp__action_row > .dp__action_buttons > .dp__action_select {
-  @apply btn btn-outline btn-primary btn-sm;
+  @apply d-btn d-btn-outline d-btn-primary d-btn-sm;
   width: 49%;
 }
 .custom-timepicker-button > .dp__action_row > .dp__action_buttons {
   display: contents !important;
 }
-.dp__calendar_item {
-  display: contents !important;
-}
+
 .dp--tp-wrap > .dp__btn.dp__button {
   display: none !important;
 }
@@ -575,6 +576,32 @@ onMounted(async () => {
   width: 320px !important;
   min-width: 320px !important;
   max-width: 320px !important;
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1) !important;
+  border: 1px solid rgb(229 231 235) !important;
+}
+
+/* Mobile responsive calendar */
+@media (max-width: 768px) {
+  .dp__menu {
+    width: calc(100vw - 2rem) !important;
+    min-width: calc(100vw - 2rem) !important;
+    max-width: calc(100vw - 2rem) !important;
+    left: 1rem !important;
+    right: 1rem !important;
+    transform: none !important;
+  }
+}
+
+/* Dark mode menu styling */
+.dark .dp__menu {
+  border-color: rgb(55 65 81) !important;
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.3), 0 4px 6px -4px rgb(0 0 0 / 0.3) !important;
+}
+
+/* Arrow styling to match menu border */
+.dp__arrow_top {
+  border-top-color: rgb(229 231 235) !important;
+  border-right-color: rgb(229 231 235) !important;
 }
 
 /* Prevent calendar from resizing during range selection */

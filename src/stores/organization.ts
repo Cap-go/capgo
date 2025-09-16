@@ -53,15 +53,21 @@ export const useOrganizationStore = defineStore('organization', () => {
   // }
   //
   const currentOrganization = ref<Organization | undefined>(undefined)
+  const currentOrganizationFailed = ref(false)
   const currentRole = ref<OrganizationRole | null>(null)
+
+  const STORAGE_KEY = 'capgo_current_org_id'
 
   watch(currentOrganization, async (currentOrganizationRaw) => {
     if (!currentOrganizationRaw) {
       currentRole.value = null
+      localStorage.removeItem(STORAGE_KEY)
       return
     }
 
-    currentRole.value = await getCurrentRole(currentOrganizationRaw.created_by, undefined, undefined)
+    localStorage.setItem(STORAGE_KEY, currentOrganizationRaw.gid)
+    currentRole.value = await getCurrentRole(currentOrganizationRaw.created_by)
+    currentOrganizationFailed.value = !(!!currentOrganizationRaw.paying || (currentOrganizationRaw.trial_left ?? 0) > 0)
     await main.updateDashboard(currentOrganizationRaw.gid, currentOrganizationRaw.subscription_start, currentOrganizationRaw.subscription_end)
   })
 
@@ -113,16 +119,12 @@ export const useOrganizationStore = defineStore('organization', () => {
     return org.role as OrganizationRole
   }
 
+  const hasPermisisonsInRole = (perm: OrganizationRole | null, perms: OrganizationRole[]): boolean => {
+    return (perm && perms.includes(perm)) ?? false
+  }
+
   const setCurrentOrganization = (id: string) => {
     currentOrganization.value = organizations.value.find(org => org.gid === id)
-  }
-
-  const setCurrentOrganizationFromValue = (value: Organization) => {
-    currentOrganization.value = value
-  }
-
-  const hasPermisisonsInRole = (perm: OrganizationRole | null, perms: OrganizationRole[]): boolean => {
-    return (perm && perms.includes(perm)) || false
   }
 
   const setCurrentOrganizationToMain = () => {
@@ -130,13 +132,13 @@ export const useOrganizationStore = defineStore('organization', () => {
     if (!organization)
       throw new Error('User has no main organization')
 
-    currentOrganization.value = organization
+    setCurrentOrganization(organization.gid)
   }
   const setCurrentOrganizationToFirst = () => {
     if (organizations.value.length === 0)
       return
     const organization = organizations.value[0]
-    currentOrganization.value = organization
+    setCurrentOrganization(organization.gid)
   }
 
   const getMembers = async (): Promise<ExtendedOrganizationMembers> => {
@@ -204,8 +206,20 @@ export const useOrganizationStore = defineStore('organization', () => {
     })
 
     _organizations.value = new Map(mappedData.map(item => [item.id.toString(), item]))
-    if (!currentOrganization.value)
-      currentOrganization.value = organization
+
+    // Try to restore from localStorage first
+    if (!currentOrganization.value) {
+      const storedOrgId = localStorage.getItem(STORAGE_KEY)
+      if (storedOrgId) {
+        const storedOrg = data.find(org => org.gid === storedOrgId && !org.role.includes('invite'))
+        if (storedOrg) {
+          currentOrganization.value = storedOrg
+        }
+      }
+    }
+
+    currentOrganization.value ??= organization
+    currentOrganizationFailed.value = !(!!currentOrganization.value?.paying || (currentOrganization.value?.trial_left ?? 0) > 0)
 
     // console.log('done', currentOrganization.value)
     getProcessCronStatsJobInfo()
@@ -225,12 +239,42 @@ export const useOrganizationStore = defineStore('organization', () => {
     return _organizations.value
   }
 
+  const deleteOrganization = async (orgId: string) => {
+    // Validate input
+    if (!orgId || typeof orgId !== 'string' || orgId.trim() === '') {
+      return { data: null, error: new Error('Invalid organization ID') }
+    }
+
+    // Check if current user has permission to delete this organization
+    const currentUserId = main.user?.id
+    if (!currentUserId) {
+      return { data: null, error: new Error('User not authenticated') }
+    }
+
+    // Verify user has super_admin role for this organization
+    const currentOrg = _organizations.value.get(orgId)
+    if (!currentOrg || currentOrg.role !== 'super_admin') {
+      return { data: null, error: new Error('Insufficient permissions') }
+    }
+
+    const { data, error } = await supabase.from('orgs')
+      .delete()
+      .eq('id', orgId)
+
+    if (error) {
+      console.error('Organization deletion failed:', error.message)
+      return { data: null, error }
+    }
+
+    return { data, error: null }
+  }
+
   return {
     organizations,
     currentOrganization,
+    currentOrganizationFailed,
     currentRole,
     setCurrentOrganization,
-    setCurrentOrganizationFromValue,
     setCurrentOrganizationToMain,
     setCurrentOrganizationToFirst,
     getMembers,
@@ -242,5 +286,6 @@ export const useOrganizationStore = defineStore('organization', () => {
     dedupFetchOrganizations,
     getOrgByAppId,
     awaitInitialLoad,
+    deleteOrganization,
   }
 })

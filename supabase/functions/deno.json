@@ -1,0 +1,31 @@
+{
+  "imports": {
+    "@cloudflare/workers-types": "npm:@cloudflare/workers-types@4.20250303.0",
+    "@hono/sentry": "npm:@hono/sentry@1.2.0",
+    "hono": "npm:hono@^4.9.2",
+    "hono/": "npm:/hono@^4.9.2/",
+    "stripe": "npm:stripe@18.5.0",
+    "zod": "npm:zod@^4.0.17",
+    "zod/": "npm:/zod@^4.0.17/",
+    "ky": "npm:ky@^1.8.2",
+    "@logsnag/node": "npm:@logsnag/node@1.0.1",
+    "cron-schedule": "npm:cron-schedule@5.0.4",
+    "__INFO__": "This imports use different versions than npm one as it fail on npm prefix imports",
+    "dayjs": "https://esm.sh/dayjs@1.11.13?target=deno",
+    "dayjs/plugin/utc": "https://esm.sh/dayjs@1.11.13/plugin/utc?target=deno",
+    "__INFO_DRIZZLE__": "Drizzle imports are not working with version 0.44.0, so we use 0.43.1 issue https://github.com/drizzle-team/drizzle-orm/issues/3748",
+    "drizzle-orm": "https://esm.sh/drizzle-orm@0.43.1?target=deno",
+    "drizzle-orm/d1": "https://esm.sh/drizzle-orm@0.43.1/d1?target=deno",
+    "drizzle-orm/pg-core": "https://esm.sh/drizzle-orm@0.43.1/pg-core?target=deno",
+    "drizzle-orm/sqlite-core": "https://esm.sh/drizzle-orm@0.43.1/sqlite-core?target=deno",
+    "drizzle-orm/postgres-js": "https://esm.sh/drizzle-orm@0.43.1/postgres-js?target=deno",
+    "postgres": "https://deno.land/x/postgresjs@v3.4.7/mod.js",
+    "__INFO_END__": "End of specials imports",
+    "adm-zip": "npm:adm-zip@0.5.16",
+    "@supabase/supabase-js": "npm:@supabase/supabase-js@2.55.0",
+    "crypto-random-string": "npm:crypto-random-string@5.0.4",
+    "@std/semver": "jsr:@std/semver@1.0.4",
+    "@bradenmacdonald/s3-lite-client": "jsr:@bradenmacdonald/s3-lite-client@0.9.2",
+    "discord-api-types/": "npm:/discord-api-types@^0.38.15/"
+  }
+}

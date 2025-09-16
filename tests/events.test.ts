@@ -79,7 +79,7 @@ describe('[POST] /private/events operations', () => {
   //     }),
   //   })
 
-  //   const data = await response.json() as { status: string }
+  //   const data = await response.json() as { error: string }
   //   expect(response.status).toBe(200)
   //   expect(data.status).toBe('ok')
   // })
@@ -104,15 +104,15 @@ describe('[POST] /private/events operations', () => {
     })
 
     await response.json()
-    expect(response.status).toBe(400)
+    expect(response.status).toBe(401)
   })
 
   it('track event with invalid apikey', async () => {
     const response = await fetch(`${BASE_URL}/private/events`, {
       method: 'POST',
       headers: {
-        ...headers,
-        capgkey: 'invalid_key',
+        'Content-Type': 'application/json',
+        'capgkey': 'invalid_key',
       },
       body: JSON.stringify({
         channel: 'test',
@@ -146,7 +146,7 @@ describe('[POST] /private/events operations', () => {
     })
 
     await response.json()
-    expect(response.status).toBe(400)
+    expect(response.status).toBe(401)
   })
 
   it('track event with malformed body', async () => {
@@ -157,6 +157,6 @@ describe('[POST] /private/events operations', () => {
     })
 
     await response.arrayBuffer()
-    expect(response.status).toBe(500)
+    expect(response.status).toBe(400)
   })
 })

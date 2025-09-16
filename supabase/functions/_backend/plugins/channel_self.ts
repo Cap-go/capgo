@@ -1,69 +1,47 @@
 // channel self old function
-import type { Context } from '@hono/hono'
+import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
-import type { DeviceWithoutCreatedAt } from '../utils/stats.ts'
+import type { DeviceLink } from '../utils/plugin_parser.ts'
 import type { Database } from '../utils/supabase.types.ts'
-import type { AppInfos } from '../utils/types.ts'
-import { format, tryParse } from '@std/semver'
+import type { DeviceWithoutCreatedAt } from '../utils/types.ts'
 import { Hono } from 'hono/tiny'
-import { z } from 'zod'
-import { BRES, getBody } from '../utils/hono.ts'
-import { cloudlog, cloudlogErr } from '../utils/loggin.ts'
+import { z } from 'zod/mini'
+import { BRES, getIsV2, parseBody, quickError, simpleError, simpleError200 } from '../utils/hono.ts'
+import { cloudlog } from '../utils/loggin.ts'
+import { closeClient, deleteChannelDevicePg, getAppByIdPg, getAppVersionsByAppIdPg, getChannelByNamePg, getChannelDeviceOverridePg, getChannelsPg, getCompatibleChannelsPg, getDrizzleClient, getMainChannelsPg, getPgClient, isAllowedActionOrgPg, upsertChannelDevicePg } from '../utils/pg.ts'
+import { getAppByIdD1, getAppVersionsByAppIdD1, getChannelByNameD1, getChannelDeviceOverrideD1, getChannelsD1, getCompatibleChannelsD1, getDrizzleClientD1Session, getMainChannelsD1, isAllowedActionOrgActionD1 } from '../utils/pg_d1.ts'
+import { convertQueryToBody, parsePluginBody } from '../utils/plugin_parser.ts'
 import { sendStatsAndDevice } from '../utils/stats.ts'
-import { isAllowedActionOrg, supabaseAdmin } from '../utils/supabase.ts'
-import { deviceIdRegex, fixSemver, INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, MISSING_STRING_APP_ID, MISSING_STRING_DEVICE_ID, MISSING_STRING_VERSION_BUILD, MISSING_STRING_VERSION_NAME, NON_STRING_APP_ID, NON_STRING_DEVICE_ID, NON_STRING_VERSION_BUILD, NON_STRING_VERSION_NAME, reverseDomainRegex } from '../utils/utils.ts'
+import { deviceIdRegex, INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, MISSING_STRING_APP_ID, MISSING_STRING_DEVICE_ID, MISSING_STRING_VERSION_BUILD, MISSING_STRING_VERSION_NAME, NON_STRING_APP_ID, NON_STRING_DEVICE_ID, NON_STRING_VERSION_BUILD, NON_STRING_VERSION_NAME, reverseDomainRegex } from '../utils/utils.ts'
 
-interface DeviceLink extends AppInfos {
-  channel?: string
-}
+z.config(z.locales.en())
+const devicePlatformScheme = z.literal(['ios', 'android'])
 
-const devicePlatformScheme = z.union([z.literal('ios'), z.literal('android')])
-
-export const jsonRequestSchema = z.object({
+export const jsonRequestSchema = z.looseObject({
   app_id: z.string({
-    required_error: MISSING_STRING_APP_ID,
-    invalid_type_error: NON_STRING_APP_ID,
-  }),
+    error: issue => issue.input === undefined ? MISSING_STRING_APP_ID : NON_STRING_APP_ID,
+  }).check(z.regex(reverseDomainRegex, { message: INVALID_STRING_APP_ID })),
   device_id: z.string({
-    required_error: MISSING_STRING_DEVICE_ID,
-    invalid_type_error: NON_STRING_DEVICE_ID,
-  }).max(36),
+    error: issue => issue.input === undefined ? MISSING_STRING_DEVICE_ID : NON_STRING_DEVICE_ID,
+  }).check(z.maxLength(36), z.regex(deviceIdRegex, { message: INVALID_STRING_DEVICE_ID })),
   version_name: z.string({
-    required_error: MISSING_STRING_VERSION_NAME,
-    invalid_type_error: NON_STRING_VERSION_NAME,
+    error: issue => issue.input === undefined ? MISSING_STRING_VERSION_NAME : NON_STRING_VERSION_NAME,
   }),
   version_build: z.string({
-    required_error: MISSING_STRING_VERSION_BUILD,
-    invalid_type_error: NON_STRING_VERSION_BUILD,
+    error: issue => issue.input === undefined ? MISSING_STRING_VERSION_BUILD : NON_STRING_VERSION_BUILD,
   }),
-  is_emulator: z.boolean().default(false),
+  is_emulator: z.boolean(),
   defaultChannel: z.optional(z.string()),
-  is_prod: z.boolean().default(true),
+  channel: z.optional(z.string()),
+  is_prod: z.boolean(),
   platform: devicePlatformScheme,
-}).passthrough().refine(data => reverseDomainRegex.test(data.app_id), {
-  message: INVALID_STRING_APP_ID,
-}).refine(data => deviceIdRegex.test(data.device_id), {
-  message: INVALID_STRING_DEVICE_ID,
-}).transform((val) => {
-  if (val.version_name === 'builtin')
-    val.version_name = val.version_build
-
-  return val
 })
 
-async function post(c: Context, body: DeviceLink): Promise<Response> {
+async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient> | ReturnType<typeof getDrizzleClientD1Session>, isV2: boolean, body: DeviceLink): Promise<Response> {
   cloudlog({ requestId: c.get('requestId'), message: 'post channel self body', body })
-  const parseResult = jsonRequestSchema.safeParse(body)
-  if (!parseResult.success) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'post channel self', error: parseResult.error })
-    return c.json({ error: `Cannot parse json: ${parseResult.error}` }, 400)
-  }
-
-  let {
+  const {
     version_name,
     version_build,
-  } = body
-  const {
     platform,
     app_id,
     channel,
@@ -71,54 +49,32 @@ async function post(c: Context, body: DeviceLink): Promise<Response> {
     device_id,
     plugin_version,
     custom_id,
-    is_emulator = false,
-    is_prod = true,
+    is_emulator,
+    is_prod,
   } = body
-  const coerce = tryParse(fixSemver(version_build))
-  if (coerce) {
-    version_build = format(coerce)
-  }
-  else {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot find version', version_build })
-    return c.json({
-      message: `Native version: ${version_build} doesn't follow semver convention, please follow https://semver.org to allow Capgo compare version number`,
-      error: 'semver_error',
-    }, 400)
-  }
-  version_name = (version_name === 'builtin' || !version_name) ? version_build : version_name
 
-  const { data: versions } = await supabaseAdmin(c)
-    .from('app_versions')
-    .select('id, owner_org, name')
-    .eq('app_id', app_id)
-    .or(`name.eq.${version_name},name.eq.builtin`)
-    .limit(2)
+  // Read operations can use v2 flag
+  const versions = isV2
+    ? await getAppVersionsByAppIdD1(c, app_id, version_name, drizzleClient as ReturnType<typeof getDrizzleClientD1Session>)
+    : await getAppVersionsByAppIdPg(c, app_id, version_name, drizzleClient as ReturnType<typeof getDrizzleClient>)
 
   if (!versions || versions.length === 0) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot find version', version_name, body })
-    return c.json({
-      message: `Version ${version_name} doesn't exist, and no builtin version`,
-      error: 'version_error',
-    }, 400)
+    throw simpleError('version_error', `Version ${version_name} doesn't exist, and no builtin version`, { version_name, body })
   }
   const owner_org = versions[0].owner_org
 
   const version = versions.length === 2
-    ? versions.find(v => v.name !== 'builtin')
+    ? versions.find((v: { name: string }) => v.name !== 'builtin')
     : versions[0]
   if (!version) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot find version', versions })
-    return c.json({
-      message: `Version ${version_name} doesn't exist, and no builtin version`,
-      error: 'version_error',
-    }, 400)
+    throw simpleError('version_error', `Version ${version_name} doesn't exist, and no builtin version`, { versions })
   }
 
-  if (!(await isAllowedActionOrg(c, owner_org))) {
-    return c.json({
-      message: 'Action not allowed',
-      error: 'action_not_allowed',
-    }, 200)
+  const planValid = isV2
+    ? await isAllowedActionOrgActionD1(c, drizzleClient as ReturnType<typeof getDrizzleClientD1Session>, owner_org, ['mau'])
+    : await isAllowedActionOrgPg(c, drizzleClient as ReturnType<typeof getDrizzleClient>, owner_org)
+  if (!planValid) {
+    throw simpleError200(c, 'action_not_allowed', 'Action not allowed')
   }
   // find device
 
@@ -136,202 +92,141 @@ async function post(c: Context, body: DeviceLink): Promise<Response> {
     updated_at: new Date().toISOString(),
   }
 
-  const { data: dataChannelOverride } = await supabaseAdmin(c)
-    .from('channel_devices')
-    .select(`
-    app_id,
-    device_id,
-    channel_id (
-      id,
-      allow_device_self_set,
-      name
-    )
-  `)
-    .eq('app_id', app_id)
-    .eq('device_id', device_id.toLowerCase())
-    .single()
-  if (!channel || (dataChannelOverride && !(dataChannelOverride?.channel_id as any as Database['public']['Tables']['channels']['Row']).allow_device_self_set)) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot change device override current channel don\t allow it', channel, dataChannelOverride })
-    return c.json({
-      message: 'Cannot change device override current channel don\t allow it',
-      error: 'cannot_override',
-    }, 400)
+  // Read operations can use v2 flag
+  const dataChannelOverride = isV2
+    ? await getChannelDeviceOverrideD1(c, app_id, device_id, drizzleClient as ReturnType<typeof getDrizzleClientD1Session>)
+    : await getChannelDeviceOverridePg(c, app_id, device_id, drizzleClient as ReturnType<typeof getDrizzleClient>)
+
+  if (!channel) {
+    throw simpleError('cannot_override', 'Missing channel')
+  }
+  if (dataChannelOverride && !dataChannelOverride.channel_id.allow_device_self_set) {
+    throw simpleError('cannot_override', 'Cannot change device override current channel don\'t allow it')
   }
   // if channel set channel_override to it
-  if (channel) {
-    // get channel by name
-    const { data: dataChannel, error: dbError } = await supabaseAdmin(c)
-      .from('channels')
-      .select('*')
-      .eq('app_id', app_id)
-      .eq('name', channel)
-      .single()
-    if (dbError || !dataChannel) {
-      cloudlog({ requestId: c.get('requestId'), message: 'Cannot find channel', channel, app_id })
-      cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot find channel', dbError, dataChannel })
-      return c.json({
-        message: `Cannot find channel ${JSON.stringify(dbError)}`,
-        error: 'channel_not_found',
-      }, 400)
+  // get channel by name - Read operation can use v2 flag
+  const dataChannel = isV2
+    ? await getChannelByNameD1(c, app_id, channel, drizzleClient as ReturnType<typeof getDrizzleClientD1Session>)
+    : await getChannelByNamePg(c, app_id, channel, drizzleClient as ReturnType<typeof getDrizzleClient>)
+
+  if (!dataChannel) {
+    throw quickError(404, 'channel_not_found', `Cannot find channel`, { channel, app_id })
+  }
+
+  if (!dataChannel.allow_device_self_set) {
+    throw simpleError('channel_set_from_plugin_not_allowed', `This channel does not allow devices to self associate`, { channel, app_id, dataChannel })
+  }
+
+  // Get the main channel - Read operation can use v2 flag
+  const mainChannel = isV2
+    ? await getMainChannelsD1(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClientD1Session>)
+    : await getMainChannelsPg(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>)
+
+  // We DO NOT return if there is no main channel as it's not a critical error
+  // We will just set the channel_devices as the user requested
+  let mainChannelName = null as string | null
+  if (mainChannel && mainChannel.length > 0) {
+    const devicePlatform = body.platform as Database['public']['Enums']['platform_os']
+    const finalChannel = mainChannel.find((channel: { name: string, ios: boolean, android: boolean }) => channel[devicePlatform] === true)
+    mainChannelName = (finalChannel !== undefined) ? finalChannel.name : null
+  }
+
+  // const mainChannelName = (!dbMainChannelError && mainChannel) ? mainChannel.name : null
+  if (!mainChannel || mainChannel.length === 0)
+    cloudlog({ requestId: c.get('requestId'), message: 'Cannot find main channel' })
+
+  if (mainChannelName && mainChannelName === channel) {
+    // Write operation - ALWAYS use PostgreSQL
+    const pgClientForWrite = isV2 ? getPgClient(c) : null
+    const pgDrizzleClient = pgClientForWrite ? getDrizzleClient(pgClientForWrite) : drizzleClient as ReturnType<typeof getDrizzleClient>
+
+    const success = await deleteChannelDevicePg(c, app_id, device_id, pgDrizzleClient)
+    if (!success) {
+      throw simpleError('override_not_allowed', `Cannot remove channel override`, {})
     }
 
-    if (!dataChannel.allow_device_self_set) {
-      cloudlogErr({ requestId: c.get('requestId'), message: 'Channel does not permit self set', dbError, dataChannel })
-      return c.json({
-        message: `This channel does not allow devices to self associate ${JSON.stringify(dbError)}`,
-        error: 'channel_set_from_plugin_not_allowed',
-      }, 400)
+    if (pgClientForWrite) {
+      await closeClient(c, pgClientForWrite)
     }
 
-    // Get the main channel
-    const { data: mainChannel, error: dbMainChannelError } = await supabaseAdmin(c)
-      .from('channels')
-      .select(`
-        name, 
-        ios, 
-        android
-      `)
-      .eq('app_id', app_id)
-      .eq('public', true)
+    cloudlog({ requestId: c.get('requestId'), message: 'main channel set, removing override' })
+    await sendStatsAndDevice(c, device, [{ action: 'setChannel' }])
+    return c.json(BRES)
+  }
+  // if dataChannelOverride is same from dataChannel and exist then do nothing
+  if (dataChannelOverride && dataChannelOverride.channel_id.id === dataChannel.id) {
+    // already set
+    cloudlog({ requestId: c.get('requestId'), message: 'channel already set' })
+    return c.json(BRES)
+  }
 
-    // We DO NOT return if there is no main channel as it's not a critical error
-    // We will just set the channel_devices as the user requested
-    let mainChannelName = null as string | null
-    if (!dbMainChannelError) {
-      const devicePlatform = parseResult.data.platform
-      const finalChannel = mainChannel.find(channel => channel[devicePlatform] === true)
-      mainChannelName = (finalChannel !== undefined) ? finalChannel.name : null
-    }
+  cloudlog({ requestId: c.get('requestId'), message: 'setting channel' })
 
-    // const mainChannelName = (!dbMainChannelError && mainChannel) ? mainChannel.name : null
-    if (dbMainChannelError || !mainChannel)
-      cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot find main channel', dbMainChannelError })
+  // Write operations - ALWAYS use PostgreSQL
+  const pgClientForWrite = isV2 ? getPgClient(c) : null
+  const pgDrizzleClient = pgClientForWrite ? getDrizzleClient(pgClientForWrite) : drizzleClient as ReturnType<typeof getDrizzleClient>
 
-    const channelId = dataChannelOverride?.channel_id as any as Database['public']['Tables']['channels']['Row']
-    if (mainChannelName && mainChannelName === channel) {
-      const { error: dbErrorDev } = await supabaseAdmin(c)
-        .from('channel_devices')
-        .delete()
-        .eq('app_id', app_id)
-        .eq('device_id', device_id.toLowerCase())
-      if (dbErrorDev) {
-        cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot do channel override', dbErrorDev })
-        return c.json({
-          message: `Cannot remove channel override ${JSON.stringify(dbErrorDev)}`,
-          error: 'override_not_allowed',
-        }, 400)
-      }
-      cloudlog({ requestId: c.get('requestId'), message: 'main channel set, removing override' })
-    }
-    else {
-      // if dataChannelOverride is same from dataChannel and exist then do nothing
-      if (channelId && channelId.id === dataChannel.id) {
-        // already set
-        cloudlog({ requestId: c.get('requestId'), message: 'channel already set' })
-        return c.json(BRES)
-      }
-
-      cloudlog({ requestId: c.get('requestId'), message: 'setting channel' })
-      if (dataChannelOverride) {
-        const { error: dbErrorDev } = await supabaseAdmin(c)
-          .from('channel_devices')
-          .delete()
-          .eq('app_id', app_id)
-          .eq('device_id', device_id.toLowerCase())
-        if (dbErrorDev) {
-          cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot do channel override', dbErrorDev })
-          return c.json({
-            message: `Cannot remove channel override ${JSON.stringify(dbErrorDev)}`,
-            error: 'override_not_allowed',
-          }, 400)
-        }
-      }
-      const { error: dbErrorDev } = await supabaseAdmin(c)
-        .from('channel_devices')
-        .upsert({
-          device_id: device_id.toLowerCase(),
-          channel_id: dataChannel.id,
-          app_id,
-          owner_org: dataChannel.owner_org,
-        }, { onConflict: 'device_id, app_id' })
-      if (dbErrorDev) {
-        cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot do channel override', dbErrorDev })
-        return c.json({
-          message: `Cannot do channel override ${JSON.stringify(dbErrorDev)}`,
-          error: 'override_not_allowed',
-        }, 400)
-      }
+  if (dataChannelOverride) {
+    const success = await deleteChannelDevicePg(c, app_id, device_id, pgDrizzleClient)
+    if (!success) {
+      throw simpleError('override_not_allowed', `Cannot remove channel override`, {})
     }
   }
+  const success = await upsertChannelDevicePg(c, {
+    device_id,
+    channel_id: dataChannel.id,
+    app_id,
+    owner_org: dataChannel.owner_org,
+  }, pgDrizzleClient)
+  if (!success) {
+    throw simpleError('override_not_allowed', `Cannot do channel override`, {})
+  }
+
+  if (pgClientForWrite) {
+    await closeClient(c, pgClientForWrite)
+  }
+
   await sendStatsAndDevice(c, device, [{ action: 'setChannel' }])
   return c.json(BRES)
 }
 
-async function put(c: Context, body: DeviceLink): Promise<Response> {
+async function put(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient> | ReturnType<typeof getDrizzleClientD1Session>, isV2: boolean, body: DeviceLink): Promise<Response> {
   cloudlog({ requestId: c.get('requestId'), message: 'put channel self body', body })
-  let {
-    version_name,
-    version_build,
-  } = body
   const {
     platform,
     app_id,
     device_id,
     plugin_version,
+    version_name,
+    version_build,
     custom_id,
-    is_emulator = false,
-    is_prod = true,
+    is_emulator,
+    is_prod,
     version_os,
   } = body
-  const coerce = tryParse(fixSemver(version_build))
-  if (coerce) {
-    version_build = format(coerce)
-  }
-  else {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot find version', version_build })
-    return c.json({
-      message: `Native version: ${version_build} doesn't follow semver convention, please follow https://semver.org to allow Capgo compare version number`,
-      error: 'semver_error',
-    }, 400)
-  }
-  version_name = (version_name === 'builtin' || !version_name) ? version_build : version_name
-  if (!device_id || !app_id) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot find device_id or appi_id', device_id, app_id, body })
-    return c.json({ message: 'Cannot find device_id or appi_id', error: 'missing_info' }, 400)
-  }
 
-  const { data: versions } = await supabaseAdmin(c)
-    .from('app_versions')
-    .select('id, owner_org, name')
-    .eq('app_id', app_id)
-    .or(`name.eq.${version_name},name.eq.builtin`)
-    .limit(2)
+  // Read operations can use v2 flag
+  const versions = isV2
+    ? await getAppVersionsByAppIdD1(c, app_id, version_name, drizzleClient as ReturnType<typeof getDrizzleClientD1Session>)
+    : await getAppVersionsByAppIdPg(c, app_id, version_name, drizzleClient as ReturnType<typeof getDrizzleClient>)
 
   if (!versions || versions.length === 0) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot find version', version_name, body })
-    return c.json({
-      message: `Version ${version_name} doesn't exist, and no builtin version`,
-      error: 'version_error',
-    }, 400)
+    throw simpleError('version_error', `Version ${version_name} doesn't exist, and no builtin version`, { version_name, body })
   }
   const owner_org = versions[0].owner_org
 
   const version = versions.length === 2
-    ? versions.find(v => v.name !== 'builtin')
+    ? versions.find((v: { name: string }) => v.name !== 'builtin')
     : versions[0]
   if (!version) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot find version', versions })
-    return c.json({
-      message: `Version ${version_name} doesn't exist, and no builtin version`,
-      error: 'version_error',
-    }, 400)
+    throw simpleError('version_error', `Version ${version_name} doesn't exist, and no builtin version`, { versions })
   }
 
-  if (!(await isAllowedActionOrg(c, owner_org))) {
-    return c.json({
-      message: 'Action not allowed',
-      error: 'action_not_allowed',
-    }, 200)
+  const planValid = isV2
+    ? await isAllowedActionOrgActionD1(c, drizzleClient as ReturnType<typeof getDrizzleClientD1Session>, owner_org, ['mau'])
+    : await isAllowedActionOrgPg(c, drizzleClient as ReturnType<typeof getDrizzleClient>, owner_org)
+  if (!planValid) {
+    throw simpleError('action_not_allowed', 'Action not allowed')
   }
   const device: DeviceWithoutCreatedAt = {
     app_id,
@@ -346,63 +241,38 @@ async function put(c: Context, body: DeviceLink): Promise<Response> {
     platform: platform as Database['public']['Enums']['platform_os'],
     updated_at: new Date().toISOString(),
   }
-  const { data: dataChannel, error: errorChannel } = await supabaseAdmin(c)
-    .from('channels')
-    .select()
-    .eq('app_id', app_id)
-    .eq(body.defaultChannel ? 'name' : 'public', body.defaultChannel || true)
+  // Read operations can use v2 flag
+  const dataChannel = isV2
+    ? await getChannelsD1(c, app_id, body.defaultChannel ? { defaultChannel: body.defaultChannel } : { public: true }, drizzleClient as ReturnType<typeof getDrizzleClientD1Session>)
+    : await getChannelsPg(c, app_id, body.defaultChannel ? { defaultChannel: body.defaultChannel } : { public: true }, drizzleClient as ReturnType<typeof getDrizzleClient>)
 
-  const { data: dataChannelOverride } = await supabaseAdmin(c)
-    .from('channel_devices')
-    .select(`
-      app_id,
-      device_id,
-      channel_id (
-        id,
-        allow_device_self_set,
-        name
-      )
-    `)
-    .eq('app_id', app_id)
-    .eq('device_id', device_id.toLowerCase())
-    .single()
-  if (dataChannelOverride && dataChannelOverride.channel_id) {
-    const channelId = dataChannelOverride.channel_id as any as Database['public']['Tables']['channels']['Row']
+  const dataChannelOverride = isV2
+    ? await getChannelDeviceOverrideD1(c, app_id, device_id, drizzleClient as ReturnType<typeof getDrizzleClientD1Session>)
+    : await getChannelDeviceOverridePg(c, app_id, device_id, drizzleClient as ReturnType<typeof getDrizzleClient>)
+
+  if (dataChannelOverride?.channel_id) {
     await sendStatsAndDevice(c, device, [{ action: 'getChannel' }])
     return c.json({
-      channel: channelId.name,
+      channel: dataChannelOverride.channel_id.name,
       status: 'override',
-      allowSet: channelId.allow_device_self_set,
+      allowSet: dataChannelOverride.channel_id.allow_device_self_set,
     })
   }
-  if (errorChannel)
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot find channel default', errorChannel })
-  if (!dataChannel) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot find channel', dataChannel, errorChannel })
-    return c.json({
-      message: 'Cannot find channel',
-      error: 'channel_not_found',
-    }, 400)
+  if (!dataChannel || dataChannel.length === 0) {
+    throw quickError(404, 'channel_not_found', 'Cannot find channel', { dataChannel })
   }
 
   const devicePlatform = devicePlatformScheme.safeParse(platform)
   if (!devicePlatform.success) {
-    return c.json({
-      message: 'Invalid device platform',
-      error: 'invalid_platform',
-    }, 400)
+    throw simpleError('invalid_platform', 'Invalid device platform', { platform, devicePlatform })
   }
 
   const finalChannel = body.defaultChannel
-    ? dataChannel.find(channel => channel.name === body.defaultChannel)
-    : dataChannel.find(channel => channel[devicePlatform.data] === true)
+    ? dataChannel.find((channel: { name: string }) => channel.name === body.defaultChannel)
+    : dataChannel.find((channel: { ios: boolean, android: boolean }) => channel[devicePlatform.data] === true)
 
   if (!finalChannel) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot find channel', dataChannel, errorChannel })
-    return c.json({
-      message: 'Cannot find channel',
-      error: 'channel_not_found',
-    }, 400)
+    throw quickError(404, 'channel_not_found', 'Cannot find channel', { dataChannel })
   }
   await sendStatsAndDevice(c, device, [{ action: 'getChannel' }])
   return c.json({
@@ -411,104 +281,160 @@ async function put(c: Context, body: DeviceLink): Promise<Response> {
   })
 }
 
-async function deleteOverride(c: Context, body: DeviceLink): Promise<Response> {
+async function deleteOverride(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient> | ReturnType<typeof getDrizzleClientD1Session>, isV2: boolean, body: DeviceLink): Promise<Response> {
   cloudlog({ requestId: c.get('requestId'), message: 'delete channel self body', body })
-  let {
-    version_build,
-  } = body
   const {
     app_id,
     device_id,
+    version_build,
   } = body
-  const coerce = tryParse(fixSemver(version_build))
-  if (coerce) {
-    version_build = format(coerce)
-  }
-  else {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot find version', version_build })
-    return c.json({
-      message: `Native version: ${version_build} doesn't follow semver convention, please follow https://semver.org to allow Capgo compare version number`,
-      error: 'semver_error',
-    }, 400)
+  cloudlog({ requestId: c.get('requestId'), message: 'delete override', version_build })
+
+  // Read operation can use v2 flag
+  const dataChannelOverride = isV2
+    ? await getChannelDeviceOverrideD1(c, app_id, device_id, drizzleClient as ReturnType<typeof getDrizzleClientD1Session>)
+    : await getChannelDeviceOverridePg(c, app_id, device_id, drizzleClient as ReturnType<typeof getDrizzleClient>)
+
+  if (!dataChannelOverride?.channel_id) {
+    throw simpleError('cannot_override', 'Cannot change device override current channel don\t allow it', { dataChannelOverride })
   }
 
-  if (!device_id || !app_id) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot find device_id or appi_id', device_id, app_id, body })
-    return c.json({ message: 'Cannot find device_id or appi_id', error: 'missing_info' }, 400)
+  if (!dataChannelOverride.channel_id.allow_device_self_set) {
+    throw simpleError('cannot_override', 'Cannot change device override current channel don\t allow it', { channelOverride: dataChannelOverride.channel_id })
   }
-  const { data: dataChannelOverride } = await supabaseAdmin(c)
-    .from('channel_devices')
-    .select(`
-    app_id,
-    device_id,
-    channel_id (
-      id,
-      allow_device_self_set,
-      name
-    )
-  `)
-    .eq('app_id', app_id)
-    .eq('device_id', device_id.toLowerCase())
-    .single()
-  if (!dataChannelOverride || !dataChannelOverride.channel_id || !(dataChannelOverride?.channel_id as any as Database['public']['Tables']['channels']['Row']).allow_device_self_set) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot change device override current channel don\t allow it', dataChannelOverride })
-    return c.json({
-      message: 'Cannot change device override current channel don\t allow it',
-      error: 'cannot_override',
-    }, 400)
+
+  // Write operation - ALWAYS use PostgreSQL
+  const pgClientForWrite = isV2 ? getPgClient(c) : null
+  const pgDrizzleClient = pgClientForWrite ? getDrizzleClient(pgClientForWrite) : drizzleClient as ReturnType<typeof getDrizzleClient>
+
+  const success = await deleteChannelDevicePg(c, app_id, device_id, pgDrizzleClient)
+  if (!success) {
+    throw simpleError('override_not_allowed', `Cannot delete channel override`, {})
   }
-  const { error } = await supabaseAdmin(c)
-    .from('channel_devices')
-    .delete()
-    .eq('app_id', app_id)
-    .eq('device_id', device_id.toLowerCase())
-  if (error) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot delete channel override', error })
-    return c.json({
-      message: `Cannot delete channel override ${JSON.stringify(error)}`,
-      error: 'override_not_allowed',
-    }, 400)
+
+  if (pgClientForWrite) {
+    await closeClient(c, pgClientForWrite)
   }
+
   return c.json(BRES)
+}
+
+async function listCompatibleChannels(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient> | ReturnType<typeof getDrizzleClientD1Session>, isV2: boolean, body: DeviceLink): Promise<Response> {
+  const { app_id, platform, is_emulator, is_prod } = body
+
+  // Check if app exists and get owner_org for permission check - Read operation can use v2 flag
+  const appData = isV2
+    ? await getAppByIdD1(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClientD1Session>)
+    : await getAppByIdPg(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>)
+
+  if (!appData) {
+    throw quickError(404, 'app_not_found', `App ${app_id} not found`, { app_id })
+  }
+
+  const planValid = isV2
+    ? await isAllowedActionOrgActionD1(c, drizzleClient as ReturnType<typeof getDrizzleClientD1Session>, appData.owner_org, ['mau'])
+    : await isAllowedActionOrgPg(c, drizzleClient as ReturnType<typeof getDrizzleClient>, appData.owner_org)
+  if (!planValid) {
+    throw simpleError('action_not_allowed', 'Action not allowed')
+  }
+
+  // Get channels that allow device self set and are compatible with the platform - Read operation can use v2 flag
+  const channels = isV2
+    ? await getCompatibleChannelsD1(c, app_id, platform as 'ios' | 'android', is_emulator!, is_prod!, drizzleClient as ReturnType<typeof getDrizzleClientD1Session>)
+    : await getCompatibleChannelsPg(c, app_id, platform as 'ios' | 'android', is_emulator!, is_prod!, drizzleClient as ReturnType<typeof getDrizzleClient>)
+
+  if (!channels || channels.length === 0) {
+    return c.json([])
+  }
+
+  // Return the compatible channels
+  const compatibleChannels = channels.map((channel: { id: number, name: string, public: boolean, allow_device_self_set: boolean }) => ({
+    id: channel.id,
+    name: channel.name,
+    public: channel.public,
+    allow_self_set: channel.allow_device_self_set,
+  }))
+
+  cloudlog({ requestId: c.get('requestId'), message: 'Found compatible channels', count: compatibleChannels.length })
+
+  return c.json(compatibleChannels)
 }
 
 export const app = new Hono<MiddlewareKeyVariables>()
 
 app.post('/', async (c) => {
+  const body = await parseBody<DeviceLink>(c)
+  cloudlog({ requestId: c.get('requestId'), message: 'post body', body })
+
+  const isV2 = getIsV2(c)
+  const pgClient = isV2 ? null : getPgClient(c)
+
+  const bodyParsed = parsePluginBody<DeviceLink>(c, body, jsonRequestSchema)
+  let res
   try {
-    const body = await c.req.json<DeviceLink>()
-    cloudlog({ requestId: c.get('requestId'), message: 'post body', body })
-    return post(c as any, body)
+    res = await post(c, isV2 ? getDrizzleClientD1Session(c) : getDrizzleClient(pgClient as any), !!isV2, bodyParsed)
   }
-  catch (e) {
-    return c.json({ status: 'Cannot self set channel', error: JSON.stringify(e) }, 500)
+  finally {
+    if (isV2 && pgClient)
+      await closeClient(c, pgClient)
   }
+  return res
 })
 
 app.put('/', async (c) => {
   // Used as get, should be refactor with query param instead
+  const body = await parseBody<DeviceLink>(c)
+  cloudlog({ requestId: c.get('requestId'), message: 'put body', body })
+
+  const isV2 = getIsV2(c)
+  const pgClient = isV2 ? null : getPgClient(c)
+
+  const bodyParsed = parsePluginBody<DeviceLink>(c, body, jsonRequestSchema)
+  let res
   try {
-    const body = await c.req.json<DeviceLink>()
-    cloudlog({ requestId: c.get('requestId'), message: 'put body', body })
-    return put(c as any, body)
+    res = await put(c, isV2 ? getDrizzleClientD1Session(c) : getDrizzleClient(pgClient as any), !!isV2, bodyParsed)
   }
-  catch (e) {
-    return c.json({ status: 'Cannot self get channel', error: JSON.stringify(e) }, 500)
+  finally {
+    if (isV2 && pgClient)
+      await closeClient(c, pgClient)
   }
+  return res
 })
 
 app.delete('/', async (c) => {
+  const query = convertQueryToBody(c.req.query())
+  cloudlog({ requestId: c.get('requestId'), message: 'delete body', query })
+
+  const isV2 = getIsV2(c)
+  const pgClient = isV2 ? null : getPgClient(c)
+
+  const bodyParsed = parsePluginBody<DeviceLink>(c, query, jsonRequestSchema)
+  let res
   try {
-    const body = await getBody<DeviceLink>(c as any)
-    // const body = await c.req.json<DeviceLink>()
-    cloudlog({ requestId: c.get('requestId'), message: 'delete body', body })
-    return deleteOverride(c as any, body)
+    res = await deleteOverride(c, isV2 ? getDrizzleClientD1Session(c) : getDrizzleClient(pgClient as any), !!isV2, bodyParsed)
   }
-  catch (e) {
-    return c.json({ status: 'Cannot self delete channel', error: JSON.stringify(e) }, 500)
+  finally {
+    if (isV2 && pgClient)
+      await closeClient(c, pgClient)
   }
+  return res
 })
 
-app.get('/', (c) => {
-  return c.json({ status: 'ok' })
+app.get('/', async (c) => {
+  const query = convertQueryToBody(c.req.query())
+  cloudlog({ requestId: c.get('requestId'), message: 'list compatible channels', query })
+
+  const isV2 = getIsV2(c)
+  const pgClient = isV2 ? null : getPgClient(c)
+
+  const bodyParsed = parsePluginBody<DeviceLink>(c, query, jsonRequestSchema)
+  let res
+  try {
+    res = await listCompatibleChannels(c, isV2 ? getDrizzleClientD1Session(c) : getDrizzleClient(pgClient as any), !!isV2, bodyParsed)
+  }
+  finally {
+    if (isV2 && pgClient)
+      await closeClient(c, pgClient)
+  }
+  return res
 })

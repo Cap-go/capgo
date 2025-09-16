@@ -1,0 +1,11 @@
+{
+  "bumpFiles": [
+    {
+      "filename": "package.json",
+      "type": "json"
+    }
+  ],
+  "scripts": {
+    "postbump": "node scripts/update-version.js"
+  }
+}

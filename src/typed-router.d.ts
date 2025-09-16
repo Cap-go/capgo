@@ -19,6 +19,7 @@ declare module 'vue-router/auto-routes' {
    */
   export interface RouteNamedMap {
     '/[...all]': RouteRecordInfo<'/[...all]', '/:all(.*)', { all: ParamValue<true> }, { all: ParamValue<false> }>,
+    '/accountDisabled': RouteRecordInfo<'/accountDisabled', '/accountDisabled', Record<never, never>, Record<never, never>>,
     '/ApiKeys': RouteRecordInfo<'/ApiKeys', '/ApiKeys', Record<never, never>, Record<never, never>>,
     '/app/': RouteRecordInfo<'/app/', '/app', Record<never, never>, Record<never, never>>,
     '/app/modules': RouteRecordInfo<'/app/modules', '/app/modules', Record<never, never>, Record<never, never>>,
@@ -29,7 +30,9 @@ declare module 'vue-router/auto-routes' {
     '/app/p/[package].d.[device]': RouteRecordInfo<'/app/p/[package].d.[device]', '/app/p/:package/d/:device', { package: ParamValue<true>, device: ParamValue<true> }, { package: ParamValue<false>, device: ParamValue<false> }>,
     '/confirm-signup': RouteRecordInfo<'/confirm-signup', '/confirm-signup', Record<never, never>, Record<never, never>>,
     '/delete_account': RouteRecordInfo<'/delete_account', '/delete_account', Record<never, never>, Record<never, never>>,
+    '/demo_dialog': RouteRecordInfo<'/demo_dialog', '/demo_dialog', Record<never, never>, Record<never, never>>,
     '/forgot_password': RouteRecordInfo<'/forgot_password', '/forgot_password', Record<never, never>, Record<never, never>>,
+    '/invitation': RouteRecordInfo<'/invitation', '/invitation', Record<never, never>, Record<never, never>>,
     '/login': RouteRecordInfo<'/login', '/login', Record<never, never>, Record<never, never>>,
     '/onboarding/activation': RouteRecordInfo<'/onboarding/activation', '/onboarding/activation', Record<never, never>, Record<never, never>>,
     '/onboarding/confirm_email': RouteRecordInfo<'/onboarding/confirm_email', '/onboarding/confirm_email', Record<never, never>, Record<never, never>>,
@@ -37,12 +40,167 @@ declare module 'vue-router/auto-routes' {
     '/onboarding/verify_email': RouteRecordInfo<'/onboarding/verify_email', '/onboarding/verify_email', Record<never, never>, Record<never, never>>,
     '/register': RouteRecordInfo<'/register', '/register', Record<never, never>, Record<never, never>>,
     '/resend_email': RouteRecordInfo<'/resend_email', '/resend_email', Record<never, never>, Record<never, never>>,
+    '/scan': RouteRecordInfo<'/scan', '/scan', Record<never, never>, Record<never, never>>,
     '/settings/Account': RouteRecordInfo<'/settings/Account', '/settings/Account', Record<never, never>, Record<never, never>>,
     '/settings/ChangePassword': RouteRecordInfo<'/settings/ChangePassword', '/settings/ChangePassword', Record<never, never>, Record<never, never>>,
     '/settings/Notifications': RouteRecordInfo<'/settings/Notifications', '/settings/Notifications', Record<never, never>, Record<never, never>>,
     '/settings/organization/': RouteRecordInfo<'/settings/organization/', '/settings/organization', Record<never, never>, Record<never, never>>,
+    '/settings/organization/DeleteOrgDialog': RouteRecordInfo<'/settings/organization/DeleteOrgDialog', '/settings/organization/DeleteOrgDialog', Record<never, never>, Record<never, never>>,
     '/settings/organization/Members': RouteRecordInfo<'/settings/organization/Members', '/settings/organization/Members', Record<never, never>, Record<never, never>>,
     '/settings/organization/Plans': RouteRecordInfo<'/settings/organization/Plans', '/settings/organization/Plans', Record<never, never>, Record<never, never>>,
     '/settings/organization/Usage': RouteRecordInfo<'/settings/organization/Usage', '/settings/organization/Usage', Record<never, never>, Record<never, never>>,
+    '/Webhooks': RouteRecordInfo<'/Webhooks', '/Webhooks', Record<never, never>, Record<never, never>>,
   }
+
+  /**
+   * Route file to route info map by unplugin-vue-router.
+   * Used by the volar plugin to automatically type useRoute()
+   *
+   * Each key is a file path relative to the project root with 2 properties:
+   * - routes: union of route names of the possible routes when in this page (passed to useRoute<...>())
+   * - views: names of nested views (can be passed to <RouterView name="...">)
+   *
+   * @internal
+   */
+  export interface _RouteFileInfoMap {
+    'src/pages/[...all].vue': {
+      routes: '/[...all]'
+      views: never
+    }
+    'src/pages/accountDisabled.vue': {
+      routes: '/accountDisabled'
+      views: never
+    }
+    'src/pages/ApiKeys.vue': {
+      routes: '/ApiKeys'
+      views: never
+    }
+    'src/pages/app/index.vue': {
+      routes: '/app/'
+      views: never
+    }
+    'src/pages/app/modules.vue': {
+      routes: '/app/modules'
+      views: never
+    }
+    'src/pages/app/modules_test.vue': {
+      routes: '/app/modules_test'
+      views: never
+    }
+    'src/pages/app/p/[package].vue': {
+      routes: '/app/p/[package]'
+      views: never
+    }
+    'src/pages/app/p/[package].bundle.[bundle].vue': {
+      routes: '/app/p/[package].bundle.[bundle]'
+      views: never
+    }
+    'src/pages/app/p/[package].channel.[channel].vue': {
+      routes: '/app/p/[package].channel.[channel]'
+      views: never
+    }
+    'src/pages/app/p/[package].d.[device].vue': {
+      routes: '/app/p/[package].d.[device]'
+      views: never
+    }
+    'src/pages/confirm-signup.vue': {
+      routes: '/confirm-signup'
+      views: never
+    }
+    'src/pages/delete_account.vue': {
+      routes: '/delete_account'
+      views: never
+    }
+    'src/pages/demo_dialog.vue': {
+      routes: '/demo_dialog'
+      views: never
+    }
+    'src/pages/forgot_password.vue': {
+      routes: '/forgot_password'
+      views: never
+    }
+    'src/pages/invitation.vue': {
+      routes: '/invitation'
+      views: never
+    }
+    'src/pages/login.vue': {
+      routes: '/login'
+      views: never
+    }
+    'src/pages/onboarding/activation.vue': {
+      routes: '/onboarding/activation'
+      views: never
+    }
+    'src/pages/onboarding/confirm_email.vue': {
+      routes: '/onboarding/confirm_email'
+      views: never
+    }
+    'src/pages/onboarding/set_password.vue': {
+      routes: '/onboarding/set_password'
+      views: never
+    }
+    'src/pages/onboarding/verify_email.vue': {
+      routes: '/onboarding/verify_email'
+      views: never
+    }
+    'src/pages/register.vue': {
+      routes: '/register'
+      views: never
+    }
+    'src/pages/resend_email.vue': {
+      routes: '/resend_email'
+      views: never
+    }
+    'src/pages/scan.vue': {
+      routes: '/scan'
+      views: never
+    }
+    'src/pages/settings/Account.vue': {
+      routes: '/settings/Account'
+      views: never
+    }
+    'src/pages/settings/ChangePassword.vue': {
+      routes: '/settings/ChangePassword'
+      views: never
+    }
+    'src/pages/settings/Notifications.vue': {
+      routes: '/settings/Notifications'
+      views: never
+    }
+    'src/pages/settings/organization/index.vue': {
+      routes: '/settings/organization/'
+      views: never
+    }
+    'src/pages/settings/organization/DeleteOrgDialog.vue': {
+      routes: '/settings/organization/DeleteOrgDialog'
+      views: never
+    }
+    'src/pages/settings/organization/Members.vue': {
+      routes: '/settings/organization/Members'
+      views: never
+    }
+    'src/pages/settings/organization/Plans.vue': {
+      routes: '/settings/organization/Plans'
+      views: never
+    }
+    'src/pages/settings/organization/Usage.vue': {
+      routes: '/settings/organization/Usage'
+      views: never
+    }
+    'src/pages/Webhooks.vue': {
+      routes: '/Webhooks'
+      views: never
+    }
+  }
+
+  /**
+   * Get a union of possible route names in a certain route component file.
+   * Used by the volar plugin to automatically type useRoute()
+   *
+   * @internal
+   */
+  export type _RouteNamesForFilePath<FilePath extends string> =
+    _RouteFileInfoMap extends Record<FilePath, infer Info>
+      ? Info['routes']
+      : keyof RouteNamedMap
 }

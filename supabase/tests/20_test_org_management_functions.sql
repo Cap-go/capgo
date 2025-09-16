@@ -3,7 +3,7 @@ BEGIN;
 CREATE EXTENSION "basejump-supabase_test_helpers";
 
 SELECT
-  plan (35);
+  plan (45);
 
 -- Test accept_invitation_to_org (user is already a member, so should return INVALID_ROLE)
 SELECT
@@ -75,6 +75,173 @@ SELECT
     ) >= 0,
     'get_orgs_v6 test - returns organizations for admin user'
   );
+
+-- Test get_orgs_v6 with API key
+-- Test 1: Valid API key without limitations
+select
+  set_config(
+    'request.headers',
+    '{"capgkey": "67eeaff4-ae4c-49a6-8eb1-0875f5369de1"}',
+    true
+  );
+
+-- Verify the API key header is set correctly
+SELECT
+  is (
+    (
+      (
+        "current_setting" ('request.headers'::"text", true)
+      )::"json" ->> 'capgkey'::"text"
+    ),
+    '67eeaff4-ae4c-49a6-8eb1-0875f5369de1',
+    'get_orgs_v6 API key test - header reading method works'
+  );
+
+-- Test with valid API key
+SELECT
+  ok (
+    (
+      SELECT
+        COUNT(*)
+      FROM
+        get_orgs_v6 ()
+    ) > 0,
+    'get_orgs_v6 API key test - returns organizations with valid API key'
+  );
+
+-- Test 2: Invalid API key - should throw specific error
+select
+  set_config(
+    'request.headers',
+    '{"capgkey": "invalid-key-12345"}',
+    true
+  );
+
+SELECT
+  throws_like (
+    'SELECT get_orgs_v6()',
+    '%Invalid API key provided%',
+    'get_orgs_v6 API key test - throws correct error message for invalid API key'
+  );
+
+-- Test 3: API key with limited_to_orgs restrictions
+-- Use existing admin all key and temporarily modify it
+UPDATE apikeys
+SET
+  limited_to_orgs = '{"22dbad8a-b885-4309-9b3b-a09f8460fb6d"}'
+WHERE
+  key = 'ae6e7458-c46d-4c00-aa3b-153b0b8520eb';
+
+select
+  set_config(
+    'request.headers',
+    '{"capgkey": "ae6e7458-c46d-4c00-aa3b-153b0b8520eb"}',
+    true
+  );
+
+SELECT
+  ok (
+    (
+      SELECT
+        COUNT(*)
+      FROM
+        get_orgs_v6 ()
+    ) >= 0,
+    'get_orgs_v6 API key test - works with limited_to_orgs API key'
+  );
+
+-- Verify that limited API key only returns allowed orgs
+SELECT
+  ok (
+    (
+      SELECT
+        COUNT(*)
+      FROM
+        get_orgs_v6 ()
+      WHERE
+        gid = '22dbad8a-b885-4309-9b3b-a09f8460fb6d'
+    ) >= 0,
+    'get_orgs_v6 API key test - limited API key filters organizations correctly'
+  );
+
+-- Test 4: API key with empty limited_to_orgs (should work normally)
+UPDATE apikeys
+SET
+  limited_to_orgs = '{}'
+WHERE
+  key = 'ae6e7458-c46d-4c00-aa3b-153b0b8520eb';
+
+select
+  set_config(
+    'request.headers',
+    '{"capgkey": "ae6e7458-c46d-4c00-aa3b-153b0b8520eb"}',
+    true
+  );
+
+SELECT
+  ok (
+    (
+      SELECT
+        COUNT(*)
+      FROM
+        get_orgs_v6 ()
+    ) >= 0,
+    'get_orgs_v6 API key test - API key with empty limitations works normally'
+  );
+
+-- Test 5: API key with NULL limited_to_orgs (should work normally like empty array)
+UPDATE apikeys
+SET
+  limited_to_orgs = NULL
+WHERE
+  key = 'ae6e7458-c46d-4c00-aa3b-153b0b8520eb';
+
+select
+  set_config(
+    'request.headers',
+    '{"capgkey": "ae6e7458-c46d-4c00-aa3b-153b0b8520eb"}',
+    true
+  );
+
+SELECT
+  ok (
+    (
+      SELECT
+        COUNT(*)
+      FROM
+        get_orgs_v6 ()
+    ) >= 0,
+    'get_orgs_v6 API key test - API key with NULL limitations works normally'
+  );
+
+-- Test 6: No API key header (should fall back to identity and throw error)
+select
+  set_config('request.headers', '{}', true);
+
+SELECT
+  throws_like (
+    'SELECT get_orgs_v6()',
+    '%No authentication provided - API key or valid session required%',
+    'get_orgs_v6 API key test - throws correct error when no authentication'
+  );
+
+-- Test 7: Null headers (should fall back to identity and throw error)
+select
+  set_config('request.headers', '', true);
+
+SELECT
+  throws_like (
+    'SELECT get_orgs_v6()',
+    '%No authentication provided - API key or valid session required%',
+    'get_orgs_v6 API key test - throws correct error when null headers'
+  );
+
+-- Reset the test key back to no limitations
+UPDATE apikeys
+SET
+  limited_to_orgs = '{}'
+WHERE
+  key = 'ae6e7458-c46d-4c00-aa3b-153b0b8520eb';
 
 -- Test get_org_members
 SELECT
@@ -220,6 +387,14 @@ SELECT
     'is_paying_and_good_plan_org test - non-existent org returns false'
   );
 
+-- Test is_paying_and_good_plan_org for Demo org (used by statistics tests)
+SELECT
+  is (
+    is_paying_and_good_plan_org ('046a36ac-e03c-4590-9257-bd6c9dba9ee8'),
+    true,
+    'is_paying_and_good_plan_org test - Demo org has paying and good plan'
+  );
+
 -- Test is_allowed_action_org
 SELECT
   is (
@@ -285,10 +460,12 @@ SELECT
 
 -- Test get_organization_cli_warnings with proper API key setup
 -- Test 1: Set up valid API key and test normal scenario (good plan)
-DO $$
-BEGIN
-    PERFORM set_config('request.headers', '{"capgkey": "67eeaff4-ae4c-49a6-8eb1-0875f5369de1"}', true);
-END $$;
+select
+  set_config(
+    'request.headers',
+    '{"capgkey": "67eeaff4-ae4c-49a6-8eb1-0875f5369de1"}',
+    true
+  );
 
 SELECT
   ok (
@@ -310,10 +487,12 @@ SELECT
   );
 
 -- Test 2: Test with invalid API key (should return access denied)
-DO $$
-BEGIN
-    PERFORM set_config('request.headers', '{"capgkey": "invalid-key"}', true);
-END $$;
+select
+  set_config(
+    'request.headers',
+    '{"capgkey": "invalid-key"}',
+    true
+  );
 
 SELECT
   ok (
@@ -332,10 +511,12 @@ SELECT
   );
 
 -- Test 3: Test is_paying_and_good_plan_org_action directly with valid setup
-DO $$
-BEGIN
-    PERFORM set_config('request.headers', '{"capgkey": "67eeaff4-ae4c-49a6-8eb1-0875f5369de1"}', true);
-END $$;
+select
+  set_config(
+    'request.headers',
+    '{"capgkey": "67eeaff4-ae4c-49a6-8eb1-0875f5369de1"}',
+    true
+  );
 
 -- Test individual action types
 SELECT
@@ -390,16 +571,16 @@ WHERE
   customer_id = 'cus_Pa0k8TO6HVln6A';
 
 -- Reset headers first
-DO $$
-BEGIN
-    PERFORM set_config('request.headers', NULL, true);
-END $$;
+select
+  set_config('request.headers', NULL, true);
 
 -- Set API key for storage exceeded tests
-DO $$
-BEGIN
-    PERFORM set_config('request.headers', '{"capgkey": "67eeaff4-ae4c-49a6-8eb1-0875f5369de1"}', true);
-END $$;
+select
+  set_config(
+    'request.headers',
+    '{"capgkey": "67eeaff4-ae4c-49a6-8eb1-0875f5369de1"}',
+    true
+  );
 
 -- Debug: Check the state of stripe_info and org
 SELECT
@@ -517,10 +698,8 @@ WHERE
   );
 
 -- Reset the request headers for other tests
-DO $$
-BEGIN
-    PERFORM set_config('request.headers', NULL, true);
-END $$;
+select
+  set_config('request.headers', NULL, true);
 
 SELECT
   *

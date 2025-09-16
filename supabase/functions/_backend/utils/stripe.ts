@@ -1,4 +1,5 @@
-import type { Context } from '@hono/hono'
+import type { Context } from 'hono'
+import type { Database } from './supabase.types.ts'
 import Stripe from 'stripe'
 import { cloudlog, cloudlogErr } from './loggin.ts'
 import { supabaseAdmin } from './supabase.ts'
@@ -6,7 +7,7 @@ import { existInEnv, getEnv } from './utils.ts'
 
 export function getStripe(c: Context) {
   return new Stripe(getEnv(c, 'STRIPE_SECRET_KEY'), {
-    apiVersion: '2025-03-31.basil',
+    apiVersion: '2025-08-27.basil',
     httpClient: Stripe.createFetchHttpClient(),
   })
 }
@@ -22,19 +23,13 @@ export async function getSubscriptionData(c: Context, customerId: string, subscr
       expand: ['items.data.price'], // Correct expand path for retrieve
     })
 
-    console.log({
+    cloudlog({
       requestId: c.get('requestId'),
       context: 'getSubscriptionData',
       // subscriptionsFound: subscriptions.data.length, // Removed - retrieve returns one or throws
       subscriptionId: subscription.id,
       subscriptionStatus: subscription.status,
     })
-
-    // // If no subscriptions found - Removed: retrieve throws error if not found
-    // if (!subscriptions.data.length) {
-    //   cloudlog({ requestId: c.get('requestId'), message: 'getSubscriptionData', message: 'No active subscriptions found for customer'  })
-    //   return null
-    // }
 
     // // Get the subscription - Removed: already have the subscription object
     // const subscription = subscriptions.data[0]
@@ -48,7 +43,7 @@ export async function getSubscriptionData(c: Context, customerId: string, subscr
         productId = item.price.product
       }
       else {
-        console.warn({ requestId: c.get('requestId'), message: 'Price or product data missing/invalid type in subscription item', itemId: item.id })
+        cloudlog({ requestId: c.get('requestId'), message: 'Price or product data missing/invalid type in subscription item', itemId: item.id })
       }
     }
 
@@ -86,6 +81,27 @@ export async function getSubscriptionData(c: Context, customerId: string, subscr
   }
 }
 
+async function getActiveSubscription(c: Context, customerId: string, subscriptionId: string | null) {
+  cloudlog({ requestId: c.get('requestId'), message: 'Stored subscription not active or not found, checking for others.', customerId, storedSubscriptionId: subscriptionId })
+  const activeSubscriptions = await getStripe(c).subscriptions.list({
+    customer: customerId,
+    status: 'active', // Look specifically for active subscriptions
+    limit: 1, // We only need one to confirm activity
+  })
+
+  if (activeSubscriptions.data.length > 0) {
+    const activeSub = activeSubscriptions.data[0]
+    cloudlog({ requestId: c.get('requestId'), message: 'Found an active subscription, fetching its data.', activeSubscriptionId: activeSub.id })
+    // Fetch data for the newly found active subscription
+    return getSubscriptionData(c, customerId, activeSub.id)
+  }
+  else {
+    cloudlog({ requestId: c.get('requestId'), message: 'No other active subscriptions found for customer.', customerId })
+    // Keep subscriptionData as null or the inactive one, it will be handled below
+  }
+  return null
+}
+
 export async function syncSubscriptionData(c: Context, customerId: string, subscriptionId: string | null): Promise<void> {
   if (!existInEnv(c, 'STRIPE_SECRET_KEY'))
     return
@@ -95,26 +111,10 @@ export async function syncSubscriptionData(c: Context, customerId: string, subsc
 
     // If the stored subscription is not active or doesn't exist, check for any other active subscriptions
     if (!subscriptionData || (subscriptionData.status !== 'active')) {
-      cloudlog({ requestId: c.get('requestId'), message: 'Stored subscription not active or not found, checking for others.', customerId, storedSubscriptionId: subscriptionId })
-      const activeSubscriptions = await getStripe(c).subscriptions.list({
-        customer: customerId,
-        status: 'active', // Look specifically for active subscriptions
-        limit: 1, // We only need one to confirm activity
-      })
-
-      if (activeSubscriptions.data.length > 0) {
-        const activeSub = activeSubscriptions.data[0]
-        cloudlog({ requestId: c.get('requestId'), message: 'Found an active subscription, fetching its data.', activeSubscriptionId: activeSub.id })
-        // Fetch data for the newly found active subscription
-        subscriptionData = await getSubscriptionData(c, customerId, activeSub.id)
-      }
-      else {
-        cloudlog({ requestId: c.get('requestId'), message: 'No other active subscriptions found for customer.', customerId })
-        // Keep subscriptionData as null or the inactive one, it will be handled below
-      }
+      subscriptionData = await getActiveSubscription(c, customerId, subscriptionId)
     }
 
-    let dbStatus: 'succeeded' | 'canceled' | undefined
+    let dbStatus: 'succeeded' | 'canceled' | undefined = 'canceled'
 
     if (subscriptionData) {
       // Determine DB status based on the potentially updated subscription data
@@ -123,32 +123,21 @@ export async function syncSubscriptionData(c: Context, customerId: string, subsc
         if (subscriptionData.cycleEnd && new Date(subscriptionData.cycleEnd) > new Date()) {
           dbStatus = 'succeeded' // Still active until period end because cycleEnd is future
         }
-        else {
-          dbStatus = 'canceled' // Truly canceled because cycleEnd is past or null
-        }
       }
       else if (subscriptionData.status === 'active') {
         // Active subscriptions are always considered succeeded
         dbStatus = 'succeeded'
       }
-      else {
-        // All other statuses (past_due, unpaid, incomplete, incomplete_expired) are considered canceled immediately
-        dbStatus = 'canceled'
-      }
-    }
-    else {
-      // No active subscription found in Stripe
-      dbStatus = 'canceled'
     }
 
     // Update stripe_info table with latest data, even if no subscription exists
     const { error: updateError } = await supabaseAdmin(c)
       .from('stripe_info')
       .update({
-        product_id: subscriptionData?.productId || undefined,
-        subscription_id: subscriptionData?.subscriptionId || undefined,
-        subscription_anchor_start: subscriptionData?.cycleStart || undefined,
-        subscription_anchor_end: subscriptionData?.cycleEnd || undefined,
+        product_id: subscriptionData?.productId ?? undefined,
+        subscription_id: subscriptionData?.subscriptionId ?? undefined,
+        subscription_anchor_start: subscriptionData?.cycleStart ?? undefined,
+        subscription_anchor_end: subscriptionData?.cycleEnd ?? undefined,
         status: dbStatus,
       })
       .eq('customer_id', customerId)
@@ -219,6 +208,12 @@ export interface MeteredData {
   [key: string]: string
 }
 
+export interface StripeData {
+  data: Database['public']['Tables']['stripe_info']['Insert']
+  isUpgrade: boolean
+  previousProductId: string | undefined
+}
+
 export function parsePriceIds(c: Context, prices: Stripe.SubscriptionItem[]): { priceId: string | null, productId: string | null, meteredData: MeteredData } {
   let priceId: string | null = null
   let productId: string | null = null
@@ -255,7 +250,7 @@ export async function createCheckout(c: Context, customerId: string, reccurence:
     billing_address_collection: 'auto',
     mode: 'subscription',
     customer: customerId,
-    success_url: `${successUrl}?session_id={CHECKOUT_SESSION_ID}`,
+    success_url: `${successUrl}?success=true`,
     cancel_url: cancelUrl,
     automatic_tax: { enabled: true },
     client_reference_id: clientReferenceId,
@@ -317,7 +312,7 @@ export async function setThreshold(c: Context, subscriptionId: string) {
       amount_gte: 5000,
       reset_billing_cycle_anchor: false,
     },
-  } as any) // Use type assertion to bypass linter error
+  })
   return subscription
 }
 
@@ -325,7 +320,7 @@ export async function updateCustomer(c: Context, customerId: string, email: stri
   if (!existInEnv(c, 'STRIPE_SECRET_KEY'))
     return Promise.resolve()
   const customer = await getStripe(c).customers.update(customerId, {
-    email: billing_email || email,
+    email: billing_email ?? email,
     name,
     metadata: {
       user_id: userId,
@@ -335,14 +330,48 @@ export async function updateCustomer(c: Context, customerId: string, email: stri
   return customer
 }
 
-export async function recordUsage(c: Context, subscriptionItemId: string, quantity: number) {
+export async function recordUsage(c: Context, customerId: string, eventName: string, value: number, meterId?: string) {
   if (!existInEnv(c, 'STRIPE_SECRET_KEY'))
     return Promise.resolve()
-  const usageRecord = await (getStripe(c).subscriptionItems as any).createUsageRecord(subscriptionItemId, { // Use type assertion to bypass linter error
-    quantity,
-    action: 'set',
-  })
-  return usageRecord
+
+  if (!eventName) {
+    cloudlog({ requestId: c.get('requestId'), message: 'recordUsage no eventName', customerId, eventName, value, meterId })
+    return Promise.reject(new Error('No event name'))
+  }
+  try {
+    // Create a meter event for usage tracking
+    const meterEvent = await getStripe(c).billing.meterEvents.create({
+      event_name: eventName,
+      payload: {
+        value: value.toString(),
+        stripe_customer_id: customerId,
+      },
+      // Optional: specify meter ID if you have multiple meters
+      ...(meterId && { meter: meterId }),
+    })
+
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'Meter event recorded',
+      customerId,
+      eventName,
+      value,
+      meterEventId: meterEvent.identifier,
+    })
+
+    return meterEvent
+  }
+  catch (error) {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'Failed to record meter usage',
+      customerId,
+      eventName,
+      value,
+      error,
+    })
+    throw error
+  }
 }
 
 export async function removeOldSubscription(c: Context, subscriptionId: string) {

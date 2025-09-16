@@ -1,24 +1,16 @@
-import { HTTPException } from 'hono/http-exception'
-import { sendDiscordAlert } from './discord.ts'
+import type { Context } from 'hono'
+import type { SimpleErrorResponse } from './hono.ts'
+import { sendDiscordAlert500 } from './discord.ts'
+import { cloudlogErr, serializeError } from './loggin.ts'
 import { backgroundTask } from './utils.ts'
 
 export function onError(functionName: string) {
-  return async (e: any, c: any) => {
-    console.log('app onError', e)
+  return async (e: any, c: Context) => {
     c.get('sentry')?.captureException(e)
-
-    const requestId = c.get('requestId') || 'unknown'
-    const timestamp = new Date().toISOString()
-    const userAgent = c.req.header('user-agent') || 'unknown'
-    const ip = c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || 'unknown'
-    const method = c.req.method
-    const url = c.req.url
-    const headers = Object.fromEntries(c.req.raw.headers.entries())
-
     let body = 'N/A'
     try {
       const clonedReq = c.req.raw.clone()
-      body = await clonedReq.text()
+      body = await clonedReq.text().catch(() => 'Failed to read body')
       if (body.length > 1000) {
         body = `${body.substring(0, 1000)}... (truncated)`
       }
@@ -27,63 +19,61 @@ export function onError(functionName: string) {
       body = 'Failed to read body'
     }
 
-    const errorMessage = e?.message || 'Unknown error'
-    const errorStack = e?.stack || 'No stack trace'
-    const errorName = e?.name || 'Error'
-
-    await backgroundTask(c, sendDiscordAlert(c, {
-      content: `🚨 **${functionName}** Error Alert`,
-      embeds: [
-        {
-          title: `❌ ${functionName} Function Failed`,
-          description: `**Error:** ${errorName}\n**Message:** ${errorMessage}`,
-          color: 0xFF0000, // Red color
-          timestamp,
-          fields: [
-            {
-              name: '🔍 Request Details',
-              value: `**Method:** ${method}\n**URL:** ${url}\n**Request ID:** ${requestId}`,
-              inline: false,
-            },
-            {
-              name: '🌐 Client Info',
-              value: `**IP:** ${ip}\n**User-Agent:** ${userAgent}`,
-              inline: false,
-            },
-            {
-              name: '📝 Request Body',
-              value: `\`\`\`\n${body}\n\`\`\``,
-              inline: false,
-            },
-            {
-              name: '🔧 Headers',
-              value: `\`\`\`json\n${JSON.stringify(headers, null, 2).substring(0, 1000)}\n\`\`\``,
-              inline: false,
-            },
-            {
-              name: '💥 Error Stack',
-              value: `\`\`\`\n${errorStack.substring(0, 1000)}\n\`\`\``,
-              inline: false,
-            },
-            {
-              name: '🔍 Full Error Object',
-              value: `\`\`\`json\n${JSON.stringify(e, Object.getOwnPropertyNames(e), 2).substring(0, 1000)}\n\`\`\``,
-              inline: false,
-            },
-          ],
-          footer: {
-            text: `Function: ${functionName} | Environment: ${Deno.env.get('ENVIRONMENT') || 'unknown'}`,
-          },
-        },
-      ],
-    }))
-    if (e instanceof HTTPException) {
-      console.log('HTTPException found', e.status)
-      if (e.status === 429) {
-        return c.json({ error: 'you are beeing rate limited' }, e.status)
-      }
-      return c.json({ status: 'Internal Server Error', response: e.getResponse(), error: JSON.stringify(e), message: e.message }, e.status)
+    // const safeCause = e ? JSON.stringify(e, Object.getOwnPropertyNames(e)) : undefined
+    const defaultResponse: SimpleErrorResponse = {
+      error: 'unknown_error',
+      message: 'Unknown error',
+      // cause: safeCause,
+      moreInfo: {},
     }
-    return c.json({ status: 'Internal Server Error', error: JSON.stringify(e), message: e.message }, 500)
+
+    const isHttpException = e && typeof e === 'object' && typeof e.status === 'number' && typeof e.getResponse === 'function'
+    if (isHttpException) {
+      // Pull the JSON we attached to the HTTPException to improve logs and response
+      let res: SimpleErrorResponse = defaultResponse
+      try {
+        const parsed = await e.getResponse().json()
+        res = {
+          error: typeof parsed?.error === 'string' ? parsed.error : 'unknown_error',
+          message: typeof parsed?.message === 'string' ? parsed.message : 'Unknown error',
+          moreInfo: parsed?.moreInfo ?? (typeof parsed === 'object' ? parsed : {}),
+        }
+      }
+      catch {
+        // ignore JSON parse errors; fall back to default
+      }
+      // Single, structured error log entry
+      cloudlogErr({
+        requestId: c.get('requestId'),
+        functionName,
+        kind: 'http_exception',
+        method: c.req.method,
+        url: c.req.url,
+        status: e.status,
+        errorCode: res.error,
+        errorMessage: res.message,
+        moreInfo: res.moreInfo,
+        stack: serializeError(e)?.stack ?? 'N/A',
+      })
+      if (e.status === 429) {
+        return c.json({ error: 'too_many_requests', message: 'You are being rate limited' }, e.status)
+      }
+      if (e.status >= 500) {
+        await backgroundTask(c, sendDiscordAlert500(c, functionName, body, e))
+      }
+      return c.json(res, e.status)
+    }
+    // Non-HTTP errors: log with stack and return 500
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      functionName,
+      kind: 'unhandled_error',
+      method: c.req.method,
+      url: c.req.url,
+      errorMessage: e?.message ?? 'Unknown error',
+      stack: serializeError(e)?.stack ?? 'N/A',
+    })
+    await backgroundTask(c, sendDiscordAlert500(c, functionName, body, e))
+    return c.json(defaultResponse, 500)
   }
 }

@@ -4,8 +4,6 @@ import { defineConfig } from 'vitest/config'
 
 export default defineConfig(({ mode }) => ({
   test: {
-    // pool: 'threads',
-    // pool: 'vmThreads',
     include: ['tests/*.test.ts'],
     environment: 'node',
     watch: false,

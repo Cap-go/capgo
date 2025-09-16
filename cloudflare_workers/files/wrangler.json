@@ -22,6 +22,10 @@
       "zone_name": "capgo.app"
     },
     {
+      "pattern": "files.usecapgo.com",
+      "custom_domain": true
+    },
+    {
       "pattern": "updater.spencer.co/files*",
       "zone_name": "capgo.app"
     }
@@ -29,7 +33,8 @@
   "compatibility_date": "2025-04-01",
   "main": "./index.ts",
   "compatibility_flags": [
-    "nodejs_compat_v2"
+    "nodejs_compat_v2",
+    "nodejs_compat_populate_process_env"
   ],
   "logpush": true,
   "workers_dev": false,

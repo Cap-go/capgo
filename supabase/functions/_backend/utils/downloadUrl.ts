@@ -1,9 +1,8 @@
-import type { Context } from '@hono/hono'
+import type { Context } from 'hono'
 import type { Database } from './supabase.types.ts'
 import { getRuntimeKey } from 'hono/adapter'
 import { cloudlog, cloudlogErr } from './loggin.ts'
 import { s3 } from './s3.ts'
-import { supabaseAdmin } from './supabase.ts'
 
 const EXPIRATION_SECONDS = 604800
 const BASE_PATH = 'files/read/attachments'
@@ -16,30 +15,22 @@ export interface ManifestEntry {
 
 export async function getBundleUrl(
   c: Context,
-  versionId: number,
   r2_path: string | null,
   deviceId: string,
+  checksum: string,
 ) {
-  cloudlog({ requestId: c.get('requestId'), message: 'getBundleUrlV2 version', versionId })
-
-  const { data: bundleMeta } = await supabaseAdmin(c)
-    .from('app_versions_meta')
-    .select('size, checksum')
-    .eq('id', versionId)
-    .single()
-
-  cloudlog({ requestId: c.get('requestId'), message: 'path', r2_path })
+  cloudlog({ requestId: c.get('requestId'), message: 'getBundleUrl path', r2_path })
   if (!r2_path)
     return null
 
   if (getRuntimeKey() !== 'workerd') {
     try {
       const signedUrl = await s3.getSignedUrl(c, r2_path, EXPIRATION_SECONDS)
-      cloudlog({ requestId: c.get('requestId'), message: 'getBundleUrl', signedUrl, size: bundleMeta?.size })
-
+      cloudlog({ requestId: c.get('requestId'), message: 'getBundleUrl', signedUrl })
       const url = signedUrl
-
-      return { url, size: bundleMeta?.size }
+      // Since it's signed url we cannot add extra query params like checksum and device id
+      // TODO: swtich to our own file endpoint instead of direct s3 signed url
+      return url
     }
     catch (error) {
       cloudlogErr({ requestId: c.get('requestId'), message: 'getBundleUrl', error })
@@ -52,8 +43,8 @@ export async function getBundleUrl(
     url.host = 'localhost:54321'
     finalPath = `functions/v1/${BASE_PATH}`
   }
-  const downloadUrl = `${url.protocol}//${url.host}/${finalPath}/${r2_path}?key=${bundleMeta?.checksum}&device_id=${deviceId}`
-  return { url: downloadUrl, size: bundleMeta?.size }
+  const downloadUrl = `${url.protocol}//${url.host}/${finalPath}/${r2_path}?key=${checksum}&device_id=${deviceId}`
+  return downloadUrl
 }
 
 export function getManifestUrl(c: Context, versionId: number, manifest: Partial<Database['public']['Tables']['manifest']['Row']>[] | null, deviceId: string): ManifestEntry[] {

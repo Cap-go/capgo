@@ -65,7 +65,7 @@ async function fix_apps() {
       .from('apps')
       .list(`${app.user_id}/${app.app_id}/versions`)
     console.log('versions', versions)
-    const versionSize = versions.data.reduce((acc, cur) => acc + (cur.metadata.size || 0), 0) || 0
+    const versionSize = versions.data.reduce((acc, cur) => acc + (cur.metadata.size?? 0), 0)?? 0
     if (new Date().getDate() === 1) {
       const today_id = new Date().toISOString().slice(0, 10)
       const increment = {
