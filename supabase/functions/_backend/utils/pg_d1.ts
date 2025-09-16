@@ -7,6 +7,36 @@ import { quickError } from './hono.ts'
 import { cloudlog, cloudlogErr } from './loggin.ts'
 import * as schemaV2 from './sqlite_schema.ts'
 
+const PLAN_EXCEEDED_COLUMNS_V2: Record<'mau' | 'storage' | 'bandwidth', string> = {
+  mau: 'mau_exceeded',
+  storage: 'storage_exceeded',
+  bandwidth: 'bandwidth_exceeded',
+}
+
+function buildPlanValidationExpressionV2(
+  actions: ('mau' | 'storage' | 'bandwidth')[],
+  ownerColumn: typeof schemaV2.app_versions.owner_org | typeof schemaV2.apps.owner_org,
+) {
+  const extraConditions = actions.map(action => ` AND ${PLAN_EXCEEDED_COLUMNS_V2[action]} = 0`).join('')
+  return sql<boolean>`EXISTS (
+    SELECT 1
+    FROM ${schemaV2.stripe_info}
+    WHERE ${schemaV2.stripe_info.customer_id} = (
+      SELECT ${schemaV2.orgs.customer_id}
+      FROM ${schemaV2.orgs}
+      WHERE ${schemaV2.orgs.id} = ${ownerColumn}
+    )
+    AND (
+      (date(${schemaV2.stripe_info.trial_at}) > date('now'))
+      OR (
+        ${schemaV2.stripe_info.status} = 'succeeded'
+        AND ${schemaV2.stripe_info.is_good_plan} = 1
+        ${sql.raw(extraConditions)}
+      )
+    )
+  )`
+}
+
 export function getAliasV2() {
   const versionAlias = aliasV2(schemaV2.app_versions, 'version')
   const channelDevicesAlias = aliasV2(schemaV2.channel_devices, 'channel_devices')
@@ -188,23 +218,10 @@ export async function getAppOwnerPostgresV2(
 ): Promise<{ owner_org: string, orgs: { created_by: string, id: string }, plan_valid: boolean } | null> {
   try {
     cloudlog({ requestId: c.get('requestId'), message: 'appOwner', appId })
+    if (actions.length === 0)
+      return null
     const orgAlias = aliasV2(schemaV2.orgs, 'orgs')
-    const conditions = actions.map(action => `${action}_exceeded = 0`).join(' AND ')
-    const planExpression = actions.length > 0
-      ? sql<boolean>`EXISTS (
-        SELECT 1
-        FROM ${schemaV2.stripe_info}
-        WHERE customer_id = (SELECT customer_id FROM ${schemaV2.orgs} WHERE id = ${schemaV2.apps.owner_org})
-        AND (
-          (date(trial_at) > date('now'))
-          OR (
-            status = 'succeeded'
-            AND is_good_plan = 1
-            ${conditions ? sql` AND ${sql.raw(conditions)}` : sql``}
-          )
-        )
-      )`
-      : sql<boolean>`true`
+    const planExpression = buildPlanValidationExpressionV2(actions, schemaV2.apps.owner_org)
     const appOwner = await drizzleCient
       .select({
         owner_org: schemaV2.apps.owner_org,
@@ -263,20 +280,7 @@ export async function getAppVersionsByAppIdD1(
   try {
     if (actions.length === 0)
       return []
-    const conditions = actions.map(action => `${action}_exceeded = 0`).join(' AND ')
-    const planExpression = sql<boolean>`EXISTS (
-      SELECT 1
-      FROM ${schemaV2.stripe_info}
-      WHERE customer_id = (SELECT customer_id FROM ${schemaV2.orgs} WHERE id = ${schemaV2.app_versions.owner_org})
-      AND (
-        (date(trial_at) > date('now'))
-        OR (
-          status = 'succeeded'
-          AND is_good_plan = 1
-          ${conditions ? sql` AND ${sql.raw(conditions)}` : sql``}
-        )
-      )
-    )`
+    const planExpression = buildPlanValidationExpressionV2(actions, schemaV2.app_versions.owner_org)
     const versions = await drizzleCient
       .select({
         id: schemaV2.app_versions.id,
@@ -442,20 +446,7 @@ export async function getAppByIdD1(
   try {
     if (actions.length === 0)
       return null
-    const conditions = actions.map(action => `${action}_exceeded = 0`).join(' AND ')
-    const planExpression = sql<boolean>`EXISTS (
-      SELECT 1
-      FROM ${schemaV2.stripe_info}
-      WHERE customer_id = (SELECT customer_id FROM ${schemaV2.orgs} WHERE id = ${schemaV2.apps.owner_org})
-      AND (
-        (date(trial_at) > date('now'))
-        OR (
-          status = 'succeeded'
-          AND is_good_plan = 1
-          ${conditions ? sql` AND ${sql.raw(conditions)}` : sql``}
-        )
-      )
-    )`
+    const planExpression = buildPlanValidationExpressionV2(actions, schemaV2.apps.owner_org)
     const app = await drizzleCient
       .select({
         owner_org: schemaV2.apps.owner_org,

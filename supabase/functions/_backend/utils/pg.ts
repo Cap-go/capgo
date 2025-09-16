@@ -7,6 +7,36 @@ import { backgroundTask, existInEnv, getEnv } from '../utils/utils.ts'
 import { cloudlog, cloudlogErr } from './loggin.ts'
 import * as schema from './postgress_schema.ts'
 
+const PLAN_EXCEEDED_COLUMNS: Record<'mau' | 'storage' | 'bandwidth', string> = {
+  mau: 'mau_exceeded',
+  storage: 'storage_exceeded',
+  bandwidth: 'bandwidth_exceeded',
+}
+
+function buildPlanValidationExpression(
+  actions: ('mau' | 'storage' | 'bandwidth')[],
+  ownerColumn: typeof schema.app_versions.owner_org | typeof schema.apps.owner_org,
+) {
+  const extraConditions = actions.map(action => ` AND ${PLAN_EXCEEDED_COLUMNS[action]} = false`).join('')
+  return sql<boolean>`EXISTS (
+    SELECT 1
+    FROM ${schema.stripe_info}
+    WHERE ${schema.stripe_info.customer_id} = (
+      SELECT ${schema.orgs.customer_id}
+      FROM ${schema.orgs}
+      WHERE ${schema.orgs.id} = ${ownerColumn}
+    )
+    AND (
+      (${schema.stripe_info.trial_at}::date > CURRENT_DATE)
+      OR (
+        ${schema.stripe_info.status} = 'succeeded'
+        AND ${schema.stripe_info.is_good_plan} = true
+        ${sql.raw(extraConditions)}
+      )
+    )
+  )`
+}
+
 export function getDatabaseURL(c: Context): string {
   // TODO: uncomment when we enable back replicate
   // const clientContinent = (c.req.raw as any)?.cf?.continent
@@ -176,13 +206,10 @@ export async function getAppOwnerPostgres(
   actions: ('mau' | 'storage' | 'bandwidth')[] = [],
 ): Promise<{ owner_org: string, orgs: { created_by: string, id: string }, plan_valid: boolean } | null> {
   try {
+    if (actions.length === 0)
+      return null
     const orgAlias = alias(schema.orgs, 'orgs')
-    const actionsArray = actions.length > 0
-      ? sql.raw(`ARRAY[${actions.map(action => `'${action}'`).join(', ')}]::action_type[]`)
-      : null
-    const planExpression = actionsArray
-      ? sql<boolean>`is_allowed_action_org_action(${schema.apps.owner_org}, ${actionsArray})`
-      : sql<boolean>`true`
+    const planExpression = buildPlanValidationExpression(actions, schema.apps.owner_org)
 
     const appOwner = await drizzleCient
       .select({
@@ -246,8 +273,7 @@ export async function getAppVersionsByAppIdPg(
   try {
     if (actions.length === 0)
       return []
-    const actionsArray = sql.raw(`ARRAY[${actions.map(action => `'${action}'`).join(', ')}]::action_type[]`)
-    const planExpression = sql<boolean>`is_allowed_action_org_action(${schema.app_versions.owner_org}, ${actionsArray})`
+    const planExpression = buildPlanValidationExpression(actions, schema.app_versions.owner_org)
     const versions = await drizzleCient
       .select({
         id: schema.app_versions.id,
@@ -462,8 +488,7 @@ export async function getAppByIdPg(
   try {
     if (actions.length === 0)
       return null
-    const actionsArray = sql.raw(`ARRAY[${actions.map(action => `'${action}'`).join(', ')}]::action_type[]`)
-    const planExpression = sql<boolean>`is_allowed_action_org_action(${schema.apps.owner_org}, ${actionsArray})`
+    const planExpression = buildPlanValidationExpression(actions, schema.apps.owner_org)
     const app = await drizzleCient
       .select({
         owner_org: schema.apps.owner_org,

@@ -447,15 +447,6 @@ export async function findBestPlan(stats: Database['public']['Functions']['find_
   return data
 }
 
-export async function getAppMetrics(orgId: string, startDate?: string, endDate?: string): Promise<AppUsageByApp[]> {
-  const { data, error } = await useSupabase()
-    .rpc('get_app_metrics', { org_id: orgId, start_date: startDate, end_date: endDate })
-  if (error)
-    throw new Error(error.message)
-
-  return data
-}
-
 export function convertNativePackages(nativePackages: { name: string, version: string }[]) {
   if (!nativePackages) {
     throw new Error(`Error parsing native packages, perhaps the metadata does not exist in Capgo?`)
