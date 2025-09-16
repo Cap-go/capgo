@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## 12.28.0 (2025-09-16)
+
+
+### Features
+
+* implement plan validation logic for app metrics and streamline database queries ([b763858](https://github.com/Cap-go/capgo/commit/b7638581c48a0b812a25e168cf1910b97ca966c9))
+
 ## 12.27.0 (2025-09-16)
 
 
