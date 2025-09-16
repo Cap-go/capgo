@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.26.5 (2025-09-16)
+
+
+### Bug Fixes
+
+* correct schema reference in update_app_versions_retention function ([b33f618](https://github.com/Cap-go/capgo/commit/b33f618827f8c1d2e8f434802950ddc62a4a60f2))
+
 ### 12.26.4 (2025-09-16)
 
 ### 12.26.3 (2025-09-16)
