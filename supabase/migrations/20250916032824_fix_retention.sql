@@ -6,8 +6,8 @@ BEGIN
     UPDATE public.app_versions
     SET deleted = true
     WHERE app_versions.deleted = false
-      AND (SELECT retention FROM apps WHERE apps.app_id = app_versions.app_id) >= 0
-      AND (SELECT retention FROM apps WHERE apps.app_id = app_versions.app_id) < 63113904
+      AND (SELECT retention FROM public.apps WHERE apps.app_id = app_versions.app_id) >= 0
+      AND (SELECT retention FROM public.apps WHERE apps.app_id = app_versions.app_id) < 63113904
       AND app_versions.created_at < (
           SELECT now() - make_interval(secs => apps.retention)
           FROM public.apps
@@ -23,11 +23,21 @@ END;
 $$;
 
 ALTER FUNCTION "public"."update_app_versions_retention" () OWNER TO "postgres";
-REVOKE ALL ON FUNCTION "public"."update_app_versions_retention" () FROM PUBLIC;
-REVOKE ALL ON FUNCTION "public"."update_app_versions_retention" () FROM anon;
-REVOKE ALL ON FUNCTION "public"."update_app_versions_retention" () FROM authenticated;
-GRANT EXECUTE ON FUNCTION "public"."update_app_versions_retention" () TO postgres;
-GRANT EXECUTE ON FUNCTION "public"."update_app_versions_retention" () TO service_role;
 
+REVOKE ALL ON FUNCTION "public"."update_app_versions_retention" ()
+FROM
+  PUBLIC;
 
+REVOKE ALL ON FUNCTION "public"."update_app_versions_retention" ()
+FROM
+  anon;
 
+REVOKE ALL ON FUNCTION "public"."update_app_versions_retention" ()
+FROM
+  authenticated;
+
+GRANT
+EXECUTE ON FUNCTION "public"."update_app_versions_retention" () TO postgres;
+
+GRANT
+EXECUTE ON FUNCTION "public"."update_app_versions_retention" () TO service_role;
