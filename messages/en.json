@@ -8,6 +8,7 @@
   "Current": "Current",
   "Filters": "Filters",
   "Override": "Override",
+  "CustomId": "Custom ID",
   "Storage": "Storage",
   "ab-testing-progressive-deploy-conflict": "AB testing and progressive deploy cannot be enabled at the same time",
   "accept-email-newsletter-and-future-marketing-offers": "I accept e-mail newsletter and future marketing offers",
