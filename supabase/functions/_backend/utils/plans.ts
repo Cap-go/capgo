@@ -106,7 +106,7 @@ async function userAbovePlan(c: Context, org: {
     subscription_id: string | null
   } | null
 }, orgId: string, is_good_plan: boolean) {
-  cloudlog({ requestId: c.get('requestId'), message: 'is_good_plan_v5_org', orgId, is_good_plan })
+  cloudlog({ requestId: c.get('requestId'), message: 'userAbovePlan', orgId, is_good_plan })
   // create dateid var with yyyy-mm with dayjs
   const get_total_stats = await getTotalStats(c, orgId)
   const current_plan = await getCurrentPlanNameOrg(c, orgId)
