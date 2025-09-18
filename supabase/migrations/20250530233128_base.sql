@@ -3840,8 +3840,6 @@ CREATE TABLE IF NOT EXISTS "public"."users" (
   "enableNotifications" boolean DEFAULT false NOT NULL,
   "optForNewsletters" boolean DEFAULT false NOT NULL,
   "legalAccepted" boolean DEFAULT false NOT NULL,
-  "customer_id" character varying,
-  "billing_email" "text",
   "ban_time" timestamp with time zone
 );
 

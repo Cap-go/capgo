@@ -32,6 +32,9 @@ async function updateUser(
         .insert({
           id: main.auth.id,
           email: main.auth.email ?? '',
+          first_name: main.auth.user_metadata?.first_name ?? '',
+          last_name: main.auth.user_metadata?.last_name ?? '',
+          country: null,
           enable_notifications: true,
           opt_for_newsletters: true,
         })
