@@ -4415,9 +4415,6 @@ ALTER TABLE ONLY "public"."stripe_info"
 ADD CONSTRAINT "stripe_info_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "public"."plans" ("stripe_id");
 
 ALTER TABLE ONLY "public"."users"
-ADD CONSTRAINT "users_customer_id_fkey" FOREIGN KEY ("customer_id") REFERENCES "public"."stripe_info" ("customer_id");
-
-ALTER TABLE ONLY "public"."users"
 ADD CONSTRAINT "users_id_fkey" FOREIGN KEY ("id") REFERENCES "auth"."users" ("id") ON DELETE CASCADE;
 
 CREATE POLICY "Allow all for auth (super_admin+)" ON "public"."app_versions" FOR DELETE TO "authenticated" USING (
