@@ -3989,9 +3989,6 @@ ALTER TABLE ONLY "public"."orgs"
 ADD CONSTRAINT "unique_name_created_by" UNIQUE ("name", "created_by");
 
 ALTER TABLE ONLY "public"."users"
-ADD CONSTRAINT "users_customer_id_key" UNIQUE ("customer_id");
-
-ALTER TABLE ONLY "public"."users"
 ADD CONSTRAINT "users_pkey" PRIMARY KEY ("id");
 
 ALTER TABLE ONLY "public"."version_meta"
