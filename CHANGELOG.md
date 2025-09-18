@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## 12.29.0 (2025-09-18)
+
+
+### Features
+
+* add first name, last name, and country fields to user insertion; remove obsolete customer_id and billing_email fields ([d54e376](https://github.com/Cap-go/capgo/commit/d54e376e3fa412b1c7cc85d4ac5f7c5a98c6aef4))
+
 ### 12.28.3 (2025-09-18)
 
 ### 12.28.2 (2025-09-18)
