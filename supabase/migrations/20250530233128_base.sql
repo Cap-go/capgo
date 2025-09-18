@@ -5093,34 +5093,6 @@ WITH
     )
   );
 
-CREATE POLICY "Allow user to self get" ON "public"."stripe_info" FOR
-SELECT
-  TO "authenticated" USING (
-    (
-      (
-        (
-          SELECT
-            "auth"."uid" () AS "uid"
-        ) IN (
-          SELECT
-            "users"."id"
-          FROM
-            "public"."users"
-          WHERE
-            (
-              ("users"."customer_id")::"text" = ("users"."customer_id")::"text"
-            )
-        )
-      )
-      OR "public"."is_admin" (
-        (
-          SELECT
-            "auth"."uid" () AS "uid"
-        )
-      )
-    )
-  );
-
 CREATE POLICY "Allow users to delete manifest entries" ON "public"."manifest" FOR DELETE TO "authenticated" USING (
   (
     EXISTS (
