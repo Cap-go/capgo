@@ -73,23 +73,20 @@ app.post('/', async (c) => {
   }
 
   // TODO: improve error handling
-  const { error: userNormalTableError } = await supabaseAdmin.from('users').insert({
+  const { error: userNormalTableError, data } = await supabaseAdmin.from('users').insert({
     id: user.user.id,
     email: invitation.email,
     first_name: invitation.first_name,
     last_name: invitation.last_name,
     enable_notifications: true,
     opt_for_newsletters: body.opt_for_newsletters,
-  })
+  }).select().single()
 
   if (userNormalTableError) {
     throw quickError(500, 'failed_to_accept_invitation', 'Failed to accept invitation insert', { error: userNormalTableError.message })
   }
 
-  await syncUserPreferenceTags(c, invitation.email, {
-    enable_notifications: true,
-    opt_for_newsletters: body.opt_for_newsletters,
-  })
+  await syncUserPreferenceTags(c, invitation.email, data)
 
   // let's now login the user in. The rough idea is that we will create a session and then return the session to the client
   // then the client will use the session to redirect to login page.
