@@ -23,7 +23,7 @@ const supabase = useSupabase()
 
 // Terms and marketing acceptance
 const acceptTerms = ref(false)
-const acceptMarketing = ref(false)
+const acceptMarketing = ref(true)
 const showTermsError = ref(false)
 
 // Password validation
@@ -100,7 +100,7 @@ async function submitForm() {
       body: {
         password: password.value,
         magic_invite_string: inviteMagicString.value,
-        optForNewsletters: acceptMarketing.value,
+        opt_for_newsletters: acceptMarketing.value,
         captchaToken: turnstileToken.value,
       },
     })

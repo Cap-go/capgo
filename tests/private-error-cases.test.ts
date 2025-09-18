@@ -384,7 +384,7 @@ describe('[POST] /private/accept_invitation - Error Cases', () => {
       body: JSON.stringify({
         password: 'ValidPassword123!!',
         magic_invite_string: 'nonexistent-invitation-id',
-        optForNewsletters: false,
+        opt_for_newsletters: false,
         captchaToken: 'test-captcha-token',
       }),
     })

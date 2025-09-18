@@ -42,7 +42,7 @@ async function submit(form: { password: string }) {
     setErrors('set-password', [updateError.message], {})
   else
     toast.success(t('changed-password-suc'))
-  router.push('/onboarding/activation')
+  router.push('/app')
 }
 watchEffect(async () => {
   if (route && route.path === '/onboarding/set_password')

@@ -2,53 +2,53 @@
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useSupabase } from '~/services/supabase'
+import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
 
 const { t } = useI18n()
 const main = useMainStore()
 const supabase = useSupabase()
 const isLoading = ref(false)
-const enableNotifications = ref(false)
-const optForNewsletters = ref(false)
+const enableNotifications = ref(main.user?.enable_notifications ?? true)
+const optForNewsletters = ref(main.user?.opt_for_newsletters ?? true)
 const displayStore = useDisplayStore()
 displayStore.NavTitle = t('notifications')
 
-enableNotifications.value = main.auth?.user_metadata?.activation?.enableNotifications ?? false
-optForNewsletters.value = main.auth?.user_metadata?.activation?.optForNewsletters ?? false
-
 async function submitNotif() {
+  if (!main.user?.id)
+    return
+
   isLoading.value = true
   enableNotifications.value = !enableNotifications.value
-  const activation = main.auth?.user_metadata?.activation || {}
-  const { data, error } = await supabase.auth.updateUser({
-    data: {
-      activation: {
-        ...activation,
-        enableNotifications: enableNotifications.value,
-      },
-    },
-  })
+  const { data, error } = await supabase
+    .from('users')
+    .update({
+      enable_notifications: enableNotifications.value,
+    })
+    .eq('id', main.user.id)
+    .select()
+    .single()
   if (!error && data)
-    main.auth = data.user
+    main.user = data
   isLoading.value = false
 }
 async function submitDoi() {
+  if (!main.user?.id)
+    return
+
   isLoading.value = true
-  console.log('submitDoi')
 
   optForNewsletters.value = !optForNewsletters.value
-  const activation = main.auth?.user_metadata?.activation || {}
-  const { data, error } = await supabase.auth.updateUser({
-    data: {
-      activation: {
-        ...activation,
-        optForNewsletters: optForNewsletters.value,
-      },
-    },
-  })
+  const { data, error } = await supabase
+    .from('users')
+    .update({
+      opt_for_newsletters: optForNewsletters.value,
+    })
+    .eq('id', main.user.id)
+    .select()
+    .single()
   if (!error && data)
-    main.auth = data.user
-  console.log('main.auth', data)
+    main.user = data
   isLoading.value = false
 }
 </script>

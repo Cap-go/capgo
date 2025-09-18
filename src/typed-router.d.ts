@@ -34,10 +34,8 @@ declare module 'vue-router/auto-routes' {
     '/forgot_password': RouteRecordInfo<'/forgot_password', '/forgot_password', Record<never, never>, Record<never, never>>,
     '/invitation': RouteRecordInfo<'/invitation', '/invitation', Record<never, never>, Record<never, never>>,
     '/login': RouteRecordInfo<'/login', '/login', Record<never, never>, Record<never, never>>,
-    '/onboarding/activation': RouteRecordInfo<'/onboarding/activation', '/onboarding/activation', Record<never, never>, Record<never, never>>,
     '/onboarding/confirm_email': RouteRecordInfo<'/onboarding/confirm_email', '/onboarding/confirm_email', Record<never, never>, Record<never, never>>,
     '/onboarding/set_password': RouteRecordInfo<'/onboarding/set_password', '/onboarding/set_password', Record<never, never>, Record<never, never>>,
-    '/onboarding/verify_email': RouteRecordInfo<'/onboarding/verify_email', '/onboarding/verify_email', Record<never, never>, Record<never, never>>,
     '/register': RouteRecordInfo<'/register', '/register', Record<never, never>, Record<never, never>>,
     '/resend_email': RouteRecordInfo<'/resend_email', '/resend_email', Record<never, never>, Record<never, never>>,
     '/scan': RouteRecordInfo<'/scan', '/scan', Record<never, never>, Record<never, never>>,
@@ -127,20 +125,12 @@ declare module 'vue-router/auto-routes' {
       routes: '/login'
       views: never
     }
-    'src/pages/onboarding/activation.vue': {
-      routes: '/onboarding/activation'
-      views: never
-    }
     'src/pages/onboarding/confirm_email.vue': {
       routes: '/onboarding/confirm_email'
       views: never
     }
     'src/pages/onboarding/set_password.vue': {
       routes: '/onboarding/set_password'
-      views: never
-    }
-    'src/pages/onboarding/verify_email.vue': {
-      routes: '/onboarding/verify_email'
       views: never
     }
     'src/pages/register.vue': {

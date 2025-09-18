@@ -586,6 +586,7 @@
   "register": "登録",
   "register-heading": "登録",
   "register-next": "登録",
+  "register-terms-disclaimer": "登録すると、利用規約に同意したものとみなされます。",
   "reload": "リロード",
   "remove-bundle-from-channel": "チャンネルからバンドルを削除する",
   "remove-bundle-from-this-channel": "このチャンネルからバンドルを削除します",

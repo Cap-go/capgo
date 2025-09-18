@@ -44,27 +44,34 @@ async function submit(form: { first_name: string, last_name: string, password: s
       password: form.password,
       options: {
         captchaToken: turnstileToken.value,
-        data: {
-          first_name: form.first_name,
-          last_name: form.last_name,
-          activation: {
-            formFilled: true,
-            enableNotifications: false,
-            legal: false,
-            optForNewsletters: false,
-          },
-        },
-        emailRedirectTo: `${import.meta.env.VITE_APP_URL}/onboarding/verify_email`,
       },
     },
     // supabase auth config
-    // http://localhost:5173/onboarding/verify_email,http://localhost:5173/forgot_password?step=2,https://capgo.app/onboarding/verify_email,https://capgo.app/forgot_password?step=2,https://capgo.app/onboarding/first_password,https://development.capgo.app/onboarding/verify_email,https://development.capgo.app/forgot_password?step=2
+    // http://localhost:5173/login,http://localhost:5173/forgot_password?step=2,https://capgo.app/login,https://capgo.app/forgot_password?step=2,https://capgo.app/onboarding/first_password,https://development.capgo.app/login,https://development.capgo.app/forgot_password?step=2
   )
   isLoading.value = false
   if (error || !user) {
     setErrors('register-account', [error?.message || 'user not found'], {})
     return
   }
+
+  const newUser = user.user
+  if (newUser) {
+    const { error: profileError } = await supabase
+      .from('users')
+      .upsert({
+        id: newUser.id,
+        email: newUser.email ?? form.email,
+        first_name: form.first_name,
+        last_name: form.last_name,
+        enable_notifications: true,
+        opt_for_newsletters: true,
+      }, { onConflict: 'id' })
+
+    if (profileError)
+      console.error('Failed to seed user profile after signup', profileError)
+  }
+
   router.push(`/app`)
 }
 </script>
@@ -160,6 +167,12 @@ async function submit(form: { first_name: string, last_name: string, password: s
                     </span>
                     <Spinner v-else size="w-8 h-8" class="px-4" color="fill-gray-100 text-gray-200 dark:text-gray-600" />
                   </button>
+                </div>
+
+                <div class="col-span-2 mt-3 text-center">
+                  <p class="text-xs text-gray-500">
+                    {{ t('register-terms-disclaimer') }}
+                  </p>
                 </div>
 
                 <div class="col-span-2 text-center">

@@ -1253,13 +1253,12 @@ export type Database = {
           created_at: string | null
           customer_id: string | null
           email: string
-          enableNotifications: boolean
+          enable_notifications: boolean
           first_name: string | null
           id: string
           image_url: string | null
           last_name: string | null
-          legalAccepted: boolean
-          optForNewsletters: boolean
+          opt_for_newsletters: boolean
           updated_at: string | null
         }
         Insert: {
@@ -1269,13 +1268,12 @@ export type Database = {
           created_at?: string | null
           customer_id?: string | null
           email: string
-          enableNotifications?: boolean
+          enable_notifications?: boolean
           first_name?: string | null
           id: string
           image_url?: string | null
           last_name?: string | null
-          legalAccepted?: boolean
-          optForNewsletters?: boolean
+          opt_for_newsletters?: boolean
           updated_at?: string | null
         }
         Update: {
@@ -1285,13 +1283,12 @@ export type Database = {
           created_at?: string | null
           customer_id?: string | null
           email?: string
-          enableNotifications?: boolean
+          enable_notifications?: boolean
           first_name?: string | null
           id?: string
           image_url?: string | null
           last_name?: string | null
-          legalAccepted?: boolean
-          optForNewsletters?: boolean
+          opt_for_newsletters?: boolean
           updated_at?: string | null
         }
         Relationships: [
