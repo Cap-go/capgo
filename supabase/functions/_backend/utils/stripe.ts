@@ -316,20 +316,6 @@ export async function setThreshold(c: Context, subscriptionId: string) {
   return subscription
 }
 
-export async function updateCustomer(c: Context, customerId: string, email: string, billing_email: string | null | undefined, userId: string, name: string) {
-  if (!existInEnv(c, 'STRIPE_SECRET_KEY'))
-    return Promise.resolve()
-  const customer = await getStripe(c).customers.update(customerId, {
-    email: billing_email ?? email,
-    name,
-    metadata: {
-      user_id: userId,
-      email,
-    },
-  })
-  return customer
-}
-
 export async function recordUsage(c: Context, customerId: string, eventName: string, value: number, meterId?: string) {
   if (!existInEnv(c, 'STRIPE_SECRET_KEY'))
     return Promise.resolve()
