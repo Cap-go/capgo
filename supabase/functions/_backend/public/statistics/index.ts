@@ -11,6 +11,9 @@ import { hasAppRight, hasAppRightApikey, hasOrgRight, supabaseAdmin } from '../.
 dayjs.extend(utc)
 
 export const app = honoFactory.createApp()
+
+const storageV2 = false;
+
 app.use('*', useCors)
 app.use('*', middlewareV2(['all', 'read']))
 
@@ -86,7 +89,7 @@ async function getNormalStats(c: Context, appId: string | null, ownerOrg: string
   }
 
   let mau = createUndefinedArray(graphDays) as number[]
-  const storage = createUndefinedArray(graphDays) as number[]
+  let storage = createUndefinedArray(graphDays) as number[]
   let bandwidth = createUndefinedArray(graphDays) as number[]
   let gets = isDashboard ? createUndefinedArray(graphDays) as number[] : []
 
@@ -153,7 +156,9 @@ async function getNormalStats(c: Context, appId: string | null, ownerOrg: string
     storage[0] = initValue
   }
 
-  // storage = (storage as number[]).reduce((p, c) => { if (p.length > 0) { c += p[p.length - 1] } p.push(c); return p }, [] as number[])
+  if (!storageV2) {
+    storage = (storage as number[]).reduce((p, c) => { if (p.length > 0) { c += p[p.length - 1] } p.push(c); return p }, [] as number[])
+  }
   // eslint-disable-next-line style/max-statements-per-line
   mau = (mau as number[]).reduce((p, c) => { if (p.length > 0) { c += p[p.length - 1] } p.push(c); return p }, [] as number[])
   // eslint-disable-next-line style/max-statements-per-line

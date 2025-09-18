@@ -657,6 +657,7 @@
   "storage-limit-exceeded": "đã vượt quá giới hạn lưu trữ",
   "storage-updates-stopped-upgrade-required": "Bạn đã đạt giới hạn lưu trữ. Việc tải lên đã bị chặn. Vui lòng nâng cấp để khôi phục dịch vụ.",
   "storage-usage": "Sử dụng bộ nhớ:",
+  "storage-warning": "Hệ thống lưu trữ gần đây đã thay đổi và bây giờ grap này đang hiển thị lưu trữ mỗi giờ thay vì dữ liệu trước đó",
   "stored-externally": "được lưu trữ bên ngoài",
   "stripe-billing-portal-will-be-opened-in-a-new-tab": "Cổng thanh toán Stripe sẽ được mở trong một tab mới",
   "subscription-required": "yêu cầu đăng ký",

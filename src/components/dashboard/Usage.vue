@@ -21,6 +21,7 @@ const noData = computed(() => false)
 const loadedAlready = ref(false)
 const storageDisplayGb = ref(true)
 const storageUnit = computed(() => storageDisplayGb.value ? 'GiB' : 'MiB')
+const storageV2 = false
 // const noData = computed(() => datas.value.mau.length == 0)
 
 const datas = ref({
@@ -145,7 +146,7 @@ if (main.dashboardFetched)
       <Spinner size="w-40 h-40" />
     </div>
     <UsageCard
-      v-if="!isLoading" :storage="true" :limits="allLimits.storage" :colors="colors.blue" :datas="datas.storage" :accumulated="false"
+      v-if="!isLoading" :storage="storageV2" :limits="allLimits.storage" :colors="colors.blue" :datas="datas.storage" :accumulated="false"
       :title="t('Storage')" :unit="storageUnit"
       class="col-span-full sm:col-span-6 xl:col-span-4"
     />

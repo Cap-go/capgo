@@ -657,6 +657,7 @@
   "storage-limit-exceeded": "depolama limiti aşıldı",
   "storage-updates-stopped-upgrade-required": "Depolama limitinize ulaştınız. Yüklemeler engellendi. Hizmeti geri getirmek için lütfen yükseltme yapın.",
   "storage-usage": "Depolama kullanımı:",
+  "storage-warning": "Depolama sistemi yakın zamanda değişti ve şimdi bu üzüm önceki veriler yerine saat başına depolama gösteriyor",
   "stored-externally": "dışarıda saklanan",
   "stripe-billing-portal-will-be-opened-in-a-new-tab": "Stripe fatura portalı yeni bir sekmede açılacak",
   "subscription-required": "abonelik gereklidir",

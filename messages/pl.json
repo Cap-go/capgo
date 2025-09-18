@@ -657,6 +657,7 @@
   "storage-limit-exceeded": "przekroczono limit przechowywania",
   "storage-updates-stopped-upgrade-required": "Osiągnąłeś limit przechowywania. Przesyłanie zostało zablokowane. Proszę uaktualnić, aby przywrócić usługę.",
   "storage-usage": "Użycie pamięci:",
+  "storage-warning": "System pamięci niedawno się zmienił, a teraz to winogrona pokazuje pamięć na godzinę zamiast poprzednich danych",
   "stored-externally": "przechowywane na zewnątrz",
   "stripe-billing-portal-will-be-opened-in-a-new-tab": "Portal do fakturowania Stripe zostanie otwarty w nowej karcie.",
   "subscription-required": "wymagana subskrypcja",

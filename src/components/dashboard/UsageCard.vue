@@ -82,8 +82,22 @@ const lastDayEvolution = computed(() => {
   <div class="flex flex-col bg-white border rounded-lg shadow-lg col-span-full border-slate-300 sm:col-span-6 xl:col-span-4 dark:border-slate-900 dark:bg-gray-800 h-[460px]">
     <div class="px-5 pt-3">
       <div class="flex flex-row items-center">
-        <h2 class="mb-2 mr-2 text-2xl font-semibold text-slate-800 dark:text-white">
-          {{ props.title }}
+        <h2 class="mb-2 mr-2 text-2xl font-semibold text-slate-800 dark:text-white w-full">
+          <div class="flex items-center justify-center mb-2 mr-2 cursor-pointer">
+            {{ props.title }}
+            <InformationInfo class="text-gray-400 hover:text-blue-500 transition-colors duration-200 w-5 h-5 ml-3" />
+            <div class="flex-1"></div>
+            <div v-if="props.storage" class="font-medium badge badge-error w-5 h-5 mr-2">
+              <div class="group relative flex items-center">
+                <ExclamationCircle class="w-5 h-5 cursor-help text-gray-400" />
+                <div
+                  class="pointer-events-none absolute left-1/2 top-full z-10 mt-2 hidden w-max max-w-xs -translate-x-1/2 rounded-md bg-slate-800 px-3 py-2 text-sm text-white shadow-lg group-hover:block dark:bg-slate-200 dark:text-black"
+                >
+                  {{ t('storage-warning') }}
+                </div>
+              </div>
+            </div>
+          </div>
         </h2>
         <div class="d-tooltip d-tooltip-bottom">
           <div class="d-tooltip-content bg-white dark:bg-gray-800 text-gray-800 dark:text-white border border-gray-200 dark:border-gray-600 shadow-2xl rounded-lg p-4 min-w-[280px]">
@@ -127,19 +141,6 @@ const lastDayEvolution = computed(() => {
                     </div>
                   </div>
                 </div>
-              </div>
-            </div>
-          </div>
-          <div class="flex items-center justify-center w-5 h-5 cursor-pointer">
-            <InformationInfo class="text-gray-400 hover:text-blue-500 transition-colors duration-200" />
-          </div>
-        </div>
-        <div v-if="props.storage" class="font-medium badge badge-error self-end ml-auto mb-2">
-          <div class="tooltip tooltip-bottom">
-            <ExclamationCircle class="w-4 h-4" />
-            <div class="tooltip-content bg-slate-800 text-white dark:bg-slate-200 dark:text-black">
-              <div class="max-w-xs whitespace-normal">
-                {{ t('storage-warning') }}
               </div>
             </div>
           </div>

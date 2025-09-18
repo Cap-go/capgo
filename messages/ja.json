@@ -657,6 +657,7 @@
   "storage-limit-exceeded": "ストレージ制限を超えました",
   "storage-updates-stopped-upgrade-required": "あなたのストレージ制限に達しました。アップロードはブロックされています。サービスを復元するには、アップグレードしてください。",
   "storage-usage": "ストレージ使用量:",
+  "storage-warning": "ストレージシステムが最近変更され、このグラップは以前のデータではなく1時間あたりのストレージを表示しています",
   "stored-externally": "外部に保存されています",
   "stripe-billing-portal-will-be-opened-in-a-new-tab": "Stripeの請求ポータルが新しいタブで開かれます",
   "subscription-required": "サブスクリプションが必要です",

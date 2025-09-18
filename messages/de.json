@@ -657,6 +657,7 @@
   "storage-limit-exceeded": "Speicherlimit überschritten",
   "storage-updates-stopped-upgrade-required": "Sie haben Ihr Speicherlimit erreicht. Uploads wurden blockiert. Bitte aktualisieren Sie, um den Service wiederherzustellen.",
   "storage-usage": "Speicherplatzverbrauch:",
+  "storage-warning": "Das Speichersystem hat sich kürzlich geändert und jetzt zeigt dieser Grap die Speicherung pro Stunde anstelle der vorherigen Daten an",
   "stored-externally": "extern gespeichert",
   "stripe-billing-portal-will-be-opened-in-a-new-tab": "Das Stripe-Rechnungsportal wird in einem neuen Tab geöffnet.",
   "subscription-required": "Abonnement erforderlich",

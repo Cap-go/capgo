@@ -657,6 +657,7 @@
   "storage-limit-exceeded": "저장 공간 한도 초과",
   "storage-updates-stopped-upgrade-required": "저장 공간 한도에 도달했습니다. 업로드가 차단되었습니다. 서비스를 복구하려면 업그레이드해 주세요.",
   "storage-usage": "저장 공간 사용량:",
+  "storage-warning": "저장 시스템이 최근에 변경되었으며 이제이 포도는 이전 데이터 대신 시간당 스토리지를 표시합니다.",
   "stored-externally": "외부에 저장됨",
   "stripe-billing-portal-will-be-opened-in-a-new-tab": "새 탭에서 Stripe 결제 포털이 열립니다.",
   "subscription-required": "구독이 필요합니다",
