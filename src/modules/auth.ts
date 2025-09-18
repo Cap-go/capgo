@@ -11,7 +11,6 @@ import { getPlans, isAdmin } from './../services/supabase'
 async function updateUser(
   main: ReturnType<typeof useMainStore>,
   supabase: SupabaseClient,
-  next: NavigationGuardNext,
 ) {
   const config = getLocalConfig()
   // console.log('set auth', auth)
@@ -127,7 +126,7 @@ async function guard(
     }
 
     if (!main.user) {
-      await updateUser(main, supabase, next)
+      await updateUser(main, supabase)
     }
 
     getPlans().then((pls) => {
