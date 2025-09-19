@@ -167,6 +167,19 @@ async function createNewOrg() {
   })
   return dialogStore.onDialogDismiss()
 }
+
+function isSelected(org: Organization) {
+  return !!(currentOrganization.value && org.gid === currentOrganization.value.gid)
+}
+
+function onOrgItemClick(org: Organization, e: MouseEvent) {
+  if (isSelected(org)) {
+    e.preventDefault()
+    e.stopPropagation()
+    return
+  }
+  onOrganizationClick(org)
+}
 </script>
 
 <template>
@@ -180,13 +193,22 @@ async function createNewOrg() {
         <IconDown class="shrink-0 w-6 h-6 ml-1 fill-current text-slate-400" />
       </summary>
       <ul class="d-dropdown-content bg-base-200 rounded-box z-1 w-52 p-2 shadow" @click="closeDropdown()">
-        <li v-for="org in organizationStore.organizations" :key="org.gid" class="block px-1 rounded-lg hover:bg-gray-600">
+        <li
+          v-for="org in organizationStore.organizations"
+          :key="org.gid"
+          class="block px-1 my-1 rounded-lg"
+          :class="{ 'bg-gray-700': isSelected(org) }"
+        >
           <a
-            class="flex items-center justify-center text-center px-3 py-3 hover:bg-gray-600 text-white"
-            @click="onOrganizationClick(org)"
+            class="flex items-center justify-between px-3 py-3 text-white rounded-md"
+            :class="isSelected(org) ? 'cursor-default' : 'hover:bg-gray-600 cursor-pointer'"
+            :aria-current="isSelected(org) ? 'true' : undefined"
+            @click="onOrgItemClick(org, $event)"
           >
-            <span>{{ org.name }}</span>
-            <div v-if="org.role.startsWith('invite')" class="w-3 h-3 ml-1 bg-red-500 rounded-full" />
+            <span class="truncate">{{ org.name }}</span>
+            <div class="flex items-center gap-2">
+              <div v-if="org.role.startsWith('invite')" class="w-3 h-3 bg-red-500 rounded-full" />
+            </div>
           </a>
         </li>
         <li class="block p-px rounded-lg hover:bg-gray-600 from-cyan-500 to-purple-500 bg-linear-to-r">
