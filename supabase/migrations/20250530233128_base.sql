@@ -875,9 +875,9 @@ BEGIN
         DateSeries ds
     LEFT JOIN
         public.daily_mau dm ON aa.app_id = dm.app_id AND ds.date = dm.date
-    LEFT JOIN
+    LEFT JOIN 
         public.daily_storage dst ON aa.app_id = dst.app_id AND ds.date = dst.date
-    LEFT JOIN
+    LEFT JOIN 
         public.daily_bandwidth db ON aa.app_id = db.app_id AND ds.date = db.date
     LEFT JOIN
         public.daily_version dv ON aa.app_id = dv.app_id AND ds.date = dv.date
