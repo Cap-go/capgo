@@ -18,7 +18,9 @@ const subscription_anchor_end = dayjs(organizationStore.currentOrganization?.sub
 
 const total = ref(0)
 const lastDayEvolution = ref(0)
-const bundleData = ref<number[]>(Array.from({ length: getDaysInCurrentMonth() }).fill(0) as number[])
+const bundleData = ref<number[]>([])
+const bundleDataByApp = ref<{ [appId: string]: number[] }>({})
+const appNames = ref<{ [appId: string]: string }>({})
 
 function getDayNumbers(startDate: Date, endDate: Date) {
   const dayNumbers = []
@@ -32,6 +34,12 @@ function getDayNumbers(startDate: Date, endDate: Date) {
 
 async function calculateStats() {
   total.value = 0
+
+  // Reset data
+  bundleDataByApp.value = {}
+  appNames.value = {}
+  bundleData.value = []
+
   const cycleStart = new Date(organizationStore.currentOrganization?.subscription_start ?? new Date())
   cycleStart.setHours(0, 0, 0, 0)
 
@@ -42,42 +50,57 @@ async function calculateStats() {
   const daysInPeriod = getDayNumbers(cycleStart, cycleEnd).length
   const dailyCounts = Array.from({ length: daysInPeriod }).fill(0) as number[]
 
-  let query = useSupabase()
-    .from('app_versions')
-    .select('created_at')
-    .gte('created_at', cycleStart.toISOString())
-    .lte('created_at', cycleEnd.toISOString())
-
+  // First get all apps for this organization
+  const appIds: string[] = []
   if (organizationStore.currentOrganization?.gid) {
     const { data: apps } = await useSupabase()
       .from('apps')
-      .select('app_id')
+      .select('app_id, name')
       .eq('owner_org', organizationStore.currentOrganization.gid)
 
     if (apps && apps.length > 0) {
-      query = query.in('app_id', apps.map(app => app.app_id))
+      apps.forEach(app => {
+        appIds.push(app.app_id)
+        appNames.value[app.app_id] = app.name || app.app_id
+        // Initialize data array for each app
+        bundleDataByApp.value[app.app_id] = Array.from({ length: daysInPeriod }).fill(0) as number[]
+      })
     }
   }
+
+  if (appIds.length === 0) {
+    bundleData.value = dailyCounts
+    return
+  }
+
+  const query = useSupabase()
+    .from('app_versions')
+    .select('created_at, app_id')
+    .gte('created_at', cycleStart.toISOString())
+    .lte('created_at', cycleEnd.toISOString())
+    .in('app_id', appIds)
 
   const { data, error } = await query
 
   if (!error && data) {
-    // Get the day numbers for the billing period
-    const dayNumbers = getDayNumbers(cycleStart, cycleEnd)
 
-    // Map each bundle to the correct day
-    data.filter(b => b.created_at !== null)
+    // Map each bundle to the correct day and app
+    data.filter(b => b.created_at !== null && b.app_id !== null)
       .forEach((bundle) => {
-        if (bundle.created_at) {
+        if (bundle.created_at && bundle.app_id) {
           const bundleDate = new Date(bundle.created_at)
-          const bundleDay = bundleDate.getDate()
 
-          // Find the index of this day in our billing period
-          const dayIndex = dayNumbers.indexOf(bundleDay)
+          // Calculate days since start of billing period
+          const daysDiff = Math.floor((bundleDate.getTime() - cycleStart.getTime()) / (1000 * 60 * 60 * 24))
 
-          if (dayIndex >= 0 && dayIndex < dailyCounts.length) {
-            dailyCounts[dayIndex]++
+          if (daysDiff >= 0 && daysDiff < daysInPeriod) {
+            dailyCounts[daysDiff]++
             total.value++
+
+            // Also track by app
+            if (bundleDataByApp.value[bundle.app_id]) {
+              bundleDataByApp.value[bundle.app_id][daysDiff]++
+            }
           }
         }
       })
@@ -97,8 +120,8 @@ async function calculateStats() {
   }
 }
 
-onMounted(() => {
-  calculateStats()
+onMounted(async () => {
+  await calculateStats()
 })
 </script>
 
@@ -177,9 +200,12 @@ onMounted(() => {
     <!-- Change the height attribute to adjust the chart height -->
     <div class="w-full h-full p-6">
       <BundleUploadsChart
+        :key="JSON.stringify(bundleDataByApp)"
         :title="t('bundle_uploads')"
         :colors="colors.violet"
         :data="bundleData"
+        :data-by-app="bundleDataByApp"
+        :app-names="appNames"
       />
     </div>
   </div>
