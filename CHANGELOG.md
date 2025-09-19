@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.29.6 (2025-09-19)
+
+
+### Bug Fixes
+
+* update development supa_anon key in configs.json ([3be2013](https://github.com/Cap-go/capgo/commit/3be201347789e5e5ebfa82bc44efde290081d835))
+
 ### 12.29.5 (2025-09-18)
 
 ### 12.29.4 (2025-09-18)
