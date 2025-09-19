@@ -68,7 +68,7 @@
   "env": {
     "preprod": {
       "name": "capgo_api-preprod",
-      "route": {
+      "routes": {
         "pattern": "api-preprod.capgo.app",
         "custom_domain": true
       },
@@ -117,7 +117,7 @@
     },
     "alpha": {
       "name": "capgo_api-alpha",
-      "route": {
+      "routes": {
         "pattern": "api-dev.capgo.app",
         "custom_domain": true
       },
