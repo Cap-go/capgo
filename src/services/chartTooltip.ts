@@ -16,14 +16,15 @@ export function createCustomTooltip(context: any) {
     tooltipEl.className = 'chartjs-tooltip'
     tooltipEl.style.opacity = '0'
     tooltipEl.style.position = 'absolute'
-    tooltipEl.style.background = isDark.value ? 'rgba(31, 41, 55, 0.95)' : 'rgba(255, 255, 255, 0.95)'
+    tooltipEl.style.background = isDark.value ? 'rgba(17, 24, 39, 0.97)' : 'rgba(255, 255, 255, 1)'
+    tooltipEl.style.backdropFilter = 'blur(12px)'
     tooltipEl.style.borderRadius = '8px'
     tooltipEl.style.color = isDark.value ? 'white' : 'black'
-    tooltipEl.style.border = isDark.value ? '1px solid rgba(75, 85, 99, 0.5)' : '1px solid rgba(209, 213, 219, 0.5)'
+    tooltipEl.style.border = isDark.value ? '1px solid rgba(55, 65, 81, 0.6)' : '1px solid rgba(209, 213, 219, 0.8)'
     tooltipEl.style.pointerEvents = 'none'
     tooltipEl.style.transform = 'translate(-50%, 0)'
     tooltipEl.style.transition = 'all .1s ease'
-    tooltipEl.style.boxShadow = '0 10px 25px rgba(0, 0, 0, 0.1)'
+    tooltipEl.style.boxShadow = '0 10px 30px rgba(0, 0, 0, 0.15), 0 4px 10px rgba(0, 0, 0, 0.1)'
     tooltipEl.style.zIndex = '1000'
     tooltipEl.style.fontSize = '12px'
     tooltipEl.style.maxHeight = '60vh'
@@ -44,6 +45,22 @@ export function createCustomTooltip(context: any) {
     const titleLines = tooltip.title || []
     const bodyLines = tooltip.body.map((b: any) => b.lines)
 
+    // Create an array of items with their values, colors, and labels
+    const items = bodyLines.map((body: any, i: number) => {
+      // Extract the numeric value from the label (format: "value - Label")
+      const match = body[0]?.match(/^(\d+(?:\.\d+)?)/)
+      const value = match ? Number.parseFloat(match[1]) : 0
+
+      return {
+        body,
+        value,
+        colors: tooltip.labelColors[i],
+      }
+    })
+
+    // Sort by value in descending order (highest to lowest)
+    items.sort((a, b) => b.value - a.value)
+
     const titleColor = isDark.value ? '#e5e7eb' : '#374151'
     let innerHtml = '<div style="padding: 12px;">'
 
@@ -52,12 +69,11 @@ export function createCustomTooltip(context: any) {
       innerHtml += `<div style="font-weight: 600; margin-bottom: 8px; color: ${titleColor};">${titleLines[0]}</div>`
     }
 
-    // Add body with scrollable content
+    // Add body with scrollable content (now sorted)
     innerHtml += '<div style="max-height: 40vh; overflow-y: auto;">'
-    bodyLines.forEach((body: any, i: number) => {
-      const colors = tooltip.labelColors[i]
-      const colorIndicator = `<div style="width: 12px; height: 12px; background-color: ${colors.backgroundColor}; border: 1px solid ${colors.borderColor}; border-radius: 2px; margin-right: 8px; flex-shrink: 0;"></div>`
-      const textContent = `<span style="font-size: 11px;">${body}</span>`
+    items.forEach((item) => {
+      const colorIndicator = `<div style="width: 12px; height: 12px; background-color: ${item.colors.backgroundColor}; border: 1px solid ${item.colors.borderColor}; border-radius: 2px; margin-right: 8px; flex-shrink: 0;"></div>`
+      const textContent = `<span style="font-size: 11px;">${item.body}</span>`
 
       innerHtml += `<div style="display: flex; align-items: center; margin-bottom: 4px;">${colorIndicator}${textContent}</div>`
     })
@@ -94,10 +110,12 @@ function positionTooltip(tooltipEl: HTMLElement, canvas: HTMLCanvasElement, tool
   if (left + tooltipRect.width / 2 > viewportWidth - 10) {
     left = viewportWidth - tooltipRect.width - 10
     tooltipEl.style.transform = 'translate(0, 0)'
-  } else if (left - tooltipRect.width / 2 < 10) {
+  }
+  else if (left - tooltipRect.width / 2 < 10) {
     left = 10
     tooltipEl.style.transform = 'translate(0, 0)'
-  } else {
+  }
+  else {
     tooltipEl.style.transform = 'translate(-50%, 0)'
   }
 
@@ -124,9 +142,19 @@ export function createTooltipConfig(hasMultipleDatasets: boolean) {
     position: 'nearest' as const,
     external: hasMultipleDatasets ? createCustomTooltip : undefined,
     enabled: !hasMultipleDatasets, // Disable default tooltip when using custom
-    callbacks: !hasMultipleDatasets ? undefined : {
+    callbacks: {
+      title(tooltipItems: any) {
+        // Format the title to show "Day X" instead of just the number
+        const day = tooltipItems[0].label
+        return `Day ${day}`
+      },
       label(context: any) {
-        return `${context.dataset.label}: ${context.parsed.y}`
+        if (hasMultipleDatasets) {
+          // Format as "value - label" for better readability
+          return `${context.parsed.y} - ${context.dataset.label}`
+        }
+        // For single dataset, use default formatting
+        return undefined
       },
     },
   }

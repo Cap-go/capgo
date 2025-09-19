@@ -97,7 +97,7 @@ async function setLogAs(id: string) {
   saveSpoof(currentJwt, currentRefreshToken)
   toast.success('Spoofed, will reload')
   setTimeout(() => {
-    router.replace('/app').then(() => {
+    router.replace('/dashboard').then(() => {
       window.location.reload()
     })
   }, 1000)
@@ -107,7 +107,7 @@ function resetSpoofedUser() {
   if (unspoofUser()) {
     toast.error('Stop Spoofed, will reload')
     setTimeout(() => {
-      router.replace('/app').then(() => {
+      router.replace('/dashboard').then(() => {
         window.location.reload()
       })
     }, 1000)

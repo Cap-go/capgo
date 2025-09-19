@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { ChartData, ChartOptions } from 'chart.js'
 import type { AnnotationOptions } from '../services/chartAnnotations'
+import { useDark } from '@vueuse/core'
 import {
   CategoryScale,
   Chart,
@@ -10,7 +11,6 @@ import {
   PointElement,
   Tooltip,
 } from 'chart.js'
-import { useDark } from '@vueuse/core'
 import { computed } from 'vue'
 import { Line } from 'vue-chartjs'
 import { useI18n } from 'vue-i18n'
@@ -144,6 +144,7 @@ function createAnotation(id: string, y: number, title: string, lineColor: string
     yMax: y,
     borderColor: lineColor,
     borderWidth: 2,
+    borderDash: [5, 5], // Make dashed line to distinguish from data lines
   }
   obj[`label_${id}`] = {
     type: 'label',
@@ -152,9 +153,14 @@ function createAnotation(id: string, y: number, title: string, lineColor: string
     backgroundColor: bgColor,
     content: [title],
     font: {
-      size: 10,
+      size: 12,
+      weight: 'bold',
     },
-    color: `${isDark.value ? '#fff' : '#000'}`,
+    color: `${isDark.value ? '#fff' : '#1f2937'}`, // Better contrast
+    borderColor: lineColor,
+    borderWidth: 1,
+    borderRadius: 4,
+    padding: 6,
   }
   return obj
 }
@@ -164,13 +170,16 @@ const generateAnnotations = computed(() => {
   let annotations: any = {}
   const min = Math.min(...accumulateData.value.filter((val: any) => val !== undefined) as number[])
   const max = Math.max(...projectionData.value.filter((val: any) => val !== undefined) as number[])
-  Object.entries(props.limits as { [key: string]: number }).forEach(([key, val], i) => {
+
+  // Use consistent white color for all limit lines for simplicity
+  const lineColor = isDark.value ? 'rgba(255, 255, 255, 0.8)' : 'rgba(255, 255, 255, 0.9)'
+  const bgColor = isDark.value ? 'rgba(31, 41, 55, 0.9)' : 'rgba(255, 255, 255, 0.95)'
+
+  Object.entries(props.limits as { [key: string]: number }).forEach(([key, val]) => {
     if (val && val > min && val < (max * 1.2)) {
-      const color1 = (i + 1) * 100
-      const color2 = (i + 2) * 100
       annotations = {
         ...annotations,
-        ...createAnotation(key, val, key, props.colors[color1], props.colors[color2]),
+        ...createAnotation(key, val, key, lineColor, bgColor),
       }
     }
   })
@@ -186,8 +195,8 @@ function generateAppColors(appCount: number) {
     const hue = (210 + i * 137.508) % 360 // Start at blue, then golden angle
 
     // Use pastel-friendly saturation and lightness values
-    const saturation = 50 + (i % 3) * 8  // 50%, 58%, 66% - softer colors
-    const lightness = 60 + (i % 4) * 5   // 60%, 65%, 70%, 75% - lighter, more pastel
+    const saturation = 50 + (i % 3) * 8 // 50%, 58%, 66% - softer colors
+    const lightness = 60 + (i % 4) * 5 // 60%, 65%, 70%, 75% - lighter, more pastel
 
     const borderColor = `hsl(${hue}, ${saturation + 15}%, ${lightness - 15}%)`
     const backgroundColor = `hsla(${hue}, ${saturation}%, ${lightness}%, 0.6)`
@@ -200,7 +209,6 @@ function generateAppColors(appCount: number) {
 
   return colors
 }
-
 
 const chartData = computed<ChartData<'line'>>(() => {
   const appIds = Object.keys(props.datasByApp || {})
@@ -239,7 +247,8 @@ const chartData = computed<ChartData<'line'>>(() => {
         })
       }
     })
-  } else {
+  }
+  else {
     // Fallback to single dataset if no app data
     datasets.push({
       label: props.title,
