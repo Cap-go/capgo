@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import dayjs from 'dayjs'
 import colors from 'tailwindcss/colors'
-import { computed, onMounted, ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import InformationInfo from '~icons/heroicons/information-circle'
 import DeploymentStatsChart from '~/components/DeploymentStatsChart.vue'
@@ -128,13 +128,16 @@ async function calculateStats() {
           lastDayEvolution.value = ((lastDayCount - previousDayCount) / previousDayCount) * 100
         }
       }
-    } else {
+    }
+    else {
       deploymentData.value = dailyCounts
     }
-  } catch (error) {
+  }
+  catch (error) {
     console.error('Error fetching deployment stats:', error)
     deploymentData.value = dailyCounts
-  } finally {
+  }
+  finally {
     isLoading.value = false
   }
 }

@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import type { Stat, Tab } from '~/components/comp_def'
+import type { Tab } from '~/components/comp_def'
 import type { Database } from '~/types/supabase.types'
-import { computed, ref, watchEffect } from 'vue'
+import { ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import IconChart from '~icons/heroicons/chart-bar'
@@ -13,8 +13,8 @@ import IconChannel from '~icons/heroicons/signal'
 import IconAlertCircle from '~icons/lucide/alert-circle'
 import AppSetting from '~/components/dashboard/AppSetting.vue'
 import BundleUploadsCard from '~/components/dashboard/BundleUploadsCard.vue'
-import UpdateStatsCard from '~/components/dashboard/UpdateStatsCard.vue'
 import DeploymentStatsCard from '~/components/dashboard/DeploymentStatsCard.vue'
+import UpdateStatsCard from '~/components/dashboard/UpdateStatsCard.vue'
 import { getCapgoVersion, useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
@@ -71,33 +71,6 @@ const tabs: Tab[] = [
     key: 'logs',
   },
 ]
-
-const stats = computed<Stat[]>(() => ([
-  {
-    label: t('channels'),
-    hoverLabel: 'Click to explore the channel list',
-    value: channelsNb.value?.toLocaleString(),
-    link: `/app/p/${id.value}?tab=channels`,
-  },
-  {
-    label: t('bundles'),
-    hoverLabel: 'Click to explore the bundle list',
-    value: bundlesNb.value?.toLocaleString(),
-    link: `/app/p/${id.value}?tab=bundles`,
-  },
-  {
-    label: t('devices'),
-    hoverLabel: 'Click to explore the device list',
-    value: devicesNb.value?.toLocaleString(),
-    link: `/app/p/${id.value}?tab=devices`,
-  },
-  {
-    label: t('plan-updates'),
-    hoverLabel: 'Click to explore the logs',
-    value: updatesNb.value?.toLocaleString(),
-    link: `/app/p/${id.value}?tab=logs`,
-  },
-]))
 
 async function loadAppInfo() {
   try {

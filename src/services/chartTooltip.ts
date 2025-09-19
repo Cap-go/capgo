@@ -1,4 +1,4 @@
-import type { Chart, TooltipModel } from 'chart.js'
+import type { Chart, TooltipItem as ChartTooltipItem, TooltipLabelStyle, TooltipModel } from 'chart.js'
 import { useDark } from '@vueuse/core'
 
 interface TooltipContext {
@@ -6,13 +6,10 @@ interface TooltipContext {
   tooltip: TooltipModel<'bar' | 'line'>
 }
 
-interface TooltipItem {
+interface ProcessedTooltipItem {
   body: string[]
   value: number
-  colors: {
-    backgroundColor: string
-    borderColor: string
-  }
+  colors: TooltipLabelStyle
 }
 
 /**
@@ -61,7 +58,7 @@ export function createCustomTooltip(context: TooltipContext) {
     const bodyLines = tooltip.body.map(b => b.lines)
 
     // Create an array of items with their values, colors, and labels
-    const items: TooltipItem[] = bodyLines.map((body: string[], i: number) => {
+    const items: ProcessedTooltipItem[] = bodyLines.map((body: string[], i: number) => {
       // Extract the numeric value from the label (format: "value - Label")
       const match = body[0]?.match(/^(\d+(?:\.\d+)?)/)
       const value = match ? Number.parseFloat(match[1]) : 0
@@ -70,7 +67,7 @@ export function createCustomTooltip(context: TooltipContext) {
         body,
         value,
         colors: tooltip.labelColors[i],
-      } as TooltipItem
+      }
     }).filter(item => item.value > 0) // Filter out zero values
 
     // Sort by value in descending order (highest to lowest)
@@ -96,7 +93,11 @@ export function createCustomTooltip(context: TooltipContext) {
     // Add body with scrollable content (now sorted)
     innerHtml += '<div style="max-height: 40vh; overflow-y: auto;">'
     items.forEach((item) => {
-      const colorIndicator = `<div style="width: 12px; height: 12px; background-color: ${item.colors.backgroundColor}; border: 1px solid ${item.colors.borderColor}; border-radius: 2px; margin-right: 8px; flex-shrink: 0;"></div>`
+      // Convert color to string if it's not already
+      const bgColor = typeof item.colors.backgroundColor === 'string' ? item.colors.backgroundColor : '#666'
+      const borderColor = typeof item.colors.borderColor === 'string' ? item.colors.borderColor : '#999'
+
+      const colorIndicator = `<div style="width: 12px; height: 12px; background-color: ${bgColor}; border: 1px solid ${borderColor}; border-radius: 2px; margin-right: 8px; flex-shrink: 0;"></div>`
       const textContent = `<span style="font-size: 11px;">${item.body}</span>`
 
       innerHtml += `<div style="display: flex; align-items: center; margin-bottom: 4px;">${colorIndicator}${textContent}</div>`
@@ -198,12 +199,6 @@ export const verticalLinePlugin = {
   },
 }
 
-interface TooltipCallbackContext {
-  label: string
-  parsed: { y: number }
-  dataset: { label: string }
-}
-
 /**
  * Creates tooltip configuration for Chart.js options
  * @param hasMultipleDatasets Whether the chart has multiple datasets (apps)
@@ -217,12 +212,12 @@ export function createTooltipConfig(hasMultipleDatasets: boolean) {
     external: hasMultipleDatasets ? createCustomTooltip : undefined,
     enabled: !hasMultipleDatasets, // Disable default tooltip when using custom
     callbacks: {
-      title(tooltipItems: TooltipCallbackContext[]) {
+      title(tooltipItems: ChartTooltipItem<any>[]) {
         // Format the title to show "Day X" instead of just the number
         const day = tooltipItems[0].label
         return `Day ${day}`
       },
-      label(context: TooltipCallbackContext) {
+      label(context: ChartTooltipItem<any>) {
         if (hasMultipleDatasets) {
           // Format as "value - label" for better readability
           return `${context.parsed.y} - ${context.dataset.label}`
