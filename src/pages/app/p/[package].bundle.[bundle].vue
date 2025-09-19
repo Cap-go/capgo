@@ -14,7 +14,7 @@ import IconInformations from '~icons/heroicons/information-circle'
 import IconTrash from '~icons/heroicons/trash'
 import IconSearch from '~icons/ic/round-search?raw'
 import IconAlertCircle from '~icons/lucide/alert-circle'
-import { appIdToUrl, bytesToMbText, urlToAppId } from '~/services/conversion'
+import { bytesToMbText } from '~/services/conversion'
 import { formatDate } from '~/services/date'
 import { checkCompatibilityNativePackages, isCompatible, useSupabase } from '~/services/supabase'
 import { openVersion } from '~/services/versions'
@@ -142,7 +142,7 @@ async function getChannels() {
 async function openChannelLink() {
   if (!version.value || !channel.value)
     return
-  router.push(`/app/p/${appIdToUrl(version.value.app_id)}/channel/${channel.value?.id}`)
+  router.push(`/app/p/${version.value.app_id}/channel/${channel.value?.id}`)
 }
 
 const showSize = computed(() => {
@@ -398,7 +398,6 @@ watchEffect(async () => {
   if (route.path.includes('/bundle/')) {
     loading.value = true
     packageId.value = route.params.package as string
-    packageId.value = urlToAppId(packageId.value)
     id.value = Number(route.params.bundle as string)
     await getVersion()
     await getChannels()
@@ -651,7 +650,7 @@ async function deleteBundle() {
     else {
       toast.success(t('bundle-deleted'))
       // Navigate back to the bundle list
-      router.push(`/app/p/${appIdToUrl(packageId.value)}/bundles/`)
+      router.push(`/app/p/${packageId.value}/bundles/`)
     }
   }
   catch (error) {
@@ -835,7 +834,7 @@ async function deleteBundle() {
       <p class="text-muted-foreground mt-2">
         {{ t('bundle-not-found-description') }}
       </p>
-      <button class="mt-4 d-btn d-btn-primary text-white" @click="router.push(`/app/p/${appIdToUrl(packageId)}/bundles/`)">
+      <button class="mt-4 d-btn d-btn-primary text-white" @click="router.push(`/app/p/${packageId}/bundles/`)">
         {{ t('back-to-bundles') }}
       </button>
     </div>

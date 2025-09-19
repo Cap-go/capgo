@@ -6,7 +6,6 @@ import ky from 'ky'
 import { onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
-import { appIdToUrl } from '~/services/conversion'
 import { formatDate } from '~/services/date'
 import { defaultApiHost, useSupabase } from '~/services/supabase'
 
@@ -196,12 +195,12 @@ async function reload() {
 async function openOneVersion(one: Element) {
   if (props.deviceId || !props.appId)
     return
-  router.push(`/app/p/${appIdToUrl(props.appId)}/bundle/${one.version?.id}`)
+  router.push(`/app/p/${props.appId}/bundle/${one.version?.id}`)
 }
 async function openOne(one: Element) {
   if (props.deviceId || !props.appId)
     return
-  router.push(`/app/p/${appIdToUrl(props.appId)}/d/${one.device_id}`)
+  router.push(`/app/p/${props.appId}/d/${one.device_id}`)
 }
 onMounted(async () => {
   await refreshData()

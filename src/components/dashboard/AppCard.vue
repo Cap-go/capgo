@@ -4,7 +4,6 @@ import { computed, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import IconSettings from '~icons/heroicons/cog-8-tooth'
-import { appIdToUrl } from '~/services/conversion'
 import { formatDate } from '~/services/date'
 import { useMainStore } from '~/stores/main'
 
@@ -21,8 +20,8 @@ const main = useMainStore()
 const isLoading = ref(true)
 const { t } = useI18n()
 
-function openSettngs(app: Database['public']['Tables']['apps']['Row']) {
-  router.push(`/app/p/${appIdToUrl(app.app_id)}/settings`)
+function openSettings(app: Database['public']['Tables']['apps']['Row']) {
+  router.push(`/app/p/${app.app_id}/settings`)
 }
 
 async function loadData() {
@@ -37,7 +36,7 @@ async function refreshData() {
 }
 
 function openPackage(appId: string) {
-  router.push(`/app/p/${appIdToUrl(appId)}`)
+  router.push(`/app/p/${appId}/devices`)
 }
 
 const acronym = computed(() => {
@@ -117,7 +116,7 @@ watchEffect(async () => {
     </td>
     <td class="w-1/5 p-2">
       <button
-        class="flex items-center p-3 mx-auto truncate rounded-lg hover:bg-gray-400 hover:text-white" @click.stop="openSettngs(app)"
+        class="flex items-center p-3 mx-auto truncate rounded-lg hover:bg-gray-400 hover:text-white" @click.stop="openSettings(app)"
       >
         <IconSettings class="text-lg" />
       </button>

@@ -5373,12 +5373,6 @@ ALTER TABLE "public"."version_meta" ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE "public"."version_usage" ENABLE ROW LEVEL SECURITY;
 
-ALTER PUBLICATION "supabase_realtime" OWNER TO "postgres";
-
-ALTER PUBLICATION "supabase_realtime"
-ADD TABLE ONLY "public"."app_versions";
-
-ALTER PUBLICATION "supabase_realtime"
 ADD TABLE ONLY "public"."apps";
 
 REVOKE USAGE ON SCHEMA "public"

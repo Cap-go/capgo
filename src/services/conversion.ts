@@ -26,13 +26,6 @@ export function bytesToGBText(bytes: number) {
   return `${bytesToGb(bytes)} GB`
 }
 
-export function urlToAppId(appId: string) {
-  return appId.replace(/--/g, '.')
-}
-export function appIdToUrl(appId: string) {
-  // return appId.replace(/\./g, '--') not needed anymore
-  return appId
-}
 export function getDaysBetweenDates(date1: string | Date, date2: string | Date) {
   const oneDay = 24 * 60 * 60 * 1000
   const firstDate = new Date(date1)

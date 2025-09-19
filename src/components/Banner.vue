@@ -4,7 +4,6 @@ import { computed, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 
-import { urlToAppId } from '~/services/conversion'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
 
@@ -26,13 +25,12 @@ const isOrgOwner = ref(false)
 watchEffect(async () => {
   try {
     if (route.path.includes('/app/p/')) {
-      const appIdRaw = route.params.package as string
-      if (!appIdRaw) {
+      appId.value = route.params.package as string
+      if (!appId.value) {
         console.error('cannot get app id. Parms:', route.params)
         return
       }
 
-      appId.value = urlToAppId(appIdRaw)
       await organizationStore.awaitInitialLoad()
     }
     else if (route.path.includes('/app') && route.path.includes('home')) {

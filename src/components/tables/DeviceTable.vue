@@ -5,7 +5,6 @@ import ky from 'ky'
 import { computed, h, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
-import { appIdToUrl } from '~/services/conversion'
 import { formatDate } from '~/services/date'
 import { defaultApiHost, useSupabase } from '~/services/supabase'
 
@@ -221,10 +220,10 @@ async function refreshData() {
   }
 }
 async function openOne(one: Element) {
-  router.push(`/app/p/${appIdToUrl(props.appId)}/d/${one.device_id}`)
+  router.push(`/app/p/${props.appId}/d/${one.device_id}`)
 }
 async function openOneVersion(one: Element) {
-  router.push(`/app/p/${appIdToUrl(props.appId)}/bundle/${one.version?.id}`)
+  router.push(`/app/p/${props.appId}/bundle/${one.version?.id}`)
 }
 
 function handleAddDevice() {

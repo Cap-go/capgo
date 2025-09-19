@@ -4,7 +4,6 @@ import { storeToRefs } from 'pinia'
 import { ref, watch, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
-import { appIdToUrl } from '~/services/conversion'
 import { useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 import { useOrganizationStore } from '~/stores/organization'
@@ -22,7 +21,8 @@ const apps = ref<Database['public']['Tables']['apps']['Row'][]>([])
 const { currentOrganization } = storeToRefs(organizationStore)
 
 async function NextStep(appId: string) {
-  router.push(`/app/p/${appIdToUrl(appId)}`)
+  console.log('Navigating to app with ID:', appId)
+  router.push(`/app/p/${appId}`)
 }
 async function getMyApps() {
   await organizationStore.awaitInitialLoad()

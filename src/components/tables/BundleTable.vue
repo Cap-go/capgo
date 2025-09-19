@@ -10,7 +10,7 @@ import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import IconSettings from '~icons/heroicons/cog-8-tooth'
 import IconTrash from '~icons/heroicons/trash'
-import { appIdToUrl, bytesToMbText } from '~/services/conversion'
+import { bytesToMbText } from '~/services/conversion'
 import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
@@ -401,7 +401,7 @@ columns.value = [
     onClick: async (elem: Element) => {
       if (elem.deleted || !channelCache.value[elem.id] || !channelCache.value[elem.id].id)
         return
-      router.push(`/app/p/${appIdToUrl(props.appId)}/channel/${channelCache.value[elem.id].id}`)
+      router.push(`/app/p/${props.appId}/channel/${channelCache.value[elem.id].id}`)
     },
   },
   {
@@ -544,7 +544,7 @@ async function addOne() {
 async function openOne(one: Element) {
   if (one.deleted)
     return
-  router.push(`/app/p/${appIdToUrl(props.appId)}/bundle/${one.id}`)
+  router.push(`/app/p/${props.appId}/bundle/${one.id}`)
 }
 
 watch(props, async () => {

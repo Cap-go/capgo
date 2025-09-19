@@ -8,7 +8,6 @@ import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import InformationInfo from '~icons/heroicons/information-circle'
 import { useChartData } from '~/services/chartDataService'
-import { urlToAppId } from '~/services/conversion'
 import { useSupabase } from '~/services/supabase'
 import { useMainStore } from '~/stores/main'
 
@@ -69,7 +68,7 @@ function getDateRange(days: number) {
 
 watchEffect(async () => {
   if (route.path.includes('/p/')) {
-    appId.value = urlToAppId(route.params.package as string)
+    appId.value = route.params.package as string
     try {
       await loadData()
     }

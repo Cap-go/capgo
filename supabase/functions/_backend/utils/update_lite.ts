@@ -11,7 +11,6 @@ import {
   tryParse,
 } from '@std/semver'
 import { backgroundTask, fixSemver, isInternalVersionName } from '../utils/utils.ts'
-import { appIdToUrl } from './conversion.ts'
 import { getBundleUrl, getManifestUrl } from './downloadUrl.ts'
 import { getIsV2, simpleError, simpleError200 } from './hono.ts'
 import { cloudlog } from './loggin.ts'
@@ -67,7 +66,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
       app_id,
       device_id,
       version_id: version_build,
-      app_id_url: appIdToUrl(app_id),
+      app_id_url: app_id,
     }, appOwner.owner_org, app_id, '0 0 * * 1'))
     cloudlog({ requestId: c.get('requestId'), message: 'semver_issue', app_id, version_build })
     return simpleError200(c, 'semver_error', `Native version: ${version_build} doesn't follow semver convention, please follow https://capgo.app/semver_tester/ to allow Capgo compare version number`)
@@ -78,7 +77,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
       app_id,
       device_id,
       version_id: version_build,
-      app_id_url: appIdToUrl(app_id),
+      app_id_url: app_id,
     }, appOwner.owner_org, app_id, '0 0 * * 1'))
   }
   version_name = (version_name === 'builtin' || !version_name) ? version_build : version_name

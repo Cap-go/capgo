@@ -4,7 +4,6 @@ import type { Database } from '../utils/supabase.types.ts'
 import type { AppStats, DeviceWithoutCreatedAt, StatsActions } from '../utils/types.ts'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod/mini'
-import { appIdToUrl } from '../utils/conversion.ts'
 import { BRES, getIsV2, parseBody, quickError, simpleError, simpleRateLimit } from '../utils/hono.ts'
 import { cloudlog } from '../utils/loggin.ts'
 import { sendNotifOrg } from '../utils/notifications.ts'
@@ -124,7 +123,7 @@ async function post(c: Context, drizzleCient: ReturnType<typeof getDrizzleClient
       app_id,
       device_id,
       version_id: appVersion.id,
-      app_id_url: appIdToUrl(app_id),
+      app_id_url: app_id,
     }, appVersion.owner_org, app_id, '0 0 * * 1')
   }
   statsActions.push({ action } as unknown as StatsActions)

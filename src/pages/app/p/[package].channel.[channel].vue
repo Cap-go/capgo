@@ -17,7 +17,6 @@ import IconSearch from '~icons/ic/round-search?raw'
 import plusOutline from '~icons/ion/add-outline?width=2em&height=2em'
 import IconAlertCircle from '~icons/lucide/alert-circle'
 import IconDown from '~icons/material-symbols/keyboard-arrow-down-rounded'
-import { appIdToUrl, urlToAppId } from '~/services/conversion'
 import { formatDate } from '~/services/date'
 import { checkCompatibilityNativePackages, isCompatible, useSupabase } from '~/services/supabase'
 import { isInternalVersionName } from '~/services/versions'
@@ -333,7 +332,6 @@ watchEffect(async () => {
   if (route.path.includes('/channel/')) {
     loading.value = true
     packageId.value = route.params.package as string
-    packageId.value = urlToAppId(packageId.value)
     id.value = Number(route.params.channel as string)
     await getChannel()
     await getDeviceIds()
@@ -900,7 +898,7 @@ async function handleRevert() {
       <p class="text-muted-foreground mt-2">
         {{ t('channel-not-found-description') }}
       </p>
-      <button class="mt-4 d-btn d-btn-primary text-white" @click="router.push(`/app/p/${appIdToUrl(packageId)}/channels`)">
+      <button class="mt-4 d-btn d-btn-primary text-white" @click="router.push(`/app/p/${packageId}/channels`)">
         {{ t('back-to-channels') }}
       </button>
     </div>

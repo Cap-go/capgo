@@ -12,7 +12,6 @@ import IconDevice from '~icons/heroicons/device-phone-mobile'
 import IconChannel from '~icons/heroicons/signal'
 import IconAlertCircle from '~icons/lucide/alert-circle'
 import AppSetting from '~/components/dashboard/AppSetting.vue'
-import { appIdToUrl, urlToAppId } from '~/services/conversion'
 import { getCapgoVersion, useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
@@ -75,25 +74,25 @@ const stats = computed<Stat[]>(() => ([
     label: t('channels'),
     hoverLabel: 'Click to explore the channel list',
     value: channelsNb.value?.toLocaleString(),
-    link: `/app/p/${appIdToUrl(id.value)}?tab=channels`,
+    link: `/app/p/${id.value}?tab=channels`,
   },
   {
     label: t('bundles'),
     hoverLabel: 'Click to explore the bundle list',
     value: bundlesNb.value?.toLocaleString(),
-    link: `/app/p/${appIdToUrl(id.value)}?tab=bundles`,
+    link: `/app/p/${id.value}?tab=bundles`,
   },
   {
     label: t('devices'),
     hoverLabel: 'Click to explore the device list',
     value: devicesNb.value?.toLocaleString(),
-    link: `/app/p/${appIdToUrl(id.value)}?tab=devices`,
+    link: `/app/p/${id.value}?tab=devices`,
   },
   {
     label: t('plan-updates'),
     hoverLabel: 'Click to explore the logs',
     value: updatesNb.value?.toLocaleString(),
-    link: `/app/p/${appIdToUrl(id.value)}?tab=logs`,
+    link: `/app/p/${id.value}?tab=logs`,
   },
 ]))
 
@@ -158,7 +157,6 @@ watchEffect(async () => {
   if (route.path.startsWith('/app/p') && lastPath.value !== route.path) {
     lastPath.value = route.path
     id.value = route.params.package as string
-    id.value = urlToAppId(id.value)
     await refreshData()
     displayStore.NavTitle = app.value?.name ?? ''
     displayStore.defaultBack = '/app'

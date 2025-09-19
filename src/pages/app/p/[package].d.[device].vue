@@ -13,7 +13,6 @@ import IconLog from '~icons/heroicons/document'
 import IconInformations from '~icons/heroicons/information-circle'
 import IconAlertCircle from '~icons/lucide/alert-circle'
 import IconDown from '~icons/material-symbols/keyboard-arrow-down-rounded'
-import { appIdToUrl, urlToAppId } from '~/services/conversion'
 import { formatDate } from '~/services/date'
 import { defaultApiHost, useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
@@ -338,7 +337,6 @@ async function onSelectChannel(value: string) {
 watchEffect(async () => {
   if (route.path.includes('/d/')) {
     packageId.value = route.params.package as string
-    packageId.value = urlToAppId(packageId.value)
     id.value = route.params.device as string
     id.value = id.value!.toLowerCase()
     await loadData()
@@ -349,7 +347,7 @@ watchEffect(async () => {
 
 function openChannel() {
   if (packageId.value && channelDevice.value?.id)
-    router.push(`/app/p/${appIdToUrl(packageId.value)}/channel/${channelDevice.value.id}`)
+    router.push(`/app/p/${packageId.value}/channel/${channelDevice.value.id}`)
 }
 </script>
 
@@ -445,7 +443,7 @@ function openChannel() {
       <p class="text-muted-foreground mt-2">
         {{ t('device-not-found-description') }}
       </p>
-      <button class="mt-4 d-btn d-btn-primary text-white" @click="router.push(`/app/p/${appIdToUrl(packageId)}/devices`)">
+      <button class="mt-4 d-btn d-btn-primary text-white" @click="router.push(`/app/p/${packageId}/devices`)">
         {{ t('back-to-devices') }}
       </button>
     </div>

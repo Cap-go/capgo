@@ -4,7 +4,6 @@ import type { TableColumn, TableSort } from '~/components/comp_def'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
-import { appIdToUrl } from '~/services/conversion'
 import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
@@ -161,7 +160,7 @@ const columns = computed<TableColumn[]>(() => [
 ])
 
 async function openOneVersion(item: DeployHistory) {
-  router.push(`/app/p/${appIdToUrl(props.appId)}/bundle/${item.version_id}`)
+  router.push(`/app/p/${props.appId}/bundle/${item.version_id}`)
 }
 
 async function fetchDeployHistory() {

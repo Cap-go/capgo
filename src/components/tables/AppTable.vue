@@ -6,7 +6,6 @@ import { computed, h, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import IconSettings from '~icons/heroicons/cog-8-tooth'
-import { appIdToUrl } from '~/services/conversion'
 import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
 import { useMainStore } from '~/stores/main'
@@ -111,18 +110,18 @@ const columns = ref<TableColumn[]>([
     actions: [
       {
         icon: IconSettings,
-        onClick: item => openSettngs(item),
+        onClick: item => openSettings(item),
       },
     ],
   },
 ])
 
-function openSettngs(app: Database['public']['Tables']['apps']['Row']) {
-  router.push(`/app/p/${appIdToUrl(app.app_id)}?tab=info`)
+function openSettings(app: Database['public']['Tables']['apps']['Row']) {
+  router.push(`/app/p/${app.app_id}?tab=info`)
 }
 
 function openPackage(app: Database['public']['Tables']['apps']['Row']) {
-  router.push(`/app/p/${appIdToUrl(app.app_id)}`)
+  router.push(`/app/p/${app.app_id}`)
 }
 
 async function openOneVersion(app: Database['public']['Tables']['apps']['Row']) {
@@ -135,7 +134,7 @@ async function openOneVersion(app: Database['public']['Tables']['apps']['Row']) 
     .eq('name', app.last_version)
     .single()
 
-  router.push(`/app/p/${appIdToUrl(app.app_id)}/bundle/${versionData?.id}`)
+  router.push(`/app/p/${app.app_id}/bundle/${versionData?.id}`)
 }
 
 // Filter apps based on search term

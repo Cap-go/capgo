@@ -12,7 +12,6 @@ import {
   tryParse,
 } from '@std/semver'
 import { getRuntimeKey } from 'hono/adapter'
-import { appIdToUrl } from './conversion.ts'
 import { getBundleUrl, getManifestUrl } from './downloadUrl.ts'
 import { getIsV2, simpleError, simpleError200 } from './hono.ts'
 import { cloudlog } from './loggin.ts'
@@ -121,7 +120,7 @@ export async function updateWithPG(
       app_id,
       device_id,
       version_id: version_build,
-      app_id_url: appIdToUrl(app_id),
+      app_id_url: app_id,
     }, appOwner.owner_org, app_id, '0 0 * * 1'))
     throw simpleError('semver_error', `Native version: ${body.version_build} doesn't follow semver convention, please check https://capgo.app/semver_tester/ to learn more about semver usage in Capgo`, { body })
   }
@@ -131,7 +130,7 @@ export async function updateWithPG(
       app_id,
       device_id,
       version_id: version_build,
-      app_id_url: appIdToUrl(app_id),
+      app_id_url: app_id,
     }, appOwner.owner_org, app_id, '0 0 * * 1'))
   }
   if (!app_id || !device_id || !version_build || !version_name || !platform) {
