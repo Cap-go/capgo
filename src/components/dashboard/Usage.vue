@@ -5,12 +5,12 @@ import colors from 'tailwindcss/colors'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { bytesToGb, getDaysBetweenDates } from '~/services/conversion'
-import { getPlans, useSupabase } from '~/services/supabase'
+import { getPlans } from '~/services/supabase'
+import { useDashboardAppsStore } from '~/stores/dashboardApps'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
-import { useDashboardAppsStore } from '~/stores/dashboardApps'
-import UpdateStatsCard from './UpdateStatsCard.vue'
 import DeploymentStatsCard from './DeploymentStatsCard.vue'
+import UpdateStatsCard from './UpdateStatsCard.vue'
 import UsageCard from './UsageCard.vue'
 
 const props = defineProps<{
@@ -45,8 +45,12 @@ const chartsLoaded = ref({
   usage: false,
   bundles: false,
   updates: false,
-  deployments: false
+  deployments: false,
 })
+
+// View mode selectors for charts
+const showCumulative = ref(true) // Switch 1: Cumulative vs Daily
+const useBillingPeriod = ref(true) // Switch 2: Billing Period vs Last 30 Days
 const main = useMainStore()
 const organizationStore = useOrganizationStore()
 const dashboardAppsStore = useDashboardAppsStore()
@@ -90,22 +94,38 @@ async function getAppStats() {
 
 async function getUsages() {
   const { global: globalStats, byApp: byAppStats, appNames: appNamesMap } = await getAppStats()
-  const cycleStart = new Date(organizationStore.currentOrganization?.subscription_start ?? new Date())
 
-  const cycleEnd = new Date(organizationStore.currentOrganization?.subscription_end ?? new Date())
-  const currentDate = new Date()
-  const currentDay = currentDate.getDate()
+  // Determine date range based on view mode
+  let cycleStart: Date
+  let cycleEnd: Date
   let cycleDay: number | undefined
 
-  if (cycleStart.getDate() === 1) {
-    cycleDay = currentDay
+  if (!useBillingPeriod.value) {
+    // Last 30 days mode
+    cycleEnd = new Date()
+    cycleStart = new Date()
+    cycleStart.setDate(cycleStart.getDate() - 29) // 30 days including today
+    cycleStart.setHours(0, 0, 0, 0)
+    cycleEnd.setHours(23, 59, 59, 999)
+    cycleDay = 30 // Always show 30 days
   }
   else {
-    const cycleStartDay = cycleStart.getUTCDate()
-    const daysInMonth = new Date(Date.UTC(currentDate.getUTCFullYear(), currentDate.getUTCMonth() + 1, 0)).getUTCDate()
-    cycleDay = (currentDate.getUTCDate() - cycleStartDay + 1 + daysInMonth) % daysInMonth
-    if (cycleDay === 0)
-      cycleDay = daysInMonth
+    // Billing period mode
+    cycleStart = new Date(organizationStore.currentOrganization?.subscription_start ?? new Date())
+    cycleEnd = new Date(organizationStore.currentOrganization?.subscription_end ?? new Date())
+    const currentDate = new Date()
+    const currentDay = currentDate.getDate()
+
+    if (cycleStart.getDate() === 1) {
+      cycleDay = currentDay
+    }
+    else {
+      const cycleStartDay = cycleStart.getUTCDate()
+      const daysInMonth = new Date(Date.UTC(currentDate.getUTCFullYear(), currentDate.getUTCMonth() + 1, 0)).getUTCDate()
+      cycleDay = (currentDate.getUTCDate() - cycleStartDay + 1 + daysInMonth) % daysInMonth
+      if (cycleDay === 0)
+        cycleDay = daysInMonth
+    }
   }
 
   const finalData = globalStats.map((item: any) => {
@@ -207,19 +227,62 @@ watch(dashboard, async (_dashboard) => {
   }
 })
 
+// Watch view mode changes and refetch data
+watch([showCumulative, useBillingPeriod], async () => {
+  if (loadedAlready.value) {
+    await getUsages()
+  }
+})
+
 if (main.dashboardFetched)
   loadData()
 </script>
 
 <template>
+  <!-- View Mode Selectors -->
+  <div v-if="!noData && !isLoading" class="flex justify-end mb-4 space-x-4">
+    <!-- Cumulative vs Daily Switch -->
+    <div class="flex items-center space-x-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+      <button
+        class="px-3 py-1 text-xs font-medium rounded-md transition-colors first-letter:uppercase" :class="[showCumulative ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white']"
+        @click="showCumulative = true"
+      >
+        {{ t('cumulative') }}
+      </button>
+      <button
+        class="px-3 py-1 text-xs font-medium rounded-md transition-colors first-letter:uppercase" :class="[!showCumulative ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white']"
+        @click="showCumulative = false"
+      >
+        {{ t('daily') }}
+      </button>
+    </div>
+
+    <!-- Billing Period vs Last 30 Days Switch -->
+    <div class="flex items-center space-x-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+      <button
+        class="px-3 py-1 text-xs font-medium rounded-md transition-colors first-letter:uppercase" :class="[useBillingPeriod ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white']"
+        @click="useBillingPeriod = true"
+      >
+        {{ t('billing-period') }}
+      </button>
+      <button
+        class="px-3 py-1 text-xs font-medium rounded-md transition-colors first-letter:uppercase" :class="[!useBillingPeriod ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white']"
+        @click="useBillingPeriod = false"
+      >
+        {{ t('last-30-days') }}
+      </button>
+    </div>
+  </div>
+
   <div
     v-if="!noData || isLoading"
     class="grid grid-cols-1 sm:grid-cols-12 gap-6 mb-6"
     :class="appId && showMobileStats ? 'xl:grid-cols-16' : 'xl:grid-cols-12'"
   >
     <UsageCard
-      v-if="!isLoading" id="mau-stat" :limits="allLimits.mau" :colors="colors.emerald" :accumulated="false"
+      v-if="!isLoading" id="mau-stat" :limits="allLimits.mau" :colors="colors.emerald" :accumulated="showCumulative"
       :datas="datas.mau" :datas-by-app="datasByApp.mau" :app-names="appNames" :title="`${t('monthly-active')}`" :unit="t('units-users')"
+      :use-billing-period="useBillingPeriod"
       class="col-span-full sm:col-span-6 xl:col-span-4"
     />
     <div
@@ -229,8 +292,9 @@ if (main.dashboardFetched)
       <Spinner size="w-40 h-40" />
     </div>
     <UsageCard
-      v-if="!isLoading" :limits="allLimits.storage" :colors="colors.blue" :datas="datas.storage" :datas-by-app="datasByApp.storage" :app-names="appNames" :accumulated="false"
+      v-if="!isLoading" :limits="allLimits.storage" :colors="colors.blue" :datas="datas.storage" :datas-by-app="datasByApp.storage" :app-names="appNames" :accumulated="showCumulative"
       :title="t('Storage')" :unit="storageUnit"
+      :use-billing-period="useBillingPeriod"
       class="col-span-full sm:col-span-6 xl:col-span-4"
     />
     <div
@@ -240,8 +304,9 @@ if (main.dashboardFetched)
       <Spinner size="w-40 h-40" />
     </div>
     <UsageCard
-      v-if="!isLoading" :limits="allLimits.bandwidth" :colors="colors.orange" :datas="datas.bandwidth" :datas-by-app="datasByApp.bandwidth" :app-names="appNames" :accumulated="false"
+      v-if="!isLoading" :limits="allLimits.bandwidth" :colors="colors.orange" :datas="datas.bandwidth" :datas-by-app="datasByApp.bandwidth" :app-names="appNames" :accumulated="showCumulative"
       :title="t('Bandwidth')" :unit="t('units-gb')"
+      :use-billing-period="useBillingPeriod"
       class="col-span-full sm:col-span-6 xl:col-span-4"
     />
     <div

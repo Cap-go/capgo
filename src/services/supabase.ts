@@ -192,47 +192,25 @@ export interface AppUsageGlobalByApp {
 export async function getAllDashboard(orgId: string, startDate?: string, endDate?: string): Promise<AppUsageGlobalByApp> {
   try {
     const supabase = useSupabase()
-    const resAppIds = await useSupabase()
-      .from('apps')
-      .select('app_id')
-      .eq('owner_org', orgId)
-      .then(res => res.data?.map(app => app.app_id) ?? [])
+    const dateRange = `?from=${new Date(startDate!).toISOString()}&to=${new Date(endDate!).toISOString()}&breakdown=true`
 
-    const dateRange = `?from=${new Date(startDate!).toISOString()}&to=${new Date(endDate!).toISOString()}`
+    // 🚀 SUPER OPTIMIZED: Single API call returns both aggregated AND per-app breakdown
+    const response = await supabase.functions.invoke(`statistics/org/${orgId}/${dateRange}`, {
+      method: 'GET',
+    })
 
-    // Combine orgData and appStats into a single Promise.all
-    const [orgStatistics, appStatistics] = await Promise.all([
-      // Get org statistics
-      supabase.functions.invoke(`statistics/org/${orgId}/${dateRange}`, {
-        method: 'GET',
-      }).then((res) => {
-        if (res.error)
-          throw new Error(res.error.message)
-        return (res.data as { mau: number, storage: number, bandwidth: number, date: string, get: number }[])
-      }),
-      // Get app statistics for all apps
-      Promise.all(resAppIds.map(appId =>
-        supabase.functions.invoke(`statistics/app/${appId}/${dateRange}`, {
-          method: 'GET',
-        }).then((res) => {
-          if (res.error)
-            throw new Error(res.error.message)
-          const typedData = res.data as { mau: number, storage: number, bandwidth: number, date: string, get: number }[]
-          return typedData.map(stat => ({
-            app_id: appId,
-            date: stat.date,
-            mau: stat.mau,
-            storage: stat.storage,
-            bandwidth: stat.bandwidth,
-            get: stat.get,
-          }))
-        }),
-      )).then(stats => stats.flat()),
-    ])
+    if (response.error) {
+      throw new Error(response.error.message)
+    }
+
+    const { global, byApp } = response.data as {
+      global: { mau: number, storage: number, bandwidth: number, date: string, get: number }[]
+      byApp: { app_id: string, mau: number, storage: number, bandwidth: number, date: string, get: number }[]
+    }
 
     return {
-      global: orgStatistics.sort((a, b) => a.date.localeCompare(b.date)),
-      byApp: appStatistics.sort((a, b) => a.date.localeCompare(b.date)),
+      global: global.sort((a, b) => a.date.localeCompare(b.date)),
+      byApp: byApp.sort((a, b) => a.date.localeCompare(b.date)),
     }
   }
   catch (error) {

@@ -6,6 +6,7 @@ import InformationInfo from '~icons/heroicons/information-circle'
 
 import { getDaysInCurrentMonth } from '~/services/date'
 import { useMainStore } from '~/stores/main'
+import { useOrganizationStore } from '~/stores/organization'
 
 const props = defineProps({
   title: { type: String, default: '' },
@@ -17,6 +18,10 @@ const props = defineProps({
     }),
   },
   accumulated: {
+    type: Boolean,
+    default: true,
+  },
+  useBillingPeriod: {
     type: Boolean,
     default: true,
   },
@@ -155,7 +160,7 @@ const lastDayEvolution = computed(() => {
 
     <!-- Change the height attribute to adjust the chart height -->
     <div class="w-full h-full p-6">
-      <LineChartStats v-if="props.datas?.length" :title="props.title" :colors="props.colors" :limits="props.limits" :data="props.datas" :datas-by-app="props.datasByApp" :app-names="props.appNames" :accumulated="accumulated" />
+      <LineChartStats v-if="props.datas?.length" :title="props.title" :colors="props.colors" :limits="props.limits" :data="props.datas" :datas-by-app="props.datasByApp" :app-names="props.appNames" :accumulated="accumulated" :use-billing-period="useBillingPeriod" />
       <div v-else class="flex flex-col items-center justify-center h-full">
         {{ t('no-data') }}
       </div>

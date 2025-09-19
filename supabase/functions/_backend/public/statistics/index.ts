@@ -22,6 +22,7 @@ const bundleUsageSchema = z.object({
 const normalStatsSchema = z.object({
   from: z.coerce.date(),
   to: z.coerce.date(),
+  breakdown: z.optional(z.coerce.boolean()),
 })
 
 interface VersionName {
@@ -61,7 +62,7 @@ async function checkOrganizationAccess(c: Context, orgId: string, supabase: Retu
   return { isPayingAndGoodPlan }
 }
 
-async function getNormalStats(c: Context, appId: string | null, ownerOrg: string | null, from: Date, to: Date, supabase: ReturnType<typeof supabaseAdmin>, isDashboard: boolean = false) {
+async function getNormalStats(c: Context, appId: string | null, ownerOrg: string | null, from: Date, to: Date, supabase: ReturnType<typeof supabaseAdmin>, isDashboard: boolean = false, includeBreakdown: boolean = false) {
   if (!appId && !ownerOrg)
     return { data: null, error: 'Invalid appId or ownerOrg' }
 
@@ -179,6 +180,82 @@ async function getNormalStats(c: Context, appId: string | null, ownerOrg: string
       date: day.toISOString(),
     }
   }
+
+  // If breakdown is requested, return both aggregated and per-app data
+  if (includeBreakdown && ownerOrg) {
+    const breakdown: any[] = []
+
+    // Process each app's data through the same aggregation logic
+    Object.keys(metricsByApp).forEach(appId => {
+      const appMetrics = metricsByApp[appId]
+
+      // Initialize arrays for this app
+      let appMau = createUndefinedArray(graphDays) as number[]
+      let appStorage = createUndefinedArray(graphDays) as number[]
+      let appBandwidth = createUndefinedArray(graphDays) as number[]
+      let appGets = isDashboard ? createUndefinedArray(graphDays) as number[] : []
+
+      // Process metrics for this app (same logic as aggregated version)
+      appMetrics.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()).forEach((item, i) => {
+        if (item.date) {
+          const dayNumber = i
+          if (appMau[dayNumber])
+            appMau[dayNumber] += item.mau
+          else
+            appMau[dayNumber] = item.mau
+
+          const storageVal = item.storage
+          if (appStorage[dayNumber])
+            appStorage[dayNumber] += storageVal
+          else
+            appStorage[dayNumber] = storageVal
+
+          const bandwidthVal = item.bandwidth ?? 0
+          if (appBandwidth[dayNumber])
+            appBandwidth[dayNumber] += bandwidthVal
+          else
+            appBandwidth[dayNumber] = bandwidthVal
+
+          if (isDashboard) {
+            appGets[dayNumber] = item.get
+          }
+        }
+      })
+
+      // Apply the same accumulation logic as the main stats
+      appStorage = (appStorage as number[]).reduce((p, c) => { if (p.length > 0) { c += p[p.length - 1] } p.push(c); return p }, [] as number[])
+      appMau = (appMau as number[]).reduce((p, c) => { if (p.length > 0) { c += p[p.length - 1] } p.push(c); return p }, [] as number[])
+      appBandwidth = (appBandwidth as number[]).reduce((p, c) => { if (p.length > 0) { c += p[p.length - 1] } p.push(c); return p }, [] as number[])
+      if (isDashboard) {
+        appGets = (appGets as number[]).reduce((p, c) => { if (p.length > 0) { c += p[p.length - 1] } p.push(c); return p }, [] as number[])
+      }
+
+      // Create final stats for this app
+      for (let i = 0; i < graphDays; i++) {
+        const day = baseDay.add(i, 'day')
+        if (day.utc().startOf('day').isAfter(today.utc().endOf('day')))
+          continue
+
+        breakdown.push({
+          app_id: appId,
+          date: day.toISOString(),
+          mau: appMau[i],
+          storage: appStorage[i],
+          bandwidth: appBandwidth[i],
+          get: isDashboard ? appGets[i] : undefined,
+        })
+      }
+    })
+
+    return {
+      data: {
+        global: finalStats.filter(x => !!x),
+        byApp: breakdown.filter(x => !!x),
+      },
+      error: null,
+    }
+  }
+
   return { data: finalStats.filter(x => !!x), error: null }
 }
 
@@ -421,7 +498,7 @@ app.get('/org/:org_id', async (c) => {
   if (auth.authType !== 'jwt')
     await checkOrganizationAccess(c, orgId, supabase)
 
-  const { data: finalStats, error } = await getNormalStats(c, null, orgId, body.from, body.to, supabase, c.get('auth')?.authType === 'jwt')
+  const { data: finalStats, error } = await getNormalStats(c, null, orgId, body.from, body.to, supabase, c.get('auth')?.authType === 'jwt', body.breakdown ?? false)
 
   if (error) {
     throw quickError(500, 'cannot_get_organization_statistics', 'Cannot get organization statistics', { error })

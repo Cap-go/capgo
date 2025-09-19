@@ -11,7 +11,7 @@ import {
   PointElement,
   Tooltip,
 } from 'chart.js'
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { Line } from 'vue-chartjs'
 import { useI18n } from 'vue-i18n'
 import { getCurrentDayMonth, getDaysInCurrentMonth } from '~/services/date'
@@ -21,6 +21,10 @@ import { createTooltipConfig, verticalLinePlugin } from '../services/chartToolti
 
 const props = defineProps({
   accumulated: {
+    type: Boolean,
+    default: true,
+  },
+  useBillingPeriod: {
     type: Boolean,
     default: true,
   },
@@ -43,6 +47,9 @@ const organizationStore = useOrganizationStore()
 const cycleStart = new Date(organizationStore.currentOrganization?.subscription_start ?? new Date())
 const cycleEnd = new Date(organizationStore.currentOrganization?.subscription_end ?? new Date())
 
+// View mode is now controlled by parent component
+const viewMode = computed(() => props.accumulated ? 'cumulative' : 'daily')
+
 Chart.register(
   Tooltip,
   PointElement,
@@ -54,7 +61,7 @@ Chart.register(
 
 const accumulateData = computed(() => {
   const monthDay = getCurrentDayMonth()
-  if (!props.accumulated)
+  if (viewMode.value === 'daily' || viewMode.value === 'last30days')
     return props.data as number[]
   return (props.data as number[]).reduce((acc: number[], val: number, i: number) => {
     const last = acc[acc.length - 1] ?? 0
@@ -125,11 +132,23 @@ function getDayNumbers(startDate: Date, endDate: Date) {
 }
 
 function monthdays() {
+  if (!props.useBillingPeriod) {
+    // Last 30 days mode - generate actual dates
+    const today = new Date()
+    const dates = []
+    for (let i = 29; i >= 0; i--) {
+      const date = new Date(today)
+      date.setDate(date.getDate() - i)
+      dates.push(date.getDate())
+    }
+    return dates
+  }
+
+  // Billing period mode - use existing logic
   // eslint-disable-next-line unicorn/no-new-array
   let keys = [...(new Array(getDaysInCurrentMonth() + 1).keys())]
   if (cycleStart && cycleEnd)
     keys = getDayNumbers(cycleStart, cycleEnd)
-
   else
     keys.shift()
 
@@ -222,7 +241,7 @@ const chartData = computed<ChartData<'line'>>(() => {
       if (appData) {
         // Process app data with accumulation if needed
         let processedData = appData
-        if (props.accumulated) {
+        if (viewMode.value === 'cumulative') {
           processedData = appData.reduce((acc: number[], val: number, i: number) => {
             const last = acc[acc.length - 1] ?? 0
             let newVal
