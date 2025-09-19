@@ -299,6 +299,8 @@
   "deploy-date": "Fecha de Despliegue",
   "deploy-history": "Historia",
   "deployed-by": "Desplegado por",
+  "deployment_statistics": "Estadísticas de implementación",
+  "deployments-title": "Total",
   "detailed-usage-plan": "Uso detallado",
   "device": "Dispositivo",
   "device-id": "ID del dispositivo",

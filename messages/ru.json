@@ -299,6 +299,8 @@
   "deploy-date": "Дата развертывания",
   "deploy-history": "История",
   "deployed-by": "Развернутый с помощью",
+  "deployment_statistics": "Статистика развертывания",
+  "deployments-title": "Всего",
   "detailed-usage-plan": "Подробное использование",
   "device": "Устройство",
   "device-id": "ID устройства",

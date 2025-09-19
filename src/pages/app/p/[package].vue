@@ -12,6 +12,9 @@ import IconDevice from '~icons/heroicons/device-phone-mobile'
 import IconChannel from '~icons/heroicons/signal'
 import IconAlertCircle from '~icons/lucide/alert-circle'
 import AppSetting from '~/components/dashboard/AppSetting.vue'
+import BundleUploadsCard from '~/components/dashboard/BundleUploadsCard.vue'
+import UpdateStatsCard from '~/components/dashboard/UpdateStatsCard.vue'
+import DeploymentStatsCard from '~/components/dashboard/DeploymentStatsCard.vue'
 import { getCapgoVersion, useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
@@ -179,11 +182,12 @@ watchEffect(() => {
         <FailedCard />
         <Usage v-if="!organizationStore.currentOrganizationFailed" :app-id="id" :show-mobile-stats="canShowMobileStats" />
 
-        <BlurBg id="app-stats" class="mb-10">
-          <template #default>
-            <StatsBar :stats="stats" />
-          </template>
-        </BlurBg>
+        <!-- New charts section -->
+        <div class="grid grid-cols-1 sm:grid-cols-12 gap-6 mb-6 xl:grid-cols-12">
+          <BundleUploadsCard class="col-span-full sm:col-span-6 xl:col-span-4" />
+          <UpdateStatsCard class="col-span-full sm:col-span-6 xl:col-span-4" />
+          <DeploymentStatsCard class="col-span-full sm:col-span-6 xl:col-span-4" />
+        </div>
       </div>
 
       <div v-if="ActiveTab === 'info'" class="mt-0 md:mt-4">

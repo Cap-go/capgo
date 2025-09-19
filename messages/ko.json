@@ -299,6 +299,8 @@
   "deploy-date": "배포 날짜",
   "deploy-history": "역사",
   "deployed-by": "배포한",
+  "deployment_statistics": "배포 통계",
+  "deployments-title": "총계",
   "detailed-usage-plan": "상세 사용법",
   "device": "장치",
   "device-id": "장치 ID",
