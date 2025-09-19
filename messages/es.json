@@ -266,6 +266,7 @@
   "created-at": "Creado en",
   "credits-used-in-period": "Créditos utilizados en el período",
   "cumulative": "Acumulativo",
+  "cumulative-not-available-last-30-days": "Acumulativo solo disponible con ciclo de facturación",
   "current": "actual",
   "current-bundle": "Paquete actual",
   "custom": "Personalizado",

@@ -266,6 +266,7 @@
   "created-at": "생성된 시각",
   "credits-used-in-period": "기간 동안 사용된 크레딧",
   "cumulative": "누적된",
+  "cumulative-not-available-last-30-days": "누적은 청구 주기와 함께만 사용 가능합니다.",
   "current": "현재",
   "current-bundle": "현재 번들",
   "custom": "사용자 정의",

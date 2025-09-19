@@ -266,6 +266,7 @@
   "created-at": "Oluşturulma tarihi",
   "credits-used-in-period": "Dönemde kullanılan krediler",
   "cumulative": "Birikimli",
+  "cumulative-not-available-last-30-days": "Yalnızca faturalandırma döngüsü ile birikimli kullanılabilir",
   "current": "güncel",
   "current-bundle": "Mevcut paket",
   "custom": "Özel",

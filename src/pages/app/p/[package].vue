@@ -38,6 +38,7 @@ const supabase = useSupabase()
 const displayStore = useDisplayStore()
 const app = ref<Database['public']['Tables']['apps']['Row']>()
 const ActiveTab = ref(route.query.tab?.toString() || 'overview')
+const usageComponent = ref()
 
 const tabs: Tab[] = [
   {
@@ -140,6 +141,11 @@ watchEffect(async () => {
 })
 
 watchEffect(() => {
+  // Clear dashboard-specific query parameters when switching away from overview
+  if (ActiveTab.value !== 'overview' && usageComponent.value?.clearDashboardParams) {
+    usageComponent.value.clearDashboardParams()
+  }
+  // Always update tab parameter
   router.replace({ query: { ...route.query, tab: ActiveTab.value } })
 })
 </script>
@@ -153,7 +159,7 @@ watchEffect(() => {
     <div v-else-if="app">
       <div v-if="ActiveTab === 'overview'" class="mt-4 w-full h-full px-4 pt-8 mb-8 overflow-y-auto max-h-fit lg:px-8 sm:px-6 overflow-x-hidden">
         <FailedCard />
-        <Usage v-if="!organizationStore.currentOrganizationFailed" :app-id="id" :show-mobile-stats="canShowMobileStats" />
+        <Usage v-if="!organizationStore.currentOrganizationFailed" ref="usageComponent" :app-id="id" :show-mobile-stats="canShowMobileStats" />
 
         <!-- New charts section -->
         <div class="grid grid-cols-1 sm:grid-cols-12 gap-6 mb-6 xl:grid-cols-12">

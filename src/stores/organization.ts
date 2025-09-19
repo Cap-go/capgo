@@ -68,7 +68,11 @@ export const useOrganizationStore = defineStore('organization', () => {
     localStorage.setItem(STORAGE_KEY, currentOrganizationRaw.gid)
     currentRole.value = await getCurrentRole(currentOrganizationRaw.created_by)
     currentOrganizationFailed.value = !(!!currentOrganizationRaw.paying || (currentOrganizationRaw.trial_left ?? 0) > 0)
-    await main.updateDashboard(currentOrganizationRaw.gid, currentOrganizationRaw.subscription_start, currentOrganizationRaw.subscription_end)
+    // Always fetch last 30 days of data and filter client-side for billing period
+    const last30DaysEnd = new Date()
+    const last30DaysStart = new Date()
+    last30DaysStart.setDate(last30DaysStart.getDate() - 29) // 30 days including today
+    await main.updateDashboard(currentOrganizationRaw.gid, last30DaysStart.toISOString(), last30DaysEnd.toISOString())
   })
 
   watch(_organizations, async (organizationsMap) => {

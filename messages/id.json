@@ -266,6 +266,7 @@
   "created-at": "Dibuat pada",
   "credits-used-in-period": "Kredit yang digunakan dalam periode",
   "cumulative": "Kumulatif",
+  "cumulative-not-available-last-30-days": "Hanya tersedia kumulatif dengan siklus penagihan",
   "current": "saat ini",
   "current-bundle": "Paket saat ini",
   "custom": "Kustom",

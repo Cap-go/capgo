@@ -61,7 +61,7 @@ Chart.register(
 
 const accumulateData = computed(() => {
   const monthDay = getCurrentDayMonth()
-  if (viewMode.value === 'daily' || viewMode.value === 'last30days')
+  if (viewMode.value === 'daily')
     return props.data as number[]
   return (props.data as number[]).reduce((acc: number[], val: number, i: number) => {
     const last = acc[acc.length - 1] ?? 0
@@ -185,6 +185,11 @@ function createAnotation(id: string, y: number, title: string, lineColor: string
 }
 
 const generateAnnotations = computed(() => {
+  // Don't show plan limits in daily mode - they only make sense for cumulative data
+  if (!props.accumulated) {
+    return {}
+  }
+
   // find biggest value in data
   let annotations: any = {}
   const min = Math.min(...accumulateData.value.filter((val: any) => val !== undefined) as number[])
