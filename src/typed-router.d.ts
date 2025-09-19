@@ -29,6 +29,7 @@ declare module 'vue-router/auto-routes' {
     '/app/p/[package].channel.[channel]': RouteRecordInfo<'/app/p/[package].channel.[channel]', '/app/p/:package/channel/:channel', { package: ParamValue<true>, channel: ParamValue<true> }, { package: ParamValue<false>, channel: ParamValue<false> }>,
     '/app/p/[package].d.[device]': RouteRecordInfo<'/app/p/[package].d.[device]', '/app/p/:package/d/:device', { package: ParamValue<true>, device: ParamValue<true> }, { package: ParamValue<false>, device: ParamValue<false> }>,
     '/confirm-signup': RouteRecordInfo<'/confirm-signup', '/confirm-signup', Record<never, never>, Record<never, never>>,
+    '/dashboard': RouteRecordInfo<'/dashboard', '/dashboard', Record<never, never>, Record<never, never>>,
     '/delete_account': RouteRecordInfo<'/delete_account', '/delete_account', Record<never, never>, Record<never, never>>,
     '/demo_dialog': RouteRecordInfo<'/demo_dialog', '/demo_dialog', Record<never, never>, Record<never, never>>,
     '/forgot_password': RouteRecordInfo<'/forgot_password', '/forgot_password', Record<never, never>, Record<never, never>>,
@@ -103,6 +104,10 @@ declare module 'vue-router/auto-routes' {
     }
     'src/pages/confirm-signup.vue': {
       routes: '/confirm-signup'
+      views: never
+    }
+    'src/pages/dashboard.vue': {
+      routes: '/dashboard'
       views: never
     }
     'src/pages/delete_account.vue': {

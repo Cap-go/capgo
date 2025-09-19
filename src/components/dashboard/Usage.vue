@@ -167,5 +167,6 @@ if (main.dashboardFetched)
       <Spinner size="w-40 h-40" />
     </div>
     <MobileStats v-if="appId && showMobileStats" class="col-span-full sm:col-span-6 xl:col-span-4" />
+    <BundleUploadsCard v-if="!appId" class="col-span-full sm:col-span-6 xl:col-span-4" />
   </div>
 </template>

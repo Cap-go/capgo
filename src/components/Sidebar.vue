@@ -8,8 +8,8 @@ import { useRoute, useRouter } from 'vue-router'
 import IconDoc from '~icons/gg/loadbar-doc'
 import IconDiscord from '~icons/ic/round-discord'
 import IconDashboard from '~icons/ic/round-space-dashboard'
-// import FluentLive20Filled from '~icons/fluent/live-20-filled'
 import IconApiKey from '~icons/mdi/shield-key'
+import IconAppStore from '~icons/simple-icons/appstore'
 import DropdownProfile from '../components/dashboard/DropdownProfile.vue'
 
 const props = defineProps <{
@@ -39,6 +39,11 @@ const tabs = ref<Tab[]>([
   {
     label: 'dashboard',
     icon: shallowRef(IconDashboard),
+    key: '/dashboard',
+  },
+  {
+    label: 'apps',
+    icon: shallowRef(IconAppStore),
     key: '/app',
   },
   {
@@ -46,11 +51,6 @@ const tabs = ref<Tab[]>([
     icon: shallowRef(IconApiKey),
     key: '/apikeys',
   },
-  // {
-  //   label: t('live-reload'),
-  //   icon: shallowRef(FluentLive20Filled),
-  //   key: '/dashboard/livereload',
-  // },
   {
     label: 'documentation',
     icon: shallowRef(IconDoc),

@@ -14,6 +14,8 @@ declare module 'vue' {
     Banner: typeof import('./components/Banner.vue')['default']
     BlurBg: typeof import('./components/BlurBg.vue')['default']
     BundleTable: typeof import('./components/tables/BundleTable.vue')['default']
+    BundleUploadsCard: typeof import('./components/dashboard/BundleUploadsCard.vue')['default']
+    BundleUploadsChart: typeof import('./components/BundleUploadsChart.vue')['default']
     ChannelTable: typeof import('./components/tables/ChannelTable.vue')['default']
     DeviceTable: typeof import('./components/tables/DeviceTable.vue')['default']
     DialogV2: typeof import('./components/DialogV2.vue')['default']

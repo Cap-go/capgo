@@ -11,6 +11,8 @@ function getPrettyName(segment: string, index: number, allSegments: string[]): s
   }
 
   switch (segment) {
+    case 'dashboard':
+      return 'dashboard'
     case 'app':
       return 'apps'
     case 'settings':
@@ -42,11 +44,15 @@ function isValidClickableSegment(segment: string, index: number, totalLength: nu
     return false
 
   // Skip 'app', 'p', and 'settings' segments - they're not clickable
-  if (segment === 'app' || segment === 'p' || segment === 'settings')
+  if (segment === 'p' || segment === 'settings')
     return false
 
-  const previousSegment = allSegments[index - 1]
-  const previousTwoSegments = allSegments[index - 2]
+  const previousSegment = allSegments.length ? allSegments[index - 1] : undefined
+  const previousTwoSegments = allSegments.length > 1 ? allSegments[index - 2] : undefined
+
+  // Include 'app' only if followed by 'p' and an appId
+  if (segment === 'app' && previousSegment !== 'p')
+    return true
 
   // Include appId (segment after 'p') only if there are more segments after it
   if (previousSegment === 'p' && previousTwoSegments === 'app' && index < totalLength - 1) {
@@ -83,7 +89,9 @@ export const install: UserModule = ({ router }) => {
       display.pathTitle = splittedPath
         .reduce((acc, segment, i) => {
           // Only add clickable segments
-          if (isValidClickableSegment(segment, i, splittedPath.length, splittedPath)) {
+          const isValid = isValidClickableSegment(segment, i, splittedPath.length, splittedPath)
+          console.log({ segment, i, isValid, splittedPath })
+          if (isValid) {
             // Build the path up to this segment
             const pathUpToHere = `/${splittedPath.slice(0, i + 1).join('/')}`
 

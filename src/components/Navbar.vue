@@ -54,9 +54,8 @@ const { t } = useI18n()
           <!-- Title on desktop -->
           <div class="hidden lg:block">
             <div class="font-bold truncate text-md md:text-2xl text-dark dark:text-white flex items-center space-x-2">
-              <span v-if="$route.path !== '/' && $route.path !== '/app'" class="text-sm text-slate-600 dark:text-slate-400 font-normal">
-                <router-link to="/" class=" first-letter:uppercase hover:underline">
-                  {{ t('home') }}
+              <span v-if="$route.path !== '/' && $route.path !== '/dashboard'" class="text-sm text-slate-600 dark:text-slate-400 font-normal">
+                <router-link to="/dashboard" class="first-letter:uppercase hover:underline">{{ t('dashboard') }}
                 </router-link>
                 <template v-for="(breadcrumb, i) in displayStore.pathTitle" :key="i">
                   <span> / </span>

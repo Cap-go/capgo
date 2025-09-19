@@ -3,13 +3,12 @@ import type { Database } from '~/types/supabase.types'
 import { storeToRefs } from 'pinia'
 import { ref, watch, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 import { useOrganizationStore } from '~/stores/organization'
 
-const route = useRoute('/app/')
-const router = useRouter()
+const route = useRoute('/dashboard')
 const organizationStore = useOrganizationStore()
 const isLoading = ref(true)
 const stepsOpen = ref(false)
@@ -20,10 +19,6 @@ const apps = ref<Database['public']['Tables']['apps']['Row'][]>([])
 
 const { currentOrganization } = storeToRefs(organizationStore)
 
-async function NextStep(appId: string) {
-  console.log('Navigating to app with ID:', appId)
-  router.push(`/app/p/${appId}`)
-}
 async function getMyApps() {
   await organizationStore.awaitInitialLoad()
   const currentGid = organizationStore.currentOrganization?.gid
@@ -54,24 +49,25 @@ watch(currentOrganization, async () => {
 })
 
 watchEffect(async () => {
-  if (route.path === '/app') {
+  if (route.path === '/dashboard') {
     displayStore.NavTitle = ''
     isLoading.value = true
     await getMyApps()
     isLoading.value = false
   }
 })
-displayStore.NavTitle = t('apps')
+displayStore.NavTitle = t('dashboard')
 displayStore.defaultBack = '/app'
 </script>
 
 <template>
   <div>
     <div v-if="!isLoading">
-      <StepsApp v-if="stepsOpen" :onboarding="!apps.length" @done="NextStep" @close-step="stepsOpen = !stepsOpen" />
-      <div v-else class="h-full pb-4 overflow-hidden">
+      <div class="h-full pb-4 overflow-hidden">
         <div class="w-full h-full px-4 pt-8 mx-auto mb-8 overflow-y-auto max-w-9xl max-h-fit lg:px-8 sm:px-6">
-          <AppTable :apps="apps" :delete-button="true" @add-app="stepsOpen = !stepsOpen" />
+          <WelcomeBanner v-if="apps.length === 0" />
+          <FailedCard />
+          <Usage v-if="!isLoading && !organizationStore.currentOrganizationFailed" />
         </div>
       </div>
     </div>
