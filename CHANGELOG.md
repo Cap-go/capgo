@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.29.6-alpha.0 (2025-09-19)
+
+
+### Bug Fixes
+
+* test ci ([79fe136](https://github.com/Cap-go/capgo/commit/79fe136039e50ffe62bc51b1c2cab249e033fddb))
+
 ### 12.29.5 (2025-09-18)
 
 ### 12.29.4 (2025-09-18)
