@@ -261,7 +261,7 @@ onMounted(async () => {
             {{ (totalInstalled + totalFailed + totalGet).toLocaleString() }}
           </div>
           <div v-if="lastDayEvolution" class="rounded-full bg-emerald-500 px-1.5 text-sm font-semibold text-white">
-            {{ lastDayEvolution < 0 ? '-' : '+' }}{{ lastDayEvolution.toFixed(2) }}%
+            {{ lastDayEvolution < 0 ? '-' : '+' }}{{ Math.abs(lastDayEvolution).toFixed(2) }}%
           </div>
         </div>
       </div>
