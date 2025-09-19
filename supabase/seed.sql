@@ -247,14 +247,14 @@ BEGIN
     (12, now(), 'com.stats.app', 'unknown', NULL, now(), 't', NULL, NULL, NULL, 'supabase', 'b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e', NULL, NULL, NULL),
     (13, now(), 'com.stats.app', '1.0.0', 'orgs/b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e/apps/com.stats.app/1.0.0.zip', now(), 'f', NULL, 'stats123', NULL, 'r2', 'b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e', '7a1b2c3d-4e5f-4a6b-7c8d-9e0f1a2b3c4d', 'stats test version', 'https://capgo.app');
 
-    INSERT INTO "public"."app_versions_meta" ("id", "created_at", "app_id", "updated_at", "checksum", "size", "devices") VALUES
-    (3, now(), 'com.demo.app', now(), '3885ee49', 1012506, 10),
-    (4, now(), 'com.demo.app', now(), '', 0, 10),
-    (5, now(), 'com.demo.app', now(), '9d4f798a', 1012529, 20),
-    (6, now(), 'com.demo.app', now(), '44913a9f', 1012541, 30),
-    (7, now(), 'com.demo.app', now(), '9f74e70a', 1012548, 40),
-    (10, now(), 'com.demoadmin.app', now(), 'admin123', 1500000, 5),
-    (13, now(), 'com.stats.app', now(), 'stats123', 850000, 15);
+    INSERT INTO "public"."app_versions_meta" ("id", "created_at", "app_id", "updated_at", "checksum", "size") VALUES
+    (3, now(), 'com.demo.app', now(), '3885ee49', 1012506),
+    (4, now(), 'com.demo.app', now(), '', 0),
+    (5, now(), 'com.demo.app', now(), '9d4f798a', 1012529),
+    (6, now(), 'com.demo.app', now(), '44913a9f', 1012541),
+    (7, now(), 'com.demo.app', now(), '9f74e70a', 1012548),
+    (10, now(), 'com.demoadmin.app', now(), 'admin123', 1500000),
+    (13, now(), 'com.stats.app', now(), 'stats123', 850000);
 
     INSERT INTO "public"."channels" ("id", "created_at", "name", "app_id", "version", "updated_at", "public", "disable_auto_update_under_native", "disable_auto_update", "ios", "android", "allow_device_self_set", "allow_emulator", "allow_dev", "created_by") VALUES
     (1, now(), 'production', 'com.demo.app', 3, now(), 't', 't', 'major'::"public"."disable_update", 'f', 't', 't', 't', 't', '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid),
@@ -369,6 +369,20 @@ BEGIN
       INSERT INTO public.daily_version (date, app_id, version_id, get, fail, install, uninstall)
       VALUES (curr_date, 'com.demo.app', current_version_id, FLOOR(RANDOM() * 100) + 1, FLOOR(RANDOM() * 10) + 1, previous_install, 0);
     END IF;
+
+    curr_date := curr_date + INTERVAL '1 day';
+  END LOOP;
+
+  -- Add daily_version data for additional apps for testing multi-app view
+  curr_date := start_date::DATE + INTERVAL '5 days'; -- Start 5 days later for variety
+  WHILE curr_date <= end_date::DATE LOOP
+    -- Add data for com.demoadmin.app
+    INSERT INTO public.daily_version (date, app_id, version_id, get, fail, install, uninstall)
+    VALUES (curr_date, 'com.demoadmin.app', 10, FLOOR(RANDOM() * 30) + 5, FLOOR(RANDOM() * 3) + 0, FLOOR(RANDOM() * 20) + 3, 0);
+
+    -- Add data for com.stats.app
+    INSERT INTO public.daily_version (date, app_id, version_id, get, fail, install, uninstall)
+    VALUES (curr_date, 'com.stats.app', 13, FLOOR(RANDOM() * 25) + 8, FLOOR(RANDOM() * 2) + 0, FLOOR(RANDOM() * 15) + 2, 0);
 
     curr_date := curr_date + INTERVAL '1 day';
   END LOOP;

@@ -8,6 +8,7 @@ import { bytesToGb, getDaysBetweenDates } from '~/services/conversion'
 import { getPlans, useSupabase } from '~/services/supabase'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
+import UpdateStatsCard from './UpdateStatsCard.vue'
 import UsageCard from './UsageCard.vue'
 
 const props = defineProps<{
@@ -247,6 +248,13 @@ if (main.dashboardFetched)
     </div>
     <MobileStats v-if="appId && showMobileStats" class="col-span-full sm:col-span-6 xl:col-span-4" />
     <BundleUploadsCard v-if="!isLoading && !appId" class="col-span-full sm:col-span-6 xl:col-span-4" />
+    <div
+      v-else-if="!appId"
+      class="col-span-full h-[460px] flex flex-col items-center justify-center border border-slate-300 rounded-lg bg-white shadow-lg sm:col-span-6 xl:col-span-4 dark:border-slate-900 dark:bg-gray-800"
+    >
+      <Spinner size="w-40 h-40" />
+    </div>
+    <UpdateStatsCard v-if="!isLoading && !appId" class="col-span-full sm:col-span-6 xl:col-span-4" />
     <div
       v-else-if="!appId"
       class="col-span-full h-[460px] flex flex-col items-center justify-center border border-slate-300 rounded-lg bg-white shadow-lg sm:col-span-6 xl:col-span-4 dark:border-slate-900 dark:bg-gray-800"

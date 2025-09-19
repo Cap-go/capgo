@@ -5,7 +5,6 @@ import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import InformationInfo from '~icons/heroicons/information-circle'
 import BundleUploadsChart from '~/components/BundleUploadsChart.vue'
-import { getDaysInCurrentMonth } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
@@ -59,7 +58,7 @@ async function calculateStats() {
       .eq('owner_org', organizationStore.currentOrganization.gid)
 
     if (apps && apps.length > 0) {
-      apps.forEach(app => {
+      apps.forEach((app) => {
         appIds.push(app.app_id)
         appNames.value[app.app_id] = app.name || app.app_id
         // Initialize data array for each app
@@ -83,7 +82,6 @@ async function calculateStats() {
   const { data, error } = await query
 
   if (!error && data) {
-
     // Map each bundle to the correct day and app
     data.filter(b => b.created_at !== null && b.app_id !== null)
       .forEach((bundle) => {
