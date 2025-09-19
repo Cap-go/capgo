@@ -266,7 +266,7 @@
   "created-at": "Создано в",
   "credits-used-in-period": "Кредиты, использованные за период",
   "cumulative": "Накопительный",
-  "cumulative-not-available-last-30-days": "Накопительный доступен только с платежным циклом",
+  "cumulative-not-available-last-30-days": "Накопительный просмотр доступен только с периодом оплаты",
   "current": "текущий",
   "current-bundle": "Текущий пакет",
   "custom": "Пользовательский",

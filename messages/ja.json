@@ -266,7 +266,7 @@
   "created-at": "作成日時",
   "credits-used-in-period": "期間中に使用されたクレジット",
   "cumulative": "累積的な",
-  "cumulative-not-available-last-30-days": "請求サイクルでのみ累積が利用可能です",
+  "cumulative-not-available-last-30-days": "請求期間でのみ利用可能な累積ビュー",
   "current": "現在の",
   "current-bundle": "現在のバンドル",
   "custom": "カスタム",

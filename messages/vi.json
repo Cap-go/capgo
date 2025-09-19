@@ -266,7 +266,7 @@
   "created-at": "Được tạo lúc",
   "credits-used-in-period": "Số điểm đã sử dụng trong kỳ",
   "cumulative": "Tích lũy",
-  "cumulative-not-available-last-30-days": "Chỉ có sẵn tích lũy với chu kỳ hóa đơn",
+  "cumulative-not-available-last-30-days": "Chỉ có thể xem tổng hợp khi có chu kỳ thanh toán",
   "current": "hiện tại",
   "current-bundle": "Gói hiện tại",
   "custom": "Tùy chỉnh",

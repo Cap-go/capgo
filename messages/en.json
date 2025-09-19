@@ -266,7 +266,7 @@
   "created-at": "Created at",
   "credits-used-in-period": "Credits used in period",
   "cumulative": "Cumulative",
-  "cumulative-not-available-last-30-days": "Cumulative only available with billing cycle",
+  "cumulative-not-available-last-30-days": "Cumulative view only available with billing period",
   "current": "current",
   "current-bundle": "Current bundle",
   "custom": "Custom",
