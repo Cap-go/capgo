@@ -249,13 +249,13 @@ const chartData = computed<ChartData<'line'>>(() => {
     })
   }
   else {
-    // Fallback to single dataset if no app data
+    // Fallback to single dataset if no app data - no fill for single line
     datasets.push({
       label: props.title,
       data: accumulateData.value,
       borderColor: props.colors[400],
       backgroundColor: props.colors[200],
-      fill: 'origin', // Fill from bottom for single app
+      fill: false, // No fill for single app line
       tension: 0.3,
       pointRadius: 2,
       pointBorderWidth: 0,
@@ -266,7 +266,7 @@ const chartData = computed<ChartData<'line'>>(() => {
       data: projectionData.value,
       borderColor: 'transparent',
       backgroundColor: props.colors[200],
-      fill: 'origin', // Fill from bottom for prediction
+      fill: false, // No fill for prediction line either
       tension: 0.9,
       pointRadius: 2,
       pointBorderWidth: 0,
