@@ -118,7 +118,7 @@
     "alpha": {
       "name": "capgo_api-alpha",
       "route": {
-        "pattern": "api-alpha.capgo.app",
+        "pattern": "api-dev.capgo.app",
         "custom_domain": true
       },
       "observability": {
