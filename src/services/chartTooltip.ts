@@ -1,16 +1,31 @@
+import type { Chart, TooltipModel } from 'chart.js'
 import { useDark } from '@vueuse/core'
+
+interface TooltipContext {
+  chart: Chart
+  tooltip: TooltipModel<'bar' | 'line'>
+}
+
+interface TooltipItem {
+  body: string[]
+  value: number
+  colors: {
+    backgroundColor: string
+    borderColor: string
+  }
+}
 
 /**
  * Creates a custom Chart.js tooltip with smart positioning and scrollable content
  * @param context Chart.js tooltip context
  */
-export function createCustomTooltip(context: any) {
+export function createCustomTooltip(context: TooltipContext) {
   const { chart, tooltip } = context
   const { canvas } = chart
   const isDark = useDark()
 
   // Get or create tooltip element
-  let tooltipEl = chart.canvas.parentNode.querySelector('.chartjs-tooltip')
+  let tooltipEl = chart.canvas.parentNode?.querySelector('.chartjs-tooltip') as HTMLElement | null
   if (!tooltipEl) {
     tooltipEl = document.createElement('div')
     tooltipEl.className = 'chartjs-tooltip'
@@ -31,7 +46,7 @@ export function createCustomTooltip(context: any) {
     tooltipEl.style.overflowY = 'auto'
     tooltipEl.style.minWidth = '200px'
     tooltipEl.style.maxWidth = '300px'
-    chart.canvas.parentNode.appendChild(tooltipEl)
+    chart.canvas.parentNode?.appendChild(tooltipEl)
   }
 
   // Hide if no tooltip
@@ -43,10 +58,10 @@ export function createCustomTooltip(context: any) {
   // Set content
   if (tooltip.body) {
     const titleLines = tooltip.title || []
-    const bodyLines = tooltip.body.map((b: any) => b.lines)
+    const bodyLines = tooltip.body.map(b => b.lines)
 
     // Create an array of items with their values, colors, and labels
-    const items = bodyLines.map((body: any, i: number) => {
+    const items: TooltipItem[] = bodyLines.map((body: string[], i: number) => {
       // Extract the numeric value from the label (format: "value - Label")
       const match = body[0]?.match(/^(\d+(?:\.\d+)?)/)
       const value = match ? Number.parseFloat(match[1]) : 0
@@ -55,8 +70,8 @@ export function createCustomTooltip(context: any) {
         body,
         value,
         colors: tooltip.labelColors[i],
-      }
-    })
+      } as TooltipItem
+    }).filter(item => item.value > 0) // Filter out zero values
 
     // Sort by value in descending order (highest to lowest)
     items.sort((a, b) => b.value - a.value)
@@ -144,9 +159,10 @@ function positionTooltip(tooltipEl: HTMLElement, canvas: HTMLCanvasElement, tool
  */
 export const verticalLinePlugin = {
   id: 'verticalLine',
-  afterDatasetsDraw(chart: any) {
-    if (chart.tooltip && chart.tooltip._active && chart.tooltip._active.length > 0) {
-      const activePoint = chart.tooltip._active[0]
+  afterDatasetsDraw(chart: Chart) {
+    const active = chart.tooltip?.getActiveElements()
+    if (chart.tooltip && active && active.length > 0) {
+      const activePoint = active[0]
       const ctx = chart.ctx
       const x = activePoint.element.x
       const topY = chart.scales.y.top
@@ -182,6 +198,12 @@ export const verticalLinePlugin = {
   },
 }
 
+interface TooltipCallbackContext {
+  label: string
+  parsed: { y: number }
+  dataset: { label: string }
+}
+
 /**
  * Creates tooltip configuration for Chart.js options
  * @param hasMultipleDatasets Whether the chart has multiple datasets (apps)
@@ -195,12 +217,12 @@ export function createTooltipConfig(hasMultipleDatasets: boolean) {
     external: hasMultipleDatasets ? createCustomTooltip : undefined,
     enabled: !hasMultipleDatasets, // Disable default tooltip when using custom
     callbacks: {
-      title(tooltipItems: any) {
+      title(tooltipItems: TooltipCallbackContext[]) {
         // Format the title to show "Day X" instead of just the number
         const day = tooltipItems[0].label
         return `Day ${day}`
       },
-      label(context: any) {
+      label(context: TooltipCallbackContext) {
         if (hasMultipleDatasets) {
           // Format as "value - label" for better readability
           return `${context.parsed.y} - ${context.dataset.label}`
