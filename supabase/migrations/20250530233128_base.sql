@@ -5373,8 +5373,6 @@ ALTER TABLE "public"."version_meta" ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE "public"."version_usage" ENABLE ROW LEVEL SECURITY;
 
-ADD TABLE ONLY "public"."apps";
-
 REVOKE USAGE ON SCHEMA "public"
 FROM
   PUBLIC;
