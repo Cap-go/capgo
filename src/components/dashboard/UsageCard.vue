@@ -24,6 +24,14 @@ const props = defineProps({
     type: Array,
     default: () => Array.from({ length: getDaysInCurrentMonth() }).fill(undefined) as number[],
   },
+  datasByApp: {
+    type: Object,
+    default: () => ({}),
+  },
+  appNames: {
+    type: Object,
+    default: () => ({}),
+  },
 })
 const { t } = useI18n()
 const main = useMainStore()
@@ -147,7 +155,7 @@ const lastDayEvolution = computed(() => {
 
     <!-- Change the height attribute to adjust the chart height -->
     <div class="w-full h-full p-6">
-      <LineChartStats v-if="props.datas?.length" :title="props.title" :colors="props.colors" :limits="props.limits" :data="props.datas" :accumulated="accumulated" />
+      <LineChartStats v-if="props.datas?.length" :title="props.title" :colors="props.colors" :limits="props.limits" :data="props.datas" :datas-by-app="props.datasByApp" :app-names="props.appNames" :accumulated="accumulated" />
       <div v-else class="flex flex-col items-center justify-center h-full">
         {{ t('no-data') }}
       </div>

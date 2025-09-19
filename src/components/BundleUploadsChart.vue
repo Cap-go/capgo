@@ -13,6 +13,7 @@ import { computed } from 'vue'
 import { Bar } from 'vue-chartjs'
 import { getDaysInCurrentMonth } from '~/services/date'
 import { useOrganizationStore } from '~/stores/organization'
+import { createTooltipConfig } from '../services/chartTooltip'
 
 const props = defineProps({
   title: { type: String, default: '' },
@@ -36,26 +37,24 @@ Chart.register(
   LinearScale,
 )
 
-// Generate distinct colors for apps
+// Generate infinite distinct pastel colors starting with blue
 function generateAppColors(appCount: number) {
-  const colors = [
-    'rgba(59, 130, 246, 0.8)', // blue
-    'rgba(34, 197, 94, 0.8)', // green
-    'rgba(168, 85, 247, 0.8)', // purple
-    'rgba(251, 146, 60, 0.8)', // orange
-    'rgba(236, 72, 153, 0.8)', // pink
-    'rgba(20, 184, 166, 0.8)', // teal
-    'rgba(251, 191, 36, 0.8)', // amber
-    'rgba(239, 68, 68, 0.8)', // red
-    'rgba(99, 102, 241, 0.8)', // indigo
-    'rgba(14, 165, 233, 0.8)', // sky
-  ]
+  const colors = []
 
-  const result = []
   for (let i = 0; i < appCount; i++) {
-    result.push(colors[i % colors.length])
+    // Start with blue (210°) and use golden ratio for distribution
+    const hue = (210 + i * 137.508) % 360 // Start at blue, then golden angle
+
+    // Use pastel-friendly saturation and lightness values
+    const saturation = 50 + (i % 3) * 8  // 50%, 58%, 66% - softer colors
+    const lightness = 60 + (i % 4) * 5   // 60%, 65%, 70%, 75% - lighter, more pastel
+
+    const backgroundColor = `hsla(${hue}, ${saturation}%, ${lightness}%, 0.8)`
+
+    colors.push(backgroundColor)
   }
-  return result
+
+  return colors
 }
 
 
@@ -95,11 +94,18 @@ const chartData = computed<ChartData<'bar'>>(() => {
   const datasets = appIds.map((appId, index) => {
     const appData = props.dataByApp[appId] as number[]
 
+    const backgroundColor = appColors[index]
+    // Create a slightly darker border for better definition
+    const borderColor = backgroundColor.replace('hsla', 'hsl').replace(', 0.8)', ')').replace(/(\d+)%\)/, (_, lightness) => {
+      const newLightness = Math.max(Number(lightness) - 15, 30)
+      return `${newLightness}%)`
+    })
+
     return {
       label: props.appNames[appId] || appId,
       data: appData,
-      backgroundColor: appColors[index],
-      borderColor: appColors[index].replace('0.8', '1'),
+      backgroundColor,
+      borderColor,
       borderWidth: 1,
     }
   })
@@ -149,10 +155,7 @@ const chartOptions = computed<ChartOptions<'bar'>>(() => ({
     title: {
       display: false,
     },
-    tooltip: {
-      mode: 'index' as const,
-      intersect: false,
-    },
+    tooltip: createTooltipConfig(Object.keys(props.dataByApp).length > 0),
   },
 }))
 

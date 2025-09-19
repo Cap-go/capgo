@@ -5,8 +5,9 @@ import colors from 'tailwindcss/colors'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { bytesToGb, getDaysBetweenDates } from '~/services/conversion'
-import { getPlans } from '~/services/supabase'
+import { getPlans, useSupabase } from '~/services/supabase'
 import { useMainStore } from '~/stores/main'
+import { useOrganizationStore } from '~/stores/organization'
 import UsageCard from './UsageCard.vue'
 
 const props = defineProps<{
@@ -28,6 +29,14 @@ const datas = ref({
   storage: [] as number[],
   bandwidth: [] as number[],
 })
+
+const datasByApp = ref({
+  mau: {} as { [appId: string]: number[] },
+  storage: {} as { [appId: string]: number[] },
+  bandwidth: {} as { [appId: string]: number[] },
+})
+
+const appNames = ref<{ [appId: string]: string }>({})
 const isLoading = ref(true)
 const main = useMainStore()
 const organizationStore = useOrganizationStore()
@@ -51,14 +60,45 @@ const allLimits = computed(() => {
 })
 
 async function getAppStats() {
-  if (props.appId)
-    return main.filterDashboard(props.appId)
+  if (props.appId) {
+    return {
+      global: main.filterDashboard(props.appId),
+      byApp: {},
+      appNames: {},
+    }
+  }
 
-  return main.dashboard
+  // Get all apps for the organization
+  const organizationGid = organizationStore.currentOrganization?.gid
+  if (!organizationGid) {
+    return {
+      global: main.dashboard,
+      byApp: {},
+      appNames: {},
+    }
+  }
+
+  const { data: apps } = await useSupabase()
+    .from('apps')
+    .select('app_id, name')
+    .eq('owner_org', organizationGid)
+
+  const appNamesMap: { [appId: string]: string } = {}
+  if (apps) {
+    apps.forEach(app => {
+      appNamesMap[app.app_id] = app.name || app.app_id
+    })
+  }
+
+  return {
+    global: main.dashboard,
+    byApp: main.dashboardByapp,
+    appNames: appNamesMap,
+  }
 }
 
 async function getUsages() {
-  const globalStats = await getAppStats()
+  const { global: globalStats, byApp: byAppStats, appNames: appNamesMap } = await getAppStats()
   const cycleStart = new Date(organizationStore.currentOrganization?.subscription_start ?? new Date())
 
   const cycleEnd = new Date(organizationStore.currentOrganization?.subscription_end ?? new Date())
@@ -95,6 +135,45 @@ async function getUsages() {
     datas.value.storage[index] = bytesToGb(item.storage ?? 0, 2)
     datas.value.bandwidth[index] = bytesToGb(item.bandwidth ?? 0, 2)
   })
+
+  // Process by-app data if available
+  appNames.value = appNamesMap
+  datasByApp.value.mau = {}
+  datasByApp.value.storage = {}
+  datasByApp.value.bandwidth = {}
+
+  if (byAppStats && Array.isArray(byAppStats) && byAppStats.length > 0 && !props.appId) {
+    // Group by app_id
+    const appGroups: { [appId: string]: any[] } = {}
+    byAppStats.forEach((item: any) => {
+      if (!appGroups[item.app_id]) {
+        appGroups[item.app_id] = []
+      }
+      appGroups[item.app_id].push({
+        ...item,
+        date: new Date(item.date),
+      })
+    })
+
+    // Process each app's data
+    Object.keys(appGroups).forEach((appId) => {
+      datasByApp.value.mau[appId] = Array.from({ length: graphDays }).fill(undefined) as number[]
+      datasByApp.value.storage[appId] = Array.from({ length: graphDays }).fill(undefined) as number[]
+      datasByApp.value.bandwidth[appId] = Array.from({ length: graphDays }).fill(undefined) as number[]
+
+      appGroups[appId].forEach((item) => {
+        const index = getDaysBetweenDates(cycleStart, item.date)
+        datasByApp.value.mau[appId][index] = item.mau
+        datasByApp.value.storage[appId][index] = bytesToGb(item.storage ?? 0, 2)
+        datasByApp.value.bandwidth[appId][index] = bytesToGb(item.bandwidth ?? 0, 2)
+      })
+
+      // Slice to current day
+      datasByApp.value.mau[appId] = datasByApp.value.mau[appId].slice(0, cycleDay)
+      datasByApp.value.storage[appId] = datasByApp.value.storage[appId].slice(0, cycleDay)
+      datasByApp.value.bandwidth[appId] = datasByApp.value.bandwidth[appId].slice(0, cycleDay)
+    })
+  }
 
   // slice the lenght of the array to the current day
   datas.value.mau = datas.value.mau.slice(0, cycleDay)
@@ -135,7 +214,7 @@ if (main.dashboardFetched)
   >
     <UsageCard
       v-if="!isLoading" id="mau-stat" :limits="allLimits.mau" :colors="colors.emerald" :accumulated="false"
-      :datas="datas.mau" :title="`${t('monthly-active')}`" :unit="t('units-users')"
+      :datas="datas.mau" :datas-by-app="datasByApp.mau" :app-names="appNames" :title="`${t('monthly-active')}`" :unit="t('units-users')"
       class="col-span-full sm:col-span-6 xl:col-span-4"
     />
     <div
@@ -145,7 +224,7 @@ if (main.dashboardFetched)
       <Spinner size="w-40 h-40" />
     </div>
     <UsageCard
-      v-if="!isLoading" :limits="allLimits.storage" :colors="colors.blue" :datas="datas.storage" :accumulated="false"
+      v-if="!isLoading" :limits="allLimits.storage" :colors="colors.blue" :datas="datas.storage" :datas-by-app="datasByApp.storage" :app-names="appNames" :accumulated="false"
       :title="t('Storage')" :unit="storageUnit"
       class="col-span-full sm:col-span-6 xl:col-span-4"
     />
@@ -156,7 +235,7 @@ if (main.dashboardFetched)
       <Spinner size="w-40 h-40" />
     </div>
     <UsageCard
-      v-if="!isLoading" :limits="allLimits.bandwidth" :colors="colors.orange" :datas="datas.bandwidth" :accumulated="false"
+      v-if="!isLoading" :limits="allLimits.bandwidth" :colors="colors.orange" :datas="datas.bandwidth" :datas-by-app="datasByApp.bandwidth" :app-names="appNames" :accumulated="false"
       :title="t('Bandwidth')" :unit="t('units-gb')"
       class="col-span-full sm:col-span-6 xl:col-span-4"
     />

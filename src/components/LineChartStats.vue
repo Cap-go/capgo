@@ -4,16 +4,20 @@ import type { AnnotationOptions } from '../services/chartAnnotations'
 import {
   CategoryScale,
   Chart,
+  Filler,
   LinearScale,
   LineElement,
   PointElement,
   Tooltip,
 } from 'chart.js'
-import { computed, ref } from 'vue'
+import { useDark } from '@vueuse/core'
+import { computed } from 'vue'
 import { Line } from 'vue-chartjs'
 import { useI18n } from 'vue-i18n'
 import { getCurrentDayMonth, getDaysInCurrentMonth } from '~/services/date'
+import { useOrganizationStore } from '~/stores/organization'
 import { inlineAnnotationPlugin } from '../services/chartAnnotations'
+import { createTooltipConfig } from '../services/chartTooltip'
 
 const props = defineProps({
   accumulated: {
@@ -24,6 +28,14 @@ const props = defineProps({
   colors: { type: Object, default: () => ({}) },
   limits: { type: Object, default: () => ({}) },
   data: { type: Array, default: Array.from({ length: getDaysInCurrentMonth() }).fill(undefined) as number[] },
+  datasByApp: {
+    type: Object,
+    default: () => ({}),
+  },
+  appNames: {
+    type: Object,
+    default: () => ({}),
+  },
 })
 const isDark = useDark()
 const { t } = useI18n()
@@ -37,6 +49,7 @@ Chart.register(
   CategoryScale,
   LinearScale,
   LineElement,
+  Filler,
 )
 
 const accumulateData = computed(() => {
@@ -164,56 +177,146 @@ const generateAnnotations = computed(() => {
   return annotations
 })
 
-const chartData = ref<ChartData<'line'>>({
-  labels: monthdays(),
-  datasets: [{
-    label: props.title,
-    data: accumulateData.value,
-    borderColor: props.colors[400],
-    backgroundColor: props.colors[200],
-    tension: 0.3,
-    pointRadius: 2,
-    pointBorderWidth: 0,
-  }, {
-    label: t('prediction'),
-    data: projectionData.value,
-    borderColor: 'transparent',
-    backgroundColor: props.colors[200],
-    tension: 0.9,
-    pointRadius: 2,
-    pointBorderWidth: 0,
-  }],
+// Generate infinite distinct pastel colors starting with blue
+function generateAppColors(appCount: number) {
+  const colors = []
+
+  for (let i = 0; i < appCount; i++) {
+    // Start with blue (210°) and use golden ratio for distribution
+    const hue = (210 + i * 137.508) % 360 // Start at blue, then golden angle
+
+    // Use pastel-friendly saturation and lightness values
+    const saturation = 50 + (i % 3) * 8  // 50%, 58%, 66% - softer colors
+    const lightness = 60 + (i % 4) * 5   // 60%, 65%, 70%, 75% - lighter, more pastel
+
+    const borderColor = `hsl(${hue}, ${saturation + 15}%, ${lightness - 15}%)`
+    const backgroundColor = `hsla(${hue}, ${saturation}%, ${lightness}%, 0.6)`
+
+    colors.push({
+      border: borderColor,
+      bg: backgroundColor,
+    })
+  }
+
+  return colors
+}
+
+
+const chartData = computed<ChartData<'line'>>(() => {
+  const appIds = Object.keys(props.datasByApp || {})
+  const datasets = []
+
+  if (appIds.length > 0) {
+    // Create stacked area datasets for each app
+    const appColors = generateAppColors(appIds.length)
+    appIds.forEach((appId, index) => {
+      const appData = props.datasByApp[appId]
+      if (appData) {
+        // Process app data with accumulation if needed
+        let processedData = appData
+        if (props.accumulated) {
+          processedData = appData.reduce((acc: number[], val: number, i: number) => {
+            const last = acc[acc.length - 1] ?? 0
+            let newVal
+            if (val !== undefined)
+              newVal = last + val
+            else if (i < getCurrentDayMonth())
+              newVal = last
+            return acc.concat([newVal as number])
+          }, [])
+        }
+
+        datasets.push({
+          label: props.appNames[appId] || appId,
+          data: processedData,
+          borderColor: appColors[index].border,
+          backgroundColor: appColors[index].bg,
+          fill: index === 0 ? 'origin' : '-1', // First fills from bottom, others fill from previous dataset
+          tension: 0.3,
+          pointRadius: 0,
+          pointBorderWidth: 0,
+          borderWidth: 1,
+        })
+      }
+    })
+  } else {
+    // Fallback to single dataset if no app data
+    datasets.push({
+      label: props.title,
+      data: accumulateData.value,
+      borderColor: props.colors[400],
+      backgroundColor: props.colors[200],
+      fill: 'origin', // Fill from bottom for single app
+      tension: 0.3,
+      pointRadius: 2,
+      pointBorderWidth: 0,
+    })
+
+    datasets.push({
+      label: t('prediction'),
+      data: projectionData.value,
+      borderColor: 'transparent',
+      backgroundColor: props.colors[200],
+      fill: 'origin', // Fill from bottom for prediction
+      tension: 0.9,
+      pointRadius: 2,
+      pointBorderWidth: 0,
+    })
+  }
+
+  return {
+    labels: monthdays(),
+    datasets,
+  }
 })
-const chartOptions = computed<ChartOptions & { plugins: { inlineAnnotationPlugin: AnnotationOptions } }>(() => ({
-  maintainAspectRatio: false,
-  scales: {
-    y: {
-      ticks: {
-        color: `${isDark.value ? 'white' : 'black'}`,
+const chartOptions = computed<ChartOptions & { plugins: { inlineAnnotationPlugin: AnnotationOptions } }>(() => {
+  const hasAppData = Object.keys(props.datasByApp || {}).length > 0
+
+  return {
+    maintainAspectRatio: false,
+    scales: {
+      y: {
+        stacked: hasAppData,
+        beginAtZero: true,
+        ticks: {
+          color: `${isDark.value ? 'white' : 'black'}`,
+        },
+        grid: {
+          color: `${isDark.value ? '#424e5f' : '#bfc9d6'}`,
+        },
       },
-      grid: {
-        color: `${isDark.value ? '#424e5f' : '#bfc9d6'}`,
+      x: {
+        ticks: {
+          color: `${isDark.value ? 'white' : 'black'}`,
+        },
+        grid: {
+          color: `${isDark.value ? '#323e4e' : '#cad5e2'}`,
+        },
       },
     },
-    x: {
-      ticks: {
-        color: `${isDark.value ? 'white' : 'black'}`,
+    plugins: {
+      inlineAnnotationPlugin: generateAnnotations.value,
+      legend: {
+        display: hasAppData,
+        position: 'bottom' as const,
+        labels: {
+          color: `${isDark.value ? 'white' : 'black'}`,
+          padding: 10,
+          font: {
+            size: 11,
+          },
+        },
       },
-      grid: {
-        color: `${isDark.value ? '#323e4e' : '#cad5e2'}`,
+      title: {
+        display: false,
+      },
+      tooltip: createTooltipConfig(hasAppData),
+      filler: {
+        propagate: false,
       },
     },
-  },
-  plugins: {
-    inlineAnnotationPlugin: generateAnnotations.value,
-    legend: {
-      display: false,
-    },
-    title: {
-      display: false,
-    },
-  },
-}))
+  }
+})
 </script>
 
 <template>
