@@ -13,7 +13,7 @@ import { computed } from 'vue'
 import { Bar } from 'vue-chartjs'
 import { getDaysInCurrentMonth } from '~/services/date'
 import { useOrganizationStore } from '~/stores/organization'
-import { createTooltipConfig } from '../services/chartTooltip'
+import { createTooltipConfig, verticalLinePlugin } from '../services/chartTooltip'
 
 const props = defineProps({
   title: { type: String, default: '' },
@@ -140,6 +140,6 @@ const chartOptions = computed<ChartOptions<'bar'>>(() => ({
 
 <template>
   <div class="w-full h-full">
-    <Bar :data="chartData" :options="chartOptions" />
+    <Bar :data="chartData" :options="chartOptions" :plugins="[verticalLinePlugin]" />
   </div>
 </template>

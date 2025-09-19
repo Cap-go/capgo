@@ -17,7 +17,7 @@ import { useI18n } from 'vue-i18n'
 import { getCurrentDayMonth, getDaysInCurrentMonth } from '~/services/date'
 import { useOrganizationStore } from '~/stores/organization'
 import { inlineAnnotationPlugin } from '../services/chartAnnotations'
-import { createTooltipConfig } from '../services/chartTooltip'
+import { createTooltipConfig, verticalLinePlugin } from '../services/chartTooltip'
 
 const props = defineProps({
   accumulated: {
@@ -329,5 +329,5 @@ const chartOptions = computed<ChartOptions & { plugins: { inlineAnnotationPlugin
 </script>
 
 <template>
-  <Line :data="chartData" height="auto" :options="(chartOptions as any)" :plugins="[inlineAnnotationPlugin]" />
+  <Line :data="chartData" height="auto" :options="(chartOptions as any)" :plugins="[inlineAnnotationPlugin, verticalLinePlugin]" />
 </template>

@@ -61,12 +61,21 @@ export function createCustomTooltip(context: any) {
     // Sort by value in descending order (highest to lowest)
     items.sort((a, b) => b.value - a.value)
 
+    // Calculate total value
+    const totalValue = items.reduce((sum, item) => sum + item.value, 0)
+
     const titleColor = isDark.value ? '#e5e7eb' : '#374151'
+    const totalColor = isDark.value ? '#60a5fa' : '#2563eb'
     let innerHtml = '<div style="padding: 12px;">'
 
     // Add title
     if (titleLines.length) {
-      innerHtml += `<div style="font-weight: 600; margin-bottom: 8px; color: ${titleColor};">${titleLines[0]}</div>`
+      innerHtml += `<div style="font-weight: 600; margin-bottom: 4px; color: ${titleColor};">${titleLines[0]}</div>`
+    }
+
+    // Add total value
+    if (items.length > 1) {
+      innerHtml += `<div style="font-weight: 600; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid ${isDark.value ? 'rgba(75, 85, 99, 0.3)' : 'rgba(209, 213, 219, 0.3)'}; color: ${totalColor};">Total: ${totalValue.toLocaleString()}</div>`
     }
 
     // Add body with scrollable content (now sorted)
@@ -128,6 +137,49 @@ function positionTooltip(tooltipEl: HTMLElement, canvas: HTMLCanvasElement, tool
   tooltipEl.style.left = `${left}px`
   tooltipEl.style.top = `${top}px`
   tooltipEl.style.opacity = '1'
+}
+
+/**
+ * Plugin to draw vertical line at tooltip position
+ */
+export const verticalLinePlugin = {
+  id: 'verticalLine',
+  afterDatasetsDraw(chart: any) {
+    if (chart.tooltip && chart.tooltip._active && chart.tooltip._active.length > 0) {
+      const activePoint = chart.tooltip._active[0]
+      const ctx = chart.ctx
+      const x = activePoint.element.x
+      const topY = chart.scales.y.top
+      const bottomY = chart.scales.y.bottom
+
+      // Save context state
+      ctx.save()
+
+      // Set higher z-index by drawing last
+      ctx.globalCompositeOperation = 'source-over'
+
+      // Draw vertical line with more visibility
+      ctx.beginPath()
+      ctx.moveTo(x, topY)
+      ctx.lineTo(x, bottomY)
+      ctx.lineWidth = 2
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)' // White with good opacity
+      ctx.setLineDash([8, 4]) // Longer dash pattern for better visibility
+      ctx.stroke()
+
+      // Draw a subtle glow effect for better visibility
+      ctx.beginPath()
+      ctx.moveTo(x, topY)
+      ctx.lineTo(x, bottomY)
+      ctx.lineWidth = 4
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)' // Wider, more transparent white glow
+      ctx.setLineDash([8, 4])
+      ctx.stroke()
+
+      // Restore context state
+      ctx.restore()
+    }
+  },
 }
 
 /**
