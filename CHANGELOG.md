@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.29.7 (2025-09-19)
+
+
+### Bug Fixes
+
+* update route pattern for alpha environment to api-dev.capgo.app ([493cb5b](https://github.com/Cap-go/capgo/commit/493cb5b91b59f265d345f6507e1119c17a39d927))
+
 ### 12.29.6 (2025-09-19)
 
 
