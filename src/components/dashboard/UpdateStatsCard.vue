@@ -1,15 +1,60 @@
 <script setup lang="ts">
 import dayjs from 'dayjs'
 import colors from 'tailwindcss/colors'
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import InformationInfo from '~icons/heroicons/information-circle'
 import UpdateStatsChart from '~/components/UpdateStatsChart.vue'
 import { useSupabase } from '~/services/supabase'
+import { useDashboardAppsStore } from '~/stores/dashboardApps'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
-import { useDashboardAppsStore } from '~/stores/dashboardApps'
-import { createUndefinedArray, createDayDiffCalculator, initializeAppDataArrays, aggregateDataByKey, incrementArrayValue } from '~/utils/chartOptimizations'
+import { createUndefinedArray, incrementArrayValue } from '~/utils/chartOptimizations'
+
+const props = defineProps({
+  useBillingPeriod: {
+    type: Boolean,
+    default: true,
+  },
+})
+
+// Helper function to filter 30-day data to billing period
+function filterToBillingPeriod(fullData: (number | undefined)[], last30DaysStart: Date, billingStart: Date) {
+  const currentDate = new Date()
+
+  // Calculate billing period length
+  let currentBillingDay: number
+
+  if (billingStart.getDate() === 1) {
+    currentBillingDay = currentDate.getDate()
+  }
+  else {
+    const billingStartDay = billingStart.getUTCDate()
+    const daysInMonth = new Date(Date.UTC(currentDate.getUTCFullYear(), currentDate.getUTCMonth() + 1, 0)).getUTCDate()
+    currentBillingDay = (currentDate.getUTCDate() - billingStartDay + 1 + daysInMonth) % daysInMonth
+    if (currentBillingDay === 0)
+      currentBillingDay = daysInMonth
+  }
+
+  // Create arrays for billing period length
+  const billingData = Array.from({ length: currentBillingDay }).fill(undefined) as (number | undefined)[]
+
+  // Map 30-day data to billing period
+  for (let i = 0; i < 30; i++) {
+    const dataDate = new Date(last30DaysStart)
+    dataDate.setDate(dataDate.getDate() + i)
+
+    // Check if this date falls within current billing period
+    if (dataDate >= billingStart && dataDate <= currentDate) {
+      const billingIndex = Math.floor((dataDate.getTime() - billingStart.getTime()) / (1000 * 60 * 60 * 24))
+      if (billingIndex >= 0 && billingIndex < currentBillingDay) {
+        billingData[billingIndex] = fullData[i]
+      }
+    }
+  }
+
+  return { data: billingData }
+}
 
 const { t } = useI18n()
 const main = useMainStore()
@@ -27,16 +72,6 @@ const updateDataByAction = ref<{ [action: string]: number[] }>({})
 const appNames = ref<{ [appId: string]: string }>({})
 const isLoading = ref(true)
 
-function getDayNumbers(startDate: Date, endDate: Date) {
-  const dayNumbers = []
-  const currentDate = new Date(startDate)
-  while (currentDate.getTime() <= endDate.getTime()) {
-    dayNumbers.push(currentDate.getDate())
-    currentDate.setDate(currentDate.getDate() + 1)
-  }
-  return dayNumbers
-}
-
 const dashboardAppsStore = useDashboardAppsStore()
 
 async function calculateStats() {
@@ -51,25 +86,29 @@ async function calculateStats() {
   appNames.value = {}
   updateData.value = []
 
-  const cycleStart = new Date(organizationStore.currentOrganization?.subscription_start ?? new Date())
-  cycleStart.setHours(0, 0, 0, 0)
+  // Always work with last 30 days of data
+  const last30DaysEnd = new Date()
+  const last30DaysStart = new Date()
+  last30DaysStart.setDate(last30DaysStart.getDate() - 29) // 30 days including today
+  last30DaysStart.setHours(0, 0, 0, 0)
+  last30DaysEnd.setHours(23, 59, 59, 999)
 
-  const cycleEnd = new Date(organizationStore.currentOrganization?.subscription_end ?? new Date())
-  cycleEnd.setHours(23, 59, 59, 999)
+  // Get billing period dates for filtering
+  const billingStart = new Date(organizationStore.currentOrganization?.subscription_start ?? new Date())
+  billingStart.setHours(0, 0, 0, 0)
 
-  // Initialize array for the billing period with optimized functions
-  const daysInPeriod = getDayNumbers(cycleStart, cycleEnd).length
-  const dailyCounts = createUndefinedArray(daysInPeriod) as (number | undefined)[]
+  // Initialize arrays for 30 days
+  const dailyCounts = createUndefinedArray(30) as (number | undefined)[]
 
-  // Initialize action-specific data arrays with optimized functions
+  // Initialize action-specific data arrays for 30 days
   updateDataByAction.value = {
-    install: createUndefinedArray(daysInPeriod) as (number | undefined)[],
-    fail: createUndefinedArray(daysInPeriod) as (number | undefined)[],
-    get: createUndefinedArray(daysInPeriod) as (number | undefined)[],
+    install: createUndefinedArray(30) as (number | undefined)[],
+    fail: createUndefinedArray(30) as (number | undefined)[],
+    get: createUndefinedArray(30) as (number | undefined)[],
   }
 
-  const startDate = cycleStart.toISOString().split('T')[0]
-  const endDate = cycleEnd.toISOString().split('T')[0]
+  const startDate = last30DaysStart.toISOString().split('T')[0]
+  const endDate = last30DaysEnd.toISOString().split('T')[0]
 
   try {
     // Use store for shared apps data to avoid redundant queries
@@ -82,10 +121,12 @@ async function calculateStats() {
       return
     }
 
-    // Initialize app data arrays efficiently
-    updateDataByApp.value = initializeAppDataArrays(dashboardAppsStore.appIds, daysInPeriod, undefined)
+    // Initialize app data arrays for 30 days
+    dashboardAppsStore.appIds.forEach((appId) => {
+      updateDataByApp.value[appId] = createUndefinedArray(30) as (number | undefined)[]
+    })
 
-    // Get update stats from daily_version table and aggregate by app/date
+    // Get update stats from daily_version table for last 30 days
     const { data } = await useSupabase()
       .from('daily_version')
       .select('date, app_id, install, fail, get')
@@ -95,57 +136,81 @@ async function calculateStats() {
       .order('date')
 
     if (data && data.length > 0) {
-      // Optimized aggregation using utility function
-      const aggregatedStats = aggregateDataByKey(
-        data,
-        (item) => `${item.app_id}_${item.date}`,
-        ['install', 'fail', 'get']
-      )
+      // Process each stat entry for 30-day period
+      data.forEach((stat: any) => {
+        if (stat.date) {
+          const statDate = new Date(stat.date)
 
-      // Create optimized day difference calculator
-      const calculateDayDiff = createDayDiffCalculator(cycleStart)
+          // Calculate days since start of 30-day period
+          const daysDiff = Math.floor((statDate.getTime() - last30DaysStart.getTime()) / (1000 * 60 * 60 * 24))
 
-      // Process each aggregated stat entry with optimized operations
-      const statEntries = Object.values(aggregatedStats)
-      for (let i = 0; i < statEntries.length; i++) {
-        const stat = statEntries[i] as any
-        if (!stat.date) continue
+          if (daysDiff >= 0 && daysDiff < 30) {
+            const installedCount = stat.install || 0
+            const failedCount = stat.fail || 0
+            const getCount = stat.get || 0
+            const totalForDay = installedCount + failedCount + getCount
 
-        const daysDiff = calculateDayDiff(stat.date)
+            // Increment arrays for 30-day data
+            incrementArrayValue(dailyCounts, daysDiff, totalForDay)
 
-        if (daysDiff >= 0 && daysDiff < daysInPeriod) {
-          const installedCount = stat.install || 0
-          const failedCount = stat.fail || 0
-          const getCount = stat.get || 0
-          const totalForDay = installedCount + failedCount + getCount
+            totalInstalled.value += installedCount
+            totalFailed.value += failedCount
+            totalGet.value += getCount
 
-          // Optimized array increments
-          incrementArrayValue(dailyCounts, daysDiff, totalForDay)
+            // Track by action type for dashboard view
+            incrementArrayValue(updateDataByAction.value.install, daysDiff, installedCount)
+            incrementArrayValue(updateDataByAction.value.fail, daysDiff, failedCount)
+            incrementArrayValue(updateDataByAction.value.get, daysDiff, getCount)
 
-          totalInstalled.value += installedCount
-          totalFailed.value += failedCount
-          totalGet.value += getCount
-
-          // Track by action type for dashboard view with optimized increments
-          incrementArrayValue(updateDataByAction.value.install, daysDiff, installedCount)
-          incrementArrayValue(updateDataByAction.value.fail, daysDiff, failedCount)
-          incrementArrayValue(updateDataByAction.value.get, daysDiff, getCount)
-
-          // Also track by app (using total for simplicity in bar chart)
-          if (updateDataByApp.value[stat.app_id]) {
-            incrementArrayValue(updateDataByApp.value[stat.app_id], daysDiff, totalForDay)
+            // Also track by app (using total for simplicity in bar chart)
+            if (updateDataByApp.value[stat.app_id]) {
+              incrementArrayValue(updateDataByApp.value[stat.app_id], daysDiff, totalForDay)
+            }
           }
         }
+      })
+
+      // Filter data based on billing period mode
+      if (props.useBillingPeriod) {
+        // Show only data within billing period
+        const filteredData = filterToBillingPeriod(dailyCounts, last30DaysStart, billingStart)
+        updateData.value = filteredData.data
+
+        // Filter by-action data too
+        Object.keys(updateDataByAction.value).forEach((action) => {
+          const filteredActionData = filterToBillingPeriod(updateDataByAction.value[action], last30DaysStart, billingStart)
+          updateDataByAction.value[action] = filteredActionData.data
+        })
+
+        // Filter by-app data too
+        Object.keys(updateDataByApp.value).forEach((appId) => {
+          const filteredAppData = filterToBillingPeriod(updateDataByApp.value[appId], last30DaysStart, billingStart)
+          updateDataByApp.value[appId] = filteredAppData.data
+        })
+
+        // Recalculate totals for billing period only
+        totalInstalled.value = 0
+        totalFailed.value = 0
+        totalGet.value = 0
+
+        const installData = updateDataByAction.value.install
+        const failData = updateDataByAction.value.fail
+        const getData = updateDataByAction.value.get
+
+        installData.forEach(count => totalInstalled.value += count || 0)
+        failData.forEach(count => totalFailed.value += count || 0)
+        getData.forEach(count => totalGet.value += count || 0)
+      }
+      else {
+        // Show all 30 days
+        updateData.value = dailyCounts
       }
 
-      // Set the data for the chart
-      updateData.value = dailyCounts
-
       // Calculate evolution (compare last two days with data)
-      const nonZeroDays = dailyCounts.filter(count => count > 0)
+      const nonZeroDays = updateData.value.filter(count => (count || 0) > 0)
       if (nonZeroDays.length >= 2) {
-        const lastDayCount = nonZeroDays[nonZeroDays.length - 1]
-        const previousDayCount = nonZeroDays[nonZeroDays.length - 2]
+        const lastDayCount = nonZeroDays[nonZeroDays.length - 1] || 0
+        const previousDayCount = nonZeroDays[nonZeroDays.length - 2] || 0
         if (previousDayCount > 0) {
           lastDayEvolution.value = ((lastDayCount - previousDayCount) / previousDayCount) * 100
         }
@@ -163,6 +228,11 @@ async function calculateStats() {
     isLoading.value = false
   }
 }
+
+// Watch for billing period mode changes and recalculate
+watch(() => props.useBillingPeriod, async () => {
+  await calculateStats()
+})
 
 onMounted(async () => {
   await calculateStats()
@@ -268,6 +338,7 @@ onMounted(async () => {
         :title="t('update_statistics')"
         :colors="colors.blue"
         :data="updateData"
+        :use-billing-period="useBillingPeriod"
         :data-by-app="updateDataByAction"
         :app-names="{ install: 'Installed', fail: 'Failed', get: 'Get' }"
       />

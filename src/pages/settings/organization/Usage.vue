@@ -198,9 +198,6 @@ function nextRunDate() {
           <h1 class="flex mx-auto text-5xl font-extrabold text-gray-900 dark:text-white items-center justify-center">
             {{ t('usage') }}
           </h1>
-
-          <FailedCard />
-
           <!-- Last Update Info & Billing Cycle -->
           <div class="mt-4 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
             <div class="flex items-center justify-between">

@@ -1,14 +1,59 @@
 <script setup lang="ts">
 import dayjs from 'dayjs'
 import colors from 'tailwindcss/colors'
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import InformationInfo from '~icons/heroicons/information-circle'
 import DeploymentStatsChart from '~/components/DeploymentStatsChart.vue'
 import { useSupabase } from '~/services/supabase'
+import { useDashboardAppsStore } from '~/stores/dashboardApps'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
-import { useDashboardAppsStore } from '~/stores/dashboardApps'
+
+const props = defineProps({
+  useBillingPeriod: {
+    type: Boolean,
+    default: true,
+  },
+})
+
+// Helper function to filter 30-day data to billing period
+function filterToBillingPeriod(fullData: number[], last30DaysStart: Date, billingStart: Date) {
+  const currentDate = new Date()
+
+  // Calculate billing period length
+  let currentBillingDay: number
+
+  if (billingStart.getDate() === 1) {
+    currentBillingDay = currentDate.getDate()
+  }
+  else {
+    const billingStartDay = billingStart.getUTCDate()
+    const daysInMonth = new Date(Date.UTC(currentDate.getUTCFullYear(), currentDate.getUTCMonth() + 1, 0)).getUTCDate()
+    currentBillingDay = (currentDate.getUTCDate() - billingStartDay + 1 + daysInMonth) % daysInMonth
+    if (currentBillingDay === 0)
+      currentBillingDay = daysInMonth
+  }
+
+  // Create arrays for billing period length
+  const billingData = Array.from({ length: currentBillingDay }).fill(0) as number[]
+
+  // Map 30-day data to billing period
+  for (let i = 0; i < 30; i++) {
+    const dataDate = new Date(last30DaysStart)
+    dataDate.setDate(dataDate.getDate() + i)
+
+    // Check if this date falls within current billing period
+    if (dataDate >= billingStart && dataDate <= currentDate) {
+      const billingIndex = Math.floor((dataDate.getTime() - billingStart.getTime()) / (1000 * 60 * 60 * 24))
+      if (billingIndex >= 0 && billingIndex < currentBillingDay) {
+        billingData[billingIndex] = fullData[i]
+      }
+    }
+  }
+
+  return { data: billingData }
+}
 
 const { t } = useI18n()
 const main = useMainStore()
@@ -23,16 +68,6 @@ const deploymentDataByApp = ref<{ [appId: string]: number[] }>({})
 const appNames = ref<{ [appId: string]: string }>({})
 const isLoading = ref(true)
 
-function getDayNumbers(startDate: Date, endDate: Date) {
-  const dayNumbers = []
-  const currentDate = new Date(startDate)
-  while (currentDate.getTime() <= endDate.getTime()) {
-    dayNumbers.push(currentDate.getDate())
-    currentDate.setDate(currentDate.getDate() + 1)
-  }
-  return dayNumbers
-}
-
 async function calculateStats() {
   isLoading.value = true
   totalDeployments.value = 0
@@ -42,18 +77,22 @@ async function calculateStats() {
   appNames.value = {}
   deploymentData.value = []
 
-  const cycleStart = new Date(organizationStore.currentOrganization?.subscription_start ?? new Date())
-  cycleStart.setHours(0, 0, 0, 0)
+  // Always work with last 30 days of data
+  const last30DaysEnd = new Date()
+  const last30DaysStart = new Date()
+  last30DaysStart.setDate(last30DaysStart.getDate() - 29) // 30 days including today
+  last30DaysStart.setHours(0, 0, 0, 0)
+  last30DaysEnd.setHours(23, 59, 59, 999)
 
-  const cycleEnd = new Date(organizationStore.currentOrganization?.subscription_end ?? new Date())
-  cycleEnd.setHours(23, 59, 59, 999)
+  // Get billing period dates for filtering
+  const billingStart = new Date(organizationStore.currentOrganization?.subscription_start ?? new Date())
+  billingStart.setHours(0, 0, 0, 0)
 
-  // Initialize array for the billing period
-  const daysInPeriod = getDayNumbers(cycleStart, cycleEnd).length
-  const dailyCounts = Array.from({ length: daysInPeriod }).fill(0) as number[]
+  // Create 30-day arrays
+  const dailyCounts30Days = Array.from({ length: 30 }).fill(0) as number[]
 
-  const startDate = cycleStart.toISOString().split('T')[0]
-  const endDate = cycleEnd.toISOString().split('T')[0]
+  const startDate = last30DaysStart.toISOString().split('T')[0]
+  const endDate = last30DaysEnd.toISOString().split('T')[0]
 
   try {
     // Use store for shared apps data
@@ -62,14 +101,14 @@ async function calculateStats() {
     appNames.value = dashboardAppsStore.appNames
 
     if (dashboardAppsStore.appIds.length === 0) {
-      deploymentData.value = dailyCounts
+      deploymentData.value = dailyCounts30Days
       isLoading.value = false
       return
     }
 
-    // Initialize data arrays for each app
+    // Initialize data arrays for each app (30 days)
     dashboardAppsStore.appIds.forEach((appId) => {
-      deploymentDataByApp.value[appId] = Array.from({ length: daysInPeriod }).fill(0) as number[]
+      deploymentDataByApp.value[appId] = Array.from({ length: 30 }).fill(0) as number[]
     })
 
     // Get deployment stats from deploy_history table for public (default) channels only
@@ -89,16 +128,16 @@ async function calculateStats() {
       .order('deployed_at')
 
     if (data && data.length > 0) {
-      // Process each deployment entry
+      // Process each deployment entry for 30-day period
       data.forEach((deployment: any) => {
         if (deployment.deployed_at) {
           const deployDate = new Date(deployment.deployed_at)
 
-          // Calculate days since start of billing period
-          const daysDiff = Math.floor((deployDate.getTime() - cycleStart.getTime()) / (1000 * 60 * 60 * 24))
+          // Calculate days since start of 30-day period
+          const daysDiff = Math.floor((deployDate.getTime() - last30DaysStart.getTime()) / (1000 * 60 * 60 * 24))
 
-          if (daysDiff >= 0 && daysDiff < daysInPeriod) {
-            dailyCounts[daysDiff] += 1
+          if (daysDiff >= 0 && daysDiff < 30) {
+            dailyCounts30Days[daysDiff] += 1
             totalDeployments.value += 1
 
             // Also track by app
@@ -109,11 +148,28 @@ async function calculateStats() {
         }
       })
 
-      // Set the data for the chart
-      deploymentData.value = dailyCounts
+      // Filter data based on billing period mode
+      if (props.useBillingPeriod) {
+        // Show only data within billing period
+        const filteredData = filterToBillingPeriod(dailyCounts30Days, last30DaysStart, billingStart)
+        deploymentData.value = filteredData.data
+
+        // Filter by-app data too
+        Object.keys(deploymentDataByApp.value).forEach((appId) => {
+          const filteredAppData = filterToBillingPeriod(deploymentDataByApp.value[appId], last30DaysStart, billingStart)
+          deploymentDataByApp.value[appId] = filteredAppData.data
+        })
+
+        // Recalculate total for billing period only
+        totalDeployments.value = filteredData.data.reduce((sum, count) => sum + count, 0)
+      }
+      else {
+        // Show all 30 days
+        deploymentData.value = dailyCounts30Days
+      }
 
       // Calculate evolution (compare last two days with data)
-      const nonZeroDays = dailyCounts.filter(count => count > 0)
+      const nonZeroDays = deploymentData.value.filter(count => count > 0)
       if (nonZeroDays.length >= 2) {
         const lastDayCount = nonZeroDays[nonZeroDays.length - 1]
         const previousDayCount = nonZeroDays[nonZeroDays.length - 2]
@@ -123,17 +179,22 @@ async function calculateStats() {
       }
     }
     else {
-      deploymentData.value = dailyCounts
+      deploymentData.value = dailyCounts30Days
     }
   }
   catch (error) {
     console.error('Error fetching deployment stats:', error)
-    deploymentData.value = dailyCounts
+    deploymentData.value = dailyCounts30Days
   }
   finally {
     isLoading.value = false
   }
 }
+
+// Watch for billing period mode changes and recalculate
+watch(() => props.useBillingPeriod, async () => {
+  await calculateStats()
+})
 
 onMounted(async () => {
   await calculateStats()
@@ -231,6 +292,7 @@ onMounted(async () => {
         :title="t('deployment_statistics')"
         :colors="colors.blue"
         :data="deploymentData"
+        :use-billing-period="useBillingPeriod"
         :data-by-app="deploymentDataByApp"
         :app-names="appNames"
       />

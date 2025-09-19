@@ -11,7 +11,7 @@ import {
   PointElement,
   Tooltip,
 } from 'chart.js'
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import { Line } from 'vue-chartjs'
 import { useI18n } from 'vue-i18n'
 import { getCurrentDayMonth, getDaysInCurrentMonth } from '~/services/date'

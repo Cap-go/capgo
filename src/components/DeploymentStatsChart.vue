@@ -22,6 +22,7 @@ const props = defineProps({
   data: { type: Array, default: () => Array.from({ length: getDaysInCurrentMonth() }).fill(0) as number[] },
   dataByApp: { type: Object, default: () => ({}) },
   appNames: { type: Object, default: () => ({}) },
+  useBillingPeriod: { type: Boolean, default: true },
 })
 
 const isDark = useDark()
@@ -48,6 +49,19 @@ function getDayNumbers(startDate: Date, endDate: Date) {
 }
 
 function monthdays() {
+  if (!props.useBillingPeriod) {
+    // Last 30 days mode - generate actual dates
+    const today = new Date()
+    const dates = []
+    for (let i = 29; i >= 0; i--) {
+      const date = new Date(today)
+      date.setDate(date.getDate() - i)
+      dates.push(date.getDate())
+    }
+    return dates
+  }
+
+  // Billing period mode - use existing logic
   return getDayNumbers(cycleStart, cycleEnd)
 }
 

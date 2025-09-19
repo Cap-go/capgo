@@ -157,43 +157,43 @@ watchEffect(() => {
       <Spinner size="w-40 h-40" />
     </div>
     <div v-else-if="app">
-      <div v-if="ActiveTab === 'overview'" class="mt-4 w-full h-full px-4 pt-8 mb-8 overflow-y-auto max-h-fit lg:px-8 sm:px-6 overflow-x-hidden">
+      <div v-if="ActiveTab === 'overview'" class="w-full h-full px-4 pt-4 mb-8 overflow-y-auto max-h-fit lg:px-8 sm:px-6 overflow-x-hidden">
         <FailedCard />
         <Usage v-if="!organizationStore.currentOrganizationFailed" ref="usageComponent" :app-id="id" :show-mobile-stats="canShowMobileStats" />
 
         <!-- New charts section -->
         <div class="grid grid-cols-1 sm:grid-cols-12 gap-6 mb-6 xl:grid-cols-12">
-          <BundleUploadsCard class="col-span-full sm:col-span-6 xl:col-span-4" />
-          <UpdateStatsCard class="col-span-full sm:col-span-6 xl:col-span-4" />
-          <DeploymentStatsCard class="col-span-full sm:col-span-6 xl:col-span-4" />
+          <BundleUploadsCard :use-billing-period="usageComponent?.useBillingPeriod ?? true" class="col-span-full sm:col-span-6 xl:col-span-4" />
+          <UpdateStatsCard :use-billing-period="usageComponent?.useBillingPeriod ?? true" class="col-span-full sm:col-span-6 xl:col-span-4" />
+          <DeploymentStatsCard :use-billing-period="usageComponent?.useBillingPeriod ?? true" class="col-span-full sm:col-span-6 xl:col-span-4" />
         </div>
       </div>
 
-      <div v-if="ActiveTab === 'info'" class="mt-0 md:mt-4">
+      <div v-if="ActiveTab === 'info'" class="mt-0 md:mt-8">
         <div class="flex flex-col mx-auto overflow-y-auto bg-white border md:rounded-lg shadow-lg border-slate-300 md:mt-5 md:w-2/3 dark:border-slate-900 dark:bg-gray-800">
           <AppSetting :app-id="id" />
         </div>
       </div>
 
-      <div v-if="ActiveTab === 'bundles'" class="mt-0 md:mt-4">
+      <div v-if="ActiveTab === 'bundles'" class="mt-0 md:mt-8">
         <div class="flex flex-col mx-auto overflow-y-auto bg-white border md:rounded-lg shadow-lg border-slate-300 md:mt-5 md:w-2/3 dark:border-slate-900 dark:bg-gray-800">
           <BundleTable :app-id="id" />
         </div>
       </div>
 
-      <div v-if="ActiveTab === 'channels'" class="mt-0 md:mt-4">
+      <div v-if="ActiveTab === 'channels'" class="mt-0 md:mt-8">
         <div class="flex flex-col mx-auto overflow-y-auto bg-white border md:rounded-lg shadow-lg border-slate-300 md:mt-5 md:w-2/3 dark:border-slate-900 dark:bg-gray-800">
           <ChannelTable :app-id="id" />
         </div>
       </div>
 
-      <div v-if="ActiveTab === 'devices'" class="mt-0 md:mt-4">
+      <div v-if="ActiveTab === 'devices'" class="mt-0 md:mt-8">
         <div class="flex flex-col mx-auto overflow-y-auto bg-white border md:rounded-lg shadow-lg border-slate-300 md:mt-5 md:w-2/3 dark:border-slate-900 dark:bg-gray-800">
           <DeviceTable :app-id="id" />
         </div>
       </div>
 
-      <div v-if="ActiveTab === 'logs'" class="mt-0 md:mt-4">
+      <div v-if="ActiveTab === 'logs'" class="mt-0 md:mt-8">
         <div class="flex flex-col mx-auto overflow-y-auto bg-white border md:rounded-lg shadow-lg border-slate-300 md:mt-5 md:w-2/3 dark:border-slate-900 dark:bg-gray-800">
           <LogTable :app-id="id" />
         </div>

@@ -2,14 +2,23 @@
 import type { ChartOptions } from 'chart.js'
 import { CategoryScale, Chart, LinearScale, LineElement, PointElement, Tooltip } from 'chart.js'
 import dayjs from 'dayjs'
-import { computed, ref, watchEffect } from 'vue'
+import { computed, ref, watchEffect, watch } from 'vue'
 import { Line } from 'vue-chartjs'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
+import { useDark } from '@vueuse/core'
 import InformationInfo from '~icons/heroicons/information-circle'
 import { useChartData } from '~/services/chartDataService'
 import { useSupabase } from '~/services/supabase'
 import { useMainStore } from '~/stores/main'
+import { useOrganizationStore } from '~/stores/organization'
+
+const props = defineProps({
+  useBillingPeriod: {
+    type: Boolean,
+    default: true,
+  },
+})
 
 Chart.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip)
 
@@ -54,17 +63,34 @@ async function loadData() {
   console.log('loadData mobile data')
   isLoading.value = true
 
-  const { startDate, endDate } = getDateRange(30)
+  const { startDate, endDate } = getDateRange()
   chartData.value = await useChartData(useSupabase(), appId.value, startDate, endDate)
   isLoading.value = false
 }
 
-function getDateRange(days: number) {
-  const endDate = new Date()
-  const startDate = new Date(endDate)
-  startDate.setDate(startDate.getDate() - days)
-  return { startDate, endDate }
+function getDateRange() {
+  const organizationStore = useOrganizationStore()
+
+  if (props.useBillingPeriod) {
+    // Use billing period dates
+    const startDate = new Date(organizationStore.currentOrganization?.subscription_start ?? new Date())
+    const endDate = new Date(organizationStore.currentOrganization?.subscription_end ?? new Date())
+    return { startDate, endDate }
+  } else {
+    // Use last 30 days
+    const endDate = new Date()
+    const startDate = new Date(endDate)
+    startDate.setDate(startDate.getDate() - 30)
+    return { startDate, endDate }
+  }
 }
+
+// Watch for billing period mode changes and reload data
+watch(() => props.useBillingPeriod, async () => {
+  if (appId.value) {
+    await loadData()
+  }
+})
 
 watchEffect(async () => {
   if (route.path.includes('/p/')) {

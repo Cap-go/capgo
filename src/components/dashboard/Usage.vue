@@ -91,9 +91,10 @@ function clearDashboardParams() {
   router.replace({ query })
 }
 
-// Expose function for parent components
+// Expose function and state for parent components
 defineExpose({
-  clearDashboardParams
+  clearDashboardParams,
+  useBillingPeriod
 })
 
 const allLimits = computed(() => {
@@ -429,22 +430,22 @@ if (main.dashboardFetched)
     >
       <Spinner size="w-40 h-40" />
     </div>
-    <MobileStats v-if="appId && showMobileStats" class="col-span-full sm:col-span-6 xl:col-span-4" />
-    <BundleUploadsCard v-if="!isLoading && !appId && chartsLoaded.bundles" class="col-span-full sm:col-span-6 xl:col-span-4" />
+    <MobileStats v-if="appId && showMobileStats" :use-billing-period="useBillingPeriod" class="col-span-full sm:col-span-6 xl:col-span-4" />
+    <BundleUploadsCard v-if="!isLoading && !appId && chartsLoaded.bundles" :use-billing-period="useBillingPeriod" class="col-span-full sm:col-span-6 xl:col-span-4" />
     <div
       v-else-if="!appId"
       class="col-span-full h-[460px] flex flex-col items-center justify-center border border-slate-300 rounded-lg bg-white shadow-lg sm:col-span-6 xl:col-span-4 dark:border-slate-900 dark:bg-gray-800"
     >
       <Spinner size="w-40 h-40" />
     </div>
-    <UpdateStatsCard v-if="!isLoading && !appId && chartsLoaded.updates" class="col-span-full sm:col-span-6 xl:col-span-4" />
+    <UpdateStatsCard v-if="!isLoading && !appId && chartsLoaded.updates" :use-billing-period="useBillingPeriod" class="col-span-full sm:col-span-6 xl:col-span-4" />
     <div
       v-else-if="!appId"
       class="col-span-full h-[460px] flex flex-col items-center justify-center border border-slate-300 rounded-lg bg-white shadow-lg sm:col-span-6 xl:col-span-4 dark:border-slate-900 dark:bg-gray-800"
     >
       <Spinner size="w-40 h-40" />
     </div>
-    <DeploymentStatsCard v-if="!isLoading && !appId && chartsLoaded.deployments" class="col-span-full sm:col-span-6 xl:col-span-4" />
+    <DeploymentStatsCard v-if="!isLoading && !appId && chartsLoaded.deployments" :use-billing-period="useBillingPeriod" class="col-span-full sm:col-span-6 xl:col-span-4" />
     <div
       v-else-if="!appId"
       class="col-span-full h-[460px] flex flex-col items-center justify-center border border-slate-300 rounded-lg bg-white shadow-lg sm:col-span-6 xl:col-span-4 dark:border-slate-900 dark:bg-gray-800"
