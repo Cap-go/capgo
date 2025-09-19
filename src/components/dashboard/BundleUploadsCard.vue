@@ -6,6 +6,7 @@ import { useI18n } from 'vue-i18n'
 import InformationInfo from '~icons/heroicons/information-circle'
 import BundleUploadsChart from '~/components/BundleUploadsChart.vue'
 import { useSupabase } from '~/services/supabase'
+import { useDashboardAppsStore } from '~/stores/dashboardApps'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
 
@@ -49,35 +50,27 @@ async function calculateStats() {
   const daysInPeriod = getDayNumbers(cycleStart, cycleEnd).length
   const dailyCounts = Array.from({ length: daysInPeriod }).fill(0) as number[]
 
-  // First get all apps for this organization
-  const appIds: string[] = []
-  if (organizationStore.currentOrganization?.gid) {
-    const { data: apps } = await useSupabase()
-      .from('apps')
-      .select('app_id, name')
-      .eq('owner_org', organizationStore.currentOrganization.gid)
+  // Use store for shared apps data
+  const dashboardAppsStore = useDashboardAppsStore()
+  await dashboardAppsStore.fetchApps()
+  appNames.value = dashboardAppsStore.appNames
 
-    if (apps && apps.length > 0) {
-      apps.forEach((app) => {
-        appIds.push(app.app_id)
-        appNames.value[app.app_id] = app.name || app.app_id
-        // Initialize data array for each app
-        bundleDataByApp.value[app.app_id] = Array.from({ length: daysInPeriod }).fill(0) as number[]
-      })
-    }
-  }
-
-  if (appIds.length === 0) {
+  if (dashboardAppsStore.appIds.length === 0) {
     bundleData.value = dailyCounts
     return
   }
+
+  // Initialize data arrays for each app
+  dashboardAppsStore.appIds.forEach((appId) => {
+    bundleDataByApp.value[appId] = Array.from({ length: daysInPeriod }).fill(0) as number[]
+  })
 
   const query = useSupabase()
     .from('app_versions')
     .select('created_at, app_id')
     .gte('created_at', cycleStart.toISOString())
     .lte('created_at', cycleEnd.toISOString())
-    .in('app_id', appIds)
+    .in('app_id', dashboardAppsStore.appIds)
 
   const { data, error } = await query
 

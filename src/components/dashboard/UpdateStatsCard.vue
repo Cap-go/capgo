@@ -8,6 +8,8 @@ import UpdateStatsChart from '~/components/UpdateStatsChart.vue'
 import { useSupabase } from '~/services/supabase'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
+import { useDashboardAppsStore } from '~/stores/dashboardApps'
+import { createUndefinedArray, createDayDiffCalculator, initializeAppDataArrays, aggregateDataByKey, incrementArrayValue } from '~/utils/chartOptimizations'
 
 const { t } = useI18n()
 const main = useMainStore()
@@ -35,6 +37,8 @@ function getDayNumbers(startDate: Date, endDate: Date) {
   return dayNumbers
 }
 
+const dashboardAppsStore = useDashboardAppsStore()
+
 async function calculateStats() {
   isLoading.value = true
   totalInstalled.value = 0
@@ -53,101 +57,86 @@ async function calculateStats() {
   const cycleEnd = new Date(organizationStore.currentOrganization?.subscription_end ?? new Date())
   cycleEnd.setHours(23, 59, 59, 999)
 
-  // Initialize array for the billing period
+  // Initialize array for the billing period with optimized functions
   const daysInPeriod = getDayNumbers(cycleStart, cycleEnd).length
-  const dailyCounts = Array.from({ length: daysInPeriod }).fill(0) as number[]
+  const dailyCounts = createUndefinedArray(daysInPeriod) as (number | undefined)[]
 
-  // Initialize action-specific data arrays
+  // Initialize action-specific data arrays with optimized functions
   updateDataByAction.value = {
-    install: Array.from({ length: daysInPeriod }).fill(0) as number[],
-    fail: Array.from({ length: daysInPeriod }).fill(0) as number[],
-    get: Array.from({ length: daysInPeriod }).fill(0) as number[],
+    install: createUndefinedArray(daysInPeriod) as (number | undefined)[],
+    fail: createUndefinedArray(daysInPeriod) as (number | undefined)[],
+    get: createUndefinedArray(daysInPeriod) as (number | undefined)[],
   }
 
   const startDate = cycleStart.toISOString().split('T')[0]
   const endDate = cycleEnd.toISOString().split('T')[0]
 
   try {
-    // First get all apps for this organization
-    const appIds: string[] = []
-    if (organizationStore.currentOrganization?.gid) {
-      const { data: apps } = await useSupabase()
-        .from('apps')
-        .select('app_id, name')
-        .eq('owner_org', organizationStore.currentOrganization.gid)
+    // Use store for shared apps data to avoid redundant queries
+    await dashboardAppsStore.fetchApps()
+    appNames.value = dashboardAppsStore.appNames
 
-      if (apps && apps.length > 0) {
-        apps.forEach((app) => {
-          appIds.push(app.app_id)
-          appNames.value[app.app_id] = app.name || app.app_id
-          // Initialize data array for each app
-          updateDataByApp.value[app.app_id] = Array.from({ length: daysInPeriod }).fill(0) as number[]
-        })
-      }
-    }
-
-    if (appIds.length === 0) {
+    if (dashboardAppsStore.appIds.length === 0) {
       updateData.value = dailyCounts
       isLoading.value = false
       return
     }
 
+    // Initialize app data arrays efficiently
+    updateDataByApp.value = initializeAppDataArrays(dashboardAppsStore.appIds, daysInPeriod, undefined)
+
     // Get update stats from daily_version table and aggregate by app/date
     const { data } = await useSupabase()
       .from('daily_version')
       .select('date, app_id, install, fail, get')
-      .in('app_id', appIds)
+      .in('app_id', dashboardAppsStore.appIds)
       .gte('date', startDate)
       .lte('date', endDate)
       .order('date')
 
     if (data && data.length > 0) {
-      // Aggregate by app and date (sum across all versions)
-      const aggregatedStats = data.reduce((acc: any, curr) => {
-        const key = `${curr.app_id}_${curr.date}`
-        if (!acc[key]) {
-          acc[key] = {
-            date: curr.date,
-            app_id: curr.app_id,
-            installed: 0,
-            installed_fail: 0,
-            get_stats: 0,
+      // Optimized aggregation using utility function
+      const aggregatedStats = aggregateDataByKey(
+        data,
+        (item) => `${item.app_id}_${item.date}`,
+        ['install', 'fail', 'get']
+      )
+
+      // Create optimized day difference calculator
+      const calculateDayDiff = createDayDiffCalculator(cycleStart)
+
+      // Process each aggregated stat entry with optimized operations
+      const statEntries = Object.values(aggregatedStats)
+      for (let i = 0; i < statEntries.length; i++) {
+        const stat = statEntries[i] as any
+        if (!stat.date) continue
+
+        const daysDiff = calculateDayDiff(stat.date)
+
+        if (daysDiff >= 0 && daysDiff < daysInPeriod) {
+          const installedCount = stat.install || 0
+          const failedCount = stat.fail || 0
+          const getCount = stat.get || 0
+          const totalForDay = installedCount + failedCount + getCount
+
+          // Optimized array increments
+          incrementArrayValue(dailyCounts, daysDiff, totalForDay)
+
+          totalInstalled.value += installedCount
+          totalFailed.value += failedCount
+          totalGet.value += getCount
+
+          // Track by action type for dashboard view with optimized increments
+          incrementArrayValue(updateDataByAction.value.install, daysDiff, installedCount)
+          incrementArrayValue(updateDataByAction.value.fail, daysDiff, failedCount)
+          incrementArrayValue(updateDataByAction.value.get, daysDiff, getCount)
+
+          // Also track by app (using total for simplicity in bar chart)
+          if (updateDataByApp.value[stat.app_id]) {
+            incrementArrayValue(updateDataByApp.value[stat.app_id], daysDiff, totalForDay)
           }
         }
-        acc[key].installed += curr.install || 0
-        acc[key].installed_fail += curr.fail || 0
-        acc[key].get_stats += curr.get || 0
-        return acc
-      }, {})
-
-      // Process each aggregated stat entry
-      Object.values(aggregatedStats).forEach((stat: any) => {
-        if (stat.date) {
-          const statDate = new Date(stat.date)
-
-          // Calculate days since start of billing period
-          const daysDiff = Math.floor((statDate.getTime() - cycleStart.getTime()) / (1000 * 60 * 60 * 24))
-
-          if (daysDiff >= 0 && daysDiff < daysInPeriod) {
-            const totalForDay = (stat.installed || 0) + (stat.installed_fail || 0) + (stat.get_stats || 0)
-            dailyCounts[daysDiff] += totalForDay
-
-            totalInstalled.value += stat.installed || 0
-            totalFailed.value += stat.installed_fail || 0
-            totalGet.value += stat.get_stats || 0
-
-            // Track by action type for dashboard view
-            updateDataByAction.value.install[daysDiff] += stat.installed || 0
-            updateDataByAction.value.fail[daysDiff] += stat.installed_fail || 0
-            updateDataByAction.value.get[daysDiff] += stat.get_stats || 0
-
-            // Also track by app (using total for simplicity in bar chart)
-            if (updateDataByApp.value[stat.app_id]) {
-              updateDataByApp.value[stat.app_id][daysDiff] += totalForDay
-            }
-          }
-        }
-      })
+      }
 
       // Set the data for the chart
       updateData.value = dailyCounts

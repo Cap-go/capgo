@@ -8,6 +8,7 @@ import { bytesToGb, getDaysBetweenDates } from '~/services/conversion'
 import { getPlans, useSupabase } from '~/services/supabase'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
+import { useDashboardAppsStore } from '~/stores/dashboardApps'
 import UpdateStatsCard from './UpdateStatsCard.vue'
 import DeploymentStatsCard from './DeploymentStatsCard.vue'
 import UsageCard from './UsageCard.vue'
@@ -40,8 +41,15 @@ const datasByApp = ref({
 
 const appNames = ref<{ [appId: string]: string }>({})
 const isLoading = ref(true)
+const chartsLoaded = ref({
+  usage: false,
+  bundles: false,
+  updates: false,
+  deployments: false
+})
 const main = useMainStore()
 const organizationStore = useOrganizationStore()
+const dashboardAppsStore = useDashboardAppsStore()
 
 const { dashboard } = storeToRefs(main)
 
@@ -70,32 +78,13 @@ async function getAppStats() {
     }
   }
 
-  // Get all apps for the organization
-  const organizationGid = organizationStore.currentOrganization?.gid
-  if (!organizationGid) {
-    return {
-      global: main.dashboard,
-      byApp: {},
-      appNames: {},
-    }
-  }
-
-  const { data: apps } = await useSupabase()
-    .from('apps')
-    .select('app_id, name')
-    .eq('owner_org', organizationGid)
-
-  const appNamesMap: { [appId: string]: string } = {}
-  if (apps) {
-    apps.forEach(app => {
-      appNamesMap[app.app_id] = app.name || app.app_id
-    })
-  }
+  // Use store for apps data
+  await dashboardAppsStore.fetchApps()
 
   return {
     global: main.dashboard,
     byApp: main.dashboardByapp,
-    appNames: appNamesMap,
+    appNames: dashboardAppsStore.appNames,
   }
 }
 
@@ -192,6 +181,20 @@ async function loadData() {
   })
   await getUsages()
   isLoading.value = false
+  chartsLoaded.value.usage = true
+
+  // Stagger additional charts loading to improve perceived performance
+  setTimeout(() => {
+    chartsLoaded.value.bundles = true
+  }, 100)
+
+  setTimeout(() => {
+    chartsLoaded.value.updates = true
+  }, 200)
+
+  setTimeout(() => {
+    chartsLoaded.value.deployments = true
+  }, 300)
 }
 
 watch(dashboard, async (_dashboard) => {
@@ -248,21 +251,21 @@ if (main.dashboardFetched)
       <Spinner size="w-40 h-40" />
     </div>
     <MobileStats v-if="appId && showMobileStats" class="col-span-full sm:col-span-6 xl:col-span-4" />
-    <BundleUploadsCard v-if="!isLoading && !appId" class="col-span-full sm:col-span-6 xl:col-span-4" />
+    <BundleUploadsCard v-if="!isLoading && !appId && chartsLoaded.bundles" class="col-span-full sm:col-span-6 xl:col-span-4" />
     <div
       v-else-if="!appId"
       class="col-span-full h-[460px] flex flex-col items-center justify-center border border-slate-300 rounded-lg bg-white shadow-lg sm:col-span-6 xl:col-span-4 dark:border-slate-900 dark:bg-gray-800"
     >
       <Spinner size="w-40 h-40" />
     </div>
-    <UpdateStatsCard v-if="!isLoading && !appId" class="col-span-full sm:col-span-6 xl:col-span-4" />
+    <UpdateStatsCard v-if="!isLoading && !appId && chartsLoaded.updates" class="col-span-full sm:col-span-6 xl:col-span-4" />
     <div
       v-else-if="!appId"
       class="col-span-full h-[460px] flex flex-col items-center justify-center border border-slate-300 rounded-lg bg-white shadow-lg sm:col-span-6 xl:col-span-4 dark:border-slate-900 dark:bg-gray-800"
     >
       <Spinner size="w-40 h-40" />
     </div>
-    <DeploymentStatsCard v-if="!isLoading && !appId" class="col-span-full sm:col-span-6 xl:col-span-4" />
+    <DeploymentStatsCard v-if="!isLoading && !appId && chartsLoaded.deployments" class="col-span-full sm:col-span-6 xl:col-span-4" />
     <div
       v-else-if="!appId"
       class="col-span-full h-[460px] flex flex-col items-center justify-center border border-slate-300 rounded-lg bg-white shadow-lg sm:col-span-6 xl:col-span-4 dark:border-slate-900 dark:bg-gray-800"
