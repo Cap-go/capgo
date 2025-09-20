@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.32.1 (2025-09-20)
+
+
+### Bug Fixes
+
+* include sentry secret in map upload ([571f8d4](https://github.com/Cap-go/capgo/commit/571f8d4689fd6de441a7bea70d3a9658d927423a))
+
 ## 12.32.0 (2025-09-20)
 
 
