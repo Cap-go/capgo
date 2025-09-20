@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## 12.31.0 (2025-09-20)
+
+
+### Features
+
+* enhance mobile tooltip behavior with dismiss and auto-hide functionality ([57d6d27](https://github.com/Cap-go/capgo/commit/57d6d2724643b2778a9fca6f7bc34257171a3f2a))
+
 ## 12.30.0 (2025-09-20)
 
 
