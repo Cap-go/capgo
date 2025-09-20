@@ -27,16 +27,44 @@ const currentPage = ref(1)
 const filters = ref({})
 const main = useMainStore()
 const organizationStore = useOrganizationStore()
-const mauNumbers = ref<Record<string, number>>({})
+
+// Create enriched apps with MAU data
+const appsWithMau = ref<(Database['public']['Tables']['apps']['Row'] & { mau: number })[]>([])
 
 async function loadMauNumbers() {
-  const promises = props.apps.map(async (app) => {
-    if (app.app_id) {
-      const mau = await main.getTotalMauByApp(app.app_id, organizationStore.currentOrganization?.subscription_start)
-      mauNumbers.value[app.app_id] = mau
+  // Wait for dashboard data to be loaded
+  await main.awaitInitialLoad()
+
+  // Calculate how many days into the billing cycle we are
+  const billingStart = new Date(organizationStore.currentOrganization?.subscription_start ?? new Date())
+  const currentDate = new Date()
+
+  // Reset to start of day for consistent comparison
+  billingStart.setHours(0, 0, 0, 0)
+  currentDate.setHours(0, 0, 0, 0)
+
+  // Calculate current billing day (how many days of data to accumulate)
+  const daysInBillingCycle = Math.floor((currentDate.getTime() - billingStart.getTime()) / (1000 * 60 * 60 * 24)) + 1
+
+  // Map apps with their MAU values from the dashboard
+  appsWithMau.value = props.apps.map((app) => {
+    // Get the app's dashboard data
+    const appDashboard = main.dashboardByapp.filter(d => d.app_id === app.app_id)
+
+    // Accumulate only the MAU values within the current billing cycle
+    let mau = 0
+    const dataLength = Math.min(daysInBillingCycle, appDashboard.length)
+    for (let i = 0; i < dataLength; i++) {
+      if (appDashboard[i]?.mau !== undefined) {
+        mau += appDashboard[i].mau
+      }
+    }
+
+    return {
+      ...app,
+      mau,
     }
   })
-  await Promise.all(promises)
 }
 
 watchEffect(async () => {
@@ -89,7 +117,7 @@ const columns = ref<TableColumn[]>([
     label: t('mau'),
     key: 'mau',
     mobile: false,
-    displayFunction: item => mauNumbers.value[item.app_id] ?? 0,
+    sortable: true,
   },
   {
     label: t('app-perm'),
@@ -140,10 +168,10 @@ async function openOneVersion(app: Database['public']['Tables']['apps']['Row']) 
 // Filter apps based on search term
 const filteredApps = computed(() => {
   if (!search.value)
-    return props.apps
+    return appsWithMau.value
 
   const searchLower = search.value.toLowerCase()
-  return props.apps.filter((app) => {
+  return appsWithMau.value.filter((app) => {
     // Search by name (primary)
     const nameMatch = app.name?.toLowerCase().includes(searchLower)
 

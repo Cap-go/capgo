@@ -122,11 +122,33 @@ export const useMainStore = defineStore('main', () => {
 
   const getTotalStatsByApp = async (appId: string, subscriptionStart?: string) => {
     const monthDay = calculateMonthDay(subscriptionStart)
-    return dashboardByapp.value.filter(d => d.app_id === appId)[monthDay]?.get ?? 0
+    const appData = dashboardByapp.value.filter(d => d.app_id === appId)
+    return appData[monthDay]?.get ?? 0
   }
   const getTotalMauByApp = async (appId: string, subscriptionStart?: string) => {
-    const monthDay = calculateMonthDay(subscriptionStart)
-    return dashboardByapp.value.filter(d => d.app_id === appId)[monthDay]?.mau ?? 0
+    // Get the app's dashboard data
+    const appData = dashboardByapp.value.filter(d => d.app_id === appId)
+
+    // Calculate how many days into the billing cycle we are
+    const startDate = subscriptionStart ? new Date(subscriptionStart) : new Date()
+    const currentDate = new Date()
+
+    // Reset to start of day for consistent comparison
+    startDate.setHours(0, 0, 0, 0)
+    currentDate.setHours(0, 0, 0, 0)
+
+    // Calculate days in billing cycle
+    const daysInBillingCycle = Math.floor((currentDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1
+
+    // Accumulate only the MAU values within the current billing cycle
+    let totalMau = 0
+    const dataLength = Math.min(daysInBillingCycle, appData.length)
+    for (let i = 0; i < dataLength; i++) {
+      if (appData[i]?.mau !== undefined) {
+        totalMau += appData[i].mau
+      }
+    }
+    return totalMau
   }
 
   const awaitInitialLoad = () => {
