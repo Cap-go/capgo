@@ -86,17 +86,20 @@ export function createCustomTooltip(context: TooltipContext, isAccumulated: bool
         // we show the accumulated value at that point (which is already calculated in the data)
         const cumulativeValues = tooltip.dataPoints?.map((point: any) => point.parsed.y) || []
         totalValue = cumulativeValues.length > 0 ? cumulativeValues[0] : 0
-      } else {
+      }
+      else {
         // Single app daily mode: show the raw daily value
         totalValue = items.reduce((sum, item) => sum + item.value, 0)
       }
-    } else {
+    }
+    else {
       // Multi-app view
       if (isAccumulated) {
         // Multi-app cumulative mode: sum all accumulated values from all apps
         const cumulativeValues = tooltip.dataPoints?.map((point: any) => point.parsed.y) || []
-        totalValue = cumulativeValues.reduce((sum: number, val: number) => sum + (isNaN(val) ? 0 : val), 0)
-      } else {
+        totalValue = cumulativeValues.reduce((sum: number, val: number) => sum + (Number.isNaN(val) ? 0 : val), 0)
+      }
+      else {
         // Multi-app daily mode: sum all daily values from different apps
         totalValue = items.reduce((sum, item) => sum + item.value, 0)
       }
@@ -249,7 +252,8 @@ export function createTooltipConfig(hasMultipleDatasets: boolean, isAccumulated:
         if (isAccumulated && !hasMultipleDatasets) {
           // For single dataset in accumulated mode, show total
           return `Total: ${context.parsed.y}`
-        } else if (hasMultipleDatasets) {
+        }
+        else if (hasMultipleDatasets) {
           // Format as "value - label" for better readability
           return `${context.parsed.y} - ${context.dataset.label}`
         }

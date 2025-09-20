@@ -8,9 +8,9 @@ import { useRoute, useRouter } from 'vue-router'
 import { bytesToGb, getDaysBetweenDates } from '~/services/conversion'
 import { getPlans } from '~/services/supabase'
 import { useDashboardAppsStore } from '~/stores/dashboardApps'
+import { useDialogV2Store } from '~/stores/dialogv2'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
-import { useDialogV2Store } from '~/stores/dialogv2'
 import DeploymentStatsCard from './DeploymentStatsCard.vue'
 import UpdateStatsCard from './UpdateStatsCard.vue'
 import UsageCard from './UsageCard.vue'
@@ -74,7 +74,7 @@ async function handleCumulativeClick() {
       buttons: [
         {
           text: t('cancel'),
-          role: 'cancel'
+          role: 'cancel',
         },
         {
           text: t('switch-to-billing-period'),
@@ -83,11 +83,12 @@ async function handleCumulativeClick() {
             // Switch to billing period first, then enable cumulative
             useBillingPeriod.value = true
             showCumulative.value = true
-          }
-        }
-      ]
+          },
+        },
+      ],
     })
-  } else {
+  }
+  else {
     // Already in billing period, just toggle cumulative mode
     showCumulative.value = true
   }
@@ -100,13 +101,15 @@ function updateUrlParams() {
   // Only add to URL if different from defaults (daily is default)
   if (showCumulative.value) {
     query.cumulative = 'true'
-  } else {
+  }
+  else {
     delete query.cumulative
   }
 
   if (!useBillingPeriod.value) {
     query.billingPeriod = 'false'
-  } else {
+  }
+  else {
     delete query.billingPeriod
   }
 
@@ -126,7 +129,7 @@ function clearDashboardParams() {
 defineExpose({
   clearDashboardParams,
   useBillingPeriod,
-  showCumulative
+  showCumulative,
 })
 
 const allLimits = computed(() => {
@@ -171,10 +174,8 @@ function filterToBillingPeriod(fullData: { mau: number[], storage: number[], ban
   currentDate.setHours(0, 0, 0, 0)
 
   // Calculate billing period length - use getDaysBetweenDates for consistency
-  let currentBillingDay: number
-
   // Simply calculate days between billing start and current date + 1 (to include today)
-  currentBillingDay = getDaysBetweenDates(billingStart, currentDate) + 1
+  const currentBillingDay = getDaysBetweenDates(billingStart, currentDate) + 1
 
   // Create arrays for billing period length
   const billingData = {
@@ -394,7 +395,7 @@ onMounted(() => {
         :class="[
           showCumulative && useBillingPeriod
             ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
-            : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+            : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white',
         ]"
         @click="handleCumulativeClick"
       >

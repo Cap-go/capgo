@@ -82,7 +82,7 @@ const dashboardAppsStore = useDashboardAppsStore()
 const chartUpdateData = computed(() => updateData.value.map(v => v ?? 0))
 const chartUpdateDataByAction = computed(() => {
   const result: { [action: string]: number[] } = {}
-  Object.keys(updateDataByAction.value).forEach(action => {
+  Object.keys(updateDataByAction.value).forEach((action) => {
     result[action] = updateDataByAction.value[action].map(v => v ?? 0)
   })
   return result

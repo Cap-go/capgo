@@ -6,8 +6,8 @@
  * Fast array initialization with undefined values
  */
 export function createUndefinedArray(length: number): (number | undefined)[] {
-  const arr = new Array(length)
-  // Don't fill with undefined - Array constructor already does this
+  const arr = Array.from({ length })
+  // Don't fill with undefined - Array.from already does this
   return arr
 }
 
@@ -15,7 +15,7 @@ export function createUndefinedArray(length: number): (number | undefined)[] {
  * Fast array initialization with zero values
  */
 export function createZeroArray(length: number): number[] {
-  return new Array(length).fill(0)
+  return Array.from({ length }).fill(0)
 }
 
 /**
@@ -40,7 +40,9 @@ export function initializeAppDataArrays(appIds: string[], length: number, fillVa
 
   for (let i = 0; i < appIds.length; i++) {
     const appId = appIds[i]
-    result[appId] = fillValue === undefined ? createUndefinedArray(length) : new Array(length).fill(fillValue)
+    result[appId] = fillValue === undefined
+      ? createUndefinedArray(length)
+      : Array.from({ length }).fill(fillValue)
   }
 
   return result
@@ -52,7 +54,7 @@ export function initializeAppDataArrays(appIds: string[], length: number, fillVa
 export function aggregateDataByKey<T extends Record<string, any>>(
   data: T[],
   keyGenerator: (item: T) => string,
-  aggregateFields: string[]
+  aggregateFields: string[],
 ): Record<string, any> {
   const result: Record<string, any> = {}
 

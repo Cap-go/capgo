@@ -208,11 +208,16 @@ const filteredApps = computed(() => {
 
       // Handle null/undefined values for MAU (should be 0 for numbers)
       if (key === 'mau') {
-        if (aVal == null) aVal = 0
-        if (bVal == null) bVal = 0
-      } else {
-        if (aVal == null) aVal = ''
-        if (bVal == null) bVal = ''
+        if (aVal == null)
+          aVal = 0
+        if (bVal == null)
+          bVal = 0
+      }
+      else {
+        if (aVal == null)
+          aVal = ''
+        if (bVal == null)
+          bVal = ''
       }
 
       // Numeric comparison for numbers
@@ -226,7 +231,8 @@ const filteredApps = computed(() => {
 
       if (sortColumn.sortable === 'asc') {
         return aStr < bStr ? -1 : aStr > bStr ? 1 : 0
-      } else {
+      }
+      else {
         return aStr > bStr ? -1 : aStr < bStr ? 1 : 0
       }
     })

@@ -59,11 +59,12 @@ const total = computed(() => {
     if (props.accumulated) {
       // Single app cumulative mode: accumulate values like LineChartStats does
       let accumulatedValue = 0
-      arrWithoutUndefined.forEach(val => {
+      arrWithoutUndefined.forEach((val) => {
         accumulatedValue += val
       })
       return accumulatedValue
-    } else {
+    }
+    else {
       // Single app daily mode: last raw daily value
       return arrWithoutUndefined[arrWithoutUndefined.length - 1] ?? 0
     }
@@ -85,7 +86,8 @@ const total = computed(() => {
       totalAccumulated += appAccumulated
     })
     return totalAccumulated
-  } else {
+  }
+  else {
     // Multi-app daily mode: sum the last values from all apps
     let dailySum = 0
     Object.values(props.datasByApp).forEach((appData: any) => {

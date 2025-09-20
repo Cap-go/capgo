@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import type { ChartOptions } from 'chart.js'
+import { useDark } from '@vueuse/core'
 import { CategoryScale, Chart, LinearScale, LineElement, PointElement, Tooltip } from 'chart.js'
 import dayjs from 'dayjs'
-import { computed, ref, watchEffect, watch } from 'vue'
+import { computed, ref, watch, watchEffect } from 'vue'
 import { Line } from 'vue-chartjs'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
-import { useDark } from '@vueuse/core'
 import InformationInfo from '~icons/heroicons/information-circle'
 import { useChartData } from '~/services/chartDataService'
 import { useSupabase } from '~/services/supabase'
@@ -76,7 +76,8 @@ function getDateRange() {
     const startDate = new Date(organizationStore.currentOrganization?.subscription_start ?? new Date())
     const endDate = new Date(organizationStore.currentOrganization?.subscription_end ?? new Date())
     return { startDate, endDate }
-  } else {
+  }
+  else {
     // Use last 30 days
     const endDate = new Date()
     const startDate = new Date(endDate)

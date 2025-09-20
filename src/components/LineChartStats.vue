@@ -274,7 +274,8 @@ const chartData = computed<ChartData<'line' | 'bar'>>(() => {
           // Use existing line chart colors for line mode
           backgroundColor = appColors[index].bg
           borderColor = appColors[index].border
-        } else {
+        }
+        else {
           // Use existing bar chart colors for bar mode
           const hue = (210 + index * 137.508) % 360
           const saturation = 50 + (index % 3) * 8
@@ -295,16 +296,18 @@ const chartData = computed<ChartData<'line' | 'bar'>>(() => {
         }
 
         // Add chart-type specific properties
-        const dataset = props.accumulated ? {
-          ...baseDataset,
-          fill: index === 0 ? 'origin' : '-1', // First fills from bottom, others fill from previous dataset
-          tension: 0.3,
-          pointRadius: 0,
-          pointBorderWidth: 0,
-        } : {
-          ...baseDataset,
-          borderWidth: 1,
-        }
+        const dataset = props.accumulated
+          ? {
+              ...baseDataset,
+              fill: index === 0 ? 'origin' : '-1', // First fills from bottom, others fill from previous dataset
+              tension: 0.3,
+              pointRadius: 0,
+              pointBorderWidth: 0,
+            }
+          : {
+              ...baseDataset,
+              borderWidth: 1,
+            }
 
         datasets.push(dataset)
       }
@@ -320,16 +323,18 @@ const chartData = computed<ChartData<'line' | 'bar'>>(() => {
     }
 
     // Add chart-type specific properties for main dataset
-    const dataset = props.accumulated ? {
-      ...mainDataset,
-      fill: false, // No fill for single app line
-      tension: 0.3,
-      pointRadius: 2,
-      pointBorderWidth: 0,
-    } : {
-      ...mainDataset,
-      borderWidth: 1,
-    }
+    const dataset = props.accumulated
+      ? {
+          ...mainDataset,
+          fill: false, // No fill for single app line
+          tension: 0.3,
+          pointRadius: 2,
+          pointBorderWidth: 0,
+        }
+      : {
+          ...mainDataset,
+          borderWidth: 1,
+        }
 
     datasets.push(dataset)
 

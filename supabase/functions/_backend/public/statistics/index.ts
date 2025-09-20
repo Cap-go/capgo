@@ -186,7 +186,7 @@ async function getNormalStats(c: Context, appId: string | null, ownerOrg: string
     const breakdown: any[] = []
 
     // Process each app's data through the same aggregation logic
-    Object.keys(metricsByApp).forEach(appId => {
+    Object.keys(metricsByApp).forEach((appId) => {
       const appMetrics = metricsByApp[appId]
 
       // Initialize arrays for this app
@@ -223,11 +223,35 @@ async function getNormalStats(c: Context, appId: string | null, ownerOrg: string
       })
 
       // Apply the same accumulation logic as the main stats
-      appStorage = (appStorage as number[]).reduce((p, c) => { if (p.length > 0) { c += p[p.length - 1] } p.push(c); return p }, [] as number[])
-      appMau = (appMau as number[]).reduce((p, c) => { if (p.length > 0) { c += p[p.length - 1] } p.push(c); return p }, [] as number[])
-      appBandwidth = (appBandwidth as number[]).reduce((p, c) => { if (p.length > 0) { c += p[p.length - 1] } p.push(c); return p }, [] as number[])
+      appStorage = (appStorage as number[]).reduce((p, c) => {
+        if (p.length > 0) {
+          c += p[p.length - 1]
+        }
+        p.push(c)
+        return p
+      }, [] as number[])
+      appMau = (appMau as number[]).reduce((p, c) => {
+        if (p.length > 0) {
+          c += p[p.length - 1]
+        }
+        p.push(c)
+        return p
+      }, [] as number[])
+      appBandwidth = (appBandwidth as number[]).reduce((p, c) => {
+        if (p.length > 0) {
+          c += p[p.length - 1]
+        }
+        p.push(c)
+        return p
+      }, [] as number[])
       if (isDashboard) {
-        appGets = (appGets as number[]).reduce((p, c) => { if (p.length > 0) { c += p[p.length - 1] } p.push(c); return p }, [] as number[])
+        appGets = (appGets as number[]).reduce((p, c) => {
+          if (p.length > 0) {
+            c += p[p.length - 1]
+          }
+          p.push(c)
+          return p
+        }, [] as number[])
       }
 
       // Create final stats for this app

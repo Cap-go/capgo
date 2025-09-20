@@ -77,7 +77,7 @@ function monthdays() {
 
 // Helper function to accumulate data
 function accumulateData(data: number[]): number[] {
-  return data.reduce((acc: number[], val: number, i: number) => {
+  return data.reduce((acc: number[], val: number) => {
     const last = acc[acc.length - 1] ?? 0
     const newVal = last + (val ?? 0)
     return acc.concat([newVal])
@@ -93,8 +93,8 @@ function generateAppColors(appCount: number) {
     const hue = (210 + i * 137.508) % 360 // Start at blue, then golden angle
 
     // Use pastel-friendly saturation and lightness values
-    const saturation = 50 + (i % 3) * 8  // 50%, 58%, 66% - softer colors
-    const lightness = 60 + (i % 4) * 5   // 60%, 65%, 70%, 75% - lighter, more pastel
+    const saturation = 50 + (i % 3) * 8 // 50%, 58%, 66% - softer colors
+    const lightness = 60 + (i % 4) * 5 // 60%, 65%, 70%, 75% - lighter, more pastel
 
     const backgroundColor = `hsla(${hue}, ${saturation}%, ${lightness}%, 0.8)`
 
@@ -119,7 +119,8 @@ const chartData = computed<ChartData<'bar' | 'line'>>(() => {
       // Use LineChartStats color scheme for line mode
       borderColor = `hsl(210, 65%, 45%)`
       backgroundColor = `hsla(210, 50%, 60%, 0.6)`
-    } else {
+    }
+    else {
       processedData = props.data as number[]
       // Use existing bar chart colors for bar mode
       backgroundColor = 'hsla(210, 50%, 70%, 0.8)'
@@ -135,14 +136,16 @@ const chartData = computed<ChartData<'bar' | 'line'>>(() => {
     }
 
     // Add line-specific properties for accumulated mode (match UsageCard styling)
-    const dataset = props.accumulated ? {
-      ...baseDataset,
-      fill: 'origin',
-      tension: 0.3,
-      pointRadius: 0,
-      pointBorderWidth: 0,
-      borderWidth: 1,
-    } : baseDataset
+    const dataset = props.accumulated
+      ? {
+          ...baseDataset,
+          fill: 'origin',
+          tension: 0.3,
+          pointRadius: 0,
+          pointBorderWidth: 0,
+          borderWidth: 1,
+        }
+      : baseDataset
 
     return {
       labels: monthdays(),
@@ -168,7 +171,8 @@ const chartData = computed<ChartData<'bar' | 'line'>>(() => {
       const lightness = 60 + (index % 4) * 5
       borderColor = `hsl(${hue}, ${saturation + 15}%, ${lightness - 15}%)`
       backgroundColor = `hsla(${hue}, ${saturation}%, ${lightness}%, 0.6)`
-    } else {
+    }
+    else {
       processedData = appData
       // Use existing bar chart colors for bar mode
       backgroundColor = appColors[index]
@@ -187,14 +191,16 @@ const chartData = computed<ChartData<'bar' | 'line'>>(() => {
     }
 
     // Add line-specific properties for accumulated mode (match UsageCard styling)
-    return props.accumulated ? {
-      ...baseDataset,
-      fill: index === 0 ? 'origin' : '-1', // First fills from bottom, others fill from previous dataset
-      tension: 0.3,
-      pointRadius: 0,
-      pointBorderWidth: 0,
-      borderWidth: 1,
-    } : baseDataset
+    return props.accumulated
+      ? {
+          ...baseDataset,
+          fill: index === 0 ? 'origin' : '-1', // First fills from bottom, others fill from previous dataset
+          tension: 0.3,
+          pointRadius: 0,
+          pointBorderWidth: 0,
+          borderWidth: 1,
+        }
+      : baseDataset
   })
 
   return {
