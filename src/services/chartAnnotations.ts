@@ -20,7 +20,7 @@ export interface AnnotationOptions {
 
 export const inlineAnnotationPlugin = {
   id: 'inlineAnnotationPlugin',
-  afterDraw: (chart: any, args: any, options: AnnotationOptions) => {
+  afterDatasetsDraw: (chart: any, args: any, options: AnnotationOptions) => {
     const { ctx, chartArea } = chart
     const { left, right } = chartArea
 

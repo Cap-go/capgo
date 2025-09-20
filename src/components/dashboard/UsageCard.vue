@@ -70,7 +70,22 @@ const total = computed(() => {
   }
 
   // Multi-app view
-  if (!props.accumulated && props.datasByApp) {
+  if (props.accumulated) {
+    // Multi-app cumulative mode: Sum the last accumulated value from each app
+    // This matches the tooltip logic where we sum all accumulated values from all apps
+    let totalAccumulated = 0
+    Object.values(props.datasByApp).forEach((appData: any) => {
+      // For each app, accumulate its daily values
+      const appArrWithoutUndefined = appData.filter((val: any) => val !== undefined)
+      let appAccumulated = 0
+      appArrWithoutUndefined.forEach(val => {
+        appAccumulated += val
+      })
+      // Add this app's accumulated total to the overall total
+      totalAccumulated += appAccumulated
+    })
+    return totalAccumulated
+  } else {
     // Multi-app daily mode: sum the last values from all apps
     let dailySum = 0
     Object.values(props.datasByApp).forEach((appData: any) => {
@@ -80,9 +95,6 @@ const total = computed(() => {
       }
     })
     return dailySum
-  } else {
-    // Multi-app cumulative mode: use the last value from aggregated data
-    return arrWithoutUndefined[arrWithoutUndefined.length - 1] ?? 0
   }
 })
 

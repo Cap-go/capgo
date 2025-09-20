@@ -167,19 +167,14 @@ async function getAppStats() {
 // Helper function to filter 30-day data to billing period
 function filterToBillingPeriod(fullData: { mau: number[], storage: number[], bandwidth: number[] }, last30DaysStart: Date, billingStart: Date) {
   const currentDate = new Date()
+  // Reset current date to start of day for consistent comparison
+  currentDate.setHours(0, 0, 0, 0)
 
-  // Calculate billing period length
+  // Calculate billing period length - use getDaysBetweenDates for consistency
   let currentBillingDay: number
 
-  if (billingStart.getDate() === 1) {
-    currentBillingDay = currentDate.getDate()
-  } else {
-    const billingStartDay = billingStart.getUTCDate()
-    const daysInMonth = new Date(Date.UTC(currentDate.getUTCFullYear(), currentDate.getUTCMonth() + 1, 0)).getUTCDate()
-    currentBillingDay = (currentDate.getUTCDate() - billingStartDay + 1 + daysInMonth) % daysInMonth
-    if (currentBillingDay === 0)
-      currentBillingDay = daysInMonth
-  }
+  // Simply calculate days between billing start and current date + 1 (to include today)
+  currentBillingDay = getDaysBetweenDates(billingStart, currentDate) + 1
 
   // Create arrays for billing period length
   const billingData = {
@@ -192,6 +187,8 @@ function filterToBillingPeriod(fullData: { mau: number[], storage: number[], ban
   for (let i = 0; i < 30; i++) {
     const dataDate = new Date(last30DaysStart)
     dataDate.setDate(dataDate.getDate() + i)
+    // Reset to start of day for consistent comparison
+    dataDate.setHours(0, 0, 0, 0)
 
     // Check if this date falls within current billing period
     if (dataDate >= billingStart && dataDate <= currentDate) {
@@ -219,11 +216,16 @@ async function getUsages() {
 
   // Get billing period dates for filtering
   const billingStart = new Date(organizationStore.currentOrganization?.subscription_start ?? new Date())
+  // Reset to start of day to match calculation in store
+  billingStart.setHours(0, 0, 0, 0)
 
   const finalData = globalStats.map((item: any) => {
+    const itemDate = new Date(item.date)
+    // Reset to start of day for consistent date handling
+    itemDate.setHours(0, 0, 0, 0)
     return {
       ...item,
-      date: new Date(item.date),
+      date: itemDate,
     } as { mau: number, storage: number, bandwidth: number, date: Date }
   })
 

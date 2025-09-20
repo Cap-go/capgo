@@ -80,8 +80,16 @@ export const useMainStore = defineStore('main', () => {
   }
 
   const calculateMonthDay = (subscriptionStart: string | undefined) => {
+    // Parse dates consistently - ensure we're handling them the same way
+    // If subscriptionStart is provided, parse it as-is (should be in ISO format from DB)
+    // Otherwise use current date
     const startDate = subscriptionStart ? new Date(subscriptionStart) : new Date()
     const currentDate = new Date()
+
+    // Reset both dates to start of day to avoid time component issues
+    startDate.setHours(0, 0, 0, 0)
+    currentDate.setHours(0, 0, 0, 0)
+
     const daysInMonth = new Date(Date.UTC(currentDate.getUTCFullYear(), currentDate.getUTCMonth() + 1, 0)).getUTCDate()
     return (getDaysBetweenDates(startDate, currentDate) % daysInMonth || daysInMonth) - 1
   }

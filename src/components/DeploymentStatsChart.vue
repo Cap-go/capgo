@@ -33,6 +33,9 @@ const isDark = useDark()
 const organizationStore = useOrganizationStore()
 const cycleStart = new Date(organizationStore.currentOrganization?.subscription_start ?? new Date())
 const cycleEnd = new Date(organizationStore.currentOrganization?.subscription_end ?? new Date())
+// Reset to start of day for consistent date handling
+cycleStart.setHours(0, 0, 0, 0)
+cycleEnd.setHours(0, 0, 0, 0)
 
 Chart.register(
   Tooltip,
