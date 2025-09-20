@@ -30,6 +30,7 @@ const organizationStore = useOrganizationStore()
 
 // Create enriched apps with MAU data
 const appsWithMau = ref<any[]>([])
+const mauDataLoaded = ref(false)
 
 async function loadMauNumbers() {
   // Wait for dashboard data to be loaded
@@ -65,6 +66,8 @@ async function loadMauNumbers() {
       mau,
     }
   })
+
+  mauDataLoaded.value = true
 }
 
 watchEffect(async () => {
@@ -167,6 +170,12 @@ async function openOneVersion(app: Database['public']['Tables']['apps']['Row']) 
 
 // Filter apps based on search term
 const filteredApps = computed(() => {
+  // If MAU data isn't loaded yet, return original apps
+  if (!mauDataLoaded.value) {
+    // Return original apps while MAU is loading (without MAU column being sortable)
+    return props.apps as any[]
+  }
+
   let apps = appsWithMau.value
 
   // Apply search filter
@@ -197,9 +206,14 @@ const filteredApps = computed(() => {
         bVal = sortColumn.displayFunction(b)
       }
 
-      // Handle null/undefined values
-      if (aVal == null) aVal = ''
-      if (bVal == null) bVal = ''
+      // Handle null/undefined values for MAU (should be 0 for numbers)
+      if (key === 'mau') {
+        if (aVal == null) aVal = 0
+        if (bVal == null) bVal = 0
+      } else {
+        if (aVal == null) aVal = ''
+        if (bVal == null) bVal = ''
+      }
 
       // Numeric comparison for numbers
       if (typeof aVal === 'number' && typeof bVal === 'number') {

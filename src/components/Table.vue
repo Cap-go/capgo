@@ -89,7 +89,18 @@ function sortClick(key: number) {
     sortable = true
   else
     sortable = 'asc'
+
   const newColumns = [...props.columns]
+
+  // Reset all other columns' sorting
+  newColumns.forEach((col, index) => {
+    if (index !== key && col.sortable && typeof col.sortable === 'string') {
+      // Reset to true (sortable but not actively sorted)
+      newColumns[index] = { ...col, sortable: true }
+    }
+  })
+
+  // Set the clicked column's sorting
   newColumns[key].sortable = sortable
   emit('update:columns', newColumns)
 }
