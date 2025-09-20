@@ -599,6 +599,14 @@ app.get('/user', async (c) => {
     throw quickError(500, 'cannot_get_user_statistics', 'Cannot get user statistics', { error: errors })
   }
 
+  interface StatEntry {
+    date: string
+    mau: number
+    storage: number
+    bandwidth: number
+    get?: number
+  }
+
   const finalStats = Array.from(stats.map(stat => stat.data!).flat().reduce((acc, curr) => {
     const current = acc.get(curr.date)
     if (current) {
@@ -610,7 +618,7 @@ app.get('/user', async (c) => {
       acc.set(curr.date, curr)
     }
     return acc
-  }, new Map<string, NonNullable<Awaited<ReturnType<typeof getNormalStats>>['data']>[number]>()).values())
+  }, new Map<string, StatEntry>()).values())
 
   return c.json(finalStats)
 })

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import dayjs from 'dayjs'
 import colors from 'tailwindcss/colors'
-import { onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import InformationInfo from '~icons/heroicons/information-circle'
 import UpdateStatsChart from '~/components/UpdateStatsChart.vue'
@@ -66,13 +66,23 @@ const totalInstalled = ref(0)
 const totalFailed = ref(0)
 const totalGet = ref(0)
 const lastDayEvolution = ref(0)
-const updateData = ref<number[]>([])
-const updateDataByApp = ref<{ [appId: string]: number[] }>({})
-const updateDataByAction = ref<{ [action: string]: number[] }>({})
+const updateData = ref<(number | undefined)[]>([])
+const updateDataByApp = ref<{ [appId: string]: (number | undefined)[] }>({})
+const updateDataByAction = ref<{ [action: string]: (number | undefined)[] }>({})
 const appNames = ref<{ [appId: string]: string }>({})
 const isLoading = ref(true)
 
 const dashboardAppsStore = useDashboardAppsStore()
+
+// Convert undefined values to 0 for chart consumption
+const chartUpdateData = computed(() => updateData.value.map(v => v ?? 0))
+const chartUpdateDataByAction = computed(() => {
+  const result: { [action: string]: number[] } = {}
+  Object.keys(updateDataByAction.value).forEach(action => {
+    result[action] = updateDataByAction.value[action].map(v => v ?? 0)
+  })
+  return result
+})
 
 async function calculateStats() {
   isLoading.value = true
@@ -334,12 +344,12 @@ onMounted(async () => {
       </div>
       <UpdateStatsChart
         v-else
-        :key="JSON.stringify(updateDataByAction)"
+        :key="JSON.stringify(chartUpdateDataByAction)"
         :title="t('update_statistics')"
         :colors="colors.blue"
-        :data="updateData"
+        :data="chartUpdateData"
         :use-billing-period="useBillingPeriod"
-        :data-by-app="updateDataByAction"
+        :data-by-app="chartUpdateDataByAction"
         :app-names="{ install: 'Installed', fail: 'Failed', get: 'Get' }"
       />
     </div>
