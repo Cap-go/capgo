@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## 12.32.0 (2025-09-20)
+
+
+### Features
+
+* try to uplaod sorcemaps for API ([6a62ee5](https://github.com/Cap-go/capgo/commit/6a62ee553e5139b5a8d37632c0160efa4dac3a34))
+
 ## 12.31.0 (2025-09-20)
 
 
