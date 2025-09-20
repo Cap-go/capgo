@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { Database } from '~/types/supabase.types'
 import { storeToRefs } from 'pinia'
-import { ref, watch, watchEffect } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { useSupabase } from '~/services/supabase'
@@ -48,7 +48,7 @@ watch(currentOrganization, async () => {
   await getMyApps()
 })
 
-watchEffect(async () => {
+onMounted(async () => {
   if (route.path === '/dashboard') {
     displayStore.NavTitle = ''
     isLoading.value = true

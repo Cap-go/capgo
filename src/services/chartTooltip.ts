@@ -68,7 +68,7 @@ export function createCustomTooltip(context: TooltipContext) {
         value,
         colors: tooltip.labelColors[i],
       }
-    }).filter(item => item.value > 0) // Filter out zero values
+    }).filter(item => item.value !== 0) // Filter out zero values
 
     // Sort by value in descending order (highest to lowest)
     items.sort((a, b) => b.value - a.value)

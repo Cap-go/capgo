@@ -361,7 +361,7 @@ const chartOptions = computed<ChartOptions & { plugins: { inlineAnnotationPlugin
         beginAtZero: true,
         ticks: {
           color: `${isDark.value ? 'white' : 'black'}`,
-          stepSize: !props.accumulated ? 1 : undefined, // Step size for bar charts
+          // Remove stepSize to let Chart.js auto-calculate optimal steps
         },
         grid: {
           color: `${isDark.value ? '#424e5f' : '#bfc9d6'}`,

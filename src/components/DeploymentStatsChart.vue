@@ -208,7 +208,7 @@ const chartOptions = computed<ChartOptions<'bar' | 'line'>>(() => ({
       stacked: !props.accumulated, // Only stack for bar charts
       ticks: {
         color: `${isDark.value ? 'white' : 'black'}`,
-        stepSize: 1,
+        // Remove stepSize to let Chart.js auto-calculate optimal steps
       },
       grid: {
         color: `${isDark.value ? '#424e5f' : '#bfc9d6'}`,

@@ -60,6 +60,7 @@ const total = computed(() => {
   }
   return sum(arrWithoutUndefined)
 })
+
 const lastDayEvolution = computed(() => {
   const arr = props.datas as number[]
   const arrWithoutUndefined = arr.filter((val: any) => val !== undefined)

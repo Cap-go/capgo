@@ -2,7 +2,7 @@
 import type { Database } from '~/types/supabase.types'
 import { storeToRefs } from 'pinia'
 import colors from 'tailwindcss/colors'
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { bytesToGb, getDaysBetweenDates } from '~/services/conversion'
@@ -336,19 +336,22 @@ watch(dashboard, async (_dashboard) => {
   }
 })
 
-// Watch for billing period mode changes and force daily mode for Last 30 Days
-watch(useBillingPeriod, (newUseBillingPeriod) => {
+// Watch view mode changes and refetch data only when needed
+watch([showCumulative, useBillingPeriod], async (newValues, oldValues) => {
+  const [, newBillingPeriod] = newValues
+  const [, oldBillingPeriod] = oldValues || [null, null]
+
   // Force daily mode when switching to Last 30 Days (cumulative doesn't make sense)
-  if (!newUseBillingPeriod) {
+  if (!newBillingPeriod && oldBillingPeriod !== null) {
     showCumulative.value = false
   }
-})
 
-// Watch view mode changes and refetch data
-watch([showCumulative, useBillingPeriod], async () => {
-  if (loadedAlready.value) {
+  // Only reload data if billing period changed (this affects the underlying data)
+  // Cumulative vs daily changes don't need data reload, just reprocessing
+  if (loadedAlready.value && newBillingPeriod !== oldBillingPeriod && oldBillingPeriod !== null) {
     await getUsages()
   }
+
   // Update URL parameters
   updateUrlParams()
 })
@@ -366,8 +369,11 @@ watch(() => route.query, (newQuery) => {
   }
 }, { deep: true })
 
-if (main.dashboardFetched)
-  loadData()
+onMounted(() => {
+  if (main.dashboardFetched) {
+    loadData()
+  }
+})
 </script>
 
 <template>
