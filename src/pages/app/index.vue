@@ -70,7 +70,7 @@ displayStore.defaultBack = '/app'
     <div v-if="!isLoading">
       <StepsApp v-if="stepsOpen" :onboarding="!apps.length" @done="NextStep" @close-step="stepsOpen = !stepsOpen" />
       <div v-else class="h-full pb-4 overflow-hidden">
-        <div class="w-full h-full px-4 pt-8 mx-auto mb-8 overflow-y-auto max-w-9xl max-h-fit lg:px-8 sm:px-6">
+        <div class="w-full h-full px-4 pt-2 md:pt-8 mx-auto mb-8 overflow-y-auto max-w-9xl max-h-fit lg:px-8 sm:px-6">
           <AppTable :apps="apps" :delete-button="true" @add-app="stepsOpen = !stepsOpen" />
         </div>
       </div>

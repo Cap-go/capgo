@@ -85,13 +85,11 @@ const { t } = useI18n()
           <Banner desktop />
         </div>
 
-        <!-- Mobile placeholder -->
-        <div class="w-[72px] lg:hidden" />
+        <!-- Mobile banner in navbar -->
+        <div class="lg:hidden">
+          <Banner desktop />
+        </div>
       </div>
-    </div>
-    <!-- Mobile banner -->
-    <div class="lg:hidden">
-      <Banner />
     </div>
   </header>
 </template>

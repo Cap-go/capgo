@@ -22,6 +22,7 @@ export function createCustomTooltip(context: TooltipContext, isAccumulated: bool
   const { chart, tooltip } = context
   const { canvas } = chart
   const isDark = useDark()
+  const isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0
 
   // Get or create tooltip element
   let tooltipEl = chart.canvas.parentNode?.querySelector('.chartjs-tooltip') as HTMLElement | null
@@ -46,12 +47,43 @@ export function createCustomTooltip(context: TooltipContext, isAccumulated: bool
     tooltipEl.style.minWidth = '200px'
     tooltipEl.style.maxWidth = '300px'
     chart.canvas.parentNode?.appendChild(tooltipEl)
+
+    // Add touch event listener for mobile to dismiss tooltip
+    if (isMobile) {
+      const dismissTooltip = (e: TouchEvent) => {
+        // Check if the touch is not on the chart canvas
+        if (!canvas.contains(e.target as Node)) {
+          tooltipEl!.style.opacity = '0'
+          chart.setActiveElements([])
+          chart.update('none')
+        }
+      }
+
+      // Store the listener reference to remove it later if needed
+      (tooltipEl as any).dismissListener = dismissTooltip
+      document.addEventListener('touchstart', dismissTooltip, { passive: true })
+    }
+  }
+
+  // Clear any existing auto-hide timer
+  if ((tooltipEl as any).hideTimer) {
+    clearTimeout((tooltipEl as any).hideTimer)
   }
 
   // Hide if no tooltip
   if (tooltip.opacity === 0) {
     tooltipEl.style.opacity = '0'
     return
+  }
+
+  // Auto-hide on mobile after 3 seconds
+  if (isMobile) {
+    (tooltipEl as any).hideTimer = setTimeout(() => {
+      tooltipEl.style.opacity = '0'
+      // Trigger chart update to clear tooltip
+      chart.setActiveElements([])
+      chart.update('none')
+    }, 3000)
   }
 
   // Set content

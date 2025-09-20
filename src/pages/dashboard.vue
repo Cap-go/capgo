@@ -64,7 +64,7 @@ displayStore.defaultBack = '/app'
   <div>
     <div v-if="!isLoading">
       <div class="h-full pb-4 overflow-hidden">
-        <div class="w-full h-full px-4 pt-8 mx-auto mb-8 overflow-y-auto max-w-9xl max-h-fit lg:px-8 sm:px-6">
+        <div class="w-full h-full px-4 pt-2 md:pt-8 mx-auto mb-8 overflow-y-auto max-w-9xl max-h-fit lg:px-8 sm:px-6">
           <WelcomeBanner v-if="apps.length === 0" />
           <FailedCard />
           <Usage v-if="!isLoading && !organizationStore.currentOrganizationFailed" />
