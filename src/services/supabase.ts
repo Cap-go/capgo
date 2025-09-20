@@ -192,9 +192,9 @@ export interface AppUsageGlobalByApp {
 export async function getAllDashboard(orgId: string, startDate?: string, endDate?: string): Promise<AppUsageGlobalByApp> {
   try {
     const supabase = useSupabase()
-    const dateRange = `?from=${new Date(startDate!).toISOString()}&to=${new Date(endDate!).toISOString()}&breakdown=true`
+    const dateRange = `?from=${new Date(startDate!).toISOString()}&to=${new Date(endDate!).toISOString()}&breakdown=true&noAccumulate=true`
 
-    // 🚀 SUPER OPTIMIZED: Single API call returns both aggregated AND per-app breakdown
+    // 🚀 SUPER OPTIMIZED: Single API call returns both aggregated AND per-app breakdown (with daily values, not accumulated)
     const response = await supabase.functions.invoke(`statistics/org/${orgId}/${dateRange}`, {
       method: 'GET',
     })

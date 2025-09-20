@@ -23,6 +23,7 @@ const normalStatsSchema = z.object({
   from: z.coerce.date(),
   to: z.coerce.date(),
   breakdown: z.optional(z.coerce.boolean()),
+  noAccumulate: z.optional(z.coerce.boolean()), // Default to true for backward compatibility
 })
 
 interface VersionName {
@@ -62,7 +63,7 @@ async function checkOrganizationAccess(c: Context, orgId: string, supabase: Retu
   return { isPayingAndGoodPlan }
 }
 
-async function getNormalStats(c: Context, appId: string | null, ownerOrg: string | null, from: Date, to: Date, supabase: ReturnType<typeof supabaseAdmin>, isDashboard: boolean = false, includeBreakdown: boolean = false) {
+async function getNormalStats(c: Context, appId: string | null, ownerOrg: string | null, from: Date, to: Date, supabase: ReturnType<typeof supabaseAdmin>, isDashboard: boolean = false, includeBreakdown: boolean = false, noAccumulate: boolean = false) {
   if (!appId && !ownerOrg)
     return { data: null, error: 'Invalid appId or ownerOrg' }
 
@@ -154,15 +155,18 @@ async function getNormalStats(c: Context, appId: string | null, ownerOrg: string
     storage[0] = initValue
   }
 
-  // eslint-disable-next-line style/max-statements-per-line
-  storage = (storage as number[]).reduce((p, c) => { if (p.length > 0) { c += p[p.length - 1] } p.push(c); return p }, [] as number[])
-  // eslint-disable-next-line style/max-statements-per-line
-  mau = (mau as number[]).reduce((p, c) => { if (p.length > 0) { c += p[p.length - 1] } p.push(c); return p }, [] as number[])
-  // eslint-disable-next-line style/max-statements-per-line
-  bandwidth = (bandwidth as number[]).reduce((p, c) => { if (p.length > 0) { c += p[p.length - 1] } p.push(c); return p }, [] as number[])
-  if (isDashboard) {
+  // Accumulate data if requested (default behavior for backward compatibility)
+  if (noAccumulate === false) {
     // eslint-disable-next-line style/max-statements-per-line
-    gets = (gets as number[]).reduce((p, c) => { if (p.length > 0) { c += p[p.length - 1] } p.push(c); return p }, [] as number[])
+    storage = (storage as number[]).reduce((p, c) => { if (p.length > 0) { c += p[p.length - 1] } p.push(c); return p }, [] as number[])
+    // eslint-disable-next-line style/max-statements-per-line
+    mau = (mau as number[]).reduce((p, c) => { if (p.length > 0) { c += p[p.length - 1] } p.push(c); return p }, [] as number[])
+    // eslint-disable-next-line style/max-statements-per-line
+    bandwidth = (bandwidth as number[]).reduce((p, c) => { if (p.length > 0) { c += p[p.length - 1] } p.push(c); return p }, [] as number[])
+    if (isDashboard) {
+      // eslint-disable-next-line style/max-statements-per-line
+      gets = (gets as number[]).reduce((p, c) => { if (p.length > 0) { c += p[p.length - 1] } p.push(c); return p }, [] as number[])
+    }
   }
   const baseDay = dayjs(from).utc()
 
@@ -222,36 +226,38 @@ async function getNormalStats(c: Context, appId: string | null, ownerOrg: string
         }
       })
 
-      // Apply the same accumulation logic as the main stats
-      appStorage = (appStorage as number[]).reduce((p, c) => {
-        if (p.length > 0) {
-          c += p[p.length - 1]
-        }
-        p.push(c)
-        return p
-      }, [] as number[])
-      appMau = (appMau as number[]).reduce((p, c) => {
-        if (p.length > 0) {
-          c += p[p.length - 1]
-        }
-        p.push(c)
-        return p
-      }, [] as number[])
-      appBandwidth = (appBandwidth as number[]).reduce((p, c) => {
-        if (p.length > 0) {
-          c += p[p.length - 1]
-        }
-        p.push(c)
-        return p
-      }, [] as number[])
-      if (isDashboard) {
-        appGets = (appGets as number[]).reduce((p, c) => {
+      // Accumulate data if requested (default behavior for backward compatibility)
+      if (noAccumulate === false) {
+        appStorage = (appStorage as number[]).reduce((p, c) => {
           if (p.length > 0) {
             c += p[p.length - 1]
           }
           p.push(c)
           return p
         }, [] as number[])
+        appMau = (appMau as number[]).reduce((p, c) => {
+          if (p.length > 0) {
+            c += p[p.length - 1]
+          }
+          p.push(c)
+          return p
+        }, [] as number[])
+        appBandwidth = (appBandwidth as number[]).reduce((p, c) => {
+          if (p.length > 0) {
+            c += p[p.length - 1]
+          }
+          p.push(c)
+          return p
+        }, [] as number[])
+        if (isDashboard) {
+          appGets = (appGets as number[]).reduce((p, c) => {
+            if (p.length > 0) {
+              c += p[p.length - 1]
+            }
+            p.push(c)
+            return p
+          }, [] as number[])
+        }
       }
 
       // Create final stats for this app
@@ -482,7 +488,7 @@ app.get('/app/:app_id', async (c) => {
     await checkOrganizationAccess(c, app.owner_org, supabase)
   }
 
-  const { data: finalStats, error } = await getNormalStats(c, appId, null, body.from, body.to, supabase, c.get('auth')?.authType === 'jwt')
+  const { data: finalStats, error } = await getNormalStats(c, appId, null, body.from, body.to, supabase, c.get('auth')?.authType === 'jwt', false, body.noAccumulate ?? false)
 
   if (error) {
     throw quickError(500, 'cannot_get_app_statistics', 'Cannot get app statistics', { error })
@@ -522,7 +528,7 @@ app.get('/org/:org_id', async (c) => {
   if (auth.authType !== 'jwt')
     await checkOrganizationAccess(c, orgId, supabase)
 
-  const { data: finalStats, error } = await getNormalStats(c, null, orgId, body.from, body.to, supabase, c.get('auth')?.authType === 'jwt', body.breakdown ?? false)
+  const { data: finalStats, error } = await getNormalStats(c, null, orgId, body.from, body.to, supabase, c.get('auth')?.authType === 'jwt', body.breakdown ?? false, body.noAccumulate ?? false)
 
   if (error) {
     throw quickError(500, 'cannot_get_organization_statistics', 'Cannot get organization statistics', { error })
@@ -612,10 +618,10 @@ app.get('/user', async (c) => {
 
   let stats: Array<{ data: any, error: any }> = []
   if (auth.authType === 'apikey' && auth.apikey!.limited_to_apps && auth.apikey!.limited_to_apps.length > 0) {
-    stats = await Promise.all(auth.apikey!.limited_to_apps.map(appId => getNormalStats(c, appId, null, body.from, body.to, supabase, auth.authType === 'jwt')))
+    stats = await Promise.all(auth.apikey!.limited_to_apps.map(appId => getNormalStats(c, appId, null, body.from, body.to, supabase, auth.authType === 'jwt', false, body.noAccumulate ?? false)))
   }
   else {
-    stats = await Promise.all(uniqueOrgs.map(org => getNormalStats(c, null, org.org_id, body.from, body.to, supabase, auth.authType === 'jwt')))
+    stats = await Promise.all(uniqueOrgs.map(org => getNormalStats(c, null, org.org_id, body.from, body.to, supabase, auth.authType === 'jwt', false, body.noAccumulate ?? false)))
   }
 
   const errors = stats.filter(stat => stat.error).map(stat => stat.error)
