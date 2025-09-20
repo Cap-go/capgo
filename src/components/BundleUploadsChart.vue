@@ -7,10 +7,13 @@ import {
   CategoryScale,
   Chart,
   LinearScale,
+  LineController,
+  LineElement,
+  PointElement,
   Tooltip,
 } from 'chart.js'
 import { computed } from 'vue'
-import { Bar } from 'vue-chartjs'
+import { Bar, Line } from 'vue-chartjs'
 import { getDaysInCurrentMonth } from '~/services/date'
 import { useOrganizationStore } from '~/stores/organization'
 import { createTooltipConfig, verticalLinePlugin } from '../services/chartTooltip'
@@ -23,6 +26,7 @@ const props = defineProps({
   dataByApp: { type: Object, default: () => ({}) },
   appNames: { type: Object, default: () => ({}) },
   useBillingPeriod: { type: Boolean, default: true },
+  accumulated: { type: Boolean, default: false },
 })
 
 const isDark = useDark()
@@ -34,6 +38,9 @@ Chart.register(
   Tooltip,
   BarController,
   BarElement,
+  LineController,
+  LineElement,
+  PointElement,
   CategoryScale,
   LinearScale,
 )
@@ -86,20 +93,58 @@ function monthdays() {
   return getDayNumbers(cycleStart, cycleEnd)
 }
 
-const chartData = computed<ChartData<'bar'>>(() => {
+// Helper function to accumulate data
+function accumulateData(data: number[]): number[] {
+  return data.reduce((acc: number[], val: number, i: number) => {
+    const last = acc[acc.length - 1] ?? 0
+    const newVal = last + (val ?? 0)
+    return acc.concat([newVal])
+  }, [])
+}
+
+const chartData = computed<ChartData<'bar' | 'line'>>(() => {
   const appIds = Object.keys(props.dataByApp)
 
   if (appIds.length === 0) {
     // Fallback to single dataset if no app data
+    let backgroundColor: string
+    let borderColor: string
+    let processedData: number[]
+
+    // Process data for cumulative mode
+    if (props.accumulated) {
+      processedData = accumulateData(props.data as number[])
+      // Use LineChartStats color scheme for line mode
+      borderColor = `hsl(210, 65%, 45%)`
+      backgroundColor = `hsla(210, 50%, 60%, 0.6)`
+    } else {
+      processedData = props.data as number[]
+      // Use existing bar chart colors for bar mode
+      backgroundColor = props.colors[400]
+      borderColor = props.colors[200]
+    }
+
+    const baseDataset = {
+      label: props.title,
+      data: processedData,
+      backgroundColor,
+      borderColor,
+      borderWidth: 1,
+    }
+
+    // Add line-specific properties for accumulated mode (match UsageCard styling)
+    const dataset = props.accumulated ? {
+      ...baseDataset,
+      fill: 'origin', // Fill from bottom for single dataset
+      tension: 0.3,
+      pointRadius: 0,
+      pointBorderWidth: 0,
+      borderWidth: 1,
+    } : baseDataset
+
     return {
       labels: monthdays(),
-      datasets: [{
-        label: props.title,
-        data: props.data as number[],
-        backgroundColor: props.colors[400],
-        borderColor: props.colors[200],
-        borderWidth: 1,
-      }],
+      datasets: [dataset],
     }
   }
 
@@ -108,20 +153,46 @@ const chartData = computed<ChartData<'bar'>>(() => {
   const datasets = appIds.map((appId, index) => {
     const appData = props.dataByApp[appId] as number[]
 
-    const backgroundColor = appColors[index]
-    // Create a slightly darker border for better definition
-    const borderColor = backgroundColor.replace('hsla', 'hsl').replace(', 0.8)', ')').replace(/(\d+)%\)/, (_, lightness) => {
-      const newLightness = Math.max(Number(lightness) - 15, 30)
-      return `${newLightness}%)`
-    })
+    let backgroundColor: string
+    let borderColor: string
+    let processedData: number[]
 
-    return {
+    // Process data for cumulative mode
+    if (props.accumulated) {
+      processedData = accumulateData(appData)
+      // Use LineChartStats color scheme for line mode
+      const hue = (210 + index * 137.508) % 360
+      const saturation = 50 + (index % 3) * 8
+      const lightness = 60 + (index % 4) * 5
+      borderColor = `hsl(${hue}, ${saturation + 15}%, ${lightness - 15}%)`
+      backgroundColor = `hsla(${hue}, ${saturation}%, ${lightness}%, 0.6)`
+    } else {
+      processedData = appData
+      // Use existing bar chart colors for bar mode
+      backgroundColor = appColors[index]
+      borderColor = backgroundColor.replace('hsla', 'hsl').replace(', 0.8)', ')').replace(/(\d+)%\)/, (_, lightness) => {
+        const newLightness = Math.max(Number(lightness) - 15, 30)
+        return `${newLightness}%)`
+      })
+    }
+
+    const baseDataset = {
       label: props.appNames[appId] || appId,
-      data: appData,
+      data: processedData,
       backgroundColor,
       borderColor,
       borderWidth: 1,
     }
+
+    // Add line-specific properties for accumulated mode (match UsageCard styling)
+    return props.accumulated ? {
+      ...baseDataset,
+      fill: index === 0 ? 'origin' : '-1', // First fills from bottom, others fill from previous dataset
+      tension: 0.3,
+      pointRadius: 0,
+      pointBorderWidth: 0,
+      borderWidth: 1,
+    } : baseDataset
   })
 
   return {
@@ -130,12 +201,12 @@ const chartData = computed<ChartData<'bar'>>(() => {
   }
 })
 
-const chartOptions = computed<ChartOptions<'bar'>>(() => ({
+const chartOptions = computed<ChartOptions<'bar' | 'line'>>(() => ({
   maintainAspectRatio: false,
   scales: {
     y: {
       beginAtZero: true,
-      stacked: true,
+      stacked: !props.accumulated, // Only stack for bar charts
       ticks: {
         color: `${isDark.value ? 'white' : 'black'}`,
         stepSize: 1,
@@ -145,7 +216,7 @@ const chartOptions = computed<ChartOptions<'bar'>>(() => ({
       },
     },
     x: {
-      stacked: true,
+      stacked: !props.accumulated, // Only stack for bar charts
       ticks: {
         color: `${isDark.value ? 'white' : 'black'}`,
       },
@@ -177,6 +248,7 @@ const chartOptions = computed<ChartOptions<'bar'>>(() => ({
 
 <template>
   <div class="w-full h-full">
-    <Bar :data="chartData" :options="chartOptions" :plugins="[verticalLinePlugin]" />
+    <Line v-if="accumulated" :data="chartData as any" :options="chartOptions as any" :plugins="[verticalLinePlugin]" />
+    <Bar v-else :data="chartData as any" :options="chartOptions as any" :plugins="[verticalLinePlugin]" />
   </div>
 </template>

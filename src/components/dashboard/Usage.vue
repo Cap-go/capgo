@@ -10,6 +10,7 @@ import { getPlans } from '~/services/supabase'
 import { useDashboardAppsStore } from '~/stores/dashboardApps'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
+import { useDialogV2Store } from '~/stores/dialogv2'
 import DeploymentStatsCard from './DeploymentStatsCard.vue'
 import UpdateStatsCard from './UpdateStatsCard.vue'
 import UsageCard from './UsageCard.vue'
@@ -53,22 +54,52 @@ const chartsLoaded = ref({
 const route = useRoute()
 const router = useRouter()
 
-// Initialize from URL parameters (default: cumulative=true, billingPeriod=true)
-const showCumulative = ref(route.query.cumulative !== 'false') // Switch 1: Cumulative vs Daily
+// Initialize from URL parameters (default: cumulative=false, billingPeriod=true)
+const showCumulative = ref(route.query.cumulative === 'true') // Switch 1: Daily vs Cumulative (daily by default)
 const useBillingPeriod = ref(route.query.billingPeriod !== 'false') // Switch 2: Billing Period vs Last 30 Days
 const main = useMainStore()
 const organizationStore = useOrganizationStore()
 const dashboardAppsStore = useDashboardAppsStore()
+const dialogStore = useDialogV2Store()
 
 const { dashboard } = storeToRefs(main)
+
+// Confirmation logic for cumulative mode in 30-day view
+async function handleCumulativeClick() {
+  if (!useBillingPeriod.value) {
+    // Show confirmation dialog when trying to enable cumulative in 30-day mode
+    dialogStore.openDialog({
+      title: t('cumulative'),
+      description: t('confirm-switch-to-billing-period-for-cumulative'),
+      buttons: [
+        {
+          text: t('cancel'),
+          role: 'cancel'
+        },
+        {
+          text: t('switch-to-billing-period'),
+          role: 'primary',
+          handler: () => {
+            // Switch to billing period first, then enable cumulative
+            useBillingPeriod.value = true
+            showCumulative.value = true
+          }
+        }
+      ]
+    })
+  } else {
+    // Already in billing period, just toggle cumulative mode
+    showCumulative.value = true
+  }
+}
 
 // Function to update URL query parameters
 function updateUrlParams() {
   const query = { ...route.query }
 
-  // Only add to URL if different from defaults
-  if (!showCumulative.value) {
-    query.cumulative = 'false'
+  // Only add to URL if different from defaults (daily is default)
+  if (showCumulative.value) {
+    query.cumulative = 'true'
   } else {
     delete query.cumulative
   }
@@ -94,7 +125,8 @@ function clearDashboardParams() {
 // Expose function and state for parent components
 defineExpose({
   clearDashboardParams,
-  useBillingPeriod
+  useBillingPeriod,
+  showCumulative
 })
 
 const allLimits = computed(() => {
@@ -323,7 +355,7 @@ watch([showCumulative, useBillingPeriod], async () => {
 
 // Watch for URL parameter changes (e.g., browser back/forward)
 watch(() => route.query, (newQuery) => {
-  const newCumulative = newQuery.cumulative !== 'false'
+  const newCumulative = newQuery.cumulative === 'true' // daily is default
   const newBillingPeriod = newQuery.billingPeriod !== 'false'
 
   if (showCumulative.value !== newCumulative) {
@@ -341,34 +373,24 @@ if (main.dashboardFetched)
 <template>
   <!-- View Mode Selectors -->
   <div v-if="!noData && !isLoading" class="flex justify-end mb-4 space-x-4">
-    <!-- Cumulative vs Daily Switch -->
+    <!-- Daily vs Cumulative Switch -->
     <div class="flex items-center space-x-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
-      <div class="d-tooltip d-tooltip-bottom" :class="{ 'd-tooltip-disabled': useBillingPeriod }">
-        <div v-if="!useBillingPeriod" class="d-tooltip-content bg-white dark:bg-gray-800 text-gray-800 dark:text-white border border-gray-200 dark:border-gray-600 shadow-2xl rounded-lg p-3 max-w-xs">
-          <div class="text-sm">
-            {{ t('cumulative-not-available-last-30-days') }}
-          </div>
-        </div>
-        <button
-          class="px-3 py-1 text-xs font-medium rounded-md transition-colors first-letter:uppercase"
-          :class="[
-            showCumulative && useBillingPeriod
-              ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
-              : useBillingPeriod
-                ? 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-                : 'text-gray-400 dark:text-gray-600 cursor-not-allowed opacity-50'
-          ]"
-          :disabled="!useBillingPeriod"
-          @click="useBillingPeriod && (showCumulative = true)"
-        >
-          {{ t('cumulative') }}
-        </button>
-      </div>
       <button
         class="px-3 py-1 text-xs font-medium rounded-md transition-colors first-letter:uppercase" :class="[!showCumulative || !useBillingPeriod ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white']"
         @click="showCumulative = false"
       >
         {{ t('daily') }}
+      </button>
+      <button
+        class="px-3 py-1 text-xs font-medium rounded-md transition-colors first-letter:uppercase"
+        :class="[
+          showCumulative && useBillingPeriod
+            ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+            : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+        ]"
+        @click="handleCumulativeClick"
+      >
+        {{ t('cumulative') }}
       </button>
     </div>
 
@@ -431,21 +453,21 @@ if (main.dashboardFetched)
       <Spinner size="w-40 h-40" />
     </div>
     <MobileStats v-if="appId && showMobileStats" :use-billing-period="useBillingPeriod" class="col-span-full sm:col-span-6 xl:col-span-4" />
-    <BundleUploadsCard v-if="!isLoading && !appId && chartsLoaded.bundles" :use-billing-period="useBillingPeriod" class="col-span-full sm:col-span-6 xl:col-span-4" />
+    <BundleUploadsCard v-if="!isLoading && !appId && chartsLoaded.bundles" :use-billing-period="useBillingPeriod" :accumulated="useBillingPeriod && showCumulative" class="col-span-full sm:col-span-6 xl:col-span-4" />
     <div
       v-else-if="!appId"
       class="col-span-full h-[460px] flex flex-col items-center justify-center border border-slate-300 rounded-lg bg-white shadow-lg sm:col-span-6 xl:col-span-4 dark:border-slate-900 dark:bg-gray-800"
     >
       <Spinner size="w-40 h-40" />
     </div>
-    <UpdateStatsCard v-if="!isLoading && !appId && chartsLoaded.updates" :use-billing-period="useBillingPeriod" class="col-span-full sm:col-span-6 xl:col-span-4" />
+    <UpdateStatsCard v-if="!isLoading && !appId && chartsLoaded.updates" :use-billing-period="useBillingPeriod" :accumulated="useBillingPeriod && showCumulative" class="col-span-full sm:col-span-6 xl:col-span-4" />
     <div
       v-else-if="!appId"
       class="col-span-full h-[460px] flex flex-col items-center justify-center border border-slate-300 rounded-lg bg-white shadow-lg sm:col-span-6 xl:col-span-4 dark:border-slate-900 dark:bg-gray-800"
     >
       <Spinner size="w-40 h-40" />
     </div>
-    <DeploymentStatsCard v-if="!isLoading && !appId && chartsLoaded.deployments" :use-billing-period="useBillingPeriod" class="col-span-full sm:col-span-6 xl:col-span-4" />
+    <DeploymentStatsCard v-if="!isLoading && !appId && chartsLoaded.deployments" :use-billing-period="useBillingPeriod" :accumulated="useBillingPeriod && showCumulative" class="col-span-full sm:col-span-6 xl:col-span-4" />
     <div
       v-else-if="!appId"
       class="col-span-full h-[460px] flex flex-col items-center justify-center border border-slate-300 rounded-lg bg-white shadow-lg sm:col-span-6 xl:col-span-4 dark:border-slate-900 dark:bg-gray-800"

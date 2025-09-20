@@ -7,10 +7,13 @@ import {
   CategoryScale,
   Chart,
   LinearScale,
+  LineController,
+  LineElement,
+  PointElement,
   Tooltip,
 } from 'chart.js'
 import { computed } from 'vue'
-import { Bar } from 'vue-chartjs'
+import { Bar, Line } from 'vue-chartjs'
 import { getDaysInCurrentMonth } from '~/services/date'
 import { useOrganizationStore } from '~/stores/organization'
 import { createTooltipConfig, verticalLinePlugin } from '../services/chartTooltip'
@@ -23,6 +26,7 @@ const props = defineProps({
   dataByApp: { type: Object, default: () => ({}) },
   appNames: { type: Object, default: () => ({}) },
   useBillingPeriod: { type: Boolean, default: true },
+  accumulated: { type: Boolean, default: false },
 })
 
 const isDark = useDark()
@@ -34,6 +38,9 @@ Chart.register(
   Tooltip,
   BarController,
   BarElement,
+  LineController,
+  LineElement,
+  PointElement,
   CategoryScale,
   LinearScale,
 )
@@ -65,41 +72,75 @@ function monthdays() {
   return getDayNumbers(cycleStart, cycleEnd)
 }
 
-const chartData = computed<ChartData<'bar'>>(() => {
+// Helper function to accumulate data
+function accumulateData(data: number[]): number[] {
+  return data.reduce((acc: number[], val: number, i: number) => {
+    const last = acc[acc.length - 1] ?? 0
+    const newVal = last + (val ?? 0)
+    return acc.concat([newVal])
+  }, [])
+}
+
+const chartData = computed<ChartData<'bar' | 'line'>>(() => {
   // Always show breakdown by action type (install/fail/get)
   const actionTypes = ['install', 'fail', 'get']
-  const datasets = actionTypes.map((action) => {
+  const datasets = actionTypes.map((action, index) => {
     const actionData = props.dataByApp[action] as number[]
     const actionName = props.appNames[action] || action
 
     let backgroundColor: string
     let borderColor: string
+    let processedData: number[]
 
-    switch (action) {
-      case 'install':
-        backgroundColor = 'hsla(210, 50%, 70%, 0.8)'
-        borderColor = 'hsl(210, 50%, 55%)'
-        break
-      case 'fail':
-        backgroundColor = 'hsla(0, 50%, 70%, 0.8)'
-        borderColor = 'hsl(0, 50%, 55%)'
-        break
-      case 'get':
-        backgroundColor = 'hsla(120, 50%, 70%, 0.8)'
-        borderColor = 'hsl(120, 50%, 55%)'
-        break
-      default:
-        backgroundColor = 'hsla(210, 50%, 70%, 0.8)'
-        borderColor = 'hsl(210, 50%, 55%)'
+    // Process data for cumulative mode
+    const rawData = actionData || Array.from({ length: monthdays().length }).fill(0) as number[]
+    if (props.accumulated) {
+      processedData = accumulateData(rawData)
+      // Use LineChartStats color scheme for line mode
+      const hue = (210 + index * 137.508) % 360
+      const saturation = 50 + (index % 3) * 8
+      const lightness = 60 + (index % 4) * 5
+      borderColor = `hsl(${hue}, ${saturation + 15}%, ${lightness - 15}%)`
+      backgroundColor = `hsla(${hue}, ${saturation}%, ${lightness}%, 0.6)`
+    } else {
+      processedData = rawData
+      // Use existing bar chart colors for bar mode
+      switch (action) {
+        case 'install':
+          backgroundColor = 'hsla(210, 50%, 70%, 0.8)'
+          borderColor = 'hsl(210, 50%, 55%)'
+          break
+        case 'fail':
+          backgroundColor = 'hsla(0, 50%, 70%, 0.8)'
+          borderColor = 'hsl(0, 50%, 55%)'
+          break
+        case 'get':
+          backgroundColor = 'hsla(120, 50%, 70%, 0.8)'
+          borderColor = 'hsl(120, 50%, 55%)'
+          break
+        default:
+          backgroundColor = 'hsla(210, 50%, 70%, 0.8)'
+          borderColor = 'hsl(210, 50%, 55%)'
+      }
     }
 
-    return {
+    const baseDataset = {
       label: actionName,
-      data: actionData || Array.from({ length: monthdays().length }).fill(0) as number[],
+      data: processedData,
       backgroundColor,
       borderColor,
       borderWidth: 1,
     }
+
+    // Add line-specific properties for accumulated mode (match UsageCard styling)
+    return props.accumulated ? {
+      ...baseDataset,
+      fill: index === 0 ? 'origin' : '-1', // First fills from bottom, others fill from previous dataset
+      tension: 0.3,
+      pointRadius: 0,
+      pointBorderWidth: 0,
+      borderWidth: 1,
+    } : baseDataset
   })
 
   return {
@@ -108,12 +149,12 @@ const chartData = computed<ChartData<'bar'>>(() => {
   }
 })
 
-const chartOptions = computed<ChartOptions<'bar'>>(() => ({
+const chartOptions = computed<ChartOptions<'bar' | 'line'>>(() => ({
   maintainAspectRatio: false,
   scales: {
     y: {
       beginAtZero: true,
-      stacked: true,
+      stacked: !props.accumulated, // Only stack for bar charts
       ticks: {
         color: `${isDark.value ? 'white' : 'black'}`,
         stepSize: 1,
@@ -123,7 +164,7 @@ const chartOptions = computed<ChartOptions<'bar'>>(() => ({
       },
     },
     x: {
-      stacked: true,
+      stacked: !props.accumulated, // Only stack for bar charts
       ticks: {
         color: `${isDark.value ? 'white' : 'black'}`,
       },
@@ -154,6 +195,7 @@ const chartOptions = computed<ChartOptions<'bar'>>(() => ({
 
 <template>
   <div class="w-full h-full">
-    <Bar :data="chartData" :options="chartOptions" :plugins="[verticalLinePlugin]" />
+    <Line v-if="accumulated" :data="chartData as any" :options="chartOptions as any" :plugins="[verticalLinePlugin]" />
+    <Bar v-else :data="chartData as any" :options="chartOptions as any" :plugins="[verticalLinePlugin]" />
   </div>
 </template>

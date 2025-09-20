@@ -3,16 +3,19 @@ import type { ChartData, ChartOptions } from 'chart.js'
 import type { AnnotationOptions } from '../services/chartAnnotations'
 import { useDark } from '@vueuse/core'
 import {
+  BarController,
+  BarElement,
   CategoryScale,
   Chart,
   Filler,
   LinearScale,
+  LineController,
   LineElement,
   PointElement,
   Tooltip,
 } from 'chart.js'
 import { computed } from 'vue'
-import { Line } from 'vue-chartjs'
+import { Bar, Line } from 'vue-chartjs'
 import { useI18n } from 'vue-i18n'
 import { getCurrentDayMonth, getDaysInCurrentMonth } from '~/services/date'
 import { useOrganizationStore } from '~/stores/organization'
@@ -52,6 +55,9 @@ const viewMode = computed(() => props.accumulated ? 'cumulative' : 'daily')
 
 Chart.register(
   Tooltip,
+  BarController,
+  BarElement,
+  LineController,
   PointElement,
   CategoryScale,
   LinearScale,
@@ -234,7 +240,7 @@ function generateAppColors(appCount: number) {
   return colors
 }
 
-const chartData = computed<ChartData<'line'>>(() => {
+const chartData = computed<ChartData<'line' | 'bar'>>(() => {
   const appIds = Object.keys(props.datasByApp || {})
   const datasets = []
 
@@ -258,43 +264,85 @@ const chartData = computed<ChartData<'line'>>(() => {
           }, [])
         }
 
-        datasets.push({
+        let backgroundColor: string
+        let borderColor: string
+
+        if (props.accumulated) {
+          // Use existing line chart colors for line mode
+          backgroundColor = appColors[index].bg
+          borderColor = appColors[index].border
+        } else {
+          // Use existing bar chart colors for bar mode
+          const hue = (210 + index * 137.508) % 360
+          const saturation = 50 + (index % 3) * 8
+          const lightness = 60 + (index % 4) * 5
+          backgroundColor = `hsla(${hue}, ${saturation}%, ${lightness}%, 0.8)`
+          borderColor = backgroundColor.replace('hsla', 'hsl').replace(', 0.8)', ')').replace(/(\d+)%\)/, (_, lightness) => {
+            const newLightness = Math.max(Number(lightness) - 15, 30)
+            return `${newLightness}%)`
+          })
+        }
+
+        const baseDataset = {
           label: props.appNames[appId] || appId,
           data: processedData,
-          borderColor: appColors[index].border,
-          backgroundColor: appColors[index].bg,
+          borderColor,
+          backgroundColor,
+          borderWidth: 1,
+        }
+
+        // Add chart-type specific properties
+        const dataset = props.accumulated ? {
+          ...baseDataset,
           fill: index === 0 ? 'origin' : '-1', // First fills from bottom, others fill from previous dataset
           tension: 0.3,
           pointRadius: 0,
           pointBorderWidth: 0,
+        } : {
+          ...baseDataset,
           borderWidth: 1,
-        })
+        }
+
+        datasets.push(dataset)
       }
     })
   }
   else {
-    // Fallback to single dataset if no app data - no fill for single line
-    datasets.push({
+    // Fallback to single dataset if no app data
+    const mainDataset = {
       label: props.title,
       data: accumulateData.value,
       borderColor: props.colors[400],
       backgroundColor: props.colors[200],
+    }
+
+    // Add chart-type specific properties for main dataset
+    const dataset = props.accumulated ? {
+      ...mainDataset,
       fill: false, // No fill for single app line
       tension: 0.3,
       pointRadius: 2,
       pointBorderWidth: 0,
-    })
+    } : {
+      ...mainDataset,
+      borderWidth: 1,
+    }
 
-    datasets.push({
-      label: t('prediction'),
-      data: projectionData.value,
-      borderColor: 'transparent',
-      backgroundColor: props.colors[200],
-      fill: false, // No fill for prediction line either
-      tension: 0.9,
-      pointRadius: 2,
-      pointBorderWidth: 0,
-    })
+    datasets.push(dataset)
+
+    // Only add prediction for line charts (accumulated mode)
+    if (props.accumulated) {
+      datasets.push({
+        label: t('prediction'),
+        data: projectionData.value,
+        borderColor: 'transparent',
+        backgroundColor: props.colors[200],
+        fill: false, // No fill for prediction line either
+        tension: 0.9,
+        pointRadius: 2,
+        pointBorderWidth: 0,
+      })
+    }
   }
 
   return {
@@ -309,16 +357,18 @@ const chartOptions = computed<ChartOptions & { plugins: { inlineAnnotationPlugin
     maintainAspectRatio: false,
     scales: {
       y: {
-        stacked: hasAppData,
+        stacked: hasAppData && !props.accumulated, // Only stack for bar charts with multiple apps
         beginAtZero: true,
         ticks: {
           color: `${isDark.value ? 'white' : 'black'}`,
+          stepSize: !props.accumulated ? 1 : undefined, // Step size for bar charts
         },
         grid: {
           color: `${isDark.value ? '#424e5f' : '#bfc9d6'}`,
         },
       },
       x: {
+        stacked: hasAppData && !props.accumulated, // Only stack for bar charts with multiple apps
         ticks: {
           color: `${isDark.value ? 'white' : 'black'}`,
         },
@@ -353,5 +403,6 @@ const chartOptions = computed<ChartOptions & { plugins: { inlineAnnotationPlugin
 </script>
 
 <template>
-  <Line :data="chartData" height="auto" :options="(chartOptions as any)" :plugins="[inlineAnnotationPlugin, verticalLinePlugin]" />
+  <Line v-if="accumulated" :data="chartData as any" height="auto" :options="(chartOptions as any)" :plugins="[inlineAnnotationPlugin, verticalLinePlugin]" />
+  <Bar v-else :data="chartData as any" height="auto" :options="(chartOptions as any)" :plugins="[inlineAnnotationPlugin, verticalLinePlugin]" />
 </template>

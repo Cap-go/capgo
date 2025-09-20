@@ -15,6 +15,10 @@ const props = defineProps({
     type: Boolean,
     default: true,
   },
+  accumulated: {
+    type: Boolean,
+    default: false,
+  },
 })
 
 // Helper function to filter 30-day data to billing period
@@ -196,6 +200,11 @@ watch(() => props.useBillingPeriod, async () => {
   await calculateStats()
 })
 
+// Watch for accumulated mode changes and recalculate
+watch(() => props.accumulated, async () => {
+  await calculateStats()
+})
+
 onMounted(async () => {
   await calculateStats()
 })
@@ -293,6 +302,7 @@ onMounted(async () => {
         :colors="colors.blue"
         :data="deploymentData"
         :use-billing-period="useBillingPeriod"
+        :accumulated="accumulated"
         :data-by-app="deploymentDataByApp"
         :app-names="appNames"
       />

@@ -163,9 +163,21 @@ watchEffect(() => {
 
         <!-- New charts section -->
         <div class="grid grid-cols-1 sm:grid-cols-12 gap-6 mb-6 xl:grid-cols-12">
-          <BundleUploadsCard :use-billing-period="usageComponent?.useBillingPeriod ?? true" class="col-span-full sm:col-span-6 xl:col-span-4" />
-          <UpdateStatsCard :use-billing-period="usageComponent?.useBillingPeriod ?? true" class="col-span-full sm:col-span-6 xl:col-span-4" />
-          <DeploymentStatsCard :use-billing-period="usageComponent?.useBillingPeriod ?? true" class="col-span-full sm:col-span-6 xl:col-span-4" />
+          <BundleUploadsCard
+            :use-billing-period="usageComponent?.useBillingPeriod ?? true"
+            :accumulated="(usageComponent?.useBillingPeriod ?? true) && (usageComponent?.showCumulative ?? false)"
+            class="col-span-full sm:col-span-6 xl:col-span-4"
+          />
+          <UpdateStatsCard
+            :use-billing-period="usageComponent?.useBillingPeriod ?? true"
+            :accumulated="(usageComponent?.useBillingPeriod ?? true) && (usageComponent?.showCumulative ?? false)"
+            class="col-span-full sm:col-span-6 xl:col-span-4"
+          />
+          <DeploymentStatsCard
+            :use-billing-period="usageComponent?.useBillingPeriod ?? true"
+            :accumulated="(usageComponent?.useBillingPeriod ?? true) && (usageComponent?.showCumulative ?? false)"
+            class="col-span-full sm:col-span-6 xl:col-span-4"
+          />
         </div>
       </div>
 
