@@ -244,8 +244,10 @@ const filteredApps = computed(() => {
 </script>
 
 <template>
-  <div class="pb-14 md:pb-0 w-full block">
-    <div class="bg-white border rounded-lg shadow-lg col-span-full border-slate-300 xl:col-span-16 dark:border-slate-800 dark:bg-gray-800">
+  <div class="w-full block pb-14 md:pb-0">
+    <div
+      class="w-full col-span-full xl:col-span-16 border-none rounded-none bg-transparent shadow-none dark:bg-transparent md:rounded-lg md:border md:bg-white md:shadow-lg md:dark:border-slate-800 md:dark:bg-gray-800"
+    >
       <Table
         v-model:filters="filters"
         v-model:columns="columns"
