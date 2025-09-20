@@ -29,7 +29,7 @@ const main = useMainStore()
 const organizationStore = useOrganizationStore()
 
 // Create enriched apps with MAU data
-const appsWithMau = ref<(Database['public']['Tables']['apps']['Row'] & { mau: number })[]>([])
+const appsWithMau = ref<any[]>([])
 
 async function loadMauNumbers() {
   // Wait for dashboard data to be loaded
@@ -47,7 +47,7 @@ async function loadMauNumbers() {
   const daysInBillingCycle = Math.floor((currentDate.getTime() - billingStart.getTime()) / (1000 * 60 * 60 * 24)) + 1
 
   // Map apps with their MAU values from the dashboard
-  appsWithMau.value = props.apps.map((app) => {
+  appsWithMau.value = props.apps.map((app: any) => {
     // Get the app's dashboard data
     const appDashboard = main.dashboardByapp.filter(d => d.app_id === app.app_id)
 
@@ -188,8 +188,8 @@ const filteredApps = computed(() => {
   if (sortColumn) {
     const sorted = [...apps].sort((a, b) => {
       const key = sortColumn.key
-      let aVal = a[key]
-      let bVal = b[key]
+      let aVal: any = a[key]
+      let bVal: any = b[key]
 
       // Handle displayFunction if present
       if (sortColumn.displayFunction) {

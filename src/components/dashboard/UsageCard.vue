@@ -78,7 +78,7 @@ const total = computed(() => {
       // For each app, accumulate its daily values
       const appArrWithoutUndefined = appData.filter((val: any) => val !== undefined)
       let appAccumulated = 0
-      appArrWithoutUndefined.forEach(val => {
+      appArrWithoutUndefined.forEach((val: number) => {
         appAccumulated += val
       })
       // Add this app's accumulated total to the overall total
