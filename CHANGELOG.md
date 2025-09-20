@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.29.12 (2025-09-20)
+
+
+### Bug Fixes
+
+* add type annotations for array creation functions in chart optimizations ([fdd877b](https://github.com/Cap-go/capgo/commit/fdd877b975bc2101857f519142d85fcad06e2769))
+
 ### 12.29.11 (2025-09-20)
 
 
