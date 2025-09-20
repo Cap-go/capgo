@@ -167,19 +167,59 @@ async function openOneVersion(app: Database['public']['Tables']['apps']['Row']) 
 
 // Filter apps based on search term
 const filteredApps = computed(() => {
-  if (!search.value)
-    return appsWithMau.value
+  let apps = appsWithMau.value
 
-  const searchLower = search.value.toLowerCase()
-  return appsWithMau.value.filter((app) => {
-    // Search by name (primary)
-    const nameMatch = app.name?.toLowerCase().includes(searchLower)
+  // Apply search filter
+  if (search.value) {
+    const searchLower = search.value.toLowerCase()
+    apps = apps.filter((app) => {
+      // Search by name (primary)
+      const nameMatch = app.name?.toLowerCase().includes(searchLower)
 
-    // Search by app_id (bundle ID - bonus feature)
-    const bundleIdMatch = app.app_id.toLowerCase().includes(searchLower)
+      // Search by app_id (bundle ID - bonus feature)
+      const bundleIdMatch = app.app_id.toLowerCase().includes(searchLower)
 
-    return nameMatch || bundleIdMatch
-  })
+      return nameMatch || bundleIdMatch
+    })
+  }
+
+  // Apply sorting
+  const sortColumn = columns.value.find(col => col.sortable && typeof col.sortable === 'string')
+  if (sortColumn) {
+    const sorted = [...apps].sort((a, b) => {
+      const key = sortColumn.key
+      let aVal = a[key]
+      let bVal = b[key]
+
+      // Handle displayFunction if present
+      if (sortColumn.displayFunction) {
+        aVal = sortColumn.displayFunction(a)
+        bVal = sortColumn.displayFunction(b)
+      }
+
+      // Handle null/undefined values
+      if (aVal == null) aVal = ''
+      if (bVal == null) bVal = ''
+
+      // Numeric comparison for numbers
+      if (typeof aVal === 'number' && typeof bVal === 'number') {
+        return sortColumn.sortable === 'asc' ? aVal - bVal : bVal - aVal
+      }
+
+      // String comparison
+      const aStr = String(aVal).toLowerCase()
+      const bStr = String(bVal).toLowerCase()
+
+      if (sortColumn.sortable === 'asc') {
+        return aStr < bStr ? -1 : aStr > bStr ? 1 : 0
+      } else {
+        return aStr > bStr ? -1 : aStr < bStr ? 1 : 0
+      }
+    })
+    return sorted
+  }
+
+  return apps
 })
 </script>
 
