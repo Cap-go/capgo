@@ -6,7 +6,7 @@
  * Fast array initialization with undefined values
  */
 export function createUndefinedArray(length: number): (number | undefined)[] {
-  const arr = Array.from({ length })
+  const arr: (number | undefined)[] = Array.from({ length })
   // Don't fill with undefined - Array.from already does this
   return arr
 }
@@ -15,7 +15,7 @@ export function createUndefinedArray(length: number): (number | undefined)[] {
  * Fast array initialization with zero values
  */
 export function createZeroArray(length: number): number[] {
-  return Array.from({ length }).fill(0)
+  return Array.from({ length }).fill(0) as number[]
 }
 
 /**
@@ -42,7 +42,7 @@ export function initializeAppDataArrays(appIds: string[], length: number, fillVa
     const appId = appIds[i]
     result[appId] = fillValue === undefined
       ? createUndefinedArray(length)
-      : Array.from({ length }).fill(fillValue)
+      : Array.from({ length }).fill(fillValue) as (number | undefined)[]
   }
 
   return result
