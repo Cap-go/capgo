@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## 12.30.0 (2025-09-20)
+
+
+### Features
+
+* add noAccumulate option to getNormalStats for flexible data accumulation ([40696e8](https://github.com/Cap-go/capgo/commit/40696e857a6fd2dea123d9c014a82c21ef38a877))
+
 ### 12.29.12 (2025-09-20)
 
 
