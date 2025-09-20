@@ -1,6 +1,96 @@
 import type { Chart, TooltipItem as ChartTooltipItem, TooltipLabelStyle, TooltipModel } from 'chart.js'
 import { useDark } from '@vueuse/core'
 
+const registeredCharts = new Set<Chart>()
+const canvasListeners = new WeakMap<HTMLCanvasElement, {
+  mouseleave: EventListener
+  touchend: EventListener
+  touchcancel: EventListener
+}>()
+
+let globalDismissListener: ((event: Event) => void) | null = null
+
+function hideTooltip(chart: Chart) {
+  const tooltip = chart.tooltip
+  if (tooltip) {
+    tooltip.setActiveElements([], { x: 0, y: 0 })
+    chart.update('none')
+  }
+
+  const tooltipEl = chart.canvas.parentNode?.querySelector('.chartjs-tooltip') as HTMLElement | null
+  if (tooltipEl)
+    tooltipEl.style.opacity = '0'
+}
+
+function ensureCanvasListeners(chart: Chart) {
+  const canvas = chart.canvas
+  if (!canvas || canvasListeners.has(canvas))
+    return
+
+  const onMouseLeave: EventListener = () => hideTooltip(chart)
+  const onTouchEnd: EventListener = () => hideTooltip(chart)
+  const onTouchCancel: EventListener = () => hideTooltip(chart)
+
+  canvas.addEventListener('mouseleave', onMouseLeave)
+  canvas.addEventListener('touchend', onTouchEnd)
+  canvas.addEventListener('touchcancel', onTouchCancel)
+
+  canvasListeners.set(canvas, {
+    mouseleave: onMouseLeave,
+    touchend: onTouchEnd,
+    touchcancel: onTouchCancel,
+  })
+}
+
+function detachCanvasListeners(chart: Chart) {
+  const canvas = chart.canvas
+  if (!canvas)
+    return
+  const listeners = canvasListeners.get(canvas)
+  if (!listeners)
+    return
+
+  canvas.removeEventListener('mouseleave', listeners.mouseleave)
+  canvas.removeEventListener('touchend', listeners.touchend)
+  canvas.removeEventListener('touchcancel', listeners.touchcancel)
+  canvasListeners.delete(canvas)
+}
+
+function ensureGlobalDismissListener() {
+  if (typeof window === 'undefined' || globalDismissListener)
+    return
+
+  globalDismissListener = (event: Event) => {
+    const target = event.target as HTMLElement | null
+    if (!target)
+      return
+
+    if (target.closest('.chartjs-tooltip'))
+      return
+
+    for (const chart of registeredCharts) {
+      const canvas = chart.canvas
+      if (canvas && (canvas === target || canvas.contains(target)))
+        return
+    }
+
+    for (const chart of registeredCharts)
+      hideTooltip(chart)
+  }
+
+  document.addEventListener('touchstart', globalDismissListener)
+  document.addEventListener('click', globalDismissListener)
+}
+
+function removeGlobalDismissListener() {
+  if (typeof window === 'undefined' || !globalDismissListener)
+    return
+
+  document.removeEventListener('touchstart', globalDismissListener)
+  document.removeEventListener('click', globalDismissListener)
+  globalDismissListener = null
+}
+
 interface TooltipContext {
   chart: Chart
   tooltip: TooltipModel<'bar' | 'line'>
@@ -226,6 +316,33 @@ export const verticalLinePlugin = {
       // Restore context state
       ctx.restore()
     }
+  },
+}
+
+export const tooltipCleanupPlugin = {
+  id: 'tooltipCleanup',
+  beforeInit(chart: Chart) {
+    registeredCharts.add(chart)
+    ensureCanvasListeners(chart)
+    ensureGlobalDismissListener()
+  },
+  afterInit(chart: Chart) {
+    ensureCanvasListeners(chart)
+  },
+  afterEvent(chart: Chart, args: { event?: { type?: string } }) {
+    const eventType = args.event?.type
+    if (eventType === 'mouseout')
+      hideTooltip(chart)
+  },
+  beforeDestroy(chart: Chart) {
+    registeredCharts.delete(chart)
+    detachCanvasListeners(chart)
+    const tooltipEl = chart.canvas.parentNode?.querySelector('.chartjs-tooltip') as HTMLElement | null
+    if (tooltipEl)
+      tooltipEl.remove()
+
+    if (registeredCharts.size === 0)
+      removeGlobalDismissListener()
   },
 }
 

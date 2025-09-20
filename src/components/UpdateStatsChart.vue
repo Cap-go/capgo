@@ -16,7 +16,7 @@ import { computed } from 'vue'
 import { Bar, Line } from 'vue-chartjs'
 import { getDaysInCurrentMonth } from '~/services/date'
 import { useOrganizationStore } from '~/stores/organization'
-import { createTooltipConfig, verticalLinePlugin } from '../services/chartTooltip'
+import { createTooltipConfig, tooltipCleanupPlugin, verticalLinePlugin } from '../services/chartTooltip'
 
 const props = defineProps({
   title: { type: String, default: '' },
@@ -201,7 +201,17 @@ const chartOptions = computed<ChartOptions<'bar' | 'line'>>(() => ({
 
 <template>
   <div class="w-full h-full">
-    <Line v-if="accumulated" :data="chartData as any" :options="chartOptions as any" :plugins="[verticalLinePlugin]" />
-    <Bar v-else :data="chartData as any" :options="chartOptions as any" :plugins="[verticalLinePlugin]" />
+    <Line
+      v-if="accumulated"
+      :data="chartData as any"
+      :options="chartOptions as any"
+      :plugins="[verticalLinePlugin, tooltipCleanupPlugin]"
+    />
+    <Bar
+      v-else
+      :data="chartData as any"
+      :options="chartOptions as any"
+      :plugins="[verticalLinePlugin, tooltipCleanupPlugin]"
+    />
   </div>
 </template>

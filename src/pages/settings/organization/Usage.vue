@@ -195,19 +195,19 @@ function nextRunDate() {
     <div v-if="!isLoading" class="w-full h-full bg-white max-h-fit dark:bg-gray-800">
       <div class="px-4 pt-6 mx-auto max-w-7xl lg:px-8 sm:px-6">
         <div class="sm:align-center sm:flex sm:flex-col">
-          <h1 class="flex mx-auto text-5xl font-extrabold text-gray-900 dark:text-white items-center justify-center">
+          <h1 class="flex mx-auto text-3xl sm:text-5xl font-extrabold text-gray-900 dark:text-white items-center justify-center text-center">
             {{ t('usage') }}
           </h1>
           <!-- Last Update Info & Billing Cycle -->
           <div class="mt-4 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-            <div class="flex items-center justify-between">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <!-- Last Update Info -->
-              <div class="flex items-center space-x-4 text-sm text-gray-600 dark:text-gray-400">
+              <div class="flex flex-col gap-2 text-sm text-gray-600 dark:text-gray-400 sm:flex-row sm:items-center sm:gap-4">
                 <div class="flex items-center space-x-2">
                   <div class="w-2 h-2 bg-green-500 rounded-full" />
                   <span>{{ lastRunDate() }}</span>
                 </div>
-                <div class="w-px h-4 bg-gray-300 dark:bg-gray-600" />
+                <div class="hidden h-4 w-px bg-gray-300 dark:bg-gray-600 sm:block" />
                 <div class="flex items-center space-x-2">
                   <div class="w-2 h-2 bg-blue-500 rounded-full" />
                   <span>{{ nextRunDate() }}</span>
@@ -215,33 +215,36 @@ function nextRunDate() {
               </div>
 
               <!-- Billing Cycle Info -->
-              <div class="flex items-center text-sm font-semibold text-blue-800 dark:text-blue-200">
-                <span class="mr-2 text-gray-600 dark:text-gray-400">{{ t('billing-cycle') }}:</span>
+              <div class="flex flex-wrap items-center gap-1 text-sm font-semibold text-blue-800 dark:text-blue-200 sm:justify-end">
+                <span class="text-gray-600 dark:text-gray-400">{{ t('billing-cycle') }}:</span>
                 <span>{{ planUsage?.cycle.subscription_anchor_start }}</span>
-                <span class="mx-2">{{ t('to') }}</span>
+                <span class="mx-1 sm:mx-2">{{ t('to') }}</span>
                 <span>{{ planUsage?.cycle.subscription_anchor_end }}</span>
               </div>
             </div>
           </div>
 
           <!-- Plan Information Section -->
-          <div class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
             <!-- Current Plan -->
-            <div class="bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+            <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900 sm:p-5">
               <div class="text-sm text-gray-600 dark:text-gray-400 mb-1">
                 {{ t('Current') }}
               </div>
               <div class="text-lg font-semibold text-gray-900 dark:text-white">
                 {{ currentPlan?.name || t('loading') }}
               </div>
-              <div v-if="currentPlan" class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+              <div v-if="currentPlan" class="mt-1 text-sm text-gray-500 dark:text-gray-400">
                 ${{ currentPlan.price_m }}/{{ t('mo') }}
               </div>
             </div>
 
             <!-- Best Plan with Upgrade Button -->
-            <div class="bg-gray-50 dark:bg-gray-900 rounded-lg border p-4" :class="shouldShowUpgrade ? 'border-blue-500 border-2 shadow-lg ring-2 ring-blue-500/20' : 'border-gray-200 dark:border-gray-700'">
-              <div class="flex items-center justify-between mb-1">
+            <div
+              class="flex flex-col gap-3 rounded-lg border bg-gray-50 p-4 dark:bg-gray-900 sm:p-5"
+              :class="shouldShowUpgrade ? 'border-2 border-blue-500 shadow-lg ring-2 ring-blue-500/20 dark:border-blue-400/80' : 'border-gray-200 dark:border-gray-700'"
+            >
+              <div class="flex flex-wrap items-center justify-between gap-2">
                 <div class="text-sm text-gray-600 dark:text-gray-400">
                   {{ t('best-plan') }}
                 </div>
@@ -252,13 +255,13 @@ function nextRunDate() {
               <div class="text-lg font-semibold text-gray-900 dark:text-white">
                 {{ currentPlanSuggest?.name || t('loading') }}
               </div>
-              <div v-if="currentPlanSuggest" class="mt-2">
-                <div class="text-sm text-gray-500 dark:text-gray-400 mb-3">
+              <div v-if="currentPlanSuggest" class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div class="text-sm text-gray-500 dark:text-gray-400">
                   ${{ currentPlanSuggest.price_m }}/{{ t('mo') }}
                 </div>
                 <button
                   v-if="shouldShowUpgrade"
-                  class="w-full py-3 px-4 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold rounded-lg transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
+                  class="w-full rounded-lg bg-gradient-to-r from-blue-600 to-blue-700 px-4 py-2.5 text-sm font-semibold text-white transition-all duration-200 shadow-md hover:-translate-y-0.5 hover:from-blue-700 hover:to-blue-800 hover:shadow-lg sm:w-auto"
                   @click="goToPlans"
                 >
                   🚀 {{ t('plan-upgrade-v2') }}
