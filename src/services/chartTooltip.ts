@@ -15,8 +15,10 @@ interface ProcessedTooltipItem {
 /**
  * Creates a custom Chart.js tooltip with smart positioning and scrollable content
  * @param context Chart.js tooltip context
+ * @param isAccumulated Whether the chart is in accumulated mode
+ * @param hasMultipleDatasets Whether the chart has multiple datasets (apps)
  */
-export function createCustomTooltip(context: TooltipContext) {
+export function createCustomTooltip(context: TooltipContext, isAccumulated: boolean = false, hasMultipleDatasets: boolean = true) {
   const { chart, tooltip } = context
   const { canvas } = chart
   const isDark = useDark()
@@ -60,7 +62,8 @@ export function createCustomTooltip(context: TooltipContext) {
     // Create an array of items with their values, colors, and labels
     const items: ProcessedTooltipItem[] = bodyLines.map((body: string[], i: number) => {
       // Extract the numeric value from the label (format: "value - Label")
-      const match = body[0]?.match(/^(\d+(?:\.\d+)?)/)
+      const bodyText = body[0] || ''
+      const match = bodyText.match(/^(\d+(?:\.\d+)?)/)
       const value = match ? Number.parseFloat(match[1]) : 0
 
       return {
@@ -73,8 +76,31 @@ export function createCustomTooltip(context: TooltipContext) {
     // Sort by value in descending order (highest to lowest)
     items.sort((a, b) => b.value - a.value)
 
-    // Calculate total value
-    const totalValue = items.reduce((sum, item) => sum + item.value, 0)
+    // Calculate total value based on mode - matching UsageCard logic
+    let totalValue: number
+    const isSingleApp = !hasMultipleDatasets
+
+    if (isSingleApp) {
+      if (isAccumulated) {
+        // Single app cumulative mode: for the tooltip at a specific point,
+        // we show the accumulated value at that point (which is already calculated in the data)
+        const cumulativeValues = tooltip.dataPoints?.map((point: any) => point.parsed.y) || []
+        totalValue = cumulativeValues.length > 0 ? cumulativeValues[0] : 0
+      } else {
+        // Single app daily mode: show the raw daily value
+        totalValue = items.reduce((sum, item) => sum + item.value, 0)
+      }
+    } else {
+      // Multi-app view
+      if (isAccumulated) {
+        // Multi-app cumulative mode: sum all accumulated values from all apps
+        const cumulativeValues = tooltip.dataPoints?.map((point: any) => point.parsed.y) || []
+        totalValue = cumulativeValues.reduce((sum: number, val: number) => sum + (isNaN(val) ? 0 : val), 0)
+      } else {
+        // Multi-app daily mode: sum all daily values from different apps
+        totalValue = items.reduce((sum, item) => sum + item.value, 0)
+      }
+    }
 
     const titleColor = isDark.value ? '#e5e7eb' : '#374151'
     const totalColor = isDark.value ? '#60a5fa' : '#2563eb'
@@ -98,7 +124,8 @@ export function createCustomTooltip(context: TooltipContext) {
       const borderColor = typeof item.colors.borderColor === 'string' ? item.colors.borderColor : '#999'
 
       const colorIndicator = `<div style="width: 12px; height: 12px; background-color: ${bgColor}; border: 1px solid ${borderColor}; border-radius: 2px; margin-right: 8px; flex-shrink: 0;"></div>`
-      const textContent = `<span style="font-size: 11px;">${item.body}</span>`
+      // Join multiple lines if they exist (for accumulated mode with daily + cumulative)
+      const textContent = `<span style="font-size: 11px;">${item.body.join(' ')}</span>`
 
       innerHtml += `<div style="display: flex; align-items: center; margin-bottom: 4px;">${colorIndicator}${textContent}</div>`
     })
@@ -202,14 +229,15 @@ export const verticalLinePlugin = {
 /**
  * Creates tooltip configuration for Chart.js options
  * @param hasMultipleDatasets Whether the chart has multiple datasets (apps)
+ * @param isAccumulated Whether the chart is in accumulated/cumulative mode
  * @returns Chart.js tooltip configuration object
  */
-export function createTooltipConfig(hasMultipleDatasets: boolean) {
+export function createTooltipConfig(hasMultipleDatasets: boolean, isAccumulated: boolean = false) {
   return {
     mode: 'index' as const,
     intersect: false,
     position: 'nearest' as const,
-    external: hasMultipleDatasets ? createCustomTooltip : undefined,
+    external: hasMultipleDatasets ? (context: TooltipContext) => createCustomTooltip(context, isAccumulated, hasMultipleDatasets) : undefined,
     enabled: !hasMultipleDatasets, // Disable default tooltip when using custom
     callbacks: {
       title(tooltipItems: ChartTooltipItem<any>[]) {
@@ -218,11 +246,25 @@ export function createTooltipConfig(hasMultipleDatasets: boolean) {
         return `Day ${day}`
       },
       label(context: ChartTooltipItem<any>) {
-        if (hasMultipleDatasets) {
+        if (isAccumulated && !hasMultipleDatasets) {
+          // For single dataset in accumulated mode, show total
+          return `Total: ${context.parsed.y}`
+        } else if (hasMultipleDatasets) {
           // Format as "value - label" for better readability
           return `${context.parsed.y} - ${context.dataset.label}`
         }
-        // For single dataset, use default formatting
+        // For single dataset in daily mode, use default formatting
+        return undefined
+      },
+      afterLabel(context: ChartTooltipItem<any>) {
+        // In accumulated mode, show the daily value in parentheses
+        if (isAccumulated && context.parsed.y > 0) {
+          const dataIndex = context.dataIndex
+          const currentValue = context.parsed.y
+          const previousValue = dataIndex > 0 ? context.dataset.data[dataIndex - 1] : 0
+          const dailyValue = currentValue - previousValue
+          return dailyValue > 0 ? `(+${dailyValue} today)` : undefined
+        }
         return undefined
       },
     },

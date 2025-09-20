@@ -206,7 +206,7 @@ const chartOptions = computed<ChartOptions<'bar' | 'line'>>(() => ({
   scales: {
     y: {
       beginAtZero: true,
-      stacked: !props.accumulated, // Only stack for bar charts
+      stacked: true, // Always stack when there are multiple datasets
       ticks: {
         color: `${isDark.value ? 'white' : 'black'}`,
         // Remove stepSize to let Chart.js auto-calculate optimal steps
@@ -216,7 +216,7 @@ const chartOptions = computed<ChartOptions<'bar' | 'line'>>(() => ({
       },
     },
     x: {
-      stacked: !props.accumulated, // Only stack for bar charts
+      stacked: true, // Always stack when there are multiple datasets
       ticks: {
         color: `${isDark.value ? 'white' : 'black'}`,
       },
@@ -240,7 +240,7 @@ const chartOptions = computed<ChartOptions<'bar' | 'line'>>(() => ({
     title: {
       display: false,
     },
-    tooltip: createTooltipConfig(Object.keys(props.dataByApp).length > 0),
+    tooltip: createTooltipConfig(Object.keys(props.dataByApp).length > 0, props.accumulated),
   },
 }))
 

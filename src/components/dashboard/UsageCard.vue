@@ -43,11 +43,8 @@ const main = useMainStore()
 const organizationStore = useOrganizationStore()
 const subscription_anchor_start = dayjs(organizationStore.currentOrganization?.subscription_start).format('YYYY/MM/D')
 const subscription_anchor_end = dayjs(organizationStore.currentOrganization?.subscription_end).format('YYYY/MM/D')
-function sum(arr: number[]) {
-  return arr.reduce((a, b) => a + b, 0)
-}
+
 const total = computed(() => {
-  // remove undefined values
   const arr = props.datas as number[]
   const arrWithoutUndefined = arr.filter((val: any) => val !== undefined)
 
@@ -55,10 +52,38 @@ const total = computed(() => {
     return 0
   }
 
-  if (!props.accumulated) {
+  // Check if we're in single app view (no datasByApp or empty)
+  const isSingleApp = !props.datasByApp || Object.keys(props.datasByApp).length === 0
+
+  if (isSingleApp) {
+    if (props.accumulated) {
+      // Single app cumulative mode: accumulate values like LineChartStats does
+      let accumulatedValue = 0
+      arrWithoutUndefined.forEach(val => {
+        accumulatedValue += val
+      })
+      return accumulatedValue
+    } else {
+      // Single app daily mode: last raw daily value
+      return arrWithoutUndefined[arrWithoutUndefined.length - 1] ?? 0
+    }
+  }
+
+  // Multi-app view
+  if (!props.accumulated && props.datasByApp) {
+    // Multi-app daily mode: sum the last values from all apps
+    let dailySum = 0
+    Object.values(props.datasByApp).forEach((appData: any) => {
+      const appArrWithoutUndefined = appData.filter((val: any) => val !== undefined)
+      if (appArrWithoutUndefined.length > 0) {
+        dailySum += appArrWithoutUndefined[appArrWithoutUndefined.length - 1] ?? 0
+      }
+    })
+    return dailySum
+  } else {
+    // Multi-app cumulative mode: use the last value from aggregated data
     return arrWithoutUndefined[arrWithoutUndefined.length - 1] ?? 0
   }
-  return sum(arrWithoutUndefined)
 })
 
 const lastDayEvolution = computed(() => {
@@ -69,21 +94,14 @@ const lastDayEvolution = computed(() => {
     return 0
   }
 
-  const oldTotal = props.accumulated ? sum(arrWithoutUndefined.slice(0, -2)) : arrWithoutUndefined[arrWithoutUndefined.length - 2] ?? 0
-  const diff = (total.value as number) - oldTotal
+  const lastValue = arrWithoutUndefined[arrWithoutUndefined.length - 1] ?? 0
+  const previousValue = arrWithoutUndefined[arrWithoutUndefined.length - 2] ?? 0
 
-  // Prevent division by zero
-  if (oldTotal === 0 && diff === 0) {
-    return 0
+  if (previousValue === 0) {
+    return lastValue > 0 ? 100 : 0
   }
 
-  const denominator = arr.length > 2 ? oldTotal : diff
-  // Prevent division by zero
-  if (denominator === 0) {
-    return diff > 0 ? 100 : -100
-  }
-
-  return diff / denominator * 100
+  return ((lastValue - previousValue) / previousValue) * 100
 })
 </script>
 

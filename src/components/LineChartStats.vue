@@ -357,7 +357,7 @@ const chartOptions = computed<ChartOptions & { plugins: { inlineAnnotationPlugin
     maintainAspectRatio: false,
     scales: {
       y: {
-        stacked: hasAppData && !props.accumulated, // Only stack for bar charts with multiple apps
+        stacked: hasAppData, // Stack when there are multiple apps
         beginAtZero: true,
         ticks: {
           color: `${isDark.value ? 'white' : 'black'}`,
@@ -368,7 +368,7 @@ const chartOptions = computed<ChartOptions & { plugins: { inlineAnnotationPlugin
         },
       },
       x: {
-        stacked: hasAppData && !props.accumulated, // Only stack for bar charts with multiple apps
+        stacked: hasAppData, // Stack when there are multiple apps
         ticks: {
           color: `${isDark.value ? 'white' : 'black'}`,
         },
@@ -393,7 +393,7 @@ const chartOptions = computed<ChartOptions & { plugins: { inlineAnnotationPlugin
       title: {
         display: false,
       },
-      tooltip: createTooltipConfig(hasAppData),
+      tooltip: createTooltipConfig(hasAppData, props.accumulated),
       filler: {
         propagate: false,
       },
