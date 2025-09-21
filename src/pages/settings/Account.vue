@@ -674,10 +674,22 @@ onMounted(async () => {
       </FormKit>
     </div>
 
-    <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('enable-2FA')" to="#dialog-v2-content" defer>
+    <Teleport
+      v-if="
+        dialogStore.showDialog &&
+        (dialogStore.dialogOptions?.title === t('enable-2FA') ||
+          dialogStore.dialogOptions?.title === t('verify-2FA'))
+      "
+      to="#dialog-v2-content"
+      defer
+    >
       <!-- QR Code display for MFA setup -->
       <div v-if="mfaQRCode" class="w-full text-center">
-        <img :src="mfaQRCode" alt="QR Code for 2FA setup" class="mx-auto mb-4">
+        <img
+          :src="mfaQRCode"
+          alt="QR Code for 2FA setup"
+          class="mx-auto mb-4"
+        />
       </div>
 
       <!-- MFA verification code input -->
