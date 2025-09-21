@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.32.3 (2025-09-21)
+
+
+### Bug Fixes
+
+* wrangler API deploy command for prod ([c0fea70](https://github.com/Cap-go/capgo/commit/c0fea7071a51a9f862e8e4a45ca9959827d79f21))
+
 ### 12.32.2 (2025-09-20)
 
 ### 12.32.1 (2025-09-20)
