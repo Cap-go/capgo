@@ -168,6 +168,7 @@
     "posthog-js": "^1.262.0",
     "semver": "^7.7.2",
     "stripe": "^18.5.0",
+    "supabase": "^2.40.7",
     "tailwind-capacitor": "1.0.9",
     "vite-plugin-devtools-json": "^1.0.0",
     "vue": "3.5.21",
