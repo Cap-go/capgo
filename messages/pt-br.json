@@ -657,7 +657,7 @@
   "storage-limit-exceeded": "limite de armazenamento excedido",
   "storage-updates-stopped-upgrade-required": "Você atingiu seu limite de armazenamento. Os uploads foram bloqueados. Por favor, faça um upgrade para restaurar o serviço.",
   "storage-usage": "Uso de armazenamento:",
-  "storage-warning": "O sistema de armazenamento mudou recentemente e agora esta uva está mostrando armazenamento por hora em vez dos dados anteriores",
+  "storage-warning": "O sistema de armazenamento mudou recentemente e agora este gráfico está mostrando armazenamento por hora em vez dos dados anteriores",
   "stored-externally": "armazenado externamente",
   "stripe-billing-portal-will-be-opened-in-a-new-tab": "O portal de faturamento do Stripe será aberto em uma nova aba",
   "subscription-required": "assinatura necessária",

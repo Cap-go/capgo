@@ -657,7 +657,7 @@
   "storage-limit-exceeded": "存储限制已超过",
   "storage-updates-stopped-upgrade-required": "您已达到存储限制。上传已被阻止。请升级以恢复服务。",
   "storage-usage": "存储使用情况：",
-  "storage-warning": "存储系统最近发生了变化，现在此抓地力显示每小时存储，而不是先前的数据",
+  "storage-warning": "存储系统最近发生了变化，现在此图显示了每小时存储的信息，而不是先前的数据",
   "stored-externally": "外部存储",
   "stripe-billing-portal-will-be-opened-in-a-new-tab": "Stripe 计费门户将在新选项卡中打开",
   "subscription-required": "需要订阅",

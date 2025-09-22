@@ -657,7 +657,7 @@
   "storage-limit-exceeded": "batas penyimpanan telah terlampaui",
   "storage-updates-stopped-upgrade-required": "Anda telah mencapai batas penyimpanan. Unggahan telah diblokir. Silakan tingkatkan untuk mengembalikan layanan.",
   "storage-usage": "Penggunaan penyimpanan:",
-  "storage-warning": "Sistem penyimpanan baru -baru ini berubah dan sekarang grap ini menunjukkan penyimpanan per jam, bukan data sebelumnya",
+  "storage-warning": "Sistem penyimpanan baru -baru ini berubah dan sekarang grafik ini menunjukkan penyimpanan per jam, bukan data sebelumnya",
   "stored-externally": "disimpan secara eksternal",
   "stripe-billing-portal-will-be-opened-in-a-new-tab": "Portal penagihan Stripe akan dibuka di tab baru",
   "subscription-required": "diperlukan langganan",

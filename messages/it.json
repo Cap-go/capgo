@@ -657,7 +657,7 @@
   "storage-limit-exceeded": "limite di archiviazione superato",
   "storage-updates-stopped-upgrade-required": "Hai raggiunto il limite di archiviazione. I caricamenti sono stati bloccati. Si prega di aggiornare per ripristinare il servizio.",
   "storage-usage": "Utilizzo dello spazio di archiviazione:",
-  "storage-warning": "Il sistema di archiviazione è recentemente cambiato e ora questo GRAP mostra l'archiviazione all'ora anziché i dati precedenti",
+  "storage-warning": "Il sistema di archiviazione è recentemente cambiato e ora questo grafico mostra l'archiviazione all'ora anziché i dati precedenti",
   "stored-externally": "archiviato esternamente",
   "stripe-billing-portal-will-be-opened-in-a-new-tab": "Il portale di fatturazione Stripe verrà aperto in una nuova scheda",
   "subscription-required": "abbonamento richiesto",

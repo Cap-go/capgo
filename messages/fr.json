@@ -657,7 +657,7 @@
   "storage-limit-exceeded": "limite de stockage dépassée",
   "storage-updates-stopped-upgrade-required": "Vous avez atteint votre limite de stockage. Les téléchargements ont été bloqués. Veuillez mettre à niveau pour restaurer le service.",
   "storage-usage": "Utilisation du stockage:",
-  "storage-warning": "Le système de stockage a récemment changé et maintenant ce raisin affiche un stockage par heure au lieu des données précédentes",
+  "storage-warning": "Le système de stockage a récemment changé et maintenant ce graphique affiche un stockage par heure au lieu des données précédentes",
   "stored-externally": "stocké à l'extérieur",
   "stripe-billing-portal-will-be-opened-in-a-new-tab": "Le portail de facturation Stripe sera ouvert dans un nouvel onglet",
   "subscription-required": "abonnement requis",
