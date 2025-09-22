@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.32.7 (2025-09-22)
+
+
+### Bug Fixes
+
+* redirect to new dashboard page after login ([0517d69](https://github.com/Cap-go/capgo/commit/0517d693abf12ae18748cbbf594f648bfac692f6))
+
 ### 12.32.6 (2025-09-22)
 
 ### 12.32.5 (2025-09-21)
