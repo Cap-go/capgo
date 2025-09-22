@@ -39,7 +39,7 @@ async function nextLogin() {
     router.push(route.query.to)
   }
   else {
-    router.push('/app')
+    router.push('dashboard')
   }
   setTimeout(async () => {
     isLoading.value = false
