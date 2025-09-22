@@ -15,6 +15,8 @@
     "sync": "cap sync",
     "sync:ios": "cap sync ios",
     "sync:android": "cap sync android",
+    "dev": "vite",
+    "dev:local": "ENV=local vite",
     "serve": "vite",
     "serve:dev": "ENV=local vite",
     "backend": "supabase start && supabase functions serve",
