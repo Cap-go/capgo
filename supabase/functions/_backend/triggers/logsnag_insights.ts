@@ -158,6 +158,10 @@ app.post('/', middlewareAPISecret, async (c) => {
     updates_last_month,
     devices_last_month,
     success_rate,
+    plan_solo: plans.Solo,
+    plan_maker: plans.Maker,
+    plan_team: plans.Team,
+    plan_payg: plans['Pay as you go'],
   }
   cloudlog({ requestId: c.get('requestId'), message: 'newData', newData })
   const { error } = await supabaseAdmin(c)

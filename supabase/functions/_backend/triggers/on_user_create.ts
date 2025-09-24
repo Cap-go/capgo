@@ -15,8 +15,6 @@ app.post('/', middlewareAPISecret, triggerValidator('users', 'INSERT'), async (c
   await createApiKey(c, record.id)
   cloudlog({ requestId: c.get('requestId'), message: 'createCustomer stripe' })
   await syncUserPreferenceTags(c, record.email, record)
-  if (record.customer_id)
-    return c.json(BRES)
   const LogSnag = logsnag(c)
   await LogSnag.track({
     channel: 'user-register',

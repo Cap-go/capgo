@@ -701,23 +701,6 @@ async function deleteBundle() {
               {{ version.min_update_version }}
             </InfoRow>
 
-            <!-- meta devices -->
-            <InfoRow v-if="version_meta?.devices" :label="t('devices')">
-              {{ version_meta.devices.toLocaleString() }}
-            </InfoRow>
-            <InfoRow
-              v-if="version_meta?.installs" :label="t('install')"
-            >
-              {{ version_meta.installs.toLocaleString() }}
-            </InfoRow>
-            <InfoRow
-              v-if="version_meta?.uninstalls" :label="t('uninstall')"
-            >
-              {{ version_meta.uninstalls.toLocaleString() }}
-            </InfoRow>
-            <InfoRow v-if="version_meta?.fails" :label="t('fail')">
-              {{ version_meta.fails.toLocaleString() }}
-            </InfoRow>
             <InfoRow v-if="channels && channels.length > 0 && version && channels.filter(c => c.version === version!.id).length > 0" :label="t('channel')">
               <div class="flex flex-wrap justify-end w-full gap-3">
                 <div v-for="chn in channels.filter(c => c.version === version!.id)" id="open-channel" :key="chn.id" class="flex items-center gap-2">

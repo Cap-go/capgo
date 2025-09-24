@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "13.0.4"
+    PostgrestVersion: "13.0.5"
   }
   public: {
     Tables: {
@@ -147,39 +147,27 @@ export type Database = {
           app_id: string
           checksum: string
           created_at: string | null
-          devices: number | null
-          fails: number | null
           id: number
-          installs: number | null
           owner_org: string
           size: number
-          uninstalls: number | null
           updated_at: string | null
         }
         Insert: {
           app_id: string
           checksum: string
           created_at?: string | null
-          devices?: number | null
-          fails?: number | null
           id?: number
-          installs?: number | null
           owner_org: string
           size: number
-          uninstalls?: number | null
           updated_at?: string | null
         }
         Update: {
           app_id?: string
           checksum?: string
           created_at?: string | null
-          devices?: number | null
-          fails?: number | null
           id?: number
-          installs?: number | null
           owner_org?: string
           size?: number
-          uninstalls?: number | null
           updated_at?: string | null
         }
         Relationships: [
@@ -736,6 +724,10 @@ export type Database = {
           paying: number | null
           paying_monthly: number | null
           paying_yearly: number | null
+          plan_maker: number | null
+          plan_payg: number | null
+          plan_solo: number | null
+          plan_team: number | null
           stars: number
           success_rate: number | null
           trial: number | null
@@ -757,6 +749,10 @@ export type Database = {
           paying?: number | null
           paying_monthly?: number | null
           paying_yearly?: number | null
+          plan_maker?: number | null
+          plan_payg?: number | null
+          plan_solo?: number | null
+          plan_team?: number | null
           stars: number
           success_rate?: number | null
           trial?: number | null
@@ -778,6 +774,10 @@ export type Database = {
           paying?: number | null
           paying_monthly?: number | null
           paying_yearly?: number | null
+          plan_maker?: number | null
+          plan_payg?: number | null
+          plan_solo?: number | null
+          plan_team?: number | null
           stars?: number
           success_rate?: number | null
           trial?: number | null
@@ -1248,10 +1248,8 @@ export type Database = {
       users: {
         Row: {
           ban_time: string | null
-          billing_email: string | null
           country: string | null
           created_at: string | null
-          customer_id: string | null
           email: string
           enable_notifications: boolean
           first_name: string | null
@@ -1263,10 +1261,8 @@ export type Database = {
         }
         Insert: {
           ban_time?: string | null
-          billing_email?: string | null
           country?: string | null
           created_at?: string | null
-          customer_id?: string | null
           email: string
           enable_notifications?: boolean
           first_name?: string | null
@@ -1278,10 +1274,8 @@ export type Database = {
         }
         Update: {
           ban_time?: string | null
-          billing_email?: string | null
           country?: string | null
           created_at?: string | null
-          customer_id?: string | null
           email?: string
           enable_notifications?: boolean
           first_name?: string | null
@@ -1291,15 +1285,7 @@ export type Database = {
           opt_for_newsletters?: boolean
           updated_at?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "users_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: true
-            referencedRelation: "stripe_info"
-            referencedColumns: ["customer_id"]
-          },
-        ]
+        Relationships: []
       }
       version_meta: {
         Row: {
