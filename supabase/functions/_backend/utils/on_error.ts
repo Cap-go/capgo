@@ -6,7 +6,6 @@ import { backgroundTask } from './utils.ts'
 
 export function onError(functionName: string) {
   return async (e: any, c: Context) => {
-    c.get('sentry')?.captureException(e)
     let body = 'N/A'
     try {
       const clonedReq = c.req.raw.clone()
@@ -61,6 +60,7 @@ export function onError(functionName: string) {
       if (e.status >= 500) {
         await backgroundTask(c, sendDiscordAlert500(c, functionName, body, e))
       }
+      c.get('sentry')?.captureException(e)
       return c.json(res, e.status)
     }
     // Non-HTTP errors: log with stack and return 500
@@ -74,6 +74,7 @@ export function onError(functionName: string) {
       stack: serializeError(e)?.stack ?? 'N/A',
     })
     await backgroundTask(c, sendDiscordAlert500(c, functionName, body, e))
+    c.get('sentry')?.captureException(e)
     return c.json(defaultResponse, 500)
   }
 }
