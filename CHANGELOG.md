@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.32.15 (2025-09-25)
+
+
+### Bug Fixes
+
+* sourcemaps generation ([ca70039](https://github.com/Cap-go/capgo/commit/ca70039a3b7571c1dfcacd9af5aec87ed5ab8b40))
+
 ### 12.32.14 (2025-09-24)
 
 ### 12.32.13 (2025-09-24)
