@@ -1,16 +1,16 @@
 import type { Context } from 'hono'
 import type { SimpleErrorResponse } from './hono.ts'
+import { DrizzleError, DrizzleQueryError, entityKind, TransactionRollbackError } from 'drizzle-orm'
 import { sendDiscordAlert500 } from './discord.ts'
 import { cloudlogErr, serializeError } from './loggin.ts'
 import { backgroundTask } from './utils.ts'
-import { DrizzleError, DrizzleQueryError, entityKind, TransactionRollbackError } from 'drizzle-orm'
 
 export function onError(functionName: string) {
   return async (e: any, c: Context) => {
     let body = 'N/A'
     try {
       const clonedReq = c.req.raw.clone()
-      body = await clonedReq.text().catch((failToReadBody) => `Failed to read body (${JSON.stringify(failToReadBody)})`)
+      body = await clonedReq.text().catch(failToReadBody => `Failed to read body (${JSON.stringify(failToReadBody)})`)
       if (body.length > 1000) {
         body = `${body.substring(0, 1000)}... (truncated)`
       }
@@ -29,15 +29,15 @@ export function onError(functionName: string) {
 
     const isHttpException = e && typeof e === 'object' && typeof e.status === 'number' && typeof e.getResponse === 'function'
     // DrizzleError detection: check for known Drizzle error classes or entityKind
-    const isDrizzleError =
-      e instanceof DrizzleError ||
-      e instanceof DrizzleQueryError ||
-      e instanceof TransactionRollbackError ||
-      (typeof e === 'object' && e !== null && typeof (e as any)[entityKind] === 'string' && (
-        (e as any)[entityKind] === 'DrizzleError' ||
-        (e as any)[entityKind] === 'DrizzleQueryError' ||
-        (e as any)[entityKind] === 'TransactionRollbackError'
-      ));
+    const isDrizzleError
+      = e instanceof DrizzleError
+        || e instanceof DrizzleQueryError
+        || e instanceof TransactionRollbackError
+        || (typeof e === 'object' && e !== null && typeof (e as any)[entityKind] === 'string' && (
+          (e as any)[entityKind] === 'DrizzleError'
+          || (e as any)[entityKind] === 'DrizzleQueryError'
+          || (e as any)[entityKind] === 'TransactionRollbackError'
+        ))
     if (isHttpException) {
       // Pull the JSON we attached to the HTTPException to improve logs and response
       let res: SimpleErrorResponse = defaultResponse
