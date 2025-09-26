@@ -9,7 +9,7 @@
     "prod": "sb_publishable_T8kEcJpf9PbGYLkArVCLHA_lAE0Hb0T",
     "preprod": "sb_publishable_T8kEcJpf9PbGYLkArVCLHA_lAE0Hb0T",
     "development": "sb_publishable_CIgFoPWiB_OSrlDdMnydnw_pSL-zvAe",
-    "local": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0"
+    "local": "sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH"
   },
   "supa_url": {
     "prod": "https://xvwzpoazmxkqosrdewyv.supabase.co",

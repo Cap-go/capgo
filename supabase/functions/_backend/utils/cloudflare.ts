@@ -123,7 +123,7 @@ export async function trackDevicesCF(c: Context, device: DeviceWithoutCreatedAt)
           comparableDevice.plugin_version,
           comparableDevice.os_version,
           comparableDevice.version_build,
-          comparableDevice.custom_id,
+          comparableDevice.custom_id ?? '',
           comparableDevice.is_prod ? 1 : 0,
           comparableDevice.is_emulator ? 1 : 0,
         )
