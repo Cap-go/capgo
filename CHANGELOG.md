@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.33.1 (2025-09-26)
+
+
+### Bug Fixes
+
+* device write issue ([5f57c17](https://github.com/Cap-go/capgo/commit/5f57c179350499373e610b570398977afbcccc2f))
+
 ## 12.33.0 (2025-09-25)
 
 
