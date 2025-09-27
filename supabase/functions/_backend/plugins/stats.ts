@@ -13,11 +13,6 @@ import { parsePluginBody } from '../utils/plugin_parser.ts'
 import { createStatsVersion, opnPremStats, sendStatsAndDevice } from '../utils/stats.ts'
 import { deviceIdRegex, INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, isLimited, MISSING_STRING_APP_ID, MISSING_STRING_DEVICE_ID, MISSING_STRING_PLATFORM, MISSING_STRING_VERSION_NAME, MISSING_STRING_VERSION_OS, NON_STRING_APP_ID, NON_STRING_DEVICE_ID, NON_STRING_PLATFORM, NON_STRING_VERSION_NAME, NON_STRING_VERSION_OS, reverseDomainRegex } from '../utils/utils.ts'
 
-const failActions = [
-  'set_fail',
-  'update_fail',
-  'download_fail',
-]
 z.config(z.locales.en())
 export const jsonRequestSchema = z.object({
   app_id: z.string({
@@ -116,7 +111,7 @@ async function post(c: Context, drizzleCient: ReturnType<typeof getDrizzleClient
       }
     }
   }
-  else if (failActions.includes(action)) {
+  else if (action.endsWith('_fail')) {
     await createStatsVersion(c, appVersion.id, app_id, 'fail')
     cloudlog({ requestId: c.get('requestId'), message: 'FAIL!' })
     await sendNotifOrg(c, 'user:update_fail', {
