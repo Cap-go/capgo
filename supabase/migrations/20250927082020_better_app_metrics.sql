@@ -89,7 +89,7 @@ BEGIN
     FROM metrics;
 
     INSERT INTO public.app_metrics_cache (org_id, start_date, end_date, response, cached_at)
-    VALUES (p_org_id, p_start_date, p_end_date, metrics_json, now())
+    VALUES (p_org_id, p_start_date, p_end_date, metrics_json, clock_timestamp())
     ON CONFLICT (org_id) DO UPDATE
         SET start_date = EXCLUDED.start_date,
             end_date = EXCLUDED.end_date,
@@ -138,7 +138,16 @@ CREATE OR REPLACE FUNCTION public.get_app_metrics(
 AS $function$
 DECLARE
     cache_entry public.app_metrics_cache%ROWTYPE;
+    org_exists boolean;
 BEGIN
+    SELECT EXISTS (
+        SELECT 1 FROM public.orgs WHERE id = p_org_id
+    ) INTO org_exists;
+
+    IF NOT org_exists THEN
+        RETURN;
+    END IF;
+
     SELECT *
     INTO cache_entry
     FROM public.app_metrics_cache
@@ -150,6 +159,10 @@ BEGIN
         OR cache_entry.cached_at IS NULL
         OR cache_entry.cached_at < (now() - interval '5 minutes') THEN
         cache_entry := public.seed_get_app_metrics_caches(p_org_id, p_start_date, p_end_date);
+    END IF;
+
+    IF cache_entry.response IS NULL THEN
+        RETURN;
     END IF;
 
     RETURN QUERY
