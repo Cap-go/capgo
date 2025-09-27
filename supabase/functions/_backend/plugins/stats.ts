@@ -2,6 +2,7 @@ import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import type { AppStats, DeviceWithoutCreatedAt, StatsActions } from '../utils/types.ts'
+import { greaterOrEqual, parse } from '@std/semver'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod/mini'
 import { BRES, getIsV2, parseBody, quickError, simpleError, simpleRateLimit } from '../utils/hono.ts'
@@ -112,14 +113,21 @@ async function post(c: Context, drizzleCient: ReturnType<typeof getDrizzleClient
     }
   }
   else if (action.endsWith('_fail')) {
-    await createStatsVersion(c, appVersion.id, app_id, 'fail')
-    cloudlog({ requestId: c.get('requestId'), message: 'FAIL!' })
-    await sendNotifOrg(c, 'user:update_fail', {
-      app_id,
-      device_id,
-      version_id: appVersion.id,
-      app_id_url: app_id,
-    }, appVersion.owner_org, app_id, '0 0 * * 1')
+    // Only exclude download_fail for plugin versions below 7.17.0 and 6.14.25 as the plugin where wrongly reporting it on these versions
+    const shouldCountDownloadFail = action !== 'download_fail'
+      || greaterOrEqual(parse(plugin_version), parse('7.17.0'))
+      || (plugin_version.startsWith('6.') && greaterOrEqual(parse(plugin_version), parse('6.14.25')))
+
+    if (shouldCountDownloadFail) {
+      await createStatsVersion(c, appVersion.id, app_id, 'fail')
+      cloudlog({ requestId: c.get('requestId'), message: 'FAIL!' })
+      await sendNotifOrg(c, 'user:update_fail', {
+        app_id,
+        device_id,
+        version_id: appVersion.id,
+        app_id_url: app_id,
+      }, appVersion.owner_org, app_id, '0 0 * * 1')
+    }
   }
   statsActions.push({ action } as unknown as StatsActions)
   await sendStatsAndDevice(c, device, statsActions)
@@ -137,7 +145,7 @@ app.post('/', async (c) => {
   const pgClient = isV2 ? null : getPgClient(c)
 
   const bodyParsed = parsePluginBody<AppStats>(c, body, jsonRequestSchema)
-  const res = await post(c, isV2 ? getDrizzleClientD1Session(c) : getDrizzleClient(pgClient as any), !!isV2, bodyParsed)
+  const res = await post(c, isV2 ? getDrizzleClientD1Session(c) : getDrizzleClient(pgClient!), !!isV2, bodyParsed)
   if (isV2 && pgClient)
     await closeClient(c, pgClient)
   return res
