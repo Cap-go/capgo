@@ -3,19 +3,21 @@ import type { SimpleErrorResponse } from './hono.ts'
 import { sendDiscordAlert500 } from './discord.ts'
 import { cloudlogErr, serializeError } from './loggin.ts'
 import { backgroundTask } from './utils.ts'
-import { DrizzleError, DrizzleQueryError, entityKind, TransactionRollbackError } from 'drizzle-orm'
+import { DrizzleError, TransactionRollbackError, entityKind } from 'drizzle-orm'
+
+const drizzleErrorNames = new Set(['DrizzleError', 'DrizzleQueryError', 'TransactionRollbackError'])
 
 export function onError(functionName: string) {
   return async (e: any, c: Context) => {
     let body = 'N/A'
     try {
-      const clonedReq = c.req.raw.clone()
-      body = await clonedReq.text().catch((failToReadBody) => `Failed to read body (${JSON.stringify(failToReadBody)})`)
+      body = await c.req.json().then(body => JSON.stringify(body)).catch((failToReadBody) => `Failed to read body (${JSON.stringify(failToReadBody)})`)
       if (body.length > 1000) {
         body = `${body.substring(0, 1000)}... (truncated)`
       }
     }
     catch (failToReadBody) {
+      cloudlogErr({ requestId: c.get('requestId'), message: 'failToReadBody', failToReadBody })
       body = `Failed to read body (${JSON.stringify(failToReadBody)})`
     }
 
@@ -31,13 +33,13 @@ export function onError(functionName: string) {
     // DrizzleError detection: check for known Drizzle error classes or entityKind
     const isDrizzleError =
       e instanceof DrizzleError ||
-      e instanceof DrizzleQueryError ||
       e instanceof TransactionRollbackError ||
-      (typeof e === 'object' && e !== null && typeof (e as any)[entityKind] === 'string' && (
-        (e as any)[entityKind] === 'DrizzleError' ||
-        (e as any)[entityKind] === 'DrizzleQueryError' ||
-        (e as any)[entityKind] === 'TransactionRollbackError'
-      ));
+      (typeof e === 'object' && e !== null && ((
+        typeof (e as any)[entityKind] === 'string' && drizzleErrorNames.has((e as any)[entityKind])
+      ) || (
+          typeof (e as any).name === 'string' && drizzleErrorNames.has((e as any).name)
+        )))
+
     if (isHttpException) {
       // Pull the JSON we attached to the HTTPException to improve logs and response
       let res: SimpleErrorResponse = defaultResponse
