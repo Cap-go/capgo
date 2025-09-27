@@ -1,5 +1,6 @@
 import type { Context } from 'hono'
 import type { SimpleErrorResponse } from './hono.ts'
+import { DrizzleError, DrizzleQueryError, entityKind, TransactionRollbackError } from 'drizzle-orm'
 import { sendDiscordAlert500 } from './discord.ts'
 import { cloudlogErr, serializeError } from './loggin.ts'
 import { backgroundTask } from './utils.ts'
