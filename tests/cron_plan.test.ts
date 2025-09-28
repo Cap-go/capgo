@@ -100,6 +100,12 @@ beforeEach(async () => {
     .update({ bandwidth: 0 })
     .eq('app_id', APPNAME)
   expect(bandwidthError).toBeFalsy()
+
+  const { error: appMetricsCacheError } = await supabase
+    .from('app_metrics_cache')
+    .delete()
+    .eq('org_id', ORG_ID)
+  expect(appMetricsCacheError).toBeFalsy()
 })
 afterAll(async () => {
   await resetAppData(APPNAME)
@@ -381,6 +387,13 @@ describe('[POST] /triggers/cron_plan', () => {
       .eq('date', latestMauData?.date ?? '')
     expect(resetMauError).toBeFalsy()
 
+    // Clear cache
+    const { error: appMetricsCacheError } = await supabase
+      .from('app_metrics_cache')
+      .delete()
+      .eq('org_id', ORG_ID)
+    expect(appMetricsCacheError).toBeFalsy()
+
     // Run cron plan again
     const response2 = await fetch(`${BASE_URL}/triggers/cron_plan`, {
       method: 'POST',
@@ -482,6 +495,13 @@ describe('[POST] /triggers/cron_plan', () => {
       .eq('app_id', APPNAME)
       .eq('date', latestBandwidthData?.date ?? '')
     expect(resetBandwidthError).toBeFalsy()
+
+    // Clear cache
+    const { error: appMetricsCacheError } = await supabase
+      .from('app_metrics_cache')
+      .delete()
+      .eq('org_id', ORG_ID)
+    expect(appMetricsCacheError).toBeFalsy()
 
     // Run cron plan again
     const response2 = await fetch(`${BASE_URL}/triggers/cron_plan`, {
