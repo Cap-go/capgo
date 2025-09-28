@@ -1,9 +1,9 @@
 import type { Context } from 'hono'
 import type { SimpleErrorResponse } from './hono.ts'
+import { DrizzleError, entityKind, TransactionRollbackError } from 'drizzle-orm'
 import { sendDiscordAlert500 } from './discord.ts'
 import { cloudlogErr, serializeError } from './loggin.ts'
 import { backgroundTask } from './utils.ts'
-import { DrizzleError, TransactionRollbackError, entityKind } from 'drizzle-orm'
 
 const drizzleErrorNames = new Set(['DrizzleError', 'DrizzleQueryError', 'TransactionRollbackError'])
 
@@ -11,7 +11,7 @@ export function onError(functionName: string) {
   return async (e: any, c: Context) => {
     let body = 'N/A'
     try {
-      body = await c.req.json().then(body => JSON.stringify(body)).catch((failToReadBody) => `Failed to read body (${JSON.stringify(failToReadBody)})`)
+      body = await c.req.json().then(body => JSON.stringify(body)).catch(failToReadBody => `Failed to read body (${JSON.stringify(failToReadBody)})`)
       if (body.length > 1000) {
         body = `${body.substring(0, 1000)}... (truncated)`
       }
@@ -31,12 +31,12 @@ export function onError(functionName: string) {
 
     const isHttpException = e && typeof e === 'object' && typeof e.status === 'number' && typeof e.getResponse === 'function'
     // DrizzleError detection: check for known Drizzle error classes or entityKind
-    const isDrizzleError =
-      e instanceof DrizzleError ||
-      e instanceof TransactionRollbackError ||
-      (typeof e === 'object' && e !== null && ((
-        typeof (e as any)[entityKind] === 'string' && drizzleErrorNames.has((e as any)[entityKind])
-      ) || (
+    const isDrizzleError
+      = e instanceof DrizzleError
+        || e instanceof TransactionRollbackError
+        || (typeof e === 'object' && e !== null && ((
+          typeof (e as any)[entityKind] === 'string' && drizzleErrorNames.has((e as any)[entityKind])
+        ) || (
           typeof (e as any).name === 'string' && drizzleErrorNames.has((e as any).name)
         )))
 
