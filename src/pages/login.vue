@@ -36,10 +36,10 @@ const registerUrl = window.location.host === 'web.capgo.app' ? 'https://capgo.ap
 
 async function nextLogin() {
   if (route.query.to && typeof route.query.to === 'string') {
-    router.push(route.query.to)
+    router.replace(route.query.to)
   }
   else {
-    router.push('/dashboard')
+    router.replace('/dashboard')
   }
   setTimeout(async () => {
     isLoading.value = false
