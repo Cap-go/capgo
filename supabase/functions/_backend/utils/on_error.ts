@@ -1,6 +1,5 @@
 import type { Context } from 'hono'
 import type { SimpleErrorResponse } from './hono.ts'
-import { DrizzleError, DrizzleQueryError, entityKind, TransactionRollbackError } from 'drizzle-orm'
 import { sendDiscordAlert500 } from './discord.ts'
 import { cloudlogErr, serializeError } from './loggin.ts'
 import { backgroundTask } from './utils.ts'
@@ -88,7 +87,7 @@ export function onError(functionName: string) {
         errorMessage: e?.message ?? 'Unknown error',
         stack: serializeError(e)?.stack ?? 'N/A',
         moreInfo: {
-          drizzleErrorCause: JSON.stringify((e as Error).cause),
+          drizzleErrorCause: serializeError((e as Error).cause),
         },
       })
       await backgroundTask(c, sendDiscordAlert500(c, functionName, body, e))
