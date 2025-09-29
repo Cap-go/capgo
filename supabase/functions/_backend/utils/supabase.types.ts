@@ -1674,6 +1674,7 @@ export type Database = {
           name: string
           paying: boolean
           stats_updated_at: string | null
+          next_stats_update_at: string | null
           role: string
           subscription_end: string
           subscription_start: string

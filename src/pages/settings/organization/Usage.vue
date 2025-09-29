@@ -189,7 +189,11 @@ function lastRunDate() {
   return `${t('last-run')}: ${lastRun}`
 }
 function nextRunDate() {
-  const nextRun = dayjs(main.statsTime.next_run).format('MMMM D, YYYY HH:mm')
+  const source = currentOrganization.value?.next_stats_update_at
+  if (!source)
+    return `${t('next-run')}: ${t('unknown')}`
+
+  const nextRun = dayjs(source).format('MMMM D, YYYY HH:mm')
   return `${t('next-run')}: ${nextRun}`
 }
 </script>

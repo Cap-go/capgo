@@ -21,7 +21,8 @@ CREATE OR REPLACE FUNCTION public.get_orgs_v6 () RETURNS TABLE (
   subscription_end timestamp with time zone,
   management_email text,
   is_yearly boolean,
-  stats_updated_at timestamp without time zone
+  stats_updated_at timestamp without time zone,
+  next_stats_update_at timestamp with time zone
 ) LANGUAGE plpgsql
 SET search_path = '' SECURITY DEFINER AS $$
 DECLARE
@@ -79,7 +80,8 @@ CREATE OR REPLACE FUNCTION public.get_orgs_v6 (userid uuid) RETURNS TABLE (
   subscription_end timestamp with time zone,
   management_email text,
   is_yearly boolean,
-  stats_updated_at timestamp without time zone
+  stats_updated_at timestamp without time zone,
+  next_stats_update_at timestamp with time zone
 ) LANGUAGE plpgsql
 SET search_path = '' SECURITY DEFINER AS $$
 BEGIN
@@ -99,7 +101,8 @@ BEGIN
     (sub.f).subscription_anchor_end AS subscription_end,
     sub.management_email,
     public.is_org_yearly(sub.id) AS is_yearly,
-    sub.stats_updated_at
+    sub.stats_updated_at,
+    public.get_next_stats_update_date(sub.id) AS next_stats_update_at
   FROM (
     SELECT public.get_cycle_info_org(o.id) AS f, o.* FROM public.orgs AS o
   ) AS sub

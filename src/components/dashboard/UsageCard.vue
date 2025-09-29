@@ -47,6 +47,10 @@ const lastRunDisplay = computed(() => {
   const source = organizationStore.currentOrganization?.stats_updated_at
   return source ? dayjs(source).format('MMMM D, YYYY HH:mm') : t('unknown')
 })
+const nextRunDisplay = computed(() => {
+  const source = organizationStore.currentOrganization?.next_stats_update_at
+  return source ? dayjs(source).format('MMMM D, YYYY HH:mm') : t('unknown')
+})
 
 const total = computed(() => {
   const arr = props.datas as number[]
@@ -154,7 +158,7 @@ const lastDayEvolution = computed(() => {
                     {{ t('next-run') }}
                   </div>
                   <div class="text-sm font-medium">
-                    {{ dayjs(main.statsTime.next_run).format('MMMM D, YYYY HH:mm') }}
+                    {{ nextRunDisplay }}
                   </div>
                 </div>
               </div>

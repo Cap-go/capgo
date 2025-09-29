@@ -69,6 +69,10 @@ const lastRunDisplay = computed(() => {
   const source = organizationStore.currentOrganization?.stats_updated_at
   return source ? dayjs(source).format('MMMM D, YYYY HH:mm') : t('unknown')
 })
+const nextRunDisplay = computed(() => {
+  const source = organizationStore.currentOrganization?.next_stats_update_at
+  return source ? dayjs(source).format('MMMM D, YYYY HH:mm') : t('unknown')
+})
 
 const totalInstalled = ref(0)
 const totalFailed = ref(0)
@@ -293,7 +297,7 @@ onMounted(async () => {
                     {{ t('next-run') }}
                   </div>
                   <div class="text-sm font-medium">
-                    {{ dayjs(main.statsTime.next_run).format('MMMM D, YYYY HH:mm') }}
+                    {{ nextRunDisplay }}
                   </div>
                 </div>
               </div>
