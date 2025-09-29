@@ -65,6 +65,10 @@ const main = useMainStore()
 const organizationStore = useOrganizationStore()
 const subscription_anchor_start = dayjs(organizationStore.currentOrganization?.subscription_start).format('YYYY/MM/D')
 const subscription_anchor_end = dayjs(organizationStore.currentOrganization?.subscription_end).format('YYYY/MM/D')
+const lastRunDisplay = computed(() => {
+  const source = organizationStore.currentOrganization?.stats_updated_at
+  return source ? dayjs(source).format('MMMM D, YYYY HH:mm') : t('unknown')
+})
 
 const totalInstalled = ref(0)
 const totalFailed = ref(0)
@@ -276,7 +280,7 @@ onMounted(async () => {
                     {{ t('last-run') }}
                   </div>
                   <div class="text-sm font-medium">
-                    {{ dayjs(main.statsTime.last_run).format('MMMM D, YYYY HH:mm') }}
+                    {{ lastRunDisplay }}
                   </div>
                 </div>
               </div>

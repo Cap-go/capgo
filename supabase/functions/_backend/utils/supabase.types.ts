@@ -988,6 +988,7 @@ export type Database = {
           logo: string | null
           management_email: string
           name: string
+          stats_updated_at: string | null
           updated_at: string | null
         }
         Insert: {
@@ -998,6 +999,7 @@ export type Database = {
           logo?: string | null
           management_email: string
           name: string
+          stats_updated_at?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -1008,6 +1010,7 @@ export type Database = {
           logo?: string | null
           management_email?: string
           name?: string
+          stats_updated_at?: string | null
           updated_at?: string | null
         }
         Relationships: [
@@ -1630,6 +1633,10 @@ export type Database = {
         Args: { current_val: number; max_val: number; pattern: string }
         Returns: number
       }
+      get_next_stats_update_date: {
+        Args: { org: string }
+        Returns: string
+      }
       get_org_members: {
         Args: { guild_id: string } | { guild_id: string; user_id: string }
         Returns: {
@@ -1666,6 +1673,7 @@ export type Database = {
           management_email: string
           name: string
           paying: boolean
+          stats_updated_at: string | null
           role: string
           subscription_end: string
           subscription_start: string
@@ -2402,4 +2410,3 @@ export const Constants = {
     },
   },
 } as const
-

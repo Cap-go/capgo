@@ -181,7 +181,11 @@ async function loadData() {
 }
 
 function lastRunDate() {
-  const lastRun = dayjs(main.statsTime.last_run).format('MMMM D, YYYY HH:mm')
+  const source = currentOrganization.value?.stats_updated_at
+  if (!source)
+    return `${t('last-run')}: ${t('unknown')}`
+
+  const lastRun = dayjs(source).format('MMMM D, YYYY HH:mm')
   return `${t('last-run')}: ${lastRun}`
 }
 function nextRunDate() {

@@ -26,6 +26,7 @@ const isDark = useDark()
 const { t } = useI18n()
 const route = useRoute('/app/p/[package]')
 const main = useMainStore()
+const organizationStore = useOrganizationStore()
 
 const appId = ref('')
 const isLoading = ref(true)
@@ -109,7 +110,11 @@ watchEffect(async () => {
 })
 
 function lastRunDate() {
-  const lastRun = dayjs(main.statsTime.last_run).format('MMMM D, YYYY HH:mm')
+  const source = organizationStore.currentOrganization?.stats_updated_at
+  if (!source)
+    return `${t('last-run')}: ${t('unknown')}`
+
+  const lastRun = dayjs(source).format('MMMM D, YYYY HH:mm')
   return `${t('last-run')}: ${lastRun}`
 }
 function nextRunDate() {
