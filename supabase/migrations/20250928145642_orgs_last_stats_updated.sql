@@ -195,9 +195,8 @@ $$;
 
 ALTER FUNCTION public.get_next_stats_update_date(org uuid) OWNER TO postgres;
 
-GRANT ALL ON FUNCTION public.process_subscribed_orgs() TO anon;
-GRANT ALL ON FUNCTION public.process_subscribed_orgs() TO authenticated;
-GRANT ALL ON FUNCTION public.process_subscribed_orgs() TO service_role;
+REVOKE ALL ON FUNCTION public.process_subscribed_orgs() FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.process_subscribed_orgs() TO service_role;
 GRANT ALL ON FUNCTION public.get_next_stats_update_date(uuid) TO anon;
 GRANT ALL ON FUNCTION public.get_next_stats_update_date(uuid) TO authenticated;
 GRANT ALL ON FUNCTION public.get_next_stats_update_date(uuid) TO service_role;

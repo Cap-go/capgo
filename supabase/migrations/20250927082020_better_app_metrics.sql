@@ -124,6 +124,9 @@ BEGIN
 END;
 $function$;
 
+REVOKE EXECUTE ON FUNCTION public.get_app_metrics(org_id uuid) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.get_app_metrics(org_id uuid) TO service_role;
+
 DROP FUNCTION IF EXISTS public.get_app_metrics(org_id uuid, start_date date, end_date date);
 
 CREATE OR REPLACE FUNCTION public.get_app_metrics(
@@ -190,6 +193,9 @@ BEGIN
     ORDER BY metrics.app_id, metrics.date;
 END;
 $function$;
+
+REVOKE EXECUTE ON FUNCTION public.get_app_metrics(uuid, date, date) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.get_app_metrics(uuid, date, date) TO service_role;
 
 ALTER FUNCTION "public"."get_app_metrics" (
   "org_id" "uuid",
