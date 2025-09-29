@@ -678,7 +678,7 @@ export type Database = {
           platform: Database["public"]["Enums"]["platform_os"]
           plugin_version: string
           updated_at: string
-          version: number
+          version_name: string
           version_build: string | null
         }
         Insert: {
@@ -692,7 +692,7 @@ export type Database = {
           platform: Database["public"]["Enums"]["platform_os"]
           plugin_version?: string
           updated_at: string
-          version: number
+          version_name?: string
           version_build?: string | null
         }
         Update: {
@@ -706,7 +706,7 @@ export type Database = {
           platform?: Database["public"]["Enums"]["platform_os"]
           plugin_version?: string
           updated_at?: string
-          version?: number
+          version_name?: string
           version_build?: string | null
         }
         Relationships: []
@@ -1048,7 +1048,7 @@ export type Database = {
           created_at: string
           device_id: string
           id: number
-          version: number
+          version_name: string
         }
         Insert: {
           action: Database["public"]["Enums"]["stats_action"]
@@ -1056,7 +1056,7 @@ export type Database = {
           created_at: string
           device_id: string
           id?: never
-          version: number
+          version_name: string
         }
         Update: {
           action?: Database["public"]["Enums"]["stats_action"]
@@ -1064,7 +1064,7 @@ export type Database = {
           created_at?: string
           device_id?: string
           id?: never
-          version?: number
+          version_name?: string
         }
         Relationships: []
       }

@@ -22,7 +22,6 @@ export interface AppInfos {
 export interface AppStats extends AppInfos {
   action: string
   old_version_name?: string
-  version?: number
 }
 
 export interface BaseHeaders {
@@ -36,7 +35,7 @@ export interface Order {
 
 export interface ReadStatsParams {
   app_id: string
-  version_id?: string
+  version_name?: string
   start_date?: string
   end_date?: string
   deviceIds?: string[]
@@ -47,7 +46,7 @@ export interface ReadStatsParams {
 
 export interface ReadDevicesParams {
   app_id: string
-  version_id?: string
+  version_name?: string
   rangeStart?: number
   rangeEnd?: number
   deviceIds?: string[]
@@ -59,7 +58,7 @@ export interface ReadDevicesParams {
 export type DeviceWithoutCreatedAt = Omit<Database['public']['Tables']['devices']['Insert'], 'created_at'>
 export interface StatsActions {
   action: Database['public']['Enums']['stats_action']
-  versionId?: number
+  versionName?: string
 }
 
 export const DEFAULT_LIMIT = 1000

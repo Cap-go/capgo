@@ -3,7 +3,7 @@ import type { Ref } from 'vue'
 import type { TableColumn } from '../comp_def'
 import dayjs from 'dayjs'
 import ky from 'ky'
-import { onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { formatDate } from '~/services/date'
@@ -17,14 +17,14 @@ const props = defineProps<{
 interface Channel {
   version: {
     name: string
-    id: number
+    id?: number
   }
 }
 interface LogData {
   app_id: string
   device_id: string
   action: string
-  version_id: number
+  version_name: string
   version?: number
   created_at: string
 }
@@ -42,18 +42,19 @@ const range = ref<[Date, Date]>([dayjs().subtract(3, 'minute').toDate(), new Dat
 const filters = ref()
 const DOC_LOGS = 'https://capgo.app/docs/plugin/debugging/#sent-from-the-backend'
 
-function findVersion(id: number, versions: { name: string, id: number }[]) {
-  return versions.find(elem => elem.id === id)
+function findVersion(name: string, versions: { name: string, id?: number }[]) {
+  return versions.find(elem => elem.name === name)
 }
 
 async function versionData() {
   try {
-    const versionsIdAlreadyFetch = versions.value.map(elem => elem.id)
-    const versionsIds = elements.value
-      .map(elem => elem.version_id)
-      .filter(e => !versionsIdAlreadyFetch.includes(e))
-    // console.log('versionsIds', versionsIds)
-    if (!versionsIds.length)
+    if (!props.appId)
+      return
+    const versionsFetched = versions.value.map(elem => elem.name)
+    const versionNames = elements.value
+      .map(elem => elem.version_name)
+      .filter(name => name && !versionsFetched.includes(name))
+    if (!versionNames.length)
       return
     const { data: res } = await supabase
       .from('app_versions')
@@ -61,12 +62,13 @@ async function versionData() {
         name,
         id
       `)
-      .in('id', versionsIds)
+      .eq('app_id', props.appId ?? '')
+      .in('name', versionNames)
     if (!res?.length)
       return
-    versions.value.push(...res)
+    versions.value.push(...res.map(r => ({ name: r.name, id: r.id })))
     elements.value.forEach((elem) => {
-      elem.version = findVersion(elem.version_id, versions.value) || { name: 'unknown', id: 0 } as any
+      elem.version = findVersion(elem.version_name, versions.value) || { name: elem.version_name || 'unknown' }
     })
   }
   catch (error) {
@@ -123,7 +125,10 @@ async function getData() {
         return [] as LogData[]
       })
     // console.log('dataD', dataD)
-    elements.value.push(...dataD as any)
+    elements.value.push(...dataD.map(log => ({
+      ...log,
+      version: { name: log.version_name } as { name: string, id?: number },
+    })) as any)
   }
   catch (error) {
     console.error(error)
@@ -173,7 +178,7 @@ columns.value = [
   },
   {
     label: t('version'),
-    key: 'version',
+    key: 'version_name',
     class: 'truncate max-w-8',
     mobile: false,
     sortable: false,
@@ -195,7 +200,10 @@ async function reload() {
 async function openOneVersion(one: Element) {
   if (props.deviceId || !props.appId)
     return
-  router.push(`/app/p/${props.appId}/bundle/${one.version?.id}`)
+  if (!one.version?.id)
+    await versionData()
+  if (one.version?.id)
+    router.push(`/app/p/${props.appId}/bundle/${one.version.id}`)
 }
 async function openOne(one: Element) {
   if (props.deviceId || !props.appId)

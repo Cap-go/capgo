@@ -678,7 +678,7 @@ export type Database = {
           platform: Database["public"]["Enums"]["platform_os"]
           plugin_version: string
           updated_at: string
-          version: number
+          version_name: string
           version_build: string | null
         }
         Insert: {
@@ -692,7 +692,7 @@ export type Database = {
           platform: Database["public"]["Enums"]["platform_os"]
           plugin_version?: string
           updated_at: string
-          version: number
+          version_name?: string
           version_build?: string | null
         }
         Update: {
@@ -706,7 +706,7 @@ export type Database = {
           platform?: Database["public"]["Enums"]["platform_os"]
           plugin_version?: string
           updated_at?: string
-          version?: number
+          version_name?: string
           version_build?: string | null
         }
         Relationships: []

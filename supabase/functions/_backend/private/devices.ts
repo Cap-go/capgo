@@ -10,7 +10,7 @@ import { hasAppRight } from '../utils/supabase.ts'
 interface DataDevice {
   appId: string
   count?: boolean
-  versionId?: string
+  versionName?: string
   devicesId?: string[]
   deviceIds?: string[] // TODO: remove when migration is done
   search?: string
@@ -38,7 +38,7 @@ app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
     app_id: body.appId,
     rangeStart: body.rangeStart,
     rangeEnd: body.rangeEnd,
-    version_id: body.versionId,
+    version_name: body.versionName,
     deviceIds: devicesIds,
     search: body.search,
     order: body.order,

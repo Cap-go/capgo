@@ -805,7 +805,7 @@ async function deleteBundle() {
         <div
           class="flex flex-col mx-auto overflow-y-auto bg-white shadow-lg border-slate-300 md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-gray-800"
         >
-          <DeviceTable class="p-3" :app-id="packageId" :version-id="version.id" />
+          <DeviceTable class="p-3" :app-id="packageId" :version-name="version.name" />
         </div>
       </div>
     </div>

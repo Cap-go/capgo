@@ -15,8 +15,8 @@ interface GetDevice {
 
 export function filterDeviceKeys(devices: Database['public']['Tables']['devices']['Row'][]) {
   return devices.map((device) => {
-    const { updated_at, device_id, custom_id, is_prod, is_emulator, version, app_id, platform, plugin_version, os_version, version_build } = device
-    return { updated_at, device_id, custom_id, is_prod, is_emulator, version, app_id, platform, plugin_version, os_version, version_build }
+    const { updated_at, device_id, custom_id, is_prod, is_emulator, version_name, app_id, platform, plugin_version, os_version, version_build } = device
+    return { updated_at, device_id, custom_id, is_prod, is_emulator, version_name, app_id, platform, plugin_version, os_version, version_build }
   })
 }
 
@@ -46,16 +46,19 @@ export async function get(c: Context, body: GetDevice, apikey: Database['public'
       throw quickError(404, 'device_not_found', 'Cannot find device', { device_id: body.device_id })
     }
     const dataDevice = filterDeviceKeys(res as any)[0]
-    // get version from device
-    const { data: dataVersion, error: dbErrorVersion } = await supabaseApikey(c, apikey.key)
-      .from('app_versions')
-      .select('id, name')
-      .eq('id', dataDevice.version)
-      .single()
-    if (dbErrorVersion || !dataVersion) {
-      throw quickError(404, 'version_not_found', 'Cannot find version', { version: dataDevice.version })
+    const versionName = dataDevice.version_name
+    let versionRecord: { id: number, name: string } | null = null
+    if (versionName) {
+      const { data: dataVersion, error: dbErrorVersion } = await supabaseApikey(c, apikey.key)
+        .from('app_versions')
+        .select('id, name')
+        .eq('app_id', body.app_id)
+        .eq('name', versionName)
+        .maybeSingle()
+      if (!dbErrorVersion && dataVersion)
+        versionRecord = dataVersion as any
     }
-    dataDevice.version = dataVersion as any
+    dataDevice.version = versionRecord ?? { name: versionName }
 
     // Check for channel override
     const { data: channelOverride } = await supabaseApikey(c, apikey.key)
@@ -91,23 +94,25 @@ export async function get(c: Context, body: GetDevice, apikey: Database['public'
     }
     const dataDevices = filterDeviceKeys(res as any)
     // get versions from all devices
-    const versionIds = dataDevices.map(device => device.version)
-    const { data: dataVersions, error: dbErrorVersions } = await supabaseApikey(c, apikey.key)
-      .from('app_versions')
-      .select(`
-              id,
-              name
-      `)
-      .in('id', versionIds)
-    // replace version with object from app_versions table
-    if (dbErrorVersions || !dataVersions?.length) {
-      throw quickError(404, 'versions_not_found', 'Cannot get versions', { dbErrorVersions, dataVersions })
+    const versionNames = [...new Set(dataDevices.map(device => device.version_name).filter(Boolean))]
+    let versionMap: Record<string, { id: number, name: string }> = {}
+    if (versionNames.length) {
+      const { data: dataVersions } = await supabaseApikey(c, apikey.key)
+        .from('app_versions')
+        .select('id, name')
+        .eq('app_id', body.app_id)
+        .in('name', versionNames)
+      if (dataVersions?.length) {
+        versionMap = dataVersions.reduce((acc, version) => {
+          acc[version.name] = version as any
+          return acc
+        }, {} as Record<string, { id: number, name: string }>)
+      }
     }
     dataDevices.forEach((device) => {
-      const version = dataVersions.find((v: any) => v.id === device.version)
-      if (version) {
-        device.version = version as any
-      }
+      const versionName = device.version_name
+      const version = versionName ? versionMap[versionName] : undefined
+      device.version = version ?? { name: versionName }
     })
 
     // Get channel overrides for all devices

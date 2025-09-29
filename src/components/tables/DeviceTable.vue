@@ -5,26 +5,29 @@ import ky from 'ky'
 import { computed, h, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
+import { toast } from 'vue-sonner'
 import { formatDate } from '~/services/date'
 import { defaultApiHost, useSupabase } from '~/services/supabase'
 
 const props = defineProps<{
   appId: string
   ids?: string[]
-  versionId?: number | undefined
+  versionName?: string | undefined
   showAddButton?: boolean
+  channel?: unknown
 }>()
 
 const emit = defineEmits(['addDevice'])
 
-type Element = Database['public']['Tables']['devices']['Row'] & { version: Database['public']['Tables']['app_versions']['Row'] }
+// TODO: remove version number when all clients use version name
+type Device = Database['public']['Tables']['devices']['Row'] & { version: number }
 
 const { t } = useI18n()
 const supabase = useSupabase()
 const router = useRouter()
 const total = ref(0)
 const search = ref('')
-const elements = ref<Element[]>([])
+const elements = ref<Device[]>([])
 const isLoading = ref(false)
 const currentPage = ref(1)
 const filters = ref({
@@ -43,7 +46,7 @@ const columns = ref<TableColumn[]>([
     mobile: true,
     sortable: true,
     head: true,
-    onClick: (elem: Element) => openOne(elem),
+    onClick: (elem: Device) => openOne(elem),
     renderFunction: (item) => {
       const customId = item.custom_id?.trim()
       return h('div', { class: 'flex flex-col text-slate-800 dark:text-white' }, [
@@ -59,7 +62,7 @@ const columns = ref<TableColumn[]>([
     key: 'updated_at',
     mobile: false,
     sortable: 'desc',
-    displayFunction: (elem: Element) => formatDate(elem.updated_at ?? ''),
+    displayFunction: (elem: Device) => formatDate(elem.updated_at ?? ''),
   },
   {
     label: t('platform'),
@@ -67,16 +70,16 @@ const columns = ref<TableColumn[]>([
     mobile: true,
     sortable: true,
     head: true,
-    displayFunction: (elem: Element) => `${elem.platform} ${elem.os_version}`,
+    displayFunction: (elem: Device) => `${elem.platform} ${elem.os_version}`,
   },
   {
     label: t('bundle'),
-    key: 'version',
+    key: 'version_name',
     mobile: true,
     sortable: true,
     head: true,
-    displayFunction: (elem: Element) => elem.version.name,
-    onClick: (elem: Element) => openOneVersion(elem),
+    displayFunction: (elem: Device) => elem.version_name ?? elem.version,
+    onClick: (elem: Device) => openOneVersion(elem),
   },
 ])
 
@@ -93,14 +96,6 @@ async function getDevicesID() {
 
   const channelDev = data?.map(d => d.device_id) ?? []
   return [...channelDev]
-}
-
-interface DeviceData {
-  app_id: string
-  device_id: string
-  version: number
-  created_at: string
-  custom_id: string | null
 }
 
 async function countDevices() {
@@ -153,7 +148,7 @@ async function getData() {
         },
         body: JSON.stringify({
           appId: props.appId,
-          versionId: props.versionId,
+          versionName: props.versionName,
           devicesId: ids.length ? ids : undefined,
           search: search.value ? search.value : undefined,
           order: columns.value.filter(elem => elem.sortable).map(elem => ({ key: elem.key as string, sortable: elem.sortable })),
@@ -162,34 +157,14 @@ async function getData() {
           customIdMode: filters.value.CustomId,
         }),
       })
-      .then(res => res.json<DeviceData[]>())
+      .then(res => res.json<Device[]>())
       .catch((err) => {
         console.log('Cannot get devices', err)
-        return [] as DeviceData[]
+        return [] as Device[]
       })
     // console.log('dataD', dataD)
 
-    const versionPromises = dataD.map((element) => {
-      return supabase
-        .from('app_versions')
-        .select('name, id')
-        .eq('id', element.version)
-        .single()
-    })
-
-    // Cast so that we can set version from the other request
-    const finalData = dataD as any as Database['public']['Tables']['devices']['Row'] & { version: Database['public']['Tables']['app_versions']['Row'] }[]
-
-    // This is faster then awaiting in a big loop
-    const versionData = await Promise.all(versionPromises)
-    versionData.forEach((version, index) => {
-      if (version.error)
-        finalData[index].version = { name: 'unknown' } as any
-      else
-        finalData[index].version = version.data as any
-    })
-
-    elements.value.push(...finalData as any)
+    elements.value.push(...(dataD as Device[]))
   }
   catch (error) {
     console.error(error)
@@ -219,11 +194,32 @@ async function refreshData() {
     console.error(error)
   }
 }
-async function openOne(one: Element) {
+async function openOne(one: Device) {
   router.push(`/app/p/${props.appId}/d/${one.device_id}`)
 }
-async function openOneVersion(one: Element) {
-  router.push(`/app/p/${props.appId}/bundle/${one.version?.id}`)
+async function openOneVersion(one: Device) {
+  if (!props.appId) {
+    toast.error(t('app-id-missing', 'App ID is missing'))
+    return
+  }
+  const versionName = one.version_name ?? one.version
+  if (!versionName || versionName === 'unknown') {
+    toast.error(t('version-name-missing', 'Version name is missing'))
+    return
+  }
+  const loadingToastId = toast.loading(t('loading-version', 'Loading version…'))
+  const { data: versionRecord, error } = await supabase
+    .from('app_versions')
+    .select('id')
+    .eq('app_id', props.appId)
+    .or(`name.eq.${versionName},id.eq.${versionName}`)
+    .maybeSingle()
+  toast.dismiss(loadingToastId)
+  if (error || !versionRecord?.id) {
+    toast.error(t('cannot-find-version', 'Cannot find version'))
+    return
+  }
+  router.push(`/app/p/${props.appId}/bundle/${versionRecord.id}`)
 }
 
 function handleAddDevice() {

@@ -55,23 +55,21 @@ export function trackVersionUsageCF(c: Context, version_id: number, app_id: stri
   return Promise.resolve()
 }
 
-export function trackLogsCF(c: Context, app_id: string, device_id: string, action: string, version_id: number) {
+export function trackLogsCF(c: Context, app_id: string, device_id: string, action: string, version_name: string) {
   if (!c.env.APP_LOG)
     return Promise.resolve()
   c.env.APP_LOG.writeDataPoint({
-    blobs: [device_id, action],
-    doubles: [version_id],
+    blobs: [device_id, action, version_name],
     indexes: [app_id],
   })
   return Promise.resolve()
 }
 
-export function trackLogsCFExternal(c: Context, app_id: string, device_id: string, action: Database['public']['Enums']['stats_action'], version_id: number) {
+export function trackLogsCFExternal(c: Context, app_id: string, device_id: string, action: Database['public']['Enums']['stats_action'], version_name: string) {
   if (!c.env.APP_LOG_EXTERNAL)
     return Promise.resolve()
   c.env.APP_LOG_EXTERNAL.writeDataPoint({
-    blobs: [device_id, action],
-    doubles: [version_id],
+    blobs: [device_id, action, version_name],
     indexes: [app_id],
   })
   return Promise.resolve()
@@ -85,13 +83,13 @@ export async function trackDevicesCF(c: Context, device: DeviceWithoutCreatedAt)
 
   const upsertQuery = `
   INSERT INTO devices (
-    updated_at, device_id, version, app_id, platform, 
+    updated_at, device_id, version_name, app_id, platform, 
     plugin_version, os_version, version_build, custom_id, 
     is_prod, is_emulator
   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   ON CONFLICT (device_id, app_id) DO UPDATE SET
     updated_at = excluded.updated_at,
-    version = excluded.version,
+    version_name = excluded.version_name,
     platform = excluded.platform,
     plugin_version = excluded.plugin_version,
     os_version = excluded.os_version,
@@ -117,7 +115,7 @@ export async function trackDevicesCF(c: Context, device: DeviceWithoutCreatedAt)
         .bind(
           updated_at,
           device.device_id,
-          comparableDevice.version,
+          comparableDevice.version_name ?? device.version_name ?? 'unknown',
           device.app_id,
           comparableDevice.platform,
           comparableDevice.plugin_version,
@@ -376,7 +374,7 @@ ORDER BY date`
 interface DeviceRowCF {
   app_id: string
   device_id: string
-  version_id: number
+  version_name: string
   platform: string
   plugin_version: string
   os_version: string
@@ -441,13 +439,13 @@ export async function readDevicesCF(c: Context, params: ReadDevicesParams, custo
   if (params.search) {
     cloudlog({ requestId: c.get('requestId'), message: 'search', search: params.search })
     if (params.deviceIds?.length)
-      searchFilter = `AND custom_id LIKE '%${params.search}%')`
+      searchFilter = `AND custom_id LIKE '%${params.search}%'`
     else
-      searchFilter = `AND (device_id LIKE '%${params.search}%' OR custom_id LIKE '%${params.search}%')`
+      searchFilter = `AND (device_id LIKE '%${params.search}%' OR custom_id LIKE '%${params.search}%' OR version_name LIKE '%${params.search}%')`
   }
   let versionFilter = ''
-  if (params.version_id)
-    versionFilter = `AND version_id = ${params.version_id}`
+  if (params.version_name)
+    versionFilter = `AND version_name = '${params.version_name}'`
 
   const orderFilters: string[] = []
   if (params.order?.length) {
@@ -463,7 +461,7 @@ export async function readDevicesCF(c: Context, params: ReadDevicesParams, custo
   const query = `SELECT
   app_id,
   device_id,
-  version,
+  version_name,
   platform,
   plugin_version,
   os_version,
@@ -499,7 +497,7 @@ interface StatRowCF {
   app_id: string
   device_id: string
   action: string
-  version_id: number
+  version_name: string
   created_at: string
 }
 
@@ -523,9 +521,9 @@ export async function readStatsCF(c: Context, params: ReadStatsParams) {
   if (params.search) {
     const searchLower = params.search.toLowerCase()
     if (params.deviceIds?.length)
-      searchFilter = `AND position('${searchLower}' IN toLower(action)) > 0`
+      searchFilter = `AND (position('${searchLower}' IN toLower(action)) > 0 OR position('${searchLower}' IN toLower(blob3)) > 0)`
     else
-      searchFilter = `AND (position('${searchLower}' IN toLower(device_id)) > 0 OR position('${searchLower}' IN toLower(action)) > 0)`
+      searchFilter = `AND (position('${searchLower}' IN toLower(device_id)) > 0 OR position('${searchLower}' IN toLower(action)) > 0 OR position('${searchLower}' IN toLower(blob3)) > 0)`
   }
   const orderFilters: string[] = []
   if (params.order?.length) {
@@ -543,12 +541,12 @@ export async function readStatsCF(c: Context, params: ReadStatsParams) {
   index1 as app_id,
   blob1 as device_id,
   blob2 as action,
-  double1 as version_id,
+  blob3 as version_name,
   timestamp as created_at
 FROM app_log
 WHERE
   app_id = '${params.app_id}' ${deviceFilter} ${searchFilter} ${startFilter} ${endFilter}
-GROUP BY app_id, created_at, action, device_id, version_id
+GROUP BY app_id, created_at, action, device_id, version_name
 ${orderFilter}
 LIMIT ${params.limit ?? DEFAULT_LIMIT}`
 

@@ -48,7 +48,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
     app_id,
     device_id,
     plugin_version,
-    version: 0,
+    version_name,
     custom_id,
     is_emulator,
     is_prod,
@@ -107,23 +107,25 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
   if (!channelData) {
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot get channel', id: app_id, date: new Date().toISOString() })
     if (versionData)
-      await sendStatsAndDevice(c, device, [{ action: 'update_fail', versionId: versionData.id }])
+      await sendStatsAndDevice(c, device, [{ action: 'update_fail', versionName: version_name }])
 
     return simpleError200(c, 'no_channel', 'no default channel')
   }
 
   const version = channelData.version
-  device.version = versionData ? versionData.id : version.id
+  const statsVersionInfo = {
+    versionName: version.name,
+  }
 
   if (!version.external_url && !version.r2_path && !isInternalVersionName(version.name)) {
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot get bundle', id: app_id, version })
-    await sendStatsAndDevice(c, device, [{ action: 'missingBundle' }])
+    await sendStatsAndDevice(c, device, [{ action: 'missingBundle', ...statsVersionInfo }])
     return simpleError200(c, 'no_bundle', 'Cannot get bundle')
   }
 
   if (version_name === version.name) {
     cloudlog({ requestId: c.get('requestId'), message: 'No new version available', id: device_id, version_name, version: version.name, date: new Date().toISOString() })
-    await sendStatsAndDevice(c, device, [{ action: 'noNew' }])
+    await sendStatsAndDevice(c, device, [{ action: 'noNew', ...statsVersionInfo }])
     return simpleError200(c, 'no_new_version_available', 'No new version available')
   }
 
@@ -157,12 +159,13 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
   //  check signedURL and if it's url
   if (!signedURL || (!(signedURL.startsWith('http://') || signedURL.startsWith('https://')))) {
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot get bundle signedURL', url: signedURL, id: app_id, date: new Date().toISOString() })
-    await sendStatsAndDevice(c, device, [{ action: 'cannotGetBundle' }])
+    await sendStatsAndDevice(c, device, [{ action: 'cannotGetBundle', ...statsVersionInfo }])
     return simpleError200(c, 'no_bundle_url', 'Cannot get bundle url')
   }
+  device.version_name = statsVersionInfo.versionName
   await backgroundTask(c, Promise.all([
     createStatsVersion(c, version.id, app_id, 'get'),
-    sendStatsAndDevice(c, device, [{ action: 'get' }]),
+    sendStatsAndDevice(c, device, [{ action: 'get', ...statsVersionInfo }]),
   ]))
   cloudlog({ requestId: c.get('requestId'), message: 'New version available', app_id, version: version.name, signedURL, date: new Date().toISOString() })
   const res = resToVersion(plugin_version, signedURL, version as any, manifest)
