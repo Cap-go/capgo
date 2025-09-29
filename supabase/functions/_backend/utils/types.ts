@@ -46,7 +46,7 @@ export interface ReadStatsParams {
 
 export interface ReadDevicesParams {
   app_id: string
-  version_name?: string
+  version_name?: string | undefined
   rangeStart?: number
   rangeEnd?: number
   deviceIds?: string[]

@@ -692,7 +692,7 @@ export type Database = {
           platform: Database["public"]["Enums"]["platform_os"]
           plugin_version?: string
           updated_at: string
-          version_name?: string
+          version_name: string
           version_build?: string | null
         }
         Update: {

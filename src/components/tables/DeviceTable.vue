@@ -19,8 +19,10 @@ const props = defineProps<{
 
 const emit = defineEmits(['addDevice'])
 
-// TODO: remove version number when all clients use version name
-type Device = Database['public']['Tables']['devices']['Row'] & { version: number }
+// TODO: delete the old version check when all deivces uses the new version system
+type Device = Database['public']['Tables']['devices']['Row'] & {
+  version?: number | { id?: number | null, name?: string | null } | null
+}
 
 const { t } = useI18n()
 const supabase = useSupabase()
@@ -78,7 +80,7 @@ const columns = ref<TableColumn[]>([
     mobile: true,
     sortable: true,
     head: true,
-    displayFunction: (elem: Device) => elem.version_name ?? elem.version,
+    displayFunction: (elem: Device) => getVersionLabel(elem) || 'unknown',
     onClick: (elem: Device) => openOneVersion(elem),
   },
 ])
@@ -164,7 +166,9 @@ async function getData() {
       })
     // console.log('dataD', dataD)
 
-    elements.value.push(...(dataD as Device[]))
+    await ensureVersionNames(dataD)
+
+    elements.value.push(...dataD)
   }
   catch (error) {
     console.error(error)
@@ -202,9 +206,29 @@ async function openOneVersion(one: Device) {
     toast.error(t('app-id-missing', 'App ID is missing'))
     return
   }
-  const versionName = one.version_name ?? one.version
+  const numericVersionId = typeof one.version === 'number'
+    ? one.version
+    : (typeof one.version === 'object' && one.version !== null && typeof (one.version as any).id === 'number'
+        ? (one.version as any).id as number
+        : null)
+
+  if (numericVersionId) {
+    router.push(`/app/p/${props.appId}/bundle/${numericVersionId}`)
+    return
+  }
+
+  const versionName = getVersionLabel(one)
   if (!versionName || versionName === 'unknown') {
     toast.error(t('version-name-missing', 'Version name is missing'))
+    return
+  }
+  // TODO: delete the old version check when all deivces uses the new version system
+  if (one.version && typeof one.version === 'object' && one.version?.id) {
+    router.push(`/app/p/${props.appId}/bundle/${one.version.id}`)
+    return
+  }
+  if (one.version && typeof one.version === 'number') {
+    router.push(`/app/p/${props.appId}/bundle/${one.version}`)
     return
   }
   const loadingToastId = toast.loading(t('loading-version', 'Loading version…'))
@@ -212,7 +236,7 @@ async function openOneVersion(one: Device) {
     .from('app_versions')
     .select('id')
     .eq('app_id', props.appId)
-    .or(`name.eq.${versionName},id.eq.${versionName}`)
+    .eq('name', versionName)
     .maybeSingle()
   toast.dismiss(loadingToastId)
   if (error || !versionRecord?.id) {
@@ -224,6 +248,49 @@ async function openOneVersion(one: Device) {
 
 function handleAddDevice() {
   emit('addDevice')
+}
+
+// TODO: delete the old version check when all deivces uses the new version system
+function getVersionLabel(device: Device): string {
+  if (device.version_name && device.version_name !== '')
+    return device.version_name
+  if (typeof device.version === 'object' && device.version !== null && typeof (device.version as any).name === 'string')
+    return (device.version as any).name as string
+  if (typeof device.version === 'number')
+    return String(device.version)
+  if (typeof device.version === 'string')
+    return device.version
+  return ''
+}
+
+// TODO: delete the old version check when all deivces uses the new version system
+async function ensureVersionNames(devices: Device[]) {
+  const missingName = devices.filter(device => (!device.version_name || device.version_name === '') && typeof device.version === 'number')
+  if (!missingName.length)
+    return
+
+  const versionIds = [...new Set(missingName.map(device => device.version as number))]
+  if (!versionIds.length)
+    return
+
+  const { data: versionRecords, error } = await supabase
+    .from('app_versions')
+    .select('id, name')
+    .in('id', versionIds)
+
+  if (error || !versionRecords?.length)
+    return
+
+  const versionMap = versionRecords.reduce<Record<number, string>>((acc, record) => {
+    acc[record.id] = record.name
+    return acc
+  }, {})
+
+  missingName.forEach((device) => {
+    const id = typeof device.version === 'number' ? device.version : null
+    if (id && versionMap[id])
+      device.version_name = versionMap[id]
+  })
 }
 </script>
 
