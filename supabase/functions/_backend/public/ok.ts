@@ -10,8 +10,9 @@ app.post('/', async (c) => {
   const apiVersion = resolveCapgoApiVersion(c)
 
   return apiVersion.handle({
-    '1': () => c.json(BRES),
-    '2': (info) => c.json({ ...BRES, version: info.normalized, detail: 'ok endpoint v2 response' }),
+    '2025-10-01': () => c.json(BRES),
+    '2025-10-02': (info) => c.json({ ...BRES, version: info.normalized, detail: 'ok endpoint 2025-10-02 response' }),
+    default: () => c.json(BRES),
   })
 })
 
@@ -19,7 +20,8 @@ app.get('/', (c) => {
   const apiVersion = resolveCapgoApiVersion(c)
 
   return apiVersion.handle({
-    '1': () => c.json(BRES),
-    '2': (info) => c.json({ ...BRES, version: info.normalized, detail: 'ok endpoint v2 response' }),
+    '2025-10-01': () => c.json(BRES),
+    '2025-10-02': (info) => c.json({ ...BRES, version: info.normalized, detail: 'ok endpoint 2025-10-02 response' }),
+    default: () => c.json(BRES),
   })
 })

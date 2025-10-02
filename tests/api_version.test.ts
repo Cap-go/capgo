@@ -27,8 +27,8 @@ describe('resolveCapgoApiVersion', () => {
 
     expect(version.isDefault).toBe(true)
     expect(version.raw).toBe(CAPGO_API_DEFAULT_VERSION)
-    expect(version.normalized).toBe('1.0.0')
-    expect(version.equals('1')).toBe(true)
+    expect(version.normalized).toBe('2025.10.1')
+    expect(version.equals('2025-10-01')).toBe(true)
   })
 
   it('parses semantic versions from the header', () => {
@@ -42,6 +42,16 @@ describe('resolveCapgoApiVersion', () => {
     expect(version.normalized).toBe('2.1.0')
     expect(version.atLeast('2.0')).toBe(true)
     expect(version.before('3')).toBe(true)
+  })
+
+  it('accepts ISO-like date values', () => {
+    const ctx = createContext({ [CAPGO_API_VERSION_HEADER]: '2024-10-08' })
+    const version = resolveCapgoApiVersion(ctx)
+
+    expect(version.normalized).toBe('2024.10.8')
+    expect(version.equals('2024-10-08')).toBe(true)
+    expect(version.before('2024-12-01')).toBe(true)
+    expect(version.atLeast('2024-01-01')).toBe(true)
   })
 
   it('routes to handlers based on the requested version', () => {

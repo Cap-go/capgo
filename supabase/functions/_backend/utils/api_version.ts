@@ -4,7 +4,7 @@ import { HTTPException } from 'hono/http-exception'
 import { cloudlog } from './loggin.ts'
 
 export const CAPGO_API_VERSION_HEADER = 'capgo_api' as const
-export const CAPGO_API_DEFAULT_VERSION = '1.0.0' as const
+export const CAPGO_API_DEFAULT_VERSION = '2025-10-01' as const
 
 type VersionParts = [number, number, number]
 
@@ -40,7 +40,7 @@ function parseVersion(value: string, c: Context): VersionParts {
     })
   }
 
-  const split = withoutPrefix.split(/[._]/)
+  const split = withoutPrefix.split(/[._-]/)
   if (split.length > 3) {
     throw versionError(c, 'invalid_capgo_api_version', 'Invalid capgo_api version header', {
       header: value,
