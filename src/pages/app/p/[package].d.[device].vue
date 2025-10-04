@@ -20,18 +20,10 @@ import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
 
-interface Device {
-  version: Database['public']['Tables']['app_versions']['Row']
-}
 interface Channel {
   version: Database['public']['Tables']['app_versions']['Row']
 }
 
-interface Stat {
-  version: {
-    name: string
-  }
-}
 const displayStore = useDisplayStore()
 const dialogStore = useDialogV2Store()
 const { t } = useI18n()
@@ -50,8 +42,7 @@ watchEffect(() => {
 
 const organizationStore = useOrganizationStore()
 
-const device = ref<Database['public']['Tables']['devices']['Row'] & Device>()
-const logs = ref<(Database['public']['Tables']['stats']['Row'] & Stat)[]>([])
+const device = ref<Database['public']['Tables']['devices']['Row']>()
 const channels = ref<(Database['public']['Tables']['channels']['Row'] & Channel)[]>([])
 const versions = ref<Database['public']['Tables']['app_versions']['Row'][]>([])
 const channelDevice = ref<Database['public']['Tables']['channels']['Row']>()
@@ -147,6 +138,33 @@ async function getChannelOverride() {
     channelDevice.value = undefined
   }
 }
+
+async function getVersionInfo() {
+  if (device.value?.version && !device.value?.version_name) {
+    const { data: dataVersion } = await supabase
+      .from('app_versions')
+      .select(`
+          name
+      `)
+      .eq('id', device.value!.version)
+      .single()
+
+    if (dataVersion)
+      device.value.version_name = dataVersion.name
+  }
+  if (!device.value?.version && device.value?.version_name) {
+    const { data: dataVersion } = await supabase
+      .from('app_versions')
+      .select(`
+          id
+      `)
+      .eq('name', device.value!.version_name)
+      .single()
+
+    if (dataVersion)
+      device.value.version = dataVersion.id
+  }
+}
 async function getDevice() {
   if (!id.value)
     return
@@ -173,21 +191,8 @@ async function getDevice() {
       })
 
     const data = dataD[0]
-    const deviceValue = data as Database['public']['Tables']['devices']['Row'] & Device
-    device.value = deviceValue
-    if (!data?.version) {
-      return
-    }
-    const { data: dataVersion } = await supabase
-      .from('app_versions')
-      .select(`
-          name
-      `)
-      .eq('id', data!.version)
-      .single()
-
-    if (dataVersion)
-      deviceValue.version = dataVersion! as any as typeof deviceValue.version
+    device.value = data
+    await getVersionInfo()
   }
   catch (error) {
     console.error('no devices', error)
@@ -220,7 +225,6 @@ async function loadRevertToNativeVersion() {
 
 async function loadData() {
   isLoading.value = true
-  logs.value = []
   await Promise.all([
     getDevice(),
     getChannelOverride(),
@@ -349,6 +353,10 @@ function openChannel() {
   if (packageId.value && channelDevice.value?.id)
     router.push(`/app/p/${packageId.value}/channel/${channelDevice.value.id}`)
 }
+function openBundle() {
+  if (packageId.value && device.value?.version)
+    router.push(`/app/p/${packageId.value}/bundle/${device.value.version}`)
+}
 </script>
 
 <template>
@@ -381,8 +389,8 @@ function openChannel() {
             <InfoRow v-if="device.plugin_version" :label="t('plugin-version')">
               {{ device.plugin_version }}
             </InfoRow>
-            <InfoRow v-if="device.version.name" :label="t('version')">
-              {{ device.version.name }}
+            <InfoRow v-if="device.version_name" :label="t('version')" is-link @click="openBundle()">
+              {{ device.version_name }}
             </InfoRow>
             <InfoRow v-if="device.version_build" :label="t('version-builtin')">
               {{ device.version_build }}
