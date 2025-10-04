@@ -31,8 +31,8 @@ interface publicDevice {
 
 export function filterDeviceKeys(devices: Database['public']['Tables']['devices']['Row'][]) {
   return devices.map((device) => {
-    const { updated_at, device_id, custom_id, is_prod, is_emulator, version_name, app_id, platform, plugin_version, os_version, version_build } = device
-    return { updated_at, device_id, custom_id, is_prod, is_emulator, version_name, app_id, platform, plugin_version, os_version, version_build }
+    const { updated_at, device_id, custom_id, is_prod, is_emulator, version_name, version, app_id, platform, plugin_version, os_version, version_build } = device
+    return { updated_at, device_id, custom_id, is_prod, is_emulator, version_name, version, app_id, platform, plugin_version, os_version, version_build }
   })
 }
 
