@@ -90,7 +90,6 @@ export const install: UserModule = ({ router }) => {
         .reduce((acc, segment, i) => {
           // Only add clickable segments
           const isValid = isValidClickableSegment(segment, i, splittedPath.length, splittedPath)
-          console.log({ segment, i, isValid, splittedPath })
           if (isValid) {
             // Build the path up to this segment
             const pathUpToHere = `/${splittedPath.slice(0, i + 1).join('/')}`
