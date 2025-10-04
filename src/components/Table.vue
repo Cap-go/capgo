@@ -204,6 +204,11 @@ const debouncedSearch = useDebounceFn(() => {
   emit('update:search', searchVal.value)
 }, 1000)
 
+const hasLoadingCycleCompleted = ref(false)
+const shouldShowRows = computed(() => !props.isLoading && props.elementList.length !== 0)
+const shouldShowEmptyState = computed(() => !props.isLoading && props.elementList.length === 0 && hasLoadingCycleCompleted.value)
+const shouldShowSkeleton = computed(() => !shouldShowRows.value && !shouldShowEmptyState.value)
+
 watch(() => props.columns, () => {
   debouncedUpdateUrlParams()
   debouncedReload()
@@ -224,6 +229,16 @@ watch(() => props.currentPage, () => {
   debouncedUpdateUrlParams()
   debouncedReload()
 })
+
+watch(() => props.isLoading, (loading, previousLoading) => {
+  if (previousLoading && !loading)
+    hasLoadingCycleCompleted.value = true
+}, { immediate: true })
+
+watch(() => props.elementList, (list) => {
+  if (list.length > 0)
+    hasLoadingCycleCompleted.value = true
+}, { immediate: true })
 
 function displayValueKey(elem: any, col: TableColumn | undefined) {
   if (!col)
@@ -323,21 +338,21 @@ const RenderCell = defineComponent<{ renderer?: (item: any) => any, item: any }>
 <template>
   <div class="pb-4 overflow-x-auto md:pb-0">
     <div class="flex items-start justify-between p-3 pb-4 md:items-center">
-      <div class="flex">
-        <button class="mr-2 inline-flex items-center border border-gray-300 rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-hidden focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 cursor-pointer" type="button" @click="emit('reset')">
-          <IconReload v-if="!isLoading" class="w-4 h-4 mr-0 md:mr-2" />
-          <Spinner v-else size="w-4 h-4 mr-0 md:mr-2" />
+      <div class="flex h-10 md:mb-0">
+        <button class="mr-2 inline-flex items-center border border-gray-300 rounded-md bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-hidden focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 cursor-pointer" type="button" @click="emit('reset')">
+          <IconReload v-if="!isLoading" class="m-1 md:mr-2" />
+          <Spinner v-else size="w-[16.8px] h-[16.8px] m-1 mr-2" />
           <span class="hidden text-sm md:block">{{ t('reload') }}</span>
         </button>
         <div v-if="showAdd" class="mr-2 p-px rounded-lg from-cyan-500 to-purple-500 bg-linear-to-r">
-          <button class="inline-flex items-center rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-hidden focus:ring-4 focus:ring-gray-200 dark:hover:bg-gray-700 dark:focus:ring-gray-700 cursor-pointer" type="button" @click="emit('add')">
-            <plusOutline v-if="!isLoading" class="w-4 h-4 mr-0 md:mr-2" />
-            <Spinner v-else size="w-4 h-4 mr-0 md:mr-2" />
+          <button class="inline-flex items-center rounded-md bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-hidden focus:ring-4 focus:ring-gray-200 dark:hover:bg-gray-700 dark:focus:ring-gray-700 cursor-pointer" type="button" @click="emit('add')">
+            <plusOutline v-if="!isLoading" class="m-1 md:mr-2" />
+            <Spinner v-else size="w-[16.8px] h-[16.8px] m-1 mr-2" />
             <span class="hidden text-sm md:block">{{ t('add-one') }}</span>
           </button>
         </div>
-        <div v-if="filterText && filterList.length" class="d-dropdown">
-          <button tabindex="0" class="mr-2 inline-flex items-center border border-gray-300 rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-hidden focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 cursor-pointer">
+        <div v-if="filterText && filterList.length" class="d-dropdown h-10">
+          <button tabindex="0" class="mr-2 inline-flex items-center border border-gray-300 rounded-md bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-hidden focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 cursor-pointer h-full">
             <div v-if="filterActivated" class="absolute inline-flex items-center justify-center w-6 h-6 text-xs font-bold text-white bg-red-500 border-2 border-white rounded-full -right-2 -top-2 dark:border-gray-900">
               {{ filterActivated }}
             </div>
@@ -398,7 +413,7 @@ const RenderCell = defineComponent<{ renderer?: (item: any) => any, item: any }>
             </th>
           </tr>
         </thead>
-        <tbody v-if="!isLoading && elementList.length !== 0">
+        <tbody v-if="shouldShowRows">
           <tr
             v-for="(elem, i) in elementList" :key="i"
             class="bg-white border-b dark:border-gray-700 dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-600"
@@ -450,7 +465,7 @@ const RenderCell = defineComponent<{ renderer?: (item: any) => any, item: any }>
             </template>
           </tr>
         </tbody>
-        <tbody v-else-if="!isLoading && elementList.length === 0">
+        <tbody v-else-if="shouldShowEmptyState">
           <tr>
             <td :colspan="columns.length + (props.massSelect ? 1 : 0)" class="px-4 md:px-6 py-2 md:py-4 text-center text-gray-500 dark:text-gray-400">
               {{ t('no_elements_found') }}
@@ -458,7 +473,7 @@ const RenderCell = defineComponent<{ renderer?: (item: any) => any, item: any }>
           </tr>
         </tbody>
         <tbody v-else>
-          <tr v-for="i in 10" :key="i" :class="{ 'animate-pulse duration-1000': isLoading }">
+          <tr v-for="i in 10" :key="i" :class="{ 'animate-pulse duration-1000': shouldShowSkeleton }">
             <td v-if="props.massSelect" class="px-4 md:px-6 py-2 md:py-4" :style="`width: ${getSkeletonWidth()}`">
               <div class="rounded-full bg-gray-200 dark:bg-gray-700 w-full mb-4 h-2.5" />
             </td>
