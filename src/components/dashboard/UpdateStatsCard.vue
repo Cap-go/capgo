@@ -7,7 +7,6 @@ import InformationInfo from '~icons/heroicons/information-circle'
 import UpdateStatsChart from '~/components/UpdateStatsChart.vue'
 import { useSupabase } from '~/services/supabase'
 import { useDashboardAppsStore } from '~/stores/dashboardApps'
-import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
 import { createUndefinedArray, incrementArrayValue } from '~/utils/chartOptimizations'
 
@@ -61,7 +60,6 @@ function filterToBillingPeriod(fullData: (number | undefined)[], last30DaysStart
 }
 
 const { t } = useI18n()
-const main = useMainStore()
 const organizationStore = useOrganizationStore()
 const subscription_anchor_start = dayjs(organizationStore.currentOrganization?.subscription_start).format('YYYY/MM/D')
 const subscription_anchor_end = dayjs(organizationStore.currentOrganization?.subscription_end).format('YYYY/MM/D')

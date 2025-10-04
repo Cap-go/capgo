@@ -10,7 +10,6 @@ import { useRoute } from 'vue-router'
 import InformationInfo from '~icons/heroicons/information-circle'
 import { useChartData } from '~/services/chartDataService'
 import { useSupabase } from '~/services/supabase'
-import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
 
 const props = defineProps({
@@ -25,7 +24,6 @@ Chart.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip)
 const isDark = useDark()
 const { t } = useI18n()
 const route = useRoute('/app/p/[package]')
-const main = useMainStore()
 const organizationStore = useOrganizationStore()
 
 const appId = ref('')
