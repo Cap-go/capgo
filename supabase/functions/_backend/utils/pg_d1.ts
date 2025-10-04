@@ -79,55 +79,48 @@ export function requestInfosPostgresV2(
   platform: string,
   app_id: string,
   device_id: string,
-  version_name: string,
   defaultChannel: string,
   drizzleCient: ReturnType<typeof getDrizzleClientD1>,
 ) {
   const { versionAlias, channelDevicesAlias, channelAlias } = getAliasV2()
 
-  const appVersions = drizzleCient
-    .select({
-      id: versionAlias.id,
-    })
-    .from(versionAlias)
-    .where(or(eq(versionAlias.name, version_name), eq(versionAlias.app_id, app_id)))
-    .limit(1)
-    .then(data => data.at(0))
-
+  const versionSelect = {
+    id: sql<number>`${versionAlias.id}`.as('vid'),
+    name: sql<string>`${versionAlias.name}`.as('vname'),
+    checksum: sql<string | null>`${versionAlias.checksum}`.as('vchecksum'),
+    session_key: sql<string | null>`${versionAlias.session_key}`.as('vsession_key'),
+    storage_provider: sql<string>`${versionAlias.storage_provider}`.as('vstorage_provider'),
+    external_url: sql<string | null>`${versionAlias.external_url}`.as('vexternal_url'),
+    min_update_version: sql<string | null>`${versionAlias.min_update_version}`.as('vminUpdateVersion'),
+    r2_path: sql`${versionAlias.r2_path}`.mapWith(versionAlias.r2_path).as('vr2_path'),
+  }
+  const channelSelect = {
+    id: channelAlias.id,
+    name: channelAlias.name,
+    app_id: channelAlias.app_id,
+    allow_dev: channelAlias.allow_dev,
+    allow_emulator: channelAlias.allow_emulator,
+    disable_auto_update_under_native: channelAlias.disable_auto_update_under_native,
+    disable_auto_update: channelAlias.disable_auto_update,
+    ios: channelAlias.ios,
+    android: channelAlias.android,
+    allow_device_self_set: channelAlias.allow_device_self_set,
+    public: channelAlias.public,
+  }
+  const manifestSelect = sql<{ file_name: string, file_hash: string, s3_path: string }[]>`json_group_array(json_object(
+        'file_name', ${schemaV2.manifest.file_name},
+        'file_hash', ${schemaV2.manifest.file_hash},
+        's3_path', ${schemaV2.manifest.s3_path}
+      ))`
   const channelDeviceQuery = drizzleCient
     .select({
       channel_devices: {
         device_id: channelDevicesAlias.device_id,
         app_id: sql<string>`${channelDevicesAlias.app_id}`.as('cd_app_id'),
       },
-      version: {
-        id: sql<number>`${versionAlias.id}`.as('vid'),
-        name: sql<string>`${versionAlias.name}`.as('vname'),
-        checksum: sql<string | null>`${versionAlias.checksum}`.as('vchecksum'),
-        session_key: sql<string | null>`${versionAlias.session_key}`.as('vsession_key'),
-        storage_provider: sql<string>`${versionAlias.storage_provider}`.as('vstorage_provider'),
-        external_url: sql<string | null>`${versionAlias.external_url}`.as('vexternal_url'),
-        min_update_version: sql<string | null>`${versionAlias.min_update_version}`.as('vminUpdateVersion'),
-        r2_path: sql`${versionAlias.r2_path}`.mapWith(versionAlias.r2_path).as('vr2_path'),
-      },
-      channels: {
-        id: channelAlias.id,
-        name: channelAlias.name,
-        app_id: channelAlias.app_id,
-        allow_dev: channelAlias.allow_dev,
-        allow_emulator: channelAlias.allow_emulator,
-        disable_auto_update_under_native: channelAlias.disable_auto_update_under_native,
-        disable_auto_update: channelAlias.disable_auto_update,
-        ios: channelAlias.ios,
-        android: channelAlias.android,
-        allow_device_self_set: channelAlias.allow_device_self_set,
-        public: channelAlias.public,
-      },
-      manifestEntries: sql<{ file_name: string, file_hash: string, s3_path: string }[]>`json_group_array(json_object(
-        'file_name', ${schemaV2.manifest.file_name},
-        'file_hash', ${schemaV2.manifest.file_hash},
-        's3_path', ${schemaV2.manifest.s3_path}
-      ))`,
+      version: versionSelect,
+      channels: channelSelect,
+      manifestEntries: manifestSelect,
     },
     )
     .from(channelDevicesAlias)
@@ -147,34 +140,9 @@ export function requestInfosPostgresV2(
   const platformQuery = platform === 'android' ? channelAlias.android : channelAlias.ios
   const channelQuery = drizzleCient
     .select({
-      version: {
-        id: sql<number>`${versionAlias.id}`.as('vid'),
-        name: sql<string>`${versionAlias.name}`.as('vname'),
-        checksum: sql<string | null>`${versionAlias.checksum}`.as('vchecksum'),
-        session_key: sql<string | null>`${versionAlias.session_key}`.as('vsession_key'),
-        storage_provider: sql<string>`${versionAlias.storage_provider}`.as('vstorage_provider'),
-        external_url: sql<string | null>`${versionAlias.external_url}`.as('vexternal_url'),
-        min_update_version: sql<string | null>`${versionAlias.min_update_version}`.as('vminUpdateVersion'),
-        r2_path: sql`${versionAlias.r2_path}`.mapWith(versionAlias.r2_path).as('vr2_path'),
-      },
-      channels: {
-        id: channelAlias.id,
-        name: channelAlias.name,
-        app_id: channelAlias.app_id,
-        allow_dev: channelAlias.allow_dev,
-        allow_emulator: channelAlias.allow_emulator,
-        disable_auto_update_under_native: channelAlias.disable_auto_update_under_native,
-        disable_auto_update: channelAlias.disable_auto_update,
-        ios: channelAlias.ios,
-        android: channelAlias.android,
-        allow_device_self_set: channelAlias.allow_device_self_set,
-        public: channelAlias.public,
-      },
-      manifestEntries: sql<{ file_name: string, file_hash: string, s3_path: string }[]>`json_group_array(json_object(
-        'file_name', ${schemaV2.manifest.file_name},
-        'file_hash', ${schemaV2.manifest.file_hash},
-        's3_path', ${schemaV2.manifest.s3_path}
-      ))`,
+      version: versionSelect,
+      channels: channelSelect,
+      manifestEntries: manifestSelect,
     })
     .from(channelAlias)
     .innerJoin(versionAlias, eq(channelAlias.version, versionAlias.id))
@@ -199,9 +167,9 @@ export function requestInfosPostgresV2(
     return parseManifestEntries(c, data, 'channel')
   })
 
-  return Promise.all([channelDevice, channel, appVersions])
-    .then(([channelOverride, channelData, versionData]) => {
-      const responseData = { versionData, channelData, channelOverride }
+  return Promise.all([channelDevice, channel])
+    .then(([channelOverride, channelData]) => {
+      const responseData = { channelData, channelOverride }
       cloudlog({ requestId: c.get('requestId'), message: 'Final response data:', responseData })
       return responseData
     })

@@ -5,26 +5,29 @@ import ky from 'ky'
 import { computed, h, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
+import { toast } from 'vue-sonner'
 import { formatDate } from '~/services/date'
 import { defaultApiHost, useSupabase } from '~/services/supabase'
 
 const props = defineProps<{
   appId: string
   ids?: string[]
-  versionId?: number | undefined
+  versionName?: string | undefined
   showAddButton?: boolean
+  channel?: unknown
 }>()
 
 const emit = defineEmits(['addDevice'])
 
-type Element = Database['public']['Tables']['devices']['Row'] & { version: Database['public']['Tables']['app_versions']['Row'] }
+// TODO: delete the old version check when all deivces uses the new version system
+type Device = Database['public']['Tables']['devices']['Row']
 
 const { t } = useI18n()
 const supabase = useSupabase()
 const router = useRouter()
 const total = ref(0)
 const search = ref('')
-const elements = ref<Element[]>([])
+const elements = ref<Device[]>([])
 const isLoading = ref(false)
 const currentPage = ref(1)
 const filters = ref({
@@ -43,7 +46,7 @@ const columns = ref<TableColumn[]>([
     mobile: true,
     sortable: true,
     head: true,
-    onClick: (elem: Element) => openOne(elem),
+    onClick: (elem: Device) => openOne(elem),
     renderFunction: (item) => {
       const customId = item.custom_id?.trim()
       return h('div', { class: 'flex flex-col text-slate-800 dark:text-white' }, [
@@ -59,7 +62,7 @@ const columns = ref<TableColumn[]>([
     key: 'updated_at',
     mobile: false,
     sortable: 'desc',
-    displayFunction: (elem: Element) => formatDate(elem.updated_at ?? ''),
+    displayFunction: (elem: Device) => formatDate(elem.updated_at ?? ''),
   },
   {
     label: t('platform'),
@@ -67,16 +70,16 @@ const columns = ref<TableColumn[]>([
     mobile: true,
     sortable: true,
     head: true,
-    displayFunction: (elem: Element) => `${elem.platform} ${elem.os_version}`,
+    displayFunction: (elem: Device) => `${elem.platform} ${elem.os_version}`,
   },
   {
     label: t('bundle'),
-    key: 'version',
+    key: 'version_name',
     mobile: true,
     sortable: true,
     head: true,
-    displayFunction: (elem: Element) => elem.version.name,
-    onClick: (elem: Element) => openOneVersion(elem),
+    displayFunction: (elem: Device) => getVersionLabel(elem) || 'unknown',
+    onClick: (elem: Device) => openOneVersion(elem),
   },
 ])
 
@@ -93,14 +96,6 @@ async function getDevicesID() {
 
   const channelDev = data?.map(d => d.device_id) ?? []
   return [...channelDev]
-}
-
-interface DeviceData {
-  app_id: string
-  device_id: string
-  version: number
-  created_at: string
-  custom_id: string | null
 }
 
 async function countDevices() {
@@ -153,7 +148,7 @@ async function getData() {
         },
         body: JSON.stringify({
           appId: props.appId,
-          versionId: props.versionId,
+          versionName: props.versionName,
           devicesId: ids.length ? ids : undefined,
           search: search.value ? search.value : undefined,
           order: columns.value.filter(elem => elem.sortable).map(elem => ({ key: elem.key as string, sortable: elem.sortable })),
@@ -162,34 +157,16 @@ async function getData() {
           customIdMode: filters.value.CustomId,
         }),
       })
-      .then(res => res.json<DeviceData[]>())
+      .then(res => res.json<Device[]>())
       .catch((err) => {
         console.log('Cannot get devices', err)
-        return [] as DeviceData[]
+        return [] as Device[]
       })
     // console.log('dataD', dataD)
 
-    const versionPromises = dataD.map((element) => {
-      return supabase
-        .from('app_versions')
-        .select('name, id')
-        .eq('id', element.version)
-        .single()
-    })
+    await ensureVersionNames(dataD)
 
-    // Cast so that we can set version from the other request
-    const finalData = dataD as any as Database['public']['Tables']['devices']['Row'] & { version: Database['public']['Tables']['app_versions']['Row'] }[]
-
-    // This is faster then awaiting in a big loop
-    const versionData = await Promise.all(versionPromises)
-    versionData.forEach((version, index) => {
-      if (version.error)
-        finalData[index].version = { name: 'unknown' } as any
-      else
-        finalData[index].version = version.data as any
-    })
-
-    elements.value.push(...finalData as any)
+    elements.value.push(...dataD)
   }
   catch (error) {
     console.error(error)
@@ -219,15 +196,86 @@ async function refreshData() {
     console.error(error)
   }
 }
-async function openOne(one: Element) {
+async function openOne(one: Device) {
   router.push(`/app/p/${props.appId}/d/${one.device_id}`)
 }
-async function openOneVersion(one: Element) {
-  router.push(`/app/p/${props.appId}/bundle/${one.version?.id}`)
+async function openOneVersion(one: Device) {
+  if (!props.appId) {
+    toast.error(t('app-id-missing', 'App ID is missing'))
+    return
+  }
+
+  if (one.version) {
+    router.push(`/app/p/${props.appId}/bundle/${one.version}`)
+    return
+  }
+
+  const versionName = getVersionLabel(one)
+  if (!versionName || versionName === 'unknown') {
+    toast.error(t('version-name-missing', 'Version name is missing'))
+    return
+  }
+
+  const loadingToastId = toast.loading(t('loading-version', 'Loading version…'))
+  const { data: versionRecord, error } = await supabase
+    .from('app_versions')
+    .select('id')
+    .eq('app_id', props.appId)
+    .eq('name', versionName)
+    .single()
+  toast.dismiss(loadingToastId)
+  if (error || !versionRecord?.id) {
+    toast.error(t('cannot-find-version', 'Cannot find version'))
+    return
+  }
+  router.push(`/app/p/${props.appId}/bundle/${versionRecord.id}`)
 }
 
 function handleAddDevice() {
   emit('addDevice')
+}
+
+// TODO: delete the old version check when all deivces uses the new version system
+function getVersionLabel(device: Device): string {
+  if (device.version_name && device.version_name !== '')
+    return device.version_name
+  if (typeof device.version === 'object' && device.version !== null && typeof (device.version as any).name === 'string')
+    return (device.version as any).name as string
+  if (typeof device.version === 'number')
+    return String(device.version)
+  if (typeof device.version === 'string')
+    return device.version
+  return ''
+}
+
+// TODO: delete the old version check when all deivces uses the new version system
+async function ensureVersionNames(devices: Device[]) {
+  const missingName = devices.filter(device => (!device.version_name || device.version_name === '') && typeof device.version === 'number')
+  if (!missingName.length)
+    return
+
+  const versionIds = [...new Set(missingName.map(device => device.version as number))]
+  if (!versionIds.length)
+    return
+
+  const { data: versionRecords, error } = await supabase
+    .from('app_versions')
+    .select('id, name')
+    .in('id', versionIds)
+
+  if (error || !versionRecords?.length)
+    return
+
+  const versionMap = versionRecords.reduce<Record<number, string>>((acc, record) => {
+    acc[record.id] = record.name
+    return acc
+  }, {})
+
+  missingName.forEach((device) => {
+    const id = typeof device.version === 'number' ? device.version : null
+    if (id && versionMap[id])
+      device.version_name = versionMap[id]
+  })
 }
 </script>
 

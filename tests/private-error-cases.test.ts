@@ -66,7 +66,7 @@ describe('[POST] /private/create_device - Error Cases', () => {
         app_id: 'nonexistent.app',
         device_id: randomUUID(),
         platform: 'android',
-        version: 1,
+        version_name: '1.0.0',
       }),
     })
     expect(response.status).toBe(404)
@@ -82,7 +82,7 @@ describe('[POST] /private/create_device - Error Cases', () => {
         app_id: 'com.demoadmin.app', // Use the admin app that test user doesn't have access to
         device_id: randomUUID(),
         platform: 'android',
-        version: 1,
+        version_name: '1.0.0',
       }),
     })
 

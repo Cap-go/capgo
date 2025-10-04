@@ -13,8 +13,10 @@ import { getAppOwnerPostgresV2, getAppVersionPostgresV2, getDrizzleClientD1Sessi
 import { parsePluginBody } from '../utils/plugin_parser.ts'
 import { createStatsVersion, opnPremStats, sendStatsAndDevice } from '../utils/stats.ts'
 import { deviceIdRegex, INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, isLimited, MISSING_STRING_APP_ID, MISSING_STRING_DEVICE_ID, MISSING_STRING_PLATFORM, MISSING_STRING_VERSION_NAME, MISSING_STRING_VERSION_OS, NON_STRING_APP_ID, NON_STRING_DEVICE_ID, NON_STRING_PLATFORM, NON_STRING_VERSION_NAME, NON_STRING_VERSION_OS, reverseDomainRegex } from '../utils/utils.ts'
+import { ALLOWED_STATS_ACTIONS } from './stats_actions.ts'
 
 z.config(z.locales.en())
+
 export const jsonRequestSchema = z.object({
   app_id: z.string({
     error: issue => issue.input === undefined ? MISSING_STRING_APP_ID : NON_STRING_APP_ID,
@@ -36,7 +38,7 @@ export const jsonRequestSchema = z.object({
   }),
   version_code: z.optional(z.string()),
   version_build: z.optional(z.string()),
-  action: z.optional(z.string()),
+  action: z.optional(z.enum(ALLOWED_STATS_ACTIONS)),
   custom_id: z.optional(z.string()),
   channel: z.optional(z.string()),
   defaultChannel: z.optional(z.string()),
@@ -68,7 +70,7 @@ async function post(c: Context, drizzleCient: ReturnType<typeof getDrizzleClient
     plugin_version,
     version_build,
     os_version: version_os,
-    version: 0,
+    version_name,
     is_emulator: is_emulator ?? false,
     is_prod: is_prod ?? true,
     custom_id,
@@ -101,14 +103,14 @@ async function post(c: Context, drizzleCient: ReturnType<typeof getDrizzleClient
   if (!appOwner.plan_valid) {
     throw simpleError('action_not_allowed', 'Action not allowed', { appVersion, app_id, owner_org: appVersion.owner_org })
   }
-  device.version = appVersion.id
+  // device.version = appVersion.id
   if (action === 'set' && !device.is_emulator && device.is_prod) {
-    await createStatsVersion(c, device.version, app_id, 'install')
+    await createStatsVersion(c, appVersion.id, app_id, 'install')
     if (old_version_name) {
       const oldVersion = isV2 ? await getAppVersionPostgresV2(c, app_id, old_version_name, undefined, drizzleCient as ReturnType<typeof getDrizzleClientD1Session>) : await getAppVersionPostgres(c, app_id, old_version_name, undefined, drizzleCient as ReturnType<typeof getDrizzleClient>)
       if (oldVersion && oldVersion.id !== appVersion.id) {
         await createStatsVersion(c, oldVersion.id, app_id, 'uninstall')
-        statsActions.push({ action: 'uninstall', versionId: oldVersion.id })
+        statsActions.push({ action: 'uninstall', versionName: old_version_name ?? 'unknown' })
       }
     }
   }
@@ -129,7 +131,7 @@ async function post(c: Context, drizzleCient: ReturnType<typeof getDrizzleClient
       }, appVersion.owner_org, app_id, '0 0 * * 1')
     }
   }
-  statsActions.push({ action } as unknown as StatsActions)
+  statsActions.push({ action: action as Database['public']['Enums']['stats_action'] })
   await sendStatsAndDevice(c, device, statsActions)
   return c.json(BRES)
 }

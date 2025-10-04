@@ -10,7 +10,7 @@ const bodySchema = z.object({
   device_id: z.uuid(),
   app_id: z.string(),
   platform: z.enum(['ios', 'android']),
-  version: z.number(),
+  version_name: z.string(),
 })
 
 export const app = new Hono<MiddlewareKeyVariables>()
@@ -21,7 +21,7 @@ interface CreateDeviceBody {
   device_id: string
   app_id: string
   platform: string
-  version: number
+  version_name: string
 }
 
 app.post('/', middlewareV2(['all', 'write']), async (c) => {
@@ -67,7 +67,7 @@ app.post('/', middlewareV2(['all', 'write']), async (c) => {
   await createStatsDevices(c, {
     app_id: safeBody.app_id,
     device_id: safeBody.device_id,
-    version: safeBody.version,
+    version_name: safeBody.version_name,
     platform: safeBody.platform,
     plugin_version: '0.0.0',
     os_version: '0.0.0',

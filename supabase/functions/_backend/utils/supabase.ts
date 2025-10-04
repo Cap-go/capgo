@@ -704,7 +704,7 @@ export async function trackDevicesSB(c: Context, device: DeviceWithoutCreatedAt)
 
   const { data: existingRow, error } = await client
     .from('devices')
-    .select('version, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator')
+    .select('version_name, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator')
     .eq('app_id', device.app_id)
     .eq('device_id', device.device_id)
     .maybeSingle()
@@ -730,7 +730,7 @@ export async function trackDevicesSB(c: Context, device: DeviceWithoutCreatedAt)
     os_version: normalizedDevice.os_version ?? undefined,
     version_build: normalizedDevice.version_build ?? undefined,
     custom_id: normalizedDevice.custom_id ?? undefined,
-    version: normalizedDevice.version ?? device.version,
+    version_name: normalizedDevice.version_name ?? device.version_name,
     is_prod: normalizedDevice.is_prod,
     is_emulator: normalizedDevice.is_emulator,
   }
@@ -740,7 +740,7 @@ export async function trackDevicesSB(c: Context, device: DeviceWithoutCreatedAt)
     .upsert(payload, { onConflict: 'device_id,app_id' })
 }
 
-export function trackLogsSB(c: Context, app_id: string, device_id: string, action: Database['public']['Enums']['stats_action'], version_id: number) {
+export function trackLogsSB(c: Context, app_id: string, device_id: string, action: Database['public']['Enums']['stats_action'], version_name: string) {
   return supabaseAdmin(c)
     .from('stats')
     .insert(
@@ -749,7 +749,7 @@ export function trackLogsSB(c: Context, app_id: string, device_id: string, actio
         created_at: new Date().toISOString(),
         device_id,
         action,
-        version: version_id,
+        version_name,
       },
     )
 }
@@ -804,9 +804,9 @@ export async function readStatsSB(c: Context, params: ReadStatsParams) {
   if (params.search) {
     cloudlog({ requestId: c.get('requestId'), message: 'search', search: params.search })
     if (params.deviceIds?.length)
-      query = query.ilike('version_build', `${params.search}%`)
+      query = query.or(`version_build.ilike.${params.search}%,version_name.ilike.${params.search}%`)
     else
-      query = query.or(`device_id.ilike.${params.search}%,version_build.ilike.${params.search}%`)
+      query = query.or(`device_id.ilike.${params.search}%,version_build.ilike.${params.search}%,version_name.ilike.${params.search}%`)
   }
 
   if (params.order?.length) {
@@ -856,9 +856,9 @@ export async function readDevicesSB(c: Context, params: ReadDevicesParams, custo
   if (params.search) {
     cloudlog({ requestId: c.get('requestId'), message: 'search', search: params.search })
     if (params.deviceIds?.length)
-      query = query.ilike('custom_id', `${params.search}%`)
+      query = query.or(`custom_id.ilike.${params.search}%,version_name.ilike.${params.search}%`)
     else
-      query = query.or(`device_id.ilike.${params.search}%,custom_id.ilike.${params.search}%`)
+      query = query.or(`device_id.ilike.${params.search}%,custom_id.ilike.${params.search}%,version_name.ilike.${params.search}%`)
   }
   if (params.order?.length) {
     params.order.forEach((col) => {
@@ -868,8 +868,8 @@ export async function readDevicesSB(c: Context, params: ReadDevicesParams, custo
       }
     })
   }
-  if (params.version_id)
-    query = query.eq('version_id', params.version_id)
+  if (params.version_name)
+    query = query.eq('version_name', params.version_name)
 
   const { data, error } = await query
 

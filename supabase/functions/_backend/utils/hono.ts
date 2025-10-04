@@ -236,7 +236,7 @@ export function getIsV2(c: Context) {
   const isV2 = getRuntimeKey() === 'workerd' ? Number.parseFloat(getEnv(c, 'IS_V2') ?? '0') : 0.0
   cloudlog({ requestId: c.get('requestId'), message: 'isV2', isV2 })
   if (c.req.url.endsWith('_v2')) {
-    // allow to force v2 for update_v2 or update_lite_v2 or stats_v2
+    // allow to force v2 for update_v2 or stats_v2
     return true
   }
   if (isV2 && Math.random() < isV2) {
