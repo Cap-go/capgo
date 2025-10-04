@@ -440,6 +440,13 @@ describe('[POST] /triggers/cron_plan', () => {
       .eq('app_id', APPNAME)
     expect(resetStorageError).toBeFalsy()
 
+    // Clear cache
+    const { error: storageCacheError } = await supabase
+      .from('app_metrics_cache')
+      .delete()
+      .eq('org_id', ORG_ID)
+    expect(storageCacheError).toBeFalsy()
+
     // Run cron plan again
     const response2 = await fetch(`${BASE_URL}/triggers/cron_plan`, {
       method: 'POST',
