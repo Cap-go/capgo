@@ -680,6 +680,7 @@ export type Database = {
           updated_at: string
           version_name: string
           version_build: string | null
+          version: number | null
         }
         Insert: {
           app_id: string
@@ -694,6 +695,7 @@ export type Database = {
           updated_at: string
           version_name: string
           version_build?: string | null
+          version?: number | null
         }
         Update: {
           app_id?: string
@@ -708,6 +710,7 @@ export type Database = {
           updated_at?: string
           version_name?: string
           version_build?: string | null
+          version?: number | null
         }
         Relationships: []
       }

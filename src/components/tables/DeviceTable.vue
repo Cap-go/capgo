@@ -20,9 +20,7 @@ const props = defineProps<{
 const emit = defineEmits(['addDevice'])
 
 // TODO: delete the old version check when all deivces uses the new version system
-type Device = Database['public']['Tables']['devices']['Row'] & {
-  version?: number | { id?: number | null, name?: string | null } | null
-}
+type Device = Database['public']['Tables']['devices']['Row']
 
 const { t } = useI18n()
 const supabase = useSupabase()
@@ -206,14 +204,9 @@ async function openOneVersion(one: Device) {
     toast.error(t('app-id-missing', 'App ID is missing'))
     return
   }
-  const numericVersionId = typeof one.version === 'number'
-    ? one.version
-    : (typeof one.version === 'object' && one.version !== null && typeof (one.version as any).id === 'number'
-        ? (one.version as any).id as number
-        : null)
 
-  if (numericVersionId) {
-    router.push(`/app/p/${props.appId}/bundle/${numericVersionId}`)
+  if (one.version) {
+    router.push(`/app/p/${props.appId}/bundle/${one.version}`)
     return
   }
 
@@ -222,22 +215,14 @@ async function openOneVersion(one: Device) {
     toast.error(t('version-name-missing', 'Version name is missing'))
     return
   }
-  // TODO: delete the old version check when all deivces uses the new version system
-  if (one.version && typeof one.version === 'object' && one.version?.id) {
-    router.push(`/app/p/${props.appId}/bundle/${one.version.id}`)
-    return
-  }
-  if (one.version && typeof one.version === 'number') {
-    router.push(`/app/p/${props.appId}/bundle/${one.version}`)
-    return
-  }
+
   const loadingToastId = toast.loading(t('loading-version', 'Loading version…'))
   const { data: versionRecord, error } = await supabase
     .from('app_versions')
     .select('id')
     .eq('app_id', props.appId)
     .eq('name', versionName)
-    .maybeSingle()
+    .single()
   toast.dismiss(loadingToastId)
   if (error || !versionRecord?.id) {
     toast.error(t('cannot-find-version', 'Cannot find version'))

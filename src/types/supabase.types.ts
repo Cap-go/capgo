@@ -679,6 +679,7 @@ export type Database = {
           plugin_version: string
           updated_at: string
           version_name: string
+          version: number
           version_build: string | null
         }
         Insert: {
@@ -693,6 +694,7 @@ export type Database = {
           plugin_version?: string
           updated_at: string
           version_name?: string
+          version?: number
           version_build?: string | null
         }
         Update: {
@@ -707,6 +709,7 @@ export type Database = {
           plugin_version?: string
           updated_at?: string
           version_name?: string
+          version?: number
           version_build?: string | null
         }
         Relationships: []

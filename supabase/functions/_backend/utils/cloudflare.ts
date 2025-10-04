@@ -371,20 +371,6 @@ ORDER BY date`
   return [] as VersionUsageCF[]
 }
 
-interface DeviceRowCF {
-  app_id: string
-  device_id: string
-  version_name: string
-  platform: string
-  plugin_version: string
-  os_version: string
-  version_build: string
-  custom_id: string
-  is_prod: string
-  is_emulator: string
-  updated_at: string
-}
-
 export async function countDevicesCF(c: Context, app_id: string, customIdMode: boolean) {
   if (!c.env.DB_DEVICES)
     return 0
@@ -407,12 +393,12 @@ export async function countDevicesCF(c: Context, app_id: string, customIdMode: b
   catch (e) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Error reading device list', error: serializeError(e), query })
   }
-  return [] as DeviceRowCF[]
+  return [] as Database['public']['Tables']['devices']['Row'][]
 }
 
 export async function readDevicesCF(c: Context, params: ReadDevicesParams, customIdMode: boolean) {
   if (!c.env.DB_DEVICES)
-    return [] as DeviceRowCF[]
+    return [] as Database['public']['Tables']['devices']['Row'][]
 
   let deviceFilter = ''
   let rangeStart = params.rangeStart ?? 0
@@ -485,12 +471,12 @@ LIMIT ${rangeEnd} OFFSET ${rangeStart}`
     cloudlog({ requestId: c.get('requestId'), message: 'readDevicesCF exec await' })
     const res = await readD1
     cloudlog({ requestId: c.get('requestId'), message: 'readDevicesCF res', res })
-    return res.results as DeviceRowCF[]
+    return res.results as Database['public']['Tables']['devices']['Row'][]
   }
   catch (e) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Error reading device list', error: serializeError(e), query })
   }
-  return [] as DeviceRowCF[]
+  return [] as Database['public']['Tables']['devices']['Row'][]
 }
 
 interface StatRowCF {
