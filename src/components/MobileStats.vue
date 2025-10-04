@@ -10,7 +10,6 @@ import { useRoute } from 'vue-router'
 import InformationInfo from '~icons/heroicons/information-circle'
 import { useChartData } from '~/services/chartDataService'
 import { useSupabase } from '~/services/supabase'
-import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
 
 const props = defineProps({
@@ -25,7 +24,7 @@ Chart.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip)
 const isDark = useDark()
 const { t } = useI18n()
 const route = useRoute('/app/p/[package]')
-const main = useMainStore()
+const organizationStore = useOrganizationStore()
 
 const appId = ref('')
 const isLoading = ref(true)
@@ -109,11 +108,19 @@ watchEffect(async () => {
 })
 
 function lastRunDate() {
-  const lastRun = dayjs(main.statsTime.last_run).format('MMMM D, YYYY HH:mm')
+  const source = organizationStore.currentOrganization?.stats_updated_at
+  if (!source)
+    return `${t('last-run')}: ${t('unknown')}`
+
+  const lastRun = dayjs(source).format('MMMM D, YYYY HH:mm')
   return `${t('last-run')}: ${lastRun}`
 }
 function nextRunDate() {
-  const nextRun = dayjs(main.statsTime.next_run).format('MMMM D, YYYY HH:mm')
+  const source = organizationStore.currentOrganization?.next_stats_update_at
+  if (!source)
+    return `${t('next-run')}: ${t('unknown')}`
+
+  const nextRun = dayjs(source).format('MMMM D, YYYY HH:mm')
   return `${t('next-run')}: ${nextRun}`
 }
 </script>

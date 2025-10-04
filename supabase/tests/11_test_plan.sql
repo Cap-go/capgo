@@ -105,6 +105,7 @@ BEGIN
     UPDATE daily_mau set mau=floor((plan.mau - 1) / mau_count) where app_id='com.demo.app'; 
     UPDATE daily_bandwidth set bandwidth=floor((plan.bandwidth - convert_gb_to_bytes(0.5)) / bandwidth_count) where app_id='com.demo.app'; 
 
+    TRUNCATE TABLE "public"."app_metrics_cache";
     SELECT * from get_plan_usage_percent_detailed('046a36ac-e03c-4590-9257-bd6c9dba9ee8') limit 1 into usage;
 
     RETURN NEXT ok(usage.mau_percent <= 100, format('Plan usage MAU is less than the limit for "%s" plan', plan.name));
@@ -113,6 +114,7 @@ BEGIN
     -- here we don't set storage but we do check it because we have to make sure is_good_plan will not fail due to storage
     RETURN NEXT ok(usage.storage_percent < 100, format('Plan usage STORAGE is less than the limit for "%s" plan', plan.name));
 
+    TRUNCATE TABLE "public"."app_metrics_cache";
     SELECT * from get_total_metrics('046a36ac-e03c-4590-9257-bd6c9dba9ee8') INTO total_metrics;
     RETURN NEXT ok(total_metrics.mau > 0, format('Org total_metrics.mau > 0 for "%s" plan', plan.name));
     RETURN NEXT ok(total_metrics.bandwidth > 0, format('Org total_metrics.bandwidth > 0 for "%s" plan', plan.name));
@@ -133,12 +135,14 @@ BEGIN
     --
     UPDATE daily_mau set mau=floor((plan.mau - 1) / mau_count) * 1.5 where app_id='com.demo.app'; 
     UPDATE daily_bandwidth set bandwidth=floor((plan.bandwidth - convert_gb_to_bytes(0.5)) / bandwidth_count) * 1.5 where app_id='com.demo.app'; 
-    
+
+    TRUNCATE TABLE "public"."app_metrics_cache";
     SELECT * from get_plan_usage_percent_detailed('046a36ac-e03c-4590-9257-bd6c9dba9ee8') limit 1 into usage;
 
     RETURN NEXT ok(usage.mau_percent > 100, format('Plan usage MAU is more than the limit for "%s" plan', plan.name));
     RETURN NEXT ok(usage.bandwidth_percent > 100, format('Plan usage BANDWIDTH is more than the limit for "%s" plan', plan.name));
 
+    TRUNCATE TABLE "public"."app_metrics_cache";
     SELECT * from get_total_metrics('046a36ac-e03c-4590-9257-bd6c9dba9ee8') INTO total_metrics;
     RETURN NEXT ok(total_metrics.mau > 0, format('Org total_metrics.mau > 0 for "%s" plan', plan.name));
     RETURN NEXT ok(total_metrics.bandwidth > 0, format('Org total_metrics.bandwidth > 0 for "%s" plan', plan.name));

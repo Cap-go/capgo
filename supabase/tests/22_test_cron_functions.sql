@@ -3,7 +3,7 @@ BEGIN;
 CREATE EXTENSION "basejump-supabase_test_helpers";
 
 SELECT
-  plan (12);
+  plan (17);
 
 -- Test get_next_cron_time
 SELECT
@@ -95,6 +95,103 @@ SELECT
     one_month_ahead () > now()::timestamp,
     'one_month_ahead test - returns timestamp one month in future'
   );
+
+-- Seed helper data for get_next_stats_update_date tests
+DELETE FROM public.orgs
+  WHERE id IN (
+    '00000000-0000-0000-0000-000000000001',
+    '00000000-0000-0000-0000-000000000002',
+    '00000000-0000-0000-0000-000000000003'
+  );
+
+DELETE FROM public.stripe_info
+  WHERE customer_id IN ('cust_future_active', 'cust_expiring_today', 'cust_canceled_past');
+
+INSERT INTO public.orgs (id, created_by, management_email, name)
+VALUES
+  ('00000000-0000-0000-0000-000000000001', '6aa76066-55ef-4238-ade6-0b32334a4097', 'org1@capgo.app', 'Org Future Active'),
+  ('00000000-0000-0000-0000-000000000002', '6aa76066-55ef-4238-ade6-0b32334a4097', 'org2@capgo.app', 'Org Expiring Today'),
+  ('00000000-0000-0000-0000-000000000003', '6aa76066-55ef-4238-ade6-0b32334a4097', 'org3@capgo.app', 'Org Canceled Past'),
+  ('00000000-0000-0000-0000-000000000004', '6aa76066-55ef-4238-ade6-0b32334a4097', 'org4@capgo.app', 'Org Fourth Active');
+
+INSERT INTO public.stripe_info (customer_id, status, product_id, subscription_anchor_start, subscription_anchor_end, trial_at, is_good_plan, plan_usage)
+VALUES
+  ('cust_future_active', 'succeeded', 'prod_LQIregjtNduh4q', now() - interval '15 days', public.get_next_cron_time('0 3 * * *', now()) + interval '2 days', now() - interval '30 days', true, 0),
+  ('cust_expiring_today', 'succeeded', 'prod_LQIregjtNduh4q', now() - interval '30 days', public.get_next_cron_time('0 3 * * *', now()) + interval '1 hour', now() - interval '60 days', true, 0),
+  ('cust_canceled_past', 'succeeded', 'prod_LQIregjtNduh4q', now() - interval '10 days', now() + interval '20 days', now() - interval '40 days', true, 0),
+  ('cust_fourth_active', 'succeeded', 'prod_LQIregjtNduh4q', now() - interval '5 days', public.get_next_cron_time('0 3 * * *', now()) + interval '3 days', now() - interval '10 days', true, 0);
+
+UPDATE public.orgs
+SET customer_id = 'cust_future_active'
+WHERE id = '00000000-0000-0000-0000-000000000001';
+
+UPDATE public.orgs
+SET customer_id = 'cust_expiring_today'
+WHERE id = '00000000-0000-0000-0000-000000000002';
+
+UPDATE public.orgs
+SET customer_id = 'cust_canceled_past'
+WHERE id = '00000000-0000-0000-0000-000000000003';
+
+UPDATE public.orgs
+SET customer_id = 'cust_fourth_active'
+WHERE id = '00000000-0000-0000-0000-000000000004';
+
+WITH next_run AS (
+  SELECT public.get_next_cron_time('0 3 * * *', now()) AS t
+)
+UPDATE public.stripe_info si
+SET subscription_anchor_end = next_run.t - interval '1 minute'
+FROM next_run
+WHERE si.customer_id = 'cust_expiring_today';
+
+-- Test get_next_stats_update_date scenarios
+SELECT
+  ok (
+    get_next_stats_update_date('00000000-0000-0000-0000-000000000001') IS NOT NULL,
+    'get_next_stats_update_date returns timestamp for first active org'
+  );
+
+SELECT
+  ok (
+    get_next_stats_update_date('00000000-0000-0000-0000-000000000003') IS NOT NULL,
+    'get_next_stats_update_date returns timestamp for later active org'
+  );
+
+SELECT
+  is (
+    get_next_stats_update_date('00000000-0000-0000-0000-000000000003') -
+    get_next_stats_update_date('00000000-0000-0000-0000-000000000001'),
+    INTERVAL '4 minutes',
+    'Only paying orgs counted: org3 arrives 4 minutes after org1'
+  );
+
+-- Simulate edge case: next run boundary (org expires right before next cron)
+SELECT
+  is (
+    get_next_stats_update_date('00000000-0000-0000-0000-000000000002'),
+    NULL,
+    'Org expiring before cron should not receive an update time'
+  );
+
+SELECT
+  is (
+    get_next_stats_update_date('00000000-0000-0000-0000-000000000004') -
+    public.get_next_cron_time('0 3 * * *', now()),
+    INTERVAL '8 minutes',
+    'Fourth active org is scheduled 8 minutes after cron start (two slots)'
+  );
+
+DELETE FROM public.orgs WHERE id IN (
+  '00000000-0000-0000-0000-000000000001',
+  '00000000-0000-0000-0000-000000000002',
+  '00000000-0000-0000-0000-000000000003',
+  '00000000-0000-0000-0000-000000000004'
+);
+UPDATE public.orgs
+SET customer_id = NULL
+WHERE customer_id IN ('cust_future_active', 'cust_expiring_today', 'cust_canceled_past', 'cust_fourth_active');
+DELETE FROM public.stripe_info WHERE customer_id IN ('cust_future_active', 'cust_expiring_today', 'cust_canceled_past', 'cust_fourth_active');
 
 SELECT
   *
