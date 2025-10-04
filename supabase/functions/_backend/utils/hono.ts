@@ -41,7 +41,7 @@ export interface MiddlewareKeyVariables {
 
 export const useCors = cors({
   origin: '*',
-  allowHeaders: ['Content-Type', 'Authorization', 'capgkey', 'x-api-key', 'x-limited-key-id', 'apisecret', 'apikey', 'x-client-info'],
+  allowHeaders: ['Content-Type', 'Authorization', 'capgkey', 'capgo_api', 'x-api-key', 'x-limited-key-id', 'apisecret', 'apikey', 'x-client-info'],
   allowMethods: ['POST', 'GET', 'OPTIONS'],
 })
 
