@@ -134,6 +134,16 @@ BEGIN
 END;
 $function$;
 
+REVOKE
+EXECUTE ON FUNCTION public.get_app_metrics (org_id uuid)
+FROM
+    PUBLIC,
+    anon,
+    authenticated;
+
+GRANT
+EXECUTE ON FUNCTION public.get_app_metrics (org_id uuid) TO service_role;
+
 DROP FUNCTION IF EXISTS public.get_app_metrics (org_id uuid, start_date date, end_date date);
 
 CREATE OR REPLACE FUNCTION public.get_app_metrics (p_org_id uuid, p_start_date date, p_end_date date) RETURNS TABLE (
@@ -204,7 +214,8 @@ BEGIN
 END;
 $function$;
 
-REVOKE ALL ON FUNCTION public.get_app_metrics (uuid, date, date)
+REVOKE
+EXECUTE ON FUNCTION public.get_app_metrics (uuid, date, date)
 FROM
     PUBLIC,
     anon,
@@ -212,15 +223,6 @@ FROM
 
 GRANT
 EXECUTE ON FUNCTION public.get_app_metrics (uuid, date, date) TO service_role;
-
-REVOKE ALL ON FUNCTION public.get_app_metrics (uuid)
-FROM
-    PUBLIC,
-    anon,
-    authenticated;
-
-GRANT
-EXECUTE ON FUNCTION public.get_app_metrics (uuid) TO service_role;
 
 ALTER FUNCTION "public"."get_app_metrics" (
     "org_id" "uuid",

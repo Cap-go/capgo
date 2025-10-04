@@ -75,7 +75,7 @@ async function getNormalStats(c: Context, appId: string | null, ownerOrg: string
     ownerOrgId = data.owner_org
   }
 
-  const { data: metrics, error: metricsError } = await supabase.rpc('get_app_metrics', { p_org_id: ownerOrgId!, p_start_date: from.toISOString(), p_end_date: to.toISOString() })
+  const { data: metrics, error: metricsError } = await supabase.rpc('get_app_metrics', { p_org_id: ownerOrgId!, p_start_date: dayjs(from).utc().format('YYYY-MM-DD'), p_end_date: dayjs(to).utc().format('YYYY-MM-DD') })
   if (metricsError)
     return { data: null, error: metricsError }
   const graphDays = getDaysBetweenDates(from, to)

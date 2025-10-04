@@ -5,7 +5,6 @@ import { useI18n } from 'vue-i18n'
 import InformationInfo from '~icons/heroicons/information-circle'
 
 import { getDaysInCurrentMonth } from '~/services/date'
-import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
 
 const props = defineProps({
@@ -39,10 +38,17 @@ const props = defineProps({
   },
 })
 const { t } = useI18n()
-const main = useMainStore()
 const organizationStore = useOrganizationStore()
 const subscription_anchor_start = dayjs(organizationStore.currentOrganization?.subscription_start).format('YYYY/MM/D')
 const subscription_anchor_end = dayjs(organizationStore.currentOrganization?.subscription_end).format('YYYY/MM/D')
+const lastRunDisplay = computed(() => {
+  const source = organizationStore.currentOrganization?.stats_updated_at
+  return source ? dayjs(source).format('MMMM D, YYYY HH:mm') : t('unknown')
+})
+const nextRunDisplay = computed(() => {
+  const source = organizationStore.currentOrganization?.next_stats_update_at
+  return source ? dayjs(source).format('MMMM D, YYYY HH:mm') : t('unknown')
+})
 
 const total = computed(() => {
   const arr = props.datas as number[]
@@ -137,7 +143,7 @@ const lastDayEvolution = computed(() => {
                     {{ t('last-run') }}
                   </div>
                   <div class="text-sm font-medium">
-                    {{ dayjs(main.statsTime.last_run).format('MMMM D, YYYY HH:mm') }}
+                    {{ lastRunDisplay }}
                   </div>
                 </div>
               </div>
@@ -150,7 +156,7 @@ const lastDayEvolution = computed(() => {
                     {{ t('next-run') }}
                   </div>
                   <div class="text-sm font-medium">
-                    {{ dayjs(main.statsTime.next_run).format('MMMM D, YYYY HH:mm') }}
+                    {{ nextRunDisplay }}
                   </div>
                 </div>
               </div>
