@@ -78,7 +78,7 @@ const columns = ref<TableColumn[]>([
     mobile: true,
     sortable: true,
     head: true,
-    displayFunction: (elem: Device) => getVersionLabel(elem) || 'unknown',
+    displayFunction: (elem: Device) => elem.version_name ?? elem.version ?? 'unknown',
     onClick: (elem: Device) => openOneVersion(elem),
   },
 ])
@@ -210,18 +210,12 @@ async function openOneVersion(one: Device) {
     return
   }
 
-  const versionName = getVersionLabel(one)
-  if (!versionName || versionName === 'unknown') {
-    toast.error(t('version-name-missing', 'Version name is missing'))
-    return
-  }
-
   const loadingToastId = toast.loading(t('loading-version', 'Loading version…'))
   const { data: versionRecord, error } = await supabase
     .from('app_versions')
     .select('id')
     .eq('app_id', props.appId)
-    .eq('name', versionName)
+    .eq('name', one.version_name)
     .single()
   toast.dismiss(loadingToastId)
   if (error || !versionRecord?.id) {
@@ -233,19 +227,6 @@ async function openOneVersion(one: Device) {
 
 function handleAddDevice() {
   emit('addDevice')
-}
-
-// TODO: delete the old version check when all deivces uses the new version system
-function getVersionLabel(device: Device): string {
-  if (device.version_name && device.version_name !== '')
-    return device.version_name
-  if (typeof device.version === 'object' && device.version !== null && typeof (device.version as any).name === 'string')
-    return (device.version as any).name as string
-  if (typeof device.version === 'number')
-    return String(device.version)
-  if (typeof device.version === 'string')
-    return device.version
-  return ''
 }
 
 // TODO: delete the old version check when all deivces uses the new version system

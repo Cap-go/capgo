@@ -447,6 +447,7 @@ export async function readDevicesCF(c: Context, params: ReadDevicesParams, custo
   const query = `SELECT
   app_id,
   device_id,
+  version,
   version_name,
   platform,
   plugin_version,
