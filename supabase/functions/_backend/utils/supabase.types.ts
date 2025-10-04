@@ -7,10 +7,30 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "13.0.5"
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
   }
   public: {
     Tables: {
@@ -54,6 +74,41 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      app_metrics_cache: {
+        Row: {
+          cached_at: string
+          end_date: string
+          id: number
+          org_id: string
+          response: Json
+          start_date: string
+        }
+        Insert: {
+          cached_at?: string
+          end_date: string
+          id?: number
+          org_id: string
+          response: Json
+          start_date: string
+        }
+        Update: {
+          cached_at?: string
+          end_date?: string
+          id?: number
+          org_id?: string
+          response?: Json
+          start_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "app_metrics_cache_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
             referencedColumns: ["id"]
           },
         ]
@@ -147,6 +202,7 @@ export type Database = {
           app_id: string
           checksum: string
           created_at: string | null
+          devices: number | null
           id: number
           owner_org: string
           size: number
@@ -156,6 +212,7 @@ export type Database = {
           app_id: string
           checksum: string
           created_at?: string | null
+          devices?: number | null
           id?: number
           owner_org: string
           size: number
@@ -165,6 +222,7 @@ export type Database = {
           app_id?: string
           checksum?: string
           created_at?: string | null
+          devices?: number | null
           id?: number
           owner_org?: string
           size?: number
@@ -546,7 +604,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
-          email?: string
+          email: string
           id?: string
         }
         Update: {
@@ -671,7 +729,6 @@ export type Database = {
           app_id: string
           custom_id: string
           device_id: string
-          id: number
           is_emulator: boolean | null
           is_prod: boolean | null
           os_version: string | null
@@ -686,7 +743,6 @@ export type Database = {
           app_id: string
           custom_id?: string
           device_id: string
-          id?: never
           is_emulator?: boolean | null
           is_prod?: boolean | null
           os_version?: string | null
@@ -701,7 +757,6 @@ export type Database = {
           app_id?: string
           custom_id?: string
           device_id?: string
-          id?: never
           is_emulator?: boolean | null
           is_prod?: boolean | null
           os_version?: string | null
@@ -997,6 +1052,7 @@ export type Database = {
           storage_unit: number | null
           stripe_id: string
           updated_at: string
+          version: number
         }
         Insert: {
           bandwidth: number
@@ -1019,6 +1075,7 @@ export type Database = {
           storage_unit?: number | null
           stripe_id?: string
           updated_at?: string
+          version?: number
         }
         Update: {
           bandwidth?: number
@@ -1041,6 +1098,7 @@ export type Database = {
           storage_unit?: number | null
           stripe_id?: string
           updated_at?: string
+          version?: number
         }
         Relationships: []
       }
@@ -1462,8 +1520,8 @@ export type Database = {
       }
       get_app_metrics: {
         Args:
-          | { end_date: string; org_id: string; start_date: string }
           | { org_id: string }
+          | { p_end_date: string; p_org_id: string; p_start_date: string }
         Returns: {
           app_id: string
           bandwidth: number
@@ -1828,10 +1886,6 @@ export type Database = {
         Args: { orgid: string }
         Returns: boolean
       }
-      is_owner_of_org: {
-        Args: { org_id: string; user_id: string }
-        Returns: boolean
-      }
       is_paying_and_good_plan_org: {
         Args: { orgid: string }
         Returns: boolean
@@ -1965,6 +2019,41 @@ export type Database = {
         Args: { email: string; org_id: string }
         Returns: string
       }
+      reset_and_seed_app_data: {
+        Args: { p_app_id: string }
+        Returns: undefined
+      }
+      reset_and_seed_app_stats_data: {
+        Args: { p_app_id: string }
+        Returns: undefined
+      }
+      reset_and_seed_data: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      reset_and_seed_stats_data: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      reset_app_data: {
+        Args: { p_app_id: string }
+        Returns: undefined
+      }
+      reset_app_stats_data: {
+        Args: { p_app_id: string }
+        Returns: undefined
+      }
+      seed_get_app_metrics_caches: {
+        Args: { p_end_date: string; p_org_id: string; p_start_date: string }
+        Returns: {
+          cached_at: string
+          end_date: string
+          id: number
+          org_id: string
+          response: Json
+          start_date: string
+        }
+      }
       set_bandwidth_exceeded_by_org: {
         Args: { disabled: boolean; org_id: string }
         Returns: undefined
@@ -2004,10 +2093,8 @@ export type Database = {
     }
     Enums: {
       action_type: "mau" | "storage" | "bandwidth"
-      app_mode: "prod" | "dev" | "livereload"
       disable_update: "major" | "minor" | "patch" | "version_number" | "none"
       key_mode: "read" | "write" | "all" | "upload"
-      pay_as_you_go_type: "base" | "units"
       platform_os: "ios" | "android"
       stats_action:
         | "delete"
@@ -2065,7 +2152,7 @@ export type Database = {
         | "failed"
         | "deleted"
         | "canceled"
-      usage_mode: "5min" | "day" | "month" | "cycle" | "last_saved"
+      usage_mode: "last_saved" | "5min" | "day" | "cycle"
       user_min_right:
         | "invite_read"
         | "invite_upload"
@@ -2085,9 +2172,6 @@ export type Database = {
         file_name: string | null
         s3_path: string | null
         file_hash: string | null
-      }
-      match_plan: {
-        name: string | null
       }
       message_update: {
         msg_id: number | null
@@ -2236,13 +2320,14 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       action_type: ["mau", "storage", "bandwidth"],
-      app_mode: ["prod", "dev", "livereload"],
       disable_update: ["major", "minor", "patch", "version_number", "none"],
       key_mode: ["read", "write", "all", "upload"],
-      pay_as_you_go_type: ["base", "units"],
       platform_os: ["ios", "android"],
       stats_action: [
         "delete",
@@ -2302,7 +2387,7 @@ export const Constants = {
         "deleted",
         "canceled",
       ],
-      usage_mode: ["5min", "day", "month", "cycle", "last_saved"],
+      usage_mode: ["last_saved", "5min", "day", "cycle"],
       user_min_right: [
         "invite_read",
         "invite_upload",
@@ -2320,3 +2405,4 @@ export const Constants = {
     },
   },
 } as const
+

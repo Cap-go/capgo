@@ -14,6 +14,7 @@ BEGIN
   TRUNCATE TABLE "public"."app_versions_meta" CASCADE;
   TRUNCATE TABLE "public"."daily_mau" CASCADE;
   TRUNCATE TABLE "public"."daily_bandwidth" CASCADE;
+  TRUNCATE TABLE "public"."app_metrics_cache";
 
   -- Set "solo" plan to test user
   UPDATE stripe_info set product_id='prod_LQIregjtNduh4q' where customer_id='cus_Q38uE91NP8Ufqc';
@@ -28,6 +29,7 @@ BEGIN
   INSERT INTO "public"."daily_bandwidth" ("app_id", "bandwidth", "date") VALUES 
   ('com.demo.app', convert_gb_to_bytes(0.13), now()::date);
 
+  TRUNCATE TABLE "public"."app_metrics_cache";
   SELECT * FROM get_total_metrics ('046a36ac-e03c-4590-9257-bd6c9dba9ee8'::uuid) INTO app_metrics;
   RETURN NEXT is(app_metrics.storage, convert_gb_to_bytes(0.3)::bigint, 'Get metrics storage = 0.3 gb');
   RETURN NEXT is(app_metrics.mau, 10::bigint, 'Get metrics mau = 10');
@@ -54,6 +56,7 @@ BEGIN
   INSERT INTO "public"."daily_bandwidth" ("app_id", "bandwidth", "date") VALUES 
   ('com.demoadmin.app', convert_gb_to_bytes(0.13), now()::date);
 
+  TRUNCATE TABLE "public"."app_metrics_cache";
   SELECT * FROM get_total_metrics ('046a36ac-e03c-4590-9257-bd6c9dba9ee8'::uuid) INTO app_metrics;
   RETURN NEXT is(app_metrics.storage + 1, convert_gb_to_bytes(0.4)::bigint, 'Get metrics storage = 0.4 gb (2 apps)');
   RETURN NEXT is(app_metrics.mau, 20::bigint, 'Get metrics mau = 10 (2 apps)');
