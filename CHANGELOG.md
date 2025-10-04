@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.34.7 (2025-10-04)
+
+
+### Bug Fixes
+
+* SQL ([76cd04d](https://github.com/Cap-go/capgo/commit/76cd04db966205e91b474bc1e4da2fee8b555d90))
+
 ### 12.34.6 (2025-10-04)
 
 ### 12.34.5 (2025-10-04)
