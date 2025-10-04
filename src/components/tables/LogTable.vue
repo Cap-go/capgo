@@ -85,10 +85,7 @@ async function getData() {
         return [] as LogData[]
       })
     // console.log('dataD', dataD)
-    elements.value.push(...dataD.map(log => ({
-      ...log,
-      version: { name: log.version_name } as { name: string, id?: number },
-    })) as any)
+    elements.value.push(...dataD)
   }
   catch (error) {
     console.error(error)
