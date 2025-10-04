@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.34.9 (2025-10-04)
+
+
+### Bug Fixes
+
+* display issue in device Table ([94afef2](https://github.com/Cap-go/capgo/commit/94afef2d05b118399c77d9cf023b8cba9b232306))
+
 ### 12.34.8 (2025-10-04)
 
 ### 12.34.7 (2025-10-04)
