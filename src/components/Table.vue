@@ -362,7 +362,7 @@ const RenderCell = defineComponent<{ renderer?: (item: any) => any, item: any }>
           </button>
           <ul class="p-2 bg-white shadow d-dropdown-content d-menu dark:bg-base-200 rounded-box z-1 w-52">
             <li v-for="(f, i) in filterList" :key="i">
-              <div class="flex items-center p-2 rounded-sm hover:bg-gray-100 dark:hover:bg-gray-600">
+              <div class="flex items-center p-2 rounded-sm hover:bg-gray-100 dark:hover:bg-gray-600 cursor-pointer">
                 <input
                   :id="`filter-radio-example-${i}`"
                   :checked="filters?.[f]"
@@ -371,7 +371,7 @@ const RenderCell = defineComponent<{ renderer?: (item: any) => any, item: any }>
                   class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 dark:ring-offset-gray-800 dark:focus:ring-blue-600 dark:focus:ring-offset-gray-800"
                   @change="emit('update:filters', { ...filters, [f]: !filters?.[f] })"
                 >
-                <label :for="`filter-radio-example-${i}`" class="w-full ml-2 text-sm font-medium text-gray-900 rounded-sm dark:text-gray-300 first-letter:uppercase">{{ t(f) }}</label>
+                <label :for="`filter-radio-example-${i}`" class="w-full ml-2 text-sm font-medium text-gray-900 rounded-sm dark:text-gray-300 first-letter:uppercase cursor-pointer">{{ t(f) }}</label>
               </div>
             </li>
           </ul>

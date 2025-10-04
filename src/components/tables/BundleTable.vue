@@ -14,6 +14,7 @@ import { bytesToMbText } from '~/services/conversion'
 import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
+import { useOrganizationStore } from '~/stores/organization'
 
 const props = defineProps<{
   appId: string
@@ -26,11 +27,13 @@ const isMobile = Capacitor.isNativePlatform()
 const offset = 10
 const { t } = useI18n()
 const showSteps = ref(false)
+const autoShowSteps = ref(false)
 const dialogStore = useDialogV2Store()
 const supabase = useSupabase()
 const router = useRouter()
 const organizationStore = useOrganizationStore()
 const total = ref(0)
+const totalAllBundles = ref<number | null>(null)
 const search = ref('')
 const columns: Ref<TableColumn[]> = ref<TableColumn[]>([])
 const elements = ref<Element[]>([])
@@ -44,9 +47,19 @@ const filters = ref({
 })
 const channelCache = ref<Record<number, { name: string, id?: number }>>({})
 
+function closeSteps() {
+  autoShowSteps.value = false
+  showSteps.value = false
+}
+
+function openStepsManually() {
+  autoShowSteps.value = false
+  showSteps.value = true
+}
+
 function onboardingDone() {
+  closeSteps()
   reload()
-  showSteps.value = !showSteps.value
 }
 
 const currentVersionsNumber = computed(() => {
@@ -271,7 +284,8 @@ async function refreshData() {
     elements.value.length = 0
     selectedElements.value.length = 0
     channelCache.value = {} // Clear cache on refresh
-    await getData()
+    await Promise.all([getData(), updateOverallBundlesCount()])
+    applyAutoOnboardingState()
   }
   catch (error) {
     console.error(error)
@@ -440,17 +454,14 @@ columns.value = [
 
 async function reload() {
   elements.value.length = 0
-  getData()
-    .then(() => {
-      if (total.value === 0) {
-        showSteps.value = true
-      }
-      return organizationStore.getCurrentRoleForApp(props.appId)
-    })
-    .then((r) => {
-      role.value = r
-    })
-    .catch(console.error)
+  try {
+    await Promise.all([getData(), updateOverallBundlesCount()])
+    applyAutoOnboardingState()
+    role.value = await organizationStore.getCurrentRoleForApp(props.appId)
+  }
+  catch (error) {
+    console.error(error)
+  }
 }
 
 async function massDelete() {
@@ -538,13 +549,38 @@ function selectedElementsFilter(val: boolean[]) {
 }
 
 async function addOne() {
-  showSteps.value = true
+  openStepsManually()
 }
 
 async function openOne(one: Element) {
   if (one.deleted)
     return
   router.push(`/app/p/${props.appId}/bundle/${one.id}`)
+}
+
+async function updateOverallBundlesCount() {
+  try {
+    const { count } = await supabase
+      .from('app_versions')
+      .select('id', { count: 'exact', head: true })
+      .eq('app_id', props.appId)
+      .eq('deleted', false)
+      .neq('storage_provider', 'revert_to_builtin')
+    totalAllBundles.value = count ?? 0
+  }
+  catch (error) {
+    console.error(error)
+  }
+}
+
+function applyAutoOnboardingState() {
+  if ((totalAllBundles.value ?? 0) === 0) {
+    showSteps.value = true
+    autoShowSteps.value = true
+  }
+  else if (autoShowSteps.value) {
+    closeSteps()
+  }
 }
 
 watch(props, async () => {
@@ -572,7 +608,7 @@ watch(props, async () => {
       @reset="refreshData()"
     />
 
-    <StepsBundle v-else :onboarding="!total" :app-id="props.appId" @done="onboardingDone" @close-step="showSteps = !showSteps" />
+    <StepsBundle v-else :onboarding="(totalAllBundles ?? 0) === 0" :app-id="props.appId" @done="onboardingDone" @close-step="closeSteps()" />
 
     <!-- Teleport Content for Deletion Style Modal -->
     <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('select-style-of-deletion')" defer to="#dialog-v2-content">
