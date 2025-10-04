@@ -1285,7 +1285,7 @@ Begin
           RETURN NULL;
       END IF;
     END IF;
-    IF api_key.limited_to_apps IS DISTINCT FROM '{}' THEN
+    IF COALESCE(array_length(api_key.limited_to_apps, 1), 0) > 0 THEN
       IF NOT (app_id = ANY(api_key.limited_to_apps)) THEN
           RETURN NULL;
       END IF;
