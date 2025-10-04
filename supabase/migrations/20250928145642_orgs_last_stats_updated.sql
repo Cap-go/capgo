@@ -43,7 +43,7 @@ BEGIN
 
     user_id := api_key.user_id;
 
-    IF api_key.limited_to_orgs IS NOT NULL AND api_key.limited_to_orgs != '{}' THEN
+    IF COALESCE(array_length(api_key.limited_to_orgs, 1), 0) > 0 THEN
       RETURN QUERY
       SELECT orgs.*
       FROM public.get_orgs_v6(user_id) AS orgs
