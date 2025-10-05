@@ -109,6 +109,25 @@ if (props.filters) {
     emit('reload')
   })
 }
+function rangesEqual(a?: [Date, Date], b?: [Date, Date]) {
+  if (!a || !b)
+    return a === b
+  return a[0].getTime() === b[0].getTime() && a[1].getTime() === b[1].getTime()
+}
+
+watch(() => props.range, (newRange) => {
+  if (!newRange) {
+    if (preciseDates.value)
+      preciseDates.value = undefined
+    return
+  }
+
+  if (rangesEqual(newRange, preciseDates.value))
+    return
+
+  preciseDates.value = [new Date(newRange[0]), new Date(newRange[1])]
+}, { immediate: true })
+
 watch(preciseDates, () => {
   // console.log('preciseDates', preciseDates.value)
   emit('update:range', preciseDates.value)
@@ -172,6 +191,34 @@ function formatValue(previewValue: Date[] | undefined) {
     end: dayjs(previewValue[1]).format('HH:mm'),
   }
 }
+
+const calendarPreview = computed(() => {
+  if (!preciseDates.value) {
+    return {
+      start: dayjs().subtract(1, 'hour').format('YYYY-MM-DD'),
+      end: dayjs().format('YYYY-MM-DD'),
+    }
+  }
+
+  return {
+    start: dayjs(preciseDates.value[0]).format('YYYY-MM-DD'),
+    end: dayjs(preciseDates.value[1]).format('YYYY-MM-DD'),
+  }
+})
+
+const timePreview = computed(() => {
+  if (!preciseDates.value) {
+    return {
+      start: dayjs().subtract(1, 'hour').format('HH:mm'),
+      end: dayjs().format('HH:mm'),
+    }
+  }
+
+  return {
+    start: dayjs(preciseDates.value[0]).format('HH:mm'),
+    end: dayjs(preciseDates.value[1]).format('HH:mm'),
+  }
+})
 
 function updateUrlParams() {
   const params = new URLSearchParams()
@@ -319,58 +366,87 @@ onMounted(async () => {
                   </p>
                 </div>
               </template>
-              <template #top-extra="{ value }">
-                <div class="flex items-center justify-center hover:bg-gray-300 dark:hover:bg-gray-700 md:mb-2 rounded-full" @click="openTimePicker">
-                  <div class="flex items-center space-x-2 text-neutral-700 dark:text-neutral-200 bg-gray-300 dark:bg-gray-700 px-3 py-2 rounded-full">
+              <template #calendar-icon>
+                <div class="flex items-center gap-2 text-xs md:text-sm font-medium text-neutral-700 dark:text-neutral-200">
+                  <IconCalendar class="hidden md:block" />
+                  <div class="flex items-center gap-2">
+                    <div class="flex items-center gap-2 bg-gray-100 dark:bg-gray-700 px-3 py-1.5 rounded-full">
+                      <span>{{ calendarPreview.start }}</span>
+                    </div>
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
-                      width="24"
-                      height="24"
+                      width="20"
+                      height="20"
                       viewBox="0 0 24 24"
                       fill="none"
                       stroke="currentColor"
                       stroke-width="2"
                       stroke-linecap="round"
                       stroke-linejoin="round"
-                      class="w-5 h-5"
+                      class="text-neutral-400 dark:text-neutral-300"
                     >
-                      <circle cx="12" cy="12" r="10" />
-                      <polyline points="12 6 12 12 16 14" />
+                      <path d="M5 12h14" />
+                      <path d="m12 5 7 7-7 7" />
                     </svg>
-                    <span class="font-inter">{{ formatValue(value as any).start }}</span>
+                    <div class="flex items-center gap-2 bg-gray-100 dark:bg-gray-700 px-3 py-1.5 rounded-full">
+                      <span>{{ calendarPreview.end }}</span>
+                    </div>
                   </div>
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="24"
-                    height="24"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    class="w-5 h-5 mx-4 text-neutral-600 dark:text-neutral-400"
-                  >
-                    <path d="M5 12h14" />
-                    <path d="m12 5 7 7-7 7" />
-                  </svg>
-                  <div class="flex items-center space-x-2 text-neutral-700 dark:text-neutral-200 bg-gray-300 dark:bg-gray-700 px-3 py-2 rounded-full">
+                </div>
+              </template>
+              <template #top-extra="{ value }">
+                <div class="flex items-center justify-center gap-2 md:mb-2 cursor-pointer text-neutral-700 dark:text-neutral-200 px-2 py-1.5 transition-colors hover:bg-gray-100 dark:hover:bg-gray-700" @click="openTimePicker">
+                  <IconClock class="hidden md:block" />
+                  <div class="flex items-center gap-2">
+                    <div class="flex items-center gap-2 bg-gray-100 dark:bg-gray-700 px-3 py-1.5 rounded-full">
+                      <span class="text-xs md:text-sm font-medium">{{ formatValue(value as any).start }}</span>
+                    </div>
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
-                      width="24"
-                      height="24"
+                      width="20"
+                      height="20"
                       viewBox="0 0 24 24"
                       fill="none"
                       stroke="currentColor"
                       stroke-width="2"
                       stroke-linecap="round"
                       stroke-linejoin="round"
-                      class="w-5 h-5"
+                      class="text-neutral-400 dark:text-neutral-300"
                     >
-                      <circle cx="12" cy="12" r="10" />
-                      <polyline points="12 6 12 12 16 14" />
+                      <path d="M5 12h14" />
+                      <path d="m12 5 7 7-7 7" />
                     </svg>
-                    <span class="font-inter">{{ formatValue(value as any).end }}</span>
+                    <div class="flex items-center gap-2 bg-gray-100 dark:bg-gray-700 px-3 py-1.5 rounded-full">
+                      <span class="text-xs md:text-sm font-medium">{{ formatValue(value as any).end }}</span>
+                    </div>
+                  </div>
+                </div>
+              </template>
+              <template #clock-icon>
+                <div class="flex items-center gap-2 text-xs md:text-sm font-medium text-neutral-700 dark:text-neutral-200">
+                  <IconClock class="hidden md:block" />
+                  <div class="flex items-center gap-2">
+                    <div class="flex items-center gap-2 bg-gray-100 dark:bg-gray-700 px-3 py-1.5 rounded-full">
+                      <span>{{ timePreview.start }}</span>
+                    </div>
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="20"
+                      height="20"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      class="text-neutral-400 dark:text-neutral-300"
+                    >
+                      <path d="M5 12h14" />
+                      <path d="m12 5 7 7-7 7" />
+                    </svg>
+                    <div class="flex items-center gap-2 bg-gray-100 dark:bg-gray-700 px-3 py-1.5 rounded-full">
+                      <span>{{ timePreview.end }}</span>
+                    </div>
                   </div>
                 </div>
               </template>
@@ -487,6 +563,10 @@ onMounted(async () => {
   --dp-range-between-border-color: color-mix(in srgb, var(--color-primary-500) 20%, transparent);
 }
 
+.dp__menu_inner {
+  --dp-menu-padding: .5rem;
+}
+
 .dp__theme_dark {
   --dp-background-color: var(--color-base-100);
   --dp-text-color: var(--color-base-content);
@@ -600,8 +680,8 @@ onMounted(async () => {
 
 /* Arrow styling to match menu border */
 .dp__arrow_top {
-  border-top-color: rgb(229 231 235) !important;
-  border-right-color: rgb(229 231 235) !important;
+  border-top-color: rgb(55 65 81) !important;
+  border-right-color: rgb(55 65 81) !important;
 }
 
 /* Prevent calendar from resizing during range selection */

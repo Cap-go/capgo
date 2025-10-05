@@ -32,7 +32,7 @@ const search = ref('')
 const elements = ref<Element[]>([])
 const isLoading = ref(false)
 const currentPage = ref(1)
-const range = ref<[Date, Date]>([dayjs().subtract(3, 'minute').toDate(), new Date()])
+const range = ref<[Date, Date]>([dayjs().subtract(1, 'hour').toDate(), new Date()])
 const filters = ref()
 const DOC_LOGS = 'https://capgo.app/docs/plugin/debugging/#sent-from-the-backend'
 
