@@ -212,18 +212,16 @@ describe('[POST] /stats', () => {
     expect(json.error).toBe('app_not_found')
   })
 
-  // TODO: fix this test
-  // it.only('invalid action should fail', async () => {
-  //   const baseData = getBaseData(APP_NAME_STATS) as StatsPayload
-  //   baseData.action = 'invalid_action' as StatsAction
-  //   baseData.version_build = getVersionFromAction('invalid_action')
-  //   const version = await createAppVersions(baseData.version_build, APP_NAME_STATS)
-  //   baseData.version_name = version.name
+  it('invalid action should fail', async () => {
+    const baseData = getBaseData(APP_NAME_STATS) as StatsPayload
+    baseData.action = 'invalid_action' as StatsAction
+    baseData.version_build = getVersionFromAction('invalid_action')
+    const version = await createAppVersions(baseData.version_build, APP_NAME_STATS)
+    baseData.version_name = version.name
 
-  //   const response = await postStats(baseData)
-  //   expect(response.status).toBe(400)
-  //   const json = await response.json<StatsRes>()
-  //   console.log({ json })
-  //   expect(json.error).toBeTruthy()
-  // })
+    const response = await postStats(baseData)
+    expect(response.status).toBe(400)
+    const json = await response.json<StatsRes>()
+    expect(json.error).toBeTruthy()
+  })
 })
