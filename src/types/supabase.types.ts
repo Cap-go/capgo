@@ -7,30 +7,10 @@ export type Json =
   | Json[]
 
 export type Database = {
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "13.0.5"
   }
   public: {
     Tables: {
@@ -202,7 +182,6 @@ export type Database = {
           app_id: string
           checksum: string
           created_at: string | null
-          devices: number | null
           id: number
           owner_org: string
           size: number
@@ -212,7 +191,6 @@ export type Database = {
           app_id: string
           checksum: string
           created_at?: string | null
-          devices?: number | null
           id?: number
           owner_org: string
           size: number
@@ -222,7 +200,6 @@ export type Database = {
           app_id?: string
           checksum?: string
           created_at?: string | null
-          devices?: number | null
           id?: number
           owner_org?: string
           size?: number
@@ -604,7 +581,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
-          email: string
+          email?: string
           id?: string
         }
         Update: {
@@ -729,43 +706,46 @@ export type Database = {
           app_id: string
           custom_id: string
           device_id: string
+          id: number
           is_emulator: boolean | null
           is_prod: boolean | null
           os_version: string | null
           platform: Database["public"]["Enums"]["platform_os"]
           plugin_version: string
           updated_at: string
-          version_name: string
-          version: number
+          version: number | null
           version_build: string | null
+          version_name: string
         }
         Insert: {
           app_id: string
           custom_id?: string
           device_id: string
+          id?: never
           is_emulator?: boolean | null
           is_prod?: boolean | null
           os_version?: string | null
           platform: Database["public"]["Enums"]["platform_os"]
           plugin_version?: string
           updated_at: string
-          version_name?: string
-          version?: number
+          version?: number | null
           version_build?: string | null
+          version_name?: string
         }
         Update: {
           app_id?: string
           custom_id?: string
           device_id?: string
+          id?: never
           is_emulator?: boolean | null
           is_prod?: boolean | null
           os_version?: string | null
           platform?: Database["public"]["Enums"]["platform_os"]
           plugin_version?: string
           updated_at?: string
-          version_name?: string
-          version?: number
+          version?: number | null
           version_build?: string | null
+          version_name?: string
         }
         Relationships: []
       }
@@ -1055,7 +1035,6 @@ export type Database = {
           storage_unit: number | null
           stripe_id: string
           updated_at: string
-          version: number
         }
         Insert: {
           bandwidth: number
@@ -1078,7 +1057,6 @@ export type Database = {
           storage_unit?: number | null
           stripe_id?: string
           updated_at?: string
-          version?: number
         }
         Update: {
           bandwidth?: number
@@ -1101,7 +1079,6 @@ export type Database = {
           storage_unit?: number | null
           stripe_id?: string
           updated_at?: string
-          version?: number
         }
         Relationships: []
       }
@@ -1112,7 +1089,7 @@ export type Database = {
           created_at: string
           device_id: string
           id: number
-          version: number
+          version_name: string
         }
         Insert: {
           action: Database["public"]["Enums"]["stats_action"]
@@ -1120,7 +1097,7 @@ export type Database = {
           created_at: string
           device_id: string
           id?: never
-          version: number
+          version_name?: string
         }
         Update: {
           action?: Database["public"]["Enums"]["stats_action"]
@@ -1128,7 +1105,7 @@ export type Database = {
           created_at?: string
           device_id?: string
           id?: never
-          version?: number
+          version_name?: string
         }
         Relationships: []
       }
@@ -1675,10 +1652,10 @@ export type Database = {
           logo: string
           management_email: string
           name: string
+          next_stats_update_at: string
           paying: boolean
-          stats_updated_at: string | null
-          next_stats_update_at: string | null
           role: string
+          stats_updated_at: string
           subscription_end: string
           subscription_start: string
           trial_left: number
@@ -1895,6 +1872,10 @@ export type Database = {
         Args: { orgid: string }
         Returns: boolean
       }
+      is_owner_of_org: {
+        Args: { org_id: string; user_id: string }
+        Returns: boolean
+      }
       is_paying_and_good_plan_org: {
         Args: { orgid: string }
         Returns: boolean
@@ -2028,30 +2009,6 @@ export type Database = {
         Args: { email: string; org_id: string }
         Returns: string
       }
-      reset_and_seed_app_data: {
-        Args: { p_app_id: string }
-        Returns: undefined
-      }
-      reset_and_seed_app_stats_data: {
-        Args: { p_app_id: string }
-        Returns: undefined
-      }
-      reset_and_seed_data: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
-      reset_and_seed_stats_data: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
-      reset_app_data: {
-        Args: { p_app_id: string }
-        Returns: undefined
-      }
-      reset_app_stats_data: {
-        Args: { p_app_id: string }
-        Returns: undefined
-      }
       seed_get_app_metrics_caches: {
         Args: { p_end_date: string; p_org_id: string; p_start_date: string }
         Returns: {
@@ -2102,8 +2059,10 @@ export type Database = {
     }
     Enums: {
       action_type: "mau" | "storage" | "bandwidth"
+      app_mode: "prod" | "dev" | "livereload"
       disable_update: "major" | "minor" | "patch" | "version_number" | "none"
       key_mode: "read" | "write" | "all" | "upload"
+      pay_as_you_go_type: "base" | "units"
       platform_os: "ios" | "android"
       stats_action:
         | "delete"
@@ -2153,6 +2112,7 @@ export type Database = {
         | "getChannel"
         | "rateLimited"
         | "disableAutoUpdate"
+        | "ping"
         | "InvalidIp"
       stripe_status:
         | "created"
@@ -2161,7 +2121,7 @@ export type Database = {
         | "failed"
         | "deleted"
         | "canceled"
-      usage_mode: "last_saved" | "5min" | "day" | "cycle"
+      usage_mode: "5min" | "day" | "month" | "cycle" | "last_saved"
       user_min_right:
         | "invite_read"
         | "invite_upload"
@@ -2181,6 +2141,9 @@ export type Database = {
         file_name: string | null
         s3_path: string | null
         file_hash: string | null
+      }
+      match_plan: {
+        name: string | null
       }
       message_update: {
         msg_id: number | null
@@ -2329,14 +2292,13 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
       action_type: ["mau", "storage", "bandwidth"],
+      app_mode: ["prod", "dev", "livereload"],
       disable_update: ["major", "minor", "patch", "version_number", "none"],
       key_mode: ["read", "write", "all", "upload"],
+      pay_as_you_go_type: ["base", "units"],
       platform_os: ["ios", "android"],
       stats_action: [
         "delete",
@@ -2386,6 +2348,7 @@ export const Constants = {
         "getChannel",
         "rateLimited",
         "disableAutoUpdate",
+        "ping",
         "InvalidIp",
       ],
       stripe_status: [
@@ -2396,7 +2359,7 @@ export const Constants = {
         "deleted",
         "canceled",
       ],
-      usage_mode: ["last_saved", "5min", "day", "cycle"],
+      usage_mode: ["5min", "day", "month", "cycle", "last_saved"],
       user_min_right: [
         "invite_read",
         "invite_upload",

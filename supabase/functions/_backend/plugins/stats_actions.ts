@@ -2,6 +2,7 @@ import type { Database } from '../utils/supabase.types.ts'
 
 // Get all possible values from the StatsAction type
 export const ALLOWED_STATS_ACTIONS = [
+  'ping',
   'delete',
   'reset',
   'set',
