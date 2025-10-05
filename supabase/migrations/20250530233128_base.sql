@@ -181,7 +181,8 @@ CREATE TYPE "public"."stats_action" AS ENUM(
   'getChannel',
   'rateLimited',
   'disableAutoUpdate',
-  'InvalidIp'
+  'InvalidIp',
+  'ping'
 );
 
 ALTER TYPE "public"."stats_action" OWNER TO "postgres";
