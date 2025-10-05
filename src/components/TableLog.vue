@@ -419,11 +419,11 @@ onMounted(async () => {
             </button>
           </template>
           <template #calendar-icon>
-            <div class="flex items-center gap-2 text-xs md:text-sm font-medium text-neutral-700 dark:text-neutral-200">
+            <div class="flex items-center justify-center w-full gap-2 text-xs md:text-sm font-medium text-neutral-700 dark:text-neutral-200">
               <IconCalendar class="hidden md:block" />
-              <div class="flex items-center gap-2">
-                <div class="flex items-center gap-2 bg-gray-100 dark:bg-gray-700 px-3 py-1.5 rounded-full">
-                  <span>{{ calendarPreview.start }}</span>
+              <div class="flex flex-1 items-center justify-center gap-2">
+                <div class="flex flex-1 items-center justify-center gap-2 bg-gray-100 dark:bg-gray-700 px-3 py-1.5 rounded-full min-w-0">
+                  <span class="truncate text-center w-full">{{ calendarPreview.start }}</span>
                 </div>
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
@@ -440,8 +440,8 @@ onMounted(async () => {
                   <path d="M5 12h14" />
                   <path d="m12 5 7 7-7 7" />
                 </svg>
-                <div class="flex items-center gap-2 bg-gray-100 dark:bg-gray-700 px-3 py-1.5 rounded-full">
-                  <span>{{ calendarPreview.end }}</span>
+                <div class="flex flex-1 items-center justify-center gap-2 bg-gray-100 dark:bg-gray-700 px-3 py-1.5 rounded-full min-w-0">
+                  <span class="truncate text-center w-full">{{ calendarPreview.end }}</span>
                 </div>
               </div>
             </div>
@@ -464,11 +464,11 @@ onMounted(async () => {
                   {{ quickLabel(option) }}
                 </button>
               </div>
-              <div class="flex items-center justify-center gap-2 cursor-pointer text-neutral-700 dark:text-neutral-200 px-2 py-1.5 transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md" @click="openTimePicker">
+              <div class="flex items-center justify-center w-full gap-2 cursor-pointer text-neutral-700 dark:text-neutral-200 px-2 py-1.5 transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md" @click="openTimePicker">
                 <IconClock class="hidden md:block" />
-                <div class="flex items-center gap-2">
-                  <div class="flex items-center gap-2 bg-gray-100 dark:bg-gray-700 px-3 py-1.5 rounded-full">
-                    <span class="text-xs md:text-sm font-medium">{{ formatValue(value as any).start }}</span>
+                <div class="flex flex-1 items-center justify-center gap-2">
+                  <div class="flex flex-1 items-center justify-center gap-2 bg-gray-100 dark:bg-gray-700 px-3 py-1.5 rounded-full min-w-0">
+                    <span class="text-xs md:text-sm font-medium truncate text-center w-full">{{ formatValue(value as any).start }}</span>
                   </div>
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -485,19 +485,19 @@ onMounted(async () => {
                     <path d="M5 12h14" />
                     <path d="m12 5 7 7-7 7" />
                   </svg>
-                  <div class="flex items-center gap-2 bg-gray-100 dark:bg-gray-700 px-3 py-1.5 rounded-full">
-                    <span class="text-xs md:text-sm font-medium">{{ formatValue(value as any).end }}</span>
+                  <div class="flex flex-1 items-center justify-center gap-2 bg-gray-100 dark:bg-gray-700 px-3 py-1.5 rounded-full min-w-0">
+                    <span class="text-xs md:text-sm font-medium truncate text-center w-full">{{ formatValue(value as any).end }}</span>
                   </div>
                 </div>
               </div>
             </div>
           </template>
           <template #clock-icon>
-            <div class="flex items-center gap-2 text-xs md:text-sm font-medium text-neutral-700 dark:text-neutral-200">
+            <div class="flex items-center justify-center w-full gap-2 text-xs md:text-sm font-medium text-neutral-700 dark:text-neutral-200">
               <IconClock class="hidden md:block" />
-              <div class="flex items-center gap-2">
-                <div class="flex items-center gap-2 bg-gray-100 dark:bg-gray-700 px-3 py-1.5 rounded-full">
-                  <span>{{ timePreview.start }}</span>
+              <div class="flex flex-1 items-center justify-center gap-2">
+                <div class="flex flex-1 items-center justify-center gap-2 bg-gray-100 dark:bg-gray-700 px-3 py-1.5 rounded-full min-w-0">
+                  <span class="truncate text-center w-full">{{ timePreview.start }}</span>
                 </div>
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
@@ -514,8 +514,8 @@ onMounted(async () => {
                   <path d="M5 12h14" />
                   <path d="m12 5 7 7-7 7" />
                 </svg>
-                <div class="flex items-center gap-2 bg-gray-100 dark:bg-gray-700 px-3 py-1.5 rounded-full">
-                  <span>{{ timePreview.end }}</span>
+                <div class="flex flex-1 items-center justify-center gap-2 bg-gray-100 dark:bg-gray-700 px-3 py-1.5 rounded-full min-w-0">
+                  <span class="truncate text-center w-full">{{ timePreview.end }}</span>
                 </div>
               </div>
             </div>
@@ -696,6 +696,14 @@ onMounted(async () => {
   --dp-transition-timing: ease-out;
 }
 
+.dp__action_row {
+  justify-content: space-evenly;
+}
+
+.dp__selection_preview {
+  display: none !important;
+}
+
 .dp__inner_nav {
   border-radius: 0.5rem;
 }
@@ -706,11 +714,11 @@ onMounted(async () => {
 /* Custom action buttons styling for Capgo */
 .custom-timepicker-button > .dp__action_row > .dp__action_buttons > .dp__action_cancel {
   @apply d-btn d-btn-outline d-btn-sm;
-  width: 49%;
+  width: 45%;
 }
 .custom-timepicker-button > .dp__action_row > .dp__action_buttons > .dp__action_select {
   @apply d-btn d-btn-outline d-btn-secondary d-btn-sm;
-  width: 49%;
+  width: 45%;
 }
 .custom-timepicker-button > .dp__action_row > .dp__action_buttons {
   display: contents !important;
