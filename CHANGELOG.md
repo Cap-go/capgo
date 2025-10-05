@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.34.17 (2025-10-05)
+
+
+### Bug Fixes
+
+* allow ping event ([3b22008](https://github.com/Cap-go/capgo/commit/3b22008e1ec5856d490b6e30085ab758ab208594))
+
 ### 12.34.16 (2025-10-05)
 
 ### 12.34.15 (2025-10-05)
