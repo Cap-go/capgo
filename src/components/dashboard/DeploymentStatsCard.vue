@@ -217,12 +217,6 @@ onMounted(async () => {
         {{ t('deployments-title') }}
       </div>
       <div class="flex flex-col space-y-1">
-        <div class="flex items-center space-x-4">
-          <div class="flex items-center space-x-2">
-            <div class="w-3 h-3 rounded-full" style="background-color: hsl(210, 50%, 60%)" />
-            <span class="text-sm text-slate-600 dark:text-slate-300">{{ t('deployments') }}: {{ totalDeployments.toLocaleString() }}</span>
-          </div>
-        </div>
         <div class="flex items-start">
           <div id="total_deployment_val" class="mr-2 text-3xl font-bold text-slate-800 dark:text-white">
             {{ totalDeployments.toLocaleString() }}

@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import dayjs from 'dayjs'
 import type { Database } from '~/types/supabase.types'
+import dayjs from 'dayjs'
 import { storeToRefs } from 'pinia'
 import colors from 'tailwindcss/colors'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
+import InformationInfo from '~icons/heroicons/information-circle'
 import { bytesToGb, getDaysBetweenDates } from '~/services/conversion'
 import { getPlans } from '~/services/supabase'
 import { useDashboardAppsStore } from '~/stores/dashboardApps'
@@ -15,7 +16,6 @@ import { useOrganizationStore } from '~/stores/organization'
 import DeploymentStatsCard from './DeploymentStatsCard.vue'
 import UpdateStatsCard from './UpdateStatsCard.vue'
 import UsageCard from './UsageCard.vue'
-import InformationInfo from '~icons/heroicons/information-circle'
 
 const props = defineProps<{
   appId?: string
@@ -532,7 +532,7 @@ onMounted(() => {
     >
       <Spinner size="w-40 h-40" />
     </div>
-    <MobileStats v-if="appId && showMobileStats" :use-billing-period="useBillingPeriod" class="col-span-full sm:col-span-6 xl:col-span-4" />
+    <MobileStats v-if="appId && showMobileStats" :use-billing-period="useBillingPeriod" :accumulated="useBillingPeriod && showCumulative" class="col-span-full sm:col-span-6 xl:col-span-4" />
     <BundleUploadsCard v-if="!isLoading && !appId && chartsLoaded.bundles" :use-billing-period="useBillingPeriod" :accumulated="useBillingPeriod && showCumulative" class="col-span-full sm:col-span-6 xl:col-span-4" />
     <div
       v-else-if="!appId"

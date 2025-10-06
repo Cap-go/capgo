@@ -332,7 +332,7 @@ async function getBundleUsage(appId: string, from: Date, to: Date, shouldGetLate
         datasets,
         latestVersion: {
           name: latestVersion?.name,
-          percentage: latestVersionPercentage.toFixed(2),
+          percentage: latestVersionPercentage.toFixed(1),
         },
       },
       error: null,
@@ -427,7 +427,7 @@ function getActiveVersions(versions: number[], percentages: { [date: string]: { 
 // Create datasets for Chart.js
 function createDatasets(versions: number[], dates: string[], percentages: { [date: string]: { [version: number]: number } }, versionNames: VersionName[]) {
   return versions.map((version) => {
-    const percentageData = dates.map(date => percentages[date][version] ?? 0)
+    const percentageData = dates.map(date => Number((percentages[date][version] ?? 0).toFixed(1)))
     // const color = colorKeys[(i + SKIP_COLOR) % colorKeys.length]
     const versionName = versionNames.find(v => v.id === version)?.name ?? version
 

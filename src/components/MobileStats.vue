@@ -1,12 +1,13 @@
 <script setup lang="ts">
-import type { ChartOptions } from 'chart.js'
+import type { ChartData, ChartOptions } from 'chart.js'
 import { useDark } from '@vueuse/core'
-import { CategoryScale, Chart, LinearScale, LineElement, PointElement, Tooltip } from 'chart.js'
-import { computed, ref, watch, watchEffect } from 'vue'
+import { CategoryScale, Chart, Filler, LinearScale, LineElement, PointElement, Tooltip } from 'chart.js'
+import { computed, ref, watch } from 'vue'
 import { Line } from 'vue-chartjs'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { useChartData } from '~/services/chartDataService'
+import { createTooltipConfig, verticalLinePlugin } from '~/services/chartTooltip'
 import { useSupabase } from '~/services/supabase'
 import { useOrganizationStore } from '~/stores/organization'
 
@@ -15,94 +16,291 @@ const props = defineProps({
     type: Boolean,
     default: true,
   },
+  accumulated: {
+    type: Boolean,
+    default: true,
+  },
 })
 
-Chart.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip)
+interface ChartDataset {
+  label: string
+  data: Array<number | undefined>
+}
+
+interface ChartApiData {
+  labels: string[]
+  datasets: ChartDataset[]
+  latestVersion: {
+    name: string
+    percentage: string
+  }
+}
+
+Chart.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Filler)
 
 const isDark = useDark()
 const { t } = useI18n()
 const route = useRoute('/app/p/[package]')
+const organizationStore = useOrganizationStore()
+const supabase = useSupabase()
 
 const appId = ref('')
 const isLoading = ref(true)
+const rawChartData = ref<ChartApiData | null>(null)
+const currentRange = ref<{ startDate: Date, endDate: Date } | null>(null)
+let requestToken = 0
 
-const chartOptions = computed<ChartOptions<'line'>>(() => ({
-  maintainAspectRatio: false,
-  scales: {
-    x: {
-      grid: {
-        color: `${isDark.value ? '#424e5f' : '#bfc9d6'}`,
-      },
-      ticks: { color: isDark.value ? 'white' : 'black' },
-    },
-    y: {
-      min: 0,
-      max: 100,
-      grid: {
-        color: `${isDark.value ? '#323e4e' : '#cad5e2'}`,
-      },
-      ticks: {
-        callback: (value: number) => `${value}%`,
-        color: isDark.value ? 'white' : 'black',
-      },
-    },
-  },
-  plugins: {
-    legend: { display: false },
-    title: { display: false },
-  },
-} as any))
+const latestVersion = computed(() => rawChartData.value?.latestVersion ?? null)
+const latestVersionPercentageDisplay = computed(() => {
+  const rawPercentage = latestVersion.value?.percentage ?? 0
+  if (rawPercentage === null || rawPercentage === undefined)
+    return ''
 
-const chartData = ref<any>(null)
+  const percentage = typeof rawPercentage === 'number' ? rawPercentage.toString() : rawPercentage
+  const hasSymbol = percentage.includes('%')
 
-async function loadData() {
-  console.log('loadData mobile data')
-  isLoading.value = true
+  const match = percentage.match(/(\d+(?:\.\d+)?)/)
+  if (!match)
+    return hasSymbol ? percentage : `${percentage}%`
 
-  const { startDate, endDate } = getDateRange()
-  chartData.value = await useChartData(useSupabase(), appId.value, startDate, endDate)
-  isLoading.value = false
+  const numeric = Number(match[1])
+  if (Number.isNaN(numeric))
+    return hasSymbol ? percentage : `${percentage}%`
+
+  const rounded = Number(numeric.toFixed(1))
+  const formatted = Number.isInteger(rounded) ? Math.trunc(rounded).toString() : rounded.toFixed(1)
+  const replaced = percentage.replace(match[1], formatted)
+  return hasSymbol ? replaced : `${formatted}%`
+})
+
+function normalizeToStartOfDay(date: Date) {
+  const normalized = new Date(date)
+  normalized.setHours(0, 0, 0, 0)
+  return normalized
 }
 
 function getDateRange() {
-  const organizationStore = useOrganizationStore()
-
   if (props.useBillingPeriod) {
-    // Use billing period dates
-    const startDate = new Date(organizationStore.currentOrganization?.subscription_start ?? new Date())
-    const endDate = new Date(organizationStore.currentOrganization?.subscription_end ?? new Date())
+    const startDate = normalizeToStartOfDay(new Date(organizationStore.currentOrganization?.subscription_start ?? new Date()))
+    const endDate = normalizeToStartOfDay(new Date(organizationStore.currentOrganization?.subscription_end ?? new Date()))
     return { startDate, endDate }
   }
-  else {
-    // Use last 30 days
-    const endDate = new Date()
-    const startDate = new Date(endDate)
-    startDate.setDate(startDate.getDate() - 30)
-    return { startDate, endDate }
+
+  const endDate = normalizeToStartOfDay(new Date())
+  const startDate = new Date(endDate)
+  startDate.setDate(startDate.getDate() - 29)
+  return { startDate, endDate }
+}
+
+const totalDays = computed(() => {
+  if (!currentRange.value) {
+    return rawChartData.value?.labels.length ?? 0
+  }
+
+  const { startDate, endDate } = currentRange.value
+  const diff = Math.floor((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1
+  const rawLength = rawChartData.value?.labels.length ?? 0
+  return Math.max(diff, rawLength)
+})
+
+function accumulateValues(values: (number | undefined)[]) {
+  let runningTotal = 0
+  return values.map((val) => {
+    if (typeof val === 'number') {
+      runningTotal += val
+      return runningTotal
+    }
+    return runningTotal
+  })
+}
+
+function generateDayLabels(totalLength: number) {
+  if (!currentRange.value)
+    return Array.from({ length: totalLength }, (_value, index) => index + 1)
+
+  const labels: number[] = []
+  const { startDate, endDate } = currentRange.value
+
+  let cursor = new Date(startDate)
+  cursor.setHours(0, 0, 0, 0)
+  const finalDate = new Date(endDate)
+  finalDate.setHours(0, 0, 0, 0)
+
+  const dayInMs = 24 * 60 * 60 * 1000
+  while (cursor.getTime() <= finalDate.getTime()) {
+    labels.push(cursor.getDate())
+    cursor = new Date(cursor.getTime() + dayInMs)
+  }
+
+  if (labels.length < totalLength) {
+    const lastDay = labels[labels.length - 1] ?? 1
+    const remaining = totalLength - labels.length
+    for (let i = 1; i <= remaining; i++)
+      labels.push(lastDay + i)
+  }
+
+  return labels.slice(0, totalLength)
+}
+
+function roundPercentageInString(text: string) {
+  if (!text)
+    return text
+
+  return text.replace(/(\d+(?:\.\d+)?)(?=%)/g, (match) => {
+    const numeric = Number(match)
+    if (Number.isNaN(numeric))
+      return match
+
+    const rounded = Number(numeric.toFixed(1))
+    return Number.isInteger(rounded) ? Math.trunc(rounded).toString() : rounded.toFixed(1)
+  })
+}
+
+const processedChartData = computed<ChartData<'line'> | null>(() => {
+  if (!rawChartData.value)
+    return null
+
+  const targetLength = Math.max(totalDays.value, rawChartData.value.labels.length)
+  const formattedLabels = generateDayLabels(targetLength)
+  const datasets = rawChartData.value.datasets.map((dataset) => {
+    const rawValues = dataset.data ?? []
+    const normalizedValues = rawValues.map((value) => {
+      if (typeof value === 'number')
+        return value
+      if (value === null || value === undefined)
+        return undefined
+      const parsed = Number(value)
+      return Number.isNaN(parsed) ? undefined : parsed
+    })
+    const paddedValues = Array.from({ length: targetLength }, (_val, index) => normalizedValues[index])
+
+    const processedData = props.accumulated
+      ? accumulateValues(paddedValues)
+      : paddedValues.map(val => (typeof val === 'number' ? val : null))
+
+    return {
+      ...dataset,
+      data: processedData,
+      fill: props.accumulated ? 'origin' : false,
+      tension: 0.3,
+      pointRadius: props.accumulated ? 0 : 2,
+      pointBorderWidth: 0,
+      borderWidth: 1,
+    }
+  })
+
+  return {
+    labels: formattedLabels,
+    datasets,
+  }
+})
+
+const chartOptions = computed<ChartOptions<'line'>>(() => {
+  const hasMultipleDatasets = (processedChartData.value?.datasets.length ?? 0) > 1
+
+  return {
+    maintainAspectRatio: false,
+    scales: {
+      x: {
+        grid: {
+          color: `${isDark.value ? '#424e5f' : '#bfc9d6'}`,
+        },
+        ticks: {
+          color: isDark.value ? 'white' : 'black',
+          maxRotation: 0,
+          autoSkip: true,
+        },
+      },
+      y: {
+        beginAtZero: true,
+        grid: {
+          color: `${isDark.value ? '#323e4e' : '#cad5e2'}`,
+        },
+        ticks: {
+          callback: (value: number) => `${value}%`,
+          color: isDark.value ? 'white' : 'black',
+        },
+      },
+    },
+    plugins: {
+      legend: {
+        display: hasMultipleDatasets,
+        position: 'bottom',
+        labels: {
+          color: isDark.value ? 'white' : 'black',
+          padding: 10,
+          font: {
+            size: 11,
+          },
+          generateLabels(chart) {
+            const original = Chart.defaults.plugins.legend.labels.generateLabels(chart)
+            return original.map(item => ({
+              ...item,
+              text: roundPercentageInString(item.text),
+            }))
+          },
+        },
+      },
+      title: { display: false },
+      tooltip: createTooltipConfig(hasMultipleDatasets, props.accumulated),
+      filler: {
+        propagate: false,
+      },
+    },
+  } as ChartOptions<'line'>
+})
+
+async function loadData() {
+  if (!appId.value) {
+    rawChartData.value = null
+    return
+  }
+
+  const { startDate, endDate } = getDateRange()
+  currentRange.value = { startDate, endDate }
+  const currentToken = ++requestToken
+  isLoading.value = true
+  rawChartData.value = null
+
+  try {
+    const data = await useChartData(supabase, appId.value, startDate, endDate)
+    if (currentToken !== requestToken)
+      return
+    rawChartData.value = data
+  }
+  catch (error) {
+    console.error(error)
+    if (currentToken !== requestToken)
+      return
+    rawChartData.value = null
+  }
+  finally {
+    if (currentToken === requestToken)
+      isLoading.value = false
   }
 }
 
-// Watch for billing period mode changes and reload data
 watch(() => props.useBillingPeriod, async () => {
-  if (appId.value) {
+  if (appId.value)
     await loadData()
-  }
 })
 
-watchEffect(async () => {
-  if (route.path.includes('/p/')) {
-    appId.value = route.params.package as string
-    try {
+watch(
+  () => [route.path, route.params.package as string | undefined] as const,
+  async ([path, packageId]) => {
+    if (path.includes('/p/') && packageId) {
+      appId.value = packageId
       await loadData()
     }
-    catch (error) {
-      console.error(error)
+    else {
+      appId.value = ''
+      requestToken++
+      rawChartData.value = null
+      isLoading.value = true
     }
-  }
-  else {
-    isLoading.value = true
-  }
-})
+  },
+  { immediate: true },
+)
 </script>
 
 <template>
@@ -117,19 +315,27 @@ watchEffect(async () => {
       <div class="mb-1 text-xs font-semibold uppercase text-slate-400 dark:text-white">
         {{ t('latest_version') }}
       </div>
-      <div v-if="chartData && chartData.latestVersion" class="flex items-start">
+      <div v-if="latestVersion" class="flex items-start">
         <div id="usage_val" class="mr-2 text-3xl font-bold text-slate-800 dark:text-white">
-          {{ chartData.latestVersion?.name }}
+          {{ latestVersion.name }}
         </div>
         <div class="rounded-full bg-emerald-500 px-1.5 text-sm font-semibold text-white">
-          {{ chartData.latestVersion?.percentage }}%
+          {{ latestVersionPercentageDisplay }}
         </div>
       </div>
     </div>
     <div class="w-full h-full p-6">
-      <Line v-if="!isLoading" :data="chartData" :options="chartOptions" />
-      <div v-else class="flex items-center justify-center h-full">
+      <div v-if="isLoading" class="flex items-center justify-center h-full">
         <Spinner size="w-40 h-40" />
+      </div>
+      <Line
+        v-else-if="processedChartData && processedChartData.datasets.length"
+        :data="processedChartData!"
+        :options="chartOptions"
+        :plugins="[verticalLinePlugin]"
+      />
+      <div v-else class="flex h-full items-center justify-center text-sm text-slate-500 dark:text-slate-300">
+        {{ t('no-data') }}
       </div>
     </div>
   </div>

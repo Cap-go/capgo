@@ -37,9 +37,9 @@ const props = defineProps({
 const { t } = useI18n()
 
 const total = computed(() => {
-  const dataArray = props.datas as (number | undefined)[]
+  const dataArray = props.datas as number[]
   const hasData = dataArray.some(val => val !== undefined)
-  const sumValues = (values: (number | undefined)[]) => values.reduce((acc, val) => (typeof val === 'number' ? acc + val : acc), 0)
+  const sumValues = (values: number[]) => values.reduce((acc, val) => (typeof val === 'number' ? acc + val : acc), 0)
 
   if (hasData) {
     return sumValues(dataArray)
@@ -47,7 +47,7 @@ const total = computed(() => {
 
   if (props.datasByApp && Object.keys(props.datasByApp).length > 0) {
     return Object.values(props.datasByApp).reduce((totalSum, appValues: any) => {
-      return totalSum + sumValues(appValues as (number | undefined)[])
+      return totalSum + sumValues(appValues)
     }, 0)
   }
 
