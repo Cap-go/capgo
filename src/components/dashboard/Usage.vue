@@ -381,7 +381,7 @@ onMounted(() => {
 
 <template>
   <!-- View Mode Selectors -->
-  <div v-if="!noData && !isLoading" class="flex justify-end mb-4 space-x-4">
+  <div v-if="!noData && !isLoading" class="flex flex-col items-stretch gap-2 mb-4 sm:flex-row sm:justify-end sm:items-center sm:gap-4">
     <!-- Daily vs Cumulative Switch -->
     <div class="flex items-center space-x-1 bg-gray-200 dark:bg-gray-800 rounded-lg p-1">
       <button
