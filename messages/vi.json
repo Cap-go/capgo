@@ -191,6 +191,7 @@
   "cannot-invite-user": "Không thể mời người dùng vào tổ chức. Vui lòng liên hệ hỗ trợ Capgo",
   "cannot-load-app-settings": "Không thể tải cài đặt ứng dụng",
   "cannot-rescind-invitation": "Không thể thu hồi lời mời, vui lòng xem trong bảng điều khiển trình duyệt và báo cáo lỗi này cho nhóm hỗ trợ Capgo",
+  "cannot-rollback-to-current-version": "Không thể quay lại gói hiện tại",
   "cannot-set-this-vers": "Không thể đặt phiên bản này",
   "cannot-show": "Không thể hiển thị trang này",
   "cannot-test-app-some": "Không thể kiểm tra ứng dụng, đã xảy ra lỗi gì đó",

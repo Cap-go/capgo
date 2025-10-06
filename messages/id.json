@@ -191,6 +191,7 @@
   "cannot-invite-user": "Tidak dapat mengundang pengguna ke organisasi. Silakan hubungi dukungan Capgo",
   "cannot-load-app-settings": "Tidak dapat memuat pengaturan aplikasi",
   "cannot-rescind-invitation": "Tidak dapat mencabut undangan, silakan lihat di konsol browser dan laporkan kesalahan ini ke tim dukungan Capgo",
+  "cannot-rollback-to-current-version": "Tidak dapat mengembalikan ke bundel saat ini",
   "cannot-set-this-vers": "Tidak dapat mengatur versi ini",
   "cannot-show": "Tidak dapat menampilkan halaman ini",
   "cannot-test-app-some": "Tidak dapat menguji aplikasi, sesuatu yang salah terjadi",

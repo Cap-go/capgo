@@ -191,6 +191,7 @@
   "cannot-invite-user": "Cannot invite user to organization. Please contact <a href='https://support.capgo.app/' target='_blank' class='text-blue-500 underline hover:text-blue-600'>Capgo support</a>",
   "cannot-load-app-settings": "Cannot load app settings",
   "cannot-rescind-invitation": "Cannot rescind invitation, please look in the browser console and report this error to the <a href='https://support.capgo.app/' target='_blank' class='text-blue-500 underline hover:text-blue-600'>Capgo support team</a>",
+  "cannot-rollback-to-current-version": "Cannot rollback to current bundle",
   "cannot-set-this-vers": "Cannot set this version",
   "cannot-show": "Cannot show this page",
   "cannot-test-app-some": "Cannot test app something wrong happened",

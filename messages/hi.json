@@ -191,6 +191,7 @@
   "cannot-invite-user": "उपयोगकर्ता को संगठन में आमंत्रित नहीं कर सकते। कृपया <a href='https://support.capgo.app/' target='_blank' class='text-blue-500 underline hover:text-blue-600'>Capgo सहायता</a> से सम्पर्क करें",
   "cannot-load-app-settings": "ऐप सेटिंग्स लोड नहीं कर सकते",
   "cannot-rescind-invitation": "निमंत्रण वापस नहीं कर सकते, कृपया ब्राउज़र कंसोल में देखें और इस त्रुटि की <a href='https://support.capgo.app/' target='_blank' class='text-blue-500 underline hover:text-blue-600'>Capgo समर्थन टीम</a> को सूचित करें",
+  "cannot-rollback-to-current-version": "वर्तमान बंडल पर रोलबैक नहीं कर सकते",
   "cannot-set-this-vers": "इस संस्करण को सेट नहीं कर सकते",
   "cannot-show": "इस पृष्ठ को दिखाना संभव नहीं है",
   "cannot-test-app-some": "ऐप का परीक्षण नहीं कर सकते, कुछ गलत हो गया।",

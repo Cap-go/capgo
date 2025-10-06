@@ -803,13 +803,6 @@ async function deleteBundle() {
           </div>
         </div>
       </div>
-      <div v-else-if="ActiveTab === 'devices'" id="devices" class="flex flex-col">
-        <div
-          class="flex flex-col mx-auto overflow-y-auto bg-white shadow-lg border-slate-300 md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-gray-800"
-        >
-          <DeviceTable class="p-3" :app-id="packageId" :version-name="version.name" />
-        </div>
-      </div>
     </div>
     <div v-else class="flex flex-col items-center justify-center min-h-[50vh]">
       <IconAlertCircle class="w-16 h-16 text-destructive mb-4" />
@@ -894,7 +887,6 @@ async function deleteBundle() {
             :placeholder="t('search-channels')"
             :classes="{
               outer: 'mb-0! w-full',
-              inner: 'rounded-full!',
             }"
           />
         </div>

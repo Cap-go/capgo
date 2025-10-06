@@ -191,6 +191,7 @@
   "cannot-invite-user": "Kullanıcıyı organizasyona davet edemiyoruz. Lütfen Capgo desteği ile iletişime geçin.",
   "cannot-load-app-settings": "Uygulama ayarları yüklenemiyor",
   "cannot-rescind-invitation": "Daveti geri alamıyor, lütfen tarayıcı konsoluna bakın ve bu hatayı Capgo destek ekibine bildirin",
+  "cannot-rollback-to-current-version": "Mevcut pakete geri dönülemiyor",
   "cannot-set-this-vers": "Bu sürüm ayarlanamıyor",
   "cannot-show": "Bu sayfayı gösteremez",
   "cannot-test-app-some": "Uygulama test edilemiyor, bir şeyler yanlış gitti",

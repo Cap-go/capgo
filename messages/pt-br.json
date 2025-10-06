@@ -191,6 +191,7 @@
   "cannot-invite-user": "Não é possível convidar o usuário para a organização. Por favor, entre em contato com o suporte da Capgo.",
   "cannot-load-app-settings": "Não é possível carregar as configurações do aplicativo",
   "cannot-rescind-invitation": "Não é possível revogar o convite, por favor, verifique no console do navegador e relate esse erro para a equipe de suporte da Capgo.",
+  "cannot-rollback-to-current-version": "Não é possível reverter para o pacote atual",
   "cannot-set-this-vers": "Não é possível definir esta versão",
   "cannot-show": "Não é possível mostrar esta página",
   "cannot-test-app-some": "Não consigo testar o aplicativo, algo deu errado",

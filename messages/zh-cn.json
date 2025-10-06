@@ -191,6 +191,7 @@
   "cannot-invite-user": "无法邀请用户参加组织。\n请联系CAPGO支持",
   "cannot-load-app-settings": "无法加载应用程序设置",
   "cannot-rescind-invitation": "无法撤销邀请，请在浏览器控制台中查看并向CAPGO支持团队报告此错误",
+  "cannot-rollback-to-current-version": "无法回滚到当前捆绑包",
   "cannot-set-this-vers": "无法设置此版本",
   "cannot-show": "无法显示该页面",
   "cannot-test-app-some": "无法测试应用程序发生错误",

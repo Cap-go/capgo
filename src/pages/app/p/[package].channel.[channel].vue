@@ -854,41 +854,31 @@ async function handleRevert() {
       </div>
       <div
         v-if="channel && ActiveTab === 'devices'"
-        class="flex flex-col"
-        :class="{
-          'm-0 w-full h-screen items-center justify-center overflow-hidden': deviceIds.length === 0,
-        }"
       >
-        <div
-          class="flex flex-col overflow-y-auto bg-white shadow-lg border-slate-300 md:mx-auto md:border dark:border-slate-900 md:rounded-lg dark:bg-gray-800"
-          :class="{
-            'md:mt-5 md:w-2/3': deviceIds.length !== 0,
-            'my-auto w-fit': deviceIds.length === 0,
-            'p-4': deviceIds.length === 0 && !dialogStore.showDialog,
-          }"
-        >
-          <DeviceTable v-if="deviceIds.length > 0" class="p-3" :app-id="channel.version.app_id" :ids="deviceIds" :channel="channel" show-add-button @add-device="AddDevice" />
-          <template v-else-if="!dialogStore.showDialog">
-            <div class="text-center">
-              <div>{{ t('forced-devices-not-found') }}</div>
-              <div class="d-btn d-btn-primary mt-4 text-white cursor-pointer" @click="AddDevice">
-                <plusOutline />
+        <div class="w-full h-full px-0 pt-0 md:pt-8 mx-auto mb-8 overflow-y-auto max-w-9xl max-h-fit sm:px-6 lg:px-8">
+          <div class="flex flex-col overflow-hidden overflow-y-auto bg-white border border-slate-300 shadow-lg md:rounded-lg dark:border-slate-900 dark:bg-gray-800">
+            <DeviceTable v-if="deviceIds.length > 0" :app-id="channel.version.app_id" :ids="deviceIds" :channel="channel" show-add-button @add-device="AddDevice" />
+            <template v-else-if="!dialogStore.showDialog">
+              <div class="text-center">
+                <div>{{ t('forced-devices-not-found') }}</div>
+                <div class="d-btn d-btn-primary mt-4 text-white cursor-pointer" @click="AddDevice">
+                  <plusOutline />
+                </div>
               </div>
-            </div>
-          </template>
+            </template>
+          </div>
         </div>
       </div>
       <div
         v-if="channel && ActiveTab === 'history'"
-        class="flex flex-col"
       >
-        <div
-          class="flex flex-col overflow-y-auto bg-white shadow-lg border-slate-300 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-gray-800"
-        >
-          <HistoryTable
-            :channel-id="id"
-            :app-id="channel.app_id"
-          />
+        <div class="w-full h-full px-0 pt-0 md:pt-8 mx-auto mb-8 overflow-y-auto max-w-9xl max-h-fit sm:px-6 lg:px-8">
+          <div class="flex flex-col overflow-hidden overflow-y-auto bg-white border border-slate-300 shadow-lg md:rounded-lg dark:border-slate-900 dark:bg-gray-800">
+            <HistoryTable
+              :channel-id="id"
+              :app-id="channel.app_id"
+            />
+          </div>
         </div>
       </div>
     </div>
@@ -936,7 +926,6 @@ async function handleRevert() {
             :placeholder="t('search-versions')"
             :classes="{
               outer: 'mb-0! w-full',
-              inner: 'rounded-full!',
             }"
           />
         </div>

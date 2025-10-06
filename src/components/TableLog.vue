@@ -530,7 +530,6 @@ onMounted(async () => {
           enterkeyhint="send"
           :classes="{
             outer: 'mb-0! md:w-96',
-            inner: 'rounded-full! py-1.5!',
           }"
         />
       </div>
