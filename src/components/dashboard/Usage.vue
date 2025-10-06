@@ -383,7 +383,7 @@ onMounted(() => {
   <!-- View Mode Selectors -->
   <div v-if="!noData && !isLoading" class="flex justify-end mb-4 space-x-4">
     <!-- Daily vs Cumulative Switch -->
-    <div class="flex items-center space-x-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+    <div class="flex items-center space-x-1 bg-gray-200 dark:bg-gray-800 rounded-lg p-1">
       <button
         class="px-2 sm:px-3 py-1 text-xs font-medium rounded-md transition-colors first-letter:uppercase whitespace-nowrap truncate max-w-[70px] sm:max-w-none" :class="[!showCumulative || !useBillingPeriod ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white']"
         @click="showCumulative = false"
@@ -404,7 +404,7 @@ onMounted(() => {
     </div>
 
     <!-- Billing Period vs Last 30 Days Switch -->
-    <div class="flex items-center space-x-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+    <div class="flex items-center space-x-1 bg-gray-200 dark:bg-gray-800 rounded-lg p-1">
       <button
         class="px-2 sm:px-3 py-1 text-xs font-medium rounded-md transition-colors first-letter:uppercase whitespace-nowrap truncate max-w-[90px] sm:max-w-none" :class="[useBillingPeriod ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white']"
         @click="useBillingPeriod = true"
