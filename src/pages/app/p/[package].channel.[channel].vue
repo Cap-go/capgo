@@ -711,143 +711,143 @@ async function handleRevert() {
         <div class="w-full h-full px-0 pt-0 md:pt-8 mx-auto mb-8 overflow-y-auto max-w-9xl max-h-fit sm:px-6 lg:px-8">
           <div class="flex flex-col overflow-hidden overflow-y-auto h-[calc(100vh-200px)] bg-white border border-slate-300 shadow-lg md:rounded-lg dark:border-slate-900 dark:bg-slate-800">
             <dl class="divide-y dark:divide-slate-500 divide-slate-200">
-            <InfoRow :label="t('name')">
-              {{ channel.name }}
-            </InfoRow>
-            <!-- Bundle Number -->
-            <InfoRow :label="t('bundle-number')" :is-link="channel && !isInternalVersionName((channel.version.name))">
-              <div class="flex items-center gap-2">
-                <span class="cursor-pointer" @click="openBundle()">{{ channel.version.name }}</span>
-                <button
-                  v-if="channel"
-                  class="p-1 rounded-md border border-gray-200 hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:hover:border-gray-600 dark:hover:bg-gray-800 transition-colors"
-                  @click="openSelectVersion()"
-                >
-                  <Settings class="w-4 h-4 text-gray-500 hover:text-blue-500 dark:text-gray-400 dark:hover:text-blue-400" />
+              <InfoRow :label="t('name')">
+                {{ channel.name }}
+              </InfoRow>
+              <!-- Bundle Number -->
+              <InfoRow :label="t('bundle-number')" :is-link="channel && !isInternalVersionName((channel.version.name))">
+                <div class="flex items-center gap-2">
+                  <span class="cursor-pointer" @click="openBundle()">{{ channel.version.name }}</span>
+                  <button
+                    v-if="channel"
+                    class="p-1 rounded-md border border-gray-200 hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:hover:border-gray-600 dark:hover:bg-gray-800 transition-colors"
+                    @click="openSelectVersion()"
+                  >
+                    <Settings class="w-4 h-4 text-gray-500 hover:text-blue-500 dark:text-gray-400 dark:hover:text-blue-400" />
+                  </button>
+                </div>
+              </InfoRow>
+              <InfoRow v-if="channel.disable_auto_update === 'version_number'" :label="t('min-update-version')">
+                {{ channel.version.min_update_version ?? t('undefined-fail') }}
+              </InfoRow>
+              <!-- Created At -->
+              <InfoRow :label="t('created-at')">
+                {{ formatDate(channel.created_at) }}
+              </InfoRow>
+              <!-- Last Update -->
+              <InfoRow :label="t('last-update')">
+                {{ formatDate(channel.updated_at) }}
+              </InfoRow>
+              <!-- Bundle Link -->
+              <InfoRow
+                v-if="channel.version.link"
+                :label="t('bundle-link')"
+                :is-link="channel.version.link ? true : false"
+                @click="channel.version.link ? openLink(channel.version.link) : null"
+              >
+                {{ channel.version.link }}
+              </InfoRow>
+              <!-- Bundle Comment -->
+              <InfoRow v-if="channel.version.comment" :label="t('bundle-comment')">
+                {{ channel.version.comment }}
+              </InfoRow>
+              <InfoRow :label="t('channel-is-public')">
+                <Toggle
+                  :value="channel?.public"
+                  @change="() => (makeDefault(!channel?.public))"
+                />
+              </InfoRow>
+              <InfoRow label="iOS">
+                <Toggle
+                  :value="channel?.ios"
+                  @change="saveChannelChange('ios', !channel?.ios)"
+                />
+              </InfoRow>
+              <InfoRow label="Android">
+                <Toggle
+                  :value="channel?.android"
+                  @change="saveChannelChange('android', !channel?.android)"
+                />
+              </InfoRow>
+              <InfoRow :label="t('disable-auto-downgra')">
+                <Toggle
+                  :value="channel?.disable_auto_update_under_native"
+                  @change="saveChannelChange('disable_auto_update_under_native', !channel?.disable_auto_update_under_native)"
+                />
+              </InfoRow>
+              <InfoRow :label="t('disableAutoUpdateToMajor')">
+                <details ref="autoUpdateDropdown" class="d-dropdown d-dropdown-end">
+                  <summary class="d-btn d-btn-outline d-btn-sm">
+                    <span>{{ getAutoUpdateLabel(channel.disable_auto_update) }}</span>
+                    <IconDown class="w-4 h-4 ml-1 fill-current" />
+                  </summary>
+                  <ul class="d-dropdown-content bg-base-200 rounded-box z-1 w-48 p-2 shadow">
+                    <li class="block px-1 rounded-lg hover:bg-gray-600">
+                      <a
+                        class="block px-3 py-2 hover:bg-gray-600 text-white"
+                        @click="onSelectAutoUpdate('major')"
+                      >
+                        {{ t('major') }}
+                      </a>
+                    </li>
+                    <li class="block px-1 rounded-lg hover:bg-gray-600">
+                      <a
+                        class="block px-3 py-2 hover:bg-gray-600 text-white"
+                        @click="onSelectAutoUpdate('minor')"
+                      >
+                        {{ t('minor') }}
+                      </a>
+                    </li>
+                    <li class="block px-1 rounded-lg hover:bg-gray-600">
+                      <a
+                        class="block px-3 py-2 hover:bg-gray-600 text-white"
+                        @click="onSelectAutoUpdate('patch')"
+                      >
+                        {{ t('patch') }}
+                      </a>
+                    </li>
+                    <li class="block px-1 rounded-lg hover:bg-gray-600">
+                      <a
+                        class="block px-3 py-2 hover:bg-gray-600 text-white"
+                        @click="onSelectAutoUpdate('version_number')"
+                      >
+                        {{ t('metadata') }}
+                      </a>
+                    </li>
+                    <li class="block px-1 rounded-lg hover:bg-gray-600">
+                      <a
+                        class="block px-3 py-2 hover:bg-gray-600 text-white"
+                        @click="onSelectAutoUpdate('none')"
+                      >
+                        {{ t('none') }}
+                      </a>
+                    </li>
+                  </ul>
+                </details>
+              </InfoRow>
+              <InfoRow :label="t('allow-develoment-bui')">
+                <Toggle
+                  :value="channel?.allow_dev"
+                  @change="saveChannelChange('allow_dev', !channel?.allow_dev)"
+                />
+              </InfoRow>
+              <InfoRow :label="t('allow-emulator')">
+                <Toggle
+                  :value="channel?.allow_emulator"
+                  @change="saveChannelChange('allow_emulator', !channel?.allow_emulator)"
+                />
+              </InfoRow>
+              <InfoRow :label="t('allow-device-to-self')">
+                <Toggle
+                  :value="channel?.allow_device_self_set"
+                  @change="saveChannelChange('allow_device_self_set', !channel?.allow_device_self_set)"
+                />
+              </InfoRow>
+              <InfoRow :label="t('unlink-bundle')" :is-link="true" @click="openPannel">
+                <button class="ml-auto bg-transparent w-7 h-7">
+                  <IconNext />
                 </button>
-              </div>
-            </InfoRow>
-            <InfoRow v-if="channel.disable_auto_update === 'version_number'" :label="t('min-update-version')">
-              {{ channel.version.min_update_version ?? t('undefined-fail') }}
-            </InfoRow>
-            <!-- Created At -->
-            <InfoRow :label="t('created-at')">
-              {{ formatDate(channel.created_at) }}
-            </InfoRow>
-            <!-- Last Update -->
-            <InfoRow :label="t('last-update')">
-              {{ formatDate(channel.updated_at) }}
-            </InfoRow>
-            <!-- Bundle Link -->
-            <InfoRow
-              v-if="channel.version.link"
-              :label="t('bundle-link')"
-              :is-link="channel.version.link ? true : false"
-              @click="channel.version.link ? openLink(channel.version.link) : null"
-            >
-              {{ channel.version.link }}
-            </InfoRow>
-            <!-- Bundle Comment -->
-            <InfoRow v-if="channel.version.comment" :label="t('bundle-comment')">
-              {{ channel.version.comment }}
-            </InfoRow>
-            <InfoRow :label="t('channel-is-public')">
-              <Toggle
-                :value="channel?.public"
-                @change="() => (makeDefault(!channel?.public))"
-              />
-            </InfoRow>
-            <InfoRow label="iOS">
-              <Toggle
-                :value="channel?.ios"
-                @change="saveChannelChange('ios', !channel?.ios)"
-              />
-            </InfoRow>
-            <InfoRow label="Android">
-              <Toggle
-                :value="channel?.android"
-                @change="saveChannelChange('android', !channel?.android)"
-              />
-            </InfoRow>
-            <InfoRow :label="t('disable-auto-downgra')">
-              <Toggle
-                :value="channel?.disable_auto_update_under_native"
-                @change="saveChannelChange('disable_auto_update_under_native', !channel?.disable_auto_update_under_native)"
-              />
-            </InfoRow>
-            <InfoRow :label="t('disableAutoUpdateToMajor')">
-              <details ref="autoUpdateDropdown" class="d-dropdown d-dropdown-end">
-                <summary class="d-btn d-btn-outline d-btn-sm">
-                  <span>{{ getAutoUpdateLabel(channel.disable_auto_update) }}</span>
-                  <IconDown class="w-4 h-4 ml-1 fill-current" />
-                </summary>
-                <ul class="d-dropdown-content bg-base-200 rounded-box z-1 w-48 p-2 shadow">
-                  <li class="block px-1 rounded-lg hover:bg-gray-600">
-                    <a
-                      class="block px-3 py-2 hover:bg-gray-600 text-white"
-                      @click="onSelectAutoUpdate('major')"
-                    >
-                      {{ t('major') }}
-                    </a>
-                  </li>
-                  <li class="block px-1 rounded-lg hover:bg-gray-600">
-                    <a
-                      class="block px-3 py-2 hover:bg-gray-600 text-white"
-                      @click="onSelectAutoUpdate('minor')"
-                    >
-                      {{ t('minor') }}
-                    </a>
-                  </li>
-                  <li class="block px-1 rounded-lg hover:bg-gray-600">
-                    <a
-                      class="block px-3 py-2 hover:bg-gray-600 text-white"
-                      @click="onSelectAutoUpdate('patch')"
-                    >
-                      {{ t('patch') }}
-                    </a>
-                  </li>
-                  <li class="block px-1 rounded-lg hover:bg-gray-600">
-                    <a
-                      class="block px-3 py-2 hover:bg-gray-600 text-white"
-                      @click="onSelectAutoUpdate('version_number')"
-                    >
-                      {{ t('metadata') }}
-                    </a>
-                  </li>
-                  <li class="block px-1 rounded-lg hover:bg-gray-600">
-                    <a
-                      class="block px-3 py-2 hover:bg-gray-600 text-white"
-                      @click="onSelectAutoUpdate('none')"
-                    >
-                      {{ t('none') }}
-                    </a>
-                  </li>
-                </ul>
-              </details>
-            </InfoRow>
-            <InfoRow :label="t('allow-develoment-bui')">
-              <Toggle
-                :value="channel?.allow_dev"
-                @change="saveChannelChange('allow_dev', !channel?.allow_dev)"
-              />
-            </InfoRow>
-            <InfoRow :label="t('allow-emulator')">
-              <Toggle
-                :value="channel?.allow_emulator"
-                @change="saveChannelChange('allow_emulator', !channel?.allow_emulator)"
-              />
-            </InfoRow>
-            <InfoRow :label="t('allow-device-to-self')">
-              <Toggle
-                :value="channel?.allow_device_self_set"
-                @change="saveChannelChange('allow_device_self_set', !channel?.allow_device_self_set)"
-              />
-            </InfoRow>
-            <InfoRow :label="t('unlink-bundle')" :is-link="true" @click="openPannel">
-              <button class="ml-auto bg-transparent w-7 h-7">
-                <IconNext />
-              </button>
-            </InfoRow>
+              </InfoRow>
             </dl>
           </div>
         </div>
