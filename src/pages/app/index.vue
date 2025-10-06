@@ -71,7 +71,9 @@ displayStore.defaultBack = '/app'
       <StepsApp v-if="stepsOpen" :onboarding="!apps.length" @done="NextStep" @close-step="stepsOpen = !stepsOpen" />
       <div v-else class="h-full pb-4 overflow-hidden">
         <div class="w-full h-full px-0 pt-0 md:pt-8 mx-auto mb-8 overflow-y-auto max-w-9xl max-h-fit sm:px-6 lg:px-8">
-          <AppTable :apps="apps" :delete-button="true" @add-app="stepsOpen = !stepsOpen" />
+          <div class="flex flex-col overflow-hidden overflow-y-auto bg-white border border-slate-300 shadow-lg md:rounded-lg dark:border-slate-900 dark:bg-gray-800">
+            <AppTable :apps="apps" :delete-button="true" @add-app="stepsOpen = !stepsOpen" />
+          </div>
         </div>
       </div>
     </div>

@@ -51,7 +51,7 @@ onMounted(() => {
 <template>
   <div>
     <!-- Content -->
-    <div class="h-full mb-8 bg-white rounded-lg shadow-lg dark:bg-gray-800">
+    <div class="h-full mb-8 bg-white rounded-lg shadow-lg dark:bg-gray-800 border border-slate-300 dark:border-slate-900">
       <div class="flex flex-col h-full md:flex-row md:-mr-px">
         <div class="hidden px-3 py-6 overflow-x-scroll border-b no-scrollbar min-w-60 flex-nowrap border-slate-300 md:flex md:overflow-auto md:border-b-0 md:border-r md:space-y-3">
           <!-- Group 1 -->
