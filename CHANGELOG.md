@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.34.29 (2025-10-06)
+
+
+### Bug Fixes
+
+* usage display mobile ([b0da35e](https://github.com/Cap-go/capgo/commit/b0da35e9bca14495950b27afeed2dee63a58269e))
+
 ### 12.34.28 (2025-10-06)
 
 ### 12.34.27 (2025-10-06)
