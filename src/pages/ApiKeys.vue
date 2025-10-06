@@ -653,10 +653,10 @@ getKeys()
               @reset="refreshData()"
             />
           </div>
-          <p class="mt-6">
+          <p class="mt-6 ml-4">
             {{ t('api-keys-are-used-for-cli-and-public-api') }}
           </p>
-          <div class="mb-2">
+          <div class="mb-2 ml-4">
             <a
               class="text-blue-500 underline focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 rounded-sm inline-flex items-center"
               href="https://capgo.app/docs/tooling/cli/"
