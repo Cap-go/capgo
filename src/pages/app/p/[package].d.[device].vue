@@ -404,7 +404,7 @@ function openBundle() {
             <InfoRow v-if="minVersion(device.plugin_version) && device.is_prod" :label="t('is-production-app')">
               {{ device.is_prod?.toString() }}
             </InfoRow>
-            <InfoRow :label="t('channel-link')" :value="channelDevice?.name ?? ''" @click="openChannel()">
+            <InfoRow :label="t('channel-link')" :value="channelDevice?.name ?? ''" :is-link="true" @click="openChannel()">
               <details ref="channelDropdown" class="d-dropdown d-dropdown-end relative" @click.stop>
                 <summary class="d-btn d-btn-outline d-btn-sm">
                   <span>{{ getChannelLabel(channelDevice?.id || 'none') }}</span>

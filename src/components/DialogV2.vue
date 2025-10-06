@@ -39,6 +39,7 @@ onMounted(() => {
       <!-- Backdrop -->
       <div
         class="fixed inset-0 bg-black/50"
+        :class="{ 'cursor-pointer': !dialogStore.dialogOptions?.preventAccidentalClose }"
         @click="!dialogStore.dialogOptions?.preventAccidentalClose && close()"
       />
 

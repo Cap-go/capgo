@@ -408,7 +408,7 @@ onMounted(async () => {
               type="button"
               class="inline-flex h-10 items-center gap-2 border border-gray-300 rounded-md bg-white px-3 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-100 transition-colors dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:hover:bg-gray-700 focus:outline-hidden focus:ring-4 focus:ring-gray-200 dark:focus:ring-gray-700"
             >
-              <component :is="isCustomSelected ? IconCalendar : IconClock" class="w-4 h-4" />
+              <IconCalendar class="w-4 h-4 hidden md:block" />
               <span class="hidden md:block truncate">
                 {{ buttonLabel }}
               </span>

@@ -74,7 +74,7 @@ const tabs = ref<Tab[]>([
     <div
       class="fixed inset-0 z-60 transition-opacity duration-200 lg:hidden"
       :class="{
-        'bg-slate-900/50': props.sidebarOpen,
+        'bg-slate-900/50 cursor-pointer': props.sidebarOpen,
         'bg-slate-900/0 pointer-events-none': !props.sidebarOpen,
       }"
       aria-hidden="true"

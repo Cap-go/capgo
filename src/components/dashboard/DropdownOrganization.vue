@@ -192,7 +192,7 @@ function onOrgItemClick(org: Organization, e: MouseEvent) {
         </div>
         <IconDown class="shrink-0 w-6 h-6 ml-1 fill-current text-slate-400" />
       </summary>
-      <ul class="d-dropdown-content bg-base-200 rounded-box z-1 w-52 p-2 shadow" @click="closeDropdown()">
+      <ul class="d-dropdown-content bg-base-200 rounded-box z-1 w-52 p-2 shadow cursor-pointer" @click="closeDropdown()">
         <li
           v-for="org in organizationStore.organizations"
           :key="org.gid"

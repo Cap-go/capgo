@@ -716,7 +716,7 @@ async function handleRevert() {
             <!-- Bundle Number -->
             <InfoRow :label="t('bundle-number')" :is-link="channel && !isInternalVersionName((channel.version.name))">
               <div class="flex items-center gap-2">
-                <span @click="openBundle()">{{ channel.version.name }}</span>
+                <span class="cursor-pointer" @click="openBundle()">{{ channel.version.name }}</span>
                 <button
                   v-if="channel"
                   class="p-1 rounded-md border border-gray-200 hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:hover:border-gray-600 dark:hover:bg-gray-800 transition-colors"
@@ -869,7 +869,7 @@ async function handleRevert() {
           <template v-else-if="!dialogStore.showDialog">
             <div class="text-center">
               <div>{{ t('forced-devices-not-found') }}</div>
-              <div class="d-btn d-btn-primary mt-4 text-white" @click="AddDevice">
+              <div class="d-btn d-btn-primary mt-4 text-white cursor-pointer" @click="AddDevice">
                 <plusOutline />
               </div>
             </div>

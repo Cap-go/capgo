@@ -456,7 +456,8 @@ onMounted(checkLogin)
                 </div>
 
                 <div class="text-center">
-                  <p class="text-base text-gray-600" /><p class="font-medium text-orange-500 transition-all duration-200 hover:text-orange-600 hover:underline" @click="goback()">
+                  <p class="text-base text-gray-600" />
+                  <p class="font-medium text-orange-500 transition-all duration-200 hover:text-orange-600 hover:underline cursor-pointer" @click="goback()">
                     {{ t('go-back') }}
                   </p>
                   <p class="pt-2 text-gray-300">
