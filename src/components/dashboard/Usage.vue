@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import dayjs from 'dayjs'
 import type { Database } from '~/types/supabase.types'
 import { storeToRefs } from 'pinia'
 import colors from 'tailwindcss/colors'
@@ -14,6 +15,7 @@ import { useOrganizationStore } from '~/stores/organization'
 import DeploymentStatsCard from './DeploymentStatsCard.vue'
 import UpdateStatsCard from './UpdateStatsCard.vue'
 import UsageCard from './UsageCard.vue'
+import InformationInfo from '~icons/heroicons/information-circle'
 
 const props = defineProps<{
   appId?: string
@@ -63,6 +65,23 @@ const dashboardAppsStore = useDashboardAppsStore()
 const dialogStore = useDialogV2Store()
 
 const { dashboard } = storeToRefs(main)
+
+const subscriptionAnchorStart = computed(() => {
+  const start = organizationStore.currentOrganization?.subscription_start
+  return start ? dayjs(start).format('YYYY/MM/D') : t('unknown')
+})
+const subscriptionAnchorEnd = computed(() => {
+  const end = organizationStore.currentOrganization?.subscription_end
+  return end ? dayjs(end).format('YYYY/MM/D') : t('unknown')
+})
+const lastRunDisplay = computed(() => {
+  const source = organizationStore.currentOrganization?.stats_updated_at
+  return source ? dayjs(source).format('MMMM D, YYYY HH:mm') : t('unknown')
+})
+const nextRunDisplay = computed(() => {
+  const source = organizationStore.currentOrganization?.next_stats_update_at
+  return source ? dayjs(source).format('MMMM D, YYYY HH:mm') : t('unknown')
+})
 
 // Confirmation logic for cumulative mode in 30-day view
 async function handleCumulativeClick() {
@@ -381,42 +400,94 @@ onMounted(() => {
 
 <template>
   <!-- View Mode Selectors -->
-  <div v-if="!noData && !isLoading" class="flex flex-col items-stretch gap-2 mb-4 sm:flex-row sm:justify-end sm:items-center sm:gap-4">
-    <!-- Daily vs Cumulative Switch -->
-    <div class="flex items-center space-x-1 bg-gray-200 dark:bg-gray-800 rounded-lg p-1">
-      <button
-        class="px-2 sm:px-3 py-1 text-xs font-medium rounded-md transition-colors first-letter:uppercase whitespace-nowrap truncate max-w-[70px] sm:max-w-none" :class="[!showCumulative || !useBillingPeriod ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white']"
-        @click="showCumulative = false"
-      >
-        {{ t('daily') }}
-      </button>
-      <button
-        class="px-2 sm:px-3 py-1 text-xs font-medium rounded-md transition-colors first-letter:uppercase whitespace-nowrap truncate max-w-[70px] sm:max-w-none"
-        :class="[
-          showCumulative && useBillingPeriod
-            ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
-            : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white',
-        ]"
-        @click="handleCumulativeClick"
-      >
-        {{ t('cumulative') }}
-      </button>
-    </div>
+  <div v-if="!noData && !isLoading" class="mb-4">
+    <div class="flex flex-col items-stretch gap-2 sm:flex-row sm:justify-end sm:items-center sm:gap-4">
+      <!-- Daily vs Cumulative Switch -->
+      <div class="flex items-center space-x-1 bg-gray-200 dark:bg-gray-800 rounded-lg p-1">
+        <button
+          class="px-2 sm:px-3 py-1 text-xs font-medium rounded-md transition-colors first-letter:uppercase whitespace-nowrap truncate max-w-[70px] sm:max-w-none" :class="[!showCumulative || !useBillingPeriod ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white']"
+          @click="showCumulative = false"
+        >
+          {{ t('daily') }}
+        </button>
+        <button
+          class="px-2 sm:px-3 py-1 text-xs font-medium rounded-md transition-colors first-letter:uppercase whitespace-nowrap truncate max-w-[70px] sm:max-w-none"
+          :class="[
+            showCumulative && useBillingPeriod
+              ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+              : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white',
+          ]"
+          @click="handleCumulativeClick"
+        >
+          {{ t('cumulative') }}
+        </button>
+      </div>
 
-    <!-- Billing Period vs Last 30 Days Switch -->
-    <div class="flex items-center space-x-1 bg-gray-200 dark:bg-gray-800 rounded-lg p-1">
-      <button
-        class="px-2 sm:px-3 py-1 text-xs font-medium rounded-md transition-colors first-letter:uppercase whitespace-nowrap truncate max-w-[90px] sm:max-w-none" :class="[useBillingPeriod ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white']"
-        @click="useBillingPeriod = true"
-      >
-        {{ t('billing-period') }}
-      </button>
-      <button
-        class="px-2 sm:px-3 py-1 text-xs font-medium rounded-md transition-colors first-letter:uppercase whitespace-nowrap truncate max-w-[90px] sm:max-w-none" :class="[!useBillingPeriod ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white']"
-        @click="useBillingPeriod = false"
-      >
-        {{ t('last-30-days') }}
-      </button>
+      <!-- Billing Period vs Last 30 Days Switch -->
+      <div class="flex items-center space-x-1 bg-gray-200 dark:bg-gray-800 rounded-lg p-1">
+        <button
+          class="px-2 sm:px-3 py-1 text-xs font-medium rounded-md transition-colors first-letter:uppercase whitespace-nowrap truncate max-w-[90px] sm:max-w-none" :class="[useBillingPeriod ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white']"
+          @click="useBillingPeriod = true"
+        >
+          {{ t('billing-period') }}
+        </button>
+        <button
+          class="px-2 sm:px-3 py-1 text-xs font-medium rounded-md transition-colors first-letter:uppercase whitespace-nowrap truncate max-w-[90px] sm:max-w-none" :class="[!useBillingPeriod ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white']"
+          @click="useBillingPeriod = false"
+        >
+          {{ t('last-30-days') }}
+        </button>
+      </div>
+
+      <!-- Usage Info Tooltip -->
+      <div class="relative group flex items-center">
+        <button
+          type="button"
+          class="flex h-8 w-8 items-center justify-center rounded-md bg-white text-gray-700 shadow-sm transition-colors hover:bg-gray-50 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600 dark:hover:text-white dark:focus:ring-blue-400 sm:h-9 sm:w-9"
+          :aria-label="t('info')"
+        >
+          <InformationInfo class="h-4 w-4" />
+        </button>
+        <div class="pointer-events-none absolute right-0 top-full z-10 hidden w-[min(320px,calc(100vw-32px))] translate-y-2 rounded-lg border border-gray-200 bg-white p-4 text-sm text-gray-800 shadow-2xl group-hover:block group-focus-within:block dark:border-gray-600 dark:bg-gray-800 dark:text-white">
+          <div class="space-y-3">
+            <div class="flex items-start space-x-2">
+              <div class="mt-2 h-2 w-2 flex-shrink-0 rounded-full bg-green-500" />
+              <div>
+                <div class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                  {{ t('last-run') }}
+                </div>
+                <div class="text-sm font-medium">
+                  {{ lastRunDisplay }}
+                </div>
+              </div>
+            </div>
+            <div class="flex items-start space-x-2">
+              <div class="mt-2 h-2 w-2 flex-shrink-0 rounded-full bg-blue-500" />
+              <div>
+                <div class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                  {{ t('next-run') }}
+                </div>
+                <div class="text-sm font-medium">
+                  {{ nextRunDisplay }}
+                </div>
+              </div>
+            </div>
+            <div class="border-t border-gray-200 pt-2 dark:border-gray-600">
+              <div class="flex items-start space-x-2">
+                <div class="mt-2 h-2 w-2 flex-shrink-0 rounded-full bg-purple-500" />
+                <div>
+                  <div class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                    {{ t('billing-cycle') }}
+                  </div>
+                  <div class="text-sm font-medium">
+                    {{ subscriptionAnchorStart }} {{ t('to') }} {{ subscriptionAnchorEnd }}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 

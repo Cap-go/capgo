@@ -1,9 +1,7 @@
 <script setup lang="ts">
-import dayjs from 'dayjs'
 import colors from 'tailwindcss/colors'
-import { computed, onMounted, ref, watch } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import InformationInfo from '~icons/heroicons/information-circle'
 import DeploymentStatsChart from '~/components/DeploymentStatsChart.vue'
 import { useSupabase } from '~/services/supabase'
 import { useDashboardAppsStore } from '~/stores/dashboardApps'
@@ -60,16 +58,6 @@ function filterToBillingPeriod(fullData: number[], last30DaysStart: Date, billin
 
 const { t } = useI18n()
 const organizationStore = useOrganizationStore()
-const subscription_anchor_start = dayjs(organizationStore.currentOrganization?.subscription_start).format('YYYY/MM/D')
-const subscription_anchor_end = dayjs(organizationStore.currentOrganization?.subscription_end).format('YYYY/MM/D')
-const lastRunDisplay = computed(() => {
-  const source = organizationStore.currentOrganization?.stats_updated_at
-  return source ? dayjs(source).format('MMMM D, YYYY HH:mm') : t('unknown')
-})
-const nextRunDisplay = computed(() => {
-  const source = organizationStore.currentOrganization?.next_stats_update_at
-  return source ? dayjs(source).format('MMMM D, YYYY HH:mm') : t('unknown')
-})
 
 const totalDeployments = ref(0)
 const lastDayEvolution = ref(0)
@@ -223,55 +211,6 @@ onMounted(async () => {
         <h2 class="mb-2 mr-2 text-2xl font-semibold text-slate-800 dark:text-white">
           {{ t('deployment_statistics') }}
         </h2>
-        <div class="d-tooltip d-tooltip-bottom">
-          <div class="d-tooltip-content bg-white dark:bg-gray-800 text-gray-800 dark:text-white border border-gray-200 dark:border-gray-600 shadow-2xl rounded-lg p-4 min-w-[280px]">
-            <div class="space-y-3">
-              <!-- Last Run -->
-              <div class="flex items-start space-x-2">
-                <div class="w-2 h-2 bg-green-500 rounded-full mt-2 flex-shrink-0" />
-                <div>
-                  <div class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-                    {{ t('last-run') }}
-                  </div>
-                  <div class="text-sm font-medium">
-                    {{ lastRunDisplay }}
-                  </div>
-                </div>
-              </div>
-
-              <!-- Next Run -->
-              <div class="flex items-start space-x-2">
-                <div class="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0" />
-                <div>
-                  <div class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-                    {{ t('next-run') }}
-                  </div>
-                  <div class="text-sm font-medium">
-                    {{ nextRunDisplay }}
-                  </div>
-                </div>
-              </div>
-
-              <!-- Billing Cycle -->
-              <div class="pt-2 border-t border-gray-200 dark:border-gray-600">
-                <div class="flex items-start space-x-2">
-                  <div class="w-2 h-2 bg-purple-500 rounded-full mt-2 flex-shrink-0" />
-                  <div>
-                    <div class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-                      {{ t('billing-cycle') }}
-                    </div>
-                    <div class="text-sm font-medium">
-                      {{ subscription_anchor_start }} {{ t('to') }} {{ subscription_anchor_end }}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="flex items-center justify-center w-5 h-5 cursor-pointer">
-            <InformationInfo class="text-gray-400 hover:text-blue-500 transition-colors duration-200" />
-          </div>
-        </div>
       </div>
 
       <div class="mb-1 text-xs font-semibold uppercase text-slate-400 dark:text-white">

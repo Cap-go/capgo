@@ -1,11 +1,8 @@
 <script setup lang="ts">
-import dayjs from 'dayjs'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import InformationInfo from '~icons/heroicons/information-circle'
 
 import { getDaysInCurrentMonth } from '~/services/date'
-import { useOrganizationStore } from '~/stores/organization'
 
 const props = defineProps({
   title: { type: String, default: '' },
@@ -38,72 +35,23 @@ const props = defineProps({
   },
 })
 const { t } = useI18n()
-const organizationStore = useOrganizationStore()
-const subscription_anchor_start = dayjs(organizationStore.currentOrganization?.subscription_start).format('YYYY/MM/D')
-const subscription_anchor_end = dayjs(organizationStore.currentOrganization?.subscription_end).format('YYYY/MM/D')
-const lastRunDisplay = computed(() => {
-  const source = organizationStore.currentOrganization?.stats_updated_at
-  return source ? dayjs(source).format('MMMM D, YYYY HH:mm') : t('unknown')
-})
-const nextRunDisplay = computed(() => {
-  const source = organizationStore.currentOrganization?.next_stats_update_at
-  return source ? dayjs(source).format('MMMM D, YYYY HH:mm') : t('unknown')
-})
 
 const total = computed(() => {
-  const arr = props.datas as number[]
-  const arrWithoutUndefined = arr.filter((val: any) => val !== undefined)
+  const dataArray = props.datas as (number | undefined)[]
+  const hasData = dataArray.some(val => val !== undefined)
+  const sumValues = (values: (number | undefined)[]) => values.reduce((acc, val) => (typeof val === 'number' ? acc + val : acc), 0)
 
-  if (arrWithoutUndefined.length === 0) {
-    return 0
+  if (hasData) {
+    return sumValues(dataArray)
   }
 
-  // Check if we're in single app view (no datasByApp or empty)
-  const isSingleApp = !props.datasByApp || Object.keys(props.datasByApp).length === 0
-
-  if (isSingleApp) {
-    if (props.accumulated) {
-      // Single app cumulative mode: accumulate values like LineChartStats does
-      let accumulatedValue = 0
-      arrWithoutUndefined.forEach((val) => {
-        accumulatedValue += val
-      })
-      return accumulatedValue
-    }
-    else {
-      // Single app daily mode: last raw daily value
-      return arrWithoutUndefined[arrWithoutUndefined.length - 1] ?? 0
-    }
+  if (props.datasByApp && Object.keys(props.datasByApp).length > 0) {
+    return Object.values(props.datasByApp).reduce((totalSum, appValues: any) => {
+      return totalSum + sumValues(appValues as (number | undefined)[])
+    }, 0)
   }
 
-  // Multi-app view
-  if (props.accumulated) {
-    // Multi-app cumulative mode: Sum the last accumulated value from each app
-    // This matches the tooltip logic where we sum all accumulated values from all apps
-    let totalAccumulated = 0
-    Object.values(props.datasByApp).forEach((appData: any) => {
-      // For each app, accumulate its daily values
-      const appArrWithoutUndefined = appData.filter((val: any) => val !== undefined)
-      let appAccumulated = 0
-      appArrWithoutUndefined.forEach((val: number) => {
-        appAccumulated += val
-      })
-      // Add this app's accumulated total to the overall total
-      totalAccumulated += appAccumulated
-    })
-    return totalAccumulated
-  }
-  else {
-    // Multi-app daily mode: sum the last values from all apps
-    let dailySum = 0
-    Object.values(props.datasByApp).forEach((appData: any) => {
-      const appArrWithoutUndefined = appData.filter((val: any) => val !== undefined)
-      if (appArrWithoutUndefined.length > 0) {
-        dailySum += appArrWithoutUndefined[appArrWithoutUndefined.length - 1] ?? 0
-      }
-    })
-    return dailySum
-  }
+  return 0
 })
 
 const lastDayEvolution = computed(() => {
@@ -132,55 +80,6 @@ const lastDayEvolution = computed(() => {
         <h2 class="mb-2 mr-2 text-2xl font-semibold text-slate-800 dark:text-white">
           {{ props.title }}
         </h2>
-        <div class="d-tooltip d-tooltip-bottom">
-          <div class="d-tooltip-content bg-white dark:bg-gray-800 text-gray-800 dark:text-white border border-gray-200 dark:border-gray-600 shadow-2xl rounded-lg p-4 min-w-[280px]">
-            <div class="space-y-3">
-              <!-- Last Run -->
-              <div class="flex items-start space-x-2">
-                <div class="w-2 h-2 bg-green-500 rounded-full mt-2 flex-shrink-0" />
-                <div>
-                  <div class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-                    {{ t('last-run') }}
-                  </div>
-                  <div class="text-sm font-medium">
-                    {{ lastRunDisplay }}
-                  </div>
-                </div>
-              </div>
-
-              <!-- Next Run -->
-              <div class="flex items-start space-x-2">
-                <div class="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0" />
-                <div>
-                  <div class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-                    {{ t('next-run') }}
-                  </div>
-                  <div class="text-sm font-medium">
-                    {{ nextRunDisplay }}
-                  </div>
-                </div>
-              </div>
-
-              <!-- Billing Cycle -->
-              <div class="pt-2 border-t border-gray-200 dark:border-gray-600">
-                <div class="flex items-start space-x-2">
-                  <div class="w-2 h-2 bg-purple-500 rounded-full mt-2 flex-shrink-0" />
-                  <div>
-                    <div class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-                      {{ t('billing-cycle') }}
-                    </div>
-                    <div class="text-sm font-medium">
-                      {{ subscription_anchor_start }} {{ t('to') }} {{ subscription_anchor_end }}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="flex items-center justify-center w-5 h-5 cursor-pointer">
-            <InformationInfo class="text-gray-400 hover:text-blue-500 transition-colors duration-200" />
-          </div>
-        </div>
       </div>
 
       <div class="mb-1 text-xs font-semibold uppercase text-slate-400 dark:text-white">

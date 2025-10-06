@@ -2,12 +2,10 @@
 import type { ChartOptions } from 'chart.js'
 import { useDark } from '@vueuse/core'
 import { CategoryScale, Chart, LinearScale, LineElement, PointElement, Tooltip } from 'chart.js'
-import dayjs from 'dayjs'
 import { computed, ref, watch, watchEffect } from 'vue'
 import { Line } from 'vue-chartjs'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
-import InformationInfo from '~icons/heroicons/information-circle'
 import { useChartData } from '~/services/chartDataService'
 import { useSupabase } from '~/services/supabase'
 import { useOrganizationStore } from '~/stores/organization'
@@ -24,7 +22,6 @@ Chart.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip)
 const isDark = useDark()
 const { t } = useI18n()
 const route = useRoute('/app/p/[package]')
-const organizationStore = useOrganizationStore()
 
 const appId = ref('')
 const isLoading = ref(true)
@@ -106,23 +103,6 @@ watchEffect(async () => {
     isLoading.value = true
   }
 })
-
-function lastRunDate() {
-  const source = organizationStore.currentOrganization?.stats_updated_at
-  if (!source)
-    return `${t('last-run')}: ${t('unknown')}`
-
-  const lastRun = dayjs(source).format('MMMM D, YYYY HH:mm')
-  return `${t('last-run')}: ${lastRun}`
-}
-function nextRunDate() {
-  const source = organizationStore.currentOrganization?.next_stats_update_at
-  if (!source)
-    return `${t('next-run')}: ${t('unknown')}`
-
-  const nextRun = dayjs(source).format('MMMM D, YYYY HH:mm')
-  return `${t('next-run')}: ${nextRun}`
-}
 </script>
 
 <template>
@@ -132,22 +112,6 @@ function nextRunDate() {
         <h2 class="mb-2 mr-2 text-2xl font-semibold text-slate-800 dark:text-white">
           {{ t('active_users_by_version') }}
         </h2>
-        <div class="d-tooltip">
-          <div class="flex items-center justify-center w-5 h-5 cursor-pointer">
-            <InformationInfo class="w-4 h-4 text-slate-400 dark:text-white hover:cursor-pointer hover:text-blue-500 hover:bg-blue-500 hover:text-white rounded-full" />
-          </div>
-          <div class="d-tooltip-content bg-slate-800 text-white dark:bg-slate-200 dark:text-black">
-            <div class="max-w-xs whitespace-normal">
-              {{ lastRunDate() }}
-            </div>
-            <div class="max-w-xs whitespace-normal">
-              {{ nextRunDate() }}
-            </div>
-          </div>
-        </div>
-        <div class="font-medium badge badge-primary">
-          beta
-        </div>
       </div>
 
       <div class="mb-1 text-xs font-semibold uppercase text-slate-400 dark:text-white">
