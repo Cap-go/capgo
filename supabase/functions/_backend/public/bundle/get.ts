@@ -1,7 +1,7 @@
 import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { simpleError } from '../../utils/hono.ts'
-import { hasAppRightApikey, supabaseAdmin } from '../../utils/supabase.ts'
+import { hasAppRightApikey, supabaseApikey } from '../../utils/supabase.ts'
 import { fetchLimit } from '../../utils/utils.ts'
 
 export interface GetLatest {
@@ -18,7 +18,7 @@ export async function get(c: Context, body: GetLatest, apikey: Database['public'
   const fetchOffset = body.page ?? 0
   const from = fetchOffset * fetchLimit
   const to = (fetchOffset + 1) * fetchLimit - 1
-  const { data: dataBundles, error: dbError } = await supabaseAdmin(c)
+  const { data: dataBundles, error: dbError } = await supabaseApikey(c, apikey.key)
     .from('app_versions')
     .select()
     .eq('app_id', body.app_id)

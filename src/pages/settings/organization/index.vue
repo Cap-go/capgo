@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { FormKit } from '@formkit/vue'
 import { FunctionsHttpError } from '@supabase/supabase-js'
-import { useI18n } from 'petite-vue-i18n'
 import { storeToRefs } from 'pinia'
 import { computed, onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import iconEmail from '~icons/oui/email?raw'
 import iconName from '~icons/ph/user?raw'
@@ -97,7 +97,7 @@ async function updateEmail(form: { email: string }) {
 
   const { error } = await supabase.functions.invoke('private/set_org_email', {
     body: {
-      emial: form.email,
+      email: form.email,
       org_id: orgCopy.gid,
     },
   })

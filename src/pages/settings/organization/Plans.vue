@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import type { Database } from '~/types/supabase.types'
 import { Capacitor } from '@capacitor/core'
-import { useI18n } from 'petite-vue-i18n'
 import { storeToRefs } from 'pinia'
 import { computed, ref, watch, watchEffect } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { openCheckout } from '~/services/stripe'
 import { getCurrentPlanNameOrg } from '~/services/supabase'
@@ -74,6 +74,30 @@ watch(() => main.bestPlan, (newBestPlan) => {
 const isTrial = computed(() => currentOrganization?.value ? (!currentOrganization?.value.paying && (currentOrganization?.value.trial_left ?? 0) > 0) : false)
 
 async function openChangePlan(plan: Database['public']['Tables']['plans']['Row'], index: number) {
+  // Check if user has apps in this organization
+  if (currentOrganization.value?.app_count === 0) {
+    dialogStore.openDialog({
+      title: t('no-apps-found'),
+      description: t('add-app-first-to-change-plan'),
+      buttons: [
+        {
+          text: t('cancel'),
+          role: 'cancel',
+        },
+        {
+          text: t('add-another-app'),
+          id: 'add-app-button',
+          handler: () => {
+            router.push('/app')
+            return true
+          },
+        },
+      ],
+    })
+    await dialogStore.onDialogDismiss()
+    return
+  }
+
   // get the current url
   isSubscribeLoading.value[index] = true
   if (plan.stripe_id)
@@ -152,8 +176,8 @@ watch(currentOrganization, async (newOrg, prevOrg) => {
 
 watchEffect(async () => {
   if (route.path === '/settings/organization/plans') {
-    // if session_id is in url params show modal success plan setup
-    if (route.query.session_id) {
+    // if success is in url params show modal success plan setup
+    if (route.query.success) {
       // toast.success(t('usage-success'))
       thankYouPage.value = true
     }

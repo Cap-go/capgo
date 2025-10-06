@@ -1,7 +1,8 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
-import { z } from 'zod/v4-mini'
-import { middlewareV2, parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
+import { z } from 'zod/mini'
+import { parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
+import { middlewareV2 } from '../utils/hono_middleware.ts'
 import { createStatsDevices } from '../utils/stats.ts'
 import { supabaseAdmin as useSupabaseAdmin } from '../utils/supabase.ts'
 
@@ -9,7 +10,7 @@ const bodySchema = z.object({
   device_id: z.uuid(),
   app_id: z.string(),
   platform: z.enum(['ios', 'android']),
-  version: z.number(),
+  version_name: z.string(),
 })
 
 export const app = new Hono<MiddlewareKeyVariables>()
@@ -20,7 +21,7 @@ interface CreateDeviceBody {
   device_id: string
   app_id: string
   platform: string
-  version: number
+  version_name: string
 }
 
 app.post('/', middlewareV2(['all', 'write']), async (c) => {
@@ -66,7 +67,7 @@ app.post('/', middlewareV2(['all', 'write']), async (c) => {
   await createStatsDevices(c, {
     app_id: safeBody.app_id,
     device_id: safeBody.device_id,
-    version: safeBody.version,
+    version_name: safeBody.version_name,
     platform: safeBody.platform,
     plugin_version: '0.0.0',
     os_version: '0.0.0',

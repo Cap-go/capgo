@@ -2,6 +2,600 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.34.23 (2025-10-06)
+
+
+### Bug Fixes
+
+* config for our own app ([fca3289](https://github.com/Cap-go/capgo/commit/fca3289a4aad517d69f27f7996b86830bb59996f))
+
+### 12.34.22 (2025-10-06)
+
+### 12.34.21 (2025-10-06)
+
+### 12.34.20 (2025-10-06)
+
+
+### Bug Fixes
+
+* update deps ([65968df](https://github.com/Cap-go/capgo/commit/65968df122b189ccd30b53b5c2547a2da847b0ec))
+
+### 12.34.19 (2025-10-05)
+
+### 12.34.18 (2025-10-05)
+
+### 12.34.17 (2025-10-05)
+
+
+### Bug Fixes
+
+* allow ping event ([3b22008](https://github.com/Cap-go/capgo/commit/3b22008e1ec5856d490b6e30085ab758ab208594))
+
+### 12.34.16 (2025-10-05)
+
+### 12.34.15 (2025-10-05)
+
+### 12.34.14 (2025-10-05)
+
+### 12.34.13 (2025-10-04)
+
+
+### Bug Fixes
+
+* design ([9da1bbb](https://github.com/Cap-go/capgo/commit/9da1bbb9721cb7433288c6199b50b0831f5f7062))
+
+### 12.34.12 (2025-10-04)
+
+### 12.34.11 (2025-10-04)
+
+### 12.34.10 (2025-10-04)
+
+### 12.34.9 (2025-10-04)
+
+
+### Bug Fixes
+
+* display issue in device Table ([94afef2](https://github.com/Cap-go/capgo/commit/94afef2d05b118399c77d9cf023b8cba9b232306))
+
+### 12.34.8 (2025-10-04)
+
+### 12.34.7 (2025-10-04)
+
+
+### Bug Fixes
+
+* SQL ([76cd04d](https://github.com/Cap-go/capgo/commit/76cd04db966205e91b474bc1e4da2fee8b555d90))
+
+### 12.34.6 (2025-10-04)
+
+### 12.34.5 (2025-10-04)
+
+### 12.34.4 (2025-10-04)
+
+### 12.34.3 (2025-10-04)
+
+
+### Bug Fixes
+
+* remove old test ([7a5e899](https://github.com/Cap-go/capgo/commit/7a5e899544a02bc51a46455c46d24bdc3ef61286))
+
+### 12.34.2 (2025-10-02)
+
+
+### Bug Fixes
+
+* lint ([6474228](https://github.com/Cap-go/capgo/commit/64742284bbb9d6d90dd3a692addbee33e48038b4))
+
+### 12.34.1 (2025-10-02)
+
+## 12.34.0 (2025-10-02)
+
+
+### Features
+
+* add versioning in headers ([d496968](https://github.com/Cap-go/capgo/commit/d49696845467ab7da19e511062411aa42ba496bd))
+
+### 12.33.6 (2025-09-29)
+
+### 12.33.5 (2025-09-28)
+
+### 12.33.4 (2025-09-27)
+
+### 12.33.3 (2025-09-27)
+
+### 12.33.2 (2025-09-27)
+
+### 12.33.1 (2025-09-26)
+
+
+### Bug Fixes
+
+* device write issue ([5f57c17](https://github.com/Cap-go/capgo/commit/5f57c179350499373e610b570398977afbcccc2f))
+
+## 12.33.0 (2025-09-25)
+
+
+### Features
+
+* move sentry capture to a more sensible place ([2cdd42b](https://github.com/Cap-go/capgo/commit/2cdd42b78e11cea745897092b6f84634d48fa0b6))
+
+### 12.32.16 (2025-09-25)
+
+### 12.32.15 (2025-09-25)
+
+
+### Bug Fixes
+
+* sourcemaps generation ([ca70039](https://github.com/Cap-go/capgo/commit/ca70039a3b7571c1dfcacd9af5aec87ed5ab8b40))
+
+### 12.32.14 (2025-09-24)
+
+### 12.32.13 (2025-09-24)
+
+### 12.32.12 (2025-09-24)
+
+### 12.32.11 (2025-09-24)
+
+### 12.32.10 (2025-09-24)
+
+### 12.32.9 (2025-09-23)
+
+### 12.32.8 (2025-09-22)
+
+### 12.32.7 (2025-09-22)
+
+
+### Bug Fixes
+
+* redirect to new dashboard page after login ([0517d69](https://github.com/Cap-go/capgo/commit/0517d693abf12ae18748cbbf594f648bfac692f6))
+
+### 12.32.6 (2025-09-22)
+
+### 12.32.5 (2025-09-21)
+
+### 12.32.4 (2025-09-21)
+
+### 12.32.3 (2025-09-21)
+
+
+### Bug Fixes
+
+* wrangler API deploy command for prod ([c0fea70](https://github.com/Cap-go/capgo/commit/c0fea7071a51a9f862e8e4a45ca9959827d79f21))
+
+### 12.32.2 (2025-09-20)
+
+### 12.32.1 (2025-09-20)
+
+
+### Bug Fixes
+
+* include sentry secret in map upload ([571f8d4](https://github.com/Cap-go/capgo/commit/571f8d4689fd6de441a7bea70d3a9658d927423a))
+
+## 12.32.0 (2025-09-20)
+
+
+### Features
+
+* try to uplaod sorcemaps for API ([6a62ee5](https://github.com/Cap-go/capgo/commit/6a62ee553e5139b5a8d37632c0160efa4dac3a34))
+
+## 12.31.0 (2025-09-20)
+
+
+### Features
+
+* enhance mobile tooltip behavior with dismiss and auto-hide functionality ([57d6d27](https://github.com/Cap-go/capgo/commit/57d6d2724643b2778a9fca6f7bc34257171a3f2a))
+
+## 12.30.0 (2025-09-20)
+
+
+### Features
+
+* add noAccumulate option to getNormalStats for flexible data accumulation ([40696e8](https://github.com/Cap-go/capgo/commit/40696e857a6fd2dea123d9c014a82c21ef38a877))
+
+### 12.29.12 (2025-09-20)
+
+
+### Bug Fixes
+
+* add type annotations for array creation functions in chart optimizations ([fdd877b](https://github.com/Cap-go/capgo/commit/fdd877b975bc2101857f519142d85fcad06e2769))
+
+### 12.29.11 (2025-09-20)
+
+
+### Bug Fixes
+
+* lint issue ([0070fa2](https://github.com/Cap-go/capgo/commit/0070fa2715ce79e93ee849d5d6e7691520e18d6d))
+
+### 12.29.10 (2025-09-19)
+
+### 12.29.9 (2025-09-19)
+
+### 12.29.8 (2025-09-19)
+
+### 12.29.7 (2025-09-19)
+
+
+### Bug Fixes
+
+* update route pattern for alpha environment to api-dev.capgo.app ([493cb5b](https://github.com/Cap-go/capgo/commit/493cb5b91b59f265d345f6507e1119c17a39d927))
+
+### 12.29.6 (2025-09-19)
+
+
+### Bug Fixes
+
+* update development supa_anon key in configs.json ([3be2013](https://github.com/Cap-go/capgo/commit/3be201347789e5e5ebfa82bc44efde290081d835))
+
+### 12.29.5 (2025-09-18)
+
+### 12.29.4 (2025-09-18)
+
+### 12.29.3 (2025-09-18)
+
+### 12.29.2 (2025-09-18)
+
+### 12.29.1 (2025-09-18)
+
+## 12.29.0 (2025-09-18)
+
+
+### Features
+
+* add first name, last name, and country fields to user insertion; remove obsolete customer_id and billing_email fields ([d54e376](https://github.com/Cap-go/capgo/commit/d54e376e3fa412b1c7cc85d4ac5f7c5a98c6aef4))
+
+### 12.28.3 (2025-09-18)
+
+### 12.28.2 (2025-09-18)
+
+### 12.28.1 (2025-09-17)
+
+## 12.28.0 (2025-09-16)
+
+
+### Features
+
+* implement plan validation logic for app metrics and streamline database queries ([b763858](https://github.com/Cap-go/capgo/commit/b7638581c48a0b812a25e168cf1910b97ca966c9))
+
+## 12.27.0 (2025-09-16)
+
+
+### Features
+
+* enhance plan validation checks and streamline database queries across plugins ([bd5069c](https://github.com/Cap-go/capgo/commit/bd5069c00d2bce271a16386caadde23c06b18966))
+
+### 12.26.8 (2025-09-16)
+
+### 12.26.7 (2025-09-16)
+
+### 12.26.6 (2025-09-16)
+
+### 12.26.5 (2025-09-16)
+
+
+### Bug Fixes
+
+* correct schema reference in update_app_versions_retention function ([b33f618](https://github.com/Cap-go/capgo/commit/b33f618827f8c1d2e8f434802950ddc62a4a60f2))
+
+### 12.26.4 (2025-09-16)
+
+### 12.26.3 (2025-09-16)
+
+### 12.26.2 (2025-09-16)
+
+### 12.26.1 (2025-09-15)
+
+## 12.26.0 (2025-09-15)
+
+
+### Features
+
+* prevent to large retention in frontend ([5bd635c](https://github.com/Cap-go/capgo/commit/5bd635c4496158b4fa77600066e1057b9a51b7b8))
+
+### 12.25.9 (2025-09-15)
+
+### 12.25.8 (2025-09-15)
+
+
+### Bug Fixes
+
+* update registration URL handling in delete_account and login pages ([99f9bf9](https://github.com/Cap-go/capgo/commit/99f9bf97e44993d7371b0b6edeb4d7aa882d90e5))
+
+### 12.25.7 (2025-09-15)
+
+### 12.25.6 (2025-09-15)
+
+### 12.25.5 (2025-09-15)
+
+### 12.25.4 (2025-09-15)
+
+### 12.25.3 (2025-09-14)
+
+### 12.25.2 (2025-09-14)
+
+### 12.25.1 (2025-09-14)
+
+## 12.25.0 (2025-09-14)
+
+
+### Features
+
+* implement simpleRateLimit function and update error handling in stats, updates, and updates_lite plugins ([6411973](https://github.com/Cap-go/capgo/commit/64119733a143000b53e65638704fb47f1041b74f))
+
+### 12.24.10 (2025-09-14)
+
+### 12.24.9 (2025-09-14)
+
+### 12.24.8 (2025-09-13)
+
+### 12.24.7 (2025-09-13)
+
+### 12.24.6 (2025-09-12)
+
+### 12.24.5 (2025-09-12)
+
+
+### Bug Fixes
+
+* improve error handling and logging in various utility functions ([1c76159](https://github.com/Cap-go/capgo/commit/1c76159eb127a2168cf4180a3079aebfe813e5e4))
+
+### 12.24.4 (2025-09-12)
+
+### 12.24.3 (2025-09-12)
+
+### 12.24.2 (2025-09-10)
+
+### 12.24.1 (2025-09-10)
+
+## 12.24.0 (2025-09-10)
+
+
+### Features
+
+* implement account deletion process with RLS and cron job ([f88d933](https://github.com/Cap-go/capgo/commit/f88d933f6c7a3c1ad602026d66318a30287494cb))
+
+### 12.23.8 (2025-09-10)
+
+### 12.23.7 (2025-09-09)
+
+### 12.23.6 (2025-09-09)
+
+### 12.23.5 (2025-09-09)
+
+### 12.23.4 (2025-09-09)
+
+
+### Bug Fixes
+
+* correct spelling of 'email' in set_org_email function and related tests ([e7bff6a](https://github.com/Cap-go/capgo/commit/e7bff6a6976c5c99dc9c3c8ec1c3c7978e1af6f7))
+
+### 12.23.3 (2025-09-09)
+
+### 12.23.2 (2025-09-08)
+
+### 12.23.1 (2025-09-08)
+
+## 12.23.0 (2025-09-08)
+
+
+### Features
+
+* update PostgrestVersion to 13.0.4 and add success_rate field to database types ([2ece160](https://github.com/Cap-go/capgo/commit/2ece160ba48f3111ae41026e879f603c06e4870e))
+
+### 12.22.5 (2025-09-08)
+
+### 12.22.4 (2025-09-06)
+
+### 12.22.3 (2025-09-06)
+
+### 12.22.2 (2025-09-06)
+
+
+### Bug Fixes
+
+* update cron job calls from CALL to SELECT for proper execution ([b64d49a](https://github.com/Cap-go/capgo/commit/b64d49ab302618e51628feab79df7031bad01f7e))
+
+### 12.22.1 (2025-09-05)
+
+
+### Bug Fixes
+
+* update notifications primary key constraint to include owner_org ([dad0de1](https://github.com/Cap-go/capgo/commit/dad0de1be3145c559574babad050d952ddfd6e11))
+
+## 12.22.0 (2025-09-04)
+
+
+### Features
+
+* add new enum values to stats_action and update get_identity_org_appid calls ([2dd5c0b](https://github.com/Cap-go/capgo/commit/2dd5c0b72e4a092d4eba5f05112a79b587365ad0))
+
+### 12.21.1 (2025-09-04)
+
+## 12.21.0 (2025-09-04)
+
+
+### Features
+
+* add error handling tests for /private/stats endpoint ([ff0a955](https://github.com/Cap-go/capgo/commit/ff0a9553bc7a30a07d6f4b86168504ae417949e5))
+
+### 12.20.5 (2025-09-04)
+
+### 12.20.4 (2025-09-04)
+
+### 12.20.3 (2025-09-02)
+
+### 12.20.2 (2025-09-02)
+
+### 12.20.1 (2025-09-01)
+
+## 12.20.0 (2025-09-01)
+
+
+### Features
+
+* add @types/bun dependency and refactor environment variable access in multiple scripts ([ba6ee30](https://github.com/Cap-go/capgo/commit/ba6ee303e3bd67b8ba76bbe44c2b6623a6893778))
+
+### 12.19.6 (2025-08-30)
+
+
+### Bug Fixes
+
+* 2fa for admins && semi-fix account deletion ([292ad27](https://github.com/Cap-go/capgo/commit/292ad27411ce3467d4697184f4a9c2ead2dc230b))
+
+### 12.19.5 (2025-08-30)
+
+
+### Bug Fixes
+
+* account deletion ([321c209](https://github.com/Cap-go/capgo/commit/321c209cf26e675c58c0afd8291129d499aae9bf))
+
+### 12.19.4 (2025-08-30)
+
+
+### Bug Fixes
+
+* update device value assignment in getDevice function ([579b0ed](https://github.com/Cap-go/capgo/commit/579b0ed5bc044258e4bfbf8c14ec9dbe4d5bc2f2))
+
+### 12.19.3 (2025-08-29)
+
+
+### Bug Fixes
+
+* public POST device endpoint ([adee18e](https://github.com/Cap-go/capgo/commit/adee18eeb43759e39646aa39cb0b391b2908340b))
+
+### 12.19.2 (2025-08-29)
+
+
+### Bug Fixes
+
+* better logging for device POST endpoint ([b7941b3](https://github.com/Cap-go/capgo/commit/b7941b3139e58007de79d207c2c26f31f82e2d91))
+
+### 12.19.1 (2025-08-25)
+
+
+### Bug Fixes
+
+* licence missing ([c5a7353](https://github.com/Cap-go/capgo/commit/c5a7353e445de0a0a443f1a6d6ae7cfa24495529))
+
+## 12.19.0 (2025-08-21)
+
+
+### Features
+
+* add table_counts for tracking record counts and triggers for app_versions, manifest, channels, channel_devices, apps, orgs, and stripe_info ([c19d9a8](https://github.com/Cap-go/capgo/commit/c19d9a81012d583aa27f7c8ceeec0f419c4b3798))
+
+### 12.18.10 (2025-08-21)
+
+### 12.18.9 (2025-08-21)
+
+
+### Bug Fixes
+
+* update localization strings for development build and demo placeholders in multiple languages ([2b86e42](https://github.com/Cap-go/capgo/commit/2b86e42be168e71e3b7464e0cf285ffb0c2aae9d))
+
+### 12.18.8 (2025-08-21)
+
+### 12.18.7 (2025-08-21)
+
+### 12.18.6 (2025-08-21)
+
+
+### Bug Fixes
+
+* improve subscription metered check in setMetered function and add eventName validation in recordUsage function ([94db03b](https://github.com/Cap-go/capgo/commit/94db03ba9e60476717ac9f047110fa3794576799))
+
+### 12.18.5 (2025-08-20)
+
+### 12.18.4 (2025-08-20)
+
+
+### Bug Fixes
+
+* update button classes in Table.vue and remove unused import in DropdownOrganization.vue ([3c26953](https://github.com/Cap-go/capgo/commit/3c2695335e94aad4e1816ed7996572bfa127ba56))
+
+### 12.18.3 (2025-08-20)
+
+### 12.18.2 (2025-08-20)
+
+### 12.18.1 (2025-08-20)
+
+## 12.18.0 (2025-08-20)
+
+
+### Features
+
+* add modal to prevent pay for plan if no apps ([db550a0](https://github.com/Cap-go/capgo/commit/db550a0566395e971279e131af79a1a622fea209))
+
+### 12.17.4 (2025-08-20)
+
+### 12.17.3 (2025-08-20)
+
+### 12.17.2 (2025-08-20)
+
+### 12.17.1 (2025-08-20)
+
+## 12.17.0 (2025-08-20)
+
+
+### Features
+
+* add Memory Bank documentation and project brief for Capgo; update VSCode settings and adjust Deno imports ([f45c356](https://github.com/Cap-go/capgo/commit/f45c35618ee2297f6bd6bf9af899e1fea6fb3f6e))
+
+### 12.16.16 (2025-08-18)
+
+### 12.16.15 (2025-08-18)
+
+
+### Bug Fixes
+
+* correct plan number in identity functions test and remove obsolete error test ([cf482c6](https://github.com/Cap-go/capgo/commit/cf482c6b4bcf3c8cfaff27028a3ac3262d42907a))
+
+### 12.16.14 (2025-08-18)
+
+### 12.16.13 (2025-08-18)
+
+### 12.16.12 (2025-08-18)
+
+### 12.16.11 (2025-08-18)
+
+### 12.16.10 (2025-08-17)
+
+### 12.16.9 (2025-08-17)
+
+### 12.16.8 (2025-08-16)
+
+### 12.16.7 (2025-08-16)
+
+### 12.16.6 (2025-08-16)
+
+### 12.16.5 (2025-08-16)
+
+
+### Bug Fixes
+
+* update Stripe API version to 2025-07-30.basil ([f7b4f81](https://github.com/Cap-go/capgo/commit/f7b4f817400c0d7c5a7572bd6d025d1b4a157465))
+
+### 12.16.4 (2025-08-16)
+
+### 12.16.3 (2025-08-16)
+
+### 12.16.2 (2025-08-12)
+
+### 12.16.1 (2025-08-12)
+
+## 12.16.0 (2025-08-07)
+
+
+### Features
+
+* implement channel override logic for device retrieval ([2c00911](https://github.com/Cap-go/capgo/commit/2c00911985d98458f5d875d7d8fc9342ec5f2780))
+
+### 12.15.12 (2025-08-07)
+
+
+### Bug Fixes
+
+* add channelOverride check to prevent updates via private channels ([a0a6050](https://github.com/Cap-go/capgo/commit/a0a605059453dd6ea0766aa80e350baab2b13a74))
+
 ### 12.15.11 (2025-08-03)
 
 ### 12.15.10 (2025-08-03)

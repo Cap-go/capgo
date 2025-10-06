@@ -1,6 +1,7 @@
 import type { Database } from '../../utils/supabase.types.ts'
-import { honoFactory, middlewareKey, parseBody, quickError, simpleError } from '../../utils/hono.ts'
-import { supabaseAdmin } from '../../utils/supabase.ts'
+import { honoFactory, parseBody, quickError, simpleError } from '../../utils/hono.ts'
+import { middlewareKey } from '../../utils/hono_middleware.ts'
+import { supabaseApikey } from '../../utils/supabase.ts'
 import { Constants } from '../../utils/supabase.types.ts'
 
 const app = honoFactory.createApp()
@@ -55,7 +56,8 @@ app.put('/:id', middlewareKey(['all']), async (c) => {
     throw simpleError('no_valid_fields_provided_for_update', 'No valid fields provided for update. Provide name, mode, limited_to_apps, or limited_to_orgs.')
   }
 
-  const supabase = supabaseAdmin(c)
+  // Use anon client with capgkey header; RLS enforces ownership via user_id
+  const supabase = supabaseApikey(c, key.key)
 
   // Check if the apikey to update exists (RLS handles ownership)
   const { data: existingApikey, error: fetchError } = await supabase

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { BASE_URL, getSupabaseClient, headers, NON_OWNER_ORG_ID, resetAndSeedAppData, resetAppData, TEST_EMAIL, USER_ID } from './test-utils.ts'
+import { APIKEY_STATS, BASE_URL, getSupabaseClient, headers, NON_OWNER_ORG_ID, resetAndSeedAppData, resetAppData, TEST_EMAIL, USER_ID } from './test-utils.ts'
 
 const id = randomUUID()
 const APPNAME = `com.private.error.${id}`
@@ -66,7 +66,7 @@ describe('[POST] /private/create_device - Error Cases', () => {
         app_id: 'nonexistent.app',
         device_id: randomUUID(),
         platform: 'android',
-        version: 1,
+        version_name: '1.0.0',
       }),
     })
     expect(response.status).toBe(404)
@@ -82,7 +82,7 @@ describe('[POST] /private/create_device - Error Cases', () => {
         app_id: 'com.demoadmin.app', // Use the admin app that test user doesn't have access to
         device_id: randomUUID(),
         platform: 'android',
-        version: 1,
+        version_name: '1.0.0',
       }),
     })
 
@@ -313,7 +313,7 @@ describe('[POST] /private/set_org_email - Error Cases', () => {
       },
       body: JSON.stringify({
         org_id: testOrgId,
-        emial: 'test@example.com',
+        email: 'test@example.com',
       }),
     })
     expect(response.status).toBe(401)
@@ -338,7 +338,7 @@ describe('[POST] /private/set_org_email - Error Cases', () => {
   //     headers,
   //     body: JSON.stringify({
   //       org_id: testOrgId,
-  //       emial: 'test@example.com',
+  //       email: 'test@example.com',
   //     }),
   //   })
 
@@ -353,7 +353,7 @@ describe('[POST] /private/set_org_email - Error Cases', () => {
       headers,
       body: JSON.stringify({
         org_id: NON_OWNER_ORG_ID,
-        emial: 'test@example.com',
+        email: 'test@example.com',
       }),
     })
 
@@ -384,7 +384,7 @@ describe('[POST] /private/accept_invitation - Error Cases', () => {
       body: JSON.stringify({
         password: 'ValidPassword123!!',
         magic_invite_string: 'nonexistent-invitation-id',
-        optForNewsletters: false,
+        opt_for_newsletters: false,
         captchaToken: 'test-captcha-token',
       }),
     })
@@ -463,7 +463,7 @@ describe('[POST] /private/stats - Error Cases', () => {
     expect(data.error).toBe('app_access_denied')
   })
 
-  it('should return 400 when auth not found', async () => {
+  it('should work when used with APIKEY', async () => {
     const response = await fetch(`${BASE_URL}/private/stats`, {
       method: 'POST',
       headers,
@@ -472,9 +472,41 @@ describe('[POST] /private/stats - Error Cases', () => {
       }),
     })
 
+    expect(response.status).toBe(200)
+    const data = await response.json() as { error: string }
+    console.log(data)
+    expect(data).toBeDefined()
+  })
+
+  it('should return 400 when wrong auth', async () => {
+    const response = await fetch(`${BASE_URL}/private/stats`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'capgkey': APIKEY_STATS,
+      },
+      body: JSON.stringify({
+        appId: APPNAME,
+      }),
+    })
     expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
     expect(data.error).toBe('app_access_denied')
+  })
+  it('should return 401 when no auth', async () => {
+    const response = await fetch(`${BASE_URL}/private/stats`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        appId: APPNAME,
+      }),
+    })
+
+    expect(response.status).toBe(401)
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('no_jwt_apikey_or_subkey')
   })
 })
 

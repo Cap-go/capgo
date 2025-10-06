@@ -1,5 +1,6 @@
-import { getBodyOrQuery, honoFactory, middlewareKey, simpleError } from '../../utils/hono.ts'
-import { supabaseAdmin } from '../../utils/supabase.ts'
+import { getBodyOrQuery, honoFactory, simpleError } from '../../utils/hono.ts'
+import { middlewareKey } from '../../utils/hono_middleware.ts'
+import { supabaseApikey } from '../../utils/supabase.ts'
 
 export const app = honoFactory.createApp()
 
@@ -12,13 +13,14 @@ interface UpdateMetadataBody {
 
 app.post('/', middlewareKey(['all', 'write']), async (c) => {
   const body = await getBodyOrQuery<UpdateMetadataBody>(c)
+  const apikey = c.get('apikey')!
   // We don't need apikey for this endpoint as middleware handles permission checks
 
   if (!body.app_id || !body.version_id) {
     throw simpleError('missing_required_fields', 'Missing required fields', { app_id: body.app_id, version_id: body.version_id })
   }
 
-  const { data: version, error: versionError } = await supabaseAdmin(c)
+  const { data: version, error: versionError } = await supabaseApikey(c, apikey.key)
     .from('app_versions')
     .select('*')
     .eq('app_id', body.app_id)
@@ -43,7 +45,7 @@ app.post('/', middlewareKey(['all', 'write']), async (c) => {
     throw simpleError('no_fields_to_update', 'No fields to update')
   }
 
-  const { error: updateError } = await supabaseAdmin(c)
+  const { error: updateError } = await supabaseApikey(c, apikey.key)
     .from('app_versions')
     .update(updateData)
     .eq('app_id', body.app_id)

@@ -3,7 +3,7 @@ import type { MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
 import type { DeviceLink } from './delete.ts'
 import { BRES, quickError, simpleError } from '../../utils/hono.ts'
-import { hasAppRightApikey, supabaseAdmin, updateOrCreateChannelDevice } from '../../utils/supabase.ts'
+import { hasAppRightApikey, supabaseApikey, updateOrCreateChannelDevice } from '../../utils/supabase.ts'
 
 export async function post(c: Context<MiddlewareKeyVariables, any, object>, body: DeviceLink, apikey: Database['public']['Tables']['apikeys']['Row']) {
   if (!body.device_id || !body.app_id) {
@@ -21,7 +21,7 @@ export async function post(c: Context<MiddlewareKeyVariables, any, object>, body
   // if channel set channel_override to it
   if (body.channel) {
     // get channel by name
-    const { data: dataChannel, error: dbError } = await supabaseAdmin(c)
+    const { data: dataChannel, error: dbError } = await supabaseApikey(c, apikey.key)
       .from('channels')
       .select()
       .eq('app_id', body.app_id)
@@ -34,12 +34,15 @@ export async function post(c: Context<MiddlewareKeyVariables, any, object>, body
     if (dataChannel.public) {
       throw simpleError('public_channel_override', 'Cannot set channel override for public channel')
     }
-    await updateOrCreateChannelDevice(c, {
+    const { error: channelDeviceError } = await updateOrCreateChannelDevice(c, {
       device_id: body.device_id,
       channel_id: dataChannel.id,
       app_id: body.app_id,
       owner_org: dataChannel.owner_org,
     })
+    if (channelDeviceError) {
+      throw quickError(500, 'channel_device_error', 'Error setting channel override', { channelDeviceError })
+    }
   }
   return c.json(BRES)
 }

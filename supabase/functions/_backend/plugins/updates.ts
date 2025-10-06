@@ -2,8 +2,8 @@ import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { AppInfos } from '../utils/types.ts'
 import { canParse } from '@std/semver'
 import { Hono } from 'hono/tiny'
-import { z } from 'zod/v4-mini'
-import { BRES, parseBody, simpleError } from '../utils/hono.ts'
+import { z } from 'zod/mini'
+import { BRES, parseBody, simpleRateLimit } from '../utils/hono.ts'
 import { cloudlog } from '../utils/loggin.ts'
 import { parsePluginBody } from '../utils/plugin_parser.ts'
 import { update } from '../utils/update.ts'
@@ -60,7 +60,7 @@ app.post('/', async (c) => {
   const body = await parseBody<AppInfos>(c)
   cloudlog({ requestId: c.get('requestId'), message: 'post updates body', body })
   if (isLimited(c, body.app_id)) {
-    throw simpleError('too_many_requests', 'Too many requests')
+    throw simpleRateLimit(body)
   }
   return update(c, parsePluginBody<AppInfos>(c, body, jsonRequestSchema))
 })

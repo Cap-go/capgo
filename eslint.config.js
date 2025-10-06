@@ -3,6 +3,7 @@ import antfu from '@antfu/eslint-config'
 
 export default antfu(
   {
+    vue: true,
     rules: {
       'vue/no-deprecated-slot-attribute': 'off',
       'no-console': process.env.NODE_ENV === 'production' ? 'warn' : 'off',
@@ -17,5 +18,23 @@ export default antfu(
       'supabase/functions/_backend/scripts/*',
       'CHANGELOG.md',
     ],
+  },
+  {
+    // Vue-specific overrides
+    files: ['**/*.vue'],
+    rules: {
+      // Globally disallow v-html
+      'vue/no-v-html': 'error',
+    },
+  },
+  {
+    // Exceptions: allow v-html in vetted components
+    files: [
+      'src/components/Table.vue',
+      'src/components/TableLog.vue',
+    ],
+    rules: {
+      'vue/no-v-html': 'off',
+    },
   },
 )

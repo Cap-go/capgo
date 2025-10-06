@@ -3,8 +3,8 @@ import type { TableColumn } from './comp_def'
 import { FormKit } from '@formkit/vue'
 import { useDebounceFn } from '@vueuse/core'
 import DOMPurify from 'dompurify'
-import { useI18n } from 'petite-vue-i18n'
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, defineComponent, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import IconTrash from '~icons/heroicons/trash'
 import IconDown from '~icons/ic/round-keyboard-arrow-down'
 import IconPrev from '~icons/ic/round-keyboard-arrow-left'
@@ -89,7 +89,18 @@ function sortClick(key: number) {
     sortable = true
   else
     sortable = 'asc'
+
   const newColumns = [...props.columns]
+
+  // Reset all other columns' sorting
+  newColumns.forEach((col, index) => {
+    if (index !== key && col.sortable && typeof col.sortable === 'string') {
+      // Reset to true (sortable but not actively sorted)
+      newColumns[index] = { ...col, sortable: true }
+    }
+  })
+
+  // Set the clicked column's sorting
   newColumns[key].sortable = sortable
   emit('update:columns', newColumns)
 }
@@ -121,6 +132,10 @@ function updateUrlParams() {
   const paramsString = params.toString() ? `?${params.toString()}` : ''
   window.history.pushState({}, '', `${window.location.pathname}${paramsString}`)
 }
+
+const isSelectAllEnabled = computed(() => {
+  return props.massSelect && selectedRows.value.find(val => val)
+})
 
 function loadFromUrlParams() {
   const params = new URLSearchParams(window.location.search)
@@ -189,6 +204,11 @@ const debouncedSearch = useDebounceFn(() => {
   emit('update:search', searchVal.value)
 }, 1000)
 
+const hasLoadingCycleCompleted = ref(false)
+const shouldShowRows = computed(() => !props.isLoading && props.elementList.length !== 0)
+const shouldShowEmptyState = computed(() => !props.isLoading && props.elementList.length === 0 && hasLoadingCycleCompleted.value)
+const shouldShowSkeleton = computed(() => !shouldShowRows.value && !shouldShowEmptyState.value)
+
 watch(() => props.columns, () => {
   debouncedUpdateUrlParams()
   debouncedReload()
@@ -209,6 +229,16 @@ watch(() => props.currentPage, () => {
   debouncedUpdateUrlParams()
   debouncedReload()
 })
+
+watch(() => props.isLoading, (loading, previousLoading) => {
+  if (previousLoading && !loading)
+    hasLoadingCycleCompleted.value = true
+}, { immediate: true })
+
+watch(() => props.elementList, (list) => {
+  if (list.length > 0)
+    hasLoadingCycleCompleted.value = true
+}, { immediate: true })
 
 function displayValueKey(elem: any, col: TableColumn | undefined) {
   if (!col)
@@ -291,26 +321,38 @@ function getSkeletonWidth(columnIndex?: number) {
   const remainingWidth = hasMassSelect ? `calc((100% - 60px) / ${totalVisibleColumns})` : `${100 / totalVisibleColumns}%`
   return remainingWidth
 }
+
+// Helper component to render VNode content from a column's renderFunction
+const RenderCell = defineComponent<{ renderer?: (item: any) => any, item: any }>({
+  name: 'RenderCell',
+  props: {
+    renderer: Function as unknown as () => ((item: any) => any) | undefined,
+    item: { type: Object as any, required: true },
+  },
+  setup(props) {
+    return () => (props.renderer ? (props.renderer as any)(props.item) : null)
+  },
+})
 </script>
 
 <template>
   <div class="pb-4 overflow-x-auto md:pb-0">
     <div class="flex items-start justify-between p-3 pb-4 md:items-center">
-      <div class="flex">
-        <button class="mr-2 inline-flex items-center border border-gray-300 rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-hidden focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 cursor-pointer" type="button" @click="emit('reset')">
-          <IconReload v-if="!isLoading" class="w-4 h-4 mr-0 md:mr-2" />
-          <Spinner v-else size="w-4 h-4 mr-0 md:mr-2" />
+      <div class="flex h-10 md:mb-0">
+        <button class="mr-2 inline-flex items-center border border-gray-300 rounded-md bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-hidden focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 cursor-pointer" type="button" @click="emit('reset')">
+          <IconReload v-if="!isLoading" class="m-1 md:mr-2" />
+          <Spinner v-else size="w-[16.8px] h-[16.8px] m-1 mr-2" />
           <span class="hidden text-sm md:block">{{ t('reload') }}</span>
         </button>
         <div v-if="showAdd" class="mr-2 p-px rounded-lg from-cyan-500 to-purple-500 bg-linear-to-r">
-          <button class="inline-flex items-center rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-hidden focus:ring-4 focus:ring-gray-200 dark:hover:bg-gray-700 dark:focus:ring-gray-700 cursor-pointer" type="button" @click="emit('add')">
-            <plusOutline v-if="!isLoading" class="w-4 h-4 mr-0 md:mr-2" />
-            <Spinner v-else size="w-4 h-4 mr-0 md:mr-2" />
+          <button class="inline-flex items-center rounded-md bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-hidden focus:ring-4 focus:ring-gray-200 dark:hover:bg-gray-700 dark:focus:ring-gray-700 cursor-pointer" type="button" @click="emit('add')">
+            <plusOutline v-if="!isLoading" class="m-1 md:mr-2" />
+            <Spinner v-else size="w-[16.8px] h-[16.8px] m-1 mr-2" />
             <span class="hidden text-sm md:block">{{ t('add-one') }}</span>
           </button>
         </div>
-        <div v-if="filterText && filterList.length" class="d-dropdown">
-          <button tabindex="0" class="mr-2 inline-flex items-center border border-gray-300 rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-hidden focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 cursor-pointer">
+        <div v-if="filterText && filterList.length" class="d-dropdown h-10">
+          <button tabindex="0" class="mr-2 inline-flex items-center border border-gray-300 rounded-md bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-hidden focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 cursor-pointer h-full">
             <div v-if="filterActivated" class="absolute inline-flex items-center justify-center w-6 h-6 text-xs font-bold text-white bg-red-500 border-2 border-white rounded-full -right-2 -top-2 dark:border-gray-900">
               {{ filterActivated }}
             </div>
@@ -320,7 +362,7 @@ function getSkeletonWidth(columnIndex?: number) {
           </button>
           <ul class="p-2 bg-white shadow d-dropdown-content d-menu dark:bg-base-200 rounded-box z-1 w-52">
             <li v-for="(f, i) in filterList" :key="i">
-              <div class="flex items-center p-2 rounded-sm hover:bg-gray-100 dark:hover:bg-gray-600">
+              <div class="flex items-center p-2 rounded-sm hover:bg-gray-100 dark:hover:bg-gray-600 cursor-pointer">
                 <input
                   :id="`filter-radio-example-${i}`"
                   :checked="filters?.[f]"
@@ -329,16 +371,16 @@ function getSkeletonWidth(columnIndex?: number) {
                   class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 dark:ring-offset-gray-800 dark:focus:ring-blue-600 dark:focus:ring-offset-gray-800"
                   @change="emit('update:filters', { ...filters, [f]: !filters?.[f] })"
                 >
-                <label :for="`filter-radio-example-${i}`" class="w-full ml-2 text-sm font-medium text-gray-900 rounded-sm dark:text-gray-300 first-letter:uppercase">{{ t(f) }}</label>
+                <label :for="`filter-radio-example-${i}`" class="w-full ml-2 text-sm font-medium text-gray-900 rounded-sm dark:text-gray-300 first-letter:uppercase cursor-pointer">{{ t(f) }}</label>
               </div>
             </li>
           </ul>
         </div>
       </div>
-      <button v-if="props.massSelect && selectedRows.find(val => val)" class="inline-flex items-center self-end px-3 py-2 ml-auto mr-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-lg dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-hidden focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 cursor-pointer" type="button" @click="selectedRows = selectedRows.map(() => true); emit('selectRow', selectedRows)">
+      <button v-if="isSelectAllEnabled" class="inline-flex items-center self-end px-3 py-2 ml-auto mr-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-lg dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-hidden focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 cursor-pointer" type="button" @click="selectedRows = selectedRows.map(() => true); emit('selectRow', selectedRows)">
         <span class="text-sm">{{ t('select_all') }}</span>
       </button>
-      <button v-if="props.massSelect && selectedRows.find(val => val)" class=" self-end mr-2 inline-flex items-center border border-gray-300 rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-hidden focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 cursor-pointer" type="button" @click="emit('massDelete')">
+      <button v-if="isSelectAllEnabled" class=" self-end mr-2 inline-flex items-center border border-gray-300 rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-hidden focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 cursor-pointer" type="button" @click="emit('massDelete')">
         <IconTrash class="text-red-500 h-[24px]" />
       </button>
       <div class="flex md:w-auto overflow-hidden">
@@ -371,7 +413,7 @@ function getSkeletonWidth(columnIndex?: number) {
             </th>
           </tr>
         </thead>
-        <tbody v-if="!isLoading && elementList.length !== 0">
+        <tbody v-if="shouldShowRows">
           <tr
             v-for="(elem, i) in elementList" :key="i"
             class="bg-white border-b dark:border-gray-700 dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-600"
@@ -384,7 +426,7 @@ function getSkeletonWidth(columnIndex?: number) {
               </th>
               <template v-for="(col, _y) in columns" :key="`${i}_${_y}`">
                 <th v-if="col.head" :class="`${col.class ?? ''}${!col.mobile ? ' hidden md:table-cell' : ''} ${col.onClick ? 'cursor-pointer hover:underline clickable-cell' : ''}`" scope="row" class="py-2 md:py-4 px-4 md:px-6 font-medium text-gray-900 whitespace-nowrap dark:text-white" @click.stop="col.onClick ? col.onClick(elem) : () => {}">
-                  <div v-if="col.allowHtml" v-html="displayValueKey(elem, col)" />
+                  <RenderCell v-if="col.renderFunction" :renderer="col.renderFunction" :item="elem" />
                   <template v-else>
                     {{ displayValueKey(elem, col) }}
                   </template>
@@ -397,7 +439,7 @@ function getSkeletonWidth(columnIndex?: number) {
                         v-show="!action.visible || action.visible(elem)"
                         :key="actionIndex"
                         :disabled="action.disabled && action.disabled(elem)"
-                        class="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-600 dark:hover:text-gray-300 rounded-md cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-gray-500 dark:disabled:hover:text-gray-400"
+                        class="p-2 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-600 dark:hover:text-gray-300 rounded-md cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-gray-500 dark:disabled:hover:text-gray-400"
                         @click.stop="action.onClick(elem)"
                       >
                         <component :is="action.icon" />
@@ -405,15 +447,16 @@ function getSkeletonWidth(columnIndex?: number) {
                     </template>
                     <template v-else-if="col.icon">
                       <button
-                        class="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-600 dark:hover:text-gray-300 rounded-md cursor-pointer"
+                        class="p-2 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-600 dark:hover:text-gray-300 rounded-md cursor-pointer"
                         @click.stop="col.onClick ? col.onClick(elem) : () => {}"
-                        v-html="col.icon"
-                      />
+                      >
+                        <component :is="col.icon" />
+                      </button>
                     </template>
                   </div>
                 </td>
                 <td v-else :class="`${col.class ?? ''} ${!col.mobile ? 'hidden md:table-cell' : ''} ${col.onClick ? 'cursor-pointer hover:underline clickable-cell' : ''} overflow-hidden text-ellipsis whitespace-nowrap`" class="px-4 md:px-6 py-2 md:py-4" @click.stop="col.onClick ? col.onClick(elem) : () => {}">
-                  <div v-if="col.allowHtml" v-html="displayValueKey(elem, col)" />
+                  <RenderCell v-if="col.renderFunction" :renderer="col.renderFunction" :item="elem" />
                   <template v-else>
                     {{ displayValueKey(elem, col) }}
                   </template>
@@ -422,7 +465,7 @@ function getSkeletonWidth(columnIndex?: number) {
             </template>
           </tr>
         </tbody>
-        <tbody v-else-if="!isLoading && elementList.length === 0">
+        <tbody v-else-if="shouldShowEmptyState">
           <tr>
             <td :colspan="columns.length + (props.massSelect ? 1 : 0)" class="px-4 md:px-6 py-2 md:py-4 text-center text-gray-500 dark:text-gray-400">
               {{ t('no_elements_found') }}
@@ -430,7 +473,7 @@ function getSkeletonWidth(columnIndex?: number) {
           </tr>
         </tbody>
         <tbody v-else>
-          <tr v-for="i in 10" :key="i" :class="{ 'animate-pulse duration-1000': isLoading }">
+          <tr v-for="i in 10" :key="i" :class="{ 'animate-pulse duration-1000': shouldShowSkeleton }">
             <td v-if="props.massSelect" class="px-4 md:px-6 py-2 md:py-4" :style="`width: ${getSkeletonWidth()}`">
               <div class="rounded-full bg-gray-200 dark:bg-gray-700 w-full mb-4 h-2.5" />
             </td>

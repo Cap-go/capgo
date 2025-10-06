@@ -108,3 +108,34 @@ export async function addTagBento(c: Context, email: string, segments: { segment
     return false
   }
 }
+
+export async function unsubscribeBento(c: Context, email: string) {
+  if (!hasBento(c))
+    return
+
+  try {
+    const bentoKy = initBentoKy(c)
+    if (!bentoKy)
+      return
+
+    const siteUuid = getEnv(c, 'BENTO_SITE_UUID')
+    const command = {
+      command: 'unsubscribe',
+      email,
+    }
+
+    const result = await bentoKy.post('fetch/commands', {
+      searchParams: {
+        site_uuid: siteUuid,
+      },
+      json: { command },
+    }).json()
+
+    cloudlog({ requestId: c.get('requestId'), message: 'unsubscribeBento', email, result })
+    return true
+  }
+  catch (e) {
+    cloudlog({ requestId: c.get('requestId'), message: 'unsubscribeBento error', error: e })
+    return false
+  }
+}

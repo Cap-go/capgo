@@ -1,13 +1,15 @@
+import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
-import { z } from 'zod/v4-mini'
-import { type MiddlewareKeyVariables, parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
+import { z } from 'zod/mini'
+import { parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/loggin.ts'
 import { emptySupabase, supabaseAdmin as useSupabaseAdmin } from '../utils/supabase.ts'
+import { syncUserPreferenceTags } from '../utils/user_preferences.ts'
 
 interface AcceptInvitation {
   password: string
   magic_invite_string: string
-  optForNewsletters: boolean
+  opt_for_newsletters: boolean
   captchaToken: string
 }
 const MIN_PASSWORD_LENGTH = 'Password must be at least 6 characters'
@@ -20,7 +22,7 @@ const acceptInvitationSchema = z.object({
   password: z.string()
     .check(z.minLength(6, MIN_PASSWORD_LENGTH), z.regex(/[A-Z]/, MIN_PASSWORD_UPPERCASE), z.regex(/\d/, MIN_PASSWORD_NUMBER), z.regex(/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/, MIN_PASSWORD_SPECIAL)),
   magic_invite_string: z.string().check(z.minLength(1)),
-  optForNewsletters: z.boolean(),
+  opt_for_newsletters: z.boolean(),
   captchaToken: z.string().check(z.minLength(1)),
 })
 
@@ -64,14 +66,6 @@ app.post('/', async (c) => {
     password: body.password,
     email_confirm: true,
     id: invitation.future_uuid,
-    user_metadata: {
-      activation: {
-        formFilled: true,
-        enableNotifications: false,
-        legal: true,
-        optForNewsletters: false,
-      },
-    },
   })
 
   if (userError || !user) {
@@ -79,20 +73,20 @@ app.post('/', async (c) => {
   }
 
   // TODO: improve error handling
-  const { error: userNormalTableError } = await supabaseAdmin.from('users').insert({
+  const { error: userNormalTableError, data } = await supabaseAdmin.from('users').insert({
     id: user.user.id,
     email: invitation.email,
-    name: user.user.user_metadata.name,
-    avatar_url: user.user.user_metadata.avatar_url,
     first_name: invitation.first_name,
     last_name: invitation.last_name,
-    legalAccepted: false,
-    optForNewsletters: body.optForNewsletters,
-  })
+    enable_notifications: true,
+    opt_for_newsletters: body.opt_for_newsletters,
+  }).select().single()
 
   if (userNormalTableError) {
     throw quickError(500, 'failed_to_accept_invitation', 'Failed to accept invitation insert', { error: userNormalTableError.message })
   }
+
+  await syncUserPreferenceTags(c, invitation.email, data)
 
   // let's now login the user in. The rough idea is that we will create a session and then return the session to the client
   // then the client will use the session to redirect to login page.

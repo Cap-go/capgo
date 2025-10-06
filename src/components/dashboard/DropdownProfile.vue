@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Capacitor } from '@capacitor/core'
-import { useI18n } from 'petite-vue-i18n'
 import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import { isSpoofed, saveSpoof, unspoofUser, useSupabase } from '~/services/supabase'
@@ -97,7 +97,9 @@ async function setLogAs(id: string) {
   saveSpoof(currentJwt, currentRefreshToken)
   toast.success('Spoofed, will reload')
   setTimeout(() => {
-    window.location.reload()
+    router.replace('/dashboard').then(() => {
+      window.location.reload()
+    })
   }, 1000)
 }
 
@@ -105,7 +107,9 @@ function resetSpoofedUser() {
   if (unspoofUser()) {
     toast.error('Stop Spoofed, will reload')
     setTimeout(() => {
-      window.location.reload()
+      router.replace('/dashboard').then(() => {
+        window.location.reload()
+      })
     }, 1000)
   }
 }

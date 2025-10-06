@@ -5,8 +5,8 @@ import type { Database } from '~/types/supabase.types'
 import { Capacitor } from '@capacitor/core'
 import { FormKit } from '@formkit/vue'
 import { parse } from '@std/semver'
-import { useI18n } from 'petite-vue-i18n'
 import { computed, ref, watch, watchEffect } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import Settings from '~icons/heroicons/cog-8-tooth'
@@ -14,7 +14,7 @@ import IconInformations from '~icons/heroicons/information-circle'
 import IconTrash from '~icons/heroicons/trash'
 import IconSearch from '~icons/ic/round-search?raw'
 import IconAlertCircle from '~icons/lucide/alert-circle'
-import { appIdToUrl, bytesToMbText, urlToAppId } from '~/services/conversion'
+import { bytesToMbText } from '~/services/conversion'
 import { formatDate } from '~/services/date'
 import { checkCompatibilityNativePackages, isCompatible, useSupabase } from '~/services/supabase'
 import { openVersion } from '~/services/versions'
@@ -142,7 +142,7 @@ async function getChannels() {
 async function openChannelLink() {
   if (!version.value || !channel.value)
     return
-  router.push(`/app/p/${appIdToUrl(version.value.app_id)}/channel/${channel.value?.id}`)
+  router.push(`/app/p/${version.value.app_id}/channel/${channel.value?.id}`)
 }
 
 const showSize = computed(() => {
@@ -398,7 +398,6 @@ watchEffect(async () => {
   if (route.path.includes('/bundle/')) {
     loading.value = true
     packageId.value = route.params.package as string
-    packageId.value = urlToAppId(packageId.value)
     id.value = Number(route.params.bundle as string)
     await getVersion()
     await getChannels()
@@ -651,7 +650,7 @@ async function deleteBundle() {
     else {
       toast.success(t('bundle-deleted'))
       // Navigate back to the bundle list
-      router.push(`/app/p/${appIdToUrl(packageId.value)}/bundles/`)
+      router.push(`/app/p/${packageId.value}/bundles/`)
     }
   }
   catch (error) {
@@ -702,23 +701,6 @@ async function deleteBundle() {
               {{ version.min_update_version }}
             </InfoRow>
 
-            <!-- meta devices -->
-            <InfoRow v-if="version_meta?.devices" :label="t('devices')">
-              {{ version_meta.devices.toLocaleString() }}
-            </InfoRow>
-            <InfoRow
-              v-if="version_meta?.installs" :label="t('install')"
-            >
-              {{ version_meta.installs.toLocaleString() }}
-            </InfoRow>
-            <InfoRow
-              v-if="version_meta?.uninstalls" :label="t('uninstall')"
-            >
-              {{ version_meta.uninstalls.toLocaleString() }}
-            </InfoRow>
-            <InfoRow v-if="version_meta?.fails" :label="t('fail')">
-              {{ version_meta.fails.toLocaleString() }}
-            </InfoRow>
             <InfoRow v-if="channels && channels.length > 0 && version && channels.filter(c => c.version === version!.id).length > 0" :label="t('channel')">
               <div class="flex flex-wrap justify-end w-full gap-3">
                 <div v-for="chn in channels.filter(c => c.version === version!.id)" id="open-channel" :key="chn.id" class="flex items-center gap-2">
@@ -823,7 +805,7 @@ async function deleteBundle() {
         <div
           class="flex flex-col mx-auto overflow-y-auto bg-white shadow-lg border-slate-300 md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-gray-800"
         >
-          <DeviceTable class="p-3" :app-id="packageId" :version-id="version.id" />
+          <DeviceTable class="p-3" :app-id="packageId" :version-name="version.name" />
         </div>
       </div>
     </div>
@@ -835,7 +817,7 @@ async function deleteBundle() {
       <p class="text-muted-foreground mt-2">
         {{ t('bundle-not-found-description') }}
       </p>
-      <button class="mt-4 d-btn d-btn-primary" @click="router.push(`/app/p/${appIdToUrl(packageId)}/bundles/`)">
+      <button class="mt-4 d-btn d-btn-primary text-white" @click="router.push(`/app/p/${packageId}/bundles/`)">
         {{ t('back-to-bundles') }}
       </button>
     </div>

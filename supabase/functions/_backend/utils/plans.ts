@@ -1,4 +1,5 @@
 import type { Context } from 'hono'
+import type { PlanUsage } from './supabase.ts'
 import type { Database } from './supabase.types.ts'
 import { quickError } from './hono.ts'
 import { cloudlog, cloudlogErr } from './loggin.ts'
@@ -13,7 +14,6 @@ import {
   isOnboardedOrg,
   isOnboardingNeeded,
   isTrialOrg,
-  type PlanUsage,
   set_bandwidth_exceeded,
   set_mau_exceeded,
   set_storage_exceeded,
@@ -82,7 +82,7 @@ async function setMetered(c: Context, customer_id: string | null, orgId: string)
     .select()
     .eq('customer_id', customer_id)
     .single()
-  if (data?.subscription_metered) {
+  if (data?.subscription_metered && Object.keys(data.subscription_metered).length > 0) {
     try {
       await setThreshold(c, customer_id)
     }
@@ -92,11 +92,11 @@ async function setMetered(c: Context, customer_id: string | null, orgId: string)
     const prices = data.subscription_metered as any as Prices
     const get_metered_usage = await getMeterdUsage(c, orgId)
     if (get_metered_usage.mau && get_metered_usage.mau > 0 && prices.mau)
-      await recordUsage(c, prices.mau, get_metered_usage.mau)
+      await recordUsage(c, customer_id, prices.mau, get_metered_usage.mau)
     if (get_metered_usage.storage && get_metered_usage.storage > 0)
-      await recordUsage(c, prices.storage, get_metered_usage.storage)
+      await recordUsage(c, customer_id, prices.storage, get_metered_usage.storage)
     if (get_metered_usage.bandwidth && get_metered_usage.bandwidth > 0)
-      await recordUsage(c, prices.bandwidth, get_metered_usage.bandwidth)
+      await recordUsage(c, customer_id, prices.bandwidth, get_metered_usage.bandwidth)
   }
 }
 
@@ -106,7 +106,7 @@ async function userAbovePlan(c: Context, org: {
     subscription_id: string | null
   } | null
 }, orgId: string, is_good_plan: boolean) {
-  cloudlog({ requestId: c.get('requestId'), message: 'is_good_plan_v5_org', orgId, is_good_plan })
+  cloudlog({ requestId: c.get('requestId'), message: 'userAbovePlan', orgId, is_good_plan })
   // create dateid var with yyyy-mm with dayjs
   const get_total_stats = await getTotalStats(c, orgId)
   const current_plan = await getCurrentPlanNameOrg(c, orgId)

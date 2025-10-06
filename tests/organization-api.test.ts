@@ -261,7 +261,7 @@ describe('[POST] /organization', () => {
     expect(response.status).toBe(200)
     const type = z.object({
       status: z.string(),
-      id: z.string().uuid(),
+      id: z.uuid(),
     })
     const safe = type.safeParse(await response.json())
     expect(safe.success).toBe(true)

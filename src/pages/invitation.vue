@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { Database } from '~/types/supabase.types'
-import { useI18n } from 'petite-vue-i18n'
 import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import VueTurnstile from 'vue-turnstile'
 import Toggle from '~/components/Toggle.vue'
 import { useSupabase } from '~/services/supabase'
@@ -23,7 +23,7 @@ const supabase = useSupabase()
 
 // Terms and marketing acceptance
 const acceptTerms = ref(false)
-const acceptMarketing = ref(false)
+const acceptMarketing = ref(true)
 const showTermsError = ref(false)
 
 // Password validation
@@ -100,7 +100,7 @@ async function submitForm() {
       body: {
         password: password.value,
         magic_invite_string: inviteMagicString.value,
-        optForNewsletters: acceptMarketing.value,
+        opt_for_newsletters: acceptMarketing.value,
         captchaToken: turnstileToken.value,
       },
     })

@@ -67,7 +67,12 @@ export const useOrganizationStore = defineStore('organization', () => {
 
     localStorage.setItem(STORAGE_KEY, currentOrganizationRaw.gid)
     currentRole.value = await getCurrentRole(currentOrganizationRaw.created_by)
-    await main.updateDashboard(currentOrganizationRaw.gid, currentOrganizationRaw.subscription_start, currentOrganizationRaw.subscription_end)
+    currentOrganizationFailed.value = !(!!currentOrganizationRaw.paying || (currentOrganizationRaw.trial_left ?? 0) > 0)
+    // Always fetch last 30 days of data and filter client-side for billing period
+    const last30DaysEnd = new Date()
+    const last30DaysStart = new Date()
+    last30DaysStart.setDate(last30DaysStart.getDate() - 29) // 30 days including today
+    await main.updateDashboard(currentOrganizationRaw.gid, last30DaysStart.toISOString(), last30DaysEnd.toISOString())
   })
 
   watch(_organizations, async (organizationsMap) => {
@@ -118,16 +123,12 @@ export const useOrganizationStore = defineStore('organization', () => {
     return org.role as OrganizationRole
   }
 
-  const setCurrentOrganization = (id: string) => {
-    currentOrganization.value = organizations.value.find(org => org.gid === id)
-  }
-
-  const setCurrentOrganizationFromValue = (value: Organization) => {
-    currentOrganization.value = value
-  }
-
   const hasPermisisonsInRole = (perm: OrganizationRole | null, perms: OrganizationRole[]): boolean => {
     return (perm && perms.includes(perm)) ?? false
+  }
+
+  const setCurrentOrganization = (id: string) => {
+    currentOrganization.value = organizations.value.find(org => org.gid === id)
   }
 
   const setCurrentOrganizationToMain = () => {
@@ -135,13 +136,13 @@ export const useOrganizationStore = defineStore('organization', () => {
     if (!organization)
       throw new Error('User has no main organization')
 
-    currentOrganization.value = organization
+    setCurrentOrganization(organization.gid)
   }
   const setCurrentOrganizationToFirst = () => {
     if (organizations.value.length === 0)
       return
     const organization = organizations.value[0]
-    currentOrganization.value = organization
+    setCurrentOrganization(organization.gid)
   }
 
   const getMembers = async (): Promise<ExtendedOrganizationMembers> => {
@@ -278,7 +279,6 @@ export const useOrganizationStore = defineStore('organization', () => {
     currentOrganizationFailed,
     currentRole,
     setCurrentOrganization,
-    setCurrentOrganizationFromValue,
     setCurrentOrganizationToMain,
     setCurrentOrganizationToFirst,
     getMembers,

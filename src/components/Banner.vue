@@ -1,10 +1,9 @@
 <script setup lang="ts">
 import { Capacitor } from '@capacitor/core'
-import { useI18n } from 'petite-vue-i18n'
 import { computed, ref, watchEffect } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 
-import { urlToAppId } from '~/services/conversion'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
 
@@ -26,13 +25,12 @@ const isOrgOwner = ref(false)
 watchEffect(async () => {
   try {
     if (route.path.includes('/app/p/')) {
-      const appIdRaw = route.params.package as string
-      if (!appIdRaw) {
+      appId.value = route.params.package as string
+      if (!appId.value) {
         console.error('cannot get app id. Parms:', route.params)
         return
       }
 
-      appId.value = urlToAppId(appIdRaw)
       await organizationStore.awaitInitialLoad()
     }
     else if (route.path.includes('/app') && route.path.includes('home')) {
@@ -116,28 +114,24 @@ const bannerColor = computed(() => {
 
 <template>
   <!-- Desktop inline version -->
-  <div v-if="props.desktop && bannerText" class="flex items-center space-x-3 ml-auto">
-    <span class="text-sm font-medium text-slate-600 dark:text-slate-400">
+  <div v-if="props.desktop && bannerText" class="flex items-center space-x-2 sm:space-x-3 ml-auto">
+    <span class="text-xs sm:text-sm font-medium text-slate-600 dark:text-slate-400 hidden sm:inline">
       {{ bannerLeftText }}:
     </span>
-    <span class="text-sm font-semibold text-slate-800 dark:text-slate-200">
+    <span class="text-xs sm:text-sm font-semibold text-slate-800 dark:text-slate-200">
       {{ bannerText }}
     </span>
-    <a href="/settings/organization/plans" class="d-btn d-btn-sm border-none" :class="bannerColor">
-      {{ t('upgrade') }}
+    <a href="/settings/organization/plans" class="d-btn d-btn-xs sm:d-btn-sm border-none" :class="bannerColor">
+      {{ isMobile ? t('see-usage') : t('upgrade') }}
     </a>
   </div>
 
   <!-- Mobile/original version -->
-  <div v-else-if="!props.desktop && bannerText" class="navbar bg-gray-200 dark:bg-gray-800/90">
-    <div class="text-xl navbar-start font-bold text-black dark:text-white md:pl-4 line-clamp-1">
-      {{ bannerLeftText }}
-    </div>
-    <div class="navbar-center lg:flex">
-      <a class="text-xl font-bold text-black dark:text-white normal-case ">{{ bannerText }}</a>
-    </div>
-    <div class="navbar-end">
-      <a href="/settings/organization/plans" class="d-btn border-none" :class="bannerColor">{{ isMobile ? t('see-usage') : t('upgrade') }}</a>
-    </div>
+  <div v-else-if="!props.desktop && bannerText" class="flex items-center justify-end bg-gray-200 dark:bg-gray-800/90 min-h-[3rem] sm:min-h-[4rem] px-2 sm:px-4 gap-2">
+    <span class="text-sm sm:text-lg font-semibold text-black dark:text-white">
+      {{ bannerLeftText }}:
+    </span>
+    <span class="text-xs sm:text-base font-medium text-black dark:text-white">{{ bannerText }}</span>
+    <a href="/settings/organization/plans" class="d-btn d-btn-xs sm:d-btn-sm border-none whitespace-nowrap ml-2" :class="bannerColor">{{ isMobile ? t('see-usage') : t('upgrade') }}</a>
   </div>
 </template>

@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import type { Stat, Tab } from '~/components/comp_def'
+import type { Tab } from '~/components/comp_def'
 import type { Database } from '~/types/supabase.types'
-import { useI18n } from 'petite-vue-i18n'
-import { computed, ref, watchEffect } from 'vue'
+import { ref, watchEffect } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import IconChart from '~icons/heroicons/chart-bar'
 import IconHistory from '~icons/heroicons/clock'
@@ -10,8 +10,11 @@ import IconCog from '~icons/heroicons/cog-6-tooth'
 import IconCube from '~icons/heroicons/cube'
 import IconDevice from '~icons/heroicons/device-phone-mobile'
 import IconChannel from '~icons/heroicons/signal'
+import IconAlertCircle from '~icons/lucide/alert-circle'
 import AppSetting from '~/components/dashboard/AppSetting.vue'
-import { appIdToUrl, urlToAppId } from '~/services/conversion'
+import BundleUploadsCard from '~/components/dashboard/BundleUploadsCard.vue'
+import DeploymentStatsCard from '~/components/dashboard/DeploymentStatsCard.vue'
+import UpdateStatsCard from '~/components/dashboard/UpdateStatsCard.vue'
 import { getCapgoVersion, useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
@@ -35,6 +38,7 @@ const supabase = useSupabase()
 const displayStore = useDisplayStore()
 const app = ref<Database['public']['Tables']['apps']['Row']>()
 const ActiveTab = ref(route.query.tab?.toString() || 'overview')
+const usageComponent = ref()
 
 const tabs: Tab[] = [
   {
@@ -68,33 +72,6 @@ const tabs: Tab[] = [
     key: 'logs',
   },
 ]
-
-const stats = computed<Stat[]>(() => ([
-  {
-    label: t('channels'),
-    hoverLabel: 'Click to explore the channel list',
-    value: channelsNb.value?.toLocaleString(),
-    link: `/app/p/${appIdToUrl(id.value)}?tab=channels`,
-  },
-  {
-    label: t('bundles'),
-    hoverLabel: 'Click to explore the bundle list',
-    value: bundlesNb.value?.toLocaleString(),
-    link: `/app/p/${appIdToUrl(id.value)}?tab=bundles`,
-  },
-  {
-    label: t('devices'),
-    hoverLabel: 'Click to explore the device list',
-    value: devicesNb.value?.toLocaleString(),
-    link: `/app/p/${appIdToUrl(id.value)}?tab=devices`,
-  },
-  {
-    label: t('plan-updates'),
-    hoverLabel: 'Click to explore the logs',
-    value: updatesNb.value?.toLocaleString(),
-    link: `/app/p/${appIdToUrl(id.value)}?tab=logs`,
-  },
-]))
 
 async function loadAppInfo() {
   try {
@@ -157,7 +134,6 @@ watchEffect(async () => {
   if (route.path.startsWith('/app/p') && lastPath.value !== route.path) {
     lastPath.value = route.path
     id.value = route.params.package as string
-    id.value = urlToAppId(id.value)
     await refreshData()
     displayStore.NavTitle = app.value?.name ?? ''
     displayStore.defaultBack = '/app'
@@ -165,6 +141,11 @@ watchEffect(async () => {
 })
 
 watchEffect(() => {
+  // Clear dashboard-specific query parameters when switching away from overview
+  if (ActiveTab.value !== 'overview' && usageComponent.value?.clearDashboardParams) {
+    usageComponent.value.clearDashboardParams()
+  }
+  // Always update tab parameter
   router.replace({ query: { ...route.query, tab: ActiveTab.value } })
 })
 </script>
@@ -175,47 +156,72 @@ watchEffect(() => {
     <div v-if="isLoading" class="flex flex-col items-center justify-center h-full">
       <Spinner size="w-40 h-40" />
     </div>
-    <div v-else>
-      <div v-if="ActiveTab === 'overview'" class="mt-4 w-full h-full px-4 pt-8 mb-8 overflow-y-auto max-h-fit lg:px-8 sm:px-6 overflow-x-hidden">
+    <div v-else-if="app">
+      <div v-if="ActiveTab === 'overview'" class="w-full h-full px-4 pt-4 mb-8 overflow-y-auto max-h-fit lg:px-8 sm:px-6 overflow-x-hidden">
         <FailedCard />
-        <Usage v-if="!organizationStore.currentOrganizationFailed" :app-id="id" :show-mobile-stats="canShowMobileStats" />
+        <Usage v-if="!organizationStore.currentOrganizationFailed" ref="usageComponent" :app-id="id" :show-mobile-stats="canShowMobileStats" />
 
-        <BlurBg id="app-stats" class="mb-10">
-          <template #default>
-            <StatsBar :stats="stats" />
-          </template>
-        </BlurBg>
+        <!-- New charts section -->
+        <div class="grid grid-cols-1 sm:grid-cols-12 gap-6 mb-6 xl:grid-cols-12">
+          <BundleUploadsCard
+            :use-billing-period="usageComponent?.useBillingPeriod ?? true"
+            :accumulated="(usageComponent?.useBillingPeriod ?? true) && (usageComponent?.showCumulative ?? false)"
+            class="col-span-full sm:col-span-6 xl:col-span-4"
+          />
+          <UpdateStatsCard
+            :use-billing-period="usageComponent?.useBillingPeriod ?? true"
+            :accumulated="(usageComponent?.useBillingPeriod ?? true) && (usageComponent?.showCumulative ?? false)"
+            class="col-span-full sm:col-span-6 xl:col-span-4"
+          />
+          <DeploymentStatsCard
+            :use-billing-period="usageComponent?.useBillingPeriod ?? true"
+            :accumulated="(usageComponent?.useBillingPeriod ?? true) && (usageComponent?.showCumulative ?? false)"
+            class="col-span-full sm:col-span-6 xl:col-span-4"
+          />
+        </div>
       </div>
 
-      <div v-if="ActiveTab === 'info'" class="mt-0 md:mt-4">
+      <div v-if="ActiveTab === 'info'" class="mt-0 md:mt-8">
         <div class="flex flex-col mx-auto overflow-y-auto bg-white border md:rounded-lg shadow-lg border-slate-300 md:mt-5 md:w-2/3 dark:border-slate-900 dark:bg-gray-800">
           <AppSetting :app-id="id" />
         </div>
       </div>
 
-      <div v-if="ActiveTab === 'bundles'" class="mt-0 md:mt-4">
+      <div v-if="ActiveTab === 'bundles'" class="mt-0 md:mt-8">
         <div class="flex flex-col mx-auto overflow-y-auto bg-white border md:rounded-lg shadow-lg border-slate-300 md:mt-5 md:w-2/3 dark:border-slate-900 dark:bg-gray-800">
           <BundleTable :app-id="id" />
         </div>
       </div>
 
-      <div v-if="ActiveTab === 'channels'" class="mt-0 md:mt-4">
+      <div v-if="ActiveTab === 'channels'" class="mt-0 md:mt-8">
         <div class="flex flex-col mx-auto overflow-y-auto bg-white border md:rounded-lg shadow-lg border-slate-300 md:mt-5 md:w-2/3 dark:border-slate-900 dark:bg-gray-800">
           <ChannelTable :app-id="id" />
         </div>
       </div>
 
-      <div v-if="ActiveTab === 'devices'" class="mt-0 md:mt-4">
+      <div v-if="ActiveTab === 'devices'" class="mt-0 md:mt-8">
         <div class="flex flex-col mx-auto overflow-y-auto bg-white border md:rounded-lg shadow-lg border-slate-300 md:mt-5 md:w-2/3 dark:border-slate-900 dark:bg-gray-800">
           <DeviceTable :app-id="id" />
         </div>
       </div>
 
-      <div v-if="ActiveTab === 'logs'" class="mt-0 md:mt-4">
+      <div v-if="ActiveTab === 'logs'" class="mt-0 md:mt-8">
         <div class="flex flex-col mx-auto overflow-y-auto bg-white border md:rounded-lg shadow-lg border-slate-300 md:mt-5 md:w-2/3 dark:border-slate-900 dark:bg-gray-800">
           <LogTable :app-id="id" />
         </div>
       </div>
+    </div>
+    <div v-else class="flex flex-col items-center justify-center min-h-[50vh]">
+      <IconAlertCircle class="w-16 h-16 text-destructive mb-4" />
+      <h2 class="text-xl font-semibold text-foreground">
+        {{ t('app-not-found') }}
+      </h2>
+      <p class="text-muted-foreground mt-2">
+        {{ t('app-not-found-description') }}
+      </p>
+      <button class="mt-4 d-btn d-btn-primary text-white" @click="router.push(`/app`)">
+        {{ t('back-to-apps') }}
+      </button>
     </div>
   </div>
 </template>

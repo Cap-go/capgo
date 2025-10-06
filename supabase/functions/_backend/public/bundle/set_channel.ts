@@ -1,7 +1,7 @@
 import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { quickError, simpleError } from '../../utils/hono.ts'
-import { hasAppRightApikey, supabaseAdmin } from '../../utils/supabase.ts'
+import { hasAppRightApikey, supabaseApikey } from '../../utils/supabase.ts'
 
 interface SetChannelBody {
   app_id: string
@@ -20,7 +20,7 @@ export async function setChannel(c: Context, body: SetChannelBody, apikey: Datab
   }
 
   // Get organization info
-  const { data: org, error: orgError } = await supabaseAdmin(c)
+  const { data: org, error: orgError } = await supabaseApikey(c, apikey.key)
     .from('apps')
     .select('owner_org')
     .eq('app_id', body.app_id)
@@ -31,7 +31,7 @@ export async function setChannel(c: Context, body: SetChannelBody, apikey: Datab
   }
 
   // Verify the bundle exists and belongs to the app
-  const { data: version, error: versionError } = await supabaseAdmin(c)
+  const { data: version, error: versionError } = await supabaseApikey(c, apikey.key)
     .from('app_versions')
     .select('*')
     .eq('app_id', body.app_id)
@@ -45,7 +45,7 @@ export async function setChannel(c: Context, body: SetChannelBody, apikey: Datab
   }
 
   // Verify the channel exists and belongs to the app
-  const { data: channel, error: channelError } = await supabaseAdmin(c)
+  const { data: channel, error: channelError } = await supabaseApikey(c, apikey.key)
     .from('channels')
     .select('*')
     .eq('app_id', body.app_id)
@@ -58,7 +58,7 @@ export async function setChannel(c: Context, body: SetChannelBody, apikey: Datab
   }
 
   // Update the channel to set the new version
-  const { error: updateError } = await supabaseAdmin(c)
+  const { error: updateError } = await supabaseApikey(c, apikey.key)
     .from('channels')
     .update({ version: body.version_id })
     .eq('id', body.channel_id)

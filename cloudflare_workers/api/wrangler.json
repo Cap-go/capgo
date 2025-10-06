@@ -1,9 +1,15 @@
 {
   "name": "capgo_api-prod",
-  "route": {
-    "pattern": "api.capgo.app",
-    "custom_domain": true
-  },
+  "routes": [
+    {
+      "pattern": "api.capgo.app",
+      "custom_domain": true
+    },
+    {
+      "pattern": "api.usecapgo.com",
+      "custom_domain": true
+    }
+  ],
   "compatibility_date": "2025-04-01",
   "main": "./index.ts",
   "compatibility_flags": [
@@ -62,7 +68,7 @@
   "env": {
     "preprod": {
       "name": "capgo_api-preprod",
-      "route": {
+      "routes": {
         "pattern": "api-preprod.capgo.app",
         "custom_domain": true
       },
@@ -111,8 +117,8 @@
     },
     "alpha": {
       "name": "capgo_api-alpha",
-      "route": {
-        "pattern": "api-alpha.capgo.app",
+      "routes": {
+        "pattern": "api-dev.capgo.app",
         "custom_domain": true
       },
       "observability": {

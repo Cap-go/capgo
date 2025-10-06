@@ -1,7 +1,7 @@
 import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { quickError, simpleError } from '../../utils/hono.ts'
-import { hasAppRightApikey, supabaseAdmin } from '../../utils/supabase.ts'
+import { hasAppRightApikey, supabaseApikey } from '../../utils/supabase.ts'
 
 interface UpdateApp {
   name?: string
@@ -14,7 +14,14 @@ export async function put(c: Context, appId: string, body: UpdateApp, apikey: Da
     throw quickError(401, 'cannot_access_app', 'You can\'t access this app', { app_id: appId })
   }
 
-  const { data, error: dbError } = await supabaseAdmin(c)
+  if (body.retention && body.retention >= 63113904) {
+    throw quickError(400, 'retention_to_big', 'Retention cannot be bigger than 63113903 (2 years)', { retention: body.retention })
+  }
+  else if (body.retention && body.retention < 0) {
+    throw quickError(400, 'retention_to_small', 'Retention cannot be smaller than 0', { retention: body.retention })
+  }
+
+  const { data, error: dbError } = await supabaseApikey(c, apikey.key)
     .from('apps')
     .update({
       name: body.name,

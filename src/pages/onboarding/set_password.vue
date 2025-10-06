@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { setErrors } from '@formkit/core'
 import { FormKit, FormKitMessages } from '@formkit/vue'
-import { useI18n } from 'petite-vue-i18n'
 import { ref, watchEffect } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import iconPassword from '~icons/ph/key?raw'
@@ -42,7 +42,7 @@ async function submit(form: { password: string }) {
     setErrors('set-password', [updateError.message], {})
   else
     toast.success(t('changed-password-suc'))
-  router.push('/onboarding/activation')
+  router.replace('/dashboard')
 }
 watchEffect(async () => {
   if (route && route.path === '/onboarding/set_password')

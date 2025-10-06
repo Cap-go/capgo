@@ -1,6 +1,6 @@
-import type { Locale } from 'petite-vue-i18n'
+import type { Locale } from 'vue-i18n'
 import type { UserModule } from '~/types'
-import { createI18n } from 'petite-vue-i18n'
+import { createI18n } from 'vue-i18n'
 
 // Import i18n resources
 // https://vitejs.dev/guide/features.html#glob-import
@@ -28,11 +28,12 @@ export const languages = {
   'ja': '日本語',
   'ko': '한국어',
   'pl': 'Polski',
-  'pt-BR': 'Português (Brasil)',
+  'pt-br': 'Português (Brasil)',
   'ru': 'Русский',
   'tr': 'Türkçe',
   'vi': 'Tiếng Việt',
-  'zh-CN': '简体中文',
+  'zh-cn': '简体中文',
+  'hi': 'हिन्दी',
 }
 
 const loadedLanguages: string[] = []

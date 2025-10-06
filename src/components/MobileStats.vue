@@ -1,23 +1,30 @@
 <script setup lang="ts">
 import type { ChartOptions } from 'chart.js'
+import { useDark } from '@vueuse/core'
 import { CategoryScale, Chart, LinearScale, LineElement, PointElement, Tooltip } from 'chart.js'
 import dayjs from 'dayjs'
-import { useI18n } from 'petite-vue-i18n'
-import { computed, ref, watchEffect } from 'vue'
+import { computed, ref, watch, watchEffect } from 'vue'
 import { Line } from 'vue-chartjs'
+import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import InformationInfo from '~icons/heroicons/information-circle'
 import { useChartData } from '~/services/chartDataService'
-import { urlToAppId } from '~/services/conversion'
 import { useSupabase } from '~/services/supabase'
-import { useMainStore } from '~/stores/main'
+import { useOrganizationStore } from '~/stores/organization'
+
+const props = defineProps({
+  useBillingPeriod: {
+    type: Boolean,
+    default: true,
+  },
+})
 
 Chart.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip)
 
 const isDark = useDark()
 const { t } = useI18n()
 const route = useRoute('/app/p/[package]')
-const main = useMainStore()
+const organizationStore = useOrganizationStore()
 
 const appId = ref('')
 const isLoading = ref(true)
@@ -55,21 +62,39 @@ async function loadData() {
   console.log('loadData mobile data')
   isLoading.value = true
 
-  const { startDate, endDate } = getDateRange(30)
+  const { startDate, endDate } = getDateRange()
   chartData.value = await useChartData(useSupabase(), appId.value, startDate, endDate)
   isLoading.value = false
 }
 
-function getDateRange(days: number) {
-  const endDate = new Date()
-  const startDate = new Date(endDate)
-  startDate.setDate(startDate.getDate() - days)
-  return { startDate, endDate }
+function getDateRange() {
+  const organizationStore = useOrganizationStore()
+
+  if (props.useBillingPeriod) {
+    // Use billing period dates
+    const startDate = new Date(organizationStore.currentOrganization?.subscription_start ?? new Date())
+    const endDate = new Date(organizationStore.currentOrganization?.subscription_end ?? new Date())
+    return { startDate, endDate }
+  }
+  else {
+    // Use last 30 days
+    const endDate = new Date()
+    const startDate = new Date(endDate)
+    startDate.setDate(startDate.getDate() - 30)
+    return { startDate, endDate }
+  }
 }
+
+// Watch for billing period mode changes and reload data
+watch(() => props.useBillingPeriod, async () => {
+  if (appId.value) {
+    await loadData()
+  }
+})
 
 watchEffect(async () => {
   if (route.path.includes('/p/')) {
-    appId.value = urlToAppId(route.params.package as string)
+    appId.value = route.params.package as string
     try {
       await loadData()
     }
@@ -83,11 +108,19 @@ watchEffect(async () => {
 })
 
 function lastRunDate() {
-  const lastRun = dayjs(main.statsTime.last_run).format('MMMM D, YYYY HH:mm')
+  const source = organizationStore.currentOrganization?.stats_updated_at
+  if (!source)
+    return `${t('last-run')}: ${t('unknown')}`
+
+  const lastRun = dayjs(source).format('MMMM D, YYYY HH:mm')
   return `${t('last-run')}: ${lastRun}`
 }
 function nextRunDate() {
-  const nextRun = dayjs(main.statsTime.next_run).format('MMMM D, YYYY HH:mm')
+  const source = organizationStore.currentOrganization?.next_stats_update_at
+  if (!source)
+    return `${t('next-run')}: ${t('unknown')}`
+
+  const nextRun = dayjs(source).format('MMMM D, YYYY HH:mm')
   return `${t('next-run')}: ${nextRun}`
 }
 </script>

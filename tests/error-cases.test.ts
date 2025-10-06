@@ -315,25 +315,6 @@ describe('plugin Endpoint Error Cases', () => {
     const data = await response.json() as { error: string }
     expect(data.error).toBe('invalid_json_body')
   })
-
-  it('should return 400 for updates_lite with invalid request', async () => {
-    const response = await fetch(`${BASE_URL}/updates_lite`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'cap-platform': 'ios',
-        'cap-platform-version': '15.0',
-        'cap-version-name': '1.0.0',
-        'cap-version-build': '1',
-        'cap-version-code': '1',
-        'cap-app-id': 'nonexistent.app',
-      },
-      body: JSON.stringify({}),
-    })
-    expect(response.status).toBe(400)
-    const data = await response.json() as { error: string }
-    expect(data.error).toBe('invalid_json_body')
-  })
 })
 
 describe('files Endpoint Error Cases', () => {

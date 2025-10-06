@@ -2,9 +2,9 @@
 import type { ArrayElement } from '~/services/types'
 import type { Database } from '~/types/supabase.types'
 import dayjs from 'dayjs'
-import { useI18n } from 'petite-vue-i18n'
 import { storeToRefs } from 'pinia'
 import { computed, ref, watchEffect } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import { bytesToGb } from '~/services/conversion'
@@ -30,8 +30,8 @@ const { currentOrganization } = storeToRefs(organizationStore)
 
 watchEffect(async () => {
   if (route.path === '/settings/organization/plans') {
-    // if session_id is in url params show modal success plan setup
-    if (route.query.session_id) {
+    // if success is in url params show modal success plan setup
+    if (route.query.success) {
       toast.success(t('usage-success'))
     }
     else if (main.user?.id) {
@@ -181,11 +181,19 @@ async function loadData() {
 }
 
 function lastRunDate() {
-  const lastRun = dayjs(main.statsTime.last_run).format('MMMM D, YYYY HH:mm')
+  const source = currentOrganization.value?.stats_updated_at
+  if (!source)
+    return `${t('last-run')}: ${t('unknown')}`
+
+  const lastRun = dayjs(source).format('MMMM D, YYYY HH:mm')
   return `${t('last-run')}: ${lastRun}`
 }
 function nextRunDate() {
-  const nextRun = dayjs(main.statsTime.next_run).format('MMMM D, YYYY HH:mm')
+  const source = currentOrganization.value?.next_stats_update_at
+  if (!source)
+    return `${t('next-run')}: ${t('unknown')}`
+
+  const nextRun = dayjs(source).format('MMMM D, YYYY HH:mm')
   return `${t('next-run')}: ${nextRun}`
 }
 </script>
@@ -198,70 +206,67 @@ function nextRunDate() {
           <h1 class="flex mx-auto text-5xl font-extrabold text-gray-900 dark:text-white items-center justify-center">
             {{ t('usage') }}
           </h1>
-
-          <FailedCard />
-
           <!-- Last Update Info & Billing Cycle -->
           <div class="mt-4 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-            <div class="flex items-center justify-between">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <!-- Last Update Info -->
-              <div class="flex items-center space-x-4 text-sm text-gray-600 dark:text-gray-400">
+              <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                 <div class="flex items-center space-x-2">
-                  <div class="w-2 h-2 bg-green-500 rounded-full" />
-                  <span>{{ lastRunDate() }}</span>
+                  <div class="w-2 h-2 bg-green-500 rounded-full flex-shrink-0" />
+                  <span class="truncate">{{ lastRunDate() }}</span>
                 </div>
-                <div class="w-px h-4 bg-gray-300 dark:bg-gray-600" />
+                <div class="hidden sm:block w-px h-4 bg-gray-300 dark:bg-gray-600" />
                 <div class="flex items-center space-x-2">
-                  <div class="w-2 h-2 bg-blue-500 rounded-full" />
-                  <span>{{ nextRunDate() }}</span>
+                  <div class="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0" />
+                  <span class="truncate">{{ nextRunDate() }}</span>
                 </div>
               </div>
 
               <!-- Billing Cycle Info -->
-              <div class="flex items-center text-sm font-semibold text-blue-800 dark:text-blue-200">
-                <span class="mr-2 text-gray-600 dark:text-gray-400">{{ t('billing-cycle') }}:</span>
-                <span>{{ planUsage?.cycle.subscription_anchor_start }}</span>
-                <span class="mx-2">{{ t('to') }}</span>
-                <span>{{ planUsage?.cycle.subscription_anchor_end }}</span>
+              <div class="flex flex-wrap items-center gap-1 text-xs sm:text-sm font-semibold text-blue-800 dark:text-blue-200">
+                <span class="text-gray-600 dark:text-gray-400">{{ t('billing-cycle') }}:</span>
+                <span class="whitespace-nowrap">{{ planUsage?.cycle.subscription_anchor_start }}</span>
+                <span class="mx-1">{{ t('to') }}</span>
+                <span class="whitespace-nowrap">{{ planUsage?.cycle.subscription_anchor_end }}</span>
               </div>
             </div>
           </div>
 
           <!-- Plan Information Section -->
-          <div class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <!-- Current Plan -->
-            <div class="bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
-              <div class="text-sm text-gray-600 dark:text-gray-400 mb-1">
+            <div class="bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 p-3 sm:p-4">
+              <div class="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-1">
                 {{ t('Current') }}
               </div>
-              <div class="text-lg font-semibold text-gray-900 dark:text-white">
+              <div class="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">
                 {{ currentPlan?.name || t('loading') }}
               </div>
-              <div v-if="currentPlan" class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+              <div v-if="currentPlan" class="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-1">
                 ${{ currentPlan.price_m }}/{{ t('mo') }}
               </div>
             </div>
 
             <!-- Best Plan with Upgrade Button -->
-            <div class="bg-gray-50 dark:bg-gray-900 rounded-lg border p-4" :class="shouldShowUpgrade ? 'border-blue-500 border-2 shadow-lg ring-2 ring-blue-500/20' : 'border-gray-200 dark:border-gray-700'">
+            <div class="bg-gray-50 dark:bg-gray-900 rounded-lg border p-3 sm:p-4" :class="shouldShowUpgrade ? 'border-blue-500 border-2 shadow-lg ring-2 ring-blue-500/20' : 'border-gray-200 dark:border-gray-700'">
               <div class="flex items-center justify-between mb-1">
-                <div class="text-sm text-gray-600 dark:text-gray-400">
+                <div class="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                   {{ t('best-plan') }}
                 </div>
-                <div v-if="shouldShowUpgrade" class="px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 text-xs rounded-full font-medium">
+                <div v-if="shouldShowUpgrade" class="px-1.5 py-0.5 sm:px-2 sm:py-1 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 text-[10px] sm:text-xs rounded-full font-medium">
                   {{ t('recommended') }}
                 </div>
               </div>
-              <div class="text-lg font-semibold text-gray-900 dark:text-white">
+              <div class="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">
                 {{ currentPlanSuggest?.name || t('loading') }}
               </div>
               <div v-if="currentPlanSuggest" class="mt-2">
-                <div class="text-sm text-gray-500 dark:text-gray-400 mb-3">
+                <div class="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mb-2 sm:mb-3">
                   ${{ currentPlanSuggest.price_m }}/{{ t('mo') }}
                 </div>
                 <button
                   v-if="shouldShowUpgrade"
-                  class="w-full py-3 px-4 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold rounded-lg transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
+                  class="w-full sm:w-auto py-2 px-3 sm:py-2.5 sm:px-4 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-sm sm:text-base font-semibold rounded-lg transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
                   @click="goToPlans"
                 >
                   🚀 {{ t('plan-upgrade-v2') }}

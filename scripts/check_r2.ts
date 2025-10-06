@@ -206,7 +206,7 @@ async function main() {
   // console.log(`${process.env.S3_ACCESS_KEY_ID}`)
 }
 
-function getEnv(c: any, s: string) {
+function getEnv(s: string) {
   return process.env[s] ?? ''
 }
 
@@ -249,17 +249,17 @@ export function supabaseAdmin() {
       detectSessionInUrl: false,
     },
   }
-  return createClient<Database>(getEnv(c, 'SUPABASE_URL'), getEnv(c, 'SUPABASE_SERVICE_ROLE_KEY'), options)
+  return createClient<Database>(getEnv('SUPABASE_URL'), getEnv('SUPABASE_SERVICE_ROLE_KEY'), options)
 }
 
 export function initS3() {
   const c = null
-  const access_key_id = getEnv(c, 'S3_BACKUP_1')
-  const access_key_secret = getEnv(c, 'S3_BACKUP_2')
-  const storageEndpoint = getEnv(c, 'S3_ENDPOINT')
-  const useSsl = getEnv(c, 'S3_SSL') !== 'false'
+  const access_key_id = getEnv('S3_BACKUP_1')
+  const access_key_secret = getEnv('S3_BACKUP_2')
+  const storageEndpoint = getEnv('S3_ENDPOINT')
+  const useSsl = getEnv('S3_SSL') !== 'false'
 
-  const storageRegion = getEnv(c, 'S3_REGION')
+  const storageRegion = getEnv('S3_REGION')
   const params = {
     credentials: {
       accessKeyId: access_key_id,

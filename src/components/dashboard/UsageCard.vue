@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import dayjs from 'dayjs'
-import { useI18n } from 'petite-vue-i18n'
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import InformationInfo from '~icons/heroicons/information-circle'
 
 import { getDaysInCurrentMonth } from '~/services/date'
-import { useMainStore } from '~/stores/main'
+import { useOrganizationStore } from '~/stores/organization'
 
 const props = defineProps({
   title: { type: String, default: '' },
@@ -20,21 +20,37 @@ const props = defineProps({
     type: Boolean,
     default: true,
   },
+  useBillingPeriod: {
+    type: Boolean,
+    default: true,
+  },
   datas: {
     type: Array,
     default: () => Array.from({ length: getDaysInCurrentMonth() }).fill(undefined) as number[],
   },
+  datasByApp: {
+    type: Object,
+    default: () => ({}),
+  },
+  appNames: {
+    type: Object,
+    default: () => ({}),
+  },
 })
 const { t } = useI18n()
-const main = useMainStore()
 const organizationStore = useOrganizationStore()
 const subscription_anchor_start = dayjs(organizationStore.currentOrganization?.subscription_start).format('YYYY/MM/D')
 const subscription_anchor_end = dayjs(organizationStore.currentOrganization?.subscription_end).format('YYYY/MM/D')
-function sum(arr: number[]) {
-  return arr.reduce((a, b) => a + b, 0)
-}
+const lastRunDisplay = computed(() => {
+  const source = organizationStore.currentOrganization?.stats_updated_at
+  return source ? dayjs(source).format('MMMM D, YYYY HH:mm') : t('unknown')
+})
+const nextRunDisplay = computed(() => {
+  const source = organizationStore.currentOrganization?.next_stats_update_at
+  return source ? dayjs(source).format('MMMM D, YYYY HH:mm') : t('unknown')
+})
+
 const total = computed(() => {
-  // remove undefined values
   const arr = props.datas as number[]
   const arrWithoutUndefined = arr.filter((val: any) => val !== undefined)
 
@@ -42,11 +58,54 @@ const total = computed(() => {
     return 0
   }
 
-  if (!props.accumulated) {
-    return arrWithoutUndefined[arrWithoutUndefined.length - 1] ?? 0
+  // Check if we're in single app view (no datasByApp or empty)
+  const isSingleApp = !props.datasByApp || Object.keys(props.datasByApp).length === 0
+
+  if (isSingleApp) {
+    if (props.accumulated) {
+      // Single app cumulative mode: accumulate values like LineChartStats does
+      let accumulatedValue = 0
+      arrWithoutUndefined.forEach((val) => {
+        accumulatedValue += val
+      })
+      return accumulatedValue
+    }
+    else {
+      // Single app daily mode: last raw daily value
+      return arrWithoutUndefined[arrWithoutUndefined.length - 1] ?? 0
+    }
   }
-  return sum(arrWithoutUndefined)
+
+  // Multi-app view
+  if (props.accumulated) {
+    // Multi-app cumulative mode: Sum the last accumulated value from each app
+    // This matches the tooltip logic where we sum all accumulated values from all apps
+    let totalAccumulated = 0
+    Object.values(props.datasByApp).forEach((appData: any) => {
+      // For each app, accumulate its daily values
+      const appArrWithoutUndefined = appData.filter((val: any) => val !== undefined)
+      let appAccumulated = 0
+      appArrWithoutUndefined.forEach((val: number) => {
+        appAccumulated += val
+      })
+      // Add this app's accumulated total to the overall total
+      totalAccumulated += appAccumulated
+    })
+    return totalAccumulated
+  }
+  else {
+    // Multi-app daily mode: sum the last values from all apps
+    let dailySum = 0
+    Object.values(props.datasByApp).forEach((appData: any) => {
+      const appArrWithoutUndefined = appData.filter((val: any) => val !== undefined)
+      if (appArrWithoutUndefined.length > 0) {
+        dailySum += appArrWithoutUndefined[appArrWithoutUndefined.length - 1] ?? 0
+      }
+    })
+    return dailySum
+  }
 })
+
 const lastDayEvolution = computed(() => {
   const arr = props.datas as number[]
   const arrWithoutUndefined = arr.filter((val: any) => val !== undefined)
@@ -55,21 +114,14 @@ const lastDayEvolution = computed(() => {
     return 0
   }
 
-  const oldTotal = props.accumulated ? sum(arrWithoutUndefined.slice(0, -2)) : arrWithoutUndefined[arrWithoutUndefined.length - 2] ?? 0
-  const diff = (total.value as number) - oldTotal
+  const lastValue = arrWithoutUndefined[arrWithoutUndefined.length - 1] ?? 0
+  const previousValue = arrWithoutUndefined[arrWithoutUndefined.length - 2] ?? 0
 
-  // Prevent division by zero
-  if (oldTotal === 0 && diff === 0) {
-    return 0
+  if (previousValue === 0) {
+    return lastValue > 0 ? 100 : 0
   }
 
-  const denominator = arr.length > 2 ? oldTotal : diff
-  // Prevent division by zero
-  if (denominator === 0) {
-    return diff > 0 ? 100 : -100
-  }
-
-  return diff / denominator * 100
+  return ((lastValue - previousValue) / previousValue) * 100
 })
 </script>
 
@@ -91,7 +143,7 @@ const lastDayEvolution = computed(() => {
                     {{ t('last-run') }}
                   </div>
                   <div class="text-sm font-medium">
-                    {{ dayjs(main.statsTime.last_run).format('MMMM D, YYYY HH:mm') }}
+                    {{ lastRunDisplay }}
                   </div>
                 </div>
               </div>
@@ -104,7 +156,7 @@ const lastDayEvolution = computed(() => {
                     {{ t('next-run') }}
                   </div>
                   <div class="text-sm font-medium">
-                    {{ dayjs(main.statsTime.next_run).format('MMMM D, YYYY HH:mm') }}
+                    {{ nextRunDisplay }}
                   </div>
                 </div>
               </div>
@@ -139,7 +191,7 @@ const lastDayEvolution = computed(() => {
           {{ total?.toLocaleString() }} {{ unit }}
         </div>
         <div v-if="lastDayEvolution" class="rounded-full bg-emerald-500 px-1.5 text-sm font-semibold text-white">
-          {{ lastDayEvolution < 0 ? '-' : '+' }}{{ lastDayEvolution.toFixed(2) }}%
+          {{ lastDayEvolution < 0 ? '-' : '+' }}{{ Math.abs(lastDayEvolution).toFixed(2) }}%
         </div>
       </div>
     </div>
@@ -147,7 +199,7 @@ const lastDayEvolution = computed(() => {
 
     <!-- Change the height attribute to adjust the chart height -->
     <div class="w-full h-full p-6">
-      <LineChartStats v-if="props.datas?.length" :title="props.title" :colors="props.colors" :limits="props.limits" :data="props.datas" :accumulated="accumulated" />
+      <LineChartStats v-if="props.datas?.length" :title="props.title" :colors="props.colors" :limits="props.limits" :data="props.datas" :datas-by-app="props.datasByApp" :app-names="props.appNames" :accumulated="accumulated" :use-billing-period="useBillingPeriod" />
       <div v-else class="flex flex-col items-center justify-center h-full">
         {{ t('no-data') }}
       </div>

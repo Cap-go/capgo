@@ -86,5 +86,11 @@ app.post('/', middlewareAPISecret, async (c) => {
   ])
 
   cloudlog({ requestId: c.get('requestId'), message: 'stats saved', mauLength: mau.length, bandwidthLength: bandwidth.length, storageLength: storage.length, versionUsageLength: versionUsage.length })
+
+  await supabase.from('orgs')
+    .update({ stats_updated_at: new Date().toISOString() })
+    .eq('id', body.orgId)
+    .throwOnError()
+
   return c.json({ status: 'Stats saved', mau, bandwidth, storage, versionUsage })
 })

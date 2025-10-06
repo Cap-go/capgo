@@ -6,10 +6,11 @@ import { FormKit } from '@formkit/vue'
 import VueDatePicker from '@vuepic/vue-datepicker'
 import { useDark, useDebounceFn } from '@vueuse/core'
 import dayjs from 'dayjs'
-import { useI18n } from 'petite-vue-i18n'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import IconCalendar from '~icons/heroicons/calendar'
 import IconClock from '~icons/heroicons/clock'
+import IconDown from '~icons/ic/round-keyboard-arrow-down'
 import IconFastBackward from '~icons/ic/round-keyboard-double-arrow-left'
 import IconSearch from '~icons/ic/round-search?raw'
 import IconSortDown from '~icons/lucide/chevron-down'
@@ -46,18 +47,14 @@ const emit = defineEmits([
   'update:currentPage',
 ])
 const datepicker = ref<DatePickerInstance>(null)
-const dropdown = useTemplateRef('dropdown')
-function closeDropdown() {
-  if (dropdown.value) {
-    dropdown.value.removeAttribute('open')
-  }
-}
 const { t } = useI18n()
 const isDark = useDark()
 const searchVal = ref(props.search ?? '')
 const currentSelected = ref<'general' | 'precise'>('general')
-type Minutes = 1 | 3 | 12
-const currentGeneralTime = ref<Minutes>(1)
+type QuickHourOption = 1 | 3 | 6 | 12
+const quickOptions: QuickHourOption[] = [1, 3, 6, 12]
+const quickGroupLabel = computed(() => t('last'))
+const currentGeneralTime = ref<QuickHourOption>(1)
 const preciseDates = ref<[Date, Date]>()
 const thisOrganization = ref<Organization | null>(null)
 const organizationStore = useOrganizationStore()
@@ -109,6 +106,39 @@ if (props.filters) {
     emit('reload')
   })
 }
+function rangesEqual(a?: [Date, Date], b?: [Date, Date]) {
+  if (!a || !b)
+    return a === b
+  return a[0].getTime() === b[0].getTime() && a[1].getTime() === b[1].getTime()
+}
+
+watch(() => props.range, (newRange) => {
+  if (!newRange) {
+    if (preciseDates.value)
+      preciseDates.value = undefined
+    return
+  }
+
+  if (rangesEqual(newRange, preciseDates.value))
+    return
+
+  preciseDates.value = [new Date(newRange[0]), new Date(newRange[1])]
+
+  const start = dayjs(newRange[0])
+  const end = dayjs(newRange[1])
+  const diffMinutes = Math.abs(end.diff(start, 'minute'))
+  const nowDiffMinutes = Math.abs(end.diff(dayjs(), 'minute'))
+  const matchedOption = quickOptions.find(option => Math.abs(diffMinutes - option * 60) <= 2 && nowDiffMinutes <= 5)
+
+  if (matchedOption) {
+    currentSelected.value = 'general'
+    currentGeneralTime.value = matchedOption
+  }
+  else {
+    currentSelected.value = 'precise'
+  }
+}, { immediate: true })
+
 watch(preciseDates, () => {
   // console.log('preciseDates', preciseDates.value)
   emit('update:range', preciseDates.value)
@@ -127,38 +157,28 @@ function displayValueKey(elem: any, col: TableColumn | undefined) {
 }
 
 async function fastBackward() {
-  console.log('fastBackward')
   emit('fastBackward')
   emit('update:currentPage', props.currentPage - 1)
   emit('reload')
 }
 
-async function clickRight() {
+function clickRight() {
   currentSelected.value = 'precise'
 }
 
-async function setTime(time: Minutes) {
+function closeDatepickerMenu() {
+  datepicker.value?.closeMenu?.()
+}
+
+async function setTime(time: QuickHourOption, shouldCloseMenu = false) {
   currentSelected.value = 'general'
   currentGeneralTime.value = time
-  if (time === 1) {
-    preciseDates.value = [
-      dayjs().subtract(1, 'hour').toDate(),
-      new Date(),
-    ]
-  }
-  else if (time === 3) {
-    preciseDates.value = [
-      dayjs().subtract(3, 'hour').toDate(),
-      new Date(),
-    ]
-  }
-  else {
-    preciseDates.value = [
-      dayjs().subtract(12, 'hour').toDate(),
-      new Date(),
-    ]
-  }
-  closeDropdown()
+  preciseDates.value = [
+    dayjs().subtract(time, 'hour').toDate(),
+    new Date(),
+  ]
+  if (shouldCloseMenu)
+    closeDatepickerMenu()
 }
 
 function formatValue(previewValue: Date[] | undefined) {
@@ -171,6 +191,98 @@ function formatValue(previewValue: Date[] | undefined) {
     start: dayjs(previewValue[0]).format('HH:mm'),
     end: dayjs(previewValue[1]).format('HH:mm'),
   }
+}
+
+const calendarPreview = computed(() => {
+  if (!preciseDates.value) {
+    return {
+      start: dayjs().subtract(1, 'hour').format('YYYY-MM-DD'),
+      end: dayjs().format('YYYY-MM-DD'),
+    }
+  }
+
+  return {
+    start: dayjs(preciseDates.value[0]).format('YYYY-MM-DD'),
+    end: dayjs(preciseDates.value[1]).format('YYYY-MM-DD'),
+  }
+})
+
+const timePreview = computed(() => {
+  if (!preciseDates.value) {
+    return {
+      start: dayjs().subtract(1, 'hour').format('HH:mm'),
+      end: dayjs().format('HH:mm'),
+    }
+  }
+
+  return {
+    start: dayjs(preciseDates.value[0]).format('HH:mm'),
+    end: dayjs(preciseDates.value[1]).format('HH:mm'),
+  }
+})
+
+function quickLabel(hours: QuickHourOption) {
+  if (hours === 1) {
+    const single = t('one-hour-short')
+    if (single && single !== 'one-hour-short')
+      return single
+    return '1h'
+  }
+  const plural = t('x-hours-short', { hours })
+  if (plural && plural !== 'x-hours-short')
+    return plural
+  return `${hours}h`
+}
+
+function formatDurationLabel(totalMinutes: number) {
+  const minutes = Math.max(0, Math.round(Math.abs(totalMinutes)))
+  const days = Math.floor(minutes / 1440)
+  const hours = Math.floor((minutes % 1440) / 60)
+  const mins = minutes % 60
+  const parts: string[] = []
+  if (days)
+    parts.push(`${days}d`)
+  if (hours)
+    parts.push(`${hours}h`)
+  if (mins || !parts.length)
+    parts.push(`${mins}m`)
+  return parts.join(' ')
+}
+
+const buttonLabel = computed(() => {
+  if (currentSelected.value === 'general')
+    return `${quickGroupLabel.value} ${quickLabel(currentGeneralTime.value)}`
+
+  const range = preciseDates.value
+  if (!range)
+    return `${quickGroupLabel.value} ${quickLabel(currentGeneralTime.value)}`
+
+  const [startDate, endDate] = range
+  const start = dayjs(startDate)
+  const end = dayjs(endDate)
+  const now = dayjs()
+  const endIsNow = Math.abs(end.diff(now, 'minute')) <= 2
+
+  if (endIsNow) {
+    const diffMinutes = Math.max(1, Math.abs(end.diff(start, 'minute')))
+    return `${quickGroupLabel.value} ${formatDurationLabel(diffMinutes)}`
+  }
+
+  if (start.isSame(now, 'day') && end.isSame(now, 'day'))
+    return `${start.format('HH:mm')} → ${end.format('HH:mm')}`
+
+  if (start.isSame(end, 'day'))
+    return `${start.format('D MMM HH:mm')} → ${end.format('HH:mm')}`
+
+  return `${start.format('D MMM HH:mm')} → ${end.format('D MMM HH:mm')}`
+})
+
+const isCustomSelected = computed(() => currentSelected.value === 'precise')
+
+function selectQuick(option: QuickHourOption) {
+  if (currentSelected.value === 'general' && currentGeneralTime.value === option)
+    return
+  setTime(option, true)
 }
 
 function updateUrlParams() {
@@ -190,7 +302,7 @@ function updateUrlParams() {
 }
 
 function openTimePicker() {
-  console.log('openTimePicker')
+  currentSelected.value = 'precise'
   datepicker.value?.switchView('time')
 }
 
@@ -275,108 +387,140 @@ onMounted(async () => {
           <span class="hidden text-sm md:block">{{ t('reload') }}</span>
         </button>
       </div>
-      <div class="flex h-10 mr-2 md:mr-auto text-sm font-medium text-gray-500 border border-gray-200 divide-gray-100 rounded-md dark:divide-gray-300 md:ml-4 dark:border-gray-600 dark:bg-gray-800 dark:text-white focus:outline-hidden focus:ring-4">
-        <div ref="dropdown" class="d-dropdown d-dropdown-right">
-          <button
-            tabindex="0"
-            class="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors rounded-l-md h-full"
-            :class="{ 'bg-gray-50 dark:bg-gray-700': currentSelected === 'general' }"
-          >
-            <IconClock class="h-4 w-4" />
-            <span class="text-sm font-medium hidden md:block">
-              {{ currentGeneralTime === 1 ? t('last-hour') : (currentGeneralTime === 3 ? t('last-3-hours') : t('last-12-hours')) }}
-            </span>
-          </button>
-          <ul class="p-2 bg-white shadow d-dropdown-content d-menu dark:bg-base-200 rounded-box z-1 w-52">
-            <li><a :class="{ 'bg-gray-300 dark:bg-gray-400': currentGeneralTime === 1 }" @click="setTime(1)">{{ t('last-hour') }}</a></li>
-            <li><a :class="{ 'bg-gray-300 dark:bg-gray-400': currentGeneralTime === 3 }" @click="setTime(3)">{{ t('last-3-hours') }}</a></li>
-            <li><a :class="{ 'bg-gray-300 dark:bg-gray-400': currentGeneralTime === 12 }" @click="setTime(12)">{{ t('last-12-hours') }}</a></li>
-          </ul>
-        </div>
-        <div class="flex-auto flex items-center justify-center mx-0 w-px bg-gray-200 dark:bg-gray-600" />
-        <div class="flex items-center justify-center flex-auto rounded-r-md cursor-pointer hover:bg-gray-300 dark:hover:bg-gray-700" :class="{ 'bg-gray-100 text-gray-600 dark:text-gray-300 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-900': currentSelected === 'precise' }" @click="clickRight">
-          <div class="relative">
-            <VueDatePicker
-              ref="datepicker"
-              v-model="preciseDates"
-              position="right"
-              :min-date="dayjs().subtract(30, 'day').toDate()"
-              :max-date="dayjs().toDate()"
-              :start-time="startTime"
-              prevent-min-max-navigation
-              :dark="isDark"
-              range
-              :ui="{
-                menu: 'custom-timepicker-button',
-              }"
-              @update:model-value="clickRight"
+      <div class="flex h-10 mr-2 md:mr-auto">
+        <VueDatePicker
+          ref="datepicker"
+          v-model="preciseDates"
+          position="right"
+          :min-date="dayjs().subtract(30, 'day').toDate()"
+          :max-date="dayjs().toDate()"
+          :start-time="startTime"
+          prevent-min-max-navigation
+          :dark="isDark"
+          range
+          :ui="{
+            menu: 'custom-timepicker-button',
+          }"
+          @update:model-value="clickRight"
+        >
+          <template #trigger>
+            <button
+              type="button"
+              class="inline-flex h-10 items-center gap-2 border border-gray-300 rounded-md bg-white px-3 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-100 transition-colors dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:hover:bg-gray-700 focus:outline-hidden focus:ring-4 focus:ring-gray-200 dark:focus:ring-gray-700"
             >
-              <template #trigger>
-                <div class="flex flex-row items-center justify-center h-10 px-3 md:px-6">
-                  <IconCalendar class="mr-1" />
-                  <p class="hidden md:block">
-                    {{ t('custom') }}
-                  </p>
+              <component :is="isCustomSelected ? IconCalendar : IconClock" class="w-4 h-4" />
+              <span class="hidden md:block truncate">
+                {{ buttonLabel }}
+              </span>
+              <span class="md:hidden">
+                {{ isCustomSelected ? buttonLabel : `${quickGroupLabel} ${quickLabel(currentGeneralTime)}` }}
+              </span>
+              <IconDown class="w-4 h-4" />
+            </button>
+          </template>
+          <template #calendar-icon>
+            <div class="flex items-center justify-center w-full gap-2 text-xs md:text-sm font-medium text-neutral-700 dark:text-neutral-200">
+              <IconCalendar class="hidden md:block" />
+              <div class="flex flex-1 items-center justify-center gap-2">
+                <div class="flex flex-1 items-center justify-center gap-2 bg-gray-100 dark:bg-gray-700 px-3 py-1.5 rounded-full min-w-0">
+                  <span class="truncate text-center w-full">{{ calendarPreview.start }}</span>
                 </div>
-              </template>
-              <template #top-extra="{ value }">
-                <div class="flex items-center justify-center hover:bg-gray-300 dark:hover:bg-gray-700 md:mb-2 rounded-full" @click="openTimePicker">
-                  <div class="flex items-center space-x-2 text-neutral-700 dark:text-neutral-200 bg-gray-300 dark:bg-gray-700 px-3 py-2 rounded-full">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="24"
-                      height="24"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      class="w-5 h-5"
-                    >
-                      <circle cx="12" cy="12" r="10" />
-                      <polyline points="12 6 12 12 16 14" />
-                    </svg>
-                    <span class="font-inter">{{ formatValue(value as any).start }}</span>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  class="text-neutral-400 dark:text-neutral-300"
+                >
+                  <path d="M5 12h14" />
+                  <path d="m12 5 7 7-7 7" />
+                </svg>
+                <div class="flex flex-1 items-center justify-center gap-2 bg-gray-100 dark:bg-gray-700 px-3 py-1.5 rounded-full min-w-0">
+                  <span class="truncate text-center w-full">{{ calendarPreview.end }}</span>
+                </div>
+              </div>
+            </div>
+          </template>
+          <template #top-extra="{ value }">
+            <div class="flex flex-col gap-2 md:mb-2">
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="ml-2 text-xs uppercase tracking-wide text-gray-500 dark:text-neutral-400">{{ quickGroupLabel }}</span>
+                <button
+                  v-for="option in quickOptions"
+                  :key="option"
+                  type="button"
+                  class="inline-flex cursor-pointer items-center px-3 py-1.5 text-xs md:text-sm rounded-full border border-gray-200/80 text-gray-600 bg-gray-50 transition-colors hover:bg-gray-100 dark:border-gray-600/60 dark:bg-gray-800/60 dark:text-neutral-200 dark:hover:bg-gray-700/70 disabled:opacity-80 disabled:cursor-default disabled:hover:bg-gray-50 disabled:dark:hover:bg-gray-800/60"
+                  :class="{
+                    'bg-gray-900 text-white border-gray-900 dark:bg-gray-100 dark:text-gray-900 dark:border-gray-100': currentSelected === 'general' && currentGeneralTime === option,
+                  }"
+                  :disabled="currentSelected === 'general' && currentGeneralTime === option"
+                  @click.stop="selectQuick(option)"
+                >
+                  {{ quickLabel(option) }}
+                </button>
+              </div>
+              <div class="flex items-center justify-center w-full gap-2 cursor-pointer text-neutral-700 dark:text-neutral-200 px-2 py-1.5 transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md" @click="openTimePicker">
+                <IconClock class="hidden md:block" />
+                <div class="flex flex-1 items-center justify-center gap-2">
+                  <div class="flex flex-1 items-center justify-center gap-2 bg-gray-100 dark:bg-gray-700 px-3 py-1.5 rounded-full min-w-0">
+                    <span class="text-xs md:text-sm font-medium truncate text-center w-full">{{ formatValue(value as any).start }}</span>
                   </div>
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
-                    width="24"
-                    height="24"
+                    width="20"
+                    height="20"
                     viewBox="0 0 24 24"
                     fill="none"
                     stroke="currentColor"
                     stroke-width="2"
                     stroke-linecap="round"
                     stroke-linejoin="round"
-                    class="w-5 h-5 mx-4 text-neutral-600 dark:text-neutral-400"
+                    class="text-neutral-400 dark:text-neutral-300"
                   >
                     <path d="M5 12h14" />
                     <path d="m12 5 7 7-7 7" />
                   </svg>
-                  <div class="flex items-center space-x-2 text-neutral-700 dark:text-neutral-200 bg-gray-300 dark:bg-gray-700 px-3 py-2 rounded-full">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="24"
-                      height="24"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      class="w-5 h-5"
-                    >
-                      <circle cx="12" cy="12" r="10" />
-                      <polyline points="12 6 12 12 16 14" />
-                    </svg>
-                    <span class="font-inter">{{ formatValue(value as any).end }}</span>
+                  <div class="flex flex-1 items-center justify-center gap-2 bg-gray-100 dark:bg-gray-700 px-3 py-1.5 rounded-full min-w-0">
+                    <span class="text-xs md:text-sm font-medium truncate text-center w-full">{{ formatValue(value as any).end }}</span>
                   </div>
                 </div>
-              </template>
-            </VueDatePicker>
-          </div>
-        </div>
+              </div>
+            </div>
+          </template>
+          <template #clock-icon>
+            <div class="flex items-center justify-center w-full gap-2 text-xs md:text-sm font-medium text-neutral-700 dark:text-neutral-200">
+              <IconClock class="hidden md:block" />
+              <div class="flex flex-1 items-center justify-center gap-2">
+                <div class="flex flex-1 items-center justify-center gap-2 bg-gray-100 dark:bg-gray-700 px-3 py-1.5 rounded-full min-w-0">
+                  <span class="truncate text-center w-full">{{ timePreview.start }}</span>
+                </div>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  class="text-neutral-400 dark:text-neutral-300"
+                >
+                  <path d="M5 12h14" />
+                  <path d="m12 5 7 7-7 7" />
+                </svg>
+                <div class="flex flex-1 items-center justify-center gap-2 bg-gray-100 dark:bg-gray-700 px-3 py-1.5 rounded-full min-w-0">
+                  <span class="truncate text-center w-full">{{ timePreview.end }}</span>
+                </div>
+              </div>
+            </div>
+          </template>
+        </VueDatePicker>
       </div>
       <div class="flex md:w-auto overflow-hidden">
         <FormKit
@@ -416,7 +560,9 @@ onMounted(async () => {
               <th v-if="col.head" :class="`${col.class} ${!col.mobile ? 'hidden md:table-cell' : ''} ${col.onClick ? 'cursor-pointer hover:underline clickable-cell' : ''}`" scope="row" class="px-1 md:px-6 py-1 md:py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white" @click.stop="col.onClick ? col.onClick(elem) : () => {}">
                 {{ displayValueKey(elem, col) }}
               </th>
-              <td v-else-if="col.icon" :class="`${col.class} ${!col.mobile ? 'hidden md:table-cell' : ''}`" class="px-1 md:px-6 py-1 md:py-4 cursor-pointer" @click.stop="col.onClick ? col.onClick(elem) : () => {}" v-html="col.icon" />
+              <td v-else-if="col.icon" :class="`${col.class} ${!col.mobile ? 'hidden md:table-cell' : ''}`" class="px-1 md:px-6 py-1 md:py-4 cursor-pointer" @click.stop="col.onClick ? col.onClick(elem) : () => {}">
+                <component :is="col.icon" />
+              </td>
               <td v-else :class="`${col.class} ${!col.mobile ? 'hidden md:table-cell' : ''} ${col.onClick ? 'cursor-pointer hover:underline clickable-cell' : ''}`" class="px-1 md:px-6 py-1 md:py-4" @click.stop="col.onClick ? col.onClick(elem) : () => {}">
                 {{ displayValueKey(elem, col) }}
               </td>
@@ -485,6 +631,10 @@ onMounted(async () => {
   --dp-range-between-border-color: color-mix(in srgb, var(--color-primary-500) 20%, transparent);
 }
 
+.dp__menu_inner {
+  --dp-menu-padding: .5rem;
+}
+
 .dp__theme_dark {
   --dp-background-color: var(--color-base-100);
   --dp-text-color: var(--color-base-content);
@@ -546,14 +696,29 @@ onMounted(async () => {
   --dp-transition-timing: ease-out;
 }
 
+.dp__action_row {
+  justify-content: space-evenly;
+}
+
+.dp__selection_preview {
+  display: none !important;
+}
+
+.dp__inner_nav {
+  border-radius: 0.5rem;
+}
+
+.dp__inc_dec_button {
+  border-radius: 0.5rem;
+}
 /* Custom action buttons styling for Capgo */
 .custom-timepicker-button > .dp__action_row > .dp__action_buttons > .dp__action_cancel {
   @apply d-btn d-btn-outline d-btn-sm;
-  width: 49%;
+  width: 45%;
 }
 .custom-timepicker-button > .dp__action_row > .dp__action_buttons > .dp__action_select {
-  @apply d-btn d-btn-outline d-btn-primary d-btn-sm;
-  width: 49%;
+  @apply d-btn d-btn-outline d-btn-secondary d-btn-sm;
+  width: 45%;
 }
 .custom-timepicker-button > .dp__action_row > .dp__action_buttons {
   display: contents !important;
@@ -598,8 +763,8 @@ onMounted(async () => {
 
 /* Arrow styling to match menu border */
 .dp__arrow_top {
-  border-top-color: rgb(229 231 235) !important;
-  border-right-color: rgb(229 231 235) !important;
+  border-top-color: rgb(55 65 81) !important;
+  border-right-color: rgb(55 65 81) !important;
 }
 
 /* Prevent calendar from resizing during range selection */

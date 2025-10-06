@@ -1,6 +1,6 @@
 import type { Context } from 'hono'
 import type { Database } from '../../../utils/supabase.types.ts'
-import { z } from 'zod/v4-mini'
+import { z } from 'zod/mini'
 import { simpleError } from '../../../utils/hono.ts'
 import { cloudlog } from '../../../utils/loggin.ts'
 import { apikeyHasOrgRight, hasOrgRightApikey, supabaseApikey } from '../../../utils/supabase.ts'

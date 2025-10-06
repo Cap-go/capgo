@@ -8,7 +8,8 @@ import { parseUploadMetadata } from '../tus/parse.ts'
 import { DEFAULT_RETRY_PARAMS, RetryBucket } from '../tus/retry.ts'
 import { MAX_UPLOAD_LENGTH_BYTES, TUS_VERSION, X_CHECKSUM_SHA256 } from '../tus/uploadHandler.ts'
 import { ALLOWED_HEADERS, ALLOWED_METHODS, EXPOSED_HEADERS, toBase64 } from '../tus/util.ts'
-import { middlewareKey, simpleError } from '../utils/hono.ts'
+import { simpleError } from '../utils/hono.ts'
+import { middlewareKey } from '../utils/hono_middleware.ts'
 import { cloudlog } from '../utils/loggin.ts'
 import { hasAppRightApikey, supabaseAdmin } from '../utils/supabase.ts'
 import { backgroundTask } from '../utils/utils.ts'
@@ -42,16 +43,21 @@ async function getHandler(c: Context): Promise<Response> {
     return c.json({ error: 'not_found', message: 'Not found' }, 404)
   }
 
-  // let response = null
-  // disable cache for now TODO: add it back when we understand why it doesn't give file tto download but text
+  // Support for deno cache or CF cache do not remove this
   // @ts-expect-error-next-line
-  const cache = caches.default
+  const cache = getRuntimeKey() === 'workerd' ? caches.default : caches
   const cacheUrl = new URL(c.req.url)
   cacheUrl.searchParams.set('range', c.req.header('range') || '')
   const cacheKey = new Request(cacheUrl, c.req)
   let response = await cache.match(cacheKey)
-  // TODO: move bandwidth tracking here instead of in the updates.ts
-  // createStatsBandwidth(c, device_id, app_id, res.size ?? 0)
+  // TODO: test making stats from files insead of updates
+  // await backgroundTask(c, async () => {
+  //   const r2Path = new URL(c.req.url).pathname.split(`/files/read/${ATTACHMENT_PREFIX}/`)[1]
+  //   const app_id = r2Path?.split('/')[3] || ''
+  //   const device_id = c.req.query('device_id') || ''
+  //   const size = await s3.getSize(c, r2Path)
+  //   await createStatsBandwidth(c, device_id, app_id, size ?? 0)
+  // })
   if (response != null) {
     cloudlog({ requestId: c.get('requestId'), message: 'getHandler files cache hit' })
     return response

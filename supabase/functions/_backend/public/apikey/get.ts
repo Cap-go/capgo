@@ -1,5 +1,6 @@
-import { honoFactory, middlewareKey, quickError, simpleError } from '../../utils/hono.ts'
-import { supabaseAdmin } from '../../utils/supabase.ts'
+import { honoFactory, quickError, simpleError } from '../../utils/hono.ts'
+import { middlewareKey } from '../../utils/hono_middleware.ts'
+import { supabaseApikey } from '../../utils/supabase.ts'
 
 const app = honoFactory.createApp()
 
@@ -8,7 +9,8 @@ app.get('/', middlewareKey(['all']), async (c) => {
   if (key.limited_to_orgs?.length) {
     throw quickError(401, 'cannot_create_apikey', 'You cannot do that as a limited API key', { key })
   }
-  const supabase = supabaseAdmin(c)
+  // Use anon client with capgkey header; RLS filters by user_id for ownership
+  const supabase = supabaseApikey(c, key.key)
 
   const { data: apikeys, error } = await supabase
     .from('apikeys')
@@ -31,7 +33,8 @@ app.get('/:id', middlewareKey(['all']), async (c) => {
   if (!id) {
     throw simpleError('api_key_id_required', 'API key ID is required', { id })
   }
-  const supabase = supabaseAdmin(c)
+  // Use anon client with capgkey header; RLS filters by user_id for ownership
+  const supabase = supabaseApikey(c, key.key)
   const { data: apikey, error } = await supabase
     .from('apikeys')
     .select('*')

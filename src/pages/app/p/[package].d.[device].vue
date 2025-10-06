@@ -5,15 +5,14 @@ import type { Database } from '~/types/supabase.types'
 import { greaterThan, parse } from '@std/semver'
 import { onClickOutside } from '@vueuse/core'
 import ky from 'ky'
-import { useI18n } from 'petite-vue-i18n'
 import { ref, watchEffect } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import IconLog from '~icons/heroicons/document'
 import IconInformations from '~icons/heroicons/information-circle'
 import IconAlertCircle from '~icons/lucide/alert-circle'
 import IconDown from '~icons/material-symbols/keyboard-arrow-down-rounded'
-import { appIdToUrl, urlToAppId } from '~/services/conversion'
 import { formatDate } from '~/services/date'
 import { defaultApiHost, useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
@@ -21,18 +20,10 @@ import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
 
-interface Device {
-  version: Database['public']['Tables']['app_versions']['Row']
-}
 interface Channel {
   version: Database['public']['Tables']['app_versions']['Row']
 }
 
-interface Stat {
-  version: {
-    name: string
-  }
-}
 const displayStore = useDisplayStore()
 const dialogStore = useDialogV2Store()
 const { t } = useI18n()
@@ -51,8 +42,7 @@ watchEffect(() => {
 
 const organizationStore = useOrganizationStore()
 
-const device = ref<Database['public']['Tables']['devices']['Row'] & Device>()
-const logs = ref<(Database['public']['Tables']['stats']['Row'] & Stat)[]>([])
+const device = ref<Database['public']['Tables']['devices']['Row']>()
 const channels = ref<(Database['public']['Tables']['channels']['Row'] & Channel)[]>([])
 const versions = ref<Database['public']['Tables']['app_versions']['Row'][]>([])
 const channelDevice = ref<Database['public']['Tables']['channels']['Row']>()
@@ -148,6 +138,33 @@ async function getChannelOverride() {
     channelDevice.value = undefined
   }
 }
+
+async function getVersionInfo() {
+  if (device.value?.version && !device.value?.version_name) {
+    const { data: dataVersion } = await supabase
+      .from('app_versions')
+      .select(`
+          name
+      `)
+      .eq('id', device.value!.version)
+      .single()
+
+    if (dataVersion)
+      device.value.version_name = dataVersion.name
+  }
+  if (!device.value?.version && device.value?.version_name) {
+    const { data: dataVersion } = await supabase
+      .from('app_versions')
+      .select(`
+          id
+      `)
+      .eq('name', device.value!.version_name)
+      .single()
+
+    if (dataVersion)
+      device.value.version = dataVersion.id
+  }
+}
 async function getDevice() {
   if (!id.value)
     return
@@ -174,22 +191,8 @@ async function getDevice() {
       })
 
     const data = dataD[0]
-    if (!data?.version) {
-      return
-    }
-    const { data: dataVersion } = await supabase
-      .from('app_versions')
-      .select(`
-          name
-      `)
-      .eq('id', data!.version)
-      .single()
-
-    const deviceValue = data as Database['public']['Tables']['devices']['Row'] & Device
-    if (dataVersion)
-      deviceValue.version = dataVersion! as any as typeof deviceValue.version
-    device.value = deviceValue
-    // console.log('device', device.value)
+    device.value = data
+    await getVersionInfo()
   }
   catch (error) {
     console.error('no devices', error)
@@ -222,7 +225,6 @@ async function loadRevertToNativeVersion() {
 
 async function loadData() {
   isLoading.value = true
-  logs.value = []
   await Promise.all([
     getDevice(),
     getChannelOverride(),
@@ -339,7 +341,6 @@ async function onSelectChannel(value: string) {
 watchEffect(async () => {
   if (route.path.includes('/d/')) {
     packageId.value = route.params.package as string
-    packageId.value = urlToAppId(packageId.value)
     id.value = route.params.device as string
     id.value = id.value!.toLowerCase()
     await loadData()
@@ -350,7 +351,11 @@ watchEffect(async () => {
 
 function openChannel() {
   if (packageId.value && channelDevice.value?.id)
-    router.push(`/app/p/${appIdToUrl(packageId.value)}/channel/${channelDevice.value.id}`)
+    router.push(`/app/p/${packageId.value}/channel/${channelDevice.value.id}`)
+}
+function openBundle() {
+  if (packageId.value && device.value?.version)
+    router.push(`/app/p/${packageId.value}/bundle/${device.value.version}`)
 }
 </script>
 
@@ -384,8 +389,8 @@ function openChannel() {
             <InfoRow v-if="device.plugin_version" :label="t('plugin-version')">
               {{ device.plugin_version }}
             </InfoRow>
-            <InfoRow v-if="device.version.name" :label="t('version')">
-              {{ device.version.name }}
+            <InfoRow v-if="device.version_name" :label="t('version')" is-link @click="openBundle()">
+              {{ device.version_name }}
             </InfoRow>
             <InfoRow v-if="device.version_build" :label="t('version-builtin')">
               {{ device.version_build }}
@@ -446,7 +451,7 @@ function openChannel() {
       <p class="text-muted-foreground mt-2">
         {{ t('device-not-found-description') }}
       </p>
-      <button class="mt-4 d-btn d-btn-primary" @click="router.push(`/app/p/${appIdToUrl(packageId)}/devices`)">
+      <button class="mt-4 d-btn d-btn-primary text-white" @click="router.push(`/app/p/${packageId}/devices`)">
         {{ t('back-to-devices') }}
       </button>
     </div>

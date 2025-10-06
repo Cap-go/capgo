@@ -1,11 +1,11 @@
 import type { Context } from 'hono'
 import type { Database } from './supabase.types.ts'
 import type { DeviceWithoutCreatedAt, ReadDevicesParams, ReadStatsParams, StatsActions } from './types.ts'
-import { backgroundTask } from '../utils/utils.ts'
 import { countDevicesCF, countUpdatesFromLogsCF, countUpdatesFromLogsExternalCF, createIfNotExistStoreInfo, getAppsFromCF, getUpdateStatsCF, readBandwidthUsageCF, readDevicesCF, readDeviceUsageCF, readStatsCF, readStatsVersionCF, trackBandwidthUsageCF, trackDevicesCF, trackDeviceUsageCF, trackLogsCF, trackLogsCFExternal, trackVersionUsageCF, updateStoreApp } from './cloudflare.ts'
 import { simpleError200 } from './hono.ts'
 import { cloudlog } from './loggin.ts'
 import { countDevicesSB, getAppsFromSB, getUpdateStatsSB, readBandwidthUsageSB, readDevicesSB, readDeviceUsageSB, readStatsSB, readStatsStorageSB, readStatsVersionSB, trackBandwidthUsageSB, trackDevicesSB, trackDeviceUsageSB, trackLogsSB, trackMetaSB, trackVersionUsageSB } from './supabase.ts'
+import { backgroundTask } from './utils.ts'
 
 export function createStatsMau(c: Context, device_id: string, app_id: string) {
   const lowerDeviceId = device_id
@@ -26,7 +26,7 @@ export async function opnPremStats(c: Context, app_id: string, action: string, d
   if (action === 'get')
     await updateStoreApp(c, app_id, 1)
   // save stats of unknow sources in our analytic DB
-  await backgroundTask(c, createStatsLogsExternal(c, device.app_id, device.device_id, 'get', device.version))
+  await backgroundTask(c, createStatsLogsExternal(c, device.app_id, device.device_id, 'get', device.version_name))
   cloudlog({ requestId: c.get('requestId'), message: 'App is external', app_id: device.app_id, country: (c.req.raw as any)?.cf?.country })
   return simpleError200(c, 'app_not_found', 'App not found')
 }
@@ -47,20 +47,22 @@ export function createStatsVersion(c: Context, version_id: number, app_id: strin
   return trackVersionUsageCF(c, version_id, app_id, action)
 }
 
-export function createStatsLogsExternal(c: Context, app_id: string, device_id: string, action: Database['public']['Enums']['stats_action'], version_id: number) {
+export function createStatsLogsExternal(c: Context, app_id: string, device_id: string, action: Database['public']['Enums']['stats_action'], versionName?: string) {
   const lowerDeviceId = device_id
+  const finalVersionName = versionName && versionName !== '' ? versionName : 'unknown'
   // This is super important until every device get the version of plugin 6.2.5
   if (!c.env.APP_LOG_EXTERNAL)
-    return trackLogsSB(c, app_id, lowerDeviceId, action, version_id)
-  return trackLogsCFExternal(c, app_id, lowerDeviceId, action, version_id)
+    return trackLogsSB(c, app_id, lowerDeviceId, action, finalVersionName)
+  return trackLogsCFExternal(c, app_id, lowerDeviceId, action, finalVersionName)
 }
 
-export function createStatsLogs(c: Context, app_id: string, device_id: string, action: Database['public']['Enums']['stats_action'], version_id: number) {
+export function createStatsLogs(c: Context, app_id: string, device_id: string, action: Database['public']['Enums']['stats_action'], versionName?: string) {
   const lowerDeviceId = device_id
+  const finalVersionName = versionName && versionName !== '' ? versionName : 'unknown'
   // This is super important until every device get the version of plugin 6.2.5
   if (!c.env.APP_LOG)
-    return trackLogsSB(c, app_id, lowerDeviceId, action, version_id)
-  return trackLogsCF(c, app_id, lowerDeviceId, action, version_id)
+    return trackLogsSB(c, app_id, lowerDeviceId, action, finalVersionName)
+  return trackLogsCF(c, app_id, lowerDeviceId, action, finalVersionName)
 }
 
 export function createStatsDevices(c: Context, device: DeviceWithoutCreatedAt) {
@@ -105,22 +107,22 @@ export function readStats(c: Context, params: ReadStatsParams) {
   return readStatsCF(c, params)
 }
 
-export function countDevices(c: Context, app_id: string) {
+export function countDevices(c: Context, app_id: string, customIdMode: boolean) {
   if (!c.env.DB_DEVICES)
-    return countDevicesSB(c, app_id)
-  return countDevicesCF(c, app_id)
+    return countDevicesSB(c, app_id, customIdMode)
+  return countDevicesCF(c, app_id, customIdMode)
 }
 
-export function readDevices(c: Context, params: ReadDevicesParams) {
+export function readDevices(c: Context, params: ReadDevicesParams, customIdMode: boolean) {
   if (!c.env.DB_DEVICES)
-    return readDevicesSB(c, params)
-  return readDevicesCF(c, params)
+    return readDevicesSB(c, params, customIdMode)
+  return readDevicesCF(c, params, customIdMode)
 }
 
 export function sendStatsAndDevice(c: Context, device: DeviceWithoutCreatedAt, statsActions: StatsActions[]) {
   const jobs = []
-  statsActions.forEach(({ action, versionId }) => {
-    jobs.push(createStatsLogs(c, device.app_id, device.device_id, action, versionId ?? device.version))
+  statsActions.forEach(({ action, versionName }) => {
+    jobs.push(createStatsLogs(c, device.app_id, device.device_id, action, versionName ?? device.version_name))
   })
 
   jobs.push(createStatsDevices(c, device))

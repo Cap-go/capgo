@@ -7,7 +7,7 @@ import { readActiveAppsCF, readLastMonthDevicesCF, readLastMonthUpdatesCF } from
 import { BRES, middlewareAPISecret } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../utils/loggin.ts'
 import { logsnag, logsnagInsights } from '../utils/logsnag.ts'
-import { countAllApps, countAllUpdates, countAllUpdatesExternal } from '../utils/stats.ts'
+import { countAllApps, countAllUpdates, countAllUpdatesExternal, getUpdateStats } from '../utils/stats.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 
 interface PlanTotal { [key: string]: number }
@@ -22,6 +22,7 @@ interface GlobalStats {
   orgs: PromiseLike<number>
   stars: Promise<number>
   onboarded: PromiseLike<number>
+  success_rate: PromiseLike<number>
   need_upgrade: PromiseLike<number>
   customers: PromiseLike<CustomerCount>
   plans: PromiseLike<PlanTotal>
@@ -79,6 +80,10 @@ function getStats(c: Context): GlobalStats {
 
       return total
     }),
+    success_rate: getUpdateStats(c).then((res) => {
+      cloudlog({ requestId: c.get('requestId'), message: 'success_rate', success_rate: res.total.success_rate })
+      return res.total.success_rate
+    }),
     actives: readActiveAppsCF(c).then(async (app_ids) => {
       try {
         const res2 = await supabase.rpc('count_active_users', { app_ids }).single()
@@ -112,6 +117,7 @@ app.post('/', middlewareAPISecret, async (c) => {
     actives,
     updates_last_month,
     devices_last_month,
+    success_rate,
   ] = await Promise.all([
     res.apps,
     res.updates,
@@ -126,6 +132,7 @@ app.post('/', middlewareAPISecret, async (c) => {
     res.actives,
     res.updates_last_month,
     res.devices_last_month,
+    res.success_rate,
   ])
   const not_paying = users - customers.total - plans.Trial
   cloudlog({ requestId: c.get('requestId'), message: 'All Promises', apps, updates, updates_external, users, stars, customers, onboarded, need_upgrade, plans })
@@ -150,6 +157,11 @@ app.post('/', middlewareAPISecret, async (c) => {
     not_paying,
     updates_last_month,
     devices_last_month,
+    success_rate,
+    plan_solo: plans.Solo,
+    plan_maker: plans.Maker,
+    plan_team: plans.Team,
+    plan_payg: plans['Pay as you go'],
   }
   cloudlog({ requestId: c.get('requestId'), message: 'newData', newData })
   const { error } = await supabaseAdmin(c)
@@ -163,6 +175,7 @@ app.post('/', middlewareAPISecret, async (c) => {
     user_id: 'admin',
     tags: {
       updates_last_month,
+      success_rate,
     },
     icon: '📲',
   }).catch((e: any) => {

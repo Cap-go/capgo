@@ -7,6 +7,12 @@ import { i18n } from '~/modules/i18n'
 import { hideLoader, showLoader } from './loader'
 import { downloadUrl } from './supabase'
 
+export function isInternalVersionName(version: string) {
+  if (!version)
+    return false
+  return version === 'builtin' || version === 'unknown'
+}
+
 export async function openVersion(app: Database['public']['Tables']['app_versions']['Row']) {
   const { t } = i18n.global
 

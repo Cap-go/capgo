@@ -3,7 +3,7 @@ import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import dayjs from 'dayjs'
 import { Hono } from 'hono/tiny'
-import { z } from 'zod/v4-mini'
+import { z } from 'zod/mini'
 import { trackBentoEvent } from '../utils/bento.ts'
 import { middlewareAuth, parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/loggin.ts'
@@ -165,7 +165,7 @@ app.post('/', middlewareAuth, async (c) => {
 })
 
 // Function to verify Cloudflare Turnstile token
-async function verifyCaptchaToken(c: any, token: string) {
+async function verifyCaptchaToken(c: Context, token: string) {
   const captchaSecret = getEnv(c, 'CAPTCHA_SECRET_KEY')
   if (!captchaSecret) {
     throw simpleError('captcha_secret_key_not_set', 'CAPTCHA_SECRET_KEY not set')

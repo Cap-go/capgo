@@ -4,7 +4,7 @@ import type { Database } from '~/types/supabase.types'
 import { Camera } from '@capacitor/camera'
 import { FormKit, FormKitMessages } from '@formkit/vue'
 import mime from 'mime'
-import { useI18n } from 'petite-vue-i18n'
+import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import ArrowUpTray from '~icons/heroicons/arrow-up-tray?raw'
 import Pencil from '~icons/heroicons/pencil-square'
@@ -160,6 +160,14 @@ async function updateAppName(newName: string) {
 async function updateAppRetention(newRetention: number) {
   if (newRetention === appRef.value?.retention) {
     return Promise.resolve()
+  }
+
+  if (newRetention < 0) {
+    return Promise.reject(t('retention-cannot-be-negative'))
+  }
+
+  if (newRetention >= 63113904) {
+    return Promise.reject(t('retention-to-big'))
   }
 
   const { error } = await supabase.from('apps').update({ retention: newRetention }).eq('app_id', props.appId)

@@ -1,6 +1,6 @@
-import { _Object, CopyObjectCommand, DeleteObjectCommand, DeleteObjectsCommand, ListObjectsV2Command, ListObjectsV2CommandOutput, S3Client, HeadObjectCommand, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3'
+import { _Object, CopyObjectCommand, DeleteObjectCommand, ListObjectsV2Command, ListObjectsV2CommandOutput, S3Client, HeadObjectCommand, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3'
 import { writeFileSync, existsSync, readFileSync } from 'fs'
-import { S3Client as S3ClientLite } from '@bradenmacdonald/s3-lite-client/mod.ts'
+import { S3Client as S3ClientLite } from '@bradenmacdonald/s3-lite-client/'
 import postgres from 'postgres'
 import { Context } from 'vm'
 
@@ -470,18 +470,18 @@ async function listAllObjectsInFolder(
     return objects
 }
 
-function getEnv(c: any, s: string) {
+function getEnv(s: string) {
     return process.env[s] ?? ''
 }
 
 export function initS3() {
     const c = null
-    const access_key_id = getEnv(c, 'S3_ACCESS_KEY_ID')
-    const access_key_secret = getEnv(c, 'S3_SECRET_ACCESS_KEY')
-    const storageEndpoint = getEnv(c, 'S3_ENDPOINT')
-    const useSsl = getEnv(c, 'S3_SSL') !== 'false'
+    const access_key_id = getEnv('S3_ACCESS_KEY_ID')
+    const access_key_secret = getEnv('S3_SECRET_ACCESS_KEY')
+    const storageEndpoint = getEnv('S3_ENDPOINT')
+    const useSsl = getEnv('S3_SSL') !== 'false'
 
-    const storageRegion = getEnv(c, 'S3_REGION')
+    const storageRegion = getEnv('S3_REGION')
     const params = {
         credentials: {
             accessKeyId: access_key_id,
@@ -501,12 +501,12 @@ export function initS3() {
 }
 
 async function initS3Lite() {
-    const access_key_id = getEnv(null, 'S3_ACCESS_KEY_ID')
-    const access_key_secret = getEnv(null, 'S3_SECRET_ACCESS_KEY')
-    const storageEndpoint = getEnv(null, 'S3_ENDPOINT')
-    const storageRegion = getEnv(null, 'S3_REGION') || 'us-east-1'
-    const useSSL = getEnv(null, 'S3_SSL') === 'true'
-    const bucket = getEnv(null, 'S3_BUCKET')
+    const access_key_id = getEnv('S3_ACCESS_KEY_ID')
+    const access_key_secret = getEnv('S3_SECRET_ACCESS_KEY')
+    const storageEndpoint = getEnv('S3_ENDPOINT')
+    const storageRegion = getEnv('S3_REGION') || 'us-east-1'
+    const useSSL = getEnv('S3_SSL') === 'true'
+    const bucket = getEnv('S3_BUCKET')
     const endPoint = useSSL ? `https://${storageEndpoint}` : `http://${storageEndpoint}`
     const options = {
         endPoint,
@@ -609,7 +609,7 @@ async function export_files_folder_to_csv(folderPath: string) {
     console.log(`\n✅ Successfully exported to: ${outputPath}`)
 }
 
-function existInEnv(c: any, s: string) {
+function existInEnv(s: string) {
     return process.env[s] !== undefined
 }
 
@@ -617,9 +617,9 @@ export function getDatabaseURL(): string {
     // TODO: uncomment when we enable back replicate
     // const clientContinent = (c.req.raw as any)?.cf?.continent
     // cloudlog({ requestId: c.get('requestId'), message: 'clientContinent', clientContinent  })
-    let DEFAULT_DB_URL = getEnv(null, 'SUPABASE_DB_URL')
-    if (existInEnv(null, 'CUSTOM_SUPABASE_DB_URL'))
-        DEFAULT_DB_URL = getEnv(null, 'CUSTOM_SUPABASE_DB_URL')
+    let DEFAULT_DB_URL = getEnv('SUPABASE_DB_URL')
+    if (existInEnv('CUSTOM_SUPABASE_DB_URL'))
+        DEFAULT_DB_URL = getEnv('CUSTOM_SUPABASE_DB_URL')
 
     // if (!clientContinent)
     //   return DEFAULT_DB_URL
@@ -631,16 +631,16 @@ export function getDatabaseURL(): string {
 
     // // Asian and Oceanian countries
     // if ((clientContinent === 'AS' || clientContinent === 'OC') && existInEnv(c, 'SG_SUPABASE_DB_URL')) {
-    //   return getEnv(c, 'SG_SUPABASE_DB_URL')
+    //   return getEnv('SG_SUPABASE_DB_URL')
     // }
 
     // // North and South American countries
     // if ((clientContinent === 'NA' || clientContinent === 'SA') && existInEnv(c, 'GK_SUPABASE_DB_URL')) {
-    //   return getEnv(c, 'GK_SUPABASE_DB_URL')
+    //   return getEnv('GK_SUPABASE_DB_URL')
     // }
     // Hyperdrive test
-    if (existInEnv(null, 'HYPERDRIVE_DB'))
-        return (getEnv(null, 'HYPERDRIVE_DB') as any).connectionString
+    if (existInEnv('HYPERDRIVE_DB'))
+        return (getEnv('HYPERDRIVE_DB') as any).connectionString
 
     // // Default to Germany for any other cases
     return DEFAULT_DB_URL

@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { useI18n } from 'petite-vue-i18n'
-import { ref, watchEffect } from 'vue'
+import { onUnmounted, ref, watchEffect } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import arrowBack from '~icons/ion/arrow-back?width=2em&height=2em'
+import IconLoader from '~icons/lucide/loader-2'
 import { pushEvent } from '~/services/posthog'
 import { getLocalConfig, isLocal, useSupabase } from '~/services/supabase'
 import { sendEvent } from '~/services/tracking'
@@ -22,7 +23,8 @@ const step = ref(0)
 const clicked = ref(0)
 const appId = ref<string>()
 const realtimeListener = ref(false)
-const mySubscription = ref()
+const pollTimer = ref<number | null>(null)
+const initialCount = ref<number | null>(null)
 const supabase = useSupabase()
 const main = useMainStore()
 const { t } = useI18n()
@@ -49,25 +51,42 @@ const steps = ref<Step[]>([
     subtitle: t('this-page-will-self-'),
   },
 ])
+
+function stepToName(stepNumber: number): string {
+  switch (stepNumber) {
+    case 0:
+      return 'copy-command'
+    case 1:
+      return 'wait-for-bundle'
+    case 2:
+      return 'discover-your-bundle'
+    default:
+      return 'unknown-step'
+  }
+}
+
 function setLog() {
   console.log('setLog', props.onboarding, main.user?.id, step.value)
   if (props.onboarding && main.user?.id) {
     sendEvent({
       channel: 'onboarding-bundle',
-      event: `onboarding-bundle-step-${step.value}`,
+      event: `onboarding-bundle-step-${stepToName(step.value)}`,
       icon: '👶',
       user_id: organizationStore.currentOrganization?.gid,
       notify: false,
     }).catch()
-    pushEvent(`user:step-${step.value}`, config.supaHost)
-
-    if (step.value === 2) {
-      pushEvent('user:onboarding-bundle-done', config.supaHost)
-      emit('done')
-    }
+    pushEvent(`user:onboarding-bundle-${stepToName(step.value)}`, config.supaHost)
   }
   if (step.value === 2) {
     emit('done')
+  }
+}
+
+function clearWatchers() {
+  if (pollTimer.value !== null) {
+    console.log('clear poll timer', pollTimer.value)
+    clearInterval(pollTimer.value)
+    pollTimer.value = null
   }
 }
 
@@ -109,8 +128,7 @@ async function copyToast(allowed: boolean, id: string, text?: string) {
     step.value += 1
     clicked.value = 0
     realtimeListener.value = false
-    if (mySubscription.value)
-      mySubscription.value.unsubscribe()
+    clearWatchers()
     scrollToElement(id)
     setLog()
   }
@@ -157,36 +175,78 @@ async function getKey(retry = true): Promise<void> {
   isLoading.value = false
 }
 
+async function getVersionsCount(): Promise<number> {
+  const orgId = organizationStore.currentOrganization?.gid
+  if (!orgId || !props.appId)
+    return 0
+  const { count, error } = await supabase
+    .from('app_versions')
+    .select('id', { count: 'exact', head: true })
+    .eq('owner_org', orgId)
+    .eq('app_id', props.appId)
+
+  if (error)
+    return 0
+  return count ?? 0
+}
+
+async function getLatestVersionId(): Promise<string | undefined> {
+  const orgId = organizationStore.currentOrganization?.gid
+  if (!orgId || !props.appId)
+    return undefined
+  const { data, error } = await supabase
+    .from('app_versions')
+    .select('id, created_at')
+    .eq('owner_org', orgId)
+    .eq('app_id', props.appId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+
+  if (error || !data || data.length === 0)
+    return undefined
+  return `${data[0].id}`
+}
+
 watchEffect(async () => {
   if (step.value === 1 && !realtimeListener.value) {
-    console.log('watch app change step 1')
+    console.log('watch app change step 1 via polling')
     realtimeListener.value = true
     await organizationStore.awaitInitialLoad()
-    mySubscription.value = supabase
-      .channel('table-db-changes')
-      .on(
-        'postgres_changes' as any,
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'app_versions',
-          filtr: `owner_org=eq.${organizationStore.currentOrganization?.gid}&eq.${props.appId}`,
-        },
-        (payload) => {
-          console.log('Change received step 1!', payload)
+
+    try {
+      initialCount.value = await getVersionsCount()
+    }
+    catch {
+      initialCount.value = 0
+    }
+
+    clearWatchers()
+
+    pollTimer.value = window.setInterval(async () => {
+      try {
+        const current = await getVersionsCount()
+        if (initialCount.value !== null && current > initialCount.value) {
+          const latestId = await getLatestVersionId()
           step.value += 1
-          appId.value = payload.new.id ?? ''
+          appId.value = latestId ?? ''
           realtimeListener.value = false
-          mySubscription.value.unsubscribe()
+          clearWatchers()
           setLog()
-        },
-      )
-      .subscribe()
+        }
+      }
+      catch (e) {
+        console.warn('Polling app_versions failed', e)
+      }
+    }, 2000)
   }
 })
 
 watchEffect(async () => {
   await getKey()
+})
+
+onUnmounted(() => {
+  clearWatchers()
 })
 </script>
 
@@ -224,6 +284,11 @@ watchEffect(async () => {
               <div class="inline-flex items-center justify-center text-xl font-bold text-white shrink-0 font-pj h-14 w-14 rounded-xl bg-muted-blue-800">
                 <template v-if="i + 1 !== steps.length">
                   {{ i + 1 }}
+                </template>
+                <template v-else-if="step === 1 && i === 1">
+                  <div class="flex justify-center">
+                    <IconLoader class="w-10 h-10 text-blue-500 animate-spin" />
+                  </div>
                 </template>
                 <template v-else>
                   🚀

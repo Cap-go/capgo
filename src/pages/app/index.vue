@@ -1,10 +1,9 @@
 <script setup lang="ts">
 import type { Database } from '~/types/supabase.types'
-import { useI18n } from 'petite-vue-i18n'
 import { storeToRefs } from 'pinia'
 import { ref, watch, watchEffect } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
-import { appIdToUrl } from '~/services/conversion'
 import { useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 import { useOrganizationStore } from '~/stores/organization'
@@ -22,7 +21,8 @@ const apps = ref<Database['public']['Tables']['apps']['Row'][]>([])
 const { currentOrganization } = storeToRefs(organizationStore)
 
 async function NextStep(appId: string) {
-  router.push(`/app/p/${appIdToUrl(appId)}`)
+  console.log('Navigating to app with ID:', appId)
+  router.push(`/app/p/${appId}`)
 }
 async function getMyApps() {
   await organizationStore.awaitInitialLoad()
@@ -61,7 +61,7 @@ watchEffect(async () => {
     isLoading.value = false
   }
 })
-displayStore.NavTitle = t('home')
+displayStore.NavTitle = t('apps')
 displayStore.defaultBack = '/app'
 </script>
 
@@ -70,10 +70,7 @@ displayStore.defaultBack = '/app'
     <div v-if="!isLoading">
       <StepsApp v-if="stepsOpen" :onboarding="!apps.length" @done="NextStep" @close-step="stepsOpen = !stepsOpen" />
       <div v-else class="h-full pb-4 overflow-hidden">
-        <div class="w-full h-full px-4 pt-8 mx-auto mb-8 overflow-y-auto max-w-9xl max-h-fit lg:px-8 sm:px-6">
-          <WelcomeBanner v-if="apps.length === 0" />
-          <FailedCard />
-          <Usage v-if="!isLoading && !organizationStore.currentOrganizationFailed" />
+        <div class="w-full h-full px-0 pt-0 md:pt-8 mx-auto mb-8 overflow-y-auto max-w-9xl max-h-fit sm:px-6 lg:px-8">
           <AppTable :apps="apps" :delete-button="true" @add-app="stepsOpen = !stepsOpen" />
         </div>
       </div>

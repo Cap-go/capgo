@@ -4,8 +4,8 @@ import type { OrganizationRole } from '~/stores/organization'
 import type { Database } from '~/types/supabase.types'
 import { FormKit } from '@formkit/vue'
 import { useDebounceFn } from '@vueuse/core'
-import { useI18n } from 'petite-vue-i18n'
 import { ref, watch, watchEffect } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import IconHistory from '~icons/heroicons/clock'
@@ -17,9 +17,9 @@ import IconSearch from '~icons/ic/round-search?raw'
 import plusOutline from '~icons/ion/add-outline?width=2em&height=2em'
 import IconAlertCircle from '~icons/lucide/alert-circle'
 import IconDown from '~icons/material-symbols/keyboard-arrow-down-rounded'
-import { appIdToUrl, urlToAppId } from '~/services/conversion'
 import { formatDate } from '~/services/date'
 import { checkCompatibilityNativePackages, isCompatible, useSupabase } from '~/services/supabase'
+import { isInternalVersionName } from '~/services/versions'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
@@ -332,7 +332,6 @@ watchEffect(async () => {
   if (route.path.includes('/channel/')) {
     loading.value = true
     packageId.value = route.params.package as string
-    packageId.value = urlToAppId(packageId.value)
     id.value = Number(route.params.channel as string)
     await getChannel()
     await getDeviceIds()
@@ -715,7 +714,7 @@ async function handleRevert() {
               {{ channel.name }}
             </InfoRow>
             <!-- Bundle Number -->
-            <InfoRow :label="t('bundle-number')" :is-link="channel && channel.version.name !== 'builtin' && channel.version.name !== 'unknown'">
+            <InfoRow :label="t('bundle-number')" :is-link="channel && !isInternalVersionName((channel.version.name))">
               <div class="flex items-center gap-2">
                 <span @click="openBundle()">{{ channel.version.name }}</span>
                 <button
@@ -899,7 +898,7 @@ async function handleRevert() {
       <p class="text-muted-foreground mt-2">
         {{ t('channel-not-found-description') }}
       </p>
-      <button class="mt-4 d-btn d-btn-primary" @click="router.push(`/app/p/${appIdToUrl(packageId)}/channels`)">
+      <button class="mt-4 d-btn d-btn-primary text-white" @click="router.push(`/app/p/${packageId}/channels`)">
         {{ t('back-to-channels') }}
       </button>
     </div>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useI18n } from 'petite-vue-i18n'
+import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useOrganizationStore } from '~/stores/organization'
 

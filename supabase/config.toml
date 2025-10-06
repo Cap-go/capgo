@@ -28,7 +28,7 @@ port = 54322
 shadow_port = 54320
 # The database major version to use. This has to be the same as your remote database's. Run `SHOW
 # server_version;` on the remote database to check.
-major_version = 15
+major_version = 17
 
 [db.pooler]
 enabled = false
@@ -251,6 +251,7 @@ enabled = false
 # user_pool_region = "us-east-1"
 
 [edge_runtime]
+deno_version = 2
 enabled = true
 # Configure one of the supported request policies: `oneshot`, `per_worker`.
 # Use `oneshot` for hot reload, or `per_worker` for load testing.
@@ -327,10 +328,6 @@ verify_jwt = false
 import_map = "./functions/deno.json"
 
 [functions.updates_debug]
-verify_jwt = false
-import_map = "./functions/deno.json"
-
-[functions.updates_lite]
 verify_jwt = false
 import_map = "./functions/deno.json"
 

@@ -3,14 +3,13 @@ import type { Ref } from 'vue'
 import type { TableColumn } from '../comp_def'
 import type { Database } from '~/types/supabase.types'
 import { FormKit } from '@formkit/vue'
-import { useI18n } from 'petite-vue-i18n'
 import { storeToRefs } from 'pinia'
 import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import IconSettings from '~icons/heroicons/cog-8-tooth'
 import IconTrash from '~icons/heroicons/trash'
-import { appIdToUrl } from '~/services/conversion'
 import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
@@ -319,11 +318,11 @@ async function showAddModal() {
 }
 
 async function openOneVersion(one: Element) {
-  router.push(`/app/p/${appIdToUrl(props.appId)}/bundle/${one.version?.id}`)
+  router.push(`/app/p/${props.appId}/bundle/${one.version?.id}`)
 }
 
 async function openOne(one: Element) {
-  router.push(`/app/p/${appIdToUrl(props.appId)}/channel/${one.id}`)
+  router.push(`/app/p/${props.appId}/channel/${one.id}`)
 }
 watch(props, async () => {
   await refreshData()

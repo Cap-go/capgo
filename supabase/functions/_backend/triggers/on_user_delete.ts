@@ -2,6 +2,7 @@ import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
+import { unsubscribeBento } from '../utils/bento.ts'
 import { BRES, middlewareAPISecret, triggerValidator } from '../utils/hono.ts'
 import { cloudlog } from '../utils/loggin.ts'
 import { cancelSubscription } from '../utils/stripe.ts'
@@ -9,6 +10,8 @@ import { supabaseAdmin } from '../utils/supabase.ts'
 
 export const app = new Hono<MiddlewareKeyVariables>()
 
+// on_user_delete - this is called 30 days before the user is actually deleted
+// This function is used to cancel the subscriptions of the user's organizations
 async function deleteUser(c: Context, record: Database['public']['Tables']['users']['Row']) {
   // Process user deletion with timeout protection
   const startTime = Date.now()
@@ -52,19 +55,29 @@ async function deleteUser(c: Context, record: Database['public']['Tables']['user
 
   const { data: orgs } = await supabaseAdmin(c)
     .from('orgs')
-    .select('id, customer_id')
+    .select('id, customer_id, management_email')
     .in('id', singleSuperAdminOrgs)
 
+  const promises = []
   if (orgs && orgs.length > 0) {
     cloudlog({ requestId: c.get('requestId'), message: 'cleaning up orgs', count: orgs.length })
 
     for (const org of orgs) {
       // Cancel org subscriptions if they exist
       if (org.customer_id) {
-        await cancelSubscription(c, org.customer_id)
+        promises.push(cancelSubscription(c, org.customer_id))
+      }
+      if (org.management_email) {
+        promises.push(unsubscribeBento(c, org.management_email))
       }
     }
   }
+
+  // 2. Unsubscribe user from Bento mailing list
+  if (record.email) {
+    promises.push(unsubscribeBento(c, record.email))
+  }
+  await Promise.all(promises)
 
   // 3. Track performance metrics
   const endTime = Date.now()

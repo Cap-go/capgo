@@ -1,3 +1,4 @@
+import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
 import { trackBentoEvent } from '../utils/bento.ts'
@@ -88,7 +89,7 @@ app.post('/', middlewareAPISecret, async (c) => {
   }
 })
 
-async function handleWeeklyInstallStats(c: any, email: string, appId: string) {
+async function handleWeeklyInstallStats(c: Context, email: string, appId: string) {
   const supabase = await supabaseAdmin(c)
 
   const { data: weeklyStats, error: generateStatsError } = await supabase.rpc('get_weekly_stats', {
@@ -129,7 +130,7 @@ async function handleWeeklyInstallStats(c: any, email: string, appId: string) {
   return c.json(BRES)
 }
 
-async function handleMonthlyCreateStats(c: any, email: string, appId: string) {
+async function handleMonthlyCreateStats(c: Context, email: string, appId: string) {
   const supabase = await supabaseAdmin(c)
   // Fetch additional stats for bundle creation, channel creation, and publishing
   const { data: appVersions, error: _appVersionsError } = await supabase

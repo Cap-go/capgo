@@ -1,5 +1,6 @@
-import { honoFactory, middlewareKey, quickError, simpleError } from '../../utils/hono.ts'
-import { supabaseAdmin } from '../../utils/supabase.ts'
+import { honoFactory, quickError, simpleError } from '../../utils/hono.ts'
+import { middlewareKey } from '../../utils/hono_middleware.ts'
+import { supabaseApikey } from '../../utils/supabase.ts'
 
 const app = honoFactory.createApp()
 
@@ -14,7 +15,8 @@ app.delete('/:id', middlewareKey(['all']), async (c) => {
     throw simpleError('api_key_id_required', 'API key ID is required', { id })
   }
 
-  const supabase = supabaseAdmin(c)
+  // Use anon client with capgkey header; RLS filters by user_id for ownership
+  const supabase = supabaseApikey(c, key.key)
 
   const { data: apikey, error: apikeyError } = await supabase.from('apikeys').select('*').or(`key.eq.${id},id.eq.${id}`).eq('user_id', key.user_id).single()
   if (!apikey || apikeyError) {

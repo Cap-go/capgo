@@ -7,6 +7,36 @@ import { backgroundTask, existInEnv, getEnv } from '../utils/utils.ts'
 import { cloudlog, cloudlogErr } from './loggin.ts'
 import * as schema from './postgress_schema.ts'
 
+const PLAN_EXCEEDED_COLUMNS: Record<'mau' | 'storage' | 'bandwidth', string> = {
+  mau: 'mau_exceeded',
+  storage: 'storage_exceeded',
+  bandwidth: 'bandwidth_exceeded',
+}
+
+function buildPlanValidationExpression(
+  actions: ('mau' | 'storage' | 'bandwidth')[],
+  ownerColumn: typeof schema.app_versions.owner_org | typeof schema.apps.owner_org,
+) {
+  const extraConditions = actions.map(action => ` AND ${PLAN_EXCEEDED_COLUMNS[action]} = false`).join('')
+  return sql<boolean>`EXISTS (
+    SELECT 1
+    FROM ${schema.stripe_info}
+    WHERE ${schema.stripe_info.customer_id} = (
+      SELECT ${schema.orgs.customer_id}
+      FROM ${schema.orgs}
+      WHERE ${schema.orgs.id} = ${ownerColumn}
+    )
+    AND (
+      (${schema.stripe_info.trial_at}::date > CURRENT_DATE)
+      OR (
+        ${schema.stripe_info.status} = 'succeeded'
+        AND ${schema.stripe_info.is_good_plan} = true
+        ${sql.raw(extraConditions)}
+      )
+    )
+  )`
+}
+
 export function getDatabaseURL(c: Context): string {
   // TODO: uncomment when we enable back replicate
   // const clientContinent = (c.req.raw as any)?.cf?.continent
@@ -37,39 +67,6 @@ export function closeClient(c: Context, client: ReturnType<typeof getPgClient>) 
   return backgroundTask(c, client.end())
 }
 
-export async function isAllowedActionOrgActionPg(c: Context, drizzleCient: ReturnType<typeof getDrizzleClient>, orgId: string, actions: ('mau' | 'storage' | 'bandwidth')[]): Promise<boolean> {
-  try {
-    const sqls = [sql`SELECT is_allowed_action_org_action(${orgId}, ARRAY[`]
-    actions.forEach((action, index) => index !== actions.length - 1 ? sqls.push(sql`${action},`) : sqls.push(sql`${action}`))
-    sqls.push(sql`]::action_type[]) AS is_allowed`)
-
-    const result = await drizzleCient.execute<{ is_allowed: boolean }>(
-      sql.join(sqls),
-    )
-    return result[0]?.is_allowed ?? false
-  }
-  catch (error) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'isAllowedActionOrg', error })
-  }
-  return false
-}
-
-export async function isAllowedActionOrgPg(c: Context, drizzleCient: ReturnType<typeof getDrizzleClient>, orgId: string): Promise<boolean> {
-  try {
-    // Assuming you have a way to get your database connection string
-
-    const result = await drizzleCient.execute<{ is_allowed: boolean }>(
-      sql`SELECT is_allowed_action_org(${orgId}) AS is_allowed`,
-    )
-
-    return result[0]?.is_allowed ?? false
-  }
-  catch (error) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'isAllowedActionOrg', error })
-  }
-  return false
-}
-
 export function getAlias() {
   const versionAlias = alias(schema.app_versions, 'version')
   const channelDevicesAlias = alias(schema.channel_devices, 'channel_devices')
@@ -82,56 +79,48 @@ export function requestInfosPostgres(
   platform: string,
   app_id: string,
   device_id: string,
-  version_name: string,
   defaultChannel: string,
   drizzleCient: ReturnType<typeof getDrizzleClient>,
 ) {
   const { versionAlias, channelDevicesAlias, channelAlias } = getAlias()
 
-  const appVersionsQuery = drizzleCient
-    .select({
-      id: versionAlias.id,
-    })
-    .from(versionAlias)
-    .where(or(eq(versionAlias.name, version_name), eq(versionAlias.app_id, app_id)))
-    .limit(1)
-  cloudlog({ requestId: c.get('requestId'), message: 'appVersions Query:', appVersionsQuery: appVersionsQuery.toSQL() })
-  const appVersions = appVersionsQuery.then(data => data.at(0))
-
+  const versionSelect = {
+    id: sql<number>`${versionAlias.id}`.as('vid'),
+    name: sql<string>`${versionAlias.name}`.as('vname'),
+    checksum: sql<string | null>`${versionAlias.checksum}`.as('vchecksum'),
+    session_key: sql<string | null>`${versionAlias.session_key}`.as('vsession_key'),
+    storage_provider: sql<string>`${versionAlias.storage_provider}`.as('vstorage_provider'),
+    external_url: sql<string | null>`${versionAlias.external_url}`.as('vexternal_url'),
+    min_update_version: sql<string | null>`${versionAlias.min_update_version}`.as('vminUpdateVersion'),
+    r2_path: sql`${versionAlias.r2_path}`.mapWith(versionAlias.r2_path).as('vr2_path'),
+  }
+  const channelSelect = {
+    id: channelAlias.id,
+    name: channelAlias.name,
+    app_id: channelAlias.app_id,
+    allow_dev: channelAlias.allow_dev,
+    allow_emulator: channelAlias.allow_emulator,
+    disable_auto_update_under_native: channelAlias.disable_auto_update_under_native,
+    disable_auto_update: channelAlias.disable_auto_update,
+    ios: channelAlias.ios,
+    android: channelAlias.android,
+    allow_device_self_set: channelAlias.allow_device_self_set,
+    public: channelAlias.public,
+  }
+  const manifestSelect = sql<{ file_name: string, file_hash: string, s3_path: string }[]>`array_agg(json_build_object(
+        'file_name', ${schema.manifest.file_name},
+        'file_hash', ${schema.manifest.file_hash},
+        's3_path', ${schema.manifest.s3_path}
+      ))`
   const channelDeviceQuery = drizzleCient
     .select({
       channel_devices: {
         device_id: channelDevicesAlias.device_id,
         app_id: sql<string>`${channelDevicesAlias.app_id}`.as('cd_app_id'),
       },
-      version: {
-        id: sql<number>`${versionAlias.id}`.as('vid'),
-        name: sql<string>`${versionAlias.name}`.as('vname'),
-        checksum: sql<string | null>`${versionAlias.checksum}`.as('vchecksum'),
-        session_key: sql<string | null>`${versionAlias.session_key}`.as('vsession_key'),
-        storage_provider: sql<string>`${versionAlias.storage_provider}`.as('vstorage_provider'),
-        external_url: sql<string | null>`${versionAlias.external_url}`.as('vexternal_url'),
-        min_update_version: sql<string | null>`${versionAlias.min_update_version}`.as('vminUpdateVersion'),
-        r2_path: sql`${versionAlias.r2_path}`.mapWith(versionAlias.r2_path).as('vr2_path'),
-      },
-      channels: {
-        id: channelAlias.id,
-        name: channelAlias.name,
-        app_id: channelAlias.app_id,
-        allow_dev: channelAlias.allow_dev,
-        allow_emulator: channelAlias.allow_emulator,
-        disable_auto_update_under_native: channelAlias.disable_auto_update_under_native,
-        disable_auto_update: channelAlias.disable_auto_update,
-        ios: channelAlias.ios,
-        android: channelAlias.android,
-        allow_device_self_set: channelAlias.allow_device_self_set,
-        public: channelAlias.public,
-      },
-      manifestEntries: sql<{ file_name: string, file_hash: string, s3_path: string }[]>`array_agg(json_build_object(
-        'file_name', ${schema.manifest.file_name},
-        'file_hash', ${schema.manifest.file_hash},
-        's3_path', ${schema.manifest.s3_path}
-      ))`,
+      version: versionSelect,
+      channels: channelSelect,
+      manifestEntries: manifestSelect,
     },
     )
     .from(channelDevicesAlias)
@@ -147,34 +136,9 @@ export function requestInfosPostgres(
   const platformQuery = platform === 'android' ? channelAlias.android : channelAlias.ios
   const channelQuery = drizzleCient
     .select({
-      version: {
-        id: sql<number>`${versionAlias.id}`.as('vid'),
-        name: sql<string>`${versionAlias.name}`.as('vname'),
-        checksum: sql<string | null>`${versionAlias.checksum}`.as('vchecksum'),
-        session_key: sql<string | null>`${versionAlias.session_key}`.as('vsession_key'),
-        storage_provider: sql<string>`${versionAlias.storage_provider}`.as('vstorage_provider'),
-        external_url: sql<string | null>`${versionAlias.external_url}`.as('vexternal_url'),
-        min_update_version: sql<string | null>`${versionAlias.min_update_version}`.as('vminUpdateVersion'),
-        r2_path: sql`${versionAlias.r2_path}`.mapWith(versionAlias.r2_path).as('vr2_path'),
-      },
-      channels: {
-        id: channelAlias.id,
-        name: channelAlias.name,
-        app_id: channelAlias.app_id,
-        allow_dev: channelAlias.allow_dev,
-        allow_emulator: channelAlias.allow_emulator,
-        disable_auto_update_under_native: channelAlias.disable_auto_update_under_native,
-        disable_auto_update: channelAlias.disable_auto_update,
-        ios: channelAlias.ios,
-        android: channelAlias.android,
-        allow_device_self_set: channelAlias.allow_device_self_set,
-        public: channelAlias.public,
-      },
-      manifestEntries: sql<{ file_name: string, file_hash: string, s3_path: string }[]>`array_agg(json_build_object(
-        'file_name', ${schema.manifest.file_name},
-        'file_hash', ${schema.manifest.file_hash},
-        's3_path', ${schema.manifest.s3_path}
-      ))`,
+      version: versionSelect,
+      channels: channelSelect,
+      manifestEntries: manifestSelect,
     })
     .from(channelAlias)
     .innerJoin(versionAlias, eq(channelAlias.version, versionAlias.id))
@@ -195,8 +159,8 @@ export function requestInfosPostgres(
   cloudlog({ requestId: c.get('requestId'), message: 'channel Query:', channelQuery: channelQuery.toSQL() })
   const channel = channelQuery.then(data => data.at(0))
 
-  return Promise.all([channelDevice, channel, appVersions])
-    .then(([channelOverride, channelData, versionData]) => ({ versionData, channelData, channelOverride }))
+  return Promise.all([channelDevice, channel])
+    .then(([channelOverride, channelData]) => ({ channelData, channelOverride }))
     .catch((e) => {
       throw e
     })
@@ -206,19 +170,26 @@ export async function getAppOwnerPostgres(
   c: Context,
   appId: string,
   drizzleCient: ReturnType<typeof getDrizzleClient>,
-): Promise<{ owner_org: string, orgs: { created_by: string, id: string } } | null> {
+  actions: ('mau' | 'storage' | 'bandwidth')[] = [],
+): Promise<{ owner_org: string, orgs: { created_by: string, id: string }, plan_valid: boolean } | null> {
   try {
+    if (actions.length === 0)
+      return null
+    const orgAlias = alias(schema.orgs, 'orgs')
+    const planExpression = buildPlanValidationExpression(actions, schema.apps.owner_org)
+
     const appOwner = await drizzleCient
       .select({
         owner_org: schema.apps.owner_org,
+        plan_valid: planExpression,
         orgs: {
-          created_by: schema.orgs.created_by,
-          id: schema.orgs.id,
+          created_by: orgAlias.created_by,
+          id: orgAlias.id,
         },
       })
       .from(schema.apps)
       .where(eq(schema.apps.app_id, appId))
-      .innerJoin(alias(schema.orgs, 'orgs'), eq(schema.apps.owner_org, schema.orgs.id))
+      .innerJoin(orgAlias, eq(schema.apps.owner_org, orgAlias.id))
       .limit(1)
       .then(data => data[0])
 
@@ -264,13 +235,18 @@ export async function getAppVersionsByAppIdPg(
   appId: string,
   versionName: string,
   drizzleCient: ReturnType<typeof getDrizzleClient>,
-): Promise<{ id: number, owner_org: string, name: string }[]> {
+  actions: ('mau' | 'storage' | 'bandwidth')[] = [],
+): Promise<{ id: number, owner_org: string, name: string, plan_valid: boolean }[]> {
   try {
+    if (actions.length === 0)
+      return []
+    const planExpression = buildPlanValidationExpression(actions, schema.app_versions.owner_org)
     const versions = await drizzleCient
       .select({
         id: schema.app_versions.id,
         owner_org: schema.app_versions.owner_org,
         name: schema.app_versions.name,
+        plan_valid: planExpression,
       })
       .from(schema.app_versions)
       .where(and(
@@ -474,11 +450,16 @@ export async function getAppByIdPg(
   c: Context,
   appId: string,
   drizzleCient: ReturnType<typeof getDrizzleClient>,
-): Promise<{ owner_org: string } | null> {
+  actions: ('mau' | 'storage' | 'bandwidth')[] = [],
+): Promise<{ owner_org: string, plan_valid: boolean } | null> {
   try {
+    if (actions.length === 0)
+      return null
+    const planExpression = buildPlanValidationExpression(actions, schema.apps.owner_org)
     const app = await drizzleCient
       .select({
         owner_org: schema.apps.owner_org,
+        plan_valid: planExpression,
       })
       .from(schema.apps)
       .where(eq(schema.apps.app_id, appId))

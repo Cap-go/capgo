@@ -7,7 +7,7 @@ import { existInEnv, getEnv } from './utils.ts'
 
 export function getStripe(c: Context) {
   return new Stripe(getEnv(c, 'STRIPE_SECRET_KEY'), {
-    apiVersion: '2025-05-28.basil',
+    apiVersion: '2025-08-27.basil',
     httpClient: Stripe.createFetchHttpClient(),
   })
 }
@@ -250,7 +250,7 @@ export async function createCheckout(c: Context, customerId: string, reccurence:
     billing_address_collection: 'auto',
     mode: 'subscription',
     customer: customerId,
-    success_url: `${successUrl}?session_id={CHECKOUT_SESSION_ID}`,
+    success_url: `${successUrl}?success=true`,
     cancel_url: cancelUrl,
     automatic_tax: { enabled: true },
     client_reference_id: clientReferenceId,
@@ -312,32 +312,52 @@ export async function setThreshold(c: Context, subscriptionId: string) {
       amount_gte: 5000,
       reset_billing_cycle_anchor: false,
     },
-  } as any) // Use type assertion to bypass linter error
+  })
   return subscription
 }
 
-export async function updateCustomer(c: Context, customerId: string, email: string, billing_email: string | null | undefined, userId: string, name: string) {
+export async function recordUsage(c: Context, customerId: string, eventName: string, value: number, meterId?: string) {
   if (!existInEnv(c, 'STRIPE_SECRET_KEY'))
     return Promise.resolve()
-  const customer = await getStripe(c).customers.update(customerId, {
-    email: billing_email ?? email,
-    name,
-    metadata: {
-      user_id: userId,
-      email,
-    },
-  })
-  return customer
-}
 
-export async function recordUsage(c: Context, subscriptionItemId: string, quantity: number) {
-  if (!existInEnv(c, 'STRIPE_SECRET_KEY'))
-    return Promise.resolve()
-  const usageRecord = await (getStripe(c).subscriptionItems as any).createUsageRecord(subscriptionItemId, { // Use type assertion to bypass linter error
-    quantity,
-    action: 'set',
-  })
-  return usageRecord
+  if (!eventName) {
+    cloudlog({ requestId: c.get('requestId'), message: 'recordUsage no eventName', customerId, eventName, value, meterId })
+    return Promise.reject(new Error('No event name'))
+  }
+  try {
+    // Create a meter event for usage tracking
+    const meterEvent = await getStripe(c).billing.meterEvents.create({
+      event_name: eventName,
+      payload: {
+        value: value.toString(),
+        stripe_customer_id: customerId,
+      },
+      // Optional: specify meter ID if you have multiple meters
+      ...(meterId && { meter: meterId }),
+    })
+
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'Meter event recorded',
+      customerId,
+      eventName,
+      value,
+      meterEventId: meterEvent.identifier,
+    })
+
+    return meterEvent
+  }
+  catch (error) {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'Failed to record meter usage',
+      customerId,
+      eventName,
+      value,
+      error,
+    })
+    throw error
+  }
 }
 
 export async function removeOldSubscription(c: Context, subscriptionId: string) {

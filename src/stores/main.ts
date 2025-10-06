@@ -13,16 +13,18 @@ import {
   unspoofUser,
 } from './../services/supabase'
 
+interface TotalStats {
+  mau: number
+  storage: number
+  bandwidth: number
+}
+
 export const useMainStore = defineStore('main', () => {
   const auth = ref<User | undefined>()
   const path = ref('')
   const user = ref<Database['public']['Tables']['users']['Row']>()
   const plans = ref<Database['public']['Tables']['plans']['Row'][]>([])
-  const totalStats = ref<{
-    mau: number
-    storage: number
-    bandwidth: number
-  }>({
+  const totalStats = ref<TotalStats>({
     mau: 0,
     storage: 0,
     bandwidth: 0,
@@ -64,8 +66,8 @@ export const useMainStore = defineStore('main', () => {
     })
   }
 
-  const getTotalStats = () => {
-    return dashboard.value.reduce((acc: any, cur: any) => {
+  const getTotalStats: () => TotalStats = () => {
+    return dashboard.value.reduce((acc: TotalStats, cur: TotalStats) => {
       acc.mau += cur.mau
       acc.bandwidth += cur.bandwidth
       acc.storage += cur.storage
@@ -78,8 +80,16 @@ export const useMainStore = defineStore('main', () => {
   }
 
   const calculateMonthDay = (subscriptionStart: string | undefined) => {
+    // Parse dates consistently - ensure we're handling them the same way
+    // If subscriptionStart is provided, parse it as-is (should be in ISO format from DB)
+    // Otherwise use current date
     const startDate = subscriptionStart ? new Date(subscriptionStart) : new Date()
     const currentDate = new Date()
+
+    // Reset both dates to start of day to avoid time component issues
+    startDate.setHours(0, 0, 0, 0)
+    currentDate.setHours(0, 0, 0, 0)
+
     const daysInMonth = new Date(Date.UTC(currentDate.getUTCFullYear(), currentDate.getUTCMonth() + 1, 0)).getUTCDate()
     return (getDaysBetweenDates(startDate, currentDate) % daysInMonth || daysInMonth) - 1
   }
@@ -112,11 +122,33 @@ export const useMainStore = defineStore('main', () => {
 
   const getTotalStatsByApp = async (appId: string, subscriptionStart?: string) => {
     const monthDay = calculateMonthDay(subscriptionStart)
-    return dashboardByapp.value.filter(d => d.app_id === appId)[monthDay]?.get ?? 0
+    const appData = dashboardByapp.value.filter(d => d.app_id === appId)
+    return appData[monthDay]?.get ?? 0
   }
   const getTotalMauByApp = async (appId: string, subscriptionStart?: string) => {
-    const monthDay = calculateMonthDay(subscriptionStart)
-    return dashboardByapp.value.filter(d => d.app_id === appId)[monthDay]?.mau ?? 0
+    // Get the app's dashboard data
+    const appData = dashboardByapp.value.filter(d => d.app_id === appId)
+
+    // Calculate how many days into the billing cycle we are
+    const startDate = subscriptionStart ? new Date(subscriptionStart) : new Date()
+    const currentDate = new Date()
+
+    // Reset to start of day for consistent comparison
+    startDate.setHours(0, 0, 0, 0)
+    currentDate.setHours(0, 0, 0, 0)
+
+    // Calculate days in billing cycle
+    const daysInBillingCycle = Math.floor((currentDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1
+
+    // Accumulate only the MAU values within the current billing cycle
+    let totalMau = 0
+    const dataLength = Math.min(daysInBillingCycle, appData.length)
+    for (let i = 0; i < dataLength; i++) {
+      if (appData[i]?.mau !== undefined) {
+        totalMau += appData[i].mau
+      }
+    }
+    return totalMau
   }
 
   const awaitInitialLoad = () => {

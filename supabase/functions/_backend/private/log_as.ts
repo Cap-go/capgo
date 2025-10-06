@@ -1,6 +1,6 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
-import { z } from 'zod/v4-mini'
+import { z } from 'zod/mini'
 import { middlewareAuth, parseBody, simpleError, useCors } from '../utils/hono.ts'
 import { emptySupabase, supabaseAdmin as useSupabaseAdmin, supabaseClient as useSupabaseClient } from '../utils/supabase.ts'
 

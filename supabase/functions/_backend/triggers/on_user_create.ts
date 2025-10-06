@@ -5,6 +5,7 @@ import { BRES, middlewareAPISecret, triggerValidator } from '../utils/hono.ts'
 import { cloudlog } from '../utils/loggin.ts'
 import { logsnag } from '../utils/logsnag.ts'
 import { createApiKey } from '../utils/supabase.ts'
+import { syncUserPreferenceTags } from '../utils/user_preferences.ts'
 
 export const app = new Hono<MiddlewareKeyVariables>()
 
@@ -13,8 +14,7 @@ app.post('/', middlewareAPISecret, triggerValidator('users', 'INSERT'), async (c
   cloudlog({ requestId: c.get('requestId'), message: 'record', record })
   await createApiKey(c, record.id)
   cloudlog({ requestId: c.get('requestId'), message: 'createCustomer stripe' })
-  if (record.customer_id)
-    return c.json(BRES)
+  await syncUserPreferenceTags(c, record.email, record)
   const LogSnag = logsnag(c)
   await LogSnag.track({
     channel: 'user-register',
