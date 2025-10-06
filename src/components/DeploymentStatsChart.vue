@@ -104,7 +104,7 @@ function generateAppColors(appCount: number) {
   return colors
 }
 
-const chartData = computed<ChartData<'bar' | 'line'>>(() => {
+const chartData = computed<ChartData<any>>(() => {
   const appIds = Object.keys(props.dataByApp)
 
   if (appIds.length === 0) {
@@ -255,7 +255,7 @@ const chartOptions = computed<ChartOptions<'bar' | 'line'>>(() => ({
 
 <template>
   <div class="w-full h-full">
-    <Line v-if="accumulated" :data="chartData as any" :options="chartOptions as any" :plugins="[verticalLinePlugin]" />
-    <Bar v-else :data="chartData as any" :options="chartOptions as any" :plugins="[verticalLinePlugin]" />
+    <Line v-if="accumulated" :data="chartData" :options="chartOptions" :plugins="[verticalLinePlugin]" />
+    <Bar v-else :data="chartData" :options="chartOptions" :plugins="[verticalLinePlugin]" />
   </div>
 </template>

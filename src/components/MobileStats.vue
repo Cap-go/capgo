@@ -30,10 +30,6 @@ interface ChartDataset {
 interface ChartApiData {
   labels: string[]
   datasets: ChartDataset[]
-  latestVersion: {
-    name: string
-    percentage: string
-  }
 }
 
 Chart.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Filler)
@@ -50,7 +46,56 @@ const rawChartData = ref<ChartApiData | null>(null)
 const currentRange = ref<{ startDate: Date, endDate: Date } | null>(null)
 let requestToken = 0
 
-const latestVersion = computed(() => rawChartData.value?.latestVersion ?? null)
+const latestVersion = computed(() => {
+  const chartData = rawChartData.value
+  const datasets = chartData?.datasets ?? []
+
+  if (!datasets.length)
+    return null
+
+  const lastIndexWithData = datasets.reduce((maxIndex, dataset) => {
+    const values = dataset.data ?? []
+
+    for (let index = values.length - 1; index >= 0; index--) {
+      const value = values[index]
+      if (typeof value === 'number' && !Number.isNaN(value))
+        return Math.max(maxIndex, index)
+    }
+
+    return maxIndex
+  }, -1)
+
+  if (lastIndexWithData < 0)
+    return null
+
+  const datasetAtLastDay = datasets.reduce<{ name: string, percentage: number } | null>((current, dataset) => {
+    const value = dataset.data?.[lastIndexWithData]
+    const numericValue = typeof value === 'number' && !Number.isNaN(value) ? value : null
+
+    if (numericValue === null)
+      return current
+
+    if (!current || numericValue > current.percentage)
+      return { name: dataset.label, percentage: numericValue }
+
+    return current
+  }, null)
+
+  if (datasetAtLastDay)
+    return datasetAtLastDay
+
+  const fallbackDataset = datasets.find(dataset => dataset.data && dataset.data[lastIndexWithData] !== undefined)
+  if (fallbackDataset) {
+    const fallbackValue = fallbackDataset.data?.[lastIndexWithData]
+    const numericFallback = typeof fallbackValue === 'number' && !Number.isNaN(fallbackValue) ? fallbackValue : 0
+    return {
+      name: fallbackDataset.label,
+      percentage: numericFallback,
+    }
+  }
+
+  return null
+})
 const latestVersionPercentageDisplay = computed(() => {
   const rawPercentage = latestVersion.value?.percentage ?? 0
   if (rawPercentage === null || rawPercentage === undefined)
@@ -305,26 +350,23 @@ watch(
 
 <template>
   <div class="flex flex-col bg-white border rounded-lg shadow-lg col-span-full border-slate-300 sm:col-span-6 xl:col-span-4 dark:border-slate-900 dark:bg-gray-800 h-[460px]">
-    <div class="px-5 pt-3">
-      <div class="flex flex-row items-center">
-        <h2 class="mb-2 mr-2 text-2xl font-semibold text-slate-800 dark:text-white">
-          {{ t('active_users_by_version') }}
-        </h2>
-      </div>
+    <div class="pt-4 px-4 flex items-start justify-between gap-2">
+      <h2 class="text-2xl font-semibold text-white">
+        {{ t('active_users_by_version') }}
+      </h2>
 
-      <div class="mb-1 text-xs font-semibold uppercase text-slate-400 dark:text-white">
-        {{ t('latest_version') }}
-      </div>
-      <div v-if="latestVersion" class="flex items-start">
-        <div id="usage_val" class="mr-2 text-3xl font-bold text-slate-800 dark:text-white">
-          {{ latestVersion.name }}
-        </div>
-        <div class="rounded-full bg-emerald-500 px-1.5 text-sm font-semibold text-white">
+      <div class="flex flex-col items-end text-right">
+        <div
+          class="inline-flex items-center justify-center rounded-full px-2 py-1 bg-emerald-500 text-xs font-bold text-white shadow-lg whitespace-nowrap"
+        >
           {{ latestVersionPercentageDisplay }}
+        </div>
+        <div v-if="latestVersion" class="text-3xl font-bold text-white">
+          {{ latestVersion.name }}
         </div>
       </div>
     </div>
-    <div class="w-full h-full p-6">
+    <div class="w-full h-full p-6 pt-2">
       <div v-if="isLoading" class="flex items-center justify-center h-full">
         <Spinner size="w-40 h-40" />
       </div>

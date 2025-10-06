@@ -254,17 +254,25 @@ onMounted(async () => {
 
 <template>
   <div class="flex flex-col bg-white border rounded-lg shadow-lg col-span-full border-slate-300 sm:col-span-6 xl:col-span-4 dark:border-slate-900 dark:bg-gray-800 h-[460px]">
-    <div class="px-5 pt-3">
-      <div class="flex flex-row items-center">
-        <h2 class="mb-2 mr-2 text-2xl font-semibold text-slate-800 dark:text-white">
-          {{ t('update_statistics') }}
-        </h2>
-      </div>
+    <div class="pt-4 px-4 flex items-start justify-between gap-2">
+      <h2 class="text-2xl font-semibold text-white">
+        {{ t('update_statistics') }}
+      </h2>
 
-      <div class="mb-1 text-xs font-semibold uppercase text-slate-400 dark:text-white">
-        {{ t('usage-title') }}
-      </div>
-      <div class="flex flex-col space-y-1">
+      <div class="flex flex-col items-end text-right">
+        <div
+          v-if="lastDayEvolution"
+          class="inline-flex items-center justify-center rounded-full px-2 py-1 text-xs font-bold text-white shadow-lg whitespace-nowrap"
+          :class="{ 'bg-emerald-500': lastDayEvolution >= 0, 'bg-yellow-500': lastDayEvolution < 0 }"
+        >
+          {{ lastDayEvolution < 0 ? '-' : '+' }}{{ Math.abs(lastDayEvolution).toFixed(2) }}%
+        </div>
+        <div v-else class="inline-flex rounded-full px-2 py-1 text-xs font-semibold opacity-0" aria-hidden="true">
+          +0.00%
+        </div>
+        <div class="text-3xl font-bold text-white">
+          {{ (totalInstalled + totalFailed + totalGet).toLocaleString() }}
+        </div>
         <div class="flex items-center space-x-4">
           <div class="flex items-center space-x-2">
             <div class="w-3 h-3 rounded-full" style="background-color: hsl(210, 50%, 60%)" />
@@ -279,20 +287,12 @@ onMounted(async () => {
             <span class="text-sm text-slate-600 dark:text-slate-300">{{ t('get') }}: {{ totalGet.toLocaleString() }}</span>
           </div>
         </div>
-        <div class="flex items-start">
-          <div id="total_update_val" class="mr-2 text-3xl font-bold text-slate-800 dark:text-white">
-            {{ (totalInstalled + totalFailed + totalGet).toLocaleString() }}
-          </div>
-          <div v-if="lastDayEvolution" class="rounded-full bg-emerald-500 px-1.5 text-sm font-semibold text-white">
-            {{ lastDayEvolution < 0 ? '-' : '+' }}{{ Math.abs(lastDayEvolution).toFixed(2) }}%
-          </div>
-        </div>
       </div>
     </div>
     <!-- Chart built with Chart.js 3 -->
 
     <!-- Change the height attribute to adjust the chart height -->
-    <div class="w-full h-full p-6">
+    <div class="w-full h-full p-6 pt-2">
       <div v-if="isLoading" class="flex items-center justify-center h-full">
         <div class="loading loading-spinner loading-lg text-blue-500" />
       </div>

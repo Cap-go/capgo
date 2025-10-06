@@ -37,7 +37,7 @@
   "activation-notification": "Notifications",
   "activation-notification-desc": "I accept to receive notification when new app version are available",
   "activation-validate": "Validate",
-  "active_users_by_version": "Active device by bundle",
+  "active_users_by_version": "Active bundle",
   "add-another-app": "Add your app",
   "add-another-bundle": "Add new bundle",
   "add-api-key": "Added new API key successfully",

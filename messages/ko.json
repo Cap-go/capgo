@@ -37,7 +37,7 @@
   "activation-notification": "알림",
   "activation-notification-desc": "새로운 앱 버전이 사용 가능할 때 알림을 받는 것에 동의합니다.",
   "activation-validate": "유효성 검사",
-  "active_users_by_version": "번들로 활성화된 장치",
+  "active_users_by_version": "활성 번들",
   "add-another-app": "앱을 추가하세요",
   "add-another-bundle": "새 번들 추가",
   "add-api-key": "성공적으로 새 API 키를 추가했습니다.",

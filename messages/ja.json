@@ -37,7 +37,7 @@
   "activation-notification": "通知",
   "activation-notification-desc": "新しいアプリバージョンが利用可能になったときに通知を受け取ることを承諾します",
   "activation-validate": "検証する",
-  "active_users_by_version": "バンドルによるアクティブデバイス",
+  "active_users_by_version": "アクティブバンドル",
   "add-another-app": "あなたのアプリを追加してください",
   "add-another-bundle": "新しいバンドルを追加する",
   "add-api-key": "新しいAPIキーを正常に追加しました",

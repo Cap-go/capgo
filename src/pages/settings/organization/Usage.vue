@@ -475,10 +475,6 @@ function nextRunDate() {
 
           <!-- Pricing Summary Card -->
           <div class="mt-8 bg-gray-50 dark:bg-gray-900 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6">
-            <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-4">
-              {{ t('usage-title') }}
-            </h3>
-
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div class="text-center p-4 bg-white dark:bg-gray-800 rounded-lg">
                 <div class="text-2xl font-bold text-gray-900 dark:text-white">
