@@ -94,6 +94,18 @@ async function getHandler(c: Context): Promise<Response> {
     cloudlog({ requestId: c.get('requestId'), message: 'getHandler files object is null' })
     return c.json({ error: 'not_found', message: 'Not found' }, 404)
   }
+  await backgroundTask(c, async () => {
+    const fileSize = object.size
+    const r2Path = new URL(c.req.url).pathname.split(`/files/read/${ATTACHMENT_PREFIX}/`)[1]
+    const app_id = r2Path?.split('/')[3]
+    const device_id = c.req.query('device_id')
+    if (app_id && device_id) {
+      await createStatsBandwidth(c, device_id, app_id, fileSize ?? 0)
+    }
+    else {
+      cloudlog({ requestId: c.get('requestId'), message: 'getHandler files cannot track bandwidth no app_id or device_id', r2Path, app_id, device_id })
+    }
+  })
   const headers = objectHeaders(object)
   if (object.range != null && c.req.header('range')) {
     headers.set('content-range', rangeHeader(object.size, object.range))
