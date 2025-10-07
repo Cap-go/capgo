@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { ORG_ID, getSupabaseClient } from './test-utils.ts'
+import { ORG_ID, getSupabaseClient, getCronPlanQueueCount, getLatestCronPlanMessage, cleanupPostgresClient } from './test-utils.ts'
 
 describe('[Function] queue_cron_plan_for_org', () => {
     let testCustomerId: string | null = null
@@ -29,7 +29,8 @@ describe('[Function] queue_cron_plan_for_org', () => {
     })
 
     afterAll(async () => {
-        // No cleanup needed since we're using existing data
+        // Cleanup PostgreSQL connection
+        await cleanupPostgresClient()
     })
 
     it('queues plan processing when plan_calculated_at is null', async () => {
@@ -47,6 +48,9 @@ describe('[Function] queue_cron_plan_for_org', () => {
             .eq('customer_id', testCustomerId)
             .throwOnError()
 
+        // Get initial queue count using direct PostgreSQL connection
+        const initialCount = await getCronPlanQueueCount()
+
         // Call the function
         const { error } = await supabase.rpc('queue_cron_plan_for_org', {
             org_id: ORG_ID,
@@ -54,7 +58,21 @@ describe('[Function] queue_cron_plan_for_org', () => {
         })
 
         expect(error).toBeNull()
-        // Note: We can't easily verify the queue was populated, but no error means it worked
+
+        // Verify a queue record was created
+        const finalCount = await getCronPlanQueueCount()
+        expect(finalCount).toBe(initialCount + 1)
+
+        // Verify the queue record contains correct data
+        const latestMessage = await getLatestCronPlanMessage()
+        expect(latestMessage).toMatchObject({
+            function_name: 'cron_plan',
+            function_type: 'cloudflare',
+            payload: {
+                orgId: ORG_ID,
+                customerId: testCustomerId
+            }
+        })
     })
 
     it('skips queuing when plan was calculated within last hour', async () => {
@@ -73,6 +91,9 @@ describe('[Function] queue_cron_plan_for_org', () => {
             .eq('customer_id', testCustomerId)
             .throwOnError()
 
+        // Get initial queue count using direct PostgreSQL connection
+        const initialCount = await getCronPlanQueueCount()
+
         // Call the function
         const { error } = await supabase.rpc('queue_cron_plan_for_org', {
             org_id: ORG_ID,
@@ -80,7 +101,24 @@ describe('[Function] queue_cron_plan_for_org', () => {
         })
 
         expect(error).toBeNull()
-        // Function should succeed but skip queuing (no way to verify this directly)
+
+        // Verify NO queue record was created (rate limiting worked)
+        const finalCount = await getCronPlanQueueCount()
+        expect(finalCount).toBe(initialCount)
+
+        // Verify plan_calculated_at was NOT updated (should remain the same)
+        const { data: stripeInfo } = await supabase
+            .from('stripe_info')
+            .select('plan_calculated_at')
+            .eq('customer_id', testCustomerId)
+            .single()
+            .throwOnError()
+
+        const actualTimestamp = new Date(stripeInfo?.plan_calculated_at!).getTime()
+        const expectedTimestamp = thirtyMinutesAgo.getTime()
+
+        // Should be within 1 second of the original timestamp (rate limiting prevented update)
+        expect(Math.abs(actualTimestamp - expectedTimestamp)).toBeLessThan(1000)
     })
 
     it('queues plan processing when plan was calculated over 1 hour ago', async () => {
@@ -99,6 +137,9 @@ describe('[Function] queue_cron_plan_for_org', () => {
             .eq('customer_id', testCustomerId)
             .throwOnError()
 
+        // Get initial queue count using direct PostgreSQL connection
+        const initialCount = await getCronPlanQueueCount()
+
         // Call the function
         const { error } = await supabase.rpc('queue_cron_plan_for_org', {
             org_id: ORG_ID,
@@ -106,6 +147,21 @@ describe('[Function] queue_cron_plan_for_org', () => {
         })
 
         expect(error).toBeNull()
+
+        // Verify a queue record was created (rate limiting allowed it)
+        const finalCount = await getCronPlanQueueCount()
+        expect(finalCount).toBe(initialCount + 1)
+
+        // Verify the queue record contains correct data
+        const latestMessage = await getLatestCronPlanMessage()
+        expect(latestMessage).toMatchObject({
+            function_name: 'cron_plan',
+            function_type: 'cloudflare',
+            payload: {
+                orgId: ORG_ID,
+                customerId: testCustomerId
+            }
+        })
     })
 
     it('handles non-existent customer_id gracefully', async () => {

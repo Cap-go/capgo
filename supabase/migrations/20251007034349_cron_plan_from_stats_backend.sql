@@ -11,34 +11,6 @@ SELECT cron.schedule(
   'SELECT public.process_function_queue(''cron_plan'')'
 );
 
--- Create a function to queue plan processing for a specific organization
-CREATE OR REPLACE FUNCTION public.queue_cron_plan_for_org(org_id uuid, customer_id text)
-RETURNS void
-LANGUAGE plpgsql
-SET search_path = ''
-AS $$
-BEGIN
-  PERFORM pgmq.send('cron_plan',
-    jsonb_build_object(
-      'function_name', 'cron_plan',
-      'function_type', 'cloudflare',
-      'payload', jsonb_build_object(
-        'orgId', org_id,
-        'customerId', customer_id
-      )
-    )
-  );
-END;
-$$;
-
-ALTER FUNCTION public.queue_cron_plan_for_org(uuid, text) OWNER TO postgres;
-
--- Revoke all permissions first, then grant only to service_role
-REVOKE ALL ON FUNCTION public.queue_cron_plan_for_org(uuid, text) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.queue_cron_plan_for_org(uuid, text) FROM anon;
-REVOKE ALL ON FUNCTION public.queue_cron_plan_for_org(uuid, text) FROM authenticated;
-GRANT ALL ON FUNCTION public.queue_cron_plan_for_org(uuid, text) TO service_role;
-
 -- Add column to track when plan was last calculated
 ALTER TABLE public.stripe_info ADD COLUMN IF NOT EXISTS plan_calculated_at timestamp with time zone;
 
@@ -72,3 +44,12 @@ BEGIN
   END IF;
 END;
 $$;
+
+
+ALTER FUNCTION public.queue_cron_plan_for_org(uuid, text) OWNER TO postgres;
+
+-- Revoke all permissions first, then grant only to service_role
+REVOKE ALL ON FUNCTION public.queue_cron_plan_for_org(uuid, text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.queue_cron_plan_for_org(uuid, text) FROM anon;
+REVOKE ALL ON FUNCTION public.queue_cron_plan_for_org(uuid, text) FROM authenticated;
+GRANT ALL ON FUNCTION public.queue_cron_plan_for_org(uuid, text) TO service_role;
