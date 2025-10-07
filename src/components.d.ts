@@ -19,8 +19,6 @@ declare module 'vue' {
     DeploymentStatsCard: typeof import('./components/dashboard/DeploymentStatsCard.vue')['default']
     DeploymentStatsChart: typeof import('./components/dashboard/DeploymentStatsChart.vue')['default']
     DevicesStats: typeof import('./components/dashboard/DevicesStats.vue')['default']
-    DevicesStatsCard: typeof import('./components/dashboard/DevicesStatsCard.vue')['default']
-    DevicesStatsChart: typeof import('./components/dashboard/DevicesStatsChart.vue')['default']
     DeviceTable: typeof import('./components/tables/DeviceTable.vue')['default']
     DialogV2: typeof import('./components/DialogV2.vue')['default']
     DropdownOrganization: typeof import('./components/dashboard/DropdownOrganization.vue')['default']
