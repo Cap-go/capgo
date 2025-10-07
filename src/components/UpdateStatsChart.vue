@@ -48,6 +48,27 @@ Chart.register(
   LinearScale,
 )
 
+const ACTION_STYLES: Record<string, { barBackground: string, barBorder: string, lineBackground: string, lineBorder: string }> = {
+  requested: {
+    barBackground: 'hsla(210, 65%, 60%, 0.8)',
+    barBorder: 'hsl(210, 65%, 45%)',
+    lineBackground: 'hsla(210, 65%, 60%, 0.35)',
+    lineBorder: 'hsl(210, 70%, 50%)',
+  },
+  install: {
+    barBackground: 'hsla(135, 60%, 60%, 0.8)',
+    barBorder: 'hsl(135, 60%, 45%)',
+    lineBackground: 'hsla(135, 60%, 60%, 0.35)',
+    lineBorder: 'hsl(135, 65%, 45%)',
+  },
+  fail: {
+    barBackground: 'hsla(0, 65%, 65%, 0.8)',
+    barBorder: 'hsl(0, 65%, 50%)',
+    lineBackground: 'hsla(0, 65%, 65%, 0.35)',
+    lineBorder: 'hsl(0, 70%, 50%)',
+  },
+}
+
 function getDayNumbers(startDate: Date, endDate: Date) {
   const dayNumbers = []
   const currentDate = new Date(startDate)
@@ -85,48 +106,18 @@ function accumulateData(data: number[]): number[] {
 }
 
 const chartData = computed<ChartData<'bar' | 'line'>>(() => {
-  // Always show breakdown by action type (install/fail/get)
-  const actionTypes = ['install', 'fail', 'get']
+  // Always show breakdown by action type (requested/install/fail)
+  const labels = monthdays()
+  const actionTypes: Array<'requested' | 'install' | 'fail'> = ['requested', 'install', 'fail']
   const datasets = actionTypes.map((action, index) => {
-    const actionData = props.dataByApp[action] as number[]
+    const actionData = props.dataByApp[action] as number[] | undefined
     const actionName = props.appNames[action] || action
+    const style = ACTION_STYLES[action] ?? ACTION_STYLES.requested
+    const rawData = (actionData && actionData.length ? actionData : Array.from({ length: labels.length }).fill(0)) as number[]
+    const processedData = props.accumulated ? accumulateData(rawData) : rawData
 
-    let backgroundColor: string
-    let borderColor: string
-    let processedData: number[]
-
-    // Process data for cumulative mode
-    const rawData = actionData || Array.from({ length: monthdays().length }).fill(0) as number[]
-    if (props.accumulated) {
-      processedData = accumulateData(rawData)
-      // Use LineChartStats color scheme for line mode
-      const hue = (210 + index * 137.508) % 360
-      const saturation = 50 + (index % 3) * 8
-      const lightness = 60 + (index % 4) * 5
-      borderColor = `hsl(${hue}, ${saturation + 15}%, ${lightness - 15}%)`
-      backgroundColor = `hsla(${hue}, ${saturation}%, ${lightness}%, 0.6)`
-    }
-    else {
-      processedData = rawData
-      // Use existing bar chart colors for bar mode
-      switch (action) {
-        case 'install':
-          backgroundColor = 'hsla(210, 50%, 70%, 0.8)'
-          borderColor = 'hsl(210, 50%, 55%)'
-          break
-        case 'fail':
-          backgroundColor = 'hsla(0, 50%, 70%, 0.8)'
-          borderColor = 'hsl(0, 50%, 55%)'
-          break
-        case 'get':
-          backgroundColor = 'hsla(120, 50%, 70%, 0.8)'
-          borderColor = 'hsl(120, 50%, 55%)'
-          break
-        default:
-          backgroundColor = 'hsla(210, 50%, 70%, 0.8)'
-          borderColor = 'hsl(210, 50%, 55%)'
-      }
-    }
+    const backgroundColor = props.accumulated ? style.lineBackground : style.barBackground
+    const borderColor = props.accumulated ? style.lineBorder : style.barBorder
 
     const baseDataset = {
       label: actionName,
@@ -134,7 +125,8 @@ const chartData = computed<ChartData<'bar' | 'line'>>(() => {
       backgroundColor,
       borderColor,
       borderWidth: 1,
-    }
+    } as ChartData<'bar' | 'line'>['datasets'][number]
+    Object.assign(baseDataset, { metaBaseValues: processedData })
 
     // Add line-specific properties for accumulated mode (match UsageCard styling)
     return props.accumulated
@@ -150,7 +142,7 @@ const chartData = computed<ChartData<'bar' | 'line'>>(() => {
   })
 
   return {
-    labels: monthdays(),
+    labels,
     datasets,
   }
 })

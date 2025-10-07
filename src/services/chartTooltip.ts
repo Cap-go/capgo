@@ -12,6 +12,35 @@ interface ProcessedTooltipItem {
   colors: TooltipLabelStyle
 }
 
+function formatTooltipValue(value: unknown) {
+  if (typeof value !== 'number' || Number.isNaN(value))
+    return '0'
+
+  const rounded = Number(value.toFixed(1))
+  return Number.isInteger(rounded) ? Math.trunc(rounded).toString() : rounded.toFixed(1)
+}
+
+function getDatasetBaseValue(chart: Chart | undefined, dataset: any, datasetIndex: number, dataIndex: number, parsedY: unknown) {
+  const metaValues = Array.isArray(dataset?.metaBaseValues) ? dataset.metaBaseValues as Array<number | null> : null
+  if (metaValues) {
+    const candidate = metaValues[dataIndex]
+    if (typeof candidate === 'number' && Number.isFinite(candidate))
+      return candidate
+    return null
+  }
+
+  if (typeof parsedY !== 'number' || Number.isNaN(parsedY))
+    return null
+
+  if (!chart || datasetIndex <= 0)
+    return parsedY
+
+  const previousDataset: any = chart.data?.datasets?.[datasetIndex - 1]
+  const previousRaw = Array.isArray(previousDataset?.data) ? previousDataset.data[dataIndex] : undefined
+  const previousValue = typeof previousRaw === 'number' && Number.isFinite(previousRaw) ? previousRaw : 0
+  return parsedY - previousValue
+}
+
 /**
  * Creates a custom Chart.js tooltip with smart positioning and scrollable content
  * @param context Chart.js tooltip context
@@ -89,21 +118,22 @@ export function createCustomTooltip(context: TooltipContext, isAccumulated: bool
   // Set content
   if (tooltip.body) {
     const titleLines = tooltip.title || []
-    const bodyLines = tooltip.body.map(b => b.lines)
+    const dataPoints = tooltip.dataPoints || []
 
     // Create an array of items with their values, colors, and labels
-    const items: ProcessedTooltipItem[] = bodyLines.map((body: string[], i: number) => {
-      // Extract the numeric value from the label (format: "value - Label")
-      const bodyText = body[0] || ''
-      const match = bodyText.match(/^(\d+(?:\.\d+)?)/)
-      const value = match ? Number.parseFloat(match[1]) : 0
+    const items: ProcessedTooltipItem[] = dataPoints.map((dataPoint, index) => {
+      const datasetIndex = dataPoint.datasetIndex ?? 0
+      const dataIndex = dataPoint.dataIndex ?? 0
+      const dataset = dataPoint.dataset as any
+      const baseValue = getDatasetBaseValue(chart, dataset, datasetIndex, dataIndex, dataPoint.parsed?.y)
+      const numericValue = typeof baseValue === 'number' && Number.isFinite(baseValue) ? baseValue : 0
 
       return {
-        body,
-        value,
-        colors: tooltip.labelColors[i],
+        body: [`${formatTooltipValue(numericValue)} - ${dataset?.label ?? ''}`],
+        value: numericValue,
+        colors: tooltip.labelColors[index],
       }
-    }).filter(item => item.value !== 0) // Filter out zero values
+    }).filter(item => item.value !== 0)
 
     // Sort by value in descending order (highest to lowest)
     items.sort((a, b) => b.value - a.value)
@@ -126,15 +156,7 @@ export function createCustomTooltip(context: TooltipContext, isAccumulated: bool
     }
     else {
       // Multi-app view
-      if (isAccumulated) {
-        // Multi-app cumulative mode: sum all accumulated values from all apps
-        const cumulativeValues = tooltip.dataPoints?.map((point: any) => point.parsed.y) || []
-        totalValue = cumulativeValues.reduce((sum: number, val: number) => sum + (Number.isNaN(val) ? 0 : val), 0)
-      }
-      else {
-        // Multi-app daily mode: sum all daily values from different apps
-        totalValue = items.reduce((sum, item) => sum + item.value, 0)
-      }
+      totalValue = items.reduce((sum, item) => sum + item.value, 0)
     }
 
     const titleColor = isDark.value ? '#e5e7eb' : '#374151'
@@ -148,7 +170,7 @@ export function createCustomTooltip(context: TooltipContext, isAccumulated: bool
 
     // Add total value
     if (items.length > 1) {
-      innerHtml += `<div style="font-weight: 600; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid ${isDark.value ? 'rgba(75, 85, 99, 0.3)' : 'rgba(209, 213, 219, 0.3)'}; color: ${totalColor};">Total: ${totalValue.toLocaleString()}</div>`
+      innerHtml += `<div style="font-weight: 600; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid ${isDark.value ? 'rgba(75, 85, 99, 0.3)' : 'rgba(209, 213, 219, 0.3)'}; color: ${totalColor};">Total: ${formatTooltipValue(totalValue)}</div>`
     }
 
     // Add body with scrollable content (now sorted)
@@ -159,7 +181,6 @@ export function createCustomTooltip(context: TooltipContext, isAccumulated: bool
       const borderColor = typeof item.colors.borderColor === 'string' ? item.colors.borderColor : '#999'
 
       const colorIndicator = `<div style="width: 12px; height: 12px; background-color: ${bgColor}; border: 1px solid ${borderColor}; border-radius: 2px; margin-right: 8px; flex-shrink: 0;"></div>`
-      // Join multiple lines if they exist (for accumulated mode with daily + cumulative)
       const textContent = `<span style="font-size: 11px;">${item.body.join(' ')}</span>`
 
       innerHtml += `<div style="display: flex; align-items: center; margin-bottom: 4px;">${colorIndicator}${textContent}</div>`
@@ -286,15 +307,18 @@ export function createTooltipConfig(hasMultipleDatasets: boolean, isAccumulated:
           return `Total: ${context.parsed.y}`
         }
         else if (hasMultipleDatasets) {
-          // Format as "value - label" for better readability
-          return `${context.parsed.y} - ${context.dataset.label}`
+          const datasetIndex = context.datasetIndex ?? 0
+          const dataIndex = context.dataIndex ?? 0
+          const baseValue = getDatasetBaseValue(context.chart, context.dataset, datasetIndex, dataIndex, context.parsed?.y)
+          const numericValue = typeof baseValue === 'number' && Number.isFinite(baseValue) ? baseValue : 0
+          return `${formatTooltipValue(numericValue)} - ${context.dataset.label}`
         }
         // For single dataset in daily mode, use default formatting
         return undefined
       },
       afterLabel(context: ChartTooltipItem<any>) {
         // In accumulated mode, show the daily value in parentheses
-        if (isAccumulated && context.parsed.y > 0) {
+        if (isAccumulated && !hasMultipleDatasets && context.parsed.y > 0) {
           const dataIndex = context.dataIndex
           const currentValue = context.parsed.y
           const previousValue = dataIndex > 0 ? context.dataset.data[dataIndex - 1] : 0

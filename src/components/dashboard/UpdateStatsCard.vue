@@ -62,7 +62,7 @@ const organizationStore = useOrganizationStore()
 
 const totalInstalled = ref(0)
 const totalFailed = ref(0)
-const totalGet = ref(0)
+const totalRequested = ref(0)
 const lastDayEvolution = ref(0)
 const updateData = ref<(number | undefined)[]>([])
 const updateDataByApp = ref<{ [appId: string]: (number | undefined)[] }>({})
@@ -73,6 +73,12 @@ const isLoading = ref(true)
 const dashboardAppsStore = useDashboardAppsStore()
 
 // Convert undefined values to 0 for chart consumption
+function capitalize(text: string) {
+  if (!text)
+    return ''
+  return text.charAt(0).toUpperCase() + text.slice(1)
+}
+
 const chartUpdateData = computed(() => updateData.value.map(v => v ?? 0))
 const chartUpdateDataByAction = computed(() => {
   const result: { [action: string]: number[] } = {}
@@ -81,12 +87,17 @@ const chartUpdateDataByAction = computed(() => {
   })
   return result
 })
+const actionDisplayNames = computed(() => ({
+  requested: capitalize(t('get')),
+  install: capitalize(t('installed')),
+  fail: capitalize(t('failed')),
+}))
 
 async function calculateStats() {
   isLoading.value = true
   totalInstalled.value = 0
   totalFailed.value = 0
-  totalGet.value = 0
+  totalRequested.value = 0
 
   // Reset data
   updateDataByApp.value = {}
@@ -112,7 +123,7 @@ async function calculateStats() {
   updateDataByAction.value = {
     install: createUndefinedArray(30) as (number | undefined)[],
     fail: createUndefinedArray(30) as (number | undefined)[],
-    get: createUndefinedArray(30) as (number | undefined)[],
+    requested: createUndefinedArray(30) as (number | undefined)[],
   }
 
   const startDate = last30DaysStart.toISOString().split('T')[0]
@@ -155,20 +166,20 @@ async function calculateStats() {
           if (daysDiff >= 0 && daysDiff < 30) {
             const installedCount = stat.install || 0
             const failedCount = stat.fail || 0
-            const getCount = stat.get || 0
-            const totalForDay = installedCount + failedCount + getCount
+            const requestedCount = stat.get || 0
+            const totalForDay = installedCount + failedCount + requestedCount
 
             // Increment arrays for 30-day data
             incrementArrayValue(dailyCounts, daysDiff, totalForDay)
 
             totalInstalled.value += installedCount
             totalFailed.value += failedCount
-            totalGet.value += getCount
+            totalRequested.value += requestedCount
 
             // Track by action type for dashboard view
             incrementArrayValue(updateDataByAction.value.install, daysDiff, installedCount)
             incrementArrayValue(updateDataByAction.value.fail, daysDiff, failedCount)
-            incrementArrayValue(updateDataByAction.value.get, daysDiff, getCount)
+            incrementArrayValue(updateDataByAction.value.requested, daysDiff, requestedCount)
 
             // Also track by app (using total for simplicity in bar chart)
             if (updateDataByApp.value[stat.app_id]) {
@@ -199,15 +210,15 @@ async function calculateStats() {
         // Recalculate totals for billing period only
         totalInstalled.value = 0
         totalFailed.value = 0
-        totalGet.value = 0
+        totalRequested.value = 0
 
         const installData = updateDataByAction.value.install
         const failData = updateDataByAction.value.fail
-        const getData = updateDataByAction.value.get
+        const requestedData = updateDataByAction.value.requested
 
         installData.forEach(count => totalInstalled.value += count || 0)
         failData.forEach(count => totalFailed.value += count || 0)
-        getData.forEach(count => totalGet.value += count || 0)
+        requestedData.forEach(count => totalRequested.value += count || 0)
       }
       else {
         // Show all 30 days
@@ -255,9 +266,25 @@ onMounted(async () => {
 <template>
   <div class="flex flex-col bg-white border rounded-lg shadow-lg col-span-full border-slate-300 sm:col-span-6 xl:col-span-4 dark:border-slate-900 dark:bg-gray-800 h-[460px]">
     <div class="pt-4 px-4 flex items-start justify-between gap-2">
-      <h2 class="text-2xl font-semibold text-white">
-        {{ t('update_statistics') }}
-      </h2>
+      <div class="lex flex-col items-start justify-between gap-2">
+        <h2 class="text-2xl font-semibold text-white">
+          {{ t('update_statistics') }}
+        </h2>
+        <div class="flex items-center space-x-4">
+          <div class="flex items-center space-x-2">
+            <div class="w-3 h-3 rounded-full" style="background-color: hsl(210, 65%, 55%)" />
+            <span class="text-sm text-slate-600 dark:text-slate-300">{{ actionDisplayNames.requested }}: {{ totalRequested.toLocaleString() }}</span>
+          </div>
+          <div class="flex items-center space-x-2">
+            <div class="w-3 h-3 rounded-full" style="background-color: hsl(135, 55%, 50%)" />
+            <span class="text-sm text-slate-600 dark:text-slate-300">{{ actionDisplayNames.install }}: {{ totalInstalled.toLocaleString() }}</span>
+          </div>
+          <div class="flex items-center space-x-2">
+            <div class="w-3 h-3 rounded-full" style="background-color: hsl(0, 50%, 60%)" />
+            <span class="text-sm text-slate-600 dark:text-slate-300">{{ actionDisplayNames.fail }}: {{ totalFailed.toLocaleString() }}</span>
+          </div>
+        </div>
+      </div>
 
       <div class="flex flex-col items-end text-right">
         <div
@@ -271,21 +298,7 @@ onMounted(async () => {
           +0.00%
         </div>
         <div class="text-3xl font-bold text-white">
-          {{ (totalInstalled + totalFailed + totalGet).toLocaleString() }}
-        </div>
-        <div class="flex items-center space-x-4">
-          <div class="flex items-center space-x-2">
-            <div class="w-3 h-3 rounded-full" style="background-color: hsl(210, 50%, 60%)" />
-            <span class="text-sm text-slate-600 dark:text-slate-300">{{ t('installed') }}: {{ totalInstalled.toLocaleString() }}</span>
-          </div>
-          <div class="flex items-center space-x-2">
-            <div class="w-3 h-3 rounded-full" style="background-color: hsl(0, 50%, 60%)" />
-            <span class="text-sm text-slate-600 dark:text-slate-300">{{ t('failed') }}: {{ totalFailed.toLocaleString() }}</span>
-          </div>
-          <div class="flex items-center space-x-2">
-            <div class="w-3 h-3 rounded-full" style="background-color: hsl(120, 50%, 60%)" />
-            <span class="text-sm text-slate-600 dark:text-slate-300">{{ t('get') }}: {{ totalGet.toLocaleString() }}</span>
-          </div>
+          {{ (totalInstalled + totalFailed + totalRequested).toLocaleString() }}
         </div>
       </div>
     </div>
@@ -305,7 +318,7 @@ onMounted(async () => {
         :use-billing-period="useBillingPeriod"
         :accumulated="accumulated"
         :data-by-app="chartUpdateDataByAction"
-        :app-names="{ install: 'Installed', fail: 'Failed', get: 'Get' }"
+        :app-names="actionDisplayNames"
       />
     </div>
   </div>

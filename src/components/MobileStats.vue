@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ChartData, ChartOptions, TooltipOptions } from 'chart.js'
+import type { ChartData, ChartOptions } from 'chart.js'
 import { useDark } from '@vueuse/core'
 import { CategoryScale, Chart, Filler, LinearScale, LineElement, PointElement, Tooltip } from 'chart.js'
 import { computed, ref, watch } from 'vue'
@@ -228,12 +228,17 @@ const processedChartData = computed<ChartData<'line'> | null>(() => {
       : undefined
     let lastKnownBaseValue = 0
     let hasSeenValue = false
+    const tooltipBaseValues: Array<number | null> = []
     const processedData = props.accumulated
       ? paddedValues.map((value, pointIndex) => {
-        if (globalLastDataIndex < 0)
+        if (globalLastDataIndex < 0) {
+          tooltipBaseValues.push(null)
           return null
-        if (globalLastDataIndex >= 0 && pointIndex > globalLastDataIndex)
+        }
+        if (globalLastDataIndex >= 0 && pointIndex > globalLastDataIndex) {
+          tooltipBaseValues.push(null)
           return null
+        }
         if (typeof value === 'number' && Number.isFinite(value)) {
           lastKnownBaseValue = value
           hasSeenValue = true
@@ -245,6 +250,7 @@ const processedChartData = computed<ChartData<'line'> | null>(() => {
           : hasSeenValue
             ? lastKnownBaseValue
             : null
+        tooltipBaseValues.push(baseValue)
         const previousValueRaw = previousDatasetData?.[pointIndex]
         const hasPreviousValue = typeof previousValueRaw === 'number' && Number.isFinite(previousValueRaw)
         const previousValue = hasPreviousValue ? previousValueRaw : 0
@@ -259,12 +265,16 @@ const processedChartData = computed<ChartData<'line'> | null>(() => {
         return stackedValue
       })
       : paddedValues.map((val, pointIndex) => {
-        if (globalLastDataIndex >= 0 && pointIndex > globalLastDataIndex)
-          return null
-        return typeof val === 'number' && Number.isFinite(val) ? val : null
-      })
+          if (globalLastDataIndex >= 0 && pointIndex > globalLastDataIndex) {
+            tooltipBaseValues.push(null)
+            return null
+          }
+          const numericValue = typeof val === 'number' && Number.isFinite(val) ? val : null
+          tooltipBaseValues.push(numericValue)
+          return numericValue
+        })
 
-    datasets.push({
+    const chartDataset = {
       ...dataset,
       data: processedData,
       fill: props.accumulated ? (datasetIndex === 0 ? 'origin' : '-1') : false,
@@ -272,7 +282,9 @@ const processedChartData = computed<ChartData<'line'> | null>(() => {
       pointRadius: props.accumulated ? 0 : 2,
       pointBorderWidth: 0,
       borderWidth: 1,
-    })
+    } as ChartData<'line'>['datasets'][number]
+    Object.assign(chartDataset, { metaBaseValues: tooltipBaseValues })
+    datasets.push(chartDataset)
   })
 
   return {
@@ -283,37 +295,7 @@ const processedChartData = computed<ChartData<'line'> | null>(() => {
 
 const chartOptions = computed<ChartOptions<'line'>>(() => {
   const hasMultipleDatasets = (processedChartData.value?.datasets.length ?? 0) > 1
-  const tooltipOptions = createTooltipConfig(hasMultipleDatasets, props.accumulated) as TooltipOptions<'line'>
-
-  if (props.accumulated && hasMultipleDatasets) {
-    tooltipOptions.external = undefined
-    tooltipOptions.enabled = true
-    tooltipOptions.callbacks = tooltipOptions.callbacks ?? {}
-    tooltipOptions.callbacks.label = (context) => {
-      const datasetIndex = context.datasetIndex ?? 0
-      const dataIndex = context.dataIndex ?? 0
-      const currentValue = typeof context.parsed.y === 'number' ? context.parsed.y : 0
-      let previousValue = 0
-
-      if (datasetIndex > 0) {
-        const previousDataset = context.chart.data.datasets?.[datasetIndex - 1]
-        if (previousDataset && Array.isArray(previousDataset.data)) {
-          const rawValue = previousDataset.data[dataIndex] as number | null | undefined
-          if (typeof rawValue === 'number')
-            previousValue = rawValue
-        }
-      }
-
-      const rawValue = datasetIndex === 0 ? currentValue : currentValue - previousValue
-      const clampedValue = Number.isFinite(rawValue) ? Math.max(rawValue, 0) : 0
-      const formattedValue = Number.isInteger(clampedValue)
-        ? Math.trunc(clampedValue).toString()
-        : clampedValue.toFixed(1)
-
-      return `${formattedValue}% - ${context.dataset.label}`
-    }
-    tooltipOptions.callbacks.afterLabel = undefined
-  }
+  const tooltipOptions = createTooltipConfig(hasMultipleDatasets, props.accumulated)
 
   return {
     maintainAspectRatio: false,
