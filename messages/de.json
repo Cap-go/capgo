@@ -504,6 +504,7 @@
   "no-deploy-history": "Es wurde keine Bereitstellungshistorie für diesen Kanal gefunden.",
   "no-permission": "Unzureichende Berechtigungen",
   "no-permission-ask-super-admin": "ungenügende Berechtigung, bitte bitten Sie einen Super-Admin, dieses Paket unsicher zu löschen",
+  "no-public-channel": "Die App hat keinen öffentlichen Kanal, wir können die Bereitstellung ohne diesen nicht zählen.",
   "no-results": "Keine Ergebnisse gefunden",
   "no-super-admin-organizations": "Keine Super_Admin-Organisationen gefunden",
   "no-versions-found": "Kein Paket gefunden",

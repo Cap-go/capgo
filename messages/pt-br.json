@@ -504,6 +504,7 @@
   "no-deploy-history": "Nenhum histórico de implantação encontrado para este canal",
   "no-permission": "Permissões insuficientes",
   "no-permission-ask-super-admin": "permissão insuficiente, por favor peça a um super administrador para excluir este pacote de forma insegura",
+  "no-public-channel": "O aplicativo não tem canal público, não podemos contar a implantação sem ele.",
   "no-results": "Nenhum resultado encontrado",
   "no-super-admin-organizations": "Nenhuma organização super_admin encontrada",
   "no-versions-found": "Nenhum pacote encontrado",

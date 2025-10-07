@@ -504,6 +504,7 @@
   "no-deploy-history": "Bu kanal için hiçbir dağıtım geçmişi bulunamadı",
   "no-permission": "Yetersiz izinler",
   "no-permission-ask-super-admin": "yetersiz izin, lütfen bu paketi güvensiz bir şekilde silmek için bir süper yöneticiye başvurun",
+  "no-public-channel": "Uygulamanın herhangi bir halka açık kanalı yok, onun olmadan dağıtımı sayamayız.",
   "no-results": "Sonuç bulunamadı",
   "no-super-admin-organizations": "Hiçbir süper_yönetici organizasyonu bulunamadı",
   "no-versions-found": "Paket bulunamadı",

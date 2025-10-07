@@ -504,6 +504,7 @@
   "no-deploy-history": "Aucun historique de déploiement trouvé pour cette chaîne",
   "no-permission": "Autorisations insuffisantes",
   "no-permission-ask-super-admin": "autorisation insuffisante, veuillez demander à un super administrateur de supprimer ce paquet de manière non sécurisée",
+  "no-public-channel": "L'application n'a pas de canal public, nous ne pouvons pas compter le déploiement sans cela",
   "no-results": "Aucun résultat trouvé",
   "no-super-admin-organizations": "Aucune organisation super_admin trouvée",
   "no-versions-found": "Aucun bundle trouvé",

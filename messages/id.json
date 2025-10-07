@@ -504,6 +504,7 @@
   "no-deploy-history": "Tidak ada riwayat penyebaran yang ditemukan untuk saluran ini",
   "no-permission": "Izin tidak cukup",
   "no-permission-ask-super-admin": "izin tidak cukup, silakan minta super admin untuk menghapus bundel ini secara tidak aman",
+  "no-public-channel": "Aplikasi ini tidak memiliki saluran publik, kami tidak dapat menghitung penyebaran tanpa itu",
   "no-results": "Tidak ada hasil yang ditemukan",
   "no-super-admin-organizations": "Tidak ada organisasi super_admin yang ditemukan",
   "no-versions-found": "Tidak ada bundel yang ditemukan",

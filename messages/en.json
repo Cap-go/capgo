@@ -504,6 +504,7 @@
   "no-deploy-history": "No deployment history found for this channel",
   "no-permission": "Insufficient permissions",
   "no-permission-ask-super-admin": "insufficient permission, please ask a super admin to delete this bundle unsafely",
+  "no-public-channel": "The app as no public channel, we cannot count deployment without it",
   "no-results": "No results found",
   "no-super-admin-organizations": "No super_admin organizations found",
   "no-versions-found": "No bundle found",

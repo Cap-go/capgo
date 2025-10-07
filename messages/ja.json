@@ -504,6 +504,7 @@
   "no-deploy-history": "このチャンネルのデプロイ履歴が見つかりませんでした",
   "no-permission": "権限が不足しています",
   "no-permission-ask-super-admin": "権限が不足しています、このバンドルを安全でない方法で削除するにはスーパー管理者に依頼してください。",
+  "no-public-channel": "アプリには公開チャンネルがなく、それなしではデプロイメントを数えることはできません",
   "no-results": "結果は見つかりませんでした",
   "no-super-admin-organizations": "スーパー管理者の組織が見つかりませんでした",
   "no-versions-found": "バンドルが見つかりません",

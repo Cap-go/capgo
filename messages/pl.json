@@ -504,6 +504,7 @@
   "no-deploy-history": "Nie znaleziono historii wdrożeń dla tego kanału",
   "no-permission": "Niewystarczające uprawnienia",
   "no-permission-ask-super-admin": "niewystarczające uprawnienia, poproś super administratora o niebezpieczne usunięcie tego pakietu",
+  "no-public-channel": "Aplikacja nie ma publicznego kanału, nie możemy liczyć wdrożeń bez niego.",
   "no-results": "Nie znaleziono żadnych wyników",
   "no-super-admin-organizations": "Nie znaleziono organizacji super_admina",
   "no-versions-found": "Nie znaleziono pakietu",

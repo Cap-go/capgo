@@ -504,6 +504,7 @@
   "no-deploy-history": "No se encontró historial de despliegue para este canal",
   "no-permission": "Permisos insuficientes",
   "no-permission-ask-super-admin": "permiso insuficiente, por favor pide a un super administrador que elimine este paquete de manera insegura",
+  "no-public-channel": "La aplicación no tiene un canal público, no podemos contar la implementación sin él.",
   "no-results": "No se encontraron resultados",
   "no-super-admin-organizations": "No se encontraron organizaciones de super_admin",
   "no-versions-found": "No se encontró ningún paquete",

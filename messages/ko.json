@@ -504,6 +504,7 @@
   "no-deploy-history": "이 채널에 대한 배포 이력이 없습니다.",
   "no-permission": "권한이 부족합니다",
   "no-permission-ask-super-admin": "권한이 부족하므로, 이 번들을 안전하지 않게 삭제하도록 슈퍼 관리자에게 요청하십시오.",
+  "no-public-channel": "이 앱은 공개 채널이 없으므로, 이를 통하지 않고 배포를 계산할 수 없습니다.",
   "no-results": "결과가 없습니다",
   "no-super-admin-organizations": "슈퍼_어드민 조직을 찾을 수 없습니다",
   "no-versions-found": "번들을 찾을 수 없습니다",

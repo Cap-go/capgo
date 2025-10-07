@@ -504,6 +504,7 @@
   "no-deploy-history": "Non è stata trovata alcuna cronologia di distribuzione per questo canale",
   "no-permission": "Permessi insufficienti",
   "no-permission-ask-super-admin": "permesso insufficiente, si prega di chiedere a un super amministratore di eliminare questo pacchetto in modo non sicuro",
+  "no-public-channel": "L'app non ha un canale pubblico, non possiamo contare il dispiegamento senza di esso.",
   "no-results": "Nessun risultato trovato",
   "no-super-admin-organizations": "Nessuna organizzazione super_admin trovata",
   "no-versions-found": "Nessun pacchetto trovato",

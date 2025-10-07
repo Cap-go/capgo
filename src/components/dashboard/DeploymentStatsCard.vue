@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import colors from 'tailwindcss/colors'
-import { onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import DeploymentStatsChart from '~/components/DeploymentStatsChart.vue'
 import { useSupabase } from '~/services/supabase'
@@ -73,6 +73,8 @@ const deploymentData = ref<number[]>([])
 const deploymentDataByApp = ref<{ [appId: string]: number[] }>({})
 const appNames = ref<{ [appId: string]: string }>({})
 const isLoading = ref(true)
+const noPublicChannel = ref(false)
+const hasData = computed(() => totalDeployments.value > 0)
 
 async function calculateStats() {
   const requestToken = ++latestRequestToken
@@ -87,6 +89,7 @@ async function calculateStats() {
   deploymentDataByApp.value = {}
   appNames.value = {}
   deploymentData.value = []
+  noPublicChannel.value = false
 
   try {
     await organizationStore.dedupFetchOrganizations()
@@ -150,6 +153,7 @@ async function calculateStats() {
         deploymentData.value = fallbackData
         deploymentDataByApp.value = {}
         appNames.value = { ...localAppNames }
+        noPublicChannel.value = false
       }
       return
     }
@@ -161,20 +165,37 @@ async function calculateStats() {
 
     const dailyCounts30Days = Array.from({ length: 30 }).fill(0) as number[]
     let totalDeploymentsCount = 0
+    let noPublicChannelDetected = false
+
+    if (targetAppIds.length > 0) {
+      try {
+        const { data: publicChannels } = await supabase
+          .from('channels')
+          .select('app_id')
+          .in('app_id', targetAppIds)
+          .eq('public', true)
+        const hasPublic = (publicChannels?.length ?? 0) > 0
+        noPublicChannelDetected = !hasPublic
+        console.log(`public channel check`, { targetAppIds, hasPublic })
+      }
+      catch (error) {
+        console.error(`failed to verify public channels`, error)
+      }
+    }
 
     const { data, error } = await supabase
       .from('deploy_history')
       .select(`
         deployed_at,
         app_id,
-        channels!inner(
+        channels(
           public
         )
       `)
+      .eq('channels.public', true)
       .in('app_id', targetAppIds)
       .gte('deployed_at', startDate)
       .lte('deployed_at', endDate)
-      .eq('channels.public', true)
       .order('deployed_at')
 
     if (error)
@@ -235,6 +256,7 @@ async function calculateStats() {
     appNames.value = { ...localAppNames }
     totalDeployments.value = finalTotal
     lastDayEvolution.value = evolution
+    noPublicChannel.value = noPublicChannelDetected
   }
   catch (error) {
     console.error('Error fetching deployment stats:', error)
@@ -244,6 +266,7 @@ async function calculateStats() {
       appNames.value = {}
       totalDeployments.value = 0
       lastDayEvolution.value = 0
+      noPublicChannel.value = false
     }
   }
   finally {
@@ -301,6 +324,18 @@ onMounted(async () => {
     <div class="w-full h-full p-6 pt-2">
       <div v-if="isLoading" class="flex items-center justify-center h-full">
         <div class="loading loading-spinner loading-lg text-blue-500" />
+      </div>
+      <div
+        v-else-if="noPublicChannel"
+        class="flex h-full items-center justify-center text-sm text-slate-500 dark:text-slate-300 text-center px-4"
+      >
+        {{ t('no-public-channel') }}
+      </div>
+      <div
+        v-else-if="!hasData"
+        class="flex h-full items-center justify-center text-sm text-slate-500 dark:text-slate-300"
+      >
+        {{ t('no-data') }}
       </div>
       <DeploymentStatsChart
         v-else
