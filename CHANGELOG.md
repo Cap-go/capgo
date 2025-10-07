@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.34.42 (2025-10-07)
+
+
+### Bug Fixes
+
+* add missing size ([628b87f](https://github.com/Cap-go/capgo/commit/628b87fa83e2746aaede0be2002f2fcd8ea9ffb8))
+
 ### 12.34.41 (2025-10-07)
 
 ### 12.34.40 (2025-10-07)
