@@ -11,6 +11,7 @@ import { ALLOWED_HEADERS, ALLOWED_METHODS, EXPOSED_HEADERS, toBase64 } from '../
 import { simpleError } from '../utils/hono.ts'
 import { middlewareKey } from '../utils/hono_middleware.ts'
 import { cloudlog } from '../utils/loggin.ts'
+import { createStatsBandwidth } from '../utils/stats.ts'
 import { hasAppRightApikey, supabaseAdmin } from '../utils/supabase.ts'
 import { backgroundTask } from '../utils/utils.ts'
 import { app as download_link } from './download_link.ts'
@@ -50,14 +51,6 @@ async function getHandler(c: Context): Promise<Response> {
   cacheUrl.searchParams.set('range', c.req.header('range') || '')
   const cacheKey = new Request(cacheUrl, c.req)
   let response = await cache.match(cacheKey)
-  // TODO: test making stats from files insead of updates
-  // await backgroundTask(c, async () => {
-  //   const r2Path = new URL(c.req.url).pathname.split(`/files/read/${ATTACHMENT_PREFIX}/`)[1]
-  //   const app_id = r2Path?.split('/')[3] || ''
-  //   const device_id = c.req.query('device_id') || ''
-  //   const size = await s3.getSize(c, r2Path)
-  //   await createStatsBandwidth(c, device_id, app_id, size ?? 0)
-  // })
   if (response != null) {
     cloudlog({ requestId: c.get('requestId'), message: 'getHandler files cache hit' })
     return response
@@ -71,6 +64,17 @@ async function getHandler(c: Context): Promise<Response> {
       return c.json({ error: 'not_found', message: 'Not found' }, 404)
     }
     const fileSize = objectInfo.size
+    await backgroundTask(c, async () => {
+      const r2Path = new URL(c.req.url).pathname.split(`/files/read/${ATTACHMENT_PREFIX}/`)[1]
+      const app_id = r2Path?.split('/')[3]
+      const device_id = c.req.query('device_id')
+      if (app_id && device_id) {
+        await createStatsBandwidth(c, device_id, app_id, fileSize ?? 0)
+      }
+      else {
+        cloudlog({ requestId: c.get('requestId'), message: 'getHandler files cannot track bandwidth no app_id or device_id', r2Path, app_id, device_id })
+      }
+    })
     const rangeMatch = rangeHeaderFromRequest.match(/bytes=(\d+)-(\d*)/)
     if (rangeMatch) {
       const rangeStart = Number.parseInt(rangeMatch[1])
@@ -242,13 +246,13 @@ async function checkWriteAppAccess(c: Context, next: Next) {
   await next()
 }
 
-app.options(`/upload/${ATTACHMENT_PREFIX}`, optionsHandler as any)
-app.post(`/upload/${ATTACHMENT_PREFIX}`, middlewareKey(['all', 'write', 'upload']), setKeyFromMetadata as any, checkWriteAppAccess as any, uploadHandler as any)
+app.options(`/upload/${ATTACHMENT_PREFIX}`, optionsHandler)
+app.post(`/upload/${ATTACHMENT_PREFIX}`, middlewareKey(['all', 'write', 'upload']), setKeyFromMetadata, checkWriteAppAccess, uploadHandler)
 
-app.options(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, optionsHandler as any)
-app.get(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, middlewareKey(['all', 'write', 'upload']), setKeyFromIdParam as any, checkWriteAppAccess as any, getHandler as any)
-app.get(`/read/${ATTACHMENT_PREFIX}/:id{.+}`, setKeyFromIdParam as any, getHandler as any)
-app.patch(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, middlewareKey(['all', 'write', 'upload']), setKeyFromIdParam as any, checkWriteAppAccess as any, uploadHandler as any)
+app.options(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, optionsHandler)
+app.get(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, middlewareKey(['all', 'write', 'upload']), setKeyFromIdParam, checkWriteAppAccess, getHandler)
+app.get(`/read/${ATTACHMENT_PREFIX}/:id{.+}`, setKeyFromIdParam, getHandler)
+app.patch(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, middlewareKey(['all', 'write', 'upload']), setKeyFromIdParam, checkWriteAppAccess, uploadHandler)
 
 app.route('/config', files_config)
 app.route('/download_link', download_link)

@@ -324,10 +324,12 @@ export async function updateWithPG(
       if (url) {
         // only count the size of the bundle if it's not external and zip for now
         signedURL = url
-        await backgroundTask(c, async () => {
-          const size = await s3.getSize(c, version.r2_path)
-          await createStatsBandwidth(c, device_id, app_id, size ?? 0)
-        })
+        if (getRuntimeKey() !== 'workerd') {
+          await backgroundTask(c, async () => {
+            const size = await s3.getSize(c, version.r2_path)
+            await createStatsBandwidth(c, device_id, app_id, size ?? 0)
+          })
+        }
       }
     }
     manifest = getManifestUrl(c, version.id, manifestEntries, device_id)
