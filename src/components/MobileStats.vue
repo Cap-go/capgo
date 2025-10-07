@@ -195,10 +195,8 @@ const processedChartData = computed<ChartData<'line'> | null>(() => {
     return null
 
   const targetLength = Math.max(totalDays.value, rawChartData.value.labels.length)
-  const formattedLabels = generateDayLabels(targetLength)
-  const datasets: ChartData<'line'>['datasets'] = []
-
-  rawChartData.value.datasets.forEach((dataset, datasetIndex) => {
+  let globalLastDataIndex = -1
+  const normalizedDatasets = rawChartData.value.datasets.map((dataset) => {
     const rawValues = dataset.data ?? []
     const normalizedValues = rawValues.map((value) => {
       if (typeof value === 'number')
@@ -208,28 +206,63 @@ const processedChartData = computed<ChartData<'line'> | null>(() => {
       const parsed = Number(value)
       return Number.isNaN(parsed) ? undefined : parsed
     })
+
+    for (let index = normalizedValues.length - 1; index >= 0; index--) {
+      const candidate = normalizedValues[index]
+      if (typeof candidate === 'number' && Number.isFinite(candidate)) {
+        globalLastDataIndex = Math.max(globalLastDataIndex, index)
+        break
+      }
+    }
+
+    return { dataset, normalizedValues }
+  })
+  const formattedLabels = generateDayLabels(targetLength)
+  const datasets: ChartData<'line'>['datasets'] = []
+
+  normalizedDatasets.forEach(({ dataset, normalizedValues }, datasetIndex) => {
     const paddedValues = Array.from({ length: targetLength }, (_val, index) => normalizedValues[index])
     const previousDataset = datasetIndex > 0 ? datasets[datasetIndex - 1] : null
     const previousDatasetData = previousDataset && Array.isArray(previousDataset.data)
       ? previousDataset.data as Array<number | null | undefined>
       : undefined
     let lastKnownBaseValue = 0
+    let hasSeenValue = false
     const processedData = props.accumulated
       ? paddedValues.map((value, pointIndex) => {
-        if (typeof value === 'number')
+        if (globalLastDataIndex < 0)
+          return null
+        if (globalLastDataIndex >= 0 && pointIndex > globalLastDataIndex)
+          return null
+        if (typeof value === 'number' && Number.isFinite(value)) {
           lastKnownBaseValue = value
+          hasSeenValue = true
+        }
 
-        const baseValue = typeof value === 'number' ? value : lastKnownBaseValue
+        const hasValidValue = typeof value === 'number' && Number.isFinite(value)
+        const baseValue = hasValidValue
+          ? value
+          : hasSeenValue
+            ? lastKnownBaseValue
+            : null
         const previousValueRaw = previousDatasetData?.[pointIndex]
-        const previousValue = typeof previousValueRaw === 'number' ? previousValueRaw : 0
+        const hasPreviousValue = typeof previousValueRaw === 'number' && Number.isFinite(previousValueRaw)
+        const previousValue = hasPreviousValue ? previousValueRaw : 0
+        if (baseValue === null)
+          return null
+
         const stackedValue = datasetIndex === 0 ? baseValue : baseValue + previousValue
 
         if (!Number.isFinite(stackedValue))
-          return previousValue
+          return datasetIndex > 0 && hasPreviousValue ? previousValue : null
 
         return stackedValue
       })
-      : paddedValues.map(val => (typeof val === 'number' ? val : null))
+      : paddedValues.map((val, pointIndex) => {
+        if (globalLastDataIndex >= 0 && pointIndex > globalLastDataIndex)
+          return null
+        return typeof val === 'number' && Number.isFinite(val) ? val : null
+      })
 
     datasets.push({
       ...dataset,
