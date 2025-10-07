@@ -231,39 +231,39 @@ const processedChartData = computed<ChartData<'line'> | null>(() => {
     const tooltipBaseValues: Array<number | null> = []
     const processedData = props.accumulated
       ? paddedValues.map((value, pointIndex) => {
-        if (globalLastDataIndex < 0) {
-          tooltipBaseValues.push(null)
-          return null
-        }
-        if (globalLastDataIndex >= 0 && pointIndex > globalLastDataIndex) {
-          tooltipBaseValues.push(null)
-          return null
-        }
-        if (typeof value === 'number' && Number.isFinite(value)) {
-          lastKnownBaseValue = value
-          hasSeenValue = true
-        }
+          if (globalLastDataIndex < 0) {
+            tooltipBaseValues.push(null)
+            return null
+          }
+          if (globalLastDataIndex >= 0 && pointIndex > globalLastDataIndex) {
+            tooltipBaseValues.push(null)
+            return null
+          }
+          if (typeof value === 'number' && Number.isFinite(value)) {
+            lastKnownBaseValue = value
+            hasSeenValue = true
+          }
 
-        const hasValidValue = typeof value === 'number' && Number.isFinite(value)
-        const baseValue = hasValidValue
-          ? value
-          : hasSeenValue
-            ? lastKnownBaseValue
-            : null
-        tooltipBaseValues.push(baseValue)
-        const previousValueRaw = previousDatasetData?.[pointIndex]
-        const hasPreviousValue = typeof previousValueRaw === 'number' && Number.isFinite(previousValueRaw)
-        const previousValue = hasPreviousValue ? previousValueRaw : 0
-        if (baseValue === null)
-          return null
+          const hasValidValue = typeof value === 'number' && Number.isFinite(value)
+          const baseValue = hasValidValue
+            ? value
+            : hasSeenValue
+              ? lastKnownBaseValue
+              : null
+          tooltipBaseValues.push(baseValue)
+          const previousValueRaw = previousDatasetData?.[pointIndex]
+          const hasPreviousValue = typeof previousValueRaw === 'number' && Number.isFinite(previousValueRaw)
+          const previousValue = hasPreviousValue ? previousValueRaw : 0
+          if (baseValue === null)
+            return null
 
-        const stackedValue = datasetIndex === 0 ? baseValue : baseValue + previousValue
+          const stackedValue = datasetIndex === 0 ? baseValue : baseValue + previousValue
 
-        if (!Number.isFinite(stackedValue))
-          return datasetIndex > 0 && hasPreviousValue ? previousValue : null
+          if (!Number.isFinite(stackedValue))
+            return datasetIndex > 0 && hasPreviousValue ? previousValue : null
 
-        return stackedValue
-      })
+          return stackedValue
+        })
       : paddedValues.map((val, pointIndex) => {
           if (globalLastDataIndex >= 0 && pointIndex > globalLastDataIndex) {
             tooltipBaseValues.push(null)
