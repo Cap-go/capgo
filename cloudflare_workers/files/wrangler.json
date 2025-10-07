@@ -50,6 +50,12 @@
       "preview_bucket_name": "capgo"
     }
   ],
+  "analytics_engine_datasets": [
+    {
+      "binding": "BANDWIDTH_USAGE",
+      "dataset": "bandwidth_usage"
+    }
+  ],
   "durable_objects": {
     "bindings": [
       {
@@ -99,6 +105,12 @@
           "zone_name": "capgo.app"
         }
       ],
+      "analytics_engine_datasets": [
+        {
+          "binding": "BANDWIDTH_USAGE",
+          "dataset": "bandwidth_usage"
+        }
+      ],
       "durable_objects": {
         "bindings": [
           {
@@ -136,6 +148,12 @@
         {
           "pattern": "api-alpha.capgo.app/private/download_link",
           "zone_name": "capgo.app"
+        }
+      ],
+      "analytics_engine_datasets": [
+        {
+          "binding": "BANDWIDTH_USAGE",
+          "dataset": "bandwidth_usage"
         }
       ],
       "durable_objects": {

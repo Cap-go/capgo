@@ -348,10 +348,10 @@ export async function updateWithPG(
   }
   // cloudlog(c.get('requestId'), 'save stats', device_id)
   device.version_name = version.name
-  await backgroundTask(c, Promise.all([
+  await Promise.all([
     createStatsVersion(c, version.id, app_id, 'get'),
     sendStatsAndDevice(c, device, [{ action: 'get', versionName: version.name }]),
-  ]))
+  ])
   cloudlog({ requestId: c.get('requestId'), message: 'New version available', app_id, version: version.name, signedURL, date: new Date().toISOString() })
   const res = resToVersion(plugin_version, signedURL, version as any, manifest)
   if (!res.url && !res.manifest) {

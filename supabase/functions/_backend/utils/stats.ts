@@ -26,24 +26,25 @@ export async function opnPremStats(c: Context, app_id: string, action: string, d
   if (action === 'get')
     await updateStoreApp(c, app_id, 1)
   // save stats of unknow sources in our analytic DB
-  await backgroundTask(c, createStatsLogsExternal(c, device.app_id, device.device_id, 'get', device.version_name))
+  await createStatsLogsExternal(c, device.app_id, device.device_id, 'get', device.version_name)
   cloudlog({ requestId: c.get('requestId'), message: 'App is external', app_id: device.app_id, country: (c.req.raw as any)?.cf?.country })
   return simpleError200(c, 'app_not_found', 'App not found')
 }
 
 export function createStatsBandwidth(c: Context, device_id: string, app_id: string, file_size: number) {
   const lowerDeviceId = device_id
+  cloudlog({ requestId: c.get('requestId'), message: 'createStatsBandwidth', device_id: lowerDeviceId, app_id, file_size })
   if (file_size === 0)
     return
   if (!c.env.BANDWIDTH_USAGE)
-    return trackBandwidthUsageSB(c, lowerDeviceId, app_id, file_size)
+    return backgroundTask(c, trackBandwidthUsageSB(c, lowerDeviceId, app_id, file_size))
   return trackBandwidthUsageCF(c, lowerDeviceId, app_id, file_size)
 }
 
 export type VersionAction = 'get' | 'fail' | 'install' | 'uninstall'
 export function createStatsVersion(c: Context, version_id: number, app_id: string, action: VersionAction) {
   if (!c.env.VERSION_USAGE)
-    return trackVersionUsageSB(c, version_id, app_id, action)
+    return backgroundTask(c, trackVersionUsageSB(c, version_id, app_id, action))
   return trackVersionUsageCF(c, version_id, app_id, action)
 }
 
@@ -52,7 +53,7 @@ export function createStatsLogsExternal(c: Context, app_id: string, device_id: s
   const finalVersionName = versionName && versionName !== '' ? versionName : 'unknown'
   // This is super important until every device get the version of plugin 6.2.5
   if (!c.env.APP_LOG_EXTERNAL)
-    return trackLogsSB(c, app_id, lowerDeviceId, action, finalVersionName)
+    return backgroundTask(c, trackLogsSB(c, app_id, lowerDeviceId, action, finalVersionName))
   return trackLogsCFExternal(c, app_id, lowerDeviceId, action, finalVersionName)
 }
 
@@ -61,14 +62,25 @@ export function createStatsLogs(c: Context, app_id: string, device_id: string, a
   const finalVersionName = versionName && versionName !== '' ? versionName : 'unknown'
   // This is super important until every device get the version of plugin 6.2.5
   if (!c.env.APP_LOG)
-    return trackLogsSB(c, app_id, lowerDeviceId, action, finalVersionName)
+    return backgroundTask(c, trackLogsSB(c, app_id, lowerDeviceId, action, finalVersionName))
   return trackLogsCF(c, app_id, lowerDeviceId, action, finalVersionName)
 }
 
 export function createStatsDevices(c: Context, device: DeviceWithoutCreatedAt) {
   if (!c.env.DB_DEVICES)
-    return trackDevicesSB(c, device)
+    return backgroundTask(c, trackDevicesSB(c, device))
   return trackDevicesCF(c, device)
+}
+
+export function sendStatsAndDevice(c: Context, device: DeviceWithoutCreatedAt, statsActions: StatsActions[]) {
+  const jobs = []
+  statsActions.forEach(({ action, versionName }) => {
+    jobs.push(createStatsLogs(c, device.app_id, device.device_id, action, versionName ?? device.version_name))
+  })
+
+  jobs.push(createStatsDevices(c, device))
+
+  return Promise.all(jobs)
 }
 
 export function createStatsMeta(c: Context, app_id: string, version_id: number, size: number) {
@@ -117,20 +129,6 @@ export function readDevices(c: Context, params: ReadDevicesParams, customIdMode:
   if (!c.env.DB_DEVICES)
     return readDevicesSB(c, params, customIdMode)
   return readDevicesCF(c, params, customIdMode)
-}
-
-export function sendStatsAndDevice(c: Context, device: DeviceWithoutCreatedAt, statsActions: StatsActions[]) {
-  const jobs = []
-  statsActions.forEach(({ action, versionName }) => {
-    jobs.push(createStatsLogs(c, device.app_id, device.device_id, action, versionName ?? device.version_name))
-  })
-
-  jobs.push(createStatsDevices(c, device))
-
-  return backgroundTask(c, Promise.all(jobs)
-    .catch((error) => {
-      cloudlog({ requestId: c.get('requestId'), message: '[sendStatsAndDevice] rejected with error', error })
-    }))
 }
 
 export async function countAllApps(c: Context): Promise<number> {

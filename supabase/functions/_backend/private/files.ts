@@ -24,10 +24,28 @@ const ATTACHMENT_PREFIX = 'attachments'
 
 export const app = new Hono<MiddlewareKeyVariables>()
 
+async function saveBandwidthUsage(c: Context, fileSize: number | null | undefined) {
+  cloudlog({ requestId: c.get('requestId'), message: 'saveBandwidthUsage', fileSize })
+  if (!fileSize || fileSize <= 0)
+    return Promise.resolve()
+
+  cloudlog({ requestId: c.get('requestId'), message: 'getHandler files track bandwidth', fileSize })
+  const r2Path = new URL(c.req.url).pathname.split(`/files/read/${ATTACHMENT_PREFIX}/`)[1]
+  const app_id = r2Path?.split('/')[3]
+  const device_id = c.req.query('device_id')
+  if (app_id && device_id) {
+    await createStatsBandwidth(c, device_id, app_id, fileSize ?? 0)
+  }
+  else {
+    cloudlog({ requestId: c.get('requestId'), message: 'getHandler files cannot track bandwidth no app_id or device_id', r2Path, app_id, device_id })
+  }
+}
+
 async function getHandler(c: Context): Promise<Response> {
   const requestId = c.get('fileId')
-  // cloudlog('fileId', requestId)
+  cloudlog({ requestId: c.get('requestId'), message: 'getHandler files', fileId: requestId })
   if (getRuntimeKey() !== 'workerd') {
+    cloudlog({ requestId: c.get('requestId'), message: 'getHandler files using supabase storage' })
     // serve file from supabase storage using they sdk
     const { data } = supabaseAdmin(c).storage.from('capgo').getPublicUrl(requestId)
 
@@ -58,23 +76,14 @@ async function getHandler(c: Context): Promise<Response> {
 
   const rangeHeaderFromRequest = c.req.header('range')
   if (rangeHeaderFromRequest) {
+    cloudlog({ requestId: c.get('requestId'), message: 'getHandler files range request', range: rangeHeaderFromRequest })
     const objectInfo = await new RetryBucket(bucket, DEFAULT_RETRY_PARAMS).head(requestId)
     if (objectInfo == null) {
       cloudlog({ requestId: c.get('requestId'), message: 'getHandler files object is null' })
       return c.json({ error: 'not_found', message: 'Not found' }, 404)
     }
     const fileSize = objectInfo.size
-    await backgroundTask(c, async () => {
-      const r2Path = new URL(c.req.url).pathname.split(`/files/read/${ATTACHMENT_PREFIX}/`)[1]
-      const app_id = r2Path?.split('/')[3]
-      const device_id = c.req.query('device_id')
-      if (app_id && device_id) {
-        await createStatsBandwidth(c, device_id, app_id, fileSize ?? 0)
-      }
-      else {
-        cloudlog({ requestId: c.get('requestId'), message: 'getHandler files cannot track bandwidth no app_id or device_id', r2Path, app_id, device_id })
-      }
-    })
+    await saveBandwidthUsage(c, fileSize)
     const rangeMatch = rangeHeaderFromRequest.match(/bytes=(\d+)-(\d*)/)
     if (rangeMatch) {
       const rangeStart = Number.parseInt(rangeMatch[1])
@@ -94,30 +103,21 @@ async function getHandler(c: Context): Promise<Response> {
     cloudlog({ requestId: c.get('requestId'), message: 'getHandler files object is null' })
     return c.json({ error: 'not_found', message: 'Not found' }, 404)
   }
-  await backgroundTask(c, async () => {
-    const fileSize = object.size
-    const r2Path = new URL(c.req.url).pathname.split(`/files/read/${ATTACHMENT_PREFIX}/`)[1]
-    const app_id = r2Path?.split('/')[3]
-    const device_id = c.req.query('device_id')
-    if (app_id && device_id) {
-      await createStatsBandwidth(c, device_id, app_id, fileSize ?? 0)
-    }
-    else {
-      cloudlog({ requestId: c.get('requestId'), message: 'getHandler files cannot track bandwidth no app_id or device_id', r2Path, app_id, device_id })
-    }
-  })
+  await saveBandwidthUsage(c, object.size)
   const headers = objectHeaders(object)
   if (object.range != null && c.req.header('range')) {
+    cloudlog({ requestId: c.get('requestId'), message: 'getHandler files range request', range: rangeHeader(object.size, object.range) })
     headers.set('content-range', rangeHeader(object.size, object.range))
     response = new Response(object.body, { headers, status: 206 })
     return response
   }
-  else {
-    headers.set('Content-Disposition', `attachment; filename="${object.key}"`)
-    response = new Response(object.body, { headers })
-    await backgroundTask(c, cache.put(cacheKey, response.clone()))
-    return response
-  }
+  headers.set('Content-Disposition', `attachment; filename="${object.key}"`)
+  response = new Response(object.body, { headers })
+  await backgroundTask(c, () => {
+    cloudlog({ requestId: c.get('requestId'), message: 'getHandler files cache saved', fileId: requestId })
+    cache.put(cacheKey, response.clone())
+  })
+  return response
 }
 
 function objectHeaders(object: R2Object): Headers {
