@@ -37,6 +37,8 @@ const cycleEnd = new Date(organizationStore.currentOrganization?.subscription_en
 cycleStart.setHours(0, 0, 0, 0)
 cycleEnd.setHours(0, 0, 0, 0)
 
+const DAY_IN_MS = 1000 * 60 * 60 * 24
+
 Chart.register(
   Tooltip,
   BarController,
@@ -58,6 +60,46 @@ function getDayNumbers(startDate: Date, endDate: Date) {
   return dayNumbers
 }
 
+function getTodayLimit(labelCount: number) {
+  if (!props.useBillingPeriod)
+    return labelCount - 1
+
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const diff = Math.floor((today.getTime() - cycleStart.getTime()) / DAY_IN_MS)
+
+  if (Number.isNaN(diff) || diff < 0)
+    return -1
+
+  return Math.min(diff, labelCount - 1)
+}
+
+function transformSeries(source: number[], accumulated: boolean, labelCount: number) {
+  const display: Array<number | null> = Array.from({ length: labelCount }).fill(null) as Array<number | null>
+  const base: Array<number | null> = Array.from({ length: labelCount }).fill(null) as Array<number | null>
+  const limitIndex = getTodayLimit(labelCount)
+
+  if (limitIndex < 0)
+    return { display, base }
+
+  let runningTotal = 0
+  for (let index = 0; index <= limitIndex; index++) {
+    const hasValue = index < source.length && typeof source[index] === 'number' && Number.isFinite(source[index])
+    const numericValue = hasValue ? source[index] as number : 0
+
+    base[index] = numericValue
+    if (accumulated) {
+      runningTotal += numericValue
+      display[index] = runningTotal
+    }
+    else {
+      display[index] = numericValue
+    }
+  }
+
+  return { display, base }
+}
+
 function monthdays() {
   if (!props.useBillingPeriod) {
     // Last 30 days mode - generate actual dates
@@ -73,15 +115,6 @@ function monthdays() {
 
   // Billing period mode - use existing logic
   return getDayNumbers(cycleStart, cycleEnd)
-}
-
-// Helper function to accumulate data
-function accumulateData(data: number[]): number[] {
-  return data.reduce((acc: number[], val: number) => {
-    const last = acc[acc.length - 1] ?? 0
-    const newVal = last + (val ?? 0)
-    return acc.concat([newVal])
-  }, [])
 }
 
 // Generate infinite distinct pastel colors starting with blue
@@ -106,33 +139,36 @@ function generateAppColors(appCount: number) {
 
 const chartData = computed<ChartData<any>>(() => {
   const appIds = Object.keys(props.dataByApp)
+  const labels = monthdays()
+  const labelCount = labels.length
 
   if (appIds.length === 0) {
     // Single app view - show total deployments
     let backgroundColor: string
     let borderColor: string
-    let processedData: number[]
+    let processed: { display: Array<number | null>, base: Array<number | null> }
 
     // Process data for cumulative mode
     if (props.accumulated) {
-      processedData = accumulateData(props.data as number[])
+      processed = transformSeries(props.data as number[], true, labelCount)
       // Use LineChartStats color scheme for line mode
       borderColor = `hsl(210, 65%, 45%)`
       backgroundColor = `hsla(210, 50%, 60%, 0.6)`
     }
     else {
-      processedData = props.data as number[]
+      processed = transformSeries(props.data as number[], false, labelCount)
       // Use existing bar chart colors for bar mode
       backgroundColor = 'hsla(210, 50%, 70%, 0.8)'
       borderColor = 'hsl(210, 50%, 55%)'
     }
 
-    const baseDataset = {
+    const baseDataset: any = {
       label: 'Deployments',
-      data: processedData,
+      data: processed.display,
       backgroundColor,
       borderColor,
       borderWidth: 1,
+      metaBaseValues: processed.base,
     }
 
     // Add line-specific properties for accumulated mode (match UsageCard styling)
@@ -146,9 +182,8 @@ const chartData = computed<ChartData<any>>(() => {
           borderWidth: 1,
         }
       : baseDataset
-
     return {
-      labels: monthdays(),
+      labels,
       datasets: [dataset],
     }
   }
@@ -160,11 +195,11 @@ const chartData = computed<ChartData<any>>(() => {
 
     let backgroundColor: string
     let borderColor: string
-    let processedData: number[]
+    let processed: { display: Array<number | null>, base: Array<number | null> }
 
     // Process data for cumulative mode
     if (props.accumulated) {
-      processedData = accumulateData(appData)
+      processed = transformSeries(appData, true, labelCount)
       // Use LineChartStats color scheme for line mode
       const hue = (210 + index * 137.508) % 360
       const saturation = 50 + (index % 3) * 8
@@ -173,7 +208,7 @@ const chartData = computed<ChartData<any>>(() => {
       backgroundColor = `hsla(${hue}, ${saturation}%, ${lightness}%, 0.6)`
     }
     else {
-      processedData = appData
+      processed = transformSeries(appData, false, labelCount)
       // Use existing bar chart colors for bar mode
       backgroundColor = appColors[index]
       borderColor = backgroundColor.replace('hsla', 'hsl').replace(', 0.8)', ')').replace(/(\d+)%\)/, (_, lightness) => {
@@ -182,12 +217,13 @@ const chartData = computed<ChartData<any>>(() => {
       })
     }
 
-    const baseDataset = {
+    const baseDataset: any = {
       label: props.appNames[appId] || appId,
-      data: processedData,
+      data: processed.display,
       backgroundColor,
       borderColor,
       borderWidth: 1,
+      metaBaseValues: processed.base,
     }
 
     // Add line-specific properties for accumulated mode (match UsageCard styling)
@@ -204,7 +240,7 @@ const chartData = computed<ChartData<any>>(() => {
   })
 
   return {
-    labels: monthdays(),
+    labels,
     datasets,
   }
 })

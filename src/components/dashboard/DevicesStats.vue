@@ -139,6 +139,10 @@ function getDateRange() {
   if (props.useBillingPeriod) {
     const startDate = normalizeToStartOfDay(new Date(activeOrganization?.subscription_start ?? new Date()))
     const endDate = normalizeToStartOfDay(new Date(activeOrganization?.subscription_end ?? new Date()))
+
+    if (endDate.getTime() < startDate.getTime())
+      return { startDate, endDate: startDate }
+
     return { startDate, endDate }
   }
 
@@ -209,6 +213,24 @@ const processedChartData = computed<ChartData<'line'> | null>(() => {
   let globalLastDataIndex = -1
   const normalizedDatasets = rawChartData.value.datasets.map((dataset) => {
     const rawValues = dataset.data ?? []
+    const limitIndex = (() => {
+      if (!props.useBillingPeriod)
+        return rawValues.length - 1
+
+      if (!currentRange.value)
+        return rawValues.length - 1
+
+      const today = normalizeToStartOfDay(new Date())
+      const diff = Math.floor((today.getTime() - currentRange.value.startDate.getTime()) / (24 * 60 * 60 * 1000))
+
+      if (Number.isNaN(diff))
+        return -1
+
+      if (diff < 0)
+        return -1
+
+      return Math.min(diff, rawValues.length - 1)
+    })()
     const normalizedValues = rawValues.map((value) => {
       if (typeof value === 'number')
         return value
@@ -216,6 +238,12 @@ const processedChartData = computed<ChartData<'line'> | null>(() => {
         return undefined
       const parsed = Number(value)
       return Number.isNaN(parsed) ? undefined : parsed
+    }).map((value, index) => {
+      if (limitIndex < 0)
+        return undefined
+      if (index > limitIndex)
+        return undefined
+      return value
     })
 
     for (let index = normalizedValues.length - 1; index >= 0; index--) {

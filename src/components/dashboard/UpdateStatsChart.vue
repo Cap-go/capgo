@@ -37,6 +37,8 @@ const cycleEnd = new Date(organizationStore.currentOrganization?.subscription_en
 cycleStart.setHours(0, 0, 0, 0)
 cycleEnd.setHours(0, 0, 0, 0)
 
+const DAY_IN_MS = 1000 * 60 * 60 * 24
+
 Chart.register(
   Tooltip,
   BarController,
@@ -79,6 +81,46 @@ function getDayNumbers(startDate: Date, endDate: Date) {
   return dayNumbers
 }
 
+function getTodayLimit(labelCount: number) {
+  if (!props.useBillingPeriod)
+    return labelCount - 1
+
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const diff = Math.floor((today.getTime() - cycleStart.getTime()) / DAY_IN_MS)
+
+  if (Number.isNaN(diff) || diff < 0)
+    return -1
+
+  return Math.min(diff, labelCount - 1)
+}
+
+function transformSeries(source: number[], accumulated: boolean, labelCount: number) {
+  const display: Array<number | null> = Array.from({ length: labelCount }).fill(null) as Array<number | null>
+  const base: Array<number | null> = Array.from({ length: labelCount }).fill(null) as Array<number | null>
+  const limitIndex = getTodayLimit(labelCount)
+
+  if (limitIndex < 0)
+    return { display, base }
+
+  let runningTotal = 0
+  for (let index = 0; index <= limitIndex; index++) {
+    const hasValue = index < source.length && typeof source[index] === 'number' && Number.isFinite(source[index])
+    const numericValue = hasValue ? source[index] as number : 0
+
+    base[index] = numericValue
+    if (accumulated) {
+      runningTotal += numericValue
+      display[index] = runningTotal
+    }
+    else {
+      display[index] = numericValue
+    }
+  }
+
+  return { display, base }
+}
+
 function monthdays() {
   if (!props.useBillingPeriod) {
     // Last 30 days mode - generate actual dates
@@ -96,37 +138,29 @@ function monthdays() {
   return getDayNumbers(cycleStart, cycleEnd)
 }
 
-// Helper function to accumulate data
-function accumulateData(data: number[]): number[] {
-  return data.reduce((acc: number[], val: number) => {
-    const last = acc[acc.length - 1] ?? 0
-    const newVal = last + (val ?? 0)
-    return acc.concat([newVal])
-  }, [])
-}
-
 const chartData = computed<ChartData<'bar' | 'line'>>(() => {
   // Always show breakdown by action type (requested/install/fail)
   const labels = monthdays()
+  const labelCount = labels.length
   const actionTypes: Array<'requested' | 'install' | 'fail'> = ['requested', 'install', 'fail']
   const datasets = actionTypes.map((action, index) => {
     const actionData = props.dataByApp[action] as number[] | undefined
     const actionName = props.appNames[action] || action
     const style = ACTION_STYLES[action] ?? ACTION_STYLES.requested
-    const rawData = (actionData && actionData.length ? actionData : Array.from({ length: labels.length }).fill(0)) as number[]
-    const processedData = props.accumulated ? accumulateData(rawData) : rawData
+    const rawData = actionData && actionData.length ? actionData : Array.from({ length: labels.length }).fill(0) as Array<number>
+    const processed = transformSeries(rawData, props.accumulated, labelCount)
 
     const backgroundColor = props.accumulated ? style.lineBackground : style.barBackground
     const borderColor = props.accumulated ? style.lineBorder : style.barBorder
 
-    const baseDataset = {
+    const baseDataset: any = {
       label: actionName,
-      data: processedData,
+      data: processed.display,
       backgroundColor,
       borderColor,
       borderWidth: 1,
+      metaBaseValues: processed.base,
     } as ChartData<'bar' | 'line'>['datasets'][number]
-    Object.assign(baseDataset, { metaBaseValues: processedData })
 
     // Add line-specific properties for accumulated mode (match UsageCard styling)
     return props.accumulated
