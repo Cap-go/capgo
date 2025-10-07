@@ -2,7 +2,7 @@
 import colors from 'tailwindcss/colors'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import UpdateStatsChart from '~/components/UpdateStatsChart.vue'
+import UpdateStatsChart from '~/components/dashboard/UpdateStatsChart.vue'
 import { useSupabase } from '~/services/supabase'
 import { useDashboardAppsStore } from '~/stores/dashboardApps'
 import { useOrganizationStore } from '~/stores/organization'
@@ -310,7 +310,7 @@ onMounted(async () => {
         <div class="loading loading-spinner loading-lg text-blue-500" />
       </div>
       <UpdateStatsChart
-        v-else
+        v-else-if="chartUpdateData?.length"
         :key="JSON.stringify(chartUpdateDataByAction)"
         :title="t('update_statistics')"
         :colors="colors.blue"
@@ -320,6 +320,9 @@ onMounted(async () => {
         :data-by-app="chartUpdateDataByAction"
         :app-names="actionDisplayNames"
       />
+      <div v-else class="flex flex-col items-center justify-center h-full">
+        {{ t('no-data') }}
+      </div>
     </div>
   </div>
 </template>

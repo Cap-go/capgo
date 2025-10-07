@@ -2,10 +2,10 @@
 import colors from 'tailwindcss/colors'
 import { onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import BundleUploadsChart from '~/components/BundleUploadsChart.vue'
 import { useSupabase } from '~/services/supabase'
 import { useDashboardAppsStore } from '~/stores/dashboardApps'
 import { useOrganizationStore } from '~/stores/organization'
+import BundleUploadsChart from './BundleUploadsChart.vue'
 
 const props = defineProps({
   useBillingPeriod: {

@@ -30,7 +30,7 @@ const devicesNb = ref(0)
 const updatesNb = ref(0)
 const channelsNb = ref(0)
 const capgoVersion = ref('')
-const canShowMobileStats = ref(true)
+const canShowDevicesStats = ref(true)
 const main = useMainStore()
 const organizationStore = useOrganizationStore()
 const isLoading = ref(false)
@@ -159,7 +159,7 @@ watchEffect(() => {
     <div v-else-if="app">
       <div v-if="ActiveTab === 'overview'" class="w-full h-full px-4 pt-4 mb-8 overflow-y-auto max-h-fit lg:px-8 sm:px-6 overflow-x-hidden">
         <FailedCard />
-        <Usage v-if="!organizationStore.currentOrganizationFailed" ref="usageComponent" :app-id="id" :show-mobile-stats="canShowMobileStats" />
+        <Usage v-if="!organizationStore.currentOrganizationFailed" ref="usageComponent" :app-id="id" :show-mobile-stats="canShowDevicesStats" />
 
         <!-- New charts section -->
         <div class="grid grid-cols-1 sm:grid-cols-12 gap-6 mb-6 xl:grid-cols-12">

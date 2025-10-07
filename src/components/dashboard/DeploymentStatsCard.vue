@@ -2,10 +2,10 @@
 import colors from 'tailwindcss/colors'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import DeploymentStatsChart from '~/components/DeploymentStatsChart.vue'
 import { useSupabase } from '~/services/supabase'
 import { useDashboardAppsStore } from '~/stores/dashboardApps'
 import { useOrganizationStore } from '~/stores/organization'
+import DeploymentStatsChart from './DeploymentStatsChart.vue'
 
 const props = defineProps({
   useBillingPeriod: {

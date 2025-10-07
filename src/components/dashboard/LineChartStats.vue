@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { ChartData, ChartOptions } from 'chart.js'
-import type { AnnotationOptions } from '../services/chartAnnotations'
+import type { AnnotationOptions } from '../../services/chartAnnotations'
 import { useDark } from '@vueuse/core'
 import {
   BarController,
@@ -19,8 +19,8 @@ import { Bar, Line } from 'vue-chartjs'
 import { useI18n } from 'vue-i18n'
 import { getCurrentDayMonth, getDaysInCurrentMonth } from '~/services/date'
 import { useOrganizationStore } from '~/stores/organization'
-import { inlineAnnotationPlugin } from '../services/chartAnnotations'
-import { createTooltipConfig, verticalLinePlugin } from '../services/chartTooltip'
+import { inlineAnnotationPlugin } from '../../services/chartAnnotations'
+import { createTooltipConfig, verticalLinePlugin } from '../../services/chartTooltip'
 
 const props = defineProps({
   accumulated: {

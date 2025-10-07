@@ -14,9 +14,9 @@ import {
 } from 'chart.js'
 import { computed } from 'vue'
 import { Bar, Line } from 'vue-chartjs'
+import { createTooltipConfig, verticalLinePlugin } from '~/services/chartTooltip'
 import { getDaysInCurrentMonth } from '~/services/date'
 import { useOrganizationStore } from '~/stores/organization'
-import { createTooltipConfig, verticalLinePlugin } from '../services/chartTooltip'
 
 const props = defineProps({
   title: { type: String, default: '' },
@@ -47,6 +47,26 @@ Chart.register(
   CategoryScale,
   LinearScale,
 )
+
+// Generate infinite distinct pastel colors starting with blue
+function generateAppColors(appCount: number) {
+  const colors = []
+
+  for (let i = 0; i < appCount; i++) {
+    // Start with blue (210°) and use golden ratio for distribution
+    const hue = (210 + i * 137.508) % 360 // Start at blue, then golden angle
+
+    // Use pastel-friendly saturation and lightness values
+    const saturation = 50 + (i % 3) * 8 // 50%, 58%, 66% - softer colors
+    const lightness = 60 + (i % 4) * 5 // 60%, 65%, 70%, 75% - lighter, more pastel
+
+    const backgroundColor = `hsla(${hue}, ${saturation}%, ${lightness}%, 0.8)`
+
+    colors.push(backgroundColor)
+  }
+
+  return colors
+}
 
 function getDayNumbers(startDate: Date, endDate: Date) {
   const dayNumbers = []
@@ -84,31 +104,11 @@ function accumulateData(data: number[]): number[] {
   }, [])
 }
 
-// Generate infinite distinct pastel colors starting with blue
-function generateAppColors(appCount: number) {
-  const colors = []
-
-  for (let i = 0; i < appCount; i++) {
-    // Start with blue (210°) and use golden ratio for distribution
-    const hue = (210 + i * 137.508) % 360 // Start at blue, then golden angle
-
-    // Use pastel-friendly saturation and lightness values
-    const saturation = 50 + (i % 3) * 8 // 50%, 58%, 66% - softer colors
-    const lightness = 60 + (i % 4) * 5 // 60%, 65%, 70%, 75% - lighter, more pastel
-
-    const backgroundColor = `hsla(${hue}, ${saturation}%, ${lightness}%, 0.8)`
-
-    colors.push(backgroundColor)
-  }
-
-  return colors
-}
-
 const chartData = computed<ChartData<any>>(() => {
   const appIds = Object.keys(props.dataByApp)
 
   if (appIds.length === 0) {
-    // Single app view - show total deployments
+    // Fallback to single dataset if no app data
     let backgroundColor: string
     let borderColor: string
     let processedData: number[]
@@ -123,12 +123,12 @@ const chartData = computed<ChartData<any>>(() => {
     else {
       processedData = props.data as number[]
       // Use existing bar chart colors for bar mode
-      backgroundColor = 'hsla(210, 50%, 70%, 0.8)'
-      borderColor = 'hsl(210, 50%, 55%)'
+      backgroundColor = props.colors[400]
+      borderColor = props.colors[200]
     }
 
     const baseDataset = {
-      label: 'Deployments',
+      label: props.title,
       data: processedData,
       backgroundColor,
       borderColor,
@@ -139,7 +139,7 @@ const chartData = computed<ChartData<any>>(() => {
     const dataset = props.accumulated
       ? {
           ...baseDataset,
-          fill: 'origin',
+          fill: 'origin', // Fill from bottom for single dataset
           tension: 0.3,
           pointRadius: 0,
           pointBorderWidth: 0,
@@ -153,7 +153,7 @@ const chartData = computed<ChartData<any>>(() => {
     }
   }
 
-  // Multiple apps view - show breakdown by app
+  // Create stacked datasets for each app
   const appColors = generateAppColors(appIds.length)
   const datasets = appIds.map((appId, index) => {
     const appData = props.dataByApp[appId] as number[]
