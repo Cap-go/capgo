@@ -92,5 +92,22 @@ app.post('/', middlewareAPISecret, async (c) => {
     .eq('id', body.orgId)
     .throwOnError()
 
+  // Get customer_id for the organization to queue plan processing
+  const { data: orgData, error: orgError } = await supabase
+    .from('orgs')
+    .select('customer_id')
+    .eq('id', body.orgId)
+    .single()
+
+  if (!orgError && orgData?.customer_id) {
+    // Queue plan processing for this organization
+    await supabase.rpc('queue_cron_plan_for_org', {
+      org_id: body.orgId,
+      customer_id: orgData.customer_id,
+    }).throwOnError()
+
+    cloudlog({ requestId: c.get('requestId'), message: 'plan processing queued for org', orgId: body.orgId, customerId: orgData.customer_id })
+  }
+
   return c.json({ status: 'Stats saved', mau, bandwidth, storage, versionUsage })
 })

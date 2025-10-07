@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '../src/types/supabase.types'
 import { env } from 'node:process'
 import { createClient } from '@supabase/supabase-js'
+import postgres from 'postgres'
 
 export const POSTGRES_URL = 'postgresql://postgres:postgres@127.0.0.1:54322/postgres'
 export const BASE_URL = `${env.SUPABASE_URL}/functions/v1`
@@ -351,5 +352,38 @@ export async function cleanup(): Promise<void> {
   if (supabaseClient) {
     // Close connections if needed
     supabaseClient = null
+  }
+}
+
+// PostgreSQL direct connection helpers
+let sql: ReturnType<typeof postgres> | null = null
+
+export async function getPostgresClient(): Promise<ReturnType<typeof postgres>> {
+  if (!sql) {
+    sql = postgres(POSTGRES_URL)
+  }
+  return sql
+}
+
+export async function executeSQL(query: string, params?: any[]): Promise<any> {
+  const client = await getPostgresClient()
+  const result = await client.unsafe(query, params || [])
+  return result
+}
+
+export async function getCronPlanQueueCount(): Promise<number> {
+  const result = await executeSQL('SELECT COUNT(*) as count FROM pgmq.q_cron_plan')
+  return parseInt(result[0]?.count || '0')
+}
+
+export async function getLatestCronPlanMessage(): Promise<any> {
+  const result = await executeSQL('SELECT message FROM pgmq.q_cron_plan ORDER BY msg_id DESC LIMIT 1')
+  return result[0]?.message
+}
+
+export async function cleanupPostgresClient(): Promise<void> {
+  if (sql) {
+    await sql.end()
+    sql = null
   }
 }
