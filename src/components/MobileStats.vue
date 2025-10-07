@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { ChartData, ChartOptions } from 'chart.js'
+import type { Organization } from '~/stores/organization'
 import { useDark } from '@vueuse/core'
 import { CategoryScale, Chart, Filler, LinearScale, LineElement, PointElement, Tooltip } from 'chart.js'
 import { computed, ref, watch } from 'vue'
@@ -124,10 +125,20 @@ function normalizeToStartOfDay(date: Date) {
   return normalized
 }
 
+function resolveOrganizationForCurrentContext(): Organization | undefined {
+  if (appId.value) {
+    const org = organizationStore.getOrgByAppId(appId.value)
+    if (org)
+      return org
+  }
+  return organizationStore.currentOrganization
+}
+
 function getDateRange() {
+  const activeOrganization = resolveOrganizationForCurrentContext()
   if (props.useBillingPeriod) {
-    const startDate = normalizeToStartOfDay(new Date(organizationStore.currentOrganization?.subscription_start ?? new Date()))
-    const endDate = normalizeToStartOfDay(new Date(organizationStore.currentOrganization?.subscription_end ?? new Date()))
+    const startDate = normalizeToStartOfDay(new Date(activeOrganization?.subscription_start ?? new Date()))
+    const endDate = normalizeToStartOfDay(new Date(activeOrganization?.subscription_end ?? new Date()))
     return { startDate, endDate }
   }
 
@@ -354,6 +365,14 @@ async function loadData() {
   if (!appId.value) {
     rawChartData.value = null
     return
+  }
+
+  try {
+    await organizationStore.dedupFetchOrganizations()
+    await organizationStore.awaitInitialLoad()
+  }
+  catch (error) {
+    console.error('Error preparing organization data for mobile stats:', error)
   }
 
   const { startDate, endDate } = getDateRange()

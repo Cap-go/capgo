@@ -8,6 +8,7 @@ export const useDashboardAppsStore = defineStore('dashboardApps', () => {
   const isLoading = ref(false)
   const isLoaded = ref(false)
   const currentOrgId = ref<string | null>(null)
+  let loadPromise: Promise<void> | null = null
 
   const appNames = computed(() => {
     const names: { [appId: string]: string } = {}
@@ -21,11 +22,28 @@ export const useDashboardAppsStore = defineStore('dashboardApps', () => {
 
   async function fetchApps(force = false) {
     const organizationStore = useOrganizationStore()
+    try {
+      await organizationStore.dedupFetchOrganizations()
+      await organizationStore.awaitInitialLoad()
+    }
+    catch (error) {
+      console.error('Error preparing organization data for apps fetch:', error)
+      return
+    }
     const orgId = organizationStore.currentOrganization?.gid
 
-    // Return early if already loading
-    if (isLoading.value || !orgId) {
+    if (!orgId) {
+      apps.value = []
+      currentOrgId.value = null
+      isLoaded.value = true
       return
+    }
+
+    if (isLoading.value) {
+      if (loadPromise)
+        await loadPromise
+      if (!force)
+        return
     }
 
     // Return cached data if same organization and not forcing
@@ -39,30 +57,31 @@ export const useDashboardAppsStore = defineStore('dashboardApps', () => {
       currentOrgId.value = orgId
     }
 
-    if (!orgId) {
-      apps.value = []
-      isLoaded.value = true
-      return
-    }
-
     isLoading.value = true
 
-    try {
-      const { data } = await useSupabase()
-        .from('apps')
-        .select('app_id, name')
-        .eq('owner_org', orgId)
+    const supabase = useSupabase()
+    const request = (async () => {
+      try {
+        const { data } = await supabase
+          .from('apps')
+          .select('app_id, name')
+          .eq('owner_org', orgId)
 
-      apps.value = data || []
-      isLoaded.value = true
-    }
-    catch (error) {
-      console.error('Error fetching apps:', error)
-      apps.value = []
-    }
-    finally {
-      isLoading.value = false
-    }
+        apps.value = data || []
+        isLoaded.value = true
+      }
+      catch (error) {
+        console.error('Error fetching apps:', error)
+        apps.value = []
+      }
+      finally {
+        isLoading.value = false
+        loadPromise = null
+      }
+    })()
+
+    loadPromise = request
+    await request
   }
 
   function reset() {

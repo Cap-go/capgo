@@ -16,6 +16,10 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  appId: {
+    type: String,
+    default: '',
+  },
 })
 
 // Helper function to filter 30-day data to billing period
@@ -58,6 +62,10 @@ function filterToBillingPeriod(fullData: number[], last30DaysStart: Date, billin
 
 const { t } = useI18n()
 const organizationStore = useOrganizationStore()
+const dashboardAppsStore = useDashboardAppsStore()
+const supabase = useSupabase()
+const singleAppNameCache = new Map<string, string>()
+let latestRequestToken = 0
 
 const totalDeployments = ref(0)
 const lastDayEvolution = ref(0)
@@ -67,50 +75,94 @@ const appNames = ref<{ [appId: string]: string }>({})
 const isLoading = ref(true)
 
 async function calculateStats() {
+  const requestToken = ++latestRequestToken
+
   isLoading.value = true
   totalDeployments.value = 0
+  lastDayEvolution.value = 0
 
-  // Reset data
+  const fallbackData = Array.from({ length: 30 }).fill(0) as number[]
+
+  // Reset data holders
   deploymentDataByApp.value = {}
   appNames.value = {}
   deploymentData.value = []
 
-  // Always work with last 30 days of data
-  const last30DaysEnd = new Date()
-  const last30DaysStart = new Date()
-  last30DaysStart.setDate(last30DaysStart.getDate() - 29) // 30 days including today
-  last30DaysStart.setHours(0, 0, 0, 0)
-  last30DaysEnd.setHours(23, 59, 59, 999)
-
-  // Get billing period dates for filtering
-  const billingStart = new Date(organizationStore.currentOrganization?.subscription_start ?? new Date())
-  billingStart.setHours(0, 0, 0, 0)
-
-  // Create 30-day arrays
-  const dailyCounts30Days = Array.from({ length: 30 }).fill(0) as number[]
-
-  const startDate = last30DaysStart.toISOString().split('T')[0]
-  const endDate = last30DaysEnd.toISOString().split('T')[0]
-
   try {
-    // Use store for shared apps data
-    const dashboardAppsStore = useDashboardAppsStore()
-    await dashboardAppsStore.fetchApps()
-    appNames.value = dashboardAppsStore.appNames
+    await organizationStore.dedupFetchOrganizations()
+    await organizationStore.awaitInitialLoad()
 
-    if (dashboardAppsStore.appIds.length === 0) {
-      deploymentData.value = dailyCounts30Days
-      isLoading.value = false
+    const targetOrganization = props.appId
+      ? organizationStore.getOrgByAppId(props.appId) ?? organizationStore.currentOrganization
+      : organizationStore.currentOrganization
+
+    if (!targetOrganization) {
+      if (requestToken === latestRequestToken)
+        deploymentData.value = fallbackData
       return
     }
 
-    // Initialize data arrays for each app (30 days)
-    dashboardAppsStore.appIds.forEach((appId) => {
-      deploymentDataByApp.value[appId] = Array.from({ length: 30 }).fill(0) as number[]
+    // Always work with last 30 days of data
+    const last30DaysEnd = new Date()
+    const last30DaysStart = new Date()
+    last30DaysStart.setDate(last30DaysStart.getDate() - 29) // 30 days including today
+    last30DaysStart.setHours(0, 0, 0, 0)
+    last30DaysEnd.setHours(23, 59, 59, 999)
+
+    // Get billing period dates for filtering
+    const billingStart = new Date(targetOrganization.subscription_start ?? new Date())
+    billingStart.setHours(0, 0, 0, 0)
+
+    const startDate = last30DaysStart.toISOString().split('T')[0]
+    const endDate = last30DaysEnd.toISOString().split('T')[0]
+
+    const localAppNames: { [appId: string]: string } = {}
+    let targetAppIds: string[] = []
+
+    if (props.appId) {
+      targetAppIds = [props.appId]
+      let cachedName = singleAppNameCache.get(props.appId) ?? ''
+      if (!cachedName) {
+        try {
+          const { data: appRow } = await supabase
+            .from('apps')
+            .select('name')
+            .eq('app_id', props.appId)
+            .single()
+          cachedName = appRow?.name ?? props.appId
+        }
+        catch (error) {
+          console.error('Error fetching app name for deployment stats:', error)
+          cachedName = props.appId
+        }
+        singleAppNameCache.set(props.appId, cachedName)
+      }
+      localAppNames[props.appId] = cachedName || props.appId
+    }
+    else {
+      await dashboardAppsStore.fetchApps()
+      targetAppIds = [...dashboardAppsStore.appIds]
+      Object.assign(localAppNames, dashboardAppsStore.appNames)
+    }
+
+    if (targetAppIds.length === 0) {
+      if (requestToken === latestRequestToken) {
+        deploymentData.value = fallbackData
+        deploymentDataByApp.value = {}
+        appNames.value = { ...localAppNames }
+      }
+      return
+    }
+
+    const perApp: { [appId: string]: number[] } = {}
+    targetAppIds.forEach((appId) => {
+      perApp[appId] = Array.from({ length: 30 }).fill(0) as number[]
     })
 
-    // Get deployment stats from deploy_history table for public (default) channels only
-    const { data } = await useSupabase()
+    const dailyCounts30Days = Array.from({ length: 30 }).fill(0) as number[]
+    let totalDeploymentsCount = 0
+
+    const { data, error } = await supabase
       .from('deploy_history')
       .select(`
         deployed_at,
@@ -119,78 +171,94 @@ async function calculateStats() {
           public
         )
       `)
-      .in('app_id', dashboardAppsStore.appIds)
+      .in('app_id', targetAppIds)
       .gte('deployed_at', startDate)
       .lte('deployed_at', endDate)
       .eq('channels.public', true)
       .order('deployed_at')
 
+    if (error)
+      throw error
+
     if (data && data.length > 0) {
-      // Process each deployment entry for 30-day period
       data.forEach((deployment: any) => {
-        if (deployment.deployed_at) {
-          const deployDate = new Date(deployment.deployed_at)
+        if (!deployment.deployed_at || !deployment.app_id)
+          return
 
-          // Calculate days since start of 30-day period
-          const daysDiff = Math.floor((deployDate.getTime() - last30DaysStart.getTime()) / (1000 * 60 * 60 * 24))
+        const deployDate = new Date(deployment.deployed_at)
 
-          if (daysDiff >= 0 && daysDiff < 30) {
-            dailyCounts30Days[daysDiff] += 1
-            totalDeployments.value += 1
+        // Calculate days since start of 30-day period
+        const daysDiff = Math.floor((deployDate.getTime() - last30DaysStart.getTime()) / (1000 * 60 * 60 * 24))
 
-            // Also track by app
-            if (deploymentDataByApp.value[deployment.app_id]) {
-              deploymentDataByApp.value[deployment.app_id][daysDiff] += 1
-            }
-          }
-        }
+        if (daysDiff < 0 || daysDiff >= 30)
+          return
+
+        dailyCounts30Days[daysDiff] += 1
+        totalDeploymentsCount += 1
+
+        if (perApp[deployment.app_id])
+          perApp[deployment.app_id][daysDiff] += 1
       })
-
-      // Filter data based on billing period mode
-      if (props.useBillingPeriod) {
-        // Show only data within billing period
-        const filteredData = filterToBillingPeriod(dailyCounts30Days, last30DaysStart, billingStart)
-        deploymentData.value = filteredData.data
-
-        // Filter by-app data too
-        Object.keys(deploymentDataByApp.value).forEach((appId) => {
-          const filteredAppData = filterToBillingPeriod(deploymentDataByApp.value[appId], last30DaysStart, billingStart)
-          deploymentDataByApp.value[appId] = filteredAppData.data
-        })
-
-        // Recalculate total for billing period only
-        totalDeployments.value = filteredData.data.reduce((sum, count) => sum + count, 0)
-      }
-      else {
-        // Show all 30 days
-        deploymentData.value = dailyCounts30Days
-      }
-
-      // Calculate evolution (compare last two days with data)
-      const nonZeroDays = deploymentData.value.filter(count => count > 0)
-      if (nonZeroDays.length >= 2) {
-        const lastDayCount = nonZeroDays[nonZeroDays.length - 1]
-        const previousDayCount = nonZeroDays[nonZeroDays.length - 2]
-        if (previousDayCount > 0) {
-          lastDayEvolution.value = ((lastDayCount - previousDayCount) / previousDayCount) * 100
-        }
-      }
     }
-    else {
-      deploymentData.value = dailyCounts30Days
+
+    let finalDeploymentData = dailyCounts30Days
+    let finalPerApp = perApp
+    let finalTotal = totalDeploymentsCount
+
+    if (props.useBillingPeriod) {
+      const filteredData = filterToBillingPeriod(dailyCounts30Days, last30DaysStart, billingStart)
+      finalDeploymentData = filteredData.data
+
+      const filteredPerApp: { [appId: string]: number[] } = {}
+      targetAppIds.forEach((appId) => {
+        const filteredAppData = filterToBillingPeriod(perApp[appId], last30DaysStart, billingStart)
+        filteredPerApp[appId] = filteredAppData.data
+      })
+      finalPerApp = filteredPerApp
+      finalTotal = finalDeploymentData.reduce((sum, count) => sum + count, 0)
     }
+
+    let evolution = 0
+    const nonZeroDays = finalDeploymentData.filter(count => count > 0)
+    if (nonZeroDays.length >= 2) {
+      const lastDayCount = nonZeroDays[nonZeroDays.length - 1]
+      const previousDayCount = nonZeroDays[nonZeroDays.length - 2]
+      if (previousDayCount > 0)
+        evolution = ((lastDayCount - previousDayCount) / previousDayCount) * 100
+    }
+
+    if (requestToken !== latestRequestToken)
+      return
+
+    deploymentData.value = finalDeploymentData
+    deploymentDataByApp.value = finalPerApp
+    appNames.value = { ...localAppNames }
+    totalDeployments.value = finalTotal
+    lastDayEvolution.value = evolution
   }
   catch (error) {
     console.error('Error fetching deployment stats:', error)
-    deploymentData.value = dailyCounts30Days
+    if (requestToken === latestRequestToken) {
+      deploymentData.value = fallbackData
+      deploymentDataByApp.value = {}
+      appNames.value = {}
+      totalDeployments.value = 0
+      lastDayEvolution.value = 0
+    }
   }
   finally {
-    isLoading.value = false
+    if (requestToken === latestRequestToken)
+      isLoading.value = false
   }
 }
 
 // Watch for billing period mode changes and recalculate
 watch(() => props.useBillingPeriod, async () => {
+  await calculateStats()
+})
+
+// Watch for app target changes and recalculate
+watch(() => props.appId, async () => {
   await calculateStats()
 })
 
