@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.34.43 (2025-10-07)
+
+
+### Bug Fixes
+
+* add analytic engine for file worker ([21e7aef](https://github.com/Cap-go/capgo/commit/21e7aefb737c16a19e78d91806709fce2dca4194))
+
 ### 12.34.42 (2025-10-07)
 
 
