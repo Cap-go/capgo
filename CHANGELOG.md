@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.34.40 (2025-10-07)
+
+
+### Bug Fixes
+
+* race condition issue ([b15403f](https://github.com/Cap-go/capgo/commit/b15403fb6254d854a71ecbaa7eb2bcc4c0df3f4d))
+
 ### 12.34.39 (2025-10-07)
 
 ### 12.34.38 (2025-10-07)
