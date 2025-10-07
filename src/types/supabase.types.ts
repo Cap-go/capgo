@@ -756,6 +756,8 @@ export type Database = {
           created_at: string | null
           date_id: string
           devices_last_month: number | null
+          bundle_storage_gb: number
+          registers_today: number
           need_upgrade: number | null
           not_paying: number | null
           onboarded: number | null
@@ -781,6 +783,8 @@ export type Database = {
           created_at?: string | null
           date_id: string
           devices_last_month?: number | null
+          bundle_storage_gb?: number
+          registers_today?: number
           need_upgrade?: number | null
           not_paying?: number | null
           onboarded?: number | null
@@ -806,6 +810,8 @@ export type Database = {
           created_at?: string | null
           date_id?: string
           devices_last_month?: number | null
+          bundle_storage_gb?: number
+          registers_today?: number
           need_upgrade?: number | null
           not_paying?: number | null
           onboarded?: number | null
@@ -2031,6 +2037,10 @@ export type Database = {
       set_storage_exceeded_by_org: {
         Args: { disabled: boolean; org_id: string }
         Returns: undefined
+      }
+      total_bundle_storage_bytes: {
+        Args: Record<PropertyKey, never>
+        Returns: number
       }
       transfer_app: {
         Args: { p_app_id: string; p_new_org_id: string }

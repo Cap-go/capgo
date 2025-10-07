@@ -28,6 +28,25 @@ interface GlobalStats {
   plans: PromiseLike<PlanTotal>
   actives: Promise<Actives>
   devices_last_month: PromiseLike<number>
+  registers_today: PromiseLike<number>
+  bundle_storage_gb: PromiseLike<number>
+}
+
+interface DayBounds {
+  dateId: string
+  startIso: string
+  endIso: string
+}
+
+function getUtcDayBounds(reference = new Date()): DayBounds {
+  const start = new Date(Date.UTC(reference.getUTCFullYear(), reference.getUTCMonth(), reference.getUTCDate()))
+  const end = new Date(start)
+  end.setUTCDate(end.getUTCDate() + 1)
+  return {
+    dateId: start.toISOString().slice(0, 10),
+    startIso: start.toISOString(),
+    endIso: end.toISOString(),
+  }
 }
 
 async function getGithubStars(): Promise<number> {
@@ -39,7 +58,7 @@ async function getGithubStars(): Promise<number> {
   return json.stargazers_count
 }
 
-function getStats(c: Context): GlobalStats {
+function getStats(c: Context, dayBounds: DayBounds): GlobalStats {
   const supabase = supabaseAdmin(c)
   return {
     apps: countAllApps(c),
@@ -96,13 +115,35 @@ function getStats(c: Context): GlobalStats {
     }),
     updates_last_month: readLastMonthUpdatesCF(c),
     devices_last_month: readLastMonthDevicesCF(c),
+    registers_today: supabase
+      .from('users')
+      .select('id', { count: 'exact', head: true })
+      .gte('created_at', dayBounds.startIso)
+      .lt('created_at', dayBounds.endIso)
+      .then((res) => {
+        if (res.error)
+          cloudlog({ requestId: c.get('requestId'), message: 'registers_today error', error: res.error })
+        return res.count ?? 0
+      }),
+    bundle_storage_gb: supabase
+      .rpc('total_bundle_storage_bytes')
+      .then((res) => {
+        if (res.error) {
+          cloudlog({ requestId: c.get('requestId'), message: 'total_bundle_storage_bytes error', error: res.error })
+          return 0
+        }
+        const bytes = res.data ?? 0
+        const gigabytes = bytes / (1024 ** 3)
+        return Number.isFinite(gigabytes) ? Number(gigabytes.toFixed(2)) : 0
+      }),
   }
 }
 
 export const app = new Hono<MiddlewareKeyVariables>()
 
 app.post('/', middlewareAPISecret, async (c) => {
-  const res = getStats(c)
+  const dayBounds = getUtcDayBounds()
+  const res = getStats(c, dayBounds)
   const [
     apps,
     updates,
@@ -117,6 +158,8 @@ app.post('/', middlewareAPISecret, async (c) => {
     actives,
     updates_last_month,
     devices_last_month,
+    registers_today,
+    bundle_storage_gb,
     success_rate,
   ] = await Promise.all([
     res.apps,
@@ -132,13 +175,31 @@ app.post('/', middlewareAPISecret, async (c) => {
     res.actives,
     res.updates_last_month,
     res.devices_last_month,
+    res.registers_today,
+    res.bundle_storage_gb,
     res.success_rate,
   ])
   const not_paying = users - customers.total - plans.Trial
-  cloudlog({ requestId: c.get('requestId'), message: 'All Promises', apps, updates, updates_external, users, stars, customers, onboarded, need_upgrade, plans })
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: 'All Promises',
+    apps,
+    updates,
+    updates_external,
+    users,
+    stars,
+    customers,
+    onboarded,
+    need_upgrade,
+    plans,
+    updates_last_month,
+    devices_last_month,
+    registers_today,
+    bundle_storage_gb,
+  })
   // cloudlog(c.get('requestId'), 'app', app.app_id, downloads, versions, shared, channels)
   // create var date_id with yearn-month-day
-  const date_id = new Date().toISOString().slice(0, 10)
+  const date_id = dayBounds.dateId
   const newData: Database['public']['Tables']['global_stats']['Insert'] = {
     date_id,
     apps,
@@ -157,6 +218,8 @@ app.post('/', middlewareAPISecret, async (c) => {
     not_paying,
     updates_last_month,
     devices_last_month,
+    registers_today,
+    bundle_storage_gb,
     success_rate,
     plan_solo: plans.Solo,
     plan_maker: plans.Maker,
@@ -176,6 +239,8 @@ app.post('/', middlewareAPISecret, async (c) => {
     tags: {
       updates_last_month,
       success_rate,
+      registers_today,
+      storage_gb: bundle_storage_gb,
     },
     icon: '📲',
   }).catch((e: any) => {
@@ -208,6 +273,11 @@ app.post('/', middlewareAPISecret, async (c) => {
       icon: '📲',
     },
     {
+      title: 'Bundle Storage (GB)',
+      value: `${bundle_storage_gb.toFixed(2)} GB`,
+      icon: '💾',
+    },
+    {
       title: 'Total Users',
       value: users,
       icon: '👨',
@@ -216,6 +286,11 @@ app.post('/', middlewareAPISecret, async (c) => {
       title: 'Active Users',
       value: actives.users,
       icon: '🎉',
+    },
+    {
+      title: 'Registrations Today',
+      value: registers_today,
+      icon: '🆕',
     },
     {
       title: 'User onboarded',
