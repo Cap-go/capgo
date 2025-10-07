@@ -32,11 +32,15 @@
 
 ## Features
 
-- ⚡️ Test the web app directly on your phone using the native API
-
-- 😃 Share your new features with your teammates
-
-- ↕️ Manage your channels for auto-update system
+- ☁️ Cloud / Self hosted Support: Use our Cloud to manage your app updates or yours.
+- 📦 Bundle Management: Download, assign to channel, rollback.
+- 📺 Channel Support: Use channels to manage different environements.
+- 🎯 Set Channel to specific device to do QA or debug one user.
+- 🔄 Auto Update: Automatically download and set the latest bundle for the app.
+- 🛟 Rollback: Reset the app to last working bundle if an incompatible bundle has been set.
+- 📊 View your deployment statistics
+- 🔋 Supports Android and iOS
+- ⚡️ Capacitor 6/7 support
 
 <br>
 
