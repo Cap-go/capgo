@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.34.34 (2025-10-07)
+
+
+### Bug Fixes
+
+* remove claude ([49ffb6d](https://github.com/Cap-go/capgo/commit/49ffb6dcc4c94e3213235496d4887de0be82e023))
+
 ### 12.34.33 (2025-10-07)
 
 ### 12.34.32 (2025-10-07)
