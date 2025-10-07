@@ -103,7 +103,7 @@ app.post('/', middlewareAPISecret, async (c) => {
     // Queue plan processing for this organization
     await supabase.rpc('queue_cron_plan_for_org', {
       org_id: body.orgId,
-      customer_id: orgData.customer_id
+      customer_id: orgData.customer_id,
     }).throwOnError()
 
     cloudlog({ requestId: c.get('requestId'), message: 'plan processing queued for org', orgId: body.orgId, customerId: orgData.customer_id })
