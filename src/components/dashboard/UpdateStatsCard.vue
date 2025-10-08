@@ -270,7 +270,7 @@ onMounted(async () => {
   <div class="flex flex-col bg-white border rounded-lg shadow-lg col-span-full border-slate-300 sm:col-span-6 xl:col-span-4 dark:border-slate-900 dark:bg-gray-800 h-[460px]">
     <div class="pt-4 px-4 flex items-start justify-between gap-2">
       <div class="flex flex-col items-start justify-between gap-2">
-        <h2 class="flex-1 min-w-0 text-2xl font-semibold leading-tight text-white">
+        <h2 class="flex-1 min-w-0 text-2xl font-semibold leading-tight text text-slate-600 dark:text-white">
           {{ t('update_statistics') }}
         </h2>
         <div class="flex flex-wrap items-center gap-3 sm:flex-nowrap sm:gap-4">
@@ -280,8 +280,7 @@ onMounted(async () => {
               class="flex items-center gap-1 text-sm text-slate-600 dark:text-slate-300"
               :aria-label="`${actionDisplayNames.requested}: ${totalRequested.toLocaleString()}`"
             >
-              <GlobeAltIcon class="h-4 w-4 sm:hidden" aria-hidden="true" />
-              <span class="hidden sm:inline">{{ actionDisplayNames.requested }}:</span>
+              <GlobeAltIcon class="h-4 w-4" aria-hidden="true" />
               <span>{{ totalRequested.toLocaleString() }}</span>
             </div>
           </div>
@@ -291,8 +290,7 @@ onMounted(async () => {
               class="flex items-center gap-1 text-sm text-slate-600 dark:text-slate-300"
               :aria-label="`${actionDisplayNames.install}: ${totalInstalled.toLocaleString()}`"
             >
-              <ArrowDownOnSquareIcon class="h-4 w-4 sm:hidden" aria-hidden="true" />
-              <span class="hidden sm:inline">{{ actionDisplayNames.install }}:</span>
+              <ArrowDownOnSquareIcon class="h-4 w-4" aria-hidden="true" />
               <span>{{ totalInstalled.toLocaleString() }}</span>
             </div>
           </div>
@@ -302,8 +300,7 @@ onMounted(async () => {
               class="flex items-center gap-1 text-sm text-slate-600 dark:text-slate-300"
               :aria-label="`${actionDisplayNames.fail}: ${totalFailed.toLocaleString()}`"
             >
-              <XCircleIcon class="h-4 w-4 sm:hidden" aria-hidden="true" />
-              <span class="hidden sm:inline">{{ actionDisplayNames.fail }}:</span>
+              <XCircleIcon class="h-4 w-4" aria-hidden="true" />
               <span>{{ totalFailed.toLocaleString() }}</span>
             </div>
           </div>
@@ -318,10 +315,8 @@ onMounted(async () => {
         >
           {{ lastDayEvolution < 0 ? '-' : '+' }}{{ Math.abs(lastDayEvolution).toFixed(2) }}%
         </div>
-        <div v-else class="inline-flex rounded-full px-2 py-1 text-xs font-semibold opacity-0" aria-hidden="true">
-          +0.00%
-        </div>
-        <div class="text-3xl font-bold text-white">
+        <div v-else class="inline-flex rounded-full px-2 py-1 text-xs font-semibold opacity-0" aria-hidden="true" />
+        <div class="text-3xl font-bold text-slate-600 dark:text-white">
           {{ (totalInstalled + totalFailed + totalRequested).toLocaleString() }}
         </div>
       </div>

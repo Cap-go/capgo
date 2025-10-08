@@ -76,7 +76,7 @@ const lastDayEvolution = computed(() => {
 <template>
   <div class="flex flex-col bg-white border rounded-lg shadow-lg col-span-full border-slate-300 sm:col-span-6 xl:col-span-4 dark:border-slate-900 dark:bg-gray-800 h-[460px]">
     <div class="pt-4 px-4 flex items-start justify-between gap-2">
-      <h2 class="flex-1 min-w-0 text-2xl font-semibold leading-tight text-white">
+      <h2 class="flex-1 min-w-0 text-2xl font-semibold leading-tight text-slate-600 dark:text-white">
         {{ props.title }}
       </h2>
 
@@ -88,10 +88,8 @@ const lastDayEvolution = computed(() => {
         >
           {{ lastDayEvolution < 0 ? '-' : '+' }}{{ Math.abs(lastDayEvolution).toFixed(2) }}%
         </div>
-        <div v-else class="inline-flex rounded-full px-2 py-1 text-xs font-semibold opacity-0" aria-hidden="true">
-          +0.00%
-        </div>
-        <div class="text-3xl font-bold text-white">
+        <div v-else class="inline-flex rounded-full px-2 py-1 text-xs font-semibold opacity-0" aria-hidden="true" />
+        <div class="text-3xl font-bold text-slate-600 dark:text-white">
           {{ total?.toLocaleString() }} <span class="text-2xl font-normal">{{ unit }}</span>
         </div>
       </div>
