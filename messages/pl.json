@@ -379,7 +379,7 @@
   "generate-device-overwrite": "Wygeneruj nadpisanie urządzenia",
   "generate-device-overwrite-msg": "Za chwilę wygenerujesz nadpisanie urządzenia. Czy chcesz kontynuować?",
   "generated-new-apikey": "Wygenerowano nowy klucz API!",
-  "get": "żądany",
+  "requested": "żądany",
   "go-back": "Wróć",
   "good": "Dobry",
   "here": "tutaj",

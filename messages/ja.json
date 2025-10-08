@@ -379,7 +379,7 @@
   "generate-device-overwrite": "デバイスの上書きを生成する",
   "generate-device-overwrite-msg": "あなたはデバイスを上書きする予定です。続行しますか？",
   "generated-new-apikey": "新しいAPIキーを生成しました！",
-  "get": "要求された",
+  "requested": "要求された",
   "go-back": "戻る",
   "good": "良い",
   "here": "ここで",

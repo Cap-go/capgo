@@ -379,7 +379,7 @@
   "generate-device-overwrite": "장치 덮어쓰기 생성",
   "generate-device-overwrite-msg": "장치를 덮어쓰기 위해 생성하려고 합니다. 계속하시겠습니까?",
   "generated-new-apikey": "새로운 API 키를 생성했습니다!",
-  "get": "요청된",
+  "requested": "요청된",
   "go-back": "돌아가다",
   "good": "좋은",
   "here": "여기",

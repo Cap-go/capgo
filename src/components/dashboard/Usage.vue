@@ -7,6 +7,10 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import InformationInfo from '~icons/heroicons/information-circle'
+import CalendarDaysIcon from '~icons/heroicons/calendar-days'
+import ChartBarIcon from '~icons/heroicons/chart-bar'
+import BanknotesIcon from '~icons/heroicons/banknotes'
+import ArrowPathIcon from '~icons/heroicons/arrow-path'
 import { bytesToGb, getDaysBetweenDates } from '~/services/conversion'
 import { getPlans } from '~/services/supabase'
 import { useDashboardAppsStore } from '~/stores/dashboardApps'
@@ -401,41 +405,50 @@ onMounted(() => {
 <template>
   <!-- View Mode Selectors -->
   <div v-if="!noData && !isLoading" class="mb-4">
-    <div class="flex flex-col items-stretch gap-2 sm:flex-row sm:justify-end sm:items-center sm:gap-4">
+    <div class="flex flex-nowrap items-center justify-end gap-2 sm:gap-4">
       <!-- Daily vs Cumulative Switch -->
       <div class="flex items-center space-x-1 bg-gray-200 dark:bg-gray-800 rounded-lg p-1">
         <button
-          class="px-2 sm:px-3 py-1 text-xs font-medium rounded-md transition-colors first-letter:uppercase whitespace-nowrap truncate max-w-[70px] sm:max-w-none" :class="[!showCumulative || !useBillingPeriod ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white']"
+          class="px-2 sm:px-3 py-1 text-xs font-medium rounded-md transition-colors whitespace-nowrap text-center flex items-center justify-center gap-0.5 sm:gap-1.5"
+          :class="[!showCumulative || !useBillingPeriod ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white']"
+          :aria-label="t('daily')"
           @click="showCumulative = false"
         >
-          {{ t('daily') }}
+          <CalendarDaysIcon class="h-4 w-4" />
+          <span class="hidden sm:inline">{{ t('daily') }}</span>
         </button>
         <button
-          class="px-2 sm:px-3 py-1 text-xs font-medium rounded-md transition-colors first-letter:uppercase whitespace-nowrap truncate max-w-[70px] sm:max-w-none"
+          class="px-2 sm:px-3 py-1 text-xs font-medium rounded-md transition-colors whitespace-nowrap text-center flex items-center justify-center gap-0.5 sm:gap-1.5"
           :class="[
             showCumulative && useBillingPeriod
               ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
               : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white',
           ]"
+          :aria-label="t('cumulative')"
           @click="handleCumulativeClick"
         >
-          {{ t('cumulative') }}
+          <ChartBarIcon class="h-4 w-4" />
+          <span class="hidden sm:inline">{{ t('cumulative') }}</span>
         </button>
       </div>
 
       <!-- Billing Period vs Last 30 Days Switch -->
       <div class="flex items-center space-x-1 bg-gray-200 dark:bg-gray-800 rounded-lg p-1">
         <button
-          class="px-2 sm:px-3 py-1 text-xs font-medium rounded-md transition-colors first-letter:uppercase whitespace-nowrap truncate max-w-[90px] sm:max-w-none" :class="[useBillingPeriod ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white']"
+          class="px-2 sm:px-3 py-1 text-xs font-medium rounded-md transition-colors whitespace-nowrap text-center flex items-center justify-center gap-0.5 sm:gap-1.5" :class="[useBillingPeriod ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white']"
+          :aria-label="t('billing-period')"
           @click="useBillingPeriod = true"
         >
-          {{ t('billing-period') }}
+          <BanknotesIcon class="h-4 w-4" />
+          <span class="hidden sm:inline">{{ t('billing-period') }}</span>
         </button>
         <button
-          class="px-2 sm:px-3 py-1 text-xs font-medium rounded-md transition-colors first-letter:uppercase whitespace-nowrap truncate max-w-[90px] sm:max-w-none" :class="[!useBillingPeriod ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white']"
+          class="px-2 sm:px-3 py-1 text-xs font-medium rounded-md transition-colors whitespace-nowrap text-center flex items-center justify-center gap-0.5 sm:gap-1.5" :class="[!useBillingPeriod ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white']"
+          :aria-label="t('last-30-days')"
           @click="useBillingPeriod = false"
         >
-          {{ t('last-30-days') }}
+          <ArrowPathIcon class="h-4 w-4" />
+          <span class="hidden sm:inline">{{ t('last-30-days') }}</span>
         </button>
       </div>
 

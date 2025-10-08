@@ -379,7 +379,7 @@
   "generate-device-overwrite": "उपकरण अधिलेखन उत्पन्न करें",
   "generate-device-overwrite-msg": "आप एक उपकरण को ओवरराइट करने जा रहे हैं। क्या आप जारी रखना चाहते हैं?",
   "generated-new-apikey": "नया API कुंजी उत्पन्न की!",
-  "get": "अनुरोध किया",
+  "requested": "अनुरोध किया",
   "go-back": "वापस जाओ",
   "good": "अच्छा",
   "here": "यहाँ",

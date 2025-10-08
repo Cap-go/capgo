@@ -379,7 +379,7 @@
   "generate-device-overwrite": "Genera sovrascrittura del dispositivo",
   "generate-device-overwrite-msg": "Stai per generare una sovrascrittura del dispositivo. Vuoi continuare?",
   "generated-new-apikey": "Generata nuova chiave API!",
-  "get": "richiesto",
+  "requested": "richiesto",
   "go-back": "Torna indietro",
   "good": "Buono",
   "here": "qui",

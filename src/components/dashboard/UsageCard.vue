@@ -76,11 +76,11 @@ const lastDayEvolution = computed(() => {
 <template>
   <div class="flex flex-col bg-white border rounded-lg shadow-lg col-span-full border-slate-300 sm:col-span-6 xl:col-span-4 dark:border-slate-900 dark:bg-gray-800 h-[460px]">
     <div class="pt-4 px-4 flex items-start justify-between gap-2">
-      <h2 class="text-2xl font-semibold text-white">
+      <h2 class="flex-1 min-w-0 text-2xl font-semibold leading-tight text-white">
         {{ props.title }}
       </h2>
 
-      <div class="flex flex-col items-end text-right">
+      <div class="flex flex-col items-end text-right flex-shrink-0">
         <div
           v-if="lastDayEvolution"
           class="inline-flex items-center justify-center rounded-full px-2 py-1 text-xs font-bold text-white shadow-lg whitespace-nowrap"

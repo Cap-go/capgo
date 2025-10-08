@@ -379,7 +379,7 @@
   "generate-device-overwrite": "Generate device overwrite",
   "generate-device-overwrite-msg": "You are about to generate a device overwrite. Do you want to continue?",
   "generated-new-apikey": "Generated new API key!",
-  "get": "requested",
+  "requested": "requested",
   "go-back": "Go back",
   "good": "Good",
   "here": "here",

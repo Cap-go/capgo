@@ -379,7 +379,7 @@
   "generate-device-overwrite": "Générer la réécriture de l'appareil",
   "generate-device-overwrite-msg": "Vous êtes sur le point de générer une réécriture de l'appareil. Voulez-vous continuer?",
   "generated-new-apikey": "Généré une nouvelle clé API !",
-  "get": "demandé",
+  "requested": "demandé",
   "go-back": "Reviens",
   "good": "Bon",
   "here": "ici",

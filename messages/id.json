@@ -379,7 +379,7 @@
   "generate-device-overwrite": "Hasilkan penulisan ulang perangkat",
   "generate-device-overwrite-msg": "Anda akan membuat penulisan ulang perangkat. Apakah Anda ingin melanjutkan?",
   "generated-new-apikey": "Membuat kunci API baru!",
-  "get": "diminta",
+  "requested": "diminta",
   "go-back": "Kembali",
   "good": "Baik",
   "here": "di sini",

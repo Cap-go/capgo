@@ -379,7 +379,7 @@
   "generate-device-overwrite": "Cihazın üzerine yazmayı oluştur",
   "generate-device-overwrite-msg": "Bir cihaz üzerine yazma işlemi oluşturmak üzeresiniz. Devam etmek istiyor musunuz?",
   "generated-new-apikey": "Yeni API anahtarı oluşturuldu!",
-  "get": "talep edilen",
+  "requested": "talep edilen",
   "go-back": "Geri dön",
   "good": "İyi",
   "here": "burada",

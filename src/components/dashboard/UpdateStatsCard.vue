@@ -2,6 +2,9 @@
 import colors from 'tailwindcss/colors'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import GlobeAltIcon from '~icons/heroicons/globe-alt'
+import ArrowDownOnSquareIcon from '~icons/heroicons/arrow-down-on-square'
+import XCircleIcon from '~icons/heroicons/x-circle'
 import UpdateStatsChart from '~/components/dashboard/UpdateStatsChart.vue'
 import { useSupabase } from '~/services/supabase'
 import { useDashboardAppsStore } from '~/stores/dashboardApps'
@@ -266,27 +269,48 @@ onMounted(async () => {
 <template>
   <div class="flex flex-col bg-white border rounded-lg shadow-lg col-span-full border-slate-300 sm:col-span-6 xl:col-span-4 dark:border-slate-900 dark:bg-gray-800 h-[460px]">
     <div class="pt-4 px-4 flex items-start justify-between gap-2">
-      <div class="lex flex-col items-start justify-between gap-2">
-        <h2 class="text-2xl font-semibold text-white">
+      <div class="flex flex-col items-start justify-between gap-2">
+        <h2 class="flex-1 min-w-0 text-2xl font-semibold leading-tight text-white">
           {{ t('update_statistics') }}
         </h2>
-        <div class="flex items-center space-x-4">
-          <div class="flex items-center space-x-2">
+        <div class="flex flex-wrap items-center gap-3 sm:flex-nowrap sm:gap-4">
+          <div class="flex items-center gap-2">
             <div class="w-3 h-3 rounded-full" style="background-color: hsl(210, 65%, 55%)" />
-            <span class="text-sm text-slate-600 dark:text-slate-300">{{ actionDisplayNames.requested }}: {{ totalRequested.toLocaleString() }}</span>
+            <div
+              class="flex items-center gap-1 text-sm text-slate-600 dark:text-slate-300"
+              :aria-label="`${actionDisplayNames.requested}: ${totalRequested.toLocaleString()}`"
+            >
+              <GlobeAltIcon class="h-4 w-4 sm:hidden" aria-hidden="true" />
+              <span class="hidden sm:inline">{{ actionDisplayNames.requested }}:</span>
+              <span>{{ totalRequested.toLocaleString() }}</span>
+            </div>
           </div>
-          <div class="flex items-center space-x-2">
+          <div class="flex items-center gap-2">
             <div class="w-3 h-3 rounded-full" style="background-color: hsl(135, 55%, 50%)" />
-            <span class="text-sm text-slate-600 dark:text-slate-300">{{ actionDisplayNames.install }}: {{ totalInstalled.toLocaleString() }}</span>
+            <div
+              class="flex items-center gap-1 text-sm text-slate-600 dark:text-slate-300"
+              :aria-label="`${actionDisplayNames.install}: ${totalInstalled.toLocaleString()}`"
+            >
+              <ArrowDownOnSquareIcon class="h-4 w-4 sm:hidden" aria-hidden="true" />
+              <span class="hidden sm:inline">{{ actionDisplayNames.install }}:</span>
+              <span>{{ totalInstalled.toLocaleString() }}</span>
+            </div>
           </div>
-          <div class="flex items-center space-x-2">
+          <div class="flex items-center gap-2">
             <div class="w-3 h-3 rounded-full" style="background-color: hsl(0, 50%, 60%)" />
-            <span class="text-sm text-slate-600 dark:text-slate-300">{{ actionDisplayNames.fail }}: {{ totalFailed.toLocaleString() }}</span>
+            <div
+              class="flex items-center gap-1 text-sm text-slate-600 dark:text-slate-300"
+              :aria-label="`${actionDisplayNames.fail}: ${totalFailed.toLocaleString()}`"
+            >
+              <XCircleIcon class="h-4 w-4 sm:hidden" aria-hidden="true" />
+              <span class="hidden sm:inline">{{ actionDisplayNames.fail }}:</span>
+              <span>{{ totalFailed.toLocaleString() }}</span>
+            </div>
           </div>
         </div>
       </div>
 
-      <div class="flex flex-col items-end text-right">
+      <div class="flex flex-col items-end text-right flex-shrink-0">
         <div
           v-if="lastDayEvolution"
           class="inline-flex items-center justify-center rounded-full px-2 py-1 text-xs font-bold text-white shadow-lg whitespace-nowrap"

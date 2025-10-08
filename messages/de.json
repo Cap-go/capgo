@@ -379,7 +379,7 @@
   "generate-device-overwrite": "Geräteüberschreibung generieren",
   "generate-device-overwrite-msg": "Sie sind dabei, ein Geräteüberschreiben zu generieren. Möchten Sie fortfahren?",
   "generated-new-apikey": "Generierter neuer API-Schlüssel!",
-  "get": "angefordert",
+  "requested": "angefordert",
   "go-back": "Geh zurück",
   "good": "Gut",
   "here": "hier",

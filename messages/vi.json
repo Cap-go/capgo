@@ -379,7 +379,7 @@
   "generate-device-overwrite": "Tạo ghi đè thiết bị",
   "generate-device-overwrite-msg": "Bạn đang chuẩn bị tạo ra một lệnh ghi đè thiết bị. Bạn có muốn tiếp tục không?",
   "generated-new-apikey": "Đã tạo mới khóa API!",
-  "get": "đã yêu cầu",
+  "requested": "đã yêu cầu",
   "go-back": "Quay lại",
   "good": "Tốt",
   "here": "ở đây",

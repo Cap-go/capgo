@@ -379,7 +379,7 @@
   "generate-device-overwrite": "生成设备覆盖",
   "generate-device-overwrite-msg": "您即将生成设备覆盖。要继续吗？",
   "generated-new-apikey": "已生成新的 API 密钥！",
-  "get": "请求的",
+  "requested": "请求的",
   "go-back": "回去",
   "good": "好的",
   "here": "这里",
