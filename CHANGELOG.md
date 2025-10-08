@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.34.47 (2025-10-08)
+
+
+### Bug Fixes
+
+* mobile design dashboard ([3df9c9b](https://github.com/Cap-go/capgo/commit/3df9c9b811e7001cb979c742327c0fc3e0f7e9a3))
+
 ### 12.34.46 (2025-10-07)
 
 
