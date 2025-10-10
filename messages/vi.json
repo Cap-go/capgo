@@ -296,6 +296,7 @@
   "default-download-channel-android-only-title": "Kênh chỉ dành cho Android",
   "default-download-channel-conflict": "Nhiều mặc định chồng chéo trên cùng một nền tảng. Cập nhật lựa chọn để giữ cho các bản cập nhật thống nhất.",
   "default-download-channel-dialog-info": "Chọn kênh nào nên cung cấp cập nhật cho mỗi nền tảng.",
+  "default-download-channel-doc-link": "Đọc hướng dẫn kênh mặc định",
   "default-download-channel-empty": "Chưa có kênh tải xuống mặc định nào",
   "default-download-channel-help": "Những kênh này cung cấp cập nhật cho các thiết bị. Hãy ưu tiên một kênh duy nhất hỗ trợ cả hai nền tảng.",
   "default-download-channel-ios-only-desc": "Những kênh này hiện chỉ cung cấp cập nhật cho các thiết bị iOS.",

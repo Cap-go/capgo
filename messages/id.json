@@ -296,6 +296,7 @@
   "default-download-channel-android-only-title": "Saluran khusus Android",
   "default-download-channel-conflict": "Beberapa pengaturan default tumpang tindih pada platform yang sama. Perbarui pilihan untuk menjaga konsistensi pembaruan.",
   "default-download-channel-dialog-info": "Pilih saluran mana yang harus menyajikan pembaruan untuk setiap platform.",
+  "default-download-channel-doc-link": "Baca panduan kanal default",
   "default-download-channel-empty": "Belum ada saluran unduhan default",
   "default-download-channel-help": "Saluran-saluran ini mengirimkan pembaruan ke perangkat. Lebih baik pilih satu saluran yang mendukung kedua platform.",
   "default-download-channel-ios-only-desc": "Saluran-saluran ini saat ini hanya mengirimkan pembaruan ke perangkat iOS.",

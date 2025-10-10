@@ -296,6 +296,7 @@
   "default-download-channel-android-only-title": "Каналы только для Android",
   "default-download-channel-conflict": "Несколько значений по умолчанию перекрывают одну и ту же платформу. Обновите выбор, чтобы обновления были последовательными.",
   "default-download-channel-dialog-info": "Выберите, какие каналы должны предоставлять обновления для каждой платформы.",
+  "default-download-channel-doc-link": "Прочитать руководство по каналам по умолчанию",
   "default-download-channel-empty": "Пока нет канала для загрузки по умолчанию",
   "default-download-channel-help": "Эти каналы доставляют обновления на устройства. Предпочтительнее один канал, который поддерживает обе платформы.",
   "default-download-channel-ios-only-desc": "Эти каналы в настоящее время отправляют обновления только на устройства iOS.",

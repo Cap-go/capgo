@@ -416,7 +416,6 @@ async function openDefaultDownloadChannelDialog() {
 
   dialogStore.openDialog({
     title: t('select-default-download-channel-header'),
-    description: t('select-default-download-channel'),
     size: 'lg',
     preventAccidentalClose: true,
     buttons: [
@@ -1062,6 +1061,14 @@ async function transferAppOwnership() {
     <!-- Teleport for Default Download Channel Selection -->
     <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('select-default-download-channel-header')" defer to="#dialog-v2-content">
       <div class="w-full space-y-6">
+        <a
+          class="inline-flex items-center text-sm font-medium text-blue-600 underline transition hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+          href="https://capgo.app/docs/live-updates/channels/"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          {{ t('default-download-channel-doc-link') }}
+        </a>
         <p class="text-sm text-slate-500 dark:text-slate-300">
           {{ t('default-download-channel-dialog-info') }}
         </p>

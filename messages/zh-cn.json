@@ -296,6 +296,7 @@
   "default-download-channel-android-only-title": "仅限Android的频道",
   "default-download-channel-conflict": "多个默认值重叠在同一平台上。更新选择以保持更新的一致性。",
   "default-download-channel-dialog-info": "选择哪些频道应为每个平台提供更新。",
+  "default-download-channel-doc-link": "阅读默认渠道指南",
   "default-download-channel-empty": "尚未设置默认下载渠道",
   "default-download-channel-help": "这些频道将更新发送到设备。最好选择一个支持两个平台的单一频道。",
   "default-download-channel-ios-only-desc": "这些频道目前仅向iOS设备提供更新。",

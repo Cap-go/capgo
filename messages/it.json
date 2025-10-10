@@ -296,6 +296,7 @@
   "default-download-channel-android-only-title": "Canali solo per Android",
   "default-download-channel-conflict": "Più predefiniti si sovrappongono alla stessa piattaforma. Aggiorna la selezione per mantenere coerenti gli aggiornamenti.",
   "default-download-channel-dialog-info": "Scegli quali canali dovrebbero fornire aggiornamenti per ogni piattaforma.",
+  "default-download-channel-doc-link": "Leggi la guida ai canali predefiniti",
   "default-download-channel-empty": "Nessun canale di download predefinito ancora",
   "default-download-channel-help": "Questi canali forniscono aggiornamenti ai dispositivi. Preferisci un singolo canale che supporta entrambe le piattaforme.",
   "default-download-channel-ios-only-desc": "Questi canali attualmente inviano aggiornamenti solo a dispositivi iOS.",

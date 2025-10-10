@@ -296,6 +296,7 @@
   "default-download-channel-android-only-title": "Android専用チャンネル",
   "default-download-channel-conflict": "複数のデフォルトが同じプラットフォームで重なっています。更新を一貫性を保つために選択を更新してください。",
   "default-download-channel-dialog-info": "各プラットフォームに対して、どのチャンネルがアップデートを提供すべきか選択してください。",
+  "default-download-channel-doc-link": "デフォルトチャネルガイドを読む",
   "default-download-channel-empty": "まだデフォルトのダウンロードチャンネルはありません",
   "default-download-channel-help": "これらのチャンネルはデバイスにアップデートを配信します。両方のプラットフォームをサポートする単一のチャンネルが望ましいです。",
   "default-download-channel-ios-only-desc": "これらのチャンネルは現在、iOSデバイスにのみアップデートを配信しています。",

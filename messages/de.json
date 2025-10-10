@@ -296,6 +296,7 @@
   "default-download-channel-android-only-title": "Android-exklusive Kanäle",
   "default-download-channel-conflict": "Mehrere Standardwerte überschneiden sich mit derselben Plattform. Aktualisieren Sie die Auswahl, um Updates konsistent zu halten.",
   "default-download-channel-dialog-info": "Wählen Sie aus, welche Kanäle Updates für jede Plattform bereitstellen sollten.",
+  "default-download-channel-doc-link": "Lies den Leitfaden zu Standardkanälen",
   "default-download-channel-empty": "Noch kein Standard-Download-Kanal vorhanden",
   "default-download-channel-help": "Diese Kanäle liefern Updates an Geräte. Bevorzugen Sie einen einzelnen Kanal, der beide Plattformen unterstützt.",
   "default-download-channel-ios-only-desc": "Diese Kanäle liefern derzeit Updates nur für iOS-Geräte.",

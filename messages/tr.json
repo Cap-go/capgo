@@ -296,6 +296,7 @@
   "default-download-channel-android-only-title": "Yalnızca Android kanalları",
   "default-download-channel-conflict": "Birden fazla varsayılan, aynı platformda çakışır. Güncellemelerin tutarlı olmasını sağlamak için seçimi güncelleyin.",
   "default-download-channel-dialog-info": "Her platform için hangi kanalların güncellemeleri sunması gerektiğini seçin.",
+  "default-download-channel-doc-link": "Varsayılan kanallar kılavuzunu okuyun",
   "default-download-channel-empty": "Henüz varsayılan indirme kanalı yok",
   "default-download-channel-help": "Bu kanallar cihazlara güncellemeleri iletir. Hem platformları destekleyen tek bir kanalı tercih edin.",
   "default-download-channel-ios-only-desc": "Bu kanallar şu anda güncellemeleri yalnızca iOS cihazlarına gönderiyor.",

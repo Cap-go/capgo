@@ -258,6 +258,7 @@
   "default-download-channel-empty": "No default download channel yet",
   "default-download-channel-conflict": "Multiple defaults overlap the same platform. Update the selection to keep updates consistent.",
   "default-download-channel-dialog-info": "Pick which channels should serve updates for each platform.",
+  "default-download-channel-doc-link": "Read the channel defaults guide",
   "default-download-channel-use-unified": "Use one channel for iOS & Android",
   "default-download-channel-use-unified-desc": "Recommended. Devices on both platforms receive updates from the same channel.",
   "default-download-channel-split-desc": "Need different defaults? Toggle off to split by platform.",
