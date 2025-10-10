@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.34.52 (2025-10-10)
+
+
+### Bug Fixes
+
+* add channel doc link ([ff9779a](https://github.com/Cap-go/capgo/commit/ff9779a4a32dcc1c79501a3f0705d4ff27dda1c8))
+
 ### 12.34.51 (2025-10-10)
 
 ### 12.34.50 (2025-10-09)
