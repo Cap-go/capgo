@@ -1,8 +1,8 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
-import { Hono } from 'hono/tiny'
 import { eq } from 'drizzle-orm'
+import { Hono } from 'hono/tiny'
 import { BRES, middlewareAPISecret, triggerValidator } from '../utils/hono.ts'
 import { cloudlog } from '../utils/loggin.ts'
 import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
@@ -156,9 +156,11 @@ async function deleteManifest(c: Context, record: Database['public']['Tables']['
       }
       await backgroundTask(c, Promise.all(promisesDeleteS3))
     }
-  } catch (error) {
+  }
+  catch (error) {
     cloudlog({ requestId: c.get('requestId'), message: 'error fetch manifest entries', error })
-  } finally {
+  }
+  finally {
     await closeClient(c, pgClient)
   }
 }
