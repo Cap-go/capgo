@@ -66,8 +66,11 @@ async function getUploadUrl(c: Context, fileId: string, expirySeconds = 1200) {
 
 async function deleteObject(c: Context, fileId: string) {
   const client = initS3(c)
-  await client.deleteObject(fileId)
-  return true
+  const url = await client.getPresignedUrl('DELETE', fileId)
+  const response = await fetch(url, {
+    method: 'DELETE',
+  })
+  return response.status >= 200 && response.status < 300
 }
 
 async function checkIfExist(c: Context, fileId: string | null) {
@@ -77,8 +80,11 @@ async function checkIfExist(c: Context, fileId: string | null) {
   const client = initS3(c)
 
   try {
-    const file = await client.statObject(fileId)
-    return file.size > 0
+    const url = await client.getPresignedUrl('HEAD', fileId)
+    const response = await fetch(url, {
+      method: 'HEAD',
+    })
+    return response.status === 200 && !!response.headers.get('content-length') && response.headers.get('content-length') !== '0' && Number.parseInt(response.headers.get('content-length')!) > 0
   }
   catch {
     // cloudlog({ requestId: c.get('requestId'), message: 'checkIfExist', fileId, error  })
