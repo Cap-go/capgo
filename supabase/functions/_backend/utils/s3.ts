@@ -66,8 +66,11 @@ async function getUploadUrl(c: Context, fileId: string, expirySeconds = 1200) {
 
 async function deleteObject(c: Context, fileId: string) {
   const client = initS3(c)
-  await client.deleteObject(fileId)
-  return true
+  const url = await client.getPresignedUrl('DELETE', fileId)
+  const response = await fetch(url, {
+    method: 'DELETE',
+  })
+  return response.status >= 200 && response.status < 300
 }
 
 async function checkIfExist(c: Context, fileId: string | null) {
