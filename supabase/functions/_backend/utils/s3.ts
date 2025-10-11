@@ -81,7 +81,7 @@ async function checkIfExist(c: Context, fileId: string | null) {
     const response = await fetch(url, {
       method: 'HEAD',
     })
-    return response.status === 200 && response.headers.get('content-length') !== '0' && Number.parseInt(response.headers.get('content-length')!) > 0
+    return response.status === 200 && !!response.headers.get('content-length') && response.headers.get('content-length') !== '0' && Number.parseInt(response.headers.get('content-length')!) > 0
   }
   catch {
     // cloudlog({ requestId: c.get('requestId'), message: 'checkIfExist', fileId, error  })
