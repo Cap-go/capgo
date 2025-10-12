@@ -77,14 +77,13 @@ async function checkIfExist(c: Context, fileId: string | null) {
   if (!fileId) {
     return false
   }
-  const client = initS3(c)
-
   try {
     const url = await client.getPresignedUrl('HEAD', fileId)
     const response = await fetch(url, {
       method: 'HEAD',
     })
-    return response.status === 200 && !!response.headers.get('content-length') && response.headers.get('content-length') !== '0' && Number.parseInt(response.headers.get('content-length')!) > 0
+    const contentLength = Number.parseInt(response.headers.get('content-length') || '0')
+    return response.status === 200 && contentLength > 0
   }
   catch {
     // cloudlog({ requestId: c.get('requestId'), message: 'checkIfExist', fileId, error  })
