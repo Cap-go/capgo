@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.34.53 (2025-10-12)
+
+
+### Bug Fixes
+
+* chart missing AI did invent stuff ([ae3070d](https://github.com/Cap-go/capgo/commit/ae3070d81eb11fffeff7b41d4bcff8e9ec2b2e73))
+
 ### 12.34.52 (2025-10-10)
 
 
