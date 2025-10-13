@@ -78,6 +78,7 @@ async function checkIfExist(c: Context, fileId: string | null) {
     return false
   }
   try {
+    const client = initS3(c)
     const url = await client.getPresignedUrl('HEAD', fileId)
     const response = await fetch(url, {
       method: 'HEAD',
