@@ -23,7 +23,6 @@ import UsageCard from './UsageCard.vue'
 
 const props = defineProps<{
   appId?: string
-  showDevicesStats?: boolean
 }>()
 
 const plans = ref<Database['public']['Tables']['plans']['Row'][]>([])
@@ -507,7 +506,7 @@ onMounted(() => {
   <div
     v-if="!noData || isLoading"
     class="grid grid-cols-1 sm:grid-cols-12 gap-6 mb-6"
-    :class="appId && showDevicesStats ? 'xl:grid-cols-16' : 'xl:grid-cols-12'"
+    :class="appId ? 'xl:grid-cols-16' : 'xl:grid-cols-12'"
   >
     <UsageCard
       v-if="!isLoading" id="mau-stat" :limits="allLimits.mau" :colors="colors.emerald" :accumulated="useBillingPeriod && showCumulative"
@@ -545,7 +544,7 @@ onMounted(() => {
     >
       <Spinner size="w-40 h-40" />
     </div>
-    <DevicesStats v-if="appId && showDevicesStats" :use-billing-period="useBillingPeriod" :accumulated="useBillingPeriod && showCumulative" class="col-span-full sm:col-span-6 xl:col-span-4" />
+    <DevicesStats v-if="appId" :use-billing-period="useBillingPeriod" :accumulated="useBillingPeriod && showCumulative" class="col-span-full sm:col-span-6 xl:col-span-4" />
     <BundleUploadsCard v-if="!isLoading && !appId && chartsLoaded.bundles" :use-billing-period="useBillingPeriod" :accumulated="useBillingPeriod && showCumulative" class="col-span-full sm:col-span-6 xl:col-span-4" />
     <div
       v-else-if="!appId"

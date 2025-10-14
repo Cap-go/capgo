@@ -341,85 +341,8 @@ watchEffect(async () => {
   }
 })
 
-async function makeDefault(val = true) {
-  if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'super_admin'])) {
-    toast.error(t('no-permission'))
-    return
-  }
-  let buttonMessage = t('channel-make-now')
-  if (channel.value?.ios && !channel.value.android)
-    buttonMessage = t('make-default-ios')
-  else if (channel.value?.android && !channel.value.ios)
-    buttonMessage = t('make-default-android')
-
-  dialogStore.openDialog({
-    title: t('are-u-sure'),
-    description: val ? t('confirm-public-desc') : t('making-this-channel-'),
-    buttons: [
-      {
-        text: t('button-cancel'),
-        role: 'cancel',
-      },
-      {
-        text: val ? buttonMessage : t('make-normal'),
-        role: 'primary',
-        handler: async () => {
-          if (!channel.value || !id.value)
-            return
-          const { error } = await supabase
-            .from('channels')
-            .update({ public: val })
-            .eq('id', id.value)
-
-          // This code is here because the backend has a 20 second delay between setting a channel to public
-          // and the backend changing other channels to be not public
-          // In these 20 seconds the updates are broken
-          if (val && channel.value.ios) {
-            const { error: iosError } = await supabase
-              .from('channels')
-              .update({ public: false })
-              .eq('app_id', channel.value.app_id)
-              .eq('ios', true)
-              .neq('id', channel.value.id)
-            const { error: hiddenError } = await supabase
-              .from('channels')
-              .update({ public: false })
-              .eq('app_id', channel.value.app_id)
-              .eq('android', false)
-              .eq('ios', false)
-            if (iosError || hiddenError)
-              console.log('error', iosError ?? hiddenError)
-          }
-
-          if (val && channel.value.android) {
-            const { error: androidError } = await supabase
-              .from('channels')
-              .update({ public: false })
-              .eq('app_id', channel.value.app_id)
-              .eq('android', true)
-              .neq('id', channel.value.id)
-            const { error: hiddenError } = await supabase
-              .from('channels')
-              .update({ public: false })
-              .eq('app_id', channel.value.app_id)
-              .eq('android', false)
-              .eq('ios', false)
-            if (androidError || hiddenError)
-              console.log('error', androidError ?? hiddenError)
-          }
-
-          if (error) {
-            console.error(error)
-          }
-          else {
-            channel.value.public = val
-            toast.success(val ? t('defined-as-public') : t('defined-as-private'))
-          }
-        },
-      },
-    ],
-  })
-  return dialogStore.onDialogDismiss()
+function goToDefaultChannelSettings() {
+  router.push(`/app/p/${route.params.package}?tab=info`)
 }
 
 async function getUnknownVersion(): Promise<number> {
@@ -752,10 +675,30 @@ async function handleRevert() {
                 {{ channel.version.comment }}
               </InfoRow>
               <InfoRow :label="t('channel-is-public')">
-                <Toggle
-                  :value="channel?.public"
-                  @change="() => (makeDefault(!channel?.public))"
-                />
+                <div class="flex w-full items-center justify-end gap-3 text-right">
+                  <span
+                    class="inline-flex items-center rounded-md px-2 py-1 text-xs font-semibold"
+                    :class="channel?.public
+                      ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200'
+                      : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200'"
+                  >
+                    {{ channel?.public ? t('channel-default-active') : t('channel-default-inactive') }}
+                  </span>
+                  <button
+                    type="button"
+                    class="text-sm font-medium text-blue-600 underline decoration-dotted hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300"
+                    @click="goToDefaultChannelSettings"
+                  >
+                    {{ t('manage-default-channel') }}
+                  </button>
+                  <div class="relative inline-flex group">
+                    <IconInformations class="w-4 h-4 text-slate-400 transition-colors cursor-help group-hover:text-slate-600 dark:text-slate-400 dark:group-hover:text-slate-200" />
+                    <div class="pointer-events-none absolute right-0 bottom-full mb-2 w-56 rounded-lg bg-gray-800 px-3 py-2 text-xs text-white opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100">
+                      {{ t('channel-default-moved-info') }}
+                      <div class="absolute -bottom-1 right-2 h-2 w-2 rotate-45 bg-gray-800" />
+                    </div>
+                  </div>
+                </div>
               </InfoRow>
               <InfoRow label="iOS">
                 <Toggle

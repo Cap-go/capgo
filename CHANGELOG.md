@@ -2,6 +2,42 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.34.58 (2025-10-14)
+
+### 12.34.57 (2025-10-14)
+
+
+### Bug Fixes
+
+* fix supabase to 2.48.3 to make test works ([01f37c2](https://github.com/Cap-go/capgo/commit/01f37c2d83bcc538c7a879deb18f42f8e8058429))
+
+### 12.34.56 (2025-10-14)
+
+### 12.34.55 (2025-10-14)
+
+
+### Bug Fixes
+
+* usage page ([8a0866e](https://github.com/Cap-go/capgo/commit/8a0866e0f6677b62fde68a1b55530223ea656fb5))
+
+### 12.34.54 (2025-10-13)
+
+### 12.34.53 (2025-10-12)
+
+
+### Bug Fixes
+
+* chart missing AI did invent stuff ([ae3070d](https://github.com/Cap-go/capgo/commit/ae3070d81eb11fffeff7b41d4bcff8e9ec2b2e73))
+
+### 12.34.52 (2025-10-10)
+
+
+### Bug Fixes
+
+* add channel doc link ([ff9779a](https://github.com/Cap-go/capgo/commit/ff9779a4a32dcc1c79501a3f0705d4ff27dda1c8))
+
+### 12.34.51 (2025-10-10)
+
 ### 12.34.50 (2025-10-09)
 
 ### 12.34.49 (2025-10-08)

@@ -80,16 +80,30 @@ async function getUsage(orgId: string) {
     bandwidth: currentPlan?.bandwidth_unit,
   }
 
-  let totalMau = 0
+  const nowEndOfDay = dayjs().endOf('day')
+  const billingStart = organizationStore.currentOrganization?.subscription_start
+    ? dayjs(organizationStore.currentOrganization.subscription_start).startOf('day')
+    : null
+  const billingEndRaw = organizationStore.currentOrganization?.subscription_end
+    ? dayjs(organizationStore.currentOrganization.subscription_end).endOf('day')
+    : null
+  const billingEnd = billingEndRaw && billingEndRaw.isBefore(nowEndOfDay) ? billingEndRaw : nowEndOfDay
+
+  const usageInCycle = usage.filter((entry) => {
+    const entryDate = dayjs(entry.date)
+    if (billingStart && entryDate.isBefore(billingStart))
+      return false
+    if (entryDate.isAfter(billingEnd))
+      return false
+    return true
+  })
+
+  const relevantUsage = usageInCycle.length > 0 ? usageInCycle : usage
+
+  const totalMau = relevantUsage.reduce((acc, entry) => acc + (entry.mau ?? 0), 0)
+  const totalBandwidthBytes = relevantUsage.reduce((acc, entry) => acc + (entry.bandwidth ?? 0), 0)
+  const totalBandwidth = bytesToGb(totalBandwidthBytes)
   const totalStorage = bytesToGb(await getTotalStorage(orgId))
-  let totalBandwidth = 0
-
-  const latestUsage = usage.sort((a, b) => -dayjs(a.date).diff(dayjs(b.date))).at(0)
-
-  if (latestUsage) {
-    totalMau = latestUsage.mau
-    totalBandwidth = bytesToGb(latestUsage.bandwidth)
-  }
 
   const basePrice = currentPlan?.price_m ?? 0
 
