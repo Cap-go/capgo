@@ -372,12 +372,12 @@ export async function executeSQL(query: string, params?: any[]): Promise<any> {
 }
 
 export async function getCronPlanQueueCount(): Promise<number> {
-  const result = await executeSQL('SELECT COUNT(*) as count FROM pgmq.q_cron_plan')
+  const result = await executeSQL('SELECT COUNT(*) as count FROM pgmq.q_cron_stat_org')
   return parseInt(result[0]?.count || '0')
 }
 
 export async function getLatestCronPlanMessage(): Promise<any> {
-  const result = await executeSQL('SELECT message FROM pgmq.q_cron_plan ORDER BY msg_id DESC LIMIT 1')
+  const result = await executeSQL('SELECT message FROM pgmq.q_cron_stat_org ORDER BY msg_id DESC LIMIT 1')
   return result[0]?.message
 }
 

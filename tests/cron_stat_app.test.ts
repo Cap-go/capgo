@@ -2,14 +2,14 @@ import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { BASE_URL, ORG_ID, getSupabaseClient, resetAndSeedAppData, resetAndSeedAppDataStats, resetAppData, resetAppDataStats } from './test-utils.ts'
 
-const appId = `com.cron.stats.${randomUUID()}`
+const appId = `com.cron.${randomUUID().slice(0, 8)}`
 
 const triggerHeaders = {
   'Content-Type': 'application/json',
   'apisecret': 'testsecret',
 }
 
-describe('[POST] /triggers/cron_stats', () => {
+describe('[POST] /triggers/cron_stat_app', () => {
   beforeAll(async () => {
     await resetAndSeedAppData(appId)
     await resetAndSeedAppDataStats(appId)
@@ -29,7 +29,7 @@ describe('[POST] /triggers/cron_stats', () => {
   })
 
   it('updates stats_updated_at with a fresh timestamp', async () => {
-    const response = await fetch(`${BASE_URL}/triggers/cron_stats`, {
+    const response = await fetch(`${BASE_URL}/triggers/cron_stat_app`, {
       method: 'POST',
       headers: triggerHeaders,
       body: JSON.stringify({
@@ -72,7 +72,7 @@ describe('[POST] /triggers/cron_stats', () => {
       .eq('customer_id', 'cus_Pa0k8TO6HVln6A') // From seed data
       .throwOnError()
 
-    const response = await fetch(`${BASE_URL}/triggers/cron_stats`, {
+    const response = await fetch(`${BASE_URL}/triggers/cron_stat_app`, {
       method: 'POST',
       headers: triggerHeaders,
       body: JSON.stringify({
@@ -87,7 +87,7 @@ describe('[POST] /triggers/cron_stats', () => {
 
     // Verify that the queue function can be called (indicates plan processing was queued)
     // We can't easily check queue contents, but we can verify the function works
-    const { error: queueError } = await supabase.rpc('queue_cron_plan_for_org', {
+    const { error: queueError } = await supabase.rpc('queue_cron_stat_org_for_org', {
       org_id: ORG_ID,
       customer_id: 'cus_Pa0k8TO6HVln6A'
     })

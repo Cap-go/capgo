@@ -18,9 +18,9 @@ afterAll(async () => {
   await resetAppData(APPNAME)
 })
 
-describe('[POST] /triggers/cron_stats - Error Cases', () => {
+describe('[POST] /triggers/cron_stat_app - Error Cases', () => {
   it('should return 400 when appId is missing', async () => {
-    const response = await fetch(`${BASE_URL}/triggers/cron_stats`, {
+    const response = await fetch(`${BASE_URL}/triggers/cron_stat_app`, {
       method: 'POST',
       headers: triggerHeaders,
       body: JSON.stringify({}),
@@ -31,7 +31,7 @@ describe('[POST] /triggers/cron_stats - Error Cases', () => {
   })
 
   it('should return 400 when org is missing', async () => {
-    const response = await fetch(`${BASE_URL}/triggers/cron_stats`, {
+    const response = await fetch(`${BASE_URL}/triggers/cron_stat_app`, {
       method: 'POST',
       headers: triggerHeaders,
       body: JSON.stringify({
@@ -44,7 +44,7 @@ describe('[POST] /triggers/cron_stats - Error Cases', () => {
   })
 
   it('should return 400 when appId is not provided', async () => {
-    const response = await fetch(`${BASE_URL}/triggers/cron_stats`, {
+    const response = await fetch(`${BASE_URL}/triggers/cron_stat_app`, {
       method: 'POST',
       headers: triggerHeaders,
       body: JSON.stringify({
@@ -57,9 +57,9 @@ describe('[POST] /triggers/cron_stats - Error Cases', () => {
   })
 })
 
-describe('[POST] /triggers/cron_plan - Error Cases', () => {
+describe('[POST] /triggers/cron_stat_org - Error Cases', () => {
   it('should return 400 when orgId is missing', async () => {
-    const response = await fetch(`${BASE_URL}/triggers/cron_plan`, {
+    const response = await fetch(`${BASE_URL}/triggers/cron_stat_org`, {
       method: 'POST',
       headers: triggerHeaders,
       body: JSON.stringify({}),

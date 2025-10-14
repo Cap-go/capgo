@@ -17,7 +17,7 @@ app.use('/', useCors)
 
 app.post('/', middlewareAPISecret, async (c) => {
   const body = await parseBody<DataToGet>(c)
-  cloudlog({ requestId: c.get('requestId'), message: 'post cron_stats body', body })
+  cloudlog({ requestId: c.get('requestId'), message: 'post cron_stat_app body', body })
   if (!body.appId)
     throw simpleError('no_appId', 'No appId', { body })
   if (!body.orgId)
@@ -101,7 +101,7 @@ app.post('/', middlewareAPISecret, async (c) => {
 
   if (!orgError && orgData?.customer_id) {
     // Queue plan processing for this organization
-    await supabase.rpc('queue_cron_plan_for_org', {
+    await supabase.rpc('queue_cron_stat_org_for_org', {
       org_id: body.orgId,
       customer_id: orgData.customer_id,
     }).throwOnError()
