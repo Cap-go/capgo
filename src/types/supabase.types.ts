@@ -773,11 +773,10 @@ export type Database = {
         Row: {
           apps: number
           apps_active: number | null
+          bundle_storage_gb: number
           created_at: string | null
           date_id: string
           devices_last_month: number | null
-          bundle_storage_gb: number
-          registers_today: number
           need_upgrade: number | null
           not_paying: number | null
           onboarded: number | null
@@ -788,6 +787,7 @@ export type Database = {
           plan_payg: number | null
           plan_solo: number | null
           plan_team: number | null
+          registers_today: number
           stars: number
           success_rate: number | null
           trial: number | null
@@ -800,11 +800,10 @@ export type Database = {
         Insert: {
           apps: number
           apps_active?: number | null
+          bundle_storage_gb?: number
           created_at?: string | null
           date_id: string
           devices_last_month?: number | null
-          bundle_storage_gb?: number
-          registers_today?: number
           need_upgrade?: number | null
           not_paying?: number | null
           onboarded?: number | null
@@ -815,6 +814,7 @@ export type Database = {
           plan_payg?: number | null
           plan_solo?: number | null
           plan_team?: number | null
+          registers_today?: number
           stars: number
           success_rate?: number | null
           trial?: number | null
@@ -827,11 +827,10 @@ export type Database = {
         Update: {
           apps?: number
           apps_active?: number | null
+          bundle_storage_gb?: number
           created_at?: string | null
           date_id?: string
           devices_last_month?: number | null
-          bundle_storage_gb?: number
-          registers_today?: number
           need_upgrade?: number | null
           not_paying?: number | null
           onboarded?: number | null
@@ -842,6 +841,7 @@ export type Database = {
           plan_payg?: number | null
           plan_solo?: number | null
           plan_team?: number | null
+          registers_today?: number
           stars?: number
           success_rate?: number | null
           trial?: number | null
@@ -1993,7 +1993,7 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
-      queue_cron_plan_for_org: {
+      queue_cron_stat_org_for_org: {
         Args: { customer_id: string; org_id: string }
         Returns: undefined
       }
