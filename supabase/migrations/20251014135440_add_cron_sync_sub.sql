@@ -32,9 +32,14 @@ $$;
 
 -- Set permissions for the new function
 ALTER FUNCTION public.process_cron_sync_sub_jobs() OWNER TO postgres;
-GRANT ALL ON FUNCTION public.process_cron_sync_sub_jobs() TO anon;
-GRANT ALL ON FUNCTION public.process_cron_sync_sub_jobs() TO authenticated;
-GRANT ALL ON FUNCTION public.process_cron_sync_sub_jobs() TO service_role;
+
+-- Revoke all existing permissions first
+REVOKE ALL ON FUNCTION public.process_cron_sync_sub_jobs() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.process_cron_sync_sub_jobs() FROM anon;
+REVOKE ALL ON FUNCTION public.process_cron_sync_sub_jobs() FROM authenticated;
+
+-- Grant only EXECUTE permission to service_role
+GRANT EXECUTE ON FUNCTION public.process_cron_sync_sub_jobs() TO service_role;
 
 -- Create cron job for cron_sync_sub scheduling (daily at 4am)
 SELECT cron.schedule(

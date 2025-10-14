@@ -326,7 +326,7 @@ async function mass_edit_queue_messages_cf_ids(
     `)
   }
   catch (error) {
-    throw simpleError('error_updating_cf_ids', 'Error updating CF IDs', { }, error)
+    throw simpleError('error_updating_cf_ids', 'Error updating CF IDs', {}, error)
   }
 }
 
@@ -348,18 +348,21 @@ app.post('/sync', async (c) => {
   // Require JSON body with queue_name and optional batch_size
   const body = await parseBody<{ queue_name: string, batch_size?: number }>(c)
   const queueName = body?.queue_name
-  const batchSize = body?.batch_size ?? DEFAULT_BATCH_SIZE
+  const batchSize = body?.batch_size
 
   if (!queueName || typeof queueName !== 'string') {
     throw simpleError('missing_or_invalid_queue_name', 'Missing or invalid queue_name in body', { body })
   }
 
-  if (batchSize && (typeof batchSize !== 'number' || batchSize <= 0)) {
-    throw simpleError('invalid_batch_size', 'batch_size must be a positive number', { batchSize })
+  // Only validate when batchSize is explicitly provided
+  if (batchSize !== undefined) {
+    if (typeof batchSize !== 'number' || batchSize <= 0) {
+      throw simpleError('invalid_batch_size', 'batch_size must be a positive number', { batchSize })
+    }
   }
 
-  // Cap batch_size to maximum allowed (950)
-  const finalBatchSize = Math.min(batchSize, DEFAULT_BATCH_SIZE)
+  // Compute finalBatchSize: use provided batchSize capped with DEFAULT_BATCH_SIZE, or fall back to DEFAULT_BATCH_SIZE
+  const finalBatchSize = batchSize !== undefined ? Math.min(batchSize, DEFAULT_BATCH_SIZE) : DEFAULT_BATCH_SIZE
 
   await backgroundTask(c, (async () => {
     cloudlog({ requestId: c.get('requestId'), message: `[Background Queue Sync] Starting background execution for queue: ${queueName} with batch size: ${finalBatchSize}` })
