@@ -346,18 +346,18 @@ app.post('/sync', async (c) => {
   cloudlog({ requestId: c.get('requestId'), message: `[Sync Request] Received trigger to process queue.` })
 
   // Require JSON body with queue_name and optional batch_size
-  const body = await parseBody<{ queue_name: string; batch_size?: number }>(c)
+  const body = await parseBody<{ queue_name: string, batch_size?: number }>(c)
   const queueName = body?.queue_name
   const batchSize = body?.batch_size ?? DEFAULT_BATCH_SIZE
-  
+
   if (!queueName || typeof queueName !== 'string') {
     throw simpleError('missing_or_invalid_queue_name', 'Missing or invalid queue_name in body', { body })
   }
-  
+
   if (batchSize && (typeof batchSize !== 'number' || batchSize <= 0)) {
     throw simpleError('invalid_batch_size', 'batch_size must be a positive number', { batchSize })
   }
-  
+
   // Cap batch_size to maximum allowed (950)
   const finalBatchSize = Math.min(batchSize, DEFAULT_BATCH_SIZE)
 

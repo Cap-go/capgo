@@ -319,7 +319,8 @@ export async function checkPlanStatusOnly(c: Context, orgId: string): Promise<vo
   if (!is_good_plan) {
     // Use existing userAbovePlan function to handle exceeded flags
     await userAbovePlan(c, org, orgId, is_good_plan)
-  } else {
+  }
+  else {
     // If plan is good, reset exceeded flags (from userIsAtPlanUsage)
     await set_mau_exceeded(c, orgId, false)
     await set_storage_exceeded(c, orgId, false)
