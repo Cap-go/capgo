@@ -15,7 +15,7 @@ SELECT cron.schedule(
 ALTER TABLE public.stripe_info ADD COLUMN IF NOT EXISTS plan_calculated_at timestamp with time zone;
 
 -- Update the queue function to check if plan was calculated in the last hour
-CREATE OR REPLACE FUNCTION public.queue_cron_plan_for_org(org_id uuid, customer_id text)
+CREATE OR REPLACE FUNCTION public.queue_cron_stat_org_for_org(org_id uuid, customer_id text)
 RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -27,7 +27,7 @@ BEGIN
   -- Check when plan was last calculated for this customer
   SELECT plan_calculated_at INTO last_calculated
   FROM public.stripe_info
-  WHERE stripe_info.customer_id = queue_cron_plan_for_org.customer_id;
+  WHERE stripe_info.customer_id = queue_cron_stat_org_for_org.customer_id;
   
   -- Only queue if plan wasn't calculated in the last hour
   IF last_calculated IS NULL OR last_calculated < NOW() - INTERVAL '1 hour' THEN
@@ -46,10 +46,10 @@ END;
 $$;
 
 
-ALTER FUNCTION public.queue_cron_plan_for_org(uuid, text) OWNER TO postgres;
+ALTER FUNCTION public.queue_cron_stat_org_for_org(uuid, text) OWNER TO postgres;
 
 -- Revoke all permissions first, then grant only to service_role
-REVOKE ALL ON FUNCTION public.queue_cron_plan_for_org(uuid, text) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.queue_cron_plan_for_org(uuid, text) FROM anon;
-REVOKE ALL ON FUNCTION public.queue_cron_plan_for_org(uuid, text) FROM authenticated;
-GRANT ALL ON FUNCTION public.queue_cron_plan_for_org(uuid, text) TO service_role;
+REVOKE ALL ON FUNCTION public.queue_cron_stat_org_for_org(uuid, text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.queue_cron_stat_org_for_org(uuid, text) FROM anon;
+REVOKE ALL ON FUNCTION public.queue_cron_stat_org_for_org(uuid, text) FROM authenticated;
+GRANT ALL ON FUNCTION public.queue_cron_stat_org_for_org(uuid, text) TO service_role;

@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { ORG_ID, getSupabaseClient, getCronPlanQueueCount, getLatestCronPlanMessage, cleanupPostgresClient } from './test-utils.ts'
+import { cleanupPostgresClient, getCronPlanQueueCount, getLatestCronPlanMessage, getSupabaseClient, ORG_ID } from './test-utils.ts'
+
 
 describe('[Function] queue_cron_stat_org_for_org', () => {
     let testCustomerId: string | null = null
@@ -16,7 +17,8 @@ describe('[Function] queue_cron_stat_org_for_org', () => {
 
         if (orgData?.customer_id) {
             testCustomerId = orgData.customer_id
-        } else {
+        }
+        else {
             // Fallback: get any existing stripe_info record
             const { data: stripeData } = await supabase
                 .from('stripe_info')
@@ -52,9 +54,9 @@ describe('[Function] queue_cron_stat_org_for_org', () => {
         const initialCount = await getCronPlanQueueCount()
 
         // Call the function
-        const { error } = await supabase.rpc('queue_cron_plan_for_org', {
+        const { error } = await supabase.rpc('queue_cron_stat_org_for_org', {
             org_id: ORG_ID,
-            customer_id: testCustomerId
+            customer_id: testCustomerId,
         })
 
         expect(error).toBeNull()
@@ -70,8 +72,8 @@ describe('[Function] queue_cron_stat_org_for_org', () => {
             function_type: 'cloudflare',
             payload: {
                 orgId: ORG_ID,
-                customerId: testCustomerId
-            }
+                customerId: testCustomerId,
+            },
         })
     })
 
@@ -95,9 +97,9 @@ describe('[Function] queue_cron_stat_org_for_org', () => {
         const initialCount = await getCronPlanQueueCount()
 
         // Call the function
-        const { error } = await supabase.rpc('queue_cron_plan_for_org', {
+        const { error } = await supabase.rpc('queue_cron_stat_org_for_org', {
             org_id: ORG_ID,
-            customer_id: testCustomerId
+            customer_id: testCustomerId,
         })
 
         expect(error).toBeNull()
@@ -114,7 +116,7 @@ describe('[Function] queue_cron_stat_org_for_org', () => {
             .single()
             .throwOnError()
 
-        const actualTimestamp = new Date(stripeInfo?.plan_calculated_at!).getTime()
+        const actualTimestamp = new Date(stripeInfo?.plan_calculated_at ?? 0).getTime()
         const expectedTimestamp = thirtyMinutesAgo.getTime()
 
         // Should be within 1 second of the original timestamp (rate limiting prevented update)
@@ -141,9 +143,9 @@ describe('[Function] queue_cron_stat_org_for_org', () => {
         const initialCount = await getCronPlanQueueCount()
 
         // Call the function
-        const { error } = await supabase.rpc('queue_cron_plan_for_org', {
+        const { error } = await supabase.rpc('queue_cron_stat_org_for_org', {
             org_id: ORG_ID,
-            customer_id: testCustomerId
+            customer_id: testCustomerId,
         })
 
         expect(error).toBeNull()
@@ -159,8 +161,8 @@ describe('[Function] queue_cron_stat_org_for_org', () => {
             function_type: 'cloudflare',
             payload: {
                 orgId: ORG_ID,
-                customerId: testCustomerId
-            }
+                customerId: testCustomerId,
+            },
         })
     })
 
@@ -168,9 +170,9 @@ describe('[Function] queue_cron_stat_org_for_org', () => {
         const supabase = getSupabaseClient()
 
         // Call with non-existent customer_id
-        const { error } = await supabase.rpc('queue_cron_plan_for_org', {
+        const { error } = await supabase.rpc('queue_cron_stat_org_for_org', {
             org_id: ORG_ID,
-            customer_id: 'non_existent_customer'
+            customer_id: 'non_existent_customer',
         })
 
         expect(error).toBeNull()
@@ -187,9 +189,9 @@ describe('[Function] queue_cron_stat_org_for_org', () => {
         // The actual permission restriction is tested at the database level
         const supabase = getSupabaseClient()
 
-        const { error } = await supabase.rpc('queue_cron_plan_for_org', {
+        const { error } = await supabase.rpc('queue_cron_stat_org_for_org', {
             org_id: ORG_ID,
-            customer_id: testCustomerId
+            customer_id: testCustomerId,
         })
 
         expect(error).toBeNull()
