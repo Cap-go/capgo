@@ -24,12 +24,26 @@ export type Bindings = {
   ATTACHMENT_UPLOAD_HANDLER: DurableObjectNamespace
 }
 
-export function trackDeviceUsageCF(c: Context, device_id: string, app_id: string) {
+/**
+ * Track device usage (MAU) in Cloudflare Analytics Engine
+ * 
+ * This function sends MAU statistics to Cloudflare Analytics Engine with both app_id and org_id
+ * for organization-level analytics and activity detection. The org_id allows for:
+ * - Organization-level MAU queries and filtering
+ * - Activity detection for organizations with recent MAU stats
+ * - Better analytics segmentation by organization
+ * 
+ * @param c - Hono context
+ * @param device_id - Unique device identifier
+ * @param app_id - Application identifier
+ * @param org_id - Organization identifier (optional, defaults to empty string)
+ */
+export function trackDeviceUsageCF(c: Context, device_id: string, app_id: string, org_id?: string) {
   if (!c.env.DEVICE_USAGE)
     return Promise.resolve()
   c.env.DEVICE_USAGE.writeDataPoint({
     blobs: [device_id],
-    indexes: [app_id],
+    indexes: [app_id, org_id || ''],
   })
   return Promise.resolve()
 }
@@ -202,12 +216,14 @@ export interface DeviceUsageCF {
   date: string
   mau: number
   app_id: string
+  org_id?: string
 }
 
 export interface DeviceUsageAllCF {
   date: string
   device_id: string
   app_id: string
+  org_id: string
 }
 
 export async function readDeviceUsageCF(c: Context, app_id: string, period_start: string, period_end: string) {
@@ -216,7 +232,8 @@ export async function readDeviceUsageCF(c: Context, app_id: string, period_start
   const query = `SELECT
     formatDateTime(toStartOfInterval(timestamp, INTERVAL '1' DAY), '%Y-%m-%d') AS date,
     blob1 AS device_id,
-    index1 AS app_id
+    index1 AS app_id,
+    index2 AS org_id
   FROM device_usage
   WHERE
     app_id = '${app_id}'
@@ -237,12 +254,13 @@ export async function readDeviceUsageCF(c: Context, app_id: string, period_start
 
     // Now calculate MAU based on the unique devices
     const groupedByDay = arr.reduce((acc, curr) => {
-      const { date, app_id } = curr
+      const { date, app_id, org_id } = curr
       if (!acc[date]) {
         acc[date] = {
           date,
           mau: 0,
           app_id,
+          org_id,
         }
       }
       acc[date].mau++
