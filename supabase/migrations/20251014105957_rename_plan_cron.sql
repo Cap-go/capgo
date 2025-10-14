@@ -35,6 +35,7 @@ CREATE OR REPLACE FUNCTION public.queue_cron_stat_org_for_org(org_id uuid, custo
 RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = ''
 AS $$
 DECLARE
   last_calculated timestamptz;
@@ -59,3 +60,14 @@ BEGIN
   END IF;
 END;
 $$;
+
+ALTER FUNCTION public.queue_cron_stat_org_for_org(uuid, text) OWNER TO postgres;
+
+-- Revoke all permissions first, then grant only to service_role
+REVOKE ALL ON FUNCTION public.queue_cron_stat_org_for_org(uuid, text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.queue_cron_stat_org_for_org(uuid, text) FROM anon;
+REVOKE ALL ON FUNCTION public.queue_cron_stat_org_for_org(uuid, text) FROM authenticated;
+GRANT ALL ON FUNCTION public.queue_cron_stat_org_for_org(uuid, text) TO service_role;
+
+-- Drop the old function that is no longer needed
+DROP FUNCTION IF EXISTS public.queue_cron_plan_for_org(uuid, text);
