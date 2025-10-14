@@ -101,7 +101,7 @@ app.post('/', middlewareAPISecret, async (c) => {
 
     if (!orgError && orgData?.customer_id) {
         // Queue plan processing for this organization
-        await supabase.rpc('queue_cron_plan_for_org', {
+        await supabase.rpc('queue_cron_stat_org_for_org', {
             org_id: body.orgId,
             customer_id: orgData.customer_id,
         }).throwOnError()

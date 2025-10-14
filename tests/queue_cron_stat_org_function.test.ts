@@ -52,7 +52,7 @@ describe('[Function] queue_cron_stat_org_for_org', () => {
         const initialCount = await getCronPlanQueueCount()
 
         // Call the function
-        const { error } = await supabase.rpc('queue_cron_plan_for_org', {
+        const { error } = await supabase.rpc('queue_cron_stat_org_for_org', {
             org_id: ORG_ID,
             customer_id: testCustomerId
         })
@@ -95,7 +95,7 @@ describe('[Function] queue_cron_stat_org_for_org', () => {
         const initialCount = await getCronPlanQueueCount()
 
         // Call the function
-        const { error } = await supabase.rpc('queue_cron_plan_for_org', {
+        const { error } = await supabase.rpc('queue_cron_stat_org_for_org', {
             org_id: ORG_ID,
             customer_id: testCustomerId
         })
@@ -141,7 +141,7 @@ describe('[Function] queue_cron_stat_org_for_org', () => {
         const initialCount = await getCronPlanQueueCount()
 
         // Call the function
-        const { error } = await supabase.rpc('queue_cron_plan_for_org', {
+        const { error } = await supabase.rpc('queue_cron_stat_org_for_org', {
             org_id: ORG_ID,
             customer_id: testCustomerId
         })
@@ -168,7 +168,7 @@ describe('[Function] queue_cron_stat_org_for_org', () => {
         const supabase = getSupabaseClient()
 
         // Call with non-existent customer_id
-        const { error } = await supabase.rpc('queue_cron_plan_for_org', {
+        const { error } = await supabase.rpc('queue_cron_stat_org_for_org', {
             org_id: ORG_ID,
             customer_id: 'non_existent_customer'
         })
@@ -187,7 +187,7 @@ describe('[Function] queue_cron_stat_org_for_org', () => {
         // The actual permission restriction is tested at the database level
         const supabase = getSupabaseClient()
 
-        const { error } = await supabase.rpc('queue_cron_plan_for_org', {
+        const { error } = await supabase.rpc('queue_cron_stat_org_for_org', {
             org_id: ORG_ID,
             customer_id: testCustomerId
         })

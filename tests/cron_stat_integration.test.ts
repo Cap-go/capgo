@@ -155,7 +155,7 @@ describe('[Integration] cron_stat_app -> cron_stat_org flow', () => {
             .throwOnError()
 
         // Call the queue function directly (simulating what cron_stat_app does)
-        const { error } = await supabase.rpc('queue_cron_plan_for_org', {
+        const { error } = await supabase.rpc('queue_cron_stat_org_for_org', {
             org_id: ORG_ID,
             customer_id: orgData.customer_id
         })
@@ -204,7 +204,7 @@ describe('[Integration] cron_stat_app -> cron_stat_org flow', () => {
             .throwOnError()
 
         // Call the queue function directly
-        const { error } = await supabase.rpc('queue_cron_plan_for_org', {
+        const { error } = await supabase.rpc('queue_cron_stat_org_for_org', {
             org_id: ORG_ID,
             customer_id: orgData.customer_id
         })

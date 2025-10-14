@@ -87,7 +87,7 @@ describe('[POST] /triggers/cron_stat_app', () => {
 
     // Verify that the queue function can be called (indicates plan processing was queued)
     // We can't easily check queue contents, but we can verify the function works
-    const { error: queueError } = await supabase.rpc('queue_cron_plan_for_org', {
+    const { error: queueError } = await supabase.rpc('queue_cron_stat_org_for_org', {
       org_id: ORG_ID,
       customer_id: 'cus_Pa0k8TO6HVln6A'
     })
