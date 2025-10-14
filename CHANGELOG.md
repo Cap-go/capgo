@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.34.57 (2025-10-14)
+
+
+### Bug Fixes
+
+* fix supabase to 2.48.3 to make test works ([01f37c2](https://github.com/Cap-go/capgo/commit/01f37c2d83bcc538c7a879deb18f42f8e8058429))
+
 ### 12.34.56 (2025-10-14)
 
 ### 12.34.55 (2025-10-14)
