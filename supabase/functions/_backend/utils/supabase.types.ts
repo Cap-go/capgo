@@ -1978,7 +1978,7 @@ export type Database = {
         Returns: undefined
       }
       process_function_queue: {
-        Args: { queue_name: string }
+        Args: { queue_name: string; batch_size?: number }
         Returns: number
       }
       process_stats_email_monthly: {

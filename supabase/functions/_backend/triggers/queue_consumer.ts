@@ -10,7 +10,7 @@ import { closeClient, getPgClient } from '../utils/pg.ts'
 import { backgroundTask, getEnv } from '../utils/utils.ts'
 
 // Define constants
-const BATCH_SIZE = 950 // Batch size for queue reads limit of CF is 1000 fetches so we take a safe margin
+const DEFAULT_BATCH_SIZE = 950 // Default batch size for queue reads limit of CF is 1000 fetches so we take a safe margin
 
 // Zod schema for a message object
 export const messageSchema = z.object({
@@ -40,8 +40,8 @@ function generateUUID(): string {
   return crypto.randomUUID()
 }
 
-async function processQueue(c: Context, sql: ReturnType<typeof getPgClient>, queueName: string) {
-  const messages = await readQueue(c, sql, queueName)
+async function processQueue(c: Context, sql: ReturnType<typeof getPgClient>, queueName: string, batchSize: number = DEFAULT_BATCH_SIZE) {
+  const messages = await readQueue(c, sql, queueName, batchSize)
 
   if (!messages) {
     cloudlog(`[${queueName}] No messages found in queue or an error occurred.`)
@@ -185,7 +185,7 @@ async function processQueue(c: Context, sql: ReturnType<typeof getPgClient>, que
 }
 
 // Reads messages from the queue and logs them
-async function readQueue(c: Context, sql: ReturnType<typeof getPgClient>, queueName: string): Promise<Message[]> {
+async function readQueue(c: Context, sql: ReturnType<typeof getPgClient>, queueName: string, batchSize: number = DEFAULT_BATCH_SIZE): Promise<Message[]> {
   const queueKey = 'readQueue'
   const startTime = Date.now()
   let messages: Message[] = []
@@ -198,7 +198,7 @@ async function readQueue(c: Context, sql: ReturnType<typeof getPgClient>, queueN
     try {
       messages = await sql`
         SELECT msg_id, message, read_ct
-        FROM pgmq.read(${queueName}, ${visibilityTimeout}, ${BATCH_SIZE})
+        FROM pgmq.read(${queueName}, ${visibilityTimeout}, ${batchSize})
       `
     }
     catch (readError) {
@@ -345,19 +345,28 @@ app.post('/sync', async (c) => {
   const handlerStart = Date.now()
   cloudlog({ requestId: c.get('requestId'), message: `[Sync Request] Received trigger to process queue.` })
 
-  // Require JSON body with queue_name
-  const body = await parseBody<{ queue_name: string }>(c)
+  // Require JSON body with queue_name and optional batch_size
+  const body = await parseBody<{ queue_name: string; batch_size?: number }>(c)
   const queueName = body?.queue_name
+  const batchSize = body?.batch_size ?? DEFAULT_BATCH_SIZE
+  
   if (!queueName || typeof queueName !== 'string') {
     throw simpleError('missing_or_invalid_queue_name', 'Missing or invalid queue_name in body', { body })
   }
+  
+  if (batchSize && (typeof batchSize !== 'number' || batchSize <= 0)) {
+    throw simpleError('invalid_batch_size', 'batch_size must be a positive number', { batchSize })
+  }
+  
+  // Cap batch_size to maximum allowed (950)
+  const finalBatchSize = Math.min(batchSize, DEFAULT_BATCH_SIZE)
 
   await backgroundTask(c, (async () => {
-    cloudlog({ requestId: c.get('requestId'), message: `[Background Queue Sync] Starting background execution for queue: ${queueName}` })
+    cloudlog({ requestId: c.get('requestId'), message: `[Background Queue Sync] Starting background execution for queue: ${queueName} with batch size: ${finalBatchSize}` })
     let sql: ReturnType<typeof getPgClient> | null = null
     try {
       sql = getPgClient(c)
-      await processQueue(c, sql, queueName)
+      await processQueue(c, sql, queueName, finalBatchSize)
       cloudlog({ requestId: c.get('requestId'), message: `[Background Queue Sync] Background execution finished successfully.` })
     }
     finally {

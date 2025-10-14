@@ -27,6 +27,7 @@ import { app as cron_clear_versions } from '../../supabase/functions/_backend/tr
 import { app as cron_email } from '../../supabase/functions/_backend/triggers/cron_email.ts'
 import { app as cron_stat_org } from '../../supabase/functions/_backend/triggers/cron_stat_org.ts'
 import { app as cron_stat_app } from '../../supabase/functions/_backend/triggers/cron_stat_app.ts'
+import { app as cron_sync_sub } from '../../supabase/functions/_backend/triggers/cron_sync_sub.ts'
 import { app as logsnag_insights } from '../../supabase/functions/_backend/triggers/logsnag_insights.ts'
 import { app as on_app_create } from '../../supabase/functions/_backend/triggers/on_app_create.ts'
 import { app as on_channel_update } from '../../supabase/functions/_backend/triggers/on_channel_update.ts'
@@ -98,6 +99,7 @@ appTriggers.route('/stripe_event', stripe_event)
 appTriggers.route('/on_organization_create', on_organization_create)
 appTriggers.route('/cron_stat_app', cron_stat_app)
 appTriggers.route('/cron_stat_org', cron_stat_org)
+appTriggers.route('/cron_sync_sub', cron_sync_sub)
 appTriggers.route('/queue_consumer', queue_consumer)
 
 app.route('/triggers', appTriggers)
