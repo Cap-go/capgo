@@ -2,14 +2,14 @@ import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { BASE_URL, ORG_ID, USER_ID, getSupabaseClient, resetAndSeedAppData, resetAndSeedAppDataStats, resetAppData, resetAppDataStats } from './test-utils.ts'
 
-const appId = `com.cron.plan.integration.${randomUUID()}`
+const appId = `com.cron.${randomUUID().slice(0, 8)}`
 
 const triggerHeaders = {
     'Content-Type': 'application/json',
     'apisecret': 'testsecret',
 }
 
-describe('[Integration] cron_stats -> cron_plan flow', () => {
+describe('[Integration] cron_stat_app -> cron_stat_org flow', () => {
     beforeAll(async () => {
         await resetAndSeedAppData(appId)
         await resetAndSeedAppDataStats(appId)
@@ -36,7 +36,7 @@ describe('[Integration] cron_stats -> cron_plan flow', () => {
         await resetAppDataStats(appId)
     })
 
-    it('cron_stats triggers plan processing and updates plan_calculated_at', async () => {
+    it('cron_stat_app triggers plan processing and updates plan_calculated_at', async () => {
         const supabase = getSupabaseClient()
 
         // First, get the actual customer_id for our test org
@@ -72,8 +72,8 @@ describe('[Integration] cron_stats -> cron_plan flow', () => {
 
         expect(initialStripeInfo?.plan_calculated_at).toBeNull()
 
-        // Trigger cron_stats which should queue plan processing
-        const statsResponse = await fetch(`${BASE_URL}/triggers/cron_stats`, {
+        // Trigger cron_stat_app which should queue plan processing
+        const statsResponse = await fetch(`${BASE_URL}/triggers/cron_stat_app`, {
             method: 'POST',
             headers: triggerHeaders,
             body: JSON.stringify({
@@ -100,7 +100,7 @@ describe('[Integration] cron_stats -> cron_plan flow', () => {
         // The plan processing would normally be triggered by the queue processor
 
         // Manually trigger cron_plan to simulate queue processing
-        const planResponse = await fetch(`${BASE_URL}/triggers/cron_plan`, {
+        const planResponse = await fetch(`${BASE_URL}/triggers/cron_stat_org`, {
             method: 'POST',
             headers: triggerHeaders,
             body: JSON.stringify({
@@ -154,7 +154,7 @@ describe('[Integration] cron_stats -> cron_plan flow', () => {
             .eq('customer_id', orgData.customer_id)
             .throwOnError()
 
-        // Call the queue function directly (simulating what cron_stats does)
+        // Call the queue function directly (simulating what cron_stat_app does)
         const { error } = await supabase.rpc('queue_cron_plan_for_org', {
             org_id: ORG_ID,
             customer_id: orgData.customer_id
@@ -212,7 +212,7 @@ describe('[Integration] cron_stats -> cron_plan flow', () => {
         expect(error).toBeNull()
 
         // Now manually trigger plan processing to simulate queue processing
-        const planResponse = await fetch(`${BASE_URL}/triggers/cron_plan`, {
+        const planResponse = await fetch(`${BASE_URL}/triggers/cron_stat_org`, {
             method: 'POST',
             headers: triggerHeaders,
             body: JSON.stringify({
@@ -240,7 +240,7 @@ describe('[Integration] cron_stats -> cron_plan flow', () => {
     })
 
     it('handles missing customer_id gracefully', async () => {
-        // Trigger cron_stats for an org without customer_id
+        // Trigger cron_stat_app for an org without customer_id
         const supabase = getSupabaseClient()
 
         // Create a temporary org without customer_id
@@ -277,8 +277,8 @@ describe('[Integration] cron_stats -> cron_plan flow', () => {
             })
             .throwOnError()
 
-        // Trigger cron_stats - should not error even without customer_id
-        const statsResponse = await fetch(`${BASE_URL}/triggers/cron_stats`, {
+        // Trigger cron_stat_app - should not error even without customer_id
+        const statsResponse = await fetch(`${BASE_URL}/triggers/cron_stat_app`, {
             method: 'POST',
             headers: triggerHeaders,
             body: JSON.stringify({

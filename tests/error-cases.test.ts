@@ -194,8 +194,8 @@ describe('server Error Cases (5xx)', () => {
 })
 
 describe('trigger Endpoint Error Cases', () => {
-  it('should return 400 for cron_stats without appId', async () => {
-    const response = await fetch(`${BASE_URL}/triggers/cron_stats`, {
+  it('should return 400 for cron_stat_app without appId', async () => {
+    const response = await fetch(`${BASE_URL}/triggers/cron_stat_app`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -209,7 +209,7 @@ describe('trigger Endpoint Error Cases', () => {
   })
 
   it('should return 400 for cron_plan without orgId', async () => {
-    const response = await fetch(`${BASE_URL}/triggers/cron_plan`, {
+    const response = await fetch(`${BASE_URL}/triggers/cron_stat_org`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

@@ -112,9 +112,9 @@ afterAll(async () => {
   await resetAppDataStats(APPNAME)
 })
 
-describe('[POST] /triggers/cron_plan', () => {
+describe('[POST] /triggers/cron_stat_org', () => {
   it('should return 400 when orgId is missing', async () => {
-    const response = await fetch(`${BASE_URL}/triggers/cron_plan`, {
+    const response = await fetch(`${BASE_URL}/triggers/cron_stat_org`, {
       method: 'POST',
       headers,
       body: JSON.stringify({}),
@@ -150,7 +150,7 @@ describe('[POST] /triggers/cron_plan', () => {
     if (error)
       throw error
 
-    const response = await fetch(`${BASE_URL}/triggers/cron_plan`, {
+    const response = await fetch(`${BASE_URL}/triggers/cron_stat_org`, {
       method: 'POST',
       headers,
       body: JSON.stringify({ orgId: ORG_ID }),
@@ -218,7 +218,7 @@ describe('[POST] /triggers/cron_plan', () => {
     if (error)
       throw error
 
-    const response = await fetch(`${BASE_URL}/triggers/cron_plan`, {
+    const response = await fetch(`${BASE_URL}/triggers/cron_stat_org`, {
       method: 'POST',
       headers,
       body: JSON.stringify({ orgId: ORG_ID }),
@@ -295,7 +295,7 @@ describe('[POST] /triggers/cron_plan', () => {
     if (error)
       throw error
 
-    const response = await fetch(`${BASE_URL}/triggers/cron_plan`, {
+    const response = await fetch(`${BASE_URL}/triggers/cron_stat_org`, {
       method: 'POST',
       headers,
       body: JSON.stringify({ orgId: ORG_ID }),
@@ -366,7 +366,7 @@ describe('[POST] /triggers/cron_plan', () => {
     expect(setMauError).toBeFalsy()
 
     // Run cron plan to set exceeded status
-    const response = await fetch(`${BASE_URL}/triggers/cron_plan`, {
+    const response = await fetch(`${BASE_URL}/triggers/cron_stat_org`, {
       method: 'POST',
       headers,
       body: JSON.stringify({ orgId: ORG_ID }),
@@ -395,7 +395,7 @@ describe('[POST] /triggers/cron_plan', () => {
     expect(appMetricsCacheError).toBeFalsy()
 
     // Run cron plan again
-    const response2 = await fetch(`${BASE_URL}/triggers/cron_plan`, {
+    const response2 = await fetch(`${BASE_URL}/triggers/cron_stat_org`, {
       method: 'POST',
       headers,
       body: JSON.stringify({ orgId: ORG_ID }),
@@ -420,7 +420,7 @@ describe('[POST] /triggers/cron_plan', () => {
     expect(setStorageError).toBeFalsy()
 
     // Run cron plan to set exceeded status
-    const response = await fetch(`${BASE_URL}/triggers/cron_plan`, {
+    const response = await fetch(`${BASE_URL}/triggers/cron_stat_org`, {
       method: 'POST',
       headers,
       body: JSON.stringify({ orgId: ORG_ID }),
@@ -448,7 +448,7 @@ describe('[POST] /triggers/cron_plan', () => {
     expect(storageCacheError).toBeFalsy()
 
     // Run cron plan again
-    const response2 = await fetch(`${BASE_URL}/triggers/cron_plan`, {
+    const response2 = await fetch(`${BASE_URL}/triggers/cron_stat_org`, {
       method: 'POST',
       headers,
       body: JSON.stringify({ orgId: ORG_ID }),
@@ -482,7 +482,7 @@ describe('[POST] /triggers/cron_plan', () => {
     expect(setBandwidthError).toBeFalsy()
 
     // Run cron plan to set exceeded status
-    const response = await fetch(`${BASE_URL}/triggers/cron_plan`, {
+    const response = await fetch(`${BASE_URL}/triggers/cron_stat_org`, {
       method: 'POST',
       headers,
       body: JSON.stringify({ orgId: ORG_ID }),
@@ -511,7 +511,7 @@ describe('[POST] /triggers/cron_plan', () => {
     expect(appMetricsCacheError).toBeFalsy()
 
     // Run cron plan again
-    const response2 = await fetch(`${BASE_URL}/triggers/cron_plan`, {
+    const response2 = await fetch(`${BASE_URL}/triggers/cron_stat_org`, {
       method: 'POST',
       headers,
       body: JSON.stringify({ orgId: ORG_ID }),
@@ -564,7 +564,7 @@ describe('[POST] /triggers/cron_plan', () => {
   //   expect(deletedApp).toBeTruthy()
 
   //   // Wait for the trigger to process by calling cron_plan
-  //   const response = await fetch(`${BASE_URL}/triggers/cron_plan`, {
+  //   const response = await fetch(`${BASE_URL}/triggers/cron_stat_org`, {
   //     method: 'POST',
   //     headers,
   //     body: JSON.stringify({ orgId: ORG_ID }),

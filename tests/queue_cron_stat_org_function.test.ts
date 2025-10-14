@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { ORG_ID, getSupabaseClient, getCronPlanQueueCount, getLatestCronPlanMessage, cleanupPostgresClient } from './test-utils.ts'
 
-describe('[Function] queue_cron_plan_for_org', () => {
+describe('[Function] queue_cron_stat_org_for_org', () => {
     let testCustomerId: string | null = null
 
     beforeAll(async () => {
@@ -66,7 +66,7 @@ describe('[Function] queue_cron_plan_for_org', () => {
         // Verify the queue record contains correct data
         const latestMessage = await getLatestCronPlanMessage()
         expect(latestMessage).toMatchObject({
-            function_name: 'cron_plan',
+            function_name: 'cron_stat_org',
             function_type: 'cloudflare',
             payload: {
                 orgId: ORG_ID,
@@ -155,7 +155,7 @@ describe('[Function] queue_cron_plan_for_org', () => {
         // Verify the queue record contains correct data
         const latestMessage = await getLatestCronPlanMessage()
         expect(latestMessage).toMatchObject({
-            function_name: 'cron_plan',
+            function_name: 'cron_stat_org',
             function_type: 'cloudflare',
             payload: {
                 orgId: ORG_ID,

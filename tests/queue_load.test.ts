@@ -243,7 +243,7 @@ describe('queue Load Test', () => {
   //       fetch(`${BASE_URL_TRIGGER}/queue_consumer/sync`, {
   //         method: 'POST',
   //         headers: headersInternal,
-  //         body: JSON.stringify({ queue_name: 'cron_stats' }),
+  //         body: JSON.stringify({ queue_name: 'cron_stat_app' }),
   //       }),
   //     )
 

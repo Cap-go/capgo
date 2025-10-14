@@ -25,7 +25,6 @@ declare module 'vue' {
     DropdownProfile: typeof import('./components/dashboard/DropdownProfile.vue')['default']
     FailedCard: typeof import('./components/FailedCard.vue')['default']
     HistoryTable: typeof import('./components/tables/HistoryTable.vue')['default']
-    IIonCopyOutline: typeof import('~icons/ion/copy-outline')['default']
     InfoRow: typeof import('./components/package/InfoRow.vue')['default']
     LangSelector: typeof import('./components/LangSelector.vue')['default']
     LineChartStats: typeof import('./components/dashboard/LineChartStats.vue')['default']
