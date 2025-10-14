@@ -7,12 +7,10 @@ SECURITY DEFINER
 SET
   search_path = '' AS $$
 DECLARE
-  request_id text;
   headers jsonb;
   url text;
   queue_size bigint;
   calls_needed int;
-  i int;
 BEGIN
   -- Check if the queue has elements
   EXECUTE format('SELECT count(*) FROM pgmq.q_%I', queue_name) INTO queue_size;
@@ -30,7 +28,7 @@ BEGIN
 
     -- Call the endpoint multiple times if needed
     FOR i IN 1..calls_needed LOOP
-      SELECT INTO request_id net.http_post(
+      PERFORM net.http_post(
         url := url,
         headers := headers,
         body := jsonb_build_object('queue_name', queue_name, 'batch_size', batch_size),
@@ -38,10 +36,11 @@ BEGIN
       );
     END LOOP;
 
-    RETURN request_id;
+    -- Return the number of calls made
+    RETURN calls_needed::bigint;
   END IF;
 
-  RETURN NULL;
+  RETURN 0::bigint;
 END;
 $$;
 
