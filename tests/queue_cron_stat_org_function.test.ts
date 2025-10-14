@@ -1,7 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { cleanupPostgresClient, getCronPlanQueueCount, getLatestCronPlanMessage, getSupabaseClient, ORG_ID } from './test-utils.ts'
 
-describe('[Function] queue_cron_plan_for_org', () => {
+
+describe('[Function] queue_cron_stat_org_for_org', () => {
     let testCustomerId: string | null = null
 
     beforeAll(async () => {
