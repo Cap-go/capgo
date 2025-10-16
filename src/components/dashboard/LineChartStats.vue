@@ -20,7 +20,7 @@ import { useI18n } from 'vue-i18n'
 import { getCurrentDayMonth, getDaysInCurrentMonth } from '~/services/date'
 import { useOrganizationStore } from '~/stores/organization'
 import { inlineAnnotationPlugin } from '../../services/chartAnnotations'
-import { createTooltipConfig, verticalLinePlugin } from '../../services/chartTooltip'
+import { createTooltipConfig, todayLinePlugin, verticalLinePlugin } from '../../services/chartTooltip'
 
 const props = defineProps({
   accumulated: {
@@ -358,7 +358,40 @@ const chartData = computed<ChartData<'line' | 'bar'>>(() => {
     datasets,
   }
 })
-const chartOptions = computed<ChartOptions & { plugins: { inlineAnnotationPlugin: AnnotationOptions } }>(() => {
+
+const todayLineOptions = computed(() => {
+  if (!props.useBillingPeriod)
+    return { enabled: false }
+
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  if (today < cycleStart || today > cycleEnd)
+    return { enabled: false }
+
+  const diff = Math.floor((today.getTime() - cycleStart.getTime()) / (1000 * 60 * 60 * 24))
+  const labels = Array.isArray(chartData.value.labels) ? chartData.value.labels : []
+
+  if (diff < 0 || diff >= labels.length)
+    return { enabled: false }
+
+  const strokeColor = isDark.value ? 'rgba(165, 180, 252, 0.75)' : 'rgba(99, 102, 241, 0.7)'
+  const glowColor = isDark.value ? 'rgba(129, 140, 248, 0.35)' : 'rgba(165, 180, 252, 0.35)'
+  const badgeFill = isDark.value ? 'rgba(67, 56, 202, 0.45)' : 'rgba(199, 210, 254, 0.85)'
+  const textColor = isDark.value ? '#e0e7ff' : '#312e81'
+
+  return {
+    enabled: true,
+    xIndex: diff,
+    label: t('today'),
+    color: strokeColor,
+    glowColor,
+    badgeFill,
+    textColor,
+  }
+})
+
+const chartOptions = computed<ChartOptions & { plugins: { inlineAnnotationPlugin: AnnotationOptions; todayLine?: any } }>(() => {
   const hasAppData = Object.keys(props.datasByApp || {}).length > 0
 
   return {
@@ -405,12 +438,13 @@ const chartOptions = computed<ChartOptions & { plugins: { inlineAnnotationPlugin
       filler: {
         propagate: false,
       },
+      todayLine: todayLineOptions.value as any,
     },
   }
 })
 </script>
 
 <template>
-  <Line v-if="accumulated" :data="chartData as any" height="auto" :options="(chartOptions as any)" :plugins="[inlineAnnotationPlugin, verticalLinePlugin]" />
-  <Bar v-else :data="chartData as any" height="auto" :options="(chartOptions as any)" :plugins="[inlineAnnotationPlugin, verticalLinePlugin]" />
+  <Line v-if="accumulated" :data="chartData as any" height="auto" :options="(chartOptions as any)" :plugins="[inlineAnnotationPlugin, verticalLinePlugin, todayLinePlugin]" />
+  <Bar v-else :data="chartData as any" height="auto" :options="(chartOptions as any)" :plugins="[inlineAnnotationPlugin, verticalLinePlugin, todayLinePlugin]" />
 </template>
