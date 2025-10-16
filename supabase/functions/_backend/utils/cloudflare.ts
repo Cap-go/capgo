@@ -26,13 +26,13 @@ export type Bindings = {
 
 /**
  * Track device usage (MAU) in Cloudflare Analytics Engine
- * 
+ *
  * This function sends MAU statistics to Cloudflare Analytics Engine with both app_id and org_id
  * for organization-level analytics and activity detection. The org_id allows for:
  * - Organization-level MAU queries and filtering
  * - Activity detection for organizations with recent MAU stats
  * - Better analytics segmentation by organization
- * 
+ *
  * @param c - Hono context
  * @param device_id - Unique device identifier
  * @param app_id - Application identifier
