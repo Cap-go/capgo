@@ -38,12 +38,12 @@ export type Bindings = {
  * @param app_id - Application identifier
  * @param org_id - Organization identifier (optional, defaults to empty string)
  */
-export function trackDeviceUsageCF(c: Context, device_id: string, app_id: string, org_id?: string) {
+export function trackDeviceUsageCF(c: Context, device_id: string, app_id: string, org_id: string) {
   if (!c.env.DEVICE_USAGE)
     return Promise.resolve()
   c.env.DEVICE_USAGE.writeDataPoint({
     blobs: [device_id],
-    indexes: [app_id, org_id || ''],
+    indexes: [app_id, org_id],
   })
   return Promise.resolve()
 }
