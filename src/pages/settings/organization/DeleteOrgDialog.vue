@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { Organization } from '~/stores/organization'
-import { defineExpose, defineProps, ref } from 'vue'
+import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import { useDialogV2Store } from '~/stores/dialogv2'
