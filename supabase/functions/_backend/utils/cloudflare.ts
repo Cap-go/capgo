@@ -86,7 +86,7 @@ export async function trackDevicesCF(c: Context, device: DeviceWithoutCreatedAt)
     updated_at, device_id, version_name, app_id, platform, 
     plugin_version, os_version, version_build, custom_id, 
     is_prod, is_emulator, version
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   ON CONFLICT (device_id, app_id) DO UPDATE SET
     updated_at = excluded.updated_at,
     version_name = excluded.version_name,
