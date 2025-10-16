@@ -13,8 +13,8 @@ import {
   Tooltip,
 } from 'chart.js'
 import { computed } from 'vue'
-import { useI18n } from 'vue-i18n'
 import { Bar, Line } from 'vue-chartjs'
+import { useI18n } from 'vue-i18n'
 import { createTooltipConfig, todayLinePlugin, verticalLinePlugin } from '~/services/chartTooltip'
 import { getDaysInCurrentMonth } from '~/services/date'
 import { useOrganizationStore } from '~/stores/organization'

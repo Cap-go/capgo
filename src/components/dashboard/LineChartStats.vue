@@ -391,7 +391,7 @@ const todayLineOptions = computed(() => {
   }
 })
 
-const chartOptions = computed<ChartOptions & { plugins: { inlineAnnotationPlugin: AnnotationOptions; todayLine?: any } }>(() => {
+const chartOptions = computed<ChartOptions & { plugins: { inlineAnnotationPlugin: AnnotationOptions, todayLine?: any } }>(() => {
   const hasAppData = Object.keys(props.datasByApp || {}).length > 0
 
   return {
