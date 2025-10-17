@@ -8,7 +8,7 @@ import { Line } from 'vue-chartjs'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { useChartData } from '~/services/chartDataService'
-import { createTooltipConfig, verticalLinePlugin } from '~/services/chartTooltip'
+import { createTooltipConfig, todayLinePlugin, verticalLinePlugin } from '~/services/chartTooltip'
 import { useSupabase } from '~/services/supabase'
 import { useOrganizationStore } from '~/stores/organization'
 
@@ -332,6 +332,38 @@ const processedChartData = computed<ChartData<'line'> | null>(() => {
   }
 })
 
+const todayLineOptions = computed(() => {
+  if (!props.useBillingPeriod || !currentRange.value)
+    return { enabled: false }
+
+  const today = normalizeToStartOfDay(new Date())
+  const { startDate, endDate } = currentRange.value
+
+  if (today < startDate || today > endDate)
+    return { enabled: false }
+
+  const index = Math.floor((today.getTime() - startDate.getTime()) / (24 * 60 * 60 * 1000))
+  const labels = Array.isArray(processedChartData.value?.labels) ? processedChartData.value!.labels : []
+
+  if (index < 0 || index >= labels.length)
+    return { enabled: false }
+
+  const strokeColor = isDark.value ? 'rgba(165, 180, 252, 0.75)' : 'rgba(99, 102, 241, 0.7)'
+  const glowColor = isDark.value ? 'rgba(129, 140, 248, 0.35)' : 'rgba(165, 180, 252, 0.35)'
+  const badgeFill = isDark.value ? 'rgba(67, 56, 202, 0.45)' : 'rgba(199, 210, 254, 0.85)'
+  const textColor = isDark.value ? '#e0e7ff' : '#312e81'
+
+  return {
+    enabled: true,
+    xIndex: index,
+    label: t('today'),
+    color: strokeColor,
+    glowColor,
+    badgeFill,
+    textColor,
+  }
+})
+
 const chartOptions = computed<ChartOptions<'line'>>(() => {
   const hasMultipleDatasets = (processedChartData.value?.datasets.length ?? 0) > 1
   const tooltipOptions = createTooltipConfig(hasMultipleDatasets, props.accumulated)
@@ -385,6 +417,7 @@ const chartOptions = computed<ChartOptions<'line'>>(() => {
       filler: {
         propagate: false,
       },
+      todayLine: todayLineOptions.value as any,
     },
   } as ChartOptions<'line'>
 })
@@ -476,7 +509,7 @@ watch(
         v-else-if="processedChartData && processedChartData.datasets.length"
         :data="processedChartData!"
         :options="chartOptions"
-        :plugins="[verticalLinePlugin]"
+        :plugins="[verticalLinePlugin, todayLinePlugin]"
       />
       <div v-else class="flex h-full items-center justify-center text-sm text-slate-500 dark:text-slate-300">
         {{ t('no-data') }}

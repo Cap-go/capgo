@@ -241,6 +241,25 @@ function positionTooltip(tooltipEl: HTMLElement, canvas: HTMLCanvasElement, tool
 /**
  * Plugin to draw vertical line at tooltip position
  */
+interface VerticalLinePluginOptions {
+  color?: string
+  glowColor?: string
+  lineWidth?: number
+  glowWidth?: number
+  dash?: number[]
+  glowDash?: number[]
+}
+
+function isDarkMode() {
+  if (typeof document !== 'undefined' && document.documentElement.classList.contains('dark'))
+    return true
+
+  if (typeof window !== 'undefined' && typeof window.matchMedia === 'function')
+    return window.matchMedia('(prefers-color-scheme: dark)').matches
+
+  return false
+}
+
 export const verticalLinePlugin = {
   id: 'verticalLine',
   afterDatasetsDraw(chart: Chart) {
@@ -251,6 +270,15 @@ export const verticalLinePlugin = {
       const x = activePoint.element.x
       const topY = chart.scales.y.top
       const bottomY = chart.scales.y.bottom
+      const pluginOptions = (chart.options?.plugins as any)?.verticalLine as VerticalLinePluginOptions | undefined
+      const dark = isDarkMode()
+
+      const lineColor = pluginOptions?.color ?? (dark ? 'rgba(255, 255, 255, 0.7)' : 'rgba(49, 70, 87, 0.6)')
+      const glowColor = pluginOptions?.glowColor ?? (dark ? 'rgba(255, 255, 255, 0.25)' : 'rgba(129, 140, 248, 0.25)')
+      const lineWidth = pluginOptions?.lineWidth ?? 2
+      const glowWidth = pluginOptions?.glowWidth ?? 4
+      const dash = pluginOptions?.dash ?? [8, 4]
+      const glowDash = pluginOptions?.glowDash ?? dash
 
       // Save context state
       ctx.save()
@@ -262,23 +290,152 @@ export const verticalLinePlugin = {
       ctx.beginPath()
       ctx.moveTo(x, topY)
       ctx.lineTo(x, bottomY)
-      ctx.lineWidth = 2
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)' // White with good opacity
-      ctx.setLineDash([8, 4]) // Longer dash pattern for better visibility
+      ctx.lineWidth = lineWidth
+      ctx.strokeStyle = lineColor
+      ctx.setLineDash(dash)
       ctx.stroke()
 
-      // Draw a subtle glow effect for better visibility
-      ctx.beginPath()
-      ctx.moveTo(x, topY)
-      ctx.lineTo(x, bottomY)
-      ctx.lineWidth = 4
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)' // Wider, more transparent white glow
-      ctx.setLineDash([8, 4])
-      ctx.stroke()
+      if (glowWidth > 0 && glowColor) {
+        // Draw a subtle glow effect for better visibility
+        ctx.beginPath()
+        ctx.moveTo(x, topY)
+        ctx.lineTo(x, bottomY)
+        ctx.lineWidth = glowWidth
+        ctx.strokeStyle = glowColor
+        ctx.setLineDash(glowDash)
+        ctx.stroke()
+      }
 
       // Restore context state
       ctx.restore()
     }
+  },
+}
+
+interface TodayLinePluginOptions {
+  enabled?: boolean
+  xIndex?: number
+  label?: string
+  color?: string
+  glowColor?: string
+  badgeFill?: string
+  textColor?: string
+}
+
+function drawRoundedRect(ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, radius: number) {
+  const r = Math.min(radius, width / 2, height / 2)
+
+  ctx.beginPath()
+  ctx.moveTo(x + r, y)
+  ctx.lineTo(x + width - r, y)
+  ctx.quadraticCurveTo(x + width, y, x + width, y + r)
+  ctx.lineTo(x + width, y + height - r)
+  ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height)
+  ctx.lineTo(x + r, y + height)
+  ctx.quadraticCurveTo(x, y + height, x, y + height - r)
+  ctx.lineTo(x, y + r)
+  ctx.quadraticCurveTo(x, y, x + r, y)
+  ctx.closePath()
+}
+
+function resolveScale(chart: Chart, axisId: 'x' | 'y') {
+  const scale = (chart.scales as Record<string, any>)[axisId]
+  if (scale)
+    return scale
+
+  // Fallback to first matching axis for legacy ids
+  const fallbackKey = Object.keys(chart.scales).find(key => key.toLowerCase().startsWith(axisId))
+  return fallbackKey ? (chart.scales as Record<string, any>)[fallbackKey] : undefined
+}
+
+export const todayLinePlugin = {
+  id: 'todayLine',
+  afterDatasetsDraw(chart: Chart, _args: unknown, pluginOptions?: TodayLinePluginOptions) {
+    const options = pluginOptions ?? {}
+    if (!options.enabled)
+      return
+
+    const xScale = resolveScale(chart, 'x')
+    const yScale = resolveScale(chart, 'y')
+    if (!xScale || !yScale)
+      return
+
+    const index = typeof options.xIndex === 'number' ? options.xIndex : -1
+    if (index < 0)
+      return
+
+    const x = typeof xScale.getPixelForValue === 'function'
+      ? xScale.getPixelForValue(index)
+      : undefined
+
+    if (typeof x !== 'number' || Number.isNaN(x))
+      return
+
+    const ctx = chart.ctx
+    const topY = yScale.top ?? chart.chartArea?.top
+    const bottomY = yScale.bottom ?? chart.chartArea?.bottom
+    if (typeof topY !== 'number' || typeof bottomY !== 'number')
+      return
+
+    const strokeColor = options.color ?? 'rgba(99, 102, 241, 0.6)'
+    const glowColor = options.glowColor ?? 'rgba(159, 168, 255, 0.25)'
+
+    ctx.save()
+    ctx.globalCompositeOperation = 'source-over'
+
+    ctx.beginPath()
+    ctx.moveTo(x, topY)
+    ctx.lineTo(x, bottomY)
+    ctx.lineWidth = 2
+    ctx.strokeStyle = strokeColor
+    ctx.setLineDash([8, 4])
+    ctx.stroke()
+
+    ctx.beginPath()
+    ctx.moveTo(x, topY)
+    ctx.lineTo(x, bottomY)
+    ctx.lineWidth = 4
+    ctx.strokeStyle = glowColor
+    ctx.setLineDash([8, 4])
+    ctx.stroke()
+
+    ctx.setLineDash([])
+
+    if (options.label) {
+      const badgeFill = options.badgeFill ?? 'rgba(199, 210, 254, 0.85)'
+      const textColor = options.textColor ?? '#312e81'
+      const fontSize = 12
+      const paddingX = 10
+      const paddingY = 6
+      const badgeY = (chart.chartArea?.top ?? topY) + 8
+
+      ctx.font = `${fontSize}px sans-serif`
+      const labelWidth = ctx.measureText(options.label).width
+      const badgeWidth = labelWidth + paddingX * 2
+      const badgeHeight = fontSize + paddingY
+
+      let badgeX = x - badgeWidth / 2
+      const chartLeft = chart.chartArea?.left ?? 0
+      const chartRight = chart.chartArea?.right ?? chart.width
+
+      if (badgeX < chartLeft + 4)
+        badgeX = chartLeft + 4
+      if (badgeX + badgeWidth > chartRight - 4)
+        badgeX = chartRight - badgeWidth - 4
+
+      drawRoundedRect(ctx, badgeX, badgeY, badgeWidth, badgeHeight, 6)
+      ctx.fillStyle = badgeFill
+      ctx.fill()
+
+      ctx.lineWidth = 1
+      ctx.strokeStyle = strokeColor
+      ctx.stroke()
+
+      ctx.fillStyle = textColor
+      ctx.fillText(options.label, badgeX + paddingX, badgeY + badgeHeight - paddingY / 2)
+    }
+
+    ctx.restore()
   },
 }
 

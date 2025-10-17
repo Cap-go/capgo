@@ -14,9 +14,10 @@ import {
 } from 'chart.js'
 import { computed } from 'vue'
 import { Bar, Line } from 'vue-chartjs'
+import { useI18n } from 'vue-i18n'
 import { getDaysInCurrentMonth } from '~/services/date'
 import { useOrganizationStore } from '~/stores/organization'
-import { createTooltipConfig, verticalLinePlugin } from '../../services/chartTooltip'
+import { createTooltipConfig, todayLinePlugin, verticalLinePlugin } from '../../services/chartTooltip'
 
 const props = defineProps({
   title: { type: String, default: '' },
@@ -30,6 +31,7 @@ const props = defineProps({
 })
 
 const isDark = useDark()
+const { t } = useI18n()
 const organizationStore = useOrganizationStore()
 const cycleStart = new Date(organizationStore.currentOrganization?.subscription_start ?? new Date())
 const cycleEnd = new Date(organizationStore.currentOrganization?.subscription_end ?? new Date())
@@ -181,6 +183,32 @@ const chartData = computed<ChartData<'bar' | 'line'>>(() => {
   }
 })
 
+const todayLineOptions = computed(() => {
+  if (!props.useBillingPeriod)
+    return { enabled: false }
+
+  const labels = Array.isArray(chartData.value.labels) ? chartData.value.labels : []
+  const index = getTodayLimit(labels.length)
+
+  if (index < 0 || index >= labels.length)
+    return { enabled: false }
+
+  const strokeColor = isDark.value ? 'rgba(165, 180, 252, 0.75)' : 'rgba(99, 102, 241, 0.7)'
+  const glowColor = isDark.value ? 'rgba(129, 140, 248, 0.35)' : 'rgba(165, 180, 252, 0.35)'
+  const badgeFill = isDark.value ? 'rgba(67, 56, 202, 0.45)' : 'rgba(199, 210, 254, 0.85)'
+  const textColor = isDark.value ? '#e0e7ff' : '#312e81'
+
+  return {
+    enabled: true,
+    xIndex: index,
+    label: t('today'),
+    color: strokeColor,
+    glowColor,
+    badgeFill,
+    textColor,
+  }
+})
+
 const chartOptions = computed<ChartOptions<'bar' | 'line'>>(() => ({
   maintainAspectRatio: false,
   scales: {
@@ -221,13 +249,14 @@ const chartOptions = computed<ChartOptions<'bar' | 'line'>>(() => ({
       display: false,
     },
     tooltip: createTooltipConfig(true, props.accumulated),
+    todayLine: todayLineOptions.value as any,
   },
 }))
 </script>
 
 <template>
   <div class="w-full h-full">
-    <Line v-if="accumulated" :data="chartData as any" :options="chartOptions as any" :plugins="[verticalLinePlugin]" />
-    <Bar v-else :data="chartData as any" :options="chartOptions as any" :plugins="[verticalLinePlugin]" />
+    <Line v-if="accumulated" :data="chartData as any" :options="chartOptions as any" :plugins="[verticalLinePlugin, todayLinePlugin]" />
+    <Bar v-else :data="chartData as any" :options="chartOptions as any" :plugins="[verticalLinePlugin, todayLinePlugin]" />
   </div>
 </template>

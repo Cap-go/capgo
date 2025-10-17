@@ -6,13 +6,13 @@ import type { Database } from '../utils/supabase.types.ts'
 import type { DeviceWithoutCreatedAt } from '../utils/types.ts'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod/mini'
-import { BRES, getIsV2, parseBody, quickError, simpleError, simpleError200 } from '../utils/hono.ts'
+import { BRES, getIsV2, parseBody, quickError, simpleError, simpleError200, simpleRateLimit } from '../utils/hono.ts'
 import { cloudlog } from '../utils/loggin.ts'
 import { closeClient, deleteChannelDevicePg, getAppByIdPg, getAppVersionsByAppIdPg, getChannelByNamePg, getChannelDeviceOverridePg, getChannelsPg, getCompatibleChannelsPg, getDrizzleClient, getMainChannelsPg, getPgClient, upsertChannelDevicePg } from '../utils/pg.ts'
 import { getAppByIdD1, getAppVersionsByAppIdD1, getChannelByNameD1, getChannelDeviceOverrideD1, getChannelsD1, getCompatibleChannelsD1, getDrizzleClientD1Session, getMainChannelsD1 } from '../utils/pg_d1.ts'
 import { convertQueryToBody, parsePluginBody } from '../utils/plugin_parser.ts'
 import { sendStatsAndDevice } from '../utils/stats.ts'
-import { deviceIdRegex, INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, MISSING_STRING_APP_ID, MISSING_STRING_DEVICE_ID, MISSING_STRING_VERSION_BUILD, MISSING_STRING_VERSION_NAME, NON_STRING_APP_ID, NON_STRING_DEVICE_ID, NON_STRING_VERSION_BUILD, NON_STRING_VERSION_NAME, reverseDomainRegex } from '../utils/utils.ts'
+import { deviceIdRegex, INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, isLimited, MISSING_STRING_APP_ID, MISSING_STRING_DEVICE_ID, MISSING_STRING_VERSION_BUILD, MISSING_STRING_VERSION_NAME, NON_STRING_APP_ID, NON_STRING_DEVICE_ID, NON_STRING_VERSION_BUILD, NON_STRING_VERSION_NAME, reverseDomainRegex } from '../utils/utils.ts'
 
 z.config(z.locales.en())
 const devicePlatformScheme = z.literal(['ios', 'android'])
@@ -353,6 +353,10 @@ app.post('/', async (c) => {
   const body = await parseBody<DeviceLink>(c)
   cloudlog({ requestId: c.get('requestId'), message: 'post body', body })
 
+  if (isLimited(c, body.app_id)) {
+    throw simpleRateLimit(body)
+  }
+
   const isV2 = getIsV2(c)
   const pgClient = isV2 ? null : getPgClient(c)
 
@@ -373,6 +377,10 @@ app.put('/', async (c) => {
   const body = await parseBody<DeviceLink>(c)
   cloudlog({ requestId: c.get('requestId'), message: 'put body', body })
 
+  if (isLimited(c, body.app_id)) {
+    throw simpleRateLimit(body)
+  }
+
   const isV2 = getIsV2(c)
   const pgClient = isV2 ? null : getPgClient(c)
 
@@ -389,13 +397,17 @@ app.put('/', async (c) => {
 })
 
 app.delete('/', async (c) => {
-  const query = convertQueryToBody(c.req.query())
-  cloudlog({ requestId: c.get('requestId'), message: 'delete body', query })
+  const body = convertQueryToBody(c.req.query())
+  cloudlog({ requestId: c.get('requestId'), message: 'delete body', body })
+
+  if (isLimited(c, body.app_id)) {
+    throw simpleRateLimit(body)
+  }
 
   const isV2 = getIsV2(c)
   const pgClient = isV2 ? null : getPgClient(c)
 
-  const bodyParsed = parsePluginBody<DeviceLink>(c, query, jsonRequestSchema)
+  const bodyParsed = parsePluginBody<DeviceLink>(c, body, jsonRequestSchema)
   let res
   try {
     res = await deleteOverride(c, isV2 ? getDrizzleClientD1Session(c) : getDrizzleClient(pgClient as any), !!isV2, bodyParsed)
@@ -408,13 +420,17 @@ app.delete('/', async (c) => {
 })
 
 app.get('/', async (c) => {
-  const query = convertQueryToBody(c.req.query())
-  cloudlog({ requestId: c.get('requestId'), message: 'list compatible channels', query })
+  const body = convertQueryToBody(c.req.query())
+  cloudlog({ requestId: c.get('requestId'), message: 'list compatible channels', body })
+
+  if (isLimited(c, body.app_id)) {
+    throw simpleRateLimit(body)
+  }
 
   const isV2 = getIsV2(c)
   const pgClient = isV2 ? null : getPgClient(c)
 
-  const bodyParsed = parsePluginBody<DeviceLink>(c, query, jsonRequestSchema)
+  const bodyParsed = parsePluginBody<DeviceLink>(c, body, jsonRequestSchema)
   let res
   try {
     res = await listCompatibleChannels(c, isV2 ? getDrizzleClientD1Session(c) : getDrizzleClient(pgClient as any), !!isV2, bodyParsed)
