@@ -142,7 +142,7 @@ export async function updateWithPG(
     await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
     return simpleError200(c, 'need_plan_upgrade', 'Cannot update, upgrade plan to continue to update')
   }
-  await backgroundTask(c, createStatsMau(c, device_id, app_id))
+  await backgroundTask(c, createStatsMau(c, device_id, app_id, appOwner.owner_org))
 
   cloudlog({ requestId: c.get('requestId'), message: 'vals', platform, device })
 

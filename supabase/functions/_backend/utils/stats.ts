@@ -7,11 +7,11 @@ import { cloudlog } from './loggin.ts'
 import { countDevicesSB, getAppsFromSB, getUpdateStatsSB, readBandwidthUsageSB, readDevicesSB, readDeviceUsageSB, readStatsSB, readStatsStorageSB, readStatsVersionSB, trackBandwidthUsageSB, trackDevicesSB, trackDeviceUsageSB, trackLogsSB, trackMetaSB, trackVersionUsageSB } from './supabase.ts'
 import { backgroundTask } from './utils.ts'
 
-export function createStatsMau(c: Context, device_id: string, app_id: string) {
+export function createStatsMau(c: Context, device_id: string, app_id: string, org_id: string) {
   const lowerDeviceId = device_id
   if (!c.env.DEVICE_USAGE)
     return trackDeviceUsageSB(c, lowerDeviceId, app_id)
-  return trackDeviceUsageCF(c, lowerDeviceId, app_id)
+  return trackDeviceUsageCF(c, lowerDeviceId, app_id, org_id)
 }
 
 export async function opnPremStats(c: Context, app_id: string, action: string, device: DeviceWithoutCreatedAt) {
