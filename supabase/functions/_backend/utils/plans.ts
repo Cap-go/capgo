@@ -141,7 +141,7 @@ async function userAbovePlan(c: Context, org: {
 
   const sent = await sendNotifOrg(c, `user:upgrade_to_${bestPlanKey}`, { best_plan: bestPlanKey, plan_name: current_plan }, orgId, orgId, '0 0 * * 1')
   if (sent) {
-  // await addEventPerson(user.email, {}, `user:upgrade_to_${bestPlanKey}`, 'red')
+    // await addEventPerson(user.email, {}, `user:upgrade_to_${bestPlanKey}`, 'red')
     cloudlog({ requestId: c.get('requestId'), message: `user:upgrade_to_${bestPlanKey}`, orgId })
     await logsnag(c).track({
       channel: 'usage',
@@ -191,7 +191,7 @@ async function userIsAtPlanUsage(c: Context, orgId: string, percentUsage: PlanUs
   else if (percentUsage.total_percent >= 50) {
     const sent = await sendNotifOrg(c, 'user:usage_50_percent_of_plan', { percent: percentUsage }, orgId, orgId, '0 0 1 * *')
     if (sent) {
-    // await addEventPerson(user.email, {}, 'user:70_percent_of_plan', 'orange')
+      // await addEventPerson(user.email, {}, 'user:70_percent_of_plan', 'orange')
       await logsnag(c).track({
         channel: 'usage',
         event: 'User is at 50% of plan usage',
@@ -203,7 +203,8 @@ async function userIsAtPlanUsage(c: Context, orgId: string, percentUsage: PlanUs
   }
 }
 
-export async function checkPlanOrg(c: Context, orgId: string): Promise<void> {
+// Get org data with customer info
+export async function getOrgWithCustomerInfo(c: Context, orgId: string) {
   const { data: org, error: userError } = await supabaseAdmin(c)
     .from('orgs')
     .select('customer_id, stripe_info(subscription_id)')
@@ -211,11 +212,18 @@ export async function checkPlanOrg(c: Context, orgId: string): Promise<void> {
     .single()
   if (userError || !org)
     throw quickError(404, 'org_not_found', 'Org not found', { orgId, userError })
+  return org
+}
 
-  // Sync subscription data with Stripe
-  if (org.customer_id)
+// Sync subscription data with Stripe
+export async function syncOrgSubscriptionData(c: Context, org: any): Promise<void> {
+  if (org.customer_id) {
     await syncSubscriptionData(c, org.customer_id, org?.stripe_info?.subscription_id ?? null)
+  }
+}
 
+// Handle trial organization logic
+export async function handleTrialOrg(c: Context, orgId: string, org: any): Promise<boolean> {
   if (await isTrialOrg(c, orgId)) {
     const { error } = await supabaseAdmin(c)
       .from('stripe_info')
@@ -224,18 +232,28 @@ export async function checkPlanOrg(c: Context, orgId: string): Promise<void> {
       .then()
     if (error)
       cloudlogErr({ requestId: c.get('requestId'), message: 'update stripe info', error })
-    return Promise.resolve()
+    return true // Trial handled
   }
+  return false // Not a trial
+}
 
+// Calculate plan status and usage
+export async function calculatePlanStatus(c: Context, orgId: string) {
   const is_good_plan = await isGoodPlanOrg(c, orgId)
+  const percentUsage = await getPlanUsagePercent(c, orgId)
+  return { is_good_plan, percentUsage }
+}
+
+// Handle notifications and events based on org status
+export async function handleOrgNotificationsAndEvents(c: Context, org: any, orgId: string, is_good_plan: boolean, percentUsage: PlanUsage): Promise<void> {
   const is_onboarded = await isOnboardedOrg(c, orgId)
   const is_onboarding_needed = await isOnboardingNeeded(c, orgId)
-  const percentUsage = await getPlanUsagePercent(c, orgId)
+
   if (!is_good_plan && is_onboarded) {
     await userAbovePlan(c, org, orgId, is_good_plan)
   }
   else if (!is_onboarded && is_onboarding_needed) {
-    const sent = await sendNotifOrg(c, 'user:need_onboarding', { }, orgId, orgId, '0 0 1 * *')
+    const sent = await sendNotifOrg(c, 'user:need_onboarding', {}, orgId, orgId, '0 0 1 * *')
     if (sent) {
       await logsnag(c).track({
         channel: 'usage',
@@ -249,7 +267,11 @@ export async function checkPlanOrg(c: Context, orgId: string): Promise<void> {
   else if (is_good_plan && is_onboarded) {
     await userIsAtPlanUsage(c, orgId, percentUsage)
   }
-  return supabaseAdmin(c)
+}
+
+// Update stripe_info with plan status
+export async function updatePlanStatus(c: Context, org: any, is_good_plan: boolean, percentUsage: PlanUsage): Promise<void> {
+  await supabaseAdmin(c)
     .from('stripe_info')
     .update({
       is_good_plan,
@@ -257,4 +279,73 @@ export async function checkPlanOrg(c: Context, orgId: string): Promise<void> {
     })
     .eq('customer_id', org.customer_id!)
     .then()
+}
+
+// Original checkPlanOrg function - now uses the smaller functions
+export async function checkPlanOrg(c: Context, orgId: string): Promise<void> {
+  const org = await getOrgWithCustomerInfo(c, orgId)
+
+  // Sync subscription data with Stripe
+  await syncOrgSubscriptionData(c, org)
+
+  // Handle trial organizations
+  if (await handleTrialOrg(c, orgId, org)) {
+    return // Trial handled, exit early
+  }
+
+  // Calculate plan status and usage
+  const { is_good_plan, percentUsage } = await calculatePlanStatus(c, orgId)
+
+  // Handle notifications and events
+  await handleOrgNotificationsAndEvents(c, org, orgId, is_good_plan, percentUsage)
+
+  // Update plan status in database
+  await updatePlanStatus(c, org, is_good_plan, percentUsage)
+}
+
+// New function for cron_stat_org - handles is_good_plan + plan % + exceeded flags
+export async function checkPlanStatusOnly(c: Context, orgId: string): Promise<void> {
+  const org = await getOrgWithCustomerInfo(c, orgId)
+
+  // Handle trial organizations
+  if (await handleTrialOrg(c, orgId, org)) {
+    return // Trial handled, exit early
+  }
+
+  // Calculate plan status and usage
+  const { is_good_plan, percentUsage } = await calculatePlanStatus(c, orgId)
+
+  // Handle exceeded flags and notifications based on plan status
+  if (!is_good_plan) {
+    // Use existing userAbovePlan function to handle exceeded flags
+    await userAbovePlan(c, org, orgId, is_good_plan)
+  }
+  else {
+    // If plan is good, reset exceeded flags (from userIsAtPlanUsage)
+    await set_mau_exceeded(c, orgId, false)
+    await set_storage_exceeded(c, orgId, false)
+    await set_bandwidth_exceeded(c, orgId, false)
+  }
+
+  // Update plan status in database
+  await updatePlanStatus(c, org, is_good_plan, percentUsage)
+}
+
+// New function for cron_sync_sub - handles subscription sync + events
+export async function syncSubscriptionAndEvents(c: Context, orgId: string): Promise<void> {
+  const org = await getOrgWithCustomerInfo(c, orgId)
+
+  // Sync subscription data with Stripe
+  await syncOrgSubscriptionData(c, org)
+
+  // Handle trial organizations
+  if (await handleTrialOrg(c, orgId, org)) {
+    return // Trial handled, exit early
+  }
+
+  // Calculate plan status and usage for notifications
+  const { is_good_plan, percentUsage } = await calculatePlanStatus(c, orgId)
+
+  // Handle notifications and events
+  await handleOrgNotificationsAndEvents(c, org, orgId, is_good_plan, percentUsage)
 }
