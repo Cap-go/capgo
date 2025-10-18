@@ -7,7 +7,6 @@ import AutoImport from 'unplugin-auto-import/vite'
 import formkit from 'unplugin-formkit/vite'
 import IconsResolver from 'unplugin-icons/resolver'
 import Icons from 'unplugin-icons/vite'
-import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
 import Components from 'unplugin-vue-components/vite'
 import VueMacros from 'unplugin-vue-macros/vite'
 import { VueRouterAutoImports } from 'unplugin-vue-router'
@@ -66,9 +65,6 @@ export default defineConfig({
       dts: 'src/components.d.ts',
       resolvers: [
         IconsResolver(),
-        ElementPlusResolver({
-          importStyle: 'sass',
-        }),
       ],
     }),
     EnvironmentPlugin({
