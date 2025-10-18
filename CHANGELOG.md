@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.34.69 (2025-10-18)
+
+
+### Bug Fixes
+
+* remove elementplus useless and switch to konsta ([2ea4b94](https://github.com/Cap-go/capgo/commit/2ea4b94858c49e8a063b7bfadc31b89c7e2e04c1))
+
 ### 12.34.68 (2025-10-18)
 
 ### 12.34.67 (2025-10-16)
