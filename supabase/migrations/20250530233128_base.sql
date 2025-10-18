@@ -3626,6 +3626,7 @@ CREATE TABLE IF NOT EXISTS "public"."device_usage" (
   "id" integer NOT NULL,
   "device_id" character varying(255) NOT NULL,
   "app_id" character varying(255) NOT NULL,
+  "org_id" character varying(255) NOT NULL,
   "timestamp" timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 

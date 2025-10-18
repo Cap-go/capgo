@@ -312,6 +312,7 @@ DECLARE
   previous_install BIGINT := 0;
   previous_version_id BIGINT := 3;
   current_version_id BIGINT := 4;
+  demo_org_id uuid := '046a36ac-e03c-4590-9257-bd6c9dba9ee8'::uuid;
 BEGIN
   -- Truncate all tables
   TRUNCATE TABLE public.daily_mau, public.daily_bandwidth, public.daily_storage, public.daily_version, public.storage_usage, public.version_usage, public.device_usage, public.bandwidth_usage, public.devices, public.stats;
@@ -403,7 +404,8 @@ BEGIN
 
   -- Seed data for device_usage
   FOR i IN 1..50 LOOP
-    INSERT INTO public.device_usage (device_id, app_id) VALUES (random_uuid, 'com.demo.app');
+    INSERT INTO public.device_usage (device_id, app_id, org_id)
+    VALUES (random_uuid, 'com.demo.app', demo_org_id::text);
   END LOOP;
 
   -- Seed data for bandwidth_usage
@@ -549,10 +551,16 @@ DECLARE
   random_uuid UUID;
   random_fixed_uuid UUID := '00000000-0000-0000-0000-000000000000'::uuid;
   random_version_id BIGINT := 3;
+  org_id uuid;
+  fallback_org_id uuid := '046a36ac-e03c-4590-9257-bd6c9dba9ee8'::uuid;
 BEGIN
   PERFORM pg_advisory_xact_lock(hashtext(p_app_id || '_stats'));
   PERFORM public.reset_app_stats_data(p_app_id);
   random_uuid := gen_random_uuid();
+  SELECT owner_org INTO org_id FROM public.apps WHERE app_id = p_app_id LIMIT 1;
+  IF org_id IS NULL THEN
+    org_id := fallback_org_id;
+  END IF;
   INSERT INTO public.devices (updated_at, device_id, version_name, app_id, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator)
   VALUES (now(), random_uuid, '1.0.0', p_app_id, 'android', '4.15.3', '9', '1.223.0', '', 't', 't'), (now(), random_fixed_uuid, '1.0.0', p_app_id, 'android', '4.15.3', '9', '1.223.0', '', 't', 't');
   INSERT INTO public.stats (created_at, action, device_id, version_name, app_id)
@@ -570,7 +578,8 @@ BEGIN
   INSERT INTO public.storage_usage (device_id, app_id, file_size) SELECT random_uuid, p_app_id, FLOOR(RANDOM() * 10485760) - 5242880 FROM generate_series(1, 20);
   INSERT INTO public.version_usage (timestamp, app_id, version_id, action)
   SELECT start_date + (RANDOM() * (end_date - start_date)), p_app_id, random_version_id, (ARRAY['get','fail','install','uninstall'])[FLOOR(RANDOM() * 4) + 1]::public.version_action FROM generate_series(1, 30);
-  INSERT INTO public.device_usage (device_id, app_id) SELECT random_uuid, p_app_id FROM generate_series(1, 50);
+  INSERT INTO public.device_usage (device_id, app_id, org_id)
+  SELECT random_uuid, p_app_id, org_id::text FROM generate_series(1, 50);
   INSERT INTO public.bandwidth_usage (device_id, app_id, file_size) SELECT random_uuid, p_app_id, FLOOR(RANDOM() * 10485760) + 1 FROM generate_series(1, 40);
 END;
 $$;

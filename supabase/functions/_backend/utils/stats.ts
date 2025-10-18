@@ -10,7 +10,7 @@ import { backgroundTask } from './utils.ts'
 export function createStatsMau(c: Context, device_id: string, app_id: string, org_id: string) {
   const lowerDeviceId = device_id
   if (!c.env.DEVICE_USAGE)
-    return trackDeviceUsageSB(c, lowerDeviceId, app_id)
+    return trackDeviceUsageSB(c, lowerDeviceId, app_id, org_id)
   return trackDeviceUsageCF(c, lowerDeviceId, app_id, org_id)
 }
 

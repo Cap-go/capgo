@@ -671,6 +671,7 @@ export function trackDeviceUsageSB(
   c: Context,
   deviceId: string,
   appId: string,
+  orgId: string,
 ) {
   return supabaseAdmin(c)
     .from('device_usage')
@@ -678,6 +679,7 @@ export function trackDeviceUsageSB(
       {
         device_id: deviceId.toLowerCase(),
         app_id: appId,
+        org_id: orgId,
       },
     ])
 }
