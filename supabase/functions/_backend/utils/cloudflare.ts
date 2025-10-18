@@ -42,8 +42,8 @@ export function trackDeviceUsageCF(c: Context, device_id: string, app_id: string
   if (!c.env.DEVICE_USAGE)
     return Promise.resolve()
   c.env.DEVICE_USAGE.writeDataPoint({
-    blobs: [device_id],
-    indexes: [app_id, org_id],
+    blobs: [device_id, org_id],
+    indexes: [app_id],
   })
   return Promise.resolve()
 }
