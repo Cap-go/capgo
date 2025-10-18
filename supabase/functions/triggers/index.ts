@@ -20,6 +20,7 @@ import { app as on_version_create } from '../_backend/triggers/on_version_create
 import { app as on_version_delete } from '../_backend/triggers/on_version_delete.ts'
 import { app as on_version_update } from '../_backend/triggers/on_version_update.ts'
 import { app as queue_consumer } from '../_backend/triggers/queue_consumer.ts'
+import { app as schedule_app_stats } from '../_backend/triggers/schedule_app_stats.ts'
 import { app as stripe_event } from '../_backend/triggers/stripe_event.ts'
 import { createHono } from '../_backend/utils/hono.ts'
 import { version } from '../_backend/utils/version.ts'
@@ -50,6 +51,7 @@ appGlobal.route('/cron_clear_versions', cron_clear_versions)
 appGlobal.route('/on_organization_delete', on_organization_delete)
 appGlobal.route('/on_deploy_history_create', on_deploy_history_create)
 appGlobal.route('/queue_consumer', queue_consumer)
+appGlobal.route('/schedule_app_stats', schedule_app_stats)
 
 // createAllCatch(appGlobal, functionName)
 Deno.serve(appGlobal.fetch)

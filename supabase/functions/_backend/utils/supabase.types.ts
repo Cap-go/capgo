@@ -1522,6 +1522,15 @@ export type Database = {
         Args: { user_id: string }
         Returns: string
       }
+      get_active_apps_by_org: {
+        Args: { end_date: string; org_ids: string[]; start_date: string }
+        Returns: {
+          app_id: string
+          device_count: number
+          last_activity: string
+          org_id: string
+        }[]
+      }
       get_apikey: {
         Args: Record<PropertyKey, never>
         Returns: string
@@ -1691,6 +1700,14 @@ export type Database = {
           subscription_end: string
           subscription_start: string
           trial_left: number
+        }[]
+      }
+      get_paying_and_trial_orgs: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          apps: Json
+          org_id: string
+          org_name: string
         }[]
       }
       get_plan_usage_percent_detailed: {
@@ -1965,6 +1982,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      process_cron_sync_sub_jobs: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       process_d1_replication_batch: {
         Args: Record<PropertyKey, never>
         Returns: undefined
@@ -1978,7 +1999,9 @@ export type Database = {
         Returns: undefined
       }
       process_function_queue: {
-        Args: { queue_name: string; batch_size?: number }
+        Args:
+          | { batch_size?: number; queue_name: string }
+          | { queue_name: string }
         Returns: number
       }
       process_stats_email_monthly: {
@@ -2063,6 +2086,10 @@ export type Database = {
       }
       reset_app_stats_data: {
         Args: { p_app_id: string }
+        Returns: undefined
+      }
+      schedule_app_stats_job: {
+        Args: Record<PropertyKey, never>
         Returns: undefined
       }
       seed_get_app_metrics_caches: {
