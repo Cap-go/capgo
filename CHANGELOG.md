@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.34.76 (2025-10-19)
+
+
+### Bug Fixes
+
+* readDeviceUsageCF ([14ba509](https://github.com/Cap-go/capgo/commit/14ba509cb0806e1257d1a834df0dd4293fa988b7))
+
 ### 12.34.75 (2025-10-19)
 
 ### 12.34.74 (2025-10-19)
