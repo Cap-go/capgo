@@ -93,7 +93,7 @@ export function createStatsMeta(c: Context, app_id: string, version_id: number, 
 export function readStatsMau(c: Context, app_id: string, start_date: string, end_date: string) {
   if (!c.env.DEVICE_USAGE)
     return readDeviceUsageSB(c, app_id, start_date, end_date)
-  return readDeviceUsageCF(c, app_id, start_date, end_date)
+  return readDeviceUsageCF(c, app_id, start_date, end_date).then(res => res.map(({ org_id, ...rest }) => rest))
 }
 
 export function readStatsBandwidth(c: Context, app_id: string, start_date: string, end_date: string) {
