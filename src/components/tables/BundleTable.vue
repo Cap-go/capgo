@@ -601,7 +601,7 @@ watch(props, async () => {
       mass-select
       :is-loading="isLoading"
       :search-placeholder="t('search-by-name')"
-      @set-selection="selectedElementsFilter"
+      @select-row="selectedElementsFilter"
       @mass-delete="massDelete()"
       @add="addOne()"
       @reload="reload()"
