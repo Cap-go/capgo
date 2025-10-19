@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ChartData, ChartOptions } from 'chart.js'
+import type { ChartData, ChartOptions, Plugin } from 'chart.js'
 import { useDark } from '@vueuse/core'
 import {
   BarController,
@@ -209,54 +209,73 @@ const todayLineOptions = computed(() => {
   }
 })
 
-const chartOptions = computed<ChartOptions<'bar' | 'line'>>(() => ({
-  maintainAspectRatio: false,
-  scales: {
-    y: {
-      beginAtZero: true,
-      stacked: true, // Always stack when there are multiple datasets
-      ticks: {
-        color: `${isDark.value ? 'white' : 'black'}`,
-        // Remove stepSize to let Chart.js auto-calculate optimal steps
+const chartOptions = computed(() => {
+  const axisTicksColor = isDark.value ? 'white' : 'black'
+
+  return {
+    maintainAspectRatio: false,
+    scales: {
+      y: {
+        beginAtZero: true,
+        stacked: true,
+        ticks: {
+          color: axisTicksColor,
+        },
+        grid: {
+          color: `${isDark.value ? '#424e5f' : '#bfc9d6'}`,
+        },
       },
-      grid: {
-        color: `${isDark.value ? '#424e5f' : '#bfc9d6'}`,
-      },
-    },
-    x: {
-      stacked: true, // Always stack when there are multiple datasets
-      ticks: {
-        color: `${isDark.value ? 'white' : 'black'}`,
-      },
-      grid: {
-        color: `${isDark.value ? '#323e4e' : '#cad5e2'}`,
-      },
-    },
-  },
-  plugins: {
-    legend: {
-      display: true,
-      position: 'bottom' as const,
-      labels: {
-        color: `${isDark.value ? 'white' : 'black'}`,
-        padding: 10,
-        font: {
-          size: 11,
+      x: {
+        stacked: true,
+        ticks: {
+          color: axisTicksColor,
+        },
+        grid: {
+          color: `${isDark.value ? '#323e4e' : '#cad5e2'}`,
         },
       },
     },
-    title: {
-      display: false,
+    plugins: {
+      legend: {
+        display: true,
+        position: 'bottom' as const,
+        labels: {
+          color: axisTicksColor,
+          padding: 10,
+          font: {
+            size: 11,
+          },
+        },
+      },
+      title: {
+        display: false,
+      },
+      tooltip: createTooltipConfig(true, props.accumulated),
+      todayLine: todayLineOptions.value,
     },
-    tooltip: createTooltipConfig(true, props.accumulated),
-    todayLine: todayLineOptions.value as any,
-  },
-}))
+  }
+})
+
+const lineChartOptions = computed(() => chartOptions.value as unknown as ChartOptions<'line'>)
+const barChartOptions = computed(() => chartOptions.value as unknown as ChartOptions<'bar'>)
+const sharedPlugins = [verticalLinePlugin, todayLinePlugin]
+const linePlugins = sharedPlugins as unknown as Plugin<'line'>[]
+const barPlugins = sharedPlugins as unknown as Plugin<'bar'>[]
 </script>
 
 <template>
   <div class="w-full h-full">
-    <Line v-if="accumulated" :data="chartData as any" :options="chartOptions as any" :plugins="[verticalLinePlugin, todayLinePlugin]" />
-    <Bar v-else :data="chartData as any" :options="chartOptions as any" :plugins="[verticalLinePlugin, todayLinePlugin]" />
+    <Line
+      v-if="accumulated"
+      :data="chartData as any"
+      :options="lineChartOptions as any"
+      :plugins="linePlugins"
+    />
+    <Bar
+      v-else
+      :data="chartData as any"
+      :options="barChartOptions as any"
+      :plugins="barPlugins"
+    />
   </div>
 </template>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ChartData, ChartOptions } from 'chart.js'
+import type { ChartData, ChartOptions, Plugin } from 'chart.js'
 import type { AnnotationOptions } from '../../services/chartAnnotations'
 import { useDark } from '@vueuse/core'
 import {
@@ -442,9 +442,13 @@ const chartOptions = computed<ChartOptions & { plugins: { inlineAnnotationPlugin
     },
   }
 })
+
+const sharedPlugins = [inlineAnnotationPlugin, verticalLinePlugin, todayLinePlugin]
+const linePlugins = sharedPlugins as unknown as Plugin<'line'>[]
+const barPlugins = sharedPlugins as unknown as Plugin<'bar'>[]
 </script>
 
 <template>
-  <Line v-if="accumulated" :data="chartData as any" height="auto" :options="(chartOptions as any)" :plugins="[inlineAnnotationPlugin, verticalLinePlugin, todayLinePlugin]" />
-  <Bar v-else :data="chartData as any" height="auto" :options="(chartOptions as any)" :plugins="[inlineAnnotationPlugin, verticalLinePlugin, todayLinePlugin]" />
+  <Line v-if="accumulated" :data="chartData as any" height="auto" :options="(chartOptions as any)" :plugins="linePlugins" />
+  <Bar v-else :data="chartData as any" height="auto" :options="(chartOptions as any)" :plugins="barPlugins" />
 </template>

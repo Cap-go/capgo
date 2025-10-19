@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ChartData, ChartOptions } from 'chart.js'
+import type { ChartData, ChartOptions, Plugin } from 'chart.js'
 import type { Organization } from '~/stores/organization'
 import { useDark } from '@vueuse/core'
 import { CategoryScale, Chart, Filler, LinearScale, LineElement, PointElement, Tooltip } from 'chart.js'
@@ -368,6 +368,33 @@ const chartOptions = computed<ChartOptions<'line'>>(() => {
   const hasMultipleDatasets = (processedChartData.value?.datasets.length ?? 0) > 1
   const tooltipOptions = createTooltipConfig(hasMultipleDatasets, props.accumulated)
 
+  const pluginOptions = {
+    legend: {
+      display: hasMultipleDatasets,
+      position: 'bottom',
+      labels: {
+        color: isDark.value ? 'white' : 'black',
+        padding: 10,
+        font: {
+          size: 11,
+        },
+        generateLabels(chart: Chart) {
+          const original = Chart.defaults.plugins.legend.labels.generateLabels(chart)
+          return original.map(item => ({
+            ...item,
+            text: roundPercentageInString(item.text),
+          }))
+        },
+      },
+    },
+    title: { display: false },
+    tooltip: tooltipOptions,
+    filler: {
+      propagate: false,
+    },
+    todayLine: todayLineOptions.value,
+  } as const
+
   return {
     maintainAspectRatio: false,
     scales: {
@@ -388,39 +415,20 @@ const chartOptions = computed<ChartOptions<'line'>>(() => {
           color: `${isDark.value ? '#323e4e' : '#cad5e2'}`,
         },
         ticks: {
-          callback: (value: number) => `${value}%`,
+          callback: (tickValue: string | number) => {
+            const numericValue = typeof tickValue === 'number' ? tickValue : Number(tickValue)
+            const display = Number.isFinite(numericValue) ? numericValue : tickValue
+            return `${display}%`
+          },
           color: isDark.value ? 'white' : 'black',
         },
       },
     },
-    plugins: {
-      legend: {
-        display: hasMultipleDatasets,
-        position: 'bottom',
-        labels: {
-          color: isDark.value ? 'white' : 'black',
-          padding: 10,
-          font: {
-            size: 11,
-          },
-          generateLabels(chart) {
-            const original = Chart.defaults.plugins.legend.labels.generateLabels(chart)
-            return original.map(item => ({
-              ...item,
-              text: roundPercentageInString(item.text),
-            }))
-          },
-        },
-      },
-      title: { display: false },
-      tooltip: tooltipOptions,
-      filler: {
-        propagate: false,
-      },
-      todayLine: todayLineOptions.value as any,
-    },
-  } as ChartOptions<'line'>
+    plugins: pluginOptions as unknown as NonNullable<ChartOptions<'line'>['plugins']>,
+  }
 })
+
+const chartPlugins = [verticalLinePlugin, todayLinePlugin] as unknown as Plugin<'line'>[]
 
 async function loadData() {
   if (!appId.value) {
@@ -505,12 +513,7 @@ watch(
       <div v-if="isLoading" class="flex items-center justify-center h-full">
         <Spinner size="w-40 h-40" />
       </div>
-      <Line
-        v-else-if="processedChartData && processedChartData.datasets.length"
-        :data="processedChartData!"
-        :options="chartOptions"
-        :plugins="[verticalLinePlugin, todayLinePlugin]"
-      />
+      <Line v-else-if="processedChartData && processedChartData.datasets.length" :data="processedChartData!" :options="chartOptions" :plugins="chartPlugins" />
       <div v-else class="flex h-full items-center justify-center text-sm text-slate-500 dark:text-slate-300">
         {{ t('no-data') }}
       </div>
