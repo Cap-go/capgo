@@ -235,7 +235,7 @@ export async function readDeviceUsageCF(c: Context, app_id: string, period_start
     formatDateTime(toStartOfInterval(timestamp, INTERVAL '1' DAY), '%Y-%m-%d') AS date,
     blob1 AS device_id,
     index1 AS app_id,
-    index2 AS org_id
+    blob2 AS org_id
   FROM device_usage
   WHERE
     app_id = '${app_id}'
