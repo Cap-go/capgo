@@ -91,7 +91,9 @@ onMounted(() => {
                 'd-btn d-btn-warning': button.role === 'danger',
                 'd-btn d-btn-outline text-black dark:text-white hover:text-white': button.role === 'cancel',
                 'd-btn': !button.role,
+                'opacity-70 cursor-not-allowed': button.disabled,
               }"
+              :disabled="button.disabled"
               @click="close(button)"
             >
               {{ button.text }}
