@@ -21,6 +21,7 @@ app.route('/plugin/stats', stats)
 // Plugin API
 app.route('/channel_self', channel_self)
 app.route('/updates', updates)
+app.route('/updates_v2', updates)
 app.route('/stats', stats)
 app.route('/ok', ok)
 app.route('/latency', latency)
