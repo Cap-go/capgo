@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.34.90 (2025-10-21)
+
+
+### Bug Fixes
+
+* env deploy script ([7723f0c](https://github.com/Cap-go/capgo/commit/7723f0cfe05e576bbbf9a54abafbb59c43d61040))
+
 ### 12.34.89 (2025-10-21)
 
 ### 12.34.88 (2025-10-21)
