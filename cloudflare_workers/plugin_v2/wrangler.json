@@ -5,11 +5,11 @@
   },
   "routes": [
     {
-      "pattern": "plugin_v2.capgo.app",
+      "pattern": "plugin.v2.capgo.app",
       "custom_domain": true
     },
     {
-      "pattern": "plugin_v2.usecapgo.com",
+      "pattern": "plugin.v2.usecapgo.com",
       "custom_domain": true
     }
   ],
@@ -79,11 +79,11 @@
       },
       "routes": [
         {
-          "pattern": "plugin_v2.preprod.capgo.app",
+          "pattern": "plugin.v2.preprod.capgo.app",
           "custom_domain": true
         },
         {
-          "pattern": "plugin_v2.preprod.usecapgo.com",
+          "pattern": "plugin.v2.preprod.usecapgo.com",
           "custom_domain": true
         }
       ],
@@ -137,11 +137,11 @@
       },
       "routes": [
         {
-          "pattern": "plugin_v2.dev.capgo.app",
+          "pattern": "plugin.v2.dev.capgo.app",
           "custom_domain": true
         },
         {
-          "pattern": "plugin_v2.dev.usecapgo.com",
+          "pattern": "plugin.v2.dev.usecapgo.com",
           "custom_domain": true
         }
       ],
