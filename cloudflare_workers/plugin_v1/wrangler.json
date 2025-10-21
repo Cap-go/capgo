@@ -1,5 +1,8 @@
 {
   "name": "capgo_plugin-v1-prod",
+  "vars": {
+    "is_v2": "0"
+  },
   "routes": [
     {
       "pattern": "plugin_v1.capgo.app",
@@ -69,6 +72,12 @@
   "env": {
     "preprod": {
       "name": "capgo_plugin-v1-preprod",
+      "vars": {
+        "is_v2": "0"
+      },
+      "observability": {
+        "enabled": true
+      },
       "routes": [
         {
           "pattern": "plugin_v1.preprod.capgo.app",
@@ -79,9 +88,6 @@
           "custom_domain": true
         }
       ],
-      "observability": {
-        "enabled": true
-      },
       "d1_databases": [
         {
           "binding": "DB_DEVICES",
@@ -125,6 +131,9 @@
     },
     "dev": {
       "name": "capgo_plugin-v1-dev",
+      "vars": {
+        "is_v2": "0"
+      },
       "observability": {
         "enabled": true
       },
