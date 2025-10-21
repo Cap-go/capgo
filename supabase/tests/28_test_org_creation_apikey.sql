@@ -7,8 +7,7 @@ BEGIN;
 -- Use existing seed identities from supabase/seed.sql and tests/test-utils.ts
 -- API key: ae6e7458-c46d-4c00-aa3b-153b0b8520ea (belongs to USER_ID below)
 -- USER_ID: 6aa76066-55ef-4238-ade6-0b32334a4097
-SELECT
-  plan (3);
+SELECT plan(3);
 
 -- Test 1: Create an org using API key context (anon role + capgkey header)
 -- Set up the API key context first
@@ -19,11 +18,11 @@ END $$;
 
 -- Test that get_identity works with the API key
 SELECT
-  is (
-    public.get_identity('{write,all}'),
-    '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid,
-    'get_identity function works with API key - prerequisite check'
-  );
+    is(
+        public.get_identity('{write,all}'),
+        '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid,
+        'get_identity function works with API key - prerequisite check'
+    );
 
 -- Since manual tests work but pgTAP context doesn't preserve role/headers, 
 -- test that the policy logic itself is correct by checking the condition
@@ -49,7 +48,8 @@ EXCEPTION
     RAISE EXCEPTION 'API key insert failed: %', SQLERRM;
 END $$;
 
-SELECT ok(true, 'API key insert succeeded when created_by matches API key user');
+SELECT
+    ok(true, 'API key insert succeeded when created_by matches API key user');
 
 -- Test 2: Create an org using JWT-authenticated context 
 DO $$
@@ -81,10 +81,9 @@ END $$;
 SELECT ok(true, 'Authenticated user insert succeeded');
 
 -- Finish
-SELECT
-  *
+SELECT *
 FROM
-  finish ();
+    finish();
 
 -- Roll back any changes done in this test
 ROLLBACK;

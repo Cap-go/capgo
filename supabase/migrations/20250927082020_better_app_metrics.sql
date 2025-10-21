@@ -7,17 +7,21 @@ CREATE TABLE IF NOT EXISTS public.app_metrics_cache (
     cached_at timestamp with time zone NOT NULL DEFAULT now()
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS app_metrics_cache_org_id_key ON public.app_metrics_cache (org_id);
+CREATE UNIQUE INDEX IF NOT EXISTS app_metrics_cache_org_id_key ON public.app_metrics_cache (
+    org_id
+);
 
 ALTER TABLE public.app_metrics_cache ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Deny all" ON public.app_metrics_cache FOR ALL USING (false)
 WITH
-    CHECK (false);
+CHECK (false);
 
-CREATE OR REPLACE FUNCTION public.seed_get_app_metrics_caches (p_org_id uuid, p_start_date date, p_end_date date) RETURNS public.app_metrics_cache LANGUAGE plpgsql SECURITY DEFINER
+CREATE OR REPLACE FUNCTION public.seed_get_app_metrics_caches(
+    p_org_id uuid, p_start_date date, p_end_date date
+) RETURNS public.app_metrics_cache LANGUAGE plpgsql SECURITY DEFINER
 SET
-    search_path TO '' AS $function$
+search_path TO '' AS $function$
 DECLARE
     metrics_json jsonb;
     cache_record public.app_metrics_cache%ROWTYPE;
@@ -92,23 +96,23 @@ BEGIN
 END;
 $function$;
 
-REVOKE ALL ON FUNCTION public.seed_get_app_metrics_caches (uuid, date, date)
+REVOKE ALL ON FUNCTION public.seed_get_app_metrics_caches(uuid, date, date)
 FROM
-    PUBLIC;
+public;
 
-REVOKE ALL ON FUNCTION public.seed_get_app_metrics_caches (uuid, date, date)
+REVOKE ALL ON FUNCTION public.seed_get_app_metrics_caches(uuid, date, date)
 FROM
-    anon;
+anon;
 
-REVOKE ALL ON FUNCTION public.seed_get_app_metrics_caches (uuid, date, date)
+REVOKE ALL ON FUNCTION public.seed_get_app_metrics_caches(uuid, date, date)
 FROM
-    authenticated;
+authenticated;
 
-REVOKE ALL ON FUNCTION public.seed_get_app_metrics_caches (uuid, date, date)
+REVOKE ALL ON FUNCTION public.seed_get_app_metrics_caches(uuid, date, date)
 FROM
-    service_role;
+service_role;
 
-CREATE OR REPLACE FUNCTION public.get_app_metrics (org_id uuid) RETURNS TABLE (
+CREATE OR REPLACE FUNCTION public.get_app_metrics(org_id uuid) RETURNS TABLE (
     app_id character varying,
     date date,
     mau bigint,
@@ -120,7 +124,7 @@ CREATE OR REPLACE FUNCTION public.get_app_metrics (org_id uuid) RETURNS TABLE (
     uninstall bigint
 ) LANGUAGE plpgsql
 SET
-    search_path TO '' AS $function$
+search_path TO '' AS $function$
 DECLARE
     cycle_start timestamp with time zone;
     cycle_end timestamp with time zone;
@@ -135,18 +139,22 @@ END;
 $function$;
 
 REVOKE
-EXECUTE ON FUNCTION public.get_app_metrics (org_id uuid)
+EXECUTE ON FUNCTION public.get_app_metrics(org_id uuid)
 FROM
-    PUBLIC,
-    anon,
-    authenticated;
+public,
+anon,
+authenticated;
 
 GRANT
-EXECUTE ON FUNCTION public.get_app_metrics (org_id uuid) TO service_role;
+EXECUTE ON FUNCTION public.get_app_metrics(org_id uuid) TO service_role;
 
-DROP FUNCTION IF EXISTS public.get_app_metrics (org_id uuid, start_date date, end_date date);
+DROP FUNCTION IF EXISTS public.get_app_metrics(
+    org_id uuid, start_date date, end_date date
+);
 
-CREATE OR REPLACE FUNCTION public.get_app_metrics (p_org_id uuid, p_start_date date, p_end_date date) RETURNS TABLE (
+CREATE OR REPLACE FUNCTION public.get_app_metrics(
+    p_org_id uuid, p_start_date date, p_end_date date
+) RETURNS TABLE (
     app_id character varying,
     date date,
     mau bigint,
@@ -158,7 +166,7 @@ CREATE OR REPLACE FUNCTION public.get_app_metrics (p_org_id uuid, p_start_date d
     uninstall bigint
 ) LANGUAGE plpgsql SECURITY DEFINER
 SET
-    search_path TO '' AS $function$
+search_path TO '' AS $function$
 DECLARE
     cache_entry public.app_metrics_cache%ROWTYPE;
     org_exists boolean;
@@ -215,17 +223,17 @@ END;
 $function$;
 
 REVOKE
-EXECUTE ON FUNCTION public.get_app_metrics (uuid, date, date)
+EXECUTE ON FUNCTION public.get_app_metrics(uuid, date, date)
 FROM
-    PUBLIC,
-    anon,
-    authenticated;
+public,
+anon,
+authenticated;
 
 GRANT
-EXECUTE ON FUNCTION public.get_app_metrics (uuid, date, date) TO service_role;
+EXECUTE ON FUNCTION public.get_app_metrics(uuid, date, date) TO service_role;
 
-ALTER FUNCTION "public"."get_app_metrics" (
-    "org_id" "uuid",
-    "start_date" "date",
-    "end_date" "date"
+ALTER FUNCTION public.get_app_metrics(
+    "org_id" uuid,
+    "start_date" date,
+    "end_date" date
 ) OWNER TO "postgres";
