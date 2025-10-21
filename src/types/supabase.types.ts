@@ -708,18 +708,21 @@ export type Database = {
           app_id: string
           device_id: string
           id: number
+          org_id: string
           timestamp: string
         }
         Insert: {
           app_id: string
           device_id: string
           id?: number
+          org_id: string
           timestamp?: string
         }
         Update: {
           app_id?: string
           device_id?: string
           id?: number
+          org_id?: string
           timestamp?: string
         }
         Relationships: []
@@ -1318,6 +1321,302 @@ export type Database = {
           },
         ]
       }
+      usage_credit_catalog: {
+        Row: {
+          created_at: string
+          credits_amount: number
+          description: string | null
+          id: string
+          is_active: boolean
+          name: string
+          price_amount: number | null
+          price_currency: string
+          slug: string
+          stripe_price_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          credits_amount: number
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          price_amount?: number | null
+          price_currency?: string
+          slug: string
+          stripe_price_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          credits_amount?: number
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          price_amount?: number | null
+          price_currency?: string
+          slug?: string
+          stripe_price_id?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      usage_credit_consumptions: {
+        Row: {
+          applied_at: string
+          credits_used: number
+          grant_id: string
+          id: number
+          metric: Database["public"]["Enums"]["credit_metric_type"]
+          org_id: string
+          overage_event_id: string | null
+        }
+        Insert: {
+          applied_at?: string
+          credits_used: number
+          grant_id: string
+          id?: number
+          metric: Database["public"]["Enums"]["credit_metric_type"]
+          org_id: string
+          overage_event_id?: string | null
+        }
+        Update: {
+          applied_at?: string
+          credits_used?: number
+          grant_id?: string
+          id?: number
+          metric?: Database["public"]["Enums"]["credit_metric_type"]
+          org_id?: string
+          overage_event_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "usage_credit_consumptions_grant_id_fkey"
+            columns: ["grant_id"]
+            isOneToOne: false
+            referencedRelation: "usage_credit_grants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "usage_credit_consumptions_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "usage_credit_consumptions_overage_event_id_fkey"
+            columns: ["overage_event_id"]
+            isOneToOne: false
+            referencedRelation: "usage_overage_events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      usage_credit_grants: {
+        Row: {
+          credits_consumed: number
+          credits_total: number
+          expires_at: string
+          granted_at: string
+          id: string
+          notes: string | null
+          org_id: string
+          source: string
+          source_ref: Json | null
+        }
+        Insert: {
+          credits_consumed?: number
+          credits_total: number
+          expires_at?: string
+          granted_at?: string
+          id?: string
+          notes?: string | null
+          org_id: string
+          source?: string
+          source_ref?: Json | null
+        }
+        Update: {
+          credits_consumed?: number
+          credits_total?: number
+          expires_at?: string
+          granted_at?: string
+          id?: string
+          notes?: string | null
+          org_id?: string
+          source?: string
+          source_ref?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "usage_credit_grants_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      usage_credit_rates: {
+        Row: {
+          created_at: string
+          credit_cost_per_unit: number
+          effective_from: string
+          effective_to: string | null
+          id: string
+          metric: Database["public"]["Enums"]["credit_metric_type"]
+          plan_id: string | null
+          tier_max: number | null
+          tier_min: number
+          unit_label: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          credit_cost_per_unit: number
+          effective_from?: string
+          effective_to?: string | null
+          id?: string
+          metric: Database["public"]["Enums"]["credit_metric_type"]
+          plan_id?: string | null
+          tier_max?: number | null
+          tier_min?: number
+          unit_label?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          credit_cost_per_unit?: number
+          effective_from?: string
+          effective_to?: string | null
+          id?: string
+          metric?: Database["public"]["Enums"]["credit_metric_type"]
+          plan_id?: string | null
+          tier_max?: number | null
+          tier_min?: number
+          unit_label?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "usage_credit_rates_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      usage_credit_transactions: {
+        Row: {
+          amount: number
+          balance_after: number | null
+          description: string | null
+          grant_id: string | null
+          id: number
+          occurred_at: string
+          org_id: string
+          source_ref: Json | null
+          transaction_type: Database["public"]["Enums"]["credit_transaction_type"]
+        }
+        Insert: {
+          amount: number
+          balance_after?: number | null
+          description?: string | null
+          grant_id?: string | null
+          id?: number
+          occurred_at?: string
+          org_id: string
+          source_ref?: Json | null
+          transaction_type: Database["public"]["Enums"]["credit_transaction_type"]
+        }
+        Update: {
+          amount?: number
+          balance_after?: number | null
+          description?: string | null
+          grant_id?: string | null
+          id?: number
+          occurred_at?: string
+          org_id?: string
+          source_ref?: Json | null
+          transaction_type?: Database["public"]["Enums"]["credit_transaction_type"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "usage_credit_transactions_grant_id_fkey"
+            columns: ["grant_id"]
+            isOneToOne: false
+            referencedRelation: "usage_credit_grants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "usage_credit_transactions_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      usage_overage_events: {
+        Row: {
+          billing_cycle_end: string | null
+          billing_cycle_start: string | null
+          created_at: string
+          credits_debited: number
+          credits_estimated: number
+          details: Json | null
+          id: string
+          metric: Database["public"]["Enums"]["credit_metric_type"]
+          org_id: string
+          overage_amount: number
+          rate_id: string | null
+        }
+        Insert: {
+          billing_cycle_end?: string | null
+          billing_cycle_start?: string | null
+          created_at?: string
+          credits_debited?: number
+          credits_estimated: number
+          details?: Json | null
+          id?: string
+          metric: Database["public"]["Enums"]["credit_metric_type"]
+          org_id: string
+          overage_amount: number
+          rate_id?: string | null
+        }
+        Update: {
+          billing_cycle_end?: string | null
+          billing_cycle_start?: string | null
+          created_at?: string
+          credits_debited?: number
+          credits_estimated?: number
+          details?: Json | null
+          id?: string
+          metric?: Database["public"]["Enums"]["credit_metric_type"]
+          org_id?: string
+          overage_amount?: number
+          rate_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "usage_overage_events_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "usage_overage_events_rate_id_fkey"
+            columns: ["rate_id"]
+            isOneToOne: false
+            referencedRelation: "usage_credit_rates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       users: {
         Row: {
           ban_time: string | null
@@ -1404,12 +1703,61 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      usage_credit_balances: {
+        Row: {
+          available_credits: number | null
+          next_expiration: string | null
+          org_id: string | null
+          total_credits: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "usage_credit_grants_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       accept_invitation_to_org: {
         Args: { org_id: string }
         Returns: string
+      }
+      apply_usage_overage: {
+        Args: {
+          p_billing_cycle_end?: string
+          p_billing_cycle_start?: string
+          p_details?: Json
+          p_metric: Database["public"]["Enums"]["credit_metric_type"]
+          p_org_id: string
+          p_overage_amount: number
+          p_plan_id?: string
+        }
+        Returns: {
+          credits_applied: number
+          credits_remaining: number
+          credits_required: number
+          overage_amount: number
+          overage_covered: number
+          overage_event_id: string
+          overage_unpaid: number
+          rate_id: string
+        }[]
+      }
+      calculate_credit_cost: {
+        Args: {
+          p_metric: Database["public"]["Enums"]["credit_metric_type"]
+          p_overage_amount: number
+          p_plan_id: string
+        }
+        Returns: {
+          credit_cost_per_unit: number
+          credits_required: number
+          rate_id: string
+        }[]
       }
       check_min_rights: {
         Args:
@@ -1507,6 +1855,10 @@ export type Database = {
           | { apikey: string; appid: string; name_version: string }
           | { appid: string; name_version: string }
         Returns: boolean
+      }
+      expire_usage_credits: {
+        Args: Record<PropertyKey, never>
+        Returns: number
       }
       find_best_plan_v3: {
         Args: { bandwidth: number; mau: number; storage: number }
@@ -1678,6 +2030,9 @@ export type Database = {
           app_count: number
           can_use_more: boolean
           created_by: string
+          credit_available: number
+          credit_next_expiration: string
+          credit_total: number
           gid: string
           is_canceled: boolean
           is_yearly: boolean
@@ -1965,6 +2320,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      process_cron_sync_sub_jobs: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       process_d1_replication_batch: {
         Args: Record<PropertyKey, never>
         Returns: undefined
@@ -1978,7 +2337,9 @@ export type Database = {
         Returns: undefined
       }
       process_function_queue: {
-        Args: { queue_name: string }
+        Args:
+          | { batch_size?: number; queue_name: string }
+          | { queue_name: string }
         Returns: number
       }
       process_stats_email_monthly: {
@@ -2119,6 +2480,14 @@ export type Database = {
     }
     Enums: {
       action_type: "mau" | "storage" | "bandwidth"
+      credit_metric_type: "mau" | "bandwidth" | "storage"
+      credit_transaction_type:
+        | "grant"
+        | "purchase"
+        | "manual_grant"
+        | "deduction"
+        | "expiry"
+        | "refund"
       disable_update: "major" | "minor" | "patch" | "version_number" | "none"
       key_mode: "read" | "write" | "all" | "upload"
       platform_os: "ios" | "android"
@@ -2353,6 +2722,15 @@ export const Constants = {
   public: {
     Enums: {
       action_type: ["mau", "storage", "bandwidth"],
+      credit_metric_type: ["mau", "bandwidth", "storage"],
+      credit_transaction_type: [
+        "grant",
+        "purchase",
+        "manual_grant",
+        "deduction",
+        "expiry",
+        "refund",
+      ],
       disable_update: ["major", "minor", "patch", "version_number", "none"],
       key_mode: ["read", "write", "all", "upload"],
       platform_os: ["ios", "android"],
