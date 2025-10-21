@@ -46,7 +46,7 @@ const datasByApp = ref({
   bandwidth: {} as { [appId: string]: number[] },
 })
 
-const creditsV2Enabled: boolean = import.meta.env.VITE_FEATURE_CREDITS_V2;
+const creditsV2Enabled: boolean = import.meta.env.VITE_FEATURE_CREDITS_V2
 
 const appNames = ref<{ [appId: string]: string }>({})
 const isLoading = ref(true)
