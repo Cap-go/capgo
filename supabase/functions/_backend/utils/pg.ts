@@ -37,6 +37,13 @@ function buildPlanValidationExpression(
   )`
 }
 
+// Singleton postgres client cache for connection pooling
+// When using Hyperdrive, we should reuse the same client across requests
+// to take advantage of connection pooling. Creating a new client per request
+// defeats the purpose of Hyperdrive and causes connection churn at high load.
+let cachedPgClient: ReturnType<typeof postgres> | null = null
+let cachedDbUrl: string | null = null
+
 export function getDatabaseURL(c: Context): string {
   // TODO: uncomment when we enable back replicate
   // const clientContinent = (c.req.raw as any)?.cf?.continent
@@ -54,8 +61,30 @@ export function getDatabaseURL(c: Context): string {
 
 export function getPgClient(c: Context) {
   const dbUrl = getDatabaseURL(c)
-  cloudlog({ requestId: c.get('requestId'), message: 'SUPABASE_DB_URL', dbUrl })
-  return postgres(dbUrl, { prepare: false, idle_timeout: 2 })
+
+  // If we already have a client for this URL, reuse it
+  if (cachedPgClient && cachedDbUrl === dbUrl) {
+    cloudlog({ requestId: c.get('requestId'), message: 'Reusing cached postgres client', dbUrl })
+    return cachedPgClient
+  }
+
+  // Create a new client with optimized settings for Hyperdrive
+  cloudlog({ requestId: c.get('requestId'), message: 'Creating new postgres client', dbUrl })
+  cachedDbUrl = dbUrl
+  cachedPgClient = postgres(dbUrl, {
+    prepare: false,
+    // Cloudflare Workers can only maintain 5 concurrent external connections
+    max: 5,
+    // Keep connections alive longer to benefit from connection pooling
+    // Increased from 2 seconds to 60 seconds to reduce connection churn
+    idle_timeout: 60,
+    // Maximum lifetime of a connection (30 minutes)
+    max_lifetime: 60 * 30,
+    // Connection timeout
+    connect_timeout: 10,
+  })
+
+  return cachedPgClient
 }
 
 export function getDrizzleClient(client: ReturnType<typeof getPgClient>) {
@@ -63,8 +92,17 @@ export function getDrizzleClient(client: ReturnType<typeof getPgClient>) {
 }
 
 export function closeClient(c: Context, client: ReturnType<typeof getPgClient>) {
-  // cloudlog(c.get('requestId'), 'Closing client', client)
-  return backgroundTask(c, client.end())
+  // When using Hyperdrive with a singleton client pattern, we should NOT close
+  // the connection after each request. The postgres-js library and Hyperdrive
+  // manage the connection pool automatically. Closing connections defeats the
+  // purpose of connection pooling and causes massive connection churn at high load.
+  //
+  // The old implementation was:
+  // return backgroundTask(c, client.end())
+  //
+  // This no-op allows the connection to be reused across requests.
+  cloudlog({ requestId: c.get('requestId'), message: 'closeClient called (no-op with singleton pattern)' })
+  return Promise.resolve()
 }
 
 export function getAlias() {
