@@ -82,25 +82,6 @@ CREATE INDEX IF NOT EXISTS idx_usage_credit_transactions_grant ON public.usage_c
 
 CREATE UNIQUE INDEX IF NOT EXISTS plans_id_unique_idx ON public.plans (id);
 
-CREATE TABLE IF NOT EXISTS public.usage_credit_rates (
-  id uuid DEFAULT extensions.uuid_generate_v4() PRIMARY KEY,
-  metric public.credit_metric_type NOT NULL,
-  plan_id uuid REFERENCES public.plans (id) ON DELETE SET NULL,
-  tier_min numeric(20, 0) DEFAULT 0 NOT NULL CHECK (tier_min >= 0),
-  tier_max numeric(20, 0) CHECK (tier_max IS NULL OR tier_max > tier_min),
-  credit_cost_per_unit numeric(18, 6) NOT NULL CHECK (credit_cost_per_unit >= 0),
-  unit_label text DEFAULT ''::text NOT NULL,
-  effective_from timestamptz DEFAULT now() NOT NULL,
-  effective_to timestamptz,
-  created_at timestamptz DEFAULT now() NOT NULL,
-  updated_at timestamptz DEFAULT now() NOT NULL,
-  UNIQUE (metric, plan_id, tier_min, effective_from)
-);
-
-COMMENT ON TABLE public.usage_credit_rates IS 'Pricing matrix mapping metered usage (per plan/metric tier) to credit cost used by overage billing logic.';
-
-CREATE INDEX IF NOT EXISTS idx_usage_credit_rates_plan_metric ON public.usage_credit_rates (plan_id, metric, effective_from);
-
 CREATE TABLE IF NOT EXISTS public.usage_overage_events (
   id uuid DEFAULT extensions.uuid_generate_v4() PRIMARY KEY,
   org_id uuid NOT NULL REFERENCES public.orgs (id) ON DELETE CASCADE,
@@ -108,7 +89,7 @@ CREATE TABLE IF NOT EXISTS public.usage_overage_events (
   overage_amount numeric(20, 6) NOT NULL CHECK (overage_amount >= 0),
   credits_estimated numeric(18, 6) NOT NULL CHECK (credits_estimated >= 0),
   credits_debited numeric(18, 6) DEFAULT 0 NOT NULL CHECK (credits_debited >= 0),
-  rate_id uuid REFERENCES public.usage_credit_rates (id) ON DELETE SET NULL,
+  credit_step_id bigint REFERENCES public.capgo_credits_steps (id) ON DELETE SET NULL,
   billing_cycle_start date,
   billing_cycle_end date,
   created_at timestamptz DEFAULT now() NOT NULL,
@@ -140,40 +121,87 @@ CREATE OR REPLACE FUNCTION public.calculate_credit_cost(
   p_metric public.credit_metric_type,
   p_overage_amount numeric
 ) RETURNS TABLE (
-  rate_id uuid,
+  credit_step_id bigint,
   credit_cost_per_unit numeric,
   credits_required numeric
 ) LANGUAGE plpgsql
 SET search_path = '' AS $$
 DECLARE
-  v_rate RECORD;
+  v_step public.capgo_credits_steps%ROWTYPE;
+  v_highest public.capgo_credits_steps%ROWTYPE;
+  v_remaining numeric;
+  v_applied_range numeric;
+  v_units numeric;
+  v_total_credits numeric := 0;
+  v_last_step_id bigint := NULL;
+  v_unit_factor numeric;
 BEGIN
-  IF p_overage_amount <= 0 OR p_overage_amount IS NULL THEN
-    RETURN QUERY SELECT NULL::uuid, 0::numeric, 0::numeric;
+  IF p_overage_amount IS NULL OR p_overage_amount <= 0 THEN
+    RETURN QUERY SELECT NULL::bigint, 0::numeric, 0::numeric;
     RETURN;
   END IF;
 
-  SELECT r.*
-  INTO v_rate
-  FROM public.usage_credit_rates r
-  WHERE r.metric = p_metric
-    AND r.tier_min <= p_overage_amount
-    AND (r.tier_max IS NULL OR p_overage_amount < r.tier_max)
-    AND r.effective_from <= now()
-    AND (r.effective_to IS NULL OR r.effective_to > now())
-    AND (r.plan_id = p_plan_id OR r.plan_id IS NULL)
-  ORDER BY
-    (r.plan_id = p_plan_id) DESC,
-    r.tier_min DESC,
-    r.effective_from DESC
+  v_remaining := p_overage_amount;
+
+  SELECT *
+  INTO v_highest
+  FROM public.capgo_credits_steps
+  WHERE type = p_metric::text
+  ORDER BY step_max DESC, step_min DESC
   LIMIT 1;
 
   IF NOT FOUND THEN
-    RETURN QUERY SELECT NULL::uuid, 0::numeric, 0::numeric;
+    RETURN QUERY SELECT NULL::bigint, 0::numeric, 0::numeric;
     RETURN;
   END IF;
 
-  RETURN QUERY SELECT v_rate.id::uuid, v_rate.credit_cost_per_unit::numeric, v_rate.credit_cost_per_unit * p_overage_amount;
+  FOR v_step IN
+    SELECT *
+    FROM public.capgo_credits_steps
+    WHERE type = p_metric::text
+    ORDER BY step_min ASC
+  LOOP
+    EXIT WHEN v_remaining <= 0;
+
+    IF p_overage_amount < v_step.step_min THEN
+      EXIT;
+    END IF;
+
+    v_applied_range := LEAST(
+      v_remaining,
+      (v_step.step_max - v_step.step_min)::numeric
+    );
+
+    IF v_applied_range <= 0 THEN
+      CONTINUE;
+    END IF;
+
+    v_unit_factor := GREATEST(NULLIF(v_step.unit_factor, 0), 1)::numeric;
+    v_units := CEILING(v_applied_range / v_unit_factor);
+
+    IF v_units <= 0 THEN
+      CONTINUE;
+    END IF;
+
+    v_total_credits := v_total_credits + (v_units * v_step.price_per_unit::numeric);
+    v_remaining := v_remaining - v_applied_range;
+    v_last_step_id := v_step.id;
+  END LOOP;
+
+  IF v_remaining > 0 THEN
+    v_unit_factor := GREATEST(NULLIF(v_highest.unit_factor, 0), 1)::numeric;
+    v_units := CEILING(v_remaining / v_unit_factor);
+
+    IF v_units > 0 THEN
+      v_total_credits := v_total_credits + (v_units * v_highest.price_per_unit::numeric);
+      v_last_step_id := v_highest.id;
+    END IF;
+  END IF;
+
+  RETURN QUERY SELECT
+    v_last_step_id::bigint,
+    CASE WHEN p_overage_amount > 0 THEN v_total_credits / p_overage_amount ELSE 0 END,
+    v_total_credits;
 END;
 $$;
 
@@ -190,7 +218,7 @@ CREATE OR REPLACE FUNCTION public.apply_usage_overage(
   credits_required numeric,
   credits_applied numeric,
   credits_remaining numeric,
-  rate_id uuid,
+  credit_step_id bigint,
   overage_covered numeric,
   overage_unpaid numeric,
   overage_event_id uuid
@@ -208,8 +236,8 @@ DECLARE
   v_overage_paid numeric := 0;
   grant_rec public.usage_credit_grants%ROWTYPE;
 BEGIN
-  IF p_overage_amount <= 0 OR p_overage_amount IS NULL THEN
-    RETURN QUERY SELECT 0::numeric, 0::numeric, 0::numeric, 0::numeric, NULL::uuid, 0::numeric, 0::numeric, NULL::uuid;
+  IF p_overage_amount IS NULL OR p_overage_amount <= 0 THEN
+    RETURN QUERY SELECT 0::numeric, 0::numeric, 0::numeric, 0::numeric, NULL::bigint, 0::numeric, 0::numeric, NULL::uuid;
     RETURN;
   END IF;
 
@@ -218,14 +246,14 @@ BEGIN
   FROM public.calculate_credit_cost(p_plan_id, p_metric, p_overage_amount)
   LIMIT 1;
 
-  IF v_calc.rate_id IS NULL THEN
+  IF v_calc.credit_step_id IS NULL THEN
     INSERT INTO public.usage_overage_events (
       org_id,
       metric,
       overage_amount,
       credits_estimated,
       credits_debited,
-      rate_id,
+      credit_step_id,
       billing_cycle_start,
       billing_cycle_end,
       details
@@ -243,7 +271,7 @@ BEGIN
     )
     RETURNING id INTO v_event_id;
 
-    RETURN QUERY SELECT p_overage_amount, 0::numeric, 0::numeric, 0::numeric, NULL::uuid, 0::numeric, p_overage_amount, v_event_id;
+    RETURN QUERY SELECT p_overage_amount, 0::numeric, 0::numeric, 0::numeric, NULL::bigint, 0::numeric, p_overage_amount, v_event_id;
     RETURN;
   END IF;
 
@@ -256,7 +284,7 @@ BEGIN
     overage_amount,
     credits_estimated,
     credits_debited,
-    rate_id,
+    credit_step_id,
     billing_cycle_start,
     billing_cycle_end,
     details
@@ -267,7 +295,7 @@ BEGIN
     p_overage_amount,
     v_calc.credits_required,
     0,
-    v_calc.rate_id,
+    v_calc.credit_step_id,
     p_billing_cycle_start,
     p_billing_cycle_end,
     p_details
@@ -356,12 +384,13 @@ BEGIN
     v_calc.credits_required,
     v_applied,
     v_remaining,
-    v_calc.rate_id,
+    v_calc.credit_step_id,
     v_overage_paid,
     GREATEST(p_overage_amount - v_overage_paid, 0),
     v_event_id;
 END;
 $$;
+
 
 CREATE VIEW public.usage_credit_balances AS
 SELECT

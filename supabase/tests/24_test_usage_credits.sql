@@ -5,7 +5,6 @@ CREATE EXTENSION "basejump-supabase_test_helpers";
 SELECT
   plan (12);
 
--- Ensure new helper functions exist
 SELECT
   ok(
     pg_get_functiondef('apply_usage_overage(uuid, public.credit_metric_type, numeric, uuid, timestamptz, timestamptz, jsonb)'::regprocedure) IS NOT NULL,
@@ -28,8 +27,10 @@ CREATE TEMP TABLE test_credit_context (
   org_id uuid,
   grant_id uuid,
   plan_id uuid,
-  rate_id uuid
+  credit_step_id bigint
 ) ON COMMIT DROP;
+
+DELETE FROM public.capgo_credits_steps WHERE type = 'mau';
 
 WITH plan_selection AS (
   SELECT id
@@ -79,32 +80,30 @@ grant_insert AS (
   RETURNING id,
     org_id
 ),
-rate_insert AS (
-  INSERT INTO public.usage_credit_rates (
-    metric,
-    plan_id,
-    tier_min,
-    tier_max,
-    credit_cost_per_unit,
-    unit_label
+step_insert AS (
+  INSERT INTO public.capgo_credits_steps (
+    type,
+    step_min,
+    step_max,
+    price_per_unit,
+    unit_factor
   )
-  SELECT
+  VALUES (
     'mau',
-    plan_selection.id,
     0,
-    NULL,
+    1000000,
     0.1,
-    'per mau'
-  FROM plan_selection
+    1
+  )
   RETURNING id
 )
-INSERT INTO test_credit_context (org_id, grant_id, plan_id, rate_id)
+INSERT INTO test_credit_context (org_id, grant_id, plan_id, credit_step_id)
 SELECT
   grant_insert.org_id,
   grant_insert.id,
   plan_selection.id,
-  rate_insert.id
-FROM plan_selection, grant_insert, rate_insert;
+  step_insert.id
+FROM plan_selection, grant_insert, step_insert;
 
 SELECT
   is(

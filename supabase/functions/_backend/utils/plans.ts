@@ -34,7 +34,7 @@ interface CreditApplicationResult {
   credits_remaining: number
   overage_covered: number
   overage_unpaid: number
-  rate_id: string | null
+  credit_step_id: number | null
 }
 
 async function getBillingCycleRange(c: Context, orgId: string): Promise<BillingCycleInfo | null> {
@@ -79,7 +79,7 @@ async function applyCreditsForMetric(
       credits_remaining: 0,
       overage_covered: 0,
       overage_unpaid: overageAmount,
-      rate_id: null,
+      credit_step_id: null,
     }
   }
   try {
@@ -107,7 +107,7 @@ async function applyCreditsForMetric(
         credits_remaining: 0,
         overage_covered: 0,
         overage_unpaid: overageAmount,
-        rate_id: null,
+        credit_step_id: null,
       }
     }
 
@@ -118,7 +118,7 @@ async function applyCreditsForMetric(
       credits_remaining: Number(data?.credits_remaining ?? 0),
       overage_covered: Number(data?.overage_covered ?? 0),
       overage_unpaid: Number(data?.overage_unpaid ?? overageAmount),
-      rate_id: data?.rate_id ?? null,
+      credit_step_id: data?.credit_step_id ?? null,
     }
   }
   catch (error) {
@@ -130,7 +130,7 @@ async function applyCreditsForMetric(
       credits_remaining: 0,
       overage_covered: 0,
       overage_unpaid: overageAmount,
-      rate_id: null,
+      credit_step_id: null,
     }
   }
 }
