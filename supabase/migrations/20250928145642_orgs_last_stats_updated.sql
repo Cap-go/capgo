@@ -22,7 +22,10 @@ CREATE OR REPLACE FUNCTION public.get_orgs_v6 () RETURNS TABLE (
   management_email text,
   is_yearly boolean,
   stats_updated_at timestamp without time zone,
-  next_stats_update_at timestamp with time zone
+  next_stats_update_at timestamp with time zone,
+  credit_available numeric,
+  credit_total numeric,
+  credit_next_expiration timestamptz
 ) LANGUAGE plpgsql
 SET search_path = '' SECURITY DEFINER AS $$
 DECLARE
@@ -81,7 +84,10 @@ CREATE OR REPLACE FUNCTION public.get_orgs_v6 (userid uuid) RETURNS TABLE (
   management_email text,
   is_yearly boolean,
   stats_updated_at timestamp without time zone,
-  next_stats_update_at timestamp with time zone
+  next_stats_update_at timestamp with time zone,
+  credit_available numeric,
+  credit_total numeric,
+  credit_next_expiration timestamptz
 ) LANGUAGE plpgsql
 SET search_path = '' SECURITY DEFINER AS $$
 BEGIN
@@ -102,13 +108,18 @@ BEGIN
     sub.management_email,
     public.is_org_yearly(sub.id) AS is_yearly,
     sub.stats_updated_at,
-    public.get_next_stats_update_date(sub.id) AS next_stats_update_at
+    public.get_next_stats_update_date(sub.id) AS next_stats_update_at,
+    COALESCE(ucb.available_credits, 0) AS credit_available,
+    COALESCE(ucb.total_credits, 0) AS credit_total,
+    ucb.next_expiration AS credit_next_expiration
   FROM (
     SELECT public.get_cycle_info_org(o.id) AS f, o.* FROM public.orgs AS o
   ) AS sub
   JOIN public.org_users
     ON org_users.user_id = userid
-   AND sub.id = org_users.org_id;
+   AND sub.id = org_users.org_id
+  LEFT JOIN public.usage_credit_balances ucb
+    ON ucb.org_id = sub.id;
 END;
 $$;
 

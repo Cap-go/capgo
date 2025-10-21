@@ -1,0 +1,176 @@
+BEGIN;
+
+CREATE EXTENSION "basejump-supabase_test_helpers";
+
+SELECT
+  plan (12);
+
+-- Ensure new helper functions exist
+SELECT
+  ok(
+    pg_get_functiondef('apply_usage_overage(uuid, public.credit_metric_type, numeric, uuid, timestamptz, timestamptz, jsonb)'::regprocedure) IS NOT NULL,
+    'apply_usage_overage function exists'
+  );
+
+SELECT
+  ok(
+    pg_get_functiondef('calculate_credit_cost(uuid, public.credit_metric_type, numeric)'::regprocedure) IS NOT NULL,
+    'calculate_credit_cost function exists'
+  );
+
+SELECT
+  ok(
+    pg_get_functiondef('expire_usage_credits()'::regprocedure) IS NOT NULL,
+    'expire_usage_credits function exists'
+  );
+
+CREATE TEMP TABLE test_credit_context (
+  org_id uuid,
+  grant_id uuid,
+  plan_id uuid,
+  rate_id uuid
+) ON COMMIT DROP;
+
+WITH plan_selection AS (
+  SELECT id
+  FROM public.plans
+  ORDER BY created_at
+  LIMIT 1
+),
+user_insert AS (
+  INSERT INTO public.users (id, email, created_at, updated_at)
+  VALUES (gen_random_uuid(), 'credits-test@example.com', now(), now())
+  RETURNING id
+),
+org_insert AS (
+  INSERT INTO public.orgs (
+    id,
+    created_by,
+    name,
+    management_email,
+    customer_id
+  )
+  SELECT
+    gen_random_uuid(),
+    user_insert.id,
+    'Credits Test Org',
+    'credits-test@example.com',
+    'cus_test_credits'
+  FROM user_insert
+  RETURNING id
+),
+grant_insert AS (
+  INSERT INTO public.usage_credit_grants (
+    org_id,
+    credits_total,
+    credits_consumed,
+    granted_at,
+    expires_at,
+    source
+  )
+  SELECT
+    org_insert.id,
+    20,
+    0,
+    now(),
+    now() + interval '1 year',
+    'test'
+  FROM org_insert
+  RETURNING id,
+    org_id
+),
+rate_insert AS (
+  INSERT INTO public.usage_credit_rates (
+    metric,
+    plan_id,
+    tier_min,
+    tier_max,
+    credit_cost_per_unit,
+    unit_label
+  )
+  SELECT
+    'mau',
+    plan_selection.id,
+    0,
+    NULL,
+    0.1,
+    'per mau'
+  FROM plan_selection
+  RETURNING id
+)
+INSERT INTO test_credit_context (org_id, grant_id, plan_id, rate_id)
+SELECT
+  grant_insert.org_id,
+  grant_insert.id,
+  plan_selection.id,
+  rate_insert.id
+FROM plan_selection, grant_insert, rate_insert;
+
+SELECT
+  is(
+    (
+      SELECT overage_unpaid
+      FROM public.apply_usage_overage(
+        (SELECT org_id FROM test_credit_context),
+        'mau',
+        10,
+        (SELECT plan_id FROM test_credit_context),
+        now(),
+        now() + interval '1 month',
+        '{}'::jsonb
+      )
+    ),
+    0::numeric,
+    'apply_usage_overage consumes credits when available'
+  );
+
+SELECT
+  is(
+    (
+      SELECT credits_consumed
+      FROM public.usage_credit_grants
+      WHERE id = (SELECT grant_id FROM test_credit_context)
+    ),
+    1::numeric,
+    'usage_credit_grants updated with consumed credits'
+  );
+
+UPDATE public.usage_credit_grants
+SET expires_at = now() - interval '1 day'
+WHERE id = (SELECT grant_id FROM test_credit_context);
+
+SELECT
+  is(
+    public.expire_usage_credits(),
+    1::bigint,
+    'expire_usage_credits processes expired grants'
+  );
+
+SELECT
+  is(
+    (
+      SELECT credits_consumed
+      FROM public.usage_credit_grants
+      WHERE id = (SELECT grant_id FROM test_credit_context)
+    ),
+    20::numeric,
+    'expire_usage_credits consumes remaining credits'
+  );
+
+SELECT
+  ok(
+    EXISTS(
+      SELECT 1
+      FROM public.usage_credit_transactions
+      WHERE grant_id = (SELECT grant_id FROM test_credit_context)
+        AND transaction_type = 'expiry'
+    ),
+    'expiry transaction recorded'
+  );
+
+SELECT
+  *
+FROM
+  finish ();
+
+ROLLBACK;

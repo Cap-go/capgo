@@ -688,7 +688,12 @@ CREATE OR REPLACE FUNCTION "public"."get_orgs_v6" () RETURNS TABLE (
   "subscription_start" timestamp with time zone,
   "subscription_end" timestamp with time zone,
   "management_email" "text",
-  "is_yearly" boolean
+  "is_yearly" boolean,
+  "stats_updated_at" timestamp without time zone,
+  "next_stats_update_at" timestamptz,
+  "credit_available" numeric,
+  "credit_total" numeric,
+  "credit_next_expiration" timestamptz
 ) LANGUAGE "plpgsql"
 SET
   search_path = '' SECURITY DEFINER AS $$
