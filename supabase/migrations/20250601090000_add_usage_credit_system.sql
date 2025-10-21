@@ -181,9 +181,9 @@ CREATE OR REPLACE FUNCTION public.apply_usage_overage(
   p_org_id uuid,
   p_metric public.credit_metric_type,
   p_overage_amount numeric,
-  p_plan_id uuid DEFAULT NULL,
-  p_billing_cycle_start timestamptz DEFAULT NULL,
-  p_billing_cycle_end timestamptz DEFAULT NULL,
+  p_plan_id uuid,
+  p_billing_cycle_start timestamptz,
+  p_billing_cycle_end timestamptz,
   p_details jsonb DEFAULT NULL
 ) RETURNS TABLE (
   overage_amount numeric,

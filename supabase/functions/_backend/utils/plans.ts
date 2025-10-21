@@ -62,15 +62,35 @@ async function applyCreditsForMetric(
 ): Promise<CreditApplicationResult | null> {
   if (overageAmount <= 0)
     return null
+
+  if (!planId || !billingCycle?.subscription_anchor_start || !billingCycle?.subscription_anchor_end) {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'applyCreditsForMetric missing plan or billing cycle context',
+      orgId,
+      metric,
+      planId,
+      billingCycle,
+    })
+    return {
+      overage_amount: overageAmount,
+      credits_required: 0,
+      credits_applied: 0,
+      credits_remaining: 0,
+      overage_covered: 0,
+      overage_unpaid: overageAmount,
+      rate_id: null,
+    }
+  }
   try {
     const { data, error } = await supabaseAdmin(c)
       .rpc('apply_usage_overage', {
         p_org_id: orgId,
         p_metric: metric,
         p_overage_amount: overageAmount,
-        p_plan_id: planId ?? null,
-        p_billing_cycle_start: billingCycle?.subscription_anchor_start ?? null,
-        p_billing_cycle_end: billingCycle?.subscription_anchor_end ?? null,
+        p_plan_id: planId,
+        p_billing_cycle_start: billingCycle.subscription_anchor_start,
+        p_billing_cycle_end: billingCycle.subscription_anchor_end,
         p_details: {
           usage,
           limit: limit ?? 0,
