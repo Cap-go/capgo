@@ -58,19 +58,27 @@ export function parseManifestEntries(c: Context, data: any, source: string) {
   return result
 }
 
+export function getPgClientD1(c: Context, session: string = 'first-unconstrained') {
+  if (!existInEnv(c, 'DB_REPLICATE')) {
+    // Server/configuration error: surface as structured HTTP error
+    throw quickError(500, 'missing_binding', 'DB_REPLICATE is not set', { binding: 'DB_REPLICATE' })
+  }
+  return session ? c.env.DB_REPLICATE.withSession(session) : c.env.DB_REPLICATE
+}
+
 export function getDrizzleClientD1(c: Context) {
   if (!existInEnv(c, 'DB_REPLICATE')) {
     // Server/configuration error: surface as structured HTTP error
     throw quickError(500, 'missing_binding', 'DB_REPLICATE is not set', { binding: 'DB_REPLICATE' })
   }
-  return drizzleD1(c.env.DB_REPLICATE)
+  return drizzleD1(getPgClientD1(c, undefined))
 }
 
 export function getDrizzleClientD1Session(c: Context) {
   if (!existInEnv(c, 'DB_REPLICATE')) {
     throw quickError(500, 'missing_binding', 'DB_REPLICATE is not set', { binding: 'DB_REPLICATE' })
   }
-  const session = c.env.DB_REPLICATE.withSession('first-unconstrained')
+  const session = getPgClientD1(c)
   return drizzleD1(session)
 }
 
