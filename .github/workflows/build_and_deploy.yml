@@ -230,3 +230,68 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+  deploy_plugin_fc3:
+    needs: supabase_deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Install dependencies
+        run: bun install
+      - name: Resolve deployment environment
+        run: |
+          if [[ ${{ github.ref }} == *-alpha* ]]; then
+            echo "ENV=dev" >> $GITHUB_ENV
+            echo "FC_REGION=${{ secrets.ALICLOUD_FC_REGION_DEV }}" >> $GITHUB_ENV
+            echo "FC_SERVICE_NAME=${{ secrets.ALICLOUD_FC_SERVICE_DEV }}" >> $GITHUB_ENV
+            echo "FC_FUNCTION_NAME=${{ secrets.ALICLOUD_FC_FUNCTION_DEV }}" >> $GITHUB_ENV
+            echo "SENTRY_DSN=${{ secrets.ALICLOUD_SENTRY_DSN_DEV }}" >> $GITHUB_ENV
+            echo "SUPABASE_URL=${{ secrets.SUPABASE_URL_DEV }}" >> $GITHUB_ENV
+            echo "SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY_DEV }}" >> $GITHUB_ENV
+          else
+            echo "ENV=prod" >> $GITHUB_ENV
+            echo "FC_REGION=${{ secrets.ALICLOUD_FC_REGION_PROD }}" >> $GITHUB_ENV
+            echo "FC_SERVICE_NAME=${{ secrets.ALICLOUD_FC_SERVICE_PROD }}" >> $GITHUB_ENV
+            echo "FC_FUNCTION_NAME=${{ secrets.ALICLOUD_FC_FUNCTION_PROD }}" >> $GITHUB_ENV
+            echo "SENTRY_DSN=${{ secrets.ALICLOUD_SENTRY_DSN_PROD }}" >> $GITHUB_ENV
+            echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" >> $GITHUB_ENV
+            echo "SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" >> $GITHUB_ENV
+          fi
+      - name: Build Alibaba FC bundle
+        run: bunx esbuild alicloud/plugin/index.ts --bundle --platform=node --target=node22 --format=esm --outfile=dist/plugin-fc/index.js
+      - name: Prepare function package metadata
+        run: |
+          mkdir -p dist/plugin-fc
+          cat <<'EOF' > dist/plugin-fc/package.json
+          {
+            "type": "module"
+          }
+          EOF
+      - name: Setup Serverless Devs CLI
+        uses: Serverless-Devs/setup-s@v1
+      - name: Configure Alibaba credentials
+        run: |
+          mkdir -p ~/.s
+          cat <<'EOF' > ~/.s/access.yaml
+          fc-ci:
+            AccountID: ${{ secrets.ALIBABA_ACCOUNT_ID }}
+            AccessKeyID: ${{ secrets.ALIBABA_ACCESS_KEY_ID }}
+            AccessKeySecret: ${{ secrets.ALIBABA_ACCESS_KEY_SECRET }}
+          EOF
+      - name: Deploy plugin to Alibaba FC 3.0
+        env:
+          FC_REGION: ${{ env.FC_REGION }}
+          FC_SERVICE_NAME: ${{ env.FC_SERVICE_NAME }}
+          FC_FUNCTION_NAME: ${{ env.FC_FUNCTION_NAME }}
+          SENTRY_DSN: ${{ env.SENTRY_DSN }}
+          SUPABASE_URL: ${{ env.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ env.SUPABASE_SERVICE_ROLE_KEY }}
+        run: s deploy --config alicloud/plugin/s.yaml --access fc-ci --use-local
+      - name: Cleanup credentials
+        if: always()
+        run: rm -rf ~/.s

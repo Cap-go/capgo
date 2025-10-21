@@ -1,0 +1,41 @@
+edition: 3.0.0
+name: capgo-plugin
+access: fc-ci
+
+vars:
+  region: ${env:FC_REGION}
+  serviceName: ${env:FC_SERVICE_NAME}
+  functionName: ${env:FC_FUNCTION_NAME}
+
+services:
+  plugin:
+    component: fc3
+    props:
+      region: ${vars.region}
+      service:
+        name: ${vars.serviceName}
+        description: Capgo plugin worker deployed via GitHub Actions
+        internetAccess: true
+      function:
+        name: ${vars.functionName}
+        runtime: nodejs22
+        handler: index.handler
+        timeout: 60
+        memorySize: 1024
+        environmentVariables:
+          SENTRY_DSN: ${env:SENTRY_DSN}
+          SUPABASE_URL: ${env:SUPABASE_URL}
+          SUPABASE_SERVICE_ROLE_KEY: ${env:SUPABASE_SERVICE_ROLE_KEY}
+        code: dist/plugin-fc
+      triggers:
+        - name: http-trigger
+          type: http
+          config:
+            authType: anonymous
+            methods:
+              - GET
+              - POST
+              - PUT
+              - DELETE
+              - HEAD
+              - OPTIONS

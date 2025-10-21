@@ -78,6 +78,7 @@
         "drizzle-orm": "^0.44.6",
         "firebase": "12.3.0",
         "hono": "4.9.10",
+        "hono-alibaba-cloud-fc3-adapter": "^1.0.2",
         "konsta": "^5.0.2",
         "ky": "^1.11.0",
         "mime": "^4.1.0",
@@ -2327,6 +2328,8 @@
     "highlight.js": ["highlight.js@10.7.3", "", {}, "sha512-tzcUFauisWKNHaRkN4Wjl/ZA07gENAjFl3J/c480dprkGTg5EQstgaNFqBfUqCq54kZRIEcreTsAgF/m2quD7A=="],
 
     "hono": ["hono@4.9.10", "", {}, "sha512-AlI15ijFyKTXR7eHo7QK7OR4RoKIedZvBuRjO8iy4zrxvlY5oFCdiRG/V/lFJHCNXJ0k72ATgnyzx8Yqa5arug=="],
+
+    "hono-alibaba-cloud-fc3-adapter": ["hono-alibaba-cloud-fc3-adapter@1.0.2", "", { "peerDependencies": { "hono": "^4.6.12" } }, "sha512-FpggT8IAQZ5sEXGi1h6iDWvF+rth/7zNpOYvQW2mtOSUwy1tzrsHZWnj17hWZvWOb7lPOUSqYzRxT0nqR5+0mw=="],
 
     "hookable": ["hookable@5.5.3", "", {}, "sha512-Yc+BQe8SvoXH1643Qez1zqLRmbA5rCL+sSmk6TVos0LWVfNIB7PGncdlId77WzLGSIB5KaWgTaNTs2lNVEI6VQ=="],
 
