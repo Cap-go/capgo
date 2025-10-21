@@ -1,7 +1,7 @@
 {
   "name": "capgo_plugin-v1-prod",
   "vars": {
-    "is_v2": "0"
+    "IS_V2": "0"
   },
   "routes": [
     {
@@ -73,7 +73,7 @@
     "preprod": {
       "name": "capgo_plugin-v1-preprod",
       "vars": {
-        "is_v2": "0"
+        "IS_V2": "0"
       },
       "observability": {
         "enabled": true
@@ -132,7 +132,7 @@
     "dev": {
       "name": "capgo_plugin-v1-dev",
       "vars": {
-        "is_v2": "0"
+        "IS_V2": "0"
       },
       "observability": {
         "enabled": true
