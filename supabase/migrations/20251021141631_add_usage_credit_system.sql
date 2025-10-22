@@ -117,7 +117,6 @@ CREATE INDEX IF NOT EXISTS idx_usage_credit_consumptions_org_time ON public.usag
 CREATE INDEX IF NOT EXISTS idx_usage_credit_consumptions_grant ON public.usage_credit_consumptions (grant_id, applied_at DESC);
 
 CREATE OR REPLACE FUNCTION public.calculate_credit_cost(
-  p_plan_id uuid,
   p_metric public.credit_metric_type,
   p_overage_amount numeric
 ) RETURNS TABLE (
@@ -209,7 +208,6 @@ CREATE OR REPLACE FUNCTION public.apply_usage_overage(
   p_org_id uuid,
   p_metric public.credit_metric_type,
   p_overage_amount numeric,
-  p_plan_id uuid,
   p_billing_cycle_start timestamptz,
   p_billing_cycle_end timestamptz,
   p_details jsonb DEFAULT NULL
@@ -243,7 +241,7 @@ BEGIN
 
   SELECT *
   INTO v_calc
-  FROM public.calculate_credit_cost(p_plan_id, p_metric, p_overage_amount)
+  FROM public.calculate_credit_cost(p_metric, p_overage_amount)
   LIMIT 1;
 
   IF v_calc.credit_step_id IS NULL THEN
@@ -407,8 +405,8 @@ GRANT SELECT ON public.usage_credit_balances TO anon;
 GRANT SELECT ON public.usage_credit_balances TO authenticated;
 GRANT SELECT ON public.usage_credit_balances TO service_role;
 
-GRANT EXECUTE ON FUNCTION public.calculate_credit_cost(uuid, public.credit_metric_type, numeric) TO service_role;
-GRANT EXECUTE ON FUNCTION public.apply_usage_overage(uuid, public.credit_metric_type, numeric, uuid, timestamptz, timestamptz, jsonb) TO service_role;
+GRANT EXECUTE ON FUNCTION public.calculate_credit_cost(public.credit_metric_type, numeric) TO service_role;
+GRANT EXECUTE ON FUNCTION public.apply_usage_overage(uuid, public.credit_metric_type, numeric, timestamptz, timestamptz, jsonb) TO service_role;
 
 DROP FUNCTION IF EXISTS public.get_orgs_v6();
 DROP FUNCTION IF EXISTS public.get_orgs_v6(userid uuid);

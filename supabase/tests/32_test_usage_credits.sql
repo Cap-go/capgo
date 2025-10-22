@@ -13,13 +13,13 @@ $$ LANGUAGE plpgsql;
 
 SELECT
   ok(
-    pg_get_functiondef('apply_usage_overage(uuid, public.credit_metric_type, numeric, uuid, timestamptz, timestamptz, jsonb)'::regprocedure) IS NOT NULL,
+    pg_get_functiondef('apply_usage_overage(uuid, public.credit_metric_type, numeric, timestamptz, timestamptz, jsonb)'::regprocedure) IS NOT NULL,
     'apply_usage_overage function exists'
   );
 
 SELECT
   ok(
-    pg_get_functiondef('calculate_credit_cost(uuid, public.credit_metric_type, numeric)'::regprocedure) IS NOT NULL,
+    pg_get_functiondef('calculate_credit_cost(public.credit_metric_type, numeric)'::regprocedure) IS NOT NULL,
     'calculate_credit_cost function exists'
   );
 
@@ -32,7 +32,6 @@ SELECT
 CREATE TEMP TABLE test_credit_context (
   org_id uuid,
   grant_id uuid,
-  plan_id uuid,
   credit_step_id bigint
 ) ON COMMIT DROP;
 
@@ -119,13 +118,12 @@ step_insert AS (
   )
   RETURNING id
 )
-INSERT INTO test_credit_context (org_id, grant_id, plan_id, credit_step_id)
+INSERT INTO test_credit_context (org_id, grant_id, credit_step_id)
 SELECT
   grant_insert.org_id,
   grant_insert.id,
-  plan_selection.id,
   step_insert.id
-FROM plan_selection, grant_insert, step_insert;
+FROM grant_insert, step_insert;
 
 SELECT
   is(
@@ -135,7 +133,6 @@ SELECT
         (SELECT org_id FROM test_credit_context),
         'mau',
         10,
-        (SELECT plan_id FROM test_credit_context),
         now(),
         now() + interval '1 month',
         '{}'::jsonb
