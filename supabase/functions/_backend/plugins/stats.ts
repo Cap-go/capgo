@@ -148,7 +148,7 @@ app.post('/', async (c) => {
 
   const bodyParsed = parsePluginBody<AppStats>(c, body, jsonRequestSchema)
   const res = await post(c, isV2 ? getDrizzleClientD1Session(c) : getDrizzleClient(pgClient!), !!isV2, bodyParsed)
-  if (isV2 && pgClient)
+  if (!isV2 && pgClient)
     await closeClient(c, pgClient)
   return res
 })

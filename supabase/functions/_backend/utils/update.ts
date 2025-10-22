@@ -368,7 +368,7 @@ export async function update(c: Context, body: AppInfos) {
   const drizzlePg = pgClient ? getDrizzleClient(pgClient) : (null as any)
   // Lazily create D1 client inside updateWithPG when actually used
   const res = await updateWithPG(c, body, () => getDrizzleClientD1Session(c), drizzlePg, !!isV2)
-  if (isV2 && pgClient)
+  if (!isV2 && pgClient)
     await closeClient(c, pgClient)
   return res
 }

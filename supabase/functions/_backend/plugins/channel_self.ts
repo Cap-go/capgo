@@ -141,10 +141,6 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
       throw simpleError('override_not_allowed', `Cannot remove channel override`, {})
     }
 
-    if (pgClientForWrite) {
-      await closeClient(c, pgClientForWrite)
-    }
-
     cloudlog({ requestId: c.get('requestId'), message: 'main channel set, removing override' })
     await sendStatsAndDevice(c, device, [{ action: 'setChannel' }])
     return c.json(BRES)
@@ -176,10 +172,6 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
   }, pgDrizzleClient)
   if (!success) {
     throw simpleError('override_not_allowed', `Cannot do channel override`, {})
-  }
-
-  if (pgClientForWrite) {
-    await closeClient(c, pgClientForWrite)
   }
 
   await sendStatsAndDevice(c, device, [{ action: 'setChannel' }])
@@ -303,10 +295,6 @@ async function deleteOverride(c: Context, drizzleClient: ReturnType<typeof getDr
     throw simpleError('override_not_allowed', `Cannot delete channel override`, {})
   }
 
-  if (pgClientForWrite) {
-    await closeClient(c, pgClientForWrite)
-  }
-
   return c.json(BRES)
 }
 
@@ -366,7 +354,7 @@ app.post('/', async (c) => {
     res = await post(c, isV2 ? getDrizzleClientD1Session(c) : getDrizzleClient(pgClient as any), !!isV2, bodyParsed)
   }
   finally {
-    if (isV2 && pgClient)
+    if (!isV2 && pgClient)
       await closeClient(c, pgClient)
   }
   return res
@@ -390,7 +378,7 @@ app.put('/', async (c) => {
     res = await put(c, isV2 ? getDrizzleClientD1Session(c) : getDrizzleClient(pgClient as any), !!isV2, bodyParsed)
   }
   finally {
-    if (isV2 && pgClient)
+    if (!isV2 && pgClient)
       await closeClient(c, pgClient)
   }
   return res
@@ -413,7 +401,7 @@ app.delete('/', async (c) => {
     res = await deleteOverride(c, isV2 ? getDrizzleClientD1Session(c) : getDrizzleClient(pgClient as any), !!isV2, bodyParsed)
   }
   finally {
-    if (isV2 && pgClient)
+    if (!isV2 && pgClient)
       await closeClient(c, pgClient)
   }
   return res
@@ -436,7 +424,7 @@ app.get('/', async (c) => {
     res = await listCompatibleChannels(c, isV2 ? getDrizzleClientD1Session(c) : getDrizzleClient(pgClient as any), !!isV2, bodyParsed)
   }
   finally {
-    if (isV2 && pgClient)
+    if (!isV2 && pgClient)
       await closeClient(c, pgClient)
   }
   return res
