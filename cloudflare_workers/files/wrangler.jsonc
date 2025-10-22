@@ -37,6 +37,7 @@
           "pattern": "files.capgo.app",
           "custom_domain": true
         },
+        // TODO: remove this it's deprecated
         {
           "pattern": "api.capgo.app/files*",
           "zone_name": "capgo.app"
@@ -53,6 +54,7 @@
           "pattern": "api.capgo.app/private/download_link",
           "zone_name": "capgo.app"
         },
+        // end of TODO
         {
           "pattern": "files.usecapgo.com",
           "custom_domain": true
@@ -91,20 +93,12 @@
       },
       "routes": [
         {
-          "pattern": "files-preprod.capgo.app",
+          "pattern": "files.preprod.capgo.app",
           "custom_domain": true
         },
         {
-          "pattern": "api-preprod.capgo.app/private/files*",
-          "zone_name": "capgo.app"
-        },
-        {
-          "pattern": "api-preprod.capgo.app/files*",
-          "zone_name": "capgo.app"
-        },
-        {
-          "pattern": "api-preprod.capgo.app/private/download_link",
-          "zone_name": "capgo.app"
+          "pattern": "files.preprod.usecapgo.com",
+          "custom_domain": true
         }
       ],
       "r2_buckets": [
@@ -136,20 +130,12 @@
       },
       "routes": [
         {
-          "pattern": "files-alpha.capgo.app",
+          "pattern": "files.dev.capgo.app",
           "custom_domain": true
         },
         {
-          "pattern": "api-alpha.capgo.app/private/files*",
-          "zone_name": "capgo.app"
-        },
-        {
-          "pattern": "api-alpha.capgo.app/files*",
-          "zone_name": "capgo.app"
-        },
-        {
-          "pattern": "api-alpha.capgo.app/private/download_link",
-          "zone_name": "capgo.app"
+          "pattern": "files.dev.usecapgo.com",
+          "custom_domain": true
         }
       ],
       "r2_buckets": [

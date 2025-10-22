@@ -26,6 +26,7 @@
           "pattern": "plugin.capgo.app",
           "custom_domain": true
         },
+        // TODO: remove this it's deprecated
         {
           "pattern": "api.capgo.app/plugin/*",
           "zone_name": "capgo.app"
@@ -42,6 +43,7 @@
           "pattern": "api.capgo.app/stats",
           "zone_name": "capgo.app"
         },
+        // end of TODO
         {
           "pattern": "plugin.usecapgo.com",
           "custom_domain": true
@@ -111,24 +113,12 @@
       },
       "routes": [
         {
-          "pattern": "plugin-preprod.capgo.app",
+          "pattern": "plugin.preprod.capgo.app",
           "custom_domain": true
         },
         {
-          "pattern": "api-preprod.capgo.app/plugin/*",
-          "zone_name": "capgo.app"
-        },
-        {
-          "pattern": "api-preprod.capgo.app/updates*",
-          "zone_name": "capgo.app"
-        },
-        {
-          "pattern": "api-preprod.capgo.app/channel_self",
-          "zone_name": "capgo.app"
-        },
-        {
-          "pattern": "api-preprod.capgo.app/stats",
-          "zone_name": "capgo.app"
+          "pattern": "api.preprod.usecapgo.com",
+          "custom_domain": true
         }
       ],
       "d1_databases": [
@@ -191,24 +181,12 @@
       },
       "routes": [
         {
-          "pattern": "plugin-alpha.capgo.app",
+          "pattern": "plugin.dev.capgo.app",
           "custom_domain": true
         },
         {
-          "pattern": "api-alpha.capgo.app/plugin/*",
-          "zone_name": "capgo.app"
-        },
-        {
-          "pattern": "api-alpha.capgo.app/updates*",
-          "zone_name": "capgo.app"
-        },
-        {
-          "pattern": "api-alpha.capgo.app/channel_self",
-          "zone_name": "capgo.app"
-        },
-        {
-          "pattern": "api-alpha.capgo.app/stats",
-          "zone_name": "capgo.app"
+          "pattern": "api.dev.usecapgo.com",
+          "custom_domain": true
         }
       ],
       "d1_databases": [

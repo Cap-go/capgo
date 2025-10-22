@@ -70,10 +70,16 @@
     },
     "preprod": {
       "name": "capgo_api-preprod",
-      "routes": {
-        "pattern": "api-preprod.capgo.app",
-        "custom_domain": true
-      },
+      "routes": [
+        {
+          "pattern": "api.preprod.capgo.app",
+          "custom_domain": true
+        },
+        {
+          "pattern": "api.preprod.usecapgo.com",
+          "custom_domain": true
+        }
+      ],
       "observability": {
         "enabled": true
       },
@@ -119,10 +125,16 @@
     },
     "alpha": {
       "name": "capgo_api-alpha",
-      "routes": {
-        "pattern": "api-dev.capgo.app",
-        "custom_domain": true
-      },
+      "routes": [
+        {
+          "pattern": "api.dev.capgo.app",
+          "custom_domain": true
+        },
+        {
+          "pattern": "api.dev.usecapgo.com",
+          "custom_domain": true
+        }
+      ],
       "observability": {
         "enabled": true
       },
