@@ -69,6 +69,12 @@
           "database_name": "capgo_prod_replicate",
           "database_id": "7f267d86-f4f7-49f5-9622-e44373aa00dc"
         }
+      ],
+      "hyperdrive": [
+        {
+          "binding": "HYPERDRIVE_DB",
+          "id": "0f1d77550db142fbb17cb6b3ee659a06"
+        }
       ]
     },
     "preprod": {
@@ -127,6 +133,12 @@
           "binding": "APP_LOG_EXTERNAL",
           "dataset": "app_log_external"
         }
+      ],
+      "hyperdrive": [
+        {
+          "binding": "HYPERDRIVE_DB",
+          "id": "0f1d77550db142fbb17cb6b3ee659a06"
+        }
       ]
     },
     "dev": {
@@ -184,6 +196,12 @@
         {
           "binding": "APP_LOG_EXTERNAL",
           "dataset": "app_log_external_alpha"
+        }
+      ],
+      "hyperdrive": [
+        {
+          "binding": "HYPERDRIVE_DB",
+          "id": "0f1d77550db142fbb17cb6b3ee659a06"
         }
       ]
     },
