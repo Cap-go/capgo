@@ -7,10 +7,33 @@
     "not_found_handling": "single-page-application"
   },
   "workers_dev": false,
-  "routes": [
-    {
-      "pattern": "web.capgo.app",
-      "custom_domain": true
+  "env": {
+    "dev": {
+      "name": "capgo_webapp-dev",
+      "routes": [
+        {
+          "pattern": "web.dev.capgo.app",
+          "custom_domain": true
+        }
+      ]
+    },
+    "preprod": {
+      "name": "capgo_webapp-preprod",
+      "routes": [
+        {
+          "pattern": "web.preprod.capgo.app",
+          "custom_domain": true
+        }
+      ]
+    },
+    "prod": {
+      "name": "capgo_webapp-prod",
+      "routes": [
+        {
+          "pattern": "web.capgo.app",
+          "custom_domain": true
+        }
+      ]
     }
-  ]
+  }
 }
