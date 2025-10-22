@@ -236,7 +236,7 @@ async function userAbovePlan(c: Context, org: {
     cloudlogErr({ requestId: c.get('requestId'), message: 'currentPlanError', error: currentPlanError })
   }
 
-  await setMetered(c, org.customer_id!, orgId)
+  await setMetered(c, org.customer_id, orgId)
 
   const billingCycle = await getBillingCycleRange(c, orgId)
   const planId = currentPlan?.id
