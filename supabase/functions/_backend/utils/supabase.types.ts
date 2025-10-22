@@ -1681,7 +1681,6 @@ export type Database = {
           p_metric: Database["public"]["Enums"]["credit_metric_type"]
           p_org_id: string
           p_overage_amount: number
-          p_plan_id: string
         }
         Returns: {
           credit_step_id: number
@@ -1698,7 +1697,6 @@ export type Database = {
         Args: {
           p_metric: Database["public"]["Enums"]["credit_metric_type"]
           p_overage_amount: number
-          p_plan_id: string
         }
         Returns: {
           credit_cost_per_unit: number
