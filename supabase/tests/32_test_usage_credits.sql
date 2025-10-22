@@ -3,7 +3,13 @@ BEGIN;
 CREATE EXTENSION "basejump-supabase_test_helpers";
 
 SELECT
-  plan (12);
+  plan (8);
+
+DO $$
+BEGIN
+  PERFORM tests.create_supabase_user('usage_credits_user', 'credits-test@example.com', '555-555-5555');
+END;
+$$ LANGUAGE plpgsql;
 
 SELECT
   ok(
@@ -31,17 +37,32 @@ CREATE TEMP TABLE test_credit_context (
 ) ON COMMIT DROP;
 
 DELETE FROM public.capgo_credits_steps WHERE type = 'mau';
+DELETE FROM public.stripe_info WHERE customer_id = 'cus_test_credits';
 
 WITH plan_selection AS (
-  SELECT id
+  SELECT id,
+    stripe_id
   FROM public.plans
   ORDER BY created_at
   LIMIT 1
 ),
 user_insert AS (
   INSERT INTO public.users (id, email, created_at, updated_at)
-  VALUES (gen_random_uuid(), 'credits-test@example.com', now(), now())
+  SELECT
+    tests.get_supabase_uid('usage_credits_user'),
+    'credits-test@example.com',
+    now(),
+    now()
   RETURNING id
+),
+stripe_info_insert AS (
+  INSERT INTO public.stripe_info (customer_id, product_id, status)
+  SELECT
+    'cus_test_credits',
+    plan_selection.stripe_id,
+    'succeeded'
+  FROM plan_selection
+  RETURNING customer_id
 ),
 org_insert AS (
   INSERT INTO public.orgs (
@@ -56,8 +77,9 @@ org_insert AS (
     user_insert.id,
     'Credits Test Org',
     'credits-test@example.com',
-    'cus_test_credits'
-  FROM user_insert
+    stripe_info_insert.customer_id
+  FROM user_insert,
+    stripe_info_insert
   RETURNING id
 ),
 grant_insert AS (
