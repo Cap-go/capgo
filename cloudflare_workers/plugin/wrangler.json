@@ -1,38 +1,4 @@
 {
-  "name": "capgo_plugin-prod",
-  "vars": {
-    "IS_V2": "1"
-  },
-  "routes": [
-    {
-      "pattern": "plugin.capgo.app",
-      "custom_domain": true
-    },
-    {
-      "pattern": "api.capgo.app/plugin/*",
-      "zone_name": "capgo.app"
-    },
-    {
-      "pattern": "api.capgo.app/updates*",
-      "zone_name": "capgo.app"
-    },
-    {
-      "pattern": "api.capgo.app/channel_self",
-      "zone_name": "capgo.app"
-    },
-    {
-      "pattern": "api.capgo.app/stats",
-      "zone_name": "capgo.app"
-    },
-    {
-      "pattern": "plugin.usecapgo.com",
-      "custom_domain": true
-    },
-    {
-      "pattern": "updater.spencer.co/*",
-      "zone_name": "capgo.app"
-    }
-  ],
   "logpush": true,
   "compatibility_date": "2025-09-15",
   "main": "./index.ts",
@@ -41,64 +7,100 @@
     "nodejs_compat_populate_process_env"
   ],
   "workers_dev": false,
-  "observability": {
-    "enabled": true,
-    "head_sampling_rate": 0.001
-  },
   "placement": {
     "mode": "smart"
   },
   "upload_source_maps": true,
-  "analytics_engine_datasets": [
-    {
-      "binding": "DEVICE_USAGE",
-      "dataset": "device_usage"
-    },
-    {
-      "binding": "BANDWIDTH_USAGE",
-      "dataset": "bandwidth_usage"
-    },
-    {
-      "binding": "VERSION_USAGE",
-      "dataset": "version_usage"
-    },
-    {
-      "binding": "APP_LOG",
-      "dataset": "app_log"
-    },
-    {
-      "binding": "APP_LOG_EXTERNAL",
-      "dataset": "app_log_external"
-    }
-  ],
-  "d1_databases": [
-    {
-      "binding": "DB_DEVICES",
-      "database_name": "capgo_prod_devices",
-      "database_id": "2510b55c-d6a2-4595-a2a5-d9aca82a3753"
-    },
-    {
-      "binding": "DB_STOREAPPS",
-      "database_name": "capgo_prod_storeapps",
-      "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
-    },
-    {
-      "binding": "DB_REPLICATE",
-      "database_name": "capgo_prod_replicate",
-      "database_id": "7f267d86-f4f7-49f5-9622-e44373aa00dc"
-    }
-  ],
-  "hyperdrive": [
-    {
-      "binding": "HYPERDRIVE_DB",
-      "id": "0f1d77550db142fbb17cb6b3ee659a06"
-    },
-    {
-      "binding": "HYPERDRIVE_DB_DIRECT",
-      "id": "20ce343dca144637bf8e141de18cd0d5"
-    }
-  ],
   "env": {
+    "prod": {
+      "name": "capgo_plugin-prod",
+      "vars": {
+        "IS_V2": "1"
+      },
+      "observability": {
+        "enabled": true,
+        "head_sampling_rate": 0.001
+      },
+      "routes": [
+        {
+          "pattern": "plugin.capgo.app",
+          "custom_domain": true
+        },
+        {
+          "pattern": "api.capgo.app/plugin/*",
+          "zone_name": "capgo.app"
+        },
+        {
+          "pattern": "api.capgo.app/updates*",
+          "zone_name": "capgo.app"
+        },
+        {
+          "pattern": "api.capgo.app/channel_self",
+          "zone_name": "capgo.app"
+        },
+        {
+          "pattern": "api.capgo.app/stats",
+          "zone_name": "capgo.app"
+        },
+        {
+          "pattern": "plugin.usecapgo.com",
+          "custom_domain": true
+        },
+        {
+          "pattern": "updater.spencer.co/*",
+          "zone_name": "capgo.app"
+        }
+      ],
+      "analytics_engine_datasets": [
+        {
+          "binding": "DEVICE_USAGE",
+          "dataset": "device_usage"
+        },
+        {
+          "binding": "BANDWIDTH_USAGE",
+          "dataset": "bandwidth_usage"
+        },
+        {
+          "binding": "VERSION_USAGE",
+          "dataset": "version_usage"
+        },
+        {
+          "binding": "APP_LOG",
+          "dataset": "app_log"
+        },
+        {
+          "binding": "APP_LOG_EXTERNAL",
+          "dataset": "app_log_external"
+        }
+      ],
+      "d1_databases": [
+        {
+          "binding": "DB_DEVICES",
+          "database_name": "capgo_prod_devices",
+          "database_id": "2510b55c-d6a2-4595-a2a5-d9aca82a3753"
+        },
+        {
+          "binding": "DB_STOREAPPS",
+          "database_name": "capgo_prod_storeapps",
+          "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
+        },
+        {
+          "binding": "DB_REPLICATE",
+          "database_name": "capgo_prod_replicate",
+          "database_id": "7f267d86-f4f7-49f5-9622-e44373aa00dc"
+        }
+      ],
+      "hyperdrive": [
+        {
+          "binding": "HYPERDRIVE_DB",
+          "id": "0f1d77550db142fbb17cb6b3ee659a06"
+        },
+        {
+          "binding": "HYPERDRIVE_DB_DIRECT",
+          "id": "20ce343dca144637bf8e141de18cd0d5"
+        }
+      ]
+    },
     "preprod": {
       "name": "capgo_plugin-preprod",
       "vars": {
