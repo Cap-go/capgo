@@ -80,8 +80,6 @@ COMMENT ON TABLE public.usage_credit_transactions IS 'General ledger of credit m
 CREATE INDEX IF NOT EXISTS idx_usage_credit_transactions_org_time ON public.usage_credit_transactions (org_id, occurred_at DESC);
 CREATE INDEX IF NOT EXISTS idx_usage_credit_transactions_grant ON public.usage_credit_transactions (grant_id, occurred_at DESC);
 
-CREATE UNIQUE INDEX IF NOT EXISTS plans_id_unique_idx ON public.plans (id);
-
 CREATE TABLE IF NOT EXISTS public.usage_overage_events (
   id uuid DEFAULT extensions.uuid_generate_v4() PRIMARY KEY,
   org_id uuid NOT NULL REFERENCES public.orgs (id) ON DELETE CASCADE,
@@ -150,6 +148,7 @@ BEGIN
   LIMIT 1;
 
   IF NOT FOUND THEN
+    RAISE WARNING 'No pricing steps found for metric: %', p_metric::text;
     RETURN QUERY SELECT NULL::bigint, 0::numeric, 0::numeric;
     RETURN;
   END IF;

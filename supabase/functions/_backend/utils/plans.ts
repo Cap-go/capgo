@@ -295,6 +295,7 @@ async function userAbovePlan(c: Context, org: {
     bandwidth: totalStats.bandwidth,
   })
 
+  // If the calculated best plan ranks lower than the current one, the org is over-provisioned, so skip upgrade nudges.
   if (planToInt(bestPlan) < planToInt(currentPlanName)) {
     return true
   }
