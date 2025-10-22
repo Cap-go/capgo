@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.34.100 (2025-10-22)
+
+
+### Bug Fixes
+
+* fucking AI who destroyed our connexions by never closing it ... ([3d901be](https://github.com/Cap-go/capgo/commit/3d901bef9de0e481602a0c038c575284f07c5154))
+
 ### 12.34.99 (2025-10-22)
 
 
