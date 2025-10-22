@@ -1,36 +1,5 @@
 {
-  "name": "capgo_files-prod",
-  "routes": [
-    {
-      "pattern": "files.capgo.app",
-      "custom_domain": true
-    },
-    {
-      "pattern": "api.capgo.app/files*",
-      "zone_name": "capgo.app"
-    },
-    {
-      "pattern": "plugin.capgo.app/files*",
-      "zone_name": "capgo.app"
-    },
-    {
-      "pattern": "api.capgo.app/private/files*",
-      "zone_name": "capgo.app"
-    },
-    {
-      "pattern": "api.capgo.app/private/download_link",
-      "zone_name": "capgo.app"
-    },
-    {
-      "pattern": "files.usecapgo.com",
-      "custom_domain": true
-    },
-    {
-      "pattern": "updater.spencer.co/files*",
-      "zone_name": "capgo.app"
-    }
-  ],
-  "compatibility_date": "2025-04-01",
+  "compatibility_date": "2025-09-15",
   "main": "./index.ts",
   "compatibility_flags": [
     "nodejs_compat_v2",
@@ -38,32 +7,7 @@
   ],
   "logpush": true,
   "workers_dev": false,
-  "observability": {
-    "enabled": true,
-    "head_sampling_rate": 0.001
-  },
   "upload_source_maps": true,
-  "r2_buckets": [
-    {
-      "binding": "ATTACHMENT_BUCKET",
-      "bucket_name": "capgo",
-      "preview_bucket_name": "capgo"
-    }
-  ],
-  "analytics_engine_datasets": [
-    {
-      "binding": "BANDWIDTH_USAGE",
-      "dataset": "bandwidth_usage"
-    }
-  ],
-  "durable_objects": {
-    "bindings": [
-      {
-        "name": "ATTACHMENT_UPLOAD_HANDLER",
-        "class_name": "AttachmentUploadHandler"
-      }
-    ]
-  },
   "migrations": [
     {
       "tag": "v1",
@@ -82,6 +26,64 @@
     }
   ],
   "env": {
+    "prod": {
+      "name": "capgo_files-prod",
+      "observability": {
+        "enabled": true,
+        "head_sampling_rate": 0.001
+      },
+      "routes": [
+        {
+          "pattern": "files.capgo.app",
+          "custom_domain": true
+        },
+        {
+          "pattern": "api.capgo.app/files*",
+          "zone_name": "capgo.app"
+        },
+        {
+          "pattern": "plugin.capgo.app/files*",
+          "zone_name": "capgo.app"
+        },
+        {
+          "pattern": "api.capgo.app/private/files*",
+          "zone_name": "capgo.app"
+        },
+        {
+          "pattern": "api.capgo.app/private/download_link",
+          "zone_name": "capgo.app"
+        },
+        {
+          "pattern": "files.usecapgo.com",
+          "custom_domain": true
+        },
+        {
+          "pattern": "updater.spencer.co/files*",
+          "zone_name": "capgo.app"
+        }
+      ],
+      "r2_buckets": [
+        {
+          "binding": "ATTACHMENT_BUCKET",
+          "bucket_name": "capgo",
+          "preview_bucket_name": "capgo"
+        }
+      ],
+      "analytics_engine_datasets": [
+        {
+          "binding": "BANDWIDTH_USAGE",
+          "dataset": "bandwidth_usage"
+        }
+      ],
+      "durable_objects": {
+        "bindings": [
+          {
+            "name": "ATTACHMENT_UPLOAD_HANDLER",
+            "class_name": "AttachmentUploadHandler"
+          }
+        ]
+      }
+    },
     "preprod": {
       "name": "capgo_files-preprod",
       "observability": {
@@ -105,6 +107,13 @@
           "zone_name": "capgo.app"
         }
       ],
+      "r2_buckets": [
+        {
+          "binding": "ATTACHMENT_BUCKET",
+          "bucket_name": "capgo",
+          "preview_bucket_name": "capgo"
+        }
+      ],
       "analytics_engine_datasets": [
         {
           "binding": "BANDWIDTH_USAGE",
@@ -118,14 +127,7 @@
             "class_name": "AttachmentUploadHandler"
           }
         ]
-      },
-      "r2_buckets": [
-        {
-          "binding": "ATTACHMENT_BUCKET",
-          "bucket_name": "capgo",
-          "preview_bucket_name": "capgo"
-        }
-      ]
+      }
     },
     "alpha": {
       "name": "capgo_files-alpha",
@@ -150,6 +152,13 @@
           "zone_name": "capgo.app"
         }
       ],
+      "r2_buckets": [
+        {
+          "binding": "ATTACHMENT_BUCKET",
+          "bucket_name": "capgo-alpha",
+          "preview_bucket_name": "capgo-alpha"
+        }
+      ],
       "analytics_engine_datasets": [
         {
           "binding": "BANDWIDTH_USAGE",
@@ -163,14 +172,7 @@
             "class_name": "AttachmentUploadHandler"
           }
         ]
-      },
-      "r2_buckets": [
-        {
-          "binding": "ATTACHMENT_BUCKET",
-          "bucket_name": "capgo-alpha",
-          "preview_bucket_name": "capgo-alpha"
-        }
-      ]
+      }
     },
     "local": {
       "name": "capgo_files-local",

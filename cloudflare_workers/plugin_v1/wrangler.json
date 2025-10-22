@@ -13,9 +13,9 @@
   "upload_source_maps": true,
   "env": {
     "prod": {
-      "name": "capgo_plugin-prod",
+      "name": "capgo_plugin-v1-prod",
       "vars": {
-        "IS_V2": "1"
+        "IS_V2": "0"
       },
       "observability": {
         "enabled": true,
@@ -23,32 +23,12 @@
       },
       "routes": [
         {
-          "pattern": "plugin.capgo.app",
+          "pattern": "plugin.v1.capgo.app",
           "custom_domain": true
         },
         {
-          "pattern": "api.capgo.app/plugin/*",
-          "zone_name": "capgo.app"
-        },
-        {
-          "pattern": "api.capgo.app/updates*",
-          "zone_name": "capgo.app"
-        },
-        {
-          "pattern": "api.capgo.app/channel_self",
-          "zone_name": "capgo.app"
-        },
-        {
-          "pattern": "api.capgo.app/stats",
-          "zone_name": "capgo.app"
-        },
-        {
-          "pattern": "plugin.usecapgo.com",
+          "pattern": "plugin.v1.usecapgo.com",
           "custom_domain": true
-        },
-        {
-          "pattern": "updater.spencer.co/*",
-          "zone_name": "capgo.app"
         }
       ],
       "analytics_engine_datasets": [
@@ -83,52 +63,31 @@
           "binding": "DB_STOREAPPS",
           "database_name": "capgo_prod_storeapps",
           "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
-        },
-        {
-          "binding": "DB_REPLICATE",
-          "database_name": "capgo_prod_replicate",
-          "database_id": "7f267d86-f4f7-49f5-9622-e44373aa00dc"
         }
       ],
       "hyperdrive": [
         {
           "binding": "HYPERDRIVE_DB",
           "id": "0f1d77550db142fbb17cb6b3ee659a06"
-        },
-        {
-          "binding": "HYPERDRIVE_DB_DIRECT",
-          "id": "20ce343dca144637bf8e141de18cd0d5"
         }
       ]
     },
     "preprod": {
-      "name": "capgo_plugin-preprod",
+      "name": "capgo_plugin-v1-preprod",
       "vars": {
-        "IS_V2": "1"
+        "IS_V2": "0"
       },
       "observability": {
         "enabled": true
       },
       "routes": [
         {
-          "pattern": "plugin-preprod.capgo.app",
+          "pattern": "plugin.v1.preprod.capgo.app",
           "custom_domain": true
         },
         {
-          "pattern": "api-preprod.capgo.app/plugin/*",
-          "zone_name": "capgo.app"
-        },
-        {
-          "pattern": "api-preprod.capgo.app/updates*",
-          "zone_name": "capgo.app"
-        },
-        {
-          "pattern": "api-preprod.capgo.app/channel_self",
-          "zone_name": "capgo.app"
-        },
-        {
-          "pattern": "api-preprod.capgo.app/stats",
-          "zone_name": "capgo.app"
+          "pattern": "plugin.v1.preprod.usecapgo.com",
+          "custom_domain": true
         }
       ],
       "d1_databases": [
@@ -141,11 +100,6 @@
           "binding": "DB_STOREAPPS",
           "database_name": "capgo_prod_storeapps",
           "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
-        },
-        {
-          "binding": "DB_REPLICATE",
-          "database_name": "capgo_prod_replicate",
-          "database_id": "7f267d86-f4f7-49f5-9622-e44373aa00dc"
         }
       ],
       "analytics_engine_datasets": [
@@ -174,41 +128,25 @@
         {
           "binding": "HYPERDRIVE_DB",
           "id": "0f1d77550db142fbb17cb6b3ee659a06"
-        },
-        {
-          "binding": "HYPERDRIVE_DB_DIRECT",
-          "id": "20ce343dca144637bf8e141de18cd0d5"
         }
       ]
     },
-    "alpha": {
-      "name": "capgo_plugin-alpha",
+    "dev": {
+      "name": "capgo_plugin-v1-dev",
       "vars": {
-        "IS_V2": "1"
+        "IS_V2": "0"
       },
       "observability": {
         "enabled": true
       },
       "routes": [
         {
-          "pattern": "plugin-alpha.capgo.app",
+          "pattern": "plugin.v1.dev.capgo.app",
           "custom_domain": true
         },
         {
-          "pattern": "api-alpha.capgo.app/plugin/*",
-          "zone_name": "capgo.app"
-        },
-        {
-          "pattern": "api-alpha.capgo.app/updates*",
-          "zone_name": "capgo.app"
-        },
-        {
-          "pattern": "api-alpha.capgo.app/channel_self",
-          "zone_name": "capgo.app"
-        },
-        {
-          "pattern": "api-alpha.capgo.app/stats",
-          "zone_name": "capgo.app"
+          "pattern": "plugin.v1.dev.usecapgo.com",
+          "custom_domain": true
         }
       ],
       "d1_databases": [
@@ -221,11 +159,6 @@
           "binding": "DB_STOREAPPS",
           "database_name": "capgo_prod_storeapps",
           "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
-        },
-        {
-          "binding": "DB_REPLICATE",
-          "database_name": "capgo_alpha_replicate",
-          "database_id": "7f267d86-f4f7-49f5-9622-e44373aa00dc"
         }
       ],
       "analytics_engine_datasets": [
@@ -254,15 +187,11 @@
         {
           "binding": "HYPERDRIVE_DB",
           "id": "0f1d77550db142fbb17cb6b3ee659a06"
-        },
-        {
-          "binding": "HYPERDRIVE_DB_DIRECT",
-          "id": "20ce343dca144637bf8e141de18cd0d5"
         }
       ]
     },
     "local": {
-      "name": "capgo_plugin-local"
+      "name": "capgo_plugin-v1-local"
     }
   }
 }

@@ -26,8 +26,8 @@ code in this repository.
 ### Code Quality
 
 - `bun lint` - Lint Vue, TypeScript, and JavaScript files
-- `bun lint-fix` - Auto-fix linting issues
-- `bun lint-backend` - Lint Supabase backend files
+- `bun lint:fix` - Auto-fix linting issues
+- `bun lint:backend` - Lint Supabase backend files
 - `bun typecheck` - Run TypeScript type checking with vue-tsc
 - `bun types` - Generate TypeScript types from Supabase
 

@@ -74,21 +74,19 @@ jobs:
       - name: Set environment variable
         run: |
           if [[ ${{ github.ref }} == *-alpha* ]]; then
-            echo "ENV=alpha" >> $GITHUB_ENV
-            echo "PROJECT_NAME=capgo-webapp-alpha" >> $GITHUB_ENV
-            echo "CHANNEL=alpha" >> $GITHUB_ENV
+            echo "ENV=dev" >> $GITHUB_ENV
+            echo "CHANNEL=dev" >> $GITHUB_ENV
           else
             echo "ENV=prod" >> $GITHUB_ENV
-            echo "PROJECT_NAME=capgo-webapp" >> $GITHUB_ENV
             echo "CHANNEL=production" >> $GITHUB_ENV
           fi
       - name: Build
-        run: bun ${{ env.ENV == 'prod' && 'mobile' || 'dev-mobile' }}
+        run: bun ${{ env.ENV == 'prod' && 'build:mobile' || 'build:dev:mobile' }}
         env:
           VITE_VAPID_KEY: ${{ secrets.VITE_VAPID_KEY }}
           VITE_FIREBASE_CONFIG: ${{ secrets.VITE_FIREBASE_CONFIG }}
       - name: Publish CF webapp
-        run: bunx wrangler@latest pages deploy dist --project-name ${{ env.PROJECT_NAME }} --branch main
+        run: bun run deploy:cloudflare:webapp:${{ env.ENV }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -96,6 +94,14 @@ jobs:
         run: bunx @capgo/cli@latest bundle upload -a ${{ secrets.CAPGO_TOKEN }} --channel ${{ env.CHANNEL }}  --partial --tus
         env:
           CAPGO_TOKEN: ${{ secrets.CAPGO_TOKEN }}
+      - name: Create GitHub release
+        id: create_release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          # body: ${{ steps.create_release.outputs. }}
+          name: ${{ github.ref_name }}
+          prerelease: ${{ contains(github.ref, '-alpha.') }}
 
   deploy_api:
     needs: supabase_deploy
@@ -112,7 +118,7 @@ jobs:
       - name: Set environment variable
         run: |
           if [[ ${{ github.ref }} == *-alpha* ]]; then
-            echo "ENV=alpha" >> $GITHUB_ENV
+            echo "ENV=dev" >> $GITHUB_ENV
           else
             echo "ENV=prod" >> $GITHUB_ENV
           fi
@@ -138,7 +144,7 @@ jobs:
       - name: Set environment variable
         run: |
           if [[ ${{ github.ref }} == *-alpha* ]]; then
-            echo "ENV=alpha" >> $GITHUB_ENV
+            echo "ENV=dev" >> $GITHUB_ENV
           else
             echo "ENV=prod" >> $GITHUB_ENV
           fi
@@ -163,12 +169,62 @@ jobs:
       - name: Set environment variable
         run: |
           if [[ ${{ github.ref }} == *-alpha* ]]; then
-            echo "ENV=alpha" >> $GITHUB_ENV
+            echo "ENV=dev" >> $GITHUB_ENV
           else
             echo "ENV=prod" >> $GITHUB_ENV
           fi
       - name: Deploy CF Worker Plugin
         run: bun run deploy:cloudflare:plugin:${{ env.ENV }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+  deploy_plugin_v2:
+    needs: supabase_deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Install dependencies
+        run: bun install
+      - name: Set environment variable
+        run: |
+          if [[ ${{ github.ref }} == *-alpha* ]]; then
+            echo "ENV=dev" >> $GITHUB_ENV
+          else
+            echo "ENV=prod" >> $GITHUB_ENV
+          fi
+      - name: Deploy CF Worker Plugin V2
+        run: bun run deploy:cloudflare:plugin_v2:${{ env.ENV }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+  deploy_plugin_v1:
+    needs: supabase_deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Install dependencies
+        run: bun install
+      - name: Set environment variable
+        run: |
+          if [[ ${{ github.ref }} == *-alpha* ]]; then
+            echo "ENV=dev" >> $GITHUB_ENV
+          else
+            echo "ENV=prod" >> $GITHUB_ENV
+          fi
+      - name: Deploy CF Worker Plugin V1
+        run: bun run deploy:cloudflare:plugin_v1:${{ env.ENV }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

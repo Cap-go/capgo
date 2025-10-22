@@ -1,0 +1,39 @@
+{
+  "name": "capgo-webapp",
+  "compatibility_date": "2025-06-17",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application"
+  },
+  "workers_dev": false,
+  "env": {
+    "dev": {
+      "name": "capgo_webapp-dev",
+      "routes": [
+        {
+          "pattern": "web.dev.capgo.app",
+          "custom_domain": true
+        }
+      ]
+    },
+    "preprod": {
+      "name": "capgo_webapp-preprod",
+      "routes": [
+        {
+          "pattern": "web.preprod.capgo.app",
+          "custom_domain": true
+        }
+      ]
+    },
+    "prod": {
+      "name": "capgo_webapp-prod",
+      "routes": [
+        {
+          "pattern": "web.capgo.app",
+          "custom_domain": true
+        }
+      ]
+    }
+  }
+}

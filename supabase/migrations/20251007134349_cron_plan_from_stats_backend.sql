@@ -6,16 +6,18 @@ SELECT cron.unschedule('process_cron_plan_queue');
 
 -- Reschedule process_cron_plan_queue to run every minute instead of every 2 hours
 SELECT cron.schedule(
-  'process_cron_plan_queue',
-  '* * * * *',
-  'SELECT public.process_function_queue(''cron_plan'')'
+    'process_cron_plan_queue',
+    '* * * * *',
+    'SELECT public.process_function_queue(''cron_plan'')'
 );
 
 -- Add column to track when plan was last calculated
 ALTER TABLE public.stripe_info ADD COLUMN IF NOT EXISTS plan_calculated_at timestamp with time zone;
 
 -- Update the queue function to check if plan was calculated in the last hour
-CREATE OR REPLACE FUNCTION public.queue_cron_plan_for_org(org_id uuid, customer_id text)
+CREATE OR REPLACE FUNCTION public.queue_cron_plan_for_org(
+    org_id uuid, customer_id text
+)
 RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -49,7 +51,11 @@ $$;
 ALTER FUNCTION public.queue_cron_plan_for_org(uuid, text) OWNER TO postgres;
 
 -- Revoke all permissions first, then grant only to service_role
-REVOKE ALL ON FUNCTION public.queue_cron_plan_for_org(uuid, text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.queue_cron_plan_for_org(uuid, text) FROM public;
 REVOKE ALL ON FUNCTION public.queue_cron_plan_for_org(uuid, text) FROM anon;
-REVOKE ALL ON FUNCTION public.queue_cron_plan_for_org(uuid, text) FROM authenticated;
-GRANT ALL ON FUNCTION public.queue_cron_plan_for_org(uuid, text) TO service_role;
+REVOKE ALL ON FUNCTION public.queue_cron_plan_for_org(
+    uuid, text
+) FROM authenticated;
+GRANT ALL ON FUNCTION public.queue_cron_plan_for_org(
+    uuid, text
+) TO service_role;

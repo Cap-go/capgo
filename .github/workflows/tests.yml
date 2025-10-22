@@ -58,7 +58,7 @@ jobs:
       # - name: Install playwright
       #   run: bunx playwright install
       - name: Lint
-        run: bun lint && bun lint-backend
+        run: bun lint && bun lint:backend
       - name: Typecheck
         run: bun typecheck
       - name: Lint I18n

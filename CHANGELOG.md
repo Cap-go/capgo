@@ -2,6 +2,62 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.34.95 (2025-10-22)
+
+### 12.34.94 (2025-10-22)
+
+### 12.34.93 (2025-10-22)
+
+### 12.34.92 (2025-10-22)
+
+
+### Bug Fixes
+
+* deploy using workers instead of page ([ad87b78](https://github.com/Cap-go/capgo/commit/ad87b786644bda891fd15d32c8ce2e9f4d8e3c42))
+
+### 12.34.91 (2025-10-21)
+
+### 12.34.90 (2025-10-21)
+
+
+### Bug Fixes
+
+* env deploy script ([7723f0c](https://github.com/Cap-go/capgo/commit/7723f0cfe05e576bbbf9a54abafbb59c43d61040))
+
+### 12.34.89 (2025-10-21)
+
+### 12.34.88 (2025-10-21)
+
+### 12.34.87 (2025-10-21)
+
+### 12.34.86 (2025-10-21)
+
+### 12.34.85 (2025-10-21)
+
+### 12.34.84 (2025-10-21)
+
+### 12.34.83 (2025-10-21)
+
+### 12.34.82 (2025-10-21)
+
+### 12.34.81 (2025-10-21)
+
+
+### Bug Fixes
+
+* envs ([841574a](https://github.com/Cap-go/capgo/commit/841574a490a7922f1f1a7a35c76c98df76f9c465))
+
+### 12.34.80 (2025-10-20)
+
+### 12.34.79 (2025-10-20)
+
+### 12.34.78 (2025-10-19)
+
+
+### Bug Fixes
+
+* ignore org_id for now for readDeviceUsageCF ([67df97d](https://github.com/Cap-go/capgo/commit/67df97deeb98d960ad74def108a500bd24592030))
+
 ### 12.34.77 (2025-10-19)
 
 ### 12.34.76 (2025-10-19)

@@ -13,7 +13,7 @@
   "upload_source_maps": true,
   "env": {
     "prod": {
-      "name": "capgo_plugin-prod",
+      "name": "capgo_plugin-v2-prod",
       "vars": {
         "IS_V2": "1"
       },
@@ -23,32 +23,12 @@
       },
       "routes": [
         {
-          "pattern": "plugin.capgo.app",
+          "pattern": "plugin.v2.capgo.app",
           "custom_domain": true
         },
         {
-          "pattern": "api.capgo.app/plugin/*",
-          "zone_name": "capgo.app"
-        },
-        {
-          "pattern": "api.capgo.app/updates*",
-          "zone_name": "capgo.app"
-        },
-        {
-          "pattern": "api.capgo.app/channel_self",
-          "zone_name": "capgo.app"
-        },
-        {
-          "pattern": "api.capgo.app/stats",
-          "zone_name": "capgo.app"
-        },
-        {
-          "pattern": "plugin.usecapgo.com",
+          "pattern": "plugin.v2.usecapgo.com",
           "custom_domain": true
-        },
-        {
-          "pattern": "updater.spencer.co/*",
-          "zone_name": "capgo.app"
         }
       ],
       "analytics_engine_datasets": [
@@ -88,16 +68,6 @@
           "binding": "DB_REPLICATE",
           "database_name": "capgo_prod_replicate",
           "database_id": "7f267d86-f4f7-49f5-9622-e44373aa00dc"
-        }
-      ],
-      "hyperdrive": [
-        {
-          "binding": "HYPERDRIVE_DB",
-          "id": "0f1d77550db142fbb17cb6b3ee659a06"
-        },
-        {
-          "binding": "HYPERDRIVE_DB_DIRECT",
-          "id": "20ce343dca144637bf8e141de18cd0d5"
         }
       ]
     },
@@ -111,24 +81,12 @@
       },
       "routes": [
         {
-          "pattern": "plugin-preprod.capgo.app",
+          "pattern": "plugin.v2.preprod.capgo.app",
           "custom_domain": true
         },
         {
-          "pattern": "api-preprod.capgo.app/plugin/*",
-          "zone_name": "capgo.app"
-        },
-        {
-          "pattern": "api-preprod.capgo.app/updates*",
-          "zone_name": "capgo.app"
-        },
-        {
-          "pattern": "api-preprod.capgo.app/channel_self",
-          "zone_name": "capgo.app"
-        },
-        {
-          "pattern": "api-preprod.capgo.app/stats",
-          "zone_name": "capgo.app"
+          "pattern": "plugin.v2.preprod.usecapgo.com",
+          "custom_domain": true
         }
       ],
       "d1_databases": [
@@ -169,46 +127,24 @@
           "binding": "APP_LOG_EXTERNAL",
           "dataset": "app_log_external"
         }
-      ],
-      "hyperdrive": [
-        {
-          "binding": "HYPERDRIVE_DB",
-          "id": "0f1d77550db142fbb17cb6b3ee659a06"
-        },
-        {
-          "binding": "HYPERDRIVE_DB_DIRECT",
-          "id": "20ce343dca144637bf8e141de18cd0d5"
-        }
       ]
     },
-    "alpha": {
-      "name": "capgo_plugin-alpha",
-      "vars": {
-        "IS_V2": "1"
-      },
+    "dev": {
+      "name": "capgo_plugin-dev",
       "observability": {
         "enabled": true
       },
+      "vars": {
+        "IS_V2": "1"
+      },
       "routes": [
         {
-          "pattern": "plugin-alpha.capgo.app",
+          "pattern": "plugin.v2.dev.capgo.app",
           "custom_domain": true
         },
         {
-          "pattern": "api-alpha.capgo.app/plugin/*",
-          "zone_name": "capgo.app"
-        },
-        {
-          "pattern": "api-alpha.capgo.app/updates*",
-          "zone_name": "capgo.app"
-        },
-        {
-          "pattern": "api-alpha.capgo.app/channel_self",
-          "zone_name": "capgo.app"
-        },
-        {
-          "pattern": "api-alpha.capgo.app/stats",
-          "zone_name": "capgo.app"
+          "pattern": "plugin.v2.dev.usecapgo.com",
+          "custom_domain": true
         }
       ],
       "d1_databases": [
@@ -248,16 +184,6 @@
         {
           "binding": "APP_LOG_EXTERNAL",
           "dataset": "app_log_external_alpha"
-        }
-      ],
-      "hyperdrive": [
-        {
-          "binding": "HYPERDRIVE_DB",
-          "id": "0f1d77550db142fbb17cb6b3ee659a06"
-        },
-        {
-          "binding": "HYPERDRIVE_DB_DIRECT",
-          "id": "20ce343dca144637bf8e141de18cd0d5"
         }
       ]
     },
