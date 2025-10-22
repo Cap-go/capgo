@@ -88,7 +88,7 @@ jobs:
           VITE_VAPID_KEY: ${{ secrets.VITE_VAPID_KEY }}
           VITE_FIREBASE_CONFIG: ${{ secrets.VITE_FIREBASE_CONFIG }}
       - name: Publish CF webapp
-        run: bunx wrangler@latest pages deploy dist --project-name ${{ env.PROJECT_NAME }} --branch main
+        run: bunx wrangler@latest deploy --project-name ${{ env.PROJECT_NAME }} --branch main
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

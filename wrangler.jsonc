@@ -1,0 +1,16 @@
+{
+  "name": "capgo-webapp",
+  "compatibility_date": "2025-06-17",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application"
+  },
+  "workers_dev": false,
+  "routes": [
+    {
+      "pattern": "web.capgo.app",
+      "custom_domain": true
+    }
+  ]
+}
