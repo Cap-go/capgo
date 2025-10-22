@@ -8,7 +8,7 @@ import { z } from 'zod/mini'
 import { BRES, getIsV2, parseBody, quickError, simpleError, simpleRateLimit } from '../utils/hono.ts'
 import { cloudlog } from '../utils/loggin.ts'
 import { sendNotifOrg } from '../utils/notifications.ts'
-import { closeClient, getAppOwnerPostgres, getAppVersionPostgres, getDrizzleClient, getPgClient } from '../utils/pg.ts'
+import { getAppOwnerPostgres, getAppVersionPostgres, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import { getAppOwnerPostgresV2, getAppVersionPostgresV2, getDrizzleClientD1Session } from '../utils/pg_d1.ts'
 import { parsePluginBody } from '../utils/plugin_parser.ts'
 import { createStatsVersion, opnPremStats, sendStatsAndDevice } from '../utils/stats.ts'
@@ -148,8 +148,6 @@ app.post('/', async (c) => {
 
   const bodyParsed = parsePluginBody<AppStats>(c, body, jsonRequestSchema)
   const res = await post(c, isV2 ? getDrizzleClientD1Session(c) : getDrizzleClient(pgClient!), !!isV2, bodyParsed)
-  if (isV2 && pgClient)
-    await closeClient(c, pgClient)
   return res
 })
 

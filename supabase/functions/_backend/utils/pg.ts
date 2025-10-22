@@ -13,6 +13,21 @@ const PLAN_EXCEEDED_COLUMNS: Record<'mau' | 'storage' | 'bandwidth', string> = {
   bandwidth: 'bandwidth_exceeded',
 }
 
+const POSTGRES_IDLE_TIMEOUT_SECONDS = 60
+
+type PgClient = ReturnType<typeof postgres>
+
+interface GlobalWithPgRegistry {
+  __capgoPgClients?: Map<string, PgClient>
+}
+
+function getClientRegistry() {
+  const globalScope = globalThis as typeof globalThis & GlobalWithPgRegistry
+  if (!globalScope.__capgoPgClients)
+    globalScope.__capgoPgClients = new Map<string, PgClient>()
+  return globalScope.__capgoPgClients
+}
+
 function buildPlanValidationExpression(
   actions: ('mau' | 'storage' | 'bandwidth')[],
   ownerColumn: typeof schema.app_versions.owner_org | typeof schema.apps.owner_org,
@@ -54,17 +69,32 @@ export function getDatabaseURL(c: Context): string {
 
 export function getPgClient(c: Context) {
   const dbUrl = getDatabaseURL(c)
-  cloudlog({ requestId: c.get('requestId'), message: 'SUPABASE_DB_URL', dbUrl })
-  return postgres(dbUrl, { prepare: false, idle_timeout: 2 })
+  const registry = getClientRegistry()
+  const cachedClient = registry.get(dbUrl)
+  if (cachedClient) {
+    cloudlog({ requestId: c.get('requestId'), message: 'Reusing Postgres client', dbUrl })
+    return cachedClient
+  }
+
+  cloudlog({ requestId: c.get('requestId'), message: 'Creating Postgres client', dbUrl })
+  const client = postgres(dbUrl, {
+    prepare: false,
+    // Cloudflare Workers can only maintain 5 concurrent external connections
+    // max: 5,
+    // Keep connections alive longer to benefit from connection pooling
+    // Increased from 2 seconds to 60 seconds to reduce connection churn
+    idle_timeout: POSTGRES_IDLE_TIMEOUT_SECONDS,
+    // Maximum lifetime of a connection (30 minutes)
+    // max_lifetime: 60 * 30,
+    // Connection timeout
+    connect_timeout: 30,
+  })
+  registry.set(dbUrl, client)
+  return client
 }
 
 export function getDrizzleClient(client: ReturnType<typeof getPgClient>) {
   return drizzle(client as any, { logger: true })
-}
-
-export function closeClient(c: Context, client: ReturnType<typeof getPgClient>) {
-  // cloudlog(c.get('requestId'), 'Closing client', client)
-  return backgroundTask(c, client.end())
 }
 
 export function getAlias() {

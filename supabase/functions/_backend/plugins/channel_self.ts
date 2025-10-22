@@ -8,7 +8,7 @@ import { Hono } from 'hono/tiny'
 import { z } from 'zod/mini'
 import { BRES, getIsV2, parseBody, quickError, simpleError, simpleError200, simpleRateLimit } from '../utils/hono.ts'
 import { cloudlog } from '../utils/loggin.ts'
-import { closeClient, deleteChannelDevicePg, getAppByIdPg, getAppVersionsByAppIdPg, getChannelByNamePg, getChannelDeviceOverridePg, getChannelsPg, getCompatibleChannelsPg, getDrizzleClient, getMainChannelsPg, getPgClient, upsertChannelDevicePg } from '../utils/pg.ts'
+import { deleteChannelDevicePg, getAppByIdPg, getAppVersionsByAppIdPg, getChannelByNamePg, getChannelDeviceOverridePg, getChannelsPg, getCompatibleChannelsPg, getDrizzleClient, getMainChannelsPg, getPgClient, upsertChannelDevicePg } from '../utils/pg.ts'
 import { getAppByIdD1, getAppVersionsByAppIdD1, getChannelByNameD1, getChannelDeviceOverrideD1, getChannelsD1, getCompatibleChannelsD1, getDrizzleClientD1Session, getMainChannelsD1 } from '../utils/pg_d1.ts'
 import { convertQueryToBody, parsePluginBody } from '../utils/plugin_parser.ts'
 import { sendStatsAndDevice } from '../utils/stats.ts'
@@ -141,10 +141,6 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
       throw simpleError('override_not_allowed', `Cannot remove channel override`, {})
     }
 
-    if (pgClientForWrite) {
-      await closeClient(c, pgClientForWrite)
-    }
-
     cloudlog({ requestId: c.get('requestId'), message: 'main channel set, removing override' })
     await sendStatsAndDevice(c, device, [{ action: 'setChannel' }])
     return c.json(BRES)
@@ -176,10 +172,6 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
   }, pgDrizzleClient)
   if (!success) {
     throw simpleError('override_not_allowed', `Cannot do channel override`, {})
-  }
-
-  if (pgClientForWrite) {
-    await closeClient(c, pgClientForWrite)
   }
 
   await sendStatsAndDevice(c, device, [{ action: 'setChannel' }])
@@ -303,10 +295,6 @@ async function deleteOverride(c: Context, drizzleClient: ReturnType<typeof getDr
     throw simpleError('override_not_allowed', `Cannot delete channel override`, {})
   }
 
-  if (pgClientForWrite) {
-    await closeClient(c, pgClientForWrite)
-  }
-
   return c.json(BRES)
 }
 
@@ -361,14 +349,7 @@ app.post('/', async (c) => {
   const pgClient = isV2 ? null : getPgClient(c)
 
   const bodyParsed = parsePluginBody<DeviceLink>(c, body, jsonRequestSchema)
-  let res
-  try {
-    res = await post(c, isV2 ? getDrizzleClientD1Session(c) : getDrizzleClient(pgClient as any), !!isV2, bodyParsed)
-  }
-  finally {
-    if (isV2 && pgClient)
-      await closeClient(c, pgClient)
-  }
+  const res = await post(c, isV2 ? getDrizzleClientD1Session(c) : getDrizzleClient(pgClient as any), !!isV2, bodyParsed)
   return res
 })
 
@@ -385,14 +366,7 @@ app.put('/', async (c) => {
   const pgClient = isV2 ? null : getPgClient(c)
 
   const bodyParsed = parsePluginBody<DeviceLink>(c, body, jsonRequestSchema)
-  let res
-  try {
-    res = await put(c, isV2 ? getDrizzleClientD1Session(c) : getDrizzleClient(pgClient as any), !!isV2, bodyParsed)
-  }
-  finally {
-    if (isV2 && pgClient)
-      await closeClient(c, pgClient)
-  }
+  const res = await put(c, isV2 ? getDrizzleClientD1Session(c) : getDrizzleClient(pgClient as any), !!isV2, bodyParsed)
   return res
 })
 
@@ -408,14 +382,7 @@ app.delete('/', async (c) => {
   const pgClient = isV2 ? null : getPgClient(c)
 
   const bodyParsed = parsePluginBody<DeviceLink>(c, body, jsonRequestSchema)
-  let res
-  try {
-    res = await deleteOverride(c, isV2 ? getDrizzleClientD1Session(c) : getDrizzleClient(pgClient as any), !!isV2, bodyParsed)
-  }
-  finally {
-    if (isV2 && pgClient)
-      await closeClient(c, pgClient)
-  }
+  const res = await deleteOverride(c, isV2 ? getDrizzleClientD1Session(c) : getDrizzleClient(pgClient as any), !!isV2, bodyParsed)
   return res
 })
 
@@ -431,13 +398,6 @@ app.get('/', async (c) => {
   const pgClient = isV2 ? null : getPgClient(c)
 
   const bodyParsed = parsePluginBody<DeviceLink>(c, body, jsonRequestSchema)
-  let res
-  try {
-    res = await listCompatibleChannels(c, isV2 ? getDrizzleClientD1Session(c) : getDrizzleClient(pgClient as any), !!isV2, bodyParsed)
-  }
-  finally {
-    if (isV2 && pgClient)
-      await closeClient(c, pgClient)
-  }
+  const res = await listCompatibleChannels(c, isV2 ? getDrizzleClientD1Session(c) : getDrizzleClient(pgClient as any), !!isV2, bodyParsed)
   return res
 })

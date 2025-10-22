@@ -3,7 +3,7 @@ import { getRuntimeKey } from 'hono/adapter'
 import { Hono } from 'hono/tiny'
 import { BRES, simpleError } from '../utils/hono.ts'
 import { cloudlog } from '../utils/loggin.ts'
-import { closeClient, getPgClient } from '../utils/pg.ts'
+import { getPgClient } from '../utils/pg.ts'
 import { getPgClientD1 } from '../utils/pg_d1.ts'
 import { existInEnv } from '../utils/utils.ts'
 
@@ -28,7 +28,6 @@ app.get('/', async (c) => {
   const pgClient = getPgClient(c)
   const res = await pgClient`select 1`
 
-  closeClient(c, pgClient)
   if (!res)
     throw simpleError('cannot_get_apps', 'Cannot get apps')
   return c.json(BRES)

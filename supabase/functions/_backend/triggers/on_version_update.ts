@@ -5,7 +5,7 @@ import { eq } from 'drizzle-orm'
 import { Hono } from 'hono/tiny'
 import { BRES, middlewareAPISecret, triggerValidator } from '../utils/hono.ts'
 import { cloudlog } from '../utils/loggin.ts'
-import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
+import { getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import { manifest } from '../utils/postgress_schema.ts'
 import { getPath, s3 } from '../utils/s3.ts'
 import { createStatsMeta } from '../utils/stats.ts'
@@ -159,9 +159,6 @@ async function deleteManifest(c: Context, record: Database['public']['Tables']['
   }
   catch (error) {
     cloudlog({ requestId: c.get('requestId'), message: 'error fetch manifest entries', error })
-  }
-  finally {
-    await closeClient(c, pgClient)
   }
 }
 

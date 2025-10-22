@@ -16,7 +16,7 @@ import { getBundleUrl, getManifestUrl } from './downloadUrl.ts'
 import { getIsV2, simpleError, simpleError200 } from './hono.ts'
 import { cloudlog } from './loggin.ts'
 import { sendNotifOrg } from './notifications.ts'
-import { closeClient, getAppOwnerPostgres, getDrizzleClient, getPgClient, requestInfosPostgres } from './pg.ts'
+import { getAppOwnerPostgres, getDrizzleClient, getPgClient, requestInfosPostgres } from './pg.ts'
 import { getAppOwnerPostgresV2, getDrizzleClientD1Session, requestInfosPostgresV2 } from './pg_d1.ts'
 import { s3 } from './s3.ts'
 import { createStatsBandwidth, createStatsMau, createStatsVersion, opnPremStats, sendStatsAndDevice } from './stats.ts'
@@ -368,7 +368,5 @@ export async function update(c: Context, body: AppInfos) {
   const drizzlePg = pgClient ? getDrizzleClient(pgClient) : (null as any)
   // Lazily create D1 client inside updateWithPG when actually used
   const res = await updateWithPG(c, body, () => getDrizzleClientD1Session(c), drizzlePg, !!isV2)
-  if (isV2 && pgClient)
-    await closeClient(c, pgClient)
   return res
 }

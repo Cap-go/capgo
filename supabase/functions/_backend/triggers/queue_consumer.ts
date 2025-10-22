@@ -6,7 +6,7 @@ import { z } from 'zod/mini'
 import { sendDiscordAlert } from '../utils/discord.ts'
 import { BRES, middlewareAPISecret, parseBody, simpleError } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../utils/loggin.ts'
-import { closeClient, getPgClient } from '../utils/pg.ts'
+import { getPgClient } from '../utils/pg.ts'
 import { backgroundTask, getEnv } from '../utils/utils.ts'
 
 // Define constants
@@ -367,16 +367,9 @@ app.post('/sync', async (c) => {
   await backgroundTask(c, (async () => {
     cloudlog({ requestId: c.get('requestId'), message: `[Background Queue Sync] Starting background execution for queue: ${queueName} with batch size: ${finalBatchSize}` })
     let sql: ReturnType<typeof getPgClient> | null = null
-    try {
-      sql = getPgClient(c)
-      await processQueue(c, sql, queueName, finalBatchSize)
-      cloudlog({ requestId: c.get('requestId'), message: `[Background Queue Sync] Background execution finished successfully.` })
-    }
-    finally {
-      if (sql)
-        await closeClient(c, sql)
-      cloudlog({ requestId: c.get('requestId'), message: `[Background Queue Sync] PostgreSQL connection closed.` })
-    }
+    sql = getPgClient(c)
+    await processQueue(c, sql, queueName, finalBatchSize)
+    cloudlog({ requestId: c.get('requestId'), message: `[Background Queue Sync] Background execution finished successfully.` })
   })())
   cloudlog({ requestId: c.get('requestId'), message: `[Sync Request] Responding 202 Accepted. Time: ${Date.now() - handlerStart}ms` })
   return c.json(BRES, 202)
