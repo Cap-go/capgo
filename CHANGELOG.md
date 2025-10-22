@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.34.92 (2025-10-22)
+
+
+### Bug Fixes
+
+* deploy using workers instead of page ([ad87b78](https://github.com/Cap-go/capgo/commit/ad87b786644bda891fd15d32c8ce2e9f4d8e3c42))
+
 ### 12.34.91 (2025-10-21)
 
 ### 12.34.90 (2025-10-21)
