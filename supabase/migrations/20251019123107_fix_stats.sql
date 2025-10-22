@@ -1,6 +1,5 @@
 -- Note: already applied to production
-
-DROP FUNCTION IF EXISTS public.process_function_queue(text);
+DROP FUNCTION IF EXISTS public.process_function_queue (text);
 
 CREATE OR REPLACE FUNCTION "public"."process_cron_stats_jobs" () RETURNS "void" LANGUAGE "plpgsql"
 SET
@@ -36,28 +35,21 @@ BEGIN
 END;
 $$;
 
-SELECT cron.unschedule('process_cron_stat_app_queue');
+SELECT
+  cron.unschedule ('process_cron_stat_app_queue');
 
-SELECT cron.schedule(
-  'process_cron_stat_app_queue',
-  '* * * * *',
-  'SELECT public.process_function_queue(''cron_stat_app'', 10)'
-);
+SELECT
+  cron.schedule (
+    'process_cron_stat_app_queue',
+    '* * * * *',
+    'SELECT public.process_function_queue(''cron_stat_app'', 10)'
+  );
 
-CREATE OR REPLACE FUNCTION public.queue_cron_stat_org_for_org(org_id uuid, customer_id text)
-RETURNS void
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = ''
-AS $$
-DECLARE
-  last_calculated timestamptz;
+CREATE OR REPLACE FUNCTION public.queue_cron_stat_org_for_org (org_id uuid, customer_id text) RETURNS void LANGUAGE plpgsql SECURITY DEFINER
+SET
+  search_path = '' AS $$
 BEGIN
-  -- Check when plan was last calculated for this customer
-  SELECT plan_calculated_at INTO last_calculated
-  FROM public.stripe_info
-  WHERE stripe_info.customer_id = queue_cron_stat_org_for_org.customer_id;
-  
+
   PERFORM pgmq.send('cron_stat_org',
     jsonb_build_object(
       'function_name', 'cron_stat_org',
@@ -71,10 +63,12 @@ BEGIN
 END;
 $$;
 
-SELECT cron.unschedule('process_cron_stat_org_queue');
+SELECT
+  cron.unschedule ('process_cron_stat_org_queue');
 
-SELECT cron.schedule(
-  'process_cron_stat_org_queue',
-  '*/5 * * * *',
-  'SELECT public.process_function_queue(''cron_stat_org'', 10)'
-);
+SELECT
+  cron.schedule (
+    'process_cron_stat_org_queue',
+    '*/5 * * * *',
+    'SELECT public.process_function_queue(''cron_stat_org'', 10)'
+  );
