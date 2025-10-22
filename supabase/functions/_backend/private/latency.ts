@@ -10,6 +10,7 @@ import { existInEnv } from '../utils/utils.ts'
 export const app = new Hono<MiddlewareKeyVariables>()
 
 app.get('/', async (c) => {
+  cloudlog({ requestId: c.get('requestId'), message: 'Latency check' })
   if (getRuntimeKey() === 'workerd' && existInEnv(c, 'DB_REPLICATE')) {
     cloudlog({ requestId: c.get('requestId'), message: 'Using D1 for workerd runtime' })
     const pgClient = getPgClientD1(c)
