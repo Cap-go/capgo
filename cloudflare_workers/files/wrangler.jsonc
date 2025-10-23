@@ -34,11 +34,6 @@
       },
       "routes": [
         {
-          "pattern": "files.capgo.app",
-          "custom_domain": true
-        },
-        // TODO: remove this it's deprecated
-        {
           "pattern": "api.capgo.app/files*",
           "zone_name": "capgo.app"
         },
@@ -47,18 +42,14 @@
           "zone_name": "capgo.app"
         },
         {
-          "pattern": "api.capgo.app/private/files*",
-          "zone_name": "capgo.app"
+          "pattern": "api.usecapgo.com/files*",
+          "zone_name": "usecapgo.com"
         },
         {
-          "pattern": "api.capgo.app/private/download_link",
-          "zone_name": "capgo.app"
+          "pattern": "plugin.usecapgo.com/files*",
+          "zone_name": "usecapgo.com"
         },
-        // end of TODO
-        {
-          "pattern": "files.usecapgo.com",
-          "custom_domain": true
-        },
+        // Custom domain for PAYG
         {
           "pattern": "updater.spencer.co/files*",
           "zone_name": "capgo.app"
@@ -93,12 +84,20 @@
       },
       "routes": [
         {
-          "pattern": "files.preprod.capgo.app",
-          "custom_domain": true
+          "pattern": "api.preprod.capgo.app/files*",
+          "zone_name": "capgo.app"
         },
         {
-          "pattern": "files.preprod.usecapgo.com",
-          "custom_domain": true
+          "pattern": "plugin.preprod.capgo.app/files*",
+          "zone_name": "capgo.app"
+        },
+        {
+          "pattern": "api.preprod.usecapgo.com/files*",
+          "zone_name": "usecapgo.com"
+        },
+        {
+          "pattern": "plugin.preprod.usecapgo.com/files*",
+          "zone_name": "usecapgo.com"
         }
       ],
       "r2_buckets": [
@@ -130,12 +129,20 @@
       },
       "routes": [
         {
-          "pattern": "files.dev.capgo.app",
-          "custom_domain": true
+          "pattern": "api.dev.capgo.app/files*",
+          "zone_name": "capgo.app"
         },
         {
-          "pattern": "files.dev.usecapgo.com",
-          "custom_domain": true
+          "pattern": "plugin.dev.capgo.app/files*",
+          "zone_name": "capgo.app"
+        },
+        {
+          "pattern": "api.dev.usecapgo.com/files*",
+          "zone_name": "usecapgo.com"
+        },
+        {
+          "pattern": "plugin.dev.usecapgo.com/files*",
+          "zone_name": "usecapgo.com"
         }
       ],
       "r2_buckets": [
