@@ -33,6 +33,11 @@
         "head_sampling_rate": 0.001
       },
       "routes": [
+        // TODO: remove after we switched cli to new domain
+        {
+          "pattern": "files.capgo.app",
+          "custom_domain": true
+        },
         // No special domain to ease clients who allow specific domains only
         {
           "pattern": "api.capgo.app/files*",
