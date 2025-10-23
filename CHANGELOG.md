@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.34.119 (2025-10-23)
+
+
+### Bug Fixes
+
+*   // TODO: michael fix the test you broke ([bad28d2](https://github.com/Cap-go/capgo/commit/bad28d2a6d95aa965baa8813e79a8ee77f34f732))
+
 ### 12.34.118 (2025-10-23)
 
 ### 12.34.117 (2025-10-23)
