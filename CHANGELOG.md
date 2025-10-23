@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.34.107 (2025-10-23)
+
+
+### Bug Fixes
+
+* add missing import ([a81c6ea](https://github.com/Cap-go/capgo/commit/a81c6ea652c10a5a1fbca5dc65204c7768686767))
+
 ### 12.34.106 (2025-10-23)
 
 
