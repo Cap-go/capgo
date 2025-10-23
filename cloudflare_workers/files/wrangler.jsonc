@@ -1,11 +1,12 @@
 {
+  "name": "capgo_file",
+  "logpush": true,
   "compatibility_date": "2025-09-15",
   "main": "./index.ts",
   "compatibility_flags": [
     "nodejs_compat_v2",
     "nodejs_compat_populate_process_env"
   ],
-  "logpush": true,
   "workers_dev": false,
   "upload_source_maps": true,
   "migrations": [

@@ -1,11 +1,12 @@
 {
+  "name": "capgo_api",
+  "logpush": true,
   "compatibility_date": "2025-09-15",
   "main": "./index.ts",
   "compatibility_flags": [
     "nodejs_compat_v2",
     "nodejs_compat_populate_process_env"
   ],
-  "logpush": true,
   "placement": {
     "mode": "smart"
   },
