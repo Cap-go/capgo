@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.34.125 (2025-10-23)
+
+
+### Bug Fixes
+
+* bundle, stats chart and account validation name + pg loggin ([91ebadc](https://github.com/Cap-go/capgo/commit/91ebadc5cfad372e93a8ff444474830fc0698a31))
+
 ### 12.34.124 (2025-10-23)
 
 
