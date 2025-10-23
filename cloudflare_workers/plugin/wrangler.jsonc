@@ -16,7 +16,8 @@
     "prod": {
       "name": "capgo_plugin-prod",
       "vars": {
-        "IS_V2": "0.9"
+        "IS_V2": "0.9",
+        "ENV_NAME": "capgo_plugin-prod"
       },
       "observability": {
         "enabled": true,
@@ -115,7 +116,8 @@
     "prodv1": {
       "name": "capgo_plugin-v1-prod",
       "vars": {
-        "IS_V2": "0"
+        "IS_V2": "0",
+        "ENV_NAME": "capgo_plugin-v1-prod"
       },
       "observability": {
         "enabled": true,
@@ -187,7 +189,8 @@
     "prodv2": {
       "name": "capgo_plugin-v2-prod",
       "vars": {
-        "IS_V2": "1"
+        "IS_V2": "1",
+        "ENV_NAME": "capgo_plugin-v2-prod"
       },
       "observability": {
         "enabled": true,
@@ -264,7 +267,8 @@
     "preprod": {
       "name": "capgo_plugin-preprod",
       "vars": {
-        "IS_V2": "0"
+        "IS_V2": "0",
+        "ENV_NAME": "capgo_plugin-preprod"
       },
       "observability": {
         "enabled": true
@@ -340,7 +344,8 @@
     "alpha": {
       "name": "capgo_plugin-alpha",
       "vars": {
-        "IS_V2": "1"
+        "IS_V2": "1",
+        "ENV_NAME": "capgo_plugin-alpha"
       },
       "observability": {
         "enabled": true

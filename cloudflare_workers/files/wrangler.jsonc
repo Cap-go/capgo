@@ -29,6 +29,9 @@
   "env": {
     "prod": {
       "name": "capgo_files-prod",
+      "vars": {
+        "ENV_NAME": "capgo_files-prod"
+      },
       "observability": {
         "enabled": true,
         "head_sampling_rate": 0.001
@@ -86,6 +89,9 @@
     },
     "preprod": {
       "name": "capgo_files-preprod",
+      "vars": {
+        "ENV_NAME": "capgo_files-preprod"
+      },
       "observability": {
         "enabled": true
       },
@@ -131,6 +137,9 @@
     },
     "alpha": {
       "name": "capgo_files-alpha",
+      "vars": {
+        "ENV_NAME": "capgo_files-alpha"
+      },
       "observability": {
         "enabled": true
       },

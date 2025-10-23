@@ -15,6 +15,9 @@
   "env": {
     "prod": {
       "name": "capgo_api-prod",
+      "vars": {
+        "ENV_NAME": "capgo_api-prod"
+      },
       "routes": [
         {
           "pattern": "api.capgo.app",
@@ -71,6 +74,9 @@
     },
     "preprod": {
       "name": "capgo_api-preprod",
+      "vars": {
+        "ENV_NAME": "capgo_api-preprod"
+      },
       "routes": [
         {
           "pattern": "api.preprod.capgo.app",
@@ -126,6 +132,9 @@
     },
     "alpha": {
       "name": "capgo_api-alpha",
+      "vars": {
+        "ENV_NAME": "capgo_api-alpha"
+      },
       "routes": [
         {
           "pattern": "api.dev.capgo.app",

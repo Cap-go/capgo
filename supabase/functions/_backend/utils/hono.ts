@@ -168,6 +168,11 @@ export function createHono(functionName: string, version: string, sentryDsn?: st
 }
 
 export function createAllCatch(appGlobal: Hono<MiddlewareKeyVariables>, functionName: string) {
+  appGlobal.use('*', (c, next): any => {
+    // ADD HEADER TO IDENTIFY WORKER SOURCE
+    c.header('X-Worker-Source', getEnv(c, 'ENV_NAME') ?? functionName)
+    next()
+  })
   appGlobal.all('*', (c) => {
     cloudlog({ requestId: c.get('requestId'), functionName, message: 'Not found', url: c.req.url })
     return c.json({ error: 'not_found', message: 'Not found' }, 404)

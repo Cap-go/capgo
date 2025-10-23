@@ -1,3 +1,4 @@
+import process from 'node:process'
 import { app as channel_self } from '../../supabase/functions/_backend/plugins/channel_self.ts'
 import { app as stats } from '../../supabase/functions/_backend/plugins/stats.ts'
 import { app as updates } from '../../supabase/functions/_backend/plugins/updates.ts'
