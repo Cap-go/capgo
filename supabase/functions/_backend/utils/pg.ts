@@ -55,7 +55,12 @@ export function getDatabaseURL(c: Context): string {
 export function getPgClient(c: Context) {
   const dbUrl = getDatabaseURL(c)
   cloudlog({ requestId: c.get('requestId'), message: 'SUPABASE_DB_URL', dbUrl })
-  return postgres(dbUrl, { prepare: false, idle_timeout: 2 })
+  return postgres(dbUrl, {
+    prepare: false,
+    idle_timeout: 20, // Increase from 2 to 20 seconds
+    connect_timeout: 10, // Add explicit connect timeout
+    max_lifetime: 60, // Add connection lifetime limit
+  })
 }
 
 export function getDrizzleClient(client: ReturnType<typeof getPgClient>) {
