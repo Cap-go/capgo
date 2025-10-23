@@ -1,16 +1,16 @@
-import { randomUUID } from 'node:crypto'
+// import { randomUUID } from 'node:crypto'
 import postgres from 'postgres'
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { BASE_URL, headersInternal, ORG_ID, POSTGRES_URL } from './test-utils.ts'
+import { BASE_URL, headersInternal, POSTGRES_URL } from './test-utils.ts'
 
 const BASE_URL_TRIGGER = `${BASE_URL}/triggers`
-const id = randomUUID()
-const TEST_APP_ID = `com.loadapp.${id}`
+// const id = randomUUID()
+// const TEST_APP_ID = `com.loadapp.${id}`
 const sql = postgres(POSTGRES_URL, { prepare: false, idle_timeout: 2 })
 const queueName = 'test_queue_consumer'
-const functionName = 'ok'
-const functionType = ''
+// const functionName = 'ok'
+// const functionType = ''
 
 beforeAll(async () => {
   // Clean up any existing messages in the test queue
