@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.34.124 (2025-10-23)
+
+
+### Bug Fixes
+
+* test storage now works again ([2a4ad33](https://github.com/Cap-go/capgo/commit/2a4ad334f78ef7647c172e567e3463dc2e089543))
+
 ### 12.34.123 (2025-10-23)
 
 ### 12.34.122 (2025-10-23)
