@@ -227,6 +227,7 @@
     "cross-env": "^10.1.0",
     "discord-api-types": "^0.38.28",
     "eslint": "9.38.0",
+    "eslint-plugin-format": "^1.0.2",
     "husky": "^9.1.7",
     "sass": "1.93.2",
     "tailwindcss": "^4.1.15",
