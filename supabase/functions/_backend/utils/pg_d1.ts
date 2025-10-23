@@ -78,6 +78,7 @@ export function getDrizzleClientD1Session(c: Context) {
   if (!existInEnv(c, 'DB_REPLICATE')) {
     throw quickError(500, 'missing_binding', 'DB_REPLICATE is not set', { binding: 'DB_REPLICATE' })
   }
+  c.header('X-Database-Source', 'd1')
   const session = getPgClientD1(c)
   return drizzleD1(session)
 }

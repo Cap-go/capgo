@@ -38,18 +38,33 @@ function buildPlanValidationExpression(
 }
 
 export function getDatabaseURL(c: Context): string {
-  // TODO: uncomment when we enable back replicate
-  // const clientContinent = (c.req.raw as any)?.cf?.continent
-  // cloudlog({ requestId: c.get('requestId'), message: 'clientContinent', clientContinent  })
-  let DEFAULT_DB_URL = getEnv(c, 'SUPABASE_DB_URL')
+  const clientContinent = (c.req.raw as Request & { cf?: { continent?: string } })?.cf?.continent
+  cloudlog({ requestId: c.get('requestId'), message: 'clientContinent', clientContinent })
+
+  // Check for Hyperdrive replicas
+  // Use Singapore replica for AS (Asia) and OC (Oceania)
+  if (existInEnv(c, 'HYPERDRIVE_DB_SG') && (clientContinent === 'AS' || clientContinent === 'OC')) {
+    c.header('X-Database-Source', 'hyperdrive-sg')
+    return (getEnv(c, 'HYPERDRIVE_DB_SG') as unknown as Hyperdrive).connectionString
+  }
+  // Use US replica only for NA (North America) and SA (South America)
+  if (existInEnv(c, 'HYPERDRIVE_DB_US') && (clientContinent === 'NA' || clientContinent === 'SA')) {
+    c.header('X-Database-Source', 'hyperdrive-us')
+    return (getEnv(c, 'HYPERDRIVE_DB_US') as unknown as Hyperdrive).connectionString
+  }
+
+  // Fallback to single Hyperdrive if available
+  if (existInEnv(c, 'HYPERDRIVE_DB')) {
+    c.header('X-Database-Source', 'hyperdrive')
+    return (getEnv(c, 'HYPERDRIVE_DB') as unknown as Hyperdrive).connectionString
+  }
+
+  // Fallback to direct database connection for EU, AF, AN and unknown continents
+  c.header('X-Database-Source', 'direct')
   if (existInEnv(c, 'CUSTOM_SUPABASE_DB_URL'))
-    DEFAULT_DB_URL = getEnv(c, 'CUSTOM_SUPABASE_DB_URL')
+    return getEnv(c, 'CUSTOM_SUPABASE_DB_URL')
 
-  if (existInEnv(c, 'HYPERDRIVE_DB'))
-    return (getEnv(c, 'HYPERDRIVE_DB') as any as Hyperdrive).connectionString
-
-  // // Default to Germany for any other cases
-  return DEFAULT_DB_URL
+  return getEnv(c, 'SUPABASE_DB_URL')
 }
 
 export function getPgClient(c: Context) {
