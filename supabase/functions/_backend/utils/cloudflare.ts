@@ -815,25 +815,27 @@ export async function createIfNotExistStoreInfo(c: Context, app: Partial<StoreAp
 
   try {
     // Check if app exists
-    const existingApp = await c.env.DB_STOREAPPS
+    const existingApp = await c.env.DB_STOREAPPS.withSession('first-unconstrained')
       .prepare('SELECT app_id FROM store_apps WHERE app_id = ?')
       .bind(app.app_id)
       .first()
 
-    if (!existingApp) {
-      const columns = Object.keys(app)
-      const placeholders = columns.map(() => '?').join(', ')
-      const values = columns.map(column => app[column as keyof StoreApp])
-
-      const query = `INSERT INTO store_apps (${columns.join(', ')}) VALUES (${placeholders})`
-      cloudlog({ requestId: c.get('requestId'), message: 'createIfNotExistStoreInfo query', query, placeholders, values })
-      const res = await c.env.DB_STOREAPPS
-        .prepare(query)
-        .bind(...values)
-        .run()
-
-      cloudlog({ requestId: c.get('requestId'), message: 'createIfNotExistStoreInfo result', res })
+    if (existingApp) {
+      return false
     }
+    const columns = Object.keys(app)
+    const placeholders = columns.map(() => '?').join(', ')
+    const values = columns.map(column => app[column as keyof StoreApp])
+
+    const query = `INSERT INTO store_apps (${columns.join(', ')}) VALUES (${placeholders})`
+    cloudlog({ requestId: c.get('requestId'), message: 'createIfNotExistStoreInfo query', query, placeholders, values })
+    const res = await c.env.DB_STOREAPPS
+      .prepare(query)
+      .bind(...values)
+      .run()
+
+    cloudlog({ requestId: c.get('requestId'), message: 'createIfNotExistStoreInfo result', res })
+    return true
   }
   catch (e) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Error creating store info', error: serializeError(e) })
