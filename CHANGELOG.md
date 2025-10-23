@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## 12.35.0 (2025-10-23)
+
+
+### Features
+
+* make hono return X-Worker-Source ([1a80f79](https://github.com/Cap-go/capgo/commit/1a80f7949e06cd9f178e618fb516d8c719bb6786))
+
 ### 12.34.126 (2025-10-23)
 
 
