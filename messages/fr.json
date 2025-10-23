@@ -520,6 +520,7 @@
   "more-version-storage": "Plus de version de stockage",
   "my-notifications": "Mes Notifications",
   "name": "Nom",
+  "name-contains-invalid-characters": "Le nom contient des caractères invalides",
   "name-length-error": "Erreur de longueur du nom, veuillez utiliser un nom entre 1 et 32 caractères",
   "name-required": "le nom est requis",
   "need-more-contact-us": "Besoin de plus ? Contactez-nous pour un plan sur mesure",

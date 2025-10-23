@@ -520,6 +520,7 @@
   "more-version-storage": "Penyimpanan Versi Lebih Banyak",
   "my-notifications": "Notifikasi Saya",
   "name": "Nama",
+  "name-contains-invalid-characters": "Nama berisi karakter tidak valid",
   "name-length-error": "Kesalahan panjang nama, silakan gunakan nama antara 1 dan 32 karakter",
   "name-required": "nama diperlukan",
   "need-more-contact-us": "Butuh lebih banyak? Hubungi kami untuk rencana yang disesuaikan",

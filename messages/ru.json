@@ -520,6 +520,7 @@
   "more-version-storage": "Больше версий хранения",
   "my-notifications": "Мои Уведомления",
   "name": "Имя",
+  "name-contains-invalid-characters": "Имя содержит недопустимые символы",
   "name-length-error": "Ошибка длины имени, используйте имя от 1 до 32 символов",
   "name-required": "требуется имя",
   "need-more-contact-us": "Нужно больше? Свяжитесь с нами для разработки индивидуального плана",

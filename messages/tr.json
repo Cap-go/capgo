@@ -520,6 +520,7 @@
   "more-version-storage": "Daha Fazla Sürüm Depolama",
   "my-notifications": "Benim Bildirimlerim",
   "name": "İsim",
+  "name-contains-invalid-characters": "İsim geçersiz karakterler içeriyor",
   "name-length-error": "İsim uzunluk hatası, lütfen 1 ile 32 karakter arasında bir isim kullanın.",
   "name-required": "isim gereklidir",
   "need-more-contact-us": "Daha fazlasına mı ihtiyacınız var? Özel plan için bizimle iletişime geçin.",

@@ -520,6 +520,7 @@
   "more-version-storage": "Nhiều phiên bản Lưu trữ",
   "my-notifications": "Thông báo của tôi",
   "name": "Tên",
+  "name-contains-invalid-characters": "Tên chứa các ký tự không hợp lệ",
   "name-length-error": "Lỗi độ dài tên, vui lòng sử dụng tên có từ 1 đến 32 ký tự",
   "name-required": "yêu cầu tên",
   "need-more-contact-us": "Cần thêm? Liên hệ với chúng tôi để có kế hoạch phù hợp",

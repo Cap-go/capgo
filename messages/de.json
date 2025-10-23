@@ -520,6 +520,7 @@
   "more-version-storage": "Mehr Versionsspeicher",
   "my-notifications": "Meine Benachrichtigungen",
   "name": "Name",
+  "name-contains-invalid-characters": "Name enthält ungültige Zeichen",
   "name-length-error": "Fehler bei der Namenslänge, bitte verwenden Sie einen Namen zwischen 1 und 32 Zeichen.",
   "name-required": "Name ist erforderlich",
   "need-more-contact-us": "Brauchen Sie mehr? Kontaktieren Sie uns für einen maßgeschneiderten Plan",

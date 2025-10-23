@@ -520,6 +520,7 @@
   "more-version-storage": "もっと多くのバージョンストレージ",
   "my-notifications": "私の通知",
   "name": "名前",
+  "name-contains-invalid-characters": "名前に無効な文字が含まれています",
   "name-length-error": "名前の長さエラー、1から32文字の間で名前を使用してください",
   "name-required": "名前が必要です",
   "need-more-contact-us": "もっと必要ですか？カスタムプランについてはお問い合わせください。",

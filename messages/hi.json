@@ -520,6 +520,7 @@
   "more-version-storage": "अधिक संस्करण भंडारण",
   "my-notifications": "मेरी सूचनाएं",
   "name": "नाम",
+  "name-contains-invalid-characters": "नाम में अमान्य वर्ण हैं",
   "name-length-error": "नाम की लंबाई में त्रुटि, कृपया 1 से 32 वर्णों के बीच का नाम उपयोग करें",
   "name-required": "नाम आवश्यक है",
   "need-more-contact-us": "अधिक चाहिए? हमसे संपर्क करें तैयार की गई योजना के लिए",
