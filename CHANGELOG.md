@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.34.112 (2025-10-23)
+
+
+### Bug Fixes
+
+* stats ([8b90449](https://github.com/Cap-go/capgo/commit/8b90449a897e040b2829865ad2eb9e797029f58f))
+
 ### 12.34.111 (2025-10-23)
 
 ### 12.34.110 (2025-10-23)
