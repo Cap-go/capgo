@@ -33,6 +33,7 @@
         "head_sampling_rate": 0.001
       },
       "routes": [
+        // No special domain to ease clients who allow specific domains only
         {
           "pattern": "api.capgo.app/files*",
           "zone_name": "capgo.app"
