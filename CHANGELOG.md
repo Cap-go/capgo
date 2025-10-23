@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.34.109 (2025-10-23)
+
+
+### Bug Fixes
+
+* ensure less query goes to d1 storeapp and are defer ([2a5daa4](https://github.com/Cap-go/capgo/commit/2a5daa468d1fbb872b2a90c6aff299603ba62668))
+
 ### 12.34.108 (2025-10-23)
 
 
