@@ -1,8 +1,8 @@
 import type { Database } from '../src/types/supabase.types.ts'
 import { randomUUID } from 'node:crypto'
 
-import { ALLOWED_STATS_ACTIONS } from 'supabase/functions/_backend/plugins/stats_actions.ts'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { ALLOWED_STATS_ACTIONS } from '../supabase/functions/_backend/plugins/stats_actions.ts'
 import { APP_NAME, BASE_URL, createAppVersions, getBaseData, getSupabaseClient, getVersionFromAction, headers, resetAndSeedAppData, resetAndSeedAppDataStats, resetAppData, resetAppDataStats } from './test-utils.ts'
 
 const id = randomUUID()
