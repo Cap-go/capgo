@@ -33,7 +33,7 @@ export async function onPremStats(c: Context, app_id: string, action: string, de
 
   // save stats of unknow sources in our analytic DB
   await createStatsLogsExternal(c, device.app_id, device.device_id, 'get', device.version_name)
-  cloudlog({ requestId: c.get('requestId'), message: 'App is external', app_id: device.app_id, country: (c.req.raw as any)?.cf?.country })
+  cloudlog({ requestId: c.get('requestId'), message: 'App is external', app_id: device.app_id, country: (c.req.raw as any)?.cf?.country, user_agent: c.req.headers.get('user-agent') })
   return simpleError200(c, 'app_not_found', 'App not found')
 }
 
