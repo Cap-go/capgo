@@ -275,7 +275,7 @@
           "custom_domain": true
         },
         {
-          "pattern": "api.preprod.usecapgo.com",
+          "pattern": "plugin.preprod.usecapgo.com",
           "custom_domain": true
         }
       ],
