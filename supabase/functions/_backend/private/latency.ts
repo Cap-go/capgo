@@ -3,7 +3,7 @@ import { getRuntimeKey } from 'hono/adapter'
 import { Hono } from 'hono/tiny'
 import { BRES, simpleError } from '../utils/hono.ts'
 import { cloudlog } from '../utils/loggin.ts'
-import { closeClient, getPgClient, selectOne } from '../utils/pg.ts'
+import { closeClient, getDrizzleClient, getPgClient, selectOne } from '../utils/pg.ts'
 import { getDrizzleClientD1, selectOneD1 } from '../utils/pg_d1.ts'
 import { existInEnv } from '../utils/utils.ts'
 
@@ -27,7 +27,8 @@ app.get('/', async (c) => {
     cloudlog({ requestId: c.get('requestId'), message: 'Using Supabase DB URL' })
   }
   const pgClient = getPgClient(c)
-  const res = await selectOne(pgClient as any)
+  const db = getDrizzleClient(pgClient)
+  const res = await selectOne(db)
 
   closeClient(c, pgClient)
   if (!res)
