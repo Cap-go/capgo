@@ -363,7 +363,7 @@ export async function updateWithPG(
 
 export async function update(c: Context, body: AppInfos) {
   const isV2 = getIsV2(c)
-  const pgClient = isV2 ? null : getPgClient(c)
+  const pgClient = isV2 ? null : getPgClient(c, true) // READ-ONLY: writes use SDK, not Drizzle
 
   const drizzlePg = pgClient ? getDrizzleClient(pgClient) : (null as any)
   // Lazily create D1 client inside updateWithPG when actually used

@@ -144,7 +144,7 @@ app.post('/', async (c) => {
     throw simpleRateLimit(body)
   }
   const isV2 = getIsV2(c)
-  const pgClient = isV2 ? null : getPgClient(c)
+  const pgClient = isV2 ? null : getPgClient(c, true) // READ-ONLY: writes use SDK, not Drizzle
 
   const bodyParsed = parsePluginBody<AppStats>(c, body, jsonRequestSchema)
   const res = await post(c, isV2 ? getDrizzleClientD1Session(c) : getDrizzleClient(pgClient!), !!isV2, bodyParsed)
