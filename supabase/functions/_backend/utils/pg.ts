@@ -64,9 +64,14 @@ export function getDatabaseURL(c: Context): string {
   }
 
   // Fallback to direct database connection for EU, AF, AN and unknown continents
-  c.header('X-Database-Source', 'direct')
-  if (existInEnv(c, 'CUSTOM_SUPABASE_DB_URL'))
+
+  if (existInEnv(c, 'CUSTOM_SUPABASE_DB_URL')) {
+    c.header('X-Database-Source', 'custom-url')
     return getEnv(c, 'CUSTOM_SUPABASE_DB_URL')
+  }
+  else {
+    c.header('X-Database-Source', 'direct')
+  }
 
   return getEnv(c, 'SUPABASE_DB_URL')
 }
