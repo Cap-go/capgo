@@ -520,15 +520,15 @@ onUnmounted(() => {
               </div>
             </div>
             <div v-if="i === 0" class="pt-6 mt-6 border-t border-gray-200 dark:border-gray-700">
-              <h3 class="text-lg font-semibold text-gray-900 font-pj dark:text-gray-100">
+              <h3 class="text-lg font-semibold text-gray-900 font-pj">
                 {{ t('onboarding-invite-option-title') }}
               </h3>
-              <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">
+              <p class="mt-2 text-sm text-gray-600">
                 {{ t('onboarding-invite-option-subtitle') }}
               </p>
               <button
                 type="button"
-                class="inline-flex items-center px-4 py-2 mt-4 text-sm font-semibold transition-colors duration-200 rounded-md bg-muted-blue-50 text-muted-blue-800 hover:bg-muted-blue-100 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-muted-blue-500 dark:bg-slate-800 dark:text-muted-blue-100 dark:hover:bg-slate-700"
+                class="inline-flex items-center px-4 py-2 mt-4 text-sm font-semibold transition-colors duration-200 rounded-md bg-muted-blue-50 text-muted-blue-800 hover:bg-muted-blue-100 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-muted-blue-500"
                 @click="openInviteDialog"
               >
                 {{ t('onboarding-invite-option-cta') }}
