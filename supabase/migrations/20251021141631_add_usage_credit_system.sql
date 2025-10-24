@@ -383,8 +383,6 @@ GROUP BY org_id;
 
 COMMENT ON VIEW public.usage_credit_balances IS 'Aggregated balance view per org: total credits granted, remaining unexpired credits, and the closest upcoming expiry.';
 
-GRANT SELECT ON public.usage_credit_balances TO anon;
-GRANT SELECT ON public.usage_credit_balances TO authenticated;
 GRANT SELECT ON public.usage_credit_balances TO service_role;
 
 GRANT EXECUTE ON FUNCTION public.calculate_credit_cost(public.credit_metric_type, numeric) TO service_role;
