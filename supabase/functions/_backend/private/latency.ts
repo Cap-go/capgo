@@ -4,7 +4,7 @@ import { Hono } from 'hono/tiny'
 import { BRES, simpleError } from '../utils/hono.ts'
 import { cloudlog } from '../utils/loggin.ts'
 import { closeClient, getDrizzleClient, getPgClient, selectOne } from '../utils/pg.ts'
-import { getDrizzleClientD1, selectOneD1 } from '../utils/pg_d1.ts'
+import { getDrizzleClientD1Session, selectOneD1 } from '../utils/pg_d1.ts'
 import { existInEnv } from '../utils/utils.ts'
 
 export const app = new Hono<MiddlewareKeyVariables>()
@@ -13,7 +13,7 @@ app.get('/', async (c) => {
   cloudlog({ requestId: c.get('requestId'), message: 'Latency check' })
   if (getRuntimeKey() === 'workerd' && existInEnv(c, 'DB_REPLICATE')) {
     cloudlog({ requestId: c.get('requestId'), message: 'Using D1 for workerd runtime' })
-    const pgClient = getDrizzleClientD1(c)
+    const pgClient = getDrizzleClientD1Session(c)
     const res = await selectOneD1(pgClient)
 
     if (!res)
