@@ -85,6 +85,12 @@ jobs:
         env:
           VITE_VAPID_KEY: ${{ secrets.VITE_VAPID_KEY }}
           VITE_FIREBASE_CONFIG: ${{ secrets.VITE_FIREBASE_CONFIG }}
+      - name: Generate AI changelog
+        id: changelog
+        uses: mistricky/ccc@v0.2.2
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
       - name: Publish CF webapp
         run: bun run deploy:cloudflare:webapp:${{ env.ENV }}
         env:
@@ -98,9 +104,16 @@ jobs:
         id: create_release
         uses: softprops/action-gh-release@v2
         with:
-          generate_release_notes: true
-          # body: ${{ steps.create_release.outputs. }}
-          name: ${{ github.ref_name }}
+          body: |
+            ## 🆕 Changelog
+
+            ${{ steps.changelog.outputs.result }}
+
+            ---
+
+            🔗 **Full Changelog**: https://github.com/${{ github.repository }}/compare/${{ steps.changelog.outputs.from_tag }}...${{ steps.changelog.outputs.to_tag }}
+          make_latest: true
+          token: "${{ secrets.PERSONAL_ACCESS_TOKEN }}"
           prerelease: ${{ contains(github.ref, '-alpha.') }}
 
   deploy_api:
