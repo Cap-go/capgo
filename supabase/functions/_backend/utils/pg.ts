@@ -4,6 +4,7 @@ import { alias } from 'drizzle-orm/pg-core'
 import { drizzle } from 'drizzle-orm/postgres-js'
 import postgres from 'postgres'
 import { backgroundTask, existInEnv, getEnv } from '../utils/utils.ts'
+import { getClientDbRegion } from './geolocation.ts'
 import { cloudlog, cloudlogErr } from './loggin.ts'
 import * as schema from './postgress_schema.ts'
 
@@ -42,17 +43,16 @@ export function selectOne(drizzleClient: ReturnType<typeof getDrizzleClient>) {
 }
 
 export function getDatabaseURL(c: Context): string {
-  const clientContinent = (c.req.raw as Request & { cf?: { continent?: string } })?.cf?.continent
-  cloudlog({ requestId: c.get('requestId'), message: 'clientContinent', clientContinent })
+  const dbRegion = getClientDbRegion(c)
 
-  // Check for Hyperdrive replicas
-  // Use Singapore replica for AS (Asia) and OC (Oceania)
-  if (existInEnv(c, 'HYPERDRIVE_DB_SG') && (clientContinent === 'AS' || clientContinent === 'OC')) {
+  // Check for Hyperdrive replicas (3 regions: AS, US, EU)
+  // Asia region
+  if (existInEnv(c, 'HYPERDRIVE_DB_SG') && dbRegion === 'AS') {
     c.header('X-Database-Source', 'hyperdrive-sg')
     return (getEnv(c, 'HYPERDRIVE_DB_SG') as unknown as Hyperdrive).connectionString
   }
-  // Use US replica only for NA (North America) and SA (South America)
-  if (existInEnv(c, 'HYPERDRIVE_DB_US') && (clientContinent === 'NA' || clientContinent === 'SA')) {
+  // US region
+  if (existInEnv(c, 'HYPERDRIVE_DB_US') && dbRegion === 'US') {
     c.header('X-Database-Source', 'hyperdrive-us')
     return (getEnv(c, 'HYPERDRIVE_DB_US') as unknown as Hyperdrive).connectionString
   }
@@ -63,16 +63,26 @@ export function getDatabaseURL(c: Context): string {
     return (getEnv(c, 'HYPERDRIVE_DB') as unknown as Hyperdrive).connectionString
   }
 
-  // Fallback to direct database connection for EU, AF, AN and unknown continents
+  // Custom Supabase pooler with geo-routing (3 regions: AS, US, EU)
+  // Asia region
+  if (existInEnv(c, 'CUSTOM_SUPABASE_DB_URL_SG') && dbRegion === 'AS') {
+    c.header('X-Database-Source', 'sb_pooler_sg')
+    return getEnv(c, 'CUSTOM_SUPABASE_DB_URL_SG')
+  }
 
+  // US region
+  if (existInEnv(c, 'CUSTOM_SUPABASE_DB_URL_US') && dbRegion === 'US') {
+    c.header('X-Database-Source', 'sb_pooler_us')
+    return getEnv(c, 'CUSTOM_SUPABASE_DB_URL_US')
+  }
+
+  // EU region (fallback for Europe/Africa and unknown regions)
   if (existInEnv(c, 'CUSTOM_SUPABASE_DB_URL')) {
-    c.header('X-Database-Source', 'custom-url')
+    c.header('X-Database-Source', 'sb_pooler_main')
     return getEnv(c, 'CUSTOM_SUPABASE_DB_URL')
   }
-  else {
-    c.header('X-Database-Source', 'direct')
-  }
 
+  c.header('X-Database-Source', 'direct')
   return getEnv(c, 'SUPABASE_DB_URL')
 }
 

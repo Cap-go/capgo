@@ -150,7 +150,7 @@ export function createHono(functionName: string, version: string, sentryDsn?: st
   }
   appGlobal.use('*', (c, next): Promise<any> => {
     // ADD HEADER TO IDENTIFY WORKER SOURCE
-    c.header('X-Worker-Source', getEnv(c, 'ENV_NAME') ?? functionName)
+    c.header('X-Worker-Source', getEnv(c, 'ENV_NAME') || functionName)
     return next()
   })
 
