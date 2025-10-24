@@ -303,7 +303,22 @@ async function archive_queue_messages(c: Context, sql: ReturnType<typeof getPgCl
     `
   }
   catch (error) {
-    throw simpleError('error_archiving_queue_messages', 'Error archiving queue messages', { msgIds, queueName }, error)
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    const errorStack = error instanceof Error ? error.stack : undefined
+    const msgIdsTruncated = msgIds.length > 20 ? msgIds.slice(0, 20) : msgIds
+
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: `[${queueName}] Failed to archive ${msgIds.length} messages`,
+      error,
+      errorMessage,
+      errorStack,
+      queueName,
+      msgIds: msgIdsTruncated,
+      msgIdsLength: msgIds.length,
+    })
+
+    throw simpleError('error_archiving_queue_messages', `Error archiving queue messages: ${errorMessage}`, { msgIds: msgIdsTruncated, msgIdsLength: msgIds.length, queueName, errorMessage }, error)
   }
 }
 
