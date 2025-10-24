@@ -37,6 +37,10 @@ function buildPlanValidationExpressionV2(
   )`
 }
 
+export function selectOneD1(drizzleClient: ReturnType<typeof getDrizzleClientD1>) {
+  return drizzleClient.run(sql`select 1`)
+}
+
 export function getAliasV2() {
   const versionAlias = aliasV2(schemaV2.app_versions, 'version')
   const channelDevicesAlias = aliasV2(schemaV2.channel_devices, 'channel_devices')
@@ -58,19 +62,29 @@ export function parseManifestEntries(c: Context, data: any, source: string) {
   return result
 }
 
+export function getPgClientD1(c: Context, session: string = 'first-unconstrained') {
+  if (!existInEnv(c, 'DB_REPLICATE')) {
+    // Server/configuration error: surface as structured HTTP error
+    throw quickError(500, 'missing_binding', 'DB_REPLICATE is not set', { binding: 'DB_REPLICATE' })
+  }
+  return session ? c.env.DB_REPLICATE.withSession(session) : c.env.DB_REPLICATE
+}
+
 export function getDrizzleClientD1(c: Context) {
   if (!existInEnv(c, 'DB_REPLICATE')) {
     // Server/configuration error: surface as structured HTTP error
     throw quickError(500, 'missing_binding', 'DB_REPLICATE is not set', { binding: 'DB_REPLICATE' })
   }
-  return drizzleD1(c.env.DB_REPLICATE)
+  c.header('X-Database-Source', 'd1')
+  return drizzleD1(getPgClientD1(c, undefined))
 }
 
 export function getDrizzleClientD1Session(c: Context) {
   if (!existInEnv(c, 'DB_REPLICATE')) {
     throw quickError(500, 'missing_binding', 'DB_REPLICATE is not set', { binding: 'DB_REPLICATE' })
   }
-  const session = c.env.DB_REPLICATE.withSession('first-unconstrained')
+  c.header('X-Database-Source', 'd1-session')
+  const session = getPgClientD1(c)
   return drizzleD1(session)
 }
 

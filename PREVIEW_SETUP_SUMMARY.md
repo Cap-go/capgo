@@ -2,7 +2,9 @@
 
 ## ✅ Completed Implementation
 
-I've successfully set up a **simplified** Cloudflare preview deployment system for Capgo that automatically creates preview environments for every pull request using **production configuration**.
+I've successfully set up a **simplified** Cloudflare preview deployment system
+for Capgo that automatically creates preview environments for every pull request
+using **production configuration**.
 
 ### 🏗️ What Was Created
 
@@ -30,7 +32,7 @@ When you create a pull request:
    - Deploys to: `https://capgo-preview-{PR_NUMBER}.pages.dev`
 
 2. **Worker Deployment**
-   - Takes existing production `wrangler.json` configs
+   - Takes existing production `wrangler.jsonc` configs
    - Modifies only the worker name and removes custom domains
    - Deploys to:
      - `https://capgo-api-preview-{PR_NUMBER}.workers.dev`
@@ -39,13 +41,14 @@ When you create a pull request:
 
 3. **Configuration**
    - **Same** database connections as production
-   - **Same** environment variables as production  
+   - **Same** environment variables as production
    - **Same** secrets and API keys as production
    - **Only difference**: Preview URLs instead of custom domains
 
 ### 🔧 Required Setup
 
 To activate the system, ensure these GitHub secrets are configured:
+
 - `CLOUDFLARE_API_TOKEN` - Token with Pages and Workers permissions
 - `CLOUDFLARE_ACCOUNT_ID` - Your Cloudflare account ID
 - `VITE_VAPID_KEY` - Existing Vapid key for PWA
@@ -61,7 +64,9 @@ To activate the system, ensure these GitHub secrets are configured:
 
 ### ⚠️ Important Considerations
 
-**Production Database Usage**: Preview environments connect to the same databases as production, which means:
+**Production Database Usage**: Preview environments connect to the same
+databases as production, which means:
+
 - ✅ Realistic testing with real data
 - ⚠️ Preview changes can affect production data
 - 🔒 Test carefully on preview environments
@@ -70,8 +75,10 @@ To activate the system, ensure these GitHub secrets are configured:
 ### 📋 What Was Removed/Simplified
 
 Compared to the initial implementation:
+
 - ❌ No custom preview configurations in `configs.json`
-- ❌ No custom preview scripts (`generate_preview_config.mjs`, `cleanup_preview.mjs`)
+- ❌ No custom preview scripts (`generate_preview_config.mjs`,
+  `cleanup_preview.mjs`)
 - ❌ No custom npm scripts for preview management
 - ❌ No preview-specific environment variables
 - ✅ Simple production config modification approach
@@ -84,12 +91,15 @@ bun mobile
 
 # Worker config transformation (automatic)
 jq '.name = "capgo-api-preview-123" | .workers_dev = true | del(.route) | del(.routes)' \
-  cloudflare_workers/api/wrangler.json > /tmp/wrangler-api-preview.json
+  cloudflare_workers/api/wrangler.jsonc > /tmp/wrangler-api-preview.json
 
 # Deploy to preview URLs
 bunx wrangler deploy --config /tmp/wrangler-api-preview.json
 ```
 
-The system is now **much simpler** and ready to use! Create a pull request to see it in action - it will deploy your changes using the exact same configuration as production, just to preview URLs.
+The system is now **much simpler** and ready to use! Create a pull request to
+see it in action - it will deploy your changes using the exact same
+configuration as production, just to preview URLs.
 
-This approach provides the most realistic testing environment possible while keeping the implementation extremely simple and maintainable.
+This approach provides the most realistic testing environment possible while
+keeping the implementation extremely simple and maintainable.

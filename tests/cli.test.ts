@@ -10,14 +10,20 @@ describe('tests CLI upload', () => {
   const APPNAME_one = `com.cli_${id_one}`
 
   beforeAll(async () => {
-    await resetAndSeedAppData(APPNAME_one)
-    await prepareCli(APPNAME_one)
+    // Run setup in parallel
+    await Promise.all([
+      resetAndSeedAppData(APPNAME_one),
+      prepareCli(APPNAME_one),
+    ])
   })
 
   afterAll(async () => {
-    await cleanupCli(APPNAME_one)
-    await resetAppData(APPNAME_one)
-    await resetAppDataStats(APPNAME_one)
+    // Run cleanup in parallel
+    await Promise.all([
+      cleanupCli(APPNAME_one),
+      resetAppData(APPNAME_one),
+      resetAppDataStats(APPNAME_one),
+    ])
   })
 
   // Essential upload tests only
@@ -52,26 +58,29 @@ describe.concurrent('tests CLI upload options in parallel', () => {
   const prepareApp = async () => {
     const id = randomUUID()
     const APPNAME = `com.cli_ccr_${id}`
-    await resetAndSeedAppData(APPNAME)
-    await prepareCli(APPNAME)
+    // Run DB and file setup in parallel
+    await Promise.all([
+      resetAndSeedAppData(APPNAME),
+      prepareCli(APPNAME),
+    ])
     return { id, APPNAME }
   }
 
   beforeAll(async () => {
-    // Setup shared app
-    await resetAndSeedAppData(SHARED_APPNAME)
-    await prepareCli(SHARED_APPNAME)
-
-    // Pre-create only essential apps (reduced further)
+    // Pre-create only essential apps in parallel
     const promises = []
 
-    // Only 1 app for file tests
-    for (let i = 0; i < 1; i++) {
-      promises.push(prepareApp().then(app => fileTestApps.push(app)))
-    }
+    // Setup shared app with its specific name
+    promises.push(Promise.all([
+      resetAndSeedAppData(SHARED_APPNAME),
+      prepareCli(SHARED_APPNAME),
+    ]))
 
-    // Create enough API test apps to handle retries
-    for (let i = 0; i < 6; i++) {
+    // Only 1 app for file tests
+    promises.push(prepareApp().then(app => fileTestApps.push(app)))
+
+    // Reduced from 6 to 2 - just what we actually need
+    for (let i = 0; i < 2; i++) {
       promises.push(prepareApp().then(app => apiTestApps.push(app)))
     }
 
@@ -81,11 +90,14 @@ describe.concurrent('tests CLI upload options in parallel', () => {
   afterAll(async () => {
     const allApps = [SHARED_APPNAME, ...usedApps]
 
-    for (const appName of allApps) {
-      await cleanupCli(appName)
-      await resetAppData(appName)
-      await resetAppDataStats(appName)
-    }
+    // Parallel cleanup
+    await Promise.all(allApps.map(async (appName) => {
+      await Promise.all([
+        cleanupCli(appName),
+        resetAppData(appName),
+        resetAppDataStats(appName),
+      ])
+    }))
   })
 
   // Essential file modification tests (only most critical)

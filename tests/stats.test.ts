@@ -1,8 +1,8 @@
 import type { Database } from '../src/types/supabase.types.ts'
 import { randomUUID } from 'node:crypto'
 
-import { ALLOWED_STATS_ACTIONS } from 'supabase/functions/_backend/plugins/stats_actions.ts'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { ALLOWED_STATS_ACTIONS } from '../supabase/functions/_backend/plugins/stats_actions.ts'
 import { APP_NAME, BASE_URL, createAppVersions, getBaseData, getSupabaseClient, getVersionFromAction, headers, resetAndSeedAppData, resetAndSeedAppDataStats, resetAppData, resetAppDataStats } from './test-utils.ts'
 
 const id = randomUUID()
@@ -143,58 +143,61 @@ describe('[POST] /stats', () => {
     await getSupabaseClient().from('devices').delete().eq('device_id', uuid).eq('app_id', APP_NAME_STATS)
   })
 
-  it('test all possible stats actions', async () => {
-    const uuid = randomUUID().toLowerCase()
-    const baseData = getBaseData(APP_NAME_STATS) as StatsPayload
-    baseData.device_id = uuid
-
-    // Test all possible actions
-    let versionName = ''
+  // Test each stats action concurrently with separate devices for maximum parallelization
+  describe.concurrent('test all possible stats actions', () => {
     for (const action of ALLOWED_STATS_ACTIONS) {
-      baseData.action = action
-      baseData.version_build = getVersionFromAction(action)
-      const version = await createAppVersions(baseData.version_build, APP_NAME_STATS)
-      baseData.version_name = version.name
-      versionName = version.name
+      it.concurrent(`should handle ${action} action`, async () => {
+        const uuid = randomUUID().toLowerCase()
+        const baseData = getBaseData(APP_NAME_STATS) as StatsPayload
+        baseData.device_id = uuid
+        baseData.action = action
+        baseData.version_build = getVersionFromAction(action)
 
-      baseData.version_code = '2'
-      baseData.version_os = '16.1'
-      baseData.custom_id = 'test2'
+        const version = await createAppVersions(baseData.version_build, APP_NAME_STATS)
+        baseData.version_name = version.name
+        baseData.version_code = '2'
+        baseData.version_os = '16.1'
+        baseData.custom_id = 'test2'
 
-      const response = await postStats(baseData)
-      const responseData = await response.json<StatsRes>()
-      expect(response.status).toBe(200)
-      expect(responseData.status).toBe('ok')
+        const response = await postStats(baseData)
+        const responseData = await response.json<StatsRes>()
+        expect(response.status).toBe(200)
+        expect(responseData.status).toBe('ok')
 
-      // Verify stats entry
-      const { error: statsError, data: statsData } = await getSupabaseClient()
-        .from('stats')
-        .select()
-        .eq('device_id', uuid)
-        .eq('app_id', APP_NAME_STATS)
-        .eq('action', action)
-        .single()
+        // Verify stats entry
+        const { error: statsError, data: statsData } = await getSupabaseClient()
+          .from('stats')
+          .select()
+          .eq('device_id', uuid)
+          .eq('app_id', APP_NAME_STATS)
+          .eq('action', action)
+          .single()
 
-      expect(statsError).toBeNull()
-      expect(statsData).toBeTruthy()
-      expect(statsData?.action).toBe(action)
-      expect(statsData?.device_id).toBe(uuid)
+        expect(statsError).toBeNull()
+        expect(statsData).toBeTruthy()
+        expect(statsData?.action).toBe(action)
+        expect(statsData?.device_id).toBe(uuid)
+
+        // Verify device state
+        const { error: deviceError, data: deviceData } = await getSupabaseClient()
+          .from('devices')
+          .select()
+          .eq('device_id', uuid)
+          .eq('app_id', APP_NAME_STATS)
+          .single()
+
+        expect(deviceError).toBeNull()
+        expect(deviceData).toBeTruthy()
+        expect(deviceData?.version_build).toBe(baseData.version_build)
+        expect(deviceData?.version_name).toBe(version.name)
+        expect(deviceData?.os_version).toBe('16.1')
+        expect(deviceData?.plugin_version).toBe('7.0.0')
+        expect(deviceData?.custom_id).toBe('test2')
+
+        // Clean up
+        await getSupabaseClient().from('devices').delete().eq('device_id', uuid).eq('app_id', APP_NAME_STATS)
+      })
     }
-
-    // console.log({ versionId, uuid })
-    // Verify final device state
-    const lastAction = ALLOWED_STATS_ACTIONS[ALLOWED_STATS_ACTIONS.length - 1]
-    const { error: deviceError, data: deviceData } = await getSupabaseClient().from('devices').select().eq('device_id', uuid).eq('app_id', APP_NAME_STATS).single()
-    expect(deviceError).toBeNull()
-    expect(deviceData).toBeTruthy()
-    expect(deviceData?.version_build).toBe(getVersionFromAction(lastAction))
-    expect(deviceData?.version_name).toBe(versionName)
-    expect(deviceData?.os_version).toBe('16.1')
-    expect(deviceData?.plugin_version).toBe('7.0.0')
-    expect(deviceData?.custom_id).toBe('test2')
-
-    // Clean up
-    await getSupabaseClient().from('devices').delete().eq('device_id', uuid).eq('app_id', APP_NAME_STATS)
   })
 
   it('app that does not exist', async () => {

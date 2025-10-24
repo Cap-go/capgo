@@ -26,5 +26,5 @@ jobs:
         run: npm run lint -- --fix
       - name: Lint backend
         id: lint_code_backend
-        run: npm run lint-backend -- --fix
+        run: npm run lint:backend -- --fix
       - uses: autofix-ci/action@635ffb0c9798bd160680f18fd73371e355b85f27

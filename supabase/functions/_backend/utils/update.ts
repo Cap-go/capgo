@@ -19,7 +19,7 @@ import { sendNotifOrg } from './notifications.ts'
 import { closeClient, getAppOwnerPostgres, getDrizzleClient, getPgClient, requestInfosPostgres } from './pg.ts'
 import { getAppOwnerPostgresV2, getDrizzleClientD1Session, requestInfosPostgresV2 } from './pg_d1.ts'
 import { s3 } from './s3.ts'
-import { createStatsBandwidth, createStatsMau, createStatsVersion, opnPremStats, sendStatsAndDevice } from './stats.ts'
+import { createStatsBandwidth, createStatsMau, createStatsVersion, onPremStats, sendStatsAndDevice } from './stats.ts'
 import { backgroundTask, existInEnv, fixSemver, isInternalVersionName } from './utils.ts'
 
 const PLAN_LIMIT: Array<'mau' | 'bandwidth' | 'storage'> = ['mau', 'bandwidth']
@@ -45,7 +45,7 @@ export function resToVersion(plugin_version: string, signedURL: string, version:
   return res
 }
 
-async function returnV2orV1<T>(
+function returnV2orV1<T>(
   c: Context,
   isV2: boolean,
   runV1: () => Promise<T>,
@@ -108,7 +108,7 @@ export async function updateWithPG(
     updated_at: new Date().toISOString(),
   }
   if (!appOwner) {
-    return opnPremStats(c, app_id, 'get', device)
+    return onPremStats(c, app_id, 'get', device)
   }
   if (body.version_build === 'unknown') {
     return simpleError200(c, 'unknown_version_build', 'Version build is unknown, cannot proceed with update', { body })
@@ -368,7 +368,7 @@ export async function update(c: Context, body: AppInfos) {
   const drizzlePg = pgClient ? getDrizzleClient(pgClient) : (null as any)
   // Lazily create D1 client inside updateWithPG when actually used
   const res = await updateWithPG(c, body, () => getDrizzleClientD1Session(c), drizzlePg, !!isV2)
-  if (isV2 && pgClient)
+  if (!isV2 && pgClient)
     await closeClient(c, pgClient)
   return res
 }

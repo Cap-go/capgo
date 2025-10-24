@@ -1,10 +1,10 @@
-import type { Router } from 'vue-router/auto'
 // register vue composition api globally
+import type { Router } from 'vue-router'
 import { CapacitorUpdater } from '@capgo/capacitor-updater'
 
 import { setupLayouts } from 'virtual:generated-layouts'
 import { createApp } from 'vue'
-import { createRouter, createWebHistory } from 'vue-router/auto'
+import { createRouter, createWebHistory } from 'vue-router'
 import { routes } from 'vue-router/auto-routes'
 import { posthogLoader } from '~/services/posthog'
 import { getLocalConfig } from '~/services/supabase'

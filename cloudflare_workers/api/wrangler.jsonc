@@ -1,77 +1,92 @@
 {
-  "name": "capgo_api-prod",
-  "routes": [
-    {
-      "pattern": "api.capgo.app",
-      "custom_domain": true
-    },
-    {
-      "pattern": "api.usecapgo.com",
-      "custom_domain": true
-    }
-  ],
-  "compatibility_date": "2025-04-01",
+  "name": "capgo_api",
+  "logpush": true,
+  "compatibility_date": "2025-09-15",
   "main": "./index.ts",
   "compatibility_flags": [
     "nodejs_compat_v2",
     "nodejs_compat_populate_process_env"
   ],
-  "logpush": true,
   "placement": {
     "mode": "smart"
   },
   "workers_dev": false,
-  "observability": {
-    "enabled": true,
-    "head_sampling_rate": 1
-  },
   "upload_source_maps": true,
-  "analytics_engine_datasets": [
-    {
-      "binding": "DEVICE_USAGE",
-      "dataset": "device_usage"
-    },
-    {
-      "binding": "BANDWIDTH_USAGE",
-      "dataset": "bandwidth_usage"
-    },
-    {
-      "binding": "VERSION_USAGE",
-      "dataset": "version_usage"
-    },
-    {
-      "binding": "APP_LOG",
-      "dataset": "app_log"
-    },
-    {
-      "binding": "APP_LOG_EXTERNAL",
-      "dataset": "app_log_external"
-    }
-  ],
-  "d1_databases": [
-    {
-      "binding": "DB_DEVICES",
-      "database_name": "capgo_prod_devices",
-      "database_id": "2510b55c-d6a2-4595-a2a5-d9aca82a3753"
-    },
-    {
-      "binding": "DB_STOREAPPS",
-      "database_name": "capgo_prod_storeapps",
-      "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
-    },
-    {
-      "binding": "DB_REPLICATE",
-      "database_name": "capgo_prod_replicate",
-      "database_id": "7f267d86-f4f7-49f5-9622-e44373aa00dc"
-    }
-  ],
   "env": {
+    "prod": {
+      "name": "capgo_api-prod",
+      "vars": {
+        "ENV_NAME": "capgo_api-prod"
+      },
+      "routes": [
+        {
+          "pattern": "api.capgo.app",
+          "custom_domain": true
+        },
+        {
+          "pattern": "api.usecapgo.com",
+          "custom_domain": true
+        }
+      ],
+      "observability": {
+        "enabled": true,
+        "head_sampling_rate": 1
+      },
+      "analytics_engine_datasets": [
+        {
+          "binding": "DEVICE_USAGE",
+          "dataset": "device_usage"
+        },
+        {
+          "binding": "BANDWIDTH_USAGE",
+          "dataset": "bandwidth_usage"
+        },
+        {
+          "binding": "VERSION_USAGE",
+          "dataset": "version_usage"
+        },
+        {
+          "binding": "APP_LOG",
+          "dataset": "app_log"
+        },
+        {
+          "binding": "APP_LOG_EXTERNAL",
+          "dataset": "app_log_external"
+        }
+      ],
+      "d1_databases": [
+        {
+          "binding": "DB_DEVICES",
+          "database_name": "capgo_prod_devices",
+          "database_id": "2510b55c-d6a2-4595-a2a5-d9aca82a3753"
+        },
+        {
+          "binding": "DB_STOREAPPS",
+          "database_name": "capgo_prod_storeapps",
+          "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
+        },
+        {
+          "binding": "DB_REPLICATE",
+          "database_name": "capgo_prod_replicate",
+          "database_id": "7f267d86-f4f7-49f5-9622-e44373aa00dc"
+        }
+      ]
+    },
     "preprod": {
       "name": "capgo_api-preprod",
-      "routes": {
-        "pattern": "api-preprod.capgo.app",
-        "custom_domain": true
+      "vars": {
+        "ENV_NAME": "capgo_api-preprod"
       },
+      "routes": [
+        {
+          "pattern": "api.preprod.capgo.app",
+          "custom_domain": true
+        },
+        {
+          "pattern": "api.preprod.usecapgo.com",
+          "custom_domain": true
+        }
+      ],
       "observability": {
         "enabled": true
       },
@@ -117,10 +132,19 @@
     },
     "alpha": {
       "name": "capgo_api-alpha",
-      "routes": {
-        "pattern": "api-dev.capgo.app",
-        "custom_domain": true
+      "vars": {
+        "ENV_NAME": "capgo_api-alpha"
       },
+      "routes": [
+        {
+          "pattern": "api.dev.capgo.app",
+          "custom_domain": true
+        },
+        {
+          "pattern": "api.dev.usecapgo.com",
+          "custom_domain": true
+        }
+      ],
       "observability": {
         "enabled": true
       },

@@ -16,6 +16,10 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  appId: {
+    type: String,
+    default: '',
+  },
 })
 
 // Helper function to filter 30-day data to billing period
@@ -87,18 +91,42 @@ async function calculateStats() {
   // Create 30-day arrays
   const dailyCounts30Days = Array.from({ length: 30 }).fill(0) as number[]
 
-  // Use store for shared apps data
-  const dashboardAppsStore = useDashboardAppsStore()
-  await dashboardAppsStore.fetchApps()
-  appNames.value = dashboardAppsStore.appNames
+  // Determine target apps
+  const localAppNames: { [appId: string]: string } = {}
+  let targetAppIds: string[] = []
 
-  if (dashboardAppsStore.appIds.length === 0) {
+  if (props.appId) {
+    // Single app mode
+    targetAppIds = [props.appId]
+    try {
+      const { data: appRow } = await useSupabase()
+        .from('apps')
+        .select('name')
+        .eq('app_id', props.appId)
+        .single()
+      localAppNames[props.appId] = appRow?.name ?? props.appId
+    }
+    catch (error) {
+      console.error('Error fetching app name for bundle stats:', error)
+      localAppNames[props.appId] = props.appId
+    }
+    appNames.value = localAppNames
+  }
+  else {
+    // Multiple apps mode - use store for shared apps data
+    const dashboardAppsStore = useDashboardAppsStore()
+    await dashboardAppsStore.fetchApps()
+    targetAppIds = [...dashboardAppsStore.appIds]
+    appNames.value = dashboardAppsStore.appNames
+  }
+
+  if (targetAppIds.length === 0) {
     bundleData.value = dailyCounts30Days
     return
   }
 
   // Initialize data arrays for each app (30 days)
-  dashboardAppsStore.appIds.forEach((appId) => {
+  targetAppIds.forEach((appId) => {
     bundleDataByApp.value[appId] = Array.from({ length: 30 }).fill(0) as number[]
   })
 
@@ -108,7 +136,7 @@ async function calculateStats() {
     .select('created_at, app_id')
     .gte('created_at', last30DaysStart.toISOString())
     .lte('created_at', last30DaysEnd.toISOString())
-    .in('app_id', dashboardAppsStore.appIds)
+    .in('app_id', targetAppIds)
 
   const { data, error } = await query
 

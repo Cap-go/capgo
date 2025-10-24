@@ -10,8 +10,6 @@ import { app as credits } from '../../supabase/functions/_backend/private/credit
 import { app as devices_priv } from '../../supabase/functions/_backend/private/devices.ts'
 import { app as download_link } from '../../supabase/functions/_backend/private/download_link.ts'
 import { app as events } from '../../supabase/functions/_backend/private/events.ts'
-import { app as latency } from '../../supabase/functions/_backend/private/latency.ts'
-import { app as latency_drizzle } from '../../supabase/functions/_backend/private/latency_drizzle.ts'
 import { app as log_as } from '../../supabase/functions/_backend/private/log_as.ts'
 import { app as plans } from '../../supabase/functions/_backend/private/plans.ts'
 import { app as publicStats } from '../../supabase/functions/_backend/private/public_stats.ts'
@@ -48,9 +46,6 @@ appGlobal.route('/stats', stats_priv)
 appGlobal.route('/stripe_checkout', stripe_checkout)
 appGlobal.route('/stripe_portal', stripe_portal)
 appGlobal.route('/upload_link', upload_link)
-appGlobal.route('/latency', latency)
-appGlobal.route('/latency_drizzle', latency_drizzle)
-appGlobal.route('/latency_postres', latency)
 appGlobal.route('/events', events)
 
 export default handle(appGlobal)

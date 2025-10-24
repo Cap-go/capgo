@@ -3,7 +3,7 @@ import { createDecipheriv, createHash, publicDecrypt, randomUUID } from 'node:cr
 import { existsSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import AdmZip from 'adm-zip'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { cleanupCli, getSemver, prepareCli, runCli, tempFileFolder } from './cli-utils'
 import { getSupabaseClient, getUpdate, getUpdateBaseData, resetAndSeedAppData, resetAppData, resetAppDataStats, responseOk } from './test-utils'
 
@@ -43,24 +43,8 @@ describe.concurrent('test key generation', () => {
   })
 })
 
-describe('tests CLI encryption encrypt/upload/download/decrypt', () => {
-  const id = randomUUID()
-  const APPNAME = `com.cli_new_encryption_${id}`
-  let semver = getSemver()
-
-  beforeAll(async () => {
-    await resetAndSeedAppData(APPNAME)
-    await prepareCli(APPNAME)
-    // Create key once for all tests
-    await runCli(['key', 'create', '--force'], APPNAME, false, '')
-  })
-  afterAll(async () => {
-    await cleanupCli(APPNAME)
-    await resetAppData(APPNAME)
-    await resetAppDataStats(APPNAME)
-  })
-
-  async function testEncryption(publicKey: string, output2: string, skipUpdate = false) {
+describe.concurrent('tests CLI encryption encrypt/upload/download/decrypt', () => {
+  async function testEncryption(publicKey: string, output2: string, semver: string, appName: string, skipUpdate = false) {
     const checksum = output2.split('\n').find(line => line.includes('Checksum'))?.split(' ').at(-1) as string
     expect(checksum).toBeDefined()
     expect(checksum?.length).toBe(64)
@@ -70,7 +54,7 @@ describe('tests CLI encryption encrypt/upload/download/decrypt', () => {
       .from('app_versions')
       .select('*')
       .eq('name', semver)
-      .eq('app_id', APPNAME)
+      .eq('app_id', appName)
       .single()
       .throwOnError()
 
@@ -82,7 +66,7 @@ describe('tests CLI encryption encrypt/upload/download/decrypt', () => {
 
     if (!skipUpdate) {
     // let's not download the bundle
-      const baseData = getUpdateBaseData(APPNAME)
+      const baseData = getUpdateBaseData(appName)
       const response = await getUpdate(baseData)
       await responseOk(response, 'Update new bundle')
 
@@ -154,50 +138,98 @@ describe('tests CLI encryption encrypt/upload/download/decrypt', () => {
     }
   }
 
-  it('test create key', async () => {
-    const publicKeyFile = readFileSync(join(tempFileFolder(APPNAME), '.capgo_key_v2.pub'), 'utf-8')
-    expect(publicKeyFile).toBeTruthy()
-    expect(publicKeyFile).toContain('PUBLIC KEY')
+  it.concurrent('test upload bundle with auto encryption', async () => {
+    const id = randomUUID()
+    const APPNAME = `com.cli_new_encryption_auto_${id}`
+    let semver = getSemver()
+
+    await resetAndSeedAppData(APPNAME)
+    await prepareCli(APPNAME)
+
+    try {
+      // Create key
+      await runCli(['key', 'create', '--force'], APPNAME, false, '')
+
+      const publicKeyFile = readFileSync(join(tempFileFolder(APPNAME), '.capgo_key_v2.pub'), 'utf-8')
+      expect(publicKeyFile).toBeTruthy()
+      expect(publicKeyFile).toContain('PUBLIC KEY')
+
+      semver = getSemver(semver)
+      const output2 = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--ignore-checksum-check'], APPNAME, false)
+      expect(output2).toContain('Time to share your update to the world')
+      expect(output2).toContain('Encrypting your bundle with V2')
+
+      await testEncryption(publicKeyFile, output2, semver, APPNAME)
+    }
+    finally {
+      await cleanupCli(APPNAME)
+      await resetAppData(APPNAME)
+      await resetAppDataStats(APPNAME)
+    }
   })
 
-  it('test upload bundle with auto encryption ', async () => {
-    const publicKeyFile = readFileSync(join(tempFileFolder(APPNAME), '.capgo_key_v2.pub'), 'utf-8')
-    semver = getSemver(semver)
-    const output2 = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--ignore-checksum-check'], APPNAME, false)
-    expect(output2).toContain('Time to share your update to the world')
-    expect(output2).toContain('Encrypting your bundle with V2')
+  it.concurrent('test upload bundle with custom key data', async () => {
+    const id = randomUUID()
+    const APPNAME = `com.cli_new_encryption_keydata_${id}`
+    let semver = getSemver()
 
-    await testEncryption(publicKeyFile, output2)
+    await resetAndSeedAppData(APPNAME)
+    await prepareCli(APPNAME)
+
+    try {
+      // Create key
+      await runCli(['key', 'create', '--force'], APPNAME, false, '')
+
+      semver = getSemver(semver)
+      const privateKeyFile = readFileSync(join(tempFileFolder(APPNAME), '.capgo_key_v2'), 'utf-8')
+      // Fix: Write key data to a temporary file and use --key-v2 instead of --key-data-v2
+      const keyFilePath = join(tempFileFolder(APPNAME), 'temp_key_file')
+      writeFileSync(keyFilePath, privateKeyFile)
+
+      const output4 = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--ignore-checksum-check', '--key-v2', 'temp_key_file'], APPNAME, false)
+      expect(output4).toContain('Time to share your update to the world')
+      expect(output4).toContain('Encrypting your bundle with V2')
+
+      await testEncryption(privateKeyFile, output4, semver, APPNAME, true)
+    }
+    finally {
+      await cleanupCli(APPNAME)
+      await resetAppData(APPNAME)
+      await resetAppDataStats(APPNAME)
+    }
   })
 
-  it('test upload bundle with custom key data ', async () => {
-    semver = getSemver(semver)
-    const privateKeyFile = readFileSync(join(tempFileFolder(APPNAME), '.capgo_key_v2'), 'utf-8')
-    // Fix: Write key data to a temporary file and use --key-v2 instead of --key-data-v2
-    const keyFilePath = join(tempFileFolder(APPNAME), 'temp_key_file')
-    writeFileSync(keyFilePath, privateKeyFile)
+  it.concurrent('test upload bundle with custom key path', async () => {
+    const id = randomUUID()
+    const APPNAME = `com.cli_new_encryption_keypath_${id}`
+    let semver = getSemver()
 
-    const output4 = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--ignore-checksum-check', '--key-v2', 'temp_key_file'], APPNAME, false)
-    expect(output4).toContain('Time to share your update to the world')
-    expect(output4).toContain('Encrypting your bundle with V2')
+    await resetAndSeedAppData(APPNAME)
+    await prepareCli(APPNAME)
 
-    await testEncryption(privateKeyFile, output4, true)
-  })
+    try {
+      // Create key
+      await runCli(['key', 'create', '--force'], APPNAME, false, '')
 
-  it('test upload bundle with custom key path ', async () => {
-    // test with key data
-    const privateKeyFile = readFileSync(join(tempFileFolder(APPNAME), '.capgo_key_v2'), 'utf-8')
-    expect(privateKeyFile).toContain('PRIVATE KEY')
+      // test with key data
+      const privateKeyFile = readFileSync(join(tempFileFolder(APPNAME), '.capgo_key_v2'), 'utf-8')
+      expect(privateKeyFile).toContain('PRIVATE KEY')
 
-    renameSync(join(tempFileFolder(APPNAME), '.capgo_key_v2'), join(tempFileFolder(APPNAME), 'wierd_file'))
-    rmSync(join(tempFileFolder(APPNAME), '.capgo_key_v2.pub'))
+      renameSync(join(tempFileFolder(APPNAME), '.capgo_key_v2'), join(tempFileFolder(APPNAME), 'wierd_file'))
+      rmSync(join(tempFileFolder(APPNAME), '.capgo_key_v2.pub'))
 
-    semver = getSemver(semver)
-    const output3 = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--ignore-checksum-check', '--key-v2', 'wierd_file'], APPNAME, false)
-    expect(output3).toContain('Time to share your update to the world')
-    expect(output3).toContain('Encrypting your bundle with V2')
+      semver = getSemver(semver)
+      const output3 = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--ignore-checksum-check', '--key-v2', 'wierd_file'], APPNAME, false)
+      expect(output3).toContain('Time to share your update to the world')
+      expect(output3).toContain('Encrypting your bundle with V2')
 
-    await testEncryption(privateKeyFile, output3, true)
+      await testEncryption(privateKeyFile, output3, semver, APPNAME, true)
+    }
+    finally {
+      await cleanupCli(APPNAME)
+      await resetAppData(APPNAME)
+      await resetAppDataStats(APPNAME)
+    }
   })
 })
 

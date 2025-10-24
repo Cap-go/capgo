@@ -13,25 +13,27 @@ SELECT pgmq.create('cron_stat_org');
 
 -- Reschedule the cron jobs with new queue names
 SELECT cron.schedule(
-  'process_cron_stat_app_jobs',
-  '0 */6 * * *',
-  'SELECT process_cron_stats_jobs();'
+    'process_cron_stat_app_jobs',
+    '0 */6 * * *',
+    'SELECT process_cron_stats_jobs();'
 );
 
 SELECT cron.schedule(
-  'process_cron_stat_app_queue',
-  '* * * * *',
-  'SELECT public.process_function_queue(''cron_stat_app'')'
+    'process_cron_stat_app_queue',
+    '* * * * *',
+    'SELECT public.process_function_queue(''cron_stat_app'')'
 );
 
 SELECT cron.schedule(
-  'process_cron_stat_org_queue',
-  '* * * * *',
-  'SELECT public.process_function_queue(''cron_stat_org'')'
+    'process_cron_stat_org_queue',
+    '* * * * *',
+    'SELECT public.process_function_queue(''cron_stat_org'')'
 );
 
 -- Update the queue_cron_stat_org_for_org function to use the new queue name
-CREATE OR REPLACE FUNCTION public.queue_cron_stat_org_for_org(org_id uuid, customer_id text)
+CREATE OR REPLACE FUNCTION public.queue_cron_stat_org_for_org(
+    org_id uuid, customer_id text
+)
 RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -64,10 +66,16 @@ $$;
 ALTER FUNCTION public.queue_cron_stat_org_for_org(uuid, text) OWNER TO postgres;
 
 -- Revoke all permissions first, then grant only to service_role
-REVOKE ALL ON FUNCTION public.queue_cron_stat_org_for_org(uuid, text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.queue_cron_stat_org_for_org(
+    uuid, text
+) FROM public;
 REVOKE ALL ON FUNCTION public.queue_cron_stat_org_for_org(uuid, text) FROM anon;
-REVOKE ALL ON FUNCTION public.queue_cron_stat_org_for_org(uuid, text) FROM authenticated;
-GRANT ALL ON FUNCTION public.queue_cron_stat_org_for_org(uuid, text) TO service_role;
+REVOKE ALL ON FUNCTION public.queue_cron_stat_org_for_org(
+    uuid, text
+) FROM authenticated;
+GRANT ALL ON FUNCTION public.queue_cron_stat_org_for_org(
+    uuid, text
+) TO service_role;
 
 -- Drop the old function that is no longer needed
 DROP FUNCTION IF EXISTS public.queue_cron_plan_for_org(uuid, text);

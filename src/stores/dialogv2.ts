@@ -6,6 +6,7 @@ export interface DialogV2Button {
   handler?: () => void
   role?: 'primary' | 'secondary' | 'danger' | 'cancel'
   preventClose?: boolean
+  disabled?: boolean
 }
 
 export interface DialogV2Options {

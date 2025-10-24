@@ -1,2 +1,2 @@
-ALTER TABLE "public"."global_stats"
-add column "devices_last_month" bigint default 0;
+ALTER TABLE public.global_stats
+ADD COLUMN devices_last_month bigint DEFAULT 0;

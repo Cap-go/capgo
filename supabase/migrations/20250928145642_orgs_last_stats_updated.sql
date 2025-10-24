@@ -1,28 +1,28 @@
 -- Add a nullable column to track when org stats were last refreshed
 ALTER TABLE public.orgs
-  ADD COLUMN stats_updated_at timestamp WITHOUT time zone;
+ADD COLUMN stats_updated_at timestamp without time zone;
 
 -- Expose stats_updated_at via get_orgs_v6 helpers
 DROP FUNCTION IF EXISTS public.get_orgs_v6();
 DROP FUNCTION IF EXISTS public.get_orgs_v6(uuid);
 
-CREATE OR REPLACE FUNCTION public.get_orgs_v6 () RETURNS TABLE (
-  gid uuid,
-  created_by uuid,
-  logo text,
-  name text,
-  role character varying,
-  paying boolean,
-  trial_left integer,
-  can_use_more boolean,
-  is_canceled boolean,
-  app_count bigint,
-  subscription_start timestamp with time zone,
-  subscription_end timestamp with time zone,
-  management_email text,
-  is_yearly boolean,
-  stats_updated_at timestamp without time zone,
-  next_stats_update_at timestamp with time zone
+CREATE OR REPLACE FUNCTION public.get_orgs_v6() RETURNS TABLE (
+    gid uuid,
+    created_by uuid,
+    logo text,
+    name text,
+    role character varying,
+    paying boolean,
+    trial_left integer,
+    can_use_more boolean,
+    is_canceled boolean,
+    app_count bigint,
+    subscription_start timestamp with time zone,
+    subscription_end timestamp with time zone,
+    management_email text,
+    is_yearly boolean,
+    stats_updated_at timestamp without time zone,
+    next_stats_update_at timestamp with time zone
 ) LANGUAGE plpgsql
 SET search_path = '' SECURITY DEFINER AS $$
 DECLARE
@@ -65,23 +65,23 @@ BEGIN
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION public.get_orgs_v6 (userid uuid) RETURNS TABLE (
-  gid uuid,
-  created_by uuid,
-  logo text,
-  name text,
-  role character varying,
-  paying boolean,
-  trial_left integer,
-  can_use_more boolean,
-  is_canceled boolean,
-  app_count bigint,
-  subscription_start timestamp with time zone,
-  subscription_end timestamp with time zone,
-  management_email text,
-  is_yearly boolean,
-  stats_updated_at timestamp without time zone,
-  next_stats_update_at timestamp with time zone
+CREATE OR REPLACE FUNCTION public.get_orgs_v6(userid uuid) RETURNS TABLE (
+    gid uuid,
+    created_by uuid,
+    logo text,
+    name text,
+    role character varying,
+    paying boolean,
+    trial_left integer,
+    can_use_more boolean,
+    is_canceled boolean,
+    app_count bigint,
+    subscription_start timestamp with time zone,
+    subscription_end timestamp with time zone,
+    management_email text,
+    is_yearly boolean,
+    stats_updated_at timestamp without time zone,
+    next_stats_update_at timestamp with time zone
 ) LANGUAGE plpgsql
 SET search_path = '' SECURITY DEFINER AS $$
 BEGIN
@@ -122,13 +122,13 @@ GRANT ALL ON FUNCTION public.get_orgs_v6(uuid) TO service_role;
 -- Refresh cron job frequency for cron stats queue processing
 SELECT cron.unschedule('process_cron_stats_queue');
 SELECT cron.schedule(
-  'process_cron_stats_queue',
-  '*/4 * * * *',
-  'SELECT public.process_function_queue(''cron_stats'')'
+    'process_cron_stats_queue',
+    '*/4 * * * *',
+    'SELECT public.process_function_queue(''cron_stats'')'
 );
 
 -- Ensure subscribed orgs are processed in deterministic (UUID ascending) order
-CREATE OR REPLACE FUNCTION public.process_subscribed_orgs () RETURNS void LANGUAGE plpgsql
+CREATE OR REPLACE FUNCTION public.process_subscribed_orgs() RETURNS void LANGUAGE plpgsql
 SET search_path = '' AS $$
 DECLARE
   org_record RECORD;
@@ -155,7 +155,7 @@ BEGIN
 END;
 $$;
 
-ALTER FUNCTION public.process_subscribed_orgs () OWNER TO postgres;
+ALTER FUNCTION public.process_subscribed_orgs() OWNER TO postgres;
 
 -- Predict next stats update window for an organization.
 -- NOTE: supabase postgres operates in UTC, matching pg_cron's timezone expectations.
@@ -195,7 +195,9 @@ $$;
 
 ALTER FUNCTION public.get_next_stats_update_date(org uuid) OWNER TO postgres;
 
-REVOKE ALL ON FUNCTION public.process_subscribed_orgs() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.process_subscribed_orgs() FROM public,
+anon,
+authenticated;
 GRANT EXECUTE ON FUNCTION public.process_subscribed_orgs() TO service_role;
 GRANT ALL ON FUNCTION public.get_next_stats_update_date(uuid) TO anon;
 GRANT ALL ON FUNCTION public.get_next_stats_update_date(uuid) TO authenticated;

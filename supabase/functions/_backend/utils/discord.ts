@@ -9,7 +9,7 @@ export async function sendDiscordAlert(c: Context, payload: RESTPostAPIWebhookWi
   const webhookUrl = getEnv(c, 'DISCORD_ALERT')
 
   if (!webhookUrl) {
-    cloudlog({ requestId: c.get('requestId'), message: 'Discord not set' })
+    cloudlog({ requestId: c.get('requestId'), message: 'Discord not set', payload: JSON.stringify(payload) })
     return true
   }
 

@@ -2,6 +2,242 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.35.10 (2025-10-24)
+
+### 12.35.9 (2025-10-24)
+
+### 12.35.8 (2025-10-24)
+
+
+### Bug Fixes
+
+* improve test speed ([4df6a59](https://github.com/Cap-go/capgo/commit/4df6a599cc9c5d05b677505afc5974217627156d))
+
+### 12.35.7 (2025-10-24)
+
+### 12.35.6 (2025-10-24)
+
+### 12.35.5 (2025-10-24)
+
+
+### Bug Fixes
+
+* to latest ([09349de](https://github.com/Cap-go/capgo/commit/09349de723ee002d20316c34f6e2fc4b71667fe8))
+
+### 12.35.4 (2025-10-24)
+
+
+### Bug Fixes
+
+* latency ([908e9f8](https://github.com/Cap-go/capgo/commit/908e9f87f6a3fb4fcf8ab9e6ab6e0b189d57d67e))
+
+### 12.35.3 (2025-10-24)
+
+
+### Bug Fixes
+
+* auto github release ([379d5fe](https://github.com/Cap-go/capgo/commit/379d5fe7c0d843b2f92aefe761d5add50b16e841))
+
+### 12.35.2 (2025-10-24)
+
+### 12.35.1 (2025-10-24)
+
+
+### Bug Fixes
+
+* header placement ([a602334](https://github.com/Cap-go/capgo/commit/a602334cc952b33718b7aaa08fa005ebafae0ee2))
+
+## 12.35.0 (2025-10-23)
+
+
+### Features
+
+* make hono return X-Worker-Source ([1a80f79](https://github.com/Cap-go/capgo/commit/1a80f7949e06cd9f178e618fb516d8c719bb6786))
+
+### 12.34.126 (2025-10-23)
+
+
+### Bug Fixes
+
+* secrets ([7d13e02](https://github.com/Cap-go/capgo/commit/7d13e0216ec5fc5474169a1eb9485521b06316d9))
+
+### 12.34.125 (2025-10-23)
+
+
+### Bug Fixes
+
+* bundle, stats chart and account validation name + pg loggin ([91ebadc](https://github.com/Cap-go/capgo/commit/91ebadc5cfad372e93a8ff444474830fc0698a31))
+
+### 12.34.124 (2025-10-23)
+
+
+### Bug Fixes
+
+* test storage now works again ([2a4ad33](https://github.com/Cap-go/capgo/commit/2a4ad334f78ef7647c172e567e3463dc2e089543))
+
+### 12.34.123 (2025-10-23)
+
+### 12.34.122 (2025-10-23)
+
+### 12.34.121 (2025-10-23)
+
+### 12.34.120 (2025-10-23)
+
+
+### Bug Fixes
+
+* typecheck ([a8b3df0](https://github.com/Cap-go/capgo/commit/a8b3df0412da73077bab551a7906dbe53e79d047))
+
+### 12.34.119 (2025-10-23)
+
+
+### Bug Fixes
+
+*   // TODO: michael fix the test you broke ([bad28d2](https://github.com/Cap-go/capgo/commit/bad28d2a6d95aa965baa8813e79a8ee77f34f732))
+
+### 12.34.118 (2025-10-23)
+
+### 12.34.117 (2025-10-23)
+
+### 12.34.116 (2025-10-23)
+
+### 12.34.115 (2025-10-23)
+
+### 12.34.114 (2025-10-23)
+
+### 12.34.113 (2025-10-23)
+
+### 12.34.112 (2025-10-23)
+
+
+### Bug Fixes
+
+* stats ([8b90449](https://github.com/Cap-go/capgo/commit/8b90449a897e040b2829865ad2eb9e797029f58f))
+
+### 12.34.111 (2025-10-23)
+
+### 12.34.110 (2025-10-23)
+
+### 12.34.109 (2025-10-23)
+
+
+### Bug Fixes
+
+* ensure less query goes to d1 storeapp and are defer ([2a5daa4](https://github.com/Cap-go/capgo/commit/2a5daa468d1fbb872b2a90c6aff299603ba62668))
+
+### 12.34.108 (2025-10-23)
+
+
+### Bug Fixes
+
+* use only v2 ([c7c68bb](https://github.com/Cap-go/capgo/commit/c7c68bb645f223a928faca5da888fd714b23fdd1))
+
+### 12.34.107 (2025-10-23)
+
+
+### Bug Fixes
+
+* add missing import ([a81c6ea](https://github.com/Cap-go/capgo/commit/a81c6ea652c10a5a1fbca5dc65204c7768686767))
+
+### 12.34.106 (2025-10-23)
+
+
+### Bug Fixes
+
+* update all packages ([df74dfc](https://github.com/Cap-go/capgo/commit/df74dfc4a9a18a3d61569d66b711fa67ea44283f))
+
+### 12.34.105 (2025-10-23)
+
+### 12.34.104 (2025-10-23)
+
+### 12.34.103 (2025-10-23)
+
+### 12.34.102 (2025-10-23)
+
+
+### Bug Fixes
+
+* file config ([121277d](https://github.com/Cap-go/capgo/commit/121277d887485cd3b5c7d2a8d70c5905e6584037))
+
+### 12.34.101 (2025-10-22)
+
+### 12.34.100 (2025-10-22)
+
+
+### Bug Fixes
+
+* fucking AI who destroyed our connexions by never closing it ... ([3d901be](https://github.com/Cap-go/capgo/commit/3d901bef9de0e481602a0c038c575284f07c5154))
+
+### 12.34.99 (2025-10-22)
+
+
+### Bug Fixes
+
+* use file who allow comments and update domains ([0585c3e](https://github.com/Cap-go/capgo/commit/0585c3e3ebb2c2ee5e4488a5fbcc3cd961455ba7))
+
+### 12.34.98 (2025-10-22)
+
+
+### Bug Fixes
+
+* add script for each env ([1b37c0f](https://github.com/Cap-go/capgo/commit/1b37c0fa840f428812d30f5f4ff53d1f06ab22c5))
+
+### 12.34.97 (2025-10-22)
+
+
+### Bug Fixes
+
+* lint ([6f6e0f2](https://github.com/Cap-go/capgo/commit/6f6e0f24e5793a7c040974155006f54f06761f1a))
+
+### 12.34.96 (2025-10-22)
+
+### 12.34.95 (2025-10-22)
+
+### 12.34.94 (2025-10-22)
+
+### 12.34.93 (2025-10-22)
+
+### 12.34.92 (2025-10-22)
+
+
+### Bug Fixes
+
+* deploy using workers instead of page ([ad87b78](https://github.com/Cap-go/capgo/commit/ad87b786644bda891fd15d32c8ce2e9f4d8e3c42))
+
+### 12.34.91 (2025-10-21)
+
+### 12.34.90 (2025-10-21)
+
+
+### Bug Fixes
+
+* env deploy script ([7723f0c](https://github.com/Cap-go/capgo/commit/7723f0cfe05e576bbbf9a54abafbb59c43d61040))
+
+### 12.34.89 (2025-10-21)
+
+### 12.34.88 (2025-10-21)
+
+### 12.34.87 (2025-10-21)
+
+### 12.34.86 (2025-10-21)
+
+### 12.34.85 (2025-10-21)
+
+### 12.34.84 (2025-10-21)
+
+### 12.34.83 (2025-10-21)
+
+### 12.34.82 (2025-10-21)
+
+### 12.34.81 (2025-10-21)
+
+
+### Bug Fixes
+
+* envs ([841574a](https://github.com/Cap-go/capgo/commit/841574a490a7922f1f1a7a35c76c98df76f9c465))
+
+### 12.34.80 (2025-10-20)
+
 ### 12.34.79 (2025-10-20)
 
 ### 12.34.78 (2025-10-19)

@@ -83,7 +83,6 @@ export default defineConfig({
 
     // https://github.com/posva/unplugin-vue-router
     VueRouter({
-      extensions: ['.vue', '.md'],
       dts: 'src/typed-router.d.ts',
     }),
 
