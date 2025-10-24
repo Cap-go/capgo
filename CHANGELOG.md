@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.35.8 (2025-10-24)
+
+
+### Bug Fixes
+
+* improve test speed ([4df6a59](https://github.com/Cap-go/capgo/commit/4df6a599cc9c5d05b677505afc5974217627156d))
+
 ### 12.35.7 (2025-10-24)
 
 ### 12.35.6 (2025-10-24)
