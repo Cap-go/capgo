@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.35.1 (2025-10-24)
+
+
+### Bug Fixes
+
+* header placement ([a602334](https://github.com/Cap-go/capgo/commit/a602334cc952b33718b7aaa08fa005ebafae0ee2))
+
 ## 12.35.0 (2025-10-23)
 
 
