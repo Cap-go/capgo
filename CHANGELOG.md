@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.35.4 (2025-10-24)
+
+
+### Bug Fixes
+
+* latency ([908e9f8](https://github.com/Cap-go/capgo/commit/908e9f87f6a3fb4fcf8ab9e6ab6e0b189d57d67e))
+
 ### 12.35.3 (2025-10-24)
 
 
