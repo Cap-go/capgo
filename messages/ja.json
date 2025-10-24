@@ -689,6 +689,7 @@
   "search-by-device-id-": "デバイスIDまたはアクションで検索します",
   "search-by-device-id-0": "デバイスIDで検索",
   "search-by-name": "名前で検索",
+  "search-by-name-or-app-id": "名前またはAppIDで検索してください",
   "search-by-name-or-bundle-id": "名前またはバンドルIDで検索します",
   "search-by-name-or-email": "名前またはメールで検索",
   "search-channels": "チャンネルを検索",

@@ -689,6 +689,7 @@
   "search-by-device-id-": "Поиск по ID устройства или действию",
   "search-by-device-id-0": "Поиск по идентификатору устройства",
   "search-by-name": "Поиск по имени",
+  "search-by-name-or-app-id": "Поиск по имени или AppID",
   "search-by-name-or-bundle-id": "Поиск по имени или ID пакета",
   "search-by-name-or-email": "Поиск по имени или электронной почте",
   "search-channels": "Поиск канала",

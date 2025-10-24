@@ -689,6 +689,7 @@
   "search-by-device-id-": "डिवाइस ID या क्रिया द्वारा खोजें",
   "search-by-device-id-0": "डिवाइस ID से खोजें",
   "search-by-name": "नाम से खोजें",
+  "search-by-name-or-app-id": "नाम या ऐपआईडी द्वारा खोजें",
   "search-by-name-or-bundle-id": "नाम या बंडल ID से खोजें",
   "search-by-name-or-email": "नाम या ईमेल द्वारा खोजें",
   "search-channels": "चैनल खोजें",

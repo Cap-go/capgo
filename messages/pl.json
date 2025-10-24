@@ -689,6 +689,7 @@
   "search-by-device-id-": "Wyszukaj według identyfikatora urządzenia lub działania",
   "search-by-device-id-0": "Szukaj według identyfikatora urządzenia",
   "search-by-name": "Szukaj według nazwy",
+  "search-by-name-or-app-id": "Wyszukaj według nazwy lub AppID",
   "search-by-name-or-bundle-id": "Wyszukaj według nazwy lub ID pakietu",
   "search-by-name-or-email": "Wyszukaj według nazwy lub e-maila",
   "search-channels": "Szukaj kanału",
