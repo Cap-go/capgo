@@ -37,6 +37,10 @@ function buildPlanValidationExpressionV2(
   )`
 }
 
+export function selectOneD1(drizzleClient: ReturnType<typeof getDrizzleClientD1>) {
+  return drizzleClient.run(sql`select 1`)
+}
+
 export function getAliasV2() {
   const versionAlias = aliasV2(schemaV2.app_versions, 'version')
   const channelDevicesAlias = aliasV2(schemaV2.channel_devices, 'channel_devices')

@@ -37,6 +37,10 @@ function buildPlanValidationExpression(
   )`
 }
 
+export function selectOne(drizzleClient: ReturnType<typeof getDrizzleClient>) {
+  return drizzleClient.execute(sql`select 1`)
+}
+
 export function getDatabaseURL(c: Context): string {
   const clientContinent = (c.req.raw as Request & { cf?: { continent?: string } })?.cf?.continent
   cloudlog({ requestId: c.get('requestId'), message: 'clientContinent', clientContinent })
