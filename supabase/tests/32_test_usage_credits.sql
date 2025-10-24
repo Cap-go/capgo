@@ -107,14 +107,16 @@ step_insert AS (
     step_min,
     step_max,
     price_per_unit,
-    unit_factor
+    unit_factor,
+    org_id
   )
   VALUES (
     'mau',
     0,
     1000000,
     0.1,
-    1
+    1,
+    NULL
   )
   RETURNING id
 )
