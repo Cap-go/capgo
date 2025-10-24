@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.35.15 (2025-10-24)
+
+
+### Bug Fixes
+
+* use read replicate properly ([77c73f6](https://github.com/Cap-go/capgo/commit/77c73f69782cc5399eef339e2243579bcec916f4))
+
 ### 12.35.14 (2025-10-24)
 
 
