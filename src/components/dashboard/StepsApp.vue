@@ -1,11 +1,10 @@
 <script setup lang="ts">
-import type { Database } from '~/types/supabase.types'
-import { computed, onUnmounted, ref, watch, watchEffect } from 'vue'
+import { onUnmounted, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
-import VueTurnstile from 'vue-turnstile'
 import arrowBack from '~icons/ion/arrow-back?width=2em&height=2em'
 import IconLoader from '~icons/lucide/loader-2'
+import InviteTeammateModal from '~/components/dashboard/InviteTeammateModal.vue'
 import { pushEvent } from '~/services/posthog'
 import { getLocalConfig, isLocal, useSupabase } from '~/services/supabase'
 import { sendEvent } from '~/services/tracking'
@@ -53,16 +52,7 @@ const steps = ref<Step[]>([
     subtitle: t('this-page-will-self-'),
   },
 ])
-const inviteEmail = ref('')
-const inviteFirstName = ref('')
-const inviteLastName = ref('')
-const inviteCaptchaToken = ref('')
-const inviteCaptchaElement = ref<InstanceType<typeof VueTurnstile> | null>(null)
-const captchaKey = ref(import.meta.env.VITE_CAPTCHA_KEY)
-const isInviting = ref(false)
-const inviteRole: Database['public']['Enums']['user_min_right'] = 'admin'
-const inviteDialogTitle = computed(() => t('onboarding-invite-option-modal-title'))
-const isInviteDialogOpen = ref(false)
+const inviteModalRef = ref<InstanceType<typeof InviteTeammateModal> | null>(null)
 
 function stepToName(stepNumber: number): string {
   switch (stepNumber) {
@@ -115,66 +105,12 @@ function goToNextStep(scrollTargetId?: string) {
 }
 
 function openInviteDialog() {
-  resetInviteForm()
-  isInviteDialogOpen.value = true
-  dialogStore.openDialog({
-    title: inviteDialogTitle.value,
-    description: t('onboarding-invite-option-dialog-desc'),
-    size: 'lg',
-    preventAccidentalClose: true,
-    buttons: [
-      {
-        text: t('button-cancel'),
-        role: 'cancel',
-      },
-      {
-        id: 'invite-send',
-        text: t('send-invitation'),
-        role: 'primary',
-        preventClose: true,
-        handler: () => {
-          handleInviteSubmit()
-        },
-      },
-    ],
-  })
-  updateInviteDialogButton(false)
-  dialogStore.onDialogDismiss().then(() => {
-    isInviteDialogOpen.value = false
-    isInviting.value = false
-    resetInviteForm()
-  })
+  inviteModalRef.value?.openDialog()
 }
 
-function completeInviteSuccess() {
-  resetInviteForm()
-  dialogStore.closeDialog({
-    text: t('send-invitation'),
-    role: 'primary',
-  })
-  isInviteDialogOpen.value = false
+function onInviteSuccess() {
   goToNextStep('step_card_1')
 }
-
-function updateInviteDialogButton(loading: boolean) {
-  const buttons = dialogStore.dialogOptions?.buttons
-  if (!buttons)
-    return
-  const submitButton = buttons.find(button => button.id === 'invite-send')
-  if (!submitButton)
-    return
-  submitButton.disabled = loading
-  submitButton.text = loading
-    ? t('sending-invitation')
-    : t('send-invitation')
-}
-
-watch([isInviting, isInviteDialogOpen], ([loading, open]) => {
-  if (!open)
-    return
-
-  updateInviteDialogButton(loading)
-}, { immediate: true })
 
 function clearWatchers() {
   if (pollTimer.value !== null) {
@@ -285,143 +221,6 @@ async function getLatestAppId(): Promise<string | undefined> {
   return data[0].app_id as string
 }
 
-function validateEmail(email: string) {
-  return /^[^\s@]+@[^\s@][^\s.@]*\.[^\s@]+$/.test(email.toLowerCase())
-}
-
-function resetInviteForm() {
-  inviteEmail.value = ''
-  inviteFirstName.value = ''
-  inviteLastName.value = ''
-  if (captchaKey.value) {
-    inviteCaptchaToken.value = ''
-    inviteCaptchaElement.value?.reset()
-  }
-}
-
-async function inviteNewUserFallback(email: string, orgId: string) {
-  if (!captchaKey.value) {
-    toast.error(t('captcha-not-available', 'Captcha verification is not configured in this environment.'))
-    return false
-  }
-
-  if (captchaKey.value && !inviteCaptchaToken.value) {
-    toast.error(t('captcha-required', 'Captcha verification is required'))
-    return false
-  }
-
-  const { error } = await supabase.functions.invoke('private/invite_new_user_to_org', {
-    body: {
-      email,
-      org_id: orgId,
-      invite_type: inviteRole,
-      captcha_token: inviteCaptchaToken.value,
-      first_name: inviteFirstName.value.trim(),
-      last_name: inviteLastName.value.trim(),
-    },
-  })
-
-  if (error) {
-    console.error('Invite new user failed', error)
-    toast.error(t('invitation-failed', 'Invitation failed'))
-    return false
-  }
-
-  toast.success(t('org-invited-user', 'User has been invited successfully'))
-  return true
-}
-
-async function handleInviteSubmit() {
-  if (isInviting.value)
-    return
-
-  const email = inviteEmail.value.trim().toLowerCase()
-  const firstName = inviteFirstName.value.trim()
-  const lastName = inviteLastName.value.trim()
-
-  if (!email) {
-    toast.error(t('missing-email', 'Email is required'))
-    return
-  }
-
-  if (!validateEmail(email)) {
-    toast.error(t('invalid-email', 'Invalid email'))
-    return
-  }
-
-  if (!firstName) {
-    toast.error(t('first-name-required', 'First name is required'))
-    return
-  }
-
-  if (!lastName) {
-    toast.error(t('last-name-required', 'Last name is required'))
-    return
-  }
-
-  const orgId = organizationStore.currentOrganization?.gid
-  if (!orgId) {
-    toast.error(t('organization-not-found'))
-    return
-  }
-
-  isInviting.value = true
-  try {
-    const { data, error } = await supabase
-      .rpc('invite_user_to_org', {
-        email,
-        org_id: orgId,
-        invite_type: inviteRole,
-      })
-
-    if (error) {
-      console.error('Error inviting user:', error)
-      toast.error(t('error-inviting-user', 'Error inviting user'))
-      return
-    }
-
-    if (!data) {
-      toast.error(t('invitation-failed', 'Invitation failed'))
-      return
-    }
-
-    if (data === 'OK') {
-      toast.success(t('org-invited-user', 'User has been invited successfully'))
-      completeInviteSuccess()
-      return
-    }
-
-    if (data === 'NO_EMAIL') {
-      const invited = await inviteNewUserFallback(email, orgId)
-      if (invited) {
-        completeInviteSuccess()
-      }
-      return
-    }
-
-    if (data === 'ALREADY_INVITED') {
-      toast.error(t('user-already-invited', 'This user is already invited'))
-    }
-    else if (data === 'TOO_RECENT_INVITATION_CANCELATION') {
-      toast.error(t('too-recent-invitation-cancelation', 'An invitation was cancelled recently. Please wait a bit longer.'))
-    }
-    else if (data === 'CAN_NOT_INVITE_OWNER') {
-      toast.error(t('cannot-invite-owner', 'You cannot invite the owner of the account'))
-    }
-    else if (data === 'NO_RIGHTS') {
-      toast.error(t('no-permission', 'You do not have permission to invite members'))
-    }
-    else {
-      toast.error(`${t('unexpected-invitation-response', 'Unexpected invitation response')}: ${data}`)
-    }
-  }
-  finally {
-    isInviting.value = false
-    if (captchaKey.value)
-      inviteCaptchaElement.value?.reset()
-    inviteCaptchaToken.value = ''
-  }
-}
 watchEffect(async () => {
   if (step.value === 1 && !realtimeListener.value) {
     console.log('watch app change step 1 via polling')
@@ -488,12 +287,12 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <div class="max-w-4xl mx-auto mt-12 sm:px-10">
+      <div class="max-w-6xl mx-auto mt-12 sm:px-10">
         <template v-for="(s, i) in steps" :key="i">
           <div v-if="i > 0" class="w-1 h-10 mx-auto bg-gray-200" :class="[step !== i ? 'opacity-30' : '']" />
 
           <div :id="`step_card_${i}`" :class="[step !== i ? 'opacity-30' : '']" class="relative p-5 overflow-hidden bg-white border border-gray-200 rounded-2xl">
-            <div class="flex items-start sm:items-center">
+            <div class="flex items-start gap-6">
               <div class="inline-flex items-center justify-center text-xl font-bold text-white shrink-0 font-pj h-14 w-14 rounded-xl bg-muted-blue-800">
                 <template v-if="i + 1 !== steps.length">
                   {{ i + 1 }}
@@ -507,19 +306,21 @@ onUnmounted(() => {
                   🚀
                 </template>
               </div>
-              <div class="ml-6 text-xl font-medium text-gray-900 font-pj">
-                {{ s.title }}<br>
-                <span class="text-sm">{{ s.subtitle }}</span>
-                <div class="p-3 rounded-lg" :class="{ 'dark:bg-black bg-gray-100': s.command }">
-                  <code v-if="s.command" :id="`step_command_${i}`" class="block text-lg break-all whitespace-pre-wrap cursor-pointer text-pumpkin-orange-700" @click="copyToast(step === i, `step_command_${i}`, s.command)">
+              <div class="flex-1 min-w-0">
+                <div class="text-xl font-medium text-gray-900 font-pj">
+                  {{ s.title }}<br>
+                  <span class="text-sm">{{ s.subtitle }}</span>
+                </div>
+                <div v-if="s.command" class="relative mt-4 p-5 pr-16 rounded-lg bg-black group cursor-pointer" @click="copyToast(step === i, `step_command_${i}`, s.command)">
+                  <code :id="`step_command_${i}`" class="block text-xl break-all whitespace-pre-wrap text-pumpkin-orange-700">
                     {{ s.command }}
-                    <i-ion-copy-outline class="text-muted-blue-300" />
                   </code>
+                  <i-ion-copy-outline class="absolute top-5 right-5 text-muted-blue-300 w-6 h-6" />
                 </div>
                 <br v-if="s.command">
               </div>
             </div>
-            <div v-if="i === 0" class="pt-6 mt-6 border-t border-gray-200 dark:border-gray-700">
+            <div v-if="i === 0" class="pt-6 border-t border-gray-200">
               <h3 class="text-lg font-semibold text-gray-900 font-pj">
                 {{ t('onboarding-invite-option-title') }}
               </h3>
@@ -539,69 +340,5 @@ onUnmounted(() => {
       </div>
     </div>
   </section>
-  <Teleport v-if="dialogStore.showDialog && isInviteDialogOpen" to="#dialog-v2-content" defer>
-    <form class="grid gap-4 sm:grid-cols-2" @submit.prevent="handleInviteSubmit">
-      <div class="sm:col-span-2">
-        <label for="invite-email" class="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-200">
-          {{ t('email', 'Email') }}
-        </label>
-        <input
-          id="invite-email"
-          v-model="inviteEmail"
-          type="email"
-          autocomplete="email"
-          class="block w-full px-3 py-2 text-sm border border-gray-300 rounded-md shadow-sm focus:ring-muted-blue-500 focus:border-muted-blue-500 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-100"
-          placeholder="teammate@email.com"
-          required
-        >
-      </div>
-      <div>
-        <label for="invite-first-name" class="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-200">
-          {{ t('first-name', 'First name') }}
-        </label>
-        <input
-          id="invite-first-name"
-          v-model="inviteFirstName"
-          type="text"
-          autocomplete="given-name"
-          class="block w-full px-3 py-2 text-sm border border-gray-300 rounded-md shadow-sm focus:ring-muted-blue-500 focus:border-muted-blue-500 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-100"
-          placeholder="Jane"
-          required
-        >
-      </div>
-      <div>
-        <label for="invite-last-name" class="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-200">
-          {{ t('last-name', 'Last name') }}
-        </label>
-        <input
-          id="invite-last-name"
-          v-model="inviteLastName"
-          type="text"
-          autocomplete="family-name"
-          class="block w-full px-3 py-2 text-sm border border-gray-300 rounded-md shadow-sm focus:ring-muted-blue-500 focus:border-muted-blue-500 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-100"
-          placeholder="Doe"
-          required
-        >
-      </div>
-      <div v-if="captchaKey" class="sm:col-span-2">
-        <label for="invite-captcha" class="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-200">
-          {{ t('captcha', 'Captcha') }}
-        </label>
-        <VueTurnstile
-          id="invite-captcha"
-          ref="inviteCaptchaElement"
-          v-model="inviteCaptchaToken"
-          size="flexible"
-          :site-key="captchaKey"
-        />
-      </div>
-      <div v-else class="sm:col-span-2 text-sm text-gray-500 dark:text-gray-400">
-        {{ t('captcha-not-available', 'Captcha verification is not configured in this environment.') }}
-      </div>
-      <p class="sm:col-span-2 text-sm text-gray-500 dark:text-gray-400">
-        {{ t('onboarding-invite-option-helper') }}
-      </p>
-      <button type="submit" class="hidden" tabindex="-1" aria-hidden="true" />
-    </form>
-  </Teleport>
+  <InviteTeammateModal ref="inviteModalRef" @success="onInviteSuccess" />
 </template>
