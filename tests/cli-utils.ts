@@ -1,9 +1,19 @@
 import { spawn } from 'node:child_process'
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
+import { access, mkdir, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import process, { cwd, env } from 'node:process'
-import { sync as rimrafSync } from 'rimraf'
 import { APIKEY_TEST_ALL, BASE_URL } from './test-utils'
+
+// Helper to check if file/directory exists using promises
+async function exists(path: string): Promise<boolean> {
+  try {
+    await access(path)
+    return true
+  }
+  catch {
+    return false
+  }
+}
 
 export const TEMP_DIR_NAME = 'temp_cli_test'
 export const BASE_PACKAGE_JSON = `{
@@ -66,18 +76,18 @@ const config: CapacitorConfig = ${JSON.stringify(generateDefaultJsonCliConfig(ap
 export default config;\n`
 }
 
-export function setDependencies(dependencies: Record<string, string>, appId: string) {
+export async function setDependencies(dependencies: Record<string, string>, appId: string) {
   // write package.json
   const pathPack = join(tempFileFolder(appId), 'package.json')
   const res = BASE_PACKAGE_JSON.replace('%APPID%', appId).replace('%DEPENDENCIES%', JSON.stringify(dependencies, null, 2))
-  writeFileSync(pathPack, res)
+  await writeFile(pathPack, res)
 }
 
-export function deleteTempFolders(appId: string) {
+export async function deleteTempFolders(appId: string) {
   const tempFolder = tempFileFolder(appId)
-  if (existsSync(tempFolder)) {
+  if (await exists(tempFolder)) {
     // console.log('Deleting temp folder', tempFolder)
-    rimrafSync(tempFolder)
+    await rm(tempFolder, { recursive: true, force: true })
   }
   preparedApps.delete(appId)
 }
@@ -94,19 +104,28 @@ export async function prepareCli(appId: string, old = false, installDeps = false
     return
   }
 
+  const tempFolder = tempFileFolder(appId)
   const defaultConfig = generateCliConfig(appId)
-  deleteTempFolders(appId)
-  mkdirSync(tempFileFolder(appId), { recursive: true })
 
-  const capacitorConfigPath = join(tempFileFolder(appId), 'capacitor.config.ts')
-  writeFileSync(capacitorConfigPath, defaultConfig)
+  await deleteTempFolders(appId)
 
-  mkdirSync(join(tempFileFolder(appId), 'dist'), { recursive: true })
-  writeFileSync(join(tempFileFolder(appId), 'dist', 'index.js'), 'import { CapacitorUpdater } from \'@capgo/capacitor-updater\';\nconsole.log("Hello world!!!");\nCapacitorUpdater.notifyAppReady();')
-  writeFileSync(join(tempFileFolder(appId), 'dist', 'index.html'), '')
+  // Create all directories and files in parallel for better performance
+  const distPath = join(tempFolder, 'dist')
+  const nodeModulesPath = join(tempFolder, 'node_modules')
+  const capacitorConfigPath = join(tempFolder, 'capacitor.config.ts')
 
-  // Create package.json for reference
-  setDependencies(old ? BASE_DEPENDENCIES_OLD : BASE_DEPENDENCIES, appId)
+  // Create directories
+  await mkdir(distPath, { recursive: true })
+
+  // Write all files in parallel
+  await Promise.all([
+    writeFile(capacitorConfigPath, defaultConfig),
+    writeFile(join(distPath, 'index.js'), 'import { CapacitorUpdater } from \'@capgo/capacitor-updater\';\nconsole.log("Hello world!!!");\nCapacitorUpdater.notifyAppReady();'),
+    writeFile(join(distPath, 'index.html'), ''),
+  ])
+
+  // Create package.json
+  await setDependencies(old ? BASE_DEPENDENCIES_OLD : BASE_DEPENDENCIES, appId)
 
   if (installDeps) {
     // Only install dependencies for tests that specifically need them (like metadata tests)
@@ -114,11 +133,10 @@ export async function prepareCli(appId: string, old = false, installDeps = false
   }
   else {
     // Create empty node_modules folder to satisfy CLI checks without installing
-    const nodeModulesPath = join(tempFileFolder(appId), 'node_modules')
-    mkdirSync(nodeModulesPath, { recursive: true })
+    await mkdir(nodeModulesPath, { recursive: true })
 
     // Create a minimal package.json in node_modules to indicate it's "installed"
-    writeFileSync(join(nodeModulesPath, '.package-lock.json'), '{"name": "temp", "lockfileVersion": 1}')
+    await writeFile(join(nodeModulesPath, '.package-lock.json'), '{"name": "temp", "lockfileVersion": 1}')
   }
 
   preparedApps.add(appId)
@@ -127,15 +145,20 @@ export async function prepareCli(appId: string, old = false, installDeps = false
 // Minimal install that only gets essential dependencies
 async function npmInstallMinimal(appId: string) {
   try {
-    // Use exec again but import it
+    // Use exec with callback-based approach (no promisify as per user requirement)
     const { exec } = await import('node:child_process')
-    const { promisify } = await import('node:util')
-    const execAsync = promisify(exec)
 
     // First try bun install
-    await execAsync('bun install', {
-      cwd: tempFileFolder(appId),
-      timeout: 60000,
+    await new Promise<void>((resolve, reject) => {
+      exec('bun install', {
+        cwd: tempFileFolder(appId),
+        timeout: 60000,
+      }, (error) => {
+        if (error)
+          reject(error)
+        else
+          resolve()
+      })
     })
   }
   catch (error) {
@@ -143,29 +166,34 @@ async function npmInstallMinimal(appId: string) {
 
     try {
       const { exec } = await import('node:child_process')
-      const { promisify } = await import('node:util')
-      const execAsync = promisify(exec)
 
       // Fallback to npm
-      await execAsync('npm install --silent --no-audit --no-fund', {
-        cwd: tempFileFolder(appId),
-        timeout: 60000,
+      await new Promise<void>((resolve, reject) => {
+        exec('npm install --silent --no-audit --no-fund', {
+          cwd: tempFileFolder(appId),
+          timeout: 60000,
+        }, (error) => {
+          if (error)
+            reject(error)
+          else
+            resolve()
+        })
       })
     }
     catch (npmError) {
       console.error(`Both bun and npm install failed for ${appId}:`, npmError)
       // Create fake node_modules as fallback
       const nodeModulesPath = join(tempFileFolder(appId), 'node_modules')
-      mkdirSync(nodeModulesPath, { recursive: true })
-      writeFileSync(join(nodeModulesPath, '.package-lock.json'), '{"name": "temp", "lockfileVersion": 1}')
+      await mkdir(nodeModulesPath, { recursive: true })
+      await writeFile(join(nodeModulesPath, '.package-lock.json'), '{"name": "temp", "lockfileVersion": 1}')
       throw npmError
     }
   }
 }
 
 // cleanup CLI
-export function cleanupCli(appId: string) {
-  deleteTempFolders(appId)
+export async function cleanupCli(appId: string) {
+  await deleteTempFolders(appId)
 }
 
 // Cleanup function for process management
@@ -212,7 +240,7 @@ export async function runCli(params: string[], appId: string, logOutput = false,
     executable = env.NODE_PATH ?? 'node'
     cliPath = localCliPath
   }
-  else if (existsSync(mainProjectCliPath)) {
+  else if (await exists(mainProjectCliPath)) {
     // Use the main project's CLI installation directly - fastest and most reliable
     executable = 'node'
     cliPath = mainProjectCliPath
@@ -233,8 +261,8 @@ export async function runCli(params: string[], appId: string, logOutput = false,
     const child = spawn(command[0], command.slice(1), {
       cwd: basePath,
       stdio: ['pipe', 'pipe', 'pipe'],
-      env: { ...env, FORCE_COLOR: '1' },
-      timeout: 30000, // 30 second timeout
+      env: { ...env, FORCE_COLOR: '0' }, // Disable color to reduce output overhead
+      timeout: 20000, // Reduced from 30s to 20s
     })
 
     // Track the process

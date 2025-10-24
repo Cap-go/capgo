@@ -41,9 +41,7 @@ describe('tests min version', () => {
     // Instead of exact match, check if the line contains any version pattern
     expect(min_update_version).toMatch(/Auto set min-update-version to \d+\.\d+\.\d+/)
 
-    // Allow some time for database update
-    await new Promise(resolve => setTimeout(resolve, 1000))
-
+    // No need to wait - the CLI already waited for the database update to complete
     const { data, error: checkError } = await supabase
       .from('app_versions')
       .select('min_update_version')
