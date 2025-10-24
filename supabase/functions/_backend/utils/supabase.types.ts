@@ -340,10 +340,10 @@ export type Database = {
         Row: {
           created_at: string
           id: number
+          org_id: string | null
           price_per_unit: number
           step_max: number
           step_min: number
-          stripe_id: string | null
           type: string
           unit_factor: number
           updated_at: string
@@ -351,10 +351,10 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: number
+          org_id?: string | null
           price_per_unit: number
           step_max: number
           step_min: number
-          stripe_id?: string | null
           type: string
           unit_factor?: number
           updated_at?: string
@@ -362,15 +362,23 @@ export type Database = {
         Update: {
           created_at?: string
           id?: number
+          org_id?: string | null
           price_per_unit?: number
           step_max?: number
           step_min?: number
-          stripe_id?: string | null
           type?: string
           unit_factor?: number
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "capgo_credits_steps_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       channel_devices: {
         Row: {
@@ -1320,48 +1328,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      usage_credit_catalog: {
-        Row: {
-          created_at: string
-          credits_amount: number
-          description: string | null
-          id: string
-          is_active: boolean
-          name: string
-          price_amount: number | null
-          price_currency: string
-          slug: string
-          stripe_price_id: string | null
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          credits_amount: number
-          description?: string | null
-          id?: string
-          is_active?: boolean
-          name: string
-          price_amount?: number | null
-          price_currency?: string
-          slug: string
-          stripe_price_id?: string | null
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          credits_amount?: number
-          description?: string | null
-          id?: string
-          is_active?: boolean
-          name?: string
-          price_amount?: number | null
-          price_currency?: string
-          slug?: string
-          stripe_price_id?: string | null
-          updated_at?: string
-        }
-        Relationships: []
       }
       usage_credit_consumptions: {
         Row: {

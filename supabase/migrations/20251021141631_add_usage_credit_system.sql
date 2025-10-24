@@ -28,23 +28,6 @@ BEGIN
 END;
 $$;
 
-CREATE TABLE IF NOT EXISTS public.usage_credit_catalog (
-  id uuid DEFAULT extensions.uuid_generate_v4() PRIMARY KEY,
-  created_at timestamptz DEFAULT now() NOT NULL,
-  updated_at timestamptz DEFAULT now() NOT NULL,
-  slug text NOT NULL,
-  name text NOT NULL,
-  description text,
-  credits_amount numeric(18, 6) NOT NULL,
-  price_amount numeric(18, 6),
-  price_currency text DEFAULT 'usd'::text NOT NULL,
-  stripe_price_id text,
-  is_active boolean DEFAULT true NOT NULL,
-  UNIQUE (slug)
-);
-
-COMMENT ON TABLE public.usage_credit_catalog IS 'Static catalog of prepaid credit packs that can be purchased (price, amount, stripe ids, etc.)';
-
 CREATE TABLE IF NOT EXISTS public.usage_credit_grants (
   id uuid DEFAULT extensions.uuid_generate_v4() PRIMARY KEY,
   org_id uuid NOT NULL REFERENCES public.orgs (id) ON DELETE CASCADE,
