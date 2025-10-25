@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## 12.36.0 (2025-10-25)
+
+
+### Features
+
+* add snippet ([fc9b4ee](https://github.com/Cap-go/capgo/commit/fc9b4ee2e4abd118f08faf656d0207e8039da35e))
+
 ### 12.35.26 (2025-10-25)
 
 ### 12.35.25 (2025-10-25)
