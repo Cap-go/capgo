@@ -63,9 +63,9 @@ async function processQueue(c: Context, sql: ReturnType<typeof getPgClient>, que
 
   // Process messages that have been read less than 5 times
   const results = await Promise.all(messagesToProcess.map(async (message) => {
-    const function_name = message.message.function_name
-    const function_type = message.message.function_type
-    const body = message.message.payload
+    const function_name = message.message?.function_name ?? 'unknown'
+    const function_type = message.message?.function_type ?? 'supabase'
+    const body = message.message?.payload ?? {}
     const cfId = generateUUID()
     const httpResponse = await http_post_helper(c, function_name, function_type, body, cfId)
 
@@ -103,13 +103,13 @@ async function processQueue(c: Context, sql: ReturnType<typeof getPgClient>, que
 
     const timestamp = new Date().toISOString()
     const failureDetails = messagesFailed.map(msg => ({
-      function_name: msg.message.function_name,
-      function_type: msg.message.function_type ?? 'supabase',
+      function_name: msg.message?.function_name ?? 'unknown',
+      function_type: msg.message?.function_type ?? 'supabase',
       msg_id: msg.msg_id,
       read_count: msg.read_ct,
       status: msg.httpResponse.status,
       status_text: msg.httpResponse.statusText,
-      payload_size: JSON.stringify(msg.message.payload).length,
+      payload_size: msg.message?.payload ? JSON.stringify(msg.message.payload).length : 0,
       cf_id: msg.cfId,
     }))
 
