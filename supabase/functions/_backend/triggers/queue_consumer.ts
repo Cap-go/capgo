@@ -284,9 +284,11 @@ async function delete_queue_message_batch(c: Context, sql: ReturnType<typeof get
   try {
     if (msgIds.length === 0)
       return
-    await sql`
-      SELECT pgmq.delete(${queueName}, ARRAY[${sql.array(msgIds)}]::bigint[])
-    `
+    // Format array as properly quoted bigint values
+    const arrayStr = msgIds.map(id => `${id}::bigint`).join(',')
+    await sql.unsafe(`
+      SELECT pgmq.delete($1, ARRAY[${arrayStr}])
+    `, [queueName])
   }
   catch (error) {
     throw simpleError('error_deleting_queue_messages', 'Error deleting queue messages', { msgIds, queueName }, error)
@@ -298,9 +300,11 @@ async function archive_queue_messages(c: Context, sql: ReturnType<typeof getPgCl
   try {
     if (msgIds.length === 0)
       return
-    await sql`
-      SELECT pgmq.archive(${queueName}, ARRAY[${sql.array(msgIds)}]::bigint[])
-    `
+    // Format array as properly quoted bigint values
+    const arrayStr = msgIds.map(id => `${id}::bigint`).join(',')
+    await sql.unsafe(`
+      SELECT pgmq.archive($1, ARRAY[${arrayStr}])
+    `, [queueName])
   }
   catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error)
