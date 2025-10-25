@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.35.25 (2025-10-25)
+
+
+### Bug Fixes
+
+* undo the runner change ([d91949c](https://github.com/Cap-go/capgo/commit/d91949c0c025dde79e3d32effb91a2f994957cfa))
+
 ### 12.35.24 (2025-10-25)
 
 ### 12.35.23 (2025-10-25)
