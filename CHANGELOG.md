@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.36.1 (2025-10-25)
+
+
+### Bug Fixes
+
+* check if messages are not null && test for archive ([2f39329](https://github.com/Cap-go/capgo/commit/2f39329a64191be36b326a9d7f3b0930ee8c626f))
+
 ## 12.36.0 (2025-10-25)
 
 
