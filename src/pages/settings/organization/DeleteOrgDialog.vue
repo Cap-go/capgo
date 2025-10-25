@@ -41,10 +41,12 @@ async function open() {
               const { error } = await organizationStore.deleteOrganization(props.org.gid)
 
               if (error) {
-                toast.error(t('cannot-del-org'))
+                console.error('Delete organization error:', error)
+                toast.error(`${t('cannot-del-org')}: ${error.message}`)
               }
               else {
                 toast.success(t('org-deleted'))
+                dialogStore.closeDialog({ text: t('button-confirm'), role: 'danger' })
                 await organizationStore.fetchOrganizations()
                 await organizationStore.setCurrentOrganizationToFirst()
                 router.push('/app')

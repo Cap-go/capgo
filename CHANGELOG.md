@@ -2,6 +2,76 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.36.3 (2025-10-25)
+
+### 12.36.2 (2025-10-25)
+
+### 12.36.1 (2025-10-25)
+
+
+### Bug Fixes
+
+* check if messages are not null && test for archive ([2f39329](https://github.com/Cap-go/capgo/commit/2f39329a64191be36b326a9d7f3b0930ee8c626f))
+
+## 12.36.0 (2025-10-25)
+
+
+### Features
+
+* add snippet ([fc9b4ee](https://github.com/Cap-go/capgo/commit/fc9b4ee2e4abd118f08faf656d0207e8039da35e))
+
+### 12.35.26 (2025-10-25)
+
+### 12.35.25 (2025-10-25)
+
+
+### Bug Fixes
+
+* undo the runner change ([d91949c](https://github.com/Cap-go/capgo/commit/d91949c0c025dde79e3d32effb91a2f994957cfa))
+
+### 12.35.24 (2025-10-25)
+
+### 12.35.23 (2025-10-25)
+
+### 12.35.22 (2025-10-25)
+
+### 12.35.21 (2025-10-25)
+
+### 12.35.20 (2025-10-25)
+
+### 12.35.19 (2025-10-25)
+
+### 12.35.18 (2025-10-25)
+
+### 12.35.17 (2025-10-25)
+
+### 12.35.16 (2025-10-25)
+
+### 12.35.15 (2025-10-24)
+
+
+### Bug Fixes
+
+* use read replicate properly ([77c73f6](https://github.com/Cap-go/capgo/commit/77c73f69782cc5399eef339e2243579bcec916f4))
+
+### 12.35.14 (2025-10-24)
+
+
+### Bug Fixes
+
+* lint ([2851d14](https://github.com/Cap-go/capgo/commit/2851d14a56e243fc526e76332ccaee25f665f4ff))
+
+### 12.35.13 (2025-10-24)
+
+### 12.35.12 (2025-10-24)
+
+
+### Bug Fixes
+
+* colors and steps design ([97ad99b](https://github.com/Cap-go/capgo/commit/97ad99beaf5e8c3bda6cdcf491b2ec607c31f3f7))
+
+### 12.35.11 (2025-10-24)
+
 ### 12.35.10 (2025-10-24)
 
 ### 12.35.9 (2025-10-24)

@@ -121,7 +121,7 @@
       },
       "observability": {
         "enabled": true,
-        "head_sampling_rate": 0.001
+        "head_sampling_rate": 1
       },
       "routes": [
         {
@@ -194,7 +194,7 @@
       },
       "observability": {
         "enabled": true,
-        "head_sampling_rate": 0.001
+        "head_sampling_rate": 1
       },
       "routes": [
         {
@@ -262,7 +262,11 @@
           "binding": "HYPERDRIVE_DB_US",
           "id": "0a7ce52554d643d6beeab710d0675ce0"
         }
-      ]
+      ],
+      // Do not place smart as we want to use read replicas in specific regions
+      "placement": {
+        "mode": "off"
+      }
     },
     "preprod": {
       "name": "capgo_plugin-preprod",

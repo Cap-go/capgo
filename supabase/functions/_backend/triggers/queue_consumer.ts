@@ -63,9 +63,9 @@ async function processQueue(c: Context, sql: ReturnType<typeof getPgClient>, que
 
   // Process messages that have been read less than 5 times
   const results = await Promise.all(messagesToProcess.map(async (message) => {
-    const function_name = message.message.function_name
-    const function_type = message.message.function_type
-    const body = message.message.payload
+    const function_name = message.message?.function_name ?? 'unknown'
+    const function_type = message.message?.function_type ?? 'supabase'
+    const body = message.message?.payload ?? {}
     const cfId = generateUUID()
     const httpResponse = await http_post_helper(c, function_name, function_type, body, cfId)
 
@@ -103,13 +103,13 @@ async function processQueue(c: Context, sql: ReturnType<typeof getPgClient>, que
 
     const timestamp = new Date().toISOString()
     const failureDetails = messagesFailed.map(msg => ({
-      function_name: msg.message.function_name,
-      function_type: msg.message.function_type ?? 'supabase',
+      function_name: msg.message?.function_name ?? 'unknown',
+      function_type: msg.message?.function_type ?? 'supabase',
       msg_id: msg.msg_id,
       read_count: msg.read_ct,
       status: msg.httpResponse.status,
       status_text: msg.httpResponse.statusText,
-      payload_size: JSON.stringify(msg.message.payload).length,
+      payload_size: msg.message?.payload ? JSON.stringify(msg.message.payload).length : 0,
       cf_id: msg.cfId,
     }))
 
@@ -193,7 +193,7 @@ async function readQueue(c: Context, sql: ReturnType<typeof getPgClient>, queueN
   cloudlog({ requestId: c.get('requestId'), message: `[${queueKey}] Starting queue read at ${startTime}.` })
 
   try {
-    const visibilityTimeout = 60
+    const visibilityTimeout = 120
     cloudlog(`[${queueKey}] Reading messages from queue: ${queueName}`)
     try {
       messages = await sql`
@@ -205,7 +205,7 @@ async function readQueue(c: Context, sql: ReturnType<typeof getPgClient>, queueN
       throw simpleError('error_reading_from_pgmq_queue', 'Error reading from pgmq queue', { queueName }, readError)
     }
 
-    if (!messages || messages.length === 0) {
+    if (!messages || (messages && messages.length === 0)) {
       cloudlog({ requestId: c.get('requestId'), message: `[${queueKey}] No new messages found in queue ${queueName}.` })
       return messages
     }
@@ -284,9 +284,11 @@ async function delete_queue_message_batch(c: Context, sql: ReturnType<typeof get
   try {
     if (msgIds.length === 0)
       return
-    await sql`
-      SELECT pgmq.delete(${queueName}, ARRAY[${sql.array(msgIds)}]::bigint[])
-    `
+    // Format array as properly quoted bigint values
+    const arrayStr = msgIds.map(id => `${id}::bigint`).join(',')
+    await sql.unsafe(`
+      SELECT pgmq.delete($1, ARRAY[${arrayStr}])
+    `, [queueName])
   }
   catch (error) {
     throw simpleError('error_deleting_queue_messages', 'Error deleting queue messages', { msgIds, queueName }, error)
@@ -298,12 +300,29 @@ async function archive_queue_messages(c: Context, sql: ReturnType<typeof getPgCl
   try {
     if (msgIds.length === 0)
       return
-    await sql`
-      SELECT pgmq.archive(${queueName}, ARRAY[${sql.array(msgIds)}]::bigint[])
-    `
+    // Format array as properly quoted bigint values
+    const arrayStr = msgIds.map(id => `${id}::bigint`).join(',')
+    await sql.unsafe(`
+      SELECT pgmq.archive($1, ARRAY[${arrayStr}])
+    `, [queueName])
   }
   catch (error) {
-    throw simpleError('error_archiving_queue_messages', 'Error archiving queue messages', { msgIds, queueName }, error)
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    const errorStack = error instanceof Error ? error.stack : undefined
+    const msgIdsTruncated = msgIds.length > 20 ? msgIds.slice(0, 20) : msgIds
+
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: `[${queueName}] Failed to archive ${msgIds.length} messages`,
+      error,
+      errorMessage,
+      errorStack,
+      queueName,
+      msgIds: msgIdsTruncated,
+      msgIdsLength: msgIds.length,
+    })
+
+    throw simpleError('error_archiving_queue_messages', `Error archiving queue messages: ${errorMessage}`, { msgIds: msgIdsTruncated, msgIdsLength: msgIds.length, queueName, errorMessage }, error)
   }
 }
 

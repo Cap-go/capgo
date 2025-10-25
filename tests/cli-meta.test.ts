@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { BASE_PACKAGE_JSON, cleanupCli, getSemver, prepareCli, runCli, setDependencies, tempFileFolder } from './cli-utils'
+import { BASE_PACKAGE_JSON, cleanupCli, getSemver, prepareCli, runCli, tempFileFolder } from './cli-utils'
 import { resetAndSeedAppData, resetAppData, resetAppDataStats } from './test-utils'
 
 async function assertCompatibilityTableColumns(appId: string, column1: string, column2: string, column3: string, column4: string, customPackageJsonPath?: string) {
@@ -51,7 +51,7 @@ describe('tests CLI metadata', () => {
     const tempPackageJson = join(process.cwd(), 'temp_cli_test', APPNAME, 'package.json')
     const mainNodeModules = join(process.cwd(), 'node_modules')
     await runCli(['bundle', 'upload', '-b', testSemver, '-c', 'production', '--ignore-checksum-check', '--package-json', tempPackageJson, '--node-modules', mainNodeModules], APPNAME, false, undefined, true, false)
-    
+
     // Now compatibility check should show remote versions from the uploaded bundle
     await assertCompatibilityTableColumns(APPNAME, '@capacitor/android', '7.0.0', '7.0.0', '✅')
   })

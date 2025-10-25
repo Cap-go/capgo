@@ -74,7 +74,7 @@ export function getManifestUrl(c: Context, versionId: number, manifest: Partial<
     }).filter(entry => entry !== null) as ManifestEntry[]
   }
   catch (error) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'getManifestUrl', error })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'getManifestUrl', error, manifest })
     return []
   }
 }

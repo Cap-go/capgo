@@ -416,7 +416,7 @@ app.get('/', async (c) => {
   }
 
   const isV2 = getIsV2(c)
-  const pgClient = isV2 ? null : getPgClient(c)
+  const pgClient = isV2 ? null : getPgClient(c, true) // READ-ONLY: only queries channels
 
   const bodyParsed = parsePluginBody<DeviceLink>(c, body, jsonRequestSchema)
   let res
