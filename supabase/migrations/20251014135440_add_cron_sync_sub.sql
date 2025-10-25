@@ -76,12 +76,14 @@ BEGIN
           AND si.customer_id IS NOT NULL
     LOOP
         -- Queue sync_sub processing for this organization
-        PERFORM pgmq.send('cron_sync_sub',
-            json_build_object(
-                'function_name', 'cron_sync_sub',
+          PERFORM pgmq.send('cron_sync_sub',
+            jsonb_build_object(
+              'function_name', 'cron_sync_sub',
+              'payload', jsonb_build_object(
                 'orgId', org_record.id,
                 'customerId', org_record.customer_id
-            )::jsonb
+              )
+            )
         );
     END LOOP;
 END;
