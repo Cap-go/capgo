@@ -193,7 +193,7 @@ async function readQueue(c: Context, sql: ReturnType<typeof getPgClient>, queueN
   cloudlog({ requestId: c.get('requestId'), message: `[${queueKey}] Starting queue read at ${startTime}.` })
 
   try {
-    const visibilityTimeout = 60
+    const visibilityTimeout = 120
     cloudlog(`[${queueKey}] Reading messages from queue: ${queueName}`)
     try {
       messages = await sql`
