@@ -28,5 +28,11 @@
     "preprod": "0x4AAAAAAAxItBa5rCQ3Vvhl",
     "development": "0x4AAAAAAAxDbvW2bw7mcEZs",
     "local": ""
+  },
+  "feature_credits_v2": {
+    "prod": false,
+    "preprod": false,
+    "development": true,
+    "local": true
   }
 }

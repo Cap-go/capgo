@@ -76,6 +76,7 @@ export default defineConfig({
       VITE_API_HOST: `${getUrl('api_domain')}`,
       VITE_CAPTCHA_KEY: getRightKey('captcha_key'),
       VITE_BRANCH: branch,
+      VITE_FEATURE_CREDITS_V2: getRightKey('feature_credits_v2'),
       package_dependencies: JSON.stringify(pack.dependencies),
       domain: getUrl(),
     }, { defineOn: 'import.meta.env' }),

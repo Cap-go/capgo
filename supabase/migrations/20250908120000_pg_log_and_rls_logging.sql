@@ -373,7 +373,7 @@ CREATE OR REPLACE FUNCTION "public"."invite_user_to_org" (
 ) RETURNS character varying LANGUAGE "plpgsql" SECURITY DEFINER
 SET
   search_path = '' AS $$
-Declare  
+Declare
   org record;
   invited_user record;
   current_record record;
@@ -522,7 +522,7 @@ BEGIN
     PERFORM public.pg_log('deny: NO_RIGHTS', jsonb_build_object('org_id', modify_permissions_tmp.org_id, 'email', modify_permissions_tmp.email, 'new_role', modify_permissions_tmp.new_role));
     RETURN 'NO_RIGHTS';
   END IF;
-  
+
   -- Special permission check for super_admin roles
   IF (non_invite_role = 'super_admin'::public.user_min_right) THEN
     IF NOT (public.check_min_rights('super_admin'::public.user_min_right, (select public.get_identity_org_allowed('{read,upload,write,all}'::"public"."key_mode"[], modify_permissions_tmp.org_id)), modify_permissions_tmp.org_id, NULL::character varying, NULL::bigint)) THEN
@@ -737,12 +737,12 @@ $$;
 CREATE OR REPLACE FUNCTION "public"."check_org_user_privilages" () RETURNS "trigger" LANGUAGE "plpgsql"
 SET
   search_path = '' AS $$BEGIN
-  
+
   -- here we check if the user is a service role in order to bypass this permission check
   IF (((SELECT auth.jwt() ->> 'role')='service_role') OR ((select current_user) IS NOT DISTINCT FROM 'postgres')) THEN
     RETURN NEW;
   END IF;
-  
+
   IF ("public"."check_min_rights"('super_admin'::"public"."user_min_right", (select auth.uid()), NEW.org_id, NULL::character varying, NULL::bigint))
   THEN
     RETURN NEW;

@@ -73,17 +73,17 @@ function getStats(c: Context, dayBounds: DayBounds): GlobalStats {
       .select('*', { count: 'exact' })
       .then(res => res.count ?? 0),
     stars: getGithubStars(),
-    customers: supabase.rpc('get_customer_counts', {}).single().then((res) => {
+    customers: supabase.rpc('get_customer_counts').single().then((res) => {
       if (res.error || !res.data)
         cloudlog({ requestId: c.get('requestId'), message: 'get_customer_counts', error: res.error })
       return res.data ?? { total: 0, yearly: 0, monthly: 0 }
     }),
-    onboarded: supabase.rpc('count_all_onboarded', {}).single().then((res) => {
+    onboarded: supabase.rpc('count_all_onboarded').single().then((res) => {
       if (res.error || !res.data)
         cloudlog({ requestId: c.get('requestId'), message: 'count_all_onboarded', error: res.error })
       return res.data ?? 0
     }),
-    need_upgrade: supabase.rpc('count_all_need_upgrade', {}).single().then((res) => {
+    need_upgrade: supabase.rpc('count_all_need_upgrade').single().then((res) => {
       if (res.error || !res.data)
         cloudlog({ requestId: c.get('requestId'), message: 'count_all_need_upgrade', error: res.error })
       return res.data ?? 0
