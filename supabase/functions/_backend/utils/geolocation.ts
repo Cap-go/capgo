@@ -110,15 +110,6 @@ export function getClientDbRegion(c: Context): 'EU' | 'US' | 'AS' | undefined {
     return dbRegion
   }
 
-  // 5. Last resort: log IP for debugging but return undefined
-  const forwardedFor = c.req.header('x-forwarded-for')
-  if (forwardedFor) {
-    const clientIp = forwardedFor.split(',')[0]?.trim()
-    cloudlog({ requestId: c.get('requestId'), message: 'dbRegion', region: undefined, clientIp, source: 'ip-fallback' })
-  }
-  else {
-    cloudlog({ requestId: c.get('requestId'), message: 'dbRegion', region: undefined, source: 'unknown' })
-  }
-
+  cloudlog({ requestId: c.get('requestId'), message: 'dbRegion unknown', region: undefined, source: 'unknown', req: c.req.raw })
   return undefined
 }

@@ -12,7 +12,6 @@ export const app = new Hono<MiddlewareKeyVariables>()
 app.get('/', async (c) => {
   cloudlog({ requestId: c.get('requestId'), message: 'Latency check' })
   if (getRuntimeKey() === 'workerd' && existInEnv(c, 'DB_REPLICATE')) {
-    cloudlog({ requestId: c.get('requestId'), message: 'Using D1 for workerd runtime' })
     const pgClient = getDrizzleClientD1Session(c)
     const res = await selectOneD1(pgClient)
 
@@ -20,13 +19,7 @@ app.get('/', async (c) => {
       throw simpleError('cannot_get_apps', 'Cannot get apps')
     return c.json(BRES)
   }
-  if (existInEnv(c, 'CUSTOM_SUPABASE_DB_URL')) {
-    cloudlog({ requestId: c.get('requestId'), message: 'Using Hyperdrive Supabase DB URL' })
-  }
-  else {
-    cloudlog({ requestId: c.get('requestId'), message: 'Using Supabase DB URL' })
-  }
-  const pgClient = getPgClient(c)
+  const pgClient = getPgClient(c, true)
   const db = getDrizzleClient(pgClient)
   const res = await selectOne(db)
 

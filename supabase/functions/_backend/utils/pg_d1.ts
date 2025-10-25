@@ -75,6 +75,7 @@ export function getDrizzleClientD1(c: Context) {
     // Server/configuration error: surface as structured HTTP error
     throw quickError(500, 'missing_binding', 'DB_REPLICATE is not set', { binding: 'DB_REPLICATE' })
   }
+  cloudlog({ requestId: c.get('requestId'), message: 'Using D1 for Drizzle Client' })
   c.header('X-Database-Source', 'd1')
   return drizzleD1(getPgClientD1(c, undefined))
 }
@@ -84,6 +85,7 @@ export function getDrizzleClientD1Session(c: Context) {
     throw quickError(500, 'missing_binding', 'DB_REPLICATE is not set', { binding: 'DB_REPLICATE' })
   }
   c.header('X-Database-Source', 'd1-session')
+  cloudlog({ requestId: c.get('requestId'), message: 'Using D1 with session for Drizzle Client' })
   const session = getPgClientD1(c)
   return drizzleD1(session)
 }

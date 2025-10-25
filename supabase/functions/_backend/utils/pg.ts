@@ -42,52 +42,63 @@ export function selectOne(drizzleClient: ReturnType<typeof getDrizzleClient>) {
   return drizzleClient.execute(sql`select 1`)
 }
 
-export function getDatabaseURL(c: Context): string {
+export function getDatabaseURL(c: Context, readOnly = false): string {
   const dbRegion = getClientDbRegion(c)
 
-  // Check for Hyperdrive replicas (3 regions: AS, US, EU)
-  // Asia region
-  if (existInEnv(c, 'HYPERDRIVE_DB_SG') && dbRegion === 'AS') {
-    c.header('X-Database-Source', 'hyperdrive-sg')
-    return (getEnv(c, 'HYPERDRIVE_DB_SG') as unknown as Hyperdrive).connectionString
-  }
-  // US region
-  if (existInEnv(c, 'HYPERDRIVE_DB_US') && dbRegion === 'US') {
-    c.header('X-Database-Source', 'hyperdrive-us')
-    return (getEnv(c, 'HYPERDRIVE_DB_US') as unknown as Hyperdrive).connectionString
+  // For read-only queries, use region to avoid Network latency
+  if (readOnly) {
+    // Hyperdrive main read replica regional routing in Cloudflare Workers
+    // Asia region
+    if (existInEnv(c, 'HYPERDRIVE_DB_SG') && dbRegion === 'AS') {
+      c.header('X-Database-Source', 'hyperdrive-sg')
+      cloudlog({ requestId: c.get('requestId'), message: 'Using Hyperdrive SG for read-only' })
+      return (getEnv(c, 'HYPERDRIVE_DB_SG') as unknown as Hyperdrive).connectionString
+    }
+    // US region
+    if (existInEnv(c, 'HYPERDRIVE_DB_US') && dbRegion === 'US') {
+      c.header('X-Database-Source', 'hyperdrive-us')
+      cloudlog({ requestId: c.get('requestId'), message: 'Using Hyperdrive US for read-only' })
+      return (getEnv(c, 'HYPERDRIVE_DB_US') as unknown as Hyperdrive).connectionString
+    }
+
+    // Custom Supabase Region Read replicate Poolers
+    // Asia region
+    if (existInEnv(c, 'READ_SUPABASE_DB_URL_SG') && dbRegion === 'AS') {
+      c.header('X-Database-Source', 'read_pooler_sg')
+      cloudlog({ requestId: c.get('requestId'), message: 'Using Read Pooler SG for read-only' })
+      return getEnv(c, 'READ_SUPABASE_DB_URL_SG')
+    }
+
+    // US region
+    if (existInEnv(c, 'READ_SUPABASE_DB_URL_US') && dbRegion === 'US') {
+      c.header('X-Database-Source', 'read_pooler_us')
+      cloudlog({ requestId: c.get('requestId'), message: 'Using Read Pooler US for read-only' })
+      return getEnv(c, 'READ_SUPABASE_DB_URL_US')
+    }
   }
 
   // Fallback to single Hyperdrive if available
   if (existInEnv(c, 'HYPERDRIVE_DB')) {
     c.header('X-Database-Source', 'hyperdrive')
+    cloudlog({ requestId: c.get('requestId'), message: 'Using Hyperdrive for read-write' })
     return (getEnv(c, 'HYPERDRIVE_DB') as unknown as Hyperdrive).connectionString
   }
 
-  // Custom Supabase pooler with geo-routing (3 regions: AS, US, EU)
-  // Asia region
-  if (existInEnv(c, 'CUSTOM_SUPABASE_DB_URL_SG') && dbRegion === 'AS') {
-    c.header('X-Database-Source', 'sb_pooler_sg')
-    return getEnv(c, 'CUSTOM_SUPABASE_DB_URL_SG')
-  }
-
-  // US region
-  if (existInEnv(c, 'CUSTOM_SUPABASE_DB_URL_US') && dbRegion === 'US') {
-    c.header('X-Database-Source', 'sb_pooler_us')
-    return getEnv(c, 'CUSTOM_SUPABASE_DB_URL_US')
-  }
-
-  // EU region (fallback for Europe/Africa and unknown regions)
-  if (existInEnv(c, 'CUSTOM_SUPABASE_DB_URL')) {
+  // Main DB write poller EU region
+  if (existInEnv(c, 'MAIN_SUPABASE_DB_URL')) {
     c.header('X-Database-Source', 'sb_pooler_main')
-    return getEnv(c, 'CUSTOM_SUPABASE_DB_URL')
+    cloudlog({ requestId: c.get('requestId'), message: 'Using Main Supabase Pooler for read-write' })
+    return getEnv(c, 'MAIN_SUPABASE_DB_URL')
   }
 
+  // Default Supabase direct connection used for testing or if no other option is available
   c.header('X-Database-Source', 'direct')
+  cloudlog({ requestId: c.get('requestId'), message: 'Using Direct Supabase for read-write' })
   return getEnv(c, 'SUPABASE_DB_URL')
 }
 
-export function getPgClient(c: Context) {
-  const dbUrl = getDatabaseURL(c)
+export function getPgClient(c: Context, readOnly = false) {
+  const dbUrl = getDatabaseURL(c, readOnly)
   const requestId = c.get('requestId')
   cloudlog({ requestId, message: 'SUPABASE_DB_URL', dbUrl })
 
@@ -215,11 +226,13 @@ export function requestInfosPostgres(
     allow_device_self_set: channelAlias.allow_device_self_set,
     public: channelAlias.public,
   }
-  const manifestSelect = sql<{ file_name: string, file_hash: string, s3_path: string }[]>`array_agg(json_build_object(
-        'file_name', ${schema.manifest.file_name},
-        'file_hash', ${schema.manifest.file_hash},
-        's3_path', ${schema.manifest.s3_path}
-      ))`
+  const manifestSelect = sql<{ file_name: string, file_hash: string, s3_path: string }[]>`COALESCE(json_agg(
+        json_build_object(
+          'file_name', ${schema.manifest.file_name},
+          'file_hash', ${schema.manifest.file_hash},
+          's3_path', ${schema.manifest.s3_path}
+        )
+      ) FILTER (WHERE ${schema.manifest.file_name} IS NOT NULL), '[]'::json)`
   const channelDeviceQuery = drizzleCient
     .select({
       channel_devices: {
