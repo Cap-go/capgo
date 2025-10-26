@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.36.5 (2025-10-26)
+
+
+### Bug Fixes
+
+* new SDK way to spawn CLI and test ([8a07c2f](https://github.com/Cap-go/capgo/commit/8a07c2f3a9a1d1e1671dc900f9c498474fd8e466))
+
 ### 12.36.4 (2025-10-26)
 
 
