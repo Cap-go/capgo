@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.36.4 (2025-10-26)
+
+
+### Bug Fixes
+
+* queue missing process ([1ac6b58](https://github.com/Cap-go/capgo/commit/1ac6b58e652d99fec7525dca9dcdff24abdf51ee))
+
 ### 12.36.3 (2025-10-25)
 
 ### 12.36.2 (2025-10-25)
