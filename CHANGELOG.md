@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.36.11 (2025-10-27)
+
+
+### Bug Fixes
+
+* force 429 to prevent ddos ([1c73131](https://github.com/Cap-go/capgo/commit/1c7313120b0d107126d4cf6a68c0db3f426506a8))
+
 ### 12.36.10 (2025-10-27)
 
 
