@@ -1,8 +1,7 @@
-import { spawn } from 'node:child_process'
 import { access, mkdir, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import process, { cwd, env } from 'node:process'
-import { APIKEY_TEST_ALL, BASE_URL } from './test-utils'
+import { cwd, env } from 'node:process'
+import { BASE_URL } from './test-utils'
 
 // Helper to check if file/directory exists using promises
 async function exists(path: string): Promise<boolean> {
@@ -40,9 +39,6 @@ export const BASE_DEPENDENCIES_OLD = {
 
 // Cache for prepared apps to avoid repeated setup
 const preparedApps = new Set<string>()
-
-// Track active processes for cleanup
-const activeProcesses = new Set<ReturnType<typeof spawn>>()
 
 export const tempFileFolder = (appId: string) => join(cwd(), TEMP_DIR_NAME, appId)
 
@@ -194,174 +190,4 @@ async function npmInstallMinimal(appId: string) {
 // cleanup CLI
 export async function cleanupCli(appId: string) {
   await deleteTempFolders(appId)
-}
-
-// Cleanup function for process management
-export function cleanupAllProcesses() {
-  activeProcesses.forEach((proc) => {
-    try {
-      proc.kill('SIGTERM')
-    }
-    catch {
-      // Process may already be dead
-    }
-  })
-  activeProcesses.clear()
-}
-
-// Register cleanup on process exit
-process.on('exit', cleanupAllProcesses)
-process.on('SIGINT', cleanupAllProcesses)
-process.on('SIGTERM', cleanupAllProcesses)
-
-export async function runCli(params: string[], appId: string, logOutput = false, overwriteApiKey?: string, overwriteSupaHost?: boolean, noFolder?: boolean): Promise<string> {
-  const basePath = noFolder ? cwd() : tempFileFolder(appId)
-
-  // Use the main project's CLI directly - most reliable approach
-  const mainProjectCliPath = join(cwd(), 'node_modules', '@capgo', 'cli', 'dist', 'index.js')
-
-  let localCliPath = env.LOCAL_CLI_PATH
-  if (localCliPath === 'true') {
-    // For easy local testing, we can set the LOCAL_CLI_PATH to true and the CLI folder will be used
-    localCliPath = '../../../CLI/dist/index.js'
-  }
-  if (localCliPath) {
-    if (noFolder) {
-      // remove ../../ from the path as the running path is not in subfolder
-      localCliPath = localCliPath.replace('../../', '')
-    }
-  }
-
-  // Determine the command to use
-  let executable: string
-  let cliPath: string
-
-  if (localCliPath) {
-    executable = env.NODE_PATH ?? 'node'
-    cliPath = localCliPath
-  }
-  else if (await exists(mainProjectCliPath)) {
-    // Use the main project's CLI installation directly - fastest and most reliable
-    executable = 'node'
-    cliPath = mainProjectCliPath
-  }
-  else {
-    throw new Error('CLI not available. Install @capgo/cli as devDependency')
-  }
-
-  const command = [
-    executable,
-    cliPath,
-    ...params,
-    ...((overwriteApiKey === undefined || overwriteApiKey.length > 0) ? ['--apikey', overwriteApiKey ?? APIKEY_TEST_ALL] : []),
-    ...(overwriteSupaHost ? ['--supa-host', env.SUPABASE_URL ?? '', '--supa-anon', env.SUPABASE_ANON_KEY ?? ''] : []),
-  ]
-
-  return new Promise((resolve, reject) => {
-    const child = spawn(command[0], command.slice(1), {
-      cwd: basePath,
-      stdio: ['pipe', 'pipe', 'pipe'],
-      env: { ...env, FORCE_COLOR: '0' }, // Disable color to reduce output overhead
-      timeout: 20000, // Reduced from 30s to 20s
-    })
-
-    // Track the process
-    activeProcesses.add(child)
-
-    let stdout = ''
-    let stderr = ''
-    let finished = false
-
-    const cleanup = () => {
-      if (!finished) {
-        finished = true
-        activeProcesses.delete(child)
-      }
-    }
-
-    child.stdout?.on('data', (data) => {
-      stdout += data.toString()
-    })
-
-    child.stderr?.on('data', (data) => {
-      stderr += data.toString()
-    })
-
-    child.on('close', (_code) => {
-      cleanup()
-      const output = stdout || stderr
-
-      if (logOutput) {
-        console.log(output)
-      }
-
-      resolve(output) // Always resolve with output for consistent error checking
-    })
-
-    child.on('error', (error) => {
-      cleanup()
-      reject(error)
-    })
-
-    // Handle timeout explicitly
-    child.on('exit', (code, signal) => {
-      if (signal === 'SIGTERM') {
-        cleanup()
-        reject(new Error(`Process terminated: ${signal}`))
-      }
-    })
-  })
-}
-
-// Batch CLI operations to reduce setup overhead
-export async function batchRunCli(
-  operations: Array<{
-    params: string[]
-    expectedOutput?: string
-    appId: string
-    overwriteApiKey?: string
-    overwriteSupaHost?: boolean
-    noFolder?: boolean
-  }>,
-): Promise<string[]> {
-  // Execute operations sequentially to avoid conflicts
-  const results: string[] = []
-
-  for (const op of operations) {
-    const result = await runCli(
-      op.params,
-      op.appId,
-      false,
-      op.overwriteApiKey,
-      op.overwriteSupaHost,
-      op.noFolder,
-    )
-    results.push(result)
-  }
-
-  return results
-}
-
-// Helper for common CLI test patterns
-export async function testCliCommand(
-  params: string[],
-  appId: string,
-  expectedOutput: string,
-  shouldContain = true,
-  overwriteApiKey?: string,
-): Promise<string> {
-  const output = await runCli(params, appId, false, overwriteApiKey, true, true)
-
-  if (shouldContain) {
-    if (!output.includes(expectedOutput)) {
-      throw new Error(`Expected output to contain "${expectedOutput}", but got: ${output}`)
-    }
-  }
-  else {
-    if (output.includes(expectedOutput)) {
-      throw new Error(`Expected output NOT to contain "${expectedOutput}", but got: ${output}`)
-    }
-  }
-
-  return output
 }

@@ -1,15 +1,14 @@
+import type { UploadOptions } from '@capgo/cli/sdk'
 import { mkdir, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { cwd } from 'node:process'
-import type { AddChannelOptions, CleanupOptions, UploadOptions } from '@capgo/cli/sdk'
+import { cwd, env } from 'node:process'
 import { CapgoSDK } from '@capgo/cli/sdk'
+import { BASE_DEPENDENCIES, BASE_DEPENDENCIES_OLD, BASE_PACKAGE_JSON, TEMP_DIR_NAME } from './cli-utils'
 import { APIKEY_TEST_ALL } from './test-utils'
-import { env } from 'node:process'
 
 // Supabase base URL (not including /functions/v1)
 const SUPABASE_URL = env.SUPABASE_URL || 'http://localhost:54321'
 const SUPABASE_ANON_KEY = env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0'
-import { BASE_DEPENDENCIES, BASE_DEPENDENCIES_OLD, BASE_PACKAGE_JSON, TEMP_DIR_NAME } from './cli-utils'
 
 /**
  * SDK-based CLI test utilities
@@ -18,6 +17,11 @@ import { BASE_DEPENDENCIES, BASE_DEPENDENCIES_OLD, BASE_PACKAGE_JSON, TEMP_DIR_N
 
 // Cache for prepared apps to avoid repeated setup
 const preparedApps = new Set<string>()
+
+// Simple queue for key generation to prevent concurrent conflicts
+// When multiple tests run in parallel, they all try to create keys in the project root
+// This queue ensures they run one at a time
+let keyGenerationQueue = Promise.resolve()
 
 export const tempFileFolder = (appId: string) => join(cwd(), TEMP_DIR_NAME, appId)
 
@@ -126,7 +130,8 @@ export function createTestSDK(apikey: string = APIKEY_TEST_ALL) {
 }
 
 /**
- * Upload a bundle using the SDK
+ * Upload a bundle using the SDK with test-specific defaults
+ * Provides: auto path calculation, disables code checks, uses zip format
  */
 export async function uploadBundleSDK(
   appId: string,
@@ -135,18 +140,13 @@ export async function uploadBundleSDK(
   additionalOptions?: Partial<UploadOptions>,
 ) {
   const sdk = createTestSDK()
-  const folderPath = tempFileFolder(appId)
 
   const options: UploadOptions = {
     appId,
-    path: join(folderPath, 'dist'),
+    path: join(tempFileFolder(appId), 'dist'),
     bundle: version,
     channel,
-    apikey: APIKEY_TEST_ALL,
-    supaHost: SUPABASE_URL,
-    supaAnon: SUPABASE_ANON_KEY,
-    ignoreCompatibilityCheck: true,
-    disableCodeCheck: true,
+    disableCodeCheck: true, // Skip notifyAppReady check for tests
     useZip: true, // Use legacy zip upload for local testing
     ...additionalOptions,
   }
@@ -154,138 +154,64 @@ export async function uploadBundleSDK(
   return sdk.uploadBundle(options)
 }
 
-/**
- * Add a channel using the SDK
- */
-export async function addChannelSDK(
-  channelId: string,
-  appId: string,
-  isDefault?: boolean,
-  additionalOptions?: Partial<AddChannelOptions>,
-) {
-  const sdk = createTestSDK()
+// Note: Tests should use createTestSDK() directly for channel operations
+// Example: const sdk = createTestSDK(); await sdk.addChannel({ channelId, appId })
 
-  const options: AddChannelOptions = {
-    channelId,
-    appId,
-    default: isDefault,
-    supaHost: SUPABASE_URL,
-    supaAnon: SUPABASE_ANON_KEY,
-    ...additionalOptions,
+/**
+ * Generate encryption keys using the SDK
+ * Uses a queue to serialize operations (prevent concurrent conflicts when creating keys in project root)
+ */
+export async function generateEncryptionKeysSDK(appId: string, force = true) {
+  const { existsSync, renameSync } = await import('node:fs')
+
+  // Queue this operation to run after previous ones complete
+  const previousOperation = keyGenerationQueue
+  let operationComplete: () => void
+  keyGenerationQueue = new Promise(resolve => operationComplete = resolve)
+
+  // Wait for previous operation to finish
+  await previousOperation
+
+  try {
+    const sdk = createTestSDK()
+    const folderPath = tempFileFolder(appId)
+
+    // Generate keys (they will be created in the project root)
+    const result = await sdk.generateEncryptionKeys({ force })
+
+    if (!result.success) {
+      return result
+    }
+
+    // Find where the keys were actually created and move them to the test folder
+    const projectRoot = cwd()
+    const privateKeySource = join(projectRoot, '.capgo_key_v2')
+    const publicKeySource = join(projectRoot, '.capgo_key_v2.pub')
+    const privateKeyDest = join(folderPath, '.capgo_key_v2')
+    const publicKeyDest = join(folderPath, '.capgo_key_v2.pub')
+
+    // Check if keys exist in project root
+    if (existsSync(privateKeySource) && existsSync(publicKeySource)) {
+      renameSync(privateKeySource, privateKeyDest)
+      renameSync(publicKeySource, publicKeyDest)
+    }
+    else {
+      // Keys might have been created in the test folder already
+      // Check if they exist there
+      if (!existsSync(privateKeyDest) || !existsSync(publicKeyDest)) {
+        return {
+          success: false,
+          error: `Keys not found in expected locations. Checked:\n- ${privateKeySource}\n- ${privateKeyDest}`,
+        }
+      }
+    }
+
+    return result
   }
-
-  return sdk.addChannel(options)
-}
-
-/**
- * Delete a channel using the SDK
- */
-export async function deleteChannelSDK(
-  channelId: string,
-  appId: string,
-  deleteBundle = false,
-) {
-  const sdk = createTestSDK()
-  return sdk.deleteChannel(channelId, appId, deleteBundle)
-}
-
-/**
- * Set/update channel using the SDK
- */
-export async function setChannelSDK(
-  channelId: string,
-  appId: string,
-  bundle?: string,
-  additionalOptions?: Partial<any>,
-) {
-  const sdk = createTestSDK()
-
-  const options = {
-    channelId,
-    appId,
-    bundle,
-    supaHost: SUPABASE_URL,
-    supaAnon: SUPABASE_ANON_KEY,
-    ...additionalOptions,
+  finally {
+    // Signal that this operation is complete
+    operationComplete!()
   }
-
-  return sdk.updateChannel(options)
-}
-
-/**
- * List channels using the SDK
- */
-export async function listChannelsSDK(appId: string) {
-  const sdk = createTestSDK()
-  return sdk.listChannels(appId)
-}
-
-/**
- * List bundles using the SDK
- */
-export async function listBundlesSDK(appId: string) {
-  const sdk = createTestSDK()
-  return sdk.listBundles(appId)
-}
-
-/**
- * Delete a bundle using the SDK
- */
-export async function deleteBundleSDK(appId: string, bundleId: string) {
-  const sdk = createTestSDK()
-  return sdk.deleteBundle(appId, bundleId)
-}
-
-/**
- * Cleanup old bundles using the SDK
- */
-export async function cleanupBundlesSDK(
-  appId: string,
-  keep: number,
-  additionalOptions?: Partial<CleanupOptions>,
-) {
-  const sdk = createTestSDK()
-
-  const options: CleanupOptions = {
-    appId,
-    keep,
-    force: true,
-    supaHost: SUPABASE_URL,
-    supaAnon: SUPABASE_ANON_KEY,
-    ...additionalOptions,
-  }
-
-  return sdk.cleanupBundles(options)
-}
-
-/**
- * Add an app using the SDK
- */
-export async function addAppSDK(appId: string, name?: string, icon?: string) {
-  const sdk = createTestSDK()
-  return sdk.addApp({
-    appId,
-    name,
-    icon,
-    supaHost: SUPABASE_URL,
-    supaAnon: SUPABASE_ANON_KEY,
-  })
-}
-
-/**
- * Delete an app using the SDK
- */
-export async function deleteAppSDK(appId: string, skipConfirmation = true) {
-  const sdk = createTestSDK()
-  return sdk.deleteApp(appId, skipConfirmation)
-}
-
-/**
- * List apps using the SDK
- */
-export async function listAppsSDK() {
-  const sdk = createTestSDK()
-  return sdk.listApps()
 }
 
 // Export BASE_DEPENDENCIES for compatibility
