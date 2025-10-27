@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## 12.37.0 (2025-10-27)
+
+
+### Features
+
+* add aliproxy ([7f11aea](https://github.com/Cap-go/capgo/commit/7f11aea4044eab662ea8912941aefa20a98e4e9f))
+
 ### 12.36.12 (2025-10-27)
 
 
