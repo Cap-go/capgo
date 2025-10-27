@@ -193,7 +193,7 @@
     "@antfu/eslint-config": "6.0.0",
     "@capacitor/cli": "^7.4.4",
     "@capacitor/core": "^7.4.4",
-    "@capgo/cli": "7.17.7",
+    "@capgo/cli": "7.17.10",
     "@cloudflare/workers-types": "4.20251014.0",
     "@iconify/json": "^2.2.399",
     "@playwright/test": "1.56.1",
