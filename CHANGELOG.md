@@ -2,6 +2,57 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.36.11 (2025-10-27)
+
+
+### Bug Fixes
+
+* force 429 to prevent ddos ([1c73131](https://github.com/Cap-go/capgo/commit/1c7313120b0d107126d4cf6a68c0db3f426506a8))
+
+### 12.36.10 (2025-10-27)
+
+
+### Bug Fixes
+
+* github config ([0fd65ef](https://github.com/Cap-go/capgo/commit/0fd65efef33a5c864caa358a9c36a7c496c4187f))
+
+### 12.36.9 (2025-10-27)
+
+
+### Bug Fixes
+
+* use latest to make test pass ([e142cef](https://github.com/Cap-go/capgo/commit/e142cefb85a4f59d1df7989af867934830506784))
+
+### 12.36.8 (2025-10-27)
+
+
+### Bug Fixes
+
+* lint issue ([183c0e7](https://github.com/Cap-go/capgo/commit/183c0e73c4fa39b9c01bfedccdbe4112078b6371))
+
+### 12.36.7 (2025-10-27)
+
+### 12.36.6 (2025-10-27)
+
+
+### Bug Fixes
+
+* test use no spawn ([f5cb237](https://github.com/Cap-go/capgo/commit/f5cb237f8f5718a5e224cea5b4fd84d612c8008d))
+
+### 12.36.5 (2025-10-26)
+
+
+### Bug Fixes
+
+* new SDK way to spawn CLI and test ([8a07c2f](https://github.com/Cap-go/capgo/commit/8a07c2f3a9a1d1e1671dc900f9c498474fd8e466))
+
+### 12.36.4 (2025-10-26)
+
+
+### Bug Fixes
+
+* queue missing process ([1ac6b58](https://github.com/Cap-go/capgo/commit/1ac6b58e652d99fec7525dca9dcdff24abdf51ee))
+
 ### 12.36.3 (2025-10-25)
 
 ### 12.36.2 (2025-10-25)

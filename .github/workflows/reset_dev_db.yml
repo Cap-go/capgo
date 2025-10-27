@@ -16,7 +16,7 @@ jobs:
     name: Reset capgo-dev database
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup bun
         uses: oven-sh/setup-bun@v2

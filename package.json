@@ -1,7 +1,7 @@
 {
   "name": "capgo-app",
   "type": "module",
-  "version": "12.36.3",
+  "version": "12.36.11",
   "private": true,
   "license": "GPL-3.0",
   "scripts": {
@@ -193,7 +193,7 @@
     "@antfu/eslint-config": "6.0.0",
     "@capacitor/cli": "^7.4.4",
     "@capacitor/core": "^7.4.4",
-    "@capgo/cli": "7.17.7",
+    "@capgo/cli": "7.18.3",
     "@cloudflare/workers-types": "4.20251014.0",
     "@iconify/json": "^2.2.399",
     "@playwright/test": "1.56.1",
@@ -234,7 +234,7 @@
     "vite-plugin-vue-layouts": "0.11.0",
     "vite-plugin-webfont-dl": "^3.11.1",
     "vitest": "^4.0.2",
-    "vue-tsc": "3.1.1",
+    "vue-tsc": "3.1.2",
     "wrangler": "^4.45.0"
   },
   "husky": {
