@@ -1,6 +1,6 @@
 import { Buffer } from 'node:buffer'
 import { createDecipheriv, createHash, publicDecrypt, randomUUID } from 'node:crypto'
-import { existsSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, renameSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import AdmZip from 'adm-zip'
 import { describe, expect, it } from 'vitest'
