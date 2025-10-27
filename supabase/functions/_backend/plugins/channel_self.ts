@@ -8,8 +8,8 @@ import { Hono } from 'hono/tiny'
 import { z } from 'zod/mini'
 import { BRES, getIsV2, parseBody, quickError, simpleError, simpleError200, simpleRateLimit } from '../utils/hono.ts'
 import { cloudlog } from '../utils/loggin.ts'
-import { closeClient, deleteChannelDevicePg, getAppByIdPg, getAppVersionsByAppIdPg, getChannelByNamePg, getChannelDeviceOverridePg, getChannelsPg, getCompatibleChannelsPg, getDrizzleClient, getMainChannelsPg, getPgClient, upsertChannelDevicePg } from '../utils/pg.ts'
-import { getAppByIdD1, getAppVersionsByAppIdD1, getChannelByNameD1, getChannelDeviceOverrideD1, getChannelsD1, getCompatibleChannelsD1, getDrizzleClientD1Session, getMainChannelsD1 } from '../utils/pg_d1.ts'
+import { closeClient, deleteChannelDevicePg, getAppByIdPg, getAppOwnerPostgres, getAppVersionsByAppIdPg, getChannelByNamePg, getChannelDeviceOverridePg, getChannelsPg, getCompatibleChannelsPg, getDrizzleClient, getMainChannelsPg, getPgClient, upsertChannelDevicePg } from '../utils/pg.ts'
+import { getAppByIdD1, getAppOwnerPostgresV2, getAppVersionsByAppIdD1, getChannelByNameD1, getChannelDeviceOverrideD1, getChannelsD1, getCompatibleChannelsD1, getDrizzleClientD1Session, getMainChannelsD1 } from '../utils/pg_d1.ts'
 import { convertQueryToBody, parsePluginBody } from '../utils/plugin_parser.ts'
 import { sendStatsAndDevice } from '../utils/stats.ts'
 import { deviceIdRegex, INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, isLimited, MISSING_STRING_APP_ID, MISSING_STRING_DEVICE_ID, MISSING_STRING_VERSION_BUILD, MISSING_STRING_VERSION_NAME, NON_STRING_APP_ID, NON_STRING_DEVICE_ID, NON_STRING_VERSION_BUILD, NON_STRING_VERSION_NAME, reverseDomainRegex } from '../utils/utils.ts'
@@ -53,6 +53,17 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
     is_emulator,
     is_prod,
   } = body
+
+  // Check if app exists first - Read operation can use v2 flag
+  const appOwner = isV2
+    ? await getAppOwnerPostgresV2(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClientD1Session>, PLAN_MAU_ACTIONS)
+    : await getAppOwnerPostgres(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>, PLAN_MAU_ACTIONS)
+
+  if (!appOwner) {
+    // On-premise app detected - return 429 to prevent DDOS
+    cloudlog({ requestId: c.get('requestId'), message: 'On-premise app detected in channel_self POST, returning 429', app_id })
+    return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
+  }
 
   // Read operations can use v2 flag
   const versions = isV2
@@ -193,6 +204,17 @@ async function put(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient
     version_os,
   } = body
 
+  // Check if app exists first - Read operation can use v2 flag
+  const appOwner = isV2
+    ? await getAppOwnerPostgresV2(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClientD1Session>, PLAN_MAU_ACTIONS)
+    : await getAppOwnerPostgres(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>, PLAN_MAU_ACTIONS)
+
+  if (!appOwner) {
+    // On-premise app detected - return 429 to prevent DDOS
+    cloudlog({ requestId: c.get('requestId'), message: 'On-premise app detected in channel_self PUT, returning 429', app_id })
+    return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
+  }
+
   // Read operations can use v2 flag
   const versions = isV2
     ? await getAppVersionsByAppIdD1(c, app_id, version_name, drizzleClient as ReturnType<typeof getDrizzleClientD1Session>, PLAN_MAU_ACTIONS)
@@ -273,6 +295,17 @@ async function deleteOverride(c: Context, drizzleClient: ReturnType<typeof getDr
   } = body
   cloudlog({ requestId: c.get('requestId'), message: 'delete override', version_build })
 
+  // Check if app exists first - Read operation can use v2 flag
+  const appOwner = isV2
+    ? await getAppOwnerPostgresV2(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClientD1Session>, PLAN_MAU_ACTIONS)
+    : await getAppOwnerPostgres(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>, PLAN_MAU_ACTIONS)
+
+  if (!appOwner) {
+    // On-premise app detected - return 429 to prevent DDOS
+    cloudlog({ requestId: c.get('requestId'), message: 'On-premise app detected in channel_self DELETE, returning 429', app_id })
+    return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
+  }
+
   // Read operation can use v2 flag
   const dataChannelOverride = isV2
     ? await getChannelDeviceOverrideD1(c, app_id, device_id, drizzleClient as ReturnType<typeof getDrizzleClientD1Session>)
@@ -302,14 +335,16 @@ async function listCompatibleChannels(c: Context, drizzleClient: ReturnType<type
   const { app_id, platform, is_emulator, is_prod } = body
 
   // Check if app exists and get owner_org for permission check - Read operation can use v2 flag
-  const appData = isV2
-    ? await getAppByIdD1(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClientD1Session>, PLAN_MAU_ACTIONS)
-    : await getAppByIdPg(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>, PLAN_MAU_ACTIONS)
+  const appOwner = isV2
+    ? await getAppOwnerPostgresV2(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClientD1Session>, PLAN_MAU_ACTIONS)
+    : await getAppOwnerPostgres(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>, PLAN_MAU_ACTIONS)
 
-  if (!appData) {
-    throw quickError(404, 'app_not_found', `App ${app_id} not found`, { app_id })
+  if (!appOwner) {
+    // On-premise app detected - return 429 to prevent DDOS
+    cloudlog({ requestId: c.get('requestId'), message: 'On-premise app detected in channel_self GET, returning 429', app_id })
+    return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
   }
-  if (!appData.plan_valid) {
+  if (!appOwner.plan_valid) {
     throw simpleError('action_not_allowed', 'Action not allowed')
   }
 
