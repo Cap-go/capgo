@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.36.12 (2025-10-27)
+
+
+### Bug Fixes
+
+* **README:** use bun serve:local ([075b6fa](https://github.com/Cap-go/capgo/commit/075b6faa4edaacef5166ecbe435a3c7b0bf367cf))
+
 ### 12.36.11 (2025-10-27)
 
 
