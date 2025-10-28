@@ -677,7 +677,7 @@ const RenderCell = defineComponent<{
 
 <style scoped>
 .scale-checkbox {
-    transform: scale(1.5);
-    transform-origin: center;
+  transform: scale(1.5);
+  transform-origin: center;
 }
 </style>

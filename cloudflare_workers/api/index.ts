@@ -1,3 +1,4 @@
+import process from 'node:process'
 import { app as config } from '../../supabase/functions/_backend/private/config.ts'
 import { app as create_device } from '../../supabase/functions/_backend/private/create_device.ts'
 import { app as credits } from '../../supabase/functions/_backend/private/credits.ts'

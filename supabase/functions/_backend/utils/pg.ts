@@ -4,6 +4,7 @@ import { alias } from 'drizzle-orm/pg-core'
 import { drizzle } from 'drizzle-orm/postgres-js'
 import postgres from 'postgres'
 import { backgroundTask, existInEnv, getEnv } from '../utils/utils.ts'
+import { getClientDbRegion } from './geolocation.ts'
 import { cloudlog, cloudlogErr } from './loggin.ts'
 import * as schema from './postgress_schema.ts'
 
@@ -37,29 +38,147 @@ function buildPlanValidationExpression(
   )`
 }
 
-export function getDatabaseURL(c: Context): string {
-  // TODO: uncomment when we enable back replicate
-  // const clientContinent = (c.req.raw as any)?.cf?.continent
-  // cloudlog({ requestId: c.get('requestId'), message: 'clientContinent', clientContinent  })
-  let DEFAULT_DB_URL = getEnv(c, 'SUPABASE_DB_URL')
-  if (existInEnv(c, 'CUSTOM_SUPABASE_DB_URL'))
-    DEFAULT_DB_URL = getEnv(c, 'CUSTOM_SUPABASE_DB_URL')
-
-  if (existInEnv(c, 'HYPERDRIVE_DB'))
-    return (getEnv(c, 'HYPERDRIVE_DB') as any as Hyperdrive).connectionString
-
-  // // Default to Germany for any other cases
-  return DEFAULT_DB_URL
+export function selectOne(drizzleClient: ReturnType<typeof getDrizzleClient>) {
+  return drizzleClient.execute(sql`select 1`)
 }
 
-export function getPgClient(c: Context) {
-  const dbUrl = getDatabaseURL(c)
-  cloudlog({ requestId: c.get('requestId'), message: 'SUPABASE_DB_URL', dbUrl })
-  return postgres(dbUrl, { prepare: false, idle_timeout: 2 })
+export function getDatabaseURL(c: Context, readOnly = false): string {
+  const dbRegion = getClientDbRegion(c)
+
+  // For read-only queries, use region to avoid Network latency
+  if (readOnly) {
+    // Hyperdrive main read replica regional routing in Cloudflare Workers
+    // Asia region
+    if (existInEnv(c, 'HYPERDRIVE_DB_SG') && dbRegion === 'AS') {
+      c.header('X-Database-Source', 'hyperdrive-sg')
+      cloudlog({ requestId: c.get('requestId'), message: 'Using Hyperdrive SG for read-only' })
+      return (getEnv(c, 'HYPERDRIVE_DB_SG') as unknown as Hyperdrive).connectionString
+    }
+    // US region
+    if (existInEnv(c, 'HYPERDRIVE_DB_US') && dbRegion === 'US') {
+      c.header('X-Database-Source', 'hyperdrive-us')
+      cloudlog({ requestId: c.get('requestId'), message: 'Using Hyperdrive US for read-only' })
+      return (getEnv(c, 'HYPERDRIVE_DB_US') as unknown as Hyperdrive).connectionString
+    }
+
+    // Custom Supabase Region Read replicate Poolers
+    // Asia region
+    if (existInEnv(c, 'READ_SUPABASE_DB_URL_SG') && dbRegion === 'AS') {
+      c.header('X-Database-Source', 'read_pooler_sg')
+      cloudlog({ requestId: c.get('requestId'), message: 'Using Read Pooler SG for read-only' })
+      return getEnv(c, 'READ_SUPABASE_DB_URL_SG')
+    }
+
+    // US region
+    if (existInEnv(c, 'READ_SUPABASE_DB_URL_US') && dbRegion === 'US') {
+      c.header('X-Database-Source', 'read_pooler_us')
+      cloudlog({ requestId: c.get('requestId'), message: 'Using Read Pooler US for read-only' })
+      return getEnv(c, 'READ_SUPABASE_DB_URL_US')
+    }
+  }
+
+  // Fallback to single Hyperdrive if available
+  if (existInEnv(c, 'HYPERDRIVE_DB')) {
+    c.header('X-Database-Source', 'hyperdrive')
+    cloudlog({ requestId: c.get('requestId'), message: 'Using Hyperdrive for read-write' })
+    return (getEnv(c, 'HYPERDRIVE_DB') as unknown as Hyperdrive).connectionString
+  }
+
+  // Main DB write poller EU region
+  if (existInEnv(c, 'MAIN_SUPABASE_DB_URL')) {
+    c.header('X-Database-Source', 'sb_pooler_main')
+    cloudlog({ requestId: c.get('requestId'), message: 'Using Main Supabase Pooler for read-write' })
+    return getEnv(c, 'MAIN_SUPABASE_DB_URL')
+  }
+
+  // Default Supabase direct connection used for testing or if no other option is available
+  c.header('X-Database-Source', 'direct')
+  cloudlog({ requestId: c.get('requestId'), message: 'Using Direct Supabase for read-write' })
+  return getEnv(c, 'SUPABASE_DB_URL')
 }
 
-export function getDrizzleClient(client: ReturnType<typeof getPgClient>) {
-  return drizzle(client as any, { logger: true })
+export function getPgClient(c: Context, readOnly = false) {
+  const dbUrl = getDatabaseURL(c, readOnly)
+  const requestId = c.get('requestId')
+  cloudlog({ requestId, message: 'SUPABASE_DB_URL', dbUrl })
+
+  const options = {
+    prepare: false,
+    max: 5,
+    fetch_types: false,
+    idle_timeout: 20, // Increase from 2 to 20 seconds
+    connect_timeout: 10, // Add explicit connect timeout
+    max_lifetime: 60, // Add connection lifetime limit
+
+    // Add connection debugging
+    connection: {
+      application_name: 'capgo_plugin',
+    },
+
+    // Hook to log errors - this is called for connection-level errors
+    onclose: (connectionId: number) => {
+      cloudlog({ requestId, message: 'PG Connection Closed', connectionId })
+    },
+  }
+
+  const sql = postgres(dbUrl, options)
+
+  return sql
+}
+
+export function getDrizzleClient(queryClient: ReturnType<typeof getPgClient>) {
+  return drizzle({ client: queryClient as any, logger: true })
+}
+
+// Helper to extract detailed error information from postgres.js errors
+export function logPgError(c: Context, functionName: string, error: unknown) {
+  const e = error as Error & {
+    code?: string
+    errno?: number
+    syscall?: string
+    address?: string
+    port?: number
+    severity?: string
+    detail?: string
+    hint?: string
+    position?: string
+    routine?: string
+    file?: string
+    line?: string
+    column?: string
+  }
+
+  cloudlogErr({
+    requestId: c.get('requestId'),
+    message: `${functionName} - PostgreSQL Error`,
+    error: {
+      // Basic error info
+      message: e.message,
+      name: e.name,
+      stack: e.stack,
+
+      // PostgreSQL-specific error codes
+      code: e.code, // e.g., '57P01' for connection termination, 'ECONNREFUSED', 'ETIMEDOUT'
+      severity: e.severity,
+      detail: e.detail,
+      hint: e.hint,
+
+      // Network-level errors
+      errno: e.errno, // System error number
+      syscall: e.syscall, // System call that failed (e.g., 'connect', 'read', 'write')
+      address: e.address, // IP address
+      port: e.port, // Port number
+
+      // Query position info
+      position: e.position,
+      routine: e.routine,
+
+      // File info for debugging
+      file: e.file,
+      line: e.line,
+      column: e.column,
+    },
+  })
 }
 
 export function closeClient(c: Context, client: ReturnType<typeof getPgClient>) {
@@ -107,11 +226,13 @@ export function requestInfosPostgres(
     allow_device_self_set: channelAlias.allow_device_self_set,
     public: channelAlias.public,
   }
-  const manifestSelect = sql<{ file_name: string, file_hash: string, s3_path: string }[]>`array_agg(json_build_object(
-        'file_name', ${schema.manifest.file_name},
-        'file_hash', ${schema.manifest.file_hash},
-        's3_path', ${schema.manifest.s3_path}
-      ))`
+  const manifestSelect = sql<{ file_name: string, file_hash: string, s3_path: string }[]>`COALESCE(json_agg(
+        json_build_object(
+          'file_name', ${schema.manifest.file_name},
+          'file_hash', ${schema.manifest.file_hash},
+          's3_path', ${schema.manifest.s3_path}
+        )
+      ) FILTER (WHERE ${schema.manifest.file_name} IS NOT NULL), '[]'::json)`
   const channelDeviceQuery = drizzleCient
     .select({
       channel_devices: {
@@ -162,6 +283,7 @@ export function requestInfosPostgres(
   return Promise.all([channelDevice, channel])
     .then(([channelOverride, channelData]) => ({ channelData, channelOverride }))
     .catch((e) => {
+      logPgError(c, 'requestInfosPostgres', e)
       throw e
     })
 }
@@ -195,8 +317,8 @@ export async function getAppOwnerPostgres(
 
     return appOwner
   }
-  catch (e: any) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'getAppOwnerPostgres', error: e })
+  catch (e: unknown) {
+    logPgError(c, 'getAppOwnerPostgres', e)
     return null
   }
 }
@@ -224,8 +346,8 @@ export async function getAppVersionPostgres(
       .then(data => data[0])
     return appVersion
   }
-  catch (e: any) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'getAppVersionPostgres', error: e })
+  catch (e: unknown) {
+    logPgError(c, 'getAppVersionPostgres', e)
     return null
   }
 }
@@ -256,8 +378,8 @@ export async function getAppVersionsByAppIdPg(
       .limit(2)
     return versions
   }
-  catch (e: any) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'getAppVersionsByAppIdPg', error: e })
+  catch (e: unknown) {
+    logPgError(c, 'getAppVersionsByAppIdPg', e)
     return []
   }
 }
@@ -303,8 +425,8 @@ export async function getChannelDeviceOverridePg(
       },
     }
   }
-  catch (e: any) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'getChannelDeviceOverridePg', error: e })
+  catch (e: unknown) {
+    logPgError(c, 'getChannelDeviceOverridePg', e)
     return null
   }
 }
@@ -332,8 +454,8 @@ export async function getChannelByNamePg(
       .then(data => data[0])
     return channel
   }
-  catch (e: any) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'getChannelByNamePg', error: e })
+  catch (e: unknown) {
+    logPgError(c, 'getChannelByNamePg', e)
     return null
   }
 }
@@ -357,8 +479,8 @@ export async function getMainChannelsPg(
       ))
     return channels
   }
-  catch (e: any) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'getMainChannelsPg', error: e })
+  catch (e: unknown) {
+    logPgError(c, 'getMainChannelsPg', e)
     return []
   }
 }
@@ -378,8 +500,8 @@ export async function deleteChannelDevicePg(
       ))
     return true
   }
-  catch (e: any) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'deleteChannelDevicePg', error: e })
+  catch (e: unknown) {
+    logPgError(c, 'deleteChannelDevicePg', e)
     return false
   }
 }
@@ -406,8 +528,8 @@ export async function upsertChannelDevicePg(
       })
     return true
   }
-  catch (e: any) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'upsertChannelDevicePg', error: e })
+  catch (e: unknown) {
+    logPgError(c, 'upsertChannelDevicePg', e)
     return false
   }
 }
@@ -440,8 +562,8 @@ export async function getChannelsPg(
       .where(and(...whereConditions))
     return channels
   }
-  catch (e: any) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'getChannelsPg', error: e })
+  catch (e: unknown) {
+    logPgError(c, 'getChannelsPg', e)
     return []
   }
 }
@@ -467,8 +589,8 @@ export async function getAppByIdPg(
       .then(data => data[0])
     return app
   }
-  catch (e: any) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'getAppByIdPg', error: e })
+  catch (e: unknown) {
+    logPgError(c, 'getAppByIdPg', e)
     return null
   }
 }
@@ -503,8 +625,8 @@ export async function getCompatibleChannelsPg(
       ))
     return channels
   }
-  catch (e: any) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'getCompatibleChannelsPg', error: e })
+  catch (e: unknown) {
+    logPgError(c, 'getCompatibleChannelsPg', e)
     return []
   }
 }

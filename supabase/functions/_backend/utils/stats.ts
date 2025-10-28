@@ -14,21 +14,28 @@ export function createStatsMau(c: Context, device_id: string, app_id: string, or
   return trackDeviceUsageCF(c, lowerDeviceId, app_id, org_id)
 }
 
-export async function opnPremStats(c: Context, app_id: string, action: string, device: DeviceWithoutCreatedAt) {
-  if (app_id) {
-    await createIfNotExistStoreInfo(c, {
+export async function onPremStats(c: Context, app_id: string, action: string, device: DeviceWithoutCreatedAt) {
+  if (!app_id) {
+    cloudlog({ requestId: c.get('requestId'), message: 'App ID is missing in onPremStats', country: c.req.raw?.cf?.country })
+    return simpleError200(c, 'app_not_found', 'App not found')
+  }
+  backgroundTask(c, async () => {
+    const res = await createIfNotExistStoreInfo(c, {
       app_id,
+      updates: 1,
       onprem: true,
       capacitor: true,
       capgo: true,
     })
-  }
-  if (action === 'get')
-    await updateStoreApp(c, app_id, 1)
+    if (!res && action === 'get')
+      await updateStoreApp(c, app_id, 1)
+  })
+
   // save stats of unknow sources in our analytic DB
   await createStatsLogsExternal(c, device.app_id, device.device_id, 'get', device.version_name)
-  cloudlog({ requestId: c.get('requestId'), message: 'App is external', app_id: device.app_id, country: (c.req.raw as any)?.cf?.country })
-  return simpleError200(c, 'app_not_found', 'App not found')
+  cloudlog({ requestId: c.get('requestId'), message: 'App is external (onPremise), returning 429', app_id: device.app_id, country: c.req.raw.cf?.country, user_agent: c.req.raw.headers.get('user-agent') })
+  // Return 429 to prevent device from retrying until next app kill (DDOS prevention)
+  return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
 }
 
 export function createStatsBandwidth(c: Context, device_id: string, app_id: string, file_size: number) {

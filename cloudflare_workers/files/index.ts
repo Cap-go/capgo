@@ -1,3 +1,4 @@
+import process from 'node:process'
 import { app as download_link } from '../../supabase/functions/_backend/private/download_link.ts'
 import { app as files } from '../../supabase/functions/_backend/private/files.ts'
 import { app as upload_link } from '../../supabase/functions/_backend/private/upload_link.ts'

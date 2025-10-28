@@ -16,7 +16,7 @@ jobs:
     name: Build code and deploy to Supabase
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Setup bun
         uses: oven-sh/setup-bun@v2
         with:
@@ -64,7 +64,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          fetch-tags: true
       - name: Setup bun
         uses: oven-sh/setup-bun@v2
         with:
@@ -75,20 +78,24 @@ jobs:
         run: |
           if [[ ${{ github.ref }} == *-alpha* ]]; then
             echo "ENV=dev" >> $GITHUB_ENV
-            echo "PROJECT_NAME=capgo-webapp-dev" >> $GITHUB_ENV
             echo "CHANNEL=dev" >> $GITHUB_ENV
           else
             echo "ENV=prod" >> $GITHUB_ENV
-            echo "PROJECT_NAME=capgo-webapp" >> $GITHUB_ENV
             echo "CHANNEL=production" >> $GITHUB_ENV
           fi
       - name: Build
-        run: bun ${{ env.ENV == 'prod' && 'mobile' || 'dev-mobile' }}
+        run: bun ${{ env.ENV == 'prod' && 'build:mobile' || 'build:dev:mobile' }}
         env:
           VITE_VAPID_KEY: ${{ secrets.VITE_VAPID_KEY }}
           VITE_FIREBASE_CONFIG: ${{ secrets.VITE_FIREBASE_CONFIG }}
+      - name: Generate AI changelog
+        id: changelog
+        uses: mistricky/ccc@v0.2.2
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
       - name: Publish CF webapp
-        run: bunx wrangler@latest pages deploy dist --project-name ${{ env.PROJECT_NAME }} --branch main
+        run: bun run deploy:cloudflare:webapp:${{ env.ENV }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -100,9 +107,16 @@ jobs:
         id: create_release
         uses: softprops/action-gh-release@v2
         with:
-          generate_release_notes: true
-          # body: ${{ steps.create_release.outputs. }}
-          name: ${{ github.ref_name }}
+          body: |
+            ## 🆕 Changelog
+
+            ${{ steps.changelog.outputs.result }}
+
+            ---
+
+            🔗 **Full Changelog**: https://github.com/${{ github.repository }}/compare/${{ steps.changelog.outputs.from_tag }}...${{ steps.changelog.outputs.to_tag }}
+          make_latest: true
+          token: "${{ secrets.PERSONAL_ACCESS_TOKEN }}"
           prerelease: ${{ contains(github.ref, '-alpha.') }}
 
   deploy_api:
@@ -110,7 +124,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Setup bun
         uses: oven-sh/setup-bun@v2
         with:
@@ -136,7 +150,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Setup bun
         uses: oven-sh/setup-bun@v2
         with:
@@ -161,7 +175,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Setup bun
         uses: oven-sh/setup-bun@v2
         with:
@@ -186,7 +200,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Setup bun
         uses: oven-sh/setup-bun@v2
         with:
@@ -211,7 +225,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Setup bun
         uses: oven-sh/setup-bun@v2
         with:

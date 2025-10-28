@@ -80,8 +80,8 @@ const bannerText = computed(() => {
   return null
 })
 const bannerColor = computed(() => {
-  const warning = 'd-btn-warning'
-  const success = 'd-btn-success'
+  const warning = 'd-btn-warning text-black'
+  const success = 'd-btn-success text-black'
 
   const org = organizationStore.currentOrganization
   if (!org)

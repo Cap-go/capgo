@@ -24,11 +24,11 @@ jobs:
           path: ${{ env.DENO_DIR }}
           key: my_cache_key
       - name: Checkout capgo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Install Supabase CLI
         uses: supabase/setup-cli@v1
         with:
-          version: 2.48.3 # we fix the version till this is resolved again https://github.com/supabase/storage/issues/771
+          version: 2.53.6
       - name: Show Supabase CLI version
         run: supabase --version
       - name: Set edge runtime policy to per_worker
@@ -58,7 +58,7 @@ jobs:
       # - name: Install playwright
       #   run: bunx playwright install
       - name: Lint
-        run: bun lint && bun lint-backend
+        run: bun lint && bun lint:backend
       - name: Typecheck
         run: bun typecheck
       - name: Lint I18n

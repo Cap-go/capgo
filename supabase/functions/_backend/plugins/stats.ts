@@ -11,7 +11,7 @@ import { sendNotifOrg } from '../utils/notifications.ts'
 import { closeClient, getAppOwnerPostgres, getAppVersionPostgres, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import { getAppOwnerPostgresV2, getAppVersionPostgresV2, getDrizzleClientD1Session } from '../utils/pg_d1.ts'
 import { parsePluginBody } from '../utils/plugin_parser.ts'
-import { createStatsVersion, opnPremStats, sendStatsAndDevice } from '../utils/stats.ts'
+import { createStatsVersion, onPremStats, sendStatsAndDevice } from '../utils/stats.ts'
 import { deviceIdRegex, INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, isLimited, MISSING_STRING_APP_ID, MISSING_STRING_DEVICE_ID, MISSING_STRING_PLATFORM, MISSING_STRING_VERSION_NAME, MISSING_STRING_VERSION_OS, NON_STRING_APP_ID, NON_STRING_DEVICE_ID, NON_STRING_PLATFORM, NON_STRING_VERSION_NAME, NON_STRING_VERSION_OS, reverseDomainRegex } from '../utils/utils.ts'
 import { ALLOWED_STATS_ACTIONS } from './stats_actions.ts'
 
@@ -81,7 +81,7 @@ async function post(c: Context, drizzleCient: ReturnType<typeof getDrizzleClient
     ? await getAppOwnerPostgresV2(c, app_id, drizzleCient as ReturnType<typeof getDrizzleClientD1Session>, planActions)
     : await getAppOwnerPostgres(c, app_id, drizzleCient as ReturnType<typeof getDrizzleClient>, planActions)
   if (!appOwner) {
-    return opnPremStats(c, app_id, action, device)
+    return onPremStats(c, app_id, action, device)
   }
   const statsActions: StatsActions[] = []
 
@@ -144,11 +144,11 @@ app.post('/', async (c) => {
     throw simpleRateLimit(body)
   }
   const isV2 = getIsV2(c)
-  const pgClient = isV2 ? null : getPgClient(c)
+  const pgClient = isV2 ? null : getPgClient(c, true) // READ-ONLY: writes use SDK, not Drizzle
 
   const bodyParsed = parsePluginBody<AppStats>(c, body, jsonRequestSchema)
   const res = await post(c, isV2 ? getDrizzleClientD1Session(c) : getDrizzleClient(pgClient!), !!isV2, bodyParsed)
-  if (isV2 && pgClient)
+  if (!isV2 && pgClient)
     await closeClient(c, pgClient)
   return res
 })

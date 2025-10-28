@@ -631,7 +631,7 @@ onMounted(async () => {
 }
 
 .dp__menu_inner {
-  --dp-menu-padding: .5rem;
+  --dp-menu-padding: 0.5rem;
 }
 
 .dp__theme_dark {
@@ -738,7 +738,9 @@ onMounted(async () => {
   width: 320px !important;
   min-width: 320px !important;
   max-width: 320px !important;
-  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1) !important;
+  box-shadow:
+    0 10px 15px -3px rgb(0 0 0 / 0.1),
+    0 4px 6px -4px rgb(0 0 0 / 0.1) !important;
   border: 1px solid rgb(229 231 235) !important;
 }
 
@@ -757,7 +759,9 @@ onMounted(async () => {
 /* Dark mode menu styling */
 .dark .dp__menu {
   border-color: rgb(55 65 81) !important;
-  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.3), 0 4px 6px -4px rgb(0 0 0 / 0.3) !important;
+  box-shadow:
+    0 10px 15px -3px rgb(0 0 0 / 0.3),
+    0 4px 6px -4px rgb(0 0 0 / 0.3) !important;
 }
 
 /* Arrow styling to match menu border */

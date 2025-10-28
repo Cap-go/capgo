@@ -14,16 +14,22 @@ import { useOrganizationStore } from '~/stores/organization'
 const props = defineProps<{
   apps: (Database['public']['Tables']['apps']['Row'])[]
   deleteButton: boolean
+  total?: number
+  currentPage?: number
+  search?: string
+  serverSidePagination?: boolean
 }>()
 const emit = defineEmits([
   'addApp',
+  'update:currentPage',
+  'update:search',
 ])
 const { t } = useI18n()
 const isMobile = Capacitor.isNativePlatform()
 const supabase = useSupabase()
 const router = useRouter()
-const search = ref('')
-const currentPage = ref(1)
+const internalSearch = ref(props.search || '')
+const internalCurrentPage = ref(props.currentPage || 1)
 const filters = ref({})
 const main = useMainStore()
 const organizationStore = useOrganizationStore()
@@ -178,9 +184,9 @@ const filteredApps = computed(() => {
 
   let apps = appsWithMau.value
 
-  // Apply search filter
-  if (search.value) {
-    const searchLower = search.value.toLowerCase()
+  // Apply search filter (only for client-side pagination)
+  if (!props.serverSidePagination && internalSearch.value) {
+    const searchLower = internalSearch.value.toLowerCase()
     apps = apps.filter((app) => {
       // Search by name (primary)
       const nameMatch = app.name?.toLowerCase().includes(searchLower)
@@ -251,15 +257,17 @@ const filteredApps = computed(() => {
       <Table
         v-model:filters="filters"
         v-model:columns="columns"
-        v-model:current-page="currentPage"
-        v-model:search="search"
+        v-model:current-page="internalCurrentPage"
+        v-model:search="internalSearch"
         :show-add="!isMobile"
-        :total="filteredApps.length"
+        :total="props.total ?? filteredApps.length"
         :element-list="filteredApps"
-        :search-placeholder="t('search-by-name-or-bundle-id')"
+        :search-placeholder="t('search-by-name-or-app-id')"
         :is-loading="false"
         filter-text="Filters"
         @add="emit('addApp')"
+        @update:current-page="(page) => emit('update:currentPage', page)"
+        @update:search="(val) => emit('update:search', val)"
       />
     </div>
   </div>

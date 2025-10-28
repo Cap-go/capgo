@@ -13,7 +13,7 @@ jobs:
     name: Bump version and create changelog with standard version
     steps:
       - name: Check out
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           token: "${{ secrets.PERSONAL_ACCESS_TOKEN }}"
       - name: Setup bun

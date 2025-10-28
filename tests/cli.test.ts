@@ -2,7 +2,8 @@ import { randomUUID } from 'node:crypto'
 import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { cleanupCli, getSemver, prepareCli, runCli, tempFileFolder } from './cli-utils'
+import { uploadBundleSDK } from './cli-sdk-utils'
+import { cleanupCli, getSemver, prepareCli, tempFileFolder } from './cli-utils'
 import { getSupabaseClient, ORG_ID, resetAndSeedAppData, resetAppData, resetAppDataStats, USER_ID } from './test-utils'
 
 describe('tests CLI upload', () => {
@@ -10,41 +11,49 @@ describe('tests CLI upload', () => {
   const APPNAME_one = `com.cli_${id_one}`
 
   beforeAll(async () => {
-    await resetAndSeedAppData(APPNAME_one)
-    await prepareCli(APPNAME_one)
+    await Promise.all([
+      resetAndSeedAppData(APPNAME_one),
+      prepareCli(APPNAME_one),
+    ])
   })
 
   afterAll(async () => {
-    await cleanupCli(APPNAME_one)
-    await resetAppData(APPNAME_one)
-    await resetAppDataStats(APPNAME_one)
+    await Promise.all([
+      cleanupCli(APPNAME_one),
+      resetAppData(APPNAME_one),
+      resetAppDataStats(APPNAME_one),
+    ])
   })
 
-  // Essential upload tests only
   it('should upload bundle successfully', async () => {
     const semver = getSemver()
-    const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--ignore-checksum-check', '--dry-upload'], APPNAME_one, false)
-    expect(output).toContain('Time to share your update to the world')
-  }, 30000) // Increase timeout to 30 seconds
+    const result = await uploadBundleSDK(APPNAME_one, semver, 'production', {
+      ignoreCompatibilityCheck: true,
+    })
+    expect(result.success).toBe(true)
+  }, 30000)
 
   it('should not upload same hash twice', async () => {
     const semver = getSemver()
 
     // First upload
-    await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--dry-upload'], APPNAME_one, false)
+    await uploadBundleSDK(APPNAME_one, semver, 'production', {
+      ignoreCompatibilityCheck: true,
+    })
 
     // Second upload with same content should be skipped
-    const output2 = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--dry-upload'], APPNAME_one, false)
-    expect(output2).toContain('Cannot upload the same bundle content')
-  }, 30000) // Increase timeout
+    const result2 = await uploadBundleSDK(APPNAME_one, semver, 'production', {
+      ignoreCompatibilityCheck: true,
+    })
+    expect(result2.success).toBe(false)
+    expect(result2.error).toContain('same bundle content')
+  }, 30000)
 })
 
 describe.concurrent('tests CLI upload options in parallel', () => {
-  // Single shared app for most tests to reduce setup overhead
   const sharedId = randomUUID()
   const SHARED_APPNAME = `com.cli_shared_${sharedId}`
 
-  // Pre-create minimal apps for file modification tests
   const fileTestApps: Array<{ id: string, APPNAME: string }> = []
   const apiTestApps: Array<{ id: string, APPNAME: string }> = []
   const usedApps: Array<string> = []
@@ -52,26 +61,24 @@ describe.concurrent('tests CLI upload options in parallel', () => {
   const prepareApp = async () => {
     const id = randomUUID()
     const APPNAME = `com.cli_ccr_${id}`
-    await resetAndSeedAppData(APPNAME)
-    await prepareCli(APPNAME)
+    await Promise.all([
+      resetAndSeedAppData(APPNAME),
+      prepareCli(APPNAME),
+    ])
     return { id, APPNAME }
   }
 
   beforeAll(async () => {
-    // Setup shared app
-    await resetAndSeedAppData(SHARED_APPNAME)
-    await prepareCli(SHARED_APPNAME)
-
-    // Pre-create only essential apps (reduced further)
     const promises = []
 
-    // Only 1 app for file tests
-    for (let i = 0; i < 1; i++) {
-      promises.push(prepareApp().then(app => fileTestApps.push(app)))
-    }
+    promises.push(Promise.all([
+      resetAndSeedAppData(SHARED_APPNAME),
+      prepareCli(SHARED_APPNAME),
+    ]))
 
-    // Create enough API test apps to handle retries
-    for (let i = 0; i < 6; i++) {
+    promises.push(prepareApp().then(app => fileTestApps.push(app)))
+
+    for (let i = 0; i < 2; i++) {
       promises.push(prepareApp().then(app => apiTestApps.push(app)))
     }
 
@@ -81,14 +88,15 @@ describe.concurrent('tests CLI upload options in parallel', () => {
   afterAll(async () => {
     const allApps = [SHARED_APPNAME, ...usedApps]
 
-    for (const appName of allApps) {
-      await cleanupCli(appName)
-      await resetAppData(appName)
-      await resetAppDataStats(appName)
-    }
+    await Promise.all(allApps.map(async (appName) => {
+      await Promise.all([
+        cleanupCli(appName),
+        resetAppData(appName),
+        resetAppDataStats(appName),
+      ])
+    }))
   })
 
-  // Essential file modification tests (only most critical)
   it.concurrent('test code check (missing notifyAppReady)', async () => {
     const app = fileTestApps.shift()
     if (!app)
@@ -97,15 +105,22 @@ describe.concurrent('tests CLI upload options in parallel', () => {
 
     const semver = getSemver()
     writeFileSync(join(tempFileFolder(app.APPNAME), 'dist', 'index.js'), 'import { CapacitorUpdater } from \'@capgo/capacitor-updater\';\nconsole.log("Hello world!!!");')
-    const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--dry-upload'], app.APPNAME, false)
-    expect(output).toContain('notifyAppReady() is missing in')
+
+    const result = await uploadBundleSDK(app.APPNAME, semver, 'production', {
+      ignoreCompatibilityCheck: true,
+      disableCodeCheck: false, // Enable code check for this test
+    })
+    expect(result.success).toBe(false)
+    expect(result.error).toContain('notifyAppReady')
   }, 30000)
 
-  // Essential upload option tests (use shared app)
   it.concurrent('test --min-update-version', async () => {
     const semver = getSemver()
-    const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--min-update-version', '1.0.0', '--ignore-checksum-check', '--dry-upload'], SHARED_APPNAME, false)
-    expect(output).toContain('Time to share your update to the world')
+    const result = await uploadBundleSDK(SHARED_APPNAME, semver, 'production', {
+      ignoreCompatibilityCheck: true,
+      minUpdateVersion: '1.0.0',
+    })
+    expect(result.success).toBe(true)
 
     const supabase = getSupabaseClient()
     const { data, error } = await supabase
@@ -122,11 +137,14 @@ describe.concurrent('tests CLI upload options in parallel', () => {
   it.concurrent('cannot upload with wrong api key', async () => {
     const testApiKey = randomUUID()
     const semver = getSemver()
-    const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--dry-upload'], SHARED_APPNAME, false, testApiKey)
-    expect(output).toContain('Invalid API key or insufficient permissions.')
+    const result = await uploadBundleSDK(SHARED_APPNAME, semver, 'production', {
+      ignoreCompatibilityCheck: true,
+      apikey: testApiKey,
+    })
+    expect(result.success).toBe(false)
+    expect(result.error).toContain('Invalid API key')
   }, 30000)
 
-  // Essential API key tests (only most critical)
   it.concurrent('should test upload with org-limited API key', async () => {
     const app = apiTestApps.shift()
     if (!app)
@@ -147,8 +165,11 @@ describe.concurrent('tests CLI upload options in parallel', () => {
           limited_to_orgs: [ORG_ID],
         })
 
-      const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--ignore-checksum-check', '--dry-upload'], app.APPNAME, false, testApiKey)
-      expect(output).toContain('Bundle uploaded')
+      const result = await uploadBundleSDK(app.APPNAME, semver, 'production', {
+        ignoreCompatibilityCheck: true,
+        apikey: testApiKey,
+      })
+      expect(result.success).toBe(true)
     }
     finally {
       await supabase.from('apikeys').delete().eq('key', testApiKey)
@@ -176,8 +197,12 @@ describe.concurrent('tests CLI upload options in parallel', () => {
           limited_to_orgs: [wrongOrgId],
         })
 
-      const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--dry-upload'], app.APPNAME, false, testApiKey)
-      expect(output).toContain(`Cannot get organization id for app id ${app.APPNAME}`)
+      const result = await uploadBundleSDK(app.APPNAME, semver, 'production', {
+        ignoreCompatibilityCheck: true,
+        apikey: testApiKey,
+      })
+      expect(result.success).toBe(false)
+      expect(result.error).toContain(`Cannot get organization id for app id ${app.APPNAME}`)
     }
     finally {
       await supabase.from('apikeys').delete().eq('key', testApiKey)

@@ -79,3 +79,4 @@ internal/electric/.env.prod
 scripts/*.json
 scripts/*.txt
 scripts/*.csv
+test-runner-profile

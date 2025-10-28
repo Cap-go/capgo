@@ -115,7 +115,7 @@ async function updateIt(c: Context, record: Database['public']['Tables']['app_ve
 
 async function deleteManifest(c: Context, record: Database['public']['Tables']['app_versions']['Row']) {
   // Delete manifest entries - first get them to delete from S3
-  const pgClient = getPgClient(c)
+  const pgClient = getPgClient(c, true) // READ-ONLY: deletes use SDK, not Drizzle
   const drizzleClient = getDrizzleClient(pgClient)
 
   try {
