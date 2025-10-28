@@ -31,6 +31,10 @@
     {
       "pattern": "updater.spencer.co/*",
       "zone_name": "capgo.app"
+    },
+    {
+      "pattern": "updater.capgo.com.cn/*",
+      "zone_name": "capgo.app"
     }
   ],
   "logpush": true,
