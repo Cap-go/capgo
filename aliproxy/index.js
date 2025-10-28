@@ -3,7 +3,7 @@
 const https = require('node:https')
 const querystring = require('node:querystring')
 
-const TARGET_HOST = 'plugin.usecapgo.com'
+const TARGET_HOST = 'updater.capgo.com.cn'
 const ALLOWED_HOST = TARGET_HOST // for quick safety check
 
 exports.handler = function (event, context, callback) {
