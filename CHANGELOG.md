@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.38.1 (2025-10-28)
+
+
+### Bug Fixes
+
+* update TARGET_HOST in aliproxy and add new route pattern in wrangler.jsonc ([6856fdb](https://github.com/Cap-go/capgo/commit/6856fdb8931bf73ce63386f344ad7db16fa7d85e))
+
 ## 12.38.0 (2025-10-28)
 
 
