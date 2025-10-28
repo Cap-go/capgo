@@ -54,7 +54,7 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
     is_prod,
   } = body
 
-  const drizzleClientD1 = getDrizzleClientD1Session(c)
+  const drizzleClientD1 = (isV2 ? getDrizzleClientD1Session(c) : undefined) as ReturnType<typeof getDrizzleClientD1Session>
   // Check if app exists first - Read operation can use v2 flag
   const appOwner = isV2
     ? await getAppOwnerPostgresV2(c, app_id, drizzleClientD1, PLAN_MAU_ACTIONS)
@@ -290,7 +290,7 @@ async function deleteOverride(c: Context, drizzleClient: ReturnType<typeof getDr
     device_id,
     version_build,
   } = body
-  const drizzleClientD1 = getDrizzleClientD1Session(c)
+  const drizzleClientD1 = (isV2 ? getDrizzleClientD1Session(c) : undefined) as ReturnType<typeof getDrizzleClientD1Session>
   cloudlog({ requestId: c.get('requestId'), message: 'delete override', version_build })
 
   // Check if app exists first - Read operation can use v2 flag
@@ -391,6 +391,9 @@ app.post('/', async (c) => {
   const pgClient = getPgClient(c)
 
   const bodyParsed = parsePluginBody<DeviceLink>(c, body, jsonRequestSchema)
+  if (!bodyParsed.channel) {
+    throw simpleError('missing_channel', 'Cannot find channel in body', { body })
+  }
   let res
   try {
     res = await post(c, getDrizzleClient(pgClient), !!isV2, bodyParsed)

@@ -119,7 +119,7 @@ describe('invalids /channel_self tests', () => {
     expect(response.status).toBe(400)
 
     const error = await getResponseErrorCode(response)
-    expect(error).toBe('cannot_override')
+    expect(error).toBe('missing_channel')
   })
 
   it('[POST] with a channel that does not exist', async () => {
