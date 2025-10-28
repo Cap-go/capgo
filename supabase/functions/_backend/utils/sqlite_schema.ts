@@ -1,13 +1,4 @@
-import { customType, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core'
-
-const boolean = customType<{ data: boolean }>({
-  dataType() {
-    return 'boolean'
-  },
-  toDriver(value: boolean): boolean {
-    return value
-  },
-})
+import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 
 export const apps = sqliteTable('apps', {
   id: text('id').primaryKey(),
@@ -27,7 +18,7 @@ export const app_versions = sqliteTable('app_versions', {
   name: text('name').notNull(),
   r2_path: text('r2_path'),
   user_id: text('user_id'),
-  deleted: boolean('deleted').default(false).notNull(),
+  deleted: integer('deleted', { mode: 'boolean' }).default(false).notNull(),
   external_url: text('external_url'),
   checksum: text('checksum'),
   session_key: text('session_key'),
@@ -50,14 +41,14 @@ export const channels = sqliteTable('channels', {
   app_id: text('app_id').notNull(),
   version: integer('version', { mode: 'number' }).notNull(),
   created_by: text('created_by'),
-  public: boolean('public').default(false).notNull(),
-  disable_auto_update_under_native: boolean('disable_auto_update_under_native').default(true).notNull(),
+  public: integer('public', { mode: 'boolean' }).default(false).notNull(),
+  disable_auto_update_under_native: integer('disable_auto_update_under_native', { mode: 'boolean' }).default(true).notNull(),
   disable_auto_update: text('disable_auto_update').default('major').notNull(),
-  ios: boolean('ios').default(true).notNull(),
-  android: boolean('android').default(true).notNull(),
-  allow_device_self_set: boolean('allow_device_self_set').default(false).notNull(),
-  allow_emulator: boolean('allow_emulator').default(true).notNull(),
-  allow_dev: boolean('allow_dev').default(true).notNull(),
+  ios: integer('ios', { mode: 'boolean' }).default(true).notNull(),
+  android: integer('android', { mode: 'boolean' }).default(true).notNull(),
+  allow_device_self_set: integer('allow_device_self_set', { mode: 'boolean' }).default(false).notNull(),
+  allow_emulator: integer('allow_emulator', { mode: 'boolean' }).default(true).notNull(),
+  allow_dev: integer('allow_dev', { mode: 'boolean' }).default(true).notNull(),
 })
 
 export const channel_devices = sqliteTable('channel_devices', {
@@ -82,8 +73,8 @@ export const stripe_info = sqliteTable('stripe_info', {
   customer_id: text('customer_id'),
   status: text('status'),
   trial_at: text('trial_at'),
-  is_good_plan: boolean('is_good_plan'),
-  mau_exceeded: boolean('mau_exceeded'),
-  storage_exceeded: boolean('storage_exceeded'),
-  bandwidth_exceeded: boolean('bandwidth_exceeded'),
+  is_good_plan: integer('is_good_plan', { mode: 'boolean' }),
+  mau_exceeded: integer('mau_exceeded', { mode: 'boolean' }),
+  storage_exceeded: integer('storage_exceeded', { mode: 'boolean' }),
+  bandwidth_exceeded: integer('bandwidth_exceeded', { mode: 'boolean' }),
 })

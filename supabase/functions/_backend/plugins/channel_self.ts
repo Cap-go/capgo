@@ -135,7 +135,7 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
   let mainChannelName = null as string | null
   if (mainChannel && mainChannel.length > 0) {
     const devicePlatform = body.platform as Database['public']['Enums']['platform_os']
-    const finalChannel = mainChannel.find((channel: { name: string, ios: boolean, android: boolean }) => channel[devicePlatform] === true)
+    const finalChannel = mainChannel.find((channel: { name: string, ios: boolean, android: boolean }) => channel[devicePlatform])
     mainChannelName = (finalChannel !== undefined) ? finalChannel.name : null
   }
 
@@ -271,7 +271,7 @@ async function put(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient
 
   const finalChannel = body.defaultChannel
     ? dataChannel.find((channel: { name: string }) => channel.name === body.defaultChannel)
-    : dataChannel.find((channel: { ios: boolean, android: boolean }) => channel[devicePlatform.data] === true)
+    : dataChannel.find((channel: { ios: boolean, android: boolean }) => channel[devicePlatform.data])
 
   if (!finalChannel) {
     throw quickError(404, 'channel_not_found', 'Cannot find channel', { dataChannel })
