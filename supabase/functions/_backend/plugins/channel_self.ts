@@ -38,7 +38,7 @@ export const jsonRequestSchema = z.looseObject({
   platform: devicePlatformScheme,
 })
 
-async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient> | ReturnType<typeof getDrizzleClientD1Session>, isV2: boolean, body: DeviceLink): Promise<Response> {
+async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient>, isV2: boolean, body: DeviceLink): Promise<Response> {
   cloudlog({ requestId: c.get('requestId'), message: 'post channel self body', body })
   const {
     version_name,
@@ -54,9 +54,10 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
     is_prod,
   } = body
 
+  const drizzleClientD1 = getDrizzleClientD1Session(c)
   // Check if app exists first - Read operation can use v2 flag
   const appOwner = isV2
-    ? await getAppOwnerPostgresV2(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClientD1Session>, PLAN_MAU_ACTIONS)
+    ? await getAppOwnerPostgresV2(c, app_id, drizzleClientD1, PLAN_MAU_ACTIONS)
     : await getAppOwnerPostgres(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>, PLAN_MAU_ACTIONS)
 
   if (!appOwner) {
@@ -67,7 +68,7 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
 
   // Read operations can use v2 flag
   const versions = isV2
-    ? await getAppVersionsByAppIdD1(c, app_id, version_name, drizzleClient as ReturnType<typeof getDrizzleClientD1Session>, PLAN_MAU_ACTIONS)
+    ? await getAppVersionsByAppIdD1(c, app_id, version_name, drizzleClientD1, PLAN_MAU_ACTIONS)
     : await getAppVersionsByAppIdPg(c, app_id, version_name, drizzleClient as ReturnType<typeof getDrizzleClient>, PLAN_MAU_ACTIONS)
 
   if (!versions || versions.length === 0) {
@@ -101,7 +102,7 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
 
   // Read operations can use v2 flag
   const dataChannelOverride = isV2
-    ? await getChannelDeviceOverrideD1(c, app_id, device_id, drizzleClient as ReturnType<typeof getDrizzleClientD1Session>)
+    ? await getChannelDeviceOverrideD1(c, app_id, device_id, drizzleClientD1)
     : await getChannelDeviceOverridePg(c, app_id, device_id, drizzleClient as ReturnType<typeof getDrizzleClient>)
 
   if (!channel) {
@@ -113,7 +114,7 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
   // if channel set channel_override to it
   // get channel by name - Read operation can use v2 flag
   const dataChannel = isV2
-    ? await getChannelByNameD1(c, app_id, channel, drizzleClient as ReturnType<typeof getDrizzleClientD1Session>)
+    ? await getChannelByNameD1(c, app_id, channel, drizzleClientD1)
     : await getChannelByNamePg(c, app_id, channel, drizzleClient as ReturnType<typeof getDrizzleClient>)
 
   if (!dataChannel) {
@@ -126,7 +127,7 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
 
   // Get the main channel - Read operation can use v2 flag
   const mainChannel = isV2
-    ? await getMainChannelsD1(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClientD1Session>)
+    ? await getMainChannelsD1(c, app_id, drizzleClientD1)
     : await getMainChannelsPg(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>)
 
   // We DO NOT return if there is no main channel as it's not a critical error
@@ -143,11 +144,9 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot find main channel' })
 
   if (mainChannelName && mainChannelName === channel) {
-    // Write operation - ALWAYS use PostgreSQL
-    const pgClientForWrite = isV2 ? getPgClient(c) : null
-    const pgDrizzleClient = pgClientForWrite ? getDrizzleClient(pgClientForWrite) : drizzleClient as ReturnType<typeof getDrizzleClient>
+    // Write operation - use the PG client created by the route handler
 
-    const success = await deleteChannelDevicePg(c, app_id, device_id, pgDrizzleClient)
+    const success = await deleteChannelDevicePg(c, app_id, device_id, drizzleClient)
     if (!success) {
       throw simpleError('override_not_allowed', `Cannot remove channel override`, {})
     }
@@ -165,12 +164,10 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
 
   cloudlog({ requestId: c.get('requestId'), message: 'setting channel' })
 
-  // Write operations - ALWAYS use PostgreSQL
-  const pgClientForWrite = isV2 ? getPgClient(c) : null
-  const pgDrizzleClient = pgClientForWrite ? getDrizzleClient(pgClientForWrite) : drizzleClient as ReturnType<typeof getDrizzleClient>
+  // Write operations - use the PG client created by the route handler
 
   if (dataChannelOverride) {
-    const success = await deleteChannelDevicePg(c, app_id, device_id, pgDrizzleClient)
+    const success = await deleteChannelDevicePg(c, app_id, device_id, drizzleClient)
     if (!success) {
       throw simpleError('override_not_allowed', `Cannot remove channel override`, {})
     }
@@ -180,7 +177,7 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
     channel_id: dataChannel.id,
     app_id,
     owner_org: dataChannel.owner_org,
-  }, pgDrizzleClient)
+  }, drizzleClient)
   if (!success) {
     throw simpleError('override_not_allowed', `Cannot do channel override`, {})
   }
@@ -286,18 +283,19 @@ async function put(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient
   })
 }
 
-async function deleteOverride(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient> | ReturnType<typeof getDrizzleClientD1Session>, isV2: boolean, body: DeviceLink): Promise<Response> {
+async function deleteOverride(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient>, isV2: boolean, body: DeviceLink): Promise<Response> {
   cloudlog({ requestId: c.get('requestId'), message: 'delete channel self body', body })
   const {
     app_id,
     device_id,
     version_build,
   } = body
+  const drizzleClientD1 = getDrizzleClientD1Session(c)
   cloudlog({ requestId: c.get('requestId'), message: 'delete override', version_build })
 
   // Check if app exists first - Read operation can use v2 flag
   const appOwner = isV2
-    ? await getAppOwnerPostgresV2(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClientD1Session>, PLAN_MAU_ACTIONS)
+    ? await getAppOwnerPostgresV2(c, app_id, drizzleClientD1, PLAN_MAU_ACTIONS)
     : await getAppOwnerPostgres(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>, PLAN_MAU_ACTIONS)
 
   if (!appOwner) {
@@ -308,7 +306,7 @@ async function deleteOverride(c: Context, drizzleClient: ReturnType<typeof getDr
 
   // Read operation can use v2 flag
   const dataChannelOverride = isV2
-    ? await getChannelDeviceOverrideD1(c, app_id, device_id, drizzleClient as ReturnType<typeof getDrizzleClientD1Session>)
+    ? await getChannelDeviceOverrideD1(c, app_id, device_id, drizzleClientD1)
     : await getChannelDeviceOverridePg(c, app_id, device_id, drizzleClient as ReturnType<typeof getDrizzleClient>)
 
   if (!dataChannelOverride?.channel_id) {
@@ -319,11 +317,9 @@ async function deleteOverride(c: Context, drizzleClient: ReturnType<typeof getDr
     throw simpleError('cannot_override', 'Cannot change device override current channel don\t allow it', { channelOverride: dataChannelOverride.channel_id })
   }
 
-  // Write operation - ALWAYS use PostgreSQL
-  const pgClientForWrite = isV2 ? getPgClient(c) : null
-  const pgDrizzleClient = pgClientForWrite ? getDrizzleClient(pgClientForWrite) : drizzleClient as ReturnType<typeof getDrizzleClient>
+  // Write operation - use the PG client created by the route handler
 
-  const success = await deleteChannelDevicePg(c, app_id, device_id, pgDrizzleClient)
+  const success = await deleteChannelDevicePg(c, app_id, device_id, drizzleClient)
   if (!success) {
     throw simpleError('override_not_allowed', `Cannot delete channel override`, {})
   }
@@ -391,16 +387,16 @@ app.post('/', async (c) => {
   }
 
   const isV2 = getIsV2(c)
-  const pgClient = isV2 ? null : getPgClient(c)
+  // POST has writes, so always create PG client (even if using D1 for reads)
+  const pgClient = getPgClient(c)
 
   const bodyParsed = parsePluginBody<DeviceLink>(c, body, jsonRequestSchema)
   let res
   try {
-    res = await post(c, isV2 ? getDrizzleClientD1Session(c) : getDrizzleClient(pgClient as any), !!isV2, bodyParsed)
+    res = await post(c, getDrizzleClient(pgClient), !!isV2, bodyParsed)
   }
   finally {
-    if (!isV2 && pgClient)
-      await closeClient(c, pgClient)
+    await closeClient(c, pgClient)
   }
   return res
 })
@@ -438,16 +434,16 @@ app.delete('/', async (c) => {
   }
 
   const isV2 = getIsV2(c)
-  const pgClient = isV2 ? null : getPgClient(c)
+  // DELETE has writes, so always create PG client (even if using D1 for reads)
+  const pgClient = getPgClient(c)
 
   const bodyParsed = parsePluginBody<DeviceLink>(c, body, jsonRequestSchema)
   let res
   try {
-    res = await deleteOverride(c, isV2 ? getDrizzleClientD1Session(c) : getDrizzleClient(pgClient as any), !!isV2, bodyParsed)
+    res = await deleteOverride(c, getDrizzleClient(pgClient), !!isV2, bodyParsed)
   }
   finally {
-    if (!isV2 && pgClient)
-      await closeClient(c, pgClient)
+    await closeClient(c, pgClient)
   }
   return res
 })

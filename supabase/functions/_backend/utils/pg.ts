@@ -100,6 +100,7 @@ export function getDatabaseURL(c: Context, readOnly = false): string {
 export function getPgClient(c: Context, readOnly = false) {
   const dbUrl = getDatabaseURL(c, readOnly)
   const requestId = c.get('requestId')
+  const appName = c.header('X-Database-Source') ?? 'capgo_plugin'
   cloudlog({ requestId, message: 'SUPABASE_DB_URL', dbUrl })
 
   const options = {
@@ -112,7 +113,7 @@ export function getPgClient(c: Context, readOnly = false) {
 
     // Add connection debugging
     connection: {
-      application_name: 'capgo_plugin',
+      application_name: appName,
     },
 
     // Hook to log errors - this is called for connection-level errors
