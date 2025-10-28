@@ -334,7 +334,17 @@ async function deleteOverride(c: Context, drizzleClient: ReturnType<typeof getDr
 async function listCompatibleChannels(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient> | ReturnType<typeof getDrizzleClientD1Session>, isV2: boolean, body: DeviceLink): Promise<Response> {
   const { app_id, platform, is_emulator, is_prod } = body
 
-  // Check if app exists and get owner_org for permission check - Read operation can use v2 flag
+  // First check if app exists - Read operation can use v2 flag
+  const appExists = isV2
+    ? await getAppByIdD1(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClientD1Session>, PLAN_MAU_ACTIONS)
+    : await getAppByIdPg(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>, PLAN_MAU_ACTIONS)
+
+  if (!appExists) {
+    // App doesn't exist in database - return 404
+    throw quickError(404, 'app_not_found', 'App not found', { app_id })
+  }
+
+  // Check if app has valid org association (not on-premise) - Read operation can use v2 flag
   const appOwner = isV2
     ? await getAppOwnerPostgresV2(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClientD1Session>, PLAN_MAU_ACTIONS)
     : await getAppOwnerPostgres(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>, PLAN_MAU_ACTIONS)
