@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.38.5 (2025-10-28)
+
+
+### Bug Fixes
+
+* create device from UI ([8b746de](https://github.com/Cap-go/capgo/commit/8b746de569930a0bd83c78668400436ded32e3ce))
+
 ### 12.38.4 (2025-10-28)
 
 
