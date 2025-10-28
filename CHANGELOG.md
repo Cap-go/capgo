@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## 12.38.0 (2025-10-28)
+
+
+### Features
+
+* enhance subscription handling and logging in Stripe events ([882916a](https://github.com/Cap-go/capgo/commit/882916a893a50e2c71b3665e24155b07d2fbd9ec))
+
 ## 12.37.0 (2025-10-27)
 
 
