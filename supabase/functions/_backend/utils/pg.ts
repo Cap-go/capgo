@@ -270,7 +270,7 @@ export function requestInfosPostgres(
           eq(channelAlias.app_id, app_id),
           eq(platformQuery, true),
         )
-      : and (
+      : and(
           eq(channelAlias.app_id, app_id),
           eq(channelAlias.name, defaultChannel),
         ),
@@ -518,6 +518,7 @@ export async function upsertChannelDevicePg(
         device_id: data.device_id,
         channel_id: data.channel_id,
         app_id: data.app_id,
+        owner_org: data.owner_org,
       })
       .onConflictDoUpdate({
         target: [schema.channel_devices.device_id, schema.channel_devices.app_id],
