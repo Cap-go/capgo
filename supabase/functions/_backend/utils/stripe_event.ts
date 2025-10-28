@@ -51,7 +51,8 @@ function subscriptionUpdated(c: Context, event: Stripe.CustomerSubscriptionCreat
     data.status = 'created'
   }
   else {
-    data.status = subscription.cancel_at ? 'canceled' : 'updated'
+    // For updates, just mark as 'updated' - the triggers file will handle the business logic
+    data.status = 'updated'
   }
   data.subscription_id = subscription.id
   data.customer_id = String(subscription.customer)
