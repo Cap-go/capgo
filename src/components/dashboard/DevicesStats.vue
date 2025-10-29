@@ -24,6 +24,10 @@ const props = defineProps({
     type: Boolean,
     default: true,
   },
+  reloadTrigger: {
+    type: Number,
+    default: 0,
+  },
 })
 
 interface ChartDataset {
@@ -419,7 +423,14 @@ async function loadData() {
   }
 }
 
+// Watch billing period changes - need to refetch because date range changes
 watch(() => props.useBillingPeriod, async () => {
+  if (appId.value)
+    await loadData()
+})
+
+// Watch for reload trigger - force refetch
+watch(() => props.reloadTrigger, async () => {
   if (appId.value)
     await loadData()
 })

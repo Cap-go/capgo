@@ -25,6 +25,10 @@ const props = defineProps({
     type: String,
     default: '',
   },
+  reloadTrigger: {
+    type: Number,
+    default: 0,
+  },
 })
 
 // Helper function to filter 30-day data to billing period
@@ -68,6 +72,9 @@ function filterToBillingPeriod(fullData: (number | undefined)[], last30DaysStart
 const { t } = useI18n()
 const organizationStore = useOrganizationStore()
 
+// Debug: log initial prop value
+console.log('[UpdateStatsCard] Component created, initial reloadTrigger:', props.reloadTrigger)
+
 const totalInstalled = ref(0)
 const totalFailed = ref(0)
 const totalRequested = ref(0)
@@ -77,6 +84,9 @@ const updateDataByApp = ref<{ [appId: string]: (number | undefined)[] }>({})
 const updateDataByAction = ref<{ [action: string]: (number | undefined)[] }>({})
 const appNames = ref<{ [appId: string]: string }>({})
 const isLoading = ref(true)
+
+// Cache for raw API data
+const cachedRawStats = ref<any[] | null>(null)
 
 const dashboardAppsStore = useDashboardAppsStore()
 
@@ -104,7 +114,8 @@ const actionDisplayNames = computed(() => ({
 const totalUpdates = computed(() => totalInstalled.value + totalFailed.value + totalRequested.value)
 const hasData = computed(() => chartUpdateData.value?.length > 0)
 
-async function calculateStats() {
+async function calculateStats(forceRefetch = false) {
+  console.log('[UpdateStatsCard] calculateStats called, forceRefetch:', forceRefetch, 'hasCache:', !!cachedRawStats.value)
   isLoading.value = true
   totalInstalled.value = 0
   totalFailed.value = 0
@@ -113,7 +124,6 @@ async function calculateStats() {
   // Reset data
   updateDataByApp.value = {}
   updateDataByAction.value = {}
-  appNames.value = {}
   updateData.value = []
 
   // Always work with last 30 days of data
@@ -148,25 +158,32 @@ async function calculateStats() {
     if (props.appId) {
       // Single app mode
       targetAppIds = [props.appId]
-      try {
-        const { data: appRow } = await useSupabase()
-          .from('apps')
-          .select('name')
-          .eq('app_id', props.appId)
-          .single()
-        localAppNames[props.appId] = appRow?.name ?? props.appId
+      if (!cachedRawStats.value || forceRefetch) {
+        try {
+          const { data: appRow } = await useSupabase()
+            .from('apps')
+            .select('name')
+            .eq('app_id', props.appId)
+            .single()
+          localAppNames[props.appId] = appRow?.name ?? props.appId
+        }
+        catch (error) {
+          console.error('Error fetching app name for update stats:', error)
+          localAppNames[props.appId] = props.appId
+        }
+        appNames.value = localAppNames
       }
-      catch (error) {
-        console.error('Error fetching app name for update stats:', error)
-        localAppNames[props.appId] = props.appId
-      }
-      appNames.value = localAppNames
     }
     else {
       // Multiple apps mode - use store for shared apps data
-      await dashboardAppsStore.fetchApps()
-      targetAppIds = [...dashboardAppsStore.appIds]
-      appNames.value = dashboardAppsStore.appNames
+      if (!cachedRawStats.value || forceRefetch) {
+        await dashboardAppsStore.fetchApps()
+        targetAppIds = [...dashboardAppsStore.appIds]
+        appNames.value = dashboardAppsStore.appNames
+      }
+      else {
+        targetAppIds = Object.keys(appNames.value)
+      }
     }
 
     if (targetAppIds.length === 0) {
@@ -180,14 +197,27 @@ async function calculateStats() {
       updateDataByApp.value[appId] = createUndefinedArray(30) as (number | undefined)[]
     })
 
-    // Get update stats from daily_version table for last 30 days
-    const { data } = await useSupabase()
-      .from('daily_version')
-      .select('date, app_id, install, fail, get')
-      .in('app_id', targetAppIds)
-      .gte('date', startDate)
-      .lte('date', endDate)
-      .order('date')
+    // Use cached data if available and not forcing refetch
+    let data
+    if (cachedRawStats.value && !forceRefetch) {
+      console.log('[UpdateStatsCard] Using cached data')
+      data = cachedRawStats.value
+    }
+    else {
+      console.log('[UpdateStatsCard] Fetching from API (forceRefetch:', forceRefetch, 'hasCache:', !!cachedRawStats.value, ')')
+      // Get update stats from daily_version table for last 30 days
+      const result = await useSupabase()
+        .from('daily_version')
+        .select('date, app_id, install, fail, get')
+        .in('app_id', targetAppIds)
+        .gte('date', startDate)
+        .lte('date', endDate)
+        .order('date')
+      data = result.data
+      // Cache the fetched data
+      cachedRawStats.value = data
+      console.log('[UpdateStatsCard] Data fetched and cached, items:', data?.length)
+    }
 
     if (data && data.length > 0) {
       // Process each stat entry for 30-day period
@@ -283,18 +313,27 @@ async function calculateStats() {
   }
 }
 
-// Watch for billing period mode changes and recalculate
+// Watch for billing period mode changes - use cached data
 watch(() => props.useBillingPeriod, async () => {
-  await calculateStats()
+  await calculateStats(false) // Don't refetch, just reprocess cached data
 })
 
-// Watch for accumulated mode changes and recalculate
+// Watch for accumulated mode changes - use cached data
 watch(() => props.accumulated, async () => {
-  await calculateStats()
+  await calculateStats(false) // Don't refetch, just reprocess cached data
+})
+
+// Watch for reload trigger - force refetch
+watch(() => props.reloadTrigger, async (newVal, oldVal) => {
+  console.log('[UpdateStatsCard] Reload trigger watcher fired:', oldVal, '->', newVal, 'type:', typeof newVal)
+  if (newVal > 0) {
+    console.log('[UpdateStatsCard] Calling calculateStats(true)')
+    await calculateStats(true) // Force refetch from API
+  }
 })
 
 onMounted(async () => {
-  await calculateStats()
+  await calculateStats(true) // Initial fetch
 })
 </script>
 

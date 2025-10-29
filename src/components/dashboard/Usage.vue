@@ -6,7 +6,7 @@ import colors from 'tailwindcss/colors'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
-import ArrowPathIcon from '~icons/heroicons/arrow-path'
+import ArrowPathIconSolid from '~icons/heroicons/arrow-path-solid'
 import BanknotesIcon from '~icons/heroicons/banknotes'
 import CalendarDaysIcon from '~icons/heroicons/calendar-days'
 import ChartBarIcon from '~icons/heroicons/chart-bar'
@@ -63,6 +63,7 @@ const chartsLoaded = ref({
   updates: false,
   deployments: false,
 })
+const reloadTrigger = ref(0) // Increment this to trigger reload in all charts
 
 // View mode selectors for charts
 const route = useRoute()
@@ -154,6 +155,14 @@ function clearDashboardParams() {
   delete query.cumulative
   delete query.billingPeriod
   router.replace({ query })
+}
+
+// Function to reload all chart data
+function reloadAllCharts() {
+  console.log('[Usage] Reloading all charts, trigger:', reloadTrigger.value, '->', reloadTrigger.value + 1)
+  reloadTrigger.value++
+  // Also reload usage data
+  getUsages()
 }
 
 // Expose function and state for parent components
@@ -455,10 +464,20 @@ onMounted(() => {
           :aria-label="t('last-30-days')"
           @click="useBillingPeriod = false"
         >
-          <ArrowPathIcon class="h-4 w-4" />
+          <CalendarDaysIcon class="h-4 w-4" />
           <span class="hidden sm:inline">{{ t('last-30-days') }}</span>
         </button>
       </div>
+
+      <!-- Reload Button -->
+      <button
+        type="button"
+        class="flex h-8 w-8 items-center justify-center rounded-md bg-white text-gray-700 shadow-sm transition-colors hover:bg-gray-50 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600 dark:hover:text-white dark:focus:ring-blue-400 sm:h-9 sm:w-9"
+        :aria-label="t('reload')"
+        @click="reloadAllCharts"
+      >
+        <ArrowPathIconSolid class="h-4 w-4" />
+      </button>
 
       <!-- Usage Info Tooltip -->
       <div class="relative group flex items-center">
@@ -538,9 +557,9 @@ onMounted(() => {
       :is-loading="isLoading"
       class="col-span-full sm:col-span-6 xl:col-span-4"
     />
-    <DevicesStats v-if="appId" :use-billing-period="useBillingPeriod" :accumulated="useBillingPeriod && showCumulative" class="col-span-full sm:col-span-6 xl:col-span-4" />
-    <BundleUploadsCard v-if="!appId" :use-billing-period="useBillingPeriod" :accumulated="useBillingPeriod && showCumulative" class="col-span-full sm:col-span-6 xl:col-span-4" />
-    <UpdateStatsCard v-if="!appId" :use-billing-period="useBillingPeriod" :accumulated="useBillingPeriod && showCumulative" class="col-span-full sm:col-span-6 xl:col-span-4" />
-    <DeploymentStatsCard v-if="!appId" :use-billing-period="useBillingPeriod" :accumulated="useBillingPeriod && showCumulative" class="col-span-full sm:col-span-6 xl:col-span-4" />
+    <DevicesStats v-show="appId" :use-billing-period="useBillingPeriod" :accumulated="useBillingPeriod && showCumulative" :reload-trigger="reloadTrigger" class="col-span-full sm:col-span-6 xl:col-span-4" />
+    <BundleUploadsCard v-show="!appId" :use-billing-period="useBillingPeriod" :accumulated="useBillingPeriod && showCumulative" :reload-trigger="reloadTrigger" class="col-span-full sm:col-span-6 xl:col-span-4" />
+    <UpdateStatsCard v-show="!appId" :use-billing-period="useBillingPeriod" :accumulated="useBillingPeriod && showCumulative" :reload-trigger="reloadTrigger" class="col-span-full sm:col-span-6 xl:col-span-4" />
+    <DeploymentStatsCard v-show="!appId" :use-billing-period="useBillingPeriod" :accumulated="useBillingPeriod && showCumulative" :reload-trigger="reloadTrigger" class="col-span-full sm:col-span-6 xl:col-span-4" />
   </div>
 </template>

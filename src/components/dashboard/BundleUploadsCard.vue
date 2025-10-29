@@ -20,6 +20,10 @@ const props = defineProps({
     type: String,
     default: '',
   },
+  reloadTrigger: {
+    type: Number,
+    default: 0,
+  },
 })
 
 // Helper function to filter 30-day data to billing period
@@ -69,7 +73,11 @@ const bundleData = ref<number[]>([])
 const bundleDataByApp = ref<{ [appId: string]: number[] }>({})
 const appNames = ref<{ [appId: string]: string }>({})
 
-async function calculateStats() {
+// Cache for raw API data
+const cachedRawStats = ref<any[] | null>(null)
+
+async function calculateStats(forceRefetch = false) {
+  console.log('[BundleUploadsCard] calculateStats called, forceRefetch:', forceRefetch, 'hasCache:', !!cachedRawStats.value)
   total.value = 0
 
   // Reset data
@@ -130,15 +138,32 @@ async function calculateStats() {
     bundleDataByApp.value[appId] = Array.from({ length: 30 }).fill(0) as number[]
   })
 
-  // Always fetch last 30 days of data
-  const query = useSupabase()
-    .from('app_versions')
-    .select('created_at, app_id')
-    .gte('created_at', last30DaysStart.toISOString())
-    .lte('created_at', last30DaysEnd.toISOString())
-    .in('app_id', targetAppIds)
+  // Use cached data if available and not forcing refetch
+  let data, error
+  if (cachedRawStats.value && !forceRefetch) {
+    console.log('[BundleUploadsCard] Using cached data')
+    data = cachedRawStats.value
+    error = null
+  }
+  else {
+    console.log('[BundleUploadsCard] Fetching from API')
+    // Always fetch last 30 days of data
+    const query = useSupabase()
+      .from('app_versions')
+      .select('created_at, app_id')
+      .gte('created_at', last30DaysStart.toISOString())
+      .lte('created_at', last30DaysEnd.toISOString())
+      .in('app_id', targetAppIds)
 
-  const { data, error } = await query
+    const result = await query
+    data = result.data
+    error = result.error
+    // Cache the fetched data
+    if (!error) {
+      cachedRawStats.value = data
+      console.log('[BundleUploadsCard] Data cached, items:', data?.length)
+    }
+  }
 
   if (!error && data) {
     // Map each bundle to the correct day and app (30 days)
@@ -194,18 +219,27 @@ async function calculateStats() {
   }
 }
 
-// Watch for billing period mode changes and recalculate
+// Watch for billing period mode changes - use cached data
 watch(() => props.useBillingPeriod, async () => {
-  await calculateStats()
+  await calculateStats(false) // Don't refetch, just reprocess cached data
 })
 
-// Watch for accumulated mode changes and recalculate
+// Watch for accumulated mode changes - use cached data
 watch(() => props.accumulated, async () => {
-  await calculateStats()
+  await calculateStats(false) // Don't refetch, just reprocess cached data
 })
+
+// Watch for reload trigger - force refetch
+watch(() => props.reloadTrigger, async (newVal, oldVal) => {
+  console.log('[BundleUploadsCard] Reload trigger changed:', oldVal, '->', newVal)
+  if (newVal !== oldVal && newVal > 0) {
+    console.log('[BundleUploadsCard] Calling calculateStats(true)')
+    await calculateStats(true) // Force refetch from API
+  }
+}, { flush: 'sync' })
 
 onMounted(async () => {
-  await calculateStats()
+  await calculateStats(true) // Initial fetch
 })
 </script>
 

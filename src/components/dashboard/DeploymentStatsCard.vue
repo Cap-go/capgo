@@ -21,6 +21,10 @@ const props = defineProps({
     type: String,
     default: '',
   },
+  reloadTrigger: {
+    type: Number,
+    default: 0,
+  },
 })
 
 // Helper function to filter 30-day data to billing period
@@ -77,7 +81,11 @@ const isLoading = ref(true)
 const noPublicChannel = ref(false)
 const hasData = computed(() => totalDeployments.value > 0)
 
-async function calculateStats() {
+// Cache for raw API data
+const cachedRawStats = ref<any[] | null>(null)
+
+async function calculateStats(forceRefetch = false) {
+  console.log('[DeploymentStatsCard] calculateStats called, forceRefetch:', forceRefetch, 'hasCache:', !!cachedRawStats.value)
   const requestToken = ++latestRequestToken
 
   isLoading.value = true
@@ -168,36 +176,55 @@ async function calculateStats() {
     let totalDeploymentsCount = 0
     let noPublicChannelDetected = false
 
-    if (targetAppIds.length > 0) {
-      try {
-        const { data: publicChannels } = await supabase
-          .from('channels')
-          .select('app_id')
-          .in('app_id', targetAppIds)
-          .eq('public', true)
-        const hasPublic = (publicChannels?.length ?? 0) > 0
-        noPublicChannelDetected = !hasPublic
-        console.log(`public channel check`, { targetAppIds, hasPublic })
-      }
-      catch (error) {
-        console.error(`failed to verify public channels`, error)
-      }
+    // Use cached data if available and not forcing refetch
+    let data, error
+    if (cachedRawStats.value && !forceRefetch) {
+      console.log('[DeploymentStatsCard] Using cached data')
+      data = cachedRawStats.value
+      error = null
+      // Use cached noPublicChannel state
+      noPublicChannelDetected = noPublicChannel.value
     }
+    else {
+      console.log('[DeploymentStatsCard] Fetching from API')
+      // Only check public channels when actually fetching new data
+      if (targetAppIds.length > 0) {
+        try {
+          const { data: publicChannels } = await supabase
+            .from('channels')
+            .select('app_id')
+            .in('app_id', targetAppIds)
+            .eq('public', true)
+          const hasPublic = (publicChannels?.length ?? 0) > 0
+          noPublicChannelDetected = !hasPublic
+          console.log(`[DeploymentStatsCard] Public channel check`, { targetAppIds, hasPublic })
+        }
+        catch (error) {
+          console.error(`[DeploymentStatsCard] Failed to verify public channels`, error)
+        }
+      }
 
-    const { data, error } = await supabase
-      .from('deploy_history')
-      .select(`
-        deployed_at,
-        app_id,
-        channels(
-          public
-        )
-      `)
-      .eq('channels.public', true)
-      .in('app_id', targetAppIds)
-      .gte('deployed_at', startDate)
-      .lte('deployed_at', endDate)
-      .order('deployed_at')
+      const result = await supabase
+        .from('deploy_history')
+        .select(`
+          deployed_at,
+          app_id,
+          channels(
+            public
+          )
+        `)
+        .eq('channels.public', true)
+        .in('app_id', targetAppIds)
+        .gte('deployed_at', startDate)
+        .lte('deployed_at', endDate)
+        .order('deployed_at')
+
+      data = result.data
+      error = result.error
+      // Cache the fetched data
+      if (!error)
+        cachedRawStats.value = data
+    }
 
     if (error)
       throw error
@@ -276,23 +303,33 @@ async function calculateStats() {
   }
 }
 
-// Watch for billing period mode changes and recalculate
+// Watch for billing period mode changes - use cached data
 watch(() => props.useBillingPeriod, async () => {
-  await calculateStats()
+  await calculateStats(false) // Don't refetch, just reprocess cached data
 })
 
-// Watch for app target changes and recalculate
+// Watch for app target changes - need to refetch
 watch(() => props.appId, async () => {
-  await calculateStats()
+  cachedRawStats.value = null // Clear cache when app changes
+  await calculateStats(true) // Force refetch for new app
 })
 
-// Watch for accumulated mode changes and recalculate
+// Watch for accumulated mode changes - use cached data
 watch(() => props.accumulated, async () => {
-  await calculateStats()
+  await calculateStats(false) // Don't refetch, just reprocess cached data
 })
+
+// Watch for reload trigger - force refetch
+watch(() => props.reloadTrigger, async (newVal, oldVal) => {
+  console.log('[DeploymentStatsCard] Reload trigger changed:', oldVal, '->', newVal)
+  if (newVal !== oldVal && newVal > 0) {
+    console.log('[DeploymentStatsCard] Calling calculateStats(true)')
+    await calculateStats(true) // Force refetch from API
+  }
+}, { flush: 'sync' })
 
 onMounted(async () => {
-  await calculateStats()
+  await calculateStats(true) // Initial fetch
 })
 </script>
 
