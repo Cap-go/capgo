@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## 12.39.0 (2025-10-29)
+
+
+### Features
+
+* add 'blocked_by_server_url' to stats_action enum ([21bbdbc](https://github.com/Cap-go/capgo/commit/21bbdbcb9746fbae99ca37bde15175b6b26ac2ce))
+
 ### 12.38.22 (2025-10-29)
 
 ### 12.38.21 (2025-10-29)
