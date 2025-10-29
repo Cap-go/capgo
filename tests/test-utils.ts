@@ -429,7 +429,11 @@ export async function cleanupPostgresClient(): Promise<void> {
  * before tests query it.
  */
 export async function triggerD1Sync(): Promise<void> {
-  if (!USE_CLOUDFLARE) {
+  const useCloudflare = process.env.USE_CLOUDFLARE_WORKERS === 'true'
+  console.log(`[D1 Sync] triggerD1Sync() called - process.env.USE_CLOUDFLARE_WORKERS=${process.env.USE_CLOUDFLARE_WORKERS}, useCloudflare=${useCloudflare}`)
+
+  if (!useCloudflare) {
+    console.log('[D1 Sync] Skipping - not Cloudflare Workers')
     return // Only needed for Cloudflare Workers tests
   }
 
@@ -439,9 +443,14 @@ export async function triggerD1Sync(): Promise<void> {
   const stack = new Error('stack trace').stack || ''
   const isPluginTest = stack.includes('updates') || stack.includes('stats') || stack.includes('channel_self')
 
+  console.log(`[D1 Sync] Stack includes updates=${stack.includes('updates')}, isPluginTest=${isPluginTest}`)
+
   if (!isPluginTest) {
+    console.log('[D1 Sync] Skipping - not a plugin test')
     return // Skip sync for non-plugin tests
   }
+
+  console.log('[D1 Sync] Triggering sync...')
 
   const D1_SYNC_URL = 'http://127.0.0.1:8790/sync'
   const WEBHOOK_SECRET = 'testsecret'
@@ -464,12 +473,19 @@ export async function triggerD1Sync(): Promise<void> {
 
     // Poll the queue until it's empty or timeout
     const startTime = Date.now()
+    let lastCount = -1
     while (Date.now() - startTime < MAX_WAIT_MS) {
       const queueSize = await executeSQL('SELECT COUNT(*) as count FROM pgmq.q_replicate_data')
       const count = parseInt(queueSize[0]?.count || '0')
 
+      if (count !== lastCount) {
+        console.log(`[D1 Sync] Queue has ${count} pending messages`)
+        lastCount = count
+      }
+
       if (count === 0) {
         // Queue is empty, sync is complete
+        console.log(`[D1 Sync] Sync complete in ${Date.now() - startTime}ms`)
         return
       }
 
@@ -477,7 +493,7 @@ export async function triggerD1Sync(): Promise<void> {
       await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS))
     }
 
-    console.warn('D1 sync timeout: queue still has pending messages after 5s')
+    console.warn(`[D1 Sync] TIMEOUT: queue still has ${lastCount} pending messages after 5s`)
   } catch (error) {
     console.warn('Failed to trigger D1 sync:', error)
   }

@@ -18,7 +18,7 @@ import { computed } from 'vue'
 import { Bar, Line } from 'vue-chartjs'
 import { useI18n } from 'vue-i18n'
 import { createLegendConfig, createStackedChartScales } from '~/services/chartConfig'
-import { getCurrentDayMonth, getDaysInCurrentMonth } from '~/services/date'
+import { generateMonthDays, getCurrentDayMonth, getDaysInCurrentMonth } from '~/services/date'
 import { useOrganizationStore } from '~/stores/organization'
 import { inlineAnnotationPlugin } from '../../services/chartAnnotations'
 import { createTooltipConfig, todayLinePlugin, verticalLinePlugin } from '../../services/chartTooltip'
@@ -131,38 +131,8 @@ const projectionData = computed(() => {
   return res
 })
 
-function getDayNumbers(startDate: Date, endDate: Date) {
-  const dayNumbers = []
-  const currentDate = new Date(startDate)
-  while (currentDate.getTime() <= endDate.getTime()) {
-    dayNumbers.push(currentDate.getDate())
-    currentDate.setDate(currentDate.getDate() + 1)
-  }
-  return dayNumbers
-}
-
 function monthdays() {
-  if (!props.useBillingPeriod) {
-    // Last 30 days mode - generate actual dates
-    const today = new Date()
-    const dates = []
-    for (let i = 29; i >= 0; i--) {
-      const date = new Date(today)
-      date.setDate(date.getDate() - i)
-      dates.push(date.getDate())
-    }
-    return dates
-  }
-
-  // Billing period mode - use existing logic
-  // eslint-disable-next-line unicorn/no-new-array
-  let keys = [...(new Array(getDaysInCurrentMonth() + 1).keys())]
-  if (cycleStart && cycleEnd)
-    keys = getDayNumbers(cycleStart, cycleEnd)
-  else
-    keys.shift()
-
-  return [...keys]
+  return generateMonthDays(props.useBillingPeriod, cycleStart, cycleEnd)
 }
 
 function createAnotation(id: string, y: number, title: string, lineColor: string, bgColor: string) {

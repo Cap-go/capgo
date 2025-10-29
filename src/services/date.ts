@@ -102,6 +102,23 @@ export function generateChartDayLabels(useBillingPeriod: boolean, startDate: Dat
     return dates
   }
 
-  // Billing period mode - use getDayNumbers
+  // Billing period mode - use the actual billing period end date
   return getDayNumbers(startDate, endDate)
+}
+
+export function generateMonthDays(useBillingPeriod: boolean, cycleStart: Date, cycleEnd: Date) {
+  if (!useBillingPeriod) {
+    // Last 30 days mode - generate actual dates
+    const today = new Date()
+    const dates = []
+    for (let i = 29; i >= 0; i--) {
+      const date = new Date(today)
+      date.setDate(date.getDate() - i)
+      dates.push(date.getDate())
+    }
+    return dates
+  }
+
+  // Billing period mode - use the actual billing cycle end date
+  return getDayNumbers(cycleStart, cycleEnd)
 }

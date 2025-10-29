@@ -153,16 +153,16 @@ const totalDays = computed(() => {
     return rawChartData.value?.labels.length ?? 0
   }
 
+  // Both modes: show full date range (billing cycle or last 30 days)
   const { startDate, endDate } = currentRange.value
-  const diff = Math.floor((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1
-  const rawLength = rawChartData.value?.labels.length ?? 0
-  return Math.max(diff, rawLength)
+  return Math.floor((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1
 })
 
 function generateDayLabels(_totalLength: number) {
   if (!currentRange.value)
     return []
 
+  // Both modes: generate labels for the full date range
   const { startDate, endDate } = currentRange.value
   return generateChartDayLabels(props.useBillingPeriod, startDate, endDate)
 }
@@ -185,7 +185,19 @@ const processedChartData = computed<ChartData<'line'> | null>(() => {
   if (!rawChartData.value)
     return null
 
-  const targetLength = Math.max(totalDays.value, rawChartData.value.labels.length)
+  const targetLength = totalDays.value
+
+  // Calculate offset for padding in both modes
+  // If API data starts later than our range start, we need padding
+  let dataOffset = 0
+  if (currentRange.value && rawChartData.value.labels.length > 0) {
+    const firstApiDate = new Date(rawChartData.value.labels[0])
+    const rangeStart = currentRange.value.startDate
+    dataOffset = Math.floor((firstApiDate.getTime() - rangeStart.getTime()) / (1000 * 60 * 60 * 24))
+    if (dataOffset < 0)
+      dataOffset = 0
+  }
+
   let globalLastDataIndex = -1
   const normalizedDatasets = rawChartData.value.datasets.map((dataset) => {
     const rawValues = dataset.data ?? []
@@ -225,7 +237,8 @@ const processedChartData = computed<ChartData<'line'> | null>(() => {
     for (let index = normalizedValues.length - 1; index >= 0; index--) {
       const candidate = normalizedValues[index]
       if (typeof candidate === 'number' && Number.isFinite(candidate)) {
-        globalLastDataIndex = Math.max(globalLastDataIndex, index)
+        // Account for offset when tracking last data index
+        globalLastDataIndex = Math.max(globalLastDataIndex, index + dataOffset)
         break
       }
     }
@@ -236,7 +249,11 @@ const processedChartData = computed<ChartData<'line'> | null>(() => {
   const datasets: ChartData<'line'>['datasets'] = []
 
   normalizedDatasets.forEach(({ dataset, normalizedValues }, datasetIndex) => {
-    const paddedValues = Array.from({ length: targetLength }, (_val, index) => normalizedValues[index])
+    // Pad with nulls at the start if needed (when billing period starts before API data)
+    const paddedValues = Array.from({ length: targetLength }, (_val, index) => {
+      const dataIndex = index - dataOffset
+      return dataIndex >= 0 && dataIndex < normalizedValues.length ? normalizedValues[dataIndex] : undefined
+    })
     const previousDataset = datasetIndex > 0 ? datasets[datasetIndex - 1] : null
     const previousDatasetData = previousDataset && Array.isArray(previousDataset.data)
       ? previousDataset.data as Array<number | null | undefined>
