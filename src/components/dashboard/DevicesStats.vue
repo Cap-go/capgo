@@ -7,8 +7,10 @@ import { computed, ref, watch } from 'vue'
 import { Line } from 'vue-chartjs'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
+import { createChartScales } from '~/services/chartConfig'
 import { useChartData } from '~/services/chartDataService'
 import { createTooltipConfig, todayLinePlugin, verticalLinePlugin } from '~/services/chartTooltip'
+import { generateChartDayLabels, getChartDateRange, normalizeToStartOfDay } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
 import { useOrganizationStore } from '~/stores/organization'
 
@@ -119,12 +121,6 @@ const latestVersionPercentageDisplay = computed(() => {
   return hasSymbol ? replaced : `${formatted}%`
 })
 
-function normalizeToStartOfDay(date: Date) {
-  const normalized = new Date(date)
-  normalized.setHours(0, 0, 0, 0)
-  return normalized
-}
-
 function resolveOrganizationForCurrentContext(): Organization | undefined {
   if (appId.value) {
     const org = organizationStore.getOrgByAppId(appId.value)
@@ -136,20 +132,11 @@ function resolveOrganizationForCurrentContext(): Organization | undefined {
 
 function getDateRange() {
   const activeOrganization = resolveOrganizationForCurrentContext()
-  if (props.useBillingPeriod) {
-    const startDate = normalizeToStartOfDay(new Date(activeOrganization?.subscription_start ?? new Date()))
-    const endDate = normalizeToStartOfDay(new Date(activeOrganization?.subscription_end ?? new Date()))
-
-    if (endDate.getTime() < startDate.getTime())
-      return { startDate, endDate: startDate }
-
-    return { startDate, endDate }
-  }
-
-  const endDate = normalizeToStartOfDay(new Date())
-  const startDate = new Date(endDate)
-  startDate.setDate(startDate.getDate() - 29)
-  return { startDate, endDate }
+  return getChartDateRange(
+    props.useBillingPeriod,
+    activeOrganization?.subscription_start,
+    activeOrganization?.subscription_end,
+  )
 }
 
 const totalDays = computed(() => {
@@ -163,32 +150,12 @@ const totalDays = computed(() => {
   return Math.max(diff, rawLength)
 })
 
-function generateDayLabels(totalLength: number) {
+function generateDayLabels(_totalLength: number) {
   if (!currentRange.value)
-    return Array.from({ length: totalLength }, (_value, index) => index + 1)
+    return []
 
-  const labels: number[] = []
   const { startDate, endDate } = currentRange.value
-
-  let cursor = new Date(startDate)
-  cursor.setHours(0, 0, 0, 0)
-  const finalDate = new Date(endDate)
-  finalDate.setHours(0, 0, 0, 0)
-
-  const dayInMs = 24 * 60 * 60 * 1000
-  while (cursor.getTime() <= finalDate.getTime()) {
-    labels.push(cursor.getDate())
-    cursor = new Date(cursor.getTime() + dayInMs)
-  }
-
-  if (labels.length < totalLength) {
-    const lastDay = labels[labels.length - 1] ?? 1
-    const remaining = totalLength - labels.length
-    for (let i = 1; i <= remaining; i++)
-      labels.push(lastDay + i)
-  }
-
-  return labels.slice(0, totalLength)
+  return generateChartDayLabels(props.useBillingPeriod, startDate, endDate)
 }
 
 function roundPercentageInString(text: string) {
@@ -397,33 +364,14 @@ const chartOptions = computed<ChartOptions<'line'>>(() => {
 
   return {
     maintainAspectRatio: false,
-    scales: {
-      x: {
-        grid: {
-          color: `${isDark.value ? '#424e5f' : '#bfc9d6'}`,
-        },
-        ticks: {
-          color: isDark.value ? 'white' : 'black',
-          maxRotation: 0,
-          autoSkip: true,
-        },
+    scales: createChartScales(isDark.value, {
+      suggestedMax: 100,
+      yTickCallback: (tickValue: string | number) => {
+        const numericValue = typeof tickValue === 'number' ? tickValue : Number(tickValue)
+        const display = Number.isFinite(numericValue) ? numericValue : tickValue
+        return `${display}%`
       },
-      y: {
-        beginAtZero: true,
-        suggestedMax: 100,
-        grid: {
-          color: `${isDark.value ? '#323e4e' : '#cad5e2'}`,
-        },
-        ticks: {
-          callback: (tickValue: string | number) => {
-            const numericValue = typeof tickValue === 'number' ? tickValue : Number(tickValue)
-            const display = Number.isFinite(numericValue) ? numericValue : tickValue
-            return `${display}%`
-          },
-          color: isDark.value ? 'white' : 'black',
-        },
-      },
-    },
+    }),
     plugins: pluginOptions as unknown as NonNullable<ChartOptions<'line'>['plugins']>,
   }
 })

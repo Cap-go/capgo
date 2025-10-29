@@ -17,6 +17,7 @@ import {
 import { computed } from 'vue'
 import { Bar, Line } from 'vue-chartjs'
 import { useI18n } from 'vue-i18n'
+import { createLegendConfig, createStackedChartScales } from '~/services/chartConfig'
 import { getCurrentDayMonth, getDaysInCurrentMonth } from '~/services/date'
 import { useOrganizationStore } from '~/stores/organization'
 import { inlineAnnotationPlugin } from '../../services/chartAnnotations'
@@ -396,41 +397,10 @@ const chartOptions = computed<ChartOptions & { plugins: { inlineAnnotationPlugin
 
   return {
     maintainAspectRatio: false,
-    scales: {
-      y: {
-        stacked: hasAppData, // Stack when there are multiple apps
-        beginAtZero: true,
-        ticks: {
-          color: `${isDark.value ? 'white' : 'black'}`,
-          // Remove stepSize to let Chart.js auto-calculate optimal steps
-        },
-        grid: {
-          color: `${isDark.value ? '#424e5f' : '#bfc9d6'}`,
-        },
-      },
-      x: {
-        stacked: hasAppData, // Stack when there are multiple apps
-        ticks: {
-          color: `${isDark.value ? 'white' : 'black'}`,
-        },
-        grid: {
-          color: `${isDark.value ? '#323e4e' : '#cad5e2'}`,
-        },
-      },
-    },
+    scales: createStackedChartScales(isDark.value, hasAppData),
     plugins: {
       inlineAnnotationPlugin: generateAnnotations.value,
-      legend: {
-        display: hasAppData,
-        position: 'bottom' as const,
-        labels: {
-          color: `${isDark.value ? 'white' : 'black'}`,
-          padding: 10,
-          font: {
-            size: 11,
-          },
-        },
-      },
+      legend: createLegendConfig(isDark.value, hasAppData),
       title: {
         display: false,
       },

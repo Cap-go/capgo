@@ -15,6 +15,7 @@ import {
 import { computed } from 'vue'
 import { Bar, Line } from 'vue-chartjs'
 import { useI18n } from 'vue-i18n'
+import { createLegendConfig, createStackedChartScales } from '~/services/chartConfig'
 import { getDaysInCurrentMonth } from '~/services/date'
 import { useOrganizationStore } from '~/stores/organization'
 import { createTooltipConfig, todayLinePlugin, verticalLinePlugin } from '../../services/chartTooltip'
@@ -210,43 +211,11 @@ const todayLineOptions = computed(() => {
 })
 
 const chartOptions = computed(() => {
-  const axisTicksColor = isDark.value ? 'white' : 'black'
-
   return {
     maintainAspectRatio: false,
-    scales: {
-      y: {
-        beginAtZero: true,
-        stacked: true,
-        ticks: {
-          color: axisTicksColor,
-        },
-        grid: {
-          color: `${isDark.value ? '#424e5f' : '#bfc9d6'}`,
-        },
-      },
-      x: {
-        stacked: true,
-        ticks: {
-          color: axisTicksColor,
-        },
-        grid: {
-          color: `${isDark.value ? '#323e4e' : '#cad5e2'}`,
-        },
-      },
-    },
+    scales: createStackedChartScales(isDark.value, true),
     plugins: {
-      legend: {
-        display: true,
-        position: 'bottom' as const,
-        labels: {
-          color: axisTicksColor,
-          padding: 10,
-          font: {
-            size: 11,
-          },
-        },
-      },
+      legend: createLegendConfig(isDark.value, true),
       title: {
         display: false,
       },

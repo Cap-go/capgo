@@ -15,6 +15,7 @@ import {
 import { computed } from 'vue'
 import { Bar, Line } from 'vue-chartjs'
 import { useI18n } from 'vue-i18n'
+import { createLegendConfig, createStackedChartScales } from '~/services/chartConfig'
 import { createTooltipConfig, todayLinePlugin, verticalLinePlugin } from '~/services/chartTooltip'
 import { getDaysInCurrentMonth } from '~/services/date'
 import { useOrganizationStore } from '~/stores/organization'
@@ -276,44 +277,13 @@ const todayLineOptions = computed(() => {
 const chartOptions = computed(() => {
   const datasetCount = Object.keys(props.dataByApp).length
   const hasMultipleDatasets = datasetCount > 0
-  const axisTicksColor = isDark.value ? 'white' : 'black'
   const stacked = hasMultipleDatasets
 
   return {
     maintainAspectRatio: false,
-    scales: {
-      y: {
-        beginAtZero: true,
-        stacked,
-        ticks: {
-          color: axisTicksColor,
-        },
-        grid: {
-          color: `${isDark.value ? '#424e5f' : '#bfc9d6'}`,
-        },
-      },
-      x: {
-        stacked,
-        ticks: {
-          color: axisTicksColor,
-        },
-        grid: {
-          color: `${isDark.value ? '#323e4e' : '#cad5e2'}`,
-        },
-      },
-    },
+    scales: createStackedChartScales(isDark.value, stacked),
     plugins: {
-      legend: {
-        display: hasMultipleDatasets,
-        position: 'bottom' as const,
-        labels: {
-          color: axisTicksColor,
-          padding: 10,
-          font: {
-            size: 11,
-          },
-        },
-      },
+      legend: createLegendConfig(isDark.value, hasMultipleDatasets),
       title: {
         display: false,
       },
