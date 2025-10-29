@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { z } from 'zod'
 
-import { APP_NAME, createAppVersions, getBaseData, getSupabaseClient, getVersionFromAction, ORG_ID, postUpdate, resetAndSeedAppData, resetAppData, resetAppDataStats } from './test-utils.ts'
+import { APP_NAME, createAppVersions, getBaseData, getSupabaseClient, getVersionFromAction, ORG_ID, postUpdate, resetAndSeedAppData, resetAppData, resetAppDataStats, triggerD1Sync } from './test-utils.ts'
 
 const id = randomUUID()
 const APP_NAME_UPDATE = `${APP_NAME}.${id}`
@@ -203,6 +203,7 @@ describe('update scenarios', () => {
   it('disable auto update to minor', async () => {
     const versionId = await getSupabaseClient().from('app_versions').select('id').eq('name', '1.361.0').eq('app_id', APP_NAME_UPDATE).single().throwOnError().then(({ data }) => data?.id)
     await getSupabaseClient().from('channels').update({ disable_auto_update: 'minor', version: versionId }).eq('name', 'production').eq('app_id', APP_NAME_UPDATE).throwOnError()
+    await triggerD1Sync() // Sync channel updates to D1
 
     const baseData = getBaseData(APP_NAME_UPDATE)
     baseData.version_name = '1.1.0'
@@ -215,6 +216,7 @@ describe('update scenarios', () => {
 
   it('disallow emulator', async () => {
     await getSupabaseClient().from('channels').update({ allow_emulator: false, disable_auto_update: 'major' }).eq('name', 'production').eq('app_id', APP_NAME_UPDATE)
+    await triggerD1Sync() // Sync channel updates to D1
 
     const baseData = getBaseData(APP_NAME_UPDATE)
     baseData.version_name = '1.1.0'
@@ -228,6 +230,7 @@ describe('update scenarios', () => {
 
   it('development build', async () => {
     await getSupabaseClient().from('channels').update({ allow_dev: false }).eq('name', 'production').eq('app_id', APP_NAME_UPDATE)
+    await triggerD1Sync() // Sync channel updates to D1
 
     const baseData = getBaseData(APP_NAME_UPDATE)
     baseData.version_name = '1.1.0'
@@ -258,6 +261,7 @@ describe('update scenarios', () => {
     expect(data2?.length).toBe(1)
 
     await getSupabaseClient().from('channels').update({ disable_auto_update: 'none', allow_dev: true, allow_emulator: true, android: true }).eq('name', 'no_access').eq('app_id', APP_NAME_UPDATE)
+    await triggerD1Sync() // Sync channel and channel_devices updates to D1
 
     const baseData = getBaseData(APP_NAME_UPDATE)
     baseData.device_id = uuid
@@ -276,6 +280,7 @@ describe('update scenarios', () => {
 
   it('disallowed public channel update', async () => {
     await getSupabaseClient().from('channels').update({ public: false }).eq('name', 'production').eq('app_id', APP_NAME_UPDATE)
+    await triggerD1Sync() // Sync channel updates to D1
 
     const baseData = getBaseData(APP_NAME_UPDATE)
     baseData.version_name = '1.1.0'
@@ -298,6 +303,7 @@ describe('update scenarios', () => {
       public: false,
       allow_device_self_set: false,
     }).eq('name', 'production').eq('app_id', APP_NAME_UPDATE)
+    await triggerD1Sync() // Sync channel updates to D1
 
     const baseData = getBaseData(APP_NAME_UPDATE)
     baseData.version_name = '1.1.0';

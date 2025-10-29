@@ -95,6 +95,9 @@ jobs:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           github_token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
           model: claude-sonnet-4-5-20250929
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
       - name: Publish CF webapp
         run: bun run deploy:cloudflare:webapp:${{ env.ENV }}
         env:
