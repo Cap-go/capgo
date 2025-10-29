@@ -1519,6 +1519,7 @@ export type Database = {
           subscription_anchor_start: string
         }[]
       }
+      get_d1_sync_url: { Args: never; Returns: string }
       get_d1_webhook_signature: { Args: never; Returns: string }
       get_db_url: { Args: never; Returns: string }
       get_global_metrics:
@@ -2087,6 +2088,7 @@ export type Database = {
         | "disableAutoUpdate"
         | "ping"
         | "InvalidIp"
+        | "blocked_by_server_url"
       stripe_status:
         | "created"
         | "succeeded"
@@ -2323,6 +2325,7 @@ export const Constants = {
         "disableAutoUpdate",
         "ping",
         "InvalidIp",
+        "blocked_by_server_url",
       ],
       stripe_status: [
         "created",
