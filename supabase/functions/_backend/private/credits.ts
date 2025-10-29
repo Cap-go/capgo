@@ -64,8 +64,7 @@ interface CompleteTopUpRequest {
 }
 
 const DEFAULT_TOP_UP_QUANTITY = 100
-// const CREDIT_TOP_UP_PRODUCT_ID = 'prod_TINXCAiTb8Vsxc'
-const CREDIT_TOP_UP_PRODUCT_ID = 'prod_TJRd2hFHZsBIPK'
+const CREDIT_TOP_UP_PRODUCT_ID = 'prod_TINXCAiTb8Vsxc'
 
 export const app = new Hono<MiddlewareKeyVariables>()
 
