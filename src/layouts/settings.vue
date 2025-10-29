@@ -4,17 +4,20 @@ import { Capacitor } from '@capacitor/core'
 import { ref, shallowRef, watch, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
-import IconPlans from '~icons/material-symbols/price-change'
-import IconNotification from '~icons/mdi/message-notification'
-import IconPassword from '~icons/mdi/password'
-import IconAcount from '~icons/mdi/user'
-import IconBilling from '~icons/mingcute/bill-fill'
+import IconCredits from '~icons/heroicons/currency-dollar'
+import IconUsage from '~icons/heroicons/chart-pie'
+import IconPlans from '~icons/heroicons/credit-card'
+import IconNotification from '~icons/heroicons/bell'
+import IconPassword from '~icons/heroicons/lock-closed'
+import IconAcount from '~icons/heroicons//user'
+import IconBilling from '~icons/heroicons/building-library'
 import { openPortal } from '~/services/stripe'
 import { useOrganizationStore } from '~/stores/organization'
 
 const { t } = useI18n()
 const organizationStore = useOrganizationStore()
 const router = useRouter()
+const creditsV2Enabled = import.meta.env.VITE_FEATURE_CREDITS_V2
 function getCurrentTab() {
   // look the path and set the active tab
   const path = router.currentRoute.value.path
@@ -74,20 +77,37 @@ watch(type, (val) => {
 })
 
 watchEffect(() => {
-  if (organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['super_admin'])
-    && (!organizationTabs.value.find(tab => tab.label === 'usage'))) {
+  const hasSuperAdminRights = organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['super_admin'])
+
+  if (hasSuperAdminRights && (!organizationTabs.value.find((tab: Tab) => tab.label === 'usage'))) {
     // push it 2 before the last tab
     organizationTabs.value.push({
       label: 'usage',
-      icon: shallowRef(IconPlans) as any,
+      icon: shallowRef(IconUsage) as any,
       key: '/settings/organization/usage',
     })
   }
-  else if (organizationTabs.value.find(tab => tab.label === 'usage')) {
-    organizationTabs.value = organizationTabs.value.filter(tab => tab.label !== 'usage')
+  else if (organizationTabs.value.find((tab: Tab) => tab.label === 'usage')) {
+    organizationTabs.value = organizationTabs.value.filter((tab: Tab) => tab.label !== 'usage')
   }
-  if (organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['super_admin'])
-    && !organizationTabs.value.find(tab => tab.label === 'plans')) {
+  console.log('creditsV2Enabled', creditsV2Enabled)
+  console.log('hasSuperAdminRights', hasSuperAdminRights)
+  if (creditsV2Enabled && hasSuperAdminRights && !organizationTabs.value.find((tab: Tab) => tab.label === 'credits')) {
+    const insertIndex = organizationTabs.value.findIndex((tab: Tab) => tab.label === 'members') + 1
+    const creditsTab = {
+      label: 'credits',
+      icon: shallowRef(IconCredits) as any,
+      key: '/settings/organization/credits',
+    } satisfies Tab
+    if (insertIndex > 0)
+      organizationTabs.value.splice(insertIndex, 0, creditsTab)
+    else
+      organizationTabs.value.push(creditsTab)
+  }
+  else if ((!creditsV2Enabled || !hasSuperAdminRights) && organizationTabs.value.find((tab: Tab) => tab.label === 'credits')) {
+    organizationTabs.value = organizationTabs.value.filter((tab: Tab) => tab.label !== 'credits')
+  }
+  if (hasSuperAdminRights && !organizationTabs.value.find((tab: Tab) => tab.label === 'plans')) {
     organizationTabs.value.push(
       {
         label: 'plans',
@@ -96,13 +116,13 @@ watchEffect(() => {
       },
     )
   }
-  else if (!organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['super_admin'])) {
-    organizationTabs.value = organizationTabs.value.filter(tab => tab.label !== 'plans')
+  else if (!hasSuperAdminRights) {
+    organizationTabs.value = organizationTabs.value.filter((tab: Tab) => tab.label !== 'plans')
   }
 
   if (!Capacitor.isNativePlatform()
-    && organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['super_admin'])
-    && !organizationTabs.value.find(tab => tab.label === 'billing')) {
+    && hasSuperAdminRights
+    && !organizationTabs.value.find((tab: Tab) => tab.label === 'billing')) {
     organizationTabs.value.push({
       label: 'billing',
       icon: shallowRef(IconBilling) as any,
@@ -110,8 +130,8 @@ watchEffect(() => {
       onClick: () => openPortal(organizationStore.currentOrganization?.gid ?? '', t),
     })
   }
-  else if (!organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['super_admin'])) {
-    organizationTabs.value = organizationTabs.value.filter(tab => tab.label !== 'billing')
+  else if (!hasSuperAdminRights) {
+    organizationTabs.value = organizationTabs.value.filter((tab: Tab) => tab.label !== 'billing')
   }
 })
 
