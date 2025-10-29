@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import ArrowDownOnSquareIcon from '~icons/heroicons/arrow-down-on-square'
 import GlobeAltIcon from '~icons/heroicons/globe-alt'
 import XCircleIcon from '~icons/heroicons/x-circle'
+import ChartCard from './ChartCard.vue'
 import UpdateStatsChart from '~/components/dashboard/UpdateStatsChart.vue'
 import { useSupabase } from '~/services/supabase'
 import { useDashboardAppsStore } from '~/stores/dashboardApps'
@@ -99,6 +100,9 @@ const actionDisplayNames = computed(() => ({
   install: capitalize(t('installed')),
   fail: capitalize(t('failed')),
 }))
+
+const totalUpdates = computed(() => totalInstalled.value + totalFailed.value + totalRequested.value)
+const hasData = computed(() => chartUpdateData.value?.length > 0)
 
 async function calculateStats() {
   isLoading.value = true
@@ -295,8 +299,14 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="flex flex-col bg-white border rounded-lg shadow-lg col-span-full border-slate-300 sm:col-span-6 xl:col-span-4 dark:border-slate-900 dark:bg-gray-800 h-[460px]">
-    <div class="pt-4 px-4 flex items-start justify-between gap-2">
+  <ChartCard
+    :title="t('update_statistics')"
+    :total="totalUpdates"
+    :last-day-evolution="lastDayEvolution"
+    :is-loading="isLoading"
+    :has-data="hasData"
+  >
+    <template #header>
       <div class="flex flex-col items-start justify-between gap-2">
         <h2 class="flex-1 min-w-0 text-2xl font-semibold leading-tight text text-slate-600 dark:text-white">
           {{ t('update_statistics') }}
@@ -334,42 +344,17 @@ onMounted(async () => {
           </div>
         </div>
       </div>
+    </template>
 
-      <div class="flex flex-col items-end text-right flex-shrink-0">
-        <div
-          v-if="lastDayEvolution"
-          class="inline-flex items-center justify-center rounded-full px-2 py-1 text-xs font-bold text-white shadow-lg whitespace-nowrap"
-          :class="{ 'bg-emerald-500': lastDayEvolution >= 0, 'bg-yellow-500': lastDayEvolution < 0 }"
-        >
-          {{ lastDayEvolution < 0 ? '-' : '+' }}{{ Math.abs(lastDayEvolution).toFixed(2) }}%
-        </div>
-        <div v-else class="inline-flex rounded-full px-2 py-1 text-xs font-semibold opacity-0" aria-hidden="true" />
-        <div class="text-3xl font-bold text-slate-600 dark:text-white">
-          {{ (totalInstalled + totalFailed + totalRequested).toLocaleString() }}
-        </div>
-      </div>
-    </div>
-    <!-- Chart built with Chart.js 3 -->
-
-    <!-- Change the height attribute to adjust the chart height -->
-    <div class="w-full h-full p-6 pt-2">
-      <div v-if="isLoading" class="flex items-center justify-center h-full">
-        <div class="loading loading-spinner loading-lg text-blue-500" />
-      </div>
-      <UpdateStatsChart
-        v-else-if="chartUpdateData?.length"
-        :key="JSON.stringify(chartUpdateDataByAction)"
-        :title="t('update_statistics')"
-        :colors="colors.blue"
-        :data="chartUpdateData"
-        :use-billing-period="useBillingPeriod"
-        :accumulated="accumulated"
-        :data-by-app="chartUpdateDataByAction"
-        :app-names="actionDisplayNames"
-      />
-      <div v-else class="flex flex-col items-center justify-center h-full">
-        {{ t('no-data') }}
-      </div>
-    </div>
-  </div>
+    <UpdateStatsChart
+      :key="JSON.stringify(chartUpdateDataByAction)"
+      :title="t('update_statistics')"
+      :colors="colors.blue"
+      :data="chartUpdateData"
+      :use-billing-period="useBillingPeriod"
+      :accumulated="accumulated"
+      :data-by-app="chartUpdateDataByAction"
+      :app-names="actionDisplayNames"
+    />
+  </ChartCard>
 </template>

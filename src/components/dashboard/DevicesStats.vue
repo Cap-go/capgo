@@ -13,6 +13,7 @@ import { createTooltipConfig, todayLinePlugin, verticalLinePlugin } from '~/serv
 import { generateChartDayLabels, getChartDateRange, normalizeToStartOfDay } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
 import { useOrganizationStore } from '~/stores/organization'
+import ChartCard from './ChartCard.vue'
 
 const props = defineProps({
   useBillingPeriod: {
@@ -299,6 +300,8 @@ const processedChartData = computed<ChartData<'line'> | null>(() => {
   }
 })
 
+const hasData = computed(() => !!(processedChartData.value && processedChartData.value.datasets.length > 0))
+
 const todayLineOptions = computed(() => {
   if (!props.useBillingPeriod || !currentRange.value)
     return { enabled: false }
@@ -393,10 +396,10 @@ async function loadData() {
   }
 
   const { startDate, endDate } = getDateRange()
-  currentRange.value = { startDate, endDate }
   const currentToken = ++requestToken
   isLoading.value = true
   rawChartData.value = null
+  currentRange.value = { startDate, endDate }
 
   try {
     const data = await useChartData(supabase, appId.value, startDate, endDate)
@@ -423,10 +426,13 @@ watch(() => props.useBillingPeriod, async () => {
 
 watch(
   () => [route.path, route.params.package as string | undefined] as const,
-  async ([path, packageId]) => {
+  async ([path, packageId], old) => {
+    const oldPackageId = old?.[1]
     if (path.includes('/p/') && packageId) {
+      const packageChanged = packageId !== oldPackageId
       appId.value = packageId
-      await loadData()
+      if (packageChanged)
+        await loadData()
     }
     else {
       appId.value = ''
@@ -440,31 +446,30 @@ watch(
 </script>
 
 <template>
-  <div class="flex flex-col bg-white border rounded-lg shadow-lg col-span-full border-slate-300 sm:col-span-6 xl:col-span-4 dark:border-slate-900 dark:bg-gray-800 h-[460px]">
-    <div class="pt-4 px-4 flex items-start justify-between gap-2">
-      <h2 class="flex-1 min-w-0 text-2xl font-semibold leading-tight text-slate-600 dark:text-white">
-        {{ t('active_users_by_version') }}
-      </h2>
+  <ChartCard
+    :title="t('active_users_by_version')"
+    :is-loading="isLoading"
+    :has-data="hasData"
+  >
+    <template #header>
+      <div class="flex items-start justify-between gap-2 flex-1">
+        <h2 class="flex-1 min-w-0 text-2xl font-semibold leading-tight text-slate-600 dark:text-white">
+          {{ t('active_users_by_version') }}
+        </h2>
 
-      <div class="flex flex-col items-end text-right flex-shrink-0">
-        <div
-          class="inline-flex items-center justify-center rounded-full px-2 py-1 bg-emerald-500 text-xs font-bold text-white shadow-lg whitespace-nowrap"
-        >
-          {{ latestVersionPercentageDisplay }}
+        <div class="flex flex-col items-end text-right flex-shrink-0">
+          <div
+            class="inline-flex items-center justify-center rounded-full px-2 py-1 bg-emerald-500 text-xs font-bold text-white shadow-lg whitespace-nowrap"
+          >
+            {{ latestVersionPercentageDisplay }}
+          </div>
+          <div v-if="latestVersion" class="text-3xl font-bold text-slate-600 dark:text-white">
+            {{ latestVersion.name }}
+          </div>
         </div>
-        <div v-if="latestVersion" class="text-3xl font-bold text-slate-600 dark:text-white">
-          {{ latestVersion.name }}
-        </div>
       </div>
-    </div>
-    <div class="w-full h-full p-6 pt-2">
-      <div v-if="isLoading" class="flex items-center justify-center h-full">
-        <Spinner size="w-40 h-40" />
-      </div>
-      <Line v-else-if="processedChartData && processedChartData.datasets.length" :data="processedChartData!" :options="chartOptions" :plugins="chartPlugins" />
-      <div v-else class="flex h-full items-center justify-center text-sm text-slate-500 dark:text-slate-300">
-        {{ t('no-data') }}
-      </div>
-    </div>
-  </div>
+    </template>
+
+    <Line :data="processedChartData!" :options="chartOptions" :plugins="chartPlugins" />
+  </ChartCard>
 </template>

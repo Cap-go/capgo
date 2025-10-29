@@ -49,18 +49,9 @@ const datasByApp = ref({
 const appNames = ref<{ [appId: string]: string }>({})
 
 // Create computed properties to ensure reactivity when switching between modes
-const mauData = computed(() => {
-  console.log('[computed] mauData recalculated, length:', datas.value.mau.length)
-  return datas.value.mau
-})
-const storageData = computed(() => {
-  console.log('[computed] storageData recalculated, length:', datas.value.storage.length)
-  return datas.value.storage
-})
-const bandwidthData = computed(() => {
-  console.log('[computed] bandwidthData recalculated, length:', datas.value.bandwidth.length)
-  return datas.value.bandwidth
-})
+const mauData = computed(() => datas.value.mau)
+const storageData = computed(() => datas.value.storage)
+const bandwidthData = computed(() => datas.value.bandwidth)
 const mauDataByApp = computed(() => datasByApp.value.mau)
 const storageDataByApp = computed(() => datasByApp.value.storage)
 const bandwidthDataByApp = computed(() => datasByApp.value.bandwidth)
@@ -246,7 +237,6 @@ function filterToBillingPeriod(fullData: { mau: number[], storage: number[], ban
 }
 
 async function getUsages() {
-  console.log('[getUsages] Starting, useBillingPeriod:', useBillingPeriod.value)
   const { global: globalStats, byApp: byAppStats, appNames: appNamesMap } = await getAppStats()
 
   // Always work with last 30 days of data - normalize first for consistency
@@ -254,8 +244,6 @@ async function getUsages() {
   last30DaysEnd.setHours(0, 0, 0, 0)
   const last30DaysStart = new Date(last30DaysEnd)
   last30DaysStart.setDate(last30DaysStart.getDate() - 29) // 30 days including today
-
-  console.log('[getUsages] Date range - last30:', last30DaysStart.toISOString(), 'to', last30DaysEnd.toISOString())
 
   // Get billing period dates for filtering
   const billingStart = new Date(organizationStore.currentOrganization?.subscription_start ?? new Date())
@@ -286,8 +274,6 @@ async function getUsages() {
       datas.value.bandwidth[index] = bytesToGb(item.bandwidth ?? 0, 2)
     }
   })
-
-  console.log('[getUsages] After populating 30-day arrays - MAU length:', datas.value.mau.length, 'first value:', datas.value.mau[0], 'last value:', datas.value.mau[29])
 
   // Process by-app data if available
   appNames.value = appNamesMap
@@ -326,13 +312,10 @@ async function getUsages() {
   }
 
   // Filter data based on billing period mode
-  console.log('[getUsages] Before filtering - useBillingPeriod:', useBillingPeriod.value, 'MAU length:', datas.value.mau.length)
   if (useBillingPeriod.value) {
-    console.log('[getUsages] Filtering to billing period')
     // Show only data within billing period
     const filteredData = filterToBillingPeriod(datas.value, last30DaysStart, billingStart)
     datas.value = filteredData.data
-    console.log('[getUsages] After billing filter - MAU length:', datas.value.mau.length, 'first value:', datas.value.mau[0])
 
     // Filter by-app data too
     if (Object.keys(datasByApp.value.mau).length > 0) {
@@ -348,11 +331,7 @@ async function getUsages() {
         datasByApp.value.bandwidth[appId] = filteredAppData.data.bandwidth
       })
     }
-  } else {
-    console.log('[getUsages] Skipping billing filter (last 30 days mode) - MAU length:', datas.value.mau.length)
   }
-
-  console.log('[getUsages] Final - MAU length:', datas.value.mau.length, 'Storage length:', datas.value.storage.length, 'Bandwidth length:', datas.value.bandwidth.length)
 }
 
 async function loadData() {
@@ -396,8 +375,6 @@ watch([showCumulative, useBillingPeriod], async (newValues, oldValues) => {
   const [, newBillingPeriod] = newValues
   const [, oldBillingPeriod] = oldValues || [null, null]
 
-  console.log('[watcher] useBillingPeriod changed:', oldBillingPeriod, '->', newBillingPeriod, 'loadedAlready:', loadedAlready.value)
-
   // Force daily mode when switching to Last 30 Days (cumulative doesn't make sense)
   if (!newBillingPeriod && oldBillingPeriod !== null) {
     showCumulative.value = false
@@ -406,11 +383,7 @@ watch([showCumulative, useBillingPeriod], async (newValues, oldValues) => {
   // Only reload data if billing period changed (this affects the underlying data)
   // Cumulative vs daily changes don't need data reload, just reprocessing
   if (loadedAlready.value && newBillingPeriod !== oldBillingPeriod && oldBillingPeriod !== null) {
-    console.log('[watcher] Calling getUsages() due to billing period change')
     await getUsages()
-    console.log('[watcher] getUsages() completed')
-  } else {
-    console.log('[watcher] NOT calling getUsages() - condition not met')
   }
 
   // Update URL parameters
@@ -545,62 +518,29 @@ onMounted(() => {
     :class="appId ? 'xl:grid-cols-16' : 'xl:grid-cols-12'"
   >
     <UsageCard
-      v-if="!isLoading" id="mau-stat" :limits="allLimits.mau" :colors="colors.emerald" :accumulated="useBillingPeriod && showCumulative"
+      id="mau-stat" :limits="allLimits.mau" :colors="colors.emerald" :accumulated="useBillingPeriod && showCumulative"
       :datas="mauData" :datas-by-app="mauDataByApp" :app-names="appNames" :title="`${t('monthly-active')}`" :unit="t('units-users')"
       :use-billing-period="useBillingPeriod"
+      :is-loading="isLoading"
       class="col-span-full sm:col-span-6 xl:col-span-4"
     />
-    <div
-      v-else
-      class="col-span-full h-[460px] flex flex-col items-center justify-center border border-slate-300 rounded-lg bg-white shadow-lg sm:col-span-6 xl:col-span-4 dark:border-slate-900 dark:bg-gray-800"
-    >
-      <Spinner size="w-40 h-40" />
-    </div>
     <UsageCard
-      v-if="!isLoading" :limits="allLimits.storage" :colors="colors.blue" :datas="storageData" :datas-by-app="storageDataByApp" :app-names="appNames" :accumulated="useBillingPeriod && showCumulative"
+      :limits="allLimits.storage" :colors="colors.blue" :datas="storageData" :datas-by-app="storageDataByApp" :app-names="appNames" :accumulated="useBillingPeriod && showCumulative"
       :title="t('Storage')" :unit="storageUnit"
       :use-billing-period="useBillingPeriod"
+      :is-loading="isLoading"
       class="col-span-full sm:col-span-6 xl:col-span-4"
     />
-    <div
-      v-else
-      class="col-span-full h-[460px] flex flex-col items-center justify-center border border-slate-300 rounded-lg bg-white shadow-lg sm:col-span-6 xl:col-span-4 dark:border-slate-900 dark:bg-gray-800"
-    >
-      <Spinner size="w-40 h-40" />
-    </div>
     <UsageCard
-      v-if="!isLoading" :limits="allLimits.bandwidth" :colors="colors.orange" :datas="bandwidthData" :datas-by-app="bandwidthDataByApp" :app-names="appNames" :accumulated="useBillingPeriod && showCumulative"
+      :limits="allLimits.bandwidth" :colors="colors.orange" :datas="bandwidthData" :datas-by-app="bandwidthDataByApp" :app-names="appNames" :accumulated="useBillingPeriod && showCumulative"
       :title="t('Bandwidth')" :unit="t('units-gb')"
       :use-billing-period="useBillingPeriod"
+      :is-loading="isLoading"
       class="col-span-full sm:col-span-6 xl:col-span-4"
     />
-    <div
-      v-else
-      class="col-span-full h-[460px] flex flex-col items-center justify-center border border-slate-300 rounded-lg bg-white shadow-lg sm:col-span-6 xl:col-span-4 dark:border-slate-900 dark:bg-gray-800"
-    >
-      <Spinner size="w-40 h-40" />
-    </div>
     <DevicesStats v-if="appId" :use-billing-period="useBillingPeriod" :accumulated="useBillingPeriod && showCumulative" class="col-span-full sm:col-span-6 xl:col-span-4" />
-    <BundleUploadsCard v-if="!isLoading && !appId && chartsLoaded.bundles" :use-billing-period="useBillingPeriod" :accumulated="useBillingPeriod && showCumulative" class="col-span-full sm:col-span-6 xl:col-span-4" />
-    <div
-      v-else-if="!appId"
-      class="col-span-full h-[460px] flex flex-col items-center justify-center border border-slate-300 rounded-lg bg-white shadow-lg sm:col-span-6 xl:col-span-4 dark:border-slate-900 dark:bg-gray-800"
-    >
-      <Spinner size="w-40 h-40" />
-    </div>
-    <UpdateStatsCard v-if="!isLoading && !appId && chartsLoaded.updates" :use-billing-period="useBillingPeriod" :accumulated="useBillingPeriod && showCumulative" class="col-span-full sm:col-span-6 xl:col-span-4" />
-    <div
-      v-else-if="!appId"
-      class="col-span-full h-[460px] flex flex-col items-center justify-center border border-slate-300 rounded-lg bg-white shadow-lg sm:col-span-6 xl:col-span-4 dark:border-slate-900 dark:bg-gray-800"
-    >
-      <Spinner size="w-40 h-40" />
-    </div>
-    <DeploymentStatsCard v-if="!isLoading && !appId && chartsLoaded.deployments" :use-billing-period="useBillingPeriod" :accumulated="useBillingPeriod && showCumulative" class="col-span-full sm:col-span-6 xl:col-span-4" />
-    <div
-      v-else-if="!appId"
-      class="col-span-full h-[460px] flex flex-col items-center justify-center border border-slate-300 rounded-lg bg-white shadow-lg sm:col-span-6 xl:col-span-4 dark:border-slate-900 dark:bg-gray-800"
-    >
-      <Spinner size="w-40 h-40" />
-    </div>
+    <BundleUploadsCard v-if="!appId" :use-billing-period="useBillingPeriod" :accumulated="useBillingPeriod && showCumulative" class="col-span-full sm:col-span-6 xl:col-span-4" />
+    <UpdateStatsCard v-if="!appId" :use-billing-period="useBillingPeriod" :accumulated="useBillingPeriod && showCumulative" class="col-span-full sm:col-span-6 xl:col-span-4" />
+    <DeploymentStatsCard v-if="!appId" :use-billing-period="useBillingPeriod" :accumulated="useBillingPeriod && showCumulative" class="col-span-full sm:col-span-6 xl:col-span-4" />
   </div>
 </template>
