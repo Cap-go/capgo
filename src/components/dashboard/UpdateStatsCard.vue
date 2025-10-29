@@ -113,6 +113,7 @@ const totalUpdates = computed(() => totalInstalled.value + totalFailed.value + t
 const hasData = computed(() => chartUpdateData.value?.length > 0)
 
 async function calculateStats(forceRefetch = false) {
+  const startTime = Date.now()
   isLoading.value = true
   totalInstalled.value = 0
   totalFailed.value = 0
@@ -173,28 +174,17 @@ async function calculateStats(forceRefetch = false) {
     }
     else {
       // Multiple apps mode - use store for shared apps data
-      if (!cachedRawStats.value || forceRefetch) {
-        console.log('[UpdateStatsCard] Fetching apps list')
+      // Only fetch apps if not already loaded in store
+      if (!dashboardAppsStore.isLoaded) {
         await dashboardAppsStore.fetchApps()
-        targetAppIds = [...dashboardAppsStore.appIds]
-        appNames.value = dashboardAppsStore.appNames
       }
-      else {
-        console.log('[UpdateStatsCard] Using cached app IDs')
-        // When using cache, get app IDs from the cached data or from store
-        targetAppIds = Object.keys(appNames.value)
-        // If appNames is empty but store has data, use store
-        if (targetAppIds.length === 0 && dashboardAppsStore.appIds.length > 0) {
-          console.log('[UpdateStatsCard] AppNames empty, using store appIds')
-          targetAppIds = [...dashboardAppsStore.appIds]
-          appNames.value = dashboardAppsStore.appNames
-        }
-      }
+
+      targetAppIds = [...dashboardAppsStore.appIds]
+      appNames.value = dashboardAppsStore.appNames
     }
 
     if (targetAppIds.length === 0) {
       updateData.value = dailyCounts
-      isLoading.value = false
       return
     }
 
@@ -312,6 +302,11 @@ async function calculateStats(forceRefetch = false) {
     updateData.value = dailyCounts
   }
   finally {
+    // Ensure spinner shows for at least 300ms for better UX
+    const elapsed = Date.now() - startTime
+    if (elapsed < 300) {
+      await new Promise(resolve => setTimeout(resolve, 300 - elapsed))
+    }
     isLoading.value = false
   }
 }

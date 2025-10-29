@@ -95,12 +95,8 @@ export const useMainStore = defineStore('main', () => {
   }
 
   const updateDashboard = async (currentOrgId: string, rangeStart?: string, rangeEnd?: string) => {
-    console.log('[mainStore] updateDashboard called, orgId:', currentOrgId, 'rangeStart:', rangeStart, 'rangeEnd:', rangeEnd)
-    console.trace('[mainStore] Stack trace for updateDashboard')
     try {
-      console.log('[mainStore] Calling getAllDashboard - NETWORK REQUEST ABOUT TO HAPPEN')
       const dashboardRes = await getAllDashboard(currentOrgId, rangeStart, rangeEnd)
-      console.log('[mainStore] getAllDashboard completed')
       dashboard.value = dashboardRes.global
       dashboardByapp.value = dashboardRes.byApp
 

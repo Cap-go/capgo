@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import Spinner from '~/components/Spinner.vue'
 
 const props = defineProps({
   title: {
@@ -76,7 +77,7 @@ const displayNoDataMessage = computed(() => props.noDataMessage ?? t('no-data'))
     <div class="w-full h-full p-6 pt-2">
       <!-- Loading state -->
       <div v-if="isLoading" class="flex items-center justify-center h-full">
-        <div class="loading loading-spinner loading-lg text-blue-500" />
+        <Spinner size="w-24 h-24" />
       </div>
 
       <!-- Error message -->

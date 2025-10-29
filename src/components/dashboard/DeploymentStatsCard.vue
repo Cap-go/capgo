@@ -85,6 +85,7 @@ const hasData = computed(() => totalDeployments.value > 0)
 const cachedRawStats = ref<any[] | null>(null)
 
 async function calculateStats(forceRefetch = false) {
+  const startTime = Date.now()
   const requestToken = ++latestRequestToken
 
   isLoading.value = true
@@ -152,13 +153,9 @@ async function calculateStats(forceRefetch = false) {
     }
     else {
       // Only fetch apps if not already loaded in store
-      if (!dashboardAppsStore.isLoaded) {
-        console.log('[DeploymentStatsCard] Fetching apps list')
+      if (!dashboardAppsStore.isLoaded)
         await dashboardAppsStore.fetchApps()
-      }
-      else {
-        console.log('[DeploymentStatsCard] Using apps from store (already loaded)')
-      }
+
       targetAppIds = [...dashboardAppsStore.appIds]
       Object.assign(localAppNames, dashboardAppsStore.appNames)
     }
@@ -301,8 +298,14 @@ async function calculateStats(forceRefetch = false) {
     }
   }
   finally {
-    if (requestToken === latestRequestToken)
+    if (requestToken === latestRequestToken) {
+      // Ensure spinner shows for at least 300ms for better UX
+      const elapsed = Date.now() - startTime
+      if (elapsed < 300) {
+        await new Promise(resolve => setTimeout(resolve, 300 - elapsed))
+      }
       isLoading.value = false
+    }
   }
 }
 

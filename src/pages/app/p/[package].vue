@@ -152,10 +152,7 @@ watchEffect(() => {
 <template>
   <div>
     <Tabs v-model:active-tab="ActiveTab" :tabs="tabs" />
-    <div v-if="isLoading" class="flex flex-col items-center justify-center h-full">
-      <Spinner size="w-40 h-40" />
-    </div>
-    <div v-else-if="app">
+    <div v-if="app || isLoading">
       <div v-if="ActiveTab === 'overview'" class="w-full h-full px-4 pt-4 mb-8 overflow-y-auto max-h-fit lg:px-8 sm:px-6 overflow-x-hidden">
         <FailedCard />
         <Usage v-if="!organizationStore.currentOrganizationFailed" ref="usageComponent" :app-id="id" />

@@ -174,11 +174,25 @@ function clearDashboardParams() {
 }
 
 // Function to reload all chart data
-function reloadAllCharts() {
-  console.log('[Usage] Reloading all charts, trigger:', reloadTrigger.value, '->', reloadTrigger.value + 1)
+async function reloadAllCharts() {
+  // Force reload of main dashboard data
+  const last30DaysEnd = new Date()
+  const last30DaysStart = new Date()
+  last30DaysStart.setDate(last30DaysStart.getDate() - 29) // 30 days including today
+
+  const orgId = organizationStore.currentOrganization?.gid
+  if (orgId) {
+    await main.updateDashboard(orgId, last30DaysStart.toISOString(), last30DaysEnd.toISOString())
+  }
+
+  // Force reload apps data
+  await dashboardAppsStore.fetchApps(true)
+
+  // Increment reload trigger for all chart components
   reloadTrigger.value++
+
   // Also reload usage data - force refetch
-  getUsages(true)
+  await getUsages(true)
 }
 
 // Expose function and state for parent components
@@ -205,9 +219,7 @@ const allLimits = computed(() => {
 })
 
 async function getAppStats() {
-  console.log('[Usage] getAppStats called')
   if (props.appId) {
-    console.log('[Usage] getAppStats - single app mode, filtering dashboard')
     return {
       global: main.filterDashboard(props.appId),
       byApp: {},
@@ -216,9 +228,10 @@ async function getAppStats() {
   }
 
   // Use store for apps data
-  console.log('[Usage] getAppStats - calling dashboardAppsStore.fetchApps()')
-  await dashboardAppsStore.fetchApps()
-  console.log('[Usage] getAppStats - fetchApps completed')
+  // Only fetch if not already loaded
+  if (!dashboardAppsStore.isLoaded) {
+    await dashboardAppsStore.fetchApps()
+  }
 
   return {
     global: main.dashboard,
@@ -343,8 +356,6 @@ async function getUsages(forceRefetch = false) {
 
   // Cache the full 30-day data
   cached30DayData.value = full30DayData
-  console.log('[Usage] Cached 30-day data')
-  console.log('[Usage] ===== getUsages END (fetched) =====')
 
   // Process by-app data if available
   appNames.value = appNamesMap
@@ -416,6 +427,7 @@ async function getUsages(forceRefetch = false) {
 }
 
 async function loadData() {
+  const startTime = Date.now()
   isLoading.value = true
 
   await getPlans().then((pls) => {
@@ -423,6 +435,12 @@ async function loadData() {
     plans.value.push(...pls)
   })
   await getUsages(true) // Initial load - force fetch
+
+  // Ensure spinner shows for at least 300ms for better UX
+  const elapsed = Date.now() - startTime
+  if (elapsed < 300) {
+    await new Promise(resolve => setTimeout(resolve, 300 - elapsed))
+  }
   isLoading.value = false
   chartsLoaded.value.usage = true
   loadedAlready.value = true // Mark as loaded so watcher can reload data on mode changes
@@ -493,7 +511,7 @@ onMounted(() => {
 
 <template>
   <!-- View Mode Selectors -->
-  <div v-if="!noData && !isLoading" class="mb-4">
+  <div v-if="!noData" class="mb-4">
     <div class="flex flex-nowrap items-center justify-end gap-2 sm:gap-4">
       <!-- Daily vs Cumulative Switch -->
       <div class="flex items-center space-x-1 bg-gray-200 dark:bg-gray-800 rounded-lg p-1">
