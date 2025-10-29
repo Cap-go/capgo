@@ -430,7 +430,7 @@ function createDatasets(versions: number[], dates: string[], percentages: { [dat
   return versions.map((version) => {
     const percentageData = dates.map(date => Number((percentages[date][version] ?? 0).toFixed(1)))
     // const color = colorKeys[(i + SKIP_COLOR) % colorKeys.length]
-    const versionName = versionNames.find(v => v.id === version)?.name ?? version
+    const versionName = versionNames.find(v => v.id === version)?.name ?? String(version)
 
     return {
       label: versionName,

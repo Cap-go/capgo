@@ -2,7 +2,7 @@ import type { SimpleErrorResponse } from '../supabase/functions/_backend/utils/h
 import type { DeviceLink, HttpMethod } from './test-utils.ts'
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { BASE_URL, getBaseData, getSupabaseClient, resetAndSeedAppData, resetAppData, resetAppDataStats } from './test-utils.ts'
+import { PLUGIN_BASE_URL, getBaseData, getSupabaseClient, resetAndSeedAppData, resetAppData, resetAppDataStats } from './test-utils.ts'
 
 interface ChannelInfo {
   id: string
@@ -17,7 +17,7 @@ const id = randomUUID()
 const APPNAME = `com.sa.${id}`
 
 async function fetchEndpoint(method: HttpMethod, bodyIn: object) {
-  const url = new URL(`${BASE_URL}/channel_self`)
+  const url = new URL(`${PLUGIN_BASE_URL}/channel_self`)
   if (method === 'DELETE') {
     for (const [key, value] of Object.entries(bodyIn))
       url.searchParams.append(key, value.toString())
@@ -33,7 +33,7 @@ async function fetchEndpoint(method: HttpMethod, bodyIn: object) {
 }
 
 async function fetchGetChannels(queryParams: Record<string, string>) {
-  const url = new URL(`${BASE_URL}/channel_self`)
+  const url = new URL(`${PLUGIN_BASE_URL}/channel_self`)
   for (const [key, value] of Object.entries(queryParams))
     url.searchParams.append(key, value)
 
@@ -59,7 +59,7 @@ afterAll(async () => {
 
 describe('invalids /channel_self tests', () => {
   it('[POST] invalid json', async () => {
-    const response = await fetch(`${BASE_URL}/channel_self`, {
+    const response = await fetch(`${PLUGIN_BASE_URL}/channel_self`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -245,7 +245,7 @@ describe('invalids /channel_self tests', () => {
 
 describe('[GET] /channel_self tests', () => {
   it('[GET] without query params should return error', async () => {
-    const response = await fetch(`${BASE_URL}/channel_self`, {
+    const response = await fetch(`${PLUGIN_BASE_URL}/channel_self`, {
       method: 'GET',
     })
 
