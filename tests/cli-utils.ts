@@ -1,7 +1,7 @@
 import { access, mkdir, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { cwd, env } from 'node:process'
-import { BASE_URL } from './test-utils'
+import { BASE_URL, getEndpointUrl } from './test-utils'
 
 // Helper to check if file/directory exists using promises
 async function exists(path: string): Promise<boolean> {
@@ -50,9 +50,9 @@ function generateDefaultJsonCliConfig(appId: string) {
     plugins: {
       CapacitorUpdater: {
         autoUpdate: true,
-        statsUrl: `${BASE_URL}/stats`,
-        channelUrl: `${BASE_URL}/channel_self`,
-        updateUrl: `${BASE_URL}/updates`,
+        statsUrl: getEndpointUrl('/stats'),
+        channelUrl: getEndpointUrl('/channel_self'),
+        updateUrl: getEndpointUrl('/updates'),
         localS3: true,
         localHost: 'http://localhost:5173',
         localWebHost: 'http://localhost:5173',

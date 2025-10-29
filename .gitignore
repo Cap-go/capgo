@@ -1,5 +1,6 @@
 .DS_Store
 *.local
+!cloudflare_workers/.env.local
 dist
 dist-ssr
 node_modules
@@ -80,3 +81,4 @@ scripts/*.json
 scripts/*.txt
 scripts/*.csv
 test-runner-profile
+.wrangler-shared

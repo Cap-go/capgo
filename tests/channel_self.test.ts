@@ -2,7 +2,7 @@ import type { SimpleErrorResponse } from '../supabase/functions/_backend/utils/h
 import type { DeviceLink, HttpMethod } from './test-utils.ts'
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { BASE_URL, getBaseData, getSupabaseClient, resetAndSeedAppData, resetAppData, resetAppDataStats } from './test-utils.ts'
+import { PLUGIN_BASE_URL, getBaseData, getSupabaseClient, resetAndSeedAppData, resetAppData, resetAppDataStats, triggerD1Sync } from './test-utils.ts'
 
 interface ChannelInfo {
   id: string
@@ -17,7 +17,7 @@ const id = randomUUID()
 const APPNAME = `com.sa.${id}`
 
 async function fetchEndpoint(method: HttpMethod, bodyIn: object) {
-  const url = new URL(`${BASE_URL}/channel_self`)
+  const url = new URL(`${PLUGIN_BASE_URL}/channel_self`)
   if (method === 'DELETE') {
     for (const [key, value] of Object.entries(bodyIn))
       url.searchParams.append(key, value.toString())
@@ -33,7 +33,7 @@ async function fetchEndpoint(method: HttpMethod, bodyIn: object) {
 }
 
 async function fetchGetChannels(queryParams: Record<string, string>) {
-  const url = new URL(`${BASE_URL}/channel_self`)
+  const url = new URL(`${PLUGIN_BASE_URL}/channel_self`)
   for (const [key, value] of Object.entries(queryParams))
     url.searchParams.append(key, value)
 
@@ -59,7 +59,7 @@ afterAll(async () => {
 
 describe('invalids /channel_self tests', () => {
   it('[POST] invalid json', async () => {
-    const response = await fetch(`${BASE_URL}/channel_self`, {
+    const response = await fetch(`${PLUGIN_BASE_URL}/channel_self`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -119,7 +119,7 @@ describe('invalids /channel_self tests', () => {
     expect(response.status).toBe(400)
 
     const error = await getResponseErrorCode(response)
-    expect(error).toBe('cannot_override')
+    expect(error).toBe('missing_channel')
   })
 
   it('[POST] with a channel that does not exist', async () => {
@@ -141,6 +141,7 @@ describe('invalids /channel_self tests', () => {
     const { error } = await getSupabaseClient().from('channels').update({ allow_device_self_set: false }).eq('name', data.channel).eq('app_id', APPNAME).select('id').single()
 
     expect(error).toBeNull()
+    await triggerD1Sync() // Sync channel updates to D1
 
     try {
       const response = await fetchEndpoint('POST', data)
@@ -195,6 +196,7 @@ describe('invalids /channel_self tests', () => {
     const { error } = await getSupabaseClient().from('app_versions').update({ name: 'build_not_in' }).eq('name', 'builtin').eq('app_id', APPNAME).select('id').single()
 
     expect(error).toBeNull()
+    await triggerD1Sync() // Sync app_versions updates to D1
 
     try {
       const response = await fetchEndpoint('PUT', data)
@@ -245,7 +247,7 @@ describe('invalids /channel_self tests', () => {
 
 describe('[GET] /channel_self tests', () => {
   it('[GET] without query params should return error', async () => {
-    const response = await fetch(`${BASE_URL}/channel_self`, {
+    const response = await fetch(`${PLUGIN_BASE_URL}/channel_self`, {
       method: 'GET',
     })
 
@@ -410,6 +412,7 @@ describe('[GET] /channel_self tests', () => {
 
     expect(updateError).toBeNull()
     expect(channelData?.allow_emulator).toBe(false)
+    await triggerD1Sync() // Sync channel updates to D1
 
     try {
       const data = getBaseData(APPNAME)
@@ -467,6 +470,7 @@ describe('[GET] /channel_self tests', () => {
       .eq('app_id', APPNAME)
 
     expect(updateError).toBeNull()
+    await triggerD1Sync() // Sync channel updates to D1
 
     try {
       // Test dev device - real device (is_emulator=false) should get no channels
@@ -499,6 +503,7 @@ describe('[GET] /channel_self tests', () => {
         .update({ allow_dev: true })
         .eq('name', 'development')
         .eq('app_id', APPNAME)
+      await triggerD1Sync() // Sync the reset back to D1
     }
   })
 
@@ -556,6 +561,75 @@ it('[POST] with a version that does not exist', async () => {
 
   const responseError = await getResponseErrorCode(response)
   expect(responseError).toBeUndefined()
+})
+
+it('[POST] /channel_self creates new channel_device with owner_org', async () => {
+  // This test ensures that when a NEW device sets a channel for the first time,
+  // the channel_devices record is created with all required fields including owner_org
+  // This specifically tests the INSERT path of the upsert operation
+  await resetAndSeedAppData(APPNAME)
+
+  // First, enable allow_device_self_set for beta channel (non-default channel)
+  const { error: channelUpdateError, data: betaChannel } = await getSupabaseClient()
+    .from('channels')
+    .update({ allow_device_self_set: true })
+    .eq('name', 'beta')
+    .eq('app_id', APPNAME)
+    .select('id, owner_org')
+    .single()
+
+  expect(channelUpdateError).toBeNull()
+  expect(betaChannel).toBeTruthy()
+
+  try {
+    // Use a brand new device_id that has never been in channel_devices
+    const data = getBaseData(APPNAME)
+    data.device_id = randomUUID().toLowerCase()
+    data.channel = 'beta' // Use non-default channel to trigger INSERT
+
+    // Verify no existing channel_devices record for this device
+    const { data: existingRecord } = await getSupabaseClient()
+      .from('channel_devices')
+      .select('*')
+      .eq('device_id', data.device_id)
+      .eq('app_id', APPNAME)
+
+    expect(existingRecord).toHaveLength(0)
+
+    // Call POST endpoint to set channel (this triggers INSERT in upsert)
+    const response = await fetchEndpoint('POST', data)
+    expect(response.ok).toBeTruthy()
+    expect(await response.json()).toEqual({ status: 'ok' })
+
+    // Verify channel_devices record was created with owner_org
+    const { data: channelDevice, error: channelDeviceError } = await getSupabaseClient()
+      .from('channel_devices')
+      .select('device_id, app_id, channel_id, owner_org')
+      .eq('device_id', data.device_id)
+      .eq('app_id', APPNAME)
+      .single()
+
+    expect(channelDeviceError).toBeNull()
+    expect(channelDevice).toBeTruthy()
+    expect(channelDevice!.device_id).toBe(data.device_id)
+    expect(channelDevice!.app_id).toBe(APPNAME)
+    expect(channelDevice!.owner_org).toBeTruthy() // Most important: owner_org must be set
+    expect(typeof channelDevice!.owner_org).toBe('string')
+    expect(channelDevice!.channel_id).toBe(betaChannel!.id)
+
+    // Verify owner_org matches the channel's owner_org
+    expect(channelDevice!.owner_org).toBe(betaChannel!.owner_org)
+  }
+  finally {
+    // Reset beta channel to not allow self set
+    const { error: resetError } = await getSupabaseClient()
+      .from('channels')
+      .update({ allow_device_self_set: false })
+      .eq('name', 'beta')
+      .eq('app_id', APPNAME)
+
+    expect(resetError).toBeNull()
+  }
 })
 
 it('[POST] /channel_self with default channel', async () => {
@@ -652,6 +726,7 @@ it('[PUT] /channel_self (with overwrite)', async () => {
   }, { onConflict: 'device_id, app_id' })
 
   expect(error).toBeNull()
+  await triggerD1Sync() // Sync channel_devices to D1
 
   try {
     const response = await fetchEndpoint('PUT', data)
@@ -738,6 +813,7 @@ it('[DELETE] /channel_self (with overwrite)', async () => {
   }, { onConflict: 'device_id, app_id' })
 
   expect(error).toBeNull()
+  await triggerD1Sync() // Sync channel_devices to D1
 
   try {
     const response = await fetchEndpoint('DELETE', data)

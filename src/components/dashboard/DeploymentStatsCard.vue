@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import { useSupabase } from '~/services/supabase'
 import { useDashboardAppsStore } from '~/stores/dashboardApps'
 import { useOrganizationStore } from '~/stores/organization'
+import ChartCard from './ChartCard.vue'
 import DeploymentStatsChart from './DeploymentStatsChart.vue'
 
 const props = defineProps({
@@ -19,6 +20,10 @@ const props = defineProps({
   appId: {
     type: String,
     default: '',
+  },
+  reloadTrigger: {
+    type: Number,
+    default: 0,
   },
 })
 
@@ -76,7 +81,11 @@ const isLoading = ref(true)
 const noPublicChannel = ref(false)
 const hasData = computed(() => totalDeployments.value > 0)
 
-async function calculateStats() {
+// Cache for raw API data
+const cachedRawStats = ref<any[] | null>(null)
+
+async function calculateStats(forceRefetch = false) {
+  const startTime = Date.now()
   const requestToken = ++latestRequestToken
 
   isLoading.value = true
@@ -143,7 +152,10 @@ async function calculateStats() {
       localAppNames[props.appId] = cachedName || props.appId
     }
     else {
-      await dashboardAppsStore.fetchApps()
+      // Only fetch apps if not already loaded in store
+      if (!dashboardAppsStore.isLoaded)
+        await dashboardAppsStore.fetchApps()
+
       targetAppIds = [...dashboardAppsStore.appIds]
       Object.assign(localAppNames, dashboardAppsStore.appNames)
     }
@@ -167,36 +179,52 @@ async function calculateStats() {
     let totalDeploymentsCount = 0
     let noPublicChannelDetected = false
 
-    if (targetAppIds.length > 0) {
-      try {
-        const { data: publicChannels } = await supabase
-          .from('channels')
-          .select('app_id')
-          .in('app_id', targetAppIds)
-          .eq('public', true)
-        const hasPublic = (publicChannels?.length ?? 0) > 0
-        noPublicChannelDetected = !hasPublic
-        console.log(`public channel check`, { targetAppIds, hasPublic })
-      }
-      catch (error) {
-        console.error(`failed to verify public channels`, error)
-      }
+    // Use cached data if available and not forcing refetch
+    let data, error
+    if (cachedRawStats.value && !forceRefetch) {
+      data = cachedRawStats.value
+      error = null
+      // Use cached noPublicChannel state
+      noPublicChannelDetected = noPublicChannel.value
     }
+    else {
+      // Only check public channels when actually fetching new data
+      if (targetAppIds.length > 0) {
+        try {
+          const { data: publicChannels } = await supabase
+            .from('channels')
+            .select('app_id')
+            .in('app_id', targetAppIds)
+            .eq('public', true)
+          const hasPublic = (publicChannels?.length ?? 0) > 0
+          noPublicChannelDetected = !hasPublic
+        }
+        catch (error) {
+          console.error(`[DeploymentStatsCard] Failed to verify public channels`, error)
+        }
+      }
 
-    const { data, error } = await supabase
-      .from('deploy_history')
-      .select(`
-        deployed_at,
-        app_id,
-        channels(
-          public
-        )
-      `)
-      .eq('channels.public', true)
-      .in('app_id', targetAppIds)
-      .gte('deployed_at', startDate)
-      .lte('deployed_at', endDate)
-      .order('deployed_at')
+      const result = await supabase
+        .from('deploy_history')
+        .select(`
+          deployed_at,
+          app_id,
+          channels(
+            public
+          )
+        `)
+        .eq('channels.public', true)
+        .in('app_id', targetAppIds)
+        .gte('deployed_at', startDate)
+        .lte('deployed_at', endDate)
+        .order('deployed_at')
+
+      data = result.data
+      error = result.error
+      // Cache the fetched data
+      if (!error)
+        cachedRawStats.value = data
+    }
 
     if (error)
       throw error
@@ -270,82 +298,63 @@ async function calculateStats() {
     }
   }
   finally {
-    if (requestToken === latestRequestToken)
+    if (requestToken === latestRequestToken) {
+      // Ensure spinner shows for at least 300ms for better UX
+      const elapsed = Date.now() - startTime
+      if (elapsed < 300) {
+        await new Promise(resolve => setTimeout(resolve, 300 - elapsed))
+      }
       isLoading.value = false
+    }
   }
 }
 
-// Watch for billing period mode changes and recalculate
+// Watch for billing period mode changes - use cached data
 watch(() => props.useBillingPeriod, async () => {
-  await calculateStats()
+  await calculateStats(false) // Don't refetch, just reprocess cached data
 })
 
-// Watch for app target changes and recalculate
+// Watch for app target changes - need to refetch
 watch(() => props.appId, async () => {
-  await calculateStats()
+  cachedRawStats.value = null // Clear cache when app changes
+  await calculateStats(true) // Force refetch for new app
 })
 
-// Watch for accumulated mode changes and recalculate
+// Watch for accumulated mode changes - use cached data
 watch(() => props.accumulated, async () => {
-  await calculateStats()
+  await calculateStats(false) // Don't refetch, just reprocess cached data
+})
+
+// Watch for reload trigger - force refetch
+watch(() => props.reloadTrigger, async (newVal, oldVal) => {
+  if (newVal !== oldVal && newVal > 0) {
+    await calculateStats(true) // Force refetch from API
+  }
 })
 
 onMounted(async () => {
-  await calculateStats()
+  await calculateStats(true) // Initial fetch
 })
 </script>
 
 <template>
-  <div class="flex flex-col bg-white border rounded-lg shadow-lg col-span-full border-slate-300 sm:col-span-6 xl:col-span-4 dark:border-slate-900 dark:bg-gray-800 h-[460px]">
-    <div class="pt-4 px-4 flex items-start justify-between gap-2">
-      <h2 class="flex-1 min-w-0 text-2xl font-semibold leading-tight text-slate-600 dark:text-white">
-        {{ t('deployment_statistics') }}
-      </h2>
-
-      <div class="flex flex-col items-end text-right flex-shrink-0">
-        <div
-          v-if="lastDayEvolution"
-          class="inline-flex items-center justify-center rounded-full px-2 py-1 text-xs font-bold text-white shadow-lg whitespace-nowrap"
-          :class="{ 'bg-emerald-500': lastDayEvolution >= 0, 'bg-yellow-500': lastDayEvolution < 0 }"
-        >
-          {{ lastDayEvolution < 0 ? '-' : '+' }}{{ Math.abs(lastDayEvolution).toFixed(2) }}%
-        </div>
-        <div v-else class="inline-flex rounded-full px-2 py-1 text-xs font-semibold opacity-0" aria-hidden="true" />
-        <div class="text-3xl font-bold text-slate-600 dark:text-white">
-          {{ totalDeployments?.toLocaleString() }}
-        </div>
-      </div>
-    </div>
-    <!-- Chart built with Chart.js 3 -->
-
-    <!-- Change the height attribute to adjust the chart height -->
-    <div class="w-full h-full p-6 pt-2">
-      <div v-if="isLoading" class="flex items-center justify-center h-full">
-        <div class="loading loading-spinner loading-lg text-blue-500" />
-      </div>
-      <div
-        v-else-if="noPublicChannel"
-        class="flex h-full items-center justify-center text-sm text-slate-500 dark:text-slate-300 text-center px-4"
-      >
-        {{ t('no-public-channel') }}
-      </div>
-      <div
-        v-else-if="!hasData"
-        class="flex h-full items-center justify-center text-sm text-slate-500 dark:text-slate-300"
-      >
-        {{ t('no-data') }}
-      </div>
-      <DeploymentStatsChart
-        v-else
-        :key="JSON.stringify(deploymentDataByApp)"
-        :title="t('deployment_statistics')"
-        :colors="colors.blue"
-        :data="deploymentData"
-        :use-billing-period="useBillingPeriod"
-        :accumulated="accumulated"
-        :data-by-app="deploymentDataByApp"
-        :app-names="appNames"
-      />
-    </div>
-  </div>
+  <ChartCard
+    :title="t('deployment_statistics')"
+    :total="totalDeployments"
+    :last-day-evolution="lastDayEvolution"
+    :is-loading="isLoading"
+    :has-data="hasData"
+    :error-message="noPublicChannel ? t('no-public-channel') : undefined"
+  >
+    <DeploymentStatsChart
+      :key="JSON.stringify(deploymentDataByApp)"
+      :title="t('deployment_statistics')"
+      :colors="colors.blue"
+      :data="deploymentData"
+      :use-billing-period="useBillingPeriod"
+      :accumulated="accumulated"
+      :data-by-app="deploymentDataByApp"
+      :app-names="appNames"
+    />
+  </ChartCard>
 </template>

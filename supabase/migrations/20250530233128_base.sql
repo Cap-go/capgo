@@ -182,7 +182,8 @@ CREATE TYPE "public"."stats_action" AS ENUM(
   'rateLimited',
   'disableAutoUpdate',
   'InvalidIp',
-  'ping'
+  'ping',
+  'blocked_by_server_url'
 );
 
 ALTER TYPE "public"."stats_action" OWNER TO "postgres";

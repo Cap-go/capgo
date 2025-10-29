@@ -62,17 +62,12 @@ displayStore.defaultBack = '/app'
 
 <template>
   <div>
-    <div v-if="!isLoading">
-      <div class="h-full pb-4 overflow-hidden">
-        <div class="w-full h-full px-4 pt-2 md:pt-8 mx-auto mb-8 overflow-y-auto max-w-9xl max-h-fit lg:px-8 sm:px-6">
-          <WelcomeBanner v-if="apps.length === 0" />
-          <FailedCard />
-          <Usage v-if="!isLoading && !organizationStore.currentOrganizationFailed" />
-        </div>
+    <div class="h-full pb-4 overflow-hidden">
+      <div class="w-full h-full px-4 pt-2 md:pt-8 mx-auto mb-8 overflow-y-auto max-w-9xl max-h-fit lg:px-8 sm:px-6">
+        <WelcomeBanner v-if="apps.length === 0" />
+        <FailedCard />
+        <Usage v-if="!organizationStore.currentOrganizationFailed" />
       </div>
-    </div>
-    <div v-else class="flex flex-col items-center justify-center h-full">
-      <Spinner size="w-40 h-40" />
     </div>
   </div>
 </template>

@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { useI18n } from 'vue-i18n'
-
 import { getDaysInCurrentMonth } from '~/services/date'
+import ChartCard from './ChartCard.vue'
+import LineChartStats from './LineChartStats.vue'
 
 const props = defineProps({
   title: { type: String, default: '' },
@@ -33,8 +33,11 @@ const props = defineProps({
     type: Object,
     default: () => ({}),
   },
+  isLoading: {
+    type: Boolean,
+    default: false,
+  },
 })
-const { t } = useI18n()
 
 const total = computed(() => {
   const dataArray = props.datas as number[]
@@ -71,37 +74,29 @@ const lastDayEvolution = computed(() => {
 
   return ((lastValue - previousValue) / previousValue) * 100
 })
+
+const hasData = computed(() => (props.datas as number[]).length > 0)
 </script>
 
 <template>
-  <div class="flex flex-col bg-white border rounded-lg shadow-lg col-span-full border-slate-300 sm:col-span-6 xl:col-span-4 dark:border-slate-900 dark:bg-gray-800 h-[460px]">
-    <div class="pt-4 px-4 flex items-start justify-between gap-2">
-      <h2 class="flex-1 min-w-0 text-2xl font-semibold leading-tight text-slate-600 dark:text-white">
-        {{ props.title }}
-      </h2>
-
-      <div class="flex flex-col items-end text-right flex-shrink-0">
-        <div
-          v-if="lastDayEvolution"
-          class="inline-flex items-center justify-center rounded-full px-2 py-1 text-xs font-bold text-white shadow-lg whitespace-nowrap"
-          :class="{ 'bg-emerald-500': lastDayEvolution >= 0, 'bg-yellow-500': lastDayEvolution < 0 }"
-        >
-          {{ lastDayEvolution < 0 ? '-' : '+' }}{{ Math.abs(lastDayEvolution).toFixed(2) }}%
-        </div>
-        <div v-else class="inline-flex rounded-full px-2 py-1 text-xs font-semibold opacity-0" aria-hidden="true" />
-        <div class="text-3xl font-bold text-slate-600 dark:text-white">
-          {{ total?.toLocaleString() }} <span class="text-2xl font-normal">{{ unit }}</span>
-        </div>
-      </div>
-    </div>
-    <!-- Chart built with Chart.js 3 -->
-
-    <!-- Change the height attribute to adjust the chart height -->
-    <div class="w-full h-full p-6 pt-2">
-      <LineChartStats v-if="props.datas?.length" :title="props.title" :colors="props.colors" :limits="props.limits" :data="props.datas" :datas-by-app="props.datasByApp" :app-names="props.appNames" :accumulated="accumulated" :use-billing-period="useBillingPeriod" />
-      <div v-else class="flex flex-col items-center justify-center h-full">
-        {{ t('no-data') }}
-      </div>
-    </div>
-  </div>
+  <ChartCard
+    :title="title"
+    :total="total"
+    :unit="unit"
+    :last-day-evolution="lastDayEvolution"
+    :has-data="hasData"
+    :is-loading="isLoading"
+  >
+    <LineChartStats
+      :key="`${useBillingPeriod}-${accumulated}`"
+      :title="title"
+      :colors="colors"
+      :limits="limits"
+      :data="datas"
+      :datas-by-app="datasByApp"
+      :app-names="appNames"
+      :accumulated="accumulated"
+      :use-billing-period="useBillingPeriod"
+    />
+  </ChartCard>
 </template>

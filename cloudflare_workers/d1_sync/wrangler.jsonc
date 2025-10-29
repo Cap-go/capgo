@@ -1,0 +1,48 @@
+{
+  "name": "capgo-d1-sync",
+  "main": "src/worker.ts",
+  "compatibility_date": "2025-09-15",
+  "compatibility_flags": ["nodejs_compat_v2"],
+  "env": {
+    "prod": {
+      "name": "capgo-d1-sync-prod",
+      "route": {
+        "pattern": "sync.capgo.app",
+        "custom_domain": true
+      },
+      "observability": {
+        "enabled": true
+      },
+      "hyperdrive": [
+        {
+          "binding": "HYPERDRIVE_DB",
+          "id": "0f1d77550db142fbb17cb6b3ee659a06"
+        }
+      ],
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "capgo_replicate",
+          "database_id": "7f267d86-f4f7-49f5-9622-e44373aa00dc"
+        }
+      ]
+    },
+    "local": {
+      "name": "capgo-d1-sync-local",
+      "hyperdrive": [
+        {
+          "binding": "HYPERDRIVE_DB",
+          "id": "local-dev-hyperdrive",
+          "localConnectionString": "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+        }
+      ],
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "capgo_local_replicate",
+          "database_id": "3fca2d80-4ca0-4118-b0ce-a36068f43f15"
+        }
+      ]
+    }
+  }
+}

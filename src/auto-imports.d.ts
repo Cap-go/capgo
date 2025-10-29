@@ -41,7 +41,6 @@ declare global {
   const ignorableWatch: typeof import('@vueuse/core').ignorableWatch
   const inject: typeof import('vue').inject
   const injectLocal: typeof import('@vueuse/core').injectLocal
-  const isDark: typeof import('./composables/dark')['isDark']
   const isDefined: typeof import('@vueuse/core').isDefined
   const isProxy: typeof import('vue').isProxy
   const isReactive: typeof import('vue').isReactive
@@ -92,7 +91,6 @@ declare global {
   const refWithControl: typeof import('@vueuse/core').refWithControl
   const resolveComponent: typeof import('vue').resolveComponent
   const resolveRef: typeof import('@vueuse/core').resolveRef
-  const resolveUnref: typeof import('@vueuse/core').resolveUnref
   const shallowReactive: typeof import('vue').shallowReactive
   const shallowReadonly: typeof import('vue').shallowReadonly
   const shallowRef: typeof import('vue').shallowRef
@@ -106,7 +104,6 @@ declare global {
   const toRef: typeof import('vue').toRef
   const toRefs: typeof import('vue').toRefs
   const toValue: typeof import('vue').toValue
-  const toggleDark: typeof import('./composables/dark')['toggleDark']
   const triggerRef: typeof import('vue').triggerRef
   const tryOnBeforeMount: typeof import('@vueuse/core').tryOnBeforeMount
   const tryOnBeforeUnmount: typeof import('@vueuse/core').tryOnBeforeUnmount

@@ -155,7 +155,7 @@ async function customDeviceOverwritePart5(
       device_id: deviceId,
       app_id: route.params.package as string,
       platform,
-      version: Number(route.params.channel),
+      version_name: channel.value?.version.name ?? 'unknown',
     },
   })
 
@@ -802,7 +802,7 @@ async function handleRevert() {
           <div class="flex flex-col overflow-hidden overflow-y-auto bg-white border border-slate-300 shadow-lg md:rounded-lg dark:border-slate-900 dark:bg-gray-800">
             <DeviceTable v-if="deviceIds.length > 0" :app-id="channel.version.app_id" :ids="deviceIds" :channel="channel" show-add-button @add-device="AddDevice" />
             <template v-else-if="!dialogStore.showDialog">
-              <div class="text-center">
+              <div class="text-center py-4">
                 <div>{{ t('forced-devices-not-found') }}</div>
                 <div class="d-btn d-btn-primary mt-4 text-white cursor-pointer" @click="AddDevice">
                   <plusOutline />

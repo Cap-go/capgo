@@ -15,7 +15,8 @@ import {
 import { computed } from 'vue'
 import { Bar, Line } from 'vue-chartjs'
 import { useI18n } from 'vue-i18n'
-import { getDaysInCurrentMonth } from '~/services/date'
+import { createLegendConfig, createStackedChartScales } from '~/services/chartConfig'
+import { generateMonthDays, getDaysInCurrentMonth } from '~/services/date'
 import { useOrganizationStore } from '~/stores/organization'
 import { createTooltipConfig, todayLinePlugin, verticalLinePlugin } from '../../services/chartTooltip'
 
@@ -73,22 +74,18 @@ const ACTION_STYLES: Record<string, { barBackground: string, barBorder: string, 
   },
 }
 
-function getDayNumbers(startDate: Date, endDate: Date) {
-  const dayNumbers = []
-  const currentDate = new Date(startDate)
-  while (currentDate.getTime() <= endDate.getTime()) {
-    dayNumbers.push(currentDate.getDate())
-    currentDate.setDate(currentDate.getDate() + 1)
-  }
-  return dayNumbers
-}
-
 function getTodayLimit(labelCount: number) {
   if (!props.useBillingPeriod)
     return labelCount - 1
 
   const today = new Date()
   today.setHours(0, 0, 0, 0)
+
+  // If cycle end is today or in the past, show all data
+  if (cycleEnd <= today)
+    return labelCount - 1
+
+  // If cycle end is in the future, only show data up to today
   const diff = Math.floor((today.getTime() - cycleStart.getTime()) / DAY_IN_MS)
 
   if (Number.isNaN(diff) || diff < 0)
@@ -124,20 +121,7 @@ function transformSeries(source: number[], accumulated: boolean, labelCount: num
 }
 
 function monthdays() {
-  if (!props.useBillingPeriod) {
-    // Last 30 days mode - generate actual dates
-    const today = new Date()
-    const dates = []
-    for (let i = 29; i >= 0; i--) {
-      const date = new Date(today)
-      date.setDate(date.getDate() - i)
-      dates.push(date.getDate())
-    }
-    return dates
-  }
-
-  // Billing period mode - use existing logic
-  return getDayNumbers(cycleStart, cycleEnd)
+  return generateMonthDays(props.useBillingPeriod, cycleStart, cycleEnd)
 }
 
 const chartData = computed<ChartData<'bar' | 'line'>>(() => {
@@ -210,43 +194,11 @@ const todayLineOptions = computed(() => {
 })
 
 const chartOptions = computed(() => {
-  const axisTicksColor = isDark.value ? 'white' : 'black'
-
   return {
     maintainAspectRatio: false,
-    scales: {
-      y: {
-        beginAtZero: true,
-        stacked: true,
-        ticks: {
-          color: axisTicksColor,
-        },
-        grid: {
-          color: `${isDark.value ? '#424e5f' : '#bfc9d6'}`,
-        },
-      },
-      x: {
-        stacked: true,
-        ticks: {
-          color: axisTicksColor,
-        },
-        grid: {
-          color: `${isDark.value ? '#323e4e' : '#cad5e2'}`,
-        },
-      },
-    },
+    scales: createStackedChartScales(isDark.value, true),
     plugins: {
-      legend: {
-        display: true,
-        position: 'bottom' as const,
-        labels: {
-          color: axisTicksColor,
-          padding: 10,
-          font: {
-            size: 11,
-          },
-        },
-      },
+      legend: createLegendConfig(isDark.value, true),
       title: {
         display: false,
       },

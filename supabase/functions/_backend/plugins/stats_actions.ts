@@ -51,4 +51,5 @@ export const ALLOWED_STATS_ACTIONS = [
   'rateLimited',
   'disableAutoUpdate',
   'InvalidIp',
+  'blocked_by_server_url',
 ] as const satisfies readonly Database['public']['Enums']['stats_action'][]

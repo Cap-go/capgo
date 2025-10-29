@@ -7,10 +7,13 @@ import { computed, ref, watch } from 'vue'
 import { Line } from 'vue-chartjs'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
+import { createChartScales } from '~/services/chartConfig'
 import { useChartData } from '~/services/chartDataService'
 import { createTooltipConfig, todayLinePlugin, verticalLinePlugin } from '~/services/chartTooltip'
+import { generateChartDayLabels, getChartDateRange, normalizeToStartOfDay } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
 import { useOrganizationStore } from '~/stores/organization'
+import ChartCard from './ChartCard.vue'
 
 const props = defineProps({
   useBillingPeriod: {
@@ -20,6 +23,10 @@ const props = defineProps({
   accumulated: {
     type: Boolean,
     default: true,
+  },
+  reloadTrigger: {
+    type: Number,
+    default: 0,
   },
 })
 
@@ -46,6 +53,10 @@ const isLoading = ref(true)
 const rawChartData = ref<ChartApiData | null>(null)
 const currentRange = ref<{ startDate: Date, endDate: Date } | null>(null)
 let requestToken = 0
+
+// Cache for both billing period and last 30 days data
+const cachedBillingData = ref<{ data: ChartApiData, range: { startDate: Date, endDate: Date } } | null>(null)
+const cached30DayData = ref<{ data: ChartApiData, range: { startDate: Date, endDate: Date } } | null>(null)
 
 const latestVersion = computed(() => {
   const chartData = rawChartData.value
@@ -119,12 +130,6 @@ const latestVersionPercentageDisplay = computed(() => {
   return hasSymbol ? replaced : `${formatted}%`
 })
 
-function normalizeToStartOfDay(date: Date) {
-  const normalized = new Date(date)
-  normalized.setHours(0, 0, 0, 0)
-  return normalized
-}
-
 function resolveOrganizationForCurrentContext(): Organization | undefined {
   if (appId.value) {
     const org = organizationStore.getOrgByAppId(appId.value)
@@ -136,20 +141,11 @@ function resolveOrganizationForCurrentContext(): Organization | undefined {
 
 function getDateRange() {
   const activeOrganization = resolveOrganizationForCurrentContext()
-  if (props.useBillingPeriod) {
-    const startDate = normalizeToStartOfDay(new Date(activeOrganization?.subscription_start ?? new Date()))
-    const endDate = normalizeToStartOfDay(new Date(activeOrganization?.subscription_end ?? new Date()))
-
-    if (endDate.getTime() < startDate.getTime())
-      return { startDate, endDate: startDate }
-
-    return { startDate, endDate }
-  }
-
-  const endDate = normalizeToStartOfDay(new Date())
-  const startDate = new Date(endDate)
-  startDate.setDate(startDate.getDate() - 29)
-  return { startDate, endDate }
+  return getChartDateRange(
+    props.useBillingPeriod,
+    activeOrganization?.subscription_start,
+    activeOrganization?.subscription_end,
+  )
 }
 
 const totalDays = computed(() => {
@@ -157,38 +153,18 @@ const totalDays = computed(() => {
     return rawChartData.value?.labels.length ?? 0
   }
 
+  // Both modes: show full date range (billing cycle or last 30 days)
   const { startDate, endDate } = currentRange.value
-  const diff = Math.floor((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1
-  const rawLength = rawChartData.value?.labels.length ?? 0
-  return Math.max(diff, rawLength)
+  return Math.floor((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1
 })
 
-function generateDayLabels(totalLength: number) {
+function generateDayLabels(_totalLength: number) {
   if (!currentRange.value)
-    return Array.from({ length: totalLength }, (_value, index) => index + 1)
+    return []
 
-  const labels: number[] = []
+  // Both modes: generate labels for the full date range
   const { startDate, endDate } = currentRange.value
-
-  let cursor = new Date(startDate)
-  cursor.setHours(0, 0, 0, 0)
-  const finalDate = new Date(endDate)
-  finalDate.setHours(0, 0, 0, 0)
-
-  const dayInMs = 24 * 60 * 60 * 1000
-  while (cursor.getTime() <= finalDate.getTime()) {
-    labels.push(cursor.getDate())
-    cursor = new Date(cursor.getTime() + dayInMs)
-  }
-
-  if (labels.length < totalLength) {
-    const lastDay = labels[labels.length - 1] ?? 1
-    const remaining = totalLength - labels.length
-    for (let i = 1; i <= remaining; i++)
-      labels.push(lastDay + i)
-  }
-
-  return labels.slice(0, totalLength)
+  return generateChartDayLabels(props.useBillingPeriod, startDate, endDate)
 }
 
 function roundPercentageInString(text: string) {
@@ -209,7 +185,19 @@ const processedChartData = computed<ChartData<'line'> | null>(() => {
   if (!rawChartData.value)
     return null
 
-  const targetLength = Math.max(totalDays.value, rawChartData.value.labels.length)
+  const targetLength = totalDays.value
+
+  // Calculate offset for padding in both modes
+  // If API data starts later than our range start, we need padding
+  let dataOffset = 0
+  if (currentRange.value && rawChartData.value.labels.length > 0) {
+    const firstApiDate = new Date(rawChartData.value.labels[0])
+    const rangeStart = currentRange.value.startDate
+    dataOffset = Math.floor((firstApiDate.getTime() - rangeStart.getTime()) / (1000 * 60 * 60 * 24))
+    if (dataOffset < 0)
+      dataOffset = 0
+  }
+
   let globalLastDataIndex = -1
   const normalizedDatasets = rawChartData.value.datasets.map((dataset) => {
     const rawValues = dataset.data ?? []
@@ -249,7 +237,8 @@ const processedChartData = computed<ChartData<'line'> | null>(() => {
     for (let index = normalizedValues.length - 1; index >= 0; index--) {
       const candidate = normalizedValues[index]
       if (typeof candidate === 'number' && Number.isFinite(candidate)) {
-        globalLastDataIndex = Math.max(globalLastDataIndex, index)
+        // Account for offset when tracking last data index
+        globalLastDataIndex = Math.max(globalLastDataIndex, index + dataOffset)
         break
       }
     }
@@ -260,7 +249,11 @@ const processedChartData = computed<ChartData<'line'> | null>(() => {
   const datasets: ChartData<'line'>['datasets'] = []
 
   normalizedDatasets.forEach(({ dataset, normalizedValues }, datasetIndex) => {
-    const paddedValues = Array.from({ length: targetLength }, (_val, index) => normalizedValues[index])
+    // Pad with nulls at the start if needed (when billing period starts before API data)
+    const paddedValues = Array.from({ length: targetLength }, (_val, index) => {
+      const dataIndex = index - dataOffset
+      return dataIndex >= 0 && dataIndex < normalizedValues.length ? normalizedValues[dataIndex] : undefined
+    })
     const previousDataset = datasetIndex > 0 ? datasets[datasetIndex - 1] : null
     const previousDatasetData = previousDataset && Array.isArray(previousDataset.data)
       ? previousDataset.data as Array<number | null | undefined>
@@ -332,6 +325,8 @@ const processedChartData = computed<ChartData<'line'> | null>(() => {
   }
 })
 
+const hasData = computed(() => !!(processedChartData.value && processedChartData.value.datasets.length > 0))
+
 const todayLineOptions = computed(() => {
   if (!props.useBillingPeriod || !currentRange.value)
     return { enabled: false }
@@ -397,40 +392,21 @@ const chartOptions = computed<ChartOptions<'line'>>(() => {
 
   return {
     maintainAspectRatio: false,
-    scales: {
-      x: {
-        grid: {
-          color: `${isDark.value ? '#424e5f' : '#bfc9d6'}`,
-        },
-        ticks: {
-          color: isDark.value ? 'white' : 'black',
-          maxRotation: 0,
-          autoSkip: true,
-        },
+    scales: createChartScales(isDark.value, {
+      suggestedMax: 100,
+      yTickCallback: (tickValue: string | number) => {
+        const numericValue = typeof tickValue === 'number' ? tickValue : Number(tickValue)
+        const display = Number.isFinite(numericValue) ? numericValue : tickValue
+        return `${display}%`
       },
-      y: {
-        beginAtZero: true,
-        suggestedMax: 100,
-        grid: {
-          color: `${isDark.value ? '#323e4e' : '#cad5e2'}`,
-        },
-        ticks: {
-          callback: (tickValue: string | number) => {
-            const numericValue = typeof tickValue === 'number' ? tickValue : Number(tickValue)
-            const display = Number.isFinite(numericValue) ? numericValue : tickValue
-            return `${display}%`
-          },
-          color: isDark.value ? 'white' : 'black',
-        },
-      },
-    },
+    }),
     plugins: pluginOptions as unknown as NonNullable<ChartOptions<'line'>['plugins']>,
   }
 })
 
 const chartPlugins = [verticalLinePlugin, todayLinePlugin] as unknown as Plugin<'line'>[]
 
-async function loadData() {
+async function loadData(forceRefetch = false) {
   if (!appId.value) {
     rawChartData.value = null
     return
@@ -445,16 +421,37 @@ async function loadData() {
   }
 
   const { startDate, endDate } = getDateRange()
-  currentRange.value = { startDate, endDate }
+  const isBillingMode = props.useBillingPeriod
+
+  // Check if we have cached data for this mode
+  const cachedData = isBillingMode ? cachedBillingData.value : cached30DayData.value
+
+  if (cachedData && !forceRefetch) {
+    rawChartData.value = cachedData.data
+    currentRange.value = cachedData.range
+    return
+  }
+
   const currentToken = ++requestToken
   isLoading.value = true
   rawChartData.value = null
+  currentRange.value = { startDate, endDate }
 
   try {
     const data = await useChartData(supabase, appId.value, startDate, endDate)
     if (currentToken !== requestToken)
       return
+
     rawChartData.value = data
+
+    // Cache the data for this mode
+    const cacheEntry = { data, range: { startDate, endDate } }
+    if (isBillingMode) {
+      cachedBillingData.value = cacheEntry
+    }
+    else {
+      cached30DayData.value = cacheEntry
+    }
   }
   catch (error) {
     console.error(error)
@@ -468,17 +465,31 @@ async function loadData() {
   }
 }
 
+// Watch billing period changes - use cached data if available
 watch(() => props.useBillingPeriod, async () => {
   if (appId.value)
-    await loadData()
+    await loadData(false) // Use cache if available
+})
+
+// Watch for reload trigger - force refetch
+watch(() => props.reloadTrigger, async () => {
+  if (appId.value)
+    await loadData(true) // Force refetch
 })
 
 watch(
   () => [route.path, route.params.package as string | undefined] as const,
-  async ([path, packageId]) => {
+  async ([path, packageId], old) => {
+    const oldPackageId = old?.[1]
     if (path.includes('/p/') && packageId) {
+      const packageChanged = packageId !== oldPackageId
       appId.value = packageId
-      await loadData()
+      if (packageChanged) {
+        // Clear cache when switching apps
+        cachedBillingData.value = null
+        cached30DayData.value = null
+        await loadData(true) // Force refetch for new app
+      }
     }
     else {
       appId.value = ''
@@ -492,31 +503,30 @@ watch(
 </script>
 
 <template>
-  <div class="flex flex-col bg-white border rounded-lg shadow-lg col-span-full border-slate-300 sm:col-span-6 xl:col-span-4 dark:border-slate-900 dark:bg-gray-800 h-[460px]">
-    <div class="pt-4 px-4 flex items-start justify-between gap-2">
-      <h2 class="flex-1 min-w-0 text-2xl font-semibold leading-tight text-slate-600 dark:text-white">
-        {{ t('active_users_by_version') }}
-      </h2>
+  <ChartCard
+    :title="t('active_users_by_version')"
+    :is-loading="isLoading"
+    :has-data="hasData"
+  >
+    <template #header>
+      <div class="flex items-start justify-between gap-2 flex-1">
+        <h2 class="flex-1 min-w-0 text-2xl font-semibold leading-tight text-slate-600 dark:text-white">
+          {{ t('active_users_by_version') }}
+        </h2>
 
-      <div class="flex flex-col items-end text-right flex-shrink-0">
-        <div
-          class="inline-flex items-center justify-center rounded-full px-2 py-1 bg-emerald-500 text-xs font-bold text-white shadow-lg whitespace-nowrap"
-        >
-          {{ latestVersionPercentageDisplay }}
+        <div class="flex flex-col items-end text-right shrink-0">
+          <div
+            class="inline-flex items-center justify-center rounded-full px-2 py-1 bg-emerald-500 text-xs font-bold text-white shadow-lg whitespace-nowrap"
+          >
+            {{ latestVersionPercentageDisplay }}
+          </div>
+          <div v-if="latestVersion" class="text-3xl font-bold text-slate-600 dark:text-white">
+            {{ latestVersion.name }}
+          </div>
         </div>
-        <div v-if="latestVersion" class="text-3xl font-bold text-slate-600 dark:text-white">
-          {{ latestVersion.name }}
-        </div>
       </div>
-    </div>
-    <div class="w-full h-full p-6 pt-2">
-      <div v-if="isLoading" class="flex items-center justify-center h-full">
-        <Spinner size="w-40 h-40" />
-      </div>
-      <Line v-else-if="processedChartData && processedChartData.datasets.length" :data="processedChartData!" :options="chartOptions" :plugins="chartPlugins" />
-      <div v-else class="flex h-full items-center justify-center text-sm text-slate-500 dark:text-slate-300">
-        {{ t('no-data') }}
-      </div>
-    </div>
-  </div>
+    </template>
+
+    <Line :data="processedChartData!" :options="chartOptions" :plugins="chartPlugins" />
+  </ChartCard>
 </template>

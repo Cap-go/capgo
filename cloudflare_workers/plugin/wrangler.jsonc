@@ -51,6 +51,10 @@
           "custom_domain": true
         },
         {
+          "pattern": "updater.capgo.com.cn/*",
+          "zone_name": "capgo.app"
+        },
+        {
           "pattern": "updater.spencer.co/*",
           "zone_name": "capgo.app"
         }
@@ -97,19 +101,15 @@
       "hyperdrive": [
         {
           "binding": "HYPERDRIVE_DB",
-          "id": "9935434381594dd7ad9821e6449e36c5"
-        },
-        {
-          "binding": "HYPERDRIVE_DB_DIRECT",
-          "id": "20ce343dca144637bf8e141de18cd0d5"
+          "id": "0f1d77550db142fbb17cb6b3ee659a06"
         },
         {
           "binding": "HYPERDRIVE_DB_SG",
-          "id": "3925125689b646758fd8d8b230db6dc5"
+          "id": "06ee738d905d43d1a055682face2dddb"
         },
         {
           "binding": "HYPERDRIVE_DB_US",
-          "id": "0a7ce52554d643d6beeab710d0675ce0"
+          "id": "51df4318bd5d4a35a5c4c145b520b22f"
         }
       ]
     },
@@ -170,19 +170,16 @@
       "hyperdrive": [
         {
           "binding": "HYPERDRIVE_DB",
-          "id": "9935434381594dd7ad9821e6449e36c5"
+          "id": "0f1d77550db142fbb17cb6b3ee659a06"
         },
-        {
-          "binding": "HYPERDRIVE_DB_DIRECT",
-          "id": "20ce343dca144637bf8e141de18cd0d5"
-        },
+
         {
           "binding": "HYPERDRIVE_DB_SG",
-          "id": "3925125689b646758fd8d8b230db6dc5"
+          "id": "06ee738d905d43d1a055682face2dddb"
         },
         {
           "binding": "HYPERDRIVE_DB_US",
-          "id": "0a7ce52554d643d6beeab710d0675ce0"
+          "id": "51df4318bd5d4a35a5c4c145b520b22f"
         }
       ]
     },
@@ -248,19 +245,15 @@
       "hyperdrive": [
         {
           "binding": "HYPERDRIVE_DB",
-          "id": "9935434381594dd7ad9821e6449e36c5"
-        },
-        {
-          "binding": "HYPERDRIVE_DB_DIRECT",
-          "id": "20ce343dca144637bf8e141de18cd0d5"
+          "id": "0f1d77550db142fbb17cb6b3ee659a06"
         },
         {
           "binding": "HYPERDRIVE_DB_SG",
-          "id": "3925125689b646758fd8d8b230db6dc5"
+          "id": "06ee738d905d43d1a055682face2dddb"
         },
         {
           "binding": "HYPERDRIVE_DB_US",
-          "id": "0a7ce52554d643d6beeab710d0675ce0"
+          "id": "51df4318bd5d4a35a5c4c145b520b22f"
         }
       ],
       // Do not place smart as we want to use read replicas in specific regions
@@ -329,19 +322,16 @@
       "hyperdrive": [
         {
           "binding": "HYPERDRIVE_DB",
-          "id": "9935434381594dd7ad9821e6449e36c5"
+          "id": "0f1d77550db142fbb17cb6b3ee659a06"
         },
-        {
-          "binding": "HYPERDRIVE_DB_DIRECT",
-          "id": "20ce343dca144637bf8e141de18cd0d5"
-        },
+
         {
           "binding": "HYPERDRIVE_DB_SG",
-          "id": "3925125689b646758fd8d8b230db6dc5"
+          "id": "06ee738d905d43d1a055682face2dddb"
         },
         {
           "binding": "HYPERDRIVE_DB_US",
-          "id": "0a7ce52554d643d6beeab710d0675ce0"
+          "id": "51df4318bd5d4a35a5c4c145b520b22f"
         }
       ]
     },
@@ -406,24 +396,31 @@
       "hyperdrive": [
         {
           "binding": "HYPERDRIVE_DB",
-          "id": "9935434381594dd7ad9821e6449e36c5"
-        },
-        {
-          "binding": "HYPERDRIVE_DB_DIRECT",
-          "id": "20ce343dca144637bf8e141de18cd0d5"
+          "id": "0f1d77550db142fbb17cb6b3ee659a06"
         },
         {
           "binding": "HYPERDRIVE_DB_SG",
-          "id": "3925125689b646758fd8d8b230db6dc5"
+          "id": "06ee738d905d43d1a055682face2dddb"
         },
         {
           "binding": "HYPERDRIVE_DB_US",
-          "id": "0a7ce52554d643d6beeab710d0675ce0"
+          "id": "51df4318bd5d4a35a5c4c145b520b22f"
         }
       ]
     },
     "local": {
-      "name": "capgo_plugin-local"
+      "name": "capgo_plugin-local",
+      "vars": {
+        "IS_V2": "1",
+        "CAPGO_PREVENT_BACKGROUND_FUNCTIONS": "true"
+      },
+      "d1_databases": [
+        {
+          "binding": "DB_REPLICATE",
+          "database_name": "capgo_local_replicate",
+          "database_id": "3fca2d80-4ca0-4118-b0ce-a36068f43f15"
+        }
+      ]
     }
   }
 }
