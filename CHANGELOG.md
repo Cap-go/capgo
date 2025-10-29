@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.38.20 (2025-10-29)
+
+
+### Bug Fixes
+
+* update health check endpoints to use HTTP GET method ([a441352](https://github.com/Cap-go/capgo/commit/a4413527127b056eaa21a0a55141cfea7b778718))
+
 ### 12.38.19 (2025-10-29)
 
 ### 12.38.18 (2025-10-29)
