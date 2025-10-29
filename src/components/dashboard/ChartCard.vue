@@ -54,7 +54,7 @@ const displayNoDataMessage = computed(() => props.noDataMessage ?? t('no-data'))
         </h2>
       </slot>
 
-      <div v-if="total !== undefined" class="flex flex-col items-end text-right flex-shrink-0">
+      <div v-if="total !== undefined" class="flex flex-col items-end text-right shrink-0">
         <!-- Evolution badge -->
         <div
           v-if="showEvolutionBadge"

@@ -85,7 +85,6 @@ const hasData = computed(() => totalDeployments.value > 0)
 const cachedRawStats = ref<any[] | null>(null)
 
 async function calculateStats(forceRefetch = false) {
-  console.log('[DeploymentStatsCard] calculateStats called, forceRefetch:', forceRefetch, 'hasCache:', !!cachedRawStats.value)
   const requestToken = ++latestRequestToken
 
   isLoading.value = true
@@ -152,7 +151,14 @@ async function calculateStats(forceRefetch = false) {
       localAppNames[props.appId] = cachedName || props.appId
     }
     else {
-      await dashboardAppsStore.fetchApps()
+      // Only fetch apps if not already loaded in store
+      if (!dashboardAppsStore.isLoaded) {
+        console.log('[DeploymentStatsCard] Fetching apps list')
+        await dashboardAppsStore.fetchApps()
+      }
+      else {
+        console.log('[DeploymentStatsCard] Using apps from store (already loaded)')
+      }
       targetAppIds = [...dashboardAppsStore.appIds]
       Object.assign(localAppNames, dashboardAppsStore.appNames)
     }
@@ -179,14 +185,12 @@ async function calculateStats(forceRefetch = false) {
     // Use cached data if available and not forcing refetch
     let data, error
     if (cachedRawStats.value && !forceRefetch) {
-      console.log('[DeploymentStatsCard] Using cached data')
       data = cachedRawStats.value
       error = null
       // Use cached noPublicChannel state
       noPublicChannelDetected = noPublicChannel.value
     }
     else {
-      console.log('[DeploymentStatsCard] Fetching from API')
       // Only check public channels when actually fetching new data
       if (targetAppIds.length > 0) {
         try {
@@ -197,7 +201,6 @@ async function calculateStats(forceRefetch = false) {
             .eq('public', true)
           const hasPublic = (publicChannels?.length ?? 0) > 0
           noPublicChannelDetected = !hasPublic
-          console.log(`[DeploymentStatsCard] Public channel check`, { targetAppIds, hasPublic })
         }
         catch (error) {
           console.error(`[DeploymentStatsCard] Failed to verify public channels`, error)
@@ -321,12 +324,10 @@ watch(() => props.accumulated, async () => {
 
 // Watch for reload trigger - force refetch
 watch(() => props.reloadTrigger, async (newVal, oldVal) => {
-  console.log('[DeploymentStatsCard] Reload trigger changed:', oldVal, '->', newVal)
   if (newVal !== oldVal && newVal > 0) {
-    console.log('[DeploymentStatsCard] Calling calculateStats(true)')
     await calculateStats(true) // Force refetch from API
   }
-}, { flush: 'sync' })
+})
 
 onMounted(async () => {
   await calculateStats(true) // Initial fetch

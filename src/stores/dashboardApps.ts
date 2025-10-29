@@ -21,6 +21,7 @@ export const useDashboardAppsStore = defineStore('dashboardApps', () => {
   const appIds = computed(() => apps.value.map(app => app.app_id))
 
   async function fetchApps(force = false) {
+    console.log('[dashboardAppsStore] fetchApps called, force:', force, 'isLoaded:', isLoaded.value, 'currentOrgId:', currentOrgId.value)
     const organizationStore = useOrganizationStore()
     try {
       await organizationStore.dedupFetchOrganizations()
@@ -33,6 +34,7 @@ export const useDashboardAppsStore = defineStore('dashboardApps', () => {
     const orgId = organizationStore.currentOrganization?.gid
 
     if (!orgId) {
+      console.log('[dashboardAppsStore] No orgId, resetting')
       apps.value = []
       currentOrgId.value = null
       isLoaded.value = true
@@ -40,6 +42,7 @@ export const useDashboardAppsStore = defineStore('dashboardApps', () => {
     }
 
     if (isLoading.value) {
+      console.log('[dashboardAppsStore] Already loading, waiting for existing promise')
       if (loadPromise)
         await loadPromise
       if (!force)
@@ -48,6 +51,7 @@ export const useDashboardAppsStore = defineStore('dashboardApps', () => {
 
     // Return cached data if same organization and not forcing
     if (!force && isLoaded.value && currentOrgId.value === orgId) {
+      console.log('[dashboardAppsStore] Using cached apps data - NO NETWORK REQUEST')
       return
     }
 
@@ -57,6 +61,8 @@ export const useDashboardAppsStore = defineStore('dashboardApps', () => {
       currentOrgId.value = orgId
     }
 
+    console.log('[dashboardAppsStore] Fetching apps from API - NETWORK REQUEST ABOUT TO HAPPEN')
+    console.trace('[dashboardAppsStore] Stack trace for fetchApps')
     isLoading.value = true
 
     const supabase = useSupabase()
@@ -67,6 +73,7 @@ export const useDashboardAppsStore = defineStore('dashboardApps', () => {
           .select('app_id, name')
           .eq('owner_org', orgId)
 
+        console.log('[dashboardAppsStore] Apps fetched, count:', data?.length)
         apps.value = data || []
         isLoaded.value = true
       }

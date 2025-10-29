@@ -54,6 +54,10 @@ const rawChartData = ref<ChartApiData | null>(null)
 const currentRange = ref<{ startDate: Date, endDate: Date } | null>(null)
 let requestToken = 0
 
+// Cache for both billing period and last 30 days data
+const cachedBillingData = ref<{ data: ChartApiData, range: { startDate: Date, endDate: Date } } | null>(null)
+const cached30DayData = ref<{ data: ChartApiData, range: { startDate: Date, endDate: Date } } | null>(null)
+
 const latestVersion = computed(() => {
   const chartData = rawChartData.value
   const datasets = chartData?.datasets ?? []
@@ -385,7 +389,7 @@ const chartOptions = computed<ChartOptions<'line'>>(() => {
 
 const chartPlugins = [verticalLinePlugin, todayLinePlugin] as unknown as Plugin<'line'>[]
 
-async function loadData() {
+async function loadData(forceRefetch = false) {
   if (!appId.value) {
     rawChartData.value = null
     return
@@ -400,6 +404,17 @@ async function loadData() {
   }
 
   const { startDate, endDate } = getDateRange()
+  const isBillingMode = props.useBillingPeriod
+
+  // Check if we have cached data for this mode
+  const cachedData = isBillingMode ? cachedBillingData.value : cached30DayData.value
+
+  if (cachedData && !forceRefetch) {
+    rawChartData.value = cachedData.data
+    currentRange.value = cachedData.range
+    return
+  }
+
   const currentToken = ++requestToken
   isLoading.value = true
   rawChartData.value = null
@@ -409,7 +424,17 @@ async function loadData() {
     const data = await useChartData(supabase, appId.value, startDate, endDate)
     if (currentToken !== requestToken)
       return
+
     rawChartData.value = data
+
+    // Cache the data for this mode
+    const cacheEntry = { data, range: { startDate, endDate } }
+    if (isBillingMode) {
+      cachedBillingData.value = cacheEntry
+    }
+    else {
+      cached30DayData.value = cacheEntry
+    }
   }
   catch (error) {
     console.error(error)
@@ -423,16 +448,16 @@ async function loadData() {
   }
 }
 
-// Watch billing period changes - need to refetch because date range changes
+// Watch billing period changes - use cached data if available
 watch(() => props.useBillingPeriod, async () => {
   if (appId.value)
-    await loadData()
+    await loadData(false) // Use cache if available
 })
 
 // Watch for reload trigger - force refetch
 watch(() => props.reloadTrigger, async () => {
   if (appId.value)
-    await loadData()
+    await loadData(true) // Force refetch
 })
 
 watch(
@@ -442,8 +467,12 @@ watch(
     if (path.includes('/p/') && packageId) {
       const packageChanged = packageId !== oldPackageId
       appId.value = packageId
-      if (packageChanged)
-        await loadData()
+      if (packageChanged) {
+        // Clear cache when switching apps
+        cachedBillingData.value = null
+        cached30DayData.value = null
+        await loadData(true) // Force refetch for new app
+      }
     }
     else {
       appId.value = ''
@@ -468,7 +497,7 @@ watch(
           {{ t('active_users_by_version') }}
         </h2>
 
-        <div class="flex flex-col items-end text-right flex-shrink-0">
+        <div class="flex flex-col items-end text-right shrink-0">
           <div
             class="inline-flex items-center justify-center rounded-full px-2 py-1 bg-emerald-500 text-xs font-bold text-white shadow-lg whitespace-nowrap"
           >

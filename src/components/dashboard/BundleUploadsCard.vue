@@ -77,7 +77,6 @@ const appNames = ref<{ [appId: string]: string }>({})
 const cachedRawStats = ref<any[] | null>(null)
 
 async function calculateStats(forceRefetch = false) {
-  console.log('[BundleUploadsCard] calculateStats called, forceRefetch:', forceRefetch, 'hasCache:', !!cachedRawStats.value)
   total.value = 0
 
   // Reset data
@@ -123,7 +122,14 @@ async function calculateStats(forceRefetch = false) {
   else {
     // Multiple apps mode - use store for shared apps data
     const dashboardAppsStore = useDashboardAppsStore()
-    await dashboardAppsStore.fetchApps()
+    // Only fetch apps if not already loaded in store
+    if (!dashboardAppsStore.isLoaded) {
+      console.log('[BundleUploadsCard] Fetching apps list')
+      await dashboardAppsStore.fetchApps()
+    }
+    else {
+      console.log('[BundleUploadsCard] Using apps from store (already loaded)')
+    }
     targetAppIds = [...dashboardAppsStore.appIds]
     appNames.value = dashboardAppsStore.appNames
   }
@@ -141,12 +147,10 @@ async function calculateStats(forceRefetch = false) {
   // Use cached data if available and not forcing refetch
   let data, error
   if (cachedRawStats.value && !forceRefetch) {
-    console.log('[BundleUploadsCard] Using cached data')
     data = cachedRawStats.value
     error = null
   }
   else {
-    console.log('[BundleUploadsCard] Fetching from API')
     // Always fetch last 30 days of data
     const query = useSupabase()
       .from('app_versions')
@@ -161,7 +165,6 @@ async function calculateStats(forceRefetch = false) {
     // Cache the fetched data
     if (!error) {
       cachedRawStats.value = data
-      console.log('[BundleUploadsCard] Data cached, items:', data?.length)
     }
   }
 
@@ -231,12 +234,10 @@ watch(() => props.accumulated, async () => {
 
 // Watch for reload trigger - force refetch
 watch(() => props.reloadTrigger, async (newVal, oldVal) => {
-  console.log('[BundleUploadsCard] Reload trigger changed:', oldVal, '->', newVal)
   if (newVal !== oldVal && newVal > 0) {
-    console.log('[BundleUploadsCard] Calling calculateStats(true)')
     await calculateStats(true) // Force refetch from API
   }
-}, { flush: 'sync' })
+})
 
 onMounted(async () => {
   await calculateStats(true) // Initial fetch
@@ -250,7 +251,7 @@ onMounted(async () => {
         {{ t('bundle_uploads') }}
       </h2>
 
-      <div class="flex flex-col items-end text-right flex-shrink-0">
+      <div class="flex flex-col items-end text-right shrink-0">
         <div
           v-if="lastDayEvolution"
           class="inline-flex items-center justify-center rounded-full px-2 py-1 text-xs font-bold text-white shadow-lg whitespace-nowrap"
