@@ -411,7 +411,8 @@
     "local": {
       "name": "capgo_plugin-local",
       "vars": {
-        "IS_V2": "1"
+        "IS_V2": "1",
+        "CAPGO_PREVENT_BACKGROUND_FUNCTIONS": "true"
       },
       "d1_databases": [
         {
