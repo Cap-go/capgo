@@ -90,14 +90,23 @@ jobs:
           working-directory: .
       - name: Run tests
         run: bun run test:all
-      - name: Start Cloudflare Workers for testing
-        run: |
-          chmod +x scripts/start-cloudflare-workers.sh
-          ./scripts/start-cloudflare-workers.sh &
-          # Wait for workers to be ready
-          sleep 10
-          # Check if plugin worker is responding
-          timeout 30 bash -c 'until curl -s http://localhost:8788/ok > /dev/null; do sleep 1; done' || true
+      - uses: JarvusInnovations/background-action@v1
+        name: Start Cloudflare Workers for testing
+        with:
+          run: |
+            chmod +x scripts/start-cloudflare-workers.sh
+            ./scripts/start-cloudflare-workers.sh
+          wait-on: |
+            http-get://127.0.0.1:8790/ok
+            http-get://127.0.0.1:8787/ok
+            http-get://127.0.0.1:8788/ok
+            http-get://127.0.0.1:8789/ok
+          tail: stderr,stdout
+          log-output-resume: stderr,stdout
+          wait-for: 2m
+          log-output: stderr,stdout
+          log-output-if: true
+          working-directory: .
       - name: Run Cloudflare Workers plugin tests
         run: bun run test:cloudflare:plugin
       # - name: Run playwright tests
