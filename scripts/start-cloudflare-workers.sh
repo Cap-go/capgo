@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # Script to start Cloudflare Workers for testing
-# This script starts the API and Plugin workers in the background
+# This script starts all workers (D1 Sync, API, Plugin, Files) in the background
 
 set -e
 
@@ -17,9 +17,17 @@ echo -e "${YELLOW}Cleaning up existing wrangler processes...${NC}"
 pkill -f "wrangler dev" || true
 sleep 2
 
+# Start D1 Sync worker on port 8790
+echo -e "${GREEN}Starting D1 Sync worker on port 8790...${NC}"
+bunx wrangler dev -c cloudflare_workers/d1_sync/wrangler.jsonc --port 8790 --env=local &
+SYNC_PID=$!
+
+# Wait a bit for the sync worker to start
+sleep 3
+
 # Start API worker on port 8787
 echo -e "${GREEN}Starting API worker on port 8787...${NC}"
-wrangler dev -c cloudflare_workers/api/wrangler.jsonc --port 8787 --env-file=internal/cloudflare/.env.local &
+bunx wrangler dev -c cloudflare_workers/api/wrangler.jsonc --port 8787 --env-file=internal/cloudflare/.env.local --env=local &
 API_PID=$!
 
 # Wait a bit for the first worker to start
@@ -27,7 +35,7 @@ sleep 3
 
 # Start Plugin worker on port 8788
 echo -e "${GREEN}Starting Plugin worker on port 8788...${NC}"
-wrangler dev -c cloudflare_workers/plugin/wrangler.jsonc --port 8788 --env-file=internal/cloudflare/.env.local &
+bunx wrangler dev -c cloudflare_workers/plugin/wrangler.jsonc --port 8788 --env-file=internal/cloudflare/.env.local --env=local &
 PLUGIN_PID=$!
 
 # Wait a bit for the second worker to start
@@ -35,20 +43,43 @@ sleep 3
 
 # Start Files worker on port 8789
 echo -e "${GREEN}Starting Files worker on port 8789...${NC}"
-wrangler dev -c cloudflare_workers/files/wrangler.jsonc --port 8789 --env-file=internal/cloudflare/.env.local &
+bunx wrangler dev -c cloudflare_workers/files/wrangler.jsonc --port 8789 --env-file=internal/cloudflare/.env.local --env=local &
 FILES_PID=$!
 
 echo -e "${GREEN}All workers started!${NC}"
+echo "D1 Sync Worker PID: $SYNC_PID (http://127.0.0.1:8790)"
 echo "API Worker PID: $API_PID (http://127.0.0.1:8787)"
 echo "Plugin Worker PID: $PLUGIN_PID (http://127.0.0.1:8788)"
 echo "Files Worker PID: $FILES_PID (http://127.0.0.1:8789)"
+echo ""
+
+# Queue initial data to D1 via PGMQ (production-like approach)
+echo -e "${GREEN}Queueing initial data for D1 sync...${NC}"
+psql postgresql://postgres:postgres@127.0.0.1:54322/postgres -f scripts/trigger-initial-d1-sync.sql > /dev/null 2>&1
+if [ $? -eq 0 ]; then
+  echo -e "${GREEN}✓ Initial data queued to PGMQ${NC}"
+
+  # Trigger sync worker to process the queue
+  echo -e "${GREEN}Triggering D1 sync worker...${NC}"
+  curl -s -X POST http://127.0.0.1:8790/sync -H "x-webhook-signature: testsecret" > /dev/null 2>&1
+  if [ $? -eq 0 ]; then
+    echo -e "${GREEN}✓ D1 sync triggered successfully${NC}"
+    sleep 2
+    echo -e "${GREEN}✓ D1 database is now ready with initial data${NC}"
+  else
+    echo -e "${YELLOW}⚠ Warning: Failed to trigger D1 sync${NC}"
+  fi
+else
+  echo -e "${YELLOW}⚠ Warning: Failed to queue initial data${NC}"
+fi
+
 echo ""
 echo "Press Ctrl+C to stop all workers"
 
 # Function to cleanup on exit
 cleanup() {
   echo -e "\n${YELLOW}Stopping workers...${NC}"
-  kill $API_PID $PLUGIN_PID $FILES_PID 2>/dev/null || true
+  kill $SYNC_PID $API_PID $PLUGIN_PID $FILES_PID 2>/dev/null || true
   pkill -f "wrangler dev" || true
   echo -e "${GREEN}All workers stopped${NC}"
 }

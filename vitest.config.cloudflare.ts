@@ -7,12 +7,12 @@ export default defineConfig(({ mode }) => ({
     include: ['tests/*.test.ts'],
     environment: 'node',
     watch: false,
-    bail: 1,
+    bail: 0, // Run all tests to see full results
     testTimeout: 30_000, // Increased timeout for Cloudflare Workers
     hookTimeout: 10_000,
     retry: 2,
-    maxConcurrency: 50,
-    maxWorkers: 24,
+    maxConcurrency: 10, // Reduced for D1 sync reliability
+    maxWorkers: 5, // Reduced for D1 sync reliability
     env: {
       ...loadEnv(mode, cwd(), ''),
       // Override to use Cloudflare Workers instead of Supabase Edge Functions

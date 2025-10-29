@@ -26,6 +26,23 @@ The application has three Cloudflare Workers:
 1. Supabase must be running: `supabase start`
 2. Database must be seeded: `supabase db reset`
 3. Environment variables must be configured in `internal/cloudflare/.env.local`
+4. (Optional) For V2/D1 testing: Local D1 database must be synced (see V2/D1 Testing section)
+
+## Testing Modes
+
+The workers support two testing modes:
+
+### V1 Mode (PostgreSQL only)
+- Tests the traditional PostgreSQL code path
+- No D1 setup required
+- Simpler and faster for basic testing
+
+### V2 Mode (D1 + PostgreSQL)
+- Tests the production D1 (edge database) code path
+- Requires D1 setup and sync
+- **Recommended for comprehensive testing** since production uses D1
+
+The workers automatically use V2 mode when `IS_V2=1` is set in the local environment.
 
 ## Running Tests
 
@@ -148,8 +165,100 @@ To run Cloudflare Worker tests in CI:
 3. **Debug mode**: Add `--log-level debug` to wrangler commands in the start script for verbose logging
 4. **Separate terminal**: Run workers in a dedicated terminal to see logs in real-time
 
+## V2/D1 Testing
+
+### Overview
+
+V2 testing mode tests the production D1 (Cloudflare's edge database) code path. In production, a percentage of traffic (controlled by `IS_V2`) uses D1 instead of PostgreSQL for faster reads at the edge.
+
+### Why Test V2?
+
+- **Production parity**: 90% of production traffic uses D1 (`IS_V2=0.9`)
+- **Catch D1-specific bugs**: D1 uses SQLite syntax which differs from PostgreSQL
+- **Validate data sync**: Ensures the Postgres→D1 sync system works correctly
+
+### Setup V2 Testing
+
+1. **Create local D1 database** (one-time setup):
+   ```bash
+   # D1 database is already created as part of the project setup
+   # Database ID: 3fca2d80-4ca0-4118-b0ce-a36068f43f15
+   ```
+
+2. **Sync data from Postgres to D1**:
+   ```bash
+   # Make sure Supabase is running and seeded
+   supabase db reset
+
+   # Sync all data to local D1
+   bun run scripts/sync-postgres-to-d1.ts
+   ```
+
+3. **Start workers with V2 enabled**:
+   ```bash
+   # The workers now start with --env=local which enables V2 automatically
+   ./scripts/start-cloudflare-workers.sh
+   ```
+
+4. **Run tests**:
+   ```bash
+   bun test:cloudflare:backend
+   ```
+
+### Syncing Data
+
+The sync script (`scripts/sync-postgres-to-d1.ts`) copies data from PostgreSQL to D1:
+
+- **What it syncs**: All tables defined in `cloudflare_workers/d1_sync/schema.json`
+- **When to run**: After `supabase db reset` or when testing D1-specific features
+- **How it works**: Reads from Postgres, writes to local D1 database
+
+```bash
+# Re-sync data if you've made database changes
+bun run scripts/sync-postgres-to-d1.ts
+```
+
+### Verifying V2 is Active
+
+Check the worker startup logs for:
+```
+env.IS_V2 ("1")                                            Environment Variable      local
+env.DB_REPLICATE (capgo_local_replicate)                   D1 Database               local
+```
+
+### V2 Testing Workflow
+
+```bash
+# 1. Start Supabase
+supabase start
+supabase db reset
+
+# 2. Sync to D1
+bun run scripts/sync-postgres-to-d1.ts
+
+# 3. Start workers (V2 enabled automatically)
+./scripts/start-cloudflare-workers.sh
+
+# 4. Run tests
+bun test:cloudflare:backend
+```
+
+### Troubleshooting V2
+
+**D1 database not found**:
+- Ensure `cloudflare_workers/d1_sync/wrangler.jsonc` has the correct database configuration
+- The local environment should have `database_id: 3fca2d80-4ca0-4118-b0ce-a36068f43f15`
+
+**Data sync failures**:
+- Verify Postgres is running: `supabase status`
+- Check the schema matches: `cloudflare_workers/d1_sync/schema.json`
+
+**Tests failing with D1 but passing with Postgres**:
+- This indicates a D1-specific bug (SQLite vs PostgreSQL differences)
+- Common issues: Date formatting, JSON handling, boolean values (0/1 vs true/false)
+
 ## Future Enhancements
 
+- Add continuous sync during development (watch mode)
 - Add support for testing against remote Cloudflare Workers (dev/preprod environments)
-- Integrate Cloudflare D1 local database for testing
 - Add performance benchmarking between Supabase and Cloudflare deployments

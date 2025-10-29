@@ -189,7 +189,17 @@
       ]
     },
     "local": {
-      "name": "capgo_api-local"
+      "name": "capgo_api-local",
+      "vars": {
+        "IS_V2": "1"
+      },
+      "d1_databases": [
+        {
+          "binding": "DB_REPLICATE",
+          "database_name": "capgo_local_replicate",
+          "database_id": "3fca2d80-4ca0-4118-b0ce-a36068f43f15"
+        }
+      ]
     }
   }
 }

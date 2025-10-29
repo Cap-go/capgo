@@ -154,6 +154,9 @@ export async function resetAndSeedAppData(appId: string): Promise<void> {
             throw error
           }
           seededApps.add(appId)
+
+          // Trigger D1 sync for Cloudflare Workers tests
+          await triggerD1Sync()
           break
         }
         catch (error: any) {
@@ -216,6 +219,9 @@ export async function resetAndSeedAppDataStats(appId: string): Promise<void> {
         if (error) {
           throw error
         }
+
+        // Trigger D1 sync for Cloudflare Workers tests
+        await triggerD1Sync()
         break
       }
       catch (error: any) {
@@ -414,5 +420,65 @@ export async function cleanupPostgresClient(): Promise<void> {
   if (sql) {
     await sql.end()
     sql = null
+  }
+}
+
+/**
+ * Trigger D1 sync worker to immediately process any pending PGMQ messages
+ * This is needed for Cloudflare Workers tests to ensure data is synced to D1
+ * before tests query it.
+ */
+export async function triggerD1Sync(): Promise<void> {
+  if (!USE_CLOUDFLARE) {
+    return // Only needed for Cloudflare Workers tests
+  }
+
+  // Only trigger sync for plugin endpoint tests that use V2/D1
+  // API endpoints use Postgres directly and don't need D1 sync
+  // Check if caller is from a plugin test file using stack trace
+  const stack = new Error('stack trace').stack || ''
+  const isPluginTest = stack.includes('updates') || stack.includes('stats') || stack.includes('channel_self')
+
+  if (!isPluginTest) {
+    return // Skip sync for non-plugin tests
+  }
+
+  const D1_SYNC_URL = 'http://127.0.0.1:8790/sync'
+  const WEBHOOK_SECRET = 'testsecret'
+  const MAX_WAIT_MS = 5000 // Max 5 seconds to wait for sync
+  const POLL_INTERVAL_MS = 100 // Check every 100ms
+
+  try {
+    // Trigger the sync
+    const response = await fetch(D1_SYNC_URL, {
+      method: 'POST',
+      headers: {
+        'x-webhook-signature': WEBHOOK_SECRET,
+      },
+    })
+
+    if (!response.ok) {
+      console.warn(`D1 sync trigger failed: ${response.status}`)
+      return
+    }
+
+    // Poll the queue until it's empty or timeout
+    const startTime = Date.now()
+    while (Date.now() - startTime < MAX_WAIT_MS) {
+      const queueSize = await executeSQL('SELECT COUNT(*) as count FROM pgmq.q_replicate_data')
+      const count = parseInt(queueSize[0]?.count || '0')
+
+      if (count === 0) {
+        // Queue is empty, sync is complete
+        return
+      }
+
+      // Wait before polling again
+      await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS))
+    }
+
+    console.warn('D1 sync timeout: queue still has pending messages after 5s')
+  } catch (error) {
+    console.warn('Failed to trigger D1 sync:', error)
   }
 }
