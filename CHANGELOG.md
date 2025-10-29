@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.38.21 (2025-10-29)
+
+
+### Bug Fixes
+
+* update .gitignore to include cloudflare_workers/.env.local and adjust env-file paths in start script ([a1121dc](https://github.com/Cap-go/capgo/commit/a1121dc4bdb429bffa376ca69483cf825009a59d))
+
 ### 12.38.20 (2025-10-29)
 
 
