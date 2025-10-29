@@ -1,5 +1,6 @@
 .DS_Store
 *.local
+!cloudflare_workers/.env.local
 dist
 dist-ssr
 node_modules
