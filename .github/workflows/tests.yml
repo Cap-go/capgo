@@ -97,10 +97,10 @@ jobs:
             chmod +x scripts/start-cloudflare-workers.sh
             ./scripts/start-cloudflare-workers.sh
           wait-on: |
-            http-get://127.0.0.1:8790/ok
-            http-get://127.0.0.1:8787/ok
-            http-get://127.0.0.1:8788/ok
-            http-get://127.0.0.1:8789/ok
+            http-get://127.0.0.1:8790/health
+            http-post://127.0.0.1:8787/ok
+            http-post://127.0.0.1:8788/ok
+            http-post://127.0.0.1:8789/ok
           tail: stderr,stdout
           log-output-resume: stderr,stdout
           wait-for: 2m
