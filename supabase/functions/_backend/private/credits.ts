@@ -273,8 +273,6 @@ app.post('/complete-top-up', middlewareAuth, async (c) => {
     .eq('id', body.orgId)
     .single()
 
-  console.log('Organization data:', org, 'Error:', orgError);
-
   if (orgError || !org?.customer_id)
     throw simpleError('stripe_customer_missing', 'Organization does not have a Stripe customer')
 
@@ -330,11 +328,6 @@ app.post('/complete-top-up', middlewareAuth, async (c) => {
       : session.payment_intent?.id ?? null,
     itemsSummary,
   }
-
-  console.log('Source reference for top-up:', sourceRef);
-  console.log('Credit quantity to top up:', creditQuantity);
-  console.log('Organization ID:', body.orgId);
-  console
 
   const { data: grant, error: rpcError } = await supabaseAdmin(c)
     .rpc('top_up_usage_credits', {

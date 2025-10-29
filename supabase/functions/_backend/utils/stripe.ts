@@ -295,7 +295,7 @@ async function getOneTimePriceId(c: Context, productId: string): Promise<string 
     const prices = await getStripe(c).prices.search({
       query: `product:"${productId}" AND active:'true'`,
     })
-    console.log('One-time prices found:', prices);
+
     for (const price of prices.data) {
       if (price.type === 'one_time' && price.active)
         return price.id
