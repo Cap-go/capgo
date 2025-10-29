@@ -340,6 +340,7 @@ describe('update scenarios', () => {
       allow_device_self_set: false,
       version: defaultVersion?.id,
     }).eq('name', 'production').eq('app_id', APP_NAME_UPDATE)
+    await triggerD1Sync() // Sync channel updates to D1
 
     // Get the channel id
     const { data: channelData, error: channelError } = await getSupabaseClient()
@@ -363,6 +364,7 @@ describe('update scenarios', () => {
       })
 
     expect(overrideError).toBeNull()
+    await triggerD1Sync() // Sync channel_devices to D1
 
     // Test that update succeeds with device override
     const baseData = getBaseData(APP_NAME_UPDATE)

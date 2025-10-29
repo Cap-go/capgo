@@ -470,6 +470,7 @@ describe('[GET] /channel_self tests', () => {
       .eq('app_id', APPNAME)
 
     expect(updateError).toBeNull()
+    await triggerD1Sync() // Sync channel updates to D1
 
     try {
       // Test dev device - real device (is_emulator=false) should get no channels
@@ -502,6 +503,7 @@ describe('[GET] /channel_self tests', () => {
         .update({ allow_dev: true })
         .eq('name', 'development')
         .eq('app_id', APPNAME)
+      await triggerD1Sync() // Sync the reset back to D1
     }
   })
 

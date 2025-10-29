@@ -90,5 +90,15 @@ jobs:
           working-directory: .
       - name: Run tests
         run: bun run test:all
+      - name: Start Cloudflare Workers for testing
+        run: |
+          chmod +x scripts/start-cloudflare-workers.sh
+          ./scripts/start-cloudflare-workers.sh &
+          # Wait for workers to be ready
+          sleep 10
+          # Check if plugin worker is responding
+          timeout 30 bash -c 'until curl -s http://localhost:8788/ok > /dev/null; do sleep 1; done' || true
+      - name: Run Cloudflare Workers plugin tests
+        run: bun run test:cloudflare:plugin
       # - name: Run playwright tests
       #   run: bun run test:front
