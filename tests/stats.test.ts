@@ -209,10 +209,10 @@ describe('[POST] /stats', () => {
     baseData.version_name = version.name
 
     const response = await postStats(baseData)
-    expect(response.status).toBe(200)
+    expect(response.status).toBe(429)
     const json = await response.json<StatsRes>()
     // console.log({ json })
-    expect(json.error).toBe('app_not_found')
+    expect(json.error).toBe('on_premise_app')
   })
 
   it('invalid action should fail', async () => {

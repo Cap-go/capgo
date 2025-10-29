@@ -311,7 +311,7 @@ async function getBundleUsage(appId: string, from: Date, to: Date, shouldGetLate
 
   // stolen from MobileStats.vue
   const versions = [...new Set(dailyVersion.map(d => d.version_id))]
-  const dates = [...new Set(dailyVersion.map(d => d.date))].sort((a, b) => new Date(a).getTime() - new Date(b).getTime())
+  const dates = generateDateLabels(from, to)
 
   // Step 1: Calculate accumulated data
   const accumulatedData = calculateAccumulatedData(dailyVersion, dates, versions)
@@ -320,7 +320,8 @@ async function getBundleUsage(appId: string, from: Date, to: Date, shouldGetLate
   // Step 3: Get active versions (versions with non-zero usage)
   const activeVersions = getActiveVersions(versions, percentageData)
   // Step 4: Create datasets for the chart
-  const datasets = createDatasets(activeVersions, dates, percentageData, versionNames)
+  let datasets = createDatasets(activeVersions, dates, percentageData, versionNames)
+  datasets = fillMissingDailyData(datasets, dates)
 
   if (shouldGetLatestVersion) {
     const latestVersion = getLatestVersion(versionNames)
@@ -382,8 +383,8 @@ function calculateAccumulatedData(usage: AppUsageByVersion[], dates: string[], v
           accumulated[date][version] = prevValue + change.install
         }
         else {
-          // Version has no new installs: decrease proportionally
-          const decreaseFactor = Math.max(0, 1 - (totalNewInstalls / prevTotal))
+          // Version has no new installs: decrease proportionally (guard against zero totals)
+          const decreaseFactor = prevTotal === 0 ? 1 : Math.max(0, 1 - (totalNewInstalls / prevTotal))
           accumulated[date][version] = Math.max(0, prevValue * decreaseFactor)
         }
 
@@ -436,6 +437,55 @@ function createDatasets(versions: number[], dates: string[], percentages: { [dat
       data: percentageData,
     }
   })
+}
+
+function generateDateLabels(from: Date, to: Date) {
+  const start = dayjs(from).utc().startOf('day')
+  const end = dayjs(to).utc().startOf('day')
+
+  if (start.isAfter(end))
+    return []
+
+  const labels: string[] = []
+  let cursor = start
+  while (cursor.isBefore(end) || cursor.isSame(end)) {
+    labels.push(cursor.format('YYYY-MM-DD'))
+    cursor = cursor.add(1, 'day')
+  }
+
+  return labels
+}
+
+function fillMissingDailyData(datasets: { label: string, data: number[] }[], labels: string[]) {
+  if (datasets.length === 0 || labels.length === 0)
+    return datasets
+
+  const today = dayjs().utc().format('YYYY-MM-DD')
+  const populated = datasets.map(dataset => ({
+    ...dataset,
+    data: [...dataset.data],
+  }))
+
+  for (let index = 1; index < labels.length; index++) {
+    if (labels[index] === today)
+      continue
+
+    const dailyTotal = populated.reduce((sum, dataset) => sum + (dataset.data[index] ?? 0), 0)
+    const previousTotal = populated.reduce((sum, dataset) => sum + (dataset.data[index - 1] ?? 0), 0)
+
+    if (dailyTotal === 0 && previousTotal > 0) {
+      populated.forEach((dataset) => {
+        dataset.data[index] = dataset.data[index - 1] ?? 0
+      })
+    }
+  }
+
+  return populated
+}
+
+export const bundleUsageTestUtils = {
+  generateDateLabels,
+  fillMissingDailyData,
 }
 
 // Find the latest version based on creation date

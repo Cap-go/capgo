@@ -96,9 +96,9 @@ describe('[POST] /updates parallel tests', () => {
     baseData.app_id = 'does.not.exist'
 
     const response = await postUpdate(baseData)
-    expect(response.status).toBe(200)
+    expect(response.status).toBe(429)
     const json = await response.json<UpdateRes>()
-    expect(json.error).toBe('app_not_found')
+    expect(json.error).toBe('on_premise_app')
   })
 
   it('direct channel overwrite', async () => {
@@ -181,10 +181,10 @@ describe('[POST] /updates invalid data', () => {
     baseData.app_id = 'non.existent.app'
 
     const response = await postUpdate(baseData)
-    expect(response.status).toBe(200)
+    expect(response.status).toBe(429)
 
     const json = await response.json<UpdateRes>()
-    expect(json.error).toBe('app_not_found')
+    expect(json.error).toBe('on_premise_app')
   })
 })
 

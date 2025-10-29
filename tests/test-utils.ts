@@ -5,8 +5,37 @@ import { createClient } from '@supabase/supabase-js'
 import postgres from 'postgres'
 
 export const POSTGRES_URL = 'postgresql://postgres:postgres@127.0.0.1:54322/postgres'
-export const BASE_URL = `${env.SUPABASE_URL}/functions/v1`
+
+// Determine which backend to use based on environment variable
+const USE_CLOUDFLARE = env.USE_CLOUDFLARE_WORKERS === 'true'
+
+// For Cloudflare Workers, we need to determine the correct URL based on the endpoint
+// API endpoints go to CLOUDFLARE_API_URL, plugin endpoints go to CLOUDFLARE_PLUGIN_URL
+export const CLOUDFLARE_API_URL = env.CLOUDFLARE_API_URL ?? 'http://127.0.0.1:8787'
+export const CLOUDFLARE_PLUGIN_URL = env.CLOUDFLARE_PLUGIN_URL ?? 'http://127.0.0.1:8788'
+export const CLOUDFLARE_FILES_URL = env.CLOUDFLARE_FILES_URL ?? 'http://127.0.0.1:8789'
+
+// Default to Supabase Edge Functions for backward compatibility
+export const BASE_URL = USE_CLOUDFLARE ? CLOUDFLARE_API_URL : `${env.SUPABASE_URL}/functions/v1`
+export const PLUGIN_BASE_URL = USE_CLOUDFLARE ? CLOUDFLARE_PLUGIN_URL : `${env.SUPABASE_URL}/functions/v1`
 export const API_SECRET = 'testsecret'
+
+/**
+ * Get the correct base URL for an endpoint based on whether it's a plugin endpoint or API endpoint
+ * Plugin endpoints: /updates, /channel_self, /stats, /ok, /latency
+ * All other endpoints go to the API worker
+ */
+export function getEndpointUrl(path: string): string {
+  if (!USE_CLOUDFLARE) {
+    return `${env.SUPABASE_URL}/functions/v1${path}`
+  }
+
+  // Plugin endpoints
+  const pluginEndpoints = ['/updates', '/channel_self', '/stats', '/ok', '/latency', '/plugin/']
+  const isPluginEndpoint = pluginEndpoints.some(endpoint => path.startsWith(endpoint))
+
+  return isPluginEndpoint ? `${CLOUDFLARE_PLUGIN_URL}${path}` : `${CLOUDFLARE_API_URL}${path}`
+}
 export const APIKEY_TEST_ALL = 'ae6e7458-c46d-4c00-aa3b-153b0b8520ea' // all key
 export const APIKEY_TEST_UPLOAD = 'c591b04e-cf29-4945-b9a0-776d0672061b' // upload key
 export const APIKEY_TEST2_ALL = 'ac4d9a98-ec25-4af8-933c-2aae4aa52b85' // test2 all key (dedicated for statistics)
@@ -91,7 +120,7 @@ export type HttpMethod = 'POST' | 'PUT' | 'DELETE'
 
 export async function fetchBundle(appId: string) {
   const params = new URLSearchParams({ app_id: appId })
-  const response = await fetch(`${BASE_URL}/bundle?${params.toString()}`, {
+  const response = await fetch(`${getEndpointUrl('/bundle')}?${params.toString()}`, {
     method: 'GET',
     headers,
   })
@@ -307,7 +336,7 @@ export async function responseOk(response: Response, requestName: string): Promi
 }
 
 export async function getUpdate(data: ReturnType<typeof updateAndroidBaseData>): Promise<Response> {
-  return await fetch(`${BASE_URL}/updates`, {
+  return await fetch(getEndpointUrl('/updates'), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -321,7 +350,7 @@ export function getUpdateBaseData(appId: string): ReturnType<typeof updateAndroi
 }
 
 export async function postUpdate(data: object) {
-  const response = await fetch(`${BASE_URL}/updates`, {
+  const response = await fetch(getEndpointUrl('/updates'), {
     method: 'POST',
     headers,
     body: JSON.stringify(data),
