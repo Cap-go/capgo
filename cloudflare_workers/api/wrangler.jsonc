@@ -187,6 +187,9 @@
           "database_id": "7f267d86-f4f7-49f5-9622-e44373aa00dc"
         }
       ]
+    },
+    "local": {
+      "name": "capgo_api-local"
     }
   }
 }
