@@ -1,7 +1,10 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
-import { parseBody, simpleError, useCors } from '../utils/hono.ts'
-import { supabaseAdmin } from '../utils/supabase.ts'
+import { middlewareAuth, parseBody, simpleError, useCors } from '../utils/hono.ts'
+import { cloudlog } from '../utils/loggin.ts'
+import { createOneTimeCheckout, getStripe } from '../utils/stripe.ts'
+import { hasOrgRight, supabaseAdmin } from '../utils/supabase.ts'
+import { getEnv } from '../utils/utils.ts'
 
 interface CreditStep {
   id: number
@@ -49,6 +52,20 @@ interface CostCalculationResponse {
     storage: number
   }
 }
+
+interface StartTopUpRequest {
+  orgId: string
+  quantity?: number
+}
+
+interface CompleteTopUpRequest {
+  orgId: string
+  sessionId: string
+}
+
+const DEFAULT_TOP_UP_QUANTITY = 100
+// const CREDIT_TOP_UP_PRODUCT_ID = 'prod_TINXCAiTb8Vsxc'
+const CREDIT_TOP_UP_PRODUCT_ID = 'prod_TJRd2hFHZsBIPK'
 
 export const app = new Hono<MiddlewareKeyVariables>()
 
@@ -180,4 +197,158 @@ app.post('/', async (c) => {
   }
 
   return c.json(response)
+})
+
+app.post('/start-top-up', middlewareAuth, async (c) => {
+  const body = await parseBody<StartTopUpRequest>(c)
+  const quantity = Number.isFinite(body.quantity) && (body.quantity ?? 0) > 0
+    ? Math.floor(body.quantity!)
+    : DEFAULT_TOP_UP_QUANTITY
+
+  if (!body.orgId)
+    throw simpleError('missing_org_id', 'Organization id is required')
+
+  const authorization = c.get('authorization')
+  const token = authorization?.split('Bearer ')[1]
+  const { data: auth, error } = await supabaseAdmin(c).auth.getUser(token)
+
+  if (error || !auth?.user?.id)
+    throw simpleError('not_authorized', 'Not authorized')
+
+  if (!await hasOrgRight(c, body.orgId, auth.user.id, 'super_admin'))
+    throw simpleError('not_authorized', 'Not authorized')
+
+  const { data: org, error: orgError } = await supabaseAdmin(c)
+    .from('orgs')
+    .select('customer_id')
+    .eq('id', body.orgId)
+    .single()
+
+  if (orgError || !org?.customer_id)
+    throw simpleError('stripe_customer_missing', 'Organization does not have a Stripe customer')
+
+  const baseUrl = getEnv(c, 'WEBAPP_URL')
+  const successUrl = `${baseUrl}/settings/organization/credits?creditCheckout=success&session_id={CHECKOUT_SESSION_ID}`
+  const cancelUrl = `${baseUrl}/settings/organization/credits?creditCheckout=cancelled`
+
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: 'Starting credit top-up checkout',
+    orgId: body.orgId,
+    quantity,
+    productId: CREDIT_TOP_UP_PRODUCT_ID,
+    userId: auth.user.id,
+  })
+
+  const checkout = await createOneTimeCheckout(
+    c,
+    org.customer_id,
+    CREDIT_TOP_UP_PRODUCT_ID,
+    quantity,
+    successUrl,
+    cancelUrl,
+    body.orgId,
+  )
+
+  return c.json({ url: checkout.url })
+})
+
+app.post('/complete-top-up', middlewareAuth, async (c) => {
+  const body = await parseBody<CompleteTopUpRequest>(c)
+  if (!body.orgId || !body.sessionId)
+    throw simpleError('missing_parameters', 'orgId and sessionId are required')
+
+  const authorization = c.get('authorization')
+  const token = authorization?.split('Bearer ')[1]
+  const { data: auth, error } = await supabaseAdmin(c).auth.getUser(token)
+
+  if (error || !auth?.user?.id)
+    throw simpleError('not_authorized', 'Not authorized')
+
+  if (!await hasOrgRight(c, body.orgId, auth.user.id, 'super_admin'))
+    throw simpleError('not_authorized', 'Not authorized')
+
+  const { data: org, error: orgError } = await supabaseAdmin(c)
+    .from('orgs')
+    .select('customer_id')
+    .eq('id', body.orgId)
+    .single()
+
+  console.log('Organization data:', org, 'Error:', orgError);
+
+  if (orgError || !org?.customer_id)
+    throw simpleError('stripe_customer_missing', 'Organization does not have a Stripe customer')
+
+  const stripe = getStripe(c)
+  const session = await stripe.checkout.sessions.retrieve(body.sessionId)
+
+  if (!session || session.customer !== org.customer_id)
+    throw simpleError('invalid_session_customer', 'Checkout session does not belong to this organization')
+
+  if (session.mode !== 'payment')
+    throw simpleError('invalid_session_mode', 'Checkout session is not a payment session')
+
+  if (session.payment_status !== 'paid' || session.status !== 'complete')
+    throw simpleError('session_not_paid', 'Checkout session is not paid')
+
+  const lineItems = await stripe.checkout.sessions.listLineItems(body.sessionId, {
+    expand: ['data.price.product'],
+    limit: 100,
+  })
+
+  let creditQuantity = 0
+  const itemsSummary = lineItems.data.map((item) => {
+    const priceProduct = typeof item.price?.product === 'string'
+      ? item.price?.product
+      : (item.price?.product as { id?: string } | null)?.id ?? null
+    if (priceProduct === CREDIT_TOP_UP_PRODUCT_ID)
+      creditQuantity += item.quantity ?? 0
+
+    return {
+      id: item.id,
+      quantity: item.quantity,
+      priceId: item.price?.id ?? null,
+      productId: priceProduct,
+    }
+  })
+
+  if (creditQuantity <= 0)
+    throw simpleError('credit_product_not_found', 'Checkout session does not include the credit product')
+
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: 'Completing credit top-up',
+    orgId: body.orgId,
+    sessionId: body.sessionId,
+    creditQuantity,
+    itemsSummary,
+  })
+
+  const sourceRef = {
+    sessionId: body.sessionId,
+    paymentIntentId: typeof session.payment_intent === 'string'
+      ? session.payment_intent
+      : session.payment_intent?.id ?? null,
+    itemsSummary,
+  }
+
+  console.log('Source reference for top-up:', sourceRef);
+  console.log('Credit quantity to top up:', creditQuantity);
+  console.log('Organization ID:', body.orgId);
+  console
+
+  const { data: grant, error: rpcError } = await supabaseAdmin(c)
+    .rpc('top_up_usage_credits', {
+      p_org_id: body.orgId,
+      p_amount: creditQuantity,
+      p_source: 'stripe_top_up',
+      p_notes: 'Stripe Checkout credit top-up',
+      p_source_ref: sourceRef,
+    })
+    .single()
+
+  if (rpcError)
+    throw simpleError('top_up_failed', 'Failed to top up credits', {}, rpcError)
+
+  return c.json({ grant })
 })

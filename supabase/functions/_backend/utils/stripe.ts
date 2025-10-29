@@ -288,6 +288,68 @@ export async function createCheckout(c: Context, customerId: string, reccurence:
   return { url: session.url }
 }
 
+async function getOneTimePriceId(c: Context, productId: string): Promise<string | null> {
+  if (!existInEnv(c, 'STRIPE_SECRET_KEY'))
+    return null
+  try {
+    const prices = await getStripe(c).prices.search({
+      query: `product:"${productId}" AND active:'true'`,
+    })
+    console.log('One-time prices found:', prices);
+    for (const price of prices.data) {
+      if (price.type === 'one_time' && price.active)
+        return price.id
+    }
+  }
+  catch (err) {
+    cloudlog({ requestId: c.get('requestId'), message: 'search one-time price error', error: err })
+  }
+  return null
+}
+
+export async function createOneTimeCheckout(
+  c: Context,
+  customerId: string,
+  productId: string,
+  quantity: number,
+  successUrl: string,
+  cancelUrl: string,
+  clientReferenceId?: string,
+) {
+  if (!existInEnv(c, 'STRIPE_SECRET_KEY'))
+    return { url: '' }
+
+  const priceId = await getOneTimePriceId(c, productId)
+  if (!priceId)
+    throw new Error(`Cannot find one-time price for product ${productId}`)
+
+  const session = await getStripe(c).checkout.sessions.create({
+    billing_address_collection: 'auto',
+    mode: 'payment',
+    customer: customerId,
+    success_url: successUrl,
+    cancel_url: cancelUrl,
+    automatic_tax: { enabled: true },
+    client_reference_id: clientReferenceId,
+    customer_update: {
+      address: 'auto',
+      name: 'auto',
+    },
+    tax_id_collection: { enabled: true },
+    line_items: [
+      {
+        price: priceId,
+        quantity,
+      },
+    ],
+    metadata: {
+      productId,
+      intendedQuantity: String(quantity),
+    },
+  })
+  return { url: session.url }
+}
+
 export interface StripeCustomer {
   id: string
   email: string
