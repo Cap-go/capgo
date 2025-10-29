@@ -2,7 +2,7 @@ import type { SimpleErrorResponse } from '../supabase/functions/_backend/utils/h
 import type { DeviceLink, HttpMethod } from './test-utils.ts'
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { PLUGIN_BASE_URL, getBaseData, getSupabaseClient, resetAndSeedAppData, resetAppData, resetAppDataStats } from './test-utils.ts'
+import { PLUGIN_BASE_URL, getBaseData, getSupabaseClient, resetAndSeedAppData, resetAppData, resetAppDataStats, triggerD1Sync } from './test-utils.ts'
 
 interface ChannelInfo {
   id: string
@@ -141,6 +141,7 @@ describe('invalids /channel_self tests', () => {
     const { error } = await getSupabaseClient().from('channels').update({ allow_device_self_set: false }).eq('name', data.channel).eq('app_id', APPNAME).select('id').single()
 
     expect(error).toBeNull()
+    await triggerD1Sync() // Sync channel updates to D1
 
     try {
       const response = await fetchEndpoint('POST', data)
@@ -195,6 +196,7 @@ describe('invalids /channel_self tests', () => {
     const { error } = await getSupabaseClient().from('app_versions').update({ name: 'build_not_in' }).eq('name', 'builtin').eq('app_id', APPNAME).select('id').single()
 
     expect(error).toBeNull()
+    await triggerD1Sync() // Sync app_versions updates to D1
 
     try {
       const response = await fetchEndpoint('PUT', data)
@@ -410,6 +412,7 @@ describe('[GET] /channel_self tests', () => {
 
     expect(updateError).toBeNull()
     expect(channelData?.allow_emulator).toBe(false)
+    await triggerD1Sync() // Sync channel updates to D1
 
     try {
       const data = getBaseData(APPNAME)
@@ -467,6 +470,7 @@ describe('[GET] /channel_self tests', () => {
       .eq('app_id', APPNAME)
 
     expect(updateError).toBeNull()
+    await triggerD1Sync() // Sync channel updates to D1
 
     try {
       // Test dev device - real device (is_emulator=false) should get no channels
@@ -499,6 +503,7 @@ describe('[GET] /channel_self tests', () => {
         .update({ allow_dev: true })
         .eq('name', 'development')
         .eq('app_id', APPNAME)
+      await triggerD1Sync() // Sync the reset back to D1
     }
   })
 
@@ -721,6 +726,7 @@ it('[PUT] /channel_self (with overwrite)', async () => {
   }, { onConflict: 'device_id, app_id' })
 
   expect(error).toBeNull()
+  await triggerD1Sync() // Sync channel_devices to D1
 
   try {
     const response = await fetchEndpoint('PUT', data)
@@ -807,6 +813,7 @@ it('[DELETE] /channel_self (with overwrite)', async () => {
   }, { onConflict: 'device_id, app_id' })
 
   expect(error).toBeNull()
+  await triggerD1Sync() // Sync channel_devices to D1
 
   try {
     const response = await fetchEndpoint('DELETE', data)

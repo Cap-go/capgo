@@ -701,6 +701,11 @@ export default {
         return new Response('OK', { status: 200 })
       }
 
+      if (path === '/ok') {
+        console.log(`[Fetch] Responding to /ok check`)
+        return new Response('OK', { status: 200 })
+      }
+
       console.log(`[Fetch] Path not found: ${path}`)
       return new Response('Not found', { status: 404 })
     }
