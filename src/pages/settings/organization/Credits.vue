@@ -5,9 +5,9 @@ import { storeToRefs } from 'pinia'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
+import { toast } from 'vue-sonner'
 import BanknotesIcon from '~icons/heroicons/banknotes'
 import ScaleIcon from '~icons/heroicons/scale'
-import { toast } from 'vue-sonner'
 import { completeCreditTopUp, startCreditTopUp } from '~/services/stripe'
 import { useSupabase } from '~/services/supabase'
 import { useOrganizationStore } from '~/stores/organization'
@@ -211,7 +211,6 @@ watch(() => currentOrganization.value?.gid, async (newOrgId, oldOrgId) => {
             </div>
             <p class="text-sm text-gray-500 dark:text-gray-400">
               {{ t('credits-available') }}
-
             </p>
           </div>
           <div v-if="creditNextExpiration" class="text-right">
