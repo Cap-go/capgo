@@ -292,7 +292,6 @@ async function getUsages(forceRefetch = false) {
 
   // Use cached 30-day data if available and not forcing refetch
   if (cached30DayData.value && !forceRefetch) {
-
     // Filter data based on billing period mode
     if (useBillingPeriod.value) {
       // Show only data within billing period

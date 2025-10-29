@@ -5,12 +5,12 @@ import { useI18n } from 'vue-i18n'
 import ArrowDownOnSquareIcon from '~icons/heroicons/arrow-down-on-square'
 import GlobeAltIcon from '~icons/heroicons/globe-alt'
 import XCircleIcon from '~icons/heroicons/x-circle'
-import ChartCard from './ChartCard.vue'
 import UpdateStatsChart from '~/components/dashboard/UpdateStatsChart.vue'
 import { useSupabase } from '~/services/supabase'
 import { useDashboardAppsStore } from '~/stores/dashboardApps'
 import { useOrganizationStore } from '~/stores/organization'
 import { createUndefinedArray, incrementArrayValue } from '~/utils/chartOptimizations'
+import ChartCard from './ChartCard.vue'
 
 const props = defineProps({
   useBillingPeriod: {
@@ -71,7 +71,6 @@ function filterToBillingPeriod(fullData: (number | undefined)[], last30DaysStart
 
 const { t } = useI18n()
 const organizationStore = useOrganizationStore()
-
 
 const totalInstalled = ref(0)
 const totalFailed = ref(0)

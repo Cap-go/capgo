@@ -101,4 +101,3 @@ const displayNoDataMessage = computed(() => props.noDataMessage ?? t('no-data'))
     </div>
   </div>
 </template>
-
