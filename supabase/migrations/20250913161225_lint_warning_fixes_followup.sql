@@ -208,18 +208,27 @@ BEGIN
 END;
 $$;
 
--- L) process_d1_replication_batch: avoid shadowed loop var
+-- K.1) get_d1_sync_url: get D1 sync worker URL from Vault
+CREATE OR REPLACE FUNCTION "public"."get_d1_sync_url"() RETURNS "text"
+    LANGUAGE "sql" STABLE SECURITY DEFINER PARALLEL SAFE
+    AS $$
+    SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name='d1_sync_url';
+$$;
+
+-- L) process_d1_replication_batch: avoid shadowed loop var, use URL from Vault
 CREATE OR REPLACE FUNCTION "public"."process_d1_replication_batch" () RETURNS void LANGUAGE plpgsql SECURITY DEFINER
 SET
   search_path = '' AS $$
-DECLARE queue_size bigint; calls_needed int;
+DECLARE queue_size bigint; calls_needed int; webhook_url text; webhook_signature text;
 BEGIN
-  IF public.get_d1_webhook_signature() IS NOT NULL THEN
+  webhook_url := public.get_d1_sync_url();
+  webhook_signature := public.get_d1_webhook_signature();
+  IF webhook_url IS NOT NULL AND webhook_signature IS NOT NULL THEN
     SELECT count(*) INTO queue_size FROM pgmq.q_replicate_data;
     IF queue_size > 0 THEN
       calls_needed := least(ceil(queue_size / 1000.0)::int, 10);
       FOR i IN 1..calls_needed LOOP
-        PERFORM net.http_post(url := 'https://sync.capgo.app/sync', headers := jsonb_build_object('x-webhook-signature', public.get_d1_webhook_signature()));
+        PERFORM net.http_post(url := webhook_url, headers := jsonb_build_object('x-webhook-signature', webhook_signature));
       END LOOP;
     END IF;
   END IF;

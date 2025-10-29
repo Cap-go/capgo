@@ -17,7 +17,8 @@ import {
 import { computed } from 'vue'
 import { Bar, Line } from 'vue-chartjs'
 import { useI18n } from 'vue-i18n'
-import { getCurrentDayMonth, getDaysInCurrentMonth } from '~/services/date'
+import { createLegendConfig, createStackedChartScales } from '~/services/chartConfig'
+import { generateMonthDays, getCurrentDayMonth, getDaysInCurrentMonth } from '~/services/date'
 import { useOrganizationStore } from '~/stores/organization'
 import { inlineAnnotationPlugin } from '../../services/chartAnnotations'
 import { createTooltipConfig, todayLinePlugin, verticalLinePlugin } from '../../services/chartTooltip'
@@ -130,38 +131,8 @@ const projectionData = computed(() => {
   return res
 })
 
-function getDayNumbers(startDate: Date, endDate: Date) {
-  const dayNumbers = []
-  const currentDate = new Date(startDate)
-  while (currentDate.getTime() <= endDate.getTime()) {
-    dayNumbers.push(currentDate.getDate())
-    currentDate.setDate(currentDate.getDate() + 1)
-  }
-  return dayNumbers
-}
-
 function monthdays() {
-  if (!props.useBillingPeriod) {
-    // Last 30 days mode - generate actual dates
-    const today = new Date()
-    const dates = []
-    for (let i = 29; i >= 0; i--) {
-      const date = new Date(today)
-      date.setDate(date.getDate() - i)
-      dates.push(date.getDate())
-    }
-    return dates
-  }
-
-  // Billing period mode - use existing logic
-  // eslint-disable-next-line unicorn/no-new-array
-  let keys = [...(new Array(getDaysInCurrentMonth() + 1).keys())]
-  if (cycleStart && cycleEnd)
-    keys = getDayNumbers(cycleStart, cycleEnd)
-  else
-    keys.shift()
-
-  return [...keys]
+  return generateMonthDays(props.useBillingPeriod, cycleStart, cycleEnd)
 }
 
 function createAnotation(id: string, y: number, title: string, lineColor: string, bgColor: string) {
@@ -396,41 +367,10 @@ const chartOptions = computed<ChartOptions & { plugins: { inlineAnnotationPlugin
 
   return {
     maintainAspectRatio: false,
-    scales: {
-      y: {
-        stacked: hasAppData, // Stack when there are multiple apps
-        beginAtZero: true,
-        ticks: {
-          color: `${isDark.value ? 'white' : 'black'}`,
-          // Remove stepSize to let Chart.js auto-calculate optimal steps
-        },
-        grid: {
-          color: `${isDark.value ? '#424e5f' : '#bfc9d6'}`,
-        },
-      },
-      x: {
-        stacked: hasAppData, // Stack when there are multiple apps
-        ticks: {
-          color: `${isDark.value ? 'white' : 'black'}`,
-        },
-        grid: {
-          color: `${isDark.value ? '#323e4e' : '#cad5e2'}`,
-        },
-      },
-    },
+    scales: createStackedChartScales(isDark.value, hasAppData),
     plugins: {
       inlineAnnotationPlugin: generateAnnotations.value,
-      legend: {
-        display: hasAppData,
-        position: 'bottom' as const,
-        labels: {
-          color: `${isDark.value ? 'white' : 'black'}`,
-          padding: 10,
-          font: {
-            size: 11,
-          },
-        },
-      },
+      legend: createLegendConfig(isDark.value, hasAppData),
       title: {
         display: false,
       },

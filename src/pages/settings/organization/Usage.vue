@@ -226,12 +226,12 @@ function nextRunDate() {
               <!-- Last Update Info -->
               <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                 <div class="flex items-center space-x-2">
-                  <div class="w-2 h-2 bg-green-500 rounded-full flex-shrink-0" />
+                  <div class="w-2 h-2 bg-green-500 rounded-full shrink-0" />
                   <span class="truncate">{{ lastRunDate() }}</span>
                 </div>
                 <div class="hidden sm:block w-px h-4 bg-gray-300 dark:bg-gray-600" />
                 <div class="flex items-center space-x-2">
-                  <div class="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0" />
+                  <div class="w-2 h-2 bg-blue-500 rounded-full shrink-0" />
                   <span class="truncate">{{ nextRunDate() }}</span>
                 </div>
               </div>
@@ -305,7 +305,7 @@ function nextRunDate() {
               <!-- Limit Exceeded Alert -->
               <div v-if="(planUsage?.detailPlanUsage?.mau_percent || 0) >= 100" class="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
                 <div class="flex items-start">
-                  <svg class="h-5 w-5 text-red-400 mt-0.5 mr-2 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                  <svg class="h-5 w-5 text-red-400 mt-0.5 mr-2 shrink-0" viewBox="0 0 20 20" fill="currentColor">
                     <path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" />
                   </svg>
                   <div class="flex-1">
@@ -370,7 +370,7 @@ function nextRunDate() {
               <!-- Limit Exceeded Alert -->
               <div v-if="(planUsage?.detailPlanUsage?.storage_percent || 0) >= 100" class="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
                 <div class="flex items-start">
-                  <svg class="h-5 w-5 text-red-400 mt-0.5 mr-2 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                  <svg class="h-5 w-5 text-red-400 mt-0.5 mr-2 shrink-0" viewBox="0 0 20 20" fill="currentColor">
                     <path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" />
                   </svg>
                   <div class="flex-1">
@@ -435,7 +435,7 @@ function nextRunDate() {
               <!-- Limit Exceeded Alert -->
               <div v-if="(planUsage?.detailPlanUsage?.bandwidth_percent || 0) >= 100" class="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
                 <div class="flex items-start">
-                  <svg class="h-5 w-5 text-red-400 mt-0.5 mr-2 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                  <svg class="h-5 w-5 text-red-400 mt-0.5 mr-2 shrink-0" viewBox="0 0 20 20" fill="currentColor">
                     <path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" />
                   </svg>
                   <div class="flex-1">

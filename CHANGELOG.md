@@ -2,6 +2,75 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.38.15 (2025-10-29)
+
+### 12.38.14 (2025-10-29)
+
+### 12.38.13 (2025-10-29)
+
+### 12.38.12 (2025-10-29)
+
+
+### Bug Fixes
+
+* lint and cf tests ([326115d](https://github.com/Cap-go/capgo/commit/326115d02259481fc3ee4367e0cb6d2e82fd9e27))
+
+### 12.38.11 (2025-10-29)
+
+### 12.38.10 (2025-10-29)
+
+### 12.38.9 (2025-10-29)
+
+### 12.38.8 (2025-10-29)
+
+### 12.38.7 (2025-10-29)
+
+
+### Bug Fixes
+
+* disable for test ([94686b9](https://github.com/Cap-go/capgo/commit/94686b96ae390249848124b4838c87aaf4b81ba6))
+
+### 12.38.6 (2025-10-28)
+
+### 12.38.5 (2025-10-28)
+
+
+### Bug Fixes
+
+* create device from UI ([8b746de](https://github.com/Cap-go/capgo/commit/8b746de569930a0bd83c78668400436ded32e3ce))
+
+### 12.38.4 (2025-10-28)
+
+
+### Bug Fixes
+
+* tests ([c6ceed2](https://github.com/Cap-go/capgo/commit/c6ceed2c4a3028e92669cd0aaf71a119956d8acf))
+
+### 12.38.3 (2025-10-28)
+
+### 12.38.2 (2025-10-28)
+
+### 12.38.1 (2025-10-28)
+
+
+### Bug Fixes
+
+* update TARGET_HOST in aliproxy and add new route pattern in wrangler.jsonc ([6856fdb](https://github.com/Cap-go/capgo/commit/6856fdb8931bf73ce63386f344ad7db16fa7d85e))
+
+## 12.38.0 (2025-10-28)
+
+
+### Features
+
+* enhance subscription handling and logging in Stripe events ([882916a](https://github.com/Cap-go/capgo/commit/882916a893a50e2c71b3665e24155b07d2fbd9ec))
+
+## 12.37.0 (2025-10-27)
+
+
+### Features
+
+* add aliproxy ([7f11aea](https://github.com/Cap-go/capgo/commit/7f11aea4044eab662ea8912941aefa20a98e4e9f))
+
 ### 12.36.12 (2025-10-27)
 
 

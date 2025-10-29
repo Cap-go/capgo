@@ -6,8 +6,14 @@ const SKIP_COLOR = 10
 const colorKeys = Object.keys(colors)
 const chartDataCache = ref<Map<string, any>>(new Map())
 
+function formatDateParam(date: Date) {
+  const normalized = new Date(date)
+  normalized.setUTCHours(0, 0, 0, 0)
+  return normalized.toISOString().slice(0, 10)
+}
+
 function buildCacheKey(appId: string, from: Date, to: Date) {
-  return `${appId}|${from.toISOString()}|${to.toISOString()}`
+  return `${appId}|${formatDateParam(from)}|${formatDateParam(to)}`
 }
 
 export async function useChartData(supabase: SupabaseClient, appId: string, from: Date, to: Date) {
@@ -16,7 +22,9 @@ export async function useChartData(supabase: SupabaseClient, appId: string, from
   if (chartDataCache.value.has(cacheKey))
     return chartDataCache.value.get(cacheKey)
 
-  const { error, data } = await supabase.functions.invoke(`statistics/app/${appId}/bundle_usage?from=${from.toISOString()}&to=${to.toISOString()}`, {
+  const fromParam = formatDateParam(from)
+  const toParam = formatDateParam(to)
+  const { error, data } = await supabase.functions.invoke(`statistics/app/${appId}/bundle_usage?from=${fromParam}&to=${toParam}`, {
     method: 'GET',
   })
   if (error)

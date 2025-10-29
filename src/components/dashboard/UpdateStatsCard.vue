@@ -10,6 +10,7 @@ import { useSupabase } from '~/services/supabase'
 import { useDashboardAppsStore } from '~/stores/dashboardApps'
 import { useOrganizationStore } from '~/stores/organization'
 import { createUndefinedArray, incrementArrayValue } from '~/utils/chartOptimizations'
+import ChartCard from './ChartCard.vue'
 
 const props = defineProps({
   useBillingPeriod: {
@@ -24,45 +25,13 @@ const props = defineProps({
     type: String,
     default: '',
   },
+  reloadTrigger: {
+    type: Number,
+    default: 0,
+  },
 })
 
-// Helper function to filter 30-day data to billing period
-function filterToBillingPeriod(fullData: (number | undefined)[], last30DaysStart: Date, billingStart: Date) {
-  const currentDate = new Date()
-
-  // Calculate billing period length
-  let currentBillingDay: number
-
-  if (billingStart.getDate() === 1) {
-    currentBillingDay = currentDate.getDate()
-  }
-  else {
-    const billingStartDay = billingStart.getUTCDate()
-    const daysInMonth = new Date(Date.UTC(currentDate.getUTCFullYear(), currentDate.getUTCMonth() + 1, 0)).getUTCDate()
-    currentBillingDay = (currentDate.getUTCDate() - billingStartDay + 1 + daysInMonth) % daysInMonth
-    if (currentBillingDay === 0)
-      currentBillingDay = daysInMonth
-  }
-
-  // Create arrays for billing period length
-  const billingData = Array.from({ length: currentBillingDay }).fill(undefined) as (number | undefined)[]
-
-  // Map 30-day data to billing period
-  for (let i = 0; i < 30; i++) {
-    const dataDate = new Date(last30DaysStart)
-    dataDate.setDate(dataDate.getDate() + i)
-
-    // Check if this date falls within current billing period
-    if (dataDate >= billingStart && dataDate <= currentDate) {
-      const billingIndex = Math.floor((dataDate.getTime() - billingStart.getTime()) / (1000 * 60 * 60 * 24))
-      if (billingIndex >= 0 && billingIndex < currentBillingDay) {
-        billingData[billingIndex] = fullData[i]
-      }
-    }
-  }
-
-  return { data: billingData }
-}
+// Removed filterToBillingPeriod - no longer needed as we work with correct date range from the start
 
 const { t } = useI18n()
 const organizationStore = useOrganizationStore()
@@ -76,6 +45,9 @@ const updateDataByApp = ref<{ [appId: string]: (number | undefined)[] }>({})
 const updateDataByAction = ref<{ [action: string]: (number | undefined)[] }>({})
 const appNames = ref<{ [appId: string]: string }>({})
 const isLoading = ref(true)
+
+// Cache for raw API data
+const cachedRawStats = ref<any[] | null>(null)
 
 const dashboardAppsStore = useDashboardAppsStore()
 
@@ -100,7 +72,11 @@ const actionDisplayNames = computed(() => ({
   fail: capitalize(t('failed')),
 }))
 
-async function calculateStats() {
+const totalUpdates = computed(() => totalInstalled.value + totalFailed.value + totalRequested.value)
+const hasData = computed(() => chartUpdateData.value?.length > 0)
+
+async function calculateStats(forceRefetch = false) {
+  const startTime = Date.now()
   isLoading.value = true
   totalInstalled.value = 0
   totalFailed.value = 0
@@ -109,32 +85,44 @@ async function calculateStats() {
   // Reset data
   updateDataByApp.value = {}
   updateDataByAction.value = {}
-  appNames.value = {}
   updateData.value = []
 
-  // Always work with last 30 days of data
-  const last30DaysEnd = new Date()
-  const last30DaysStart = new Date()
-  last30DaysStart.setDate(last30DaysStart.getDate() - 29) // 30 days including today
-  last30DaysStart.setHours(0, 0, 0, 0)
-  last30DaysEnd.setHours(23, 59, 59, 999)
+  // Determine the date range based on mode
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
 
-  // Get billing period dates for filtering
-  const billingStart = new Date(organizationStore.currentOrganization?.subscription_start ?? new Date())
-  billingStart.setHours(0, 0, 0, 0)
+  let rangeStart: Date
+  let rangeEnd: Date
 
-  // Initialize arrays for 30 days
-  const dailyCounts = createUndefinedArray(30) as (number | undefined)[]
-
-  // Initialize action-specific data arrays for 30 days
-  updateDataByAction.value = {
-    install: createUndefinedArray(30) as (number | undefined)[],
-    fail: createUndefinedArray(30) as (number | undefined)[],
-    requested: createUndefinedArray(30) as (number | undefined)[],
+  if (props.useBillingPeriod) {
+    // Billing period mode: use the full billing period (start to end)
+    rangeStart = new Date(organizationStore.currentOrganization?.subscription_start ?? today)
+    rangeStart.setHours(0, 0, 0, 0)
+    rangeEnd = new Date(organizationStore.currentOrganization?.subscription_end ?? today)
+    rangeEnd.setHours(0, 0, 0, 0)
+  }
+  else {
+    // Last 30 days mode: from 29 days ago to today
+    rangeEnd = new Date(today)
+    rangeStart = new Date(today)
+    rangeStart.setDate(rangeStart.getDate() - 29)
   }
 
-  const startDate = last30DaysStart.toISOString().split('T')[0]
-  const endDate = last30DaysEnd.toISOString().split('T')[0]
+  // Calculate number of days in range
+  const dayCount = Math.floor((rangeEnd.getTime() - rangeStart.getTime()) / (1000 * 60 * 60 * 24)) + 1
+
+  // Initialize arrays for the actual range
+  const dailyCounts = createUndefinedArray(dayCount) as (number | undefined)[]
+
+  // Initialize action-specific data arrays
+  updateDataByAction.value = {
+    install: createUndefinedArray(dayCount) as (number | undefined)[],
+    fail: createUndefinedArray(dayCount) as (number | undefined)[],
+    requested: createUndefinedArray(dayCount) as (number | undefined)[],
+  }
+
+  const startDate = rangeStart.toISOString().split('T')[0]
+  const endDate = rangeEnd.toISOString().split('T')[0]
 
   try {
     // Determine target apps
@@ -144,75 +132,91 @@ async function calculateStats() {
     if (props.appId) {
       // Single app mode
       targetAppIds = [props.appId]
-      try {
-        const { data: appRow } = await useSupabase()
-          .from('apps')
-          .select('name')
-          .eq('app_id', props.appId)
-          .single()
-        localAppNames[props.appId] = appRow?.name ?? props.appId
+      if (!cachedRawStats.value || forceRefetch) {
+        try {
+          const { data: appRow } = await useSupabase()
+            .from('apps')
+            .select('name')
+            .eq('app_id', props.appId)
+            .single()
+          localAppNames[props.appId] = appRow?.name ?? props.appId
+        }
+        catch (error) {
+          console.error('Error fetching app name for update stats:', error)
+          localAppNames[props.appId] = props.appId
+        }
+        appNames.value = localAppNames
       }
-      catch (error) {
-        console.error('Error fetching app name for update stats:', error)
-        localAppNames[props.appId] = props.appId
-      }
-      appNames.value = localAppNames
     }
     else {
       // Multiple apps mode - use store for shared apps data
-      await dashboardAppsStore.fetchApps()
+      // Only fetch apps if not already loaded in store
+      if (!dashboardAppsStore.isLoaded) {
+        await dashboardAppsStore.fetchApps()
+      }
+
       targetAppIds = [...dashboardAppsStore.appIds]
       appNames.value = dashboardAppsStore.appNames
     }
 
     if (targetAppIds.length === 0) {
       updateData.value = dailyCounts
-      isLoading.value = false
       return
     }
 
-    // Initialize app data arrays for 30 days
+    // Initialize app data arrays for the actual range
     targetAppIds.forEach((appId) => {
-      updateDataByApp.value[appId] = createUndefinedArray(30) as (number | undefined)[]
+      updateDataByApp.value[appId] = createUndefinedArray(dayCount) as (number | undefined)[]
     })
 
-    // Get update stats from daily_version table for last 30 days
-    const { data } = await useSupabase()
-      .from('daily_version')
-      .select('date, app_id, install, fail, get')
-      .in('app_id', targetAppIds)
-      .gte('date', startDate)
-      .lte('date', endDate)
-      .order('date')
+    // Use cached data if available and not forcing refetch
+    let data
+    if (cachedRawStats.value && !forceRefetch) {
+      data = cachedRawStats.value
+    }
+    else {
+      // Get update stats from daily_version table for last 30 days
+      const result = await useSupabase()
+        .from('daily_version')
+        .select('date, app_id, install, fail, get')
+        .in('app_id', targetAppIds)
+        .gte('date', startDate)
+        .lte('date', endDate)
+        .order('date')
+      data = result.data
+      // Cache the fetched data
+      cachedRawStats.value = data
+    }
 
     if (data && data.length > 0) {
-      // Process each stat entry for 30-day period
+      // Process each stat entry
       data.forEach((stat: any) => {
         if (stat.date) {
           const statDate = new Date(stat.date)
+          statDate.setHours(0, 0, 0, 0)
 
-          // Calculate days since start of 30-day period
-          const daysDiff = Math.floor((statDate.getTime() - last30DaysStart.getTime()) / (1000 * 60 * 60 * 24))
+          // Calculate days since start of range
+          const daysDiff = Math.floor((statDate.getTime() - rangeStart.getTime()) / (1000 * 60 * 60 * 24))
 
-          if (daysDiff >= 0 && daysDiff < 30) {
+          if (daysDiff >= 0 && daysDiff < dayCount) {
             const installedCount = stat.install || 0
             const failedCount = stat.fail || 0
             const requestedCount = stat.get || 0
             const totalForDay = installedCount + failedCount + requestedCount
 
-            // Increment arrays for 30-day data
+            // Increment arrays
             incrementArrayValue(dailyCounts, daysDiff, totalForDay)
 
             totalInstalled.value += installedCount
             totalFailed.value += failedCount
             totalRequested.value += requestedCount
 
-            // Track by action type for dashboard view
+            // Track by action type
             incrementArrayValue(updateDataByAction.value.install, daysDiff, installedCount)
             incrementArrayValue(updateDataByAction.value.fail, daysDiff, failedCount)
             incrementArrayValue(updateDataByAction.value.requested, daysDiff, requestedCount)
 
-            // Also track by app (using total for simplicity in bar chart)
+            // Track by app
             if (updateDataByApp.value[stat.app_id]) {
               incrementArrayValue(updateDataByApp.value[stat.app_id], daysDiff, totalForDay)
             }
@@ -220,41 +224,8 @@ async function calculateStats() {
         }
       })
 
-      // Filter data based on billing period mode
-      if (props.useBillingPeriod) {
-        // Show only data within billing period
-        const filteredData = filterToBillingPeriod(dailyCounts, last30DaysStart, billingStart)
-        updateData.value = filteredData.data
-
-        // Filter by-action data too
-        Object.keys(updateDataByAction.value).forEach((action) => {
-          const filteredActionData = filterToBillingPeriod(updateDataByAction.value[action], last30DaysStart, billingStart)
-          updateDataByAction.value[action] = filteredActionData.data
-        })
-
-        // Filter by-app data too
-        Object.keys(updateDataByApp.value).forEach((appId) => {
-          const filteredAppData = filterToBillingPeriod(updateDataByApp.value[appId], last30DaysStart, billingStart)
-          updateDataByApp.value[appId] = filteredAppData.data
-        })
-
-        // Recalculate totals for billing period only
-        totalInstalled.value = 0
-        totalFailed.value = 0
-        totalRequested.value = 0
-
-        const installData = updateDataByAction.value.install
-        const failData = updateDataByAction.value.fail
-        const requestedData = updateDataByAction.value.requested
-
-        installData.forEach(count => totalInstalled.value += count || 0)
-        failData.forEach(count => totalFailed.value += count || 0)
-        requestedData.forEach(count => totalRequested.value += count || 0)
-      }
-      else {
-        // Show all 30 days
-        updateData.value = dailyCounts
-      }
+      // Set the data (no filtering needed - we already queried the right range)
+      updateData.value = dailyCounts
 
       // Calculate evolution (compare last two days with data)
       const nonZeroDays = updateData.value.filter(count => (count || 0) > 0)
@@ -275,28 +246,47 @@ async function calculateStats() {
     updateData.value = dailyCounts
   }
   finally {
+    // Ensure spinner shows for at least 300ms for better UX
+    const elapsed = Date.now() - startTime
+    if (elapsed < 300) {
+      await new Promise(resolve => setTimeout(resolve, 300 - elapsed))
+    }
     isLoading.value = false
   }
 }
 
-// Watch for billing period mode changes and recalculate
+// Watch for billing period mode changes - must refetch since date range changes
 watch(() => props.useBillingPeriod, async () => {
-  await calculateStats()
+  cachedRawStats.value = null // Clear cache since we're querying different date range
+  await calculateStats(true) // Must refetch for new date range
 })
 
-// Watch for accumulated mode changes and recalculate
+// Watch for accumulated mode changes - use cached data
 watch(() => props.accumulated, async () => {
-  await calculateStats()
+  await calculateStats(false) // Don't refetch, just reprocess cached data
+})
+
+// Watch for reload trigger - force refetch
+watch(() => props.reloadTrigger, async (newVal) => {
+  if (newVal > 0) {
+    await calculateStats(true) // Force refetch from API
+  }
 })
 
 onMounted(async () => {
-  await calculateStats()
+  await calculateStats(true) // Initial fetch
 })
 </script>
 
 <template>
-  <div class="flex flex-col bg-white border rounded-lg shadow-lg col-span-full border-slate-300 sm:col-span-6 xl:col-span-4 dark:border-slate-900 dark:bg-gray-800 h-[460px]">
-    <div class="pt-4 px-4 flex items-start justify-between gap-2">
+  <ChartCard
+    :title="t('update_statistics')"
+    :total="totalUpdates"
+    :last-day-evolution="lastDayEvolution"
+    :is-loading="isLoading"
+    :has-data="hasData"
+  >
+    <template #header>
       <div class="flex flex-col items-start justify-between gap-2">
         <h2 class="flex-1 min-w-0 text-2xl font-semibold leading-tight text text-slate-600 dark:text-white">
           {{ t('update_statistics') }}
@@ -334,42 +324,17 @@ onMounted(async () => {
           </div>
         </div>
       </div>
+    </template>
 
-      <div class="flex flex-col items-end text-right flex-shrink-0">
-        <div
-          v-if="lastDayEvolution"
-          class="inline-flex items-center justify-center rounded-full px-2 py-1 text-xs font-bold text-white shadow-lg whitespace-nowrap"
-          :class="{ 'bg-emerald-500': lastDayEvolution >= 0, 'bg-yellow-500': lastDayEvolution < 0 }"
-        >
-          {{ lastDayEvolution < 0 ? '-' : '+' }}{{ Math.abs(lastDayEvolution).toFixed(2) }}%
-        </div>
-        <div v-else class="inline-flex rounded-full px-2 py-1 text-xs font-semibold opacity-0" aria-hidden="true" />
-        <div class="text-3xl font-bold text-slate-600 dark:text-white">
-          {{ (totalInstalled + totalFailed + totalRequested).toLocaleString() }}
-        </div>
-      </div>
-    </div>
-    <!-- Chart built with Chart.js 3 -->
-
-    <!-- Change the height attribute to adjust the chart height -->
-    <div class="w-full h-full p-6 pt-2">
-      <div v-if="isLoading" class="flex items-center justify-center h-full">
-        <div class="loading loading-spinner loading-lg text-blue-500" />
-      </div>
-      <UpdateStatsChart
-        v-else-if="chartUpdateData?.length"
-        :key="JSON.stringify(chartUpdateDataByAction)"
-        :title="t('update_statistics')"
-        :colors="colors.blue"
-        :data="chartUpdateData"
-        :use-billing-period="useBillingPeriod"
-        :accumulated="accumulated"
-        :data-by-app="chartUpdateDataByAction"
-        :app-names="actionDisplayNames"
-      />
-      <div v-else class="flex flex-col items-center justify-center h-full">
-        {{ t('no-data') }}
-      </div>
-    </div>
-  </div>
+    <UpdateStatsChart
+      :key="JSON.stringify(chartUpdateDataByAction)"
+      :title="t('update_statistics')"
+      :colors="colors.blue"
+      :data="chartUpdateData"
+      :use-billing-period="useBillingPeriod"
+      :accumulated="accumulated"
+      :data-by-app="chartUpdateDataByAction"
+      :app-names="actionDisplayNames"
+    />
+  </ChartCard>
 </template>

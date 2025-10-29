@@ -6,7 +6,7 @@ import { bigint, boolean, customType, pgEnum, pgTable, serial, text, timestamp, 
 export const disableUpdatePgEnum = pgEnum('disable_update', ['major', 'minor', 'patch', 'version_number', 'none'])
 
 // Keeping this for backward compatibility but marking as deprecated
-const manfiestType = customType <{ data: Database['public']['CompositeTypes']['manifest_entry'][] }>({
+const manfiestType = customType<{ data: Database['public']['CompositeTypes']['manifest_entry'][] }>({
   dataType() {
     return 'manifest_entry[]'
   },
@@ -102,7 +102,7 @@ export const channel_devices = pgTable('channel_devices', {
   device_id: text('device_id').notNull(),
   channel_id: bigint('channel_id', { mode: 'number' }).notNull().references(() => channels.id),
   app_id: varchar('app_id').notNull().references(() => apps.name),
-  owner_org: uuid('owner_org'),
+  owner_org: uuid('owner_org').notNull(),
 })
 
 export const orgs = pgTable('orgs', {

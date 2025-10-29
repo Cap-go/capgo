@@ -8,9 +8,9 @@ import { getEnv } from './utils.ts'
 function logsnag(c: Context) {
   const ls = getEnv(c, 'LOGSNAG_TOKEN')
     ? new LogSnag({
-      token: getEnv(c, 'LOGSNAG_TOKEN'),
-      project: getEnv(c, 'LOGSNAG_PROJECT'),
-    })
+        token: getEnv(c, 'LOGSNAG_TOKEN'),
+        project: getEnv(c, 'LOGSNAG_PROJECT'),
+      })
     : {
         publish: () => Promise.resolve(true),
         track: (_obj: any) => Promise.resolve(true),

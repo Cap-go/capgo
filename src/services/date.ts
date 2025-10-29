@@ -34,3 +34,91 @@ export function getCurrentDayMonth() {
 
   return date.getDate()
 }
+
+export function normalizeToStartOfDay(date: Date) {
+  const normalized = new Date(date)
+  normalized.setHours(0, 0, 0, 0)
+  return normalized
+}
+
+export const DAY_IN_MS = 24 * 60 * 60 * 1000
+
+export function enumerateDates(startDate: Date, endDate: Date) {
+  const start = normalizeToStartOfDay(startDate)
+  const end = normalizeToStartOfDay(endDate)
+
+  if (start.getTime() > end.getTime())
+    return []
+
+  const dates: Date[] = []
+  let cursor = start
+  while (cursor.getTime() <= end.getTime()) {
+    dates.push(new Date(cursor))
+    cursor = new Date(cursor.getTime() + DAY_IN_MS)
+  }
+
+  return dates
+}
+
+export function enumerateDayNumbers(startDate: Date, endDate: Date) {
+  return enumerateDates(startDate, endDate).map(date => date.getDate())
+}
+
+export function getDayNumbers(startDate: Date, endDate: Date) {
+  const dayNumbers = []
+  const currentDate = new Date(startDate)
+  while (currentDate.getTime() <= endDate.getTime()) {
+    dayNumbers.push(currentDate.getDate())
+    currentDate.setDate(currentDate.getDate() + 1)
+  }
+  return dayNumbers
+}
+
+export function getChartDateRange(useBillingPeriod: boolean, billingStart?: Date | string | null, billingEnd?: Date | string | null) {
+  if (useBillingPeriod) {
+    const startDate = new Date(billingStart ?? new Date())
+    const endDate = new Date(billingEnd ?? new Date())
+    startDate.setHours(0, 0, 0, 0)
+    endDate.setHours(0, 0, 0, 0)
+    return { startDate, endDate }
+  }
+
+  const endDate = normalizeToStartOfDay(new Date())
+  const startDate = new Date(endDate)
+  startDate.setDate(startDate.getDate() - 29)
+  return { startDate, endDate }
+}
+
+export function generateChartDayLabels(useBillingPeriod: boolean, startDate: Date, endDate: Date) {
+  if (!useBillingPeriod) {
+    // Last 30 days mode - generate actual dates
+    const today = new Date()
+    const dates = []
+    for (let i = 29; i >= 0; i--) {
+      const date = new Date(today)
+      date.setDate(date.getDate() - i)
+      dates.push(date.getDate())
+    }
+    return dates
+  }
+
+  // Billing period mode - use the actual billing period end date
+  return getDayNumbers(startDate, endDate)
+}
+
+export function generateMonthDays(useBillingPeriod: boolean, cycleStart: Date, cycleEnd: Date) {
+  if (!useBillingPeriod) {
+    // Last 30 days mode - generate actual dates
+    const today = new Date()
+    const dates = []
+    for (let i = 29; i >= 0; i--) {
+      const date = new Date(today)
+      date.setDate(date.getDate() - i)
+      dates.push(date.getDate())
+    }
+    return dates
+  }
+
+  // Billing period mode - use the actual billing cycle end date
+  return getDayNumbers(cycleStart, cycleEnd)
+}

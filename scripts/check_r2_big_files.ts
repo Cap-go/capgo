@@ -618,8 +618,8 @@ export function getDatabaseURL(): string {
     // const clientContinent = (c.req.raw as any)?.cf?.continent
     // cloudlog({ requestId: c.get('requestId'), message: 'clientContinent', clientContinent  })
     let DEFAULT_DB_URL = getEnv('SUPABASE_DB_URL')
-    if (existInEnv('CUSTOM_SUPABASE_DB_URL'))
-        DEFAULT_DB_URL = getEnv('CUSTOM_SUPABASE_DB_URL')
+    if (existInEnv('MAIN_SUPABASE_DB_URL'))
+        DEFAULT_DB_URL = getEnv('MAIN_SUPABASE_DB_URL')
 
     // if (!clientContinent)
     //   return DEFAULT_DB_URL

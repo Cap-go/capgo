@@ -21,6 +21,10 @@ export const useDashboardAppsStore = defineStore('dashboardApps', () => {
   const appIds = computed(() => apps.value.map(app => app.app_id))
 
   async function fetchApps(force = false) {
+    // Quick check: if already loaded and not forcing, return immediately without any async calls
+    if (!force && isLoaded.value && currentOrgId.value !== null)
+      return
+
     const organizationStore = useOrganizationStore()
     try {
       await organizationStore.dedupFetchOrganizations()
@@ -47,9 +51,8 @@ export const useDashboardAppsStore = defineStore('dashboardApps', () => {
     }
 
     // Return cached data if same organization and not forcing
-    if (!force && isLoaded.value && currentOrgId.value === orgId) {
+    if (!force && isLoaded.value && currentOrgId.value === orgId)
       return
-    }
 
     // Reset if organization changed
     if (currentOrgId.value !== orgId) {
@@ -71,7 +74,7 @@ export const useDashboardAppsStore = defineStore('dashboardApps', () => {
         isLoaded.value = true
       }
       catch (error) {
-        console.error('Error fetching apps:', error)
+        console.error('[dashboardAppsStore] Error fetching apps:', error)
         apps.value = []
       }
       finally {
