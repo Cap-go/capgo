@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.39.1 (2025-10-29)
+
+
+### Bug Fixes
+
+* add WEBHOOK_SECRET to .env.local and update start script to use env-file ([77f400a](https://github.com/Cap-go/capgo/commit/77f400a0e9015e065a069a62e22c06860efe54fd))
+
 ## 12.39.0 (2025-10-29)
 
 
