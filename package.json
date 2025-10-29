@@ -1,7 +1,7 @@
 {
   "name": "capgo-app",
   "type": "module",
-  "version": "12.38.21",
+  "version": "12.38.22",
   "private": true,
   "license": "GPL-3.0",
   "scripts": {
