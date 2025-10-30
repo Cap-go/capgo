@@ -1,5 +1,6 @@
 import type { Context } from 'hono'
 import { cloudlog } from './loggin.ts'
+import { getEnv } from './utils.ts'
 
 // Map country code to database region (ISO 3166-1 alpha-2 to DB region)
 // Database regions: EU (Europe/Africa), US (Americas), AS (Asia/Oceania)
@@ -77,9 +78,9 @@ export function getClientDbRegion(c: Context): 'EU' | 'US' | 'AS' | undefined {
   }
 
   // 3. Supabase Functions: x-sb-edge-region header
-  // Supabase Edge Functions provide region in x-sb-edge-region header (e.g., eu-west-3, us-east-1, ap-southeast-1)
+  // Supabase Edge Functions provide region in ENV VAR SB_REGION (e.g., eu-west-3, us-east-1, ap-southeast-1)
   // Map AWS region codes directly to DB regions
-  const sbRegion = c.req.header('x-sb-edge-region')
+  const sbRegion = getEnv(c, 'SB_REGION')
   if (sbRegion) {
     let dbRegion: 'EU' | 'US' | 'AS' | undefined
     // Parse AWS region code prefix
