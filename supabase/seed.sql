@@ -40,6 +40,10 @@ BEGIN
     TRUNCATE TABLE "public"."stripe_info" CASCADE;
     TRUNCATE TABLE "public"."plans" CASCADE;
     TRUNCATE TABLE "public"."capgo_credits_steps" CASCADE;
+    TRUNCATE TABLE "public"."usage_credit_grants" CASCADE;
+    TRUNCATE TABLE "public"."usage_credit_transactions" CASCADE;
+    TRUNCATE TABLE "public"."usage_credit_consumptions" CASCADE;
+    TRUNCATE TABLE "public"."usage_overage_events" CASCADE;
 
     -- Insert seed data
     -- (Include all your INSERT statements here)
@@ -66,117 +70,132 @@ BEGIN
         step_min,
         step_max,
         price_per_unit,
-        unit_factor
+        unit_factor,
+        org_id
       )
     VALUES
-      ('mau', 0, 1000000, 0.003, 1),
-      ('mau', 1000000, 3000000, 0.0022, 1),
-      ('mau', 3000000, 10000000, 0.0016, 1),
-      ('mau', 10000000, 15000000, 0.0014, 1),
-      ('mau', 15000000, 25000000, 0.00115, 1),
-      ('mau', 25000000, 40000000, 0.001, 1),
-      ('mau', 40000000, 100000000, 0.0009, 1),
-      ('mau', 100000000, 9223372036854775807, 0.0007, 1),
-      ('bandwidth', 0, 1374000000000, 0.12, 1073741824), -- 0–10 TB
+      ('mau', 0, 1000000, 0.003, 1, NULL),
+      ('mau', 1000000, 3000000, 0.0022, 1, NULL),
+      ('mau', 3000000, 10000000, 0.0016, 1, NULL),
+      ('mau', 10000000, 15000000, 0.0014, 1, NULL),
+      ('mau', 15000000, 25000000, 0.0011, 1, NULL),
+      ('mau', 25000000, 40000000, 0.001, 1, NULL),
+      ('mau', 40000000, 100000000, 0.0009, 1, NULL),
+      ('mau', 100000000, 9223372036854775807, 0.0007, 1, NULL),
+      ('bandwidth', 0, 1099511627776, 0.12, 1073741824, NULL), -- 0–1 TB
       (
         'bandwidth',
-        1374000000000,
-        2749000000000,
+        1099511627776,
+        2199023255552,
         0.10,
-        1073741824
-      ), -- 10–20 TB
+        1073741824,
+        NULL
+      ), -- 1–2 TB
       (
         'bandwidth',
-        2749000000000,
-        6872000000000,
+        2199023255552,
+        6597069766656,
         0.085,
-        1073741824
-      ), -- 20–50 TB
+        1073741824,
+        NULL
+      ), -- 2–6 TB
       (
         'bandwidth',
-        6872000000000,
-        13740000000000,
+        6597069766656,
+        13194139533312,
         0.07,
-        1073741824
-      ), -- 50–100 TB
+        1073741824,
+        NULL
+      ), -- 6–12 TB
       (
         'bandwidth',
-        13740000000000,
-        27490000000000,
+        13194139533312,
+        27487790694400,
         0.055,
-        1073741824
-      ), -- 100–200 TB
+        1073741824,
+        NULL
+      ), -- 12–25 TB
       (
         'bandwidth',
-        27490000000000,
-        68720000000000,
+        27487790694400,
+        69269232549888,
         0.04,
-        1073741824
-      ), -- 200–500 TB
+        1073741824,
+        NULL
+      ), -- 25–63 TB
       (
         'bandwidth',
-        68720000000000,
-        137400000000000,
+        69269232549888,
+        139637976727552,
         0.03,
-        1073741824
-      ), -- 500–1000 TB
+        1073741824,
+        NULL
+      ), -- 63–127 TB
       (
         'bandwidth',
-        137400000000000,
+        139637976727552,
         9223372036854775807,
         0.02,
-        1073741824
-      ), -- 1000+ TB
-      ('storage', 0, 1342000000, 0.09, 1073741824), -- 0–10 GB
+        1073741824,
+        NULL
+      ), -- 127+ TB
+      ('storage', 0, 1073741824, 0.09, 1073741824, NULL), -- 0–1 GiB
       (
         'storage',
-        1342000000,
-        6711000000,
+        1073741824,
+        6442450944,
         0.08,
-        1073741824
-      ), -- 10–50 GB
+        1073741824,
+        NULL
+      ), -- 1–6 GiB
       (
         'storage',
-        6711000000,
-        26840000000,
+        6442450944,
+        26843545600,
         0.065,
-        1073741824
-      ), -- 50–200 GB
+        1073741824,
+        NULL
+      ), -- 6–25 GiB
       (
         'storage',
-        26840000000,
-        67110000000,
+        26843545600,
+        67645734912,
         0.05,
-        1073741824
-      ), -- 200–500 GB
+        1073741824,
+        NULL
+      ), -- 25–63 GiB
       (
         'storage',
-        67110000000,
-        268400000000,
+        67645734912,
+        268435456000,
         0.04,
-        1073741824
-      ), -- 500–2000 GB
+        1073741824,
+        NULL
+      ), -- 63–250 GiB
       (
         'storage',
-        268400000000,
-        687200000000,
+        268435456000,
+        687194767360,
         0.03,
-        1073741824
-      ), -- 2–5 TB
+        1073741824,
+        NULL
+      ), -- 250–640 GiB
       (
         'storage',
-        687200000000,
-        1374000000000,
+        687194767360,
+        1374389534720,
         0.025,
-        1073741824
-      ), -- 5–10 TB
+        1073741824,
+        NULL
+      ), -- 640–1280 GiB
       (
         'storage',
-        1374000000000,
+        1374389534720,
         9223372036854775807,
         0.021,
-        1073741824
-      );
+        1073741824,
+        NULL
+      ); -- 1280+ GiB
 
     INSERT INTO "storage"."buckets" ("id", "name", "owner", "created_at", "updated_at", "public") VALUES
     ('capgo', 'capgo', NULL, now(), now(), 't'),
@@ -207,6 +226,38 @@ BEGIN
     ('a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d', '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5', now(), now(), '', 'Non-Owner Org', 'test2@capgo.app', 'cus_NonOwner'),
     ('b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e', '7a1b2c3d-4e5f-4a6b-7c8d-9e0f1a2b3c4d', now(), now(), '', 'Stats Test Org', 'stats@capgo.app', 'cus_StatsTest');
     ALTER TABLE public.orgs ENABLE TRIGGER generate_org_user_on_org_create;
+
+    INSERT INTO public.usage_credit_grants (
+      org_id,
+      credits_total,
+      credits_consumed,
+      granted_at,
+      expires_at,
+      source,
+      source_ref,
+      notes
+    )
+    VALUES
+      (
+        '22dbad8a-b885-4309-9b3b-a09f8460fb6d',
+        1000,
+        275,
+        now() - interval '45 days',
+        now() + interval '6 months',
+        'seed',
+        '{}'::jsonb,
+        'Seed usage credits for admin org'
+      ),
+      (
+        '046a36ac-e03c-4590-9257-bd6c9dba9ee8',
+        500,
+        0,
+        now() - interval '7 days',
+        now() + interval '3 months',
+        'seed',
+        '{}'::jsonb,
+        'Seed usage credits for demo org'
+      );
 
     INSERT INTO "public"."org_users" ("org_id", "user_id", "user_right", "app_id", "channel_id") VALUES
     ('22dbad8a-b885-4309-9b3b-a09f8460fb6d', 'c591b04e-cf29-4945-b9a0-776d0672061a', 'super_admin'::"public"."user_min_right", null, null),

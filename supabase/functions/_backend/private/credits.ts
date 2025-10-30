@@ -10,7 +10,7 @@ interface CreditStep {
   price_per_unit: number
   type: string
   unit_factor: number
-  stripe_id?: string | null
+  org_id?: string | null
   created_at: string
   updated_at: string
 }
