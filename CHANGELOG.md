@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.40.6 (2025-10-30)
+
+
+### Bug Fixes
+
+* update domain references from web.capgo.app to console.capgo.app ([dad57fe](https://github.com/Cap-go/capgo/commit/dad57febe3fe3e487abe9632f86ee1afb590b3b9))
+
 ### 12.40.5 (2025-10-30)
 
 
