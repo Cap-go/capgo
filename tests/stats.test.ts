@@ -1,5 +1,6 @@
 import type { Database } from '../src/types/supabase.types.ts'
 import { randomUUID } from 'node:crypto'
+import { env } from 'node:process'
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { ALLOWED_STATS_ACTIONS } from '../supabase/functions/_backend/plugins/stats_actions.ts'
@@ -7,6 +8,9 @@ import { APP_NAME, createAppVersions, getBaseData, getSupabaseClient, getVersion
 
 const id = randomUUID()
 const APP_NAME_STATS = `${APP_NAME}.${id}`
+
+// Check if we're using Cloudflare Workers (which requires sequential tests due to D1 sync)
+const USE_CLOUDFLARE = env.USE_CLOUDFLARE_WORKERS === 'true'
 
 interface StatsRes {
   error?: string
@@ -145,10 +149,14 @@ describe('[POST] /stats', () => {
     await getSupabaseClient().from('devices').delete().eq('device_id', uuid).eq('app_id', APP_NAME_STATS)
   })
 
-  // Test each stats action concurrently with separate devices for maximum parallelization
-  describe.concurrent('test all possible stats actions', () => {
+  // Test each stats action - concurrent for Supabase, sequential for Cloudflare (due to D1 sync)
+  // Cloudflare Workers use D1 which requires sequential sync, Supabase can run concurrently
+  const testDescribe = USE_CLOUDFLARE ? describe : describe.concurrent
+  const testIt = USE_CLOUDFLARE ? it : it.concurrent
+
+  testDescribe('test all possible stats actions', () => {
     for (const action of ALLOWED_STATS_ACTIONS) {
-      it.concurrent(`should handle ${action} action`, async () => {
+      testIt(`should handle ${action} action`, async () => {
         const uuid = randomUUID().toLowerCase()
         const baseData = getBaseData(APP_NAME_STATS) as StatsPayload
         baseData.device_id = uuid

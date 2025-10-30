@@ -8,7 +8,7 @@ export default defineConfig(({ mode }) => ({
     environment: 'node',
     watch: false,
     bail: 0,
-    testTimeout: 30_000,
+    testTimeout: process.env.CI ? 60_000 : 30_000, // 60s in CI, 30s locally
     hookTimeout: 10_000,
     retry: 2,
     // Very low concurrency for plugin tests that need D1 sync

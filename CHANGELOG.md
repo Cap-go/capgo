@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.40.3 (2025-10-30)
+
+### 12.40.2 (2025-10-30)
+
+### 12.40.1 (2025-10-30)
+
+## 12.40.0 (2025-10-30)
+
+
+### Features
+
+* add D1 sync verification step and adjust test timeout for CI ([437fd69](https://github.com/Cap-go/capgo/commit/437fd694d62fb6951c2ca6ecc5e135b401d01dd8))
+
 ### 12.39.1 (2025-10-29)
 
 
