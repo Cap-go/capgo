@@ -11,6 +11,7 @@ import ScaleIcon from '~icons/heroicons/scale'
 import { completeCreditTopUp, startCreditTopUp } from '~/services/stripe'
 import { useSupabase } from '~/services/supabase'
 import { useOrganizationStore } from '~/stores/organization'
+import { useDisplayStore } from '~/stores/display'
 
 const creditsV2Enabled = import.meta.env.VITE_FEATURE_CREDITS_V2
 
