@@ -1,3 +1,4 @@
+import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
 import { middlewareAuth, parseBody, simpleError, useCors } from '../utils/hono.ts'
@@ -64,7 +65,37 @@ interface CompleteTopUpRequest {
 }
 
 const DEFAULT_TOP_UP_QUANTITY = 100
-const CREDIT_TOP_UP_PRODUCT_ID = 'prod_TINXCAiTb8Vsxc'
+// const CREDIT_TOP_UP_PRODUCT_ID = 'prod_TINXCAiTb8Vsxc'
+const CREDIT_TOP_UP_PRODUCT_ID = 'prod_TJRd2hFHZsBIPK'
+
+
+type AppContext = Context<MiddlewareKeyVariables, any, any>
+
+async function resolveOrgStripeContext(c: AppContext, orgId: string) {
+  const token = c.get('authorization')?.split('Bearer ')[1]
+  const { data: auth, error } = await supabaseAdmin(c).auth.getUser(token)
+
+  if (error || !auth?.user?.id)
+    throw simpleError('not_authorized', 'Not authorized')
+
+  const userId = auth.user.id
+
+  if (!await hasOrgRight(c, orgId, userId, 'super_admin'))
+    throw simpleError('not_authorized', 'Not authorized')
+
+  const { data: org, error: orgError } = await supabaseAdmin(c)
+    .from('orgs')
+    .select('customer_id')
+    .eq('id', orgId)
+    .single()
+
+  const customerId = org?.customer_id
+
+  if (orgError || !customerId)
+    throw simpleError('stripe_customer_missing', 'Organization does not have a Stripe customer')
+
+  return { customerId, userId }
+}
 
 export const app = new Hono<MiddlewareKeyVariables>()
 
@@ -207,24 +238,7 @@ app.post('/start-top-up', middlewareAuth, async (c) => {
   if (!body.orgId)
     throw simpleError('missing_org_id', 'Organization id is required')
 
-  const authorization = c.get('authorization')
-  const token = authorization?.split('Bearer ')[1]
-  const { data: auth, error } = await supabaseAdmin(c).auth.getUser(token)
-
-  if (error || !auth?.user?.id)
-    throw simpleError('not_authorized', 'Not authorized')
-
-  if (!await hasOrgRight(c, body.orgId, auth.user.id, 'super_admin'))
-    throw simpleError('not_authorized', 'Not authorized')
-
-  const { data: org, error: orgError } = await supabaseAdmin(c)
-    .from('orgs')
-    .select('customer_id')
-    .eq('id', body.orgId)
-    .single()
-
-  if (orgError || !org?.customer_id)
-    throw simpleError('stripe_customer_missing', 'Organization does not have a Stripe customer')
+  const { customerId, userId } = await resolveOrgStripeContext(c, body.orgId)
 
   const baseUrl = getEnv(c, 'WEBAPP_URL')
   const successUrl = `${baseUrl}/settings/organization/credits?creditCheckout=success&session_id={CHECKOUT_SESSION_ID}`
@@ -236,12 +250,12 @@ app.post('/start-top-up', middlewareAuth, async (c) => {
     orgId: body.orgId,
     quantity,
     productId: CREDIT_TOP_UP_PRODUCT_ID,
-    userId: auth.user.id,
+    userId,
   })
 
   const checkout = await createOneTimeCheckout(
     c,
-    org.customer_id,
+    customerId,
     CREDIT_TOP_UP_PRODUCT_ID,
     quantity,
     successUrl,
@@ -257,29 +271,12 @@ app.post('/complete-top-up', middlewareAuth, async (c) => {
   if (!body.orgId || !body.sessionId)
     throw simpleError('missing_parameters', 'orgId and sessionId are required')
 
-  const authorization = c.get('authorization')
-  const token = authorization?.split('Bearer ')[1]
-  const { data: auth, error } = await supabaseAdmin(c).auth.getUser(token)
-
-  if (error || !auth?.user?.id)
-    throw simpleError('not_authorized', 'Not authorized')
-
-  if (!await hasOrgRight(c, body.orgId, auth.user.id, 'super_admin'))
-    throw simpleError('not_authorized', 'Not authorized')
-
-  const { data: org, error: orgError } = await supabaseAdmin(c)
-    .from('orgs')
-    .select('customer_id')
-    .eq('id', body.orgId)
-    .single()
-
-  if (orgError || !org?.customer_id)
-    throw simpleError('stripe_customer_missing', 'Organization does not have a Stripe customer')
+  const { customerId } = await resolveOrgStripeContext(c, body.orgId)
 
   const stripe = getStripe(c)
   const session = await stripe.checkout.sessions.retrieve(body.sessionId)
 
-  if (!session || session.customer !== org.customer_id)
+  if (!session || session.customer !== customerId)
     throw simpleError('invalid_session_customer', 'Checkout session does not belong to this organization')
 
   if (session.mode !== 'payment')
