@@ -26,7 +26,7 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="https" />
-                <data android:host="web.capgo.app" />
+                <data android:host="console.capgo.app" />
             </intent-filter>
 
         </activity>

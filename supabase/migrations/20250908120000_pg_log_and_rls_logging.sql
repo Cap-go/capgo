@@ -579,7 +579,7 @@ BEGIN
     -- test the user plan
     IF (public.is_paying_and_good_plan_org_action(orgid, ARRAY['mau']::"public"."action_type"[]) = true AND public.is_paying_and_good_plan_org_action(orgid, ARRAY['bandwidth']::"public"."action_type"[]) = true AND public.is_paying_and_good_plan_org_action(orgid, ARRAY['storage']::"public"."action_type"[]) = false) THEN
         messages := array_append(messages, jsonb_build_object(
-            'message', 'You have exceeded your storage limit.\nUpload will fail, but you can still download your data.\nMAU and bandwidth limits are not exceeded.\nIn order to upload your data, please upgrade your plan here: https://web.capgo.app/settings/plans.',
+            'message', 'You have exceeded your storage limit.\nUpload will fail, but you can still download your data.\nMAU and bandwidth limits are not exceeded.\nIn order to upload your data, please upgrade your plan here: https://console.capgo.app/settings/plans.',
             'fatal', true
         ));
     END IF;
