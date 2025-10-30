@@ -115,8 +115,8 @@ async function loadTransactions() {
 
 async function handleBuyCredits() {
   if (!currentOrganization.value?.gid)
-    return
-  try {
+  return
+try {
     isStartingCheckout.value = true
     await startCreditTopUp(currentOrganization.value.gid)
   }
@@ -276,10 +276,10 @@ watch(() => currentOrganization.value?.gid, async (newOrgId, oldOrgId) => {
         <button
           type="button"
           :class="{ 'opacity-75 pointer-events-none': isProcessingCheckout }"
-          class="w-full sm:w-auto py-2 px-3 sm:py-2.5 sm:px-4 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-sm sm:text-base font-semibold rounded-lg transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
+          class="inline-flex w-full sm:w-auto py-2 px-3 sm:py-2.5 sm:px-4 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-sm sm:text-base font-semibold rounded-lg transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
           @click="handleBuyCredits"
         >
-          <Spinner v-if="isProcessingCheckout" size="w-4 h-4" class="mr-2 text-blue-600" />
+          <Spinner v-if="isProcessingCheckout" size="w-4 h-4" class="mr-2" color="white" />
           <span>{{ t('buy-credits') }}</span>
         </button>
       </div>
