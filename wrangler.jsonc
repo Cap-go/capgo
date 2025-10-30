@@ -32,6 +32,10 @@
         {
           "pattern": "web.capgo.app",
           "custom_domain": true
+        },
+        {
+          "pattern": "console.capgo.app",
+          "custom_domain": true
         }
       ]
     }
