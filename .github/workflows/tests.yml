@@ -107,6 +107,20 @@ jobs:
           log-output: stderr,stdout
           log-output-if: true
           working-directory: .
+      - name: Verify D1 sync is ready
+        run: |
+          echo "Verifying D1 sync worker is operational..."
+          for i in {1..30}; do
+            response=$(curl -s -w "%{http_code}" -X POST http://127.0.0.1:8790/sync -H "x-webhook-signature: testsecret" -o /dev/null)
+            if [ "$response" = "200" ]; then
+              echo "✓ D1 sync is ready"
+              exit 0
+            fi
+            echo "Waiting for D1 sync... ($i/30) - HTTP $response"
+            sleep 2
+          done
+          echo "✗ D1 sync failed to become ready"
+          exit 1
       - name: Run Cloudflare Workers plugin tests
         run: bun run test:cloudflare:plugin
       # - name: Run playwright tests

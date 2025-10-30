@@ -454,7 +454,7 @@ export async function triggerD1Sync(): Promise<void> {
 
   const D1_SYNC_URL = 'http://127.0.0.1:8790/sync'
   const WEBHOOK_SECRET = 'testsecret'
-  const MAX_WAIT_MS = 5000 // Max 5 seconds to wait for sync
+  const MAX_WAIT_MS = env.CI ? 15000 : 5000 // Max 15s in CI, 5s locally to wait for sync
   const POLL_INTERVAL_MS = 100 // Check every 100ms
 
   try {
