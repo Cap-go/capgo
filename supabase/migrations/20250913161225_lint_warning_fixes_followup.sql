@@ -209,9 +209,9 @@ END;
 $$;
 
 -- K.1) get_d1_sync_url: get D1 sync worker URL from Vault
-CREATE OR REPLACE FUNCTION "public"."get_d1_sync_url"() RETURNS "text"
-    LANGUAGE "sql" STABLE SECURITY DEFINER PARALLEL SAFE
-    AS $$
+CREATE OR REPLACE FUNCTION "public"."get_d1_sync_url" () RETURNS "text" LANGUAGE "sql" STABLE SECURITY DEFINER PARALLEL SAFE
+SET
+  search_path TO '' AS $$
     SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name='d1_sync_url';
 $$;
 
