@@ -3,7 +3,7 @@
 const { Buffer } = require('node:buffer')
 const https = require('node:https')
 
-const TARGET_HOST = 'plugin.preprod.capgo.app'
+const TARGET_HOST = 'updater.capgo.com.cn'
 
 exports.handler = function (event, _context, callback) {
   try {
