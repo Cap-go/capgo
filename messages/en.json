@@ -273,7 +273,7 @@
   "copy-organization-id": "copy organization id",
   "country": "Country",
   "credit-transaction-amount": "Amount",
-  "credit-transaction-balance": "Balance after",
+  "credit-transaction-balance": "New balance",
   "credit-transaction-description": "Description",
   "credit-transaction-deduction": "Usage deduction",
   "credit-transaction-expiry": "Expiry",
