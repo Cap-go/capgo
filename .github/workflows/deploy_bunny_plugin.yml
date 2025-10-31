@@ -11,21 +11,50 @@ on:
       - "supabase/functions/_backend/utils/**"
       - .github/workflows/deploy_bunny_plugin.yml
 
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}/plugin
+
 jobs:
-  deploy:
+  build-and-deploy:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: bunny_containers/plugin/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
 
       - name: Deploy to Bunny Magic Container
         uses: BunnyWay/actions/magic-container@main
         with:
           access_key: ${{ secrets.BUNNY_ACCESS_KEY }}
           container_id: ${{ secrets.BUNNY_PLUGIN_CONTAINER_ID }}
-          container_path: .
-          dockerfile_path: bunny_containers/plugin/Dockerfile
-          environment_variables: |
-            LIBSQL_URL=${{ secrets.LIBSQL_URL }}
-            LIBSQL_AUTH_TOKEN=${{ secrets.LIBSQL_AUTH_TOKEN_READ }}
-            PORT=3000
+          image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest

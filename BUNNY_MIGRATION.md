@@ -69,6 +69,20 @@ These are now ignored in `.gitignore`.
 
 ## Deployment
 
+### Deployment Process
+
+Both containers use a two-step deployment process:
+
+1. **Build & Publish**: GitHub Actions builds Docker image and publishes to GitHub Container Registry (ghcr.io)
+2. **Deploy**: Bunny Magic Container pulls the published image from GHCR
+
+The workflow automatically:
+- Builds Docker image using Dockerfile
+- Pushes to `ghcr.io/[owner]/capgo-1/[container]:latest`
+- Notifies Bunny to pull and deploy the new image
+
+**Note**: Environment variables are configured in the Bunny dashboard, not in GitHub Actions.
+
 ### Automatic Deployment
 
 Both containers auto-deploy via GitHub Actions when:
@@ -81,18 +95,25 @@ Use GitHub workflow dispatch in Actions tab:
 - "Deploy Bunny LibSQL Sync Container"
 - "Deploy Bunny Plugin Container"
 
+### Docker Images
+
+Published to GitHub Container Registry:
+- LibSQL Sync: `ghcr.io/[owner]/capgo-1/libsql-sync:latest`
+- Plugin: `ghcr.io/[owner]/capgo-1/plugin:latest`
+
+Images are public and pulled by Bunny Magic Container.
+
 ### Required GitHub Secrets
+
+Only 3 secrets needed:
 
 ```
 BUNNY_ACCESS_KEY                # Bunny CDN access key
 BUNNY_LIBSQL_SYNC_CONTAINER_ID  # Container ID for sync
 BUNNY_PLUGIN_CONTAINER_ID       # Container ID for plugin
-LIBSQL_URL                      # LibSQL database URL
-LIBSQL_AUTH_TOKEN               # LibSQL write token (sync)
-LIBSQL_AUTH_TOKEN_READ          # LibSQL read token (plugin)
-PGMQ_URL                        # PostgreSQL with PGMQ
-LIBSQL_WEBHOOK_SIGNATURE        # Webhook secret
 ```
+
+**Note**: `GITHUB_TOKEN` is automatically provided by GitHub Actions for publishing Docker images to ghcr.io.
 
 ## Migration Steps
 
@@ -105,20 +126,38 @@ In Bunny dashboard:
 
 ### 2. Configure GitHub Secrets
 
-Add all required secrets to GitHub repository settings.
+Add the 3 required secrets to GitHub repository settings:
+- `BUNNY_ACCESS_KEY`
+- `BUNNY_LIBSQL_SYNC_CONTAINER_ID`
+- `BUNNY_PLUGIN_CONTAINER_ID`
 
-### 3. Deploy Containers
+### 3. Configure Environment Variables in Bunny Dashboard
+
+For each container in Bunny dashboard, configure environment variables:
+
+**LibSQL Sync Container:**
+- `PORT=3000`
+- `LIBSQL_URL`
+- `LIBSQL_AUTH_TOKEN`
+- `PGMQ_URL`
+- `WEBHOOK_SIGNATURE`
+
+**Plugin Container:**
+- `PORT=3000`
+- All the environment variables listed in `bunny_containers/README.md` (39 total)
+
+### 4. Deploy Containers
 
 Push to main or trigger manual deployment via GitHub Actions.
 
-### 4. Update Supabase Vault
+### 5. Update Supabase Vault
 
 Set `libsql_sync_url` to point to the new LibSQL Sync container URL:
 ```
 https://your-libsql-sync-container.b-cdn.net/sync
 ```
 
-### 5. Verify Deployment
+### 6. Verify Deployment
 
 Test endpoints:
 ```bash
@@ -134,7 +173,7 @@ curl https://your-plugin-container.b-cdn.net/stats
 curl https://your-plugin-container.b-cdn.net/channel_self
 ```
 
-### 6. Clean Up Old Edge Scripts (Optional)
+### 7. Clean Up Old Edge Scripts (Optional)
 
 Once verified, remove old `bunny/` directory:
 ```bash
