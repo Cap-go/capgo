@@ -1,4 +1,4 @@
-import type { SQLiteType, TableSchema } from './schema.ts'
+import type { SQLiteType } from './schema.ts'
 import { createClient } from '@libsql/client'
 
 import postgres from 'postgres'
