@@ -1,0 +1,31 @@
+name: Deploy Bunny Plugin Container
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "bunny_containers/plugin/**"
+      - "supabase/functions/_backend/plugins/**"
+      - "supabase/functions/_backend/utils/**"
+      - .github/workflows/deploy_bunny_plugin.yml
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to Bunny Magic Container
+        uses: BunnyWay/actions/magic-container@main
+        with:
+          access_key: ${{ secrets.BUNNY_ACCESS_KEY }}
+          container_id: ${{ secrets.BUNNY_PLUGIN_CONTAINER_ID }}
+          container_path: .
+          dockerfile_path: bunny_containers/plugin/Dockerfile
+          environment_variables: |
+            LIBSQL_URL=${{ secrets.LIBSQL_URL }}
+            LIBSQL_AUTH_TOKEN=${{ secrets.LIBSQL_AUTH_TOKEN_READ }}
+            PORT=3000

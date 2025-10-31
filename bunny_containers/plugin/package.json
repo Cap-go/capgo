@@ -1,0 +1,17 @@
+{
+  "name": "bunny-plugin",
+  "type": "module",
+  "version": "1.0.0",
+  "scripts": {
+    "start": "bun run src/server.ts"
+  },
+  "dependencies": {
+    "@libsql/client": "^0.14.0",
+    "drizzle-orm": "^0.38.3",
+    "hono": "^4.7.3",
+    "postgres": "^3.4.5"
+  },
+  "devDependencies": {
+    "bun-types": "latest"
+  }
+}

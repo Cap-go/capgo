@@ -1,0 +1,30 @@
+name: Deploy Bunny LibSQL Sync Container
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "bunny_containers/libsql_sync/**"
+      - .github/workflows/deploy_bunny_libsql_sync.yml
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to Bunny Magic Container
+        uses: BunnyWay/actions/magic-container@main
+        with:
+          access_key: ${{ secrets.BUNNY_ACCESS_KEY }}
+          container_id: ${{ secrets.BUNNY_LIBSQL_SYNC_CONTAINER_ID }}
+          container_path: bunny_containers/libsql_sync
+          environment_variables: |
+            LIBSQL_URL=${{ secrets.LIBSQL_URL }}
+            LIBSQL_AUTH_TOKEN=${{ secrets.LIBSQL_AUTH_TOKEN }}
+            PGMQ_URL=${{ secrets.PGMQ_URL }}
+            WEBHOOK_SIGNATURE=${{ secrets.LIBSQL_WEBHOOK_SIGNATURE }}
+            PORT=3000
