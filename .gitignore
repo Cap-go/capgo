@@ -6,6 +6,7 @@ dist-ssr
 bunny/api/dist.js
 bunny/files/dist.js
 bunny/plugin/dist.js
+bunny/libsql_sync/dist.js
 node_modules
 .idea/
 *.log
