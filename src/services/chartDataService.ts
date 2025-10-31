@@ -1,17 +1,30 @@
-// chartDataService.ts
-
 import type { SupabaseClient } from '@supabase/supabase-js'
 import colors from 'tailwindcss/colors'
+import { ref } from 'vue'
 
 const SKIP_COLOR = 10
 const colorKeys = Object.keys(colors)
-const chartData = ref<Map<string, any>>(new Map())
+const chartDataCache = ref<Map<string, any>>(new Map())
+
+function formatDateParam(date: Date) {
+  const normalized = new Date(date)
+  normalized.setUTCHours(0, 0, 0, 0)
+  return normalized.toISOString().slice(0, 10)
+}
+
+function buildCacheKey(appId: string, from: Date, to: Date) {
+  return `${appId}|${formatDateParam(from)}|${formatDateParam(to)}`
+}
 
 export async function useChartData(supabase: SupabaseClient, appId: string, from: Date, to: Date) {
-  if (chartData.value.has(appId))
-    return chartData.value.get(appId)
+  const cacheKey = buildCacheKey(appId, from, to)
 
-  const { error, data } = await supabase.functions.invoke(`statistics/app/${appId}/bundle_usage?from=${from.toISOString()}&to=${to.toISOString()}`, {
+  if (chartDataCache.value.has(cacheKey))
+    return chartDataCache.value.get(cacheKey)
+
+  const fromParam = formatDateParam(from)
+  const toParam = formatDateParam(to)
+  const { error, data } = await supabase.functions.invoke(`statistics/app/${appId}/bundle_usage?from=${fromParam}&to=${toParam}`, {
     method: 'GET',
   })
   if (error)
@@ -48,6 +61,20 @@ export async function useChartData(supabase: SupabaseClient, appId: string, from
     }),
     latestVersion: chartDataFromApi.latestVersion,
   }
-  chartData.value.set(appId, finalData)
+  chartDataCache.value.set(cacheKey, finalData)
   return finalData
+}
+
+export function clearChartDataCache(appId?: string) {
+  if (!appId) {
+    chartDataCache.value.clear()
+    return
+  }
+
+  const keysToDelete: string[] = []
+  chartDataCache.value.forEach((_value, key) => {
+    if (key.startsWith(`${appId}|`))
+      keysToDelete.push(key)
+  })
+  keysToDelete.forEach(key => chartDataCache.value.delete(key))
 }

@@ -53,7 +53,7 @@ enabled = true
 sql_paths = ["./seed.sql"]
 
 [realtime]
-enabled = true
+enabled = false
 # Bind realtime via either IPv4 or IPv6. (default: IPv4)
 # ip_version = "IPv6"
 # The maximum length in bytes of HTTP request headers. (default: 4096)
@@ -71,7 +71,7 @@ openai_api_key = "env(OPENAI_API_KEY)"
 # Email testing server. Emails sent with the local dev setup are not actually sent - rather, they
 # are monitored, and you can view the emails that would have been sent from the web interface.
 [inbucket]
-enabled = true
+enabled = false
 # Port to use for the email testing server web interface.
 port = 54324
 # Uncomment to expose additional ports for testing user applications that send emails.
@@ -87,7 +87,7 @@ file_size_limit = "50MiB"
 
 # Image transformation API is available to Supabase Pro plan.
 # [storage.image_transformation]
-# enabled = true
+# enabled = false
 
 # Uncomment to configure local storage buckets
 # [storage.buckets.images]
@@ -147,7 +147,7 @@ otp_expiry = 3600
 
 # Use a production-ready SMTP server
 # [auth.email.smtp]
-# enabled = true
+# enabled = false
 # host = "smtp.sendgrid.net"
 # port = 587
 # user = "apikey"
@@ -183,7 +183,7 @@ max_frequency = "5s"
 
 # This hook runs before a token is issued and allows you to add additional claims based on the authentication method used.
 # [auth.hook.custom_access_token]
-# enabled = true
+# enabled = false
 # uri = "pg-functions://<database>/<schema>/<hook_name>"
 
 # Configure one of the supported SMS providers: `twilio`, `twilio_verify`, `messagebird`, `textlocal`, `vonage`.
@@ -272,7 +272,7 @@ inspector_port = 8083
 # static_files = [ "./functions/MY_FUNCTION_NAME/*.html" ]
 
 [analytics]
-enabled = true
+enabled = false
 port = 54327
 # Configure one of the supported backends: `postgres`, `bigquery`.
 backend = "postgres"
@@ -328,10 +328,6 @@ verify_jwt = false
 import_map = "./functions/deno.json"
 
 [functions.updates_debug]
-verify_jwt = false
-import_map = "./functions/deno.json"
-
-[functions.updates_lite]
 verify_jwt = false
 import_map = "./functions/deno.json"
 

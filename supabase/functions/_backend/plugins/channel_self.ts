@@ -6,16 +6,17 @@ import type { Database } from '../utils/supabase.types.ts'
 import type { DeviceWithoutCreatedAt } from '../utils/types.ts'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod/mini'
-import { BRES, getIsV2, parseBody, quickError, simpleError, simpleError200 } from '../utils/hono.ts'
+import { BRES, getIsV2, parseBody, quickError, simpleError, simpleError200, simpleRateLimit } from '../utils/hono.ts'
 import { cloudlog } from '../utils/loggin.ts'
-import { closeClient, deleteChannelDevicePg, getAppByIdPg, getAppVersionsByAppIdPg, getChannelByNamePg, getChannelDeviceOverridePg, getChannelsPg, getCompatibleChannelsPg, getDrizzleClient, getMainChannelsPg, getPgClient, isAllowedActionOrgPg, upsertChannelDevicePg } from '../utils/pg.ts'
-import { getAppByIdD1, getAppVersionsByAppIdD1, getChannelByNameD1, getChannelDeviceOverrideD1, getChannelsD1, getCompatibleChannelsD1, getDrizzleClientD1Session, getMainChannelsD1, isAllowedActionOrgActionD1 } from '../utils/pg_d1.ts'
+import { closeClient, deleteChannelDevicePg, getAppByIdPg, getAppOwnerPostgres, getAppVersionsByAppIdPg, getChannelByNamePg, getChannelDeviceOverridePg, getChannelsPg, getCompatibleChannelsPg, getDrizzleClient, getMainChannelsPg, getPgClient, upsertChannelDevicePg } from '../utils/pg.ts'
+import { getAppByIdD1, getAppOwnerPostgresV2, getAppVersionsByAppIdD1, getChannelByNameD1, getChannelDeviceOverrideD1, getChannelsD1, getCompatibleChannelsD1, getDrizzleClientD1Session, getMainChannelsD1 } from '../utils/pg_d1.ts'
 import { convertQueryToBody, parsePluginBody } from '../utils/plugin_parser.ts'
 import { sendStatsAndDevice } from '../utils/stats.ts'
-import { deviceIdRegex, INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, MISSING_STRING_APP_ID, MISSING_STRING_DEVICE_ID, MISSING_STRING_VERSION_BUILD, MISSING_STRING_VERSION_NAME, NON_STRING_APP_ID, NON_STRING_DEVICE_ID, NON_STRING_VERSION_BUILD, NON_STRING_VERSION_NAME, reverseDomainRegex } from '../utils/utils.ts'
+import { deviceIdRegex, INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, isLimited, MISSING_STRING_APP_ID, MISSING_STRING_DEVICE_ID, MISSING_STRING_VERSION_BUILD, MISSING_STRING_VERSION_NAME, NON_STRING_APP_ID, NON_STRING_DEVICE_ID, NON_STRING_VERSION_BUILD, NON_STRING_VERSION_NAME, reverseDomainRegex } from '../utils/utils.ts'
 
 z.config(z.locales.en())
 const devicePlatformScheme = z.literal(['ios', 'android'])
+const PLAN_MAU_ACTIONS: Array<'mau'> = ['mau']
 
 export const jsonRequestSchema = z.looseObject({
   app_id: z.string({
@@ -37,7 +38,7 @@ export const jsonRequestSchema = z.looseObject({
   platform: devicePlatformScheme,
 })
 
-async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient> | ReturnType<typeof getDrizzleClientD1Session>, isV2: boolean, body: DeviceLink): Promise<Response> {
+async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient>, isV2: boolean, body: DeviceLink): Promise<Response> {
   cloudlog({ requestId: c.get('requestId'), message: 'post channel self body', body })
   const {
     version_name,
@@ -53,16 +54,29 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
     is_prod,
   } = body
 
+  const drizzleClientD1 = (isV2 ? getDrizzleClientD1Session(c) : undefined) as ReturnType<typeof getDrizzleClientD1Session>
+  // Check if app exists first - Read operation can use v2 flag
+  const appOwner = isV2
+    ? await getAppOwnerPostgresV2(c, app_id, drizzleClientD1, PLAN_MAU_ACTIONS)
+    : await getAppOwnerPostgres(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>, PLAN_MAU_ACTIONS)
+
+  if (!appOwner) {
+    // On-premise app detected - return 429 to prevent DDOS
+    cloudlog({ requestId: c.get('requestId'), message: 'On-premise app detected in channel_self POST, returning 429', app_id })
+    return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
+  }
+
   // Read operations can use v2 flag
   const versions = isV2
-    ? await getAppVersionsByAppIdD1(c, app_id, version_name, drizzleClient as ReturnType<typeof getDrizzleClientD1Session>)
-    : await getAppVersionsByAppIdPg(c, app_id, version_name, drizzleClient as ReturnType<typeof getDrizzleClient>)
+    ? await getAppVersionsByAppIdD1(c, app_id, version_name, drizzleClientD1, PLAN_MAU_ACTIONS)
+    : await getAppVersionsByAppIdPg(c, app_id, version_name, drizzleClient as ReturnType<typeof getDrizzleClient>, PLAN_MAU_ACTIONS)
 
   if (!versions || versions.length === 0) {
     throw simpleError('version_error', `Version ${version_name} doesn't exist, and no builtin version`, { version_name, body })
   }
-  const owner_org = versions[0].owner_org
-
+  if (!versions[0].plan_valid) {
+    throw simpleError200(c, 'action_not_allowed', 'Action not allowed')
+  }
   const version = versions.length === 2
     ? versions.find((v: { name: string }) => v.name !== 'builtin')
     : versions[0]
@@ -70,19 +84,13 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
     throw simpleError('version_error', `Version ${version_name} doesn't exist, and no builtin version`, { versions })
   }
 
-  const planValid = isV2
-    ? await isAllowedActionOrgActionD1(c, drizzleClient as ReturnType<typeof getDrizzleClientD1Session>, owner_org, ['mau'])
-    : await isAllowedActionOrgPg(c, drizzleClient as ReturnType<typeof getDrizzleClient>, owner_org)
-  if (!planValid) {
-    throw simpleError200(c, 'action_not_allowed', 'Action not allowed')
-  }
   // find device
 
   const device: DeviceWithoutCreatedAt = {
     app_id,
     device_id,
     plugin_version,
-    version: version.id,
+    version_name,
     custom_id,
     is_emulator,
     is_prod,
@@ -94,7 +102,7 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
 
   // Read operations can use v2 flag
   const dataChannelOverride = isV2
-    ? await getChannelDeviceOverrideD1(c, app_id, device_id, drizzleClient as ReturnType<typeof getDrizzleClientD1Session>)
+    ? await getChannelDeviceOverrideD1(c, app_id, device_id, drizzleClientD1)
     : await getChannelDeviceOverridePg(c, app_id, device_id, drizzleClient as ReturnType<typeof getDrizzleClient>)
 
   if (!channel) {
@@ -106,7 +114,7 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
   // if channel set channel_override to it
   // get channel by name - Read operation can use v2 flag
   const dataChannel = isV2
-    ? await getChannelByNameD1(c, app_id, channel, drizzleClient as ReturnType<typeof getDrizzleClientD1Session>)
+    ? await getChannelByNameD1(c, app_id, channel, drizzleClientD1)
     : await getChannelByNamePg(c, app_id, channel, drizzleClient as ReturnType<typeof getDrizzleClient>)
 
   if (!dataChannel) {
@@ -119,7 +127,7 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
 
   // Get the main channel - Read operation can use v2 flag
   const mainChannel = isV2
-    ? await getMainChannelsD1(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClientD1Session>)
+    ? await getMainChannelsD1(c, app_id, drizzleClientD1)
     : await getMainChannelsPg(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>)
 
   // We DO NOT return if there is no main channel as it's not a critical error
@@ -127,7 +135,7 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
   let mainChannelName = null as string | null
   if (mainChannel && mainChannel.length > 0) {
     const devicePlatform = body.platform as Database['public']['Enums']['platform_os']
-    const finalChannel = mainChannel.find((channel: { name: string, ios: boolean, android: boolean }) => channel[devicePlatform] === true)
+    const finalChannel = mainChannel.find((channel: { name: string, ios: boolean, android: boolean }) => channel[devicePlatform])
     mainChannelName = (finalChannel !== undefined) ? finalChannel.name : null
   }
 
@@ -136,17 +144,11 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot find main channel' })
 
   if (mainChannelName && mainChannelName === channel) {
-    // Write operation - ALWAYS use PostgreSQL
-    const pgClientForWrite = isV2 ? getPgClient(c) : null
-    const pgDrizzleClient = pgClientForWrite ? getDrizzleClient(pgClientForWrite) : drizzleClient as ReturnType<typeof getDrizzleClient>
+    // Write operation - use the PG client created by the route handler
 
-    const success = await deleteChannelDevicePg(c, app_id, device_id, pgDrizzleClient)
+    const success = await deleteChannelDevicePg(c, app_id, device_id, drizzleClient)
     if (!success) {
       throw simpleError('override_not_allowed', `Cannot remove channel override`, {})
-    }
-
-    if (pgClientForWrite) {
-      await closeClient(c, pgClientForWrite)
     }
 
     cloudlog({ requestId: c.get('requestId'), message: 'main channel set, removing override' })
@@ -162,12 +164,10 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
 
   cloudlog({ requestId: c.get('requestId'), message: 'setting channel' })
 
-  // Write operations - ALWAYS use PostgreSQL
-  const pgClientForWrite = isV2 ? getPgClient(c) : null
-  const pgDrizzleClient = pgClientForWrite ? getDrizzleClient(pgClientForWrite) : drizzleClient as ReturnType<typeof getDrizzleClient>
+  // Write operations - use the PG client created by the route handler
 
   if (dataChannelOverride) {
-    const success = await deleteChannelDevicePg(c, app_id, device_id, pgDrizzleClient)
+    const success = await deleteChannelDevicePg(c, app_id, device_id, drizzleClient)
     if (!success) {
       throw simpleError('override_not_allowed', `Cannot remove channel override`, {})
     }
@@ -177,13 +177,9 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
     channel_id: dataChannel.id,
     app_id,
     owner_org: dataChannel.owner_org,
-  }, pgDrizzleClient)
+  }, drizzleClient)
   if (!success) {
     throw simpleError('override_not_allowed', `Cannot do channel override`, {})
-  }
-
-  if (pgClientForWrite) {
-    await closeClient(c, pgClientForWrite)
   }
 
   await sendStatsAndDevice(c, device, [{ action: 'setChannel' }])
@@ -205,16 +201,28 @@ async function put(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient
     version_os,
   } = body
 
+  // Check if app exists first - Read operation can use v2 flag
+  const appOwner = isV2
+    ? await getAppOwnerPostgresV2(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClientD1Session>, PLAN_MAU_ACTIONS)
+    : await getAppOwnerPostgres(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>, PLAN_MAU_ACTIONS)
+
+  if (!appOwner) {
+    // On-premise app detected - return 429 to prevent DDOS
+    cloudlog({ requestId: c.get('requestId'), message: 'On-premise app detected in channel_self PUT, returning 429', app_id })
+    return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
+  }
+
   // Read operations can use v2 flag
   const versions = isV2
-    ? await getAppVersionsByAppIdD1(c, app_id, version_name, drizzleClient as ReturnType<typeof getDrizzleClientD1Session>)
-    : await getAppVersionsByAppIdPg(c, app_id, version_name, drizzleClient as ReturnType<typeof getDrizzleClient>)
+    ? await getAppVersionsByAppIdD1(c, app_id, version_name, drizzleClient as ReturnType<typeof getDrizzleClientD1Session>, PLAN_MAU_ACTIONS)
+    : await getAppVersionsByAppIdPg(c, app_id, version_name, drizzleClient as ReturnType<typeof getDrizzleClient>, PLAN_MAU_ACTIONS)
 
   if (!versions || versions.length === 0) {
     throw simpleError('version_error', `Version ${version_name} doesn't exist, and no builtin version`, { version_name, body })
   }
-  const owner_org = versions[0].owner_org
-
+  if (!versions[0].plan_valid) {
+    throw simpleError('action_not_allowed', 'Action not allowed')
+  }
   const version = versions.length === 2
     ? versions.find((v: { name: string }) => v.name !== 'builtin')
     : versions[0]
@@ -222,17 +230,11 @@ async function put(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient
     throw simpleError('version_error', `Version ${version_name} doesn't exist, and no builtin version`, { versions })
   }
 
-  const planValid = isV2
-    ? await isAllowedActionOrgActionD1(c, drizzleClient as ReturnType<typeof getDrizzleClientD1Session>, owner_org, ['mau'])
-    : await isAllowedActionOrgPg(c, drizzleClient as ReturnType<typeof getDrizzleClient>, owner_org)
-  if (!planValid) {
-    throw simpleError('action_not_allowed', 'Action not allowed')
-  }
   const device: DeviceWithoutCreatedAt = {
     app_id,
     device_id,
     plugin_version,
-    version: version.id,
+    version_name,
     custom_id,
     is_emulator,
     is_prod,
@@ -269,7 +271,7 @@ async function put(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient
 
   const finalChannel = body.defaultChannel
     ? dataChannel.find((channel: { name: string }) => channel.name === body.defaultChannel)
-    : dataChannel.find((channel: { ios: boolean, android: boolean }) => channel[devicePlatform.data] === true)
+    : dataChannel.find((channel: { ios: boolean, android: boolean }) => channel[devicePlatform.data])
 
   if (!finalChannel) {
     throw quickError(404, 'channel_not_found', 'Cannot find channel', { dataChannel })
@@ -281,18 +283,30 @@ async function put(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient
   })
 }
 
-async function deleteOverride(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient> | ReturnType<typeof getDrizzleClientD1Session>, isV2: boolean, body: DeviceLink): Promise<Response> {
+async function deleteOverride(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient>, isV2: boolean, body: DeviceLink): Promise<Response> {
   cloudlog({ requestId: c.get('requestId'), message: 'delete channel self body', body })
   const {
     app_id,
     device_id,
     version_build,
   } = body
+  const drizzleClientD1 = (isV2 ? getDrizzleClientD1Session(c) : undefined) as ReturnType<typeof getDrizzleClientD1Session>
   cloudlog({ requestId: c.get('requestId'), message: 'delete override', version_build })
+
+  // Check if app exists first - Read operation can use v2 flag
+  const appOwner = isV2
+    ? await getAppOwnerPostgresV2(c, app_id, drizzleClientD1, PLAN_MAU_ACTIONS)
+    : await getAppOwnerPostgres(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>, PLAN_MAU_ACTIONS)
+
+  if (!appOwner) {
+    // On-premise app detected - return 429 to prevent DDOS
+    cloudlog({ requestId: c.get('requestId'), message: 'On-premise app detected in channel_self DELETE, returning 429', app_id })
+    return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
+  }
 
   // Read operation can use v2 flag
   const dataChannelOverride = isV2
-    ? await getChannelDeviceOverrideD1(c, app_id, device_id, drizzleClient as ReturnType<typeof getDrizzleClientD1Session>)
+    ? await getChannelDeviceOverrideD1(c, app_id, device_id, drizzleClientD1)
     : await getChannelDeviceOverridePg(c, app_id, device_id, drizzleClient as ReturnType<typeof getDrizzleClient>)
 
   if (!dataChannelOverride?.channel_id) {
@@ -303,17 +317,11 @@ async function deleteOverride(c: Context, drizzleClient: ReturnType<typeof getDr
     throw simpleError('cannot_override', 'Cannot change device override current channel don\t allow it', { channelOverride: dataChannelOverride.channel_id })
   }
 
-  // Write operation - ALWAYS use PostgreSQL
-  const pgClientForWrite = isV2 ? getPgClient(c) : null
-  const pgDrizzleClient = pgClientForWrite ? getDrizzleClient(pgClientForWrite) : drizzleClient as ReturnType<typeof getDrizzleClient>
+  // Write operation - use the PG client created by the route handler
 
-  const success = await deleteChannelDevicePg(c, app_id, device_id, pgDrizzleClient)
+  const success = await deleteChannelDevicePg(c, app_id, device_id, drizzleClient)
   if (!success) {
     throw simpleError('override_not_allowed', `Cannot delete channel override`, {})
-  }
-
-  if (pgClientForWrite) {
-    await closeClient(c, pgClientForWrite)
   }
 
   return c.json(BRES)
@@ -322,19 +330,27 @@ async function deleteOverride(c: Context, drizzleClient: ReturnType<typeof getDr
 async function listCompatibleChannels(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient> | ReturnType<typeof getDrizzleClientD1Session>, isV2: boolean, body: DeviceLink): Promise<Response> {
   const { app_id, platform, is_emulator, is_prod } = body
 
-  // Check if app exists and get owner_org for permission check - Read operation can use v2 flag
-  const appData = isV2
-    ? await getAppByIdD1(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClientD1Session>)
-    : await getAppByIdPg(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>)
+  // First check if app exists - Read operation can use v2 flag
+  const appExists = isV2
+    ? await getAppByIdD1(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClientD1Session>, PLAN_MAU_ACTIONS)
+    : await getAppByIdPg(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>, PLAN_MAU_ACTIONS)
 
-  if (!appData) {
-    throw quickError(404, 'app_not_found', `App ${app_id} not found`, { app_id })
+  if (!appExists) {
+    // App doesn't exist in database - return 404
+    throw quickError(404, 'app_not_found', 'App not found', { app_id })
   }
 
-  const planValid = isV2
-    ? await isAllowedActionOrgActionD1(c, drizzleClient as ReturnType<typeof getDrizzleClientD1Session>, appData.owner_org, ['mau'])
-    : await isAllowedActionOrgPg(c, drizzleClient as ReturnType<typeof getDrizzleClient>, appData.owner_org)
-  if (!planValid) {
+  // Check if app has valid org association (not on-premise) - Read operation can use v2 flag
+  const appOwner = isV2
+    ? await getAppOwnerPostgresV2(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClientD1Session>, PLAN_MAU_ACTIONS)
+    : await getAppOwnerPostgres(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>, PLAN_MAU_ACTIONS)
+
+  if (!appOwner) {
+    // On-premise app detected - return 429 to prevent DDOS
+    cloudlog({ requestId: c.get('requestId'), message: 'On-premise app detected in channel_self GET, returning 429', app_id })
+    return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
+  }
+  if (!appOwner.plan_valid) {
     throw simpleError('action_not_allowed', 'Action not allowed')
   }
 
@@ -366,17 +382,24 @@ app.post('/', async (c) => {
   const body = await parseBody<DeviceLink>(c)
   cloudlog({ requestId: c.get('requestId'), message: 'post body', body })
 
+  if (isLimited(c, body.app_id)) {
+    throw simpleRateLimit(body)
+  }
+
   const isV2 = getIsV2(c)
-  const pgClient = isV2 ? null : getPgClient(c)
+  // POST has writes, so always create PG client (even if using D1 for reads)
+  const pgClient = getPgClient(c)
 
   const bodyParsed = parsePluginBody<DeviceLink>(c, body, jsonRequestSchema)
+  if (!bodyParsed.channel) {
+    throw simpleError('missing_channel', 'Cannot find channel in body', { body })
+  }
   let res
   try {
-    res = await post(c, isV2 ? getDrizzleClientD1Session(c) : getDrizzleClient(pgClient as any), !!isV2, bodyParsed)
+    res = await post(c, getDrizzleClient(pgClient), !!isV2, bodyParsed)
   }
   finally {
-    if (isV2 && pgClient)
-      await closeClient(c, pgClient)
+    await closeClient(c, pgClient)
   }
   return res
 })
@@ -385,6 +408,10 @@ app.put('/', async (c) => {
   // Used as get, should be refactor with query param instead
   const body = await parseBody<DeviceLink>(c)
   cloudlog({ requestId: c.get('requestId'), message: 'put body', body })
+
+  if (isLimited(c, body.app_id)) {
+    throw simpleRateLimit(body)
+  }
 
   const isV2 = getIsV2(c)
   const pgClient = isV2 ? null : getPgClient(c)
@@ -395,45 +422,53 @@ app.put('/', async (c) => {
     res = await put(c, isV2 ? getDrizzleClientD1Session(c) : getDrizzleClient(pgClient as any), !!isV2, bodyParsed)
   }
   finally {
-    if (isV2 && pgClient)
+    if (!isV2 && pgClient)
       await closeClient(c, pgClient)
   }
   return res
 })
 
 app.delete('/', async (c) => {
-  const query = convertQueryToBody(c.req.query())
-  cloudlog({ requestId: c.get('requestId'), message: 'delete body', query })
+  const body = convertQueryToBody(c.req.query())
+  cloudlog({ requestId: c.get('requestId'), message: 'delete body', body })
+
+  if (isLimited(c, body.app_id)) {
+    throw simpleRateLimit(body)
+  }
 
   const isV2 = getIsV2(c)
-  const pgClient = isV2 ? null : getPgClient(c)
+  // DELETE has writes, so always create PG client (even if using D1 for reads)
+  const pgClient = getPgClient(c)
 
-  const bodyParsed = parsePluginBody<DeviceLink>(c, query, jsonRequestSchema)
+  const bodyParsed = parsePluginBody<DeviceLink>(c, body, jsonRequestSchema)
   let res
   try {
-    res = await deleteOverride(c, isV2 ? getDrizzleClientD1Session(c) : getDrizzleClient(pgClient as any), !!isV2, bodyParsed)
+    res = await deleteOverride(c, getDrizzleClient(pgClient), !!isV2, bodyParsed)
   }
   finally {
-    if (isV2 && pgClient)
-      await closeClient(c, pgClient)
+    await closeClient(c, pgClient)
   }
   return res
 })
 
 app.get('/', async (c) => {
-  const query = convertQueryToBody(c.req.query())
-  cloudlog({ requestId: c.get('requestId'), message: 'list compatible channels', query })
+  const body = convertQueryToBody(c.req.query())
+  cloudlog({ requestId: c.get('requestId'), message: 'list compatible channels', body })
+
+  if (isLimited(c, body.app_id)) {
+    throw simpleRateLimit(body)
+  }
 
   const isV2 = getIsV2(c)
-  const pgClient = isV2 ? null : getPgClient(c)
+  const pgClient = isV2 ? null : getPgClient(c, true) // READ-ONLY: only queries channels
 
-  const bodyParsed = parsePluginBody<DeviceLink>(c, query, jsonRequestSchema)
+  const bodyParsed = parsePluginBody<DeviceLink>(c, body, jsonRequestSchema)
   let res
   try {
     res = await listCompatibleChannels(c, isV2 ? getDrizzleClientD1Session(c) : getDrizzleClient(pgClient as any), !!isV2, bodyParsed)
   }
   finally {
-    if (isV2 && pgClient)
+    if (!isV2 && pgClient)
       await closeClient(c, pgClient)
   }
   return res

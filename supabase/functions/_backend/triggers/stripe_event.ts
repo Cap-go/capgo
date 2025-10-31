@@ -1,15 +1,17 @@
 import type { Context } from 'hono'
 import type Stripe from 'stripe'
-import type { MiddlewareKeyVariables } from '../utils/hono.ts'
+import type { MiddlewareKeyVariablesStripe } from '../utils/hono_middleware_stripe.ts'
 import type { StripeData } from '../utils/stripe.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
 import { addTagBento, trackBentoEvent } from '../utils/bento.ts'
-import { BRES, middlewareStripeWebhook, quickError, simpleError } from '../utils/hono.ts'
+import { BRES, quickError, simpleError } from '../utils/hono.ts'
+import { middlewareStripeWebhook } from '../utils/hono_middleware_stripe.ts'
+import { cloudlog } from '../utils/loggin.ts'
 import { logsnag } from '../utils/logsnag.ts'
 import { customerToSegmentOrg, supabaseAdmin } from '../utils/supabase.ts'
 
-export const app = new Hono<MiddlewareKeyVariables>()
+export const app = new Hono<MiddlewareKeyVariablesStripe>()
 
 interface Org {
   id: string
@@ -233,11 +235,31 @@ app.post('/', middlewareStripeWebhook(), async (c) => {
   }
   else if (stripeData.data.status === 'failed') {
     await trackBentoEvent(c, org.management_email, {}, 'org:failed_payment')
-  }
-  else if (['canceled', 'deleted'].includes(stripeData.data.status ?? '') && customer && customer.subscription_id === stripeData.data.subscription_id) {
-    await didCancel(c, org, LogSnag)
-    stripeData.data.status = 'succeeded'
+    // Update the database with failed status
     await updateStripeInfo(c, stripeData)
+  }
+  else if (['created', 'succeeded', 'updated'].includes(stripeData.data.status ?? '') && (!stripeData.data.price_id || !stripeData.data.product_id)) {
+    // Subscription event without price/product data - log warning but don't process
+    cloudlog({ requestId: c.get('requestId'), message: 'Subscription webhook missing price_id or product_id', stripeData, subscriptionId: stripeData.data.subscription_id })
+  }
+  else if (['canceled', 'deleted'].includes(stripeData.data.status ?? '')) {
+    // Check if this is the subscription currently in the database
+    if (customer && customer.subscription_id === stripeData.data.subscription_id) {
+      // This is the known subscription being cancelled
+      await didCancel(c, org, LogSnag)
+      // Only mark as 'succeeded' if subscription is still active until period end
+      // Check if subscription_anchor_end is in the future
+      if (stripeData.data.subscription_anchor_end && new Date(stripeData.data.subscription_anchor_end) > new Date()) {
+        stripeData.data.status = 'succeeded'
+      }
+      // Otherwise keep it as 'canceled' since the period has ended
+      await updateStripeInfo(c, stripeData)
+    }
+    // If it's a different subscription (not the one in DB), ignore it
+    // This prevents old subscription webhooks from overwriting newer active subscriptions
+    else {
+      cloudlog({ requestId: c.get('requestId'), message: 'Ignoring canceled/deleted webhook for subscription not in database', subscriptionInDb: customer?.subscription_id, webhookSubscription: stripeData.data.subscription_id })
+    }
   }
   return cancelingOrFinished(c, stripeEvent, stripeData.data)
 })

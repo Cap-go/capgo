@@ -1,8 +1,10 @@
+import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Context } from 'hono'
 import type { AuthInfo, MiddlewareKeyVariables } from './hono.ts'
 import type { Database } from './supabase.types.ts'
 import type { DeviceWithoutCreatedAt, Order, ReadDevicesParams, ReadStatsParams } from './types.ts'
 import { createClient } from '@supabase/supabase-js'
+import { buildNormalizedDeviceForWrite, hasComparableDeviceChanged } from './deviceComparison.ts'
 import { simpleError } from './hono.ts'
 import { cloudlog, cloudlogErr } from './loggin.ts'
 import { createCustomer } from './stripe.ts'
@@ -669,6 +671,7 @@ export function trackDeviceUsageSB(
   c: Context,
   deviceId: string,
   appId: string,
+  orgId: string,
 ) {
   return supabaseAdmin(c)
     .from('device_usage')
@@ -676,6 +679,7 @@ export function trackDeviceUsageSB(
       {
         device_id: deviceId.toLowerCase(),
         app_id: appId,
+        org_id: orgId,
       },
     ])
 }
@@ -695,29 +699,50 @@ export function trackMetaSB(
     })
 }
 
-export function trackDevicesSB(c: Context, device: DeviceWithoutCreatedAt) {
+export async function trackDevicesSB(c: Context, device: DeviceWithoutCreatedAt) {
   cloudlog({ requestId: c.get('requestId'), message: 'trackDevicesSB', device })
-  return supabaseAdmin(c)
+
+  const client = supabaseAdmin(c)
+
+  const { data: existingRow, error } = await client
     .from('devices')
-    .upsert(
-      {
-        app_id: device.app_id,
-        updated_at: new Date().toISOString(),
-        device_id: device.device_id,
-        platform: device.platform,
-        plugin_version: device.plugin_version,
-        os_version: device.os_version,
-        version_build: device.version_build,
-        custom_id: device.custom_id,
-        version: device.version,
-        is_prod: device.is_prod,
-        is_emulator: device.is_emulator,
-      },
-      { onConflict: 'device_id,app_id' },
-    )
+    .select('version_name, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator')
+    .eq('app_id', device.app_id)
+    .eq('device_id', device.device_id)
+    .maybeSingle()
+
+  if (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error fetching existing device', error })
+  }
+
+  if (existingRow && !hasComparableDeviceChanged(existingRow, device)) {
+    cloudlog({ requestId: c.get('requestId'), message: 'No Supabase upsert needed for device', device_id: device.device_id })
+    return Promise.resolve()
+  }
+
+  const normalizedDevice = buildNormalizedDeviceForWrite(device)
+  const updatedAt = new Date().toISOString()
+
+  const payload: Database['public']['Tables']['devices']['Insert'] = {
+    app_id: device.app_id,
+    updated_at: updatedAt,
+    device_id: device.device_id,
+    platform: normalizedDevice.platform ?? device.platform,
+    plugin_version: normalizedDevice.plugin_version ?? undefined,
+    os_version: normalizedDevice.os_version ?? undefined,
+    version_build: normalizedDevice.version_build ?? undefined,
+    custom_id: normalizedDevice.custom_id ?? undefined,
+    version_name: normalizedDevice.version_name ?? device.version_name,
+    is_prod: normalizedDevice.is_prod,
+    is_emulator: normalizedDevice.is_emulator,
+  }
+
+  return client
+    .from('devices')
+    .upsert(payload, { onConflict: 'device_id,app_id' })
 }
 
-export function trackLogsSB(c: Context, app_id: string, device_id: string, action: Database['public']['Enums']['stats_action'], version_id: number) {
+export function trackLogsSB(c: Context, app_id: string, device_id: string, action: Database['public']['Enums']['stats_action'], version_name: string) {
   return supabaseAdmin(c)
     .from('stats')
     .insert(
@@ -726,7 +751,7 @@ export function trackLogsSB(c: Context, app_id: string, device_id: string, actio
         created_at: new Date().toISOString(),
         device_id,
         action,
-        version: version_id,
+        version_name,
       },
     )
 }
@@ -781,9 +806,9 @@ export async function readStatsSB(c: Context, params: ReadStatsParams) {
   if (params.search) {
     cloudlog({ requestId: c.get('requestId'), message: 'search', search: params.search })
     if (params.deviceIds?.length)
-      query = query.ilike('version_build', `${params.search}%`)
+      query = query.or(`version_build.ilike.${params.search}%,version_name.ilike.${params.search}%`)
     else
-      query = query.or(`device_id.ilike.${params.search}%,version_build.ilike.${params.search}%`)
+      query = query.or(`device_id.ilike.${params.search}%,version_build.ilike.${params.search}%,version_name.ilike.${params.search}%`)
   }
 
   if (params.order?.length) {
@@ -805,7 +830,7 @@ export async function readStatsSB(c: Context, params: ReadStatsParams) {
   return data ?? []
 }
 
-export async function readDevicesSB(c: Context, params: ReadDevicesParams) {
+export async function readDevicesSB(c: Context, params: ReadDevicesParams, customIdMode: boolean) {
   const supabase = supabaseAdmin(c)
 
   cloudlog({ requestId: c.get('requestId'), message: 'readDevicesSB', params })
@@ -815,6 +840,12 @@ export async function readDevicesSB(c: Context, params: ReadDevicesParams) {
     .eq('app_id', params.app_id)
     .range(params.rangeStart ?? 0, params.rangeEnd ?? DEFAULT_LIMIT)
     .limit(params.limit ?? DEFAULT_LIMIT)
+
+  if (customIdMode) {
+    query = query
+      .not('custom_id', 'is', null)
+      .neq('custom_id', '')
+  }
 
   if (params.deviceIds?.length) {
     cloudlog({ requestId: c.get('requestId'), message: 'deviceIds', deviceIds: params.deviceIds })
@@ -827,9 +858,9 @@ export async function readDevicesSB(c: Context, params: ReadDevicesParams) {
   if (params.search) {
     cloudlog({ requestId: c.get('requestId'), message: 'search', search: params.search })
     if (params.deviceIds?.length)
-      query = query.ilike('custom_id', `${params.search}%`)
+      query = query.or(`custom_id.ilike.${params.search}%,version_name.ilike.${params.search}%`)
     else
-      query = query.or(`device_id.ilike.${params.search}%,custom_id.ilike.${params.search}%`)
+      query = query.or(`device_id.ilike.${params.search}%,custom_id.ilike.${params.search}%,version_name.ilike.${params.search}%`)
   }
   if (params.order?.length) {
     params.order.forEach((col) => {
@@ -839,8 +870,8 @@ export async function readDevicesSB(c: Context, params: ReadDevicesParams) {
       }
     })
   }
-  if (params.version_id)
-    query = query.eq('version_id', params.version_id)
+  if (params.version_name)
+    query = query.eq('version_name', params.version_name)
 
   const { data, error } = await query
 
@@ -852,11 +883,24 @@ export async function readDevicesSB(c: Context, params: ReadDevicesParams) {
   return data ?? []
 }
 
-export async function countDevicesSB(c: Context, app_id: string) {
-  const { count } = await supabaseAdmin(c)
+export async function countDevicesSB(c: Context, app_id: string, customIdMode: boolean) {
+  const req = supabaseAdmin(c)
     .from('devices')
     .select('device_id', { count: 'exact', head: true })
     .eq('app_id', app_id)
+
+  if (customIdMode) {
+    req
+      .not('custom_id', 'is', null)
+      .neq('custom_id', '')
+  }
+
+  const { count, error } = await req
+
+  if (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error counting devices', error })
+    return 0
+  }
   return count ?? 0
 }
 
@@ -912,13 +956,13 @@ export async function getUpdateStatsSB(c: Context): Promise<UpdateStats> {
 
   const apps = data.map((app: any) => {
     const totalEvents = app.failed + app.install + app.get
-    const successRate = totalEvents > 0 ? ((app.install + app.get) / totalEvents) * 100 : 100
+    const successRate = Number((totalEvents > 0 ? ((app.install + app.get) / totalEvents) * 100 : 100).toFixed(2))
     return {
       app_id: app.app_id,
       failed: Number(app.failed),
       set: Number(app.install),
       get: Number(app.get),
-      success_rate: Number(successRate.toFixed(2)),
+      success_rate: successRate,
       healthy: successRate >= 70,
     }
   })
@@ -940,5 +984,47 @@ export async function getUpdateStatsSB(c: Context): Promise<UpdateStats> {
       success_rate: Number(totalSuccessRate.toFixed(2)),
       healthy: totalSuccessRate >= 70,
     },
+  }
+}
+
+export async function checkKey(c: Context, authorization: string | undefined, supabase: SupabaseClient<Database>, allowed: Database['public']['Enums']['key_mode'][]): Promise<Database['public']['Tables']['apikeys']['Row'] | null> {
+  if (!authorization)
+    return null
+  try {
+    const { data, error } = await supabase
+      .from('apikeys')
+      .select()
+      .eq('key', authorization)
+      .in('mode', allowed)
+      .single()
+    if (!data || error) {
+      cloudlog({ requestId: c.get('requestId'), message: 'Invalid apikey', authorization, allowed, error })
+      return null
+    }
+    return data
+  }
+  catch (error) {
+    cloudlog({ requestId: c.get('requestId'), message: 'checkKey error', error })
+    return null
+  }
+}
+
+export async function checkKeyById(c: Context, id: number, supabase: SupabaseClient<Database>, allowed: Database['public']['Enums']['key_mode'][]): Promise<Database['public']['Tables']['apikeys']['Row'] | null> {
+  if (!id)
+    return null
+  try {
+    const { data, error } = await supabase
+      .from('apikeys')
+      .select('*')
+      .eq('id', id)
+      .in('mode', allowed)
+      .single()
+    if (!data || error)
+      return null
+    return data
+  }
+  catch (error) {
+    cloudlog({ requestId: c.get('requestId'), message: 'checkKeyById error', error })
+    return null
   }
 }

@@ -1,11 +1,16 @@
 import type { Database } from '../src/types/supabase.types.ts'
 import { randomUUID } from 'node:crypto'
+import { env } from 'node:process'
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { APP_NAME, BASE_URL, createAppVersions, getBaseData, getSupabaseClient, getVersionFromAction, headers, resetAndSeedAppData, resetAndSeedAppDataStats, resetAppData, resetAppDataStats } from './test-utils.ts'
+import { ALLOWED_STATS_ACTIONS } from '../supabase/functions/_backend/plugins/stats_actions.ts'
+import { APP_NAME, createAppVersions, getBaseData, getSupabaseClient, getVersionFromAction, headers, PLUGIN_BASE_URL, resetAndSeedAppData, resetAndSeedAppDataStats, resetAppData, resetAppDataStats, triggerD1Sync } from './test-utils.ts'
 
 const id = randomUUID()
 const APP_NAME_STATS = `${APP_NAME}.${id}`
+
+// Check if we're using Cloudflare Workers (which requires sequential tests due to D1 sync)
+const USE_CLOUDFLARE = env.USE_CLOUDFLARE_WORKERS === 'true'
 
 interface StatsRes {
   error?: string
@@ -19,60 +24,8 @@ interface StatsPayload extends ReturnType<typeof getBaseData> {
   action: StatsAction
 }
 
-// Get all possible values from the StatsAction type
-const POSSIBLE_STATS_ACTIONS = [
-  'delete',
-  'reset',
-  'set',
-  'get',
-  'set_fail',
-  'update_fail',
-  'download_fail',
-  'windows_path_fail',
-  'canonical_path_fail',
-  'directory_path_fail',
-  'unzip_fail',
-  'low_mem_fail',
-  'download_10',
-  'download_20',
-  'download_30',
-  'download_40',
-  'download_50',
-  'download_60',
-  'download_70',
-  'download_80',
-  'download_90',
-  'download_complete',
-  'decrypt_fail',
-  'app_moved_to_foreground',
-  'app_moved_to_background',
-  'uninstall',
-  'needPlanUpgrade',
-  'missingBundle',
-  'noNew',
-  'disablePlatformIos',
-  'disablePlatformAndroid',
-  'disableAutoUpdateToMajor',
-  'cannotUpdateViaPrivateChannel',
-  'disableAutoUpdateToMinor',
-  'disableAutoUpdateToPatch',
-  'channelMisconfigured',
-  'disableAutoUpdateMetadata',
-  'disableAutoUpdateUnderNative',
-  'disableDevBuild',
-  'disableEmulator',
-  'cannotGetBundle',
-  'checksum_fail',
-  'NoChannelOrOverride',
-  'setChannel',
-  'getChannel',
-  'rateLimited',
-] as const satisfies readonly StatsAction[]
-
-const ALL_STATS_ACTIONS = [...POSSIBLE_STATS_ACTIONS]
-
 async function postStats(data: object) {
-  const response = await fetch(`${BASE_URL}/stats`, {
+  const response = await fetch(`${PLUGIN_BASE_URL}/stats`, {
     method: 'POST',
     headers,
     body: JSON.stringify(data),
@@ -93,19 +46,18 @@ afterAll(async () => {
 describe('stats Action Types', () => {
   it('test ALL_STATS_ACTIONS should contain all possible stats actions', () => {
     // Verify each action is unique
-    const uniqueActions = new Set(ALL_STATS_ACTIONS)
-    expect(uniqueActions.size).toBe(ALL_STATS_ACTIONS.length)
+    const uniqueActions = new Set(ALLOWED_STATS_ACTIONS)
+    expect(uniqueActions.size).toBe(ALLOWED_STATS_ACTIONS.length)
 
     // Verify version generation is unique and valid semver
-    const versions = ALL_STATS_ACTIONS.map(action => getVersionFromAction(action))
+    const versions = ALLOWED_STATS_ACTIONS.map(action => getVersionFromAction(action))
     const uniqueVersions = new Set(versions)
-    expect(uniqueVersions.size).toBe(ALL_STATS_ACTIONS.length)
+    expect(uniqueVersions.size).toBe(ALLOWED_STATS_ACTIONS.length)
     // Verify all versions match semver pattern
     expect(versions.every(_v => /^\d+\.\d+\.\d+(-[0-9A-Z-]+)?$/i)).toBe(true)
     type StatsActionEnum = Database['public']['Enums']['stats_action']
     const assertEqual = <T extends readonly StatsActionEnum[]>(value: T) => value
-    assertEqual(POSSIBLE_STATS_ACTIONS)
-    assertEqual(ALL_STATS_ACTIONS)
+    assertEqual(ALLOWED_STATS_ACTIONS)
   })
 })
 describe('test valid and invalid cases of version_build', () => {
@@ -119,6 +71,7 @@ describe('test valid and invalid cases of version_build', () => {
     baseData.version_build = getVersionFromAction('set')
     const version = await createAppVersions(baseData.version_build, APP_NAME_STATS)
     baseData.version_name = version.name
+    await triggerD1Sync() // Sync the newly created version to D1
 
     let response = await postStats(baseData)
     expect(response.status).toBe(200)
@@ -173,6 +126,7 @@ describe('[POST] /stats', () => {
 
     const version = await createAppVersions(baseData.version_build, APP_NAME_STATS)
     baseData.version_name = version.name
+    await triggerD1Sync() // Sync the newly created version to D1
     const response = await postStats(baseData)
     expect(response.status).toBe(200)
     expect(await response.json<StatsRes>()).toEqual({ status: 'ok' })
@@ -182,7 +136,7 @@ describe('[POST] /stats', () => {
     expect(deviceError).toBeNull()
     expect(deviceData).toBeTruthy()
     expect(deviceData?.app_id).toBe(baseData.app_id)
-    expect(deviceData?.version).toBe(version.id)
+    expect(deviceData?.version_name).toBe(version.name)
 
     // Check stats log
     const { error: statsError, data: statsData } = await getSupabaseClient().from('stats').select().eq('device_id', uuid).eq('app_id', APP_NAME_STATS).single()
@@ -195,58 +149,66 @@ describe('[POST] /stats', () => {
     await getSupabaseClient().from('devices').delete().eq('device_id', uuid).eq('app_id', APP_NAME_STATS)
   })
 
-  it('test all possible stats actions', async () => {
-    const uuid = randomUUID().toLowerCase()
-    const baseData = getBaseData(APP_NAME_STATS) as StatsPayload
-    baseData.device_id = uuid
+  // Test each stats action - concurrent for Supabase, sequential for Cloudflare (due to D1 sync)
+  // Cloudflare Workers use D1 which requires sequential sync, Supabase can run concurrently
+  const testDescribe = USE_CLOUDFLARE ? describe : describe.concurrent
+  const testIt = USE_CLOUDFLARE ? it : it.concurrent
 
-    // Test all possible actions
-    let versionId = 0
-    for (const action of ALL_STATS_ACTIONS) {
-      baseData.action = action
-      baseData.version_build = getVersionFromAction(action)
-      const version = await createAppVersions(baseData.version_build, APP_NAME_STATS)
-      baseData.version_name = version.name
-      versionId = version.id
+  testDescribe('test all possible stats actions', () => {
+    for (const action of ALLOWED_STATS_ACTIONS) {
+      testIt(`should handle ${action} action`, async () => {
+        const uuid = randomUUID().toLowerCase()
+        const baseData = getBaseData(APP_NAME_STATS) as StatsPayload
+        baseData.device_id = uuid
+        baseData.action = action
+        baseData.version_build = getVersionFromAction(action)
 
-      baseData.version_code = '2'
-      baseData.version_os = '16.1'
-      baseData.custom_id = 'test2'
+        const version = await createAppVersions(baseData.version_build, APP_NAME_STATS)
+        baseData.version_name = version.name
+        baseData.version_code = '2'
+        baseData.version_os = '16.1'
+        baseData.custom_id = 'test2'
+        await triggerD1Sync() // Sync the newly created version to D1
 
-      const response = await postStats(baseData)
-      const responseData = await response.json<StatsRes>()
-      expect(response.status).toBe(200)
-      expect(responseData.status).toBe('ok')
+        const response = await postStats(baseData)
+        const responseData = await response.json<StatsRes>()
+        expect(response.status).toBe(200)
+        expect(responseData.status).toBe('ok')
 
-      // Verify stats entry
-      const { error: statsError, data: statsData } = await getSupabaseClient()
-        .from('stats')
-        .select()
-        .eq('device_id', uuid)
-        .eq('app_id', APP_NAME_STATS)
-        .eq('action', action)
-        .single()
+        // Verify stats entry
+        const { error: statsError, data: statsData } = await getSupabaseClient()
+          .from('stats')
+          .select()
+          .eq('device_id', uuid)
+          .eq('app_id', APP_NAME_STATS)
+          .eq('action', action)
+          .single()
 
-      expect(statsError).toBeNull()
-      expect(statsData).toBeTruthy()
-      expect(statsData?.action).toBe(action)
-      expect(statsData?.device_id).toBe(uuid)
+        expect(statsError).toBeNull()
+        expect(statsData).toBeTruthy()
+        expect(statsData?.action).toBe(action)
+        expect(statsData?.device_id).toBe(uuid)
+
+        // Verify device state
+        const { error: deviceError, data: deviceData } = await getSupabaseClient()
+          .from('devices')
+          .select()
+          .eq('device_id', uuid)
+          .eq('app_id', APP_NAME_STATS)
+          .single()
+
+        expect(deviceError).toBeNull()
+        expect(deviceData).toBeTruthy()
+        expect(deviceData?.version_build).toBe(baseData.version_build)
+        expect(deviceData?.version_name).toBe(version.name)
+        expect(deviceData?.os_version).toBe('16.1')
+        expect(deviceData?.plugin_version).toBe('7.0.0')
+        expect(deviceData?.custom_id).toBe('test2')
+
+        // Clean up
+        await getSupabaseClient().from('devices').delete().eq('device_id', uuid).eq('app_id', APP_NAME_STATS)
+      })
     }
-
-    // console.log({ versionId, uuid })
-    // Verify final device state
-    const lastAction = ALL_STATS_ACTIONS[ALL_STATS_ACTIONS.length - 1]
-    const { error: deviceError, data: deviceData } = await getSupabaseClient().from('devices').select().eq('device_id', uuid).eq('app_id', APP_NAME_STATS).single()
-    expect(deviceError).toBeNull()
-    expect(deviceData).toBeTruthy()
-    expect(deviceData?.version_build).toBe(getVersionFromAction(lastAction))
-    expect(deviceData?.version).toBe(versionId)
-    expect(deviceData?.os_version).toBe('16.1')
-    expect(deviceData?.plugin_version).toBe('7.0.0')
-    expect(deviceData?.custom_id).toBe('test2')
-
-    // Clean up
-    await getSupabaseClient().from('devices').delete().eq('device_id', uuid).eq('app_id', APP_NAME_STATS)
   })
 
   it('app that does not exist', async () => {
@@ -256,26 +218,26 @@ describe('[POST] /stats', () => {
     baseData.version_build = getVersionFromAction('get')
     const version = await createAppVersions(baseData.version_build, APP_NAME_STATS)
     baseData.version_name = version.name
+    await triggerD1Sync() // Sync the newly created version to D1
 
     const response = await postStats(baseData)
-    expect(response.status).toBe(200)
+    expect(response.status).toBe(429)
     const json = await response.json<StatsRes>()
     // console.log({ json })
-    expect(json.error).toBe('app_not_found')
+    expect(json.error).toBe('on_premise_app')
   })
 
-  // TODO: fix this test
-  // it.only('invalid action should fail', async () => {
-  //   const baseData = getBaseData(APP_NAME_STATS) as StatsPayload
-  //   baseData.action = 'invalid_action' as StatsAction
-  //   baseData.version_build = getVersionFromAction('invalid_action')
-  //   const version = await createAppVersions(baseData.version_build, APP_NAME_STATS)
-  //   baseData.version_name = version.name
+  it('invalid action should fail', async () => {
+    const baseData = getBaseData(APP_NAME_STATS) as StatsPayload
+    baseData.action = 'invalid_action' as StatsAction
+    baseData.version_build = getVersionFromAction('invalid_action')
+    const version = await createAppVersions(baseData.version_build, APP_NAME_STATS)
+    baseData.version_name = version.name
+    await triggerD1Sync() // Sync the newly created version to D1
 
-  //   const response = await postStats(baseData)
-  //   expect(response.status).toBe(400)
-  //   const json = await response.json<StatsRes>()
-  //   console.log({ json })
-  //   expect(json.error).toBeTruthy()
-  // })
+    const response = await postStats(baseData)
+    expect(response.status).toBe(400)
+    const json = await response.json<StatsRes>()
+    expect(json.error).toBeTruthy()
+  })
 })

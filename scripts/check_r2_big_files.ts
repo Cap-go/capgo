@@ -559,7 +559,7 @@ async function export_files_folder_to_csv(folderPath: string) {
     const csvRows = folderObjects.map(obj => {
         const size = obj.Size ?? 0
         const sizeGB = (size / (1024 * 1024 * 1024)).toFixed(6)
-        const webLink = `https://web.capgo.app/app/p/${obj.Key?.split('/').pop() ?? ''}`
+        const webLink = `https://console.capgo.app/app/p/${obj.Key?.split('/').pop() ?? ''}`
 
         return [
             `"${obj.Key?.split('/').pop() ?? ''}"`,
@@ -618,8 +618,8 @@ export function getDatabaseURL(): string {
     // const clientContinent = (c.req.raw as any)?.cf?.continent
     // cloudlog({ requestId: c.get('requestId'), message: 'clientContinent', clientContinent  })
     let DEFAULT_DB_URL = getEnv('SUPABASE_DB_URL')
-    if (existInEnv('CUSTOM_SUPABASE_DB_URL'))
-        DEFAULT_DB_URL = getEnv('CUSTOM_SUPABASE_DB_URL')
+    if (existInEnv('MAIN_SUPABASE_DB_URL'))
+        DEFAULT_DB_URL = getEnv('MAIN_SUPABASE_DB_URL')
 
     // if (!clientContinent)
     //   return DEFAULT_DB_URL
@@ -964,7 +964,7 @@ async function export_supabase_csv(orgId: string) {
         }
 
         const sizeGB = (sizeBytes / (1024 * 1024 * 1024)).toFixed(6)
-        const webLink = `https://web.capgo.app/app/p/${version.app_id}/bundle/${version.id}`
+        const webLink = `https://console.capgo.app/app/p/${version.app_id}/bundle/${version.id}`
 
         csvData.push({
             app_id: version.app_id ?? '',

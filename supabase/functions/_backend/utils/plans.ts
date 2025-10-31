@@ -20,6 +20,120 @@ import {
   supabaseAdmin,
 } from './supabase.ts'
 
+type CreditMetric = 'mau' | 'bandwidth' | 'storage'
+
+interface BillingCycleInfo {
+  subscription_anchor_start: string | null
+  subscription_anchor_end: string | null
+}
+
+interface CreditApplicationResult {
+  overage_amount: number
+  credits_required: number
+  credits_applied: number
+  credits_remaining: number
+  overage_covered: number
+  overage_unpaid: number
+  credit_step_id: number | null
+}
+
+async function getBillingCycleRange(c: Context, orgId: string): Promise<BillingCycleInfo | null> {
+  try {
+    const { data } = await supabaseAdmin(c)
+      .rpc('get_cycle_info_org', { orgid: orgId })
+      .single()
+    return data ?? null
+  }
+  catch (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'getBillingCycleRange error', orgId, error })
+    return null
+  }
+}
+
+async function applyCreditsForMetric(
+  c: Context,
+  orgId: string,
+  metric: CreditMetric,
+  overageAmount: number,
+  planId: string | undefined,
+  usage: number,
+  limit: number | null | undefined,
+  billingCycle: BillingCycleInfo | null,
+): Promise<CreditApplicationResult | null> {
+  if (overageAmount <= 0)
+    return null
+
+  if (!planId || !billingCycle?.subscription_anchor_start || !billingCycle?.subscription_anchor_end) {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'applyCreditsForMetric missing plan or billing cycle context',
+      orgId,
+      metric,
+      planId,
+      billingCycle,
+    })
+    return {
+      overage_amount: overageAmount,
+      credits_required: 0,
+      credits_applied: 0,
+      credits_remaining: 0,
+      overage_covered: 0,
+      overage_unpaid: overageAmount,
+      credit_step_id: null,
+    }
+  }
+  try {
+    const { data, error } = await supabaseAdmin(c)
+      .rpc('apply_usage_overage', {
+        p_org_id: orgId,
+        p_metric: metric,
+        p_overage_amount: overageAmount,
+        p_billing_cycle_start: billingCycle.subscription_anchor_start,
+        p_billing_cycle_end: billingCycle.subscription_anchor_end,
+        p_details: {
+          usage,
+          limit: limit ?? 0,
+        },
+      })
+      .single()
+
+    if (error) {
+      cloudlogErr({ requestId: c.get('requestId'), message: 'apply_usage_overage error', orgId, metric, overageAmount, error })
+      return {
+        overage_amount: overageAmount,
+        credits_required: 0,
+        credits_applied: 0,
+        credits_remaining: 0,
+        overage_covered: 0,
+        overage_unpaid: overageAmount,
+        credit_step_id: null,
+      }
+    }
+
+    return {
+      overage_amount: Number(data?.overage_amount ?? overageAmount),
+      credits_required: Number(data?.credits_required ?? 0),
+      credits_applied: Number(data?.credits_applied ?? 0),
+      credits_remaining: Number(data?.credits_remaining ?? 0),
+      overage_covered: Number(data?.overage_covered ?? 0),
+      overage_unpaid: Number(data?.overage_unpaid ?? overageAmount),
+      credit_step_id: data?.credit_step_id ?? null,
+    }
+  }
+  catch (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'applyCreditsForMetric exception', orgId, metric, overageAmount, error })
+    return {
+      overage_amount: overageAmount,
+      credits_required: 0,
+      credits_applied: 0,
+      credits_remaining: 0,
+      overage_covered: 0,
+      overage_unpaid: overageAmount,
+      credit_step_id: null,
+    }
+  }
+}
+
 function planToInt(plan: string) {
   switch (plan) {
     case 'Solo':
@@ -105,43 +219,90 @@ async function userAbovePlan(c: Context, org: {
   stripe_info: {
     subscription_id: string | null
   } | null
-}, orgId: string, is_good_plan: boolean) {
-  cloudlog({ requestId: c.get('requestId'), message: 'is_good_plan_v5_org', orgId, is_good_plan })
-  // create dateid var with yyyy-mm with dayjs
-  const get_total_stats = await getTotalStats(c, orgId)
-  const current_plan = await getCurrentPlanNameOrg(c, orgId)
-  if (!get_total_stats) {
-    return
+}, orgId: string, is_good_plan: boolean): Promise<boolean> {
+  cloudlog({ requestId: c.get('requestId'), message: 'userAbovePlan', orgId, is_good_plan })
+  const totalStats = await getTotalStats(c, orgId)
+  const currentPlanName = await getCurrentPlanNameOrg(c, orgId)
+  if (!totalStats) {
+    return false
   }
-  const best_plan = await findBestPlan(c, { mau: get_total_stats.mau, storage: get_total_stats.storage, bandwidth: get_total_stats.bandwidth })
-  const bestPlanKey = best_plan.toLowerCase().replace(' ', '_')
-  await setMetered(c, org.customer_id!, orgId)
-  if (planToInt(best_plan) < planToInt(current_plan)) {
-    return
-  }
-  const { data: currentPlan, error: currentPlanError } = await supabaseAdmin(c).from('plans').select('*').eq('name', current_plan).single()
+
+  const { data: currentPlan, error: currentPlanError } = await supabaseAdmin(c)
+    .from('plans')
+    .select('*')
+    .eq('name', currentPlanName)
+    .single()
   if (currentPlanError) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'currentPlanError', error: currentPlanError })
   }
 
-  cloudlog(get_total_stats)
-  if (get_total_stats.mau > (currentPlan?.mau ?? 0)) {
-    cloudlog({ requestId: c.get('requestId'), message: 'set_mau_exceeded', orgId, get_total_stats, currentPlan })
-    await set_mau_exceeded(c, orgId, true)
-  }
-  if (get_total_stats.storage > (currentPlan?.storage ?? 0)) {
-    cloudlog({ requestId: c.get('requestId'), message: 'set_storage_exceeded', orgId, get_total_stats, currentPlan })
-    await set_storage_exceeded(c, orgId, true)
+  await setMetered(c, org.customer_id, orgId)
+
+  const billingCycle = await getBillingCycleRange(c, orgId)
+  const planId = currentPlan?.id
+
+  const metrics: Array<{ key: CreditMetric, usage: number, limit: number | null | undefined }> = [
+    { key: 'mau', usage: Number(totalStats.mau ?? 0), limit: currentPlan?.mau },
+    { key: 'storage', usage: Number(totalStats.storage ?? 0), limit: currentPlan?.storage },
+    { key: 'bandwidth', usage: Number(totalStats.bandwidth ?? 0), limit: currentPlan?.bandwidth },
+  ]
+
+  const creditResults: Record<CreditMetric, CreditApplicationResult | null> = {
+    mau: null,
+    storage: null,
+    bandwidth: null,
   }
 
-  if (get_total_stats.bandwidth > (currentPlan?.bandwidth ?? 0)) {
-    cloudlog({ requestId: c.get('requestId'), message: 'set_bandwidth_exceeded', orgId, get_total_stats, currentPlan })
-    await set_bandwidth_exceeded(c, orgId, true)
+  let hasUnpaidOverage = false
+
+  for (const metric of metrics) {
+    const planLimit = Number(metric.limit ?? 0)
+    const overage = metric.usage - planLimit
+    if (overage > 0) {
+      const creditResult = await applyCreditsForMetric(c, orgId, metric.key, overage, planId, metric.usage, metric.limit, billingCycle)
+      creditResults[metric.key] = creditResult
+      const unpaid = creditResult?.overage_unpaid ?? overage
+      if (metric.key === 'mau') {
+        await set_mau_exceeded(c, orgId, unpaid > 0)
+      }
+      else if (metric.key === 'storage') {
+        await set_storage_exceeded(c, orgId, unpaid > 0)
+      }
+      else if (metric.key === 'bandwidth') {
+        await set_bandwidth_exceeded(c, orgId, unpaid > 0)
+      }
+      if (unpaid > 0)
+        hasUnpaidOverage = true
+    }
+    else {
+      if (metric.key === 'mau')
+        await set_mau_exceeded(c, orgId, false)
+      else if (metric.key === 'storage')
+        await set_storage_exceeded(c, orgId, false)
+      else if (metric.key === 'bandwidth')
+        await set_bandwidth_exceeded(c, orgId, false)
+    }
   }
 
-  const sent = await sendNotifOrg(c, `user:upgrade_to_${bestPlanKey}`, { best_plan: bestPlanKey, plan_name: current_plan }, orgId, orgId, '0 0 * * 1')
+  if (!hasUnpaidOverage) {
+    cloudlog({ requestId: c.get('requestId'), message: 'Overage fully covered by credits', orgId, creditResults })
+    return false
+  }
+
+  const bestPlan = await findBestPlan(c, {
+    mau: totalStats.mau,
+    storage: totalStats.storage,
+    bandwidth: totalStats.bandwidth,
+  })
+
+  // If the calculated best plan ranks lower than the current one, the org is over-provisioned, so skip upgrade nudges.
+  if (planToInt(bestPlan) < planToInt(currentPlanName)) {
+    return true
+  }
+
+  const bestPlanKey = bestPlan.toLowerCase().replace(' ', '_')
+  const sent = await sendNotifOrg(c, `user:upgrade_to_${bestPlanKey}`, { best_plan: bestPlanKey, plan_name: currentPlanName }, orgId, orgId, '0 0 * * 1')
   if (sent) {
-  // await addEventPerson(user.email, {}, `user:upgrade_to_${bestPlanKey}`, 'red')
     cloudlog({ requestId: c.get('requestId'), message: `user:upgrade_to_${bestPlanKey}`, orgId })
     await logsnag(c).track({
       channel: 'usage',
@@ -151,6 +312,8 @@ async function userAbovePlan(c: Context, org: {
       notify: false,
     }).catch()
   }
+
+  return true
 }
 
 async function userIsAtPlanUsage(c: Context, orgId: string, percentUsage: PlanUsage) {
@@ -191,7 +354,7 @@ async function userIsAtPlanUsage(c: Context, orgId: string, percentUsage: PlanUs
   else if (percentUsage.total_percent >= 50) {
     const sent = await sendNotifOrg(c, 'user:usage_50_percent_of_plan', { percent: percentUsage }, orgId, orgId, '0 0 1 * *')
     if (sent) {
-    // await addEventPerson(user.email, {}, 'user:70_percent_of_plan', 'orange')
+      // await addEventPerson(user.email, {}, 'user:70_percent_of_plan', 'orange')
       await logsnag(c).track({
         channel: 'usage',
         event: 'User is at 50% of plan usage',
@@ -203,19 +366,27 @@ async function userIsAtPlanUsage(c: Context, orgId: string, percentUsage: PlanUs
   }
 }
 
-export async function checkPlanOrg(c: Context, orgId: string): Promise<void> {
+// Get org data with customer info
+export async function getOrgWithCustomerInfo(c: Context, orgId: string) {
   const { data: org, error: userError } = await supabaseAdmin(c)
     .from('orgs')
-    .select('customer_id, stripe_info(subscription_id)')
+    .select('customer_id, stripe_info(subscription_id, subscription_anchor_start, subscription_anchor_end)')
     .eq('id', orgId)
     .single()
   if (userError || !org)
     throw quickError(404, 'org_not_found', 'Org not found', { orgId, userError })
+  return org
+}
 
-  // Sync subscription data with Stripe
-  if (org.customer_id)
+// Sync subscription data with Stripe
+export async function syncOrgSubscriptionData(c: Context, org: any): Promise<void> {
+  if (org.customer_id) {
     await syncSubscriptionData(c, org.customer_id, org?.stripe_info?.subscription_id ?? null)
+  }
+}
 
+// Handle trial organization logic
+export async function handleTrialOrg(c: Context, orgId: string, org: any): Promise<boolean> {
   if (await isTrialOrg(c, orgId)) {
     const { error } = await supabaseAdmin(c)
       .from('stripe_info')
@@ -224,18 +395,31 @@ export async function checkPlanOrg(c: Context, orgId: string): Promise<void> {
       .then()
     if (error)
       cloudlogErr({ requestId: c.get('requestId'), message: 'update stripe info', error })
-    return Promise.resolve()
+    return true // Trial handled
   }
+  return false // Not a trial
+}
 
+// Calculate plan status and usage
+export async function calculatePlanStatus(c: Context, orgId: string) {
   const is_good_plan = await isGoodPlanOrg(c, orgId)
+  const percentUsage = await getPlanUsagePercent(c, orgId)
+  return { is_good_plan, percentUsage }
+}
+
+// Handle notifications and events based on org status
+export async function handleOrgNotificationsAndEvents(c: Context, org: any, orgId: string, is_good_plan: boolean, percentUsage: PlanUsage): Promise<boolean> {
   const is_onboarded = await isOnboardedOrg(c, orgId)
   const is_onboarding_needed = await isOnboardingNeeded(c, orgId)
-  const percentUsage = await getPlanUsagePercent(c, orgId)
+
+  let finalIsGoodPlan = is_good_plan
+
   if (!is_good_plan && is_onboarded) {
-    await userAbovePlan(c, org, orgId, is_good_plan)
+    const needsUpgrade = await userAbovePlan(c, org, orgId, is_good_plan)
+    finalIsGoodPlan = !needsUpgrade
   }
   else if (!is_onboarded && is_onboarding_needed) {
-    const sent = await sendNotifOrg(c, 'user:need_onboarding', { }, orgId, orgId, '0 0 1 * *')
+    const sent = await sendNotifOrg(c, 'user:need_onboarding', {}, orgId, orgId, '0 0 1 * *')
     if (sent) {
       await logsnag(c).track({
         channel: 'usage',
@@ -248,8 +432,15 @@ export async function checkPlanOrg(c: Context, orgId: string): Promise<void> {
   }
   else if (is_good_plan && is_onboarded) {
     await userIsAtPlanUsage(c, orgId, percentUsage)
+    finalIsGoodPlan = true
   }
-  return supabaseAdmin(c)
+
+  return finalIsGoodPlan
+}
+
+// Update stripe_info with plan status
+export async function updatePlanStatus(c: Context, org: any, is_good_plan: boolean, percentUsage: PlanUsage): Promise<void> {
+  await supabaseAdmin(c)
     .from('stripe_info')
     .update({
       is_good_plan,
@@ -257,4 +448,62 @@ export async function checkPlanOrg(c: Context, orgId: string): Promise<void> {
     })
     .eq('customer_id', org.customer_id!)
     .then()
+}
+
+// Original checkPlanOrg function - now uses the smaller functions
+export async function checkPlanOrg(c: Context, orgId: string): Promise<void> {
+  const org = await getOrgWithCustomerInfo(c, orgId)
+
+  // Sync subscription data with Stripe
+  await syncOrgSubscriptionData(c, org)
+
+  // Handle trial organizations
+  if (await handleTrialOrg(c, orgId, org)) {
+    return // Trial handled, exit early
+  }
+
+  // Calculate plan status and usage
+  const { is_good_plan, percentUsage } = await calculatePlanStatus(c, orgId)
+
+  // Handle notifications and events
+  const finalIsGoodPlan = await handleOrgNotificationsAndEvents(c, org, orgId, is_good_plan, percentUsage)
+
+  // Update plan status in database
+  await updatePlanStatus(c, org, finalIsGoodPlan, percentUsage)
+}
+
+// New function for cron_stat_org - handles is_good_plan + plan % + exceeded flags
+export async function checkPlanStatusOnly(c: Context, orgId: string): Promise<void> {
+  const org = await getOrgWithCustomerInfo(c, orgId)
+
+  // Handle trial organizations
+  if (await handleTrialOrg(c, orgId, org)) {
+    return // Trial handled, exit early
+  }
+
+  // Calculate plan status and usage
+  const { is_good_plan, percentUsage } = await calculatePlanStatus(c, orgId)
+
+  // Update plan status in database
+  const finalIsGoodPlan = await handleOrgNotificationsAndEvents(c, org, orgId, is_good_plan, percentUsage)
+  await updatePlanStatus(c, org, finalIsGoodPlan, percentUsage)
+}
+
+// New function for cron_sync_sub - handles subscription sync + events
+export async function syncSubscriptionAndEvents(c: Context, orgId: string): Promise<void> {
+  const org = await getOrgWithCustomerInfo(c, orgId)
+
+  // Sync subscription data with Stripe
+  await syncOrgSubscriptionData(c, org)
+
+  // Handle trial organizations
+  if (await handleTrialOrg(c, orgId, org)) {
+    return // Trial handled, exit early
+  }
+
+  // Calculate plan status and usage for notifications
+  const { is_good_plan, percentUsage } = await calculatePlanStatus(c, orgId)
+
+  // Handle notifications and events
+  await handleOrgNotificationsAndEvents(c, org, orgId, is_good_plan, percentUsage)
 }

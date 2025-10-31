@@ -18,6 +18,9 @@ const config: CapacitorConfig = {
       androidScaleType: 'CENTER_CROP',
     },
     CapacitorUpdater: {
+      shakeMenu: true,
+      autoSplashscreen: true,
+      directUpdate: 'atInstall',
       version: pkg.version,
     },
   },

@@ -56,15 +56,17 @@ async function openLogAsDialog() {
 }
 
 async function setLogAs(id: string) {
-  if (isSpoofed())
+  const toastId = toast.loading('Logging as...')
+  if (isSpoofed()) {
     unspoofUser()
-
+  }
   const supabase = await useSupabase()
   const { data, error } = await supabase.functions.invoke('private/log_as', {
     body: { user_id: id },
   })
 
   if (error) {
+    toast.dismiss(toastId)
     toast.error('Cannot log in, see console')
     console.error(error)
     return
@@ -73,6 +75,7 @@ async function setLogAs(id: string) {
   const { jwt: newJwt, refreshToken: newRefreshToken } = data
 
   if (!newJwt || !newRefreshToken) {
+    toast.dismiss(toastId)
     toast.error('Cannot log in, see console')
     console.error('No data or token?', data)
     return
@@ -80,6 +83,7 @@ async function setLogAs(id: string) {
 
   const { data: currentSession, error: sessionError } = await supabase.auth.getSession()
   if (sessionError || !currentSession?.session) {
+    toast.dismiss(toastId)
     console.error('No current session', sessionError)
     toast.error('Cannot log in, see console')
     return
@@ -89,15 +93,17 @@ async function setLogAs(id: string) {
 
   const { error: authError } = await supabase.auth.setSession({ access_token: newJwt, refresh_token: newRefreshToken })
   if (authError) {
+    toast.dismiss(toastId)
     console.error('Auth error', authError)
     toast.error('Cannot log in, see console')
     return
   }
 
   saveSpoof(currentJwt, currentRefreshToken)
+  toast.dismiss(toastId)
   toast.success('Spoofed, will reload')
   setTimeout(() => {
-    router.replace('/app').then(() => {
+    router.replace('/dashboard').then(() => {
       window.location.reload()
     })
   }, 1000)
@@ -107,7 +113,7 @@ function resetSpoofedUser() {
   if (unspoofUser()) {
     toast.error('Stop Spoofed, will reload')
     setTimeout(() => {
-      router.replace('/app').then(() => {
+      router.replace('/dashboard').then(() => {
         window.location.reload()
       })
     }, 1000)

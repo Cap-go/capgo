@@ -1,8 +1,5 @@
-import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Context } from 'hono'
-import type { Database } from './supabase.types.ts'
 import { env, getRuntimeKey } from 'hono/adapter'
-import { cloudlog } from './loggin.ts'
 
 declare const EdgeRuntime: { waitUntil?: (promise: Promise<any>) => void } | undefined
 
@@ -45,6 +42,10 @@ export const INVALID_STRING_PLATFORM = 'Platform is not supported or invalid'
 
 // function to fix semver 1.0 to 1.0.0 any verssion missing . should add .0 also should work for 1
 export function fixSemver(version: string) {
+  if (version === 'builtin')
+    return '0.0.0'
+  if (version === 'unknown')
+    return '0.0.0'
   const nbPoint = (version?.match(/\./g) ?? []).length
   if (nbPoint === 0)
     return `${version}.0.0`
@@ -53,46 +54,10 @@ export function fixSemver(version: string) {
   return version
 }
 
-export async function checkKey(c: Context, authorization: string | undefined, supabase: SupabaseClient<Database>, allowed: Database['public']['Enums']['key_mode'][]): Promise<Database['public']['Tables']['apikeys']['Row'] | null> {
-  if (!authorization)
-    return null
-  try {
-    const { data, error } = await supabase
-      .from('apikeys')
-      .select()
-      .eq('key', authorization)
-      .in('mode', allowed)
-      .single()
-    if (!data || error) {
-      cloudlog({ requestId: c.get('requestId'), message: 'Invalid apikey', authorization, allowed, error })
-      return null
-    }
-    return data
-  }
-  catch (error) {
-    cloudlog({ requestId: c.get('requestId'), message: 'checkKey error', error })
-    return null
-  }
-}
-
-export async function checkKeyById(c: Context, id: number, supabase: SupabaseClient<Database>, allowed: Database['public']['Enums']['key_mode'][]): Promise<Database['public']['Tables']['apikeys']['Row'] | null> {
-  if (!id)
-    return null
-  try {
-    const { data, error } = await supabase
-      .from('apikeys')
-      .select('*')
-      .eq('id', id)
-      .in('mode', allowed)
-      .single()
-    if (!data || error)
-      return null
-    return data
-  }
-  catch (error) {
-    cloudlog({ requestId: c.get('requestId'), message: 'checkKeyById error', error })
-    return null
-  }
+export function isInternalVersionName(version: string) {
+  if (!version)
+    return false
+  return version === 'builtin' || version === 'unknown'
 }
 
 interface LimitedApp {

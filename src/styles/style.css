@@ -2,10 +2,10 @@
 layer(base);
 
 @import 'tailwindcss';
+@import 'konsta/vue/theme.css';
 @plugin "@tailwindcss/typography";
 @plugin "@tailwindcss/aspect-ratio";
 @plugin "@tailwindcss/container-queries";
-@plugin "@capgo/tailwind-capacitor";
 
 @plugin "daisyui" {
   themes: capgotheme --default, dark --prefersdark;

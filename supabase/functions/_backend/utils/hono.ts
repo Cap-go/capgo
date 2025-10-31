@@ -1,7 +1,5 @@
 import type { Context } from 'hono'
-import type Stripe from 'stripe'
 import type { Bindings } from './cloudflare.ts'
-import type { StripeData } from './stripe.ts'
 import type { DeletePayload, InsertPayload, UpdatePayload } from './supabase.ts'
 import type { Database } from './supabase.types.ts'
 import { sentry } from '@hono/sentry'
@@ -13,17 +11,10 @@ import { logger } from 'hono/logger'
 import { requestId } from 'hono/request-id'
 import { Hono } from 'hono/tiny'
 import { timingSafeEqual } from 'hono/utils/buffer'
-import { cloudlog, cloudlogErr } from './loggin.ts'
+import { cloudlog } from './loggin.ts'
 import { onError } from './on_error.ts'
-import { extractDataEvent, parseStripeEvent } from './stripe_event.ts'
-import { supabaseAdmin, supabaseClient } from './supabase.ts'
-import { checkKey, checkKeyById, getEnv } from './utils.ts'
 
-export const useCors = cors({
-  origin: '*',
-  allowHeaders: ['Content-Type', 'Authorization', 'capgkey', 'x-api-key', 'x-limited-key-id', 'apisecret', 'apikey', 'x-client-info'],
-  allowMethods: ['POST', 'GET', 'OPTIONS'],
-})
+import { getEnv } from './utils.ts'
 
 export interface AuthInfo {
   userId: string
@@ -45,113 +36,16 @@ export interface MiddlewareKeyVariables {
     subkey?: Database['public']['Tables']['apikeys']['Row']
     webhookBody?: any
     oldRecord?: any
-    stripeEvent?: Stripe.Event
-    stripeData?: StripeData
   }
 }
+
+export const useCors = cors({
+  origin: '*',
+  allowHeaders: ['Content-Type', 'Authorization', 'capgkey', 'capgo_api', 'x-api-key', 'x-limited-key-id', 'apisecret', 'apikey', 'x-client-info'],
+  allowMethods: ['POST', 'GET', 'OPTIONS'],
+})
 
 export const honoFactory = createFactory<MiddlewareKeyVariables>()
-
-// TODO: make universal middleware who
-//  Accept authorization header (JWT)
-//  Accept capgkey header (legacy apikey header name for CLI)
-//  Accept x-api-key header (new apikey header name for CLI + public api)
-//  Accept x-limited-key-id header (subkey id, for whitelabel api, only work in combination with x-api-key)
-// It takes rights as an argument, so it can be used in public and private api
-// It sets apikey, capgkey, subkey to the context
-// It throws an error if the apikey is invalid
-// It throws an error if the subkey is invalid
-// It throws an error if the apikey is invalid and the subkey is invalid
-// It throws an error if the apikey is invalid and the subkey is invalid
-// It throws an error if no apikey or subkey is provided
-// It throws an error if the rights are invalid
-
-function isUUID(str: string) {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str)
-}
-
-async function foundAPIKey(c: Context, capgkeyString: string, rights: Database['public']['Enums']['key_mode'][]) {
-  const subkey_id = c.req.header('x-limited-key-id') ? Number(c.req.header('x-limited-key-id')) : null
-
-  cloudlog({ requestId: c.get('requestId'), message: 'Capgkey provided', capgkeyString })
-  const apikey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKey(c, capgkeyString, supabaseAdmin(c), rights)
-  if (!apikey) {
-    cloudlog({ requestId: c.get('requestId'), message: 'Invalid apikey', capgkeyString, rights })
-    throw quickError(401, 'invalid_apikey', 'Invalid apikey')
-  }
-  c.set('auth', {
-    userId: apikey.user_id,
-    authType: 'apikey',
-    apikey,
-  } as AuthInfo)
-  c.set('apikey', apikey)
-  if (subkey_id) {
-    cloudlog({ requestId: c.get('requestId'), message: 'Subkey id provided', subkey_id })
-    const subkey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKeyById(c, subkey_id, supabaseAdmin(c), rights)
-    cloudlog({ requestId: c.get('requestId'), message: 'Subkey', subkey })
-    if (!subkey) {
-      cloudlog({ requestId: c.get('requestId'), message: 'Invalid subkey', subkey_id })
-      throw quickError(401, 'invalid_subkey', 'Invalid subkey')
-    }
-    if (subkey && subkey.user_id !== apikey.user_id) {
-      cloudlog({ requestId: c.get('requestId'), message: 'Subkey user_id does not match apikey user_id', subkey, apikey })
-      throw quickError(401, 'invalid_subkey', 'Invalid subkey')
-    }
-    if (subkey?.limited_to_apps && subkey?.limited_to_apps.length === 0 && subkey?.limited_to_orgs && subkey?.limited_to_orgs.length === 0) {
-      cloudlog({ requestId: c.get('requestId'), message: 'Invalid subkey, no limited apps or orgs', subkey })
-      throw quickError(401, 'invalid_subkey', 'Invalid subkey, no limited apps or orgs')
-    }
-    if (subkey) {
-      c.set('auth', {
-        userId: apikey.user_id,
-        authType: 'apikey',
-        apikey: subkey,
-      } as AuthInfo)
-      c.set('subkey', subkey)
-    }
-  }
-}
-
-async function foundJWT(c: Context, jwt: string) {
-  cloudlog({ requestId: c.get('requestId'), message: 'JWT provided', jwt })
-  const supabaseJWT = supabaseClient(c, jwt)
-  const { data: user, error: userError } = await supabaseJWT.auth.getUser()
-  if (userError) {
-    cloudlog({ requestId: c.get('requestId'), message: 'Invalid JWT', userError })
-    throw quickError(401, 'invalid_jwt', 'Invalid JWT')
-  }
-  c.set('auth', {
-    userId: user.user?.id,
-    authType: 'jwt',
-    jwt,
-  } as AuthInfo)
-}
-
-export function middlewareV2(rights: Database['public']['Enums']['key_mode'][]) {
-  return honoFactory.createMiddleware(async (c, next) => {
-    let jwt = c.req.header('authorization')
-    let capgkey = c.req.header('capgkey') ?? c.req.header('x-api-key')
-
-    // make sure jwt is valid otherwise it means it was an apikey and you need to set it in capgkey_string
-    // if jwt is uuid, it means it was an apikey and you need to set it in capgkey_string
-    if (jwt && isUUID(jwt)) {
-      cloudlog({ requestId: c.get('requestId'), message: 'Setting apikey in capgkey_string', jwt })
-      capgkey = jwt
-      jwt = undefined
-    }
-    if (jwt) {
-      await foundJWT(c, jwt)
-    }
-    else if (capgkey) {
-      await foundAPIKey(c, capgkey, rights)
-    }
-    else {
-      cloudlog('No apikey or subkey provided')
-      throw quickError(401, 'no_jwt_apikey_or_subkey', 'No JWT, apikey or subkey provided')
-    }
-    await next()
-  })
-}
 
 export function triggerValidator(
   table: keyof Database['public']['Tables'],
@@ -187,67 +81,6 @@ export function triggerValidator(
 
     await next()
   })
-}
-
-export function middlewareStripeWebhook() {
-  return honoFactory.createMiddleware(async (c, next) => {
-    if (!getEnv(c, 'STRIPE_WEBHOOK_SECRET') || !getEnv(c, 'STRIPE_SECRET_KEY')) {
-      cloudlog({ requestId: c.get('requestId'), message: 'Webhook Error: no secret found' })
-      throw simpleError('webhook_error_no_secret', 'Webhook Error: no secret found')
-    }
-
-    const signature = c.req.raw.headers.get('stripe-signature')
-    if (!signature || !getEnv(c, 'STRIPE_WEBHOOK_SECRET') || !getEnv(c, 'STRIPE_SECRET_KEY')) {
-      cloudlog({ requestId: c.get('requestId'), message: 'Webhook Error: no signature' })
-      throw simpleError('webhook_error_no_signature', 'Webhook Error: no signature')
-    }
-    const body = await c.req.text()
-    const stripeEvent = await parseStripeEvent(c, body, signature)
-    const stripeDataEvent = extractDataEvent(c, stripeEvent)
-    const stripeData = stripeDataEvent.data
-    if (stripeData.customer_id === '') {
-      cloudlog({ requestId: c.get('requestId'), message: 'Webhook Error: no customer found' })
-      throw simpleError('webhook_error_no_customer', 'Webhook Error: no customer found')
-    }
-    c.set('stripeEvent', stripeEvent)
-    c.set('stripeData', stripeDataEvent)
-    await next()
-  })
-}
-
-export function middlewareKey(rights: Database['public']['Enums']['key_mode'][]) {
-  const subMiddlewareKey = honoFactory.createMiddleware(async (c, next) => {
-    const capgkey_string = c.req.header('capgkey')
-    const apikey_string = c.req.header('authorization')
-    const subkey_id = c.req.header('x-limited-key-id') ? Number(c.req.header('x-limited-key-id')) : null
-    const key = capgkey_string ?? apikey_string
-    if (!key) {
-      cloudlog('No key provided')
-      throw quickError(401, 'no_key_provided', 'No key provided')
-    }
-    const apikey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKey(c, key, supabaseAdmin(c), rights)
-    if (!apikey) {
-      cloudlog({ requestId: c.get('requestId'), message: 'Invalid apikey', key })
-      throw quickError(401, 'invalid_apikey', 'Invalid apikey')
-    }
-    c.set('apikey', apikey)
-    c.set('capgkey', key)
-    if (subkey_id) {
-      const subkey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKeyById(c, subkey_id, supabaseAdmin(c), rights)
-      if (!subkey) {
-        cloudlog({ requestId: c.get('requestId'), message: 'Invalid subkey', subkey_id })
-        throw quickError(401, 'invalid_subkey', 'Invalid subkey')
-      }
-      if (subkey?.limited_to_apps && subkey?.limited_to_apps.length === 0 && subkey?.limited_to_orgs && subkey?.limited_to_orgs.length === 0) {
-        cloudlog({ requestId: c.get('requestId'), message: 'Invalid subkey, no limited apps or orgs', subkey })
-        throw quickError(401, 'invalid_subkey', 'Invalid subkey, no limited apps or orgs')
-      }
-      if (subkey)
-        c.set('subkey', subkey)
-    }
-    await next()
-  })
-  return subMiddlewareKey
 }
 
 export async function getBodyOrQuery<T>(c: Context<MiddlewareKeyVariables, any, any>) {
@@ -315,6 +148,11 @@ export function createHono(functionName: string, version: string, sentryDsn?: st
       release: version,
     }) as any)
   }
+  appGlobal.use('*', (c, next): Promise<any> => {
+    // ADD HEADER TO IDENTIFY WORKER SOURCE
+    c.header('X-Worker-Source', getEnv(c, 'ENV_NAME') || functionName)
+    return next()
+  })
 
   appGlobal.use('*', logger())
   appGlobal.use('*', requestId())
@@ -356,7 +194,7 @@ export function simpleError200(c: Context, errorCode: string, message: string, m
     message,
     ...moreInfo,
   }
-  cloudlogErr({ requestId: c.get('requestId'), message, errorCode, moreInfo })
+  cloudlog({ requestId: c.get('requestId'), message, errorCode, moreInfo })
   return c.json(res, status)
 }
 
@@ -366,7 +204,20 @@ export function quickError(status: number, errorCode: string, message: string, m
     message,
     moreInfo,
   }
-  return new HTTPException(status as any, { res: new Response(JSON.stringify(res), { status }), cause })
+  // Throw an HTTPException carrying the JSON response; keep Error.message concise
+  return new HTTPException(status as any, {
+    res: new Response(JSON.stringify(res), { status, headers: { 'content-type': 'application/json; charset=utf-8' } }),
+    message,
+    cause,
+  })
+}
+
+export function simpleRateLimit(moreInfo: any = {}, cause?: any) {
+  const status = 429
+  const message = 'Too many requests'
+  const errorCode = 'too_many_requests'
+  cloudlog({ message, errorCode, moreInfo })
+  return quickError(status, errorCode, message, moreInfo, cause)
 }
 
 export function simpleError(errorCode: string, message: string, moreInfo: any = {}, cause?: any) {
@@ -390,10 +241,12 @@ export function getIsV2(c: Context) {
   const isV2 = getRuntimeKey() === 'workerd' ? Number.parseFloat(getEnv(c, 'IS_V2') ?? '0') : 0.0
   cloudlog({ requestId: c.get('requestId'), message: 'isV2', isV2 })
   if (c.req.url.endsWith('_v2')) {
-    // allow to force v2 for update_v2 or update_lite_v2 or stats_v2
+    cloudlog({ requestId: c.get('requestId'), message: 'isV2 forced to true by _v2 suffix' })
+    // allow to force v2 for update_v2 or stats_v2
     return true
   }
   if (isV2 && Math.random() < isV2) {
+    cloudlog({ requestId: c.get('requestId'), message: 'isV2 forced to true by random chance', isV2 })
     return true
   }
   cloudlog({ requestId: c.get('requestId'), message: 'isV2 forced to false', isV2 })

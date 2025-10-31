@@ -24,11 +24,11 @@ jobs:
           path: ${{ env.DENO_DIR }}
           key: my_cache_key
       - name: Checkout capgo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Install Supabase CLI
         uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: 2.53.6
       - name: Show Supabase CLI version
         run: supabase --version
       - name: Set edge runtime policy to per_worker
@@ -57,6 +57,14 @@ jobs:
         run: bun install
       # - name: Install playwright
       #   run: bunx playwright install
+      - name: Lint
+        run: bun lint && bun lint:backend
+      - name: Typecheck
+        run: bun typecheck
+      - name: Lint I18n
+        run: bunx @inlang/cli lint --project project.inlang
+      - name: Lint SQL
+        run: supabase db lint -s public --fail-on warning
       - uses: JarvusInnovations/background-action@v1
         name: Bootstrap Edge server
         with:
@@ -82,5 +90,39 @@ jobs:
           working-directory: .
       - name: Run tests
         run: bun run test:all
+        # TODO: enable these tests when they are stable
+      # - uses: JarvusInnovations/background-action@v1
+      #   name: Start Cloudflare Workers for testing
+      #   with:
+      #     run: |
+      #       chmod +x scripts/start-cloudflare-workers.sh
+      #       ./scripts/start-cloudflare-workers.sh
+      #     wait-on: |
+      #       http-get://127.0.0.1:8790/ok
+      #       http-get://127.0.0.1:8787/ok
+      #       http-get://127.0.0.1:8788/ok
+      #       http-get://127.0.0.1:8789/ok
+      #     tail: stderr,stdout
+      #     log-output-resume: stderr,stdout
+      #     wait-for: 2m
+      #     log-output: stderr,stdout
+      #     log-output-if: true
+      #     working-directory: .
+      # - name: Verify D1 sync is ready
+      #   run: |
+      #     echo "Verifying D1 sync worker is operational..."
+      #     for i in {1..30}; do
+      #       response=$(curl -s -w "%{http_code}" -X POST http://127.0.0.1:8790/sync -H "x-webhook-signature: testsecret" -o /dev/null)
+      #       if [ "$response" = "200" ]; then
+      #         echo "✓ D1 sync is ready"
+      #         exit 0
+      #       fi
+      #       echo "Waiting for D1 sync... ($i/30) - HTTP $response"
+      #       sleep 2
+      #     done
+      #     echo "✗ D1 sync failed to become ready"
+      #     exit 1
+      # - name: Run Cloudflare Workers plugin tests
+      #   run: bun run test:cloudflare:plugin
       # - name: Run playwright tests
       #   run: bun run test:front

@@ -4,7 +4,6 @@ import type { TableColumn, TableSort } from '~/components/comp_def'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
-import { appIdToUrl } from '~/services/conversion'
 import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
@@ -17,23 +16,18 @@ interface DeployHistory {
   app_id: string
   channel_id: number
   deployed_at: string
-  link?: string
-  comment?: string
-  created_by: string
   version: {
     id: number
     name: string
     app_id: string
     created_at: string
-    link?: string
-    comment?: string
     deleted?: boolean
   }
-  user?: {
-    id: string
-    first_name: string
-    last_name: string
-  }
+  created_by: string
+  user: {
+    uid: string
+    email: string
+  } | null
 }
 
 const props = defineProps<{
@@ -41,6 +35,7 @@ const props = defineProps<{
   appId: string
 }>()
 
+const members = ref([] as ExtendedOrganizationMembers)
 const { t } = useI18n()
 const router = useRouter()
 const supabase = useSupabase()
@@ -84,17 +79,6 @@ function isCurrentVersion(item: DeployHistory): boolean {
   return item.version_id === currentVersionId.value
 }
 
-// Function to open link in a new tab
-function openLink(url?: string): void {
-  if (url) {
-    // Using window from global scope
-    const win = window.open(url, '_blank')
-    // Add some security with noopener
-    if (win)
-      win.opener = null
-  }
-}
-
 const columns = computed<TableColumn[]>(() => [
   {
     label: t('bundle-number'),
@@ -103,13 +87,6 @@ const columns = computed<TableColumn[]>(() => [
     sortable: true,
     displayFunction: item => item.version.name,
     onClick: (item: DeployHistory) => openOneVersion(item),
-  },
-  {
-    label: t('created-at'),
-    key: 'version.created_at',
-    mobile: false,
-    sortable: true,
-    displayFunction: item => formatDate(item.version.created_at),
   },
   {
     label: t('deploy-date'),
@@ -125,24 +102,7 @@ const columns = computed<TableColumn[]>(() => [
     displayFunction: item => item.user?.email || '-',
   },
   {
-    label: t('link'),
-    key: 'link',
-    mobile: false,
-    displayFunction: item => item.link || '-',
-    onClick: (item) => {
-      if (item.link) {
-        openLink(item.link)
-      }
-    },
-  },
-  {
-    label: t('comment'),
-    key: 'comment',
-    mobile: false,
-    displayFunction: item => item.comment || '-',
-  },
-  {
-    label: t('rollback-to-this-version'),
+    label: t('action'),
     key: 'rollback',
     mobile: true,
     class: 'text-center',
@@ -156,12 +116,15 @@ const columns = computed<TableColumn[]>(() => [
       if (!isCurrentVersion(item) && !item.version?.deleted) {
         handleRollback(item)
       }
+      else {
+        toast.error(t('cannot-rollback-to-current-version'))
+      }
     },
   },
 ])
 
 async function openOneVersion(item: DeployHistory) {
-  router.push(`/app/p/${appIdToUrl(props.appId)}/bundle/${item.version_id}`)
+  router.push(`/app/p/${props.appId}/bundle/${item.version_id}`)
 }
 
 async function fetchDeployHistory() {
@@ -169,6 +132,7 @@ async function fetchDeployHistory() {
   try {
     deployHistory.value.length = 0
     await fetchCurrentVersion()
+    members.value = await organizationStore.getMembers()
 
     // Using "deploy_history" as a string rather than a type reference
     let query = supabase
@@ -180,14 +144,7 @@ async function fetchDeployHistory() {
           name,
           app_id,
           created_at,
-          link,
-          comment,
           deleted
-        ),
-        user:created_by (
-          id,
-          first_name,
-          last_name
         )
       `, { count: 'exact' })
       .eq('channel_id', props.channelId)
@@ -213,6 +170,13 @@ async function fetchDeployHistory() {
     }) as unknown as DeployHistory[]
 
     deployHistory.value = filteredData
+    for (const item of deployHistory.value) {
+      const member = members.value.find(m => m.uid === item.created_by)
+      if (member) {
+        item.user = member
+      }
+    }
+    console.log('Deploy History:', deployHistory.value)
 
     total.value = count ?? 0
   }
@@ -285,6 +249,7 @@ watch([() => props.channelId, () => props.appId], () => {
   <Table
     :is-loading="loading"
     :search="search"
+    :search-placeholder="t('search-by-name')"
     :total="total"
     :current-page="page"
     :columns="columns"

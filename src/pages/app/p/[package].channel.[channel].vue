@@ -17,9 +17,9 @@ import IconSearch from '~icons/ic/round-search?raw'
 import plusOutline from '~icons/ion/add-outline?width=2em&height=2em'
 import IconAlertCircle from '~icons/lucide/alert-circle'
 import IconDown from '~icons/material-symbols/keyboard-arrow-down-rounded'
-import { appIdToUrl, urlToAppId } from '~/services/conversion'
 import { formatDate } from '~/services/date'
 import { checkCompatibilityNativePackages, isCompatible, useSupabase } from '~/services/supabase'
+import { isInternalVersionName } from '~/services/versions'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
@@ -155,7 +155,7 @@ async function customDeviceOverwritePart5(
       device_id: deviceId,
       app_id: route.params.package as string,
       platform,
-      version: Number(route.params.channel),
+      version_name: channel.value?.version.name ?? 'unknown',
     },
   })
 
@@ -332,7 +332,6 @@ watchEffect(async () => {
   if (route.path.includes('/channel/')) {
     loading.value = true
     packageId.value = route.params.package as string
-    packageId.value = urlToAppId(packageId.value)
     id.value = Number(route.params.channel as string)
     await getChannel()
     await getDeviceIds()
@@ -342,85 +341,8 @@ watchEffect(async () => {
   }
 })
 
-async function makeDefault(val = true) {
-  if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'super_admin'])) {
-    toast.error(t('no-permission'))
-    return
-  }
-  let buttonMessage = t('channel-make-now')
-  if (channel.value?.ios && !channel.value.android)
-    buttonMessage = t('make-default-ios')
-  else if (channel.value?.android && !channel.value.ios)
-    buttonMessage = t('make-default-android')
-
-  dialogStore.openDialog({
-    title: t('are-u-sure'),
-    description: val ? t('confirm-public-desc') : t('making-this-channel-'),
-    buttons: [
-      {
-        text: t('button-cancel'),
-        role: 'cancel',
-      },
-      {
-        text: val ? buttonMessage : t('make-normal'),
-        role: 'primary',
-        handler: async () => {
-          if (!channel.value || !id.value)
-            return
-          const { error } = await supabase
-            .from('channels')
-            .update({ public: val })
-            .eq('id', id.value)
-
-          // This code is here because the backend has a 20 second delay between setting a channel to public
-          // and the backend changing other channels to be not public
-          // In these 20 seconds the updates are broken
-          if (val && channel.value.ios) {
-            const { error: iosError } = await supabase
-              .from('channels')
-              .update({ public: false })
-              .eq('app_id', channel.value.app_id)
-              .eq('ios', true)
-              .neq('id', channel.value.id)
-            const { error: hiddenError } = await supabase
-              .from('channels')
-              .update({ public: false })
-              .eq('app_id', channel.value.app_id)
-              .eq('android', false)
-              .eq('ios', false)
-            if (iosError || hiddenError)
-              console.log('error', iosError ?? hiddenError)
-          }
-
-          if (val && channel.value.android) {
-            const { error: androidError } = await supabase
-              .from('channels')
-              .update({ public: false })
-              .eq('app_id', channel.value.app_id)
-              .eq('android', true)
-              .neq('id', channel.value.id)
-            const { error: hiddenError } = await supabase
-              .from('channels')
-              .update({ public: false })
-              .eq('app_id', channel.value.app_id)
-              .eq('android', false)
-              .eq('ios', false)
-            if (androidError || hiddenError)
-              console.log('error', androidError ?? hiddenError)
-          }
-
-          if (error) {
-            console.error(error)
-          }
-          else {
-            channel.value.public = val
-            toast.success(val ? t('defined-as-public') : t('defined-as-private'))
-          }
-        },
-      },
-    ],
-  })
-  return dialogStore.onDialogDismiss()
+function goToDefaultChannelSettings() {
+  router.push(`/app/p/${route.params.package}?tab=info`)
 }
 
 async function getUnknownVersion(): Promise<number> {
@@ -708,186 +630,198 @@ async function handleRevert() {
     </div>
     <div v-else-if="channel">
       <Tabs v-model:active-tab="ActiveTab" :tabs="tabs" />
-      <div v-if="channel && ActiveTab === 'info'" class="flex flex-col overflow-y-auto h-[calc(100vh-200px)]">
-        <div class="flex flex-col overflow-y-auto bg-white shadow-lg border-slate-300 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-slate-800">
-          <dl class="divide-y dark:divide-slate-500 divide-slate-200">
-            <InfoRow :label="t('name')">
-              {{ channel.name }}
-            </InfoRow>
-            <!-- Bundle Number -->
-            <InfoRow :label="t('bundle-number')" :is-link="channel && channel.version.name !== 'builtin' && channel.version.name !== 'unknown'">
-              <div class="flex items-center gap-2">
-                <span @click="openBundle()">{{ channel.version.name }}</span>
-                <button
-                  v-if="channel"
-                  class="p-1 rounded-md border border-gray-200 hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:hover:border-gray-600 dark:hover:bg-gray-800 transition-colors"
-                  @click="openSelectVersion()"
-                >
-                  <Settings class="w-4 h-4 text-gray-500 hover:text-blue-500 dark:text-gray-400 dark:hover:text-blue-400" />
+      <div v-if="channel && ActiveTab === 'info'" class="mt-0 md:mt-8">
+        <div class="w-full h-full px-0 pt-0 md:pt-8 mx-auto mb-8 overflow-y-auto max-w-9xl max-h-fit sm:px-6 lg:px-8">
+          <div class="flex flex-col overflow-hidden overflow-y-auto h-[calc(100vh-200px)] bg-white border border-slate-300 shadow-lg md:rounded-lg dark:border-slate-900 dark:bg-slate-800">
+            <dl class="divide-y dark:divide-slate-500 divide-slate-200">
+              <InfoRow :label="t('name')">
+                {{ channel.name }}
+              </InfoRow>
+              <!-- Bundle Number -->
+              <InfoRow :label="t('bundle-number')" :is-link="channel && !isInternalVersionName((channel.version.name))">
+                <div class="flex items-center gap-2">
+                  <span class="cursor-pointer" @click="openBundle()">{{ channel.version.name }}</span>
+                  <button
+                    v-if="channel"
+                    class="p-1 rounded-md border border-gray-200 hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:hover:border-gray-600 dark:hover:bg-gray-800 transition-colors"
+                    @click="openSelectVersion()"
+                  >
+                    <Settings class="w-4 h-4 text-gray-500 hover:text-blue-500 dark:text-gray-400 dark:hover:text-blue-400" />
+                  </button>
+                </div>
+              </InfoRow>
+              <InfoRow v-if="channel.disable_auto_update === 'version_number'" :label="t('min-update-version')">
+                {{ channel.version.min_update_version ?? t('undefined-fail') }}
+              </InfoRow>
+              <!-- Created At -->
+              <InfoRow :label="t('created-at')">
+                {{ formatDate(channel.created_at) }}
+              </InfoRow>
+              <!-- Last Update -->
+              <InfoRow :label="t('last-update')">
+                {{ formatDate(channel.updated_at) }}
+              </InfoRow>
+              <!-- Bundle Link -->
+              <InfoRow
+                v-if="channel.version.link"
+                :label="t('bundle-link')"
+                :is-link="channel.version.link ? true : false"
+                @click="channel.version.link ? openLink(channel.version.link) : null"
+              >
+                {{ channel.version.link }}
+              </InfoRow>
+              <!-- Bundle Comment -->
+              <InfoRow v-if="channel.version.comment" :label="t('bundle-comment')">
+                {{ channel.version.comment }}
+              </InfoRow>
+              <InfoRow :label="t('channel-is-public')">
+                <div class="flex w-full items-center justify-end gap-3 text-right">
+                  <span
+                    class="inline-flex items-center rounded-md px-2 py-1 text-xs font-semibold"
+                    :class="channel?.public
+                      ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200'
+                      : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200'"
+                  >
+                    {{ channel?.public ? t('channel-default-active') : t('channel-default-inactive') }}
+                  </span>
+                  <button
+                    type="button"
+                    class="text-sm font-medium text-blue-600 underline decoration-dotted hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300"
+                    @click="goToDefaultChannelSettings"
+                  >
+                    {{ t('manage-default-channel') }}
+                  </button>
+                  <div class="relative inline-flex group">
+                    <IconInformations class="w-4 h-4 text-slate-400 transition-colors cursor-help group-hover:text-slate-600 dark:text-slate-400 dark:group-hover:text-slate-200" />
+                    <div class="pointer-events-none absolute right-0 bottom-full mb-2 w-56 rounded-lg bg-gray-800 px-3 py-2 text-xs text-white opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100">
+                      {{ t('channel-default-moved-info') }}
+                      <div class="absolute -bottom-1 right-2 h-2 w-2 rotate-45 bg-gray-800" />
+                    </div>
+                  </div>
+                </div>
+              </InfoRow>
+              <InfoRow label="iOS">
+                <Toggle
+                  :value="channel?.ios"
+                  @change="saveChannelChange('ios', !channel?.ios)"
+                />
+              </InfoRow>
+              <InfoRow label="Android">
+                <Toggle
+                  :value="channel?.android"
+                  @change="saveChannelChange('android', !channel?.android)"
+                />
+              </InfoRow>
+              <InfoRow :label="t('disable-auto-downgra')">
+                <Toggle
+                  :value="channel?.disable_auto_update_under_native"
+                  @change="saveChannelChange('disable_auto_update_under_native', !channel?.disable_auto_update_under_native)"
+                />
+              </InfoRow>
+              <InfoRow :label="t('disableAutoUpdateToMajor')">
+                <details ref="autoUpdateDropdown" class="d-dropdown d-dropdown-end">
+                  <summary class="d-btn d-btn-outline d-btn-sm">
+                    <span>{{ getAutoUpdateLabel(channel.disable_auto_update) }}</span>
+                    <IconDown class="w-4 h-4 ml-1 fill-current" />
+                  </summary>
+                  <ul class="d-dropdown-content bg-base-200 rounded-box z-1 w-48 p-2 shadow">
+                    <li class="block px-1 rounded-lg hover:bg-gray-600">
+                      <a
+                        class="block px-3 py-2 hover:bg-gray-600 text-white"
+                        @click="onSelectAutoUpdate('major')"
+                      >
+                        {{ t('major') }}
+                      </a>
+                    </li>
+                    <li class="block px-1 rounded-lg hover:bg-gray-600">
+                      <a
+                        class="block px-3 py-2 hover:bg-gray-600 text-white"
+                        @click="onSelectAutoUpdate('minor')"
+                      >
+                        {{ t('minor') }}
+                      </a>
+                    </li>
+                    <li class="block px-1 rounded-lg hover:bg-gray-600">
+                      <a
+                        class="block px-3 py-2 hover:bg-gray-600 text-white"
+                        @click="onSelectAutoUpdate('patch')"
+                      >
+                        {{ t('patch') }}
+                      </a>
+                    </li>
+                    <li class="block px-1 rounded-lg hover:bg-gray-600">
+                      <a
+                        class="block px-3 py-2 hover:bg-gray-600 text-white"
+                        @click="onSelectAutoUpdate('version_number')"
+                      >
+                        {{ t('metadata') }}
+                      </a>
+                    </li>
+                    <li class="block px-1 rounded-lg hover:bg-gray-600">
+                      <a
+                        class="block px-3 py-2 hover:bg-gray-600 text-white"
+                        @click="onSelectAutoUpdate('none')"
+                      >
+                        {{ t('none') }}
+                      </a>
+                    </li>
+                  </ul>
+                </details>
+              </InfoRow>
+              <InfoRow :label="t('allow-develoment-bui')">
+                <Toggle
+                  :value="channel?.allow_dev"
+                  @change="saveChannelChange('allow_dev', !channel?.allow_dev)"
+                />
+              </InfoRow>
+              <InfoRow :label="t('allow-emulator')">
+                <Toggle
+                  :value="channel?.allow_emulator"
+                  @change="saveChannelChange('allow_emulator', !channel?.allow_emulator)"
+                />
+              </InfoRow>
+              <InfoRow :label="t('allow-device-to-self')">
+                <Toggle
+                  :value="channel?.allow_device_self_set"
+                  @change="saveChannelChange('allow_device_self_set', !channel?.allow_device_self_set)"
+                />
+              </InfoRow>
+              <InfoRow :label="t('unlink-bundle')" :is-link="true" @click="openPannel">
+                <button class="ml-auto bg-transparent w-7 h-7">
+                  <IconNext />
                 </button>
-              </div>
-            </InfoRow>
-            <InfoRow v-if="channel.disable_auto_update === 'version_number'" :label="t('min-update-version')">
-              {{ channel.version.min_update_version ?? t('undefined-fail') }}
-            </InfoRow>
-            <!-- Created At -->
-            <InfoRow :label="t('created-at')">
-              {{ formatDate(channel.created_at) }}
-            </InfoRow>
-            <!-- Last Update -->
-            <InfoRow :label="t('last-update')">
-              {{ formatDate(channel.updated_at) }}
-            </InfoRow>
-            <!-- Bundle Link -->
-            <InfoRow
-              v-if="channel.version.link"
-              :label="t('bundle-link')"
-              :is-link="channel.version.link ? true : false"
-              @click="channel.version.link ? openLink(channel.version.link) : null"
-            >
-              {{ channel.version.link }}
-            </InfoRow>
-            <!-- Bundle Comment -->
-            <InfoRow v-if="channel.version.comment" :label="t('bundle-comment')">
-              {{ channel.version.comment }}
-            </InfoRow>
-            <InfoRow :label="t('channel-is-public')">
-              <Toggle
-                :value="channel?.public"
-                @change="() => (makeDefault(!channel?.public))"
-              />
-            </InfoRow>
-            <InfoRow label="iOS">
-              <Toggle
-                :value="channel?.ios"
-                @change="saveChannelChange('ios', !channel?.ios)"
-              />
-            </InfoRow>
-            <InfoRow label="Android">
-              <Toggle
-                :value="channel?.android"
-                @change="saveChannelChange('android', !channel?.android)"
-              />
-            </InfoRow>
-            <InfoRow :label="t('disable-auto-downgra')">
-              <Toggle
-                :value="channel?.disable_auto_update_under_native"
-                @change="saveChannelChange('disable_auto_update_under_native', !channel?.disable_auto_update_under_native)"
-              />
-            </InfoRow>
-            <InfoRow :label="t('disableAutoUpdateToMajor')">
-              <details ref="autoUpdateDropdown" class="d-dropdown d-dropdown-end">
-                <summary class="d-btn d-btn-outline d-btn-sm">
-                  <span>{{ getAutoUpdateLabel(channel.disable_auto_update) }}</span>
-                  <IconDown class="w-4 h-4 ml-1 fill-current" />
-                </summary>
-                <ul class="d-dropdown-content bg-base-200 rounded-box z-1 w-48 p-2 shadow">
-                  <li class="block px-1 rounded-lg hover:bg-gray-600">
-                    <a
-                      class="block px-3 py-2 hover:bg-gray-600 text-white"
-                      @click="onSelectAutoUpdate('major')"
-                    >
-                      {{ t('major') }}
-                    </a>
-                  </li>
-                  <li class="block px-1 rounded-lg hover:bg-gray-600">
-                    <a
-                      class="block px-3 py-2 hover:bg-gray-600 text-white"
-                      @click="onSelectAutoUpdate('minor')"
-                    >
-                      {{ t('minor') }}
-                    </a>
-                  </li>
-                  <li class="block px-1 rounded-lg hover:bg-gray-600">
-                    <a
-                      class="block px-3 py-2 hover:bg-gray-600 text-white"
-                      @click="onSelectAutoUpdate('patch')"
-                    >
-                      {{ t('patch') }}
-                    </a>
-                  </li>
-                  <li class="block px-1 rounded-lg hover:bg-gray-600">
-                    <a
-                      class="block px-3 py-2 hover:bg-gray-600 text-white"
-                      @click="onSelectAutoUpdate('version_number')"
-                    >
-                      {{ t('metadata') }}
-                    </a>
-                  </li>
-                  <li class="block px-1 rounded-lg hover:bg-gray-600">
-                    <a
-                      class="block px-3 py-2 hover:bg-gray-600 text-white"
-                      @click="onSelectAutoUpdate('none')"
-                    >
-                      {{ t('none') }}
-                    </a>
-                  </li>
-                </ul>
-              </details>
-            </InfoRow>
-            <InfoRow :label="t('allow-develoment-bui')">
-              <Toggle
-                :value="channel?.allow_dev"
-                @change="saveChannelChange('allow_dev', !channel?.allow_dev)"
-              />
-            </InfoRow>
-            <InfoRow :label="t('allow-emulator')">
-              <Toggle
-                :value="channel?.allow_emulator"
-                @change="saveChannelChange('allow_emulator', !channel?.allow_emulator)"
-              />
-            </InfoRow>
-            <InfoRow :label="t('allow-device-to-self')">
-              <Toggle
-                :value="channel?.allow_device_self_set"
-                @change="saveChannelChange('allow_device_self_set', !channel?.allow_device_self_set)"
-              />
-            </InfoRow>
-            <InfoRow :label="t('unlink-bundle')" :is-link="true" @click="openPannel">
-              <button class="ml-auto bg-transparent w-7 h-7">
-                <IconNext />
-              </button>
-            </InfoRow>
-          </dl>
+              </InfoRow>
+            </dl>
+          </div>
         </div>
       </div>
       <div
         v-if="channel && ActiveTab === 'devices'"
-        class="flex flex-col"
-        :class="{
-          'm-0 w-full h-screen items-center justify-center overflow-hidden': deviceIds.length === 0,
-        }"
       >
-        <div
-          class="flex flex-col overflow-y-auto bg-white shadow-lg border-slate-300 md:mx-auto md:border dark:border-slate-900 md:rounded-lg dark:bg-gray-800"
-          :class="{
-            'md:mt-5 md:w-2/3': deviceIds.length !== 0,
-            'my-auto w-fit': deviceIds.length === 0,
-            'p-4': deviceIds.length === 0 && !dialogStore.showDialog,
-          }"
-        >
-          <DeviceTable v-if="deviceIds.length > 0" class="p-3" :app-id="channel.version.app_id" :ids="deviceIds" :channel="channel" show-add-button @add-device="AddDevice" />
-          <template v-else-if="!dialogStore.showDialog">
-            <div class="text-center">
-              <div>{{ t('forced-devices-not-found') }}</div>
-              <div class="d-btn d-btn-primary mt-4 text-white" @click="AddDevice">
-                <plusOutline />
+        <div class="w-full h-full px-0 pt-0 md:pt-8 mx-auto mb-8 overflow-y-auto max-w-9xl max-h-fit sm:px-6 lg:px-8">
+          <div class="flex flex-col overflow-hidden overflow-y-auto bg-white border border-slate-300 shadow-lg md:rounded-lg dark:border-slate-900 dark:bg-gray-800">
+            <DeviceTable v-if="deviceIds.length > 0" :app-id="channel.version.app_id" :ids="deviceIds" :channel="channel" show-add-button @add-device="AddDevice" />
+            <template v-else-if="!dialogStore.showDialog">
+              <div class="text-center py-4">
+                <div>{{ t('forced-devices-not-found') }}</div>
+                <div class="d-btn d-btn-primary mt-4 text-white cursor-pointer" @click="AddDevice">
+                  <plusOutline />
+                </div>
               </div>
-            </div>
-          </template>
+            </template>
+          </div>
         </div>
       </div>
       <div
         v-if="channel && ActiveTab === 'history'"
-        class="flex flex-col"
       >
-        <div
-          class="flex flex-col overflow-y-auto bg-white shadow-lg border-slate-300 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-gray-800"
-        >
-          <HistoryTable
-            :channel-id="id"
-            :app-id="channel.app_id"
-          />
+        <div class="w-full h-full px-0 pt-0 md:pt-8 mx-auto mb-8 overflow-y-auto max-w-9xl max-h-fit sm:px-6 lg:px-8">
+          <div class="flex flex-col overflow-hidden overflow-y-auto bg-white border border-slate-300 shadow-lg md:rounded-lg dark:border-slate-900 dark:bg-gray-800">
+            <HistoryTable
+              :channel-id="id"
+              :app-id="channel.app_id"
+            />
+          </div>
         </div>
       </div>
     </div>
@@ -899,7 +833,7 @@ async function handleRevert() {
       <p class="text-muted-foreground mt-2">
         {{ t('channel-not-found-description') }}
       </p>
-      <button class="mt-4 d-btn d-btn-primary text-white" @click="router.push(`/app/p/${appIdToUrl(packageId)}/channels`)">
+      <button class="mt-4 d-btn d-btn-primary text-white" @click="router.push(`/app/p/${packageId}/channels`)">
         {{ t('back-to-channels') }}
       </button>
     </div>
@@ -935,7 +869,6 @@ async function handleRevert() {
             :placeholder="t('search-versions')"
             :classes="{
               outer: 'mb-0! w-full',
-              inner: 'rounded-full!',
             }"
           />
         </div>

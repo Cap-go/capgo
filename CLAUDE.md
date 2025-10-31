@@ -15,6 +15,7 @@ code in this repository.
 
 ### Testing
 
+#### Supabase Edge Functions (Default)
 - `bun test:all` - Run all backend tests
 - `bun test:backend` - Run backend tests excluding CLI tests
 - `bun test:cli` - Run CLI-specific tests
@@ -23,11 +24,19 @@ code in this repository.
 - `LOCAL_CLI_PATH=true bun test:all:local` - Run all tests with local CLI
   configuration
 
+#### Cloudflare Workers Testing
+- `bun test:cloudflare:all` - Run all tests against Cloudflare Workers
+- `bun test:cloudflare:backend` - Run backend tests against Cloudflare Workers
+- `bun test:cloudflare:updates` - Run update tests against Cloudflare Workers
+- `./scripts/start-cloudflare-workers.sh` - Start local Cloudflare Workers for testing
+
+See [CLOUDFLARE_TESTING.md](CLOUDFLARE_TESTING.md) for detailed information on testing against Cloudflare Workers.
+
 ### Code Quality
 
 - `bun lint` - Lint Vue, TypeScript, and JavaScript files
-- `bun lint-fix` - Auto-fix linting issues
-- `bun lint-backend` - Lint Supabase backend files
+- `bun lint:fix` - Auto-fix linting issues
+- `bun lint:backend` - Lint Supabase backend files
 - `bun typecheck` - Run TypeScript type checking with vue-tsc
 - `bun types` - Generate TypeScript types from Supabase
 

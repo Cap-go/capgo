@@ -8,32 +8,28 @@ CREATE TABLE public.to_delete_accounts (
 );
 
 -- Ensure only one pending delete per account and efficient scheduling
-CREATE UNIQUE INDEX IF NOT EXISTS to_delete_accounts_account_id_key
-  ON public.to_delete_accounts (account_id);
-CREATE INDEX IF NOT EXISTS to_delete_accounts_removal_date_idx
-  ON public.to_delete_accounts (removal_date);
+CREATE UNIQUE INDEX IF NOT EXISTS to_delete_accounts_account_id_key ON public.to_delete_accounts (account_id);
+
+CREATE INDEX IF NOT EXISTS to_delete_accounts_removal_date_idx ON public.to_delete_accounts (removal_date);
 
 -- Enable Row Level Security
 ALTER TABLE public.to_delete_accounts ENABLE ROW LEVEL SECURITY;
 
 -- Create RLS policy that denies access to all users
 -- Only service_role or bypassing RLS can access this table
-CREATE POLICY "Deny all access" ON public.to_delete_accounts
-  FOR ALL
-  USING (false)
-  WITH CHECK (false);
+CREATE POLICY "Deny all access" ON public.to_delete_accounts FOR ALL USING (false)
+WITH
+  CHECK (false);
 
 -- Grant permissions to service_role for system operations
 GRANT ALL ON TABLE public.to_delete_accounts TO service_role;
+
 GRANT ALL ON SEQUENCE public.to_delete_accounts_id_seq TO service_role;
 
 -- Function to check if an account is disabled (marked for deletion)
-CREATE OR REPLACE FUNCTION public.is_account_disabled(user_id UUID)
-RETURNS BOOLEAN
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
+CREATE OR REPLACE FUNCTION public.is_account_disabled (user_id UUID) RETURNS BOOLEAN LANGUAGE plpgsql SECURITY DEFINER
+SET
+  search_path = public AS $$
 BEGIN
     -- Check if the user_id exists in the to_delete_accounts table
     RETURN EXISTS (
@@ -45,12 +41,9 @@ END;
 $$;
 
 -- Function to get the removal date for a disabled account
-CREATE OR REPLACE FUNCTION public.get_account_removal_date(user_id UUID)
-RETURNS TIMESTAMPTZ
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
+CREATE OR REPLACE FUNCTION public.get_account_removal_date (user_id UUID) RETURNS TIMESTAMPTZ LANGUAGE plpgsql SECURITY DEFINER
+SET
+  search_path = public AS $$
 DECLARE
     removal_date TIMESTAMPTZ;
 BEGIN
@@ -68,9 +61,9 @@ BEGIN
 END;
 $$;
 
-
 CREATE OR REPLACE FUNCTION "public"."delete_user" () RETURNS "void" LANGUAGE "plpgsql"
-SECURITY DEFINER AS $$
+SET
+  search_path = '' SECURITY DEFINER AS $$
 DECLARE
   user_id_fn uuid;
   user_email text;
@@ -106,14 +99,9 @@ BEGIN
 END;
 $$;
 
-
 -- Function to permanently delete accounts that have passed their removal_date
 -- This function can only be called by PostgreSQL/cron jobs, not by users
-CREATE OR REPLACE FUNCTION "public"."delete_accounts_marked_for_deletion" () 
-RETURNS TABLE(deleted_count INTEGER, deleted_user_ids UUID[])
-LANGUAGE "plpgsql"
-SECURITY DEFINER
-AS $$
+CREATE OR REPLACE FUNCTION "public"."delete_accounts_marked_for_deletion" () RETURNS TABLE (deleted_count INTEGER, deleted_user_ids UUID[]) LANGUAGE "plpgsql" SECURITY DEFINER AS $$
 DECLARE
   account_record RECORD;
   deleted_users UUID[] := '{}';
@@ -161,18 +149,30 @@ $$;
 
 -- Revoke all permissions from public (no one can execute by default)
 -- Revoke all permissions from public (default), anon, and authenticated users
-REVOKE ALL ON FUNCTION "public"."delete_accounts_marked_for_deletion"() FROM PUBLIC;
-REVOKE ALL ON FUNCTION "public"."delete_accounts_marked_for_deletion"() FROM anon;
-REVOKE ALL ON FUNCTION "public"."delete_accounts_marked_for_deletion"() FROM authenticated;
+REVOKE ALL ON FUNCTION "public"."delete_accounts_marked_for_deletion" ()
+FROM
+  PUBLIC;
+
+REVOKE ALL ON FUNCTION "public"."delete_accounts_marked_for_deletion" ()
+FROM
+  anon;
+
+REVOKE ALL ON FUNCTION "public"."delete_accounts_marked_for_deletion" ()
+FROM
+  authenticated;
 
 -- Grant execution permission only to postgres superuser and service_role
-GRANT EXECUTE ON FUNCTION "public"."delete_accounts_marked_for_deletion"() TO postgres;
-GRANT EXECUTE ON FUNCTION "public"."delete_accounts_marked_for_deletion"() TO service_role;
+GRANT
+EXECUTE ON FUNCTION "public"."delete_accounts_marked_for_deletion" () TO postgres;
 
-  -- Create a cron job to run the account deletion function every minute
-  -- This will process and permanently delete accounts that have passed their removal_date
-  SELECT "cron"."schedule"(
-    'delete-expired-accounts',           -- job name
-    '* * * * *',                        -- cron expression (every minute)
-    'SELECT "public"."delete_accounts_marked_for_deletion"();'  -- SQL command
+GRANT
+EXECUTE ON FUNCTION "public"."delete_accounts_marked_for_deletion" () TO service_role;
+
+-- Create a cron job to run the account deletion function every minute
+-- This will process and permanently delete accounts that have passed their removal_date
+SELECT
+  "cron"."schedule" (
+    'delete-expired-accounts', -- job name
+    '* * * * *', -- cron expression (every minute)
+    'SELECT "public"."delete_accounts_marked_for_deletion"();' -- SQL command
   );

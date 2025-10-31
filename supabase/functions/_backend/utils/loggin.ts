@@ -19,10 +19,10 @@ export function serializeError(err: unknown) {
     return { name: err.name, message: err.message, stack: err.stack, cause: err.cause ? String(err.cause) : undefined }
   }
   try {
-    return JSON.stringify(err, (_k, v) => (typeof v === 'bigint' ? v.toString() : v))
+    return { message: JSON.stringify(err, (_k, v) => (typeof v === 'bigint' ? v.toString() : v)), stack: undefined, name: 'Error', cause: undefined }
   }
   catch {
-    return String(err)
+    return { message: String(err), stack: undefined, name: 'Error', cause: undefined }
   }
 }
 

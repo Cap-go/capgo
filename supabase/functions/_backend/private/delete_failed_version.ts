@@ -1,6 +1,7 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
-import { middlewareKey, parseBody, quickError, simpleError } from '../utils/hono.ts'
+import { parseBody, quickError, simpleError } from '../utils/hono.ts'
+import { middlewareKey } from '../utils/hono_middleware.ts'
 import { cloudlog } from '../utils/loggin.ts'
 import { logsnag } from '../utils/logsnag.ts'
 import { s3 } from '../utils/s3.ts'

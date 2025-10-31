@@ -1,0 +1,13 @@
+tree 8e7a628586f556be76e210e9db1fac0beb8d9d36
+parent 50858be6014b1d1011fc221bdb7d7520fc1358ac
+author martindonadieu <martindonadieu@gmail.com> 1664984602 +0200
+committer martindonadieu <martindonadieu@gmail.com> 1664984602 +0200
+gpgsig -----BEGIN PGP SIGNATURE-----
+ 
+ iHUEABYKAB0WIQQHWd5lOmDb/1UVT+y87nelVXJSVQUCYz2mGgAKCRC87nelVXJS
+ VY23AP43Cs3bxCGpkKrZa3vfbWekw8Fn0659hm9xtiFDlxoOnQD/cIsxppiGELqJ
+ SaPIXjB4YTmmBo9p1gxO+E43Q/tlQAM=
+ =3UYv
+ -----END PGP SIGNATURE-----
+
+fix: rename version in bundle

@@ -1,4 +1,5 @@
-import { honoFactory, middlewareKey, quickError, simpleError } from '../../utils/hono.ts'
+import { honoFactory, quickError, simpleError } from '../../utils/hono.ts'
+import { middlewareKey } from '../../utils/hono_middleware.ts'
 import { supabaseApikey } from '../../utils/supabase.ts'
 
 const app = honoFactory.createApp()

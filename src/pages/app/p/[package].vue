@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import type { Stat, Tab } from '~/components/comp_def'
+import type { Tab } from '~/components/comp_def'
 import type { Database } from '~/types/supabase.types'
-import { computed, ref, watchEffect } from 'vue'
+import { ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import IconChart from '~icons/heroicons/chart-bar'
@@ -12,7 +12,9 @@ import IconDevice from '~icons/heroicons/device-phone-mobile'
 import IconChannel from '~icons/heroicons/signal'
 import IconAlertCircle from '~icons/lucide/alert-circle'
 import AppSetting from '~/components/dashboard/AppSetting.vue'
-import { appIdToUrl, urlToAppId } from '~/services/conversion'
+import BundleUploadsCard from '~/components/dashboard/BundleUploadsCard.vue'
+import DeploymentStatsCard from '~/components/dashboard/DeploymentStatsCard.vue'
+import UpdateStatsCard from '~/components/dashboard/UpdateStatsCard.vue'
 import { getCapgoVersion, useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
@@ -28,7 +30,6 @@ const devicesNb = ref(0)
 const updatesNb = ref(0)
 const channelsNb = ref(0)
 const capgoVersion = ref('')
-const canShowMobileStats = ref(true)
 const main = useMainStore()
 const organizationStore = useOrganizationStore()
 const isLoading = ref(false)
@@ -36,6 +37,7 @@ const supabase = useSupabase()
 const displayStore = useDisplayStore()
 const app = ref<Database['public']['Tables']['apps']['Row']>()
 const ActiveTab = ref(route.query.tab?.toString() || 'overview')
+const usageComponent = ref()
 
 const tabs: Tab[] = [
   {
@@ -69,33 +71,6 @@ const tabs: Tab[] = [
     key: 'logs',
   },
 ]
-
-const stats = computed<Stat[]>(() => ([
-  {
-    label: t('channels'),
-    hoverLabel: 'Click to explore the channel list',
-    value: channelsNb.value?.toLocaleString(),
-    link: `/app/p/${appIdToUrl(id.value)}?tab=channels`,
-  },
-  {
-    label: t('bundles'),
-    hoverLabel: 'Click to explore the bundle list',
-    value: bundlesNb.value?.toLocaleString(),
-    link: `/app/p/${appIdToUrl(id.value)}?tab=bundles`,
-  },
-  {
-    label: t('devices'),
-    hoverLabel: 'Click to explore the device list',
-    value: devicesNb.value?.toLocaleString(),
-    link: `/app/p/${appIdToUrl(id.value)}?tab=devices`,
-  },
-  {
-    label: t('plan-updates'),
-    hoverLabel: 'Click to explore the logs',
-    value: updatesNb.value?.toLocaleString(),
-    link: `/app/p/${appIdToUrl(id.value)}?tab=logs`,
-  },
-]))
 
 async function loadAppInfo() {
   try {
@@ -158,7 +133,6 @@ watchEffect(async () => {
   if (route.path.startsWith('/app/p') && lastPath.value !== route.path) {
     lastPath.value = route.path
     id.value = route.params.package as string
-    id.value = urlToAppId(id.value)
     await refreshData()
     displayStore.NavTitle = app.value?.name ?? ''
     displayStore.defaultBack = '/app'
@@ -166,6 +140,11 @@ watchEffect(async () => {
 })
 
 watchEffect(() => {
+  // Clear dashboard-specific query parameters when switching away from overview
+  if (ActiveTab.value !== 'overview' && usageComponent.value?.clearDashboardParams) {
+    usageComponent.value.clearDashboardParams()
+  }
+  // Always update tab parameter
   router.replace({ query: { ...route.query, tab: ActiveTab.value } })
 })
 </script>
@@ -173,48 +152,71 @@ watchEffect(() => {
 <template>
   <div>
     <Tabs v-model:active-tab="ActiveTab" :tabs="tabs" />
-    <div v-if="isLoading" class="flex flex-col items-center justify-center h-full">
-      <Spinner size="w-40 h-40" />
-    </div>
-    <div v-else-if="app">
-      <div v-if="ActiveTab === 'overview'" class="mt-4 w-full h-full px-4 pt-8 mb-8 overflow-y-auto max-h-fit lg:px-8 sm:px-6 overflow-x-hidden">
+    <div v-if="app || isLoading">
+      <div v-if="ActiveTab === 'overview'" class="w-full h-full px-4 pt-4 mb-8 overflow-y-auto max-h-fit lg:px-8 sm:px-6 overflow-x-hidden">
         <FailedCard />
-        <Usage v-if="!organizationStore.currentOrganizationFailed" :app-id="id" :show-mobile-stats="canShowMobileStats" />
+        <Usage v-if="!organizationStore.currentOrganizationFailed" ref="usageComponent" :app-id="id" />
 
-        <BlurBg id="app-stats" class="mb-10">
-          <template #default>
-            <StatsBar :stats="stats" />
-          </template>
-        </BlurBg>
-      </div>
-
-      <div v-if="ActiveTab === 'info'" class="mt-0 md:mt-4">
-        <div class="flex flex-col mx-auto overflow-y-auto bg-white border md:rounded-lg shadow-lg border-slate-300 md:mt-5 md:w-2/3 dark:border-slate-900 dark:bg-gray-800">
-          <AppSetting :app-id="id" />
+        <!-- New charts section -->
+        <div class="grid grid-cols-1 sm:grid-cols-12 gap-6 mb-6 xl:grid-cols-12">
+          <BundleUploadsCard
+            :app-id="id"
+            :use-billing-period="usageComponent?.useBillingPeriod ?? true"
+            :accumulated="(usageComponent?.useBillingPeriod ?? true) && (usageComponent?.showCumulative ?? false)"
+            class="col-span-full sm:col-span-6 xl:col-span-4"
+          />
+          <UpdateStatsCard
+            :app-id="id"
+            :use-billing-period="usageComponent?.useBillingPeriod ?? true"
+            :accumulated="(usageComponent?.useBillingPeriod ?? true) && (usageComponent?.showCumulative ?? false)"
+            class="col-span-full sm:col-span-6 xl:col-span-4"
+          />
+          <DeploymentStatsCard
+            :app-id="id"
+            :use-billing-period="usageComponent?.useBillingPeriod ?? true"
+            :accumulated="(usageComponent?.useBillingPeriod ?? true) && (usageComponent?.showCumulative ?? false)"
+            class="col-span-full sm:col-span-6 xl:col-span-4"
+          />
         </div>
       </div>
 
-      <div v-if="ActiveTab === 'bundles'" class="mt-0 md:mt-4">
-        <div class="flex flex-col mx-auto overflow-y-auto bg-white border md:rounded-lg shadow-lg border-slate-300 md:mt-5 md:w-2/3 dark:border-slate-900 dark:bg-gray-800">
-          <BundleTable :app-id="id" />
+      <div v-if="ActiveTab === 'info'" class="mt-0 md:mt-8">
+        <div class="w-full h-full px-0 pt-0 md:pt-8 mx-auto mb-8 overflow-y-auto max-w-9xl max-h-fit sm:px-6 lg:px-8">
+          <div class="flex flex-col overflow-hidden overflow-y-auto bg-white border border-slate-300 shadow-lg md:rounded-lg dark:border-slate-900 dark:bg-gray-800">
+            <AppSetting :app-id="id" />
+          </div>
         </div>
       </div>
 
-      <div v-if="ActiveTab === 'channels'" class="mt-0 md:mt-4">
-        <div class="flex flex-col mx-auto overflow-y-auto bg-white border md:rounded-lg shadow-lg border-slate-300 md:mt-5 md:w-2/3 dark:border-slate-900 dark:bg-gray-800">
-          <ChannelTable :app-id="id" />
+      <div v-if="ActiveTab === 'bundles'" class="mt-0 md:mt-8">
+        <div class="w-full h-full px-0 pt-0 md:pt-8 mx-auto mb-8 overflow-y-auto max-w-9xl max-h-fit sm:px-6 lg:px-8">
+          <div class="flex flex-col overflow-hidden overflow-y-auto bg-white border border-slate-300 shadow-lg md:rounded-lg dark:border-slate-900 dark:bg-gray-800">
+            <BundleTable :app-id="id" />
+          </div>
         </div>
       </div>
 
-      <div v-if="ActiveTab === 'devices'" class="mt-0 md:mt-4">
-        <div class="flex flex-col mx-auto overflow-y-auto bg-white border md:rounded-lg shadow-lg border-slate-300 md:mt-5 md:w-2/3 dark:border-slate-900 dark:bg-gray-800">
-          <DeviceTable :app-id="id" />
+      <div v-if="ActiveTab === 'channels'" class="mt-0 md:mt-8">
+        <div class="w-full h-full px-0 pt-0 md:pt-8 mx-auto mb-8 overflow-y-auto max-w-9xl max-h-fit sm:px-6 lg:px-8">
+          <div class="flex flex-col overflow-hidden overflow-y-auto bg-white border border-slate-300 shadow-lg md:rounded-lg dark:border-slate-900 dark:bg-gray-800">
+            <ChannelTable :app-id="id" />
+          </div>
         </div>
       </div>
 
-      <div v-if="ActiveTab === 'logs'" class="mt-0 md:mt-4">
-        <div class="flex flex-col mx-auto overflow-y-auto bg-white border md:rounded-lg shadow-lg border-slate-300 md:mt-5 md:w-2/3 dark:border-slate-900 dark:bg-gray-800">
-          <LogTable :app-id="id" />
+      <div v-if="ActiveTab === 'devices'" class="mt-0 md:mt-8">
+        <div class="w-full h-full px-0 pt-0 md:pt-8 mx-auto mb-8 overflow-y-auto max-w-9xl max-h-fit sm:px-6 lg:px-8">
+          <div class="flex flex-col overflow-hidden overflow-y-auto bg-white border border-slate-300 shadow-lg md:rounded-lg dark:border-slate-900 dark:bg-gray-800">
+            <DeviceTable :app-id="id" />
+          </div>
+        </div>
+      </div>
+
+      <div v-if="ActiveTab === 'logs'" class="mt-0 md:mt-8">
+        <div class="w-full h-full px-0 pt-0 md:pt-8 mx-auto mb-8 overflow-y-auto max-w-9xl max-h-fit sm:px-6 lg:px-8">
+          <div class="flex flex-col overflow-hidden overflow-y-auto bg-white border border-slate-300 shadow-lg md:rounded-lg dark:border-slate-900 dark:bg-gray-800">
+            <LogTable :app-id="id" />
+          </div>
         </div>
       </div>
     </div>

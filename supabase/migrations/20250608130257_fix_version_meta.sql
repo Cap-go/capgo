@@ -16,92 +16,95 @@ END $$;
 -- Create a temporary table with the rows we want to keep
 CREATE TEMP TABLE version_meta_keep AS
 WITH
-  ranked_positive AS (
+ranked_positive AS (
     -- For positive sizes, rank by timestamp ASC (earliest first)
     SELECT
-      timestamp,
-      app_id,
-      version_id,
-      size,
-      ROW_NUMBER() OVER (
-        PARTITION BY
-          app_id,
-          version_id
-        ORDER BY
-          timestamp ASC
-      ) as rn
+        timestamp,
+        app_id,
+        version_id,
+        size,
+        ROW_NUMBER() OVER (
+            PARTITION BY
+                app_id,
+                version_id
+            ORDER BY
+                timestamp ASC
+        ) AS rn
     FROM
-      version_meta
+        version_meta
     WHERE
-      size > 0
-  ),
-  ranked_negative AS (
+        size > 0
+),
+
+ranked_negative AS (
     -- For negative sizes, rank by timestamp DESC (latest first)  
     SELECT
-      timestamp,
-      app_id,
-      version_id,
-      size,
-      ROW_NUMBER() OVER (
-        PARTITION BY
-          app_id,
-          version_id
-        ORDER BY
-          timestamp DESC
-      ) as rn
+        timestamp,
+        app_id,
+        version_id,
+        size,
+        ROW_NUMBER() OVER (
+            PARTITION BY
+                app_id,
+                version_id
+            ORDER BY
+                timestamp DESC
+        ) AS rn
     FROM
-      version_meta
+        version_meta
     WHERE
-      size < 0
-  ),
-  zero_sizes AS (
+        size < 0
+),
+
+zero_sizes AS (
     -- Handle size = 0 case (keep earliest)
     SELECT
-      timestamp,
-      app_id,
-      version_id,
-      size,
-      ROW_NUMBER() OVER (
-        PARTITION BY
-          app_id,
-          version_id
-        ORDER BY
-          timestamp ASC
-      ) as rn
+        timestamp,
+        app_id,
+        version_id,
+        size,
+        ROW_NUMBER() OVER (
+            PARTITION BY
+                app_id,
+                version_id
+            ORDER BY
+                timestamp ASC
+        ) AS rn
     FROM
-      version_meta
+        version_meta
     WHERE
-      size = 0
-  )
+        size = 0
+)
+
 SELECT
-  timestamp,
-  app_id,
-  version_id,
-  size
+    timestamp,
+    app_id,
+    version_id,
+    size
 FROM
-  ranked_positive
+    ranked_positive
 WHERE
-  rn = 1
+    rn = 1
 UNION ALL
 SELECT
-  timestamp,
-  app_id,
-  version_id,
-  size
+    timestamp,
+    app_id,
+    version_id,
+    size
 FROM
-  ranked_negative
+    ranked_negative
 WHERE
-  rn = 1
+    rn = 1
 UNION ALL
 SELECT
-  timestamp,
-  app_id,
-  version_id,
-  size
+    timestamp,
+    app_id,
+    version_id,
+    size
 FROM
-  zero_sizes
+    zero_sizes
 WHERE
-  rn = 1;
+    rn = 1;
 
 -- Show how many rows we're keeping vs deleting
 DO $$ 
@@ -121,14 +124,14 @@ DELETE FROM version_meta;
 
 -- Insert the deduplicated rows back
 INSERT INTO
-  version_meta (timestamp, app_id, version_id, size)
+version_meta (timestamp, app_id, version_id, size)
 SELECT
-  timestamp,
-  app_id,
-  version_id,
-  size
+    timestamp,
+    app_id,
+    version_id,
+    size
 FROM
-  version_meta_keep;
+    version_meta_keep;
 
 -- Drop the temp table
 DROP TABLE version_meta_keep;
@@ -136,24 +139,29 @@ DROP TABLE version_meta_keep;
 -- Create partial unique constraints - one for positive sizes, one for negative sizes
 -- This allows both positive and negative entries for the same (app_id, version_id)
 -- but prevents duplicate positive or duplicate negative entries
-CREATE UNIQUE INDEX unique_app_version_positive ON version_meta (app_id, version_id)
+CREATE UNIQUE INDEX unique_app_version_positive ON version_meta (
+    app_id, version_id
+)
 WHERE
-  size > 0;
+size > 0;
 
-CREATE UNIQUE INDEX unique_app_version_negative ON version_meta (app_id, version_id)
+CREATE UNIQUE INDEX unique_app_version_negative ON version_meta (
+    app_id, version_id
+)
 WHERE
-  size < 0;
+size < 0;
 
 -- Create a secure function to handle version_meta upserts
 -- Only available to supabase service role, not public users
-CREATE OR REPLACE FUNCTION upsert_version_meta (
-  p_app_id VARCHAR(255),
-  p_version_id BIGINT,
-  p_size BIGINT
-) RETURNS BOOLEAN LANGUAGE plpgsql SECURITY DEFINER -- Run with definer's privileges (postgres/service role)
+CREATE OR REPLACE FUNCTION UPSERT_VERSION_META(
+    p_app_id VARCHAR(255),
+    p_version_id BIGINT,
+    p_size BIGINT
+-- Run with definer's privileges (postgres/service role)
+) RETURNS BOOLEAN LANGUAGE plpgsql SECURITY DEFINER
 SET
-  search_path = '' -- Security: fix search path
-  AS $$
+search_path = '' -- Security: fix search path
+AS $$
 DECLARE
   existing_count INTEGER;
 BEGIN
@@ -194,12 +202,14 @@ END;
 $$;
 
 -- Revoke public access and grant only to service role
-REVOKE ALL ON FUNCTION upsert_version_meta (VARCHAR(255), BIGINT, BIGINT)
+REVOKE ALL ON FUNCTION UPSERT_VERSION_META(VARCHAR(255), BIGINT, BIGINT)
 FROM
-  PUBLIC;
+public;
 
 GRANT
-EXECUTE ON FUNCTION upsert_version_meta (VARCHAR(255), BIGINT, BIGINT) TO service_role;
+EXECUTE ON FUNCTION UPSERT_VERSION_META(
+    VARCHAR(255), BIGINT, BIGINT
+) TO service_role;
 
 -- Verify the deduplication worked
 DO $$ 

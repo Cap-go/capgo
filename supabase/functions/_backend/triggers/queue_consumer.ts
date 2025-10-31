@@ -10,7 +10,7 @@ import { closeClient, getPgClient } from '../utils/pg.ts'
 import { backgroundTask, getEnv } from '../utils/utils.ts'
 
 // Define constants
-const BATCH_SIZE = 950 // Batch size for queue reads limit of CF is 1000 fetches so we take a safe margin
+const DEFAULT_BATCH_SIZE = 950 // Default batch size for queue reads limit of CF is 1000 fetches so we take a safe margin
 
 // Zod schema for a message object
 export const messageSchema = z.object({
@@ -40,8 +40,8 @@ function generateUUID(): string {
   return crypto.randomUUID()
 }
 
-async function processQueue(c: Context, sql: ReturnType<typeof getPgClient>, queueName: string) {
-  const messages = await readQueue(c, sql, queueName)
+async function processQueue(c: Context, sql: ReturnType<typeof getPgClient>, queueName: string, batchSize: number = DEFAULT_BATCH_SIZE) {
+  const messages = await readQueue(c, sql, queueName, batchSize)
 
   if (!messages) {
     cloudlog(`[${queueName}] No messages found in queue or an error occurred.`)
@@ -63,9 +63,9 @@ async function processQueue(c: Context, sql: ReturnType<typeof getPgClient>, que
 
   // Process messages that have been read less than 5 times
   const results = await Promise.all(messagesToProcess.map(async (message) => {
-    const function_name = message.message.function_name
-    const function_type = message.message.function_type
-    const body = message.message.payload
+    const function_name = message.message?.function_name ?? 'unknown'
+    const function_type = message.message?.function_type ?? 'supabase'
+    const body = message.message?.payload ?? {}
     const cfId = generateUUID()
     const httpResponse = await http_post_helper(c, function_name, function_type, body, cfId)
 
@@ -103,13 +103,13 @@ async function processQueue(c: Context, sql: ReturnType<typeof getPgClient>, que
 
     const timestamp = new Date().toISOString()
     const failureDetails = messagesFailed.map(msg => ({
-      function_name: msg.message.function_name,
-      function_type: msg.message.function_type ?? 'supabase',
+      function_name: msg.message?.function_name ?? 'unknown',
+      function_type: msg.message?.function_type ?? 'supabase',
       msg_id: msg.msg_id,
       read_count: msg.read_ct,
       status: msg.httpResponse.status,
       status_text: msg.httpResponse.statusText,
-      payload_size: JSON.stringify(msg.message.payload).length,
+      payload_size: msg.message?.payload ? JSON.stringify(msg.message.payload).length : 0,
       cf_id: msg.cfId,
     }))
 
@@ -185,7 +185,7 @@ async function processQueue(c: Context, sql: ReturnType<typeof getPgClient>, que
 }
 
 // Reads messages from the queue and logs them
-async function readQueue(c: Context, sql: ReturnType<typeof getPgClient>, queueName: string): Promise<Message[]> {
+async function readQueue(c: Context, sql: ReturnType<typeof getPgClient>, queueName: string, batchSize: number = DEFAULT_BATCH_SIZE): Promise<Message[]> {
   const queueKey = 'readQueue'
   const startTime = Date.now()
   let messages: Message[] = []
@@ -193,19 +193,19 @@ async function readQueue(c: Context, sql: ReturnType<typeof getPgClient>, queueN
   cloudlog({ requestId: c.get('requestId'), message: `[${queueKey}] Starting queue read at ${startTime}.` })
 
   try {
-    const visibilityTimeout = 60
+    const visibilityTimeout = 120
     cloudlog(`[${queueKey}] Reading messages from queue: ${queueName}`)
     try {
       messages = await sql`
         SELECT msg_id, message, read_ct
-        FROM pgmq.read(${queueName}, ${visibilityTimeout}, ${BATCH_SIZE})
+        FROM pgmq.read(${queueName}, ${visibilityTimeout}, ${batchSize})
       `
     }
     catch (readError) {
       throw simpleError('error_reading_from_pgmq_queue', 'Error reading from pgmq queue', { queueName }, readError)
     }
 
-    if (!messages || messages.length === 0) {
+    if (!messages || (messages && messages.length === 0)) {
       cloudlog({ requestId: c.get('requestId'), message: `[${queueKey}] No new messages found in queue ${queueName}.` })
       return messages
     }
@@ -284,9 +284,11 @@ async function delete_queue_message_batch(c: Context, sql: ReturnType<typeof get
   try {
     if (msgIds.length === 0)
       return
-    await sql`
-      SELECT pgmq.delete(${queueName}, ARRAY[${sql.array(msgIds)}]::bigint[])
-    `
+    // Format array as properly quoted bigint values
+    const arrayStr = msgIds.map(id => `${id}::bigint`).join(',')
+    await sql.unsafe(`
+      SELECT pgmq.delete($1, ARRAY[${arrayStr}])
+    `, [queueName])
   }
   catch (error) {
     throw simpleError('error_deleting_queue_messages', 'Error deleting queue messages', { msgIds, queueName }, error)
@@ -298,12 +300,29 @@ async function archive_queue_messages(c: Context, sql: ReturnType<typeof getPgCl
   try {
     if (msgIds.length === 0)
       return
-    await sql`
-      SELECT pgmq.archive(${queueName}, ARRAY[${sql.array(msgIds)}]::bigint[])
-    `
+    // Format array as properly quoted bigint values
+    const arrayStr = msgIds.map(id => `${id}::bigint`).join(',')
+    await sql.unsafe(`
+      SELECT pgmq.archive($1, ARRAY[${arrayStr}])
+    `, [queueName])
   }
   catch (error) {
-    throw simpleError('error_archiving_queue_messages', 'Error archiving queue messages', { msgIds, queueName }, error)
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    const errorStack = error instanceof Error ? error.stack : undefined
+    const msgIdsTruncated = msgIds.length > 20 ? msgIds.slice(0, 20) : msgIds
+
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: `[${queueName}] Failed to archive ${msgIds.length} messages`,
+      error,
+      errorMessage,
+      errorStack,
+      queueName,
+      msgIds: msgIdsTruncated,
+      msgIdsLength: msgIds.length,
+    })
+
+    throw simpleError('error_archiving_queue_messages', `Error archiving queue messages: ${errorMessage}`, { msgIds: msgIdsTruncated, msgIdsLength: msgIds.length, queueName, errorMessage }, error)
   }
 }
 
@@ -326,7 +345,7 @@ async function mass_edit_queue_messages_cf_ids(
     `)
   }
   catch (error) {
-    throw simpleError('error_updating_cf_ids', 'Error updating CF IDs', { }, error)
+    throw simpleError('error_updating_cf_ids', 'Error updating CF IDs', {}, error)
   }
 }
 
@@ -345,19 +364,31 @@ app.post('/sync', async (c) => {
   const handlerStart = Date.now()
   cloudlog({ requestId: c.get('requestId'), message: `[Sync Request] Received trigger to process queue.` })
 
-  // Require JSON body with queue_name
-  const body = await parseBody<{ queue_name: string }>(c)
+  // Require JSON body with queue_name and optional batch_size
+  const body = await parseBody<{ queue_name: string, batch_size?: number }>(c)
   const queueName = body?.queue_name
+  const batchSize = body?.batch_size
+
   if (!queueName || typeof queueName !== 'string') {
     throw simpleError('missing_or_invalid_queue_name', 'Missing or invalid queue_name in body', { body })
   }
 
+  // Only validate when batchSize is explicitly provided
+  if (batchSize !== undefined) {
+    if (typeof batchSize !== 'number' || batchSize <= 0) {
+      throw simpleError('invalid_batch_size', 'batch_size must be a positive number', { batchSize })
+    }
+  }
+
+  // Compute finalBatchSize: use provided batchSize capped with DEFAULT_BATCH_SIZE, or fall back to DEFAULT_BATCH_SIZE
+  const finalBatchSize = batchSize !== undefined ? Math.min(batchSize, DEFAULT_BATCH_SIZE) : DEFAULT_BATCH_SIZE
+
   await backgroundTask(c, (async () => {
-    cloudlog({ requestId: c.get('requestId'), message: `[Background Queue Sync] Starting background execution for queue: ${queueName}` })
+    cloudlog({ requestId: c.get('requestId'), message: `[Background Queue Sync] Starting background execution for queue: ${queueName} with batch size: ${finalBatchSize}` })
     let sql: ReturnType<typeof getPgClient> | null = null
     try {
       sql = getPgClient(c)
-      await processQueue(c, sql, queueName)
+      await processQueue(c, sql, queueName, finalBatchSize)
       cloudlog({ requestId: c.get('requestId'), message: `[Background Queue Sync] Background execution finished successfully.` })
     }
     finally {

@@ -16,7 +16,6 @@ import mfaIcon from '~icons/simple-icons/2fas?raw'
 import { hideLoader } from '~/services/loader'
 import { autoAuth, hashEmail, useSupabase } from '~/services/supabase'
 import { openSupport } from '~/services/support'
-import { registerWebsiteDomain } from '~/utils/Utils'
 
 const route = useRoute('/login')
 const supabase = useSupabase()
@@ -33,12 +32,14 @@ const captchaComponent = ref<InstanceType<typeof VueTurnstile> | null>(null)
 
 const version = import.meta.env.VITE_APP_VERSION
 
+const registerUrl = window.location.host === 'console.capgo.app' ? 'https://capgo.app/register/' : `/register/`
+
 async function nextLogin() {
   if (route.query.to && typeof route.query.to === 'string') {
-    router.push(route.query.to)
+    router.replace(route.query.to)
   }
   else {
-    router.push('/app')
+    router.replace('/dashboard')
   }
   setTimeout(async () => {
     isLoading.value = false
@@ -381,7 +382,7 @@ onMounted(checkLogin)
                   </p>
                   <div class="">
                     <a
-                      :href="`${registerWebsiteDomain()}/register/`"
+                      :href="registerUrl"
                       data-test="register"
                       class="text-sm font-medium text-orange-500 transition-all duration-200 focus:text-orange-600 hover:text-orange-600 hover:underline"
                     >
@@ -455,7 +456,8 @@ onMounted(checkLogin)
                 </div>
 
                 <div class="text-center">
-                  <p class="text-base text-gray-600" /><p class="font-medium text-orange-500 transition-all duration-200 hover:text-orange-600 hover:underline" @click="goback()">
+                  <p class="text-base text-gray-600" />
+                  <p class="font-medium text-orange-500 transition-all duration-200 hover:text-orange-600 hover:underline cursor-pointer" @click="goback()">
                     {{ t('go-back') }}
                   </p>
                   <p class="pt-2 text-gray-300">

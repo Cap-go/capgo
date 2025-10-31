@@ -9,8 +9,9 @@ import { Hono } from 'hono/tiny'
 import { app as clear_app_cache } from '../../supabase/functions/_backend/triggers/clear_app_cache.ts'
 import { app as clear_device_cache } from '../../supabase/functions/_backend/triggers/clear_device_cache.ts'
 import { app as cron_email } from '../../supabase/functions/_backend/triggers/cron_email.ts'
-import { app as cron_plan } from '../../supabase/functions/_backend/triggers/cron_plan.ts'
-import { app as cron_stats } from '../../supabase/functions/_backend/triggers/cron_stats.ts'
+import { app as cron_stat_org } from '../../supabase/functions/_backend/triggers/cron_stat_org.ts'
+import { app as cron_stat_app } from '../../supabase/functions/_backend/triggers/cron_stat_app.ts'
+import { app as cron_sync_sub } from '../../supabase/functions/_backend/triggers/cron_sync_sub.ts'
 import { app as logsnag_insights } from '../../supabase/functions/_backend/triggers/logsnag_insights.ts'
 import { app as on_channel_update } from '../../supabase/functions/_backend/triggers/on_channel_update.ts'
 import { app as on_deploy_history_create } from '../../supabase/functions/_backend/triggers/on_deploy_history_create.ts'
@@ -50,8 +51,9 @@ appGlobal.route('/on_version_update', on_version_update)
 appGlobal.route('/on_version_delete', on_version_delete)
 appGlobal.route('/on_manifest_create', on_manifest_create)
 appGlobal.route('/stripe_event', stripe_event)
-appGlobal.route('/cron_stats', cron_stats)
-appGlobal.route('/cron_plan', cron_plan)
+appGlobal.route('/cron_stat_app', cron_stat_app)
+appGlobal.route('/cron_stat_org', cron_stat_org)
+appGlobal.route('/cron_sync_sub', cron_sync_sub)
 appGlobal.route('/on_deploy_history_create', on_deploy_history_create)
 appGlobal.route('/queue_consumer', queue_consumer)
 

@@ -2,7 +2,8 @@ import type { TrackOptions } from '@logsnag/node'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
 import { trackBentoEvent } from '../utils/bento.ts'
-import { BRES, middlewareV2, parseBody, simpleError, useCors } from '../utils/hono.ts'
+import { BRES, parseBody, simpleError, useCors } from '../utils/hono.ts'
+import { middlewareV2 } from '../utils/hono_middleware.ts'
 import { logsnag } from '../utils/logsnag.ts'
 import { supabaseWithAuth } from '../utils/supabase.ts'
 import { backgroundTask } from '../utils/utils.ts'
@@ -15,7 +16,7 @@ app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
   const body = await parseBody<TrackOptions>(c)
   const supabase = supabaseWithAuth(c, c.get('auth')!)
   await backgroundTask(c, logsnag(c).track(body))
-  if (body.user_id && body.tags && typeof body.tags['app-id'] === 'string' && body.event === 'onboarding-step-10') {
+  if (body.user_id && body.tags && typeof body.tags['app-id'] === 'string' && body.event === 'onboarding-step-done') {
     const orgId = body.user_id
     const appId = body.tags['app-id']
     await backgroundTask(c, Promise.all([

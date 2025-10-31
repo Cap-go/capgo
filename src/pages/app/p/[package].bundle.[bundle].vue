@@ -14,7 +14,7 @@ import IconInformations from '~icons/heroicons/information-circle'
 import IconTrash from '~icons/heroicons/trash'
 import IconSearch from '~icons/ic/round-search?raw'
 import IconAlertCircle from '~icons/lucide/alert-circle'
-import { appIdToUrl, bytesToMbText, urlToAppId } from '~/services/conversion'
+import { bytesToMbText } from '~/services/conversion'
 import { formatDate } from '~/services/date'
 import { checkCompatibilityNativePackages, isCompatible, useSupabase } from '~/services/supabase'
 import { openVersion } from '~/services/versions'
@@ -142,7 +142,7 @@ async function getChannels() {
 async function openChannelLink() {
   if (!version.value || !channel.value)
     return
-  router.push(`/app/p/${appIdToUrl(version.value.app_id)}/channel/${channel.value?.id}`)
+  router.push(`/app/p/${version.value.app_id}/channel/${channel.value?.id}`)
 }
 
 const showSize = computed(() => {
@@ -398,7 +398,6 @@ watchEffect(async () => {
   if (route.path.includes('/bundle/')) {
     loading.value = true
     packageId.value = route.params.package as string
-    packageId.value = urlToAppId(packageId.value)
     id.value = Number(route.params.bundle as string)
     await getVersion()
     await getChannels()
@@ -651,7 +650,7 @@ async function deleteBundle() {
     else {
       toast.success(t('bundle-deleted'))
       // Navigate back to the bundle list
-      router.push(`/app/p/${appIdToUrl(packageId.value)}/bundles/`)
+      router.push(`/app/p/${packageId.value}/bundles/`)
     }
   }
   catch (error) {
@@ -668,162 +667,140 @@ async function deleteBundle() {
     </div>
     <div v-else-if="version">
       <Tabs v-model:active-tab="ActiveTab" :tabs="tabs" />
-      <div v-if="ActiveTab === 'info'" id="devices" class="flex flex-col">
-        <div
-          class="flex flex-col overflow-y-auto bg-white shadow-lg border-slate-300 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-slate-800"
-        >
-          <dl class="divide-y dark:divide-slate-500 divide-slate-200">
-            <InfoRow :label="t('bundle-number')">
-              {{ version.name }}
-            </InfoRow>
-            <InfoRow :label="t('id')">
-              {{ version.id.toString() }}
-            </InfoRow>
-            <InfoRow v-if="version.created_at" :label="t('created-at')">
-              {{ formatDate(version.created_at) }}
-            </InfoRow>
-            <InfoRow v-if="version.updated_at" :label="t('updated-at')">
-              {{ formatDate(version.updated_at) }}
-            </InfoRow>
-            <!-- Checksum -->
-            <InfoRow
-              v-if="version.checksum" :label="t('checksum')" :is-link="true"
-              @click="copyToast(version?.checksum ?? '')"
-            >
-              {{ hideString(version.checksum) }}
-            </InfoRow>
-            <!-- Min update version -->
-            <InfoRow
-              v-if="showBundleMetadataInput" id="metadata-bundle"
-              :label="t('min-update-version')" editable
-              :readonly="organizationStore.hasPermisisonsInRole(role, ['admin', 'super_admin', 'write']) === false"
-              @click="guardMinAutoUpdate" @update:value="(saveCustomId as any)" @keydown="preventInputChangePerm"
-            >
-              {{ version.min_update_version }}
-            </InfoRow>
+      <div v-if="ActiveTab === 'info'" id="devices" class="mt-0 md:mt-8">
+        <div class="w-full h-full px-0 pt-0 md:pt-8 mx-auto mb-8 overflow-y-auto max-w-9xl max-h-fit sm:px-6 lg:px-8">
+          <div
+            class="flex flex-col overflow-hidden overflow-y-auto bg-white border border-slate-300 shadow-lg md:rounded-lg dark:border-slate-900 dark:bg-slate-800"
+          >
+            <dl class="divide-y dark:divide-slate-500 divide-slate-200">
+              <InfoRow :label="t('bundle-number')">
+                {{ version.name }}
+              </InfoRow>
+              <InfoRow :label="t('id')">
+                {{ version.id.toString() }}
+              </InfoRow>
+              <InfoRow v-if="version.created_at" :label="t('created-at')">
+                {{ formatDate(version.created_at) }}
+              </InfoRow>
+              <InfoRow v-if="version.updated_at" :label="t('updated-at')">
+                {{ formatDate(version.updated_at) }}
+              </InfoRow>
+              <!-- Checksum -->
+              <InfoRow
+                v-if="version.checksum" :label="t('checksum')" :is-link="true"
+                @click="copyToast(version?.checksum ?? '')"
+              >
+                {{ hideString(version.checksum) }}
+              </InfoRow>
+              <!-- Min update version -->
+              <InfoRow
+                v-if="showBundleMetadataInput" id="metadata-bundle"
+                :label="t('min-update-version')" editable
+                :readonly="organizationStore.hasPermisisonsInRole(role, ['admin', 'super_admin', 'write']) === false"
+                @click="guardMinAutoUpdate" @update:value="(saveCustomId as any)" @keydown="preventInputChangePerm"
+              >
+                {{ version.min_update_version }}
+              </InfoRow>
 
-            <!-- meta devices -->
-            <InfoRow v-if="version_meta?.devices" :label="t('devices')">
-              {{ version_meta.devices.toLocaleString() }}
-            </InfoRow>
-            <InfoRow
-              v-if="version_meta?.installs" :label="t('install')"
-            >
-              {{ version_meta.installs.toLocaleString() }}
-            </InfoRow>
-            <InfoRow
-              v-if="version_meta?.uninstalls" :label="t('uninstall')"
-            >
-              {{ version_meta.uninstalls.toLocaleString() }}
-            </InfoRow>
-            <InfoRow v-if="version_meta?.fails" :label="t('fail')">
-              {{ version_meta.fails.toLocaleString() }}
-            </InfoRow>
-            <InfoRow v-if="channels && channels.length > 0 && version && channels.filter(c => c.version === version!.id).length > 0" :label="t('channel')">
-              <div class="flex flex-wrap justify-end w-full gap-3">
-                <div v-for="chn in channels.filter(c => c.version === version!.id)" id="open-channel" :key="chn.id" class="flex items-center gap-2">
-                  <span
-                    class="font-bold text-blue-600 underline cursor-pointer underline-offset-4 hover:text-blue-700 dark:text-blue-500 dark:hover:text-blue-400"
-                    @click="openChannel(chn)"
-                  >
-                    {{ chn!.name }}
-                  </span>
+              <InfoRow v-if="channels && channels.length > 0 && version && channels.filter(c => c.version === version!.id).length > 0" :label="t('channel')">
+                <div class="flex flex-wrap justify-end w-full gap-3">
+                  <div v-for="chn in channels.filter(c => c.version === version!.id)" id="open-channel" :key="chn.id" class="flex items-center gap-2">
+                    <span
+                      class="font-bold text-blue-600 underline cursor-pointer underline-offset-4 hover:text-blue-700 dark:text-blue-500 dark:hover:text-blue-400"
+                      @click="openChannel(chn)"
+                    >
+                      {{ chn!.name }}
+                    </span>
+                    <button
+                      class="p-1 rounded-md border border-gray-200 hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:hover:border-gray-600 dark:hover:bg-gray-800 transition-colors"
+                      @click="openChannelSettings(chn)"
+                    >
+                      <Settings class="w-4 h-4 text-gray-500 hover:text-blue-500 dark:text-gray-400 dark:hover:text-blue-400" />
+                    </button>
+                  </div>
+                </div>
+              </InfoRow>
+              <InfoRow
+                v-else id="open-channel" :label="t('channel')" :is-link="true"
+                @click="ASChannelChooser()"
+              >
+                {{ t('set-bundle') }}
+              </InfoRow>
+              <InfoRow
+                v-if="version.session_key" :label="t('encryption')"
+              >
+                {{ t('encrypted') }}
+              </InfoRow>
+              <InfoRow
+                v-else :label="t('encryption')"
+              >
+                {{ t('not-encrypted-bundle') }}
+              </InfoRow>
+              <!-- session_key -->
+              <InfoRow
+                v-if="version.session_key" :label="t('session_key')" :is-link="true"
+                @click="copyToast(version?.session_key ?? '')"
+              >
+                {{ hideString(version.session_key) }}
+              </InfoRow>
+              <!-- version.external_url -->
+              <InfoRow
+                v-if="version.external_url" :label="t('url')" :is-link="true"
+                @click="copyToast(version?.external_url ?? '')"
+              >
+                {{ version.external_url }}
+              </InfoRow>
+              <!-- Bundle Link -->
+              <InfoRow
+                v-if="version.link" :label="t('bundle-link')" :is-link="true"
+                @click="openLink(version.link)"
+              >
+                {{ version.link }}
+              </InfoRow>
+              <!-- Bundle Comment -->
+              <InfoRow
+                v-if="version.comment" :label="t('bundle-comment')"
+              >
+                {{ version.comment }}
+              </InfoRow>
+              <!-- size -->
+              <InfoRow v-if="version?.r2_path" :label="t('size')" :is-link="true" @click="openDownload()">
+                {{ showSize }}
+              </InfoRow>
+              <InfoRow v-if="!version?.r2_path" :label="t('size')" :is-link="true" @click="openDownload()">
+                {{ t('cannot-calculate-size-of-partial-bundle') }}
+              </InfoRow>
+              <InfoRow v-if="version?.manifest" :label="t('partial-bundle')" :is-link="false">
+                {{ t('enabled') }}
+              </InfoRow>
+              <InfoRow v-if="version?.r2_path" :label="t('zip-bundle')" :is-link="false">
+                {{ t('enabled') }}
+              </InfoRow>
+
+              <!-- Delete Bundle Action -->
+              <InfoRow
+                v-if="!version.deleted"
+                :label="t('status')"
+                :icon="IconTrash"
+                :disabled="!organizationStore.hasPermisisonsInRole(role, ['admin', 'write', 'super_admin'])"
+              >
+                <span class="">
+                  {{ t('bundle-active') }}
                   <button
                     class="p-1 rounded-md border border-gray-200 hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:hover:border-gray-600 dark:hover:bg-gray-800 transition-colors"
-                    @click="openChannelSettings(chn)"
+                    @click="deleteBundle"
                   >
-                    <Settings class="w-4 h-4 text-gray-500 hover:text-blue-500 dark:text-gray-400 dark:hover:text-blue-400" />
+                    <IconTrash class="w-4 h-4 text-red-500 dark:text-red-400 cursor-pointer hover:text-red-600 transition-colors" />
                   </button>
-                </div>
-              </div>
-            </InfoRow>
-            <InfoRow
-              v-else id="open-channel" :label="t('channel')" :is-link="true"
-              @click="ASChannelChooser()"
-            >
-              {{ t('set-bundle') }}
-            </InfoRow>
-            <InfoRow
-              v-if="version.session_key" :label="t('encryption')"
-            >
-              {{ t('encrypted') }}
-            </InfoRow>
-            <InfoRow
-              v-else :label="t('encryption')"
-            >
-              {{ t('not-encrypted-bundle') }}
-            </InfoRow>
-            <!-- session_key -->
-            <InfoRow
-              v-if="version.session_key" :label="t('session_key')" :is-link="true"
-              @click="copyToast(version?.session_key ?? '')"
-            >
-              {{ hideString(version.session_key) }}
-            </InfoRow>
-            <!-- version.external_url -->
-            <InfoRow
-              v-if="version.external_url" :label="t('url')" :is-link="true"
-              @click="copyToast(version?.external_url ?? '')"
-            >
-              {{ version.external_url }}
-            </InfoRow>
-            <!-- Bundle Link -->
-            <InfoRow
-              v-if="version.link" :label="t('bundle-link')" :is-link="true"
-              @click="openLink(version.link)"
-            >
-              {{ version.link }}
-            </InfoRow>
-            <!-- Bundle Comment -->
-            <InfoRow
-              v-if="version.comment" :label="t('bundle-comment')"
-            >
-              {{ version.comment }}
-            </InfoRow>
-            <!-- size -->
-            <InfoRow v-if="version?.r2_path" :label="t('size')" :is-link="true" @click="openDownload()">
-              {{ showSize }}
-            </InfoRow>
-            <InfoRow v-if="!version?.r2_path" :label="t('size')" :is-link="true" @click="openDownload()">
-              {{ t('cannot-calculate-size-of-partial-bundle') }}
-            </InfoRow>
-            <InfoRow v-if="version?.manifest" :label="t('partial-bundle')" :is-link="false">
-              {{ t('enabled') }}
-            </InfoRow>
-            <InfoRow v-if="version?.r2_path" :label="t('zip-bundle')" :is-link="false">
-              {{ t('enabled') }}
-            </InfoRow>
+                </span>
+              </InfoRow>
 
-            <!-- Delete Bundle Action -->
-            <InfoRow
-              v-if="!version.deleted"
-              :label="t('status')"
-              :icon="IconTrash"
-              :disabled="!organizationStore.hasPermisisonsInRole(role, ['admin', 'write', 'super_admin'])"
-            >
-              <span class="">
-                {{ t('bundle-active') }}
-                <button
-                  class="p-1 rounded-md border border-gray-200 hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:hover:border-gray-600 dark:hover:bg-gray-800 transition-colors"
-                  @click="deleteBundle"
-                >
-                  <IconTrash class="w-4 h-4 text-red-500 dark:text-red-400 cursor-pointer hover:text-red-600 transition-colors" />
-                </button>
-              </span>
-            </InfoRow>
-
-            <!-- Show deleted status if applicable -->
-            <InfoRow v-if="version.deleted" :label="t('status')">
-              {{ t('bundle-deleted') }}
-            </InfoRow>
-          </dl>
-        </div>
-      </div>
-      <div v-else-if="ActiveTab === 'devices'" id="devices" class="flex flex-col">
-        <div
-          class="flex flex-col mx-auto overflow-y-auto bg-white shadow-lg border-slate-300 md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-gray-800"
-        >
-          <DeviceTable class="p-3" :app-id="packageId" :version-id="version.id" />
+              <!-- Show deleted status if applicable -->
+              <InfoRow v-if="version.deleted" :label="t('status')">
+                {{ t('bundle-deleted') }}
+              </InfoRow>
+            </dl>
+          </div>
         </div>
       </div>
     </div>
@@ -835,7 +812,7 @@ async function deleteBundle() {
       <p class="text-muted-foreground mt-2">
         {{ t('bundle-not-found-description') }}
       </p>
-      <button class="mt-4 d-btn d-btn-primary text-white" @click="router.push(`/app/p/${appIdToUrl(packageId)}/bundles/`)">
+      <button class="mt-4 d-btn d-btn-primary text-white" @click="router.push(`/app/p/${packageId}/bundles/`)">
         {{ t('back-to-bundles') }}
       </button>
     </div>
@@ -910,7 +887,6 @@ async function deleteBundle() {
             :placeholder="t('search-channels')"
             :classes="{
               outer: 'mb-0! w-full',
-              inner: 'rounded-full!',
             }"
           />
         </div>

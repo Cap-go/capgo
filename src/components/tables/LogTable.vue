@@ -3,10 +3,10 @@ import type { Ref } from 'vue'
 import type { TableColumn } from '../comp_def'
 import dayjs from 'dayjs'
 import ky from 'ky'
-import { onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
-import { appIdToUrl } from '~/services/conversion'
+import { toast } from 'vue-sonner'
 import { formatDate } from '~/services/date'
 import { defaultApiHost, useSupabase } from '~/services/supabase'
 
@@ -15,65 +15,26 @@ const props = defineProps<{
   appId?: string
 }>()
 
-interface Channel {
-  version: {
-    name: string
-    id: number
-  }
-}
 interface LogData {
   app_id: string
   device_id: string
   action: string
-  version_id: number
+  version_name: string
   version?: number
   created_at: string
 }
-type Element = LogData & Channel
+type Element = LogData
 const columns: Ref<TableColumn[]> = ref<TableColumn[]>([])
 const router = useRouter()
 const { t } = useI18n()
 const supabase = useSupabase()
 const search = ref('')
 const elements = ref<Element[]>([])
-const versions = ref<Channel['version'][]>([])
 const isLoading = ref(false)
 const currentPage = ref(1)
-const range = ref<[Date, Date]>([dayjs().subtract(3, 'minute').toDate(), new Date()])
+const range = ref<[Date, Date]>([dayjs().subtract(1, 'hour').toDate(), new Date()])
 const filters = ref()
 const DOC_LOGS = 'https://capgo.app/docs/plugin/debugging/#sent-from-the-backend'
-
-function findVersion(id: number, versions: { name: string, id: number }[]) {
-  return versions.find(elem => elem.id === id)
-}
-
-async function versionData() {
-  try {
-    const versionsIdAlreadyFetch = versions.value.map(elem => elem.id)
-    const versionsIds = elements.value
-      .map(elem => elem.version_id)
-      .filter(e => !versionsIdAlreadyFetch.includes(e))
-    // console.log('versionsIds', versionsIds)
-    if (!versionsIds.length)
-      return
-    const { data: res } = await supabase
-      .from('app_versions')
-      .select(`
-        name,
-        id
-      `)
-      .in('id', versionsIds)
-    if (!res?.length)
-      return
-    versions.value.push(...res)
-    elements.value.forEach((elem) => {
-      elem.version = findVersion(elem.version_id, versions.value) || { name: 'unknown', id: 0 } as any
-    })
-  }
-  catch (error) {
-    console.error(error)
-  }
-}
 
 const paginatedRange = computed(() => {
   const rangeStart = range.value ? range.value[0].getTime() : undefined
@@ -124,7 +85,7 @@ async function getData() {
         return [] as LogData[]
       })
     // console.log('dataD', dataD)
-    elements.value.push(...dataD as any)
+    elements.value.push(...dataD)
   }
   catch (error) {
     console.error(error)
@@ -136,9 +97,7 @@ async function refreshData() {
   try {
     currentPage.value = 1
     elements.value.length = 0
-    versions.value.length = 0
     await getData()
-    await versionData()
   }
   catch (error) {
     console.error(error)
@@ -170,15 +129,14 @@ columns.value = [
     class: 'truncate max-w-8',
     sortable: true,
     head: true,
-    onClick: () => window.open(DOC_LOGS, '_blank'),
+    onClick: () => window.open(DOC_LOGS, '_blank', 'noopener,noreferrer'),
   },
   {
     label: t('version'),
-    key: 'version',
+    key: 'version_name',
     class: 'truncate max-w-8',
     mobile: false,
     sortable: false,
-    displayFunction: (elem: Element) => elem.version?.name,
     onClick: (elem: Element) => openOneVersion(elem),
   },
 ]
@@ -187,7 +145,6 @@ async function reload() {
   try {
     elements.value.length = 0
     await getData()
-    await versionData()
   }
   catch (error) {
     console.error(error)
@@ -196,12 +153,31 @@ async function reload() {
 async function openOneVersion(one: Element) {
   if (props.deviceId || !props.appId)
     return
-  router.push(`/app/p/${appIdToUrl(props.appId)}/bundle/${one.version?.id}`)
+  if (!one.version) {
+    const loadingToastId = toast.loading(t('loading-version'))
+    const { data: versionRecord, error } = await supabase
+      .from('app_versions')
+      .select('id')
+      .eq('app_id', props.appId)
+      .eq('name', one.version_name)
+      .single()
+    if (error || !versionRecord?.id) {
+      toast.dismiss(loadingToastId)
+      toast.error(t('cannot-find-version'))
+      return
+    }
+    one.version = versionRecord.id
+    toast.dismiss(loadingToastId)
+  }
+  if (one.version)
+    router.push(`/app/p/${props.appId}/bundle/${one.version}`)
+  else
+    toast.error(t('version-name-missing'))
 }
 async function openOne(one: Element) {
   if (props.deviceId || !props.appId)
     return
-  router.push(`/app/p/${appIdToUrl(props.appId)}/d/${one.device_id}`)
+  router.push(`/app/p/${props.appId}/d/${one.device_id}`)
 }
 onMounted(async () => {
   await refreshData()

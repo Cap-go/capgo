@@ -1,11 +1,8 @@
 <script setup lang="ts">
-import dayjs from 'dayjs'
 import { computed } from 'vue'
-import { useI18n } from 'vue-i18n'
-import InformationInfo from '~icons/heroicons/information-circle'
-
 import { getDaysInCurrentMonth } from '~/services/date'
-import { useMainStore } from '~/stores/main'
+import ChartCard from './ChartCard.vue'
+import LineChartStats from './LineChartStats.vue'
 
 const props = defineProps({
   title: { type: String, default: '' },
@@ -20,33 +17,46 @@ const props = defineProps({
     type: Boolean,
     default: true,
   },
+  useBillingPeriod: {
+    type: Boolean,
+    default: true,
+  },
   datas: {
     type: Array,
     default: () => Array.from({ length: getDaysInCurrentMonth() }).fill(undefined) as number[],
   },
+  datasByApp: {
+    type: Object,
+    default: () => ({}),
+  },
+  appNames: {
+    type: Object,
+    default: () => ({}),
+  },
+  isLoading: {
+    type: Boolean,
+    default: false,
+  },
 })
-const { t } = useI18n()
-const main = useMainStore()
-const organizationStore = useOrganizationStore()
-const subscription_anchor_start = dayjs(organizationStore.currentOrganization?.subscription_start).format('YYYY/MM/D')
-const subscription_anchor_end = dayjs(organizationStore.currentOrganization?.subscription_end).format('YYYY/MM/D')
-function sum(arr: number[]) {
-  return arr.reduce((a, b) => a + b, 0)
-}
+
 const total = computed(() => {
-  // remove undefined values
-  const arr = props.datas as number[]
-  const arrWithoutUndefined = arr.filter((val: any) => val !== undefined)
+  const dataArray = props.datas as number[]
+  const hasData = dataArray.some(val => val !== undefined)
+  const sumValues = (values: number[]) => values.reduce((acc, val) => (typeof val === 'number' ? acc + val : acc), 0)
 
-  if (arrWithoutUndefined.length === 0) {
-    return 0
+  if (hasData) {
+    return sumValues(dataArray)
   }
 
-  if (!props.accumulated) {
-    return arrWithoutUndefined[arrWithoutUndefined.length - 1] ?? 0
+  if (props.datasByApp && Object.keys(props.datasByApp).length > 0) {
+    return Object.values(props.datasByApp).reduce((totalSum, appValues: any) => {
+      return totalSum + sumValues(appValues)
+    }, 0)
   }
-  return sum(arrWithoutUndefined)
+
+  return 0
 })
+
 const lastDayEvolution = computed(() => {
   const arr = props.datas as number[]
   const arrWithoutUndefined = arr.filter((val: any) => val !== undefined)
@@ -55,102 +65,38 @@ const lastDayEvolution = computed(() => {
     return 0
   }
 
-  const oldTotal = props.accumulated ? sum(arrWithoutUndefined.slice(0, -2)) : arrWithoutUndefined[arrWithoutUndefined.length - 2] ?? 0
-  const diff = (total.value as number) - oldTotal
+  const lastValue = arrWithoutUndefined[arrWithoutUndefined.length - 1] ?? 0
+  const previousValue = arrWithoutUndefined[arrWithoutUndefined.length - 2] ?? 0
 
-  // Prevent division by zero
-  if (oldTotal === 0 && diff === 0) {
-    return 0
+  if (previousValue === 0) {
+    return lastValue > 0 ? 100 : 0
   }
 
-  const denominator = arr.length > 2 ? oldTotal : diff
-  // Prevent division by zero
-  if (denominator === 0) {
-    return diff > 0 ? 100 : -100
-  }
-
-  return diff / denominator * 100
+  return ((lastValue - previousValue) / previousValue) * 100
 })
+
+const hasData = computed(() => (props.datas as number[]).length > 0)
 </script>
 
 <template>
-  <div class="flex flex-col bg-white border rounded-lg shadow-lg col-span-full border-slate-300 sm:col-span-6 xl:col-span-4 dark:border-slate-900 dark:bg-gray-800 h-[460px]">
-    <div class="px-5 pt-3">
-      <div class="flex flex-row items-center">
-        <h2 class="mb-2 mr-2 text-2xl font-semibold text-slate-800 dark:text-white">
-          {{ props.title }}
-        </h2>
-        <div class="d-tooltip d-tooltip-bottom">
-          <div class="d-tooltip-content bg-white dark:bg-gray-800 text-gray-800 dark:text-white border border-gray-200 dark:border-gray-600 shadow-2xl rounded-lg p-4 min-w-[280px]">
-            <div class="space-y-3">
-              <!-- Last Run -->
-              <div class="flex items-start space-x-2">
-                <div class="w-2 h-2 bg-green-500 rounded-full mt-2 flex-shrink-0" />
-                <div>
-                  <div class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-                    {{ t('last-run') }}
-                  </div>
-                  <div class="text-sm font-medium">
-                    {{ dayjs(main.statsTime.last_run).format('MMMM D, YYYY HH:mm') }}
-                  </div>
-                </div>
-              </div>
-
-              <!-- Next Run -->
-              <div class="flex items-start space-x-2">
-                <div class="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0" />
-                <div>
-                  <div class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-                    {{ t('next-run') }}
-                  </div>
-                  <div class="text-sm font-medium">
-                    {{ dayjs(main.statsTime.next_run).format('MMMM D, YYYY HH:mm') }}
-                  </div>
-                </div>
-              </div>
-
-              <!-- Billing Cycle -->
-              <div class="pt-2 border-t border-gray-200 dark:border-gray-600">
-                <div class="flex items-start space-x-2">
-                  <div class="w-2 h-2 bg-purple-500 rounded-full mt-2 flex-shrink-0" />
-                  <div>
-                    <div class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-                      {{ t('billing-cycle') }}
-                    </div>
-                    <div class="text-sm font-medium">
-                      {{ subscription_anchor_start }} {{ t('to') }} {{ subscription_anchor_end }}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="flex items-center justify-center w-5 h-5 cursor-pointer">
-            <InformationInfo class="text-gray-400 hover:text-blue-500 transition-colors duration-200" />
-          </div>
-        </div>
-      </div>
-
-      <div class="mb-1 text-xs font-semibold uppercase text-slate-400 dark:text-white">
-        {{ t('usage-title') }}
-      </div>
-      <div class="flex items-start">
-        <div id="usage_val" class="mr-2 text-3xl font-bold text-slate-800 dark:text-white">
-          {{ total?.toLocaleString() }} {{ unit }}
-        </div>
-        <div v-if="lastDayEvolution" class="rounded-full bg-emerald-500 px-1.5 text-sm font-semibold text-white">
-          {{ lastDayEvolution < 0 ? '-' : '+' }}{{ lastDayEvolution.toFixed(2) }}%
-        </div>
-      </div>
-    </div>
-    <!-- Chart built with Chart.js 3 -->
-
-    <!-- Change the height attribute to adjust the chart height -->
-    <div class="w-full h-full p-6">
-      <LineChartStats v-if="props.datas?.length" :title="props.title" :colors="props.colors" :limits="props.limits" :data="props.datas" :accumulated="accumulated" />
-      <div v-else class="flex flex-col items-center justify-center h-full">
-        {{ t('no-data') }}
-      </div>
-    </div>
-  </div>
+  <ChartCard
+    :title="title"
+    :total="total"
+    :unit="unit"
+    :last-day-evolution="lastDayEvolution"
+    :has-data="hasData"
+    :is-loading="isLoading"
+  >
+    <LineChartStats
+      :key="`${useBillingPeriod}-${accumulated}`"
+      :title="title"
+      :colors="colors"
+      :limits="limits"
+      :data="datas"
+      :datas-by-app="datasByApp"
+      :app-names="appNames"
+      :accumulated="accumulated"
+      :use-billing-period="useBillingPeriod"
+    />
+  </ChartCard>
 </template>

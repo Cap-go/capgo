@@ -32,11 +32,24 @@
 
 ## Features
 
-- ⚡️ Test the web app directly on your phone using the native API
-
-- 😃 Share your new features with your teammates
-
-- ↕️ Manage your channels for auto-update system
+- ☁️ Cloud / Self hosted Support: Use our [Cloud](https://capgo.app/) to manage
+  your app updates or yours.
+- 📦 Bundle Management: Download, assign to channel, rollback.
+- 📺 Channel Support: Use channels to manage different environements.
+- 🎯 Set Channel to specific device to do QA or debug one user.
+- 🔄 Auto Update: Automatically download and set the latest bundle for the app.
+- 🛟 Rollback: Reset the app to last working bundle if an incompatible bundle
+  has been set.
+- 🔁 **Delta Updates**: Make instant updates by only downloading changed files.
+- 🔒 **Security**: Encrypt and sign each updates with best in class security
+  standards.
+- ⚔️ **Battle-Tested**: Used in more than 3000 projects.
+- 📊 View your deployment statistics
+- 🔋 Supports Android and iOS
+- ⚡️ Capacitor 6/7 support
+- 🌐 **Open Source**: Licensed under GNU AFFERO GENERAL PUBLIC LICENSE
+- 🌐 **Open Source Backend**: Self install
+  [our backend](https://github.com/Cap-go/capgo) in your infra
 
 <br>
 
@@ -143,7 +156,9 @@ All the following official plugins are already installed and pre-configured:
 
 Capgo is deployed to production on Cloudflare workers, Netlify and Supabase.
 
-Cloudflare workers take 99% of the traffic. Supabase is used for internal calls, for internal tasks such as CRON jobs that call functions. Netlify is used only as a backup for Cloudflare.
+Cloudflare workers take 99% of the traffic. Supabase is used for internal calls,
+for internal tasks such as CRON jobs that call functions. Netlify is used only
+as a backup for Cloudflare.
 
 When self-hosted, installing only Supabase is sufficient.
 
@@ -154,7 +169,7 @@ Use the CLI to deploy to preprod
 ```bash
 bun run dev-build
 # then deploy
-bun run deploy:cloudflare_frontend:preprod
+bun run deploy:cloudflare:webapp:preprod
 ```
 
 or Prod
@@ -162,7 +177,7 @@ or Prod
 ```bash
 bun run build
 # then deploy
-bun run deploy:cloudflare_frontend:prod
+bun run deploy:cloudflare:webapp:prod
 ```
 
 ### Development
@@ -175,13 +190,15 @@ Before continuing, ensure you have the following installed:
 - [bun](https://bun.sh/)
 - [Supabase CLI](https://supabase.com/docs/guides/cli)
 
-You can install the `supabase` CLI globally with `bun install supabase -g` and you'll be able to invoke `supabase` from anywhere.
+You can install the `supabase` CLI globally with `bun install supabase -g` and
+you'll be able to invoke `supabase` from anywhere.
 
 Alternatively, you can install the `supabase` CLI locally with
 `bun install supabase --save-dev` but, to invoke it, you have to use:
 `./node_modules/supabase/bin/supabase`.
 
-In the following guideline, we will assume that you have installed the `supabase` CLI globally.
+In the following guideline, we will assume that you have installed the
+`supabase` CLI globally.
 
 #### Start Supabase DB Locally
 
@@ -208,8 +225,7 @@ service_role key: xxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXx.xxxxXxxxxXxxxxXxxxxXxxxxX
 
 #### Seed Supabase DB locally
 
-[!WARNING]
-⚠️ Ensure Docker is running.
+[!WARNING] ⚠️ Ensure Docker is running.
 
 ```bash
 supabase db reset
@@ -219,7 +235,7 @@ supabase db reset
 
 ```bash
 bun install
-bun serve:dev
+bun serve:local
 ```
 
 #### Login
@@ -234,16 +250,15 @@ There are two login credentials you can use:
 | Admin User | admin@capgo.app | adminadmin |
 
 The _demo user_ account has some demo data in it. If the data is not fresh, just
-reset the db with `supabase db reset`. The seed has been made in a way that ensures the
-data is always fresh.
+reset the db with `supabase db reset`. The seed has been made in a way that
+ensures the data is always fresh.
 
-The _admin user_ account has administration rights so the user can impersonate other users.
-You can find the interface for that in the "Account" section.
+The _admin user_ account has administration rights so the user can impersonate
+other users. You can find the interface for that in the "Account" section.
 
 #### Supabase DB Reset
 
-[!WARNING]
-⚠️ Ensure Docker is running.
+[!WARNING] ⚠️ Ensure Docker is running.
 
 This will seed the DB with demo data.
 
@@ -258,7 +273,8 @@ To deploy the supabase instance in self-hosted, use the
 
 ### Deploy Supabase cloud
 
-To deploy the Supabase instance on cloud, you need a paid account, which costs $25/month.
+To deploy the Supabase instance on cloud, you need a paid account, which costs
+$25/month.
 
 Link the project to the cloud with the following command:
 
@@ -305,4 +321,5 @@ bun install
 bun mobile
 ```
 
-And you will see the generated files in the `dist` directory, ready to be served on stores.
+And you will see the generated files in the `dist` directory, ready to be served
+on stores.

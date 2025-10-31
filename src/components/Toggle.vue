@@ -1,14 +1,21 @@
 <script setup lang="ts">
-defineProps({
+const props = defineProps({
   value: { type: Boolean, default: false },
   disabled: { type: Boolean, default: false },
 })
-const emit = defineEmits(['update:value'])
+const emit = defineEmits(['update:value', 'change'])
+
+function onChange(event: Event) {
+  const target = event.target as HTMLInputElement | null
+  const nextValue = target ? target.checked : !props.value
+  emit('update:value', nextValue)
+  emit('change', nextValue)
+}
 </script>
 
 <template>
   <label class="relative inline-flex items-center cursor-pointer">
-    <input :value="value" type="checkbox" class="sr-only peer" :checked="value" :disabled="disabled" @change="emit('update:value', value)">
+    <input type="checkbox" class="sr-only peer" :checked="value" :disabled="disabled" @change="onChange">
     <div class="peer h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-0.5 after:h-5 after:w-5 after:border after:border-gray-300 dark:border-gray-600 after:rounded-full after:bg-white dark:bg-gray-700 peer-checked:bg-blue-600 after:transition-all after:content-[''] peer-checked:after:translate-x-full peer-checked:after:border-white" />
   </label>
 </template>

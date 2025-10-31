@@ -1,0 +1,230 @@
+# Capgo AI Coding Agent Instructions
+
+## Project Overview
+
+Capgo is a live update platform for Capacitor apps, consisting of:
+- **Frontend**: Vue 3 SPA built with Vite, Tailwind CSS, and DaisyUI
+- **Backend**: Multi-platform edge functions (Cloudflare Workers primary, Supabase/Netlify backup)
+- **Database**: PostgreSQL via Supabase, with migration to Cloudflare D1 in progress
+- **Mobile**: Capacitor iOS/Android apps with OTA update capabilities
+
+## Critical Architecture Patterns
+
+### Multi-Platform Backend Deployment
+
+The backend runs on **three platforms** with identical code:
+1. **Cloudflare Workers** (99% of production traffic, ports 8787/8788/8789 locally)
+2. **Supabase Edge Functions** (internal tasks, CRON jobs, local development)
+3. **Netlify Edge Functions** (backup deployment)
+
+Code lives in `supabase/functions/_backend/` and is deployed to all three platforms. Workers are split:
+- **API Worker** (8787): `/bundle`, `/app`, `/device`, `/channel`, `/private/*`, `/triggers`
+- **Plugin Worker** (8788): `/updates`, `/channel_self`, `/stats` 
+- **Files Worker** (8789): File upload/download operations
+
+Use `cloudflare_workers/{api,plugin,files}/index.ts` to see routing. All routes use Hono framework (`createHono` from `utils/hono.ts`).
+
+### Database Layer: V1 (Postgres) → V2 (D1) Migration
+
+Active migration from Supabase Postgres to Cloudflare D1. Patterns:
+- **V1 functions**: `pg.ts` - `getPgClient()`, `getDrizzleClient()` using `postgres` package
+- **V2 functions**: `pg_d1.ts` - `getPgClientD1()`, `getDrizzleClientD1()` using Cloudflare D1
+- Schema defined in `utils/postgress_schema.ts` with Drizzle ORM
+- Code uses `getIsV2(c)` to switch between implementations
+- D1 queries use sessions: `getPgClientD1(c, 'first-unconstrained')` for read-only operations
+
+**Never edit committed migrations** in `supabase/migrations/`. Create new migrations with `supabase migration new <feature_slug>`.
+
+### Request Context Flow
+
+All endpoints receive Hono `Context` object:
+```typescript
+import type { Context } from 'hono'
+import type { MiddlewareKeyVariables } from '../utils/hono.ts'
+
+function myEndpoint(c: Context<MiddlewareKeyVariables>) {
+  const requestId = c.get('requestId')  // For logging
+  const apikey = c.get('apikey')        // Authenticated API key
+  const auth = c.get('auth')            // Auth info (userId, authType)
+}
+```
+
+Use `cloudlog({ requestId: c.get('requestId'), message: '...' })` for structured logging.
+
+### Authentication Middleware
+
+- API endpoints use `middlewareAPISecret` (internal) or `middlewareKey` (external API keys)
+- Keys stored in `apikeys` table, validated against `owner_org` for authorization
+- JWT auth available via `middlewareAuth` for user sessions
+- Check `c.get('auth')?.authType` to determine 'apikey' vs 'jwt'
+
+## Development Workflows
+
+### Local Development Setup
+
+```bash
+# Start Supabase (required for all development)
+supabase start
+
+# Seed database with fresh test data
+supabase db reset
+
+# Start frontend (localhost:5173)
+bun serve:local  # Uses local env
+bun serve:dev    # Uses development branch env
+
+# Start backend edge functions
+bun backend  # Supabase functions on :54321
+
+# Start Cloudflare Workers (optional, for testing CF deployment)
+./scripts/start-cloudflare-workers.sh
+```
+
+Test accounts (after `supabase db reset`):
+- `test@capgo.app` / `testtest` (demo user with data)
+- `admin@capgo.app` / `adminadmin` (admin user)
+
+### Testing Strategy
+
+**Backend tests** (`tests/` directory, Vitest):
+```bash
+bun test:all          # All tests against Supabase
+bun test:backend      # Exclude CLI tests
+bun test:cli          # Only CLI tests (requires LOCAL_CLI_PATH=true)
+
+# Cloudflare Workers testing
+bun test:cloudflare:all      # All tests against CF Workers
+bun test:cloudflare:backend  # Backend tests on CF Workers
+```
+
+Tests use `tests/test-utils.ts` helpers:
+- `getEndpointUrl(path)` routes to correct worker based on endpoint
+- `USE_CLOUDFLARE_WORKERS=true` env var switches backend target
+- Tests modify local database; always reset before test runs
+
+**Frontend tests** (Playwright):
+```bash
+bun test:front  # E2E tests in playwright/e2e/
+```
+
+### Code Quality Commands
+
+```bash
+bun lint          # ESLint for frontend (src/**/*.{vue,ts,js})
+bun lint:fix      # Auto-fix linting issues
+bun lint:backend  # ESLint for backend (supabase/**/*.{ts,js})
+bun typecheck     # Vue + TypeScript type checking
+bun types         # Generate Supabase types (after migrations)
+```
+
+**Never commit without running `bun lint:fix`** before validation.
+
+## Database Conventions
+
+### Migrations Workflow
+
+1. Create migration: `supabase migration new <feature_slug>`
+2. Edit the **single migration file** until feature ships
+3. Test locally: `supabase db reset` (applies all migrations + seed)
+4. Update `supabase/seed.sql` for new/changed test fixtures
+5. Push to cloud: `supabase db push --linked` (prod only)
+
+**Critical rules:**
+- One migration per feature, edit until merged
+- Never modify previously committed migrations
+- Seed data should support current tests, not historical states
+- Run `bun types` after schema changes to regenerate TypeScript types
+
+### Drizzle ORM Patterns
+
+Schema in `postgress_schema.ts` mirrors SQL tables:
+```typescript
+import { schema } from './postgress_schema.ts'
+const data = await drizzleClient
+  .select({ id: schema.apps.id, name: schema.apps.name })
+  .from(schema.apps)
+  .where(eq(schema.apps.owner_org, orgId))
+  .limit(1)
+```
+
+Use `aliasV2()` for self-joins or multiple table references in same query.
+
+## Frontend Conventions
+
+### Vue 3 Composition API
+
+Use `<script setup>` syntax exclusively:
+```vue
+<script setup lang="ts">
+import { ref } from 'vue'
+import { useRoute } from 'vue-router'
+
+const count = ref(0)
+const route = useRoute()
+</script>
+```
+
+### Styling Standards
+
+- **Tailwind utility classes** for layout/spacing
+- **DaisyUI components** (`d-btn`, `d-input`, `d-card`) for interactive elements
+- **Konsta components** ONLY for safe area helpers (top/bottom insets)
+- Color palette from `src/styles/style.css`: `--color-azure-500: #119eff` (primary), `--color-primary-500: #515271` (text/backgrounds)
+
+Avoid custom CSS; prefer utility composition and DaisyUI theming.
+
+### File-Based Routing
+
+Routes auto-generated from `src/pages/` via `unplugin-vue-router`:
+- `src/pages/app/[id].vue` → `/app/:id`
+- Use `useRoute()` for params, `useRouter()` for navigation
+- TypeScript types in `src/typed-router.d.ts` (auto-generated)
+
+## Deployment & CI/CD
+
+**Do not manually deploy or commit version bumps.** CI/CD handles:
+- Version bumping in `package.json`
+- `CHANGELOG.md` generation (semantic-release)
+- Deployment to Cloudflare/Netlify/Supabase after merge to `main`
+
+If deployment is needed (exceptional cases):
+```bash
+# Cloudflare Workers
+bun deploy:cloudflare:api:prod
+bun deploy:cloudflare:plugin:prod
+
+# Supabase Functions  
+bun deploy:supabase:prod
+```
+
+## Key Files Reference
+
+| Path | Purpose |
+|------|---------|
+| `supabase/functions/_backend/` | Shared backend code for all platforms |
+| `cloudflare_workers/{api,plugin,files}/index.ts` | Platform-specific entry points |
+| `supabase/functions/_backend/utils/hono.ts` | Hono app factory, middleware, error handling |
+| `supabase/functions/_backend/utils/pg.ts` | Postgres V1 database layer |
+| `supabase/functions/_backend/utils/pg_d1.ts` | D1 V2 database layer |
+| `tests/test-utils.ts` | Test helpers, endpoint routing, seeding |
+| `scripts/utils.mjs` | Environment config, branch detection |
+| `src/services/supabase.ts` | Frontend Supabase client setup |
+
+## Common Pitfalls
+
+1. **Mixing V1/V2 database code**: Check `getIsV2(c)` and use correct `pg.ts` vs `pg_d1.ts` functions
+2. **Editing old migrations**: Always create new migration files
+3. **Forgetting lint before commit**: `bun lint:fix` is required
+4. **Hard-coding URLs**: Use `getRightKey()` from `scripts/utils.mjs` for environment-specific config
+5. **Missing requestId in logs**: Always use `cloudlog({ requestId: c.get('requestId'), ... })`
+6. **Importing from wrong paths**: Backend uses `./utils/`, frontend uses `~/` alias for `src/`
+7. **Testing without CF Workers**: Run `./scripts/start-cloudflare-workers.sh` for full coverage
+
+## Environment Variables
+
+Managed in `configs.json` (local) and `internal/cloudflare/.env.*` (deployed):
+- `BRANCH=local|development|main` selects config environment
+- Local: `bun serve:local` (localhost Supabase)
+- Dev: `bun serve:dev` (development branch config)
+
+Use `getRightKey(keyname)` to access environment-specific values.

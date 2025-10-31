@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { ref, watchEffect } from 'vue'
+import { onUnmounted, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import arrowBack from '~icons/ion/arrow-back?width=2em&height=2em'
+import IconLoader from '~icons/lucide/loader-2'
+import InviteTeammateModal from '~/components/dashboard/InviteTeammateModal.vue'
 import { pushEvent } from '~/services/posthog'
 import { getLocalConfig, isLocal, useSupabase } from '~/services/supabase'
 import { sendEvent } from '~/services/tracking'
@@ -22,7 +24,8 @@ const step = ref(0)
 const clicked = ref(0)
 const appId = ref<string>()
 const realtimeListener = ref(false)
-const mySubscription = ref()
+const pollTimer = ref<number | null>(null)
+const initialCount = ref<number | null>(null)
 const supabase = useSupabase()
 const main = useMainStore()
 const { t } = useI18n()
@@ -49,25 +52,43 @@ const steps = ref<Step[]>([
     subtitle: t('this-page-will-self-'),
   },
 ])
+const inviteModalRef = ref<InstanceType<typeof InviteTeammateModal> | null>(null)
+
+function stepToName(stepNumber: number): string {
+  switch (stepNumber) {
+    case 0:
+      return 'copy-command'
+    case 1:
+      return 'wait-for-bundle'
+    case 2:
+      return 'discover-your-bundle'
+    default:
+      return 'unknown-step'
+  }
+}
+
 function setLog() {
   console.log('setLog', props.onboarding, main.user?.id, step.value)
   if (props.onboarding && main.user?.id) {
     sendEvent({
       channel: 'onboarding-bundle',
-      event: `onboarding-bundle-step-${step.value}`,
+      event: `onboarding-bundle-step-${stepToName(step.value)}`,
       icon: '👶',
       user_id: organizationStore.currentOrganization?.gid,
       notify: false,
     }).catch()
-    pushEvent(`user:step-${step.value}`, config.supaHost)
-
-    if (step.value === 2) {
-      pushEvent('user:onboarding-bundle-done', config.supaHost)
-      emit('done')
-    }
+    pushEvent(`user:onboarding-bundle-${stepToName(step.value)}`, config.supaHost)
   }
   if (step.value === 2) {
     emit('done')
+  }
+}
+
+function clearWatchers() {
+  if (pollTimer.value !== null) {
+    console.log('clear poll timer', pollTimer.value)
+    clearInterval(pollTimer.value)
+    pollTimer.value = null
   }
 }
 
@@ -109,8 +130,7 @@ async function copyToast(allowed: boolean, id: string, text?: string) {
     step.value += 1
     clicked.value = 0
     realtimeListener.value = false
-    if (mySubscription.value)
-      mySubscription.value.unsubscribe()
+    clearWatchers()
     scrollToElement(id)
     setLog()
   }
@@ -157,41 +177,96 @@ async function getKey(retry = true): Promise<void> {
   isLoading.value = false
 }
 
+async function getVersionsCount(): Promise<number> {
+  const orgId = organizationStore.currentOrganization?.gid
+  if (!orgId || !props.appId)
+    return 0
+  const { count, error } = await supabase
+    .from('app_versions')
+    .select('id', { count: 'exact', head: true })
+    .eq('owner_org', orgId)
+    .eq('app_id', props.appId)
+
+  if (error)
+    return 0
+  return count ?? 0
+}
+
+async function getLatestVersionId(): Promise<string | undefined> {
+  const orgId = organizationStore.currentOrganization?.gid
+  if (!orgId || !props.appId)
+    return undefined
+  const { data, error } = await supabase
+    .from('app_versions')
+    .select('id, created_at')
+    .eq('owner_org', orgId)
+    .eq('app_id', props.appId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+
+  if (error || !data || data.length === 0)
+    return undefined
+  return `${data[0].id}`
+}
+
+function openInviteDialog() {
+  inviteModalRef.value?.openDialog()
+}
+
+function onInviteSuccess() {
+  step.value += 1
+  clicked.value = 0
+  realtimeListener.value = false
+  clearWatchers()
+  scrollToElement('step_card_1')
+  setLog()
+}
+
 watchEffect(async () => {
   if (step.value === 1 && !realtimeListener.value) {
-    console.log('watch app change step 1')
+    console.log('watch app change step 1 via polling')
     realtimeListener.value = true
     await organizationStore.awaitInitialLoad()
-    mySubscription.value = supabase
-      .channel('table-db-changes')
-      .on(
-        'postgres_changes' as any,
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'app_versions',
-          filtr: `owner_org=eq.${organizationStore.currentOrganization?.gid}&eq.${props.appId}`,
-        },
-        (payload) => {
-          console.log('Change received step 1!', payload)
+
+    try {
+      initialCount.value = await getVersionsCount()
+    }
+    catch {
+      initialCount.value = 0
+    }
+
+    clearWatchers()
+
+    pollTimer.value = window.setInterval(async () => {
+      try {
+        const current = await getVersionsCount()
+        if (initialCount.value !== null && current > initialCount.value) {
+          const latestId = await getLatestVersionId()
           step.value += 1
-          appId.value = payload.new.id ?? ''
+          appId.value = latestId ?? ''
           realtimeListener.value = false
-          mySubscription.value.unsubscribe()
+          clearWatchers()
           setLog()
-        },
-      )
-      .subscribe()
+        }
+      }
+      catch (e) {
+        console.warn('Polling app_versions failed', e)
+      }
+    }, 2000)
   }
 })
 
 watchEffect(async () => {
   await getKey()
 })
+
+onUnmounted(() => {
+  clearWatchers()
+})
 </script>
 
 <template>
-  <section class="h-full py-12 overflow-y-auto max-h-fit lg:py-20 sm:py-16">
+  <section class="h-full py-12 overflow-y-auto max-h-fit lg:py-20 sm:py-16 bg-slate-900">
     <div class="px-4 mx-auto max-w-7xl lg:px-8 sm:px-6">
       <div class="flex items-center justify-items-center place-content-center">
         <button v-if="!onboarding" class="bg-gray-800 text-white d-btn d-btn-outline mr-6" @click="emit('closeStep')">
@@ -215,35 +290,58 @@ watchEffect(async () => {
           </h2>
         </div>
       </div>
-      <div class="max-w-4xl mx-auto mt-12 sm:px-10">
+      <div class="max-w-6xl mx-auto mt-12 sm:px-10">
         <template v-for="(s, i) in steps" :key="i">
           <div v-if="i > 0" class="w-1 h-10 mx-auto bg-gray-200" :class="[step !== i ? 'opacity-30' : '']" />
 
           <div :class="[step !== i ? 'opacity-30' : '']" class="relative p-5 overflow-hidden bg-white border border-gray-200 rounded-2xl">
-            <div class="flex items-start sm:items-center">
+            <div class="flex items-start gap-6">
               <div class="inline-flex items-center justify-center text-xl font-bold text-white shrink-0 font-pj h-14 w-14 rounded-xl bg-muted-blue-800">
                 <template v-if="i + 1 !== steps.length">
                   {{ i + 1 }}
+                </template>
+                <template v-else-if="step === 1 && i === 1">
+                  <div class="flex justify-center">
+                    <IconLoader class="w-10 h-10 text-blue-500 animate-spin" />
+                  </div>
                 </template>
                 <template v-else>
                   🚀
                 </template>
               </div>
-              <div class="ml-6 text-xl font-medium text-gray-900 font-pj">
-                {{ s.title }}<br>
-                <span class="text-sm">{{ s.subtitle }}</span>
-                <div class="p-3 rounded-lg" :class="{ 'dark:bg-black bg-gray-100': s.command }">
-                  <code v-if="s.command" :id="`step_command_${i}`" class="block text-lg break-all whitespace-pre-wrap cursor-pointer text-pumpkin-orange-700" @click="copyToast(step === i, `step_command_${i}`, s.command)">
+              <div class="flex-1 min-w-0">
+                <div class="text-xl font-medium text-gray-900 font-pj">
+                  {{ s.title }}<br>
+                  <span class="text-sm">{{ s.subtitle }}</span>
+                </div>
+                <div v-if="s.command" class="relative mt-4 p-5 pr-16 rounded-lg bg-black group cursor-pointer" @click="copyToast(step === i, `step_command_${i}`, s.command)">
+                  <code :id="`step_command_${i}`" class="block text-xl break-all whitespace-pre-wrap text-pumpkin-orange-700">
                     {{ s.command }}
-                    <i-ion-copy-outline class="text-muted-blue-300" />
                   </code>
+                  <i-ion-copy-outline class="absolute top-5 right-5 text-muted-blue-300 w-6 h-6" />
                 </div>
                 <br v-if="s.command">
               </div>
+            </div>
+            <div v-if="i === 0" class="pt-6 border-t border-gray-200">
+              <h3 class="text-lg font-semibold text-gray-900 font-pj">
+                {{ t('onboarding-invite-option-title') }}
+              </h3>
+              <p class="mt-2 text-sm text-gray-600">
+                {{ t('onboarding-invite-option-subtitle') }}
+              </p>
+              <button
+                type="button"
+                class="inline-flex items-center px-4 py-2 mt-4 text-sm font-semibold transition-colors duration-200 rounded-md bg-muted-blue-50 text-muted-blue-800 hover:bg-muted-blue-100 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-muted-blue-500"
+                @click="openInviteDialog"
+              >
+                {{ t('onboarding-invite-option-cta') }}
+              </button>
             </div>
           </div>
         </template>
       </div>
     </div>
   </section>
+  <InviteTeammateModal ref="inviteModalRef" @success="onInviteSuccess" />
 </template>

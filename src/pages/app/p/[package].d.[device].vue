@@ -13,7 +13,6 @@ import IconLog from '~icons/heroicons/document'
 import IconInformations from '~icons/heroicons/information-circle'
 import IconAlertCircle from '~icons/lucide/alert-circle'
 import IconDown from '~icons/material-symbols/keyboard-arrow-down-rounded'
-import { appIdToUrl, urlToAppId } from '~/services/conversion'
 import { formatDate } from '~/services/date'
 import { defaultApiHost, useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
@@ -21,18 +20,10 @@ import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
 
-interface Device {
-  version: Database['public']['Tables']['app_versions']['Row']
-}
 interface Channel {
   version: Database['public']['Tables']['app_versions']['Row']
 }
 
-interface Stat {
-  version: {
-    name: string
-  }
-}
 const displayStore = useDisplayStore()
 const dialogStore = useDialogV2Store()
 const { t } = useI18n()
@@ -51,8 +42,7 @@ watchEffect(() => {
 
 const organizationStore = useOrganizationStore()
 
-const device = ref<Database['public']['Tables']['devices']['Row'] & Device>()
-const logs = ref<(Database['public']['Tables']['stats']['Row'] & Stat)[]>([])
+const device = ref<Database['public']['Tables']['devices']['Row']>()
 const channels = ref<(Database['public']['Tables']['channels']['Row'] & Channel)[]>([])
 const versions = ref<Database['public']['Tables']['app_versions']['Row'][]>([])
 const channelDevice = ref<Database['public']['Tables']['channels']['Row']>()
@@ -148,6 +138,33 @@ async function getChannelOverride() {
     channelDevice.value = undefined
   }
 }
+
+async function getVersionInfo() {
+  if (device.value?.version && !device.value?.version_name) {
+    const { data: dataVersion } = await supabase
+      .from('app_versions')
+      .select(`
+          name
+      `)
+      .eq('id', device.value!.version)
+      .single()
+
+    if (dataVersion)
+      device.value.version_name = dataVersion.name
+  }
+  if (!device.value?.version && device.value?.version_name) {
+    const { data: dataVersion } = await supabase
+      .from('app_versions')
+      .select(`
+          id
+      `)
+      .eq('name', device.value!.version_name)
+      .single()
+
+    if (dataVersion)
+      device.value.version = dataVersion.id
+  }
+}
 async function getDevice() {
   if (!id.value)
     return
@@ -174,21 +191,8 @@ async function getDevice() {
       })
 
     const data = dataD[0]
-    const deviceValue = data as Database['public']['Tables']['devices']['Row'] & Device
-    device.value = deviceValue
-    if (!data?.version) {
-      return
-    }
-    const { data: dataVersion } = await supabase
-      .from('app_versions')
-      .select(`
-          name
-      `)
-      .eq('id', data!.version)
-      .single()
-
-    if (dataVersion)
-      deviceValue.version = dataVersion! as any as typeof deviceValue.version
+    device.value = data
+    await getVersionInfo()
   }
   catch (error) {
     console.error('no devices', error)
@@ -221,7 +225,6 @@ async function loadRevertToNativeVersion() {
 
 async function loadData() {
   isLoading.value = true
-  logs.value = []
   await Promise.all([
     getDevice(),
     getChannelOverride(),
@@ -338,7 +341,6 @@ async function onSelectChannel(value: string) {
 watchEffect(async () => {
   if (route.path.includes('/d/')) {
     packageId.value = route.params.package as string
-    packageId.value = urlToAppId(packageId.value)
     id.value = route.params.device as string
     id.value = id.value!.toLowerCase()
     await loadData()
@@ -349,7 +351,11 @@ watchEffect(async () => {
 
 function openChannel() {
   if (packageId.value && channelDevice.value?.id)
-    router.push(`/app/p/${appIdToUrl(packageId.value)}/channel/${channelDevice.value.id}`)
+    router.push(`/app/p/${packageId.value}/channel/${channelDevice.value.id}`)
+}
+function openBundle() {
+  if (packageId.value && device.value?.version)
+    router.push(`/app/p/${packageId.value}/bundle/${device.value.version}`)
 }
 </script>
 
@@ -360,80 +366,84 @@ function openChannel() {
     </div>
     <div v-else-if="device">
       <Tabs v-model:active-tab="ActiveTab" :tabs="tabs" />
-      <div v-if="ActiveTab === 'info'" id="devices" class="flex flex-col">
-        <div v-if="device.plugin_version === '0.0.0'" class="my-2 bg-[#ef4444] text-center text-white w-fit ml-auto mr-auto border-8 rounded-2xl border-[#ef4444]">
-          {{ t('device-injected') }}
-          <br>
-          {{ t('device-injected-2') }}
-        </div>
-        <div class="flex flex-col overflow-visible bg-white shadow-lg border-slate-300 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-gray-800">
-          <dl :key="reloadCount" class="divide-y dark:divide-slate-500 divide-slate-200">
-            <InfoRow :label="t('device-id')">
-              {{ device.device_id }}
-            </InfoRow>
-            <InfoRow v-if="device.custom_id" :label="t('custom-id')">
-              {{ device.custom_id }}
-            </InfoRow>
-            <InfoRow v-if="device.updated_at" :label="t('last-update')">
-              {{ formatDate(device.updated_at) }}
-            </InfoRow>
-            <InfoRow v-if="device.platform" :label="t('platform')">
-              {{ device.platform }}
-            </InfoRow>
-            <InfoRow v-if="device.plugin_version" :label="t('plugin-version')">
-              {{ device.plugin_version }}
-            </InfoRow>
-            <InfoRow v-if="device.version.name" :label="t('version')">
-              {{ device.version.name }}
-            </InfoRow>
-            <InfoRow v-if="device.version_build" :label="t('version-builtin')">
-              {{ device.version_build }}
-            </InfoRow>
-            <InfoRow v-if="device.os_version" :label="t('os-version')">
-              {{ device.os_version }}
-            </InfoRow>
-            <InfoRow v-if="minVersion(device.plugin_version) && device.is_emulator" :label="t('is-emulator')">
-              {{ device.is_emulator?.toString() }}
-            </InfoRow>
-            <InfoRow v-if="minVersion(device.plugin_version) && device.is_prod" :label="t('is-production-app')">
-              {{ device.is_prod?.toString() }}
-            </InfoRow>
-            <InfoRow :label="t('channel-link')" :value="channelDevice?.name ?? ''" @click="openChannel()">
-              <details ref="channelDropdown" class="d-dropdown d-dropdown-end relative" @click.stop>
-                <summary class="d-btn d-btn-outline d-btn-sm">
-                  <span>{{ getChannelLabel(channelDevice?.id || 'none') }}</span>
-                  <IconDown class="w-4 h-4 ml-1 fill-current" />
-                </summary>
-                <ul class="d-dropdown-content bg-base-200 rounded-box z-50 w-48 p-2 shadow-lg absolute right-0 top-full mt-1">
-                  <li class="block px-1 rounded-lg hover:bg-gray-600">
-                    <a
-                      class="block px-3 py-2 hover:bg-gray-600 text-white"
-                      @click="onSelectChannel('none')"
-                    >
-                      {{ t('none') }}
-                    </a>
-                  </li>
-                  <li v-for="ch in channels" :key="ch.id" class="block px-1 rounded-lg hover:bg-gray-600">
-                    <a
-                      class="block px-3 py-2 hover:bg-gray-600 text-white"
-                      @click="onSelectChannel(ch.id.toString())"
-                    >
-                      {{ ch.name }}
-                    </a>
-                  </li>
-                </ul>
-              </details>
-            </InfoRow>
-          </dl>
+      <div v-if="ActiveTab === 'info'" id="devices" class="mt-0 md:mt-8">
+        <div class="w-full h-full px-0 pt-0 md:pt-8 mx-auto mb-8 overflow-y-auto max-w-9xl max-h-fit sm:px-6 lg:px-8">
+          <div v-if="device.plugin_version === '0.0.0'" class="my-2 bg-[#ef4444] text-center text-white w-fit ml-auto mr-auto border-8 rounded-2xl border-[#ef4444]">
+            {{ t('device-injected') }}
+            <br>
+            {{ t('device-injected-2') }}
+          </div>
+          <div class="flex flex-col overflow-hidden overflow-y-auto bg-white border border-slate-300 shadow-lg md:rounded-lg dark:border-slate-900 dark:bg-gray-800">
+            <dl :key="reloadCount" class="divide-y dark:divide-slate-500 divide-slate-200">
+              <InfoRow :label="t('device-id')">
+                {{ device.device_id }}
+              </InfoRow>
+              <InfoRow v-if="device.custom_id" :label="t('custom-id')">
+                {{ device.custom_id }}
+              </InfoRow>
+              <InfoRow v-if="device.updated_at" :label="t('last-update')">
+                {{ formatDate(device.updated_at) }}
+              </InfoRow>
+              <InfoRow v-if="device.platform" :label="t('platform')">
+                {{ device.platform }}
+              </InfoRow>
+              <InfoRow v-if="device.plugin_version" :label="t('plugin-version')">
+                {{ device.plugin_version }}
+              </InfoRow>
+              <InfoRow v-if="device.version_name" :label="t('version')" is-link @click="openBundle()">
+                {{ device.version_name }}
+              </InfoRow>
+              <InfoRow v-if="device.version_build" :label="t('version-builtin')">
+                {{ device.version_build }}
+              </InfoRow>
+              <InfoRow v-if="device.os_version" :label="t('os-version')">
+                {{ device.os_version }}
+              </InfoRow>
+              <InfoRow v-if="minVersion(device.plugin_version) && device.is_emulator" :label="t('is-emulator')">
+                {{ device.is_emulator?.toString() }}
+              </InfoRow>
+              <InfoRow v-if="minVersion(device.plugin_version) && device.is_prod" :label="t('is-production-app')">
+                {{ device.is_prod?.toString() }}
+              </InfoRow>
+              <InfoRow :label="t('channel-link')" :value="channelDevice?.name ?? ''" :is-link="true" @click="openChannel()">
+                <details ref="channelDropdown" class="d-dropdown d-dropdown-end relative" @click.stop>
+                  <summary class="d-btn d-btn-outline d-btn-sm">
+                    <span>{{ getChannelLabel(channelDevice?.id || 'none') }}</span>
+                    <IconDown class="w-4 h-4 ml-1 fill-current" />
+                  </summary>
+                  <ul class="d-dropdown-content bg-base-200 rounded-box z-50 w-48 p-2 shadow-lg absolute right-0 top-full mt-1">
+                    <li class="block px-1 rounded-lg hover:bg-gray-600">
+                      <a
+                        class="block px-3 py-2 hover:bg-gray-600 text-white"
+                        @click="onSelectChannel('none')"
+                      >
+                        {{ t('none') }}
+                      </a>
+                    </li>
+                    <li v-for="ch in channels" :key="ch.id" class="block px-1 rounded-lg hover:bg-gray-600">
+                      <a
+                        class="block px-3 py-2 hover:bg-gray-600 text-white"
+                        @click="onSelectChannel(ch.id.toString())"
+                      >
+                        {{ ch.name }}
+                      </a>
+                    </li>
+                  </ul>
+                </details>
+              </InfoRow>
+            </dl>
+          </div>
         </div>
       </div>
       <div v-else-if="ActiveTab === 'logs'" id="devices">
-        <div class="flex flex-col mx-auto overflow-y-auto bg-white shadow-lg border-slate-300 md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-gray-800">
-          <LogTable
-            class="p-3"
-            :device-id="id"
-            :app-id="packageId"
-          />
+        <div class="w-full h-full px-0 pt-0 md:pt-8 mx-auto mb-8 overflow-y-auto max-w-9xl max-h-fit sm:px-6 lg:px-8">
+          <div class="flex flex-col overflow-hidden overflow-y-auto bg-white border border-slate-300 shadow-lg md:rounded-lg dark:border-slate-900 dark:bg-gray-800">
+            <LogTable
+              class="p-3"
+              :device-id="id"
+              :app-id="packageId"
+            />
+          </div>
         </div>
       </div>
     </div>
@@ -445,7 +455,7 @@ function openChannel() {
       <p class="text-muted-foreground mt-2">
         {{ t('device-not-found-description') }}
       </p>
-      <button class="mt-4 d-btn d-btn-primary text-white" @click="router.push(`/app/p/${appIdToUrl(packageId)}/devices`)">
+      <button class="mt-4 d-btn d-btn-primary text-white" @click="router.push(`/app/p/${packageId}/devices`)">
         {{ t('back-to-devices') }}
       </button>
     </div>

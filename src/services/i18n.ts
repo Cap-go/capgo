@@ -15,6 +15,9 @@ export function getEmoji(country: string) {
     case 'ja':
       countryCode = 'JP'
       break
+    case 'hi':
+      countryCode = 'IN'
+      break
     default:
       break
   }

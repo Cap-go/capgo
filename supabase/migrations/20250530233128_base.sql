@@ -181,7 +181,9 @@ CREATE TYPE "public"."stats_action" AS ENUM(
   'getChannel',
   'rateLimited',
   'disableAutoUpdate',
-  'InvalidIp'
+  'InvalidIp',
+  'ping',
+  'blocked_by_server_url'
 );
 
 ALTER TYPE "public"."stats_action" OWNER TO "postgres";
@@ -1234,7 +1236,7 @@ Begin
   limit 1 into api_key;
 
   if api_key IS DISTINCT FROM  NULL THEN
-    IF api_key.limited_to_orgs IS NOT NULL AND api_key.limited_to_orgs != '{}' THEN
+    IF COALESCE(array_length(api_key.limited_to_orgs, 1), 0) > 0 THEN
       IF NOT (org_id = ANY(api_key.limited_to_orgs)) THEN
           RETURN NULL;
       END IF;
@@ -1280,12 +1282,12 @@ Begin
   limit 1 into api_key;
 
   if api_key IS DISTINCT FROM  NULL THEN
-    IF api_key.limited_to_orgs IS NOT NULL AND api_key.limited_to_orgs != '{}' THEN
+    IF COALESCE(array_length(api_key.limited_to_orgs, 1), 0) > 0 THEN
       IF NOT (org_id = ANY(api_key.limited_to_orgs)) THEN
           RETURN NULL;
       END IF;
     END IF;
-    IF api_key.limited_to_apps IS DISTINCT FROM '{}' THEN
+    IF COALESCE(array_length(api_key.limited_to_apps, 1), 0) > 0 THEN
       IF NOT (app_id = ANY(api_key.limited_to_apps)) THEN
           RETURN NULL;
       END IF;
@@ -1565,7 +1567,7 @@ BEGIN
     -- test the user plan
     IF (public.is_paying_and_good_plan_org_action(orgid, ARRAY['mau']::"public"."action_type"[]) = true AND public.is_paying_and_good_plan_org_action(orgid, ARRAY['bandwidth']::"public"."action_type"[]) = true AND public.is_paying_and_good_plan_org_action(orgid, ARRAY['storage']::"public"."action_type"[]) = false) THEN
         messages := array_append(messages, jsonb_build_object(
-            'message', 'You have exceeded your storage limit.\nUpload will fail, but you can still download your data.\nMAU and bandwidth limits are not exceeded.\nIn order to upload your data, please upgrade your plan here: https://web.capgo.app/settings/plans.',
+            'message', 'You have exceeded your storage limit.\nUpload will fail, but you can still download your data.\nMAU and bandwidth limits are not exceeded.\nIn order to upload your data, please upgrade your plan here: https://console.capgo.app/settings/plans.',
             'fatal', true
         ));
     END IF;
@@ -1613,7 +1615,7 @@ BEGIN
     user_id := api_key.user_id;
 
     -- Check limited_to_orgs only if api_key exists and has restrictions
-    IF api_key.limited_to_orgs IS NOT NULL AND api_key.limited_to_orgs != '{}' THEN
+    IF COALESCE(array_length(api_key.limited_to_orgs, 1), 0) > 0 THEN
       return query select orgs.* FROM public.get_orgs_v6(user_id) orgs
       where orgs.gid = ANY(api_key.limited_to_orgs::uuid[]);
       RETURN;
@@ -2044,6 +2046,10 @@ BEGIN
     -- If not found, try Authorization header
     IF api_key IS NULL OR api_key = '' THEN
       api_key := (headers_text::"json" ->> 'authorization'::"text");
+      -- Ignore Authorization when it starts with the Bearer scheme (JWT)
+      IF api_key IS NOT NULL AND api_key <> '' AND api_key ~* '^\s*bearer\s+' THEN
+        RETURN NULL;
+      END IF;
     END IF;
 
     RETURN api_key;
@@ -2141,7 +2147,7 @@ Begin
   org_id := public.get_user_main_org_id_by_app_id(appid);
 
   SELECT * FROM public.apikeys WHERE key = apikey INTO api_key;
-  IF api_key.limited_to_orgs IS NOT NULL AND api_key.limited_to_orgs != '{}' THEN
+  IF COALESCE(array_length(api_key.limited_to_orgs, 1), 0) > 0 THEN
       IF NOT (org_id = ANY(api_key.limited_to_orgs)) THEN
           RETURN false;
       END IF;
@@ -2555,43 +2561,26 @@ $$;
 
 ALTER FUNCTION "public"."is_paying_and_good_plan_org" ("orgid" "uuid") OWNER TO "postgres";
 
-CREATE OR REPLACE FUNCTION "public"."is_paying_and_good_plan_org_action" (
-  "orgid" "uuid",
-  "actions" "public"."action_type" []
-) RETURNS boolean LANGUAGE "plpgsql"
+CREATE OR REPLACE FUNCTION public.is_paying_and_good_plan_org_action (orgid uuid, actions public.action_type[]) RETURNS boolean LANGUAGE plpgsql
 SET
   search_path = '' SECURITY DEFINER AS $$
-DECLARE
-    org_customer_id text;
-    exceeded boolean := false;
+DECLARE org_customer_id text; result boolean;
 BEGIN
-    -- Get customer_id once
-    SELECT o.customer_id INTO org_customer_id
-    FROM public.orgs o WHERE o.id = orgid;
+  SELECT o.customer_id INTO org_customer_id FROM public.orgs o WHERE o.id = orgid;
 
-    -- Check if any action is exceeded
-    SELECT EXISTS (
-        SELECT 1 FROM public.stripe_info
-        WHERE customer_id = org_customer_id
-        AND (
-            ('mau' = ANY(actions) AND mau_exceeded)
-            OR ('storage' = ANY(actions) AND storage_exceeded)
-            OR ('bandwidth' = ANY(actions) AND bandwidth_exceeded)
-        )
-    ) INTO exceeded;
+  SELECT (si.trial_at > now())
+      OR (si.status = 'succeeded' AND NOT (
+            (si.mau_exceeded AND 'mau' = ANY(actions)) OR
+            (si.storage_exceeded AND 'storage' = ANY(actions)) OR
+            (si.bandwidth_exceeded AND 'bandwidth' = ANY(actions))
+          ))
+  INTO result
+  FROM public.stripe_info si
+  WHERE si.customer_id = org_customer_id
+  LIMIT 1;
 
-    -- Return final check
-    RETURN EXISTS (
-        SELECT 1
-        FROM public.stripe_info
-        WHERE customer_id = org_customer_id
-        AND (
-            trial_at::date - (now())::date > 0
-            OR (status = 'succeeded' AND NOT exceeded)
-        )
-    );
-END;
-$$;
+  RETURN COALESCE(result, false);
+END; $$;
 
 ALTER FUNCTION "public"."is_paying_and_good_plan_org_action" (
   "orgid" "uuid",
@@ -3638,6 +3627,7 @@ CREATE TABLE IF NOT EXISTS "public"."device_usage" (
   "id" integer NOT NULL,
   "device_id" character varying(255) NOT NULL,
   "app_id" character varying(255) NOT NULL,
+  "org_id" character varying(255) NOT NULL,
   "timestamp" timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
@@ -3685,7 +3675,11 @@ CREATE TABLE IF NOT EXISTS "public"."global_stats" (
   "paying_yearly" integer DEFAULT 0,
   "paying_monthly" integer DEFAULT 0,
   "updates_last_month" integer DEFAULT 0,
-  "success_rate" integer DEFAULT 0
+  "success_rate" FLOAT DEFAULT 0,
+  "plan_solo" integer DEFAULT 0,
+  "plan_maker" integer DEFAULT 0,
+  "plan_team" integer DEFAULT 0,
+  "plan_payg" integer DEFAULT 0
 );
 
 ALTER TABLE "public"."global_stats" OWNER TO "postgres";
@@ -3853,8 +3847,6 @@ CREATE TABLE IF NOT EXISTS "public"."users" (
   "enableNotifications" boolean DEFAULT false NOT NULL,
   "optForNewsletters" boolean DEFAULT false NOT NULL,
   "legalAccepted" boolean DEFAULT false NOT NULL,
-  "customer_id" character varying,
-  "billing_email" "text",
   "ban_time" timestamp with time zone
 );
 
@@ -4004,9 +3996,6 @@ ALTER TABLE ONLY "public"."orgs"
 ADD CONSTRAINT "unique_name_created_by" UNIQUE ("name", "created_by");
 
 ALTER TABLE ONLY "public"."users"
-ADD CONSTRAINT "users_customer_id_key" UNIQUE ("customer_id");
-
-ALTER TABLE ONLY "public"."users"
 ADD CONSTRAINT "users_pkey" PRIMARY KEY ("id");
 
 ALTER TABLE ONLY "public"."version_meta"
@@ -4014,6 +4003,16 @@ ADD CONSTRAINT "version_meta_pkey" PRIMARY KEY ("timestamp", "app_id", "version_
 
 ALTER TABLE ONLY "public"."version_usage"
 ADD CONSTRAINT "version_usage_pkey" PRIMARY KEY ("timestamp", "app_id", "version_id", "action");
+
+CREATE INDEX IF NOT EXISTS si_customer_status_trial_idx ON public.stripe_info (customer_id, status, trial_at) INCLUDE (
+  mau_exceeded,
+  storage_exceeded,
+  bandwidth_exceeded
+);
+
+CREATE INDEX IF NOT EXISTS orgs_updated_at_id_idx ON public.orgs (updated_at DESC) INCLUDE (id)
+WHERE
+  customer_id IS NOT NULL;
 
 CREATE INDEX "apikeys_key_idx" ON "public"."apikeys" USING "btree" ("key");
 
@@ -4421,9 +4420,6 @@ ADD CONSTRAINT "owner_org_id_fkey" FOREIGN KEY ("owner_org") REFERENCES "public"
 
 ALTER TABLE ONLY "public"."stripe_info"
 ADD CONSTRAINT "stripe_info_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "public"."plans" ("stripe_id");
-
-ALTER TABLE ONLY "public"."users"
-ADD CONSTRAINT "users_customer_id_fkey" FOREIGN KEY ("customer_id") REFERENCES "public"."stripe_info" ("customer_id");
 
 ALTER TABLE ONLY "public"."users"
 ADD CONSTRAINT "users_id_fkey" FOREIGN KEY ("id") REFERENCES "auth"."users" ("id") ON DELETE CASCADE;
@@ -5104,34 +5100,6 @@ WITH
     )
   );
 
-CREATE POLICY "Allow user to self get" ON "public"."stripe_info" FOR
-SELECT
-  TO "authenticated" USING (
-    (
-      (
-        (
-          SELECT
-            "auth"."uid" () AS "uid"
-        ) IN (
-          SELECT
-            "users"."id"
-          FROM
-            "public"."users"
-          WHERE
-            (
-              ("users"."customer_id")::"text" = ("users"."customer_id")::"text"
-            )
-        )
-      )
-      OR "public"."is_admin" (
-        (
-          SELECT
-            "auth"."uid" () AS "uid"
-        )
-      )
-    )
-  );
-
 CREATE POLICY "Allow users to delete manifest entries" ON "public"."manifest" FOR DELETE TO "authenticated" USING (
   (
     EXISTS (
@@ -5411,14 +5379,6 @@ ALTER TABLE "public"."users" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."version_meta" ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE "public"."version_usage" ENABLE ROW LEVEL SECURITY;
-
-ALTER PUBLICATION "supabase_realtime" OWNER TO "postgres";
-
-ALTER PUBLICATION "supabase_realtime"
-ADD TABLE ONLY "public"."app_versions";
-
-ALTER PUBLICATION "supabase_realtime"
-ADD TABLE ONLY "public"."apps";
 
 REVOKE USAGE ON SCHEMA "public"
 FROM

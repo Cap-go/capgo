@@ -3,7 +3,14 @@ import type { TableColumn } from './comp_def'
 import { FormKit } from '@formkit/vue'
 import { useDebounceFn } from '@vueuse/core'
 import DOMPurify from 'dompurify'
-import { computed, defineComponent, onMounted, onUnmounted, ref, watch } from 'vue'
+import {
+  computed,
+  defineComponent,
+  onMounted,
+  onUnmounted,
+  ref,
+  watch,
+} from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconTrash from '~icons/heroicons/trash'
 import IconDown from '~icons/ic/round-keyboard-arrow-down'
@@ -87,9 +94,19 @@ function sortClick(key: number) {
     sortable = 'desc'
   else if (sortable === 'desc')
     sortable = true
-  else
-    sortable = 'asc'
+  else sortable = 'asc'
+
   const newColumns = [...props.columns]
+
+  // Reset all other columns' sorting
+  newColumns.forEach((col, index) => {
+    if (index !== key && col.sortable && typeof col.sortable === 'string') {
+      // Reset to true (sortable but not actively sorted)
+      newColumns[index] = { ...col, sortable: true }
+    }
+  })
+
+  // Set the clicked column's sorting
   newColumns[key].sortable = sortable
   emit('update:columns', newColumns)
 }
@@ -98,28 +115,28 @@ function updateUrlParams() {
   const params = new URLSearchParams(window.location.search)
   if (searchVal.value)
     params.set('search', searchVal.value)
-  else
-    params.delete('search')
+  else params.delete('search')
   if (props.filters) {
     Object.entries(props.filters).forEach(([key, value]) => {
       if (value)
         params.append('filter', key)
-      else
-        params.delete('filter', key)
+      else params.delete('filter', key)
     })
   }
   if (props.currentPage)
     params.set('page', props.currentPage.toString())
-  else
-    params.delete('page')
+  else params.delete('page')
   props.columns.forEach((col) => {
     if (col.sortable && col.sortable !== true)
       params.set(`sort_${col.key}`, col.sortable)
-    else
-      params.delete(`sort_${col.key}`)
+    else params.delete(`sort_${col.key}`)
   })
   const paramsString = params.toString() ? `?${params.toString()}` : ''
-  window.history.pushState({}, '', `${window.location.pathname}${paramsString}`)
+  window.history.pushState(
+    {},
+    '',
+    `${window.location.pathname}${paramsString}`,
+  )
 }
 
 const isSelectAllEnabled = computed(() => {
@@ -154,7 +171,11 @@ function loadFromUrlParams() {
   const newColumns = [...props.columns]
   props.columns.forEach((col) => {
     const sortParam = params.get(`sort_${col.key}`)
-    if (sortParam && col.sortable && (sortParam === 'asc' || sortParam === 'desc')) {
+    if (
+      sortParam
+      && col.sortable
+      && (sortParam === 'asc' || sortParam === 'desc')
+    ) {
       newColumns[props.columns.indexOf(col)].sortable = sortParam
     }
   })
@@ -174,7 +195,11 @@ onUnmounted(() => {
     params.delete(`sort_${col.key}`)
   })
   const paramsString = params.toString() ? `?${params.toString()}` : ''
-  window.history.pushState({}, '', `${window.location.pathname}${paramsString}`)
+  window.history.pushState(
+    {},
+    '',
+    `${window.location.pathname}${paramsString}`,
+  )
 })
 
 onMounted(() => {
@@ -193,15 +218,37 @@ const debouncedSearch = useDebounceFn(() => {
   emit('update:search', searchVal.value)
 }, 1000)
 
-watch(() => props.columns, () => {
-  debouncedUpdateUrlParams()
-  debouncedReload()
-}, { deep: true })
+const hasLoadingCycleCompleted = ref(false)
+const shouldShowRows = computed(
+  () => !props.isLoading && props.elementList.length !== 0,
+)
+const shouldShowEmptyState = computed(
+  () =>
+    !props.isLoading
+    && props.elementList.length === 0
+    && hasLoadingCycleCompleted.value,
+)
+const shouldShowSkeleton = computed(
+  () => !shouldShowRows.value && !shouldShowEmptyState.value,
+)
 
-watch(() => props.filters, () => {
-  debouncedUpdateUrlParams()
-  debouncedReload()
-}, { deep: true, immediate: true })
+watch(
+  () => props.columns,
+  () => {
+    debouncedUpdateUrlParams()
+    debouncedReload()
+  },
+  { deep: true },
+)
+
+watch(
+  () => props.filters,
+  () => {
+    debouncedUpdateUrlParams()
+    debouncedReload()
+  },
+  { deep: true, immediate: true },
+)
 
 watch(searchVal, () => {
   debouncedSearch()
@@ -209,10 +256,31 @@ watch(searchVal, () => {
   debouncedReload()
 })
 
-watch(() => props.currentPage, () => {
-  debouncedUpdateUrlParams()
-  debouncedReload()
-})
+watch(
+  () => props.currentPage,
+  () => {
+    debouncedUpdateUrlParams()
+    debouncedReload()
+  },
+)
+
+watch(
+  () => props.isLoading,
+  (loading, previousLoading) => {
+    if (previousLoading && !loading)
+      hasLoadingCycleCompleted.value = true
+  },
+  { immediate: true },
+)
+
+watch(
+  () => props.elementList,
+  (list) => {
+    if (list.length > 0)
+      hasLoadingCycleCompleted.value = true
+  },
+  { immediate: true },
+)
 
 function displayValueKey(elem: any, col: TableColumn | undefined) {
   if (!col)
@@ -259,13 +327,21 @@ async function fastBackward() {
     emit('update:currentPage', 1)
   }
 }
-watch(props.elementList, () => {
-  selectedRows.value = props.elementList.map(_ => false)
-  previousSelectedRow.value = null
-})
+watch(
+  () => props.elementList,
+  (list) => {
+    selectedRows.value = list.map(() => false)
+    previousSelectedRow.value = null
+  },
+  { immediate: true },
+)
 async function handleCheckboxClick(i: number, e: MouseEvent) {
   if (e.shiftKey && previousSelectedRow.value !== null) {
-    for (let y = Math.min(previousSelectedRow.value, i); y <= Math.max(previousSelectedRow.value, i); y++) {
+    for (
+      let y = Math.min(previousSelectedRow.value, i);
+      y <= Math.max(previousSelectedRow.value, i);
+      y++
+    ) {
       if (i > previousSelectedRow.value && y === previousSelectedRow.value)
         continue
 
@@ -292,12 +368,17 @@ function getSkeletonWidth(columnIndex?: number) {
   }
 
   // Data columns - distribute remaining width equally
-  const remainingWidth = hasMassSelect ? `calc((100% - 60px) / ${totalVisibleColumns})` : `${100 / totalVisibleColumns}%`
+  const remainingWidth = hasMassSelect
+    ? `calc((100% - 60px) / ${totalVisibleColumns})`
+    : `${100 / totalVisibleColumns}%`
   return remainingWidth
 }
 
 // Helper component to render VNode content from a column's renderFunction
-const RenderCell = defineComponent<{ renderer?: (item: any) => any, item: any }>({
+const RenderCell = defineComponent<{
+  renderer?: (item: any) => any
+  item: any
+}>({
   name: 'RenderCell',
   props: {
     renderer: Function as unknown as () => ((item: any) => any) | undefined,
@@ -312,22 +393,34 @@ const RenderCell = defineComponent<{ renderer?: (item: any) => any, item: any }>
 <template>
   <div class="pb-4 overflow-x-auto md:pb-0">
     <div class="flex items-start justify-between p-3 pb-4 md:items-center">
-      <div class="flex">
-        <button class="mr-2 inline-flex items-center border border-gray-300 rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-hidden focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 cursor-pointer" type="button" @click="emit('reset')">
-          <IconReload v-if="!isLoading" class="w-4 h-4 mr-0 md:mr-2" />
-          <Spinner v-else size="w-4 h-4 mr-0 md:mr-2" />
-          <span class="hidden text-sm md:block">{{ t('reload') }}</span>
+      <div class="flex h-10 md:mb-0">
+        <button
+          class="mr-2 inline-flex items-center border border-gray-300 rounded-md bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-hidden focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 cursor-pointer"
+          type="button" @click="emit('reset')"
+        >
+          <IconReload v-if="!isLoading" class="m-1 md:mr-2" />
+          <Spinner v-else size="w-[16.8px] h-[16.8px] m-1 mr-2" />
+          <span class="hidden text-sm md:block">{{ t("reload") }}</span>
         </button>
         <div v-if="showAdd" class="mr-2 p-px rounded-lg from-cyan-500 to-purple-500 bg-linear-to-r">
-          <button class="inline-flex items-center rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-hidden focus:ring-4 focus:ring-gray-200 dark:hover:bg-gray-700 dark:focus:ring-gray-700 cursor-pointer" type="button" @click="emit('add')">
-            <plusOutline v-if="!isLoading" class="w-4 h-4 mr-0 md:mr-2" />
-            <Spinner v-else size="w-4 h-4 mr-0 md:mr-2" />
-            <span class="hidden text-sm md:block">{{ t('add-one') }}</span>
+          <button
+            class="inline-flex items-center rounded-md bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-hidden focus:ring-4 focus:ring-gray-200 dark:hover:bg-gray-700 dark:focus:ring-gray-700 cursor-pointer"
+            type="button" @click="emit('add')"
+          >
+            <plusOutline v-if="!isLoading" class="m-1 md:mr-2" />
+            <Spinner v-else size="w-[16.8px] h-[16.8px] m-1 mr-2" />
+            <span class="hidden text-sm md:block">{{ t("add-one") }}</span>
           </button>
         </div>
-        <div v-if="filterText && filterList.length" class="d-dropdown">
-          <button tabindex="0" class="mr-2 inline-flex items-center border border-gray-300 rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-hidden focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 cursor-pointer">
-            <div v-if="filterActivated" class="absolute inline-flex items-center justify-center w-6 h-6 text-xs font-bold text-white bg-red-500 border-2 border-white rounded-full -right-2 -top-2 dark:border-gray-900">
+        <div v-if="filterText && filterList.length" class="d-dropdown h-10">
+          <button
+            tabindex="0"
+            class="mr-2 inline-flex items-center border border-gray-300 rounded-md bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-hidden focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 cursor-pointer h-full"
+          >
+            <div
+              v-if="filterActivated"
+              class="absolute inline-flex items-center justify-center w-6 h-6 text-xs font-bold text-white bg-red-500 border-2 border-white rounded-full -right-2 -top-2 dark:border-gray-900"
+            >
               {{ filterActivated }}
             </div>
             <IconFilter class="w-4 h-4 mr-2" />
@@ -336,36 +429,49 @@ const RenderCell = defineComponent<{ renderer?: (item: any) => any, item: any }>
           </button>
           <ul class="p-2 bg-white shadow d-dropdown-content d-menu dark:bg-base-200 rounded-box z-1 w-52">
             <li v-for="(f, i) in filterList" :key="i">
-              <div class="flex items-center p-2 rounded-sm hover:bg-gray-100 dark:hover:bg-gray-600">
+              <div
+                class="flex items-center p-2 rounded-sm hover:bg-gray-100 dark:hover:bg-gray-600 cursor-pointer"
+              >
                 <input
-                  :id="`filter-radio-example-${i}`"
-                  :checked="filters?.[f]"
-                  type="checkbox"
+                  :id="`filter-radio-example-${i}`" :checked="filters?.[f]" type="checkbox"
                   :name="`filter-radio-${i}`"
                   class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 dark:ring-offset-gray-800 dark:focus:ring-blue-600 dark:focus:ring-offset-gray-800"
-                  @change="emit('update:filters', { ...filters, [f]: !filters?.[f] })"
+                  @change="
+                    emit('update:filters', { ...filters, [f]: !filters?.[f] })
+                  "
                 >
-                <label :for="`filter-radio-example-${i}`" class="w-full ml-2 text-sm font-medium text-gray-900 rounded-sm dark:text-gray-300 first-letter:uppercase">{{ t(f) }}</label>
+                <label
+                  :for="`filter-radio-example-${i}`"
+                  class="w-full ml-2 text-sm font-medium text-gray-900 rounded-sm dark:text-gray-300 first-letter:uppercase cursor-pointer"
+                >{{
+                  t(f) }}</label>
               </div>
             </li>
           </ul>
         </div>
       </div>
-      <button v-if="isSelectAllEnabled" class="inline-flex items-center self-end px-3 py-2 ml-auto mr-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-lg dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-hidden focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 cursor-pointer" type="button" @click="selectedRows = selectedRows.map(() => true); emit('selectRow', selectedRows)">
-        <span class="text-sm">{{ t('select_all') }}</span>
+      <button
+        v-if="isSelectAllEnabled"
+        class="inline-flex items-center self-end px-3 py-2 ml-auto mr-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-lg dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-hidden focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 cursor-pointer"
+        type="button" @click="
+          selectedRows = selectedRows.map(() => true);
+          emit('selectRow', selectedRows);
+        "
+      >
+        <span class="text-sm">{{ t("select_all") }}</span>
       </button>
-      <button v-if="isSelectAllEnabled" class=" self-end mr-2 inline-flex items-center border border-gray-300 rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-hidden focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 cursor-pointer" type="button" @click="emit('massDelete')">
+      <button
+        v-if="isSelectAllEnabled"
+        class="self-end mr-2 inline-flex items-center border border-gray-300 rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-hidden focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 cursor-pointer"
+        type="button" @click="emit('massDelete')"
+      >
         <IconTrash class="text-red-500 h-[24px]" />
       </button>
       <div class="flex md:w-auto overflow-hidden">
         <FormKit
-          v-model="searchVal"
-          :placeholder="searchPlaceholder"
-          :prefix-icon="IconSearch" :disabled="isLoading"
-          enterkeyhint="send"
-          :classes="{
+          v-model="searchVal" :placeholder="searchPlaceholder" :prefix-icon="IconSearch"
+          :disabled="isLoading" enterkeyhint="send" :classes="{
             outer: 'mb-0! md:w-96',
-            inner: 'rounded-full! py-1.5!',
           }"
         />
       </div>
@@ -375,7 +481,12 @@ const RenderCell = defineComponent<{ renderer?: (item: any) => any, item: any }>
         <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
           <tr>
             <th v-if="props.massSelect" class="px-4 md:px-6" />
-            <th v-for="(col, i) in columns" :key="i" scope="col" class="py-1 md:py-3 px-4 md:px-6" :class="{ 'cursor-pointer': col.sortable, 'hidden md:table-cell': !col.mobile }" @click="sortClick(i)">
+            <th
+              v-for="(col, i) in columns" :key="i" scope="col" class="py-1 md:py-3 px-4 md:px-6" :class="{
+                'cursor-pointer': col.sortable,
+                'hidden md:table-cell': !col.mobile,
+              }" @click="sortClick(i)"
+            >
               <div class="flex items-center first-letter:uppercase">
                 {{ col.label }}
                 <div v-if="col.sortable">
@@ -387,7 +498,7 @@ const RenderCell = defineComponent<{ renderer?: (item: any) => any, item: any }>
             </th>
           </tr>
         </thead>
-        <tbody v-if="!isLoading && elementList.length !== 0">
+        <tbody v-if="shouldShowRows">
           <tr
             v-for="(elem, i) in elementList" :key="i"
             class="bg-white border-b dark:border-gray-700 dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-600"
@@ -395,23 +506,33 @@ const RenderCell = defineComponent<{ renderer?: (item: any) => any, item: any }>
             <template v-if="true">
               <th v-if="props.massSelect" class="px-4 md:px-6">
                 <input
-                  id="select-rows" :checked="selectedRows[i]" class="scale-checkbox" type="checkbox" @click="(e: MouseEvent) => { handleCheckboxClick(i, e) }"
+                  id="select-rows" :checked="selectedRows[i]" class="scale-checkbox"
+                  type="checkbox" @click="(e: MouseEvent) => { handleCheckboxClick(i, e) }"
                 >
               </th>
               <template v-for="(col, _y) in columns" :key="`${i}_${_y}`">
-                <th v-if="col.head" :class="`${col.class ?? ''}${!col.mobile ? ' hidden md:table-cell' : ''} ${col.onClick ? 'cursor-pointer hover:underline clickable-cell' : ''}`" scope="row" class="py-2 md:py-4 px-4 md:px-6 font-medium text-gray-900 whitespace-nowrap dark:text-white" @click.stop="col.onClick ? col.onClick(elem) : () => {}">
+                <th
+                  v-if="col.head" :class="`${col.class ?? ''}${!col.mobile ? ' hidden md:table-cell' : ''
+                  } ${col.onClick
+                    ? 'cursor-pointer hover:underline clickable-cell'
+                    : ''
+                  }`" scope="row" class="py-2 md:py-4 px-4 md:px-6 font-medium text-gray-900 whitespace-nowrap dark:text-white"
+                  @click.stop="col.onClick ? col.onClick(elem) : () => { }"
+                >
                   <RenderCell v-if="col.renderFunction" :renderer="col.renderFunction" :item="elem" />
                   <template v-else>
                     {{ displayValueKey(elem, col) }}
                   </template>
                 </th>
-                <td v-else-if="col.actions || col.icon" :class="`${col.class ?? ''} ${!col.mobile ? 'hidden md:table-cell' : ''}`" class="px-4 md:px-6 py-2 md:py-4">
+                <td
+                  v-else-if="col.actions || col.icon" :class="`${col.class ?? ''} ${!col.mobile ? 'hidden md:table-cell' : ''
+                  }`" class="px-4 md:px-6 py-2 md:py-4"
+                >
                   <div class="flex items-center space-x-1">
                     <template v-if="col.actions">
                       <button
                         v-for="(action, actionIndex) in col.actions"
-                        v-show="!action.visible || action.visible(elem)"
-                        :key="actionIndex"
+                        v-show="!action.visible || action.visible(elem)" :key="actionIndex"
                         :disabled="action.disabled && action.disabled(elem)"
                         class="p-2 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-600 dark:hover:text-gray-300 rounded-md cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-gray-500 dark:disabled:hover:text-gray-400"
                         @click.stop="action.onClick(elem)"
@@ -422,14 +543,21 @@ const RenderCell = defineComponent<{ renderer?: (item: any) => any, item: any }>
                     <template v-else-if="col.icon">
                       <button
                         class="p-2 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-600 dark:hover:text-gray-300 rounded-md cursor-pointer"
-                        @click.stop="col.onClick ? col.onClick(elem) : () => {}"
+                        @click.stop="col.onClick ? col.onClick(elem) : () => { }"
                       >
                         <component :is="col.icon" />
                       </button>
                     </template>
                   </div>
                 </td>
-                <td v-else :class="`${col.class ?? ''} ${!col.mobile ? 'hidden md:table-cell' : ''} ${col.onClick ? 'cursor-pointer hover:underline clickable-cell' : ''} overflow-hidden text-ellipsis whitespace-nowrap`" class="px-4 md:px-6 py-2 md:py-4" @click.stop="col.onClick ? col.onClick(elem) : () => {}">
+                <td
+                  v-else :class="`${col.class ?? ''} ${!col.mobile ? 'hidden md:table-cell' : ''
+                  } ${col.onClick
+                    ? 'cursor-pointer hover:underline clickable-cell'
+                    : ''
+                  } overflow-hidden text-ellipsis whitespace-nowrap`" class="px-4 md:px-6 py-2 md:py-4"
+                  @click.stop="col.onClick ? col.onClick(elem) : () => { }"
+                >
                   <RenderCell v-if="col.renderFunction" :renderer="col.renderFunction" :item="elem" />
                   <template v-else>
                     {{ displayValueKey(elem, col) }}
@@ -439,55 +567,106 @@ const RenderCell = defineComponent<{ renderer?: (item: any) => any, item: any }>
             </template>
           </tr>
         </tbody>
-        <tbody v-else-if="!isLoading && elementList.length === 0">
+        <tbody v-else-if="shouldShowEmptyState">
           <tr>
-            <td :colspan="columns.length + (props.massSelect ? 1 : 0)" class="px-4 md:px-6 py-2 md:py-4 text-center text-gray-500 dark:text-gray-400">
-              {{ t('no_elements_found') }}
+            <td
+              :colspan="columns.length + (props.massSelect ? 1 : 0)"
+              class="px-4 md:px-6 py-2 md:py-4 text-center text-gray-500 dark:text-gray-400"
+            >
+              {{ t("no_elements_found") }}
             </td>
           </tr>
         </tbody>
         <tbody v-else>
-          <tr v-for="i in 10" :key="i" :class="{ 'animate-pulse duration-1000': isLoading }">
-            <td v-if="props.massSelect" class="px-4 md:px-6 py-2 md:py-4" :style="`width: ${getSkeletonWidth()}`">
+          <tr v-for="i in 10" :key="i" :class="{ 'animate-pulse duration-1000': shouldShowSkeleton }">
+            <td
+              v-if="props.massSelect" class="px-4 md:px-6 py-2 md:py-4"
+              :style="`width: ${getSkeletonWidth()}`"
+            >
               <div class="rounded-full bg-gray-200 dark:bg-gray-700 w-full mb-4 h-2.5" />
             </td>
-            <td v-for="(col, y) in columns" :key="`${i}_${y}`" class="px-4 md:px-6 py-2 md:py-4" :class="{ 'hidden md:table-cell': !col.mobile }" :style="`width: ${getSkeletonWidth(y)}`">
-              <div class="rounded-full bg-gray-200 dark:bg-gray-700 w-full" :class="{ 'mb-4 h-2.5': col.head, 'h-2 mb-2.5': !col.head }" />
+            <td
+              v-for="(col, y) in columns" :key="`${i}_${y}`" class="px-4 md:px-6 py-2 md:py-4"
+              :class="{ 'hidden md:table-cell': !col.mobile }" :style="`width: ${getSkeletonWidth(y)}`"
+            >
+              <div
+                class="rounded-full bg-gray-200 dark:bg-gray-700 w-full"
+                :class="{ 'mb-4 h-2.5': col.head, 'h-2 mb-2.5': !col.head }"
+              />
             </td>
           </tr>
         </tbody>
       </table>
     </div>
 
-    <nav class="fixed bottom-0 left-0 z-40 flex items-center justify-between w-full p-4 bg-white md:relative dark:bg-gray-900 md:bg-transparent md:pt-4 dark:md:bg-transparent" aria-label="Table navigation">
-      <span class="text-sm font-normal text-gray-500 dark:text-gray-400"><span class="hidden md:inline-block">{{ t('showing') }}</span> <span class="font-semibold text-gray-900 dark:text-white">{{ displayElemRange }}</span> of <span class="font-semibold text-gray-900 dark:text-white">{{ total }}</span></span>
+    <nav
+      class="fixed bottom-0 left-0 z-40 flex items-center justify-between w-full p-4 bg-white md:relative dark:bg-gray-900 md:bg-transparent md:pt-4 dark:md:bg-transparent"
+      aria-label="Table navigation"
+    >
+      <span class="text-sm font-normal text-gray-500 dark:text-gray-400"><span class="hidden md:inline-block">{{
+                                                                           t("showing") }}</span>
+        <span class="font-semibold text-gray-900 dark:text-white">{{
+          displayElemRange
+        }}</span>
+        of
+        <span class="font-semibold text-gray-900 dark:text-white">{{
+          total
+        }}</span></span>
       <ul class="inline-flex items-center -space-x-px">
         <li>
-          <button class="block px-3 py-2 ml-0 leading-tight text-gray-500 bg-white border border-gray-300 rounded-l-lg dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 cursor-pointer" :class="{ 'hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-700 dark:hover:text-white': canPrev() }" :disabled="!canPrev()" @click="fastBackward">
-            <span class="sr-only">{{ t('fast-backward') }}</span>
+          <button
+            class="block px-3 py-2 ml-0 leading-tight text-gray-500 bg-white border border-gray-300 rounded-l-lg dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 cursor-pointer"
+            :class="{
+              'hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-700 dark:hover:text-white':
+                canPrev(),
+            }" :disabled="!canPrev()" @click="fastBackward"
+          >
+            <span class="sr-only">{{ t("fast-backward") }}</span>
             <IconFastBackward />
           </button>
         </li>
         <li>
-          <button class="block px-3 py-2 ml-0 leading-tight text-gray-500 bg-white border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 cursor-pointer" :class="{ 'hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-700 dark:hover:text-white': canPrev() }" :disabled="!canPrev()" @click="prev">
-            <span class="sr-only">{{ t('previous') }}</span>
+          <button
+            class="block px-3 py-2 ml-0 leading-tight text-gray-500 bg-white border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 cursor-pointer"
+            :class="{
+              'hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-700 dark:hover:text-white':
+                canPrev(),
+            }" :disabled="!canPrev()" @click="prev"
+          >
+            <span class="sr-only">{{ t("previous") }}</span>
             <IconPrev />
           </button>
         </li>
         <li>
-          <button aria-current="page" class="z-10 px-3 py-2 leading-tight text-blue-600 border border-blue-300 bg-blue-50 dark:border-gray-700 dark:bg-gray-700 dark:text-white" disabled>
+          <button
+            aria-current="page"
+            class="z-10 px-3 py-2 leading-tight text-blue-600 border border-blue-300 bg-blue-50 dark:border-gray-700 dark:bg-gray-700 dark:text-white"
+            disabled
+          >
             {{ currentPage }}
           </button>
         </li>
         <li>
-          <button class="block px-3 py-2 leading-tight text-gray-500 bg-white border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 cursor-pointer" :class="{ 'hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-700 dark:hover:text-white': canNext() }" :disabled="!canNext()" @click="next">
-            <span class="sr-only">{{ t('next') }}</span>
+          <button
+            class="block px-3 py-2 leading-tight text-gray-500 bg-white border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 cursor-pointer"
+            :class="{
+              'hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-700 dark:hover:text-white':
+                canNext(),
+            }" :disabled="!canNext()" @click="next"
+          >
+            <span class="sr-only">{{ t("next") }}</span>
             <IconNext />
           </button>
         </li>
         <li>
-          <button class="block px-3 py-2 leading-tight text-gray-500 bg-white border border-gray-300 rounded-r-lg dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 cursor-pointer" :class="{ 'hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-700 dark:hover:text-white': canNext() }" :disabled="!canNext()" @click="fastForward">
-            <span class="sr-only"> {{ t('fast-forward') }} </span>
+          <button
+            class="block px-3 py-2 leading-tight text-gray-500 bg-white border border-gray-300 rounded-r-lg dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 cursor-pointer"
+            :class="{
+              'hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-700 dark:hover:text-white':
+                canNext(),
+            }" :disabled="!canNext()" @click="fastForward"
+          >
+            <span class="sr-only"> {{ t("fast-forward") }} </span>
             <IconFastForward />
           </button>
         </li>

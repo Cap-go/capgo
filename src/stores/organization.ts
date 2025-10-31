@@ -68,10 +68,18 @@ export const useOrganizationStore = defineStore('organization', () => {
     localStorage.setItem(STORAGE_KEY, currentOrganizationRaw.gid)
     currentRole.value = await getCurrentRole(currentOrganizationRaw.created_by)
     currentOrganizationFailed.value = !(!!currentOrganizationRaw.paying || (currentOrganizationRaw.trial_left ?? 0) > 0)
-    await main.updateDashboard(currentOrganizationRaw.gid, currentOrganizationRaw.subscription_start, currentOrganizationRaw.subscription_end)
+    // Always fetch last 30 days of data and filter client-side for billing period
+    const last30DaysEnd = new Date()
+    const last30DaysStart = new Date()
+    last30DaysStart.setDate(last30DaysStart.getDate() - 29) // 30 days including today
+    await main.updateDashboard(currentOrganizationRaw.gid, last30DaysStart.toISOString(), last30DaysEnd.toISOString())
   })
 
   watch(_organizations, async (organizationsMap) => {
+    // Only run once - if we already have the app-to-org mapping, skip
+    if (_organizationsByAppId.value.size > 0)
+      return
+
     const organizations = Array.from(organizationsMap.values())
 
     const { error, data: allAppsByOwner } = await supabase.from('apps').select('app_id, owner_org')
@@ -205,7 +213,7 @@ export const useOrganizationStore = defineStore('organization', () => {
       return { id, ...item }
     })
 
-    _organizations.value = new Map(mappedData.map(item => [item.id.toString(), item]))
+    _organizations.value = new Map(mappedData.map(item => [item.gid, item]))
 
     // Try to restore from localStorage first
     if (!currentOrganization.value) {
@@ -251,9 +259,11 @@ export const useOrganizationStore = defineStore('organization', () => {
       return { data: null, error: new Error('User not authenticated') }
     }
 
-    // Verify user has super_admin role for this organization
+    // Verify user has super_admin or owner role for this organization
     const currentOrg = _organizations.value.get(orgId)
-    if (!currentOrg || currentOrg.role !== 'super_admin') {
+    console.log('Delete org check:', { orgId, currentOrg, role: currentOrg?.role, userId: currentUserId })
+    if (!currentOrg || (currentOrg.role !== 'super_admin' && currentOrg.role !== 'owner')) {
+      console.error('Permission denied:', { role: currentOrg?.role, required: ['super_admin', 'owner'] })
       return { data: null, error: new Error('Insufficient permissions') }
     }
 
@@ -263,7 +273,7 @@ export const useOrganizationStore = defineStore('organization', () => {
 
     if (error) {
       console.error('Organization deletion failed:', error.message)
-      return { data: null, error }
+      return { data, error }
     }
 
     return { data, error: null }

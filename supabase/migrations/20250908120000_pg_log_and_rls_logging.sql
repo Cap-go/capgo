@@ -145,7 +145,7 @@ Begin
   org_id := public.get_user_main_org_id_by_app_id(appid);
 
   SELECT * FROM public.apikeys WHERE key = apikey INTO api_key;
-  IF api_key.limited_to_orgs IS NOT NULL AND api_key.limited_to_orgs != '{}' THEN
+  IF COALESCE(array_length(api_key.limited_to_orgs, 1), 0) > 0 THEN
       IF NOT (org_id = ANY(api_key.limited_to_orgs)) THEN
           PERFORM public.pg_log('deny: APIKEY_ORG_RESTRICT', jsonb_build_object('org_id', org_id, 'appid', appid));
           RETURN false;
@@ -197,7 +197,7 @@ Begin
   limit 1 into api_key;
 
   if api_key IS DISTINCT FROM  NULL THEN
-    IF api_key.limited_to_orgs IS NOT NULL AND api_key.limited_to_orgs != '{}' THEN
+    IF COALESCE(array_length(api_key.limited_to_orgs, 1), 0) > 0 THEN
       IF NOT (org_id = ANY(api_key.limited_to_orgs)) THEN
           PERFORM public.pg_log('deny: IDENTITY_ORG_UNALLOWED', jsonb_build_object('org_id', org_id));
           RETURN NULL;
@@ -245,7 +245,7 @@ Begin
   limit 1 into api_key;
 
   if api_key IS DISTINCT FROM  NULL THEN
-    IF api_key.limited_to_orgs IS NOT NULL AND api_key.limited_to_orgs != '{}' THEN
+    IF COALESCE(array_length(api_key.limited_to_orgs, 1), 0) > 0 THEN
       IF NOT (org_id = ANY(api_key.limited_to_orgs)) THEN
           PERFORM public.pg_log('deny: IDENTITY_APP_ORG_UNALLOWED', jsonb_build_object('org_id', org_id, 'app_id', app_id));
           RETURN NULL;
@@ -373,7 +373,7 @@ CREATE OR REPLACE FUNCTION "public"."invite_user_to_org" (
 ) RETURNS character varying LANGUAGE "plpgsql" SECURITY DEFINER
 SET
   search_path = '' AS $$
-Declare  
+Declare
   org record;
   invited_user record;
   current_record record;
@@ -522,7 +522,7 @@ BEGIN
     PERFORM public.pg_log('deny: NO_RIGHTS', jsonb_build_object('org_id', modify_permissions_tmp.org_id, 'email', modify_permissions_tmp.email, 'new_role', modify_permissions_tmp.new_role));
     RETURN 'NO_RIGHTS';
   END IF;
-  
+
   -- Special permission check for super_admin roles
   IF (non_invite_role = 'super_admin'::public.user_min_right) THEN
     IF NOT (public.check_min_rights('super_admin'::public.user_min_right, (select public.get_identity_org_allowed('{read,upload,write,all}'::"public"."key_mode"[], modify_permissions_tmp.org_id)), modify_permissions_tmp.org_id, NULL::character varying, NULL::bigint)) THEN
@@ -579,7 +579,7 @@ BEGIN
     -- test the user plan
     IF (public.is_paying_and_good_plan_org_action(orgid, ARRAY['mau']::"public"."action_type"[]) = true AND public.is_paying_and_good_plan_org_action(orgid, ARRAY['bandwidth']::"public"."action_type"[]) = true AND public.is_paying_and_good_plan_org_action(orgid, ARRAY['storage']::"public"."action_type"[]) = false) THEN
         messages := array_append(messages, jsonb_build_object(
-            'message', 'You have exceeded your storage limit.\nUpload will fail, but you can still download your data.\nMAU and bandwidth limits are not exceeded.\nIn order to upload your data, please upgrade your plan here: https://web.capgo.app/settings/plans.',
+            'message', 'You have exceeded your storage limit.\nUpload will fail, but you can still download your data.\nMAU and bandwidth limits are not exceeded.\nIn order to upload your data, please upgrade your plan here: https://console.capgo.app/settings/plans.',
             'fatal', true
         ));
     END IF;
@@ -712,7 +712,7 @@ BEGIN
     user_id := api_key.user_id;
 
     -- Check limited_to_orgs only if api_key exists and has restrictions
-    IF api_key.limited_to_orgs IS NOT NULL AND api_key.limited_to_orgs != '{}' THEN
+    IF COALESCE(array_length(api_key.limited_to_orgs, 1), 0) > 0 THEN
       return query select orgs.* FROM public.get_orgs_v6(user_id) orgs
       where orgs.gid = ANY(api_key.limited_to_orgs::uuid[]);
       RETURN;
@@ -737,12 +737,12 @@ $$;
 CREATE OR REPLACE FUNCTION "public"."check_org_user_privilages" () RETURNS "trigger" LANGUAGE "plpgsql"
 SET
   search_path = '' AS $$BEGIN
-  
+
   -- here we check if the user is a service role in order to bypass this permission check
   IF (((SELECT auth.jwt() ->> 'role')='service_role') OR ((select current_user) IS NOT DISTINCT FROM 'postgres')) THEN
     RETURN NEW;
   END IF;
-  
+
   IF ("public"."check_min_rights"('super_admin'::"public"."user_min_right", (select auth.uid()), NEW.org_id, NULL::character varying, NULL::bigint))
   THEN
     RETURN NEW;

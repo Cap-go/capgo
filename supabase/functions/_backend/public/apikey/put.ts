@@ -1,5 +1,6 @@
 import type { Database } from '../../utils/supabase.types.ts'
-import { honoFactory, middlewareKey, parseBody, quickError, simpleError } from '../../utils/hono.ts'
+import { honoFactory, parseBody, quickError, simpleError } from '../../utils/hono.ts'
+import { middlewareKey } from '../../utils/hono_middleware.ts'
 import { supabaseApikey } from '../../utils/supabase.ts'
 import { Constants } from '../../utils/supabase.types.ts'
 

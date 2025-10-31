@@ -3,7 +3,8 @@ import type { AuthInfo } from '../../utils/hono.ts'
 import dayjs from 'dayjs'
 import utc from 'dayjs/plugin/utc'
 import { z } from 'zod/mini'
-import { honoFactory, middlewareV2, quickError, simpleError, useCors } from '../../utils/hono.ts'
+import { honoFactory, quickError, simpleError, useCors } from '../../utils/hono.ts'
+import { middlewareV2 } from '../../utils/hono_middleware.ts'
 import { cloudlog, cloudlogErr } from '../../utils/loggin.ts'
 import { hasAppRight, hasAppRightApikey, hasOrgRight, supabaseAdmin } from '../../utils/supabase.ts'
 
@@ -21,6 +22,8 @@ const bundleUsageSchema = z.object({
 const normalStatsSchema = z.object({
   from: z.coerce.date(),
   to: z.coerce.date(),
+  breakdown: z.optional(z.coerce.boolean()),
+  noAccumulate: z.optional(z.coerce.boolean()), // Default to true for backward compatibility
 })
 
 interface VersionName {
@@ -60,7 +63,7 @@ async function checkOrganizationAccess(c: Context, orgId: string, supabase: Retu
   return { isPayingAndGoodPlan }
 }
 
-async function getNormalStats(c: Context, appId: string | null, ownerOrg: string | null, from: Date, to: Date, supabase: ReturnType<typeof supabaseAdmin>, isDashboard: boolean = false) {
+async function getNormalStats(c: Context, appId: string | null, ownerOrg: string | null, from: Date, to: Date, supabase: ReturnType<typeof supabaseAdmin>, isDashboard: boolean = false, includeBreakdown: boolean = false, noAccumulate: boolean = false) {
   if (!appId && !ownerOrg)
     return { data: null, error: 'Invalid appId or ownerOrg' }
 
@@ -72,7 +75,7 @@ async function getNormalStats(c: Context, appId: string | null, ownerOrg: string
     ownerOrgId = data.owner_org
   }
 
-  const { data: metrics, error: metricsError } = await supabase.rpc('get_app_metrics', { org_id: ownerOrgId!, start_date: from.toISOString(), end_date: to.toISOString() })
+  const { data: metrics, error: metricsError } = await supabase.rpc('get_app_metrics', { p_org_id: ownerOrgId!, p_start_date: dayjs(from).utc().format('YYYY-MM-DD'), p_end_date: dayjs(to).utc().format('YYYY-MM-DD') })
   if (metricsError)
     return { data: null, error: metricsError }
   const graphDays = getDaysBetweenDates(from, to)
@@ -152,15 +155,18 @@ async function getNormalStats(c: Context, appId: string | null, ownerOrg: string
     storage[0] = initValue
   }
 
-  // eslint-disable-next-line style/max-statements-per-line
-  storage = (storage as number[]).reduce((p, c) => { if (p.length > 0) { c += p[p.length - 1] } p.push(c); return p }, [] as number[])
-  // eslint-disable-next-line style/max-statements-per-line
-  mau = (mau as number[]).reduce((p, c) => { if (p.length > 0) { c += p[p.length - 1] } p.push(c); return p }, [] as number[])
-  // eslint-disable-next-line style/max-statements-per-line
-  bandwidth = (bandwidth as number[]).reduce((p, c) => { if (p.length > 0) { c += p[p.length - 1] } p.push(c); return p }, [] as number[])
-  if (isDashboard) {
+  // Accumulate data if requested (default behavior for backward compatibility)
+  if (noAccumulate === false) {
     // eslint-disable-next-line style/max-statements-per-line
-    gets = (gets as number[]).reduce((p, c) => { if (p.length > 0) { c += p[p.length - 1] } p.push(c); return p }, [] as number[])
+    storage = (storage as number[]).reduce((p, c) => { if (p.length > 0) { c += p[p.length - 1] } p.push(c); return p }, [] as number[])
+    // eslint-disable-next-line style/max-statements-per-line
+    mau = (mau as number[]).reduce((p, c) => { if (p.length > 0) { c += p[p.length - 1] } p.push(c); return p }, [] as number[])
+    // eslint-disable-next-line style/max-statements-per-line
+    bandwidth = (bandwidth as number[]).reduce((p, c) => { if (p.length > 0) { c += p[p.length - 1] } p.push(c); return p }, [] as number[])
+    if (isDashboard) {
+      // eslint-disable-next-line style/max-statements-per-line
+      gets = (gets as number[]).reduce((p, c) => { if (p.length > 0) { c += p[p.length - 1] } p.push(c); return p }, [] as number[])
+    }
   }
   const baseDay = dayjs(from).utc()
 
@@ -178,6 +184,108 @@ async function getNormalStats(c: Context, appId: string | null, ownerOrg: string
       date: day.toISOString(),
     }
   }
+
+  // If breakdown is requested, return both aggregated and per-app data
+  if (includeBreakdown && ownerOrg) {
+    const breakdown: any[] = []
+
+    // Process each app's data through the same aggregation logic
+    Object.keys(metricsByApp).forEach((appId) => {
+      const appMetrics = metricsByApp[appId]
+
+      // Initialize arrays for this app
+      let appMau = createUndefinedArray(graphDays) as number[]
+      let appStorage = createUndefinedArray(graphDays) as number[]
+      let appBandwidth = createUndefinedArray(graphDays) as number[]
+      let appGets = isDashboard ? createUndefinedArray(graphDays) as number[] : []
+
+      // Process metrics for this app (same logic as aggregated version)
+      appMetrics.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()).forEach((item, i) => {
+        if (item.date) {
+          const dayNumber = i
+          if (appMau[dayNumber])
+            appMau[dayNumber] += item.mau
+          else
+            appMau[dayNumber] = item.mau
+
+          const storageVal = item.storage
+          if (appStorage[dayNumber])
+            appStorage[dayNumber] += storageVal
+          else
+            appStorage[dayNumber] = storageVal
+
+          const bandwidthVal = item.bandwidth ?? 0
+          if (appBandwidth[dayNumber])
+            appBandwidth[dayNumber] += bandwidthVal
+          else
+            appBandwidth[dayNumber] = bandwidthVal
+
+          if (isDashboard) {
+            appGets[dayNumber] = item.get
+          }
+        }
+      })
+
+      // Accumulate data if requested (default behavior for backward compatibility)
+      if (noAccumulate === false) {
+        appStorage = (appStorage as number[]).reduce((p, c) => {
+          if (p.length > 0) {
+            c += p[p.length - 1]
+          }
+          p.push(c)
+          return p
+        }, [] as number[])
+        appMau = (appMau as number[]).reduce((p, c) => {
+          if (p.length > 0) {
+            c += p[p.length - 1]
+          }
+          p.push(c)
+          return p
+        }, [] as number[])
+        appBandwidth = (appBandwidth as number[]).reduce((p, c) => {
+          if (p.length > 0) {
+            c += p[p.length - 1]
+          }
+          p.push(c)
+          return p
+        }, [] as number[])
+        if (isDashboard) {
+          appGets = (appGets as number[]).reduce((p, c) => {
+            if (p.length > 0) {
+              c += p[p.length - 1]
+            }
+            p.push(c)
+            return p
+          }, [] as number[])
+        }
+      }
+
+      // Create final stats for this app
+      for (let i = 0; i < graphDays; i++) {
+        const day = baseDay.add(i, 'day')
+        if (day.utc().startOf('day').isAfter(today.utc().endOf('day')))
+          continue
+
+        breakdown.push({
+          app_id: appId,
+          date: day.toISOString(),
+          mau: appMau[i],
+          storage: appStorage[i],
+          bandwidth: appBandwidth[i],
+          get: isDashboard ? appGets[i] : undefined,
+        })
+      }
+    })
+
+    return {
+      data: {
+        global: finalStats.filter(x => !!x),
+        byApp: breakdown.filter(x => !!x),
+      },
+      error: null,
+    }
+  }
+
   return { data: finalStats.filter(x => !!x), error: null }
 }
 
@@ -203,7 +311,7 @@ async function getBundleUsage(appId: string, from: Date, to: Date, shouldGetLate
 
   // stolen from MobileStats.vue
   const versions = [...new Set(dailyVersion.map(d => d.version_id))]
-  const dates = [...new Set(dailyVersion.map(d => d.date))].sort((a, b) => new Date(a).getTime() - new Date(b).getTime())
+  const dates = generateDateLabels(from, to)
 
   // Step 1: Calculate accumulated data
   const accumulatedData = calculateAccumulatedData(dailyVersion, dates, versions)
@@ -212,7 +320,8 @@ async function getBundleUsage(appId: string, from: Date, to: Date, shouldGetLate
   // Step 3: Get active versions (versions with non-zero usage)
   const activeVersions = getActiveVersions(versions, percentageData)
   // Step 4: Create datasets for the chart
-  const datasets = createDatasets(activeVersions, dates, percentageData, versionNames)
+  let datasets = createDatasets(activeVersions, dates, percentageData, versionNames)
+  datasets = fillMissingDailyData(datasets, dates)
 
   if (shouldGetLatestVersion) {
     const latestVersion = getLatestVersion(versionNames)
@@ -224,7 +333,7 @@ async function getBundleUsage(appId: string, from: Date, to: Date, shouldGetLate
         datasets,
         latestVersion: {
           name: latestVersion?.name,
-          percentage: latestVersionPercentage.toFixed(2),
+          percentage: latestVersionPercentage.toFixed(1),
         },
       },
       error: null,
@@ -274,8 +383,8 @@ function calculateAccumulatedData(usage: AppUsageByVersion[], dates: string[], v
           accumulated[date][version] = prevValue + change.install
         }
         else {
-          // Version has no new installs: decrease proportionally
-          const decreaseFactor = Math.max(0, 1 - (totalNewInstalls / prevTotal))
+          // Version has no new installs: decrease proportionally (guard against zero totals)
+          const decreaseFactor = prevTotal === 0 ? 1 : Math.max(0, 1 - (totalNewInstalls / prevTotal))
           accumulated[date][version] = Math.max(0, prevValue * decreaseFactor)
         }
 
@@ -319,15 +428,64 @@ function getActiveVersions(versions: number[], percentages: { [date: string]: { 
 // Create datasets for Chart.js
 function createDatasets(versions: number[], dates: string[], percentages: { [date: string]: { [version: number]: number } }, versionNames: VersionName[]) {
   return versions.map((version) => {
-    const percentageData = dates.map(date => percentages[date][version] ?? 0)
+    const percentageData = dates.map(date => Number((percentages[date][version] ?? 0).toFixed(1)))
     // const color = colorKeys[(i + SKIP_COLOR) % colorKeys.length]
-    const versionName = versionNames.find(v => v.id === version)?.name ?? version
+    const versionName = versionNames.find(v => v.id === version)?.name ?? String(version)
 
     return {
       label: versionName,
       data: percentageData,
     }
   })
+}
+
+function generateDateLabels(from: Date, to: Date) {
+  const start = dayjs(from).utc().startOf('day')
+  const end = dayjs(to).utc().startOf('day')
+
+  if (start.isAfter(end))
+    return []
+
+  const labels: string[] = []
+  let cursor = start
+  while (cursor.isBefore(end) || cursor.isSame(end)) {
+    labels.push(cursor.format('YYYY-MM-DD'))
+    cursor = cursor.add(1, 'day')
+  }
+
+  return labels
+}
+
+function fillMissingDailyData(datasets: { label: string, data: number[] }[], labels: string[]) {
+  if (datasets.length === 0 || labels.length === 0)
+    return datasets
+
+  const today = dayjs().utc().format('YYYY-MM-DD')
+  const populated = datasets.map(dataset => ({
+    ...dataset,
+    data: [...dataset.data],
+  }))
+
+  for (let index = 1; index < labels.length; index++) {
+    if (labels[index] === today)
+      continue
+
+    const dailyTotal = populated.reduce((sum, dataset) => sum + (dataset.data[index] ?? 0), 0)
+    const previousTotal = populated.reduce((sum, dataset) => sum + (dataset.data[index - 1] ?? 0), 0)
+
+    if (dailyTotal === 0 && previousTotal > 0) {
+      populated.forEach((dataset) => {
+        dataset.data[index] = dataset.data[index - 1] ?? 0
+      })
+    }
+  }
+
+  return populated
+}
+
+export const bundleUsageTestUtils = {
+  generateDateLabels,
+  fillMissingDailyData,
 }
 
 // Find the latest version based on creation date
@@ -380,7 +538,7 @@ app.get('/app/:app_id', async (c) => {
     await checkOrganizationAccess(c, app.owner_org, supabase)
   }
 
-  const { data: finalStats, error } = await getNormalStats(c, appId, null, body.from, body.to, supabase, c.get('auth')?.authType === 'jwt')
+  const { data: finalStats, error } = await getNormalStats(c, appId, null, body.from, body.to, supabase, c.get('auth')?.authType === 'jwt', false, body.noAccumulate ?? false)
 
   if (error) {
     throw quickError(500, 'cannot_get_app_statistics', 'Cannot get app statistics', { error })
@@ -420,7 +578,7 @@ app.get('/org/:org_id', async (c) => {
   if (auth.authType !== 'jwt')
     await checkOrganizationAccess(c, orgId, supabase)
 
-  const { data: finalStats, error } = await getNormalStats(c, null, orgId, body.from, body.to, supabase, c.get('auth')?.authType === 'jwt')
+  const { data: finalStats, error } = await getNormalStats(c, null, orgId, body.from, body.to, supabase, c.get('auth')?.authType === 'jwt', body.breakdown ?? false, body.noAccumulate ?? false)
 
   if (error) {
     throw quickError(500, 'cannot_get_organization_statistics', 'Cannot get organization statistics', { error })
@@ -510,15 +668,23 @@ app.get('/user', async (c) => {
 
   let stats: Array<{ data: any, error: any }> = []
   if (auth.authType === 'apikey' && auth.apikey!.limited_to_apps && auth.apikey!.limited_to_apps.length > 0) {
-    stats = await Promise.all(auth.apikey!.limited_to_apps.map(appId => getNormalStats(c, appId, null, body.from, body.to, supabase, auth.authType === 'jwt')))
+    stats = await Promise.all(auth.apikey!.limited_to_apps.map(appId => getNormalStats(c, appId, null, body.from, body.to, supabase, auth.authType === 'jwt', false, body.noAccumulate ?? false)))
   }
   else {
-    stats = await Promise.all(uniqueOrgs.map(org => getNormalStats(c, null, org.org_id, body.from, body.to, supabase, auth.authType === 'jwt')))
+    stats = await Promise.all(uniqueOrgs.map(org => getNormalStats(c, null, org.org_id, body.from, body.to, supabase, auth.authType === 'jwt', false, body.noAccumulate ?? false)))
   }
 
   const errors = stats.filter(stat => stat.error).map(stat => stat.error)
   if (errors.length > 0) {
     throw quickError(500, 'cannot_get_user_statistics', 'Cannot get user statistics', { error: errors })
+  }
+
+  interface StatEntry {
+    date: string
+    mau: number
+    storage: number
+    bandwidth: number
+    get?: number
   }
 
   const finalStats = Array.from(stats.map(stat => stat.data!).flat().reduce((acc, curr) => {
@@ -532,7 +698,7 @@ app.get('/user', async (c) => {
       acc.set(curr.date, curr)
     }
     return acc
-  }, new Map<string, NonNullable<Awaited<ReturnType<typeof getNormalStats>>['data']>[number]>()).values())
+  }, new Map<string, StatEntry>()).values())
 
   return c.json(finalStats)
 })

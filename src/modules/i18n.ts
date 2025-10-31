@@ -28,11 +28,12 @@ export const languages = {
   'ja': '日本語',
   'ko': '한국어',
   'pl': 'Polski',
-  'pt-BR': 'Português (Brasil)',
+  'pt-br': 'Português (Brasil)',
   'ru': 'Русский',
   'tr': 'Türkçe',
   'vi': 'Tiếng Việt',
-  'zh-CN': '简体中文',
+  'zh-cn': '简体中文',
+  'hi': 'हिन्दी',
 }
 
 const loadedLanguages: string[] = []

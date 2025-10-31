@@ -1,6 +1,7 @@
 import type { Database } from '../../utils/supabase.types.ts'
 import type { GetLatest } from './get.ts'
-import { getBodyOrQuery, honoFactory, middlewareKey } from '../../utils/hono.ts'
+import { getBodyOrQuery, honoFactory } from '../../utils/hono.ts'
+import { middlewareKey } from '../../utils/hono_middleware.ts'
 import { createBundle } from './create.ts'
 import { deleteBundle } from './delete.ts'
 import { get } from './get.ts'

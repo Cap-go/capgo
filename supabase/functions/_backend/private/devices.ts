@@ -1,7 +1,8 @@
 import type { AuthInfo, MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Order } from '../utils/types.ts'
 import { Hono } from 'hono/tiny'
-import { middlewareV2, parseBody, simpleError, useCors } from '../utils/hono.ts'
+import { parseBody, simpleError, useCors } from '../utils/hono.ts'
+import { middlewareV2 } from '../utils/hono_middleware.ts'
 import { cloudlog } from '../utils/loggin.ts'
 import { countDevices, readDevices } from '../utils/stats.ts'
 import { hasAppRight } from '../utils/supabase.ts'
@@ -9,10 +10,11 @@ import { hasAppRight } from '../utils/supabase.ts'
 interface DataDevice {
   appId: string
   count?: boolean
-  versionId?: string
+  versionName?: string
   devicesId?: string[]
   deviceIds?: string[] // TODO: remove when migration is done
   search?: string
+  customIdMode?: boolean
   order?: Order[]
   rangeStart?: number
   rangeEnd?: number
@@ -31,14 +33,14 @@ app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
   }
   const devicesIds = body.devicesId ?? body.deviceIds ?? []
   if (body.count)
-    return c.json({ count: await countDevices(c, body.appId) })
+    return c.json({ count: await countDevices(c, body.appId, body.customIdMode ?? false) })
   return c.json(await readDevices(c, {
     app_id: body.appId,
     rangeStart: body.rangeStart,
     rangeEnd: body.rangeEnd,
-    version_id: body.versionId,
+    version_name: body.versionName,
     deviceIds: devicesIds,
     search: body.search,
     order: body.order,
-  }))
+  }, body.customIdMode ?? false))
 })

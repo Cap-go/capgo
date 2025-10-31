@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { Organization } from '~/stores/organization'
-import { defineExpose, defineProps, ref } from 'vue'
+import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import { useDialogV2Store } from '~/stores/dialogv2'
@@ -41,10 +41,12 @@ async function open() {
               const { error } = await organizationStore.deleteOrganization(props.org.gid)
 
               if (error) {
-                toast.error(t('cannot-del-org'))
+                console.error('Delete organization error:', error)
+                toast.error(`${t('cannot-del-org')}: ${error.message}`)
               }
               else {
                 toast.success(t('org-deleted'))
+                dialogStore.closeDialog({ text: t('button-confirm'), role: 'danger' })
                 await organizationStore.fetchOrganizations()
                 await organizationStore.setCurrentOrganizationToFirst()
                 router.push('/app')

@@ -1,14 +1,14 @@
 CREATE TABLE IF NOT EXISTS capgo_credits_steps (
-  id BIGSERIAL PRIMARY KEY,
-  step_min bigint NOT NULL,
-  step_max bigint NOT NULL,
-  price_per_unit FLOAT NOT NULL,
-  type TEXT NOT NULL,
-  unit_factor BIGINT NOT NULL DEFAULT 1,
-  stripe_id TEXT,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  CONSTRAINT step_range_check CHECK (step_min < step_max)
+    id BIGSERIAL PRIMARY KEY,
+    step_min BIGINT NOT NULL,
+    step_max BIGINT NOT NULL,
+    price_per_unit FLOAT NOT NULL,
+    type TEXT NOT NULL,
+    unit_factor BIGINT NOT NULL DEFAULT 1,
+    stripe_id TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT step_range_check CHECK (step_min < step_max)
 );
 
 -- Add a comment to the table
@@ -32,14 +32,16 @@ COMMENT ON COLUMN capgo_credits_steps.updated_at IS 'Timestamp when the tier was
 -- Create trigger for updating updated_at column
 CREATE TRIGGER handle_updated_at BEFORE
 UPDATE ON capgo_credits_steps FOR EACH ROW
-EXECUTE FUNCTION extensions.moddatetime ('updated_at');
+EXECUTE FUNCTION extensions.moddatetime('updated_at');
 
 -- Create an index on step ranges for faster lookups
-CREATE INDEX capgo_credits_steps_range_idx ON capgo_credits_steps (step_min, step_max);
+CREATE INDEX capgo_credits_steps_range_idx ON capgo_credits_steps (
+    step_min, step_max
+);
 
 ALTER TABLE capgo_credits_steps ENABLE ROW LEVEL SECURITY;
 
 -- Allow anyone to read capgo_credits_steps
 CREATE POLICY "Anyone can read capgo_credits_steps" ON capgo_credits_steps FOR
 SELECT
-  TO public USING (true);
+TO public USING (true);

@@ -7,7 +7,7 @@ import { existInEnv, getEnv } from './utils.ts'
 
 export function getStripe(c: Context) {
   return new Stripe(getEnv(c, 'STRIPE_SECRET_KEY'), {
-    apiVersion: '2025-08-27.basil',
+    apiVersion: '2025-09-30.clover',
     httpClient: Stripe.createFetchHttpClient(),
   })
 }
@@ -83,20 +83,31 @@ export async function getSubscriptionData(c: Context, customerId: string, subscr
 
 async function getActiveSubscription(c: Context, customerId: string, subscriptionId: string | null) {
   cloudlog({ requestId: c.get('requestId'), message: 'Stored subscription not active or not found, checking for others.', customerId, storedSubscriptionId: subscriptionId })
-  const activeSubscriptions = await getStripe(c).subscriptions.list({
+
+  // Try to find active subscriptions first
+  let activeSubscriptions = await getStripe(c).subscriptions.list({
     customer: customerId,
-    status: 'active', // Look specifically for active subscriptions
-    limit: 1, // We only need one to confirm activity
+    status: 'active',
+    limit: 1,
   })
+
+  // If no active subscriptions, check for trialing subscriptions
+  if (activeSubscriptions.data.length === 0) {
+    activeSubscriptions = await getStripe(c).subscriptions.list({
+      customer: customerId,
+      status: 'trialing', // Check for trial subscriptions
+      limit: 1,
+    })
+  }
 
   if (activeSubscriptions.data.length > 0) {
     const activeSub = activeSubscriptions.data[0]
-    cloudlog({ requestId: c.get('requestId'), message: 'Found an active subscription, fetching its data.', activeSubscriptionId: activeSub.id })
+    cloudlog({ requestId: c.get('requestId'), message: 'Found an active or trialing subscription, fetching its data.', activeSubscriptionId: activeSub.id, status: activeSub.status })
     // Fetch data for the newly found active subscription
     return getSubscriptionData(c, customerId, activeSub.id)
   }
   else {
-    cloudlog({ requestId: c.get('requestId'), message: 'No other active subscriptions found for customer.', customerId })
+    cloudlog({ requestId: c.get('requestId'), message: 'No other active or trialing subscriptions found for customer.', customerId })
     // Keep subscriptionData as null or the inactive one, it will be handled below
   }
   return null
@@ -110,7 +121,7 @@ export async function syncSubscriptionData(c: Context, customerId: string, subsc
     let subscriptionData = await getSubscriptionData(c, customerId, subscriptionId)
 
     // If the stored subscription is not active or doesn't exist, check for any other active subscriptions
-    if (!subscriptionData || (subscriptionData.status !== 'active')) {
+    if (!subscriptionData || (subscriptionData.status !== 'active' && subscriptionData.status !== 'trialing')) {
       subscriptionData = await getActiveSubscription(c, customerId, subscriptionId)
     }
 
@@ -124,8 +135,8 @@ export async function syncSubscriptionData(c: Context, customerId: string, subsc
           dbStatus = 'succeeded' // Still active until period end because cycleEnd is future
         }
       }
-      else if (subscriptionData.status === 'active') {
-        // Active subscriptions are always considered succeeded
+      else if (subscriptionData.status === 'active' || subscriptionData.status === 'trialing') {
+        // Active and trialing subscriptions are always considered succeeded
         dbStatus = 'succeeded'
       }
     }
@@ -314,20 +325,6 @@ export async function setThreshold(c: Context, subscriptionId: string) {
     },
   })
   return subscription
-}
-
-export async function updateCustomer(c: Context, customerId: string, email: string, billing_email: string | null | undefined, userId: string, name: string) {
-  if (!existInEnv(c, 'STRIPE_SECRET_KEY'))
-    return Promise.resolve()
-  const customer = await getStripe(c).customers.update(customerId, {
-    email: billing_email ?? email,
-    name,
-    metadata: {
-      user_id: userId,
-      email,
-    },
-  })
-  return customer
 }
 
 export async function recordUsage(c: Context, customerId: string, eventName: string, value: number, meterId?: string) {

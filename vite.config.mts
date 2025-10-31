@@ -7,7 +7,6 @@ import AutoImport from 'unplugin-auto-import/vite'
 import formkit from 'unplugin-formkit/vite'
 import IconsResolver from 'unplugin-icons/resolver'
 import Icons from 'unplugin-icons/vite'
-import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
 import Components from 'unplugin-vue-components/vite'
 import VueMacros from 'unplugin-vue-macros/vite'
 import { VueRouterAutoImports } from 'unplugin-vue-router'
@@ -66,9 +65,6 @@ export default defineConfig({
       dts: 'src/components.d.ts',
       resolvers: [
         IconsResolver(),
-        ElementPlusResolver({
-          importStyle: 'sass',
-        }),
       ],
     }),
     EnvironmentPlugin({
@@ -80,13 +76,13 @@ export default defineConfig({
       VITE_API_HOST: `${getUrl('api_domain')}`,
       VITE_CAPTCHA_KEY: getRightKey('captcha_key'),
       VITE_BRANCH: branch,
+      VITE_FEATURE_CREDITS_V2: getRightKey('feature_credits_v2'),
       package_dependencies: JSON.stringify(pack.dependencies),
       domain: getUrl(),
     }, { defineOn: 'import.meta.env' }),
 
     // https://github.com/posva/unplugin-vue-router
     VueRouter({
-      extensions: ['.vue', '.md'],
       dts: 'src/typed-router.d.ts',
     }),
 

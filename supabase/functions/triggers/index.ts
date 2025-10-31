@@ -2,8 +2,9 @@ import { app as clear_app_cache } from '../_backend/triggers/clear_app_cache.ts'
 import { app as clear_device_cache } from '../_backend/triggers/clear_device_cache.ts'
 import { app as cron_clear_versions } from '../_backend/triggers/cron_clear_versions.ts'
 import { app as cron_email } from '../_backend/triggers/cron_email.ts'
-import { app as cron_plan } from '../_backend/triggers/cron_plan.ts'
-import { app as cron_stats } from '../_backend/triggers/cron_stats.ts'
+import { app as cron_stat_app } from '../_backend/triggers/cron_stat_app.ts'
+import { app as cron_stat_org } from '../_backend/triggers/cron_stat_org.ts'
+import { app as cron_sync_sub } from '../_backend/triggers/cron_sync_sub.ts'
 import { app as logsnag_insights } from '../_backend/triggers/logsnag_insights.ts'
 import { app as on_app_create } from '../_backend/triggers/on_app_create.ts'
 import { app as on_app_delete } from '../_backend/triggers/on_app_delete.ts'
@@ -42,8 +43,9 @@ appGlobal.route('/on_version_delete', on_version_delete)
 appGlobal.route('/on_manifest_create', on_manifest_create)
 appGlobal.route('/stripe_event', stripe_event)
 appGlobal.route('/on_organization_create', on_organization_create)
-appGlobal.route('/cron_stats', cron_stats)
-appGlobal.route('/cron_plan', cron_plan)
+appGlobal.route('/cron_stat_app', cron_stat_app)
+appGlobal.route('/cron_stat_org', cron_stat_org)
+appGlobal.route('/cron_sync_sub', cron_sync_sub)
 appGlobal.route('/cron_clear_versions', cron_clear_versions)
 appGlobal.route('/on_organization_delete', on_organization_delete)
 appGlobal.route('/on_deploy_history_create', on_deploy_history_create)
