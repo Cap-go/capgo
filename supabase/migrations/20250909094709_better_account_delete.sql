@@ -29,7 +29,7 @@ GRANT ALL ON SEQUENCE public.to_delete_accounts_id_seq TO service_role;
 -- Function to check if an account is disabled (marked for deletion)
 CREATE OR REPLACE FUNCTION public.is_account_disabled (user_id UUID) RETURNS BOOLEAN LANGUAGE plpgsql SECURITY DEFINER
 SET
-  search_path = public AS $$
+  search_path = '' AS $$
 BEGIN
     -- Check if the user_id exists in the to_delete_accounts table
     RETURN EXISTS (
@@ -43,7 +43,7 @@ $$;
 -- Function to get the removal date for a disabled account
 CREATE OR REPLACE FUNCTION public.get_account_removal_date (user_id UUID) RETURNS TIMESTAMPTZ LANGUAGE plpgsql SECURITY DEFINER
 SET
-  search_path = public AS $$
+  search_path = '' AS $$
 DECLARE
     removal_date TIMESTAMPTZ;
 BEGIN
