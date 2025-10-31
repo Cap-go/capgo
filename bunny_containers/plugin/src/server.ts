@@ -1,18 +1,17 @@
 import { Hono } from 'hono'
-
+import { app as channel_self } from '../../../supabase/functions/_backend/plugins/channel_self.ts'
+import { app as stats } from '../../../supabase/functions/_backend/plugins/stats.ts'
 // Import plugin endpoints
 import { app as updates } from '../../../supabase/functions/_backend/plugins/updates.ts'
-import { app as stats } from '../../../supabase/functions/_backend/plugins/stats.ts'
-import { app as channel_self } from '../../../supabase/functions/_backend/plugins/channel_self.ts'
 
-const PORT = process.env.PORT || '3000'
+const PORT = Bun.env.PORT || '3000'
 
 // Create main Hono app
 const app = new Hono()
 
 // Health check
-app.get('/health', (c) => c.text('OK'))
-app.get('/ok', (c) => c.text('OK'))
+app.get('/health', c => c.text('OK'))
+app.get('/ok', c => c.text('OK'))
 
 // Mount plugin routes
 app.route('/updates', updates)

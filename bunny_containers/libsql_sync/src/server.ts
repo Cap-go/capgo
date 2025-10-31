@@ -1,17 +1,18 @@
+import type { SQLiteType, TableSchema } from './schema.ts'
 import { createClient } from '@libsql/client'
+
 import postgres from 'postgres'
+// Import schema
+import { TABLE_SCHEMAS, TABLE_SCHEMAS_TYPES, TABLES } from './schema.ts'
 
 // Environment variables
-const LIBSQL_URL = process.env.LIBSQL_URL!
-const LIBSQL_AUTH_TOKEN = process.env.LIBSQL_AUTH_TOKEN!
-const PGMQ_URL = process.env.PGMQ_URL!
-const WEBHOOK_SIGNATURE = process.env.WEBHOOK_SIGNATURE!
-const PORT = process.env.PORT || '3000'
+const LIBSQL_URL = Bun.env.LIBSQL_URL!
+const LIBSQL_AUTH_TOKEN = Bun.env.LIBSQL_AUTH_TOKEN!
+const PGMQ_URL = Bun.env.PGMQ_URL!
+const WEBHOOK_SIGNATURE = Bun.env.WEBHOOK_SIGNATURE!
+const PORT = Bun.env.PORT || '3000'
 
 const BATCH_SIZE = 998
-
-// Import schema
-import { TABLE_SCHEMAS, TABLE_SCHEMAS_TYPES, TABLES, type SQLiteType, type TableSchema } from './schema.ts'
 
 // PostgreSQL to SQLite type conversion
 function convertPgValueToSqlite(value: any, sqliteType: SQLiteType): any {
@@ -54,14 +55,16 @@ async function readQueueMessages(limit: number): Promise<any[]> {
       FROM pgmq.read('replicate_data_libsql', 30, ${limit})
     `
     return messages.map((m: any) => ({ msg_id: m.msg_id, ...m.message }))
-  } finally {
+  }
+  finally {
     await sql.end()
   }
 }
 
 // Archive processed messages from PGMQ queue
 async function archiveMessages(msgIds: number[]): Promise<void> {
-  if (msgIds.length === 0) return
+  if (msgIds.length === 0)
+    return
 
   const sql = postgres(PGMQ_URL, { max: 1 })
 
@@ -70,7 +73,8 @@ async function archiveMessages(msgIds: number[]): Promise<void> {
       SELECT pgmq.archive('replicate_data_libsql', msg_id)
       FROM unnest(${msgIds}::bigint[]) AS msg_id
     `
-  } finally {
+  }
+  finally {
     await sql.end()
   }
 }
@@ -134,7 +138,8 @@ async function processQueue(): Promise<{ processed: number, queued: number }> {
         args: values,
       })
       msgIds.push(msg_id)
-    } else if (type === 'DELETE') {
+    }
+    else if (type === 'DELETE') {
       if (!old_record) {
         console.warn(`No old_record data for DELETE on ${table}`)
         msgIds.push(msg_id)
@@ -169,7 +174,8 @@ async function processQueue(): Promise<{ processed: number, queued: number }> {
   try {
     const result = await sql`SELECT COUNT(*) as count FROM pgmq.q_replicate_data_libsql`
     queued = Number(result[0]?.count || 0)
-  } finally {
+  }
+  finally {
     await sql.end()
   }
 
@@ -262,7 +268,8 @@ const server = Bun.serve({
       }
 
       return new Response('Not Found', { status: 404 })
-    } catch (error) {
+    }
+    catch (error) {
       console.error('Error processing request:', error)
       return Response.json(
         {
