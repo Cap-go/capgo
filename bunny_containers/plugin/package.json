@@ -6,10 +6,21 @@
     "start": "bun run src/server.ts"
   },
   "dependencies": {
+    "@bradenmacdonald/s3-lite-client": "npm:@jsr/bradenmacdonald__s3-lite-client@0.9.4",
+    "@hono/sentry": "^1.2.2",
     "@libsql/client": "^0.14.0",
-    "drizzle-orm": "^0.38.3",
-    "hono": "^4.7.3",
-    "postgres": "^3.4.5"
+    "@logsnag/node": "^1.0.1",
+    "@std/semver": "npm:@jsr/std__semver@1.0.6",
+    "@supabase/supabase-js": "^2.76.1",
+    "adm-zip": "^0.5.16",
+    "crypto-random-string": "^5.0.0",
+    "dayjs": "^1.11.18",
+    "drizzle-orm": "^0.43.1",
+    "hono": "^4.10.2",
+    "ky": "^1.13.0",
+    "postgres": "^3.4.7",
+    "stripe": "^19.1.0",
+    "zod": "^4.1.11"
   },
   "devDependencies": {
     "bun-types": "latest"
