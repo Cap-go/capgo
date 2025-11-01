@@ -87,9 +87,10 @@ SELECT
     )
   );
 
--- Recreate view without SECURITY DEFINER
+-- Recreate view with SECURITY INVOKER (uses calling user's permissions)
 -- The view will respect RLS policies on the underlying table
-CREATE VIEW public.usage_credit_balances AS
+CREATE VIEW public.usage_credit_balances
+WITH (security_invoker = true) AS
 SELECT
   org_id,
   SUM(GREATEST(credits_total, 0)) AS total_credits,
