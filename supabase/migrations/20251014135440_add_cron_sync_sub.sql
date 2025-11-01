@@ -80,8 +80,8 @@ BEGIN
     -- Process each organization that has a customer_id (paying customers only)
     FOR org_record IN 
         SELECT DISTINCT o.id, si.customer_id
-        FROM orgs o
-        INNER JOIN stripe_info si ON o.customer_id = si.customer_id
+        FROM public.orgs o
+        INNER JOIN public.stripe_info si ON o.customer_id = si.customer_id
         WHERE o.customer_id IS NOT NULL 
           AND si.customer_id IS NOT NULL
     LOOP
