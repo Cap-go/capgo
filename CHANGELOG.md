@@ -2,6 +2,36 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.40.14 (2025-11-01)
+
+### 12.40.13 (2025-11-01)
+
+
+### Bug Fixes
+
+* specify schema for orgs and stripe_info in cron_sync_sub processing ([d7b81be](https://github.com/Cap-go/capgo/commit/d7b81be9c64ac7b3286f05053d05772ca7c0e385))
+
+### 12.40.12 (2025-10-31)
+
+
+### Bug Fixes
+
+* compat versions ([a118268](https://github.com/Cap-go/capgo/commit/a118268b14b71db3ab8ed30a2029e7d72280cf1d))
+
+### 12.40.11 (2025-10-31)
+
+
+### Bug Fixes
+
+* release ([ab0c9c5](https://github.com/Cap-go/capgo/commit/ab0c9c5df239ae3dba1e4f8b76d84c3770e1c718))
+
+### 12.40.10 (2025-10-31)
+
+
+### Bug Fixes
+
+* RLS issues ([1ada6f9](https://github.com/Cap-go/capgo/commit/1ada6f9d42756e67fa0313887495fb0511408689))
+
 ### 12.40.9 (2025-10-30)
 
 ### 12.40.8 (2025-10-30)

@@ -174,7 +174,7 @@ export async function updateWithPG(
   const manifestEntries = channelOverride?.manifestEntries ?? channelData.manifestEntries
   // device.version = versionData ? versionData.id : version.id
 
-  // TODO: find better solution to check if device is from apple or google, currently not qworking in netlify-egde
+  // TODO: find better solution to check if device is from apple or google, currently not working in
 
   if (!version.external_url && !version.r2_path && !isInternalVersionName(version.name) && (!manifestEntries || manifestEntries.length === 0)) {
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot get bundle', id: app_id, version, manifestEntriesLength: manifestEntries ? manifestEntries.length : 0, channelData: channelData ? channelData.channels.name : 'no channel data', defaultChannel })

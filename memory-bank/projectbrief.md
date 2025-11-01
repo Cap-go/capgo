@@ -52,8 +52,8 @@ deployment automation tools.
 ## Technical Architecture
 
 - **Frontend**: Vue 3 with Composition API, TailwindCSS, DaisyUI
-- **Backend**: Multi-platform deployment (Cloudflare Workers primary, Netlify
-  backup, Supabase internal)
+- **Backend**: Multi-platform deployment (Cloudflare Workers primary backup,
+  Supabase internal)
 - **Database**: PostgreSQL via Supabase
 - **Mobile**: Capacitor with native plugins
 - **Build System**: Vite with custom Rolldown integration

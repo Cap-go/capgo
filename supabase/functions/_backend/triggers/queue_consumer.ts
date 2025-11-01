@@ -19,7 +19,7 @@ export const messageSchema = z.object({
   message: z.object({
     payload: z.unknown(),
     function_name: z.string(),
-    function_type: z.nullable(z.optional(z.enum(['netlify', 'cloudflare', 'cloudflare_pp', '']))),
+    function_type: z.nullable(z.optional(z.enum(['cloudflare', 'cloudflare_pp', '']))),
   }),
 })
 
@@ -29,7 +29,7 @@ interface Message {
   message: {
     payload: any
     function_name: string
-    function_type: 'netlify' | 'cloudflare' | 'cloudflare_pp' | '' | null | undefined
+    function_type: 'cloudflare' | 'cloudflare_pp' | '' | null | undefined
   }
 }
 
@@ -248,9 +248,6 @@ export async function http_post_helper(
   }
   else if (function_type === 'cloudflare' && getEnv(c, 'CLOUDFLARE_FUNCTION_URL')) {
     url = `${getEnv(c, 'CLOUDFLARE_FUNCTION_URL')}/triggers/${function_name}`
-  }
-  else if (function_type === 'netlify' && getEnv(c, 'NETLIFY_FUNCTION_URL')) {
-    url = `${getEnv(c, 'NETLIFY_FUNCTION_URL')}/triggers/${function_name}`
   }
   else {
     url = `${getEnv(c, 'SUPABASE_URL')}/functions/v1/triggers/${function_name}`

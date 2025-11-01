@@ -50,13 +50,20 @@ jobs:
           git add supabase/functions/_backend/utils/version.ts
           git add CHANGELOG.md
           if ! git diff --cached --quiet; then
+            # Get the current tag before amending (if it exists)
+            CURRENT_TAG=$(git describe --tags --exact-match 2>/dev/null || echo "")
+
+            # Amend the commit
             git commit --amend --no-edit
+
+            # Move the tag to the amended commit
+            if [ -n "$CURRENT_TAG" ]; then
+              git tag -f "$CURRENT_TAG"
+            fi
           fi
       - name: Push to origin
         run: |
           CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
-          CURRENT_MESSAGE=$(git show-branch --no-name HEAD)
           remote_repo="https://${GITHUB_ACTOR}:${{ secrets.PERSONAL_ACCESS_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git"
-          git commit --amend -o -m "$CURRENT_MESSAGE [skip netlify]"
           git pull $remote_repo $CURRENT_BRANCH
           git push $remote_repo HEAD:$CURRENT_BRANCH --follow-tags --tags
