@@ -13,6 +13,7 @@
     "@std/semver": "npm:@jsr/std__semver@1.0.6",
     "@supabase/supabase-js": "^2.76.1",
     "adm-zip": "^0.5.16",
+    "cron-schedule": "^5.0.4",
     "crypto-random-string": "^5.0.0",
     "dayjs": "^1.11.18",
     "drizzle-orm": "^0.43.1",
@@ -23,6 +24,7 @@
     "zod": "^4.1.11"
   },
   "devDependencies": {
-    "bun-types": "latest"
+    "bun-types": "latest",
+    "discord-api-types": "^0.38.31"
   }
 }
