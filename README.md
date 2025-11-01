@@ -16,7 +16,6 @@
 [![Bump version](https://github.com/Cap-go/capgo/actions/workflows/bump_version.yml/badge.svg)](https://github.com/Cap-go/capgo/actions/workflows/bump_version.yml)
 [![Build source code and send to Capgo](https://github.com/Cap-go/capgo/actions/workflows/build_and_deploy.yml/badge.svg)](https://github.com/Cap-go/capgo/actions/workflows/build_and_deploy.yml)
 [![udd-update-dependencies](https://github.com/Cap-go/capgo/actions/workflows/udd.yml/badge.svg)](https://github.com/Cap-go/capgo/actions/workflows/udd.yml)
-[![Netlify Status](https://api.netlify.com/api/v1/badges/2ebcdd5c-362b-4135-8fac-9ce872309174/deploy-status)](https://app.netlify.com/sites/webcapgo/deploys)
 <a href="#badge">
 <img alt="semantic-release" src="https://img.shields.io/badge/%20%20%F0%9F%93%A6%F0%9F%9A%80-semantic--release-e10079.svg">
 </a>
@@ -154,11 +153,10 @@ All the following official plugins are already installed and pre-configured:
 
 ## Usage
 
-Capgo is deployed to production on Cloudflare workers, Netlify and Supabase.
+Capgo is deployed to production on Cloudflare workers and Supabase.
 
 Cloudflare workers take 99% of the traffic. Supabase is used for internal calls,
-for internal tasks such as CRON jobs that call functions. Netlify is used only
-as a backup for Cloudflare.
+for internal tasks such as CRON jobs that call functions.
 
 When self-hosted, installing only Supabase is sufficient.
 

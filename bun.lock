@@ -53,7 +53,6 @@
         "@iconify-json/simple-icons": "^1.2.55",
         "@intlify/unplugin-vue-i18n": "^11.0.1",
         "@logsnag/node": "1.0.1",
-        "@netlify/functions": "^5.0.1",
         "@revenuecat/purchases-capacitor": "11.2.8",
         "@sentry/cli": "^2.57.0",
         "@std/semver": "npm:@jsr/std__semver@1.0.6",
@@ -876,10 +875,6 @@
     "@logsnag/node": ["@logsnag/node@1.0.1", "", {}, "sha512-JW2S1KN91XyOb0oG2PblboZ1Ys4mkOSMn83GDYjM8CXzcFbkYFMnlFQoEgP0Y5z+1A56hOO+a7uLsvxO5IdUFA=="],
 
     "@napi-rs/wasm-runtime": ["@napi-rs/wasm-runtime@1.0.7", "", { "dependencies": { "@emnapi/core": "^1.5.0", "@emnapi/runtime": "^1.5.0", "@tybys/wasm-util": "^0.10.1" } }, "sha512-SeDnOO0Tk7Okiq6DbXmmBODgOAb9dp9gjlphokTUxmt8U3liIP1ZsozBahH69j/RJv+Rfs6IwUKHTgQYJ/HBAw=="],
-
-    "@netlify/functions": ["@netlify/functions@5.0.1", "", { "dependencies": { "@netlify/types": "2.1.0" } }, "sha512-olCwsnp0GDpjSYPfWrtUIvOsZcrRta6lxwZWfl3XxucXOw5AcGDKSqKGRElzyyZoRA8OXVh5B5NHj5Jd4PRx+A=="],
-
-    "@netlify/types": ["@netlify/types@2.1.0", "", {}, "sha512-ktUb5d58pt1lQGXO5E9S0F1ljM0g+CoQuGTVII0IxBc0apmPq5RI0o3OWLY7U3ZERRiYTg5UfjiMihBEzuZsuw=="],
 
     "@node-ipc/js-queue": ["@node-ipc/js-queue@2.0.3", "", { "dependencies": { "easy-stack": "1.0.1" } }, "sha512-fL1wpr8hhD5gT2dA1qifeVaoDFlQR5es8tFuKqjHX+kdOtdNHnxkVZbtIrR2rxnMFvehkjaZRNV2H/gPXlb0hw=="],
 

@@ -16,6 +16,7 @@ code in this repository.
 ### Testing
 
 #### Supabase Edge Functions (Default)
+
 - `bun test:all` - Run all backend tests
 - `bun test:backend` - Run backend tests excluding CLI tests
 - `bun test:cli` - Run CLI-specific tests
@@ -25,12 +26,15 @@ code in this repository.
   configuration
 
 #### Cloudflare Workers Testing
+
 - `bun test:cloudflare:all` - Run all tests against Cloudflare Workers
 - `bun test:cloudflare:backend` - Run backend tests against Cloudflare Workers
 - `bun test:cloudflare:updates` - Run update tests against Cloudflare Workers
-- `./scripts/start-cloudflare-workers.sh` - Start local Cloudflare Workers for testing
+- `./scripts/start-cloudflare-workers.sh` - Start local Cloudflare Workers for
+  testing
 
-See [CLOUDFLARE_TESTING.md](CLOUDFLARE_TESTING.md) for detailed information on testing against Cloudflare Workers.
+See [CLOUDFLARE_TESTING.md](CLOUDFLARE_TESTING.md) for detailed information on
+testing against Cloudflare Workers.
 
 ### Code Quality
 
@@ -64,7 +68,6 @@ See [CLOUDFLARE_TESTING.md](CLOUDFLARE_TESTING.md) for detailed information on t
 - **Edge Functions**: Supabase Edge Functions (Deno runtime)
 - **API Deployment**: Multi-platform deployment:
   - Cloudflare Workers (primary, handles 99% of traffic)
-  - Netlify Edge Functions (backup)
   - Supabase Functions (internal tasks, CRON jobs)
 
 ### Key Backend Components
