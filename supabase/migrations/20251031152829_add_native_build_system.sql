@@ -1,0 +1,445 @@
+-- Complete Native Build System
+-- This single migration adds ALL native build functionality:
+-- 1. Build time tracking (seconds-based, credit system integration)
+-- 2. Build requests table for upload/build workflows  
+-- 3. Database functions (RPC) for build operations
+-- 4. Updated plan functions to include build_time_percent
+
+BEGIN;
+
+-- ==================================================
+-- PART 1: BUILD TIME TRACKING
+-- ==================================================
+
+-- Add build_time_seconds to plans
+ALTER TABLE public.plans ADD COLUMN build_time_seconds bigint DEFAULT 0 NOT NULL;
+COMMENT ON COLUMN public.plans.build_time_seconds IS 'Maximum build time in seconds per billing cycle';
+
+-- Add build_time_exceeded flag to stripe_info
+ALTER TABLE public.stripe_info ADD COLUMN build_time_exceeded boolean DEFAULT false;
+COMMENT ON COLUMN public.stripe_info.build_time_exceeded IS 'Organization exceeded build time limit';
+
+-- Extend enums for build_time
+ALTER TYPE public.credit_metric_type ADD VALUE IF NOT EXISTS 'build_time';
+ALTER TYPE public.action_type ADD VALUE IF NOT EXISTS 'build_time';
+
+-- Create build_logs table
+CREATE TABLE IF NOT EXISTS public.build_logs (
+  id uuid DEFAULT extensions.uuid_generate_v4() PRIMARY KEY,
+  created_at timestamptz DEFAULT now() NOT NULL,
+  updated_at timestamptz DEFAULT now() NOT NULL,
+  org_id uuid NOT NULL REFERENCES public.orgs (id) ON DELETE CASCADE,
+  app_id character varying NOT NULL REFERENCES public.apps (app_id) ON DELETE CASCADE,
+  build_id character varying NOT NULL,
+  platform character varying NOT NULL CHECK (platform IN ('ios', 'android')),
+  build_time_seconds bigint NOT NULL CHECK (build_time_seconds >= 0),
+  build_minutes numeric(10, 2) GENERATED ALWAYS AS (build_time_seconds::numeric / 60.0) STORED,
+  status character varying NOT NULL CHECK (status IN ('success', 'failed', 'cancelled', 'timeout')),
+  build_metadata jsonb DEFAULT '{}'::jsonb,
+  UNIQUE (build_id, org_id)
+);
+
+CREATE INDEX idx_build_logs_org_created ON public.build_logs (org_id, created_at DESC);
+CREATE INDEX idx_build_logs_app_created ON public.build_logs (app_id, created_at DESC);
+CREATE INDEX idx_build_logs_build_id ON public.build_logs (build_id);
+
+ALTER TABLE public.build_logs ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can read own org build logs" ON public.build_logs FOR SELECT TO authenticated
+  USING (org_id IN (SELECT org_id FROM public.org_users WHERE user_id = auth.uid()));
+
+CREATE POLICY "Service role manages build logs" ON public.build_logs FOR ALL TO service_role
+  USING (true) WITH CHECK (true);
+
+CREATE TRIGGER handle_updated_at_build_logs BEFORE UPDATE ON public.build_logs
+  FOR EACH ROW EXECUTE FUNCTION extensions.moddatetime('updated_at');
+
+-- Create daily_build_time table
+CREATE TABLE IF NOT EXISTS public.daily_build_time (
+  id uuid DEFAULT extensions.uuid_generate_v4() PRIMARY KEY,
+  created_at timestamptz DEFAULT now() NOT NULL,
+  app_id character varying NOT NULL REFERENCES public.apps (app_id) ON DELETE CASCADE,
+  date date NOT NULL,
+  build_time_seconds bigint NOT NULL DEFAULT 0 CHECK (build_time_seconds >= 0),
+  build_count bigint NOT NULL DEFAULT 0 CHECK (build_count >= 0),
+  UNIQUE (app_id, date)
+);
+
+CREATE INDEX idx_daily_build_time_app_date ON public.daily_build_time (app_id, date DESC);
+
+ALTER TABLE public.daily_build_time ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users read org daily build time" ON public.daily_build_time FOR SELECT TO authenticated
+  USING (app_id IN (SELECT app_id FROM public.apps WHERE owner_org IN (SELECT org_id FROM public.org_users WHERE user_id = auth.uid())));
+
+CREATE POLICY "Service manages daily build time" ON public.daily_build_time FOR ALL TO service_role
+  USING (true) WITH CHECK (true);
+
+-- ==================================================
+-- PART 2: BUILD REQUESTS TABLE
+-- ==================================================
+
+CREATE TABLE IF NOT EXISTS public.build_requests (
+  id uuid DEFAULT extensions.uuid_generate_v4() PRIMARY KEY,
+  created_at timestamptz DEFAULT now() NOT NULL,
+  updated_at timestamptz DEFAULT now() NOT NULL,
+  org_id uuid NOT NULL REFERENCES public.orgs (id) ON DELETE CASCADE,
+  app_id character varying NOT NULL REFERENCES public.apps (app_id) ON DELETE CASCADE,
+  user_id uuid REFERENCES auth.users (id) ON DELETE SET NULL,
+  platform character varying NOT NULL CHECK (platform IN ('ios', 'android', 'both')),
+  build_mode character varying DEFAULT 'release' CHECK (build_mode IN ('debug', 'release')),
+  status character varying DEFAULT 'pending' NOT NULL CHECK (status IN ('pending', 'uploaded', 'processing', 'building', 'success', 'failed', 'cancelled')),
+  source_path character varying,
+  upload_session_key character varying UNIQUE,
+  upload_expires_at timestamptz,
+  output_path_ios character varying,
+  output_path_android character varying,
+  build_config jsonb DEFAULT '{}'::jsonb,
+  build_logs text,
+  error_message text,
+  build_started_at timestamptz,
+  build_completed_at timestamptz,
+  build_time_seconds bigint,
+  build_log_id uuid REFERENCES public.build_logs (id) ON DELETE SET NULL
+);
+
+CREATE INDEX idx_build_requests_org_id ON public.build_requests (org_id, created_at DESC);
+CREATE INDEX idx_build_requests_app_id ON public.build_requests (app_id, created_at DESC);
+CREATE INDEX idx_build_requests_status ON public.build_requests (status, created_at);
+
+ALTER TABLE public.build_requests ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users view org build requests" ON public.build_requests FOR SELECT
+  USING (org_id IN (SELECT org_id FROM public.org_users WHERE user_id = auth.uid()));
+
+CREATE POLICY "Users create build requests" ON public.build_requests FOR INSERT
+  WITH CHECK (app_id IN (SELECT a.app_id FROM public.apps a INNER JOIN public.org_users ou ON a.owner_org = ou.org_id WHERE ou.user_id = auth.uid() AND ou.user_right IN ('super_admin', 'admin', 'upload', 'write')));
+
+CREATE POLICY "Users update org build requests" ON public.build_requests FOR UPDATE
+  USING (org_id IN (SELECT org_id FROM public.org_users WHERE user_id = auth.uid() AND user_right IN ('super_admin', 'admin', 'write')));
+
+-- Storage bucket
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES ('build-sources', 'build-sources', false, 524288000, ARRAY['application/zip', 'application/x-zip-compressed', 'application/octet-stream'])
+ON CONFLICT (id) DO NOTHING;
+
+COMMIT;
+
+-- ==================================================
+-- PART 3: RPC FUNCTIONS FOR BUILD OPERATIONS
+-- ==================================================
+
+-- Function: record_build_time
+CREATE OR REPLACE FUNCTION public.record_build_time(
+  p_org_id uuid, p_app_id character varying, p_build_id character varying,
+  p_platform character varying, p_build_time_seconds bigint,
+  p_status character varying DEFAULT 'success', p_build_metadata jsonb DEFAULT '{}'
+) RETURNS uuid
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = ''
+AS $$
+DECLARE
+  v_build_log_id uuid;
+BEGIN
+  IF p_build_time_seconds < 0 THEN RAISE EXCEPTION 'Build time cannot be negative'; END IF;
+  IF p_platform NOT IN ('ios', 'android') THEN RAISE EXCEPTION 'Invalid platform: %', p_platform; END IF;
+  
+  INSERT INTO public.build_logs (org_id, app_id, build_id, platform, build_time_seconds, status, build_metadata)
+  VALUES (p_org_id, p_app_id, p_build_id, p_platform, p_build_time_seconds, p_status, p_build_metadata)
+  ON CONFLICT (build_id, org_id) DO UPDATE SET
+    build_time_seconds = EXCLUDED.build_time_seconds, status = EXCLUDED.status,
+    build_metadata = EXCLUDED.build_metadata, updated_at = now()
+  RETURNING id INTO v_build_log_id;
+  
+  IF p_status = 'success' THEN
+    INSERT INTO public.daily_build_time (app_id, date, build_time_seconds, build_count)
+    VALUES (p_app_id, CURRENT_DATE, p_build_time_seconds, 1)
+    ON CONFLICT (app_id, date) DO UPDATE SET
+      build_time_seconds = public.daily_build_time.build_time_seconds + EXCLUDED.build_time_seconds,
+      build_count = public.daily_build_time.build_count + 1;
+  END IF;
+  
+  RETURN v_build_log_id;
+END;
+$$;
+
+-- Function: get_org_build_time_seconds
+CREATE OR REPLACE FUNCTION public.get_org_build_time_seconds(
+  p_org_id uuid, p_start_date date, p_end_date date
+) RETURNS TABLE (total_build_time_seconds bigint, total_builds bigint)
+LANGUAGE plpgsql STABLE SET search_path = ''
+AS $$
+BEGIN
+  RETURN QUERY
+  SELECT COALESCE(SUM(dbt.build_time_seconds), 0)::bigint, COALESCE(SUM(dbt.build_count), 0)::bigint
+  FROM public.daily_build_time dbt
+  INNER JOIN public.apps a ON a.app_id = dbt.app_id
+  WHERE a.owner_org = p_org_id AND dbt.date >= p_start_date AND dbt.date <= p_end_date;
+END;
+$$;
+
+-- Function: is_build_time_exceeded_by_org
+CREATE OR REPLACE FUNCTION public.is_build_time_exceeded_by_org(org_id uuid)
+RETURNS boolean
+LANGUAGE plpgsql STABLE SET search_path = ''
+AS $$
+BEGIN
+  RETURN (SELECT build_time_exceeded FROM public.stripe_info
+    WHERE stripe_info.customer_id = (SELECT customer_id FROM public.orgs WHERE id = is_build_time_exceeded_by_org.org_id));
+END;
+$$;
+
+GRANT ALL ON FUNCTION public.is_build_time_exceeded_by_org(uuid) TO anon, authenticated, service_role;
+
+-- Function: set_build_time_exceeded_by_org
+CREATE OR REPLACE FUNCTION public.set_build_time_exceeded_by_org(org_id uuid, disabled boolean)
+RETURNS void
+LANGUAGE plpgsql SET search_path = ''
+AS $$
+BEGIN
+  UPDATE public.stripe_info SET build_time_exceeded = disabled
+  WHERE stripe_info.customer_id = (SELECT customer_id FROM public.orgs WHERE id = set_build_time_exceeded_by_org.org_id);
+END;
+$$;
+
+GRANT ALL ON FUNCTION public.set_build_time_exceeded_by_org(uuid, boolean) TO anon, authenticated, service_role;
+
+-- Function: create_build_request
+CREATE OR REPLACE FUNCTION public.create_build_request(
+  p_app_id character varying, p_platform character varying,
+  p_build_mode character varying DEFAULT 'release', p_build_config jsonb DEFAULT '{}'::jsonb
+) RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = ''
+AS $$
+DECLARE
+  v_org_id uuid; v_user_id uuid; v_build_request_id uuid;
+  v_upload_session_key character varying; v_upload_path character varying; v_upload_expires_at timestamptz;
+BEGIN
+  v_user_id := auth.uid();
+  IF v_user_id IS NULL THEN RAISE EXCEPTION 'Not authenticated'; END IF;
+  
+  SELECT owner_org INTO v_org_id FROM public.apps WHERE app_id = p_app_id;
+  IF v_org_id IS NULL THEN RAISE EXCEPTION 'App not found: %', p_app_id; END IF;
+  
+  IF NOT EXISTS (SELECT 1 FROM public.org_users WHERE org_id = v_org_id AND user_id = v_user_id
+    AND user_right IN ('super_admin', 'admin', 'upload', 'write')) THEN
+    RAISE EXCEPTION 'Insufficient permissions';
+  END IF;
+  
+  v_upload_session_key := encode(extensions.gen_random_bytes(32), 'hex');
+  v_upload_path := v_org_id || '/' || p_app_id || '/' || v_upload_session_key || '.zip';
+  v_upload_expires_at := now() + interval '1 hour';
+  
+  INSERT INTO public.build_requests (org_id, app_id, user_id, platform, build_mode, build_config,
+    upload_session_key, upload_expires_at, status)
+  VALUES (v_org_id, p_app_id, v_user_id, p_platform, p_build_mode, p_build_config,
+    v_upload_session_key, v_upload_expires_at, 'pending')
+  RETURNING id INTO v_build_request_id;
+  
+  RETURN jsonb_build_object('build_request_id', v_build_request_id, 'upload_session_key', v_upload_session_key,
+    'upload_path', v_upload_path, 'upload_expires_at', v_upload_expires_at, 'status', 'pending');
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.create_build_request TO authenticated;
+
+
+-- ==================================================
+-- PART 4: UPDATE EXISTING FUNCTIONS WITH BUILD_TIME_SECONDS
+-- ==================================================
+
+-- Update get_app_metrics
+DROP FUNCTION IF EXISTS public.get_app_metrics(uuid);
+DROP FUNCTION IF EXISTS public.get_app_metrics(uuid, date, date);
+
+CREATE FUNCTION public.get_app_metrics(org_id uuid, start_date date, end_date date)
+RETURNS TABLE (app_id character varying, date date, mau bigint, storage bigint, bandwidth bigint,
+  build_time_seconds bigint, get bigint, fail bigint, install bigint, uninstall bigint)
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = ''
+AS $$
+BEGIN
+  RETURN QUERY
+  WITH DateSeries AS (SELECT generate_series(start_date, end_date, '1 day'::interval)::date AS "date"),
+  all_apps AS (SELECT apps.app_id FROM public.apps WHERE apps.owner_org = get_app_metrics.org_id
+    UNION SELECT deleted_apps.app_id FROM public.deleted_apps WHERE deleted_apps.owner_org = get_app_metrics.org_id)
+  SELECT aa.app_id, ds.date::date, COALESCE(dm.mau, 0) AS mau, COALESCE(dst.storage, 0) AS storage,
+    COALESCE(db.bandwidth, 0) AS bandwidth, COALESCE(dbt.build_time_seconds, 0) AS build_time_seconds,
+    COALESCE(SUM(dv.get)::bigint, 0) AS get, COALESCE(SUM(dv.fail)::bigint, 0) AS fail,
+    COALESCE(SUM(dv.install)::bigint, 0) AS install, COALESCE(SUM(dv.uninstall)::bigint, 0) AS uninstall
+  FROM all_apps aa CROSS JOIN DateSeries ds
+  LEFT JOIN public.daily_mau dm ON aa.app_id = dm.app_id AND ds.date = dm.date
+  LEFT JOIN public.daily_storage dst ON aa.app_id = dst.app_id AND ds.date = dst.date
+  LEFT JOIN public.daily_bandwidth db ON aa.app_id = db.app_id AND ds.date = db.date
+  LEFT JOIN public.daily_build_time dbt ON aa.app_id = dbt.app_id AND ds.date = dbt.date
+  LEFT JOIN public.daily_version dv ON aa.app_id = dv.app_id AND ds.date = dv.date
+  GROUP BY aa.app_id, ds.date, dm.mau, dst.storage, db.bandwidth, dbt.build_time_seconds
+  ORDER BY aa.app_id, ds.date;
+END;
+$$;
+
+CREATE FUNCTION public.get_app_metrics(org_id uuid)
+RETURNS TABLE (app_id character varying, date date, mau bigint, storage bigint, bandwidth bigint,
+  build_time_seconds bigint, get bigint, fail bigint, install bigint, uninstall bigint)
+LANGUAGE plpgsql STABLE SET search_path = ''
+AS $$
+DECLARE cycle_start timestamptz; cycle_end timestamptz;
+BEGIN
+  SELECT subscription_anchor_start, subscription_anchor_end INTO cycle_start, cycle_end
+  FROM public.get_cycle_info_org(org_id);
+  RETURN QUERY SELECT * FROM public.get_app_metrics(org_id, cycle_start::date, cycle_end::date);
+END;
+$$;
+
+-- Update get_total_metrics
+DROP FUNCTION IF EXISTS public.get_total_metrics(uuid);
+DROP FUNCTION IF EXISTS public.get_total_metrics(uuid, date, date);
+
+CREATE FUNCTION public.get_total_metrics(org_id uuid, start_date date, end_date date)
+RETURNS TABLE (mau bigint, storage bigint, bandwidth bigint, build_time_seconds bigint,
+  get bigint, fail bigint, install bigint, uninstall bigint)
+LANGUAGE plpgsql STABLE SET search_path = ''
+AS $$
+BEGIN
+  RETURN QUERY SELECT COALESCE(SUM(metrics.mau), 0)::bigint, 
+    COALESCE(public.get_total_storage_size_org(org_id), 0)::bigint,
+    COALESCE(SUM(metrics.bandwidth), 0)::bigint, COALESCE(SUM(metrics.build_time_seconds), 0)::bigint,
+    COALESCE(SUM(metrics.get), 0)::bigint, COALESCE(SUM(metrics.fail), 0)::bigint,
+    COALESCE(SUM(metrics.install), 0)::bigint, COALESCE(SUM(metrics.uninstall), 0)::bigint
+  FROM public.get_app_metrics(org_id, start_date, end_date) AS metrics;
+END;
+$$;
+
+CREATE FUNCTION public.get_total_metrics(org_id uuid)
+RETURNS TABLE (mau bigint, storage bigint, bandwidth bigint, build_time_seconds bigint,
+  get bigint, fail bigint, install bigint, uninstall bigint)
+LANGUAGE plpgsql STABLE SET search_path = ''
+AS $$
+DECLARE cycle_start timestamptz; cycle_end timestamptz;
+BEGIN
+  SELECT subscription_anchor_start, subscription_anchor_end INTO cycle_start, cycle_end
+  FROM public.get_cycle_info_org(org_id);
+  RETURN QUERY SELECT * FROM public.get_total_metrics(org_id, cycle_start::date, cycle_end::date);
+END;
+$$;
+
+
+-- Update find_fit_plan_v3
+DROP FUNCTION IF EXISTS public.find_fit_plan_v3(bigint, bigint, bigint);
+
+CREATE FUNCTION public.find_fit_plan_v3(mau bigint, bandwidth bigint, storage bigint, build_time_seconds bigint DEFAULT 0)
+RETURNS TABLE (name character varying)
+LANGUAGE plpgsql STABLE SET search_path = ''
+AS $$
+BEGIN
+  RETURN QUERY (SELECT plans.name FROM public.plans
+    WHERE plans.mau >= find_fit_plan_v3.mau AND plans.storage >= find_fit_plan_v3.storage
+      AND plans.bandwidth >= find_fit_plan_v3.bandwidth AND plans.build_time_seconds >= find_fit_plan_v3.build_time_seconds
+      OR plans.name = 'Pay as you go'
+    ORDER BY plans.mau);
+END;
+$$;
+
+-- Update is_good_plan_v5_org
+DROP FUNCTION IF EXISTS public.is_good_plan_v5_org(uuid);
+
+CREATE FUNCTION public.is_good_plan_v5_org(orgid uuid)
+RETURNS boolean
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = ''
+AS $$
+DECLARE total_metrics RECORD; current_plan_name TEXT;
+BEGIN
+  SELECT * INTO total_metrics FROM public.get_total_metrics(orgid,
+    (SELECT subscription_anchor_start::date FROM public.stripe_info si
+     INNER JOIN public.orgs o ON o.customer_id = si.customer_id WHERE o.id = orgid),
+    (SELECT subscription_anchor_end::date FROM public.stripe_info si
+     INNER JOIN public.orgs o ON o.customer_id = si.customer_id WHERE o.id = orgid));
+  
+  current_plan_name := (SELECT public.get_current_plan_name_org(orgid));
+  
+  RETURN EXISTS (SELECT 1 FROM public.find_fit_plan_v3(total_metrics.mau, total_metrics.bandwidth,
+      total_metrics.storage, total_metrics.build_time_seconds)
+    WHERE find_fit_plan_v3.name = current_plan_name);
+END;
+$$;
+
+-- Update is_paying_and_good_plan_org_action
+CREATE OR REPLACE FUNCTION public.is_paying_and_good_plan_org_action(orgid uuid, actions public.action_type[])
+RETURNS boolean
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = ''
+AS $$
+DECLARE org_customer_id text; result boolean;
+BEGIN
+  SELECT o.customer_id INTO org_customer_id FROM public.orgs o WHERE o.id = orgid;
+  SELECT (si.trial_at > now()) OR (si.status = 'succeeded' AND NOT (
+      (si.mau_exceeded AND 'mau' = ANY(actions)) OR (si.storage_exceeded AND 'storage' = ANY(actions)) OR
+      (si.bandwidth_exceeded AND 'bandwidth' = ANY(actions)) OR (si.build_time_exceeded AND 'build_time' = ANY(actions))))
+  INTO result FROM public.stripe_info si WHERE si.customer_id = org_customer_id LIMIT 1;
+  RETURN COALESCE(result, false);
+END;
+$$;
+
+GRANT ALL ON FUNCTION public.is_paying_and_good_plan_org_action(uuid, public.action_type[]) TO anon, authenticated, service_role;
+
+-- Update get_current_plan_max_org to include build_time_seconds
+DROP FUNCTION IF EXISTS public.get_current_plan_max_org(uuid);
+CREATE FUNCTION public.get_current_plan_max_org(orgid uuid)
+RETURNS TABLE (mau bigint, bandwidth bigint, storage bigint, build_time_seconds bigint)
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = ''
+AS $$
+Begin
+  RETURN QUERY
+  (SELECT plans.mau, plans.bandwidth, plans.storage, plans.build_time_seconds
+  FROM public.plans
+    WHERE stripe_id=(
+      SELECT product_id
+      FROM public.stripe_info
+      where customer_id=(
+        SELECT customer_id
+        FROM public.orgs
+        where id=orgid)
+  ));
+End;
+$$;
+
+-- Update get_plan_usage_percent_detailed
+DROP FUNCTION IF EXISTS public.get_plan_usage_percent_detailed(uuid);
+DROP FUNCTION IF EXISTS public.get_plan_usage_percent_detailed(uuid, date, date);
+
+CREATE FUNCTION public.get_plan_usage_percent_detailed(orgid uuid)
+RETURNS TABLE (total_percent double precision, mau_percent double precision, bandwidth_percent double precision,
+  storage_percent double precision, build_time_percent double precision)
+LANGUAGE plpgsql SET search_path = '' SECURITY DEFINER
+AS $$
+DECLARE current_plan_max RECORD; total_stats RECORD;
+  percent_mau double precision; percent_bandwidth double precision; percent_storage double precision; percent_build_time double precision;
+BEGIN
+  SELECT * INTO current_plan_max FROM public.get_current_plan_max_org(orgid);
+  SELECT * INTO total_stats FROM public.get_total_metrics(orgid);
+  percent_mau := public.convert_number_to_percent(total_stats.mau, current_plan_max.mau);
+  percent_bandwidth := public.convert_number_to_percent(total_stats.bandwidth, current_plan_max.bandwidth);
+  percent_storage := public.convert_number_to_percent(total_stats.storage, current_plan_max.storage);
+  percent_build_time := public.convert_number_to_percent(total_stats.build_time_seconds, current_plan_max.build_time_seconds);
+  RETURN QUERY SELECT GREATEST(percent_mau, percent_bandwidth, percent_storage, percent_build_time),
+    percent_mau, percent_bandwidth, percent_storage, percent_build_time;
+END;
+$$;
+
+CREATE FUNCTION public.get_plan_usage_percent_detailed(orgid uuid, cycle_start date, cycle_end date)
+RETURNS TABLE (total_percent double precision, mau_percent double precision, bandwidth_percent double precision,
+  storage_percent double precision, build_time_percent double precision)
+LANGUAGE plpgsql SET search_path = '' SECURITY DEFINER
+AS $$
+DECLARE current_plan_max RECORD; total_stats RECORD;
+  percent_mau double precision; percent_bandwidth double precision; percent_storage double precision; percent_build_time double precision;
+BEGIN
+  SELECT * INTO current_plan_max FROM public.get_current_plan_max_org(orgid);
+  SELECT * INTO total_stats FROM public.get_total_metrics(orgid, cycle_start, cycle_end);
+  percent_mau := public.convert_number_to_percent(total_stats.mau, current_plan_max.mau);
+  percent_bandwidth := public.convert_number_to_percent(total_stats.bandwidth, current_plan_max.bandwidth);
+  percent_storage := public.convert_number_to_percent(total_stats.storage, current_plan_max.storage);
+  percent_build_time := public.convert_number_to_percent(total_stats.build_time_seconds, current_plan_max.build_time_seconds);
+  RETURN QUERY SELECT GREATEST(percent_mau, percent_bandwidth, percent_storage, percent_build_time),
+    percent_mau, percent_bandwidth, percent_storage, percent_build_time;
+END;
+$$;
+
+COMMIT;

@@ -2,7 +2,7 @@ BEGIN;
 
 CREATE EXTENSION "basejump-supabase_test_helpers";
 
-SELECT plan(31);
+SELECT plan(35);
 
 -- Test get_metered_usage without org
 SELECT
@@ -250,6 +250,42 @@ SELECT
         ) IS NULL,
         'is_storage_exceeded_by_org test - non-existent org returns null'
     );
+
+-- Test is_build_time_exceeded_by_org
+SELECT
+    is(
+        is_build_time_exceeded_by_org('22dbad8a-b885-4309-9b3b-a09f8460fb6d'),
+        FALSE,
+        'is_build_time_exceeded_by_org test - build time not exceeded'
+    );
+
+-- Test is_build_time_exceeded_by_org negative case
+SELECT
+    ok(
+        is_build_time_exceeded_by_org(
+            '00000000-0000-0000-0000-000000000000'
+        ) IS NULL,
+        'is_build_time_exceeded_by_org test - non-existent org returns null'
+    );
+
+-- Test set_build_time_exceeded_by_org
+SELECT lives_ok(
+    $$SELECT set_build_time_exceeded_by_org('22dbad8a-b885-4309-9b3b-a09f8460fb6d', TRUE)$$,
+    'set_build_time_exceeded_by_org test - can set to true'
+);
+
+SELECT
+    is(
+        is_build_time_exceeded_by_org('22dbad8a-b885-4309-9b3b-a09f8460fb6d'),
+        TRUE,
+        'is_build_time_exceeded_by_org test - build time is exceeded after setting'
+    );
+
+-- Reset for other tests
+SELECT lives_ok(
+    $$SELECT set_build_time_exceeded_by_org('22dbad8a-b885-4309-9b3b-a09f8460fb6d', FALSE)$$,
+    'set_build_time_exceeded_by_org test - can reset to false'
+);
 
 -- Test get_weekly_stats
 SELECT

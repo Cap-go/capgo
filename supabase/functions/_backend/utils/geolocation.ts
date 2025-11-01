@@ -81,6 +81,7 @@ export function getClientDbRegion(c: Context): 'EU' | 'US' | 'AS' | undefined {
   // Supabase Edge Functions provide region in ENV VAR SB_REGION (e.g., eu-west-3, us-east-1, ap-southeast-1)
   // Map AWS region codes directly to DB regions
   const sbRegion = getEnv(c, 'SB_REGION')
+  cloudlog({ requestId: c.get('requestId'), message: 'SB_REGION', region: sbRegion, source: 'env' })
   if (sbRegion) {
     let dbRegion: 'EU' | 'US' | 'AS' | undefined
     // Parse AWS region code prefix

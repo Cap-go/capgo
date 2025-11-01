@@ -7,10 +7,30 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "13.0.5"
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
   }
   public: {
     Tables: {
@@ -182,6 +202,7 @@ export type Database = {
           app_id: string
           checksum: string
           created_at: string | null
+          devices: number | null
           id: number
           owner_org: string
           size: number
@@ -191,6 +212,7 @@ export type Database = {
           app_id: string
           checksum: string
           created_at?: string | null
+          devices?: number | null
           id?: number
           owner_org: string
           size: number
@@ -200,6 +222,7 @@ export type Database = {
           app_id?: string
           checksum?: string
           created_at?: string | null
+          devices?: number | null
           id?: number
           owner_org?: string
           size?: number
@@ -312,6 +335,157 @@ export type Database = {
           timestamp?: string
         }
         Relationships: []
+      }
+      build_logs: {
+        Row: {
+          app_id: string
+          build_id: string
+          build_metadata: Json | null
+          build_minutes: number | null
+          build_time_seconds: number
+          created_at: string
+          id: string
+          org_id: string
+          platform: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          app_id: string
+          build_id: string
+          build_metadata?: Json | null
+          build_minutes?: number | null
+          build_time_seconds: number
+          created_at?: string
+          id?: string
+          org_id: string
+          platform: string
+          status: string
+          updated_at?: string
+        }
+        Update: {
+          app_id?: string
+          build_id?: string
+          build_metadata?: Json | null
+          build_minutes?: number | null
+          build_time_seconds?: number
+          created_at?: string
+          id?: string
+          org_id?: string
+          platform?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "build_logs_app_id_fkey"
+            columns: ["app_id"]
+            isOneToOne: false
+            referencedRelation: "apps"
+            referencedColumns: ["app_id"]
+          },
+          {
+            foreignKeyName: "build_logs_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      build_requests: {
+        Row: {
+          app_id: string
+          build_completed_at: string | null
+          build_config: Json | null
+          build_log_id: string | null
+          build_logs: string | null
+          build_mode: string | null
+          build_started_at: string | null
+          build_time_seconds: number | null
+          created_at: string
+          error_message: string | null
+          id: string
+          org_id: string
+          output_path_android: string | null
+          output_path_ios: string | null
+          platform: string
+          source_path: string | null
+          status: string
+          updated_at: string
+          upload_expires_at: string | null
+          upload_session_key: string | null
+          user_id: string | null
+        }
+        Insert: {
+          app_id: string
+          build_completed_at?: string | null
+          build_config?: Json | null
+          build_log_id?: string | null
+          build_logs?: string | null
+          build_mode?: string | null
+          build_started_at?: string | null
+          build_time_seconds?: number | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          org_id: string
+          output_path_android?: string | null
+          output_path_ios?: string | null
+          platform: string
+          source_path?: string | null
+          status?: string
+          updated_at?: string
+          upload_expires_at?: string | null
+          upload_session_key?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          app_id?: string
+          build_completed_at?: string | null
+          build_config?: Json | null
+          build_log_id?: string | null
+          build_logs?: string | null
+          build_mode?: string | null
+          build_started_at?: string | null
+          build_time_seconds?: number | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          org_id?: string
+          output_path_android?: string | null
+          output_path_ios?: string | null
+          platform?: string
+          source_path?: string | null
+          status?: string
+          updated_at?: string
+          upload_expires_at?: string | null
+          upload_session_key?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "build_requests_app_id_fkey"
+            columns: ["app_id"]
+            isOneToOne: false
+            referencedRelation: "apps"
+            referencedColumns: ["app_id"]
+          },
+          {
+            foreignKeyName: "build_requests_build_log_id_fkey"
+            columns: ["build_log_id"]
+            isOneToOne: false
+            referencedRelation: "build_logs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "build_requests_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       capgo_credits_steps: {
         Row: {
@@ -509,6 +683,41 @@ export type Database = {
         }
         Relationships: []
       }
+      daily_build_time: {
+        Row: {
+          app_id: string
+          build_count: number
+          build_time_seconds: number
+          created_at: string
+          date: string
+          id: string
+        }
+        Insert: {
+          app_id: string
+          build_count?: number
+          build_time_seconds?: number
+          created_at?: string
+          date: string
+          id?: string
+        }
+        Update: {
+          app_id?: string
+          build_count?: number
+          build_time_seconds?: number
+          created_at?: string
+          date?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_build_time_app_id_fkey"
+            columns: ["app_id"]
+            isOneToOne: false
+            referencedRelation: "apps"
+            referencedColumns: ["app_id"]
+          },
+        ]
+      }
       daily_mau: {
         Row: {
           app_id: string
@@ -589,7 +798,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
-          email?: string
+          email: string
           id?: string
         }
         Update: {
@@ -717,7 +926,6 @@ export type Database = {
           app_id: string
           custom_id: string
           device_id: string
-          id: number
           is_emulator: boolean | null
           is_prod: boolean | null
           os_version: string | null
@@ -732,7 +940,6 @@ export type Database = {
           app_id: string
           custom_id?: string
           device_id: string
-          id?: never
           is_emulator?: boolean | null
           is_prod?: boolean | null
           os_version?: string | null
@@ -747,7 +954,6 @@ export type Database = {
           app_id?: string
           custom_id?: string
           device_id?: string
-          id?: never
           is_emulator?: boolean | null
           is_prod?: boolean | null
           os_version?: string | null
@@ -1034,6 +1240,7 @@ export type Database = {
         Row: {
           bandwidth: number
           bandwidth_unit: number | null
+          build_time_seconds: number
           created_at: string
           description: string
           id: string
@@ -1052,10 +1259,12 @@ export type Database = {
           storage_unit: number | null
           stripe_id: string
           updated_at: string
+          version: number
         }
         Insert: {
           bandwidth: number
           bandwidth_unit?: number | null
+          build_time_seconds?: number
           created_at?: string
           description?: string
           id?: string
@@ -1074,10 +1283,12 @@ export type Database = {
           storage_unit?: number | null
           stripe_id?: string
           updated_at?: string
+          version?: number
         }
         Update: {
           bandwidth?: number
           bandwidth_unit?: number | null
+          build_time_seconds?: number
           created_at?: string
           description?: string
           id?: string
@@ -1096,6 +1307,7 @@ export type Database = {
           storage_unit?: number | null
           stripe_id?: string
           updated_at?: string
+          version?: number
         }
         Relationships: []
       }
@@ -1153,6 +1365,7 @@ export type Database = {
       stripe_info: {
         Row: {
           bandwidth_exceeded: boolean | null
+          build_time_exceeded: boolean | null
           canceled_at: string | null
           created_at: string
           customer_id: string
@@ -1174,6 +1387,7 @@ export type Database = {
         }
         Insert: {
           bandwidth_exceeded?: boolean | null
+          build_time_exceeded?: boolean | null
           canceled_at?: string | null
           created_at?: string
           customer_id: string
@@ -1195,6 +1409,7 @@ export type Database = {
         }
         Update: {
           bandwidth_exceeded?: boolean | null
+          build_time_exceeded?: boolean | null
           canceled_at?: string | null
           created_at?: string
           customer_id?: string
@@ -1691,6 +1906,15 @@ export type Database = {
           plan_name: string
         }[]
       }
+      create_build_request: {
+        Args: {
+          p_app_id: string
+          p_build_config?: Json
+          p_build_mode?: string
+          p_platform: string
+        }
+        Returns: Json
+      }
       delete_accounts_marked_for_deletion: {
         Args: never
         Returns: {
@@ -1714,7 +1938,12 @@ export type Database = {
         Returns: string
       }
       find_fit_plan_v3: {
-        Args: { bandwidth: number; mau: number; storage: number }
+        Args: {
+          bandwidth: number
+          build_time_seconds?: number
+          mau: number
+          storage: number
+        }
         Returns: {
           name: string
         }[]
@@ -1728,6 +1957,7 @@ export type Database = {
             Returns: {
               app_id: string
               bandwidth: number
+              build_time_seconds: number
               date: string
               fail: number
               get: number
@@ -1738,10 +1968,11 @@ export type Database = {
             }[]
           }
         | {
-            Args: { p_end_date: string; p_org_id: string; p_start_date: string }
+            Args: { end_date: string; org_id: string; start_date: string }
             Returns: {
               app_id: string
               bandwidth: number
+              build_time_seconds: number
               date: string
               fail: number
               get: number
@@ -1872,6 +2103,13 @@ export type Database = {
         Returns: number
       }
       get_next_stats_update_date: { Args: { org: string }; Returns: string }
+      get_org_build_time_seconds: {
+        Args: { p_end_date: string; p_org_id: string; p_start_date: string }
+        Returns: {
+          total_build_time_seconds: number
+          total_builds: number
+        }[]
+      }
       get_org_members:
         | {
             Args: { guild_id: string; user_id: string }
@@ -1961,6 +2199,7 @@ export type Database = {
             Args: { orgid: string }
             Returns: {
               bandwidth_percent: number
+              build_time_percent: number
               mau_percent: number
               storage_percent: number
               total_percent: number
@@ -1970,6 +2209,7 @@ export type Database = {
             Args: { cycle_end: string; cycle_start: string; orgid: string }
             Returns: {
               bandwidth_percent: number
+              build_time_percent: number
               mau_percent: number
               storage_percent: number
               total_percent: number
@@ -1991,6 +2231,7 @@ export type Database = {
             Args: { org_id: string }
             Returns: {
               bandwidth: number
+              build_time_seconds: number
               fail: number
               get: number
               install: number
@@ -2003,6 +2244,7 @@ export type Database = {
             Args: { end_date: string; org_id: string; start_date: string }
             Returns: {
               bandwidth: number
+              build_time_seconds: number
               fail: number
               get: number
               install: number
@@ -2142,6 +2384,10 @@ export type Database = {
         Args: { org_id: string }
         Returns: boolean
       }
+      is_build_time_exceeded_by_org: {
+        Args: { org_id: string }
+        Returns: boolean
+      }
       is_canceled_org: { Args: { orgid: string }; Returns: boolean }
       is_good_plan_v5_org: { Args: { orgid: string }; Returns: boolean }
       is_mau_exceeded_by_org: { Args: { org_id: string }; Returns: boolean }
@@ -2154,10 +2400,6 @@ export type Database = {
       is_onboarded_org: { Args: { orgid: string }; Returns: boolean }
       is_onboarding_needed_org: { Args: { orgid: string }; Returns: boolean }
       is_org_yearly: { Args: { orgid: string }; Returns: boolean }
-      is_owner_of_org: {
-        Args: { org_id: string; user_id: string }
-        Returns: boolean
-      }
       is_paying_and_good_plan_org: { Args: { orgid: string }; Returns: boolean }
       is_paying_and_good_plan_org_action: {
         Args: {
@@ -2243,11 +2485,35 @@ export type Database = {
           version_id: number
         }[]
       }
+      record_build_time: {
+        Args: {
+          p_app_id: string
+          p_build_id: string
+          p_build_metadata?: Json
+          p_build_time_seconds: number
+          p_org_id: string
+          p_platform: string
+          p_status?: string
+        }
+        Returns: string
+      }
       remove_old_jobs: { Args: never; Returns: undefined }
       rescind_invitation: {
         Args: { email: string; org_id: string }
         Returns: string
       }
+      reset_and_seed_app_data: {
+        Args: { p_app_id: string }
+        Returns: undefined
+      }
+      reset_and_seed_app_stats_data: {
+        Args: { p_app_id: string }
+        Returns: undefined
+      }
+      reset_and_seed_data: { Args: never; Returns: undefined }
+      reset_and_seed_stats_data: { Args: never; Returns: undefined }
+      reset_app_data: { Args: { p_app_id: string }; Returns: undefined }
+      reset_app_stats_data: { Args: { p_app_id: string }; Returns: undefined }
       seed_get_app_metrics_caches: {
         Args: { p_end_date: string; p_org_id: string; p_start_date: string }
         Returns: {
@@ -2266,6 +2532,10 @@ export type Database = {
         }
       }
       set_bandwidth_exceeded_by_org: {
+        Args: { disabled: boolean; org_id: string }
+        Returns: undefined
+      }
+      set_build_time_exceeded_by_org: {
         Args: { disabled: boolean; org_id: string }
         Returns: undefined
       }
@@ -2298,8 +2568,8 @@ export type Database = {
       verify_mfa: { Args: never; Returns: boolean }
     }
     Enums: {
-      action_type: "mau" | "storage" | "bandwidth"
-      credit_metric_type: "mau" | "bandwidth" | "storage"
+      action_type: "mau" | "storage" | "bandwidth" | "build_time"
+      credit_metric_type: "mau" | "bandwidth" | "storage" | "build_time"
       credit_transaction_type:
         | "grant"
         | "purchase"
@@ -2307,10 +2577,8 @@ export type Database = {
         | "deduction"
         | "expiry"
         | "refund"
-      app_mode: "prod" | "dev" | "livereload"
       disable_update: "major" | "minor" | "patch" | "version_number" | "none"
       key_mode: "read" | "write" | "all" | "upload"
-      pay_as_you_go_type: "base" | "units"
       platform_os: "ios" | "android"
       stats_action:
         | "delete"
@@ -2360,8 +2628,8 @@ export type Database = {
         | "getChannel"
         | "rateLimited"
         | "disableAutoUpdate"
-        | "ping"
         | "InvalidIp"
+        | "ping"
         | "blocked_by_server_url"
       stripe_status:
         | "created"
@@ -2370,7 +2638,7 @@ export type Database = {
         | "failed"
         | "deleted"
         | "canceled"
-      usage_mode: "5min" | "day" | "month" | "cycle" | "last_saved"
+      usage_mode: "last_saved" | "5min" | "day" | "cycle"
       user_min_right:
         | "invite_read"
         | "invite_upload"
@@ -2390,9 +2658,6 @@ export type Database = {
         file_name: string | null
         s3_path: string | null
         file_hash: string | null
-      }
-      match_plan: {
-        name: string | null
       }
       message_update: {
         msg_id: number | null
@@ -2541,10 +2806,13 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
-      action_type: ["mau", "storage", "bandwidth"],
-      credit_metric_type: ["mau", "bandwidth", "storage"],
+      action_type: ["mau", "storage", "bandwidth", "build_time"],
+      credit_metric_type: ["mau", "bandwidth", "storage", "build_time"],
       credit_transaction_type: [
         "grant",
         "purchase",
@@ -2553,10 +2821,8 @@ export const Constants = {
         "expiry",
         "refund",
       ],
-      app_mode: ["prod", "dev", "livereload"],
       disable_update: ["major", "minor", "patch", "version_number", "none"],
       key_mode: ["read", "write", "all", "upload"],
-      pay_as_you_go_type: ["base", "units"],
       platform_os: ["ios", "android"],
       stats_action: [
         "delete",
@@ -2606,8 +2872,8 @@ export const Constants = {
         "getChannel",
         "rateLimited",
         "disableAutoUpdate",
-        "ping",
         "InvalidIp",
+        "ping",
         "blocked_by_server_url",
       ],
       stripe_status: [
@@ -2618,7 +2884,7 @@ export const Constants = {
         "deleted",
         "canceled",
       ],
-      usage_mode: ["5min", "day", "month", "cycle", "last_saved"],
+      usage_mode: ["last_saved", "5min", "day", "cycle"],
       user_min_right: [
         "invite_read",
         "invite_upload",
@@ -2636,3 +2902,4 @@ export const Constants = {
     },
   },
 } as const
+
