@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.40.13 (2025-11-01)
+
+
+### Bug Fixes
+
+* specify schema for orgs and stripe_info in cron_sync_sub processing ([d7b81be](https://github.com/Cap-go/capgo/commit/d7b81be9c64ac7b3286f05053d05772ca7c0e385))
+
 ### 12.40.12 (2025-10-31)
 
 
