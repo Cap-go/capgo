@@ -1,0 +1,15 @@
+{
+  "name": "libsql-sync",
+  "type": "module",
+  "version": "1.0.0",
+  "scripts": {
+    "start": "bun run src/server.ts"
+  },
+  "dependencies": {
+    "@libsql/client": "^0.14.0",
+    "postgres": "^3.4.5"
+  },
+  "devDependencies": {
+    "bun-types": "latest"
+  }
+}
