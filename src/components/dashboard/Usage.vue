@@ -46,7 +46,7 @@ const datasByApp = ref({
   bandwidth: {} as { [appId: string]: number[] },
 })
 
-const creditsV2Enabled = import.meta.env.VITE_FEATURE_CREDITS_V2 === 'true'
+const creditsV2Enabled = import.meta.env.VITE_FEATURE_CREDITS_V2
 
 const appNames = ref<{ [appId: string]: string }>({})
 
@@ -640,7 +640,7 @@ onMounted(() => {
     </div>
   </div>
 
-  <div v-if="creditsV2Enabled && !isLoading" class="mb-6">
+  <div v-if="creditsV2Enabled && !isLoading && creditAvailable" class="mb-6">
     <div class="grid grid-cols-1 sm:grid-cols-12 gap-4">
       <div class="col-span-full sm:col-span-6 xl:col-span-4 bg-white border border-gray-200 rounded-lg p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
         <div class="flex items-start justify-between gap-4">
