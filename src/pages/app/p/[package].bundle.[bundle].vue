@@ -40,6 +40,7 @@ const channels = ref<(Database['public']['Tables']['channels']['Row'])[]>([])
 const channel = ref<(Database['public']['Tables']['channels']['Row'])>()
 const version_meta = ref<Database['public']['Tables']['app_versions_meta']['Row']>()
 const showBundleMetadataInput = ref<boolean>(false)
+const hasManifest = ref<boolean>(false)
 
 // Channel chooser state
 const selectedChannelForLink = ref<Database['public']['Tables']['channels']['Row'] | null>(null)
@@ -380,6 +381,11 @@ async function getVersion() {
       .select()
       .eq('id', id.value)
       .single()
+    const { count } = await supabase
+      .from('manifest')
+      .select('id', { count: 'exact', head: true })
+      .eq('app_version_id', id.value)
+      .limit(1)
     if (!data) {
       console.error('no version found')
       return
@@ -387,6 +393,7 @@ async function getVersion() {
     if (dataVersionsMeta)
       version_meta.value = dataVersionsMeta
 
+    hasManifest.value = (count ?? 0) > 0
     version.value = data
   }
   catch (error) {
@@ -770,7 +777,7 @@ async function deleteBundle() {
               <InfoRow v-if="!version?.r2_path" :label="t('size')" :is-link="true" @click="openDownload()">
                 {{ t('cannot-calculate-size-of-partial-bundle') }}
               </InfoRow>
-              <InfoRow v-if="version?.manifest" :label="t('partial-bundle')" :is-link="false">
+              <InfoRow v-if="hasManifest" :label="t('partial-bundle')" :is-link="false">
                 {{ t('enabled') }}
               </InfoRow>
               <InfoRow v-if="version?.r2_path" :label="t('zip-bundle')" :is-link="false">

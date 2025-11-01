@@ -1,7 +1,7 @@
 {
   "name": "capgo-app",
   "type": "module",
-  "version": "12.40.9",
+  "version": "12.40.15",
   "private": true,
   "license": "GPL-3.0",
   "scripts": {
@@ -37,7 +37,6 @@
     "plugin_v1:prod": "wrangler dev -c cloudflare_workers/plugin/wrangler.jsonc --env=prodv1 --env-file=internal/cloudflare/.env.prod",
     "plugin_v2:prod": "wrangler dev -c cloudflare_workers/plugin/wrangler.jsonc --env=prodv2 --env-file=internal/cloudflare/.env.prod",
     "files:prod": "wrangler dev -c cloudflare_workers/files/wrangler.jsonc --env=prod --env-file=internal/cloudflare/.env.prod",
-    "netlify:dev": "bunx netlify dev --port 8881",
     "init:playwright": "bunx playwright install",
     "test:front": "playwright test",
     "test:local": "LOCAL_CLI_PATH=true vitest run",
@@ -96,8 +95,6 @@
     "deploy:supabase_env:prod": "bunx supabase secrets set --project-ref xvwzpoazmxkqosrdewyv --env-file internal/cloudflare/.env.prod",
     "deploy:supabase_env:preprod": "bunx supabase secrets set --project-ref aucsybvnhavogdmzwtcw --env-file internal/cloudflare/.env.preprod",
     "deploy:supabase_env:dev": "bunx supabase secrets set --project-ref aucsybvnhavogdmzwtcw --env-file internal/cloudflare/.env.alpha",
-    "deploy:netlify_env:prod": "bunx netlify env:import -r internal/cloudflare/.env.prod",
-    "deploy:netlify_env:preprod": "bunx netlify env:import -r internal/cloudflare/.env.preprod",
     "size": "bunx vite-bundle-visualizer",
     "sentry:sourcemaps": "_SENTRY_RELEASE=$(sentry-cli releases propose-version) && sentry-cli releases new $_SENTRY_RELEASE --org=forgr-cu --project=capgo-cloudflare && sentry-cli sourcemaps upload --org=forgr-cu --project=capgo-cloudflare --release=$_SENTRY_RELEASE --strip-prefix 'cloudflare_workers/api/dist/..' cloudflare_workers/api/dist",
     "postdeploy:cloudflare:api:prod": "bun run sentry:sourcemaps"
@@ -152,7 +149,6 @@
     "@iconify-json/simple-icons": "^1.2.55",
     "@intlify/unplugin-vue-i18n": "^11.0.1",
     "@logsnag/node": "1.0.1",
-    "@netlify/functions": "^5.0.1",
     "@revenuecat/purchases-capacitor": "11.2.8",
     "@sentry/cli": "^2.57.0",
     "@std/semver": "npm:@jsr/std__semver@1.0.6",

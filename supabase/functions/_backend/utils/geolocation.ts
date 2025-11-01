@@ -65,19 +65,7 @@ export function getClientDbRegion(c: Context): 'EU' | 'US' | 'AS' | undefined {
     return dbRegion
   }
 
-  // 2. Netlify Edge Functions: context.geo.country.code (backup deployment)
-  // Netlify provides country code in context.geo, we map it to DB region
-  if (c.env && typeof c.env === 'object' && 'geo' in c.env) {
-    const netlifyGeo = (c.env as Record<string, unknown>).geo as { country?: { code?: string } } | undefined
-    const countryCode = netlifyGeo?.country?.code
-    if (countryCode) {
-      const dbRegion = getDbRegionFromCountryCode(countryCode)
-      cloudlog({ requestId: c.get('requestId'), message: 'dbRegion', region: dbRegion, countryCode, source: 'netlify' })
-      return dbRegion
-    }
-  }
-
-  // 3. Supabase Functions: x-sb-edge-region header
+  // 2. Supabase Functions: x-sb-edge-region header
   // Supabase Edge Functions provide region in ENV VAR SB_REGION (e.g., eu-west-3, us-east-1, ap-southeast-1)
   // Map AWS region codes directly to DB regions
   const sbRegion = getEnv(c, 'SB_REGION')
