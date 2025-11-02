@@ -250,13 +250,14 @@ export function parsePriceIds(c: Context, prices: Stripe.SubscriptionItem[]): { 
   return { priceId, productId, meteredData }
 }
 
-export async function createCheckout(c: Context, customerId: string, reccurence: string, planId: string, successUrl: string, cancelUrl: string, clientReferenceId?: string) {
+export async function createCheckout(c: Context, customerId: string, reccurence: string, planId: string, successUrl: string, cancelUrl: string, clientReferenceId?: string, attributionId?: string) {
   if (!existInEnv(c, 'STRIPE_SECRET_KEY'))
     return { url: '' }
   const prices = await getPriceIds(c, planId, reccurence)
   cloudlog({ requestId: c.get('requestId'), message: 'prices', prices })
   if (!prices.priceId)
     return Promise.reject(new Error('Cannot find price'))
+  const metadata = attributionId ? { attribution_id: attributionId } : undefined
   const session = await getStripe(c).checkout.sessions.create({
     billing_address_collection: 'auto',
     mode: 'subscription',
@@ -265,16 +266,12 @@ export async function createCheckout(c: Context, customerId: string, reccurence:
     cancel_url: cancelUrl,
     automatic_tax: { enabled: true },
     client_reference_id: clientReferenceId,
+    metadata,
     customer_update: {
       address: 'auto',
       name: 'auto',
     },
     tax_id_collection: { enabled: true },
-    // TODO: find why this is not working as expected
-    // saved_payment_method_options: {
-    //   allow_redisplay_filters: 'always',
-    //   payment_method_save: true,
-    // },
     line_items: [
       {
         price: prices.priceId,

@@ -6,10 +6,11 @@ import { createCheckout } from '../utils/stripe.ts'
 import { hasOrgRight, supabaseAdmin } from '../utils/supabase.ts'
 import { getEnv } from '../utils/utils.ts'
 
-interface PortalData {
+interface CheckoutData {
   priceId: string
   clientReferenceId?: string
   reccurence: 'month' | 'year'
+  attributionId?: string
   successUrl: string
   cancelUrl: string
   orgId: string
@@ -20,7 +21,7 @@ export const app = new Hono<MiddlewareKeyVariables>()
 app.use('/', useCors)
 
 app.post('/', middlewareAuth, async (c) => {
-  const body = await parseBody<PortalData>(c)
+  const body = await parseBody<CheckoutData>(c)
   cloudlog({ requestId: c.get('requestId'), message: 'post stripe checkout body', body })
   const authorization = c.get('authorization')
   const { data: auth, error } = await supabaseAdmin(c).auth.getUser(
@@ -48,6 +49,6 @@ app.post('/', middlewareAuth, async (c) => {
     throw simpleError('not_authorize', 'Not authorize')
 
   cloudlog({ requestId: c.get('requestId'), message: 'user', org })
-  const checkout = await createCheckout(c, org.customer_id, body.reccurence ?? 'month', body.priceId ?? 'price_1KkINoGH46eYKnWwwEi97h1B', body.successUrl ?? `${getEnv(c, 'WEBAPP_URL')}/app/usage`, body.cancelUrl ?? `${getEnv(c, 'WEBAPP_URL')}/app/usage`, body.clientReferenceId)
+  const checkout = await createCheckout(c, org.customer_id, body.reccurence ?? 'month', body.priceId ?? 'price_1KkINoGH46eYKnWwwEi97h1B', body.successUrl ?? `${getEnv(c, 'WEBAPP_URL')}/app/usage`, body.cancelUrl ?? `${getEnv(c, 'WEBAPP_URL')}/app/usage`, body.clientReferenceId, body.attributionId)
   return c.json({ url: checkout.url })
 })
