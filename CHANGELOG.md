@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.40.16 (2025-11-02)
+
+
+### Bug Fixes
+
+* deprecation plugin ([daa423e](https://github.com/Cap-go/capgo/commit/daa423e0c1b534676f4df5061f90b1e51a2a735f))
+
 ### 12.40.15 (2025-11-01)
 
 
