@@ -125,10 +125,10 @@ export async function updateWithPG(
     throw simpleError('semver_error', `Native version: ${body.version_build} doesn't follow semver convention, please check https://capgo.app/semver_tester/ to learn more about semver usage in Capgo`, { body })
   }
   // Check if plugin_version is deprecated and send notification
-  // v6 is deprecated if < 6.14.36, v7 is deprecated if < 7.25.0, anything < 6.0.0 is deprecated
+  // v6 is deprecated if < 6.25.0, v7 is deprecated if < 7.25.0, anything < 6.0.0 is deprecated
   const parsedPluginVersion = parse(plugin_version)
   const isDeprecated = lessThan(parsedPluginVersion, parse('6.0.0'))
-    || (parsedPluginVersion.major === 6 && lessThan(parsedPluginVersion, parse('6.14.36')))
+    || (parsedPluginVersion.major === 6 && lessThan(parsedPluginVersion, parse('6.25.0')))
     || (parsedPluginVersion.major === 7 && lessThan(parsedPluginVersion, parse('7.25.0')))
 
   if (isDeprecated) {
