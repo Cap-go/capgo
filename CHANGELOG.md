@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.40.15 (2025-11-01)
+
+
+### Bug Fixes
+
+* RLS issues ([a8964d6](https://github.com/Cap-go/capgo/commit/a8964d655d211d07d810e018a1e81fbaf3377242))
+
 ### 12.40.14 (2025-11-01)
 
 ### 12.40.13 (2025-11-01)
