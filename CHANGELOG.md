@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## 12.41.0 (2025-11-02)
+
+
+### Features
+
+* add datafast attribution ([74cce66](https://github.com/Cap-go/capgo/commit/74cce6678cf7797da141475547009cd25094420b))
+
 ### 12.40.17 (2025-11-02)
 
 ### 12.40.16 (2025-11-02)
