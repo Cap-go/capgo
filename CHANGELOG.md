@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## 12.42.0 (2025-11-03)
+
+
+### Features
+
+* handle new fail event for manifest ([04c2949](https://github.com/Cap-go/capgo/commit/04c2949bf8f33460f5eea8df2c80b4061bd936ee))
+
 ### 12.41.2 (2025-11-03)
 
 ### 12.41.1 (2025-11-03)
