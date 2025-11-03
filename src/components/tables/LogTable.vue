@@ -24,6 +24,28 @@ interface LogData {
   created_at: string
 }
 type Element = LogData
+
+interface ParsedVersionName {
+  version: string
+  filename: string | null
+  isFileSpecific: boolean
+}
+
+function parseVersionName(versionName: string): ParsedVersionName {
+  const colonIndex = versionName.indexOf(':')
+  if (colonIndex > 0) {
+    return {
+      version: versionName.substring(0, colonIndex),
+      filename: versionName.substring(colonIndex + 1),
+      isFileSpecific: true,
+    }
+  }
+  return {
+    version: versionName,
+    filename: null,
+    isFileSpecific: false,
+  }
+}
 const columns: Ref<TableColumn[]> = ref<TableColumn[]>([])
 const router = useRouter()
 const { t } = useI18n()
@@ -137,6 +159,12 @@ columns.value = [
     class: 'truncate max-w-8',
     mobile: false,
     sortable: false,
+    displayFunction: (elem: Element) => {
+      const parsed = parseVersionName(elem.version_name)
+      return parsed.isFileSpecific
+        ? `${parsed.version} (${parsed.filename})`
+        : parsed.version
+    },
     onClick: (elem: Element) => openOneVersion(elem),
   },
 ]
@@ -155,11 +183,15 @@ async function openOneVersion(one: Element) {
     return
   if (!one.version) {
     const loadingToastId = toast.loading(t('loading-version'))
+    // Extract version from composite format if present (e.g., "1.2.3:main.js" -> "1.2.3")
+    const parsed = parseVersionName(one.version_name)
+    const versionName = parsed.version
+
     const { data: versionRecord, error } = await supabase
       .from('app_versions')
       .select('id')
       .eq('app_id', props.appId)
-      .eq('name', one.version_name)
+      .eq('name', versionName)
       .single()
     if (error || !versionRecord?.id) {
       toast.dismiss(loadingToastId)
