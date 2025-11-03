@@ -124,8 +124,14 @@ export async function updateWithPG(
     }, appOwner.owner_org, app_id, '0 0 * * 1'))
     throw simpleError('semver_error', `Native version: ${body.version_build} doesn't follow semver convention, please check https://capgo.app/semver_tester/ to learn more about semver usage in Capgo`, { body })
   }
-  // if plugin_version is < 6 send notif to alert for update
-  if (lessThan(parse(plugin_version), parse('6.0.0'))) {
+  // Check if plugin_version is deprecated and send notification
+  // v6 is deprecated if < 6.25.0, v7 is deprecated if < 7.25.0, anything < 6.0.0 is deprecated
+  const parsedPluginVersion = parse(plugin_version)
+  const isDeprecated = lessThan(parsedPluginVersion, parse('6.0.0'))
+    || (parsedPluginVersion.major === 6 && lessThan(parsedPluginVersion, parse('6.25.0')))
+    || (parsedPluginVersion.major === 7 && lessThan(parsedPluginVersion, parse('7.25.0')))
+
+  if (isDeprecated) {
     await backgroundTask(c, sendNotifOrg(c, 'user:plugin_issue', {
       app_id,
       device_id,

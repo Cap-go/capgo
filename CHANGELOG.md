@@ -2,6 +2,33 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## 12.42.0 (2025-11-03)
+
+
+### Features
+
+* handle new fail event for manifest ([04c2949](https://github.com/Cap-go/capgo/commit/04c2949bf8f33460f5eea8df2c80b4061bd936ee))
+
+### 12.41.2 (2025-11-03)
+
+### 12.41.1 (2025-11-03)
+
+## 12.41.0 (2025-11-02)
+
+
+### Features
+
+* add datafast attribution ([74cce66](https://github.com/Cap-go/capgo/commit/74cce6678cf7797da141475547009cd25094420b))
+
+### 12.40.17 (2025-11-02)
+
+### 12.40.16 (2025-11-02)
+
+
+### Bug Fixes
+
+* deprecation plugin ([daa423e](https://github.com/Cap-go/capgo/commit/daa423e0c1b534676f4df5061f90b1e51a2a735f))
+
 ### 12.40.15 (2025-11-01)
 
 
