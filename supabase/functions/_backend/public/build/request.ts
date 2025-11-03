@@ -1,6 +1,7 @@
 import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { simpleError } from '../../utils/hono.ts'
+import { cloudlog, cloudlogErr } from '../../utils/loggin.ts'
 import { hasAppRightApikey, supabaseAdmin } from '../../utils/supabase.ts'
 import { getEnv } from '../../utils/utils.ts'
 
@@ -34,21 +35,38 @@ export async function requestBuild(
     credentials = {},
   } = body
 
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: 'Build request received',
+    app_id,
+    platform,
+    user_id: apikey.user_id,
+  })
+
   // Validate required fields
   if (!app_id) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Missing app_id' })
     throw simpleError('missing_parameter', 'app_id is required')
   }
 
   if (!platform) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Missing platform' })
     throw simpleError('missing_parameter', 'platform is required')
   }
 
   if (!['ios', 'android'].includes(platform)) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Invalid platform', platform })
     throw simpleError('invalid_parameter', 'platform must be ios or android')
   }
 
   // Check if the user has write access to this app
   if (!(await hasAppRightApikey(c, app_id, apikey.user_id, 'write', apikey.key))) {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'Unauthorized build request',
+      app_id,
+      user_id: apikey.user_id,
+    })
     throw simpleError('unauthorized', 'You do not have permission to request builds for this app')
   }
 
@@ -61,10 +79,19 @@ export async function requestBuild(
     .single()
 
   if (appError || !app) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'App not found', app_id, error: appError })
     throw simpleError('not_found', 'App not found')
   }
 
   const org_id = app.owner_org
+
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: 'Creating job in builder',
+    org_id,
+    app_id,
+    platform,
+  })
 
   // Create job in builder.capgo.app
   const builderResponse = await fetch(`${getEnv(c, 'BUILDER_URL')}/jobs`, {
@@ -84,10 +111,25 @@ export async function requestBuild(
 
   if (!builderResponse.ok) {
     const errorText = await builderResponse.text()
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'Builder API error',
+      status: builderResponse.status,
+      error: errorText,
+    })
     throw simpleError('builder_error', `Builder API error: ${errorText}`)
   }
 
   const builderJob = await builderResponse.json() as BuilderJobResponse
+
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: 'Build job created',
+    job_id: builderJob.jobId,
+    org_id,
+    app_id,
+    platform,
+  })
 
   return c.json({
     job_id: builderJob.jobId,

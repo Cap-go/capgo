@@ -57,10 +57,26 @@ export async function getBuildStatus(
 
   if (!builderResponse.ok) {
     const errorText = await builderResponse.text()
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'Builder status fetch failed',
+      job_id,
+      status: builderResponse.status,
+      error: errorText,
+    })
     throw simpleError('builder_error', `Failed to get build status: ${errorText}`)
   }
 
   const builderJob = await builderResponse.json() as BuilderStatusResponse
+
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: 'Build status fetched',
+    job_id,
+    status: builderJob.job.status,
+    started_at: builderJob.job.started_at,
+    completed_at: builderJob.job.completed_at,
+  })
 
   // Track build time if job completed
   if (builderJob.job.started_at && builderJob.job.completed_at) {
@@ -68,6 +84,15 @@ export async function getBuildStatus(
 
     // Record build time in tracking system (only once per build)
     if (builderJob.job.status === 'succeeded' || builderJob.job.status === 'failed') {
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'Recording build time',
+        job_id,
+        org_id,
+        build_time_seconds: buildTimeSeconds,
+        platform,
+      })
+
       await recordBuildTime(
         c,
         org_id,
