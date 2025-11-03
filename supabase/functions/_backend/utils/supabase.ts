@@ -402,35 +402,31 @@ export async function set_build_time_exceeded(c: Context, orgId: string, disable
 export async function recordBuildTime(
   c: Context,
   orgId: string,
-  appId: string,
+  userId: string,
   buildId: string,
   platform: 'ios' | 'android',
   buildTimeSeconds: number,
-  status: 'success' | 'failed' | 'cancelled' | 'timeout' = 'success',
-  buildMetadata?: Record<string, unknown>,
 ): Promise<string | null> {
   try {
     const { data, error } = await supabaseAdmin(c)
       .rpc('record_build_time', {
         p_org_id: orgId,
-        p_app_id: appId,
+        p_user_id: userId,
         p_build_id: buildId,
         p_platform: platform,
         p_build_time_seconds: buildTimeSeconds,
-        p_status: status,
-        p_build_metadata: (buildMetadata || {}) as Record<string, any>,
       })
       .single()
 
     if (error) {
-      cloudlogErr({ requestId: c.get('requestId'), message: 'recordBuildTime error', orgId, appId, buildId, error })
+      cloudlogErr({ requestId: c.get('requestId'), message: 'recordBuildTime error', orgId, userId, buildId, error })
       return null
     }
 
     return data as string
   }
   catch (error) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'recordBuildTime error', orgId, appId, buildId, error })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'recordBuildTime error', orgId, userId, buildId, error })
     return null
   }
 }

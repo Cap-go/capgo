@@ -23,105 +23,56 @@ COMMENT ON COLUMN public.stripe_info.build_time_exceeded IS 'Organization exceed
 ALTER TYPE public.credit_metric_type ADD VALUE IF NOT EXISTS 'build_time';
 ALTER TYPE public.action_type ADD VALUE IF NOT EXISTS 'build_time';
 
--- Create build_logs table
+-- Build logs - BILLING ONLY: tracks build time for charging orgs
+-- Platform multipliers: android=1x, ios=2x
 CREATE TABLE IF NOT EXISTS public.build_logs (
   id uuid DEFAULT extensions.uuid_generate_v4() PRIMARY KEY,
   created_at timestamptz DEFAULT now() NOT NULL,
-  updated_at timestamptz DEFAULT now() NOT NULL,
+
+  -- Who to bill
   org_id uuid NOT NULL REFERENCES public.orgs (id) ON DELETE CASCADE,
-  app_id character varying NOT NULL REFERENCES public.apps (app_id) ON DELETE CASCADE,
+  user_id uuid REFERENCES auth.users (id) ON DELETE SET NULL,
+
+  -- External reference
   build_id character varying NOT NULL,
+
+  -- Raw build time
   platform character varying NOT NULL CHECK (platform IN ('ios', 'android')),
   build_time_seconds bigint NOT NULL CHECK (build_time_seconds >= 0),
-  build_minutes numeric(10, 2) GENERATED ALWAYS AS (build_time_seconds::numeric / 60.0) STORED,
-  status character varying NOT NULL CHECK (status IN ('success', 'failed', 'cancelled', 'timeout')),
-  build_metadata jsonb DEFAULT '{}'::jsonb,
+
+  -- Billable amount (with platform multiplier applied: android=1x, ios=2x)
+  -- This locks in the price at time of build
+  billable_seconds bigint NOT NULL CHECK (billable_seconds >= 0),
+
   UNIQUE (build_id, org_id)
 );
 
 CREATE INDEX idx_build_logs_org_created ON public.build_logs (org_id, created_at DESC);
-CREATE INDEX idx_build_logs_app_created ON public.build_logs (app_id, created_at DESC);
-CREATE INDEX idx_build_logs_build_id ON public.build_logs (build_id);
 
 ALTER TABLE public.build_logs ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Users can read own org build logs" ON public.build_logs FOR SELECT TO authenticated
-  USING (org_id IN (SELECT org_id FROM public.org_users WHERE user_id = auth.uid()));
+-- Users can view:
+-- 1. Their own builds
+-- 2. All org builds if they're admin/super_admin
+CREATE POLICY "Users read own or org admin builds" ON public.build_logs FOR SELECT TO authenticated
+  USING (
+    user_id = auth.uid()
+    OR
+    EXISTS (
+      SELECT 1 FROM public.org_users
+      WHERE org_users.org_id = build_logs.org_id
+        AND org_users.user_id = auth.uid()
+        AND org_users.user_right IN ('super_admin', 'admin')
+    )
+  );
 
+-- Only service role can write (backend records builds)
 CREATE POLICY "Service role manages build logs" ON public.build_logs FOR ALL TO service_role
   USING (true) WITH CHECK (true);
 
-CREATE TRIGGER handle_updated_at_build_logs BEFORE UPDATE ON public.build_logs
-  FOR EACH ROW EXECUTE FUNCTION extensions.moddatetime('updated_at');
-
--- Create daily_build_time table
-CREATE TABLE IF NOT EXISTS public.daily_build_time (
-  id uuid DEFAULT extensions.uuid_generate_v4() PRIMARY KEY,
-  created_at timestamptz DEFAULT now() NOT NULL,
-  app_id character varying NOT NULL REFERENCES public.apps (app_id) ON DELETE CASCADE,
-  date date NOT NULL,
-  build_time_seconds bigint NOT NULL DEFAULT 0 CHECK (build_time_seconds >= 0),
-  build_count bigint NOT NULL DEFAULT 0 CHECK (build_count >= 0),
-  UNIQUE (app_id, date)
-);
-
-CREATE INDEX idx_daily_build_time_app_date ON public.daily_build_time (app_id, date DESC);
-
-ALTER TABLE public.daily_build_time ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Users read org daily build time" ON public.daily_build_time FOR SELECT TO authenticated
-  USING (app_id IN (SELECT app_id FROM public.apps WHERE owner_org IN (SELECT org_id FROM public.org_users WHERE user_id = auth.uid())));
-
-CREATE POLICY "Service manages daily build time" ON public.daily_build_time FOR ALL TO service_role
-  USING (true) WITH CHECK (true);
-
--- ==================================================
--- PART 2: BUILD REQUESTS TABLE
--- ==================================================
-
-CREATE TABLE IF NOT EXISTS public.build_requests (
-  id uuid DEFAULT extensions.uuid_generate_v4() PRIMARY KEY,
-  created_at timestamptz DEFAULT now() NOT NULL,
-  updated_at timestamptz DEFAULT now() NOT NULL,
-  org_id uuid NOT NULL REFERENCES public.orgs (id) ON DELETE CASCADE,
-  app_id character varying NOT NULL REFERENCES public.apps (app_id) ON DELETE CASCADE,
-  user_id uuid REFERENCES auth.users (id) ON DELETE SET NULL,
-  platform character varying NOT NULL CHECK (platform IN ('ios', 'android', 'both')),
-  build_mode character varying DEFAULT 'release' CHECK (build_mode IN ('debug', 'release')),
-  status character varying DEFAULT 'pending' NOT NULL CHECK (status IN ('pending', 'uploaded', 'processing', 'building', 'success', 'failed', 'cancelled')),
-  source_path character varying,
-  upload_session_key character varying UNIQUE,
-  upload_expires_at timestamptz,
-  output_path_ios character varying,
-  output_path_android character varying,
-  build_config jsonb DEFAULT '{}'::jsonb,
-  build_logs text,
-  error_message text,
-  build_started_at timestamptz,
-  build_completed_at timestamptz,
-  build_time_seconds bigint,
-  build_log_id uuid REFERENCES public.build_logs (id) ON DELETE SET NULL
-);
-
-CREATE INDEX idx_build_requests_org_id ON public.build_requests (org_id, created_at DESC);
-CREATE INDEX idx_build_requests_app_id ON public.build_requests (app_id, created_at DESC);
-CREATE INDEX idx_build_requests_status ON public.build_requests (status, created_at);
-
-ALTER TABLE public.build_requests ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Users view org build requests" ON public.build_requests FOR SELECT
-  USING (org_id IN (SELECT org_id FROM public.org_users WHERE user_id = auth.uid()));
-
-CREATE POLICY "Users create build requests" ON public.build_requests FOR INSERT
-  WITH CHECK (app_id IN (SELECT a.app_id FROM public.apps a INNER JOIN public.org_users ou ON a.owner_org = ou.org_id WHERE ou.user_id = auth.uid() AND ou.user_right IN ('super_admin', 'admin', 'upload', 'write')));
-
-CREATE POLICY "Users update org build requests" ON public.build_requests FOR UPDATE
-  USING (org_id IN (SELECT org_id FROM public.org_users WHERE user_id = auth.uid() AND user_right IN ('super_admin', 'admin', 'write')));
-
--- Storage bucket
-INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-VALUES ('build-sources', 'build-sources', false, 524288000, ARRAY['application/zip', 'application/x-zip-compressed', 'application/octet-stream'])
-ON CONFLICT (id) DO NOTHING;
+-- Note: No daily aggregation needed - just query build_logs for billing
+-- Note: No build_requests table - use builder.capgo.app API to get job history
+-- Note: No storage bucket - builder.capgo.app manages its own R2
 
 COMMIT;
 
@@ -129,35 +80,43 @@ COMMIT;
 -- PART 3: RPC FUNCTIONS FOR BUILD OPERATIONS
 -- ==================================================
 
--- Function: record_build_time
+-- Function: record_build_time - BILLING ONLY
+-- Applies platform multiplier: android=1x, ios=2x
 CREATE OR REPLACE FUNCTION public.record_build_time(
-  p_org_id uuid, p_app_id character varying, p_build_id character varying,
-  p_platform character varying, p_build_time_seconds bigint,
-  p_status character varying DEFAULT 'success', p_build_metadata jsonb DEFAULT '{}'
+  p_org_id uuid,
+  p_user_id uuid,
+  p_build_id character varying,
+  p_platform character varying,
+  p_build_time_seconds bigint
 ) RETURNS uuid
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = ''
 AS $$
 DECLARE
   v_build_log_id uuid;
+  v_multiplier numeric;
+  v_billable_seconds bigint;
 BEGIN
   IF p_build_time_seconds < 0 THEN RAISE EXCEPTION 'Build time cannot be negative'; END IF;
   IF p_platform NOT IN ('ios', 'android') THEN RAISE EXCEPTION 'Invalid platform: %', p_platform; END IF;
-  
-  INSERT INTO public.build_logs (org_id, app_id, build_id, platform, build_time_seconds, status, build_metadata)
-  VALUES (p_org_id, p_app_id, p_build_id, p_platform, p_build_time_seconds, p_status, p_build_metadata)
+
+  -- Apply platform multiplier
+  v_multiplier := CASE p_platform
+    WHEN 'ios' THEN 2
+    WHEN 'android' THEN 1
+    ELSE 1
+  END;
+
+  v_billable_seconds := (p_build_time_seconds * v_multiplier)::bigint;
+
+  INSERT INTO public.build_logs (org_id, user_id, build_id, platform, build_time_seconds, billable_seconds)
+  VALUES (p_org_id, p_user_id, p_build_id, p_platform, p_build_time_seconds, v_billable_seconds)
   ON CONFLICT (build_id, org_id) DO UPDATE SET
-    build_time_seconds = EXCLUDED.build_time_seconds, status = EXCLUDED.status,
-    build_metadata = EXCLUDED.build_metadata, updated_at = now()
+    user_id = EXCLUDED.user_id,
+    platform = EXCLUDED.platform,
+    build_time_seconds = EXCLUDED.build_time_seconds,
+    billable_seconds = EXCLUDED.billable_seconds
   RETURNING id INTO v_build_log_id;
-  
-  IF p_status = 'success' THEN
-    INSERT INTO public.daily_build_time (app_id, date, build_time_seconds, build_count)
-    VALUES (p_app_id, CURRENT_DATE, p_build_time_seconds, 1)
-    ON CONFLICT (app_id, date) DO UPDATE SET
-      build_time_seconds = public.daily_build_time.build_time_seconds + EXCLUDED.build_time_seconds,
-      build_count = public.daily_build_time.build_count + 1;
-  END IF;
-  
+
   RETURN v_build_log_id;
 END;
 $$;
@@ -203,44 +162,7 @@ $$;
 
 GRANT ALL ON FUNCTION public.set_build_time_exceeded_by_org(uuid, boolean) TO anon, authenticated, service_role;
 
--- Function: create_build_request
-CREATE OR REPLACE FUNCTION public.create_build_request(
-  p_app_id character varying, p_platform character varying,
-  p_build_mode character varying DEFAULT 'release', p_build_config jsonb DEFAULT '{}'::jsonb
-) RETURNS jsonb
-LANGUAGE plpgsql SECURITY DEFINER SET search_path = ''
-AS $$
-DECLARE
-  v_org_id uuid; v_user_id uuid; v_build_request_id uuid;
-  v_upload_session_key character varying; v_upload_path character varying; v_upload_expires_at timestamptz;
-BEGIN
-  v_user_id := auth.uid();
-  IF v_user_id IS NULL THEN RAISE EXCEPTION 'Not authenticated'; END IF;
-  
-  SELECT owner_org INTO v_org_id FROM public.apps WHERE app_id = p_app_id;
-  IF v_org_id IS NULL THEN RAISE EXCEPTION 'App not found: %', p_app_id; END IF;
-  
-  IF NOT EXISTS (SELECT 1 FROM public.org_users WHERE org_id = v_org_id AND user_id = v_user_id
-    AND user_right IN ('super_admin', 'admin', 'upload', 'write')) THEN
-    RAISE EXCEPTION 'Insufficient permissions';
-  END IF;
-  
-  v_upload_session_key := encode(extensions.gen_random_bytes(32), 'hex');
-  v_upload_path := v_org_id || '/' || p_app_id || '/' || v_upload_session_key || '.zip';
-  v_upload_expires_at := now() + interval '1 hour';
-  
-  INSERT INTO public.build_requests (org_id, app_id, user_id, platform, build_mode, build_config,
-    upload_session_key, upload_expires_at, status)
-  VALUES (v_org_id, p_app_id, v_user_id, p_platform, p_build_mode, p_build_config,
-    v_upload_session_key, v_upload_expires_at, 'pending')
-  RETURNING id INTO v_build_request_id;
-  
-  RETURN jsonb_build_object('build_request_id', v_build_request_id, 'upload_session_key', v_upload_session_key,
-    'upload_path', v_upload_path, 'upload_expires_at', v_upload_expires_at, 'status', 'pending');
-END;
-$$;
-
-GRANT EXECUTE ON FUNCTION public.create_build_request TO authenticated;
+-- Note: No create_build_request RPC needed - backend TypeScript handles builder.capgo.app API calls
 
 
 -- ==================================================

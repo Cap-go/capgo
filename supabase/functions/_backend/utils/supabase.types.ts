@@ -338,148 +338,38 @@ export type Database = {
       }
       build_logs: {
         Row: {
-          app_id: string
+          billable_seconds: number
           build_id: string
-          build_metadata: Json | null
-          build_minutes: number | null
           build_time_seconds: number
           created_at: string
           id: string
           org_id: string
           platform: string
-          status: string
-          updated_at: string
+          user_id: string | null
         }
         Insert: {
-          app_id: string
+          billable_seconds: number
           build_id: string
-          build_metadata?: Json | null
-          build_minutes?: number | null
           build_time_seconds: number
           created_at?: string
           id?: string
           org_id: string
           platform: string
-          status: string
-          updated_at?: string
+          user_id?: string | null
         }
         Update: {
-          app_id?: string
+          billable_seconds?: number
           build_id?: string
-          build_metadata?: Json | null
-          build_minutes?: number | null
           build_time_seconds?: number
           created_at?: string
           id?: string
           org_id?: string
           platform?: string
-          status?: string
-          updated_at?: string
+          user_id?: string | null
         }
         Relationships: [
-          {
-            foreignKeyName: "build_logs_app_id_fkey"
-            columns: ["app_id"]
-            isOneToOne: false
-            referencedRelation: "apps"
-            referencedColumns: ["app_id"]
-          },
           {
             foreignKeyName: "build_logs_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "orgs"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      build_requests: {
-        Row: {
-          app_id: string
-          build_completed_at: string | null
-          build_config: Json | null
-          build_log_id: string | null
-          build_logs: string | null
-          build_mode: string | null
-          build_started_at: string | null
-          build_time_seconds: number | null
-          created_at: string
-          error_message: string | null
-          id: string
-          org_id: string
-          output_path_android: string | null
-          output_path_ios: string | null
-          platform: string
-          source_path: string | null
-          status: string
-          updated_at: string
-          upload_expires_at: string | null
-          upload_session_key: string | null
-          user_id: string | null
-        }
-        Insert: {
-          app_id: string
-          build_completed_at?: string | null
-          build_config?: Json | null
-          build_log_id?: string | null
-          build_logs?: string | null
-          build_mode?: string | null
-          build_started_at?: string | null
-          build_time_seconds?: number | null
-          created_at?: string
-          error_message?: string | null
-          id?: string
-          org_id: string
-          output_path_android?: string | null
-          output_path_ios?: string | null
-          platform: string
-          source_path?: string | null
-          status?: string
-          updated_at?: string
-          upload_expires_at?: string | null
-          upload_session_key?: string | null
-          user_id?: string | null
-        }
-        Update: {
-          app_id?: string
-          build_completed_at?: string | null
-          build_config?: Json | null
-          build_log_id?: string | null
-          build_logs?: string | null
-          build_mode?: string | null
-          build_started_at?: string | null
-          build_time_seconds?: number | null
-          created_at?: string
-          error_message?: string | null
-          id?: string
-          org_id?: string
-          output_path_android?: string | null
-          output_path_ios?: string | null
-          platform?: string
-          source_path?: string | null
-          status?: string
-          updated_at?: string
-          upload_expires_at?: string | null
-          upload_session_key?: string | null
-          user_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "build_requests_app_id_fkey"
-            columns: ["app_id"]
-            isOneToOne: false
-            referencedRelation: "apps"
-            referencedColumns: ["app_id"]
-          },
-          {
-            foreignKeyName: "build_requests_build_log_id_fkey"
-            columns: ["build_log_id"]
-            isOneToOne: false
-            referencedRelation: "build_logs"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "build_requests_org_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "orgs"
@@ -682,41 +572,6 @@ export type Database = {
           id?: number
         }
         Relationships: []
-      }
-      daily_build_time: {
-        Row: {
-          app_id: string
-          build_count: number
-          build_time_seconds: number
-          created_at: string
-          date: string
-          id: string
-        }
-        Insert: {
-          app_id: string
-          build_count?: number
-          build_time_seconds?: number
-          created_at?: string
-          date: string
-          id?: string
-        }
-        Update: {
-          app_id?: string
-          build_count?: number
-          build_time_seconds?: number
-          created_at?: string
-          date?: string
-          id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "daily_build_time_app_id_fkey"
-            columns: ["app_id"]
-            isOneToOne: false
-            referencedRelation: "apps"
-            referencedColumns: ["app_id"]
-          },
-        ]
       }
       daily_mau: {
         Row: {
@@ -1906,15 +1761,6 @@ export type Database = {
           plan_name: string
         }[]
       }
-      create_build_request: {
-        Args: {
-          p_app_id: string
-          p_build_config?: Json
-          p_build_mode?: string
-          p_platform: string
-        }
-        Returns: Json
-      }
       delete_accounts_marked_for_deletion: {
         Args: never
         Returns: {
@@ -1990,6 +1836,7 @@ export type Database = {
         Args: { orgid: string }
         Returns: {
           bandwidth: number
+          build_time_seconds: number
           mau: number
           storage: number
         }[]
@@ -2487,13 +2334,11 @@ export type Database = {
       }
       record_build_time: {
         Args: {
-          p_app_id: string
           p_build_id: string
-          p_build_metadata?: Json
           p_build_time_seconds: number
           p_org_id: string
           p_platform: string
-          p_status?: string
+          p_user_id: string
         }
         Returns: string
       }

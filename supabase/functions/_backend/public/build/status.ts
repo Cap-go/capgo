@@ -1,0 +1,94 @@
+import type { Context } from 'hono'
+import type { Database } from '../../utils/supabase.types.ts'
+import { simpleError } from '../../utils/hono.ts'
+import { hasAppRightApikey, recordBuildTime, supabaseAdmin } from '../../utils/supabase.ts'
+import { getEnv } from '../../utils/utils.ts'
+
+export interface BuildStatusParams {
+  job_id: string
+  app_id: string
+  platform: 'ios' | 'android'
+}
+
+interface BuilderStatusResponse {
+  job: {
+    status: string
+    started_at: number | null
+    completed_at: number | null
+    error: string | null
+  }
+  machine: Record<string, unknown> | null
+  uploadUrl?: string
+}
+
+export async function getBuildStatus(
+  c: Context,
+  params: BuildStatusParams,
+  apikey: Database['public']['Tables']['apikeys']['Row'],
+): Promise<Response> {
+  const { job_id, app_id, platform } = params
+
+  // Security: Check if user has read access to this app
+  if (!(await hasAppRightApikey(c, app_id, apikey.user_id, 'read', apikey.key))) {
+    throw simpleError('unauthorized', 'You do not have permission to view builds for this app')
+  }
+
+  // Get app's org_id
+  const supabase = supabaseAdmin(c)
+  const { data: app, error: appError } = await supabase
+    .from('apps')
+    .select('owner_org')
+    .eq('app_id', app_id)
+    .single()
+
+  if (appError || !app) {
+    throw simpleError('not_found', 'App not found')
+  }
+
+  const org_id = app.owner_org
+
+  // Fetch status from builder
+  const builderResponse = await fetch(`${getEnv(c, 'BUILDER_URL')}/jobs/${job_id}`, {
+    method: 'GET',
+    headers: {
+      'x-api-key': getEnv(c, 'BUILDER_API_KEY'),
+    },
+  })
+
+  if (!builderResponse.ok) {
+    const errorText = await builderResponse.text()
+    throw simpleError('builder_error', `Failed to get build status: ${errorText}`)
+  }
+
+  const builderJob = await builderResponse.json() as BuilderStatusResponse
+
+  // Track build time if job completed
+  if (builderJob.job.started_at && builderJob.job.completed_at) {
+    const buildTimeSeconds = Math.floor((builderJob.job.completed_at - builderJob.job.started_at) / 1000)
+
+    // Record build time in tracking system (only once per build)
+    if (builderJob.job.status === 'succeeded' || builderJob.job.status === 'failed') {
+      await recordBuildTime(
+        c,
+        org_id,
+        apikey.user_id,
+        job_id,
+        platform,
+        buildTimeSeconds,
+      )
+    }
+  }
+
+  return c.json({
+    job_id,
+    status: builderJob.job.status,
+    machine: builderJob.machine || null,
+    started_at: builderJob.job.started_at,
+    completed_at: builderJob.job.completed_at,
+    build_time_seconds: builderJob.job.started_at && builderJob.job.completed_at
+      ? Math.floor((builderJob.job.completed_at - builderJob.job.started_at) / 1000)
+      : null,
+    error: builderJob.job.error || null,
+    upload_url: builderJob.uploadUrl || null,
+  }, 200)
+}
