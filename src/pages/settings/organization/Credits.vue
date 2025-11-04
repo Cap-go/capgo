@@ -63,128 +63,141 @@ const hasCreditSummary = computed(() => creditTotal.value > 0 || creditAvailable
 const creditUsedUsd = computed(() => creditUsed.value * creditUsdRate.value)
 const creditsAvailableUsd = computed(() => creditAvailable.value * creditUsdRate.value)
 
-const creditPricingSections = computed(() => [
+const creditPricingSectionsConfig = [
   {
     icon: UserGroupIcon,
-    title: t('credits-pricing-mau-title'),
-    subtitle: t('credits-pricing-mau-subtitle'),
+    titleKey: 'credits-pricing-mau-title',
+    subtitleKey: 'credits-pricing-mau-subtitle',
     accentClass: 'bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-300',
     tiers: [
       {
-        label: t('credits-pricing-mau-tier-first'),
-        price: t('credits-pricing-mau-tier-first-price'),
+        labelKey: 'credits-pricing-mau-tier-first',
+        priceKey: 'credits-pricing-mau-tier-first-price',
       },
       {
-        label: t('credits-pricing-mau-tier-next-2m'),
-        price: t('credits-pricing-mau-tier-next-2m-price'),
+        labelKey: 'credits-pricing-mau-tier-next-2m',
+        priceKey: 'credits-pricing-mau-tier-next-2m-price',
       },
       {
-        label: t('credits-pricing-mau-tier-next-7m'),
-        price: t('credits-pricing-mau-tier-next-7m-price'),
+        labelKey: 'credits-pricing-mau-tier-next-7m',
+        priceKey: 'credits-pricing-mau-tier-next-7m-price',
       },
       {
-        label: t('credits-pricing-mau-tier-next-5m'),
-        price: t('credits-pricing-mau-tier-next-5m-price'),
+        labelKey: 'credits-pricing-mau-tier-next-5m',
+        priceKey: 'credits-pricing-mau-tier-next-5m-price',
       },
       {
-        label: t('credits-pricing-mau-tier-next-10m'),
-        price: t('credits-pricing-mau-tier-next-10m-price'),
+        labelKey: 'credits-pricing-mau-tier-next-10m',
+        priceKey: 'credits-pricing-mau-tier-next-10m-price',
       },
       {
-        label: t('credits-pricing-mau-tier-next-15m'),
-        price: t('credits-pricing-mau-tier-next-15m-price'),
+        labelKey: 'credits-pricing-mau-tier-next-15m',
+        priceKey: 'credits-pricing-mau-tier-next-15m-price',
       },
       {
-        label: t('credits-pricing-mau-tier-next-60m'),
-        price: t('credits-pricing-mau-tier-next-60m-price'),
+        labelKey: 'credits-pricing-mau-tier-next-60m',
+        priceKey: 'credits-pricing-mau-tier-next-60m-price',
       },
       {
-        label: t('credits-pricing-mau-tier-over-100m'),
-        price: t('credits-pricing-mau-tier-over-100m-price'),
+        labelKey: 'credits-pricing-mau-tier-over-100m',
+        priceKey: 'credits-pricing-mau-tier-over-100m-price',
       },
     ],
   },
   {
     icon: CloudIcon,
-    title: t('credits-pricing-bandwidth-title'),
-    subtitle: t('credits-pricing-bandwidth-subtitle'),
+    titleKey: 'credits-pricing-bandwidth-title',
+    subtitleKey: 'credits-pricing-bandwidth-subtitle',
     accentClass: 'bg-orange-100 text-orange-600 dark:bg-orange-900/40 dark:text-orange-300',
     tiers: [
       {
-        label: t('credits-pricing-bandwidth-tier-first'),
-        price: t('credits-pricing-bandwidth-tier-first-price'),
+        labelKey: 'credits-pricing-bandwidth-tier-first',
+        priceKey: 'credits-pricing-bandwidth-tier-first-price',
       },
       {
-        label: t('credits-pricing-bandwidth-tier-next-1tb'),
-        price: t('credits-pricing-bandwidth-tier-next-1tb-price'),
+        labelKey: 'credits-pricing-bandwidth-tier-next-1tb',
+        priceKey: 'credits-pricing-bandwidth-tier-next-1tb-price',
       },
       {
-        label: t('credits-pricing-bandwidth-tier-next-4tb'),
-        price: t('credits-pricing-bandwidth-tier-next-4tb-price'),
+        labelKey: 'credits-pricing-bandwidth-tier-next-4tb',
+        priceKey: 'credits-pricing-bandwidth-tier-next-4tb-price',
       },
       {
-        label: t('credits-pricing-bandwidth-tier-next-6tb'),
-        price: t('credits-pricing-bandwidth-tier-next-6tb-price'),
+        labelKey: 'credits-pricing-bandwidth-tier-next-6tb',
+        priceKey: 'credits-pricing-bandwidth-tier-next-6tb-price',
       },
       {
-        label: t('credits-pricing-bandwidth-tier-next-13tb'),
-        price: t('credits-pricing-bandwidth-tier-next-13tb-price'),
+        labelKey: 'credits-pricing-bandwidth-tier-next-13tb',
+        priceKey: 'credits-pricing-bandwidth-tier-next-13tb-price',
       },
       {
-        label: t('credits-pricing-bandwidth-tier-next-38tb'),
-        price: t('credits-pricing-bandwidth-tier-next-38tb-price'),
+        labelKey: 'credits-pricing-bandwidth-tier-next-38tb',
+        priceKey: 'credits-pricing-bandwidth-tier-next-38tb-price',
       },
       {
-        label: t('credits-pricing-bandwidth-tier-next-64tb'),
-        price: t('credits-pricing-bandwidth-tier-next-64tb-price'),
+        labelKey: 'credits-pricing-bandwidth-tier-next-64tb',
+        priceKey: 'credits-pricing-bandwidth-tier-next-64tb-price',
       },
       {
-        label: t('credits-pricing-bandwidth-tier-over-128tb'),
-        price: t('credits-pricing-bandwidth-tier-over-128tb-price'),
+        labelKey: 'credits-pricing-bandwidth-tier-over-128tb',
+        priceKey: 'credits-pricing-bandwidth-tier-over-128tb-price',
       },
     ],
   },
   {
     icon: ArchiveBoxIcon,
-    title: t('credits-pricing-storage-title'),
-    subtitle: t('credits-pricing-storage-subtitle'),
+    titleKey: 'credits-pricing-storage-title',
+    subtitleKey: 'credits-pricing-storage-subtitle',
     accentClass: 'bg-purple-100 text-purple-600 dark:bg-purple-900/40 dark:text-purple-300',
     tiers: [
       {
-        label: t('credits-pricing-storage-tier-first'),
-        price: t('credits-pricing-storage-tier-first-price'),
+        labelKey: 'credits-pricing-storage-tier-first',
+        priceKey: 'credits-pricing-storage-tier-first-price',
       },
       {
-        label: t('credits-pricing-storage-tier-next-5gib'),
-        price: t('credits-pricing-storage-tier-next-5gib-price'),
+        labelKey: 'credits-pricing-storage-tier-next-5gib',
+        priceKey: 'credits-pricing-storage-tier-next-5gib-price',
       },
       {
-        label: t('credits-pricing-storage-tier-next-19gib'),
-        price: t('credits-pricing-storage-tier-next-19gib-price'),
+        labelKey: 'credits-pricing-storage-tier-next-19gib',
+        priceKey: 'credits-pricing-storage-tier-next-19gib-price',
       },
       {
-        label: t('credits-pricing-storage-tier-next-38gib'),
-        price: t('credits-pricing-storage-tier-next-38gib-price'),
+        labelKey: 'credits-pricing-storage-tier-next-38gib',
+        priceKey: 'credits-pricing-storage-tier-next-38gib-price',
       },
       {
-        label: t('credits-pricing-storage-tier-next-187gib'),
-        price: t('credits-pricing-storage-tier-next-187gib-price'),
+        labelKey: 'credits-pricing-storage-tier-next-187gib',
+        priceKey: 'credits-pricing-storage-tier-next-187gib-price',
       },
       {
-        label: t('credits-pricing-storage-tier-next-390gib'),
-        price: t('credits-pricing-storage-tier-next-390gib-price'),
+        labelKey: 'credits-pricing-storage-tier-next-390gib',
+        priceKey: 'credits-pricing-storage-tier-next-390gib-price',
       },
       {
-        label: t('credits-pricing-storage-tier-next-640gib'),
-        price: t('credits-pricing-storage-tier-next-640gib-price'),
+        labelKey: 'credits-pricing-storage-tier-next-640gib',
+        priceKey: 'credits-pricing-storage-tier-next-640gib-price',
       },
       {
-        label: t('credits-pricing-storage-tier-over-1tb'),
-        price: t('credits-pricing-storage-tier-over-1tb-price'),
+        labelKey: 'credits-pricing-storage-tier-over-1tb',
+        priceKey: 'credits-pricing-storage-tier-over-1tb-price',
       },
     ],
   },
-])
+] as const
+
+const creditPricingSections = computed(() =>
+  creditPricingSectionsConfig.map(section => ({
+    icon: section.icon,
+    accentClass: section.accentClass,
+    title: t(section.titleKey),
+    subtitle: t(section.subtitleKey),
+    tiers: section.tiers.map(tier => ({
+      label: t(tier.labelKey),
+      price: t(tier.priceKey),
+    })),
+  })),
+)
 
 const creditPricingFootnote = computed(() => t('credits-pricing-footnote'))
 const creditPricingDisclaimer = computed(() => t('credits-pricing-disclaimer'))
