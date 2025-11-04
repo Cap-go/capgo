@@ -340,6 +340,11 @@ export async function createOneTimeCheckout(
       {
         price: priceId,
         quantity,
+        adjustable_quantity: {
+          enabled: true,
+          minimum: 1,
+          maximum: 100000,
+        },
       },
     ],
     metadata: {

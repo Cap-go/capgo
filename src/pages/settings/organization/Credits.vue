@@ -1,17 +1,21 @@
 <script setup lang="ts">
 import type { Database } from '~/types/supabase.types'
+import { FormKit } from '@formkit/vue'
 import dayjs from 'dayjs'
 import { storeToRefs } from 'pinia'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
+import ArchiveBoxIcon from '~icons/heroicons/archive-box'
 import BanknotesIcon from '~icons/heroicons/banknotes'
+import CloudIcon from '~icons/heroicons/cloud'
 import ScaleIcon from '~icons/heroicons/scale'
+import UserGroupIcon from '~icons/heroicons/user-group'
 import { completeCreditTopUp, startCreditTopUp } from '~/services/stripe'
 import { useSupabase } from '~/services/supabase'
-import { useOrganizationStore } from '~/stores/organization'
 import { useDisplayStore } from '~/stores/display'
+import { useOrganizationStore } from '~/stores/organization'
 
 const creditsV2Enabled = import.meta.env.VITE_FEATURE_CREDITS_V2
 
@@ -30,6 +34,17 @@ const creditUsdRate = ref(1)
 const isStartingCheckout = ref(false)
 const isCompletingTopUp = ref(false)
 const isProcessingCheckout = computed(() => isStartingCheckout.value || isCompletingTopUp.value)
+const DEFAULT_TOP_UP_QUANTITY = 100
+const CREDIT_TAX_MULTIPLIER = 1.2
+const topUpQuantityInput = ref(String(DEFAULT_TOP_UP_QUANTITY))
+const topUpQuantity = computed(() => {
+  const parsed = Number.parseInt(topUpQuantityInput.value, 10)
+  if (Number.isNaN(parsed) || parsed <= 0)
+    return null
+  return parsed
+})
+const isTopUpQuantityValid = computed(() => topUpQuantity.value !== null)
+const topUpQuantityUsd = computed(() => (topUpQuantity.value ?? 0) * creditUsdRate.value * CREDIT_TAX_MULTIPLIER)
 
 const creditTotal = computed(() => Number(currentOrganization.value?.credit_total ?? 0))
 const creditAvailable = computed(() => Number(currentOrganization.value?.credit_available ?? 0))
@@ -47,6 +62,132 @@ const hasCreditSummary = computed(() => creditTotal.value > 0 || creditAvailable
 
 const creditUsedUsd = computed(() => creditUsed.value * creditUsdRate.value)
 const creditsAvailableUsd = computed(() => creditAvailable.value * creditUsdRate.value)
+
+const creditPricingSections = computed(() => [
+  {
+    icon: UserGroupIcon,
+    title: t('credits-pricing-mau-title'),
+    subtitle: t('credits-pricing-mau-subtitle'),
+    accentClass: 'bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-300',
+    tiers: [
+      {
+        label: t('credits-pricing-mau-tier-first'),
+        price: t('credits-pricing-mau-tier-first-price'),
+      },
+      {
+        label: t('credits-pricing-mau-tier-next-2m'),
+        price: t('credits-pricing-mau-tier-next-2m-price'),
+      },
+      {
+        label: t('credits-pricing-mau-tier-next-7m'),
+        price: t('credits-pricing-mau-tier-next-7m-price'),
+      },
+      {
+        label: t('credits-pricing-mau-tier-next-5m'),
+        price: t('credits-pricing-mau-tier-next-5m-price'),
+      },
+      {
+        label: t('credits-pricing-mau-tier-next-10m'),
+        price: t('credits-pricing-mau-tier-next-10m-price'),
+      },
+      {
+        label: t('credits-pricing-mau-tier-next-15m'),
+        price: t('credits-pricing-mau-tier-next-15m-price'),
+      },
+      {
+        label: t('credits-pricing-mau-tier-next-60m'),
+        price: t('credits-pricing-mau-tier-next-60m-price'),
+      },
+      {
+        label: t('credits-pricing-mau-tier-over-100m'),
+        price: t('credits-pricing-mau-tier-over-100m-price'),
+      },
+    ],
+  },
+  {
+    icon: CloudIcon,
+    title: t('credits-pricing-bandwidth-title'),
+    subtitle: t('credits-pricing-bandwidth-subtitle'),
+    accentClass: 'bg-orange-100 text-orange-600 dark:bg-orange-900/40 dark:text-orange-300',
+    tiers: [
+      {
+        label: t('credits-pricing-bandwidth-tier-first'),
+        price: t('credits-pricing-bandwidth-tier-first-price'),
+      },
+      {
+        label: t('credits-pricing-bandwidth-tier-next-1tb'),
+        price: t('credits-pricing-bandwidth-tier-next-1tb-price'),
+      },
+      {
+        label: t('credits-pricing-bandwidth-tier-next-4tb'),
+        price: t('credits-pricing-bandwidth-tier-next-4tb-price'),
+      },
+      {
+        label: t('credits-pricing-bandwidth-tier-next-6tb'),
+        price: t('credits-pricing-bandwidth-tier-next-6tb-price'),
+      },
+      {
+        label: t('credits-pricing-bandwidth-tier-next-13tb'),
+        price: t('credits-pricing-bandwidth-tier-next-13tb-price'),
+      },
+      {
+        label: t('credits-pricing-bandwidth-tier-next-38tb'),
+        price: t('credits-pricing-bandwidth-tier-next-38tb-price'),
+      },
+      {
+        label: t('credits-pricing-bandwidth-tier-next-64tb'),
+        price: t('credits-pricing-bandwidth-tier-next-64tb-price'),
+      },
+      {
+        label: t('credits-pricing-bandwidth-tier-over-128tb'),
+        price: t('credits-pricing-bandwidth-tier-over-128tb-price'),
+      },
+    ],
+  },
+  {
+    icon: ArchiveBoxIcon,
+    title: t('credits-pricing-storage-title'),
+    subtitle: t('credits-pricing-storage-subtitle'),
+    accentClass: 'bg-purple-100 text-purple-600 dark:bg-purple-900/40 dark:text-purple-300',
+    tiers: [
+      {
+        label: t('credits-pricing-storage-tier-first'),
+        price: t('credits-pricing-storage-tier-first-price'),
+      },
+      {
+        label: t('credits-pricing-storage-tier-next-5gib'),
+        price: t('credits-pricing-storage-tier-next-5gib-price'),
+      },
+      {
+        label: t('credits-pricing-storage-tier-next-19gib'),
+        price: t('credits-pricing-storage-tier-next-19gib-price'),
+      },
+      {
+        label: t('credits-pricing-storage-tier-next-38gib'),
+        price: t('credits-pricing-storage-tier-next-38gib-price'),
+      },
+      {
+        label: t('credits-pricing-storage-tier-next-187gib'),
+        price: t('credits-pricing-storage-tier-next-187gib-price'),
+      },
+      {
+        label: t('credits-pricing-storage-tier-next-390gib'),
+        price: t('credits-pricing-storage-tier-next-390gib-price'),
+      },
+      {
+        label: t('credits-pricing-storage-tier-next-640gib'),
+        price: t('credits-pricing-storage-tier-next-640gib-price'),
+      },
+      {
+        label: t('credits-pricing-storage-tier-over-1tb'),
+        price: t('credits-pricing-storage-tier-over-1tb-price'),
+      },
+    ],
+  },
+])
+
+const creditPricingFootnote = computed(() => t('credits-pricing-footnote'))
+const creditPricingDisclaimer = computed(() => t('credits-pricing-disclaimer'))
 
 function formatCredits(value: number) {
   return new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)
@@ -116,10 +257,14 @@ async function loadTransactions() {
 
 async function handleBuyCredits() {
   if (!currentOrganization.value?.gid)
-  return
-try {
+    return
+  if (!isTopUpQuantityValid.value || topUpQuantity.value === null) {
+    toast.error(t('credits-top-up-quantity-invalid'))
+    return
+  }
+  try {
     isStartingCheckout.value = true
-    await startCreditTopUp(currentOrganization.value.gid)
+    await startCreditTopUp(currentOrganization.value.gid, topUpQuantity.value)
   }
   catch (error) {
     console.error('Failed to initiate credit checkout', error)
@@ -198,7 +343,7 @@ watch(() => currentOrganization.value?.gid, async (newOrgId, oldOrgId) => {
 </script>
 
 <template>
-  <div class="space-y-8 px-4 pt-6 mx-auto max-w-7xl lg:px-8 sm:px-6">
+  <div class="space-y-8 px-4 pt-6 pb-6 mx-auto max-w-7xl lg:px-8 sm:px-6">
     <div class="grid grid-cols-1 gap-6 xl:grid-cols-2">
       <div class="flex h-full flex-col justify-between rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
         <div class="flex items-start justify-between gap-4">
@@ -265,8 +410,8 @@ watch(() => currentOrganization.value?.gid, async (newOrgId, oldOrgId) => {
     </div>
 
     <div class="rounded-3xl border border-blue-500 p-6 text-white shadow-lg">
-      <div class="flex flex-col items-start justify-between gap-6 sm:flex-row sm:items-center">
-        <div>
+      <div class="flex flex-col items-start justify-between gap-6 sm:flex-col sm:items-start">
+        <div class="max-w-xl">
           <h3 class="text-2xl font-semibold">
             {{ t('credits-cta-title') }}
           </h3>
@@ -274,18 +419,101 @@ watch(() => currentOrganization.value?.gid, async (newOrgId, oldOrgId) => {
             {{ t('credits-cta-description') }}
           </p>
         </div>
-        <button
-          type="button"
-          :class="{ 'opacity-75 pointer-events-none': isProcessingCheckout }"
-          class="inline-flex w-full sm:w-auto py-2 px-3 sm:py-2.5 sm:px-4 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-sm sm:text-base font-semibold rounded-lg transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
-          @click="handleBuyCredits"
-        >
-          <Spinner v-if="isProcessingCheckout" size="w-4 h-4" class="mr-2" color="white" />
-          <span>{{ t('buy-credits') }}</span>
-        </button>
+        <form class="flex w-full flex-row p-3 sm:h-full sm:flex-row sm:items-center sm:justify-between" @submit.prevent="handleBuyCredits">
+          <div class="flex w-full flex-col gap-2 sm:w-56">
+            <FormKit
+              v-model="topUpQuantityInput"
+              type="number"
+              name="creditsTopUpQuantity"
+              inputmode="numeric"
+              min="1"
+              step="1"
+              :placeholder="String(DEFAULT_TOP_UP_QUANTITY)"
+              :label="t('credits-top-up-quantity-label')"
+              validation="required|min:1"
+              validation-visibility="live"
+              outer-class="w-full !mb-0"
+              label-class="text-xs font-semibold uppercase tracking-wide text-white/80"
+              help-class="hidden"
+              message-class="text-xs text-rose-200 mt-1"
+            />
+            <div class="text-xs opacity-90 space-y-1">
+              <p>
+                {{ t('credits-top-up-quantity-help') }}
+              </p>
+              <p class="font-medium">
+                {{ t('credits-top-up-total-estimate', { amount: formatCurrency(topUpQuantityUsd) }) }}
+              </p>
+            </div>
+          </div>
+          <button
+            type="submit"
+            :disabled="isProcessingCheckout || !isTopUpQuantityValid"
+            :class="{ 'opacity-75 pointer-events-none': isProcessingCheckout || !isTopUpQuantityValid }"
+            class="inline-flex w-full sm:w-auto justify-center py-2 px-3 sm:py-2.5 sm:px-4 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-sm sm:text-base font-semibold rounded-lg transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5 disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            <Spinner v-if="isProcessingCheckout" size="w-4 h-4" class="mr-2" color="white" />
+            <span>{{ t('buy-credits') }}</span>
+          </button>
+        </form>
       </div>
     </div>
 
+    <div class="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+      <div class="space-y-8 lg:p-2">
+        <div class="text-center">
+          <h2 class="text-2xl font-semibold text-gray-900 dark:text-white">
+            {{ t('credits-pricing-title') }}
+          </h2>
+          <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">
+            {{ t('credits-pricing-description') }}
+          </p>
+        </div>
+        <div class="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+          <div
+            v-for="section in creditPricingSections"
+            :key="section.title"
+            class="flex h-full flex-col rounded-2xl border border-gray-200 bg-gray-50 p-6 shadow-sm dark:border-gray-700 dark:bg-gray-900/40"
+          >
+            <div class="flex items-start gap-3">
+              <div class="flex h-10 w-20 items-center justify-center rounded-full" :class="section.accentClass">
+                <component :is="section.icon" class="h-5 w-5" />
+              </div>
+              <div>
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+                  {{ section.title }}
+                </h3>
+                <p class="text-sm text-gray-500 dark:text-gray-400">
+                  {{ section.subtitle }}
+                </p>
+              </div>
+            </div>
+            <dl class="mt-6 flex-1 space-y-3">
+              <div
+                v-for="tier in section.tiers"
+                :key="tier.label"
+                class="flex items-baseline justify-between rounded-lg bg-white px-4 py-3 text-sm text-gray-600 shadow-sm dark:bg-gray-900/60 dark:text-gray-300"
+              >
+                <dt class="font-medium text-gray-700 dark:text-gray-200">
+                  {{ tier.label }}
+                </dt>
+                <dd class="font-semibold text-gray-900 dark:text-white">
+                  {{ tier.price }}
+                </dd>
+              </div>
+            </dl>
+          </div>
+        </div>
+        <div class="space-y-2 text-center text-xs text-gray-500 dark:text-gray-400">
+          <p>
+            {{ creditPricingFootnote }}
+          </p>
+          <p>
+            {{ creditPricingDisclaimer }}
+          </p>
+        </div>
+      </div>
+    </div>
     <div class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
       <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4 dark:border-gray-700">
         <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
