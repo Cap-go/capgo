@@ -310,6 +310,43 @@ Push the functions to the cloud:
 supabase functions deploy
 ```
 
+### Environment Variables for Self-Hosted Deployments
+
+By default, the configuration uses Capgo production values from [configs.json](configs.json). For self-hosted deployments, you **must override** all configuration values using environment variables.
+
+#### Required Environment Variables
+
+All configuration keys from `configs.json` can be overridden by setting their uppercase equivalent as environment variables:
+
+| Environment Variable | Description | Default (Prod) | Required for Self-Hosted |
+|---------------------|-------------|----------------|--------------------------|
+| `BASE_DOMAIN` | Console domain | `console.capgo.app` | ✅ Yes |
+| `SUPA_ANON` | Supabase anonymous key | Capgo production key | ✅ Yes |
+| `SUPA_URL` | Supabase URL | `https://xvwzpoazmxkqosrdewyv.supabase.co` | ✅ Yes |
+| `API_DOMAIN` | API domain | `api.capgo.app` | ✅ Yes |
+| `CAPTCHA_KEY` | Turnstile captcha key | Capgo production key | ⚠️ Optional |
+| `FEATURE_CREDITS_V2` | Enable credits v2 feature | `false` | ⚠️ Optional |
+
+#### Example Self-Hosted Configuration
+
+```bash
+# .env file for self-hosted deployment
+BASE_DOMAIN=console.yourdomain.com
+SUPA_ANON=your-supabase-anon-key
+SUPA_URL=https://your-supabase-url.supabase.co
+API_DOMAIN=api.yourdomain.com
+CAPTCHA_KEY=your-turnstile-key
+FEATURE_CREDITS_V2=true
+```
+
+#### How It Works
+
+The configuration system (`scripts/utils.mjs`) checks for environment variables first:
+1. If an uppercase environment variable exists (e.g., `SUPA_URL`), it uses that value
+2. Otherwise, it falls back to the appropriate value from `configs.json` based on the branch (`prod`, `preprod`, `development`, or `local`)
+
+**Important:** Without setting these environment variables, your self-hosted instance will attempt to connect to Capgo's production infrastructure, which will fail.
+
 ### Build
 
 To build the web app in mobile, in order to push to mobile stores, run:
