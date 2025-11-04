@@ -79,7 +79,7 @@ BEGIN
   VALUES (
     p_org_id,
     v_grant_id,
-    'grant',
+    'purchase',
     p_amount,
     v_available,
     p_notes,
