@@ -9,7 +9,6 @@ node_modules
 .env.mobile
 .env
 .env.dev
-.netlify
 ios/App/App/GoogleService-Info.plist
 android/app/google-services.json
 android/google-play-key.json
@@ -30,7 +29,6 @@ fastlane/metadata/review_information/phone_number.txt
 .capgo_key.pub
 .wrangler
 
-scripts/template/netlify/test.gplay.js
 
 test-results
 playwright-report
@@ -63,7 +61,6 @@ internal/cloudflare/.env.preprod
 internal/cloudflare/.env.prod
 scripts/local_cf_backend/spawn
 temp_cli_test
-internal/netlify/.env.prod
 internal/supabase/.env.prod
 cloudflare_workers/files/.wrangler/*
 cloudflare_workers/plugin/.wrangler/*

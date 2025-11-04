@@ -1,8 +1,8 @@
 {
   "base_domain": {
-    "prod": "web.capgo.app",
-    "preprod": "web.preprod.capgo.app",
-    "development": "web.development.capgo.app",
+    "prod": "console.capgo.app",
+    "preprod": "console.preprod.capgo.app",
+    "development": "console.development.capgo.app",
     "local": "localhost:3332"
   },
   "supa_anon": {

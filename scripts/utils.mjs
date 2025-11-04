@@ -9,6 +9,12 @@ console.log('Branch', branch)
 
 export function getRightKey(keyname) {
   // console.log('getRightKey', branch, keyname)
+  // Check for environment variable first (uppercase version)
+  // Use env var if it's defined (even if empty string)
+  const envVarName = keyname.toUpperCase()
+  if (envVarName in env)
+    return env[envVarName]
+
   if (!keys || !keys[keyname])
     return ''
   if (branch === 'alpha')

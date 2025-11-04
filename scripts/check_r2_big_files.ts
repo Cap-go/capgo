@@ -559,7 +559,7 @@ async function export_files_folder_to_csv(folderPath: string) {
     const csvRows = folderObjects.map(obj => {
         const size = obj.Size ?? 0
         const sizeGB = (size / (1024 * 1024 * 1024)).toFixed(6)
-        const webLink = `https://web.capgo.app/app/p/${obj.Key?.split('/').pop() ?? ''}`
+        const webLink = `https://console.capgo.app/app/p/${obj.Key?.split('/').pop() ?? ''}`
 
         return [
             `"${obj.Key?.split('/').pop() ?? ''}"`,
@@ -964,7 +964,7 @@ async function export_supabase_csv(orgId: string) {
         }
 
         const sizeGB = (sizeBytes / (1024 * 1024 * 1024)).toFixed(6)
-        const webLink = `https://web.capgo.app/app/p/${version.app_id}/bundle/${version.id}`
+        const webLink = `https://console.capgo.app/app/p/${version.app_id}/bundle/${version.id}`
 
         csvData.push({
             app_id: version.app_id ?? '',

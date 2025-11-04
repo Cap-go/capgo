@@ -43,6 +43,8 @@ export async function openPortal(orgId: string, t: ComposerTranslation) {
   if (!session)
     return
 
+  // datafast_visitor_id
+
   const prem = supabase.functions.invoke('private/stripe_portal', {
     body: JSON.stringify({ callbackUrl: window.location.href, orgId }),
   }).then(({ data }) => {
@@ -76,12 +78,18 @@ export async function openPortal(orgId: string, t: ComposerTranslation) {
   return dialogStore.onDialogDismiss()
 }
 
+async function getAttributionId() {
+  // attribute is made via cookie of name datafast_visitor_id
+  return (await cookieStore.get('datafast_visitor_id'))?.value
+}
+
 export async function openCheckout(priceId: string, successUrl: string, cancelUrl: string, isYear: boolean, orgId: string) {
   //   console.log('openCheckout')
   const supabase = useSupabase()
   const session = await supabase.auth.getSession()
   if (!session)
     return
+  const attributionId = await getAttributionId()
   try {
     const resp = await supabase.functions.invoke('private/stripe_checkout', {
       body: JSON.stringify({
@@ -90,6 +98,7 @@ export async function openCheckout(priceId: string, successUrl: string, cancelUr
         cancelUrl,
         reccurence: isYear ? 'year' : 'month',
         orgId,
+        attributionId,
       }),
     })
     if (!resp.error && resp.data?.url)

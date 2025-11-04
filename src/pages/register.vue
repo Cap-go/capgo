@@ -18,7 +18,7 @@ const turnstileToken = ref('')
 const captchaKey = ref(import.meta.env.VITE_CAPTCHA_KEY)
 const isLoading = ref(false)
 
-if (window.location.host === 'web.capgo.app') {
+if (window.location.host === 'console.capgo.app') {
   // do not allow to register on webapp on production
   window.location.href = 'https://capgo.app/register/'
 }

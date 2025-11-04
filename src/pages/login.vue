@@ -32,7 +32,7 @@ const captchaComponent = ref<InstanceType<typeof VueTurnstile> | null>(null)
 
 const version = import.meta.env.VITE_APP_VERSION
 
-const registerUrl = window.location.host === 'web.capgo.app' ? 'https://capgo.app/register/' : `/register/`
+const registerUrl = window.location.host === 'console.capgo.app' ? 'https://capgo.app/register/' : `/register/`
 
 async function nextLogin() {
   if (route.query.to && typeof route.query.to === 'string') {

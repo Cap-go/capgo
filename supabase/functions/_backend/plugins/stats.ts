@@ -85,11 +85,16 @@ async function post(c: Context, drizzleCient: ReturnType<typeof getDrizzleClient
   }
   const statsActions: StatsActions[] = []
 
+  // Extract version from composite format if present (e.g., "1.2.3:main.js" -> "1.2.3")
+  // Composite format is used for file-specific failure stats
+  const colonIndex = version_name.indexOf(':')
+  const versionOnly = colonIndex > 0 ? version_name.substring(0, colonIndex) : version_name
+
   let allowedDeleted = false
-  if (version_name === 'builtin' || version_name === 'unknown') {
+  if (versionOnly === 'builtin' || versionOnly === 'unknown') {
     allowedDeleted = true
   }
-  let appVersion = isV2 ? await getAppVersionPostgresV2(c, app_id, version_name, allowedDeleted, drizzleCient as ReturnType<typeof getDrizzleClientD1Session>) : await getAppVersionPostgres(c, app_id, version_name, allowedDeleted, drizzleCient as ReturnType<typeof getDrizzleClient>)
+  let appVersion = isV2 ? await getAppVersionPostgresV2(c, app_id, versionOnly, allowedDeleted, drizzleCient as ReturnType<typeof getDrizzleClientD1Session>) : await getAppVersionPostgres(c, app_id, versionOnly, allowedDeleted, drizzleCient as ReturnType<typeof getDrizzleClient>)
   if (!appVersion) {
     const appVersion2 = isV2 ? await getAppVersionPostgresV2(c, app_id, 'unknown', allowedDeleted, drizzleCient as ReturnType<typeof getDrizzleClientD1Session>) : await getAppVersionPostgres(c, app_id, 'unknown', allowedDeleted, drizzleCient as ReturnType<typeof getDrizzleClient>)
     if (appVersion2) {

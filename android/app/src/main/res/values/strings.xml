@@ -6,7 +6,7 @@
     <string name="custom_url_scheme">ee.forgr.capacitor_go</string>
     <string name="asset_statements" translatable="false">
       [{
-        \"include\": \"https://web.capgo.app/.well-known/assetlinks.json\"
+        \"include\": \"https://console.capgo.app/.well-known/assetlinks.json\"
       }]
     </string>
 </resources>

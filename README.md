@@ -16,7 +16,6 @@
 [![Bump version](https://github.com/Cap-go/capgo/actions/workflows/bump_version.yml/badge.svg)](https://github.com/Cap-go/capgo/actions/workflows/bump_version.yml)
 [![Build source code and send to Capgo](https://github.com/Cap-go/capgo/actions/workflows/build_and_deploy.yml/badge.svg)](https://github.com/Cap-go/capgo/actions/workflows/build_and_deploy.yml)
 [![udd-update-dependencies](https://github.com/Cap-go/capgo/actions/workflows/udd.yml/badge.svg)](https://github.com/Cap-go/capgo/actions/workflows/udd.yml)
-[![Netlify Status](https://api.netlify.com/api/v1/badges/2ebcdd5c-362b-4135-8fac-9ce872309174/deploy-status)](https://app.netlify.com/sites/webcapgo/deploys)
 <a href="#badge">
 <img alt="semantic-release" src="https://img.shields.io/badge/%20%20%F0%9F%93%A6%F0%9F%9A%80-semantic--release-e10079.svg">
 </a>
@@ -154,11 +153,10 @@ All the following official plugins are already installed and pre-configured:
 
 ## Usage
 
-Capgo is deployed to production on Cloudflare workers, Netlify and Supabase.
+Capgo is deployed to production on Cloudflare workers and Supabase.
 
 Cloudflare workers take 99% of the traffic. Supabase is used for internal calls,
-for internal tasks such as CRON jobs that call functions. Netlify is used only
-as a backup for Cloudflare.
+for internal tasks such as CRON jobs that call functions.
 
 When self-hosted, installing only Supabase is sufficient.
 
@@ -311,6 +309,43 @@ Push the functions to the cloud:
 ```bash
 supabase functions deploy
 ```
+
+### Environment Variables for Self-Hosted Deployments
+
+By default, the configuration uses Capgo production values from [configs.json](configs.json). For self-hosted deployments, you **must override** all configuration values using environment variables.
+
+#### Required Environment Variables
+
+All configuration keys from `configs.json` can be overridden by setting their uppercase equivalent as environment variables:
+
+| Environment Variable | Description | Default (Prod) | Required for Self-Hosted |
+|---------------------|-------------|----------------|--------------------------|
+| `BASE_DOMAIN` | Console domain | `console.capgo.app` | ✅ Yes |
+| `SUPA_ANON` | Supabase anonymous key | Capgo production key | ✅ Yes |
+| `SUPA_URL` | Supabase URL | `https://xvwzpoazmxkqosrdewyv.supabase.co` | ✅ Yes |
+| `API_DOMAIN` | API domain | `api.capgo.app` | ✅ Yes |
+| `CAPTCHA_KEY` | Turnstile captcha key | Capgo production key | ⚠️ Optional |
+| `FEATURE_CREDITS_V2` | Enable credits v2 feature | `false` | ⚠️ Optional |
+
+#### Example Self-Hosted Configuration
+
+```bash
+# .env file for self-hosted deployment
+BASE_DOMAIN=console.yourdomain.com
+SUPA_ANON=your-supabase-anon-key
+SUPA_URL=https://your-supabase-url.supabase.co
+API_DOMAIN=api.yourdomain.com
+CAPTCHA_KEY=your-turnstile-key
+FEATURE_CREDITS_V2=true
+```
+
+#### How It Works
+
+The configuration system (`scripts/utils.mjs`) checks for environment variables first:
+1. If an uppercase environment variable exists (e.g., `SUPA_URL`), it uses that value
+2. Otherwise, it falls back to the appropriate value from `configs.json` based on the branch (`prod`, `preprod`, `development`, or `local`)
+
+**Important:** Without setting these environment variables, your self-hosted instance will attempt to connect to Capgo's production infrastructure, which will fail.
 
 ### Build
 

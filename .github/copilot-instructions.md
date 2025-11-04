@@ -4,7 +4,7 @@
 
 Capgo is a live update platform for Capacitor apps, consisting of:
 - **Frontend**: Vue 3 SPA built with Vite, Tailwind CSS, and DaisyUI
-- **Backend**: Multi-platform edge functions (Cloudflare Workers primary, Supabase/Netlify backup)
+- **Backend**: Multi-platform edge functions (Cloudflare Workers primary, Supabase backup)
 - **Database**: PostgreSQL via Supabase, with migration to Cloudflare D1 in progress
 - **Mobile**: Capacitor iOS/Android apps with OTA update capabilities
 
@@ -15,7 +15,6 @@ Capgo is a live update platform for Capacitor apps, consisting of:
 The backend runs on **three platforms** with identical code:
 1. **Cloudflare Workers** (99% of production traffic, ports 8787/8788/8789 locally)
 2. **Supabase Edge Functions** (internal tasks, CRON jobs, local development)
-3. **Netlify Edge Functions** (backup deployment)
 
 Code lives in `supabase/functions/_backend/` and is deployed to all three platforms. Workers are split:
 - **API Worker** (8787): `/bundle`, `/app`, `/device`, `/channel`, `/private/*`, `/triggers`
@@ -185,7 +184,7 @@ Routes auto-generated from `src/pages/` via `unplugin-vue-router`:
 **Do not manually deploy or commit version bumps.** CI/CD handles:
 - Version bumping in `package.json`
 - `CHANGELOG.md` generation (semantic-release)
-- Deployment to Cloudflare/Netlify/Supabase after merge to `main`
+- Deployment to Cloudflare/Supabase after merge to `main`
 
 If deployment is needed (exceptional cases):
 ```bash
