@@ -89,6 +89,10 @@ export function trackLogsCFExternal(c: Context, app_id: string, device_id: strin
   return Promise.resolve()
 }
 
+function getD1Session(c: Context) {
+  return c.env.DB_DEVICES.withSession('first-unconstrained')
+}
+
 export async function trackDevicesCF(c: Context, device: DeviceWithoutCreatedAt) {
   cloudlog({ requestId: c.get('requestId'), message: 'trackDevicesCF', device })
 
@@ -118,7 +122,8 @@ export async function trackDevicesCF(c: Context, device: DeviceWithoutCreatedAt)
 
     const comparableDevice = toComparableDevice(device)
 
-    const existingRow = await c.env.DB_DEVICES.prepare(`
+    // c.env.DB_DEVICES.
+    const existingRow = await getD1Session(c).prepare(`
       SELECT * FROM devices 
       WHERE device_id = ? AND app_id = ?
     `).bind(device.device_id, device.app_id).first()
@@ -403,7 +408,7 @@ export async function countDevicesCF(c: Context, app_id: string, customIdMode: b
 
   cloudlog({ requestId: c.get('requestId'), message: 'countDevicesCF query', query })
   try {
-    const readD1 = c.env.DB_DEVICES
+    const readD1 = getD1Session(c)
       .prepare(query)
       .bind(app_id)
       .first('total')
@@ -486,7 +491,7 @@ LIMIT ${rangeEnd} OFFSET ${rangeStart}`
   cloudlog({ requestId: c.get('requestId'), message: 'readDevicesCF query', query })
   try {
     cloudlog({ requestId: c.get('requestId'), message: 'readDevicesCF exec' })
-    const readD1 = c.env.DB_DEVICES
+    const readD1 = getD1Session(c)
       .prepare(query)
       .all()
     cloudlog({ requestId: c.get('requestId'), message: 'readDevicesCF exec await' })
