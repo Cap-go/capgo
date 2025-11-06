@@ -15,13 +15,13 @@ import IconLog from '~icons/heroicons/document'
 import IconInformations from '~icons/heroicons/information-circle'
 import IconAlertCircle from '~icons/lucide/alert-circle'
 import IconDown from '~icons/material-symbols/keyboard-arrow-down-rounded'
+import { useDeviceUpdateFormat } from '~/composables/useDeviceUpdateFormat'
 import { formatDate } from '~/services/date'
 import { defaultApiHost, useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
-import { useDeviceUpdateFormat } from '~/composables/useDeviceUpdateFormat'
 
 interface Channel {
   version: Database['public']['Tables']['app_versions']['Row']
@@ -369,7 +369,8 @@ function getCurlCommand() {
   if (!device.value)
     return ''
 
-  const defaultChannel = channelDevice.value?.name || 'production'
+  // Use the stored default_channel from device, or empty string if not available
+  const defaultChannel = device.value.default_channel || ''
   const requestBody = transformDeviceToUpdateRequest(device.value, packageId.value, defaultChannel)
   const jsonBody = JSON.stringify(requestBody, null, 2)
 
@@ -430,6 +431,9 @@ async function copyCurlCommand() {
               </InfoRow>
               <InfoRow v-if="device.os_version" :label="t('os-version')">
                 {{ device.os_version }}
+              </InfoRow>
+              <InfoRow v-if="device.default_channel" :label="t('default-channel')">
+                {{ device.default_channel }}
               </InfoRow>
               <InfoRow v-if="minVersion(device.plugin_version) && device.is_emulator" :label="t('is-emulator')">
                 {{ device.is_emulator?.toString() }}

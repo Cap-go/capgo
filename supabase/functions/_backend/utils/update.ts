@@ -106,6 +106,7 @@ export async function updateWithPG(
     os_version: version_os,
     platform: platform as Database['public']['Enums']['platform_os'],
     updated_at: new Date().toISOString(),
+    default_channel: defaultChannel ?? null,
   }
   if (!appOwner) {
     return onPremStats(c, app_id, 'get', device)

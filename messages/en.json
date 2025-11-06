@@ -300,6 +300,7 @@
   "dashboard": "dashboard",
   "debug-api-description": "Use this curl command to reproduce the exact API request this device makes to check for updates",
   "debug-api-request": "Debug API Request",
+  "default-channel": "Default Channel",
   "default-download-channel": "Default download channel",
   "default-download-channel-android-only-desc": "These channels currently deliver updates only to Android devices.",
   "default-download-channel-android-only-empty": "No Android-only channels yet.",

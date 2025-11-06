@@ -13,9 +13,7 @@ CREATE INDEX idx_stats_app_id_created_at ON stats (app_id, created_at);
 
 CREATE INDEX idx_stats_app_id_device_id ON stats (app_id, device_id);
 
-CREATE INDEX idx_stats_app_id_version_name ON stats (
-    app_id, version_name
-);
+CREATE INDEX idx_stats_app_id_version_name ON stats (app_id, version_name);
 
 -- DROP TABLE IF EXISTS devices;
 CREATE TABLE IF NOT EXISTS devices (
@@ -27,6 +25,7 @@ CREATE TABLE IF NOT EXISTS devices (
     platform character varying(8) NOT NULL,
     plugin_version character varying(20) NOT NULL,
     os_version character varying(20) NOT NULL,
+    default_channel character varying(20) NOT NULL,
     version_build character varying(20) DEFAULT 'builtin',
     custom_id character varying(36) DEFAULT '' NOT NULL,
     is_prod boolean DEFAULT true,
@@ -34,21 +33,13 @@ CREATE TABLE IF NOT EXISTS devices (
     PRIMARY KEY (app_id, device_id)
 );
 
-CREATE INDEX devices_app_id_device_id_updated_at_idx ON devices (
-    app_id, device_id, updated_at
-);
+CREATE INDEX devices_app_id_device_id_updated_at_idx ON devices (app_id, device_id, updated_at);
 
-CREATE INDEX devices_app_id_updated_at_idx ON devices (
-    app_id, updated_at
-);
+CREATE INDEX devices_app_id_updated_at_idx ON devices (app_id, updated_at);
 
-CREATE INDEX idx_app_id_created_at_devices ON devices (
-    app_id, updated_at
-);
+CREATE INDEX idx_app_id_created_at_devices ON devices (app_id, updated_at);
 
-CREATE INDEX idx_app_id_version_name_devices ON devices (
-    app_id, version_name
-);
+CREATE INDEX idx_app_id_version_name_devices ON devices (app_id, version_name);
 
 CREATE TABLE store_apps (
     created_at datetime DEFAULT CURRENT_TIMESTAMP NOT NULL,
@@ -83,37 +74,25 @@ CREATE TABLE store_apps (
 
 CREATE INDEX idx_store_apps ON store_apps (capacitor);
 
-CREATE INDEX idx_store_apps_capacitor ON store_apps (
-    capacitor, installs DESC
-);
+CREATE INDEX idx_store_apps_capacitor ON store_apps (capacitor, installs DESC);
 
-CREATE INDEX idx_store_apps_cordova ON store_apps (
-    cordova, capacitor, installs DESC
-);
+CREATE INDEX idx_store_apps_cordova ON store_apps (cordova, capacitor, installs DESC);
 
-CREATE INDEX idx_store_apps_flutter ON store_apps (
-    flutter, installs DESC
-);
+CREATE INDEX idx_store_apps_flutter ON store_apps (flutter, installs DESC);
 
 CREATE INDEX idx_store_apps_install ON store_apps (capacitor, installs);
 
 CREATE INDEX idx_store_apps_kotlin ON store_apps (kotlin, installs DESC);
 
-CREATE INDEX idx_store_apps_native_script ON store_apps (
-    native_script, installs DESC
-);
+CREATE INDEX idx_store_apps_native_script ON store_apps (native_script, installs DESC);
 
 CREATE INDEX idx_store_apps_native_script_1 ON store_apps (native_script)
 WHERE
-native_script = 1;
+    native_script = 1;
 
-CREATE INDEX idx_store_apps_react_native ON store_apps (
-    react_native, installs DESC
-);
+CREATE INDEX idx_store_apps_react_native ON store_apps (react_native, installs DESC);
 
-CREATE INDEX idx_store_apps_c_c_installs_desc ON store_apps (
-    cordova, capacitor, installs DESC
-);
+CREATE INDEX idx_store_apps_c_c_installs_desc ON store_apps (cordova, capacitor, installs DESC);
 
 CREATE INDEX idx_store_capgo ON store_apps (capgo);
 

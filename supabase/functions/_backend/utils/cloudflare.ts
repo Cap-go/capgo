@@ -101,10 +101,10 @@ export async function trackDevicesCF(c: Context, device: DeviceWithoutCreatedAt)
 
   const upsertQuery = `
   INSERT INTO devices (
-    updated_at, device_id, version_name, app_id, platform, 
-    plugin_version, os_version, version_build, custom_id, 
-    is_prod, is_emulator, version
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    updated_at, device_id, version_name, app_id, platform,
+    plugin_version, os_version, version_build, custom_id,
+    is_prod, is_emulator, version, default_channel
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   ON CONFLICT (device_id, app_id) DO UPDATE SET
     updated_at = excluded.updated_at,
     version_name = excluded.version_name,
@@ -115,7 +115,8 @@ export async function trackDevicesCF(c: Context, device: DeviceWithoutCreatedAt)
     custom_id = excluded.custom_id,
     is_prod = excluded.is_prod,
     is_emulator = excluded.is_emulator,
-    version = 0
+    version = 0,
+    default_channel = excluded.default_channel
 `
   try {
     const updated_at = new Date().toISOString()
@@ -145,6 +146,7 @@ export async function trackDevicesCF(c: Context, device: DeviceWithoutCreatedAt)
           comparableDevice.is_prod ? 1 : 0,
           comparableDevice.is_emulator ? 1 : 0,
           device.version ?? 0,
+          device.default_channel ?? null,
         )
         .run()
       cloudlog({ requestId: c.get('requestId'), message: 'Upsert result:', res })
