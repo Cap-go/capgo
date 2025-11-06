@@ -2,6 +2,7 @@ import type { AnalyticsEngineDataPoint, D1Database, Hyperdrive } from '@cloudfla
 import type { Context } from 'hono'
 import type { Database } from './supabase.types.ts'
 import type { DeviceWithoutCreatedAt, ReadDevicesParams, ReadStatsParams } from './types.ts'
+import { get } from 'node:http'
 import dayjs from 'dayjs'
 import ky from 'ky'
 import { hasComparableDeviceChanged, toComparableDevice } from './deviceComparison.ts'
@@ -89,11 +90,19 @@ export function trackLogsCFExternal(c: Context, app_id: string, device_id: strin
   return Promise.resolve()
 }
 
-function getD1DevicesSession(c: Context) {
+function getD1WriteDevicesSession(c: Context) {
+  return c.env.DB_DEVICES
+}
+
+function getD1WriteStoreAppSession(c: Context) {
+  return c.env.DB_STOREAPPS
+}
+
+function getD1ReadDevicesSession(c: Context) {
   return c.env.DB_DEVICES.withSession('first-unconstrained')
 }
 
-function getD1StoreAppSession(c: Context) {
+function getD1ReadStoreAppSession(c: Context) {
   return c.env.DB_STOREAPPS.withSession('first-unconstrained')
 }
 
@@ -128,7 +137,7 @@ export async function trackDevicesCF(c: Context, device: DeviceWithoutCreatedAt)
     const comparableDevice = toComparableDevice(device)
 
     // c.env.DB_DEVICES.
-    const existingRow = await getD1DevicesSession(c).prepare(`
+    const existingRow = await getD1ReadDevicesSession(c).prepare(`
       SELECT * FROM devices 
       WHERE device_id = ? AND app_id = ?
     `).bind(device.device_id, device.app_id).first()
@@ -136,23 +145,21 @@ export async function trackDevicesCF(c: Context, device: DeviceWithoutCreatedAt)
     if (!existingRow || hasComparableDeviceChanged(existingRow, device)) {
       cloudlog({ requestId: c.get('requestId'), message: existingRow ? 'Updating existing device' : 'Inserting new device' })
 
-      const res = await c.env.DB_DEVICES.prepare(upsertQuery)
-        .bind(
-          updated_at,
-          device.device_id,
-          comparableDevice.version_name ?? device.version_name ?? 'unknown',
-          device.app_id,
-          comparableDevice.platform,
-          comparableDevice.plugin_version,
-          comparableDevice.os_version,
-          comparableDevice.version_build,
-          comparableDevice.custom_id ?? '',
-          comparableDevice.is_prod ? 1 : 0,
-          comparableDevice.is_emulator ? 1 : 0,
-          device.version ?? 0,
-          device.default_channel ?? null,
-        )
-        .run()
+      const res = await getD1WriteDevicesSession(c).prepare(upsertQuery).bind(
+        updated_at,
+        device.device_id,
+        comparableDevice.version_name ?? device.version_name ?? 'unknown',
+        device.app_id,
+        comparableDevice.platform,
+        comparableDevice.plugin_version,
+        comparableDevice.os_version,
+        comparableDevice.version_build,
+        comparableDevice.custom_id ?? '',
+        comparableDevice.is_prod ? 1 : 0,
+        comparableDevice.is_emulator ? 1 : 0,
+        device.version ?? 0,
+        device.default_channel ?? null,
+      ).run()
       cloudlog({ requestId: c.get('requestId'), message: 'Upsert result:', res })
     }
     else {
@@ -416,7 +423,7 @@ export async function countDevicesCF(c: Context, app_id: string, customIdMode: b
 
   cloudlog({ requestId: c.get('requestId'), message: 'countDevicesCF query', query })
   try {
-    const readD1 = getD1DevicesSession(c)
+    const readD1 = getD1ReadDevicesSession(c)
       .prepare(query)
       .bind(app_id)
       .first('total')
@@ -499,7 +506,7 @@ LIMIT ${rangeEnd} OFFSET ${rangeStart}`
   cloudlog({ requestId: c.get('requestId'), message: 'readDevicesCF query', query })
   try {
     cloudlog({ requestId: c.get('requestId'), message: 'readDevicesCF exec' })
-    const readD1 = getD1DevicesSession(c)
+    const readD1 = getD1ReadDevicesSession(c)
       .prepare(query)
       .all()
     cloudlog({ requestId: c.get('requestId'), message: 'readDevicesCF exec await' })
@@ -594,9 +601,9 @@ export async function getAppsFromCF(c: Context): Promise<{ app_id: string }[]> {
 
   const query = `SELECT app_id FROM store_apps WHERE (onprem = 1 OR capgo = 1) AND url != ''`
   cloudlog({ requestId: c.get('requestId'), message: 'getAppsFromCF query', query })
-  // use c.env.DB_STOREAPPS and table store_apps
+  // use c.env.DB_STORE_APPS and table store_apps
   try {
-    const readD1 = getD1StoreAppSession(c)
+    const readD1 = getD1ReadStoreAppSession(c)
       .prepare(query)
       .all()
     const res = await readD1
@@ -618,7 +625,7 @@ export async function countUpdatesFromStoreAppsCF(c: Context): Promise<number> {
 
   cloudlog({ requestId: c.get('requestId'), message: 'countUpdatesFromStoreAppsCF query', query })
   try {
-    const readD1 = getD1StoreAppSession(c)
+    const readD1 = getD1ReadStoreAppSession(c)
       .prepare(query)
       .first('count')
     const res = await readD1
@@ -715,7 +722,7 @@ export async function getAppsToProcessCF(c: Context, flag: 'to_get_framework' | 
 
   cloudlog({ requestId: c.get('requestId'), message: 'getAppsToProcessCF query', query })
   try {
-    const readD1 = getD1StoreAppSession(c)
+    const readD1 = getD1ReadStoreAppSession(c)
       .prepare(query)
       .all()
     const res = await readD1
@@ -760,7 +767,7 @@ export async function getTopAppsCF(c: Context, mode: string, limit: number): Pro
 
   cloudlog({ requestId: c.get('requestId'), message: 'getTopAppsCF query', query })
   try {
-    const readD1 = getD1StoreAppSession(c)
+    const readD1 = getD1ReadStoreAppSession(c)
       .prepare(query)
       .all()
     const res = await readD1
@@ -797,7 +804,7 @@ export async function getTotalAppsByModeCF(c: Context, mode: string) {
 
   cloudlog({ requestId: c.get('requestId'), message: 'getTotalAppsByModeCF query', query })
   try {
-    const readD1 = getD1StoreAppSession(c)
+    const readD1 = getD1ReadStoreAppSession(c)
       .prepare(query)
       .first('total')
     const res = await readD1
@@ -816,7 +823,7 @@ export async function getStoreAppByIdCF(c: Context, appId: string): Promise<Stor
 
   cloudlog({ requestId: c.get('requestId'), message: 'getStoreAppByIdCF query', query })
   try {
-    const readD1 = getD1StoreAppSession(c)
+    const readD1 = getD1ReadStoreAppSession(c)
       .prepare(query)
       .first()
     const res = await readD1
@@ -836,7 +843,7 @@ export async function createIfNotExistStoreInfo(c: Context, app: Partial<StoreAp
 
   try {
     // Check if app exists
-    const existingApp = await getD1StoreAppSession(c)
+    const existingApp = await getD1ReadStoreAppSession(c)
       .prepare('SELECT app_id FROM store_apps WHERE app_id = ?')
       .bind(app.app_id)
       .first()
@@ -850,7 +857,7 @@ export async function createIfNotExistStoreInfo(c: Context, app: Partial<StoreAp
 
     const query = `INSERT INTO store_apps (${columns.join(', ')}) VALUES (${placeholders})`
     cloudlog({ requestId: c.get('requestId'), message: 'createIfNotExistStoreInfo query', query, placeholders, values })
-    const res = await c.env.DB_STOREAPPS
+    const res = await getD1WriteStoreAppSession(c)
       .prepare(query)
       .bind(...values)
       .run()
@@ -878,7 +885,7 @@ export async function saveStoreInfoCF(c: Context, app: Partial<StoreApp>) {
   const query = `INSERT INTO store_apps (app_id, ${columns.join(', ')}) VALUES (?, ${placeholders}) ON CONFLICT(app_id) DO UPDATE SET ${updates}`
 
   try {
-    const res = await c.env.DB_STOREAPPS
+    const res = await getD1WriteStoreAppSession(c)
       .prepare(query)
       .bind(app.app_id, ...values)
       .run()
@@ -913,7 +920,7 @@ export async function updateStoreApp(c: Context, appId: string, updates: number)
   const query = `INSERT INTO store_apps (app_id, updates, updated_at) VALUES (?, ?, datetime('now')) ON CONFLICT(app_id) DO UPDATE SET updates = updates + ?, updated_at = datetime('now')`
 
   try {
-    const res = await c.env.DB_STOREAPPS
+    const res = await getD1WriteStoreAppSession(c)
       .prepare(query)
       .bind(appId, updates, updates)
       .run()
