@@ -2,7 +2,6 @@ import type { AnalyticsEngineDataPoint, D1Database, Hyperdrive } from '@cloudfla
 import type { Context } from 'hono'
 import type { Database } from './supabase.types.ts'
 import type { DeviceWithoutCreatedAt, ReadDevicesParams, ReadStatsParams } from './types.ts'
-import { get } from 'node:http'
 import dayjs from 'dayjs'
 import ky from 'ky'
 import { hasComparableDeviceChanged, toComparableDevice } from './deviceComparison.ts'
