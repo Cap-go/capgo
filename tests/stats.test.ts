@@ -259,7 +259,6 @@ describe('[POST] /stats', () => {
 
     // Wait for data to be written
     await triggerD1Sync()
-    await new Promise(resolve => setTimeout(resolve, 1000))
 
     // Verify default_channel was saved
     const { error, data } = await getSupabaseClient()
@@ -296,7 +295,6 @@ describe('[POST] /stats', () => {
     expect(response.status).toBe(200)
 
     await triggerD1Sync()
-    await new Promise(resolve => setTimeout(resolve, 1000))
 
     // Verify initial channel was saved
     let result = await getSupabaseClient()
@@ -315,7 +313,6 @@ describe('[POST] /stats', () => {
     expect(response.status).toBe(200)
 
     await triggerD1Sync()
-    await new Promise(resolve => setTimeout(resolve, 1000))
 
     // Verify channel was updated
     result = await getSupabaseClient()
@@ -350,7 +347,6 @@ describe('[POST] /stats', () => {
     expect(response.status).toBe(200)
 
     await triggerD1Sync()
-    await new Promise(resolve => setTimeout(resolve, 1000))
 
     // Verify channel was saved
     let result = await getSupabaseClient()
@@ -369,7 +365,6 @@ describe('[POST] /stats', () => {
     expect(response.status).toBe(200)
 
     await triggerD1Sync()
-    await new Promise(resolve => setTimeout(resolve, 1000))
 
     // Verify channel was unset (should be null)
     result = await getSupabaseClient()
