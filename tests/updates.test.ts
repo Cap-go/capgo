@@ -389,4 +389,77 @@ describe('update scenarios', () => {
       version: defaultVersion?.id,
     }).eq('name', 'production').eq('app_id', APP_NAME_UPDATE)
   })
+
+  it('saves default_channel when provided', async () => {
+    const uuid = randomUUID().toLowerCase()
+    const testDefaultChannel = 'staging'
+
+    const baseData = getBaseData(APP_NAME_UPDATE)
+    baseData.device_id = uuid
+    baseData.defaultChannel = testDefaultChannel
+
+    const response = await postUpdate(baseData)
+    expect(response.status).toBe(200)
+
+    // Wait for data to be written
+    await triggerD1Sync()
+    await new Promise(resolve => setTimeout(resolve, 1000))
+
+    // Verify default_channel was saved in the database
+    const { error, data } = await getSupabaseClient()
+      .from('devices')
+      .select('default_channel')
+      .eq('device_id', uuid)
+      .eq('app_id', APP_NAME_UPDATE)
+      .single()
+
+    expect(error).toBeNull()
+    expect(data).toBeTruthy()
+    expect(data?.default_channel).toBe(testDefaultChannel)
+
+    // Clean up
+    await getSupabaseClient().from('devices').delete().eq('device_id', uuid).eq('app_id', APP_NAME_UPDATE)
+  })
+
+  it('overwrites default_channel with null when not provided', async () => {
+    const uuid = randomUUID().toLowerCase()
+    const testDefaultChannel = 'production'
+
+    // First request with default_channel
+    const baseData1 = getBaseData(APP_NAME_UPDATE)
+    baseData1.device_id = uuid
+    baseData1.defaultChannel = testDefaultChannel
+
+    const response1 = await postUpdate(baseData1)
+    expect(response1.status).toBe(200)
+
+    await triggerD1Sync()
+    await new Promise(resolve => setTimeout(resolve, 1000))
+
+    // Second request WITHOUT default_channel (should overwrite with null)
+    const baseData2 = getBaseData(APP_NAME_UPDATE)
+    baseData2.device_id = uuid
+    // No defaultChannel field
+
+    const response2 = await postUpdate(baseData2)
+    expect(response2.status).toBe(200)
+
+    await triggerD1Sync()
+    await new Promise(resolve => setTimeout(resolve, 1000))
+
+    // Verify default_channel was overwritten with null
+    const { error, data } = await getSupabaseClient()
+      .from('devices')
+      .select('default_channel')
+      .eq('device_id', uuid)
+      .eq('app_id', APP_NAME_UPDATE)
+      .single()
+
+    expect(error).toBeNull()
+    expect(data).toBeTruthy()
+    expect(data?.default_channel).toBeNull()
+
+    // Clean up
+    await getSupabaseClient().from('devices').delete().eq('device_id', uuid).eq('app_id', APP_NAME_UPDATE)
+  })
 })

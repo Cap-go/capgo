@@ -12,6 +12,7 @@ export interface DeviceComparable {
   version_name: string | null
   is_prod: boolean
   is_emulator: boolean
+  default_channel: string | null
 }
 
 export type DeviceExistingRowLike = {
@@ -24,6 +25,7 @@ export type DeviceExistingRowLike = {
   version_name?: string | null
   is_prod?: boolean | number | null
   is_emulator?: boolean | number | null
+  default_channel?: string | null
 } | null | undefined
 
 export function toComparableDevice(device: DeviceWithoutCreatedAt): DeviceComparable {
@@ -37,6 +39,7 @@ export function toComparableDevice(device: DeviceWithoutCreatedAt): DeviceCompar
     version_name: normalizeOptionalString(device.version_name),
     is_prod: device.is_prod ?? false,
     is_emulator: device.is_emulator ?? false,
+    default_channel: normalizeOptionalString(device.default_channel),
   }
 }
 
@@ -51,6 +54,7 @@ export function toComparableExisting(existing: DeviceExistingRowLike): DeviceCom
     version_name: normalizeOptionalString(existing?.version_name as string | null | undefined),
     is_prod: existing?.is_prod === undefined || existing?.is_prod === null ? false : Boolean(existing.is_prod),
     is_emulator: existing?.is_emulator === undefined || existing?.is_emulator === null ? false : Boolean(existing.is_emulator),
+    default_channel: normalizeOptionalString(existing?.default_channel as string | null | undefined),
   }
 }
 

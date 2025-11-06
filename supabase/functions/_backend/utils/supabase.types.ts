@@ -739,6 +739,7 @@ export type Database = {
         Row: {
           app_id: string
           custom_id: string
+          default_channel: string | null
           device_id: string
           is_emulator: boolean | null
           is_prod: boolean | null
@@ -753,6 +754,7 @@ export type Database = {
         Insert: {
           app_id: string
           custom_id?: string
+          default_channel?: string | null
           device_id: string
           is_emulator?: boolean | null
           is_prod?: boolean | null
@@ -767,6 +769,7 @@ export type Database = {
         Update: {
           app_id?: string
           custom_id?: string
+          default_channel?: string | null
           device_id?: string
           is_emulator?: boolean | null
           is_prod?: boolean | null

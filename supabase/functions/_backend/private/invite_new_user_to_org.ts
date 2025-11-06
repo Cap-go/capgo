@@ -10,14 +10,19 @@ import { cloudlog } from '../utils/loggin.ts'
 import { hasOrgRight, supabaseAdmin } from '../utils/supabase.ts'
 import { getEnv } from '../utils/utils.ts'
 
+// Validate name to prevent HTML/script injection
+// Allow Unicode letters from all languages, spaces, hyphens, and apostrophes
+// Rejects numbers, URLs, and most special characters while supporting international names
+const nameRegex = /^[\p{L}\s'-]+$/u
+
 // Define the schema for the invite user request
 const inviteUserSchema = z.object({
   email: z.email(),
   org_id: z.string().check(z.minLength(1)),
   invite_type: z.enum(['read', 'upload', 'write', 'admin', 'super_admin']),
   captcha_token: z.string().check(z.minLength(1)),
-  first_name: z.string().check(z.minLength(1)),
-  last_name: z.string().check(z.minLength(1)),
+  first_name: z.string().check(z.minLength(1), z.regex(nameRegex, 'First name contains invalid characters')),
+  last_name: z.string().check(z.minLength(1), z.regex(nameRegex, 'Last name contains invalid characters')),
 })
 
 const captchaSchema = z.object({

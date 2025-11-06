@@ -73,7 +73,23 @@ const seedPromises = new Map<string, Promise<void>>()
 // Connection pool to reduce database connection overhead
 let supabaseClient: SupabaseClient<Database> | null = null
 
-export function makeBaseData(appId: string) {
+export interface BaseTestData {
+  channel: string
+  platform: string
+  device_id: string
+  app_id: string
+  custom_id: string
+  version_build: string
+  version_code: string
+  version_os: string
+  version_name: string
+  plugin_version: string
+  is_emulator: boolean
+  is_prod: boolean
+  defaultChannel?: string
+}
+
+export function makeBaseData(appId: string): BaseTestData {
   return {
     channel: 'production',
     platform: 'android',
@@ -408,7 +424,7 @@ export async function executeSQL(query: string, params?: any[]): Promise<any> {
 
 export async function getCronPlanQueueCount(): Promise<number> {
   const result = await executeSQL('SELECT COUNT(*) as count FROM pgmq.q_cron_stat_org')
-  return parseInt(result[0]?.count || '0')
+  return Number.parseInt(result[0]?.count || '0')
 }
 
 export async function getLatestCronPlanMessage(): Promise<any> {
@@ -429,13 +445,12 @@ export async function cleanupPostgresClient(): Promise<void> {
  * before tests query it.
  */
 export async function triggerD1Sync(): Promise<void> {
-  const useCloudflare = process.env.USE_CLOUDFLARE_WORKERS === 'true'
-  console.log(`[D1 Sync] triggerD1Sync() called - process.env.USE_CLOUDFLARE_WORKERS=${process.env.USE_CLOUDFLARE_WORKERS}, useCloudflare=${useCloudflare}`)
+  const useCloudflare = env.USE_CLOUDFLARE_WORKERS === 'true'
 
   if (!useCloudflare) {
-    console.log('[D1 Sync] Skipping - not Cloudflare Workers')
     return // Only needed for Cloudflare Workers tests
   }
+  console.log(`[D1 Sync] triggerD1Sync() called - process.env.USE_CLOUDFLARE_WORKERS=${process.env.USE_CLOUDFLARE_WORKERS}, useCloudflare=${useCloudflare}`)
 
   // Only trigger sync for plugin endpoint tests that use V2/D1
   // API endpoints use Postgres directly and don't need D1 sync
@@ -476,7 +491,7 @@ export async function triggerD1Sync(): Promise<void> {
     let lastCount = -1
     while (Date.now() - startTime < MAX_WAIT_MS) {
       const queueSize = await executeSQL('SELECT COUNT(*) as count FROM pgmq.q_replicate_data')
-      const count = parseInt(queueSize[0]?.count || '0')
+      const count = Number.parseInt(queueSize[0]?.count || '0')
 
       if (count !== lastCount) {
         console.log(`[D1 Sync] Queue has ${count} pending messages`)
@@ -494,7 +509,8 @@ export async function triggerD1Sync(): Promise<void> {
     }
 
     console.warn(`[D1 Sync] TIMEOUT: queue still has ${lastCount} pending messages after 5s`)
-  } catch (error) {
+  }
+  catch (error) {
     console.warn('Failed to trigger D1 sync:', error)
   }
 }

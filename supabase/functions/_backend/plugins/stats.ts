@@ -61,6 +61,7 @@ async function post(c: Context, drizzleCient: ReturnType<typeof getDrizzleClient
     custom_id,
     is_emulator = false,
     is_prod = true,
+    defaultChannel,
   } = body
 
   const device: DeviceWithoutCreatedAt = {
@@ -75,6 +76,7 @@ async function post(c: Context, drizzleCient: ReturnType<typeof getDrizzleClient
     is_prod: is_prod ?? true,
     custom_id,
     updated_at: new Date().toISOString(),
+    default_channel: defaultChannel ?? null,
   }
   const planActions: Array<'mau' | 'bandwidth'> = ['mau', 'bandwidth']
   const appOwner = isV2

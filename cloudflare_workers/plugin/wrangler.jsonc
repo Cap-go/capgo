@@ -105,11 +105,11 @@
         },
         {
           "binding": "HYPERDRIVE_DB_SG",
-          "id": "06ee738d905d43d1a055682face2dddb"
+          "id": "acaf2391be8449f18e49776847d3106c"
         },
         {
           "binding": "HYPERDRIVE_DB_US",
-          "id": "51df4318bd5d4a35a5c4c145b520b22f"
+          "id": "a2acda0d0be14c1285b33fbf32c99466"
         }
       ]
     },
@@ -175,11 +175,11 @@
 
         {
           "binding": "HYPERDRIVE_DB_SG",
-          "id": "06ee738d905d43d1a055682face2dddb"
+          "id": "acaf2391be8449f18e49776847d3106c"
         },
         {
           "binding": "HYPERDRIVE_DB_US",
-          "id": "51df4318bd5d4a35a5c4c145b520b22f"
+          "id": "a2acda0d0be14c1285b33fbf32c99466"
         }
       ]
     },
@@ -249,11 +249,11 @@
         },
         {
           "binding": "HYPERDRIVE_DB_SG",
-          "id": "06ee738d905d43d1a055682face2dddb"
+          "id": "acaf2391be8449f18e49776847d3106c"
         },
         {
           "binding": "HYPERDRIVE_DB_US",
-          "id": "51df4318bd5d4a35a5c4c145b520b22f"
+          "id": "a2acda0d0be14c1285b33fbf32c99466"
         }
       ],
       // Do not place smart as we want to use read replicas in specific regions
@@ -327,11 +327,11 @@
 
         {
           "binding": "HYPERDRIVE_DB_SG",
-          "id": "06ee738d905d43d1a055682face2dddb"
+          "id": "acaf2391be8449f18e49776847d3106c"
         },
         {
           "binding": "HYPERDRIVE_DB_US",
-          "id": "51df4318bd5d4a35a5c4c145b520b22f"
+          "id": "a2acda0d0be14c1285b33fbf32c99466"
         }
       ]
     },
@@ -400,11 +400,11 @@
         },
         {
           "binding": "HYPERDRIVE_DB_SG",
-          "id": "06ee738d905d43d1a055682face2dddb"
+          "id": "acaf2391be8449f18e49776847d3106c"
         },
         {
           "binding": "HYPERDRIVE_DB_US",
-          "id": "51df4318bd5d4a35a5c4c145b520b22f"
+          "id": "a2acda0d0be14c1285b33fbf32c99466"
         }
       ]
     },
