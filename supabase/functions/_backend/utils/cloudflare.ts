@@ -499,7 +499,15 @@ LIMIT ${rangeEnd} OFFSET ${rangeStart}`
     cloudlog({ requestId: c.get('requestId'), message: 'readDevicesCF exec await' })
     const res = await readD1
     cloudlog({ requestId: c.get('requestId'), message: 'readDevicesCF res', res })
-    return res.results as Database['public']['Tables']['devices']['Row'][]
+
+    // Convert SQLite integers to booleans for is_prod and is_emulator
+    const results = (res.results as any[]).map((row) => ({
+      ...row,
+      is_prod: Boolean(row.is_prod),
+      is_emulator: Boolean(row.is_emulator),
+    })) as Database['public']['Tables']['devices']['Row'][]
+
+    return results
   }
   catch (e) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Error reading device list', error: serializeError(e), query })
