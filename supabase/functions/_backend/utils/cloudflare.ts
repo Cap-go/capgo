@@ -414,7 +414,7 @@ export async function countDevicesCF(c: Context, app_id: string, customIdMode: b
 
   cloudlog({ requestId: c.get('requestId'), message: 'countDevicesCF query', query })
   try {
-    const readD1 = getD1Session(c)
+    const readD1 = getD1DevicesSession(c)
       .prepare(query)
       .bind(app_id)
       .first('total')
@@ -497,7 +497,7 @@ LIMIT ${rangeEnd} OFFSET ${rangeStart}`
   cloudlog({ requestId: c.get('requestId'), message: 'readDevicesCF query', query })
   try {
     cloudlog({ requestId: c.get('requestId'), message: 'readDevicesCF exec' })
-    const readD1 = getD1Session(c)
+    const readD1 = getD1DevicesSession(c)
       .prepare(query)
       .all()
     cloudlog({ requestId: c.get('requestId'), message: 'readDevicesCF exec await' })
