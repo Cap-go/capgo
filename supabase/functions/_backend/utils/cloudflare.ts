@@ -501,7 +501,7 @@ LIMIT ${rangeEnd} OFFSET ${rangeStart}`
     cloudlog({ requestId: c.get('requestId'), message: 'readDevicesCF res', res })
 
     // Convert SQLite integers to booleans for is_prod and is_emulator
-    const results = (res.results as any[]).map((row) => ({
+    const results = (res.results as any[]).map(row => ({
       ...row,
       is_prod: Boolean(row.is_prod),
       is_emulator: Boolean(row.is_emulator),
