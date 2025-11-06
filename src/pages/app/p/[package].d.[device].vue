@@ -193,6 +193,8 @@ async function getDevice() {
       })
       .then(res => res.json<Database['public']['Tables']['devices']['Row'][]>())
       .catch((err) => {
+        // Ensure we read the response to avoid memory leaks
+        err.response?.arrayBuffer()
         console.log('Cannot get device', err)
         return [] as Database['public']['Tables']['devices']['Row'][]
       })

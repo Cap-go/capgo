@@ -46,6 +46,8 @@ function logsnagInsights(c: Context, data: { title: string, value: string | bool
     }).then(res => res.json())
       .catch((e) => {
         cloudlogErr({ requestId: c.get('requestId'), message: 'logsnagInsights error', error: e, payload })
+        // ensure we read the response to avoid memory leaks
+        e.response?.arrayBuffer()
         return false
       }),
     )

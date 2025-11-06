@@ -68,7 +68,11 @@ export async function sendEvent(payload: TrackOptions): Promise<null> {
       timeout: 10000, // 10 seconds timeout
       retry: 3,
     })
-      .catch(() => null)
+      .catch((e) => {
+        // ensure we read the response to avoid memory leaks
+        e.response?.arrayBuffer()
+        return null
+      })
       .then(() => null)
   }).catch(() => null)
 }

@@ -103,6 +103,8 @@ async function getData() {
       })
       .then(res => res.json<LogData[]>())
       .catch((err) => {
+        // Ensure we read the response to avoid memory leaks
+        err.response?.arrayBuffer()
         console.log('Cannot get devices', err)
         return [] as LogData[]
       })

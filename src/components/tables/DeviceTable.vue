@@ -121,6 +121,8 @@ async function countDevices() {
     })
     .then(res => res.json<{ count: number }>())
     .catch((err) => {
+      // Ensure we read the response to avoid memory leaks
+      err.response?.arrayBuffer()
       console.log('Cannot get devices', err)
       return { count: 0 }
     })
@@ -159,6 +161,8 @@ async function getData() {
       })
       .then(res => res.json<Device[]>())
       .catch((err) => {
+        // Ensure we read the response to avoid memory leaks
+        err.response?.arrayBuffer()
         console.log('Cannot get devices', err)
         return [] as Device[]
       })

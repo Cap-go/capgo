@@ -50,7 +50,10 @@ export async function trackBentoEvent(c: Context, email: string, data: any, even
         site_uuid: siteUuid,
       },
       json: payload,
-    }).json<{ results: number, failed: number }>()
+    }).json<{ results: number, failed: number }>().catch((e) => {
+      e.response?.arrayBuffer()
+      throw new Error(`trackBentoEvent error: ${e.message}`)
+    })
     if (res.failed > 0) {
       cloudlogErr({ requestId: c.get('requestId'), message: 'trackBentoEvent', error: res })
       return false
@@ -95,7 +98,11 @@ export async function addTagBento(c: Context, email: string, segments: { segment
         json: {
           command,
         },
-      }).json(),
+      }).json().catch((e) => {
+        // Ensure we read the response to avoid memory leaks
+        e.response?.arrayBuffer()
+        throw new Error(`trackBentoEvent error: ${e.message}`)
+      }),
     ))
 
     cloudlog({ requestId: c.get('requestId'), message: 'addTagBento', email, commands, results })

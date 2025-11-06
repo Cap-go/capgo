@@ -219,6 +219,8 @@ async function runQueryToCFA<T>(c: Context, query: string) {
     else {
       cloudlogErr({ requestId: c.get('requestId'), message: 'runQueryToCFA error', error: serializeError(e) })
     }
+    // Ensuring we read the response to avoid memory leaks
+    e.response?.arrayBuffer()
     throw new Error('runQueryToCFA encountered an error')
   })
   const res = await response.json<AnalyticsApiResponse & { data: T[] }>()

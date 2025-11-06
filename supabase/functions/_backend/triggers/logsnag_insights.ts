@@ -54,7 +54,10 @@ async function getGithubStars(): Promise<number> {
     headers: {
       'User-Agent': 'capgo-app', // GitHub API rate limit
     },
-  }).json<{ stargazers_count: number }>()
+  }).json<{ stargazers_count: number }>().catch((e) => {
+    e.response?.arrayBuffer()
+    throw new Error(`getGithubStars error: ${e.message}`)
+  })
   return json.stargazers_count
 }
 

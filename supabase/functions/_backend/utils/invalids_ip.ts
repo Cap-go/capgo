@@ -10,6 +10,11 @@ async function ipapi(ip: string, lang = 'en') {
     throw new Error(`unknown language, supported ones are: ${langs.join(', ')}`)
 
   const res = await ky(`http://ip-api.com/json/${ip}?lang=${lang}&fields=66842623`)
+    .catch((e) => {
+      // Ensure we read the response to avoid memory leaks
+      e.response?.arrayBuffer()
+      throw new Error(`ipapi error: ${e.message}`)
+    })
 
   return await res.json<{ isp: string }>()
 }

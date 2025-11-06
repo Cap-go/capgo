@@ -43,7 +43,9 @@ export async function getRemoteConfig() {
     .get(`${defaultApiHost}/private/config`)
     .then(res => res.json<CapgoConfig>())
     .then(d => ({ ...localConfig, ...d } as CapgoConfig))
-    .catch(() => {
+    .catch((e) => {
+      // ensure we read the response to avoid memory leaks
+      e.response?.arrayBuffer()
       console.log('Local config', localConfig)
       return localConfig as CapgoConfig
     })
@@ -127,7 +129,11 @@ export async function downloadUrl(provider: string, userId: string, appId: strin
     headers: {
       Authorization: `Bearer ${currentJwt}`,
     },
-  }).json<{ url: string }>()
+  }).json<{ url: string }>().catch((e) => {
+    // ensure we read the response to avoid memory leaks
+    e.response?.arrayBuffer()
+    throw new Error(`downloadUrl error: ${e.message}`)
+  })
   return res.url
 }
 
@@ -366,7 +372,11 @@ export async function getPlans(): Promise<Database['public']['Tables']['plans'][
   const data = await ky
     .get(`${defaultApiHost}/private/plans`)
     .then(res => res.json<Database['public']['Tables']['plans']['Row'][]>())
-    .catch(() => [])
+    .catch((e) => {
+      // ensure we read the response to avoid memory leaks
+      e.response?.arrayBuffer()
+      return []
+    })
   return data
 }
 
