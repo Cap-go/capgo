@@ -45,7 +45,7 @@ export function resToVersion(plugin_version: string, signedURL: string, version:
   return res
 }
 
-function returnV2orV1<T>(
+async function returnV2orV1<T>(
   c: Context,
   isV2: boolean,
   runV1: () => Promise<T>,
@@ -57,11 +57,12 @@ function returnV2orV1<T>(
   }
   // In the v1 case, use PG as the source of truth, but kick off v2 in the background
   if (getRuntimeKey() === 'workerd' && existInEnv(c, 'DB_REPLICATE')) {
-    backgroundTask(c, runV2().then((res) => {
+    const replicatePromise = runV2().then((res) => {
       cloudlog({ requestId: c.get('requestId'), message: 'Completed background V2 function', res })
     }).catch((err) => {
       cloudlog({ requestId: c.get('requestId'), message: 'Error in background V2 function', err })
-    }))
+    })
+    await backgroundTask(c, replicatePromise)
   }
   return runV1()
 }

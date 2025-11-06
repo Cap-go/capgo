@@ -23,7 +23,7 @@ app.get('/', async (c) => {
   const db = getDrizzleClient(pgClient)
   const res = await selectOne(db)
 
-  closeClient(c, pgClient)
+  await closeClient(c, pgClient)
   if (!res)
     throw simpleError('cannot_get_apps', 'Cannot get apps')
   return c.json(BRES)

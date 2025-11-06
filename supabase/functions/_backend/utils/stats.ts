@@ -19,7 +19,7 @@ export async function onPremStats(c: Context, app_id: string, action: string, de
     cloudlog({ requestId: c.get('requestId'), message: 'App ID is missing in onPremStats', country: c.req.raw?.cf?.country })
     return simpleError200(c, 'app_not_found', 'App not found')
   }
-  backgroundTask(c, async () => {
+  await backgroundTask(c, async () => {
     const res = await createIfNotExistStoreInfo(c, {
       app_id,
       updates: 1,
