@@ -3,6 +3,7 @@ import type { Database } from '../../utils/supabase.types.ts'
 // import ky from 'ky'
 import { simpleError } from '../../utils/hono.ts'
 import { hasAppRightApikey, supabaseApikey } from '../../utils/supabase.ts'
+import { isValidSemver } from '../../utils/utils.ts'
 
 interface CreateBundleBody {
   app_id: string
@@ -191,6 +192,9 @@ export async function createBundle(c: Context, body: CreateBundleBody, apikey: D
   }
   if (!body.checksum) {
     throw simpleError('missing_checksum', 'Missing required fields: checksum', { checksum: body.checksum })
+  }
+  if (!isValidSemver(body.version)) {
+    throw simpleError('invalid_version_format', 'Version must be valid semver format (e.g., 1.0.0, 1.0.0-alpha.1)', { version: body.version })
   }
   if (!(await hasAppRightApikey(c, body.app_id, apikey.user_id, 'write', apikey.key))) {
     throw simpleError('cannot_create_bundle', 'You can\'t access this app', { app_id: body.app_id })
