@@ -89,8 +89,12 @@ export function trackLogsCFExternal(c: Context, app_id: string, device_id: strin
   return Promise.resolve()
 }
 
-function getD1Session(c: Context) {
+function getD1DevicesSession(c: Context) {
   return c.env.DB_DEVICES.withSession('first-unconstrained')
+}
+
+function getD1StoreAppSession(c: Context) {
+  return c.env.DB_STOREAPPS.withSession('first-unconstrained')
 }
 
 export async function trackDevicesCF(c: Context, device: DeviceWithoutCreatedAt) {
@@ -123,7 +127,7 @@ export async function trackDevicesCF(c: Context, device: DeviceWithoutCreatedAt)
     const comparableDevice = toComparableDevice(device)
 
     // c.env.DB_DEVICES.
-    const existingRow = await getD1Session(c).prepare(`
+    const existingRow = await getD1DevicesSession(c).prepare(`
       SELECT * FROM devices 
       WHERE device_id = ? AND app_id = ?
     `).bind(device.device_id, device.app_id).first()
@@ -580,7 +584,7 @@ export async function getAppsFromCF(c: Context): Promise<{ app_id: string }[]> {
   cloudlog({ requestId: c.get('requestId'), message: 'getAppsFromCF query', query })
   // use c.env.DB_STOREAPPS and table store_apps
   try {
-    const readD1 = c.env.DB_STOREAPPS
+    const readD1 = getD1StoreAppSession(c)
       .prepare(query)
       .all()
     const res = await readD1
@@ -602,7 +606,7 @@ export async function countUpdatesFromStoreAppsCF(c: Context): Promise<number> {
 
   cloudlog({ requestId: c.get('requestId'), message: 'countUpdatesFromStoreAppsCF query', query })
   try {
-    const readD1 = c.env.DB_STOREAPPS
+    const readD1 = getD1StoreAppSession(c)
       .prepare(query)
       .first('count')
     const res = await readD1
@@ -699,7 +703,7 @@ export async function getAppsToProcessCF(c: Context, flag: 'to_get_framework' | 
 
   cloudlog({ requestId: c.get('requestId'), message: 'getAppsToProcessCF query', query })
   try {
-    const readD1 = c.env.DB_STOREAPPS
+    const readD1 = getD1StoreAppSession(c)
       .prepare(query)
       .all()
     const res = await readD1
@@ -744,7 +748,7 @@ export async function getTopAppsCF(c: Context, mode: string, limit: number): Pro
 
   cloudlog({ requestId: c.get('requestId'), message: 'getTopAppsCF query', query })
   try {
-    const readD1 = c.env.DB_STOREAPPS
+    const readD1 = getD1StoreAppSession(c)
       .prepare(query)
       .all()
     const res = await readD1
@@ -781,7 +785,7 @@ export async function getTotalAppsByModeCF(c: Context, mode: string) {
 
   cloudlog({ requestId: c.get('requestId'), message: 'getTotalAppsByModeCF query', query })
   try {
-    const readD1 = c.env.DB_STOREAPPS
+    const readD1 = getD1StoreAppSession(c)
       .prepare(query)
       .first('total')
     const res = await readD1
@@ -800,7 +804,7 @@ export async function getStoreAppByIdCF(c: Context, appId: string): Promise<Stor
 
   cloudlog({ requestId: c.get('requestId'), message: 'getStoreAppByIdCF query', query })
   try {
-    const readD1 = c.env.DB_STOREAPPS
+    const readD1 = getD1StoreAppSession(c)
       .prepare(query)
       .first()
     const res = await readD1
@@ -820,7 +824,7 @@ export async function createIfNotExistStoreInfo(c: Context, app: Partial<StoreAp
 
   try {
     // Check if app exists
-    const existingApp = await c.env.DB_STOREAPPS.withSession('first-unconstrained')
+    const existingApp = await getD1StoreAppSession(c)
       .prepare('SELECT app_id FROM store_apps WHERE app_id = ?')
       .bind(app.app_id)
       .first()
