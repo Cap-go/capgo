@@ -47,7 +47,7 @@ export const jsonRequestSchema = z.object({
   is_prod: z.boolean(),
 })
 
-async function post(c: Context, drizzleCient: ReturnType<typeof getDrizzleClient> | ReturnType<typeof getDrizzleClientD1Session>, isV2: boolean, body: AppStats) {
+async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient> | ReturnType<typeof getDrizzleClientD1Session>, isV2: boolean, body: AppStats) {
   const {
     version_name,
     version_build,
@@ -80,8 +80,8 @@ async function post(c: Context, drizzleCient: ReturnType<typeof getDrizzleClient
   }
   const planActions: Array<'mau' | 'bandwidth'> = ['mau', 'bandwidth']
   const appOwner = isV2
-    ? await getAppOwnerPostgresV2(c, app_id, drizzleCient as ReturnType<typeof getDrizzleClientD1Session>, planActions)
-    : await getAppOwnerPostgres(c, app_id, drizzleCient as ReturnType<typeof getDrizzleClient>, planActions)
+    ? await getAppOwnerPostgresV2(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClientD1Session>, planActions)
+    : await getAppOwnerPostgres(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>, planActions)
   if (!appOwner) {
     return onPremStats(c, app_id, action, device)
   }
@@ -96,9 +96,9 @@ async function post(c: Context, drizzleCient: ReturnType<typeof getDrizzleClient
   if (versionOnly === 'builtin' || versionOnly === 'unknown') {
     allowedDeleted = true
   }
-  let appVersion = isV2 ? await getAppVersionPostgresV2(c, app_id, versionOnly, allowedDeleted, drizzleCient as ReturnType<typeof getDrizzleClientD1Session>) : await getAppVersionPostgres(c, app_id, versionOnly, allowedDeleted, drizzleCient as ReturnType<typeof getDrizzleClient>)
+  let appVersion = isV2 ? await getAppVersionPostgresV2(c, app_id, versionOnly, allowedDeleted, drizzleClient as ReturnType<typeof getDrizzleClientD1Session>) : await getAppVersionPostgres(c, app_id, versionOnly, allowedDeleted, drizzleClient as ReturnType<typeof getDrizzleClient>)
   if (!appVersion) {
-    const appVersion2 = isV2 ? await getAppVersionPostgresV2(c, app_id, 'unknown', allowedDeleted, drizzleCient as ReturnType<typeof getDrizzleClientD1Session>) : await getAppVersionPostgres(c, app_id, 'unknown', allowedDeleted, drizzleCient as ReturnType<typeof getDrizzleClient>)
+    const appVersion2 = isV2 ? await getAppVersionPostgresV2(c, app_id, 'unknown', allowedDeleted, drizzleClient as ReturnType<typeof getDrizzleClientD1Session>) : await getAppVersionPostgres(c, app_id, 'unknown', allowedDeleted, drizzleClient as ReturnType<typeof getDrizzleClient>)
     if (appVersion2) {
       appVersion = appVersion2
       cloudlog({ requestId: c.get('requestId'), message: `Version name ${version_name} not found, using unknown instead`, app_id, version_name })
@@ -114,7 +114,7 @@ async function post(c: Context, drizzleCient: ReturnType<typeof getDrizzleClient
   if (action === 'set' && !device.is_emulator && device.is_prod) {
     await createStatsVersion(c, appVersion.id, app_id, 'install')
     if (old_version_name) {
-      const oldVersion = isV2 ? await getAppVersionPostgresV2(c, app_id, old_version_name, undefined, drizzleCient as ReturnType<typeof getDrizzleClientD1Session>) : await getAppVersionPostgres(c, app_id, old_version_name, undefined, drizzleCient as ReturnType<typeof getDrizzleClient>)
+      const oldVersion = isV2 ? await getAppVersionPostgresV2(c, app_id, old_version_name, undefined, drizzleClient as ReturnType<typeof getDrizzleClientD1Session>) : await getAppVersionPostgres(c, app_id, old_version_name, undefined, drizzleClient as ReturnType<typeof getDrizzleClient>)
       if (oldVersion && oldVersion.id !== appVersion.id) {
         await createStatsVersion(c, oldVersion.id, app_id, 'uninstall')
         statsActions.push({ action: 'uninstall', versionName: old_version_name ?? 'unknown' })

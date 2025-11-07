@@ -155,7 +155,8 @@ CREATE TABLE IF NOT EXISTS apps (
     retention INTEGER,
     owner_org TEXT,
     default_upload_channel TEXT,
-    transfer_history TEXT
+    transfer_history TEXT,
+    channel_device_count INTEGER DEFAULT 0
 );
 
 CREATE INDEX IF NOT EXISTS idx_apps_id ON apps (id);

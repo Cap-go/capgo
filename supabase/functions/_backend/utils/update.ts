@@ -71,7 +71,7 @@ export async function updateWithPG(
   c: Context,
   body: AppInfos,
   getDrizzleCientD1: () => ReturnType<typeof getDrizzleClientD1>,
-  drizzleCient: ReturnType<typeof getDrizzleClient>,
+  drizzleClient: ReturnType<typeof getDrizzleClient>,
   isV2: boolean,
 ) {
   cloudlog({ requestId: c.get('requestId'), message: 'body', body, date: new Date().toISOString() })
@@ -92,7 +92,7 @@ export async function updateWithPG(
   const appOwner = await returnV2orV1(
     c,
     isV2,
-    () => getAppOwnerPostgres(c, app_id, drizzleCient, PLAN_LIMIT),
+    () => getAppOwnerPostgres(c, app_id, drizzleClient, PLAN_LIMIT),
     () => getAppOwnerPostgresV2(c, app_id, getDrizzleCientD1(), PLAN_LIMIT),
   )
   const device: DeviceWithoutCreatedAt = {
@@ -112,6 +112,15 @@ export async function updateWithPG(
   if (!appOwner) {
     return onPremStats(c, app_id, 'get', device)
   }
+  const channelDeviceCount = appOwner.channel_device_count ?? 0
+  const bypassChannelOverrides = channelDeviceCount <= 0
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: 'App channel device count evaluated',
+    app_id,
+    channelDeviceCount,
+    bypassChannelOverrides,
+  })
   if (body.version_build === 'unknown') {
     return simpleError200(c, 'unknown_version_build', 'Version build is unknown, cannot proceed with update', { body })
   }
@@ -157,8 +166,8 @@ export async function updateWithPG(
   const requestedInto = await returnV2orV1(
     c,
     isV2,
-    () => requestInfosPostgres(c, platform, app_id, device_id, defaultChannel, drizzleCient),
-    () => requestInfosPostgresV2(c, platform, app_id, device_id, defaultChannel, getDrizzleCientD1()),
+    () => requestInfosPostgres(c, platform, app_id, device_id, defaultChannel, drizzleClient, channelDeviceCount),
+    () => requestInfosPostgresV2(c, platform, app_id, device_id, defaultChannel, getDrizzleCientD1(), channelDeviceCount),
   )
   const { channelOverride } = requestedInto
   let { channelData } = requestedInto

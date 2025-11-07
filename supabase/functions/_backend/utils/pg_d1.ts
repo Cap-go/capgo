@@ -90,14 +90,7 @@ export function getDrizzleClientD1Session(c: Context) {
   return drizzleD1(session)
 }
 
-export function requestInfosPostgresV2(
-  c: Context,
-  platform: string,
-  app_id: string,
-  device_id: string,
-  defaultChannel: string,
-  drizzleCient: ReturnType<typeof getDrizzleClientD1>,
-) {
+function getSchemaUpdatesAlias() {
   const { versionAlias, channelDevicesAlias, channelAlias } = getAliasV2()
 
   const versionSelect = {
@@ -128,7 +121,17 @@ export function requestInfosPostgresV2(
         'file_hash', ${schemaV2.manifest.file_hash},
         's3_path', ${schemaV2.manifest.s3_path}
       ))`
-  const channelDeviceQuery = drizzleCient
+  return { versionSelect, channelDevicesAlias, channelAlias, channelSelect, manifestSelect, versionAlias }
+}
+
+export function requestInfosChannelDevicePostgres(
+  c: Context,
+  app_id: string,
+  device_id: string,
+  drizzleClient: ReturnType<typeof getDrizzleClientD1>,
+) {
+  const { versionSelect, channelDevicesAlias, channelAlias, channelSelect, manifestSelect, versionAlias } = getSchemaUpdatesAlias()
+  const query = drizzleClient
     .select({
       channel_devices: {
         device_id: channelDevicesAlias.device_id,
@@ -137,8 +140,7 @@ export function requestInfosPostgresV2(
       version: versionSelect,
       channels: channelSelect,
       manifestEntries: manifestSelect,
-    },
-    )
+    })
     .from(channelDevicesAlias)
     .innerJoin(channelAlias, eq(channelDevicesAlias.channel_id, channelAlias.id))
     .innerJoin(versionAlias, eq(channelAlias.version, versionAlias.id))
@@ -147,14 +149,23 @@ export function requestInfosPostgresV2(
     .groupBy(channelDevicesAlias.device_id, channelDevicesAlias.app_id, channelAlias.id, versionAlias.id)
     .limit(1)
 
-  cloudlog({ requestId: c.get('requestId'), message: 'channelDevice Query:', channelDeviceQuery: channelDeviceQuery.toSQL() })
-  const channelDevice = channelDeviceQuery.then((data) => {
+  cloudlog({ requestId: c.get('requestId'), message: 'channelDevice Query:', channelDeviceQuery: query.toSQL() })
+  return query.then((data) => {
     cloudlog({ requestId: c.get('requestId'), message: 'channelDevice data:', data })
     return parseManifestEntries(c, data, 'channelDevice')
   })
+}
 
+export function requestInfosChannelPostgres(
+  c: Context,
+  platform: string,
+  app_id: string,
+  defaultChannel: string,
+  drizzleClient: ReturnType<typeof getDrizzleClientD1>,
+) {
+  const { versionSelect, channelAlias, channelSelect, manifestSelect, versionAlias } = getSchemaUpdatesAlias()
   const platformQuery = platform === 'android' ? channelAlias.android : channelAlias.ios
-  const channelQuery = drizzleCient
+  const channelQuery = drizzleClient
     .select({
       version: versionSelect,
       channels: channelSelect,
@@ -182,6 +193,24 @@ export function requestInfosPostgresV2(
     cloudlog({ requestId: c.get('requestId'), message: 'channel data:', data })
     return parseManifestEntries(c, data, 'channel')
   })
+  return channel
+}
+
+export function requestInfosPostgresV2(
+  c: Context,
+  platform: string,
+  app_id: string,
+  device_id: string,
+  defaultChannel: string,
+  drizzleClient: ReturnType<typeof getDrizzleClientD1>,
+  channelDeviceCount?: number | null,
+) {
+  const shouldQueryChannelOverride = channelDeviceCount === undefined || channelDeviceCount === null ? true : channelDeviceCount > 0
+
+  const channelDevice = shouldQueryChannelOverride
+    ? requestInfosChannelDevicePostgres(c, app_id, device_id, drizzleClient)
+    : Promise.resolve(undefined)
+  const channel = requestInfosChannelPostgres(c, platform, app_id, defaultChannel, drizzleClient)
 
   return Promise.all([channelDevice, channel])
     .then(([channelOverride, channelData]) => {
@@ -197,19 +226,20 @@ export function requestInfosPostgresV2(
 export async function getAppOwnerPostgresV2(
   c: Context,
   appId: string,
-  drizzleCient: ReturnType<typeof getDrizzleClientD1>,
+  drizzleClient: ReturnType<typeof getDrizzleClientD1>,
   actions: ('mau' | 'storage' | 'bandwidth')[] = [],
-): Promise<{ owner_org: string, orgs: { created_by: string, id: string }, plan_valid: boolean } | null> {
+): Promise<{ owner_org: string, orgs: { created_by: string, id: string }, plan_valid: boolean, channel_device_count: number } | null> {
   try {
     cloudlog({ requestId: c.get('requestId'), message: 'appOwner', appId })
     if (actions.length === 0)
       return null
     const orgAlias = aliasV2(schemaV2.orgs, 'orgs')
     const planExpression = buildPlanValidationExpressionV2(actions, schemaV2.apps.owner_org)
-    const appOwner = await drizzleCient
+    const appOwner = await drizzleClient
       .select({
         owner_org: schemaV2.apps.owner_org,
         plan_valid: planExpression,
+        channel_device_count: schemaV2.apps.channel_device_count,
         orgs: {
           created_by: orgAlias.created_by,
           id: orgAlias.id,
@@ -229,10 +259,10 @@ export async function getAppOwnerPostgresV2(
   }
 }
 
-export async function getAppVersionPostgresV2(c: Context, appId: string, versionName: string, allowedDeleted: boolean | undefined, drizzleCient: ReturnType<typeof getDrizzleClientD1Session>): Promise<{ id: number, owner_org: string } | null> {
+export async function getAppVersionPostgresV2(c: Context, appId: string, versionName: string, allowedDeleted: boolean | undefined, drizzleClient: ReturnType<typeof getDrizzleClientD1Session>): Promise<{ id: number, owner_org: string } | null> {
   try {
     cloudlog({ requestId: c.get('requestId'), message: 'getAppVersionPostgresV2', appId, versionName })
-    const appVersion = await drizzleCient
+    const appVersion = await drizzleClient
       .select({
         id: schemaV2.app_versions.id,
         owner_org: schemaV2.app_versions.owner_org,
@@ -258,14 +288,14 @@ export async function getAppVersionsByAppIdD1(
   c: Context,
   appId: string,
   versionName: string,
-  drizzleCient: ReturnType<typeof getDrizzleClientD1>,
+  drizzleClient: ReturnType<typeof getDrizzleClientD1>,
   actions: ('mau' | 'storage' | 'bandwidth')[] = [],
 ): Promise<{ id: number, owner_org: string, name: string, plan_valid: boolean }[]> {
   try {
     if (actions.length === 0)
       return []
     const planExpression = buildPlanValidationExpressionV2(actions, schemaV2.app_versions.owner_org)
-    const versions = await drizzleCient
+    const versions = await drizzleClient
       .select({
         id: schemaV2.app_versions.id,
         owner_org: schemaV2.app_versions.owner_org,
@@ -290,10 +320,10 @@ export async function getChannelDeviceOverrideD1(
   c: Context,
   appId: string,
   deviceId: string,
-  drizzleCient: ReturnType<typeof getDrizzleClientD1>,
+  drizzleClient: ReturnType<typeof getDrizzleClientD1>,
 ): Promise<{ app_id: string, device_id: string, channel_id: { id: number, allow_device_self_set: boolean, name: string } } | null> {
   try {
-    const result = await drizzleCient
+    const result = await drizzleClient
       .select({
         app_id: schemaV2.channel_devices.app_id,
         device_id: schemaV2.channel_devices.device_id,
@@ -337,10 +367,10 @@ export async function getChannelByNameD1(
   c: Context,
   appId: string,
   channelName: string,
-  drizzleCient: ReturnType<typeof getDrizzleClientD1>,
+  drizzleClient: ReturnType<typeof getDrizzleClientD1>,
 ): Promise<{ id: number, name: string, allow_device_self_set: boolean, owner_org: string } | null> {
   try {
-    const channel = await drizzleCient
+    const channel = await drizzleClient
       .select({
         id: schemaV2.channels.id,
         name: schemaV2.channels.name,
@@ -365,10 +395,10 @@ export async function getChannelByNameD1(
 export async function getMainChannelsD1(
   c: Context,
   appId: string,
-  drizzleCient: ReturnType<typeof getDrizzleClientD1>,
+  drizzleClient: ReturnType<typeof getDrizzleClientD1>,
 ): Promise<{ name: string, ios: boolean, android: boolean }[]> {
   try {
-    const channels = await drizzleCient
+    const channels = await drizzleClient
       .select({
         name: schemaV2.channels.name,
         ios: schemaV2.channels.ios,
@@ -391,7 +421,7 @@ export async function getChannelsD1(
   c: Context,
   appId: string,
   condition: { defaultChannel?: string } | { public: boolean },
-  drizzleCient: ReturnType<typeof getDrizzleClientD1>,
+  drizzleClient: ReturnType<typeof getDrizzleClientD1>,
 ): Promise<{ id: number, name: string, ios: boolean, android: boolean, public: boolean }[]> {
   try {
     const whereConditions = [eq(schemaV2.channels.app_id, appId)]
@@ -403,7 +433,7 @@ export async function getChannelsD1(
       whereConditions.push(eq(schemaV2.channels.public, condition.public))
     }
 
-    const channels = await drizzleCient
+    const channels = await drizzleClient
       .select({
         id: schemaV2.channels.id,
         name: schemaV2.channels.name,
@@ -424,14 +454,14 @@ export async function getChannelsD1(
 export async function getAppByIdD1(
   c: Context,
   appId: string,
-  drizzleCient: ReturnType<typeof getDrizzleClientD1>,
+  drizzleClient: ReturnType<typeof getDrizzleClientD1>,
   actions: ('mau' | 'storage' | 'bandwidth')[] = [],
 ): Promise<{ owner_org: string, plan_valid: boolean } | null> {
   try {
     if (actions.length === 0)
       return null
     const planExpression = buildPlanValidationExpressionV2(actions, schemaV2.apps.owner_org)
-    const app = await drizzleCient
+    const app = await drizzleClient
       .select({
         owner_org: schemaV2.apps.owner_org,
         plan_valid: planExpression,
@@ -454,10 +484,10 @@ export async function getCompatibleChannelsD1(
   platform: 'ios' | 'android',
   isEmulator: boolean,
   isProd: boolean,
-  drizzleCient: ReturnType<typeof getDrizzleClientD1>,
+  drizzleClient: ReturnType<typeof getDrizzleClientD1>,
 ): Promise<{ id: number, name: string, allow_device_self_set: boolean, allow_emulator: boolean, allow_dev: boolean, ios: boolean, android: boolean, public: boolean }[]> {
   try {
-    const channels = await drizzleCient
+    const channels = await drizzleClient
       .select({
         id: schemaV2.channels.id,
         name: schemaV2.channels.name,

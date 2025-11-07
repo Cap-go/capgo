@@ -43,6 +43,7 @@ export const apps = pgTable('apps', {
   updated_at: timestamp('updated_at'),
   id: uuid('id').primaryKey().unique(),
   retention: bigint('retention', { mode: 'number' }).notNull().default(2592000),
+  channel_device_count: bigint('channel_device_count', { mode: 'number' }).notNull().default(0),
 })
 
 export const app_versions = pgTable('app_versions', {

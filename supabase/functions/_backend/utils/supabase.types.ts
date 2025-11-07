@@ -232,6 +232,7 @@ export type Database = {
       apps: {
         Row: {
           app_id: string
+          channel_device_count: number
           created_at: string | null
           default_upload_channel: string
           icon_url: string
@@ -246,6 +247,7 @@ export type Database = {
         }
         Insert: {
           app_id: string
+          channel_device_count?: number
           created_at?: string | null
           default_upload_channel?: string
           icon_url: string
@@ -260,6 +262,7 @@ export type Database = {
         }
         Update: {
           app_id?: string
+          channel_device_count?: number
           created_at?: string | null
           default_upload_channel?: string
           icon_url?: string

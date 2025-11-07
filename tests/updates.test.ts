@@ -51,6 +51,90 @@ describe('[POST] /updates', () => {
   })
 })
 
+describe('channel device count gating', () => {
+  const supabase = getSupabaseClient()
+  let betaChannelId: number
+
+  beforeAll(async () => {
+    const { data, error } = await supabase
+      .from('channels')
+      .select('id')
+      .eq('app_id', APP_NAME_UPDATE)
+      .eq('name', 'beta')
+      .single()
+    if (error || !data)
+      throw error ?? new Error('Missing beta channel')
+    betaChannelId = data.id
+  })
+
+  async function processChannelDeviceQueue(batchSize = 25) {
+    const { error } = await supabase.rpc('process_channel_device_counts_queue' as any, { batch_size: batchSize })
+    if (error)
+      throw error
+  }
+
+  async function cleanupDevice(deviceId: string) {
+    await supabase.from('channel_devices').delete()
+      .eq('app_id', APP_NAME_UPDATE)
+      .eq('device_id', deviceId)
+    await processChannelDeviceQueue()
+    await supabase.from('apps').update({ channel_device_count: 0 }).eq('app_id', APP_NAME_UPDATE)
+  }
+
+  it('uses device overrides when count is positive', async () => {
+    const deviceId = randomUUID().toLowerCase()
+    await supabase.from('channel_devices').insert({
+      channel_id: betaChannelId,
+      app_id: APP_NAME_UPDATE,
+      device_id: deviceId,
+      owner_org: ORG_ID,
+    })
+    await processChannelDeviceQueue()
+
+    const baseData = getBaseData(APP_NAME_UPDATE)
+    baseData.device_id = deviceId
+    baseData.version_name = '0.0.0'
+    baseData.version_build = '0.0.0'
+
+    try {
+      const response = await postUpdate(baseData)
+      expect(response.status).toBe(200)
+      const json = await response.json<UpdateRes>()
+      expect(json.version).toBe('1.361.0')
+    }
+    finally {
+      await cleanupDevice(deviceId)
+    }
+  })
+
+  it('ignores overrides when count forced to zero', async () => {
+    const deviceId = randomUUID().toLowerCase()
+    await supabase.from('channel_devices').insert({
+      channel_id: betaChannelId,
+      app_id: APP_NAME_UPDATE,
+      device_id: deviceId,
+      owner_org: ORG_ID,
+    })
+    await processChannelDeviceQueue()
+    await supabase.from('apps').update({ channel_device_count: 0 }).eq('app_id', APP_NAME_UPDATE)
+
+    const baseData = getBaseData(APP_NAME_UPDATE)
+    baseData.device_id = deviceId
+    baseData.version_name = '0.0.0'
+    baseData.version_build = '0.0.0'
+
+    try {
+      const response = await postUpdate(baseData)
+      expect(response.status).toBe(200)
+      const json = await response.json<UpdateRes>()
+      expect(json.version).toBe('1.0.0')
+    }
+    finally {
+      await cleanupDevice(deviceId)
+    }
+  })
+})
+
 describe('[POST] /updates parallel tests', () => {
   it('with new device', async () => {
     const uuid = randomUUID().toLowerCase()
@@ -365,6 +449,7 @@ describe('update scenarios', () => {
 
     expect(overrideError).toBeNull()
     await triggerD1Sync() // Sync channel_devices to D1
+    await getSupabaseClient().rpc('process_channel_device_counts_queue' as any, { batch_size: 10 })
 
     // Test that update succeeds with device override
     const baseData = getBaseData(APP_NAME_UPDATE)
@@ -383,6 +468,7 @@ describe('update scenarios', () => {
 
     // Clean up
     await getSupabaseClient().from('channel_devices').delete().eq('device_id', uuid).eq('app_id', APP_NAME_UPDATE)
+    await getSupabaseClient().rpc('process_channel_device_counts_queue' as any, { batch_size: 10 })
     await getSupabaseClient().from('channels').update({
       public: true,
       allow_device_self_set: true,
