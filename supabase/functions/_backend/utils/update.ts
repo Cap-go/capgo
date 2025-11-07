@@ -56,7 +56,7 @@ async function returnV2orV1<T>(
     return runV2()
   }
   // In the v1 case, use PG as the source of truth, but kick off v2 in the background
-  if (getRuntimeKey() === 'workerd' && existInEnv(c, 'DB_REPLICATE')) {
+  if (getRuntimeKey() === 'workerd' && existInEnv(c, 'DB_REPLICATE_EU')) {
     const replicatePromise = runV2().then((res) => {
       cloudlog({ requestId: c.get('requestId'), message: 'Completed background V2 function', res })
     }).catch((err) => {

@@ -64,28 +64,34 @@ export function parseManifestEntries(c: Context, data: any, source: string) {
 }
 
 export function getPgClientD1(c: Context, session: string = 'first-unconstrained') {
-  if (!existInEnv(c, 'DB_REPLICATE')) {
+  if (!existInEnv(c, 'DB_REPLICATE_EU')) {
     // Server/configuration error: surface as structured HTTP error
-    throw quickError(500, 'missing_binding', 'DB_REPLICATE is not set', { binding: 'DB_REPLICATE' })
+    throw quickError(500, 'missing_binding', 'DB_REPLICATE is not set', { binding: 'DB_REPLICATE_EU' })
   }
-  return session ? c.env.DB_REPLICATE.withSession(session) : c.env.DB_REPLICATE
+  const rand = Math.floor(Math.random() * 3)
+  const DB_REG = ['EU', 'US', 'AS'][rand]
+  cloudlog({ requestId: c.get('requestId'), message: `Using D1 ${DB_REG} instance` })
+  const DB = [c.env.DB_REPLICATE_EU, c.env.DB_REPLICATE_US, c.env.DB_REPLICATE_AS][rand]
+  if (session)
+    c.header('X-Database-Source', `d1-${DB_REG}-session`)
+  else
+    c.header('X-Database-Source', `d1-${DB_REG}`)
+  return session ? DB.withSession(session) : DB
 }
 
 export function getDrizzleClientD1(c: Context) {
-  if (!existInEnv(c, 'DB_REPLICATE')) {
+  if (!existInEnv(c, 'DB_REPLICATE_EU')) {
     // Server/configuration error: surface as structured HTTP error
-    throw quickError(500, 'missing_binding', 'DB_REPLICATE is not set', { binding: 'DB_REPLICATE' })
+    throw quickError(500, 'missing_binding', 'DB_REPLICATE is not set', { binding: 'DB_REPLICATE_EU' })
   }
   cloudlog({ requestId: c.get('requestId'), message: 'Using D1 for Drizzle Client' })
-  c.header('X-Database-Source', 'd1')
   return drizzleD1(getPgClientD1(c, undefined))
 }
 
 export function getDrizzleClientD1Session(c: Context) {
-  if (!existInEnv(c, 'DB_REPLICATE')) {
-    throw quickError(500, 'missing_binding', 'DB_REPLICATE is not set', { binding: 'DB_REPLICATE' })
+  if (!existInEnv(c, 'DB_REPLICATE_EU')) {
+    throw quickError(500, 'missing_binding', 'DB_REPLICATE is not set', { binding: 'DB_REPLICATE_EU' })
   }
-  c.header('X-Database-Source', 'd1-session')
   cloudlog({ requestId: c.get('requestId'), message: 'Using D1 with session for Drizzle Client' })
   const session = getPgClientD1(c)
   return drizzleD1(session)
