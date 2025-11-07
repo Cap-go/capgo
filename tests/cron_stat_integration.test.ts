@@ -249,7 +249,7 @@ describe('[Integration] cron_stat_app -> cron_stat_org flow', () => {
       .from('orgs')
       .insert({
         id: tempOrgId,
-        name: 'Test Org No Customer',
+        name: `Test Org No Customer ${tempOrgId}`,
         management_email: 'test@example.com',
         created_by: USER_ID,
       })

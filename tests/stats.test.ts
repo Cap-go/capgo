@@ -240,4 +240,144 @@ describe('[POST] /stats', () => {
     const json = await response.json<StatsRes>()
     expect(json.error).toBeTruthy()
   })
+
+  it('saves default_channel when provided', async () => {
+    const uuid = randomUUID().toLowerCase()
+    const testDefaultChannel = 'dev'
+
+    const baseData = getBaseData(APP_NAME_STATS) as StatsPayload
+    baseData.action = 'set'
+    baseData.device_id = uuid
+    baseData.defaultChannel = testDefaultChannel
+    baseData.version_build = getVersionFromAction('set')
+    const version = await createAppVersions(baseData.version_build, APP_NAME_STATS)
+    baseData.version_name = version.name
+    await triggerD1Sync()
+
+    const response = await postStats(baseData)
+    expect(response.status).toBe(200)
+
+    // Wait for data to be written
+    await triggerD1Sync()
+
+    // Verify default_channel was saved
+    const { error, data } = await getSupabaseClient()
+      .from('devices')
+      .select('default_channel')
+      .eq('device_id', uuid)
+      .eq('app_id', APP_NAME_STATS)
+      .single()
+
+    expect(error).toBeNull()
+    expect(data).toBeTruthy()
+    expect(data?.default_channel).toBe(testDefaultChannel)
+
+    // Clean up
+    await getSupabaseClient().from('devices').delete().eq('device_id', uuid).eq('app_id', APP_NAME_STATS)
+  })
+
+  it('updates default_channel when changed', async () => {
+    const uuid = randomUUID().toLowerCase()
+    const initialChannel = 'staging'
+    const updatedChannel = 'production'
+
+    const baseData = getBaseData(APP_NAME_STATS) as StatsPayload
+    baseData.action = 'set'
+    baseData.device_id = uuid
+    baseData.defaultChannel = initialChannel
+    baseData.version_build = getVersionFromAction('set')
+    const version = await createAppVersions(baseData.version_build, APP_NAME_STATS)
+    baseData.version_name = version.name
+    await triggerD1Sync()
+
+    // First request with initial channel
+    let response = await postStats(baseData)
+    expect(response.status).toBe(200)
+
+    await triggerD1Sync()
+
+    // Verify initial channel was saved
+    let result = await getSupabaseClient()
+      .from('devices')
+      .select('default_channel')
+      .eq('device_id', uuid)
+      .eq('app_id', APP_NAME_STATS)
+      .single()
+
+    expect(result.error).toBeNull()
+    expect(result.data?.default_channel).toBe(initialChannel)
+
+    // Second request with updated channel
+    baseData.defaultChannel = updatedChannel
+    response = await postStats(baseData)
+    expect(response.status).toBe(200)
+
+    await triggerD1Sync()
+
+    // Verify channel was updated
+    result = await getSupabaseClient()
+      .from('devices')
+      .select('default_channel')
+      .eq('device_id', uuid)
+      .eq('app_id', APP_NAME_STATS)
+      .single()
+
+    expect(result.error).toBeNull()
+    expect(result.data?.default_channel).toBe(updatedChannel)
+
+    // Clean up
+    await getSupabaseClient().from('devices').delete().eq('device_id', uuid).eq('app_id', APP_NAME_STATS)
+  })
+
+  it('unsets default_channel when not provided', async () => {
+    const uuid = randomUUID().toLowerCase()
+    const initialChannel = 'beta'
+
+    const baseData = getBaseData(APP_NAME_STATS) as StatsPayload
+    baseData.action = 'set'
+    baseData.device_id = uuid
+    baseData.defaultChannel = initialChannel
+    baseData.version_build = getVersionFromAction('set')
+    const version = await createAppVersions(baseData.version_build, APP_NAME_STATS)
+    baseData.version_name = version.name
+    await triggerD1Sync()
+
+    // First request with channel set
+    let response = await postStats(baseData)
+    expect(response.status).toBe(200)
+
+    await triggerD1Sync()
+
+    // Verify channel was saved
+    let result = await getSupabaseClient()
+      .from('devices')
+      .select('default_channel')
+      .eq('device_id', uuid)
+      .eq('app_id', APP_NAME_STATS)
+      .single()
+
+    expect(result.error).toBeNull()
+    expect(result.data?.default_channel).toBe(initialChannel)
+
+    // Second request without defaultChannel (undefined)
+    delete baseData.defaultChannel
+    response = await postStats(baseData)
+    expect(response.status).toBe(200)
+
+    await triggerD1Sync()
+
+    // Verify channel was unset (should be null)
+    result = await getSupabaseClient()
+      .from('devices')
+      .select('default_channel')
+      .eq('device_id', uuid)
+      .eq('app_id', APP_NAME_STATS)
+      .single()
+
+    expect(result.error).toBeNull()
+    expect(result.data?.default_channel).toBeNull()
+
+    // Clean up
+    await getSupabaseClient().from('devices').delete().eq('device_id', uuid).eq('app_id', APP_NAME_STATS)
+  })
 })

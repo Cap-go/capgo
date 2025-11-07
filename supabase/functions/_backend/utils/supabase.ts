@@ -706,7 +706,7 @@ export async function trackDevicesSB(c: Context, device: DeviceWithoutCreatedAt)
 
   const { data: existingRow, error } = await client
     .from('devices')
-    .select('version_name, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator')
+    .select('version_name, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator, default_channel')
     .eq('app_id', device.app_id)
     .eq('device_id', device.device_id)
     .maybeSingle()
@@ -723,7 +723,7 @@ export async function trackDevicesSB(c: Context, device: DeviceWithoutCreatedAt)
   const normalizedDevice = buildNormalizedDeviceForWrite(device)
   const updatedAt = new Date().toISOString()
 
-  const payload: Database['public']['Tables']['devices']['Insert'] = {
+  const payload = {
     app_id: device.app_id,
     updated_at: updatedAt,
     device_id: device.device_id,
@@ -735,7 +735,8 @@ export async function trackDevicesSB(c: Context, device: DeviceWithoutCreatedAt)
     version_name: normalizedDevice.version_name ?? device.version_name,
     is_prod: normalizedDevice.is_prod,
     is_emulator: normalizedDevice.is_emulator,
-  }
+    default_channel: device.default_channel ?? null,
+  } as Database['public']['Tables']['devices']['Insert']
 
   return client
     .from('devices')

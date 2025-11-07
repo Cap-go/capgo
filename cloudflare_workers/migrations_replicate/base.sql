@@ -6,6 +6,8 @@ DROP TABLE IF EXISTS channel_devices;
 
 DROP TABLE IF EXISTS apps;
 
+DROP TABLE IF EXISTS manifest;
+
 DROP TABLE IF EXISTS orgs;
 
 -- Create app_versions table
@@ -155,7 +157,9 @@ CREATE TABLE IF NOT EXISTS apps (
     retention INTEGER,
     owner_org TEXT,
     default_upload_channel TEXT,
-    transfer_history TEXT
+    transfer_history TEXT,
+    channel_device_count INTEGER DEFAULT 0,
+    manifest_bundle_count INTEGER DEFAULT 0
 );
 
 CREATE INDEX IF NOT EXISTS idx_apps_id ON apps (id);

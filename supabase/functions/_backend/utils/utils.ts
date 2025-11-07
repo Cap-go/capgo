@@ -13,6 +13,10 @@ export const reverseDomainRegex = /^[a-z0-9]+(\.[\w-]+)+$/i
 //    0F673663-459A-44C0-A7F5-613F2A4AF3AB (ios)
 export const deviceIdRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
+// Regex for Semantic Versioning validation (strict semver, no leading 'v')
+// Based on https://semver.org/#is-there-a-suggested-regular-expression-regex-to-check-a-semver-string
+export const regexSemver = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-z-][0-9a-z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-z-][0-9a-z-]*))*))?(?:\+([0-9a-z-]+(?:\.[0-9a-z-]+)*))?$/i
+
 // Zod validation messages
 export const MISSING_STRING_APP_ID = 'App ID is required'
 export const NON_STRING_APP_ID = 'App ID must be a string'
@@ -58,6 +62,15 @@ export function isInternalVersionName(version: string) {
   if (!version)
     return false
   return version === 'builtin' || version === 'unknown'
+}
+
+export function isValidSemver(version: string): boolean {
+  if (!version)
+    return false
+  // Reject leading 'v' or 'V'
+  if (version.startsWith('v') || version.startsWith('V'))
+    return false
+  return regexSemver.test(version)
 }
 
 interface LimitedApp {

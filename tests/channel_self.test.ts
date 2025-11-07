@@ -2,7 +2,7 @@ import type { SimpleErrorResponse } from '../supabase/functions/_backend/utils/h
 import type { DeviceLink, HttpMethod } from './test-utils.ts'
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { PLUGIN_BASE_URL, getBaseData, getSupabaseClient, resetAndSeedAppData, resetAppData, resetAppDataStats, triggerD1Sync } from './test-utils.ts'
+import { getBaseData, getSupabaseClient, PLUGIN_BASE_URL, resetAndSeedAppData, resetAppData, resetAppDataStats, triggerD1Sync } from './test-utils.ts'
 
 interface ChannelInfo {
   id: string
@@ -897,4 +897,45 @@ it('verify channel stays after deleting channel_device', async () => {
   expect(channelAfter).toBeTruthy()
   expect(channelAfter!.id).toBe(channelId)
   expect(channelAfter!.name).toBe(channelName)
+})
+
+it('saves default_channel when provided', async () => {
+  const uuid = randomUUID().toLowerCase()
+  const testDefaultChannel = 'beta'
+
+  // Enable allow_device_self_set for beta channel
+  const { error: updateError } = await getSupabaseClient()
+    .from('channels')
+    .update({ allow_device_self_set: true })
+    .eq('name', 'beta')
+    .eq('app_id', APPNAME)
+
+  expect(updateError).toBeNull()
+
+  const baseData = getBaseData(APPNAME)
+  baseData.device_id = uuid
+  baseData.defaultChannel = testDefaultChannel
+  baseData.channel = 'beta' // Required for POST /channel_self
+
+  const response = await fetchEndpoint('POST', baseData)
+  expect(response.status).toBe(200)
+
+  // Wait for data to be written
+  await triggerD1Sync()
+  await new Promise(resolve => setTimeout(resolve, 1000))
+
+  // Verify default_channel was saved
+  const { error, data } = await getSupabaseClient()
+    .from('devices')
+    .select('default_channel')
+    .eq('device_id', uuid)
+    .eq('app_id', APPNAME)
+    .single()
+
+  expect(error).toBeNull()
+  expect(data).toBeTruthy()
+  expect(data?.default_channel).toBe(testDefaultChannel)
+
+  // Clean up
+  await getSupabaseClient().from('devices').delete().eq('device_id', uuid).eq('app_id', APPNAME)
 })

@@ -7,6 +7,7 @@ import { backgroundTask, existInEnv, getEnv } from '../utils/utils.ts'
 import { getClientDbRegion } from './geolocation.ts'
 import { cloudlog, cloudlogErr } from './loggin.ts'
 import * as schema from './postgress_schema.ts'
+import { withOptionalManifestSelect } from './queryHelpers.ts'
 
 const PLAN_EXCEEDED_COLUMNS: Record<'mau' | 'storage' | 'bandwidth', string> = {
   mau: 'mau_exceeded',
@@ -194,14 +195,7 @@ export function getAlias() {
   return { versionAlias, channelDevicesAlias, channelAlias }
 }
 
-export function requestInfosPostgres(
-  c: Context,
-  platform: string,
-  app_id: string,
-  device_id: string,
-  defaultChannel: string,
-  drizzleCient: ReturnType<typeof getDrizzleClient>,
-) {
+function getSchemaUpdatesAlias() {
   const { versionAlias, channelDevicesAlias, channelAlias } = getAlias()
 
   const versionSelect = {
@@ -234,37 +228,68 @@ export function requestInfosPostgres(
           's3_path', ${schema.manifest.s3_path}
         )
       ) FILTER (WHERE ${schema.manifest.file_name} IS NOT NULL), '[]'::json)`
-  const channelDeviceQuery = drizzleCient
-    .select({
-      channel_devices: {
-        device_id: channelDevicesAlias.device_id,
-        app_id: sql<string>`${channelDevicesAlias.app_id}`.as('cd_app_id'),
-      },
-      version: versionSelect,
-      channels: channelSelect,
-      manifestEntries: manifestSelect,
+  return { versionSelect, channelDevicesAlias, channelAlias, channelSelect, manifestSelect, versionAlias }
+}
+
+export function requestInfosChannelDevicePostgres(
+  c: Context,
+  app_id: string,
+  device_id: string,
+  drizzleClient: ReturnType<typeof getDrizzleClient>,
+  includeManifest: boolean,
+) {
+  const { versionSelect, channelDevicesAlias, channelAlias, channelSelect, manifestSelect, versionAlias } = getSchemaUpdatesAlias()
+  const baseSelect = {
+    channel_devices: {
+      device_id: channelDevicesAlias.device_id,
+      app_id: sql<string>`${channelDevicesAlias.app_id}`.as('cd_app_id'),
     },
-    )
+    version: versionSelect,
+    channels: channelSelect,
+  }
+  const selectShape = withOptionalManifestSelect(baseSelect, includeManifest, manifestSelect)
+
+  const baseQuery = drizzleClient
+    .select(selectShape)
     .from(channelDevicesAlias)
     .innerJoin(channelAlias, eq(channelDevicesAlias.channel_id, channelAlias.id))
     .innerJoin(versionAlias, eq(channelAlias.version, versionAlias.id))
-    .leftJoin(schema.manifest, eq(schema.manifest.app_version_id, versionAlias.id))
+
+  const channelDevice = (includeManifest
+    ? baseQuery.leftJoin(schema.manifest, eq(schema.manifest.app_version_id, versionAlias.id))
+    : baseQuery)
     .where(and(eq(channelDevicesAlias.device_id, device_id), eq(channelDevicesAlias.app_id, app_id)))
     .groupBy(channelDevicesAlias.device_id, channelDevicesAlias.app_id, channelAlias.id, versionAlias.id)
     .limit(1)
-  cloudlog({ requestId: c.get('requestId'), message: 'channelDevice Query:', channelDeviceQuery: channelDeviceQuery.toSQL() })
-  const channelDevice = channelDeviceQuery.then(data => data.at(0))
+  cloudlog({ requestId: c.get('requestId'), message: 'channelDevice Query:', channelDeviceQuery: channelDevice.toSQL() })
 
+  return channelDevice.then(data => data.at(0))
+}
+
+export function requestInfosChannelPostgres(
+  c: Context,
+  platform: string,
+  app_id: string,
+  defaultChannel: string,
+  drizzleClient: ReturnType<typeof getDrizzleClient>,
+  includeManifest: boolean,
+) {
+  const { versionSelect, channelAlias, channelSelect, manifestSelect, versionAlias } = getSchemaUpdatesAlias()
   const platformQuery = platform === 'android' ? channelAlias.android : channelAlias.ios
-  const channelQuery = drizzleCient
-    .select({
-      version: versionSelect,
-      channels: channelSelect,
-      manifestEntries: manifestSelect,
-    })
+  const baseSelect = {
+    version: versionSelect,
+    channels: channelSelect,
+  }
+  const selectShape = withOptionalManifestSelect(baseSelect, includeManifest, manifestSelect)
+
+  const baseQuery = drizzleClient
+    .select(selectShape)
     .from(channelAlias)
     .innerJoin(versionAlias, eq(channelAlias.version, versionAlias.id))
-    .leftJoin(schema.manifest, eq(schema.manifest.app_version_id, versionAlias.id))
+
+  const channelQuery = (includeManifest
+    ? baseQuery.leftJoin(schema.manifest, eq(schema.manifest.app_version_id, versionAlias.id))
+    : baseQuery)
     .where(!defaultChannel
       ? and(
           eq(channelAlias.public, true),
@@ -281,6 +306,30 @@ export function requestInfosPostgres(
   cloudlog({ requestId: c.get('requestId'), message: 'channel Query:', channelQuery: channelQuery.toSQL() })
   const channel = channelQuery.then(data => data.at(0))
 
+  return channel
+}
+
+export function requestInfosPostgres(
+  c: Context,
+  platform: string,
+  app_id: string,
+  device_id: string,
+  defaultChannel: string,
+  drizzleClient: ReturnType<typeof getDrizzleClient>,
+  channelDeviceCount?: number | null,
+  manifestBundleCount?: number | null,
+) {
+  const shouldQueryChannelOverride = channelDeviceCount === undefined || channelDeviceCount === null ? true : channelDeviceCount > 0
+  const shouldFetchManifest = manifestBundleCount === undefined || manifestBundleCount === null ? true : manifestBundleCount > 0
+
+  const channelDevice = shouldQueryChannelOverride
+    ? requestInfosChannelDevicePostgres(c, app_id, device_id, drizzleClient, shouldFetchManifest)
+    : Promise.resolve(undefined).then(() => {
+        cloudlog({ requestId: c.get('requestId'), message: 'Skipping channel device override query' })
+        return null
+      })
+  const channel = requestInfosChannelPostgres(c, platform, app_id, defaultChannel, drizzleClient, shouldFetchManifest)
+
   return Promise.all([channelDevice, channel])
     .then(([channelOverride, channelData]) => ({ channelData, channelOverride }))
     .catch((e) => {
@@ -292,19 +341,21 @@ export function requestInfosPostgres(
 export async function getAppOwnerPostgres(
   c: Context,
   appId: string,
-  drizzleCient: ReturnType<typeof getDrizzleClient>,
+  drizzleClient: ReturnType<typeof getDrizzleClient>,
   actions: ('mau' | 'storage' | 'bandwidth')[] = [],
-): Promise<{ owner_org: string, orgs: { created_by: string, id: string }, plan_valid: boolean } | null> {
+): Promise<{ owner_org: string, orgs: { created_by: string, id: string }, plan_valid: boolean, channel_device_count: number, manifest_bundle_count: number } | null> {
   try {
     if (actions.length === 0)
       return null
     const orgAlias = alias(schema.orgs, 'orgs')
     const planExpression = buildPlanValidationExpression(actions, schema.apps.owner_org)
 
-    const appOwner = await drizzleCient
+    const appOwner = await drizzleClient
       .select({
         owner_org: schema.apps.owner_org,
         plan_valid: planExpression,
+        channel_device_count: schema.apps.channel_device_count,
+        manifest_bundle_count: schema.apps.manifest_bundle_count,
         orgs: {
           created_by: orgAlias.created_by,
           id: orgAlias.id,
@@ -329,10 +380,10 @@ export async function getAppVersionPostgres(
   appId: string,
   versionName: string,
   allowedDeleted: boolean | undefined,
-  drizzleCient: ReturnType<typeof getDrizzleClient>,
+  drizzleClient: ReturnType<typeof getDrizzleClient>,
 ): Promise<{ id: number, owner_org: string } | null> {
   try {
-    const appVersion = await drizzleCient
+    const appVersion = await drizzleClient
       .select({
         id: schema.app_versions.id,
         owner_org: schema.app_versions.owner_org,
@@ -357,14 +408,14 @@ export async function getAppVersionsByAppIdPg(
   c: Context,
   appId: string,
   versionName: string,
-  drizzleCient: ReturnType<typeof getDrizzleClient>,
+  drizzleClient: ReturnType<typeof getDrizzleClient>,
   actions: ('mau' | 'storage' | 'bandwidth')[] = [],
 ): Promise<{ id: number, owner_org: string, name: string, plan_valid: boolean }[]> {
   try {
     if (actions.length === 0)
       return []
     const planExpression = buildPlanValidationExpression(actions, schema.app_versions.owner_org)
-    const versions = await drizzleCient
+    const versions = await drizzleClient
       .select({
         id: schema.app_versions.id,
         owner_org: schema.app_versions.owner_org,
@@ -389,10 +440,10 @@ export async function getChannelDeviceOverridePg(
   c: Context,
   appId: string,
   deviceId: string,
-  drizzleCient: ReturnType<typeof getDrizzleClient>,
+  drizzleClient: ReturnType<typeof getDrizzleClient>,
 ): Promise<{ app_id: string, device_id: string, channel_id: { id: number, allow_device_self_set: boolean, name: string } } | null> {
   try {
-    const result = await drizzleCient
+    const result = await drizzleClient
       .select({
         app_id: schema.channel_devices.app_id,
         device_id: schema.channel_devices.device_id,
@@ -436,10 +487,10 @@ export async function getChannelByNamePg(
   c: Context,
   appId: string,
   channelName: string,
-  drizzleCient: ReturnType<typeof getDrizzleClient>,
+  drizzleClient: ReturnType<typeof getDrizzleClient>,
 ): Promise<{ id: number, name: string, allow_device_self_set: boolean, owner_org: string } | null> {
   try {
-    const channel = await drizzleCient
+    const channel = await drizzleClient
       .select({
         id: schema.channels.id,
         name: schema.channels.name,
@@ -464,10 +515,10 @@ export async function getChannelByNamePg(
 export async function getMainChannelsPg(
   c: Context,
   appId: string,
-  drizzleCient: ReturnType<typeof getDrizzleClient>,
+  drizzleClient: ReturnType<typeof getDrizzleClient>,
 ): Promise<{ name: string, ios: boolean, android: boolean }[]> {
   try {
-    const channels = await drizzleCient
+    const channels = await drizzleClient
       .select({
         name: schema.channels.name,
         ios: schema.channels.ios,
@@ -490,10 +541,10 @@ export async function deleteChannelDevicePg(
   c: Context,
   appId: string,
   deviceId: string,
-  drizzleCient: ReturnType<typeof getDrizzleClient>,
+  drizzleClient: ReturnType<typeof getDrizzleClient>,
 ): Promise<boolean> {
   try {
-    await drizzleCient
+    await drizzleClient
       .delete(schema.channel_devices)
       .where(and(
         eq(schema.channel_devices.app_id, appId),
@@ -510,10 +561,10 @@ export async function deleteChannelDevicePg(
 export async function upsertChannelDevicePg(
   c: Context,
   data: { device_id: string, channel_id: number, app_id: string, owner_org: string },
-  drizzleCient: ReturnType<typeof getDrizzleClient>,
+  drizzleClient: ReturnType<typeof getDrizzleClient>,
 ): Promise<boolean> {
   try {
-    await drizzleCient
+    await drizzleClient
       .insert(schema.channel_devices)
       .values({
         device_id: data.device_id,
@@ -540,7 +591,7 @@ export async function getChannelsPg(
   c: Context,
   appId: string,
   condition: { defaultChannel?: string } | { public: boolean },
-  drizzleCient: ReturnType<typeof getDrizzleClient>,
+  drizzleClient: ReturnType<typeof getDrizzleClient>,
 ): Promise<{ id: number, name: string, ios: boolean, android: boolean, public: boolean }[]> {
   try {
     const whereConditions = [eq(schema.channels.app_id, appId)]
@@ -552,7 +603,7 @@ export async function getChannelsPg(
       whereConditions.push(eq(schema.channels.public, condition.public))
     }
 
-    const channels = await drizzleCient
+    const channels = await drizzleClient
       .select({
         id: schema.channels.id,
         name: schema.channels.name,
@@ -573,14 +624,14 @@ export async function getChannelsPg(
 export async function getAppByIdPg(
   c: Context,
   appId: string,
-  drizzleCient: ReturnType<typeof getDrizzleClient>,
+  drizzleClient: ReturnType<typeof getDrizzleClient>,
   actions: ('mau' | 'storage' | 'bandwidth')[] = [],
 ): Promise<{ owner_org: string, plan_valid: boolean } | null> {
   try {
     if (actions.length === 0)
       return null
     const planExpression = buildPlanValidationExpression(actions, schema.apps.owner_org)
-    const app = await drizzleCient
+    const app = await drizzleClient
       .select({
         owner_org: schema.apps.owner_org,
         plan_valid: planExpression,
@@ -603,10 +654,10 @@ export async function getCompatibleChannelsPg(
   platform: 'ios' | 'android',
   isEmulator: boolean,
   isProd: boolean,
-  drizzleCient: ReturnType<typeof getDrizzleClient>,
+  drizzleClient: ReturnType<typeof getDrizzleClient>,
 ): Promise<{ id: number, name: string, allow_device_self_set: boolean, allow_emulator: boolean, allow_dev: boolean, ios: boolean, android: boolean, public: boolean }[]> {
   try {
-    const channels = await drizzleCient
+    const channels = await drizzleClient
       .select({
         id: schema.channels.id,
         name: schema.channels.name,

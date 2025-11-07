@@ -159,6 +159,7 @@ declare global {
   const useDeviceMotion: typeof import('@vueuse/core').useDeviceMotion
   const useDeviceOrientation: typeof import('@vueuse/core').useDeviceOrientation
   const useDevicePixelRatio: typeof import('@vueuse/core').useDevicePixelRatio
+  const useDeviceUpdateFormat: typeof import('./composables/useDeviceUpdateFormat').useDeviceUpdateFormat
   const useDevicesList: typeof import('@vueuse/core').useDevicesList
   const useDialogV2Store: typeof import('./stores/dialogv2').useDialogV2Store
   const useDisplayMedia: typeof import('@vueuse/core').useDisplayMedia
@@ -311,6 +312,9 @@ declare global {
   // @ts-ignore
   export type { Component, Slot, Slots, ComponentPublicInstance, ComputedRef, DirectiveBinding, ExtractDefaultPropTypes, ExtractPropTypes, ExtractPublicPropTypes, InjectionKey, PropType, Ref, ShallowRef, MaybeRef, MaybeRefOrGetter, VNode, WritableComputedRef } from 'vue'
   import('vue')
+  // @ts-ignore
+  export type { UpdateEndpointRequest } from './composables/useDeviceUpdateFormat'
+  import('./composables/useDeviceUpdateFormat')
   // @ts-ignore
   export type { DialogV2Button, DialogV2Options } from './stores/dialogv2'
   import('./stores/dialogv2')
@@ -478,6 +482,7 @@ declare module 'vue' {
     readonly useDeviceMotion: UnwrapRef<typeof import('@vueuse/core')['useDeviceMotion']>
     readonly useDeviceOrientation: UnwrapRef<typeof import('@vueuse/core')['useDeviceOrientation']>
     readonly useDevicePixelRatio: UnwrapRef<typeof import('@vueuse/core')['useDevicePixelRatio']>
+    readonly useDeviceUpdateFormat: UnwrapRef<typeof import('./composables/useDeviceUpdateFormat')['useDeviceUpdateFormat']>
     readonly useDevicesList: UnwrapRef<typeof import('@vueuse/core')['useDevicesList']>
     readonly useDialogV2Store: UnwrapRef<typeof import('./stores/dialogv2')['useDialogV2Store']>
     readonly useDisplayMedia: UnwrapRef<typeof import('@vueuse/core')['useDisplayMedia']>

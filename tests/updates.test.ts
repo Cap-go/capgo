@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { z } from 'zod'
 
 import { APP_NAME, createAppVersions, getBaseData, getSupabaseClient, getVersionFromAction, ORG_ID, postUpdate, resetAndSeedAppData, resetAppData, resetAppDataStats, triggerD1Sync } from './test-utils.ts'
@@ -13,6 +13,7 @@ interface UpdateRes {
   checksum?: string
   version?: string
   message?: string
+  manifest?: { file_name: string | null, file_hash?: string | null, download_url?: string | null }[]
 }
 
 const updateNewScheme = z.object({
@@ -48,6 +49,160 @@ describe('[POST] /updates', () => {
     const json = await response.json<UpdateRes>()
     expect(() => updateNewScheme.parse(json)).not.toThrow()
     expect(json.version).toBe('1.0.0')
+  })
+})
+
+describe('channel device count gating', () => {
+  const supabase = getSupabaseClient()
+  let betaChannelId: number
+
+  beforeAll(async () => {
+    const { data, error } = await supabase
+      .from('channels')
+      .select('id')
+      .eq('app_id', APP_NAME_UPDATE)
+      .eq('name', 'beta')
+      .single()
+    if (error || !data)
+      throw error ?? new Error('Missing beta channel')
+    betaChannelId = data.id
+  })
+
+  async function processChannelDeviceQueue(batchSize = 25) {
+    const { error } = await supabase.rpc('process_channel_device_counts_queue' as any, { batch_size: batchSize })
+    if (error)
+      throw error
+  }
+
+  async function cleanupDevice(deviceId: string) {
+    await supabase.from('channel_devices').delete().eq('app_id', APP_NAME_UPDATE).eq('device_id', deviceId)
+    await processChannelDeviceQueue()
+    await supabase.from('apps').update({ channel_device_count: 0 }).eq('app_id', APP_NAME_UPDATE)
+  }
+
+  it('uses device overrides when count is positive', async () => {
+    const deviceId = randomUUID().toLowerCase()
+    await supabase.from('channel_devices').insert({
+      channel_id: betaChannelId,
+      app_id: APP_NAME_UPDATE,
+      device_id: deviceId,
+      owner_org: ORG_ID,
+    })
+    await processChannelDeviceQueue()
+
+    const baseData = getBaseData(APP_NAME_UPDATE)
+    baseData.device_id = deviceId
+    baseData.version_name = '0.0.0'
+    baseData.version_build = '0.0.0'
+
+    try {
+      const response = await postUpdate(baseData)
+      expect(response.status).toBe(200)
+      const json = await response.json<UpdateRes>()
+      expect(json.version).toBe('1.361.0')
+    }
+    finally {
+      await cleanupDevice(deviceId)
+    }
+  })
+
+  it('ignores overrides when count forced to zero', async () => {
+    const deviceId = randomUUID().toLowerCase()
+    await supabase.from('channel_devices').insert({
+      channel_id: betaChannelId,
+      app_id: APP_NAME_UPDATE,
+      device_id: deviceId,
+      owner_org: ORG_ID,
+    })
+    await processChannelDeviceQueue()
+    await supabase.from('apps').update({ channel_device_count: 0 }).eq('app_id', APP_NAME_UPDATE)
+
+    const baseData = getBaseData(APP_NAME_UPDATE)
+    baseData.device_id = deviceId
+    baseData.version_name = '0.0.0'
+    baseData.version_build = '0.0.0'
+
+    try {
+      const response = await postUpdate(baseData)
+      expect(response.status).toBe(200)
+      const json = await response.json<UpdateRes>()
+      expect(json.version).toBe('1.0.0')
+    }
+    finally {
+      await cleanupDevice(deviceId)
+    }
+  })
+})
+
+describe('manifest bundle count gating', () => {
+  const supabase = getSupabaseClient()
+  const insertedManifestIds: number[] = []
+  let baseVersionId: number
+
+  beforeAll(async () => {
+    const { data, error } = await supabase
+      .from('app_versions')
+      .select('id')
+      .eq('app_id', APP_NAME_UPDATE)
+      .eq('name', '1.0.0')
+      .single()
+    if (error || !data)
+      throw error ?? new Error('Missing base version for manifest tests')
+    baseVersionId = data.id
+  })
+
+  afterEach(async () => {
+    if (insertedManifestIds.length > 0) {
+      await supabase.from('manifest').delete().in('id', insertedManifestIds)
+      insertedManifestIds.length = 0
+    }
+    await supabase.from('apps').update({ manifest_bundle_count: 0 }).eq('app_id', APP_NAME_UPDATE)
+  })
+
+  async function seedManifestEntry() {
+    const suffix = randomUUID().slice(0, 8)
+    const fileName = `manifest-test-${suffix}.js`
+    const { data, error } = await supabase
+      .from('manifest')
+      .insert({
+        app_version_id: baseVersionId,
+        file_name: fileName,
+        s3_path: `tests/${fileName}`,
+        file_hash: `hash-${suffix}`,
+      })
+      .select('id')
+      .single()
+    if (error || !data)
+      throw error ?? new Error('Failed to seed manifest entry')
+    insertedManifestIds.push(data.id)
+    return fileName
+  }
+
+  function makeUpdatePayload() {
+    const baseData = getBaseData(APP_NAME_UPDATE)
+    baseData.version_name = '1.1.0'
+    return baseData
+  }
+
+  it('returns manifest entries when manifest bundles exist', async () => {
+    const fileName = await seedManifestEntry()
+    const { error } = await supabase.from('apps').update({ manifest_bundle_count: 1 }).eq('app_id', APP_NAME_UPDATE)
+    if (error)
+      throw error
+
+    const response = await postUpdate(makeUpdatePayload())
+    expect(response.status).toBe(200)
+    const json = await response.json<UpdateRes>()
+    expect(json.manifest).toBeDefined()
+    expect(json.manifest?.some(entry => entry?.file_name === fileName)).toBe(true)
+  })
+
+  it('skips manifest query when manifest bundle count is zero', async () => {
+    await seedManifestEntry()
+    const response = await postUpdate(makeUpdatePayload())
+    expect(response.status).toBe(200)
+    const json = await response.json<UpdateRes>()
+    expect(json.manifest).toBeUndefined()
   })
 })
 
@@ -365,6 +520,7 @@ describe('update scenarios', () => {
 
     expect(overrideError).toBeNull()
     await triggerD1Sync() // Sync channel_devices to D1
+    await getSupabaseClient().rpc('process_channel_device_counts_queue' as any, { batch_size: 10 })
 
     // Test that update succeeds with device override
     const baseData = getBaseData(APP_NAME_UPDATE)
@@ -383,10 +539,84 @@ describe('update scenarios', () => {
 
     // Clean up
     await getSupabaseClient().from('channel_devices').delete().eq('device_id', uuid).eq('app_id', APP_NAME_UPDATE)
+    await getSupabaseClient().rpc('process_channel_device_counts_queue' as any, { batch_size: 10 })
     await getSupabaseClient().from('channels').update({
       public: true,
       allow_device_self_set: true,
       version: defaultVersion?.id,
     }).eq('name', 'production').eq('app_id', APP_NAME_UPDATE)
+  })
+
+  it('saves default_channel when provided', async () => {
+    const uuid = randomUUID().toLowerCase()
+    const testDefaultChannel = 'staging'
+
+    const baseData = getBaseData(APP_NAME_UPDATE)
+    baseData.device_id = uuid
+    baseData.defaultChannel = testDefaultChannel
+
+    const response = await postUpdate(baseData)
+    expect(response.status).toBe(200)
+
+    // Wait for data to be written
+    await triggerD1Sync()
+    await new Promise(resolve => setTimeout(resolve, 1000))
+
+    // Verify default_channel was saved in the database
+    const { error, data } = await getSupabaseClient()
+      .from('devices')
+      .select('default_channel')
+      .eq('device_id', uuid)
+      .eq('app_id', APP_NAME_UPDATE)
+      .single()
+
+    expect(error).toBeNull()
+    expect(data).toBeTruthy()
+    expect(data?.default_channel).toBe(testDefaultChannel)
+
+    // Clean up
+    await getSupabaseClient().from('devices').delete().eq('device_id', uuid).eq('app_id', APP_NAME_UPDATE)
+  })
+
+  it('overwrites default_channel with null when not provided', async () => {
+    const uuid = randomUUID().toLowerCase()
+    const testDefaultChannel = 'production'
+
+    // First request with default_channel
+    const baseData1 = getBaseData(APP_NAME_UPDATE)
+    baseData1.device_id = uuid
+    baseData1.defaultChannel = testDefaultChannel
+
+    const response1 = await postUpdate(baseData1)
+    expect(response1.status).toBe(200)
+
+    await triggerD1Sync()
+    await new Promise(resolve => setTimeout(resolve, 1000))
+
+    // Second request WITHOUT default_channel (should overwrite with null)
+    const baseData2 = getBaseData(APP_NAME_UPDATE)
+    baseData2.device_id = uuid
+    // No defaultChannel field
+
+    const response2 = await postUpdate(baseData2)
+    expect(response2.status).toBe(200)
+
+    await triggerD1Sync()
+    await new Promise(resolve => setTimeout(resolve, 1000))
+
+    // Verify default_channel was overwritten with null
+    const { error, data } = await getSupabaseClient()
+      .from('devices')
+      .select('default_channel')
+      .eq('device_id', uuid)
+      .eq('app_id', APP_NAME_UPDATE)
+      .single()
+
+    expect(error).toBeNull()
+    expect(data).toBeTruthy()
+    expect(data?.default_channel).toBeNull()
+
+    // Clean up
+    await getSupabaseClient().from('devices').delete().eq('device_id', uuid).eq('app_id', APP_NAME_UPDATE)
   })
 })
