@@ -256,7 +256,7 @@ Check the worker startup logs for:
 
 ```
 env.IS_V2 ("1")                                            Environment Variable      local
-env.DB_REPLICATE_EU (capgo_local_replicate)                   D1 Database               local
+env.DB_REPLICA_EU (capgo_local_replicate)                   D1 Database               local
 ```
 
 ### V2 Testing Workflow
