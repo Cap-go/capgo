@@ -28,6 +28,16 @@ interface Env {
   WEBHOOK_SECRET: string
 }
 
+interface ReplicaTarget {
+  name: string
+  session: D1DatabaseSession
+}
+
+interface SqlOperation {
+  sql: string
+  params: any[]
+}
+
 interface NukeRequest {
   type: 'all' | 'table'
   table?: string
@@ -440,6 +450,29 @@ async function nukeTable(db: D1DatabaseSession, tableName: string) {
   console.log(`[Nuke Table ${tableName}] Nuke process completed in ${Date.now() - start}ms`)
 }
 
+async function executeBatchAcrossReplicas(
+  replicas: ReplicaTarget[],
+  operations: SqlOperation[],
+  queueKey: string,
+) {
+  for (const replica of replicas) {
+    const statements = operations.map(operation =>
+      replica.session.prepare(operation.sql).bind(...operation.params),
+    )
+    console.log(`[${queueKey}] Applying batch of ${operations.length} operations to replica ${replica.name}.`)
+    await replica.session.batch(statements)
+    console.log(`[${queueKey}] Replica ${replica.name} batch applied successfully.`)
+  }
+}
+
+function buildReplicaTargets(env: Env): ReplicaTarget[] {
+  return [
+    { name: 'EU', session: env.DB_REPLICA_EU.withSession(`first-primary`) },
+    { name: 'AS', session: env.DB_REPLICA_AS.withSession(`first-primary`) },
+    { name: 'US', session: env.DB_REPLICA_US.withSession(`first-primary`) },
+  ]
+}
+
 // Handles the /sync endpoint trigger
 async function handleSyncRequest(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
   const handlerStart = Date.now()
@@ -468,12 +501,10 @@ async function handleSyncRequest(request: Request, env: Env, ctx: ExecutionConte
   // No body needed, just trigger the queue processing
 
   try {
+    const replicaTargets = buildReplicaTargets(env)
+
     // Ensure tables exist (including sync_pgmq_state) before scheduling background task
-    await Promise.all([
-      checkAndCreateTables(env.DB_REPLICA_EU.withSession(`first-primary`)),
-      checkAndCreateTables(env.DB_REPLICA_AS.withSession(`first-primary`)),
-      checkAndCreateTables(env.DB_REPLICA_US.withSession(`first-primary`)),
-    ])
+    await Promise.all(replicaTargets.map(replica => checkAndCreateTables(replica.session)))
     console.log(`[Sync Request] Database tables checked/ensured. Scheduling background processing. Time: ${Date.now() - handlerStart}ms`)
 
     // Run the queue processing in the background using waitUntil
@@ -481,11 +512,7 @@ async function handleSyncRequest(request: Request, env: Env, ctx: ExecutionConte
       (async () => {
         console.log(`[Background Queue Sync] Starting background execution.`)
         try {
-          await Promise.all([
-            processReplicationQueue(env.DB_REPLICA_EU.withSession(`first-primary`), env),
-            processReplicationQueue(env.DB_REPLICA_AS.withSession(`first-primary`), env),
-            processReplicationQueue(env.DB_REPLICA_US.withSession(`first-primary`), env),
-          ])
+          await processReplicationQueue(replicaTargets, env)
           console.log(`[Background Queue Sync] Background execution finished successfully.`)
         }
         catch (error) {
@@ -507,16 +534,20 @@ async function handleSyncRequest(request: Request, env: Env, ctx: ExecutionConte
 }
 
 // Renamed from processPgmqMessages - Processes the single replication queue
-async function processReplicationQueue(db: D1DatabaseSession, env: Env) {
+async function processReplicationQueue(replicas: ReplicaTarget[], env: Env) {
   const queueKey = 'replicate_data' // Using queue name for logging consistency
   const startTime = Date.now()
   console.log(`[${queueKey}] Starting replication queue processing at ${startTime}.`)
+
+  if (!replicas.length) {
+    throw new Error(`[${queueKey}] No D1 replicas configured. Aborting replication run.`)
+  }
 
   // let pgPool: Pool | null = null; // Removed pg Pool
   // let pgClient: PoolClient | null = null; // Removed pg Client
   let sql: postgres.Sql | null = null // postgres instance
   let processedMsgCount = 0
-  let currentBatch: D1PreparedStatement[] = []
+  let currentBatch: SqlOperation[] = []
   let highestMsgIdRead = -1 // Track the highest message ID read in this run
   const successfullyProcessedMsgIds: bigint[] = [] // Collect IDs for deletion
   const highReadCountMsgIds: bigint[] = [] // Collect IDs for archiving due to high read count
@@ -605,14 +636,14 @@ async function processReplicationQueue(db: D1DatabaseSession, env: Env) {
 
         if (sqlOperation) {
           // c. Add statement to batch
-          currentBatch.push(db.prepare(sqlOperation.sql).bind(...sqlOperation.params))
+          currentBatch.push(sqlOperation)
           batchMsgIds.push(currentMsgIdBigInt) // Add ID to current batch tracker
 
           // d. If D1 batch size reached, execute batch
           if (currentBatch.length >= BATCH_SIZE) {
-            console.log(`[${queueKey}] D1 batch size (${BATCH_SIZE}) reached at msg_id ${currentMsgId}. Executing batch...`)
-            await db.batch(currentBatch)
-            console.log(`[${queueKey}] D1 batch executed successfully.`)
+            console.log(`[${queueKey}] Batch size (${BATCH_SIZE}) reached at msg_id ${currentMsgId}. Executing batch across replicas...`)
+            await executeBatchAcrossReplicas(replicas, currentBatch, queueKey)
+            console.log(`[${queueKey}] Batch executed successfully across ${replicas.length} replicas.`)
             // Add successfully committed batch IDs to the main list
             successfullyProcessedMsgIds.push(...batchMsgIds)
             currentBatch = [] // Reset batch
@@ -637,9 +668,9 @@ async function processReplicationQueue(db: D1DatabaseSession, env: Env) {
 
     // 5. Execute remaining batch
     if (currentBatch.length > 0) {
-      console.log(`[${queueKey}] Executing final D1 batch of ${currentBatch.length} items...`)
-      await db.batch(currentBatch)
-      console.log(`[${queueKey}] Final D1 batch executed successfully.`)
+      console.log(`[${queueKey}] Executing final batch of ${currentBatch.length} items across replicas...`)
+      await executeBatchAcrossReplicas(replicas, currentBatch, queueKey)
+      console.log(`[${queueKey}] Final batch executed successfully across replicas.`)
       // Add remaining successfully committed batch IDs
       successfullyProcessedMsgIds.push(...batchMsgIds)
     }
@@ -698,7 +729,7 @@ async function processReplicationQueue(db: D1DatabaseSession, env: Env) {
       await sql.end({ timeout: 5 }) // Add a timeout for ending
       console.log(`[${queueKey}] PostgreSQL connection pool ended.`)
     }
-    console.log(`[${queueKey}] Finished processing ${processedMsgCount} messages (up to highest read ID: ${highestMsgIdRead}) in ${Date.now() - startTime}ms. ${successfullyProcessedMsgIds.length} messages marked for deletion.`)
+    console.log(`[${queueKey}] Finished processing ${processedMsgCount} messages (up to highest read ID: ${highestMsgIdRead}) in ${Date.now() - startTime}ms. ${successfullyProcessedMsgIds.length} messages marked for deletion across ${replicas.length} replicas.`)
   }
 }
 
