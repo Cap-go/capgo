@@ -2,7 +2,7 @@
 import type { TableColumn } from './comp_def'
 import type { Organization } from '~/stores/organization'
 import { FormKit } from '@formkit/vue'
-import { VueDatePicker } from '@vuepic/vue-datepicker'
+import VueDatePicker from '@vuepic/vue-datepicker'
 import { useDark, useDebounceFn } from '@vueuse/core'
 import dayjs from 'dayjs'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'

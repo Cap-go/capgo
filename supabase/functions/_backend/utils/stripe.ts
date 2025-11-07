@@ -7,7 +7,7 @@ import { existInEnv, getEnv } from './utils.ts'
 
 export function getStripe(c: Context) {
   return new Stripe(getEnv(c, 'STRIPE_SECRET_KEY'), {
-    apiVersion: '2025-10-29.clover',
+    apiVersion: '2025-09-30.clover',
     httpClient: Stripe.createFetchHttpClient(),
   })
 }

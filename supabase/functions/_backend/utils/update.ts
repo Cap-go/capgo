@@ -192,7 +192,7 @@ export async function updateWithPG(
   }
 
   const version = channelOverride?.version ?? channelData.version
-  const manifestEntries = (channelOverride?.manifestEntries ?? channelData?.manifestEntries ?? []) as ManifestEntry[]
+  const manifestEntries = (channelOverride?.manifestEntries ?? channelData?.manifestEntries ?? []) as Partial<Database['public']['Tables']['manifest']['Row']>[]
   // device.version = versionData ? versionData.id : version.id
 
   // TODO: find better solution to check if device is from apple or google, currently not working in
