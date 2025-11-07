@@ -174,7 +174,6 @@
     "firebase": "12.5.0",
     "hono": "4.10.4",
     "konsta": "^5.0.4",
-    "ky": "^1.14.0",
     "mime": "^4.1.0",
     "pinia": "3.0.4",
     "plausible-tracker": "^0.3.9",

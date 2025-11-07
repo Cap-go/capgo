@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import type { TableColumn } from '../comp_def'
 import type { Database } from '~/types/supabase.types'
-import ky from 'ky'
 import { computed, h, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
@@ -106,8 +105,10 @@ async function countDevices() {
     return props.ids.length
 
   const currentJwt = currentSession.session.access_token
-  const dataD = await ky
-    .post(`${defaultApiHost}/private/devices`, {
+
+  try {
+    const response = await fetch(`${defaultApiHost}/private/devices`, {
+      method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'authorization': `Bearer ${currentJwt ?? ''}`,
@@ -119,14 +120,19 @@ async function countDevices() {
         customIdMode: filters.value.CustomId,
       }),
     })
-    .then(res => res.json<{ count: number }>())
-    .catch((err) => {
-      // Ensure we read the response to avoid memory leaks
-      err.response?.arrayBuffer()
-      console.log('Cannot get devices', err)
-      return { count: 0 }
-    })
-  return dataD.count
+
+    if (!response.ok) {
+      console.log('Cannot get devices', response.status)
+      return 0
+    }
+
+    const dataD = await response.json() as { count: number }
+    return dataD.count
+  }
+  catch (err) {
+    console.log('Cannot get devices', err)
+    return 0
+  }
 }
 
 async function getData() {
@@ -142,8 +148,10 @@ async function getData() {
     if (!currentSession.session)
       return
     const currentJwt = currentSession.session.access_token
-    const dataD = await ky
-      .post(`${defaultApiHost}/private/devices`, {
+
+    try {
+      const response = await fetch(`${defaultApiHost}/private/devices`, {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'authorization': `Bearer ${currentJwt ?? ''}`,
@@ -159,18 +167,21 @@ async function getData() {
           customIdMode: filters.value.CustomId,
         }),
       })
-      .then(res => res.json<Device[]>())
-      .catch((err) => {
-        // Ensure we read the response to avoid memory leaks
-        err.response?.arrayBuffer()
-        console.log('Cannot get devices', err)
-        return [] as Device[]
-      })
-    // console.log('dataD', dataD)
 
-    await ensureVersionNames(dataD)
+      if (!response.ok) {
+        console.log('Cannot get devices', response.status)
+        return
+      }
 
-    elements.value.push(...dataD)
+      const dataD = await response.json() as Device[]
+
+      await ensureVersionNames(dataD)
+
+      elements.value.push(...dataD)
+    }
+    catch (err) {
+      console.log('Cannot get devices', err)
+    }
   }
   catch (error) {
     console.error(error)

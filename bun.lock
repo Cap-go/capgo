@@ -78,7 +78,6 @@
         "firebase": "12.5.0",
         "hono": "4.10.4",
         "konsta": "^5.0.4",
-        "ky": "^1.14.0",
         "mime": "^4.1.0",
         "pinia": "3.0.4",
         "plausible-tracker": "^0.3.9",
@@ -2461,8 +2460,6 @@
     "kolorist": ["kolorist@1.8.0", "", {}, "sha512-Y+60/zizpJ3HRH8DCss+q95yr6145JXZo46OTpFvDZWLfRCE4qChOyk1b26nMaNpfHHgxagk9dXT5OP0Tfe+dQ=="],
 
     "konsta": ["konsta@5.0.4", "", { "dependencies": { "tailwind-merge": "^3.3.1" } }, "sha512-bm7lXKsbOSqB5LaBppudCp7K0/uMptmoN3mu8hrsHVQuuiNYGypPU56raw7OJ8XGhVZhaKVjzISY411uo0Eg+g=="],
-
-    "ky": ["ky@1.14.0", "", {}, "sha512-Rczb6FMM6JT0lvrOlP5WUOCB7s9XKxzwgErzhKlKde1bEV90FXplV1o87fpt4PU/asJFiqjYJxAJyzJhcrxOsQ=="],
 
     "launch-editor": ["launch-editor@2.12.0", "", { "dependencies": { "picocolors": "^1.1.1", "shell-quote": "^1.8.3" } }, "sha512-giOHXoOtifjdHqUamwKq6c49GzBdLjvxrd2D+Q4V6uOHopJv7p9VJxikDsQ/CBXZbEITgUqSVHXLTG3VhPP1Dg=="],
 

@@ -4,7 +4,6 @@ import type { OrganizationRole } from '~/stores/organization'
 import type { Database } from '~/types/supabase.types'
 import { greaterThan, parse } from '@std/semver'
 import { onClickOutside } from '@vueuse/core'
-import ky from 'ky'
 import { ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
@@ -180,8 +179,10 @@ async function getDevice() {
     if (!currentSession.session)
       return
     const currentJwt = currentSession.session.access_token
-    const dataD = await ky
-      .post(`${defaultApiHost}/private/devices`, {
+
+    try {
+      const response = await fetch(`${defaultApiHost}/private/devices`, {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'authorization': `Bearer ${currentJwt ?? ''}`,
@@ -191,17 +192,20 @@ async function getDevice() {
           deviceIds: [id.value],
         }),
       })
-      .then(res => res.json<Database['public']['Tables']['devices']['Row'][]>())
-      .catch((err) => {
-        // Ensure we read the response to avoid memory leaks
-        err.response?.arrayBuffer()
-        console.log('Cannot get device', err)
-        return [] as Database['public']['Tables']['devices']['Row'][]
-      })
 
-    const data = dataD[0]
-    device.value = data
-    await getVersionInfo()
+      if (!response.ok) {
+        console.log('Cannot get device', response.status)
+        return
+      }
+
+      const dataD = await response.json() as Database['public']['Tables']['devices']['Row'][]
+      const data = dataD[0]
+      device.value = data
+      await getVersionInfo()
+    }
+    catch (err) {
+      console.log('Cannot get device', err)
+    }
   }
   catch (error) {
     console.error('no devices', error)

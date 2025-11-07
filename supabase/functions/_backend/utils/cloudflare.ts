@@ -3,7 +3,6 @@ import type { Context } from 'hono'
 import type { Database } from './supabase.types.ts'
 import type { DeviceWithoutCreatedAt, ReadDevicesParams, ReadStatsParams } from './types.ts'
 import dayjs from 'dayjs'
-import ky from 'ky'
 import { hasComparableDeviceChanged, toComparableDevice } from './deviceComparison.ts'
 import { cloudlog, cloudlogErr, serializeError } from './loggin.ts'
 import { DEFAULT_LIMIT } from './types.ts'
@@ -41,51 +40,62 @@ export type Bindings = {
 export function trackDeviceUsageCF(c: Context, device_id: string, app_id: string, org_id: string) {
   if (!c.env.DEVICE_USAGE)
     return Promise.resolve()
+
+  // writeDataPoint returns immediately and Workers runtime handles it in background
   c.env.DEVICE_USAGE.writeDataPoint({
     blobs: [device_id, org_id],
     indexes: [app_id],
   })
+
   return Promise.resolve()
 }
 
 export function trackBandwidthUsageCF(c: Context, device_id: string, app_id: string, file_size: number) {
   if (!c.env.BANDWIDTH_USAGE)
     return Promise.resolve()
+
   c.env.BANDWIDTH_USAGE.writeDataPoint({
     blobs: [device_id],
     doubles: [file_size],
     indexes: [app_id],
   })
+
   return Promise.resolve()
 }
 
 export function trackVersionUsageCF(c: Context, version_id: number, app_id: string, action: string) {
   if (!c.env.VERSION_USAGE)
     return Promise.resolve()
+
   c.env.VERSION_USAGE.writeDataPoint({
     blobs: [app_id, version_id, action],
     indexes: [app_id],
   })
+
   return Promise.resolve()
 }
 
 export function trackLogsCF(c: Context, app_id: string, device_id: string, action: string, version_name: string) {
   if (!c.env.APP_LOG)
     return Promise.resolve()
+
   c.env.APP_LOG.writeDataPoint({
     blobs: [device_id, action, version_name],
     indexes: [app_id],
   })
+
   return Promise.resolve()
 }
 
 export function trackLogsCFExternal(c: Context, app_id: string, device_id: string, action: Database['public']['Enums']['stats_action'], version_name: string) {
   if (!c.env.APP_LOG_EXTERNAL)
     return Promise.resolve()
+
   c.env.APP_LOG_EXTERNAL.writeDataPoint({
     blobs: [device_id, action, version_name],
     indexes: [app_id],
   })
+
   return Promise.resolve()
 }
 
@@ -109,7 +119,7 @@ export async function trackDevicesCF(c: Context, device: DeviceWithoutCreatedAt)
   cloudlog({ requestId: c.get('requestId'), message: 'trackDevicesCF', device })
 
   if (!c.env.DB_DEVICES)
-    return Promise.resolve()
+    return
 
   const upsertQuery = `
   INSERT INTO devices (
@@ -137,7 +147,7 @@ export async function trackDevicesCF(c: Context, device: DeviceWithoutCreatedAt)
 
     // c.env.DB_DEVICES.
     const existingRow = await getD1ReadDevicesSession(c).prepare(`
-      SELECT * FROM devices 
+      SELECT * FROM devices
       WHERE device_id = ? AND app_id = ?
     `).bind(device.device_id, device.app_id).first()
 
@@ -168,8 +178,6 @@ export async function trackDevicesCF(c: Context, device: DeviceWithoutCreatedAt)
   catch (e) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Error tracking device', error: serializeError(e), query: upsertQuery })
   }
-
-  return Promise.resolve()
 }
 
 export function formatDateCF(date: string | undefined) {
@@ -214,23 +222,27 @@ async function runQueryToCFA<T>(c: Context, query: string) {
     'User-Agent': 'Capgo/1.0',
   }
   cloudlog({ requestId: c.get('requestId'), message: 'runQueryToCFA payload', headers, query })
-  const response = await ky.post(`https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/analytics_engine/sql`, {
-    headers,
-    body: query,
-  }).catch(async (e) => {
-    if (e.name === 'HTTPError') {
-      const errorJson = await e.response.json()
-      cloudlogErr({ requestId: c.get('requestId'), message: 'runQueryToCFA HTTPError', error: errorJson })
+
+  try {
+    const response = await fetch(`https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/analytics_engine/sql`, {
+      method: 'POST',
+      headers,
+      body: query,
+    })
+
+    if (!response.ok) {
+      const errorJson = await response.json()
+      cloudlogErr({ requestId: c.get('requestId'), message: 'runQueryToCFA HTTPError', status: response.status, error: errorJson })
+      throw new Error('runQueryToCFA encountered an error')
     }
-    else {
-      cloudlogErr({ requestId: c.get('requestId'), message: 'runQueryToCFA error', error: serializeError(e) })
-    }
-    // Ensuring we read the response to avoid memory leaks
-    e.response?.arrayBuffer()
+
+    const res = await response.json() as AnalyticsApiResponse & { data: T[] }
+    return convertDataToJsTypes<T>(res)
+  }
+  catch (e) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'runQueryToCFA error', error: serializeError(e) })
     throw new Error('runQueryToCFA encountered an error')
-  })
-  const res = await response.json<AnalyticsApiResponse & { data: T[] }>()
-  return convertDataToJsTypes<T>(res)
+  }
 }
 
 export interface DeviceUsageCF {

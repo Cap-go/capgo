@@ -3,7 +3,6 @@ import type { RouteLocationNormalizedLoaded } from 'vue-router'
 import type { Database } from '~/types/supabase.types'
 import { format, parse } from '@std/semver'
 import { createClient } from '@supabase/supabase-js'
-import ky from 'ky'
 import subset from 'semver/ranges/subset'
 
 let supaClient: SupabaseClient<Database> = null as any
@@ -35,21 +34,25 @@ export function getLocalConfig() {
 let config: CapgoConfig = getLocalConfig()
 
 export async function getRemoteConfig() {
-  // call host + /api/private/config and parse the result as json using ky
   const localConfig = getLocalConfig()
   if (import.meta.env.MODE === 'development')
     return localConfig
-  const data = await ky
-    .get(`${defaultApiHost}/private/config`)
-    .then(res => res.json<CapgoConfig>())
-    .then(d => ({ ...localConfig, ...d } as CapgoConfig))
-    .catch((e) => {
-      // ensure we read the response to avoid memory leaks
-      e.response?.arrayBuffer()
+
+  try {
+    const response = await fetch(`${defaultApiHost}/private/config`)
+    if (!response.ok) {
       console.log('Local config', localConfig)
       return localConfig as CapgoConfig
-    })
-  config = data
+    }
+    const data = await response.json() as CapgoConfig
+    const merged = { ...localConfig, ...data } as CapgoConfig
+    config = merged
+    return merged
+  }
+  catch {
+    console.log('Local config', localConfig)
+    return localConfig as CapgoConfig
+  }
 }
 
 export function useSupabase() {
@@ -124,17 +127,27 @@ export async function downloadUrl(provider: string, userId: string, appId: strin
     return ''
 
   const currentJwt = currentSession.session.access_token
-  const res = await ky.post(`${defaultApiHost}/files/download_link`, {
-    json: data,
-    headers: {
-      Authorization: `Bearer ${currentJwt}`,
-    },
-  }).json<{ url: string }>().catch((e) => {
-    // ensure we read the response to avoid memory leaks
-    e.response?.arrayBuffer()
-    throw new Error(`downloadUrl error: ${e.message}`)
-  })
-  return res.url
+
+  try {
+    const response = await fetch(`${defaultApiHost}/files/download_link`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${currentJwt}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    })
+
+    if (!response.ok) {
+      throw new Error(`downloadUrl error: HTTP ${response.status}`)
+    }
+
+    const res = await response.json() as { url: string }
+    return res.url
+  }
+  catch (e) {
+    throw new Error(`downloadUrl error: ${e instanceof Error ? e.message : String(e)}`)
+  }
 }
 
 // do a function to get get_process_cron_stats_job_info for supabase

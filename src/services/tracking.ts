@@ -1,4 +1,3 @@
-import ky from 'ky'
 import { defaultApiHost, useSupabase } from '~/services/supabase'
 
 type TagKey = Lowercase<string>
@@ -55,24 +54,56 @@ interface TrackOptions {
 }
 
 export async function sendEvent(payload: TrackOptions): Promise<null> {
-  return useSupabase().auth.getSession().then(({ data: currentSession }) => {
+  try {
+    const { data: currentSession } = await useSupabase().auth.getSession()
     if (!currentSession.session)
       return null
 
     const currentJwt = currentSession.session.access_token
-    return ky.post(`${defaultApiHost}/private/events`, {
-      json: payload,
-      headers: {
-        Authorization: `Bearer ${currentJwt}`,
-      },
-      timeout: 10000, // 10 seconds timeout
-      retry: 3,
-    })
-      .catch((e) => {
-        // ensure we read the response to avoid memory leaks
-        e.response?.arrayBuffer()
+
+    // Implement retry logic (3 attempts)
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        // 10 second timeout using AbortSignal
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 10000)
+
+        const response = await fetch(`${defaultApiHost}/private/events`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${currentJwt}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload),
+          signal: controller.signal,
+        })
+
+        clearTimeout(timeoutId)
+
+        // Consume response to avoid memory leaks, but don't throw on errors
+        if (!response.ok) {
+          await response.text().catch(() => {})
+          // Retry on server errors (5xx)
+          if (response.status >= 500 && attempt < 2) {
+            continue
+          }
+        }
+
         return null
-      })
-      .then(() => null)
-  }).catch(() => null)
+      }
+      catch (error) {
+        // If it's a timeout or network error and we have retries left, continue
+        if (attempt < 2 && (error instanceof Error && (error.name === 'AbortError' || error.message.includes('fetch')))) {
+          continue
+        }
+        // Last attempt failed, return null
+        return null
+      }
+    }
+
+    return null
+  }
+  catch {
+    return null
+  }
 }

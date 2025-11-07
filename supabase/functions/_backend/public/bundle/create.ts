@@ -1,6 +1,5 @@
 import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
-// import ky from 'ky'
 import { simpleError } from '../../utils/hono.ts'
 import { hasAppRightApikey, supabaseApikey } from '../../utils/supabase.ts'
 import { isValidSemver } from '../../utils/utils.ts'
