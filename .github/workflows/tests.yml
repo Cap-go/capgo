@@ -9,13 +9,13 @@ on:
     tags:
       - "*"
   pull_request:
-  workflow_call:  # Allow this workflow to be called by other workflows
+  workflow_call: # Allow this workflow to be called by other workflows
 
 env:
   DENO_DIR: my_cache_directory
 
 jobs:
-  test_base_sql:
+  test_all:
     runs-on: ubuntu-latest
     name: Run tests
     steps:
@@ -26,18 +26,6 @@ jobs:
           key: my_cache_key
       - name: Checkout capgo
         uses: actions/checkout@v5
-      - name: Install Supabase CLI
-        uses: supabase/setup-cli@v1
-        with:
-          version: 2.53.6
-      - name: Show Supabase CLI version
-        run: supabase --version
-      - name: Set edge runtime policy to per_worker
-        run: sed -i 's/policy = "oneshot"/policy = "per_worker"/g' supabase/config.toml && grep -q 'policy = "per_worker"' supabase/config.toml || exit 1
-      - name: Run Supabase Start
-        run: supabase start -x imgproxy,studio,mailpit,realtime,postgres-meta,supavisor,studio,logflare,vector,realtime,gotrue
-      - name: Run Supabase Test DB
-        run: supabase test db
       - name: Setup bun
         uses: oven-sh/setup-bun@v2
         with:
@@ -64,6 +52,16 @@ jobs:
         run: bun typecheck
       - name: Lint I18n
         run: bunx @inlang/cli lint --project project.inlang
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.54.11
+      - name: Show Supabase CLI version
+        run: supabase --version
+      - name: Run Supabase Start
+        run: supabase start -x imgproxy,studio,mailpit,realtime,postgres-meta,supavisor,studio,logflare,vector,realtime,gotrue
+      - name: Run Supabase Test DB
+        run: supabase test db
       - name: Lint SQL
         run: supabase db lint -s public --fail-on warning
       - uses: JarvusInnovations/background-action@v1
@@ -89,7 +87,7 @@ jobs:
           # failure = exit-early or timeout
 
           working-directory: .
-      - name: Run tests
+      - name: Run all backend and CLI tests
         run: bun run test:all
         # TODO: enable these tests when they are stable
       # - uses: JarvusInnovations/background-action@v1
