@@ -4,7 +4,7 @@
     "@hono/sentry": "npm:@hono/sentry@1.2.2",
     "hono": "npm:hono@^4.10.2",
     "hono/": "npm:/hono@^4.10.2/",
-    "stripe": "npm:stripe@19.1.0",
+    "stripe": "npm:stripe@19.3.0",
     "zod": "npm:zod@^4.1.11",
     "zod/": "npm:/zod@^4.1.11/",
     "ky": "npm:ky@^1.13.0",
