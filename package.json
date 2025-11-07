@@ -1,7 +1,7 @@
 {
   "name": "capgo-app",
   "type": "module",
-  "version": "12.42.3",
+  "version": "12.42.4",
   "private": true,
   "license": "GPL-3.0",
   "scripts": {
@@ -196,7 +196,7 @@
     "@antfu/eslint-config": "6.2.0",
     "@capacitor/cli": "^7.4.4",
     "@capacitor/core": "^7.4.4",
-    "@capgo/cli": "7.19.1",
+    "@capgo/cli": "7.19.2",
     "@cloudflare/workers-types": "4.20251106.1",
     "@iconify/json": "^2.2.404",
     "@playwright/test": "1.56.1",
