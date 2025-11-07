@@ -382,15 +382,18 @@ export async function isPayingOrg(orgId: string): Promise<boolean> {
 }
 
 export async function getPlans(): Promise<Database['public']['Tables']['plans']['Row'][]> {
-  const data = await ky
-    .get(`${defaultApiHost}/private/plans`)
-    .then(res => res.json<Database['public']['Tables']['plans']['Row'][]>())
-    .catch((e) => {
-      // ensure we read the response to avoid memory leaks
-      e.response?.arrayBuffer()
+  try {
+    const response = await fetch(`${defaultApiHost}/private/plans`)
+
+    if (!response.ok) {
       return []
-    })
-  return data
+    }
+
+    return await response.json() as Database['public']['Tables']['plans']['Row'][]
+  }
+  catch {
+    return []
+  }
 }
 
 interface PlanUsage {
