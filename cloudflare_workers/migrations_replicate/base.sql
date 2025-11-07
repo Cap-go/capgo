@@ -6,6 +6,8 @@ DROP TABLE IF EXISTS channel_devices;
 
 DROP TABLE IF EXISTS apps;
 
+DROP TABLE IF EXISTS manifest;
+
 DROP TABLE IF EXISTS orgs;
 
 -- Create app_versions table
