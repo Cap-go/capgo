@@ -209,7 +209,10 @@ export function requestInfosPostgresV2(
 
   const channelDevice = shouldQueryChannelOverride
     ? requestInfosChannelDevicePostgres(c, app_id, device_id, drizzleClient)
-    : Promise.resolve(undefined)
+    : Promise.resolve(undefined).then(() => {
+        cloudlog({ requestId: c.get('requestId'), message: 'Skipping channel device override query' })
+        return null
+      })
   const channel = requestInfosChannelPostgres(c, platform, app_id, defaultChannel, drizzleClient)
 
   return Promise.all([channelDevice, channel])
