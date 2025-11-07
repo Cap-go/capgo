@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import type { FloatingConfig } from '@vuepic/vue-datepicker'
 import type { TableColumn } from './comp_def'
 import type { Organization } from '~/stores/organization'
 import { FormKit } from '@formkit/vue'
