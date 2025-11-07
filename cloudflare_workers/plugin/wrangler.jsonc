@@ -16,7 +16,7 @@
     "prod": {
       "name": "capgo_plugin-prod",
       "vars": {
-        "IS_V2": "0.3",
+        "IS_V2": "0.5",
         "ENV_NAME": "capgo_plugin-prod"
       },
       "observability": {
