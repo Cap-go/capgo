@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import type { DatePickerInstance } from '@vuepic/vue-datepicker'
+import type { FloatingConfig } from '@vuepic/vue-datepicker'
 import type { TableColumn } from './comp_def'
 import type { Organization } from '~/stores/organization'
 import { FormKit } from '@formkit/vue'
-import VueDatePicker from '@vuepic/vue-datepicker'
+import { VueDatePicker } from '@vuepic/vue-datepicker'
 import { useDark, useDebounceFn } from '@vueuse/core'
 import dayjs from 'dayjs'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
@@ -31,7 +31,6 @@ interface Props {
   elementList: { [key: string]: any }[]
   appId: string
 }
-
 const props = defineProps<Props>()
 const emit = defineEmits([
   'reload',
@@ -46,7 +45,9 @@ const emit = defineEmits([
   'update:columns',
   'update:currentPage',
 ])
-const datepicker = ref<DatePickerInstance>(null)
+
+// const floating: FloatingConfig = { offset: 8, arrow: true, placement: 'right', strategy: 'fixed' }
+const datepicker = useTemplateRef<InstanceType<typeof VueDatePicker>>('datepicker')
 const { t } = useI18n()
 const isDark = useDark()
 const searchVal = ref(props.search ?? '')
@@ -391,7 +392,6 @@ onMounted(async () => {
         <VueDatePicker
           ref="datepicker"
           v-model="preciseDates"
-          position="right"
           :min-date="dayjs().subtract(30, 'day').toDate()"
           :max-date="dayjs().toDate()"
           :start-time="startTime"
