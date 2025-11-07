@@ -21,7 +21,9 @@ declare global {
 const BATCH_SIZE = 998 // D1 batch size for statements
 
 interface Env {
-  DB: D1Database
+  DB_REPLICA_EU: D1Database
+  DB_REPLICA_AS: D1Database
+  DB_REPLICA_US: D1Database
   HYPERDRIVE_DB: Hyperdrive // Add Hyperdrive binding
   WEBHOOK_SECRET: string
 }
@@ -332,7 +334,11 @@ async function handleNuke(request: Request, env: Env) {
   try {
     console.log(`[Nuke] Initializing database for nuke operation...`)
     // Initialize database ensures data tables exist
-    await checkAndCreateTables(env.DB.withSession(`first-primary`))
+    await Promise.all([
+      checkAndCreateTables(env.DB_REPLICA_EU.withSession(`first-primary`)),
+      checkAndCreateTables(env.DB_REPLICA_AS.withSession(`first-primary`)),
+      checkAndCreateTables(env.DB_REPLICA_US.withSession(`first-primary`)),
+    ])
     console.log(`[Nuke] Database initialized.`)
 
     let tableName: string | undefined
@@ -351,14 +357,22 @@ async function handleNuke(request: Request, env: Env) {
     switch (body.type) {
       case 'all':
         console.log(`[Nuke All] Starting database nuke.`)
-        await nukeDatabase(env.DB.withSession(`first-primary`))
+        await Promise.all([
+          nukeDatabase(env.DB_REPLICA_EU.withSession(`first-primary`)),
+          nukeDatabase(env.DB_REPLICA_AS.withSession(`first-primary`)),
+          nukeDatabase(env.DB_REPLICA_US.withSession(`first-primary`)),
+        ])
         console.log(`[Nuke All] Database nuke complete.`)
         return new Response('Database nuked', { status: 200 })
 
       case 'table':
         // tableName is already validated and locked
         console.log(`[Nuke Table ${tableName}] Starting table nuke.`)
-        await nukeTable(env.DB.withSession(`first-primary`), tableName!)
+        await Promise.all([
+          nukeTable(env.DB_REPLICA_EU.withSession(`first-primary`), tableName!),
+          nukeTable(env.DB_REPLICA_AS.withSession(`first-primary`), tableName!),
+          nukeTable(env.DB_REPLICA_US.withSession(`first-primary`), tableName!),
+        ])
         console.log(`[Nuke Table ${tableName}] Table nuke complete.`)
         // No lock to release
         return new Response(`Table ${tableName} nuked`, { status: 200 })
@@ -455,7 +469,11 @@ async function handleSyncRequest(request: Request, env: Env, ctx: ExecutionConte
 
   try {
     // Ensure tables exist (including sync_pgmq_state) before scheduling background task
-    await checkAndCreateTables(env.DB.withSession(`first-primary`))
+    await Promise.all([
+      checkAndCreateTables(env.DB_REPLICA_EU.withSession(`first-primary`)),
+      checkAndCreateTables(env.DB_REPLICA_AS.withSession(`first-primary`)),
+      checkAndCreateTables(env.DB_REPLICA_US.withSession(`first-primary`)),
+    ])
     console.log(`[Sync Request] Database tables checked/ensured. Scheduling background processing. Time: ${Date.now() - handlerStart}ms`)
 
     // Run the queue processing in the background using waitUntil
@@ -463,7 +481,11 @@ async function handleSyncRequest(request: Request, env: Env, ctx: ExecutionConte
       (async () => {
         console.log(`[Background Queue Sync] Starting background execution.`)
         try {
-          await processReplicationQueue(env.DB.withSession(`first-primary`), env)
+          await Promise.all([
+            processReplicationQueue(env.DB_REPLICA_EU.withSession(`first-primary`), env),
+            processReplicationQueue(env.DB_REPLICA_AS.withSession(`first-primary`), env),
+            processReplicationQueue(env.DB_REPLICA_US.withSession(`first-primary`), env),
+          ])
           console.log(`[Background Queue Sync] Background execution finished successfully.`)
         }
         catch (error) {
