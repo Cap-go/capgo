@@ -83,7 +83,8 @@
       "owner_org": "TEXT",
       "default_upload_channel": "TEXT",
       "transfer_history": "JSON",
-      "channel_device_count": "INTEGER"
+      "channel_device_count": "INTEGER",
+      "manifest_bundle_count": "INTEGER"
     },
     "indexes": [
       "app_id",

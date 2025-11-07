@@ -156,7 +156,8 @@ CREATE TABLE IF NOT EXISTS apps (
     owner_org TEXT,
     default_upload_channel TEXT,
     transfer_history TEXT,
-    channel_device_count INTEGER DEFAULT 0
+    channel_device_count INTEGER DEFAULT 0,
+    manifest_bundle_count INTEGER DEFAULT 0
 );
 
 CREATE INDEX IF NOT EXISTS idx_apps_id ON apps (id);

@@ -5,6 +5,7 @@ import { alias as aliasV2 } from 'drizzle-orm/sqlite-core'
 import { existInEnv } from '../utils/utils.ts'
 import { quickError } from './hono.ts'
 import { cloudlog, cloudlogErr } from './loggin.ts'
+import { withOptionalManifestSelect } from './queryHelpers.ts'
 import * as schemaV2 from './sqlite_schema.ts'
 
 const PLAN_EXCEEDED_COLUMNS_V2: Record<'mau' | 'storage' | 'bandwidth', string> = {
@@ -129,22 +130,28 @@ export function requestInfosChannelDevicePostgres(
   app_id: string,
   device_id: string,
   drizzleClient: ReturnType<typeof getDrizzleClientD1>,
+  includeManifest: boolean,
 ) {
   const { versionSelect, channelDevicesAlias, channelAlias, channelSelect, manifestSelect, versionAlias } = getSchemaUpdatesAlias()
-  const query = drizzleClient
-    .select({
-      channel_devices: {
-        device_id: channelDevicesAlias.device_id,
-        app_id: sql<string>`${channelDevicesAlias.app_id}`.as('cd_app_id'),
-      },
-      version: versionSelect,
-      channels: channelSelect,
-      manifestEntries: manifestSelect,
-    })
+  const baseSelect = {
+    channel_devices: {
+      device_id: channelDevicesAlias.device_id,
+      app_id: sql<string>`${channelDevicesAlias.app_id}`.as('cd_app_id'),
+    },
+    version: versionSelect,
+    channels: channelSelect,
+  }
+  const selectShape = withOptionalManifestSelect(baseSelect, includeManifest, manifestSelect)
+
+  const baseQuery = drizzleClient
+    .select(selectShape)
     .from(channelDevicesAlias)
     .innerJoin(channelAlias, eq(channelDevicesAlias.channel_id, channelAlias.id))
     .innerJoin(versionAlias, eq(channelAlias.version, versionAlias.id))
-    .leftJoin(schemaV2.manifest, eq(schemaV2.manifest.app_version_id, versionAlias.id))
+
+  const query = (includeManifest
+    ? baseQuery.leftJoin(schemaV2.manifest, eq(schemaV2.manifest.app_version_id, versionAlias.id))
+    : baseQuery)
     .where(and(eq(channelDevicesAlias.device_id, device_id), eq(channelDevicesAlias.app_id, app_id)))
     .groupBy(channelDevicesAlias.device_id, channelDevicesAlias.app_id, channelAlias.id, versionAlias.id)
     .limit(1)
@@ -162,18 +169,24 @@ export function requestInfosChannelPostgres(
   app_id: string,
   defaultChannel: string,
   drizzleClient: ReturnType<typeof getDrizzleClientD1>,
+  includeManifest: boolean,
 ) {
   const { versionSelect, channelAlias, channelSelect, manifestSelect, versionAlias } = getSchemaUpdatesAlias()
   const platformQuery = platform === 'android' ? channelAlias.android : channelAlias.ios
-  const channelQuery = drizzleClient
-    .select({
-      version: versionSelect,
-      channels: channelSelect,
-      manifestEntries: manifestSelect,
-    })
+  const baseSelect = {
+    version: versionSelect,
+    channels: channelSelect,
+  }
+  const selectShape = withOptionalManifestSelect(baseSelect, includeManifest, manifestSelect)
+
+  const baseQuery = drizzleClient
+    .select(selectShape)
     .from(channelAlias)
     .innerJoin(versionAlias, eq(channelAlias.version, versionAlias.id))
-    .leftJoin(schemaV2.manifest, eq(schemaV2.manifest.app_version_id, versionAlias.id))
+
+  const channelQuery = (includeManifest
+    ? baseQuery.leftJoin(schemaV2.manifest, eq(schemaV2.manifest.app_version_id, versionAlias.id))
+    : baseQuery)
     .where(!defaultChannel
       ? and(
           eq(channelAlias.public, true),
@@ -204,16 +217,18 @@ export function requestInfosPostgresV2(
   defaultChannel: string,
   drizzleClient: ReturnType<typeof getDrizzleClientD1>,
   channelDeviceCount?: number | null,
+  manifestBundleCount?: number | null,
 ) {
   const shouldQueryChannelOverride = channelDeviceCount === undefined || channelDeviceCount === null ? true : channelDeviceCount > 0
+  const shouldFetchManifest = manifestBundleCount === undefined || manifestBundleCount === null ? true : manifestBundleCount > 0
 
   const channelDevice = shouldQueryChannelOverride
-    ? requestInfosChannelDevicePostgres(c, app_id, device_id, drizzleClient)
+    ? requestInfosChannelDevicePostgres(c, app_id, device_id, drizzleClient, shouldFetchManifest)
     : Promise.resolve(undefined).then(() => {
         cloudlog({ requestId: c.get('requestId'), message: 'Skipping channel device override query' })
         return null
       })
-  const channel = requestInfosChannelPostgres(c, platform, app_id, defaultChannel, drizzleClient)
+  const channel = requestInfosChannelPostgres(c, platform, app_id, defaultChannel, drizzleClient, shouldFetchManifest)
 
   return Promise.all([channelDevice, channel])
     .then(([channelOverride, channelData]) => {
@@ -231,7 +246,7 @@ export async function getAppOwnerPostgresV2(
   appId: string,
   drizzleClient: ReturnType<typeof getDrizzleClientD1>,
   actions: ('mau' | 'storage' | 'bandwidth')[] = [],
-): Promise<{ owner_org: string, orgs: { created_by: string, id: string }, plan_valid: boolean, channel_device_count: number } | null> {
+): Promise<{ owner_org: string, orgs: { created_by: string, id: string }, plan_valid: boolean, channel_device_count: number, manifest_bundle_count: number } | null> {
   try {
     cloudlog({ requestId: c.get('requestId'), message: 'appOwner', appId })
     if (actions.length === 0)
@@ -243,6 +258,7 @@ export async function getAppOwnerPostgresV2(
         owner_org: schemaV2.apps.owner_org,
         plan_valid: planExpression,
         channel_device_count: schemaV2.apps.channel_device_count,
+        manifest_bundle_count: schemaV2.apps.manifest_bundle_count,
         orgs: {
           created_by: orgAlias.created_by,
           id: orgAlias.id,

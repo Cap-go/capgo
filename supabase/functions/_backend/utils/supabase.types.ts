@@ -240,6 +240,7 @@ export type Database = {
           last_version: string | null
           name: string | null
           owner_org: string
+          manifest_bundle_count: number
           retention: number
           transfer_history: Json[] | null
           updated_at: string | null
@@ -255,6 +256,7 @@ export type Database = {
           last_version?: string | null
           name?: string | null
           owner_org: string
+          manifest_bundle_count?: number
           retention?: number
           transfer_history?: Json[] | null
           updated_at?: string | null
@@ -270,6 +272,7 @@ export type Database = {
           last_version?: string | null
           name?: string | null
           owner_org?: string
+          manifest_bundle_count?: number
           retention?: number
           transfer_history?: Json[] | null
           updated_at?: string | null

@@ -113,13 +113,17 @@ export async function updateWithPG(
     return onPremStats(c, app_id, 'get', device)
   }
   const channelDeviceCount = appOwner.channel_device_count ?? 0
+  const manifestBundleCount = appOwner.manifest_bundle_count ?? 0
   const bypassChannelOverrides = channelDeviceCount <= 0
+  const fetchManifestEntries = manifestBundleCount > 0
   cloudlog({
     requestId: c.get('requestId'),
     message: 'App channel device count evaluated',
     app_id,
     channelDeviceCount,
     bypassChannelOverrides,
+    manifestBundleCount,
+    fetchManifestEntries,
   })
   if (body.version_build === 'unknown') {
     return simpleError200(c, 'unknown_version_build', 'Version build is unknown, cannot proceed with update', { body })
@@ -166,8 +170,8 @@ export async function updateWithPG(
   const requestedInto = await returnV2orV1(
     c,
     isV2,
-    () => requestInfosPostgres(c, platform, app_id, device_id, defaultChannel, drizzleClient, channelDeviceCount),
-    () => requestInfosPostgresV2(c, platform, app_id, device_id, defaultChannel, getDrizzleCientD1(), channelDeviceCount),
+    () => requestInfosPostgres(c, platform, app_id, device_id, defaultChannel, drizzleClient, channelDeviceCount, manifestBundleCount),
+    () => requestInfosPostgresV2(c, platform, app_id, device_id, defaultChannel, getDrizzleCientD1(), channelDeviceCount, manifestBundleCount),
   )
   const { channelOverride } = requestedInto
   let { channelData } = requestedInto
@@ -188,7 +192,7 @@ export async function updateWithPG(
   }
 
   const version = channelOverride?.version ?? channelData.version
-  const manifestEntries = channelOverride?.manifestEntries ?? channelData.manifestEntries
+  const manifestEntries = (channelOverride?.manifestEntries ?? channelData?.manifestEntries ?? []) as ManifestEntry[]
   // device.version = versionData ? versionData.id : version.id
 
   // TODO: find better solution to check if device is from apple or google, currently not working in
