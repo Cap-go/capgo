@@ -1,6 +1,5 @@
 import type { Context } from 'hono'
 import type { ManifestEntry } from './downloadUrl.ts'
-import type { getDrizzleClientD1 } from './pg_d1.ts'
 
 import type { Database } from './supabase.types.ts'
 import type { AppInfos, DeviceWithoutCreatedAt } from './types.ts'
@@ -20,7 +19,7 @@ import { closeClient, getAppOwnerPostgres, getDrizzleClient, getPgClient, reques
 import { getAppOwnerPostgresV2, getDrizzleClientD1Session, requestInfosPostgresV2 } from './pg_d1.ts'
 import { s3 } from './s3.ts'
 import { createStatsBandwidth, createStatsMau, createStatsVersion, onPremStats, sendStatsAndDevice } from './stats.ts'
-import { backgroundTask, existInEnv, fixSemver, isInternalVersionName } from './utils.ts'
+import { backgroundTask, fixSemver, isInternalVersionName } from './utils.ts'
 
 const PLAN_LIMIT: Array<'mau' | 'bandwidth' | 'storage'> = ['mau', 'bandwidth']
 
