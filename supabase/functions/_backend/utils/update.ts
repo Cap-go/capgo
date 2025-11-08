@@ -55,15 +55,16 @@ async function returnV2orV1<T>(
   if (isV2) {
     return runV2()
   }
+  // Disabled to no overload DB
   // In the v1 case, use PG as the source of truth, but kick off v2 in the background
-  if (getRuntimeKey() === 'workerd' && existInEnv(c, 'DB_REPLICATE')) {
-    const replicatePromise = runV2().then((res) => {
-      cloudlog({ requestId: c.get('requestId'), message: 'Completed background V2 function', res })
-    }).catch((err) => {
-      cloudlog({ requestId: c.get('requestId'), message: 'Error in background V2 function', err })
-    })
-    await backgroundTask(c, replicatePromise)
-  }
+  // if (getRuntimeKey() === 'workerd' && existInEnv(c, 'DB_REPLICA_EU')) {
+  //   const replicatePromise = runV2().then((res) => {
+  //     cloudlog({ requestId: c.get('requestId'), message: 'Completed background V2 function', res })
+  //   }).catch((err) => {
+  //     cloudlog({ requestId: c.get('requestId'), message: 'Error in background V2 function', err })
+  //   })
+  //   await backgroundTask(c, replicatePromise)
+  // }
   return runV1()
 }
 

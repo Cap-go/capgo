@@ -19,7 +19,7 @@ app.get('/', async (c) => {
   ]
 
   // Count from D1 database using pre-calculated counts
-  const d1 = c.env.DB_REPLICATE as D1Database
+  const d1 = c.env.DB_REPLICA_EU as D1Database
   const d1Counts = await Promise.all(
     tables.map(table =>
       d1.prepare(`SELECT record_count as count FROM table_counts WHERE table_name = ?`).bind(table).first(),

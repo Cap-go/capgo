@@ -17,7 +17,9 @@ export type Bindings = {
   APP_LOG: AnalyticsEngineDataPoint
   DB_DEVICES: D1Database
   DB_STOREAPPS: D1Database
-  DB_REPLICATE: D1Database
+  DB_REPLICA_EU: D1Database
+  DB_REPLICA_AS: D1Database
+  DB_REPLICA_US: D1Database
   HYPERDRIVE_DB: Hyperdrive
   HYPERDRIVE_DB_DIRECT: Hyperdrive
   ATTACHMENT_UPLOAD_HANDLER: DurableObjectNamespace

@@ -80,8 +80,8 @@ export function getDatabaseURL(c: Context, readOnly = false): string {
 
   // Fallback to single Hyperdrive if available
   if (existInEnv(c, 'HYPERDRIVE_DB')) {
-    c.header('X-Database-Source', 'hyperdrive')
-    cloudlog({ requestId: c.get('requestId'), message: 'Using Hyperdrive for read-write' })
+    c.header('X-Database-Source', readOnly ? 'read_pooler_eu' : 'hyperdrive')
+    cloudlog({ requestId: c.get('requestId'), message: `Using Hyperdrive EU for ${readOnly ? 'read-only' : 'read-write'}` })
     return (getEnv(c, 'HYPERDRIVE_DB') as unknown as Hyperdrive).connectionString
   }
 
@@ -101,7 +101,7 @@ export function getDatabaseURL(c: Context, readOnly = false): string {
 export function getPgClient(c: Context, readOnly = false) {
   const dbUrl = getDatabaseURL(c, readOnly)
   const requestId = c.get('requestId')
-  const appName = c.header('X-Database-Source') ?? 'capgo_plugin'
+  const appName = c.res.headers.get('X-Database-Source') ?? 'unknown source'
   cloudlog({ requestId, message: 'SUPABASE_DB_URL', dbUrl })
 
   const options = {
