@@ -70,7 +70,7 @@ async function returnV2orV1<T>(
 export async function updateWithPG(
   c: Context,
   body: AppInfos,
-  getDrizzleCientD1: () => ReturnType<typeof getDrizzleClientD1>,
+  getDrizzleCientD1: () => ReturnType<typeof getDrizzleClientD1Session>,
   drizzleClient: ReturnType<typeof getDrizzleClient>,
   isV2: boolean,
 ) {
