@@ -3,6 +3,7 @@ import { and, eq, or, sql } from 'drizzle-orm'
 import { drizzle as drizzleD1 } from 'drizzle-orm/d1'
 import { alias as aliasV2 } from 'drizzle-orm/sqlite-core'
 import { existInEnv } from '../utils/utils.ts'
+import { getClientDbRegion } from './geolocation.ts'
 import { quickError } from './hono.ts'
 import { cloudlog, cloudlogErr } from './loggin.ts'
 import { withOptionalManifestSelect } from './queryHelpers.ts'
@@ -38,7 +39,7 @@ function buildPlanValidationExpressionV2(
   )`
 }
 
-export function selectOneD1(drizzleClient: ReturnType<typeof getDrizzleClientD1>) {
+export function selectOneD1(drizzleClient: ReturnType<typeof getDrizzleClientD1Session>) {
   return drizzleClient.run(sql`select 1`)
 }
 
@@ -64,28 +65,24 @@ export function parseManifestEntries(c: Context, data: any, source: string) {
 }
 
 export function getPgClientD1(c: Context, session: string = 'first-unconstrained') {
+  const dbRegion = getClientDbRegion(c)
+  let DB: D1Database = c.env.DB_REPLICA_EU
+  let DB_REG: 'EU' | 'US' | 'AS' = 'EU'
+  if (existInEnv(c, 'DB_REPLICA_EU') && dbRegion === 'AS') {
+    DB = c.env.DB_REPLICA_AS
+    DB_REG = 'AS'
+  }
+  else if (existInEnv(c, 'DB_REPLICA_US') && dbRegion === 'US') {
+    DB = c.env.DB_REPLICA_US
+    DB_REG = 'US'
+  }
   if (!existInEnv(c, 'DB_REPLICA_EU')) {
     // Server/configuration error: surface as structured HTTP error
     throw quickError(500, 'missing_binding', 'DB_REPLICA_EU is not set', { binding: 'DB_REPLICA_EU' })
   }
-  const rand = Math.floor(Math.random() * 3)
-  const DB_REG = ['EU', 'US', 'AS'][rand]
   cloudlog({ requestId: c.get('requestId'), message: `Using D1 ${DB_REG} instance` })
-  const DB = [c.env.DB_REPLICA_EU, c.env.DB_REPLICA_US, c.env.DB_REPLICA_AS][rand]
-  if (session)
-    c.header('X-Database-Source', `d1-${DB_REG}-session`)
-  else
-    c.header('X-Database-Source', `d1-${DB_REG}`)
-  return session ? DB.withSession(session) : DB
-}
-
-export function getDrizzleClientD1(c: Context) {
-  if (!existInEnv(c, 'DB_REPLICA_EU')) {
-    // Server/configuration error: surface as structured HTTP error
-    throw quickError(500, 'missing_binding', 'DB_REPLICATE is not set', { binding: 'DB_REPLICA_EU' })
-  }
-  cloudlog({ requestId: c.get('requestId'), message: 'Using D1 for Drizzle Client' })
-  return drizzleD1(getPgClientD1(c, undefined))
+  c.header('X-Database-Source', `d1-${DB_REG}-session`)
+  return DB.withSession(session) as any as D1Database
 }
 
 export function getDrizzleClientD1Session(c: Context) {
@@ -93,8 +90,7 @@ export function getDrizzleClientD1Session(c: Context) {
     throw quickError(500, 'missing_binding', 'DB_REPLICATE is not set', { binding: 'DB_REPLICA_EU' })
   }
   cloudlog({ requestId: c.get('requestId'), message: 'Using D1 with session for Drizzle Client' })
-  const session = getPgClientD1(c)
-  return drizzleD1(session)
+  return drizzleD1(getPgClientD1(c))
 }
 
 function getSchemaUpdatesAlias() {
@@ -135,7 +131,7 @@ export function requestInfosChannelDevicePostgres(
   c: Context,
   app_id: string,
   device_id: string,
-  drizzleClient: ReturnType<typeof getDrizzleClientD1>,
+  drizzleClient: ReturnType<typeof getDrizzleClientD1Session>,
   includeManifest: boolean,
 ) {
   const { versionSelect, channelDevicesAlias, channelAlias, channelSelect, manifestSelect, versionAlias } = getSchemaUpdatesAlias()
@@ -174,7 +170,7 @@ export function requestInfosChannelPostgres(
   platform: string,
   app_id: string,
   defaultChannel: string,
-  drizzleClient: ReturnType<typeof getDrizzleClientD1>,
+  drizzleClient: ReturnType<typeof getDrizzleClientD1Session>,
   includeManifest: boolean,
 ) {
   const { versionSelect, channelAlias, channelSelect, manifestSelect, versionAlias } = getSchemaUpdatesAlias()
@@ -221,7 +217,7 @@ export function requestInfosPostgresV2(
   app_id: string,
   device_id: string,
   defaultChannel: string,
-  drizzleClient: ReturnType<typeof getDrizzleClientD1>,
+  drizzleClient: ReturnType<typeof getDrizzleClientD1Session>,
   channelDeviceCount?: number | null,
   manifestBundleCount?: number | null,
 ) {
@@ -250,7 +246,7 @@ export function requestInfosPostgresV2(
 export async function getAppOwnerPostgresV2(
   c: Context,
   appId: string,
-  drizzleClient: ReturnType<typeof getDrizzleClientD1>,
+  drizzleClient: ReturnType<typeof getDrizzleClientD1Session>,
   actions: ('mau' | 'storage' | 'bandwidth')[] = [],
 ): Promise<{ owner_org: string, orgs: { created_by: string, id: string }, plan_valid: boolean, channel_device_count: number, manifest_bundle_count: number } | null> {
   try {
@@ -313,7 +309,7 @@ export async function getAppVersionsByAppIdD1(
   c: Context,
   appId: string,
   versionName: string,
-  drizzleClient: ReturnType<typeof getDrizzleClientD1>,
+  drizzleClient: ReturnType<typeof getDrizzleClientD1Session>,
   actions: ('mau' | 'storage' | 'bandwidth')[] = [],
 ): Promise<{ id: number, owner_org: string, name: string, plan_valid: boolean }[]> {
   try {
@@ -345,7 +341,7 @@ export async function getChannelDeviceOverrideD1(
   c: Context,
   appId: string,
   deviceId: string,
-  drizzleClient: ReturnType<typeof getDrizzleClientD1>,
+  drizzleClient: ReturnType<typeof getDrizzleClientD1Session>,
 ): Promise<{ app_id: string, device_id: string, channel_id: { id: number, allow_device_self_set: boolean, name: string } } | null> {
   try {
     const result = await drizzleClient
@@ -392,7 +388,7 @@ export async function getChannelByNameD1(
   c: Context,
   appId: string,
   channelName: string,
-  drizzleClient: ReturnType<typeof getDrizzleClientD1>,
+  drizzleClient: ReturnType<typeof getDrizzleClientD1Session>,
 ): Promise<{ id: number, name: string, allow_device_self_set: boolean, owner_org: string } | null> {
   try {
     const channel = await drizzleClient
@@ -420,7 +416,7 @@ export async function getChannelByNameD1(
 export async function getMainChannelsD1(
   c: Context,
   appId: string,
-  drizzleClient: ReturnType<typeof getDrizzleClientD1>,
+  drizzleClient: ReturnType<typeof getDrizzleClientD1Session>,
 ): Promise<{ name: string, ios: boolean, android: boolean }[]> {
   try {
     const channels = await drizzleClient
@@ -446,7 +442,7 @@ export async function getChannelsD1(
   c: Context,
   appId: string,
   condition: { defaultChannel?: string } | { public: boolean },
-  drizzleClient: ReturnType<typeof getDrizzleClientD1>,
+  drizzleClient: ReturnType<typeof getDrizzleClientD1Session>,
 ): Promise<{ id: number, name: string, ios: boolean, android: boolean, public: boolean }[]> {
   try {
     const whereConditions = [eq(schemaV2.channels.app_id, appId)]
@@ -479,7 +475,7 @@ export async function getChannelsD1(
 export async function getAppByIdD1(
   c: Context,
   appId: string,
-  drizzleClient: ReturnType<typeof getDrizzleClientD1>,
+  drizzleClient: ReturnType<typeof getDrizzleClientD1Session>,
   actions: ('mau' | 'storage' | 'bandwidth')[] = [],
 ): Promise<{ owner_org: string, plan_valid: boolean } | null> {
   try {
@@ -509,7 +505,7 @@ export async function getCompatibleChannelsD1(
   platform: 'ios' | 'android',
   isEmulator: boolean,
   isProd: boolean,
-  drizzleClient: ReturnType<typeof getDrizzleClientD1>,
+  drizzleClient: ReturnType<typeof getDrizzleClientD1Session>,
 ): Promise<{ id: number, name: string, allow_device_self_set: boolean, allow_emulator: boolean, allow_dev: boolean, ios: boolean, android: boolean, public: boolean }[]> {
   try {
     const channels = await drizzleClient

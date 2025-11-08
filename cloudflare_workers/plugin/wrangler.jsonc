@@ -9,7 +9,7 @@
   ],
   "workers_dev": false,
   "placement": {
-    "mode": "smart"
+    "mode": "off"
   },
   "upload_source_maps": true,
   "env": {
