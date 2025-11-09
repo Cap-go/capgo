@@ -238,9 +238,9 @@ export type Database = {
           icon_url: string
           id: string | null
           last_version: string | null
+          manifest_bundle_count: number
           name: string | null
           owner_org: string
-          manifest_bundle_count: number
           retention: number
           transfer_history: Json[] | null
           updated_at: string | null
@@ -254,9 +254,9 @@ export type Database = {
           icon_url: string
           id?: string | null
           last_version?: string | null
+          manifest_bundle_count?: number
           name?: string | null
           owner_org: string
-          manifest_bundle_count?: number
           retention?: number
           transfer_history?: Json[] | null
           updated_at?: string | null
@@ -270,9 +270,9 @@ export type Database = {
           icon_url?: string
           id?: string | null
           last_version?: string | null
+          manifest_bundle_count?: number
           name?: string | null
           owner_org?: string
-          manifest_bundle_count?: number
           retention?: number
           transfer_history?: Json[] | null
           updated_at?: string | null
@@ -2200,6 +2200,10 @@ export type Database = {
       parse_step_pattern: { Args: { pattern: string }; Returns: number }
       pg_log: { Args: { decision: string; input?: Json }; Returns: undefined }
       process_admin_stats: { Args: never; Returns: undefined }
+      process_channel_device_counts_queue: {
+        Args: { batch_size?: number }
+        Returns: number
+      }
       process_cron_stats_jobs: { Args: never; Returns: undefined }
       process_cron_sync_sub_jobs: { Args: never; Returns: undefined }
       process_d1_replication_batch: { Args: never; Returns: undefined }
@@ -2207,6 +2211,10 @@ export type Database = {
       process_free_trial_expired: { Args: never; Returns: undefined }
       process_function_queue: {
         Args: { batch_size?: number; queue_name: string }
+        Returns: number
+      }
+      process_manifest_bundle_counts_queue: {
+        Args: { batch_size?: number }
         Returns: number
       }
       process_stats_email_monthly: { Args: never; Returns: undefined }
@@ -2379,6 +2387,7 @@ export type Database = {
         | "download_manifest_file_fail"
         | "download_manifest_checksum_fail"
         | "download_manifest_brotli_fail"
+        | "backend_refusal"
       stripe_status:
         | "created"
         | "succeeded"
@@ -2632,6 +2641,7 @@ export const Constants = {
         "download_manifest_file_fail",
         "download_manifest_checksum_fail",
         "download_manifest_brotli_fail",
+        "backend_refusal",
       ],
       stripe_status: [
         "created",
