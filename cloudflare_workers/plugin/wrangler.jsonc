@@ -9,7 +9,7 @@
   ],
   "workers_dev": false,
   "placement": {
-    "mode": "off"
+    "mode": "smart"
   },
   "upload_source_maps": true,
   "env": {
@@ -110,8 +110,8 @@
       ],
       "hyperdrive": [
         {
-          "binding": "HYPERDRIVE_DB",
-          "id": "0f1d77550db142fbb17cb6b3ee659a06"
+          "binding": "HYPERDRIVE_DB_EU",
+          "id": "52723917a61f49b7b36eb71b225b19f5"
         },
         {
           "binding": "HYPERDRIVE_DB_SG",
@@ -179,8 +179,8 @@
       ],
       "hyperdrive": [
         {
-          "binding": "HYPERDRIVE_DB",
-          "id": "0f1d77550db142fbb17cb6b3ee659a06"
+          "binding": "HYPERDRIVE_DB_EU",
+          "id": "52723917a61f49b7b36eb71b225b19f5"
         },
 
         {
@@ -264,8 +264,8 @@
       ],
       "hyperdrive": [
         {
-          "binding": "HYPERDRIVE_DB",
-          "id": "0f1d77550db142fbb17cb6b3ee659a06"
+          "binding": "HYPERDRIVE_DB_EU",
+          "id": "52723917a61f49b7b36eb71b225b19f5"
         },
         {
           "binding": "HYPERDRIVE_DB_SG",
@@ -351,8 +351,8 @@
       ],
       "hyperdrive": [
         {
-          "binding": "HYPERDRIVE_DB",
-          "id": "0f1d77550db142fbb17cb6b3ee659a06"
+          "binding": "_EU",
+          "id": "52723917a61f49b7b36eb71b225b19f5"
         },
 
         {
@@ -435,8 +435,8 @@
       ],
       "hyperdrive": [
         {
-          "binding": "HYPERDRIVE_DB",
-          "id": "0f1d77550db142fbb17cb6b3ee659a06"
+          "binding": "HYPERDRIVE_DB_EU",
+          "id": "52723917a61f49b7b36eb71b225b19f5"
         },
         {
           "binding": "HYPERDRIVE_DB_SG",

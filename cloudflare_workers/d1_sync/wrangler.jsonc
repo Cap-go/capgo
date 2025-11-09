@@ -15,7 +15,7 @@
       },
       "hyperdrive": [
         {
-          "binding": "HYPERDRIVE_DB",
+          "binding": "HYPERDRIVE_DB_EU",
           "id": "0f1d77550db142fbb17cb6b3ee659a06"
         }
       ],
@@ -41,7 +41,7 @@
       "name": "capgo-d1-sync-local",
       "hyperdrive": [
         {
-          "binding": "HYPERDRIVE_DB",
+          "binding": "HYPERDRIVE_DB_EU",
           "id": "local-dev-hyperdrive",
           "localConnectionString": "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
         }

@@ -40,8 +40,8 @@ function generateUUID(): string {
   return crypto.randomUUID()
 }
 
-async function processQueue(c: Context, sql: ReturnType<typeof getPgClient>, queueName: string, batchSize: number = DEFAULT_BATCH_SIZE) {
-  const messages = await readQueue(c, sql, queueName, batchSize)
+async function processQueue(c: Context, db: ReturnType<typeof getPgClient>, queueName: string, batchSize: number = DEFAULT_BATCH_SIZE) {
+  const messages = await readQueue(c, db, queueName, batchSize)
 
   if (!messages) {
     cloudlog(`[${queueName}] No messages found in queue or an error occurred.`)
@@ -58,7 +58,7 @@ async function processQueue(c: Context, sql: ReturnType<typeof getPgClient>, que
   // Archive messages that have been read 5 or more times
   if (messagesToSkip.length > 0) {
     cloudlog(`[${queueName}] Archiving ${messagesToSkip.length} messages that have been read 5 or more times.`)
-    await archive_queue_messages(c, sql, queueName, messagesToSkip.map(msg => msg.msg_id))
+    await archive_queue_messages(c, db, queueName, messagesToSkip.map(msg => msg.msg_id))
   }
 
   // Process messages that have been read less than 5 times
@@ -85,7 +85,7 @@ async function processQueue(c: Context, sql: ReturnType<typeof getPgClient>, que
 
   if (cfIdUpdates.length > 0) {
     cloudlog({ requestId: c.get('requestId'), message: `[${queueName}] Updating ${cfIdUpdates.length} messages with CF IDs.` })
-    await mass_edit_queue_messages_cf_ids(c, sql, cfIdUpdates)
+    await mass_edit_queue_messages_cf_ids(c, db, cfIdUpdates)
   }
 
   // Batch remove all messages that have succeeded
@@ -96,7 +96,7 @@ async function processQueue(c: Context, sql: ReturnType<typeof getPgClient>, que
   }, [[], []] as [typeof results, typeof results])
   if (successMessages.length > 0) {
     cloudlog({ requestId: c.get('requestId'), message: `[${queueName}] Deleting ${successMessages.length} successful messages from queue.` })
-    await delete_queue_message_batch(c, sql, queueName, successMessages.map(msg => msg.msg_id))
+    await delete_queue_message_batch(c, db, queueName, successMessages.map(msg => msg.msg_id))
   }
   if (messagesFailed.length > 0) {
     cloudlog({ requestId: c.get('requestId'), message: `[${queueName}] Failed to process ${messagesFailed.length} messages.` })
@@ -185,7 +185,7 @@ async function processQueue(c: Context, sql: ReturnType<typeof getPgClient>, que
 }
 
 // Reads messages from the queue and logs them
-async function readQueue(c: Context, sql: ReturnType<typeof getPgClient>, queueName: string, batchSize: number = DEFAULT_BATCH_SIZE): Promise<Message[]> {
+async function readQueue(c: Context, db: ReturnType<typeof getPgClient>, queueName: string, batchSize: number = DEFAULT_BATCH_SIZE): Promise<Message[]> {
   const queueKey = 'readQueue'
   const startTime = Date.now()
   let messages: Message[] = []
@@ -196,7 +196,7 @@ async function readQueue(c: Context, sql: ReturnType<typeof getPgClient>, queueN
     const visibilityTimeout = 120
     cloudlog(`[${queueKey}] Reading messages from queue: ${queueName}`)
     try {
-      messages = await sql`
+      messages = await db`
         SELECT msg_id, message, read_ct
         FROM pgmq.read(${queueName}, ${visibilityTimeout}, ${batchSize})
       `
@@ -277,13 +277,13 @@ export async function http_post_helper(
 }
 
 // Helper function to delete multiple messages from the queue in a single batch
-async function delete_queue_message_batch(c: Context, sql: ReturnType<typeof getPgClient>, queueName: string, msgIds: number[]) {
+async function delete_queue_message_batch(c: Context, db: ReturnType<typeof getPgClient>, queueName: string, msgIds: number[]) {
   try {
     if (msgIds.length === 0)
       return
     // Format array as properly quoted bigint values
     const arrayStr = msgIds.map(id => `${id}::bigint`).join(',')
-    await sql.unsafe(`
+    await db.unsafe(`
       SELECT pgmq.delete($1, ARRAY[${arrayStr}])
     `, [queueName])
   }
@@ -293,13 +293,13 @@ async function delete_queue_message_batch(c: Context, sql: ReturnType<typeof get
 }
 
 // Helper function to archive multiple messages from the queue in a single batch
-async function archive_queue_messages(c: Context, sql: ReturnType<typeof getPgClient>, queueName: string, msgIds: number[]) {
+async function archive_queue_messages(c: Context, db: ReturnType<typeof getPgClient>, queueName: string, msgIds: number[]) {
   try {
     if (msgIds.length === 0)
       return
     // Format array as properly quoted bigint values
     const arrayStr = msgIds.map(id => `${id}::bigint`).join(',')
-    await sql.unsafe(`
+    await db.unsafe(`
       SELECT pgmq.archive($1, ARRAY[${arrayStr}])
     `, [queueName])
   }
@@ -326,7 +326,7 @@ async function archive_queue_messages(c: Context, sql: ReturnType<typeof getPgCl
 // Helper function to mass update queue messages with CF IDs
 async function mass_edit_queue_messages_cf_ids(
   c: Context,
-  sql: ReturnType<typeof getPgClient>,
+  db: ReturnType<typeof getPgClient>,
   updates: Array<{ msg_id: number, cf_id: string, queue: string }>,
 ) {
   try {
@@ -335,7 +335,7 @@ async function mass_edit_queue_messages_cf_ids(
       `ROW(${u.msg_id}::bigint, '${u.cf_id}'::varchar, '${u.queue}'::varchar)::message_update`,
     ).join(',')
 
-    await sql.unsafe(`
+    await db.unsafe(`
       SELECT mass_edit_queue_messages_cf_ids(
         ARRAY[${rowValues}]
       )
@@ -382,15 +382,15 @@ app.post('/sync', async (c) => {
 
   await backgroundTask(c, (async () => {
     cloudlog({ requestId: c.get('requestId'), message: `[Background Queue Sync] Starting background execution for queue: ${queueName} with batch size: ${finalBatchSize}` })
-    let sql: ReturnType<typeof getPgClient> | null = null
+    let db: ReturnType<typeof getPgClient> | null = null
     try {
-      sql = getPgClient(c)
-      await processQueue(c, sql, queueName, finalBatchSize)
+      db = getPgClient(c)
+      await processQueue(c, db, queueName, finalBatchSize)
       cloudlog({ requestId: c.get('requestId'), message: `[Background Queue Sync] Background execution finished successfully.` })
     }
     finally {
-      if (sql)
-        await closeClient(c, sql)
+      if (db)
+        await closeClient(c, db)
       cloudlog({ requestId: c.get('requestId'), message: `[Background Queue Sync] PostgreSQL connection closed.` })
     }
   })())

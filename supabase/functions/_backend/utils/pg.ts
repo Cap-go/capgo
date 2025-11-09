@@ -79,10 +79,10 @@ export function getDatabaseURL(c: Context, readOnly = false): string {
   }
 
   // Fallback to single Hyperdrive if available
-  if (existInEnv(c, 'HYPERDRIVE_DB')) {
-    c.header('X-Database-Source', readOnly ? 'read_pooler_eu' : 'hyperdrive')
+  if (existInEnv(c, 'HYPERDRIVE_DB_EU')) {
+    c.header('X-Database-Source', readOnly ? 'read_pooler_eu' : 'hyperdrive_eu')
     cloudlog({ requestId: c.get('requestId'), message: `Using Hyperdrive EU for ${readOnly ? 'read-only' : 'read-write'}` })
-    return (getEnv(c, 'HYPERDRIVE_DB') as unknown as Hyperdrive).connectionString
+    return (getEnv(c, 'HYPERDRIVE_DB_EU') as unknown as Hyperdrive).connectionString
   }
 
   // Main DB write poller EU region
@@ -123,13 +123,13 @@ export function getPgClient(c: Context, readOnly = false) {
     },
   }
 
-  const sql = postgres(dbUrl, options)
+  const db = postgres(dbUrl, options)
 
-  return sql
+  return db
 }
 
-export function getDrizzleClient(queryClient: ReturnType<typeof getPgClient>) {
-  return drizzle({ client: queryClient as any, logger: true })
+export function getDrizzleClient(db: ReturnType<typeof getPgClient>) {
+  return drizzle({ client: db, logger: true })
 }
 
 // Helper to extract detailed error information from postgres.js errors
@@ -183,9 +183,9 @@ export function logPgError(c: Context, functionName: string, error: unknown) {
   })
 }
 
-export function closeClient(c: Context, client: ReturnType<typeof getPgClient>) {
+export function closeClient(c: Context, db: ReturnType<typeof getPgClient>) {
   // cloudlog(c.get('requestId'), 'Closing client', client)
-  return backgroundTask(c, client.end())
+  return backgroundTask(c, db.end())
 }
 
 export function getAlias() {

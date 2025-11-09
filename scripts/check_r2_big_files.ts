@@ -639,8 +639,8 @@ export function getDatabaseURL(): string {
     //   return getEnv('GK_SUPABASE_DB_URL')
     // }
     // Hyperdrive test
-    if (existInEnv('HYPERDRIVE_DB'))
-        return (getEnv('HYPERDRIVE_DB') as any).connectionString
+    if (existInEnv('HYPERDRIVE_DB_EU'))
+        return (getEnv('HYPERDRIVE_DB_EU') as any).connectionString
 
     // // Default to Germany for any other cases
     return DEFAULT_DB_URL
