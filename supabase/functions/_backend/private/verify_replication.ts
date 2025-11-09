@@ -29,9 +29,9 @@ app.get('/', async (c) => {
   ]
 
   // Count from D1 database using pre-calculated counts
-  const d1EU = c.env.DB_REPLICA_EU.withSession('first-unconstrained') as D1Database
-  const d1US = c.env.DB_REPLICA_US.withSession('first-unconstrained') as D1Database
-  const d1AS = c.env.DB_REPLICA_AS.withSession('first-unconstrained') as D1Database
+  const d1EU = c.env.DB_REPLICA_EU.withSession('first-unconstrained') as D1DatabaseSession
+  const d1US = c.env.DB_REPLICA_US.withSession('first-unconstrained') as D1DatabaseSession
+  const d1AS = c.env.DB_REPLICA_AS.withSession('first-unconstrained') as D1DatabaseSession
   const [d1CountsEU, d1CountsUS, d1CountsAS] = await Promise.all([Promise.all(
     tables.map(table =>
       d1EU.prepare(`SELECT record_count as count FROM table_counts WHERE table_name = ?`).bind(table).first(),

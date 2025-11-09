@@ -58,7 +58,7 @@ async function processQueue(c: Context, db: ReturnType<typeof getPgClient>, queu
   // Archive messages that have been read 5 or more times
   if (messagesToSkip.length > 0) {
     cloudlog(`[${queueName}] Archiving ${messagesToSkip.length} messages that have been read 5 or more times.`)
-    await archive_queue_messages(c, sql, queueName, messagesToSkip.map(msg => msg.msg_id))
+    await archive_queue_messages(c, db, queueName, messagesToSkip.map(msg => msg.msg_id))
   }
 
   // Process messages that have been read less than 5 times
@@ -85,7 +85,7 @@ async function processQueue(c: Context, db: ReturnType<typeof getPgClient>, queu
 
   if (cfIdUpdates.length > 0) {
     cloudlog({ requestId: c.get('requestId'), message: `[${queueName}] Updating ${cfIdUpdates.length} messages with CF IDs.` })
-    await mass_edit_queue_messages_cf_ids(c, sql, cfIdUpdates)
+    await mass_edit_queue_messages_cf_ids(c, db, cfIdUpdates)
   }
 
   // Batch remove all messages that have succeeded
@@ -96,7 +96,7 @@ async function processQueue(c: Context, db: ReturnType<typeof getPgClient>, queu
   }, [[], []] as [typeof results, typeof results])
   if (successMessages.length > 0) {
     cloudlog({ requestId: c.get('requestId'), message: `[${queueName}] Deleting ${successMessages.length} successful messages from queue.` })
-    await delete_queue_message_batch(c, sql, queueName, successMessages.map(msg => msg.msg_id))
+    await delete_queue_message_batch(c, db, queueName, successMessages.map(msg => msg.msg_id))
   }
   if (messagesFailed.length > 0) {
     cloudlog({ requestId: c.get('requestId'), message: `[${queueName}] Failed to process ${messagesFailed.length} messages.` })
