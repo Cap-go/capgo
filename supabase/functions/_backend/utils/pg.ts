@@ -43,6 +43,17 @@ export function selectOne(drizzleClient: ReturnType<typeof getDrizzleClient>) {
   return drizzleClient.execute(sql`select 1`)
 }
 
+function fixSupabaseHost(host: string): string {
+  if (host.includes('postgres:postgres@supabase_db_')) {
+  // Supabase adds a prefix to the hostname that breaks connection in local docker
+  // e.g. "supabase_db_NAME:5432" -> "db:5432"
+    const url = URL.parse(host)!
+    url.hostname = url.hostname.split('_')[1]
+    return url.href
+  }
+  return host
+}
+
 export function getDatabaseURL(c: Context, readOnly = false): string {
   const dbRegion = getClientDbRegion(c)
 
@@ -95,7 +106,7 @@ export function getDatabaseURL(c: Context, readOnly = false): string {
   // Default Supabase direct connection used for testing or if no other option is available
   c.header('X-Database-Source', 'direct')
   cloudlog({ requestId: c.get('requestId'), message: 'Using Direct Supabase for read-write' })
-  return getEnv(c, 'SUPABASE_DB_URL')
+  return fixSupabaseHost(getEnv(c, 'SUPABASE_DB_URL'))
 }
 
 export function getPgClient(c: Context, readOnly = false) {
