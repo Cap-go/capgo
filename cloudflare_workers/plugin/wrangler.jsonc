@@ -123,25 +123,6 @@
         "mode": "smart"
       }
     },
-    "prod_ab": {
-      "name": "capgo_plugin-ab",
-      "vars": {
-        "ENV_NAME": "capgo_plugin-ab"
-      },
-      "observability": {
-        "enabled": true,
-        "head_sampling_rate": 0.001
-      },
-      "routes": [
-        {
-          "pattern": "plugin.ab.capgo.app",
-          "custom_domain": true
-        }
-      ],
-      "placement": {
-        "mode": "off"
-      }
-    },
     "prod_a": {
       "name": "capgo_plugin-a-prod",
       "vars": {
