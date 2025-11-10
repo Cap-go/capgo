@@ -20,6 +20,7 @@ export type Bindings = {
   DB_REPLICA_EU: D1Database
   DB_REPLICA_AS: D1Database
   DB_REPLICA_US: D1Database
+  DB_REPLICA_OC: D1Database
   HYPERDRIVE_DB_EU: Hyperdrive
   ATTACHMENT_UPLOAD_HANDLER: DurableObjectNamespace
 }

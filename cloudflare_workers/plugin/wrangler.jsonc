@@ -465,9 +465,9 @@
           "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
         },
         {
-          "binding": "DB_REPLICA_AS",
-          "database_name": "capgo_replicate_as",
-          "database_id": "c01d7197-67b8-4b23-99d9-cceb76d3e7f6"
+          "binding": "DB_REPLICA_OC",
+          "database_name": "capgo_replicate_oc",
+          "database_id": "58dbd199-4629-4bd0-a02c-ce019b5ab2e0"
         }
       ],
       "hyperdrive": [

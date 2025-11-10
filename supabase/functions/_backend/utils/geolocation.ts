@@ -31,7 +31,7 @@ function getDbRegionFromCountryCode(countryCode: string | undefined): 'EU' | 'US
 
 // Map continent codes to database regions
 // Continents: EU, AS, NA, SA, AF, OC -> Database regions: EU, US, AS
-function mapContinentToDbRegion(continent: string | undefined): 'EU' | 'US' | 'AS' | undefined {
+function mapContinentToDbRegion(continent: string | undefined): 'EU' | 'US' | 'AS' | 'OC' | undefined {
   if (!continent)
     return undefined
 
@@ -40,8 +40,9 @@ function mapContinentToDbRegion(continent: string | undefined): 'EU' | 'US' | 'A
     case 'AF': // Africa
       return 'EU'
     case 'AS': // Asia
-    case 'OC': // Oceania
       return 'AS'
+    case 'OC': // Oceania
+      return 'OC'
     case 'NA': // North America
     case 'SA': // South America
       return 'US'
@@ -60,7 +61,7 @@ export function getContinentCF(c: Context): string | undefined {
  * @param c Hono context
  * @returns Database region code: 'EU', 'US', 'AS', or undefined
  */
-export function getClientDbRegion(c: Context): 'EU' | 'US' | 'AS' | undefined {
+export function getClientDbRegion(c: Context): 'EU' | 'US' | 'AS' | 'OC' | undefined {
   // 1. Cloudflare Workers: c.req.raw.cf?.continent (primary deployment, 99% of traffic)
   const continent = getContinentCF(c)
   if (continent) {

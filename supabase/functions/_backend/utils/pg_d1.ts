@@ -67,7 +67,7 @@ export function parseManifestEntries(c: Context, data: any, source: string) {
 export function getPgClientD1(c: Context, session: string = 'first-unconstrained') {
   const dbRegion = getClientDbRegion(c)
   let DB: D1Database = c.env.DB_REPLICA_EU
-  let DB_REG: 'EU' | 'US' | 'AS' = 'EU'
+  let DB_REG: 'EU' | 'US' | 'AS' | 'OC' = 'EU'
   if (existInEnv(c, 'DB_REPLICA_EU') && dbRegion === 'AS') {
     DB = c.env.DB_REPLICA_AS
     DB_REG = 'AS'
@@ -75,6 +75,10 @@ export function getPgClientD1(c: Context, session: string = 'first-unconstrained
   else if (existInEnv(c, 'DB_REPLICA_US') && dbRegion === 'US') {
     DB = c.env.DB_REPLICA_US
     DB_REG = 'US'
+  }
+  else if (existInEnv(c, 'DB_REPLICA_OC') && dbRegion === 'OC') {
+    DB = c.env.DB_REPLICA_OC
+    DB_REG = 'OC'
   }
   if (!existInEnv(c, 'DB_REPLICA_EU')) {
     // Server/configuration error: surface as structured HTTP error
