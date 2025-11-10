@@ -115,7 +115,9 @@ export async function updateWithPG(
   const channelDeviceCount = appOwner.channel_device_count ?? 0
   const manifestBundleCount = appOwner.manifest_bundle_count ?? 0
   const bypassChannelOverrides = channelDeviceCount <= 0
-  const fetchManifestEntries = manifestBundleCount > 0
+  const pluginVersion = parse(plugin_version)
+  // Ensure there is manifest and the plugin version support manifest fetching
+  const fetchManifestEntries = manifestBundleCount > 0 && greaterOrEqual(pluginVersion, parse('6.25.0'))
   cloudlog({
     requestId: c.get('requestId'),
     message: 'App channel device count evaluated',
