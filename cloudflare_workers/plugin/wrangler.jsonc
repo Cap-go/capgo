@@ -116,16 +116,40 @@
       ],
       "hyperdrive": [
         {
-          "binding": "HYPERDRIVE_DB_EU",
-          "id": "d1a6f37476a4435da70b209eaed6c97e"
+          "binding": "HYPERDRIVE_CAPGO_DIRECT_EU",
+          "id": "ae1fe6178b564adc9fc9a71ccc769a35"
         },
         {
-          "binding": "HYPERDRIVE_DB_AS",
-          "id": "ad3af67004d94935a15c5a1f209b353e"
+          "binding": "HYPERDRIVE_CAPGO_DIRECT_AS",
+          "id": "fcb24f3a06144ed2a940cf682321f312"
         },
         {
-          "binding": "HYPERDRIVE_DB_NA",
-          "id": "1fcc9b9c3e5e449ab4d7e84b16e164ec"
+          "binding": "HYPERDRIVE_CAPGO_DIRECT_NA",
+          "id": "8d3cfaace1fc4f66a6c0da5dbc41c4bf"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_SESSION_EU",
+          "id": "07838c5ad23d4c5dac99e1a2fcdab2f4"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_SESSION_AS",
+          "id": "05ccf0817feb4161b8544cba1306ed9e"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_SESSION_NA",
+          "id": "7e2f8d7496c249798f78342ca25edb20"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_TRANSACTION_EU",
+          "id": "b661b11c413844c5a08406bc37390590"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_TRANSACTION_AS",
+          "id": "37569e8f364d45e495b2c9d2ce3ddfbc"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_TRANSACTION_NA",
+          "id": "73f370b143724245a1e3239d2bc7db94"
         }
       ]
     },
@@ -208,16 +232,40 @@
       ],
       "hyperdrive": [
         {
-          "binding": "HYPERDRIVE_DB_EU",
-          "id": "d1a6f37476a4435da70b209eaed6c97e"
+          "binding": "HYPERDRIVE_CAPGO_DIRECT_EU",
+          "id": "ae1fe6178b564adc9fc9a71ccc769a35"
         },
         {
-          "binding": "HYPERDRIVE_DB_AS",
-          "id": "ad3af67004d94935a15c5a1f209b353e"
+          "binding": "HYPERDRIVE_CAPGO_DIRECT_AS",
+          "id": "fcb24f3a06144ed2a940cf682321f312"
         },
         {
-          "binding": "HYPERDRIVE_DB_NA",
-          "id": "1fcc9b9c3e5e449ab4d7e84b16e164ec"
+          "binding": "HYPERDRIVE_CAPGO_DIRECT_NA",
+          "id": "8d3cfaace1fc4f66a6c0da5dbc41c4bf"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_SESSION_EU",
+          "id": "07838c5ad23d4c5dac99e1a2fcdab2f4"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_SESSION_AS",
+          "id": "05ccf0817feb4161b8544cba1306ed9e"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_SESSION_NA",
+          "id": "7e2f8d7496c249798f78342ca25edb20"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_TRANSACTION_EU",
+          "id": "b661b11c413844c5a08406bc37390590"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_TRANSACTION_AS",
+          "id": "37569e8f364d45e495b2c9d2ce3ddfbc"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_TRANSACTION_NA",
+          "id": "73f370b143724245a1e3239d2bc7db94"
         }
       ]
     },
@@ -300,16 +348,40 @@
       ],
       "hyperdrive": [
         {
-          "binding": "HYPERDRIVE_DB_EU",
-          "id": "d1a6f37476a4435da70b209eaed6c97e"
+          "binding": "HYPERDRIVE_CAPGO_DIRECT_EU",
+          "id": "ae1fe6178b564adc9fc9a71ccc769a35"
         },
         {
-          "binding": "HYPERDRIVE_DB_AS",
-          "id": "ad3af67004d94935a15c5a1f209b353e"
+          "binding": "HYPERDRIVE_CAPGO_DIRECT_AS",
+          "id": "fcb24f3a06144ed2a940cf682321f312"
         },
         {
-          "binding": "HYPERDRIVE_DB_NA",
-          "id": "1fcc9b9c3e5e449ab4d7e84b16e164ec"
+          "binding": "HYPERDRIVE_CAPGO_DIRECT_NA",
+          "id": "8d3cfaace1fc4f66a6c0da5dbc41c4bf"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_SESSION_EU",
+          "id": "07838c5ad23d4c5dac99e1a2fcdab2f4"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_SESSION_AS",
+          "id": "05ccf0817feb4161b8544cba1306ed9e"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_SESSION_NA",
+          "id": "7e2f8d7496c249798f78342ca25edb20"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_TRANSACTION_EU",
+          "id": "b661b11c413844c5a08406bc37390590"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_TRANSACTION_AS",
+          "id": "37569e8f364d45e495b2c9d2ce3ddfbc"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_TRANSACTION_NA",
+          "id": "73f370b143724245a1e3239d2bc7db94"
         }
       ]
     },
@@ -392,16 +464,40 @@
       ],
       "hyperdrive": [
         {
-          "binding": "HYPERDRIVE_DB_EU",
-          "id": "d1a6f37476a4435da70b209eaed6c97e"
+          "binding": "HYPERDRIVE_CAPGO_DIRECT_EU",
+          "id": "ae1fe6178b564adc9fc9a71ccc769a35"
         },
         {
-          "binding": "HYPERDRIVE_DB_AS",
-          "id": "ad3af67004d94935a15c5a1f209b353e"
+          "binding": "HYPERDRIVE_CAPGO_DIRECT_AS",
+          "id": "fcb24f3a06144ed2a940cf682321f312"
         },
         {
-          "binding": "HYPERDRIVE_DB_NA",
-          "id": "1fcc9b9c3e5e449ab4d7e84b16e164ec"
+          "binding": "HYPERDRIVE_CAPGO_DIRECT_NA",
+          "id": "8d3cfaace1fc4f66a6c0da5dbc41c4bf"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_SESSION_EU",
+          "id": "07838c5ad23d4c5dac99e1a2fcdab2f4"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_SESSION_AS",
+          "id": "05ccf0817feb4161b8544cba1306ed9e"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_SESSION_NA",
+          "id": "7e2f8d7496c249798f78342ca25edb20"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_TRANSACTION_EU",
+          "id": "b661b11c413844c5a08406bc37390590"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_TRANSACTION_AS",
+          "id": "37569e8f364d45e495b2c9d2ce3ddfbc"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_TRANSACTION_NA",
+          "id": "73f370b143724245a1e3239d2bc7db94"
         }
       ]
     },
@@ -484,16 +580,40 @@
       ],
       "hyperdrive": [
         {
-          "binding": "HYPERDRIVE_DB_EU",
-          "id": "d1a6f37476a4435da70b209eaed6c97e"
+          "binding": "HYPERDRIVE_CAPGO_DIRECT_EU",
+          "id": "ae1fe6178b564adc9fc9a71ccc769a35"
         },
         {
-          "binding": "HYPERDRIVE_DB_AS",
-          "id": "ad3af67004d94935a15c5a1f209b353e"
+          "binding": "HYPERDRIVE_CAPGO_DIRECT_AS",
+          "id": "fcb24f3a06144ed2a940cf682321f312"
         },
         {
-          "binding": "HYPERDRIVE_DB_NA",
-          "id": "1fcc9b9c3e5e449ab4d7e84b16e164ec"
+          "binding": "HYPERDRIVE_CAPGO_DIRECT_NA",
+          "id": "8d3cfaace1fc4f66a6c0da5dbc41c4bf"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_SESSION_EU",
+          "id": "07838c5ad23d4c5dac99e1a2fcdab2f4"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_SESSION_AS",
+          "id": "05ccf0817feb4161b8544cba1306ed9e"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_SESSION_NA",
+          "id": "7e2f8d7496c249798f78342ca25edb20"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_TRANSACTION_EU",
+          "id": "b661b11c413844c5a08406bc37390590"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_TRANSACTION_AS",
+          "id": "37569e8f364d45e495b2c9d2ce3ddfbc"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_TRANSACTION_NA",
+          "id": "73f370b143724245a1e3239d2bc7db94"
         }
       ]
     },
@@ -576,16 +696,40 @@
       ],
       "hyperdrive": [
         {
-          "binding": "HYPERDRIVE_DB_EU",
-          "id": "d1a6f37476a4435da70b209eaed6c97e"
+          "binding": "HYPERDRIVE_CAPGO_DIRECT_EU",
+          "id": "ae1fe6178b564adc9fc9a71ccc769a35"
         },
         {
-          "binding": "HYPERDRIVE_DB_AS",
-          "id": "ad3af67004d94935a15c5a1f209b353e"
+          "binding": "HYPERDRIVE_CAPGO_DIRECT_AS",
+          "id": "fcb24f3a06144ed2a940cf682321f312"
         },
         {
-          "binding": "HYPERDRIVE_DB_NA",
-          "id": "1fcc9b9c3e5e449ab4d7e84b16e164ec"
+          "binding": "HYPERDRIVE_CAPGO_DIRECT_NA",
+          "id": "8d3cfaace1fc4f66a6c0da5dbc41c4bf"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_SESSION_EU",
+          "id": "07838c5ad23d4c5dac99e1a2fcdab2f4"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_SESSION_AS",
+          "id": "05ccf0817feb4161b8544cba1306ed9e"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_SESSION_NA",
+          "id": "7e2f8d7496c249798f78342ca25edb20"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_TRANSACTION_EU",
+          "id": "b661b11c413844c5a08406bc37390590"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_TRANSACTION_AS",
+          "id": "37569e8f364d45e495b2c9d2ce3ddfbc"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_TRANSACTION_NA",
+          "id": "73f370b143724245a1e3239d2bc7db94"
         }
       ]
     },
@@ -668,12 +812,40 @@
       ],
       "hyperdrive": [
         {
-          "binding": "HYPERDRIVE_DB_EU",
-          "id": "d1a6f37476a4435da70b209eaed6c97e"
+          "binding": "HYPERDRIVE_CAPGO_DIRECT_EU",
+          "id": "ae1fe6178b564adc9fc9a71ccc769a35"
         },
         {
-          "binding": "HYPERDRIVE_DB_NA",
-          "id": "1fcc9b9c3e5e449ab4d7e84b16e164ec"
+          "binding": "HYPERDRIVE_CAPGO_DIRECT_AS",
+          "id": "fcb24f3a06144ed2a940cf682321f312"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_DIRECT_NA",
+          "id": "8d3cfaace1fc4f66a6c0da5dbc41c4bf"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_SESSION_EU",
+          "id": "07838c5ad23d4c5dac99e1a2fcdab2f4"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_SESSION_AS",
+          "id": "05ccf0817feb4161b8544cba1306ed9e"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_SESSION_NA",
+          "id": "7e2f8d7496c249798f78342ca25edb20"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_TRANSACTION_EU",
+          "id": "b661b11c413844c5a08406bc37390590"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_TRANSACTION_AS",
+          "id": "37569e8f364d45e495b2c9d2ce3ddfbc"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_TRANSACTION_NA",
+          "id": "73f370b143724245a1e3239d2bc7db94"
         }
       ]
     },
@@ -752,16 +924,40 @@
       ],
       "hyperdrive": [
         {
-          "binding": "HYPERDRIVE_DB_EU",
-          "id": "d1a6f37476a4435da70b209eaed6c97e"
+          "binding": "HYPERDRIVE_CAPGO_DIRECT_EU",
+          "id": "ae1fe6178b564adc9fc9a71ccc769a35"
         },
         {
-          "binding": "HYPERDRIVE_DB_AS",
-          "id": "ad3af67004d94935a15c5a1f209b353e"
+          "binding": "HYPERDRIVE_CAPGO_DIRECT_AS",
+          "id": "fcb24f3a06144ed2a940cf682321f312"
         },
         {
-          "binding": "HYPERDRIVE_DB_NA",
-          "id": "1fcc9b9c3e5e449ab4d7e84b16e164ec"
+          "binding": "HYPERDRIVE_CAPGO_DIRECT_NA",
+          "id": "8d3cfaace1fc4f66a6c0da5dbc41c4bf"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_SESSION_EU",
+          "id": "07838c5ad23d4c5dac99e1a2fcdab2f4"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_SESSION_AS",
+          "id": "05ccf0817feb4161b8544cba1306ed9e"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_SESSION_NA",
+          "id": "7e2f8d7496c249798f78342ca25edb20"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_TRANSACTION_EU",
+          "id": "b661b11c413844c5a08406bc37390590"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_TRANSACTION_AS",
+          "id": "37569e8f364d45e495b2c9d2ce3ddfbc"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_TRANSACTION_NA",
+          "id": "73f370b143724245a1e3239d2bc7db94"
         }
       ],
       "placement": {
@@ -838,16 +1034,40 @@
       ],
       "hyperdrive": [
         {
-          "binding": "HYPERDRIVE_DB_EU",
-          "id": "d1a6f37476a4435da70b209eaed6c97e"
+          "binding": "HYPERDRIVE_CAPGO_DIRECT_EU",
+          "id": "ae1fe6178b564adc9fc9a71ccc769a35"
         },
         {
-          "binding": "HYPERDRIVE_DB_AS",
-          "id": "ad3af67004d94935a15c5a1f209b353e"
+          "binding": "HYPERDRIVE_CAPGO_DIRECT_AS",
+          "id": "fcb24f3a06144ed2a940cf682321f312"
         },
         {
-          "binding": "HYPERDRIVE_DB_NA",
-          "id": "1fcc9b9c3e5e449ab4d7e84b16e164ec"
+          "binding": "HYPERDRIVE_CAPGO_DIRECT_NA",
+          "id": "8d3cfaace1fc4f66a6c0da5dbc41c4bf"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_SESSION_EU",
+          "id": "07838c5ad23d4c5dac99e1a2fcdab2f4"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_SESSION_AS",
+          "id": "05ccf0817feb4161b8544cba1306ed9e"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_SESSION_NA",
+          "id": "7e2f8d7496c249798f78342ca25edb20"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_TRANSACTION_EU",
+          "id": "b661b11c413844c5a08406bc37390590"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_TRANSACTION_AS",
+          "id": "37569e8f364d45e495b2c9d2ce3ddfbc"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_TRANSACTION_NA",
+          "id": "73f370b143724245a1e3239d2bc7db94"
         }
       ],
       "placement": {

@@ -623,24 +623,9 @@ export function getDatabaseURL(): string {
 
     // if (!clientContinent)
     //   return DEFAULT_DB_URL
-
-    // // European countries or Africa or Antarctica
-    // if ((clientContinent === 'EU' || clientContinent === 'AF' || clientContinent === 'AN')) {
-    //   return DEFAULT_DB_URL
-    // }
-
-    // // Asian and Oceanian countries
-    // if ((clientContinent === 'AS' || clientContinent === 'OC') && existInEnv(c, 'SG_SUPABASE_DB_URL')) {
-    //   return getEnv('SG_SUPABASE_DB_URL')
-    // }
-
-    // // North and South American countries
-    // if ((clientContinent === 'NA' || clientContinent === 'SA') && existInEnv(c, 'GK_SUPABASE_DB_URL')) {
-    //   return getEnv('GK_SUPABASE_DB_URL')
-    // }
     // Hyperdrive test
-    if (existInEnv('HYPERDRIVE_DB_EU'))
-        return (getEnv('HYPERDRIVE_DB_EU') as any).connectionString
+    if (existInEnv('HYPERDRIVE_CAPGO_TRANSACTION_EU'))
+        return (getEnv('HYPERDRIVE_CAPGO_TRANSACTION_EU') as any).connectionString
 
     // // Default to Germany for any other cases
     return DEFAULT_DB_URL

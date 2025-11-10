@@ -61,16 +61,16 @@ export function getDatabaseURL(c: Context, readOnly = false): string {
   if (readOnly) {
     // Hyperdrive main read replica regional routing in Cloudflare Workers
     // Asia region
-    if (existInEnv(c, 'HYPERDRIVE_DB_AS') && dbRegion === 'AS') {
-      c.header('X-Database-Source', 'hyperdrive-as')
+    if (c.env.HYPERDRIVE_CAPGO_TRANSACTION_AS && dbRegion === 'AS') {
+      c.header('X-Database-Source', 'HYPERDRIVE_CAPGO_TRANSACTION_AS')
       cloudlog({ requestId: c.get('requestId'), message: 'Using Hyperdrive AS for read-only' })
-      return (getEnv(c, 'HYPERDRIVE_DB_AS') as unknown as Hyperdrive).connectionString
+      return c.env.HYPERDRIVE_CAPGO_TRANSACTION_AS.connectionString
     }
     // US region
-    if (existInEnv(c, 'HYPERDRIVE_DB_NA') && dbRegion === 'NA') {
-      c.header('X-Database-Source', 'hyperdrive-na')
+    if (c.env.HYPERDRIVE_CAPGO_TRANSACTION_NA && dbRegion === 'NA') {
+      c.header('X-Database-Source', 'HYPERDRIVE_CAPGO_TRANSACTION_NA')
       cloudlog({ requestId: c.get('requestId'), message: 'Using Hyperdrive NA for read-only' })
-      return (getEnv(c, 'HYPERDRIVE_DB_NA') as unknown as Hyperdrive).connectionString
+      return c.env.HYPERDRIVE_CAPGO_TRANSACTION_NA.connectionString
     }
 
     // Custom Supabase Region Read replicate Poolers
@@ -90,13 +90,13 @@ export function getDatabaseURL(c: Context, readOnly = false): string {
   }
 
   // Fallback to single Hyperdrive if available
-  if (existInEnv(c, 'HYPERDRIVE_DB_EU')) {
-    c.header('X-Database-Source', readOnly ? 'read_pooler_eu' : 'hyperdrive_eu')
+  if (c.env.HYPERDRIVE_CAPGO_TRANSACTION_EU) {
+    c.header('X-Database-Source', 'HYPERDRIVE_CAPGO_TRANSACTION_EU')
     cloudlog({ requestId: c.get('requestId'), message: `Using Hyperdrive EU for ${readOnly ? 'read-only' : 'read-write'}` })
-    return (getEnv(c, 'HYPERDRIVE_DB_EU') as unknown as Hyperdrive).connectionString
+    return c.env.HYPERDRIVE_CAPGO_TRANSACTION_EU.connectionString
   }
 
-  // Main DB write poller EU region
+  // Main DB write poller EU region in supabase
   if (existInEnv(c, 'MAIN_SUPABASE_DB_URL')) {
     c.header('X-Database-Source', 'sb_pooler_main')
     cloudlog({ requestId: c.get('requestId'), message: 'Using Main Supabase Pooler for read-write' })
