@@ -24,6 +24,7 @@ interface Env {
   DB_REPLICA_EU: D1Database
   DB_REPLICA_AS: D1Database
   DB_REPLICA_US: D1Database
+  DB_REPLICA_OC: D1Database // Add Oceania replica
   HYPERDRIVE_DB_EU: Hyperdrive // Add Hyperdrive binding
   WEBHOOK_SECRET: string
 }
@@ -36,11 +37,6 @@ interface ReplicaTarget {
 interface SqlOperation {
   sql: string
   params: any[]
-}
-
-interface NukeRequest {
-  type: 'all' | 'table'
-  table?: string
 }
 
 // Helper function for JSON stringify to handle BigInt
@@ -315,141 +311,6 @@ async function constantTimeComparison(a: string, b: string): Promise<boolean> {
   return crypto.subtle.timingSafeEqual(aHash, bHash)
 }
 
-async function handleNuke(request: Request, env: Env) {
-  console.log(`[Nuke] Received nuke request to ${request.url}`)
-  if (request.method !== 'POST') {
-    console.log(`[Nuke] Invalid method: ${request.method}`)
-    return new Response('Method not allowed', { status: 405 })
-  }
-
-  const signature = request.headers.get('x-webhook-signature') ?? ''
-  // Avoid logging the actual signature unless necessary for debugging
-  const isValid = await constantTimeComparison(signature, env.WEBHOOK_SECRET)
-  if (!isValid) {
-    console.log(`[Nuke] Unauthorized access attempt.`)
-    return new Response('Unauthorized', { status: 401 })
-  }
-  console.log(`[Nuke] Signature validated.`)
-
-  let body: NukeRequest
-  try {
-    body = await request.json() as NukeRequest
-    console.log(`[Nuke] Parsed request body:`, JSON.stringify(body, jsonReplacer))
-  }
-  catch (e) {
-    console.error(`[Nuke] Error parsing request body:`, e)
-    return new Response('Invalid request body', { status: 400 })
-  }
-
-  try {
-    console.log(`[Nuke] Initializing database for nuke operation...`)
-    // Initialize database ensures data tables exist
-    await Promise.all([
-      checkAndCreateTables(env.DB_REPLICA_EU.withSession(`first-primary`)),
-      checkAndCreateTables(env.DB_REPLICA_AS.withSession(`first-primary`)),
-      checkAndCreateTables(env.DB_REPLICA_US.withSession(`first-primary`)),
-    ])
-    console.log(`[Nuke] Database initialized.`)
-
-    let tableName: string | undefined
-    if (body.type === 'table') {
-      tableName = body.table
-      if (!tableName || !TABLES.some(t => t.name === tableName)) {
-        console.log(`[Nuke] Invalid table specified: ${tableName}`)
-        return new Response(`Invalid table: ${tableName}`, { status: 400 })
-      }
-
-      // Locking removed, proceed directly
-      console.log(`[Nuke Table ${tableName}] Proceeding without lock.`)
-    }
-
-    // Now proceed with nuking
-    switch (body.type) {
-      case 'all':
-        console.log(`[Nuke All] Starting database nuke.`)
-        await Promise.all([
-          nukeDatabase(env.DB_REPLICA_EU.withSession(`first-primary`)),
-          nukeDatabase(env.DB_REPLICA_AS.withSession(`first-primary`)),
-          nukeDatabase(env.DB_REPLICA_US.withSession(`first-primary`)),
-        ])
-        console.log(`[Nuke All] Database nuke complete.`)
-        return new Response('Database nuked', { status: 200 })
-
-      case 'table':
-        // tableName is already validated and locked
-        console.log(`[Nuke Table ${tableName}] Starting table nuke.`)
-        await Promise.all([
-          nukeTable(env.DB_REPLICA_EU.withSession(`first-primary`), tableName!),
-          nukeTable(env.DB_REPLICA_AS.withSession(`first-primary`), tableName!),
-          nukeTable(env.DB_REPLICA_US.withSession(`first-primary`), tableName!),
-        ])
-        console.log(`[Nuke Table ${tableName}] Table nuke complete.`)
-        // No lock to release
-        return new Response(`Table ${tableName} nuked`, { status: 200 })
-
-      default:
-        // This case should ideally not be reached if using TypeScript types properly
-        console.error(`[Nuke] Invalid nuke type received: ${body.type}`)
-        // Release lock if it was acquired for an invalid type somehow
-        // if (tableName) await releaseLock(env.db.withSession(`first-primary`), tableName); // Removed lock call
-        return new Response(`Invalid nuke type: ${body.type}`, { status: 400 })
-    }
-  }
-  catch (error) {
-    console.error('[Nuke] Error during nuke operation:', error)
-    // No lock release needed here either
-    return new Response(error instanceof Error ? error.message : 'Internal server error during nuke', { status: 500 })
-  }
-}
-
-async function nukeDatabase(db: D1DatabaseSession) {
-  console.log(`[Nuke DB] Nuking database`)
-  const start = Date.now()
-
-  // Then nuke all actual data tables
-  const tableNames = TABLES.map(t => t.name)
-  console.log(`[Nuke DB] Nuking tables: ${tableNames.join(', ')}`)
-  for (const tableName of tableNames) {
-    await nukeTable(db, tableName)
-  }
-
-  console.log(`[Nuke DB] Database nuke completed in ${Date.now() - start}ms`)
-}
-
-async function nukeTable(db: D1DatabaseSession, tableName: string) {
-  const start = Date.now()
-  console.log(`[Nuke Table ${tableName}] Starting nuke process`)
-
-  // Drop the table
-  console.log(`[Nuke Table ${tableName}] Dropping table...`)
-  try {
-    await db.prepare(`DROP TABLE IF EXISTS ${tableName}`).run()
-    console.log(`[Nuke Table ${tableName}] Table dropped.`)
-  }
-  catch (dropError) {
-    console.error(`[Nuke Table ${tableName}] Error dropping table:`, dropError)
-    // Continue to recreate if drop failed (might not exist)
-  }
-
-  // Recreate the table
-  const schema = TABLE_SCHEMAS[tableName as keyof typeof TABLE_SCHEMAS]
-  if (!schema) {
-    console.error(`[Nuke Table ${tableName}] Schema not found! Cannot recreate table.`)
-    throw new Error(`Schema not found for table: ${tableName}`)
-  }
-  console.log(`[Nuke Table ${tableName}] Recreating table...`)
-  try {
-    await db.prepare(schema).run()
-    console.log(`[Nuke Table ${tableName}] Table recreated.`)
-  }
-  catch (createError) {
-    console.error(`[Nuke Table ${tableName}] Error recreating table:`, createError)
-    throw createError // Propagate if recreation fails
-  }
-
-  console.log(`[Nuke Table ${tableName}] Nuke process completed in ${Date.now() - start}ms`)
-}
-
 async function executeBatchAcrossReplicas(
   replicas: ReplicaTarget[],
   operations: SqlOperation[],
@@ -470,6 +331,7 @@ function buildReplicaTargets(env: Env): ReplicaTarget[] {
     { name: 'EU', session: env.DB_REPLICA_EU.withSession(`first-primary`) },
     { name: 'AS', session: env.DB_REPLICA_AS.withSession(`first-primary`) },
     { name: 'US', session: env.DB_REPLICA_US.withSession(`first-primary`) },
+    { name: 'OC', session: env.DB_REPLICA_OC.withSession(`first-primary`) },
   ]
 }
 
@@ -740,10 +602,6 @@ export default {
     console.log(`[Fetch] Received request: ${request.method} ${path}`)
 
     try {
-      if (path === '/nuke') {
-        return await handleNuke(request, env)
-      }
-
       // Added back /sync endpoint to trigger queue processing
       if (path === '/sync') {
         return await handleSyncRequest(request, env, ctx)
