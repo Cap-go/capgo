@@ -13,8 +13,9 @@ import { Hono } from 'hono/tiny'
 import { timingSafeEqual } from 'hono/utils/buffer'
 import { cloudlog } from './loggin.ts'
 import { onError } from './on_error.ts'
-
 import { getEnv } from './utils.ts'
+
+import { version as CapgoVersion } from './version.ts'
 
 export interface AuthInfo {
   userId: string
@@ -150,7 +151,8 @@ export function createHono(functionName: string, version: string, sentryDsn?: st
   }
   appGlobal.use('*', (c, next): Promise<any> => {
     // ADD HEADER TO IDENTIFY WORKER SOURCE
-    c.header('X-Worker-Source', getEnv(c, 'ENV_NAME') || functionName)
+    const name = `${getEnv(c, 'ENV_NAME') || functionName}-${CapgoVersion}`
+    c.header('X-Worker-Source', name)
     return next()
   })
 
