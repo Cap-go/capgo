@@ -14,7 +14,7 @@
       "name": "capgo_plugin-prod",
       "vars": {
         "IS_V2": "0",
-        "ENV_NAME": "capgo_plugin-prod"
+        "ENV_NAME": "capgo_plugin-eu-prod_old"
       },
       "observability": {
         "enabled": true,

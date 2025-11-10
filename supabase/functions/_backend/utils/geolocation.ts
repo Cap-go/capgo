@@ -16,7 +16,7 @@ export function getContinentCF(c: Context): ContinentsCFWorker | undefined {
   }
   // const cfData = (c.req.raw as Request & { cf?: { continent?: string } })?.cf
   // return cfData?.continent
-  const nameContinent = (getEnv(c, 'ENV_NAME')?.split('-')[0]).toUpperCase()
+  const nameContinent = ('capgo_plugin-eu-prod-12.46.2'.split('-')[1]).toUpperCase()
   return nameContinent as ContinentsCFWorker
 }
 
