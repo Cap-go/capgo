@@ -4,7 +4,7 @@ import { alias } from 'drizzle-orm/pg-core'
 import { drizzle } from 'drizzle-orm/postgres-js'
 import postgres from 'postgres'
 import { backgroundTask, existInEnv, getEnv } from '../utils/utils.ts'
-import { getClientDbRegion } from './geolocation.ts'
+import { getClientDbRegionSB } from './geolocation.ts'
 import { cloudlog, cloudlogErr } from './loggin.ts'
 import * as schema from './postgress_schema.ts'
 import { withOptionalManifestSelect } from './queryHelpers.ts'
@@ -55,7 +55,7 @@ function fixSupabaseHost(host: string): string {
 }
 
 export function getDatabaseURL(c: Context, readOnly = false): string {
-  const dbRegion = getClientDbRegion(c)
+  const dbRegion = getClientDbRegionSB(c)
 
   // For read-only queries, use region to avoid Network latency
   if (readOnly) {
@@ -67,25 +67,25 @@ export function getDatabaseURL(c: Context, readOnly = false): string {
       return (getEnv(c, 'HYPERDRIVE_DB_SG') as unknown as Hyperdrive).connectionString
     }
     // US region
-    if (existInEnv(c, 'HYPERDRIVE_DB_US') && dbRegion === 'US') {
-      c.header('X-Database-Source', 'hyperdrive-us')
-      cloudlog({ requestId: c.get('requestId'), message: 'Using Hyperdrive US for read-only' })
-      return (getEnv(c, 'HYPERDRIVE_DB_US') as unknown as Hyperdrive).connectionString
+    if (existInEnv(c, 'HYPERDRIVE_DB_NA') && dbRegion === 'NA') {
+      c.header('X-Database-Source', 'hyperdrive-na')
+      cloudlog({ requestId: c.get('requestId'), message: 'Using Hyperdrive NA for read-only' })
+      return (getEnv(c, 'HYPERDRIVE_DB_NA') as unknown as Hyperdrive).connectionString
     }
 
     // Custom Supabase Region Read replicate Poolers
     // Asia region
-    if (existInEnv(c, 'READ_SUPABASE_DB_URL_SG') && dbRegion === 'AS') {
-      c.header('X-Database-Source', 'read_pooler_sg')
-      cloudlog({ requestId: c.get('requestId'), message: 'Using Read Pooler SG for read-only' })
-      return getEnv(c, 'READ_SUPABASE_DB_URL_SG')
+    if (existInEnv(c, 'READ_SUPABASE_DB_URL_AS') && dbRegion === 'AS') {
+      c.header('X-Database-Source', 'read_pooler_as')
+      cloudlog({ requestId: c.get('requestId'), message: 'Using Read Pooler AS for read-only' })
+      return getEnv(c, 'READ_SUPABASE_DB_URL_AS')
     }
 
-    // US region
-    if (existInEnv(c, 'READ_SUPABASE_DB_URL_US') && dbRegion === 'US') {
-      c.header('X-Database-Source', 'read_pooler_us')
-      cloudlog({ requestId: c.get('requestId'), message: 'Using Read Pooler US for read-only' })
-      return getEnv(c, 'READ_SUPABASE_DB_URL_US')
+    // NA region
+    if (existInEnv(c, 'READ_SUPABASE_DB_URL_NA') && dbRegion === 'NA') {
+      c.header('X-Database-Source', 'read_pooler_na')
+      cloudlog({ requestId: c.get('requestId'), message: 'Using Read Pooler NA for read-only' })
+      return getEnv(c, 'READ_SUPABASE_DB_URL_NA')
     }
   }
 

@@ -1,59 +1,31 @@
 import type { Context } from 'hono'
 import { cloudlog } from './loggin.ts'
-import { getEnv } from './utils.ts'
+import { existInEnv, getEnv } from './utils.ts'
 
-// Map country code to database region (ISO 3166-1 alpha-2 to DB region)
-// Database regions: EU (Europe/Africa), US (Americas), AS (Asia/Oceania)
-function getDbRegionFromCountryCode(countryCode: string | undefined): 'EU' | 'US' | 'AS' | undefined {
-  if (!countryCode)
+// Antartica and Tor are redirected to EU in our snippet
+type ContinentsCFWorker = 'EU' | 'NA' | 'AS' | 'OC' | 'SA' | 'AF'
+type RegionsAWS = 'EU' | 'NA' | 'SA' | 'AF' | 'AP' | 'ME' | 'IL' | 'CA' | 'MX'
+// TODO: Enable OC when ready
+type DbRegionD1 = 'EU' | 'NA' | 'AS' | 'OC' | undefined
+// type DbRegionD1 = 'EU' | 'NA' | 'AS' | 'OC' | undefined
+type DbRegionSB = 'EU' | 'NA' | 'AS' | undefined
+
+export function getContinentCF(c: Context): ContinentsCFWorker | undefined {
+  if (!existInEnv(c, 'ENV_NAME')) {
     return undefined
-
-  // Asia (AS) - includes Middle East
-  const asiaCountries = ['CN', 'IN', 'ID', 'PK', 'BD', 'JP', 'PH', 'VN', 'TR', 'IR', 'TH', 'MM', 'KR', 'IQ', 'AF', 'SA', 'UZ', 'MY', 'NP', 'YE', 'KP', 'LK', 'KH', 'JO', 'AZ', 'TJ', 'AE', 'IL', 'HK', 'LA', 'SG', 'LB', 'KG', 'TM', 'SY', 'KW', 'GE', 'OM', 'MN', 'AM', 'QA', 'BH', 'TL', 'BT', 'MO', 'MV', 'BN']
-  // Europe (EU) - includes Africa
-  const europeCountries = ['RU', 'DE', 'GB', 'FR', 'IT', 'ES', 'UA', 'PL', 'RO', 'NL', 'BE', 'CZ', 'GR', 'PT', 'SE', 'HU', 'BY', 'AT', 'RS', 'CH', 'BG', 'DK', 'FI', 'SK', 'NO', 'IE', 'HR', 'BA', 'AL', 'LT', 'SI', 'LV', 'MK', 'EE', 'ME', 'LU', 'MT', 'IS', 'MD', 'LI', 'SM', 'MC', 'VA', 'AD']
-  // Africa (mapped to EU region)
-  const africaCountries = ['NG', 'ET', 'EG', 'CD', 'TZ', 'ZA', 'KE', 'UG', 'DZ', 'SD', 'MA', 'AO', 'GH', 'MZ', 'MG', 'CM', 'CI', 'NE', 'BF', 'ML', 'MW', 'ZM', 'SO', 'SN', 'TD', 'ZW', 'GN', 'RW', 'BJ', 'TN', 'BI', 'SS', 'TG', 'SL', 'LY', 'LR', 'MR', 'CF', 'ER', 'GM', 'BW', 'GA', 'GW', 'GQ', 'MU', 'SZ', 'DJ', 'RE', 'KM', 'CV', 'ST', 'SC', 'YT', 'EH']
-  // Americas (US) - North and South America
-  const americasCountries = ['US', 'MX', 'CA', 'GT', 'CU', 'HT', 'DO', 'HN', 'NI', 'SV', 'CR', 'PA', 'JM', 'TT', 'BS', 'BZ', 'BB', 'LC', 'GD', 'VC', 'AG', 'DM', 'KN', 'GL', 'PR', 'VI', 'BM', 'BR', 'CO', 'AR', 'PE', 'VE', 'CL', 'EC', 'BO', 'PY', 'UY', 'GY', 'SR', 'GF', 'FK']
-  // Oceania (mapped to AS region)
-  const oceaniaCountries = ['AU', 'PG', 'NZ', 'FJ', 'SB', 'NC', 'PF', 'WS', 'GU', 'KI', 'FM', 'VU', 'TO', 'PW', 'MH', 'NR', 'TV', 'AS', 'MP', 'CK', 'WF', 'NU', 'TK', 'PN']
-
-  if (asiaCountries.includes(countryCode) || oceaniaCountries.includes(countryCode))
-    return 'AS'
-  if (europeCountries.includes(countryCode) || africaCountries.includes(countryCode))
-    return 'EU'
-  if (americasCountries.includes(countryCode))
-    return 'US'
-
-  return undefined // Unknown
-}
-
-// Map continent codes to database regions
-// Continents: EU, AS, NA, SA, AF, OC -> Database regions: EU, US, AS
-function mapContinentToDbRegion(continent: string | undefined): 'EU' | 'US' | 'AS' | 'OC' | undefined {
-  if (!continent)
-    return undefined
-
-  switch (continent) {
-    case 'EU': // Europe
-    case 'AF': // Africa
-      return 'EU'
-    case 'AS': // Asia
-      return 'AS'
-    case 'OC': // Oceania
-      return 'OC'
-    case 'NA': // North America
-    case 'SA': // South America
-      return 'US'
-    default:
-      return undefined
   }
+  // const cfData = (c.req.raw as Request & { cf?: { continent?: string } })?.cf
+  // return cfData?.continent
+  const nameContinent = (getEnv(c, 'ENV_NAME')?.split('-')[0]).toUpperCase()
+  return nameContinent as ContinentsCFWorker
 }
 
-export function getContinentCF(c: Context): string | undefined {
-  const cfData = (c.req.raw as Request & { cf?: { continent?: string } })?.cf
-  return cfData?.continent
+export function getContinentSB(c: Context): RegionsAWS | undefined {
+  if (!existInEnv(c, 'SB_REGION')) {
+    return undefined
+  }
+  const sbRegion = getEnv(c, 'SB_REGION')!.split('-')[0].toUpperCase()
+  return sbRegion as RegionsAWS
 }
 /**
  * Get database region from request context based on deployment platform
@@ -61,49 +33,51 @@ export function getContinentCF(c: Context): string | undefined {
  * @param c Hono context
  * @returns Database region code: 'EU', 'US', 'AS', or undefined
  */
-export function getClientDbRegion(c: Context): 'EU' | 'US' | 'AS' | 'OC' | undefined {
-  // 1. Cloudflare Workers: c.req.raw.cf?.continent (primary deployment, 99% of traffic)
+export function getClientDbRegionD1(c: Context): DbRegionD1 {
   const continent = getContinentCF(c)
+  cloudlog({ requestId: c.get('requestId'), message: 'nameContinent', continent, source: 'env-check' })
   if (continent) {
-    const dbRegion = mapContinentToDbRegion(continent)
-    cloudlog({ requestId: c.get('requestId'), message: 'dbRegion', region: dbRegion, continent, source: 'cloudflare' })
-    return dbRegion
-  }
-
-  // 2. Supabase Functions: x-sb-edge-region header
-  // Supabase Edge Functions provide region in ENV VAR SB_REGION (e.g., eu-west-3, us-east-1, ap-southeast-1)
-  // Map AWS region codes directly to DB regions
-  const sbRegion = getEnv(c, 'SB_REGION')
-  if (sbRegion) {
-    let dbRegion: 'EU' | 'US' | 'AS' | undefined
-    // Parse AWS region code prefix
-    if (sbRegion.startsWith('ap-') || sbRegion.startsWith('me-')) {
-      // Asia Pacific and Middle East regions -> AS
-      dbRegion = 'AS'
+    switch (continent) {
+      case 'EU': // Europe
+      case 'AF': // Africa
+        return 'EU'
+      case 'AS': // Asia
+      case 'OC': // Oceania
+        return 'AS'
+        // TODO: Enabled Oceania mapping when ready
+        // case 'AS': // Asia
+        //   return 'AS'
+        // case 'OC': // Oceania
+        //   return 'OC'
+      case 'NA': // North America
+      case 'SA': // South America
+        return 'NA'
+      default:
+        return undefined
     }
-    else if (sbRegion.startsWith('us-') || sbRegion.startsWith('ca-') || sbRegion.startsWith('sa-')) {
-      // Americas regions -> US
-      dbRegion = 'US'
-    }
-    else if (sbRegion.startsWith('eu-') || sbRegion.startsWith('af-')) {
-      // Europe and Africa regions -> EU
-      dbRegion = 'EU'
-    }
-
-    cloudlog({ requestId: c.get('requestId'), message: 'dbRegion', region: dbRegion, awsRegion: sbRegion, source: 'supabase-region' })
-    if (dbRegion)
-      return dbRegion
   }
+}
 
-  // 4. Deno Deploy: x-country header (fallback)
-  // Deno Deploy provides x-country header with ISO country code
-  const xCountry = c.req.header('x-country')
-  if (xCountry) {
-    const dbRegion = getDbRegionFromCountryCode(xCountry)
-    cloudlog({ requestId: c.get('requestId'), message: 'dbRegion', region: dbRegion, countryCode: xCountry, source: 'deno-deploy' })
-    return dbRegion
+export function getClientDbRegionSB(c: Context): DbRegionSB {
+  // 1. Supabase Edge Functions provide region in ENV VAR SB_REGION (e.g., eu-west-3, us-east-1, ap-southeast-1)
+  // 2. Cloudflare Workers: we use the name of the worker to ensure there is no weird placement (primary deployment, 99% of traffic)
+  const continent = getContinentSB(c) ?? getContinentCF(c)
+  switch (continent) {
+    case 'EU': // Europe CF, AWS
+    case 'AF': // Africa, CF, AWS
+    case 'ME': // Middle East AWS
+    case 'IL': // Israel AWS
+      return 'EU'
+    case 'AS': // Asia CF
+    case 'AP': // Asia Pacific AWS
+    case 'OC': // Oceania CF
+      return 'AS'
+    case 'NA': // North America CF, AWS
+    case 'CA': // Canada AWS
+    case 'MX': // Mexico AWS
+    case 'SA': // South America CF, AWS
+      return 'NA'
+    default:
+      return undefined
   }
-
-  cloudlog({ requestId: c.get('requestId'), message: 'dbRegion unknown', region: undefined, source: 'unknown', req: c.req.raw })
-  return undefined
 }
