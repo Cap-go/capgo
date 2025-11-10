@@ -15,12 +15,13 @@ import {
   isOnboardingNeeded,
   isTrialOrg,
   set_bandwidth_exceeded,
+  set_build_time_exceeded,
   set_mau_exceeded,
   set_storage_exceeded,
   supabaseAdmin,
 } from './supabase.ts'
 
-type CreditMetric = 'mau' | 'bandwidth' | 'storage'
+type CreditMetric = Database['public']['Enums']['credit_metric_type']
 
 interface BillingCycleInfo {
   subscription_anchor_start: string | null
@@ -149,12 +150,22 @@ function planToInt(plan: string) {
   }
 }
 
-export async function findBestPlan(c: Context, stats: Database['public']['Functions']['find_best_plan_v3']['Args']): Promise<string> {
+interface FindBestPlanArgs {
+  mau: number
+  bandwidth: number
+  storage: number
+  build_time_seconds?: number
+}
+
+export async function findBestPlan(c: Context, stats: Database['public']['Functions']['find_best_plan_v3']['Args'] | FindBestPlanArgs): Promise<string> {
+  const buildTimeSeconds = 'build_time_seconds' in stats ? stats.build_time_seconds : 0
+
   const { data, error } = await supabaseAdmin(c)
     .rpc('find_best_plan_v3', {
       mau: stats.mau ?? 0,
       bandwidth: stats.bandwidth,
       storage: stats.storage,
+      build_time_seconds: buildTimeSeconds ?? 0,
     })
     .single()
   if (error) {
@@ -211,6 +222,7 @@ async function setMetered(c: Context, customer_id: string | null, orgId: string)
       await recordUsage(c, customer_id, prices.storage, get_metered_usage.storage)
     if (get_metered_usage.bandwidth && get_metered_usage.bandwidth > 0)
       await recordUsage(c, customer_id, prices.bandwidth, get_metered_usage.bandwidth)
+    // Note: build_minutes uses credits-only billing, not Stripe metered pricing
   }
 }
 
@@ -245,12 +257,14 @@ async function userAbovePlan(c: Context, org: {
     { key: 'mau', usage: Number(totalStats.mau ?? 0), limit: currentPlan?.mau },
     { key: 'storage', usage: Number(totalStats.storage ?? 0), limit: currentPlan?.storage },
     { key: 'bandwidth', usage: Number(totalStats.bandwidth ?? 0), limit: currentPlan?.bandwidth },
+    { key: 'build_time', usage: Number(totalStats.build_time_seconds ?? 0), limit: currentPlan?.build_time_seconds },
   ]
 
   const creditResults: Record<CreditMetric, CreditApplicationResult | null> = {
     mau: null,
     storage: null,
     bandwidth: null,
+    build_time: null,
   }
 
   let hasUnpaidOverage = false
@@ -271,6 +285,9 @@ async function userAbovePlan(c: Context, org: {
       else if (metric.key === 'bandwidth') {
         await set_bandwidth_exceeded(c, orgId, unpaid > 0)
       }
+      else if (metric.key === 'build_time') {
+        await set_build_time_exceeded(c, orgId, unpaid > 0)
+      }
       if (unpaid > 0)
         hasUnpaidOverage = true
     }
@@ -281,6 +298,8 @@ async function userAbovePlan(c: Context, org: {
         await set_storage_exceeded(c, orgId, false)
       else if (metric.key === 'bandwidth')
         await set_bandwidth_exceeded(c, orgId, false)
+      else if (metric.key === 'build_time')
+        await set_build_time_exceeded(c, orgId, false)
     }
   }
 
@@ -293,6 +312,7 @@ async function userAbovePlan(c: Context, org: {
     mau: totalStats.mau,
     storage: totalStats.storage,
     bandwidth: totalStats.bandwidth,
+    build_time_seconds: totalStats.build_time_seconds,
   })
 
   // If the calculated best plan ranks lower than the current one, the org is over-provisioned, so skip upgrade nudges.
@@ -321,6 +341,7 @@ async function userIsAtPlanUsage(c: Context, orgId: string, percentUsage: PlanUs
   await set_mau_exceeded(c, orgId, false)
   await set_storage_exceeded(c, orgId, false)
   await set_bandwidth_exceeded(c, orgId, false)
+  await set_build_time_exceeded(c, orgId, false)
 
   // check if user is at more than 90%, 50% or 70% of plan usage
   if (percentUsage.total_percent >= 90) {

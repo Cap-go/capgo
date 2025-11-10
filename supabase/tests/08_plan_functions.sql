@@ -3,7 +3,7 @@ BEGIN;
 
 CREATE EXTENSION "basejump-supabase_test_helpers";
 
-SELECT plan(12);
+SELECT plan(14);
 
 -- Test get_current_plan_max_org
 SELECT
@@ -25,6 +25,13 @@ SELECT
         'SELECT (get_current_plan_max_org(''22dbad8a-b885-4309-9b3b-a09f8460fb6d'')).storage',
         $$VALUES (1073741824::bigint)$$,
         'get_current_plan_max_org test - correct storage'
+    );
+
+SELECT
+    results_eq(
+        'SELECT (get_current_plan_max_org(''22dbad8a-b885-4309-9b3b-a09f8460fb6d'')).build_time_seconds',
+        $$VALUES (1800::bigint)$$,
+        'get_current_plan_max_org test - correct build_time_seconds'
     );
 
 -- Test get_current_plan_max_org negative cases
@@ -100,6 +107,13 @@ SELECT
                     plans
                 WHERE
                     id = '526e11d8-3c51-4581-ac92-4770c602f47c'
+            ),
+            (
+                SELECT build_time_seconds
+                FROM
+                    plans
+                WHERE
+                    id = '526e11d8-3c51-4581-ac92-4770c602f47c'
             )
         ),
         'Solo',
@@ -130,6 +144,13 @@ SELECT
                     plans
                 WHERE
                     id = 'abd76414-8f90-49a5-b3a4-8ff4d2e12c77'
+            ),
+            (
+                SELECT build_time_seconds
+                FROM
+                    plans
+                WHERE
+                    id = 'abd76414-8f90-49a5-b3a4-8ff4d2e12c77'
             )
         ),
         'Team',
@@ -139,13 +160,13 @@ SELECT
 -- Test find_best_plan_v3 negative cases
 SELECT
     ok(
-        find_best_plan_v3(0, 0, 0) IS NOT NULL,
+        find_best_plan_v3(0, 0, 0, 0) IS NOT NULL,
         'find_best_plan_v3 test - zero usage returns valid plan'
     );
 
 SELECT
     ok(
-        find_best_plan_v3(-100, -1, -1) IS NOT NULL,
+        find_best_plan_v3(-100, -1, -1, -1) IS NOT NULL,
         'find_best_plan_v3 test - negative usage returns valid plan'
     );
 
