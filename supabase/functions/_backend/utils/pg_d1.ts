@@ -91,7 +91,7 @@ export function getPgClientD1(c: Context, session: string = 'first-unconstrained
 
 export function getDrizzleClientD1Session(c: Context) {
   if (!existInEnv(c, 'DB_REPLICA_EU')) {
-    throw quickError(500, 'missing_binding', 'DB_REPLICATE is not set', { binding: 'DB_REPLICA_EU' })
+    throw quickError(500, 'missing_binding', 'DB_REPLICA_EU is not set', { binding: 'DB_REPLICA_EU' })
   }
   cloudlog({ requestId: c.get('requestId'), message: 'Using D1 with session for Drizzle Client' })
   return drizzleD1(getPgClientD1(c))
