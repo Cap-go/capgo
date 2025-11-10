@@ -76,10 +76,10 @@ export function getPgClientD1(c: Context, session: string = 'first-unconstrained
     DB = c.env.DB_REPLICA_US
     DB_REG = 'US'
   }
-  else if (existInEnv(c, 'DB_REPLICA_OC') && dbRegion === 'OC') {
-    DB = c.env.DB_REPLICA_OC
-    DB_REG = 'OC'
-  }
+  // else if (existInEnv(c, 'DB_REPLICA_OC') && dbRegion === 'OC') {
+  //   DB = c.env.DB_REPLICA_OC
+  //   DB_REG = 'OC'
+  // }
   if (!existInEnv(c, 'DB_REPLICA_EU')) {
     // Server/configuration error: surface as structured HTTP error
     throw quickError(500, 'missing_binding', 'DB_REPLICA_EU is not set', { binding: 'DB_REPLICA_EU' })
