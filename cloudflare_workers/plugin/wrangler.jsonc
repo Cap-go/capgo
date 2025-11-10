@@ -139,7 +139,7 @@
           "custom_domain": true
         },
         {
-          "pattern": "plugi.a.usecapgo.com",
+          "pattern": "plugin.a.usecapgo.com",
           "custom_domain": true
         }
       ],
