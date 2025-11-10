@@ -56,10 +56,9 @@ function fixSupabaseHost(host: string): string {
 
 export function getDatabaseURL(c: Context, readOnly = false): string {
   const dbRegion = getClientDbRegion(c)
-  const isSmart = getEnv(c, 'ENV_NAME') === 'capgo_plugin-a-prod'
 
   // For read-only queries, use region to avoid Network latency
-  if (readOnly && !isSmart) {
+  if (readOnly) {
     // Hyperdrive main read replica regional routing in Cloudflare Workers
     // Asia region
     if (existInEnv(c, 'HYPERDRIVE_DB_SG') && dbRegion === 'AS') {
