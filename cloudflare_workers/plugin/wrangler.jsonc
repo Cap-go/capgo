@@ -114,7 +114,7 @@
           "id": "52723917a61f49b7b36eb71b225b19f5"
         },
         {
-          "binding": "HYPERDRIVE_DB_SG",
+          "binding": "HYPERDRIVE_DB_AS",
           "id": "acaf2391be8449f18e49776847d3106c"
         },
         {
@@ -261,7 +261,7 @@
         },
 
         {
-          "binding": "HYPERDRIVE_DB_SG",
+          "binding": "HYPERDRIVE_DB_AS",
           "id": "acaf2391be8449f18e49776847d3106c"
         }
       ]
@@ -481,9 +481,8 @@
           "binding": "HYPERDRIVE_DB_EU",
           "id": "52723917a61f49b7b36eb71b225b19f5"
         },
-
         {
-          "binding": "HYPERDRIVE_DB_SG",
+          "binding": "HYPERDRIVE_DB_AS",
           "id": "acaf2391be8449f18e49776847d3106c"
         }
       ]
@@ -636,7 +635,7 @@
         },
 
         {
-          "binding": "HYPERDRIVE_DB_SG",
+          "binding": "HYPERDRIVE_DB_AS",
           "id": "acaf2391be8449f18e49776847d3106c"
         },
         {
@@ -722,7 +721,7 @@
           "id": "52723917a61f49b7b36eb71b225b19f5"
         },
         {
-          "binding": "HYPERDRIVE_DB_SG",
+          "binding": "HYPERDRIVE_DB_AS",
           "id": "acaf2391be8449f18e49776847d3106c"
         },
         {

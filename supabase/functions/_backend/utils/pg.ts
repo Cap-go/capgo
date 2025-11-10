@@ -61,10 +61,10 @@ export function getDatabaseURL(c: Context, readOnly = false): string {
   if (readOnly) {
     // Hyperdrive main read replica regional routing in Cloudflare Workers
     // Asia region
-    if (existInEnv(c, 'HYPERDRIVE_DB_SG') && dbRegion === 'AS') {
-      c.header('X-Database-Source', 'hyperdrive-sg')
-      cloudlog({ requestId: c.get('requestId'), message: 'Using Hyperdrive SG for read-only' })
-      return (getEnv(c, 'HYPERDRIVE_DB_SG') as unknown as Hyperdrive).connectionString
+    if (existInEnv(c, 'HYPERDRIVE_DB_AS') && dbRegion === 'AS') {
+      c.header('X-Database-Source', 'hyperdrive-as')
+      cloudlog({ requestId: c.get('requestId'), message: 'Using Hyperdrive AS for read-only' })
+      return (getEnv(c, 'HYPERDRIVE_DB_AS') as unknown as Hyperdrive).connectionString
     }
     // US region
     if (existInEnv(c, 'HYPERDRIVE_DB_NA') && dbRegion === 'NA') {
