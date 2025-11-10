@@ -5,6 +5,7 @@
   "main": "./index.ts",
   "compatibility_flags": [
     "nodejs_compat_v2",
+    // "enable_workers_observability_tracing",
     "nodejs_compat_populate_process_env"
   ],
   "workers_dev": false,
@@ -18,10 +19,7 @@
       },
       "observability": {
         "head_sampling_rate": 0.001,
-        "enabled": true,
-        "tracing": {
-          "enabled": true
-        }
+        "enabled": true
       },
       "placement": {
         "mode": "smart"
@@ -142,10 +140,7 @@
       },
       "observability": {
         "enabled": true,
-        "head_sampling_rate": 1,
-        "tracing": {
-          "enabled": true
-        }
+        "head_sampling_rate": 1
       },
       "routes": [
         {
@@ -234,10 +229,7 @@
       },
       "observability": {
         "enabled": true,
-        "head_sampling_rate": 1,
-        "tracing": {
-          "enabled": true
-        }
+        "head_sampling_rate": 1
       },
       "placement": {
         "mode": "smart"
@@ -329,10 +321,7 @@
       },
       "observability": {
         "enabled": true,
-        "head_sampling_rate": 1,
-        "tracing": {
-          "enabled": true
-        }
+        "head_sampling_rate": 1
       },
       "placement": {
         "mode": "smart"
@@ -427,10 +416,7 @@
       },
       "observability": {
         "enabled": true,
-        "head_sampling_rate": 1,
-        "tracing": {
-          "enabled": true
-        }
+        "head_sampling_rate": 1
       },
       "routes": [
         {
@@ -519,10 +505,7 @@
       },
       "observability": {
         "enabled": true,
-        "head_sampling_rate": 1,
-        "tracing": {
-          "enabled": true
-        }
+        "head_sampling_rate": 1
       },
       "placement": {
         "mode": "smart"
@@ -614,10 +597,7 @@
       },
       "observability": {
         "enabled": true,
-        "head_sampling_rate": 1,
-        "tracing": {
-          "enabled": true
-        }
+        "head_sampling_rate": 1
       },
       "placement": {
         "mode": "smart"
@@ -704,10 +684,7 @@
         "ENV_NAME": "capgo_plugin-preprod"
       },
       "observability": {
-        "enabled": true,
-        "tracing": {
-          "enabled": true
-        }
+        "enabled": true
       },
       "routes": [
         {
