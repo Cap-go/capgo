@@ -319,47 +319,6 @@ export type Database = {
         }
         Relationships: []
       }
-      build_logs: {
-        Row: {
-          billable_seconds: number
-          build_id: string
-          build_time_seconds: number
-          created_at: string
-          id: string
-          org_id: string
-          platform: string
-          user_id: string | null
-        }
-        Insert: {
-          billable_seconds: number
-          build_id: string
-          build_time_seconds: number
-          created_at?: string
-          id?: string
-          org_id: string
-          platform: string
-          user_id?: string | null
-        }
-        Update: {
-          billable_seconds?: number
-          build_id?: string
-          build_time_seconds?: number
-          created_at?: string
-          id?: string
-          org_id?: string
-          platform?: string
-          user_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "build_logs_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "orgs"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       capgo_credits_steps: {
         Row: {
           created_at: string
@@ -1084,7 +1043,6 @@ export type Database = {
         Row: {
           bandwidth: number
           bandwidth_unit: number | null
-          build_time_seconds: number
           created_at: string
           description: string
           id: string
@@ -1107,7 +1065,6 @@ export type Database = {
         Insert: {
           bandwidth: number
           bandwidth_unit?: number | null
-          build_time_seconds?: number
           created_at?: string
           description?: string
           id?: string
@@ -1130,7 +1087,6 @@ export type Database = {
         Update: {
           bandwidth?: number
           bandwidth_unit?: number | null
-          build_time_seconds?: number
           created_at?: string
           description?: string
           id?: string
@@ -1206,7 +1162,6 @@ export type Database = {
       stripe_info: {
         Row: {
           bandwidth_exceeded: boolean | null
-          build_time_exceeded: boolean | null
           canceled_at: string | null
           created_at: string
           customer_id: string
@@ -1228,7 +1183,6 @@ export type Database = {
         }
         Insert: {
           bandwidth_exceeded?: boolean | null
-          build_time_exceeded?: boolean | null
           canceled_at?: string | null
           created_at?: string
           customer_id: string
@@ -1250,7 +1204,6 @@ export type Database = {
         }
         Update: {
           bandwidth_exceeded?: boolean | null
-          build_time_exceeded?: boolean | null
           canceled_at?: string | null
           created_at?: string
           customer_id?: string
@@ -1770,12 +1723,7 @@ export type Database = {
         Returns: string
       }
       find_fit_plan_v3: {
-        Args: {
-          bandwidth: number
-          build_time_seconds?: number
-          mau: number
-          storage: number
-        }
+        Args: { bandwidth: number; mau: number; storage: number }
         Returns: {
           name: string
         }[]
@@ -1789,7 +1737,6 @@ export type Database = {
             Returns: {
               app_id: string
               bandwidth: number
-              build_time_seconds: number
               date: string
               fail: number
               get: number
@@ -1800,11 +1747,10 @@ export type Database = {
             }[]
           }
         | {
-            Args: { end_date: string; org_id: string; start_date: string }
+            Args: { p_end_date: string; p_org_id: string; p_start_date: string }
             Returns: {
               app_id: string
               bandwidth: number
-              build_time_seconds: number
               date: string
               fail: number
               get: number
@@ -1822,7 +1768,6 @@ export type Database = {
         Args: { orgid: string }
         Returns: {
           bandwidth: number
-          build_time_seconds: number
           mau: number
           storage: number
         }[]
@@ -1936,13 +1881,6 @@ export type Database = {
         Returns: number
       }
       get_next_stats_update_date: { Args: { org: string }; Returns: string }
-      get_org_build_time_seconds: {
-        Args: { p_end_date: string; p_org_id: string; p_start_date: string }
-        Returns: {
-          total_build_time_seconds: number
-          total_builds: number
-        }[]
-      }
       get_org_members:
         | {
             Args: { guild_id: string; user_id: string }
@@ -2032,7 +1970,6 @@ export type Database = {
             Args: { orgid: string }
             Returns: {
               bandwidth_percent: number
-              build_time_percent: number
               mau_percent: number
               storage_percent: number
               total_percent: number
@@ -2042,7 +1979,6 @@ export type Database = {
             Args: { cycle_end: string; cycle_start: string; orgid: string }
             Returns: {
               bandwidth_percent: number
-              build_time_percent: number
               mau_percent: number
               storage_percent: number
               total_percent: number
@@ -2064,7 +2000,6 @@ export type Database = {
             Args: { org_id: string }
             Returns: {
               bandwidth: number
-              build_time_seconds: number
               fail: number
               get: number
               install: number
@@ -2077,7 +2012,6 @@ export type Database = {
             Args: { end_date: string; org_id: string; start_date: string }
             Returns: {
               bandwidth: number
-              build_time_seconds: number
               fail: number
               get: number
               install: number
@@ -2217,10 +2151,6 @@ export type Database = {
         Args: { org_id: string }
         Returns: boolean
       }
-      is_build_time_exceeded_by_org: {
-        Args: { org_id: string }
-        Returns: boolean
-      }
       is_canceled_org: { Args: { orgid: string }; Returns: boolean }
       is_good_plan_v5_org: { Args: { orgid: string }; Returns: boolean }
       is_mau_exceeded_by_org: { Args: { org_id: string }; Returns: boolean }
@@ -2330,16 +2260,6 @@ export type Database = {
           version_id: number
         }[]
       }
-      record_build_time: {
-        Args: {
-          p_build_id: string
-          p_build_time_seconds: number
-          p_org_id: string
-          p_platform: string
-          p_user_id: string
-        }
-        Returns: string
-      }
       remove_old_jobs: { Args: never; Returns: undefined }
       rescind_invitation: {
         Args: { email: string; org_id: string }
@@ -2363,10 +2283,6 @@ export type Database = {
         }
       }
       set_bandwidth_exceeded_by_org: {
-        Args: { disabled: boolean; org_id: string }
-        Returns: undefined
-      }
-      set_build_time_exceeded_by_org: {
         Args: { disabled: boolean; org_id: string }
         Returns: undefined
       }
@@ -2399,9 +2315,9 @@ export type Database = {
       verify_mfa: { Args: never; Returns: boolean }
     }
     Enums: {
-      action_type: "mau" | "storage" | "bandwidth" | "build_time"
-      credit_metric_type: "mau" | "bandwidth" | "storage" | "build_time"
+      action_type: "mau" | "storage" | "bandwidth"
       app_mode: "prod" | "dev" | "livereload"
+      credit_metric_type: "mau" | "bandwidth" | "storage"
       credit_transaction_type:
         | "grant"
         | "purchase"
@@ -2652,9 +2568,9 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      action_type: ["mau", "storage", "bandwidth", "build_time"],
-      credit_metric_type: ["mau", "bandwidth", "storage", "build_time"],
+      action_type: ["mau", "storage", "bandwidth"],
       app_mode: ["prod", "dev", "livereload"],
+      credit_metric_type: ["mau", "bandwidth", "storage"],
       credit_transaction_type: [
         "grant",
         "purchase",

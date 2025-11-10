@@ -70,9 +70,52 @@ CREATE POLICY "Users read own or org admin builds" ON public.build_logs FOR SELE
 CREATE POLICY "Service role manages build logs" ON public.build_logs FOR ALL TO service_role
   USING (true) WITH CHECK (true);
 
+-- Daily build time aggregates per app/day for reporting
+CREATE TABLE IF NOT EXISTS public.daily_build_time (
+  app_id character varying NOT NULL REFERENCES public.apps (app_id) ON DELETE CASCADE,
+  date date NOT NULL,
+  build_time_seconds bigint NOT NULL DEFAULT 0 CHECK (build_time_seconds >= 0),
+  build_count bigint NOT NULL DEFAULT 0 CHECK (build_count >= 0),
+  PRIMARY KEY (app_id, date)
+);
+
+CREATE INDEX idx_daily_build_time_app_date ON public.daily_build_time (app_id, date);
+
+-- Build requests - stores native build jobs requested via API
+CREATE TABLE IF NOT EXISTS public.build_requests (
+  id uuid DEFAULT extensions.uuid_generate_v4() PRIMARY KEY,
+  created_at timestamptz DEFAULT now() NOT NULL,
+  updated_at timestamptz DEFAULT now() NOT NULL,
+  app_id character varying NOT NULL REFERENCES public.apps (app_id) ON DELETE CASCADE,
+  owner_org uuid NOT NULL REFERENCES public.orgs (id) ON DELETE CASCADE,
+  requested_by uuid NOT NULL REFERENCES auth.users (id) ON DELETE SET NULL,
+  platform character varying NOT NULL CHECK (platform IN ('ios', 'android', 'both')),
+  build_mode character varying NOT NULL DEFAULT 'release',
+  build_config jsonb DEFAULT '{}'::jsonb,
+  status character varying NOT NULL DEFAULT 'pending',
+  builder_job_id character varying,
+  upload_session_key character varying NOT NULL,
+  upload_path character varying NOT NULL,
+  upload_url character varying NOT NULL,
+  upload_expires_at timestamptz NOT NULL,
+  last_error text
+);
+
+CREATE INDEX idx_build_requests_app ON public.build_requests (app_id);
+CREATE INDEX idx_build_requests_org ON public.build_requests (owner_org);
+CREATE INDEX idx_build_requests_job ON public.build_requests (builder_job_id);
+
+ALTER TABLE public.build_requests ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Service role manages build requests" ON public.build_requests FOR ALL TO service_role
+  USING (true) WITH CHECK (true);
+
+CREATE TRIGGER handle_build_requests_updated_at
+  BEFORE UPDATE ON public.build_requests
+  FOR EACH ROW EXECUTE FUNCTION moddatetime('updated_at');
+
 -- Note: No daily aggregation needed - just query build_logs for billing
--- Note: No build_requests table - use builder.capgo.app API to get job history
--- Note: No storage bucket - builder.capgo.app manages its own R2
+-- Note: builder.capgo.app manages its own R2 storage; this table only stores metadata
 
 COMMIT;
 
@@ -259,6 +302,31 @@ BEGIN
     ORDER BY plans.mau);
 END;
 $$;
+
+-- Update find_best_plan_v3 to account for build time
+DROP FUNCTION IF EXISTS public.find_best_plan_v3(bigint, double precision, double precision);
+
+CREATE FUNCTION public.find_best_plan_v3(mau bigint, bandwidth double precision, storage double precision, build_time_seconds bigint DEFAULT 0)
+RETURNS character varying
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = ''
+AS $$
+BEGIN
+  RETURN (
+    SELECT name
+    FROM public.plans
+    WHERE (
+      plans.mau >= find_best_plan_v3.mau
+      AND plans.storage >= find_best_plan_v3.storage
+      AND plans.bandwidth >= find_best_plan_v3.bandwidth
+      AND plans.build_time_seconds >= find_best_plan_v3.build_time_seconds
+    ) OR plans.name = 'Pay as you go'
+    ORDER BY plans.mau
+    LIMIT 1
+  );
+END;
+$$;
+
+ALTER FUNCTION public.find_best_plan_v3(bigint, double precision, double precision, bigint) OWNER TO "postgres";
 
 -- Update is_good_plan_v5_org
 DROP FUNCTION IF EXISTS public.is_good_plan_v5_org(uuid);

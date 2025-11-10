@@ -10,6 +10,13 @@ import { getBuildStatus } from './status.ts'
 
 export const app = honoFactory.createApp()
 
+// POST /build - Backwards compatible build request entrypoint
+app.post('/', middlewareKey(['all', 'write']), async (c) => {
+  const body = await getBodyOrQuery<RequestBuildBody>(c)
+  const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
+  return requestBuild(c, body, apikey)
+})
+
 // POST /build/request - Request a new native build
 app.post('/request', middlewareKey(['all', 'write']), async (c) => {
   const body = await getBodyOrQuery<RequestBuildBody>(c)

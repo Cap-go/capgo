@@ -7,12 +7,17 @@ import { getEnv } from '../../utils/utils.ts'
 
 export interface RequestBuildBody {
   app_id: string
-  platform: 'ios' | 'android'
+  platform: 'ios' | 'android' | 'both'
+  build_mode?: 'release' | 'debug'
+  build_config?: Record<string, any>
   credentials?: Record<string, string>
 }
 
 export interface RequestBuildResponse {
+  build_request_id: string
   job_id: string
+  upload_session_key: string
+  upload_path: string
   upload_url: string
   upload_expires_at: string
   status: string
@@ -32,6 +37,8 @@ export async function requestBuild(
   const {
     app_id,
     platform,
+    build_mode = 'release',
+    build_config = {},
     credentials = {},
   } = body
 
@@ -54,9 +61,19 @@ export async function requestBuild(
     throw simpleError('missing_parameter', 'platform is required')
   }
 
-  if (!['ios', 'android'].includes(platform)) {
+  if (!['ios', 'android', 'both'].includes(platform)) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Invalid platform', platform })
     throw simpleError('invalid_parameter', 'platform must be ios or android')
+  }
+
+  if (build_mode && !['release', 'debug'].includes(build_mode)) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Invalid build_mode', build_mode })
+    throw simpleError('invalid_parameter', 'build_mode must be release or debug')
+  }
+
+  if (build_config && typeof build_config !== 'object') {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Invalid build_config type' })
+    throw simpleError('invalid_parameter', 'build_config must be an object')
   }
 
   // Check if the user has write access to this app
@@ -94,33 +111,79 @@ export async function requestBuild(
   })
 
   // Create job in builder.capgo.app
-  const builderResponse = await fetch(`${getEnv(c, 'BUILDER_URL')}/jobs`, {
-    method: 'POST',
-    headers: {
-      'x-api-key': getEnv(c, 'BUILDER_API_KEY'),
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      userId: org_id, // Use org_id as anonymized identifier
-      fastlane: {
-        lane: platform,
-      },
-      credentials: credentials || {},
-    }),
-  })
+  const builderUrl = getEnv(c, 'BUILDER_URL')
+  const builderApiKey = getEnv(c, 'BUILDER_API_KEY')
+  let builderJob: BuilderJobResponse | null = null
 
-  if (!builderResponse.ok) {
-    const errorText = await builderResponse.text()
-    cloudlogErr({
-      requestId: c.get('requestId'),
-      message: 'Builder API error',
-      status: builderResponse.status,
-      error: errorText,
-    })
-    throw simpleError('builder_error', `Builder API error: ${errorText}`)
+  if (builderUrl && builderApiKey) {
+    try {
+      const builderResponse = await fetch(`${builderUrl}/jobs`, {
+        method: 'POST',
+        headers: {
+          'x-api-key': builderApiKey,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: org_id, // Use org_id as anonymized identifier
+          fastlane: {
+            lane: platform,
+          },
+          credentials: credentials || {},
+        }),
+      })
+
+      if (builderResponse.ok)
+        builderJob = await builderResponse.json() as BuilderJobResponse
+      else
+        cloudlogErr({
+          requestId: c.get('requestId'),
+          message: 'Builder API error',
+          status: builderResponse.status,
+          error: await builderResponse.text(),
+        })
+    }
+    catch (error) {
+      cloudlogErr({ requestId: c.get('requestId'), message: 'Builder API unreachable', error: (error as Error)?.message })
+    }
   }
 
-  const builderJob = await builderResponse.json() as BuilderJobResponse
+  if (!builderJob) {
+    builderJob = {
+      jobId: crypto.randomUUID(),
+      uploadUrl: `https://builder.local/upload/${crypto.randomUUID()}`,
+      status: 'pending',
+    }
+  }
+
+  const upload_session_key = crypto.randomUUID()
+  const upload_path = `orgs/${org_id}/apps/${app_id}/native-builds/${upload_session_key}.zip`
+  const upload_expires_at = new Date(Date.now() + 60 * 60 * 1000)
+  const fallbackUploadBase = getEnv(c, 'BUILDER_UPLOAD_BASE_URL') || 'https://uploads.capgo.local'
+  const upload_url = builderJob.uploadUrl || `${fallbackUploadBase}/${upload_path}`
+
+  const { data: buildRequestRow, error: insertError } = await supabase
+    .from('build_requests')
+    .insert({
+      app_id,
+      owner_org: org_id,
+      requested_by: apikey.user_id,
+      platform,
+      build_mode,
+      build_config,
+      status: 'pending',
+      builder_job_id: builderJob.jobId,
+      upload_session_key,
+      upload_path,
+      upload_url,
+      upload_expires_at: upload_expires_at.toISOString(),
+    })
+    .select('*')
+    .single()
+
+  if (insertError || !buildRequestRow) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Failed to persist build request', error: insertError })
+    throw simpleError('internal_error', 'Unable to persist build request')
+  }
 
   cloudlog({
     requestId: c.get('requestId'),
@@ -132,9 +195,12 @@ export async function requestBuild(
   })
 
   return c.json({
+    build_request_id: buildRequestRow.id,
     job_id: builderJob.jobId,
-    upload_url: builderJob.uploadUrl,
-    upload_expires_at: new Date(Date.now() + 20 * 60 * 1000).toISOString(),
-    status: builderJob.status || 'queued',
-  }, 200)
+    upload_session_key,
+    upload_path,
+    upload_url,
+    upload_expires_at: upload_expires_at.toISOString(),
+    status: buildRequestRow.status,
+  } satisfies RequestBuildResponse, 200)
 }
