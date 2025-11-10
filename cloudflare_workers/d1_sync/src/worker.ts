@@ -153,11 +153,19 @@ function cleanFields(record: any, tableName: string): Record<string, any> {
   return cleanRecord
 }
 
+// Update handleMessages function to use the new schema structure
+// Adapts to the message format from trigger_http_queue_post_to_function_d1
+function handleMessages(pgmqMsg: any, table: TableSchema) {
+  if (pgmqMsg.message && Array.isArray(pgmqMsg.message)) {
+    return pgmqMsg.message.map((msg: any) => handleMessage(pgmqMsg.msg_id, msg, table))
+  }
+  return [handleMessage(pgmqMsg.msg_id, pgmqMsg.message, table)]
+}
+
 // Update handleMessage function to use the new schema structure
 // Adapts to the message format from trigger_http_queue_post_to_function_d1
-function handleMessage(pgmqMsg: any, table: TableSchema) {
+function handleMessage(msg_id: string, message: any, table: TableSchema) {
   // Assume pgmqMsg format: { msg_id: number, ..., message: { record: object | null, old_record: object | null, type: string, table: string } }
-  const { msg_id, message } = pgmqMsg
   // Extract operation type and determine the relevant data record based on the operation type
   const opType = message?.type?.toUpperCase()
   const tableName = table.name
@@ -493,12 +501,12 @@ async function processReplicationQueue(replicas: ReplicaTarget[], env: Env) {
           continue // Skip this message
         }
 
-        // b. Use handleMessage to create D1 statement
-        const sqlOperation = handleMessage(pgmqMsg, tableSchema)
+        // b. Use handleMessages to create D1 statement
+        const sqlOperations = handleMessages(pgmqMsg, tableSchema)
 
-        if (sqlOperation) {
+        if (sqlOperations) {
           // c. Add statement to batch
-          currentBatch.push(sqlOperation)
+          currentBatch.push(...sqlOperations)
           batchMsgIds.push(currentMsgIdBigInt) // Add ID to current batch tracker
 
           // d. If D1 batch size reached, execute batch
