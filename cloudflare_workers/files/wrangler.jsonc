@@ -4,7 +4,7 @@
   "compatibility_date": "2025-09-15",
   "main": "./index.ts",
   "compatibility_flags": [
-    "nodejs_compat_v2",
+    "nodejs_compat",
     "nodejs_compat_populate_process_env"
   ],
   "workers_dev": false,
@@ -49,6 +49,30 @@
         },
         {
           "pattern": "plugin.capgo.app/files*",
+          "zone_name": "capgo.app"
+        },
+        {
+          "pattern": "plugin.eu.capgo.app/files*",
+          "zone_name": "capgo.app"
+        },
+        {
+          "pattern": "plugin.na.capgo.app/files*",
+          "zone_name": "capgo.app"
+        },
+        {
+          "pattern": "plugin.sa.capgo.app/files*",
+          "zone_name": "capgo.app"
+        },
+        {
+          "pattern": "plugin.af.capgo.app/files*",
+          "zone_name": "capgo.app"
+        },
+        {
+          "pattern": "plugin.as.capgo.app/files*",
+          "zone_name": "capgo.app"
+        },
+        {
+          "pattern": "plugin.oc.capgo.app/files*",
           "zone_name": "capgo.app"
         },
         {
