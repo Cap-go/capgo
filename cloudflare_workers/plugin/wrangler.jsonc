@@ -8,9 +8,6 @@
     "nodejs_compat_populate_process_env"
   ],
   "workers_dev": false,
-  "placement": {
-    "mode": "smart"
-  },
   "upload_source_maps": true,
   "env": {
     "prod": {
@@ -121,13 +118,35 @@
           "binding": "HYPERDRIVE_DB_US",
           "id": "a2acda0d0be14c1285b33fbf32c99466"
         }
-      ]
+      ],
+      "placement": {
+        "mode": "smart"
+      }
     },
-    "prodv1": {
-      "name": "capgo_plugin-v1-prod",
+    "prod_ab": {
+      "name": "capgo_plugin-ab",
       "vars": {
-        "IS_V2": "0",
-        "ENV_NAME": "capgo_plugin-v1-prod"
+        "ENV_NAME": "capgo_plugin-ab"
+      },
+      "observability": {
+        "enabled": true,
+        "head_sampling_rate": 0.001
+      },
+      "routes": [
+        {
+          "pattern": "plugin.ab.capgo.app",
+          "custom_domain": true
+        }
+      ],
+      "placement": {
+        "mode": "off"
+      }
+    },
+    "prod_a": {
+      "name": "capgo_plugin-a-prod",
+      "vars": {
+        "IS_V2": "0.5",
+        "ENV_NAME": "capgo_plugin-a-prod"
       },
       "observability": {
         "enabled": true,
@@ -135,11 +154,11 @@
       },
       "routes": [
         {
-          "pattern": "plugin.v1.capgo.app",
+          "pattern": "plugin.a.capgo.app",
           "custom_domain": true
         },
         {
-          "pattern": "plugin.v1.usecapgo.com",
+          "pattern": "plugi.a.usecapgo.com",
           "custom_domain": true
         }
       ],
@@ -175,6 +194,21 @@
           "binding": "DB_STOREAPPS",
           "database_name": "capgo_prod_storeapps",
           "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
+        },
+        {
+          "binding": "DB_REPLICA_EU",
+          "database_name": "capgo_replicate",
+          "database_id": "7f267d86-f4f7-49f5-9622-e44373aa00dc"
+        },
+        {
+          "binding": "DB_REPLICA_AS",
+          "database_name": "capgo_replicate_as",
+          "database_id": "c01d7197-67b8-4b23-99d9-cceb76d3e7f6"
+        },
+        {
+          "binding": "DB_REPLICA_US",
+          "database_name": "capgo_replicate_us",
+          "database_id": "320c32be-d3d9-4c7c-a84c-e20ef01fd20d"
         }
       ],
       "hyperdrive": [
@@ -191,13 +225,16 @@
           "binding": "HYPERDRIVE_DB_US",
           "id": "a2acda0d0be14c1285b33fbf32c99466"
         }
-      ]
+      ],
+      "placement": {
+        "mode": "smart"
+      }
     },
-    "prodv2": {
-      "name": "capgo_plugin-v2-prod",
+    "prod_b": {
+      "name": "capgo_plugin-b-prod",
       "vars": {
-        "IS_V2": "1",
-        "ENV_NAME": "capgo_plugin-v2-prod"
+        "IS_V2": "0.5",
+        "ENV_NAME": "capgo_plugin-a-prod"
       },
       "observability": {
         "enabled": true,
@@ -205,11 +242,11 @@
       },
       "routes": [
         {
-          "pattern": "plugin.v2.capgo.app",
+          "pattern": "plugin.b.capgo.app",
           "custom_domain": true
         },
         {
-          "pattern": "plugin.v2.usecapgo.com",
+          "pattern": "plugin.b.usecapgo.com",
           "custom_domain": true
         }
       ],
@@ -363,7 +400,10 @@
           "binding": "HYPERDRIVE_DB_US",
           "id": "a2acda0d0be14c1285b33fbf32c99466"
         }
-      ]
+      ],
+      "placement": {
+        "mode": "smart"
+      }
     },
     "alpha": {
       "name": "capgo_plugin-alpha",
@@ -446,7 +486,10 @@
           "binding": "HYPERDRIVE_DB_US",
           "id": "a2acda0d0be14c1285b33fbf32c99466"
         }
-      ]
+      ],
+      "placement": {
+        "mode": "smart"
+      }
     },
     "local": {
       "name": "capgo_plugin-local",

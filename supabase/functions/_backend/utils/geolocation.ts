@@ -50,6 +50,10 @@ function mapContinentToDbRegion(continent: string | undefined): 'EU' | 'US' | 'A
   }
 }
 
+export function getContinentCF(c: Context): string | undefined {
+  const cfData = (c.req.raw as Request & { cf?: { continent?: string } })?.cf
+  return cfData?.continent
+}
 /**
  * Get database region from request context based on deployment platform
  * Maps client location to database regions: EU (Europe/Africa), US (Americas), AS (Asia/Oceania)
@@ -58,10 +62,10 @@ function mapContinentToDbRegion(continent: string | undefined): 'EU' | 'US' | 'A
  */
 export function getClientDbRegion(c: Context): 'EU' | 'US' | 'AS' | undefined {
   // 1. Cloudflare Workers: c.req.raw.cf?.continent (primary deployment, 99% of traffic)
-  const cfData = (c.req.raw as Request & { cf?: { continent?: string } })?.cf
-  if (cfData?.continent) {
-    const dbRegion = mapContinentToDbRegion(cfData.continent)
-    cloudlog({ requestId: c.get('requestId'), message: 'dbRegion', region: dbRegion, continent: cfData.continent, source: 'cloudflare' })
+  const continent = getContinentCF(c)
+  if (continent) {
+    const dbRegion = mapContinentToDbRegion(continent)
+    cloudlog({ requestId: c.get('requestId'), message: 'dbRegion', region: dbRegion, continent, source: 'cloudflare' })
     return dbRegion
   }
 

@@ -191,7 +191,7 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
-  deploy_plugin_v2:
+  deploy_plugin_b:
     needs: supabase_deploy
     runs-on: ubuntu-latest
     steps:
@@ -211,12 +211,12 @@ jobs:
             echo "ENV=prod" >> $GITHUB_ENV
           fi
       - name: Deploy CF Worker Plugin V2
-        run: bun run deploy:cloudflare:plugin_v2:${{ env.ENV }}
+        run: bun run deploy:cloudflare:plugin_b:${{ env.ENV }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
-  deploy_plugin_v1:
+  deploy_plugin_a:
     needs: supabase_deploy
     runs-on: ubuntu-latest
     steps:
@@ -236,7 +236,7 @@ jobs:
             echo "ENV=prod" >> $GITHUB_ENV
           fi
       - name: Deploy CF Worker Plugin V1
-        run: bun run deploy:cloudflare:plugin_v1:${{ env.ENV }}
+        run: bun run deploy:cloudflare:plugin_a:${{ env.ENV }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
