@@ -11,7 +11,7 @@ export const app = new Hono<MiddlewareKeyVariables>()
 
 app.get('/', async (c) => {
   cloudlog({ requestId: c.get('requestId'), message: 'Latency check' })
-  if (getRuntimeKey() === 'workerd' && existInEnv(c, 'DB_REPLICATE')) {
+  if (getRuntimeKey() === 'workerd' && existInEnv(c, 'DB_REPLICA_EU')) {
     const pgClient = getDrizzleClientD1Session(c)
     const res = await selectOneD1(pgClient)
 
@@ -23,7 +23,7 @@ app.get('/', async (c) => {
   const db = getDrizzleClient(pgClient)
   const res = await selectOne(db)
 
-  closeClient(c, pgClient)
+  await closeClient(c, pgClient)
   if (!res)
     throw simpleError('cannot_get_apps', 'Cannot get apps')
   return c.json(BRES)

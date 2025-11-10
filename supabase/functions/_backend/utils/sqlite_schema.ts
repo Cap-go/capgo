@@ -9,6 +9,8 @@ export const apps = sqliteTable('apps', {
   last_version: text('last_version'),
   retention: integer('retention', { mode: 'number' }).notNull().default(2592000),
   owner_org: text('owner_org').notNull(),
+  channel_device_count: integer('channel_device_count', { mode: 'number' }).notNull().default(0),
+  manifest_bundle_count: integer('manifest_bundle_count', { mode: 'number' }).notNull().default(0),
 })
 
 export const app_versions = sqliteTable('app_versions', {

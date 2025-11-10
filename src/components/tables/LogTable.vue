@@ -2,7 +2,6 @@
 import type { Ref } from 'vue'
 import type { TableColumn } from '../comp_def'
 import dayjs from 'dayjs'
-import ky from 'ky'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
@@ -86,8 +85,10 @@ async function getData() {
       return
     const currentJwt = currentSession.session.access_token
     // console.log('paginatedRange.value', paginatedRange.value, currentPage.value)
-    const dataD = await ky
-      .post(`${defaultApiHost}/private/stats`, {
+
+    try {
+      const response = await fetch(`${defaultApiHost}/private/stats`, {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'authorization': `Bearer ${currentJwt ?? ''}`,
@@ -101,13 +102,19 @@ async function getData() {
           rangeEnd: paginatedRange.value.rangeEnd,
         }),
       })
-      .then(res => res.json<LogData[]>())
-      .catch((err) => {
-        console.log('Cannot get devices', err)
-        return [] as LogData[]
-      })
-    // console.log('dataD', dataD)
-    elements.value.push(...dataD)
+
+      if (!response.ok) {
+        console.log('Cannot get stats', response.status)
+        return
+      }
+
+      const dataD = await response.json() as LogData[]
+      // console.log('dataD', dataD)
+      elements.value.push(...dataD)
+    }
+    catch (err) {
+      console.log('Cannot get devices', err)
+    }
   }
   catch (error) {
     console.error(error)

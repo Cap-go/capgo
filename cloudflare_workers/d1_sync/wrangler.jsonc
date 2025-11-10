@@ -15,15 +15,25 @@
       },
       "hyperdrive": [
         {
-          "binding": "HYPERDRIVE_DB",
-          "id": "0f1d77550db142fbb17cb6b3ee659a06"
+          "binding": "HYPERDRIVE_DB_EU",
+          "id": "52723917a61f49b7b36eb71b225b19f5"
         }
       ],
       "d1_databases": [
         {
-          "binding": "DB",
+          "binding": "DB_REPLICA_EU",
           "database_name": "capgo_replicate",
           "database_id": "7f267d86-f4f7-49f5-9622-e44373aa00dc"
+        },
+        {
+          "binding": "DB_REPLICA_AS",
+          "database_name": "capgo_replicate_as",
+          "database_id": "c01d7197-67b8-4b23-99d9-cceb76d3e7f6"
+        },
+        {
+          "binding": "DB_REPLICA_US",
+          "database_name": "capgo_replicate_us",
+          "database_id": "320c32be-d3d9-4c7c-a84c-e20ef01fd20d"
         }
       ]
     },
@@ -31,7 +41,7 @@
       "name": "capgo-d1-sync-local",
       "hyperdrive": [
         {
-          "binding": "HYPERDRIVE_DB",
+          "binding": "HYPERDRIVE_DB_EU",
           "id": "local-dev-hyperdrive",
           "localConnectionString": "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
         }

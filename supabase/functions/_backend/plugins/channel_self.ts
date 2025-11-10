@@ -52,6 +52,7 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
     custom_id,
     is_emulator,
     is_prod,
+    defaultChannel,
   } = body
 
   const drizzleClientD1 = (isV2 ? getDrizzleClientD1Session(c) : undefined) as ReturnType<typeof getDrizzleClientD1Session>
@@ -98,6 +99,7 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
     os_version: version_os,
     platform: platform as Database['public']['Enums']['platform_os'],
     updated_at: new Date().toISOString(),
+    default_channel: defaultChannel ?? null,
   }
 
   // Read operations can use v2 flag

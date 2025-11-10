@@ -16,7 +16,7 @@
     "prod": {
       "name": "capgo_plugin-prod",
       "vars": {
-        "IS_V2": "0.9",
+        "IS_V2": "0",
         "ENV_NAME": "capgo_plugin-prod"
       },
       "observability": {
@@ -93,23 +93,33 @@
           "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
         },
         {
-          "binding": "DB_REPLICATE",
-          "database_name": "capgo_prod_replicate",
+          "binding": "DB_REPLICA_EU",
+          "database_name": "capgo_replicate",
           "database_id": "7f267d86-f4f7-49f5-9622-e44373aa00dc"
+        },
+        {
+          "binding": "DB_REPLICA_AS",
+          "database_name": "capgo_replicate_as",
+          "database_id": "c01d7197-67b8-4b23-99d9-cceb76d3e7f6"
+        },
+        {
+          "binding": "DB_REPLICA_US",
+          "database_name": "capgo_replicate_us",
+          "database_id": "320c32be-d3d9-4c7c-a84c-e20ef01fd20d"
         }
       ],
       "hyperdrive": [
         {
-          "binding": "HYPERDRIVE_DB",
-          "id": "0f1d77550db142fbb17cb6b3ee659a06"
+          "binding": "HYPERDRIVE_DB_EU",
+          "id": "52723917a61f49b7b36eb71b225b19f5"
         },
         {
           "binding": "HYPERDRIVE_DB_SG",
-          "id": "06ee738d905d43d1a055682face2dddb"
+          "id": "acaf2391be8449f18e49776847d3106c"
         },
         {
           "binding": "HYPERDRIVE_DB_US",
-          "id": "51df4318bd5d4a35a5c4c145b520b22f"
+          "id": "a2acda0d0be14c1285b33fbf32c99466"
         }
       ]
     },
@@ -169,17 +179,17 @@
       ],
       "hyperdrive": [
         {
-          "binding": "HYPERDRIVE_DB",
-          "id": "0f1d77550db142fbb17cb6b3ee659a06"
+          "binding": "HYPERDRIVE_DB_EU",
+          "id": "52723917a61f49b7b36eb71b225b19f5"
         },
 
         {
           "binding": "HYPERDRIVE_DB_SG",
-          "id": "06ee738d905d43d1a055682face2dddb"
+          "id": "acaf2391be8449f18e49776847d3106c"
         },
         {
           "binding": "HYPERDRIVE_DB_US",
-          "id": "51df4318bd5d4a35a5c4c145b520b22f"
+          "id": "a2acda0d0be14c1285b33fbf32c99466"
         }
       ]
     },
@@ -237,23 +247,33 @@
           "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
         },
         {
-          "binding": "DB_REPLICATE",
-          "database_name": "capgo_prod_replicate",
+          "binding": "DB_REPLICA_EU",
+          "database_name": "capgo_replicate",
           "database_id": "7f267d86-f4f7-49f5-9622-e44373aa00dc"
+        },
+        {
+          "binding": "DB_REPLICA_AS",
+          "database_name": "capgo_replicate_as",
+          "database_id": "c01d7197-67b8-4b23-99d9-cceb76d3e7f6"
+        },
+        {
+          "binding": "DB_REPLICA_US",
+          "database_name": "capgo_replicate_us",
+          "database_id": "320c32be-d3d9-4c7c-a84c-e20ef01fd20d"
         }
       ],
       "hyperdrive": [
         {
-          "binding": "HYPERDRIVE_DB",
-          "id": "0f1d77550db142fbb17cb6b3ee659a06"
+          "binding": "HYPERDRIVE_DB_EU",
+          "id": "52723917a61f49b7b36eb71b225b19f5"
         },
         {
           "binding": "HYPERDRIVE_DB_SG",
-          "id": "06ee738d905d43d1a055682face2dddb"
+          "id": "acaf2391be8449f18e49776847d3106c"
         },
         {
           "binding": "HYPERDRIVE_DB_US",
-          "id": "51df4318bd5d4a35a5c4c145b520b22f"
+          "id": "a2acda0d0be14c1285b33fbf32c99466"
         }
       ],
       // Do not place smart as we want to use read replicas in specific regions
@@ -292,9 +312,19 @@
           "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
         },
         {
-          "binding": "DB_REPLICATE",
-          "database_name": "capgo_prod_replicate",
+          "binding": "DB_REPLICA_EU",
+          "database_name": "capgo_replicate",
           "database_id": "7f267d86-f4f7-49f5-9622-e44373aa00dc"
+        },
+        {
+          "binding": "DB_REPLICA_AS",
+          "database_name": "capgo_replicate_as",
+          "database_id": "c01d7197-67b8-4b23-99d9-cceb76d3e7f6"
+        },
+        {
+          "binding": "DB_REPLICA_US",
+          "database_name": "capgo_replicate_us",
+          "database_id": "320c32be-d3d9-4c7c-a84c-e20ef01fd20d"
         }
       ],
       "analytics_engine_datasets": [
@@ -321,17 +351,17 @@
       ],
       "hyperdrive": [
         {
-          "binding": "HYPERDRIVE_DB",
-          "id": "0f1d77550db142fbb17cb6b3ee659a06"
+          "binding": "_EU",
+          "id": "52723917a61f49b7b36eb71b225b19f5"
         },
 
         {
           "binding": "HYPERDRIVE_DB_SG",
-          "id": "06ee738d905d43d1a055682face2dddb"
+          "id": "acaf2391be8449f18e49776847d3106c"
         },
         {
           "binding": "HYPERDRIVE_DB_US",
-          "id": "51df4318bd5d4a35a5c4c145b520b22f"
+          "id": "a2acda0d0be14c1285b33fbf32c99466"
         }
       ]
     },
@@ -366,9 +396,19 @@
           "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
         },
         {
-          "binding": "DB_REPLICATE",
-          "database_name": "capgo_alpha_replicate",
+          "binding": "DB_REPLICA_EU",
+          "database_name": "capgo_replicate",
           "database_id": "7f267d86-f4f7-49f5-9622-e44373aa00dc"
+        },
+        {
+          "binding": "DB_REPLICA_AS",
+          "database_name": "capgo_replicate_as",
+          "database_id": "c01d7197-67b8-4b23-99d9-cceb76d3e7f6"
+        },
+        {
+          "binding": "DB_REPLICA_US",
+          "database_name": "capgo_replicate_us",
+          "database_id": "320c32be-d3d9-4c7c-a84c-e20ef01fd20d"
         }
       ],
       "analytics_engine_datasets": [
@@ -395,16 +435,16 @@
       ],
       "hyperdrive": [
         {
-          "binding": "HYPERDRIVE_DB",
-          "id": "0f1d77550db142fbb17cb6b3ee659a06"
+          "binding": "HYPERDRIVE_DB_EU",
+          "id": "52723917a61f49b7b36eb71b225b19f5"
         },
         {
           "binding": "HYPERDRIVE_DB_SG",
-          "id": "06ee738d905d43d1a055682face2dddb"
+          "id": "acaf2391be8449f18e49776847d3106c"
         },
         {
           "binding": "HYPERDRIVE_DB_US",
-          "id": "51df4318bd5d4a35a5c4c145b520b22f"
+          "id": "a2acda0d0be14c1285b33fbf32c99466"
         }
       ]
     },
@@ -416,9 +456,19 @@
       },
       "d1_databases": [
         {
-          "binding": "DB_REPLICATE",
-          "database_name": "capgo_local_replicate",
-          "database_id": "3fca2d80-4ca0-4118-b0ce-a36068f43f15"
+          "binding": "DB_REPLICA_EU",
+          "database_name": "capgo_replicate",
+          "database_id": "7f267d86-f4f7-49f5-9622-e44373aa00dc"
+        },
+        {
+          "binding": "DB_REPLICA_AS",
+          "database_name": "capgo_replicate_as",
+          "database_id": "c01d7197-67b8-4b23-99d9-cceb76d3e7f6"
+        },
+        {
+          "binding": "DB_REPLICA_US",
+          "database_name": "capgo_replicate_us",
+          "database_id": "320c32be-d3d9-4c7c-a84c-e20ef01fd20d"
         }
       ]
     }

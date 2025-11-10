@@ -1,17 +1,22 @@
 # Cloudflare Workers Testing Guide
 
-This guide explains how to run tests against Cloudflare Workers instead of Supabase Edge Functions.
+This guide explains how to run tests against Cloudflare Workers instead of
+Supabase Edge Functions.
 
 ## Overview
 
-By default, tests run against Supabase Edge Functions (`supabase functions serve`). However, since production primarily uses Cloudflare Workers, you can now run tests directly against local Cloudflare Workers to ensure compatibility.
+By default, tests run against Supabase Edge Functions
+(`supabase functions serve`). However, since production primarily uses
+Cloudflare Workers, you can now run tests directly against local Cloudflare
+Workers to ensure compatibility.
 
 ## Architecture
 
 The application has three Cloudflare Workers:
 
 1. **API Worker** (port 8787): Handles most API endpoints
-   - `/bundle`, `/app`, `/device`, `/channel`, `/apikey`, `/organization`, `/statistics`
+   - `/bundle`, `/app`, `/device`, `/channel`, `/apikey`, `/organization`,
+     `/statistics`
    - Private endpoints: `/private/*`
    - Trigger endpoints for cron jobs and database triggers
 
@@ -26,33 +31,40 @@ The application has three Cloudflare Workers:
 1. Supabase must be running: `supabase start`
 2. Database must be seeded: `supabase db reset`
 3. Environment variables must be configured in `internal/cloudflare/.env.local`
-4. (Optional) For V2/D1 testing: Local D1 database must be synced (see V2/D1 Testing section)
+4. (Optional) For V2/D1 testing: Local D1 database must be synced (see V2/D1
+   Testing section)
 
 ## Testing Modes
 
 The workers support two testing modes:
 
 ### V1 Mode (PostgreSQL only)
+
 - Tests the traditional PostgreSQL code path
 - No D1 setup required
 - Simpler and faster for basic testing
 
 ### V2 Mode (D1 + PostgreSQL)
+
 - Tests the production D1 (edge database) code path
 - Requires D1 setup and sync
 - **Recommended for comprehensive testing** since production uses D1
 
-The workers automatically use V2 mode when `IS_V2=1` is set in the local environment.
+The workers automatically use V2 mode when `IS_V2=1` is set in the local
+environment.
 
 ## Running Tests
 
 ### Option 1: Manual Setup (Recommended for Development)
 
 1. Start the Cloudflare Workers:
+
    ```bash
    ./scripts/start-cloudflare-workers.sh
    ```
-   This will start all three workers in the background. Press Ctrl+C to stop them.
+
+   This will start all three workers in the background. Press Ctrl+C to stop
+   them.
 
 2. In another terminal, run the tests:
    ```bash
@@ -86,7 +98,8 @@ kill $WORKERS_PID
 
 ## Environment Variables
 
-The Cloudflare Worker tests use the following environment variables (set automatically by `vitest.config.cloudflare.ts`):
+The Cloudflare Worker tests use the following environment variables (set
+automatically by `vitest.config.cloudflare.ts`):
 
 - `USE_CLOUDFLARE_WORKERS=true` - Enables Cloudflare Worker mode
 - `CLOUDFLARE_API_URL=http://127.0.0.1:8787` - API Worker URL
@@ -95,19 +108,25 @@ The Cloudflare Worker tests use the following environment variables (set automat
 
 ## How It Works
 
-The test utilities (`tests/test-utils.ts`) automatically route requests to the correct worker:
+The test utilities (`tests/test-utils.ts`) automatically route requests to the
+correct worker:
 
-- Plugin endpoints (`/updates`, `/channel_self`, `/stats`) → Plugin Worker (8788)
+- Plugin endpoints (`/updates`, `/channel_self`, `/stats`) → Plugin Worker
+  (8788)
 - All other endpoints → API Worker (8787)
 
-This is done via the `getEndpointUrl()` helper function which determines the correct worker based on the endpoint path.
+This is done via the `getEndpointUrl()` helper function which determines the
+correct worker based on the endpoint path.
 
 ## Differences from Supabase Edge Functions
 
-1. **Port Configuration**: Cloudflare Workers run on different ports (8787, 8788, 8789)
-2. **Environment Loading**: Uses `internal/cloudflare/.env.local` instead of Supabase secrets
+1. **Port Configuration**: Cloudflare Workers run on different ports (8787,
+   8788, 8789)
+2. **Environment Loading**: Uses `internal/cloudflare/.env.local` instead of
+   Supabase secrets
 3. **Runtime**: Uses Cloudflare Workers runtime instead of Deno
-4. **Worker Separation**: API and Plugin endpoints are handled by separate workers
+4. **Worker Separation**: API and Plugin endpoints are handled by separate
+   workers
 
 ## Troubleshooting
 
@@ -160,32 +179,41 @@ To run Cloudflare Worker tests in CI:
 
 ## Development Tips
 
-1. **Keep workers running**: Start workers once and run tests multiple times for faster iteration
-2. **Watch mode**: Wrangler supports hot reload, changes to backend code will automatically restart workers
-3. **Debug mode**: Add `--log-level debug` to wrangler commands in the start script for verbose logging
-4. **Separate terminal**: Run workers in a dedicated terminal to see logs in real-time
+1. **Keep workers running**: Start workers once and run tests multiple times for
+   faster iteration
+2. **Watch mode**: Wrangler supports hot reload, changes to backend code will
+   automatically restart workers
+3. **Debug mode**: Add `--log-level debug` to wrangler commands in the start
+   script for verbose logging
+4. **Separate terminal**: Run workers in a dedicated terminal to see logs in
+   real-time
 
 ## V2/D1 Testing
 
 ### Overview
 
-V2 testing mode tests the production D1 (Cloudflare's edge database) code path. In production, a percentage of traffic (controlled by `IS_V2`) uses D1 instead of PostgreSQL for faster reads at the edge.
+V2 testing mode tests the production D1 (Cloudflare's edge database) code path.
+In production, a percentage of traffic (controlled by `IS_V2`) uses D1 instead
+of PostgreSQL for faster reads at the edge.
 
 ### Why Test V2?
 
 - **Production parity**: 90% of production traffic uses D1 (`IS_V2=0.9`)
-- **Catch D1-specific bugs**: D1 uses SQLite syntax which differs from PostgreSQL
+- **Catch D1-specific bugs**: D1 uses SQLite syntax which differs from
+  PostgreSQL
 - **Validate data sync**: Ensures the Postgres→D1 sync system works correctly
 
 ### Setup V2 Testing
 
 1. **Create local D1 database** (one-time setup):
+
    ```bash
    # D1 database is already created as part of the project setup
    # Database ID: 3fca2d80-4ca0-4118-b0ce-a36068f43f15
    ```
 
 2. **Sync data from Postgres to D1**:
+
    ```bash
    # Make sure Supabase is running and seeded
    supabase db reset
@@ -195,6 +223,7 @@ V2 testing mode tests the production D1 (Cloudflare's edge database) code path. 
    ```
 
 3. **Start workers with V2 enabled**:
+
    ```bash
    # The workers now start with --env=local which enables V2 automatically
    ./scripts/start-cloudflare-workers.sh
@@ -207,10 +236,13 @@ V2 testing mode tests the production D1 (Cloudflare's edge database) code path. 
 
 ### Syncing Data
 
-The sync script (`scripts/sync-postgres-to-d1.ts`) copies data from PostgreSQL to D1:
+The sync script (`scripts/sync-postgres-to-d1.ts`) copies data from PostgreSQL
+to D1:
 
-- **What it syncs**: All tables defined in `cloudflare_workers/d1_sync/schema.json`
-- **When to run**: After `supabase db reset` or when testing D1-specific features
+- **What it syncs**: All tables defined in
+  `cloudflare_workers/d1_sync/schema.json`
+- **When to run**: After `supabase db reset` or when testing D1-specific
+  features
 - **How it works**: Reads from Postgres, writes to local D1 database
 
 ```bash
@@ -221,9 +253,10 @@ bun run scripts/sync-postgres-to-d1.ts
 ### Verifying V2 is Active
 
 Check the worker startup logs for:
+
 ```
 env.IS_V2 ("1")                                            Environment Variable      local
-env.DB_REPLICATE (capgo_local_replicate)                   D1 Database               local
+env.DB_REPLICA_EU (capgo_local_replicate)                   D1 Database               local
 ```
 
 ### V2 Testing Workflow
@@ -246,19 +279,26 @@ bun test:cloudflare:backend
 ### Troubleshooting V2
 
 **D1 database not found**:
-- Ensure `cloudflare_workers/d1_sync/wrangler.jsonc` has the correct database configuration
-- The local environment should have `database_id: 3fca2d80-4ca0-4118-b0ce-a36068f43f15`
+
+- Ensure `cloudflare_workers/d1_sync/wrangler.jsonc` has the correct database
+  configuration
+- The local environment should have
+  `database_id: 3fca2d80-4ca0-4118-b0ce-a36068f43f15`
 
 **Data sync failures**:
+
 - Verify Postgres is running: `supabase status`
 - Check the schema matches: `cloudflare_workers/d1_sync/schema.json`
 
 **Tests failing with D1 but passing with Postgres**:
+
 - This indicates a D1-specific bug (SQLite vs PostgreSQL differences)
-- Common issues: Date formatting, JSON handling, boolean values (0/1 vs true/false)
+- Common issues: Date formatting, JSON handling, boolean values (0/1 vs
+  true/false)
 
 ## Future Enhancements
 
 - Add continuous sync during development (watch mode)
-- Add support for testing against remote Cloudflare Workers (dev/preprod environments)
+- Add support for testing against remote Cloudflare Workers (dev/preprod
+  environments)
 - Add performance benchmarking between Supabase and Cloudflare deployments

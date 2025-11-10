@@ -2,7 +2,6 @@ import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
-import ky from 'ky'
 import { readActiveAppsCF, readLastMonthDevicesCF, readLastMonthUpdatesCF } from '../utils/cloudflare.ts'
 import { BRES, middlewareAPISecret } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../utils/loggin.ts'
@@ -50,12 +49,23 @@ function getUtcDayBounds(reference = new Date()): DayBounds {
 }
 
 async function getGithubStars(): Promise<number> {
-  const json = await ky.get('https://api.github.com/repos/Cap-go/capacitor-updater', {
-    headers: {
-      'User-Agent': 'capgo-app', // GitHub API rate limit
-    },
-  }).json<{ stargazers_count: number }>()
-  return json.stargazers_count
+  try {
+    const response = await fetch('https://api.github.com/repos/Cap-go/capacitor-updater', {
+      headers: {
+        'User-Agent': 'capgo-app', // GitHub API rate limit
+      },
+    })
+
+    if (!response.ok) {
+      throw new Error(`GitHub API error: HTTP ${response.status}`)
+    }
+
+    const json = await response.json() as { stargazers_count: number }
+    return json.stargazers_count
+  }
+  catch (e) {
+    throw new Error(`getGithubStars error: ${e instanceof Error ? e.message : String(e)}`)
+  }
 }
 
 function getStats(c: Context, dayBounds: DayBounds): GlobalStats {

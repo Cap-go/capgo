@@ -1,6 +1,5 @@
 import type { Context } from 'hono'
 import type { ManifestEntry } from './downloadUrl.ts'
-import type { getDrizzleClientD1 } from './pg_d1.ts'
 
 import type { Database } from './supabase.types.ts'
 import type { AppInfos, DeviceWithoutCreatedAt } from './types.ts'
@@ -20,7 +19,7 @@ import { closeClient, getAppOwnerPostgres, getDrizzleClient, getPgClient, reques
 import { getAppOwnerPostgresV2, getDrizzleClientD1Session, requestInfosPostgresV2 } from './pg_d1.ts'
 import { s3 } from './s3.ts'
 import { createStatsBandwidth, createStatsMau, createStatsVersion, onPremStats, sendStatsAndDevice } from './stats.ts'
-import { backgroundTask, existInEnv, fixSemver, isInternalVersionName } from './utils.ts'
+import { backgroundTask, fixSemver, isInternalVersionName } from './utils.ts'
 
 const PLAN_LIMIT: Array<'mau' | 'bandwidth' | 'storage'> = ['mau', 'bandwidth']
 
@@ -45,7 +44,7 @@ export function resToVersion(plugin_version: string, signedURL: string, version:
   return res
 }
 
-function returnV2orV1<T>(
+async function returnV2orV1<T>(
   c: Context,
   isV2: boolean,
   runV1: () => Promise<T>,
@@ -55,22 +54,24 @@ function returnV2orV1<T>(
   if (isV2) {
     return runV2()
   }
+  // Disabled to no overload DB
   // In the v1 case, use PG as the source of truth, but kick off v2 in the background
-  if (getRuntimeKey() === 'workerd' && existInEnv(c, 'DB_REPLICATE')) {
-    backgroundTask(c, runV2().then((res) => {
-      cloudlog({ requestId: c.get('requestId'), message: 'Completed background V2 function', res })
-    }).catch((err) => {
-      cloudlog({ requestId: c.get('requestId'), message: 'Error in background V2 function', err })
-    }))
-  }
+  // if (getRuntimeKey() === 'workerd' && existInEnv(c, 'DB_REPLICA_EU')) {
+  //   const replicatePromise = runV2().then((res) => {
+  //     cloudlog({ requestId: c.get('requestId'), message: 'Completed background V2 function', res })
+  //   }).catch((err) => {
+  //     cloudlog({ requestId: c.get('requestId'), message: 'Error in background V2 function', err })
+  //   })
+  //   await backgroundTask(c, replicatePromise)
+  // }
   return runV1()
 }
 
 export async function updateWithPG(
   c: Context,
   body: AppInfos,
-  getDrizzleCientD1: () => ReturnType<typeof getDrizzleClientD1>,
-  drizzleCient: ReturnType<typeof getDrizzleClient>,
+  getDrizzleCientD1: () => ReturnType<typeof getDrizzleClientD1Session>,
+  drizzleClient: ReturnType<typeof getDrizzleClient>,
   isV2: boolean,
 ) {
   cloudlog({ requestId: c.get('requestId'), message: 'body', body, date: new Date().toISOString() })
@@ -91,7 +92,7 @@ export async function updateWithPG(
   const appOwner = await returnV2orV1(
     c,
     isV2,
-    () => getAppOwnerPostgres(c, app_id, drizzleCient, PLAN_LIMIT),
+    () => getAppOwnerPostgres(c, app_id, drizzleClient, PLAN_LIMIT),
     () => getAppOwnerPostgresV2(c, app_id, getDrizzleCientD1(), PLAN_LIMIT),
   )
   const device: DeviceWithoutCreatedAt = {
@@ -106,10 +107,24 @@ export async function updateWithPG(
     os_version: version_os,
     platform: platform as Database['public']['Enums']['platform_os'],
     updated_at: new Date().toISOString(),
+    default_channel: defaultChannel ?? null,
   }
   if (!appOwner) {
     return onPremStats(c, app_id, 'get', device)
   }
+  const channelDeviceCount = appOwner.channel_device_count ?? 0
+  const manifestBundleCount = appOwner.manifest_bundle_count ?? 0
+  const bypassChannelOverrides = channelDeviceCount <= 0
+  const fetchManifestEntries = manifestBundleCount > 0
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: 'App channel device count evaluated',
+    app_id,
+    channelDeviceCount,
+    bypassChannelOverrides,
+    manifestBundleCount,
+    fetchManifestEntries,
+  })
   if (body.version_build === 'unknown') {
     return simpleError200(c, 'unknown_version_build', 'Version build is unknown, cannot proceed with update', { body })
   }
@@ -155,8 +170,8 @@ export async function updateWithPG(
   const requestedInto = await returnV2orV1(
     c,
     isV2,
-    () => requestInfosPostgres(c, platform, app_id, device_id, defaultChannel, drizzleCient),
-    () => requestInfosPostgresV2(c, platform, app_id, device_id, defaultChannel, getDrizzleCientD1()),
+    () => requestInfosPostgres(c, platform, app_id, device_id, defaultChannel, drizzleClient, channelDeviceCount, manifestBundleCount),
+    () => requestInfosPostgresV2(c, platform, app_id, device_id, defaultChannel, getDrizzleCientD1(), channelDeviceCount, manifestBundleCount),
   )
   const { channelOverride } = requestedInto
   let { channelData } = requestedInto
@@ -177,7 +192,7 @@ export async function updateWithPG(
   }
 
   const version = channelOverride?.version ?? channelData.version
-  const manifestEntries = channelOverride?.manifestEntries ?? channelData.manifestEntries
+  const manifestEntries = (channelOverride?.manifestEntries ?? channelData?.manifestEntries ?? []) as Partial<Database['public']['Tables']['manifest']['Row']>[]
   // device.version = versionData ? versionData.id : version.id
 
   // TODO: find better solution to check if device is from apple or google, currently not working in

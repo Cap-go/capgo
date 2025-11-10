@@ -9,8 +9,8 @@ on:
     tags:
       - "*"
 
-#  Break deploy as we have bug in files upload CF worker
 jobs:
+  # Tests already passed before tag was created, so just build and deploy
   supabase_deploy:
     runs-on: ubuntu-latest
     name: Build code and deploy to Supabase
@@ -44,14 +44,6 @@ jobs:
         run: supabase link --project-ref ${{ env.SUPABASE_PROJECT_ID }}
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_TOKEN }}
-      - name: Wait for tests to succeed
-        if: ${{ env.SUPA_ENV != 'ALPHA' }}
-        uses: lewagon/wait-on-check-action@v1.4.1
-        with:
-          ref: ${{ github.ref }}
-          check-name: Run tests
-          repo-token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
-          wait-interval: 10
       - name: Apply Supabase Migrations
         run: supabase db push
       - name: Update functions

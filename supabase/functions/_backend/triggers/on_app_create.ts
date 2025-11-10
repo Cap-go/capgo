@@ -31,6 +31,25 @@ app.post('/', middlewareAPISecret, triggerValidator('apps', 'INSERT'), async (c)
     notify: false,
   }))
   const supabase = supabaseAdmin(c)
+  const { error: dbVersionError } = await supabase
+    .from('app_versions')
+    .insert([
+      {
+        owner_org: record.owner_org,
+        deleted: true,
+        name: 'unknown',
+        app_id: record.app_id,
+      },
+      {
+        owner_org: record.owner_org,
+        deleted: true,
+        name: 'builtin',
+        app_id: record.app_id,
+      },
+    ])
+  if (dbVersionError) {
+    cloudlog({ requestId: c.get('requestId'), message: 'Error creating default versions', dbVersionError })
+  }
   await backgroundTask(c, supabase
     .from('orgs')
     .select('*')

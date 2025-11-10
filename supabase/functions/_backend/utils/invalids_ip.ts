@@ -1,5 +1,3 @@
-import ky from 'ky'
-
 async function ipapi(ip: string, lang = 'en') {
   ip = ip ?? ''
   lang = lang ?? 'en'
@@ -9,9 +7,18 @@ async function ipapi(ip: string, lang = 'en') {
   if (!langs.includes(lang))
     throw new Error(`unknown language, supported ones are: ${langs.join(', ')}`)
 
-  const res = await ky(`http://ip-api.com/json/${ip}?lang=${lang}&fields=66842623`)
+  try {
+    const response = await fetch(`http://ip-api.com/json/${ip}?lang=${lang}&fields=66842623`)
 
-  return await res.json<{ isp: string }>()
+    if (!response.ok) {
+      throw new Error(`ipapi error: HTTP ${response.status}`)
+    }
+
+    return await response.json() as { isp: string }
+  }
+  catch (e) {
+    throw new Error(`ipapi error: ${e instanceof Error ? e.message : String(e)}`)
+  }
 }
 
 export async function invalidIps(ips: string[]) {

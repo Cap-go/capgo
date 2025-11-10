@@ -4,15 +4,17 @@ import type { OrganizationRole } from '~/stores/organization'
 import type { Database } from '~/types/supabase.types'
 import { greaterThan, parse } from '@std/semver'
 import { onClickOutside } from '@vueuse/core'
-import ky from 'ky'
 import { ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
+import IconCopy from '~icons/heroicons/clipboard-document-check'
+import IconCode from '~icons/heroicons/code-bracket'
 import IconLog from '~icons/heroicons/document'
 import IconInformations from '~icons/heroicons/information-circle'
 import IconAlertCircle from '~icons/lucide/alert-circle'
 import IconDown from '~icons/material-symbols/keyboard-arrow-down-rounded'
+import { useDeviceUpdateFormat } from '~/composables/useDeviceUpdateFormat'
 import { formatDate } from '~/services/date'
 import { defaultApiHost, useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
@@ -53,6 +55,10 @@ const revertToNativeVersion = ref<Database['public']['Functions']['check_revert_
 
 // Channel dropdown state
 const channelDropdown = ref<HTMLDetailsElement>()
+
+// Device update format composable
+const { transformDeviceToUpdateRequest } = useDeviceUpdateFormat()
+const showDebugSection = ref(false)
 
 onClickOutside(channelDropdown, () => closeChannelDropdown())
 
@@ -173,8 +179,10 @@ async function getDevice() {
     if (!currentSession.session)
       return
     const currentJwt = currentSession.session.access_token
-    const dataD = await ky
-      .post(`${defaultApiHost}/private/devices`, {
+
+    try {
+      const response = await fetch(`${defaultApiHost}/private/devices`, {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'authorization': `Bearer ${currentJwt ?? ''}`,
@@ -184,15 +192,20 @@ async function getDevice() {
           deviceIds: [id.value],
         }),
       })
-      .then(res => res.json<Database['public']['Tables']['devices']['Row'][]>())
-      .catch((err) => {
-        console.log('Cannot get device', err)
-        return [] as Database['public']['Tables']['devices']['Row'][]
-      })
 
-    const data = dataD[0]
-    device.value = data
-    await getVersionInfo()
+      if (!response.ok) {
+        console.log('Cannot get device', response.status)
+        return
+      }
+
+      const dataD = await response.json() as Database['public']['Tables']['devices']['Row'][]
+      const data = dataD[0]
+      device.value = data
+      await getVersionInfo()
+    }
+    catch (err) {
+      console.log('Cannot get device', err)
+    }
   }
   catch (error) {
     console.error('no devices', error)
@@ -357,6 +370,32 @@ function openBundle() {
   if (packageId.value && device.value?.version)
     router.push(`/app/p/${packageId.value}/bundle/${device.value.version}`)
 }
+
+function getCurlCommand() {
+  if (!device.value)
+    return ''
+
+  // Use the stored default_channel from device, or empty string if not available
+  const defaultChannel = device.value.default_channel || ''
+  const requestBody = transformDeviceToUpdateRequest(device.value, packageId.value, defaultChannel)
+  const jsonBody = JSON.stringify(requestBody, null, 2)
+
+  return `curl -X POST '${defaultApiHost}/updates' \\
+  -H 'Content-Type: application/json' \\
+  -d '${jsonBody}'`
+}
+
+async function copyCurlCommand() {
+  try {
+    const curl = getCurlCommand()
+    await navigator.clipboard.writeText(curl)
+    toast.success(t('copy-success'))
+  }
+  catch (error) {
+    console.error('Failed to copy curl command:', error)
+    toast.error(t('copy-fail'))
+  }
+}
 </script>
 
 <template>
@@ -399,6 +438,9 @@ function openBundle() {
               <InfoRow v-if="device.os_version" :label="t('os-version')">
                 {{ device.os_version }}
               </InfoRow>
+              <InfoRow v-if="device.default_channel" :label="t('default-channel')">
+                {{ device.default_channel }}
+              </InfoRow>
               <InfoRow v-if="minVersion(device.plugin_version) && device.is_emulator" :label="t('is-emulator')">
                 {{ device.is_emulator?.toString() }}
               </InfoRow>
@@ -432,6 +474,39 @@ function openBundle() {
                 </details>
               </InfoRow>
             </dl>
+
+            <!-- Debug API Section -->
+            <div class="border-t border-slate-300 dark:border-slate-700">
+              <button
+                class="w-full px-6 py-4 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
+                @click="showDebugSection = !showDebugSection"
+              >
+                <div class="flex items-center gap-2">
+                  <IconCode class="w-5 h-5 text-slate-600 dark:text-slate-300" />
+                  <span class="font-medium text-slate-700 dark:text-slate-200">{{ t('debug-api-request') }}</span>
+                </div>
+                <IconDown
+                  class="w-5 h-5 text-slate-600 dark:text-slate-300 transition-transform"
+                  :class="{ 'rotate-180': showDebugSection }"
+                />
+              </button>
+
+              <div v-if="showDebugSection" class="px-6 pb-4">
+                <div class="relative">
+                  <pre class="bg-slate-900 text-slate-100 p-4 rounded-lg overflow-x-auto text-sm"><code>{{ getCurlCommand() }}</code></pre>
+                  <button
+                    class="absolute top-2 right-2 p-2 rounded hover:bg-slate-700 transition-colors"
+                    :title="t('copy-curl')"
+                    @click="copyCurlCommand"
+                  >
+                    <IconCopy class="w-4 h-4 text-slate-300" />
+                  </button>
+                </div>
+                <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">
+                  {{ t('debug-api-description') }}
+                </p>
+              </div>
+            </div>
           </div>
         </div>
       </div>
