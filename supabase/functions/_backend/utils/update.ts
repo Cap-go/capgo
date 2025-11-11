@@ -12,7 +12,7 @@ import {
 } from '@std/semver'
 import { getRuntimeKey } from 'hono/adapter'
 import { getBundleUrl, getManifestUrl } from './downloadUrl.ts'
-import { getIsV2, simpleError, simpleError200 } from './hono.ts'
+import { getIsV2Updater, simpleError, simpleError200 } from './hono.ts'
 import { cloudlog } from './logging.ts'
 import { sendNotifOrg } from './notifications.ts'
 import { closeClient, getAppOwnerPostgres, getDrizzleClient, getPgClient, requestInfosPostgres } from './pg.ts'
@@ -385,7 +385,7 @@ export async function updateWithPG(
 }
 
 export async function update(c: Context, body: AppInfos) {
-  const isV2 = getIsV2(c)
+  const isV2 = getIsV2Updater(c)
   const pgClient = isV2 ? null : getPgClient(c, true) // READ-ONLY: writes use SDK, not Drizzle
 
   const drizzlePg = pgClient ? getDrizzleClient(pgClient) : (null as any)

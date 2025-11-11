@@ -14,7 +14,8 @@
     "prod": {
       "name": "capgo_plugin-prod",
       "vars": {
-        "IS_V2": "0",
+        "IS_V2": "1",
+        "IS_V2_UPDATER": "0",
         "ENV_NAME": "capgo_plugin-eu-prod_old"
       },
       "observability": {
@@ -156,7 +157,8 @@
     "prod_eu": {
       "name": "capgo_plugin-eu-prod",
       "vars": {
-        "IS_V2": "0",
+        "IS_V2": "1",
+        "IS_V2_UPDATER": "0",
         "ENV_NAME": "capgo_plugin-eu-prod"
       },
       "placement": {
@@ -272,7 +274,8 @@
     "prod_as": {
       "name": "capgo_plugin-as-prod",
       "vars": {
-        "IS_V2": "0",
+        "IS_V2": "1",
+        "IS_V2_UPDATER": "0",
         "ENV_NAME": "capgo_plugin-as-prod"
       },
       "observability": {
@@ -388,7 +391,8 @@
     "prod_na": {
       "name": "capgo_plugin-na-prod",
       "vars": {
-        "IS_V2": "0",
+        "IS_V2": "1",
+        "IS_V2_UPDATER": "0",
         "ENV_NAME": "capgo_plugin-na-prod"
       },
       "observability": {
@@ -504,7 +508,8 @@
     "prod_af": {
       "name": "capgo_plugin-af-prod",
       "vars": {
-        "IS_V2": "0",
+        "IS_V2": "1",
+        "IS_V2_UPDATER": "0",
         "ENV_NAME": "capgo_plugin-af-prod"
       },
       "placement": {
@@ -620,7 +625,8 @@
     "prod_oc": {
       "name": "capgo_plugin-oc-prod",
       "vars": {
-        "IS_V2": "0",
+        "IS_V2": "1",
+        "IS_V2_UPDATER": "0",
         "ENV_NAME": "capgo_plugin-oc-prod"
       },
       "observability": {
@@ -736,7 +742,8 @@
     "prod_sa": {
       "name": "capgo_plugin-sa-prod",
       "vars": {
-        "IS_V2": "0",
+        "IS_V2": "1",
+        "IS_V2_UPDATER": "0",
         "ENV_NAME": "capgo_plugin-sa-prod"
       },
       "observability": {
@@ -852,7 +859,8 @@
     "preprod": {
       "name": "capgo_plugin-preprod",
       "vars": {
-        "IS_V2": "0",
+        "IS_V2": "1",
+        "IS_V2_UPDATER": "0",
         "ENV_NAME": "capgo_plugin-preprod"
       },
       "observability": {
@@ -968,6 +976,7 @@
       "name": "capgo_plugin-alpha",
       "vars": {
         "IS_V2": "1",
+        "IS_V2_UPDATER": "0",
         "ENV_NAME": "capgo_plugin-alpha"
       },
       "observability": {
