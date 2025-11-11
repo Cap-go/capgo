@@ -52,6 +52,30 @@
           "zone_name": "capgo.app"
         },
         {
+          "pattern": "plugin.eu.capgo.app/files*",
+          "zone_name": "capgo.app"
+        },
+        {
+          "pattern": "plugin.na.capgo.app/files*",
+          "zone_name": "capgo.app"
+        },
+        {
+          "pattern": "plugin.sa.capgo.app/files*",
+          "zone_name": "capgo.app"
+        },
+        {
+          "pattern": "plugin.af.capgo.app/files*",
+          "zone_name": "capgo.app"
+        },
+        {
+          "pattern": "plugin.as.capgo.app/files*",
+          "zone_name": "capgo.app"
+        },
+        {
+          "pattern": "plugin.oc.capgo.app/files*",
+          "zone_name": "capgo.app"
+        },
+        {
           "pattern": "api.usecapgo.com/files*",
           "zone_name": "usecapgo.com"
         },
