@@ -5,7 +5,6 @@ import { existInEnv, getEnv } from './utils.ts'
 // Antartica and Tor are redirected to EU in our snippet
 type ContinentsCFWorker = 'EU' | 'NA' | 'AS' | 'OC' | 'SA' | 'AF'
 type RegionsAWS = 'EU' | 'NA' | 'SA' | 'AF' | 'AP' | 'ME' | 'IL' | 'CA' | 'MX'
-// TODO: Enable OC when ready
 type DbRegionD1 = 'EU' | 'NA' | 'AS' | 'OC' | undefined
 // type DbRegionD1 = 'EU' | 'NA' | 'AS' | 'OC' | undefined
 type DbRegionSB = 'EU' | 'NA' | 'AS' | undefined
@@ -43,13 +42,9 @@ export function getClientDbRegionD1(c: Context): DbRegionD1 {
       case 'AF': // Africa
         return 'EU'
       case 'AS': // Asia
-      case 'OC': // Oceania
         return 'AS'
-        // TODO: Enabled Oceania mapping when ready
-        // case 'AS': // Asia
-        //   return 'AS'
-        // case 'OC': // Oceania
-        //   return 'OC'
+      case 'OC': // Oceania
+        return 'OC'
       case 'NA': // North America
       case 'SA': // South America
         return 'NA'
