@@ -185,7 +185,7 @@ jobs:
             cf_target: plugin_as
           - region: us
             region_label: United States (US)
-            cf_target: plugin_us
+            cf_target: plugin_na
           - region: sa
             region_label: South America (SA)
             cf_target: plugin_sa
