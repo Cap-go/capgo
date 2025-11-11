@@ -255,10 +255,14 @@ export function getIsV2Internal(c: Context, name: string) {
   return false
 }
 
-export function getIsV2(c: Context) {
-  return getIsV2Internal(c, 'IS_V2')
+export function getIsV2Channel(c: Context) {
+  return getIsV2Internal(c, 'IS_V2_CHANNEL')
 }
 
 export function getIsV2Updater(c: Context) {
   return getIsV2Internal(c, 'IS_V2_UPDATER')
+}
+
+export function getIsV2Stats(c: Context) {
+  return getIsV2Internal(c, 'IS_V2_STATS')
 }

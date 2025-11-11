@@ -6,7 +6,7 @@ import type { Database } from '../utils/supabase.types.ts'
 import type { DeviceWithoutCreatedAt } from '../utils/types.ts'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod/mini'
-import { BRES, getIsV2, parseBody, quickError, simpleError, simpleError200, simpleRateLimit } from '../utils/hono.ts'
+import { BRES, getIsV2Channel, parseBody, quickError, simpleError, simpleError200, simpleRateLimit } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { closeClient, deleteChannelDevicePg, getAppByIdPg, getAppOwnerPostgres, getAppVersionsByAppIdPg, getChannelByNamePg, getChannelDeviceOverridePg, getChannelsPg, getCompatibleChannelsPg, getDrizzleClient, getMainChannelsPg, getPgClient, upsertChannelDevicePg } from '../utils/pg.ts'
 import { getAppByIdD1, getAppOwnerPostgresV2, getAppVersionsByAppIdD1, getChannelByNameD1, getChannelDeviceOverrideD1, getChannelsD1, getCompatibleChannelsD1, getDrizzleClientD1Session, getMainChannelsD1 } from '../utils/pg_d1.ts'
@@ -388,7 +388,7 @@ app.post('/', async (c) => {
     throw simpleRateLimit(body)
   }
 
-  const isV2 = getIsV2(c)
+  const isV2 = getIsV2Channel(c)
   // POST has writes, so always create PG client (even if using D1 for reads)
   const pgClient = getPgClient(c)
 
@@ -415,7 +415,7 @@ app.put('/', async (c) => {
     throw simpleRateLimit(body)
   }
 
-  const isV2 = getIsV2(c)
+  const isV2 = getIsV2Channel(c)
   const pgClient = isV2 ? null : getPgClient(c)
 
   const bodyParsed = parsePluginBody<DeviceLink>(c, body, jsonRequestSchema)
@@ -438,7 +438,7 @@ app.delete('/', async (c) => {
     throw simpleRateLimit(body)
   }
 
-  const isV2 = getIsV2(c)
+  const isV2 = getIsV2Channel(c)
   // DELETE has writes, so always create PG client (even if using D1 for reads)
   const pgClient = getPgClient(c)
 
@@ -461,7 +461,7 @@ app.get('/', async (c) => {
     throw simpleRateLimit(body)
   }
 
-  const isV2 = getIsV2(c)
+  const isV2 = getIsV2Channel(c)
   const pgClient = isV2 ? null : getPgClient(c, true) // READ-ONLY: only queries channels
 
   const bodyParsed = parsePluginBody<DeviceLink>(c, body, jsonRequestSchema)
