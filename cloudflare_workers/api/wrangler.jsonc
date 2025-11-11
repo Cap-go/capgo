@@ -67,8 +67,8 @@
         },
         {
           "binding": "DB_REPLICA_EU",
-          "database_name": "capgo_replicate",
-          "database_id": "7f267d86-f4f7-49f5-9622-e44373aa00dc"
+          "database_name": "capgo_replicate_eu",
+          "database_id": "107046f7-af0e-4126-b493-1d4e66f48947"
         },
         {
           "binding": "DB_REPLICA_AS",
@@ -140,8 +140,8 @@
         },
         {
           "binding": "DB_REPLICA_EU",
-          "database_name": "capgo_replicate",
-          "database_id": "7f267d86-f4f7-49f5-9622-e44373aa00dc"
+          "database_name": "capgo_replicate_eu",
+          "database_id": "107046f7-af0e-4126-b493-1d4e66f48947"
         },
         {
           "binding": "DB_REPLICA_AS",
@@ -213,8 +213,8 @@
         },
         {
           "binding": "DB_REPLICA_EU",
-          "database_name": "capgo_replicate",
-          "database_id": "7f267d86-f4f7-49f5-9622-e44373aa00dc"
+          "database_name": "capgo_replicate_eu",
+          "database_id": "107046f7-af0e-4126-b493-1d4e66f48947"
         },
         {
           "binding": "DB_REPLICA_AS",
@@ -241,8 +241,8 @@
       "d1_databases": [
         {
           "binding": "DB_REPLICA_EU",
-          "database_name": "capgo_replicate",
-          "database_id": "7f267d86-f4f7-49f5-9622-e44373aa00dc"
+          "database_name": "capgo_replicate_eu",
+          "database_id": "107046f7-af0e-4126-b493-1d4e66f48947"
         },
         {
           "binding": "DB_REPLICA_AS",
