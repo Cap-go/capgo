@@ -80,9 +80,9 @@ function createProject(wid, title, val, s, c) {
 
   t1.textColor = Color.white()
   t1.font = new Font('Avenir-Heavy', s)
-  const formatedNumber = new Intl.NumberFormat('en-US').format(Math.floor(val / 100).toString())
+  const formattedNumber = new Intl.NumberFormat('en-US').format(Math.floor(val / 100).toString())
   const change = c > 0 ? `+ ${c}%` : `- ${Math.abs(c)}%`
-  const t2 = hstack.addText(`€${formatedNumber}`)
+  const t2 = hstack.addText(`€${formattedNumber}`)
   const t3 = hstack.addText(`${change}`)
   t2.textColor = Color.white()
   t3.textColor = c > 0 ? new Color('#32CD32') : new Color('#FF0000')

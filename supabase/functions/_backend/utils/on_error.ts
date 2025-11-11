@@ -2,7 +2,7 @@ import type { Context } from 'hono'
 import type { SimpleErrorResponse } from './hono.ts'
 import { DrizzleError, entityKind, TransactionRollbackError } from 'drizzle-orm'
 import { sendDiscordAlert500 } from './discord.ts'
-import { cloudlogErr, serializeError } from './loggin.ts'
+import { cloudlogErr, serializeError } from './logging.ts'
 import { backgroundTask } from './utils.ts'
 
 const drizzleErrorNames = new Set(['DrizzleError', 'DrizzleQueryError', 'TransactionRollbackError'])

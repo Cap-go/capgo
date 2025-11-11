@@ -4,7 +4,7 @@ import type { Database } from './supabase.types.ts'
 import { parseCronExpression } from 'cron-schedule'
 import dayjs from 'dayjs'
 import { trackBentoEvent } from './bento.ts'
-import { cloudlog, cloudlogErr } from './loggin.ts'
+import { cloudlog, cloudlogErr } from './logging.ts'
 import { supabaseAdmin } from './supabase.ts'
 
 interface EventData {
@@ -96,6 +96,6 @@ export async function sendNotifOrg(c: Context, eventName: string, eventData: Eve
   return sendNow(c, eventName, eventData, org.management_email, orgId, uniqId, notif).then(() => true)
 }
 
-// dayjs substract one week
+// dayjs subtract one week
 // const last_send_at = dayjs().subtract(1, 'week').toISOString()
 // cloudlog(c.get('requestId'), 'isSendable', isSendable(last_send_at, '0 0 1 * *'))

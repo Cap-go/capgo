@@ -1,7 +1,7 @@
 import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { BRES, simpleError } from '../../utils/hono.ts'
-import { cloudlogErr } from '../../utils/loggin.ts'
+import { cloudlogErr } from '../../utils/logging.ts'
 import { hasAppRightApikey, supabaseApikey, updateOrCreateChannel } from '../../utils/supabase.ts'
 
 interface ChannelSet {

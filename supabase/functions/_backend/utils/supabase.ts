@@ -6,7 +6,7 @@ import type { DeviceWithoutCreatedAt, Order, ReadDevicesParams, ReadStatsParams 
 import { createClient } from '@supabase/supabase-js'
 import { buildNormalizedDeviceForWrite, hasComparableDeviceChanged } from './deviceComparison.ts'
 import { simpleError } from './hono.ts'
-import { cloudlog, cloudlogErr } from './loggin.ts'
+import { cloudlog, cloudlogErr } from './logging.ts'
 import { createCustomer } from './stripe.ts'
 import { getEnv } from './utils.ts'
 
@@ -70,7 +70,7 @@ export function emptySupabase(c: Context) {
   return createClient<Database>(getEnv(c, 'SUPABASE_URL'), getEnv(c, 'SUPABASE_ANON_KEY'), options)
 }
 
-// WARNING: The service role key has admin priviliges and should only be used in secure server environments!
+// WARNING: The service role key has admin privileges and should only be used in secure server environments!
 export function supabaseAdmin(c: Context) {
   const options = {
     auth: {
@@ -905,18 +905,18 @@ export async function countDevicesSB(c: Context, app_id: string, customIdMode: b
   return count ?? 0
 }
 
-const DEFAUL_PLAN_NAME = 'Solo'
+const DEFAULT_PLAN_NAME = 'Solo'
 
 export async function getCurrentPlanNameOrg(c: Context, orgId?: string): Promise<string> {
   if (!orgId)
-    return DEFAUL_PLAN_NAME
+    return DEFAULT_PLAN_NAME
   const { data, error } = await supabaseAdmin(c)
     .rpc('get_current_plan_name_org', { orgid: orgId })
     .single()
   if (error)
     throw new Error(error.message)
 
-  return data ?? DEFAUL_PLAN_NAME
+  return data ?? DEFAULT_PLAN_NAME
 }
 
 interface UpdateStats {

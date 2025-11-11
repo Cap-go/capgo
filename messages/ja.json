@@ -76,7 +76,7 @@
   "alert-regenerate-key": "このキーを再生成してもよろしいですか？",
   "alert-unknown-error": "不明なエラー、開発者コンソールを参照してください",
   "allow-develoment-bui": "開発ビルドを許可する",
-  "allow-development-bui": "開発ビルドを許可する",
+  "allow-dev-build": "開発ビルドを許可する",
   "allow-device-to-self": "デバイスに自己分離/関連付けを許可する",
   "allow-emulator": "エミュレータを許可する",
   "already-account": "すでにアカウントをお持ちですか？",

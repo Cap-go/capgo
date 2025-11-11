@@ -4,7 +4,7 @@ import { canParse } from '@std/semver'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod/mini'
 import { BRES, parseBody, simpleRateLimit } from '../utils/hono.ts'
-import { cloudlog } from '../utils/loggin.ts'
+import { cloudlog } from '../utils/logging.ts'
 import { parsePluginBody } from '../utils/plugin_parser.ts'
 import { update } from '../utils/update.ts'
 

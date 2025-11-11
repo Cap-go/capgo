@@ -76,7 +76,7 @@
   "alert-regenerate-key": "Bu anahtarı yeniden oluşturmak istediğinizden emin misiniz?",
   "alert-unknown-error": "Bilinmeyen hata, dev konsoluna bakın",
   "allow-develoment-bui": "Geliştirme yapısına izin ver",
-  "allow-development-bui": "Geliştirme yapısına izin ver",
+  "allow-dev-build": "Geliştirme yapısına izin ver",
   "allow-device-to-self": "Cihazların kendiliğinden ayrılmasına/bağlanmasına izin verin",
   "allow-emulator": "Emülatörlere İzin Ver",
   "already-account": "Zaten bir hesabınız var mı?",

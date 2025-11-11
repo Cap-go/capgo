@@ -76,7 +76,7 @@
   "alert-regenerate-key": "Bạn có chắc bạn muốn tạo lại khóa này không?",
   "alert-unknown-error": "Lỗi không xác định, xem bảng điều khiển phát triển",
   "allow-develoment-bui": "Cho phép xây dựng phát triển",
-  "allow-development-bui": "Cho phép xây dựng phát triển",
+  "allow-dev-build": "Cho phép xây dựng phát triển",
   "allow-device-to-self": "Cho phép thiết bị tự ngắt kết nối/kết nối",
   "allow-emulator": "Cho phép giả lập",
   "already-account": "Bạn đã có tài khoản chưa?",

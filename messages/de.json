@@ -76,7 +76,7 @@
   "alert-regenerate-key": "Sind Sie sicher, dass Sie diesen Schlüssel neu generieren möchten?",
   "alert-unknown-error": "Unbekannter Fehler, siehe Entwicklerkonsole",
   "allow-develoment-bui": "Erlaube Entwicklungsgeräte",
-  "allow-development-bui": "Erlaube Entwicklungsbau",
+  "allow-dev-build": "Erlaube Entwicklungsbau",
   "allow-device-to-self": "Erlauben Sie Geräten, sich selbst zu dissoziieren/assoziiieren.",
   "allow-emulator": "Erlaube Emulatoren",
   "already-account": "Sie haben bereits ein Konto?",

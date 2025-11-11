@@ -31,7 +31,7 @@ async function uploadPhotoShared(data: string, fileName: string, contentType: st
     await callback(true, res.publicUrl)
 }
 
-async function updloadPhotoUser(formId: string, data: string, fileName: string, contentType: string, isLoading: Ref<boolean>, wentWrong: string) {
+async function uploadPhotoUser(formId: string, data: string, fileName: string, contentType: string, isLoading: Ref<boolean>, wentWrong: string) {
   async function userCallback(success: boolean, url: string) {
     if (!success) {
       setErrors(formId, [wentWrong], {})
@@ -64,7 +64,7 @@ async function updloadPhotoUser(formId: string, data: string, fileName: string, 
   await uploadPhotoShared(data, fileName, contentType, isLoading, userCallback)
 }
 
-async function updloadPhotoOrg(formId: string, data: string, fileName: string, contentType: string, isLoading: Ref<boolean>, wentWrong: string) {
+async function uploadPhotoOrg(formId: string, data: string, fileName: string, contentType: string, isLoading: Ref<boolean>, wentWrong: string) {
   async function orgCallback(success: boolean, url: string) {
     if (!success) {
       setErrors(formId, [wentWrong], {})
@@ -108,7 +108,7 @@ function blobToData(blob: Blob) {
 }
 
 export async function takePhoto(formId: string, isLoading: Ref<boolean>, type: 'org' | 'user', wentWrong: string) {
-  const updloadPhoto = (type === 'user') ? updloadPhotoUser : updloadPhotoOrg
+  const uploadPhoto = (type === 'user') ? uploadPhotoUser : uploadPhotoOrg
   const cameraPhoto = await Camera.getPhoto({
     resultType: CameraResultType.DataUrl,
     source: CameraSource.Camera,
@@ -127,7 +127,7 @@ export async function takePhoto(formId: string, isLoading: Ref<boolean>, type: '
   if (!contentType)
     return
   try {
-    await updloadPhoto(formId, cameraPhoto.dataUrl.split('base64,')[1], fileName, contentType, isLoading, wentWrong)
+    await uploadPhoto(formId, cameraPhoto.dataUrl.split('base64,')[1], fileName, contentType, isLoading, wentWrong)
   }
   catch (e) {
     console.error(e)
@@ -136,7 +136,7 @@ export async function takePhoto(formId: string, isLoading: Ref<boolean>, type: '
 }
 
 export async function pickPhoto(formId: string, isLoading: Ref<boolean>, type: 'org' | 'user', wentWrong: string) {
-  const updloadPhoto = (type === 'user') ? updloadPhotoUser : updloadPhotoOrg
+  const uploadPhoto = (type === 'user') ? uploadPhotoUser : uploadPhotoOrg
   const { photos } = await Camera.pickImages({
     limit: 1,
     quality: 100,
@@ -158,7 +158,7 @@ export async function pickPhoto(formId: string, isLoading: Ref<boolean>, type: '
     const contentType = mime.getType(photos[0].format)
     if (!contentType)
       return
-    await updloadPhoto(
+    await uploadPhoto(
       formId,
       contents.data as any,
       `${new Date().getTime()}.${photos[0].format}`,

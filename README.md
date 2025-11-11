@@ -34,7 +34,7 @@
 - ☁️ Cloud / Self hosted Support: Use our [Cloud](https://capgo.app/) to manage
   your app updates or yours.
 - 📦 Bundle Management: Download, assign to channel, rollback.
-- 📺 Channel Support: Use channels to manage different environements.
+- 📺 Channel Support: Use channels to manage different environments.
 - 🎯 Set Channel to specific device to do QA or debug one user.
 - 🔄 Auto Update: Automatically download and set the latest bundle for the app.
 - 🛟 Rollback: Reset the app to last working bundle if an incompatible bundle

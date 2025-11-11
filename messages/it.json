@@ -76,7 +76,7 @@
   "alert-regenerate-key": "Sei sicuro di voler rigenerare questa chiave?",
   "alert-unknown-error": "Errore sconosciuto, vedi console dev",
   "allow-develoment-bui": "Consenti dispositivi di sviluppo",
-  "allow-development-bui": "Consenti la costruzione dello sviluppo",
+  "allow-dev-build": "Consenti la costruzione dello sviluppo",
   "allow-device-to-self": "Consenti ai dispositivi di dissociarsi/associarsi autonomamente",
   "allow-emulator": "Permetti Emulatori",
   "already-account": "Hai già un account?",

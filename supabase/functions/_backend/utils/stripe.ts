@@ -1,7 +1,7 @@
 import type { Context } from 'hono'
 import type { Database } from './supabase.types.ts'
 import Stripe from 'stripe'
-import { cloudlog, cloudlogErr } from './loggin.ts'
+import { cloudlog, cloudlogErr } from './logging.ts'
 import { supabaseAdmin } from './supabase.ts'
 import { existInEnv, getEnv } from './utils.ts'
 
@@ -192,7 +192,7 @@ export async function cancelSubscription(c: Context, customerId: string) {
   })
 }
 
-async function getPriceIds(c: Context, planId: string, reccurence: string): Promise<{ priceId: string | null, meteredIds: string[] }> {
+async function getPriceIds(c: Context, planId: string, recurrence: string): Promise<{ priceId: string | null, meteredIds: string[] }> {
   let priceId = null
   const meteredIds: string[] = []
   if (!existInEnv(c, 'STRIPE_SECRET_KEY'))
@@ -203,7 +203,7 @@ async function getPriceIds(c: Context, planId: string, reccurence: string): Prom
     })
     cloudlog({ requestId: c.get('requestId'), message: 'prices stripe', prices })
     prices.data.forEach((price) => {
-      if (price.recurring && price.recurring.interval === reccurence && price.active && price.recurring.usage_type === 'licensed')
+      if (price.recurring && price.recurring.interval === recurrence && price.active && price.recurring.usage_type === 'licensed')
         priceId = price.id
       if (price.billing_scheme === 'per_unit' && price.active && price?.recurring?.usage_type !== 'licensed')
         meteredIds.push(price.id)
@@ -250,10 +250,10 @@ export function parsePriceIds(c: Context, prices: Stripe.SubscriptionItem[]): { 
   return { priceId, productId, meteredData }
 }
 
-export async function createCheckout(c: Context, customerId: string, reccurence: string, planId: string, successUrl: string, cancelUrl: string, clientReferenceId?: string, attributionId?: string) {
+export async function createCheckout(c: Context, customerId: string, recurrence: string, planId: string, successUrl: string, cancelUrl: string, clientReferenceId?: string, attributionId?: string) {
   if (!existInEnv(c, 'STRIPE_SECRET_KEY'))
     return { url: '' }
-  const prices = await getPriceIds(c, planId, reccurence)
+  const prices = await getPriceIds(c, planId, recurrence)
   cloudlog({ requestId: c.get('requestId'), message: 'prices', prices })
   if (!prices.priceId)
     return Promise.reject(new Error('Cannot find price'))

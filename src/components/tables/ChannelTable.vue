@@ -269,7 +269,7 @@ columns.value = [
       },
       {
         icon: IconTrash,
-        visible: () => organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['admin', 'super_admin']),
+        visible: () => organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['admin', 'super_admin']),
         onClick: (elem: Element) => deleteOne(elem),
       },
     ],
@@ -286,7 +286,7 @@ async function reload() {
   }
 }
 async function showAddModal() {
-  if (!currentOrganization.value || (!organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['admin', 'super_admin']))) {
+  if (!currentOrganization.value || (!organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['admin', 'super_admin']))) {
     toast.error(t('no-permission'))
     return
   }

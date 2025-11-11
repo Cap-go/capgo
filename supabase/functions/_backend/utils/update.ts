@@ -13,7 +13,7 @@ import {
 import { getRuntimeKey } from 'hono/adapter'
 import { getBundleUrl, getManifestUrl } from './downloadUrl.ts'
 import { getIsV2, simpleError, simpleError200 } from './hono.ts'
-import { cloudlog } from './loggin.ts'
+import { cloudlog } from './logging.ts'
 import { sendNotifOrg } from './notifications.ts'
 import { closeClient, getAppOwnerPostgres, getDrizzleClient, getPgClient, requestInfosPostgres } from './pg.ts'
 import { getAppOwnerPostgresV2, getDrizzleClientD1Session, requestInfosPostgresV2 } from './pg_d1.ts'
@@ -70,7 +70,7 @@ async function returnV2orV1<T>(
 export async function updateWithPG(
   c: Context,
   body: AppInfos,
-  getDrizzleCientD1: () => ReturnType<typeof getDrizzleClientD1Session>,
+  getDrizzleClientD1: () => ReturnType<typeof getDrizzleClientD1Session>,
   drizzleClient: ReturnType<typeof getDrizzleClient>,
   isV2: boolean,
 ) {
@@ -93,7 +93,7 @@ export async function updateWithPG(
     c,
     isV2,
     () => getAppOwnerPostgres(c, app_id, drizzleClient, PLAN_LIMIT),
-    () => getAppOwnerPostgresV2(c, app_id, getDrizzleCientD1(), PLAN_LIMIT),
+    () => getAppOwnerPostgresV2(c, app_id, getDrizzleClientD1(), PLAN_LIMIT),
   )
   const device: DeviceWithoutCreatedAt = {
     app_id,
@@ -173,7 +173,7 @@ export async function updateWithPG(
     c,
     isV2,
     () => requestInfosPostgres(c, platform, app_id, device_id, defaultChannel, drizzleClient, channelDeviceCount, manifestBundleCount),
-    () => requestInfosPostgresV2(c, platform, app_id, device_id, defaultChannel, getDrizzleCientD1(), channelDeviceCount, manifestBundleCount),
+    () => requestInfosPostgresV2(c, platform, app_id, device_id, defaultChannel, getDrizzleClientD1(), channelDeviceCount, manifestBundleCount),
   )
   const { channelOverride } = requestedInto
   let { channelData } = requestedInto
@@ -185,7 +185,7 @@ export async function updateWithPG(
     return simpleError200(c, 'no_channel', 'no default channel or override')
   }
 
-  // Trigger only if the channel is overwriten but the version is not
+  // Trigger only if the channel is overwritten but the version is not
   if (channelOverride)
     channelData = channelOverride
 
@@ -366,7 +366,7 @@ export async function updateWithPG(
     return simpleError200(c, 'no_bundle_url', 'Cannot get bundle url')
   }
   if (manifest.length && !signedURL) {
-    // TODO: remove this when all plugin acccept no URL
+    // TODO: remove this when all plugin accept no URL
     signedURL = 'https://404.capgo.app/no.zip'
   }
   // cloudlog(c.get('requestId'), 'save stats', device_id)

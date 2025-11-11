@@ -1,0 +1,64 @@
+# Typos configuration file
+# https://github.com/crate-ci/typos
+
+[default]
+extend-ignore-re = [
+  # Ignore URLs
+  "https?://[^\\s]+",
+  # Ignore base64 encoded strings
+  "[A-Za-z0-9+/]{40,}={0,2}",
+  # Ignore hex strings
+  "0x[0-9a-fA-F]+",
+]
+
+[files]
+extend-exclude = [
+  # Build outputs and dependencies
+  "dist/",
+  "node_modules/",
+  "*.lock",
+  "bun.lockb",
+
+  # Generated files
+  "*.gen.ts",
+  "*.generated.ts",
+  "src/typed-router.d.ts",
+  "src/components.d.ts",
+
+  # Database and Supabase
+  "supabase/.branches/",
+  "supabase/.temp/",
+
+  # Assets and data files
+  "*.json",
+  "*.svg",
+  "*.ico",
+  "*.png",
+  "*.jpg",
+  "*.jpeg",
+  "*.gif",
+  "*.woff",
+  "*.woff2",
+  "*.ttf",
+  "*.eot",
+
+  # Mobile platforms
+  "ios/",
+  "android/",
+
+  # Cloudflare snippets and workers
+  "scripts/snippet/",
+  "cloudflare_workers/snippet/",
+
+  # Logs and temporary files
+  "*.log",
+  ".DS_Store",
+]
+
+[default.extend-words]
+# Add custom words that should be ignored
+# Format: incorrectword = "correctword" or incorrectword = "incorrectword" to accept as-is
+capgo = "capgo"
+forgr = "forgr"
+supabase = "supabase"
+# Add more project-specific terms as needed

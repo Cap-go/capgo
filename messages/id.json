@@ -76,7 +76,7 @@
   "alert-regenerate-key": "Apakah Anda yakin ingin menghasilkan kunci ini lagi?",
   "alert-unknown-error": "Kesalahan tidak diketahui, lihat konsol pengembang",
   "allow-develoment-bui": "Izinkan pembangunan versi pengembangan",
-  "allow-development-bui": "Izinkan pembangunan versi pengembangan",
+  "allow-dev-build": "Izinkan pembangunan versi pengembangan",
   "allow-device-to-self": "Izinkan perangkat untuk memisahkan/mengasosiasikan diri sendiri",
   "allow-emulator": "Izinkan Emulator",
   "already-account": "Anda sudah memiliki akun?",

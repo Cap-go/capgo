@@ -76,7 +76,7 @@
   "alert-regenerate-key": "Czy na pewno chcesz wygenerować ten klucz ponownie?",
   "alert-unknown-error": "Nieznany błąd, zobacz konsolę deweloperską",
   "allow-develoment-bui": "Zezwól na budowę deweloperską",
-  "allow-development-bui": "Zezwól na budowę wersji rozwojowej",
+  "allow-dev-build": "Zezwól na budowę wersji rozwojowej",
   "allow-device-to-self": "Pozwól urządzeniom na samodzielne rozłączanie/łączenie się",
   "allow-emulator": "Zezwalaj na emulatory",
   "already-account": "Masz już konto?",

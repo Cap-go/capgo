@@ -1,5 +1,5 @@
 import type { Context } from 'hono'
-import { cloudlog } from './loggin.ts'
+import { cloudlog } from './logging.ts'
 import { existInEnv, getEnv } from './utils.ts'
 
 // Antartica and Tor are redirected to EU in our snippet

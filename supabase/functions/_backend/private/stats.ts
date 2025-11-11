@@ -3,7 +3,7 @@ import type { Order } from '../utils/types.ts'
 import { Hono } from 'hono/tiny'
 import { parseBody, simpleError, useCors } from '../utils/hono.ts'
 import { middlewareV2 } from '../utils/hono_middleware.ts'
-import { cloudlog } from '../utils/loggin.ts'
+import { cloudlog } from '../utils/logging.ts'
 import { readStats } from '../utils/stats.ts'
 import { hasAppRight } from '../utils/supabase.ts'
 

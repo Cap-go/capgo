@@ -76,7 +76,7 @@
   "alert-regenerate-key": "您确定要重新生成此密钥吗",
   "alert-unknown-error": "未知错误，请参阅开发控制台",
   "allow-develoment-bui": "允许开发构建",
-  "allow-development-bui": "允许开发构建",
+  "allow-dev-build": "允许开发构建",
   "allow-device-to-self": "允许设备自我解除关联/关联",
   "allow-emulator": "允许模拟器",
   "already-account": "你已经有一个账户了吗？",

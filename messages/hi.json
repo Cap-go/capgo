@@ -76,7 +76,7 @@
   "alert-regenerate-key": "क्या आप वाकई इस कुंजी को पुनर्जनित करना चाहते हैं?",
   "alert-unknown-error": "अज्ञात त्रुटि, डेव कंसोल देखें",
   "allow-develoment-bui": "विकास उपकरणों की अनुमति दें",
-  "allow-development-bui": "विकास बिल्ड की अनुमति दें",
+  "allow-dev-build": "विकास बिल्ड की अनुमति दें",
   "allow-device-to-self": "उपकरणों को स्वत: अलग/सहयुक्त होने की अनुमति दें",
   "allow-emulator": "एमुलेटर्स की अनुमति दें",
   "already-account": "क्या आपका पहले से ही एक खाता है?",

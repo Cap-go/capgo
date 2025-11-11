@@ -1682,8 +1682,8 @@ export type Database = {
       }
       cleanup_frequent_job_details: { Args: never; Returns: undefined }
       cleanup_queue_messages: { Args: never; Returns: undefined }
-      convert_bytes_to_gb: { Args: { byt: number }; Returns: number }
-      convert_bytes_to_mb: { Args: { byt: number }; Returns: number }
+      convert_bytes_to_gb: { Args: { bytes_value: number }; Returns: number }
+      convert_bytes_to_mb: { Args: { bytes_value: number }; Returns: number }
       convert_gb_to_bytes: { Args: { gb: number }; Returns: number }
       convert_mb_to_bytes: { Args: { gb: number }; Returns: number }
       convert_number_to_percent: {

@@ -2,7 +2,7 @@ import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
 import { BRES, middlewareAPISecret, parseBody, quickError, simpleError } from '../utils/hono.ts'
-import { cloudlog, cloudlogErr } from '../utils/loggin.ts'
+import { cloudlog, cloudlogErr } from '../utils/logging.ts'
 import { getPath, s3 } from '../utils/s3.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 
@@ -104,19 +104,19 @@ app.post('/', middlewareAPISecret, async (c) => {
 
     if ((count ?? 0) > 0) {
       if (notFound) {
-        // set channel to unknow version where version is currently set
-        // find id of unknow version
-        const { data: unknowVersion, error: errorUnknowVersion } = await supabase.from('app_versions')
+        // set channel to unknown version where version is currently set
+        // find id of unknown version
+        const { data: unknownVersion, error: errorUnknownVersion } = await supabase.from('app_versions')
           .select('id')
           .eq('app_id', version.app_id)
           .eq('name', 'unknown')
           .single()
-        if (errorUnknowVersion)
-          throw simpleError('cannot_find_unknow_version', 'Cannot find unknow version for app_id', { error: errorUnknowVersion })
-        if (!unknowVersion)
-          throw simpleError('cannot_find_unknow_version', 'Cannot find unknow version for app_id', { error: 'no unknow version found' })
+        if (errorUnknownVersion)
+          throw simpleError('cannot_find_unknown_version', 'Cannot find unknown version for app_id', { error: errorUnknownVersion })
+        if (!unknownVersion)
+          throw simpleError('cannot_find_unknown_version', 'Cannot find unknown version for app_id', { error: 'no unknown version found' })
         await supabase.from('channels')
-          .update({ version: unknowVersion.id })
+          .update({ version: unknownVersion.id })
           .eq('version', version.id)
       }
       else {

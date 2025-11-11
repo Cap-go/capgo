@@ -4,7 +4,7 @@ import { drizzle as drizzleD1 } from 'drizzle-orm/d1'
 import { alias as aliasV2 } from 'drizzle-orm/sqlite-core'
 import { getClientDbRegionD1 } from './geolocation.ts'
 import { quickError } from './hono.ts'
-import { cloudlog, cloudlogErr } from './loggin.ts'
+import { cloudlog, cloudlogErr } from './logging.ts'
 import { withOptionalManifestSelect } from './queryHelpers.ts'
 import * as schemaV2 from './sqlite_schema.ts'
 

@@ -76,26 +76,26 @@ export const install: UserModule = ({ router }) => {
   router.beforeEach(async (to) => {
     const display = useDisplayStore()
 
-    const splittedPath = to.path.split('/').filter(Boolean)
+    const splitPath = to.path.split('/').filter(Boolean)
 
     // Handle special case for account-related settings
-    if (splittedPath.length === 2 && splittedPath[0] === 'settings' && (splittedPath[1] === 'changepassword' || splittedPath[1] === 'notifications')) {
+    if (splitPath.length === 2 && splitPath[0] === 'settings' && (splitPath[1] === 'changepassword' || splitPath[1] === 'notifications')) {
       display.pathTitle = [{
         path: '/settings/account',
         name: 'account',
       }]
     }
     else {
-      display.pathTitle = splittedPath
+      display.pathTitle = splitPath
         .reduce((acc, segment, i) => {
           // Only add clickable segments
-          const isValid = isValidClickableSegment(segment, i, splittedPath.length, splittedPath)
+          const isValid = isValidClickableSegment(segment, i, splitPath.length, splitPath)
           if (isValid) {
             // Build the path up to this segment
-            const pathUpToHere = `/${splittedPath.slice(0, i + 1).join('/')}`
+            const pathUpToHere = `/${splitPath.slice(0, i + 1).join('/')}`
 
             // Get pretty name for the segment
-            const prettyName = getPrettyName(segment, i, splittedPath)
+            const prettyName = getPrettyName(segment, i, splitPath)
 
             acc.push({
               path: pathUpToHere,

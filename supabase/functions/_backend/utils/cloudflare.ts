@@ -4,7 +4,7 @@ import type { Database } from './supabase.types.ts'
 import type { DeviceWithoutCreatedAt, ReadDevicesParams, ReadStatsParams } from './types.ts'
 import dayjs from 'dayjs'
 import { hasComparableDeviceChanged, toComparableDevice } from './deviceComparison.ts'
-import { cloudlog, cloudlogErr, serializeError } from './loggin.ts'
+import { cloudlog, cloudlogErr, serializeError } from './logging.ts'
 import { DEFAULT_LIMIT } from './types.ts'
 import { getEnv } from './utils.ts'
 
@@ -641,7 +641,7 @@ export async function getAppsFromCF(c: Context): Promise<{ app_id: string }[]> {
 export async function countUpdatesFromStoreAppsCF(c: Context): Promise<number> {
   if (!c.env.DB_STOREAPPS)
     return Promise.resolve(0)
-  // use countUpdatesFromStoreApps exemple to make it work with Cloudflare
+  // use countUpdatesFromStoreApps example to make it work with Cloudflare
   const query = `SELECT SUM(updates) + SUM(installs) AS count FROM store_apps WHERE onprem = 1 OR capgo = 1`
 
   cloudlog({ requestId: c.get('requestId'), message: 'countUpdatesFromStoreAppsCF query', query })

@@ -2,7 +2,7 @@ import type { Context } from 'hono'
 import type { PlanUsage } from './supabase.ts'
 import type { Database } from './supabase.types.ts'
 import { quickError } from './hono.ts'
-import { cloudlog, cloudlogErr } from './loggin.ts'
+import { cloudlog, cloudlogErr } from './logging.ts'
 import { logsnag } from './logsnag.ts'
 import { sendNotifOrg } from './notifications.ts'
 import { recordUsage, setThreshold, syncSubscriptionData } from './stripe.ts'
@@ -201,7 +201,7 @@ async function setMetered(c: Context, customer_id: string | null, orgId: string)
       await setThreshold(c, customer_id)
     }
     catch (error) {
-      cloudlog({ requestId: c.get('requestId'), message: 'error setTreshold', error })
+      cloudlog({ requestId: c.get('requestId'), message: 'error setThreshold', error })
     }
     const prices = data.subscription_metered as any as Prices
     const get_metered_usage = await getMeterdUsage(c, orgId)

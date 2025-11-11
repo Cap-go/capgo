@@ -123,7 +123,7 @@ async function deleteApp() {
 
 async function submit(form: { app_name: string, retention: number }) {
   isLoading.value = true
-  if (role.value && !organizationStore.hasPermisisonsInRole(role.value, ['super_admin'])) {
+  if (role.value && !organizationStore.hasPermissionsInRole(role.value, ['super_admin'])) {
     toast.error(t('no-permission'))
     isLoading.value = false
     return
@@ -241,7 +241,7 @@ const visibleUploadChannels = computed(() => {
 const uploadHasHidden = computed(() => !uploadSearch.value.trim() && filteredUploadChannels.value.length > 3)
 
 async function setDefaultChannel() {
-  if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'super_admin'])) {
+  if (!organizationStore.hasPermissionsInRole(role.value, ['admin', 'super_admin'])) {
     toast.error(t('no-permission'))
     return
   }
@@ -370,7 +370,7 @@ const downloadChannelLabel = computed(() => {
 })
 
 async function openDefaultDownloadChannelDialog() {
-  if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'super_admin'])) {
+  if (!organizationStore.hasPermissionsInRole(role.value, ['admin', 'super_admin'])) {
     toast.error(t('no-permission'))
     return
   }
@@ -579,11 +579,11 @@ const isSuperAdmin = computed(() => {
   // TODO: check if that is smart to not let admins delete apps
   if (!role.value)
     return false
-  return organizationStore.hasPermisisonsInRole(role.value as any, ['super_admin'])
+  return organizationStore.hasPermissionsInRole(role.value as any, ['super_admin'])
 })
 
 async function editPhoto() {
-  if (role.value && !organizationStore.hasPermisisonsInRole(role.value, ['super_admin'])) {
+  if (role.value && !organizationStore.hasPermissionsInRole(role.value, ['super_admin'])) {
     toast.error(t('no-permission'))
     return
   }

@@ -1,5 +1,5 @@
 import type { Context } from 'hono'
-import { cloudlog, cloudlogErr, serializeError } from './loggin.ts'
+import { cloudlog, cloudlogErr, serializeError } from './logging.ts'
 import { getEnv } from './utils.ts'
 
 function hasBento(c: Context) {
