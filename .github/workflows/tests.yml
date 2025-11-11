@@ -27,6 +27,8 @@ jobs:
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
+      - name: Check for typos
+        uses: crate-ci/typos@v1.28.3
       - name: Show bun version
         run: bun --version
       - name: Show capgo version
