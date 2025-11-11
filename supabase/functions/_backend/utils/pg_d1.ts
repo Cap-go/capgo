@@ -76,7 +76,6 @@ export function getPgClientD1(c: Context, session: string = 'first-unconstrained
     DB = c.env.DB_REPLICA_NA
   }
   else if (dbRegion === 'OC') {
-    // TODO: Currently not used, will be enabled by geolocation when ready
     DB = c.env.DB_REPLICA_OC
   }
   if (DB === undefined) {
