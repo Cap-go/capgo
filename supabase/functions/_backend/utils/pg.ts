@@ -3,7 +3,6 @@ import { and, eq, or, sql } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
 import { drizzle } from 'drizzle-orm/postgres-js'
 import postgres from 'postgres'
-import { app } from '../plugins/channel_self.ts'
 import { backgroundTask, existInEnv, getEnv } from '../utils/utils.ts'
 import { getClientDbRegionSB } from './geolocation.ts'
 import { cloudlog, cloudlogErr } from './logging.ts'
@@ -63,16 +62,16 @@ export function getDatabaseURL(c: Context, readOnly = false): string {
     // Hyperdrive main read replica regional routing in Cloudflare Workers
     // When using Hyperdrive we use session databases directly to avoid supabase pooler overhead and allow prepared statements
     // Asia region
-    if (c.env.HYPERDRIVE_CAPGO_TRANSACTION_AS && dbRegion === 'AS') {
-      c.header('X-Database-Source', 'HYPERDRIVE_CAPGO_TRANSACTION_AS')
-      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_TRANSACTION_AS for read-only' })
-      return c.env.HYPERDRIVE_CAPGO_TRANSACTION_AS.connectionString
+    if (c.env.HYPERDRIVE_CAPGO_DIRECT_AS && dbRegion === 'AS') {
+      c.header('X-Database-Source', 'HYPERDRIVE_CAPGO_DIRECT_AS')
+      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_DIRECT_AS for read-only' })
+      return c.env.HYPERDRIVE_CAPGO_DIRECT_AS.connectionString
     }
     // US region
-    if (c.env.HYPERDRIVE_CAPGO_TRANSACTION_NA && dbRegion === 'NA') {
-      c.header('X-Database-Source', 'HYPERDRIVE_CAPGO_TRANSACTION_NA')
-      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_TRANSACTION_NA for read-only' })
-      return c.env.HYPERDRIVE_CAPGO_TRANSACTION_NA.connectionString
+    if (c.env.HYPERDRIVE_CAPGO_DIRECT_NA && dbRegion === 'NA') {
+      c.header('X-Database-Source', 'HYPERDRIVE_CAPGO_DIRECT_NA')
+      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_DIRECT_NA for read-only' })
+      return c.env.HYPERDRIVE_CAPGO_DIRECT_NA.connectionString
     }
 
     // Custom Supabase Region Read replicate Poolers
@@ -92,10 +91,10 @@ export function getDatabaseURL(c: Context, readOnly = false): string {
   }
 
   // Fallback to single Hyperdrive if available
-  if (c.env.HYPERDRIVE_CAPGO_TRANSACTION_EU) {
-    c.header('X-Database-Source', 'HYPERDRIVE_CAPGO_TRANSACTION_EU')
-    cloudlog({ requestId: c.get('requestId'), message: `Using HYPERDRIVE_CAPGO_TRANSACTION_EU for ${readOnly ? 'read-only' : 'read-write'}` })
-    return c.env.HYPERDRIVE_CAPGO_TRANSACTION_EU.connectionString
+  if (c.env.HYPERDRIVE_CAPGO_DIRECT_EU) {
+    c.header('X-Database-Source', 'HYPERDRIVE_CAPGO_DIRECT_EU')
+    cloudlog({ requestId: c.get('requestId'), message: `Using HYPERDRIVE_CAPGO_DIRECT_EU for ${readOnly ? 'read-only' : 'read-write'}` })
+    return c.env.HYPERDRIVE_CAPGO_DIRECT_EU.connectionString
   }
 
   // Main DB write poller EU region in supabase
@@ -118,14 +117,14 @@ export function getPgClient(c: Context, readOnly = false) {
   const dbName = c.res.headers.get('X-Database-Source') ?? 'unknown source'
   cloudlog({ requestId, message: 'SUPABASE_DB_URL', dbUrl, dbName, appName })
 
-  // const prepare = !!appName.startsWith('HYPERDRIVE')
+  const prepare = (!!appName.startsWith('HYPERDRIVE_CAPGO_DIRECT') || !!dbName.startsWith('HYPERDRIVE_CAPGO_SESSION'))
   const options = {
-    prepare: false,
+    prepare,
     max: 5,
     fetch_types: false,
-    idle_timeout: 20, // Increase from 2 to 20 seconds
-    connect_timeout: 10, // Add explicit connect timeout
-    max_lifetime: 60, // Add connection lifetime limit
+    // idle_timeout: 20, // Increase from 2 to 20 seconds
+    // connect_timeout: 10, // Add explicit connect timeout
+    // max_lifetime: 60, // Add connection lifetime limit
 
     // Add connection debugging
     connection: {
