@@ -3,7 +3,7 @@ import { classifyEmail, classifyEmailHeuristic } from './classifier'
 import { createForumThread, getThreadMessages, postToThread } from './discord'
 import { extractThreadId, parseEmail } from './email-parser'
 import { formatDiscordMessageAsEmail, sendEmail } from './email-sender'
-import { getAllThreadMappings, getDiscordThreadId, refreshThreadMapping, storeThreadMapping } from './storage'
+import { deleteThreadMapping, getAllThreadMappings, getDiscordThreadId, refreshThreadMapping, storeThreadMapping } from './storage'
 
 /**
  * Email Worker - Handles incoming emails and Discord webhooks
@@ -261,6 +261,16 @@ async function processThreadForNewMessages(env: Env, mapping: ThreadMapping): Pr
   // Fetch recent messages from Discord
   console.log(`   Fetching recent messages from Discord...`)
   const messages = await getThreadMessages(env, mapping.discordThreadId, 10)
+
+  // Check if thread was deleted (404)
+  if (messages === null) {
+    console.log(`   🗑️  Thread was deleted - cleaning up mapping`)
+    await deleteThreadMapping(env, mapping.emailMessageId)
+    // Also delete the last-message tracking
+    await env.EMAIL_THREAD_MAPPING.delete(lastMessageKey)
+    return
+  }
+
   console.log(`   - Fetched ${messages.length} total message(s) from Discord`)
 
   if (messages.length === 0) {

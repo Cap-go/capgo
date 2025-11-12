@@ -207,7 +207,7 @@ export async function getThreadMessages(
   env: Env,
   threadId: string,
   limit: number = 50,
-): Promise<DiscordAPIMessage[]> {
+): Promise<DiscordAPIMessage[] | null> {
   const url = `${DISCORD_API_BASE}/channels/${threadId}/messages?limit=${limit}`
 
   try {
@@ -226,6 +226,13 @@ export async function getThreadMessages(
       const errorText = await response.text()
       console.error(`❌ Failed to fetch thread messages: ${response.status}`)
       console.error(`   Error response: ${errorText}`)
+
+      // Return null for 404 (thread deleted) so caller can clean up
+      if (response.status === 404) {
+        console.error(`   Thread ${threadId} not found - may have been deleted`)
+        return null
+      }
+
       return []
     }
 
