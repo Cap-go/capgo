@@ -31,9 +31,9 @@ interface Env {
   HYPERDRIVE_CAPGO_SESSION_EU: Hyperdrive // Add Hyperdrive binding
   HYPERDRIVE_CAPGO_SESSION_AS: Hyperdrive // Add Hyperdrive binding
   HYPERDRIVE_CAPGO_SESSION_NA: Hyperdrive // Add Hyperdrive binding
-  HYPERDRIVE_CAPGO_TRANSACTION_EU: Hyperdrive // Add Hyperdrive binding
-  HYPERDRIVE_CAPGO_TRANSACTION_AS: Hyperdrive // Add Hyperdrive binding
-  HYPERDRIVE_CAPGO_TRANSACTION_NA: Hyperdrive // Add Hyperdrive binding
+  HYPERDRIVE_CAPGO_SESSION_EU: Hyperdrive // Add Hyperdrive binding
+  HYPERDRIVE_CAPGO_SESSION_AS: Hyperdrive // Add Hyperdrive binding
+  HYPERDRIVE_CAPGO_SESSION_NA: Hyperdrive // Add Hyperdrive binding
   WEBHOOK_SECRET: string
 }
 
@@ -433,16 +433,30 @@ async function processReplicationQueue(replicas: ReplicaTarget[], env: Env) {
 
   try {
     // 2. Create PostgreSQL connection using Hyperdrive
-    if (!env.HYPERDRIVE_CAPGO_DIRECT_EU) {
-      console.error(`[${queueKey}] Hyperdrive binding HYPERDRIVE_CAPGO_DIRECT_EU not configured.`)
-      throw new Error('Hyperdrive binding HYPERDRIVE_CAPGO_DIRECT_EU not configured.')
+    if (!env.HYPERDRIVE_CAPGO_SESSION_EU) {
+      console.error(`[${queueKey}] Hyperdrive binding HYPERDRIVE_CAPGO_SESSION_EU not configured.`)
+      throw new Error('Hyperdrive binding HYPERDRIVE_CAPGO_SESSION_EU not configured.')
+    }
+    const options = {
+      prepare: true,
+      max: 5,
+      fetch_types: false,
+      idle_timeout: 60, // Increase from 2 to 20 seconds
+      connect_timeout: 10, // Add explicit connect timeout
+      max_lifetime: 600, // Add connection lifetime limit
+
+      // Add connection debugging
+      connection: {
+        application_name: 'd1_sync_worker',
+      },
+      onnotice: (notice: postgres.Notice) => { console.log(`[${queueKey}] PG Notice:`, notice.message) }, // Added Notice type
+      // Hook to log errors - this is called for connection-level errors
+      onclose: (connectionId: number) => {
+        console.log({ message: 'PG Connection Closed', connectionId })
+      },
     }
     // Create postgres instance using the Hyperdrive connection string
-    sql = postgres(env.HYPERDRIVE_CAPGO_DIRECT_EU.connectionString, {
-      prepare: false, // Use simple query protocol
-      idle_timeout: 2, // Close idle connections after 2 seconds
-      onnotice: (notice: postgres.Notice) => { console.log(`[${queueKey}] PG Notice:`, notice.message) }, // Added Notice type
-    })
+    sql = postgres(env.HYPERDRIVE_CAPGO_SESSION_EU.connectionString, options)
     console.log(`[${queueKey}] PostgreSQL connection handler created via Hyperdrive.`)
 
     // No explicit connect needed, postgres handles it
