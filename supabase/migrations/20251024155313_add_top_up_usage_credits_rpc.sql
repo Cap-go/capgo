@@ -1,5 +1,38 @@
 BEGIN;
 
+CREATE TABLE IF NOT EXISTS public.capgo_credit_products (
+    slug text NOT NULL,
+    environment text NOT NULL DEFAULT 'live',
+    provider text NOT NULL DEFAULT 'stripe',
+    product_id text NOT NULL,
+    metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT capgo_credit_products_environment_check CHECK (environment IN ('live', 'test')),
+    CONSTRAINT capgo_credit_products_slug_environment_pk PRIMARY KEY (slug, environment)
+);
+
+COMMENT ON TABLE public.capgo_credit_products IS 'Stripe product references used for credit flows (top-ups, add-ons, etc).';
+COMMENT ON COLUMN public.capgo_credit_products.slug IS 'Stable identifier for the credit product (e.g. credit_top_up).';
+COMMENT ON COLUMN public.capgo_credit_products.environment IS 'Stripe environment the product belongs to (live or test).';
+COMMENT ON COLUMN public.capgo_credit_products.provider IS 'Payment provider for the product (stripe, etc).';
+COMMENT ON COLUMN public.capgo_credit_products.product_id IS 'Provider product identifier (e.g. Stripe prod_***).';
+
+CREATE UNIQUE INDEX IF NOT EXISTS capgo_credit_products_provider_product_idx
+    ON public.capgo_credit_products (provider, product_id);
+
+CREATE TRIGGER handle_capgo_credit_products_updated_at
+    BEFORE UPDATE ON public.capgo_credit_products
+    FOR EACH ROW
+    EXECUTE FUNCTION extensions.moddatetime('updated_at');
+
+INSERT INTO public.capgo_credit_products (slug, environment, provider, product_id)
+VALUES
+    ('credit_top_up', 'live', 'stripe', 'prod_TINXCAiTb8Vsxc'),
+    ('credit_top_up', 'test', 'stripe', 'prod_TJRd2hFHZsBIPK')
+ON CONFLICT (slug, environment) DO UPDATE
+SET product_id = EXCLUDED.product_id;
+
 CREATE OR REPLACE FUNCTION public.top_up_usage_credits(
     p_org_id uuid,
     p_amount numeric,

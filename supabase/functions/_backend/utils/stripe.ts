@@ -5,6 +5,15 @@ import { cloudlog, cloudlogErr } from './loggin.ts'
 import { supabaseAdmin } from './supabase.ts'
 import { existInEnv, getEnv } from './utils.ts'
 
+export type StripeEnvironment = 'live' | 'test'
+
+export function resolveStripeEnvironment(c: Context): StripeEnvironment {
+  const secretKey = getEnv(c, 'STRIPE_SECRET_KEY') || ''
+  if (secretKey.startsWith('sk_live'))
+    return 'live'
+  return 'test'
+}
+
 export function getStripe(c: Context) {
   return new Stripe(getEnv(c, 'STRIPE_SECRET_KEY'), {
     apiVersion: '2025-10-29.clover',

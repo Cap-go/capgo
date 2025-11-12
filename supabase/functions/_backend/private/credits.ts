@@ -1,9 +1,10 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
+import type { StripeEnvironment } from '../utils/stripe.ts'
 import { Hono } from 'hono/tiny'
 import { middlewareAuth, parseBody, simpleError, useCors } from '../utils/hono.ts'
-import { cloudlog } from '../utils/loggin.ts'
-import { createOneTimeCheckout, getStripe } from '../utils/stripe.ts'
+import { cloudlog, cloudlogErr } from '../utils/loggin.ts'
+import { createOneTimeCheckout, getStripe, resolveStripeEnvironment } from '../utils/stripe.ts'
 import { hasOrgRight, supabaseAdmin } from '../utils/supabase.ts'
 import { getEnv } from '../utils/utils.ts'
 
@@ -65,10 +66,31 @@ interface CompleteTopUpRequest {
 }
 
 const DEFAULT_TOP_UP_QUANTITY = 100
-// const CREDIT_TOP_UP_PRODUCT_ID = 'prod_TINXCAiTb8Vsxc' // PRODUCTION ID
-const CREDIT_TOP_UP_PRODUCT_ID = 'prod_TJRd2hFHZsBIPK' // TEST ID
+const CREDIT_TOP_UP_SLUG = 'credit_top_up'
 
 type AppContext = Context<MiddlewareKeyVariables, any, any>
+
+async function getCreditTopUpProductId(c: AppContext): Promise<{ productId: string, environment: StripeEnvironment }> {
+  const environment = resolveStripeEnvironment(c)
+  const { data, error } = await supabaseAdmin(c)
+    .from('capgo_credit_products')
+    .select('product_id')
+    .eq('slug', CREDIT_TOP_UP_SLUG)
+    .eq('environment', environment)
+    .single()
+
+  if (error || !data?.product_id) {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'credit_top_up_product_missing',
+      environment,
+      error,
+    })
+    throw simpleError('credit_product_not_configured', 'Credit product is not configured for this environment')
+  }
+
+  return { productId: data.product_id, environment }
+}
 
 async function resolveOrgStripeContext(c: AppContext, orgId: string) {
   const token = c.get('authorization')?.split('Bearer ')[1]
@@ -243,19 +265,22 @@ app.post('/start-top-up', middlewareAuth, async (c) => {
   const successUrl = `${baseUrl}/settings/organization/credits?creditCheckout=success&session_id={CHECKOUT_SESSION_ID}`
   const cancelUrl = `${baseUrl}/settings/organization/credits?creditCheckout=cancelled`
 
+  const { productId, environment } = await getCreditTopUpProductId(c)
+
   cloudlog({
     requestId: c.get('requestId'),
     message: 'Starting credit top-up checkout',
     orgId: body.orgId,
     quantity,
-    productId: CREDIT_TOP_UP_PRODUCT_ID,
+    productId,
+    environment,
     userId,
   })
 
   const checkout = await createOneTimeCheckout(
     c,
     customerId,
-    CREDIT_TOP_UP_PRODUCT_ID,
+    productId,
     quantity,
     successUrl,
     cancelUrl,
@@ -284,6 +309,8 @@ app.post('/complete-top-up', middlewareAuth, async (c) => {
   if (session.payment_status !== 'paid' || session.status !== 'complete')
     throw simpleError('session_not_paid', 'Checkout session is not paid')
 
+  const { productId, environment } = await getCreditTopUpProductId(c)
+
   const lineItems = await stripe.checkout.sessions.listLineItems(body.sessionId, {
     expand: ['data.price.product'],
     limit: 100,
@@ -294,7 +321,7 @@ app.post('/complete-top-up', middlewareAuth, async (c) => {
     const priceProduct = typeof item.price?.product === 'string'
       ? item.price?.product
       : (item.price?.product as { id?: string } | null)?.id ?? null
-    if (priceProduct === CREDIT_TOP_UP_PRODUCT_ID)
+    if (priceProduct === productId)
       creditQuantity += item.quantity ?? 0
 
     return {
@@ -314,6 +341,7 @@ app.post('/complete-top-up', middlewareAuth, async (c) => {
     orgId: body.orgId,
     sessionId: body.sessionId,
     creditQuantity,
+    environment,
     itemsSummary,
   })
 
