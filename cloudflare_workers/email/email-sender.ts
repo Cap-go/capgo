@@ -97,73 +97,78 @@ function formatEmailAddress(email: string, name?: string): string {
 }
 
 /**
- * Builds a multipart email body
- */
-function buildMultipartBody(boundary: string, text: string, html: string): string {
-  return [
-    `--${boundary}`,
-    'Content-Type: text/plain; charset=utf-8',
-    'Content-Transfer-Encoding: 7bit',
-    '',
-    text,
-    '',
-    `--${boundary}`,
-    'Content-Type: text/html; charset=utf-8',
-    'Content-Transfer-Encoding: 7bit',
-    '',
-    html,
-    '',
-    `--${boundary}--`,
-  ].join('\r\n')
-}
-
-/**
  * Formats a Discord message as email text
+ * Converts Markdown to plain text with formatting
  */
 export function formatDiscordMessageAsEmail(
   username: string,
   content: string,
   threadSubject: string,
 ): EmailOptions {
-  const text = `${username} replied to your message:\n\n${content}\n\n---\nSubject: ${threadSubject}\nReplied via Discord`
-
-  const html = `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-      <div style="background-color: #5865F2; color: white; padding: 20px; border-radius: 5px 5px 0 0;">
-        <h2 style="margin: 0;">Discord Reply</h2>
-      </div>
-      <div style="background-color: #f5f5f5; padding: 20px; border-radius: 0 0 5px 5px;">
-        <p><strong>${username}</strong> replied to your message:</p>
-        <blockquote style="border-left: 3px solid #5865F2; padding-left: 15px; margin: 20px 0;">
-          ${escapeHtml(content)}
-        </blockquote>
-        <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;">
-        <p style="font-size: 12px; color: #666;">
-          Subject: ${escapeHtml(threadSubject)}<br>
-          Replied via Discord
-        </p>
-      </div>
-    </div>
-  `
+  // Convert Markdown to plain text
+  const text = markdownToPlainText(content)
 
   return {
     to: '',
     subject: `Re: ${threadSubject}`,
     text,
-    html,
   }
 }
 
 /**
- * Escapes HTML special characters
+ * Converts Markdown to formatted plain text
+ * Uses safe regexes to avoid ReDoS vulnerabilities
  */
-function escapeHtml(text: string): string {
-  const map: Record<string, string> = {
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    '\'': '&#039;',
+function markdownToPlainText(markdown: string): string {
+  let text = markdown
+
+  // Code blocks first (to avoid processing markdown inside code)
+  // Split by ``` and process alternating sections
+  const codeBlockParts = text.split('```')
+  for (let i = 0; i < codeBlockParts.length; i++) {
+    if (i % 2 === 0) {
+      // Not in code block - process markdown
+      let part = codeBlockParts[i]
+
+      // Bold: **text** or __text__ -> *text*
+      part = part.replace(/\*\*([^*]+)\*\*/g, '*$1*')
+      part = part.replace(/__([^_]+)__/g, '*$1*')
+
+      // Italic: *text* or _text_ -> *text*
+      part = part.replace(/\*([^*]+)\*/g, '*$1*')
+      part = part.replace(/_([^_]+)_/g, '*$1*')
+
+      // Inline code: `code` -> "code"
+      part = part.replace(/`([^`]+)`/g, '"$1"')
+
+      // Links: [text](url) -> text (url)
+      part = part.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '$1 ($2)')
+
+      // Headers: # Header -> Header (match at start of line)
+      part = part.replace(/^(#{1,6}) +(.+)$/gm, '$2')
+
+      // Bullet lists: - item or * item -> • item
+      part = part.replace(/^[*-] +(.+)$/gm, '• $1')
+
+      // Blockquotes: > quote -> | quote
+      part = part.replace(/^> +(.+)$/gm, '| $1')
+
+      // Horizontal rules: --- or *** -> ────────
+      part = part.replace(/^[*-]{3,}$/gm, '────────')
+
+      codeBlockParts[i] = part
+    }
+    else {
+      // In code block - extract just the code (skip language identifier)
+      const lines = codeBlockParts[i].split('\n')
+      if (lines.length > 0) {
+        lines.shift() // Remove first line (language identifier)
+      }
+      codeBlockParts[i] = lines.join('\n')
+    }
   }
-  return text.replace(/[&<>"']/g, m => map[m])
+
+  text = codeBlockParts.join('\n')
+
+  return text.trim()
 }

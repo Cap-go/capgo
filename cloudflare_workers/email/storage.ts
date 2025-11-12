@@ -132,3 +132,30 @@ export async function refreshThreadMapping(
     )
   }
 }
+
+/**
+ * Gets all active thread mappings from KV
+ * Returns an array of all thread mappings
+ */
+export async function getAllThreadMappings(env: Env): Promise<ThreadMapping[]> {
+  const mappings: ThreadMapping[] = []
+
+  // List all keys with the thread prefix (Discord -> Email mapping)
+  // We use the THREAD_PREFIX because we want unique threads, not duplicate email entries
+  const list = await env.EMAIL_THREAD_MAPPING.list({ prefix: THREAD_PREFIX })
+
+  for (const key of list.keys) {
+    const data = await env.EMAIL_THREAD_MAPPING.get(key.name)
+    if (data) {
+      try {
+        const mapping = JSON.parse(data) as ThreadMapping
+        mappings.push(mapping)
+      }
+      catch (error) {
+        console.error(`Failed to parse mapping for key ${key.name}:`, error)
+      }
+    }
+  }
+
+  return mappings
+}

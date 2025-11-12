@@ -3,7 +3,7 @@ import type { EmailMessage, ParsedEmail } from './types'
 /**
  * Parses an incoming email message
  */
-export function parseEmail(message: EmailMessage): ParsedEmail {
+export function parseEmail(message: EmailMessage, rawEmailText?: string): ParsedEmail {
   const headers = message.headers
 
   // Parse From header
@@ -30,7 +30,9 @@ export function parseEmail(message: EmailMessage): ParsedEmail {
   const subject = headers.get('subject') || 'No Subject'
 
   // Parse body (this is simplified - in production you'd use a proper MIME parser)
-  const body = parseEmailBody(message.raw)
+  // Use provided rawEmailText if available, otherwise try message.raw
+  const rawText = rawEmailText || (typeof message.raw === 'string' ? message.raw : '')
+  const body = parseEmailBody(rawText)
 
   return {
     from,

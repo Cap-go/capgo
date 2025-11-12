@@ -1,9 +1,9 @@
-import type { EmailMessage, Env, ParsedEmail } from './types'
+import type { EmailMessage, Env, ParsedEmail, ThreadMapping } from './types'
 import { classifyEmail, classifyEmailHeuristic } from './classifier'
-import { createForumThread, postToThread } from './discord'
+import { createForumThread, getThreadMessages, postToThread } from './discord'
 import { extractThreadId, parseEmail } from './email-parser'
 import { formatDiscordMessageAsEmail, sendEmail } from './email-sender'
-import { getDiscordThreadId, getEmailMapping, refreshThreadMapping, storeThreadMapping } from './storage'
+import { getAllThreadMappings, getDiscordThreadId, refreshThreadMapping, storeThreadMapping } from './storage'
 
 /**
  * Email Worker - Handles incoming emails and Discord webhooks
@@ -31,9 +31,35 @@ export default {
         console.log(`   ${key}: ${value.substring(0, 100)}${value.length > 100 ? '...' : ''}`)
       }
 
+      // Read the raw email stream if needed
+      let rawEmailText = ''
+      if (message.raw && typeof message.raw !== 'string') {
+        console.log('📖 Reading email body from ReadableStream...')
+        try {
+          const reader = message.raw.getReader()
+          const decoder = new TextDecoder()
+          const chunks: string[] = []
+
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
+            chunks.push(decoder.decode(value, { stream: true }))
+          }
+
+          rawEmailText = chunks.join('')
+          console.log(`✅ Email body read: ${rawEmailText.length} characters`)
+        }
+        catch (error) {
+          console.error('❌ Error reading email stream:', error)
+        }
+      }
+      else if (typeof message.raw === 'string') {
+        rawEmailText = message.raw
+      }
+
       // Parse the email
       console.log('🔍 Parsing email...')
-      const parsedEmail = parseEmail(message)
+      const parsedEmail = parseEmail(message, rawEmailText)
 
       console.log('✅ Email parsed:', {
         from: parsedEmail.from,
@@ -43,7 +69,21 @@ export default {
         inReplyTo: parsedEmail.inReplyTo,
         hasBody: !!parsedEmail.body.text || !!parsedEmail.body.html,
         bodyTextLength: parsedEmail.body.text?.length || 0,
+        bodyHtmlLength: parsedEmail.body.html?.length || 0,
       })
+
+      // Log email body content for debugging
+      if (parsedEmail.body.text) {
+        console.log('📄 Email body (text):')
+        console.log(parsedEmail.body.text.substring(0, 500) + (parsedEmail.body.text.length > 500 ? '...' : ''))
+      }
+      if (parsedEmail.body.html) {
+        console.log('📄 Email body (html):')
+        console.log(parsedEmail.body.html.substring(0, 500) + (parsedEmail.body.html.length > 500 ? '...' : ''))
+      }
+      if (!parsedEmail.body.text && !parsedEmail.body.html) {
+        console.warn('⚠️  No email body found!')
+      }
 
       // Check if this is a reply to an existing thread
       const threadId = extractThreadId(parsedEmail)
@@ -106,12 +146,31 @@ export default {
       return new Response('OK', { status: 200 })
     }
 
-    // Discord webhook handler
-    if (url.pathname === '/discord-webhook' && request.method === 'POST') {
-      return await handleDiscordWebhook(request, env)
-    }
-
     return new Response('Not Found', { status: 404 })
+  },
+
+  async scheduled(event: ScheduledEvent, env: Env): Promise<void> {
+    console.log('====================================')
+    console.log('⏰ SCHEDULED WORKER: Polling Discord for new messages')
+    console.log('====================================')
+
+    try {
+      // Get all thread mappings from KV
+      const mappings = await getAllThreadMappings(env)
+      console.log(`📋 Found ${mappings.length} active thread mappings`)
+
+      for (const mapping of mappings) {
+        await processThreadForNewMessages(env, mapping)
+      }
+
+      console.log('====================================')
+      console.log('✅ SCHEDULED WORKER: Polling complete')
+      console.log('====================================')
+    }
+    catch (error) {
+      console.error('❌ ERROR in scheduled worker:', error)
+      console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace')
+    }
   },
 }
 
@@ -185,83 +244,93 @@ async function handleEmailReply(env: Env, email: ParsedEmail, threadId: string):
 }
 
 /**
- * Handles Discord webhook for replies
- * This endpoint should be registered as a webhook in your Discord channel settings
+ * Process a single thread to check for new messages and send emails
  */
-async function handleDiscordWebhook(request: Request, env: Env): Promise<Response> {
-  try {
-    const payload = await request.json() as any
+async function processThreadForNewMessages(env: Env, mapping: ThreadMapping): Promise<void> {
+  console.log(`🔍 Checking thread ${mapping.discordThreadId} for new messages`)
+  console.log(`   Thread info:`)
+  console.log(`   - Subject: ${mapping.subject}`)
+  console.log(`   - Original sender: ${mapping.originalSender}`)
+  console.log(`   - Email message ID: ${mapping.emailMessageId}`)
 
-    // Handle Discord webhook verification
-    if (payload.type === 1) {
-      return new Response(JSON.stringify({ type: 1 }), {
-        headers: { 'Content-Type': 'application/json' },
+  // Get the last processed message ID from KV
+  const lastMessageKey = `last-message:${mapping.discordThreadId}`
+  const lastMessageId = await env.EMAIL_THREAD_MAPPING.get(lastMessageKey)
+  console.log(`   - Last processed message ID: ${lastMessageId || 'none'}`)
+
+  // Fetch recent messages from Discord
+  console.log(`   Fetching recent messages from Discord...`)
+  const messages = await getThreadMessages(env, mapping.discordThreadId, 10)
+  console.log(`   - Fetched ${messages.length} total message(s) from Discord`)
+
+  if (messages.length === 0) {
+    console.log(`   ⚠️  No messages found in thread`)
+    return
+  }
+
+  // Log all messages for debugging
+  console.log(`   All messages in thread:`)
+  for (const msg of messages) {
+    console.log(`   - ID: ${msg.id}, Author: ${msg.author?.username || 'unknown'}, Bot: ${msg.author?.bot || false}, Content length: ${msg.content?.length || 0}`)
+  }
+
+  // Filter out bot messages and messages we've already processed
+  const humanMessages = messages.filter(msg => !msg.author.bot)
+  console.log(`   - ${humanMessages.length} human message(s) (filtered out ${messages.length - humanMessages.length} bot messages)`)
+
+  const newMessages = humanMessages
+    .filter(msg => !lastMessageId || msg.id > lastMessageId)
+    .reverse() // Process oldest first
+
+  console.log(`   - ${newMessages.length} new message(s) to process`)
+
+  if (newMessages.length === 0) {
+    console.log(`   ✅ No new messages to process`)
+    return
+  }
+
+  // Process each new message
+  for (const message of newMessages) {
+    console.log(`📤 Processing message ${message.id}:`)
+    console.log(`   - Author: ${message.author.username}`)
+    console.log(`   - Raw content: "${message.content}"`)
+    console.log(`   - Content length: ${message.content?.length || 0} characters`)
+
+    // Format the Discord message as an email
+    const emailContent = formatDiscordMessageAsEmail(
+      message.author.username,
+      message.content,
+      mapping.subject,
+    )
+
+    console.log(`   - Formatted email text: "${emailContent.text}"`)
+    console.log(`   - Email subject: "${emailContent.subject}"`)
+    console.log(`   - Sending to: ${mapping.originalSender}`)
+    console.log(`   - In-Reply-To: ${mapping.emailMessageId}`)
+
+    // Send the email reply
+    const success = await sendEmail(env, {
+      ...emailContent,
+      to: mapping.originalSender,
+      inReplyTo: mapping.emailMessageId,
+      references: [mapping.emailMessageId],
+    })
+
+    if (success) {
+      console.log(`✅ Email sent successfully to ${mapping.originalSender}`)
+      console.log(`   Storing last processed message ID: ${message.id}`)
+      // Update the last processed message ID
+      await env.EMAIL_THREAD_MAPPING.put(lastMessageKey, message.id, {
+        expirationTtl: 30 * 24 * 60 * 60, // 30 days
       })
     }
-
-    // Handle message creation in a thread
-    if (payload.type === 0 && payload.channel_id) {
-      await handleDiscordMessage(env, payload)
+    else {
+      console.error(`❌ Failed to send email reply`)
     }
-
-    return new Response('OK', { status: 200 })
-  }
-  catch (error) {
-    console.error('Error handling Discord webhook:', error)
-    return new Response('Internal Server Error', { status: 500 })
-  }
-}
-
-/**
- * Handles a Discord message and sends it as an email reply
- */
-async function handleDiscordMessage(env: Env, payload: any): Promise<void> {
-  const channelId = payload.channel_id
-  const author = payload.author || payload.member?.user
-
-  // Ignore bot messages (including our own)
-  if (author?.bot)
-    return
-
-  // Get the thread mapping
-  const mapping = await getEmailMapping(env, channelId)
-
-  if (!mapping) {
-    console.log('No email mapping found for Discord thread:', channelId)
-    return
   }
 
-  console.log('Found email mapping for thread:', channelId)
-
-  // Format the Discord message as an email
-  const emailContent = formatDiscordMessageAsEmail(
-    author?.username || 'Discord User',
-    payload.content || '',
-    mapping.subject,
-  )
-
-  // Send the email reply
-  const success = await sendEmail(env, {
-    ...emailContent,
-    to: mapping.originalSender,
-    inReplyTo: mapping.emailMessageId,
-    references: [mapping.emailMessageId],
-  })
-
-  if (success) {
-    console.log('Sent email reply to:', mapping.originalSender)
-  }
-  else {
-    console.error('Failed to send email reply')
-  }
-}
-
-/**
- * Alternative: Use a scheduled handler to poll Discord for new messages
- * This is useful if webhooks are not available
- */
-export async function scheduled(event: ScheduledEvent, env: Env): Promise<void> {
-  // This could poll recent Discord threads and send emails for new messages
-  // Not implemented in this example
-  console.log('Scheduled handler triggered')
+  // Refresh the thread mapping TTL to keep it alive
+  console.log(`   Refreshing thread mapping TTL...`)
+  await refreshThreadMapping(env, mapping.emailMessageId)
+  console.log(`   ✅ Thread mapping TTL refreshed`)
 }

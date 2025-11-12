@@ -193,28 +193,27 @@ This setup works perfectly with services like:
 - Microsoft 365
 - Any email forwarding service
 
-### 7. Discord Webhook (for replies)
+### 7. Discord → Email (Automatic Polling)
 
-You have two options for handling Discord replies:
+The worker automatically polls Discord every 2 minutes to check for new messages in threads and sends them as email replies.
 
-#### Option A: Discord Webhook (Recommended)
+**How it works:**
+1. Every 2 minutes, the scheduled worker runs (configured via cron trigger)
+2. It checks all active Discord threads for new messages
+3. When it finds a message from a human (not the bot), it sends an email reply to the original sender
+4. The message ID is tracked to avoid sending duplicates
 
-1. In your Discord forum channel, go to **Edit Channel** → **Integrations** → **Webhooks**
-2. Create a new webhook
-3. Set the webhook URL to: `https://email.yourdomain.com/discord-webhook`
-4. Note: You may need to use Discord's interaction endpoints or a bot that listens to messages
-
-#### Option B: Message Polling (Alternative)
-
-If webhooks are not available, the worker includes a scheduled handler that can poll Discord for new messages. Configure a cron trigger in [wrangler.jsonc](./wrangler.jsonc):
+**The cron trigger is already configured in wrangler.jsonc:**
 
 ```jsonc
 {
   "triggers": {
-    "crons": ["*/5 * * * *"]  // Every 5 minutes
+    "crons": ["*/2 * * * *"]  // Every 2 minutes
   }
 }
 ```
+
+**Note:** Discord doesn't provide webhooks for forum thread messages, so polling is the most reliable approach. The 2-minute interval balances responsiveness with API rate limits.
 
 ### 8. Deploy
 
