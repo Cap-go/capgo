@@ -60,17 +60,18 @@ export function getDatabaseURL(c: Context, readOnly = false): string {
   // For read-only queries, use region to avoid Network latency
   if (readOnly) {
     // Hyperdrive main read replica regional routing in Cloudflare Workers
+    // When using Hyperdrive we use session databases directly to avoid supabase pooler overhead and allow prepared statements
     // Asia region
-    if (c.env.HYPERDRIVE_CAPGO_TRANSACTION_AS && dbRegion === 'AS') {
-      c.header('X-Database-Source', 'HYPERDRIVE_CAPGO_TRANSACTION_AS')
-      cloudlog({ requestId: c.get('requestId'), message: 'Using Hyperdrive AS for read-only' })
-      return c.env.HYPERDRIVE_CAPGO_TRANSACTION_AS.connectionString
+    if (c.env.HYPERDRIVE_CAPGO_DIRECT_AS && dbRegion === 'AS') {
+      c.header('X-Database-Source', 'HYPERDRIVE_CAPGO_DIRECT_AS')
+      cloudlog({ requestId: c.get('requestId'), message: 'Using Hyperdrive direct AS for read-only' })
+      return c.env.HYPERDRIVE_CAPGO_DIRECT_AS.connectionString
     }
     // US region
-    if (c.env.HYPERDRIVE_CAPGO_TRANSACTION_NA && dbRegion === 'NA') {
-      c.header('X-Database-Source', 'HYPERDRIVE_CAPGO_TRANSACTION_NA')
-      cloudlog({ requestId: c.get('requestId'), message: 'Using Hyperdrive NA for read-only' })
-      return c.env.HYPERDRIVE_CAPGO_TRANSACTION_NA.connectionString
+    if (c.env.HYPERDRIVE_CAPGO_DIRECT_NA && dbRegion === 'NA') {
+      c.header('X-Database-Source', 'HYPERDRIVE_CAPGO_DIRECT_NA')
+      cloudlog({ requestId: c.get('requestId'), message: 'Using Hyperdrive direct NA for read-only' })
+      return c.env.HYPERDRIVE_CAPGO_DIRECT_NA.connectionString
     }
 
     // Custom Supabase Region Read replicate Poolers
@@ -90,10 +91,10 @@ export function getDatabaseURL(c: Context, readOnly = false): string {
   }
 
   // Fallback to single Hyperdrive if available
-  if (c.env.HYPERDRIVE_CAPGO_TRANSACTION_EU) {
-    c.header('X-Database-Source', 'HYPERDRIVE_CAPGO_TRANSACTION_EU')
-    cloudlog({ requestId: c.get('requestId'), message: `Using Hyperdrive EU for ${readOnly ? 'read-only' : 'read-write'}` })
-    return c.env.HYPERDRIVE_CAPGO_TRANSACTION_EU.connectionString
+  if (c.env.HYPERDRIVE_CAPGO_DIRECT_EU) {
+    c.header('X-Database-Source', 'HYPERDRIVE_CAPGO_DIRECT_EU')
+    cloudlog({ requestId: c.get('requestId'), message: `Using Hyperdrive direct EU for ${readOnly ? 'read-only' : 'read-write'}` })
+    return c.env.HYPERDRIVE_CAPGO_DIRECT_EU.connectionString
   }
 
   // Main DB write poller EU region in supabase
@@ -115,13 +116,14 @@ export function getPgClient(c: Context, readOnly = false) {
   const appName = c.res.headers.get('X-Database-Source') ?? 'unknown source'
   cloudlog({ requestId, message: 'SUPABASE_DB_URL', dbUrl })
 
+  const prepare = !!appName.startsWith('HYPERDRIVE')
   const options = {
-    prepare: false,
+    prepare,
     max: 5,
     fetch_types: false,
-    idle_timeout: 20, // Increase from 2 to 20 seconds
+    idle_timeout: 60, // Increase from 2 to 20 seconds
     connect_timeout: 10, // Add explicit connect timeout
-    max_lifetime: 60, // Add connection lifetime limit
+    max_lifetime: 600, // Add connection lifetime limit
 
     // Add connection debugging
     connection: {

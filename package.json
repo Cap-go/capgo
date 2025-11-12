@@ -77,7 +77,7 @@
     "deploy:cloudflare:files:dev": "bunx wrangler deploy --config cloudflare_workers/files/wrangler.jsonc --env=dev --minify",
     "deploy:cloudflare:plugin:dev": "bunx wrangler deploy --config cloudflare_workers/plugin/wrangler.jsonc --env=dev --minify",
     "deploy:cloudflare:plugin:prod": "bunx wrangler deploy --config cloudflare_workers/plugin/wrangler.jsonc --env=prod --minify",
-    "deploy:cloudflare:plugins:prod": "npm run deploy:cloudflare:plugin_as:prod && npm run deploy:cloudflare:plugin_na:prod && npm run deploy:cloudflare:plugin_eu:prod && npm run deploy:cloudflare:plugin_af:prod && npm run deploy:cloudflare:plugin_oc:prod && npm run deploy:cloudflare:plugin_sa:prod",
+    "deploy:cloudflare:plugins:prod": "npm run deploy:cloudflare:plugin_as:prod && npm run deploy:cloudflare:plugin_na:prod && npm run deploy:cloudflare:plugin_eu:prod && npm run deploy:cloudflare:plugin_af:prod && npm run deploy:cloudflare:plugin_oc:prod && npm run deploy:cloudflare:plugin_sa:prod && npm run deploy:cloudflare:plugin:prod",
     "deploy:cloudflare:plugin_as:prod": "bunx wrangler deploy --config cloudflare_workers/plugin/wrangler.jsonc --env=prod_as --minify",
     "deploy:cloudflare:plugin_na:prod": "bunx wrangler deploy --config cloudflare_workers/plugin/wrangler.jsonc --env=prod_na --minify",
     "deploy:cloudflare:plugin_eu:prod": "bunx wrangler deploy --config cloudflare_workers/plugin/wrangler.jsonc --env=prod_eu --minify",

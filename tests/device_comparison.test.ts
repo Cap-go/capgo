@@ -101,14 +101,14 @@ describe('deviceComparison utilities', () => {
 
       expect(comparable).toEqual({
         platform: 'ios',
-        plugin_version: null,
-        os_version: null,
-        version_build: null,
+        plugin_version: '', // D1 NOT NULL
+        os_version: '', // D1 NOT NULL
+        version_build: 'builtin', // D1 DEFAULT 'builtin'
         custom_id: '', // D1 DEFAULT '' NOT NULL
-        version_name: 'unknown', // D1 DEFAULT 'unknown' NOT NULL
+        version_name: null, // D1 NULLABLE
         is_prod: false,
         is_emulator: false,
-        default_channel: null,
+        default_channel: null, // D1 NULLABLE
       })
     })
 
@@ -131,14 +131,14 @@ describe('deviceComparison utilities', () => {
 
       expect(comparable).toEqual({
         platform: null,
-        plugin_version: null,
-        os_version: null,
-        version_build: null,
+        plugin_version: '', // D1 NOT NULL
+        os_version: '', // D1 NOT NULL
+        version_build: 'builtin', // D1 DEFAULT 'builtin'
         custom_id: '', // D1 DEFAULT '' NOT NULL
-        version_name: 'unknown', // D1 DEFAULT 'unknown' NOT NULL
+        version_name: null, // D1 NULLABLE
         is_prod: false,
         is_emulator: false,
-        default_channel: null,
+        default_channel: null, // D1 NULLABLE
       })
     })
   })
@@ -203,14 +203,14 @@ describe('deviceComparison utilities', () => {
 
       expect(comparable).toEqual({
         platform: null,
-        plugin_version: null,
-        os_version: null,
-        version_build: null,
+        plugin_version: '', // D1 NOT NULL
+        os_version: '', // D1 NOT NULL
+        version_build: 'builtin', // D1 DEFAULT 'builtin'
         custom_id: '', // D1 DEFAULT '' NOT NULL
-        version_name: 'unknown', // D1 DEFAULT 'unknown' NOT NULL
+        version_name: null, // D1 NULLABLE
         is_prod: false,
         is_emulator: false,
-        default_channel: null,
+        default_channel: null, // D1 NULLABLE
       })
     })
 
@@ -219,14 +219,14 @@ describe('deviceComparison utilities', () => {
 
       expect(comparable).toEqual({
         platform: null,
-        plugin_version: null,
-        os_version: null,
-        version_build: null,
+        plugin_version: '', // D1 NOT NULL
+        os_version: '', // D1 NOT NULL
+        version_build: 'builtin', // D1 DEFAULT 'builtin'
         custom_id: '', // D1 DEFAULT '' NOT NULL
-        version_name: 'unknown', // D1 DEFAULT 'unknown' NOT NULL
+        version_name: null, // D1 NULLABLE
         is_prod: false,
         is_emulator: false,
-        default_channel: null,
+        default_channel: null, // D1 NULLABLE
       })
     })
   })
@@ -586,11 +586,11 @@ describe('deviceComparison utilities', () => {
       const normalized = buildNormalizedDeviceForWrite(device)
 
       expect(normalized).toEqual({
-        version_name: 'unknown', // D1 DEFAULT 'unknown' NOT NULL
+        version_name: null, // D1 NULLABLE
         platform: 'ios',
-        plugin_version: null,
-        os_version: null,
-        version_build: null,
+        plugin_version: '', // D1 NOT NULL
+        os_version: '', // D1 NOT NULL
+        version_build: 'builtin', // D1 DEFAULT 'builtin'
         custom_id: '', // D1 DEFAULT '' NOT NULL
         is_prod: false,
         is_emulator: false,
@@ -847,7 +847,7 @@ describe('deviceComparison utilities', () => {
         device_id: 'test-device',
         app_id: 'test-app',
         platform: 'android',
-        plugin_version: null, // Will be normalized to null
+        plugin_version: null,
         os_version: null,
         default_channel: null,
         is_prod: true,
@@ -856,14 +856,10 @@ describe('deviceComparison utilities', () => {
 
       const storedInD1 = simulateD1Storage(device)
 
-      // What actually gets stored in D1:
-      // plugin_version: null
-      // os_version: null
-      // default_channel: null ?? null = null
-
-      // D1 will store these as NULL or empty string depending on schema
-      expect(storedInD1.plugin_version).toBe(null)
-      expect(storedInD1.os_version).toBe(null)
+      // D1 schema: plugin_version & os_version are NOT NULL → ''
+      // D1 schema: default_channel is NULLABLE → null
+      expect(storedInD1.plugin_version).toBe('')
+      expect(storedInD1.os_version).toBe('')
       expect(storedInD1.default_channel).toBe(null)
     })
 
