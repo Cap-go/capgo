@@ -1,9 +1,18 @@
 import type { EmailMessage, Env, ParsedEmail, ThreadMapping } from './types'
 import { classifyEmail, classifyEmailHeuristic } from './classifier'
 import { createForumThread, getThreadMessages, postToThread } from './discord'
-import { extractThreadId, parseEmail } from './email-parser'
+import { extractThreadId, getAllPotentialThreadIds, parseEmail } from './email-parser'
 import { formatDiscordMessageAsEmail, sendEmail } from './email-sender'
 import { deleteThreadMapping, getAllThreadMappings, getDiscordThreadId, refreshThreadMapping, storeThreadMapping } from './storage'
+
+/**
+ * Generates a unique message ID for an email
+ */
+function generateMessageId(fromAddress: string, timestamp: number): string {
+  const domain = fromAddress.split('@')[1] || 'usecapgo.com'
+  const randomPart = Math.random().toString(36).substring(2, 15)
+  return `${timestamp}.${randomPart}@${domain}`
+}
 
 /**
  * Email Worker - Handles incoming emails and Discord webhooks
@@ -216,14 +225,29 @@ async function handleNewEmail(env: Env, email: ParsedEmail, category?: string): 
 /**
  * Handles an email reply by posting to existing Discord thread
  */
-async function handleEmailReply(env: Env, email: ParsedEmail, threadId: string): Promise<void> {
-  console.log('Processing email reply for thread ID:', threadId)
+async function handleEmailReply(env: Env, email: ParsedEmail, _threadId: string): Promise<void> {
+  console.log('Processing email reply - checking all potential thread IDs')
 
-  // Get the Discord thread ID from the mapping
-  const mapping = await getDiscordThreadId(env, threadId)
+  // Get all potential thread IDs from References and In-Reply-To headers
+  const allPotentialIds = getAllPotentialThreadIds(email)
+  console.log(`Found ${allPotentialIds.length} potential thread ID(s) to check:`, allPotentialIds)
+
+  // Try to find a mapping for any of the potential thread IDs
+  let mapping: ThreadMapping | null = null
+  let foundThreadId: string | null = null
+
+  for (const potentialId of allPotentialIds) {
+    console.log(`Checking thread ID: ${potentialId}`)
+    mapping = await getDiscordThreadId(env, potentialId)
+    if (mapping) {
+      foundThreadId = potentialId
+      console.log(`✅ Found mapping for thread ID: ${potentialId}`)
+      break
+    }
+  }
 
   if (!mapping) {
-    console.log('No mapping found, creating new thread')
+    console.log('❌ No mapping found for any thread ID, creating new thread')
     await handleNewEmail(env, email)
     return
   }
@@ -235,7 +259,7 @@ async function handleEmailReply(env: Env, email: ParsedEmail, threadId: string):
 
   if (success) {
     // Refresh the mapping TTL to keep it alive
-    await refreshThreadMapping(env, threadId)
+    await refreshThreadMapping(env, foundThreadId!)
     console.log('Posted to Discord thread successfully')
   }
   else {
@@ -328,21 +352,38 @@ async function processThreadForNewMessages(env: Env, mapping: ThreadMapping): Pr
       mapping.subject,
     )
 
+    // Generate a unique Message-ID for this outgoing email
+    const ourMessageId = generateMessageId(env.EMAIL_FROM_ADDRESS, Date.now())
+    console.log(`   - Generated Message-ID: ${ourMessageId}`)
     console.log(`   - Formatted email text: "${emailContent.text}"`)
     console.log(`   - Email subject: "${emailContent.subject}"`)
     console.log(`   - Sending to: ${mapping.originalSender}`)
     console.log(`   - In-Reply-To: ${mapping.emailMessageId}`)
 
-    // Send the email reply
+    // Send the email reply with our custom Message-ID
     const success = await sendEmail(env, {
       ...emailContent,
       to: mapping.originalSender,
       inReplyTo: mapping.emailMessageId,
       references: [mapping.emailMessageId],
+      messageId: ourMessageId, // Use our generated Message-ID
     })
 
     if (success) {
       console.log(`✅ Email sent successfully to ${mapping.originalSender}`)
+      console.log(`   Storing our Message-ID in KV: ${ourMessageId}`)
+
+      // Store our Message-ID in KV so customer replies can find this thread
+      await storeThreadMapping(
+        env,
+        ourMessageId, // Store the Message-ID we just generated
+        mapping.discordThreadId,
+        mapping.discordGuildId,
+        mapping.discordChannelId,
+        mapping.originalSender,
+        mapping.subject,
+      )
+
       console.log(`   Storing last processed message ID: ${message.id}`)
       // Update the last processed message ID
       await env.EMAIL_THREAD_MAPPING.put(lastMessageKey, message.id, {

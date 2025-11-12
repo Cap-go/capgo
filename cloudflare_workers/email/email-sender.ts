@@ -7,6 +7,7 @@ interface EmailOptions {
   html?: string
   inReplyTo?: string
   references?: string[]
+  messageId?: string // Custom Message-ID to use for this email
 }
 
 /**
@@ -53,13 +54,27 @@ async function sendViaResend(
     }
 
     // Add threading headers for replies
-    if (options.inReplyTo) {
-      payload.headers = {
-        'In-Reply-To': options.inReplyTo,
-        'References': options.references
-          ? options.references.join(' ')
-          : options.inReplyTo,
+    if (options.inReplyTo || options.messageId) {
+      const headers: Record<string, string> = {}
+
+      // Add custom Message-ID if provided
+      if (options.messageId) {
+        const messageId = options.messageId.startsWith('<') ? options.messageId : `<${options.messageId}>`
+        headers['Message-ID'] = messageId
       }
+
+      // Add reply headers
+      if (options.inReplyTo) {
+        const inReplyTo = options.inReplyTo.startsWith('<') ? options.inReplyTo : `<${options.inReplyTo}>`
+        const references = options.references
+          ? options.references.map(ref => ref.startsWith('<') ? ref : `<${ref}>`).join(' ')
+          : inReplyTo
+
+        headers['In-Reply-To'] = inReplyTo
+        headers.References = references
+      }
+
+      payload.headers = headers
     }
 
     const response = await fetch('https://api.resend.com/emails', {

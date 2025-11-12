@@ -44,6 +44,14 @@ export interface ParsedEmail {
   messageId: string
   references?: string[]
   date?: Date
+  attachments?: EmailAttachment[]
+}
+
+export interface EmailAttachment {
+  filename: string
+  contentType: string
+  content: ArrayBuffer | string // Base64 string or binary data
+  size: number
 }
 
 export interface ThreadMapping {

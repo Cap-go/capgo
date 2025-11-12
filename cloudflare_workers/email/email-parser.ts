@@ -181,18 +181,56 @@ function generateMessageId(from: string, timestamp: number): string {
 
 /**
  * Extracts the thread ID from email references
- * Returns the first message ID in the thread
+ * Returns all potential message IDs in the thread (cleaned, without angle brackets)
+ * We return an array because we need to check all references to find a match in KV
  */
 export function extractThreadId(email: ParsedEmail): string | null {
-  // If this is a reply, use the In-Reply-To header
-  if (email.inReplyTo)
-    return email.inReplyTo
+  // Collect all potential thread IDs to check
+  const potentialIds: string[] = []
 
-  // Otherwise, check references (first one is the original message)
-  if (email.references && email.references.length > 0)
-    return email.references[0]
+  // Add In-Reply-To first (most direct reference)
+  if (email.inReplyTo) {
+    potentialIds.push(cleanMessageId(email.inReplyTo))
+  }
 
-  return null
+  // Add all References (in reverse order - newest first)
+  if (email.references && email.references.length > 0) {
+    // Reverse to check newest first, then oldest
+    const reversedRefs = [...email.references].reverse()
+    for (const ref of reversedRefs) {
+      const cleaned = cleanMessageId(ref)
+      if (!potentialIds.includes(cleaned)) {
+        potentialIds.push(cleaned)
+      }
+    }
+  }
+
+  // Return the first one found (we'll update handleEmailReply to check all)
+  return potentialIds.length > 0 ? potentialIds[0] : null
+}
+
+/**
+ * Gets all potential thread IDs from an email's references
+ * Used to check multiple possible mappings in KV
+ */
+export function getAllPotentialThreadIds(email: ParsedEmail): string[] {
+  const potentialIds: string[] = []
+
+  if (email.inReplyTo) {
+    potentialIds.push(cleanMessageId(email.inReplyTo))
+  }
+
+  if (email.references && email.references.length > 0) {
+    const reversedRefs = [...email.references].reverse()
+    for (const ref of reversedRefs) {
+      const cleaned = cleanMessageId(ref)
+      if (!potentialIds.includes(cleaned)) {
+        potentialIds.push(cleaned)
+      }
+    }
+  }
+
+  return potentialIds
 }
 
 /**

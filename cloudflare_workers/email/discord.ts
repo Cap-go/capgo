@@ -86,6 +86,7 @@ export async function createForumThread(
 
 /**
  * Posts a message to an existing Discord thread
+ * Only sends the email body text, no embeds (those are only for the initial thread creation)
  */
 export async function postToThread(
   env: Env,
@@ -94,7 +95,9 @@ export async function postToThread(
 ): Promise<boolean> {
   const url = `${DISCORD_API_BASE}/channels/${threadId}/messages`
 
-  const message = formatEmailForDiscord(email)
+  // For follow-up messages, just send the plain text body
+  const bodyText = email.body.text || stripHtml(email.body.html || '')
+  const content = bodyText.trim() || '(Empty message)'
 
   try {
     const response = await fetch(url, {
@@ -104,8 +107,7 @@ export async function postToThread(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        content: message.content,
-        embeds: message.embeds,
+        content,
         allowed_mentions: {
           parse: [],
         },
