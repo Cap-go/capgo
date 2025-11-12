@@ -1,3 +1,13 @@
+/**
+ * App ID Validation Tests
+ *
+ * IMPORTANT: These integration tests require the backend to be running with the latest code.
+ * If tests fail with unexpected status codes, restart Supabase Edge Functions:
+ *   supabase functions serve --no-verify-jwt
+ *
+ * or for Cloudflare Workers:
+ *   npm run dev:cloudflare (or restart the workers)
+ */
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { isValidAppId } from '../supabase/functions/_backend/utils/utils.ts'
