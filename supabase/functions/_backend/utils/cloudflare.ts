@@ -183,7 +183,7 @@ export async function trackDevicesCF(c: Context, device: DeviceWithoutCreatedAt)
       cloudlog({ requestId: c.get('requestId'), message: existingRow ? 'Updating existing device' : 'Inserting new device' })
 
       // DEBUG: Log what we're writing to D1
-      console.log({
+      cloudlog({
         message: '[D1_WRITE] Writing to D1:',
         context: {
           device_id: device.device_id,
