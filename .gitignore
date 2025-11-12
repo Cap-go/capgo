@@ -3,6 +3,8 @@
 !cloudflare_workers/.env.local
 dist
 dist-ssr
+# Old Bunny Edge Script builds (deprecated - using Magic Containers now)
+bunny/
 node_modules
 .idea/
 *.log

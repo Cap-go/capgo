@@ -17,6 +17,8 @@ export default antfu(
       '**/supabase.types*',
       'supabase/functions/_backend/scripts/*',
       'CHANGELOG.md',
+      'bunny_containers/**',
+      'bunny/**',
     ],
   },
   {
