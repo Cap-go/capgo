@@ -1,4 +1,5 @@
 import type { DeviceWithoutCreatedAt } from './types.ts'
+import { cloudlog } from './logging.ts'
 
 const normalizeOptionalString = (value: string | null | undefined) => (value === undefined || value === null || value === '' ? null : value)
 
@@ -97,13 +98,16 @@ export function hasComparableDeviceChanged(existing: DeviceExistingRowLike, devi
     const hasChanged = existingValue !== value
 
     if (hasChanged) {
-      console.log(`[DEVICE_COMPARISON] Field "${key}" changed:`, {
-        existing: existingValue,
-        new: value,
-        existingType: typeof existingValue,
-        newType: typeof value,
-        device_id: device.device_id,
-        app_id: device.app_id,
+      cloudlog({
+        message: `[DEVICE_COMPARISON] Field "${key}" changed:`,
+        context: {
+          existing: existingValue,
+          new: value,
+          existingType: typeof existingValue,
+          newType: typeof value,
+          device_id: device.device_id,
+          app_id: device.app_id,
+        },
       })
     }
 
@@ -111,11 +115,15 @@ export function hasComparableDeviceChanged(existing: DeviceExistingRowLike, devi
   })
 
   if (!changed) {
-    console.log(`[DEVICE_COMPARISON] No changes detected for device ${device.device_id}`)
-  } else {
-    console.log(`[DEVICE_COMPARISON] Changes detected for device ${device.device_id}`, {
-      comparableExisting,
-      comparableDevice,
+    cloudlog(`[DEVICE_COMPARISON] No changes detected for device ${device.device_id}`)
+  }
+  else {
+    cloudlog({
+      message: `[DEVICE_COMPARISON] Changes detected for device ${device.device_id}`,
+      context: {
+        comparableExisting,
+        comparableDevice,
+      },
     })
   }
 

@@ -91,10 +91,10 @@ export function getDatabaseURL(c: Context, readOnly = false): string {
   }
 
   // Fallback to single Hyperdrive if available
-  if (c.env.HYPERDRIVE_CAPGO_DIRECT_EU) {
-    c.header('X-Database-Source', 'HYPERDRIVE_CAPGO_DIRECT_EU')
-    cloudlog({ requestId: c.get('requestId'), message: `Using Hyperdrive direct EU for ${readOnly ? 'read-only' : 'read-write'}` })
-    return c.env.HYPERDRIVE_CAPGO_DIRECT_EU.connectionString
+  if (c.env.HYPERDRIVE_CAPGO_SESSION_EU) {
+    c.header('X-Database-Source', 'HYPERDRIVE_CAPGO_SESSION_EU')
+    cloudlog({ requestId: c.get('requestId'), message: `Using Hyperdrive session EU for ${readOnly ? 'read-only' : 'read-write'}` })
+    return c.env.HYPERDRIVE_CAPGO_SESSION_EU.connectionString
   }
 
   // Main DB write poller EU region in supabase

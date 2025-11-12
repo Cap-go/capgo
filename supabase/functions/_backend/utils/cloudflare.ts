@@ -163,16 +163,19 @@ export async function trackDevicesCF(c: Context, device: DeviceWithoutCreatedAt)
 
     // DEBUG: Log what D1 returned
     if (existingRow) {
-      console.log('[D1_READ] Existing row from D1:', {
-        device_id: existingRow.device_id,
-        app_id: existingRow.app_id,
-        version_name: existingRow.version_name,
-        version_name_type: typeof existingRow.version_name,
-        default_channel: existingRow.default_channel,
-        default_channel_type: typeof existingRow.default_channel,
-        plugin_version: existingRow.plugin_version,
-        os_version: existingRow.os_version,
-        custom_id: existingRow.custom_id,
+      cloudlog({
+        message: '[D1_READ] Existing row from D1:',
+        context: {
+          device_id: existingRow.device_id,
+          app_id: existingRow.app_id,
+          version_name: existingRow.version_name,
+          version_name_type: typeof existingRow.version_name,
+          default_channel: existingRow.default_channel,
+          default_channel_type: typeof existingRow.default_channel,
+          plugin_version: existingRow.plugin_version,
+          os_version: existingRow.os_version,
+          custom_id: existingRow.custom_id,
+        },
       })
     }
 
@@ -180,17 +183,20 @@ export async function trackDevicesCF(c: Context, device: DeviceWithoutCreatedAt)
       cloudlog({ requestId: c.get('requestId'), message: existingRow ? 'Updating existing device' : 'Inserting new device' })
 
       // DEBUG: Log what we're writing to D1
-      console.log('[D1_WRITE] Writing to D1:', {
-        device_id: device.device_id,
-        app_id: device.app_id,
-        version_name: comparableDevice.version_name,
-        version_name_type: typeof comparableDevice.version_name,
-        default_channel: comparableDevice.default_channel,
-        default_channel_type: typeof comparableDevice.default_channel,
-        plugin_version: comparableDevice.plugin_version,
-        os_version: comparableDevice.os_version,
-        custom_id: comparableDevice.custom_id,
-        version_build: comparableDevice.version_build,
+      console.log({
+        message: '[D1_WRITE] Writing to D1:',
+        context: {
+          device_id: device.device_id,
+          app_id: device.app_id,
+          version_name: comparableDevice.version_name,
+          version_name_type: typeof comparableDevice.version_name,
+          default_channel: comparableDevice.default_channel,
+          default_channel_type: typeof comparableDevice.default_channel,
+          plugin_version: comparableDevice.plugin_version,
+          os_version: comparableDevice.os_version,
+          custom_id: comparableDevice.custom_id,
+          version_build: comparableDevice.version_build,
+        },
       })
 
       const res = await getD1WriteDevicesSession(c).prepare(upsertQuery).bind(
