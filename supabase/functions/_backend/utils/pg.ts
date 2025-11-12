@@ -3,6 +3,7 @@ import { and, eq, or, sql } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
 import { drizzle } from 'drizzle-orm/postgres-js'
 import postgres from 'postgres'
+import { app } from '../plugins/channel_self.ts'
 import { backgroundTask, existInEnv, getEnv } from '../utils/utils.ts'
 import { getClientDbRegionSB } from './geolocation.ts'
 import { cloudlog, cloudlogErr } from './logging.ts'
@@ -113,8 +114,9 @@ export function getDatabaseURL(c: Context, readOnly = false): string {
 export function getPgClient(c: Context, readOnly = false) {
   const dbUrl = getDatabaseURL(c, readOnly)
   const requestId = c.get('requestId')
-  const appName = c.res.headers.get('X-Database-Source') ?? 'unknown source'
-  cloudlog({ requestId, message: 'SUPABASE_DB_URL', dbUrl })
+  const appName = c.res.headers.get('X-Worker-Source') ?? 'unknown source'
+  const dbName = c.res.headers.get('X-Database-Source') ?? 'unknown source'
+  cloudlog({ requestId, message: 'SUPABASE_DB_URL', dbUrl, dbName, appName })
 
   // const prepare = !!appName.startsWith('HYPERDRIVE')
   const options = {
@@ -127,7 +129,7 @@ export function getPgClient(c: Context, readOnly = false) {
 
     // Add connection debugging
     connection: {
-      application_name: appName,
+      application_name: `${appName}-${dbName}`,
     },
 
     // Hook to log errors - this is called for connection-level errors
