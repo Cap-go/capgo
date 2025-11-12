@@ -3,7 +3,7 @@ BEGIN;
 CREATE EXTENSION "basejump-supabase_test_helpers";
 
 SELECT
-  plan (9);
+  plan (10);
 
 DO $$
 BEGIN
@@ -198,6 +198,43 @@ SELECT
         AND transaction_type = 'expiry'
     ),
     'expiry transaction recorded'
+  );
+
+WITH inserted_transaction AS (
+  INSERT INTO public.usage_credit_transactions (
+    org_id,
+    grant_id,
+    transaction_type,
+    amount,
+    balance_after,
+    description,
+    source_ref
+  )
+  SELECT
+    org_id,
+    grant_id,
+    'purchase',
+    5,
+    5,
+    'Idempotency test transaction',
+    jsonb_build_object('sessionId', 'cs_test_idempotent', 'paymentIntentId', 'pi_test_idempotent')
+  FROM test_credit_context
+  LIMIT 1
+  RETURNING id
+)
+SELECT
+  ok(
+    EXISTS(
+      SELECT 1
+      FROM public.usage_credit_transactions
+      WHERE org_id = (SELECT org_id FROM test_credit_context)
+        AND transaction_type = 'purchase'
+        AND (
+          source_ref ->> 'sessionId' = 'cs_test_idempotent'
+          OR source_ref ->> 'paymentIntentId' = 'pi_test_idempotent'
+        )
+    ),
+    'credit top-up queries can locate existing purchases by session or payment intent reference'
   );
 
 SELECT

@@ -93,7 +93,15 @@ async function getCreditTopUpProductId(c: AppContext): Promise<{ productId: stri
 }
 
 async function resolveOrgStripeContext(c: AppContext, orgId: string) {
-  const token = c.get('authorization')?.split('Bearer ')[1]
+  const rawAuthHeader = c.req.header('authorization')
+    ?? c.req.header('Authorization')
+    ?? c.get('authorization')
+  const tokenMatch = rawAuthHeader?.match(/^\s*Bearer\s+(\S+)\s*$/i)
+  const token = tokenMatch?.[1]
+
+  if (!token)
+    throw simpleError('not_authorized', 'Not authorized')
+
   const { data: auth, error } = await supabaseAdmin(c).auth.getUser(token)
 
   if (error || !auth?.user?.id)
@@ -310,6 +318,9 @@ app.post('/complete-top-up', middlewareAuth, async (c) => {
     throw simpleError('session_not_paid', 'Checkout session is not paid')
 
   const { productId, environment } = await getCreditTopUpProductId(c)
+  const paymentIntentId = typeof session.payment_intent === 'string'
+    ? session.payment_intent
+    : session.payment_intent?.id ?? null
 
   const lineItems = await stripe.checkout.sessions.listLineItems(body.sessionId, {
     expand: ['data.price.product'],
@@ -335,6 +346,56 @@ app.post('/complete-top-up', middlewareAuth, async (c) => {
   if (creditQuantity <= 0)
     throw simpleError('credit_product_not_found', 'Checkout session does not include the credit product')
 
+  const sourceMatchFilters = [`source_ref->>sessionId.eq.${body.sessionId}`]
+  if (paymentIntentId)
+    sourceMatchFilters.push(`source_ref->>paymentIntentId.eq.${paymentIntentId}`)
+
+  const { data: existingTx, error: existingTxError } = await supabaseAdmin(c)
+    .from('usage_credit_transactions')
+    .select('id, grant_id, balance_after')
+    .eq('org_id', body.orgId)
+    .eq('transaction_type', 'purchase')
+    .or(sourceMatchFilters.join(','))
+    .limit(1)
+
+  if (existingTxError) {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'credit_top_up_idempotency_check_failed',
+      error: existingTxError,
+      orgId: body.orgId,
+      sessionId: body.sessionId,
+    })
+  }
+
+  const matchedTx = existingTx?.[0]
+
+  if (matchedTx) {
+    const { data: balance } = await supabaseAdmin(c)
+      .from('usage_credit_balances')
+      .select('total_credits, available_credits, next_expiration')
+      .eq('org_id', body.orgId)
+      .single()
+
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'Skipping credit top-up RPC due to existing transaction',
+      orgId: body.orgId,
+      sessionId: body.sessionId,
+      transactionId: matchedTx.id,
+    })
+
+    return c.json({
+      grant: {
+        grant_id: matchedTx.grant_id,
+        transaction_id: matchedTx.id,
+        available_credits: balance?.available_credits ?? matchedTx.balance_after ?? 0,
+        total_credits: balance?.total_credits ?? matchedTx.balance_after ?? 0,
+        next_expiration: balance?.next_expiration ?? null,
+      },
+    })
+  }
+
   cloudlog({
     requestId: c.get('requestId'),
     message: 'Completing credit top-up',
@@ -347,9 +408,7 @@ app.post('/complete-top-up', middlewareAuth, async (c) => {
 
   const sourceRef = {
     sessionId: body.sessionId,
-    paymentIntentId: typeof session.payment_intent === 'string'
-      ? session.payment_intent
-      : session.payment_intent?.id ?? null,
+    paymentIntentId,
     itemsSummary,
   }
 
