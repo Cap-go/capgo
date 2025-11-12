@@ -165,7 +165,7 @@ SELECT
         'public',
         'org_users',
         ARRAY[
-            'Allow memeber and owner to select',
+            'Allow member and owner to select',
             'Allow org admin to update',
             'Allow to self delete',
             'Allow org admin to insert',

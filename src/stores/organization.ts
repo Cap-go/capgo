@@ -42,7 +42,7 @@ export const useOrganizationStore = defineStore('organization', () => {
     throw new Error(`Cannot find role for (${appOwner}, ${appId}, ${channelId}))`)
   }
 
-  // WARNING: currentOrganization does not guarantee corectness when used in an app-based URL
+  // WARNING: currentOrganization does not guarantee correctness when used in an app-based URL
   // For example if you try to use this value when fetching app channels it COULD BE incorrect
   // When trying to fetch an organization in an app based component the following should be used
   //
@@ -127,7 +127,7 @@ export const useOrganizationStore = defineStore('organization', () => {
     return org.role as OrganizationRole
   }
 
-  const hasPermisisonsInRole = (perm: OrganizationRole | null, perms: OrganizationRole[]): boolean => {
+  const hasPermissionsInRole = (perm: OrganizationRole | null, perms: OrganizationRole[]): boolean => {
     return (perm && perms.includes(perm)) ?? false
   }
 
@@ -179,9 +179,9 @@ export const useOrganizationStore = defineStore('organization', () => {
       return
 
     if (!_initialized.value) {
-      const listner = supabase.auth.onAuthStateChange((event: any) => {
+      const listener = supabase.auth.onAuthStateChange((event: any) => {
         if (event === 'SIGNED_OUT') {
-          listner.data.subscription.unsubscribe()
+          listener.data.subscription.unsubscribe()
           // Remove all from orgs
           _organizations.value = new Map()
           _organizationsByAppId.value = new Map()
@@ -192,7 +192,7 @@ export const useOrganizationStore = defineStore('organization', () => {
       })
     }
 
-    // We have RLS that ensure that we only selct rows where we are member or owner
+    // We have RLS that ensure that we only select rows where we are member or owner
     const { data, error } = await supabase
       .rpc('get_orgs_v6')
 
@@ -291,7 +291,7 @@ export const useOrganizationStore = defineStore('organization', () => {
     getCurrentRoleForApp,
     getCurrentRole,
     getAllOrgs,
-    hasPermisisonsInRole,
+    hasPermissionsInRole,
     fetchOrganizations,
     dedupFetchOrganizations,
     getOrgByAppId,

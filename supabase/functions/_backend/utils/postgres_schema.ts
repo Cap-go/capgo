@@ -6,7 +6,7 @@ import { bigint, boolean, customType, pgEnum, pgTable, serial, text, timestamp, 
 export const disableUpdatePgEnum = pgEnum('disable_update', ['major', 'minor', 'patch', 'version_number', 'none'])
 
 // Keeping this for backward compatibility but marking as deprecated
-const manfiestType = customType<{ data: Database['public']['CompositeTypes']['manifest_entry'][] }>({
+const manifestType = customType<{ data: Database['public']['CompositeTypes']['manifest_entry'][] }>({
   dataType() {
     return 'manifest_entry[]'
   },
@@ -16,7 +16,7 @@ const manfiestType = customType<{ data: Database['public']['CompositeTypes']['ma
         if (typeof element !== 'string')
           throw new Error(`Cannot do DB type mapping - not every element is a string. Data: ${JSON.stringify(value)}`)
         if (element.split(',').length !== 3)
-          throw new Error(`Cannot do DB type mapping - splitted string length is not 3. Data: ${element}`)
+          throw new Error(`Cannot do DB type mapping - split string length is not 3. Data: ${element}`)
       }
 
       return value.map((val) => {
@@ -63,7 +63,7 @@ export const app_versions = pgTable('app_versions', {
   min_update_version: varchar('min_update_version'),
   r2_path: varchar('r2_path'),
   // Keeping this for backward compatibility but it's deprecated now
-  manifest: manfiestType('manifest'),
+  manifest: manifestType('manifest'),
 })
 
 // New manifest table schema

@@ -40,7 +40,7 @@ export default defineConfig({
   fullyParallel: true,
   /* Fail the build on CI if you accidentally left test.only in the source code. */
   forbidOnly: !!env.CI,
-  /* Never retry, the entire thing is stateful and retries will never succed becouse of the modifications to supabase in the previous attempt */
+  /* Never retry, the entire thing is stateful and retries will never succeed because of the modifications to supabase in the previous attempt */
   retries: 0,
   /* Opt out of parallel tests on CI. */
   workers: os.cpus().length,

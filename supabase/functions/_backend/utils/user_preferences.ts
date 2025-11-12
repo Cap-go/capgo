@@ -1,7 +1,7 @@
 import type { Context } from 'hono'
 import type { Database } from './supabase.types.ts'
 import { addTagBento } from './bento.ts'
-import { cloudlog } from './loggin.ts'
+import { cloudlog } from './logging.ts'
 
 const NOTIFICATION_TAG = 'notifications_opt_in'
 const NEWSLETTER_TAG = 'newsletter_opt_in'

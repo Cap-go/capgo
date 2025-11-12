@@ -96,7 +96,7 @@ export async function openCheckout(priceId: string, successUrl: string, cancelUr
         priceId,
         successUrl,
         cancelUrl,
-        reccurence: isYear ? 'year' : 'month',
+        recurrence: isYear ? 'year' : 'month',
         orgId,
         attributionId,
       }),

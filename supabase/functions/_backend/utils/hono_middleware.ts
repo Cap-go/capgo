@@ -2,7 +2,7 @@ import type { Context } from 'hono'
 import type { AuthInfo } from './hono.ts'
 import type { Database } from './supabase.types.ts'
 import { honoFactory, quickError } from './hono.ts'
-import { cloudlog } from './loggin.ts'
+import { cloudlog } from './logging.ts'
 import { checkKey, checkKeyById, supabaseAdmin, supabaseClient } from './supabase.ts'
 
 // TODO: make universal middleware who

@@ -25,7 +25,7 @@ const turnstileToken = ref('')
 const captchaKey = ref(import.meta.env.VITE_CAPTCHA_KEY)
 const statusAuth: Ref<'login' | '2fa'> = ref('login')
 const mfaLoginFactor: Ref<Factor | null> = ref(null)
-const mfaChallangeId: Ref<string> = ref('')
+const mfaChallengeId: Ref<string> = ref('')
 const router = useRouter()
 const { t } = useI18n()
 const captchaComponent = ref<InstanceType<typeof VueTurnstile> | null>(null)
@@ -73,11 +73,11 @@ async function checkMfa() {
     if (errorChallenge) {
       isLoading.value = false
       setErrors('login-account', ['See browser console'], {})
-      console.error('Cannot challange mfa', errorChallenge)
+      console.error('Cannot challenge mfa', errorChallenge)
       return
     }
 
-    mfaChallangeId.value = challenge.id
+    mfaChallengeId.value = challenge.id
     statusAuth.value = '2fa'
     isLoading.value = false
   }
@@ -161,7 +161,7 @@ async function submit(form: { email: string, password: string, code: string }) {
     // http://localhost:5173/app
     const verify = await supabase.auth.mfa.verify({
       factorId: mfaLoginFactor.value!.id!,
-      challengeId: mfaChallangeId.value!,
+      challengeId: mfaChallengeId.value!,
       code: form.code.replace(' ', ''),
     })
 
@@ -197,12 +197,12 @@ async function checkAuthUser() {
     const { data: challenge, error: errorChallenge } = await supabase.auth.mfa.challenge({ factorId: mfaFactor!.id })
     if (errorChallenge) {
       setErrors('login-account', ['See browser console'], {})
-      console.error('Cannot challange mfa', errorChallenge)
+      console.error('Cannot challenge mfa', errorChallenge)
       return
     }
 
     mfaLoginFactor.value = mfaFactor!
-    mfaChallangeId.value = challenge.id
+    mfaChallengeId.value = challenge.id
 
     statusAuth.value = '2fa'
     isLoading.value = false
@@ -309,7 +309,7 @@ async function goback() {
     return
   }
 
-  mfaChallangeId.value = ''
+  mfaChallengeId.value = ''
   mfaLoginFactor.value = null
   statusAuth.value = 'login'
 }
@@ -328,7 +328,7 @@ onMounted(checkLogin)
           </p> !
         </h1>
         <p class="max-w-xl mx-auto mt-4 text-base leading-relaxed text-gray-600 dark:text-gray-300">
-          {{ t('login-to-your-accoun') }}
+          {{ t('login-to-your-account') }}
         </p>
       </div>
 
@@ -386,7 +386,7 @@ onMounted(checkLogin)
                       data-test="register"
                       class="text-sm font-medium text-orange-500 transition-all duration-200 focus:text-orange-600 hover:text-orange-600 hover:underline"
                     >
-                      {{ t('create-a-free-accoun') }}
+                      {{ t('create-a-free-account') }}
                     </a>
                   </div>
                   <div class="">
@@ -425,7 +425,7 @@ onMounted(checkLogin)
                   :prefix-icon="mfaIcon" inputmode="text" :label="t('2fa-code')"
                   :validation-rules="{ mfa_code_validation }"
                   :validation-messages="{
-                    mfa_code_validation: '2FA authentication code is not formated properly',
+                    mfa_code_validation: '2FA authentication code is not formatted properly',
                   }"
                   placeholder="xxx xxx"
                   autocomplete="off"

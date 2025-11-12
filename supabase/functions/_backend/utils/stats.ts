@@ -3,7 +3,7 @@ import type { Database } from './supabase.types.ts'
 import type { DeviceWithoutCreatedAt, ReadDevicesParams, ReadStatsParams, StatsActions } from './types.ts'
 import { countDevicesCF, countUpdatesFromLogsCF, countUpdatesFromLogsExternalCF, createIfNotExistStoreInfo, getAppsFromCF, getUpdateStatsCF, readBandwidthUsageCF, readDevicesCF, readDeviceUsageCF, readStatsCF, readStatsVersionCF, trackBandwidthUsageCF, trackDevicesCF, trackDeviceUsageCF, trackLogsCF, trackLogsCFExternal, trackVersionUsageCF, updateStoreApp } from './cloudflare.ts'
 import { simpleError200 } from './hono.ts'
-import { cloudlog } from './loggin.ts'
+import { cloudlog } from './logging.ts'
 import { countDevicesSB, getAppsFromSB, getUpdateStatsSB, readBandwidthUsageSB, readDevicesSB, readDeviceUsageSB, readStatsSB, readStatsStorageSB, readStatsVersionSB, trackBandwidthUsageSB, trackDevicesSB, trackDeviceUsageSB, trackLogsSB, trackMetaSB, trackVersionUsageSB } from './supabase.ts'
 import { backgroundTask } from './utils.ts'
 
@@ -31,7 +31,7 @@ export async function onPremStats(c: Context, app_id: string, action: string, de
       await updateStoreApp(c, app_id, 1)
   })
 
-  // save stats of unknow sources in our analytic DB
+  // save stats of unknown sources in our analytic DB
   await createStatsLogsExternal(c, device.app_id, device.device_id, 'get', device.version_name)
   cloudlog({ requestId: c.get('requestId'), message: 'App is external (onPremise), returning 429', app_id: device.app_id, country: c.req.raw.cf?.country, user_agent: c.req.raw.headers.get('user-agent') })
   // Return 429 to prevent device from retrying until next app kill (DDOS prevention)

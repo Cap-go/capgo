@@ -7,7 +7,7 @@ import { Hono } from 'hono/tiny'
 import { addTagBento, trackBentoEvent } from '../utils/bento.ts'
 import { BRES, quickError, simpleError } from '../utils/hono.ts'
 import { middlewareStripeWebhook } from '../utils/hono_middleware_stripe.ts'
-import { cloudlog } from '../utils/loggin.ts'
+import { cloudlog } from '../utils/logging.ts'
 import { logsnag } from '../utils/logsnag.ts'
 import { customerToSegmentOrg, supabaseAdmin } from '../utils/supabase.ts'
 
@@ -117,7 +117,7 @@ async function createdOrUpdated(c: Context, stripeData: StripeData, org: Org, Lo
 
     const segment = await customerToSegmentOrg(c, org.id, stripeData.data.price_id, plan)
     const isMonthly = plan.price_m_id === stripeData.data.price_id
-    const eventName = `user:subcribe_${statusName}:${isMonthly ? 'monthly' : 'yearly'}`
+    const eventName = `user:subscribe_${statusName}:${isMonthly ? 'monthly' : 'yearly'}`
     await trackBentoEvent(c, org.management_email, { plan_name: plan.name }, eventName)
     await addTagBento(c, org.management_email, segment)
     await LogSnag.track({

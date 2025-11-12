@@ -10,7 +10,7 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import Settings from '~icons/heroicons/cog-8-tooth'
-import IconInformations from '~icons/heroicons/information-circle'
+import IconInformation from '~icons/heroicons/information-circle'
 import IconTrash from '~icons/heroicons/trash'
 import IconSearch from '~icons/ic/round-search?raw'
 import IconAlertCircle from '~icons/lucide/alert-circle'
@@ -121,7 +121,7 @@ async function copyToast(text: string) {
 const tabs: Tab[] = [
   {
     label: 'info',
-    icon: IconInformations,
+    icon: IconInformation,
     key: 'info',
   },
 ]
@@ -155,7 +155,7 @@ const showSize = computed(() => {
     return t('metadata-not-found')
 })
 
-async function getUnknowBundleId() {
+async function getUnknownBundleId() {
   if (!version.value)
     return
   const { data } = await supabase
@@ -306,7 +306,7 @@ async function handleChannelAction(action: 'set' | 'open' | 'unlink') {
   }
   else if (action === 'unlink') {
     try {
-      const id = await getUnknowBundleId()
+      const id = await getUnknownBundleId()
       if (!id)
         return
       await setChannel(channel.value, id)
@@ -462,7 +462,7 @@ async function saveCustomId(input: string) {
 }
 
 function guardMinAutoUpdate(event: Event) {
-  if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'super_admin', 'write'])) {
+  if (!organizationStore.hasPermissionsInRole(role.value, ['admin', 'super_admin', 'write'])) {
     toast.error(t('no-permission'))
     event.preventDefault()
     return false
@@ -470,7 +470,7 @@ function guardMinAutoUpdate(event: Event) {
 }
 
 function preventInputChangePerm(event: Event) {
-  if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'super_admin', 'write'])) {
+  if (!organizationStore.hasPermissionsInRole(role.value, ['admin', 'super_admin', 'write'])) {
     event.preventDefault()
     return false
   }
@@ -495,7 +495,7 @@ async function didCancel(name: string, askForMethod = true): Promise<boolean | '
           text: t('unsafe'),
           role: 'danger',
           handler: async () => {
-            if (!organizationStore.hasPermisisonsInRole(await organizationStore.getCurrentRoleForApp(packageId.value), ['super_admin'])) {
+            if (!organizationStore.hasPermissionsInRole(await organizationStore.getCurrentRoleForApp(packageId.value), ['super_admin'])) {
               toast.error(t('no-permission-ask-super-admin'))
               return false
             }
@@ -573,7 +573,7 @@ async function deleteBundle() {
   if (!version.value)
     return
 
-  if (role.value && !organizationStore.hasPermisisonsInRole(role.value, ['admin', 'write', 'super_admin'])) {
+  if (role.value && !organizationStore.hasPermissionsInRole(role.value, ['admin', 'write', 'super_admin'])) {
     toast.error(t('no-permission'))
     return
   }
@@ -703,7 +703,7 @@ async function deleteBundle() {
               <InfoRow
                 v-if="showBundleMetadataInput" id="metadata-bundle"
                 :label="t('min-update-version')" editable
-                :readonly="organizationStore.hasPermisisonsInRole(role, ['admin', 'super_admin', 'write']) === false"
+                :readonly="organizationStore.hasPermissionsInRole(role, ['admin', 'super_admin', 'write']) === false"
                 @click="guardMinAutoUpdate" @update:value="(saveCustomId as any)" @keydown="preventInputChangePerm"
               >
                 {{ version.min_update_version }}
@@ -789,7 +789,7 @@ async function deleteBundle() {
                 v-if="!version.deleted"
                 :label="t('status')"
                 :icon="IconTrash"
-                :disabled="!organizationStore.hasPermisisonsInRole(role, ['admin', 'write', 'super_admin'])"
+                :disabled="!organizationStore.hasPermissionsInRole(role, ['admin', 'write', 'super_admin'])"
               >
                 <span class="">
                   {{ t('bundle-active') }}

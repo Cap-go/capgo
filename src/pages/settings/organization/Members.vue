@@ -221,12 +221,12 @@ async function showPermModal(invite: boolean): Promise<Database['public']['Enums
 }
 
 async function showInviteModal() {
-  if (!currentOrganization.value || (!organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['admin', 'super_admin']))) {
+  if (!currentOrganization.value || (!organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['admin', 'super_admin']))) {
     toast.error(t('no-permission'))
     return
   }
 
-  let permisionPromise: Promise<Database['public']['Enums']['user_min_right'] | undefined> | undefined
+  let permissionPromise: Promise<Database['public']['Enums']['user_min_right'] | undefined> | undefined
   let email: string | undefined
 
   emailInput.value = ''
@@ -255,18 +255,18 @@ async function showInviteModal() {
             return false
           }
 
-          permisionPromise = showPermModal(true)
+          permissionPromise = showPermModal(true)
         },
       },
     ],
   })
   await dialogStore.onDialogDismiss()
-  const permision = permisionPromise ? await permisionPromise : undefined
+  const permission = permissionPromise ? await permissionPromise : undefined
 
-  if (!permision || !email)
+  if (!permission || !email)
     return
 
-  await sendInvitation(email, permision)
+  await sendInvitation(email, permission)
 }
 
 async function sendInvitation(email: string, type: Database['public']['Enums']['user_min_right']) {
@@ -600,13 +600,13 @@ function canEdit(member: ExtendedOrganizationMember) {
   const role = organizationStore.currentRole
   if (!role)
     return false
-  return (organizationStore.hasPermisisonsInRole(role, ['admin', 'super_admin'])) && (member.uid !== currentOrganization?.value?.created_by)
+  return (organizationStore.hasPermissionsInRole(role, ['admin', 'super_admin'])) && (member.uid !== currentOrganization?.value?.created_by)
 }
 function isSuperAdmin() {
   const role = organizationStore.currentRole
   if (!role)
     return false
-  return organizationStore.hasPermisisonsInRole(role, ['super_admin'])
+  return organizationStore.hasPermissionsInRole(role, ['super_admin'])
 }
 function canDelete(member: ExtendedOrganizationMember) {
   const role = organizationStore.currentRole

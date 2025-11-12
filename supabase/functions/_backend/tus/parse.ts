@@ -3,7 +3,7 @@
 
 import type { Context } from 'hono'
 import { HTTPException } from 'hono/http-exception'
-import { cloudlog } from '../utils/loggin.ts'
+import { cloudlog } from '../utils/logging.ts'
 import { X_CHECKSUM_SHA256 } from './uploadHandler.ts'
 import { fromBase64 } from './util.ts'
 

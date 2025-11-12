@@ -3,7 +3,7 @@ import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
 import { trackBentoEvent } from '../utils/bento.ts'
 import { BRES, middlewareAPISecret, parseBody, simpleError } from '../utils/hono.ts'
-import { cloudlogErr } from '../utils/loggin.ts'
+import { cloudlogErr } from '../utils/logging.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 
 const thresholds = {
@@ -45,7 +45,7 @@ const funComparisons = {
   ],
 }
 
-// Check what treshold does the stat qualify for and return the fun comparison
+// Check what threshold does the stat qualify for and return the fun comparison
 function getFunComparison(comparison: keyof typeof funComparisons, stat: number): string {
   const thresholdsForComparisons = thresholds[comparison]
   const index = thresholdsForComparisons.findIndex((threshold, index) => {
@@ -69,7 +69,7 @@ app.post('/', middlewareAPISecret, async (c) => {
   if (!email || !appId || !type) {
     throw simpleError('missing_email_appId_type', 'Missing email, appId, or type', { email, appId, type })
   }
-  // cherck if email exists
+  // check if email exists
   const { data: user, error: userError } = await supabaseAdmin(c)
     .from('users')
     .select('*')
@@ -104,22 +104,22 @@ async function handleWeeklyInstallStats(c: Context, email: string, appId: string
     return c.json({ status: 'No updates this week' }, 200)
   }
 
-  const sucessUpdates = weeklyStats.all_updates - weeklyStats.failed_updates
-  if (sucessUpdates < 0) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot send email for app, sucessUpdates < 0', error: weeklyStats, metadata: { app_id: appId, email } })
+  const successUpdates = weeklyStats.all_updates - weeklyStats.failed_updates
+  if (successUpdates < 0) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot send email for app, successUpdates < 0', error: weeklyStats, metadata: { app_id: appId, email } })
     cloudlogErr({ requestId: c.get('requestId'), message: 'Invalid stats detected', error: weeklyStats, metadata: { app_id: appId, email } })
     return c.json({ status: 'No valid stats available' }, 200)
   }
 
-  const successPercantage = Math.round((sucessUpdates / weeklyStats.all_updates) * 10_000) / 10_000
+  const successPercentage = Math.round((successUpdates / weeklyStats.all_updates) * 10_000) / 10_000
 
   const metadata = {
     app_id: appId,
     weekly_updates: (weeklyStats.all_updates).toString(),
     fun_comparison: getFunComparison('updates', weeklyStats.all_updates),
-    weekly_install: sucessUpdates.toString(),
-    weekly_install_success: (successPercantage * 100).toString(),
-    fun_comparison_2: getFunComparison('failRate', successPercantage),
+    weekly_install: successUpdates.toString(),
+    weekly_install_success: (successPercentage * 100).toString(),
+    fun_comparison_2: getFunComparison('failRate', successPercentage),
     weekly_fail: (weeklyStats.failed_updates).toString(),
     weekly_open: (weeklyStats.open_app).toString(),
     fun_comparison_3: getFunComparison('appOpen', weeklyStats.open_app),

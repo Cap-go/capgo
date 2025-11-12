@@ -2,7 +2,7 @@ import type { Context } from 'hono'
 import type { MeteredData, StripeData } from './stripe.ts'
 import type { Database } from './supabase.types.ts'
 import Stripe from 'stripe'
-import { cloudlog, cloudlogErr } from './loggin.ts'
+import { cloudlog, cloudlogErr } from './logging.ts'
 import { getStripe, parsePriceIds } from './stripe.ts'
 import { getEnv } from './utils.ts'
 

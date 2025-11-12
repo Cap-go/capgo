@@ -5,8 +5,8 @@ import type { AppStats, DeviceWithoutCreatedAt, StatsActions } from '../utils/ty
 import { greaterOrEqual, parse } from '@std/semver'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod/mini'
-import { BRES, getIsV2, parseBody, quickError, simpleError, simpleRateLimit } from '../utils/hono.ts'
-import { cloudlog } from '../utils/loggin.ts'
+import { BRES, getIsV2Stats, parseBody, quickError, simpleError, simpleRateLimit } from '../utils/hono.ts'
+import { cloudlog } from '../utils/logging.ts'
 import { sendNotifOrg } from '../utils/notifications.ts'
 import { closeClient, getAppOwnerPostgres, getAppVersionPostgres, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import { getAppOwnerPostgresV2, getAppVersionPostgresV2, getDrizzleClientD1Session } from '../utils/pg_d1.ts'
@@ -150,7 +150,7 @@ app.post('/', async (c) => {
   if (isLimited(c, body.app_id)) {
     throw simpleRateLimit(body)
   }
-  const isV2 = getIsV2(c)
+  const isV2 = getIsV2Stats(c)
   const pgClient = isV2 ? null : getPgClient(c, true) // READ-ONLY: writes use SDK, not Drizzle
 
   const bodyParsed = parsePluginBody<AppStats>(c, body, jsonRequestSchema)

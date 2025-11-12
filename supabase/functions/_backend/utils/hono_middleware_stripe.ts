@@ -3,7 +3,7 @@ import type { Bindings } from './cloudflare.ts'
 import type { StripeData } from './stripe.ts'
 import { createFactory } from 'hono/factory'
 import { simpleError } from './hono.ts'
-import { cloudlog } from './loggin.ts'
+import { cloudlog } from './logging.ts'
 import { extractDataEvent, parseStripeEvent } from './stripe_event.ts'
 import { getEnv } from './utils.ts'
 

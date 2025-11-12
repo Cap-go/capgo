@@ -30,7 +30,7 @@ SELECT
             'com.demo.app2'
         ),
         'NO_APP',
-        'get_org_perm_for_apikey test - missign app'
+        'get_org_perm_for_apikey test - missing app'
     );
 
 SELECT

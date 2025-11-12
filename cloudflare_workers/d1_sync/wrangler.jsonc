@@ -2,7 +2,7 @@
   "name": "capgo-d1-sync",
   "main": "src/worker.ts",
   "compatibility_date": "2025-09-15",
-  "compatibility_flags": ["nodejs_compat_v2"],
+  "compatibility_flags": ["nodejs_compat"],
   "env": {
     "prod": {
       "name": "capgo-d1-sync-prod",
@@ -15,15 +15,23 @@
       },
       "hyperdrive": [
         {
-          "binding": "HYPERDRIVE_DB_EU",
-          "id": "0f1d77550db142fbb17cb6b3ee659a06"
+          "binding": "HYPERDRIVE_CAPGO_DIRECT_EU",
+          "id": "ae1fe6178b564adc9fc9a71ccc769a35"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_SESSION_EU",
+          "id": "07838c5ad23d4c5dac99e1a2fcdab2f4"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_TRANSACTION_EU",
+          "id": "b661b11c413844c5a08406bc37390590"
         }
       ],
       "d1_databases": [
         {
           "binding": "DB_REPLICA_EU",
-          "database_name": "capgo_replicate",
-          "database_id": "7f267d86-f4f7-49f5-9622-e44373aa00dc"
+          "database_name": "capgo_replicate_eu",
+          "database_id": "107046f7-af0e-4126-b493-1d4e66f48947"
         },
         {
           "binding": "DB_REPLICA_AS",
@@ -34,6 +42,11 @@
           "binding": "DB_REPLICA_US",
           "database_name": "capgo_replicate_us",
           "database_id": "320c32be-d3d9-4c7c-a84c-e20ef01fd20d"
+        },
+        {
+          "binding": "DB_REPLICA_OC",
+          "database_name": "capgo_replicate_oc",
+          "database_id": "58dbd199-4629-4bd0-a02c-ce019b5ab2e0"
         }
       ]
     },
@@ -41,7 +54,7 @@
       "name": "capgo-d1-sync-local",
       "hyperdrive": [
         {
-          "binding": "HYPERDRIVE_DB_EU",
+          "binding": "HYPERDRIVE_CAPGO_DIRECT_EU",
           "id": "local-dev-hyperdrive",
           "localConnectionString": "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
         }

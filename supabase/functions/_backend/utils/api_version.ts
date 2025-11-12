@@ -1,7 +1,7 @@
 import type { Context } from 'hono'
 import { HTTPException } from 'hono/http-exception'
 
-import { cloudlog } from './loggin.ts'
+import { cloudlog } from './logging.ts'
 
 export const CAPGO_API_VERSION_HEADER = 'capgo_api' as const
 export const CAPGO_API_DEFAULT_VERSION = '2025-10-01' as const

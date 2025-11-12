@@ -13,7 +13,7 @@ import { HTTPException } from 'hono/http-exception'
 import { logger } from 'hono/logger'
 import { Hono } from 'hono/tiny'
 import { quickError } from '../utils/hono.ts'
-import { cloudlog, cloudlogErr } from '../utils/loggin.ts'
+import { cloudlog, cloudlogErr } from '../utils/logging.ts'
 import { onError } from '../utils/on_error.ts'
 import { noopDigester, sha256Digester } from './digest.ts'
 import { parseChecksum, parseUploadMetadata } from './parse.ts'
@@ -123,10 +123,10 @@ export class UploadHandler {
       catch (e) {
         if (e instanceof UnrecoverableError) {
           try {
-            const ue = e as UnrecoverableError
-            cloudlogErr({ requestId: c.get('requestId'), message: `Upload for ${ue.r2Key} failed with unrecoverable error ${ue.message}` })
+            const unrecoverableError = e as UnrecoverableError
+            cloudlogErr({ requestId: c.get('requestId'), message: `Upload for ${unrecoverableError.r2Key} failed with unrecoverable error ${unrecoverableError.message}` })
             // this upload can never make progress, try to clean up
-            await this.cleanup(ue.r2Key)
+            await this.cleanup(unrecoverableError.r2Key)
           }
           catch (cleanupError) {
             // ignore errors cleaning up
@@ -383,7 +383,7 @@ export class UploadHandler {
   // B. Once the object is uploaded, return the checksum on subsequent GET/HEAD requests
   //
   // Depending on how the object is uploaded, we achieve A and B different ways. If the object can be uploaded without
-  // using mulitpart upload, R2 provides support for A and B directly. Otherwise, we support B by
+  // using multipart upload, R2 provides support for A and B directly. Otherwise, we support B by
   // adding custom metadata to the object when we create the multipart upload. For A, if the client manages to upload
   // the object in one-shot we calculate the digest as it comes in. Otherwise, after the multipart upload is
   // finished, we retrieve the object from R2 and recompute the digest.
@@ -557,7 +557,7 @@ export class UploadHandler {
     catch (e) {
       if (isR2MultipartDoesNotExistError(e)) {
         // The multipart transaction we persisted no longer exists. It either expired, or it's possible we
-        // finished the transaction but failed to update the state afterwords. Either way, we should give up.
+        // finished the transaction but failed to update the state afterwards. Either way, we should give up.
         throw new UnrecoverableError(`multipart upload does not exist ${e}`, r2Key)
       }
       throw e

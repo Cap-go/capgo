@@ -4,7 +4,7 @@
 import type { Context } from 'hono'
 import { Buffer } from 'node:buffer'
 import { HTTPException } from 'hono/http-exception'
-import { cloudlog } from '../utils/loggin.ts'
+import { cloudlog } from '../utils/logging.ts'
 
 export const REQUEST_METHODS = ['POST', 'HEAD', 'PATCH', 'OPTIONS', 'DELETE'] as const
 

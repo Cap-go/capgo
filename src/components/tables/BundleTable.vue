@@ -90,7 +90,7 @@ async function showDeletionMethodDialog(): Promise<DeletionMethod> {
         text: t('unsafe'),
         role: 'danger',
         handler: async () => {
-          if (!organizationStore.hasPermisisonsInRole(await organizationStore.getCurrentRoleForApp(props.appId), ['super_admin'])) {
+          if (!organizationStore.hasPermissionsInRole(await organizationStore.getCurrentRoleForApp(props.appId), ['super_admin'])) {
             toast.error(t('no-permission-ask-super-admin'))
             return false
           }
@@ -188,7 +188,7 @@ async function showUnlinkDialog(message: string): Promise<boolean> {
   return !cancelled && shouldUnlink
 }
 
-async function enhenceVersionElems(dataVersions: Database['public']['Tables']['app_versions']['Row'][]) {
+async function enhanceVersionElems(dataVersions: Database['public']['Tables']['app_versions']['Row'][]) {
   const { data: dataVersionsMeta } = await supabase
     .from('app_versions_meta')
     .select()
@@ -250,7 +250,7 @@ async function getData() {
     const { data: dataVersions, count } = await req
     if (!dataVersions)
       return
-    const enhancedVersions = await enhenceVersionElems(dataVersions)
+    const enhancedVersions = await enhanceVersionElems(dataVersions)
     await fetchChannelsForVersions(enhancedVersions)
     elements.value = enhancedVersions as any
     total.value = count ?? 0
@@ -445,7 +445,7 @@ columns.value = [
       },
       {
         icon: IconTrash,
-        visible: () => role.value ? organizationStore.hasPermisisonsInRole(role.value, ['admin', 'write', 'super_admin']) : false,
+        visible: () => role.value ? organizationStore.hasPermissionsInRole(role.value, ['admin', 'write', 'super_admin']) : false,
         onClick: (elem: Element) => deleteOne(elem),
       },
     ],
@@ -466,7 +466,7 @@ async function reload() {
 
 async function massDelete() {
   console.log('massDelete')
-  if (role.value && !organizationStore.hasPermisisonsInRole(role.value, ['admin', 'write', 'super_admin'])) {
+  if (role.value && !organizationStore.hasPermissionsInRole(role.value, ['admin', 'write', 'super_admin'])) {
     toast.error(t('no-permission'))
     return
   }

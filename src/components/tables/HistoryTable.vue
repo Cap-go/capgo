@@ -191,7 +191,7 @@ async function fetchDeployHistory() {
 
 async function handleRollback(item: DeployHistory) {
   const role = await organizationStore.getCurrentRoleForApp(props.appId)
-  if (!organizationStore.hasPermisisonsInRole(role, ['admin', 'super_admin', 'write'])) {
+  if (!organizationStore.hasPermissionsInRole(role, ['admin', 'super_admin', 'write'])) {
     toast.error(t('no-permission'))
     return
   }

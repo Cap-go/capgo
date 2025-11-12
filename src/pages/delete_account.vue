@@ -178,7 +178,7 @@ onMounted (() => {
                       :href="registerUrl"
                       class="font-medium text-orange-500 transition-all duration-200 hover:text-orange-600 hover:underline"
                     >
-                      {{ t('create-a-free-accoun') }}
+                      {{ t('create-a-free-account') }}
                     </a>
                   </p>
                   <p class="pt-2 text-gray-300">

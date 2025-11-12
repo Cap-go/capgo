@@ -22,7 +22,7 @@ BEGIN
     -- Force demo app to have the given plan
     UPDATE stripe_info set product_id=plan.stripe_id where customer_id='cus_Q38uE91NP8Ufqc';
 
-    -- let's devide the plan storage by half and put it. 
+    -- let's divide the plan storage by half and put it.
     INSERT INTO "public"."app_versions_meta" ("created_at", "app_id", "updated_at", "checksum", "size", "id", "devices") VALUES
     (now(), 'com.demo.app', now(), '3885ee49', FLOOR(plan.storage / 2), 3, 10);
 

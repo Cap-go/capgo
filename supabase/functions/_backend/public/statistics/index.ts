@@ -1,11 +1,11 @@
 import type { Context } from 'hono'
 import type { AuthInfo } from '../../utils/hono.ts'
 import dayjs from 'dayjs'
-import utc from 'dayjs/plugin/utc'
+import utc from 'dayjs/plugin/utc.js'
 import { z } from 'zod/mini'
 import { honoFactory, quickError, simpleError, useCors } from '../../utils/hono.ts'
 import { middlewareV2 } from '../../utils/hono_middleware.ts'
-import { cloudlog, cloudlogErr } from '../../utils/loggin.ts'
+import { cloudlog, cloudlogErr } from '../../utils/logging.ts'
 import { hasAppRight, hasAppRightApikey, hasOrgRight, supabaseAdmin } from '../../utils/supabase.ts'
 
 dayjs.extend(utc)
@@ -590,7 +590,7 @@ app.get('/org/:org_id', async (c) => {
 app.get('/app/:app_id/bundle_usage', async (c) => {
   const appId = c.req.param('app_id')
   const query = c.req.query()
-  const useDashbord = false
+  const useDashboard = false
 
   const bodyParsed = bundleUsageSchema.safeParse(query)
   if (!bodyParsed.success) {
@@ -621,7 +621,7 @@ app.get('/app/:app_id/bundle_usage', async (c) => {
     await checkOrganizationAccess(c, app.owner_org, supabase)
   }
 
-  const { data, error } = await getBundleUsage(appId, body.from, body.to, useDashbord, supabase)
+  const { data, error } = await getBundleUsage(appId, body.from, body.to, useDashboard, supabase)
 
   if (error) {
     throw quickError(500, 'cannot_get_app_statistics', 'Cannot get app statistics', { error })

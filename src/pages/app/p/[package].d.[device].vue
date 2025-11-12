@@ -11,7 +11,7 @@ import { toast } from 'vue-sonner'
 import IconCopy from '~icons/heroicons/clipboard-document-check'
 import IconCode from '~icons/heroicons/code-bracket'
 import IconLog from '~icons/heroicons/document'
-import IconInformations from '~icons/heroicons/information-circle'
+import IconInformation from '~icons/heroicons/information-circle'
 import IconAlertCircle from '~icons/lucide/alert-circle'
 import IconDown from '~icons/material-symbols/keyboard-arrow-down-rounded'
 import { useDeviceUpdateFormat } from '~/composables/useDeviceUpdateFormat'
@@ -65,7 +65,7 @@ onClickOutside(channelDropdown, () => closeChannelDropdown())
 const tabs: Tab[] = [
   {
     label: t('info'),
-    icon: IconInformations,
+    icon: IconInformation,
     key: 'info',
   },
   {
@@ -309,7 +309,7 @@ function getChannelLabel(channelId: number | string | null) {
 }
 
 async function onSelectChannel(value: string) {
-  const hasPerm = organizationStore.hasPermisisonsInRole(role.value, ['admin', 'super_admin', 'write'])
+  const hasPerm = organizationStore.hasPermissionsInRole(role.value, ['admin', 'super_admin', 'write'])
 
   if (!hasPerm) {
     toast.error(t('no-permission'))

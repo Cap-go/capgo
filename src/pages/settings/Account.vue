@@ -491,7 +491,7 @@ async function handleMfa() {
 
           if (challengeError) {
             toast.error(t('mfa-fail'))
-            console.error('Cannot create MFA challange', challengeError)
+            console.error('Cannot create MFA challenge', challengeError)
             return false
           }
 

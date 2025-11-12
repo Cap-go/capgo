@@ -4,7 +4,7 @@ import type { Database } from './supabase.types.ts'
 import type { DeviceWithoutCreatedAt, ReadDevicesParams, ReadStatsParams } from './types.ts'
 import dayjs from 'dayjs'
 import { hasComparableDeviceChanged, toComparableDevice } from './deviceComparison.ts'
-import { cloudlog, cloudlogErr, serializeError } from './loggin.ts'
+import { cloudlog, cloudlogErr, serializeError } from './logging.ts'
 import { DEFAULT_LIMIT } from './types.ts'
 import { getEnv } from './utils.ts'
 
@@ -20,7 +20,16 @@ export type Bindings = {
   DB_REPLICA_EU: D1Database
   DB_REPLICA_AS: D1Database
   DB_REPLICA_US: D1Database
-  HYPERDRIVE_DB_EU: Hyperdrive
+  DB_REPLICA_OC: D1Database
+  HYPERDRIVE_CAPGO_DIRECT_EU: Hyperdrive // Add Hyperdrive binding
+  HYPERDRIVE_CAPGO_DIRECT_AS: Hyperdrive // Add Hyperdrive binding
+  HYPERDRIVE_CAPGO_DIRECT_NA: Hyperdrive // Add Hyperdrive binding
+  HYPERDRIVE_CAPGO_SESSION_EU: Hyperdrive // Add Hyperdrive binding
+  HYPERDRIVE_CAPGO_SESSION_AS: Hyperdrive // Add Hyperdrive binding
+  HYPERDRIVE_CAPGO_SESSION_NA: Hyperdrive // Add Hyperdrive binding
+  HYPERDRIVE_CAPGO_TRANSACTION_EU: Hyperdrive // Add Hyperdrive binding
+  HYPERDRIVE_CAPGO_TRANSACTION_AS: Hyperdrive // Add Hyperdrive binding
+  HYPERDRIVE_CAPGO_TRANSACTION_NA: Hyperdrive // Add Hyperdrive binding
   ATTACHMENT_UPLOAD_HANDLER: DurableObjectNamespace
 }
 
@@ -152,23 +161,58 @@ export async function trackDevicesCF(c: Context, device: DeviceWithoutCreatedAt)
       WHERE device_id = ? AND app_id = ?
     `).bind(device.device_id, device.app_id).first()
 
+    // DEBUG: Log what D1 returned
+    if (existingRow) {
+      cloudlog({
+        message: '[D1_READ] Existing row from D1:',
+        context: {
+          device_id: existingRow.device_id,
+          app_id: existingRow.app_id,
+          version_name: existingRow.version_name,
+          version_name_type: typeof existingRow.version_name,
+          default_channel: existingRow.default_channel,
+          default_channel_type: typeof existingRow.default_channel,
+          plugin_version: existingRow.plugin_version,
+          os_version: existingRow.os_version,
+          custom_id: existingRow.custom_id,
+        },
+      })
+    }
+
     if (!existingRow || hasComparableDeviceChanged(existingRow, device)) {
       cloudlog({ requestId: c.get('requestId'), message: existingRow ? 'Updating existing device' : 'Inserting new device' })
+
+      // DEBUG: Log what we're writing to D1
+      cloudlog({
+        message: '[D1_WRITE] Writing to D1:',
+        context: {
+          device_id: device.device_id,
+          app_id: device.app_id,
+          version_name: comparableDevice.version_name,
+          version_name_type: typeof comparableDevice.version_name,
+          default_channel: comparableDevice.default_channel,
+          default_channel_type: typeof comparableDevice.default_channel,
+          plugin_version: comparableDevice.plugin_version,
+          os_version: comparableDevice.os_version,
+          custom_id: comparableDevice.custom_id,
+          version_build: comparableDevice.version_build,
+        },
+      })
 
       const res = await getD1WriteDevicesSession(c).prepare(upsertQuery).bind(
         updated_at,
         device.device_id,
-        comparableDevice.version_name ?? device.version_name ?? 'unknown',
+        comparableDevice.version_name, // FIXED: Use comparable value directly
         device.app_id,
         comparableDevice.platform,
         comparableDevice.plugin_version,
         comparableDevice.os_version,
         comparableDevice.version_build,
-        comparableDevice.custom_id ?? '',
+        comparableDevice.custom_id, // FIXED: Use comparable value directly, no ?? ''
         comparableDevice.is_prod ? 1 : 0,
         comparableDevice.is_emulator ? 1 : 0,
         device.version ?? 0,
-        device.default_channel ?? null,
+        comparableDevice.default_channel, // FIXED: Use comparable, not raw device
       ).run()
       cloudlog({ requestId: c.get('requestId'), message: 'Upsert result:', res })
     }
@@ -632,7 +676,7 @@ export async function getAppsFromCF(c: Context): Promise<{ app_id: string }[]> {
 export async function countUpdatesFromStoreAppsCF(c: Context): Promise<number> {
   if (!c.env.DB_STOREAPPS)
     return Promise.resolve(0)
-  // use countUpdatesFromStoreApps exemple to make it work with Cloudflare
+  // use countUpdatesFromStoreApps example to make it work with Cloudflare
   const query = `SELECT SUM(updates) + SUM(installs) AS count FROM store_apps WHERE onprem = 1 OR capgo = 1`
 
   cloudlog({ requestId: c.get('requestId'), message: 'countUpdatesFromStoreAppsCF query', query })

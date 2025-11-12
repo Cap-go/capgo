@@ -2,10 +2,9 @@ import type { Context } from 'hono'
 import { and, eq, or, sql } from 'drizzle-orm'
 import { drizzle as drizzleD1 } from 'drizzle-orm/d1'
 import { alias as aliasV2 } from 'drizzle-orm/sqlite-core'
-import { existInEnv } from '../utils/utils.ts'
-import { getClientDbRegion } from './geolocation.ts'
+import { getClientDbRegionD1 } from './geolocation.ts'
 import { quickError } from './hono.ts'
-import { cloudlog, cloudlogErr } from './loggin.ts'
+import { cloudlog, cloudlogErr } from './logging.ts'
 import { withOptionalManifestSelect } from './queryHelpers.ts'
 import * as schemaV2 from './sqlite_schema.ts'
 
@@ -65,30 +64,30 @@ export function parseManifestEntries(c: Context, data: any, source: string) {
 }
 
 export function getPgClientD1(c: Context, session: string = 'first-unconstrained') {
-  const dbRegion = getClientDbRegion(c)
-  let DB: D1Database = c.env.DB_REPLICA_EU
-  let DB_REG: 'EU' | 'US' | 'AS' = 'EU'
-  if (existInEnv(c, 'DB_REPLICA_EU') && dbRegion === 'AS') {
+  const dbRegion = getClientDbRegionD1(c)
+  let DB: D1Database = undefined as any
+  if (dbRegion === 'EU') {
+    DB = c.env.DB_REPLICA_EU
+  }
+  else if (dbRegion === 'AS') {
     DB = c.env.DB_REPLICA_AS
-    DB_REG = 'AS'
   }
-  else if (existInEnv(c, 'DB_REPLICA_US') && dbRegion === 'US') {
-    DB = c.env.DB_REPLICA_US
-    DB_REG = 'US'
+  else if (dbRegion === 'NA') {
+    DB = c.env.DB_REPLICA_NA
   }
-  if (!existInEnv(c, 'DB_REPLICA_EU')) {
+  else if (dbRegion === 'OC') {
+    DB = c.env.DB_REPLICA_OC
+  }
+  if (DB === undefined) {
     // Server/configuration error: surface as structured HTTP error
-    throw quickError(500, 'missing_binding', 'DB_REPLICA_EU is not set', { binding: 'DB_REPLICA_EU' })
+    throw quickError(500, 'missing_binding', `REPLICATE ${dbRegion} is missing`, { dbRegion })
   }
-  cloudlog({ requestId: c.get('requestId'), message: `Using D1 ${DB_REG} instance` })
-  c.header('X-Database-Source', `d1-${DB_REG}-session`)
+  cloudlog({ requestId: c.get('requestId'), message: `Using D1 ${dbRegion} instance` })
+  c.header('X-Database-Source', `d1-${dbRegion}-session`)
   return DB.withSession(session) as any as D1Database
 }
 
 export function getDrizzleClientD1Session(c: Context) {
-  if (!existInEnv(c, 'DB_REPLICA_EU')) {
-    throw quickError(500, 'missing_binding', 'DB_REPLICATE is not set', { binding: 'DB_REPLICA_EU' })
-  }
   cloudlog({ requestId: c.get('requestId'), message: 'Using D1 with session for Drizzle Client' })
   return drizzleD1(getPgClientD1(c))
 }

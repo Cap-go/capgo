@@ -49,9 +49,9 @@ export const useMainStore = defineStore('main', () => {
     return new Promise<void>((resolve) => {
       const supabase = useSupabase()
       const config = getLocalConfig()
-      const listner = supabase.auth.onAuthStateChange((event: any) => {
+      const listener = supabase.auth.onAuthStateChange((event: any) => {
         if (event === 'SIGNED_OUT') {
-          listner.data.subscription.unsubscribe()
+          listener.data.subscription.unsubscribe()
           auth.value = undefined
           user.value = undefined
           reset(config.supaHost)

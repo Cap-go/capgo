@@ -35,7 +35,7 @@ const ActiveTab = ref(getCurrentTab())
 const tabs = ref<Tab[]>([
   {
     label: 'account',
-    icon: shallowRef(IconAcount),
+    icon: shallowRef(IconAccount),
     key: '/settings/account',
   },
   {
@@ -53,7 +53,7 @@ const tabs = ref<Tab[]>([
 const organizationTabs = ref<Tab[]>([
   {
     label: 'general-information',
-    icon: shallowRef(IconAcount),
+    icon: shallowRef(IconAccount),
     key: '/settings/organization/',
   },
   {
