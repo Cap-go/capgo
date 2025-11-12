@@ -1,0 +1,100 @@
+{
+  "name": "capgo_email",
+  "logpush": true,
+  "compatibility_date": "2025-09-15",
+  "main": "./index.ts",
+  "compatibility_flags": [
+    "nodejs_compat",
+    "nodejs_compat_populate_process_env"
+  ],
+  "placement": {
+    "mode": "smart"
+  },
+  "workers_dev": false,
+  "upload_source_maps": true,
+  "env": {
+    "prod": {
+      "name": "capgo_email-prod",
+      "vars": {
+        "ENV_NAME": "capgo_email-prod"
+      },
+      "routes": [
+        {
+          "pattern": "email.capgo.app",
+          "custom_domain": true
+        }
+      ],
+      "observability": {
+        "enabled": true,
+        "head_sampling_rate": 1
+      },
+      "kv_namespaces": [
+        {
+          "binding": "EMAIL_THREAD_MAPPING",
+          "id": "83eebe9478db4d91851a3a0aa137ec72"
+        }
+      ]
+    },
+    "preprod": {
+      "name": "capgo_email-preprod",
+      "vars": {
+        "ENV_NAME": "capgo_email-preprod"
+      },
+      "routes": [
+        {
+          "pattern": "email.preprod.capgo.app",
+          "custom_domain": true
+        }
+      ],
+      "observability": {
+        "enabled": true
+      },
+      "kv_namespaces": [
+        {
+          "binding": "EMAIL_THREAD_MAPPING",
+          "id": "YOUR_PREPROD_KV_ID"
+        }
+      ]
+    },
+    "alpha": {
+      "name": "capgo_email-alpha",
+      "vars": {
+        "ENV_NAME": "capgo_email-alpha"
+      },
+      "routes": [
+        {
+          "pattern": "email.dev.capgo.app",
+          "custom_domain": true
+        }
+      ],
+      "observability": {
+        "enabled": true
+      },
+      "kv_namespaces": [
+        {
+          "binding": "EMAIL_THREAD_MAPPING",
+          "id": "YOUR_ALPHA_KV_ID"
+        }
+      ]
+    },
+    "local": {
+      "name": "capgo_email-local",
+      "vars": {
+        "ENV_NAME": "capgo_email-local"
+      },
+      "kv_namespaces": [
+        {
+          "binding": "EMAIL_THREAD_MAPPING",
+          "id": "local-kv",
+          "preview_id": "local-kv"
+        }
+      ]
+    }
+  },
+  "kv_namespaces": [
+    {
+      "binding": "EMAIL_THREAD_MAPPING",
+      "id": "83eebe9478db4d91851a3a0aa137ec72"
+    }
+  ]
+}
