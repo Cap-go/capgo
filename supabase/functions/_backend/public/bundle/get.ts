@@ -2,7 +2,7 @@ import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { simpleError } from '../../utils/hono.ts'
 import { hasAppRightApikey, supabaseApikey } from '../../utils/supabase.ts'
-import { fetchLimit } from '../../utils/utils.ts'
+import { fetchLimit, isValidAppId } from '../../utils/utils.ts'
 
 export interface GetLatest {
   app_id: string
@@ -11,6 +11,12 @@ export interface GetLatest {
 }
 
 export async function get(c: Context, body: GetLatest, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
+  if (!body.app_id) {
+    throw simpleError('missing_app_id', 'Missing app_id', { body })
+  }
+  if (!isValidAppId(body.app_id)) {
+    throw simpleError('invalid_app_id', 'App ID must be a reverse domain string', { app_id: body.app_id })
+  }
   if (!(await hasAppRightApikey(c, body.app_id, apikey.user_id, 'read', apikey.key))) {
     throw simpleError('cannot_get_bundle', 'You can\'t access this app', { app_id: body.app_id })
   }

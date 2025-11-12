@@ -1,6 +1,7 @@
 import { getBodyOrQuery, honoFactory, simpleError } from '../../utils/hono.ts'
 import { middlewareKey } from '../../utils/hono_middleware.ts'
 import { supabaseApikey } from '../../utils/supabase.ts'
+import { isValidAppId } from '../../utils/utils.ts'
 
 export const app = honoFactory.createApp()
 
@@ -18,6 +19,10 @@ app.post('/', middlewareKey(['all', 'write']), async (c) => {
 
   if (!body.app_id || !body.version_id) {
     throw simpleError('missing_required_fields', 'Missing required fields', { app_id: body.app_id, version_id: body.version_id })
+  }
+
+  if (!isValidAppId(body.app_id)) {
+    throw simpleError('invalid_app_id', 'App ID must be a reverse domain string', { app_id: body.app_id })
   }
 
   const { data: version, error: versionError } = await supabaseApikey(c, apikey.key)

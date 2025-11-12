@@ -2,6 +2,7 @@ import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { quickError, simpleError } from '../../utils/hono.ts'
 import { hasAppRightApikey, supabaseApikey } from '../../utils/supabase.ts'
+import { isValidAppId } from '../../utils/utils.ts'
 
 interface SetChannelBody {
   app_id: string
@@ -10,13 +11,17 @@ interface SetChannelBody {
 }
 
 export async function setChannel(c: Context, body: SetChannelBody, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
+  if (!body.app_id || !body.version_id || !body.channel_id) {
+    throw simpleError('missing_required_fields', 'Missing required fields', { app_id: body.app_id, version_id: body.version_id, channel_id: body.channel_id })
+  }
+
+  if (!isValidAppId(body.app_id)) {
+    throw simpleError('invalid_app_id', 'App ID must be a reverse domain string', { app_id: body.app_id })
+  }
+
   // Check API key permissions
   if (!(await hasAppRightApikey(c, body.app_id, apikey.user_id, 'write', apikey.key))) {
     throw simpleError('cannot_access_app', 'You can\'t access this app', { app_id: body.app_id })
-  }
-
-  if (!body.app_id || !body.version_id || !body.channel_id) {
-    throw simpleError('missing_required_fields', 'Missing required fields', { app_id: body.app_id, version_id: body.version_id, channel_id: body.channel_id })
   }
 
   // Get organization info

@@ -4,14 +4,19 @@ import type { Database } from '../../utils/supabase.types.ts'
 import type { DeviceLink } from './delete.ts'
 import { BRES, quickError, simpleError } from '../../utils/hono.ts'
 import { hasAppRightApikey, supabaseApikey, updateOrCreateChannelDevice } from '../../utils/supabase.ts'
+import { isValidAppId } from '../../utils/utils.ts'
 
 export async function post(c: Context<MiddlewareKeyVariables, any, object>, body: DeviceLink, apikey: Database['public']['Tables']['apikeys']['Row']) {
   if (!body.device_id || !body.app_id) {
     throw simpleError('missing_device_id_or_app_id', 'Missing device_id or app_id', { body })
   }
 
+  if (!isValidAppId(body.app_id)) {
+    throw simpleError('invalid_app_id', 'App ID must be a reverse domain string', { app_id: body.app_id })
+  }
+
   if (!(await hasAppRightApikey(c, body.app_id, apikey.user_id, 'write', apikey.key))) {
-    throw simpleError('invalid_app_id', 'You can\'t access this app', { app_id: body.app_id })
+    throw simpleError('cannot_access_app', 'You can\'t access this app', { app_id: body.app_id })
   }
 
   if ((body as any).version_id) {
