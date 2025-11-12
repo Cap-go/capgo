@@ -62,45 +62,45 @@ export function getDatabaseURL(c: Context, readOnly = false): string {
     // Hyperdrive main read replica regional routing in Cloudflare Workers
     // When using Hyperdrive we use session databases directly to avoid supabase pooler overhead and allow prepared statements
     // Asia region
-    if (c.env.HYPERDRIVE_CAPGO_SESSION_AS && dbRegion === 'AS') {
-      c.header('X-Database-Source', 'HYPERDRIVE_CAPGO_SESSION_AS')
-      cloudlog({ requestId: c.get('requestId'), message: 'Using Hyperdrive session AS for read-only' })
-      return c.env.HYPERDRIVE_CAPGO_SESSION_AS.connectionString
+    if (c.env.HYPERDRIVE_CAPGO_TRANSACTION_AS && dbRegion === 'AS') {
+      c.header('X-Database-Source', 'HYPERDRIVE_CAPGO_TRANSACTION_AS')
+      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_TRANSACTION_AS for read-only' })
+      return c.env.HYPERDRIVE_CAPGO_TRANSACTION_AS.connectionString
     }
     // US region
-    if (c.env.HYPERDRIVE_CAPGO_SESSION_NA && dbRegion === 'NA') {
-      c.header('X-Database-Source', 'HYPERDRIVE_CAPGO_SESSION_NA')
-      cloudlog({ requestId: c.get('requestId'), message: 'Using Hyperdrive session NA for read-only' })
-      return c.env.HYPERDRIVE_CAPGO_SESSION_NA.connectionString
+    if (c.env.HYPERDRIVE_CAPGO_TRANSACTION_NA && dbRegion === 'NA') {
+      c.header('X-Database-Source', 'HYPERDRIVE_CAPGO_TRANSACTION_NA')
+      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_TRANSACTION_NA for read-only' })
+      return c.env.HYPERDRIVE_CAPGO_TRANSACTION_NA.connectionString
     }
 
     // Custom Supabase Region Read replicate Poolers
     // Asia region
     if (existInEnv(c, 'READ_SUPABASE_DB_URL_AS') && dbRegion === 'AS') {
       c.header('X-Database-Source', 'read_pooler_as')
-      cloudlog({ requestId: c.get('requestId'), message: 'Using Read Pooler AS for read-only' })
+      cloudlog({ requestId: c.get('requestId'), message: 'Using READ_SUPABASE_DB_URL_AS for read-only' })
       return getEnv(c, 'READ_SUPABASE_DB_URL_AS')
     }
 
     // NA region
     if (existInEnv(c, 'READ_SUPABASE_DB_URL_NA') && dbRegion === 'NA') {
       c.header('X-Database-Source', 'read_pooler_na')
-      cloudlog({ requestId: c.get('requestId'), message: 'Using Read Pooler NA for read-only' })
+      cloudlog({ requestId: c.get('requestId'), message: 'Using READ_SUPABASE_DB_URL_NA for read-only' })
       return getEnv(c, 'READ_SUPABASE_DB_URL_NA')
     }
   }
 
   // Fallback to single Hyperdrive if available
-  if (c.env.HYPERDRIVE_CAPGO_SESSION_EU) {
-    c.header('X-Database-Source', 'HYPERDRIVE_CAPGO_SESSION_EU')
-    cloudlog({ requestId: c.get('requestId'), message: `Using Hyperdrive session EU for ${readOnly ? 'read-only' : 'read-write'}` })
-    return c.env.HYPERDRIVE_CAPGO_SESSION_EU.connectionString
+  if (c.env.HYPERDRIVE_CAPGO_TRANSACTION_EU) {
+    c.header('X-Database-Source', 'HYPERDRIVE_CAPGO_TRANSACTION_EU')
+    cloudlog({ requestId: c.get('requestId'), message: `Using HYPERDRIVE_CAPGO_TRANSACTION_EU for ${readOnly ? 'read-only' : 'read-write'}` })
+    return c.env.HYPERDRIVE_CAPGO_TRANSACTION_EU.connectionString
   }
 
   // Main DB write poller EU region in supabase
   if (existInEnv(c, 'MAIN_SUPABASE_DB_URL')) {
     c.header('X-Database-Source', 'sb_pooler_main')
-    cloudlog({ requestId: c.get('requestId'), message: 'Using Main Supabase Pooler for read-write' })
+    cloudlog({ requestId: c.get('requestId'), message: 'Using MAIN_SUPABASE_DB_URL for read-write' })
     return getEnv(c, 'MAIN_SUPABASE_DB_URL')
   }
 
@@ -116,14 +116,14 @@ export function getPgClient(c: Context, readOnly = false) {
   const appName = c.res.headers.get('X-Database-Source') ?? 'unknown source'
   cloudlog({ requestId, message: 'SUPABASE_DB_URL', dbUrl })
 
-  const prepare = !!appName.startsWith('HYPERDRIVE')
+  // const prepare = !!appName.startsWith('HYPERDRIVE')
   const options = {
-    prepare,
+    prepare: false,
     max: 5,
     fetch_types: false,
-    idle_timeout: 60, // Increase from 2 to 20 seconds
+    idle_timeout: 20, // Increase from 2 to 20 seconds
     connect_timeout: 10, // Add explicit connect timeout
-    max_lifetime: 600, // Add connection lifetime limit
+    max_lifetime: 60, // Add connection lifetime limit
 
     // Add connection debugging
     connection: {
