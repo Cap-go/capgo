@@ -31,9 +31,9 @@ interface Env {
   HYPERDRIVE_CAPGO_SESSION_EU: Hyperdrive // Add Hyperdrive binding
   HYPERDRIVE_CAPGO_SESSION_AS: Hyperdrive // Add Hyperdrive binding
   HYPERDRIVE_CAPGO_SESSION_NA: Hyperdrive // Add Hyperdrive binding
-  HYPERDRIVE_CAPGO_SESSION_EU: Hyperdrive // Add Hyperdrive binding
-  HYPERDRIVE_CAPGO_SESSION_AS: Hyperdrive // Add Hyperdrive binding
-  HYPERDRIVE_CAPGO_SESSION_NA: Hyperdrive // Add Hyperdrive binding
+  HYPERDRIVE_CAPGO_TRANSACTION_EU: Hyperdrive // Add Hyperdrive binding
+  HYPERDRIVE_CAPGO_TRANSACTION_AS: Hyperdrive // Add Hyperdrive binding
+  HYPERDRIVE_CAPGO_TRANSACTION_NA: Hyperdrive // Add Hyperdrive binding
   WEBHOOK_SECRET: string
 }
 
@@ -449,14 +449,14 @@ async function processReplicationQueue(replicas: ReplicaTarget[], env: Env) {
       connection: {
         application_name: 'd1_sync_worker',
       },
-      onnotice: (notice: postgres.Notice) => { console.log(`[${queueKey}] PG Notice:`, notice.message) }, // Added Notice type
+
       // Hook to log errors - this is called for connection-level errors
       onclose: (connectionId: number) => {
         console.log({ message: 'PG Connection Closed', connectionId })
       },
     }
     // Create postgres instance using the Hyperdrive connection string
-    sql = postgres(env.HYPERDRIVE_CAPGO_SESSION_EU.connectionString, options)
+    sql = postgres(env.HYPERDRIVE_CAPGO_TRANSACTION_EU.connectionString, options)
     console.log(`[${queueKey}] PostgreSQL connection handler created via Hyperdrive.`)
 
     // No explicit connect needed, postgres handles it

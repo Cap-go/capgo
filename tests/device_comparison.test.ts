@@ -113,10 +113,11 @@ describe('deviceComparison utilities', () => {
     })
 
     it('should handle undefined/null fields and apply D1 defaults', () => {
-      const device: DeviceWithoutCreatedAt = {
+      const device = {
         device_id: 'test-device',
         app_id: 'test-app',
-        platform: undefined,
+        updated_at: new Date().toISOString(),
+        platform: null,
         plugin_version: undefined,
         os_version: null,
         version_build: undefined,
@@ -125,7 +126,7 @@ describe('deviceComparison utilities', () => {
         is_prod: undefined,
         is_emulator: undefined,
         default_channel: null,
-      }
+      } as unknown as DeviceWithoutCreatedAt
 
       const comparable = toComparableDevice(device)
 
@@ -521,9 +522,10 @@ describe('deviceComparison utilities', () => {
         default_channel: '',
       }
 
-      const device: DeviceWithoutCreatedAt = {
+      const device = {
         device_id: 'test-device',
         app_id: 'test-app',
+        updated_at: new Date().toISOString(),
         platform: undefined,
         plugin_version: undefined,
         os_version: null,
@@ -533,7 +535,7 @@ describe('deviceComparison utilities', () => {
         is_prod: undefined,
         is_emulator: null,
         default_channel: null,
-      }
+      } as unknown as DeviceWithoutCreatedAt
 
       expect(hasComparableDeviceChanged(existing, device)).toBe(false)
     })
