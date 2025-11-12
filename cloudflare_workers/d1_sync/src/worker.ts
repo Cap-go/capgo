@@ -433,12 +433,12 @@ async function processReplicationQueue(replicas: ReplicaTarget[], env: Env) {
 
   try {
     // 2. Create PostgreSQL connection using Hyperdrive
-    if (!env.HYPERDRIVE_CAPGO_TRANSACTION_EU) {
-      console.error(`[${queueKey}] Hyperdrive binding HYPERDRIVE_CAPGO_TRANSACTION_EU not configured.`)
-      throw new Error('Hyperdrive binding HYPERDRIVE_CAPGO_TRANSACTION_EU not configured.')
+    if (!env.HYPERDRIVE_CAPGO_DIRECT_EU) {
+      console.error(`[${queueKey}] Hyperdrive binding HYPERDRIVE_CAPGO_DIRECT_EU not configured.`)
+      throw new Error('Hyperdrive binding HYPERDRIVE_CAPGO_DIRECT_EU not configured.')
     }
     // Create postgres instance using the Hyperdrive connection string
-    sql = postgres(env.HYPERDRIVE_CAPGO_TRANSACTION_EU.connectionString, {
+    sql = postgres(env.HYPERDRIVE_CAPGO_DIRECT_EU.connectionString, {
       prepare: false, // Use simple query protocol
       idle_timeout: 2, // Close idle connections after 2 seconds
       onnotice: (notice: postgres.Notice) => { console.log(`[${queueKey}] PG Notice:`, notice.message) }, // Added Notice type
