@@ -260,10 +260,10 @@ app.post('/', async (c) => {
 
 app.post('/start-top-up', middlewareAuth, async (c) => {
   const body = await parseBody<StartTopUpRequest>(c)
-  const quantity = Number.isFinite(body.quantity) && (body.quantity ?? 0) > 0
-    ? Math.floor(body.quantity!)
+  const parsedQuantity = Number.isFinite(body.quantity) ? Math.floor(body.quantity!) : undefined
+  const quantity = parsedQuantity && parsedQuantity >= 1
+    ? parsedQuantity
     : DEFAULT_TOP_UP_QUANTITY
-
   if (!body.orgId)
     throw simpleError('missing_org_id', 'Organization id is required')
 
