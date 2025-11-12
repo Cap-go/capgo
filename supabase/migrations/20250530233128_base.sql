@@ -2416,24 +2416,42 @@ $$;
 
 ALTER FUNCTION "public"."is_canceled_org" ("orgid" "uuid") OWNER TO "postgres";
 
-CREATE OR REPLACE FUNCTION "public"."is_good_plan_v5_org" ("orgid" "uuid") RETURNS boolean LANGUAGE "plpgsql"
+CREATE OR REPLACE FUNCTION public.is_good_plan_v5_org (orgid uuid) RETURNS boolean LANGUAGE plpgsql
 SET
   search_path = '' SECURITY DEFINER AS $$
 DECLARE
-    total_metrics RECORD;
-    current_plan_name TEXT;
+  s date;
+  e date;
+  v_mau       bigint;
+  v_bandwidth bigint;
+  v_storage   bigint;
+  current_plan_name text;
 BEGIN
-  SELECT * INTO total_metrics FROM public.get_total_metrics(orgid);
-  current_plan_name := (SELECT public.get_current_plan_name_org(orgid));
+  -- 1) get cycle dates once
+  SELECT subscription_anchor_start::date,
+         subscription_anchor_end::date
+  INTO s, e
+  FROM public.get_cycle_info_org(orgid);
 
+  -- 2) call the 3-arg totals once via FROM (no repeated eval)
+  SELECT m.mau, m.bandwidth, m.storage
+  INTO   v_mau, v_bandwidth, v_storage
+  FROM public.get_total_metrics(
+         orgid, s, e
+       ) AS m(mau, storage, bandwidth, "get", fail, install, uninstall);
+
+  -- 3) current plan
+  current_plan_name := public.get_current_plan_name_org(orgid);
+
+  -- 4) inline fit check (no extra function call)
   RETURN EXISTS (
     SELECT 1
-    FROM public.find_fit_plan_v3(
-      total_metrics.mau,
-      total_metrics.bandwidth,
-      total_metrics.storage
-    )
-    WHERE find_fit_plan_v3.name = current_plan_name
+    FROM public.plans p
+    WHERE p.name = current_plan_name
+      AND (
+        p.name = 'Pay as you go'
+        OR (p.mau >= v_mau AND p.bandwidth >= v_bandwidth AND p.storage >= v_storage)
+      )
   );
 END;
 $$;

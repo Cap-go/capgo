@@ -167,8 +167,8 @@
         "mode": "smart"
       },
       "observability": {
-        "enabled": true,
-        "head_sampling_rate": 1
+        "head_sampling_rate": 0.001,
+        "enabled": true
       },
       "routes": [
         {
@@ -282,8 +282,8 @@
         "ENV_NAME": "capgo_plugin-as-prod"
       },
       "observability": {
-        "enabled": true,
-        "head_sampling_rate": 1
+        "head_sampling_rate": 0.001,
+        "enabled": true
       },
       "placement": {
         "mode": "smart"
@@ -400,8 +400,8 @@
         "ENV_NAME": "capgo_plugin-na-prod"
       },
       "observability": {
-        "enabled": true,
-        "head_sampling_rate": 1
+        "head_sampling_rate": 0.001,
+        "enabled": true
       },
       "placement": {
         "mode": "smart"
@@ -521,8 +521,8 @@
         "mode": "smart"
       },
       "observability": {
-        "enabled": true,
-        "head_sampling_rate": 1
+        "head_sampling_rate": 0.001,
+        "enabled": true
       },
       "routes": [
         {
@@ -636,8 +636,8 @@
         "ENV_NAME": "capgo_plugin-oc-prod"
       },
       "observability": {
-        "enabled": true,
-        "head_sampling_rate": 1
+        "head_sampling_rate": 0.001,
+        "enabled": true
       },
       "placement": {
         "mode": "smart"
@@ -754,8 +754,8 @@
         "ENV_NAME": "capgo_plugin-sa-prod"
       },
       "observability": {
-        "enabled": true,
-        "head_sampling_rate": 1
+        "head_sampling_rate": 0.001,
+        "enabled": true
       },
       "placement": {
         "mode": "smart"
@@ -872,6 +872,7 @@
         "ENV_NAME": "capgo_plugin-preprod"
       },
       "observability": {
+        "head_sampling_rate": 1,
         "enabled": true
       },
       "routes": [
@@ -989,6 +990,7 @@
         "ENV_NAME": "capgo_plugin-alpha"
       },
       "observability": {
+        "head_sampling_rate": 1,
         "enabled": true
       },
       "routes": [
