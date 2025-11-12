@@ -110,3 +110,49 @@ export interface DiscordWebhookPayload {
     timestamp: string
   }
 }
+
+/**
+ * Discord API Message object
+ * https://discord.com/developers/docs/resources/message#message-object
+ */
+export interface DiscordAPIMessage {
+  id: string
+  channel_id: string
+  author: {
+    id: string
+    username: string
+    discriminator: string
+    avatar?: string
+    bot?: boolean
+    system?: boolean
+  }
+  content: string // Empty if bot doesn't have Message Content Intent
+  timestamp: string
+  edited_timestamp?: string | null
+  tts: boolean
+  mention_everyone: boolean
+  mentions: Array<{
+    id: string
+    username: string
+    discriminator: string
+  }>
+  mention_roles: string[]
+  attachments: Array<{
+    id: string
+    filename: string
+    size: number
+    url: string
+    proxy_url: string
+  }>
+  embeds: DiscordEmbed[]
+  reactions?: Array<{
+    count: number
+    me: boolean
+    emoji: {
+      id: string | null
+      name: string
+    }
+  }>
+  type: number // 0 = default, 19 = reply, etc.
+  flags?: number
+}

@@ -296,6 +296,21 @@ async function processThreadForNewMessages(env: Env, mapping: ThreadMapping): Pr
     console.log(`   - Raw content: "${message.content}"`)
     console.log(`   - Content length: ${message.content?.length || 0} characters`)
 
+    // Skip messages with empty content
+    if (!message.content || message.content.trim().length === 0) {
+      console.error(`   ⚠️  Skipping message ${message.id} - empty content`)
+      console.error(`   ⚠️  This indicates the bot is missing "Message Content Intent" privilege`)
+      console.error(`   ⚠️  Enable it at: https://discord.com/developers/applications → Bot → Privileged Gateway Intents`)
+
+      // Still track this message ID so we don't keep retrying it
+      await env.EMAIL_THREAD_MAPPING.put(
+        lastMessageKey,
+        message.id,
+        { expirationTtl: 60 * 60 * 24 * 30 }, // 30 days
+      )
+      continue
+    }
+
     // Format the Discord message as an email
     const emailContent = formatDiscordMessageAsEmail(
       message.author.username,

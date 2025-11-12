@@ -1,4 +1,4 @@
-import type { DiscordEmbed, DiscordMessage, DiscordThread, Env, ParsedEmail } from './types'
+import type { DiscordAPIMessage, DiscordEmbed, DiscordMessage, DiscordThread, Env, ParsedEmail } from './types'
 
 const DISCORD_API_BASE = 'https://discord.com/api/v10'
 
@@ -207,25 +207,63 @@ export async function getThreadMessages(
   env: Env,
   threadId: string,
   limit: number = 50,
-): Promise<any[]> {
+): Promise<DiscordAPIMessage[]> {
   const url = `${DISCORD_API_BASE}/channels/${threadId}/messages?limit=${limit}`
 
   try {
+    console.log(`🔵 Fetching messages from Discord thread ${threadId}`)
+    console.log(`   URL: ${url}`)
+
     const response = await fetch(url, {
       headers: {
-        'Authorization': `Bot ${env.DISCORD_BOT_TOKEN}`,
+        Authorization: `Bot ${env.DISCORD_BOT_TOKEN}`,
       },
     })
 
+    console.log(`   Response status: ${response.status}`)
+
     if (!response.ok) {
-      console.error('Failed to fetch thread messages:', response.status)
+      const errorText = await response.text()
+      console.error(`❌ Failed to fetch thread messages: ${response.status}`)
+      console.error(`   Error response: ${errorText}`)
       return []
     }
 
-    return await response.json()
+    const messages = await response.json() as DiscordAPIMessage[]
+    console.log(`   Fetched ${messages.length} message(s)`, messages)
+
+    // Log full message objects for debugging
+    for (const msg of messages) {
+      console.log(`   Message ${msg.id}:`)
+      console.log(`     - Type: ${msg.type}`)
+      console.log(`     - Author: ${msg.author?.username} (ID: ${msg.author?.id}, Bot: ${msg.author?.bot})`)
+      console.log(`     - Content: "${msg.content}"`)
+      console.log(`     - Content length: ${msg.content?.length || 0}`)
+      console.log(`     - Timestamp: ${msg.timestamp}`)
+      console.log(`     - Has embeds: ${msg.embeds?.length > 0}`)
+      console.log(`     - Has attachments: ${msg.attachments?.length > 0}`)
+      console.log(`     - Raw message keys: ${Object.keys(msg).join(', ')}`)
+    }
+
+    // Check if all messages have empty content - indicates missing Message Content Intent
+    const allEmpty = messages.every(msg => !msg.content || msg.content.length === 0)
+    if (allEmpty && messages.length > 0) {
+      console.error('⚠️  WARNING: All messages have empty content!')
+      console.error('⚠️  This likely means the Discord bot is missing the "Message Content Intent" privilege.')
+      console.error('⚠️  To fix this:')
+      console.error('⚠️  1. Go to https://discord.com/developers/applications')
+      console.error('⚠️  2. Select your application')
+      console.error('⚠️  3. Go to the "Bot" tab')
+      console.error('⚠️  4. Scroll to "Privileged Gateway Intents"')
+      console.error('⚠️  5. Enable "MESSAGE CONTENT INTENT"')
+      console.error('⚠️  6. Save changes')
+      console.error('⚠️  Note: Bots do NOT need Gateway connection to access message content via REST API')
+    }
+
+    return messages
   }
   catch (error) {
-    console.error('Error fetching thread messages:', error)
+    console.error('❌ Error fetching thread messages:', error)
     return []
   }
 }
