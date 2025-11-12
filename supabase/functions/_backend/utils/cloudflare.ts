@@ -167,17 +167,17 @@ export async function trackDevicesCF(c: Context, device: DeviceWithoutCreatedAt)
       const res = await getD1WriteDevicesSession(c).prepare(upsertQuery).bind(
         updated_at,
         device.device_id,
-        comparableDevice.version_name ?? device.version_name ?? 'unknown',
+        comparableDevice.version_name, // FIXED: Use comparable value directly
         device.app_id,
         comparableDevice.platform,
         comparableDevice.plugin_version,
         comparableDevice.os_version,
         comparableDevice.version_build,
-        comparableDevice.custom_id ?? '',
+        comparableDevice.custom_id, // FIXED: Use comparable value directly, no ?? ''
         comparableDevice.is_prod ? 1 : 0,
         comparableDevice.is_emulator ? 1 : 0,
         device.version ?? 0,
-        device.default_channel ?? null,
+        comparableDevice.default_channel, // FIXED: Use comparable, not raw device
       ).run()
       cloudlog({ requestId: c.get('requestId'), message: 'Upsert result:', res })
     }
