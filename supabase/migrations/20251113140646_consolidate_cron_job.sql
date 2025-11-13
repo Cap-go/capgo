@@ -253,7 +253,7 @@ BEGIN
 
   -- Every second: D1 replication
   BEGIN
-    PERFORM process_d1_replication_batch();
+    PERFORM public.process_d1_replication_batch();
   EXCEPTION WHEN OTHERS THEN
     RAISE WARNING 'process_d1_replication_batch failed: %', SQLERRM;
   END;
