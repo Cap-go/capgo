@@ -15,7 +15,7 @@ AS $$
 DECLARE
   account_record RECORD;
   org_record RECORD;
-  deleted_users UUID[] := '{}';
+  deleted_users UUID[] := ARRAY[]::UUID[];
   total_deleted INTEGER := 0;
   other_super_admins_count INTEGER;
   replacement_owner_id UUID;
