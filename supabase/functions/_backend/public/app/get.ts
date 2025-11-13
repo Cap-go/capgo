@@ -2,9 +2,15 @@ import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { quickError, simpleError } from '../../utils/hono.ts'
 import { hasAppRightApikey, supabaseApikey } from '../../utils/supabase.ts'
-import { fetchLimit } from '../../utils/utils.ts'
+import { fetchLimit, isValidAppId } from '../../utils/utils.ts'
 
 export async function get(c: Context, appId: string, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
+  if (!appId) {
+    throw quickError(400, 'missing_app_id', 'Missing app_id')
+  }
+  if (!isValidAppId(appId)) {
+    throw quickError(400, 'invalid_app_id', 'App ID must be a reverse domain string', { app_id: appId })
+  }
   if (!(await hasAppRightApikey(c, appId, apikey.user_id, 'read', apikey.key))) {
     throw quickError(401, 'cannot_access_app', 'You can\'t access this app', { app_id: appId })
   }

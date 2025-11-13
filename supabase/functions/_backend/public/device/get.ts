@@ -4,7 +4,7 @@ import { quickError, simpleError } from '../../utils/hono.ts'
 import { cloudlog } from '../../utils/logging.ts'
 import { readDevices } from '../../utils/stats.ts'
 import { hasAppRightApikey, supabaseApikey } from '../../utils/supabase.ts'
-import { fetchLimit } from '../../utils/utils.ts'
+import { fetchLimit, isValidAppId } from '../../utils/utils.ts'
 
 interface GetDevice {
   app_id: string
@@ -37,8 +37,14 @@ export function filterDeviceKeys(devices: Database['public']['Tables']['devices'
 }
 
 export async function get(c: Context, body: GetDevice, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
-  if (!body.app_id || !(await hasAppRightApikey(c, body.app_id, apikey.user_id, 'read', apikey.key))) {
-    throw simpleError('invalid_app_id', 'You can\'t access this app', { app_id: body.app_id })
+  if (!body.app_id) {
+    throw simpleError('missing_app_id', 'Missing app_id', { body })
+  }
+  if (!isValidAppId(body.app_id)) {
+    throw simpleError('invalid_app_id', 'App ID must be a reverse domain string', { app_id: body.app_id })
+  }
+  if (!(await hasAppRightApikey(c, body.app_id, apikey.user_id, 'read', apikey.key))) {
+    throw simpleError('cannot_access_app', 'You can\'t access this app', { app_id: body.app_id })
   }
 
   // start is 30 days ago

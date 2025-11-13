@@ -11,6 +11,7 @@ async function ipapi(ip: string, lang = 'en') {
     const response = await fetch(`http://ip-api.com/json/${ip}?lang=${lang}&fields=66842623`)
 
     if (!response.ok) {
+      await response.text() // Consume body to prevent resource leak
       throw new Error(`ipapi error: HTTP ${response.status}`)
     }
 

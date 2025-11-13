@@ -27,6 +27,7 @@ export async function sendDiscordAlert(c: Context, payload: RESTPostAPIWebhookWi
     })
 
     if (!response.ok) {
+      await response.text() // Consume body to prevent resource leak
       cloudlogErr({ requestId: c.get('requestId'), message: 'Discord webhook failed', status: response.status })
       return true
     }
