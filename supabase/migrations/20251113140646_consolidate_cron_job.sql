@@ -37,37 +37,6 @@ GRANT ALL ON FUNCTION "public"."process_function_queue" ("queue_names" "text" []
 
 GRANT ALL ON FUNCTION "public"."process_function_queue" ("queue_names" "text" [], "batch_size" integer) TO "service_role";
 
--- Add a convenience wrapper function that accepts comma-separated queue names as text
-CREATE OR REPLACE FUNCTION "public"."process_function_queues" (
-  "queue_names_csv" "text",
-  "batch_size" integer DEFAULT 950
-) RETURNS void LANGUAGE "plpgsql"
-SET
-  search_path = '' AS $$
-DECLARE
-  queue_names_array text[];
-BEGIN
-  -- Convert comma-separated string to array
-  queue_names_array := string_to_array(queue_names_csv, ',');
-
-  -- Trim whitespace from each queue name
-  queue_names_array := array(
-    SELECT trim(unnest) FROM unnest(queue_names_array)
-  );
-
-  -- Call the array-based function (fire-and-forget)
-  PERFORM public.process_function_queue(queue_names_array, batch_size);
-END;
-$$;
-
-ALTER FUNCTION "public"."process_function_queues" ("queue_names_csv" "text", "batch_size" integer) OWNER TO "postgres";
-
-GRANT ALL ON FUNCTION "public"."process_function_queues" ("queue_names_csv" "text", "batch_size" integer) TO "anon";
-
-GRANT ALL ON FUNCTION "public"."process_function_queues" ("queue_names_csv" "text", "batch_size" integer) TO "authenticated";
-
-GRANT ALL ON FUNCTION "public"."process_function_queues" ("queue_names_csv" "text", "batch_size" integer) TO "service_role";
-
 -- Update the single-queue function to use 8-second timeout for better pg_net throughput
 -- Original had 15 seconds which was risky given pg_net's 200 req/s limit
 -- Fire-and-forget: uses PERFORM instead of SELECT INTO for true non-blocking behavior
@@ -317,7 +286,7 @@ BEGIN
   -- Every hour (at :00:00): Hourly cleanup
   IF current_minute = 0 AND current_second = 0 THEN
     BEGIN
-      PERFORM cleanup_frequent_job_details();
+      PERFORM public.cleanup_frequent_job_details();
     EXCEPTION WHEN OTHERS THEN
       RAISE WARNING 'cleanup_frequent_job_details failed: %', SQLERRM;
     END;
@@ -335,7 +304,7 @@ BEGIN
   -- Every 6 hours (at :00:00): Stats jobs
   IF current_hour % 6 = 0 AND current_minute = 0 AND current_second = 0 THEN
     BEGIN
-      PERFORM process_cron_stats_jobs();
+      PERFORM public.process_cron_stats_jobs();
     EXCEPTION WHEN OTHERS THEN
       RAISE WARNING 'process_cron_stats_jobs failed: %', SQLERRM;
     END;
@@ -344,19 +313,19 @@ BEGIN
   -- Daily at 00:00:00 - Midnight tasks
   IF current_hour = 0 AND current_minute = 0 AND current_second = 0 THEN
     BEGIN
-      PERFORM cleanup_queue_messages();
+      PERFORM public.cleanup_queue_messages();
     EXCEPTION WHEN OTHERS THEN
       RAISE WARNING 'cleanup_queue_messages failed: %', SQLERRM;
     END;
 
     BEGIN
-      PERFORM delete_old_deleted_apps();
+      PERFORM public.delete_old_deleted_apps();
     EXCEPTION WHEN OTHERS THEN
       RAISE WARNING 'delete_old_deleted_apps failed: %', SQLERRM;
     END;
 
     BEGIN
-      PERFORM remove_old_jobs();
+      PERFORM public.remove_old_jobs();
     EXCEPTION WHEN OTHERS THEN
       RAISE WARNING 'remove_old_jobs failed: %', SQLERRM;
     END;
@@ -365,7 +334,7 @@ BEGIN
   -- Daily at 00:40:00 - Old app version retention
   IF current_hour = 0 AND current_minute = 40 AND current_second = 0 THEN
     BEGIN
-      PERFORM update_app_versions_retention();
+      PERFORM public.update_app_versions_retention();
     EXCEPTION WHEN OTHERS THEN
       RAISE WARNING 'update_app_versions_retention failed: %', SQLERRM;
     END;
@@ -383,7 +352,7 @@ BEGIN
   -- Daily at 03:00:00 - Free trial and credits
   IF current_hour = 3 AND current_minute = 0 AND current_second = 0 THEN
     BEGIN
-      PERFORM process_free_trial_expired();
+      PERFORM public.process_free_trial_expired();
     EXCEPTION WHEN OTHERS THEN
       RAISE WARNING 'process_free_trial_expired failed: %', SQLERRM;
     END;
@@ -415,7 +384,7 @@ BEGIN
     -- Weekly stats email (every Saturday at noon)
     IF EXTRACT(DOW FROM now()) = 6 THEN
       BEGIN
-        PERFORM process_stats_email_weekly();
+        PERFORM public.process_stats_email_weekly();
       EXCEPTION WHEN OTHERS THEN
         RAISE WARNING 'process_stats_email_weekly failed: %', SQLERRM;
       END;
@@ -424,7 +393,7 @@ BEGIN
     -- Monthly stats email (1st of month at noon)
     IF EXTRACT(DAY FROM now()) = 1 THEN
       BEGIN
-        PERFORM process_stats_email_monthly();
+        PERFORM public.process_stats_email_monthly();
       EXCEPTION WHEN OTHERS THEN
         RAISE WARNING 'process_stats_email_monthly failed: %', SQLERRM;
       END;
