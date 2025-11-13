@@ -2,6 +2,7 @@ import type { Context } from 'hono'
 import { and, eq, or, sql } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
 import { drizzle } from 'drizzle-orm/postgres-js'
+import { getRuntimeKey } from 'hono/adapter'
 import postgres from 'postgres'
 import { backgroundTask, existInEnv, getEnv } from '../utils/utils.ts'
 import { getClientDbRegionSB } from './geolocation.ts'
@@ -199,7 +200,10 @@ export function logPgError(c: Context, functionName: string, error: unknown) {
 
 export function closeClient(c: Context, db: ReturnType<typeof getPgClient>) {
   // cloudlog(c.get('requestId'), 'Closing client', client)
-  return backgroundTask(c, db.end())
+  // See https://github.com/porsager/postgres/issues/1097 DO NOT CLOSE CLIENT IN NODE.JS ENV
+  if (getRuntimeKey() !== 'workerd')
+    return backgroundTask(c, db.end())
+  return undefined
 }
 
 export function getAlias() {

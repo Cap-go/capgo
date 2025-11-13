@@ -617,10 +617,12 @@ async function processReplicationQueue(replicas: ReplicaTarget[], env: Env) {
     //     console.log(`[${queueKey}] PostgreSQL client released.`);
     // }
     // End the postgres connection pool gracefully
-    if (sql) {
-      await sql.end({ timeout: 5 }) // Add a timeout for ending
-      console.log(`[${queueKey}] PostgreSQL connection pool ended.`)
-    }
+    // DO not end the pool in Cloudflare Workers environment
+    // See https://github.com/porsager/postgres/issues/1097 DO NOT CLOSE CLIENT IN NODE.JS ENV
+    // if (sql) {
+    //   await sql.end({ timeout: 5 }) // Add a timeout for ending
+    //   console.log(`[${queueKey}] PostgreSQL connection pool ended.`)
+    // }
     console.log(`[${queueKey}] Finished processing ${processedMsgCount} messages (up to highest read ID: ${highestMsgIdRead}) in ${Date.now() - startTime}ms. ${successfullyProcessedMsgIds.length} messages marked for deletion across ${replicas.length} replicas.`)
   }
 }
