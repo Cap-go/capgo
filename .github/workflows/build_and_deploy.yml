@@ -174,9 +174,6 @@ jobs:
       matrix:
         region: [global, eu, as, us]
         include:
-          - region: global
-            region_label: Global
-            cf_target: plugin
           - region: eu
             region_label: Europe (EU)
             cf_target: plugin_eu

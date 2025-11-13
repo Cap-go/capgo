@@ -357,10 +357,9 @@ export default {
     // more on the cf object: https://developers.cloudflare.com/workers/runtime-apis/request#incomingrequestcfproperties
     const continent = mapped[request.cf.colo] ?? 'EU'
     const path = new URL(request.url).pathname
-    let baseUrl = continentMap.EU
     // If country is not null and is defined in the country map above, redirect.
     if (continent != null && continent in continentMap) {
-      baseUrl = continentMap[continent]
+      const baseUrl = continentMap[continent]
       // Remove this logging statement from your final output.
       console.log(
         `Based on ${continent}-based request, your user would go to ${baseUrl}${path}.`,
@@ -369,8 +368,6 @@ export default {
 
       // If request country not in map, return another page.
     }
-    else {
-      return fetch(`${baseUrl}${path}`, request)
-    }
+    return fetch(request)
   },
 }
