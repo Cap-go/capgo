@@ -2,35 +2,30 @@
 -- This allows consolidating multiple cron jobs into fewer jobs
 -- Overloaded function that accepts an array of queue names
 -- Uses exception handling to ensure one queue failure doesn't block others
+-- Drop old function signatures if they exist (changing return type from bigint to void)
+-- Only drop process_function_queue overloads that existed before this migration
+DROP FUNCTION IF EXISTS "public"."process_function_queue" ("queue_name" "text", "batch_size" integer);
+
 CREATE OR REPLACE FUNCTION "public"."process_function_queue" (
   "queue_names" "text" [],
   "batch_size" integer DEFAULT 950
-) RETURNS bigint LANGUAGE "plpgsql"
+) RETURNS void LANGUAGE "plpgsql"
 SET
   search_path = '' AS $$
 DECLARE
   queue_name text;
-  request_id text;
-  last_request_id text := NULL;
 BEGIN
   -- Process each queue in the array with individual exception handling
   FOREACH queue_name IN ARRAY queue_names
   LOOP
     BEGIN
-      -- Call the existing single-queue function
-      SELECT INTO last_request_id public.process_function_queue(queue_name, batch_size);
-
-      -- Keep track of the last non-null request_id
-      IF last_request_id IS NOT NULL THEN
-        request_id := last_request_id;
-      END IF;
+      -- Call the existing single-queue function (fire-and-forget)
+      PERFORM public.process_function_queue(queue_name, batch_size);
     EXCEPTION WHEN OTHERS THEN
       -- Log the error but continue processing other queues
       RAISE WARNING 'process_function_queue failed for queue "%": %', queue_name, SQLERRM;
     END;
   END LOOP;
-
-  RETURN request_id;
 END;
 $$;
 
@@ -46,7 +41,7 @@ GRANT ALL ON FUNCTION "public"."process_function_queue" ("queue_names" "text" []
 CREATE OR REPLACE FUNCTION "public"."process_function_queues" (
   "queue_names_csv" "text",
   "batch_size" integer DEFAULT 950
-) RETURNS bigint LANGUAGE "plpgsql"
+) RETURNS void LANGUAGE "plpgsql"
 SET
   search_path = '' AS $$
 DECLARE
@@ -60,8 +55,8 @@ BEGIN
     SELECT trim(unnest) FROM unnest(queue_names_array)
   );
 
-  -- Call the array-based function
-  RETURN public.process_function_queue(queue_names_array, batch_size);
+  -- Call the array-based function (fire-and-forget)
+  PERFORM public.process_function_queue(queue_names_array, batch_size);
 END;
 $$;
 
@@ -75,19 +70,18 @@ GRANT ALL ON FUNCTION "public"."process_function_queues" ("queue_names_csv" "tex
 
 -- Update the single-queue function to use 8-second timeout for better pg_net throughput
 -- Original had 15 seconds which was risky given pg_net's 200 req/s limit
+-- Fire-and-forget: uses PERFORM instead of SELECT INTO for true non-blocking behavior
 CREATE OR REPLACE FUNCTION "public"."process_function_queue" (
   "queue_name" "text",
   "batch_size" integer DEFAULT 950
-) RETURNS bigint LANGUAGE "plpgsql"
+) RETURNS void LANGUAGE "plpgsql"
 SET
   search_path = '' AS $$
 DECLARE
-  request_id text;
   headers jsonb;
   url text;
   queue_size bigint;
   calls_needed int;
-  i int;
 BEGIN
   -- Check if the queue has elements
   EXECUTE format('SELECT count(*) FROM pgmq.q_%I', queue_name) INTO queue_size;
@@ -103,27 +97,25 @@ BEGIN
     -- Calculate how many times to call the sync endpoint (1 call per batch_size items, max 10 calls)
     calls_needed := least(ceil(queue_size / batch_size::float)::int, 10);
 
-    -- Call the endpoint multiple times if needed
+    -- Call the endpoint multiple times if needed (fire-and-forget)
     FOR i IN 1..calls_needed LOOP
-      SELECT INTO request_id net.http_post(
+      PERFORM net.http_post(
         url := url,
         headers := headers,
         body := jsonb_build_object('queue_name', queue_name, 'batch_size', batch_size),
         timeout_milliseconds := 8000
       );
     END LOOP;
-
-    RETURN request_id;
   END IF;
-
-  RETURN NULL;
 END;
 $$;
 
 ALTER FUNCTION "public"."process_function_queue" ("queue_name" "text", "batch_size" integer) OWNER TO "postgres";
 
 GRANT ALL ON FUNCTION "public"."process_function_queue" ("queue_name" "text", "batch_size" integer) TO "anon";
+
 GRANT ALL ON FUNCTION "public"."process_function_queue" ("queue_name" "text", "batch_size" integer) TO "authenticated";
+
 GRANT ALL ON FUNCTION "public"."process_function_queue" ("queue_name" "text", "batch_size" integer) TO "service_role";
 
 -- Consolidate cron jobs from 37 to ~15 jobs using the new multi-queue processing function
@@ -513,9 +505,9 @@ SELECT
 --    - Sequential processing prevents overwhelming pg_net
 -- 5. Tasks execute sequentially within time slots (as per original design)
 -- 6. Response data is stored in unlogged tables (6-hour retention)
--- 7. HTTP requests are fire-and-forget:
+-- 7. HTTP requests are true fire-and-forget:
+--    - Uses PERFORM instead of SELECT INTO (discards request_id for true non-blocking)
 --    - net.http_post returns immediately after queuing the request
 --    - Actual HTTP calls happen asynchronously in background
 --    - "Blocking" only occurs during: queue size check, request queuing, sequential array processing
---    - The single-queue function uses SELECT INTO to capture request_id but doesn't wait for HTTP response
---    - For true non-blocking, could use PERFORM instead of SELECT INTO (discards request_id)
+--    - All functions now return void for cleaner fire-and-forget semantics
