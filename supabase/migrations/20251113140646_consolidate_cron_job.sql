@@ -238,7 +238,9 @@ SELECT
 
 -- Create a single consolidated function that runs every second and intelligently decides what to execute
 -- Uses exception handling to prevent one task from blocking others
-CREATE OR REPLACE FUNCTION public.process_all_cron_tasks () RETURNS void LANGUAGE plpgsql AS $$
+CREATE OR REPLACE FUNCTION public.process_all_cron_tasks () RETURNS void LANGUAGE plpgsql
+SET
+  search_path = '' AS $$
 DECLARE
   current_hour int;
   current_minute int;
