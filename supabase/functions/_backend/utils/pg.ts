@@ -1,8 +1,10 @@
 import type { Context } from 'hono'
 import { and, eq, or, sql } from 'drizzle-orm'
+import { drizzle } from 'drizzle-orm/node-postgres'
 import { alias } from 'drizzle-orm/pg-core'
-import { drizzle } from 'drizzle-orm/postgres-js'
-import postgres from 'postgres'
+import { getRuntimeKey } from 'hono/adapter'
+// @ts-types="npm:@types/pg"
+import { Pool } from 'pg'
 import { backgroundTask, existInEnv, getEnv } from '../utils/utils.ts'
 import { getClientDbRegionSB } from './geolocation.ts'
 import { cloudlog, cloudlogErr } from './logging.ts'
@@ -117,36 +119,35 @@ export function getPgClient(c: Context, readOnly = false) {
   const dbName = c.res.headers.get('X-Database-Source') ?? 'unknown source'
   cloudlog({ requestId, message: 'SUPABASE_DB_URL', dbUrl, dbName, appName })
 
-  const prepare = (!!appName.startsWith('HYPERDRIVE_CAPGO_DIRECT') || !!dbName.startsWith('HYPERDRIVE_CAPGO_SESSION'))
   const options = {
-    prepare,
-    max: 5,
-    fetch_types: false,
-    // idle_timeout: 20, // Increase from 2 to 20 seconds
-    // connect_timeout: 10, // Add explicit connect timeout
-    // max_lifetime: 60, // Add connection lifetime limit
-
-    // Add connection debugging
-    connection: {
-      application_name: `${appName}-${dbName}`,
-    },
-
-    // Hook to log errors - this is called for connection-level errors
-    onclose: (connectionId: number) => {
-      cloudlog({ requestId, message: 'PG Connection Closed', connectionId })
-    },
+    prepare: true,
+    connectionString: dbUrl,
+    max: 1,
+    application_name: `${appName}-${dbName}`,
+    idleTimeoutMillis: 20000, // Increase from 2 to 20 seconds
+    connectionTimeoutMillis: 10000, // Add explicit connect timeout
+    maxLifetimeMillis: 30 * 60 * 1000, // 30 minutes
   }
 
-  const db = postgres(dbUrl, options)
+  const pool = new Pool(options)
 
-  return db
+  // Hook to log when connections are removed from the pool
+  pool.on('remove', () => {
+    cloudlog({ requestId, message: 'PG Connection Removed from Pool' })
+  })
+
+  pool.on('error', (err: Error) => {
+    cloudlogErr({ requestId, message: 'PG Pool Error', error: err })
+  })
+
+  return pool
 }
 
 export function getDrizzleClient(db: ReturnType<typeof getPgClient>) {
-  return drizzle({ client: db, logger: true })
+  return drizzle(db, { schema, logger: true })
 }
 
-// Helper to extract detailed error information from postgres.js errors
+// Helper to extract detailed error information from pg errors
 export function logPgError(c: Context, functionName: string, error: unknown) {
   const e = error as Error & {
     code?: string
@@ -199,7 +200,9 @@ export function logPgError(c: Context, functionName: string, error: unknown) {
 
 export function closeClient(c: Context, db: ReturnType<typeof getPgClient>) {
   // cloudlog(c.get('requestId'), 'Closing client', client)
-  return backgroundTask(c, db.end())
+  if (getRuntimeKey() !== 'workerd')
+    return backgroundTask(c, db.end())
+  return undefined
 }
 
 export function getAlias() {

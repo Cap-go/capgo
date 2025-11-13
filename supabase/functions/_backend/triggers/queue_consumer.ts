@@ -196,10 +196,11 @@ async function readQueue(c: Context, db: ReturnType<typeof getPgClient>, queueNa
     const visibilityTimeout = 120
     cloudlog(`[${queueKey}] Reading messages from queue: ${queueName}`)
     try {
-      messages = await db`
-        SELECT msg_id, message, read_ct
-        FROM pgmq.read(${queueName}, ${visibilityTimeout}, ${batchSize})
-      `
+      const result = await db.query(
+        'SELECT msg_id, message, read_ct FROM pgmq.read($1, $2, $3)',
+        [queueName, visibilityTimeout, batchSize],
+      )
+      messages = result.rows
     }
     catch (readError) {
       throw simpleError('error_reading_from_pgmq_queue', 'Error reading from pgmq queue', { queueName }, readError)
@@ -281,11 +282,11 @@ async function delete_queue_message_batch(c: Context, db: ReturnType<typeof getP
   try {
     if (msgIds.length === 0)
       return
-    // Format array as properly quoted bigint values
-    const arrayStr = msgIds.map(id => `${id}::bigint`).join(',')
-    await db.unsafe(`
-      SELECT pgmq.delete($1, ARRAY[${arrayStr}])
-    `, [queueName])
+    // Use pg's array syntax
+    await db.query(
+      'SELECT pgmq.delete($1, $2::bigint[])',
+      [queueName, msgIds],
+    )
   }
   catch (error) {
     throw simpleError('error_deleting_queue_messages', 'Error deleting queue messages', { msgIds, queueName }, error)
@@ -297,11 +298,11 @@ async function archive_queue_messages(c: Context, db: ReturnType<typeof getPgCli
   try {
     if (msgIds.length === 0)
       return
-    // Format array as properly quoted bigint values
-    const arrayStr = msgIds.map(id => `${id}::bigint`).join(',')
-    await db.unsafe(`
-      SELECT pgmq.archive($1, ARRAY[${arrayStr}])
-    `, [queueName])
+    // Use pg's array syntax
+    await db.query(
+      'SELECT pgmq.archive($1, $2::bigint[])',
+      [queueName, msgIds],
+    )
   }
   catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error)
@@ -331,11 +332,15 @@ async function mass_edit_queue_messages_cf_ids(
 ) {
   try {
     // Build the array of ROW values as a string
-    const rowValues = updates.map(u =>
-      `ROW(${u.msg_id}::bigint, '${u.cf_id}'::varchar, '${u.queue}'::varchar)::message_update`,
-    ).join(',')
+    // Note: With pg library, we need to sanitize values to prevent SQL injection
+    const rowValues = updates.map((u) => {
+      // Escape single quotes in cf_id and queue
+      const escapedCfId = u.cf_id.replace(/'/g, '\'\'')
+      const escapedQueue = u.queue.replace(/'/g, '\'\'')
+      return `ROW(${u.msg_id}::bigint, '${escapedCfId}'::varchar, '${escapedQueue}'::varchar)::message_update`
+    }).join(',')
 
-    await db.unsafe(`
+    await db.query(`
       SELECT mass_edit_queue_messages_cf_ids(
         ARRAY[${rowValues}]
       )

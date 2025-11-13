@@ -1,5 +1,5 @@
 // import { randomUUID } from 'node:crypto'
-import postgres from 'postgres'
+import { Pool } from 'pg'
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { BASE_URL, headersInternal, POSTGRES_URL } from './test-utils.ts'
@@ -7,20 +7,24 @@ import { BASE_URL, headersInternal, POSTGRES_URL } from './test-utils.ts'
 const BASE_URL_TRIGGER = `${BASE_URL}/triggers`
 // const id = randomUUID()
 // const TEST_APP_ID = `com.loadapp.${id}`
-const sql = postgres(POSTGRES_URL, { prepare: false, idle_timeout: 2 })
+const pool = new Pool({
+  connectionString: POSTGRES_URL,
+  max: 1,
+  idleTimeoutMillis: 2000,
+})
 const queueName = 'test_queue_consumer'
 // const functionName = 'ok'
 // const functionType = ''
 
 beforeAll(async () => {
   // Clean up any existing messages in the test queue
-  await sql.unsafe(`DELETE FROM pgmq.q_${queueName}`)
-  await sql.unsafe(`DELETE FROM pgmq.a_${queueName}`)
+  await pool.query(`DELETE FROM pgmq.q_${queueName}`)
+  await pool.query(`DELETE FROM pgmq.a_${queueName}`)
 })
 describe('queue Load Test', () => {
   afterAll(async () => {
     // Close postgres connection
-    await sql.end()
+    await pool.end()
   })
   it('should handle queue consumer health check', async () => {
     const healthResponse = await fetch(`${BASE_URL_TRIGGER}/queue_consumer/health`, {
