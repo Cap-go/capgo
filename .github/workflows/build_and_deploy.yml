@@ -172,7 +172,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        region: [global, eu, as, us]
+        region: [eu, as, us, sa, oc, af]
         include:
           - region: eu
             region_label: Europe (EU)
