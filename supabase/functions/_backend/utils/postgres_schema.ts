@@ -69,8 +69,6 @@ export const app_versions = pgTable('app_versions', {
 // New manifest table schema
 export const manifest = pgTable('manifest', {
   id: serial('id').primaryKey().notNull(),
-  created_at: timestamp('created_at').defaultNow(),
-  updated_at: timestamp('updated_at').defaultNow(),
   app_version_id: bigint('app_version_id', { mode: 'number' }).notNull().references(() => app_versions.id, { onDelete: 'cascade' }),
   file_name: varchar('file_name').notNull(),
   s3_path: varchar('s3_path').notNull(),
