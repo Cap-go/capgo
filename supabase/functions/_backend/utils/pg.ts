@@ -122,7 +122,7 @@ export function getPgClient(c: Context, readOnly = false) {
   const options = {
     prepare: true,
     connectionString: dbUrl,
-    max: 1,
+    max: 4,
     application_name: `${appName}-${dbName}`,
     idleTimeoutMillis: 20000, // Increase from 2 to 20 seconds
     connectionTimeoutMillis: 10000, // Add explicit connect timeout
