@@ -85,7 +85,7 @@ async function createdOrUpdated(c: Context, stripeData: StripeData, org: Org, Lo
   if (plan) {
     // Filter out undefined values to avoid FK constraint violations
     const updateData = Object.fromEntries(
-      Object.entries(stripeData.data).filter(([_, v]) => v !== undefined)
+      Object.entries(stripeData.data).filter(([_, v]) => v !== undefined),
     )
     const { error: dbError2 } = await supabaseAdmin(c)
       .from('stripe_info')
@@ -144,7 +144,7 @@ async function createdOrUpdated(c: Context, stripeData: StripeData, org: Org, Lo
 async function updateStripeInfo(c: Context, stripeData: StripeData) {
   // Filter out undefined values to avoid FK constraint violations
   const updateData = Object.fromEntries(
-    Object.entries(stripeData.data).filter(([_, v]) => v !== undefined)
+    Object.entries(stripeData.data).filter(([_, v]) => v !== undefined),
   )
   const { error: dbError2 } = await supabaseAdmin(c)
     .from('stripe_info')
