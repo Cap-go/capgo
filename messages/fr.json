@@ -395,6 +395,7 @@
   "error-fetching-deploy-history": "Erreur lors de la récupération de l'historique de déploiement",
   "error-fetching-members": "Erreur lors de la récupération des membres",
   "error-fetching-versions": "Erreur lors de la récupération des versions ! Veuillez vérifier la console du navigateur et contacter le support",
+  "error-invalid-version": "ID de version invalide. Veuillez réessayer ou contacter le support.",
   "error-inviting-user": "Erreur lors de l'invitation de l'utilisateur",
   "error-loading-deletion-date": "Impossible de trouver la date de suppression de votre compte",
   "error-message-invitation": "Une erreur s'est produite. Veuillez contacter le support Capgo",

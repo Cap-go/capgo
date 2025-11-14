@@ -309,6 +309,12 @@ async function unlinkChannels(app_id: string, unlink: Database['public']['Tables
     return Promise.reject(new Error('Cannot find unknown'))
   }
 
+  if (!unknownVersion?.id || typeof unknownVersion.id !== 'number') {
+    toast.error(t('error-invalid-version'))
+    console.error('Invalid unknown version ID:', unknownVersion)
+    return Promise.reject(new Error('Invalid unknown version ID'))
+  }
+
   const { error: updateError } = await supabase
     .from('channels')
     .update({ version: unknownVersion.id })

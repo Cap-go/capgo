@@ -168,6 +168,12 @@ async function getUnknownBundleId() {
 }
 // add check compatibility here
 async function setChannel(channel: Database['public']['Tables']['channels']['Row'], id: number) {
+  if (!id || typeof id !== 'number') {
+    console.error('Invalid version ID:', id)
+    toast.error(t('error-invalid-version'))
+    return Promise.reject(new Error('Invalid version ID'))
+  }
+
   return supabase
     .from('channels')
     .update({
@@ -554,6 +560,12 @@ async function unlinkChannels(appId: string, unlink: { id: number, name: string 
     toast.error(t('cannot-find-unknown-version'))
     console.error('Cannot find unknown version:', unknownError)
     return Promise.reject(new Error('Cannot find unknown version'))
+  }
+
+  if (!unknownVersion.id || typeof unknownVersion.id !== 'number') {
+    toast.error(t('error-invalid-version'))
+    console.error('Invalid unknown version ID:', unknownVersion)
+    return Promise.reject(new Error('Invalid unknown version ID'))
   }
 
   const { error: updateError } = await supabase
