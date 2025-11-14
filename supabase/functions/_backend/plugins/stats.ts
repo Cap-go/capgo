@@ -18,6 +18,8 @@ import { ALLOWED_STATS_ACTIONS } from './stats_actions.ts'
 
 z.config(z.locales.en())
 
+const PLAN_ERROR = 'Cannot send stats, upgrade plan to continue to update'
+
 export const jsonRequestSchema = z.object({
   app_id: z.string({
     error: issue => issue.input === undefined ? MISSING_STRING_APP_ID : NON_STRING_APP_ID,
@@ -57,6 +59,10 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
   if (cachedStatus === 'onprem') {
     return onPremStats(c, app_id, action, device)
   }
+  if (cachedStatus === 'cancelled') {
+    await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
+    return simpleError200(c, 'need_plan_upgrade', PLAN_ERROR)
+  }
   const appOwner = isV2
     ? await getAppOwnerPostgresV2(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClientD1Session>, planActions)
     : await getAppOwnerPostgres(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>, planActions)
@@ -65,7 +71,7 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
     return onPremStats(c, app_id, action, device)
   }
   if (!appOwner.plan_valid) {
-    await setAppStatus(c, app_id, 'onprem')
+    await setAppStatus(c, app_id, 'cancelled')
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot update, upgrade plan to continue to update', id: app_id })
     await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
     return simpleError200(c, 'need_plan_upgrade', 'Cannot update, upgrade plan to continue to update')

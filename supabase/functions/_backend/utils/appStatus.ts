@@ -5,7 +5,7 @@ import { backgroundTask } from './utils.ts'
 const APP_STATUS_CACHE_PATH = '/.app-status'
 const APP_STATUS_CACHE_TTL_SECONDS = 900
 
-export type AppStatus = 'cloud' | 'onprem'
+export type AppStatus = 'cloud' | 'onprem' | 'cancelled'
 
 function buildAppStatusRequest(c: Context, appId: string) {
   const helper = new CacheHelper(c)

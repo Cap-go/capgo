@@ -1,8 +1,7 @@
 import type { Context } from 'hono'
 import type { ManifestEntry } from './downloadUrl.ts'
-
 import type { Database } from './supabase.types.ts'
-import type { AppInfos, DeviceWithoutCreatedAt } from './types.ts'
+import type { AppInfos } from './types.ts'
 import {
   greaterOrEqual,
   greaterThan,
@@ -24,6 +23,7 @@ import { createStatsBandwidth, createStatsMau, createStatsVersion, onPremStats, 
 import { backgroundTask, fixSemver, isInternalVersionName } from './utils.ts'
 
 const PLAN_LIMIT: Array<'mau' | 'bandwidth' | 'storage'> = ['mau', 'bandwidth']
+const PLAN_ERROR = 'Cannot get update, upgrade plan to continue to update'
 
 export function resToVersion(plugin_version: string, signedURL: string, version: Database['public']['Tables']['app_versions']['Row'], manifest: ManifestEntry[]) {
   const res: {
@@ -89,8 +89,14 @@ export async function updateWithPG(
   // if version_build is not semver, then make it semver
   const device = makeDevice(body)
   const cachedStatus = await getAppStatus(c, app_id)
-  if (cachedStatus === 'onprem')
+  if (cachedStatus === 'onprem') {
     return onPremStats(c, app_id, 'get', device)
+  }
+  if (cachedStatus === 'cancelled') {
+    cloudlog({ requestId: c.get('requestId'), message: 'Cannot update, upgrade plan to continue to update', id: app_id })
+    await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
+    return simpleError200(c, 'need_plan_upgrade', PLAN_ERROR)
+  }
   const appOwner = await returnV2orV1(
     c,
     isV2,
@@ -102,10 +108,10 @@ export async function updateWithPG(
     return onPremStats(c, app_id, 'get', device)
   }
   if (!appOwner.plan_valid) {
-    await setAppStatus(c, app_id, 'onprem')
+    await setAppStatus(c, app_id, 'cancelled')
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot update, upgrade plan to continue to update', id: app_id })
     await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
-    return simpleError200(c, 'need_plan_upgrade', 'Cannot update, upgrade plan to continue to update')
+    return simpleError200(c, 'need_plan_upgrade', PLAN_ERROR)
   }
   await setAppStatus(c, app_id, 'cloud')
   const channelDeviceCount = appOwner.channel_device_count ?? 0

@@ -17,6 +17,7 @@ import { deviceIdRegex, INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, isLimit
 z.config(z.locales.en())
 const devicePlatformScheme = z.literal(['ios', 'android'])
 const PLAN_MAU_ACTIONS: Array<'mau'> = ['mau']
+const PLAN_ERROR = 'Cannot set channel, upgrade plan to continue to update'
 
 export const jsonRequestSchema = z.looseObject({
   app_id: z.string({
@@ -49,6 +50,10 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
     cloudlog({ requestId: c.get('requestId'), message: 'Channel_self cache hit, app marked onprem', app_id })
     return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
   }
+  if (cachedStatus === 'cancelled') {
+    await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
+    return simpleError200(c, 'need_plan_upgrade', PLAN_ERROR)
+  }
   // Check if app exists first - Read operation can use v2 flag
   const appOwner = isV2
     ? await getAppOwnerPostgresV2(c, app_id, drizzleClientD1, PLAN_MAU_ACTIONS)
@@ -61,10 +66,10 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
     return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
   }
   if (!appOwner.plan_valid) {
-    await setAppStatus(c, app_id, 'onprem')
+    await setAppStatus(c, app_id, 'cancelled')
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot update, upgrade plan to continue to update', id: app_id })
     await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
-    return simpleError200(c, 'need_plan_upgrade', 'Cannot update, upgrade plan to continue to update')
+    return simpleError200(c, 'need_plan_upgrade', PLAN_ERROR)
   }
 
   await setAppStatus(c, app_id, 'cloud')
@@ -184,6 +189,10 @@ async function put(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient
     cloudlog({ requestId: c.get('requestId'), message: 'Channel_self cache hit (put), app marked onprem', app_id })
     return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
   }
+  if (cachedStatus === 'cancelled') {
+    await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
+    return simpleError200(c, 'need_plan_upgrade', PLAN_ERROR)
+  }
   const appOwner = isV2
     ? await getAppOwnerPostgresV2(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClientD1Session>, PLAN_MAU_ACTIONS)
     : await getAppOwnerPostgres(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>, PLAN_MAU_ACTIONS)
@@ -194,10 +203,10 @@ async function put(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient
     return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
   }
   if (!appOwner.plan_valid) {
-    await setAppStatus(c, app_id, 'onprem')
+    await setAppStatus(c, app_id, 'cancelled')
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot update, upgrade plan to continue to update', id: app_id })
     await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
-    return simpleError200(c, 'need_plan_upgrade', 'Cannot update, upgrade plan to continue to update')
+    return simpleError200(c, 'need_plan_upgrade', PLAN_ERROR)
   }
   await setAppStatus(c, app_id, 'cloud')
 
@@ -275,6 +284,10 @@ async function deleteOverride(c: Context, drizzleClient: ReturnType<typeof getDr
     cloudlog({ requestId: c.get('requestId'), message: 'Channel_self cache hit (delete), app marked onprem', app_id })
     return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
   }
+  if (cachedStatus === 'cancelled') {
+    await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
+    return simpleError200(c, 'need_plan_upgrade', PLAN_ERROR)
+  }
   const appOwner = isV2
     ? await getAppOwnerPostgresV2(c, app_id, drizzleClientD1, PLAN_MAU_ACTIONS)
     : await getAppOwnerPostgres(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>, PLAN_MAU_ACTIONS)
@@ -285,10 +298,10 @@ async function deleteOverride(c: Context, drizzleClient: ReturnType<typeof getDr
     return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
   }
   if (!appOwner.plan_valid) {
-    await setAppStatus(c, app_id, 'onprem')
+    await setAppStatus(c, app_id, 'cancelled')
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot update, upgrade plan to continue to update', id: app_id })
     await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
-    return simpleError200(c, 'need_plan_upgrade', 'Cannot update, upgrade plan to continue to update')
+    return simpleError200(c, 'need_plan_upgrade', PLAN_ERROR)
   }
   await setAppStatus(c, app_id, 'cloud')
 
@@ -335,6 +348,10 @@ async function listCompatibleChannels(c: Context, drizzleClient: ReturnType<type
     cloudlog({ requestId: c.get('requestId'), message: 'Channel_self cache hit (list), app marked onprem', app_id })
     return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
   }
+  if (cachedStatus === 'cancelled') {
+    await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
+    return simpleError200(c, 'need_plan_upgrade', PLAN_ERROR)
+  }
   const appOwner = isV2
     ? await getAppOwnerPostgresV2(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClientD1Session>, PLAN_MAU_ACTIONS)
     : await getAppOwnerPostgres(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>, PLAN_MAU_ACTIONS)
@@ -345,10 +362,10 @@ async function listCompatibleChannels(c: Context, drizzleClient: ReturnType<type
     return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
   }
   if (!appOwner.plan_valid) {
-    await setAppStatus(c, app_id, 'onprem')
+    await setAppStatus(c, app_id, 'cancelled')
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot update, upgrade plan to continue to update', id: app_id })
     await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
-    return simpleError200(c, 'need_plan_upgrade', 'Cannot update, upgrade plan to continue to update')
+    return simpleError200(c, 'need_plan_upgrade', PLAN_ERROR)
   }
   await setAppStatus(c, app_id, 'cloud')
 
