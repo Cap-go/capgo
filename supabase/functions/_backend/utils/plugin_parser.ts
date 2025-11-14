@@ -1,6 +1,7 @@
 import type { Context } from 'hono'
 import type { ZodMiniObject } from 'zod/mini'
-import type { AppInfos, AppStats } from './types.ts'
+import type { Database } from './supabase.types.ts'
+import type { AppInfos, AppStats, DeviceWithoutCreatedAt } from './types.ts'
 import { format, tryParse } from '@std/semver'
 import { fixSemver } from '../utils/utils.ts'
 import { simpleError } from './hono.ts'
@@ -11,6 +12,24 @@ export interface DeviceLink extends AppInfos {
 
 function getInvalidCode(c: Context) {
   return c.req.method === 'GET' || c.req.method === 'DELETE' ? 'invalid_query_parameters' : 'invalid_json_body'
+}
+
+export function makeDevice(devBody: AppInfos | DeviceLink | AppStats): DeviceWithoutCreatedAt {
+  const device: DeviceWithoutCreatedAt = {
+    platform: devBody.platform as Database['public']['Enums']['platform_os'],
+    device_id: devBody.device_id,
+    app_id: devBody.app_id,
+    plugin_version: devBody.plugin_version,
+    version_build: devBody.version_build,
+    os_version: devBody.version_os,
+    version_name: devBody.version_name,
+    is_emulator: devBody.is_emulator ?? false,
+    is_prod: devBody.is_prod ?? true,
+    custom_id: devBody.custom_id,
+    updated_at: new Date().toISOString(),
+    default_channel: devBody.defaultChannel ?? null,
+  }
+  return device
 }
 
 export function parsePluginBody<T extends AppInfos | DeviceLink | AppStats>(c: Context, body: T, schema: ZodMiniObject) {

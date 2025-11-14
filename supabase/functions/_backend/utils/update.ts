@@ -11,6 +11,7 @@ import {
   tryParse,
 } from '@std/semver'
 import { getRuntimeKey } from 'hono/adapter'
+import { getAppStatus, setAppStatus } from './appStatus.ts'
 import { getBundleUrl, getManifestUrl } from './downloadUrl.ts'
 import { getIsV2Updater, simpleError, simpleError200 } from './hono.ts'
 import { cloudlog } from './logging.ts'
@@ -89,12 +90,6 @@ export async function updateWithPG(
     is_prod = true,
   } = body
   // if version_build is not semver, then make it semver
-  const appOwner = await returnV2orV1(
-    c,
-    isV2,
-    () => getAppOwnerPostgres(c, app_id, drizzleClient, PLAN_LIMIT),
-    () => getAppOwnerPostgresV2(c, app_id, getDrizzleClientD1(), PLAN_LIMIT),
-  )
   const device: DeviceWithoutCreatedAt = {
     app_id,
     device_id,
@@ -109,9 +104,26 @@ export async function updateWithPG(
     updated_at: new Date().toISOString(),
     default_channel: defaultChannel ?? null,
   }
+  const cachedStatus = await getAppStatus(c, app_id)
+  if (cachedStatus === 'onprem')
+    return onPremStats(c, app_id, 'get', device)
+  const appOwner = await returnV2orV1(
+    c,
+    isV2,
+    () => getAppOwnerPostgres(c, app_id, drizzleClient, PLAN_LIMIT),
+    () => getAppOwnerPostgresV2(c, app_id, getDrizzleClientD1(), PLAN_LIMIT),
+  )
   if (!appOwner) {
+    await setAppStatus(c, app_id, 'onprem')
     return onPremStats(c, app_id, 'get', device)
   }
+  if (!appOwner.plan_valid) {
+    await setAppStatus(c, app_id, 'onprem')
+    cloudlog({ requestId: c.get('requestId'), message: 'Cannot update, upgrade plan to continue to update', id: app_id })
+    await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
+    return simpleError200(c, 'need_plan_upgrade', 'Cannot update, upgrade plan to continue to update')
+  }
+  await setAppStatus(c, app_id, 'cloud')
   const channelDeviceCount = appOwner.channel_device_count ?? 0
   const manifestBundleCount = appOwner.manifest_bundle_count ?? 0
   const bypassChannelOverrides = channelDeviceCount <= 0
@@ -160,11 +172,6 @@ export async function updateWithPG(
     throw simpleError('missing_info', 'Cannot find device_id or app_id', { body })
   }
 
-  if (!appOwner.plan_valid) {
-    cloudlog({ requestId: c.get('requestId'), message: 'Cannot update, upgrade plan to continue to update', id: app_id })
-    await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
-    return simpleError200(c, 'need_plan_upgrade', 'Cannot update, upgrade plan to continue to update')
-  }
   await backgroundTask(c, createStatsMau(c, device_id, app_id, appOwner.owner_org))
 
   cloudlog({ requestId: c.get('requestId'), message: 'vals', platform, device })
