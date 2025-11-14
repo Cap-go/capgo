@@ -189,20 +189,54 @@ async function uploadHandler(c: Context) {
 }
 
 async function setKeyFromMetadata(c: Context, next: Next) {
-  const fileId = parseUploadMetadata(c, c.req.raw.headers).filename
+  const uploadMetadata = parseUploadMetadata(c, c.req.raw.headers)
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: 'setKeyFromMetadata - raw metadata',
+    metadata: uploadMetadata,
+  })
+
+  const fileId = uploadMetadata.filename
   if (fileId == null) {
-    cloudlog({ requestId: c.get('requestId'), message: 'fileId is null' })
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'setKeyFromMetadata - fileId is null',
+      uploadMetadataLength: c.req.header('Upload-Metadata')?.length ?? 0,
+    })
     return c.json({ error: 'not_found', message: 'Not found' }, 404)
   }
+
+  cloudlog({ requestId: c.get('requestId'), message: 'setKeyFromMetadata - raw fileId', fileId })
+
   // Decode base64 if necessary
+  // Check if it looks like base64 (no slashes, only valid base64 chars)
   let decodedFileId = fileId
-  try {
-    decodedFileId = atob(fileId)
+  const looksLikeBase64 = !fileId.includes('/') && /^[A-Z0-9+/]+=*$/i.test(fileId)
+
+  if (looksLikeBase64) {
+    try {
+      decodedFileId = atob(fileId)
+      cloudlog({ requestId: c.get('requestId'), message: 'setKeyFromMetadata - decoded from base64', decodedFileId })
+    }
+    catch (decodeError) {
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'setKeyFromMetadata - base64 decode failed, using raw',
+        fileId,
+        error: decodeError instanceof Error ? decodeError.message : String(decodeError),
+      })
+    }
   }
-  catch {
-    cloudlog({ requestId: c.get('requestId'), message: 'Debug setKeyFromMetadata - Not base64 encoded:', fileId })
+  else {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'setKeyFromMetadata - fileId already decoded (contains slashes)',
+      fileId,
+    })
   }
+
   const normalizedFileId = decodeURIComponent(decodedFileId)
+  cloudlog({ requestId: c.get('requestId'), message: 'setKeyFromMetadata - final normalized fileId', normalizedFileId })
   c.set('fileId', normalizedFileId)
   await next()
 }
@@ -220,26 +254,117 @@ async function setKeyFromIdParam(c: Context, next: Next) {
 
 async function checkWriteAppAccess(c: Context, next: Next) {
   const requestId = c.get('fileId') as string
-  const [orgs, owner_org, apps, app_id] = requestId.split('/')
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: 'checkWriteAppAccess - start',
+    fileId: requestId,
+  })
+
+  const parts = requestId.split('/')
+  const [orgs, owner_org, apps, app_id] = parts
+
   if (orgs !== 'orgs' || apps !== 'apps') {
-    throw new HTTPException(400, { message: 'Invalid requestId' })
-  }
-  if (requestId.split('/').length < 5) {
-    throw new HTTPException(400, { message: 'Invalid requestId' })
-  }
-  cloudlog({ requestId: c.get('requestId'), message: 'checkWriteAppAccess', app_id, owner_org })
-  const capgkey = c.get('capgkey') as string
-  cloudlog({ requestId: c.get('requestId'), message: 'capgkey', capgkey })
-  const { data: userId, error: _errorUserId } = await supabaseAdmin(c)
-    .rpc('get_user_id', { apikey: capgkey, app_id })
-  if (_errorUserId) {
-    cloudlog({ requestId: c.get('requestId'), message: '_errorUserId', error: _errorUserId })
-    throw new HTTPException(400, { message: 'Error User not found' })
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'checkWriteAppAccess - invalid path structure',
+      fileId: requestId,
+      orgs,
+      apps,
+      expected: 'orgs/*/apps/*',
+    })
+    throw new HTTPException(400, {
+      res: c.json({
+        error: 'invalid_file_path',
+        message: 'Invalid file path structure. Expected: orgs/{owner_org}/apps/{app_id}/...',
+        moreInfo: { fileId: requestId, orgs, apps, requestId: c.get('requestId') },
+      }),
+    })
   }
 
+  if (parts.length < 5) {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'checkWriteAppAccess - path too short',
+      fileId: requestId,
+      pathLength: parts.length,
+      minRequired: 5,
+    })
+    throw new HTTPException(400, {
+      res: c.json({
+        error: 'invalid_file_path',
+        message: 'Invalid file path. Path must have at least 5 segments: orgs/{owner_org}/apps/{app_id}/{filename}',
+        moreInfo: { fileId: requestId, pathLength: parts.length, requestId: c.get('requestId') },
+      }),
+    })
+  }
+
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: 'checkWriteAppAccess - parsed path',
+    app_id,
+    owner_org,
+  })
+
+  const capgkey = c.get('capgkey') as string
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: 'checkWriteAppAccess - checking api key',
+    capgkey: capgkey ? `${capgkey.substring(0, 10)}...` : 'missing',
+    capgkeyLength: capgkey?.length ?? 0,
+    hasCapgkey: !!capgkey,
+  })
+
+  const { data: userId, error: _errorUserId } = await supabaseAdmin(c)
+    .rpc('get_user_id', { apikey: capgkey, app_id })
+
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: 'checkWriteAppAccess - get_user_id result',
+    userId,
+    hasError: !!_errorUserId,
+    error: _errorUserId,
+    userIdIsNull: userId === null,
+  })
+
+  if (_errorUserId || userId === null) {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'checkWriteAppAccess - user lookup failed',
+      error: _errorUserId,
+      userId,
+      app_id,
+      capgkeyPrefix: capgkey ? capgkey.substring(0, 15) : 'missing',
+    })
+    throw new HTTPException(400, {
+      res: c.json({
+        error: 'user_not_found',
+        message: 'User not found for the provided API key',
+        moreInfo: { app_id, hasApiKey: !!capgkey, apiKeyLength: capgkey?.length ?? 0, requestId: c.get('requestId') },
+      }),
+    })
+  }
+
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: 'checkWriteAppAccess - checking app permissions',
+    userId,
+    app_id,
+  })
+
   if (!(await hasAppRightApikey(c, app_id, userId, 'read', capgkey))) {
-    cloudlog({ requestId: c.get('requestId'), message: 'no read' })
-    throw new HTTPException(400, { message: 'You can\'t access this app' })
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'checkWriteAppAccess - insufficient permissions',
+      userId,
+      app_id,
+    })
+    throw new HTTPException(403, {
+      res: c.json({
+        error: 'insufficient_permissions',
+        message: 'You don\'t have permission to access this app',
+        moreInfo: { app_id, requestId: c.get('requestId') },
+      }),
+    })
   }
 
   const { data: app, error: errorApp } = await supabaseAdmin(c)
@@ -247,14 +372,52 @@ async function checkWriteAppAccess(c: Context, next: Next) {
     .select('app_id, owner_org')
     .eq('app_id', app_id)
     .single()
+
   if (errorApp) {
-    cloudlog({ requestId: c.get('requestId'), message: 'errorApp', error: errorApp })
-    throw new HTTPException(400, { message: 'Error App not found' })
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'checkWriteAppAccess - app not found',
+      error: errorApp,
+      app_id,
+    })
+    throw new HTTPException(404, {
+      res: c.json({
+        error: 'app_not_found',
+        message: 'App not found',
+        moreInfo: { app_id, requestId: c.get('requestId') },
+      }),
+    })
   }
+
   if (app.owner_org !== owner_org) {
-    cloudlog({ requestId: c.get('requestId'), message: 'owner_org' })
-    throw new HTTPException(400, { message: 'You can\'t access this app' })
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'checkWriteAppAccess - owner org mismatch',
+      filePathOwnerOrg: owner_org,
+      actualOwnerOrg: app.owner_org,
+      app_id,
+    })
+    throw new HTTPException(403, {
+      res: c.json({
+        error: 'owner_org_mismatch',
+        message: 'The owner organization in the file path does not match the app\'s owner organization',
+        moreInfo: {
+          app_id,
+          filePathOwnerOrg: owner_org,
+          actualOwnerOrg: app.owner_org,
+          requestId: c.get('requestId'),
+        },
+      }),
+    })
   }
+
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: 'checkWriteAppAccess - access granted',
+    app_id,
+    owner_org,
+  })
+
   await next()
 }
 
