@@ -18,6 +18,7 @@ import { cloudlog } from './logging.ts'
 import { sendNotifOrg } from './notifications.ts'
 import { closeClient, getAppOwnerPostgres, getDrizzleClient, getPgClient, requestInfosPostgres } from './pg.ts'
 import { getAppOwnerPostgresV2, getDrizzleClientD1Session, requestInfosPostgresV2 } from './pg_d1.ts'
+import { makeDevice } from './plugin_parser.ts'
 import { s3 } from './s3.ts'
 import { createStatsBandwidth, createStatsMau, createStatsVersion, onPremStats, sendStatsAndDevice } from './stats.ts'
 import { backgroundTask, fixSemver, isInternalVersionName } from './utils.ts'
@@ -45,7 +46,7 @@ export function resToVersion(plugin_version: string, signedURL: string, version:
   return res
 }
 
-async function returnV2orV1<T>(
+function returnV2orV1<T>(
   c: Context,
   isV2: boolean,
   runV1: () => Promise<T>,
@@ -82,28 +83,11 @@ export async function updateWithPG(
     device_id,
     platform,
     app_id,
-    version_os,
     plugin_version = '2.3.3',
-    custom_id,
     defaultChannel,
-    is_emulator = false,
-    is_prod = true,
   } = body
   // if version_build is not semver, then make it semver
-  const device: DeviceWithoutCreatedAt = {
-    app_id,
-    device_id,
-    plugin_version,
-    version_name,
-    custom_id,
-    is_emulator,
-    is_prod,
-    version_build,
-    os_version: version_os,
-    platform: platform as Database['public']['Enums']['platform_os'],
-    updated_at: new Date().toISOString(),
-    default_channel: defaultChannel ?? null,
-  }
+  const device = makeDevice(body)
   const cachedStatus = await getAppStatus(c, app_id)
   if (cachedStatus === 'onprem')
     return onPremStats(c, app_id, 'get', device)
@@ -315,7 +299,7 @@ export async function updateWithPG(
       })
     }
 
-    if (!channelData.channels.allow_dev && !is_prod) {
+    if (!channelData.channels.allow_dev && !body.is_prod) {
       cloudlog({ requestId: c.get('requestId'), message: 'Cannot update dev build is disabled', id: device_id, date: new Date().toISOString() })
       await sendStatsAndDevice(c, device, [{ action: 'disableDevBuild', versionName: version.name }])
       return simpleError200(c, 'disable_dev_build', 'Cannot update, dev build is disabled', {
@@ -323,7 +307,7 @@ export async function updateWithPG(
         old: version_name,
       })
     }
-    if (!channelData.channels.allow_emulator && is_emulator) {
+    if (!channelData.channels.allow_emulator && body.is_emulator) {
       cloudlog({ requestId: c.get('requestId'), message: 'Cannot update emulator is disabled', id: device_id, date: new Date().toISOString() })
       await sendStatsAndDevice(c, device, [{ action: 'disableEmulator', versionName: version.name }])
       return simpleError200(c, 'disable_emulator', 'Cannot update, emulator is disabled', {
