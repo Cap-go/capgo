@@ -3,20 +3,21 @@ import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { DeviceLink } from '../utils/plugin_parser.ts'
 import type { Database } from '../utils/supabase.types.ts'
-import type { DeviceWithoutCreatedAt } from '../utils/types.ts'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod/mini'
+import { getAppStatus, setAppStatus } from '../utils/appStatus.ts'
 import { BRES, getIsV2Channel, parseBody, quickError, simpleError, simpleError200, simpleRateLimit } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { closeClient, deleteChannelDevicePg, getAppByIdPg, getAppOwnerPostgres, getAppVersionsByAppIdPg, getChannelByNamePg, getChannelDeviceOverridePg, getChannelsPg, getCompatibleChannelsPg, getDrizzleClient, getMainChannelsPg, getPgClient, upsertChannelDevicePg } from '../utils/pg.ts'
 import { getAppByIdD1, getAppOwnerPostgresV2, getAppVersionsByAppIdD1, getChannelByNameD1, getChannelDeviceOverrideD1, getChannelsD1, getCompatibleChannelsD1, getDrizzleClientD1Session, getMainChannelsD1 } from '../utils/pg_d1.ts'
-import { convertQueryToBody, parsePluginBody } from '../utils/plugin_parser.ts'
+import { convertQueryToBody, makeDevice, parsePluginBody } from '../utils/plugin_parser.ts'
 import { sendStatsAndDevice } from '../utils/stats.ts'
 import { deviceIdRegex, INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, isLimited, MISSING_STRING_APP_ID, MISSING_STRING_DEVICE_ID, MISSING_STRING_VERSION_BUILD, MISSING_STRING_VERSION_NAME, NON_STRING_APP_ID, NON_STRING_DEVICE_ID, NON_STRING_VERSION_BUILD, NON_STRING_VERSION_NAME, reverseDomainRegex } from '../utils/utils.ts'
 
 z.config(z.locales.en())
 const devicePlatformScheme = z.literal(['ios', 'android'])
 const PLAN_MAU_ACTIONS: Array<'mau'> = ['mau']
+const PLAN_ERROR = 'Cannot set channel, upgrade plan to continue to update'
 
 export const jsonRequestSchema = z.looseObject({
   app_id: z.string({
@@ -40,22 +41,19 @@ export const jsonRequestSchema = z.looseObject({
 
 async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient>, isV2: boolean, body: DeviceLink): Promise<Response> {
   cloudlog({ requestId: c.get('requestId'), message: 'post channel self body', body })
-  const {
-    version_name,
-    version_build,
-    platform,
-    app_id,
-    channel,
-    version_os,
-    device_id,
-    plugin_version,
-    custom_id,
-    is_emulator,
-    is_prod,
-    defaultChannel,
-  } = body
+  const device = makeDevice(body)
+  const { app_id, version_name, device_id, channel } = body
 
   const drizzleClientD1 = (isV2 ? getDrizzleClientD1Session(c) : undefined) as ReturnType<typeof getDrizzleClientD1Session>
+  const cachedStatus = await getAppStatus(c, app_id)
+  if (cachedStatus === 'onprem') {
+    cloudlog({ requestId: c.get('requestId'), message: 'Channel_self cache hit, app marked onprem', app_id })
+    return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
+  }
+  if (cachedStatus === 'cancelled') {
+    await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
+    return simpleError200(c, 'need_plan_upgrade', PLAN_ERROR)
+  }
   // Check if app exists first - Read operation can use v2 flag
   const appOwner = isV2
     ? await getAppOwnerPostgresV2(c, app_id, drizzleClientD1, PLAN_MAU_ACTIONS)
@@ -64,8 +62,17 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
   if (!appOwner) {
     // On-premise app detected - return 429 to prevent DDOS
     cloudlog({ requestId: c.get('requestId'), message: 'On-premise app detected in channel_self POST, returning 429', app_id })
+    await setAppStatus(c, app_id, 'onprem')
     return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
   }
+  if (!appOwner.plan_valid) {
+    await setAppStatus(c, app_id, 'cancelled')
+    cloudlog({ requestId: c.get('requestId'), message: 'Cannot update, upgrade plan to continue to update', id: app_id })
+    await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
+    return simpleError200(c, 'need_plan_upgrade', PLAN_ERROR)
+  }
+
+  await setAppStatus(c, app_id, 'cloud')
 
   // Read operations can use v2 flag
   const versions = isV2
@@ -83,23 +90,6 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
     : versions[0]
   if (!version) {
     throw simpleError('version_error', `Version ${version_name} doesn't exist, and no builtin version`, { versions })
-  }
-
-  // find device
-
-  const device: DeviceWithoutCreatedAt = {
-    app_id,
-    device_id,
-    plugin_version,
-    version_name,
-    custom_id,
-    is_emulator,
-    is_prod,
-    version_build,
-    os_version: version_os,
-    platform: platform as Database['public']['Enums']['platform_os'],
-    updated_at: new Date().toISOString(),
-    default_channel: defaultChannel ?? null,
   }
 
   // Read operations can use v2 flag
@@ -190,29 +180,35 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
 
 async function put(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient> | ReturnType<typeof getDrizzleClientD1Session>, isV2: boolean, body: DeviceLink): Promise<Response> {
   cloudlog({ requestId: c.get('requestId'), message: 'put channel self body', body })
-  const {
-    platform,
-    app_id,
-    device_id,
-    plugin_version,
-    version_name,
-    version_build,
-    custom_id,
-    is_emulator,
-    is_prod,
-    version_os,
-  } = body
+  const device = makeDevice(body)
+  const { app_id, version_name, defaultChannel, device_id } = body
 
   // Check if app exists first - Read operation can use v2 flag
+  const cachedStatus = await getAppStatus(c, app_id)
+  if (cachedStatus === 'onprem') {
+    cloudlog({ requestId: c.get('requestId'), message: 'Channel_self cache hit (put), app marked onprem', app_id })
+    return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
+  }
+  if (cachedStatus === 'cancelled') {
+    await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
+    return simpleError200(c, 'need_plan_upgrade', PLAN_ERROR)
+  }
   const appOwner = isV2
     ? await getAppOwnerPostgresV2(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClientD1Session>, PLAN_MAU_ACTIONS)
     : await getAppOwnerPostgres(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>, PLAN_MAU_ACTIONS)
 
   if (!appOwner) {
-    // On-premise app detected - return 429 to prevent DDOS
     cloudlog({ requestId: c.get('requestId'), message: 'On-premise app detected in channel_self PUT, returning 429', app_id })
+    await setAppStatus(c, app_id, 'onprem')
     return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
   }
+  if (!appOwner.plan_valid) {
+    await setAppStatus(c, app_id, 'cancelled')
+    cloudlog({ requestId: c.get('requestId'), message: 'Cannot update, upgrade plan to continue to update', id: app_id })
+    await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
+    return simpleError200(c, 'need_plan_upgrade', PLAN_ERROR)
+  }
+  await setAppStatus(c, app_id, 'cloud')
 
   // Read operations can use v2 flag
   const versions = isV2
@@ -232,28 +228,14 @@ async function put(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient
     throw simpleError('version_error', `Version ${version_name} doesn't exist, and no builtin version`, { versions })
   }
 
-  const device: DeviceWithoutCreatedAt = {
-    app_id,
-    device_id,
-    plugin_version,
-    version_name,
-    custom_id,
-    is_emulator,
-    is_prod,
-    version_build,
-    os_version: version_os,
-    platform: platform as Database['public']['Enums']['platform_os'],
-    updated_at: new Date().toISOString(),
-  }
   // Read operations can use v2 flag
   const dataChannel = isV2
-    ? await getChannelsD1(c, app_id, body.defaultChannel ? { defaultChannel: body.defaultChannel } : { public: true }, drizzleClient as ReturnType<typeof getDrizzleClientD1Session>)
-    : await getChannelsPg(c, app_id, body.defaultChannel ? { defaultChannel: body.defaultChannel } : { public: true }, drizzleClient as ReturnType<typeof getDrizzleClient>)
+    ? await getChannelsD1(c, app_id, defaultChannel ? { defaultChannel } : { public: true }, drizzleClient as ReturnType<typeof getDrizzleClientD1Session>)
+    : await getChannelsPg(c, app_id, defaultChannel ? { defaultChannel } : { public: true }, drizzleClient as ReturnType<typeof getDrizzleClient>)
 
   const dataChannelOverride = isV2
     ? await getChannelDeviceOverrideD1(c, app_id, device_id, drizzleClient as ReturnType<typeof getDrizzleClientD1Session>)
     : await getChannelDeviceOverridePg(c, app_id, device_id, drizzleClient as ReturnType<typeof getDrizzleClient>)
-
   if (dataChannelOverride?.channel_id) {
     await sendStatsAndDevice(c, device, [{ action: 'getChannel' }])
     return c.json({
@@ -266,13 +248,13 @@ async function put(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient
     throw quickError(404, 'channel_not_found', 'Cannot find channel', { dataChannel })
   }
 
-  const devicePlatform = devicePlatformScheme.safeParse(platform)
+  const devicePlatform = devicePlatformScheme.safeParse(body.platform)
   if (!devicePlatform.success) {
-    throw simpleError('invalid_platform', 'Invalid device platform', { platform, devicePlatform })
+    throw simpleError('invalid_platform', 'Invalid device platform', { platform: body.platform, devicePlatform })
   }
 
-  const finalChannel = body.defaultChannel
-    ? dataChannel.find((channel: { name: string }) => channel.name === body.defaultChannel)
+  const finalChannel = defaultChannel
+    ? dataChannel.find((channel: { name: string }) => channel.name === defaultChannel)
     : dataChannel.find((channel: { ios: boolean, android: boolean }) => channel[devicePlatform.data])
 
   if (!finalChannel) {
@@ -292,19 +274,36 @@ async function deleteOverride(c: Context, drizzleClient: ReturnType<typeof getDr
     device_id,
     version_build,
   } = body
+  const device = makeDevice(body)
   const drizzleClientD1 = (isV2 ? getDrizzleClientD1Session(c) : undefined) as ReturnType<typeof getDrizzleClientD1Session>
   cloudlog({ requestId: c.get('requestId'), message: 'delete override', version_build })
 
   // Check if app exists first - Read operation can use v2 flag
+  const cachedStatus = await getAppStatus(c, app_id)
+  if (cachedStatus === 'onprem') {
+    cloudlog({ requestId: c.get('requestId'), message: 'Channel_self cache hit (delete), app marked onprem', app_id })
+    return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
+  }
+  if (cachedStatus === 'cancelled') {
+    await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
+    return simpleError200(c, 'need_plan_upgrade', PLAN_ERROR)
+  }
   const appOwner = isV2
     ? await getAppOwnerPostgresV2(c, app_id, drizzleClientD1, PLAN_MAU_ACTIONS)
     : await getAppOwnerPostgres(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>, PLAN_MAU_ACTIONS)
 
   if (!appOwner) {
-    // On-premise app detected - return 429 to prevent DDOS
     cloudlog({ requestId: c.get('requestId'), message: 'On-premise app detected in channel_self DELETE, returning 429', app_id })
+    await setAppStatus(c, app_id, 'onprem')
     return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
   }
+  if (!appOwner.plan_valid) {
+    await setAppStatus(c, app_id, 'cancelled')
+    cloudlog({ requestId: c.get('requestId'), message: 'Cannot update, upgrade plan to continue to update', id: app_id })
+    await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
+    return simpleError200(c, 'need_plan_upgrade', PLAN_ERROR)
+  }
+  await setAppStatus(c, app_id, 'cloud')
 
   // Read operation can use v2 flag
   const dataChannelOverride = isV2
@@ -331,6 +330,7 @@ async function deleteOverride(c: Context, drizzleClient: ReturnType<typeof getDr
 
 async function listCompatibleChannels(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient> | ReturnType<typeof getDrizzleClientD1Session>, isV2: boolean, body: DeviceLink): Promise<Response> {
   const { app_id, platform, is_emulator, is_prod } = body
+  const device = makeDevice(body)
 
   // First check if app exists - Read operation can use v2 flag
   const appExists = isV2
@@ -343,18 +343,31 @@ async function listCompatibleChannels(c: Context, drizzleClient: ReturnType<type
   }
 
   // Check if app has valid org association (not on-premise) - Read operation can use v2 flag
+  const cachedStatus = await getAppStatus(c, app_id)
+  if (cachedStatus === 'onprem') {
+    cloudlog({ requestId: c.get('requestId'), message: 'Channel_self cache hit (list), app marked onprem', app_id })
+    return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
+  }
+  if (cachedStatus === 'cancelled') {
+    await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
+    return simpleError200(c, 'need_plan_upgrade', PLAN_ERROR)
+  }
   const appOwner = isV2
     ? await getAppOwnerPostgresV2(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClientD1Session>, PLAN_MAU_ACTIONS)
     : await getAppOwnerPostgres(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>, PLAN_MAU_ACTIONS)
 
   if (!appOwner) {
-    // On-premise app detected - return 429 to prevent DDOS
     cloudlog({ requestId: c.get('requestId'), message: 'On-premise app detected in channel_self GET, returning 429', app_id })
+    await setAppStatus(c, app_id, 'onprem')
     return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
   }
   if (!appOwner.plan_valid) {
-    throw simpleError('action_not_allowed', 'Action not allowed')
+    await setAppStatus(c, app_id, 'cancelled')
+    cloudlog({ requestId: c.get('requestId'), message: 'Cannot update, upgrade plan to continue to update', id: app_id })
+    await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
+    return simpleError200(c, 'need_plan_upgrade', PLAN_ERROR)
   }
+  await setAppStatus(c, app_id, 'cloud')
 
   // Get channels that allow device self set and are compatible with the platform - Read operation can use v2 flag
   const channels = isV2

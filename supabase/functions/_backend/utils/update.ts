@@ -1,8 +1,7 @@
 import type { Context } from 'hono'
 import type { ManifestEntry } from './downloadUrl.ts'
-
 import type { Database } from './supabase.types.ts'
-import type { AppInfos, DeviceWithoutCreatedAt } from './types.ts'
+import type { AppInfos } from './types.ts'
 import {
   greaterOrEqual,
   greaterThan,
@@ -11,17 +10,20 @@ import {
   tryParse,
 } from '@std/semver'
 import { getRuntimeKey } from 'hono/adapter'
+import { getAppStatus, setAppStatus } from './appStatus.ts'
 import { getBundleUrl, getManifestUrl } from './downloadUrl.ts'
 import { getIsV2Updater, simpleError, simpleError200 } from './hono.ts'
 import { cloudlog } from './logging.ts'
 import { sendNotifOrg } from './notifications.ts'
 import { closeClient, getAppOwnerPostgres, getDrizzleClient, getPgClient, requestInfosPostgres } from './pg.ts'
 import { getAppOwnerPostgresV2, getDrizzleClientD1Session, requestInfosPostgresV2 } from './pg_d1.ts'
+import { makeDevice } from './plugin_parser.ts'
 import { s3 } from './s3.ts'
 import { createStatsBandwidth, createStatsMau, createStatsVersion, onPremStats, sendStatsAndDevice } from './stats.ts'
 import { backgroundTask, fixSemver, isInternalVersionName } from './utils.ts'
 
 const PLAN_LIMIT: Array<'mau' | 'bandwidth' | 'storage'> = ['mau', 'bandwidth']
+const PLAN_ERROR = 'Cannot get update, upgrade plan to continue to update'
 
 export function resToVersion(plugin_version: string, signedURL: string, version: Database['public']['Tables']['app_versions']['Row'], manifest: ManifestEntry[]) {
   const res: {
@@ -44,7 +46,7 @@ export function resToVersion(plugin_version: string, signedURL: string, version:
   return res
 }
 
-async function returnV2orV1<T>(
+function returnV2orV1<T>(
   c: Context,
   isV2: boolean,
   runV1: () => Promise<T>,
@@ -81,37 +83,37 @@ export async function updateWithPG(
     device_id,
     platform,
     app_id,
-    version_os,
     plugin_version = '2.3.3',
-    custom_id,
     defaultChannel,
-    is_emulator = false,
-    is_prod = true,
   } = body
   // if version_build is not semver, then make it semver
+  const device = makeDevice(body)
+  const cachedStatus = await getAppStatus(c, app_id)
+  if (cachedStatus === 'onprem') {
+    return onPremStats(c, app_id, 'get', device)
+  }
+  if (cachedStatus === 'cancelled') {
+    cloudlog({ requestId: c.get('requestId'), message: 'Cannot update, upgrade plan to continue to update', id: app_id })
+    await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
+    return simpleError200(c, 'need_plan_upgrade', PLAN_ERROR)
+  }
   const appOwner = await returnV2orV1(
     c,
     isV2,
     () => getAppOwnerPostgres(c, app_id, drizzleClient, PLAN_LIMIT),
     () => getAppOwnerPostgresV2(c, app_id, getDrizzleClientD1(), PLAN_LIMIT),
   )
-  const device: DeviceWithoutCreatedAt = {
-    app_id,
-    device_id,
-    plugin_version,
-    version_name,
-    custom_id,
-    is_emulator,
-    is_prod,
-    version_build,
-    os_version: version_os,
-    platform: platform as Database['public']['Enums']['platform_os'],
-    updated_at: new Date().toISOString(),
-    default_channel: defaultChannel ?? null,
-  }
   if (!appOwner) {
+    await setAppStatus(c, app_id, 'onprem')
     return onPremStats(c, app_id, 'get', device)
   }
+  if (!appOwner.plan_valid) {
+    await setAppStatus(c, app_id, 'cancelled')
+    cloudlog({ requestId: c.get('requestId'), message: 'Cannot update, upgrade plan to continue to update', id: app_id })
+    await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
+    return simpleError200(c, 'need_plan_upgrade', PLAN_ERROR)
+  }
+  await setAppStatus(c, app_id, 'cloud')
   const channelDeviceCount = appOwner.channel_device_count ?? 0
   const manifestBundleCount = appOwner.manifest_bundle_count ?? 0
   const bypassChannelOverrides = channelDeviceCount <= 0
@@ -160,11 +162,6 @@ export async function updateWithPG(
     throw simpleError('missing_info', 'Cannot find device_id or app_id', { body })
   }
 
-  if (!appOwner.plan_valid) {
-    cloudlog({ requestId: c.get('requestId'), message: 'Cannot update, upgrade plan to continue to update', id: app_id })
-    await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
-    return simpleError200(c, 'need_plan_upgrade', 'Cannot update, upgrade plan to continue to update')
-  }
   await backgroundTask(c, createStatsMau(c, device_id, app_id, appOwner.owner_org))
 
   cloudlog({ requestId: c.get('requestId'), message: 'vals', platform, device })
@@ -308,7 +305,7 @@ export async function updateWithPG(
       })
     }
 
-    if (!channelData.channels.allow_dev && !is_prod) {
+    if (!channelData.channels.allow_dev && !body.is_prod) {
       cloudlog({ requestId: c.get('requestId'), message: 'Cannot update dev build is disabled', id: device_id, date: new Date().toISOString() })
       await sendStatsAndDevice(c, device, [{ action: 'disableDevBuild', versionName: version.name }])
       return simpleError200(c, 'disable_dev_build', 'Cannot update, dev build is disabled', {
@@ -316,7 +313,7 @@ export async function updateWithPG(
         old: version_name,
       })
     }
-    if (!channelData.channels.allow_emulator && is_emulator) {
+    if (!channelData.channels.allow_emulator && body.is_emulator) {
       cloudlog({ requestId: c.get('requestId'), message: 'Cannot update emulator is disabled', id: device_id, date: new Date().toISOString() })
       await sendStatsAndDevice(c, device, [{ action: 'disableEmulator', versionName: version.name }])
       return simpleError200(c, 'disable_emulator', 'Cannot update, emulator is disabled', {

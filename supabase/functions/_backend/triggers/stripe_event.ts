@@ -83,9 +83,13 @@ async function createdOrUpdated(c: Context, stripeData: StripeData, org: Org, Lo
     .eq('stripe_id', stripeData.data.product_id)
     .single()
   if (plan) {
+    // Filter out undefined values to avoid FK constraint violations
+    const updateData = Object.fromEntries(
+      Object.entries(stripeData.data).filter(([_, v]) => v !== undefined)
+    )
     const { error: dbError2 } = await supabaseAdmin(c)
       .from('stripe_info')
-      .update(stripeData.data)
+      .update(updateData)
       .eq('customer_id', stripeData.data.customer_id)
     if (stripeData.isUpgrade && stripeData.previousProductId) {
       statusName = 'upgraded'
@@ -138,9 +142,13 @@ async function createdOrUpdated(c: Context, stripeData: StripeData, org: Org, Lo
 }
 
 async function updateStripeInfo(c: Context, stripeData: StripeData) {
+  // Filter out undefined values to avoid FK constraint violations
+  const updateData = Object.fromEntries(
+    Object.entries(stripeData.data).filter(([_, v]) => v !== undefined)
+  )
   const { error: dbError2 } = await supabaseAdmin(c)
     .from('stripe_info')
-    .update(stripeData.data)
+    .update(updateData)
     .eq('customer_id', stripeData.data.customer_id)
   if (dbError2) {
     throw quickError(404, 'canceled_customer_id_not_found', `canceled:  customer_id not found`, { dbError2, stripeData })

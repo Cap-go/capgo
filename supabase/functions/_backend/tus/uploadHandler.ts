@@ -150,41 +150,140 @@ export class UploadHandler {
   }
 
   async initCreate(c: Context, uploadMetadata: UploadMetadata) {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'TUS initCreate - start',
+      metadata: uploadMetadata,
+    })
+
     const r2Key = uploadMetadata.filename ?? ''
     if (r2Key == null) {
-      cloudlog({ requestId: c.get('requestId'), message: 'in DO files create r2Key is null' })
-      throw new HTTPException(400, { message: 'bad filename metadata' })
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'TUS initCreate - r2Key is null',
+        metadata: uploadMetadata,
+      })
+      throw new HTTPException(400, {
+        res: c.json({
+          error: 'bad_filename_metadata',
+          message: 'Filename metadata is missing or invalid',
+          moreInfo: { metadata: uploadMetadata, requestId: c.get('requestId') },
+        }),
+      })
     }
+
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'TUS initCreate - r2Key extracted',
+      r2Key,
+    })
 
     const existingUploadOffset: number | undefined = await this.state.storage.get(UPLOAD_OFFSET_KEY)
     if (existingUploadOffset != null && existingUploadOffset > 0) {
-      cloudlog({ requestId: c.get('requestId'), message: 'in DO files create duplicate object creation' })
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'TUS initCreate - duplicate upload detected, cleaning up',
+        r2Key,
+        existingUploadOffset,
+      })
       await this.cleanup(r2Key)
-      throw new HTTPException(409, { message: 'object already exists' })
+      throw new HTTPException(409, {
+        res: c.json({
+          error: 'duplicate_upload',
+          message: 'Upload already exists',
+          moreInfo: { r2Key, existingUploadOffset, requestId: c.get('requestId') },
+        }),
+      })
     }
 
     const contentType = c.req.header('Content-Type')
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'TUS initCreate - checking content type',
+      contentType,
+    })
+
     if (contentType != null && contentType !== 'application/offset+octet-stream') {
-      cloudlog({ requestId: c.get('requestId'), message: 'in DO files create create only supports application/offset+octet-stream content-type' })
-      throw new HTTPException(415, { message: 'create only supports application/offset+octet-stream content-type' })
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'TUS initCreate - invalid content type',
+        contentType,
+        expected: 'application/offset+octet-stream',
+      })
+      throw new HTTPException(415, {
+        res: c.json({
+          error: 'invalid_content_type',
+          message: 'Create only supports application/offset+octet-stream content-type',
+          moreInfo: { contentType, requestId: c.get('requestId') },
+        }),
+      })
     }
+
     const contentLength = readIntFromHeader(c.req.raw.headers, 'Content-Length')
     if (!Number.isNaN(contentLength) && contentLength > 0 && contentType == null) {
-      cloudlog({ requestId: c.get('requestId'), message: 'in DO files create body requires application/offset+octet-stream content-type' })
-      throw new HTTPException(415, { message: 'body requires application/offset+octet-stream content-type' })
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'TUS initCreate - content-type required for body',
+        contentLength,
+      })
+      throw new HTTPException(415, {
+        res: c.json({
+          error: 'missing_content_type',
+          message: 'Body requires application/offset+octet-stream content-type',
+          moreInfo: { contentLength, requestId: c.get('requestId') },
+        }),
+      })
     }
+
     const hasContent = c.req.raw.body != null && contentType != null
     const uploadLength = readIntFromHeader(c.req.raw.headers, 'Upload-Length')
     const uploadDeferLength = readIntFromHeader(c.req.raw.headers, 'Upload-Defer-Length')
+
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'TUS initCreate - checking upload length headers',
+      uploadLength,
+      uploadDeferLength,
+      hasContent,
+    })
+
     if (Number.isNaN(uploadLength) && Number.isNaN(uploadDeferLength)) {
-      cloudlog({ requestId: c.get('requestId'), message: 'in DO files create must contain Upload-Length or Upload-Defer-Length header' })
-      throw new HTTPException(400, { message: 'must contain Upload-Length or Upload-Defer-Length header' })
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'TUS initCreate - missing upload length header',
+      })
+      throw new HTTPException(400, {
+        res: c.json({
+          error: 'missing_upload_length',
+          message: 'Must contain Upload-Length or Upload-Defer-Length header',
+          moreInfo: { requestId: c.get('requestId') },
+        }),
+      })
     }
 
     if (!Number.isNaN(uploadDeferLength) && uploadDeferLength !== 1) {
-      cloudlog({ requestId: c.get('requestId'), message: 'in DO files create bad Upload-Defer-Length' })
-      throw new HTTPException(400, { message: 'bad Upload-Defer-Length' })
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'TUS initCreate - invalid Upload-Defer-Length',
+        uploadDeferLength,
+      })
+      throw new HTTPException(400, {
+        res: c.json({
+          error: 'bad_upload_defer_length',
+          message: 'Invalid Upload-Defer-Length value',
+          moreInfo: { uploadDeferLength, requestId: c.get('requestId') },
+        }),
+      })
     }
+
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'TUS initCreate - validation complete',
+      r2Key,
+      uploadLength,
+      hasContent,
+    })
+
     return {
       r2Key,
       uploadLength,
@@ -194,11 +293,33 @@ export class UploadHandler {
 
   // create a new TUS upload
   async create(c: Context): Promise<Response> {
-    cloudlog({ requestId: c.get('requestId'), message: 'in DO create' })
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'TUS create - start',
+      url: c.req.url,
+      method: c.req.method,
+    })
     const uploadMetadata = parseUploadMetadata(c, c.req.raw.headers)
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'TUS create - parsed metadata',
+      metadata: uploadMetadata,
+    })
     const checksum = parseChecksum(c.req.raw.headers)
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'TUS create - parsed checksum',
+      checksum,
+    })
 
     const { r2Key, uploadLength, hasContent } = await this.initCreate(c, uploadMetadata)
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'TUS create - initialized',
+      r2Key,
+      uploadLength,
+      hasContent,
+    })
 
     const uploadInfo: StoredUploadInfo = {}
 

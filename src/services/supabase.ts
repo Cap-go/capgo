@@ -326,18 +326,6 @@ export async function getTotalStorage(orgId?: string): Promise<number> {
   return data ?? 0
 }
 
-export async function isGoodPlanOrg(orgId?: string): Promise<boolean> {
-  if (!orgId)
-    return false
-  const { data, error } = await useSupabase()
-    .rpc('is_good_plan_v5_org', { orgid: orgId })
-    .single()
-  if (error)
-    throw new Error(error.message)
-
-  return data ?? false
-}
-
 export async function isTrialOrg(orgId: string): Promise<number> {
   const { data, error } = await useSupabase()
     .rpc('is_trial_org', { orgid: orgId })
