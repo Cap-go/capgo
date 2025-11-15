@@ -395,6 +395,7 @@
   "error-fetching-deploy-history": "Dağıtım geçmişi getirme hatası",
   "error-fetching-members": "Üyeler getirilirken hata",
   "error-fetching-versions": "Sürüm alınırken hata oluştu! Lütfen tarayıcı konsolunu kontrol edin ve destek ile iletişime geçin",
+  "error-invalid-version": "Geçersiz sürüm kimliği. Lütfen tekrar deneyin veya destekle iletişime geçin.",
   "error-inviting-user": "Kullanıcı davet hatası",
   "error-loading-deletion-date": "Hesabınızın silinme tarihini bulamıyoruz",
   "error-message-invitation": "Hata oluştu. Lütfen Capgo desteği ile iletişime geçin.",

@@ -395,6 +395,7 @@
   "error-fetching-deploy-history": "배포 이력 가져오기 오류",
   "error-fetching-members": "멤버 가져오기 오류",
   "error-fetching-versions": "버전을 가져오는 중 오류가 발생했습니다! 브라우저 콘솔을 확인하고 지원팀에 연락해 주세요.",
+  "error-invalid-version": "잘못된 버전 ID입니다. 다시 시도하거나 지원팀에 문의해 주세요.",
   "error-inviting-user": "사용자 초대 오류",
   "error-loading-deletion-date": "당신의 계정 삭제 날짜를 찾을 수 없습니다.",
   "error-message-invitation": "오류가 발생했습니다. Capgo 지원에 문의하십시오.",

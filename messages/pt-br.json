@@ -395,6 +395,7 @@
   "error-fetching-deploy-history": "Erro ao buscar o histórico de implantação",
   "error-fetching-members": "Erro ao buscar membros",
   "error-fetching-versions": "Erro ao buscar versões! Por favor, verifique o console do navegador e entre em contato com o suporte",
+  "error-invalid-version": "ID de versão inválido. Por favor, tente novamente ou entre em contato com o suporte.",
   "error-inviting-user": "Erro ao convidar usuário",
   "error-loading-deletion-date": "Não é possível encontrar a data de exclusão da sua conta",
   "error-message-invitation": "Ocorreu um erro. Por favor, entre em contato com o suporte da Capgo.",

@@ -395,6 +395,7 @@
   "error-fetching-deploy-history": "デプロイメント履歴の取得エラー",
   "error-fetching-members": "メンバーの取得エラー",
   "error-fetching-versions": "バージョンの取得エラー！ブラウザコンソールを確認し、サポートに連絡してください",
+  "error-invalid-version": "無効なバージョンIDです。もう一度お試しいただくか、サポートにお問い合わせください。",
   "error-inviting-user": "ユーザーの招待エラー",
   "error-loading-deletion-date": "あなたのアカウントの削除日を見つけることができません",
   "error-message-invitation": "エラーが発生しました。Capgoサポートに連絡してください。",

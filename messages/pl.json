@@ -395,6 +395,7 @@
   "error-fetching-deploy-history": "Błąd podczas pobierania historii wdrożeń",
   "error-fetching-members": "Błąd podczas pobierania członków",
   "error-fetching-versions": "Błąd podczas pobierania wersji! Sprawdź konsolę przeglądarki i skontaktuj się z pomocą techniczną",
+  "error-invalid-version": "Nieprawidłowe ID wersji. Spróbuj ponownie lub skontaktuj się z pomocą techniczną.",
   "error-inviting-user": "Błąd podczas zapraszania użytkownika",
   "error-loading-deletion-date": "Nie można znaleźć daty usunięcia Twojego konta",
   "error-message-invitation": "Wystąpił błąd. Proszę skontaktować się z pomocą techniczną Capgo.",

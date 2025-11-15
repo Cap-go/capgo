@@ -395,6 +395,7 @@
   "error-fetching-deploy-history": "Fehler beim Abrufen der Bereitstellungshistorie",
   "error-fetching-members": "Fehler beim Abrufen von Mitgliedern",
   "error-fetching-versions": "Fehler beim Abrufen von Versionen! Bitte überprüfen Sie die Browser-Konsole und kontaktieren Sie den Support",
+  "error-invalid-version": "Ungültige Versions-ID. Bitte versuchen Sie es erneut oder kontaktieren Sie den Support.",
   "error-inviting-user": "Fehler beim Einladen des Benutzers",
   "error-loading-deletion-date": "Kann das Datum der Löschung Ihres Kontos nicht finden",
   "error-message-invitation": "Ein Fehler ist aufgetreten. Bitte kontaktieren Sie den Capgo-Support.",

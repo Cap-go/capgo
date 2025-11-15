@@ -309,6 +309,14 @@ async function saveChannelChange(key: string, val: any) {
   console.log('saveChannelChange', key, val)
   if (!id.value || !channel.value)
     return
+
+  // Validate version ID if updating version field
+  if (key === 'version' && (val === undefined || val === null || typeof val !== 'number')) {
+    console.error('Invalid version ID:', val)
+    toast.error(t('error-invalid-version'))
+    return
+  }
+
   try {
     const update = {
       [key]: val,
@@ -467,6 +475,12 @@ async function handleRevertToBuiltin() {
           if (error) {
             console.error('lazy load revertVersionId fail', error)
             toast.error(t('error-revert-to-builtin'))
+            return
+          }
+
+          if (!revertVersionId || typeof revertVersionId !== 'number') {
+            console.error('Invalid revert version ID:', revertVersionId)
+            toast.error(t('error-invalid-version'))
             return
           }
 
