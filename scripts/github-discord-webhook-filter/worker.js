@@ -1,5 +1,6 @@
 const BLOCKED_SENDERS = [
   'sonarcloud',
+  'sonarqube',
   'sonar-cloud',
   'coderabbit',
   'code-rabbit',
@@ -51,7 +52,12 @@ export default {
     console.log('Forwarding payload to Discord webhook.', discordUrl, payload)
     return fetch(discordUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': request.headers.get('User-Agent') || 'GitHub-Hookshot',
+        'X-GitHub-Event': request.headers.get('X-GitHub-Event') || '',
+        'X-GitHub-Delivery': request.headers.get('X-GitHub-Delivery') || '',
+      },
       body: JSON.stringify(payload),
     })
   },
