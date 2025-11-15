@@ -4,7 +4,7 @@ import { FormKit, FormKitMessages } from '@formkit/vue'
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
-import iconPassword from '~icons/ph/key?raw'
+import iconPassword from '~icons/heroicons/key?raw'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 
