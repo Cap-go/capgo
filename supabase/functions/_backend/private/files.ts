@@ -1,13 +1,13 @@
 import type { Context, Next } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
+import type { Database } from '../utils/supabase.types.ts'
 import { getRuntimeKey } from 'hono/adapter'
 import { HTTPException } from 'hono/http-exception'
 import { Hono } from 'hono/tiny'
 import { app as ok } from '../public/ok.ts'
 import { parseUploadMetadata } from '../tus/parse.ts'
 import { DEFAULT_RETRY_PARAMS, RetryBucket } from '../tus/retry.ts'
-import { MAX_UPLOAD_LENGTH_BYTES, TUS_VERSION, X_CHECKSUM_SHA256 } from '../tus/uploadHandler.ts'
-import { ALLOWED_HEADERS, ALLOWED_METHODS, EXPOSED_HEADERS, toBase64 } from '../tus/util.ts'
+import { ALLOWED_HEADERS, ALLOWED_METHODS, EXPOSED_HEADERS, MAX_UPLOAD_LENGTH_BYTES, toBase64, TUS_VERSION, X_CHECKSUM_SHA256 } from '../tus/util.ts'
 import { simpleError } from '../utils/hono.ts'
 import { middlewareKey } from '../utils/hono_middleware.ts'
 import { cloudlog } from '../utils/logging.ts'
@@ -175,15 +175,20 @@ async function uploadHandler(c: Context) {
 
   if (durableObjNs == null) {
     cloudlog({ requestId: c.get('requestId'), message: 'files durableObjNs is null' })
-    throw simpleError('invalid_bucket_configuration', 'Invalid bucket configuration')
+    return simpleError('invalid_bucket_configuration', 'Invalid bucket configuration')
   }
 
   const handler = durableObjNs.get(durableObjNs.idFromName(normalizedRequestId))
-  cloudlog({ requestId: c.get('requestId'), message: 'upload handler' })
+  cloudlog({ requestId: c.get('requestId'), message: 'upload handler - forwarding to DO', method: c.req.method, url: c.req.url })
+
+  // Pass requestId to DO via header so it can use it in logs
+  const headers = new Headers(c.req.raw.headers)
+  headers.set('X-Request-Id', c.get('requestId') || 'unknown')
+
   return await handler.fetch(c.req.url, {
     body: c.req.raw.body,
     method: c.req.method,
-    headers: c.req.raw.headers,
+    headers,
     signal: AbortSignal.timeout(DO_CALL_TIMEOUT),
   })
 }
@@ -243,11 +248,24 @@ async function setKeyFromMetadata(c: Context, next: Next) {
 
 async function setKeyFromIdParam(c: Context, next: Next) {
   const fileId = c.req.param('id')
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: 'setKeyFromIdParam - raw param',
+    fileId,
+    url: c.req.url,
+    method: c.req.method,
+  })
   if (fileId == null) {
-    cloudlog({ requestId: c.get('requestId'), message: 'fileId is null' })
+    cloudlog({ requestId: c.get('requestId'), message: 'setKeyFromIdParam - fileId is null' })
     return c.json({ error: 'not_found', message: 'Not found' }, 404)
   }
   const normalizedFileId = decodeURIComponent(fileId)
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: 'setKeyFromIdParam - after decodeURIComponent',
+    originalFileId: fileId,
+    normalizedFileId,
+  })
   c.set('fileId', normalizedFileId)
   await next()
 }
@@ -306,12 +324,15 @@ async function checkWriteAppAccess(c: Context, next: Next) {
   })
 
   const capgkey = c.get('capgkey') as string
+  const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
+
   cloudlog({
     requestId: c.get('requestId'),
     message: 'checkWriteAppAccess - checking api key',
     capgkey: capgkey ? `${capgkey.substring(0, 10)}...` : 'missing',
     capgkeyLength: capgkey?.length ?? 0,
     hasCapgkey: !!capgkey,
+    userId: apikey.user_id,
   })
 
   const { data: userId, error: _errorUserId } = await supabaseAdmin(c)
@@ -346,12 +367,21 @@ async function checkWriteAppAccess(c: Context, next: Next) {
 
   cloudlog({
     requestId: c.get('requestId'),
-    message: 'checkWriteAppAccess - checking app permissions',
+    message: 'checkWriteAppAccess - checking app permissions via hasAppRightApikey',
     userId,
     app_id,
   })
 
-  if (!(await hasAppRightApikey(c, app_id, userId, 'read', capgkey))) {
+  // Use the hasAppRightApikey function which checks org membership, roles, and permissions
+  const hasPermission = await hasAppRightApikey(c, app_id, userId, 'read', capgkey)
+
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: 'checkWriteAppAccess - hasAppRightApikey result',
+    hasPermission,
+  })
+
+  if (!hasPermission) {
     cloudlog({
       requestId: c.get('requestId'),
       message: 'checkWriteAppAccess - insufficient permissions',

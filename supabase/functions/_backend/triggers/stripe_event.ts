@@ -55,7 +55,7 @@ async function invoiceUpcoming(c: Context, LogSnag: ReturnType<typeof logsnag>, 
       .eq('stripe_id', stripeData.data.product_id)
       .single()
     if (!plan) {
-      throw simpleError('failed_to_get_plan', 'failed to get plan', { stripeData })
+      return simpleError('failed_to_get_plan', 'failed to get plan', { stripeData })
     }
     planName = plan.name
     if (plan.price_y_id === stripeData.data.price_id) {
@@ -116,7 +116,7 @@ async function createdOrUpdated(c: Context, stripeData: StripeData, org: Org, Lo
     }
 
     if (dbError2) {
-      throw quickError(404, 'succeeded_customer_id_not_found', `succeeded: customer_id not found`, { dbError2, stripeData })
+      return quickError(404, 'succeeded_customer_id_not_found', `succeeded: customer_id not found`, { dbError2, stripeData })
     }
 
     const segment = await customerToSegmentOrg(c, org.id, stripeData.data.price_id, plan)
@@ -151,7 +151,7 @@ async function updateStripeInfo(c: Context, stripeData: StripeData) {
     .update(updateData)
     .eq('customer_id', stripeData.data.customer_id)
   if (dbError2) {
-    throw quickError(404, 'canceled_customer_id_not_found', `canceled:  customer_id not found`, { dbError2, stripeData })
+    return quickError(404, 'canceled_customer_id_not_found', `canceled:  customer_id not found`, { dbError2, stripeData })
   }
   return false
 }
@@ -176,10 +176,10 @@ async function getOrg(c: Context, stripeData: StripeData) {
     .eq('customer_id', stripeData.data.customer_id)
     .single()
   if (dbError) {
-    throw simpleError('webhook_error_no_org_found', 'Webhook Error: no org found')
+    return simpleError('webhook_error_no_org_found', 'Webhook Error: no org found')
   }
   if (!org) {
-    throw simpleError('webhook_error_no_org_found', 'Webhook Error: no org found')
+    return simpleError('webhook_error_no_org_found', 'Webhook Error: no org found')
   }
   return org
 }
@@ -193,7 +193,7 @@ async function cancelingOrFinished(c: Context, stripeEvent: Stripe.Event, stripe
       .update({ canceled_at: new Date().toISOString() })
       .eq('customer_id', stripeData.customer_id)
     if (dbError2) {
-      throw quickError(404, 'user_cancelled_customer_id_not_found', `USER CANCELLED, customer_id not found`, { dbError2, stripeData })
+      return quickError(404, 'user_cancelled_customer_id_not_found', `USER CANCELLED, customer_id not found`, { dbError2, stripeData })
     }
   }
   else if (stripeEvent.data.object.object === 'subscription' && stripeEvent.data.object.cancel_at_period_end === false && typeof previousAttributes.cancel_at_period_end === 'boolean' && previousAttributes.cancel_at_period_end === true) {
@@ -203,7 +203,7 @@ async function cancelingOrFinished(c: Context, stripeEvent: Stripe.Event, stripe
       .update({ canceled_at: null })
       .eq('customer_id', stripeData.customer_id)
     if (dbError2) {
-      throw quickError(404, 'user_uncancelled_customer_id_not_found', `USER UNCANCELED, customer_id not found`, { dbError2, stripeData })
+      return quickError(404, 'user_uncancelled_customer_id_not_found', `USER UNCANCELED, customer_id not found`, { dbError2, stripeData })
     }
   }
   return c.json(BRES)
@@ -224,7 +224,7 @@ app.post('/', middlewareStripeWebhook(), async (c) => {
     .single()
 
   if (!customer) {
-    throw simpleError('no_customer_found', 'no customer found', { stripeData })
+    return simpleError('no_customer_found', 'no customer found', { stripeData })
   }
 
   if (stripeEvent.type === 'customer.source.expiring') {

@@ -67,7 +67,7 @@ app.post('/', middlewareAPISecret, async (c) => {
   const { email, appId, type } = await parseBody<{ email: string, appId: string, type: string }>(c)
 
   if (!email || !appId || !type) {
-    throw simpleError('missing_email_appId_type', 'Missing email, appId, or type', { email, appId, type })
+    return simpleError('missing_email_appId_type', 'Missing email, appId, or type', { email, appId, type })
   }
   // check if email exists
   const { data: user, error: userError } = await supabaseAdmin(c)
@@ -76,7 +76,7 @@ app.post('/', middlewareAPISecret, async (c) => {
     .eq('email', email)
     .single()
   if (userError || !user)
-    throw simpleError('user_not_found', 'User not found', { email, userError })
+    return simpleError('user_not_found', 'User not found', { email, userError })
 
   if (type === 'weekly_install_stats') {
     return await handleWeeklyInstallStats(c, email, appId)
@@ -85,7 +85,7 @@ app.post('/', middlewareAPISecret, async (c) => {
     return await handleMonthlyCreateStats(c, email, appId)
   }
   else {
-    throw simpleError('invalid_stats_type', 'Invalid stats type', { email, appId, type })
+    return simpleError('invalid_stats_type', 'Invalid stats type', { email, appId, type })
   }
 })
 
@@ -97,7 +97,7 @@ async function handleWeeklyInstallStats(c: Context, email: string, appId: string
   }).single()
 
   if (!weeklyStats || generateStatsError) {
-    throw simpleError('cannot_generate_stats', 'Cannot generate stats', { error: generateStatsError })
+    return simpleError('cannot_generate_stats', 'Cannot generate stats', { error: generateStatsError })
   }
 
   if (weeklyStats.all_updates === 0) {

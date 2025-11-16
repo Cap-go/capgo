@@ -21,7 +21,7 @@ app.post('/', middlewareV2(['all', 'write']), async (c) => {
   const body = await parseBody<any>(c)
   const parsedBodyResult = bodySchema.safeParse(body)
   if (!parsedBodyResult.success) {
-    throw simpleError('invalid_json_body', 'Invalid json body', { body, parsedBodyResult })
+    return simpleError('invalid_json_body', 'Invalid json body', { body, parsedBodyResult })
   }
 
   const safeBody = parsedBodyResult.data
@@ -34,11 +34,11 @@ app.post('/', middlewareV2(['all', 'write']), async (c) => {
     .single()
 
   if (!organization || organizationError) {
-    throw simpleError('get_org_internal_error', 'Get org internal error', { organizationError })
+    return simpleError('get_org_internal_error', 'Get org internal error', { organizationError })
   }
 
   if (!organization.customer_id) {
-    throw simpleError('org_does_not_have_customer', 'Organization does not have a customer id', { orgId: safeBody.org_id })
+    return simpleError('org_does_not_have_customer', 'Organization does not have a customer id', { orgId: safeBody.org_id })
   }
 
   const userRight = await supabaseAdmin.rpc('check_min_rights', {
@@ -50,11 +50,11 @@ app.post('/', middlewareV2(['all', 'write']), async (c) => {
   })
 
   if (userRight.error) {
-    throw simpleError('internal_auth_error', 'Internal auth error', { userRight })
+    return simpleError('internal_auth_error', 'Internal auth error', { userRight })
   }
 
   if (!userRight.data) {
-    throw quickError(401, 'not_authorized', 'Not authorized', { userId: auth.userId, orgId: safeBody.org_id })
+    return quickError(401, 'not_authorized', 'Not authorized', { userId: auth.userId, orgId: safeBody.org_id })
   }
 
   await updateCustomerEmail(c, organization.customer_id, safeBody.email)
@@ -67,7 +67,7 @@ app.post('/', middlewareV2(['all', 'write']), async (c) => {
   if (updateOrgErr) {
     // revert stripe
     await updateCustomerEmail(c, organization.customer_id, organization.management_email)
-    throw simpleError('critical_error', 'Critical error', { updateOrgErr })
+    return simpleError('critical_error', 'Critical error', { updateOrgErr })
   }
 
   return c.body(null, 204) // No content

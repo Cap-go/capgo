@@ -80,7 +80,7 @@ export function getPgClientD1(c: Context, session: string = 'first-unconstrained
   }
   if (DB === undefined) {
     // Server/configuration error: surface as structured HTTP error
-    throw quickError(500, 'missing_binding', `REPLICATE ${dbRegion} is missing`, { dbRegion })
+    return quickError(500, 'missing_binding', `REPLICATE ${dbRegion} is missing`, { dbRegion })
   }
   cloudlog({ requestId: c.get('requestId'), message: `Using D1 ${dbRegion} instance` })
   c.header('X-Database-Source', `d1-${dbRegion}-session`)

@@ -88,7 +88,7 @@ app.get('/', async (c) => {
   const totalPercent = Object.values(diff).reduce((acc, table) => acc + table.percent, 0)
   const diffPercentage = Number((totalPercent / Object.keys(diff).length).toFixed(3))
   if (diffPercentage > 1) {
-    throw simpleError('mismatch_found', 'Mismatch found', { diff, diffPercentage })
+    return simpleError('mismatch_found', 'Mismatch found', { diff, diffPercentage })
   }
   return c.json({ status: 'ok', diff, diffPercentage })
 })

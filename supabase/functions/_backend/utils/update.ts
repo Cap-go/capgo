@@ -141,7 +141,7 @@ export async function updateWithPG(
       version_id: version_build,
       app_id_url: app_id,
     }, appOwner.owner_org, app_id, '0 0 * * 1'))
-    throw simpleError('semver_error', `Native version: ${body.version_build} doesn't follow semver convention, please check https://capgo.app/semver_tester/ to learn more about semver usage in Capgo`, { body })
+    return simpleError('semver_error', `Native version: ${body.version_build} doesn't follow semver convention, please check https://capgo.app/semver_tester/ to learn more about semver usage in Capgo`, { body })
   }
   // Check if plugin_version is deprecated and send notification
   // v6 is deprecated if < 6.25.0, v7 is deprecated if < 7.25.0, anything < 6.0.0 is deprecated
@@ -159,7 +159,7 @@ export async function updateWithPG(
     }, appOwner.owner_org, app_id, '0 0 * * 1'))
   }
   if (!app_id || !device_id || !version_build || !version_name || !platform) {
-    throw simpleError('missing_info', 'Cannot find device_id or app_id', { body })
+    return simpleError('missing_info', 'Cannot find device_id or app_id', { body })
   }
 
   await backgroundTask(c, createStatsMau(c, device_id, app_id, appOwner.owner_org))
