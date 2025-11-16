@@ -1,15 +1,29 @@
 import type { Context } from 'hono'
 
+import type { PoolClient } from 'pg'
 import type { Database } from './supabase.types.ts'
 import { parseCronExpression } from 'cron-schedule'
 import dayjs from 'dayjs'
 import { trackBentoEvent } from './bento.ts'
 import { cloudlog, cloudlogErr } from './logging.ts'
+import { closeClient, getPgClient } from './pg.ts'
 import { supabaseAdmin } from './supabase.ts'
 
 interface EventData {
   [key: string]: any
 }
+
+const ACQUIRE_NOTIFICATION_LOCK = `
+select pg_try_advisory_lock(
+  hashtext($1::text),
+  hashtext($2 || ':' || $3)
+) as locked`
+
+const RELEASE_NOTIFICATION_LOCK = `
+select pg_advisory_unlock(
+  hashtext($1::text),
+  hashtext($2 || ':' || $3)
+) as unlocked`
 
 async function sendNow(c: Context, eventName: string, eventData: EventData, email: string, orgId: string, uniqId: string, past: Database['public']['Tables']['notifications']['Row'] | null) {
   cloudlog({ requestId: c.get('requestId'), message: 'send notif', eventName, email })
@@ -64,36 +78,70 @@ function isSendable(c: Context, last: string, cron: string) {
 }
 
 export async function sendNotifOrg(c: Context, eventName: string, eventData: EventData, orgId: string, uniqId: string, cron: string) {
-  const { data: org, error: orgError } = await supabaseAdmin(c)
-    .from('orgs')
-    .select()
-    .eq('id', orgId)
-    .single()
+  const lockPool = getPgClient(c)
+  let lockConnection: PoolClient | null = null
+  let lockAcquired = false
 
-  if (!org || orgError) {
-    cloudlog({ requestId: c.get('requestId'), message: 'org not found', orgId })
+  try {
+    lockConnection = await lockPool.connect()
+    const lockResult = await lockConnection.query<{ locked: boolean }>(ACQUIRE_NOTIFICATION_LOCK, [orgId, eventName, uniqId])
+    lockAcquired = lockResult.rows?.[0]?.locked ?? false
+    if (!lockAcquired) {
+      cloudlog({ requestId: c.get('requestId'), message: 'notif lock busy', orgId, event: eventName, uniqId })
+      return false
+    }
+
+    const { data: org, error: orgError } = await supabaseAdmin(c)
+      .from('orgs')
+      .select()
+      .eq('id', orgId)
+      .single()
+
+    if (!org || orgError) {
+      cloudlog({ requestId: c.get('requestId'), message: 'org not found', orgId })
+      return false
+    }
+    // check if notif has already been send in notifications table
+    const { data: notif } = await supabaseAdmin(c)
+      .from('notifications')
+      .select()
+      .eq('owner_org', org.id)
+      .eq('event', eventName)
+      .eq('uniq_id', uniqId)
+      .single()
+    // set user data in crisp
+    if (!notif) {
+      cloudlog({ requestId: c.get('requestId'), message: 'notif never sent', event: eventName, uniqId })
+      await sendNow(c, eventName, eventData, org.management_email, orgId, uniqId, null)
+      return true
+    }
+
+    if (notif && !isSendable(c, notif.last_send_at, cron)) {
+      cloudlog({ requestId: c.get('requestId'), message: 'notif already sent', event: eventName, orgId })
+      return false
+    }
+    cloudlog({ requestId: c.get('requestId'), message: 'notif ready to sent', event: eventName, orgId })
+    await sendNow(c, eventName, eventData, org.management_email, orgId, uniqId, notif)
+    return true
+  }
+  catch (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'notif lock failure', error })
     return false
   }
-  // check if notif has already been send in notifications table
-  const { data: notif } = await supabaseAdmin(c)
-    .from('notifications')
-    .select()
-    .eq('owner_org', org.id)
-    .eq('event', eventName)
-    .eq('uniq_id', uniqId)
-    .single()
-  // set user data in crisp
-  if (!notif) {
-    cloudlog({ requestId: c.get('requestId'), message: 'notif never sent', event: eventName, uniqId })
-    return sendNow(c, eventName, eventData, org.management_email, orgId, uniqId, null).then(() => true)
+  finally {
+    if (lockConnection) {
+      if (lockAcquired) {
+        try {
+          await lockConnection.query(RELEASE_NOTIFICATION_LOCK, [orgId, eventName, uniqId])
+        }
+        catch (unlockError) {
+          cloudlogErr({ requestId: c.get('requestId'), message: 'notif unlock failure', error: unlockError })
+        }
+      }
+      lockConnection.release()
+    }
+    await closeClient(c, lockPool)
   }
-
-  if (notif && !isSendable(c, notif.last_send_at, cron)) {
-    cloudlog({ requestId: c.get('requestId'), message: 'notif already sent', event: eventName, orgId })
-    return false
-  }
-  cloudlog({ requestId: c.get('requestId'), message: 'notif ready to sent', event: eventName, orgId })
-  return sendNow(c, eventName, eventData, org.management_email, orgId, uniqId, notif).then(() => true)
 }
 
 // dayjs subtract one week
