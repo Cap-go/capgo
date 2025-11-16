@@ -13,7 +13,6 @@ export function posthogLoader(supaHost: string) {
     api_host: 'https://psthg.digitalshift-ee.workers.dev/',
     person_profiles: 'identified_only',
     defaults: '2025-05-24',
-    disable_external_dependency_loading: true,
   })
 }
 

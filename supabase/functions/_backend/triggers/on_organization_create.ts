@@ -16,7 +16,7 @@ app.post('/', middlewareAPISecret, triggerValidator('orgs', 'INSERT'), async (c)
 
   if (!record.id) {
     cloudlog({ requestId: c.get('requestId'), message: 'No id' })
-    throw simpleError('no_id', 'No id', { record })
+    return simpleError('no_id', 'No id', { record })
   }
 
   if (!record.customer_id)

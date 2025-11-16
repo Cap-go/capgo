@@ -37,7 +37,7 @@ app.post('/', async (c) => {
   // Validate the request body using Zod
   const validationResult = acceptInvitationSchema.safeParse(rawBody)
   if (!validationResult.success) {
-    throw simpleError('invalid_json_body', 'Invalid request', { errors: z.prettifyError(validationResult.error) })
+    return simpleError('invalid_json_body', 'Invalid request', { errors: z.prettifyError(validationResult.error) })
   }
 
   const body = validationResult.data
@@ -53,11 +53,11 @@ app.post('/', async (c) => {
     .single()
 
   if (invitationError) {
-    throw quickError(500, 'failed_to_accept_invitation', 'Failed to accept invitation get tmp_users', { error: invitationError.message })
+    return quickError(500, 'failed_to_accept_invitation', 'Failed to accept invitation get tmp_users', { error: invitationError.message })
   }
 
   if (!invitation) {
-    throw quickError(404, 'failed_to_accept_invitation', 'Invitation not found', { error: 'Invitation not found' })
+    return quickError(404, 'failed_to_accept_invitation', 'Invitation not found', { error: 'Invitation not found' })
   }
 
   // here the real magic happens
@@ -69,7 +69,7 @@ app.post('/', async (c) => {
   })
 
   if (userError || !user) {
-    throw quickError(500, 'failed_to_accept_invitation', 'Failed to accept invitation createUser', { error: userError?.message ?? 'Unknown error' })
+    return quickError(500, 'failed_to_accept_invitation', 'Failed to accept invitation createUser', { error: userError?.message ?? 'Unknown error' })
   }
 
   // TODO: improve error handling
@@ -83,7 +83,7 @@ app.post('/', async (c) => {
   }).select().single()
 
   if (userNormalTableError) {
-    throw quickError(500, 'failed_to_accept_invitation', 'Failed to accept invitation insert', { error: userNormalTableError.message })
+    return quickError(500, 'failed_to_accept_invitation', 'Failed to accept invitation insert', { error: userNormalTableError.message })
   }
 
   await syncUserPreferenceTags(c, invitation.email, data)
@@ -100,13 +100,13 @@ app.post('/', async (c) => {
   })
 
   if (sessionError) {
-    throw quickError(500, 'failed_to_accept_invitation', 'Sign in failed', { error: sessionError.message })
+    return quickError(500, 'failed_to_accept_invitation', 'Sign in failed', { error: sessionError.message })
   }
 
   // We are still not finished. We need to remove from tmp_users and accept the invitation
   const { error: tmpUserDeleteError } = await supabaseAdmin.from('tmp_users').delete().eq('invite_magic_string', body.magic_invite_string)
   if (tmpUserDeleteError) {
-    throw quickError(500, 'failed_to_accept_invitation', 'Failed to accept invitation delete tmp_users', { error: tmpUserDeleteError.message })
+    return quickError(500, 'failed_to_accept_invitation', 'Failed to accept invitation delete tmp_users', { error: tmpUserDeleteError.message })
   }
 
   const { error: insertIntoMainTableError } = await supabaseAdmin.from('org_users').insert({
@@ -116,7 +116,7 @@ app.post('/', async (c) => {
   })
 
   if (insertIntoMainTableError) {
-    throw quickError(500, 'failed_to_accept_invitation', 'Failed to accept invitation insert into org_users', { error: insertIntoMainTableError.message })
+    return quickError(500, 'failed_to_accept_invitation', 'Failed to accept invitation insert into org_users', { error: insertIntoMainTableError.message })
   }
 
   return c.json({

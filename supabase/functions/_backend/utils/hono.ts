@@ -57,12 +57,12 @@ export function triggerValidator(
 
     if (body.table !== String(table)) {
       cloudlog({ requestId: c.get('requestId'), message: `Not ${String(table)}` })
-      throw simpleError('table_not_match', 'Not table', { body })
+      return simpleError('table_not_match', 'Not table', { body })
     }
 
     if (body.type !== type) {
       cloudlog({ requestId: c.get('requestId'), message: `Not ${type}` })
-      throw simpleError('type_not_match', 'Not type', { body })
+      return simpleError('type_not_match', 'Not type', { body })
     }
 
     // Store the validated body in context for next middleware
@@ -77,7 +77,7 @@ export function triggerValidator(
       c.set('oldRecord', body.old_record)
     }
     else {
-      throw simpleError('invalid_payload', 'Invalid payload', { body })
+      return simpleError('invalid_payload', 'Invalid payload', { body })
     }
 
     await next()
@@ -97,7 +97,7 @@ export async function getBodyOrQuery<T>(c: Context<MiddlewareKeyVariables, any, 
   }
   if (!body || Object.keys(body).length === 0) {
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot find body', query: c.req.query() })
-    throw simpleError('invalid_json_parse_body', 'Invalid JSON body')
+    return simpleError('invalid_json_parse_body', 'Invalid JSON body')
   }
   if ((body as any).device_id) {
     (body as any).device_id = (body as any).device_id.toLowerCase()
@@ -109,7 +109,7 @@ export const middlewareAuth = honoFactory.createMiddleware(async (c, next) => {
   const authorization = c.req.header('authorization')
   if (!authorization) {
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot find authorization', query: c.req.query() })
-    throw simpleError('cannot_find_authorization', 'Cannot find authorization')
+    return simpleError('cannot_find_authorization', 'Cannot find authorization')
   }
   c.set('authorization', authorization)
   await next()
@@ -122,11 +122,11 @@ export const middlewareAPISecret = honoFactory.createMiddleware(async (c, next) 
   // timingSafeEqual is here to prevent a timing attack
   if (!authorizationSecret || !API_SECRET) {
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot find authorizationSecret or API_SECRET', query: c.req.query() })
-    throw simpleError('cannot_find_authorization_secret', 'Cannot find authorization')
+    return simpleError('cannot_find_authorization_secret', 'Cannot find authorization')
   }
   if (!await timingSafeEqual(authorizationSecret, API_SECRET)) {
     cloudlog({ requestId: c.get('requestId'), message: 'Invalid API secret', query: c.req.query() })
-    throw simpleError('invalid_api_secret', 'Invalid API secret')
+    return simpleError('invalid_api_secret', 'Invalid API secret')
   }
   c.set('APISecret', authorizationSecret)
   await next()
@@ -157,7 +157,28 @@ export function createHono(functionName: string, version: string, sentryDsn?: st
   })
 
   appGlobal.use('*', logger())
-  appGlobal.use('*', requestId())
+  // Use platform-specific request IDs, fallback to generated UUID
+  appGlobal.use('*', requestId({
+    generator: (c) => {
+      // Cloudflare provides the Ray ID in the cf-ray header
+      // Check this first as it's our primary deployment target
+      const cfRay = c.req.header('cf-ray')
+      if (cfRay) {
+        cloudlog({ message: 'requestId source: cf-ray', cfRay })
+        return cfRay
+      }
+      // Supabase Edge Functions provide SB_EXECUTION_ID
+      const sbExecutionId = getEnv(c, 'SB_EXECUTION_ID')
+      if (sbExecutionId) {
+        cloudlog({ message: 'requestId source: SB_EXECUTION_ID', sbExecutionId })
+        return sbExecutionId
+      }
+      // Fallback to crypto.randomUUID() if not on any known platform
+      const uuid = crypto.randomUUID()
+      cloudlog({ message: 'requestId source: crypto.randomUUID()', uuid })
+      return uuid
+    },
+  }))
 
   appGlobal.post('/ok', (c) => {
     return c.json(BRES)
@@ -200,21 +221,22 @@ export function simpleError200(c: Context, errorCode: string, message: string, m
   return c.json(res, status)
 }
 
-export function quickError(status: number, errorCode: string, message: string, moreInfo: any = {}, cause?: any) {
-  const res: SimpleErrorResponse = {
+export function quickError(status: number, errorCode: string, message: string, moreInfo: any = {}, cause?: any): never {
+  // Store error details in cause so onError can extract them
+  const errorDetails = {
     error: errorCode,
     message,
     moreInfo,
+    originalCause: cause,
   }
-  // Throw an HTTPException carrying the JSON response; keep Error.message concise
-  return new HTTPException(status as any, {
-    res: new Response(JSON.stringify(res), { status, headers: { 'content-type': 'application/json; charset=utf-8' } }),
+  // Throw a simple HTTPException - onError will create the response with X-Request-Id header
+  throw new HTTPException(status as any, {
     message,
-    cause,
+    cause: errorDetails,
   })
 }
 
-export function simpleRateLimit(moreInfo: any = {}, cause?: any) {
+export function simpleRateLimit(moreInfo: any = {}, cause?: any): never {
   const status = 429
   const message = 'Too many requests'
   const errorCode = 'too_many_requests'
@@ -222,14 +244,14 @@ export function simpleRateLimit(moreInfo: any = {}, cause?: any) {
   return quickError(status, errorCode, message, moreInfo, cause)
 }
 
-export function simpleError(errorCode: string, message: string, moreInfo: any = {}, cause?: any) {
+export function simpleError(errorCode: string, message: string, moreInfo: any = {}, cause?: any): never {
   return quickError(400, errorCode, message, moreInfo, cause)
 }
 
 export function parseBody<T>(c: Context) {
   return c.req.json<T>()
     .catch((e) => {
-      throw simpleError('invalid_json_parse_body', 'Invalid JSON body', { e })
+      return simpleError('invalid_json_parse_body', 'Invalid JSON body', { e })
     })
     .then((body) => {
       if ((body as any).device_id) {

@@ -30,7 +30,7 @@ app.post('/', middlewareV2(['all', 'write']), async (c) => {
   const body = await parseBody<CreateDeviceBody>(c)
   const parsedBodyResult = bodySchema.safeParse(body)
   if (!parsedBodyResult.success) {
-    throw simpleError('invalid_json_body', 'Invalid JSON body', { body, parsedBodyResult })
+    return simpleError('invalid_json_body', 'Invalid JSON body', { body, parsedBodyResult })
   }
 
   const safeBody = parsedBodyResult.data
@@ -43,7 +43,7 @@ app.post('/', middlewareV2(['all', 'write']), async (c) => {
     .single()
 
   if (appError) {
-    throw quickError(404, 'app_not_found', 'App not found', { app_id: safeBody.app_id })
+    return quickError(404, 'app_not_found', 'App not found', { app_id: safeBody.app_id })
   }
 
   const userId = auth.userId
@@ -57,11 +57,11 @@ app.post('/', middlewareV2(['all', 'write']), async (c) => {
   })
 
   if (userRight.error) {
-    throw simpleError('internal_auth_error', 'Cannot get user right', { userRight })
+    return simpleError('internal_auth_error', 'Cannot get user right', { userRight })
   }
 
   if (!userRight.data) {
-    throw quickError(401, 'not_authorized', 'Not authorized', { userId, appId: safeBody.app_id })
+    return quickError(401, 'not_authorized', 'Not authorized', { userId, appId: safeBody.app_id })
   }
 
   await createStatsDevices(c, {

@@ -203,7 +203,7 @@ async function readQueue(c: Context, db: ReturnType<typeof getPgClient>, queueNa
       messages = result.rows
     }
     catch (readError) {
-      throw simpleError('error_reading_from_pgmq_queue', 'Error reading from pgmq queue', { queueName }, readError)
+      return simpleError('error_reading_from_pgmq_queue', 'Error reading from pgmq queue', { queueName }, readError)
     }
 
     if (!messages || (messages && messages.length === 0)) {
@@ -217,7 +217,7 @@ async function readQueue(c: Context, db: ReturnType<typeof getPgClient>, queueNa
       return parsed.data as Message[]
     }
     else {
-      throw simpleError('invalid_message_format', 'Invalid message format', { parsed: parsed.error })
+      return simpleError('invalid_message_format', 'Invalid message format', { parsed: parsed.error })
     }
   }
   catch (error) {
@@ -270,7 +270,7 @@ export async function http_post_helper(
     return response
   }
   catch (error) {
-    throw simpleError('request_timeout', 'Request Timeout (Internal QUEUE handling error)', { function_name }, error)
+    return simpleError('request_timeout', 'Request Timeout (Internal QUEUE handling error)', { function_name }, error)
   }
   finally {
     clearTimeout(timeoutId)
@@ -289,7 +289,7 @@ async function delete_queue_message_batch(c: Context, db: ReturnType<typeof getP
     )
   }
   catch (error) {
-    throw simpleError('error_deleting_queue_messages', 'Error deleting queue messages', { msgIds, queueName }, error)
+    return simpleError('error_deleting_queue_messages', 'Error deleting queue messages', { msgIds, queueName }, error)
   }
 }
 
@@ -320,7 +320,7 @@ async function archive_queue_messages(c: Context, db: ReturnType<typeof getPgCli
       msgIdsLength: msgIds.length,
     })
 
-    throw simpleError('error_archiving_queue_messages', `Error archiving queue messages: ${errorMessage}`, { msgIds: msgIdsTruncated, msgIdsLength: msgIds.length, queueName, errorMessage }, error)
+    return simpleError('error_archiving_queue_messages', `Error archiving queue messages: ${errorMessage}`, { msgIds: msgIdsTruncated, msgIdsLength: msgIds.length, queueName, errorMessage }, error)
   }
 }
 
@@ -347,7 +347,7 @@ async function mass_edit_queue_messages_cf_ids(
     `)
   }
   catch (error) {
-    throw simpleError('error_updating_cf_ids', 'Error updating CF IDs', {}, error)
+    return simpleError('error_updating_cf_ids', 'Error updating CF IDs', {}, error)
   }
 }
 
@@ -372,13 +372,13 @@ app.post('/sync', async (c) => {
   const batchSize = body?.batch_size
 
   if (!queueName || typeof queueName !== 'string') {
-    throw simpleError('missing_or_invalid_queue_name', 'Missing or invalid queue_name in body', { body })
+    return simpleError('missing_or_invalid_queue_name', 'Missing or invalid queue_name in body', { body })
   }
 
   // Only validate when batchSize is explicitly provided
   if (batchSize !== undefined) {
     if (typeof batchSize !== 'number' || batchSize <= 0) {
-      throw simpleError('invalid_batch_size', 'batch_size must be a positive number', { batchSize })
+      return simpleError('invalid_batch_size', 'batch_size must be a positive number', { batchSize })
     }
   }
 

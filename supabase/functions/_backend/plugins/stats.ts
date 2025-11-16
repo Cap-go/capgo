@@ -96,7 +96,7 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
       cloudlog({ requestId: c.get('requestId'), message: `Version name ${version_name} not found, using unknown instead`, app_id, version_name })
     }
     else {
-      throw quickError(404, 'version_not_found', 'Version not found', { app_id, version_name })
+      return quickError(404, 'version_not_found', 'Version not found', { app_id, version_name })
     }
   }
   // device.version = appVersion.id
@@ -137,7 +137,7 @@ export const app = new Hono<MiddlewareKeyVariables>()
 app.post('/', async (c) => {
   const body = await parseBody<AppStats>(c)
   if (isLimited(c, body.app_id)) {
-    throw simpleRateLimit(body)
+    return simpleRateLimit(body)
   }
   const isV2 = getIsV2Stats(c)
   const pgClient = isV2 ? null : getPgClient(c, true) // READ-ONLY: writes use SDK, not Drizzle

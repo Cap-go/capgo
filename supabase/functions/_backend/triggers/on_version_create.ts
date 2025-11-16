@@ -16,7 +16,7 @@ app.post('/', middlewareAPISecret, triggerValidator('app_versions', 'INSERT'), a
 
   if (!record.id) {
     cloudlog({ requestId: c.get('requestId'), message: 'No id' })
-    throw simpleError('no_id', 'No id', { record })
+    return simpleError('no_id', 'No id', { record })
   }
 
   const { error: errorUpdate } = await supabaseAdmin(c)
@@ -48,7 +48,7 @@ app.post('/', middlewareAPISecret, triggerValidator('app_versions', 'INSERT'), a
     .single()
     .then(({ data, error }) => {
       if (error || !data) {
-        throw simpleError('error_fetching_organization', 'Error fetching organization', { error })
+        return simpleError('error_fetching_organization', 'Error fetching organization', { error })
       }
       return trackBentoEvent(c, data.management_email, {
         org_id: record.owner_org,

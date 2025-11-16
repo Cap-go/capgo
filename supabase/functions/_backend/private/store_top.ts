@@ -17,11 +17,11 @@ app.get('/', async (c) => {
   const totalCategory = countTotal ?? 0
 
   if (!data) {
-    throw simpleError('error_unknown', 'Error unknown')
+    return simpleError('error_unknown', 'Error unknown')
   }
   return c.json({
     apps: data ?? [],
     // calculate percentage usage
-    usage: ((totalCategory * 100) / countTotal).toFixed(2),
+    usage: countTotal && countTotal > 0 ? ((totalCategory * 100) / countTotal).toFixed(2) : '0.00',
   })
 })

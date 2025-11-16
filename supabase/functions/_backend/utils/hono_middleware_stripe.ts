@@ -21,13 +21,13 @@ export function middlewareStripeWebhook() {
   return honoFactory.createMiddleware(async (c, next) => {
     if (!getEnv(c, 'STRIPE_WEBHOOK_SECRET') || !getEnv(c, 'STRIPE_SECRET_KEY')) {
       cloudlog({ requestId: c.get('requestId'), message: 'Webhook Error: no secret found' })
-      throw simpleError('webhook_error_no_secret', 'Webhook Error: no secret found')
+      return simpleError('webhook_error_no_secret', 'Webhook Error: no secret found')
     }
 
     const signature = c.req.raw.headers.get('stripe-signature')
     if (!signature || !getEnv(c, 'STRIPE_WEBHOOK_SECRET') || !getEnv(c, 'STRIPE_SECRET_KEY')) {
       cloudlog({ requestId: c.get('requestId'), message: 'Webhook Error: no signature' })
-      throw simpleError('webhook_error_no_signature', 'Webhook Error: no signature')
+      return simpleError('webhook_error_no_signature', 'Webhook Error: no signature')
     }
     const body = await c.req.text()
     const stripeEvent = await parseStripeEvent(c, body, signature)
@@ -35,7 +35,7 @@ export function middlewareStripeWebhook() {
     const stripeData = stripeDataEvent.data
     if (stripeData.customer_id === '') {
       cloudlog({ requestId: c.get('requestId'), message: 'Webhook Error: no customer found' })
-      throw simpleError('webhook_error_no_customer', 'Webhook Error: no customer found')
+      return simpleError('webhook_error_no_customer', 'Webhook Error: no customer found')
     }
     c.set('stripeEvent', stripeEvent)
     c.set('stripeData', stripeDataEvent)

@@ -374,7 +374,7 @@ export async function getOrgWithCustomerInfo(c: Context, orgId: string) {
     .eq('id', orgId)
     .single()
   if (userError || !org)
-    throw quickError(404, 'org_not_found', 'Org not found', { orgId, userError })
+    return quickError(404, 'org_not_found', 'Org not found', { orgId, userError })
   return org
 }
 

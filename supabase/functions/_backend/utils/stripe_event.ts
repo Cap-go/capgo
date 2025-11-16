@@ -89,7 +89,7 @@ function invoiceUpcoming(event: Stripe.InvoiceUpcomingEvent, data: Database['pub
 
 export function extractDataEvent(c: Context, event: Stripe.Event): StripeData {
   let data: Database['public']['Tables']['stripe_info']['Insert'] = {
-    product_id: undefined, // Changed from '' to undefined to avoid FK constraint violations
+    product_id: undefined as any, // Changed from '' to undefined to avoid FK constraint violations
     price_id: undefined, // Changed from '' to undefined for consistency
     subscription_id: undefined,
     subscription_anchor_start: undefined,

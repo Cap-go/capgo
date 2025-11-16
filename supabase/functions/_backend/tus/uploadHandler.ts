@@ -9,8 +9,10 @@ import type {
 } from './retry.ts'
 import type { Part } from './util.ts'
 import { Buffer } from 'node:buffer'
+import { DurableObject } from 'cloudflare:workers'
 import { HTTPException } from 'hono/http-exception'
 import { logger } from 'hono/logger'
+import { requestId } from 'hono/request-id'
 import { Hono } from 'hono/tiny'
 import { quickError } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../utils/logging.ts'
@@ -23,30 +25,23 @@ import {
   isR2MultipartDoesNotExistError,
   RetryBucket,
 } from './retry.ts'
-import { ALLOWED_HEADERS, ALLOWED_METHODS, AsyncLock, EXPOSED_HEADERS, generateParts, readIntFromHeader, toBase64, WritableStreamBuffer } from './util.ts'
-
-export const TUS_VERSION = '1.0.0'
-
-// uploads larger than this will be rejected
-export const MAX_UPLOAD_LENGTH_BYTES = 1024 * 1024 * 1024 // 1GB
-export const MAX_CHUNK_SIZE_BYTES = 1024 * 1024 * 99 // 99MB
-export const ALERT_UPLOAD_SIZE_BYTES = 1024 * 1024 * 20 // 20MB
-
-export const X_CHECKSUM_SHA256 = 'X-Checksum-Sha256'
-
-// how long an unfinished upload lives in ms
-const UPLOAD_EXPIRATION_MS = 1 * 24 * 60 * 60 * 1000 // 1 day
-// TODO: make sure partial unfinished uploads are cleaned up automatically in r2 after 1 day
-
-// how much we'll buffer in memory, must be greater than or equal to R2's min part size
-// https://developers.cloudflare.com/r2/objects/multipart-objects/#limitations
-const BUFFER_SIZE = 1024 * 1024 * 5
-
-// how much of the upload we've written
-const UPLOAD_OFFSET_KEY = 'upload-offset'
-
-// key for StoredUploadInfo
-const UPLOAD_INFO_KEY = 'upload-info'
+import {
+  ALLOWED_HEADERS,
+  ALLOWED_METHODS,
+  AsyncLock,
+  BUFFER_SIZE,
+  EXPOSED_HEADERS,
+  generateParts,
+  MAX_UPLOAD_LENGTH_BYTES,
+  readIntFromHeader,
+  toBase64,
+  TUS_VERSION,
+  UPLOAD_EXPIRATION_MS,
+  UPLOAD_INFO_KEY,
+  UPLOAD_OFFSET_KEY,
+  WritableStreamBuffer,
+  X_CHECKSUM_SHA256,
+} from './util.ts'
 
 // Stored for each part with the key of the multipart part number. Part numbers start with 1
 interface StoredR2Part {
@@ -79,9 +74,9 @@ interface Env {
   ATTACHMENT_BUCKET: R2Bucket
 }
 
-export class UploadHandler {
+export class UploadHandler extends DurableObject {
   state: DurableObjectState
-  env: Env
+  override env: Env
   router: Hono<MiddlewareKeyVariables, BlankSchema, '/'>
   parts: StoredR2Part[]
   multipart: RetryMultipartUpload | undefined
@@ -91,6 +86,7 @@ export class UploadHandler {
   requestGate: AsyncLock
 
   constructor(state: DurableObjectState, env: Env) {
+    super(state as unknown as ConstructorParameters<typeof DurableObject>[0], env)
     const bucket = env.ATTACHMENT_BUCKET
     this.state = state
     this.env = env
@@ -98,6 +94,8 @@ export class UploadHandler {
     this.requestGate = new AsyncLock()
     this.retryBucket = new RetryBucket(bucket, DEFAULT_RETRY_PARAMS)
     this.router = new Hono<MiddlewareKeyVariables>()
+    // Extract requestId from X-Request-Id header passed by Worker
+    this.router.use('*', requestId({ headerName: 'X-Request-Id' }))
     this.router.use('*', logger())
     this.router.options('/files/upload/:bucket', optionsHandler as any)
     this.router.post('/files/upload/:bucket', this.exclusive(this.create) as any)
@@ -141,11 +139,11 @@ export class UploadHandler {
     }
   }
 
-  fetch(request: Request): Response | Promise<Response> {
+  override fetch(request: Request): Response | Promise<Response> {
     return this.router.fetch(request)
   }
 
-  async alarm() {
+  override async alarm() {
     return await this.cleanup()
   }
 
@@ -365,7 +363,7 @@ export class UploadHandler {
       const headResponse = await this.retryBucket.head(r2Key)
       if (headResponse == null) {
         cloudlog({ requestId: c.get('requestId'), message: 'in DO files head headResponse is null' })
-        throw quickError(404, 'not_found', 'Not Found')
+        return quickError(404, 'not_found', 'Not Found')
       }
       offset = headResponse.size
       uploadLength = headResponse.size
