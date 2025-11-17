@@ -254,7 +254,7 @@ BEGIN
         275,
         now() - interval '45 days',
         now() + interval '6 months',
-        'seed',
+        'manual',
         '{}'::jsonb,
         'Seed usage credits for admin org'
       ),
@@ -264,7 +264,7 @@ BEGIN
         0,
         now() - interval '7 days',
         now() + interval '3 months',
-        'seed',
+        'stripe_top_up',
         '{}'::jsonb,
         'Seed usage credits for demo org'
       );

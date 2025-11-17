@@ -3,7 +3,7 @@ BEGIN;
 CREATE EXTENSION "basejump-supabase_test_helpers";
 
 SELECT
-  plan (10);
+  plan (11);
 
 DO $$
 BEGIN
@@ -108,7 +108,7 @@ grant_insert AS (
     0,
     now(),
     now() + interval '1 year',
-    'test'
+    'manual'
   FROM org_insert
   RETURNING id,
     org_id
@@ -138,6 +138,30 @@ SELECT
   grant_insert.id,
   step_insert.id
 FROM grant_insert, step_insert;
+
+SELECT
+  throws_ok(
+    $sql$
+      INSERT INTO public.usage_credit_grants (
+        org_id,
+        credits_total,
+        credits_consumed,
+        granted_at,
+        expires_at,
+        source
+      )
+      VALUES (
+        (SELECT org_id FROM test_credit_context LIMIT 1),
+        5,
+        0,
+        now(),
+        now() + interval '1 day',
+        'invalid_source'
+      )
+    $sql$,
+    'new row for relation "usage_credit_grants" violates check constraint "usage_credit_grants_source_check"',
+    'usage_credit_grants.source enforces allowed values'
+  );
 
 SELECT
   is(
