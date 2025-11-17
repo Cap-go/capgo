@@ -1,6 +1,7 @@
 const BLOCKED_SENDERS = [
   'sonarcloud',
   'sonarqube',
+  'socket-security',
   'sonar-cloud',
   'coderabbit',
   'code-rabbit',
