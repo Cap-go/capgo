@@ -24,11 +24,11 @@ app.delete('/', middlewareKey(['all', 'write', 'upload']), async (c) => {
   const { data: userId, error: _errorUserId } = await supabaseAdmin(c)
     .rpc('get_user_id', { apikey: capgkey, app_id: body.app_id })
   if (_errorUserId) {
-    throw quickError(404, 'user_not_found', 'Error User not found', { _errorUserId })
+    return quickError(404, 'user_not_found', 'Error User not found', { _errorUserId })
   }
 
   if (!(await hasAppRightApikey(c, body.app_id, userId, 'read', capgkey))) {
-    throw quickError(401, 'not_authorized', 'You can\'t access this app', { app_id: body.app_id })
+    return quickError(401, 'not_authorized', 'You can\'t access this app', { app_id: body.app_id })
   }
 
   const { error: errorApp } = await supabaseAdmin(c)
@@ -37,14 +37,14 @@ app.delete('/', middlewareKey(['all', 'write', 'upload']), async (c) => {
     .eq('app_id', body.app_id)
     .single()
   if (errorApp) {
-    throw quickError(404, 'app_not_found', 'Error App not found', { errorApp })
+    return quickError(404, 'app_not_found', 'Error App not found', { errorApp })
   }
 
   if (!body.app_id) {
-    throw quickError(400, 'error_app_id_missing', 'Error bundle name missing', { body })
+    return quickError(400, 'error_app_id_missing', 'Error bundle name missing', { body })
   }
   if (!body.name) {
-    throw quickError(400, 'error_bundle_name_missing', 'Error bundle name missing', { body })
+    return quickError(400, 'error_bundle_name_missing', 'Error bundle name missing', { body })
   }
 
   const { data: version, error: errorVersion } = await supabaseAdmin(c)
@@ -56,13 +56,13 @@ app.delete('/', middlewareKey(['all', 'write', 'upload']), async (c) => {
     .eq('deleted', false)
     .single()
   if (errorVersion) {
-    throw simpleError('error_already_deleted', 'Already deleted', { errorVersion })
+    return simpleError('error_already_deleted', 'Already deleted', { errorVersion })
   }
   // check if object exist in r2
   if (version.r2_path) {
     const exist = await s3.checkIfExist(c, version.r2_path)
     if (exist) {
-      throw simpleError('error_already_uploaded_to_s3', 'Error already uploaded to S3, delete is unsafe use the webapp to delete it')
+      return simpleError('error_already_uploaded_to_s3', 'Error already uploaded to S3, delete is unsafe use the webapp to delete it')
     }
   }
 
@@ -73,7 +73,7 @@ app.delete('/', middlewareKey(['all', 'write', 'upload']), async (c) => {
     .eq('id', version.id)
     .single()
   if (errorDelete) {
-    throw simpleError('error_deleting_version', 'Error deleting version', { errorDelete })
+    return simpleError('error_deleting_version', 'Error deleting version', { errorDelete })
   }
 
   const LogSnag = logsnag(c)

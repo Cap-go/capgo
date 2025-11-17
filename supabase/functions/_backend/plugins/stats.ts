@@ -1,21 +1,24 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
-import type { AppStats, DeviceWithoutCreatedAt, StatsActions } from '../utils/types.ts'
+import type { AppStats, StatsActions } from '../utils/types.ts'
 import { greaterOrEqual, parse } from '@std/semver'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod/mini'
-import { BRES, getIsV2Stats, parseBody, quickError, simpleError, simpleRateLimit } from '../utils/hono.ts'
+import { getAppStatus, setAppStatus } from '../utils/appStatus.ts'
+import { BRES, getIsV2Stats, parseBody, quickError, simpleError200, simpleRateLimit } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { sendNotifOrg } from '../utils/notifications.ts'
 import { closeClient, getAppOwnerPostgres, getAppVersionPostgres, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import { getAppOwnerPostgresV2, getAppVersionPostgresV2, getDrizzleClientD1Session } from '../utils/pg_d1.ts'
-import { parsePluginBody } from '../utils/plugin_parser.ts'
+import { makeDevice, parsePluginBody } from '../utils/plugin_parser.ts'
 import { createStatsVersion, onPremStats, sendStatsAndDevice } from '../utils/stats.ts'
 import { deviceIdRegex, INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, isLimited, MISSING_STRING_APP_ID, MISSING_STRING_DEVICE_ID, MISSING_STRING_PLATFORM, MISSING_STRING_VERSION_NAME, MISSING_STRING_VERSION_OS, NON_STRING_APP_ID, NON_STRING_DEVICE_ID, NON_STRING_PLATFORM, NON_STRING_VERSION_NAME, NON_STRING_VERSION_OS, reverseDomainRegex } from '../utils/utils.ts'
 import { ALLOWED_STATS_ACTIONS } from './stats_actions.ts'
 
 z.config(z.locales.en())
+
+const PLAN_ERROR = 'Cannot send stats, upgrade plan to continue to update'
 
 export const jsonRequestSchema = z.object({
   app_id: z.string({
@@ -48,43 +51,32 @@ export const jsonRequestSchema = z.object({
 })
 
 async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient> | ReturnType<typeof getDrizzleClientD1Session>, isV2: boolean, body: AppStats) {
-  const {
-    version_name,
-    version_build,
-    platform,
-    old_version_name,
-    app_id,
-    version_os,
-    device_id,
-    action,
-    plugin_version = '2.3.3',
-    custom_id,
-    is_emulator = false,
-    is_prod = true,
-    defaultChannel,
-  } = body
+  const device = makeDevice(body)
+  const { app_id, action, version_name, old_version_name, plugin_version } = body
 
-  const device: DeviceWithoutCreatedAt = {
-    platform: platform as Database['public']['Enums']['platform_os'],
-    device_id,
-    app_id,
-    plugin_version,
-    version_build,
-    os_version: version_os,
-    version_name,
-    is_emulator: is_emulator ?? false,
-    is_prod: is_prod ?? true,
-    custom_id,
-    updated_at: new Date().toISOString(),
-    default_channel: defaultChannel ?? null,
-  }
   const planActions: Array<'mau' | 'bandwidth'> = ['mau', 'bandwidth']
+  const cachedStatus = await getAppStatus(c, app_id)
+  if (cachedStatus === 'onprem') {
+    return onPremStats(c, app_id, action, device)
+  }
+  if (cachedStatus === 'cancelled') {
+    await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
+    return simpleError200(c, 'need_plan_upgrade', PLAN_ERROR)
+  }
   const appOwner = isV2
     ? await getAppOwnerPostgresV2(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClientD1Session>, planActions)
     : await getAppOwnerPostgres(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>, planActions)
   if (!appOwner) {
+    await setAppStatus(c, app_id, 'onprem')
     return onPremStats(c, app_id, action, device)
   }
+  if (!appOwner.plan_valid) {
+    await setAppStatus(c, app_id, 'cancelled')
+    cloudlog({ requestId: c.get('requestId'), message: 'Cannot update, upgrade plan to continue to update', id: app_id })
+    await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
+    return simpleError200(c, 'need_plan_upgrade', 'Cannot update, upgrade plan to continue to update')
+  }
+  await setAppStatus(c, app_id, 'cloud')
   const statsActions: StatsActions[] = []
 
   // Extract version from composite format if present (e.g., "1.2.3:main.js" -> "1.2.3")
@@ -104,11 +96,8 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
       cloudlog({ requestId: c.get('requestId'), message: `Version name ${version_name} not found, using unknown instead`, app_id, version_name })
     }
     else {
-      throw quickError(404, 'version_not_found', 'Version not found', { app_id, version_name })
+      return quickError(404, 'version_not_found', 'Version not found', { app_id, version_name })
     }
-  }
-  if (!appOwner.plan_valid) {
-    throw simpleError('action_not_allowed', 'Action not allowed', { appVersion, app_id, owner_org: appVersion.owner_org })
   }
   // device.version = appVersion.id
   if (action === 'set' && !device.is_emulator && device.is_prod) {
@@ -132,7 +121,7 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
       cloudlog({ requestId: c.get('requestId'), message: 'FAIL!' })
       await sendNotifOrg(c, 'user:update_fail', {
         app_id,
-        device_id,
+        device_id: body.device_id,
         version_id: appVersion.id,
         app_id_url: app_id,
       }, appVersion.owner_org, app_id, '0 0 * * 1')
@@ -148,7 +137,7 @@ export const app = new Hono<MiddlewareKeyVariables>()
 app.post('/', async (c) => {
   const body = await parseBody<AppStats>(c)
   if (isLimited(c, body.app_id)) {
-    throw simpleRateLimit(body)
+    return simpleRateLimit(body)
   }
   const isV2 = getIsV2Stats(c)
   const pgClient = isV2 ? null : getPgClient(c, true) // READ-ONLY: writes use SDK, not Drizzle

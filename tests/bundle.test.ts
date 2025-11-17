@@ -112,7 +112,7 @@ describe('[POST] /bundle/metadata operations', () => {
 
     expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('cannot_find_version')
+    expect(data.error).toBe('invalid_app_id') // Changed: validation now catches invalid format first
   })
 })
 
@@ -308,6 +308,6 @@ describe('[PUT] /bundle operations - Set bundle to channel', () => {
 
     expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('cannot_access_app')
+    expect(data.error).toBe('invalid_app_id') // Changed: validation now catches invalid format first
   })
 })

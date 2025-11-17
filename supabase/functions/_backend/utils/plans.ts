@@ -374,7 +374,7 @@ export async function getOrgWithCustomerInfo(c: Context, orgId: string) {
     .eq('id', orgId)
     .single()
   if (userError || !org)
-    throw quickError(404, 'org_not_found', 'Org not found', { orgId, userError })
+    return quickError(404, 'org_not_found', 'Org not found', { orgId, userError })
   return org
 }
 
@@ -448,28 +448,6 @@ export async function updatePlanStatus(c: Context, org: any, is_good_plan: boole
     })
     .eq('customer_id', org.customer_id!)
     .then()
-}
-
-// Original checkPlanOrg function - now uses the smaller functions
-export async function checkPlanOrg(c: Context, orgId: string): Promise<void> {
-  const org = await getOrgWithCustomerInfo(c, orgId)
-
-  // Sync subscription data with Stripe
-  await syncOrgSubscriptionData(c, org)
-
-  // Handle trial organizations
-  if (await handleTrialOrg(c, orgId, org)) {
-    return // Trial handled, exit early
-  }
-
-  // Calculate plan status and usage
-  const { is_good_plan, percentUsage } = await calculatePlanStatus(c, orgId)
-
-  // Handle notifications and events
-  const finalIsGoodPlan = await handleOrgNotificationsAndEvents(c, org, orgId, is_good_plan, percentUsage)
-
-  // Update plan status in database
-  await updatePlanStatus(c, org, finalIsGoodPlan, percentUsage)
 }
 
 // New function for cron_stat_org - handles is_good_plan + plan % + exceeded flags

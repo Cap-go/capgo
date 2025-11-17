@@ -479,6 +479,7 @@
   "error-fetching-deploy-history": "Kesalahan dalam mengambil riwayat penyebaran",
   "error-fetching-members": "Kesalahan dalam mengambil anggota",
   "error-fetching-versions": "Kesalahan dalam mengambil versi! Silakan periksa konsol browser dan hubungi dukungan",
+  "error-invalid-version": "ID versi tidak valid. Silakan coba lagi atau hubungi dukungan.",
   "error-inviting-user": "Kesalahan dalam mengundang pengguna",
   "error-loading-deletion-date": "Tidak dapat menemukan tanggal penghapusan akun Anda",
   "error-message-invitation": "Terjadi kesalahan. Silakan hubungi dukungan Capgo",

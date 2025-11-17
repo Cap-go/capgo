@@ -1,8 +1,10 @@
 import type { AnalyticsEngineDataPoint, D1Database, Hyperdrive } from '@cloudflare/workers-types'
 import type { Context } from 'hono'
+import type { DeviceComparable } from './deviceComparison.ts'
 import type { Database } from './supabase.types.ts'
 import type { DeviceWithoutCreatedAt, ReadDevicesParams, ReadStatsParams } from './types.ts'
 import dayjs from 'dayjs'
+import { CacheHelper } from './cache.ts'
 import { hasComparableDeviceChanged, toComparableDevice } from './deviceComparison.ts'
 import { cloudlog, cloudlogErr, serializeError } from './logging.ts'
 import { DEFAULT_LIMIT } from './types.ts'
@@ -125,13 +127,43 @@ function getD1ReadStoreAppSession(c: Context) {
   return c.env.DB_STOREAPPS.withSession('first-unconstrained')
 }
 
+const TRACK_DEVICE_CACHE_PATH = '/.track-device-cache'
+const TRACK_DEVICE_CACHE_MAX_AGE_SECONDS = 31536000
+
+type DeviceCachePayload = DeviceComparable & {
+  app_id: string
+  device_id: string
+  cached_at: string
+}
+
 export async function trackDevicesCF(c: Context, device: DeviceWithoutCreatedAt) {
   cloudlog({ requestId: c.get('requestId'), message: 'trackDevicesCF', device })
 
   if (!c.env.DB_DEVICES)
     return
 
-  const upsertQuery = `
+  try {
+    const trackDeviceCache = new CacheHelper(c)
+    const trackDeviceCacheRequest = trackDeviceCache.buildRequest(TRACK_DEVICE_CACHE_PATH, {
+      app_id: device.app_id,
+      device_id: device.device_id,
+    })
+    const cachedDevice = trackDeviceCache.available
+      ? await trackDeviceCache.matchJson<DeviceCachePayload>(trackDeviceCacheRequest)
+      : null
+    if (cachedDevice && !hasComparableDeviceChanged(cachedDevice, device)) {
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'Cache hit – device unchanged, skipping D1 read',
+        context: {
+          device_id: device.device_id,
+          app_id: device.app_id,
+        },
+      })
+      return
+    }
+
+    const upsertQuery = `
   INSERT INTO devices (
     updated_at, device_id, version_name, app_id, platform,
     plugin_version, os_version, version_build, custom_id,
@@ -150,39 +182,42 @@ export async function trackDevicesCF(c: Context, device: DeviceWithoutCreatedAt)
     version = 0,
     default_channel = excluded.default_channel
 `
-  try {
     const updated_at = new Date().toISOString()
 
     const comparableDevice = toComparableDevice(device)
+    let shouldUpsert = true
 
-    // c.env.DB_DEVICES.
-    const existingRow = await getD1ReadDevicesSession(c).prepare(`
-      SELECT * FROM devices
-      WHERE device_id = ? AND app_id = ?
-    `).bind(device.device_id, device.app_id).first()
+    if (!cachedDevice) {
+      const existingRow = await getD1ReadDevicesSession(c).prepare(`
+        SELECT * FROM devices
+        WHERE device_id = ? AND app_id = ?
+      `).bind(device.device_id, device.app_id).first()
 
-    // DEBUG: Log what D1 returned
-    if (existingRow) {
-      cloudlog({
-        message: '[D1_READ] Existing row from D1:',
-        context: {
-          device_id: existingRow.device_id,
-          app_id: existingRow.app_id,
-          version_name: existingRow.version_name,
-          version_name_type: typeof existingRow.version_name,
-          default_channel: existingRow.default_channel,
-          default_channel_type: typeof existingRow.default_channel,
-          plugin_version: existingRow.plugin_version,
-          os_version: existingRow.os_version,
-          custom_id: existingRow.custom_id,
-        },
-      })
+      if (existingRow) {
+        cloudlog({
+          message: '[D1_READ] Existing row from D1:',
+          context: {
+            device_id: existingRow.device_id,
+            app_id: existingRow.app_id,
+            version_name: existingRow.version_name,
+            version_name_type: typeof existingRow.version_name,
+            default_channel: existingRow.default_channel,
+            default_channel_type: typeof existingRow.default_channel,
+            plugin_version: existingRow.plugin_version,
+            os_version: existingRow.os_version,
+            custom_id: existingRow.custom_id,
+          },
+        })
+      }
+
+      if (existingRow && !hasComparableDeviceChanged(existingRow, device)) {
+        cloudlog({ requestId: c.get('requestId'), message: 'Cache miss but row already up to date, skipping write' })
+        shouldUpsert = false
+      }
     }
 
-    if (!existingRow || hasComparableDeviceChanged(existingRow, device)) {
-      cloudlog({ requestId: c.get('requestId'), message: existingRow ? 'Updating existing device' : 'Inserting new device' })
-
-      // DEBUG: Log what we're writing to D1
+    if (shouldUpsert) {
+      cloudlog({ requestId: c.get('requestId'), message: cachedDevice ? 'Cache hit – device changed, upserting' : 'Cache miss – upserting device row' })
       cloudlog({
         message: '[D1_WRITE] Writing to D1:',
         context: {
@@ -202,26 +237,32 @@ export async function trackDevicesCF(c: Context, device: DeviceWithoutCreatedAt)
       const res = await getD1WriteDevicesSession(c).prepare(upsertQuery).bind(
         updated_at,
         device.device_id,
-        comparableDevice.version_name, // FIXED: Use comparable value directly
+        comparableDevice.version_name,
         device.app_id,
         comparableDevice.platform,
         comparableDevice.plugin_version,
         comparableDevice.os_version,
         comparableDevice.version_build,
-        comparableDevice.custom_id, // FIXED: Use comparable value directly, no ?? ''
+        comparableDevice.custom_id,
         comparableDevice.is_prod ? 1 : 0,
         comparableDevice.is_emulator ? 1 : 0,
         device.version ?? 0,
-        comparableDevice.default_channel, // FIXED: Use comparable, not raw device
+        comparableDevice.default_channel,
       ).run()
       cloudlog({ requestId: c.get('requestId'), message: 'Upsert result:', res })
     }
-    else {
-      cloudlog({ requestId: c.get('requestId'), message: 'No update needed' })
+    if (trackDeviceCache.available) {
+      const cachePayload: DeviceCachePayload = {
+        ...comparableDevice,
+        app_id: device.app_id,
+        device_id: device.device_id,
+        cached_at: new Date().toISOString(),
+      }
+      await trackDeviceCache.putJson(trackDeviceCacheRequest, cachePayload, TRACK_DEVICE_CACHE_MAX_AGE_SECONDS)
     }
   }
   catch (e) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Error tracking device', error: serializeError(e), query: upsertQuery })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error tracking device', error: serializeError(e), device })
   }
 }
 

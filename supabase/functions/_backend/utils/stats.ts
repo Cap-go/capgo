@@ -76,7 +76,8 @@ export function createStatsLogs(c: Context, app_id: string, device_id: string, a
 export function createStatsDevices(c: Context, device: DeviceWithoutCreatedAt) {
   if (!c.env.DB_DEVICES)
     return backgroundTask(c, trackDevicesSB(c, device))
-  return trackDevicesCF(c, device)
+  // trackDevicesCF should always be as Background task as it write in D1
+  return backgroundTask(c, trackDevicesCF(c, device))
 }
 
 export function sendStatsAndDevice(c: Context, device: DeviceWithoutCreatedAt, statsActions: StatsActions[]) {

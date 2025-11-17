@@ -45,7 +45,7 @@ describe('[GET] /bundle - Error Cases', () => {
     })
     expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('cannot_get_bundle')
+    expect(data.error).toBe('missing_app_id')
   })
 
   it('should return 400 when user cannot access the app', async () => {
@@ -91,7 +91,7 @@ describe('[DELETE] /bundle - Error Cases', () => {
     })
     expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('cannot_delete_bundle')
+    expect(data.error).toBe('missing_app_id') // Changed: validation now catches this first
   })
 
   it('should return 400 when user cannot access the app', async () => {

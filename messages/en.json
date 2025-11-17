@@ -482,6 +482,7 @@
   "error-loading-deletion-date": "Cannot find the date of deletion of your account",
   "error-message-invitation": "Error happened. Please contact <a href='https://support.capgo.app/' target='_blank' class='text-blue-500 underline hover:text-blue-600'>Capgo support</a>",
   "error-no-user-id": "Cannot find your user account",
+  "error-invalid-version": "Invalid version ID. Please try again or contact support.",
   "error-revert-to-builtin": "Cannot revert to builtin",
   "error-rollback": "Error rolling back to previous version",
   "error-update-channel": "Cannot update channel",

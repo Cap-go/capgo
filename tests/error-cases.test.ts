@@ -43,7 +43,7 @@ describe('[GET] /device - Error Cases', () => {
     })
     expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('invalid_app_id')
+    expect(data.error).toBe('cannot_access_app') // Changed: validation passes for valid format, then access check fails
   })
 
   it('should return 400 for missing device_id or app_id', async () => {
@@ -53,7 +53,7 @@ describe('[GET] /device - Error Cases', () => {
     })
     expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('invalid_app_id')
+    expect(data.error).toBe('missing_app_id') // Changed: validation catches missing app_id first
   })
 
   it('should return 400 when trying to set version to device', async () => {

@@ -2,8 +2,7 @@
 
 import type { SQLiteType, TableSchema } from './schema.ts'
 // import { createClient, SupabaseClient } from '@supabase/supabase-js'; // Removed Supabase client
-// import { Pool, type PoolClient } from 'pg'; // Removed pg Pool
-import postgres from 'postgres' // Use default import
+import { Pool } from 'pg'
 import {
   TABLE_SCHEMAS,
   TABLE_SCHEMAS_TYPES,
@@ -421,9 +420,7 @@ async function processReplicationQueue(replicas: ReplicaTarget[], env: Env) {
     throw new Error(`[${queueKey}] No D1 replicas configured. Aborting replication run.`)
   }
 
-  // let pgPool: Pool | null = null; // Removed pg Pool
-  // let pgClient: PoolClient | null = null; // Removed pg Client
-  let sql: postgres.Sql | null = null // postgres instance
+  let pool: Pool | null = null
   let processedMsgCount = 0
   let currentBatch: SqlOperation[] = []
   let highestMsgIdRead = -1 // Track the highest message ID read in this run
@@ -440,24 +437,21 @@ async function processReplicationQueue(replicas: ReplicaTarget[], env: Env) {
     const options = {
       prepare: true,
       max: 5,
-      fetch_types: false,
-      idle_timeout: 60, // Increase from 2 to 20 seconds
-      connect_timeout: 10, // Add explicit connect timeout
-      max_lifetime: 600, // Add connection lifetime limit
-
-      // Add connection debugging
-      connection: {
-        application_name: 'd1_sync_worker',
-      },
-
-      // Hook to log errors - this is called for connection-level errors
-      onclose: (connectionId: number) => {
-        console.log({ message: 'PG Connection Closed', connectionId })
-      },
+      connectionString: env.HYPERDRIVE_CAPGO_DIRECT_EU.connectionString,
+      application_name: 'd1_sync_worker',
+      idleTimeoutMillis: 60000, // 60 seconds
+      connectionTimeoutMillis: 10000, // 10 seconds
+      maxLifetimeMillis: 600000, // 10 minutes
     }
-    // Create postgres instance using the Hyperdrive connection string
-    sql = postgres(env.HYPERDRIVE_CAPGO_DIRECT_EU.connectionString, options)
-    console.log(`[${queueKey}] PostgreSQL connection handler created via Hyperdrive.`)
+    // Create Pool instance using the Hyperdrive connection string
+    pool = new Pool(options)
+
+    // Hook to log when connections are removed from the pool
+    pool.on('remove', () => {
+      console.log({ message: 'PG Connection Closed' })
+    })
+
+    console.log(`[${queueKey}] PostgreSQL connection pool created via Hyperdrive.`)
 
     // No explicit connect needed, postgres handles it
 
@@ -467,14 +461,15 @@ async function processReplicationQueue(replicas: ReplicaTarget[], env: Env) {
 
     console.log(`[${queueKey}] Reading messages from queue: ${queueName}`)
 
-    // Read a batch of messages using postgres sql tag
+    // Read a batch of messages using pg pool
     let messages = []
     try {
-      // Use tagged template literal for safe query construction
-      messages = await sql`
-                SELECT msg_id, message, read_ct 
-                FROM pgmq.read(${queueName}, ${visibilityTimeout}, ${BATCH_SIZE})
-            `
+      // Use parameterized query for safe query construction
+      const result = await pool.query(
+        'SELECT msg_id, message, read_ct FROM pgmq.read($1, $2, $3)',
+        [queueName, visibilityTimeout, BATCH_SIZE],
+      )
+      messages = result.rows
     }
     catch (readError) {
       console.error(`[${queueKey}] Error reading from pgmq queue ${queueName}:`, readError)
@@ -573,10 +568,10 @@ async function processReplicationQueue(replicas: ReplicaTarget[], env: Env) {
       console.log(`[${queueKey}] Deleting ${successfullyProcessedMsgIds.length} processed/skipped messages from queue ${queueName}...`, successfullyProcessedMsgIds)
       // Use the pgmq.delete version that accepts a bigint[] array
       try {
-        // Use sql.unsafe with proper escaping for the array parameter
-        // Since BigInts are safe and we're joining them, this is secure
+        // Use parameterized query with array
+        // Since BigInts are safe and we're using parameterized query, this is secure
         const idsArrayLiteral = `ARRAY[${successfullyProcessedMsgIds.join(',')}]::bigint[]`
-        await sql.unsafe(`SELECT pgmq.delete($1::text, ${idsArrayLiteral})`, [queueName])
+        await pool.query(`SELECT pgmq.delete($1::text, ${idsArrayLiteral})`, [queueName])
         console.log(`[${queueKey}] Successfully deleted processed/skipped messages.`)
       }
       catch (deleteError) {
@@ -595,10 +590,10 @@ async function processReplicationQueue(replicas: ReplicaTarget[], env: Env) {
     if (highReadCountMsgIds.length > 0) {
       console.log(`[${queueKey}] Archiving ${highReadCountMsgIds.length} messages with high read count from queue ${queueName}...`, highReadCountMsgIds)
       try {
-        // Use sql.unsafe with proper escaping for the array parameter
-        // Since BigInts are safe and we're joining them, this is secure
+        // Use parameterized query with array
+        // Since BigInts are safe and we're using parameterized query, this is secure
         const idsArrayLiteral = `ARRAY[${highReadCountMsgIds.join(',')}]::bigint[]`
-        await sql.unsafe(`SELECT pgmq.archive($1::text, ${idsArrayLiteral})`, [queueName])
+        await pool.query(`SELECT pgmq.archive($1::text, ${idsArrayLiteral})`, [queueName])
         console.log(`[${queueKey}] Successfully archived messages with high read count.`)
       }
       catch (archiveError) {
@@ -611,16 +606,11 @@ async function processReplicationQueue(replicas: ReplicaTarget[], env: Env) {
     console.error(`[${queueKey}] Error processing messages:`, error)
   }
   finally {
-    // Release the client back to the pool (handled by postgres.js automatically)
-    // if (pgClient) {
-    //     pgClient.release();
-    //     console.log(`[${queueKey}] PostgreSQL client released.`);
+    // End the pg connection pool gracefully
+    // if (pool) {
+    //   await pool.end()
+    //   console.log(`[${queueKey}] PostgreSQL connection pool ended.`)
     // }
-    // End the postgres connection pool gracefully
-    if (sql) {
-      await sql.end({ timeout: 5 }) // Add a timeout for ending
-      console.log(`[${queueKey}] PostgreSQL connection pool ended.`)
-    }
     console.log(`[${queueKey}] Finished processing ${processedMsgCount} messages (up to highest read ID: ${highestMsgIdRead}) in ${Date.now() - startTime}ms. ${successfullyProcessedMsgIds.length} messages marked for deletion across ${replicas.length} replicas.`)
   }
 }

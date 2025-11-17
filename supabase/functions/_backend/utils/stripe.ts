@@ -151,15 +151,27 @@ export async function syncSubscriptionData(c: Context, customerId: string, subsc
     }
 
     // Update stripe_info table with latest data, even if no subscription exists
+    const updateData: any = {
+      status: dbStatus,
+    }
+
+    // Only include fields if they have valid values to avoid foreign key constraint violations
+    if (subscriptionData?.productId) {
+      updateData.product_id = subscriptionData.productId
+    }
+    if (subscriptionData?.subscriptionId) {
+      updateData.subscription_id = subscriptionData.subscriptionId
+    }
+    if (subscriptionData?.cycleStart) {
+      updateData.subscription_anchor_start = subscriptionData.cycleStart
+    }
+    if (subscriptionData?.cycleEnd) {
+      updateData.subscription_anchor_end = subscriptionData.cycleEnd
+    }
+
     const { error: updateError } = await supabaseAdmin(c)
       .from('stripe_info')
-      .update({
-        product_id: subscriptionData?.productId ?? undefined,
-        subscription_id: subscriptionData?.subscriptionId ?? undefined,
-        subscription_anchor_start: subscriptionData?.cycleStart ?? undefined,
-        subscription_anchor_end: subscriptionData?.cycleEnd ?? undefined,
-        status: dbStatus,
-      })
+      .update(updateData)
       .eq('customer_id', customerId)
 
     if (updateError) {

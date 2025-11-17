@@ -30,7 +30,7 @@ async function foundAPIKey(c: Context, capgkeyString: string, rights: Database['
   const apikey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKey(c, capgkeyString, supabaseAdmin(c), rights)
   if (!apikey) {
     cloudlog({ requestId: c.get('requestId'), message: 'Invalid apikey', capgkeyString, rights })
-    throw quickError(401, 'invalid_apikey', 'Invalid apikey')
+    return quickError(401, 'invalid_apikey', 'Invalid apikey')
   }
   c.set('auth', {
     userId: apikey.user_id,
@@ -44,15 +44,15 @@ async function foundAPIKey(c: Context, capgkeyString: string, rights: Database['
     cloudlog({ requestId: c.get('requestId'), message: 'Subkey', subkey })
     if (!subkey) {
       cloudlog({ requestId: c.get('requestId'), message: 'Invalid subkey', subkey_id })
-      throw quickError(401, 'invalid_subkey', 'Invalid subkey')
+      return quickError(401, 'invalid_subkey', 'Invalid subkey')
     }
     if (subkey && subkey.user_id !== apikey.user_id) {
       cloudlog({ requestId: c.get('requestId'), message: 'Subkey user_id does not match apikey user_id', subkey, apikey })
-      throw quickError(401, 'invalid_subkey', 'Invalid subkey')
+      return quickError(401, 'invalid_subkey', 'Invalid subkey')
     }
     if (subkey?.limited_to_apps && subkey?.limited_to_apps.length === 0 && subkey?.limited_to_orgs && subkey?.limited_to_orgs.length === 0) {
       cloudlog({ requestId: c.get('requestId'), message: 'Invalid subkey, no limited apps or orgs', subkey })
-      throw quickError(401, 'invalid_subkey', 'Invalid subkey, no limited apps or orgs')
+      return quickError(401, 'invalid_subkey', 'Invalid subkey, no limited apps or orgs')
     }
     if (subkey) {
       c.set('auth', {
@@ -71,7 +71,7 @@ async function foundJWT(c: Context, jwt: string) {
   const { data: user, error: userError } = await supabaseJWT.auth.getUser()
   if (userError) {
     cloudlog({ requestId: c.get('requestId'), message: 'Invalid JWT', userError })
-    throw quickError(401, 'invalid_jwt', 'Invalid JWT')
+    return quickError(401, 'invalid_jwt', 'Invalid JWT')
   }
   c.set('auth', {
     userId: user.user?.id,
@@ -99,8 +99,8 @@ export function middlewareV2(rights: Database['public']['Enums']['key_mode'][]) 
       await foundAPIKey(c, capgkey, rights)
     }
     else {
-      cloudlog('No apikey or subkey provided')
-      throw quickError(401, 'no_jwt_apikey_or_subkey', 'No JWT, apikey or subkey provided')
+      cloudlog({ requestId: c.get('requestId'), message: 'No apikey or subkey provided' })
+      return quickError(401, 'no_jwt_apikey_or_subkey', 'No JWT, apikey or subkey provided')
     }
     await next()
   })
@@ -112,14 +112,23 @@ export function middlewareKey(rights: Database['public']['Enums']['key_mode'][])
     const apikey_string = c.req.header('authorization')
     const subkey_id = c.req.header('x-limited-key-id') ? Number(c.req.header('x-limited-key-id')) : null
     const key = capgkey_string ?? apikey_string
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'middlewareKey - checking authorization',
+      method: c.req.method,
+      url: c.req.url,
+      hasCapgkey: !!capgkey_string,
+      hasAuthorization: !!apikey_string,
+      hasKey: !!key,
+    })
     if (!key) {
-      cloudlog('No key provided')
-      throw quickError(401, 'no_key_provided', 'No key provided')
+      cloudlog({ requestId: c.get('requestId'), message: 'No key provided', method: c.req.method, url: c.req.url })
+      return quickError(401, 'no_key_provided', 'No key provided')
     }
     const apikey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKey(c, key, supabaseAdmin(c), rights)
     if (!apikey) {
-      cloudlog({ requestId: c.get('requestId'), message: 'Invalid apikey', key })
-      throw quickError(401, 'invalid_apikey', 'Invalid apikey')
+      cloudlog({ requestId: c.get('requestId'), message: 'Invalid apikey', key, method: c.req.method, url: c.req.url })
+      return quickError(401, 'invalid_apikey', 'Invalid apikey')
     }
     c.set('apikey', apikey)
     c.set('capgkey', key)
@@ -127,11 +136,11 @@ export function middlewareKey(rights: Database['public']['Enums']['key_mode'][])
       const subkey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKeyById(c, subkey_id, supabaseAdmin(c), rights)
       if (!subkey) {
         cloudlog({ requestId: c.get('requestId'), message: 'Invalid subkey', subkey_id })
-        throw quickError(401, 'invalid_subkey', 'Invalid subkey')
+        return quickError(401, 'invalid_subkey', 'Invalid subkey')
       }
       if (subkey?.limited_to_apps && subkey?.limited_to_apps.length === 0 && subkey?.limited_to_orgs && subkey?.limited_to_orgs.length === 0) {
         cloudlog({ requestId: c.get('requestId'), message: 'Invalid subkey, no limited apps or orgs', subkey })
-        throw quickError(401, 'invalid_subkey', 'Invalid subkey, no limited apps or orgs')
+        return quickError(401, 'invalid_subkey', 'Invalid subkey, no limited apps or orgs')
       }
       if (subkey)
         c.set('subkey', subkey)

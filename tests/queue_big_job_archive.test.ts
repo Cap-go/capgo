@@ -1,9 +1,13 @@
-import postgres from 'postgres'
+import { Pool } from 'pg'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { BASE_URL, headersInternal, POSTGRES_URL } from './test-utils.ts'
 
 const BASE_URL_TRIGGER = `${BASE_URL}/triggers`
-const sql = postgres(POSTGRES_URL, { prepare: false, idle_timeout: 2 })
+const pool = new Pool({
+  connectionString: POSTGRES_URL,
+  max: 1,
+  idleTimeoutMillis: 2000,
+})
 const tmpQueueName = 'queue_big_job_archive'
 const MESSAGE_COUNT = 950
 
@@ -11,30 +15,30 @@ describe('queue_big_job_archive', () => {
   beforeAll(async () => {
     // Drop queue if it exists (ignore errors)
     try {
-      await sql`SELECT pgmq.drop_queue(${tmpQueueName})`
+      await pool.query('SELECT pgmq.drop_queue($1)', [tmpQueueName])
     }
     catch {
       // Ignore error if queue doesn't exist
     }
 
     // Create temporary queue
-    await sql`SELECT pgmq.create(${tmpQueueName})`
+    await pool.query('SELECT pgmq.create($1)', [tmpQueueName])
   })
 
   beforeEach(async () => {
     // Clean up any existing messages before each test
-    await sql.unsafe(`DELETE FROM pgmq.q_${tmpQueueName}`)
-    await sql.unsafe(`DELETE FROM pgmq.a_${tmpQueueName}`)
+    await pool.query(`DELETE FROM pgmq.q_${tmpQueueName}`)
+    await pool.query(`DELETE FROM pgmq.a_${tmpQueueName}`)
   })
 
   afterAll(async () => {
     // Clean up temporary queue and tables
-    await sql.unsafe(`DELETE FROM pgmq.q_${tmpQueueName}`)
-    await sql.unsafe(`DELETE FROM pgmq.a_${tmpQueueName}`)
-    await sql`SELECT pgmq.drop_queue(${tmpQueueName})`
+    await pool.query(`DELETE FROM pgmq.q_${tmpQueueName}`)
+    await pool.query(`DELETE FROM pgmq.a_${tmpQueueName}`)
+    await pool.query('SELECT pgmq.drop_queue($1)', [tmpQueueName])
 
     // Close postgres connection
-    await sql.end()
+    await pool.end()
   })
 
   it('should process 950 jobs with vt=10 successfully', async () => {
@@ -71,7 +75,7 @@ describe('queue_big_job_archive', () => {
       }
 
       insertPromises.push(
-        sql.unsafe(
+        pool.query(
           `INSERT INTO pgmq.q_${tmpQueueName} (message, vt, read_ct) VALUES ${values.join(', ')}`,
           params,
         ),
@@ -81,7 +85,8 @@ describe('queue_big_job_archive', () => {
     await Promise.all(insertPromises)
 
     // Verify messages were added to queue
-    const [{ count: initialCount }] = await sql.unsafe(`SELECT count(*) as count FROM pgmq.q_${tmpQueueName}`)
+    const result = await pool.query(`SELECT count(*) as count FROM pgmq.q_${tmpQueueName}`)
+    const initialCount = result.rows[0].count
     expect(Number.parseInt(initialCount)).toBe(MESSAGE_COUNT)
 
     // Process the queue via HTTP
@@ -102,11 +107,13 @@ describe('queue_big_job_archive', () => {
     await new Promise(resolve => setTimeout(resolve, 5000))
 
     // Verify queue is empty after processing
-    const [{ count: finalQueueCount }] = await sql.unsafe(`SELECT count(*) as count FROM pgmq.q_${tmpQueueName}`)
+    const finalQueueResult = await pool.query(`SELECT count(*) as count FROM pgmq.q_${tmpQueueName}`)
+    const finalQueueCount = finalQueueResult.rows[0].count
     expect(Number.parseInt(finalQueueCount)).toBe(0)
 
     // Verify archive table is also empty
-    const [{ count: archiveCount }] = await sql.unsafe(`SELECT count(*) as count FROM pgmq.a_${tmpQueueName}`)
+    const archiveResult = await pool.query(`SELECT count(*) as count FROM pgmq.a_${tmpQueueName}`)
+    const archiveCount = archiveResult.rows[0].count
     expect(Number.parseInt(archiveCount)).toBe(MESSAGE_COUNT)
   })
 })

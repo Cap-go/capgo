@@ -110,4 +110,3 @@ createAllCatch(appTriggers, functionNameTriggers)
 export default {
   fetch: app.fetch,
 }
-export { AttachmentUploadHandler, UploadHandler as TemporaryKeyHandler, UploadHandler } from '../../supabase/functions/_backend/tus/uploadHandler.ts'

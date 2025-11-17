@@ -479,6 +479,7 @@
   "error-fetching-deploy-history": "डिप्लॉयमेंट इतिहास प्राप्त करने में त्रुटि",
   "error-fetching-members": "सदस्यों को लाने में त्रुटि",
   "error-fetching-versions": "संस्करणों को लाने में त्रुटि! कृपया ब्राउज़र कंसोल की जाँच करें और सहायता से सम्पर्क करें",
+  "error-invalid-version": "अमान्य संस्करण आईडी। कृपया पुन: प्रयास करें या सहायता से संपर्क करें।",
   "error-inviting-user": "उपयोगकर्ता को आमंत्रित करने में त्रुटि",
   "error-loading-deletion-date": "आपके खाते की हटाने की तारीख नहीं मिल सकती",
   "error-message-invitation": "त्रुटि हुई। कृपया <a href='https://support.capgo.app/' target='_blank' class='text-blue-500 underline hover:text-blue-600'>Capgo सहायता</a> से संपर्क करें",

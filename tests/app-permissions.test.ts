@@ -25,6 +25,7 @@ describe('app creation permission tests', () => {
         method: 'POST',
         headers,
         body: JSON.stringify({
+          app_id: appName, // Added app_id for validation
           owner_org: nonExistentOrgId,
           name: appName,
           icon: 'test-icon',
@@ -87,6 +88,7 @@ describe('app creation permission tests', () => {
         method: 'POST',
         headers,
         body: JSON.stringify({
+          app_id: appName, // Added app_id for validation
           owner_org: unauthorizedOrgId,
           name: appName,
           icon: 'test-icon',
@@ -140,13 +142,14 @@ describe('app creation permission tests', () => {
         method: 'POST',
         headers,
         body: JSON.stringify({
+          app_id: appName, // Added app_id for validation
           name: appName,
           icon: 'test-icon',
           // Omitting owner_org
         }),
       })
 
-      // We expect this to fail either with a 400 (missing required field) or a 403 (not authorized)
+      // We expect this to fail with 400 (missing required field - app_id validation passes but owner_org logic may vary)
       expect(response.status).toBe(400)
     })
   })

@@ -1,37 +1,8 @@
-import type { Database } from './supabase.types.ts'
-import { bigint, boolean, customType, pgEnum, pgTable, serial, text, timestamp, uuid, varchar } from 'drizzle-orm/pg-core'
+import { bigint, boolean, pgEnum, pgTable, serial, text, timestamp, uuid, varchar } from 'drizzle-orm/pg-core'
 
 // do_not_change
 
 export const disableUpdatePgEnum = pgEnum('disable_update', ['major', 'minor', 'patch', 'version_number', 'none'])
-
-// Keeping this for backward compatibility but marking as deprecated
-const manifestType = customType<{ data: Database['public']['CompositeTypes']['manifest_entry'][] }>({
-  dataType() {
-    return 'manifest_entry[]'
-  },
-  fromDriver(value: unknown) {
-    if (Array.isArray(value)) {
-      for (const element of value) {
-        if (typeof element !== 'string')
-          throw new Error(`Cannot do DB type mapping - not every element is a string. Data: ${JSON.stringify(value)}`)
-        if (element.split(',').length !== 3)
-          throw new Error(`Cannot do DB type mapping - split string length is not 3. Data: ${element}`)
-      }
-
-      return value.map((val) => {
-        const split = val.split(',')
-        return {
-          file_name: split[0].slice(1),
-          s3_path: split[1],
-          file_hash: split[2].slice(0, -1),
-        }
-      })
-    }
-
-    return [{ file_hash: '', file_name: '', s3_path: '' }]
-  },
-})
 
 export const apps = pgTable('apps', {
   created_at: timestamp('created_at').notNull().defaultNow(),
@@ -62,15 +33,10 @@ export const app_versions = pgTable('app_versions', {
   storage_provider: text('storage_provider').default('r2').notNull(),
   min_update_version: varchar('min_update_version'),
   r2_path: varchar('r2_path'),
-  // Keeping this for backward compatibility but it's deprecated now
-  manifest: manifestType('manifest'),
 })
 
-// New manifest table schema
 export const manifest = pgTable('manifest', {
   id: serial('id').primaryKey().notNull(),
-  created_at: timestamp('created_at').defaultNow(),
-  updated_at: timestamp('updated_at').defaultNow(),
   app_version_id: bigint('app_version_id', { mode: 'number' }).notNull().references(() => app_versions.id, { onDelete: 'cascade' }),
   file_name: varchar('file_name').notNull(),
   s3_path: varchar('s3_path').notNull(),

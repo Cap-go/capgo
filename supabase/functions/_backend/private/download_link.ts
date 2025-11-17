@@ -22,18 +22,18 @@ app.post('/', middlewareAuth, async (c) => {
   cloudlog({ requestId: c.get('requestId'), message: 'post download link body', body })
   const authorization = c.req.header('authorization')
   if (!authorization)
-    throw simpleError('cannot_find_authorization', 'Cannot find authorization')
+    return simpleError('cannot_find_authorization', 'Cannot find authorization')
 
   const { data: auth, error } = await supabaseAdmin(c).auth.getUser(
     authorization?.split('Bearer ')[1],
   )
   if (error || !auth?.user?.id)
-    throw simpleError('not_authorize', 'Not authorize')
+    return simpleError('not_authorize', 'Not authorize')
 
   const userId = auth.user.id
 
   if (!(await hasAppRight(c, body.app_id, userId, 'read')))
-    throw simpleError('app_access_denied', 'You can\'t access this app', { app_id: body.app_id })
+    return simpleError('app_access_denied', 'You can\'t access this app', { app_id: body.app_id })
 
   const { data: bundle, error: getBundleError } = await supabaseAdmin(c)
     .from('app_versions')
@@ -45,11 +45,11 @@ app.post('/', middlewareAuth, async (c) => {
   const ownerOrg = (bundle?.owner_org as any).created_by
 
   if (getBundleError) {
-    throw simpleError('cannot_get_bundle', 'Cannot get bundle', { getBundleError })
+    return simpleError('cannot_get_bundle', 'Cannot get bundle', { getBundleError })
   }
 
   if (!ownerOrg) {
-    throw simpleError('cannot_get_owner_org', 'Cannot get owner org', { bundle })
+    return simpleError('cannot_get_owner_org', 'Cannot get owner org', { bundle })
   }
 
   if (body.isManifest) {
@@ -60,7 +60,7 @@ app.post('/', middlewareAuth, async (c) => {
       .eq('id', body.id)
 
     if (getManifestError) {
-      throw simpleError('cannot_get_manifest', 'Cannot get manifest', { getManifestError })
+      return simpleError('cannot_get_manifest', 'Cannot get manifest', { getManifestError })
     }
     const manifestEntries = getManifestUrl(c, bundle.id, manifest, userId)
     return c.json({ manifest: manifestEntries })
@@ -68,7 +68,7 @@ app.post('/', middlewareAuth, async (c) => {
   else {
     const url = await getBundleUrl(c, bundle.r2_path, userId, bundle.checksum ?? '')
     if (!url)
-      throw simpleError('cannot_get_bundle_url', 'Cannot get bundle url')
+      return simpleError('cannot_get_bundle_url', 'Cannot get bundle url')
 
     return c.json({ url })
   }

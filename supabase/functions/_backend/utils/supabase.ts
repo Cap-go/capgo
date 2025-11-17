@@ -55,7 +55,7 @@ export function supabaseWithAuth(c: Context, auth: AuthInfo) {
     return supabaseApikey(c, auth.apikey.key)
   }
   else {
-    throw simpleError('not_authorized', 'Not authorized')
+    return simpleError('not_authorized', 'Not authorized')
   }
 }
 
@@ -217,17 +217,25 @@ export async function hasAppRight(c: Context, appId: string | undefined, userid:
 }
 
 export async function hasAppRightApikey(c: Context<MiddlewareKeyVariables, any, object>, appId: string | undefined, userid: string, right: Database['public']['Enums']['user_min_right'], apikey: string) {
-  if (!appId)
+  if (!appId) {
+    cloudlog({ requestId: c.get('requestId'), message: 'hasAppRightApikey - appId is undefined' })
     return false
+  }
 
-  cloudlog({ requestId: c.get('requestId'), message: 'hasAppRightApikey', appId, userid, right, apikey })
+  cloudlog({ requestId: c.get('requestId'), message: 'hasAppRightApikey - calling RPC', appId, userid, right, apikeyPrefix: apikey?.substring(0, 15) })
 
   const { data, error } = await supabaseAdmin(c)
     .rpc('has_app_right_apikey', { appid: appId, right, userid, apikey })
 
+  cloudlog({ requestId: c.get('requestId'), message: 'hasAppRightApikey - RPC result', data, hasError: !!error, error })
+
   if (error) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'has_app_right_userid error', error })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'has_app_right_apikey error', error, appId, userid, right })
     return false
+  }
+
+  if (!data) {
+    cloudlog({ requestId: c.get('requestId'), message: 'hasAppRightApikey - permission denied', appId, userid, right, apikeyPrefix: apikey?.substring(0, 15) })
   }
 
   return data

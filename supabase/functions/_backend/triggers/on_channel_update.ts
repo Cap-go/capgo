@@ -13,10 +13,10 @@ app.post('/', middlewareAPISecret, triggerValidator('channels', 'UPDATE'), async
 
   if (!record.id) {
     cloudlog({ requestId: c.get('requestId'), message: 'No id' })
-    throw simpleError('no_id', 'No id', { record })
+    return simpleError('no_id', 'No id', { record })
   }
   if (!record.app_id) {
-    throw simpleError('no_app_id', 'No app id included the request', { record })
+    return simpleError('no_app_id', 'No app id included the request', { record })
   }
 
   if (record.public && record.ios) {

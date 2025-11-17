@@ -479,6 +479,7 @@
   "error-fetching-deploy-history": "Errore nel recupero della cronologia dei deployment",
   "error-fetching-members": "Errore nel recupero dei membri",
   "error-fetching-versions": "Errore nel recupero delle versioni! Si prega di controllare la console del browser e contattare il supporto",
+  "error-invalid-version": "ID versione non valido. Riprova o contatta il supporto.",
   "error-inviting-user": "Errore nell'invitare l'utente",
   "error-loading-deletion-date": "Non riesco a trovare la data di cancellazione del tuo account",
   "error-message-invitation": "Si è verificato un errore. Si prega di contattare il supporto Capgo",

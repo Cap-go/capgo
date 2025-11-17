@@ -478,6 +478,7 @@
   "error-fetching-deploy-history": "获取部署历史记录时出错",
   "error-fetching-members": "获取成员时出错",
   "error-fetching-versions": "获取版本错误！请检查浏览器控制台并联系支持人员",
+  "error-invalid-version": "无效的版本ID。请再试一次或联系支持。",
   "error-inviting-user": "邀请用户时出错",
   "error-loading-deletion-date": "无法找到您账户删除的日期",
   "error-message-invitation": "错误发生了。\n请联系CAPGO支持",

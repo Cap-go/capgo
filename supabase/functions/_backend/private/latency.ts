@@ -16,7 +16,7 @@ app.get('/', async (c) => {
     const res = await selectOneD1(pgClient)
 
     if (!res)
-      throw simpleError('cannot_get_apps', 'Cannot get apps')
+      return simpleError('cannot_get_apps', 'Cannot get apps')
     return c.json(BRES)
   }
   const pgClient = getPgClient(c, true)
@@ -25,6 +25,6 @@ app.get('/', async (c) => {
 
   await closeClient(c, pgClient)
   if (!res)
-    throw simpleError('cannot_get_apps', 'Cannot get apps')
+    return simpleError('cannot_get_apps', 'Cannot get apps')
   return c.json(BRES)
 })

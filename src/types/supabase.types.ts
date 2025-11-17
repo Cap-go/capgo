@@ -2249,6 +2249,7 @@ export type Database = {
       parse_step_pattern: { Args: { pattern: string }; Returns: number }
       pg_log: { Args: { decision: string; input?: Json }; Returns: undefined }
       process_admin_stats: { Args: never; Returns: undefined }
+      process_all_cron_tasks: { Args: never; Returns: undefined }
       process_channel_device_counts_queue: {
         Args: { batch_size?: number }
         Returns: number
@@ -2258,10 +2259,15 @@ export type Database = {
       process_d1_replication_batch: { Args: never; Returns: undefined }
       process_failed_uploads: { Args: never; Returns: undefined }
       process_free_trial_expired: { Args: never; Returns: undefined }
-      process_function_queue: {
-        Args: { batch_size?: number; queue_name: string }
-        Returns: number
-      }
+      process_function_queue:
+        | {
+            Args: { batch_size?: number; queue_names: string[] }
+            Returns: undefined
+          }
+        | {
+            Args: { batch_size?: number; queue_name: string }
+            Returns: undefined
+          }
       process_manifest_bundle_counts_queue: {
         Args: { batch_size?: number }
         Returns: number

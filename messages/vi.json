@@ -479,6 +479,7 @@
   "error-fetching-deploy-history": "Lỗi khi tải lịch sử triển khai",
   "error-fetching-members": "Lỗi khi tải thành viên",
   "error-fetching-versions": "Lỗi khi tìm kiếm phiên bản! Vui lòng kiểm tra console trình duyệt và liên hệ hỗ trợ",
+  "error-invalid-version": "ID phiên bản không hợp lệ. Vui lòng thử lại hoặc liên hệ hỗ trợ.",
   "error-inviting-user": "Lỗi khi mời người dùng",
   "error-loading-deletion-date": "Không thể tìm thấy ngày xóa tài khoản của bạn",
   "error-message-invitation": "Đã xảy ra lỗi. Vui lòng liên hệ hỗ trợ Capgo",

@@ -9,8 +9,10 @@ import type {
 } from './retry.ts'
 import type { Part } from './util.ts'
 import { Buffer } from 'node:buffer'
+import { DurableObject } from 'cloudflare:workers'
 import { HTTPException } from 'hono/http-exception'
 import { logger } from 'hono/logger'
+import { requestId } from 'hono/request-id'
 import { Hono } from 'hono/tiny'
 import { quickError } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../utils/logging.ts'
@@ -23,30 +25,23 @@ import {
   isR2MultipartDoesNotExistError,
   RetryBucket,
 } from './retry.ts'
-import { ALLOWED_HEADERS, ALLOWED_METHODS, AsyncLock, EXPOSED_HEADERS, generateParts, readIntFromHeader, toBase64, WritableStreamBuffer } from './util.ts'
-
-export const TUS_VERSION = '1.0.0'
-
-// uploads larger than this will be rejected
-export const MAX_UPLOAD_LENGTH_BYTES = 1024 * 1024 * 1024 // 1GB
-export const MAX_CHUNK_SIZE_BYTES = 1024 * 1024 * 99 // 99MB
-export const ALERT_UPLOAD_SIZE_BYTES = 1024 * 1024 * 20 // 20MB
-
-export const X_CHECKSUM_SHA256 = 'X-Checksum-Sha256'
-
-// how long an unfinished upload lives in ms
-const UPLOAD_EXPIRATION_MS = 1 * 24 * 60 * 60 * 1000 // 1 day
-// TODO: make sure partial unfinished uploads are cleaned up automatically in r2 after 1 day
-
-// how much we'll buffer in memory, must be greater than or equal to R2's min part size
-// https://developers.cloudflare.com/r2/objects/multipart-objects/#limitations
-const BUFFER_SIZE = 1024 * 1024 * 5
-
-// how much of the upload we've written
-const UPLOAD_OFFSET_KEY = 'upload-offset'
-
-// key for StoredUploadInfo
-const UPLOAD_INFO_KEY = 'upload-info'
+import {
+  ALLOWED_HEADERS,
+  ALLOWED_METHODS,
+  AsyncLock,
+  BUFFER_SIZE,
+  EXPOSED_HEADERS,
+  generateParts,
+  MAX_UPLOAD_LENGTH_BYTES,
+  readIntFromHeader,
+  toBase64,
+  TUS_VERSION,
+  UPLOAD_EXPIRATION_MS,
+  UPLOAD_INFO_KEY,
+  UPLOAD_OFFSET_KEY,
+  WritableStreamBuffer,
+  X_CHECKSUM_SHA256,
+} from './util.ts'
 
 // Stored for each part with the key of the multipart part number. Part numbers start with 1
 interface StoredR2Part {
@@ -79,9 +74,9 @@ interface Env {
   ATTACHMENT_BUCKET: R2Bucket
 }
 
-export class UploadHandler {
+export class UploadHandler extends DurableObject {
   state: DurableObjectState
-  env: Env
+  override env: Env
   router: Hono<MiddlewareKeyVariables, BlankSchema, '/'>
   parts: StoredR2Part[]
   multipart: RetryMultipartUpload | undefined
@@ -91,6 +86,7 @@ export class UploadHandler {
   requestGate: AsyncLock
 
   constructor(state: DurableObjectState, env: Env) {
+    super(state as unknown as ConstructorParameters<typeof DurableObject>[0], env)
     const bucket = env.ATTACHMENT_BUCKET
     this.state = state
     this.env = env
@@ -98,6 +94,8 @@ export class UploadHandler {
     this.requestGate = new AsyncLock()
     this.retryBucket = new RetryBucket(bucket, DEFAULT_RETRY_PARAMS)
     this.router = new Hono<MiddlewareKeyVariables>()
+    // Extract requestId from X-Request-Id header passed by Worker
+    this.router.use('*', requestId({ headerName: 'X-Request-Id' }))
     this.router.use('*', logger())
     this.router.options('/files/upload/:bucket', optionsHandler as any)
     this.router.post('/files/upload/:bucket', this.exclusive(this.create) as any)
@@ -141,50 +139,149 @@ export class UploadHandler {
     }
   }
 
-  fetch(request: Request): Response | Promise<Response> {
+  override fetch(request: Request): Response | Promise<Response> {
     return this.router.fetch(request)
   }
 
-  async alarm() {
+  override async alarm() {
     return await this.cleanup()
   }
 
   async initCreate(c: Context, uploadMetadata: UploadMetadata) {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'TUS initCreate - start',
+      metadata: uploadMetadata,
+    })
+
     const r2Key = uploadMetadata.filename ?? ''
     if (r2Key == null) {
-      cloudlog({ requestId: c.get('requestId'), message: 'in DO files create r2Key is null' })
-      throw new HTTPException(400, { message: 'bad filename metadata' })
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'TUS initCreate - r2Key is null',
+        metadata: uploadMetadata,
+      })
+      throw new HTTPException(400, {
+        res: c.json({
+          error: 'bad_filename_metadata',
+          message: 'Filename metadata is missing or invalid',
+          moreInfo: { metadata: uploadMetadata, requestId: c.get('requestId') },
+        }),
+      })
     }
+
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'TUS initCreate - r2Key extracted',
+      r2Key,
+    })
 
     const existingUploadOffset: number | undefined = await this.state.storage.get(UPLOAD_OFFSET_KEY)
     if (existingUploadOffset != null && existingUploadOffset > 0) {
-      cloudlog({ requestId: c.get('requestId'), message: 'in DO files create duplicate object creation' })
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'TUS initCreate - duplicate upload detected, cleaning up',
+        r2Key,
+        existingUploadOffset,
+      })
       await this.cleanup(r2Key)
-      throw new HTTPException(409, { message: 'object already exists' })
+      throw new HTTPException(409, {
+        res: c.json({
+          error: 'duplicate_upload',
+          message: 'Upload already exists',
+          moreInfo: { r2Key, existingUploadOffset, requestId: c.get('requestId') },
+        }),
+      })
     }
 
     const contentType = c.req.header('Content-Type')
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'TUS initCreate - checking content type',
+      contentType,
+    })
+
     if (contentType != null && contentType !== 'application/offset+octet-stream') {
-      cloudlog({ requestId: c.get('requestId'), message: 'in DO files create create only supports application/offset+octet-stream content-type' })
-      throw new HTTPException(415, { message: 'create only supports application/offset+octet-stream content-type' })
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'TUS initCreate - invalid content type',
+        contentType,
+        expected: 'application/offset+octet-stream',
+      })
+      throw new HTTPException(415, {
+        res: c.json({
+          error: 'invalid_content_type',
+          message: 'Create only supports application/offset+octet-stream content-type',
+          moreInfo: { contentType, requestId: c.get('requestId') },
+        }),
+      })
     }
+
     const contentLength = readIntFromHeader(c.req.raw.headers, 'Content-Length')
     if (!Number.isNaN(contentLength) && contentLength > 0 && contentType == null) {
-      cloudlog({ requestId: c.get('requestId'), message: 'in DO files create body requires application/offset+octet-stream content-type' })
-      throw new HTTPException(415, { message: 'body requires application/offset+octet-stream content-type' })
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'TUS initCreate - content-type required for body',
+        contentLength,
+      })
+      throw new HTTPException(415, {
+        res: c.json({
+          error: 'missing_content_type',
+          message: 'Body requires application/offset+octet-stream content-type',
+          moreInfo: { contentLength, requestId: c.get('requestId') },
+        }),
+      })
     }
+
     const hasContent = c.req.raw.body != null && contentType != null
     const uploadLength = readIntFromHeader(c.req.raw.headers, 'Upload-Length')
     const uploadDeferLength = readIntFromHeader(c.req.raw.headers, 'Upload-Defer-Length')
+
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'TUS initCreate - checking upload length headers',
+      uploadLength,
+      uploadDeferLength,
+      hasContent,
+    })
+
     if (Number.isNaN(uploadLength) && Number.isNaN(uploadDeferLength)) {
-      cloudlog({ requestId: c.get('requestId'), message: 'in DO files create must contain Upload-Length or Upload-Defer-Length header' })
-      throw new HTTPException(400, { message: 'must contain Upload-Length or Upload-Defer-Length header' })
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'TUS initCreate - missing upload length header',
+      })
+      throw new HTTPException(400, {
+        res: c.json({
+          error: 'missing_upload_length',
+          message: 'Must contain Upload-Length or Upload-Defer-Length header',
+          moreInfo: { requestId: c.get('requestId') },
+        }),
+      })
     }
 
     if (!Number.isNaN(uploadDeferLength) && uploadDeferLength !== 1) {
-      cloudlog({ requestId: c.get('requestId'), message: 'in DO files create bad Upload-Defer-Length' })
-      throw new HTTPException(400, { message: 'bad Upload-Defer-Length' })
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'TUS initCreate - invalid Upload-Defer-Length',
+        uploadDeferLength,
+      })
+      throw new HTTPException(400, {
+        res: c.json({
+          error: 'bad_upload_defer_length',
+          message: 'Invalid Upload-Defer-Length value',
+          moreInfo: { uploadDeferLength, requestId: c.get('requestId') },
+        }),
+      })
     }
+
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'TUS initCreate - validation complete',
+      r2Key,
+      uploadLength,
+      hasContent,
+    })
+
     return {
       r2Key,
       uploadLength,
@@ -194,11 +291,33 @@ export class UploadHandler {
 
   // create a new TUS upload
   async create(c: Context): Promise<Response> {
-    cloudlog({ requestId: c.get('requestId'), message: 'in DO create' })
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'TUS create - start',
+      url: c.req.url,
+      method: c.req.method,
+    })
     const uploadMetadata = parseUploadMetadata(c, c.req.raw.headers)
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'TUS create - parsed metadata',
+      metadata: uploadMetadata,
+    })
     const checksum = parseChecksum(c.req.raw.headers)
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'TUS create - parsed checksum',
+      checksum,
+    })
 
     const { r2Key, uploadLength, hasContent } = await this.initCreate(c, uploadMetadata)
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'TUS create - initialized',
+      r2Key,
+      uploadLength,
+      hasContent,
+    })
 
     const uploadInfo: StoredUploadInfo = {}
 
@@ -244,7 +363,7 @@ export class UploadHandler {
       const headResponse = await this.retryBucket.head(r2Key)
       if (headResponse == null) {
         cloudlog({ requestId: c.get('requestId'), message: 'in DO files head headResponse is null' })
-        throw quickError(404, 'not_found', 'Not Found')
+        return quickError(404, 'not_found', 'Not Found')
       }
       offset = headResponse.size
       uploadLength = headResponse.size
