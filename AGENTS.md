@@ -19,6 +19,9 @@
   command to ensure consistent formatting.
 - Leave `CHANGELOG.md` entries and the `version` field in `package.json` to the
   release automation; CI/CD updates them during tagged releases.
+- do not create new cron jobs it's bad pattern instead update
+  process_all_cron_tasks function in a new migration file to add your job if
+  needed.
 
 ## Frontend Style
 
