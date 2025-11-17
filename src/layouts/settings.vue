@@ -10,7 +10,7 @@ import IconUsage from '~icons/heroicons/chart-pie'
 import IconPlans from '~icons/heroicons/credit-card'
 import IconCredits from '~icons/heroicons/currency-dollar'
 import IconPassword from '~icons/heroicons/lock-closed'
-import IconAcount from '~icons/heroicons/user'
+import IconAccount from '~icons/heroicons/user'
 import { openPortal } from '~/services/stripe'
 import { useOrganizationStore } from '~/stores/organization'
 
