@@ -224,28 +224,26 @@ SELECT
     'expiry transaction recorded'
   );
 
-WITH inserted_transaction AS (
-  INSERT INTO public.usage_credit_transactions (
-    org_id,
-    grant_id,
-    transaction_type,
-    amount,
-    balance_after,
-    description,
-    source_ref
-  )
-  SELECT
-    org_id,
-    grant_id,
-    'purchase',
-    5,
-    5,
-    'Idempotency test transaction',
-    jsonb_build_object('sessionId', 'cs_test_idempotent', 'paymentIntentId', 'pi_test_idempotent')
-  FROM test_credit_context
-  LIMIT 1
-  RETURNING id
+INSERT INTO public.usage_credit_transactions (
+  org_id,
+  grant_id,
+  transaction_type,
+  amount,
+  balance_after,
+  description,
+  source_ref
 )
+SELECT
+  org_id,
+  grant_id,
+  'purchase',
+  5,
+  5,
+  'Idempotency test transaction',
+  jsonb_build_object('sessionId', 'cs_test_idempotent', 'paymentIntentId', 'pi_test_idempotent')
+FROM test_credit_context
+LIMIT 1;
+
 SELECT
   ok(
     EXISTS(
