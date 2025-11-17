@@ -22,16 +22,45 @@ const BLOCKED_SENDERS = [
   'vercel',
 ]
 
+// Content patterns that indicate automated bot messages
+const BLOCKED_CONTENT_PATTERNS = [
+  /snyk\s+(checks?|security|test)/i,
+  /sonarcloud/i,
+  /sonarqube/i,
+  /code\s*coverage/i,
+  /quality\s+gate/i,
+  /socket\s+security/i,
+  /linear\s+issue/i,
+  /netlify\s+deploy/i,
+  /vercel\s+deploy/i,
+]
+
 function isBlocked(payload) {
   const senderLogin = payload.sender?.login?.toLowerCase() || ''
   const commentAuthor = payload.comment?.user?.login?.toLowerCase() || ''
   const reviewAuthor = payload.review?.user?.login?.toLowerCase() || ''
 
-  return BLOCKED_SENDERS.some(blocked =>
+  // Check if sender/author username contains blocked terms
+  const isBlockedUser = BLOCKED_SENDERS.some(blocked =>
     senderLogin.includes(blocked) ||
     commentAuthor.includes(blocked) ||
     reviewAuthor.includes(blocked)
   )
+
+  if (isBlockedUser) {
+    return true
+  }
+
+  // Check if comment/review content contains bot patterns
+  const commentBody = payload.comment?.body || ''
+  const reviewBody = payload.review?.body || ''
+  const combinedContent = `${commentBody} ${reviewBody}`.toLowerCase()
+
+  const hasBlockedContent = BLOCKED_CONTENT_PATTERNS.some(pattern =>
+    pattern.test(combinedContent)
+  )
+
+  return hasBlockedContent
 }
 
 export default {
