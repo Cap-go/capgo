@@ -77,7 +77,7 @@ watch(type, (val) => {
 })
 
 watchEffect(() => {
-  const hasSuperAdminRights = organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['super_admin'])
+  const hasSuperAdminRights = organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['super_admin'])
 
   if (hasSuperAdminRights && (!organizationTabs.value.find((tab: Tab) => tab.label === 'usage'))) {
     // push it 2 before the last tab

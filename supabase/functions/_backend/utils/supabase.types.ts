@@ -2462,6 +2462,7 @@ export type Database = {
         | "InvalidIp"
         | "ping"
         | "blocked_by_server_url"
+        | "backend_refusal"
         | "download_manifest_start"
         | "download_manifest_complete"
         | "download_zip_start"
@@ -2469,7 +2470,6 @@ export type Database = {
         | "download_manifest_file_fail"
         | "download_manifest_checksum_fail"
         | "download_manifest_brotli_fail"
-        | "backend_refusal"
       stripe_status:
         | "created"
         | "succeeded"
@@ -2714,6 +2714,7 @@ export const Constants = {
         "InvalidIp",
         "ping",
         "blocked_by_server_url",
+        "backend_refusal",
         "download_manifest_start",
         "download_manifest_complete",
         "download_zip_start",
@@ -2721,7 +2722,6 @@ export const Constants = {
         "download_manifest_file_fail",
         "download_manifest_checksum_fail",
         "download_manifest_brotli_fail",
-        "backend_refusal",
       ],
       stripe_status: [
         "created",
