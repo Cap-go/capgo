@@ -320,7 +320,10 @@ async function handleCreditCheckoutReturn() {
   try {
     await completeCreditTopUp(currentOrganization.value.gid, sessionIdParam)
     toast.success('Credits added successfully')
+    const orgId = currentOrganization.value?.gid
     await organizationStore.fetchOrganizations()
+    if (orgId)
+      organizationStore.setCurrentOrganization(orgId)
     await Promise.allSettled([loadTransactions()])
   }
   catch (error) {

@@ -3,7 +3,7 @@ BEGIN;
 CREATE EXTENSION "basejump-supabase_test_helpers";
 
 SELECT
-  plan (11);
+  plan (14);
 
 DO $$
 BEGIN
@@ -257,6 +257,74 @@ SELECT
         )
     ),
     'credit top-up queries can locate existing purchases by session or payment intent reference'
+  );
+
+CREATE TEMP TABLE test_top_up_concurrency_results (
+  run_label text,
+  grant_id uuid,
+  transaction_id bigint,
+  available_credits numeric,
+  total_credits numeric,
+  next_expiration timestamptz
+) ON COMMIT DROP;
+
+INSERT INTO test_top_up_concurrency_results
+SELECT
+  'first',
+  *
+FROM public.top_up_usage_credits(
+  (SELECT org_id FROM test_credit_context),
+  5,
+  NULL,
+  'stripe_top_up',
+  jsonb_build_object(
+    'sessionId', 'cs_concurrent_top_up',
+    'paymentIntentId', 'pi_concurrent_top_up'
+  ),
+  'concurrent top-up attempt'
+);
+
+INSERT INTO test_top_up_concurrency_results
+SELECT
+  'second',
+  *
+FROM public.top_up_usage_credits(
+  (SELECT org_id FROM test_credit_context),
+  5,
+  NULL,
+  'stripe_top_up',
+  jsonb_build_object(
+    'sessionId', 'cs_concurrent_top_up',
+    'paymentIntentId', 'pi_concurrent_top_up'
+  ),
+  'concurrent top-up duplicate'
+);
+
+SELECT
+  is(
+    (SELECT transaction_id FROM test_top_up_concurrency_results WHERE run_label = 'first'),
+    (SELECT transaction_id FROM test_top_up_concurrency_results WHERE run_label = 'second'),
+    'duplicate top-up RPC calls return the same transaction id'
+  );
+
+SELECT
+  is(
+    (SELECT grant_id FROM test_top_up_concurrency_results WHERE run_label = 'first'),
+    (SELECT grant_id FROM test_top_up_concurrency_results WHERE run_label = 'second'),
+    'duplicate top-up RPC calls return the same grant id'
+  );
+
+SELECT
+  is(
+    (
+      SELECT COUNT(*)
+      FROM public.usage_credit_transactions
+      WHERE org_id = (SELECT org_id FROM test_credit_context)
+        AND transaction_type = 'purchase'
+        AND source_ref ->> 'sessionId' = 'cs_concurrent_top_up'
+    ),
+    1::bigint,
+    'duplicate top-up RPC calls result in a single purchase transaction row'
   );
 
 SELECT

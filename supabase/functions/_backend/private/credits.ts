@@ -66,6 +66,7 @@ interface CompleteTopUpRequest {
 }
 
 const DEFAULT_TOP_UP_QUANTITY = 100
+const MAX_TOP_UP_QUANTITY = 100000
 const CREDIT_TOP_UP_SLUG = 'credit_top_up'
 
 type AppContext = Context<MiddlewareKeyVariables, any, any>
@@ -261,8 +262,8 @@ app.post('/', async (c) => {
 app.post('/start-top-up', middlewareAuth, async (c) => {
   const body = await parseBody<StartTopUpRequest>(c)
   const parsedQuantity = Number.isFinite(body.quantity) ? Math.floor(body.quantity!) : undefined
-  const quantity = parsedQuantity && parsedQuantity >= 1
-    ? parsedQuantity
+  const quantity = parsedQuantity
+    ? Math.min(Math.max(parsedQuantity, 1), MAX_TOP_UP_QUANTITY)
     : DEFAULT_TOP_UP_QUANTITY
   if (!body.orgId)
     throw simpleError('missing_org_id', 'Organization id is required')

@@ -52,11 +52,16 @@ SET search_path = '' AS $$
 DECLARE
   v_request_role text := current_setting('request.jwt.claim.role', true);
   v_effective_expires timestamptz := COALESCE(p_expires_at, now() + interval '1 year');
+  v_source_ref jsonb := p_source_ref;
+  v_session_id text := NULLIF(v_source_ref ->> 'sessionId', '');
+  v_payment_intent_id text := NULLIF(v_source_ref ->> 'paymentIntentId', '');
   v_grant_id uuid;
   v_transaction_id bigint;
   v_available numeric := 0;
   v_total numeric := 0;
   v_next_expiration timestamptz;
+  v_existing_transaction_id bigint;
+  v_existing_grant_id uuid;
 BEGIN
   IF current_user <> 'postgres' AND COALESCE(v_request_role, '') <> 'service_role' THEN
     RAISE EXCEPTION 'insufficient_privileges';
@@ -70,64 +75,106 @@ BEGIN
     RAISE EXCEPTION 'amount must be positive';
   END IF;
 
-  INSERT INTO public.usage_credit_grants (
-    org_id,
-    credits_total,
-    credits_consumed,
-    granted_at,
-    expires_at,
-    source,
-    source_ref,
-    notes
-  )
-  VALUES (
-    p_org_id,
-    p_amount,
-    0,
-    now(),
-    v_effective_expires,
-    COALESCE(NULLIF(p_source, ''), 'manual'),
-    p_source_ref,
-    p_notes
-  )
-  RETURNING id INTO v_grant_id;
+  -- Guard the grant/transaction creation inside a subtransaction so we can detect
+  -- race-condition duplicates via the new unique indexes and return the existing
+  -- ledger row instead of creating another grant.
+  BEGIN
+    INSERT INTO public.usage_credit_grants (
+      org_id,
+      credits_total,
+      credits_consumed,
+      granted_at,
+      expires_at,
+      source,
+      source_ref,
+      notes
+    )
+    VALUES (
+      p_org_id,
+      p_amount,
+      0,
+      now(),
+      v_effective_expires,
+      COALESCE(NULLIF(p_source, ''), 'manual'),
+      v_source_ref,
+      p_notes
+    )
+    RETURNING id INTO v_grant_id;
 
-  SELECT
-    COALESCE(b.total_credits, 0),
-    COALESCE(b.available_credits, 0),
-    b.next_expiration
-  INTO v_total, v_available, v_next_expiration
-  FROM public.usage_credit_balances AS b
-  WHERE b.org_id = p_org_id;
+    SELECT
+      COALESCE(b.total_credits, 0),
+      COALESCE(b.available_credits, 0),
+      b.next_expiration
+    INTO v_total, v_available, v_next_expiration
+    FROM public.usage_credit_balances AS b
+    WHERE b.org_id = p_org_id;
 
-  INSERT INTO public.usage_credit_transactions (
-    org_id,
-    grant_id,
-    transaction_type,
-    amount,
-    balance_after,
-    description,
-    source_ref
-  )
-  VALUES (
-    p_org_id,
-    v_grant_id,
-    'purchase',
-    p_amount,
-    v_available,
-    p_notes,
-    p_source_ref
-  )
-  RETURNING id INTO v_transaction_id;
+    INSERT INTO public.usage_credit_transactions (
+      org_id,
+      grant_id,
+      transaction_type,
+      amount,
+      balance_after,
+      description,
+      source_ref
+    )
+    VALUES (
+      p_org_id,
+      v_grant_id,
+      'purchase',
+      p_amount,
+      v_available,
+      p_notes,
+      v_source_ref
+    )
+    RETURNING id INTO v_transaction_id;
 
-  grant_id := v_grant_id;
-  transaction_id := v_transaction_id;
-  available_credits := v_available;
-  total_credits := v_total;
-  next_expiration := v_next_expiration;
+    grant_id := v_grant_id;
+    transaction_id := v_transaction_id;
+    available_credits := v_available;
+    total_credits := v_total;
+    next_expiration := v_next_expiration;
 
-  RETURN NEXT;
-  RETURN;
+    RETURN NEXT;
+    RETURN;
+  EXCEPTION WHEN unique_violation THEN
+    IF v_session_id IS NULL AND v_payment_intent_id IS NULL THEN
+      RAISE;
+    END IF;
+
+    SELECT id, grant_id
+    INTO v_existing_transaction_id, v_existing_grant_id
+    FROM public.usage_credit_transactions
+    WHERE org_id = p_org_id
+      AND transaction_type = 'purchase'
+      AND (
+        (v_session_id IS NOT NULL AND source_ref ->> 'sessionId' = v_session_id)
+        OR (v_payment_intent_id IS NOT NULL AND source_ref ->> 'paymentIntentId' = v_payment_intent_id)
+      )
+    ORDER BY id DESC
+    LIMIT 1;
+
+    IF NOT FOUND THEN
+      RAISE;
+    END IF;
+
+    SELECT
+      COALESCE(b.total_credits, 0),
+      COALESCE(b.available_credits, 0),
+      b.next_expiration
+    INTO v_total, v_available, v_next_expiration
+    FROM public.usage_credit_balances AS b
+    WHERE b.org_id = p_org_id;
+
+    grant_id := v_existing_grant_id;
+    transaction_id := v_existing_transaction_id;
+    available_credits := v_available;
+    total_credits := v_total;
+    next_expiration := v_next_expiration;
+
+    RETURN NEXT;
+    RETURN;
+  END;
 END;
 $$;
 
