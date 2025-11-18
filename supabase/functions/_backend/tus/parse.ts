@@ -1,7 +1,6 @@
 // Copyright 2023 Signal Messenger, LLC
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import type { Context } from 'hono'
 import { HTTPException } from 'hono/http-exception'
 import { cloudlog } from '../utils/logging.ts'
 import { fromBase64, X_CHECKSUM_SHA256 } from './util.ts'
@@ -12,9 +11,9 @@ export interface UploadMetadata {
 
 // Parse "Upload-Metadata" header as described in the TUS creation extension
 // https://tus.io/protocols/resumable-upload#upload-metadata
-export function parseUploadMetadata(c: Context, headers: Headers): UploadMetadata {
+export function parseUploadMetadata(requestId: string, headers: Headers): UploadMetadata {
   const uploadMetadata: string | null = headers.get('Upload-Metadata')
-  cloudlog({ requestId: c.get('requestId'), message: 'parseUploadMetadata', uploadMetadata })
+  cloudlog({ requestId, message: 'parseUploadMetadata', uploadMetadata })
   if (uploadMetadata == null) {
     return {}
   }

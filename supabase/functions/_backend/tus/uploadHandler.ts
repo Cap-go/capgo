@@ -1,7 +1,4 @@
 import type { DurableObjectState, R2UploadedPart } from '@cloudflare/workers-types'
-import type { Context } from 'hono'
-import type { BlankSchema } from 'hono/types'
-import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Digester } from './digest.ts'
 import type { UploadMetadata } from './parse.ts'
 import type {
@@ -11,12 +8,8 @@ import type { Part } from './util.ts'
 import { Buffer } from 'node:buffer'
 import { DurableObject } from 'cloudflare:workers'
 import { HTTPException } from 'hono/http-exception'
-import { logger } from 'hono/logger'
-import { requestId } from 'hono/request-id'
-import { Hono } from 'hono/tiny'
 import { quickError } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../utils/logging.ts'
-import { onError } from '../utils/on_error.ts'
 import { noopDigester, sha256Digester } from './digest.ts'
 import { parseChecksum, parseUploadMetadata } from './parse.ts'
 import {
@@ -58,98 +51,71 @@ interface StoredUploadInfo {
   multipartUploadId?: string
 }
 
-function optionsHandler(c: Context) {
-  cloudlog({ requestId: c.get('requestId'), message: 'in DO optionsHandler' })
-  return c.newResponse(null, 204, {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization, Content-Length, X-Signal-Checksum-SHA256, tus-resumable, tus-version, tus-max-size, tus-extension, tus-checksum-sha256, upload-metadata, upload-length, upload-offset',
-    'Tus-Resumable': TUS_VERSION,
-    'Tus-Version': TUS_VERSION,
-    'Tus-Max-Size': MAX_UPLOAD_LENGTH_BYTES.toString(),
-    'Tus-Extension': 'creation,creation-defer-length,creation-with-upload,expiration',
-  })
-}
-
 interface Env {
   ATTACHMENT_BUCKET: R2Bucket
 }
 
-export class UploadHandler extends DurableObject {
-  state: DurableObjectState
-  override env: Env
-  router: Hono<MiddlewareKeyVariables, BlankSchema, '/'>
+function resJson(body: object): Response {
+  return new Response(JSON.stringify(body), {
+    headers: { 'Content-Type': 'application/json' },
+  })
+}
+
+export class AttachmentUploadHandler extends DurableObject {
   parts: StoredR2Part[]
+  requestId: string | undefined
   multipart: RetryMultipartUpload | undefined
   retryBucket: RetryBucket
 
   // only allow a single request to operate at a time
   requestGate: AsyncLock
 
-  constructor(state: DurableObjectState, env: Env) {
-    super(state as unknown as ConstructorParameters<typeof DurableObject>[0], env)
+  constructor(ctx: DurableObjectState, env: Env) {
+    super(ctx, env)
     const bucket = env.ATTACHMENT_BUCKET
-    this.state = state
-    this.env = env
     this.parts = []
+    this.requestId = ''
     this.requestGate = new AsyncLock()
     this.retryBucket = new RetryBucket(bucket, DEFAULT_RETRY_PARAMS)
-    this.router = new Hono<MiddlewareKeyVariables>()
-    // Extract requestId from X-Request-Id header passed by Worker
-    this.router.use('*', requestId({ headerName: 'X-Request-Id' }))
-    this.router.use('*', logger())
-    this.router.options('/files/upload/:bucket', optionsHandler as any)
-    this.router.post('/files/upload/:bucket', this.exclusive(this.create) as any)
-    this.router.options('/files/upload/:bucket/:id{.+}', optionsHandler as any)
-    this.router.patch('/files/upload/:bucket/:id{.+}', this.exclusive(this.patch) as any)
-    this.router.get('/files/upload/:bucket/:id{.+}', this.exclusive(this.head) as any)
-    // TODO: remove this when all users have been migrated
-    this.router.options('/private/files/upload/:bucket', optionsHandler as any)
-    this.router.post('/private/files/upload/:bucket', this.exclusive(this.create) as any)
-    this.router.options('/private/files/upload/:bucket/:id{.+}', optionsHandler as any)
-    this.router.patch('/private/files/upload/:bucket/:id{.+}', this.exclusive(this.patch) as any)
-    this.router.get('/private/files/upload/:bucket/:id{.+}', this.exclusive(this.head) as any)
-    this.router.onError(onError('TUS handler'))
+  }
+
+  setRequestId(rId: string) {
+    this.requestId = rId
   }
 
   // forbid concurrent requests while running clsMethod
-  exclusive(clsMethod: (c: Context) => Promise<Response>): (c: Context) => Promise<Response> {
-    return async (c) => {
-      const release = await this.requestGate.lock()
-      try {
-        return await clsMethod.bind(this)(c)
-      }
-      catch (e) {
-        if (e instanceof UnrecoverableError) {
-          try {
-            const unrecoverableError = e as UnrecoverableError
-            cloudlogErr({ requestId: c.get('requestId'), message: `Upload for ${unrecoverableError.r2Key} failed with unrecoverable error ${unrecoverableError.message}` })
-            // this upload can never make progress, try to clean up
-            await this.cleanup(unrecoverableError.r2Key)
-          }
-          catch (cleanupError) {
-            // ignore errors cleaning up
-            cloudlogErr({ requestId: c.get('requestId'), message: `error cleaning up ${cleanupError}` })
-          }
-        }
-        throw e
-      }
-      finally {
-        release()
-      }
+  private async withLock<T>(fn: () => Promise<T>): Promise<T> {
+    const release = await this.requestGate.lock()
+    try {
+      return await fn()
     }
-  }
-
-  override fetch(request: Request): Response | Promise<Response> {
-    return this.router.fetch(request)
+    catch (e) {
+      if (e instanceof UnrecoverableError) {
+        try {
+          const unrecoverableError = e as UnrecoverableError
+          cloudlogErr({ requestId: this.requestId, message: `Upload for ${unrecoverableError.r2Key} failed with unrecoverable error ${unrecoverableError.message}` })
+          // this upload can never make progress, try to clean up
+          await this.cleanup(unrecoverableError.r2Key)
+        }
+        catch (cleanupError) {
+          // ignore errors cleaning up
+          cloudlogErr({ requestId: this.requestId, message: `error cleaning up ${cleanupError}` })
+        }
+      }
+      throw e
+    }
+    finally {
+      release()
+    }
   }
 
   override async alarm() {
     return await this.cleanup()
   }
 
-  async initCreate(c: Context, uploadMetadata: UploadMetadata) {
+  async initCreate(body: ReadableStream<Uint8Array> | null, headers: Headers, uploadMetadata: UploadMetadata) {
     cloudlog({
-      requestId: c.get('requestId'),
+      requestId: this.requestId,
       message: 'TUS initCreate - start',
       metadata: uploadMetadata,
     })
@@ -157,88 +123,88 @@ export class UploadHandler extends DurableObject {
     const r2Key = uploadMetadata.filename ?? ''
     if (r2Key == null) {
       cloudlog({
-        requestId: c.get('requestId'),
+        requestId: this.requestId,
         message: 'TUS initCreate - r2Key is null',
         metadata: uploadMetadata,
       })
       throw new HTTPException(400, {
-        res: c.json({
+        res: resJson({
           error: 'bad_filename_metadata',
           message: 'Filename metadata is missing or invalid',
-          moreInfo: { metadata: uploadMetadata, requestId: c.get('requestId') },
+          moreInfo: { metadata: uploadMetadata, requestId: this.requestId },
         }),
       })
     }
 
     cloudlog({
-      requestId: c.get('requestId'),
+      requestId: this.requestId,
       message: 'TUS initCreate - r2Key extracted',
       r2Key,
     })
 
-    const existingUploadOffset: number | undefined = await this.state.storage.get(UPLOAD_OFFSET_KEY)
+    const existingUploadOffset: number | undefined = await this.ctx.storage.kv.get(UPLOAD_OFFSET_KEY)
     if (existingUploadOffset != null && existingUploadOffset > 0) {
       cloudlog({
-        requestId: c.get('requestId'),
+        requestId: this.requestId,
         message: 'TUS initCreate - duplicate upload detected, cleaning up',
         r2Key,
         existingUploadOffset,
       })
       await this.cleanup(r2Key)
       throw new HTTPException(409, {
-        res: c.json({
+        res: resJson({
           error: 'duplicate_upload',
           message: 'Upload already exists',
-          moreInfo: { r2Key, existingUploadOffset, requestId: c.get('requestId') },
+          moreInfo: { r2Key, existingUploadOffset, requestId: this.requestId },
         }),
       })
     }
 
-    const contentType = c.req.header('Content-Type')
+    const contentType = headers.get('Content-Type')
     cloudlog({
-      requestId: c.get('requestId'),
+      requestId: this.requestId,
       message: 'TUS initCreate - checking content type',
       contentType,
     })
 
     if (contentType != null && contentType !== 'application/offset+octet-stream') {
       cloudlog({
-        requestId: c.get('requestId'),
+        requestId: this.requestId,
         message: 'TUS initCreate - invalid content type',
         contentType,
         expected: 'application/offset+octet-stream',
       })
       throw new HTTPException(415, {
-        res: c.json({
+        res: resJson({
           error: 'invalid_content_type',
           message: 'Create only supports application/offset+octet-stream content-type',
-          moreInfo: { contentType, requestId: c.get('requestId') },
+          moreInfo: { contentType, requestId: this.requestId },
         }),
       })
     }
 
-    const contentLength = readIntFromHeader(c.req.raw.headers, 'Content-Length')
+    const contentLength = readIntFromHeader(headers, 'Content-Length')
     if (!Number.isNaN(contentLength) && contentLength > 0 && contentType == null) {
       cloudlog({
-        requestId: c.get('requestId'),
+        requestId: this.requestId,
         message: 'TUS initCreate - content-type required for body',
         contentLength,
       })
       throw new HTTPException(415, {
-        res: c.json({
+        res: resJson({
           error: 'missing_content_type',
           message: 'Body requires application/offset+octet-stream content-type',
-          moreInfo: { contentLength, requestId: c.get('requestId') },
+          moreInfo: { contentLength, requestId: this.requestId },
         }),
       })
     }
 
-    const hasContent = c.req.raw.body != null && contentType != null
-    const uploadLength = readIntFromHeader(c.req.raw.headers, 'Upload-Length')
-    const uploadDeferLength = readIntFromHeader(c.req.raw.headers, 'Upload-Defer-Length')
+    const hasContent = body != null && contentType != null
+    const uploadLength = readIntFromHeader(headers, 'Upload-Length')
+    const uploadDeferLength = readIntFromHeader(headers, 'Upload-Defer-Length')
 
     cloudlog({
-      requestId: c.get('requestId'),
+      requestId: this.requestId,
       message: 'TUS initCreate - checking upload length headers',
       uploadLength,
       uploadDeferLength,
@@ -247,35 +213,35 @@ export class UploadHandler extends DurableObject {
 
     if (Number.isNaN(uploadLength) && Number.isNaN(uploadDeferLength)) {
       cloudlog({
-        requestId: c.get('requestId'),
+        requestId: this.requestId,
         message: 'TUS initCreate - missing upload length header',
       })
       throw new HTTPException(400, {
-        res: c.json({
+        res: resJson({
           error: 'missing_upload_length',
           message: 'Must contain Upload-Length or Upload-Defer-Length header',
-          moreInfo: { requestId: c.get('requestId') },
+          moreInfo: { requestId: this.requestId },
         }),
       })
     }
 
     if (!Number.isNaN(uploadDeferLength) && uploadDeferLength !== 1) {
       cloudlog({
-        requestId: c.get('requestId'),
+        requestId: this.requestId,
         message: 'TUS initCreate - invalid Upload-Defer-Length',
         uploadDeferLength,
       })
       throw new HTTPException(400, {
-        res: c.json({
+        res: resJson({
           error: 'bad_upload_defer_length',
           message: 'Invalid Upload-Defer-Length value',
-          moreInfo: { uploadDeferLength, requestId: c.get('requestId') },
+          moreInfo: { uploadDeferLength, requestId: this.requestId },
         }),
       })
     }
 
     cloudlog({
-      requestId: c.get('requestId'),
+      requestId: this.requestId,
       message: 'TUS initCreate - validation complete',
       r2Key,
       uploadLength,
@@ -290,159 +256,162 @@ export class UploadHandler extends DurableObject {
   }
 
   // create a new TUS upload
-  async create(c: Context): Promise<Response> {
-    cloudlog({
-      requestId: c.get('requestId'),
-      message: 'TUS create - start',
-      url: c.req.url,
-      method: c.req.method,
-    })
-    const uploadMetadata = parseUploadMetadata(c, c.req.raw.headers)
-    cloudlog({
-      requestId: c.get('requestId'),
-      message: 'TUS create - parsed metadata',
-      metadata: uploadMetadata,
-    })
-    const checksum = parseChecksum(c.req.raw.headers)
-    cloudlog({
-      requestId: c.get('requestId'),
-      message: 'TUS create - parsed checksum',
-      checksum,
-    })
+  async create(url: string, headers: Headers, body: ReadableStream<Uint8Array> | null): Promise<Response> {
+    return this.withLock(async () => {
+      cloudlog({
+        requestId: this.requestId,
+        message: 'TUS create - start',
+        url,
+      })
+      const uploadMetadata = parseUploadMetadata(this.requestId!, headers)
+      cloudlog({
+        requestId: this.requestId,
+        message: 'TUS create - parsed metadata',
+        metadata: uploadMetadata,
+      })
+      const checksum = parseChecksum(headers)
+      cloudlog({
+        requestId: this.requestId,
+        message: 'TUS create - parsed checksum',
+        checksum,
+      })
 
-    const { r2Key, uploadLength, hasContent } = await this.initCreate(c, uploadMetadata)
-    cloudlog({
-      requestId: c.get('requestId'),
-      message: 'TUS create - initialized',
-      r2Key,
-      uploadLength,
-      hasContent,
-    })
+      const { r2Key, uploadLength, hasContent } = await this.initCreate(body, headers, uploadMetadata)
+      cloudlog({
+        requestId: this.requestId,
+        message: 'TUS create - initialized',
+        r2Key,
+        uploadLength,
+        hasContent,
+      })
 
-    const uploadInfo: StoredUploadInfo = {}
+      const uploadInfo: StoredUploadInfo = {}
 
-    const expiration = new Date(Date.now() + UPLOAD_EXPIRATION_MS)
-    await this.state.storage.setAlarm(expiration)
-    if (!Number.isNaN(uploadLength)) {
-      uploadInfo.uploadLength = uploadLength
-    }
-    if (checksum != null) {
-      uploadInfo.checksum = checksum
-    }
-    await this.state.storage.put(UPLOAD_OFFSET_KEY, 0)
-    await this.state.storage.put(UPLOAD_INFO_KEY, uploadInfo)
+      const expiration = new Date(Date.now() + UPLOAD_EXPIRATION_MS)
+      await this.ctx.storage.setAlarm(expiration)
+      if (!Number.isNaN(uploadLength)) {
+        uploadInfo.uploadLength = uploadLength
+      }
+      if (checksum != null) {
+        uploadInfo.checksum = checksum
+      }
+      await this.ctx.storage.kv.put(UPLOAD_OFFSET_KEY, 0)
+      await this.ctx.storage.kv.put(UPLOAD_INFO_KEY, uploadInfo)
 
-    const uploadLocation = new URL(r2Key, c.req.url.endsWith('/') ? c.req.url : `${c.req.url}/`)
+      const uploadLocation = new URL(r2Key, url.endsWith('/') ? url : `${url}/`)
 
-    const uploadOffset = hasContent
-      ? await this.appendBody(c, r2Key, c.req.raw.body as ReadableStream<Uint8Array>, 0, uploadInfo)
-      : 0
-    return new Response(null, {
-      status: 201,
-      headers: new Headers({
-        'Location': uploadLocation.href,
-        'Upload-Expires': expiration.toString(),
-        'Upload-Offset': uploadOffset.toString(),
-        'Tus-Resumable': TUS_VERSION,
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': ALLOWED_METHODS,
-        'Access-Control-Allow-Headers': ALLOWED_HEADERS,
-        'Access-Control-Expose-Headers': EXPOSED_HEADERS,
-      }),
+      const uploadOffset = hasContent
+        ? await this.appendBody(r2Key, body!, 0, uploadInfo)
+        : 0
+      return new Response(null, {
+        status: 201,
+        headers: new Headers({
+          'Location': uploadLocation.href,
+          'Upload-Expires': expiration.toString(),
+          'Upload-Offset': uploadOffset.toString(),
+          'Tus-Resumable': TUS_VERSION,
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': ALLOWED_METHODS,
+          'Access-Control-Allow-Headers': ALLOWED_HEADERS,
+          'Access-Control-Expose-Headers': EXPOSED_HEADERS,
+        }),
+      })
     })
   }
 
   // get the current upload offset to resume an upload
-  async head(c: Context): Promise<Response> {
-    cloudlog({ requestId: c.get('requestId'), message: 'in DO head detected' })
-    const r2Key = c.req.param('id')
+  async head(r2Key: string): Promise<Response> {
+    return this.withLock(async () => {
+      cloudlog({ requestId: this.requestId, message: 'in DO head detected' })
 
-    let offset: number | undefined = await this.state.storage.get(UPLOAD_OFFSET_KEY)
-    let uploadLength: number | undefined
-    if (offset == null) {
-      const headResponse = await this.retryBucket.head(r2Key)
-      if (headResponse == null) {
-        cloudlog({ requestId: c.get('requestId'), message: 'in DO files head headResponse is null' })
-        return quickError(404, 'not_found', 'Not Found')
+      let offset: number | undefined = await this.ctx.storage.kv.get(UPLOAD_OFFSET_KEY)
+      let uploadLength: number | undefined
+      if (offset == null) {
+        const headResponse = await this.retryBucket.head(r2Key)
+        if (headResponse == null) {
+          cloudlog({ requestId: this.requestId, message: 'in DO files head headResponse is null' })
+          return quickError(404, 'not_found', 'Not Found')
+        }
+        offset = headResponse.size
+        uploadLength = headResponse.size
       }
-      offset = headResponse.size
-      uploadLength = headResponse.size
-    }
-    else {
-      const info: StoredUploadInfo | undefined = await this.state.storage.get(UPLOAD_INFO_KEY)
-      uploadLength = info?.uploadLength
-    }
+      else {
+        const info: StoredUploadInfo | undefined = await this.ctx.storage.kv.get(UPLOAD_INFO_KEY)
+        uploadLength = info?.uploadLength
+      }
 
-    const headers = new Headers({
-      'Upload-Offset': offset?.toString() ?? '0',
-      'Upload-Expires': (await this.expirationTime()).toString(),
-      'Cache-Control': 'no-store',
-      'Tus-Resumable': TUS_VERSION,
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': ALLOWED_METHODS,
-      'Access-Control-Allow-Headers': ALLOWED_HEADERS,
-      'Access-Control-Expose-Headers': EXPOSED_HEADERS,
-    })
-    if (uploadLength != null) {
-      headers.set('Upload-Length', uploadLength.toString())
-    }
-    return new Response(null, { headers })
-  }
-
-  // append to the upload at the current upload offset
-  async patch(c: Context): Promise<Response> {
-    const r2Key = c.req.param('id')
-    cloudlog({ requestId: c.get('requestId'), message: 'in DO patch', r2Key })
-
-    let uploadOffset: number | undefined = await this.state.storage.get(UPLOAD_OFFSET_KEY)
-    if (uploadOffset == null) {
-      cloudlog({ requestId: c.get('requestId'), message: 'in DO files patch uploadOffset is null' })
-      return c.text('Not Found', 404)
-    }
-
-    const headerOffset = readIntFromHeader(c.req.raw.headers, 'Upload-Offset')
-    if (uploadOffset !== headerOffset) {
-      cloudlog({ requestId: c.get('requestId'), message: 'in DO files patch incorrect upload offset' })
-      return c.text('incorrect upload offset', 409)
-    }
-
-    const uploadInfo: StoredUploadInfo | undefined = await this.state.storage.get(UPLOAD_INFO_KEY)
-    if (uploadInfo == null) {
-      throw new UnrecoverableError('existing upload should have had uploadInfo', r2Key)
-    }
-    const headerUploadLength = readIntFromHeader(c.req.raw.headers, 'Upload-Length')
-    if (uploadInfo.uploadLength != null && !Number.isNaN(headerUploadLength) && uploadInfo.uploadLength !== headerUploadLength) {
-      cloudlog({ requestId: c.get('requestId'), message: 'in DO files patch upload length cannot change' })
-      return c.text('upload length cannot change', 400)
-    }
-
-    if (uploadInfo.uploadLength == null && !Number.isNaN(headerUploadLength)) {
-      uploadInfo.uploadLength = headerUploadLength
-      await this.state.storage.put(UPLOAD_INFO_KEY, uploadInfo)
-    }
-
-    if (c.req.raw.body == null) {
-      cloudlog({ requestId: c.get('requestId'), message: 'in DO files patch must provide request body' })
-      return c.text('Must provide request body', 400)
-    }
-
-    uploadOffset = await this.appendBody(c, r2Key, c.req.raw.body, uploadOffset, uploadInfo)
-
-    return new Response(null, {
-      status: 204,
-      headers: new Headers({
-        'Upload-Offset': uploadOffset.toString(),
+      const headers = new Headers({
+        'Upload-Offset': offset?.toString() ?? '0',
         'Upload-Expires': (await this.expirationTime()).toString(),
+        'Cache-Control': 'no-store',
         'Tus-Resumable': TUS_VERSION,
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': ALLOWED_METHODS,
         'Access-Control-Allow-Headers': ALLOWED_HEADERS,
         'Access-Control-Expose-Headers': EXPOSED_HEADERS,
-      }),
+      })
+      if (uploadLength != null) {
+        headers.set('Upload-Length', uploadLength.toString())
+      }
+      return new Response(null, { headers })
     })
   }
 
-  async switchOnPartKind(c: Context, r2Key: string, uploadOffset: number, uploadInfo: StoredUploadInfo, part: Part, digester: Digester, checksum: Uint8Array | undefined) {
+  // append to the upload at the current upload offset
+  async patch(r2Key: string, headers: Headers, body: ReadableStream<Uint8Array> | null): Promise<Response> {
+    return this.withLock(async () => {
+      cloudlog({ requestId: this.requestId, message: 'in DO patch', r2Key })
+
+      let uploadOffset: number | undefined = await this.ctx.storage.kv.get(UPLOAD_OFFSET_KEY)
+      if (uploadOffset == null) {
+        cloudlog({ requestId: this.requestId, message: 'in DO files patch uploadOffset is null' })
+        return new Response('Not Found', { status: 404 })
+      }
+
+      const headerOffset = readIntFromHeader(headers, 'Upload-Offset')
+      if (uploadOffset !== headerOffset) {
+        cloudlog({ requestId: this.requestId, message: 'in DO files patch incorrect upload offset' })
+        return new Response('incorrect upload offset', { status: 409 })
+      }
+
+      const uploadInfo: StoredUploadInfo | undefined = await this.ctx.storage.kv.get(UPLOAD_INFO_KEY)
+      if (uploadInfo == null) {
+        throw new UnrecoverableError('existing upload should have had uploadInfo', r2Key)
+      }
+      const headerUploadLength = readIntFromHeader(headers, 'Upload-Length')
+      if (uploadInfo.uploadLength != null && !Number.isNaN(headerUploadLength) && uploadInfo.uploadLength !== headerUploadLength) {
+        cloudlog({ requestId: this.requestId, message: 'in DO files patch upload length cannot change' })
+        return new Response('upload length cannot change', { status: 400 })
+      }
+
+      if (uploadInfo.uploadLength == null && !Number.isNaN(headerUploadLength)) {
+        uploadInfo.uploadLength = headerUploadLength
+        await this.ctx.storage.kv.put(UPLOAD_INFO_KEY, uploadInfo)
+      }
+
+      if (body == null) {
+        cloudlog({ requestId: this.requestId, message: 'in DO files patch must provide request body' })
+        return new Response('must provide request body', { status: 400 })
+      }
+
+      uploadOffset = await this.appendBody(r2Key, body, uploadOffset, uploadInfo)
+
+      return new Response(null, {
+        status: 204,
+        headers: new Headers({
+          'Upload-Offset': uploadOffset.toString(),
+          'Upload-Expires': (await this.expirationTime()).toString(),
+          'Tus-Resumable': TUS_VERSION,
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': ALLOWED_METHODS,
+          'Access-Control-Allow-Headers': ALLOWED_HEADERS,
+          'Access-Control-Expose-Headers': EXPOSED_HEADERS,
+        }),
+      })
+    })
+  }
+
+  async switchOnPartKind(r2Key: string, uploadOffset: number, uploadInfo: StoredUploadInfo, part: Part, digester: Digester, checksum: Uint8Array | undefined) {
     switch (part.kind) {
       case 'intermediate': {
         this.multipart ??= await this.r2CreateMultipartUpload(r2Key, uploadInfo)
@@ -451,8 +420,8 @@ export class UploadHandler extends DurableObject {
           length: part.bytes.byteLength,
         })
         uploadOffset += part.bytes.byteLength
-        const writePart = this.state.storage.put(this.parts.length.toString(), this.parts.at(-1))
-        const writeOffset = this.state.storage.put(UPLOAD_OFFSET_KEY, uploadOffset)
+        const writePart = this.ctx.storage.kv.put(this.parts.length.toString(), this.parts.at(-1))
+        const writeOffset = this.ctx.storage.kv.put(UPLOAD_OFFSET_KEY, uploadOffset)
         await Promise.all([writePart, writeOffset])
         break
       }
@@ -462,14 +431,14 @@ export class UploadHandler extends DurableObject {
         if (!finished) {
           // write the partial part to a temporary object so we can rehydrate it
           // later, and then we're done
-          await this.r2Put(c, this.tempkey(), part.bytes)
+          await this.r2Put(this.tempkey(), part.bytes)
           uploadOffset += part.bytes.byteLength
-          await this.state.storage.put(UPLOAD_OFFSET_KEY, uploadOffset)
+          await this.ctx.storage.kv.put(UPLOAD_OFFSET_KEY, uploadOffset)
         }
         else if (!this.multipart) {
           // all the bytes fit into a single in memory buffer, so we can just upload
           // it directly without using multipart
-          await this.r2Put(c, r2Key, part.bytes, checksum)
+          await this.r2Put(r2Key, part.bytes, checksum)
           uploadOffset += part.bytes.byteLength
           await this.cleanup()
         }
@@ -477,7 +446,7 @@ export class UploadHandler extends DurableObject {
           // upload the last part (can be less than the 5mb min part size), then complete the upload
           const uploadedPart = await this.r2UploadPart(r2Key, this.parts.length + 1, part.bytes)
           this.parts.push({ part: uploadedPart, length: part.bytes.byteLength })
-          await this.r2CompleteMultipartUpload(c, r2Key, await digester.digest(), checksum)
+          await this.r2CompleteMultipartUpload(r2Key, await digester.digest(), checksum)
           uploadOffset += part.bytes.byteLength
           await this.cleanup()
         }
@@ -506,10 +475,10 @@ export class UploadHandler extends DurableObject {
   // adding custom metadata to the object when we create the multipart upload. For A, if the client manages to upload
   // the object in one-shot we calculate the digest as it comes in. Otherwise, after the multipart upload is
   // finished, we retrieve the object from R2 and recompute the digest.
-  async appendBody(c: Context, r2Key: string, body: ReadableStream<Uint8Array>, uploadOffset: number, uploadInfo: StoredUploadInfo): Promise<number> {
+  async appendBody(r2Key: string, body: ReadableStream<Uint8Array>, uploadOffset: number, uploadInfo: StoredUploadInfo): Promise<number> {
     if ((uploadInfo.uploadLength ?? 0) > MAX_UPLOAD_LENGTH_BYTES) {
       await this.cleanup(r2Key)
-      cloudlog({ requestId: c.get('requestId'), message: 'files append body Upload-Length exceeds maximum upload size' })
+      cloudlog({ requestId: this.requestId, message: 'files append body Upload-Length exceeds maximum upload size' })
       throw new HTTPException(413, { message: 'Upload-Length exceeds maximum upload size' })
     }
 
@@ -523,30 +492,30 @@ export class UploadHandler extends DurableObject {
     // optimization: only bother calculating the stream's checksum if the client provided it, and we're not resuming
     const digester: Digester = checksum != null && uploadOffset === 0 && !isSinglePart ? sha256Digester() : noopDigester()
 
-    for await (const part of generateParts(c, body, mem)) {
+    for await (const part of generateParts(this.requestId!, body, mem)) {
       const newLength = uploadOffset + part.bytes.byteLength
       if (uploadInfo.uploadLength != null && newLength > uploadInfo.uploadLength) {
         await this.cleanup(r2Key)
-        cloudlog({ requestId: c.get('requestId'), message: 'files append body body exceeds Upload-Length' })
+        cloudlog({ requestId: this.requestId, message: 'files append body body exceeds Upload-Length' })
         throw new HTTPException(413, { message: 'body exceeds Upload-Length' })
       }
       if (newLength > MAX_UPLOAD_LENGTH_BYTES) {
         await this.cleanup(r2Key)
-        cloudlog({ requestId: c.get('requestId'), message: 'files append body body exceeds maximum upload size' })
+        cloudlog({ requestId: this.requestId, message: 'files append body body exceeds maximum upload size' })
         throw new HTTPException(413, { message: 'body exceeds maximum upload size' })
       }
 
       await digester.update(part.bytes)
-      uploadOffset = await this.switchOnPartKind(c, r2Key, uploadOffset, uploadInfo, part, digester, checksum)
+      uploadOffset = await this.switchOnPartKind(r2Key, uploadOffset, uploadInfo, part, digester, checksum)
     }
     return uploadOffset
   }
 
   // Check a checksum, throwing a 415 if the checksum does not match
-  async checkChecksum(c: Context, r2Key: string, expected: Uint8Array, actual: ArrayBuffer) {
+  async checkChecksum(r2Key: string, expected: Uint8Array, actual: ArrayBuffer) {
     if (!Buffer.from(actual).equals(expected)) {
       await this.cleanup(r2Key)
-      cloudlog({ requestId: c.get('requestId'), message: 'files checksum checksum does not match' })
+      cloudlog({ requestId: this.requestId, message: 'files checksum checksum does not match' })
       throw new HTTPException(415, { message: `The SHA-256 checksum you specified ${toBase64(actual)} did not match what we received ${toBase64(expected)}.` })
     }
   }
@@ -616,7 +585,7 @@ export class UploadHandler extends DurableObject {
 
     let partOffset = 0
     for (; ;) {
-      const part: StoredR2Part | undefined = await this.state.storage.get((this.parts.length + 1).toString())
+      const part: StoredR2Part | undefined = await this.ctx.storage.kv.get((this.parts.length + 1).toString())
       if (part == null) {
         break
       }
@@ -643,7 +612,7 @@ export class UploadHandler extends DurableObject {
     }
     const upload = await this.retryBucket.createMultipartUpload(r2Key, { customMetadata })
     uploadInfo.multipartUploadId = upload.r2MultipartUpload.uploadId
-    await this.state.storage.put(UPLOAD_INFO_KEY, uploadInfo)
+    await this.ctx.storage.kv.put(UPLOAD_INFO_KEY, uploadInfo)
     return upload
   }
 
@@ -651,15 +620,15 @@ export class UploadHandler extends DurableObject {
     return this.retryBucket.resumeMultipartUpload(r2Key, multipartUploadId)
   }
 
-  async r2Put(c: Context, r2Key: string, bytes: Uint8Array, checksum?: Uint8Array) {
+  async r2Put(r2Key: string, bytes: Uint8Array, checksum?: Uint8Array) {
     try {
       await this.retryBucket.put(r2Key, bytes, checksum as any)
     }
     catch (e) {
       if (isR2ChecksumError(e)) {
-        cloudlogErr({ requestId: c.get('requestId'), message: `checksum failure: ${e}` })
+        cloudlogErr({ requestId: this.requestId, message: `checksum failure: ${e}` })
         await this.cleanup()
-        cloudlog({ requestId: c.get('requestId'), message: 'files put checksum failure' })
+        cloudlog({ requestId: this.requestId, message: 'files put checksum failure' })
         throw new HTTPException(415)
       }
       throw e
@@ -683,26 +652,26 @@ export class UploadHandler extends DurableObject {
     }
   }
 
-  async r2CompleteMultipartUpload(c: Context, r2Key: string, actualChecksum?: ArrayBuffer, expectedChecksum?: Uint8Array) {
+  async r2CompleteMultipartUpload(r2Key: string, actualChecksum?: ArrayBuffer, expectedChecksum?: Uint8Array) {
     if (this.multipart == null) {
       throw new UnrecoverableError('cannot call complete multipart with no multipart upload', r2Key)
     }
 
     // If we were able to calculate the streaming digest, we can accept or reject now.
     if (actualChecksum != null && expectedChecksum != null) {
-      await this.checkChecksum(c, r2Key, expectedChecksum, actualChecksum)
+      await this.checkChecksum(r2Key, expectedChecksum, actualChecksum)
     }
 
     await this.multipart.complete(this.parts.map(storedPart => storedPart.part))
 
     // Otherwise we have to compute the digest from the finished upload
     if (actualChecksum == null && expectedChecksum != null) {
-      await this.checkChecksum(c, r2Key, expectedChecksum, await this.retrieveChecksum(r2Key))
+      await this.checkChecksum(r2Key, expectedChecksum, await this.retrieveChecksum(r2Key))
     }
   }
 
   tempkey(): string {
-    return `temporary/${this.state.id.toString()}`
+    return `temporary/${this.ctx.id.toString()}`
   }
 
   // Cleanup the state for this durable object. If r2Key is provided, the method will make
@@ -722,8 +691,8 @@ export class UploadHandler extends DurableObject {
       if (r2Key != null) {
         await this.hydrateParts(
           r2Key,
-          await this.state.storage.get(UPLOAD_OFFSET_KEY) ?? 0,
-          await this.state.storage.get(UPLOAD_INFO_KEY) ?? {},
+          await this.ctx.storage.kv.get(UPLOAD_OFFSET_KEY) ?? 0,
+          await this.ctx.storage.kv.get(UPLOAD_INFO_KEY) ?? {},
         )
         if (this.multipart != null) {
           await this.multipart.abort()
@@ -736,23 +705,17 @@ export class UploadHandler extends DurableObject {
 
     this.multipart = undefined
     this.parts = []
-    await this.state.storage.deleteAll()
-    await this.state.storage.deleteAlarm()
+    await this.ctx.storage.deleteAll()
+    await this.ctx.storage.deleteAlarm()
   }
 
   // After this time, the upload can no longer be used
   async expirationTime(): Promise<Date> {
-    const expiration = await this.state.storage.getAlarm()
+    const expiration = await this.ctx.storage.getAlarm()
     if (expiration == null) {
       return new Date()
     }
     return new Date(expiration)
-  }
-}
-
-export class AttachmentUploadHandler extends UploadHandler {
-  constructor(state: DurableObjectState, env: Env) {
-    super(state, env)
   }
 }
 

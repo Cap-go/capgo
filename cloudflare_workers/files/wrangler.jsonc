@@ -12,17 +12,8 @@
   "migrations": [
     {
       "tag": "v1",
-      "new_classes": [
-        "UploadHandler"
-      ]
-    },
-    {
-      "tag": "v2",
-      "renamed_classes": [
-        {
-          "from": "UploadHandler",
-          "to": "AttachmentUploadHandler"
-        }
+      "new_sqlite_classes": [
+        "AttachmentUploadHandler"
       ]
     }
   ],

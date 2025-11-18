@@ -1,4 +1,5 @@
 import type { Context, Next } from 'hono'
+import type { AttachmentUploadHandler } from '../tus/uploadHandler.ts'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { getRuntimeKey } from 'hono/adapter'
@@ -17,8 +18,6 @@ import { backgroundTask } from '../utils/utils.ts'
 import { app as download_link } from './download_link.ts'
 import { app as files_config } from './files_config.ts'
 import { app as upload_link } from './upload_link.ts'
-
-const DO_CALL_TIMEOUT = 1000 * 60 * 30 // 20 minutes
 
 const ATTACHMENT_PREFIX = 'attachments'
 
@@ -168,33 +167,37 @@ function optionsHandler(c: Context) {
 
 // TUS protocol requests (POST/PATCH/HEAD) that get forwarded to a durable object
 async function uploadHandler(c: Context) {
-  const requestId = c.get('fileId') as string
+  const fileId = c.get('fileId') as string
   // make requestId safe
-  const normalizedRequestId = decodeURIComponent(requestId)
-  const durableObjNs: DurableObjectNamespace = c.env.ATTACHMENT_UPLOAD_HANDLER
+  const normalizedRequestId = decodeURIComponent(fileId)
+  const durableObjNs: DurableObjectNamespace<AttachmentUploadHandler> = c.env.ATTACHMENT_UPLOAD_HANDLER
 
   if (durableObjNs == null) {
     cloudlog({ requestId: c.get('requestId'), message: 'files durableObjNs is null' })
     return simpleError('invalid_bucket_configuration', 'Invalid bucket configuration')
   }
 
-  const handler = durableObjNs.get(durableObjNs.idFromName(normalizedRequestId))
+  const DO = durableObjNs.get(durableObjNs.idFromName(normalizedRequestId))
   cloudlog({ requestId: c.get('requestId'), message: 'upload handler - forwarding to DO', method: c.req.method, url: c.req.url })
-
-  // Pass requestId to DO via header so it can use it in logs
-  const headers = new Headers(c.req.raw.headers)
-  headers.set('X-Request-Id', c.get('requestId') || 'unknown')
-
-  return await handler.fetch(c.req.url, {
-    body: c.req.raw.body,
-    method: c.req.method,
-    headers,
-    signal: AbortSignal.timeout(DO_CALL_TIMEOUT),
-  })
+  const headers = c.req.raw.headers
+  DO.setRequestId(c.get('requestId') as string)
+  if (c.req.method === 'POST') {
+    return await DO.create(c.req.url, headers, c.req.raw.body)
+  }
+  if (c.req.method === 'PATCH') {
+    return await DO.patch(fileId, headers, c.req.raw.body)
+  }
+  if (c.req.method === 'HEAD') {
+    return await DO.head(fileId)
+  }
+  if (c.req.method === 'OPTIONS') {
+    return optionsHandler(c)
+  }
+  return simpleError('invalid_method', 'Invalid method for upload handler')
 }
 
 async function setKeyFromMetadata(c: Context, next: Next) {
-  const uploadMetadata = parseUploadMetadata(c, c.req.raw.headers)
+  const uploadMetadata = parseUploadMetadata(c.get('requestId'), c.req.raw.headers)
   cloudlog({
     requestId: c.get('requestId'),
     message: 'setKeyFromMetadata - raw metadata',
@@ -451,13 +454,13 @@ async function checkWriteAppAccess(c: Context, next: Next) {
   await next()
 }
 
-app.options(`/upload/${ATTACHMENT_PREFIX}`, optionsHandler)
+app.options(`/upload/${ATTACHMENT_PREFIX}`, setKeyFromMetadata, checkWriteAppAccess, optionsHandler)
+app.options(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, setKeyFromMetadata, checkWriteAppAccess, optionsHandler)
 app.post(`/upload/${ATTACHMENT_PREFIX}`, middlewareKey(['all', 'write', 'upload']), setKeyFromMetadata, checkWriteAppAccess, uploadHandler)
+app.patch(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, middlewareKey(['all', 'write', 'upload']), setKeyFromMetadata, checkWriteAppAccess, uploadHandler)
+app.get(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, middlewareKey(['all', 'write', 'upload']), setKeyFromMetadata, checkWriteAppAccess, uploadHandler)
 
-app.options(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, optionsHandler)
-app.get(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, middlewareKey(['all', 'write', 'upload']), setKeyFromIdParam, checkWriteAppAccess, getHandler)
 app.get(`/read/${ATTACHMENT_PREFIX}/:id{.+}`, setKeyFromIdParam, getHandler)
-app.patch(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, middlewareKey(['all', 'write', 'upload']), setKeyFromIdParam, checkWriteAppAccess, uploadHandler)
 
 app.route('/config', files_config)
 app.route('/download_link', download_link)

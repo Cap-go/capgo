@@ -6,7 +6,7 @@ import { app as ok } from '../../supabase/functions/_backend/public/ok.ts'
 import { createAllCatch, createHono } from '../../supabase/functions/_backend/utils/hono.ts'
 import { version } from '../../supabase/functions/_backend/utils/version.ts'
 
-export { AttachmentUploadHandler, UploadHandler } from '../../supabase/functions/_backend/tus/uploadHandler.ts'
+export { AttachmentUploadHandler } from '../../supabase/functions/_backend/tus/uploadHandler.ts'
 
 const functionName = 'files'
 const app = createHono(functionName, version, process.env.SENTRY_DSN)
