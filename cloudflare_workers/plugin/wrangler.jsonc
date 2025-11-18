@@ -281,13 +281,13 @@
         }
       ]
     },
-    "prod_cn": {
-      "name": "capgo_plugin-cn-prod",
+    "prod_hk": {
+      "name": "capgo_plugin-hk-prod",
       "vars": {
         "IS_V2_STATS": "1",
         "IS_V2_CHANNEL": "1",
         "IS_V2_UPDATER": "0",
-        "ENV_NAME": "capgo_plugin-cn-prod"
+        "ENV_NAME": "capgo_plugin-hk-prod"
       },
       "observability": {
         "head_sampling_rate": 0.001,
@@ -298,7 +298,7 @@
       },
       "routes": [
         {
-          "pattern": "plugin.cn.capgo.app",
+          "pattern": "plugin.hk.capgo.app",
           "custom_domain": true
         },
         {
