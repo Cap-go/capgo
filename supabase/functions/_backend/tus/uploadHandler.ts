@@ -75,8 +75,6 @@ interface Env {
 }
 
 export class UploadHandler extends DurableObject {
-  state: DurableObjectState
-  override env: Env
   router: Hono<MiddlewareKeyVariables, BlankSchema, '/'>
   parts: StoredR2Part[]
   multipart: RetryMultipartUpload | undefined
@@ -85,11 +83,9 @@ export class UploadHandler extends DurableObject {
   // only allow a single request to operate at a time
   requestGate: AsyncLock
 
-  constructor(state: DurableObjectState, env: Env) {
-    super(state as unknown as ConstructorParameters<typeof DurableObject>[0], env)
+  constructor(ctx: DurableObjectState, env: Env) {
+    super(ctx, env)
     const bucket = env.ATTACHMENT_BUCKET
-    this.state = state
-    this.env = env
     this.parts = []
     this.requestGate = new AsyncLock()
     this.retryBucket = new RetryBucket(bucket, DEFAULT_RETRY_PARAMS)
@@ -176,7 +172,7 @@ export class UploadHandler extends DurableObject {
       r2Key,
     })
 
-    const existingUploadOffset: number | undefined = await this.state.storage.get(UPLOAD_OFFSET_KEY)
+    const existingUploadOffset: number | undefined = await this.ctx.storage.get(UPLOAD_OFFSET_KEY)
     if (existingUploadOffset != null && existingUploadOffset > 0) {
       cloudlog({
         requestId: c.get('requestId'),
@@ -322,15 +318,15 @@ export class UploadHandler extends DurableObject {
     const uploadInfo: StoredUploadInfo = {}
 
     const expiration = new Date(Date.now() + UPLOAD_EXPIRATION_MS)
-    await this.state.storage.setAlarm(expiration)
+    await this.ctx.storage.setAlarm(expiration)
     if (!Number.isNaN(uploadLength)) {
       uploadInfo.uploadLength = uploadLength
     }
     if (checksum != null) {
       uploadInfo.checksum = checksum
     }
-    await this.state.storage.put(UPLOAD_OFFSET_KEY, 0)
-    await this.state.storage.put(UPLOAD_INFO_KEY, uploadInfo)
+    await this.ctx.storage.put(UPLOAD_OFFSET_KEY, 0)
+    await this.ctx.storage.put(UPLOAD_INFO_KEY, uploadInfo)
 
     const uploadLocation = new URL(r2Key, c.req.url.endsWith('/') ? c.req.url : `${c.req.url}/`)
 
@@ -357,7 +353,7 @@ export class UploadHandler extends DurableObject {
     cloudlog({ requestId: c.get('requestId'), message: 'in DO head detected' })
     const r2Key = c.req.param('id')
 
-    let offset: number | undefined = await this.state.storage.get(UPLOAD_OFFSET_KEY)
+    let offset: number | undefined = await this.ctx.storage.get(UPLOAD_OFFSET_KEY)
     let uploadLength: number | undefined
     if (offset == null) {
       const headResponse = await this.retryBucket.head(r2Key)
@@ -369,7 +365,7 @@ export class UploadHandler extends DurableObject {
       uploadLength = headResponse.size
     }
     else {
-      const info: StoredUploadInfo | undefined = await this.state.storage.get(UPLOAD_INFO_KEY)
+      const info: StoredUploadInfo | undefined = await this.ctx.storage.get(UPLOAD_INFO_KEY)
       uploadLength = info?.uploadLength
     }
 
@@ -394,7 +390,7 @@ export class UploadHandler extends DurableObject {
     const r2Key = c.req.param('id')
     cloudlog({ requestId: c.get('requestId'), message: 'in DO patch', r2Key })
 
-    let uploadOffset: number | undefined = await this.state.storage.get(UPLOAD_OFFSET_KEY)
+    let uploadOffset: number | undefined = await this.ctx.storage.get(UPLOAD_OFFSET_KEY)
     if (uploadOffset == null) {
       cloudlog({ requestId: c.get('requestId'), message: 'in DO files patch uploadOffset is null' })
       return c.text('Not Found', 404)
@@ -406,7 +402,7 @@ export class UploadHandler extends DurableObject {
       return c.text('incorrect upload offset', 409)
     }
 
-    const uploadInfo: StoredUploadInfo | undefined = await this.state.storage.get(UPLOAD_INFO_KEY)
+    const uploadInfo: StoredUploadInfo | undefined = await this.ctx.storage.get(UPLOAD_INFO_KEY)
     if (uploadInfo == null) {
       throw new UnrecoverableError('existing upload should have had uploadInfo', r2Key)
     }
@@ -418,7 +414,7 @@ export class UploadHandler extends DurableObject {
 
     if (uploadInfo.uploadLength == null && !Number.isNaN(headerUploadLength)) {
       uploadInfo.uploadLength = headerUploadLength
-      await this.state.storage.put(UPLOAD_INFO_KEY, uploadInfo)
+      await this.ctx.storage.put(UPLOAD_INFO_KEY, uploadInfo)
     }
 
     if (c.req.raw.body == null) {
@@ -451,8 +447,8 @@ export class UploadHandler extends DurableObject {
           length: part.bytes.byteLength,
         })
         uploadOffset += part.bytes.byteLength
-        const writePart = this.state.storage.put(this.parts.length.toString(), this.parts.at(-1))
-        const writeOffset = this.state.storage.put(UPLOAD_OFFSET_KEY, uploadOffset)
+        const writePart = this.ctx.storage.put(this.parts.length.toString(), this.parts.at(-1))
+        const writeOffset = this.ctx.storage.put(UPLOAD_OFFSET_KEY, uploadOffset)
         await Promise.all([writePart, writeOffset])
         break
       }
@@ -464,7 +460,7 @@ export class UploadHandler extends DurableObject {
           // later, and then we're done
           await this.r2Put(c, this.tempkey(), part.bytes)
           uploadOffset += part.bytes.byteLength
-          await this.state.storage.put(UPLOAD_OFFSET_KEY, uploadOffset)
+          await this.ctx.storage.put(UPLOAD_OFFSET_KEY, uploadOffset)
         }
         else if (!this.multipart) {
           // all the bytes fit into a single in memory buffer, so we can just upload
@@ -616,7 +612,7 @@ export class UploadHandler extends DurableObject {
 
     let partOffset = 0
     for (; ;) {
-      const part: StoredR2Part | undefined = await this.state.storage.get((this.parts.length + 1).toString())
+      const part: StoredR2Part | undefined = await this.ctx.storage.get((this.parts.length + 1).toString())
       if (part == null) {
         break
       }
@@ -643,7 +639,7 @@ export class UploadHandler extends DurableObject {
     }
     const upload = await this.retryBucket.createMultipartUpload(r2Key, { customMetadata })
     uploadInfo.multipartUploadId = upload.r2MultipartUpload.uploadId
-    await this.state.storage.put(UPLOAD_INFO_KEY, uploadInfo)
+    await this.ctx.storage.put(UPLOAD_INFO_KEY, uploadInfo)
     return upload
   }
 
@@ -702,7 +698,7 @@ export class UploadHandler extends DurableObject {
   }
 
   tempkey(): string {
-    return `temporary/${this.state.id.toString()}`
+    return `temporary/${this.ctx.id.toString()}`
   }
 
   // Cleanup the state for this durable object. If r2Key is provided, the method will make
@@ -722,8 +718,8 @@ export class UploadHandler extends DurableObject {
       if (r2Key != null) {
         await this.hydrateParts(
           r2Key,
-          await this.state.storage.get(UPLOAD_OFFSET_KEY) ?? 0,
-          await this.state.storage.get(UPLOAD_INFO_KEY) ?? {},
+          await this.ctx.storage.get(UPLOAD_OFFSET_KEY) ?? 0,
+          await this.ctx.storage.get(UPLOAD_INFO_KEY) ?? {},
         )
         if (this.multipart != null) {
           await this.multipart.abort()
@@ -736,13 +732,13 @@ export class UploadHandler extends DurableObject {
 
     this.multipart = undefined
     this.parts = []
-    await this.state.storage.deleteAll()
-    await this.state.storage.deleteAlarm()
+    await this.ctx.storage.deleteAll()
+    await this.ctx.storage.deleteAlarm()
   }
 
   // After this time, the upload can no longer be used
   async expirationTime(): Promise<Date> {
-    const expiration = await this.state.storage.getAlarm()
+    const expiration = await this.ctx.storage.getAlarm()
     if (expiration == null) {
       return new Date()
     }
