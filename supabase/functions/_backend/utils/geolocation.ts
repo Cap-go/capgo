@@ -3,7 +3,7 @@ import { cloudlog } from './logging.ts'
 import { existInEnv, getEnv } from './utils.ts'
 
 // Antartica and Tor are redirected to EU in our snippet
-type ContinentsCFWorker = 'EU' | 'NA' | 'AS' | 'OC' | 'SA' | 'AF'
+type ContinentsCFWorker = 'EU' | 'NA' | 'AS' | 'OC' | 'SA' | 'AF' | 'ME' | 'HK'
 type RegionsAWS = 'EU' | 'NA' | 'SA' | 'AF' | 'AP' | 'ME' | 'IL' | 'CA' | 'MX'
 type DbRegionD1 = 'EU' | 'NA' | 'AS' | 'OC' | undefined
 // type DbRegionD1 = 'EU' | 'NA' | 'AS' | 'OC' | undefined
@@ -40,8 +40,10 @@ export function getClientDbRegionD1(c: Context): DbRegionD1 {
     switch (continent) {
       case 'EU': // Europe
       case 'AF': // Africa
+      case 'ME': // Middle East
         return 'EU'
       case 'AS': // Asia
+      case 'HK': // Hong Kong / China
         return 'AS'
       case 'OC': // Oceania
         return 'OC'

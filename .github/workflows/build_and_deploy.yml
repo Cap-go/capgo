@@ -172,7 +172,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        region: [eu, as, us, sa, oc, af]
+        region: [eu, as, us, sa, oc, af, me, hk]
         include:
           - region: eu
             region_label: Europe (EU)
@@ -192,6 +192,12 @@ jobs:
           - region: af
             region_label: Africa (AF)
             cf_target: plugin_af
+          - region: me
+            region_label: Middle East (ME)
+            cf_target: plugin_me
+          - region: hk
+            region_label: Hong Kong (HK)
+            cf_target: plugin_hk
     name: Deploy CF Worker Plugin (${{ matrix.region_label }})
     steps:
       - name: Checkout
