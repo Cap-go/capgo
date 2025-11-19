@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
-import { BASE_URL, getBaseData, getSupabaseClient, ORG_ID, postUpdate, PRODUCT_ID, resetAndSeedAppDataStats, resetAppData, resetAppDataStats, STRIPE_INFO_CUSTOMER_ID, TEST_EMAIL, USER_ID } from './test-utils.ts'
+import { BASE_URL, getSupabaseClient, ORG_ID, PRODUCT_ID, resetAndSeedAppDataStats, resetAppData, resetAppDataStats, STRIPE_INFO_CUSTOMER_ID, TEST_EMAIL, USER_ID } from './test-utils.ts'
 
 const id = randomUUID()
 const APPNAME = `com.cp.${id}`
@@ -107,7 +107,7 @@ afterAll(async () => {
     .eq('org_id', ORG_ID)
 })
 
-describe('Build Time Tracking System', () => {
+describe('build Time Tracking System', () => {
   // TODO: Update these tests to use build_logs instead of daily_build_time
   it.skip('should handle too big build time correctly', async () => {
     const supabase = getSupabaseClient()
@@ -336,133 +336,111 @@ describe('Build Time Tracking System', () => {
     expect(metrics.build_time_seconds).toBe(3000) // 50 minutes total in seconds
   })
 
-  it('should correctly insert build logs', async () => {
+  it('should correctly record build time using RPC function (iOS 2x multiplier)', async () => {
     const supabase = getSupabaseClient()
-
     const buildId = randomUUID()
-    const { error: insertError } = await supabase
-      .from('build_logs')
-      .insert({
-        org_id: ORG_ID,
-        user_id: USER_ID,
-        build_id: buildId,
-        platform: 'ios',
-        build_time_seconds: 600, // 10 minutes
-        billable_seconds: 1200, // iOS multiplier 2x
-      })
-    expect(insertError).toBeFalsy()
 
-    // Verify the build log was inserted
-    const { data: buildLog, error: buildLogError } = await supabase
+    const { error: rpcError } = await supabase.rpc('record_build_time', {
+      p_org_id: ORG_ID,
+      p_user_id: USER_ID,
+      p_build_id: buildId,
+      p_platform: 'ios',
+      p_build_time_seconds: 600, // 10 minutes
+    })
+    expect(rpcError).toBeFalsy()
+
+    const { data: buildLog, error } = await supabase
       .from('build_logs')
       .select('*')
       .eq('build_id', buildId)
       .single()
-    expect(buildLogError).toBeFalsy()
-    expect(buildLog).toBeTruthy()
+    expect(error).toBeFalsy()
     expect(buildLog?.build_time_seconds).toBe(600)
-    expect(buildLog?.billable_seconds).toBe(1200)
-    expect(buildLog?.platform).toBe('ios')
+    expect(buildLog?.billable_seconds).toBe(1200) // iOS 2x multiplier
   })
 
-  it('should correctly apply platform multiplier (android 1x)', async () => {
+  it('should correctly apply Android 1x multiplier', async () => {
     const supabase = getSupabaseClient()
-
     const buildId = randomUUID()
-    const { error: insertError } = await supabase
-      .from('build_logs')
-      .insert({
-        org_id: ORG_ID,
-        user_id: USER_ID,
-        build_id: buildId,
-        platform: 'android',
-        build_time_seconds: 150,
-        billable_seconds: 150, // Android multiplier 1x
-      })
-    expect(insertError).toBeFalsy()
 
-    // Verify the multiplier is correct
-    const { data: buildLog, error: buildLogError } = await supabase
+    const { error: rpcError } = await supabase.rpc('record_build_time', {
+      p_org_id: ORG_ID,
+      p_user_id: USER_ID,
+      p_build_id: buildId,
+      p_platform: 'android',
+      p_build_time_seconds: 150,
+    })
+    expect(rpcError).toBeFalsy()
+
+    const { data: buildLog, error } = await supabase
       .from('build_logs')
-      .select('build_time_seconds, billable_seconds')
+      .select('*')
       .eq('build_id', buildId)
       .single()
-    expect(buildLogError).toBeFalsy()
-    expect(buildLog).toBeTruthy()
+    expect(error).toBeFalsy()
     expect(buildLog?.build_time_seconds).toBe(150)
-    expect(buildLog?.billable_seconds).toBe(150) // 1x multiplier
+    expect(buildLog?.billable_seconds).toBe(150) // Android 1x multiplier
   })
 
-  it('should prevent duplicate build logs with same build_id and org_id', async () => {
+  it('should upsert on duplicate build_id', async () => {
     const supabase = getSupabaseClient()
-
     const buildId = randomUUID()
 
-    // First insert should succeed
-    const { error: insertError1 } = await supabase
-      .from('build_logs')
-      .insert({
-        org_id: ORG_ID,
-        user_id: USER_ID,
-        build_id: buildId,
-        platform: 'ios',
-        build_time_seconds: 600,
-        billable_seconds: 1200,
-      })
-    expect(insertError1).toBeFalsy()
+    // First call
+    await supabase.rpc('record_build_time', {
+      p_org_id: ORG_ID,
+      p_user_id: USER_ID,
+      p_build_id: buildId,
+      p_platform: 'ios',
+      p_build_time_seconds: 600,
+    })
 
-    // Second insert with same build_id and org_id should fail
-    const { error: insertError2 } = await supabase
+    // Second call with updated time
+    const { error: rpcError } = await supabase.rpc('record_build_time', {
+      p_org_id: ORG_ID,
+      p_user_id: USER_ID,
+      p_build_id: buildId,
+      p_platform: 'ios',
+      p_build_time_seconds: 700,
+    })
+    expect(rpcError).toBeFalsy()
+
+    // Should have updated, not created duplicate
+    const { data: logs, error } = await supabase
       .from('build_logs')
-      .insert({
-        org_id: ORG_ID,
-        user_id: USER_ID,
-        build_id: buildId,
-        platform: 'ios',
-        build_time_seconds: 700,
-        billable_seconds: 1400,
-      })
-    expect(insertError2).toBeTruthy()
-    expect(insertError2?.code).toBe('23505') // unique_violation error
+      .select('*')
+      .eq('build_id', buildId)
+    expect(error).toBeFalsy()
+    expect(logs?.length).toBe(1)
+    expect(logs?.[0]?.build_time_seconds).toBe(700)
+    expect(logs?.[0]?.billable_seconds).toBe(1400)
   })
 
-  it('should enforce platform check constraint', async () => {
+  it('should reject invalid platform', async () => {
     const supabase = getSupabaseClient()
-
     const buildId = randomUUID()
 
-    // Try to insert with invalid platform
-    const { error: insertError } = await supabase
-      .from('build_logs')
-      .insert({
-        org_id: ORG_ID,
-        user_id: USER_ID,
-        build_id: buildId,
-        platform: 'windows', // Invalid platform
-        build_time_seconds: 600,
-        billable_seconds: 600,
-      })
-    expect(insertError).toBeTruthy()
-    expect(insertError?.code).toBe('23514') // check_violation error
+    const { error } = await supabase.rpc('record_build_time', {
+      p_org_id: ORG_ID,
+      p_user_id: USER_ID,
+      p_build_id: buildId,
+      p_platform: 'windows' as any,
+      p_build_time_seconds: 600,
+    })
+    expect(error).toBeTruthy()
   })
 
-  it('should enforce build_time_seconds non-negative constraint', async () => {
+  it('should reject negative build time', async () => {
     const supabase = getSupabaseClient()
-
     const buildId = randomUUID()
 
-    // Try to insert with negative build time
-    const { error: insertError } = await supabase
-      .from('build_logs')
-      .insert({
-        org_id: ORG_ID,
-        user_id: USER_ID,
-        build_id: buildId,
-        platform: 'ios',
-        build_time_seconds: -100,
-        billable_seconds: -200,
-      })
-    expect(insertError).toBeTruthy()
-    expect(insertError?.code).toBe('23514') // check_violation error
+    const { error } = await supabase.rpc('record_build_time', {
+      p_org_id: ORG_ID,
+      p_user_id: USER_ID,
+      p_build_id: buildId,
+      p_platform: 'ios',
+      p_build_time_seconds: -100,
+    })
+    expect(error).toBeTruthy()
   })
 })

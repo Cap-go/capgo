@@ -81,7 +81,7 @@ afterAll(async () => {
     .eq('app_id', APPNAME)
 })
 
-describe('Build Request API', () => {
+describe('build Request API', () => {
   it('should successfully request a build', async () => {
     const response = await fetch(`${BASE_URL}/build`, {
       method: 'POST',
@@ -94,7 +94,7 @@ describe('Build Request API', () => {
     })
 
     expect(response.status).toBe(200)
-    const result = await response.json()
+    const result = await response.json() as any
 
     expect(result).toHaveProperty('build_request_id')
     expect(result).toHaveProperty('upload_session_key')
@@ -132,7 +132,7 @@ describe('Build Request API', () => {
     })
 
     expect(response.status).toBe(200)
-    const result = await response.json()
+    const result = await response.json() as any
 
     const supabase = getSupabaseClient()
     const { data: buildRequest } = await supabase
@@ -163,7 +163,7 @@ describe('Build Request API', () => {
     })
 
     expect(response.status).toBe(200)
-    const result = await response.json()
+    const result = await response.json() as any
 
     const supabase = getSupabaseClient()
     const { data: buildRequest } = await supabase
@@ -247,8 +247,8 @@ describe('Build Request API', () => {
       }),
     })
 
-    const result1 = await response1.json()
-    const result2 = await response2.json()
+    const result1 = await response1.json() as any
+    const result2 = await response2.json() as any
 
     expect(result1.upload_session_key).not.toBe(result2.upload_session_key)
     expect(result1.build_request_id).not.toBe(result2.build_request_id)
@@ -266,7 +266,7 @@ describe('Build Request API', () => {
       }),
     })
 
-    const result = await response.json()
+    const result = await response.json() as any
     const expiresAt = new Date(result.upload_expires_at)
 
     // Should expire in approximately 1 hour
