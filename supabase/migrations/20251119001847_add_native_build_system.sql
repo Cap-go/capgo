@@ -662,7 +662,7 @@ $function$;
 DROP FUNCTION IF EXISTS public.get_app_metrics(uuid, date, date);
 
 CREATE FUNCTION public.get_app_metrics(
-    p_org_id uuid, p_start_date date, p_end_date date
+    org_id uuid, start_date date, end_date date
 ) RETURNS TABLE (
     app_id character varying,
     date date,
@@ -682,7 +682,7 @@ DECLARE
     org_exists boolean;
 BEGIN
     SELECT EXISTS (
-        SELECT 1 FROM public.orgs WHERE id = p_org_id
+        SELECT 1 FROM public.orgs WHERE id = get_app_metrics.org_id
     ) INTO org_exists;
 
     IF NOT org_exists THEN
@@ -692,14 +692,14 @@ BEGIN
     SELECT *
     INTO cache_entry
     FROM public.app_metrics_cache
-    WHERE org_id = p_org_id;
+    WHERE app_metrics_cache.org_id = get_app_metrics.org_id;
 
     IF cache_entry.id IS NULL
-        OR cache_entry.start_date IS DISTINCT FROM p_start_date
-        OR cache_entry.end_date IS DISTINCT FROM p_end_date
+        OR cache_entry.start_date IS DISTINCT FROM get_app_metrics.start_date
+        OR cache_entry.end_date IS DISTINCT FROM get_app_metrics.end_date
         OR cache_entry.cached_at IS NULL
         OR cache_entry.cached_at < (now() - interval '5 minutes') THEN
-        cache_entry := public.seed_get_app_metrics_caches(p_org_id, p_start_date, p_end_date);
+        cache_entry := public.seed_get_app_metrics_caches(get_app_metrics.org_id, get_app_metrics.start_date, get_app_metrics.end_date);
     END IF;
 
     IF cache_entry.response IS NULL THEN

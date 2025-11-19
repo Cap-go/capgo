@@ -308,11 +308,11 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
           class="flex flex-col p-5 rounded-2xl border transition-all duration-200 overflow-hidden relative group bg-white dark:bg-base-100"
           :class="[
             p.name === currentPlan?.name ? 'border-2 border-blue-500' : 'border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-700',
-            isRecommended(p) ? 'shadow-lg shadow-blue-500/10' : 'shadow-sm'
+            isRecommended(p) ? 'shadow-lg shadow-blue-500/10' : 'shadow-sm',
           ]"
         >
           <!-- Recommended Badge -->
-          <div v-if="isRecommended(p)" class="absolute top-0 inset-x-0 h-1 bg-linear-to-r from-blue-500 to-indigo-500"></div>
+          <div v-if="isRecommended(p)" class="absolute top-0 inset-x-0 h-1 bg-linear-to-r from-blue-500 to-indigo-500" />
           <div v-if="isRecommended(p)" class="absolute top-3 right-3">
             <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-200">
               {{ t('recommended') }}
@@ -353,8 +353,8 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
             @click="openChangePlan(p, index)"
           >
             <svg v-if="isSubscribeLoading[index]" class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
             </svg>
             {{ buttonName(p) }}
           </button>
@@ -384,8 +384,12 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
     <div v-else class="h-full w-full flex items-center justify-center bg-gray-50 dark:bg-base-300">
       <div class="text-center">
         <img src="/capgo.webp" alt="logo" class="h-20 w-20 mx-auto mb-8 animate-bounce">
-        <h2 class="text-3xl font-bold text-gray-900 dark:text-white mb-4">{{ t('thank-you-for-sub') }}</h2>
-        <div class="text-6xl mb-8">🎉</div>
+        <h2 class="text-3xl font-bold text-gray-900 dark:text-white mb-4">
+          {{ t('thank-you-for-sub') }}
+        </h2>
+        <div class="text-6xl mb-8">
+          🎉
+        </div>
         <router-link to="/app" class="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
           {{ t('use-capgo') }} 🚀
         </router-link>
