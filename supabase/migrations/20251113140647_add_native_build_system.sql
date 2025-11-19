@@ -81,6 +81,26 @@ CREATE TABLE IF NOT EXISTS public.daily_build_time (
 
 CREATE INDEX idx_daily_build_time_app_date ON public.daily_build_time (app_id, date);
 
+ALTER TABLE public.daily_build_time ENABLE ROW LEVEL SECURITY;
+
+-- Users can view build time data for apps in their organization
+CREATE POLICY "Users read own org build time" ON public.daily_build_time FOR SELECT TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.apps
+      WHERE apps.app_id = daily_build_time.app_id
+        AND EXISTS (
+          SELECT 1 FROM public.org_users
+          WHERE org_users.org_id = apps.owner_org
+            AND org_users.user_id = auth.uid()
+        )
+    )
+  );
+
+-- Only service role can write (backend records build metrics)
+CREATE POLICY "Service role manages build time" ON public.daily_build_time FOR ALL TO service_role
+  USING (true) WITH CHECK (true);
+
 -- Build requests - stores native build jobs requested via API
 CREATE TABLE IF NOT EXISTS public.build_requests (
   id uuid DEFAULT extensions.uuid_generate_v4() PRIMARY KEY,
