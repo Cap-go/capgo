@@ -446,7 +446,7 @@ export async function getOrgBuildTimeSeconds(
   endDate: string,
 ): Promise<{ total_build_time_seconds: number, total_builds: number }> {
   try {
-    const { data, error} = await supabaseAdmin(c)
+    const { data, error } = await supabaseAdmin(c)
       .rpc('get_org_build_time_seconds', {
         p_org_id: orgId,
         p_start_date: startDate,

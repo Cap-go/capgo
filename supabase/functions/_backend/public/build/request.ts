@@ -132,15 +132,17 @@ export async function requestBuild(
         }),
       })
 
-      if (builderResponse.ok)
+      if (builderResponse.ok) {
         builderJob = await builderResponse.json() as BuilderJobResponse
-      else
+      }
+      else {
         cloudlogErr({
           requestId: c.get('requestId'),
           message: 'Builder API error',
           status: builderResponse.status,
           error: await builderResponse.text(),
         })
+      }
     }
     catch (error) {
       cloudlogErr({ requestId: c.get('requestId'), message: 'Builder API unreachable', error: (error as Error)?.message })
