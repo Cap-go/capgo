@@ -58,7 +58,7 @@ BEGIN
     INSERT INTO "public"."deleted_account" ("created_at", "email", "id") VALUES
     (now(), encode(extensions.digest('deleted@capgo.app'::bytea, 'sha256'::text)::bytea, 'hex'::text), '00000000-0000-0000-0000-000000000001');
 
-    INSERT INTO "public"."plans" ("created_at", "updated_at", "name", "description", "price_m", "price_y", "stripe_id", "version", "id", "price_m_id", "price_y_id", "storage", "bandwidth", "mau", "market_desc", "storage_unit", "bandwidth_unit", "mau_unit", "price_m_storage_id", "price_m_bandwidth_id", "price_m_mau_id", "build_time_seconds") VALUES
+    INSERT INTO "public"."plans" ("created_at", "updated_at", "name", "description", "price_m", "price_y", "stripe_id", "version", "id", "price_m_id", "price_y_id", "storage", "bandwidth", "mau", "market_desc", "storage_unit", "bandwidth_unit", "mau_unit", "price_m_storage_id", "price_m_bandwidth_id", "price_m_mau_id", "build_time_unit") VALUES
     (now(), now(), 'Maker', 'plan.maker.desc', 39, 396, 'prod_LQIs1Yucml9ChU', 100, '440cfd69-0cfd-486e-b59b-cb99f7ae76a0', 'price_1KjSGyGH46eYKnWwL4h14DsK', 'price_1KjSKIGH46eYKnWwFG9u4tNi', 3221225472, 268435456000, 10000, 'Best for small business owners', 0, 0, 0, NULL, NULL, NULL, 3600),
     (now(), now(), 'Pay as you go', 'plan.payasyougo.desc', 239, 4799, 'prod_MH5Jh6ajC9e7ZH', 1000, '745d7ab3-6cd6-4d65-b257-de6782d5ba50', 'price_1LYX8yGH46eYKnWwzeBjISvW', 'price_1LYX8yGH46eYKnWwzeBjISvW', 12884901888, 3221225472000, 1000000, 'Best for scalling enterprises', 0.05, 0.1, 0.0002, 'price_1LYXD8GH46eYKnWwaVvggvyy', 'price_1LYXDoGH46eYKnWwPEYVZXui', 'price_1LYXE2GH46eYKnWwo5qd4BTU', 600000),
     (now(), now(), 'Solo', 'plan.solo.desc', 14, 146, 'prod_LQIregjtNduh4q', 10, '526e11d8-3c51-4581-ac92-4770c602f47c', 'price_1LVvuZGH46eYKnWwuGKOf4DK', 'price_1LVvuIGH46eYKnWwHMDCrxcH', 1073741824, 13958643712, 1000, 'Best for independent developers', 0, 0, 0, NULL, NULL, NULL, 1800),
@@ -678,13 +678,34 @@ BEGIN
 END;
 $$;
 
-ALTER FUNCTION "public"."reset_and_seed_app_data" ("p_app_id" character varying, "p_org_id" uuid, "p_user_id" uuid, "p_admin_user_id" uuid, "p_stripe_customer_id" text, "p_plan_product_id" text) OWNER TO "postgres";
+ALTER FUNCTION "public"."reset_and_seed_app_data" (
+  "p_app_id" character varying,
+  "p_org_id" uuid,
+  "p_user_id" uuid,
+  "p_admin_user_id" uuid,
+  "p_stripe_customer_id" text,
+  "p_plan_product_id" text
+) OWNER TO "postgres";
 
-REVOKE ALL ON FUNCTION "public"."reset_and_seed_app_data" ("p_app_id" character varying, "p_org_id" uuid, "p_user_id" uuid, "p_admin_user_id" uuid, "p_stripe_customer_id" text, "p_plan_product_id" text)
+REVOKE ALL ON FUNCTION "public"."reset_and_seed_app_data" (
+  "p_app_id" character varying,
+  "p_org_id" uuid,
+  "p_user_id" uuid,
+  "p_admin_user_id" uuid,
+  "p_stripe_customer_id" text,
+  "p_plan_product_id" text
+)
 FROM
   PUBLIC;
 
-GRANT ALL ON FUNCTION "public"."reset_and_seed_app_data" ("p_app_id" character varying, "p_org_id" uuid, "p_user_id" uuid, "p_admin_user_id" uuid, "p_stripe_customer_id" text, "p_plan_product_id" text) TO "service_role";
+GRANT ALL ON FUNCTION "public"."reset_and_seed_app_data" (
+  "p_app_id" character varying,
+  "p_org_id" uuid,
+  "p_user_id" uuid,
+  "p_admin_user_id" uuid,
+  "p_stripe_customer_id" text,
+  "p_plan_product_id" text
+) TO "service_role";
 
 CREATE OR REPLACE FUNCTION "public"."reset_app_stats_data" ("p_app_id" character varying) RETURNS "void" LANGUAGE "plpgsql"
 SET
@@ -756,7 +777,7 @@ BEGIN
     INSERT INTO public.daily_mau (app_id, date, mau) VALUES (p_app_id, curr_date, random_mau);
     INSERT INTO public.daily_bandwidth (app_id, date, bandwidth) VALUES (p_app_id, curr_date, random_bandwidth);
     INSERT INTO public.daily_storage (app_id, date, storage) VALUES (p_app_id, curr_date, random_storage);
-    INSERT INTO public.daily_build_time (app_id, date, build_time_seconds, build_count)
+    INSERT INTO public.daily_build_time (app_id, date, build_time_unit, build_count)
     VALUES (p_app_id, curr_date, FLOOR(RANDOM() * 7200) + 300, FLOOR(RANDOM() * 10) + 1);
     INSERT INTO public.daily_version (date, app_id, version_id, get, fail, install, uninstall)
     VALUES (curr_date, p_app_id, random_version_id, FLOOR(RANDOM() * 100) + 1, FLOOR(RANDOM() * 10) + 1, FLOOR(RANDOM() * 50) + 1, FLOOR(RANDOM() * 20) + 1);

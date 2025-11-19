@@ -35,7 +35,7 @@ const { currentOrganization } = storeToRefs(organizationStore)
 
 function planFeatures(plan: Database['public']['Tables']['plans']['Row']) {
   // Convert build time from seconds to hours or minutes for display
-  const buildTimeSeconds = plan.build_time_seconds || 0
+  const buildTimeSeconds = plan.build_time_unit || 0
   const buildTimeHours = Math.floor(buildTimeSeconds / 3600)
   const buildTimeMinutes = Math.floor(buildTimeSeconds / 60)
 

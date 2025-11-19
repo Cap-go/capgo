@@ -289,7 +289,7 @@ interface PlanTotal {
   mau: number
   bandwidth: number
   storage: number
-  build_time_seconds: number
+  build_time_unit: number
   get: number
   fail: number
   install: number
@@ -302,7 +302,7 @@ export async function getTotalStats(c: Context, orgId?: string): Promise<PlanTot
       mau: 0,
       bandwidth: 0,
       storage: 0,
-      build_time_seconds: 0,
+      build_time_unit: 0,
       get: 0,
       fail: 0,
       install: 0,
@@ -422,7 +422,7 @@ export async function recordBuildTime(
         p_user_id: userId,
         p_build_id: buildId,
         p_platform: platform,
-        p_build_time_seconds: buildTimeSeconds,
+        p_build_time_unit: buildTimeSeconds,
       })
       .single()
 
@@ -444,10 +444,10 @@ export async function getOrgBuildTimeSeconds(
   orgId: string,
   startDate: string,
   endDate: string,
-): Promise<{ total_build_time_seconds: number, total_builds: number }> {
+): Promise<{ total_build_time_unit: number, total_builds: number }> {
   try {
     const { data, error } = await supabaseAdmin(c)
-      .rpc('get_org_build_time_seconds', {
+      .rpc('get_org_build_time_unit', {
         p_org_id: orgId,
         p_start_date: startDate,
         p_end_date: endDate,
@@ -456,14 +456,14 @@ export async function getOrgBuildTimeSeconds(
 
     if (error) {
       cloudlogErr({ requestId: c.get('requestId'), message: 'getOrgBuildTimeSeconds error', orgId, error })
-      return { total_build_time_seconds: 0, total_builds: 0 }
+      return { total_build_time_unit: 0, total_builds: 0 }
     }
 
-    return data as { total_build_time_seconds: number, total_builds: number }
+    return data as { total_build_time_unit: number, total_builds: number }
   }
   catch (error) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'getOrgBuildTimeSeconds error', orgId, error })
-    return { total_build_time_seconds: 0, total_builds: 0 }
+    return { total_build_time_unit: 0, total_builds: 0 }
   }
 }
 

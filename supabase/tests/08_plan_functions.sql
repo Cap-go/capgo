@@ -30,9 +30,9 @@ SELECT
 
 SELECT
     results_eq (
-        'SELECT (get_current_plan_max_org(''22dbad8a-b885-4309-9b3b-a09f8460fb6d'')).build_time_seconds',
+        'SELECT (get_current_plan_max_org(''22dbad8a-b885-4309-9b3b-a09f8460fb6d'')).build_time_unit',
         $$VALUES (1800::bigint)$$,
-        'get_current_plan_max_org test - correct build_time_seconds'
+        'get_current_plan_max_org test - correct build_time_unit'
     );
 
 -- Test get_current_plan_max_org negative cases
@@ -112,7 +112,7 @@ SELECT
             ),
             (
                 SELECT
-                    build_time_seconds
+                    build_time_unit
                 FROM
                     plans
                 WHERE
@@ -153,7 +153,7 @@ SELECT
             ),
             (
                 SELECT
-                    build_time_seconds
+                    build_time_unit
                 FROM
                     plans
                 WHERE

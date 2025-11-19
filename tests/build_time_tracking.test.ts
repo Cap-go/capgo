@@ -122,7 +122,7 @@ describe('build Time Tracking System', () => {
       .insert({
         app_id: APPNAME,
         date: dateStr,
-        build_time_seconds: 36000, // 10 hours
+        build_time_unit: 36000, // 10 hours
         build_count: 10,
       })
     expect(insertError).toBeFalsy()
@@ -209,7 +209,7 @@ describe('build Time Tracking System', () => {
       .insert({
         app_id: APPNAME,
         date: new Date().toISOString().split('T')[0],
-        build_time_seconds: 36000, // 10 hours
+        build_time_unit: 36000, // 10 hours
         build_count: 10,
       })
     expect(insertError).toBeFalsy()
@@ -231,7 +231,7 @@ describe('build Time Tracking System', () => {
     // Reset build time to normal value
     const { error: resetBuildTimeError } = await supabase
       .from('daily_build_time')
-      .update({ build_time_seconds: 0, build_count: 0 })
+      .update({ build_time_unit: 0, build_count: 0 })
       .eq('app_id', APPNAME)
       .eq('date', new Date().toISOString().split('T')[0])
     expect(resetBuildTimeError).toBeFalsy()
@@ -267,7 +267,7 @@ describe('build Time Tracking System', () => {
       .insert({
         app_id: APPNAME,
         date: new Date().toISOString().split('T')[0],
-        build_time_seconds: 1800, // 30 minutes
+        build_time_unit: 1800, // 30 minutes
         build_count: 5,
       })
     expect(insertError).toBeFalsy()
@@ -288,7 +288,7 @@ describe('build Time Tracking System', () => {
     // Find today's metrics
     const todayMetrics = metrics.find(m => m.date === new Date().toISOString().split('T')[0])
     expect(todayMetrics).toBeTruthy()
-    expect(todayMetrics?.build_time_seconds).toBe(1800)
+    expect(todayMetrics?.build_time_unit).toBe(1800)
   })
 
   it.skip('should correctly track build time in get_total_metrics', async () => {
@@ -304,7 +304,7 @@ describe('build Time Tracking System', () => {
       .insert({
         app_id: APPNAME,
         date: today.toISOString().split('T')[0],
-        build_time_seconds: 1800, // 30 minutes
+        build_time_unit: 1800, // 30 minutes
         build_count: 5,
       })
     expect(insertError1).toBeFalsy()
@@ -314,7 +314,7 @@ describe('build Time Tracking System', () => {
       .insert({
         app_id: APPNAME,
         date: yesterday.toISOString().split('T')[0],
-        build_time_seconds: 1200, // 20 minutes
+        build_time_unit: 1200, // 20 minutes
         build_count: 3,
       })
     expect(insertError2).toBeFalsy()
@@ -333,7 +333,7 @@ describe('build Time Tracking System', () => {
       throw new Error('Total metrics should not be null or empty')
 
     const metrics = totalMetrics[0]
-    expect(metrics.build_time_seconds).toBe(3000) // 50 minutes total in seconds
+    expect(metrics.build_time_unit).toBe(3000) // 50 minutes total in seconds
   })
 
   it('should correctly record build time using RPC function (iOS 2x multiplier)', async () => {
@@ -345,7 +345,7 @@ describe('build Time Tracking System', () => {
       p_user_id: USER_ID,
       p_build_id: buildId,
       p_platform: 'ios',
-      p_build_time_seconds: 600, // 10 minutes
+      p_build_time_unit: 600, // 10 minutes
     })
     expect(rpcError).toBeFalsy()
 
@@ -355,7 +355,7 @@ describe('build Time Tracking System', () => {
       .eq('build_id', buildId)
       .single()
     expect(error).toBeFalsy()
-    expect(buildLog?.build_time_seconds).toBe(600)
+    expect(buildLog?.build_time_unit).toBe(600)
     expect(buildLog?.billable_seconds).toBe(1200) // iOS 2x multiplier
   })
 
@@ -368,7 +368,7 @@ describe('build Time Tracking System', () => {
       p_user_id: USER_ID,
       p_build_id: buildId,
       p_platform: 'android',
-      p_build_time_seconds: 150,
+      p_build_time_unit: 150,
     })
     expect(rpcError).toBeFalsy()
 
@@ -378,7 +378,7 @@ describe('build Time Tracking System', () => {
       .eq('build_id', buildId)
       .single()
     expect(error).toBeFalsy()
-    expect(buildLog?.build_time_seconds).toBe(150)
+    expect(buildLog?.build_time_unit).toBe(150)
     expect(buildLog?.billable_seconds).toBe(150) // Android 1x multiplier
   })
 
@@ -392,7 +392,7 @@ describe('build Time Tracking System', () => {
       p_user_id: USER_ID,
       p_build_id: buildId,
       p_platform: 'ios',
-      p_build_time_seconds: 600,
+      p_build_time_unit: 600,
     })
 
     // Second call with updated time
@@ -401,7 +401,7 @@ describe('build Time Tracking System', () => {
       p_user_id: USER_ID,
       p_build_id: buildId,
       p_platform: 'ios',
-      p_build_time_seconds: 700,
+      p_build_time_unit: 700,
     })
     expect(rpcError).toBeFalsy()
 
@@ -412,7 +412,7 @@ describe('build Time Tracking System', () => {
       .eq('build_id', buildId)
     expect(error).toBeFalsy()
     expect(logs?.length).toBe(1)
-    expect(logs?.[0]?.build_time_seconds).toBe(700)
+    expect(logs?.[0]?.build_time_unit).toBe(700)
     expect(logs?.[0]?.billable_seconds).toBe(1400)
   })
 
@@ -425,7 +425,7 @@ describe('build Time Tracking System', () => {
       p_user_id: USER_ID,
       p_build_id: buildId,
       p_platform: 'windows' as any,
-      p_build_time_seconds: 600,
+      p_build_time_unit: 600,
     })
     expect(error).toBeTruthy()
   })
@@ -439,7 +439,7 @@ describe('build Time Tracking System', () => {
       p_user_id: USER_ID,
       p_build_id: buildId,
       p_platform: 'ios',
-      p_build_time_seconds: -100,
+      p_build_time_unit: -100,
     })
     expect(error).toBeTruthy()
   })
