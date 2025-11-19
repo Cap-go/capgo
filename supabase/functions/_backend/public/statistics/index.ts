@@ -136,7 +136,7 @@ async function getNormalStats(c: Context, appId: string | null, ownerOrg: string
           else
             bandwidth[dayNumber] = bandwidthVal
 
-          const buildTimeVal = item.build_time_seconds ?? 0
+          const buildTimeVal = item.build_time_unit ?? 0
           if (buildTime[dayNumber])
             buildTime[dayNumber] += buildTimeVal
           else
@@ -231,7 +231,7 @@ async function getNormalStats(c: Context, appId: string | null, ownerOrg: string
           else
             appBandwidth[dayNumber] = bandwidthVal
 
-          const buildTimeVal = item.build_time_seconds ?? 0
+          const buildTimeVal = item.build_time_unit ?? 0
           if (appBuildTime[dayNumber])
             appBuildTime[dayNumber] += buildTimeVal
           else
