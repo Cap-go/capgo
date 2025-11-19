@@ -44,10 +44,6 @@
           "custom_domain": true
         },
         {
-          "pattern": "updater.capgo.com.cn/*",
-          "zone_name": "capgo.app"
-        },
-        {
           "pattern": "updater.spencer.co/*",
           "zone_name": "capgo.app"
         },
@@ -302,7 +298,11 @@
           "custom_domain": true
         },
         {
-          "pattern": "plugin.cn.usecapgo.com",
+          "pattern": "updater.capgo.com.cn/*",
+          "zone_name": "capgo.app"
+        },
+        {
+          "pattern": "plugin.hk.usecapgo.com",
           "custom_domain": true
         }
       ],
