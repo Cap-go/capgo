@@ -342,35 +342,6 @@ export type Database = {
         }
         Relationships: []
       }
-      capgo_credit_products: {
-        Row: {
-          created_at: string
-          environment: string
-          metadata: Json
-          product_id: string
-          provider: string
-          slug: string
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          environment?: string
-          metadata?: Json
-          product_id: string
-          provider?: string
-          slug: string
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          environment?: string
-          metadata?: Json
-          product_id?: string
-          provider?: string
-          slug?: string
-          updated_at?: string
-        }
-        Relationships: []
       build_logs: {
         Row: {
           billable_seconds: number
@@ -483,6 +454,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      capgo_credit_products: {
+        Row: {
+          created_at: string
+          environment: string
+          metadata: Json
+          product_id: string
+          provider: string
+          slug: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          environment?: string
+          metadata?: Json
+          product_id: string
+          provider?: string
+          slug: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          environment?: string
+          metadata?: Json
+          product_id?: string
+          provider?: string
+          slug?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       capgo_credits_steps: {
         Row: {
@@ -1235,7 +1236,6 @@ export type Database = {
           bandwidth: number
           bandwidth_unit: number | null
           build_time_seconds: number
-          build_time_unit: number | null
           created_at: string
           description: string
           id: string
@@ -1260,7 +1260,6 @@ export type Database = {
           bandwidth: number
           bandwidth_unit?: number | null
           build_time_seconds?: number
-          build_time_unit?: number | null
           created_at?: string
           description?: string
           id?: string
@@ -1285,7 +1284,6 @@ export type Database = {
           bandwidth?: number
           bandwidth_unit?: number | null
           build_time_seconds?: number
-          build_time_unit?: number | null
           created_at?: string
           description?: string
           id?: string
