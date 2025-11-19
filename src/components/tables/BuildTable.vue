@@ -211,14 +211,14 @@ onMounted(async () => {
   <div>
     <div v-if="!showSteps" class="flex flex-col overflow-hidden overflow-y-auto bg-white border border-slate-300 shadow-lg md:rounded-lg dark:border-slate-900 dark:bg-gray-800">
       <Table
+        v-model:search="search"
+        v-model:current-page="currentPage"
         :columns="columns"
         :element-list="elements"
         :is-loading="isLoading"
         :search-function="(e: Element, s: string) => e.platform.toLowerCase().includes(s.toLowerCase()) || e.status.toLowerCase().includes(s.toLowerCase())"
         :search-placeholder="t('search-builds')"
         :show-add="!isMobile"
-        v-model:search="search"
-        v-model:current-page="currentPage"
         :total="total"
         :offset="offset"
         @add="addOne()"

@@ -312,25 +312,33 @@ function nextRunDate() {
             </h3>
             <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div class="bg-white dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
-                <div class="text-xs text-gray-500 dark:text-gray-400 mb-1">{{ t('MAU') }}</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                  {{ t('MAU') }}
+                </div>
                 <div class="text-lg font-bold text-blue-600 dark:text-blue-400">
                   {{ planUsage.currentPlan.mau.toLocaleString() }}
                 </div>
               </div>
               <div class="bg-white dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
-                <div class="text-xs text-gray-500 dark:text-gray-400 mb-1">{{ t('Storage') }}</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                  {{ t('Storage') }}
+                </div>
                 <div class="text-lg font-bold text-purple-600 dark:text-purple-400">
                   {{ planUsage.currentPlan.storage.toLocaleString() }} GB
                 </div>
               </div>
               <div class="bg-white dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
-                <div class="text-xs text-gray-500 dark:text-gray-400 mb-1">{{ t('Bandwidth') }}</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                  {{ t('Bandwidth') }}
+                </div>
                 <div class="text-lg font-bold text-green-600 dark:text-green-400">
                   {{ planUsage.currentPlan.bandwidth.toLocaleString() }} GB
                 </div>
               </div>
               <div class="bg-white dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
-                <div class="text-xs text-gray-500 dark:text-gray-400 mb-1">{{ t('build-time') }}</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                  {{ t('build-time') }}
+                </div>
                 <div class="text-lg font-bold text-orange-600 dark:text-orange-400">
                   {{ formatBuildTime(planUsage.currentPlan.build_time_seconds || 0) }}
                 </div>
