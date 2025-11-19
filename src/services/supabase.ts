@@ -389,6 +389,7 @@ interface PlanUsage {
   mau_percent: number
   bandwidth_percent: number
   storage_percent: number
+  build_time_percent: number
 }
 
 export async function getPlanUsagePercent(orgId?: string): Promise<PlanUsage> {
@@ -398,6 +399,7 @@ export async function getPlanUsagePercent(orgId?: string): Promise<PlanUsage> {
       mau_percent: 0,
       bandwidth_percent: 0,
       storage_percent: 0,
+      build_time_percent: 0,
     }
   }
   const { data, error } = await useSupabase()

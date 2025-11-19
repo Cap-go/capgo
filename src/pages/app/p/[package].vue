@@ -11,6 +11,7 @@ import IconCube from '~icons/heroicons/cube'
 import IconDevice from '~icons/heroicons/device-phone-mobile'
 import IconChannel from '~icons/heroicons/signal'
 import IconAlertCircle from '~icons/lucide/alert-circle'
+import IconBuild from '~icons/heroicons/wrench-screwdriver'
 import AppSetting from '~/components/dashboard/AppSetting.vue'
 import BundleUploadsCard from '~/components/dashboard/BundleUploadsCard.vue'
 import DeploymentStatsCard from '~/components/dashboard/DeploymentStatsCard.vue'
@@ -69,6 +70,11 @@ const tabs: Tab[] = [
     label: 'logs',
     icon: IconHistory,
     key: 'logs',
+  },
+  {
+    label: 'builds',
+    icon: IconBuild,
+    key: 'builds',
   },
 ]
 
@@ -216,6 +222,14 @@ watchEffect(() => {
         <div class="w-full h-full px-0 pt-0 md:pt-8 mx-auto mb-8 overflow-y-auto max-w-9xl max-h-fit sm:px-6 lg:px-8">
           <div class="flex flex-col overflow-hidden overflow-y-auto bg-white border border-slate-300 shadow-lg md:rounded-lg dark:border-slate-900 dark:bg-gray-800">
             <LogTable :app-id="id" />
+          </div>
+        </div>
+      </div>
+
+      <div v-if="ActiveTab === 'builds'" class="mt-0 md:mt-8">
+        <div class="w-full h-full px-0 pt-0 md:pt-8 mx-auto mb-8 overflow-y-auto max-w-9xl max-h-fit sm:px-6 lg:px-8">
+          <div class="flex flex-col overflow-hidden overflow-y-auto bg-white border border-slate-300 shadow-lg md:rounded-lg dark:border-slate-900 dark:bg-gray-800">
+            <BuildTable :app-id="id" />
           </div>
         </div>
       </div>

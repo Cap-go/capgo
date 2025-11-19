@@ -127,6 +127,16 @@ CREATE INDEX idx_build_requests_job ON public.build_requests (builder_job_id);
 
 ALTER TABLE public.build_requests ENABLE ROW LEVEL SECURITY;
 
+-- Users can view build requests for apps in their organization
+CREATE POLICY "Users read own org build requests" ON public.build_requests FOR SELECT TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.org_users
+      WHERE org_users.org_id = build_requests.owner_org
+        AND org_users.user_id = (SELECT auth.uid())
+    )
+  );
+
 CREATE POLICY "Service role manages build requests" ON public.build_requests FOR ALL TO service_role
   USING (true) WITH CHECK (true);
 
@@ -136,6 +146,11 @@ CREATE TRIGGER handle_build_requests_updated_at
 
 -- Note: No daily aggregation needed - just query build_logs for billing
 -- Note: builder.capgo.app manages its own R2 storage; this table only stores metadata
+
+-- Grant permissions for PostgREST access
+GRANT ALL ON public.build_logs TO postgres, anon, authenticated, service_role;
+GRANT ALL ON public.daily_build_time TO postgres, anon, authenticated, service_role;
+GRANT ALL ON public.build_requests TO postgres, anon, authenticated, service_role;
 
 COMMIT;
 

@@ -1,7 +1,7 @@
 import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { simpleError } from '../../utils/hono.ts'
-import { cloudlog, cloudlogErr } from '../../utils/loggin.ts'
+import { cloudlog, cloudlogErr } from '../../utils/logging.ts'
 import { hasAppRightApikey } from '../../utils/supabase.ts'
 import { getEnv } from '../../utils/utils.ts'
 
