@@ -8,11 +8,21 @@ export default defineConfig(({ mode }) => ({
     environment: 'node',
     watch: false,
     bail: 1,
-    testTimeout: 20_000, // Reduced from 20s
-    hookTimeout: 8_000, // Reduced from 8s
-    retry: 2, // Reduced from 2
-    maxConcurrency: 50, // Reduced from 32 to prevent deadlocks
-    maxWorkers: 24, // Reduced from 24 to prevent resource conflicts
+    testTimeout: 20_000,
+    hookTimeout: 8_000,
+    retry: 2,
+    maxConcurrency: 10, // Reduced to prevent worker communication issues
+    maxWorkers: 4, // Reduced to prevent EPIPE errors
+    poolOptions: {
+      threads: {
+        singleThread: false,
+        isolate: true,
+        // Prevent worker reuse issues
+        execArgv: [],
+      },
+    },
+    // Allow graceful shutdown of workers
+    teardownTimeout: 10_000,
     env: loadEnv(mode, cwd(), ''),
   },
 }))
