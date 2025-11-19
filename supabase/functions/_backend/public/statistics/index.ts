@@ -75,7 +75,7 @@ async function getNormalStats(c: Context, appId: string | null, ownerOrg: string
     ownerOrgId = data.owner_org
   }
 
-  const { data: metrics, error: metricsError } = await supabase.rpc('get_app_metrics', { p_org_id: ownerOrgId!, p_start_date: dayjs(from).utc().format('YYYY-MM-DD'), p_end_date: dayjs(to).utc().format('YYYY-MM-DD') })
+  const { data: metrics, error: metricsError } = await supabase.rpc('get_app_metrics', { org_id: ownerOrgId!, start_date: dayjs(from).utc().format('YYYY-MM-DD'), end_date: dayjs(to).utc().format('YYYY-MM-DD') })
   if (metricsError)
     return { data: null, error: metricsError }
   const graphDays = getDaysBetweenDates(from, to)
@@ -90,6 +90,7 @@ async function getNormalStats(c: Context, appId: string | null, ownerOrg: string
   let mau = createUndefinedArray(graphDays) as number[]
   let storage = createUndefinedArray(graphDays) as number[]
   let bandwidth = createUndefinedArray(graphDays) as number[]
+  let buildTime = createUndefinedArray(graphDays) as number[]
   let gets = isDashboard ? createUndefinedArray(graphDays) as number[] : []
 
   // Group metrics by app_id
@@ -135,6 +136,12 @@ async function getNormalStats(c: Context, appId: string | null, ownerOrg: string
           else
             bandwidth[dayNumber] = bandwidthVal
 
+          const buildTimeVal = item.build_time_seconds ?? 0
+          if (buildTime[dayNumber])
+            buildTime[dayNumber] += buildTimeVal
+          else
+            buildTime[dayNumber] = buildTimeVal
+
           if (isDashboard) {
             gets[dayNumber] = item.get
           }
@@ -163,6 +170,8 @@ async function getNormalStats(c: Context, appId: string | null, ownerOrg: string
     mau = (mau as number[]).reduce((p, c) => { if (p.length > 0) { c += p[p.length - 1] } p.push(c); return p }, [] as number[])
     // eslint-disable-next-line style/max-statements-per-line
     bandwidth = (bandwidth as number[]).reduce((p, c) => { if (p.length > 0) { c += p[p.length - 1] } p.push(c); return p }, [] as number[])
+    // eslint-disable-next-line style/max-statements-per-line
+    buildTime = (buildTime as number[]).reduce((p, c) => { if (p.length > 0) { c += p[p.length - 1] } p.push(c); return p }, [] as number[])
     if (isDashboard) {
       // eslint-disable-next-line style/max-statements-per-line
       gets = (gets as number[]).reduce((p, c) => { if (p.length > 0) { c += p[p.length - 1] } p.push(c); return p }, [] as number[])
@@ -170,7 +179,7 @@ async function getNormalStats(c: Context, appId: string | null, ownerOrg: string
   }
   const baseDay = dayjs(from).utc()
 
-  const finalStats = createUndefinedArray(graphDays) as { date: string, mau: number, storage: number, bandwidth: number, get: number | undefined }[]
+  const finalStats = createUndefinedArray(graphDays) as { date: string, mau: number, storage: number, bandwidth: number, build_time_seconds: number, get: number | undefined }[]
   const today = dayjs().utc()
   for (let i = 0; i < graphDays; i++) {
     const day = baseDay.add(i, 'day')
@@ -180,6 +189,7 @@ async function getNormalStats(c: Context, appId: string | null, ownerOrg: string
       mau: mau[i],
       storage: storage[i],
       bandwidth: bandwidth[i],
+      build_time_seconds: buildTime[i],
       get: isDashboard ? gets[i] : undefined,
       date: day.toISOString(),
     }
@@ -197,6 +207,7 @@ async function getNormalStats(c: Context, appId: string | null, ownerOrg: string
       let appMau = createUndefinedArray(graphDays) as number[]
       let appStorage = createUndefinedArray(graphDays) as number[]
       let appBandwidth = createUndefinedArray(graphDays) as number[]
+      let appBuildTime = createUndefinedArray(graphDays) as number[]
       let appGets = isDashboard ? createUndefinedArray(graphDays) as number[] : []
 
       // Process metrics for this app (same logic as aggregated version)
@@ -219,6 +230,12 @@ async function getNormalStats(c: Context, appId: string | null, ownerOrg: string
             appBandwidth[dayNumber] += bandwidthVal
           else
             appBandwidth[dayNumber] = bandwidthVal
+
+          const buildTimeVal = item.build_time_seconds ?? 0
+          if (appBuildTime[dayNumber])
+            appBuildTime[dayNumber] += buildTimeVal
+          else
+            appBuildTime[dayNumber] = buildTimeVal
 
           if (isDashboard) {
             appGets[dayNumber] = item.get
@@ -249,6 +266,13 @@ async function getNormalStats(c: Context, appId: string | null, ownerOrg: string
           p.push(c)
           return p
         }, [] as number[])
+        appBuildTime = (appBuildTime as number[]).reduce((p, c) => {
+          if (p.length > 0) {
+            c += p[p.length - 1]
+          }
+          p.push(c)
+          return p
+        }, [] as number[])
         if (isDashboard) {
           appGets = (appGets as number[]).reduce((p, c) => {
             if (p.length > 0) {
@@ -272,6 +296,7 @@ async function getNormalStats(c: Context, appId: string | null, ownerOrg: string
           mau: appMau[i],
           storage: appStorage[i],
           bandwidth: appBandwidth[i],
+          build_time_seconds: appBuildTime[i],
           get: isDashboard ? appGets[i] : undefined,
         })
       }
@@ -684,6 +709,7 @@ app.get('/user', async (c) => {
     mau: number
     storage: number
     bandwidth: number
+    build_time_seconds: number
     get?: number
   }
 
@@ -693,6 +719,7 @@ app.get('/user', async (c) => {
       current.mau += curr.mau
       current.storage += curr.storage
       current.bandwidth += curr.bandwidth
+      current.build_time_seconds += curr.build_time_seconds
     }
     else {
       acc.set(curr.date, curr)

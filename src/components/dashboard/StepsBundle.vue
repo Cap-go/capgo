@@ -266,7 +266,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <section class="h-full py-12 overflow-y-auto max-h-fit lg:py-20 sm:py-16 bg-slate-900">
+  <section class="h-full py-12 overflow-y-auto max-h-fit lg:py-20 sm:py-16 bg-slate-100 dark:bg-slate-900">
     <div class="px-4 mx-auto max-w-7xl lg:px-8 sm:px-6">
       <div class="flex items-center justify-items-center place-content-center">
         <button v-if="!onboarding" class="bg-gray-800 text-white d-btn d-btn-outline mr-6" @click="emit('closeStep')">
@@ -294,7 +294,7 @@ onUnmounted(() => {
         <template v-for="(s, i) in steps" :key="i">
           <div v-if="i > 0" class="w-1 h-10 mx-auto bg-gray-200" :class="[step !== i ? 'opacity-30' : '']" />
 
-          <div :class="[step !== i ? 'opacity-30' : '']" class="relative p-5 overflow-hidden bg-white border border-gray-200 rounded-2xl">
+          <div :class="[step !== i ? 'opacity-30' : '']" class="relative p-5 overflow-hidden bg-white dark:border dark:border-gray-200 rounded-2xl">
             <div class="flex items-start gap-6">
               <div class="inline-flex items-center justify-center text-xl font-bold text-white shrink-0 font-pj h-14 w-14 rounded-xl bg-muted-blue-800">
                 <template v-if="i + 1 !== steps.length">

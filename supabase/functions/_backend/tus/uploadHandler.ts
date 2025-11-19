@@ -1,4 +1,4 @@
-import type { DurableObjectState, R2UploadedPart } from '@cloudflare/workers-types'
+import type { R2UploadedPart } from '@cloudflare/workers-types'
 import type { Context } from 'hono'
 import type { BlankSchema } from 'hono/types'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
@@ -83,7 +83,7 @@ export class UploadHandler extends DurableObject {
   // only allow a single request to operate at a time
   requestGate: AsyncLock
 
-  constructor(ctx: DurableObjectState, env: Env) {
+  constructor(ctx: ConstructorParameters<typeof DurableObject>[0], env: Env) {
     super(ctx, env)
     const bucket = env.ATTACHMENT_BUCKET
     this.parts = []
@@ -747,8 +747,8 @@ export class UploadHandler extends DurableObject {
 }
 
 export class AttachmentUploadHandler extends UploadHandler {
-  constructor(state: DurableObjectState, env: Env) {
-    super(state, env)
+  constructor(ctx: ConstructorParameters<typeof DurableObject>[0], env: Env) {
+    super(ctx, env)
   }
 }
 

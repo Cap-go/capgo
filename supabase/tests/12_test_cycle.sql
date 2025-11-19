@@ -5,9 +5,10 @@ CREATE EXTENSION "basejump-supabase_test_helpers";
 
 -- + 2 is for the count(*)
 -- -1 is for the pay as you go if statenent
-SELECT plan(18);
+SELECT
+  plan (18);
 
-CREATE OR REPLACE FUNCTION my_tests() RETURNS SETOF TEXT AS $$
+CREATE OR REPLACE FUNCTION my_tests () RETURNS SETOF TEXT AS $$
 DECLARE
   cycle_start timestamp with time zone;
   cycle_end timestamp with time zone;
@@ -67,10 +68,12 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-SELECT my_tests();
+SELECT
+  my_tests ();
 
-SELECT *
+SELECT
+  *
 FROM
-    finish();
+  finish ();
 
 ROLLBACK;

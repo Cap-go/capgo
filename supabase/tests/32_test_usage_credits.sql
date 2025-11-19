@@ -12,19 +12,23 @@ END;
 $$ LANGUAGE plpgsql;
 
 SELECT
-  ok(
-    pg_get_functiondef('apply_usage_overage(uuid, public.credit_metric_type, numeric, timestamptz, timestamptz, jsonb)'::regprocedure) IS NOT NULL,
+  ok (
+    pg_get_functiondef(
+      'apply_usage_overage(uuid, public.credit_metric_type, numeric, timestamptz, timestamptz, jsonb)'::regprocedure
+    ) IS NOT NULL,
     'apply_usage_overage function exists'
   );
 
 SELECT
-  ok(
-    pg_get_functiondef('calculate_credit_cost(public.credit_metric_type, numeric)'::regprocedure) IS NOT NULL,
+  ok (
+    pg_get_functiondef(
+      'calculate_credit_cost(public.credit_metric_type, numeric)'::regprocedure
+    ) IS NOT NULL,
     'calculate_credit_cost function exists'
   );
 
 SELECT
-  ok(
+  ok (
     pg_get_functiondef('expire_usage_credits()'::regprocedure) IS NOT NULL,
     'expire_usage_credits function exists'
   );
@@ -130,14 +134,15 @@ step_insert AS (
     1,
     NULL
   )
-  RETURNING id
-)
-INSERT INTO test_credit_context (org_id, grant_id, credit_step_id)
+INSERT INTO
+  test_credit_context (org_id, grant_id, credit_step_id)
 SELECT
   grant_insert.org_id,
   grant_insert.id,
   step_insert.id
-FROM grant_insert, step_insert;
+FROM
+  grant_insert,
+  step_insert;
 
 SELECT
   throws_ok(
@@ -166,59 +171,97 @@ SELECT
 SELECT
   is(
     (
-      SELECT overage_unpaid
-      FROM public.apply_usage_overage(
-        (SELECT org_id FROM test_credit_context),
-        'mau',
-        10,
-        now(),
-        now() + interval '1 month',
-        '{}'::jsonb
-      )
+      SELECT
+        overage_unpaid
+      FROM
+        public.apply_usage_overage (
+          (
+            SELECT
+              org_id
+            FROM
+              test_credit_context
+          ),
+          'mau',
+          10,
+          now(),
+          now() + interval '1 month',
+          '{}'::jsonb
+        )
     ),
     0::numeric,
     'apply_usage_overage consumes credits when available'
   );
 
 SELECT
-  is(
+  is (
     (
-      SELECT credits_consumed
-      FROM public.usage_credit_grants
-      WHERE id = (SELECT grant_id FROM test_credit_context)
+      SELECT
+        credits_consumed
+      FROM
+        public.usage_credit_grants
+      WHERE
+        id = (
+          SELECT
+            grant_id
+          FROM
+            test_credit_context
+        )
     ),
     1::numeric,
     'usage_credit_grants updated with consumed credits'
   );
 
 UPDATE public.usage_credit_grants
-SET expires_at = now() - interval '1 day'
-WHERE id = (SELECT grant_id FROM test_credit_context);
+SET
+  expires_at = now() - interval '1 day'
+WHERE
+  id = (
+    SELECT
+      grant_id
+    FROM
+      test_credit_context
+  );
 
 SELECT
-  is(
-    public.expire_usage_credits(),
+  is (
+    public.expire_usage_credits (),
     1::bigint,
     'expire_usage_credits processes expired grants'
   );
 
 SELECT
-  is(
+  is (
     (
-      SELECT credits_consumed
-      FROM public.usage_credit_grants
-      WHERE id = (SELECT grant_id FROM test_credit_context)
+      SELECT
+        credits_consumed
+      FROM
+        public.usage_credit_grants
+      WHERE
+        id = (
+          SELECT
+            grant_id
+          FROM
+            test_credit_context
+        )
     ),
     20::numeric,
     'expire_usage_credits consumes remaining credits'
   );
 
 SELECT
-  ok(
-    EXISTS(
-      SELECT 1
-      FROM public.usage_credit_transactions
-      WHERE grant_id = (SELECT grant_id FROM test_credit_context)
+  ok (
+    EXISTS (
+      SELECT
+        1
+      FROM
+        public.usage_credit_transactions
+      WHERE
+        grant_id = (
+          SELECT
+            grant_id
+          FROM
+            test_credit_context
+        )
         AND transaction_type = 'expiry'
     ),
     'expiry transaction recorded'

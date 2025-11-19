@@ -59,11 +59,11 @@ BEGIN
     INSERT INTO "public"."deleted_account" ("created_at", "email", "id") VALUES
     (now(), encode(extensions.digest('deleted@capgo.app'::bytea, 'sha256'::text)::bytea, 'hex'::text), '00000000-0000-0000-0000-000000000001');
 
-    INSERT INTO "public"."plans" ("created_at", "updated_at", "name", "description", "price_m", "price_y", "stripe_id", "version", "id", "price_m_id", "price_y_id", "storage", "bandwidth", "mau", "market_desc", "storage_unit", "bandwidth_unit", "mau_unit", "price_m_storage_id", "price_m_bandwidth_id", "price_m_mau_id") VALUES
-    (now(), now(), 'Maker', 'plan.maker.desc', 39, 396, 'prod_LQIs1Yucml9ChU', 100, '440cfd69-0cfd-486e-b59b-cb99f7ae76a0', 'price_1KjSGyGH46eYKnWwL4h14DsK', 'price_1KjSKIGH46eYKnWwFG9u4tNi', 3221225472, 268435456000, 10000, 'Best for small business owners', 0, 0, 0, NULL, NULL, NULL),
-    (now(), now(), 'Pay as you go', 'plan.payasyougo.desc', 239, 4799, 'prod_MH5Jh6ajC9e7ZH', 1000, '745d7ab3-6cd6-4d65-b257-de6782d5ba50', 'price_1LYX8yGH46eYKnWwzeBjISvW', 'price_1LYX8yGH46eYKnWwzeBjISvW', 12884901888, 3221225472000, 1000000, 'Best for scalling enterprises', 0.05, 0.1, 0.0002, 'price_1LYXD8GH46eYKnWwaVvggvyy', 'price_1LYXDoGH46eYKnWwPEYVZXui', 'price_1LYXE2GH46eYKnWwo5qd4BTU'),
-    (now(), now(), 'Solo', 'plan.solo.desc', 14, 146, 'prod_LQIregjtNduh4q', 10, '526e11d8-3c51-4581-ac92-4770c602f47c', 'price_1LVvuZGH46eYKnWwuGKOf4DK', 'price_1LVvuIGH46eYKnWwHMDCrxcH', 1073741824, 13958643712, 1000, 'Best for independent developers', 0, 0, 0, NULL, NULL, NULL),
-    (now(), now(), 'Team', 'plan.team.desc', 99, 998, 'prod_LQIugvJcPrxhda', 1000, 'abd76414-8f90-49a5-b3a4-8ff4d2e12c77', 'price_1KjSIUGH46eYKnWwWHvg8XYs', 'price_1KjSLlGH46eYKnWwAwMW2wiW', 6442450944, 536870912000, 100000, 'Best for medium enterprises', 0, 0, 0, NULL, NULL, NULL);
+    INSERT INTO "public"."plans" ("created_at", "updated_at", "name", "description", "price_m", "price_y", "stripe_id", "version", "id", "price_m_id", "price_y_id", "storage", "bandwidth", "mau", "market_desc", "storage_unit", "bandwidth_unit", "mau_unit", "price_m_storage_id", "price_m_bandwidth_id", "price_m_mau_id", "build_time_seconds") VALUES
+    (now(), now(), 'Maker', 'plan.maker.desc', 39, 396, 'prod_LQIs1Yucml9ChU', 100, '440cfd69-0cfd-486e-b59b-cb99f7ae76a0', 'price_1KjSGyGH46eYKnWwL4h14DsK', 'price_1KjSKIGH46eYKnWwFG9u4tNi', 3221225472, 268435456000, 10000, 'Best for small business owners', 0, 0, 0, NULL, NULL, NULL, 3600),
+    (now(), now(), 'Pay as you go', 'plan.payasyougo.desc', 239, 4799, 'prod_MH5Jh6ajC9e7ZH', 1000, '745d7ab3-6cd6-4d65-b257-de6782d5ba50', 'price_1LYX8yGH46eYKnWwzeBjISvW', 'price_1LYX8yGH46eYKnWwzeBjISvW', 12884901888, 3221225472000, 1000000, 'Best for scalling enterprises', 0.05, 0.1, 0.0002, 'price_1LYXD8GH46eYKnWwaVvggvyy', 'price_1LYXDoGH46eYKnWwPEYVZXui', 'price_1LYXE2GH46eYKnWwo5qd4BTU', 600000),
+    (now(), now(), 'Solo', 'plan.solo.desc', 14, 146, 'prod_LQIregjtNduh4q', 10, '526e11d8-3c51-4581-ac92-4770c602f47c', 'price_1LVvuZGH46eYKnWwuGKOf4DK', 'price_1LVvuIGH46eYKnWwHMDCrxcH', 1073741824, 13958643712, 1000, 'Best for independent developers', 0, 0, 0, NULL, NULL, NULL, 1800),
+    (now(), now(), 'Team', 'plan.team.desc', 99, 998, 'prod_LQIugvJcPrxhda', 1000, 'abd76414-8f90-49a5-b3a4-8ff4d2e12c77', 'price_1KjSIUGH46eYKnWwWHvg8XYs', 'price_1KjSLlGH46eYKnWwAwMW2wiW', 6442450944, 536870912000, 100000, 'Best for medium enterprises', 0, 0, 0, NULL, NULL, NULL, 18000);
 
     INSERT INTO
       "public"."capgo_credits_steps" (
@@ -196,7 +196,13 @@ BEGIN
         0.021,
         1073741824,
         NULL
-      ); -- 1280+ GiB
+      ), -- 1280+ GiB
+      ('build_time', 0, 6000, 0.5, 60, NULL), -- 0-100 minutes (in seconds, displayed as minutes)
+      ('build_time', 6000, 30000, 0.45, 60, NULL), -- 100-500 minutes (in seconds, displayed as minutes)
+      ('build_time', 30000, 60000, 0.40, 60, NULL), -- 500-1000 minutes (in seconds, displayed as minutes)
+      ('build_time', 60000, 300000, 0.35, 60, NULL), -- 1000-5000 minutes (in seconds, displayed as minutes)
+      ('build_time', 300000, 600000, 0.30, 60, NULL), -- 5000-10000 minutes (in seconds, displayed as minutes)
+      ('build_time', 600000, 9223372036854775807, 0.25, 60, NULL); -- 10000+ minutes (in seconds, displayed as minutes)
 
     INSERT INTO "public"."capgo_credit_products" (
         "slug",
@@ -212,12 +218,30 @@ BEGIN
     ('apps', 'apps', NULL, now(), now(), 'f'),
     ('images', 'images', NULL, now(), now(), 't');
 
-    INSERT INTO "public"."stripe_info" ("created_at", "updated_at", "subscription_id", "customer_id", "status", "product_id", "trial_at", "price_id", "is_good_plan", "plan_usage", "subscription_metered", "subscription_anchor_start", "subscription_anchor_end") VALUES
-    (now(), now(), 'sub_1', 'cus_Pa0k8TO6HVln6A', 'succeeded', 'prod_LQIregjtNduh4q', now() + interval '15 days', NULL, 't', 2, '{}', now() - interval '15 days', now() + interval '15 days'),
-    (now(), now(), 'sub_2', 'cus_Q38uE91NP8Ufqc', 'succeeded', 'prod_LQIregjtNduh4q', now() + interval '15 days', NULL, 't', 2, '{}', now() - interval '15 days', now() + interval '15 days'),
-    (now(), now(), 'sub_3', 'cus_Pa0f3M6UCQ8g5Q', 'succeeded', 'prod_LQIregjtNduh4q', now() + interval '15 days', NULL, 't', 2, '{}', now() - interval '15 days', now() + interval '15 days'),
-    (now(), now(), 'sub_4', 'cus_NonOwner', 'succeeded', 'prod_LQIregjtNduh4q', now() + interval '15 days', NULL, 't', 2, '{}', now() - interval '15 days', now() + interval '15 days'),
-    (now(), now(), 'sub_5', 'cus_StatsTest', 'succeeded', 'prod_LQIregjtNduh4q', now() + interval '15 days', NULL, 't', 2, '{}', now() - interval '15 days', now() + interval '15 days');
+    INSERT INTO "public"."stripe_info" (
+      "created_at",
+      "updated_at",
+      "subscription_id",
+      "customer_id",
+      "status",
+      "product_id",
+      "trial_at",
+      "price_id",
+      "is_good_plan",
+      "plan_usage",
+      "subscription_metered",
+      "subscription_anchor_start",
+      "subscription_anchor_end",
+      "mau_exceeded",
+      "bandwidth_exceeded",
+      "storage_exceeded",
+      "build_time_exceeded"
+    ) VALUES
+    (now(), now(), 'sub_1', 'cus_Pa0k8TO6HVln6A', 'succeeded', 'prod_LQIregjtNduh4q', now() + interval '15 days', NULL, 't', 2, '{}', now() - interval '15 days', now() + interval '15 days', false, false, false, false),
+    (now(), now(), 'sub_2', 'cus_Q38uE91NP8Ufqc', 'succeeded', 'prod_LQIregjtNduh4q', now() + interval '15 days', NULL, 't', 2, '{}', now() - interval '15 days', now() + interval '15 days', false, false, false, false),
+    (now(), now(), 'sub_3', 'cus_Pa0f3M6UCQ8g5Q', 'succeeded', 'prod_LQIregjtNduh4q', now() + interval '15 days', NULL, 't', 2, '{}', now() - interval '15 days', now() + interval '15 days', false, false, false, false),
+    (now(), now(), 'sub_4', 'cus_NonOwner', 'succeeded', 'prod_LQIregjtNduh4q', now() + interval '15 days', NULL, 't', 2, '{}', now() - interval '15 days', now() + interval '15 days', false, false, false, false),
+    (now(), now(), 'sub_5', 'cus_StatsTest', 'succeeded', 'prod_LQIregjtNduh4q', now() + interval '15 days', NULL, 't', 2, '{}', now() - interval '15 days', now() + interval '15 days', false, false, false, false);
 
     -- Do not insert new orgs
     ALTER TABLE public.users DISABLE TRIGGER generate_org_on_user_create;
@@ -504,6 +528,7 @@ BEGIN
     DELETE FROM public.channel_devices WHERE app_id = p_app_id;
     DELETE FROM public.channels WHERE app_id = p_app_id;
     DELETE FROM public.app_versions WHERE app_id = p_app_id;
+    DELETE FROM public.build_requests WHERE app_id = p_app_id;
     DELETE FROM public.apps WHERE app_id = p_app_id;
     
     -- Advisory lock is automatically released at transaction end
@@ -518,17 +543,114 @@ FROM
 
 GRANT ALL ON FUNCTION "public"."reset_app_data" ("p_app_id" character varying) TO "service_role";
 
-CREATE OR REPLACE FUNCTION "public"."reset_and_seed_app_data" ("p_app_id" varchar) RETURNS void LANGUAGE plpgsql SECURITY DEFINER
+CREATE OR REPLACE FUNCTION "public"."reset_and_seed_app_data" (
+  "p_app_id" varchar,
+  "p_org_id" uuid DEFAULT NULL,
+  "p_user_id" uuid DEFAULT NULL,
+  "p_admin_user_id" uuid DEFAULT NULL,
+  "p_stripe_customer_id" text DEFAULT NULL,
+  "p_plan_product_id" text DEFAULT NULL
+) RETURNS void LANGUAGE plpgsql SECURITY DEFINER
 SET
   search_path = '' AS $$
 DECLARE
-  org_id uuid := '046a36ac-e03c-4590-9257-bd6c9dba9ee8'::uuid;
-  user_id uuid := '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid;
+  org_id uuid := COALESCE(p_org_id, '046a36ac-e03c-4590-9257-bd6c9dba9ee8'::uuid);
+  user_id uuid := COALESCE(p_user_id, '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid);
+  admin_user_id uuid := COALESCE(p_admin_user_id, 'c591b04e-cf29-4945-b9a0-776d0672061a'::uuid);
+  stripe_customer_id text := COALESCE(p_stripe_customer_id, 'cus_Q38uE91NP8Ufqc');
+  plan_product_id text := COALESCE(p_plan_product_id, 'prod_LQIregjtNduh4q');
+  org_name text := CASE
+    WHEN p_org_id IS NULL THEN 'Demo org'
+    ELSE concat('Seeded Org ', p_app_id)
+  END;
   builtin_version_id bigint; unknown_version_id bigint; v1_0_1_version_id bigint; v1_0_0_version_id bigint; v1_361_0_version_id bigint; v1_360_0_version_id bigint; v1_359_0_version_id bigint;
   production_channel_id bigint; beta_channel_id bigint; development_channel_id bigint; no_access_channel_id bigint;
 BEGIN
   PERFORM pg_advisory_xact_lock(hashtext(p_app_id));
   PERFORM public.reset_app_data(p_app_id);
+  -- Ensure the base Stripe customer and org exist so FK inserts are stable between tests
+  INSERT INTO public.stripe_info (
+    customer_id,
+    product_id,
+    subscription_id,
+    status,
+    trial_at,
+    is_good_plan,
+    plan_usage,
+    subscription_metered,
+    subscription_anchor_start,
+    subscription_anchor_end,
+    mau_exceeded,
+    bandwidth_exceeded,
+    storage_exceeded,
+    build_time_exceeded
+  ) VALUES (
+    stripe_customer_id,
+    plan_product_id,
+    'sub_seeded_demo',
+    'succeeded',
+    now() - interval '15 days',
+    true,
+    2,
+    '{}'::json,
+    now() - interval '15 days',
+    now() + interval '15 days',
+    false,
+    false,
+    false,
+    false
+  )
+  ON CONFLICT (customer_id) DO UPDATE SET
+    product_id = EXCLUDED.product_id,
+    subscription_id = EXCLUDED.subscription_id,
+    status = EXCLUDED.status,
+    trial_at = EXCLUDED.trial_at,
+    is_good_plan = EXCLUDED.is_good_plan,
+    plan_usage = EXCLUDED.plan_usage,
+    subscription_metered = EXCLUDED.subscription_metered,
+    subscription_anchor_start = EXCLUDED.subscription_anchor_start,
+    subscription_anchor_end = EXCLUDED.subscription_anchor_end,
+    mau_exceeded = EXCLUDED.mau_exceeded,
+    bandwidth_exceeded = EXCLUDED.bandwidth_exceeded,
+    storage_exceeded = EXCLUDED.storage_exceeded,
+    build_time_exceeded = EXCLUDED.build_time_exceeded,
+    updated_at = now();
+
+  INSERT INTO public.orgs (id, created_by, created_at, updated_at, logo, name, management_email, customer_id)
+  VALUES (
+    org_id,
+    user_id,
+    now(),
+    now(),
+    '',
+    org_name,
+    'test@capgo.app',
+    stripe_customer_id
+  )
+  ON CONFLICT (id) DO UPDATE SET
+    customer_id = EXCLUDED.customer_id,
+    management_email = EXCLUDED.management_email,
+    name = EXCLUDED.name,
+    updated_at = now();
+
+  EXECUTE $sql$
+    INSERT INTO public.org_users (org_id, user_id, user_right)
+    SELECT $1, $2, 'super_admin'
+    WHERE NOT EXISTS (
+      SELECT 1 FROM public.org_users ou
+      WHERE ou.org_id = $1 AND ou.user_id = $2
+    )
+  $sql$ USING org_id, user_id;
+
+  EXECUTE $sql2$
+    INSERT INTO public.org_users (org_id, user_id, user_right)
+    SELECT $1, $2, 'super_admin'
+    WHERE NOT EXISTS (
+      SELECT 1 FROM public.org_users ou
+      WHERE ou.org_id = $1 AND ou.user_id = $2
+    )
+  $sql2$ USING org_id, admin_user_id;
+
   INSERT INTO public.apps (created_at, app_id, icon_url, name, last_version, updated_at, owner_org, user_id)
   VALUES (now(), p_app_id, '', 'Seeded App', '1.0.0', now(), org_id, user_id);
   WITH version_inserts AS (
@@ -566,13 +688,13 @@ BEGIN
 END;
 $$;
 
-ALTER FUNCTION "public"."reset_and_seed_app_data" ("p_app_id" character varying) OWNER TO "postgres";
+ALTER FUNCTION "public"."reset_and_seed_app_data" ("p_app_id" character varying, "p_org_id" uuid, "p_user_id" uuid, "p_admin_user_id" uuid, "p_stripe_customer_id" text, "p_plan_product_id" text) OWNER TO "postgres";
 
-REVOKE ALL ON FUNCTION "public"."reset_and_seed_app_data" ("p_app_id" character varying)
+REVOKE ALL ON FUNCTION "public"."reset_and_seed_app_data" ("p_app_id" character varying, "p_org_id" uuid, "p_user_id" uuid, "p_admin_user_id" uuid, "p_stripe_customer_id" text, "p_plan_product_id" text)
 FROM
   PUBLIC;
 
-GRANT ALL ON FUNCTION "public"."reset_and_seed_app_data" ("p_app_id" character varying) TO "service_role";
+GRANT ALL ON FUNCTION "public"."reset_and_seed_app_data" ("p_app_id" character varying, "p_org_id" uuid, "p_user_id" uuid, "p_admin_user_id" uuid, "p_stripe_customer_id" text, "p_plan_product_id" text) TO "service_role";
 
 CREATE OR REPLACE FUNCTION "public"."reset_app_stats_data" ("p_app_id" character varying) RETURNS "void" LANGUAGE "plpgsql"
 SET
@@ -586,6 +708,7 @@ BEGIN
   DELETE FROM public.daily_bandwidth WHERE app_id = p_app_id;
   DELETE FROM public.daily_storage WHERE app_id = p_app_id;
   DELETE FROM public.daily_version WHERE app_id = p_app_id;
+  DELETE FROM public.daily_build_time WHERE app_id = p_app_id;
   DELETE FROM public.storage_usage WHERE app_id = p_app_id;
   DELETE FROM public.version_usage WHERE app_id = p_app_id;
   DELETE FROM public.device_usage WHERE app_id = p_app_id;
@@ -621,6 +744,7 @@ DECLARE
   random_version_id BIGINT := 3;
   org_id uuid;
   fallback_org_id uuid := '046a36ac-e03c-4590-9257-bd6c9dba9ee8'::uuid;
+  fallback_user_id uuid := '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid;
 BEGIN
   PERFORM pg_advisory_xact_lock(hashtext(p_app_id || '_stats'));
   PERFORM public.reset_app_stats_data(p_app_id);
@@ -629,6 +753,9 @@ BEGIN
   IF org_id IS NULL THEN
     org_id := fallback_org_id;
   END IF;
+  INSERT INTO public.apps (created_at, app_id, icon_url, name, last_version, updated_at, owner_org, user_id)
+  VALUES (now(), p_app_id, '', 'Seeded Stats App', '1.0.0', now(), org_id, fallback_user_id)
+  ON CONFLICT (app_id) DO NOTHING;
   INSERT INTO public.devices (updated_at, device_id, version_name, app_id, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator)
   VALUES (now(), random_uuid, '1.0.0', p_app_id, 'android', '4.15.3', '9', '1.223.0', '', 't', 't'), (now(), random_fixed_uuid, '1.0.0', p_app_id, 'android', '4.15.3', '9', '1.223.0', '', 't', 't');
   INSERT INTO public.stats (created_at, action, device_id, version_name, app_id)
@@ -639,6 +766,8 @@ BEGIN
     INSERT INTO public.daily_mau (app_id, date, mau) VALUES (p_app_id, curr_date, random_mau);
     INSERT INTO public.daily_bandwidth (app_id, date, bandwidth) VALUES (p_app_id, curr_date, random_bandwidth);
     INSERT INTO public.daily_storage (app_id, date, storage) VALUES (p_app_id, curr_date, random_storage);
+    INSERT INTO public.daily_build_time (app_id, date, build_time_seconds, build_count)
+    VALUES (p_app_id, curr_date, FLOOR(RANDOM() * 7200) + 300, FLOOR(RANDOM() * 10) + 1);
     INSERT INTO public.daily_version (date, app_id, version_id, get, fail, install, uninstall)
     VALUES (curr_date, p_app_id, random_version_id, FLOOR(RANDOM() * 100) + 1, FLOOR(RANDOM() * 10) + 1, FLOOR(RANDOM() * 50) + 1, FLOOR(RANDOM() * 20) + 1);
     curr_date := curr_date + INTERVAL '1 day';

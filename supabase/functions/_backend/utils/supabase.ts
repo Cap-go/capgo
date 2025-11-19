@@ -289,6 +289,7 @@ interface PlanTotal {
   mau: number
   bandwidth: number
   storage: number
+  build_time_seconds: number
   get: number
   fail: number
   install: number
@@ -301,6 +302,7 @@ export async function getTotalStats(c: Context, orgId?: string): Promise<PlanTot
       mau: 0,
       bandwidth: 0,
       storage: 0,
+      build_time_seconds: 0,
       get: 0,
       fail: 0,
       install: 0,
@@ -320,6 +322,7 @@ export interface PlanUsage {
   mau_percent: number
   bandwidth_percent: number
   storage_percent: number
+  build_time_percent: number
 }
 
 export async function getPlanUsagePercent(c: Context, orgId?: string): Promise<PlanUsage> {
@@ -329,6 +332,7 @@ export async function getPlanUsagePercent(c: Context, orgId?: string): Promise<P
       mau_percent: 0,
       bandwidth_percent: 0,
       storage_percent: 0,
+      build_time_percent: 0,
     }
   }
   const { data, error } = await supabaseAdmin(c)
@@ -392,6 +396,75 @@ export async function set_bandwidth_exceeded(c: Context, orgId: string, disabled
     return false
   }
   return true
+}
+
+export async function set_build_time_exceeded(c: Context, orgId: string, disabled: boolean): Promise<boolean> {
+  const { error } = await supabaseAdmin(c).rpc('set_build_time_exceeded_by_org', { org_id: orgId, disabled })
+  if (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'set_build_time_exceeded error', orgId, error })
+    return false
+  }
+  return true
+}
+
+export async function recordBuildTime(
+  c: Context,
+  orgId: string,
+  userId: string,
+  buildId: string,
+  platform: 'ios' | 'android',
+  buildTimeSeconds: number,
+): Promise<string | null> {
+  try {
+    const { data, error } = await supabaseAdmin(c)
+      .rpc('record_build_time', {
+        p_org_id: orgId,
+        p_user_id: userId,
+        p_build_id: buildId,
+        p_platform: platform,
+        p_build_time_seconds: buildTimeSeconds,
+      })
+      .single()
+
+    if (error) {
+      cloudlogErr({ requestId: c.get('requestId'), message: 'recordBuildTime error', orgId, userId, buildId, error })
+      return null
+    }
+
+    return data as string
+  }
+  catch (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'recordBuildTime error', orgId, userId, buildId, error })
+    return null
+  }
+}
+
+export async function getOrgBuildTimeSeconds(
+  c: Context,
+  orgId: string,
+  startDate: string,
+  endDate: string,
+): Promise<{ total_build_time_seconds: number, total_builds: number }> {
+  try {
+    const { data, error } = await supabaseAdmin(c)
+      .rpc('get_org_build_time_seconds', {
+        p_org_id: orgId,
+        p_start_date: startDate,
+        p_end_date: endDate,
+      })
+      .single()
+
+    if (error) {
+      cloudlogErr({ requestId: c.get('requestId'), message: 'getOrgBuildTimeSeconds error', orgId, error })
+      return { total_build_time_seconds: 0, total_builds: 0 }
+    }
+
+    return data as { total_build_time_seconds: number, total_builds: number }
+  }
+  catch (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'getOrgBuildTimeSeconds error', orgId, error })
+    return { total_build_time_seconds: 0, total_builds: 0 }
+  }
 }
 
 export async function isOnboardingNeeded(c: Context, userId: string): Promise<boolean> {

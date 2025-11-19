@@ -2,9 +2,10 @@ BEGIN;
 
 CREATE EXTENSION "basejump-supabase_test_helpers";
 
-SELECT plan(7);
+SELECT
+  plan (7);
 
-CREATE OR REPLACE FUNCTION app_metrics_cache_tests() RETURNS SETOF TEXT AS $$
+CREATE OR REPLACE FUNCTION app_metrics_cache_tests () RETURNS SETOF TEXT AS $$
 DECLARE
   test_org uuid := '046a36ac-e03c-4590-9257-bd6c9dba9ee8';
   test_app character varying := 'com.demo.app';
@@ -82,10 +83,12 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-SELECT app_metrics_cache_tests();
+SELECT
+  app_metrics_cache_tests ();
 
-SELECT *
+SELECT
+  *
 FROM
-    finish();
+  finish ();
 
 ROLLBACK;

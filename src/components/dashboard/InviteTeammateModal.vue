@@ -284,21 +284,17 @@ defineExpose({
           required
         >
       </div>
-      <div v-if="captchaKey" class="sm:col-span-2">
-        <label for="invite-captcha" class="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-200">
-          {{ t('captcha', 'Captcha') }}
-        </label>
-        <VueTurnstile
-          id="invite-captcha"
-          ref="inviteCaptchaElement"
-          v-model="inviteCaptchaToken"
-          size="flexible"
-          :site-key="captchaKey"
-        />
-      </div>
-      <div v-else class="sm:col-span-2 text-sm text-gray-500 dark:text-gray-400">
-        {{ t('captcha-not-available', 'Captcha verification is not configured in this environment.') }}
-      </div>
+      <template v-if="!!captchaKey">
+        <div class="sm:col-span-2">
+          <VueTurnstile
+            id="invite-captcha"
+            ref="inviteCaptchaElement"
+            v-model="inviteCaptchaToken"
+            size="flexible"
+            :site-key="captchaKey"
+          />
+        </div>
+      </template>
       <p class="sm:col-span-2 text-sm text-gray-500 dark:text-gray-400">
         {{ t('onboarding-invite-option-helper') }}
       </p>

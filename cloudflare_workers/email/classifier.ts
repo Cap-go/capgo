@@ -1,6 +1,6 @@
 import type { Env, ParsedEmail } from './types'
 
-export type EmailCategory = 'support' | 'sales' | 'query' | 'other'
+export type EmailCategory = 'support' | 'sales' | 'query' | 'spam' | 'other'
 
 export interface ClassificationResult {
   category: EmailCategory
@@ -86,12 +86,38 @@ export async function classifyEmail(
 function buildClassificationPrompt(email: ParsedEmail): string {
   const bodyPreview = truncateText(email.body.text || email.body.html || '', 1000)
 
-  return `You are an email classifier for a customer service system. Classify the following email into one of these categories:
+  return `You are an email classifier for Capgo's customer service system.
 
-1. **support** - Customer needs help with a problem, bug report, technical issue, or account issue
-2. **sales** - Inquiry about pricing, purchasing, features, demos, or becoming a customer
-3. **query** - General question, information request, or feedback
-4. **other** - Spam, unrelated content, automated messages, or anything that doesn't fit the above
+**What is Capgo?**
+Capgo is a live update and mobile app deployment platform for Capacitor apps (mobile applications). It allows developers to push over-the-air (OTA) updates to their iOS and Android apps without going through app store reviews. Capgo provides tools for managing app versions, channels, updates, and analytics for mobile app developers.
+
+Classify the following email into one of these categories:
+
+1. **support** - Customer needs help with a problem, bug report, technical issue, or account issue related to Capgo's mobile app update platform
+2. **sales** - Inquiry about pricing, purchasing, features, demos, or becoming a Capgo customer
+3. **query** - General question, information request, or feedback about Capgo's services
+4. **spam** - Spam, marketing emails, phishing attempts, suspicious links, promotional content, or unsolicited bulk email
+5. **other** - Automated messages (auto-replies, bounce messages), unsubscribe requests, or emails completely unrelated to Capgo's mobile app platform (e.g., industrial equipment, physical products, unrelated services)
+
+**IMPORTANT**:
+- If the email is completely unrelated to mobile apps, software development, or Capgo's services (e.g., requests for physical products, industrial equipment, unrelated business services), classify as "spam"
+- If there are any indicators of spam, phishing, or unsolicited marketing, classify as "spam"
+- These emails should NOT be processed
+
+Spam indicators include:
+- Suspicious links or attachments
+- Generic greetings (no personalization)
+- Mass marketing content
+- Get-rich-quick schemes
+- Requests for personal/financial information
+- Poor grammar or spelling (typical of phishing)
+- Urgency tactics or threats
+- Unsolicited promotional content
+- Multiple unrelated links
+- Unsolicited business solicitations (RFQs, quotations, sourcing requests)
+- Suspicious sender domains (.xyz, .top, .info, etc.)
+- Generic B2B spam (supply chain, procurement requests from unknown companies)
+- "To unsubscribe" instructions in body
 
 Email Details:
 From: ${email.from.name || email.from.email}
@@ -101,7 +127,7 @@ ${bodyPreview}
 
 Respond in the following JSON format only (no other text):
 {
-  "category": "support|sales|query|other",
+  "category": "support|sales|query|spam|other",
   "confidence": 0.0-1.0,
   "reason": "brief explanation"
 }
@@ -110,8 +136,12 @@ Examples:
 - "My app is crashing" → support
 - "How much does the enterprise plan cost?" → sales
 - "What features do you support?" → query
+- "URGENT: Click here to claim your prize!" → spam
 - "Unsubscribe me" → other
-- "[AUTO-REPLY] Out of office" → other`
+- "[AUTO-REPLY] Out of office" → other
+- "Buy cheap meds online" → spam
+- "Your account has been suspended, verify now" → spam
+- "Request for quotation for valves" from unknown company → spam`
 }
 
 /**
@@ -129,7 +159,7 @@ function parseClassificationResponse(response: string): ClassificationResult {
     const category = parsed.category as EmailCategory
     const confidence = Number(parsed.confidence) || 0
 
-    // Only process support, sales, and query emails
+    // Only process support, sales, and query emails (NOT spam or other)
     const shouldProcess = ['support', 'sales', 'query'].includes(category)
 
     return {
@@ -169,24 +199,80 @@ export function classifyEmailHeuristic(email: ParsedEmail): ClassificationResult
   const body = (email.body.text || email.body.html || '').toLowerCase()
   const combined = `${subject} ${body}`
 
-  // Check for spam/automated patterns
-  const spamPatterns = [
-    /unsubscribe/i,
+  // Check for automated message patterns (auto-replies, bounces)
+  const automatedPatterns = [
     /auto.?reply/i,
     /out of office/i,
     /delivery failure/i,
     /mailer.?daemon/i,
     /no.?reply@/i,
+    /returned mail/i,
+    /mail delivery/i,
+  ]
+
+  for (const pattern of automatedPatterns) {
+    if (pattern.test(combined)) {
+      return {
+        category: 'other',
+        confidence: 0.9,
+        shouldProcess: false,
+        reason: 'Automated message detected',
+      }
+    }
+  }
+
+  // Check for spam/phishing patterns
+  const spamPatterns = [
+    /click here/i,
+    /verify your account/i,
+    /urgent.*action required/i,
+    /suspended.*account/i,
+    /claim.*prize/i,
+    /congratulations.*won/i,
+    /limited time offer/i,
+    /act now/i,
+    /buy.*cheap/i,
+    /make money/i,
+    /free.*money/i,
+    /nigerian prince/i,
+    /enlarge/i,
+    /viagra/i,
+    /casino/i,
+    /lottery/i,
+    /inheritance/i,
+    /security alert/i,
+    /confirm.*identity/i,
+    /update.*payment/i,
+    /crypto.*investment/i,
+    // B2B spam patterns
+    /request for quotation/i,
+    /rfq.*quotation/i,
+    /source and provide/i,
+    /supply.*quotation/i,
+    /procurement.*request/i,
+    /tender.*invitation/i,
+    /to unsubscribe reply/i,
+    /quote.*earliest convenience/i,
   ]
 
   for (const pattern of spamPatterns) {
     if (pattern.test(combined)) {
       return {
-        category: 'other',
-        confidence: 0.8,
+        category: 'spam',
+        confidence: 0.9,
         shouldProcess: false,
-        reason: 'Automated or spam message detected',
+        reason: 'Spam or phishing indicators detected',
       }
+    }
+  }
+
+  // Check for unsubscribe requests separately
+  if (/unsubscribe/i.test(combined) && combined.length < 100) {
+    return {
+      category: 'other',
+      confidence: 0.95,
+      shouldProcess: false,
+      reason: 'Unsubscribe request detected',
     }
   }
 

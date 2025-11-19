@@ -20,6 +20,10 @@ const props = defineProps<{
   appId: string
 }>()
 
+const emit = defineEmits<{
+  'update:showingSteps': [value: boolean]
+}>()
+
 type Element = Database['public']['Tables']['app_versions']['Row'] & Database['public']['Tables']['app_versions_meta']['Row']
 
 const role = ref<OrganizationRole | null>(null)
@@ -593,26 +597,31 @@ watch(props, async () => {
   await refreshData()
   role.value = await organizationStore.getCurrentRoleForApp(props.appId)
 })
+
+watch(showSteps, (newValue) => {
+  emit('update:showingSteps', newValue)
+})
 </script>
 
 <template>
   <div>
-    <Table
-      v-if="!showSteps"
-      v-model:filters="filters" v-model:columns="columns" v-model:current-page="currentPage" v-model:search="search"
-      :total="total"
-      :show-add="!isMobile"
-      :element-list="elements"
-      filter-text="Filters"
-      mass-select
-      :is-loading="isLoading"
-      :search-placeholder="t('search-by-name')"
-      @select-row="selectedElementsFilter"
-      @mass-delete="massDelete()"
-      @add="addOne()"
-      @reload="reload()"
-      @reset="refreshData()"
-    />
+    <div v-if="!showSteps" class="flex flex-col overflow-hidden overflow-y-auto bg-white border border-slate-300 shadow-lg md:rounded-lg dark:border-slate-900 dark:bg-gray-800">
+      <Table
+        v-model:filters="filters" v-model:columns="columns" v-model:current-page="currentPage" v-model:search="search"
+        :total="total"
+        :show-add="!isMobile"
+        :element-list="elements"
+        filter-text="Filters"
+        mass-select
+        :is-loading="isLoading"
+        :search-placeholder="t('search-by-name')"
+        @select-row="selectedElementsFilter"
+        @mass-delete="massDelete()"
+        @add="addOne()"
+        @reload="reload()"
+        @reset="refreshData()"
+      />
+    </div>
 
     <StepsBundle v-else :onboarding="(totalAllBundles ?? 0) === 0" :app-id="props.appId" @done="onboardingDone" @close-step="closeSteps()" />
 

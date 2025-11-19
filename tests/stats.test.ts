@@ -74,6 +74,9 @@ describe('test valid and invalid cases of version_build', () => {
     await triggerD1Sync() // Sync the newly created version to D1
 
     let response = await postStats(baseData)
+    if (response.status !== 200) {
+      console.log('stats error', await response.text())
+    }
     expect(response.status).toBe(200)
     let responseData = await response.json<StatsRes>()
     expect(responseData.status).toBe('ok')
