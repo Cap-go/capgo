@@ -4,7 +4,6 @@ import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import arrowBack from '~icons/ion/arrow-back?width=2em&height=2em'
 import IconLoader from '~icons/lucide/loader-2'
-import InviteTeammateModal from '~/components/dashboard/InviteTeammateModal.vue'
 import { pushEvent } from '~/services/posthog'
 import { getLocalConfig, isLocal, useSupabase } from '~/services/supabase'
 import { sendEvent } from '~/services/tracking'
@@ -22,7 +21,7 @@ const displayStore = useDisplayStore()
 const isLoading = ref(false)
 const step = ref(0)
 const clicked = ref(0)
-const appId = ref<string>()
+const buildId = ref<string>()
 const realtimeListener = ref(false)
 const pollTimer = ref<number | null>(null)
 const initialCount = ref<number | null>(null)
@@ -42,26 +41,25 @@ const config = getLocalConfig()
 const localCommand = isLocal(config.supaHost) ? ` --supa-host ${config.supaHost} --supa-anon ${config.supaKey}` : ``
 const steps = ref<Step[]>([
   {
-    title: t('add-another-bundle'),
-    command: `npx @capgo/cli@latest bundle upload -a [APIKEY]${localCommand}`,
-    subtitle: '',
+    title: t('build-step-request-build'),
+    command: `npx @capgo/cli@latest build request -a [APIKEY] --platform ios${localCommand}`,
+    subtitle: t('build-step-request-subtitle'),
   },
   {
-    title: t('discover-your-bundle'),
+    title: t('build-step-wait'),
     command: '',
-    subtitle: t('this-page-will-self-'),
+    subtitle: t('build-step-wait-subtitle'),
   },
 ])
-const inviteModalRef = ref<InstanceType<typeof InviteTeammateModal> | null>(null)
 
 function stepToName(stepNumber: number): string {
   switch (stepNumber) {
     case 0:
-      return 'copy-command'
+      return 'request-build'
     case 1:
-      return 'wait-for-bundle'
+      return 'wait-for-build'
     case 2:
-      return 'discover-your-bundle'
+      return 'build-completed'
     default:
       return 'unknown-step'
   }
@@ -71,13 +69,13 @@ function setLog() {
   console.log('setLog', props.onboarding, main.user?.id, step.value)
   if (props.onboarding && main.user?.id) {
     sendEvent({
-      channel: 'onboarding-bundle',
-      event: `onboarding-bundle-step-${stepToName(step.value)}`,
-      icon: '👶',
+      channel: 'onboarding-build',
+      event: `onboarding-build-step-${stepToName(step.value)}`,
+      icon: '🏗️',
       user_id: organizationStore.currentOrganization?.gid,
       notify: false,
     }).catch()
-    pushEvent(`user:onboarding-bundle-${stepToName(step.value)}`, config.supaHost)
+    pushEvent(`user:onboarding-build-${stepToName(step.value)}`, config.supaHost)
   }
   if (step.value === 2) {
     emit('done')
@@ -93,11 +91,9 @@ function clearWatchers() {
 }
 
 function scrollToElement(id: string) {
-  // Get the element with the id
   const el = document.getElementById(id)
   console.log('el', el)
   if (el) {
-    // Use el.scrollIntoView() to instantly scroll to the element
     el.scrollIntoView({ behavior: 'smooth' })
   }
 }
@@ -112,7 +108,6 @@ async function copyToast(allowed: boolean, id: string, text?: string) {
   }
   catch (err) {
     console.error('Failed to copy: ', err)
-    // Display a modal with the copied key
     dialogStore.openDialog({
       title: t('cannot-copy'),
       description: text,
@@ -177,12 +172,12 @@ async function getKey(retry = true): Promise<void> {
   isLoading.value = false
 }
 
-async function getVersionsCount(): Promise<number> {
+async function getBuildRequestsCount(): Promise<number> {
   const orgId = organizationStore.currentOrganization?.gid
   if (!orgId || !props.appId)
     return 0
   const { count, error } = await supabase
-    .from('app_versions')
+    .from('build_requests')
     .select('id', { count: 'exact', head: true })
     .eq('owner_org', orgId)
     .eq('app_id', props.appId)
@@ -192,12 +187,12 @@ async function getVersionsCount(): Promise<number> {
   return count ?? 0
 }
 
-async function getLatestVersionId(): Promise<string | undefined> {
+async function getLatestBuildId(): Promise<string | undefined> {
   const orgId = organizationStore.currentOrganization?.gid
   if (!orgId || !props.appId)
     return undefined
   const { data, error } = await supabase
-    .from('app_versions')
+    .from('build_requests')
     .select('id, created_at')
     .eq('owner_org', orgId)
     .eq('app_id', props.appId)
@@ -209,27 +204,14 @@ async function getLatestVersionId(): Promise<string | undefined> {
   return `${data[0].id}`
 }
 
-function openInviteDialog() {
-  inviteModalRef.value?.openDialog()
-}
-
-function onInviteSuccess() {
-  step.value += 1
-  clicked.value = 0
-  realtimeListener.value = false
-  clearWatchers()
-  scrollToElement('step_card_1')
-  setLog()
-}
-
 watchEffect(async () => {
   if (step.value === 1 && !realtimeListener.value) {
-    console.log('watch app change step 1 via polling')
+    console.log('watch build change step 1 via polling')
     realtimeListener.value = true
     await organizationStore.awaitInitialLoad()
 
     try {
-      initialCount.value = await getVersionsCount()
+      initialCount.value = await getBuildRequestsCount()
     }
     catch {
       initialCount.value = 0
@@ -239,18 +221,18 @@ watchEffect(async () => {
 
     pollTimer.value = window.setInterval(async () => {
       try {
-        const current = await getVersionsCount()
+        const current = await getBuildRequestsCount()
         if (initialCount.value !== null && current > initialCount.value) {
-          const latestId = await getLatestVersionId()
+          const latestId = await getLatestBuildId()
           step.value += 1
-          appId.value = latestId ?? ''
+          buildId.value = latestId ?? ''
           realtimeListener.value = false
           clearWatchers()
           setLog()
         }
       }
       catch (e) {
-        console.warn('Polling app_versions failed', e)
+        console.warn('Polling build_requests failed', e)
       }
     }, 2000)
   }
@@ -274,10 +256,10 @@ onUnmounted(() => {
         </button>
         <div v-if="props.onboarding" class="text-center">
           <h2 class="text-3xl font-bold text-gray-900 font-pj sm:text-4xl xl:text-5xl dark:text-gray-50">
-            {{ t('feel-magic-of-capgo') }} <span class="font-prompt">Capgo</span> !
+            {{ t('start-your-first-build') }}
           </h2>
           <p class="mx-auto mt-6 text-lg font-normal text-gray-600 font-pj dark:text-gray-200">
-            {{ t('add-your-first-bundle') }}
+            {{ t('build-native-apps-with-cli') }}
           </p>
           <p class="mx-auto mt-2 font-normal text-md font-pj text-muted-blue-300 dark:text-muted-blue-50">
             {{ t('pro-tip-you-can-copy') }} <span class="text-pumpkin-orange-900">{{ t('commands') }}</span> {{ t('by-clicking-on-them') }}
@@ -286,7 +268,7 @@ onUnmounted(() => {
 
         <div v-else class="text-center">
           <h2 class="text-3xl font-bold text-gray-900 font-pj sm:text-4xl xl:text-5xl dark:text-gray-50">
-            {{ t('add-another-bundle') }}
+            {{ t('request-new-build') }}
           </h2>
         </div>
       </div>
@@ -323,25 +305,9 @@ onUnmounted(() => {
                 <br v-if="s.command">
               </div>
             </div>
-            <div v-if="i === 0" class="pt-6 border-t border-gray-200">
-              <h3 class="text-lg font-semibold text-gray-900 font-pj">
-                {{ t('onboarding-invite-option-title') }}
-              </h3>
-              <p class="mt-2 text-sm text-gray-600">
-                {{ t('onboarding-invite-option-subtitle') }}
-              </p>
-              <button
-                type="button"
-                class="inline-flex items-center px-4 py-2 mt-4 text-sm font-semibold transition-colors duration-200 rounded-md bg-muted-blue-50 text-muted-blue-800 hover:bg-muted-blue-100 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-muted-blue-500"
-                @click="openInviteDialog"
-              >
-                {{ t('onboarding-invite-option-cta') }}
-              </button>
-            </div>
           </div>
         </template>
       </div>
     </div>
   </section>
-  <InviteTeammateModal ref="inviteModalRef" @success="onInviteSuccess" />
 </template>

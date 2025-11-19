@@ -39,6 +39,8 @@ const displayStore = useDisplayStore()
 const app = ref<Database['public']['Tables']['apps']['Row']>()
 const ActiveTab = ref(route.query.tab?.toString() || 'overview')
 const usageComponent = ref()
+const showingBuildSteps = ref(false)
+const showingBundleSteps = ref(false)
 
 const tabs: Tab[] = [
   {
@@ -196,9 +198,7 @@ watchEffect(() => {
 
       <div v-if="ActiveTab === 'bundles'" class="mt-0 md:mt-8">
         <div class="w-full h-full px-0 pt-0 md:pt-8 mx-auto mb-8 overflow-y-auto max-w-9xl max-h-fit sm:px-6 lg:px-8">
-          <div class="flex flex-col overflow-hidden overflow-y-auto bg-white border border-slate-300 shadow-lg md:rounded-lg dark:border-slate-900 dark:bg-gray-800">
-            <BundleTable :app-id="id" />
-          </div>
+          <BundleTable :app-id="id" @update:showing-steps="showingBundleSteps = $event" />
         </div>
       </div>
 
@@ -228,9 +228,7 @@ watchEffect(() => {
 
       <div v-if="ActiveTab === 'builds'" class="mt-0 md:mt-8">
         <div class="w-full h-full px-0 pt-0 md:pt-8 mx-auto mb-8 overflow-y-auto max-w-9xl max-h-fit sm:px-6 lg:px-8">
-          <div class="flex flex-col overflow-hidden overflow-y-auto bg-white border border-slate-300 shadow-lg md:rounded-lg dark:border-slate-900 dark:bg-gray-800">
-            <BuildTable :app-id="id" />
-          </div>
+          <BuildTable :app-id="id" @update:showing-steps="showingBuildSteps = $event" />
         </div>
       </div>
     </div>
