@@ -345,7 +345,7 @@ export async function createOneTimeCheckout(
     billing_address_collection: 'auto',
     mode: 'payment',
     customer: customerId,
-    success_url: successUrl,
+    success_url: `${successUrl}?success=true`,
     cancel_url: cancelUrl,
     automatic_tax: { enabled: true },
     client_reference_id: clientReferenceId,
