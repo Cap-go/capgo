@@ -257,6 +257,9 @@ onUnmounted(() => {
         <div v-if="props.onboarding" class="text-center">
           <h2 class="text-3xl font-bold text-gray-900 font-pj sm:text-4xl xl:text-5xl dark:text-gray-50">
             {{ t('start-your-first-build') }}
+            <span class="ml-3 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
+              BETA
+            </span>
           </h2>
           <p class="mx-auto mt-6 text-lg font-normal text-gray-600 font-pj dark:text-gray-200">
             {{ t('build-native-apps-with-cli') }}
@@ -269,6 +272,9 @@ onUnmounted(() => {
         <div v-else class="text-center">
           <h2 class="text-3xl font-bold text-gray-900 font-pj sm:text-4xl xl:text-5xl dark:text-gray-50">
             {{ t('request-new-build') }}
+            <span class="ml-3 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
+              BETA
+            </span>
           </h2>
         </div>
       </div>
