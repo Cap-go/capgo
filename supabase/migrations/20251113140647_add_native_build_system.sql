@@ -56,12 +56,12 @@ ALTER TABLE public.build_logs ENABLE ROW LEVEL SECURITY;
 -- 2. All org builds if they're admin/super_admin
 CREATE POLICY "Users read own or org admin builds" ON public.build_logs FOR SELECT TO authenticated
   USING (
-    user_id = auth.uid()
+    user_id = (SELECT auth.uid())
     OR
     EXISTS (
       SELECT 1 FROM public.org_users
       WHERE org_users.org_id = build_logs.org_id
-        AND org_users.user_id = auth.uid()
+        AND org_users.user_id = (SELECT auth.uid())
         AND org_users.user_right IN ('super_admin', 'admin')
     )
   );
@@ -92,7 +92,7 @@ CREATE POLICY "Users read own org build time" ON public.daily_build_time FOR SEL
         AND EXISTS (
           SELECT 1 FROM public.org_users
           WHERE org_users.org_id = apps.owner_org
-            AND org_users.user_id = auth.uid()
+            AND org_users.user_id = (SELECT auth.uid())
         )
     )
   );
