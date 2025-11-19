@@ -154,18 +154,18 @@ interface FindBestPlanArgs {
   mau: number
   bandwidth: number
   storage: number
-  build_time_seconds?: number
+  build_time_unit?: number
 }
 
 export async function findBestPlan(c: Context, stats: Database['public']['Functions']['find_best_plan_v3']['Args'] | FindBestPlanArgs): Promise<string> {
-  const buildTimeSeconds = 'build_time_seconds' in stats ? stats.build_time_seconds : 0
+  const buildTimeSeconds = 'build_time_unit' in stats ? stats.build_time_unit : 0
 
   const { data, error } = await supabaseAdmin(c)
     .rpc('find_best_plan_v3', {
       mau: stats.mau ?? 0,
       bandwidth: stats.bandwidth,
       storage: stats.storage,
-      build_time_seconds: buildTimeSeconds ?? 0,
+      build_time_unit: buildTimeSeconds ?? 0,
     })
     .single()
   if (error) {
@@ -257,7 +257,7 @@ async function userAbovePlan(c: Context, org: {
     { key: 'mau', usage: Number(totalStats.mau ?? 0), limit: currentPlan?.mau },
     { key: 'storage', usage: Number(totalStats.storage ?? 0), limit: currentPlan?.storage },
     { key: 'bandwidth', usage: Number(totalStats.bandwidth ?? 0), limit: currentPlan?.bandwidth },
-    { key: 'build_time', usage: Number(totalStats.build_time_seconds ?? 0), limit: currentPlan?.build_time_seconds },
+    { key: 'build_time', usage: Number(totalStats.build_time_unit ?? 0), limit: currentPlan?.build_time_unit },
   ]
 
   const creditResults: Record<CreditMetric, CreditApplicationResult | null> = {
@@ -312,7 +312,7 @@ async function userAbovePlan(c: Context, org: {
     mau: totalStats.mau,
     storage: totalStats.storage,
     bandwidth: totalStats.bandwidth,
-    build_time_seconds: totalStats.build_time_seconds,
+    build_time_unit: totalStats.build_time_unit,
   })
 
   // If the calculated best plan ranks lower than the current one, the org is over-provisioned, so skip upgrade nudges.

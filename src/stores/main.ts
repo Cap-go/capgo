@@ -17,7 +17,7 @@ interface TotalStats {
   mau: number
   storage: number
   bandwidth: number
-  build_time_seconds: number
+  build_time_unit: number
 }
 
 export const useMainStore = defineStore('main', () => {
@@ -29,7 +29,7 @@ export const useMainStore = defineStore('main', () => {
     mau: 0,
     storage: 0,
     bandwidth: 0,
-    build_time_seconds: 0,
+    build_time_unit: 0,
   })
   const bestPlan = ref<string>('')
   // getProcessCronStatsJobInfo
@@ -73,13 +73,13 @@ export const useMainStore = defineStore('main', () => {
       acc.mau += cur.mau
       acc.bandwidth += cur.bandwidth
       acc.storage += cur.storage
-      acc.build_time_seconds += cur.build_time_seconds
+      acc.build_time_unit += cur.build_time_unit
       return acc
     }, {
       mau: 0,
       bandwidth: 0,
       storage: 0,
-      build_time_seconds: 0,
+      build_time_unit: 0,
     })
   }
 

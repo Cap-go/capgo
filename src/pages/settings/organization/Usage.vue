@@ -73,7 +73,7 @@ async function getUsage(orgId: string) {
     mau: plan?.mau,
     storage: plan?.storage,
     bandwidth: plan?.bandwidth,
-    build_time: plan?.build_time_seconds || 0,
+    build_time: plan?.build_time_unit || 0,
   }
 
   const payg_units = {
@@ -107,7 +107,7 @@ async function getUsage(orgId: string) {
   const totalBandwidthBytes = relevantUsage.reduce((acc, entry) => acc + (entry.bandwidth ?? 0), 0)
   const totalBandwidth = bytesToGb(totalBandwidthBytes)
   const totalStorage = bytesToGb(await getTotalStorage(orgId))
-  const totalBuildTime = relevantUsage.reduce((acc, entry) => acc + (entry.build_time_seconds ?? 0), 0)
+  const totalBuildTime = relevantUsage.reduce((acc, entry) => acc + (entry.build_time_unit ?? 0), 0)
 
   const basePrice = currentPlan?.price_m ?? 0
 
@@ -340,7 +340,7 @@ function nextRunDate() {
                   {{ t('build-time') }}
                 </div>
                 <div class="text-lg font-bold text-orange-600 dark:text-orange-400">
-                  {{ formatBuildTime(planUsage.currentPlan.build_time_seconds || 0) }}
+                  {{ formatBuildTime(planUsage.currentPlan.build_time_unit || 0) }}
                 </div>
               </div>
             </div>
@@ -590,7 +590,7 @@ function nextRunDate() {
                 <div class="flex justify-between">
                   <span class="text-gray-600 dark:text-gray-400">{{ t('included-in-plan') }}</span>
                   <span class="font-semibold text-gray-900 dark:text-white">
-                    {{ formatBuildTime(planUsage?.currentPlan?.build_time_seconds || 0) }}
+                    {{ formatBuildTime(planUsage?.currentPlan?.build_time_unit || 0) }}
                   </span>
                 </div>
                 <div class="flex justify-between">

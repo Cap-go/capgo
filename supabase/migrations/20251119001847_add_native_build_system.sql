@@ -9,11 +9,11 @@ BEGIN;
 -- ==================================================
 -- PART 1: BUILD TIME TRACKING
 -- ==================================================
--- Add build_time_seconds to plans
+-- Add build_time_unit to plans
 ALTER TABLE public.plans
-ADD COLUMN build_time_seconds bigint DEFAULT 0 NOT NULL;
+ADD COLUMN build_time_unit bigint DEFAULT 0 NOT NULL;
 
-COMMENT ON COLUMN public.plans.build_time_seconds IS 'Maximum build time in seconds per billing cycle';
+COMMENT ON COLUMN public.plans.build_time_unit IS 'Maximum build time in seconds per billing cycle';
 
 -- Add build_time_exceeded flag to stripe_info
 ALTER TABLE public.stripe_info
@@ -40,7 +40,7 @@ CREATE TABLE IF NOT EXISTS public.build_logs (
   build_id character varying NOT NULL,
   -- Raw build time
   platform character varying NOT NULL CHECK (platform IN ('ios', 'android')),
-  build_time_seconds bigint NOT NULL CHECK (build_time_seconds >= 0),
+  build_time_unit bigint NOT NULL CHECK (build_time_unit >= 0),
   -- Billable amount (with platform multiplier applied: android=1x, ios=2x)
   -- This locks in the price at time of build
   billable_seconds bigint NOT NULL CHECK (billable_seconds >= 0),
@@ -85,7 +85,7 @@ WITH
 CREATE TABLE IF NOT EXISTS public.daily_build_time (
   app_id character varying NOT NULL REFERENCES public.apps (app_id) ON DELETE CASCADE,
   date date NOT NULL,
-  build_time_seconds bigint NOT NULL DEFAULT 0 CHECK (build_time_seconds >= 0),
+  build_time_unit bigint NOT NULL DEFAULT 0 CHECK (build_time_unit >= 0),
   build_count bigint NOT NULL DEFAULT 0 CHECK (build_count >= 0),
   PRIMARY KEY (app_id, date)
 );
@@ -209,7 +209,7 @@ CREATE OR REPLACE FUNCTION public.record_build_time (
   p_user_id uuid,
   p_build_id character varying,
   p_platform character varying,
-  p_build_time_seconds bigint
+  p_build_time_unit bigint
 ) RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER
 SET
   search_path = '' AS $$
@@ -218,7 +218,7 @@ DECLARE
   v_multiplier numeric;
   v_billable_seconds bigint;
 BEGIN
-  IF p_build_time_seconds < 0 THEN RAISE EXCEPTION 'Build time cannot be negative'; END IF;
+  IF p_build_time_unit < 0 THEN RAISE EXCEPTION 'Build time cannot be negative'; END IF;
   IF p_platform NOT IN ('ios', 'android') THEN RAISE EXCEPTION 'Invalid platform: %', p_platform; END IF;
 
   -- Apply platform multiplier
@@ -228,14 +228,14 @@ BEGIN
     ELSE 1
   END;
 
-  v_billable_seconds := (p_build_time_seconds * v_multiplier)::bigint;
+  v_billable_seconds := (p_build_time_unit * v_multiplier)::bigint;
 
-  INSERT INTO public.build_logs (org_id, user_id, build_id, platform, build_time_seconds, billable_seconds)
-  VALUES (p_org_id, p_user_id, p_build_id, p_platform, p_build_time_seconds, v_billable_seconds)
+  INSERT INTO public.build_logs (org_id, user_id, build_id, platform, build_time_unit, billable_seconds)
+  VALUES (p_org_id, p_user_id, p_build_id, p_platform, p_build_time_unit, v_billable_seconds)
   ON CONFLICT (build_id, org_id) DO UPDATE SET
     user_id = EXCLUDED.user_id,
     platform = EXCLUDED.platform,
-    build_time_seconds = EXCLUDED.build_time_seconds,
+    build_time_unit = EXCLUDED.build_time_unit,
     billable_seconds = EXCLUDED.billable_seconds
   RETURNING id INTO v_build_log_id;
 
@@ -243,16 +243,13 @@ BEGIN
 END;
 $$;
 
--- Function: get_org_build_time_seconds
-CREATE OR REPLACE FUNCTION public.get_org_build_time_seconds (p_org_id uuid, p_start_date date, p_end_date date) RETURNS TABLE (
-  total_build_time_seconds bigint,
-  total_builds bigint
-) LANGUAGE plpgsql STABLE
+-- Function: get_org_build_time_unit
+CREATE OR REPLACE FUNCTION public.get_org_build_time_unit (p_org_id uuid, p_start_date date, p_end_date date) RETURNS TABLE (total_build_time_unit bigint, total_builds bigint) LANGUAGE plpgsql STABLE
 SET
   search_path = '' AS $$
 BEGIN
   RETURN QUERY
-  SELECT COALESCE(SUM(dbt.build_time_seconds), 0)::bigint, COALESCE(SUM(dbt.build_count), 0)::bigint
+  SELECT COALESCE(SUM(dbt.build_time_unit), 0)::bigint, COALESCE(SUM(dbt.build_count), 0)::bigint
   FROM public.daily_build_time dbt
   INNER JOIN public.apps a ON a.app_id = dbt.app_id
   WHERE a.owner_org = p_org_id AND dbt.date >= p_start_date AND dbt.date <= p_end_date;
@@ -289,7 +286,7 @@ service_role;
 
 -- Note: No create_build_request RPC needed - backend TypeScript handles builder.capgo.app API calls
 -- ==================================================
--- PART 4: UPDATE EXISTING FUNCTIONS WITH BUILD_TIME_SECONDS
+-- PART 4: UPDATE EXISTING FUNCTIONS WITH build_time_unit
 -- ==================================================
 -- Update get_app_metrics
 DROP FUNCTION IF EXISTS public.get_app_metrics (uuid);
@@ -302,7 +299,7 @@ CREATE FUNCTION public.get_app_metrics (org_id uuid, start_date date, end_date d
   mau bigint,
   storage bigint,
   bandwidth bigint,
-  build_time_seconds bigint,
+  build_time_unit bigint,
   get bigint,
   fail bigint,
   install bigint,
@@ -316,7 +313,7 @@ BEGIN
   all_apps AS (SELECT apps.app_id FROM public.apps WHERE apps.owner_org = get_app_metrics.org_id
     UNION SELECT deleted_apps.app_id FROM public.deleted_apps WHERE deleted_apps.owner_org = get_app_metrics.org_id)
   SELECT aa.app_id, ds.date::date, COALESCE(dm.mau, 0) AS mau, COALESCE(dst.storage, 0) AS storage,
-    COALESCE(db.bandwidth, 0) AS bandwidth, COALESCE(dbt.build_time_seconds, 0) AS build_time_seconds,
+    COALESCE(db.bandwidth, 0) AS bandwidth, COALESCE(dbt.build_time_unit, 0) AS build_time_unit,
     COALESCE(SUM(dv.get)::bigint, 0) AS get, COALESCE(SUM(dv.fail)::bigint, 0) AS fail,
     COALESCE(SUM(dv.install)::bigint, 0) AS install, COALESCE(SUM(dv.uninstall)::bigint, 0) AS uninstall
   FROM all_apps aa CROSS JOIN DateSeries ds
@@ -325,7 +322,7 @@ BEGIN
   LEFT JOIN public.daily_bandwidth db ON aa.app_id = db.app_id AND ds.date = db.date
   LEFT JOIN public.daily_build_time dbt ON aa.app_id = dbt.app_id AND ds.date = dbt.date
   LEFT JOIN public.daily_version dv ON aa.app_id = dv.app_id AND ds.date = dv.date
-  GROUP BY aa.app_id, ds.date, dm.mau, dst.storage, db.bandwidth, dbt.build_time_seconds
+  GROUP BY aa.app_id, ds.date, dm.mau, dst.storage, db.bandwidth, dbt.build_time_unit
   ORDER BY aa.app_id, ds.date;
 END;
 $$;
@@ -336,7 +333,7 @@ CREATE FUNCTION public.get_app_metrics (org_id uuid) RETURNS TABLE (
   mau bigint,
   storage bigint,
   bandwidth bigint,
-  build_time_seconds bigint,
+  build_time_unit bigint,
   get bigint,
   fail bigint,
   install bigint,
@@ -361,7 +358,7 @@ CREATE FUNCTION public.get_total_metrics (org_id uuid, start_date date, end_date
   mau bigint,
   storage bigint,
   bandwidth bigint,
-  build_time_seconds bigint,
+  build_time_unit bigint,
   get bigint,
   fail bigint,
   install bigint,
@@ -372,7 +369,7 @@ SET
 BEGIN
   RETURN QUERY SELECT COALESCE(SUM(metrics.mau), 0)::bigint, 
     COALESCE(public.get_total_storage_size_org(org_id), 0)::bigint,
-    COALESCE(SUM(metrics.bandwidth), 0)::bigint, COALESCE(SUM(metrics.build_time_seconds), 0)::bigint,
+    COALESCE(SUM(metrics.bandwidth), 0)::bigint, COALESCE(SUM(metrics.build_time_unit), 0)::bigint,
     COALESCE(SUM(metrics.get), 0)::bigint, COALESCE(SUM(metrics.fail), 0)::bigint,
     COALESCE(SUM(metrics.install), 0)::bigint, COALESCE(SUM(metrics.uninstall), 0)::bigint
   FROM public.get_app_metrics(org_id, start_date, end_date) AS metrics;
@@ -383,7 +380,7 @@ CREATE FUNCTION public.get_total_metrics (org_id uuid) RETURNS TABLE (
   mau bigint,
   storage bigint,
   bandwidth bigint,
-  build_time_seconds bigint,
+  build_time_unit bigint,
   get bigint,
   fail bigint,
   install bigint,
@@ -406,14 +403,14 @@ CREATE FUNCTION public.find_fit_plan_v3 (
   mau bigint,
   bandwidth bigint,
   storage bigint,
-  build_time_seconds bigint DEFAULT 0
+  build_time_unit bigint DEFAULT 0
 ) RETURNS TABLE (name character varying) LANGUAGE plpgsql STABLE
 SET
   search_path = '' AS $$
 BEGIN
   RETURN QUERY (SELECT plans.name FROM public.plans
     WHERE plans.mau >= find_fit_plan_v3.mau AND plans.storage >= find_fit_plan_v3.storage
-      AND plans.bandwidth >= find_fit_plan_v3.bandwidth AND plans.build_time_seconds >= find_fit_plan_v3.build_time_seconds
+      AND plans.bandwidth >= find_fit_plan_v3.bandwidth AND plans.build_time_unit >= find_fit_plan_v3.build_time_unit
       OR plans.name = 'Pay as you go'
     ORDER BY plans.mau);
 END;
@@ -426,7 +423,7 @@ CREATE FUNCTION public.find_best_plan_v3 (
   mau bigint,
   bandwidth double precision,
   storage double precision,
-  build_time_seconds bigint DEFAULT 0
+  build_time_unit bigint DEFAULT 0
 ) RETURNS character varying LANGUAGE plpgsql SECURITY DEFINER
 SET
   search_path = '' AS $$
@@ -438,7 +435,7 @@ BEGIN
       plans.mau >= find_best_plan_v3.mau
       AND plans.storage >= find_best_plan_v3.storage
       AND plans.bandwidth >= find_best_plan_v3.bandwidth
-      AND plans.build_time_seconds >= find_best_plan_v3.build_time_seconds
+      AND plans.build_time_unit >= find_best_plan_v3.build_time_unit
     ) OR plans.name = 'Pay as you go'
     ORDER BY plans.mau
     LIMIT 1
@@ -470,7 +467,7 @@ BEGIN
   current_plan_name := (SELECT public.get_current_plan_name_org(orgid));
   
   RETURN EXISTS (SELECT 1 FROM public.find_fit_plan_v3(total_metrics.mau, total_metrics.bandwidth,
-      total_metrics.storage, total_metrics.build_time_seconds)
+      total_metrics.storage, total_metrics.build_time_unit)
     WHERE find_fit_plan_v3.name = current_plan_name);
 END;
 $$;
@@ -494,20 +491,20 @@ GRANT ALL ON FUNCTION public.is_paying_and_good_plan_org_action (uuid, public.ac
 authenticated,
 service_role;
 
--- Update get_current_plan_max_org to include build_time_seconds
+-- Update get_current_plan_max_org to include build_time_unit
 DROP FUNCTION IF EXISTS public.get_current_plan_max_org (uuid);
 
 CREATE FUNCTION public.get_current_plan_max_org (orgid uuid) RETURNS TABLE (
   mau bigint,
   bandwidth bigint,
   storage bigint,
-  build_time_seconds bigint
+  build_time_unit bigint
 ) LANGUAGE plpgsql SECURITY DEFINER
 SET
   search_path = '' AS $$
 Begin
   RETURN QUERY
-  (SELECT plans.mau, plans.bandwidth, plans.storage, plans.build_time_seconds
+  (SELECT plans.mau, plans.bandwidth, plans.storage, plans.build_time_unit
   FROM public.plans
     WHERE stripe_id=(
       SELECT product_id
@@ -542,7 +539,7 @@ BEGIN
   percent_mau := public.convert_number_to_percent(total_stats.mau, current_plan_max.mau);
   percent_bandwidth := public.convert_number_to_percent(total_stats.bandwidth, current_plan_max.bandwidth);
   percent_storage := public.convert_number_to_percent(total_stats.storage, current_plan_max.storage);
-  percent_build_time := public.convert_number_to_percent(total_stats.build_time_seconds, current_plan_max.build_time_seconds);
+  percent_build_time := public.convert_number_to_percent(total_stats.build_time_unit, current_plan_max.build_time_unit);
   RETURN QUERY SELECT GREATEST(percent_mau, percent_bandwidth, percent_storage, percent_build_time),
     percent_mau, percent_bandwidth, percent_storage, percent_build_time;
 END;
@@ -565,22 +562,20 @@ BEGIN
   percent_mau := public.convert_number_to_percent(total_stats.mau, current_plan_max.mau);
   percent_bandwidth := public.convert_number_to_percent(total_stats.bandwidth, current_plan_max.bandwidth);
   percent_storage := public.convert_number_to_percent(total_stats.storage, current_plan_max.storage);
-  percent_build_time := public.convert_number_to_percent(total_stats.build_time_seconds, current_plan_max.build_time_seconds);
+  percent_build_time := public.convert_number_to_percent(total_stats.build_time_unit, current_plan_max.build_time_unit);
   RETURN QUERY SELECT GREATEST(percent_mau, percent_bandwidth, percent_storage, percent_build_time),
     percent_mau, percent_bandwidth, percent_storage, percent_build_time;
 END;
 $$;
 
 -- ==================================================
--- PART 5: UPDATE CACHE FUNCTIONS TO INCLUDE BUILD_TIME_SECONDS
+-- PART 5: UPDATE CACHE FUNCTIONS TO INCLUDE build_time_unit
 -- ==================================================
 -- The seed_get_app_metrics_caches function caches metrics data in JSONB format
--- It needs to include build_time_seconds in the cached data structure
-CREATE OR REPLACE FUNCTION public.seed_get_app_metrics_caches(
-    p_org_id uuid, p_start_date date, p_end_date date
-) RETURNS public.app_metrics_cache LANGUAGE plpgsql SECURITY DEFINER
+-- It needs to include build_time_unit in the cached data structure
+CREATE OR REPLACE FUNCTION public.seed_get_app_metrics_caches (p_org_id uuid, p_start_date date, p_end_date date) RETURNS public.app_metrics_cache LANGUAGE plpgsql SECURITY DEFINER
 SET
-search_path TO '' AS $function$
+  search_path TO '' AS $function$
 DECLARE
     metrics_json jsonb;
     cache_record public.app_metrics_cache%ROWTYPE;
@@ -614,7 +609,7 @@ BEGIN
             COALESCE(dm.mau, 0) AS mau,
             COALESCE(dst.storage, 0) AS storage,
             COALESCE(db.bandwidth, 0) AS bandwidth,
-            COALESCE(dbt.build_time_seconds, 0) AS build_time_seconds,
+            COALESCE(dbt.build_time_unit, 0) AS build_time_unit,
             COALESCE(SUM(dv.get)::bigint, 0) AS get,
             COALESCE(SUM(dv.fail)::bigint, 0) AS fail,
             COALESCE(SUM(dv.install)::bigint, 0) AS install,
@@ -636,7 +631,7 @@ BEGIN
         LEFT JOIN
             deleted_metrics del ON aa.app_id = del.app_id AND ds.date = del.date
         GROUP BY
-            aa.app_id, ds.date, dm.mau, dst.storage, db.bandwidth, dbt.build_time_seconds, del.deleted_count
+            aa.app_id, ds.date, dm.mau, dst.storage, db.bandwidth, dbt.build_time_unit, del.deleted_count
     )
     SELECT COALESCE(
         jsonb_agg(row_to_json(metrics) ORDER BY metrics.app_id, metrics.date),
@@ -658,25 +653,23 @@ BEGIN
 END;
 $function$;
 
--- Update get_app_metrics to properly extract build_time_seconds from cache
-DROP FUNCTION IF EXISTS public.get_app_metrics(uuid, date, date);
+-- Update get_app_metrics to properly extract build_time_unit from cache
+DROP FUNCTION IF EXISTS public.get_app_metrics (uuid, date, date);
 
-CREATE FUNCTION public.get_app_metrics(
-    org_id uuid, start_date date, end_date date
-) RETURNS TABLE (
-    app_id character varying,
-    date date,
-    mau bigint,
-    storage bigint,
-    bandwidth bigint,
-    build_time_seconds bigint,
-    get bigint,
-    fail bigint,
-    install bigint,
-    uninstall bigint
+CREATE FUNCTION public.get_app_metrics (org_id uuid, start_date date, end_date date) RETURNS TABLE (
+  app_id character varying,
+  date date,
+  mau bigint,
+  storage bigint,
+  bandwidth bigint,
+  build_time_unit bigint,
+  get bigint,
+  fail bigint,
+  install bigint,
+  uninstall bigint
 ) LANGUAGE plpgsql SECURITY DEFINER
 SET
-search_path TO '' AS $function$
+  search_path TO '' AS $function$
 DECLARE
     cache_entry public.app_metrics_cache%ROWTYPE;
     org_exists boolean;
@@ -713,7 +706,7 @@ BEGIN
         metrics.mau,
         metrics.storage,
         metrics.bandwidth,
-        metrics.build_time_seconds,
+        metrics.build_time_unit,
         metrics.get,
         metrics.fail,
         metrics.install,
@@ -724,7 +717,7 @@ BEGIN
         mau bigint,
         storage bigint,
         bandwidth bigint,
-        build_time_seconds bigint,
+        build_time_unit bigint,
         get bigint,
         fail bigint,
         install bigint,
