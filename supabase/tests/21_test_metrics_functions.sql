@@ -2,88 +2,97 @@ BEGIN;
 
 CREATE EXTENSION "basejump-supabase_test_helpers";
 
-SELECT plan(35);
+SELECT
+    plan (36);
 
 -- Test get_metered_usage without org
 SELECT
-    ok(
+    ok (
         (
-            SELECT mau
+            SELECT
+                mau
             FROM
-                get_metered_usage()
+                get_metered_usage ()
         ) >= 0,
         'get_metered_usage test - returns global mau'
     );
 
 SELECT
-    ok(
+    ok (
         (
-            SELECT bandwidth
+            SELECT
+                bandwidth
             FROM
-                get_metered_usage()
+                get_metered_usage ()
         ) >= 0,
         'get_metered_usage test - returns global bandwidth'
     );
 
 SELECT
-    ok(
+    ok (
         (
-            SELECT storage
+            SELECT
+                storage
             FROM
-                get_metered_usage()
+                get_metered_usage ()
         ) >= 0,
         'get_metered_usage test - returns global storage'
     );
 
 -- Test get_metered_usage with org
 SELECT
-    ok(
+    ok (
         (
-            SELECT mau
+            SELECT
+                mau
             FROM
-                get_metered_usage('22dbad8a-b885-4309-9b3b-a09f8460fb6d')
+                get_metered_usage ('22dbad8a-b885-4309-9b3b-a09f8460fb6d')
         ) >= 0,
         'get_metered_usage test - returns org mau'
     );
 
 SELECT
-    ok(
+    ok (
         (
-            SELECT bandwidth
+            SELECT
+                bandwidth
             FROM
-                get_metered_usage('22dbad8a-b885-4309-9b3b-a09f8460fb6d')
+                get_metered_usage ('22dbad8a-b885-4309-9b3b-a09f8460fb6d')
         ) >= 0,
         'get_metered_usage test - returns org bandwidth'
     );
 
 SELECT
-    ok(
+    ok (
         (
-            SELECT storage
+            SELECT
+                storage
             FROM
-                get_metered_usage('22dbad8a-b885-4309-9b3b-a09f8460fb6d')
+                get_metered_usage ('22dbad8a-b885-4309-9b3b-a09f8460fb6d')
         ) >= 0,
         'get_metered_usage test - returns org storage'
     );
 
 -- Test get_metered_usage negative cases
 SELECT
-    is(
+    is (
         (
-            SELECT mau
+            SELECT
+                mau
             FROM
-                get_metered_usage('00000000-0000-0000-0000-000000000000')
+                get_metered_usage ('00000000-0000-0000-0000-000000000000')
         ),
         0::bigint,
         'get_metered_usage test - non-existent org returns zero mau'
     );
 
 SELECT
-    is(
+    is (
         (
-            SELECT bandwidth
+            SELECT
+                bandwidth
             FROM
-                get_metered_usage('00000000-0000-0000-0000-000000000000')
+                get_metered_usage ('00000000-0000-0000-0000-000000000000')
         ),
         0::bigint,
         'get_metered_usage test - non-existent org returns zero bandwidth'
@@ -91,23 +100,23 @@ SELECT
 
 -- Test get_total_storage_size_org
 SELECT
-    ok(
-        get_total_storage_size_org('22dbad8a-b885-4309-9b3b-a09f8460fb6d') >= 0,
+    ok (
+        get_total_storage_size_org ('22dbad8a-b885-4309-9b3b-a09f8460fb6d') >= 0,
         'get_total_storage_size_org test - returns storage size'
     );
 
 -- Test get_total_storage_size_org negative case
 SELECT
-    is(
-        get_total_storage_size_org('00000000-0000-0000-0000-000000000000'),
+    is (
+        get_total_storage_size_org ('00000000-0000-0000-0000-000000000000'),
         0::double precision,
         'get_total_storage_size_org test - non-existent org returns zero'
     );
 
 -- Test get_total_app_storage_size_orgs
 SELECT
-    ok(
-        get_total_app_storage_size_orgs(
+    ok (
+        get_total_app_storage_size_orgs (
             '22dbad8a-b885-4309-9b3b-a09f8460fb6d',
             'com.demoadmin.app'
         ) >= 0,
@@ -116,8 +125,8 @@ SELECT
 
 -- Test get_total_app_storage_size_orgs negative cases
 SELECT
-    is(
-        get_total_app_storage_size_orgs(
+    is (
+        get_total_app_storage_size_orgs (
             '00000000-0000-0000-0000-000000000000',
             'com.demoadmin.app'
         ),
@@ -126,8 +135,8 @@ SELECT
     );
 
 SELECT
-    is(
-        get_total_app_storage_size_orgs(
+    is (
+        get_total_app_storage_size_orgs (
             '22dbad8a-b885-4309-9b3b-a09f8460fb6d',
             'non-existent-app'
         ),
@@ -137,36 +146,35 @@ SELECT
 
 -- Test get_plan_usage_percent_detailed without dates
 SELECT
-    ok(
+    ok (
         (
-            SELECT total_percent
+            SELECT
+                total_percent
             FROM
-                get_plan_usage_percent_detailed(
-                    '22dbad8a-b885-4309-9b3b-a09f8460fb6d'
-                )
+                get_plan_usage_percent_detailed ('22dbad8a-b885-4309-9b3b-a09f8460fb6d')
         ) >= 0,
         'get_plan_usage_percent_detailed test - returns total percent'
     );
 
 SELECT
-    ok(
+    ok (
         (
-            SELECT mau_percent
+            SELECT
+                mau_percent
             FROM
-                get_plan_usage_percent_detailed(
-                    '22dbad8a-b885-4309-9b3b-a09f8460fb6d'
-                )
+                get_plan_usage_percent_detailed ('22dbad8a-b885-4309-9b3b-a09f8460fb6d')
         ) >= 0,
         'get_plan_usage_percent_detailed test - returns mau percent'
     );
 
 -- Test get_plan_usage_percent_detailed with dates
 SELECT
-    ok(
+    ok (
         (
-            SELECT total_percent
+            SELECT
+                total_percent
             FROM
-                get_plan_usage_percent_detailed(
+                get_plan_usage_percent_detailed (
                     '22dbad8a-b885-4309-9b3b-a09f8460fb6d',
                     '2024-01-01',
                     '2024-01-31'
@@ -177,23 +185,23 @@ SELECT
 
 -- Test get_plan_usage_percent_detailed negative cases
 SELECT
-    ok(
+    ok (
         (
-            SELECT total_percent
+            SELECT
+                total_percent
             FROM
-                get_plan_usage_percent_detailed(
-                    '00000000-0000-0000-0000-000000000000'
-                )
+                get_plan_usage_percent_detailed ('00000000-0000-0000-0000-000000000000')
         ) IS NULL,
         'get_plan_usage_percent_detailed test - non-existent org returns null'
     );
 
 SELECT
-    ok(
+    ok (
         (
-            SELECT total_percent
+            SELECT
+                total_percent
             FROM
-                get_plan_usage_percent_detailed(
+                get_plan_usage_percent_detailed (
                     '22dbad8a-b885-4309-9b3b-a09f8460fb6d',
                     '2025-01-01',
                     '2025-01-31'
@@ -204,155 +212,156 @@ SELECT
 
 -- Test is_mau_exceeded_by_org
 SELECT
-    is(
-        is_mau_exceeded_by_org('22dbad8a-b885-4309-9b3b-a09f8460fb6d'),
+    is (
+        is_mau_exceeded_by_org ('22dbad8a-b885-4309-9b3b-a09f8460fb6d'),
         FALSE,
         'is_mau_exceeded_by_org test - mau not exceeded'
     );
 
 -- Test is_mau_exceeded_by_org negative case
 SELECT
-    ok(
-        is_mau_exceeded_by_org('00000000-0000-0000-0000-000000000000') IS NULL,
+    ok (
+        is_mau_exceeded_by_org ('00000000-0000-0000-0000-000000000000') IS NULL,
         'is_mau_exceeded_by_org test - non-existent org returns null'
     );
 
 -- Test is_bandwidth_exceeded_by_org
 SELECT
-    is(
-        is_bandwidth_exceeded_by_org('22dbad8a-b885-4309-9b3b-a09f8460fb6d'),
+    is (
+        is_bandwidth_exceeded_by_org ('22dbad8a-b885-4309-9b3b-a09f8460fb6d'),
         FALSE,
         'is_bandwidth_exceeded_by_org test - bandwidth not exceeded'
     );
 
 -- Test is_bandwidth_exceeded_by_org negative case
 SELECT
-    ok(
-        is_bandwidth_exceeded_by_org(
-            '00000000-0000-0000-0000-000000000000'
-        ) IS NULL,
+    ok (
+        is_bandwidth_exceeded_by_org ('00000000-0000-0000-0000-000000000000') IS NULL,
         'is_bandwidth_exceeded_by_org test - non-existent org returns null'
     );
 
 -- Test is_storage_exceeded_by_org
 SELECT
-    is(
-        is_storage_exceeded_by_org('22dbad8a-b885-4309-9b3b-a09f8460fb6d'),
+    is (
+        is_storage_exceeded_by_org ('22dbad8a-b885-4309-9b3b-a09f8460fb6d'),
         FALSE,
         'is_storage_exceeded_by_org test - storage not exceeded'
     );
 
 -- Test is_storage_exceeded_by_org negative case
 SELECT
-    ok(
-        is_storage_exceeded_by_org(
-            '00000000-0000-0000-0000-000000000000'
-        ) IS NULL,
+    ok (
+        is_storage_exceeded_by_org ('00000000-0000-0000-0000-000000000000') IS NULL,
         'is_storage_exceeded_by_org test - non-existent org returns null'
     );
 
 -- Test is_build_time_exceeded_by_org
 SELECT
-    is(
-        is_build_time_exceeded_by_org('22dbad8a-b885-4309-9b3b-a09f8460fb6d'),
+    is (
+        is_build_time_exceeded_by_org ('22dbad8a-b885-4309-9b3b-a09f8460fb6d'),
         FALSE,
         'is_build_time_exceeded_by_org test - build time not exceeded'
     );
 
 -- Test is_build_time_exceeded_by_org negative case
 SELECT
-    ok(
-        is_build_time_exceeded_by_org(
-            '00000000-0000-0000-0000-000000000000'
-        ) IS NULL,
+    ok (
+        is_build_time_exceeded_by_org ('00000000-0000-0000-0000-000000000000') IS NULL,
         'is_build_time_exceeded_by_org test - non-existent org returns null'
     );
 
 -- Test set_build_time_exceeded_by_org
-SELECT lives_ok(
-    $$SELECT set_build_time_exceeded_by_org('22dbad8a-b885-4309-9b3b-a09f8460fb6d', TRUE)$$,
-    'set_build_time_exceeded_by_org test - can set to true'
-);
+SELECT
+    lives_ok (
+        $$SELECT set_build_time_exceeded_by_org('22dbad8a-b885-4309-9b3b-a09f8460fb6d', TRUE)$$,
+        'set_build_time_exceeded_by_org test - can set to true'
+    );
 
 SELECT
-    is(
-        is_build_time_exceeded_by_org('22dbad8a-b885-4309-9b3b-a09f8460fb6d'),
+    is (
+        is_build_time_exceeded_by_org ('22dbad8a-b885-4309-9b3b-a09f8460fb6d'),
         TRUE,
         'is_build_time_exceeded_by_org test - build time is exceeded after setting'
     );
 
 -- Reset for other tests
-SELECT lives_ok(
-    $$SELECT set_build_time_exceeded_by_org('22dbad8a-b885-4309-9b3b-a09f8460fb6d', FALSE)$$,
-    'set_build_time_exceeded_by_org test - can reset to false'
-);
+SELECT
+    lives_ok (
+        $$SELECT set_build_time_exceeded_by_org('22dbad8a-b885-4309-9b3b-a09f8460fb6d', FALSE)$$,
+        'set_build_time_exceeded_by_org test - can reset to false'
+    );
 
 -- Test get_weekly_stats
 SELECT
-    ok(
+    ok (
         (
-            SELECT count(*)
+            SELECT
+                count(*)
             FROM
-                get_weekly_stats('com.demoadmin.app')
+                get_weekly_stats ('com.demoadmin.app')
         ) >= 0,
         'get_weekly_stats test - returns weekly stats'
     );
 
 -- Test get_weekly_stats negative case
 SELECT
-    ok(
+    ok (
         (
-            SELECT count(*)
+            SELECT
+                count(*)
             FROM
-                get_weekly_stats('non-existent-app')
+                get_weekly_stats ('non-existent-app')
         ) >= 0,
         'get_weekly_stats test - non-existent app returns valid result'
     );
 
 -- Test get_customer_counts
 SELECT
-    ok(
+    ok (
         (
-            SELECT total
+            SELECT
+                total
             FROM
-                get_customer_counts()
+                get_customer_counts ()
         ) >= 0,
         'get_customer_counts test - returns customer counts'
     );
 
 -- Test count_active_users
 SELECT
-    ok(
-        count_active_users(ARRAY['com.demoadmin.app']) >= 0,
+    ok (
+        count_active_users (ARRAY['com.demoadmin.app']) >= 0,
         'count_active_users test - returns active user count'
     );
 
 -- Test count_active_users negative cases
 SELECT
-    ok(
-        count_active_users(ARRAY['non-existent-app']) >= 0,
+    ok (
+        count_active_users (ARRAY['non-existent-app']) >= 0,
         'count_active_users test - non-existent app returns valid result'
     );
 
 SELECT
-    ok(
-        count_active_users(ARRAY[]::varchar []) >= 0,
+    ok (
+        count_active_users (ARRAY[]::varchar[]) >= 0,
         'count_active_users test - empty array returns valid result'
     );
 
 -- Test get_versions_with_no_metadata
 SELECT
-    ok(
+    ok (
         (
-            SELECT count(*)
+            SELECT
+                count(*)
             FROM
-                get_versions_with_no_metadata()
+                get_versions_with_no_metadata ()
         ) >= 0,
         'get_versions_with_no_metadata test - returns versions without metadata'
     );
 
-SELECT *
+SELECT
+    *
 FROM
-    finish();
+    finish ();
 
 ROLLBACK;
