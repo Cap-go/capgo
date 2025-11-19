@@ -127,6 +127,8 @@
   "billing": "биллинг",
   "billing-cycle": "Цикл выставления счетов",
   "billing-period": "период оплаты",
+  "build-hours": "часы строительства",
+  "build-minutes": "минуты сборки",
   "build-mode": "Режим Строительства",
   "build-native-apps-with-cli": "Создавайте нативные приложения для iOS и Android с помощью CLI",
   "build-step-request-build": "Запросить сборку для нативной платформы",

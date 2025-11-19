@@ -127,6 +127,8 @@
   "billing": "청구",
   "billing-cycle": "청구 주기",
   "billing-period": "청구 기간",
+  "build-hours": "건설 시간",
+  "build-minutes": "빌드 분",
   "build-mode": "건설 모드",
   "build-native-apps-with-cli": "CLI를 사용하여 기본 iOS 및 Android 앱을 만드세요.",
   "build-step-request-build": "네이티브 빌드를 요청하십시오",

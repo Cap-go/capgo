@@ -127,6 +127,8 @@
   "billing": "faturamento",
   "billing-cycle": "Ciclo de faturamento",
   "billing-period": "período de faturamento",
+  "build-hours": "construir horas",
+  "build-minutes": "minutos de construção",
   "build-mode": "Modo de Construção",
   "build-native-apps-with-cli": "Construa aplicativos nativos para iOS e Android com o CLI",
   "build-step-request-build": "Solicite uma construção nativa",

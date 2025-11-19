@@ -127,6 +127,8 @@
   "billing": "计费",
   "billing-cycle": "计费周期",
   "billing-period": "计费周期",
+  "build-hours": "建设时间",
+  "build-minutes": "构建分钟",
   "build-mode": "建造模式",
   "build-native-apps-with-cli": "使用CLI构建本地iOS和Android应用程序",
   "build-step-request-build": "请求本地构建",

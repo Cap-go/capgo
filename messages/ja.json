@@ -127,6 +127,8 @@
   "billing": "請求書",
   "billing-cycle": "請求サイクル",
   "billing-period": "請求期間",
+  "build-hours": "建設時間",
+  "build-minutes": "ビルド時間",
   "build-mode": "ビルドモード",
   "build-native-apps-with-cli": "CLIを使用してネイティブiOSおよびAndroidアプリを作成します",
   "build-step-request-build": "ネイティブビルドをリクエストしてください",

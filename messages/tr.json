@@ -127,6 +127,8 @@
   "billing": "faturalama",
   "billing-cycle": "Fatura döngüsü",
   "billing-period": "fatura dönemi",
+  "build-hours": "inşa saatleri",
+  "build-minutes": "dakika oluştur",
   "build-mode": "İnşa Modu",
   "build-native-apps-with-cli": "CLI ile yerel iOS ve Android uygulamaları oluşturun",
   "build-step-request-build": "Yerel bir yapı talep edin",

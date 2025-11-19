@@ -127,6 +127,8 @@
   "billing": "thanh toán",
   "billing-cycle": "Chu kỳ thanh toán",
   "billing-period": "kỳ hóa đơn",
+  "build-hours": "xây dựng giờ",
+  "build-minutes": "xây dựng phút",
   "build-mode": "Chế độ Xây dựng",
   "build-native-apps-with-cli": "Xây dựng ứng dụng iOS và Android gốc với CLI",
   "build-step-request-build": "Yêu cầu xây dựng bản địa",

@@ -127,6 +127,8 @@
   "build-step-upload-subtitle": "You need to upload a bundle before requesting a build",
   "build-step-wait": "Waiting for your build",
   "build-step-wait-subtitle": "This page will self-refresh when the build is detected",
+  "build-hours": "build hours",
+  "build-minutes": "build minutes",
   "build-time": "Build Time",
   "build-time-builds-stopped-upgrade-required": "You've exceeded your Build Time limit. Native builds have been paused. Please upgrade to restore service.",
   "build-time-limit-exceeded": "Build time limit exceeded",

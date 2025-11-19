@@ -127,6 +127,8 @@
   "billing": "बिलिंग",
   "billing-cycle": "बिलिंग चक्र",
   "billing-period": "बिलिंग अवधि",
+  "build-hours": "निर्माण के घंटे",
+  "build-minutes": "निर्माण मिनट",
   "build-mode": "निर्माण मोड",
   "build-native-apps-with-cli": "CLI के साथ मूल iOS और Android ऐप्स बनाएं",
   "build-step-request-build": "स्वदेशी निर्माण का अनुरोध करें",

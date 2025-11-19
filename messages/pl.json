@@ -127,6 +127,8 @@
   "billing": "fakturowanie",
   "billing-cycle": "Cykl rozliczeniowy",
   "billing-period": "okres rozliczeniowy",
+  "build-hours": "godziny budowy",
+  "build-minutes": "minuty budowy",
   "build-mode": "Tryb Budowy",
   "build-native-apps-with-cli": "Buduj natywne aplikacje iOS i Android za pomocą CLI",
   "build-step-request-build": "Poproś o natywną kompilację",

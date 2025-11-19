@@ -127,6 +127,8 @@
   "billing": "penagihan",
   "billing-cycle": "Siklus penagihan",
   "billing-period": "periode penagihan",
+  "build-hours": "membangun jam",
+  "build-minutes": "membangun menit",
   "build-mode": "Mode Bangun",
   "build-native-apps-with-cli": "Bangun aplikasi iOS dan Android asli dengan CLI",
   "build-step-request-build": "Minta pembuatan asli",

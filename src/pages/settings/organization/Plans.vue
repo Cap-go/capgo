@@ -34,10 +34,24 @@ const isMobile = Capacitor.isNativePlatform()
 const { currentOrganization } = storeToRefs(organizationStore)
 
 function planFeatures(plan: Database['public']['Tables']['plans']['Row']) {
+  // Convert build time from seconds to hours or minutes for display
+  const buildTimeSeconds = plan.build_time_seconds || 0
+  const buildTimeHours = Math.floor(buildTimeSeconds / 3600)
+  const buildTimeMinutes = Math.floor(buildTimeSeconds / 60)
+
+  let buildTimeDisplay = ''
+  if (buildTimeHours >= 1) {
+    buildTimeDisplay = `${buildTimeHours} ${t('build-hours')}`
+  }
+  else {
+    buildTimeDisplay = `${buildTimeMinutes} ${t('build-minutes')}`
+  }
+
   const features = [
     `${plan.mau.toLocaleString()} ${t('mau')}`,
     `${plan.storage.toLocaleString()} ${t('plan-storage')}`,
     `${plan.bandwidth.toLocaleString()} ${t('plan-bandwidth')}`,
+    buildTimeDisplay,
     t('priority-support'),
   ]
   if (plan.name.toLowerCase().includes('as you go')) {
@@ -49,6 +63,9 @@ function planFeatures(plan: Database['public']['Tables']['plans']['Row']) {
 
     if (plan.bandwidth_unit)
       features[2] += ` included, then $${plan.bandwidth_unit} per GB`
+
+    if (plan.build_time_unit)
+      features[3] += ` included, then $${plan.build_time_unit} per hour`
 
     features.push('Dedicated support')
     features.push('Custom Domain')
