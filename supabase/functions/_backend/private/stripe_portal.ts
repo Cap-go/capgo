@@ -1,7 +1,7 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
 import { middlewareAuth, parseBody, simpleError, useCors } from '../utils/hono.ts'
-import { cloudlog } from '../utils/loggin.ts'
+import { cloudlog } from '../utils/logging.ts'
 import { createPortal } from '../utils/stripe.ts'
 import { hasOrgRight, supabaseAdmin } from '../utils/supabase.ts'
 
@@ -23,7 +23,7 @@ app.post('/', middlewareAuth, async (c) => {
   )
 
   if (error || !auth?.user?.id)
-    throw simpleError('not_authorize', 'Not authorize')
+    return simpleError('not_authorize', 'Not authorize')
     // get user from users
   cloudlog({ requestId: c.get('requestId'), message: 'auth', auth: auth.user.id })
   const { data: org, error: dbError } = await supabaseAdmin(c)
@@ -32,12 +32,12 @@ app.post('/', middlewareAuth, async (c) => {
     .eq('id', body.orgId)
     .single()
   if (dbError || !org)
-    throw simpleError('not_authorize', 'Not authorize')
+    return simpleError('not_authorize', 'Not authorize')
   if (!org.customer_id)
-    throw simpleError('no_customer', 'No customer')
+    return simpleError('no_customer', 'No customer')
 
   if (!await hasOrgRight(c, body.orgId, auth.user.id, 'super_admin'))
-    throw simpleError('not_authorize', 'Not authorize')
+    return simpleError('not_authorize', 'Not authorize')
 
   cloudlog({ requestId: c.get('requestId'), message: 'org', org })
   const link = await createPortal(c, org.customer_id, body.callbackUrl)

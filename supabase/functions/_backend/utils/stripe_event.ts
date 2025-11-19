@@ -2,7 +2,7 @@ import type { Context } from 'hono'
 import type { MeteredData, StripeData } from './stripe.ts'
 import type { Database } from './supabase.types.ts'
 import Stripe from 'stripe'
-import { cloudlog, cloudlogErr } from './loggin.ts'
+import { cloudlog, cloudlogErr } from './logging.ts'
 import { getStripe, parsePriceIds } from './stripe.ts'
 import { getEnv } from './utils.ts'
 
@@ -71,14 +71,17 @@ function invoiceUpcoming(event: Stripe.InvoiceUpcomingEvent, data: Database['pub
 
   const plan = invoice.lines.data[0]
   if (plan) {
-    if (plan.parent?.subscription_item_details?.subscription) {
-      data.subscription_id = plan.parent.subscription_item_details.subscription as string
+    const subscriptionId = plan.parent?.subscription_item_details?.subscription
+    if (subscriptionId) {
+      data.subscription_id = subscriptionId as string
     }
-    if (plan.pricing?.price_details?.product) {
-      data.product_id = plan.pricing.price_details.product as string
+    const productId = plan.pricing?.price_details?.product
+    if (productId) {
+      data.product_id = productId as string
     }
-    if (plan.pricing?.price_details?.price) {
-      data.price_id = plan.pricing.price_details.price as string
+    const priceId = plan.pricing?.price_details?.price
+    if (priceId) {
+      data.price_id = priceId as string
     }
   }
   return data
@@ -86,8 +89,8 @@ function invoiceUpcoming(event: Stripe.InvoiceUpcomingEvent, data: Database['pub
 
 export function extractDataEvent(c: Context, event: Stripe.Event): StripeData {
   let data: Database['public']['Tables']['stripe_info']['Insert'] = {
-    product_id: '',
-    price_id: '',
+    product_id: undefined as any, // Changed from '' to undefined to avoid FK constraint violations
+    price_id: undefined, // Changed from '' to undefined for consistency
     subscription_id: undefined,
     subscription_anchor_start: undefined,
     subscription_anchor_end: undefined,

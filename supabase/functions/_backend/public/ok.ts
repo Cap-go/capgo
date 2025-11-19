@@ -1,6 +1,6 @@
 import { resolveCapgoApiVersion } from '../utils/api_version.ts'
 import { BRES, honoFactory, parseBody } from '../utils/hono.ts'
-import { cloudlog } from '../utils/loggin.ts'
+import { cloudlog } from '../utils/logging.ts'
 
 export const app = honoFactory.createApp()
 

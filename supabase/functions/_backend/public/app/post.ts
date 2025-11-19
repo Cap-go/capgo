@@ -2,6 +2,7 @@ import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { quickError, simpleError } from '../../utils/hono.ts'
 import { hasOrgRightApikey, supabaseApikey } from '../../utils/supabase.ts'
+import { isValidAppId } from '../../utils/utils.ts'
 
 export interface CreateApp {
   app_id: string
@@ -11,6 +12,12 @@ export interface CreateApp {
 }
 
 export async function post(c: Context, body: CreateApp, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
+  if (!body.app_id) {
+    throw simpleError('missing_app_id', 'Missing app_id', { body })
+  }
+  if (!isValidAppId(body.app_id)) {
+    throw simpleError('invalid_app_id', 'App ID must be a reverse domain string', { app_id: body.app_id })
+  }
   if (!body.name) {
     throw simpleError('missing_name', 'Missing name', { body })
   }

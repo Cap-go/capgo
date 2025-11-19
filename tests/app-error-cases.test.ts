@@ -34,6 +34,7 @@ describe('[POST] /app - Error Cases', () => {
       headers,
       body: JSON.stringify({
         owner_org: testOrgId,
+        app_id: `${APPNAME}.missingname`,
         // Missing name
       }),
     })
@@ -48,6 +49,7 @@ describe('[POST] /app - Error Cases', () => {
       method: 'POST',
       headers,
       body: JSON.stringify({
+        app_id: `${APPNAME}.accessdenied`,
         name: 'Test App',
         owner_org: nonExistentOrgId,
       }),
@@ -58,11 +60,12 @@ describe('[POST] /app - Error Cases', () => {
   })
 
   it('should return 400 when app creation fails due to duplicate name', async () => {
-    // Try to create another app with the same name
+    // Try to create another app with the same name (same app_id)
     const response2 = await fetch(`${BASE_URL}/app`, {
       method: 'POST',
       headers,
       body: JSON.stringify({
+        app_id: APPNAME, // Same app_id as the one created in beforeAll
         name: APPNAME,
         owner_org: testOrgId,
       }),

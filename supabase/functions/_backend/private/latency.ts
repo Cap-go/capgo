@@ -2,7 +2,7 @@ import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { getRuntimeKey } from 'hono/adapter'
 import { Hono } from 'hono/tiny'
 import { BRES, simpleError } from '../utils/hono.ts'
-import { cloudlog } from '../utils/loggin.ts'
+import { cloudlog } from '../utils/logging.ts'
 import { closeClient, getDrizzleClient, getPgClient, selectOne } from '../utils/pg.ts'
 import { getDrizzleClientD1Session, selectOneD1 } from '../utils/pg_d1.ts'
 import { existInEnv } from '../utils/utils.ts'
@@ -16,7 +16,7 @@ app.get('/', async (c) => {
     const res = await selectOneD1(pgClient)
 
     if (!res)
-      throw simpleError('cannot_get_apps', 'Cannot get apps')
+      return simpleError('cannot_get_apps', 'Cannot get apps')
     return c.json(BRES)
   }
   const pgClient = getPgClient(c, true)
@@ -25,6 +25,6 @@ app.get('/', async (c) => {
 
   await closeClient(c, pgClient)
   if (!res)
-    throw simpleError('cannot_get_apps', 'Cannot get apps')
+    return simpleError('cannot_get_apps', 'Cannot get apps')
   return c.json(BRES)
 })

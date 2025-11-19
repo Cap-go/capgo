@@ -6,7 +6,7 @@ import { Hono } from 'hono/tiny'
 import { z } from 'zod/mini'
 import { trackBentoEvent } from '../utils/bento.ts'
 import { middlewareAuth, parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
-import { cloudlog } from '../utils/loggin.ts'
+import { cloudlog } from '../utils/logging.ts'
 import { hasOrgRight, supabaseAdmin } from '../utils/supabase.ts'
 import { getEnv } from '../utils/utils.ts'
 
@@ -37,7 +37,7 @@ async function validateInvite(c: Context, rawBody: any) {
   // Validate the request body using Zod
   const validationResult = inviteUserSchema.safeParse(rawBody)
   if (!validationResult.success) {
-    throw simpleError('invalid_request', 'Invalid request', { errors: z.prettifyError(validationResult.error) })
+    return simpleError('invalid_request', 'Invalid request', { errors: z.prettifyError(validationResult.error) })
   }
 
   const body = validationResult.data
@@ -99,10 +99,10 @@ app.post('/', middlewareAuth, async (c) => {
 
   const res = await validateInvite(c, rawBody)
   if (!res.inviteCreatorUser) {
-    throw simpleError('failed_to_invite_user', 'Failed to invite user', { }, res.error ?? 'Failed to invite user')
+    return simpleError('failed_to_invite_user', 'Failed to invite user', { }, res.error ?? 'Failed to invite user')
   }
   if (!res.org) {
-    throw quickError(404, 'organization_not_found', 'Organization not found')
+    return quickError(404, 'organization_not_found', 'Organization not found')
   }
   const body = res.body
   const inviteCreatorUser = res.inviteCreatorUser
@@ -119,7 +119,7 @@ app.post('/', middlewareAuth, async (c) => {
   if (existingInvitation) {
     const nowMinusThreeHours = dayjs().subtract(3, 'hours')
     if (!dayjs(nowMinusThreeHours).isAfter(dayjs(existingInvitation.cancelled_at))) {
-      throw simpleError('user_already_invited', 'User already invited and it hasnt been 3 hours since the last invitation was cancelled')
+      return simpleError('user_already_invited', 'User already invited and it hasnt been 3 hours since the last invitation was cancelled')
     }
 
     const { error: updateInvitationError, data: updatedInvitationData } = await supabaseAdmin(c)
@@ -135,7 +135,7 @@ app.post('/', middlewareAuth, async (c) => {
       .single()
 
     if (updateInvitationError) {
-      throw simpleError('failed_to_invite_user', 'Failed to invite user', { }, updateInvitationError.message)
+      return simpleError('failed_to_invite_user', 'Failed to invite user', { }, updateInvitationError.message)
     }
 
     newInvitation = updatedInvitationData
@@ -150,7 +150,7 @@ app.post('/', middlewareAuth, async (c) => {
     }).select('*').single()
 
     if (createUserError) {
-      throw simpleError('failed_to_invite_user', 'Failed to invite user', { }, createUserError.message)
+      return simpleError('failed_to_invite_user', 'Failed to invite user', { }, createUserError.message)
     }
 
     newInvitation = newInvitationData
@@ -164,7 +164,7 @@ app.post('/', middlewareAuth, async (c) => {
     invited_last_name: `${body.last_name}`,
   }, 'org:invite_new_capgo_user_to_org')
   if (!bentoEvent) {
-    throw simpleError('failed_to_invite_user', 'Failed to invite user', { }, 'Failed to track bento event')
+    return simpleError('failed_to_invite_user', 'Failed to invite user', { }, 'Failed to track bento event')
   }
   return c.json({ status: 'User invited successfully' })
 })
@@ -173,7 +173,7 @@ app.post('/', middlewareAuth, async (c) => {
 async function verifyCaptchaToken(c: Context, token: string) {
   const captchaSecret = getEnv(c, 'CAPTCHA_SECRET_KEY')
   if (!captchaSecret) {
-    throw simpleError('captcha_secret_key_not_set', 'CAPTCHA_SECRET_KEY not set')
+    return simpleError('captcha_secret_key_not_set', 'CAPTCHA_SECRET_KEY not set')
   }
 
   // "/siteverify" API endpoint.
@@ -192,10 +192,10 @@ async function verifyCaptchaToken(c: Context, token: string) {
   const captchaResult = await result.json()
   const captchaResultData = captchaSchema.safeParse(captchaResult)
   if (!captchaResultData.success) {
-    throw simpleError('invalid_captcha', 'Invalid captcha result')
+    return simpleError('invalid_captcha', 'Invalid captcha result')
   }
   cloudlog({ requestId: c.get('requestId'), context: 'captcha_result', captchaResultData })
   if (captchaResultData.data.success !== true) {
-    throw simpleError('invalid_captcha', 'Invalid captcha result')
+    return simpleError('invalid_captcha', 'Invalid captcha result')
   }
 }

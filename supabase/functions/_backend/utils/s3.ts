@@ -1,7 +1,7 @@
 import type { Context } from 'hono'
 import type { Database } from '../utils/supabase.types.ts'
 import { S3Client } from '@bradenmacdonald/s3-lite-client'
-import { cloudlog } from './loggin.ts'
+import { cloudlog } from './logging.ts'
 import { getEnv } from './utils.ts'
 
 function initS3(c: Context) {

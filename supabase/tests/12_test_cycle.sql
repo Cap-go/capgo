@@ -55,7 +55,7 @@ BEGIN
   RETURN NEXT ok(cycle_start > (now() - interval '3 months') AND cycle_start < now(), 'Start date is within the last 3 months and before now');
   RETURN NEXT ok(cycle_end > (now() + interval '1 days'), 'End date is at least one day later than now');
 
-  -- Let's not destory the org customer_id so that we can see if get cycle will work even when no data is available
+  -- Let's not destroy the org customer_id so that we can see if get cycle will work even when no data is available
   UPDATE orgs
   set customer_id=NULL
   where id='046a36ac-e03c-4590-9257-bd6c9dba9ee8';

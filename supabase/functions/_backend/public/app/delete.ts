@@ -2,8 +2,15 @@ import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { BRES, simpleError } from '../../utils/hono.ts'
 import { hasAppRightApikey, supabaseAdmin } from '../../utils/supabase.ts'
+import { isValidAppId } from '../../utils/utils.ts'
 
 export async function deleteApp(c: Context, appId: string, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
+  if (!appId) {
+    throw simpleError('missing_app_id', 'Missing app_id')
+  }
+  if (!isValidAppId(appId)) {
+    throw simpleError('invalid_app_id', 'App ID must be a reverse domain string', { app_id: appId })
+  }
   if (!(await hasAppRightApikey(c, appId, apikey.user_id, 'write', apikey.key))) {
     throw simpleError('cannot_delete_app', 'You can\'t access this app', { app_id: appId })
   }

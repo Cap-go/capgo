@@ -7,7 +7,7 @@ import { Hono } from 'hono/tiny'
 import { addTagBento, trackBentoEvent } from '../utils/bento.ts'
 import { BRES, quickError, simpleError } from '../utils/hono.ts'
 import { middlewareStripeWebhook } from '../utils/hono_middleware_stripe.ts'
-import { cloudlog } from '../utils/loggin.ts'
+import { cloudlog } from '../utils/logging.ts'
 import { logsnag } from '../utils/logsnag.ts'
 import { customerToSegmentOrg, supabaseAdmin } from '../utils/supabase.ts'
 
@@ -55,7 +55,7 @@ async function invoiceUpcoming(c: Context, LogSnag: ReturnType<typeof logsnag>, 
       .eq('stripe_id', stripeData.data.product_id)
       .single()
     if (!plan) {
-      throw simpleError('failed_to_get_plan', 'failed to get plan', { stripeData })
+      return simpleError('failed_to_get_plan', 'failed to get plan', { stripeData })
     }
     planName = plan.name
     if (plan.price_y_id === stripeData.data.price_id) {
@@ -83,9 +83,13 @@ async function createdOrUpdated(c: Context, stripeData: StripeData, org: Org, Lo
     .eq('stripe_id', stripeData.data.product_id)
     .single()
   if (plan) {
+    // Filter out undefined values to avoid FK constraint violations
+    const updateData = Object.fromEntries(
+      Object.entries(stripeData.data).filter(([_, v]) => v !== undefined),
+    )
     const { error: dbError2 } = await supabaseAdmin(c)
       .from('stripe_info')
-      .update(stripeData.data)
+      .update(updateData)
       .eq('customer_id', stripeData.data.customer_id)
     if (stripeData.isUpgrade && stripeData.previousProductId) {
       statusName = 'upgraded'
@@ -112,12 +116,12 @@ async function createdOrUpdated(c: Context, stripeData: StripeData, org: Org, Lo
     }
 
     if (dbError2) {
-      throw quickError(404, 'succeeded_customer_id_not_found', `succeeded: customer_id not found`, { dbError2, stripeData })
+      return quickError(404, 'succeeded_customer_id_not_found', `succeeded: customer_id not found`, { dbError2, stripeData })
     }
 
     const segment = await customerToSegmentOrg(c, org.id, stripeData.data.price_id, plan)
     const isMonthly = plan.price_m_id === stripeData.data.price_id
-    const eventName = `user:subcribe_${statusName}:${isMonthly ? 'monthly' : 'yearly'}`
+    const eventName = `user:subscribe_${statusName}:${isMonthly ? 'monthly' : 'yearly'}`
     await trackBentoEvent(c, org.management_email, { plan_name: plan.name }, eventName)
     await addTagBento(c, org.management_email, segment)
     await LogSnag.track({
@@ -138,12 +142,16 @@ async function createdOrUpdated(c: Context, stripeData: StripeData, org: Org, Lo
 }
 
 async function updateStripeInfo(c: Context, stripeData: StripeData) {
+  // Filter out undefined values to avoid FK constraint violations
+  const updateData = Object.fromEntries(
+    Object.entries(stripeData.data).filter(([_, v]) => v !== undefined),
+  )
   const { error: dbError2 } = await supabaseAdmin(c)
     .from('stripe_info')
-    .update(stripeData.data)
+    .update(updateData)
     .eq('customer_id', stripeData.data.customer_id)
   if (dbError2) {
-    throw quickError(404, 'canceled_customer_id_not_found', `canceled:  customer_id not found`, { dbError2, stripeData })
+    return quickError(404, 'canceled_customer_id_not_found', `canceled:  customer_id not found`, { dbError2, stripeData })
   }
   return false
 }
@@ -168,10 +176,10 @@ async function getOrg(c: Context, stripeData: StripeData) {
     .eq('customer_id', stripeData.data.customer_id)
     .single()
   if (dbError) {
-    throw simpleError('webhook_error_no_org_found', 'Webhook Error: no org found')
+    return simpleError('webhook_error_no_org_found', 'Webhook Error: no org found')
   }
   if (!org) {
-    throw simpleError('webhook_error_no_org_found', 'Webhook Error: no org found')
+    return simpleError('webhook_error_no_org_found', 'Webhook Error: no org found')
   }
   return org
 }
@@ -185,7 +193,7 @@ async function cancelingOrFinished(c: Context, stripeEvent: Stripe.Event, stripe
       .update({ canceled_at: new Date().toISOString() })
       .eq('customer_id', stripeData.customer_id)
     if (dbError2) {
-      throw quickError(404, 'user_cancelled_customer_id_not_found', `USER CANCELLED, customer_id not found`, { dbError2, stripeData })
+      return quickError(404, 'user_cancelled_customer_id_not_found', `USER CANCELLED, customer_id not found`, { dbError2, stripeData })
     }
   }
   else if (stripeEvent.data.object.object === 'subscription' && stripeEvent.data.object.cancel_at_period_end === false && typeof previousAttributes.cancel_at_period_end === 'boolean' && previousAttributes.cancel_at_period_end === true) {
@@ -195,7 +203,7 @@ async function cancelingOrFinished(c: Context, stripeEvent: Stripe.Event, stripe
       .update({ canceled_at: null })
       .eq('customer_id', stripeData.customer_id)
     if (dbError2) {
-      throw quickError(404, 'user_uncancelled_customer_id_not_found', `USER UNCANCELED, customer_id not found`, { dbError2, stripeData })
+      return quickError(404, 'user_uncancelled_customer_id_not_found', `USER UNCANCELED, customer_id not found`, { dbError2, stripeData })
     }
   }
   return c.json(BRES)
@@ -216,7 +224,7 @@ app.post('/', middlewareStripeWebhook(), async (c) => {
     .single()
 
   if (!customer) {
-    throw simpleError('no_customer_found', 'no customer found', { stripeData })
+    return simpleError('no_customer_found', 'no customer found', { stripeData })
   }
 
   if (stripeEvent.type === 'customer.source.expiring') {

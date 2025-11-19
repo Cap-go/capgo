@@ -18,7 +18,7 @@ const props = defineProps<{
 
 const emit = defineEmits(['addDevice'])
 
-// TODO: delete the old version check when all deivces uses the new version system
+// TODO: delete the old version check when all devices uses the new version system
 type Device = Database['public']['Tables']['devices']['Row']
 
 const { t } = useI18n()
@@ -244,7 +244,7 @@ function handleAddDevice() {
   emit('addDevice')
 }
 
-// TODO: delete the old version check when all deivces uses the new version system
+// TODO: delete the old version check when all devices uses the new version system
 async function ensureVersionNames(devices: Device[]) {
   const missingName = devices.filter(device => (!device.version_name || device.version_name === '') && typeof device.version === 'number')
   if (!missingName.length)

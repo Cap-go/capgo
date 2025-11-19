@@ -1,7 +1,7 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
 import { middlewareAuth, parseBody, simpleError, useCors } from '../utils/hono.ts'
-import { cloudlog } from '../utils/loggin.ts'
+import { cloudlog } from '../utils/logging.ts'
 import { createCheckout } from '../utils/stripe.ts'
 import { hasOrgRight, supabaseAdmin } from '../utils/supabase.ts'
 import { getEnv } from '../utils/utils.ts'
@@ -9,7 +9,7 @@ import { getEnv } from '../utils/utils.ts'
 interface CheckoutData {
   priceId: string
   clientReferenceId?: string
-  reccurence: 'month' | 'year'
+  recurrence: 'month' | 'year'
   attributionId?: string
   successUrl: string
   cancelUrl: string
@@ -29,10 +29,10 @@ app.post('/', middlewareAuth, async (c) => {
   )
 
   if (!body.orgId)
-    throw simpleError('no_org_id_provided', 'No org_id provided')
+    return simpleError('no_org_id_provided', 'No org_id provided')
 
   if (error || !auth?.user?.id)
-    throw simpleError('not_authorize', 'Not authorize')
+    return simpleError('not_authorize', 'Not authorize')
     // get user from users
   cloudlog({ requestId: c.get('requestId'), message: 'auth', auth: auth.user.id })
   const { data: org, error: dbError } = await supabaseAdmin(c)
@@ -41,14 +41,14 @@ app.post('/', middlewareAuth, async (c) => {
     .eq('id', body.orgId)
     .single()
   if (dbError || !org)
-    throw simpleError('not_authorize', 'Not authorize')
+    return simpleError('not_authorize', 'Not authorize')
   if (!org.customer_id)
-    throw simpleError('no_customer', 'No customer')
+    return simpleError('no_customer', 'No customer')
 
   if (!await hasOrgRight(c, body.orgId, auth.user.id, 'super_admin'))
-    throw simpleError('not_authorize', 'Not authorize')
+    return simpleError('not_authorize', 'Not authorize')
 
   cloudlog({ requestId: c.get('requestId'), message: 'user', org })
-  const checkout = await createCheckout(c, org.customer_id, body.reccurence ?? 'month', body.priceId ?? 'price_1KkINoGH46eYKnWwwEi97h1B', body.successUrl ?? `${getEnv(c, 'WEBAPP_URL')}/app/usage`, body.cancelUrl ?? `${getEnv(c, 'WEBAPP_URL')}/app/usage`, body.clientReferenceId, body.attributionId)
+  const checkout = await createCheckout(c, org.customer_id, body.recurrence ?? 'month', body.priceId ?? 'price_1KkINoGH46eYKnWwwEi97h1B', body.successUrl ?? `${getEnv(c, 'WEBAPP_URL')}/app/usage`, body.cancelUrl ?? `${getEnv(c, 'WEBAPP_URL')}/app/usage`, body.clientReferenceId, body.attributionId)
   return c.json({ url: checkout.url })
 })

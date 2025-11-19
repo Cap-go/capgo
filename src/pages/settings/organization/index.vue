@@ -39,7 +39,7 @@ watch(currentOrganization, (newOrg) => {
 })
 
 async function presentActionSheet() {
-  if (!currentOrganization.value || (!organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['admin', 'super_admin']))) {
+  if (!currentOrganization.value || (!organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['admin', 'super_admin']))) {
     toast.error(t('no-permission'))
     return
   }
@@ -113,7 +113,7 @@ async function updateEmail(form: { email: string }) {
 }
 
 async function saveChanges(form: { orgName: string, email: string }) {
-  if (!currentOrganization.value || (!organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['admin', 'super_admin']))) {
+  if (!currentOrganization.value || (!organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['admin', 'super_admin']))) {
     toast.error(t('no-permission'))
     return
   }
@@ -160,7 +160,7 @@ async function saveChanges(form: { orgName: string, email: string }) {
 }
 
 const hasOrgPerm = computed(() => {
-  return organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['admin', 'super_admin'])
+  return organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['admin', 'super_admin'])
 })
 
 const acronym = computed(() => {
@@ -218,7 +218,7 @@ async function copyOrganizationId() {
           <h2 class="mb-5 text-2xl font-bold text-slate-800 dark:text-white">
             {{ t('general-information') }}
           </h2>
-          <div clas="dark:text-gray-100">
+          <div class="dark:text-gray-100">
             {{ t('modify-org-info') }}
           </div>
           <section>

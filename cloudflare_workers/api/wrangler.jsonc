@@ -4,7 +4,7 @@
   "compatibility_date": "2025-09-15",
   "main": "./index.ts",
   "compatibility_flags": [
-    "nodejs_compat_v2",
+    "nodejs_compat",
     "nodejs_compat_populate_process_env"
   ],
   "placement": {
@@ -67,8 +67,8 @@
         },
         {
           "binding": "DB_REPLICA_EU",
-          "database_name": "capgo_replicate",
-          "database_id": "7f267d86-f4f7-49f5-9622-e44373aa00dc"
+          "database_name": "capgo_replicate_eu",
+          "database_id": "107046f7-af0e-4126-b493-1d4e66f48947"
         },
         {
           "binding": "DB_REPLICA_AS",
@@ -79,6 +79,11 @@
           "binding": "DB_REPLICA_US",
           "database_name": "capgo_replicate_us",
           "database_id": "320c32be-d3d9-4c7c-a84c-e20ef01fd20d"
+        },
+        {
+          "binding": "DB_REPLICA_OC",
+          "database_name": "capgo_replicate_oc",
+          "database_id": "58dbd199-4629-4bd0-a02c-ce019b5ab2e0"
         }
       ]
     },
@@ -135,8 +140,8 @@
         },
         {
           "binding": "DB_REPLICA_EU",
-          "database_name": "capgo_replicate",
-          "database_id": "7f267d86-f4f7-49f5-9622-e44373aa00dc"
+          "database_name": "capgo_replicate_eu",
+          "database_id": "107046f7-af0e-4126-b493-1d4e66f48947"
         },
         {
           "binding": "DB_REPLICA_AS",
@@ -147,6 +152,11 @@
           "binding": "DB_REPLICA_US",
           "database_name": "capgo_replicate_us",
           "database_id": "320c32be-d3d9-4c7c-a84c-e20ef01fd20d"
+        },
+        {
+          "binding": "DB_REPLICA_OC",
+          "database_name": "capgo_replicate_oc",
+          "database_id": "58dbd199-4629-4bd0-a02c-ce019b5ab2e0"
         }
       ]
     },
@@ -203,8 +213,8 @@
         },
         {
           "binding": "DB_REPLICA_EU",
-          "database_name": "capgo_replicate",
-          "database_id": "7f267d86-f4f7-49f5-9622-e44373aa00dc"
+          "database_name": "capgo_replicate_eu",
+          "database_id": "107046f7-af0e-4126-b493-1d4e66f48947"
         },
         {
           "binding": "DB_REPLICA_AS",
@@ -215,19 +225,24 @@
           "binding": "DB_REPLICA_US",
           "database_name": "capgo_replicate_us",
           "database_id": "320c32be-d3d9-4c7c-a84c-e20ef01fd20d"
+        },
+        {
+          "binding": "DB_REPLICA_OC",
+          "database_name": "capgo_replicate_oc",
+          "database_id": "58dbd199-4629-4bd0-a02c-ce019b5ab2e0"
         }
       ]
     },
     "local": {
       "name": "capgo_api-local",
       "vars": {
-        "IS_V2": "1"
+        "ENV_NAME": "capgo_api-local"
       },
       "d1_databases": [
         {
           "binding": "DB_REPLICA_EU",
-          "database_name": "capgo_replicate",
-          "database_id": "7f267d86-f4f7-49f5-9622-e44373aa00dc"
+          "database_name": "capgo_replicate_eu",
+          "database_id": "107046f7-af0e-4126-b493-1d4e66f48947"
         },
         {
           "binding": "DB_REPLICA_AS",

@@ -73,6 +73,12 @@ export function isValidSemver(version: string): boolean {
   return regexSemver.test(version)
 }
 
+export function isValidAppId(appId: string): boolean {
+  if (!appId)
+    return false
+  return reverseDomainRegex.test(appId)
+}
+
 interface LimitedApp {
   id: string
   ignore: number

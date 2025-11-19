@@ -1,37 +1,20 @@
-import type { Database } from './supabase.types.ts'
-import { bigint, boolean, customType, pgEnum, pgTable, serial, text, timestamp, uuid, varchar } from 'drizzle-orm/pg-core'
+import { bigint, boolean, pgEnum, pgTable, serial, text, timestamp, uuid, varchar } from 'drizzle-orm/pg-core'
 
 // do_not_change
 
 export const disableUpdatePgEnum = pgEnum('disable_update', ['major', 'minor', 'patch', 'version_number', 'none'])
-
-// Keeping this for backward compatibility but marking as deprecated
-const manfiestType = customType<{ data: Database['public']['CompositeTypes']['manifest_entry'][] }>({
-  dataType() {
-    return 'manifest_entry[]'
-  },
-  fromDriver(value: unknown) {
-    if (Array.isArray(value)) {
-      for (const element of value) {
-        if (typeof element !== 'string')
-          throw new Error(`Cannot do DB type mapping - not every element is a string. Data: ${JSON.stringify(value)}`)
-        if (element.split(',').length !== 3)
-          throw new Error(`Cannot do DB type mapping - splitted string length is not 3. Data: ${element}`)
-      }
-
-      return value.map((val) => {
-        const split = val.split(',')
-        return {
-          file_name: split[0].slice(1),
-          s3_path: split[1],
-          file_hash: split[2].slice(0, -1),
-        }
-      })
-    }
-
-    return [{ file_hash: '', file_name: '', s3_path: '' }]
-  },
-})
+export const keyModePgEnum = pgEnum('key_mode', ['read', 'write', 'all', 'upload'])
+export const userMinRightPgEnum = pgEnum('user_min_right', [
+  'invite_read',
+  'invite_upload',
+  'invite_write',
+  'invite_admin',
+  'read',
+  'upload',
+  'write',
+  'admin',
+  'super_admin',
+])
 
 export const apps = pgTable('apps', {
   created_at: timestamp('created_at').notNull().defaultNow(),
@@ -62,15 +45,10 @@ export const app_versions = pgTable('app_versions', {
   storage_provider: text('storage_provider').default('r2').notNull(),
   min_update_version: varchar('min_update_version'),
   r2_path: varchar('r2_path'),
-  // Keeping this for backward compatibility but it's deprecated now
-  manifest: manfiestType('manifest'),
 })
 
-// New manifest table schema
 export const manifest = pgTable('manifest', {
   id: serial('id').primaryKey().notNull(),
-  created_at: timestamp('created_at').defaultNow(),
-  updated_at: timestamp('updated_at').defaultNow(),
   app_version_id: bigint('app_version_id', { mode: 'number' }).notNull().references(() => app_versions.id, { onDelete: 'cascade' }),
   file_name: varchar('file_name').notNull(),
   s3_path: varchar('s3_path').notNull(),
@@ -125,4 +103,27 @@ export const stripe_info = pgTable('stripe_info', {
   mau_exceeded: boolean('mau_exceeded'),
   storage_exceeded: boolean('storage_exceeded'),
   bandwidth_exceeded: boolean('bandwidth_exceeded'),
+})
+
+export const apikeys = pgTable('apikeys', {
+  id: bigint('id', { mode: 'number' }).primaryKey().notNull(),
+  created_at: timestamp('created_at').defaultNow(),
+  user_id: uuid('user_id').notNull(),
+  key: varchar('key').notNull(),
+  mode: keyModePgEnum('mode').notNull(),
+  updated_at: timestamp('updated_at').defaultNow(),
+  name: varchar('name').notNull(),
+  limited_to_orgs: uuid('limited_to_orgs').array(),
+  limited_to_apps: varchar('limited_to_apps').array(),
+})
+
+export const org_users = pgTable('org_users', {
+  id: bigint('id', { mode: 'number' }).primaryKey().notNull(),
+  created_at: timestamp('created_at').defaultNow(),
+  updated_at: timestamp('updated_at').defaultNow(),
+  user_id: uuid('user_id').notNull(),
+  org_id: uuid('org_id').notNull(),
+  app_id: varchar('app_id'),
+  channel_id: bigint('channel_id', { mode: 'number' }),
+  user_right: userMinRightPgEnum('user_right'),
 })

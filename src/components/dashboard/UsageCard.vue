@@ -21,11 +21,11 @@ const props = defineProps({
     type: Boolean,
     default: true,
   },
-  datas: {
+  data: {
     type: Array,
     default: () => Array.from({ length: getDaysInCurrentMonth() }).fill(undefined) as number[],
   },
-  datasByApp: {
+  dataByApp: {
     type: Object,
     default: () => ({}),
   },
@@ -40,7 +40,7 @@ const props = defineProps({
 })
 
 const total = computed(() => {
-  const dataArray = props.datas as number[]
+  const dataArray = props.data as number[]
   const hasData = dataArray.some(val => val !== undefined)
   const sumValues = (values: number[]) => values.reduce((acc, val) => (typeof val === 'number' ? acc + val : acc), 0)
 
@@ -48,8 +48,8 @@ const total = computed(() => {
     return sumValues(dataArray)
   }
 
-  if (props.datasByApp && Object.keys(props.datasByApp).length > 0) {
-    return Object.values(props.datasByApp).reduce((totalSum, appValues: any) => {
+  if (props.dataByApp && Object.keys(props.dataByApp).length > 0) {
+    return Object.values(props.dataByApp).reduce((totalSum, appValues: any) => {
       return totalSum + sumValues(appValues)
     }, 0)
   }
@@ -58,7 +58,7 @@ const total = computed(() => {
 })
 
 const lastDayEvolution = computed(() => {
-  const arr = props.datas as number[]
+  const arr = props.data as number[]
   const arrWithoutUndefined = arr.filter((val: any) => val !== undefined)
 
   if (arrWithoutUndefined.length < 2) {
@@ -75,7 +75,7 @@ const lastDayEvolution = computed(() => {
   return ((lastValue - previousValue) / previousValue) * 100
 })
 
-const hasData = computed(() => (props.datas as number[]).length > 0)
+const hasData = computed(() => (props.data as number[]).length > 0)
 </script>
 
 <template>
@@ -92,8 +92,8 @@ const hasData = computed(() => (props.datas as number[]).length > 0)
       :title="title"
       :colors="colors"
       :limits="limits"
-      :data="datas"
-      :datas-by-app="datasByApp"
+      :data="data"
+      :data-by-app="dataByApp"
       :app-names="appNames"
       :accumulated="accumulated"
       :use-billing-period="useBillingPeriod"

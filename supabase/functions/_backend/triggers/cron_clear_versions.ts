@@ -2,7 +2,7 @@ import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
 import { BRES, middlewareAPISecret, parseBody, quickError, simpleError } from '../utils/hono.ts'
-import { cloudlog, cloudlogErr } from '../utils/loggin.ts'
+import { cloudlog, cloudlogErr } from '../utils/logging.ts'
 import { getPath, s3 } from '../utils/s3.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 
@@ -17,7 +17,7 @@ app.post('/', middlewareAPISecret, async (c) => {
 
   const version = body.version
   if (!version)
-    throw simpleError('no_version', 'No version', { body })
+    return simpleError('no_version', 'No version', { body })
   if (version.user_id === null) {
     // find the user_id from the app_id
     const { data: app, error: errorApp } = await supabaseAdmin(c)
@@ -26,9 +26,9 @@ app.post('/', middlewareAPISecret, async (c) => {
       .eq('app_id', version.app_id)
       .single()
     if (errorApp)
-      throw simpleError('cannot_find_user_id', 'Cannot find user_id for app_id', { error: errorApp })
+      return simpleError('cannot_find_user_id', 'Cannot find user_id for app_id', { error: errorApp })
     if (!app)
-      throw simpleError('cannot_find_user_id', 'Cannot find user_id for app_id', { error: 'no app found' })
+      return simpleError('cannot_find_user_id', 'Cannot find user_id for app_id', { error: 'no app found' })
     version.user_id = app.user_id
   }
 
@@ -39,20 +39,20 @@ app.post('/', middlewareAPISecret, async (c) => {
         cloudlog({ requestId: c.get('requestId'), message: 'error getPath', error: e })
         // if error is rate limit this terminate the function
         if (e.message.includes('Rate limit exceeded')) {
-          throw quickError(429, 'rate_limit_exceeded', 'Rate limit exceeded')
+          return quickError(429, 'rate_limit_exceeded', 'Rate limit exceeded')
         }
         return null
       })
     cloudlog({ requestId: c.get('requestId'), message: 'v2Path', v2Path })
     if (!v2Path) {
       notFound = true
-      throw quickError(404, 'no_path', 'No path', { versionId: version.id })
+      return quickError(404, 'no_path', 'No path', { versionId: version.id })
     }
     const size = await s3.getSize(c, v2Path).catch((e) => {
       cloudlog({ requestId: c.get('requestId'), message: 'error getSize', error: e })
       // if error is rate limit this terminate the function
       if (e.message.includes('Rate limit exceeded')) {
-        throw quickError(429, 'rate_limit_exceeded', 'Rate limit exceeded')
+        return quickError(429, 'rate_limit_exceeded', 'Rate limit exceeded')
       }
       return null
     })
@@ -60,7 +60,7 @@ app.post('/', middlewareAPISecret, async (c) => {
       cloudlog({ requestId: c.get('requestId'), message: `No size for ${v2Path}, ${size}` })
       // throw error to trigger the deletion
       notFound = true
-      throw simpleError('no_size', 'No size', { versionId: version.id, v2Path })
+      return simpleError('no_size', 'No size', { versionId: version.id, v2Path })
     }
     // get checksum from table app_versions
     const { data: appVersion, error: errorAppVersion } = await supabaseAdmin(c)
@@ -69,9 +69,9 @@ app.post('/', middlewareAPISecret, async (c) => {
       .eq('id', version.id)
       .single()
     if (errorAppVersion)
-      throw simpleError('cannot_find_checksum', 'Cannot find checksum for app_versions id', { error: errorAppVersion })
+      return simpleError('cannot_find_checksum', 'Cannot find checksum for app_versions id', { error: errorAppVersion })
     if (!appVersion)
-      throw simpleError('cannot_find_checksum', 'Cannot find checksum for app_versions id', { error: 'no app_versions found' })
+      return simpleError('cannot_find_checksum', 'Cannot find checksum for app_versions id', { error: 'no app_versions found' })
     const checksum = appVersion.checksum
     if (!checksum) {
       cloudlog({ requestId: c.get('requestId'), message: `No checksum for ${v2Path}, ${checksum}` })
@@ -100,27 +100,27 @@ app.post('/', middlewareAPISecret, async (c) => {
       .eq('version', version.id)
 
     if (error)
-      throw simpleError('cannot_check_channel_count', 'Cannot check channel count', { error })
+      return simpleError('cannot_check_channel_count', 'Cannot check channel count', { error })
 
     if ((count ?? 0) > 0) {
       if (notFound) {
-        // set channel to unknow version where version is currently set
-        // find id of unknow version
-        const { data: unknowVersion, error: errorUnknowVersion } = await supabase.from('app_versions')
+        // set channel to unknown version where version is currently set
+        // find id of unknown version
+        const { data: unknownVersion, error: errorUnknownVersion } = await supabase.from('app_versions')
           .select('id')
           .eq('app_id', version.app_id)
           .eq('name', 'unknown')
           .single()
-        if (errorUnknowVersion)
-          throw simpleError('cannot_find_unknow_version', 'Cannot find unknow version for app_id', { error: errorUnknowVersion })
-        if (!unknowVersion)
-          throw simpleError('cannot_find_unknow_version', 'Cannot find unknow version for app_id', { error: 'no unknow version found' })
+        if (errorUnknownVersion)
+          return simpleError('cannot_find_unknown_version', 'Cannot find unknown version for app_id', { error: errorUnknownVersion })
+        if (!unknownVersion)
+          return simpleError('cannot_find_unknown_version', 'Cannot find unknown version for app_id', { error: 'no unknown version found' })
         await supabase.from('channels')
-          .update({ version: unknowVersion.id })
+          .update({ version: unknownVersion.id })
           .eq('version', version.id)
       }
       else {
-        throw simpleError('cannot_delete_failed_version', 'Cannot delete failed version', { error: `linked in some channels (${data.map(d => d.id).join(', ')})` })
+        return simpleError('cannot_delete_failed_version', 'Cannot delete failed version', { error: `linked in some channels (${data.map(d => d.id).join(', ')})` })
       }
     }
 
@@ -129,7 +129,7 @@ app.post('/', middlewareAPISecret, async (c) => {
       .eq('id', version.id)
 
     if (error1)
-      throw simpleError('cannot_delete_version', 'Cannot delete version', { error: error1 })
+      return simpleError('cannot_delete_version', 'Cannot delete version', { error: error1 })
   }
   return c.json(BRES)
 })

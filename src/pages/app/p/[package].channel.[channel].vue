@@ -11,7 +11,7 @@ import { toast } from 'vue-sonner'
 import IconHistory from '~icons/heroicons/clock'
 import Settings from '~icons/heroicons/cog-8-tooth'
 import IconDevice from '~icons/heroicons/device-phone-mobile'
-import IconInformations from '~icons/heroicons/information-circle'
+import IconInformation from '~icons/heroicons/information-circle'
 import IconNext from '~icons/ic/round-keyboard-arrow-right'
 import IconSearch from '~icons/ic/round-search?raw'
 import plusOutline from '~icons/ion/add-outline?width=2em&height=2em'
@@ -207,7 +207,7 @@ watch(channel, async (channel) => {
 const tabs: Tab[] = [
   {
     label: 'info',
-    icon: IconInformations,
+    icon: IconInformation,
     key: 'info',
   },
   {
@@ -301,7 +301,7 @@ async function reload() {
 }
 
 async function saveChannelChange(key: string, val: any) {
-  if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'super_admin'])) {
+  if (!organizationStore.hasPermissionsInRole(role.value, ['admin', 'super_admin'])) {
     toast.error(t('no-permission'))
     return
   }
@@ -309,6 +309,14 @@ async function saveChannelChange(key: string, val: any) {
   console.log('saveChannelChange', key, val)
   if (!id.value || !channel.value)
     return
+
+  // Validate version ID if updating version field
+  if (key === 'version' && (val === undefined || val === null || typeof val !== 'number')) {
+    console.error('Invalid version ID:', val)
+    toast.error(t('error-invalid-version'))
+    return
+  }
+
   try {
     const update = {
       [key]: val,
@@ -356,7 +364,7 @@ async function getUnknownVersion(): Promise<number> {
       .eq('name', 'unknown')
       .single()
     if (error) {
-      console.error('no unknow version', error)
+      console.error('no unknown version', error)
       return 0
     }
     return data.id
@@ -367,10 +375,10 @@ async function getUnknownVersion(): Promise<number> {
   return 0
 }
 
-async function openPannel() {
+async function openPanel() {
   if (!channel.value || !main.auth)
     return
-  if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'super_admin', 'write'])) {
+  if (!organizationStore.hasPermissionsInRole(role.value, ['admin', 'super_admin', 'write'])) {
     toast.error(t('no-permission'))
     return
   }
@@ -420,7 +428,7 @@ function getAutoUpdateLabel(value: string) {
 }
 
 async function onSelectAutoUpdate(value: Database['public']['Enums']['disable_update']) {
-  if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'super_admin'])) {
+  if (!organizationStore.hasPermissionsInRole(role.value, ['admin', 'super_admin'])) {
     toast.error(t('no-permission'))
     return false
   }
@@ -445,7 +453,7 @@ async function onSelectAutoUpdate(value: Database['public']['Enums']['disable_up
 }
 
 async function handleRevertToBuiltin() {
-  if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'super_admin', 'write'])) {
+  if (!organizationStore.hasPermissionsInRole(role.value, ['admin', 'super_admin', 'write'])) {
     toast.error(t('no-permission'))
     return
   }
@@ -467,6 +475,12 @@ async function handleRevertToBuiltin() {
           if (error) {
             console.error('lazy load revertVersionId fail', error)
             toast.error(t('error-revert-to-builtin'))
+            return
+          }
+
+          if (!revertVersionId || typeof revertVersionId !== 'number') {
+            console.error('Invalid revert version ID:', revertVersionId)
+            toast.error(t('error-invalid-version'))
             return
           }
 
@@ -615,7 +629,7 @@ async function handleVersionLink(version: Database['public']['Tables']['app_vers
 }
 
 async function handleUnlink() {
-  await openPannel()
+  await openPanel()
 }
 
 async function handleRevert() {
@@ -692,7 +706,7 @@ async function handleRevert() {
                     {{ t('manage-default-channel') }}
                   </button>
                   <div class="relative inline-flex group">
-                    <IconInformations class="w-4 h-4 text-slate-400 transition-colors cursor-help group-hover:text-slate-600 dark:text-slate-400 dark:group-hover:text-slate-200" />
+                    <IconInformation class="w-4 h-4 text-slate-400 transition-colors cursor-help group-hover:text-slate-600 dark:text-slate-400 dark:group-hover:text-slate-200" />
                     <div class="pointer-events-none absolute right-0 bottom-full mb-2 w-56 rounded-lg bg-gray-800 px-3 py-2 text-xs text-white opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100">
                       {{ t('channel-default-moved-info') }}
                       <div class="absolute -bottom-1 right-2 h-2 w-2 rotate-45 bg-gray-800" />
@@ -768,7 +782,7 @@ async function handleRevert() {
                   </ul>
                 </details>
               </InfoRow>
-              <InfoRow :label="t('allow-develoment-bui')">
+              <InfoRow :label="t('allow-dev-build')">
                 <Toggle
                   :value="channel?.allow_dev"
                   @change="saveChannelChange('allow_dev', !channel?.allow_dev)"
@@ -786,7 +800,7 @@ async function handleRevert() {
                   @change="saveChannelChange('allow_device_self_set', !channel?.allow_device_self_set)"
                 />
               </InfoRow>
-              <InfoRow :label="t('unlink-bundle')" :is-link="true" @click="openPannel">
+              <InfoRow :label="t('unlink-bundle')" :is-link="true" @click="openPanel">
                 <button class="ml-auto bg-transparent w-7 h-7">
                   <IconNext />
                 </button>

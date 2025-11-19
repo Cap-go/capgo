@@ -2,7 +2,7 @@ import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { simpleError } from '../../utils/hono.ts'
 import { hasAppRightApikey, supabaseApikey } from '../../utils/supabase.ts'
-import { isValidSemver } from '../../utils/utils.ts'
+import { isValidAppId, isValidSemver } from '../../utils/utils.ts'
 
 interface CreateBundleBody {
   app_id: string
@@ -182,6 +182,9 @@ async function insertBundle(c: Context, body: CreateBundleBody, ownerOrg: string
 export async function createBundle(c: Context, body: CreateBundleBody, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
   if (!body.app_id) {
     throw simpleError('missing_app_id', 'Missing required fields: app_id', { app_id: body.app_id })
+  }
+  if (!isValidAppId(body.app_id)) {
+    throw simpleError('invalid_app_id', 'App ID must be a reverse domain string', { app_id: body.app_id })
   }
   if (!body.version) {
     throw simpleError('missing_version', 'Missing required fields: version', { version: body.version })

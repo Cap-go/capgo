@@ -375,7 +375,7 @@ GRANT ALL ON FUNCTION "public"."get_invite_by_magic_lookup" (TEXT) TO service_ro
 GRANT
 EXECUTE ON FUNCTION "public"."get_invite_by_magic_lookup" (TEXT) TO authenticated;
 
-CREATE OR REPLACE FUNCTION "public"."check_org_user_privilages" () RETURNS "trigger" LANGUAGE "plpgsql"
+CREATE OR REPLACE FUNCTION "public"."check_org_user_privileges" () RETURNS "trigger" LANGUAGE "plpgsql"
 SET
   search_path = '' AS $$BEGIN
   
@@ -391,12 +391,12 @@ SET
 
   IF NEW.user_right IS NOT DISTINCT FROM 'super_admin'::"public"."user_min_right"
   THEN
-    RAISE EXCEPTION 'Admins cannot elevate privilages!';
+    RAISE EXCEPTION 'Admins cannot elevate privileges!';
   END IF;
 
   IF NEW.user_right IS NOT DISTINCT FROM 'invite_super_admin'::"public"."user_min_right"
   THEN
-    RAISE EXCEPTION 'Admins cannot elevate privilages!';
+    RAISE EXCEPTION 'Admins cannot elevate privileges!';
   END IF;
 
   RETURN NEW;

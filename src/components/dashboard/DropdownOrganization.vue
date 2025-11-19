@@ -33,7 +33,7 @@ onMounted(async () => {
 })
 
 async function handleOrganizationInvitation(org: Organization) {
-  const newName = t('alert-accept-inviation').replace('%ORG%', org.name)
+  const newName = t('alert-accept-invitation').replace('%ORG%', org.name)
   dialogStore.openDialog({
     title: t('alert-confirm-invite'),
     description: `${newName}`,

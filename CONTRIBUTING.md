@@ -5,7 +5,7 @@ First off, thanks for taking the time to contribute! ❤️
 
 All types of contributions are encouraged and valued. Please make sure to read the relevant section before making your contribution. It will make it a lot easier for us maintainers and smooth out the experience for all involved. The community looks forward to your contributions. 🎉
 
-### Running tests localy
+### Running tests locally
 
 This project uses a custom test runner located in [tests_backend](https://github.com/Cap-go/capgo/tree/main/tests_backend).
 There exists some requirements to run the tests:
@@ -18,7 +18,7 @@ The tests can be run with the following commands:
  * `CLI_PATH=/home/user/CLI/ bun test:cli` (cli only)
  * `bun test:backend`
 
-**Running tests localy WILL make changes to supabase**
+**Running tests locally WILL make changes to supabase**
 
 After you submit a PR a contributor will run the full test suite on your changes.
 

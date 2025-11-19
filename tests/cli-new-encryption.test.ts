@@ -128,7 +128,7 @@ describe.concurrent('tests CLI encryption encrypt/upload/download/decrypt', () =
       const decryptedChecksum = publicDecrypt(publicKey, new Uint8Array(Buffer.from(data!.checksum!, 'base64')))
       const decryptedChecksumStr = decryptedChecksum.toString('base64')
       expect(decryptedChecksumStr).toBe(calculatedSha256Hash)
-      expect(decryptedChecksumStr).toBe(checksum) // redundent, but I will keep it
+      expect(decryptedChecksumStr).toBe(checksum) // redundant, but I will keep it
     }
     else {
       const decryptedChecksum = publicDecrypt(publicKey, new Uint8Array(Buffer.from(data!.checksum!, 'base64')))
@@ -221,13 +221,13 @@ describe.concurrent('tests CLI encryption encrypt/upload/download/decrypt', () =
       const privateKeyFile = readFileSync(join(tempFileFolder(APPNAME), '.capgo_key_v2'), 'utf-8')
       expect(privateKeyFile).toContain('PRIVATE KEY')
 
-      renameSync(join(tempFileFolder(APPNAME), '.capgo_key_v2'), join(tempFileFolder(APPNAME), 'wierd_file'))
+      renameSync(join(tempFileFolder(APPNAME), '.capgo_key_v2'), join(tempFileFolder(APPNAME), 'weird_file'))
       rmSync(join(tempFileFolder(APPNAME), '.capgo_key_v2.pub'))
 
       semver = getSemver(semver)
       const result = await uploadBundleSDK(APPNAME, semver, 'production', {
         ignoreCompatibilityCheck: true,
-        encryptionKey: join(tempFileFolder(APPNAME), 'wierd_file'),
+        encryptionKey: join(tempFileFolder(APPNAME), 'weird_file'),
       })
       expect(result.success).toBe(true)
 

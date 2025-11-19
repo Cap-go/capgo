@@ -1,5 +1,5 @@
 import type { Context } from 'hono'
-import { cloudlog, cloudlogErr } from './loggin.ts'
+import { cloudlog, cloudlogErr } from './logging.ts'
 import { getEnv } from './utils.ts'
 
 function getAllMetrics(c: Context): Promise<string[]> {

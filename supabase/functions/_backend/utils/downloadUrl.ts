@@ -1,7 +1,7 @@
 import type { Context } from 'hono'
 import type { Database } from './supabase.types.ts'
 import { getRuntimeKey } from 'hono/adapter'
-import { cloudlog, cloudlogErr } from './loggin.ts'
+import { cloudlog, cloudlogErr } from './logging.ts'
 import { s3 } from './s3.ts'
 
 const EXPIRATION_SECONDS = 604800
@@ -29,7 +29,7 @@ export async function getBundleUrl(
       cloudlog({ requestId: c.get('requestId'), message: 'getBundleUrl', signedUrl })
       const url = signedUrl
       // Since it's signed url we cannot add extra query params like checksum and device id
-      // TODO: swtich to our own file endpoint instead of direct s3 signed url
+      // TODO: switch to our own file endpoint instead of direct s3 signed url
       return url
     }
     catch (error) {

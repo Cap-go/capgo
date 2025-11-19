@@ -1,7 +1,7 @@
 import type { Context } from 'hono'
 import type { Database } from './supabase.types.ts'
 import Stripe from 'stripe'
-import { cloudlog, cloudlogErr } from './loggin.ts'
+import { cloudlog, cloudlogErr } from './logging.ts'
 import { supabaseAdmin } from './supabase.ts'
 import { existInEnv, getEnv } from './utils.ts'
 
@@ -142,15 +142,27 @@ export async function syncSubscriptionData(c: Context, customerId: string, subsc
     }
 
     // Update stripe_info table with latest data, even if no subscription exists
+    const updateData: any = {
+      status: dbStatus,
+    }
+
+    // Only include fields if they have valid values to avoid foreign key constraint violations
+    if (subscriptionData?.productId) {
+      updateData.product_id = subscriptionData.productId
+    }
+    if (subscriptionData?.subscriptionId) {
+      updateData.subscription_id = subscriptionData.subscriptionId
+    }
+    if (subscriptionData?.cycleStart) {
+      updateData.subscription_anchor_start = subscriptionData.cycleStart
+    }
+    if (subscriptionData?.cycleEnd) {
+      updateData.subscription_anchor_end = subscriptionData.cycleEnd
+    }
+
     const { error: updateError } = await supabaseAdmin(c)
       .from('stripe_info')
-      .update({
-        product_id: subscriptionData?.productId ?? undefined,
-        subscription_id: subscriptionData?.subscriptionId ?? undefined,
-        subscription_anchor_start: subscriptionData?.cycleStart ?? undefined,
-        subscription_anchor_end: subscriptionData?.cycleEnd ?? undefined,
-        status: dbStatus,
-      })
+      .update(updateData)
       .eq('customer_id', customerId)
 
     if (updateError) {
@@ -192,7 +204,7 @@ export async function cancelSubscription(c: Context, customerId: string) {
   })
 }
 
-async function getPriceIds(c: Context, planId: string, reccurence: string): Promise<{ priceId: string | null, meteredIds: string[] }> {
+async function getPriceIds(c: Context, planId: string, recurrence: string): Promise<{ priceId: string | null, meteredIds: string[] }> {
   let priceId = null
   const meteredIds: string[] = []
   if (!existInEnv(c, 'STRIPE_SECRET_KEY'))
@@ -203,7 +215,7 @@ async function getPriceIds(c: Context, planId: string, reccurence: string): Prom
     })
     cloudlog({ requestId: c.get('requestId'), message: 'prices stripe', prices })
     prices.data.forEach((price) => {
-      if (price.recurring && price.recurring.interval === reccurence && price.active && price.recurring.usage_type === 'licensed')
+      if (price.recurring && price.recurring.interval === recurrence && price.active && price.recurring.usage_type === 'licensed')
         priceId = price.id
       if (price.billing_scheme === 'per_unit' && price.active && price?.recurring?.usage_type !== 'licensed')
         meteredIds.push(price.id)
@@ -250,10 +262,10 @@ export function parsePriceIds(c: Context, prices: Stripe.SubscriptionItem[]): { 
   return { priceId, productId, meteredData }
 }
 
-export async function createCheckout(c: Context, customerId: string, reccurence: string, planId: string, successUrl: string, cancelUrl: string, clientReferenceId?: string, attributionId?: string) {
+export async function createCheckout(c: Context, customerId: string, recurrence: string, planId: string, successUrl: string, cancelUrl: string, clientReferenceId?: string, attributionId?: string) {
   if (!existInEnv(c, 'STRIPE_SECRET_KEY'))
     return { url: '' }
-  const prices = await getPriceIds(c, planId, reccurence)
+  const prices = await getPriceIds(c, planId, recurrence)
   cloudlog({ requestId: c.get('requestId'), message: 'prices', prices })
   if (!prices.priceId)
     return Promise.reject(new Error('Cannot find price'))

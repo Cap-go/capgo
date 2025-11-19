@@ -5,6 +5,7 @@ import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import { useSupabase } from '~/services/supabase'
+import { sendEvent } from '~/services/tracking'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useOrganizationStore } from '~/stores/organization'
 
@@ -66,6 +67,13 @@ function completeInviteSuccess() {
   })
   isInviteDialogOpen.value = false
   emit('success')
+  sendEvent({
+    channel: 'onboarding-v2',
+    event: `onboarding-step-invite-teammate`,
+    icon: '👥',
+    user_id: organizationStore.currentOrganization?.gid,
+    notify: false,
+  }).catch()
 }
 
 function updateInviteDialogButton(loading: boolean) {

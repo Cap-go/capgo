@@ -375,7 +375,7 @@ ALTER FUNCTION "public"."check_min_rights" (
   "channel_id" bigint
 ) OWNER TO "postgres";
 
-CREATE OR REPLACE FUNCTION "public"."check_org_user_privilages" () RETURNS "trigger" LANGUAGE "plpgsql"
+CREATE OR REPLACE FUNCTION "public"."check_org_user_privileges" () RETURNS "trigger" LANGUAGE "plpgsql"
 SET
   search_path = '' AS $$BEGIN
   IF (select current_user) IS NOT DISTINCT FROM 'postgres' THEN
@@ -389,18 +389,18 @@ SET
 
   IF NEW.user_right IS NOT DISTINCT FROM 'super_admin'::"public"."user_min_right"
   THEN
-    RAISE EXCEPTION 'Admins cannot elevate privilages!';
+    RAISE EXCEPTION 'Admins cannot elevate privileges!';
   END IF;
 
   IF NEW.user_right IS NOT DISTINCT FROM 'invite_super_admin'::"public"."user_min_right"
   THEN
-    RAISE EXCEPTION 'Admins cannot elevate privilages!';
+    RAISE EXCEPTION 'Admins cannot elevate privileges!';
   END IF;
 
   RETURN NEW;
 END;$$;
 
-ALTER FUNCTION "public"."check_org_user_privilages" () OWNER TO "postgres";
+ALTER FUNCTION "public"."check_org_user_privileges" () OWNER TO "postgres";
 
 CREATE OR REPLACE FUNCTION "public"."check_revert_to_builtin_version" ("appid" character varying) RETURNS integer LANGUAGE "plpgsql"
 SET
@@ -466,25 +466,25 @@ $_$;
 
 ALTER FUNCTION "public"."cleanup_queue_messages" () OWNER TO "postgres";
 
-CREATE OR REPLACE FUNCTION "public"."convert_bytes_to_gb" ("byt" double precision) RETURNS double precision LANGUAGE "plpgsql"
+CREATE OR REPLACE FUNCTION "public"."convert_bytes_to_gb" ("bytes_value" double precision) RETURNS double precision LANGUAGE "plpgsql"
 SET
   search_path = '' AS $$
 Begin
-  RETURN byt / 1024.0 / 1024.0 / 1024.0;
+  RETURN bytes_value / 1024.0 / 1024.0 / 1024.0;
 End;
 $$;
 
-ALTER FUNCTION "public"."convert_bytes_to_gb" ("byt" double precision) OWNER TO "postgres";
+ALTER FUNCTION "public"."convert_bytes_to_gb" ("bytes_value" double precision) OWNER TO "postgres";
 
-CREATE OR REPLACE FUNCTION "public"."convert_bytes_to_mb" ("byt" double precision) RETURNS double precision LANGUAGE "plpgsql"
+CREATE OR REPLACE FUNCTION "public"."convert_bytes_to_mb" ("bytes_value" double precision) RETURNS double precision LANGUAGE "plpgsql"
 SET
   search_path = '' AS $$
 Begin
-  RETURN byt / 1024.0 / 1024.0;
+  RETURN bytes_value / 1024.0 / 1024.0;
 End;
 $$;
 
-ALTER FUNCTION "public"."convert_bytes_to_mb" ("byt" double precision) OWNER TO "postgres";
+ALTER FUNCTION "public"."convert_bytes_to_mb" ("bytes_value" double precision) OWNER TO "postgres";
 
 CREATE OR REPLACE FUNCTION "public"."convert_gb_to_bytes" ("gb" double precision) RETURNS double precision LANGUAGE "plpgsql"
 SET
@@ -1129,7 +1129,7 @@ DECLARE
 Begin
   SELECT auth.uid() into auth_uid;
 
-  -- JWT auth.uid is not null, reutrn
+  -- JWT auth.uid is not null, return
   IF auth_uid IS NOT NULL THEN
     return auth_uid;
   END IF;
@@ -2416,24 +2416,42 @@ $$;
 
 ALTER FUNCTION "public"."is_canceled_org" ("orgid" "uuid") OWNER TO "postgres";
 
-CREATE OR REPLACE FUNCTION "public"."is_good_plan_v5_org" ("orgid" "uuid") RETURNS boolean LANGUAGE "plpgsql"
+CREATE OR REPLACE FUNCTION public.is_good_plan_v5_org (orgid uuid) RETURNS boolean LANGUAGE plpgsql
 SET
   search_path = '' SECURITY DEFINER AS $$
 DECLARE
-    total_metrics RECORD;
-    current_plan_name TEXT;
+  s date;
+  e date;
+  v_mau       bigint;
+  v_bandwidth bigint;
+  v_storage   bigint;
+  current_plan_name text;
 BEGIN
-  SELECT * INTO total_metrics FROM public.get_total_metrics(orgid);
-  current_plan_name := (SELECT public.get_current_plan_name_org(orgid));
+  -- 1) get cycle dates once
+  SELECT subscription_anchor_start::date,
+         subscription_anchor_end::date
+  INTO s, e
+  FROM public.get_cycle_info_org(orgid);
 
+  -- 2) call the 3-arg totals once via FROM (no repeated eval)
+  SELECT m.mau, m.bandwidth, m.storage
+  INTO   v_mau, v_bandwidth, v_storage
+  FROM public.get_total_metrics(
+         orgid, s, e
+       ) AS m(mau, storage, bandwidth, "get", fail, install, uninstall);
+
+  -- 3) current plan
+  current_plan_name := public.get_current_plan_name_org(orgid);
+
+  -- 4) inline fit check (no extra function call)
   RETURN EXISTS (
     SELECT 1
-    FROM public.find_fit_plan_v3(
-      total_metrics.mau,
-      total_metrics.bandwidth,
-      total_metrics.storage
-    )
-    WHERE find_fit_plan_v3.name = current_plan_name
+    FROM public.plans p
+    WHERE p.name = current_plan_name
+      AND (
+        p.name = 'Pay as you go'
+        OR (p.mau >= v_mau AND p.bandwidth >= v_bandwidth AND p.storage >= v_storage)
+      )
   );
 END;
 $$;
@@ -2629,7 +2647,7 @@ SET
   search_path = '' AS $_$
 DECLARE
     val RECORD;
-    is_diffrent boolean;
+    is_different boolean;
 BEGIN
     -- API key? We do not care
     IF (select auth.uid()) IS NULL THEN
@@ -2647,9 +2665,9 @@ BEGIN
       -- raise warning '?? % % %', val.key, val.value, format('SELECT (NEW."%s" <> OLD."%s")', val.key, val.key);
 
       EXECUTE format('SELECT ($1."%s" is distinct from $2."%s")', val.key, val.key) using NEW, OLD
-      INTO is_diffrent;
+      INTO is_different;
 
-      IF is_diffrent AND val.key <> 'version' AND val.key <> 'updated_at' THEN
+      IF is_different AND val.key <> 'version' AND val.key <> 'updated_at' THEN
           RAISE EXCEPTION 'not allowed %', val.key;
       END IF;
     end loop;
@@ -4155,10 +4173,10 @@ CREATE OR REPLACE TRIGGER "check_if_org_can_exist_org_users"
 AFTER DELETE ON "public"."org_users" FOR EACH ROW
 EXECUTE FUNCTION "public"."check_if_org_can_exist" ();
 
-CREATE OR REPLACE TRIGGER "check_privilages" BEFORE INSERT
+CREATE OR REPLACE TRIGGER "check_privileges" BEFORE INSERT
 OR
 UPDATE ON "public"."org_users" FOR EACH ROW
-EXECUTE FUNCTION "public"."check_org_user_privilages" ();
+EXECUTE FUNCTION "public"."check_org_user_privileges" ();
 
 CREATE OR REPLACE TRIGGER "force_valid_apikey_name" BEFORE INSERT
 OR
@@ -4774,7 +4792,7 @@ WITH
   );
 
 -- SELECT
-CREATE POLICY "Allow memeber and owner to select" ON "public"."org_users" FOR
+CREATE POLICY "Allow member and owner to select" ON "public"."org_users" FOR
 SELECT
   TO "authenticated",
   "anon" USING (
@@ -5459,11 +5477,11 @@ GRANT ALL ON FUNCTION "public"."check_min_rights" (
   "channel_id" bigint
 ) TO "service_role";
 
-GRANT ALL ON FUNCTION "public"."check_org_user_privilages" () TO "anon";
+GRANT ALL ON FUNCTION "public"."check_org_user_privileges" () TO "anon";
 
-GRANT ALL ON FUNCTION "public"."check_org_user_privilages" () TO "authenticated";
+GRANT ALL ON FUNCTION "public"."check_org_user_privileges" () TO "authenticated";
 
-GRANT ALL ON FUNCTION "public"."check_org_user_privilages" () TO "service_role";
+GRANT ALL ON FUNCTION "public"."check_org_user_privileges" () TO "service_role";
 
 GRANT ALL ON FUNCTION "public"."check_revert_to_builtin_version" ("appid" character varying) TO "anon";
 
@@ -5491,17 +5509,17 @@ GRANT ALL ON FUNCTION "public"."cleanup_queue_messages" () TO "authenticated";
 
 GRANT ALL ON FUNCTION "public"."cleanup_queue_messages" () TO "service_role";
 
-GRANT ALL ON FUNCTION "public"."convert_bytes_to_gb" ("byt" double precision) TO "anon";
+GRANT ALL ON FUNCTION "public"."convert_bytes_to_gb" ("bytes_value" double precision) TO "anon";
 
-GRANT ALL ON FUNCTION "public"."convert_bytes_to_gb" ("byt" double precision) TO "authenticated";
+GRANT ALL ON FUNCTION "public"."convert_bytes_to_gb" ("bytes_value" double precision) TO "authenticated";
 
-GRANT ALL ON FUNCTION "public"."convert_bytes_to_gb" ("byt" double precision) TO "service_role";
+GRANT ALL ON FUNCTION "public"."convert_bytes_to_gb" ("bytes_value" double precision) TO "service_role";
 
-GRANT ALL ON FUNCTION "public"."convert_bytes_to_mb" ("byt" double precision) TO "anon";
+GRANT ALL ON FUNCTION "public"."convert_bytes_to_mb" ("bytes_value" double precision) TO "anon";
 
-GRANT ALL ON FUNCTION "public"."convert_bytes_to_mb" ("byt" double precision) TO "authenticated";
+GRANT ALL ON FUNCTION "public"."convert_bytes_to_mb" ("bytes_value" double precision) TO "authenticated";
 
-GRANT ALL ON FUNCTION "public"."convert_bytes_to_mb" ("byt" double precision) TO "service_role";
+GRANT ALL ON FUNCTION "public"."convert_bytes_to_mb" ("bytes_value" double precision) TO "service_role";
 
 GRANT ALL ON FUNCTION "public"."convert_gb_to_bytes" ("gb" double precision) TO "anon";
 

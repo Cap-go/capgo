@@ -89,7 +89,7 @@ async function guard(
   const main = useMainStore()
 
   // TOTP means the user was force logged using the "email" tactic
-  // In practice this means the user is beeing spoofed by an admin
+  // In practice this means the user is being spoofed by an admin
   const isAdminForced
     = !!auth.user?.factors?.find(f => f.factor_type === 'totp') || false
 

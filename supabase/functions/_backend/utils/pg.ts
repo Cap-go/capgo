@@ -1,12 +1,14 @@
 import type { Context } from 'hono'
 import { and, eq, or, sql } from 'drizzle-orm'
+import { drizzle } from 'drizzle-orm/node-postgres'
 import { alias } from 'drizzle-orm/pg-core'
-import { drizzle } from 'drizzle-orm/postgres-js'
-import postgres from 'postgres'
+import { getRuntimeKey } from 'hono/adapter'
+// @ts-types="npm:@types/pg"
+import { Pool } from 'pg'
 import { backgroundTask, existInEnv, getEnv } from '../utils/utils.ts'
-import { getClientDbRegion } from './geolocation.ts'
-import { cloudlog, cloudlogErr } from './loggin.ts'
-import * as schema from './postgress_schema.ts'
+import { getClientDbRegionSB } from './geolocation.ts'
+import { cloudlog, cloudlogErr } from './logging.ts'
+import * as schema from './postgres_schema.ts'
 import { withOptionalManifestSelect } from './queryHelpers.ts'
 
 const PLAN_EXCEEDED_COLUMNS: Record<'mau' | 'storage' | 'bandwidth', string> = {
@@ -55,51 +57,52 @@ function fixSupabaseHost(host: string): string {
 }
 
 export function getDatabaseURL(c: Context, readOnly = false): string {
-  const dbRegion = getClientDbRegion(c)
+  const dbRegion = getClientDbRegionSB(c)
 
   // For read-only queries, use region to avoid Network latency
   if (readOnly) {
     // Hyperdrive main read replica regional routing in Cloudflare Workers
+    // When using Hyperdrive we use session databases directly to avoid supabase pooler overhead and allow prepared statements
     // Asia region
-    if (existInEnv(c, 'HYPERDRIVE_DB_SG') && dbRegion === 'AS') {
-      c.header('X-Database-Source', 'hyperdrive-sg')
-      cloudlog({ requestId: c.get('requestId'), message: 'Using Hyperdrive SG for read-only' })
-      return (getEnv(c, 'HYPERDRIVE_DB_SG') as unknown as Hyperdrive).connectionString
+    if (c.env.HYPERDRIVE_CAPGO_DIRECT_AS && dbRegion === 'AS') {
+      c.header('X-Database-Source', 'HYPERDRIVE_CAPGO_DIRECT_AS')
+      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_DIRECT_AS for read-only' })
+      return c.env.HYPERDRIVE_CAPGO_DIRECT_AS.connectionString
     }
     // US region
-    if (existInEnv(c, 'HYPERDRIVE_DB_US') && dbRegion === 'US') {
-      c.header('X-Database-Source', 'hyperdrive-us')
-      cloudlog({ requestId: c.get('requestId'), message: 'Using Hyperdrive US for read-only' })
-      return (getEnv(c, 'HYPERDRIVE_DB_US') as unknown as Hyperdrive).connectionString
+    if (c.env.HYPERDRIVE_CAPGO_DIRECT_NA && dbRegion === 'NA') {
+      c.header('X-Database-Source', 'HYPERDRIVE_CAPGO_DIRECT_NA')
+      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_DIRECT_NA for read-only' })
+      return c.env.HYPERDRIVE_CAPGO_DIRECT_NA.connectionString
     }
 
     // Custom Supabase Region Read replicate Poolers
     // Asia region
-    if (existInEnv(c, 'READ_SUPABASE_DB_URL_SG') && dbRegion === 'AS') {
-      c.header('X-Database-Source', 'read_pooler_sg')
-      cloudlog({ requestId: c.get('requestId'), message: 'Using Read Pooler SG for read-only' })
-      return getEnv(c, 'READ_SUPABASE_DB_URL_SG')
+    if (existInEnv(c, 'READ_SUPABASE_DB_URL_AS') && dbRegion === 'AS') {
+      c.header('X-Database-Source', 'read_pooler_as')
+      cloudlog({ requestId: c.get('requestId'), message: 'Using READ_SUPABASE_DB_URL_AS for read-only' })
+      return getEnv(c, 'READ_SUPABASE_DB_URL_AS')
     }
 
-    // US region
-    if (existInEnv(c, 'READ_SUPABASE_DB_URL_US') && dbRegion === 'US') {
-      c.header('X-Database-Source', 'read_pooler_us')
-      cloudlog({ requestId: c.get('requestId'), message: 'Using Read Pooler US for read-only' })
-      return getEnv(c, 'READ_SUPABASE_DB_URL_US')
+    // NA region
+    if (existInEnv(c, 'READ_SUPABASE_DB_URL_NA') && dbRegion === 'NA') {
+      c.header('X-Database-Source', 'read_pooler_na')
+      cloudlog({ requestId: c.get('requestId'), message: 'Using READ_SUPABASE_DB_URL_NA for read-only' })
+      return getEnv(c, 'READ_SUPABASE_DB_URL_NA')
     }
   }
 
   // Fallback to single Hyperdrive if available
-  if (existInEnv(c, 'HYPERDRIVE_DB_EU')) {
-    c.header('X-Database-Source', readOnly ? 'read_pooler_eu' : 'hyperdrive_eu')
-    cloudlog({ requestId: c.get('requestId'), message: `Using Hyperdrive EU for ${readOnly ? 'read-only' : 'read-write'}` })
-    return (getEnv(c, 'HYPERDRIVE_DB_EU') as unknown as Hyperdrive).connectionString
+  if (c.env.HYPERDRIVE_CAPGO_DIRECT_EU) {
+    c.header('X-Database-Source', 'HYPERDRIVE_CAPGO_DIRECT_EU')
+    cloudlog({ requestId: c.get('requestId'), message: `Using HYPERDRIVE_CAPGO_DIRECT_EU for ${readOnly ? 'read-only' : 'read-write'}` })
+    return c.env.HYPERDRIVE_CAPGO_DIRECT_EU.connectionString
   }
 
-  // Main DB write poller EU region
+  // Main DB write poller EU region in supabase
   if (existInEnv(c, 'MAIN_SUPABASE_DB_URL')) {
     c.header('X-Database-Source', 'sb_pooler_main')
-    cloudlog({ requestId: c.get('requestId'), message: 'Using Main Supabase Pooler for read-write' })
+    cloudlog({ requestId: c.get('requestId'), message: 'Using MAIN_SUPABASE_DB_URL for read-write' })
     return getEnv(c, 'MAIN_SUPABASE_DB_URL')
   }
 
@@ -112,38 +115,39 @@ export function getDatabaseURL(c: Context, readOnly = false): string {
 export function getPgClient(c: Context, readOnly = false) {
   const dbUrl = getDatabaseURL(c, readOnly)
   const requestId = c.get('requestId')
-  const appName = c.res.headers.get('X-Database-Source') ?? 'unknown source'
-  cloudlog({ requestId, message: 'SUPABASE_DB_URL', dbUrl })
+  const appName = c.res.headers.get('X-Worker-Source') ?? 'unknown source'
+  const dbName = c.res.headers.get('X-Database-Source') ?? 'unknown source'
+  cloudlog({ requestId, message: 'SUPABASE_DB_URL', dbUrl, dbName, appName })
 
   const options = {
-    prepare: false,
-    max: 5,
-    fetch_types: false,
-    idle_timeout: 20, // Increase from 2 to 20 seconds
-    connect_timeout: 10, // Add explicit connect timeout
-    max_lifetime: 60, // Add connection lifetime limit
-
-    // Add connection debugging
-    connection: {
-      application_name: appName,
-    },
-
-    // Hook to log errors - this is called for connection-level errors
-    onclose: (connectionId: number) => {
-      cloudlog({ requestId, message: 'PG Connection Closed', connectionId })
-    },
+    prepare: true,
+    connectionString: dbUrl,
+    max: 4,
+    application_name: `${appName}-${dbName}`,
+    idleTimeoutMillis: 20000, // Increase from 2 to 20 seconds
+    connectionTimeoutMillis: 10000, // Add explicit connect timeout
+    maxLifetimeMillis: 30 * 60 * 1000, // 30 minutes
   }
 
-  const db = postgres(dbUrl, options)
+  const pool = new Pool(options)
 
-  return db
+  // Hook to log when connections are removed from the pool
+  pool.on('remove', () => {
+    cloudlog({ requestId, message: 'PG Connection Removed from Pool' })
+  })
+
+  pool.on('error', (err: Error) => {
+    cloudlogErr({ requestId, message: 'PG Pool Error', error: err })
+  })
+
+  return pool
 }
 
 export function getDrizzleClient(db: ReturnType<typeof getPgClient>) {
-  return drizzle({ client: db, logger: true })
+  return drizzle(db, { schema, logger: true })
 }
 
-// Helper to extract detailed error information from postgres.js errors
+// Helper to extract detailed error information from pg errors
 export function logPgError(c: Context, functionName: string, error: unknown) {
   const e = error as Error & {
     code?: string
@@ -196,7 +200,9 @@ export function logPgError(c: Context, functionName: string, error: unknown) {
 
 export function closeClient(c: Context, db: ReturnType<typeof getPgClient>) {
   // cloudlog(c.get('requestId'), 'Closing client', client)
-  return backgroundTask(c, db.end())
+  if (getRuntimeKey() !== 'workerd')
+    return backgroundTask(c, db.end())
+  return undefined
 }
 
 export function getAlias() {

@@ -1,7 +1,7 @@
 import type { Context } from 'hono'
 import { LogSnag } from '@logsnag/node'
 
-import { cloudlog, cloudlogErr, serializeError } from './loggin.ts'
+import { cloudlog, cloudlogErr, serializeError } from './logging.ts'
 import { getEnv } from './utils.ts'
 
 function logsnag(c: Context) {

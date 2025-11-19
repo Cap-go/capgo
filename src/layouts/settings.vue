@@ -7,7 +7,7 @@ import { useRouter } from 'vue-router'
 import IconPlans from '~icons/material-symbols/price-change'
 import IconNotification from '~icons/mdi/message-notification'
 import IconPassword from '~icons/mdi/password'
-import IconAcount from '~icons/mdi/user'
+import IconAccount from '~icons/mdi/user'
 import IconBilling from '~icons/mingcute/bill-fill'
 import { openPortal } from '~/services/stripe'
 import { useOrganizationStore } from '~/stores/organization'
@@ -32,7 +32,7 @@ const ActiveTab = ref(getCurrentTab())
 const tabs = ref<Tab[]>([
   {
     label: 'account',
-    icon: shallowRef(IconAcount),
+    icon: shallowRef(IconAccount),
     key: '/settings/account',
   },
   {
@@ -50,7 +50,7 @@ const tabs = ref<Tab[]>([
 const organizationTabs = ref<Tab[]>([
   {
     label: 'general-information',
-    icon: shallowRef(IconAcount),
+    icon: shallowRef(IconAccount),
     key: '/settings/organization/',
   },
   {
@@ -74,7 +74,7 @@ watch(type, (val) => {
 })
 
 watchEffect(() => {
-  if (organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['super_admin'])
+  if (organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['super_admin'])
     && (!organizationTabs.value.find(tab => tab.label === 'usage'))) {
     // push it 2 before the last tab
     organizationTabs.value.push({
@@ -86,7 +86,7 @@ watchEffect(() => {
   else if (organizationTabs.value.find(tab => tab.label === 'usage')) {
     organizationTabs.value = organizationTabs.value.filter(tab => tab.label !== 'usage')
   }
-  if (organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['super_admin'])
+  if (organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['super_admin'])
     && !organizationTabs.value.find(tab => tab.label === 'plans')) {
     organizationTabs.value.push(
       {
@@ -96,12 +96,12 @@ watchEffect(() => {
       },
     )
   }
-  else if (!organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['super_admin'])) {
+  else if (!organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['super_admin'])) {
     organizationTabs.value = organizationTabs.value.filter(tab => tab.label !== 'plans')
   }
 
   if (!Capacitor.isNativePlatform()
-    && organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['super_admin'])
+    && organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['super_admin'])
     && !organizationTabs.value.find(tab => tab.label === 'billing')) {
     organizationTabs.value.push({
       label: 'billing',
@@ -110,7 +110,7 @@ watchEffect(() => {
       onClick: () => openPortal(organizationStore.currentOrganization?.gid ?? '', t),
     })
   }
-  else if (!organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['super_admin'])) {
+  else if (!organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['super_admin'])) {
     organizationTabs.value = organizationTabs.value.filter(tab => tab.label !== 'billing')
   }
 })

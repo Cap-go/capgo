@@ -2,7 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '../src/types/supabase.types'
 import { env } from 'node:process'
 import { createClient } from '@supabase/supabase-js'
-import postgres from 'postgres'
+import { Pool } from 'pg'
 
 export const POSTGRES_URL = 'postgresql://postgres:postgres@127.0.0.1:54322/postgres'
 
@@ -449,19 +449,23 @@ export async function cleanup(): Promise<void> {
 }
 
 // PostgreSQL direct connection helpers
-let sql: ReturnType<typeof postgres> | null = null
+let pool: Pool | null = null
 
-export async function getPostgresClient(): Promise<ReturnType<typeof postgres>> {
-  if (!sql) {
-    sql = postgres(POSTGRES_URL)
+export async function getPostgresClient(): Promise<Pool> {
+  if (!pool) {
+    pool = new Pool({
+      connectionString: POSTGRES_URL,
+      max: 1,
+      idleTimeoutMillis: 2000,
+    })
   }
-  return sql
+  return pool
 }
 
 export async function executeSQL(query: string, params?: any[]): Promise<any> {
   const client = await getPostgresClient()
-  const result = await client.unsafe(query, params || [])
-  return result
+  const result = await client.query(query, params || [])
+  return result.rows
 }
 
 export async function getCronPlanQueueCount(): Promise<number> {
@@ -475,9 +479,9 @@ export async function getLatestCronPlanMessage(): Promise<any> {
 }
 
 export async function cleanupPostgresClient(): Promise<void> {
-  if (sql) {
-    await sql.end()
-    sql = null
+  if (pool) {
+    await pool.end()
+    pool = null
   }
 }
 

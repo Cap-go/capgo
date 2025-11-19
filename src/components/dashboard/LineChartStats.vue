@@ -36,7 +36,7 @@ const props = defineProps({
   colors: { type: Object, default: () => ({}) },
   limits: { type: Object, default: () => ({}) },
   data: { type: Array, default: Array.from({ length: getDaysInCurrentMonth() }).fill(undefined) as number[] },
-  datasByApp: {
+  dataByApp: {
     type: Object,
     default: () => ({}),
   },
@@ -135,7 +135,7 @@ function monthdays() {
   return generateMonthDays(props.useBillingPeriod, cycleStart, cycleEnd)
 }
 
-function createAnotation(id: string, y: number, title: string, lineColor: string, bgColor: string) {
+function createAnnotation(id: string, y: number, title: string, lineColor: string, bgColor: string) {
   const obj: any = {}
   obj[`line_${id}`] = {
     type: 'line',
@@ -183,7 +183,7 @@ const generateAnnotations = computed(() => {
     if (val && val > min && val < (max * 1.2)) {
       annotations = {
         ...annotations,
-        ...createAnotation(key, val, key, lineColor, bgColor),
+        ...createAnnotation(key, val, key, lineColor, bgColor),
       }
     }
   })
@@ -215,14 +215,14 @@ function generateAppColors(appCount: number) {
 }
 
 const chartData = computed<ChartData<'line' | 'bar'>>(() => {
-  const appIds = Object.keys(props.datasByApp || {})
+  const appIds = Object.keys(props.dataByApp || {})
   const datasets = []
 
   if (appIds.length > 0) {
     // Create stacked area datasets for each app
     const appColors = generateAppColors(appIds.length)
     appIds.forEach((appId, index) => {
-      const appData = props.datasByApp[appId]
+      const appData = props.dataByApp[appId]
       if (appData) {
         // Process app data with accumulation if needed
         let processedData = appData
@@ -363,7 +363,7 @@ const todayLineOptions = computed(() => {
 })
 
 const chartOptions = computed<ChartOptions & { plugins: { inlineAnnotationPlugin: AnnotationOptions, todayLine?: any } }>(() => {
-  const hasAppData = Object.keys(props.datasByApp || {}).length > 0
+  const hasAppData = Object.keys(props.dataByApp || {}).length > 0
 
   return {
     maintainAspectRatio: false,

@@ -27,7 +27,7 @@ watchEffect(async () => {
     if (route.path.includes('/app/p/')) {
       appId.value = route.params.package as string
       if (!appId.value) {
-        console.error('cannot get app id. Parms:', route.params)
+        console.error('cannot get app id. Params:', route.params)
         return
       }
 

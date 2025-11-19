@@ -4,7 +4,7 @@ import { canParse } from '@std/semver'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod/mini'
 import { BRES, parseBody, simpleRateLimit } from '../utils/hono.ts'
-import { cloudlog } from '../utils/loggin.ts'
+import { cloudlog } from '../utils/logging.ts'
 import { parsePluginBody } from '../utils/plugin_parser.ts'
 import { update } from '../utils/update.ts'
 
@@ -60,7 +60,7 @@ app.post('/', async (c) => {
   const body = await parseBody<AppInfos>(c)
   cloudlog({ requestId: c.get('requestId'), message: 'post updates body', body })
   if (isLimited(c, body.app_id)) {
-    throw simpleRateLimit(body)
+    return simpleRateLimit(body)
   }
   return update(c, parsePluginBody<AppInfos>(c, body, jsonRequestSchema))
 })

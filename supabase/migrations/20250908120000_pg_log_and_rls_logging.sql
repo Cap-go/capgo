@@ -733,8 +733,8 @@ BEGIN
 END;
 $$;
 
--- 5) public.check_org_user_privilages() – log on privilege escalation
-CREATE OR REPLACE FUNCTION "public"."check_org_user_privilages" () RETURNS "trigger" LANGUAGE "plpgsql"
+-- 5) public.public.check_org_user_privileges() – log on privilege escalation
+CREATE OR REPLACE FUNCTION "public"."public.check_org_user_privileges" () RETURNS "trigger" LANGUAGE "plpgsql"
 SET
   search_path = '' AS $$BEGIN
 
@@ -751,13 +751,13 @@ SET
   IF NEW.user_right IS NOT DISTINCT FROM 'super_admin'::"public"."user_min_right"
   THEN
     PERFORM public.pg_log('deny: ELEVATE_SUPER_ADMIN', jsonb_build_object('org_id', NEW.org_id, 'uid', auth.uid()));
-    RAISE EXCEPTION 'Admins cannot elevate privilages!';
+    RAISE EXCEPTION 'Admins cannot elevate privileges!';
   END IF;
 
   IF NEW.user_right IS NOT DISTINCT FROM 'invite_super_admin'::"public"."user_min_right"
   THEN
     PERFORM public.pg_log('deny: ELEVATE_INVITE_SUPER_ADMIN', jsonb_build_object('org_id', NEW.org_id, 'uid', auth.uid()));
-    RAISE EXCEPTION 'Admins cannot elevate privilages!';
+    RAISE EXCEPTION 'Admins cannot elevate privileges!';
   END IF;
 
   RETURN NEW;

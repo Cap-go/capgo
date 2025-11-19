@@ -21,7 +21,7 @@ import { app as on_version_delete } from '../_backend/triggers/on_version_delete
 import { app as on_version_update } from '../_backend/triggers/on_version_update.ts'
 import { app as queue_consumer } from '../_backend/triggers/queue_consumer.ts'
 import { app as stripe_event } from '../_backend/triggers/stripe_event.ts'
-import { createHono } from '../_backend/utils/hono.ts'
+import { createAllCatch, createHono } from '../_backend/utils/hono.ts'
 import { version } from '../_backend/utils/version.ts'
 
 const functionName = 'triggers'
@@ -51,5 +51,5 @@ appGlobal.route('/on_organization_delete', on_organization_delete)
 appGlobal.route('/on_deploy_history_create', on_deploy_history_create)
 appGlobal.route('/queue_consumer', queue_consumer)
 
-// createAllCatch(appGlobal, functionName)
+createAllCatch(appGlobal, functionName)
 Deno.serve(appGlobal.fetch)

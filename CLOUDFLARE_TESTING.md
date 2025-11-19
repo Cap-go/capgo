@@ -50,8 +50,8 @@ The workers support two testing modes:
 - Requires D1 setup and sync
 - **Recommended for comprehensive testing** since production uses D1
 
-The workers automatically use V2 mode when `IS_V2=1` is set in the local
-environment.
+The workers automatically use V2 mode when `IS_V2_STATS=1`, `IS_V2_CHANNEL=1`,
+or `IS_V2_UPDATER=1` is set in the local environment.
 
 ## Running Tests
 
@@ -193,12 +193,14 @@ To run Cloudflare Worker tests in CI:
 ### Overview
 
 V2 testing mode tests the production D1 (Cloudflare's edge database) code path.
-In production, a percentage of traffic (controlled by `IS_V2`) uses D1 instead
-of PostgreSQL for faster reads at the edge.
+In production, a percentage of traffic (controlled by `IS_V2_STATS`,
+`IS_V2_CHANNEL`, `IS_V2_UPDATER`) uses D1 instead of PostgreSQL for faster reads
+at the edge.
 
 ### Why Test V2?
 
-- **Production parity**: 90% of production traffic uses D1 (`IS_V2=0.9`)
+- **Production parity**: 90% of production traffic uses D1 (`IS_V2_STATS=0.9`,
+  `IS_V2_CHANNEL=0.9`, `IS_V2_UPDATER=0.9`)
 - **Catch D1-specific bugs**: D1 uses SQLite syntax which differs from
   PostgreSQL
 - **Validate data sync**: Ensures the Postgres→D1 sync system works correctly
@@ -255,7 +257,9 @@ bun run scripts/sync-postgres-to-d1.ts
 Check the worker startup logs for:
 
 ```
-env.IS_V2 ("1")                                            Environment Variable      local
+env.IS_V2_STATS ("1")                                            Environment Variable      local
+env.IS_V2_CHANNEL ("1")                                         Environment Variable      local
+env.IS_V2_UPDATER ("0")                                        Environment Variable      local
 env.DB_REPLICA_EU (capgo_local_replicate)                   D1 Database               local
 ```
 

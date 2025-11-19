@@ -138,7 +138,7 @@ async function loadData(initial: boolean) {
 }
 
 watch(currentOrganization, async (newOrg, prevOrg) => {
-  if (!organizationStore.hasPermisisonsInRole(await organizationStore.getCurrentRole(newOrg?.created_by ?? ''), ['super_admin'])) {
+  if (!organizationStore.hasPermissionsInRole(await organizationStore.getCurrentRole(newOrg?.created_by ?? ''), ['super_admin'])) {
     if (!initialLoad.value) {
       const orgsMap = organizationStore.getAllOrgs()
       const newOrg = [...orgsMap]

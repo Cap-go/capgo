@@ -4,29 +4,52 @@
   "compatibility_date": "2025-09-15",
   "main": "./index.ts",
   "compatibility_flags": [
-    "nodejs_compat_v2",
+    "nodejs_compat",
+    // "enable_workers_observability_tracing",
     "nodejs_compat_populate_process_env"
   ],
   "workers_dev": false,
-  "placement": {
-    "mode": "smart"
-  },
   "upload_source_maps": true,
   "env": {
-    "prod": {
-      "name": "capgo_plugin-prod",
+    "prod_eu": {
+      "name": "capgo_plugin-eu-prod",
       "vars": {
-        "IS_V2": "0",
-        "ENV_NAME": "capgo_plugin-prod"
+        "IS_V2_STATS": "1",
+        "IS_V2_CHANNEL": "1",
+        "IS_V2_UPDATER": "0",
+        "ENV_NAME": "capgo_plugin-eu-prod"
       },
       "observability": {
-        "enabled": true,
-        "head_sampling_rate": 0.001
+        "head_sampling_rate": 0.001,
+        "enabled": true
+      },
+      "placement": {
+        "mode": "smart"
       },
       "routes": [
         {
           "pattern": "plugin.capgo.app",
           "custom_domain": true
+        },
+        {
+          "pattern": "plugin.eu.capgo.app",
+          "custom_domain": true
+        },
+        {
+          "pattern": "plugin.eu.usecapgo.com",
+          "custom_domain": true
+        },
+        {
+          "pattern": "plugin.usecapgo.com",
+          "custom_domain": true
+        },
+        {
+          "pattern": "updater.capgo.com.cn/*",
+          "zone_name": "capgo.app"
+        },
+        {
+          "pattern": "updater.spencer.co/*",
+          "zone_name": "capgo.app"
         },
         // TODO: remove this it's deprecated
         {
@@ -44,20 +67,8 @@
         {
           "pattern": "api.capgo.app/stats",
           "zone_name": "capgo.app"
-        },
+        }
         // end of TODO
-        {
-          "pattern": "plugin.usecapgo.com",
-          "custom_domain": true
-        },
-        {
-          "pattern": "updater.capgo.com.cn/*",
-          "zone_name": "capgo.app"
-        },
-        {
-          "pattern": "updater.spencer.co/*",
-          "zone_name": "capgo.app"
-        }
       ],
       "analytics_engine_datasets": [
         {
@@ -93,9 +104,14 @@
           "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
         },
         {
+          "binding": "DB_REPLICA_OC",
+          "database_name": "capgo_replicate_oc",
+          "database_id": "58dbd199-4629-4bd0-a02c-ce019b5ab2e0"
+        },
+        {
           "binding": "DB_REPLICA_EU",
-          "database_name": "capgo_replicate",
-          "database_id": "7f267d86-f4f7-49f5-9622-e44373aa00dc"
+          "database_name": "capgo_replicate_eu",
+          "database_id": "107046f7-af0e-4126-b493-1d4e66f48947"
         },
         {
           "binding": "DB_REPLICA_AS",
@@ -103,191 +119,886 @@
           "database_id": "c01d7197-67b8-4b23-99d9-cceb76d3e7f6"
         },
         {
-          "binding": "DB_REPLICA_US",
+          "binding": "DB_REPLICA_NA",
           "database_name": "capgo_replicate_us",
           "database_id": "320c32be-d3d9-4c7c-a84c-e20ef01fd20d"
         }
       ],
       "hyperdrive": [
         {
-          "binding": "HYPERDRIVE_DB_EU",
-          "id": "52723917a61f49b7b36eb71b225b19f5"
+          "binding": "HYPERDRIVE_CAPGO_DIRECT_EU",
+          "id": "ae1fe6178b564adc9fc9a71ccc769a35"
         },
         {
-          "binding": "HYPERDRIVE_DB_SG",
-          "id": "acaf2391be8449f18e49776847d3106c"
+          "binding": "HYPERDRIVE_CAPGO_DIRECT_AS",
+          "id": "fcb24f3a06144ed2a940cf682321f312"
         },
         {
-          "binding": "HYPERDRIVE_DB_US",
-          "id": "a2acda0d0be14c1285b33fbf32c99466"
+          "binding": "HYPERDRIVE_CAPGO_DIRECT_NA",
+          "id": "8d3cfaace1fc4f66a6c0da5dbc41c4bf"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_SESSION_EU",
+          "id": "07838c5ad23d4c5dac99e1a2fcdab2f4"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_SESSION_AS",
+          "id": "05ccf0817feb4161b8544cba1306ed9e"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_SESSION_NA",
+          "id": "7e2f8d7496c249798f78342ca25edb20"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_TRANSACTION_EU",
+          "id": "b661b11c413844c5a08406bc37390590"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_TRANSACTION_AS",
+          "id": "37569e8f364d45e495b2c9d2ce3ddfbc"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_TRANSACTION_NA",
+          "id": "73f370b143724245a1e3239d2bc7db94"
         }
       ]
     },
-    "prodv1": {
-      "name": "capgo_plugin-v1-prod",
+    "prod_me": {
+      "name": "capgo_plugin-me-prod",
       "vars": {
-        "IS_V2": "0",
-        "ENV_NAME": "capgo_plugin-v1-prod"
+        "IS_V2_STATS": "1",
+        "IS_V2_CHANNEL": "1",
+        "IS_V2_UPDATER": "0",
+        "ENV_NAME": "capgo_plugin-me-prod"
       },
       "observability": {
-        "enabled": true,
-        "head_sampling_rate": 1
+        "head_sampling_rate": 0.001,
+        "enabled": true
       },
-      "routes": [
-        {
-          "pattern": "plugin.v1.capgo.app",
-          "custom_domain": true
-        },
-        {
-          "pattern": "plugin.v1.usecapgo.com",
-          "custom_domain": true
-        }
-      ],
-      "analytics_engine_datasets": [
-        {
-          "binding": "DEVICE_USAGE",
-          "dataset": "device_usage"
-        },
-        {
-          "binding": "BANDWIDTH_USAGE",
-          "dataset": "bandwidth_usage"
-        },
-        {
-          "binding": "VERSION_USAGE",
-          "dataset": "version_usage"
-        },
-        {
-          "binding": "APP_LOG",
-          "dataset": "app_log"
-        },
-        {
-          "binding": "APP_LOG_EXTERNAL",
-          "dataset": "app_log_external"
-        }
-      ],
-      "d1_databases": [
-        {
-          "binding": "DB_DEVICES",
-          "database_name": "capgo_prod_devices",
-          "database_id": "2510b55c-d6a2-4595-a2a5-d9aca82a3753"
-        },
-        {
-          "binding": "DB_STOREAPPS",
-          "database_name": "capgo_prod_storeapps",
-          "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
-        }
-      ],
-      "hyperdrive": [
-        {
-          "binding": "HYPERDRIVE_DB_EU",
-          "id": "52723917a61f49b7b36eb71b225b19f5"
-        },
-
-        {
-          "binding": "HYPERDRIVE_DB_SG",
-          "id": "acaf2391be8449f18e49776847d3106c"
-        },
-        {
-          "binding": "HYPERDRIVE_DB_US",
-          "id": "a2acda0d0be14c1285b33fbf32c99466"
-        }
-      ]
-    },
-    "prodv2": {
-      "name": "capgo_plugin-v2-prod",
-      "vars": {
-        "IS_V2": "1",
-        "ENV_NAME": "capgo_plugin-v2-prod"
-      },
-      "observability": {
-        "enabled": true,
-        "head_sampling_rate": 1
-      },
-      "routes": [
-        {
-          "pattern": "plugin.v2.capgo.app",
-          "custom_domain": true
-        },
-        {
-          "pattern": "plugin.v2.usecapgo.com",
-          "custom_domain": true
-        }
-      ],
-      "analytics_engine_datasets": [
-        {
-          "binding": "DEVICE_USAGE",
-          "dataset": "device_usage"
-        },
-        {
-          "binding": "BANDWIDTH_USAGE",
-          "dataset": "bandwidth_usage"
-        },
-        {
-          "binding": "VERSION_USAGE",
-          "dataset": "version_usage"
-        },
-        {
-          "binding": "APP_LOG",
-          "dataset": "app_log"
-        },
-        {
-          "binding": "APP_LOG_EXTERNAL",
-          "dataset": "app_log_external"
-        }
-      ],
-      "d1_databases": [
-        {
-          "binding": "DB_DEVICES",
-          "database_name": "capgo_prod_devices",
-          "database_id": "2510b55c-d6a2-4595-a2a5-d9aca82a3753"
-        },
-        {
-          "binding": "DB_STOREAPPS",
-          "database_name": "capgo_prod_storeapps",
-          "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
-        },
-        {
-          "binding": "DB_REPLICA_EU",
-          "database_name": "capgo_replicate",
-          "database_id": "7f267d86-f4f7-49f5-9622-e44373aa00dc"
-        },
-        {
-          "binding": "DB_REPLICA_AS",
-          "database_name": "capgo_replicate_as",
-          "database_id": "c01d7197-67b8-4b23-99d9-cceb76d3e7f6"
-        },
-        {
-          "binding": "DB_REPLICA_US",
-          "database_name": "capgo_replicate_us",
-          "database_id": "320c32be-d3d9-4c7c-a84c-e20ef01fd20d"
-        }
-      ],
-      "hyperdrive": [
-        {
-          "binding": "HYPERDRIVE_DB_EU",
-          "id": "52723917a61f49b7b36eb71b225b19f5"
-        },
-        {
-          "binding": "HYPERDRIVE_DB_SG",
-          "id": "acaf2391be8449f18e49776847d3106c"
-        },
-        {
-          "binding": "HYPERDRIVE_DB_US",
-          "id": "a2acda0d0be14c1285b33fbf32c99466"
-        }
-      ],
-      // Do not place smart as we want to use read replicas in specific regions
       "placement": {
-        "mode": "off"
-      }
+        "mode": "smart"
+      },
+      "routes": [
+        {
+          "pattern": "plugin.me.capgo.app",
+          "custom_domain": true
+        },
+        {
+          "pattern": "plugin.me.usecapgo.com",
+          "custom_domain": true
+        }
+      ],
+      "analytics_engine_datasets": [
+        {
+          "binding": "DEVICE_USAGE",
+          "dataset": "device_usage"
+        },
+        {
+          "binding": "BANDWIDTH_USAGE",
+          "dataset": "bandwidth_usage"
+        },
+        {
+          "binding": "VERSION_USAGE",
+          "dataset": "version_usage"
+        },
+        {
+          "binding": "APP_LOG",
+          "dataset": "app_log"
+        },
+        {
+          "binding": "APP_LOG_EXTERNAL",
+          "dataset": "app_log_external"
+        }
+      ],
+      "d1_databases": [
+        {
+          "binding": "DB_DEVICES",
+          "database_name": "capgo_prod_devices",
+          "database_id": "2510b55c-d6a2-4595-a2a5-d9aca82a3753"
+        },
+        {
+          "binding": "DB_STOREAPPS",
+          "database_name": "capgo_prod_storeapps",
+          "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
+        },
+        {
+          "binding": "DB_REPLICA_OC",
+          "database_name": "capgo_replicate_oc",
+          "database_id": "58dbd199-4629-4bd0-a02c-ce019b5ab2e0"
+        },
+        {
+          "binding": "DB_REPLICA_EU",
+          "database_name": "capgo_replicate_eu",
+          "database_id": "107046f7-af0e-4126-b493-1d4e66f48947"
+        },
+        {
+          "binding": "DB_REPLICA_AS",
+          "database_name": "capgo_replicate_as",
+          "database_id": "c01d7197-67b8-4b23-99d9-cceb76d3e7f6"
+        },
+        {
+          "binding": "DB_REPLICA_NA",
+          "database_name": "capgo_replicate_us",
+          "database_id": "320c32be-d3d9-4c7c-a84c-e20ef01fd20d"
+        }
+      ],
+      "hyperdrive": [
+        {
+          "binding": "HYPERDRIVE_CAPGO_DIRECT_EU",
+          "id": "ae1fe6178b564adc9fc9a71ccc769a35"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_DIRECT_AS",
+          "id": "fcb24f3a06144ed2a940cf682321f312"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_DIRECT_NA",
+          "id": "8d3cfaace1fc4f66a6c0da5dbc41c4bf"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_SESSION_EU",
+          "id": "07838c5ad23d4c5dac99e1a2fcdab2f4"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_SESSION_AS",
+          "id": "05ccf0817feb4161b8544cba1306ed9e"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_SESSION_NA",
+          "id": "7e2f8d7496c249798f78342ca25edb20"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_TRANSACTION_EU",
+          "id": "b661b11c413844c5a08406bc37390590"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_TRANSACTION_AS",
+          "id": "37569e8f364d45e495b2c9d2ce3ddfbc"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_TRANSACTION_NA",
+          "id": "73f370b143724245a1e3239d2bc7db94"
+        }
+      ]
+    },
+    "prod_hk": {
+      "name": "capgo_plugin-hk-prod",
+      "vars": {
+        "IS_V2_STATS": "1",
+        "IS_V2_CHANNEL": "1",
+        "IS_V2_UPDATER": "0",
+        "ENV_NAME": "capgo_plugin-hk-prod"
+      },
+      "observability": {
+        "head_sampling_rate": 0.001,
+        "enabled": true
+      },
+      "placement": {
+        "mode": "smart"
+      },
+      "routes": [
+        {
+          "pattern": "plugin.hk.capgo.app",
+          "custom_domain": true
+        },
+        {
+          "pattern": "plugin.cn.usecapgo.com",
+          "custom_domain": true
+        }
+      ],
+      "analytics_engine_datasets": [
+        {
+          "binding": "DEVICE_USAGE",
+          "dataset": "device_usage"
+        },
+        {
+          "binding": "BANDWIDTH_USAGE",
+          "dataset": "bandwidth_usage"
+        },
+        {
+          "binding": "VERSION_USAGE",
+          "dataset": "version_usage"
+        },
+        {
+          "binding": "APP_LOG",
+          "dataset": "app_log"
+        },
+        {
+          "binding": "APP_LOG_EXTERNAL",
+          "dataset": "app_log_external"
+        }
+      ],
+      "d1_databases": [
+        {
+          "binding": "DB_DEVICES",
+          "database_name": "capgo_prod_devices",
+          "database_id": "2510b55c-d6a2-4595-a2a5-d9aca82a3753"
+        },
+        {
+          "binding": "DB_STOREAPPS",
+          "database_name": "capgo_prod_storeapps",
+          "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
+        },
+        {
+          "binding": "DB_REPLICA_OC",
+          "database_name": "capgo_replicate_oc",
+          "database_id": "58dbd199-4629-4bd0-a02c-ce019b5ab2e0"
+        },
+        {
+          "binding": "DB_REPLICA_EU",
+          "database_name": "capgo_replicate_eu",
+          "database_id": "107046f7-af0e-4126-b493-1d4e66f48947"
+        },
+        {
+          "binding": "DB_REPLICA_AS",
+          "database_name": "capgo_replicate_as",
+          "database_id": "c01d7197-67b8-4b23-99d9-cceb76d3e7f6"
+        },
+        {
+          "binding": "DB_REPLICA_NA",
+          "database_name": "capgo_replicate_us",
+          "database_id": "320c32be-d3d9-4c7c-a84c-e20ef01fd20d"
+        }
+      ],
+      "hyperdrive": [
+        {
+          "binding": "HYPERDRIVE_CAPGO_DIRECT_EU",
+          "id": "ae1fe6178b564adc9fc9a71ccc769a35"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_DIRECT_AS",
+          "id": "fcb24f3a06144ed2a940cf682321f312"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_DIRECT_NA",
+          "id": "8d3cfaace1fc4f66a6c0da5dbc41c4bf"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_SESSION_EU",
+          "id": "07838c5ad23d4c5dac99e1a2fcdab2f4"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_SESSION_AS",
+          "id": "05ccf0817feb4161b8544cba1306ed9e"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_SESSION_NA",
+          "id": "7e2f8d7496c249798f78342ca25edb20"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_TRANSACTION_EU",
+          "id": "b661b11c413844c5a08406bc37390590"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_TRANSACTION_AS",
+          "id": "37569e8f364d45e495b2c9d2ce3ddfbc"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_TRANSACTION_NA",
+          "id": "73f370b143724245a1e3239d2bc7db94"
+        }
+      ]
+    },
+    "prod_as": {
+      "name": "capgo_plugin-as-prod",
+      "vars": {
+        "IS_V2_STATS": "1",
+        "IS_V2_CHANNEL": "1",
+        "IS_V2_UPDATER": "0",
+        "ENV_NAME": "capgo_plugin-as-prod"
+      },
+      "observability": {
+        "head_sampling_rate": 0.001,
+        "enabled": true
+      },
+      "placement": {
+        "mode": "smart"
+      },
+      "routes": [
+        {
+          "pattern": "plugin.as.capgo.app",
+          "custom_domain": true
+        },
+        {
+          "pattern": "plugin.as.usecapgo.com",
+          "custom_domain": true
+        }
+      ],
+      "analytics_engine_datasets": [
+        {
+          "binding": "DEVICE_USAGE",
+          "dataset": "device_usage"
+        },
+        {
+          "binding": "BANDWIDTH_USAGE",
+          "dataset": "bandwidth_usage"
+        },
+        {
+          "binding": "VERSION_USAGE",
+          "dataset": "version_usage"
+        },
+        {
+          "binding": "APP_LOG",
+          "dataset": "app_log"
+        },
+        {
+          "binding": "APP_LOG_EXTERNAL",
+          "dataset": "app_log_external"
+        }
+      ],
+      "d1_databases": [
+        {
+          "binding": "DB_DEVICES",
+          "database_name": "capgo_prod_devices",
+          "database_id": "2510b55c-d6a2-4595-a2a5-d9aca82a3753"
+        },
+        {
+          "binding": "DB_STOREAPPS",
+          "database_name": "capgo_prod_storeapps",
+          "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
+        },
+        {
+          "binding": "DB_REPLICA_OC",
+          "database_name": "capgo_replicate_oc",
+          "database_id": "58dbd199-4629-4bd0-a02c-ce019b5ab2e0"
+        },
+        {
+          "binding": "DB_REPLICA_EU",
+          "database_name": "capgo_replicate_eu",
+          "database_id": "107046f7-af0e-4126-b493-1d4e66f48947"
+        },
+        {
+          "binding": "DB_REPLICA_AS",
+          "database_name": "capgo_replicate_as",
+          "database_id": "c01d7197-67b8-4b23-99d9-cceb76d3e7f6"
+        },
+        {
+          "binding": "DB_REPLICA_NA",
+          "database_name": "capgo_replicate_us",
+          "database_id": "320c32be-d3d9-4c7c-a84c-e20ef01fd20d"
+        }
+      ],
+      "hyperdrive": [
+        {
+          "binding": "HYPERDRIVE_CAPGO_DIRECT_EU",
+          "id": "ae1fe6178b564adc9fc9a71ccc769a35"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_DIRECT_AS",
+          "id": "fcb24f3a06144ed2a940cf682321f312"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_DIRECT_NA",
+          "id": "8d3cfaace1fc4f66a6c0da5dbc41c4bf"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_SESSION_EU",
+          "id": "07838c5ad23d4c5dac99e1a2fcdab2f4"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_SESSION_AS",
+          "id": "05ccf0817feb4161b8544cba1306ed9e"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_SESSION_NA",
+          "id": "7e2f8d7496c249798f78342ca25edb20"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_TRANSACTION_EU",
+          "id": "b661b11c413844c5a08406bc37390590"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_TRANSACTION_AS",
+          "id": "37569e8f364d45e495b2c9d2ce3ddfbc"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_TRANSACTION_NA",
+          "id": "73f370b143724245a1e3239d2bc7db94"
+        }
+      ]
+    },
+    "prod_na": {
+      "name": "capgo_plugin-na-prod",
+      "vars": {
+        "IS_V2_STATS": "1",
+        "IS_V2_CHANNEL": "1",
+        "IS_V2_UPDATER": "0",
+        "ENV_NAME": "capgo_plugin-na-prod"
+      },
+      "observability": {
+        "head_sampling_rate": 0.001,
+        "enabled": true
+      },
+      "placement": {
+        "mode": "smart"
+      },
+      "routes": [
+        {
+          "pattern": "plugin.na.capgo.app",
+          "custom_domain": true
+        },
+        {
+          "pattern": "plugin.na.usecapgo.com",
+          "custom_domain": true
+        }
+      ],
+      "analytics_engine_datasets": [
+        {
+          "binding": "DEVICE_USAGE",
+          "dataset": "device_usage"
+        },
+        {
+          "binding": "BANDWIDTH_USAGE",
+          "dataset": "bandwidth_usage"
+        },
+        {
+          "binding": "VERSION_USAGE",
+          "dataset": "version_usage"
+        },
+        {
+          "binding": "APP_LOG",
+          "dataset": "app_log"
+        },
+        {
+          "binding": "APP_LOG_EXTERNAL",
+          "dataset": "app_log_external"
+        }
+      ],
+      "d1_databases": [
+        {
+          "binding": "DB_DEVICES",
+          "database_name": "capgo_prod_devices",
+          "database_id": "2510b55c-d6a2-4595-a2a5-d9aca82a3753"
+        },
+        {
+          "binding": "DB_STOREAPPS",
+          "database_name": "capgo_prod_storeapps",
+          "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
+        },
+        {
+          "binding": "DB_REPLICA_OC",
+          "database_name": "capgo_replicate_oc",
+          "database_id": "58dbd199-4629-4bd0-a02c-ce019b5ab2e0"
+        },
+        {
+          "binding": "DB_REPLICA_EU",
+          "database_name": "capgo_replicate_eu",
+          "database_id": "107046f7-af0e-4126-b493-1d4e66f48947"
+        },
+        {
+          "binding": "DB_REPLICA_AS",
+          "database_name": "capgo_replicate_as",
+          "database_id": "c01d7197-67b8-4b23-99d9-cceb76d3e7f6"
+        },
+        {
+          "binding": "DB_REPLICA_NA",
+          "database_name": "capgo_replicate_us",
+          "database_id": "320c32be-d3d9-4c7c-a84c-e20ef01fd20d"
+        }
+      ],
+      "hyperdrive": [
+        {
+          "binding": "HYPERDRIVE_CAPGO_DIRECT_EU",
+          "id": "ae1fe6178b564adc9fc9a71ccc769a35"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_DIRECT_AS",
+          "id": "fcb24f3a06144ed2a940cf682321f312"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_DIRECT_NA",
+          "id": "8d3cfaace1fc4f66a6c0da5dbc41c4bf"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_SESSION_EU",
+          "id": "07838c5ad23d4c5dac99e1a2fcdab2f4"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_SESSION_AS",
+          "id": "05ccf0817feb4161b8544cba1306ed9e"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_SESSION_NA",
+          "id": "7e2f8d7496c249798f78342ca25edb20"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_TRANSACTION_EU",
+          "id": "b661b11c413844c5a08406bc37390590"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_TRANSACTION_AS",
+          "id": "37569e8f364d45e495b2c9d2ce3ddfbc"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_TRANSACTION_NA",
+          "id": "73f370b143724245a1e3239d2bc7db94"
+        }
+      ]
+    },
+    "prod_af": {
+      "name": "capgo_plugin-af-prod",
+      "vars": {
+        "IS_V2_STATS": "1",
+        "IS_V2_CHANNEL": "1",
+        "IS_V2_UPDATER": "0",
+        "ENV_NAME": "capgo_plugin-af-prod"
+      },
+      "placement": {
+        "mode": "smart"
+      },
+      "observability": {
+        "head_sampling_rate": 0.001,
+        "enabled": true
+      },
+      "routes": [
+        {
+          "pattern": "plugin.af.capgo.app",
+          "custom_domain": true
+        },
+        {
+          "pattern": "plugin.af.usecapgo.com",
+          "custom_domain": true
+        }
+      ],
+      "analytics_engine_datasets": [
+        {
+          "binding": "DEVICE_USAGE",
+          "dataset": "device_usage"
+        },
+        {
+          "binding": "BANDWIDTH_USAGE",
+          "dataset": "bandwidth_usage"
+        },
+        {
+          "binding": "VERSION_USAGE",
+          "dataset": "version_usage"
+        },
+        {
+          "binding": "APP_LOG",
+          "dataset": "app_log"
+        },
+        {
+          "binding": "APP_LOG_EXTERNAL",
+          "dataset": "app_log_external"
+        }
+      ],
+      "d1_databases": [
+        {
+          "binding": "DB_DEVICES",
+          "database_name": "capgo_prod_devices",
+          "database_id": "2510b55c-d6a2-4595-a2a5-d9aca82a3753"
+        },
+        {
+          "binding": "DB_STOREAPPS",
+          "database_name": "capgo_prod_storeapps",
+          "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
+        },
+        {
+          "binding": "DB_REPLICA_OC",
+          "database_name": "capgo_replicate_oc",
+          "database_id": "58dbd199-4629-4bd0-a02c-ce019b5ab2e0"
+        },
+        {
+          "binding": "DB_REPLICA_EU",
+          "database_name": "capgo_replicate_eu",
+          "database_id": "107046f7-af0e-4126-b493-1d4e66f48947"
+        },
+        {
+          "binding": "DB_REPLICA_AS",
+          "database_name": "capgo_replicate_as",
+          "database_id": "c01d7197-67b8-4b23-99d9-cceb76d3e7f6"
+        },
+        {
+          "binding": "DB_REPLICA_NA",
+          "database_name": "capgo_replicate_us",
+          "database_id": "320c32be-d3d9-4c7c-a84c-e20ef01fd20d"
+        }
+      ],
+      "hyperdrive": [
+        {
+          "binding": "HYPERDRIVE_CAPGO_DIRECT_EU",
+          "id": "ae1fe6178b564adc9fc9a71ccc769a35"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_DIRECT_AS",
+          "id": "fcb24f3a06144ed2a940cf682321f312"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_DIRECT_NA",
+          "id": "8d3cfaace1fc4f66a6c0da5dbc41c4bf"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_SESSION_EU",
+          "id": "07838c5ad23d4c5dac99e1a2fcdab2f4"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_SESSION_AS",
+          "id": "05ccf0817feb4161b8544cba1306ed9e"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_SESSION_NA",
+          "id": "7e2f8d7496c249798f78342ca25edb20"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_TRANSACTION_EU",
+          "id": "b661b11c413844c5a08406bc37390590"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_TRANSACTION_AS",
+          "id": "37569e8f364d45e495b2c9d2ce3ddfbc"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_TRANSACTION_NA",
+          "id": "73f370b143724245a1e3239d2bc7db94"
+        }
+      ]
+    },
+    "prod_oc": {
+      "name": "capgo_plugin-oc-prod",
+      "vars": {
+        "IS_V2_STATS": "1",
+        "IS_V2_CHANNEL": "1",
+        "IS_V2_UPDATER": "0",
+        "ENV_NAME": "capgo_plugin-oc-prod"
+      },
+      "observability": {
+        "head_sampling_rate": 0.001,
+        "enabled": true
+      },
+      "placement": {
+        "mode": "smart"
+      },
+      "routes": [
+        {
+          "pattern": "plugin.oc.capgo.app",
+          "custom_domain": true
+        },
+        {
+          "pattern": "plugin.oc.usecapgo.com",
+          "custom_domain": true
+        }
+      ],
+      "analytics_engine_datasets": [
+        {
+          "binding": "DEVICE_USAGE",
+          "dataset": "device_usage"
+        },
+        {
+          "binding": "BANDWIDTH_USAGE",
+          "dataset": "bandwidth_usage"
+        },
+        {
+          "binding": "VERSION_USAGE",
+          "dataset": "version_usage"
+        },
+        {
+          "binding": "APP_LOG",
+          "dataset": "app_log"
+        },
+        {
+          "binding": "APP_LOG_EXTERNAL",
+          "dataset": "app_log_external"
+        }
+      ],
+      "d1_databases": [
+        {
+          "binding": "DB_DEVICES",
+          "database_name": "capgo_prod_devices",
+          "database_id": "2510b55c-d6a2-4595-a2a5-d9aca82a3753"
+        },
+        {
+          "binding": "DB_STOREAPPS",
+          "database_name": "capgo_prod_storeapps",
+          "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
+        },
+        {
+          "binding": "DB_REPLICA_OC",
+          "database_name": "capgo_replicate_oc",
+          "database_id": "58dbd199-4629-4bd0-a02c-ce019b5ab2e0"
+        },
+        {
+          "binding": "DB_REPLICA_EU",
+          "database_name": "capgo_replicate_eu",
+          "database_id": "107046f7-af0e-4126-b493-1d4e66f48947"
+        },
+        {
+          "binding": "DB_REPLICA_AS",
+          "database_name": "capgo_replicate_as",
+          "database_id": "c01d7197-67b8-4b23-99d9-cceb76d3e7f6"
+        },
+        {
+          "binding": "DB_REPLICA_NA",
+          "database_name": "capgo_replicate_us",
+          "database_id": "320c32be-d3d9-4c7c-a84c-e20ef01fd20d"
+        }
+      ],
+      "hyperdrive": [
+        {
+          "binding": "HYPERDRIVE_CAPGO_DIRECT_EU",
+          "id": "ae1fe6178b564adc9fc9a71ccc769a35"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_DIRECT_AS",
+          "id": "fcb24f3a06144ed2a940cf682321f312"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_DIRECT_NA",
+          "id": "8d3cfaace1fc4f66a6c0da5dbc41c4bf"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_SESSION_EU",
+          "id": "07838c5ad23d4c5dac99e1a2fcdab2f4"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_SESSION_AS",
+          "id": "05ccf0817feb4161b8544cba1306ed9e"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_SESSION_NA",
+          "id": "7e2f8d7496c249798f78342ca25edb20"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_TRANSACTION_EU",
+          "id": "b661b11c413844c5a08406bc37390590"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_TRANSACTION_AS",
+          "id": "37569e8f364d45e495b2c9d2ce3ddfbc"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_TRANSACTION_NA",
+          "id": "73f370b143724245a1e3239d2bc7db94"
+        }
+      ]
+    },
+    "prod_sa": {
+      "name": "capgo_plugin-sa-prod",
+      "vars": {
+        "IS_V2_STATS": "1",
+        "IS_V2_CHANNEL": "1",
+        "IS_V2_UPDATER": "0",
+        "ENV_NAME": "capgo_plugin-sa-prod"
+      },
+      "observability": {
+        "head_sampling_rate": 0.001,
+        "enabled": true
+      },
+      "placement": {
+        "mode": "smart"
+      },
+      "routes": [
+        {
+          "pattern": "plugin.sa.capgo.app",
+          "custom_domain": true
+        },
+        {
+          "pattern": "plugin.sa.usecapgo.com",
+          "custom_domain": true
+        }
+      ],
+      "analytics_engine_datasets": [
+        {
+          "binding": "DEVICE_USAGE",
+          "dataset": "device_usage"
+        },
+        {
+          "binding": "BANDWIDTH_USAGE",
+          "dataset": "bandwidth_usage"
+        },
+        {
+          "binding": "VERSION_USAGE",
+          "dataset": "version_usage"
+        },
+        {
+          "binding": "APP_LOG",
+          "dataset": "app_log"
+        },
+        {
+          "binding": "APP_LOG_EXTERNAL",
+          "dataset": "app_log_external"
+        }
+      ],
+      "d1_databases": [
+        {
+          "binding": "DB_DEVICES",
+          "database_name": "capgo_prod_devices",
+          "database_id": "2510b55c-d6a2-4595-a2a5-d9aca82a3753"
+        },
+        {
+          "binding": "DB_STOREAPPS",
+          "database_name": "capgo_prod_storeapps",
+          "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
+        },
+        {
+          "binding": "DB_REPLICA_OC",
+          "database_name": "capgo_replicate_oc",
+          "database_id": "58dbd199-4629-4bd0-a02c-ce019b5ab2e0"
+        },
+        {
+          "binding": "DB_REPLICA_EU",
+          "database_name": "capgo_replicate_eu",
+          "database_id": "107046f7-af0e-4126-b493-1d4e66f48947"
+        },
+        {
+          "binding": "DB_REPLICA_AS",
+          "database_name": "capgo_replicate_as",
+          "database_id": "c01d7197-67b8-4b23-99d9-cceb76d3e7f6"
+        },
+        {
+          "binding": "DB_REPLICA_NA",
+          "database_name": "capgo_replicate_us",
+          "database_id": "320c32be-d3d9-4c7c-a84c-e20ef01fd20d"
+        }
+      ],
+      "hyperdrive": [
+        {
+          "binding": "HYPERDRIVE_CAPGO_DIRECT_EU",
+          "id": "ae1fe6178b564adc9fc9a71ccc769a35"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_DIRECT_AS",
+          "id": "fcb24f3a06144ed2a940cf682321f312"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_DIRECT_NA",
+          "id": "8d3cfaace1fc4f66a6c0da5dbc41c4bf"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_SESSION_EU",
+          "id": "07838c5ad23d4c5dac99e1a2fcdab2f4"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_SESSION_AS",
+          "id": "05ccf0817feb4161b8544cba1306ed9e"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_SESSION_NA",
+          "id": "7e2f8d7496c249798f78342ca25edb20"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_TRANSACTION_EU",
+          "id": "b661b11c413844c5a08406bc37390590"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_TRANSACTION_AS",
+          "id": "37569e8f364d45e495b2c9d2ce3ddfbc"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_TRANSACTION_NA",
+          "id": "73f370b143724245a1e3239d2bc7db94"
+        }
+      ]
     },
     "preprod": {
       "name": "capgo_plugin-preprod",
       "vars": {
-        "IS_V2": "0",
+        "IS_V2_STATS": "1",
+        "IS_V2_CHANNEL": "1",
+        "IS_V2_UPDATER": "0",
         "ENV_NAME": "capgo_plugin-preprod"
       },
       "observability": {
+        "head_sampling_rate": 1,
         "enabled": true
       },
       "routes": [
@@ -312,9 +1023,14 @@
           "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
         },
         {
+          "binding": "DB_REPLICA_OC",
+          "database_name": "capgo_replicate_oc",
+          "database_id": "58dbd199-4629-4bd0-a02c-ce019b5ab2e0"
+        },
+        {
           "binding": "DB_REPLICA_EU",
-          "database_name": "capgo_replicate",
-          "database_id": "7f267d86-f4f7-49f5-9622-e44373aa00dc"
+          "database_name": "capgo_replicate_eu",
+          "database_id": "107046f7-af0e-4126-b493-1d4e66f48947"
         },
         {
           "binding": "DB_REPLICA_AS",
@@ -322,7 +1038,7 @@
           "database_id": "c01d7197-67b8-4b23-99d9-cceb76d3e7f6"
         },
         {
-          "binding": "DB_REPLICA_US",
+          "binding": "DB_REPLICA_NA",
           "database_name": "capgo_replicate_us",
           "database_id": "320c32be-d3d9-4c7c-a84c-e20ef01fd20d"
         }
@@ -351,27 +1067,56 @@
       ],
       "hyperdrive": [
         {
-          "binding": "_EU",
-          "id": "52723917a61f49b7b36eb71b225b19f5"
-        },
-
-        {
-          "binding": "HYPERDRIVE_DB_SG",
-          "id": "acaf2391be8449f18e49776847d3106c"
+          "binding": "HYPERDRIVE_CAPGO_DIRECT_EU",
+          "id": "ae1fe6178b564adc9fc9a71ccc769a35"
         },
         {
-          "binding": "HYPERDRIVE_DB_US",
-          "id": "a2acda0d0be14c1285b33fbf32c99466"
+          "binding": "HYPERDRIVE_CAPGO_DIRECT_AS",
+          "id": "fcb24f3a06144ed2a940cf682321f312"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_DIRECT_NA",
+          "id": "8d3cfaace1fc4f66a6c0da5dbc41c4bf"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_SESSION_EU",
+          "id": "07838c5ad23d4c5dac99e1a2fcdab2f4"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_SESSION_AS",
+          "id": "05ccf0817feb4161b8544cba1306ed9e"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_SESSION_NA",
+          "id": "7e2f8d7496c249798f78342ca25edb20"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_TRANSACTION_EU",
+          "id": "b661b11c413844c5a08406bc37390590"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_TRANSACTION_AS",
+          "id": "37569e8f364d45e495b2c9d2ce3ddfbc"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_TRANSACTION_NA",
+          "id": "73f370b143724245a1e3239d2bc7db94"
         }
-      ]
+      ],
+      "placement": {
+        "mode": "smart"
+      }
     },
     "alpha": {
       "name": "capgo_plugin-alpha",
       "vars": {
-        "IS_V2": "1",
+        "IS_V2_STATS": "1",
+        "IS_V2_CHANNEL": "1",
+        "IS_V2_UPDATER": "0",
         "ENV_NAME": "capgo_plugin-alpha"
       },
       "observability": {
+        "head_sampling_rate": 1,
         "enabled": true
       },
       "routes": [
@@ -397,8 +1142,8 @@
         },
         {
           "binding": "DB_REPLICA_EU",
-          "database_name": "capgo_replicate",
-          "database_id": "7f267d86-f4f7-49f5-9622-e44373aa00dc"
+          "database_name": "capgo_replicate_eu",
+          "database_id": "107046f7-af0e-4126-b493-1d4e66f48947"
         },
         {
           "binding": "DB_REPLICA_AS",
@@ -406,7 +1151,7 @@
           "database_id": "c01d7197-67b8-4b23-99d9-cceb76d3e7f6"
         },
         {
-          "binding": "DB_REPLICA_US",
+          "binding": "DB_REPLICA_NA",
           "database_name": "capgo_replicate_us",
           "database_id": "320c32be-d3d9-4c7c-a84c-e20ef01fd20d"
         }
@@ -435,30 +1180,60 @@
       ],
       "hyperdrive": [
         {
-          "binding": "HYPERDRIVE_DB_EU",
-          "id": "52723917a61f49b7b36eb71b225b19f5"
+          "binding": "HYPERDRIVE_CAPGO_DIRECT_EU",
+          "id": "ae1fe6178b564adc9fc9a71ccc769a35"
         },
         {
-          "binding": "HYPERDRIVE_DB_SG",
-          "id": "acaf2391be8449f18e49776847d3106c"
+          "binding": "HYPERDRIVE_CAPGO_DIRECT_AS",
+          "id": "fcb24f3a06144ed2a940cf682321f312"
         },
         {
-          "binding": "HYPERDRIVE_DB_US",
-          "id": "a2acda0d0be14c1285b33fbf32c99466"
+          "binding": "HYPERDRIVE_CAPGO_DIRECT_NA",
+          "id": "8d3cfaace1fc4f66a6c0da5dbc41c4bf"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_SESSION_EU",
+          "id": "07838c5ad23d4c5dac99e1a2fcdab2f4"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_SESSION_AS",
+          "id": "05ccf0817feb4161b8544cba1306ed9e"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_SESSION_NA",
+          "id": "7e2f8d7496c249798f78342ca25edb20"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_TRANSACTION_EU",
+          "id": "b661b11c413844c5a08406bc37390590"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_TRANSACTION_AS",
+          "id": "37569e8f364d45e495b2c9d2ce3ddfbc"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_TRANSACTION_NA",
+          "id": "73f370b143724245a1e3239d2bc7db94"
         }
-      ]
+      ],
+      "placement": {
+        "mode": "smart"
+      }
     },
     "local": {
       "name": "capgo_plugin-local",
       "vars": {
-        "IS_V2": "1",
+        "IS_V2_STATS": "1",
+        "IS_V2_CHANNEL": "1",
+        "IS_V2_UPDATER": "0",
+        "ENV_NAME": "capgo_plugin-local",
         "CAPGO_PREVENT_BACKGROUND_FUNCTIONS": "true"
       },
       "d1_databases": [
         {
           "binding": "DB_REPLICA_EU",
-          "database_name": "capgo_replicate",
-          "database_id": "7f267d86-f4f7-49f5-9622-e44373aa00dc"
+          "database_name": "capgo_replicate_eu",
+          "database_id": "107046f7-af0e-4126-b493-1d4e66f48947"
         },
         {
           "binding": "DB_REPLICA_AS",
@@ -466,7 +1241,7 @@
           "database_id": "c01d7197-67b8-4b23-99d9-cceb76d3e7f6"
         },
         {
-          "binding": "DB_REPLICA_US",
+          "binding": "DB_REPLICA_NA",
           "database_name": "capgo_replicate_us",
           "database_id": "320c32be-d3d9-4c7c-a84c-e20ef01fd20d"
         }

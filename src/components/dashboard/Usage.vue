@@ -32,15 +32,15 @@ const noData = computed(() => false)
 const loadedAlready = ref(false)
 const storageDisplayGb = ref(true)
 const storageUnit = computed(() => storageDisplayGb.value ? 'GB' : 'MB')
-// const noData = computed(() => datas.value.mau.length == 0)
+// const noData = computed(() => data.value.mau.length == 0)
 
-const datas = ref({
+const data = ref({
   mau: [] as number[],
   storage: [] as number[],
   bandwidth: [] as number[],
 })
 
-const datasByApp = ref({
+const dataByApp = ref({
   mau: {} as { [appId: string]: number[] },
   storage: {} as { [appId: string]: number[] },
   bandwidth: {} as { [appId: string]: number[] },
@@ -51,12 +51,12 @@ const creditsV2Enabled = import.meta.env.VITE_FEATURE_CREDITS_V2 === 'true'
 const appNames = ref<{ [appId: string]: string }>({})
 
 // Create computed properties to ensure reactivity when switching between modes
-const mauData = computed(() => datas.value.mau)
-const storageData = computed(() => datas.value.storage)
-const bandwidthData = computed(() => datas.value.bandwidth)
-const mauDataByApp = computed(() => datasByApp.value.mau)
-const storageDataByApp = computed(() => datasByApp.value.storage)
-const bandwidthDataByApp = computed(() => datasByApp.value.bandwidth)
+const mauData = computed(() => data.value.mau)
+const storageData = computed(() => data.value.storage)
+const bandwidthData = computed(() => data.value.bandwidth)
+const mauDataByApp = computed(() => dataByApp.value.mau)
+const storageDataByApp = computed(() => dataByApp.value.storage)
+const bandwidthDataByApp = computed(() => dataByApp.value.bandwidth)
 
 const isLoading = ref(true)
 const chartsLoaded = ref({
@@ -316,7 +316,7 @@ async function getUsages(forceRefetch = false) {
     if (useBillingPeriod.value) {
       // Show only data within billing period
       const filteredData = filterToBillingPeriod(cached30DayData.value, last30DaysStart, billingStart)
-      datas.value = filteredData.data
+      data.value = filteredData.data
 
       // Filter by-app data too if available
       if (cached30DayDataByApp.value && Object.keys(cached30DayDataByApp.value.mau).length > 0) {
@@ -327,17 +327,17 @@ async function getUsages(forceRefetch = false) {
             bandwidth: cached30DayDataByApp.value!.bandwidth[appId],
           }
           const filteredAppData = filterToBillingPeriod(appData, last30DaysStart, billingStart)
-          datasByApp.value.mau[appId] = filteredAppData.data.mau
-          datasByApp.value.storage[appId] = filteredAppData.data.storage
-          datasByApp.value.bandwidth[appId] = filteredAppData.data.bandwidth
+          dataByApp.value.mau[appId] = filteredAppData.data.mau
+          dataByApp.value.storage[appId] = filteredAppData.data.storage
+          dataByApp.value.bandwidth[appId] = filteredAppData.data.bandwidth
         })
       }
     }
     else {
       // Show all 30 days from cache
-      datas.value = { ...cached30DayData.value }
+      data.value = { ...cached30DayData.value }
       if (cached30DayDataByApp.value) {
-        datasByApp.value = { ...cached30DayDataByApp.value }
+        dataByApp.value = { ...cached30DayDataByApp.value }
       }
     }
 
@@ -416,13 +416,13 @@ async function getUsages(forceRefetch = false) {
 
   // Cache the full 30-day by-app data
   cached30DayDataByApp.value = full30DayDataByApp
-  datasByApp.value = full30DayDataByApp
+  dataByApp.value = full30DayDataByApp
 
   // Filter data based on billing period mode
   if (useBillingPeriod.value) {
     // Show only data within billing period
     const filteredData = filterToBillingPeriod(full30DayData, last30DaysStart, billingStart)
-    datas.value = filteredData.data
+    data.value = filteredData.data
 
     // Filter by-app data too
     if (Object.keys(full30DayDataByApp.mau).length > 0) {
@@ -433,15 +433,15 @@ async function getUsages(forceRefetch = false) {
           bandwidth: full30DayDataByApp.bandwidth[appId],
         }
         const filteredAppData = filterToBillingPeriod(appData, last30DaysStart, billingStart)
-        datasByApp.value.mau[appId] = filteredAppData.data.mau
-        datasByApp.value.storage[appId] = filteredAppData.data.storage
-        datasByApp.value.bandwidth[appId] = filteredAppData.data.bandwidth
+        dataByApp.value.mau[appId] = filteredAppData.data.mau
+        dataByApp.value.storage[appId] = filteredAppData.data.storage
+        dataByApp.value.bandwidth[appId] = filteredAppData.data.bandwidth
       })
     }
   }
   else {
     // Show all 30 days
-    datas.value = full30DayData
+    data.value = full30DayData
   }
 }
 
@@ -694,20 +694,20 @@ onMounted(() => {
   >
     <UsageCard
       id="mau-stat" :limits="allLimits.mau" :colors="colors.emerald" :accumulated="useBillingPeriod && showCumulative"
-      :datas="mauData" :datas-by-app="mauDataByApp" :app-names="appNames" :title="`${t('monthly-active')}`" :unit="t('units-users')"
+      :data="mauData" :data-by-app="mauDataByApp" :app-names="appNames" :title="`${t('monthly-active')}`" :unit="t('units-users')"
       :use-billing-period="useBillingPeriod"
       :is-loading="isLoading"
       class="col-span-full sm:col-span-6 xl:col-span-4"
     />
     <UsageCard
-      :limits="allLimits.storage" :colors="colors.blue" :datas="storageData" :datas-by-app="storageDataByApp" :app-names="appNames" :accumulated="useBillingPeriod && showCumulative"
+      :limits="allLimits.storage" :colors="colors.blue" :data="storageData" :data-by-app="storageDataByApp" :app-names="appNames" :accumulated="useBillingPeriod && showCumulative"
       :title="t('Storage')" :unit="storageUnit"
       :use-billing-period="useBillingPeriod"
       :is-loading="isLoading"
       class="col-span-full sm:col-span-6 xl:col-span-4"
     />
     <UsageCard
-      :limits="allLimits.bandwidth" :colors="colors.orange" :datas="bandwidthData" :datas-by-app="bandwidthDataByApp" :app-names="appNames" :accumulated="useBillingPeriod && showCumulative"
+      :limits="allLimits.bandwidth" :colors="colors.orange" :data="bandwidthData" :data-by-app="bandwidthDataByApp" :app-names="appNames" :accumulated="useBillingPeriod && showCumulative"
       :title="t('Bandwidth')" :unit="t('units-gb')"
       :use-billing-period="useBillingPeriod"
       :is-loading="isLoading"

@@ -2,7 +2,7 @@ import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
 import { BRES, middlewareAPISecret, simpleError, triggerValidator } from '../utils/hono.ts'
-import { cloudlog } from '../utils/loggin.ts'
+import { cloudlog } from '../utils/logging.ts'
 import { createApiKey } from '../utils/supabase.ts'
 import { syncUserPreferenceTags } from '../utils/user_preferences.ts'
 
@@ -18,7 +18,7 @@ app.post('/', middlewareAPISecret, triggerValidator('users', 'UPDATE'), async (c
   }
   if (!record.id) {
     cloudlog({ requestId: c.get('requestId'), message: 'No id' })
-    throw simpleError('no_id', 'No id', { record })
+    return simpleError('no_id', 'No id', { record })
   }
   await createApiKey(c, record.id)
   await syncUserPreferenceTags(c, record.email, record, oldRecord?.email)

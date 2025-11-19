@@ -63,7 +63,7 @@ app.get('/', async (c) => {
     return c.json(credits ?? [])
   }
   catch (e) {
-    throw simpleError('failed_to_fetch_pricing_data', 'Failed to fetch pricing data', {}, e)
+    return simpleError('failed_to_fetch_pricing_data', 'Failed to fetch pricing data', {}, e)
   }
 })
 
@@ -73,7 +73,7 @@ app.post('/', async (c) => {
 
   // Validate inputs
   if (mau === undefined || bandwidth === undefined || storage === undefined) {
-    throw simpleError('missing_required_fields', 'Missing required fields: mau, bandwidth, storage')
+    return simpleError('missing_required_fields', 'Missing required fields: mau, bandwidth, storage')
   }
 
   // Get pricing steps from database
@@ -83,7 +83,7 @@ app.post('/', async (c) => {
     .order('type, step_min')
 
   if (error || !credits) {
-    throw simpleError('failed_to_fetch_pricing_data', 'Failed to fetch pricing data')
+    return simpleError('failed_to_fetch_pricing_data', 'Failed to fetch pricing data')
   }
 
   // Type assertion for credits

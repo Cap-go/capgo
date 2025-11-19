@@ -190,7 +190,7 @@ If deployment is needed (exceptional cases):
 ```bash
 # Cloudflare Workers
 bun deploy:cloudflare:api:prod
-bun deploy:cloudflare:plugin:prod
+bun deploy:cloudflare:plugins:prod
 
 # Supabase Functions  
 bun deploy:supabase:prod

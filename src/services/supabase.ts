@@ -326,18 +326,6 @@ export async function getTotalStorage(orgId?: string): Promise<number> {
   return data ?? 0
 }
 
-export async function isGoodPlanOrg(orgId?: string): Promise<boolean> {
-  if (!orgId)
-    return false
-  const { data, error } = await useSupabase()
-    .rpc('is_good_plan_v5_org', { orgid: orgId })
-    .single()
-  if (error)
-    throw new Error(error.message)
-
-  return data ?? false
-}
-
 export async function isTrialOrg(orgId: string): Promise<number> {
   const { data, error } = await useSupabase()
     .rpc('is_trial_org', { orgid: orgId })
@@ -420,18 +408,18 @@ export async function getPlanUsagePercent(orgId?: string): Promise<PlanUsage> {
   return data
 }
 
-const DEFAUL_PLAN_NAME = 'Solo'
+const DEFAULT_PLAN_NAME = 'Solo'
 
 export async function getCurrentPlanNameOrg(orgId?: string): Promise<string> {
   if (!orgId)
-    return DEFAUL_PLAN_NAME
+    return DEFAULT_PLAN_NAME
   const { data, error } = await useSupabase()
     .rpc('get_current_plan_name_org', { orgid: orgId })
     .single()
   if (error)
     throw new Error(error.message)
 
-  return data ?? DEFAUL_PLAN_NAME
+  return data ?? DEFAULT_PLAN_NAME
 }
 
 export async function findBestPlan(stats: Database['public']['Functions']['find_best_plan_v3']['Args']): Promise<string> {
@@ -478,7 +466,7 @@ export function convertNativePackages(nativePackages: { name: string, version: s
   return mappedRemoteNativePackages
 }
 
-export async function getRemoteDepenencies(appId: string, channel: string) {
+export async function getRemoteDependencies(appId: string, channel: string) {
   const { data: remoteNativePackages, error } = await useSupabase()
     .from('channels')
     .select(`version ( 
@@ -494,7 +482,7 @@ export async function getRemoteDepenencies(appId: string, channel: string) {
   return convertNativePackages((remoteNativePackages.version.native_packages as any) ?? [])
 }
 
-export async function getVersionRemoteDepenencies(appId: string, bundleId: string) {
+export async function getVersionRemoteDependencies(appId: string, bundleId: string) {
   const { data, error } = await useSupabase()
     .from('app_versions')
     .select()
@@ -531,9 +519,9 @@ export function isCompatible(pkg: Compatibility): boolean {
 }
 
 export async function checkCompatibilityNativePackages(appId: string, channel: string, nativePackages: { name: string, version: string }[]) {
-  const mappedRemoteNativePackages = await getRemoteDepenencies(appId, channel)
+  const mappedRemoteNativePackages = await getRemoteDependencies(appId, channel)
 
-  const finalDepenencies: Compatibility[] = nativePackages
+  const finalDependencies: Compatibility[] = nativePackages
     .map((local) => {
       const remotePackage = mappedRemoteNativePackages.get(local.name)
       if (remotePackage) {
@@ -557,10 +545,10 @@ export async function checkCompatibilityNativePackages(appId: string, channel: s
     .filter(([remoteName]) => nativePackages.find(a => a.name === remoteName) === undefined)
     .map(([name, version]) => ({ name, localVersion: undefined, remoteVersion: version.version }))
 
-  finalDepenencies.push(...removeNotInLocal)
+  finalDependencies.push(...removeNotInLocal)
 
   return {
-    finalCompatibility: finalDepenencies,
+    finalCompatibility: finalDependencies,
     localDependencies: nativePackages,
   }
 }

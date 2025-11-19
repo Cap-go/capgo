@@ -1,54 +1,12 @@
 import type { Context } from 'hono'
-
-import type { Database } from './supabase.types.ts'
 import { parseCronExpression } from 'cron-schedule'
 import dayjs from 'dayjs'
 import { trackBentoEvent } from './bento.ts'
-import { cloudlog, cloudlogErr } from './loggin.ts'
+import { cloudlog } from './logging.ts'
 import { supabaseAdmin } from './supabase.ts'
 
 interface EventData {
   [key: string]: any
-}
-
-async function sendNow(c: Context, eventName: string, eventData: EventData, email: string, orgId: string, uniqId: string, past: Database['public']['Tables']['notifications']['Row'] | null) {
-  cloudlog({ requestId: c.get('requestId'), message: 'send notif', eventName, email })
-  const res = await trackBentoEvent(c, email, eventData, eventName)
-  if (!res) {
-    cloudlog({ requestId: c.get('requestId'), message: 'trackEvent failed', eventName, email, eventData })
-    return false
-  }
-  if (past != null) {
-    const { error } = await supabaseAdmin(c)
-      .from('notifications')
-      .update({
-        last_send_at: dayjs().toISOString(),
-        total_send: past.total_send + 1,
-      })
-      .eq('event', eventName)
-      .eq('uniq_id', uniqId)
-      .eq('owner_org', orgId)
-    if (error) {
-      cloudlogErr({ requestId: c.get('requestId'), message: 'update notif', error })
-      return false
-    }
-  }
-  else {
-    const { error } = await supabaseAdmin(c)
-      .from('notifications')
-      .insert({
-        event: eventName,
-        uniq_id: uniqId,
-        owner_org: orgId,
-        last_send_at: dayjs().toISOString(),
-      })
-    if (error) {
-      cloudlogErr({ requestId: c.get('requestId'), message: 'insert notif', error })
-      return false
-    }
-  }
-  cloudlog({ requestId: c.get('requestId'), message: 'send notif done', eventName, email })
-  return true
 }
 
 function isSendable(c: Context, last: string, cron: string) {
@@ -64,6 +22,7 @@ function isSendable(c: Context, last: string, cron: string) {
 }
 
 export async function sendNotifOrg(c: Context, eventName: string, eventData: EventData, orgId: string, uniqId: string, cron: string) {
+  // Get org info
   const { data: org, error: orgError } = await supabaseAdmin(c)
     .from('orgs')
     .select()
@@ -74,7 +33,8 @@ export async function sendNotifOrg(c: Context, eventName: string, eventData: Eve
     cloudlog({ requestId: c.get('requestId'), message: 'org not found', orgId })
     return false
   }
-  // check if notif has already been send in notifications table
+
+  // Check if notification has already been sent
   const { data: notif } = await supabaseAdmin(c)
     .from('notifications')
     .select()
@@ -82,20 +42,81 @@ export async function sendNotifOrg(c: Context, eventName: string, eventData: Eve
     .eq('event', eventName)
     .eq('uniq_id', uniqId)
     .single()
-  // set user data in crisp
+
+  let shouldSend = false
+  let isFirstSend = false
+
   if (!notif) {
-    cloudlog({ requestId: c.get('requestId'), message: 'notif never sent', event: eventName, uniqId })
-    return sendNow(c, eventName, eventData, org.management_email, orgId, uniqId, null).then(() => true)
+    // First time: use upsert with ignoreDuplicates to avoid error logs
+    isFirstSend = true
+
+    const { data: inserted, error } = await supabaseAdmin(c)
+      .from('notifications')
+      .upsert({
+        event: eventName,
+        uniq_id: uniqId,
+        owner_org: orgId,
+        last_send_at: dayjs().toISOString(),
+        total_send: 1,
+      }, {
+        onConflict: 'owner_org,event,uniq_id',
+        ignoreDuplicates: true, // Don't return error on conflict, just ignore
+      })
+      .select()
+
+    // Only send if we successfully inserted (won the race)
+    // If conflict occurred, inserted will be null
+    shouldSend = !error && !!inserted && inserted.length > 0
+    if (!shouldSend) {
+      cloudlog({ requestId: c.get('requestId'), message: 'notif insert race lost', event: eventName, orgId })
+      return false
+    }
+  }
+  else {
+    // Notification exists, check if sendable
+    if (!isSendable(c, notif.last_send_at, cron)) {
+      cloudlog({ requestId: c.get('requestId'), message: 'notif already sent', event: eventName, orgId })
+      return false
+    }
+
+    // Atomically update ONLY if timestamp hasn't changed (optimistic locking to prevent race)
+    const { data: updated, error } = await supabaseAdmin(c)
+      .from('notifications')
+      .update({
+        last_send_at: dayjs().toISOString(),
+        total_send: notif.total_send + 1,
+      })
+      .eq('event', eventName)
+      .eq('uniq_id', uniqId)
+      .eq('owner_org', orgId)
+      .eq('last_send_at', notif.last_send_at) // Optimistic lock: only update if timestamp unchanged
+      .select()
+
+    // Only send if we successfully claimed it (update succeeded)
+    shouldSend = !error && updated && updated.length > 0
+    if (!shouldSend) {
+      cloudlog({ requestId: c.get('requestId'), message: 'notif update race lost', event: eventName, orgId })
+      return false
+    }
   }
 
-  if (notif && !isSendable(c, notif.last_send_at, cron)) {
-    cloudlog({ requestId: c.get('requestId'), message: 'notif already sent', event: eventName, orgId })
-    return false
+  // Only send if we successfully claimed the notification
+  if (shouldSend) {
+    cloudlog({ requestId: c.get('requestId'), message: isFirstSend ? 'notif never sent' : 'notif ready to sent', event: eventName, uniqId })
+    const res = await trackBentoEvent(c, org.management_email, eventData, eventName)
+    if (!res) {
+      cloudlog({ requestId: c.get('requestId'), message: 'trackEvent failed', eventName, email: org.management_email, eventData })
+      // Note: We already claimed it in DB, but email failed. On next attempt, cron will determine if we retry.
+      return false
+    }
+
+    cloudlog({ requestId: c.get('requestId'), message: 'send notif done', eventName, email: org.management_email })
+    return true
   }
-  cloudlog({ requestId: c.get('requestId'), message: 'notif ready to sent', event: eventName, orgId })
-  return sendNow(c, eventName, eventData, org.management_email, orgId, uniqId, notif).then(() => true)
+
+  return false
 }
 
-// dayjs substract one week
+// dayjs subtract one week
 // const last_send_at = dayjs().subtract(1, 'week').toISOString()
 // cloudlog(c.get('requestId'), 'isSendable', isSendable(last_send_at, '0 0 1 * *'))

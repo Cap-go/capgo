@@ -1,7 +1,7 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
 import { middlewareAPISecret, parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
-import { cloudlog } from '../utils/loggin.ts'
+import { cloudlog } from '../utils/logging.ts'
 import { readStatsBandwidth, readStatsMau, readStatsStorage, readStatsVersion } from '../utils/stats.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 
@@ -19,9 +19,9 @@ app.post('/', middlewareAPISecret, async (c) => {
   const body = await parseBody<DataToGet>(c)
   cloudlog({ requestId: c.get('requestId'), message: 'post cron_stat_app body', body })
   if (!body.appId)
-    throw simpleError('no_appId', 'No appId', { body })
+    return simpleError('no_appId', 'No appId', { body })
   if (!body.orgId)
-    throw simpleError('no_orgId', 'No orgId', { body })
+    return simpleError('no_orgId', 'No orgId', { body })
 
   const supabase = supabaseAdmin(c)
 
@@ -30,15 +30,15 @@ app.post('/', middlewareAPISecret, async (c) => {
     .eq('app_id', body.appId)
     .single()
   if (!app.data)
-    throw quickError(404, 'app_not_found', 'App not found', { body })
+    return quickError(404, 'app_not_found', 'App not found', { body })
   if (app.data.owner_org !== body.orgId)
-    throw quickError(401, 'app_not_found', 'This app is not owned by the organization', { body })
+    return quickError(401, 'app_not_found', 'This app is not owned by the organization', { body })
 
   // get the period of the billing of the organization
   const cycleInfoData = await supabase.rpc('get_cycle_info_org', { orgid: body.orgId }).single()
   const cycleInfo = cycleInfoData.data
   if (!cycleInfo?.subscription_anchor_start || !cycleInfo?.subscription_anchor_end)
-    throw simpleError('cannot_get_cycle_info', 'Cannot get cycle info', { cycleInfoData })
+    return simpleError('cannot_get_cycle_info', 'Cannot get cycle info', { cycleInfoData })
 
   cloudlog({ requestId: c.get('requestId'), message: 'cycleInfo', cycleInfo })
   const startDate = cycleInfo.subscription_anchor_start

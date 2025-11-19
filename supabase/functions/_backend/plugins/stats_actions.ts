@@ -28,7 +28,6 @@ export const ALLOWED_STATS_ACTIONS = [
   'download_manifest_start',
   'download_manifest_complete',
   'download_zip_start',
-  'backend_refusal',
   'download_zip_complete',
   'download_manifest_file_fail',
   'download_manifest_checksum_fail',

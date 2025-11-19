@@ -2,7 +2,7 @@ import type { Context } from 'hono'
 import type { SimpleErrorResponse } from './hono.ts'
 import { DrizzleError, entityKind, TransactionRollbackError } from 'drizzle-orm'
 import { sendDiscordAlert500 } from './discord.ts'
-import { cloudlogErr, serializeError } from './loggin.ts'
+import { cloudlogErr, serializeError } from './logging.ts'
 import { backgroundTask } from './utils.ts'
 
 const drizzleErrorNames = new Set(['DrizzleError', 'DrizzleQueryError', 'TransactionRollbackError'])
@@ -41,18 +41,30 @@ export function onError(functionName: string) {
         )))
 
     if (isHttpException) {
-      // Pull the JSON we attached to the HTTPException to improve logs and response
+      // Extract error details from the cause (set by quickError)
       let res: SimpleErrorResponse = defaultResponse
       try {
-        const parsed = await e.getResponse().json()
-        res = {
-          error: typeof parsed?.error === 'string' ? parsed.error : 'unknown_error',
-          message: typeof parsed?.message === 'string' ? parsed.message : 'Unknown error',
-          moreInfo: parsed?.moreInfo ?? (typeof parsed === 'object' ? parsed : {}),
+        // First try to get details from cause (new approach from quickError)
+        if (e.cause && typeof e.cause === 'object' && 'error' in e.cause) {
+          const causeData = e.cause as any
+          res = {
+            error: typeof causeData.error === 'string' ? causeData.error : 'unknown_error',
+            message: typeof causeData.message === 'string' ? causeData.message : e.message || 'Unknown error',
+            moreInfo: causeData.moreInfo ?? {},
+          }
+        }
+        // Fallback: try parsing response body (for backward compatibility)
+        else if (e.res) {
+          const parsed = await e.getResponse().json()
+          res = {
+            error: typeof parsed?.error === 'string' ? parsed.error : 'unknown_error',
+            message: typeof parsed?.message === 'string' ? parsed.message : 'Unknown error',
+            moreInfo: parsed?.moreInfo ?? (typeof parsed === 'object' ? parsed : {}),
+          }
         }
       }
       catch {
-        // ignore JSON parse errors; fall back to default
+        // ignore errors; fall back to default
       }
       // Single, structured error log entry
       cloudlogErr({

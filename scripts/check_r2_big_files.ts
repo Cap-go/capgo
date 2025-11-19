@@ -1,7 +1,7 @@
 import { _Object, CopyObjectCommand, DeleteObjectCommand, ListObjectsV2Command, ListObjectsV2CommandOutput, S3Client, HeadObjectCommand, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3'
 import { writeFileSync, existsSync, readFileSync } from 'fs'
 import { S3Client as S3ClientLite } from '@bradenmacdonald/s3-lite-client/'
-import postgres from 'postgres'
+import { Pool } from 'pg'
 import { Context } from 'vm'
 
 const S3_BUCKET = 'capgo'
@@ -623,24 +623,9 @@ export function getDatabaseURL(): string {
 
     // if (!clientContinent)
     //   return DEFAULT_DB_URL
-
-    // // European countries or Africa or Antarctica
-    // if ((clientContinent === 'EU' || clientContinent === 'AF' || clientContinent === 'AN')) {
-    //   return DEFAULT_DB_URL
-    // }
-
-    // // Asian and Oceanian countries
-    // if ((clientContinent === 'AS' || clientContinent === 'OC') && existInEnv(c, 'SG_SUPABASE_DB_URL')) {
-    //   return getEnv('SG_SUPABASE_DB_URL')
-    // }
-
-    // // North and South American countries
-    // if ((clientContinent === 'NA' || clientContinent === 'SA') && existInEnv(c, 'GK_SUPABASE_DB_URL')) {
-    //   return getEnv('GK_SUPABASE_DB_URL')
-    // }
     // Hyperdrive test
-    if (existInEnv('HYPERDRIVE_DB_EU'))
-        return (getEnv('HYPERDRIVE_DB_EU') as any).connectionString
+    if (existInEnv('HYPERDRIVE_CAPGO_TRANSACTION_EU'))
+        return (getEnv('HYPERDRIVE_CAPGO_TRANSACTION_EU') as any).connectionString
 
     // // Default to Germany for any other cases
     return DEFAULT_DB_URL
@@ -649,7 +634,11 @@ export function getDatabaseURL(): string {
 export function getPgClient(c: Context) {
     const dbUrl = getDatabaseURL()
     console.log({ message: 'getPgClient', dbUrl })
-    return postgres(dbUrl, { prepare: false, idle_timeout: 2 })
+    return new Pool({
+        connectionString: dbUrl,
+        max: 1,
+        idleTimeoutMillis: 2000,
+    })
 }
 
 async function get_app_versions() {
@@ -657,14 +646,14 @@ async function get_app_versions() {
 
     // Create a mock context for getPgClient
     const mockContext = {} as Context
-    const sql = getPgClient(mockContext)
+    const pool = getPgClient(mockContext)
 
     try {
         console.log('📊 Fetching all app versions...')
 
         // Execute the query to get all app_versions as JSON
-        const result = await sql`SELECT json_agg(app_versions.*) as data FROM app_versions`
-        const appVersions = result[0].data ?? []
+        const result = await pool.query('SELECT json_agg(app_versions.*) as data FROM app_versions')
+        const appVersions = result.rows[0].data ?? []
 
         console.log(`✅ Found ${appVersions.length} app versions`)
 
@@ -680,7 +669,7 @@ async function get_app_versions() {
     } finally {
         // Close the database connection
         console.log('🔒 Closing database connection...')
-        await sql.end()
+        await pool.end()
         console.log('✅ Database connection closed')
     }
 }
@@ -756,14 +745,17 @@ async function get_big_orgs() {
     if (orgsOver100MB.length > 0) {
         // Create a mock context for getPgClient
         const mockContext = {} as Context
-        const sql = getPgClient(mockContext)
+        const pool = getPgClient(mockContext)
 
         try {
             // Create all the plan queries
             const planQueries = orgsOver100MB.map(org =>
-                sql`select name, storage from plans 
-                    where price_m_id=(select price_id from stripe_info where customer_id=(select customer_id from orgs where id = ${org.orgId})) 
-                    or price_y_id=(select price_id from stripe_info where customer_id=(select customer_id from orgs where id = ${org.orgId}))`
+                pool.query(
+                    `select name, storage from plans
+                    where price_m_id=(select price_id from stripe_info where customer_id=(select customer_id from orgs where id = $1))
+                    or price_y_id=(select price_id from stripe_info where customer_id=(select customer_id from orgs where id = $1))`,
+                    [org.orgId]
+                )
             )
 
             // Execute all queries in parallel
@@ -773,8 +765,8 @@ async function get_big_orgs() {
             // Map results back to org IDs
             orgsOver100MB.forEach((org, index) => {
                 const planResult = planResults[index]
-                if (planResult && planResult.length > 0) {
-                    planInfoMap.set(org.orgId, planResult[0])
+                if (planResult && planResult.rows.length > 0) {
+                    planInfoMap.set(org.orgId, planResult.rows[0])
                 }
             })
 
@@ -784,7 +776,7 @@ async function get_big_orgs() {
             console.error('❌ Error fetching plan information:', error)
         } finally {
             // Close the database connection
-            await sql.end()
+            await pool.end()
         }
     }
 
@@ -1091,7 +1083,7 @@ async function prepare_cleanup_zip() {
     // Connect to database
     console.log('🔗 Connecting to database...')
     const mockContext = {} as Context
-    const sql = getPgClient(mockContext)
+    const pool = getPgClient(mockContext)
 
     // Define types for cleanup data
     interface CleanupCandidate {
@@ -1110,13 +1102,13 @@ async function prepare_cleanup_zip() {
         const zipFileKeys = zipFiles.map(zipFile => zipFile.Key).filter(key => key !== undefined) as string[]
 
         // Single query to check all zip files at once
-        const result = await sql`
-            SELECT r2_path FROM app_versions 
-            WHERE r2_path = ANY(${zipFileKeys})
-        `
+        const result = await pool.query(
+            'SELECT r2_path FROM app_versions WHERE r2_path = ANY($1)',
+            [zipFileKeys]
+        )
 
         // Create a set of existing r2_paths for fast lookup
-        const existingPaths = new Set(result.map(row => row.r2_path))
+        const existingPaths = new Set(result.rows.map(row => row.r2_path))
 
         console.log(`✅ Found ${existingPaths.size} zip files with database records out of ${zipFiles.length} total`)
 
@@ -1191,7 +1183,7 @@ async function prepare_cleanup_zip() {
     } finally {
         // Close the database connection
         console.log('🔒 Closing database connection...')
-        await sql.end()
+        await pool.end()
         console.log('✅ Database connection closed')
     }
 }

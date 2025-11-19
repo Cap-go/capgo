@@ -6,7 +6,7 @@ import type { DeviceWithoutCreatedAt, Order, ReadDevicesParams, ReadStatsParams 
 import { createClient } from '@supabase/supabase-js'
 import { buildNormalizedDeviceForWrite, hasComparableDeviceChanged } from './deviceComparison.ts'
 import { simpleError } from './hono.ts'
-import { cloudlog, cloudlogErr } from './loggin.ts'
+import { cloudlog, cloudlogErr } from './logging.ts'
 import { createCustomer } from './stripe.ts'
 import { getEnv } from './utils.ts'
 
@@ -55,7 +55,7 @@ export function supabaseWithAuth(c: Context, auth: AuthInfo) {
     return supabaseApikey(c, auth.apikey.key)
   }
   else {
-    throw simpleError('not_authorized', 'Not authorized')
+    return simpleError('not_authorized', 'Not authorized')
   }
 }
 
@@ -70,7 +70,7 @@ export function emptySupabase(c: Context) {
   return createClient<Database>(getEnv(c, 'SUPABASE_URL'), getEnv(c, 'SUPABASE_ANON_KEY'), options)
 }
 
-// WARNING: The service role key has admin priviliges and should only be used in secure server environments!
+// WARNING: The service role key has admin privileges and should only be used in secure server environments!
 export function supabaseAdmin(c: Context) {
   const options = {
     auth: {
@@ -217,17 +217,25 @@ export async function hasAppRight(c: Context, appId: string | undefined, userid:
 }
 
 export async function hasAppRightApikey(c: Context<MiddlewareKeyVariables, any, object>, appId: string | undefined, userid: string, right: Database['public']['Enums']['user_min_right'], apikey: string) {
-  if (!appId)
+  if (!appId) {
+    cloudlog({ requestId: c.get('requestId'), message: 'hasAppRightApikey - appId is undefined' })
     return false
+  }
 
-  cloudlog({ requestId: c.get('requestId'), message: 'hasAppRightApikey', appId, userid, right, apikey })
+  cloudlog({ requestId: c.get('requestId'), message: 'hasAppRightApikey - calling RPC', appId, userid, right, apikeyPrefix: apikey?.substring(0, 15) })
 
   const { data, error } = await supabaseAdmin(c)
     .rpc('has_app_right_apikey', { appid: appId, right, userid, apikey })
 
+  cloudlog({ requestId: c.get('requestId'), message: 'hasAppRightApikey - RPC result', data, hasError: !!error, error })
+
   if (error) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'has_app_right_userid error', error })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'has_app_right_apikey error', error, appId, userid, right })
     return false
+  }
+
+  if (!data) {
+    cloudlog({ requestId: c.get('requestId'), message: 'hasAppRightApikey - permission denied', appId, userid, right, apikeyPrefix: apikey?.substring(0, 15) })
   }
 
   return data
@@ -978,18 +986,18 @@ export async function countDevicesSB(c: Context, app_id: string, customIdMode: b
   return count ?? 0
 }
 
-const DEFAUL_PLAN_NAME = 'Solo'
+const DEFAULT_PLAN_NAME = 'Solo'
 
 export async function getCurrentPlanNameOrg(c: Context, orgId?: string): Promise<string> {
   if (!orgId)
-    return DEFAUL_PLAN_NAME
+    return DEFAULT_PLAN_NAME
   const { data, error } = await supabaseAdmin(c)
     .rpc('get_current_plan_name_org', { orgid: orgId })
     .single()
   if (error)
     throw new Error(error.message)
 
-  return data ?? DEFAUL_PLAN_NAME
+  return data ?? DEFAULT_PLAN_NAME
 }
 
 interface UpdateStats {

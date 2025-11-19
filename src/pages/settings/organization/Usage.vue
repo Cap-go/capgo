@@ -50,8 +50,8 @@ async function getUsage(orgId: string) {
   const usage = main.dashboard
 
   const plan = plans.value.find(p => p.name === 'Pay as you go')!
-  const planCurrrent = await getCurrentPlanNameOrg(orgId)
-  const currentPlan = plans.value.find(p => p.name === planCurrrent)
+  const planCurrent = await getCurrentPlanNameOrg(orgId)
+  const currentPlan = plans.value.find(p => p.name === planCurrent)
 
   // Get usage percentages
   let detailPlanUsage: ArrayElement<Database['public']['Functions']['get_plan_usage_percent_detailed']['Returns']> = {
@@ -550,7 +550,7 @@ function nextRunDate() {
               <span class="font-medium">{{ planUsage?.detailPlanUsage?.mau_percent }}%</span>
             </div>
             <div class="flex justify-between">
-              <span>{{ t('bandwith-usage') }}</span>
+              <span>{{ t('bandwidth-usage') }}</span>
               <span class="font-medium">{{ planUsage?.detailPlanUsage?.bandwidth_percent }}%</span>
             </div>
             <div class="flex justify-between">

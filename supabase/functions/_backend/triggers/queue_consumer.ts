@@ -5,7 +5,7 @@ import { Hono } from 'hono/tiny'
 import { z } from 'zod/mini'
 import { sendDiscordAlert } from '../utils/discord.ts'
 import { BRES, middlewareAPISecret, parseBody, simpleError } from '../utils/hono.ts'
-import { cloudlog, cloudlogErr } from '../utils/loggin.ts'
+import { cloudlog, cloudlogErr } from '../utils/logging.ts'
 import { closeClient, getPgClient } from '../utils/pg.ts'
 import { backgroundTask, getEnv } from '../utils/utils.ts'
 
@@ -196,13 +196,14 @@ async function readQueue(c: Context, db: ReturnType<typeof getPgClient>, queueNa
     const visibilityTimeout = 120
     cloudlog(`[${queueKey}] Reading messages from queue: ${queueName}`)
     try {
-      messages = await db`
-        SELECT msg_id, message, read_ct
-        FROM pgmq.read(${queueName}, ${visibilityTimeout}, ${batchSize})
-      `
+      const result = await db.query(
+        'SELECT msg_id, message, read_ct FROM pgmq.read($1, $2, $3)',
+        [queueName, visibilityTimeout, batchSize],
+      )
+      messages = result.rows
     }
     catch (readError) {
-      throw simpleError('error_reading_from_pgmq_queue', 'Error reading from pgmq queue', { queueName }, readError)
+      return simpleError('error_reading_from_pgmq_queue', 'Error reading from pgmq queue', { queueName }, readError)
     }
 
     if (!messages || (messages && messages.length === 0)) {
@@ -216,7 +217,7 @@ async function readQueue(c: Context, db: ReturnType<typeof getPgClient>, queueNa
       return parsed.data as Message[]
     }
     else {
-      throw simpleError('invalid_message_format', 'Invalid message format', { parsed: parsed.error })
+      return simpleError('invalid_message_format', 'Invalid message format', { parsed: parsed.error })
     }
   }
   catch (error) {
@@ -269,7 +270,7 @@ export async function http_post_helper(
     return response
   }
   catch (error) {
-    throw simpleError('request_timeout', 'Request Timeout (Internal QUEUE handling error)', { function_name }, error)
+    return simpleError('request_timeout', 'Request Timeout (Internal QUEUE handling error)', { function_name }, error)
   }
   finally {
     clearTimeout(timeoutId)
@@ -281,14 +282,14 @@ async function delete_queue_message_batch(c: Context, db: ReturnType<typeof getP
   try {
     if (msgIds.length === 0)
       return
-    // Format array as properly quoted bigint values
-    const arrayStr = msgIds.map(id => `${id}::bigint`).join(',')
-    await db.unsafe(`
-      SELECT pgmq.delete($1, ARRAY[${arrayStr}])
-    `, [queueName])
+    // Use pg's array syntax
+    await db.query(
+      'SELECT pgmq.delete($1, $2::bigint[])',
+      [queueName, msgIds],
+    )
   }
   catch (error) {
-    throw simpleError('error_deleting_queue_messages', 'Error deleting queue messages', { msgIds, queueName }, error)
+    return simpleError('error_deleting_queue_messages', 'Error deleting queue messages', { msgIds, queueName }, error)
   }
 }
 
@@ -297,11 +298,11 @@ async function archive_queue_messages(c: Context, db: ReturnType<typeof getPgCli
   try {
     if (msgIds.length === 0)
       return
-    // Format array as properly quoted bigint values
-    const arrayStr = msgIds.map(id => `${id}::bigint`).join(',')
-    await db.unsafe(`
-      SELECT pgmq.archive($1, ARRAY[${arrayStr}])
-    `, [queueName])
+    // Use pg's array syntax
+    await db.query(
+      'SELECT pgmq.archive($1, $2::bigint[])',
+      [queueName, msgIds],
+    )
   }
   catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error)
@@ -319,7 +320,7 @@ async function archive_queue_messages(c: Context, db: ReturnType<typeof getPgCli
       msgIdsLength: msgIds.length,
     })
 
-    throw simpleError('error_archiving_queue_messages', `Error archiving queue messages: ${errorMessage}`, { msgIds: msgIdsTruncated, msgIdsLength: msgIds.length, queueName, errorMessage }, error)
+    return simpleError('error_archiving_queue_messages', `Error archiving queue messages: ${errorMessage}`, { msgIds: msgIdsTruncated, msgIdsLength: msgIds.length, queueName, errorMessage }, error)
   }
 }
 
@@ -331,18 +332,22 @@ async function mass_edit_queue_messages_cf_ids(
 ) {
   try {
     // Build the array of ROW values as a string
-    const rowValues = updates.map(u =>
-      `ROW(${u.msg_id}::bigint, '${u.cf_id}'::varchar, '${u.queue}'::varchar)::message_update`,
-    ).join(',')
+    // Note: With pg library, we need to sanitize values to prevent SQL injection
+    const rowValues = updates.map((u) => {
+      // Escape single quotes in cf_id and queue
+      const escapedCfId = u.cf_id.replace(/'/g, '\'\'')
+      const escapedQueue = u.queue.replace(/'/g, '\'\'')
+      return `ROW(${u.msg_id}::bigint, '${escapedCfId}'::varchar, '${escapedQueue}'::varchar)::message_update`
+    }).join(',')
 
-    await db.unsafe(`
+    await db.query(`
       SELECT mass_edit_queue_messages_cf_ids(
         ARRAY[${rowValues}]
       )
     `)
   }
   catch (error) {
-    throw simpleError('error_updating_cf_ids', 'Error updating CF IDs', {}, error)
+    return simpleError('error_updating_cf_ids', 'Error updating CF IDs', {}, error)
   }
 }
 
@@ -367,13 +372,13 @@ app.post('/sync', async (c) => {
   const batchSize = body?.batch_size
 
   if (!queueName || typeof queueName !== 'string') {
-    throw simpleError('missing_or_invalid_queue_name', 'Missing or invalid queue_name in body', { body })
+    return simpleError('missing_or_invalid_queue_name', 'Missing or invalid queue_name in body', { body })
   }
 
   // Only validate when batchSize is explicitly provided
   if (batchSize !== undefined) {
     if (typeof batchSize !== 'number' || batchSize <= 0) {
-      throw simpleError('invalid_batch_size', 'batch_size must be a positive number', { batchSize })
+      return simpleError('invalid_batch_size', 'batch_size must be a positive number', { batchSize })
     }
   }
 

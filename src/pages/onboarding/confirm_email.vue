@@ -45,7 +45,7 @@ async function resendEmail() {
               </p>
               <div class="flex justify-center gap-2">
                 <p class="text-sm font-medium text-gray-500">
-                  {{ t('did-not-recive-confirm-email') }}
+                  {{ t('did-not-receive-confirm-email') }}
                 </p>
                 <p
                   to="/resend_email"

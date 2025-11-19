@@ -4,7 +4,7 @@ import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
 import { unsubscribeBento } from '../utils/bento.ts'
 import { BRES, middlewareAPISecret, triggerValidator } from '../utils/hono.ts'
-import { cloudlog } from '../utils/loggin.ts'
+import { cloudlog } from '../utils/logging.ts'
 import { cancelSubscription } from '../utils/stripe.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 
