@@ -142,16 +142,16 @@ BEGIN
       RAISE;
     END IF;
 
-    SELECT id, grant_id
+    SELECT t.id, t.grant_id
     INTO v_existing_transaction_id, v_existing_grant_id
-    FROM public.usage_credit_transactions
-    WHERE org_id = p_org_id
-      AND transaction_type = 'purchase'
+    FROM public.usage_credit_transactions AS t
+    WHERE t.org_id = p_org_id
+      AND t.transaction_type = 'purchase'
       AND (
-        (v_session_id IS NOT NULL AND source_ref ->> 'sessionId' = v_session_id)
-        OR (v_payment_intent_id IS NOT NULL AND source_ref ->> 'paymentIntentId' = v_payment_intent_id)
+        (v_session_id IS NOT NULL AND t.source_ref ->> 'sessionId' = v_session_id)
+        OR (v_payment_intent_id IS NOT NULL AND t.source_ref ->> 'paymentIntentId' = v_payment_intent_id)
       )
-    ORDER BY id DESC
+    ORDER BY t.id DESC
     LIMIT 1;
 
     IF NOT FOUND THEN
