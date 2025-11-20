@@ -3,7 +3,7 @@ BEGIN;
 CREATE EXTENSION "basejump-supabase_test_helpers";
 
 SELECT
-  plan (14);
+  plan (15);
 
 DO $$
 BEGIN
@@ -31,6 +31,12 @@ SELECT
   ok (
     pg_get_functiondef('expire_usage_credits()'::regprocedure) IS NOT NULL,
     'expire_usage_credits function exists'
+  );
+
+SELECT
+  ok (
+    position('t.source_ref' in pg_get_functiondef('top_up_usage_credits(uuid, numeric, timestamptz, text, jsonb, text)'::regprocedure)) > 0,
+    'top_up_usage_credits qualifies source_ref lookups to avoid ambiguity'
   );
 
 CREATE TEMP TABLE test_credit_context (
