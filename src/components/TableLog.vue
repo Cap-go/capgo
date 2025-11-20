@@ -397,6 +397,8 @@ onMounted(async () => {
           prevent-min-max-navigation
           :dark="isDark"
           range
+          teleport="body"
+          :floating="{ arrow: false }"
           :ui="{
             menu: 'custom-timepicker-button',
           }"
@@ -670,6 +672,7 @@ onMounted(async () => {
   --dp-cell-border-radius: 0.375rem;
   --dp-common-transition: all 0.2s ease-in-out;
   --dp-button-height: 2.5rem;
+  --dp-action-button-height: 2.5rem;
   --dp-month-year-row-height: 2.5rem;
   --dp-month-year-row-button-size: 2rem;
   --dp-button-icon-height: 1.25rem;
@@ -710,16 +713,28 @@ onMounted(async () => {
   border-radius: 0.5rem;
 }
 /* Custom action buttons styling for Capgo */
-.custom-timepicker-button > .dp__action_row > .dp__action_buttons > .dp__action_cancel {
-  @apply d-btn d-btn-outline d-btn-sm;
-  width: 45%;
+.dp__menu.custom-timepicker-button .dp__action_row {
+  width: 100% !important;
+  padding: 0.5rem !important;
 }
-.custom-timepicker-button > .dp__action_row > .dp__action_buttons > .dp__action_select {
-  @apply d-btn d-btn-outline d-btn-secondary d-btn-sm;
-  width: 45%;
+
+.dp__menu.custom-timepicker-button .dp__action_row .dp__action_buttons {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  gap: 0.5rem !important;
+  width: 100% !important;
+  flex: 1 !important;
 }
-.custom-timepicker-button > .dp__action_row > .dp__action_buttons {
-  display: contents !important;
+
+.dp__menu.custom-timepicker-button .dp__action_row .dp__action_buttons .dp__action_cancel,
+.dp__menu.custom-timepicker-button .dp__action_row .dp__action_buttons .dp__action_select {
+  flex: 1 !important;
+  max-width: 47% !important;
+  min-width: 47% !important;
+  width: 47% !important;
+  justify-content: center !important;
+  text-align: center !important;
 }
 
 .dp--tp-wrap > .dp__btn.dp__button {
@@ -733,7 +748,7 @@ onMounted(async () => {
 /* Make date picker popup fixed to viewport */
 .dp__menu {
   position: fixed !important;
-  z-index: 1000 !important;
+  z-index: 9999 !important;
   width: 320px !important;
   min-width: 320px !important;
   max-width: 320px !important;
@@ -741,6 +756,20 @@ onMounted(async () => {
     0 10px 15px -3px rgb(0 0 0 / 0.1),
     0 4px 6px -4px rgb(0 0 0 / 0.1) !important;
   border: 1px solid rgb(229 231 235) !important;
+  margin: 0 !important;
+  overflow: visible !important;
+}
+
+/* Ensure menu container is never clipped */
+.dp__outer_menu_wrap {
+  z-index: 9999 !important;
+  position: fixed !important;
+  overflow: visible !important;
+}
+
+/* Override any parent overflow settings */
+body > .dp__outer_menu_wrap {
+  overflow: visible !important;
 }
 
 /* Mobile responsive calendar */
