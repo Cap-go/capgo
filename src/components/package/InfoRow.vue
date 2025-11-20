@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { useDebounceFn } from '@vueuse/core'
 import { reactive, ref, watch } from 'vue'
-import { toast } from 'vue-sonner'
 
 const props = defineProps<{
   label: string
