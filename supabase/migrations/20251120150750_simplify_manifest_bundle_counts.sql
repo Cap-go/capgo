@@ -9,9 +9,9 @@ ADD COLUMN manifest_count integer NOT NULL DEFAULT 0;
 -- Backfill manifest_count for existing versions
 UPDATE public.app_versions av
 SET manifest_count = (
-  SELECT COUNT(*)::integer
-  FROM public.manifest m
-  WHERE m.app_version_id = av.id
+    SELECT COUNT(*)::integer
+    FROM public.manifest AS m
+    WHERE m.app_version_id = av.id
 );
 
 -- Drop the old complex trigger and function

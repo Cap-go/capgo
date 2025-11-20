@@ -56,6 +56,7 @@
     "test:cloudflare:api": "vitest run --exclude=tests/cli* --exclude=tests/updates* --exclude=tests/stats* --exclude=tests/channel_self* --config vitest.config.cloudflare.ts",
     "test:cloudflare:updates": "vitest run tests/updates* --config vitest.config.cloudflare.ts",
     "lint": "eslint \"src/**/*.{vue,ts,js}\"",
+    "fmt": "bun run lint:fix && bun run lint:sql",
     "lint:fix": "eslint \"src/**/*.{vue,ts,js}\" --fix",
     "lint:backend": "eslint \"supabase/**/*.{vue,ts,js}\"",
     "lint:sql": "sqlfluff fix --dialect postgres",

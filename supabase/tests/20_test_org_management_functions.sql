@@ -2,30 +2,26 @@ BEGIN;
 
 CREATE EXTENSION "basejump-supabase_test_helpers";
 
-SELECT
-    plan (45);
+SELECT plan(45);
 
 -- Test accept_invitation_to_org (user is already a member, so should return INVALID_ROLE)
-SELECT
-    tests.authenticate_as ('test_user');
+SELECT tests.authenticate_as('test_user');
 
 SELECT
-    is (
-        accept_invitation_to_org ('046a36ac-e03c-4590-9257-bd6c9dba9ee8'),
+    is(
+        accept_invitation_to_org('046a36ac-e03c-4590-9257-bd6c9dba9ee8'),
         'INVALID_ROLE',
         'accept_invitation_to_org test - user already member'
     );
 
-SELECT
-    tests.clear_authentication ();
+SELECT tests.clear_authentication();
 
 -- Test invite_user_to_org (requires email functionality which may not be available)
-SELECT
-    tests.authenticate_as ('test_admin');
+SELECT tests.authenticate_as('test_admin');
 
 SELECT
-    ok (
-        invite_user_to_org (
+    ok(
+        invite_user_to_org(
             'newuser@example.com',
             '22dbad8a-b885-4309-9b3b-a09f8460fb6d',
             'read'
@@ -34,8 +30,8 @@ SELECT
     );
 
 SELECT
-    ok (
-        invite_user_to_org (
+    ok(
+        invite_user_to_org(
             'existing@example.com',
             '22dbad8a-b885-4309-9b3b-a09f8460fb6d',
             'read'
@@ -43,35 +39,30 @@ SELECT
         'invite_user_to_org test - returns result for existing'
     );
 
-SELECT
-    tests.clear_authentication ();
+SELECT tests.clear_authentication();
 
 -- Test get_orgs_v6 without userid
-SELECT
-    tests.authenticate_as ('test_admin');
+SELECT tests.authenticate_as('test_admin');
 
 SELECT
-    ok (
+    ok(
         (
-            SELECT
-                count(*)
+            SELECT count(*)
             FROM
-                get_orgs_v6 ()
+                get_orgs_v6()
         ) > 0,
         'get_orgs_v6 test - returns organizations'
     );
 
-SELECT
-    tests.clear_authentication ();
+SELECT tests.clear_authentication();
 
 -- Test get_orgs_v6 with userid
 SELECT
-    ok (
+    ok(
         (
-            SELECT
-                count(*)
+            SELECT count(*)
             FROM
-                get_orgs_v6 ('c591b04e-cf29-4945-b9a0-776d0672061a')
+                get_orgs_v6('c591b04e-cf29-4945-b9a0-776d0672061a')
         ) >= 0,
         'get_orgs_v6 test - returns organizations for admin user'
     );
@@ -87,9 +78,10 @@ SELECT
 
 -- Verify the API key header is set correctly
 SELECT
-    is (
+    is(
         (
-            (current_setting('request.headers'::text, TRUE))::json ->> 'capgkey'::text
+            (current_setting('request.headers'::text, TRUE))::json
+            ->> 'capgkey'::text
         ),
         '67eeaff4-ae4c-49a6-8eb1-0875f5369de1',
         'get_orgs_v6 API key test - header reading method works'
@@ -97,12 +89,11 @@ SELECT
 
 -- Test with valid API key
 SELECT
-    ok (
+    ok(
         (
-            SELECT
-                count(*)
+            SELECT count(*)
             FROM
-                get_orgs_v6 ()
+                get_orgs_v6()
         ) > 0,
         'get_orgs_v6 API key test - returns organizations with valid API key'
     );
@@ -116,7 +107,7 @@ SELECT
     );
 
 SELECT
-    throws_like (
+    throws_like(
         'SELECT get_orgs_v6()',
         '%Invalid API key provided%',
         'get_orgs_v6 API key test - throws correct error message for invalid API key'
@@ -138,24 +129,22 @@ SELECT
     );
 
 SELECT
-    ok (
+    ok(
         (
-            SELECT
-                count(*)
+            SELECT count(*)
             FROM
-                get_orgs_v6 ()
+                get_orgs_v6()
         ) >= 0,
         'get_orgs_v6 API key test - works with limited_to_orgs API key'
     );
 
 -- Verify that limited API key only returns allowed orgs
 SELECT
-    ok (
+    ok(
         (
-            SELECT
-                count(*)
+            SELECT count(*)
             FROM
-                get_orgs_v6 ()
+                get_orgs_v6()
             WHERE
                 gid = '22dbad8a-b885-4309-9b3b-a09f8460fb6d'
         ) >= 0,
@@ -177,12 +166,11 @@ SELECT
     );
 
 SELECT
-    ok (
+    ok(
         (
-            SELECT
-                count(*)
+            SELECT count(*)
             FROM
-                get_orgs_v6 ()
+                get_orgs_v6()
         ) >= 0,
         'get_orgs_v6 API key test - API key with empty limitations works normally'
     );
@@ -202,33 +190,30 @@ SELECT
     );
 
 SELECT
-    ok (
+    ok(
         (
-            SELECT
-                count(*)
+            SELECT count(*)
             FROM
-                get_orgs_v6 ()
+                get_orgs_v6()
         ) >= 0,
         'get_orgs_v6 API key test - API key with NULL limitations works normally'
     );
 
 -- Test 6: No API key header (should fall back to identity and throw error)
-SELECT
-    set_config('request.headers', '{}', TRUE);
+SELECT set_config('request.headers', '{}', TRUE);
 
 SELECT
-    throws_like (
+    throws_like(
         'SELECT get_orgs_v6()',
         '%No authentication provided - API key or valid session required%',
         'get_orgs_v6 API key test - throws correct error when no authentication'
     );
 
 -- Test 7: Null headers (should fall back to identity and throw error)
-SELECT
-    set_config('request.headers', '', TRUE);
+SELECT set_config('request.headers', '', TRUE);
 
 SELECT
-    throws_like (
+    throws_like(
         'SELECT get_orgs_v6()',
         '%No authentication provided - API key or valid session required%',
         'get_orgs_v6 API key test - throws correct error when null headers'
@@ -242,32 +227,28 @@ WHERE
     key = 'ae6e7458-c46d-4c00-aa3b-153b0b8520eb';
 
 -- Test get_org_members
-SELECT
-    tests.authenticate_as ('test_admin');
+SELECT tests.authenticate_as('test_admin');
 
 SELECT
-    ok (
+    ok(
         (
-            SELECT
-                count(*)
+            SELECT count(*)
             FROM
-                get_org_members ('22dbad8a-b885-4309-9b3b-a09f8460fb6d')
+                get_org_members('22dbad8a-b885-4309-9b3b-a09f8460fb6d')
         ) >= 0,
         'get_org_members test - returns members'
     );
 
-SELECT
-    tests.clear_authentication ();
+SELECT tests.clear_authentication();
 
 -- Test get_org_members with user_id
 SELECT
-    ok (
+    ok(
         (
-            SELECT
-                count(*)
+            SELECT count(*)
             FROM
-                get_org_members (
-                    tests.get_supabase_uid ('test_admin'),
+                get_org_members(
+                    tests.get_supabase_uid('test_admin'),
                     '22dbad8a-b885-4309-9b3b-a09f8460fb6d'
                 )
         ) >= 0,
@@ -276,47 +257,47 @@ SELECT
 
 -- Test is_canceled_org
 SELECT
-    is (
-        is_canceled_org ('22dbad8a-b885-4309-9b3b-a09f8460fb6d'),
+    is(
+        is_canceled_org('22dbad8a-b885-4309-9b3b-a09f8460fb6d'),
         FALSE,
         'is_canceled_org test - org not canceled'
     );
 
 -- Test is_canceled_org negative case
 SELECT
-    is (
-        is_canceled_org ('00000000-0000-0000-0000-000000000000'),
+    is(
+        is_canceled_org('00000000-0000-0000-0000-000000000000'),
         FALSE,
         'is_canceled_org test - non-existent org returns false'
     );
 
 -- Test is_paying_org (based on seed data, orgs have stripe_info so they are paying)
 SELECT
-    is (
-        is_paying_org ('22dbad8a-b885-4309-9b3b-a09f8460fb6d'),
+    is(
+        is_paying_org('22dbad8a-b885-4309-9b3b-a09f8460fb6d'),
         TRUE,
         'is_paying_org test - org is paying based on seed'
     );
 
 -- Test is_paying_org negative case
 SELECT
-    is (
-        is_paying_org ('00000000-0000-0000-0000-000000000000'),
+    is(
+        is_paying_org('00000000-0000-0000-0000-000000000000'),
         FALSE,
         'is_paying_org test - non-existent org returns false'
     );
 
 -- Test is_trial_org
 SELECT
-    ok (
-        is_trial_org ('22dbad8a-b885-4309-9b3b-a09f8460fb6d') >= 0,
+    ok(
+        is_trial_org('22dbad8a-b885-4309-9b3b-a09f8460fb6d') >= 0,
         'is_trial_org test - returns trial days'
     );
 
 -- Test is_trial_org negative case
 SELECT
-    ok (
-        is_trial_org ('00000000-0000-0000-0000-000000000000') IS NULL,
+    ok(
+        is_trial_org('00000000-0000-0000-0000-000000000000') IS NULL,
         'is_trial_org test - non-existent org returns null'
     );
 
@@ -330,8 +311,8 @@ SELECT
 --   );
 -- Test is_onboarded_org negative case
 SELECT
-    is (
-        is_onboarded_org ('00000000-0000-0000-0000-000000000000'),
+    is(
+        is_onboarded_org('00000000-0000-0000-0000-000000000000'),
         FALSE,
         'is_onboarded_org test - non-existent org returns false'
     );
@@ -341,117 +322,125 @@ SELECT
 -- The org is not onboarded, and if the trial gets expired in a later test, 
 -- onboarding will be needed. So we just check it returns a boolean.
 SELECT
-    ok (
-        is_onboarding_needed_org ('22dbad8a-b885-4309-9b3b-a09f8460fb6d') IS NOT NULL,
+    ok(
+        is_onboarding_needed_org(
+            '22dbad8a-b885-4309-9b3b-a09f8460fb6d'
+        ) IS NOT NULL,
         'is_onboarding_needed_org test - returns boolean result'
     );
 
 -- Test is_onboarding_needed_org negative case
 SELECT
-    ok (
-        is_onboarding_needed_org ('00000000-0000-0000-0000-000000000000') IS NULL,
+    ok(
+        is_onboarding_needed_org(
+            '00000000-0000-0000-0000-000000000000'
+        ) IS NULL,
         'is_onboarding_needed_org test - non-existent org returns null'
     );
 
 -- Test is_good_plan_v5_org (based on seed data with stripe_info)
 SELECT
-    is (
-        is_good_plan_v5_org ('22dbad8a-b885-4309-9b3b-a09f8460fb6d'),
+    is(
+        is_good_plan_v5_org('22dbad8a-b885-4309-9b3b-a09f8460fb6d'),
         TRUE,
         'is_good_plan_v5_org test - has good plan'
     );
 
 -- Test is_good_plan_v5_org negative case
 SELECT
-    is (
-        is_good_plan_v5_org ('00000000-0000-0000-0000-000000000000'),
+    is(
+        is_good_plan_v5_org('00000000-0000-0000-0000-000000000000'),
         FALSE,
         'is_good_plan_v5_org test - non-existent org returns false'
     );
 
 -- Test is_paying_and_good_plan_org
 SELECT
-    is (
-        is_paying_and_good_plan_org ('22dbad8a-b885-4309-9b3b-a09f8460fb6d'),
+    is(
+        is_paying_and_good_plan_org('22dbad8a-b885-4309-9b3b-a09f8460fb6d'),
         TRUE,
         'is_paying_and_good_plan_org test - paying and good plan'
     );
 
 -- Test is_paying_and_good_plan_org negative case
 SELECT
-    is (
-        is_paying_and_good_plan_org ('00000000-0000-0000-0000-000000000000'),
+    is(
+        is_paying_and_good_plan_org('00000000-0000-0000-0000-000000000000'),
         FALSE,
         'is_paying_and_good_plan_org test - non-existent org returns false'
     );
 
 -- Test is_paying_and_good_plan_org for Demo org (used by statistics tests)
 SELECT
-    is (
-        is_paying_and_good_plan_org ('046a36ac-e03c-4590-9257-bd6c9dba9ee8'),
+    is(
+        is_paying_and_good_plan_org('046a36ac-e03c-4590-9257-bd6c9dba9ee8'),
         TRUE,
         'is_paying_and_good_plan_org test - Demo org has paying and good plan'
     );
 
 -- Test is_allowed_action_org
 SELECT
-    is (
-        is_allowed_action_org ('22dbad8a-b885-4309-9b3b-a09f8460fb6d'),
+    is(
+        is_allowed_action_org('22dbad8a-b885-4309-9b3b-a09f8460fb6d'),
         TRUE,
         'is_allowed_action_org test - action allowed for good plan'
     );
 
 -- Test is_allowed_action_org negative case
 SELECT
-    is (
-        is_allowed_action_org ('00000000-0000-0000-0000-000000000000'),
+    is(
+        is_allowed_action_org('00000000-0000-0000-0000-000000000000'),
         FALSE,
         'is_allowed_action_org test - non-existent org returns false'
     );
 
 -- Test is_allowed_action_org_action
 SELECT
-    is (
-        is_allowed_action_org_action ('22dbad8a-b885-4309-9b3b-a09f8460fb6d', '{mau}'),
+    is(
+        is_allowed_action_org_action(
+            '22dbad8a-b885-4309-9b3b-a09f8460fb6d', '{mau}'
+        ),
         TRUE,
         'is_allowed_action_org_action test - mau action allowed'
     );
 
 -- Test is_allowed_action_org_action negative case
 SELECT
-    is (
-        is_allowed_action_org_action ('00000000-0000-0000-0000-000000000000', '{mau}'),
+    is(
+        is_allowed_action_org_action(
+            '00000000-0000-0000-0000-000000000000', '{mau}'
+        ),
         FALSE,
         'is_allowed_action_org_action test - non-existent org returns false'
     );
 
 -- Test get_current_plan_name_org
 SELECT
-    ok (
-        get_current_plan_name_org ('22dbad8a-b885-4309-9b3b-a09f8460fb6d') IS NOT NULL,
+    ok(
+        get_current_plan_name_org(
+            '22dbad8a-b885-4309-9b3b-a09f8460fb6d'
+        ) IS NOT NULL,
         'get_current_plan_name_org test - returns plan name'
     );
 
 -- Test get_current_plan_max_org
 SELECT
-    ok (
+    ok(
         (
-            SELECT
-                count(*)
+            SELECT count(*)
             FROM
-                get_current_plan_max_org ('22dbad8a-b885-4309-9b3b-a09f8460fb6d')
+                get_current_plan_max_org('22dbad8a-b885-4309-9b3b-a09f8460fb6d')
         ) = 1,
         'get_current_plan_max_org test - returns plan limits'
     );
 
 -- Test get_cycle_info_org
 SELECT
-    ok (
+    ok(
         (
-            SELECT
-                count(*)
+            SELECT count(*)
             FROM
-                get_cycle_info_org ('22dbad8a-b885-4309-9b3b-a09f8460fb6d')
+                get_cycle_info_org('22dbad8a-b885-4309-9b3b-a09f8460fb6d')
         ) >= 0,
         'get_cycle_info_org test - returns cycle info'
     );
@@ -466,17 +455,19 @@ SELECT
     );
 
 SELECT
-    ok (
-        get_identity_apikey_only ('{read,all}') IS NOT NULL,
+    ok(
+        get_identity_apikey_only('{read,all}') IS NOT NULL,
         'get_identity_apikey_only test - returns user when valid read apikey is set'
     );
 
 -- Test the function with a valid org and good plan
 SELECT
-    ok (
+    ok(
         coalesce(
             array_length(
-                get_organization_cli_warnings ('22dbad8a-b885-4309-9b3b-a09f8460fb6d', '1.0.0'),
+                get_organization_cli_warnings(
+                    '22dbad8a-b885-4309-9b3b-a09f8460fb6d', '1.0.0'
+                ),
                 1
             ),
             0
@@ -493,16 +484,18 @@ SELECT
     );
 
 SELECT
-    ok (
-        get_identity_apikey_only ('{read,all}') IS NULL,
+    ok(
+        get_identity_apikey_only('{read,all}') IS NULL,
         'get_identity_apikey_only test - returns null when invalid apikey is set'
     );
 
 -- This should return an access denied message
 SELECT
-    ok (
+    ok(
         array_length(
-            get_organization_cli_warnings ('22dbad8a-b885-4309-9b3b-a09f8460fb6d', '1.0.0'),
+            get_organization_cli_warnings(
+                '22dbad8a-b885-4309-9b3b-a09f8460fb6d', '1.0.0'
+            ),
             1
         ) = 1,
         'get_organization_cli_warnings test - returns single warning for invalid API key'
@@ -518,38 +511,38 @@ SELECT
 
 -- Test individual action types
 SELECT
-    ok (
-        is_paying_and_good_plan_org_action (
+    ok(
+        is_paying_and_good_plan_org_action(
             '22dbad8a-b885-4309-9b3b-a09f8460fb6d',
-            ARRAY['mau']::public.action_type[]
+            ARRAY['mau']::public.action_type []
         ) IS NOT NULL,
         'is_paying_and_good_plan_org_action test - MAU action returns result'
     );
 
 SELECT
-    ok (
-        is_paying_and_good_plan_org_action (
+    ok(
+        is_paying_and_good_plan_org_action(
             '22dbad8a-b885-4309-9b3b-a09f8460fb6d',
-            ARRAY['storage']::public.action_type[]
+            ARRAY['storage']::public.action_type []
         ) IS NOT NULL,
         'is_paying_and_good_plan_org_action test - Storage action returns result'
     );
 
 SELECT
-    ok (
-        is_paying_and_good_plan_org_action (
+    ok(
+        is_paying_and_good_plan_org_action(
             '22dbad8a-b885-4309-9b3b-a09f8460fb6d',
-            ARRAY['bandwidth']::public.action_type[]
+            ARRAY['bandwidth']::public.action_type []
         ) IS NOT NULL,
         'is_paying_and_good_plan_org_action test - Bandwidth action returns result'
     );
 
 -- Test multiple actions
 SELECT
-    ok (
-        is_paying_and_good_plan_org_action (
+    ok(
+        is_paying_and_good_plan_org_action(
             '22dbad8a-b885-4309-9b3b-a09f8460fb6d',
-            ARRAY['mau', 'storage', 'bandwidth']::public.action_type[]
+            ARRAY['mau', 'storage', 'bandwidth']::public.action_type []
         ) IS NOT NULL,
         'is_paying_and_good_plan_org_action test - Multiple actions return result'
     );
@@ -562,15 +555,14 @@ SET
     storage_exceeded = TRUE,
     mau_exceeded = FALSE,
     bandwidth_exceeded = FALSE,
-    trial_at = now() - INTERVAL '30 days',
+    trial_at = now() - interval '30 days',
     status = 'succeeded',
     is_good_plan = TRUE
 WHERE
     customer_id = 'cus_Pa0k8TO6HVln6A';
 
 -- Reset headers first
-SELECT
-    set_config('request.headers', NULL, TRUE);
+SELECT set_config('request.headers', NULL, TRUE);
 
 -- Set API key for storage exceeded tests
 SELECT
@@ -581,12 +573,11 @@ SELECT
     );
 
 -- Debug: Check the state of stripe_info and org
-SELECT
-    diag ('Debug: Checking stripe_info state');
+SELECT diag('Debug: Checking stripe_info state');
 
 -- Check what the customer_id is for this org
 SELECT
-    diag (
+    diag(
         'Org customer_id: ' || coalesce(customer_id, 'NULL')
     )
 FROM
@@ -596,19 +587,31 @@ WHERE
 
 -- Check what stripe_info records exist
 SELECT
-    diag (
+    diag(
         'Existing stripe_info customer_ids: ' || string_agg(customer_id, ', ')
     )
 FROM
     stripe_info;
 
 -- Check stripe_info state BEFORE update
-SELECT
-    diag ('BEFORE UPDATE:');
+SELECT diag('BEFORE UPDATE:');
 
 SELECT
-    diag (
-        'customer_id: ' || coalesce(customer_id, 'NULL') || ', status: ' || coalesce(status::TEXT, 'NULL') || ', storage_exceeded: ' || storage_exceeded::TEXT || ', mau_exceeded: ' || mau_exceeded::TEXT || ', bandwidth_exceeded: ' || bandwidth_exceeded::TEXT || ', trial_at: ' || coalesce(trial_at::TEXT, 'NULL') || ', is_good_plan: ' || is_good_plan::TEXT
+    diag(
+        'customer_id: '
+        || coalesce(customer_id, 'NULL')
+        || ', status: '
+        || coalesce(status::text, 'NULL')
+        || ', storage_exceeded: '
+        || storage_exceeded::text
+        || ', mau_exceeded: '
+        || mau_exceeded::text
+        || ', bandwidth_exceeded: '
+        || bandwidth_exceeded::text
+        || ', trial_at: '
+        || coalesce(trial_at::text, 'NULL')
+        || ', is_good_plan: '
+        || is_good_plan::text
     )
 FROM
     stripe_info
@@ -616,12 +619,24 @@ WHERE
     customer_id = 'cus_Pa0k8TO6HVln6A';
 
 -- Check stripe_info state AFTER update
-SELECT
-    diag ('AFTER UPDATE:');
+SELECT diag('AFTER UPDATE:');
 
 SELECT
-    diag (
-        'customer_id: ' || coalesce(customer_id, 'NULL') || ', status: ' || coalesce(status::TEXT, 'NULL') || ', storage_exceeded: ' || storage_exceeded::TEXT || ', mau_exceeded: ' || mau_exceeded::TEXT || ', bandwidth_exceeded: ' || bandwidth_exceeded::TEXT || ', trial_at: ' || coalesce(trial_at::TEXT, 'NULL') || ', is_good_plan: ' || is_good_plan::TEXT
+    diag(
+        'customer_id: '
+        || coalesce(customer_id, 'NULL')
+        || ', status: '
+        || coalesce(status::text, 'NULL')
+        || ', storage_exceeded: '
+        || storage_exceeded::text
+        || ', mau_exceeded: '
+        || mau_exceeded::text
+        || ', bandwidth_exceeded: '
+        || bandwidth_exceeded::text
+        || ', trial_at: '
+        || coalesce(trial_at::text, 'NULL')
+        || ', is_good_plan: '
+        || is_good_plan::text
     )
 FROM
     stripe_info
@@ -630,32 +645,32 @@ WHERE
 
 -- Debug: Check what is_paying_and_good_plan_org_action returns
 SELECT
-    diag (
+    diag(
         'Debug: is_paying_and_good_plan_org_action results'
     );
 
 SELECT
-    diag (
-        'mau: ' || is_paying_and_good_plan_org_action (
+    diag(
+        'mau: ' || is_paying_and_good_plan_org_action(
             '22dbad8a-b885-4309-9b3b-a09f8460fb6d',
-            ARRAY['mau']::public.action_type[]
-        )::TEXT
+            ARRAY['mau']::public.action_type []
+        )::text
     );
 
 SELECT
-    diag (
-        'bandwidth: ' || is_paying_and_good_plan_org_action (
+    diag(
+        'bandwidth: ' || is_paying_and_good_plan_org_action(
             '22dbad8a-b885-4309-9b3b-a09f8460fb6d',
-            ARRAY['bandwidth']::public.action_type[]
-        )::TEXT
+            ARRAY['bandwidth']::public.action_type []
+        )::text
     );
 
 SELECT
-    diag (
-        'storage: ' || is_paying_and_good_plan_org_action (
+    diag(
+        'storage: ' || is_paying_and_good_plan_org_action(
             '22dbad8a-b885-4309-9b3b-a09f8460fb6d',
-            ARRAY['storage']::public.action_type[]
-        )::TEXT
+            ARRAY['storage']::public.action_type []
+        )::text
     );
 
 -- This should now return a storage limit warning
@@ -684,11 +699,10 @@ SET
     storage_exceeded = FALSE,
     mau_exceeded = FALSE,
     bandwidth_exceeded = FALSE,
-    trial_at = now() + INTERVAL '15 days'
+    trial_at = now() + interval '15 days'
 WHERE
     customer_id = (
-        SELECT
-            customer_id
+        SELECT customer_id
         FROM
             orgs
         WHERE
@@ -696,12 +710,10 @@ WHERE
     );
 
 -- Reset the request headers for other tests
-SELECT
-    set_config('request.headers', NULL, TRUE);
+SELECT set_config('request.headers', NULL, TRUE);
 
-SELECT
-    *
+SELECT *
 FROM
-    finish ();
+    finish();
 
 ROLLBACK;
