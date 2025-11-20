@@ -134,6 +134,8 @@ step_insert AS (
     1,
     NULL
   )
+  RETURNING id
+)
 INSERT INTO
   test_credit_context (org_id, grant_id, credit_step_id)
 SELECT
