@@ -5,18 +5,22 @@ ADD COLUMN manifest_bundle_count bigint NOT NULL DEFAULT 0;
 
 -- Backfill based on existing manifest data
 WITH manifest_counts AS (
-  SELECT av.app_id, COUNT(DISTINCT av.id)::bigint AS bundle_count
-  FROM public.app_versions av
-  WHERE EXISTS (
-    SELECT 1
-    FROM public.manifest m
-    WHERE m.app_version_id = av.id
-  )
-  GROUP BY av.app_id
+    SELECT
+        av.app_id,
+        COUNT(DISTINCT av.id)::bigint AS bundle_count
+    FROM public.app_versions AS av
+    WHERE
+        EXISTS (
+            SELECT 1
+            FROM public.manifest AS m
+            WHERE m.app_version_id = av.id
+        )
+    GROUP BY av.app_id
 )
+
 UPDATE public.apps AS a
 SET manifest_bundle_count = mc.bundle_count
-FROM manifest_counts mc
+FROM manifest_counts AS mc
 WHERE mc.app_id = a.app_id;
 
 -- Dedicated queue for manifest bundle deltas
@@ -103,7 +107,9 @@ AFTER INSERT OR DELETE ON public.manifest
 FOR EACH ROW
 EXECUTE FUNCTION public.enqueue_manifest_bundle_counts();
 
-CREATE OR REPLACE FUNCTION public.process_manifest_bundle_counts_queue(batch_size integer DEFAULT 1000) RETURNS bigint
+CREATE OR REPLACE FUNCTION public.process_manifest_bundle_counts_queue(
+    batch_size integer DEFAULT 1000
+) RETURNS bigint
 LANGUAGE plpgsql
 SET search_path = '' SECURITY DEFINER AS $$
 DECLARE
@@ -148,13 +154,17 @@ BEGIN
 END;
 $$;
 
-ALTER FUNCTION public.process_manifest_bundle_counts_queue(batch_size integer) OWNER TO postgres;
+ALTER FUNCTION public.process_manifest_bundle_counts_queue(
+    batch_size integer
+) OWNER TO postgres;
 
-GRANT EXECUTE ON FUNCTION public.process_manifest_bundle_counts_queue(batch_size integer) TO service_role;
+GRANT EXECUTE ON FUNCTION public.process_manifest_bundle_counts_queue(
+    batch_size integer
+) TO service_role;
 
 SELECT
-  cron.schedule(
-    'process_manifest_bundle_counts_queue',
-    '20 seconds',
-    'SELECT public.process_manifest_bundle_counts_queue(1000);'
-  );
+    cron.schedule(
+        'process_manifest_bundle_counts_queue',
+        '20 seconds',
+        'SELECT public.process_manifest_bundle_counts_queue(1000);'
+    );

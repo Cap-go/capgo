@@ -80,9 +80,8 @@ SELECT
 SELECT
     is(
         (
-            (
-                current_setting('request.headers'::text, TRUE)
-            )::json ->> 'capgkey'::text
+            (current_setting('request.headers'::text, TRUE))::json
+            ->> 'capgkey'::text
         ),
         '67eeaff4-ae4c-49a6-8eb1-0875f5369de1',
         'get_orgs_v6 API key test - header reading method works'
@@ -556,7 +555,7 @@ SET
     storage_exceeded = TRUE,
     mau_exceeded = FALSE,
     bandwidth_exceeded = FALSE,
-    trial_at = now() - INTERVAL '30 days',
+    trial_at = now() - interval '30 days',
     status = 'succeeded',
     is_good_plan = TRUE
 WHERE
@@ -602,17 +601,17 @@ SELECT
         'customer_id: '
         || coalesce(customer_id, 'NULL')
         || ', status: '
-        || coalesce(status::TEXT, 'NULL')
+        || coalesce(status::text, 'NULL')
         || ', storage_exceeded: '
-        || storage_exceeded::TEXT
+        || storage_exceeded::text
         || ', mau_exceeded: '
-        || mau_exceeded::TEXT
+        || mau_exceeded::text
         || ', bandwidth_exceeded: '
-        || bandwidth_exceeded::TEXT
+        || bandwidth_exceeded::text
         || ', trial_at: '
-        || coalesce(trial_at::TEXT, 'NULL')
+        || coalesce(trial_at::text, 'NULL')
         || ', is_good_plan: '
-        || is_good_plan::TEXT
+        || is_good_plan::text
     )
 FROM
     stripe_info
@@ -627,17 +626,17 @@ SELECT
         'customer_id: '
         || coalesce(customer_id, 'NULL')
         || ', status: '
-        || coalesce(status::TEXT, 'NULL')
+        || coalesce(status::text, 'NULL')
         || ', storage_exceeded: '
-        || storage_exceeded::TEXT
+        || storage_exceeded::text
         || ', mau_exceeded: '
-        || mau_exceeded::TEXT
+        || mau_exceeded::text
         || ', bandwidth_exceeded: '
-        || bandwidth_exceeded::TEXT
+        || bandwidth_exceeded::text
         || ', trial_at: '
-        || coalesce(trial_at::TEXT, 'NULL')
+        || coalesce(trial_at::text, 'NULL')
         || ', is_good_plan: '
-        || is_good_plan::TEXT
+        || is_good_plan::text
     )
 FROM
     stripe_info
@@ -655,7 +654,7 @@ SELECT
         'mau: ' || is_paying_and_good_plan_org_action(
             '22dbad8a-b885-4309-9b3b-a09f8460fb6d',
             ARRAY['mau']::public.action_type []
-        )::TEXT
+        )::text
     );
 
 SELECT
@@ -663,7 +662,7 @@ SELECT
         'bandwidth: ' || is_paying_and_good_plan_org_action(
             '22dbad8a-b885-4309-9b3b-a09f8460fb6d',
             ARRAY['bandwidth']::public.action_type []
-        )::TEXT
+        )::text
     );
 
 SELECT
@@ -671,7 +670,7 @@ SELECT
         'storage: ' || is_paying_and_good_plan_org_action(
             '22dbad8a-b885-4309-9b3b-a09f8460fb6d',
             ARRAY['storage']::public.action_type []
-        )::TEXT
+        )::text
     );
 
 -- This should now return a storage limit warning
@@ -700,7 +699,7 @@ SET
     storage_exceeded = FALSE,
     mau_exceeded = FALSE,
     bandwidth_exceeded = FALSE,
-    trial_at = now() + INTERVAL '15 days'
+    trial_at = now() + interval '15 days'
 WHERE
     customer_id = (
         SELECT customer_id

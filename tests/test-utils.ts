@@ -40,6 +40,7 @@ export const APIKEY_TEST_ALL = 'ae6e7458-c46d-4c00-aa3b-153b0b8520ea' // all key
 export const APIKEY_TEST_UPLOAD = 'c591b04e-cf29-4945-b9a0-776d0672061b' // upload key
 export const APIKEY_TEST2_ALL = 'ac4d9a98-ec25-4af8-933c-2aae4aa52b85' // test2 all key (dedicated for statistics)
 export const ORG_ID = '046a36ac-e03c-4590-9257-bd6c9dba9ee8'
+export const STRIPE_INFO_CUSTOMER_ID = 'cus_Q38uE91NP8Ufqc' // Customer ID for ORG_ID
 export const NON_OWNER_ORG_ID = 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d'
 export const USER_ID = '6aa76066-55ef-4238-ade6-0b32334a4097'
 export const USER_ID_2 = '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5'
@@ -47,6 +48,8 @@ export const USER_ID_STATS = '7a1b2c3d-4e5f-4a6b-7c8d-9e0f1a2b3c4d' // Dedicated
 export const ORG_ID_STATS = 'b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e' // Dedicated org for statistics tests
 export const APIKEY_STATS = '8b2c3d4e-5f6a-4c7b-8d9e-0f1a2b3c4d5e' // Dedicated API key for statistics tests
 export const APP_NAME_STATS = 'com.stats.app' // Dedicated app for statistics tests
+export const PLAN_ORG_ID = '0f2f8c2a-6a1d-4a6c-a9a8-b1b2c3d4e5f6'
+export const PLAN_STRIPE_CUSTOMER_ID = 'cus_plan_test_123456'
 export const USER_EMAIL = 'test@capgo.app'
 export const TEST_EMAIL = 'test@test.com'
 export const PRODUCT_ID = 'prod_LQIregjtNduh4q'
@@ -67,8 +70,28 @@ export const headersInternal = {
 }
 
 // Cache for prepared apps to avoid repeated seeding
-const seededApps = new Set<string>()
+const seededApps = new Map<string, Set<string>>()
 const seedPromises = new Map<string, Promise<void>>()
+
+export interface SeedAppOptions {
+  orgId?: string
+  userId?: string
+  adminUserId?: string
+  stripeCustomerId?: string
+  planProductId?: string
+}
+
+function getSeedOptionKey(options?: SeedAppOptions): string {
+  if (!options)
+    return '__default__'
+  return JSON.stringify({
+    orgId: options.orgId ?? null,
+    userId: options.userId ?? null,
+    adminUserId: options.adminUserId ?? null,
+    stripeCustomerId: options.stripeCustomerId ?? null,
+    planProductId: options.planProductId ?? null,
+  })
+}
 
 // Connection pool to reduce database connection overhead
 let supabaseClient: SupabaseClient<Database> | null = null
@@ -144,15 +167,16 @@ export async function fetchBundle(appId: string) {
 }
 
 // Optimized app seeding with caching and deduplication
-export async function resetAndSeedAppData(appId: string): Promise<void> {
-  // Check if already seeded
-  if (seededApps.has(appId)) {
+export async function resetAndSeedAppData(appId: string, options?: SeedAppOptions): Promise<void> {
+  const optionKey = getSeedOptionKey(options)
+  const seededForApp = seededApps.get(appId)
+  if (seededForApp?.has(optionKey)) {
     return
   }
 
-  // Check if seeding is already in progress
-  if (seedPromises.has(appId)) {
-    return await seedPromises.get(appId)!
+  const promiseKey = `${appId}::${optionKey}`
+  if (seedPromises.has(promiseKey)) {
+    return await seedPromises.get(promiseKey)!
   }
 
   // Start seeding process
@@ -165,11 +189,25 @@ export async function resetAndSeedAppData(appId: string): Promise<void> {
       while (retries > 0) {
         try {
           // Execute in a transaction with repeatable read isolation
-          const { error } = await supabase.rpc('reset_and_seed_app_data' as any, { p_app_id: appId })
+          const rpcParams: Record<string, unknown> = { p_app_id: appId }
+          if (options?.orgId)
+            rpcParams.p_org_id = options.orgId
+          if (options?.userId)
+            rpcParams.p_user_id = options.userId
+          if (options?.adminUserId)
+            rpcParams.p_admin_user_id = options.adminUserId
+          if (options?.stripeCustomerId)
+            rpcParams.p_stripe_customer_id = options.stripeCustomerId
+          if (options?.planProductId)
+            rpcParams.p_plan_product_id = options.planProductId
+
+          const { error } = await supabase.rpc('reset_and_seed_app_data' as any, rpcParams)
           if (error) {
             throw error
           }
-          seededApps.add(appId)
+          const updatedSet = seededApps.get(appId) ?? new Set<string>()
+          updatedSet.add(optionKey)
+          seededApps.set(appId, updatedSet)
 
           // Trigger D1 sync for Cloudflare Workers tests
           await triggerD1Sync()
@@ -186,11 +224,11 @@ export async function resetAndSeedAppData(appId: string): Promise<void> {
       }
     }
     finally {
-      seedPromises.delete(appId)
+      seedPromises.delete(promiseKey)
     }
   })()
 
-  seedPromises.set(appId, seedPromise)
+  seedPromises.set(promiseKey, seedPromise)
   return await seedPromise
 }
 
@@ -207,6 +245,10 @@ export async function resetAppData(appId: string): Promise<void> {
           throw error
         }
         seededApps.delete(appId)
+        for (const key of Array.from(seedPromises.keys())) {
+          if (key.startsWith(`${appId}::`))
+            seedPromises.delete(key)
+        }
         break
       }
       catch (error: any) {

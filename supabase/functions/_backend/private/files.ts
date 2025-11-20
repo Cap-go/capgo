@@ -12,8 +12,10 @@ import { ALLOWED_HEADERS, ALLOWED_METHODS, EXPOSED_HEADERS, MAX_UPLOAD_LENGTH_BY
 import { simpleError } from '../utils/hono.ts'
 import { middlewareKey } from '../utils/hono_middleware.ts'
 import { cloudlog } from '../utils/logging.ts'
+import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
+import { getAppByAppIdPg, getUserIdFromApikey, hasAppRightApikeyPg } from '../utils/pg_files.ts'
 import { createStatsBandwidth } from '../utils/stats.ts'
-import { hasAppRightApikey, supabaseAdmin } from '../utils/supabase.ts'
+import { supabaseAdmin } from '../utils/supabase.ts'
 import { backgroundTask } from '../utils/utils.ts'
 import { app as download_link } from './download_link.ts'
 import { app as files_config } from './files_config.ts'
@@ -338,129 +340,133 @@ async function checkWriteAppAccess(c: Context, next: Next) {
     userId: apikey.user_id,
   })
 
-  const { data: userId, error: _errorUserId } = await supabaseAdmin(c)
-    .rpc('get_user_id', { apikey: capgkey, app_id })
+  // Use Postgres instead of Supabase SDK
+  const pgClient = getPgClient(c, true) // read-only query
+  const drizzleClient = getDrizzleClient(pgClient)
 
-  cloudlog({
-    requestId: c.get('requestId'),
-    message: 'checkWriteAppAccess - get_user_id result',
-    userId,
-    hasError: !!_errorUserId,
-    error: _errorUserId,
-    userIdIsNull: userId === null,
-  })
+  try {
+    // Get user_id from apikey using Postgres
+    const userId = await getUserIdFromApikey(c, capgkey, drizzleClient)
 
-  if (_errorUserId || userId === null) {
     cloudlog({
       requestId: c.get('requestId'),
-      message: 'checkWriteAppAccess - user lookup failed',
-      error: _errorUserId,
+      message: 'checkWriteAppAccess - get_user_id result',
       userId,
-      app_id,
-      capgkeyPrefix: capgkey ? capgkey.substring(0, 15) : 'missing',
+      userIdIsNull: userId === null,
     })
-    throw new HTTPException(400, {
-      res: c.json({
-        error: 'user_not_found',
-        message: 'User not found for the provided API key',
-        moreInfo: { app_id, hasApiKey: !!capgkey, apiKeyLength: capgkey?.length ?? 0, requestId: c.get('requestId') },
-      }),
-    })
-  }
 
-  cloudlog({
-    requestId: c.get('requestId'),
-    message: 'checkWriteAppAccess - checking app permissions via hasAppRightApikey',
-    userId,
-    app_id,
-  })
+    if (userId === null) {
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'checkWriteAppAccess - user lookup failed',
+        userId,
+        app_id,
+        capgkeyPrefix: capgkey ? capgkey.substring(0, 15) : 'missing',
+      })
+      throw new HTTPException(400, {
+        res: c.json({
+          error: 'user_not_found',
+          message: 'User not found for the provided API key',
+          moreInfo: { app_id, hasApiKey: !!capgkey, apiKeyLength: capgkey?.length ?? 0, requestId: c.get('requestId') },
+        }),
+      })
+    }
 
-  // Use the hasAppRightApikey function which checks org membership, roles, and permissions
-  const hasPermission = await hasAppRightApikey(c, app_id, userId, 'read', capgkey)
-
-  cloudlog({
-    requestId: c.get('requestId'),
-    message: 'checkWriteAppAccess - hasAppRightApikey result',
-    hasPermission,
-  })
-
-  if (!hasPermission) {
     cloudlog({
       requestId: c.get('requestId'),
-      message: 'checkWriteAppAccess - insufficient permissions',
+      message: 'checkWriteAppAccess - checking app permissions via hasAppRightApikeyPg',
       userId,
       app_id,
     })
-    throw new HTTPException(403, {
-      res: c.json({
-        error: 'insufficient_permissions',
-        message: 'You don\'t have permission to access this app',
-        moreInfo: { app_id, requestId: c.get('requestId') },
-      }),
-    })
-  }
 
-  const { data: app, error: errorApp } = await supabaseAdmin(c)
-    .from('apps')
-    .select('app_id, owner_org')
-    .eq('app_id', app_id)
-    .single()
+    // Use the Postgres version of hasAppRightApikey
+    const requiredRight: Database['public']['Enums']['user_min_right'] = 'read'
+    const hasPermission = await hasAppRightApikeyPg(c, app_id, requiredRight, userId, capgkey, drizzleClient)
 
-  if (errorApp) {
     cloudlog({
       requestId: c.get('requestId'),
-      message: 'checkWriteAppAccess - app not found',
-      error: errorApp,
-      app_id,
+      message: 'checkWriteAppAccess - hasAppRightApikeyPg result',
+      hasPermission,
     })
-    throw new HTTPException(404, {
-      res: c.json({
-        error: 'app_not_found',
-        message: 'App not found',
-        moreInfo: { app_id, requestId: c.get('requestId') },
-      }),
-    })
-  }
 
-  if (app.owner_org !== owner_org) {
+    if (!hasPermission) {
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'checkWriteAppAccess - insufficient permissions',
+        userId,
+        app_id,
+      })
+      throw new HTTPException(403, {
+        res: c.json({
+          error: 'insufficient_permissions',
+          message: 'You don\'t have permission to access this app',
+          moreInfo: { app_id, requestId: c.get('requestId') },
+        }),
+      })
+    }
+
+    // Get app using Postgres
+    const app = await getAppByAppIdPg(c, app_id, drizzleClient)
+
+    if (!app) {
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'checkWriteAppAccess - app not found',
+        app_id,
+      })
+      throw new HTTPException(404, {
+        res: c.json({
+          error: 'app_not_found',
+          message: 'App not found',
+          moreInfo: { app_id, requestId: c.get('requestId') },
+        }),
+      })
+    }
+
+    if (app.owner_org !== owner_org) {
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'checkWriteAppAccess - owner org mismatch',
+        filePathOwnerOrg: owner_org,
+        actualOwnerOrg: app.owner_org,
+        app_id,
+      })
+      throw new HTTPException(403, {
+        res: c.json({
+          error: 'owner_org_mismatch',
+          message: 'The owner organization in the file path does not match the app\'s owner organization',
+          moreInfo: {
+            app_id,
+            filePathOwnerOrg: owner_org,
+            actualOwnerOrg: app.owner_org,
+            requestId: c.get('requestId'),
+          },
+        }),
+      })
+    }
+
     cloudlog({
       requestId: c.get('requestId'),
-      message: 'checkWriteAppAccess - owner org mismatch',
-      filePathOwnerOrg: owner_org,
-      actualOwnerOrg: app.owner_org,
+      message: 'checkWriteAppAccess - access granted',
       app_id,
-    })
-    throw new HTTPException(403, {
-      res: c.json({
-        error: 'owner_org_mismatch',
-        message: 'The owner organization in the file path does not match the app\'s owner organization',
-        moreInfo: {
-          app_id,
-          filePathOwnerOrg: owner_org,
-          actualOwnerOrg: app.owner_org,
-          requestId: c.get('requestId'),
-        },
-      }),
+      owner_org,
     })
   }
-
-  cloudlog({
-    requestId: c.get('requestId'),
-    message: 'checkWriteAppAccess - access granted',
-    app_id,
-    owner_org,
-  })
+  finally {
+    // Always close the connection
+    await backgroundTask(c, closeClient(c, pgClient))
+  }
 
   await next()
 }
 
-app.options(`/upload/${ATTACHMENT_PREFIX}`, setKeyFromMetadata, checkWriteAppAccess, optionsHandler)
-app.options(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, setKeyFromMetadata, checkWriteAppAccess, optionsHandler)
-app.post(`/upload/${ATTACHMENT_PREFIX}`, middlewareKey(['all', 'write', 'upload']), setKeyFromMetadata, checkWriteAppAccess, uploadHandler)
-app.patch(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, middlewareKey(['all', 'write', 'upload']), setKeyFromMetadata, checkWriteAppAccess, uploadHandler)
-app.get(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, middlewareKey(['all', 'write', 'upload']), setKeyFromMetadata, checkWriteAppAccess, uploadHandler)
+app.options(`/upload/${ATTACHMENT_PREFIX}`, optionsHandler)
+app.post(`/upload/${ATTACHMENT_PREFIX}`, middlewareKey(['all', 'write', 'upload'], true), setKeyFromMetadata, checkWriteAppAccess, uploadHandler)
 
+app.options(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, optionsHandler)
+app.get(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, middlewareKey(['all', 'write', 'upload'], true), setKeyFromIdParam, checkWriteAppAccess, getHandler)
 app.get(`/read/${ATTACHMENT_PREFIX}/:id{.+}`, setKeyFromIdParam, getHandler)
+app.patch(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, middlewareKey(['all', 'write', 'upload'], true), setKeyFromIdParam, checkWriteAppAccess, uploadHandler)
 
 app.route('/config', files_config)
 app.route('/download_link', download_link)

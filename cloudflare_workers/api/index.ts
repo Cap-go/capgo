@@ -15,6 +15,7 @@ import { app as stripe_portal } from '../../supabase/functions/_backend/private/
 import { app as verify_replication } from '../../supabase/functions/_backend/private/verify_replication.ts'
 import { app as apikey } from '../../supabase/functions/_backend/public/apikey/index.ts'
 import { app as appEndpoint } from '../../supabase/functions/_backend/public/app/index.ts'
+import { app as build } from '../../supabase/functions/_backend/public/build/index.ts'
 import { app as bundle } from '../../supabase/functions/_backend/public/bundle/index.ts'
 import { app as channel } from '../../supabase/functions/_backend/public/channel/index.ts'
 import { app as device } from '../../supabase/functions/_backend/public/device/index.ts'
@@ -74,6 +75,7 @@ appPrivate.route('/delete_failed_version', deleted_failed_version)
 appPrivate.route('/verify_replication', verify_replication)
 appPrivate.route('/create_device', create_device)
 appPrivate.route('/events', events)
+appPrivate.route('/build', build)
 
 // Triggers
 const functionNameTriggers = 'triggers'

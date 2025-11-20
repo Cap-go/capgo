@@ -184,6 +184,7 @@ export interface AppUsageByApp {
   mau: number
   storage: number
   bandwidth: number
+  build_time_unit: number
   get: number
 }
 
@@ -200,6 +201,7 @@ export interface AppUsageGlobal {
   bandwidth: number
   mau: number
   storage: number
+  build_time_unit: number
   get: number
 }
 
@@ -223,8 +225,8 @@ export async function getAllDashboard(orgId: string, startDate?: string, endDate
     }
 
     const { global, byApp } = response.data as {
-      global: { mau: number, storage: number, bandwidth: number, date: string, get: number }[]
-      byApp: { app_id: string, mau: number, storage: number, bandwidth: number, date: string, get: number }[]
+      global: { mau: number, storage: number, bandwidth: number, build_time_unit: number, date: string, get: number }[]
+      byApp: { app_id: string, mau: number, storage: number, bandwidth: number, build_time_unit: number, date: string, get: number }[]
     }
 
     return {
@@ -389,6 +391,7 @@ interface PlanUsage {
   mau_percent: number
   bandwidth_percent: number
   storage_percent: number
+  build_time_percent: number
 }
 
 export async function getPlanUsagePercent(orgId?: string): Promise<PlanUsage> {
@@ -398,6 +401,7 @@ export async function getPlanUsagePercent(orgId?: string): Promise<PlanUsage> {
       mau_percent: 0,
       bandwidth_percent: 0,
       storage_percent: 0,
+      build_time_percent: 0,
     }
   }
   const { data, error } = await useSupabase()

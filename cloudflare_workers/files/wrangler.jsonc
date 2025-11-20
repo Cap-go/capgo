@@ -27,6 +27,20 @@
         "enabled": true,
         "head_sampling_rate": 0.001
       },
+      "hyperdrive": [
+        {
+          "binding": "HYPERDRIVE_CAPGO_DIRECT_EU",
+          "id": "ae1fe6178b564adc9fc9a71ccc769a35"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_SESSION_EU",
+          "id": "07838c5ad23d4c5dac99e1a2fcdab2f4"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_TRANSACTION_EU",
+          "id": "b661b11c413844c5a08406bc37390590"
+        }
+      ],
       "routes": [
         // TODO: remove after we switched cli to new domain
         {
@@ -64,6 +78,14 @@
         },
         {
           "pattern": "plugin.oc.capgo.app/files*",
+          "zone_name": "capgo.app"
+        },
+        {
+          "pattern": "plugin.hk.capgo.app/files*",
+          "zone_name": "capgo.app"
+        },
+        {
+          "pattern": "plugin.me.capgo.app/files*",
           "zone_name": "capgo.app"
         },
         {
@@ -110,6 +132,20 @@
       "observability": {
         "enabled": true
       },
+      "hyperdrive": [
+        {
+          "binding": "HYPERDRIVE_CAPGO_DIRECT_EU",
+          "id": "ae1fe6178b564adc9fc9a71ccc769a35"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_SESSION_EU",
+          "id": "07838c5ad23d4c5dac99e1a2fcdab2f4"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_TRANSACTION_EU",
+          "id": "b661b11c413844c5a08406bc37390590"
+        }
+      ],
       "routes": [
         {
           "pattern": "api.preprod.capgo.app/files*",

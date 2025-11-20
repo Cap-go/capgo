@@ -33,7 +33,9 @@ CREATE INDEX idx_store_apps ON store_apps (capacitor);
 
 CREATE INDEX idx_store_apps_capacitor ON store_apps (capacitor, installs DESC);
 
-CREATE INDEX idx_store_apps_cordova ON store_apps (cordova, capacitor, installs DESC);
+CREATE INDEX idx_store_apps_cordova ON store_apps (
+    cordova, capacitor, installs DESC
+);
 
 CREATE INDEX idx_store_apps_flutter ON store_apps (flutter, installs DESC);
 
@@ -41,15 +43,21 @@ CREATE INDEX idx_store_apps_install ON store_apps (capacitor, installs);
 
 CREATE INDEX idx_store_apps_kotlin ON store_apps (kotlin, installs DESC);
 
-CREATE INDEX idx_store_apps_native_script ON store_apps (native_script, installs DESC);
+CREATE INDEX idx_store_apps_native_script ON store_apps (
+    native_script, installs DESC
+);
 
 CREATE INDEX idx_store_apps_native_script_1 ON store_apps (native_script)
 WHERE
-    native_script = 1;
+native_script = 1;
 
-CREATE INDEX idx_store_apps_react_native ON store_apps (react_native, installs DESC);
+CREATE INDEX idx_store_apps_react_native ON store_apps (
+    react_native, installs DESC
+);
 
-CREATE INDEX idx_store_apps_c_c_installs_desc ON store_apps (cordova, capacitor, installs DESC);
+CREATE INDEX idx_store_apps_c_c_installs_desc ON store_apps (
+    cordova, capacitor, installs DESC
+);
 
 CREATE INDEX idx_store_capgo ON store_apps (capgo);
 

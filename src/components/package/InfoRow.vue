@@ -42,7 +42,7 @@ watch(rowInput, useDebounceFn(() => {
         <div style="margin-left: 0">
           <slot name="start" />
         </div>
-        <div style="margin-left: auto">
+        <div style="margin-left: auto" class="line-clamp-3 overflow-hidden max-w-1/2">
           <slot />
         </div>
       </div>

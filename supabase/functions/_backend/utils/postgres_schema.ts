@@ -3,6 +3,18 @@ import { bigint, boolean, pgEnum, pgTable, serial, text, timestamp, uuid, varcha
 // do_not_change
 
 export const disableUpdatePgEnum = pgEnum('disable_update', ['major', 'minor', 'patch', 'version_number', 'none'])
+export const keyModePgEnum = pgEnum('key_mode', ['read', 'write', 'all', 'upload'])
+export const userMinRightPgEnum = pgEnum('user_min_right', [
+  'invite_read',
+  'invite_upload',
+  'invite_write',
+  'invite_admin',
+  'read',
+  'upload',
+  'write',
+  'admin',
+  'super_admin',
+])
 
 export const apps = pgTable('apps', {
   created_at: timestamp('created_at').notNull().defaultNow(),
@@ -91,4 +103,27 @@ export const stripe_info = pgTable('stripe_info', {
   mau_exceeded: boolean('mau_exceeded'),
   storage_exceeded: boolean('storage_exceeded'),
   bandwidth_exceeded: boolean('bandwidth_exceeded'),
+})
+
+export const apikeys = pgTable('apikeys', {
+  id: bigint('id', { mode: 'number' }).primaryKey().notNull(),
+  created_at: timestamp('created_at').defaultNow(),
+  user_id: uuid('user_id').notNull(),
+  key: varchar('key').notNull(),
+  mode: keyModePgEnum('mode').notNull(),
+  updated_at: timestamp('updated_at').defaultNow(),
+  name: varchar('name').notNull(),
+  limited_to_orgs: uuid('limited_to_orgs').array(),
+  limited_to_apps: varchar('limited_to_apps').array(),
+})
+
+export const org_users = pgTable('org_users', {
+  id: bigint('id', { mode: 'number' }).primaryKey().notNull(),
+  created_at: timestamp('created_at').defaultNow(),
+  updated_at: timestamp('updated_at').defaultNow(),
+  user_id: uuid('user_id').notNull(),
+  org_id: uuid('org_id').notNull(),
+  app_id: varchar('app_id'),
+  channel_id: bigint('channel_id', { mode: 'number' }),
+  user_right: userMinRightPgEnum('user_right'),
 })

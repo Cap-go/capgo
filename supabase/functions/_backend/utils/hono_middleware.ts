@@ -1,8 +1,11 @@
 import type { Context } from 'hono'
 import type { AuthInfo } from './hono.ts'
 import type { Database } from './supabase.types.ts'
+import { and, eq, inArray } from 'drizzle-orm'
 import { honoFactory, quickError } from './hono.ts'
 import { cloudlog } from './logging.ts'
+import { getDrizzleClient, getPgClient, logPgError } from './pg.ts'
+import * as schema from './postgres_schema.ts'
 import { checkKey, checkKeyById, supabaseAdmin, supabaseClient } from './supabase.ts'
 
 // TODO: make universal middleware who
@@ -21,6 +24,92 @@ import { checkKey, checkKeyById, supabaseAdmin, supabaseClient } from './supabas
 
 function isUUID(str: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str)
+}
+
+/**
+ * Check API key using Postgres/Drizzle instead of Supabase SDK
+ */
+async function checkKeyPg(
+  c: Context,
+  keyString: string,
+  rights: Database['public']['Enums']['key_mode'][],
+  drizzleClient: ReturnType<typeof getDrizzleClient>,
+): Promise<Database['public']['Tables']['apikeys']['Row'] | null> {
+  try {
+    const result = await drizzleClient
+      .select()
+      .from(schema.apikeys)
+      .where(and(
+        eq(schema.apikeys.key, keyString),
+        inArray(schema.apikeys.mode, rights),
+      ))
+      .limit(1)
+      .then(data => data[0])
+
+    if (!result) {
+      return null
+    }
+
+    // Convert to the expected format, ensuring arrays are properly handled
+    return {
+      id: result.id,
+      created_at: result.created_at?.toISOString() || null,
+      user_id: result.user_id,
+      key: result.key,
+      mode: result.mode,
+      updated_at: result.updated_at?.toISOString() || null,
+      name: result.name,
+      limited_to_orgs: result.limited_to_orgs || [],
+      limited_to_apps: result.limited_to_apps || [],
+    } as Database['public']['Tables']['apikeys']['Row']
+  }
+  catch (e: unknown) {
+    logPgError(c, 'checkKeyPg', e)
+    return null
+  }
+}
+
+/**
+ * Check API key by ID using Postgres/Drizzle instead of Supabase SDK
+ */
+async function checkKeyByIdPg(
+  c: Context,
+  id: number,
+  rights: Database['public']['Enums']['key_mode'][],
+  drizzleClient: ReturnType<typeof getDrizzleClient>,
+): Promise<Database['public']['Tables']['apikeys']['Row'] | null> {
+  try {
+    const result = await drizzleClient
+      .select()
+      .from(schema.apikeys)
+      .where(and(
+        eq(schema.apikeys.id, id),
+        inArray(schema.apikeys.mode, rights),
+      ))
+      .limit(1)
+      .then(data => data[0])
+
+    if (!result) {
+      return null
+    }
+
+    // Convert to the expected format, ensuring arrays are properly handled
+    return {
+      id: result.id,
+      created_at: result.created_at?.toISOString() || null,
+      user_id: result.user_id,
+      key: result.key,
+      mode: result.mode,
+      updated_at: result.updated_at?.toISOString() || null,
+      name: result.name,
+      limited_to_orgs: result.limited_to_orgs || [],
+      limited_to_apps: result.limited_to_apps || [],
+    } as Database['public']['Tables']['apikeys']['Row']
+  }
+  catch (e: unknown) {
+    logPgError(c, 'checkKeyByIdPg', e)
+    return null
+  }
 }
 
 async function foundAPIKey(c: Context, capgkeyString: string, rights: Database['public']['Enums']['key_mode'][]) {
@@ -106,12 +195,13 @@ export function middlewareV2(rights: Database['public']['Enums']['key_mode'][]) 
   })
 }
 
-export function middlewareKey(rights: Database['public']['Enums']['key_mode'][]) {
+export function middlewareKey(rights: Database['public']['Enums']['key_mode'][], usePostgres = false) {
   const subMiddlewareKey = honoFactory.createMiddleware(async (c, next) => {
     const capgkey_string = c.req.header('capgkey')
     const apikey_string = c.req.header('authorization')
     const subkey_id = c.req.header('x-limited-key-id') ? Number(c.req.header('x-limited-key-id')) : null
     const key = capgkey_string ?? apikey_string
+
     cloudlog({
       requestId: c.get('requestId'),
       message: 'middlewareKey - checking authorization',
@@ -120,20 +210,71 @@ export function middlewareKey(rights: Database['public']['Enums']['key_mode'][])
       hasCapgkey: !!capgkey_string,
       hasAuthorization: !!apikey_string,
       hasKey: !!key,
+      usePostgres,
     })
     if (!key) {
       cloudlog({ requestId: c.get('requestId'), message: 'No key provided', method: c.req.method, url: c.req.url })
       return quickError(401, 'no_key_provided', 'No key provided')
     }
-    const apikey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKey(c, key, supabaseAdmin(c), rights)
+
+    let apikey: Database['public']['Tables']['apikeys']['Row'] | null = null
+    let pgClient: ReturnType<typeof getPgClient> | null = null
+
+    if (usePostgres) {
+      try {
+        pgClient = getPgClient(c, true) // read-only query
+        const drizzleClient = getDrizzleClient(pgClient)
+        apikey = await checkKeyPg(c, key, rights, drizzleClient)
+      }
+      finally {
+        if (pgClient) {
+          pgClient.end().catch((err) => {
+            cloudlog({
+              requestId: c.get('requestId'),
+              message: 'middlewareKey - PG connection close error',
+              error: err instanceof Error ? err.message : String(err),
+            })
+          })
+        }
+      }
+    }
+    else {
+      apikey = await checkKey(c, key, supabaseAdmin(c), rights)
+    }
+
     if (!apikey) {
       cloudlog({ requestId: c.get('requestId'), message: 'Invalid apikey', key, method: c.req.method, url: c.req.url })
       return quickError(401, 'invalid_apikey', 'Invalid apikey')
     }
     c.set('apikey', apikey)
     c.set('capgkey', key)
+
     if (subkey_id) {
-      const subkey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKeyById(c, subkey_id, supabaseAdmin(c), rights)
+      let subkey: Database['public']['Tables']['apikeys']['Row'] | null = null
+      let subkeyPgClient: ReturnType<typeof getPgClient> | null = null
+
+      if (usePostgres) {
+        try {
+          subkeyPgClient = getPgClient(c, true)
+          const drizzleClient = getDrizzleClient(subkeyPgClient)
+          subkey = await checkKeyByIdPg(c, subkey_id, rights, drizzleClient)
+        }
+        finally {
+          if (subkeyPgClient) {
+            subkeyPgClient.end().catch((err) => {
+              cloudlog({
+                requestId: c.get('requestId'),
+                message: 'middlewareKey - Subkey PG connection close error',
+                error: err instanceof Error ? err.message : String(err),
+              })
+            })
+          }
+        }
+      }
+      else {
+        subkey = await checkKeyById(c, subkey_id, supabaseAdmin(c), rights)
+      }
+
       if (!subkey) {
         cloudlog({ requestId: c.get('requestId'), message: 'Invalid subkey', subkey_id })
         return quickError(401, 'invalid_subkey', 'Invalid subkey')

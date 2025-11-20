@@ -98,17 +98,23 @@ SELECT
 
 -- Seed helper data for get_next_stats_update_date tests
 DELETE FROM public.orgs
-WHERE id IN (
-    '00000000-0000-0000-0000-000000000001',
-    '00000000-0000-0000-0000-000000000002',
-    '00000000-0000-0000-0000-000000000003'
-);
+WHERE
+    id IN (
+        '00000000-0000-0000-0000-000000000001',
+        '00000000-0000-0000-0000-000000000002',
+        '00000000-0000-0000-0000-000000000003'
+    );
 
 DELETE FROM public.stripe_info
 WHERE
-    customer_id IN ('cust_future_active', 'cust_expiring_today', 'cust_canceled_past');
+    customer_id IN (
+        'cust_future_active',
+        'cust_expiring_today',
+        'cust_canceled_past'
+    );
 
-INSERT INTO public.orgs (id, created_by, management_email, name)
+INSERT INTO
+public.orgs (id, created_by, management_email, name)
 VALUES
 (
     '00000000-0000-0000-0000-000000000001',
@@ -135,7 +141,8 @@ VALUES
     'Org Fourth Active'
 );
 
-INSERT INTO public.stripe_info (
+INSERT INTO
+public.stripe_info (
     customer_id,
     status,
     product_id,
@@ -188,29 +195,41 @@ VALUES
 );
 
 UPDATE public.orgs
-SET customer_id = 'cust_future_active'
-WHERE id = '00000000-0000-0000-0000-000000000001';
+SET
+    customer_id = 'cust_future_active'
+WHERE
+    id = '00000000-0000-0000-0000-000000000001';
 
 UPDATE public.orgs
-SET customer_id = 'cust_expiring_today'
-WHERE id = '00000000-0000-0000-0000-000000000002';
+SET
+    customer_id = 'cust_expiring_today'
+WHERE
+    id = '00000000-0000-0000-0000-000000000002';
 
 UPDATE public.orgs
-SET customer_id = 'cust_canceled_past'
-WHERE id = '00000000-0000-0000-0000-000000000003';
+SET
+    customer_id = 'cust_canceled_past'
+WHERE
+    id = '00000000-0000-0000-0000-000000000003';
 
 UPDATE public.orgs
-SET customer_id = 'cust_fourth_active'
-WHERE id = '00000000-0000-0000-0000-000000000004';
+SET
+    customer_id = 'cust_fourth_active'
+WHERE
+    id = '00000000-0000-0000-0000-000000000004';
 
-WITH next_run AS (
+WITH
+next_run AS (
     SELECT public.get_next_cron_time('0 3 * * *', now()) AS t
 )
 
 UPDATE public.stripe_info si
-SET subscription_anchor_end = next_run.t - interval '1 minute'
-FROM next_run
-WHERE si.customer_id = 'cust_expiring_today';
+SET
+    subscription_anchor_end = next_run.t - interval '1 minute'
+FROM
+    next_run
+WHERE
+    si.customer_id = 'cust_expiring_today';
 
 -- Test get_next_stats_update_date scenarios
 SELECT
@@ -254,19 +273,33 @@ SELECT
     );
 
 DELETE FROM public.orgs
-WHERE id IN (
-    '00000000-0000-0000-0000-000000000001',
-    '00000000-0000-0000-0000-000000000002',
-    '00000000-0000-0000-0000-000000000003',
-    '00000000-0000-0000-0000-000000000004'
-);
-UPDATE public.orgs
-SET customer_id = null
 WHERE
-    customer_id IN ('cust_future_active', 'cust_expiring_today', 'cust_canceled_past', 'cust_fourth_active');
+    id IN (
+        '00000000-0000-0000-0000-000000000001',
+        '00000000-0000-0000-0000-000000000002',
+        '00000000-0000-0000-0000-000000000003',
+        '00000000-0000-0000-0000-000000000004'
+    );
+
+UPDATE public.orgs
+SET
+    customer_id = null
+WHERE
+    customer_id IN (
+        'cust_future_active',
+        'cust_expiring_today',
+        'cust_canceled_past',
+        'cust_fourth_active'
+    );
+
 DELETE FROM public.stripe_info
 WHERE
-    customer_id IN ('cust_future_active', 'cust_expiring_today', 'cust_canceled_past', 'cust_fourth_active');
+    customer_id IN (
+        'cust_future_active',
+        'cust_expiring_today',
+        'cust_canceled_past',
+        'cust_fourth_active'
+    );
 
 SELECT *
 FROM

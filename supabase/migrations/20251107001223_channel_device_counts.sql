@@ -4,13 +4,16 @@ ADD COLUMN channel_device_count bigint NOT NULL DEFAULT 0;
 
 -- Backfill the counter based on current channel_devices data
 WITH device_counts AS (
-  SELECT app_id, COUNT(*)::bigint AS device_count
-  FROM public.channel_devices
-  GROUP BY app_id
+    SELECT
+        app_id,
+        COUNT(*)::bigint AS device_count
+    FROM public.channel_devices
+    GROUP BY app_id
 )
+
 UPDATE public.apps AS a
 SET channel_device_count = dc.device_count
-FROM device_counts dc
+FROM device_counts AS dc
 WHERE dc.app_id = a.app_id;
 
 -- Create dedicated queue for channel device count deltas
@@ -65,7 +68,9 @@ FOR EACH ROW
 EXECUTE FUNCTION public.enqueue_channel_device_counts();
 
 -- Worker that drains the queue and updates app counters
-CREATE OR REPLACE FUNCTION public.process_channel_device_counts_queue(batch_size integer DEFAULT 1000) RETURNS bigint
+CREATE OR REPLACE FUNCTION public.process_channel_device_counts_queue(
+    batch_size integer DEFAULT 1000
+) RETURNS bigint
 LANGUAGE plpgsql
 SET search_path = '' SECURITY DEFINER AS $$
 DECLARE
@@ -110,14 +115,18 @@ BEGIN
 END;
 $$;
 
-ALTER FUNCTION public.process_channel_device_counts_queue(batch_size integer) OWNER TO postgres;
+ALTER FUNCTION public.process_channel_device_counts_queue(
+    batch_size integer
+) OWNER TO postgres;
 
-GRANT EXECUTE ON FUNCTION public.process_channel_device_counts_queue(batch_size integer) TO service_role;
+GRANT EXECUTE ON FUNCTION public.process_channel_device_counts_queue(
+    batch_size integer
+) TO service_role;
 
 -- Schedule continuous processing of the new queue
 SELECT
-  cron.schedule(
-    'process_channel_device_counts_queue',
-    '10 seconds',
-    'SELECT public.process_channel_device_counts_queue(1000);'
-  );
+    cron.schedule(
+        'process_channel_device_counts_queue',
+        '10 seconds',
+        'SELECT public.process_channel_device_counts_queue(1000);'
+    );

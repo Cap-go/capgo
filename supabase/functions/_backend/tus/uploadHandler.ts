@@ -1,4 +1,4 @@
-import type { DurableObjectState, R2UploadedPart } from '@cloudflare/workers-types'
+import type { R2UploadedPart } from '@cloudflare/workers-types'
 import type { Digester } from './digest.ts'
 import type { UploadMetadata } from './parse.ts'
 import type {
@@ -61,7 +61,7 @@ function resJson(body: object): Response {
   })
 }
 
-export class AttachmentUploadHandler extends DurableObject {
+export class UploadHandler extends DurableObject {
   parts: StoredR2Part[]
   requestId: string | undefined
   multipart: RetryMultipartUpload | undefined
@@ -70,7 +70,7 @@ export class AttachmentUploadHandler extends DurableObject {
   // only allow a single request to operate at a time
   requestGate: AsyncLock
 
-  constructor(ctx: DurableObjectState, env: Env) {
+  constructor(ctx: ConstructorParameters<typeof DurableObject>[0], env: Env) {
     super(ctx, env)
     const bucket = env.ATTACHMENT_BUCKET
     this.parts = []

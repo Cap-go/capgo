@@ -68,8 +68,36 @@ async function handleManifest(c: Context, record: Database['public']['Tables']['
       const { error: insertError } = await supabaseAdmin(c)
         .from('manifest')
         .insert(validEntries)
-      if (insertError)
+      if (insertError) {
         cloudlog({ requestId: c.get('requestId'), message: 'error insert manifest', error: insertError })
+      }
+      else {
+        // Update manifest_count on the version
+        const { error: countError } = await supabaseAdmin(c)
+          .from('app_versions')
+          .update({ manifest_count: validEntries.length })
+          .eq('id', record.id)
+        if (countError)
+          cloudlog({ requestId: c.get('requestId'), message: 'error update manifest_count', error: countError })
+
+        // Increment manifest_bundle_count on the app using raw SQL
+        const pgClient = getPgClient(c, false)
+        try {
+          await pgClient.query(
+            `UPDATE apps
+             SET manifest_bundle_count = manifest_bundle_count + 1,
+                 updated_at = now()
+             WHERE app_id = $1`,
+            [record.app_id],
+          )
+        }
+        catch (error) {
+          cloudlog({ requestId: c.get('requestId'), message: 'error update manifest_bundle_count', error })
+        }
+        finally {
+          await closeClient(c, pgClient)
+        }
+      }
     }
   }
   // delete manifest in app_versions
@@ -125,6 +153,8 @@ async function deleteManifest(c: Context, record: Database['public']['Tables']['
       .where(eq(manifest.app_version_id, record.id))
 
     if (manifestEntries && manifestEntries.length > 0) {
+      const manifestCount = manifestEntries.length
+
       // Delete each file from S3
       const promisesDeleteS3 = []
       for (const entry of manifestEntries) {
@@ -155,6 +185,32 @@ async function deleteManifest(c: Context, record: Database['public']['Tables']['
         }
       }
       await backgroundTask(c, Promise.all(promisesDeleteS3))
+
+      // After deleting manifest entries, update manifest_count and decrement manifest_bundle_count
+      const updatePgClient = getPgClient(c, false)
+      try {
+        await updatePgClient.query(
+          `UPDATE app_versions SET manifest_count = 0 WHERE id = $1`,
+          [record.id],
+        )
+
+        // Only decrement if this version had manifests
+        if (manifestCount > 0) {
+          await updatePgClient.query(
+            `UPDATE apps
+             SET manifest_bundle_count = GREATEST(manifest_bundle_count - 1, 0),
+                 updated_at = now()
+             WHERE app_id = $1`,
+            [record.app_id],
+          )
+        }
+      }
+      catch (error) {
+        cloudlog({ requestId: c.get('requestId'), message: 'error update counters on delete', error })
+      }
+      finally {
+        await closeClient(c, updatePgClient)
+      }
     }
   }
   catch (error) {

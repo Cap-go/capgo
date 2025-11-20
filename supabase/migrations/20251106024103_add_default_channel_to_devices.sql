@@ -6,4 +6,6 @@ ADD COLUMN default_channel character varying(255);
 COMMENT ON COLUMN public.devices.default_channel IS 'The default channel name that the device is configured to request updates from';
 
 -- Create index for better query performance
-CREATE INDEX IF NOT EXISTS idx_devices_default_channel ON public.devices (default_channel);
+CREATE INDEX IF NOT EXISTS idx_devices_default_channel ON public.devices (
+    default_channel
+);

@@ -59,6 +59,7 @@ async function getUsage(orgId: string) {
     mau_percent: 0,
     bandwidth_percent: 0,
     storage_percent: 0,
+    build_time_percent: 0,
   }
 
   try {
@@ -72,12 +73,14 @@ async function getUsage(orgId: string) {
     mau: plan?.mau,
     storage: plan?.storage,
     bandwidth: plan?.bandwidth,
+    build_time: plan?.build_time_unit || 0,
   }
 
   const payg_units = {
     mau: currentPlan?.mau_unit,
     storage: currentPlan?.storage_unit,
     bandwidth: currentPlan?.bandwidth_unit,
+    build_time: currentPlan?.build_time_unit || 0,
   }
 
   const nowEndOfDay = dayjs().endOf('day')
@@ -104,6 +107,7 @@ async function getUsage(orgId: string) {
   const totalBandwidthBytes = relevantUsage.reduce((acc, entry) => acc + (entry.bandwidth ?? 0), 0)
   const totalBandwidth = bytesToGb(totalBandwidthBytes)
   const totalStorage = bytesToGb(await getTotalStorage(orgId))
+  const totalBuildTime = relevantUsage.reduce((acc, entry) => acc + (entry.build_time_unit ?? 0), 0)
 
   const basePrice = currentPlan?.price_m ?? 0
 
@@ -117,7 +121,8 @@ async function getUsage(orgId: string) {
     const mauPrice = calculatePrice(totalMau, payg_base.mau, payg_units!.mau!)
     const storagePrice = calculatePrice(totalStorage, payg_base.storage, payg_units!.storage!)
     const bandwidthPrice = calculatePrice(totalBandwidth, payg_base.bandwidth, payg_units!.bandwidth!)
-    const sum = mauPrice + storagePrice + bandwidthPrice
+    const buildTimePrice = calculatePrice(totalBuildTime, payg_base.build_time, payg_units!.build_time!)
+    const sum = mauPrice + storagePrice + bandwidthPrice + buildTimePrice
     return roundNumber(sum)
   })
 
@@ -133,6 +138,7 @@ async function getUsage(orgId: string) {
     totalMau,
     totalBandwidth,
     totalStorage,
+    totalBuildTime,
     payg_units,
     plan,
     detailPlanUsage,
@@ -153,6 +159,16 @@ const currentPlanSuggest = computed(() => main.plans.find(plan => plan.name === 
 
 function roundNumber(number: number) {
   return Math.round(number * 100) / 100
+}
+
+function formatBuildTime(seconds: number): string {
+  if (seconds === 0)
+    return '0m'
+  const hours = Math.floor(seconds / 3600)
+  const minutes = Math.floor((seconds % 3600) / 60)
+  if (hours > 0)
+    return `${hours}h ${minutes}m`
+  return `${minutes}m`
 }
 
 const shouldShowUpgrade = computed(() => {
@@ -289,8 +305,49 @@ function nextRunDate() {
             </div>
           </div>
 
+          <!-- Plan Limits Summary -->
+          <div v-if="planUsage?.currentPlan" class="mt-6 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-850 rounded-xl border border-blue-200 dark:border-gray-700 p-4 sm:p-6">
+            <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 uppercase tracking-wide">
+              {{ t('plan-limits') }}
+            </h3>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div class="bg-white dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
+                <div class="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                  {{ t('MAU') }}
+                </div>
+                <div class="text-lg font-bold text-blue-600 dark:text-blue-400">
+                  {{ planUsage.currentPlan.mau.toLocaleString() }}
+                </div>
+              </div>
+              <div class="bg-white dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
+                <div class="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                  {{ t('Storage') }}
+                </div>
+                <div class="text-lg font-bold text-purple-600 dark:text-purple-400">
+                  {{ planUsage.currentPlan.storage.toLocaleString() }} GB
+                </div>
+              </div>
+              <div class="bg-white dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
+                <div class="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                  {{ t('Bandwidth') }}
+                </div>
+                <div class="text-lg font-bold text-green-600 dark:text-green-400">
+                  {{ planUsage.currentPlan.bandwidth.toLocaleString() }} GB
+                </div>
+              </div>
+              <div class="bg-white dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
+                <div class="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                  {{ t('build-time') }}
+                </div>
+                <div class="text-lg font-bold text-orange-600 dark:text-orange-400">
+                  {{ formatBuildTime(planUsage.currentPlan.build_time_unit || 0) }}
+                </div>
+              </div>
+            </div>
+          </div>
+
           <!-- Usage Cards -->
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
+          <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mt-8">
             <!-- MAU Card -->
             <div class="bg-gray-50 dark:bg-gray-900 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6" :class="(planUsage?.detailPlanUsage?.mau_percent || 0) >= 100 ? 'border-red-500 dark:border-red-400' : ''">
               <div class="flex items-center justify-between mb-4">
@@ -485,6 +542,71 @@ function nextRunDate() {
                 </div>
               </div>
             </div>
+
+            <!-- Build Time Card -->
+            <div class="bg-gray-50 dark:bg-gray-900 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6" :class="(planUsage?.detailPlanUsage?.build_time_percent || 0) >= 100 ? 'border-red-500 dark:border-red-400' : ''">
+              <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-bold text-gray-900 dark:text-white">
+                  {{ t('build-time') }}
+                </h3>
+                <div class="text-2xl font-bold" :class="(planUsage?.detailPlanUsage?.build_time_percent || 0) >= 100 ? 'text-red-600 dark:text-red-400' : 'text-orange-600 dark:text-orange-400'">
+                  {{ planUsage?.detailPlanUsage?.build_time_percent || 0 }}%
+                </div>
+              </div>
+
+              <!-- Limit Exceeded Alert -->
+              <div v-if="(planUsage?.detailPlanUsage?.build_time_percent || 0) >= 100" class="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                <div class="flex items-start">
+                  <svg class="h-5 w-5 text-red-400 mt-0.5 mr-2 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" />
+                  </svg>
+                  <div class="flex-1">
+                    <p class="text-sm font-semibold text-red-800 dark:text-red-200">
+                      {{ t('build-time-limit-exceeded') }}
+                    </p>
+                    <p class="text-xs text-red-700 dark:text-red-300 mt-1">
+                      {{ t('build-time-builds-stopped-upgrade-required') }}
+                    </p>
+                    <button
+                      class="mt-2 px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded transition-colors"
+                      @click="goToPlans"
+                    >
+                      {{ t('upgrade-now') }}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Progress Bar -->
+              <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 mb-4">
+                <div
+                  class="h-3 rounded-full transition-all duration-300"
+                  :class="(planUsage?.detailPlanUsage?.build_time_percent || 0) >= 100 ? 'bg-gradient-to-r from-red-500 to-red-600' : 'bg-gradient-to-r from-orange-500 to-orange-600'"
+                  :style="{ width: `${Math.min(planUsage?.detailPlanUsage?.build_time_percent || 0, 100)}%` }"
+                />
+              </div>
+
+              <div class="space-y-2 text-sm">
+                <div class="flex justify-between">
+                  <span class="text-gray-600 dark:text-gray-400">{{ t('included-in-plan') }}</span>
+                  <span class="font-semibold text-gray-900 dark:text-white">
+                    {{ formatBuildTime(planUsage?.currentPlan?.build_time_unit || 0) }}
+                  </span>
+                </div>
+                <div class="flex justify-between">
+                  <span class="text-gray-600 dark:text-gray-400">{{ t('used-in-period') }}</span>
+                  <span class="font-semibold text-gray-900 dark:text-white">
+                    {{ formatBuildTime(planUsage?.totalBuildTime || 0) }}
+                  </span>
+                </div>
+                <div v-if="planUsage?.isPayAsYouGo" class="flex justify-between pt-2 border-t border-gray-200 dark:border-gray-600">
+                  <span class="text-gray-600 dark:text-gray-400">{{ t('price-per-unit-above') }}</span>
+                  <span class="font-semibold text-green-600 dark:text-green-400">
+                    ${{ planUsage?.payg_units?.build_time?.toLocaleString() }}/min
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
 
           <!-- Pricing Summary Card -->
@@ -556,6 +678,10 @@ function nextRunDate() {
             <div class="flex justify-between">
               <span>{{ t('storage-usage') }}</span>
               <span class="font-medium">{{ planUsage?.detailPlanUsage?.storage_percent }}%</span>
+            </div>
+            <div class="flex justify-between">
+              <span>{{ t('build-time-usage') }}</span>
+              <span class="font-medium">{{ planUsage?.detailPlanUsage?.build_time_percent }}%</span>
             </div>
           </div>
 

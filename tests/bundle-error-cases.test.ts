@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { BASE_URL, getSupabaseClient, headers, resetAndSeedAppData, resetAppData, TEST_EMAIL, USER_ID } from './test-utils.ts'
+import { BASE_URL, getSupabaseClient, headers, resetAndSeedAppData, resetAppData, USER_ID } from './test-utils.ts'
 
 const id = randomUUID()
 const APPNAME = `com.bundle.error.${id}`
@@ -9,31 +9,21 @@ let testOrgId: string
 beforeAll(async () => {
   await resetAndSeedAppData(APPNAME)
 
-  // Create test organization
-  const { data: orgData, error: orgError } = await getSupabaseClient().from('orgs').insert({
-    id: randomUUID(),
-    name: `Test Bundle Error Org ${id}`,
-    management_email: TEST_EMAIL,
-    created_by: USER_ID,
-  }).select().single()
+  // Get the org that was created by resetAndSeedAppData
+  const { data: app } = await getSupabaseClient()
+    .from('apps')
+    .select('owner_org')
+    .eq('app_id', APPNAME)
+    .single()
 
-  if (orgError)
-    throw orgError
-  testOrgId = orgData.id
+  if (!app)
+    throw new Error('App not found after seeding')
 
-  // Create test app
-  await getSupabaseClient().from('apps').insert({
-    id: randomUUID(),
-    app_id: APPNAME,
-    name: `Test Bundle Error App`,
-    icon_url: 'https://example.com/icon.png',
-    owner_org: testOrgId,
-  })
+  testOrgId = app.owner_org
 })
 
 afterAll(async () => {
   await resetAppData(APPNAME)
-  await getSupabaseClient().from('orgs').delete().eq('id', testOrgId)
 })
 
 describe('[GET] /bundle - Error Cases', () => {

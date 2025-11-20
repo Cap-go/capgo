@@ -49,7 +49,10 @@ EXCEPTION
 END $$;
 
 SELECT
-    ok(true, 'API key insert succeeded when created_by matches API key user');
+    ok(
+        true,
+        'API key insert succeeded when created_by matches API key user'
+    );
 
 -- Test 2: Create an org using JWT-authenticated context 
 DO $$

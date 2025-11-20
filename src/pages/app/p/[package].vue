@@ -10,6 +10,7 @@ import IconCog from '~icons/heroicons/cog-6-tooth'
 import IconCube from '~icons/heroicons/cube'
 import IconDevice from '~icons/heroicons/device-phone-mobile'
 import IconChannel from '~icons/heroicons/signal'
+import IconBuild from '~icons/heroicons/wrench-screwdriver'
 import IconAlertCircle from '~icons/lucide/alert-circle'
 import AppSetting from '~/components/dashboard/AppSetting.vue'
 import BundleUploadsCard from '~/components/dashboard/BundleUploadsCard.vue'
@@ -38,6 +39,8 @@ const displayStore = useDisplayStore()
 const app = ref<Database['public']['Tables']['apps']['Row']>()
 const ActiveTab = ref(route.query.tab?.toString() || 'overview')
 const usageComponent = ref()
+const showingBuildSteps = ref(false)
+const showingBundleSteps = ref(false)
 
 const tabs: Tab[] = [
   {
@@ -69,6 +72,11 @@ const tabs: Tab[] = [
     label: 'logs',
     icon: IconHistory,
     key: 'logs',
+  },
+  {
+    label: 'builds',
+    icon: IconBuild,
+    key: 'builds',
   },
 ]
 
@@ -190,9 +198,7 @@ watchEffect(() => {
 
       <div v-if="ActiveTab === 'bundles'" class="mt-0 md:mt-8">
         <div class="w-full h-full px-0 pt-0 md:pt-8 mx-auto mb-8 overflow-y-auto max-w-9xl max-h-fit sm:px-6 lg:px-8">
-          <div class="flex flex-col overflow-hidden overflow-y-auto bg-white border border-slate-300 shadow-lg md:rounded-lg dark:border-slate-900 dark:bg-gray-800">
-            <BundleTable :app-id="id" />
-          </div>
+          <BundleTable :app-id="id" @update:showing-steps="showingBundleSteps = $event" />
         </div>
       </div>
 
@@ -217,6 +223,12 @@ watchEffect(() => {
           <div class="flex flex-col overflow-hidden overflow-y-auto bg-white border border-slate-300 shadow-lg md:rounded-lg dark:border-slate-900 dark:bg-gray-800">
             <LogTable :app-id="id" />
           </div>
+        </div>
+      </div>
+
+      <div v-if="ActiveTab === 'builds'" class="mt-0 md:mt-8">
+        <div class="w-full h-full px-0 pt-0 md:pt-8 mx-auto mb-8 overflow-y-auto max-w-9xl max-h-fit sm:px-6 lg:px-8">
+          <BuildTable :app-id="id" @update:showing-steps="showingBuildSteps = $event" />
         </div>
       </div>
     </div>
