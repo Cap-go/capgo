@@ -9,6 +9,7 @@ const headers = {
   'Content-Type': 'application/json',
   'authorization': 'ae6e7458-c46d-4c00-aa3b-153b0b8520ea', // test user 'all' mode API key
 }
+const buildRequestUrl = `${BASE_URL}/build/request`
 
 beforeEach(async () => {
   await resetAndSeedAppData(APPNAME)
@@ -83,7 +84,7 @@ afterAll(async () => {
 
 describe('build Request API', () => {
   it('should successfully request a build', async () => {
-    const response = await fetch(`${BASE_URL}/build`, {
+    const response = await fetch(buildRequestUrl, {
       method: 'POST',
       headers,
       body: JSON.stringify({
@@ -121,7 +122,7 @@ describe('build Request API', () => {
   })
 
   it('should support "both" platform', async () => {
-    const response = await fetch(`${BASE_URL}/build`, {
+    const response = await fetch(buildRequestUrl, {
       method: 'POST',
       headers,
       body: JSON.stringify({
@@ -151,7 +152,7 @@ describe('build Request API', () => {
       buildNumber: 123,
     }
 
-    const response = await fetch(`${BASE_URL}/build`, {
+    const response = await fetch(buildRequestUrl, {
       method: 'POST',
       headers,
       body: JSON.stringify({
@@ -176,7 +177,7 @@ describe('build Request API', () => {
   })
 
   it('should reject invalid platform', async () => {
-    const response = await fetch(`${BASE_URL}/build`, {
+    const response = await fetch(buildRequestUrl, {
       method: 'POST',
       headers,
       body: JSON.stringify({
@@ -189,7 +190,7 @@ describe('build Request API', () => {
   })
 
   it('should reject missing app_id', async () => {
-    const response = await fetch(`${BASE_URL}/build`, {
+    const response = await fetch(buildRequestUrl, {
       method: 'POST',
       headers,
       body: JSON.stringify({
@@ -201,7 +202,7 @@ describe('build Request API', () => {
   })
 
   it('should reject missing platform', async () => {
-    const response = await fetch(`${BASE_URL}/build`, {
+    const response = await fetch(buildRequestUrl, {
       method: 'POST',
       headers,
       body: JSON.stringify({
@@ -213,7 +214,7 @@ describe('build Request API', () => {
   })
 
   it('should reject unauthorized access', async () => {
-    const response = await fetch(`${BASE_URL}/build`, {
+    const response = await fetch(buildRequestUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -229,7 +230,7 @@ describe('build Request API', () => {
   })
 
   it('should generate unique upload session keys', async () => {
-    const response1 = await fetch(`${BASE_URL}/build`, {
+    const response1 = await fetch(buildRequestUrl, {
       method: 'POST',
       headers,
       body: JSON.stringify({
@@ -238,7 +239,7 @@ describe('build Request API', () => {
       }),
     })
 
-    const response2 = await fetch(`${BASE_URL}/build`, {
+    const response2 = await fetch(buildRequestUrl, {
       method: 'POST',
       headers,
       body: JSON.stringify({
@@ -257,7 +258,7 @@ describe('build Request API', () => {
   it('should set expiration time for upload', async () => {
     const beforeRequest = new Date()
 
-    const response = await fetch(`${BASE_URL}/build`, {
+    const response = await fetch(buildRequestUrl, {
       method: 'POST',
       headers,
       body: JSON.stringify({
