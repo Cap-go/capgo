@@ -387,11 +387,6 @@ async function getVersion() {
       .select()
       .eq('id', id.value)
       .single()
-    const { count } = await supabase
-      .from('manifest')
-      .select('id', { count: 'exact', head: true })
-      .eq('app_version_id', id.value)
-      .limit(1)
     if (!data) {
       console.error('no version found')
       return
@@ -399,7 +394,7 @@ async function getVersion() {
     if (dataVersionsMeta)
       version_meta.value = dataVersionsMeta
 
-    hasManifest.value = (count ?? 0) > 0
+    hasManifest.value = data.manifest_count > 0
     version.value = data
   }
   catch (error) {
