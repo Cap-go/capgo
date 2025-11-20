@@ -40,6 +40,7 @@ BEGIN
     TRUNCATE TABLE "public"."stripe_info" CASCADE;
     TRUNCATE TABLE "public"."plans" CASCADE;
     TRUNCATE TABLE "public"."capgo_credits_steps" CASCADE;
+    TRUNCATE TABLE "public"."capgo_credit_products" CASCADE;
     TRUNCATE TABLE "public"."usage_credit_grants" CASCADE;
     TRUNCATE TABLE "public"."usage_credit_transactions" CASCADE;
     TRUNCATE TABLE "public"."usage_credit_consumptions" CASCADE;
@@ -203,6 +204,15 @@ BEGIN
       ('build_time', 300000, 600000, 0.30, 60, NULL), -- 5000-10000 minutes (in seconds, displayed as minutes)
       ('build_time', 600000, 9223372036854775807, 0.25, 60, NULL); -- 10000+ minutes (in seconds, displayed as minutes)
 
+    INSERT INTO "public"."capgo_credit_products" (
+        "slug",
+        "environment",
+        "provider",
+        "product_id"
+    ) VALUES
+        ('credit_top_up', 'live', 'stripe', 'prod_TINXCAiTb8Vsxc'),
+        ('credit_top_up', 'test', 'stripe', 'prod_TJRd2hFHZsBIPK');
+
     INSERT INTO "storage"."buckets" ("id", "name", "owner", "created_at", "updated_at", "public") VALUES
     ('capgo', 'capgo', NULL, now(), now(), 't'),
     ('apps', 'apps', NULL, now(), now(), 'f'),
@@ -268,7 +278,7 @@ BEGIN
         275,
         now() - interval '45 days',
         now() + interval '6 months',
-        'seed',
+        'manual',
         '{}'::jsonb,
         'Seed usage credits for admin org'
       ),
@@ -278,7 +288,7 @@ BEGIN
         0,
         now() - interval '7 days',
         now() + interval '3 months',
-        'seed',
+        'stripe_top_up',
         '{}'::jsonb,
         'Seed usage credits for demo org'
       );
