@@ -779,6 +779,7 @@ async function deleteBundle() {
               <!-- Bundle Comment -->
               <InfoRow
                 v-if="version.comment" :label="t('bundle-comment')"
+                @click="copyToast(version?.comment ?? '')"
               >
                 {{ version.comment }}
               </InfoRow>
