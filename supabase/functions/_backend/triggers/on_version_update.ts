@@ -88,7 +88,7 @@ async function handleManifest(c: Context, record: Database['public']['Tables']['
              SET manifest_bundle_count = manifest_bundle_count + 1,
                  updated_at = now()
              WHERE app_id = $1`,
-            [record.app_id]
+            [record.app_id],
           )
         }
         catch (error) {
@@ -191,7 +191,7 @@ async function deleteManifest(c: Context, record: Database['public']['Tables']['
       try {
         await updatePgClient.query(
           `UPDATE app_versions SET manifest_count = 0 WHERE id = $1`,
-          [record.id]
+          [record.id],
         )
 
         // Only decrement if this version had manifests
@@ -201,7 +201,7 @@ async function deleteManifest(c: Context, record: Database['public']['Tables']['
              SET manifest_bundle_count = GREATEST(manifest_bundle_count - 1, 0),
                  updated_at = now()
              WHERE app_id = $1`,
-            [record.app_id]
+            [record.app_id],
           )
         }
       }
