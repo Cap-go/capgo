@@ -25,9 +25,9 @@ DROP FUNCTION IF EXISTS public.enqueue_manifest_bundle_counts ();
 DROP FUNCTION IF EXISTS public.process_manifest_bundle_counts_queue (integer);
 
 -- Drop the queue (note: no schedule to drop as it was already removed in another migration)
-SELECT
-    pgmq.drop_queue ('manifest_bundle_counts');
-
+-- TODO: FIX IT IN PROD 
+-- SELECT
+--     pgmq.drop_queue ('manifest_bundle_counts');
 -- Create a single consolidated function that runs every second and intelligently decides what to execute
 -- Uses exception handling to prevent one task from blocking others
 CREATE OR REPLACE FUNCTION public.process_all_cron_tasks () RETURNS void LANGUAGE plpgsql
