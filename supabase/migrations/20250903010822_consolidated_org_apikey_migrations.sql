@@ -19,7 +19,7 @@ CHECK (
                 ),
                 owner_org,
                 app_id,
-                NULL::BIGINT
+                NULL::bigint
             )
     )
 );
@@ -106,8 +106,8 @@ authenticated USING (
                         )
                 ),
                 id,
-                NULL::CHARACTER VARYING,
-                NULL::BIGINT
+                NULL::character varying,
+                NULL::bigint
             )
     )
 );
@@ -198,17 +198,17 @@ authenticated USING (
             AND (
                 SELECT
                     public.check_min_rights(
-                        'read'::public.USER_MIN_RIGHT,
+                        'read'::public.user_min_right,
                         (
                             SELECT
                                 public.get_identity_org_allowed(
-                                    '{read,upload,write,all}'::public.KEY_MODE [],
+                                    '{read,upload,write,all}'::public.key_mode [],
                                     o.id
                                 )
                         ),
                         o.id,
-                        NULL::CHARACTER VARYING,
-                        NULL::BIGINT
+                        NULL::character varying,
+                        NULL::bigint
                     )
             )
     )
@@ -224,11 +224,11 @@ authenticated USING (
     (
         SELECT
             public.check_min_rights(
-                'write'::public.USER_MIN_RIGHT,
+                'write'::public.user_min_right,
                 (
                     SELECT
                         public.get_identity_org_appid(
-                            '{write,all}'::public.KEY_MODE [],
+                            '{write,all}'::public.key_mode [],
                             public.get_user_main_org_id_by_app_id(app_id),
                             app_id
                         )
@@ -237,7 +237,7 @@ authenticated USING (
                     SELECT public.get_user_main_org_id_by_app_id(app_id)
                 ),
                 app_id,
-                NULL::BIGINT
+                NULL::bigint
             )
     )
 )
@@ -246,11 +246,11 @@ CHECK (
     (
         SELECT
             public.check_min_rights(
-                'write'::public.USER_MIN_RIGHT,
+                'write'::public.user_min_right,
                 (
                     SELECT
                         public.get_identity_org_appid(
-                            '{write,all}'::public.KEY_MODE [],
+                            '{write,all}'::public.key_mode [],
                             public.get_user_main_org_id_by_app_id(app_id),
                             app_id
                         )
@@ -259,7 +259,7 @@ CHECK (
                     SELECT public.get_user_main_org_id_by_app_id(app_id)
                 ),
                 app_id,
-                NULL::BIGINT
+                NULL::bigint
             )
     )
 );
@@ -274,11 +274,11 @@ authenticated USING (
     (
         SELECT
             public.check_min_rights(
-                'read'::public.USER_MIN_RIGHT,
+                'read'::public.user_min_right,
                 (
                     SELECT
                         public.get_identity_org_appid(
-                            '{read,upload,write,all}'::public.KEY_MODE [],
+                            '{read,upload,write,all}'::public.key_mode [],
                             (
                                 SELECT
                                     public.get_user_main_org_id_by_app_id(
@@ -292,7 +292,7 @@ authenticated USING (
                     SELECT public.get_user_main_org_id_by_app_id(app_id)
                 ),
                 app_id,
-                NULL::BIGINT
+                NULL::bigint
             )
     )
 );
@@ -305,11 +305,11 @@ CHECK (
     (
         SELECT
             public.check_min_rights(
-                'write'::public.USER_MIN_RIGHT,
+                'write'::public.user_min_right,
                 (
                     SELECT
                         public.get_identity_org_appid(
-                            '{write,all}'::public.KEY_MODE [],
+                            '{write,all}'::public.key_mode [],
                             (
                                 SELECT
                                     public.get_user_main_org_id_by_app_id(
@@ -323,7 +323,7 @@ CHECK (
                     SELECT public.get_user_main_org_id_by_app_id(app_id)
                 ),
                 app_id,
-                NULL::BIGINT
+                NULL::bigint
             )
     )
 );

@@ -29,81 +29,107 @@ END;
 $$;
 
 CREATE TABLE IF NOT EXISTS public.usage_credit_grants (
-  id uuid DEFAULT extensions.uuid_generate_v4() PRIMARY KEY,
-  org_id uuid NOT NULL REFERENCES public.orgs (id) ON DELETE CASCADE,
-  credits_total numeric(18, 6) NOT NULL CHECK (credits_total >= 0),
-  credits_consumed numeric(18, 6) DEFAULT 0 NOT NULL CHECK (credits_consumed >= 0),
-  granted_at timestamptz DEFAULT now() NOT NULL,
-  expires_at timestamptz DEFAULT (now() + interval '1 year') NOT NULL,
-  source text DEFAULT 'manual'::text NOT NULL,
-  source_ref jsonb,
-  notes text,
-  CHECK (credits_consumed <= credits_total)
+    id uuid DEFAULT extensions.uuid_generate_v4() PRIMARY KEY,
+    org_id uuid NOT NULL REFERENCES public.orgs (id) ON DELETE CASCADE,
+    credits_total numeric(18, 6) NOT NULL CHECK (credits_total >= 0),
+    credits_consumed numeric(18, 6) DEFAULT 0 NOT NULL CHECK (
+        credits_consumed >= 0
+    ),
+    granted_at timestamptz DEFAULT now() NOT NULL,
+    expires_at timestamptz DEFAULT (now() + interval '1 year') NOT NULL,
+    source text DEFAULT 'manual'::text NOT NULL,
+    source_ref jsonb,
+    notes text,
+    CHECK (credits_consumed <= credits_total)
 );
 
 COMMENT ON TABLE public.usage_credit_grants IS 'Records every block of credits granted to an org, tracking totals, consumption and expiry.';
 
-CREATE INDEX IF NOT EXISTS idx_usage_credit_grants_org_expires ON public.usage_credit_grants (org_id, expires_at);
-CREATE INDEX IF NOT EXISTS idx_usage_credit_grants_org_remaining ON public.usage_credit_grants (org_id, (credits_total - credits_consumed));
+CREATE INDEX IF NOT EXISTS idx_usage_credit_grants_org_expires ON public.usage_credit_grants (
+    org_id, expires_at
+);
+CREATE INDEX IF NOT EXISTS idx_usage_credit_grants_org_remaining ON public.usage_credit_grants (
+    org_id, (credits_total - credits_consumed)
+);
 
 CREATE TABLE IF NOT EXISTS public.usage_credit_transactions (
-  id bigserial PRIMARY KEY,
-  org_id uuid NOT NULL REFERENCES public.orgs (id) ON DELETE CASCADE,
-  grant_id uuid REFERENCES public.usage_credit_grants (id) ON DELETE SET NULL,
-  transaction_type public.credit_transaction_type NOT NULL,
-  amount numeric(18, 6) NOT NULL,
-  balance_after numeric(18, 6),
-  occurred_at timestamptz DEFAULT now() NOT NULL,
-  description text,
-  source_ref jsonb
+    id bigserial PRIMARY KEY,
+    org_id uuid NOT NULL REFERENCES public.orgs (id) ON DELETE CASCADE,
+    grant_id uuid REFERENCES public.usage_credit_grants (id) ON DELETE SET NULL,
+    transaction_type public.credit_transaction_type NOT NULL,
+    amount numeric(18, 6) NOT NULL,
+    balance_after numeric(18, 6),
+    occurred_at timestamptz DEFAULT now() NOT NULL,
+    description text,
+    source_ref jsonb
 );
 
 COMMENT ON TABLE public.usage_credit_transactions IS 'General ledger of credit movements (grants, purchases, deductions, expiries, refunds) with running balances.';
 
-CREATE INDEX IF NOT EXISTS idx_usage_credit_transactions_org_time ON public.usage_credit_transactions (org_id, occurred_at DESC);
-CREATE INDEX IF NOT EXISTS idx_usage_credit_transactions_grant ON public.usage_credit_transactions (grant_id, occurred_at DESC);
+CREATE INDEX IF NOT EXISTS idx_usage_credit_transactions_org_time ON public.usage_credit_transactions (
+    org_id, occurred_at DESC
+);
+CREATE INDEX IF NOT EXISTS idx_usage_credit_transactions_grant ON public.usage_credit_transactions (
+    grant_id, occurred_at DESC
+);
 
 CREATE TABLE IF NOT EXISTS public.usage_overage_events (
-  id uuid DEFAULT extensions.uuid_generate_v4() PRIMARY KEY,
-  org_id uuid NOT NULL REFERENCES public.orgs (id) ON DELETE CASCADE,
-  metric public.credit_metric_type NOT NULL,
-  overage_amount numeric(20, 6) NOT NULL CHECK (overage_amount >= 0),
-  credits_estimated numeric(18, 6) NOT NULL CHECK (credits_estimated >= 0),
-  credits_debited numeric(18, 6) DEFAULT 0 NOT NULL CHECK (credits_debited >= 0),
-  credit_step_id bigint REFERENCES public.capgo_credits_steps (id) ON DELETE SET NULL,
-  billing_cycle_start date,
-  billing_cycle_end date,
-  created_at timestamptz DEFAULT now() NOT NULL,
-  details jsonb
+    id uuid DEFAULT extensions.uuid_generate_v4() PRIMARY KEY,
+    org_id uuid NOT NULL REFERENCES public.orgs (id) ON DELETE CASCADE,
+    metric public.credit_metric_type NOT NULL,
+    overage_amount numeric(20, 6) NOT NULL CHECK (overage_amount >= 0),
+    credits_estimated numeric(18, 6) NOT NULL CHECK (credits_estimated >= 0),
+    credits_debited numeric(18, 6) DEFAULT 0 NOT NULL CHECK (
+        credits_debited >= 0
+    ),
+    credit_step_id bigint REFERENCES public.capgo_credits_steps (
+        id
+    ) ON DELETE SET NULL,
+    billing_cycle_start date,
+    billing_cycle_end date,
+    created_at timestamptz DEFAULT now() NOT NULL,
+    details jsonb
 );
 
 COMMENT ON TABLE public.usage_overage_events IS 'Snapshots of detected plan overages, capturing usage, credits applied, and linkage back to pricing tiers.';
 
-CREATE INDEX IF NOT EXISTS idx_usage_overage_events_org_time ON public.usage_overage_events (org_id, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_usage_overage_events_metric ON public.usage_overage_events (metric);
+CREATE INDEX IF NOT EXISTS idx_usage_overage_events_org_time ON public.usage_overage_events (
+    org_id, created_at DESC
+);
+CREATE INDEX IF NOT EXISTS idx_usage_overage_events_metric ON public.usage_overage_events (
+    metric
+);
 
 CREATE TABLE IF NOT EXISTS public.usage_credit_consumptions (
-  id bigserial PRIMARY KEY,
-  grant_id uuid NOT NULL REFERENCES public.usage_credit_grants (id) ON DELETE CASCADE,
-  org_id uuid NOT NULL REFERENCES public.orgs (id) ON DELETE CASCADE,
-  overage_event_id uuid REFERENCES public.usage_overage_events (id) ON DELETE SET NULL,
-  metric public.credit_metric_type NOT NULL,
-  credits_used numeric(18, 6) NOT NULL CHECK (credits_used > 0),
-  applied_at timestamptz DEFAULT now() NOT NULL
+    id bigserial PRIMARY KEY,
+    grant_id uuid NOT NULL REFERENCES public.usage_credit_grants (
+        id
+    ) ON DELETE CASCADE,
+    org_id uuid NOT NULL REFERENCES public.orgs (id) ON DELETE CASCADE,
+    overage_event_id uuid REFERENCES public.usage_overage_events (
+        id
+    ) ON DELETE SET NULL,
+    metric public.credit_metric_type NOT NULL,
+    credits_used numeric(18, 6) NOT NULL CHECK (credits_used > 0),
+    applied_at timestamptz DEFAULT now() NOT NULL
 );
 
 COMMENT ON TABLE public.usage_credit_consumptions IS 'Detailed allocation records showing which grants covered each overage event and how many credits were used.';
 
-CREATE INDEX IF NOT EXISTS idx_usage_credit_consumptions_org_time ON public.usage_credit_consumptions (org_id, applied_at DESC);
-CREATE INDEX IF NOT EXISTS idx_usage_credit_consumptions_grant ON public.usage_credit_consumptions (grant_id, applied_at DESC);
+CREATE INDEX IF NOT EXISTS idx_usage_credit_consumptions_org_time ON public.usage_credit_consumptions (
+    org_id, applied_at DESC
+);
+CREATE INDEX IF NOT EXISTS idx_usage_credit_consumptions_grant ON public.usage_credit_consumptions (
+    grant_id, applied_at DESC
+);
 
 CREATE OR REPLACE FUNCTION public.calculate_credit_cost(
-  p_metric public.credit_metric_type,
-  p_overage_amount numeric
+    p_metric public.credit_metric_type,
+    p_overage_amount numeric
 ) RETURNS TABLE (
-  credit_step_id bigint,
-  credit_cost_per_unit numeric,
-  credits_required numeric
+    credit_step_id bigint,
+    credit_cost_per_unit numeric,
+    credits_required numeric
 ) LANGUAGE plpgsql
 SET search_path = '' AS $$
 DECLARE
@@ -187,21 +213,21 @@ END;
 $$;
 
 CREATE OR REPLACE FUNCTION public.apply_usage_overage(
-  p_org_id uuid,
-  p_metric public.credit_metric_type,
-  p_overage_amount numeric,
-  p_billing_cycle_start timestamptz,
-  p_billing_cycle_end timestamptz,
-  p_details jsonb DEFAULT NULL
+    p_org_id uuid,
+    p_metric public.credit_metric_type,
+    p_overage_amount numeric,
+    p_billing_cycle_start timestamptz,
+    p_billing_cycle_end timestamptz,
+    p_details jsonb DEFAULT NULL
 ) RETURNS TABLE (
-  overage_amount numeric,
-  credits_required numeric,
-  credits_applied numeric,
-  credits_remaining numeric,
-  credit_step_id bigint,
-  overage_covered numeric,
-  overage_unpaid numeric,
-  overage_event_id uuid
+    overage_amount numeric,
+    credits_required numeric,
+    credits_applied numeric,
+    credits_remaining numeric,
+    credit_step_id bigint,
+    overage_covered numeric,
+    overage_unpaid numeric,
+    overage_event_id uuid
 ) LANGUAGE plpgsql
 SET search_path = '' SECURITY DEFINER AS $$
 DECLARE
@@ -374,10 +400,21 @@ $$;
 
 CREATE VIEW public.usage_credit_balances AS
 SELECT
-  org_id,
-  SUM(GREATEST(credits_total, 0)) AS total_credits,
-  SUM(GREATEST(CASE WHEN expires_at >= now() THEN credits_total - credits_consumed ELSE 0 END, 0)) AS available_credits,
-  MIN(CASE WHEN credits_total - credits_consumed > 0 THEN expires_at END) AS next_expiration
+    org_id,
+    sum(greatest(credits_total, 0)) AS total_credits,
+    sum(
+        greatest(
+            CASE
+                WHEN
+                    expires_at >= now()
+                    THEN credits_total - credits_consumed
+                ELSE 0
+            END,
+            0
+        )
+    ) AS available_credits,
+    min(CASE WHEN credits_total - credits_consumed > 0 THEN expires_at END)
+        AS next_expiration
 FROM public.usage_credit_grants
 GROUP BY org_id;
 
@@ -385,33 +422,37 @@ COMMENT ON VIEW public.usage_credit_balances IS 'Aggregated balance view per org
 
 GRANT SELECT ON public.usage_credit_balances TO service_role;
 
-GRANT EXECUTE ON FUNCTION public.calculate_credit_cost(public.credit_metric_type, numeric) TO service_role;
-GRANT EXECUTE ON FUNCTION public.apply_usage_overage(uuid, public.credit_metric_type, numeric, timestamptz, timestamptz, jsonb) TO service_role;
+GRANT EXECUTE ON FUNCTION public.calculate_credit_cost(
+    public.credit_metric_type, numeric
+) TO service_role;
+GRANT EXECUTE ON FUNCTION public.apply_usage_overage(
+    uuid, public.credit_metric_type, numeric, timestamptz, timestamptz, jsonb
+) TO service_role;
 
 DROP FUNCTION IF EXISTS public.get_orgs_v6();
 DROP FUNCTION IF EXISTS public.get_orgs_v6(userid uuid);
 
-CREATE OR REPLACE FUNCTION public.get_orgs_v6 ()
+CREATE OR REPLACE FUNCTION public.get_orgs_v6()
 RETURNS TABLE (
-  gid uuid,
-  created_by uuid,
-  logo text,
-  name text,
-  role character varying,
-  paying boolean,
-  trial_left integer,
-  can_use_more boolean,
-  is_canceled boolean,
-  app_count bigint,
-  subscription_start timestamptz,
-  subscription_end timestamptz,
-  management_email text,
-  is_yearly boolean,
-  stats_updated_at timestamp without time zone,
-  next_stats_update_at timestamptz,
-  credit_available numeric,
-  credit_total numeric,
-  credit_next_expiration timestamptz
+    gid uuid,
+    created_by uuid,
+    logo text,
+    name text,
+    role character varying,
+    paying boolean,
+    trial_left integer,
+    can_use_more boolean,
+    is_canceled boolean,
+    app_count bigint,
+    subscription_start timestamptz,
+    subscription_end timestamptz,
+    management_email text,
+    is_yearly boolean,
+    stats_updated_at timestamp without time zone,
+    next_stats_update_at timestamptz,
+    credit_available numeric,
+    credit_total numeric,
+    credit_next_expiration timestamptz
 ) LANGUAGE plpgsql
 SET search_path = '' SECURITY DEFINER AS $$
 DECLARE
@@ -454,27 +495,27 @@ BEGIN
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION public.get_orgs_v6 (userid uuid)
+CREATE OR REPLACE FUNCTION public.get_orgs_v6(userid uuid)
 RETURNS TABLE (
-  gid uuid,
-  created_by uuid,
-  logo text,
-  name text,
-  role character varying,
-  paying boolean,
-  trial_left integer,
-  can_use_more boolean,
-  is_canceled boolean,
-  app_count bigint,
-  subscription_start timestamptz,
-  subscription_end timestamptz,
-  management_email text,
-  is_yearly boolean,
-  stats_updated_at timestamp without time zone,
-  next_stats_update_at timestamptz,
-  credit_available numeric,
-  credit_total numeric,
-  credit_next_expiration timestamptz
+    gid uuid,
+    created_by uuid,
+    logo text,
+    name text,
+    role character varying,
+    paying boolean,
+    trial_left integer,
+    can_use_more boolean,
+    is_canceled boolean,
+    app_count bigint,
+    subscription_start timestamptz,
+    subscription_end timestamptz,
+    management_email text,
+    is_yearly boolean,
+    stats_updated_at timestamp without time zone,
+    next_stats_update_at timestamptz,
+    credit_available numeric,
+    credit_total numeric,
+    credit_next_expiration timestamptz
 ) LANGUAGE plpgsql
 SET search_path = '' SECURITY DEFINER AS $$
 BEGIN
@@ -586,7 +627,7 @@ EXCEPTION
 END;
 $$;
 SELECT cron.schedule(
-  'usage_credit_expiry',
-  '0 3 * * *',
-  'SELECT public.expire_usage_credits()'
+    'usage_credit_expiry',
+    '0 3 * * *',
+    'SELECT public.expire_usage_credits()'
 );

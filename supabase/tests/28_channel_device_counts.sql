@@ -2,22 +2,19 @@ BEGIN;
 
 CREATE EXTENSION "basejump-supabase_test_helpers";
 
-SELECT
-    plan (9);
+SELECT plan(9);
 
 CREATE TEMP TABLE tmp_channel_device_counts AS
-SELECT
-    channel_device_count AS base_count
+SELECT channel_device_count AS base_count
 FROM
     public.apps
 WHERE
     app_id = 'com.demo.app';
 
 SELECT
-    is (
+    is(
         (
-            SELECT
-                COUNT(*)
+            SELECT count(*)
             FROM
                 tmp_channel_device_counts
         ),
@@ -26,16 +23,14 @@ SELECT
     );
 
 SELECT
-    is (
+    is(
         (
-            SELECT
-                base_count
+            SELECT base_count
             FROM
                 tmp_channel_device_counts
         ),
         (
-            SELECT
-                COUNT(*)::bigint
+            SELECT count(*)::bigint
             FROM
                 public.channel_devices
             WHERE
@@ -45,7 +40,7 @@ SELECT
     );
 
 INSERT INTO
-    public.channel_devices (channel_id, app_id, device_id, owner_org)
+public.channel_devices (channel_id, app_id, device_id, owner_org)
 SELECT
     id,
     app_id,
@@ -59,18 +54,16 @@ LIMIT
     1;
 
 SELECT
-    is (
+    is(
         (
-            SELECT
-                channel_device_count
+            SELECT channel_device_count
             FROM
                 public.apps
             WHERE
                 app_id = 'com.demo.app'
         ),
         (
-            SELECT
-                base_count
+            SELECT base_count
             FROM
                 tmp_channel_device_counts
         ),
@@ -78,10 +71,9 @@ SELECT
     );
 
 SELECT
-    ok (
+    ok(
         EXISTS (
-            SELECT
-                1
+            SELECT 1
             FROM
                 pgmq.q_channel_device_counts
             WHERE
@@ -92,25 +84,23 @@ SELECT
     );
 
 SELECT
-    is (
-        public.process_channel_device_counts_queue (10),
+    is(
+        public.process_channel_device_counts_queue(10),
         1::bigint,
         'Queue processor applies +1 delta'
     );
 
 SELECT
-    is (
+    is(
         (
-            SELECT
-                channel_device_count
+            SELECT channel_device_count
             FROM
                 public.apps
             WHERE
                 app_id = 'com.demo.app'
         ),
         (
-            SELECT
-                base_count + 1
+            SELECT base_count + 1
             FROM
                 tmp_channel_device_counts
         ),
@@ -123,10 +113,9 @@ WHERE
     AND device_id = 'queue-test-device';
 
 SELECT
-    ok (
+    ok(
         EXISTS (
-            SELECT
-                1
+            SELECT 1
             FROM
                 pgmq.q_channel_device_counts
             WHERE
@@ -137,32 +126,29 @@ SELECT
     );
 
 SELECT
-    is (
-        public.process_channel_device_counts_queue (10),
+    is(
+        public.process_channel_device_counts_queue(10),
         1::bigint,
         'Queue processor applies -1 delta'
     );
 
 SELECT
-    is (
+    is(
         (
-            SELECT
-                channel_device_count
+            SELECT channel_device_count
             FROM
                 public.apps
             WHERE
                 app_id = 'com.demo.app'
         ),
         (
-            SELECT
-                base_count
+            SELECT base_count
             FROM
                 tmp_channel_device_counts
         ),
         'Counter returns to base value'
     );
 
-SELECT
-    finish ();
+SELECT finish();
 
 ROLLBACK;

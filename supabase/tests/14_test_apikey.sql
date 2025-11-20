@@ -1,12 +1,11 @@
 BEGIN;
 
-SELECT
-    plan (6);
+SELECT plan(6);
 
 -- Test basic get_org_perm_for_apikey
 SELECT
-    is (
-        get_org_perm_for_apikey (
+    is(
+        get_org_perm_for_apikey(
             'ae6e7458-c46d-4c00-aa3b-153b0b8520ea',
             'com.demo.app'
         ),
@@ -15,8 +14,8 @@ SELECT
     );
 
 SELECT
-    is (
-        get_org_perm_for_apikey (
+    is(
+        get_org_perm_for_apikey(
             'ae6e7458-c46d-4c00-aa3b-153b0b8520ee',
             'com.demo.app'
         ),
@@ -25,8 +24,8 @@ SELECT
     );
 
 SELECT
-    is (
-        get_org_perm_for_apikey (
+    is(
+        get_org_perm_for_apikey(
             'ae6e7458-c46d-4c00-aa3b-153b0b8520ea',
             'com.demo.app2'
         ),
@@ -35,8 +34,8 @@ SELECT
     );
 
 SELECT
-    is (
-        get_org_perm_for_apikey (
+    is(
+        get_org_perm_for_apikey(
             'ae6e7458-c46d-4c00-aa3b-153b0b8520ea',
             'com.demoadmin.app'
         ),
@@ -46,8 +45,8 @@ SELECT
 
 -- Test upload user get_org_perm_for_apikey
 SELECT
-    is (
-        get_org_perm_for_apikey (
+    is(
+        get_org_perm_for_apikey(
             'ac4d9a98-ec25-4af8-933c-2aae4aa52b85',
             'com.demo.app'
         ),
@@ -61,8 +60,8 @@ WHERE
     AND org_id = '046a36ac-e03c-4590-9257-bd6c9dba9ee8';
 
 SELECT
-    is (
-        get_org_perm_for_apikey (
+    is(
+        get_org_perm_for_apikey(
             'ac4d9a98-ec25-4af8-933c-2aae4aa52b85',
             'com.demo.app'
         ),
@@ -70,9 +69,8 @@ SELECT
         'get_org_perm_for_apikey test - no upload right'
     );
 
-SELECT
-    *
+SELECT *
 FROM
-    finish ();
+    finish();
 
 ROLLBACK;

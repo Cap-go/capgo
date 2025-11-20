@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS devices (
     platform character varying(8) NOT NULL,
     plugin_version character varying(20) NOT NULL,
     os_version character varying(20) NOT NULL,
-    default_channel TEXT,
+    default_channel text,
     version_build character varying(20) DEFAULT 'builtin',
     custom_id character varying(36) DEFAULT '' NOT NULL,
     is_prod boolean DEFAULT true,
@@ -16,7 +16,9 @@ CREATE TABLE IF NOT EXISTS devices (
     PRIMARY KEY (app_id, device_id)
 );
 
-CREATE INDEX devices_app_id_device_id_updated_at_idx ON devices (app_id, device_id, updated_at);
+CREATE INDEX devices_app_id_device_id_updated_at_idx ON devices (
+    app_id, device_id, updated_at
+);
 
 CREATE INDEX devices_app_id_updated_at_idx ON devices (app_id, updated_at);
 
