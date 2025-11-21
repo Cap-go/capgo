@@ -237,7 +237,7 @@ function nextRunDate() {
             {{ t('usage') }}
           </h1>
           <!-- Last Update Info & Billing Cycle -->
-          <div class="mt-4 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+          <div class="mt-4 p-3 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700">
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <!-- Last Update Info -->
               <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
@@ -283,7 +283,7 @@ function nextRunDate() {
                 <div class="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                   {{ t('best-plan') }}
                 </div>
-                <div v-if="shouldShowUpgrade" class="px-1.5 py-0.5 sm:px-2 sm:py-1 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 text-[10px] sm:text-xs rounded-full font-medium">
+                <div v-if="shouldShowUpgrade" class="px-1.5 py-0.5 sm:px-2 sm:py-1 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 text-2xs sm:text-xs rounded-full font-medium">
                   {{ t('recommended') }}
                 </div>
               </div>
@@ -296,7 +296,7 @@ function nextRunDate() {
                 </div>
                 <button
                   v-if="shouldShowUpgrade"
-                  class="w-full sm:w-auto py-2 px-3 sm:py-2.5 sm:px-4 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-sm sm:text-base font-semibold rounded-lg transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
+                  class="w-full sm:w-auto py-2 px-3 sm:py-2.5 sm:px-4 bg-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-sm sm:text-base font-semibold rounded-lg transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
                   @click="goToPlans"
                 >
                   🚀 {{ t('plan-upgrade-v2') }}
@@ -306,7 +306,7 @@ function nextRunDate() {
           </div>
 
           <!-- Plan Limits Summary -->
-          <div v-if="planUsage?.currentPlan" class="mt-6 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-850 rounded-xl border border-blue-200 dark:border-gray-700 p-4 sm:p-6">
+          <div v-if="planUsage?.currentPlan" class="mt-6 bg-gray-50 dark:bg-gray-900 dark:from-gray-800 dark:to-gray-850 rounded-xl border border-blue-200 dark:border-gray-700 p-4 sm:p-6">
             <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 uppercase tracking-wide">
               {{ t('plan-limits') }}
             </h3>
@@ -386,7 +386,7 @@ function nextRunDate() {
               <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 mb-4">
                 <div
                   class="h-3 rounded-full transition-all duration-300"
-                  :class="(planUsage?.detailPlanUsage?.mau_percent || 0) >= 100 ? 'bg-gradient-to-r from-red-500 to-red-600' : 'bg-gradient-to-r from-blue-500 to-blue-600'"
+                  :class="(planUsage?.detailPlanUsage?.mau_percent || 0) >= 100 ? 'bg-linear-to-r from-red-500 to-red-600' : 'bg-linear-to-r from-blue-500 to-blue-600'"
                   :style="{ width: `${Math.min(planUsage?.detailPlanUsage?.mau_percent || 0, 100)}%` }"
                 />
               </div>
@@ -451,7 +451,7 @@ function nextRunDate() {
               <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 mb-4">
                 <div
                   class="h-3 rounded-full transition-all duration-300"
-                  :class="(planUsage?.detailPlanUsage?.storage_percent || 0) >= 100 ? 'bg-gradient-to-r from-red-500 to-red-600' : 'bg-gradient-to-r from-purple-500 to-purple-600'"
+                  :class="(planUsage?.detailPlanUsage?.storage_percent || 0) >= 100 ? 'bg-linear-to-r from-red-500 to-red-600' : 'bg-linear-to-r from-purple-500 to-purple-600'"
                   :style="{ width: `${Math.min(planUsage?.detailPlanUsage?.storage_percent || 0, 100)}%` }"
                 />
               </div>
@@ -516,7 +516,7 @@ function nextRunDate() {
               <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 mb-4">
                 <div
                   class="h-3 rounded-full transition-all duration-300"
-                  :class="(planUsage?.detailPlanUsage?.bandwidth_percent || 0) >= 100 ? 'bg-gradient-to-r from-red-500 to-red-600' : 'bg-gradient-to-r from-green-500 to-green-600'"
+                  :class="(planUsage?.detailPlanUsage?.bandwidth_percent || 0) >= 100 ? 'bg-linear-to-r from-red-500 to-red-600' : 'bg-linear-to-r from-green-500 to-green-600'"
                   :style="{ width: `${Math.min(planUsage?.detailPlanUsage?.bandwidth_percent || 0, 100)}%` }"
                 />
               </div>
@@ -581,7 +581,7 @@ function nextRunDate() {
               <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 mb-4">
                 <div
                   class="h-3 rounded-full transition-all duration-300"
-                  :class="(planUsage?.detailPlanUsage?.build_time_percent || 0) >= 100 ? 'bg-gradient-to-r from-red-500 to-red-600' : 'bg-gradient-to-r from-orange-500 to-orange-600'"
+                  :class="(planUsage?.detailPlanUsage?.build_time_percent || 0) >= 100 ? 'bg-linear-to-r from-red-500 to-red-600' : 'bg-linear-to-r from-orange-500 to-orange-600'"
                   :style="{ width: `${Math.min(planUsage?.detailPlanUsage?.build_time_percent || 0, 100)}%` }"
                 />
               </div>
@@ -630,7 +630,7 @@ function nextRunDate() {
                 </div>
               </div>
 
-              <div class="text-center p-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg">
+              <div class="text-center p-4 bg-linear-to-r from-blue-500 to-blue-600 text-white rounded-lg">
                 <div class="text-2xl font-bold">
                   ${{ planUsage?.totalPrice.toLocaleString() }}
                 </div>
