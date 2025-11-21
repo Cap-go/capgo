@@ -18,12 +18,12 @@ const style = computed(() => ({ background: props.background }))
   <div>
     <div class="relative lg:mx-auto lg:max-w-5xl" :class="{ 'mt-12 lg:mt-20': !props.mini, 'mt-6 lg:mt-12': props.mini }">
       <div class="absolute -inset-2">
-        <div class="w-full h-full mx-auto rounded-lg opacity-30 blur-lg" :style="style" />
+        <div class="mx-auto w-full h-full rounded-lg opacity-30 blur-lg" :style="style" />
       </div>
 
-      <div class="absolute rounded-xl from-cyan-500 to-purple-500 bg-linear-to-r -inset-px" />
+      <div class="absolute -inset-px from-cyan-500 to-purple-500 rounded-xl bg-linear-to-r" />
 
-      <div class="relative flex flex-col items-stretch overflow-hidden text-center bg-white rounded-xl dark:bg-black/90 md:flex-row md:text-left">
+      <div class="flex overflow-hidden relative flex-col items-stretch text-center bg-white rounded-xl md:flex-row md:text-left dark:bg-black/90">
         <slot />
       </div>
     </div>

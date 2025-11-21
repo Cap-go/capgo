@@ -101,18 +101,18 @@ function readExternalInput() {
 </script>
 
 <template>
-  <div class="container mx-auto p-8 space-y-8">
+  <div class="container p-8 mx-auto space-y-8">
     <div class="text-center">
-      <h1 class="text-3xl font-bold mb-4">
+      <h1 class="mb-4 text-3xl font-bold">
         DialogV2 Demo
       </h1>
-      <p class="text-gray-600 dark:text-gray-400 mb-8">
+      <p class="mb-8 text-gray-600 dark:text-gray-400">
         Demonstrates DialogV2 component with Vue Teleport functionality
       </p>
     </div>
 
     <!-- Demo Controls -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
       <button
         class="d-btn d-btn-primary"
         @click="openBasicDialog"
@@ -143,8 +143,8 @@ function readExternalInput() {
     </div>
 
     <!-- External Input Demo -->
-    <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
-      <h2 class="text-xl font-semibold mb-4">
+    <div class="p-6 bg-white rounded-lg shadow dark:bg-gray-800">
+      <h2 class="mb-4 text-xl font-semibold">
         External Input Reading Demo
       </h2>
       <div class="flex gap-4 items-center">
@@ -152,7 +152,7 @@ function readExternalInput() {
           v-model="externalInputValue"
           type="text"
           :placeholder="t('demo-input-placeholder')"
-          class="input input-bordered flex-1"
+          class="flex-1 input input-bordered"
         >
         <button
           class="d-btn d-btn-outline"
@@ -161,7 +161,7 @@ function readExternalInput() {
           {{ t('read-value') }}
         </button>
       </div>
-      <p class="text-sm text-gray-500 mt-2">
+      <p class="mt-2 text-sm text-gray-500">
         {{ t('demo-external-input-desc') }}
       </p>
     </div>
@@ -170,12 +170,12 @@ function readExternalInput() {
     <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('dialog-with-custom-input')" defer to="#dialog-v2-content">
       <div class="space-y-4">
         <div>
-          <label for="custom-input" class="block text-sm font-medium mb-2">{{ t('custom-input-field') }}</label>
+          <label for="custom-input" class="block mb-2 text-sm font-medium">{{ t('custom-input-field') }}</label>
           <input
             v-model="customInputValue"
             type="text"
             :placeholder="t('demo-text-placeholder')"
-            class="input input-bordered w-full"
+            class="w-full input input-bordered"
           >
         </div>
         <div class="text-sm text-gray-500">
@@ -187,37 +187,37 @@ function readExternalInput() {
     <!-- Teleport Content for Form Dialog -->
     <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('user-registration')" to="#dialog-v2-content">
       <div class="space-y-4">
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div>
-            <label for="first-name" class="block text-sm font-medium mb-2">{{ t('first-name') }}</label>
+            <label for="first-name" class="block mb-2 text-sm font-medium">{{ t('first-name') }}</label>
             <input
               type="text"
               :placeholder="t('demo-fname-placeholder')"
-              class="input input-bordered w-full"
+              class="w-full input input-bordered"
             >
           </div>
           <div>
-            <label for="last-name" class="block text-sm font-medium mb-2">{{ t('last-name') }}</label>
+            <label for="last-name" class="block mb-2 text-sm font-medium">{{ t('last-name') }}</label>
             <input
               type="text"
               :placeholder="t('demo-lname-placeholder')"
-              class="input input-bordered w-full"
+              class="w-full input input-bordered"
             >
           </div>
         </div>
 
         <div>
-          <label for="email" class="block text-sm font-medium mb-2">{{ t('email') }}</label>
+          <label for="email" class="block mb-2 text-sm font-medium">{{ t('email') }}</label>
           <input
             type="email"
             :placeholder="t('demo-email-placeholder')"
-            class="input input-bordered w-full"
+            class="w-full input input-bordered"
           >
         </div>
 
         <div>
-          <label for="role" class="block text-sm font-medium mb-2">{{ t('role') }}</label>
-          <select class="select select-bordered w-full">
+          <label for="role" class="block mb-2 text-sm font-medium">{{ t('role') }}</label>
+          <select class="w-full select select-bordered">
             <option disabled selected>
               {{ t('demo-select-role') }}
             </option>
@@ -227,7 +227,7 @@ function readExternalInput() {
           </select>
         </div>
 
-        <div class="flex items-center gap-2">
+        <div class="flex gap-2 items-center">
           <input
             id="terms"
             type="checkbox"
@@ -238,7 +238,7 @@ function readExternalInput() {
           </label>
         </div>
 
-        <div class="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg">
+        <div class="p-3 bg-blue-50 rounded-lg dark:bg-blue-900/20">
           <p class="text-sm text-blue-700 dark:text-blue-300">
             This entire form is teleported into the dialog using Vue Teleport!
           </p>
@@ -247,17 +247,17 @@ function readExternalInput() {
     </Teleport>
 
     <!-- Code Examples -->
-    <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
-      <h2 class="text-xl font-semibold mb-4">
+    <div class="p-6 bg-white rounded-lg shadow dark:bg-gray-800">
+      <h2 class="mb-4 text-xl font-semibold">
         Usage Examples
       </h2>
 
       <div class="space-y-4">
         <div>
-          <h3 class="font-medium mb-2">
+          <h3 class="mb-2 font-medium">
             1. Basic Dialog
           </h3>
-          <pre class="bg-gray-100 dark:bg-gray-700 p-3 rounded text-sm overflow-x-auto"><code>dialogStore.openDialog({
+          <pre class="overflow-x-auto p-3 text-sm bg-gray-100 rounded dark:bg-gray-700"><code>dialogStore.openDialog({
   title: 'Basic Dialog',
   description: 'This is a basic dialog.',
   buttons: [
@@ -268,11 +268,11 @@ function readExternalInput() {
         </div>
 
         <div>
-          <h3 class="font-medium mb-2">
+          <h3 class="mb-2 font-medium">
             2. Dialog with Teleported Content
           </h3>
-          <pre class="bg-gray-100 dark:bg-gray-700 p-3 rounded text-sm overflow-x-auto"><code>&lt;Teleport to="#dialog-v2-content" v-if="dialogStore.showDialog"&gt;
-  &lt;input v-model="customValue" class="input input-bordered w-full" /&gt;
+          <pre class="overflow-x-auto p-3 text-sm bg-gray-100 rounded dark:bg-gray-700"><code>&lt;Teleport to="#dialog-v2-content" v-if="dialogStore.showDialog"&gt;
+  &lt;input v-model="customValue" class="w-full input input-bordered" /&gt;
 &lt;/Teleport&gt;</code></pre>
         </div>
       </div>

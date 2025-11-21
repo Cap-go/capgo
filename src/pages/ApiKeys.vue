@@ -634,10 +634,10 @@ getKeys()
 
 <template>
   <div>
-    <div class="h-full pb-4 overflow-hidden">
-      <div class="w-full h-full px-0 pt-0 md:pt-8 mx-auto mb-8 overflow-y-auto max-w-9xl max-h-fit sm:px-6 lg:px-8">
+    <div class="overflow-hidden pb-4 h-full">
+      <div class="overflow-y-auto px-0 pt-0 mx-auto mb-8 w-full h-full sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
         <div class="flex flex-col">
-          <div class="flex flex-col overflow-hidden overflow-y-auto bg-white md:rounded-lg md:shadow-lg border-slate-300 md:mt-5 md:border dark:border-slate-900 dark:bg-slate-800">
+          <div class="flex overflow-hidden overflow-y-auto flex-col bg-white md:mt-5 md:rounded-lg md:border md:shadow-lg border-slate-300 dark:border-slate-900 dark:bg-slate-800">
             <Table
               v-model:current-page="currentPage"
               show-add
@@ -658,27 +658,27 @@ getKeys()
           </p>
           <div class="mb-2 ml-4">
             <a
-              class="text-blue-500 underline focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 rounded-sm inline-flex items-center"
+              class="inline-flex items-center text-blue-500 underline rounded-sm focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 focus:outline-none"
               href="https://capgo.app/docs/tooling/cli/"
               target="_blank"
               rel="noopener noreferrer"
               :aria-label="`${t('cli-doc')} (opens in new tab)`"
             >
               {{ t('cli-doc') }}
-              <svg class="w-3 h-3 ml-1" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <svg class="ml-1 w-3 h-3" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                 <path fill-rule="evenodd" d="M4.25 5.5a.75.75 0 00-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 00.75-.75v-4a.75.75 0 011.5 0v4A2.25 2.25 0 0112.75 17h-8.5A2.25 2.25 0 012 14.75v-8.5A2.25 2.25 0 014.25 4h5a.75.75 0 010 1.5h-5z" clip-rule="evenodd" />
                 <path fill-rule="evenodd" d="M6.194 12.753a.75.75 0 001.06.053L16.5 4.44v2.81a.75.75 0 001.5 0v-4.5a.75.75 0 00-.75-.75h-4.5a.75.75 0 000 1.5h2.553l-9.056 8.194a.75.75 0 00-.053 1.06z" clip-rule="evenodd" />
               </svg>
             </a>
             <a
-              class="ml-1 text-blue-500 underline focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 rounded-sm inline-flex items-center"
+              class="inline-flex items-center ml-1 text-blue-500 underline rounded-sm focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 focus:outline-none"
               href="https://capgo.app/docs/tooling/api/"
               target="_blank"
               rel="noopener noreferrer"
               :aria-label="`${t('api-doc')} (opens in new tab)`"
             >
               {{ t('api-doc') }}
-              <svg class="w-3 h-3 ml-1" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <svg class="ml-1 w-3 h-3" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                 <path fill-rule="evenodd" d="M4.25 5.5a.75.75 0 00-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 00.75-.75v-4a.75.75 0 011.5 0v4A2.25 2.25 0 0112.75 17h-8.5A2.25 2.25 0 012 14.75v-8.5A2.25 2.25 0 014.25 4h5a.75.75 0 010 1.5h-5z" clip-rule="evenodd" />
                 <path fill-rule="evenodd" d="M6.194 12.753a.75.75 0 001.06.053L16.5 4.44v2.81a.75.75 0 001.5 0v-4.5a.75.75 0 00-.75-.75h-4.5a.75.75 0 000 1.5h2.553l-9.056 8.194a.75.75 0 00-.053 1.06z" clip-rule="evenodd" />
               </svg>
@@ -707,54 +707,54 @@ getKeys()
 
         <!-- API Key Type Selection -->
         <div>
-          <div class="border rounded-lg p-4 dark:border-gray-600">
+          <div class="p-4 rounded-lg border dark:border-gray-600">
             <div class="space-y-3">
               <div class="form-control">
-                <label class="label cursor-pointer justify-start gap-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg">
+                <label class="gap-3 justify-start p-3 rounded-lg cursor-pointer hover:bg-gray-50 label dark:hover:bg-gray-800">
                   <input
                     v-model="selectedKeyType"
                     type="radio"
                     name="key-type"
                     value="read"
-                    class="radio radio-primary mr-2"
+                    class="mr-2 radio radio-primary"
                   >
-                  <span class="label-text text-base">{{ t('key-read') }}</span>
+                  <span class="text-base label-text">{{ t('key-read') }}</span>
                 </label>
               </div>
               <div class="form-control">
-                <label class="label cursor-pointer justify-start gap-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg">
+                <label class="gap-3 justify-start p-3 rounded-lg cursor-pointer hover:bg-gray-50 label dark:hover:bg-gray-800">
                   <input
                     v-model="selectedKeyType"
                     type="radio"
                     name="key-type"
                     value="upload"
-                    class="radio radio-primary mr-2"
+                    class="mr-2 radio radio-primary"
                   >
-                  <span class="label-text text-base">{{ t('key-upload') }}</span>
+                  <span class="text-base label-text">{{ t('key-upload') }}</span>
                 </label>
               </div>
               <div class="form-control">
-                <label class="label cursor-pointer justify-start gap-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg">
+                <label class="gap-3 justify-start p-3 rounded-lg cursor-pointer hover:bg-gray-50 label dark:hover:bg-gray-800">
                   <input
                     v-model="selectedKeyType"
                     type="radio"
                     name="key-type"
                     value="write"
-                    class="radio radio-primary mr-2"
+                    class="mr-2 radio radio-primary"
                   >
-                  <span class="label-text text-base">{{ t('write-key') }}</span>
+                  <span class="text-base label-text">{{ t('write-key') }}</span>
                 </label>
               </div>
               <div class="form-control">
-                <label class="label cursor-pointer justify-start gap-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg">
+                <label class="gap-3 justify-start p-3 rounded-lg cursor-pointer hover:bg-gray-50 label dark:hover:bg-gray-800">
                   <input
                     v-model="selectedKeyType"
                     type="radio"
                     name="key-type"
                     value="all"
-                    class="radio radio-primary mr-2"
+                    class="mr-2 radio radio-primary"
                   >
-                  <span class="label-text text-base">{{ t('key-all') }}</span>
+                  <span class="text-base label-text">{{ t('key-all') }}</span>
                 </label>
               </div>
             </div>
@@ -762,25 +762,25 @@ getKeys()
         </div>
 
         <!-- Limit to Organizations -->
-        <div class="flex items-center gap-2">
+        <div class="flex gap-2 items-center">
           <input
             id="limit-to-org"
             v-model="limitToOrgCheckbox"
             type="checkbox"
-            class="checkbox border-gray-500 dark:border-gray-700"
+            class="border-gray-500 dark:border-gray-700 checkbox"
           >
           <label for="limit-to-org" class="text-sm">
             {{ t('limit-to-org') }}
           </label>
         </div>
         <div v-if="limitToOrgCheckbox" class="pl-6">
-          <div class="space-y-2 max-h-32 overflow-y-auto border rounded-lg p-2">
-            <div v-for="org in organizationStore.organizations" :key="org.gid" class="flex items-center gap-2">
+          <div class="overflow-y-auto p-2 space-y-2 max-h-32 rounded-lg border">
+            <div v-for="org in organizationStore.organizations" :key="org.gid" class="flex gap-2 items-center">
               <input
                 :id="`org-${org.gid}`"
                 :value="org.gid"
                 type="checkbox"
-                class="checkbox border-gray-500 dark:border-gray-700"
+                class="border-gray-500 dark:border-gray-700 checkbox"
                 @change="handleOrgSelection(org.gid, ($event.target as HTMLInputElement).checked)"
               >
               <label :for="`org-${org.gid}`" class="text-sm">
@@ -791,25 +791,25 @@ getKeys()
         </div>
 
         <!-- Limit to Apps (only show if orgs are selected) -->
-        <div v-if="limitToOrgCheckbox && displayStore.selectedOrganizations.length > 0" class="flex items-center gap-2">
+        <div v-if="limitToOrgCheckbox && displayStore.selectedOrganizations.length > 0" class="flex gap-2 items-center">
           <input
             id="limit-to-app"
             v-model="limitToAppCheckbox"
             type="checkbox"
-            class="checkbox border-gray-500 dark:border-gray-700"
+            class="border-gray-500 dark:border-gray-700 checkbox"
           >
           <label for="limit-to-app" class="text-sm">
             {{ t('limit-to-app') }}
           </label>
         </div>
         <div v-if="limitToAppCheckbox && displayStore.selectedOrganizations.length > 0" class="pl-6">
-          <div class="space-y-2 max-h-32 overflow-y-auto border rounded-lg p-2">
-            <div v-for="app in filteredAppsForSelectedOrgs" :key="app.app_id" class="flex items-center gap-2">
+          <div class="overflow-y-auto p-2 space-y-2 max-h-32 rounded-lg border">
+            <div v-for="app in filteredAppsForSelectedOrgs" :key="app.app_id" class="flex gap-2 items-center">
               <input
                 :id="`app-${app.app_id}`"
                 :value="app"
                 type="checkbox"
-                class="checkbox border-gray-500 dark:border-gray-700"
+                class="border-gray-500 dark:border-gray-700 checkbox"
                 @change="handleAppSelection(app, ($event.target as HTMLInputElement).checked)"
               >
               <label :for="`app-${app.app_id}`" class="text-sm">
@@ -841,8 +841,8 @@ getKeys()
     <!-- Teleport Content for Organization Selection Modal -->
     <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('alert-confirm-org-limit')" defer to="#dialog-v2-content">
       <div class="space-y-4">
-        <div class="max-h-64 overflow-y-auto border rounded-lg p-2">
-          <div v-for="org in organizationStore.organizations" :key="org.gid" class="flex items-center gap-2 p-2">
+        <div class="overflow-y-auto p-2 max-h-64 rounded-lg border">
+          <div v-for="org in organizationStore.organizations" :key="org.gid" class="flex gap-2 items-center p-2">
             <input
               :id="`org-select-${org.gid}`"
               :value="org.gid"
@@ -855,7 +855,7 @@ getKeys()
             </label>
           </div>
         </div>
-        <div class="flex items-center gap-2 mt-4">
+        <div class="flex gap-2 items-center mt-4">
           <input
             id="limit-to-app-org"
             v-model="limitToOrgCheckbox"
@@ -872,8 +872,8 @@ getKeys()
     <!-- Teleport Content for App Selection Modal -->
     <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('alert-confirm-appid-limit')" defer to="#dialog-v2-content">
       <div class="space-y-4">
-        <div class="max-h-64 overflow-y-auto border rounded-lg p-2">
-          <div v-for="app in availableApps" :key="app.app_id" class="flex items-center gap-2 p-2">
+        <div class="overflow-y-auto p-2 max-h-64 rounded-lg border">
+          <div v-for="app in availableApps" :key="app.app_id" class="flex gap-2 items-center p-2">
             <input
               :id="`app-${app.app_id}`"
               :value="app"

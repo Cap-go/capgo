@@ -676,17 +676,17 @@ async function deleteBundle() {
 
 <template>
   <div>
-    <div v-if="loading" class="flex flex-col items-center justify-center min-h-[50vh]">
+    <div v-if="loading" class="flex flex-col justify-center items-center min-h-[50vh]">
       <Spinner size="w-40 h-40" />
     </div>
     <div v-else-if="version">
       <Tabs v-model:active-tab="ActiveTab" :tabs="tabs" />
       <div v-if="ActiveTab === 'info'" id="devices" class="mt-0 md:mt-8">
-        <div class="w-full h-full px-0 pt-0 md:pt-8 mx-auto mb-8 overflow-y-auto max-w-9xl max-h-fit sm:px-6 lg:px-8">
+        <div class="overflow-y-auto px-0 pt-0 mx-auto mb-8 w-full h-full sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
           <div
-            class="flex flex-col overflow-hidden overflow-y-auto bg-white border border-slate-300 shadow-lg md:rounded-lg dark:border-slate-900 dark:bg-slate-800"
+            class="flex overflow-hidden overflow-y-auto flex-col bg-white border shadow-lg md:rounded-lg border-slate-300 dark:border-slate-900 dark:bg-slate-800"
           >
-            <dl class="divide-y dark:divide-slate-500 divide-slate-200">
+            <dl class="divide-y divide-slate-200 dark:divide-slate-500">
               <InfoRow :label="t('bundle-number')">
                 {{ version.name }}
               </InfoRow>
@@ -717,19 +717,19 @@ async function deleteBundle() {
               </InfoRow>
 
               <InfoRow v-if="channels && channels.length > 0 && version && channels.filter(c => c.version === version!.id).length > 0" :label="t('channel')">
-                <div class="flex flex-wrap justify-end w-full gap-3">
-                  <div v-for="chn in channels.filter(c => c.version === version!.id)" id="open-channel" :key="chn.id" class="flex items-center gap-2">
+                <div class="flex flex-wrap gap-3 justify-end w-full">
+                  <div v-for="chn in channels.filter(c => c.version === version!.id)" id="open-channel" :key="chn.id" class="flex gap-2 items-center">
                     <span
-                      class="font-bold text-blue-600 underline cursor-pointer underline-offset-4 hover:text-blue-700 dark:text-blue-500 dark:hover:text-blue-400"
+                      class="font-bold text-blue-600 underline cursor-pointer dark:text-blue-500 hover:text-blue-700 underline-offset-4 dark:hover:text-blue-400"
                       @click="openChannel(chn)"
                     >
                       {{ chn!.name }}
                     </span>
                     <button
-                      class="p-1 rounded-md border border-gray-200 hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:hover:border-gray-600 dark:hover:bg-gray-800 transition-colors"
+                      class="p-1 rounded-md border border-gray-200 transition-colors dark:border-gray-700 hover:bg-gray-50 hover:border-gray-300 dark:hover:border-gray-600 dark:hover:bg-gray-800"
                       @click="openChannelSettings(chn)"
                     >
-                      <Settings class="w-4 h-4 text-gray-500 hover:text-blue-500 dark:text-gray-400 dark:hover:text-blue-400" />
+                      <Settings class="w-4 h-4 text-gray-500 dark:text-gray-400 hover:text-blue-500 dark:hover:text-blue-400" />
                     </button>
                   </div>
                 </div>
@@ -802,10 +802,10 @@ async function deleteBundle() {
                 <span class="">
                   {{ t('bundle-active') }}
                   <button
-                    class="p-1 rounded-md border border-gray-200 hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:hover:border-gray-600 dark:hover:bg-gray-800 transition-colors"
+                    class="p-1 rounded-md border border-gray-200 transition-colors dark:border-gray-700 hover:bg-gray-50 hover:border-gray-300 dark:hover:border-gray-600 dark:hover:bg-gray-800"
                     @click="deleteBundle"
                   >
-                    <IconTrash class="w-4 h-4 text-red-500 dark:text-red-400 cursor-pointer hover:text-red-600 transition-colors" />
+                    <IconTrash class="w-4 h-4 text-red-500 transition-colors cursor-pointer dark:text-red-400 hover:text-red-600" />
                   </button>
                 </span>
               </InfoRow>
@@ -819,15 +819,15 @@ async function deleteBundle() {
         </div>
       </div>
     </div>
-    <div v-else class="flex flex-col items-center justify-center min-h-[50vh]">
-      <IconAlertCircle class="w-16 h-16 text-destructive mb-4" />
+    <div v-else class="flex flex-col justify-center items-center min-h-[50vh]">
+      <IconAlertCircle class="mb-4 w-16 h-16 text-destructive" />
       <h2 class="text-xl font-semibold text-foreground">
         {{ t('bundle-not-found') }}
       </h2>
-      <p class="text-muted-foreground mt-2">
+      <p class="mt-2 text-muted-foreground">
         {{ t('bundle-not-found-description') }}
       </p>
-      <button class="mt-4 d-btn d-btn-primary text-white" @click="router.push(`/app/p/${packageId}/bundles/`)">
+      <button class="mt-4 text-white d-btn d-btn-primary" @click="router.push(`/app/p/${packageId}/bundles/`)">
         {{ t('back-to-bundles') }}
       </button>
     </div>
@@ -843,7 +843,7 @@ async function deleteBundle() {
           <a
             href="https://capgo.app/docs/webapp/bundles/#delete-a-bundle"
             target="_blank"
-            class="text-blue-500 underline hover:text-blue-600 ml-1"
+            class="ml-1 text-blue-500 underline hover:text-blue-600"
           >
             {{ t('here') }}
           </a>
@@ -854,7 +854,7 @@ async function deleteBundle() {
     <!-- Teleport Content for Encrypted Command Display -->
     <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('to-open-encrypted-bu')" defer to="#dialog-v2-content">
       <div class="mt-4">
-        <div class="bg-gray-100 dark:bg-gray-800 p-3 rounded-lg">
+        <div class="p-3 bg-gray-100 rounded-lg dark:bg-gray-800">
           <code class="text-sm break-all">
             npx @capgo/cli@latest bundle decrypt ./{{ version?.r2_path?.replace('/', '_') }} {{ version?.session_key }} --key ./.capgo_key
           </code>
@@ -864,16 +864,16 @@ async function deleteBundle() {
 
     <!-- Teleport Content for Unsafe Deletion Warning -->
     <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('alert-confirm-delete') && version?.deleted" defer to="#dialog-v2-content">
-      <div class="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+      <div class="p-3 mt-4 bg-red-50 rounded-lg border border-red-200 dark:border-red-800 dark:bg-red-900/20">
         <p class="text-sm text-red-800 dark:text-red-200">
           <strong class="underline">{{ t('you-are-deleting-unsafely') }}</strong>
         </p>
-        <p class="text-sm text-red-600 dark:text-red-300 mt-2">
+        <p class="mt-2 text-sm text-red-600 dark:text-red-300">
           {{ t('select-style-of-deletion-link') }}
           <a
             href="https://capgo.app/docs/webapp/bundles/#delete-a-bundle"
             target="_blank"
-            class="text-blue-500 underline hover:text-blue-600 ml-1"
+            class="ml-1 text-blue-500 underline hover:text-blue-600"
           >
             {{ t('here') }}
           </a>
@@ -883,12 +883,12 @@ async function deleteBundle() {
 
     <!-- Teleport Content for Channel Linking (Set Bundle) -->
     <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('channel-linking') && currentChannelAction === 'set'" defer to="#dialog-v2-content">
-      <div class="w-full space-y-4">
+      <div class="space-y-4 w-full">
         <div class="text-center">
-          <h3 class="text-lg font-medium mb-2">
+          <h3 class="mb-2 text-lg font-medium">
             {{ t('select-channel-to-link') }}
           </h3>
-          <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+          <p class="mb-4 text-sm text-gray-600 dark:text-gray-400">
             {{ t('choose-which-channel-to-link-this-bundle-to') }}
           </p>
         </div>
@@ -908,8 +908,8 @@ async function deleteBundle() {
 
         <div class="space-y-3">
           <!-- Current Bundle Info -->
-          <div v-if="version" class="p-3 border border-blue-300 dark:border-blue-600 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-            <div class="flex items-center justify-between">
+          <div v-if="version" class="p-3 bg-blue-50 rounded-lg border border-blue-300 dark:border-blue-600 dark:bg-blue-900/20">
+            <div class="flex justify-between items-center">
               <div>
                 <div class="font-medium text-blue-800 dark:text-blue-200">
                   {{ t('current-bundle') }}
@@ -918,7 +918,7 @@ async function deleteBundle() {
                   {{ version.name }}
                 </div>
               </div>
-              <div class="text-blue-600 dark:text-blue-400 text-xl">
+              <div class="text-xl text-blue-600 dark:text-blue-400">
                 📦
               </div>
             </div>
@@ -932,7 +932,7 @@ async function deleteBundle() {
             <div
               v-for="chan in filteredChannels"
               :key="chan.id"
-              class="p-3 border rounded-lg cursor-pointer transition-colors"
+              class="p-3 rounded-lg border transition-colors cursor-pointer"
               :class="{
                 'border-blue-500 bg-blue-50 dark:bg-blue-900/20': selectedChannelForLink?.id === chan.id,
                 'border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700': selectedChannelForLink?.id !== chan.id,
@@ -940,24 +940,24 @@ async function deleteBundle() {
               }"
               @click="selectedChannelForLink = chan"
             >
-              <div class="flex items-center justify-between">
+              <div class="flex justify-between items-center">
                 <div>
-                  <div class="font-medium flex items-center gap-2">
+                  <div class="flex gap-2 items-center font-medium">
                     {{ chan.name }}
-                    <span v-if="version && chan.version === version.id" class="text-xs bg-green-100 dark:bg-green-800 text-green-800 dark:text-green-200 px-2 py-1 rounded-full">
+                    <span v-if="version && chan.version === version.id" class="py-1 px-2 text-xs text-green-800 bg-green-100 rounded-full dark:text-green-200 dark:bg-green-800">
                       {{ t('current') }}
                     </span>
                   </div>
-                  <div class="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                  <div class="mt-1 text-sm text-gray-600 dark:text-gray-400">
                     {{ t('channel-id') }}: {{ chan.id }}
-                    <span v-if="chan.public" class="text-blue-600 dark:text-blue-400 ml-2">• {{ t('public') }}</span>
-                    <span v-else class="text-gray-500 dark:text-gray-400 ml-2">• {{ t('private') }}</span>
+                    <span v-if="chan.public" class="ml-2 text-blue-600 dark:text-blue-400">• {{ t('public') }}</span>
+                    <span v-else class="ml-2 text-gray-500 dark:text-gray-400">• {{ t('private') }}</span>
                   </div>
-                  <div v-if="chan.ios || chan.android" class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  <div v-if="chan.ios || chan.android" class="mt-1 text-xs text-gray-500 dark:text-gray-400">
                     <span v-if="chan.ios" class="mr-2">📱 iOS</span>
                     <span v-if="chan.android">🤖 Android</span>
                   </div>
-                  <div v-if="chan.created_at" class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  <div v-if="chan.created_at" class="mt-1 text-xs text-gray-500 dark:text-gray-400">
                     {{ t('created') }}: {{ new Date(chan.created_at).toLocaleDateString() }}
                   </div>
                 </div>
@@ -971,26 +971,26 @@ async function deleteBundle() {
           </div>
 
           <!-- Empty states -->
-          <div v-if="channels.length === 0" class="text-center text-gray-500 dark:text-gray-400 py-8">
-            <div class="text-4xl mb-2">
+          <div v-if="channels.length === 0" class="py-8 text-center text-gray-500 dark:text-gray-400">
+            <div class="mb-2 text-4xl">
               📱
             </div>
             <div class="font-medium">
               {{ t('no-channels-available') }}
             </div>
-            <div class="text-sm mt-1">
+            <div class="mt-1 text-sm">
               {{ t('create-a-channel-first-to-link-bundles') }}
             </div>
           </div>
 
-          <div v-else-if="filteredChannels.length === 0 && channelSearchVal.trim()" class="text-center text-gray-500 dark:text-gray-400 py-8">
-            <div class="text-4xl mb-2">
+          <div v-else-if="filteredChannels.length === 0 && channelSearchVal.trim()" class="py-8 text-center text-gray-500 dark:text-gray-400">
+            <div class="mb-2 text-4xl">
               🔍
             </div>
             <div class="font-medium">
               {{ t('no-channels-found') }}
             </div>
-            <div class="text-sm mt-1">
+            <div class="mt-1 text-sm">
               {{ t('try-a-different-search-term') }}
             </div>
           </div>
@@ -1000,9 +1000,9 @@ async function deleteBundle() {
 
     <!-- Teleport Content for Channel Actions (Settings) -->
     <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('channel-actions') && currentChannelAction === 'open'" defer to="#dialog-v2-content">
-      <div class="w-full space-y-4">
+      <div class="space-y-4 w-full">
         <div class="text-left">
-          <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+          <p class="mb-4 text-sm text-gray-600 dark:text-gray-400">
             {{ t('select-action-for-channel', { channel: selectedChannelForLink?.name || '' }) }}
           </p>
         </div>
@@ -1011,10 +1011,10 @@ async function deleteBundle() {
           <!-- Set Bundle (if user has permissions) -->
           <div
             v-if="role && (role === 'admin' || role === 'super_admin' || role === 'write')"
-            class="p-3 border border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700"
+            class="p-3 rounded-lg border border-gray-300 cursor-pointer dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700"
             @click="handleChannelAction('set')"
           >
-            <div class="flex items-center justify-between">
+            <div class="flex justify-between items-center">
               <div>
                 <div class="font-medium">
                   {{ t('set-bundle') }}
@@ -1032,10 +1032,10 @@ async function deleteBundle() {
           <!-- Unlink Channel (if user has permissions) -->
           <div
             v-if="role && (role === 'admin' || role === 'super_admin' || role === 'write')"
-            class="p-3 border border-red-300 dark:border-red-600 rounded-lg cursor-pointer hover:bg-red-50 dark:hover:bg-red-900/20"
+            class="p-3 rounded-lg border border-red-300 cursor-pointer dark:border-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
             @click="handleChannelAction('unlink')"
           >
-            <div class="flex items-center justify-between">
+            <div class="flex justify-between items-center">
               <div>
                 <div class="font-medium text-red-600 dark:text-red-400">
                   {{ t('unlink-channel') }}

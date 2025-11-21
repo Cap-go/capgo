@@ -32,13 +32,13 @@ const { t } = useI18n()
 
 <template>
   <header class="bg-slate-100 backdrop-blur-xl dark:bg-slate-900">
-    <div class="px-2 lg:px-6 sm:px-4">
-      <div class="relative flex items-center justify-between h-16 -mb-px">
+    <div class="px-2 sm:px-4 lg:px-6">
+      <div class="flex relative justify-between items-center -mb-px h-16">
         <!-- Header: Left side -->
         <div class="flex items-center space-x-4">
           <div v-if="displayStore.NavTitle && isMobile" class="pr-2">
             <button
-              class="flex p-2 rounded-sm hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-500 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+              class="flex p-2 rounded-sm dark:text-white focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none text-slate-500 dark:hover:bg-slate-600 hover:bg-slate-300"
               :aria-label="t('button-back')"
               @click="back()"
             >
@@ -48,7 +48,7 @@ const { t } = useI18n()
           </div>
           <!-- Hamburger button -->
           <button
-            class="text-slate-500 lg:hidden dark:text-white hover:text-slate-600 dark:hover:text-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded-md p-1"
+            class="p-1 rounded-md lg:hidden dark:text-white focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none text-slate-500 dark:hover:text-slate-50 hover:text-slate-600"
             aria-controls="sidebar"
             :aria-expanded="props.sidebarOpen"
             :aria-label="props.sidebarOpen ? t('close-sidebar') : t('open-sidebar')"
@@ -60,13 +60,13 @@ const { t } = useI18n()
 
           <!-- Title on desktop -->
           <div class="hidden lg:block">
-            <div class="font-bold truncate text-md md:text-2xl text-dark dark:text-white flex items-center space-x-2">
-              <nav v-if="$route.path !== '/' && $route.path !== '/app'" class="text-sm text-slate-600 dark:text-slate-400 font-normal" aria-label="Breadcrumb">
+            <div class="flex items-center space-x-2 font-bold md:text-2xl dark:text-white truncate text-md text-dark">
+              <nav v-if="$route.path !== '/' && $route.path !== '/app'" class="text-sm font-normal text-slate-600 dark:text-slate-400" aria-label="Breadcrumb">
                 <ol class="inline-flex items-center space-x-1">
                   <li>
                     <router-link
                       to="/"
-                      class="first-letter:uppercase hover:underline focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 rounded-sm px-1"
+                      class="px-1 rounded-sm hover:underline focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 focus:outline-none first-letter:uppercase"
                     >
                       {{ t('home') }}
                     </router-link>
@@ -75,7 +75,7 @@ const { t } = useI18n()
                     <span class="mx-1" aria-hidden="true"> / </span>
                     <router-link
                       :to="breadcrumb.path"
-                      class="first-letter:uppercase hover:underline focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 rounded-sm px-1"
+                      class="px-1 rounded-sm hover:underline focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 focus:outline-none first-letter:uppercase"
                     >
                       {{ breadcrumb.name.includes('.') ? breadcrumb.name : t(breadcrumb.name) }}
                     </router-link>
@@ -92,7 +92,7 @@ const { t } = useI18n()
 
         <!-- Centered title on mobile -->
         <div class="flex-1 px-4 text-center lg:hidden">
-          <div class="font-bold truncate text-md text-dark dark:text-white first-letter:uppercase">
+          <div class="font-bold dark:text-white truncate text-md text-dark first-letter:uppercase">
             {{ displayStore.NavTitle }}
           </div>
         </div>

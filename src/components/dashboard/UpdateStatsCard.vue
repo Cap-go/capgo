@@ -287,38 +287,38 @@ onMounted(async () => {
     :has-data="hasData"
   >
     <template #header>
-      <div class="flex flex-col items-start justify-between gap-2">
-        <h2 class="flex-1 min-w-0 text-2xl font-semibold leading-tight text text-slate-600 dark:text-white">
+      <div class="flex flex-col gap-2 justify-between items-start">
+        <h2 class="flex-1 min-w-0 text-2xl font-semibold leading-tight dark:text-white text text-slate-600">
           {{ t('update_statistics') }}
         </h2>
-        <div class="flex flex-wrap items-center gap-3 sm:flex-nowrap sm:gap-4">
-          <div class="flex items-center gap-2">
+        <div class="flex flex-wrap gap-3 items-center sm:flex-nowrap sm:gap-4">
+          <div class="flex gap-2 items-center">
             <div class="w-3 h-3 rounded-full" style="background-color: hsl(210, 65%, 55%)" />
             <div
-              class="flex items-center gap-1 text-sm text-slate-600 dark:text-slate-300"
+              class="flex gap-1 items-center text-sm text-slate-600 dark:text-slate-300"
               :aria-label="`${actionDisplayNames.requested}: ${totalRequested.toLocaleString()}`"
             >
-              <GlobeAltIcon class="h-4 w-4" aria-hidden="true" />
+              <GlobeAltIcon class="w-4 h-4" aria-hidden="true" />
               <span>{{ totalRequested.toLocaleString() }}</span>
             </div>
           </div>
-          <div class="flex items-center gap-2">
+          <div class="flex gap-2 items-center">
             <div class="w-3 h-3 rounded-full" style="background-color: hsl(135, 55%, 50%)" />
             <div
-              class="flex items-center gap-1 text-sm text-slate-600 dark:text-slate-300"
+              class="flex gap-1 items-center text-sm text-slate-600 dark:text-slate-300"
               :aria-label="`${actionDisplayNames.install}: ${totalInstalled.toLocaleString()}`"
             >
-              <ArrowDownOnSquareIcon class="h-4 w-4" aria-hidden="true" />
+              <ArrowDownOnSquareIcon class="w-4 h-4" aria-hidden="true" />
               <span>{{ totalInstalled.toLocaleString() }}</span>
             </div>
           </div>
-          <div class="flex items-center gap-2">
+          <div class="flex gap-2 items-center">
             <div class="w-3 h-3 rounded-full" style="background-color: hsl(0, 50%, 60%)" />
             <div
-              class="flex items-center gap-1 text-sm text-slate-600 dark:text-slate-300"
+              class="flex gap-1 items-center text-sm text-slate-600 dark:text-slate-300"
               :aria-label="`${actionDisplayNames.fail}: ${totalFailed.toLocaleString()}`"
             >
-              <XCircleIcon class="h-4 w-4" aria-hidden="true" />
+              <XCircleIcon class="w-4 h-4" aria-hidden="true" />
               <span>{{ totalFailed.toLocaleString() }}</span>
             </div>
           </div>

@@ -120,9 +120,9 @@ displayStore.defaultBack = '/app'
   <div>
     <div v-if="!isLoading">
       <StepsApp v-if="stepsOpen" :onboarding="!apps.length" @done="NextStep" @close-step="stepsOpen = !stepsOpen" />
-      <div v-else class="h-full pb-4 overflow-hidden">
-        <div class="w-full h-full px-0 pt-0 md:pt-8 mx-auto mb-8 overflow-y-auto max-w-9xl max-h-fit sm:px-6 lg:px-8">
-          <div class="flex flex-col overflow-hidden overflow-y-auto bg-white border border-slate-300 shadow-lg md:rounded-lg dark:border-slate-900 dark:bg-gray-800">
+      <div v-else class="overflow-hidden pb-4 h-full">
+        <div class="overflow-y-auto px-0 pt-0 mx-auto mb-8 w-full h-full sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
+          <div class="flex overflow-hidden overflow-y-auto flex-col bg-white border shadow-lg md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900">
             <AppTable
               v-model:current-page="currentPage"
               v-model:search="searchQuery"
@@ -136,7 +136,7 @@ displayStore.defaultBack = '/app'
         </div>
       </div>
     </div>
-    <div v-else class="flex flex-col items-center justify-center h-full">
+    <div v-else class="flex flex-col justify-center items-center h-full">
       <Spinner size="w-40 h-40" />
     </div>
   </div>

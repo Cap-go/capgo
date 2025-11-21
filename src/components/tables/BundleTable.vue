@@ -605,7 +605,7 @@ watch(showSteps, (newValue) => {
 
 <template>
   <div>
-    <div v-if="!showSteps" class="flex flex-col overflow-hidden overflow-y-auto bg-white border border-slate-300 shadow-lg md:rounded-lg dark:border-slate-900 dark:bg-gray-800">
+    <div v-if="!showSteps" class="flex overflow-hidden overflow-y-auto flex-col bg-white border shadow-lg md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900">
       <Table
         v-model:filters="filters" v-model:columns="columns" v-model:current-page="currentPage" v-model:search="search"
         :total="total"
@@ -636,7 +636,7 @@ watch(showSteps, (newValue) => {
           <a
             href="https://capgo.app/docs/webapp/bundles/#delete-a-bundle"
             target="_blank"
-            class="text-blue-500 underline hover:text-blue-600 ml-1"
+            class="ml-1 text-blue-500 underline hover:text-blue-600"
           >
             {{ t('here') }}
           </a>

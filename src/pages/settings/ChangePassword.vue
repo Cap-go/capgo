@@ -84,16 +84,16 @@ async function submit(form: { password: string, password_confirm: string }) {
 
 <template>
   <div>
-    <div class="h-full pb-8 max-h-fit grow md:pb-0">
+    <div class="pb-8 h-full md:pb-0 max-h-fit grow">
       <FormKit id="change-pass" type="form" :actions="false" @submit="submit">
         <!-- Panel body -->
         <div class="p-6 space-y-6">
-          <h2 class="mb-5 text-2xl font-bold text-slate-800 dark:text-white">
+          <h2 class="mb-5 text-2xl font-bold dark:text-white text-slate-800">
             {{ t('account-password-heading') }}
           </h2>
           <!-- Personal Info -->
           <section>
-            <div class="mt-5 space-y-4 sm:flex sm:items-center sm:items-stretch sm:space-x-4 sm:space-y-0">
+            <div class="mt-5 space-y-4 sm:flex sm:items-center sm:items-stretch sm:space-y-0 sm:space-x-4">
               <FormKit
                 type="password"
                 name="password"
@@ -121,10 +121,10 @@ async function submit(form: { password: string, password_confirm: string }) {
         </div>
         <!-- Panel footer -->
         <footer>
-          <div class="flex flex-col px-2 md:px-6 py-5 border-t border-slate-300">
+          <div class="flex flex-col py-5 px-2 border-t md:px-6 border-slate-300">
             <div class="flex self-end">
               <button
-                class="p-2 ml-3 text-white bg-blue-500 rounded-sm d-btn hover:bg-blue-600"
+                class="p-2 ml-3 text-white bg-blue-500 rounded-sm hover:bg-blue-600 d-btn"
                 type="submit"
                 color="secondary"
                 shape="round"
@@ -144,12 +144,12 @@ async function submit(form: { password: string, password_confirm: string }) {
     <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('alert-2fa-required')" defer to="#dialog-v2-content">
       <div class="space-y-4">
         <div>
-          <label for="mfa-code" class="block text-sm font-medium mb-2">{{ t('enter-2fa-code') }}</label>
+          <label for="mfa-code" class="block mb-2 text-sm font-medium">{{ t('enter-2fa-code') }}</label>
           <input
             v-model="mfaCode"
             type="text"
             placeholder="123456"
-            class="input input-bordered w-full"
+            class="w-full input input-bordered"
             maxlength="6"
             inputmode="numeric"
           >

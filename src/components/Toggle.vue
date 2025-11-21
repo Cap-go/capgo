@@ -14,8 +14,8 @@ function onChange(event: Event) {
 </script>
 
 <template>
-  <label class="relative inline-flex items-center cursor-pointer">
+  <label class="inline-flex relative items-center cursor-pointer">
     <input type="checkbox" class="sr-only peer" :checked="value" :disabled="disabled" @change="onChange">
-    <div class="peer h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-0.5 after:h-5 after:w-5 after:border after:border-gray-300 dark:border-gray-600 after:rounded-full after:bg-white dark:bg-gray-700 peer-checked:bg-blue-600 after:transition-all after:content-[''] peer-checked:after:translate-x-full peer-checked:after:border-white" />
+    <div class="w-11 h-6 bg-gray-200 rounded-full dark:bg-gray-700 dark:border-gray-600 peer after:absolute after:left-[2px] after:top-0.5 after:h-5 after:w-5 after:border after:border-gray-300 after:rounded-full after:bg-white peer-checked:bg-blue-600 after:transition-all after:content-[''] peer-checked:after:translate-x-full peer-checked:after:border-white" />
   </label>
 </template>

@@ -114,24 +114,24 @@ const bannerColor = computed(() => {
 
 <template>
   <!-- Desktop inline version -->
-  <div v-if="props.desktop && bannerText" class="flex items-center space-x-2 sm:space-x-3 ml-auto">
-    <span class="text-xs sm:text-sm font-medium text-slate-600 dark:text-slate-400 hidden sm:inline">
+  <div v-if="props.desktop && bannerText" class="flex items-center ml-auto space-x-2 sm:space-x-3">
+    <span class="hidden text-xs font-medium sm:inline sm:text-sm text-slate-600 dark:text-slate-400">
       {{ bannerLeftText }}:
     </span>
-    <span class="text-xs sm:text-sm font-semibold text-slate-800 dark:text-slate-200">
+    <span class="text-xs font-semibold sm:text-sm text-slate-800 dark:text-slate-200">
       {{ bannerText }}
     </span>
-    <a href="/settings/organization/plans" class="d-btn d-btn-xs sm:d-btn-sm border-none" :class="bannerColor">
+    <a href="/settings/organization/plans" class="border-none d-btn d-btn-xs sm:d-btn-sm" :class="bannerColor">
       {{ isMobile ? t('see-usage') : t('upgrade') }}
     </a>
   </div>
 
   <!-- Mobile/original version -->
-  <div v-else-if="!props.desktop && bannerText" class="flex items-center justify-end bg-gray-200 dark:bg-gray-800/90 min-h-[3rem] sm:min-h-[4rem] px-2 sm:px-4 gap-2">
-    <span class="text-sm sm:text-lg font-semibold text-black dark:text-white">
+  <div v-else-if="!props.desktop && bannerText" class="flex gap-2 justify-end items-center px-2 bg-gray-200 sm:px-4 min-h-12 sm:min-h-16 dark:bg-gray-800/90">
+    <span class="text-sm font-semibold text-black sm:text-lg dark:text-white">
       {{ bannerLeftText }}:
     </span>
-    <span class="text-xs sm:text-base font-medium text-black dark:text-white">{{ bannerText }}</span>
-    <a href="/settings/organization/plans" class="d-btn d-btn-xs sm:d-btn-sm border-none whitespace-nowrap ml-2" :class="bannerColor">{{ isMobile ? t('see-usage') : t('upgrade') }}</a>
+    <span class="text-xs font-medium text-black sm:text-base dark:text-white">{{ bannerText }}</span>
+    <a href="/settings/organization/plans" class="ml-2 whitespace-nowrap border-none d-btn d-btn-xs sm:d-btn-sm" :class="bannerColor">{{ isMobile ? t('see-usage') : t('upgrade') }}</a>
   </div>
 </template>

@@ -253,18 +253,18 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
 </script>
 
 <template>
-  <div class="h-full flex flex-col overflow-hidden bg-white dark:bg-gray-800">
-    <div v-if="!thankYouPage" class="flex flex-col h-full w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+  <div class="flex overflow-hidden flex-col h-full bg-white dark:bg-gray-800">
+    <div v-if="!thankYouPage" class="flex flex-col py-6 px-4 mx-auto w-full max-w-7xl h-full sm:px-6 lg:px-8">
       <!-- Header Section -->
-      <div class="flex flex-col sm:flex-row items-center justify-between gap-4 mb-6 shrink-0">
+      <div class="flex flex-col gap-4 justify-between items-center mb-6 sm:flex-row shrink-0">
         <div class="flex-1">
-          <div class="flex items-center gap-3">
+          <div class="flex gap-3 items-center">
             <h1 class="text-3xl font-bold text-gray-900 dark:text-white">
               {{ t('plan-pricing-plans') }}
             </h1>
             <!-- Custom Plan Trigger -->
             <button
-              class="hidden lg:inline-flex items-center px-3 py-1 text-xs font-medium text-blue-700 bg-blue-50 rounded-full hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-300 transition-colors"
+              class="hidden items-center py-1 px-3 text-xs font-medium text-blue-700 bg-blue-50 rounded-full transition-colors lg:inline-flex dark:text-blue-300 hover:bg-blue-100 dark:bg-blue-900/30"
               @click="openSupport()"
             >
               {{ t('need-more-contact-us') }}
@@ -276,58 +276,58 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
         </div>
 
         <!-- Toggle -->
-        <div class="flex items-center p-1 bg-gray-200 dark:bg-base-200 rounded-lg">
+        <div class="flex items-center p-1 bg-gray-200 rounded-lg dark:bg-base-200">
           <button
-            class="px-4 py-1.5 text-sm font-medium rounded-md transition-all duration-200"
+            class="py-1.5 px-4 text-sm font-medium rounded-md transition-all duration-200"
             :class="segmentVal === 'm' ? 'bg-white dark:bg-base-100 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'"
             @click="segmentVal = 'm'"
           >
             {{ t('monthly-plan') }}
           </button>
           <button
-            class="px-4 py-1.5 text-sm font-medium rounded-md transition-all duration-200 flex items-center gap-2"
+            class="flex gap-2 items-center py-1.5 px-4 text-sm font-medium rounded-md transition-all duration-200"
             :class="segmentVal === 'y' ? 'bg-white dark:bg-base-100 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'"
             @click="segmentVal = 'y'"
           >
             {{ t('yearly') }}
-            <span class="text-xs font-bold text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/30 px-1.5 py-0.5 rounded-full">-20%</span>
+            <span class="py-0.5 px-1.5 text-xs font-bold text-green-600 bg-green-100 rounded-full dark:text-green-400 dark:bg-green-900/30">-20%</span>
           </button>
         </div>
       </div>
 
       <!-- Error Message -->
-      <div v-if="organizationStore.currentOrganizationFailed" class="mb-4 shrink-0 bg-red-500 text-white px-4 py-2 rounded-lg text-center font-medium">
+      <div v-if="organizationStore.currentOrganizationFailed" class="py-2 px-4 mb-4 font-medium text-center text-white bg-red-500 rounded-lg shrink-0">
         {{ t('plan-failed') }}
       </div>
 
       <!-- Plans Grid -->
-      <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 grow min-h-0 overflow-y-auto p-1 content-start">
+      <div class="grid overflow-y-auto grid-cols-1 gap-4 content-start p-1 min-h-0 md:grid-cols-2 xl:grid-cols-4 grow">
         <div
           v-for="(p, index) in mainStore.plans"
           :key="p.price_m"
-          class="flex flex-col p-5 rounded-2xl border transition-all duration-200 overflow-hidden relative group bg-gray-100 dark:bg-base-200"
+          class="flex overflow-hidden relative flex-col p-5 bg-gray-100 rounded-2xl border transition-all duration-200 group dark:bg-base-200"
           :class="[
             p.name === currentPlan?.name ? 'border-2 border-blue-500' : 'border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-700',
             isRecommended(p) ? 'shadow-lg shadow-blue-500/10' : 'shadow-sm',
           ]"
         >
           <!-- Recommended Badge -->
-          <div v-if="isRecommended(p)" class="absolute top-0 inset-x-0 h-1 bg-linear-to-r from-blue-500 to-indigo-500" />
+          <div v-if="isRecommended(p)" class="absolute inset-x-0 top-0 h-1 from-blue-500 to-indigo-500 bg-linear-to-r" />
           <div v-if="isRecommended(p)" class="absolute top-3 right-3">
-            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-200">
+            <span class="inline-flex items-center py-0.5 px-2.5 text-xs font-medium text-blue-800 bg-blue-100 rounded-full dark:text-blue-200 dark:bg-blue-900/50">
               {{ t('recommended') }}
             </span>
           </div>
 
           <!-- Plan Header -->
           <div class="mb-4 shrink-0">
-            <h3 class="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+            <h3 class="flex gap-2 items-center text-lg font-bold text-gray-900 dark:text-white">
               {{ p.name }}
-              <span v-if="isTrial && currentPlanSuggest?.name === p.name" class="px-2 py-0.5 text-xs font-medium text-white bg-blue-600 rounded-full">
+              <span v-if="isTrial && currentPlanSuggest?.name === p.name" class="py-0.5 px-2 text-xs font-medium text-white bg-blue-600 rounded-full">
                 {{ t('free-trial') }}
               </span>
             </h3>
-            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 h-8 line-clamp-2">
+            <p class="mt-1 h-8 text-xs text-gray-500 dark:text-gray-400 line-clamp-2">
               {{ t(convertKey(p.description)) }}
             </p>
           </div>
@@ -335,12 +335,12 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
           <!-- Price -->
           <div class="mb-6 shrink-0">
             <div class="flex items-baseline">
-              <span class="text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">
+              <span class="text-3xl font-extrabold tracking-tight text-gray-900 dark:text-white">
                 ${{ getPrice(p, segmentVal) }}
               </span>
               <span class="ml-1 text-sm font-medium text-gray-500 dark:text-gray-400">/{{ t('mo') }}</span>
             </div>
-            <p v-if="isYearlyPlan(p, segmentVal)" class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            <p v-if="isYearlyPlan(p, segmentVal)" class="mt-1 text-xs text-gray-500 dark:text-gray-400">
               {{ p.price_m !== p.price_y ? t('billed-annually-at') : t('billed-monthly-at') }} ${{ p.price_y }}
             </p>
           </div>
@@ -348,11 +348,11 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
           <!-- Action Button -->
           <button
             :class="buttonStyle(p)"
-            class="w-full py-2 px-4 rounded-lg text-sm font-semibold shadow-sm transition-all duration-200 mb-6 shrink-0 flex items-center justify-center gap-2"
+            class="flex gap-2 justify-center items-center py-2 px-4 mb-6 w-full text-sm font-semibold rounded-lg shadow-sm transition-all duration-200 shrink-0"
             :disabled="isDisabled(p)"
             @click="openChangePlan(p, index)"
           >
-            <svg v-if="isSubscribeLoading[index]" class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <svg v-if="isSubscribeLoading[index]" class="w-4 h-4 text-white animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
               <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
             </svg>
@@ -360,13 +360,13 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
           </button>
 
           <!-- Features -->
-          <div class="grow overflow-y-auto -mx-2 px-2 custom-scrollbar">
+          <div class="overflow-y-auto px-2 -mx-2 grow custom-scrollbar">
             <ul class="space-y-3">
-              <li v-for="(f, indexx) in planFeatures(p)" :key="indexx" class="flex items-start gap-3 text-sm">
+              <li v-for="(f, indexx) in planFeatures(p)" :key="indexx" class="flex gap-3 items-start text-sm">
                 <svg class="w-5 h-5 text-green-500 shrink-0" viewBox="0 0 20 20" fill="currentColor">
                   <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
                 </svg>
-                <span class="text-gray-600 dark:text-gray-300 leading-tight">{{ f }}</span>
+                <span class="leading-tight text-gray-600 dark:text-gray-300">{{ f }}</span>
               </li>
             </ul>
           </div>
@@ -374,23 +374,23 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
       </div>
 
       <!-- Footer / Contact -->
-      <div v-if="!isMobile" class="mt-4 text-center shrink-0 text-xs text-gray-500 dark:text-gray-400">
+      <div v-if="!isMobile" class="mt-4 text-xs text-center text-gray-500 dark:text-gray-400 shrink-0">
         {{ t('plan-page-warn').replace('%ORG_NAME%', currentOrganization?.name ?? '') }}
         <a class="text-blue-600 hover:underline" href="https://capgo.app/docs/docs/webapp/payment/">{{ t('plan-page-warn-2') }}</a>
       </div>
     </div>
 
     <!-- Thank You Page -->
-    <div v-else class="h-full w-full flex items-center justify-center bg-gray-50 dark:bg-base-300">
+    <div v-else class="flex justify-center items-center w-full h-full bg-gray-50 dark:bg-base-300">
       <div class="text-center">
-        <img src="/capgo.webp" alt="logo" class="h-20 w-20 mx-auto mb-8 animate-bounce">
-        <h2 class="text-3xl font-bold text-gray-900 dark:text-white mb-4">
+        <img src="/capgo.webp" alt="logo" class="mx-auto mb-8 w-20 h-20 animate-bounce">
+        <h2 class="mb-4 text-3xl font-bold text-gray-900 dark:text-white">
           {{ t('thank-you-for-sub') }}
         </h2>
-        <div class="text-6xl mb-8">
+        <div class="mb-8 text-6xl">
           🎉
         </div>
-        <router-link to="/app" class="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
+        <router-link to="/app" class="inline-flex items-center py-3 px-6 text-base font-medium text-white bg-blue-600 rounded-md border border-transparent hover:bg-blue-700">
           {{ t('use-capgo') }} 🚀
         </router-link>
       </div>

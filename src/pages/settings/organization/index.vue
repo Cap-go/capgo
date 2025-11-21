@@ -212,10 +212,10 @@ async function copyOrganizationId() {
 
 <template>
   <div>
-    <div class="h-full pb-8 max-h-fit grow md:pb-0">
+    <div class="pb-8 h-full md:pb-0 max-h-fit grow">
       <FormKit id="update-org" type="form" :actions="false" @submit="saveChanges">
         <div class="p-6 space-y-6">
-          <h2 class="mb-5 text-2xl font-bold text-slate-800 dark:text-white">
+          <h2 class="mb-5 text-2xl font-bold dark:text-white text-slate-800">
             {{ t('general-information') }}
           </h2>
           <div class="dark:text-gray-100">
@@ -235,7 +235,7 @@ async function copyOrganizationId() {
                   </span>
                 </div>
               </div>
-              <button id="change-org-pic" type="button" class="cursor-pointer px-3 py-2 text-xs font-medium text-center text-black border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-white border-slate-500 focus:ring-4 focus:outline-hidden focus:ring-blue-300 dark:focus:ring-blue-800" @click="presentActionSheet">
+              <button id="change-org-pic" type="button" class="py-2 px-3 text-xs font-medium text-center text-black rounded-lg border cursor-pointer dark:text-white hover:bg-gray-100 focus:ring-4 focus:ring-blue-300 border-slate-500 dark:hover:bg-gray-600 dark:focus:ring-blue-800 focus:outline-hidden" @click="presentActionSheet">
                 {{ t('change') }}
               </button>
             </div>
@@ -269,21 +269,21 @@ async function copyOrganizationId() {
               />
             </div>
             <div class="flex flex-col md:flex-row md:items-center items-left">
-              <p class="text-slate-800 dark:text-white">
+              <p class="dark:text-white text-slate-800">
                 {{ t('organization-id') }}
               </p>
               <div class="pt-2 md:pt-0 md:ml-6">
-                <button type="button" class="px-3 cursor-pointer py-2 text-xs font-medium text-center text-gray-700 border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-white border-slate-500 focus:ring-4 focus:outline-hidden focus:ring-blue-300 dark:focus:ring-blue-800" @click.prevent="copyOrganizationId()">
+                <button type="button" class="py-2 px-3 text-xs font-medium text-center text-gray-700 rounded-lg border cursor-pointer dark:text-white hover:bg-gray-100 focus:ring-4 focus:ring-blue-300 border-slate-500 dark:hover:bg-gray-600 dark:focus:ring-blue-800 focus:outline-hidden" @click.prevent="copyOrganizationId()">
                   {{ t('copy-organization-id') }}
                 </button>
               </div>
             </div>
           </div>
           <footer style="margin-top: auto">
-            <div class="flex flex-col px-2 md:px-6 py-5 border-t border-slate-300">
+            <div class="flex flex-col py-5 px-2 border-t md:px-6 border-slate-300">
               <div class="flex self-end">
                 <button
-                  class="cursor-pointer p-2 text-red-600 border border-red-400 rounded-lg hover:bg-red-600 hover:text-white"
+                  class="p-2 text-red-600 rounded-lg border border-red-400 cursor-pointer hover:text-white hover:bg-red-600"
                   color="secondary"
                   shape="round"
                   type="button"
@@ -299,7 +299,7 @@ async function copyOrganizationId() {
                 </button>
                 <button
                   id="save-changes"
-                  class="cursor-pointer p-2 ml-3 text-white bg-blue-500 rounded-lg d-btn hover:bg-blue-600"
+                  class="p-2 ml-3 text-white bg-blue-500 rounded-lg cursor-pointer hover:bg-blue-600 d-btn"
                   type="submit"
                   color="secondary"
                   shape="round"
