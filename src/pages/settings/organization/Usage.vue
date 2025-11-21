@@ -229,415 +229,205 @@ function nextRunDate() {
 </script>
 
 <template>
-  <div>
-    <div v-if="!isLoading" class="w-full h-full bg-white max-h-fit dark:bg-gray-800">
-      <div class="px-4 pt-6 mx-auto max-w-7xl lg:px-8 sm:px-6">
-        <div class="sm:align-center sm:flex sm:flex-col">
-          <h1 class="flex mx-auto text-5xl font-extrabold text-gray-900 dark:text-white items-center justify-center">
+  <div class="h-full flex flex-col overflow-hidden bg-white dark:bg-gray-800">
+    <div v-if="!isLoading" class="flex flex-col h-full w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 overflow-y-auto">
+      <!-- Header -->
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 shrink-0">
+        <div>
+          <h1 class="text-3xl font-bold text-gray-900 dark:text-white">
             {{ t('usage') }}
           </h1>
-          <!-- Last Update Info & Billing Cycle -->
-          <div class="mt-4 p-3 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700">
-            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-              <!-- Last Update Info -->
-              <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-                <div class="flex items-center space-x-2">
-                  <div class="w-2 h-2 bg-green-500 rounded-full shrink-0" />
-                  <span class="truncate">{{ lastRunDate() }}</span>
-                </div>
-                <div class="hidden sm:block w-px h-4 bg-gray-300 dark:bg-gray-600" />
-                <div class="flex items-center space-x-2">
-                  <div class="w-2 h-2 bg-blue-500 rounded-full shrink-0" />
-                  <span class="truncate">{{ nextRunDate() }}</span>
-                </div>
-              </div>
-
-              <!-- Billing Cycle Info -->
-              <div class="flex flex-wrap items-center gap-1 text-xs sm:text-sm font-semibold text-blue-800 dark:text-blue-200">
-                <span class="text-gray-600 dark:text-gray-400">{{ t('billing-cycle') }}:</span>
-                <span class="whitespace-nowrap">{{ planUsage?.cycle.subscription_anchor_start }}</span>
-                <span class="mx-1">{{ t('to') }}</span>
-                <span class="whitespace-nowrap">{{ planUsage?.cycle.subscription_anchor_end }}</span>
-              </div>
+          <div class="mt-1 flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
+            <div class="flex items-center gap-1.5">
+              <div class="w-1.5 h-1.5 bg-green-500 rounded-full" />
+              {{ lastRunDate() }}
+            </div>
+            <span class="text-gray-300 dark:text-gray-600">•</span>
+            <div class="flex items-center gap-1.5">
+              <div class="w-1.5 h-1.5 bg-blue-500 rounded-full" />
+              {{ nextRunDate() }}
             </div>
           </div>
+        </div>
 
-          <!-- Plan Information Section -->
-          <div class="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-            <!-- Current Plan -->
-            <div class="bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 p-3 sm:p-4">
-              <div class="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-1">
-                {{ t('Current') }}
-              </div>
-              <div class="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">
-                {{ currentPlan?.name || t('loading') }}
-              </div>
-              <div v-if="currentPlan" class="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-1">
-                ${{ currentPlan.price_m }}/{{ t('mo') }}
-              </div>
+        <div class="flex items-center gap-2 px-3 py-1.5 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm text-sm">
+          <span class="text-gray-500 dark:text-gray-400">{{ t('billing-cycle') }}:</span>
+          <span class="font-medium text-gray-900 dark:text-white">{{ planUsage?.cycle.subscription_anchor_start }}</span>
+          <span class="text-gray-400">→</span>
+          <span class="font-medium text-gray-900 dark:text-white">{{ planUsage?.cycle.subscription_anchor_end }}</span>
+        </div>
+      </div>
+
+      <!-- Plan & Cost Overview -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8 shrink-0">
+        <!-- Current Plan -->
+        <div class="bg-gray-50 dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-5 shadow-sm flex flex-col justify-between">
+          <div>
+            <div class="text-sm text-gray-500 dark:text-gray-400 mb-1">
+              {{ t('Current') }}
             </div>
-
-            <!-- Best Plan with Upgrade Button -->
-            <div class="bg-gray-50 dark:bg-gray-900 rounded-lg border p-3 sm:p-4" :class="shouldShowUpgrade ? 'border-blue-500 border-2 shadow-lg ring-2 ring-blue-500/20' : 'border-gray-200 dark:border-gray-700'">
-              <div class="flex items-center justify-between mb-1">
-                <div class="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-                  {{ t('best-plan') }}
-                </div>
-                <div v-if="shouldShowUpgrade" class="px-1.5 py-0.5 sm:px-2 sm:py-1 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 text-2xs sm:text-xs rounded-full font-medium">
-                  {{ t('recommended') }}
-                </div>
-              </div>
-              <div class="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">
-                {{ currentPlanSuggest?.name || t('loading') }}
-              </div>
-              <div v-if="currentPlanSuggest" class="mt-2">
-                <div class="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mb-2 sm:mb-3">
-                  ${{ currentPlanSuggest.price_m }}/{{ t('mo') }}
-                </div>
-                <button
-                  v-if="shouldShowUpgrade"
-                  class="w-full sm:w-auto py-2 px-3 sm:py-2.5 sm:px-4 bg-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-sm sm:text-base font-semibold rounded-lg transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
-                  @click="goToPlans"
-                >
-                  🚀 {{ t('plan-upgrade-v2') }}
-                </button>
-              </div>
+            <div class="text-2xl font-bold text-gray-900 dark:text-white">
+              {{ currentPlan?.name || t('loading') }}
             </div>
           </div>
-
-          <!-- Plan Limits Summary -->
-          <div v-if="planUsage?.currentPlan" class="mt-6 bg-gray-50 dark:bg-gray-900 dark:from-gray-800 dark:to-gray-850 rounded-xl border border-blue-200 dark:border-gray-700 p-4 sm:p-6">
-            <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 uppercase tracking-wide">
-              {{ t('plan-limits') }}
-            </h3>
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div class="bg-white dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
-                <div class="text-xs text-gray-500 dark:text-gray-400 mb-1">
-                  {{ t('MAU') }}
-                </div>
-                <div class="text-lg font-bold text-blue-600 dark:text-blue-400">
-                  {{ planUsage.currentPlan.mau.toLocaleString() }}
-                </div>
-              </div>
-              <div class="bg-white dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
-                <div class="text-xs text-gray-500 dark:text-gray-400 mb-1">
-                  {{ t('Storage') }}
-                </div>
-                <div class="text-lg font-bold text-purple-600 dark:text-purple-400">
-                  {{ planUsage.currentPlan.storage.toLocaleString() }} GB
-                </div>
-              </div>
-              <div class="bg-white dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
-                <div class="text-xs text-gray-500 dark:text-gray-400 mb-1">
-                  {{ t('Bandwidth') }}
-                </div>
-                <div class="text-lg font-bold text-green-600 dark:text-green-400">
-                  {{ planUsage.currentPlan.bandwidth.toLocaleString() }} GB
-                </div>
-              </div>
-              <div class="bg-white dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
-                <div class="text-xs text-gray-500 dark:text-gray-400 mb-1">
-                  {{ t('build-time') }}
-                </div>
-                <div class="text-lg font-bold text-orange-600 dark:text-orange-400">
-                  {{ formatBuildTime(planUsage.currentPlan.build_time_unit || 0) }}
-                </div>
-              </div>
+          <div class="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700 flex justify-between items-end">
+            <div class="text-sm text-gray-500 dark:text-gray-400">
+              {{ t('base') }}
+            </div>
+            <div class="text-xl font-semibold text-gray-900 dark:text-white">
+              ${{ currentPlan?.price_m }}/{{ t('mo') }}
             </div>
           </div>
+        </div>
 
-          <!-- Usage Cards -->
-          <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mt-8">
-            <!-- MAU Card -->
-            <div class="bg-gray-50 dark:bg-gray-900 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6" :class="(planUsage?.detailPlanUsage?.mau_percent || 0) >= 100 ? 'border-red-500 dark:border-red-400' : ''">
-              <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-bold text-gray-900 dark:text-white">
-                  {{ t('monthly-active-users') }}
-                </h3>
-                <div class="text-2xl font-bold" :class="(planUsage?.detailPlanUsage?.mau_percent || 0) >= 100 ? 'text-red-600 dark:text-red-400' : 'text-blue-600 dark:text-blue-400'">
-                  {{ planUsage?.detailPlanUsage?.mau_percent || 0 }}%
-                </div>
-              </div>
-
-              <!-- Limit Exceeded Alert -->
-              <div v-if="(planUsage?.detailPlanUsage?.mau_percent || 0) >= 100" class="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-                <div class="flex items-start">
-                  <svg class="h-5 w-5 text-red-400 mt-0.5 mr-2 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                    <path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" />
-                  </svg>
-                  <div class="flex-1">
-                    <p class="text-sm font-semibold text-red-800 dark:text-red-200">
-                      {{ t('mau-limit-exceeded') }}
-                    </p>
-                    <p class="text-xs text-red-700 dark:text-red-300 mt-1">
-                      {{ t('mau-updates-stopped-upgrade-required') }}
-                    </p>
-                    <button
-                      class="mt-2 px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded transition-colors"
-                      @click="goToPlans"
-                    >
-                      {{ t('upgrade-now') }}
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Progress Bar -->
-              <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 mb-4">
-                <div
-                  class="h-3 rounded-full transition-all duration-300"
-                  :class="(planUsage?.detailPlanUsage?.mau_percent || 0) >= 100 ? 'bg-linear-to-r from-red-500 to-red-600' : 'bg-linear-to-r from-blue-500 to-blue-600'"
-                  :style="{ width: `${Math.min(planUsage?.detailPlanUsage?.mau_percent || 0, 100)}%` }"
-                />
-              </div>
-
-              <div class="space-y-2 text-sm">
-                <div class="flex justify-between">
-                  <span class="text-gray-600 dark:text-gray-400">{{ t('included-in-plan') }}</span>
-                  <span class="font-semibold text-gray-900 dark:text-white">
-                    {{ planUsage?.currentPlan?.mau.toLocaleString() }}
-                  </span>
-                </div>
-                <div class="flex justify-between">
-                  <span class="text-gray-600 dark:text-gray-400">{{ t('used-in-period') }}</span>
-                  <span class="font-semibold text-gray-900 dark:text-white">
-                    {{ planUsage?.totalMau.toLocaleString() }}
-                  </span>
-                </div>
-                <div v-if="planUsage?.isPayAsYouGo" class="flex justify-between pt-2 border-t border-gray-200 dark:border-gray-600">
-                  <span class="text-gray-600 dark:text-gray-400">{{ t('price-per-unit-above') }}</span>
-                  <span class="font-semibold text-green-600 dark:text-green-400">
-                    ${{ planUsage?.payg_units?.mau?.toLocaleString() }}
-                  </span>
-                </div>
-              </div>
+        <!-- Estimated Cost -->
+        <div class="bg-gray-50 dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-5 shadow-sm flex flex-col justify-between">
+          <div>
+            <div class="text-sm text-gray-500 dark:text-gray-400 mb-1">
+              {{ t('usage-title') }}
             </div>
-
-            <!-- Storage Card -->
-            <div class="bg-gray-50 dark:bg-gray-900 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6" :class="(planUsage?.detailPlanUsage?.storage_percent || 0) >= 100 ? 'border-red-500 dark:border-red-400' : ''">
-              <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-bold text-gray-900 dark:text-white">
-                  {{ t('Storage') }}
-                </h3>
-                <div class="text-2xl font-bold" :class="(planUsage?.detailPlanUsage?.storage_percent || 0) >= 100 ? 'text-red-600 dark:text-red-400' : 'text-purple-600 dark:text-purple-400'">
-                  {{ planUsage?.detailPlanUsage?.storage_percent || 0 }}%
-                </div>
-              </div>
-
-              <!-- Limit Exceeded Alert -->
-              <div v-if="(planUsage?.detailPlanUsage?.storage_percent || 0) >= 100" class="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-                <div class="flex items-start">
-                  <svg class="h-5 w-5 text-red-400 mt-0.5 mr-2 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                    <path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" />
-                  </svg>
-                  <div class="flex-1">
-                    <p class="text-sm font-semibold text-red-800 dark:text-red-200">
-                      {{ t('storage-limit-exceeded') }}
-                    </p>
-                    <p class="text-xs text-red-700 dark:text-red-300 mt-1">
-                      {{ t('storage-updates-stopped-upgrade-required') }}
-                    </p>
-                    <button
-                      class="mt-2 px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded transition-colors"
-                      @click="goToPlans"
-                    >
-                      {{ t('upgrade-now') }}
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Progress Bar -->
-              <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 mb-4">
-                <div
-                  class="h-3 rounded-full transition-all duration-300"
-                  :class="(planUsage?.detailPlanUsage?.storage_percent || 0) >= 100 ? 'bg-linear-to-r from-red-500 to-red-600' : 'bg-linear-to-r from-purple-500 to-purple-600'"
-                  :style="{ width: `${Math.min(planUsage?.detailPlanUsage?.storage_percent || 0, 100)}%` }"
-                />
-              </div>
-
-              <div class="space-y-2 text-sm">
-                <div class="flex justify-between">
-                  <span class="text-gray-600 dark:text-gray-400">{{ t('included-in-plan') }}</span>
-                  <span class="font-semibold text-gray-900 dark:text-white">
-                    {{ planUsage?.currentPlan?.storage.toLocaleString() }} GB
-                  </span>
-                </div>
-                <div class="flex justify-between">
-                  <span class="text-gray-600 dark:text-gray-400">{{ t('used-in-period') }}</span>
-                  <span class="font-semibold text-gray-900 dark:text-white">
-                    {{ planUsage?.totalStorage.toLocaleString() }} GB
-                  </span>
-                </div>
-                <div v-if="planUsage?.isPayAsYouGo" class="flex justify-between pt-2 border-t border-gray-200 dark:border-gray-600">
-                  <span class="text-gray-600 dark:text-gray-400">{{ t('price-per-unit-above') }}</span>
-                  <span class="font-semibold text-green-600 dark:text-green-400">
-                    ${{ planUsage?.payg_units?.storage?.toLocaleString() }} GB
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <!-- Bandwidth Card -->
-            <div class="bg-gray-50 dark:bg-gray-900 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6" :class="(planUsage?.detailPlanUsage?.bandwidth_percent || 0) >= 100 ? 'border-red-500 dark:border-red-400' : ''">
-              <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-bold text-gray-900 dark:text-white">
-                  {{ t('Bandwidth') }}
-                </h3>
-                <div class="text-2xl font-bold" :class="(planUsage?.detailPlanUsage?.bandwidth_percent || 0) >= 100 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'">
-                  {{ planUsage?.detailPlanUsage?.bandwidth_percent || 0 }}%
-                </div>
-              </div>
-
-              <!-- Limit Exceeded Alert -->
-              <div v-if="(planUsage?.detailPlanUsage?.bandwidth_percent || 0) >= 100" class="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-                <div class="flex items-start">
-                  <svg class="h-5 w-5 text-red-400 mt-0.5 mr-2 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                    <path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" />
-                  </svg>
-                  <div class="flex-1">
-                    <p class="text-sm font-semibold text-red-800 dark:text-red-200">
-                      {{ t('bandwidth-limit-exceeded') }}
-                    </p>
-                    <p class="text-xs text-red-700 dark:text-red-300 mt-1">
-                      {{ t('bandwidth-updates-stopped-upgrade-required') }}
-                    </p>
-                    <button
-                      class="mt-2 px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded transition-colors"
-                      @click="goToPlans"
-                    >
-                      {{ t('upgrade-now') }}
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Progress Bar -->
-              <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 mb-4">
-                <div
-                  class="h-3 rounded-full transition-all duration-300"
-                  :class="(planUsage?.detailPlanUsage?.bandwidth_percent || 0) >= 100 ? 'bg-linear-to-r from-red-500 to-red-600' : 'bg-linear-to-r from-green-500 to-green-600'"
-                  :style="{ width: `${Math.min(planUsage?.detailPlanUsage?.bandwidth_percent || 0, 100)}%` }"
-                />
-              </div>
-
-              <div class="space-y-2 text-sm">
-                <div class="flex justify-between">
-                  <span class="text-gray-600 dark:text-gray-400">{{ t('included-in-plan') }}</span>
-                  <span class="font-semibold text-gray-900 dark:text-white">
-                    {{ planUsage?.currentPlan?.bandwidth.toLocaleString() }} GB
-                  </span>
-                </div>
-                <div class="flex justify-between">
-                  <span class="text-gray-600 dark:text-gray-400">{{ t('used-in-period') }}</span>
-                  <span class="font-semibold text-gray-900 dark:text-white">
-                    {{ planUsage?.totalBandwidth.toLocaleString() }} GB
-                  </span>
-                </div>
-                <div v-if="planUsage?.isPayAsYouGo" class="flex justify-between pt-2 border-t border-gray-200 dark:border-gray-600">
-                  <span class="text-gray-600 dark:text-gray-400">{{ t('price-per-unit-above') }}</span>
-                  <span class="font-semibold text-green-600 dark:text-green-400">
-                    ${{ planUsage?.payg_units?.bandwidth?.toLocaleString() }} GB
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <!-- Build Time Card -->
-            <div class="bg-gray-50 dark:bg-gray-900 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6" :class="(planUsage?.detailPlanUsage?.build_time_percent || 0) >= 100 ? 'border-red-500 dark:border-red-400' : ''">
-              <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-bold text-gray-900 dark:text-white">
-                  {{ t('build-time') }}
-                </h3>
-                <div class="text-2xl font-bold" :class="(planUsage?.detailPlanUsage?.build_time_percent || 0) >= 100 ? 'text-red-600 dark:text-red-400' : 'text-orange-600 dark:text-orange-400'">
-                  {{ planUsage?.detailPlanUsage?.build_time_percent || 0 }}%
-                </div>
-              </div>
-
-              <!-- Limit Exceeded Alert -->
-              <div v-if="(planUsage?.detailPlanUsage?.build_time_percent || 0) >= 100" class="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-                <div class="flex items-start">
-                  <svg class="h-5 w-5 text-red-400 mt-0.5 mr-2 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                    <path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" />
-                  </svg>
-                  <div class="flex-1">
-                    <p class="text-sm font-semibold text-red-800 dark:text-red-200">
-                      {{ t('build-time-limit-exceeded') }}
-                    </p>
-                    <p class="text-xs text-red-700 dark:text-red-300 mt-1">
-                      {{ t('build-time-builds-stopped-upgrade-required') }}
-                    </p>
-                    <button
-                      class="mt-2 px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded transition-colors"
-                      @click="goToPlans"
-                    >
-                      {{ t('upgrade-now') }}
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Progress Bar -->
-              <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 mb-4">
-                <div
-                  class="h-3 rounded-full transition-all duration-300"
-                  :class="(planUsage?.detailPlanUsage?.build_time_percent || 0) >= 100 ? 'bg-linear-to-r from-red-500 to-red-600' : 'bg-linear-to-r from-orange-500 to-orange-600'"
-                  :style="{ width: `${Math.min(planUsage?.detailPlanUsage?.build_time_percent || 0, 100)}%` }"
-                />
-              </div>
-
-              <div class="space-y-2 text-sm">
-                <div class="flex justify-between">
-                  <span class="text-gray-600 dark:text-gray-400">{{ t('included-in-plan') }}</span>
-                  <span class="font-semibold text-gray-900 dark:text-white">
-                    {{ formatBuildTime(planUsage?.currentPlan?.build_time_unit || 0) }}
-                  </span>
-                </div>
-                <div class="flex justify-between">
-                  <span class="text-gray-600 dark:text-gray-400">{{ t('used-in-period') }}</span>
-                  <span class="font-semibold text-gray-900 dark:text-white">
-                    {{ formatBuildTime(planUsage?.totalBuildTime || 0) }}
-                  </span>
-                </div>
-                <div v-if="planUsage?.isPayAsYouGo" class="flex justify-between pt-2 border-t border-gray-200 dark:border-gray-600">
-                  <span class="text-gray-600 dark:text-gray-400">{{ t('price-per-unit-above') }}</span>
-                  <span class="font-semibold text-green-600 dark:text-green-400">
-                    ${{ planUsage?.payg_units?.build_time?.toLocaleString() }}/min
-                  </span>
-                </div>
-              </div>
+            <div class="text-2xl font-bold text-blue-600 dark:text-blue-400">
+              ${{ planUsage?.totalPrice.toLocaleString() }}
             </div>
           </div>
+          <div class="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700 flex justify-between items-end">
+            <div class="text-sm text-gray-500 dark:text-gray-400">
+              {{ t('credits-used-in-period') }}
+            </div>
+            <div class="text-xl font-semibold text-gray-900 dark:text-white">
+              +${{ planUsage?.totalUsagePrice.toLocaleString() }}
+            </div>
+          </div>
+        </div>
 
-          <!-- Pricing Summary Card -->
-          <div class="mt-8 bg-gray-50 dark:bg-gray-900 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6">
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div class="text-center p-4 bg-white dark:bg-gray-800 rounded-lg">
-                <div class="text-2xl font-bold text-gray-900 dark:text-white">
-                  ${{ planUsage?.currentPlan?.price_m.toLocaleString() }}
-                </div>
-                <div class="text-sm text-gray-600 dark:text-gray-400">
-                  {{ t('base') }}
-                </div>
+        <!-- Upgrade / Best Plan -->
+        <div v-if="shouldShowUpgrade" class="bg-linear-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl border border-blue-200 dark:border-blue-800 p-5 shadow-sm relative overflow-hidden">
+          <div class="relative z-10">
+            <div class="flex justify-between items-start mb-2">
+              <div class="text-sm font-medium text-blue-800 dark:text-blue-200">
+                {{ t('recommended') }}
               </div>
+              <div class="bg-blue-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                {{ t('upgrade') }}
+              </div>
+            </div>
+            <div class="text-xl font-bold text-gray-900 dark:text-white mb-1">
+              {{ currentPlanSuggest?.name }}
+            </div>
+            <div class="text-sm text-gray-600 dark:text-gray-300 mb-4">
+              ${{ currentPlanSuggest?.price_m }}/{{ t('mo') }}
+            </div>
+            <button class="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold transition-colors shadow-sm" @click="goToPlans">
+              {{ t('plan-upgrade-v2') }}
+            </button>
+          </div>
+        </div>
+        <div v-else class="bg-gray-50 dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-5 flex items-center justify-center text-gray-400 dark:text-gray-500 text-sm italic">
+          {{ t('good') }}
+        </div>
+      </div>
 
-              <div class="text-center p-4 bg-white dark:bg-gray-800 rounded-lg">
-                <div class="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                  ${{ planUsage?.totalUsagePrice.toLocaleString() }}
-                </div>
-                <div class="text-sm text-gray-600 dark:text-gray-400">
-                  {{ t('credits-used-in-period') }}
-                </div>
-              </div>
+      <!-- Usage Metrics Grid -->
+      <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4 shrink-0">
+        {{ t('usage') }}
+      </h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-8 shrink-0">
+        <!-- MAU -->
+        <div class="bg-gray-50 dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-5 shadow-sm hover:shadow-md transition-shadow">
+          <div class="flex justify-between items-start mb-4">
+            <div class="text-sm font-medium text-gray-500 dark:text-gray-400">
+              {{ t('monthly-active-users') }}
+            </div>
+            <div class="text-lg font-bold" :class="(planUsage?.detailPlanUsage?.mau_percent || 0) >= 100 ? 'text-red-600' : 'text-gray-900 dark:text-white'">
+              {{ planUsage?.detailPlanUsage?.mau_percent || 0 }}%
+            </div>
+          </div>
+          <div class="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-2 mb-4 overflow-hidden">
+            <div class="h-full rounded-full transition-all duration-500" :class="(planUsage?.detailPlanUsage?.mau_percent || 0) >= 100 ? 'bg-red-500' : 'bg-blue-500'" :style="{ width: `${Math.min(planUsage?.detailPlanUsage?.mau_percent || 0, 100)}%` }" />
+          </div>
+          <div class="space-y-1 text-sm">
+            <div class="flex justify-between text-gray-600 dark:text-gray-400">
+              <span>{{ t('used-in-period') }}</span>
+              <span class="font-medium text-gray-900 dark:text-white">{{ planUsage?.totalMau.toLocaleString() }}</span>
+            </div>
+            <div class="flex justify-between text-gray-600 dark:text-gray-400">
+              <span>{{ t('included-in-plan') }}</span>
+              <span>{{ planUsage?.currentPlan?.mau.toLocaleString() }}</span>
+            </div>
+          </div>
+        </div>
 
-              <div class="text-center p-4 bg-linear-to-r from-blue-500 to-blue-600 text-white rounded-lg">
-                <div class="text-2xl font-bold">
-                  ${{ planUsage?.totalPrice.toLocaleString() }}
-                </div>
-                <div class="text-sm opacity-90">
-                  {{ t('usage-title') }}
-                </div>
-              </div>
+        <!-- Storage -->
+        <div class="bg-gray-50 dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-5 shadow-sm hover:shadow-md transition-shadow">
+          <div class="flex justify-between items-start mb-4">
+            <div class="text-sm font-medium text-gray-500 dark:text-gray-400">
+              {{ t('Storage') }}
+            </div>
+            <div class="text-lg font-bold" :class="(planUsage?.detailPlanUsage?.storage_percent || 0) >= 100 ? 'text-red-600' : 'text-gray-900 dark:text-white'">
+              {{ planUsage?.detailPlanUsage?.storage_percent || 0 }}%
+            </div>
+          </div>
+          <div class="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-2 mb-4 overflow-hidden">
+            <div class="h-full rounded-full transition-all duration-500" :class="(planUsage?.detailPlanUsage?.storage_percent || 0) >= 100 ? 'bg-red-500' : 'bg-purple-500'" :style="{ width: `${Math.min(planUsage?.detailPlanUsage?.storage_percent || 0, 100)}%` }" />
+          </div>
+          <div class="space-y-1 text-sm">
+            <div class="flex justify-between text-gray-600 dark:text-gray-400">
+              <span>{{ t('used-in-period') }}</span>
+              <span class="font-medium text-gray-900 dark:text-white">{{ planUsage?.totalStorage.toLocaleString() }} GB</span>
+            </div>
+            <div class="flex justify-between text-gray-600 dark:text-gray-400">
+              <span>{{ t('included-in-plan') }}</span>
+              <span>{{ planUsage?.currentPlan?.storage.toLocaleString() }} GB</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bandwidth -->
+        <div class="bg-gray-50 dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-5 shadow-sm hover:shadow-md transition-shadow">
+          <div class="flex justify-between items-start mb-4">
+            <div class="text-sm font-medium text-gray-500 dark:text-gray-400">
+              {{ t('Bandwidth') }}
+            </div>
+            <div class="text-lg font-bold" :class="(planUsage?.detailPlanUsage?.bandwidth_percent || 0) >= 100 ? 'text-red-600' : 'text-gray-900 dark:text-white'">
+              {{ planUsage?.detailPlanUsage?.bandwidth_percent || 0 }}%
+            </div>
+          </div>
+          <div class="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-2 mb-4 overflow-hidden">
+            <div class="h-full rounded-full transition-all duration-500" :class="(planUsage?.detailPlanUsage?.bandwidth_percent || 0) >= 100 ? 'bg-red-500' : 'bg-green-500'" :style="{ width: `${Math.min(planUsage?.detailPlanUsage?.bandwidth_percent || 0, 100)}%` }" />
+          </div>
+          <div class="space-y-1 text-sm">
+            <div class="flex justify-between text-gray-600 dark:text-gray-400">
+              <span>{{ t('used-in-period') }}</span>
+              <span class="font-medium text-gray-900 dark:text-white">{{ planUsage?.totalBandwidth.toLocaleString() }} GB</span>
+            </div>
+            <div class="flex justify-between text-gray-600 dark:text-gray-400">
+              <span>{{ t('included-in-plan') }}</span>
+              <span>{{ planUsage?.currentPlan?.bandwidth.toLocaleString() }} GB</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Build Time -->
+        <div class="bg-gray-50 dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-5 shadow-sm hover:shadow-md transition-shadow">
+          <div class="flex justify-between items-start mb-4">
+            <div class="text-sm font-medium text-gray-500 dark:text-gray-400">
+              {{ t('build-time') }}
+            </div>
+            <div class="text-lg font-bold" :class="(planUsage?.detailPlanUsage?.build_time_percent || 0) >= 100 ? 'text-red-600' : 'text-gray-900 dark:text-white'">
+              {{ planUsage?.detailPlanUsage?.build_time_percent || 0 }}%
+            </div>
+          </div>
+          <div class="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-2 mb-4 overflow-hidden">
+            <div class="h-full rounded-full transition-all duration-500" :class="(planUsage?.detailPlanUsage?.build_time_percent || 0) >= 100 ? 'bg-red-500' : 'bg-orange-500'" :style="{ width: `${Math.min(planUsage?.detailPlanUsage?.build_time_percent || 0, 100)}%` }" />
+          </div>
+          <div class="space-y-1 text-sm">
+            <div class="flex justify-between text-gray-600 dark:text-gray-400">
+              <span>{{ t('used-in-period') }}</span>
+              <span class="font-medium text-gray-900 dark:text-white">{{ formatBuildTime(planUsage?.totalBuildTime || 0) }}</span>
+            </div>
+            <div class="flex justify-between text-gray-600 dark:text-gray-400">
+              <span>{{ t('included-in-plan') }}</span>
+              <span>{{ formatBuildTime(planUsage?.currentPlan?.build_time_unit || 0) }}</span>
             </div>
           </div>
         </div>
@@ -645,7 +435,7 @@ function nextRunDate() {
     </div>
 
     <!-- Loading State -->
-    <div v-else class="flex items-center justify-center min-h-[60vh]">
+    <div v-else class="flex items-center justify-center h-full">
       <div class="text-center">
         <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4" />
         <p class="text-gray-600 dark:text-gray-400">

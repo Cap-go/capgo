@@ -253,7 +253,7 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
 </script>
 
 <template>
-  <div class="h-full flex flex-col overflow-hidden bg-gray-50 dark:bg-base-300">
+  <div class="h-full flex flex-col overflow-hidden bg-white dark:bg-gray-800">
     <div v-if="!thankYouPage" class="flex flex-col h-full w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
       <!-- Header Section -->
       <div class="flex flex-col sm:flex-row items-center justify-between gap-4 mb-6 shrink-0">
@@ -305,7 +305,7 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
         <div
           v-for="(p, index) in mainStore.plans"
           :key="p.price_m"
-          class="flex flex-col p-5 rounded-2xl border transition-all duration-200 overflow-hidden relative group bg-white dark:bg-base-100"
+          class="flex flex-col p-5 rounded-2xl border transition-all duration-200 overflow-hidden relative group bg-gray-100 dark:bg-base-200"
           :class="[
             p.name === currentPlan?.name ? 'border-2 border-blue-500' : 'border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-700',
             isRecommended(p) ? 'shadow-lg shadow-blue-500/10' : 'shadow-sm',
