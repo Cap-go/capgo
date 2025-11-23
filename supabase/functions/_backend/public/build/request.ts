@@ -117,6 +117,15 @@ export async function requestBuild(
 
   if (builderUrl && builderApiKey) {
     try {
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'Calling builder API',
+        builder_url: builderUrl,
+        org_id,
+        app_id,
+        platform,
+      })
+
       const builderResponse = await fetch(`${builderUrl}/jobs`, {
         method: 'POST',
         headers: {
@@ -134,34 +143,109 @@ export async function requestBuild(
 
       if (builderResponse.ok) {
         builderJob = await builderResponse.json() as BuilderJobResponse
+        cloudlog({
+          requestId: c.get('requestId'),
+          message: 'Builder job created successfully',
+          job_id: builderJob.jobId,
+          upload_url: builderJob.uploadUrl,
+        })
       }
       else {
+        const errorText = await builderResponse.text()
+        const responseHeaders: Record<string, string> = {}
+        builderResponse.headers.forEach((value, key) => {
+          responseHeaders[key] = value
+        })
         cloudlogErr({
           requestId: c.get('requestId'),
-          message: 'Builder API error',
+          message: 'Builder API returned error',
+          builder_url: builderUrl,
           status: builderResponse.status,
-          error: await builderResponse.text(),
+          status_text: builderResponse.statusText,
+          error_body: errorText,
+          response_headers: responseHeaders,
+          org_id,
+          app_id,
+          platform,
         })
       }
     }
     catch (error) {
-      cloudlogErr({ requestId: c.get('requestId'), message: 'Builder API unreachable', error: (error as Error)?.message })
+      cloudlogErr({
+        requestId: c.get('requestId'),
+        message: 'Builder API fetch failed',
+        builder_url: builderUrl,
+        error: (error as Error)?.message,
+        error_stack: (error as Error)?.stack,
+        error_name: (error as Error)?.name,
+        org_id,
+        app_id,
+        platform,
+      })
     }
-  }
-
-  if (!builderJob) {
-    builderJob = {
-      jobId: crypto.randomUUID(),
-      uploadUrl: `https://builder.local/upload/${crypto.randomUUID()}`,
-      status: 'pending',
-    }
+  } else {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'Builder API not configured, using fallback',
+      builder_url_configured: !!builderUrl,
+      builder_api_key_configured: !!builderApiKey,
+    })
   }
 
   const upload_session_key = crypto.randomUUID()
   const upload_path = `orgs/${org_id}/apps/${app_id}/native-builds/${upload_session_key}.zip`
   const upload_expires_at = new Date(Date.now() + 60 * 60 * 1000)
-  const fallbackUploadBase = getEnv(c, 'BUILDER_UPLOAD_BASE_URL') || 'https://uploads.capgo.local'
-  const upload_url = builderJob.uploadUrl || `${fallbackUploadBase}/${upload_path}`
+
+  // Determine upload URL: use builder's URL if available, otherwise use R2/S3 fallback
+  const fallbackUploadBase = getEnv(c, 'BUILDER_UPLOAD_BASE_URL')
+  let upload_url: string
+
+  if (builderJob?.uploadUrl) {
+    // Builder provided an upload URL
+    upload_url = builderJob.uploadUrl
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'Using builder-provided upload URL',
+      upload_url,
+    })
+  } else if (fallbackUploadBase) {
+    // Use configured fallback (R2/S3)
+    upload_url = `${fallbackUploadBase}/${upload_path}`
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'Using fallback upload URL (R2/S3)',
+      fallback_base: fallbackUploadBase,
+      upload_path,
+      upload_url,
+    })
+  } else {
+    // No builder and no fallback configured - error
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'Neither builder nor fallback upload URL configured',
+      app_id,
+      org_id,
+      builder_url_configured: !!builderUrl,
+      builder_api_key_configured: !!builderApiKey,
+      fallback_upload_base_configured: false,
+    })
+    throw simpleError('service_unavailable', 'Build service temporarily unavailable. Please try again later.')
+  }
+
+  // If builder API failed, create a fallback job ID
+  if (!builderJob) {
+    builderJob = {
+      jobId: crypto.randomUUID(),
+      uploadUrl: upload_url,
+      status: 'pending',
+    }
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'Created fallback job (builder API unavailable)',
+      job_id: builderJob.jobId,
+      upload_url: builderJob.uploadUrl,
+    })
+  }
 
   const { data: buildRequestRow, error: insertError } = await supabase
     .from('build_requests')
