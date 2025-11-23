@@ -1,5 +1,5 @@
 import type { Context, Next } from 'hono'
-import type { AttachmentUploadHandler } from '../tus/uploadHandler.ts'
+import type { UploadHandler } from '../tus/uploadHandler.ts'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { getRuntimeKey } from 'hono/adapter'
@@ -172,7 +172,7 @@ async function uploadHandler(c: Context) {
   const fileId = c.get('fileId') as string
   // make requestId safe
   const normalizedRequestId = decodeURIComponent(fileId)
-  const durableObjNs: DurableObjectNamespace<AttachmentUploadHandler> = c.env.ATTACHMENT_UPLOAD_HANDLER
+  const durableObjNs: DurableObjectNamespace<UploadHandler> = c.env.UPLOAD_HANDLER
 
   if (durableObjNs == null) {
     cloudlog({ requestId: c.get('requestId'), message: 'files durableObjNs is null' })

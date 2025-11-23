@@ -1,6 +1,6 @@
 import type { AnalyticsEngineDataPoint, D1Database, Hyperdrive } from '@cloudflare/workers-types'
 import type { Context } from 'hono'
-import type { AttachmentUploadHandler } from '../tus/uploadHandler.ts'
+import type { UploadHandler } from '../tus/uploadHandler.ts'
 import type { DeviceComparable } from './deviceComparison.ts'
 import type { Database } from './supabase.types.ts'
 import type { DeviceWithoutCreatedAt, ReadDevicesParams, ReadStatsParams } from './types.ts'
@@ -33,7 +33,7 @@ export type Bindings = {
   HYPERDRIVE_CAPGO_TRANSACTION_EU: Hyperdrive // Add Hyperdrive binding
   HYPERDRIVE_CAPGO_TRANSACTION_AS: Hyperdrive // Add Hyperdrive binding
   HYPERDRIVE_CAPGO_TRANSACTION_NA: Hyperdrive // Add Hyperdrive binding
-  ATTACHMENT_UPLOAD_HANDLER: DurableObjectNamespace<AttachmentUploadHandler>
+  UPLOAD_HANDLER: DurableObjectNamespace<UploadHandler>
 }
 
 /**

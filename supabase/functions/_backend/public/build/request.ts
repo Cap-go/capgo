@@ -160,8 +160,9 @@ export async function requestBuild(
   const upload_session_key = crypto.randomUUID()
   const upload_path = `orgs/${org_id}/apps/${app_id}/native-builds/${upload_session_key}.zip`
   const upload_expires_at = new Date(Date.now() + 60 * 60 * 1000)
-  const fallbackUploadBase = getEnv(c, 'BUILDER_UPLOAD_BASE_URL') || 'https://uploads.capgo.local'
-  const upload_url = builderJob.uploadUrl || `${fallbackUploadBase}/${upload_path}`
+
+  // Use TUS protocol - upload URL points to builder's TUS endpoint
+  const upload_url = builderJob.uploadUrl || `${builderUrl}/upload/${upload_path}`
 
   const { data: buildRequestRow, error: insertError } = await supabase
     .from('build_requests')

@@ -13,7 +13,7 @@
     {
       "tag": "v1",
       "new_sqlite_classes": [
-        "AttachmentUploadHandler"
+        "UploadHandler"
       ]
     }
   ],
@@ -118,8 +118,8 @@
       "durable_objects": {
         "bindings": [
           {
-            "name": "ATTACHMENT_UPLOAD_HANDLER",
-            "class_name": "AttachmentUploadHandler"
+            "name": "UPLOAD_HANDLER",
+            "class_name": "UploadHandler"
           }
         ]
       }
@@ -180,8 +180,8 @@
       "durable_objects": {
         "bindings": [
           {
-            "name": "ATTACHMENT_UPLOAD_HANDLER",
-            "class_name": "AttachmentUploadHandler"
+            "name": "UPLOAD_HANDLER",
+            "class_name": "UploadHandler"
           }
         ]
       }
@@ -228,8 +228,8 @@
       "durable_objects": {
         "bindings": [
           {
-            "name": "ATTACHMENT_UPLOAD_HANDLER",
-            "class_name": "AttachmentUploadHandler"
+            "name": "UPLOAD_HANDLER",
+            "class_name": "UploadHandler"
           }
         ]
       }
@@ -239,8 +239,8 @@
       "durable_objects": {
         "bindings": [
           {
-            "name": "ATTACHMENT_UPLOAD_HANDLER",
-            "class_name": "AttachmentUploadHandler"
+            "name": "UPLOAD_HANDLER",
+            "class_name": "UploadHandler"
           }
         ]
       },
