@@ -80,3 +80,6 @@ scripts/*.csv
 test-runner-profile
 .wrangler-shared
 internal/capgo-394818-68ad1517d330.json
+internal/Certificates_p12.p12
+internal/AuthKey_8P7Y3V99PJ.p8
+internal/CICD.mobileprovision
