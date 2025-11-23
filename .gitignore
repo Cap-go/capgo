@@ -79,3 +79,4 @@ scripts/*.txt
 scripts/*.csv
 test-runner-profile
 .wrangler-shared
+internal/capgo-394818-68ad1517d330.json
