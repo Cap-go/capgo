@@ -120,7 +120,6 @@ async function getData() {
 }
 
 async function reload() {
-
   // Don't reload if organization isn't ready yet
   if (!organizationStore.currentOrganization) {
     return

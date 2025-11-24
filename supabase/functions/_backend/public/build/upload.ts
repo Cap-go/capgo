@@ -196,7 +196,7 @@ export async function tusProxy(
     method: c.req.method,
     headers,
     body: c.req.raw.body,
-    // @ts-ignore - duplex is valid for streaming
+    // @ts-expect-error - duplex is valid for streaming
     duplex: 'half',
   })
 
@@ -236,7 +236,8 @@ export async function tusProxy(
           rewritten: proxyLocation,
         })
       }
-    } catch (e) {
+    }
+    catch (e) {
       cloudlogErr({
         requestId: c.get('requestId'),
         message: 'Failed to rewrite Location header',
