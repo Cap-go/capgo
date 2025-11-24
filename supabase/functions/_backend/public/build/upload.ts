@@ -149,15 +149,38 @@ export async function tusProxy(
   // Example: orgs/${org_id}/apps/${app_id}/native-builds/${upload_session_key}.zip
   if (c.req.method === 'POST') {
     const artifactKey = buildRequest.upload_path
-    // Upload-Metadata format: "filename base64value"
+
+    // Parse existing Upload-Metadata header to preserve other fields like filetype
+    // Format: "key1 base64value1,key2 base64value2"
+    const existingMetadata = c.req.header('upload-metadata') || ''
+    const metadataFields: string[] = []
+
+    // Parse existing metadata and preserve non-filename fields
+    if (existingMetadata) {
+      const pairs = existingMetadata.split(',').map(p => p.trim())
+      for (const pair of pairs) {
+        const [key] = pair.split(' ', 1)
+        // Keep all fields except filename (we'll replace it)
+        if (key !== 'filename') {
+          metadataFields.push(pair)
+        }
+      }
+    }
+
+    // Add the new filename
     const encodedFilename = btoa(artifactKey)
-    headers.set('upload-metadata', `filename ${encodedFilename}`)
+    metadataFields.unshift(`filename ${encodedFilename}`) // Put filename first
+
+    const newMetadata = metadataFields.join(',')
+    headers.set('upload-metadata', newMetadata)
 
     cloudlog({
       requestId: c.get('requestId'),
       message: 'Rewrote Upload-Metadata for builder',
       job_id: jobId,
       artifact_key: artifactKey,
+      original_metadata: existingMetadata,
+      new_metadata: newMetadata,
     })
   }
 

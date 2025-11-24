@@ -110,6 +110,10 @@ export async function requestBuild(
     platform,
   })
 
+  // Create upload_path BEFORE calling builder so we can pass it
+  const upload_session_key = crypto.randomUUID()
+  const upload_path = `orgs/${org_id}/apps/${app_id}/native-builds/${upload_session_key}.zip`
+
   // Create job in builder.capgo.app
   const builderUrl = getEnv(c, 'BUILDER_URL')
   const builderApiKey = getEnv(c, 'BUILDER_API_KEY')
@@ -124,6 +128,7 @@ export async function requestBuild(
         org_id,
         app_id,
         platform,
+        artifact_key: upload_path,
       })
 
       const builderResponse = await fetch(`${builderUrl}/jobs`, {
@@ -134,6 +139,7 @@ export async function requestBuild(
         },
         body: JSON.stringify({
           userId: org_id, // Use org_id as anonymized identifier
+          artifactKey: upload_path, // Pass the artifact key to builder
           fastlane: {
             lane: platform,
           },
@@ -192,8 +198,6 @@ export async function requestBuild(
     })
   }
 
-  const upload_session_key = crypto.randomUUID()
-  const upload_path = `orgs/${org_id}/apps/${app_id}/native-builds/${upload_session_key}.zip`
   const upload_expires_at = new Date(Date.now() + 60 * 60 * 1000)
 
   // Determine upload URL: use builder's URL if available, otherwise use R2/S3 fallback
