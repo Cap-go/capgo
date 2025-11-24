@@ -22,7 +22,7 @@ jobs:
           path: ${{ env.DENO_DIR }}
           key: my_cache_key
       - name: Checkout capgo
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
       - name: Setup bun
         uses: oven-sh/setup-bun@v2
         with:

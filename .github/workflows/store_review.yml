@@ -11,7 +11,7 @@ jobs:
   release_android:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - name: Setup java
         uses: actions/setup-java@v5
         with:
@@ -42,7 +42,7 @@ jobs:
   release_ios:
     runs-on: macOS-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: 2.7.8

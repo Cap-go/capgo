@@ -16,7 +16,7 @@ jobs:
     name: Build code and deploy to Supabase
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
       - name: Setup bun
         uses: oven-sh/setup-bun@v2
         with:
@@ -56,7 +56,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           fetch-tags: true
@@ -120,7 +120,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
       - name: Setup bun
         uses: oven-sh/setup-bun@v2
         with:
@@ -146,7 +146,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
       - name: Setup bun
         uses: oven-sh/setup-bun@v2
         with:
@@ -201,7 +201,7 @@ jobs:
     name: Deploy CF Worker Plugin (${{ matrix.region_label }})
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
       - name: Setup bun
         uses: oven-sh/setup-bun@v2
         with:
