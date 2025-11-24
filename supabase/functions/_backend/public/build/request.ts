@@ -18,7 +18,7 @@ export interface RequestBuildResponse {
   job_id: string
   upload_session_key: string
   upload_path: string
-  upload_url: string
+  upload_url: string // This will be the Capgo proxy URL, not the builder URL directly
   upload_expires_at: string
   status: string
 }
@@ -201,12 +201,14 @@ export async function requestBuild(
   let upload_url: string
 
   if (builderJob?.uploadUrl) {
-    // Builder provided an upload URL
-    upload_url = builderJob.uploadUrl
+    // Return Capgo proxy URL that will forward to builder with API key
+    // The job_id is used to identify which builder upload to proxy to
+    upload_url = `${getEnv(c, 'PUBLIC_URL') || 'https://api.capgo.app'}/build/upload/${builderJob.jobId}`
     cloudlog({
       requestId: c.get('requestId'),
-      message: 'Using builder-provided upload URL',
-      upload_url,
+      message: 'Using Capgo TUS proxy URL for builder',
+      proxy_url: upload_url,
+      builder_url: builderJob.uploadUrl,
     })
   } else if (fallbackUploadBase) {
     // Use configured fallback (R2/S3)
@@ -285,7 +287,7 @@ export async function requestBuild(
     job_id: builderJob.jobId,
     upload_session_key,
     upload_path,
-    upload_url,
+    upload_url, // Capgo proxy URL
     upload_expires_at: upload_expires_at.toISOString(),
     status: buildRequestRow.status,
   } satisfies RequestBuildResponse, 200)

@@ -7,6 +7,7 @@ import { streamBuildLogs } from './logs.ts'
 import { requestBuild } from './request.ts'
 import { startBuild } from './start.ts'
 import { getBuildStatus } from './status.ts'
+import { tusProxy } from './upload.ts'
 
 export const app = honoFactory.createApp()
 
@@ -44,4 +45,34 @@ app.get('/logs/:jobId', middlewareKey(['all', 'read']), async (c) => {
   }
   const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
   return streamBuildLogs(c, jobId, appId, apikey)
+})
+
+// TUS proxy endpoints - ALL methods proxied to builder with API key injection
+// POST /build/upload/:jobId - Create TUS upload (proxied to builder)
+app.post('/upload/:jobId', middlewareKey(['all', 'write']), async (c) => {
+  const jobId = c.req.param('jobId')
+  const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
+  return tusProxy(c, jobId, apikey)
+})
+
+// HEAD /build/upload/:jobId/* - Check TUS upload progress (proxied to builder)
+app.on('HEAD', '/upload/:jobId/*', middlewareKey(['all', 'write']), async (c) => {
+  const jobId = c.req.param('jobId')
+  const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
+  return tusProxy(c, jobId, apikey)
+})
+
+// PATCH /build/upload/:jobId/* - Upload TUS chunk (proxied to builder)
+app.patch('/upload/:jobId/*', middlewareKey(['all', 'write']), async (c) => {
+  const jobId = c.req.param('jobId')
+  const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
+  return tusProxy(c, jobId, apikey)
+})
+
+// OPTIONS /build/upload/:jobId/* - TUS capabilities (proxied to builder, no auth needed)
+app.options('/upload/:jobId/*', async (c) => {
+  const jobId = c.req.param('jobId')
+  // For OPTIONS we still need to proxy but without auth check
+  const apikey = { user_id: '', key: '' } as Database['public']['Tables']['apikeys']['Row']
+  return tusProxy(c, jobId, apikey)
 })
