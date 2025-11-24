@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Tag to build (e.g., v1.0.0)"
+        description: 'Tag to build (e.g., v1.0.0)'
         required: true
 
 jobs:
@@ -40,10 +40,10 @@ jobs:
         id: sync_code
         run: bun x cap sync android
       - name: Setup java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: zulu
-          java-version: "17"
+          java-version: '17'
       - name: Decode Keystore File
         uses: timheuer/base64-to-file@v1
         id: android_keystore
@@ -58,7 +58,7 @@ jobs:
           encodedString: ${{ secrets.PLAY_CONFIG_JSON }}
       - uses: ruby/setup-ruby@v1
         with:
-          ruby-version: "3.0"
+          ruby-version: '3.0'
           bundler-cache: true
       - uses: maierj/fastlane-action@v3.1.0
         env:
