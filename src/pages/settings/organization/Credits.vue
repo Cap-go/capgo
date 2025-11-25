@@ -428,10 +428,10 @@ watch(() => currentOrganization.value?.gid, async (newOrgId, oldOrgId) => {
     <div class="rounded-3xl border border-blue-500 p-6 text-white shadow-lg">
       <div class="flex flex-col items-start justify-between gap-6 sm:flex-col sm:items-start">
         <div class="max-w-xl">
-          <h3 class="text-2xl font-semibold">
+          <h3 class="text-2xl font-semibold font-medium text-gray-900 dark:text-white">
             {{ t('credits-cta-title') }}
           </h3>
-          <p class="mt-2 max-w-xl text-sm opacity-90">
+          <p class="mt-2 max-w-xl text-sm opacity-90 font-medium text-gray-900 dark:text-white">
             {{ t('credits-cta-description') }}
           </p>
         </div>
@@ -449,11 +449,11 @@ watch(() => currentOrganization.value?.gid, async (newOrgId, oldOrgId) => {
               validation="required|min:1"
               validation-visibility="live"
               outer-class="w-full !mb-0"
-              label-class="text-xs font-semibold uppercase tracking-wide text-white/80"
+              label-class="text-xs font-semibold uppercase tracking-wide"
               help-class="hidden"
               message-class="text-xs text-rose-200 mt-1"
             />
-            <div class="text-xs opacity-90 space-y-1">
+            <div class="text-xs opacity-90 space-y-1 font-medium text-gray-900 dark:text-white">
               <p>
                 {{ t('credits-top-up-quantity-help') }}
               </p>
