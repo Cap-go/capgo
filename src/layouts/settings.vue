@@ -87,11 +87,10 @@ watchEffect(() => {
       key: '/settings/organization/usage',
     })
   }
-  else if (organizationTabs.value.find((tab: Tab) => tab.label === 'usage')) {
+  else if (!hasSuperAdminRights && organizationTabs.value.find((tab: Tab) => tab.label === 'usage')) {
     organizationTabs.value = organizationTabs.value.filter((tab: Tab) => tab.label !== 'usage')
   }
-  console.log('creditsV2Enabled', creditsV2Enabled)
-  console.log('hasSuperAdminRights', hasSuperAdminRights)
+
   if (creditsV2Enabled && hasSuperAdminRights && !organizationTabs.value.find((tab: Tab) => tab.label === 'credits')) {
     const insertIndex = organizationTabs.value.findIndex((tab: Tab) => tab.label === 'members') + 1
     const creditsTab = {
