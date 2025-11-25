@@ -10,6 +10,7 @@ import { toast } from 'vue-sonner'
 import ArchiveBoxIcon from '~icons/heroicons/archive-box'
 import BanknotesIcon from '~icons/heroicons/banknotes'
 import CloudIcon from '~icons/heroicons/cloud'
+import ChevronDownIcon from '~icons/heroicons/chevron-down'
 import ScaleIcon from '~icons/heroicons/scale'
 import UserGroupIcon from '~icons/heroicons/user-group'
 import { completeCreditTopUp, startCreditTopUp } from '~/services/stripe'
@@ -466,7 +467,7 @@ watch(() => currentOrganization.value?.gid, async (newOrgId, oldOrgId) => {
             type="submit"
             :disabled="isProcessingCheckout || !isTopUpQuantityValid"
             :class="{ 'opacity-75 pointer-events-none': isProcessingCheckout || !isTopUpQuantityValid }"
-            class="inline-flex w-full sm:w-auto justify-center py-2 px-3 sm:py-2.5 sm:px-4 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-sm sm:text-base font-semibold rounded-lg transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5 disabled:opacity-60 disabled:cursor-not-allowed"
+            class="inline-flex w-full sm:w-auto justify-center items-center py-2 px-3 sm:py-2.5 sm:px-4 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-sm sm:text-base font-semibold rounded-lg transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5 disabled:opacity-60 disabled:cursor-not-allowed"
           >
             <Spinner v-if="isProcessingCheckout" size="w-4 h-4" class="mr-2" color="white" />
             <span>{{ t('buy-credits') }}</span>
@@ -475,9 +476,9 @@ watch(() => currentOrganization.value?.gid, async (newOrgId, oldOrgId) => {
       </div>
     </div>
 
-    <div class="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-      <div class="space-y-8 lg:p-2">
-        <div class="text-center">
+    <details class="group rounded-3xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
+      <summary class="flex w-full cursor-pointer items-center justify-between gap-4 p-6 text-left [&::-webkit-details-marker]:hidden">
+        <div>
           <h2 class="text-2xl font-semibold text-gray-900 dark:text-white">
             {{ t('credits-pricing-title') }}
           </h2>
@@ -485,6 +486,11 @@ watch(() => currentOrganization.value?.gid, async (newOrgId, oldOrgId) => {
             {{ t('credits-pricing-description') }}
           </p>
         </div>
+        <div class="flex h-10 w-10 items-center justify-center rounded-full bg-blue-50 text-blue-700 transition-transform duration-200 dark:bg-blue-900/40 dark:text-blue-200">
+          <ChevronDownIcon class="h-5 w-5 transition-transform duration-200 group-open:rotate-180" />
+        </div>
+      </summary>
+      <div class="space-y-8 border-t border-gray-200 p-6 lg:p-8 dark:border-gray-700">
         <div class="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
           <div
             v-for="section in creditPricingSections"
@@ -529,7 +535,7 @@ watch(() => currentOrganization.value?.gid, async (newOrgId, oldOrgId) => {
           </p>
         </div>
       </div>
-    </div>
+    </details>
     <div class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
       <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4 dark:border-gray-700">
         <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
