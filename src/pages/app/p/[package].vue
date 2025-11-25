@@ -161,12 +161,12 @@ watchEffect(() => {
   <div>
     <Tabs v-model:active-tab="ActiveTab" :tabs="tabs" />
     <div v-if="app || isLoading">
-      <div v-if="ActiveTab === 'overview'" class="w-full h-full px-4 pt-4 mb-8 overflow-y-auto max-h-fit lg:px-8 sm:px-6 overflow-x-hidden">
+      <div v-if="ActiveTab === 'overview'" class="overflow-y-auto overflow-x-hidden px-4 pt-4 mb-8 w-full h-full sm:px-6 lg:px-8 max-h-fit">
         <FailedCard />
         <Usage v-if="!organizationStore.currentOrganizationFailed" ref="usageComponent" :app-id="id" />
 
         <!-- New charts section -->
-        <div class="grid grid-cols-1 sm:grid-cols-12 gap-6 mb-6 xl:grid-cols-12">
+        <div class="grid grid-cols-1 gap-6 mb-6 sm:grid-cols-12 xl:grid-cols-12">
           <BundleUploadsCard
             :app-id="id"
             :use-billing-period="usageComponent?.useBillingPeriod ?? true"
@@ -189,58 +189,58 @@ watchEffect(() => {
       </div>
 
       <div v-if="ActiveTab === 'info'" class="mt-0 md:mt-8">
-        <div class="w-full h-full px-0 pt-0 md:pt-8 mx-auto mb-8 overflow-y-auto max-w-9xl max-h-fit sm:px-6 lg:px-8">
-          <div class="flex flex-col overflow-hidden overflow-y-auto bg-white border border-slate-300 shadow-lg md:rounded-lg dark:border-slate-900 dark:bg-gray-800">
+        <div class="overflow-y-auto px-0 pt-0 mx-auto mb-8 w-full h-full sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
+          <div class="flex overflow-hidden overflow-y-auto flex-col bg-white border shadow-lg md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900">
             <AppSetting :app-id="id" />
           </div>
         </div>
       </div>
 
       <div v-if="ActiveTab === 'bundles'" class="mt-0 md:mt-8">
-        <div class="w-full h-full px-0 pt-0 md:pt-8 mx-auto mb-8 overflow-y-auto max-w-9xl max-h-fit sm:px-6 lg:px-8">
+        <div class="overflow-y-auto px-0 pt-0 mx-auto mb-8 w-full h-full sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
           <BundleTable :app-id="id" @update:showing-steps="showingBundleSteps = $event" />
         </div>
       </div>
 
       <div v-if="ActiveTab === 'channels'" class="mt-0 md:mt-8">
-        <div class="w-full h-full px-0 pt-0 md:pt-8 mx-auto mb-8 overflow-y-auto max-w-9xl max-h-fit sm:px-6 lg:px-8">
-          <div class="flex flex-col overflow-hidden overflow-y-auto bg-white border border-slate-300 shadow-lg md:rounded-lg dark:border-slate-900 dark:bg-gray-800">
+        <div class="overflow-y-auto px-0 pt-0 mx-auto mb-8 w-full h-full sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
+          <div class="flex overflow-hidden overflow-y-auto flex-col bg-white border shadow-lg md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900">
             <ChannelTable :app-id="id" />
           </div>
         </div>
       </div>
 
       <div v-if="ActiveTab === 'devices'" class="mt-0 md:mt-8">
-        <div class="w-full h-full px-0 pt-0 md:pt-8 mx-auto mb-8 overflow-y-auto max-w-9xl max-h-fit sm:px-6 lg:px-8">
-          <div class="flex flex-col overflow-hidden overflow-y-auto bg-white border border-slate-300 shadow-lg md:rounded-lg dark:border-slate-900 dark:bg-gray-800">
+        <div class="overflow-y-auto px-0 pt-0 mx-auto mb-8 w-full h-full sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
+          <div class="flex overflow-hidden overflow-y-auto flex-col bg-white border shadow-lg md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900">
             <DeviceTable :app-id="id" />
           </div>
         </div>
       </div>
 
       <div v-if="ActiveTab === 'logs'" class="mt-0 md:mt-8">
-        <div class="w-full h-full px-0 pt-0 md:pt-8 mx-auto mb-8 overflow-y-auto max-w-9xl max-h-fit sm:px-6 lg:px-8">
-          <div class="flex flex-col overflow-hidden overflow-y-auto bg-white border border-slate-300 shadow-lg md:rounded-lg dark:border-slate-900 dark:bg-gray-800">
+        <div class="overflow-y-auto px-0 pt-0 mx-auto mb-8 w-full h-full sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
+          <div class="flex overflow-hidden overflow-y-auto flex-col bg-white border shadow-lg md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900">
             <LogTable :app-id="id" />
           </div>
         </div>
       </div>
 
       <div v-if="ActiveTab === 'builds'" class="mt-0 md:mt-8">
-        <div class="w-full h-full px-0 pt-0 md:pt-8 mx-auto mb-8 overflow-y-auto max-w-9xl max-h-fit sm:px-6 lg:px-8">
+        <div class="overflow-y-auto px-0 pt-0 mx-auto mb-8 w-full h-full sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
           <BuildTable :app-id="id" @update:showing-steps="showingBuildSteps = $event" />
         </div>
       </div>
     </div>
-    <div v-else class="flex flex-col items-center justify-center min-h-[50vh]">
-      <IconAlertCircle class="w-16 h-16 text-destructive mb-4" />
+    <div v-else class="flex flex-col justify-center items-center min-h-[50vh]">
+      <IconAlertCircle class="mb-4 w-16 h-16 text-destructive" />
       <h2 class="text-xl font-semibold text-foreground">
         {{ t('app-not-found') }}
       </h2>
-      <p class="text-muted-foreground mt-2">
+      <p class="mt-2 text-muted-foreground">
         {{ t('app-not-found-description') }}
       </p>
-      <button class="mt-4 d-btn d-btn-primary text-white" @click="router.push(`/app`)">
+      <button class="mt-4 text-white d-btn d-btn-primary" @click="router.push(`/app`)">
         {{ t('back-to-apps') }}
       </button>
     </div>

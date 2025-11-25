@@ -39,6 +39,16 @@ export const jsonRequestSchema = z.looseObject({
   platform: devicePlatformScheme,
 })
 
+// TODO: delete when all mirgrated to jsonRequestSchema
+export const jsonRequestSchemaGet = z.looseObject({
+  app_id: z.string({
+    error: issue => issue.input === undefined ? MISSING_STRING_APP_ID : NON_STRING_APP_ID,
+  }).check(z.regex(reverseDomainRegex, { message: INVALID_STRING_APP_ID })),
+  is_emulator: z.boolean(),
+  is_prod: z.boolean(),
+  platform: devicePlatformScheme,
+})
+
 async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient>, isV2: boolean, body: DeviceLink): Promise<Response> {
   cloudlog({ requestId: c.get('requestId'), message: 'post channel self body', body })
   const device = makeDevice(body)
@@ -477,7 +487,7 @@ app.get('/', async (c) => {
   const isV2 = getIsV2Channel(c)
   const pgClient = isV2 ? null : getPgClient(c, true) // READ-ONLY: only queries channels
 
-  const bodyParsed = parsePluginBody<DeviceLink>(c, body, jsonRequestSchema)
+  const bodyParsed = parsePluginBody<DeviceLink>(c, body, jsonRequestSchemaGet)
   let res
   try {
     res = await listCompatibleChannels(c, isV2 ? getDrizzleClientD1Session(c) : getDrizzleClient(pgClient as any), !!isV2, bodyParsed)

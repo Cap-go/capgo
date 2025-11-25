@@ -2,11 +2,40 @@ import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { simpleError } from '../../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../../utils/logging.ts'
-import { hasAppRightApikey } from '../../utils/supabase.ts'
+import { hasAppRightApikey, supabaseAdmin } from '../../utils/supabase.ts'
 import { getEnv } from '../../utils/utils.ts'
 
 interface BuilderStartResponse {
   status: string
+}
+
+async function markBuildAsFailed(c: Context, jobId: string, errorMessage: string): Promise<void> {
+  const supabase = supabaseAdmin(c)
+  const { error: updateError } = await supabase
+    .from('build_requests')
+    .update({
+      status: 'failed',
+      last_error: errorMessage,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('builder_job_id', jobId)
+
+  if (updateError) {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'Failed to update build_requests status to failed',
+      job_id: jobId,
+      error: updateError,
+    })
+  }
+  else {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'Marked build_request as failed',
+      job_id: jobId,
+      error_message: errorMessage,
+    })
+  }
 }
 
 export async function startBuild(
@@ -15,57 +44,77 @@ export async function startBuild(
   appId: string,
   apikey: Database['public']['Tables']['apikeys']['Row'],
 ): Promise<Response> {
-  cloudlog({
-    requestId: c.get('requestId'),
-    message: 'Start build request',
-    job_id: jobId,
-    app_id: appId,
-    user_id: apikey.user_id,
-  })
+  let alreadyMarkedAsFailed = false
 
-  // Security: Check if user has write access to this app
-  if (!(await hasAppRightApikey(c, appId, apikey.user_id, 'write', apikey.key))) {
-    cloudlogErr({
+  try {
+    cloudlog({
       requestId: c.get('requestId'),
-      message: 'Unauthorized start build',
+      message: 'Start build request',
       job_id: jobId,
       app_id: appId,
       user_id: apikey.user_id,
     })
-    throw simpleError('unauthorized', 'You do not have permission to start builds for this app')
-  }
 
-  // Call builder to start the job
-  const builderResponse = await fetch(`${getEnv(c, 'BUILDER_URL')}/jobs/${jobId}/start`, {
-    method: 'POST',
-    headers: {
-      'x-api-key': getEnv(c, 'BUILDER_API_KEY'),
-    },
-  })
+    // Security: Check if user has write access to this app
+    if (!(await hasAppRightApikey(c, appId, apikey.user_id, 'write', apikey.key))) {
+      const errorMsg = 'You do not have permission to start builds for this app'
+      cloudlogErr({
+        requestId: c.get('requestId'),
+        message: 'Unauthorized start build',
+        job_id: jobId,
+        app_id: appId,
+        user_id: apikey.user_id,
+      })
+      await markBuildAsFailed(c, jobId, errorMsg)
+      alreadyMarkedAsFailed = true
+      throw simpleError('unauthorized', errorMsg)
+    }
 
-  if (!builderResponse.ok) {
-    const errorText = await builderResponse.text()
-    cloudlogErr({
-      requestId: c.get('requestId'),
-      message: 'Builder start failed',
-      job_id: jobId,
-      status: builderResponse.status,
-      error: errorText,
+    // Call builder to start the job
+    const builderResponse = await fetch(`${getEnv(c, 'BUILDER_URL')}/jobs/${jobId}/start`, {
+      method: 'POST',
+      headers: {
+        'x-api-key': getEnv(c, 'BUILDER_API_KEY'),
+      },
     })
-    throw simpleError('builder_error', `Failed to start build: ${errorText}`)
+
+    if (!builderResponse.ok) {
+      const errorText = await builderResponse.text()
+      const errorMsg = `Failed to start build: ${errorText}`
+      cloudlogErr({
+        requestId: c.get('requestId'),
+        message: 'Builder start failed',
+        job_id: jobId,
+        status: builderResponse.status,
+        error: errorText,
+      })
+
+      // Update build_requests to mark as failed
+      await markBuildAsFailed(c, jobId, errorMsg)
+      alreadyMarkedAsFailed = true
+      throw simpleError('builder_error', errorMsg)
+    }
+
+    const builderJob = await builderResponse.json() as BuilderStartResponse
+
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'Build started',
+      job_id: jobId,
+      status: builderJob.status,
+    })
+
+    return c.json({
+      job_id: jobId,
+      status: builderJob.status || 'running',
+    }, 200)
   }
-
-  const builderJob = await builderResponse.json() as BuilderStartResponse
-
-  cloudlog({
-    requestId: c.get('requestId'),
-    message: 'Build started',
-    job_id: jobId,
-    status: builderJob.status,
-  })
-
-  return c.json({
-    job_id: jobId,
-    status: builderJob.status || 'running',
-  }, 200)
+  catch (error) {
+    // Mark build as failed for any unexpected error (but only if not already marked)
+    if (!alreadyMarkedAsFailed) {
+      const errorMsg = error instanceof Error ? error.message : String(error)
+      await markBuildAsFailed(c, jobId, errorMsg)
+    }
+    throw error
+  }
 }

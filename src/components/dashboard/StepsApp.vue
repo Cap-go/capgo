@@ -262,17 +262,17 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <section class="h-full py-12 overflow-y-auto max-h-fit lg:py-20 sm:py-16">
-    <div class="px-4 mx-auto max-w-7xl lg:px-8 sm:px-6">
-      <div class="flex items-center justify-items-center place-content-center">
-        <button v-if="!onboarding" class="bg-gray-800 text-white d-btn d-btn-outline mr-6" @click="emit('closeStep')">
+  <section class="overflow-y-auto py-12 h-full sm:py-16 lg:py-20 max-h-fit">
+    <div class="px-4 mx-auto max-w-7xl sm:px-6 lg:px-8">
+      <div class="flex justify-items-center items-center place-content-center">
+        <button v-if="!onboarding" class="mr-6 text-white bg-gray-800 d-btn d-btn-outline" @click="emit('closeStep')">
           <arrowBack />
         </button>
         <div v-if="props.onboarding" class="text-center">
-          <h2 class="text-3xl font-bold text-gray-900 font-pj sm:text-4xl xl:text-5xl dark:text-gray-50">
+          <h2 class="text-3xl font-bold text-gray-900 sm:text-4xl xl:text-5xl dark:text-gray-50 font-pj">
             {{ t('start-using-capgo') }} <span class="font-prompt">Capgo</span> !
           </h2>
-          <p class="mx-auto mt-6 text-lg font-normal text-gray-600 font-pj dark:text-gray-200">
+          <p class="mx-auto mt-6 text-lg font-normal text-gray-600 dark:text-gray-200 font-pj">
             {{ t('add-your-first-app-t') }}
           </p>
           <p class="mx-auto mt-2 font-normal text-md font-pj text-muted-blue-300 dark:text-muted-blue-50">
@@ -281,19 +281,19 @@ onUnmounted(() => {
         </div>
 
         <div v-else class="text-center">
-          <h2 class="text-3xl font-bold text-gray-900 font-pj sm:text-4xl xl:text-5xl dark:text-gray-50">
+          <h2 class="text-3xl font-bold text-gray-900 sm:text-4xl xl:text-5xl dark:text-gray-50 font-pj">
             {{ t('add-another-app') }}
           </h2>
         </div>
       </div>
 
-      <div class="max-w-6xl mx-auto mt-12 sm:px-10">
+      <div class="mx-auto mt-12 max-w-6xl sm:px-10">
         <template v-for="(s, i) in steps" :key="i">
-          <div v-if="i > 0" class="w-1 h-10 mx-auto bg-gray-200" :class="[step !== i ? 'opacity-30' : '']" />
+          <div v-if="i > 0" class="mx-auto w-1 h-10 bg-gray-200" :class="[step !== i ? 'opacity-30' : '']" />
 
-          <div :id="`step_card_${i}`" :class="[step !== i ? 'opacity-30' : '']" class="relative p-5 overflow-hidden bg-white border border-gray-200 rounded-2xl">
-            <div class="flex items-start gap-6">
-              <div class="inline-flex items-center justify-center text-xl font-bold text-white shrink-0 font-pj h-14 w-14 rounded-xl bg-muted-blue-800">
+          <div :id="`step_card_${i}`" :class="[step !== i ? 'opacity-30' : '']" class="overflow-hidden relative p-5 bg-white rounded-2xl border border-gray-200">
+            <div class="flex gap-6 items-start">
+              <div class="inline-flex justify-center items-center w-14 h-14 text-xl font-bold text-white rounded-xl shrink-0 font-pj bg-muted-blue-800">
                 <template v-if="i + 1 !== steps.length">
                   {{ i + 1 }}
                 </template>
@@ -311,11 +311,11 @@ onUnmounted(() => {
                   {{ s.title }}<br>
                   <span class="text-sm">{{ s.subtitle }}</span>
                 </div>
-                <div v-if="s.command" class="relative mt-4 p-5 pr-16 rounded-lg bg-black group cursor-pointer" @click="copyToast(step === i, `step_command_${i}`, s.command)">
-                  <code :id="`step_command_${i}`" class="block text-xl break-all whitespace-pre-wrap text-pumpkin-orange-700">
+                <div v-if="s.command" class="relative p-5 pr-16 mt-4 bg-black rounded-lg cursor-pointer group" @click="copyToast(step === i, `step_command_${i}`, s.command)">
+                  <code :id="`step_command_${i}`" class="block text-xl whitespace-pre-wrap break-all text-pumpkin-orange-700">
                     {{ s.command }}
                   </code>
-                  <i-ion-copy-outline class="absolute top-5 right-5 text-muted-blue-300 w-6 h-6" />
+                  <i-ion-copy-outline class="absolute top-5 right-5 w-6 h-6 text-muted-blue-300" />
                 </div>
                 <br v-if="s.command">
               </div>
@@ -329,7 +329,7 @@ onUnmounted(() => {
               </p>
               <button
                 type="button"
-                class="inline-flex items-center px-4 py-2 mt-4 text-sm font-semibold transition-colors duration-200 rounded-md bg-muted-blue-50 text-muted-blue-800 hover:bg-muted-blue-100 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-muted-blue-500"
+                class="inline-flex items-center py-2 px-4 mt-4 text-sm font-semibold rounded-md transition-colors duration-200 focus:ring-2 focus:ring-offset-2 bg-muted-blue-50 text-muted-blue-800 hover:bg-muted-blue-100 focus:outline-hidden focus:ring-muted-blue-500"
                 @click="openInviteDialog"
               >
                 {{ t('onboarding-invite-option-cta') }}

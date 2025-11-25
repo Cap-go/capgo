@@ -57,6 +57,7 @@ app.route('/device', device)
 app.route('/organization', organization)
 app.route('/statistics', statistics)
 app.route('/app', appEndpoint)
+app.route('/build', build)
 
 // Private API
 const functionNamePrivate = 'private'
@@ -75,7 +76,6 @@ appPrivate.route('/delete_failed_version', deleted_failed_version)
 appPrivate.route('/verify_replication', verify_replication)
 appPrivate.route('/create_device', create_device)
 appPrivate.route('/events', events)
-appPrivate.route('/build', build)
 
 // Triggers
 const functionNameTriggers = 'triggers'

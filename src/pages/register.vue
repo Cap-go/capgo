@@ -77,19 +77,19 @@ async function submit(form: { first_name: string, last_name: string, password: s
 </script>
 
 <template>
-  <section class="flex w-full min-h-screen py-10 my-auto overflow-y-auto lg:py-8 sm:py-8">
-    <div class="px-4 mx-auto max-w-7xl lg:px-8 sm:px-6">
-      <div class="max-w-2xl mx-auto text-center">
-        <img src="/capgo.webp" alt="logo" class="w-1/6 mx-auto mb-6 rounded-sm invert dark:invert-0">
+  <section class="flex overflow-y-auto py-10 my-auto w-full min-h-screen sm:py-8 lg:py-8">
+    <div class="px-4 mx-auto max-w-7xl sm:px-6 lg:px-8">
+      <div class="mx-auto max-w-2xl text-center">
+        <img src="/capgo.webp" alt="logo" class="mx-auto mb-6 w-1/6 rounded-sm invert dark:invert-0">
 
-        <h1 class="text-3xl font-bold leading-tight text-black lg:text-5xl sm:text-4xl dark:text-white">
+        <h1 class="text-3xl font-bold leading-tight text-black sm:text-4xl lg:text-5xl dark:text-white">
           {{ t("register-heading") }}
         </h1>
       </div>
 
-      <div class="relative max-w-2xl mx-auto mt-4 md:mt-8">
+      <div class="relative mx-auto mt-4 max-w-2xl md:mt-8">
         <div class="overflow-hidden bg-white rounded-md shadow-md dark:bg-slate-800">
-          <div class="px-4 py-6 sm:px-8 sm:py-7">
+          <div class="py-6 px-4 sm:py-7 sm:px-8">
             <FormKit id="register-account" type="form" :actions="false" @submit="submit">
               <FormKitMessages data-test="form-error" />
               <div class="space-y-2 text-gray-500 md:grid md:grid-cols-2 md:gap-4 md:space-y-0">
@@ -155,12 +155,12 @@ async function submit(form: { first_name: string, last_name: string, password: s
                   :validation-label="t('password-confirmatio')"
                 />
 
-                <div class="w-1/2 col-span-2 mx-auto">
+                <div class="col-span-2 mx-auto w-1/2">
                   <div v-if="!!captchaKey">
                     <VueTurnstile v-model="turnstileToken" size="flexible" :site-key="captchaKey" />
                   </div>
                   <button
-                    :disabled="isLoading" type="submit" data-test="submit" class="inline-flex items-center justify-center w-full px-4 py-4 text-base font-semibold text-white transition-all duration-200 border border-transparent rounded-md bg-muted-blue-600 focus:bg-blue-700 hover:bg-blue-700 focus:outline-hidden"
+                    :disabled="isLoading" type="submit" data-test="submit" class="inline-flex justify-center items-center py-4 px-4 w-full text-base font-semibold text-white rounded-md border border-transparent transition-all duration-200 hover:bg-blue-700 focus:bg-blue-700 bg-muted-blue-600 focus:outline-hidden"
                   >
                     <span v-if="!isLoading" class="rounded-4xl">
                       {{ t("register-next") }}
@@ -177,7 +177,7 @@ async function submit(form: { first_name: string, last_name: string, password: s
 
                 <div class="col-span-2 text-center">
                   <p class="text-base text-gray-600">
-                    <a href="/login" title="" class="text-sm font-medium text-orange-500 transition-all duration-200 focus:text-orange-600 hover:text-orange-600 hover:underline">{{ t("already-account") }}</a>
+                    <a href="/login" title="" class="text-sm font-medium text-orange-500 transition-all duration-200 hover:text-orange-600 hover:underline focus:text-orange-600">{{ t("already-account") }}</a>
                   </p>
                 </div>
               </div>

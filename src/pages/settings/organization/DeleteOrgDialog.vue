@@ -72,7 +72,7 @@ defineExpose({
           v-model="deleteInput"
           type="text"
           :placeholder="t('type-organization-name-to-confirm')"
-          class="w-full p-3 border border-gray-300 rounded-lg dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+          class="p-3 w-full rounded-lg border border-gray-300 dark:text-white dark:bg-gray-800 dark:border-gray-600"
           @keydown.enter="$event.preventDefault()"
         >
       </div>

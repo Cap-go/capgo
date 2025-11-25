@@ -6,8 +6,8 @@ const DialogV2 = defineAsyncComponent(() => import('~/components/DialogV2.vue'))
 </script>
 
 <template>
-  <div class="h-full overflow-hidden bg-slate-100 text-slate-600 dark:bg-slate-900 dark:text-slate-300">
-    <RouterView class="h-full overflow-hidden" />
+  <div class="overflow-hidden h-full bg-slate-100 text-slate-600 dark:bg-slate-900 dark:text-slate-300">
+    <RouterView class="overflow-hidden h-full" />
     <Toast />
     <DialogV2 />
   </div>

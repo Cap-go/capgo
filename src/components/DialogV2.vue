@@ -35,7 +35,7 @@ onMounted(() => {
 
 <template>
   <Teleport to="body">
-    <div v-if="dialogStore.showDialog" class="fixed inset-0 z-50 flex items-center justify-center">
+    <div v-if="dialogStore.showDialog" class="flex fixed inset-0 z-50 justify-center items-center">
       <!-- Backdrop -->
       <div
         class="fixed inset-0 bg-black/50"
@@ -45,7 +45,7 @@ onMounted(() => {
 
       <!-- Dialog -->
       <div
-        class="relative bg-white dark:bg-base-200 rounded-lg shadow-xl max-h-[90vh] overflow-y-auto w-full mx-4"
+        class="overflow-y-auto relative mx-4 w-full bg-white rounded-lg shadow-xl max-h-[90vh] dark:bg-base-200"
         :class="[
           sizeClasses[dialogStore.dialogOptions?.size || 'md'],
         ]"
@@ -53,7 +53,7 @@ onMounted(() => {
         <!-- Close button -->
         <button
           v-if="!dialogStore.dialogOptions?.preventAccidentalClose"
-          class="absolute top-4 right-4 d-btn d-btn-sm d-btn-circle d-btn-ghost z-10 text-black dark:text-white hover:text-white hover:bg-gray-500 dark:hover:bg-gray-500"
+          class="absolute top-4 right-4 z-10 text-black dark:text-white hover:text-white hover:bg-gray-500 d-btn d-btn-sm d-btn-circle d-btn-ghost dark:hover:bg-gray-500"
           @click="close()"
         >
           ✕

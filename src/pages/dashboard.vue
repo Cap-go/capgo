@@ -62,8 +62,8 @@ displayStore.defaultBack = '/app'
 
 <template>
   <div>
-    <div class="h-full pb-4 overflow-hidden">
-      <div class="w-full h-full px-4 pt-2 md:pt-8 mx-auto mb-8 overflow-y-auto max-w-9xl max-h-fit lg:px-8 sm:px-6">
+    <div class="overflow-hidden pb-4 h-full">
+      <div class="overflow-y-auto px-4 pt-2 mx-auto mb-8 w-full h-full sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
         <WelcomeBanner v-if="apps.length === 0" />
         <FailedCard />
         <Usage v-if="!organizationStore.currentOrganizationFailed" />

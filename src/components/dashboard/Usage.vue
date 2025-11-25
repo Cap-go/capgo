@@ -531,20 +531,20 @@ onMounted(() => {
 <template>
   <!-- View Mode Selectors -->
   <div v-if="!noData" class="mb-4">
-    <div class="flex flex-nowrap items-center justify-end gap-2 sm:gap-4">
+    <div class="flex items-center justify-end gap-2 flex-nowrap sm:gap-4">
       <!-- Daily vs Cumulative Switch -->
-      <div class="flex items-center space-x-1 bg-gray-200 dark:bg-gray-800 rounded-lg p-1">
+      <div class="flex items-center p-1 space-x-1 bg-gray-200 rounded-lg dark:bg-gray-800">
         <button
-          class="px-2 sm:px-3 py-1 text-xs font-medium rounded-md transition-colors whitespace-nowrap text-center flex items-center justify-center gap-0.5 sm:gap-1.5 cursor-pointer"
+          class="flex gap-0.5 justify-center items-center py-1 px-2 text-xs font-medium text-center whitespace-nowrap rounded-md transition-colors cursor-pointer sm:gap-1.5 sm:px-3"
           :class="[!showCumulative || !useBillingPeriod ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white']"
           :aria-label="t('daily')"
           @click="showCumulative = false"
         >
-          <CalendarDaysIcon class="h-4 w-4" />
+          <CalendarDaysIcon class="w-4 h-4" />
           <span class="hidden sm:inline">{{ t('daily') }}</span>
         </button>
         <button
-          class="px-2 sm:px-3 py-1 text-xs font-medium rounded-md transition-colors whitespace-nowrap text-center flex items-center justify-center gap-0.5 sm:gap-1.5 cursor-pointer"
+          class="flex gap-0.5 justify-center items-center py-1 px-2 text-xs font-medium text-center whitespace-nowrap rounded-md transition-colors cursor-pointer sm:gap-1.5 sm:px-3"
           :class="[
             showCumulative && useBillingPeriod
               ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
@@ -553,27 +553,27 @@ onMounted(() => {
           :aria-label="t('cumulative')"
           @click="handleCumulativeClick"
         >
-          <ChartBarIcon class="h-4 w-4" />
+          <ChartBarIcon class="w-4 h-4" />
           <span class="hidden sm:inline">{{ t('cumulative') }}</span>
         </button>
       </div>
 
       <!-- Billing Period vs Last 30 Days Switch -->
-      <div class="flex items-center space-x-1 bg-gray-200 dark:bg-gray-800 rounded-lg p-1">
+      <div class="flex items-center p-1 space-x-1 bg-gray-200 rounded-lg dark:bg-gray-800">
         <button
-          class="px-2 sm:px-3 py-1 text-xs font-medium rounded-md transition-colors whitespace-nowrap text-center flex items-center justify-center gap-0.5 sm:gap-1.5 cursor-pointer" :class="[useBillingPeriod ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white']"
+          class="flex gap-0.5 justify-center items-center py-1 px-2 text-xs font-medium text-center whitespace-nowrap rounded-md transition-colors cursor-pointer sm:gap-1.5 sm:px-3" :class="[useBillingPeriod ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white']"
           :aria-label="t('billing-period')"
           @click="useBillingPeriod = true"
         >
-          <BanknotesIcon class="h-4 w-4" />
+          <BanknotesIcon class="w-4 h-4" />
           <span class="hidden sm:inline">{{ t('billing-period') }}</span>
         </button>
         <button
-          class="px-2 sm:px-3 py-1 text-xs font-medium rounded-md transition-colors whitespace-nowrap text-center flex items-center justify-center gap-0.5 sm:gap-1.5 cursor-pointer" :class="[!useBillingPeriod ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white']"
+          class="flex gap-0.5 justify-center items-center py-1 px-2 text-xs font-medium text-center whitespace-nowrap rounded-md transition-colors cursor-pointer sm:gap-1.5 sm:px-3" :class="[!useBillingPeriod ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white']"
           :aria-label="t('last-30-days')"
           @click="useBillingPeriod = false"
         >
-          <CalendarDaysIcon class="h-4 w-4" />
+          <CalendarDaysIcon class="w-4 h-4" />
           <span class="hidden sm:inline">{{ t('last-30-days') }}</span>
         </button>
       </div>
@@ -581,28 +581,28 @@ onMounted(() => {
       <!-- Reload Button -->
       <button
         type="button"
-        class="flex h-8 w-8 items-center justify-center rounded-md bg-white text-gray-700 shadow-sm transition-colors hover:bg-gray-50 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600 dark:hover:text-white dark:focus:ring-blue-400 sm:h-9 sm:w-9 cursor-pointer"
+        class="flex items-center justify-center w-8 h-8 text-gray-700 transition-colors bg-white rounded-md shadow-sm cursor-pointer sm:w-9 sm:h-9 dark:text-gray-200 dark:bg-gray-700 hover:text-gray-900 hover:bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:outline-none dark:hover:bg-gray-600 dark:hover:text-white dark:focus:ring-blue-400"
         :aria-label="t('reload')"
         @click="reloadAllCharts"
       >
-        <ArrowPathIconSolid class="h-4 w-4" />
+        <ArrowPathIconSolid class="w-4 h-4" />
       </button>
 
       <!-- Usage Info Tooltip -->
-      <div class="relative group flex items-center">
+      <div class="relative flex items-center group">
         <button
           type="button"
-          class="flex h-8 w-8 items-center justify-center rounded-md bg-white text-gray-700 shadow-sm transition-colors hover:bg-gray-50 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600 dark:hover:text-white dark:focus:ring-blue-400 sm:h-9 sm:w-9 cursor-pointer"
+          class="flex items-center justify-center w-8 h-8 text-gray-700 transition-colors bg-white rounded-md shadow-sm cursor-pointer sm:w-9 sm:h-9 dark:text-gray-200 dark:bg-gray-700 hover:text-gray-900 hover:bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:outline-none dark:hover:bg-gray-600 dark:hover:text-white dark:focus:ring-blue-400"
           :aria-label="t('info')"
         >
-          <InformationInfo class="h-4 w-4" />
+          <InformationInfo class="w-4 h-4" />
         </button>
-        <div class="pointer-events-none absolute right-0 top-full z-10 hidden w-[min(320px,calc(100vw-32px))] translate-y-2 rounded-lg border border-gray-200 bg-white p-4 text-sm text-gray-800 shadow-2xl group-hover:block group-focus-within:block dark:border-gray-600 dark:bg-gray-800 dark:text-white">
+        <div class="hidden absolute right-0 top-full z-10 p-4 text-sm text-gray-800 bg-white rounded-lg border border-gray-200 shadow-2xl translate-y-2 pointer-events-none dark:text-white dark:bg-gray-800 dark:border-gray-600 group-hover:block w-[min(320px,calc(100vw-32px))] group-focus-within:block">
           <div class="space-y-3">
             <div class="flex items-start space-x-2">
-              <div class="mt-2 h-2 w-2 shrink-0 rounded-full bg-green-500" />
+              <div class="w-2 h-2 mt-2 bg-green-500 rounded-full shrink-0" />
               <div>
-                <div class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                <div class="text-xs font-medium tracking-wide text-gray-500 uppercase dark:text-gray-400">
                   {{ t('last-run') }}
                 </div>
                 <div class="text-sm font-medium">
@@ -611,9 +611,9 @@ onMounted(() => {
               </div>
             </div>
             <div class="flex items-start space-x-2">
-              <div class="mt-2 h-2 w-2 shrink-0 rounded-full bg-blue-500" />
+              <div class="w-2 h-2 mt-2 bg-blue-500 rounded-full shrink-0" />
               <div>
-                <div class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                <div class="text-xs font-medium tracking-wide text-gray-500 uppercase dark:text-gray-400">
                   {{ t('next-run') }}
                 </div>
                 <div class="text-sm font-medium">
@@ -621,11 +621,11 @@ onMounted(() => {
                 </div>
               </div>
             </div>
-            <div class="border-t border-gray-200 pt-2 dark:border-gray-600">
+            <div class="pt-2 border-t border-gray-200 dark:border-gray-600">
               <div class="flex items-start space-x-2">
-                <div class="mt-2 h-2 w-2 shrink-0 rounded-full bg-purple-500" />
+                <div class="w-2 h-2 mt-2 bg-purple-500 rounded-full shrink-0" />
                 <div>
-                  <div class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                  <div class="text-xs font-medium tracking-wide text-gray-500 uppercase dark:text-gray-400">
                     {{ t('billing-cycle') }}
                   </div>
                   <div class="text-sm font-medium">
@@ -641,12 +641,12 @@ onMounted(() => {
   </div>
 
   <div v-if="creditsV2Enabled && !isLoading && creditAvailable" class="mb-6">
-    <div class="grid grid-cols-1 sm:grid-cols-12 gap-4">
-      <div class="col-span-full sm:col-span-6 xl:col-span-4 bg-white border border-gray-200 rounded-lg p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-12">
+      <div class="p-5 bg-white border border-gray-200 rounded-lg shadow-sm col-span-full sm:col-span-6 xl:col-span-4 dark:bg-gray-800 dark:border-gray-700">
         <div class="flex items-start justify-between gap-4">
           <div>
-            <div class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-              <BanknotesIcon class="h-4 w-4 text-emerald-500" />
+            <div class="flex items-center gap-2 text-xs font-semibold tracking-wide text-gray-500 uppercase dark:text-gray-400">
+              <BanknotesIcon class="w-4 h-4 text-emerald-500" />
               {{ t('credits-balance') }}
             </div>
             <div class="mt-2 text-2xl font-semibold text-gray-900 dark:text-white">
@@ -658,7 +658,7 @@ onMounted(() => {
             </p>
           </div>
           <div v-if="creditNextExpiration" class="text-right">
-            <div class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+            <div class="text-xs font-semibold tracking-wide text-gray-500 uppercase dark:text-gray-400">
               {{ t('credits-next-expiration') }}
             </div>
             <div class="mt-1 text-sm font-medium text-gray-900 dark:text-white">
@@ -667,15 +667,15 @@ onMounted(() => {
           </div>
         </div>
         <div class="mt-4">
-          <div class="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 mb-1">
+          <div class="flex items-center justify-between mb-1 text-xs text-gray-500 dark:text-gray-400">
             <span>{{ t('credits-used-in-period') }}</span>
             <span class="font-medium text-gray-900 dark:text-white">
               {{ formatCredits(creditUsed) }}
             </span>
           </div>
-          <div class="h-2 w-full rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
+          <div class="w-full h-2 overflow-hidden bg-gray-200 rounded-full dark:bg-gray-700">
             <div
-              class="h-full rounded-full bg-emerald-500 transition-all"
+              class="h-full transition-all rounded-full bg-emerald-500"
               :style="{ width: `${creditUsagePercent}%` }"
             />
           </div>
@@ -689,7 +689,7 @@ onMounted(() => {
 
   <div
     v-if="!noData || isLoading"
-    class="grid grid-cols-1 sm:grid-cols-12 gap-6 mb-6"
+    class="grid grid-cols-1 gap-6 mb-6 sm:grid-cols-12"
     :class="appId ? 'xl:grid-cols-16' : 'xl:grid-cols-12'"
   >
     <UsageCard

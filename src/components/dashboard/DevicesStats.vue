@@ -509,18 +509,18 @@ watch(
     :has-data="hasData"
   >
     <template #header>
-      <div class="flex items-start justify-between gap-2 flex-1">
-        <h2 class="flex-1 min-w-0 text-2xl font-semibold leading-tight text-slate-600 dark:text-white">
+      <div class="flex flex-1 gap-2 justify-between items-start">
+        <h2 class="flex-1 min-w-0 text-2xl font-semibold leading-tight dark:text-white text-slate-600">
           {{ t('active_users_by_version') }}
         </h2>
 
         <div class="flex flex-col items-end text-right shrink-0">
           <div
-            class="inline-flex items-center justify-center rounded-full px-2 py-1 bg-emerald-500 text-xs font-bold text-white shadow-lg whitespace-nowrap"
+            class="inline-flex justify-center items-center py-1 px-2 text-xs font-bold text-white whitespace-nowrap bg-emerald-500 rounded-full shadow-lg"
           >
             {{ latestVersionPercentageDisplay }}
           </div>
-          <div v-if="latestVersion" class="text-3xl font-bold text-slate-600 dark:text-white">
+          <div v-if="latestVersion" class="text-3xl font-bold dark:text-white text-slate-600">
             {{ latestVersion.name }}
           </div>
         </div>

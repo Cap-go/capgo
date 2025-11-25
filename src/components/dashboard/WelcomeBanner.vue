@@ -9,9 +9,9 @@ const dayPeriod = dayjs().hour() < 12 ? 'morning' : 'afternoon'
 </script>
 
 <template>
-  <div class="relative mb-8 overflow-hidden rounded-lg bg-blue-200 p-4 sm:p-6">
+  <div class="overflow-hidden relative p-4 mb-8 bg-blue-200 rounded-lg sm:p-6">
     <!-- Background illustration -->
-    <div class="pointer-events-none absolute right-0 top-0 mr-16 hidden -mt-4 xl:block" aria-hidden="true">
+    <div class="hidden absolute top-0 right-0 mr-16 -mt-4 pointer-events-none xl:block" aria-hidden="true">
       <svg width="319" height="198" xmlns:xlink="http://www.w3.org/1999/xlink">
         <defs>
           <path id="welcome-a" d="M64 0l64 128-64-20-64 20z" />
@@ -54,7 +54,7 @@ const dayPeriod = dayjs().hour() < 12 ? 'morning' : 'afternoon'
 
     <!-- Content -->
     <div class="relative">
-      <h1 class="mb-1 text-2xl font-bold text-slate-800 md:text-3xl">
+      <h1 class="mb-1 text-2xl font-bold md:text-3xl text-slate-800">
         {{ t('good') }} {{ t(dayPeriod) }}, {{ main.user?.first_name }} 👋
       </h1>
       <p>{{ t('welcome-to-your-capg') }}</p>

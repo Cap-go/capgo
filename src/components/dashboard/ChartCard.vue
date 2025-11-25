@@ -45,12 +45,12 @@ const displayNoDataMessage = computed(() => props.noDataMessage ?? t('no-data'))
 </script>
 
 <template>
-  <div class="flex flex-col bg-white border rounded-lg shadow-lg col-span-full border-slate-300 sm:col-span-6 xl:col-span-4 dark:border-slate-900 dark:bg-gray-800 h-[460px]">
+  <div class="flex flex-col col-span-full bg-white rounded-lg border shadow-lg sm:col-span-6 xl:col-span-4 dark:bg-gray-800 border-slate-300 h-[460px] dark:border-slate-900">
     <!-- Header with title and stats -->
-    <div class="pt-4 px-4 flex items-start justify-between gap-2">
+    <div class="flex gap-2 justify-between items-start px-4 pt-4">
       <!-- Custom header slot or default header -->
       <slot name="header">
-        <h2 class="flex-1 min-w-0 text-2xl font-semibold leading-tight text-slate-600 dark:text-white">
+        <h2 class="flex-1 min-w-0 text-2xl font-semibold leading-tight dark:text-white text-slate-600">
           {{ title }}
         </h2>
       </slot>
@@ -59,31 +59,31 @@ const displayNoDataMessage = computed(() => props.noDataMessage ?? t('no-data'))
         <!-- Evolution badge -->
         <div
           v-if="showEvolutionBadge"
-          class="inline-flex items-center justify-center rounded-full px-2 py-1 text-xs font-bold text-white shadow-lg whitespace-nowrap"
+          class="inline-flex justify-center items-center py-1 px-2 text-xs font-bold text-white whitespace-nowrap rounded-full shadow-lg"
           :class="{ 'bg-emerald-500': (lastDayEvolution ?? 0) >= 0, 'bg-yellow-500': (lastDayEvolution ?? 0) < 0 }"
         >
           {{ (lastDayEvolution ?? 0) < 0 ? '-' : '+' }}{{ Math.abs(lastDayEvolution ?? 0).toFixed(2) }}%
         </div>
-        <div v-else class="inline-flex rounded-full px-2 py-1 text-xs font-semibold opacity-0" aria-hidden="true" />
+        <div v-else class="inline-flex py-1 px-2 text-xs font-semibold rounded-full opacity-0" aria-hidden="true" />
 
         <!-- Total value -->
-        <div class="text-3xl font-bold text-slate-600 dark:text-white">
+        <div class="text-3xl font-bold dark:text-white text-slate-600">
           {{ total?.toLocaleString() }}<span v-if="unit" class="text-2xl font-normal"> {{ unit }}</span>
         </div>
       </div>
     </div>
 
     <!-- Chart content area -->
-    <div class="w-full h-full p-6 pt-2">
+    <div class="p-6 pt-2 w-full h-full">
       <!-- Loading state -->
-      <div v-if="isLoading" class="flex items-center justify-center h-full">
+      <div v-if="isLoading" class="flex justify-center items-center h-full">
         <Spinner size="w-24 h-24" />
       </div>
 
       <!-- Error message -->
       <div
         v-else-if="errorMessage"
-        class="flex h-full items-center justify-center text-sm text-slate-500 dark:text-slate-300 text-center px-4"
+        class="flex justify-center items-center px-4 h-full text-sm text-center text-slate-500 dark:text-slate-300"
       >
         {{ errorMessage }}
       </div>
@@ -91,7 +91,7 @@ const displayNoDataMessage = computed(() => props.noDataMessage ?? t('no-data'))
       <!-- No data message -->
       <div
         v-else-if="!hasData"
-        class="flex h-full items-center justify-center text-sm text-slate-500 dark:text-slate-300"
+        class="flex justify-center items-center h-full text-sm text-slate-500 dark:text-slate-300"
       >
         {{ displayNoDataMessage }}
       </div>

@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { useDebounceFn } from '@vueuse/core'
 import { reactive, ref, watch } from 'vue'
-import { toast } from 'vue-sonner'
 
 const props = defineProps<{
   label: string
@@ -24,7 +23,7 @@ watch(rowInput, useDebounceFn(() => {
 </script>
 
 <template>
-  <div class="px-4 py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6 sm:py-5">
+  <div class="py-4 px-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5 sm:px-6">
     <dl>
       <dt class="text-sm font-medium text-gray-700 dark:text-gray-200 first-letter:uppercase">
         {{ props.label }}
@@ -38,12 +37,12 @@ watch(rowInput, useDebounceFn(() => {
       }"
     >
       <div class="flex flex-row">
-        <input v-if="editable" id="inforow-input" v-model="rowInput" class="block w-full p-1 text-gray-900 bg-white border border-gray-300 rounded-lg md:w-1/2 dark:border-gray-600 focus:border-blue-500 dark:bg-gray-700 sm:text-xs dark:text-white focus:ring-blue-500 dark:focus:border-blue-500 dark:focus:ring-blue-500 dark:placeholder-gray-400" :readonly="!!props.readonly">
+        <input v-if="editable" id="inforow-input" v-model="rowInput" class="block p-1 w-full text-gray-900 bg-white rounded-lg border border-gray-300 sm:text-xs md:w-1/2 dark:placeholder-gray-400 dark:text-white dark:bg-gray-700 dark:border-gray-600 focus:border-blue-500 focus:ring-blue-500 dark:focus:border-blue-500 dark:focus:ring-blue-500" :readonly="!!props.readonly">
         <span v-else> {{ computedValue.value }} </span>
         <div style="margin-left: 0">
           <slot name="start" />
         </div>
-        <div style="margin-left: auto" class="line-clamp-3 overflow-hidden max-w-1/2">
+        <div style="margin-left: auto" class="max-w-1/2">
           <slot />
         </div>
       </div>

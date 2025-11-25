@@ -251,7 +251,7 @@ defineExpose({
           v-model="inviteEmail"
           type="email"
           autocomplete="email"
-          class="block w-full px-3 py-2 text-sm border border-gray-300 rounded-md shadow-sm focus:ring-muted-blue-500 focus:border-muted-blue-500 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-100"
+          class="block py-2 px-3 w-full text-sm rounded-md border border-gray-300 shadow-sm dark:text-gray-100 dark:border-gray-700 dark:bg-slate-900 focus:ring-muted-blue-500 focus:border-muted-blue-500"
           placeholder="teammate@email.com"
           required
         >
@@ -265,7 +265,7 @@ defineExpose({
           v-model="inviteFirstName"
           type="text"
           autocomplete="given-name"
-          class="block w-full px-3 py-2 text-sm border border-gray-300 rounded-md shadow-sm focus:ring-muted-blue-500 focus:border-muted-blue-500 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-100"
+          class="block py-2 px-3 w-full text-sm rounded-md border border-gray-300 shadow-sm dark:text-gray-100 dark:border-gray-700 dark:bg-slate-900 focus:ring-muted-blue-500 focus:border-muted-blue-500"
           placeholder="Jane"
           required
         >
@@ -279,7 +279,7 @@ defineExpose({
           v-model="inviteLastName"
           type="text"
           autocomplete="family-name"
-          class="block w-full px-3 py-2 text-sm border border-gray-300 rounded-md shadow-sm focus:ring-muted-blue-500 focus:border-muted-blue-500 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-100"
+          class="block py-2 px-3 w-full text-sm rounded-md border border-gray-300 shadow-sm dark:text-gray-100 dark:border-gray-700 dark:bg-slate-900 focus:ring-muted-blue-500 focus:border-muted-blue-500"
           placeholder="Doe"
           required
         >
@@ -295,7 +295,7 @@ defineExpose({
           />
         </div>
       </template>
-      <p class="sm:col-span-2 text-sm text-gray-500 dark:text-gray-400">
+      <p class="text-sm text-gray-500 sm:col-span-2 dark:text-gray-400">
         {{ t('onboarding-invite-option-helper') }}
       </p>
       <button type="submit" class="hidden" tabindex="-1" aria-hidden="true" />
