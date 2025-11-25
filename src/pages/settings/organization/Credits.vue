@@ -321,8 +321,8 @@ async function handleCreditCheckoutReturn() {
 
   isCompletingTopUp.value = true
   try {
-    await completeCreditTopUp(currentOrganization.value.gid, sessionId)
-    toast.success('Credits added successfully')
+    await completeCreditTopUp(currentOrganization.value.gid, sessionIdParam as string)
+    toast.success(t('credits-top-up-success'))
     const orgId = currentOrganization.value?.gid
     await organizationStore.fetchOrganizations()
     if (orgId)
@@ -431,7 +431,7 @@ watch(() => currentOrganization.value?.gid, async (newOrgId, oldOrgId) => {
     <div class="rounded-3xl border border-blue-500 p-6 text-white shadow-lg">
       <div class="flex flex-col items-start justify-between gap-6 sm:flex-col sm:items-start">
         <div class="max-w-xl">
-          <h3 class="text-2xl font-semibold font-medium text-gray-900 dark:text-white">
+          <h3 class="text-2xl font-semibold text-gray-900 dark:text-white">
             {{ t('credits-cta-title') }}
           </h3>
           <p class="mt-2 max-w-xl text-sm opacity-90 font-medium text-gray-900 dark:text-white">
