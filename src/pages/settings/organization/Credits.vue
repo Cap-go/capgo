@@ -255,8 +255,6 @@ async function loadTransactions() {
     .eq('org_id', orgId)
     .order('occurred_at', { ascending: false })
 
-  console.log('Loaded usage credit transactions:', data, error)
-
   if (error) {
     console.error('Failed to load usage credit transactions', error)
     loadError.value = error.message

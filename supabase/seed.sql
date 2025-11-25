@@ -30,6 +30,12 @@ END $$;
 CREATE OR REPLACE FUNCTION "public"."reset_and_seed_data" () RETURNS "void" LANGUAGE "plpgsql"
 SET
   search_path = '' SECURITY DEFINER AS $_$
+DECLARE
+    admin_manual_grant_id uuid;
+    admin_top_up_grant_id uuid;
+    demo_top_up_grant_id uuid;
+    admin_bandwidth_overage_id uuid;
+    demo_mau_overage_id uuid;
 BEGIN
     -- Suppress cascade notices during truncation
     SET LOCAL client_min_messages = WARNING;
@@ -281,16 +287,186 @@ BEGIN
         'manual',
         '{}'::jsonb,
         'Seed usage credits for admin org'
+      )
+    RETURNING id INTO admin_manual_grant_id;
+
+    INSERT INTO public.usage_credit_grants (
+      org_id,
+      credits_total,
+      credits_consumed,
+      granted_at,
+      expires_at,
+      source,
+      source_ref,
+      notes
+    )
+    VALUES (
+      '22dbad8a-b885-4309-9b3b-a09f8460fb6d',
+      250,
+      0,
+      now() - interval '14 days',
+      now() + interval '8 months',
+      'stripe_top_up',
+      jsonb_build_object('paymentIntentId', 'pi_seed_top_up_admin'),
+      'Stripe top-up seed for admin org'
+    )
+    RETURNING id INTO admin_top_up_grant_id;
+
+    INSERT INTO public.usage_credit_grants (
+      org_id,
+      credits_total,
+      credits_consumed,
+      granted_at,
+      expires_at,
+      source,
+      source_ref,
+      notes
+    )
+    VALUES (
+      '046a36ac-e03c-4590-9257-bd6c9dba9ee8',
+      500,
+      120,
+      now() - interval '10 days',
+      now() + interval '3 months',
+      'stripe_top_up',
+      jsonb_build_object('paymentIntentId', 'pi_seed_top_up_demo'),
+      'Seed usage credits for demo org'
+    )
+    RETURNING id INTO demo_top_up_grant_id;
+
+    -- Seed realistic credit transactions so the Credits view has ledger data
+    INSERT INTO public.usage_overage_events (
+      org_id,
+      metric,
+      overage_amount,
+      credits_estimated,
+      credits_debited,
+      billing_cycle_start,
+      billing_cycle_end,
+      details
+    )
+    VALUES
+      (
+        '22dbad8a-b885-4309-9b3b-a09f8460fb6d',
+        'bandwidth',
+        2684354560,
+        275,
+        275,
+        date_trunc('month', now()) - interval '1 month',
+        date_trunc('month', now()),
+        jsonb_build_object('note', 'Bandwidth spike from heavy release week')
+      )
+    RETURNING id INTO admin_bandwidth_overage_id;
+
+    INSERT INTO public.usage_overage_events (
+      org_id,
+      metric,
+      overage_amount,
+      credits_estimated,
+      credits_debited,
+      billing_cycle_start,
+      billing_cycle_end,
+      details
+    )
+    VALUES
+      (
+        '046a36ac-e03c-4590-9257-bd6c9dba9ee8',
+        'mau',
+        185000,
+        120,
+        120,
+        date_trunc('month', now()),
+        date_trunc('month', now()) + interval '1 month',
+        jsonb_build_object('note', 'Promo traffic pushed MAU above plan')
+      )
+    RETURNING id INTO demo_mau_overage_id;
+
+    INSERT INTO public.usage_credit_consumptions (
+      grant_id,
+      org_id,
+      overage_event_id,
+      metric,
+      credits_used,
+      applied_at
+    )
+    VALUES
+      (
+        admin_manual_grant_id,
+        '22dbad8a-b885-4309-9b3b-a09f8460fb6d',
+        admin_bandwidth_overage_id,
+        'bandwidth',
+        275,
+        now() - interval '5 days'
+      ),
+      (
+        demo_top_up_grant_id,
+        '046a36ac-e03c-4590-9257-bd6c9dba9ee8',
+        demo_mau_overage_id,
+        'mau',
+        120,
+        now() - interval '1 day'
+      );
+
+    INSERT INTO public.usage_credit_transactions (
+      org_id,
+      grant_id,
+      transaction_type,
+      amount,
+      balance_after,
+      occurred_at,
+      description,
+      source_ref
+    )
+    VALUES
+      (
+        '22dbad8a-b885-4309-9b3b-a09f8460fb6d',
+        admin_manual_grant_id,
+        'manual_grant',
+        1000,
+        1000,
+        now() - interval '45 days',
+        'Manual starter credits from support',
+        jsonb_build_object('notes', 'Initial seed allocation')
+      ),
+      (
+        '22dbad8a-b885-4309-9b3b-a09f8460fb6d',
+        admin_top_up_grant_id,
+        'purchase',
+        250,
+        1250,
+        now() - interval '14 days',
+        'Stripe top-up: 250 credits',
+        jsonb_build_object('paymentIntentId', 'pi_seed_top_up_admin', 'sessionId', 'cs_test_seed_admin')
+      ),
+      (
+        '22dbad8a-b885-4309-9b3b-a09f8460fb6d',
+        admin_manual_grant_id,
+        'deduction',
+        -275,
+        975,
+        now() - interval '5 days',
+        'Overage deduction for bandwidth usage',
+        jsonb_build_object('overage_event_id', admin_bandwidth_overage_id, 'metric', 'bandwidth')
       ),
       (
         '046a36ac-e03c-4590-9257-bd6c9dba9ee8',
+        demo_top_up_grant_id,
+        'purchase',
         500,
-        0,
-        now() - interval '7 days',
-        now() + interval '3 months',
-        'stripe_top_up',
-        '{}'::jsonb,
-        'Seed usage credits for demo org'
+        500,
+        now() - interval '10 days',
+        'Stripe top-up: 500 credits',
+        jsonb_build_object('paymentIntentId', 'pi_seed_top_up_demo', 'sessionId', 'cs_test_seed_demo')
+      ),
+      (
+        '046a36ac-e03c-4590-9257-bd6c9dba9ee8',
+        demo_top_up_grant_id,
+        'deduction',
+        -120,
+        380,
+        now() - interval '1 day',
+        'Overage deduction for MAU spike',
+        jsonb_build_object('overage_event_id', demo_mau_overage_id, 'metric', 'mau')
       );
 
     INSERT INTO "public"."org_users" ("org_id", "user_id", "user_right", "app_id", "channel_id") VALUES
