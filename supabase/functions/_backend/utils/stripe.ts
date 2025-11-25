@@ -341,11 +341,13 @@ export async function createOneTimeCheckout(
   if (!priceId)
     throw new Error(`Cannot find one-time price for product ${productId}`)
 
+  const successUrlWithFlag = successUrl.includes('?') ? `${successUrl}&success=true` : `${successUrl}?success=true`
+
   const session = await getStripe(c).checkout.sessions.create({
     billing_address_collection: 'auto',
     mode: 'payment',
     customer: customerId,
-    success_url: `${successUrl}?success=true`,
+    success_url: successUrlWithFlag,
     cancel_url: cancelUrl,
     automatic_tax: { enabled: true },
     client_reference_id: clientReferenceId,

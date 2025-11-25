@@ -9,8 +9,8 @@ import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import ArchiveBoxIcon from '~icons/heroicons/archive-box'
 import BanknotesIcon from '~icons/heroicons/banknotes'
-import CloudIcon from '~icons/heroicons/cloud'
 import ChevronDownIcon from '~icons/heroicons/chevron-down'
+import CloudIcon from '~icons/heroicons/cloud'
 import ScaleIcon from '~icons/heroicons/scale'
 import UserGroupIcon from '~icons/heroicons/user-group'
 import { completeCreditTopUp, startCreditTopUp } from '~/services/stripe'
@@ -306,7 +306,11 @@ async function handleCreditCheckoutReturn() {
   }
   const sessionIdRaw = route.query.session_id
   const sessionIdParam = Array.isArray(sessionIdRaw) ? sessionIdRaw[0] : sessionIdRaw
-  if (typeof sessionIdParam !== 'string' || !sessionIdParam) {
+  // Stripe may append unexpected query fragments after the session id; keep only the valid prefix.
+  const sessionId = typeof sessionIdParam === 'string'
+    ? (sessionIdParam.match(/^cs_\w+/)?.[0] ?? '')
+    : ''
+  if (!sessionId) {
     delete newQuery.creditCheckout
     delete newQuery.session_id
     await router.replace({ query: newQuery })
@@ -317,7 +321,7 @@ async function handleCreditCheckoutReturn() {
 
   isCompletingTopUp.value = true
   try {
-    await completeCreditTopUp(currentOrganization.value.gid, sessionIdParam)
+    await completeCreditTopUp(currentOrganization.value.gid, sessionId)
     toast.success('Credits added successfully')
     const orgId = currentOrganization.value?.gid
     await organizationStore.fetchOrganizations()
