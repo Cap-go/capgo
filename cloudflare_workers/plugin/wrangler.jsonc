@@ -990,12 +990,12 @@
       ]
     },
     "preprod": {
-      "name": "capgo_plugin-preprod",
+      "name": "capgo_plugin-eu-preprod",
       "vars": {
         "IS_V2_STATS": "1",
         "IS_V2_CHANNEL": "1",
         "IS_V2_UPDATER": "0",
-        "ENV_NAME": "capgo_plugin-preprod"
+        "ENV_NAME": "capgo_plugin-eu-preprod"
       },
       "observability": {
         "head_sampling_rate": 1,

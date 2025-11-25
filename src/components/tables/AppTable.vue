@@ -250,9 +250,9 @@ const filteredApps = computed(() => {
 </script>
 
 <template>
-  <div class="w-full block pb-14 md:pb-0">
+  <div class="block pb-14 w-full md:pb-0">
     <div
-      class="w-full col-span-full xl:col-span-16 border-none rounded-none bg-transparent shadow-none dark:bg-transparent md:rounded-lg md:border md:bg-white md:shadow-lg md:dark:border-slate-800 md:dark:bg-gray-800"
+      class="col-span-full w-full bg-transparent rounded-none border-none shadow-none md:bg-white md:rounded-lg md:border md:shadow-lg dark:bg-transparent md:dark:border-slate-800 md:dark:bg-gray-800 xl:col-span-16"
     >
       <Table
         v-model:filters="filters"

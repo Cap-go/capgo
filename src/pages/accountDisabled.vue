@@ -100,19 +100,19 @@ const timeRemaining = computed(() => {
 </script>
 
 <template>
-  <section class="flex w-full h-full flex-col">
+  <section class="flex flex-col w-full h-full">
     <!-- Capgo logo at top 10% -->
     <div class="flex justify-center items-center pt-[5vh]">
       <img src="/capgo.webp" alt="Capgo logo" class="w-16 h-16 rounded-sm invert dark:invert-0">
     </div>
 
     <!-- Main content positioned at 20% from top (80% from bottom) -->
-    <div class="flex items-start justify-center w-full pt-[12.5vh]">
-      <div class="text-center max-w-2xl px-4">
-        <h1 class="text-4xl font-bold text-gray-900 dark:text-white mb-6">
+    <div class="flex justify-center items-start w-full pt-[12.5vh]">
+      <div class="px-4 max-w-2xl text-center">
+        <h1 class="mb-6 text-4xl font-bold text-gray-900 dark:text-white">
           {{ t('account-deletion-requested') }}
         </h1>
-        <i18n-t keypath="account-deletion-restore" tag="p" class="text-lg text-gray-600 dark:text-gray-300 mb-4">
+        <i18n-t keypath="account-deletion-restore" tag="p" class="mb-4 text-lg text-gray-600 dark:text-gray-300">
           <template #link>
             <a
               href="https://support.capgo.app/"
@@ -122,11 +122,11 @@ const timeRemaining = computed(() => {
             >Capgo support</a>
           </template>
         </i18n-t>
-        <div class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 mt-6">
-          <p class="text-red-800 dark:text-red-200 font-medium">
+        <div class="p-4 mt-6 bg-red-50 rounded-lg border border-red-200 dark:border-red-800 dark:bg-red-900/20">
+          <p class="font-medium text-red-800 dark:text-red-200">
             {{ timeRemaining === t('account-deletion-very-soon') ? t('account-deletion-timer') : t('account-deletion-timer-in') }}
           </p>
-          <p class="text-2xl font-bold text-red-900 dark:text-red-100 mt-2">
+          <p class="mt-2 text-2xl font-bold text-red-900 dark:text-red-100">
             {{ timeRemaining }}
           </p>
         </div>
@@ -136,7 +136,7 @@ const timeRemaining = computed(() => {
     <!-- Logout button positioned 4vh below the content -->
     <div class="flex justify-center pt-[35vh]">
       <button
-        class="px-6 py-3 text-white bg-gray-600 hover:bg-gray-700 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-lg font-medium transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+        class="py-3 px-6 font-medium text-white bg-gray-600 rounded-lg transition-colors duration-200 dark:bg-gray-700 hover:bg-gray-700 focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:outline-none dark:hover:bg-gray-600"
         @click="handleLogout"
       >
         {{ t('sign-out') }}

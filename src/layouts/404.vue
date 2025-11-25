@@ -3,7 +3,7 @@ import { openSupport } from '~/services/support'
 </script>
 
 <template>
-  <div class="min-h-full px-4 py-16 sm:px-6 sm:py-24 md:grid md:place-items-center lg:px-8">
+  <div class="py-16 px-4 min-h-full sm:py-24 sm:px-6 md:grid md:place-items-center lg:px-8">
     <div class="mx-auto max-w-max">
       <main class="flex flex-col items-center text-center">
         <img src="/404.webp" alt="404" class="w-full max-w-[900px]">
@@ -15,8 +15,8 @@ import { openSupport } from '~/services/support'
             Please check the URL in the address bar and try again.
           </p>
           <div class="flex justify-center mt-10 space-x-3">
-            <a href="/" class="inline-flex items-center px-4 py-2 text-sm font-medium text-white border border-transparent rounded-md shadow-xs bg-cornflower-600 hover:bg-cornflower-700 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-cornflower-500"> Go back home </a>
-            <a href="#" class="inline-flex items-center px-4 py-2 text-sm font-medium border border-transparent rounded-md text-cornflower-700 bg-cornflower-100 hover:bg-cornflower-200 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-cornflower-500" @click="openSupport"> Contact support </a>
+            <a href="/" class="inline-flex items-center py-2 px-4 text-sm font-medium text-white rounded-md border border-transparent focus:ring-2 focus:ring-offset-2 shadow-xs bg-cornflower-600 hover:bg-cornflower-700 focus:outline-hidden focus:ring-cornflower-500"> Go back home </a>
+            <a href="#" class="inline-flex items-center py-2 px-4 text-sm font-medium rounded-md border border-transparent focus:ring-2 focus:ring-offset-2 text-cornflower-700 bg-cornflower-100 hover:bg-cornflower-200 focus:outline-hidden focus:ring-cornflower-500" @click="openSupport"> Contact support </a>
           </div>
         </div>
       </main>

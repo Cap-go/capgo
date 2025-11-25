@@ -14,14 +14,14 @@ function goToPlans() {
 
 <template>
   <!-- Error Alert for Non-paying Users -->
-  <div v-if="organizationStore.currentOrganizationFailed" class="mt-6 mb-6 bg-red-50 border border-red-200 rounded-xl p-8 mx-auto max-w-2xl">
+  <div v-if="organizationStore.currentOrganizationFailed" class="p-8 mx-auto mt-6 mb-6 max-w-2xl bg-red-50 rounded-xl border border-red-200">
     <div class="flex items-start">
       <div class="shrink-0">
-        <svg class="h-8 w-8 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+        <svg class="w-8 h-8 text-red-400" viewBox="0 0 20 20" fill="currentColor">
           <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
         </svg>
       </div>
-      <div class="ml-4 flex-1">
+      <div class="flex-1 ml-4">
         <h3 class="text-lg font-semibold text-red-800">
           {{ t('subscription-required') }}
         </h3>
@@ -30,7 +30,7 @@ function goToPlans() {
         </div>
         <div class="mt-6">
           <button
-            class="bg-red-600 hover:bg-red-700 text-white px-8 py-3 rounded-lg text-base font-semibold transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 shadow-md hover:shadow-lg"
+            class="py-3 px-8 text-base font-semibold text-white bg-red-600 rounded-lg shadow-md transition-colors duration-200 hover:bg-red-700 hover:shadow-lg focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:outline-none"
             @click="goToPlans"
           >
             {{ t('plan-upgrade-v2') }}

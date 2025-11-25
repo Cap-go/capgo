@@ -18,7 +18,7 @@ export interface RequestBuildResponse {
   job_id: string
   upload_session_key: string
   upload_path: string
-  upload_url: string
+  upload_url: string // This will be the Capgo proxy URL, not the builder URL directly
   upload_expires_at: string
   status: string
 }
@@ -110,58 +110,117 @@ export async function requestBuild(
     platform,
   })
 
+  // Create upload_path BEFORE calling builder so we can pass it
+  const upload_session_key = crypto.randomUUID()
+  const upload_path = `orgs/${org_id}/apps/${app_id}/native-builds/${upload_session_key}.zip`
+
   // Create job in builder.capgo.app
   const builderUrl = getEnv(c, 'BUILDER_URL')
   const builderApiKey = getEnv(c, 'BUILDER_API_KEY')
   let builderJob: BuilderJobResponse | null = null
 
-  if (builderUrl && builderApiKey) {
-    try {
-      const builderResponse = await fetch(`${builderUrl}/jobs`, {
-        method: 'POST',
-        headers: {
-          'x-api-key': builderApiKey,
-          'Content-Type': 'application/json',
+  if (!builderUrl || !builderApiKey) {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'Builder API not configured',
+      builder_url_configured: !!builderUrl,
+      builder_api_key_configured: !!builderApiKey,
+    })
+    throw simpleError('service_unavailable', 'Build service unavailable (builder not configured)')
+  }
+
+  try {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'Calling builder API',
+      builder_url: builderUrl,
+      org_id,
+      app_id,
+      platform,
+      artifact_key: upload_path,
+    })
+
+    const builderResponse = await fetch(`${builderUrl}/jobs`, {
+      method: 'POST',
+      headers: {
+        'x-api-key': builderApiKey,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        userId: org_id, // Use org_id as anonymized identifier
+        artifactKey: upload_path, // Pass the artifact key to builder
+        fastlane: {
+          lane: platform,
         },
-        body: JSON.stringify({
-          userId: org_id, // Use org_id as anonymized identifier
-          fastlane: {
-            lane: platform,
-          },
-          credentials: credentials || {},
-        }),
+        credentials: credentials || {},
+      }),
+    })
+
+    if (builderResponse.ok) {
+      builderJob = await builderResponse.json() as BuilderJobResponse
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'Builder job created successfully',
+        job_id: builderJob.jobId,
+        upload_url: builderJob.uploadUrl,
       })
-
-      if (builderResponse.ok) {
-        builderJob = await builderResponse.json() as BuilderJobResponse
-      }
-      else {
-        cloudlogErr({
-          requestId: c.get('requestId'),
-          message: 'Builder API error',
-          status: builderResponse.status,
-          error: await builderResponse.text(),
-        })
-      }
     }
-    catch (error) {
-      cloudlogErr({ requestId: c.get('requestId'), message: 'Builder API unreachable', error: (error as Error)?.message })
-    }
-  }
-
-  if (!builderJob) {
-    builderJob = {
-      jobId: crypto.randomUUID(),
-      uploadUrl: `https://builder.local/upload/${crypto.randomUUID()}`,
-      status: 'pending',
+    else {
+      const errorText = await builderResponse.text()
+      const responseHeaders: Record<string, string> = {}
+      builderResponse.headers.forEach((value, key) => {
+        responseHeaders[key] = value
+      })
+      cloudlogErr({
+        requestId: c.get('requestId'),
+        message: 'Builder API returned error',
+        builder_url: builderUrl,
+        status: builderResponse.status,
+        status_text: builderResponse.statusText,
+        error_body: errorText,
+        response_headers: responseHeaders,
+        org_id,
+        app_id,
+        platform,
+      })
+      throw simpleError('service_unavailable', 'Build service unavailable (builder error)')
     }
   }
+  catch (error) {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'Builder API fetch failed',
+      builder_url: builderUrl,
+      error: (error as Error)?.message,
+      error_stack: (error as Error)?.stack,
+      error_name: (error as Error)?.name,
+      org_id,
+      app_id,
+      platform,
+    })
+    throw simpleError('service_unavailable', 'Build service unavailable (builder call failed)')
+  }
 
-  const upload_session_key = crypto.randomUUID()
-  const upload_path = `orgs/${org_id}/apps/${app_id}/native-builds/${upload_session_key}.zip`
   const upload_expires_at = new Date(Date.now() + 60 * 60 * 1000)
-  const fallbackUploadBase = getEnv(c, 'BUILDER_UPLOAD_BASE_URL') || 'https://uploads.capgo.local'
-  const upload_url = builderJob.uploadUrl || `${fallbackUploadBase}/${upload_path}`
+
+  // Builder upload URL is mandatory; no fallback allowed
+  if (!builderJob?.uploadUrl) {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'Builder did not return uploadUrl; rejecting request',
+      builder_url: builderUrl,
+      builder_api_key_present: !!builderApiKey,
+    })
+    throw simpleError('service_unavailable', 'Build service unavailable (upload URL missing)')
+  }
+
+  const upload_url = `${getEnv(c, 'PUBLIC_URL') || 'https://api.capgo.app'}/build/upload/${builderJob.jobId}`
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: 'Using Capgo TUS proxy URL for builder',
+    proxy_url: upload_url,
+    builder_url: builderJob.uploadUrl,
+  })
 
   const { data: buildRequestRow, error: insertError } = await supabase
     .from('build_requests')
@@ -201,7 +260,7 @@ export async function requestBuild(
     job_id: builderJob.jobId,
     upload_session_key,
     upload_path,
-    upload_url,
+    upload_url, // Capgo proxy URL
     upload_expires_at: upload_expires_at.toISOString(),
     status: buildRequestRow.status,
   } satisfies RequestBuildResponse, 200)

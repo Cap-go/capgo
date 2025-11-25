@@ -639,28 +639,28 @@ async function handleRevert() {
 
 <template>
   <div>
-    <div v-if="loading" class="flex flex-col items-center justify-center min-h-[50vh]">
+    <div v-if="loading" class="flex flex-col justify-center items-center min-h-[50vh]">
       <Spinner size="w-40 h-40" />
     </div>
     <div v-else-if="channel">
       <Tabs v-model:active-tab="ActiveTab" :tabs="tabs" />
       <div v-if="channel && ActiveTab === 'info'" class="mt-0 md:mt-8">
-        <div class="w-full h-full px-0 pt-0 md:pt-8 mx-auto mb-8 overflow-y-auto max-w-9xl max-h-fit sm:px-6 lg:px-8">
-          <div class="flex flex-col overflow-hidden overflow-y-auto h-[calc(100vh-200px)] bg-white border border-slate-300 shadow-lg md:rounded-lg dark:border-slate-900 dark:bg-slate-800">
-            <dl class="divide-y dark:divide-slate-500 divide-slate-200">
+        <div class="overflow-y-auto px-0 pt-0 mx-auto mb-8 w-full h-full sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
+          <div class="flex overflow-hidden overflow-y-auto flex-col bg-white border shadow-lg md:rounded-lg h-[calc(100vh-200px)] border-slate-300 dark:border-slate-900 dark:bg-slate-800">
+            <dl class="divide-y divide-slate-200 dark:divide-slate-500">
               <InfoRow :label="t('name')">
                 {{ channel.name }}
               </InfoRow>
               <!-- Bundle Number -->
               <InfoRow :label="t('bundle-number')" :is-link="channel && !isInternalVersionName((channel.version.name))">
-                <div class="flex items-center gap-2">
+                <div class="flex gap-2 items-center">
                   <span class="cursor-pointer" @click="openBundle()">{{ channel.version.name }}</span>
                   <button
                     v-if="channel"
-                    class="p-1 rounded-md border border-gray-200 hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:hover:border-gray-600 dark:hover:bg-gray-800 transition-colors"
+                    class="p-1 rounded-md border border-gray-200 transition-colors dark:border-gray-700 hover:bg-gray-50 hover:border-gray-300 dark:hover:border-gray-600 dark:hover:bg-gray-800"
                     @click="openSelectVersion()"
                   >
-                    <Settings class="w-4 h-4 text-gray-500 hover:text-blue-500 dark:text-gray-400 dark:hover:text-blue-400" />
+                    <Settings class="w-4 h-4 text-gray-500 dark:text-gray-400 hover:text-blue-500 dark:hover:text-blue-400" />
                   </button>
                 </div>
               </InfoRow>
@@ -689,9 +689,9 @@ async function handleRevert() {
                 {{ channel.version.comment }}
               </InfoRow>
               <InfoRow :label="t('channel-is-public')">
-                <div class="flex w-full items-center justify-end gap-3 text-right">
+                <div class="flex gap-3 justify-end items-center w-full text-right">
                   <span
-                    class="inline-flex items-center rounded-md px-2 py-1 text-xs font-semibold"
+                    class="inline-flex items-center py-1 px-2 text-xs font-semibold rounded-md"
                     :class="channel?.public
                       ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200'
                       : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200'"
@@ -700,16 +700,16 @@ async function handleRevert() {
                   </span>
                   <button
                     type="button"
-                    class="text-sm font-medium text-blue-600 underline decoration-dotted hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300"
+                    class="text-sm font-medium text-blue-600 underline dark:text-blue-400 hover:text-blue-500 decoration-dotted dark:hover:text-blue-300"
                     @click="goToDefaultChannelSettings"
                   >
                     {{ t('manage-default-channel') }}
                   </button>
-                  <div class="relative inline-flex group">
-                    <IconInformation class="w-4 h-4 text-slate-400 transition-colors cursor-help group-hover:text-slate-600 dark:text-slate-400 dark:group-hover:text-slate-200" />
-                    <div class="pointer-events-none absolute right-0 bottom-full mb-2 w-56 rounded-lg bg-gray-800 px-3 py-2 text-xs text-white opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100">
+                  <div class="inline-flex relative group">
+                    <IconInformation class="w-4 h-4 transition-colors text-slate-400 cursor-help dark:text-slate-400 dark:group-hover:text-slate-200 group-hover:text-slate-600" />
+                    <div class="absolute right-0 bottom-full py-2 px-3 mb-2 w-56 text-xs text-white bg-gray-800 rounded-lg shadow-lg opacity-0 transition-opacity duration-150 pointer-events-none group-hover:opacity-100">
                       {{ t('channel-default-moved-info') }}
-                      <div class="absolute -bottom-1 right-2 h-2 w-2 rotate-45 bg-gray-800" />
+                      <div class="absolute -bottom-1 right-2 w-2 h-2 bg-gray-800 rotate-45" />
                     </div>
                   </div>
                 </div>
@@ -736,12 +736,12 @@ async function handleRevert() {
                 <details ref="autoUpdateDropdown" class="d-dropdown d-dropdown-end">
                   <summary class="d-btn d-btn-outline d-btn-sm">
                     <span>{{ getAutoUpdateLabel(channel.disable_auto_update) }}</span>
-                    <IconDown class="w-4 h-4 ml-1 fill-current" />
+                    <IconDown class="ml-1 w-4 h-4 fill-current" />
                   </summary>
-                  <ul class="d-dropdown-content bg-base-200 rounded-box z-1 w-48 p-2 shadow">
+                  <ul class="p-2 w-48 shadow d-dropdown-content bg-base-200 rounded-box z-1">
                     <li class="block px-1 rounded-lg hover:bg-gray-600">
                       <a
-                        class="block px-3 py-2 hover:bg-gray-600 text-white"
+                        class="block py-2 px-3 text-white hover:bg-gray-600"
                         @click="onSelectAutoUpdate('major')"
                       >
                         {{ t('major') }}
@@ -749,7 +749,7 @@ async function handleRevert() {
                     </li>
                     <li class="block px-1 rounded-lg hover:bg-gray-600">
                       <a
-                        class="block px-3 py-2 hover:bg-gray-600 text-white"
+                        class="block py-2 px-3 text-white hover:bg-gray-600"
                         @click="onSelectAutoUpdate('minor')"
                       >
                         {{ t('minor') }}
@@ -757,7 +757,7 @@ async function handleRevert() {
                     </li>
                     <li class="block px-1 rounded-lg hover:bg-gray-600">
                       <a
-                        class="block px-3 py-2 hover:bg-gray-600 text-white"
+                        class="block py-2 px-3 text-white hover:bg-gray-600"
                         @click="onSelectAutoUpdate('patch')"
                       >
                         {{ t('patch') }}
@@ -765,7 +765,7 @@ async function handleRevert() {
                     </li>
                     <li class="block px-1 rounded-lg hover:bg-gray-600">
                       <a
-                        class="block px-3 py-2 hover:bg-gray-600 text-white"
+                        class="block py-2 px-3 text-white hover:bg-gray-600"
                         @click="onSelectAutoUpdate('version_number')"
                       >
                         {{ t('metadata') }}
@@ -773,7 +773,7 @@ async function handleRevert() {
                     </li>
                     <li class="block px-1 rounded-lg hover:bg-gray-600">
                       <a
-                        class="block px-3 py-2 hover:bg-gray-600 text-white"
+                        class="block py-2 px-3 text-white hover:bg-gray-600"
                         @click="onSelectAutoUpdate('none')"
                       >
                         {{ t('none') }}
@@ -801,7 +801,7 @@ async function handleRevert() {
                 />
               </InfoRow>
               <InfoRow :label="t('unlink-bundle')" :is-link="true" @click="openPanel">
-                <button class="ml-auto bg-transparent w-7 h-7">
+                <button class="ml-auto w-7 h-7 bg-transparent">
                   <IconNext />
                 </button>
               </InfoRow>
@@ -812,13 +812,13 @@ async function handleRevert() {
       <div
         v-if="channel && ActiveTab === 'devices'"
       >
-        <div class="w-full h-full px-0 pt-0 md:pt-8 mx-auto mb-8 overflow-y-auto max-w-9xl max-h-fit sm:px-6 lg:px-8">
-          <div class="flex flex-col overflow-hidden overflow-y-auto bg-white border border-slate-300 shadow-lg md:rounded-lg dark:border-slate-900 dark:bg-gray-800">
+        <div class="overflow-y-auto px-0 pt-0 mx-auto mb-8 w-full h-full sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
+          <div class="flex overflow-hidden overflow-y-auto flex-col bg-white border shadow-lg md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900">
             <DeviceTable v-if="deviceIds.length > 0" :app-id="channel.version.app_id" :ids="deviceIds" :channel="channel" show-add-button @add-device="AddDevice" />
             <template v-else-if="!dialogStore.showDialog">
-              <div class="text-center py-4">
+              <div class="py-4 text-center">
                 <div>{{ t('forced-devices-not-found') }}</div>
-                <div class="d-btn d-btn-primary mt-4 text-white cursor-pointer" @click="AddDevice">
+                <div class="mt-4 text-white cursor-pointer d-btn d-btn-primary" @click="AddDevice">
                   <plusOutline />
                 </div>
               </div>
@@ -829,8 +829,8 @@ async function handleRevert() {
       <div
         v-if="channel && ActiveTab === 'history'"
       >
-        <div class="w-full h-full px-0 pt-0 md:pt-8 mx-auto mb-8 overflow-y-auto max-w-9xl max-h-fit sm:px-6 lg:px-8">
-          <div class="flex flex-col overflow-hidden overflow-y-auto bg-white border border-slate-300 shadow-lg md:rounded-lg dark:border-slate-900 dark:bg-gray-800">
+        <div class="overflow-y-auto px-0 pt-0 mx-auto mb-8 w-full h-full sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
+          <div class="flex overflow-hidden overflow-y-auto flex-col bg-white border shadow-lg md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900">
             <HistoryTable
               :channel-id="id"
               :app-id="channel.app_id"
@@ -839,15 +839,15 @@ async function handleRevert() {
         </div>
       </div>
     </div>
-    <div v-else class="flex flex-col items-center justify-center min-h-[50vh]">
-      <IconAlertCircle class="w-16 h-16 text-destructive mb-4" />
+    <div v-else class="flex flex-col justify-center items-center min-h-[50vh]">
+      <IconAlertCircle class="mb-4 w-16 h-16 text-destructive" />
       <h2 class="text-xl font-semibold text-foreground">
         {{ t('channel-not-found') }}
       </h2>
-      <p class="text-muted-foreground mt-2">
+      <p class="mt-2 text-muted-foreground">
         {{ t('channel-not-found-description') }}
       </p>
-      <button class="mt-4 d-btn d-btn-primary text-white" @click="router.push(`/app/p/${packageId}/channels`)">
+      <button class="mt-4 text-white d-btn d-btn-primary" @click="router.push(`/app/p/${packageId}/channels`)">
         {{ t('back-to-channels') }}
       </button>
     </div>
@@ -867,9 +867,9 @@ async function handleRevert() {
 
     <!-- Teleport Content for Bundle Link Dialog -->
     <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('bundle-management')" defer to="#dialog-v2-content">
-      <div class="w-full space-y-4">
+      <div class="space-y-4 w-full">
         <div class="text-left">
-          <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+          <p class="mb-4 text-sm text-gray-600 dark:text-gray-400">
             {{ t('select-bundle-action-for-channel') }}
           </p>
         </div>
@@ -889,8 +889,8 @@ async function handleRevert() {
 
         <div class="space-y-3">
           <!-- Current Bundle Info -->
-          <div class="p-3 border border-green-300 dark:border-green-600 bg-green-50 dark:bg-green-900/20 rounded-lg">
-            <div class="flex items-center justify-between">
+          <div class="p-3 bg-green-50 rounded-lg border border-green-300 dark:border-green-600 dark:bg-green-900/20">
+            <div class="flex justify-between items-center">
               <div>
                 <div class="font-medium text-green-800 dark:text-green-200">
                   {{ t('current-bundle') }}
@@ -899,7 +899,7 @@ async function handleRevert() {
                   {{ currentChannelVersion?.name || t('unknown') }}
                 </div>
               </div>
-              <div class="text-green-600 dark:text-green-400 text-xl">
+              <div class="text-xl text-green-600 dark:text-green-400">
                 🔗
               </div>
             </div>
@@ -913,10 +913,10 @@ async function handleRevert() {
             <div
               v-for="version in bundleLinkVersions"
               :key="version.id"
-              class="p-3 border border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700"
+              class="p-3 rounded-lg border border-gray-300 cursor-pointer dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700"
               @click="handleVersionLink(version as any)"
             >
-              <div class="flex items-center justify-between">
+              <div class="flex justify-between items-center">
                 <div>
                   <div class="font-medium">
                     {{ version.name }}
@@ -936,10 +936,10 @@ async function handleRevert() {
           <div v-if="showSearchAndActions" class="space-y-3">
             <!-- Link New Bundle -->
             <div
-              class="p-3 border border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700"
+              class="p-3 rounded-lg border border-gray-300 cursor-pointer dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700"
               @click="bundleLinkSearchMode = true"
             >
-              <div class="flex items-center justify-between">
+              <div class="flex justify-between items-center">
                 <div>
                   <div class="font-medium">
                     {{ t('link-new-bundle') }}
@@ -956,10 +956,10 @@ async function handleRevert() {
 
             <!-- Unlink Bundle -->
             <div
-              class="p-3 border border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700"
+              class="p-3 rounded-lg border border-gray-300 cursor-pointer dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700"
               @click="handleUnlink"
             >
-              <div class="flex items-center justify-between">
+              <div class="flex justify-between items-center">
                 <div>
                   <div class="font-medium">
                     {{ t('unlink-bundle') }}
@@ -976,10 +976,10 @@ async function handleRevert() {
 
             <!-- Revert to Built-in -->
             <div
-              class="p-3 border border-red-300 dark:border-red-600 rounded-lg cursor-pointer hover:bg-red-50 dark:hover:bg-red-900/20"
+              class="p-3 rounded-lg border border-red-300 cursor-pointer dark:border-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
               @click="handleRevert"
             >
-              <div class="flex items-center justify-between">
+              <div class="flex justify-between items-center">
                 <div>
                   <div class="font-medium text-red-600 dark:text-red-400">
                     {{ t('revert-to-builtin') }}
@@ -996,14 +996,14 @@ async function handleRevert() {
           </div>
 
           <!-- Empty state for search -->
-          <div v-if="bundleLinkSearchMode && bundleLinkVersions.length === 0" class="text-center text-gray-500 dark:text-gray-400 py-8">
-            <div class="text-4xl mb-2">
+          <div v-if="bundleLinkSearchMode && bundleLinkVersions.length === 0" class="py-8 text-center text-gray-500 dark:text-gray-400">
+            <div class="mb-2 text-4xl">
               🔍
             </div>
             <div class="font-medium">
               {{ t('no-versions-found') }}
             </div>
-            <div class="text-sm mt-1">
+            <div class="mt-1 text-sm">
               {{ t('try-a-different-search-term') }}
             </div>
           </div>

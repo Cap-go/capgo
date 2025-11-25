@@ -23,7 +23,7 @@ const refStats = toRef(() => props.stats)
         <p
           v-if="!!s.value"
           id="stats-val"
-          class="font-bold dark:text-white font-pj lg:order-1 lg:mt-3"
+          class="font-bold lg:order-1 lg:mt-3 dark:text-white font-pj"
           :class="{
             'text-5xl group-hover:hidden': !props.mini && (s.link && (s.hoverLabel || s.link)),
             'text-3xl group-hover:hidden': props.mini && (s.link && (s.hoverLabel || s.link)),
@@ -36,12 +36,12 @@ const refStats = toRef(() => props.stats)
         <div v-else class="flex justify-center lg:order-1 lg:mt-3">
           <Spinner size="w-10 h-10 ml-auto mr-auto" />
         </div>
-        <div class="flex flex-row-reverse items-center justify-center flex-column">
-          <h3 class="mt-5 text-sm font-bold tracking-widest text-gray-400 uppercase font-pj lg:order-2 lg:mt-0">
+        <div class="flex flex-row-reverse justify-center items-center flex-column">
+          <h3 class="mt-5 text-sm font-bold tracking-widest text-gray-400 uppercase lg:order-2 lg:mt-0 font-pj">
             <span :class="{ 'group-hover:hidden': s.link && (s.hoverLabel || s.link) }">{{ s.label }}</span>
             <span v-if="s.link && (s.hoverLabel || s.link)" class="hidden group-hover:inline first-letter:uppercase">{{ s.hoverLabel || s.label }}</span>
           </h3>
-          <InformationInfo v-if="!!s.informationIcon" class="ml-1 hover:cursor-pointer hover:text-blue-500 hover:bg-blue-500 hover:text-white rounded-full" @click="(s.informationIcon as any)" />
+          <InformationInfo v-if="!!s.informationIcon" class="ml-1 rounded-full hover:text-white hover:text-blue-500 hover:bg-blue-500 hover:cursor-pointer" @click="(s.informationIcon as any)" />
         </div>
       </span>
     </component>

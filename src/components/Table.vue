@@ -391,20 +391,20 @@ const RenderCell = defineComponent<{
 </script>
 
 <template>
-  <div class="pb-4 overflow-x-auto md:pb-0">
-    <div class="flex items-start justify-between p-3 pb-4 md:items-center">
+  <div class="overflow-x-auto pb-4 md:pb-0">
+    <div class="flex justify-between items-start p-3 pb-4 md:items-center">
       <div class="flex h-10 md:mb-0">
         <button
-          class="mr-2 inline-flex items-center border border-gray-300 rounded-md bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-hidden focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 cursor-pointer"
+          class="inline-flex items-center py-1.5 px-3 mr-2 text-sm font-medium text-gray-500 bg-white rounded-md border border-gray-300 cursor-pointer dark:text-white dark:bg-gray-800 dark:border-gray-600 hover:bg-gray-100 focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 focus:outline-hidden"
           type="button" @click="emit('reset')"
         >
           <IconReload v-if="!isLoading" class="m-1 md:mr-2" />
           <Spinner v-else size="w-[16.8px] h-[16.8px] m-1 mr-2" />
           <span class="hidden text-sm md:block">{{ t("reload") }}</span>
         </button>
-        <div v-if="showAdd" class="mr-2 p-px rounded-lg from-cyan-500 to-purple-500 bg-linear-to-r">
+        <div v-if="showAdd" class="p-px mr-2 from-cyan-500 to-purple-500 rounded-lg bg-linear-to-r">
           <button
-            class="inline-flex items-center rounded-md bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-hidden focus:ring-4 focus:ring-gray-200 dark:hover:bg-gray-700 dark:focus:ring-gray-700 cursor-pointer"
+            class="inline-flex items-center py-1.5 px-3 text-sm font-medium text-gray-500 bg-white rounded-md cursor-pointer dark:text-white dark:bg-gray-800 hover:bg-gray-100 focus:ring-4 focus:ring-gray-200 dark:hover:bg-gray-700 dark:focus:ring-gray-700 focus:outline-hidden"
             type="button" @click="emit('add')"
           >
             <plusOutline v-if="!isLoading" class="m-1 md:mr-2" />
@@ -412,37 +412,37 @@ const RenderCell = defineComponent<{
             <span class="hidden text-sm md:block">{{ t("add-one") }}</span>
           </button>
         </div>
-        <div v-if="filterText && filterList.length" class="d-dropdown h-10">
+        <div v-if="filterText && filterList.length" class="h-10 d-dropdown">
           <button
             tabindex="0"
-            class="mr-2 inline-flex items-center border border-gray-300 rounded-md bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-hidden focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 cursor-pointer h-full"
+            class="inline-flex items-center py-1.5 px-3 mr-2 h-full text-sm font-medium text-gray-500 bg-white rounded-md border border-gray-300 cursor-pointer dark:text-white dark:bg-gray-800 dark:border-gray-600 hover:bg-gray-100 focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 focus:outline-hidden"
           >
             <div
               v-if="filterActivated"
-              class="absolute inline-flex items-center justify-center w-6 h-6 text-xs font-bold text-white bg-red-500 border-2 border-white rounded-full -right-2 -top-2 dark:border-gray-900"
+              class="inline-flex absolute -top-2 -right-2 justify-center items-center w-6 h-6 text-xs font-bold text-white bg-red-500 rounded-full border-2 border-white dark:border-gray-900"
             >
               {{ filterActivated }}
             </div>
-            <IconFilter class="w-4 h-4 mr-2" />
+            <IconFilter class="mr-2 w-4 h-4" />
             <span class="hidden md:block">{{ t(filterText) }}</span>
-            <IconDown class="hidden w-4 h-4 ml-2 md:block" />
+            <IconDown class="hidden ml-2 w-4 h-4 md:block" />
           </button>
-          <ul class="p-2 bg-white shadow d-dropdown-content d-menu dark:bg-base-200 rounded-box z-1 w-52">
+          <ul class="p-2 w-52 bg-white shadow d-dropdown-content d-menu rounded-box z-1 dark:bg-base-200">
             <li v-for="(f, i) in filterList" :key="i">
               <div
-                class="flex items-center p-2 rounded-sm hover:bg-gray-100 dark:hover:bg-gray-600 cursor-pointer"
+                class="flex items-center p-2 rounded-sm cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
               >
                 <input
                   :id="`filter-radio-example-${i}`" :checked="filters?.[f]" type="checkbox"
                   :name="`filter-radio-${i}`"
-                  class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 dark:ring-offset-gray-800 dark:focus:ring-blue-600 dark:focus:ring-offset-gray-800"
+                  class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:ring-offset-gray-800 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-600 dark:focus:ring-offset-gray-800"
                   @change="
                     emit('update:filters', { ...filters, [f]: !filters?.[f] })
                   "
                 >
                 <label
                   :for="`filter-radio-example-${i}`"
-                  class="w-full ml-2 text-sm font-medium text-gray-900 rounded-sm dark:text-gray-300 first-letter:uppercase cursor-pointer"
+                  class="ml-2 w-full text-sm font-medium text-gray-900 rounded-sm cursor-pointer dark:text-gray-300 first-letter:uppercase"
                 >{{
                   t(f) }}</label>
               </div>
@@ -452,7 +452,7 @@ const RenderCell = defineComponent<{
       </div>
       <button
         v-if="isSelectAllEnabled"
-        class="inline-flex items-center self-end px-3 py-2 ml-auto mr-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-lg dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-hidden focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 cursor-pointer"
+        class="inline-flex items-center self-end py-2 px-3 mr-2 ml-auto text-sm font-medium text-gray-500 bg-white rounded-lg border border-gray-300 cursor-pointer dark:text-white dark:bg-gray-800 dark:border-gray-600 hover:bg-gray-100 focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 focus:outline-hidden"
         type="button" @click="
           selectedRows = selectedRows.map(() => true);
           emit('selectRow', selectedRows);
@@ -462,12 +462,12 @@ const RenderCell = defineComponent<{
       </button>
       <button
         v-if="isSelectAllEnabled"
-        class="self-end mr-2 inline-flex items-center border border-gray-300 rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-hidden focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 cursor-pointer"
+        class="inline-flex items-center self-end py-1.5 px-3 mr-2 text-sm font-medium text-gray-500 bg-white rounded-lg border border-gray-300 cursor-pointer dark:text-white dark:bg-gray-800 dark:border-gray-600 hover:bg-gray-100 focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 focus:outline-hidden"
         type="button" @click="emit('massDelete')"
       >
         <IconTrash class="text-red-500 h-[24px]" />
       </button>
-      <div class="flex md:w-auto overflow-hidden">
+      <div class="flex overflow-hidden md:w-auto">
         <FormKit
           v-model="searchVal" :placeholder="searchPlaceholder" :prefix-icon="IconSearch"
           :disabled="isLoading" enterkeyhint="send" :classes="{
@@ -477,12 +477,12 @@ const RenderCell = defineComponent<{
       </div>
     </div>
     <div class="block">
-      <table id="custom_table" class="w-full text-sm text-left text-gray-500 dark:text-gray-400 md:pb-0 pb-14">
-        <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+      <table id="custom_table" class="pb-14 w-full text-sm text-left text-gray-500 md:pb-0 dark:text-gray-400">
+        <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:text-gray-400 dark:bg-gray-700">
           <tr>
             <th v-if="props.massSelect" class="px-4 md:px-6" />
             <th
-              v-for="(col, i) in columns" :key="i" scope="col" class="py-1 md:py-3 px-4 md:px-6" :class="{
+              v-for="(col, i) in columns" :key="i" scope="col" class="py-1 px-4 md:py-3 md:px-6" :class="{
                 'cursor-pointer': col.sortable,
                 'hidden md:table-cell': !col.mobile,
               }" @click="sortClick(i)"
@@ -501,7 +501,7 @@ const RenderCell = defineComponent<{
         <tbody v-if="shouldShowRows">
           <tr
             v-for="(elem, i) in elementList" :key="i"
-            class="bg-white border-b dark:border-gray-700 dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-600"
+            class="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600"
           >
             <template v-if="true">
               <th v-if="props.massSelect" class="px-4 md:px-6">
@@ -516,7 +516,7 @@ const RenderCell = defineComponent<{
                   } ${col.onClick
                     ? 'cursor-pointer hover:underline clickable-cell'
                     : ''
-                  }`" scope="row" class="py-2 md:py-4 px-4 md:px-6 font-medium text-gray-900 whitespace-nowrap dark:text-white"
+                  }`" scope="row" class="py-2 px-4 font-medium text-gray-900 whitespace-nowrap md:py-4 md:px-6 dark:text-white"
                   @click.stop="col.onClick ? col.onClick(elem) : () => { }"
                 >
                   <RenderCell v-if="col.renderFunction" :renderer="col.renderFunction" :item="elem" />
@@ -526,7 +526,7 @@ const RenderCell = defineComponent<{
                 </th>
                 <td
                   v-else-if="col.actions || col.icon" :class="`${col.class ?? ''} ${!col.mobile ? 'hidden md:table-cell' : ''
-                  }`" class="px-4 md:px-6 py-2 md:py-4"
+                  }`" class="py-2 px-4 md:py-4 md:px-6"
                 >
                   <div class="flex items-center space-x-1">
                     <template v-if="col.actions">
@@ -534,7 +534,7 @@ const RenderCell = defineComponent<{
                         v-for="(action, actionIndex) in col.actions"
                         v-show="!action.visible || action.visible(elem)" :key="actionIndex"
                         :disabled="action.disabled && action.disabled(elem)"
-                        class="p-2 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-600 dark:hover:text-gray-300 rounded-md cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-gray-500 dark:disabled:hover:text-gray-400"
+                        class="p-2 text-gray-500 rounded-md cursor-pointer dark:text-gray-400 hover:text-gray-600 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed dark:hover:bg-gray-700 dark:hover:text-gray-300 dark:disabled:hover:text-gray-400 disabled:hover:bg-transparent disabled:hover:text-gray-500"
                         @click.stop="action.onClick(elem)"
                       >
                         <component :is="action.icon" />
@@ -542,7 +542,7 @@ const RenderCell = defineComponent<{
                     </template>
                     <template v-else-if="col.icon">
                       <button
-                        class="p-2 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-600 dark:hover:text-gray-300 rounded-md cursor-pointer"
+                        class="p-2 text-gray-500 rounded-md cursor-pointer dark:text-gray-400 hover:text-gray-600 hover:bg-gray-200 dark:hover:bg-gray-700 dark:hover:text-gray-300"
                         @click.stop="col.onClick ? col.onClick(elem) : () => { }"
                       >
                         <component :is="col.icon" />
@@ -555,7 +555,7 @@ const RenderCell = defineComponent<{
                   } ${col.onClick
                     ? 'cursor-pointer hover:underline clickable-cell'
                     : ''
-                  } overflow-hidden text-ellipsis whitespace-nowrap`" class="px-4 md:px-6 py-2 md:py-4"
+                  } overflow-hidden text-ellipsis whitespace-nowrap`" class="py-2 px-4 md:py-4 md:px-6"
                   @click.stop="col.onClick ? col.onClick(elem) : () => { }"
                 >
                   <RenderCell v-if="col.renderFunction" :renderer="col.renderFunction" :item="elem" />
@@ -571,7 +571,7 @@ const RenderCell = defineComponent<{
           <tr>
             <td
               :colspan="columns.length + (props.massSelect ? 1 : 0)"
-              class="px-4 md:px-6 py-2 md:py-4 text-center text-gray-500 dark:text-gray-400"
+              class="py-2 px-4 text-center text-gray-500 md:py-4 md:px-6 dark:text-gray-400"
             >
               {{ t("no_elements_found") }}
             </td>
@@ -580,17 +580,17 @@ const RenderCell = defineComponent<{
         <tbody v-else>
           <tr v-for="i in 10" :key="i" :class="{ 'animate-pulse duration-1000': shouldShowSkeleton }">
             <td
-              v-if="props.massSelect" class="px-4 md:px-6 py-2 md:py-4"
+              v-if="props.massSelect" class="py-2 px-4 md:py-4 md:px-6"
               :style="`width: ${getSkeletonWidth()}`"
             >
-              <div class="rounded-full bg-gray-200 dark:bg-gray-700 w-full mb-4 h-2.5" />
+              <div class="mb-4 w-full h-2.5 bg-gray-200 rounded-full dark:bg-gray-700" />
             </td>
             <td
-              v-for="(col, y) in columns" :key="`${i}_${y}`" class="px-4 md:px-6 py-2 md:py-4"
+              v-for="(col, y) in columns" :key="`${i}_${y}`" class="py-2 px-4 md:py-4 md:px-6"
               :class="{ 'hidden md:table-cell': !col.mobile }" :style="`width: ${getSkeletonWidth(y)}`"
             >
               <div
-                class="rounded-full bg-gray-200 dark:bg-gray-700 w-full"
+                class="w-full bg-gray-200 rounded-full dark:bg-gray-700"
                 :class="{ 'mb-4 h-2.5': col.head, 'h-2 mb-2.5': !col.head }"
               />
             </td>
@@ -600,7 +600,7 @@ const RenderCell = defineComponent<{
     </div>
 
     <nav
-      class="fixed bottom-0 left-0 z-40 flex items-center justify-between w-full p-4 bg-white md:relative dark:bg-gray-900 md:bg-transparent md:pt-4 dark:md:bg-transparent"
+      class="flex fixed bottom-0 left-0 z-40 justify-between items-center p-4 w-full bg-white md:relative md:pt-4 md:bg-transparent dark:bg-gray-900 dark:md:bg-transparent"
       aria-label="Table navigation"
     >
       <span class="text-sm font-normal text-gray-500 dark:text-gray-400"><span class="hidden md:inline-block">{{
@@ -615,7 +615,7 @@ const RenderCell = defineComponent<{
       <ul class="inline-flex items-center -space-x-px">
         <li>
           <button
-            class="block px-3 py-2 ml-0 leading-tight text-gray-500 bg-white border border-gray-300 rounded-l-lg dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 cursor-pointer"
+            class="block py-2 px-3 ml-0 leading-tight text-gray-500 bg-white rounded-l-lg border border-gray-300 cursor-pointer dark:text-gray-400 dark:bg-gray-800 dark:border-gray-700"
             :class="{
               'hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-700 dark:hover:text-white':
                 canPrev(),
@@ -627,7 +627,7 @@ const RenderCell = defineComponent<{
         </li>
         <li>
           <button
-            class="block px-3 py-2 ml-0 leading-tight text-gray-500 bg-white border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 cursor-pointer"
+            class="block py-2 px-3 ml-0 leading-tight text-gray-500 bg-white border border-gray-300 cursor-pointer dark:text-gray-400 dark:bg-gray-800 dark:border-gray-700"
             :class="{
               'hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-700 dark:hover:text-white':
                 canPrev(),
@@ -640,7 +640,7 @@ const RenderCell = defineComponent<{
         <li>
           <button
             aria-current="page"
-            class="z-10 px-3 py-2 leading-tight text-blue-600 border border-blue-300 bg-blue-50 dark:border-gray-700 dark:bg-gray-700 dark:text-white"
+            class="z-10 py-2 px-3 leading-tight text-blue-600 bg-blue-50 border border-blue-300 dark:text-white dark:bg-gray-700 dark:border-gray-700"
             disabled
           >
             {{ currentPage }}
@@ -648,7 +648,7 @@ const RenderCell = defineComponent<{
         </li>
         <li>
           <button
-            class="block px-3 py-2 leading-tight text-gray-500 bg-white border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 cursor-pointer"
+            class="block py-2 px-3 leading-tight text-gray-500 bg-white border border-gray-300 cursor-pointer dark:text-gray-400 dark:bg-gray-800 dark:border-gray-700"
             :class="{
               'hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-700 dark:hover:text-white':
                 canNext(),
@@ -660,7 +660,7 @@ const RenderCell = defineComponent<{
         </li>
         <li>
           <button
-            class="block px-3 py-2 leading-tight text-gray-500 bg-white border border-gray-300 rounded-r-lg dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 cursor-pointer"
+            class="block py-2 px-3 leading-tight text-gray-500 bg-white rounded-r-lg border border-gray-300 cursor-pointer dark:text-gray-400 dark:bg-gray-800 dark:border-gray-700"
             :class="{
               'hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-700 dark:hover:text-white':
                 canNext(),

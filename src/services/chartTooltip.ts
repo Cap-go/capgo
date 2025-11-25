@@ -180,7 +180,7 @@ export function createCustomTooltip(context: TooltipContext, isAccumulated: bool
       const bgColor = typeof item.colors.backgroundColor === 'string' ? item.colors.backgroundColor : '#666'
       const borderColor = typeof item.colors.borderColor === 'string' ? item.colors.borderColor : '#999'
 
-      const colorIndicator = `<div style="width: 12px; height: 12px; background-color: ${bgColor}; border: 1px solid ${borderColor}; border-radius: 2px; margin-right: 8px; flex-shrink: 0;"></div>`
+      const colorIndicator = `<div style="width: 12px; height: 12px; background-color: ${bgColor}; border: 1px solid ${borderColor}; border-radius: 2px; margin-right: 8px; shrink: 0;"></div>`
       const textContent = `<span style="font-size: 11px;">${item.body.join(' ')}</span>`
 
       innerHtml += `<div style="display: flex; align-items: center; margin-bottom: 4px;">${colorIndicator}${textContent}</div>`

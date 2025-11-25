@@ -28,8 +28,8 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="flex flex-col items-center justify-center min-h-screen p-4 bg-gray-50">
-    <div class="w-full max-w-md p-8 space-y-6 bg-white rounded-lg shadow-lg">
+  <div class="flex flex-col justify-center items-center p-4 min-h-screen bg-gray-50">
+    <div class="p-8 space-y-6 w-full max-w-md bg-white rounded-lg shadow-lg">
       <div class="text-center">
         <h1 class="text-2xl font-bold text-gray-900">
           Email Confirmation

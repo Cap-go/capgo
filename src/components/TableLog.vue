@@ -378,16 +378,16 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="pb-4 overflow-x-auto md:pb-0">
-    <div class="flex items-start justify-between p-3 pb-4 md:items-center">
+  <div class="overflow-x-auto pb-4 md:pb-0">
+    <div class="flex justify-between items-start p-3 pb-4 md:items-center">
       <div class="flex h-10 md:mb-0">
-        <button class="mr-2 inline-flex items-center border border-gray-300 rounded-md bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-hidden focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700" type="button" @click="resetTime">
+        <button class="inline-flex items-center py-1.5 px-3 mr-2 text-sm font-medium text-gray-500 bg-white rounded-md border border-gray-300 dark:text-white dark:bg-gray-800 dark:border-gray-600 hover:bg-gray-100 focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 focus:outline-hidden" type="button" @click="resetTime">
           <IconReload v-if="!isLoading" class="m-1 md:mr-2" />
           <Spinner v-else size="w-[16.8px] h-[16.8px] m-1 mr-2" />
           <span class="hidden text-sm md:block">{{ t('reload') }}</span>
         </button>
       </div>
-      <div class="flex h-10 mr-2 md:mr-auto">
+      <div class="flex mr-2 h-10 md:mr-auto">
         <VueDatePicker
           ref="datepicker"
           v-model="preciseDates"
@@ -407,9 +407,9 @@ onMounted(async () => {
           <template #trigger>
             <button
               type="button"
-              class="inline-flex h-10 items-center gap-2 border border-gray-300 rounded-md bg-white px-3 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-100 transition-colors dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:hover:bg-gray-700 focus:outline-hidden focus:ring-4 focus:ring-gray-200 dark:focus:ring-gray-700"
+              class="inline-flex gap-2 items-center py-1.5 px-3 h-10 text-sm font-medium text-gray-600 bg-white rounded-md border border-gray-300 transition-colors dark:text-white dark:bg-gray-800 dark:border-gray-600 hover:bg-gray-100 focus:ring-4 focus:ring-gray-200 dark:hover:bg-gray-700 dark:focus:ring-gray-700 focus:outline-hidden"
             >
-              <IconCalendar class="w-4 h-4 hidden md:block" />
+              <IconCalendar class="hidden w-4 h-4 md:block" />
               <span class="hidden md:block truncate">
                 {{ buttonLabel }}
               </span>
@@ -420,11 +420,11 @@ onMounted(async () => {
             </button>
           </template>
           <template #calendar-icon>
-            <div class="flex items-center justify-center w-full gap-2 text-xs md:text-sm font-medium text-neutral-700 dark:text-neutral-200">
+            <div class="flex gap-2 justify-center items-center w-full text-xs font-medium md:text-sm text-neutral-700 dark:text-neutral-200">
               <IconCalendar class="hidden md:block" />
-              <div class="flex flex-1 items-center justify-center gap-2">
-                <div class="flex flex-1 items-center justify-center gap-2 bg-gray-100 dark:bg-gray-700 px-3 py-1.5 rounded-full min-w-0">
-                  <span class="truncate text-center w-full">{{ calendarPreview.start }}</span>
+              <div class="flex flex-1 gap-2 justify-center items-center">
+                <div class="flex flex-1 gap-2 justify-center items-center py-1.5 px-3 min-w-0 bg-gray-100 rounded-full dark:bg-gray-700">
+                  <span class="w-full text-center truncate">{{ calendarPreview.start }}</span>
                 </div>
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
@@ -441,21 +441,21 @@ onMounted(async () => {
                   <path d="M5 12h14" />
                   <path d="m12 5 7 7-7 7" />
                 </svg>
-                <div class="flex flex-1 items-center justify-center gap-2 bg-gray-100 dark:bg-gray-700 px-3 py-1.5 rounded-full min-w-0">
-                  <span class="truncate text-center w-full">{{ calendarPreview.end }}</span>
+                <div class="flex flex-1 gap-2 justify-center items-center py-1.5 px-3 min-w-0 bg-gray-100 rounded-full dark:bg-gray-700">
+                  <span class="w-full text-center truncate">{{ calendarPreview.end }}</span>
                 </div>
               </div>
             </div>
           </template>
           <template #top-extra="{ value }">
             <div class="flex flex-col gap-2 md:mb-2">
-              <div class="flex flex-wrap items-center gap-2">
-                <span class="ml-2 text-xs uppercase tracking-wide text-gray-500 dark:text-neutral-400">{{ quickGroupLabel }}</span>
+              <div class="flex flex-wrap gap-2 items-center">
+                <span class="ml-2 text-xs tracking-wide text-gray-500 uppercase dark:text-neutral-400">{{ quickGroupLabel }}</span>
                 <button
                   v-for="option in quickOptions"
                   :key="option"
                   type="button"
-                  class="inline-flex cursor-pointer items-center px-3 py-1.5 text-xs md:text-sm rounded-full border border-gray-200/80 text-gray-600 bg-gray-50 transition-colors hover:bg-gray-100 dark:border-gray-600/60 dark:bg-gray-800/60 dark:text-neutral-200 dark:hover:bg-gray-700/70 disabled:opacity-80 disabled:cursor-default disabled:hover:bg-gray-50 disabled:dark:hover:bg-gray-800/60"
+                  class="inline-flex items-center py-1.5 px-3 text-xs text-gray-600 bg-gray-50 rounded-full border transition-colors cursor-pointer md:text-sm hover:bg-gray-100 disabled:opacity-80 disabled:cursor-default border-gray-200/80 dark:border-gray-600/60 dark:bg-gray-800/60 dark:text-neutral-200 dark:hover:bg-gray-700/70 disabled:hover:bg-gray-50 disabled:dark:hover:bg-gray-800/60"
                   :class="{
                     'bg-gray-900 text-white border-gray-900 dark:bg-gray-100 dark:text-gray-900 dark:border-gray-100': currentSelected === 'general' && currentGeneralTime === option,
                   }"
@@ -465,11 +465,11 @@ onMounted(async () => {
                   {{ quickLabel(option) }}
                 </button>
               </div>
-              <div class="flex items-center justify-center w-full gap-2 cursor-pointer text-neutral-700 dark:text-neutral-200 px-2 py-1.5 transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md" @click="openTimePicker">
+              <div class="flex gap-2 justify-center items-center py-1.5 px-2 w-full rounded-md transition-colors cursor-pointer hover:bg-gray-100 text-neutral-700 dark:text-neutral-200 dark:hover:bg-gray-700" @click="openTimePicker">
                 <IconClock class="hidden md:block" />
-                <div class="flex flex-1 items-center justify-center gap-2">
-                  <div class="flex flex-1 items-center justify-center gap-2 bg-gray-100 dark:bg-gray-700 px-3 py-1.5 rounded-full min-w-0">
-                    <span class="text-xs md:text-sm font-medium truncate text-center w-full">{{ formatValue(value as any).start }}</span>
+                <div class="flex flex-1 gap-2 justify-center items-center">
+                  <div class="flex flex-1 gap-2 justify-center items-center py-1.5 px-3 min-w-0 bg-gray-100 rounded-full dark:bg-gray-700">
+                    <span class="w-full text-xs font-medium text-center md:text-sm truncate">{{ formatValue(value as any).start }}</span>
                   </div>
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -486,19 +486,19 @@ onMounted(async () => {
                     <path d="M5 12h14" />
                     <path d="m12 5 7 7-7 7" />
                   </svg>
-                  <div class="flex flex-1 items-center justify-center gap-2 bg-gray-100 dark:bg-gray-700 px-3 py-1.5 rounded-full min-w-0">
-                    <span class="text-xs md:text-sm font-medium truncate text-center w-full">{{ formatValue(value as any).end }}</span>
+                  <div class="flex flex-1 gap-2 justify-center items-center py-1.5 px-3 min-w-0 bg-gray-100 rounded-full dark:bg-gray-700">
+                    <span class="w-full text-xs font-medium text-center md:text-sm truncate">{{ formatValue(value as any).end }}</span>
                   </div>
                 </div>
               </div>
             </div>
           </template>
           <template #clock-icon>
-            <div class="flex items-center justify-center w-full gap-2 text-xs md:text-sm font-medium text-neutral-700 dark:text-neutral-200">
+            <div class="flex gap-2 justify-center items-center w-full text-xs font-medium md:text-sm text-neutral-700 dark:text-neutral-200">
               <IconClock class="hidden md:block" />
-              <div class="flex flex-1 items-center justify-center gap-2">
-                <div class="flex flex-1 items-center justify-center gap-2 bg-gray-100 dark:bg-gray-700 px-3 py-1.5 rounded-full min-w-0">
-                  <span class="truncate text-center w-full">{{ timePreview.start }}</span>
+              <div class="flex flex-1 gap-2 justify-center items-center">
+                <div class="flex flex-1 gap-2 justify-center items-center py-1.5 px-3 min-w-0 bg-gray-100 rounded-full dark:bg-gray-700">
+                  <span class="w-full text-center truncate">{{ timePreview.start }}</span>
                 </div>
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
@@ -515,15 +515,15 @@ onMounted(async () => {
                   <path d="M5 12h14" />
                   <path d="m12 5 7 7-7 7" />
                 </svg>
-                <div class="flex flex-1 items-center justify-center gap-2 bg-gray-100 dark:bg-gray-700 px-3 py-1.5 rounded-full min-w-0">
-                  <span class="truncate text-center w-full">{{ timePreview.end }}</span>
+                <div class="flex flex-1 gap-2 justify-center items-center py-1.5 px-3 min-w-0 bg-gray-100 rounded-full dark:bg-gray-700">
+                  <span class="w-full text-center truncate">{{ timePreview.end }}</span>
                 </div>
               </div>
             </div>
           </template>
         </VueDatePicker>
       </div>
-      <div class="flex md:w-auto overflow-hidden">
+      <div class="flex overflow-hidden md:w-auto">
         <FormKit
           v-model="searchVal"
           :placeholder="searchPlaceholder"
@@ -537,9 +537,9 @@ onMounted(async () => {
     </div>
     <div class="block">
       <table id="custom_table" class="w-full text-sm text-left text-gray-500 dark:text-gray-400">
-        <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+        <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:text-gray-400 dark:bg-gray-700">
           <tr>
-            <th v-for="(col, i) in columns" :key="i" scope="col" class="px-1 md:px-6 py-3" :class="{ 'cursor-pointer': col.sortable, 'hidden md:table-cell': !col.mobile }" @click="sortClick(i)">
+            <th v-for="(col, i) in columns" :key="i" scope="col" class="py-3 px-1 md:px-6" :class="{ 'cursor-pointer': col.sortable, 'hidden md:table-cell': !col.mobile }" @click="sortClick(i)">
               <div class="flex items-center first-letter:uppercase">
                 {{ col.label }}
                 <div v-if="col.sortable">
@@ -554,16 +554,16 @@ onMounted(async () => {
         <tbody v-if="!isLoading && elementList.length !== 0">
           <tr
             v-for="(elem, i) in elementList" :key="i"
-            class="bg-white border-b dark:border-gray-700 dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-600"
+            class="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600"
           >
             <template v-for="(col, _y) in columns" :key="`${i}_${_y}`">
-              <th v-if="col.head" :class="`${col.class} ${!col.mobile ? 'hidden md:table-cell' : ''} ${col.onClick ? 'cursor-pointer hover:underline clickable-cell' : ''}`" scope="row" class="px-1 md:px-6 py-1 md:py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white" @click.stop="col.onClick ? col.onClick(elem) : () => {}">
+              <th v-if="col.head" :class="`${col.class} ${!col.mobile ? 'hidden md:table-cell' : ''} ${col.onClick ? 'cursor-pointer hover:underline clickable-cell' : ''}`" scope="row" class="py-1 px-1 font-medium text-gray-900 whitespace-nowrap md:py-4 md:px-6 dark:text-white" @click.stop="col.onClick ? col.onClick(elem) : () => {}">
                 {{ displayValueKey(elem, col) }}
               </th>
-              <td v-else-if="col.icon" :class="`${col.class} ${!col.mobile ? 'hidden md:table-cell' : ''}`" class="px-1 md:px-6 py-1 md:py-4 cursor-pointer" @click.stop="col.onClick ? col.onClick(elem) : () => {}">
+              <td v-else-if="col.icon" :class="`${col.class} ${!col.mobile ? 'hidden md:table-cell' : ''}`" class="py-1 px-1 cursor-pointer md:py-4 md:px-6" @click.stop="col.onClick ? col.onClick(elem) : () => {}">
                 <component :is="col.icon" />
               </td>
-              <td v-else :class="`${col.class} ${!col.mobile ? 'hidden md:table-cell' : ''} ${col.onClick ? 'cursor-pointer hover:underline clickable-cell' : ''}`" class="px-1 md:px-6 py-1 md:py-4" @click.stop="col.onClick ? col.onClick(elem) : () => {}">
+              <td v-else :class="`${col.class} ${!col.mobile ? 'hidden md:table-cell' : ''} ${col.onClick ? 'cursor-pointer hover:underline clickable-cell' : ''}`" class="py-1 px-1 md:py-4 md:px-6" @click.stop="col.onClick ? col.onClick(elem) : () => {}">
                 {{ displayValueKey(elem, col) }}
               </td>
             </template>
@@ -571,23 +571,23 @@ onMounted(async () => {
         </tbody>
         <tbody v-else-if="!isLoading && elementList.length === 0">
           <tr>
-            <td :colspan="columns.length" class="py-1 md:py-4 px-1 md:px-6 text-center text-gray-500 dark:text-gray-400">
+            <td :colspan="columns.length" class="py-1 px-1 text-center text-gray-500 md:py-4 md:px-6 dark:text-gray-400">
               {{ t('no_elements_found') }}
             </td>
           </tr>
         </tbody>
         <tbody v-else>
           <tr v-for="i in 10" :key="i" class="max-w-sm" :class="{ 'animate-pulse duration-1000': isLoading }">
-            <td v-for="(col, y) in columns" :key="`${i}_${y}`" class="px-1 md:px-6 py-1 md:py-4">
-              <div class="max-w-[300px] rounded-full bg-gray-200 dark:bg-gray-700" :class="{ 'mb-4 h-2.5': col.head, 'h-2 mb-2.5': !col.head }" />
+            <td v-for="(col, y) in columns" :key="`${i}_${y}`" class="py-1 px-1 md:py-4 md:px-6">
+              <div class="bg-gray-200 rounded-full dark:bg-gray-700 max-w-[300px]" :class="{ 'mb-4 h-2.5': col.head, 'h-2 mb-2.5': !col.head }" />
             </td>
           </tr>
         </tbody>
       </table>
     </div>
-    <nav class="fixed bottom-0 left-0 z-40 flex items-center justify-between w-full p-4 bg-white md:relative dark:bg-gray-900 md:bg-transparent md:pt-4 dark:md:bg-transparent" aria-label="Table navigation">
+    <nav class="flex fixed bottom-0 left-0 z-40 justify-between items-center p-4 w-full bg-white md:relative md:pt-4 md:bg-transparent dark:bg-gray-900 dark:md:bg-transparent" aria-label="Table navigation">
       <button
-        class="flex items-center justify-center h-10 px-4 py-2 space-x-2 text-sm font-medium transition-colors border border-gray-300 rounded-md dark:text-white dark:border-gray-700 whitespace-nowrap ring-offset-background focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:bg-primary/10 dark:hover:bg-primary/90"
+        class="flex justify-center items-center py-2 px-4 space-x-2 h-10 text-sm font-medium whitespace-nowrap rounded-md border border-gray-300 transition-colors dark:text-white dark:border-gray-700 focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-background dark:hover:bg-primary/90 hover:bg-primary/10 focus-visible:outline-hidden focus-visible:ring-ring"
         @click="fastBackward"
       >
         <IconFastBackward />

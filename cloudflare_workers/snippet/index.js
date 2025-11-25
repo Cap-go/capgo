@@ -377,15 +377,16 @@ export default {
     // colo: The three-letter IATA ↗ airport code of the data center that the request hit, for example, "DFW".
     // more on the cf object: https://developers.cloudflare.com/workers/runtime-apis/request#incomingrequestcfproperties
     const continent = mapped[request.cf.colo] ?? EuropeZone
-    const path = new URL(request.url).pathname
+    const url = new URL(request.url)
+    const pathWithQuery = url.pathname + url.search
     // If country is not null and is defined in the country map above, redirect.
     if (continent != null && continent in continentMap) {
       const baseUrl = continentMap[continent]
       // Remove this logging statement from your final output.
       console.log(
-        `Based on ${continent}-based request, your user would go to ${baseUrl}${path}.`,
+        `Based on ${continent}-based request, your user would go to ${baseUrl}${pathWithQuery}.`,
       )
-      return fetch(`${baseUrl}${path}`, request)
+      return fetch(`${baseUrl}${pathWithQuery}`, request)
 
       // If request country not in map, return another page.
     }

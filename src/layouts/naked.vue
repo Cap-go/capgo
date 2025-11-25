@@ -1,6 +1,6 @@
 <template>
-  <div class="flex h-full overflow-hidden pt-safe">
-    <main class="w-full h-full overflow-y-hidden">
+  <div class="flex overflow-hidden h-full pt-safe">
+    <main class="overflow-y-hidden w-full h-full">
       <RouterView class="static" />
     </main>
   </div>

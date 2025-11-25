@@ -400,20 +400,20 @@ async function copyCurlCommand() {
 
 <template>
   <div>
-    <div v-if="isLoading" class="flex flex-col items-center justify-center min-h-[50vh]">
+    <div v-if="isLoading" class="flex flex-col justify-center items-center min-h-[50vh]">
       <Spinner size="w-40 h-40" />
     </div>
     <div v-else-if="device">
       <Tabs v-model:active-tab="ActiveTab" :tabs="tabs" />
       <div v-if="ActiveTab === 'info'" id="devices" class="mt-0 md:mt-8">
-        <div class="w-full h-full px-0 pt-0 md:pt-8 mx-auto mb-8 overflow-y-auto max-w-9xl max-h-fit sm:px-6 lg:px-8">
-          <div v-if="device.plugin_version === '0.0.0'" class="my-2 bg-[#ef4444] text-center text-white w-fit ml-auto mr-auto border-8 rounded-2xl border-[#ef4444]">
+        <div class="overflow-y-auto px-0 pt-0 mx-auto mb-8 w-full h-full sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
+          <div v-if="device.plugin_version === '0.0.0'" class="my-2 mr-auto ml-auto text-center text-white rounded-2xl border-8 bg-[#ef4444] w-fit border-[#ef4444]">
             {{ t('device-injected') }}
             <br>
             {{ t('device-injected-2') }}
           </div>
-          <div class="flex flex-col overflow-hidden overflow-y-auto bg-white border border-slate-300 shadow-lg md:rounded-lg dark:border-slate-900 dark:bg-gray-800">
-            <dl :key="reloadCount" class="divide-y dark:divide-slate-500 divide-slate-200">
+          <div class="flex overflow-hidden overflow-y-auto flex-col bg-white border shadow-lg md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900">
+            <dl :key="reloadCount" class="divide-y divide-slate-200 dark:divide-slate-500">
               <InfoRow :label="t('device-id')">
                 {{ device.device_id }}
               </InfoRow>
@@ -448,15 +448,15 @@ async function copyCurlCommand() {
                 {{ device.is_prod?.toString() }}
               </InfoRow>
               <InfoRow :label="t('channel-link')" :value="channelDevice?.name ?? ''" :is-link="true" @click="openChannel()">
-                <details ref="channelDropdown" class="d-dropdown d-dropdown-end relative" @click.stop>
+                <details ref="channelDropdown" class="relative d-dropdown d-dropdown-end" @click.stop>
                   <summary class="d-btn d-btn-outline d-btn-sm">
                     <span>{{ getChannelLabel(channelDevice?.id || 'none') }}</span>
-                    <IconDown class="w-4 h-4 ml-1 fill-current" />
+                    <IconDown class="ml-1 w-4 h-4 fill-current" />
                   </summary>
-                  <ul class="d-dropdown-content bg-base-200 rounded-box z-50 w-48 p-2 shadow-lg absolute right-0 top-full mt-1">
+                  <ul class="absolute right-0 top-full z-50 p-2 mt-1 w-48 shadow-lg d-dropdown-content bg-base-200 rounded-box">
                     <li class="block px-1 rounded-lg hover:bg-gray-600">
                       <a
-                        class="block px-3 py-2 hover:bg-gray-600 text-white"
+                        class="block py-2 px-3 text-white hover:bg-gray-600"
                         @click="onSelectChannel('none')"
                       >
                         {{ t('none') }}
@@ -464,7 +464,7 @@ async function copyCurlCommand() {
                     </li>
                     <li v-for="ch in channels" :key="ch.id" class="block px-1 rounded-lg hover:bg-gray-600">
                       <a
-                        class="block px-3 py-2 hover:bg-gray-600 text-white"
+                        class="block py-2 px-3 text-white hover:bg-gray-600"
                         @click="onSelectChannel(ch.id.toString())"
                       >
                         {{ ch.name }}
@@ -478,24 +478,24 @@ async function copyCurlCommand() {
             <!-- Debug API Section -->
             <div class="border-t border-slate-300 dark:border-slate-700">
               <button
-                class="w-full px-6 py-4 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
+                class="flex justify-between items-center py-4 px-6 w-full transition-colors dark:hover:bg-slate-700/50 hover:bg-slate-50"
                 @click="showDebugSection = !showDebugSection"
               >
-                <div class="flex items-center gap-2">
+                <div class="flex gap-2 items-center">
                   <IconCode class="w-5 h-5 text-slate-600 dark:text-slate-300" />
                   <span class="font-medium text-slate-700 dark:text-slate-200">{{ t('debug-api-request') }}</span>
                 </div>
                 <IconDown
-                  class="w-5 h-5 text-slate-600 dark:text-slate-300 transition-transform"
+                  class="w-5 h-5 transition-transform text-slate-600 dark:text-slate-300"
                   :class="{ 'rotate-180': showDebugSection }"
                 />
               </button>
 
               <div v-if="showDebugSection" class="px-6 pb-4">
                 <div class="relative">
-                  <pre class="bg-slate-900 text-slate-100 p-4 rounded-lg overflow-x-auto text-sm"><code>{{ getCurlCommand() }}</code></pre>
+                  <pre class="overflow-x-auto p-4 text-sm rounded-lg bg-slate-900 text-slate-100"><code>{{ getCurlCommand() }}</code></pre>
                   <button
-                    class="absolute top-2 right-2 p-2 rounded hover:bg-slate-700 transition-colors"
+                    class="absolute top-2 right-2 p-2 rounded transition-colors hover:bg-slate-700"
                     :title="t('copy-curl')"
                     @click="copyCurlCommand"
                   >
@@ -511,8 +511,8 @@ async function copyCurlCommand() {
         </div>
       </div>
       <div v-else-if="ActiveTab === 'logs'" id="devices">
-        <div class="w-full h-full px-0 pt-0 md:pt-8 mx-auto mb-8 overflow-y-auto max-w-9xl max-h-fit sm:px-6 lg:px-8">
-          <div class="flex flex-col overflow-hidden overflow-y-auto bg-white border border-slate-300 shadow-lg md:rounded-lg dark:border-slate-900 dark:bg-gray-800">
+        <div class="overflow-y-auto px-0 pt-0 mx-auto mb-8 w-full h-full sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
+          <div class="flex overflow-hidden overflow-y-auto flex-col bg-white border shadow-lg md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900">
             <LogTable
               class="p-3"
               :device-id="id"
@@ -522,15 +522,15 @@ async function copyCurlCommand() {
         </div>
       </div>
     </div>
-    <div v-else class="flex flex-col items-center justify-center min-h-[50vh]">
-      <IconAlertCircle class="w-16 h-16 text-destructive mb-4" />
+    <div v-else class="flex flex-col justify-center items-center min-h-[50vh]">
+      <IconAlertCircle class="mb-4 w-16 h-16 text-destructive" />
       <h2 class="text-xl font-semibold text-foreground">
         {{ t('device-not-found') }}
       </h2>
-      <p class="text-muted-foreground mt-2">
+      <p class="mt-2 text-muted-foreground">
         {{ t('device-not-found-description') }}
       </p>
-      <button class="mt-4 d-btn d-btn-primary text-white" @click="router.push(`/app/p/${packageId}/devices`)">
+      <button class="mt-4 text-white d-btn d-btn-primary" @click="router.push(`/app/p/${packageId}/devices`)">
         {{ t('back-to-devices') }}
       </button>
     </div>
