@@ -3,7 +3,7 @@ BEGIN;
 CREATE EXTENSION "basejump-supabase_test_helpers";
 
 SELECT
-  plan (15);
+  plan (17);
 
 DO $$
 BEGIN
@@ -374,6 +374,164 @@ SELECT
         ),
         'expiry transaction recorded'
     );
+
+-- usage_credit_ledger view aggregates deductions per overage event
+WITH setup AS (
+  SELECT gen_random_uuid() AS org_id
+),
+grant_one AS (
+  INSERT INTO public.usage_credit_grants (
+    org_id,
+    credits_total,
+    credits_consumed,
+    granted_at,
+    expires_at,
+    source
+  )
+  SELECT
+    org_id,
+    50,
+    0,
+    now(),
+    now() + interval '1 year',
+    'manual'
+  FROM setup
+  RETURNING id,
+    org_id
+),
+grant_two AS (
+  INSERT INTO public.usage_credit_grants (
+    org_id,
+    credits_total,
+    credits_consumed,
+    granted_at,
+    expires_at,
+    source
+  )
+  SELECT
+    org_id,
+    25,
+    0,
+    now(),
+    now() + interval '1 year',
+    'manual'
+  FROM setup
+  RETURNING id,
+    org_id
+),
+overage AS (
+  INSERT INTO public.usage_overage_events (
+    org_id,
+    metric,
+    overage_amount,
+    credits_estimated,
+    credits_debited,
+    billing_cycle_start,
+    billing_cycle_end,
+    details
+  )
+  SELECT
+    org_id,
+    'mau',
+    1000,
+    10,
+    10,
+    current_date - interval '1 month',
+    current_date,
+    jsonb_build_object('note', 'ledger view test overage')
+  FROM setup
+  RETURNING id,
+    org_id
+),
+consumptions AS (
+  INSERT INTO public.usage_credit_consumptions (
+    grant_id,
+    org_id,
+    overage_event_id,
+    metric,
+    credits_used,
+    applied_at
+  )
+  SELECT
+    g.id,
+    g.org_id,
+    o.id,
+    'mau',
+    6,
+    now()
+  FROM grant_one g,
+    overage o
+  UNION ALL
+  SELECT
+    g.id,
+    g.org_id,
+    o.id,
+    'mau',
+    4,
+    now()
+  FROM grant_two g,
+    overage o
+),
+deductions AS (
+  INSERT INTO public.usage_credit_transactions (
+    org_id,
+    grant_id,
+    transaction_type,
+    amount,
+    balance_after,
+    occurred_at,
+    description,
+    source_ref
+  )
+  SELECT
+    o.org_id,
+    g.id,
+    'deduction',
+    -6,
+    94,
+    now() - interval '2 minutes',
+    'Overage deduction portion 1',
+    jsonb_build_object('overage_event_id', o.id, 'metric', 'mau')
+  FROM overage o,
+    grant_one g
+  UNION ALL
+  SELECT
+    o.org_id,
+    g.id,
+    'deduction',
+    -4,
+    90,
+    now() - interval '1 minute',
+    'Overage deduction portion 2',
+    jsonb_build_object('overage_event_id', o.id, 'metric', 'mau')
+  FROM overage o,
+    grant_two g
+)
+SELECT 1;
+
+SELECT
+  is(
+    (
+      SELECT COUNT(*)
+      FROM public.usage_credit_ledger
+      WHERE org_id = (SELECT org_id FROM setup)
+        AND transaction_type = 'deduction'
+    ),
+    1::bigint,
+    'usage_credit_ledger collapses multiple grant deductions for the same overage event into one row'
+  );
+
+SELECT
+  is(
+    (
+      SELECT amount
+      FROM public.usage_credit_ledger
+      WHERE org_id = (SELECT org_id FROM setup)
+        AND transaction_type = 'deduction'
+    ),
+    -10::numeric,
+    'usage_credit_ledger aggregates deduction amounts by overage event'
+  );
 
 SELECT *
 FROM

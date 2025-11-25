@@ -423,8 +423,24 @@ app.post('/complete-top-up', middlewareAuth, async (c) => {
     })
     .single()
 
-  if (rpcError)
-    throw simpleError('top_up_failed', 'Failed to top up credits', {}, rpcError)
+  if (rpcError) {
+    const rpcErrorInfo = {
+      code: rpcError.code ?? null,
+      message: rpcError.message ?? null,
+      details: (rpcError as any)?.details ?? null,
+      hint: (rpcError as any)?.hint ?? null,
+    }
+
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'credit_top_up_rpc_failed',
+      orgId: body.orgId,
+      sessionId: body.sessionId,
+      rpcError: rpcErrorInfo,
+    })
+
+    throw simpleError('top_up_failed', 'Failed to top up credits', { rpcError: rpcErrorInfo }, rpcError)
+  }
 
   return c.json({ grant })
 })

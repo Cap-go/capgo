@@ -25,34 +25,33 @@ CREATE TRIGGER handle_capgo_credit_products_updated_at
     FOR EACH ROW
     EXECUTE FUNCTION extensions.moddatetime('updated_at');
 
-DO $$
-DECLARE
-    c_provider CONSTANT text := 'stripe';
-    c_product_slug CONSTANT text := 'credit_top_up';
-    c_env_live CONSTANT text := 'live';
-    c_env_test CONSTANT text := 'test';
-BEGIN
-    ALTER TABLE public.capgo_credit_products
-    ALTER COLUMN provider SET DEFAULT c_provider;
+ALTER TABLE public.capgo_credit_products ENABLE ROW LEVEL SECURITY;
 
-    ALTER TABLE public.capgo_credit_products
-    ALTER COLUMN environment SET DEFAULT c_env_live;
+CREATE POLICY "Allow service_role full access" ON public.capgo_credit_products FOR ALL TO service_role USING (
+    true
+)
+WITH
+CHECK (true);
 
-    ALTER TABLE public.capgo_credit_products
-    DROP CONSTRAINT IF EXISTS capgo_credit_products_environment_check;
+ALTER TABLE public.capgo_credit_products
+ALTER COLUMN provider SET DEFAULT 'stripe';
 
-    ALTER TABLE public.capgo_credit_products
-    ADD CONSTRAINT capgo_credit_products_environment_check
-    CHECK (environment IN (c_env_live, c_env_test));
+ALTER TABLE public.capgo_credit_products
+ALTER COLUMN environment SET DEFAULT 'live';
 
-    INSERT INTO public.capgo_credit_products (slug, environment, provider, product_id)
-    VALUES
-        (c_product_slug, c_env_live, c_provider, 'prod_TINXCAiTb8Vsxc'),
-        (c_product_slug, c_env_test, c_provider, 'prod_TJRd2hFHZsBIPK')
-    ON CONFLICT (slug, environment) DO UPDATE
-    SET product_id = EXCLUDED.product_id;
-END;
-$$;
+ALTER TABLE public.capgo_credit_products
+DROP CONSTRAINT IF EXISTS capgo_credit_products_environment_check;
+
+ALTER TABLE public.capgo_credit_products
+ADD CONSTRAINT capgo_credit_products_environment_check
+CHECK (environment IN ('live', 'test'));
+
+INSERT INTO public.capgo_credit_products (slug, environment, provider, product_id)
+VALUES
+    ('credit_top_up', 'live', 'stripe', 'prod_TINXCAiTb8Vsxc'),
+    ('credit_top_up', 'test', 'stripe', 'prod_TJRd2hFHZsBIPK')
+ON CONFLICT (slug, environment) DO UPDATE
+SET product_id = EXCLUDED.product_id;
 
 DO $$
 DECLARE
@@ -103,7 +102,7 @@ DECLARE
   c_empty CONSTANT text := '';
   c_service_role CONSTANT text := 'service_role';
   c_default_source CONSTANT text := 'manual';
-  c_purchase CONSTANT text := 'purchase';
+  c_purchase CONSTANT public.credit_transaction_type := 'purchase';
   c_session_id_key CONSTANT text := 'sessionId';
   c_payment_intent_key CONSTANT text := 'paymentIntentId';
   v_request_role text := current_setting('request.jwt.claim.role', true);
@@ -305,5 +304,152 @@ BEGIN
   );
 END;
 $$;
+
+DROP VIEW IF EXISTS public.usage_credit_ledger;
+
+CREATE VIEW public.usage_credit_ledger
+WITH (security_invoker = true, security_barrier = true) AS
+WITH overage_allocations AS (
+  SELECT
+    e.id AS overage_event_id,
+    e.org_id,
+    e.metric,
+    e.overage_amount,
+    e.credits_estimated,
+    e.credits_debited,
+    e.billing_cycle_start,
+    e.billing_cycle_end,
+    e.created_at,
+    e.details,
+    COALESCE(SUM(c.credits_used), 0) AS credits_applied,
+    jsonb_agg(
+      jsonb_build_object(
+        'grant_id', c.grant_id,
+        'credits_used', c.credits_used,
+        'grant_source', g.source,
+        'grant_expires_at', g.expires_at,
+        'grant_notes', g.notes
+      )
+      ORDER BY g.expires_at, g.granted_at
+    ) FILTER (WHERE c.grant_id IS NOT NULL) AS grant_allocations
+  FROM public.usage_overage_events e
+  LEFT JOIN public.usage_credit_consumptions c
+    ON c.overage_event_id = e.id
+  LEFT JOIN public.usage_credit_grants g
+    ON g.id = c.grant_id
+  GROUP BY
+    e.id,
+    e.org_id,
+    e.metric,
+    e.overage_amount,
+    e.credits_estimated,
+    e.credits_debited,
+    e.billing_cycle_start,
+    e.billing_cycle_end,
+    e.created_at,
+    e.details
+),
+aggregated_deductions AS (
+  SELECT
+    MIN(t.id) AS id,
+    a.org_id,
+    'deduction'::public.credit_transaction_type AS transaction_type,
+    SUM(t.amount) AS amount,
+    MIN(t.balance_after) AS balance_after,
+    MAX(t.occurred_at) AS occurred_at,
+    MIN(t.description) AS description_raw,
+    COALESCE(
+      NULLIF(a.details ->> 'note', ''),
+      NULLIF(a.details ->> 'description', ''),
+      MIN(t.description),
+      format('Overage %s', a.metric::text)
+    ) AS description,
+    jsonb_build_object(
+      'overage_event_id', a.overage_event_id,
+      'metric', a.metric::text,
+      'overage_amount', a.overage_amount,
+      'grant_allocations', a.grant_allocations
+    ) AS source_ref,
+    a.overage_event_id,
+    a.metric,
+    a.overage_amount,
+    a.billing_cycle_start,
+    a.billing_cycle_end,
+    a.grant_allocations,
+    a.details
+  FROM public.usage_credit_transactions t
+  JOIN overage_allocations a
+    ON (t.source_ref ->> 'overage_event_id')::uuid = a.overage_event_id
+  WHERE t.transaction_type = 'deduction'
+    AND t.source_ref ? 'overage_event_id'
+  GROUP BY
+    a.overage_event_id,
+    a.metric,
+    a.overage_amount,
+    a.billing_cycle_start,
+    a.billing_cycle_end,
+    a.grant_allocations,
+    a.details,
+    a.org_id
+),
+other_transactions AS (
+  SELECT
+    t.id,
+    t.org_id,
+    t.transaction_type,
+    t.amount,
+    t.balance_after,
+    t.occurred_at,
+    t.description,
+    t.source_ref,
+    NULL::uuid AS overage_event_id,
+    NULL::public.credit_metric_type AS metric,
+    NULL::numeric AS overage_amount,
+    NULL::date AS billing_cycle_start,
+    NULL::date AS billing_cycle_end,
+    NULL::jsonb AS grant_allocations
+  FROM public.usage_credit_transactions t
+  WHERE t.transaction_type <> 'deduction'
+    OR t.source_ref IS NULL
+    OR NOT (t.source_ref ? 'overage_event_id')
+)
+  SELECT
+    id,
+    org_id,
+    transaction_type,
+    amount,
+    balance_after,
+    occurred_at,
+    description,
+    source_ref,
+    overage_event_id,
+    metric,
+    overage_amount,
+    billing_cycle_start,
+    billing_cycle_end,
+    grant_allocations,
+    NULL::jsonb AS details
+  FROM aggregated_deductions
+UNION ALL
+  SELECT
+    id,
+    org_id,
+  transaction_type,
+  amount,
+  balance_after,
+  occurred_at,
+  description,
+  source_ref,
+    overage_event_id,
+    metric,
+    overage_amount,
+    billing_cycle_start,
+    billing_cycle_end,
+    grant_allocations,
+    NULL::jsonb AS details
+  FROM other_transactions;
+
+GRANT SELECT ON public.usage_credit_ledger TO authenticated;
+GRANT SELECT ON public.usage_credit_ledger TO service_role;
 
 COMMIT;

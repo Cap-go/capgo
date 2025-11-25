@@ -20,6 +20,24 @@ import { useOrganizationStore } from '~/stores/organization'
 
 const creditsV2Enabled = import.meta.env.VITE_FEATURE_CREDITS_V2
 
+type UsageCreditLedgerRow = {
+  id: number
+  org_id: string
+  transaction_type: Database['public']['Enums']['credit_transaction_type']
+  amount: number
+  balance_after: number | null
+  occurred_at: string
+  description: string | null
+  source_ref: Record<string, any> | null
+  overage_event_id: string | null
+  metric: Database['public']['Enums']['credit_metric_type'] | null
+  overage_amount: number | null
+  billing_cycle_start: string | null
+  billing_cycle_end: string | null
+  grant_allocations: any | null
+  details: any | null
+}
+
 const router = useRouter()
 const route = useRoute()
 const { t } = useI18n()
@@ -28,7 +46,7 @@ const organizationStore = useOrganizationStore()
 const { currentOrganization } = storeToRefs(organizationStore)
 const displayStore = useDisplayStore()
 
-const transactions = ref<Database['public']['Tables']['usage_credit_transactions']['Row'][]>([])
+const transactions = ref<UsageCreditLedgerRow[]>([])
 const isLoadingTransactions = ref(false)
 const loadError = ref<string | null>(null)
 const creditUsdRate = ref(1)
@@ -250,18 +268,18 @@ async function loadTransactions() {
   loadError.value = null
 
   const { data, error } = await supabase
-    .from('usage_credit_transactions')
+    .from('usage_credit_ledger')
     .select('*')
     .eq('org_id', orgId)
     .order('occurred_at', { ascending: false })
 
   if (error) {
-    console.error('Failed to load usage credit transactions', error)
+    console.error('Failed to load usage credit ledger entries', error)
     loadError.value = error.message
     transactions.value = []
   }
   else {
-    transactions.value = data ?? []
+    transactions.value = (data ?? []) as UsageCreditLedgerRow[]
   }
 
   isLoadingTransactions.value = false

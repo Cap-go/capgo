@@ -3,7 +3,7 @@
 BEGIN;
 
 -- Plan the number of tests
-SELECT plan(35);
+SELECT plan(39);
 
 -- Test app_versions policies
 SELECT
@@ -293,6 +293,40 @@ SELECT
             'Prevent non 2FA access'
         ],
         'apikeys should have correct policies'
+    );
+
+-- Test capgo_credit_products RLS and policies
+SELECT
+    ok(
+        tests.rls_enabled('public', 'capgo_credit_products'),
+        'capgo_credit_products should have RLS enabled'
+    );
+
+SELECT
+    policies_are(
+        'public',
+        'capgo_credit_products',
+        ARRAY['Allow service_role full access'],
+        'capgo_credit_products should have correct policies'
+    );
+
+-- usage_credit_ledger should respect caller RLS and allow authenticated reads
+SELECT
+    ok(
+        has_table_privilege('authenticated', 'public.usage_credit_ledger', 'SELECT'),
+        'usage_credit_ledger grants SELECT to authenticated'
+    );
+
+SELECT
+    ok(
+        EXISTS (
+            SELECT 1
+            FROM pg_class c
+            WHERE c.relname = 'usage_credit_ledger'
+              AND c.relkind = 'v'
+              AND 'security_invoker' = ANY (c.reloptions)
+        ),
+        'usage_credit_ledger runs with security_invoker to enforce base table RLS'
     );
 
 -- Test plans policies
