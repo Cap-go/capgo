@@ -640,53 +640,6 @@ onMounted(() => {
     </div>
   </div>
 
-  <div v-if="creditsV2Enabled && !isLoading && creditAvailable" class="mb-6">
-    <div class="grid grid-cols-1 sm:grid-cols-12 gap-4">
-      <div class="col-span-full sm:col-span-6 xl:col-span-4 bg-white border border-gray-200 rounded-lg p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-        <div class="flex items-start justify-between gap-4">
-          <div>
-            <div class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-              <BanknotesIcon class="h-4 w-4 text-emerald-500" />
-              {{ t('credits-balance') }}
-            </div>
-            <div class="mt-2 text-2xl font-semibold text-gray-900 dark:text-white">
-              {{ formatCredits(creditAvailable) }}
-            </div>
-            <p class="text-sm text-gray-500 dark:text-gray-400">
-              {{ t('credits-available') }}
-              <span class="font-medium text-gray-900 dark:text-white">/ {{ formatCredits(creditTotal) }}</span>
-            </p>
-          </div>
-          <div v-if="creditNextExpiration" class="text-right">
-            <div class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-              {{ t('credits-next-expiration') }}
-            </div>
-            <div class="mt-1 text-sm font-medium text-gray-900 dark:text-white">
-              {{ creditNextExpiration }}
-            </div>
-          </div>
-        </div>
-        <div class="mt-4">
-          <div class="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 mb-1">
-            <span>{{ t('credits-used-in-period') }}</span>
-            <span class="font-medium text-gray-900 dark:text-white">
-              {{ formatCredits(creditUsed) }}
-            </span>
-          </div>
-          <div class="h-2 w-full rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
-            <div
-              class="h-full rounded-full bg-emerald-500 transition-all"
-              :style="{ width: `${creditUsagePercent}%` }"
-            />
-          </div>
-        </div>
-        <p v-if="!hasCreditSummary" class="mt-4 text-sm text-gray-500 dark:text-gray-400">
-          {{ t('no-credits-available') }}
-        </p>
-      </div>
-    </div>
-  </div>
-
   <div
     v-if="!noData || isLoading"
     class="grid grid-cols-1 sm:grid-cols-12 gap-6 mb-6"
