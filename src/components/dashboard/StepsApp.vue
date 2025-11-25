@@ -106,6 +106,14 @@ function goToNextStep(scrollTargetId?: string) {
 
 function openInviteDialog() {
   inviteModalRef.value?.openDialog()
+  sendEvent({
+    channel: 'onboarding-v2',
+    event: `onboarding-alternative-send-invite`,
+    icon: '👶',
+    user_id: organizationStore.currentOrganization?.gid,
+    notify: false,
+  }).catch()
+  pushEvent(`user:onboarding-alternative-send-invite`, config.supaHost)
 }
 
 function onInviteSuccess() {
@@ -262,9 +270,9 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <section class="overflow-y-auto py-12 h-full sm:py-16 lg:py-20 max-h-fit">
+  <section class="h-full py-12 overflow-y-auto sm:py-16 lg:py-20 max-h-fit">
     <div class="px-4 mx-auto max-w-7xl sm:px-6 lg:px-8">
-      <div class="flex justify-items-center items-center place-content-center">
+      <div class="flex items-center justify-items-center place-content-center">
         <button v-if="!onboarding" class="mr-6 text-white bg-gray-800 d-btn d-btn-outline" @click="emit('closeStep')">
           <arrowBack />
         </button>
@@ -287,13 +295,13 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <div class="mx-auto mt-12 max-w-6xl sm:px-10">
+      <div class="max-w-6xl mx-auto mt-12 sm:px-10">
         <template v-for="(s, i) in steps" :key="i">
-          <div v-if="i > 0" class="mx-auto w-1 h-10 bg-gray-200" :class="[step !== i ? 'opacity-30' : '']" />
+          <div v-if="i > 0" class="w-1 h-10 mx-auto bg-gray-200" :class="[step !== i ? 'opacity-30' : '']" />
 
-          <div :id="`step_card_${i}`" :class="[step !== i ? 'opacity-30' : '']" class="overflow-hidden relative p-5 bg-white rounded-2xl border border-gray-200">
-            <div class="flex gap-6 items-start">
-              <div class="inline-flex justify-center items-center w-14 h-14 text-xl font-bold text-white rounded-xl shrink-0 font-pj bg-muted-blue-800">
+          <div :id="`step_card_${i}`" :class="[step !== i ? 'opacity-30' : '']" class="relative p-5 overflow-hidden bg-white border border-gray-200 rounded-2xl">
+            <div class="flex items-start gap-6">
+              <div class="inline-flex items-center justify-center text-xl font-bold text-white w-14 h-14 rounded-xl shrink-0 font-pj bg-muted-blue-800">
                 <template v-if="i + 1 !== steps.length">
                   {{ i + 1 }}
                 </template>
@@ -312,10 +320,10 @@ onUnmounted(() => {
                   <span class="text-sm">{{ s.subtitle }}</span>
                 </div>
                 <div v-if="s.command" class="relative p-5 pr-16 mt-4 bg-black rounded-lg cursor-pointer group" @click="copyToast(step === i, `step_command_${i}`, s.command)">
-                  <code :id="`step_command_${i}`" class="block text-xl whitespace-pre-wrap break-all text-pumpkin-orange-700">
+                  <code :id="`step_command_${i}`" class="block text-xl break-all whitespace-pre-wrap text-pumpkin-orange-700">
                     {{ s.command }}
                   </code>
-                  <i-ion-copy-outline class="absolute top-5 right-5 w-6 h-6 text-muted-blue-300" />
+                  <i-ion-copy-outline class="absolute w-6 h-6 top-5 right-5 text-muted-blue-300" />
                 </div>
                 <br v-if="s.command">
               </div>
@@ -329,7 +337,7 @@ onUnmounted(() => {
               </p>
               <button
                 type="button"
-                class="inline-flex items-center py-2 px-4 mt-4 text-sm font-semibold rounded-md transition-colors duration-200 focus:ring-2 focus:ring-offset-2 bg-muted-blue-50 text-muted-blue-800 hover:bg-muted-blue-100 focus:outline-hidden focus:ring-muted-blue-500"
+                class="inline-flex items-center px-4 py-2 mt-4 text-sm font-semibold transition-colors duration-200 rounded-md focus:ring-2 focus:ring-offset-2 bg-muted-blue-50 text-muted-blue-800 hover:bg-muted-blue-100 focus:outline-hidden focus:ring-muted-blue-500"
                 @click="openInviteDialog"
               >
                 {{ t('onboarding-invite-option-cta') }}
