@@ -367,6 +367,8 @@ app.post('/complete-top-up', middlewareAuth, async (c) => {
       orgId: body.orgId,
       sessionId: body.sessionId,
     })
+
+    throw simpleError('idempotency_check_failed', 'Failed to verify top-up status', { error: existingTxError })
   }
 
   const matchedTx = existingTx?.[0]

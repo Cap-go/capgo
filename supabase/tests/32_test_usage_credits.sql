@@ -375,9 +375,15 @@ SELECT
         'expiry transaction recorded'
     );
 
+CREATE TEMP TABLE test_usage_ledger_context (
+  org_id uuid
+) ON COMMIT DROP;
+
 -- usage_credit_ledger view aggregates deductions per overage event
 WITH setup AS (
-  SELECT gen_random_uuid() AS org_id
+  INSERT INTO test_usage_ledger_context (org_id)
+  VALUES (gen_random_uuid())
+  RETURNING org_id
 ),
 grant_one AS (
   INSERT INTO public.usage_credit_grants (
@@ -514,7 +520,7 @@ SELECT
     (
       SELECT COUNT(*)
       FROM public.usage_credit_ledger
-      WHERE org_id = (SELECT org_id FROM setup)
+      WHERE org_id = (SELECT org_id FROM test_usage_ledger_context)
         AND transaction_type = 'deduction'
     ),
     1::bigint,
@@ -526,7 +532,7 @@ SELECT
     (
       SELECT amount
       FROM public.usage_credit_ledger
-      WHERE org_id = (SELECT org_id FROM setup)
+      WHERE org_id = (SELECT org_id FROM test_usage_ledger_context)
         AND transaction_type = 'deduction'
     ),
     -10::numeric,

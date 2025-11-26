@@ -20,7 +20,7 @@ import { useOrganizationStore } from '~/stores/organization'
 
 const creditsV2Enabled = import.meta.env.VITE_FEATURE_CREDITS_V2
 
-type UsageCreditLedgerRow = {
+interface UsageCreditLedgerRow {
   id: number
   org_id: string
   transaction_type: Database['public']['Enums']['credit_transaction_type']
