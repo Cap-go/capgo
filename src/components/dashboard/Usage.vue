@@ -46,8 +46,6 @@ const dataByApp = ref({
   bandwidth: {} as { [appId: string]: number[] },
 })
 
-const creditsV2Enabled = import.meta.env.VITE_FEATURE_CREDITS_V2
-
 const appNames = ref<{ [appId: string]: string }>({})
 
 // Create computed properties to ensure reactivity when switching between modes
@@ -110,24 +108,6 @@ const nextRunDisplay = computed(() => {
   const source = organizationStore.currentOrganization?.next_stats_update_at
   return source ? dayjs(source).format('MMMM D, YYYY HH:mm') : t('unknown')
 })
-
-const creditTotal = computed(() => Number(organizationStore.currentOrganization?.credit_total ?? 0))
-const creditAvailable = computed(() => Number(organizationStore.currentOrganization?.credit_available ?? 0))
-const creditUsed = computed(() => Math.max(creditTotal.value - creditAvailable.value, 0))
-const creditUsagePercent = computed(() => {
-  if (creditTotal.value <= 0)
-    return 0
-  return Math.min(100, Math.round((creditUsed.value / creditTotal.value) * 100))
-})
-const creditNextExpiration = computed(() => {
-  const expiresAt = organizationStore.currentOrganization?.credit_next_expiration
-  return expiresAt ? dayjs(expiresAt).format('MMMM D, YYYY') : null
-})
-const hasCreditSummary = computed(() => creditTotal.value > 0 || creditAvailable.value > 0)
-
-function formatCredits(value: number) {
-  return new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)
-}
 
 // Confirmation logic for cumulative mode in 30-day view
 async function handleCumulativeClick() {
