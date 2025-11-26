@@ -1826,6 +1826,28 @@ export type Database = {
           },
         ]
       }
+      usage_credit_ledger: {
+        Row: {
+          amount: number | null
+          balance_after: number | null
+          billing_cycle_end: string | null
+          billing_cycle_start: string | null
+          description: string | null
+          details: Json | null
+          grant_allocations: Json | null
+          id: number | null
+          metric: Database["public"]["Enums"]["credit_metric_type"] | null
+          occurred_at: string | null
+          org_id: string | null
+          overage_amount: number | null
+          overage_event_id: string | null
+          source_ref: Json | null
+          transaction_type:
+            | Database["public"]["Enums"]["credit_transaction_type"]
+            | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       accept_invitation_to_org: { Args: { org_id: string }; Returns: string }
