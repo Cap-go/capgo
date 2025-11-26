@@ -118,8 +118,12 @@ export async function updateWithPG(
   const manifestBundleCount = appOwner.manifest_bundle_count ?? 0
   const bypassChannelOverrides = channelDeviceCount <= 0
   const pluginVersion = parse(plugin_version)
-  // Ensure there is manifest and the plugin version support manifest fetching
-  const fetchManifestEntries = manifestBundleCount > 0 && greaterOrEqual(pluginVersion, parse('6.25.0'))
+  // Ensure there is manifest and the plugin version support manifest fetching (v5.10.0+, v6.25.0+, v7.0.35+)
+  const fetchManifestEntries = manifestBundleCount > 0 && (
+    greaterOrEqual(pluginVersion, parse('5.10.0')) && pluginVersion.major === 5
+    || greaterOrEqual(pluginVersion, parse('6.25.0')) && pluginVersion.major === 6
+    || greaterOrEqual(pluginVersion, parse('7.0.35')) && pluginVersion.major >= 7
+  )
   cloudlog({
     requestId: c.get('requestId'),
     message: 'App channel device count evaluated',
@@ -143,10 +147,23 @@ export async function updateWithPG(
     }, appOwner.owner_org, app_id, '0 0 * * 1'))
     return simpleError('semver_error', `Native version: ${body.version_build} doesn't follow semver convention, please check https://capgo.app/semver_tester/ to learn more about semver usage in Capgo`, { body })
   }
-  // Check if plugin_version is deprecated and send notification
-  // v6 is deprecated if < 6.25.0, v7 is deprecated if < 7.25.0, anything < 6.0.0 is deprecated
+  // Reject v4 completely - it's no longer supported
   const parsedPluginVersion = parse(plugin_version)
-  const isDeprecated = lessThan(parsedPluginVersion, parse('6.0.0'))
+  if (parsedPluginVersion.major === 4) {
+    cloudlog({ requestId: c.get('requestId'), message: 'Plugin version 4.x is no longer supported', plugin_version, app_id })
+    await backgroundTask(c, sendNotifOrg(c, 'user:plugin_issue', {
+      app_id,
+      device_id,
+      version_id: version_build,
+      app_id_url: app_id,
+    }, appOwner.owner_org, app_id, '0 0 * * 1'))
+    await sendStatsAndDevice(c, device, [{ action: 'backend_refusal' }])
+    return simpleError('unsupported_plugin_version', `Plugin version ${plugin_version} (v4) is no longer supported. Please upgrade to v5.10.0 or later.`, { body })
+  }
+
+  // Check if plugin_version is deprecated and send notification
+  // v5 is deprecated if < 5.10.0, v6 is deprecated if < 6.25.0, v7 is deprecated if < 7.25.0
+  const isDeprecated = (parsedPluginVersion.major === 5 && lessThan(parsedPluginVersion, parse('5.10.0')))
     || (parsedPluginVersion.major === 6 && lessThan(parsedPluginVersion, parse('6.25.0')))
     || (parsedPluginVersion.major === 7 && lessThan(parsedPluginVersion, parse('7.25.0')))
 

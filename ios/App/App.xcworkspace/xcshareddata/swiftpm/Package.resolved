@@ -1,0 +1,69 @@
+{
+  "originHash" : "f152cdb6913d3043085000e58fcedce3ab7d660fa46fe7c80d13dbe048aebaf3",
+  "pins" : [
+    {
+      "identity" : "alamofire",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/Alamofire/Alamofire.git",
+      "state" : {
+        "revision" : "513364f870f6bfc468f9d2ff0a95caccc10044c5",
+        "version" : "5.10.2"
+      }
+    },
+    {
+      "identity" : "bigint",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/attaswift/BigInt.git",
+      "state" : {
+        "revision" : "e07e00fa1fd435143a2dcf8b7eec9a7710b2fdfe",
+        "version" : "5.7.0"
+      }
+    },
+    {
+      "identity" : "capacitor-swift-pm",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/ionic-team/capacitor-swift-pm.git",
+      "state" : {
+        "revision" : "145cf37b8e3b240efef3d2d8a7262e621f08bb6f",
+        "version" : "7.4.4"
+      }
+    },
+    {
+      "identity" : "crisp-sdk-ios",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/crisp-im/crisp-sdk-ios.git",
+      "state" : {
+        "revision" : "30991356e5ee97153729c95fa1978f227328980a",
+        "version" : "2.11.0"
+      }
+    },
+    {
+      "identity" : "swiftkeychainwrapper",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/jrendel/SwiftKeychainWrapper.git",
+      "state" : {
+        "revision" : "185a3165346a03767101c4f62e9a545a0fe0530f",
+        "version" : "4.0.1"
+      }
+    },
+    {
+      "identity" : "version",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/mrackwitz/Version.git",
+      "state" : {
+        "revision" : "fd4b0eb5756aa7f1c33977fb626cf37d2140a3a0",
+        "version" : "0.8.0"
+      }
+    },
+    {
+      "identity" : "ziparchive",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/ZipArchive/ZipArchive.git",
+      "state" : {
+        "revision" : "38e0ce0598e06b034271f296a8e15b149c91aa19",
+        "version" : "2.4.3"
+      }
+    }
+  ],
+  "version" : 3
+}

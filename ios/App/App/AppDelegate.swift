@@ -1,7 +1,7 @@
 import UIKit
 import Capacitor
-import CapgoCapacitorUpdater
-import CapawesomeCapacitorScreenOrientation
+import CapacitorUpdaterPlugin
+import ScreenOrientationPlugin
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
