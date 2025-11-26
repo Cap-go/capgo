@@ -339,7 +339,7 @@ async function handleCreditCheckoutReturn() {
 
   isCompletingTopUp.value = true
   try {
-    await completeCreditTopUp(currentOrganization.value.gid, sessionIdParam as string)
+    await completeCreditTopUp(currentOrganization.value.gid, sessionId)
     toast.success(t('credits-top-up-success'))
     const orgId = currentOrganization.value?.gid
     await organizationStore.fetchOrganizations()
