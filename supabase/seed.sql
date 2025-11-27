@@ -44,6 +44,13 @@ BEGIN
     TRUNCATE TABLE "public"."usage_credit_transactions" CASCADE;
     TRUNCATE TABLE "public"."usage_credit_consumptions" CASCADE;
     TRUNCATE TABLE "public"."usage_overage_events" CASCADE;
+    TRUNCATE TABLE "public"."role_bindings" RESTART IDENTITY;
+    TRUNCATE TABLE "public"."group_members" RESTART IDENTITY;
+    TRUNCATE TABLE "public"."groups" RESTART IDENTITY;
+    -- Keep RBAC flags deterministic across test runs
+    INSERT INTO public.rbac_settings (id, use_new_rbac)
+    VALUES (1, false)
+    ON CONFLICT (id) DO UPDATE SET use_new_rbac = EXCLUDED.use_new_rbac, updated_at = now();
 
     -- Insert seed data
     -- (Include all your INSERT statements here)

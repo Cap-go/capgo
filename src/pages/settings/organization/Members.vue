@@ -29,6 +29,7 @@ const search = ref('')
 const columns: Ref<TableColumn[]> = ref<TableColumn[]>([])
 const isLoading = ref(false)
 const currentPage = ref(1)
+const rbacSystemEnabled = import.meta.env.VITE_FEATURE_RBAC_SYSTEM === 'true'
 const dialogStore = useDialogV2Store()
 const emailInput = ref('')
 const displayStore = useDisplayStore()
@@ -145,6 +146,7 @@ columns.value = [
     actions: computed(() => [
       {
         icon: IconWrench,
+        title: rbacSystemEnabled ? t('edit-role', 'Edit role') : t('edit-permission', 'Edit permission'),
         visible: (member: ExtendedOrganizationMember) => canEdit(member),
         onClick: (member: ExtendedOrganizationMember) => {
           changeMemberPermission(member)
@@ -193,8 +195,10 @@ async function showPermModal(invite: boolean): Promise<Database['public']['Enums
   isInvitePermissionModal.value = invite
 
   dialogStore.openDialog({
-    title: t('select-user-perms'),
-    description: t('select-user-perms-expanded'),
+    title: rbacSystemEnabled ? t('select-user-role', 'Select a role') : t('select-user-perms'),
+    description: rbacSystemEnabled
+      ? t('select-user-role-expanded', 'Choose the RBAC role to assign. Legacy roles remain visible during migration.')
+      : t('select-user-perms-expanded'),
     size: 'lg',
     buttons: [
       {
@@ -765,6 +769,13 @@ async function handleInviteNewUserSubmit() {
           {{ t('members') }}
         </h2>
       </div>
+      <div v-if="rbacSystemEnabled" class="mb-4 d-alert d-alert-info gap-3 items-start">
+        <IconInformation class="w-6 h-6 text-sky-400 shrink-0" />
+        <div class="text-sm text-slate-100">
+          <p class="font-semibold">{{ t('rbac-system-enabled', 'RBAC role management preview') }}</p>
+          <p class="text-slate-200">{{ t('rbac-system-enabled-body', 'Editing roles here will use the RBAC system. Legacy roles stay visible during migration.') }}</p>
+        </div>
+      </div>
       <Table
         v-model:columns="columns"
         v-model:current-page="currentPage"
@@ -883,7 +894,11 @@ async function handleInviteNewUserSubmit() {
     </Teleport>
 
     <!-- Teleport for permission selection modal -->
-    <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('select-user-perms')" defer to="#dialog-v2-content">
+    <Teleport
+      v-if="dialogStore.showDialog && (dialogStore.dialogOptions?.title === t('select-user-perms') || dialogStore.dialogOptions?.title === t('select-user-role', 'Select a role'))"
+      defer
+      to="#dialog-v2-content"
+    >
       <div class="w-full">
         <div class="p-4 rounded-lg border dark:border-gray-600">
           <div class="space-y-3">
