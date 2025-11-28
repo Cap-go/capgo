@@ -385,6 +385,7 @@
   "credits-top-up-quantity-label": "購入するクレジット",
   "credits-top-up-quantity-help": "決済時にStripe上で数量を直接調整できます。",
   "credits-top-up-quantity-invalid": "続行する前に有効なクレジット数を入力してください。",
+  "credits-top-up-success": "クレジットのチャージが完了しました。",
   "credits-top-up-total-estimate": "概算合計: {amount}（税込）",
   "buy-credits": "クレジットを購入",
   "cumulative": "累積的な",

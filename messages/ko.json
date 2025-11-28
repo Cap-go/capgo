@@ -385,6 +385,7 @@
   "credits-top-up-quantity-label": "구매할 크레딧",
   "credits-top-up-quantity-help": "결제 중 Stripe에서 수량을 바로 조정할 수 있습니다.",
   "credits-top-up-quantity-invalid": "계속하기 전에 유효한 크레딧 수량을 입력하세요.",
+  "credits-top-up-success": "크레딧 충전이 완료되었습니다.",
   "credits-top-up-total-estimate": "예상 합계: {amount} (세금 포함)",
   "buy-credits": "크레딧 구매",
   "cumulative": "누적된",

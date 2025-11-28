@@ -385,6 +385,7 @@
   "credits-top-up-quantity-label": "Кредиты к покупке",
   "credits-top-up-quantity-help": "Вы можете изменить количество прямо в Stripe во время оплаты.",
   "credits-top-up-quantity-invalid": "Введите корректное количество кредитов перед продолжением.",
+  "credits-top-up-success": "Кредиты успешно пополнены.",
   "credits-top-up-total-estimate": "Примерная сумма: {amount} (включая налоги)",
   "buy-credits": "Купить кредиты",
   "cumulative": "Накопительный",

@@ -385,6 +385,7 @@
   "credits-top-up-quantity-label": "Créditos para comprar",
   "credits-top-up-quantity-help": "Você pode ajustar a quantidade diretamente no Stripe durante o checkout.",
   "credits-top-up-quantity-invalid": "Insira uma quantidade válida de créditos antes de continuar.",
+  "credits-top-up-success": "Recarga de créditos realizada com sucesso.",
   "credits-top-up-total-estimate": "Total estimado: {amount} (impostos incluídos)",
   "buy-credits": "Comprar créditos",
   "cumulative": "Acumulativo",

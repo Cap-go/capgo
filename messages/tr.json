@@ -385,6 +385,7 @@
   "credits-top-up-quantity-label": "Satın alınacak kredi",
   "credits-top-up-quantity-help": "Ödeme sırasında Stripe üzerinden miktarı doğrudan ayarlayabilirsiniz.",
   "credits-top-up-quantity-invalid": "Devam etmeden önce geçerli bir kredi miktarı girin.",
+  "credits-top-up-success": "Kredi yükleme başarılı.",
   "credits-top-up-total-estimate": "Tahmini toplam: {amount} (vergiler dahil)",
   "buy-credits": "Kredi satın al",
   "cumulative": "Birikimli",

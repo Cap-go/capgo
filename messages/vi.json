@@ -385,6 +385,7 @@
   "credits-top-up-quantity-label": "Tín dụng cần mua",
   "credits-top-up-quantity-help": "Bạn có thể điều chỉnh số lượng trực tiếp trên Stripe khi thanh toán.",
   "credits-top-up-quantity-invalid": "Nhập số lượng tín dụng hợp lệ trước khi tiếp tục.",
+  "credits-top-up-success": "Nạp credits thành công.",
   "credits-top-up-total-estimate": "Tổng ước tính: {amount} (đã bao gồm thuế)",
   "buy-credits": "Mua tín dụng",
   "cumulative": "Tích lũy",

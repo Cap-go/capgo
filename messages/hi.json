@@ -385,6 +385,7 @@
   "credits-top-up-quantity-label": "खरीदने के लिए क्रेडिट्स",
   "credits-top-up-quantity-help": "आप भुगतान करते समय Stripe में सीधे मात्रा समायोजित कर सकते हैं।",
   "credits-top-up-quantity-invalid": "आगे बढ़ने से पहले मान्य क्रेडिट मात्रा दर्ज करें।",
+  "credits-top-up-success": "क्रेडिट सफलतापूर्वक जोड़े गए।",
   "credits-top-up-total-estimate": "अनुमानित कुल: {amount} (कर शामिल हैं)",
   "buy-credits": "क्रेडिट खरीदें",
   "cumulative": "संचयी",

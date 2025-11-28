@@ -385,6 +385,7 @@
   "credits-top-up-quantity-label": "购买的積分",
   "credits-top-up-quantity-help": "结账时可在 Stripe 中直接调整数量。",
   "credits-top-up-quantity-invalid": "继续之前请输入有效的積分数量。",
+  "credits-top-up-success": "积分充值成功。",
   "credits-top-up-total-estimate": "预计总计：{amount}（含税）",
   "buy-credits": "购买積分",
   "cumulative": "累积",
