@@ -6,7 +6,7 @@ import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod/mini'
 import { getAppStatus, setAppStatus } from '../utils/appStatus.ts'
-import { BRES, getIsV2Channel, parseBody, quickError, simpleError, simpleError200, simpleRateLimit } from '../utils/hono.ts'
+import { BRES, getIsV2Channel, parseBody, simpleError200, simpleRateLimit } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { closeClient, deleteChannelDevicePg, getAppByIdPg, getAppOwnerPostgres, getAppVersionsByAppIdPg, getChannelByNamePg, getChannelDeviceOverridePg, getChannelsPg, getCompatibleChannelsPg, getDrizzleClient, getMainChannelsPg, getPgClient, upsertChannelDevicePg } from '../utils/pg.ts'
 import { getAppByIdD1, getAppOwnerPostgresV2, getAppVersionsByAppIdD1, getChannelByNameD1, getChannelDeviceOverrideD1, getChannelsD1, getCompatibleChannelsD1, getDrizzleClientD1Session, getMainChannelsD1 } from '../utils/pg_d1.ts'
@@ -90,7 +90,7 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
     : await getAppVersionsByAppIdPg(c, app_id, version_name, drizzleClient as ReturnType<typeof getDrizzleClient>, PLAN_MAU_ACTIONS)
 
   if (!versions || versions.length === 0) {
-    return simpleError('version_error', `Version ${version_name} doesn't exist, and no builtin version`, { version_name, body })
+    return simpleError200(c, 'version_error', `Version ${version_name} doesn't exist, and no builtin version`, { version_name })
   }
   if (!versions[0].plan_valid) {
     return simpleError200(c, 'action_not_allowed', 'Action not allowed')
@@ -99,7 +99,7 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
     ? versions.find((v: { name: string }) => v.name !== 'builtin')
     : versions[0]
   if (!version) {
-    return simpleError('version_error', `Version ${version_name} doesn't exist, and no builtin version`, { versions })
+    return simpleError200(c, 'version_error', `Version ${version_name} doesn't exist, and no builtin version`)
   }
 
   // Read operations can use v2 flag
@@ -108,10 +108,10 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
     : await getChannelDeviceOverridePg(c, app_id, device_id, drizzleClient as ReturnType<typeof getDrizzleClient>)
 
   if (!channel) {
-    return simpleError('cannot_override', 'Missing channel')
+    return simpleError200(c, 'cannot_override', 'Missing channel')
   }
   if (dataChannelOverride && !dataChannelOverride.channel_id.allow_device_self_set) {
-    return simpleError('cannot_override', 'Cannot change device override current channel don\'t allow it')
+    return simpleError200(c, 'cannot_override', 'Cannot change device override current channel don\'t allow it')
   }
   // if channel set channel_override to it
   // get channel by name - Read operation can use v2 flag
@@ -120,11 +120,11 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
     : await getChannelByNamePg(c, app_id, channel, drizzleClient as ReturnType<typeof getDrizzleClient>)
 
   if (!dataChannel) {
-    return quickError(404, 'channel_not_found', `Cannot find channel`, { channel, app_id })
+    return simpleError200(c, 'channel_not_found', `Cannot find channel`, { channel, app_id })
   }
 
   if (!dataChannel.allow_device_self_set) {
-    return simpleError('channel_set_from_plugin_not_allowed', `This channel does not allow devices to self associate`, { channel, app_id, dataChannel })
+    return simpleError200(c, 'channel_set_from_plugin_not_allowed', `This channel does not allow devices to self associate`, { channel, app_id })
   }
 
   // Get the main channel - Read operation can use v2 flag
@@ -150,7 +150,7 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
 
     const success = await deleteChannelDevicePg(c, app_id, device_id, drizzleClient)
     if (!success) {
-      return simpleError('override_not_allowed', `Cannot remove channel override`, {})
+      return simpleError200(c, 'override_not_allowed', `Cannot remove channel override`)
     }
 
     cloudlog({ requestId: c.get('requestId'), message: 'main channel set, removing override' })
@@ -171,7 +171,7 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
   if (dataChannelOverride) {
     const success = await deleteChannelDevicePg(c, app_id, device_id, drizzleClient)
     if (!success) {
-      return simpleError('override_not_allowed', `Cannot remove channel override`, {})
+      return simpleError200(c, 'override_not_allowed', `Cannot remove channel override`)
     }
   }
   const success = await upsertChannelDevicePg(c, {
@@ -181,7 +181,7 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
     owner_org: dataChannel.owner_org,
   }, drizzleClient)
   if (!success) {
-    return simpleError('override_not_allowed', `Cannot do channel override`, {})
+    return simpleError200(c, 'override_not_allowed', `Cannot do channel override`)
   }
 
   await sendStatsAndDevice(c, device, [{ action: 'setChannel' }])
@@ -226,16 +226,16 @@ async function put(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient
     : await getAppVersionsByAppIdPg(c, app_id, version_name, drizzleClient as ReturnType<typeof getDrizzleClient>, PLAN_MAU_ACTIONS)
 
   if (!versions || versions.length === 0) {
-    return simpleError('version_error', `Version ${version_name} doesn't exist, and no builtin version`, { version_name, body })
+    return simpleError200(c, 'version_error', `Version ${version_name} doesn't exist, and no builtin version`, { version_name })
   }
   if (!versions[0].plan_valid) {
-    return simpleError('action_not_allowed', 'Action not allowed')
+    return simpleError200(c, 'action_not_allowed', 'Action not allowed')
   }
   const version = versions.length === 2
     ? versions.find((v: { name: string }) => v.name !== 'builtin')
     : versions[0]
   if (!version) {
-    return simpleError('version_error', `Version ${version_name} doesn't exist, and no builtin version`, { versions })
+    return simpleError200(c, 'version_error', `Version ${version_name} doesn't exist, and no builtin version`)
   }
 
   // Read operations can use v2 flag
@@ -255,12 +255,12 @@ async function put(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient
     })
   }
   if (!dataChannel || dataChannel.length === 0) {
-    return quickError(404, 'channel_not_found', 'Cannot find channel', { dataChannel })
+    return simpleError200(c, 'channel_not_found', 'Cannot find channel')
   }
 
   const devicePlatform = devicePlatformScheme.safeParse(body.platform)
   if (!devicePlatform.success) {
-    return simpleError('invalid_platform', 'Invalid device platform', { platform: body.platform, devicePlatform })
+    return simpleError200(c, 'invalid_platform', 'Invalid device platform', { platform: body.platform })
   }
 
   const finalChannel = defaultChannel
@@ -268,7 +268,7 @@ async function put(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient
     : dataChannel.find((channel: { ios: boolean, android: boolean }) => channel[devicePlatform.data])
 
   if (!finalChannel) {
-    return quickError(404, 'channel_not_found', 'Cannot find channel', { dataChannel })
+    return simpleError200(c, 'channel_not_found', 'Cannot find channel')
   }
   await sendStatsAndDevice(c, device, [{ action: 'getChannel' }])
   return c.json({
@@ -321,18 +321,18 @@ async function deleteOverride(c: Context, drizzleClient: ReturnType<typeof getDr
     : await getChannelDeviceOverridePg(c, app_id, device_id, drizzleClient as ReturnType<typeof getDrizzleClient>)
 
   if (!dataChannelOverride?.channel_id) {
-    return simpleError('cannot_override', 'Cannot change device override current channel don\t allow it', { dataChannelOverride })
+    return simpleError200(c, 'cannot_override', 'Cannot change device override current channel don\'t allow it')
   }
 
   if (!dataChannelOverride.channel_id.allow_device_self_set) {
-    return simpleError('cannot_override', 'Cannot change device override current channel don\t allow it', { channelOverride: dataChannelOverride.channel_id })
+    return simpleError200(c, 'cannot_override', 'Cannot change device override current channel don\'t allow it')
   }
 
   // Write operation - use the PG client created by the route handler
 
   const success = await deleteChannelDevicePg(c, app_id, device_id, drizzleClient)
   if (!success) {
-    return simpleError('override_not_allowed', `Cannot delete channel override`, {})
+    return simpleError200(c, 'override_not_allowed', `Cannot delete channel override`)
   }
 
   return c.json(BRES)
@@ -348,8 +348,8 @@ async function listCompatibleChannels(c: Context, drizzleClient: ReturnType<type
     : await getAppByIdPg(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>, PLAN_MAU_ACTIONS)
 
   if (!appExists) {
-    // App doesn't exist in database - return 404
-    return quickError(404, 'app_not_found', 'App not found', { app_id })
+    // App doesn't exist in database
+    return simpleError200(c, 'app_not_found', 'App not found', { app_id })
   }
 
   // Check if app has valid org association (not on-premise) - Read operation can use v2 flag
@@ -417,7 +417,7 @@ app.post('/', async (c) => {
 
   const bodyParsed = parsePluginBody<DeviceLink>(c, body, jsonRequestSchema)
   if (!bodyParsed.channel) {
-    return simpleError('missing_channel', 'Cannot find channel in body', { body })
+    return simpleError200(c, 'missing_channel', 'Cannot find channel in body')
   }
   let res
   try {
@@ -430,7 +430,7 @@ app.post('/', async (c) => {
 })
 
 app.put('/', async (c) => {
-  // Used as get, should be refactor with query param instead
+  // TODO: Used as get, should be refactor with query param instead
   const body = await parseBody<DeviceLink>(c)
   cloudlog({ requestId: c.get('requestId'), message: 'put body', body })
 
