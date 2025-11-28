@@ -1,4 +1,11 @@
+import type {
+  SemVer,
+} from '@std/semver'
 import type { Context } from 'hono'
+import {
+  lessThan,
+  parse,
+} from '@std/semver'
 import { env, getRuntimeKey } from 'hono/adapter'
 
 declare const EdgeRuntime: { waitUntil?: (promise: Promise<any>) => void } | undefined
@@ -56,6 +63,25 @@ export function fixSemver(version: string) {
   if (nbPoint === 1)
     return `${version}.0`
   return version
+}
+
+// Version required for Brotli support with .br extension
+export const BROTLI_MIN_UPDATER_VERSION_V5 = '5.10.0'
+export const BROTLI_MIN_UPDATER_VERSION_V6 = '6.25.0'
+export const BROTLI_MIN_UPDATER_VERSION_V7 = '7.0.35'
+
+export function isDeprecatedPluginVersion(parsedPluginVersion: SemVer, minSeven = '7.25.0'): boolean {
+  // v5 is deprecated if < 5.10.0, v6 is deprecated if < 6.25.0, v7 is deprecated if < 7.25.0
+  if (parsedPluginVersion.major === 5 && lessThan(parsedPluginVersion, parse('5.10.0'))) {
+    return true
+  }
+  if (parsedPluginVersion.major === 6 && lessThan(parsedPluginVersion, parse('6.25.0'))) {
+    return true
+  }
+  if (parsedPluginVersion.major === 7 && lessThan(parsedPluginVersion, parse(minSeven))) {
+    return true
+  }
+  return false
 }
 
 export function isInternalVersionName(version: string) {

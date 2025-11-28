@@ -31,23 +31,25 @@ ADD VALUE IF NOT EXISTS 'build_time';
 -- Build logs - BILLING ONLY: tracks build time for charging orgs
 -- Platform multipliers: android=1x, ios=2x
 CREATE TABLE IF NOT EXISTS public.build_logs (
-  id uuid DEFAULT extensions.uuid_generate_v4 () PRIMARY KEY,
-  created_at timestamptz DEFAULT now() NOT NULL,
-  -- Who to bill
-  org_id uuid NOT NULL REFERENCES public.orgs (id) ON DELETE CASCADE,
-  user_id uuid REFERENCES auth.users (id) ON DELETE SET NULL,
-  -- External reference
-  build_id character varying NOT NULL,
-  -- Raw build time
-  platform character varying NOT NULL CHECK (platform IN ('ios', 'android')),
-  build_time_unit bigint NOT NULL CHECK (build_time_unit >= 0),
-  -- Billable amount (with platform multiplier applied: android=1x, ios=2x)
-  -- This locks in the price at time of build
-  billable_seconds bigint NOT NULL CHECK (billable_seconds >= 0),
-  UNIQUE (build_id, org_id)
+    id uuid DEFAULT extensions.uuid_generate_v4() PRIMARY KEY,
+    created_at timestamptz DEFAULT now() NOT NULL,
+    -- Who to bill
+    org_id uuid NOT NULL REFERENCES public.orgs (id) ON DELETE CASCADE,
+    user_id uuid REFERENCES auth.users (id) ON DELETE SET NULL,
+    -- External reference
+    build_id character varying NOT NULL,
+    -- Raw build time
+    platform character varying NOT NULL CHECK (platform IN ('ios', 'android')),
+    build_time_unit bigint NOT NULL CHECK (build_time_unit >= 0),
+    -- Billable amount (with platform multiplier applied: android=1x, ios=2x)
+    -- This locks in the price at time of build
+    billable_seconds bigint NOT NULL CHECK (billable_seconds >= 0),
+    UNIQUE (build_id, org_id)
 );
 
-CREATE INDEX idx_build_logs_org_created ON public.build_logs (org_id, created_at DESC);
+CREATE INDEX idx_build_logs_org_created ON public.build_logs (
+    org_id, created_at DESC
+);
 
 ALTER TABLE public.build_logs ENABLE ROW LEVEL SECURITY;
 
@@ -56,93 +58,99 @@ ALTER TABLE public.build_logs ENABLE ROW LEVEL SECURITY;
 -- 2. All org builds if they're admin/super_admin
 CREATE POLICY "Users read own or org admin builds" ON public.build_logs FOR
 SELECT
-  TO authenticated USING (
+TO authenticated USING (
     user_id = (
-      SELECT
-        auth.uid ()
+        SELECT auth.uid()
     )
     OR EXISTS (
-      SELECT
-        1
-      FROM
-        public.org_users
-      WHERE
-        org_users.org_id = build_logs.org_id
-        AND org_users.user_id = (
-          SELECT
-            auth.uid ()
-        )
-        AND org_users.user_right IN ('super_admin', 'admin')
+        SELECT 1
+        FROM
+            public.org_users
+        WHERE
+            org_users.org_id = build_logs.org_id
+            AND org_users.user_id = (
+                SELECT auth.uid()
+            )
+            AND org_users.user_right IN ('super_admin', 'admin')
     )
-  );
+);
 
 -- Only service role can write (backend records builds)
-CREATE POLICY "Service role manages build logs" ON public.build_logs FOR ALL TO service_role USING (true)
+CREATE POLICY "Service role manages build logs" ON public.build_logs FOR ALL TO service_role USING (
+    true
+)
 WITH
-  CHECK (true);
+CHECK (true);
 
 -- Daily build time aggregates per app/day for reporting
 CREATE TABLE IF NOT EXISTS public.daily_build_time (
-  app_id character varying NOT NULL REFERENCES public.apps (app_id) ON DELETE CASCADE,
-  date date NOT NULL,
-  build_time_unit bigint NOT NULL DEFAULT 0 CHECK (build_time_unit >= 0),
-  build_count bigint NOT NULL DEFAULT 0 CHECK (build_count >= 0),
-  PRIMARY KEY (app_id, date)
+    app_id character varying NOT NULL REFERENCES public.apps (
+        app_id
+    ) ON DELETE CASCADE,
+    date date NOT NULL,
+    build_time_unit bigint NOT NULL DEFAULT 0 CHECK (build_time_unit >= 0),
+    build_count bigint NOT NULL DEFAULT 0 CHECK (build_count >= 0),
+    PRIMARY KEY (app_id, date)
 );
 
-CREATE INDEX idx_daily_build_time_app_date ON public.daily_build_time (app_id, date);
+CREATE INDEX idx_daily_build_time_app_date ON public.daily_build_time (
+    app_id, date
+);
 
 ALTER TABLE public.daily_build_time ENABLE ROW LEVEL SECURITY;
 
 -- Users can view build time data for apps in their organization
 CREATE POLICY "Users read own org build time" ON public.daily_build_time FOR
 SELECT
-  TO authenticated USING (
+TO authenticated USING (
     EXISTS (
-      SELECT
-        1
-      FROM
-        public.apps
-      WHERE
-        apps.app_id = daily_build_time.app_id
-        AND EXISTS (
-          SELECT
-            1
-          FROM
-            public.org_users
-          WHERE
-            org_users.org_id = apps.owner_org
-            AND org_users.user_id = (
-              SELECT
-                auth.uid ()
+        SELECT 1
+        FROM
+            public.apps
+        WHERE
+            apps.app_id = daily_build_time.app_id
+            AND EXISTS (
+                SELECT 1
+                FROM
+                    public.org_users
+                WHERE
+                    org_users.org_id = apps.owner_org
+                    AND org_users.user_id = (
+                        SELECT auth.uid()
+                    )
             )
-        )
     )
-  );
+);
 
 -- Only service role can write (backend records build metrics)
-CREATE POLICY "Service role manages build time" ON public.daily_build_time FOR ALL TO service_role USING (true)
+CREATE POLICY "Service role manages build time" ON public.daily_build_time FOR ALL TO service_role USING (
+    true
+)
 WITH
-  CHECK (true);
+CHECK (true);
 
 -- Build requests - stores native build jobs requested via API
 CREATE TABLE IF NOT EXISTS public.build_requests (
-  id uuid DEFAULT extensions.uuid_generate_v4 () PRIMARY KEY,
-  created_at timestamptz DEFAULT now() NOT NULL,
-  updated_at timestamptz DEFAULT now() NOT NULL,
-  app_id character varying NOT NULL REFERENCES public.apps (app_id) ON DELETE CASCADE,
-  owner_org uuid NOT NULL REFERENCES public.orgs (id) ON DELETE CASCADE,
-  requested_by uuid NOT NULL REFERENCES auth.users (id) ON DELETE SET NULL,
-  platform character varying NOT NULL CHECK (platform IN ('ios', 'android', 'both')),
-  build_mode character varying NOT NULL DEFAULT 'release',
-  build_config jsonb DEFAULT '{}'::jsonb,
-  status character varying NOT NULL DEFAULT 'pending',
-  builder_job_id character varying,
-  upload_session_key character varying NOT NULL,
-  upload_path character varying NOT NULL,
-  upload_url character varying NOT NULL,
-  upload_expires_at timestamptz NOT NULL,
-  last_error text
+    id uuid DEFAULT extensions.uuid_generate_v4() PRIMARY KEY,
+    created_at timestamptz DEFAULT now() NOT NULL,
+    updated_at timestamptz DEFAULT now() NOT NULL,
+    app_id character varying NOT NULL REFERENCES public.apps (
+        app_id
+    ) ON DELETE CASCADE,
+    owner_org uuid NOT NULL REFERENCES public.orgs (id) ON DELETE CASCADE,
+    requested_by uuid NOT NULL REFERENCES auth.users (id) ON DELETE SET NULL,
+    platform character varying NOT NULL CHECK (
+        platform IN ('ios', 'android', 'both')
+    ),
+    build_mode character varying NOT NULL DEFAULT 'release',
+    build_config jsonb DEFAULT '{}'::jsonb,
+    status character varying NOT NULL DEFAULT 'pending',
+    builder_job_id character varying,
+    upload_session_key character varying NOT NULL,
+    upload_path character varying NOT NULL,
+    upload_url character varying NOT NULL,
+    upload_expires_at timestamptz NOT NULL,
+    last_error text
 );
 
 CREATE INDEX idx_build_requests_app ON public.build_requests (app_id);
@@ -156,28 +164,28 @@ ALTER TABLE public.build_requests ENABLE ROW LEVEL SECURITY;
 -- Users can view build requests for apps in their organization
 CREATE POLICY "Users read own org build requests" ON public.build_requests FOR
 SELECT
-  TO authenticated USING (
+TO authenticated USING (
     EXISTS (
-      SELECT
-        1
-      FROM
-        public.org_users
-      WHERE
-        org_users.org_id = build_requests.owner_org
-        AND org_users.user_id = (
-          SELECT
-            auth.uid ()
-        )
+        SELECT 1
+        FROM
+            public.org_users
+        WHERE
+            org_users.org_id = build_requests.owner_org
+            AND org_users.user_id = (
+                SELECT auth.uid()
+            )
     )
-  );
+);
 
-CREATE POLICY "Service role manages build requests" ON public.build_requests FOR ALL TO service_role USING (true)
+CREATE POLICY "Service role manages build requests" ON public.build_requests FOR ALL TO service_role USING (
+    true
+)
 WITH
-  CHECK (true);
+CHECK (true);
 
 CREATE TRIGGER handle_build_requests_updated_at BEFORE
 UPDATE ON public.build_requests FOR EACH ROW
-EXECUTE FUNCTION moddatetime ('updated_at');
+EXECUTE FUNCTION moddatetime('updated_at');
 
 -- Note: No daily aggregation needed - just query build_logs for billing
 -- Note: builder.capgo.app manages its own R2 storage; this table only stores metadata
@@ -204,15 +212,15 @@ COMMIT;
 -- ==================================================
 -- Function: record_build_time - BILLING ONLY
 -- Applies platform multiplier: android=1x, ios=2x
-CREATE OR REPLACE FUNCTION public.record_build_time (
-  p_org_id uuid,
-  p_user_id uuid,
-  p_build_id character varying,
-  p_platform character varying,
-  p_build_time_unit bigint
+CREATE OR REPLACE FUNCTION public.record_build_time(
+    p_org_id uuid,
+    p_user_id uuid,
+    p_build_id character varying,
+    p_platform character varying,
+    p_build_time_unit bigint
 ) RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER
 SET
-  search_path = '' AS $$
+search_path = '' AS $$
 DECLARE
   v_build_log_id uuid;
   v_multiplier numeric;
@@ -244,9 +252,13 @@ END;
 $$;
 
 -- Function: get_org_build_time_unit
-CREATE OR REPLACE FUNCTION public.get_org_build_time_unit (p_org_id uuid, p_start_date date, p_end_date date) RETURNS TABLE (total_build_time_unit bigint, total_builds bigint) LANGUAGE plpgsql STABLE
+CREATE OR REPLACE FUNCTION public.get_org_build_time_unit(
+    p_org_id uuid, p_start_date date, p_end_date date
+) RETURNS TABLE (
+    total_build_time_unit bigint, total_builds bigint
+) LANGUAGE plpgsql STABLE
 SET
-  search_path = '' AS $$
+search_path = '' AS $$
 BEGIN
   RETURN QUERY
   SELECT COALESCE(SUM(dbt.build_time_unit), 0)::bigint, COALESCE(SUM(dbt.build_count), 0)::bigint
@@ -257,30 +269,36 @@ END;
 $$;
 
 -- Function: is_build_time_exceeded_by_org
-CREATE OR REPLACE FUNCTION public.is_build_time_exceeded_by_org (org_id uuid) RETURNS boolean LANGUAGE plpgsql STABLE
+CREATE OR REPLACE FUNCTION public.is_build_time_exceeded_by_org(
+    org_id uuid
+) RETURNS boolean LANGUAGE plpgsql STABLE
 SET
-  search_path = '' AS $$
+search_path = '' AS $$
 BEGIN
   RETURN (SELECT build_time_exceeded FROM public.stripe_info
     WHERE stripe_info.customer_id = (SELECT customer_id FROM public.orgs WHERE id = is_build_time_exceeded_by_org.org_id));
 END;
 $$;
 
-GRANT ALL ON FUNCTION public.is_build_time_exceeded_by_org (uuid) TO anon,
+GRANT ALL ON FUNCTION public.is_build_time_exceeded_by_org(uuid) TO anon,
 authenticated,
 service_role;
 
 -- Function: set_build_time_exceeded_by_org
-CREATE OR REPLACE FUNCTION public.set_build_time_exceeded_by_org (org_id uuid, disabled boolean) RETURNS void LANGUAGE plpgsql
+CREATE OR REPLACE FUNCTION public.set_build_time_exceeded_by_org(
+    org_id uuid, disabled boolean
+) RETURNS void LANGUAGE plpgsql
 SET
-  search_path = '' AS $$
+search_path = '' AS $$
 BEGIN
   UPDATE public.stripe_info SET build_time_exceeded = disabled
   WHERE stripe_info.customer_id = (SELECT customer_id FROM public.orgs WHERE id = set_build_time_exceeded_by_org.org_id);
 END;
 $$;
 
-GRANT ALL ON FUNCTION public.set_build_time_exceeded_by_org (uuid, boolean) TO anon,
+GRANT ALL ON FUNCTION public.set_build_time_exceeded_by_org(
+    uuid, boolean
+) TO anon,
 authenticated,
 service_role;
 
@@ -289,24 +307,26 @@ service_role;
 -- PART 4: UPDATE EXISTING FUNCTIONS WITH build_time_unit
 -- ==================================================
 -- Update get_app_metrics
-DROP FUNCTION IF EXISTS public.get_app_metrics (uuid);
+DROP FUNCTION IF EXISTS public.get_app_metrics(uuid);
 
-DROP FUNCTION IF EXISTS public.get_app_metrics (uuid, date, date);
+DROP FUNCTION IF EXISTS public.get_app_metrics(uuid, date, date);
 
-CREATE FUNCTION public.get_app_metrics (org_id uuid, start_date date, end_date date) RETURNS TABLE (
-  app_id character varying,
-  date date,
-  mau bigint,
-  storage bigint,
-  bandwidth bigint,
-  build_time_unit bigint,
-  get bigint,
-  fail bigint,
-  install bigint,
-  uninstall bigint
+CREATE FUNCTION public.get_app_metrics(
+    org_id uuid, start_date date, end_date date
+) RETURNS TABLE (
+    app_id character varying,
+    date date,
+    mau bigint,
+    storage bigint,
+    bandwidth bigint,
+    build_time_unit bigint,
+    get bigint,
+    fail bigint,
+    install bigint,
+    uninstall bigint
 ) LANGUAGE plpgsql STABLE SECURITY DEFINER
 SET
-  search_path = '' AS $$
+search_path = '' AS $$
 BEGIN
   RETURN QUERY
   WITH DateSeries AS (SELECT generate_series(start_date, end_date, '1 day'::interval)::date AS "date"),
@@ -327,20 +347,20 @@ BEGIN
 END;
 $$;
 
-CREATE FUNCTION public.get_app_metrics (org_id uuid) RETURNS TABLE (
-  app_id character varying,
-  date date,
-  mau bigint,
-  storage bigint,
-  bandwidth bigint,
-  build_time_unit bigint,
-  get bigint,
-  fail bigint,
-  install bigint,
-  uninstall bigint
+CREATE FUNCTION public.get_app_metrics(org_id uuid) RETURNS TABLE (
+    app_id character varying,
+    date date,
+    mau bigint,
+    storage bigint,
+    bandwidth bigint,
+    build_time_unit bigint,
+    get bigint,
+    fail bigint,
+    install bigint,
+    uninstall bigint
 ) LANGUAGE plpgsql STABLE
 SET
-  search_path = '' AS $$
+search_path = '' AS $$
 DECLARE cycle_start timestamptz; cycle_end timestamptz;
 BEGIN
   SELECT subscription_anchor_start, subscription_anchor_end INTO cycle_start, cycle_end
@@ -350,22 +370,24 @@ END;
 $$;
 
 -- Update get_total_metrics
-DROP FUNCTION IF EXISTS public.get_total_metrics (uuid);
+DROP FUNCTION IF EXISTS public.get_total_metrics(uuid);
 
-DROP FUNCTION IF EXISTS public.get_total_metrics (uuid, date, date);
+DROP FUNCTION IF EXISTS public.get_total_metrics(uuid, date, date);
 
-CREATE FUNCTION public.get_total_metrics (org_id uuid, start_date date, end_date date) RETURNS TABLE (
-  mau bigint,
-  storage bigint,
-  bandwidth bigint,
-  build_time_unit bigint,
-  get bigint,
-  fail bigint,
-  install bigint,
-  uninstall bigint
+CREATE FUNCTION public.get_total_metrics(
+    org_id uuid, start_date date, end_date date
+) RETURNS TABLE (
+    mau bigint,
+    storage bigint,
+    bandwidth bigint,
+    build_time_unit bigint,
+    get bigint,
+    fail bigint,
+    install bigint,
+    uninstall bigint
 ) LANGUAGE plpgsql STABLE
 SET
-  search_path = '' AS $$
+search_path = '' AS $$
 BEGIN
   RETURN QUERY SELECT COALESCE(SUM(metrics.mau), 0)::bigint, 
     COALESCE(public.get_total_storage_size_org(org_id), 0)::bigint,
@@ -376,18 +398,18 @@ BEGIN
 END;
 $$;
 
-CREATE FUNCTION public.get_total_metrics (org_id uuid) RETURNS TABLE (
-  mau bigint,
-  storage bigint,
-  bandwidth bigint,
-  build_time_unit bigint,
-  get bigint,
-  fail bigint,
-  install bigint,
-  uninstall bigint
+CREATE FUNCTION public.get_total_metrics(org_id uuid) RETURNS TABLE (
+    mau bigint,
+    storage bigint,
+    bandwidth bigint,
+    build_time_unit bigint,
+    get bigint,
+    fail bigint,
+    install bigint,
+    uninstall bigint
 ) LANGUAGE plpgsql STABLE
 SET
-  search_path = '' AS $$
+search_path = '' AS $$
 DECLARE cycle_start timestamptz; cycle_end timestamptz;
 BEGIN
   SELECT subscription_anchor_start, subscription_anchor_end INTO cycle_start, cycle_end
@@ -397,16 +419,16 @@ END;
 $$;
 
 -- Update find_fit_plan_v3
-DROP FUNCTION IF EXISTS public.find_fit_plan_v3 (bigint, bigint, bigint);
+DROP FUNCTION IF EXISTS public.find_fit_plan_v3(bigint, bigint, bigint);
 
-CREATE FUNCTION public.find_fit_plan_v3 (
-  mau bigint,
-  bandwidth bigint,
-  storage bigint,
-  build_time_unit bigint DEFAULT 0
+CREATE FUNCTION public.find_fit_plan_v3(
+    mau bigint,
+    bandwidth bigint,
+    storage bigint,
+    build_time_unit bigint DEFAULT 0
 ) RETURNS TABLE (name character varying) LANGUAGE plpgsql STABLE
 SET
-  search_path = '' AS $$
+search_path = '' AS $$
 BEGIN
   RETURN QUERY (SELECT plans.name FROM public.plans
     WHERE plans.mau >= find_fit_plan_v3.mau AND plans.storage >= find_fit_plan_v3.storage
@@ -417,16 +439,18 @@ END;
 $$;
 
 -- Update find_best_plan_v3 to account for build time
-DROP FUNCTION IF EXISTS public.find_best_plan_v3 (bigint, double precision, double precision);
+DROP FUNCTION IF EXISTS public.find_best_plan_v3(
+    bigint, double precision, double precision
+);
 
-CREATE FUNCTION public.find_best_plan_v3 (
-  mau bigint,
-  bandwidth double precision,
-  storage double precision,
-  build_time_unit bigint DEFAULT 0
+CREATE FUNCTION public.find_best_plan_v3(
+    mau bigint,
+    bandwidth double precision,
+    storage double precision,
+    build_time_unit bigint DEFAULT 0
 ) RETURNS character varying LANGUAGE plpgsql SECURITY DEFINER
 SET
-  search_path = '' AS $$
+search_path = '' AS $$
 BEGIN
   RETURN (
     SELECT name
@@ -443,19 +467,21 @@ BEGIN
 END;
 $$;
 
-ALTER FUNCTION public.find_best_plan_v3 (
-  bigint,
-  double precision,
-  double precision,
-  bigint
+ALTER FUNCTION public.find_best_plan_v3(
+    bigint,
+    double precision,
+    double precision,
+    bigint
 ) OWNER TO "postgres";
 
 -- Update is_good_plan_v5_org
-DROP FUNCTION IF EXISTS public.is_good_plan_v5_org (uuid);
+DROP FUNCTION IF EXISTS public.is_good_plan_v5_org(uuid);
 
-CREATE FUNCTION public.is_good_plan_v5_org (orgid uuid) RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER
+CREATE FUNCTION public.is_good_plan_v5_org(
+    orgid uuid
+) RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER
 SET
-  search_path = '' AS $$
+search_path = '' AS $$
 DECLARE total_metrics RECORD; current_plan_name TEXT;
 BEGIN
   SELECT * INTO total_metrics FROM public.get_total_metrics(orgid,
@@ -473,9 +499,11 @@ END;
 $$;
 
 -- Update is_paying_and_good_plan_org_action
-CREATE OR REPLACE FUNCTION public.is_paying_and_good_plan_org_action (orgid uuid, actions public.action_type[]) RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER
+CREATE OR REPLACE FUNCTION public.is_paying_and_good_plan_org_action(
+    orgid uuid, actions public.action_type []
+) RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER
 SET
-  search_path = '' AS $$
+search_path = '' AS $$
 DECLARE org_customer_id text; result boolean;
 BEGIN
   SELECT o.customer_id INTO org_customer_id FROM public.orgs o WHERE o.id = orgid;
@@ -487,21 +515,23 @@ BEGIN
 END;
 $$;
 
-GRANT ALL ON FUNCTION public.is_paying_and_good_plan_org_action (uuid, public.action_type[]) TO anon,
+GRANT ALL ON FUNCTION public.is_paying_and_good_plan_org_action(
+    uuid, public.action_type []
+) TO anon,
 authenticated,
 service_role;
 
 -- Update get_current_plan_max_org to include build_time_unit
-DROP FUNCTION IF EXISTS public.get_current_plan_max_org (uuid);
+DROP FUNCTION IF EXISTS public.get_current_plan_max_org(uuid);
 
-CREATE FUNCTION public.get_current_plan_max_org (orgid uuid) RETURNS TABLE (
-  mau bigint,
-  bandwidth bigint,
-  storage bigint,
-  build_time_unit bigint
+CREATE FUNCTION public.get_current_plan_max_org(orgid uuid) RETURNS TABLE (
+    mau bigint,
+    bandwidth bigint,
+    storage bigint,
+    build_time_unit bigint
 ) LANGUAGE plpgsql SECURITY DEFINER
 SET
-  search_path = '' AS $$
+search_path = '' AS $$
 Begin
   RETURN QUERY
   (SELECT plans.mau, plans.bandwidth, plans.storage, plans.build_time_unit
@@ -518,19 +548,23 @@ End;
 $$;
 
 -- Update get_plan_usage_percent_detailed
-DROP FUNCTION IF EXISTS public.get_plan_usage_percent_detailed (uuid);
+DROP FUNCTION IF EXISTS public.get_plan_usage_percent_detailed(uuid);
 
-DROP FUNCTION IF EXISTS public.get_plan_usage_percent_detailed (uuid, date, date);
+DROP FUNCTION IF EXISTS public.get_plan_usage_percent_detailed(
+    uuid, date, date
+);
 
-CREATE FUNCTION public.get_plan_usage_percent_detailed (orgid uuid) RETURNS TABLE (
-  total_percent double precision,
-  mau_percent double precision,
-  bandwidth_percent double precision,
-  storage_percent double precision,
-  build_time_percent double precision
+CREATE FUNCTION public.get_plan_usage_percent_detailed(
+    orgid uuid
+) RETURNS TABLE (
+    total_percent double precision,
+    mau_percent double precision,
+    bandwidth_percent double precision,
+    storage_percent double precision,
+    build_time_percent double precision
 ) LANGUAGE plpgsql
 SET
-  search_path = '' SECURITY DEFINER AS $$
+search_path = '' SECURITY DEFINER AS $$
 DECLARE current_plan_max RECORD; total_stats RECORD;
   percent_mau double precision; percent_bandwidth double precision; percent_storage double precision; percent_build_time double precision;
 BEGIN
@@ -545,15 +579,17 @@ BEGIN
 END;
 $$;
 
-CREATE FUNCTION public.get_plan_usage_percent_detailed (orgid uuid, cycle_start date, cycle_end date) RETURNS TABLE (
-  total_percent double precision,
-  mau_percent double precision,
-  bandwidth_percent double precision,
-  storage_percent double precision,
-  build_time_percent double precision
+CREATE FUNCTION public.get_plan_usage_percent_detailed(
+    orgid uuid, cycle_start date, cycle_end date
+) RETURNS TABLE (
+    total_percent double precision,
+    mau_percent double precision,
+    bandwidth_percent double precision,
+    storage_percent double precision,
+    build_time_percent double precision
 ) LANGUAGE plpgsql
 SET
-  search_path = '' SECURITY DEFINER AS $$
+search_path = '' SECURITY DEFINER AS $$
 DECLARE current_plan_max RECORD; total_stats RECORD;
   percent_mau double precision; percent_bandwidth double precision; percent_storage double precision; percent_build_time double precision;
 BEGIN
@@ -573,9 +609,11 @@ $$;
 -- ==================================================
 -- The seed_get_app_metrics_caches function caches metrics data in JSONB format
 -- It needs to include build_time_unit in the cached data structure
-CREATE OR REPLACE FUNCTION public.seed_get_app_metrics_caches (p_org_id uuid, p_start_date date, p_end_date date) RETURNS public.app_metrics_cache LANGUAGE plpgsql SECURITY DEFINER
+CREATE OR REPLACE FUNCTION public.seed_get_app_metrics_caches(
+    p_org_id uuid, p_start_date date, p_end_date date
+) RETURNS public.app_metrics_cache LANGUAGE plpgsql SECURITY DEFINER
 SET
-  search_path TO '' AS $function$
+search_path TO '' AS $function$
 DECLARE
     metrics_json jsonb;
     cache_record public.app_metrics_cache%ROWTYPE;
@@ -654,22 +692,24 @@ END;
 $function$;
 
 -- Update get_app_metrics to properly extract build_time_unit from cache
-DROP FUNCTION IF EXISTS public.get_app_metrics (uuid, date, date);
+DROP FUNCTION IF EXISTS public.get_app_metrics(uuid, date, date);
 
-CREATE FUNCTION public.get_app_metrics (org_id uuid, start_date date, end_date date) RETURNS TABLE (
-  app_id character varying,
-  date date,
-  mau bigint,
-  storage bigint,
-  bandwidth bigint,
-  build_time_unit bigint,
-  get bigint,
-  fail bigint,
-  install bigint,
-  uninstall bigint
+CREATE FUNCTION public.get_app_metrics(
+    org_id uuid, start_date date, end_date date
+) RETURNS TABLE (
+    app_id character varying,
+    date date,
+    mau bigint,
+    storage bigint,
+    bandwidth bigint,
+    build_time_unit bigint,
+    get bigint,
+    fail bigint,
+    install bigint,
+    uninstall bigint
 ) LANGUAGE plpgsql SECURITY DEFINER
 SET
-  search_path TO '' AS $function$
+search_path TO '' AS $function$
 DECLARE
     cache_entry public.app_metrics_cache%ROWTYPE;
     org_exists boolean;
