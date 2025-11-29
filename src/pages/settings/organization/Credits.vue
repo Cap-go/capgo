@@ -54,6 +54,7 @@ const isStartingCheckout = ref(false)
 const isCompletingTopUp = ref(false)
 const isProcessingCheckout = computed(() => isStartingCheckout.value || isCompletingTopUp.value)
 const DEFAULT_TOP_UP_QUANTITY = 100
+const QUICK_TOP_UP_OPTIONS = [50, 500, 5000] as const
 const CREDIT_TAX_MULTIPLIER = 1.2
 const topUpQuantityInput = ref(String(DEFAULT_TOP_UP_QUANTITY))
 const topUpQuantity = computed(() => {
@@ -231,6 +232,10 @@ function formatCurrency(value: number) {
 
 function formatDate(value: string) {
   return dayjs(value).format('MMM D, YYYY HH:mm')
+}
+
+function selectTopUpQuantity(amount: number) {
+  topUpQuantityInput.value = String(amount)
 }
 
 function transactionLabel(type: Database['public']['Enums']['credit_transaction_type']) {
@@ -457,23 +462,45 @@ watch(() => currentOrganization.value?.gid, async (newOrgId, oldOrgId) => {
           </p>
         </div>
         <form class="flex w-full flex-row p-3 sm:h-full sm:flex-row sm:items-center sm:justify-between" @submit.prevent="handleBuyCredits">
-          <div class="flex w-full flex-col gap-2 sm:w-56">
-            <FormKit
-              v-model="topUpQuantityInput"
-              type="number"
-              name="creditsTopUpQuantity"
-              inputmode="numeric"
-              min="1"
-              step="1"
-              :placeholder="String(DEFAULT_TOP_UP_QUANTITY)"
-              :label="t('credits-top-up-quantity-label')"
-              validation="required|min:1"
-              validation-visibility="live"
-              outer-class="w-full !mb-0"
-              label-class="text-xs font-semibold uppercase tracking-wide"
-              help-class="hidden"
-              message-class="text-xs text-rose-200 mt-1"
-            />
+          <div class="flex w-full flex-col gap-3 sm:max-w-md">
+            <div class="flex flex-row gap-2 sm:flex-row sm:items-end sm:gap-3">
+              <div class="relative w-full">
+                <FormKit
+                  v-model="topUpQuantityInput"
+                  type="number"
+                  name="creditsTopUpQuantity"
+                  inputmode="numeric"
+                  min="1"
+                  step="1"
+                  :placeholder="`$${DEFAULT_TOP_UP_QUANTITY}`"
+                  :label="t('credits-top-up-quantity-label')"
+                  input-class="pl-6"
+                  validation="required|min:1"
+                  validation-visibility="live"
+                  outer-class="w-full !mb-0"
+                  label-class="text-xs font-semibold uppercase tracking-wide"
+                  help-class="hidden"
+                  message-class="text-xs text-rose-200 mt-1"
+                />
+                <span class="pointer-events-none absolute left-3 top-1/2 transform text-sm font-semibold text-gray-500 dark:text-gray-300">
+                  $
+                </span>
+              </div>
+              <div class="flex shrink-0 items-end gap-2">
+                <button
+                  v-for="amount in QUICK_TOP_UP_OPTIONS"
+                  :key="amount"
+                  type="button"
+                  class="d-btn d-btn-sm min-w-[4.25rem] h-11"
+                  :class="topUpQuantity === amount
+                    ? 'border border-blue-600 bg-blue-600 text-white hover:border-blue-700 hover:bg-blue-700 dark:border-blue-500 dark:bg-blue-500 dark:hover:border-blue-400 dark:hover:bg-blue-500/90'
+                    : 'border border-blue-200 bg-white text-blue-700 hover:border-blue-400 hover:bg-blue-50 dark:border-blue-500/60 dark:bg-gray-900 dark:text-blue-200 dark:hover:border-blue-400 dark:hover:bg-blue-900/40'"
+                  @click="selectTopUpQuantity(amount)"
+                >
+                  ${{ amount }}
+                </button>
+              </div>
+            </div>
             <div class="text-xs opacity-90 space-y-1 font-medium text-gray-900 dark:text-white">
               <p>
                 {{ t('credits-top-up-quantity-help') }}
