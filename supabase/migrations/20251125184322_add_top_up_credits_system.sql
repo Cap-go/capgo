@@ -652,4 +652,359 @@ UNION ALL
 GRANT SELECT ON public.usage_credit_ledger TO authenticated;
 GRANT SELECT ON public.usage_credit_ledger TO service_role;
 
+-- Track the last credit alert threshold sent per org and enqueue alerts as credits are consumed
+
+-- State table to remember the last threshold emitted for an org and the current alert cycle
+CREATE TABLE IF NOT EXISTS public.usage_credit_alert_state (
+    org_id uuid PRIMARY KEY REFERENCES public.orgs (id) ON DELETE CASCADE,
+    alert_cycle integer NOT NULL DEFAULT 1,
+    last_threshold integer NOT NULL DEFAULT 0,
+    last_total_credits numeric NOT NULL DEFAULT 0,
+    last_available_credits numeric NOT NULL DEFAULT 0,
+    last_transaction_id bigint,
+    last_percent_used numeric,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TRIGGER handle_usage_credit_alert_state_updated_at
+    BEFORE UPDATE ON public.usage_credit_alert_state
+    FOR EACH ROW
+    EXECUTE FUNCTION extensions.moddatetime('updated_at');
+
+ALTER TABLE public.usage_credit_alert_state ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow service_role full access" ON public.usage_credit_alert_state
+    FOR ALL TO service_role USING (true) WITH CHECK (true);
+
+-- Queue dedicated to credit usage alerts
+SELECT pgmq.create('credit_usage_alerts');
+
+-- Trigger function: detect threshold crossings and enqueue messages for the worker
+CREATE OR REPLACE FUNCTION public.handle_usage_credit_alerts() RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = '' SECURITY DEFINER AS $$
+DECLARE
+  v_balance RECORD;
+  v_percent_used numeric := 0;
+  v_threshold integer := 0;
+  v_prev_threshold integer := 0;
+  v_prev_available numeric := 0;
+  v_prev_total numeric := 0;
+  v_alert_cycle integer := 1;
+  v_thresholds CONSTANT integer[] := ARRAY[50, 75, 90, 100];
+  v_reset boolean := false;
+  v_has_state boolean := false;
+BEGIN
+  IF NEW.org_id IS NULL THEN
+    RETURN NEW;
+  END IF;
+
+  SELECT total_credits, available_credits
+  INTO v_balance
+  FROM public.usage_credit_balances
+  WHERE org_id = NEW.org_id;
+
+  IF NOT FOUND OR v_balance.total_credits IS NULL OR v_balance.total_credits <= 0 THEN
+    RETURN NEW;
+  END IF;
+
+  v_percent_used := LEAST(100, CASE
+    WHEN v_balance.total_credits > 0 THEN ((v_balance.total_credits - v_balance.available_credits) / v_balance.total_credits) * 100
+    ELSE 0
+  END);
+
+  SELECT alert_cycle, last_threshold, last_available_credits, last_total_credits
+  INTO v_alert_cycle, v_prev_threshold, v_prev_available, v_prev_total
+  FROM public.usage_credit_alert_state
+  WHERE org_id = NEW.org_id
+  FOR UPDATE;
+
+  IF FOUND THEN
+    v_has_state := true;
+  ELSE
+    v_alert_cycle := 1;
+    v_prev_threshold := 0;
+    v_prev_available := 0;
+    v_prev_total := 0;
+  END IF;
+
+  -- Detect top-ups or any balance increase and reset the alert cycle
+  IF v_balance.available_credits > v_prev_available OR v_balance.total_credits > v_prev_total THEN
+    v_reset := v_has_state;
+    IF v_reset THEN
+      v_alert_cycle := v_alert_cycle + 1;
+      v_prev_threshold := 0;
+    END IF;
+  END IF;
+
+  SELECT max(val) INTO v_threshold
+  FROM unnest(v_thresholds) AS val
+  WHERE v_percent_used >= val;
+
+  IF v_threshold IS NULL THEN
+    v_threshold := 0;
+  END IF;
+
+  -- Only emit alerts on consumption/expiry events once a higher threshold is crossed
+  IF NEW.amount < 0 AND v_threshold >= 50 AND v_threshold > v_prev_threshold THEN
+    PERFORM pgmq.send(
+      'credit_usage_alerts',
+      jsonb_build_object(
+        'function_name', 'credit_usage_alerts',
+        'function_type', NULL,
+        'payload', jsonb_build_object(
+          'org_id', NEW.org_id,
+          'threshold', v_threshold,
+          'percent_used', ROUND(v_percent_used, 2),
+          'available_credits', v_balance.available_credits,
+          'total_credits', v_balance.total_credits,
+          'alert_cycle', v_alert_cycle,
+          'transaction_id', NEW.id
+        )
+      )
+    );
+  END IF;
+
+  INSERT INTO public.usage_credit_alert_state (
+    org_id,
+    alert_cycle,
+    last_threshold,
+    last_total_credits,
+    last_available_credits,
+    last_transaction_id,
+    last_percent_used
+  )
+  VALUES (
+    NEW.org_id,
+    v_alert_cycle,
+    CASE
+      WHEN v_reset THEN 0
+      WHEN v_threshold > v_prev_threshold THEN v_threshold
+      ELSE v_prev_threshold
+    END,
+    v_balance.total_credits,
+    v_balance.available_credits,
+    NEW.id,
+    ROUND(v_percent_used, 2)
+  )
+  ON CONFLICT (org_id) DO UPDATE
+  SET
+    alert_cycle = EXCLUDED.alert_cycle,
+    last_threshold = EXCLUDED.last_threshold,
+    last_total_credits = EXCLUDED.last_total_credits,
+    last_available_credits = EXCLUDED.last_available_credits,
+    last_transaction_id = EXCLUDED.last_transaction_id,
+    last_percent_used = EXCLUDED.last_percent_used;
+
+  RETURN NEW;
+END;
+$$;
+
+ALTER FUNCTION public.handle_usage_credit_alerts() OWNER TO postgres;
+
+-- Fire after every credit transaction so balances stay in sync with alerts
+DROP TRIGGER IF EXISTS usage_credit_alerts_enqueue ON public.usage_credit_transactions;
+
+CREATE TRIGGER usage_credit_alerts_enqueue
+AFTER INSERT ON public.usage_credit_transactions
+FOR EACH ROW
+EXECUTE FUNCTION public.handle_usage_credit_alerts();
+
+-- Keep the consolidated cron runner aware of the new queue (processed every 10 seconds)
+CREATE OR REPLACE FUNCTION public.process_all_cron_tasks () RETURNS void LANGUAGE plpgsql
+SET
+    search_path = '' AS $$
+DECLARE
+  current_hour int;
+  current_minute int;
+  current_second int;
+BEGIN
+  -- Get current time components in UTC
+  current_hour := EXTRACT(HOUR FROM now());
+  current_minute := EXTRACT(MINUTE FROM now());
+  current_second := EXTRACT(SECOND FROM now());
+
+  -- Every second: D1 replication
+  BEGIN
+    PERFORM public.process_d1_replication_batch();
+  EXCEPTION WHEN OTHERS THEN
+    RAISE WARNING 'process_d1_replication_batch failed: %', SQLERRM;
+  END;
+
+  -- Every 10 seconds: High-frequency queues (at :00, :10, :20, :30, :40, :50)
+  IF current_second % 10 = 0 THEN
+    -- Process high-frequency queues with default batch size (950)
+    BEGIN
+      PERFORM public.process_function_queue(ARRAY['on_channel_update', 'on_user_create', 'on_user_update', 'on_version_delete', 'on_version_update', 'on_app_delete', 'on_organization_create', 'on_user_delete', 'on_app_create', 'credit_usage_alerts']);
+    EXCEPTION WHEN OTHERS THEN
+      RAISE WARNING 'process_function_queue (high-frequency) failed: %', SQLERRM;
+    END;
+
+    -- Process channel device counts with batch size 1000
+    BEGIN
+      PERFORM public.process_channel_device_counts_queue(1000);
+    EXCEPTION WHEN OTHERS THEN
+      RAISE WARNING 'process_channel_device_counts_queue failed: %', SQLERRM;
+    END;
+
+  END IF;
+
+  -- Every minute (at :00 seconds): Per-minute tasks
+  IF current_second = 0 THEN
+    BEGIN
+      PERFORM public.delete_accounts_marked_for_deletion();
+    EXCEPTION WHEN OTHERS THEN
+      RAISE WARNING 'delete_accounts_marked_for_deletion failed: %', SQLERRM;
+    END;
+
+    -- Process with batch size 10
+    BEGIN
+      PERFORM public.process_function_queue(ARRAY['cron_sync_sub', 'cron_stat_app'], 10);
+    EXCEPTION WHEN OTHERS THEN
+      RAISE WARNING 'process_function_queue (per-minute) failed: %', SQLERRM;
+    END;
+
+    -- on_manifest_create uses default batch size
+    BEGIN
+      PERFORM public.process_function_queue(ARRAY['on_manifest_create']);
+    EXCEPTION WHEN OTHERS THEN
+      RAISE WARNING 'process_function_queue (manifest_create) failed: %', SQLERRM;
+    END;
+  END IF;
+
+  -- Every 5 minutes (at :00 seconds): Org stats with batch size 10
+  IF current_minute % 5 = 0 AND current_second = 0 THEN
+    BEGIN
+      PERFORM public.process_function_queue(ARRAY['cron_stat_org'], 10);
+    EXCEPTION WHEN OTHERS THEN
+      RAISE WARNING 'process_function_queue (cron_stat_org) failed: %', SQLERRM;
+    END;
+  END IF;
+
+  -- Every hour (at :00:00): Hourly cleanup
+  IF current_minute = 0 AND current_second = 0 THEN
+    BEGIN
+      PERFORM public.cleanup_frequent_job_details();
+    EXCEPTION WHEN OTHERS THEN
+      RAISE WARNING 'cleanup_frequent_job_details failed: %', SQLERRM;
+    END;
+  END IF;
+
+  -- Every 2 hours (at :00:00): Low-frequency queues with default batch size
+  IF current_hour % 2 = 0 AND current_minute = 0 AND current_second = 0 THEN
+    BEGIN
+      PERFORM public.process_function_queue(ARRAY['admin_stats', 'cron_email', 'on_version_create', 'on_organization_delete', 'on_deploy_history_create', 'cron_clear_versions']);
+    EXCEPTION WHEN OTHERS THEN
+      RAISE WARNING 'process_function_queue (low-frequency) failed: %', SQLERRM;
+    END;
+  END IF;
+
+  -- Every 6 hours (at :00:00): Stats jobs
+  IF current_hour % 6 = 0 AND current_minute = 0 AND current_second = 0 THEN
+    BEGIN
+      PERFORM public.process_cron_stats_jobs();
+    EXCEPTION WHEN OTHERS THEN
+      RAISE WARNING 'process_cron_stats_jobs failed: %', SQLERRM;
+    END;
+  END IF;
+
+  -- Daily at 00:00:00 - Midnight tasks
+  IF current_hour = 0 AND current_minute = 0 AND current_second = 0 THEN
+    BEGIN
+      PERFORM public.cleanup_queue_messages();
+    EXCEPTION WHEN OTHERS THEN
+      RAISE WARNING 'cleanup_queue_messages failed: %', SQLERRM;
+    END;
+
+    BEGIN
+      PERFORM public.delete_old_deleted_apps();
+    EXCEPTION WHEN OTHERS THEN
+      RAISE WARNING 'delete_old_deleted_apps failed: %', SQLERRM;
+    END;
+
+    BEGIN
+      PERFORM public.remove_old_jobs();
+    EXCEPTION WHEN OTHERS THEN
+      RAISE WARNING 'remove_old_jobs failed: %', SQLERRM;
+    END;
+  END IF;
+
+  -- Daily at 00:40:00 - Old app version retention
+  IF current_hour = 0 AND current_minute = 40 AND current_second = 0 THEN
+    BEGIN
+      PERFORM public.update_app_versions_retention();
+    EXCEPTION WHEN OTHERS THEN
+      RAISE WARNING 'update_app_versions_retention failed: %', SQLERRM;
+    END;
+  END IF;
+
+  -- Daily at 01:01:00 - Admin stats creation
+  IF current_hour = 1 AND current_minute = 1 AND current_second = 0 THEN
+    BEGIN
+      PERFORM public.process_admin_stats();
+    EXCEPTION WHEN OTHERS THEN
+      RAISE WARNING 'process_admin_stats failed: %', SQLERRM;
+    END;
+  END IF;
+
+  -- Daily at 03:00:00 - Free trial and credits
+  IF current_hour = 3 AND current_minute = 0 AND current_second = 0 THEN
+    BEGIN
+      PERFORM public.process_free_trial_expired();
+    EXCEPTION WHEN OTHERS THEN
+      RAISE WARNING 'process_free_trial_expired failed: %', SQLERRM;
+    END;
+
+    BEGIN
+      PERFORM public.expire_usage_credits();
+    EXCEPTION WHEN OTHERS THEN
+      RAISE WARNING 'expire_usage_credits failed: %', SQLERRM;
+    END;
+  END IF;
+
+  -- Daily at 04:00:00 - Sync sub scheduler
+  IF current_hour = 4 AND current_minute = 0 AND current_second = 0 THEN
+    BEGIN
+      PERFORM public.process_cron_sync_sub_jobs();
+    EXCEPTION WHEN OTHERS THEN
+      RAISE WARNING 'process_cron_sync_sub_jobs failed: %', SQLERRM;
+    END;
+  END IF;
+
+  -- Daily at 12:00:00 - Noon tasks
+  IF current_hour = 12 AND current_minute = 0 AND current_second = 0 THEN
+    BEGIN
+      DELETE FROM cron.job_run_details WHERE end_time < now() - interval '7 days';
+    EXCEPTION WHEN OTHERS THEN
+      RAISE WARNING 'cleanup job_run_details failed: %', SQLERRM;
+    END;
+
+    BEGIN
+      PERFORM public.cleanup_old_queue_archives();
+    EXCEPTION WHEN OTHERS THEN
+      RAISE WARNING 'cleanup_old_queue_archives failed: %', SQLERRM;
+    END;
+
+    -- Weekly stats email (every Saturday at noon)
+    IF EXTRACT(DOW FROM now()) = 6 THEN
+      BEGIN
+        PERFORM public.process_stats_email_weekly();
+      EXCEPTION WHEN OTHERS THEN
+        RAISE WARNING 'process_stats_email_weekly failed: %', SQLERRM;
+      END;
+    END IF;
+
+    -- Monthly stats email (1st of month at noon)
+    IF EXTRACT(DAY FROM now()) = 1 THEN
+      BEGIN
+        PERFORM public.process_stats_email_monthly();
+      EXCEPTION WHEN OTHERS THEN
+        RAISE WARNING 'process_stats_email_monthly failed: %', SQLERRM;
+      END;
+    END IF;
+  END IF;
+END;
+$$;
+
 COMMIT;
