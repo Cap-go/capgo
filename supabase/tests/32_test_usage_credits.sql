@@ -3,7 +3,7 @@ BEGIN;
 CREATE EXTENSION "basejump-supabase_test_helpers";
 
 SELECT
-  plan (17);
+  plan (18);
 
 DO $$
 BEGIN
@@ -179,30 +179,36 @@ SELECT
 SELECT
   is(
     (
-      SELECT
-        overage_unpaid
-      FROM
-        public.apply_usage_overage (
-          (
-            SELECT
-              org_id
-            FROM
-                public.apply_usage_overage(
-                    (
-                        SELECT org_id
-                        FROM
-                            test_credit_context
-                    ),
-                    'mau',
-                    10,
-                    now(),
-                    now() + interval '1 month',
-                    '{}'::jsonb
-                )
-        ),
-        0::numeric,
-        'apply_usage_overage consumes credits when available'
-    );
+      SELECT overage_unpaid
+      FROM public.apply_usage_overage(
+        (SELECT org_id FROM test_credit_context),
+        'mau',
+        10,
+        now(),
+        now() + interval '1 month',
+        '{}'::jsonb
+      )
+    ),
+    0::numeric,
+    'apply_usage_overage consumes credits when available'
+  );
+
+SELECT
+  is(
+    (
+      SELECT overage_unpaid
+      FROM public.apply_usage_overage(
+        (SELECT org_id FROM test_credit_context),
+        'mau',
+        10,
+        now(),
+        now() + interval '1 month',
+        '{}'::jsonb
+      )
+    ),
+    0::numeric,
+    'apply_usage_overage is idempotent for the same overage snapshot'
+  );
 
 SELECT
     is(

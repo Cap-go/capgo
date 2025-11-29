@@ -38,6 +38,22 @@ interface UsageCreditLedgerRow {
   details: any | null
 }
 
+interface DailyLedgerRow {
+  dateKey: string
+  dateLabel: string
+  transactionCount: number
+  amountTotal: number
+  positiveTotal: number
+  negativeTotal: number
+  latestBalance: number | null
+  typeCounts: Record<Database['public']['Enums']['credit_transaction_type'], number>
+  grantsTotal: number
+  grantsCount: number
+  deductionsTotal: number
+  deductionsCount: number
+  deductionsByMetric: Partial<Record<Database['public']['Enums']['credit_metric_type'], { total: number, count: number }>>
+}
+
 const router = useRouter()
 const route = useRoute()
 const { t } = useI18n()
@@ -53,6 +69,8 @@ const creditUsdRate = ref(1)
 const isStartingCheckout = ref(false)
 const isCompletingTopUp = ref(false)
 const isProcessingCheckout = computed(() => isStartingCheckout.value || isCompletingTopUp.value)
+const currentPage = ref(1)
+const pageSize = 5
 const DEFAULT_TOP_UP_QUANTITY = 100
 const QUICK_TOP_UP_OPTIONS = [50, 500, 5000] as const
 const CREDIT_TAX_MULTIPLIER = 1.2
@@ -230,10 +248,6 @@ function formatCurrency(value: number) {
   return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)
 }
 
-function formatDate(value: string) {
-  return dayjs(value).format('MMM D, YYYY HH:mm')
-}
-
 function selectTopUpQuantity(amount: number) {
   topUpQuantityInput.value = String(amount)
 }
@@ -255,6 +269,131 @@ function transactionLabel(type: Database['public']['Enums']['credit_transaction_
     default:
       return type
   }
+}
+
+function metricLabel(metric: Database['public']['Enums']['credit_metric_type']) {
+  switch (metric) {
+    case 'mau':
+      return 'MAU'
+    case 'bandwidth':
+      return t('bandwidth') || 'Bandwidth'
+    case 'storage':
+      return t('storage') || 'Storage'
+    case 'build_time':
+      return t('build-time') || 'Build time'
+    default:
+      return metric
+  }
+}
+
+function summarizeTypes(typeCounts: Record<Database['public']['Enums']['credit_transaction_type'], number>) {
+  const entries = Object.entries(typeCounts)
+    .filter(([, count]) => count > 0)
+    .sort((a, b) => b[1] - a[1])
+    .map(([type, count]) => `${transactionLabel(type as Database['public']['Enums']['credit_transaction_type'])} ×${count}`)
+  return entries.join(' • ') || '—'
+}
+
+function summarizeDeductionsByMetric(deductionsByMetric: DailyLedgerRow['deductionsByMetric']) {
+  const parts = Object.entries(deductionsByMetric)
+    .filter(([, info]) => info && info.count > 0)
+    .sort((a, b) => Math.abs((b[1]?.total ?? 0)) - Math.abs((a[1]?.total ?? 0)))
+    .map(([metric, info]) => `${metricLabel(metric as Database['public']['Enums']['credit_metric_type'])} ${formatCredits(Math.abs(info?.total ?? 0))}`)
+  return parts.join(' • ') || '—'
+}
+
+const dailyTransactions = computed<DailyLedgerRow[]>(() => {
+  const groups = new Map<string, DailyLedgerRow>()
+  for (const tx of transactions.value) {
+    const dateKey = dayjs(tx.occurred_at).format('YYYY-MM-DD')
+    const dateLabel = dayjs(tx.occurred_at).format('MMM D, YYYY')
+    const existing = groups.get(dateKey)
+    if (!existing) {
+      const initial: DailyLedgerRow = {
+        dateKey,
+        dateLabel,
+        transactionCount: 1,
+        amountTotal: tx.amount ?? 0,
+        positiveTotal: tx.amount >= 0 ? tx.amount : 0,
+        negativeTotal: tx.amount < 0 ? tx.amount : 0,
+        latestBalance: tx.balance_after,
+        typeCounts: {
+          grant: 0,
+          purchase: 0,
+          manual_grant: 0,
+          deduction: 0,
+          expiry: 0,
+          refund: 0,
+        },
+        grantsTotal: tx.amount >= 0 ? tx.amount : 0,
+        grantsCount: tx.amount >= 0 ? 1 : 0,
+        deductionsTotal: tx.amount < 0 ? tx.amount : 0,
+        deductionsCount: tx.amount < 0 ? 1 : 0,
+        deductionsByMetric: {},
+      }
+      initial.typeCounts[tx.transaction_type] = (initial.typeCounts[tx.transaction_type] ?? 0) + 1
+      if (tx.transaction_type === 'deduction' && tx.metric) {
+        initial.deductionsByMetric[tx.metric] = { total: tx.amount, count: 1 }
+      }
+      groups.set(dateKey, initial)
+    }
+    else {
+      existing.transactionCount += 1
+      existing.amountTotal += tx.amount ?? 0
+      if (tx.amount >= 0) {
+        existing.positiveTotal += tx.amount
+        existing.grantsTotal += tx.amount
+        existing.grantsCount += 1
+      }
+      else {
+        existing.negativeTotal += tx.amount
+        existing.deductionsTotal += tx.amount
+        existing.deductionsCount += 1
+        if (tx.transaction_type === 'deduction' && tx.metric) {
+          const metricEntry = existing.deductionsByMetric[tx.metric] ?? { total: 0, count: 0 }
+          metricEntry.total += tx.amount
+          metricEntry.count += 1
+          existing.deductionsByMetric[tx.metric] = metricEntry
+        }
+      }
+      if (existing.latestBalance === null)
+        existing.latestBalance = tx.balance_after
+      existing.typeCounts[tx.transaction_type] = (existing.typeCounts[tx.transaction_type] ?? 0) + 1
+    }
+  }
+  return Array.from(groups.values()).sort((a, b) => b.dateKey.localeCompare(a.dateKey))
+})
+
+const totalPages = computed(() => Math.max(1, Math.ceil(dailyTransactions.value.length / pageSize)))
+
+const paginatedDailyTransactions = computed(() => {
+  const start = (currentPage.value - 1) * pageSize
+  const end = start + pageSize
+  return dailyTransactions.value.slice(start, end)
+})
+
+const deductionMetricsOrder: Database['public']['Enums']['credit_metric_type'][] = ['mau', 'bandwidth', 'storage', 'build_time']
+
+function metricsWithData(day: DailyLedgerRow) {
+  const entries = Object.entries(day.deductionsByMetric || {})
+    .filter(([, info]) => info && info.count > 0)
+    .map(([metric, info]) => ({
+      metric: metric as Database['public']['Enums']['credit_metric_type'],
+      data: info!,
+    }))
+
+  // Keep preferred order, then fall back to original
+  return entries.sort((a, b) => {
+    const aIdx = deductionMetricsOrder.indexOf(a.metric)
+    const bIdx = deductionMetricsOrder.indexOf(b.metric)
+    if (aIdx === -1 && bIdx === -1)
+      return a.metric.localeCompare(b.metric)
+    if (aIdx === -1)
+      return 1
+    if (bIdx === -1)
+      return -1
+    return aIdx - bIdx
+  })
 }
 
 async function loadTransactions() {
@@ -285,6 +424,7 @@ async function loadTransactions() {
   }
   else {
     transactions.value = (data ?? []) as UsageCreditLedgerRow[]
+    currentPage.value = 1
   }
 
   isLoadingTransactions.value = false
@@ -607,46 +747,113 @@ watch(() => currentOrganization.value?.gid, async (newOrgId, oldOrgId) => {
                   {{ t('credit-transaction-occurred-at') }}
                 </th>
                 <th scope="col" class="px-4 py-3">
-                  {{ t('credit-transaction-type') }}
-                </th>
-                <th scope="col" class="px-4 py-3">
                   {{ t('credit-transaction-description') }}
                 </th>
                 <th scope="col" class="px-4 py-3 text-right">
                   {{ t('credit-transaction-amount') }}
                 </th>
-                <th scope="col" class="px-4 py-3 text-right">
-                  {{ t('credit-transaction-balance') }}
-                </th>
               </tr>
             </thead>
             <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
-              <tr
-                v-for="transaction in transactions"
-                :key="transaction.id"
-                class="transition hover:bg-gray-50 dark:hover:bg-gray-700/60"
-              >
-                <td class="whitespace-nowrap px-4 py-3 text-gray-700 dark:text-gray-200">
-                  {{ formatDate(transaction.occurred_at) }}
-                </td>
-                <td class="whitespace-nowrap px-4 py-3 text-gray-700 dark:text-gray-200">
-                  {{ transactionLabel(transaction.transaction_type) }}
-                </td>
-                <td class="px-4 py-3 text-gray-600 dark:text-gray-300">
-                  {{ transaction.description ?? '—' }}
-                </td>
-                <td
-                  class="whitespace-nowrap px-4 py-3 text-right font-semibold"
-                  :class="transaction.amount >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-500 dark:text-rose-400'"
+              <template v-for="day in paginatedDailyTransactions" :key="day.dateKey">
+                <tr class="bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-white">
+                  <td class="px-4 py-3 font-semibold">
+                    {{ day.dateLabel }}
+                  </td>
+                  <td class="px-4 py-3 text-xs text-gray-700 dark:text-gray-200">
+                    {{ day.transactionCount }} transactions • {{ summarizeTypes(day.typeCounts) }}
+                  </td>
+                  <td class="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white">
+                    <div class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                      Balance
+                    </div>
+                    <div>
+                      {{ day.latestBalance !== null ? formatCredits(day.latestBalance) : '—' }}
+                    </div>
+                  </td>
+                </tr>
+                <tr
+                  v-if="day.grantsCount > 0"
+                  :key="`${day.dateKey}-grants`"
+                  class="transition hover:bg-gray-50 dark:hover:bg-gray-700/60"
                 >
-                  {{ transaction.amount >= 0 ? '+' : '' }}{{ formatCredits(transaction.amount) }}
-                </td>
-                <td class="whitespace-nowrap px-4 py-3 text-right text-gray-700 dark:text-gray-200">
-                  {{ transaction.balance_after !== null ? formatCredits(transaction.balance_after) : '—' }}
-                </td>
-              </tr>
+                  <td class="whitespace-nowrap px-4 py-3 text-gray-700 dark:text-gray-200">
+                    {{ day.dateLabel }}
+                  </td>
+                  <td class="px-4 py-3 text-gray-700 dark:text-gray-200">
+                    <div class="font-semibold text-gray-900 dark:text-white">
+                      Grants & purchases
+                    </div>
+                  </td>
+                  <td
+                    class="whitespace-nowrap px-4 py-3 text-right font-semibold text-emerald-600 dark:text-emerald-400"
+                  >
+                    +{{ formatCredits(day.grantsTotal) }}
+                  </td>
+                </tr>
+                <tr
+                  v-for="(entry, idx) in metricsWithData(day)"
+                  :key="`${day.dateKey}-${entry.metric}`"
+                  class="transition hover:bg-gray-50 dark:hover:bg-gray-700/60"
+                >
+                  <td class="whitespace-nowrap px-4 py-3 text-gray-700 dark:text-gray-200">
+                    {{ day.dateLabel }}
+                  </td>
+                  <td class="px-4 py-3 text-gray-700 dark:text-gray-200">
+                    <div class="font-semibold text-gray-900 dark:text-white">
+                      Deduction — {{ metricLabel(entry.metric) }}
+                    </div>
+                    <div class="text-xs text-gray-500 dark:text-gray-400">
+                      {{ entry.data?.count ?? 0 }} deductions
+                    </div>
+                  </td>
+                  <td
+                    class="whitespace-nowrap px-4 py-3 text-right font-semibold text-rose-500 dark:text-rose-400"
+                  >
+                    -{{ formatCredits(Math.abs(entry.data?.total ?? 0)) }}
+                  </td>
+                </tr>
+                <tr
+                  v-if="day.grantsCount === 0 && metricsWithData(day).length === 0"
+                  :key="`${day.dateKey}-empty`"
+                  class="transition hover:bg-gray-50 dark:hover:bg-gray-700/60"
+                >
+                  <td class="whitespace-nowrap px-4 py-3 text-gray-700 dark:text-gray-200">
+                    {{ day.dateLabel }}
+                  </td>
+                  <td class="px-4 py-3 text-gray-700 dark:text-gray-200">
+                    <div class="text-sm text-gray-600 dark:text-gray-300">
+                      No activity
+                    </div>
+                  </td>
+                  <td class="whitespace-nowrap px-4 py-3 text-right font-semibold text-gray-700 dark:text-gray-200">
+                    0.00
+                  </td>
+                </tr>
+              </template>
             </tbody>
           </table>
+          <div class="mt-4 flex items-center justify-between text-sm text-gray-600 dark:text-gray-300">
+            <span>
+              Page {{ currentPage }} / {{ totalPages }}
+            </span>
+            <div class="flex items-center gap-2">
+              <button
+                class="d-btn d-btn-sm"
+                :disabled="currentPage === 1"
+                @click="currentPage = Math.max(1, currentPage - 1)"
+              >
+                Previous
+              </button>
+              <button
+                class="d-btn d-btn-sm"
+                :disabled="currentPage >= totalPages"
+                @click="currentPage = Math.min(totalPages, currentPage + 1)"
+              >
+                Next
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>

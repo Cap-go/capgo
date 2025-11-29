@@ -305,6 +305,206 @@ BEGIN
 END;
 $$;
 
+-- Prevent double-charging usage credits when the same overage is processed multiple times in a billing cycle
+CREATE OR REPLACE FUNCTION public.apply_usage_overage(
+    p_org_id uuid,
+    p_metric public.credit_metric_type,
+    p_overage_amount numeric,
+    p_billing_cycle_start timestamptz,
+    p_billing_cycle_end timestamptz,
+    p_details jsonb DEFAULT NULL
+) RETURNS TABLE (
+    overage_amount numeric,
+    credits_required numeric,
+    credits_applied numeric,
+    credits_remaining numeric,
+    credit_step_id bigint,
+    overage_covered numeric,
+    overage_unpaid numeric,
+    overage_event_id uuid
+) LANGUAGE plpgsql
+SET search_path = '' SECURITY DEFINER AS $$
+DECLARE
+  v_calc RECORD;
+  v_event_id uuid;
+  v_remaining numeric := 0;
+  v_applied numeric := 0;
+  v_per_unit numeric := 0;
+  v_available numeric;
+  v_use numeric;
+  v_balance numeric;
+  v_overage_paid numeric := 0;
+  v_existing_credits numeric := 0;
+  v_required numeric := 0;
+  v_credits_to_apply numeric := 0;
+  grant_rec public.usage_credit_grants%ROWTYPE;
+BEGIN
+  IF p_overage_amount IS NULL OR p_overage_amount <= 0 THEN
+    RETURN QUERY SELECT 0::numeric, 0::numeric, 0::numeric, 0::numeric, NULL::bigint, 0::numeric, 0::numeric, NULL::uuid;
+    RETURN;
+  END IF;
+
+  SELECT *
+  INTO v_calc
+  FROM public.calculate_credit_cost(p_metric, p_overage_amount)
+  LIMIT 1;
+
+  IF v_calc.credit_step_id IS NULL THEN
+    INSERT INTO public.usage_overage_events (
+      org_id,
+      metric,
+      overage_amount,
+      credits_estimated,
+      credits_debited,
+      credit_step_id,
+      billing_cycle_start,
+      billing_cycle_end,
+      details
+    )
+    VALUES (
+      p_org_id,
+      p_metric,
+      p_overage_amount,
+      0,
+      0,
+      NULL,
+      p_billing_cycle_start,
+      p_billing_cycle_end,
+      p_details
+    )
+    RETURNING id INTO v_event_id;
+
+    RETURN QUERY SELECT p_overage_amount, 0::numeric, 0::numeric, 0::numeric, NULL::bigint, 0::numeric, p_overage_amount, v_event_id;
+    RETURN;
+  END IF;
+
+  v_per_unit := v_calc.credit_cost_per_unit;
+  v_required := v_calc.credits_required;
+
+  SELECT COALESCE(SUM(credits_debited), 0)
+  INTO v_existing_credits
+  FROM public.usage_overage_events
+  WHERE org_id = p_org_id
+    AND metric = p_metric
+    AND (billing_cycle_start IS NOT DISTINCT FROM p_billing_cycle_start::date)
+    AND (billing_cycle_end IS NOT DISTINCT FROM p_billing_cycle_end::date);
+
+  v_credits_to_apply := GREATEST(v_required - v_existing_credits, 0);
+  v_remaining := v_credits_to_apply;
+
+  INSERT INTO public.usage_overage_events (
+    org_id,
+    metric,
+    overage_amount,
+    credits_estimated,
+    credits_debited,
+    credit_step_id,
+    billing_cycle_start,
+    billing_cycle_end,
+    details
+  )
+  VALUES (
+    p_org_id,
+    p_metric,
+    p_overage_amount,
+    v_required,
+    0,
+    v_calc.credit_step_id,
+    p_billing_cycle_start,
+    p_billing_cycle_end,
+    p_details
+  )
+  RETURNING id INTO v_event_id;
+
+  FOR grant_rec IN
+    SELECT *
+    FROM public.usage_credit_grants
+    WHERE org_id = p_org_id
+      AND expires_at >= now()
+      AND credits_consumed < credits_total
+    ORDER BY expires_at ASC, granted_at ASC
+    FOR UPDATE
+  LOOP
+    EXIT WHEN v_remaining <= 0;
+
+    v_available := grant_rec.credits_total - grant_rec.credits_consumed;
+    IF v_available <= 0 THEN
+      CONTINUE;
+    END IF;
+
+    v_use := LEAST(v_available, v_remaining);
+    v_remaining := v_remaining - v_use;
+    v_applied := v_applied + v_use;
+
+    UPDATE public.usage_credit_grants
+    SET credits_consumed = credits_consumed + v_use
+    WHERE id = grant_rec.id;
+
+    INSERT INTO public.usage_credit_consumptions (
+      grant_id,
+      org_id,
+      overage_event_id,
+      metric,
+      credits_used
+    )
+    VALUES (
+      grant_rec.id,
+      p_org_id,
+      v_event_id,
+      p_metric,
+      v_use
+    );
+
+    SELECT COALESCE(SUM(GREATEST(credits_total - credits_consumed, 0)), 0)
+    INTO v_balance
+    FROM public.usage_credit_grants
+    WHERE org_id = p_org_id
+      AND expires_at >= now();
+
+    INSERT INTO public.usage_credit_transactions (
+      org_id,
+      grant_id,
+      transaction_type,
+      amount,
+      balance_after,
+      occurred_at,
+      description,
+      source_ref
+    )
+    VALUES (
+      p_org_id,
+      grant_rec.id,
+      'deduction',
+      -v_use,
+      v_balance,
+      now(),
+      format('Overage deduction for %s usage', p_metric::text),
+      jsonb_build_object('overage_event_id', v_event_id, 'metric', p_metric::text)
+    );
+  END LOOP;
+
+  UPDATE public.usage_overage_events
+  SET credits_debited = v_applied
+  WHERE id = v_event_id;
+
+  IF v_per_unit > 0 THEN
+    v_overage_paid := LEAST(p_overage_amount, (v_applied + v_existing_credits) / v_per_unit);
+  ELSE
+    v_overage_paid := p_overage_amount;
+  END IF;
+
+  RETURN QUERY SELECT
+    p_overage_amount,
+    v_required,
+    v_applied,
+    GREATEST(v_required - v_existing_credits - v_applied, 0),
+    v_calc.credit_step_id,
+    v_overage_paid,
+    GREATEST(p_overage_amount - v_overage_paid, 0),
+    v_event_id;
+END;
+$$;
+
 DROP VIEW IF EXISTS public.usage_credit_ledger;
 
 CREATE VIEW public.usage_credit_ledger
