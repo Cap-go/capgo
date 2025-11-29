@@ -458,6 +458,36 @@ export type Database = {
           },
         ]
       }
+      capgo_credit_products: {
+        Row: {
+          created_at: string
+          environment: string
+          metadata: Json
+          product_id: string
+          provider: string
+          slug: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          environment?: string
+          metadata?: Json
+          product_id: string
+          provider?: string
+          slug: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          environment?: string
+          metadata?: Json
+          product_id?: string
+          provider?: string
+          slug?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       capgo_credits_steps: {
         Row: {
           created_at: string
@@ -1796,6 +1826,28 @@ export type Database = {
           },
         ]
       }
+      usage_credit_ledger: {
+        Row: {
+          amount: number | null
+          balance_after: number | null
+          billing_cycle_end: string | null
+          billing_cycle_start: string | null
+          description: string | null
+          details: Json | null
+          grant_allocations: Json | null
+          id: number | null
+          metric: Database["public"]["Enums"]["credit_metric_type"] | null
+          occurred_at: string | null
+          org_id: string | null
+          overage_amount: number | null
+          overage_event_id: string | null
+          source_ref: Json | null
+          transaction_type:
+            | Database["public"]["Enums"]["credit_transaction_type"]
+            | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       accept_invitation_to_org: { Args: { org_id: string }; Returns: string }
@@ -2527,6 +2579,23 @@ export type Database = {
       set_storage_exceeded_by_org: {
         Args: { disabled: boolean; org_id: string }
         Returns: undefined
+      }
+      top_up_usage_credits: {
+        Args: {
+          p_amount: number
+          p_expires_at?: string
+          p_notes?: string
+          p_org_id: string
+          p_source?: string
+          p_source_ref?: Json
+        }
+        Returns: {
+          available_credits: number
+          grant_id: string
+          next_expiration: string
+          total_credits: number
+          transaction_id: number
+        }[]
       }
       total_bundle_storage_bytes: { Args: never; Returns: number }
       transfer_app: {

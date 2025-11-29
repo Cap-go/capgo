@@ -3,7 +3,7 @@ import type { ArrayElement } from '~/services/types'
 import type { Database } from '~/types/supabase.types'
 import dayjs from 'dayjs'
 import { storeToRefs } from 'pinia'
-import { computed, ref, watchEffect } from 'vue'
+import { computed, ref, shallowRef, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
@@ -82,6 +82,11 @@ async function getUsage(orgId: string) {
     bandwidth: currentPlan?.bandwidth_unit,
     build_time: currentPlan?.build_time_unit || 0,
   }
+  const creditsUsed = Math.max(
+    Number(organizationStore.currentOrganization?.credit_total ?? 0)
+      - Number(organizationStore.currentOrganization?.credit_available ?? 0),
+    0,
+  )
 
   const nowEndOfDay = dayjs().endOf('day')
   const billingStart = organizationStore.currentOrganization?.subscription_start
@@ -114,21 +119,17 @@ async function getUsage(orgId: string) {
   const calculatePrice = (total: number, base: number, unit: number) => total <= base ? 0 : (total - base) * unit
 
   const isPayAsYouGo = currentPlan?.name === 'Pay as you go'
-  const totalUsagePrice = computed(() => {
-    if (currentPlan?.name !== 'Pay as you go')
-      return 0
+  const paygUsagePrice = isPayAsYouGo
+    ? roundNumber(
+      calculatePrice(totalMau, payg_base.mau, payg_units!.mau!)
+      + calculatePrice(totalStorage, payg_base.storage, payg_units!.storage!)
+      + calculatePrice(totalBandwidth, payg_base.bandwidth, payg_units!.bandwidth!)
+      + calculatePrice(totalBuildTime, payg_base.build_time, payg_units!.build_time!),
+    )
+    : 0
+  const totalUsagePrice = roundNumber(creditsUsed > 0 ? creditsUsed : paygUsagePrice)
 
-    const mauPrice = calculatePrice(totalMau, payg_base.mau, payg_units!.mau!)
-    const storagePrice = calculatePrice(totalStorage, payg_base.storage, payg_units!.storage!)
-    const bandwidthPrice = calculatePrice(totalBandwidth, payg_base.bandwidth, payg_units!.bandwidth!)
-    const buildTimePrice = calculatePrice(totalBuildTime, payg_base.build_time, payg_units!.build_time!)
-    const sum = mauPrice + storagePrice + bandwidthPrice + buildTimePrice
-    return roundNumber(sum)
-  })
-
-  const totalPrice = computed(() => {
-    return roundNumber(basePrice + totalUsagePrice.value)
-  })
+  const totalPrice = roundNumber(basePrice + totalUsagePrice)
 
   return {
     isPayAsYouGo,
@@ -150,7 +151,7 @@ async function getUsage(orgId: string) {
 }
 
 // const planUsageMap = ref<Map<string, Awaited<ReturnType<typeof getUsage>>>>()
-const planUsageMap = ref(new Map<string, Awaited<ReturnType<typeof getUsage>>>())
+const planUsageMap = shallowRef(new Map<string, Awaited<ReturnType<typeof getUsage>>>())
 const planUsage = computed(() => planUsageMap.value?.get(currentOrganization.value?.gid ?? ''))
 
 // Similar to Plans.vue - current plan and best plan computed properties
@@ -197,17 +198,22 @@ async function loadData() {
 
   isLoading.value = true
 
-  if (initialLoad.value) {
-    await getPlans().then((pls) => {
+  try {
+    if (initialLoad.value) {
+      const pls = await getPlans()
       plans.value.length = 0
       plans.value.push(...pls)
-    })
+    }
+
+    const usage = await getUsage(gid)
+    const nextMap = new Map(planUsageMap.value)
+    nextMap.set(gid, usage as any)
+    planUsageMap.value = nextMap
   }
-  getUsage(gid).then((res) => {
-    planUsageMap.value?.set(gid, res as any)
-  })
-  isLoading.value = false
-  initialLoad.value = false
+  finally {
+    isLoading.value = false
+    initialLoad.value = false
+  }
 }
 
 function lastRunDate() {

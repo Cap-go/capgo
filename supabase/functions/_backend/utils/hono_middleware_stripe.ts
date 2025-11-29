@@ -23,7 +23,6 @@ export function middlewareStripeWebhook() {
       cloudlog({ requestId: c.get('requestId'), message: 'Webhook Error: no secret found' })
       return simpleError('webhook_error_no_secret', 'Webhook Error: no secret found')
     }
-
     const signature = c.req.raw.headers.get('stripe-signature')
     if (!signature || !getEnv(c, 'STRIPE_WEBHOOK_SECRET') || !getEnv(c, 'STRIPE_SECRET_KEY')) {
       cloudlog({ requestId: c.get('requestId'), message: 'Webhook Error: no signature' })
