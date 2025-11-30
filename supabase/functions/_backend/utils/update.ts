@@ -121,7 +121,7 @@ export async function updateWithPG(
   // v5 is deprecated if < 5.10.0, v6 is deprecated if < 6.25.0, v7 is deprecated if < 7.25.0
   const isDeprecated = isDeprecatedPluginVersion(pluginVersion)
   // Ensure there is manifest and the plugin version support manifest fetching (v5.10.0+, v6.25.0+, v7.0.35+)
-  const fetchManifestEntries = manifestBundleCount > 0 && !isDeprecatedPluginVersion(pluginVersion, BROTLI_MIN_UPDATER_VERSION_V7)
+  const fetchManifestEntries = manifestBundleCount > 0 && !isDeprecatedPluginVersion(pluginVersion, undefined, undefined, BROTLI_MIN_UPDATER_VERSION_V7)
   cloudlog({
     requestId: c.get('requestId'),
     message: 'App channel device count evaluated',
