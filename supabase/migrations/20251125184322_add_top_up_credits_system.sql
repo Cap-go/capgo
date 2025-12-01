@@ -613,169 +613,91 @@ UNION ALL
 GRANT SELECT ON public.usage_credit_ledger TO authenticated;
 GRANT SELECT ON public.usage_credit_ledger TO service_role;
 
--- Track the last credit alert threshold sent per org and enqueue alerts as credits are consumed
-
--- State table to remember the last threshold emitted for an org and the current alert cycle
-CREATE TABLE IF NOT EXISTS public.usage_credit_alert_state (
-    org_id uuid PRIMARY KEY REFERENCES public.orgs (id) ON DELETE CASCADE,
-    alert_cycle integer NOT NULL DEFAULT 1,
-    last_threshold integer NOT NULL DEFAULT 0,
-    last_total_credits numeric NOT NULL DEFAULT 0,
-    last_available_credits numeric NOT NULL DEFAULT 0,
-    last_transaction_id bigint,
-    last_percent_used numeric,
-    created_at timestamptz NOT NULL DEFAULT now(),
-    updated_at timestamptz NOT NULL DEFAULT now()
-);
-
-CREATE TRIGGER handle_usage_credit_alert_state_updated_at
-    BEFORE UPDATE ON public.usage_credit_alert_state
-    FOR EACH ROW
-    EXECUTE FUNCTION extensions.moddatetime('updated_at');
-
-ALTER TABLE public.usage_credit_alert_state ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Allow service_role full access" ON public.usage_credit_alert_state
-    FOR ALL TO service_role USING (true) WITH CHECK (true);
-
--- Queue dedicated to credit usage alerts
+-- Create queue to deliver credit usage threshold alerts
 SELECT pgmq.create('credit_usage_alerts');
 
--- Trigger function: detect threshold crossings and enqueue messages for the worker
-CREATE OR REPLACE FUNCTION public.handle_usage_credit_alerts() RETURNS trigger
+-- Enqueue alerts when credit consumption crosses key thresholds
+CREATE OR REPLACE FUNCTION public.enqueue_credit_usage_alert() RETURNS trigger
 LANGUAGE plpgsql
 SET search_path = '' SECURITY DEFINER AS $$
 DECLARE
-  v_balance RECORD;
-  v_percent_used numeric := 0;
-  v_threshold integer := 0;
-  v_prev_threshold integer := 0;
-  v_prev_available numeric := 0;
-  v_prev_total numeric := 0;
-  v_alert_cycle integer := 1;
-  v_thresholds CONSTANT integer[] := ARRAY[50, 75, 90, 100];
-  v_reset boolean := false;
-  v_has_state boolean := false;
+  v_total numeric := 0;
+  v_available numeric := 0;
+  v_available_before numeric := 0;
+  v_percent_after numeric := 0;
+  v_percent_before numeric := 0;
+  v_threshold integer;
+  v_alert_cycle integer;
+  v_occurred_at timestamptz := COALESCE(NEW.occurred_at, now());
 BEGIN
-  IF NEW.org_id IS NULL THEN
+  IF TG_OP <> 'INSERT' THEN
+    RETURN COALESCE(NEW, OLD);
+  END IF;
+
+  IF NEW.amount IS NULL OR NEW.amount >= 0 THEN
     RETURN NEW;
   END IF;
 
-  SELECT total_credits, available_credits
-  INTO v_balance
+  SELECT
+    COALESCE(total_credits, 0),
+    COALESCE(available_credits, 0)
+  INTO v_total, v_available
   FROM public.usage_credit_balances
   WHERE org_id = NEW.org_id;
 
-  IF NOT FOUND OR v_balance.total_credits IS NULL OR v_balance.total_credits <= 0 THEN
+  v_available := GREATEST(COALESCE(NEW.balance_after, v_available, 0), 0);
+
+  IF v_total <= 0 THEN
     RETURN NEW;
   END IF;
 
-  v_percent_used := LEAST(100, CASE
-    WHEN v_balance.total_credits > 0 THEN ((v_balance.total_credits - v_balance.available_credits) / v_balance.total_credits) * 100
-    ELSE 0
-  END);
-
-  SELECT alert_cycle, last_threshold, last_available_credits, last_total_credits
-  INTO v_alert_cycle, v_prev_threshold, v_prev_available, v_prev_total
-  FROM public.usage_credit_alert_state
-  WHERE org_id = NEW.org_id
-  FOR UPDATE;
-
-  IF FOUND THEN
-    v_has_state := true;
-  ELSE
-    v_alert_cycle := 1;
-    v_prev_threshold := 0;
-    v_prev_available := 0;
-    v_prev_total := 0;
+  v_available_before := GREATEST(v_available - NEW.amount, 0);
+  IF v_available_before > v_total THEN
+    v_available_before := v_total;
   END IF;
 
-  -- Detect top-ups or any balance increase and reset the alert cycle
-  IF v_balance.available_credits > v_prev_available OR v_balance.total_credits > v_prev_total THEN
-    v_reset := v_has_state;
-    IF v_reset THEN
-      v_alert_cycle := v_alert_cycle + 1;
-      v_prev_threshold := 0;
-    END IF;
-  END IF;
+  v_percent_after := LEAST(GREATEST(((v_total - v_available) / v_total) * 100, 0), 100);
+  v_percent_before := LEAST(GREATEST(((v_total - v_available_before) / v_total) * 100, 0), 100);
 
-  SELECT max(val) INTO v_threshold
-  FROM unnest(v_thresholds) AS val
-  WHERE v_percent_used >= val;
+  v_alert_cycle := (date_part('year', v_occurred_at)::int * 100) + date_part('month', v_occurred_at)::int;
 
-  IF v_threshold IS NULL THEN
-    v_threshold := 0;
-  END IF;
-
-  -- Only emit alerts on consumption/expiry events once a higher threshold is crossed
-  IF NEW.amount < 0 AND v_threshold >= 50 AND v_threshold > v_prev_threshold THEN
-    PERFORM pgmq.send(
-      'credit_usage_alerts',
-      jsonb_build_object(
-        'function_name', 'credit_usage_alerts',
-        'function_type', NULL,
-        'payload', jsonb_build_object(
-          'org_id', NEW.org_id,
-          'threshold', v_threshold,
-          'percent_used', ROUND(v_percent_used, 2),
-          'available_credits', v_balance.available_credits,
-          'total_credits', v_balance.total_credits,
-          'alert_cycle', v_alert_cycle,
-          'transaction_id', NEW.id
+  FOREACH v_threshold IN ARRAY ARRAY [50, 75, 90, 100]
+  LOOP
+    IF v_percent_after >= v_threshold AND v_percent_before < v_threshold THEN
+      PERFORM pgmq.send(
+        'credit_usage_alerts',
+        jsonb_build_object(
+          'function_name', 'credit_usage_alerts',
+          'function_type', NULL,
+          'payload', jsonb_build_object(
+            'org_id', NEW.org_id,
+            'threshold', v_threshold,
+            'percent_used', ROUND(v_percent_after, 2),
+            'total_credits', v_total,
+            'available_credits', v_available,
+            'alert_cycle', v_alert_cycle,
+            'transaction_id', NEW.id
+          )
         )
-      )
-    );
-  END IF;
-
-  INSERT INTO public.usage_credit_alert_state (
-    org_id,
-    alert_cycle,
-    last_threshold,
-    last_total_credits,
-    last_available_credits,
-    last_transaction_id,
-    last_percent_used
-  )
-  VALUES (
-    NEW.org_id,
-    v_alert_cycle,
-    CASE
-      WHEN v_reset THEN 0
-      WHEN v_threshold > v_prev_threshold THEN v_threshold
-      ELSE v_prev_threshold
-    END,
-    v_balance.total_credits,
-    v_balance.available_credits,
-    NEW.id,
-    ROUND(v_percent_used, 2)
-  )
-  ON CONFLICT (org_id) DO UPDATE
-  SET
-    alert_cycle = EXCLUDED.alert_cycle,
-    last_threshold = EXCLUDED.last_threshold,
-    last_total_credits = EXCLUDED.last_total_credits,
-    last_available_credits = EXCLUDED.last_available_credits,
-    last_transaction_id = EXCLUDED.last_transaction_id,
-    last_percent_used = EXCLUDED.last_percent_used;
+      );
+    END IF;
+  END LOOP;
 
   RETURN NEW;
 END;
 $$;
 
-ALTER FUNCTION public.handle_usage_credit_alerts() OWNER TO postgres;
+ALTER FUNCTION public.enqueue_credit_usage_alert() OWNER TO postgres;
 
--- Fire after every credit transaction so balances stay in sync with alerts
-DROP TRIGGER IF EXISTS usage_credit_alerts_enqueue ON public.usage_credit_transactions;
+DROP TRIGGER IF EXISTS credit_usage_alert_on_transactions ON public.usage_credit_transactions;
 
-CREATE TRIGGER usage_credit_alerts_enqueue
+CREATE TRIGGER credit_usage_alert_on_transactions
 AFTER INSERT ON public.usage_credit_transactions
-FOR EACH ROW
-EXECUTE FUNCTION public.handle_usage_credit_alerts();
+FOR EACH ROW EXECUTE FUNCTION public.enqueue_credit_usage_alert();
 
--- Keep the consolidated cron runner aware of the new queue (processed every 10 seconds)
+-- Process the new queue alongside other high-frequency triggers
 CREATE OR REPLACE FUNCTION public.process_all_cron_tasks () RETURNS void LANGUAGE plpgsql
-SET
-    search_path = '' AS $$
+SET search_path = '' AS $$
 DECLARE
   current_hour int;
   current_minute int;
@@ -941,12 +863,6 @@ BEGIN
       RAISE WARNING 'cleanup job_run_details failed: %', SQLERRM;
     END;
 
-    BEGIN
-      PERFORM public.cleanup_old_queue_archives();
-    EXCEPTION WHEN OTHERS THEN
-      RAISE WARNING 'cleanup_old_queue_archives failed: %', SQLERRM;
-    END;
-
     -- Weekly stats email (every Saturday at noon)
     IF EXTRACT(DOW FROM now()) = 6 THEN
       BEGIN
@@ -967,5 +883,6 @@ BEGIN
   END IF;
 END;
 $$;
+
 
 COMMIT;

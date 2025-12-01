@@ -3,7 +3,7 @@ BEGIN;
 CREATE EXTENSION "basejump-supabase_test_helpers";
 
 SELECT
-  plan (18);
+  plan (19);
 
 DO $$
 BEGIN
@@ -368,6 +368,148 @@ SELECT
         ),
         'expiry transaction recorded'
     );
+
+CREATE TEMP TABLE test_credit_alerts_context (
+  org_id uuid,
+  grant_id uuid
+) ON COMMIT DROP;
+
+WITH alert_org AS (
+  INSERT INTO public.orgs (
+    id,
+    created_by,
+    name,
+    management_email
+  )
+  VALUES (
+    gen_random_uuid(),
+    tests.get_supabase_uid('usage_credits_user'),
+    'Credit Alert Org',
+    'credit-alerts@example.com'
+  )
+  RETURNING id
+),
+alert_grant AS (
+  INSERT INTO public.usage_credit_grants (
+    org_id,
+    credits_total,
+    credits_consumed,
+    granted_at,
+    expires_at,
+    source
+  )
+  SELECT
+    id,
+    100,
+    0,
+    now(),
+    now() + interval '1 year',
+    'manual'
+  FROM alert_org
+  RETURNING id,
+    org_id
+)
+INSERT INTO test_credit_alerts_context (org_id, grant_id)
+SELECT org_id,
+  id
+FROM alert_grant;
+
+DELETE FROM pgmq.q_credit_usage_alerts
+WHERE message -> 'payload' ->> 'org_id' = (SELECT org_id FROM test_credit_alerts_context LIMIT 1);
+
+UPDATE public.usage_credit_grants
+SET credits_consumed = credits_consumed + 60
+WHERE id = (SELECT grant_id FROM test_credit_alerts_context LIMIT 1);
+
+INSERT INTO public.usage_credit_transactions (
+  org_id,
+  grant_id,
+  transaction_type,
+  amount,
+  balance_after,
+  description,
+  source_ref
+)
+SELECT
+  org_id,
+  grant_id,
+  'deduction',
+  -60,
+  40,
+  'Credit alert threshold 50 test',
+  jsonb_build_object('note', 'credit_usage_alert_test')
+FROM test_credit_alerts_context
+LIMIT 1;
+
+UPDATE public.usage_credit_grants
+SET credits_consumed = credits_consumed + 20
+WHERE id = (SELECT grant_id FROM test_credit_alerts_context LIMIT 1);
+
+INSERT INTO public.usage_credit_transactions (
+  org_id,
+  grant_id,
+  transaction_type,
+  amount,
+  balance_after,
+  description,
+  source_ref
+)
+SELECT
+  org_id,
+  grant_id,
+  'deduction',
+  -20,
+  20,
+  'Credit alert threshold 75 test',
+  jsonb_build_object('note', 'credit_usage_alert_test')
+FROM test_credit_alerts_context
+LIMIT 1;
+
+UPDATE public.usage_credit_grants
+SET credits_consumed = credits_total
+WHERE id = (SELECT grant_id FROM test_credit_alerts_context LIMIT 1);
+
+INSERT INTO public.usage_credit_transactions (
+  org_id,
+  grant_id,
+  transaction_type,
+  amount,
+  balance_after,
+  description,
+  source_ref
+)
+SELECT
+  org_id,
+  grant_id,
+  'deduction',
+  -20,
+  0,
+  'Credit alert threshold 90-100 test',
+  jsonb_build_object('note', 'credit_usage_alert_test')
+FROM test_credit_alerts_context
+LIMIT 1;
+
+SELECT
+  is(
+    (
+      SELECT count(*)
+      FROM pgmq.q_credit_usage_alerts
+      WHERE message -> 'payload' ->> 'org_id' = (SELECT org_id FROM test_credit_alerts_context)
+    ),
+    4::bigint,
+    'credit usage alerts enqueue once per threshold at 50/75/90/100 percent'
+  );
+
+SELECT
+  is(
+    (
+      SELECT array_agg((message -> 'payload' ->> 'threshold')::int ORDER BY (message -> 'payload' ->> 'threshold')::int)
+      FROM pgmq.q_credit_usage_alerts
+      WHERE message -> 'payload' ->> 'org_id' = (SELECT org_id FROM test_credit_alerts_context)
+    ),
+    ARRAY[50, 75, 90, 100]::int[],
+    'credit usage alert payloads include expected thresholds'
+  );
 
 CREATE TEMP TABLE test_usage_ledger_context (
   org_id uuid

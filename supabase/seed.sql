@@ -46,12 +46,10 @@ BEGIN
     TRUNCATE TABLE "public"."stripe_info" CASCADE;
     TRUNCATE TABLE "public"."plans" CASCADE;
     TRUNCATE TABLE "public"."capgo_credits_steps" CASCADE;
-    TRUNCATE TABLE "public"."capgo_credit_products" CASCADE;
     TRUNCATE TABLE "public"."usage_credit_grants" CASCADE;
     TRUNCATE TABLE "public"."usage_credit_transactions" CASCADE;
     TRUNCATE TABLE "public"."usage_credit_consumptions" CASCADE;
     TRUNCATE TABLE "public"."usage_overage_events" CASCADE;
-    TRUNCATE TABLE "public"."usage_credit_alert_state" CASCADE;
 
     -- Insert seed data
     -- (Include all your INSERT statements here)
