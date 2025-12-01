@@ -458,36 +458,6 @@ export type Database = {
           },
         ]
       }
-      capgo_credit_products: {
-        Row: {
-          created_at: string
-          environment: string
-          metadata: Json
-          product_id: string
-          provider: string
-          slug: string
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          environment?: string
-          metadata?: Json
-          product_id: string
-          provider?: string
-          slug: string
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          environment?: string
-          metadata?: Json
-          product_id?: string
-          provider?: string
-          slug?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
       capgo_credits_steps: {
         Row: {
           created_at: string
@@ -1240,6 +1210,7 @@ export type Database = {
           bandwidth_unit: number | null
           build_time_unit: number
           created_at: string
+          credit_id: string
           description: string
           id: string
           market_desc: string | null
@@ -1264,6 +1235,7 @@ export type Database = {
           bandwidth_unit?: number | null
           build_time_unit?: number
           created_at?: string
+          credit_id: string
           description?: string
           id?: string
           market_desc?: string | null
@@ -1288,6 +1260,7 @@ export type Database = {
           bandwidth_unit?: number | null
           build_time_unit?: number
           created_at?: string
+          credit_id?: string
           description?: string
           id?: string
           market_desc?: string | null

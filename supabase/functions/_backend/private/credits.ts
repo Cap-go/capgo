@@ -1,10 +1,9 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
-import type { StripeEnvironment } from '../utils/stripe.ts'
 import { Hono } from 'hono/tiny'
 import { middlewareAuth, parseBody, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../utils/logging.ts'
-import { createOneTimeCheckout, getStripe, resolveStripeEnvironment } from '../utils/stripe.ts'
+import { createOneTimeCheckout, getStripe } from '../utils/stripe.ts'
 import { hasOrgRight, supabaseAdmin } from '../utils/supabase.ts'
 import { getEnv } from '../utils/utils.ts'
 
