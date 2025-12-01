@@ -84,7 +84,7 @@ async function getUsage(orgId: string) {
   }
   const creditsUsed = Math.max(
     Number(organizationStore.currentOrganization?.credit_total ?? 0)
-      - Number(organizationStore.currentOrganization?.credit_available ?? 0),
+    - Number(organizationStore.currentOrganization?.credit_available ?? 0),
     0,
   )
 
@@ -121,11 +121,11 @@ async function getUsage(orgId: string) {
   const isPayAsYouGo = currentPlan?.name === 'Pay as you go'
   const paygUsagePrice = isPayAsYouGo
     ? roundNumber(
-      calculatePrice(totalMau, payg_base.mau, payg_units!.mau!)
-      + calculatePrice(totalStorage, payg_base.storage, payg_units!.storage!)
-      + calculatePrice(totalBandwidth, payg_base.bandwidth, payg_units!.bandwidth!)
-      + calculatePrice(totalBuildTime, payg_base.build_time, payg_units!.build_time!),
-    )
+        calculatePrice(totalMau, payg_base.mau, payg_units!.mau!)
+        + calculatePrice(totalStorage, payg_base.storage, payg_units!.storage!)
+        + calculatePrice(totalBandwidth, payg_base.bandwidth, payg_units!.bandwidth!)
+        + calculatePrice(totalBuildTime, payg_base.build_time, payg_units!.build_time!),
+      )
     : 0
   const totalUsagePrice = roundNumber(creditsUsed > 0 ? creditsUsed : paygUsagePrice)
 

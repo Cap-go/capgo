@@ -614,7 +614,9 @@ watch(() => currentOrganization.value?.gid, async (newOrgId: string | undefined,
                   help-class="hidden"
                   message-class="text-xs text-rose-200 mt-1"
                 >
-                  <template #prefix>$</template>
+                  <template #prefix>
+                    $
+                  </template>
                 </FormKit>
               </div>
               <div class="flex shrink-0 items-end gap-2">
@@ -633,14 +635,14 @@ watch(() => currentOrganization.value?.gid, async (newOrgId: string | undefined,
               </div>
             </div>
             <button
-            type="submit"
-            :disabled="isProcessingCheckout || !isTopUpQuantityValid"
-            :class="{ 'opacity-75 pointer-events-none': isProcessingCheckout || !isTopUpQuantityValid }"
-            class="inline-flex justify-center size-1/2 items-center py-2 px-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-sm font-semibold rounded-lg transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5 disabled:opacity-60 disabled:cursor-not-allowed"
-          >
-            <Spinner v-if="isProcessingCheckout" size="w-4 h-4" class="mr-2" color="white" />
-            <span>{{ t('buy-credits') }}</span>
-          </button>
+              type="submit"
+              :disabled="isProcessingCheckout || !isTopUpQuantityValid"
+              :class="{ 'opacity-75 pointer-events-none': isProcessingCheckout || !isTopUpQuantityValid }"
+              class="inline-flex justify-center size-1/2 items-center py-2 px-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-sm font-semibold rounded-lg transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5 disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              <Spinner v-if="isProcessingCheckout" size="w-4 h-4" class="mr-2" color="white" />
+              <span>{{ t('buy-credits') }}</span>
+            </button>
             <div class="text-xs opacity-90 space-y-1 font-medium text-gray-900 dark:text-white">
               <p>
                 {{ t('credits-top-up-quantity-help') }}
