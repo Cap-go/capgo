@@ -294,14 +294,6 @@ function summarizeTypes(typeCounts: Record<Database['public']['Enums']['credit_t
   return entries.join(' • ') || '—'
 }
 
-function summarizeDeductionsByMetric(deductionsByMetric: DailyLedgerRow['deductionsByMetric']) {
-  const parts = Object.entries(deductionsByMetric)
-    .filter(([, info]) => info && info.count > 0)
-    .sort((a, b) => Math.abs((b[1]?.total ?? 0)) - Math.abs((a[1]?.total ?? 0)))
-    .map(([metric, info]) => `${metricLabel(metric as Database['public']['Enums']['credit_metric_type'])} ${formatCredits(Math.abs(info?.total ?? 0))}`)
-  return parts.join(' • ') || '—'
-}
-
 const dailyTransactions = computed<DailyLedgerRow[]>(() => {
   const groups = new Map<string, DailyLedgerRow>()
   for (const tx of transactions.value) {
@@ -331,9 +323,10 @@ const dailyTransactions = computed<DailyLedgerRow[]>(() => {
         deductionsCount: tx.amount < 0 ? 1 : 0,
         deductionsByMetric: {},
       }
-      initial.typeCounts[tx.transaction_type] = (initial.typeCounts[tx.transaction_type] ?? 0) + 1
+
+      initial.typeCounts[tx.transaction_type as Database['public']['Enums']['credit_transaction_type']] = (initial.typeCounts[tx.transaction_type as Database['public']['Enums']['credit_transaction_type']] ?? 0) + 1
       if (tx.transaction_type === 'deduction' && tx.metric) {
-        initial.deductionsByMetric[tx.metric] = { total: tx.amount, count: 1 }
+        initial.deductionsByMetric[tx.metric as Database['public']['Enums']['credit_metric_type']] = { total: tx.amount, count: 1 }
       }
       groups.set(dateKey, initial)
     }
@@ -350,15 +343,15 @@ const dailyTransactions = computed<DailyLedgerRow[]>(() => {
         existing.deductionsTotal += tx.amount
         existing.deductionsCount += 1
         if (tx.transaction_type === 'deduction' && tx.metric) {
-          const metricEntry = existing.deductionsByMetric[tx.metric] ?? { total: 0, count: 0 }
+          const metricEntry = existing.deductionsByMetric[tx.metric as Database['public']['Enums']['credit_metric_type']] ?? { total: 0, count: 0 }
           metricEntry.total += tx.amount
           metricEntry.count += 1
-          existing.deductionsByMetric[tx.metric] = metricEntry
+          existing.deductionsByMetric[tx.metric as Database['public']['Enums']['credit_metric_type']] = metricEntry
         }
       }
       if (existing.latestBalance === null)
         existing.latestBalance = tx.balance_after
-      existing.typeCounts[tx.transaction_type] = (existing.typeCounts[tx.transaction_type] ?? 0) + 1
+      existing.typeCounts[tx.transaction_type as Database['public']['Enums']['credit_transaction_type']] = (existing.typeCounts[tx.transaction_type as Database['public']['Enums']['credit_transaction_type']] ?? 0) + 1
     }
   }
   return Array.from(groups.values()).sort((a, b) => b.dateKey.localeCompare(a.dateKey))
@@ -514,7 +507,7 @@ onMounted(async () => {
   await handleCreditCheckoutReturn()
 })
 
-watch(() => currentOrganization.value?.gid, async (newOrgId, oldOrgId) => {
+watch(() => currentOrganization.value?.gid, async (newOrgId: string | undefined, oldOrgId: string | undefined) => {
   if (!creditsV2Enabled)
     return
   if (!newOrgId || newOrgId === oldOrgId)
