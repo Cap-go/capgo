@@ -729,8 +729,8 @@ watch(() => currentOrganization.value?.gid, async (newOrgId, oldOrgId) => {
           {{ t('credits-transactions') }}
         </h2>
       </div>
-      <div class="px-6 py-4">
-        <div v-if="loadError" class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/30 dark:text-red-200">
+      <div>
+        <div v-if="loadError" class="rounded-lg border border-red-200 bg-red-50 p-4 m-8 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/30 dark:text-red-200">
           {{ t('credits-load-error') }}
         </div>
         <div v-else-if="isLoadingTransactions" class="flex items-center justify-center py-12">
@@ -792,7 +792,7 @@ watch(() => currentOrganization.value?.gid, async (newOrgId, oldOrgId) => {
                   </td>
                 </tr>
                 <tr
-                  v-for="(entry, idx) in metricsWithData(day)"
+                  v-for="(entry) in metricsWithData(day)"
                   :key="`${day.dateKey}-${entry.metric}`"
                   class="transition hover:bg-gray-50 dark:hover:bg-gray-700/60"
                 >
@@ -833,7 +833,7 @@ watch(() => currentOrganization.value?.gid, async (newOrgId, oldOrgId) => {
               </template>
             </tbody>
           </table>
-          <div class="mt-4 flex items-center justify-between text-sm text-gray-600 dark:text-gray-300">
+          <div class="mt-4 flex items-center justify-between px-6 py-4 text-sm">
             <span>
               Page {{ currentPage }} / {{ totalPages }}
             </span>
