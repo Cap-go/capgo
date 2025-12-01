@@ -48,18 +48,6 @@ CREATE TEMP TABLE test_credit_context (
 DELETE FROM public.capgo_credits_steps WHERE type = 'mau';
 DELETE FROM public.stripe_info WHERE customer_id = 'cus_test_credits';
 
-SELECT
-  is(
-    (
-      SELECT product_id
-      FROM public.capgo_credit_products
-      WHERE slug = 'credit_top_up'
-        AND environment = 'test'
-    ),
-    'prod_TJRd2hFHZsBIPK',
-    'credit top-up product configured for test environment'
-  );
-
 WITH plan_selection AS (
   SELECT id,
     stripe_id

@@ -1,57 +1,18 @@
 BEGIN;
 
-CREATE TABLE IF NOT EXISTS public.capgo_credit_products (
-    slug text NOT NULL,
-    environment text NOT NULL,
-    provider text NOT NULL,
-    product_id text NOT NULL,
-    metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
-    created_at timestamptz NOT NULL DEFAULT now(),
-    updated_at timestamptz NOT NULL DEFAULT now(),
-    CONSTRAINT capgo_credit_products_slug_environment_pk PRIMARY KEY (slug, environment)
-);
+ALTER TABLE public.plans
+ADD COLUMN IF NOT EXISTS credit_id text;
 
-COMMENT ON TABLE public.capgo_credit_products IS 'Stripe product references used for credit flows (top-ups, add-ons, etc).';
-COMMENT ON COLUMN public.capgo_credit_products.slug IS 'Stable identifier for the credit product (e.g. credit_top_up).';
-COMMENT ON COLUMN public.capgo_credit_products.environment IS 'Stripe environment the product belongs to (live or test).';
-COMMENT ON COLUMN public.capgo_credit_products.provider IS 'Payment provider for the product (stripe, etc).';
-COMMENT ON COLUMN public.capgo_credit_products.product_id IS 'Provider product identifier (e.g. Stripe prod_***).';
+UPDATE public.plans
+SET credit_id = 'prod_TJRd2hFHZsBIPK'
+WHERE credit_id IS NULL;
 
-CREATE UNIQUE INDEX IF NOT EXISTS capgo_credit_products_provider_product_idx
-    ON public.capgo_credit_products (provider, product_id);
+ALTER TABLE public.plans
+ALTER COLUMN credit_id SET NOT NULL;
 
-CREATE TRIGGER handle_capgo_credit_products_updated_at
-    BEFORE UPDATE ON public.capgo_credit_products
-    FOR EACH ROW
-    EXECUTE FUNCTION extensions.moddatetime('updated_at');
+COMMENT ON COLUMN public.plans.credit_id IS 'Stripe product identifier used for purchasing additional credits.';
 
-ALTER TABLE public.capgo_credit_products ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Allow service_role full access" ON public.capgo_credit_products FOR ALL TO service_role USING (
-    true
-)
-WITH
-CHECK (true);
-
-ALTER TABLE public.capgo_credit_products
-ALTER COLUMN provider SET DEFAULT 'stripe';
-
-ALTER TABLE public.capgo_credit_products
-ALTER COLUMN environment SET DEFAULT 'live';
-
-ALTER TABLE public.capgo_credit_products
-DROP CONSTRAINT IF EXISTS capgo_credit_products_environment_check;
-
-ALTER TABLE public.capgo_credit_products
-ADD CONSTRAINT capgo_credit_products_environment_check
-CHECK (environment IN ('live', 'test'));
-
-INSERT INTO public.capgo_credit_products (slug, environment, provider, product_id)
-VALUES
-    ('credit_top_up', 'live', 'stripe', 'prod_TINXCAiTb8Vsxc'),
-    ('credit_top_up', 'test', 'stripe', 'prod_TJRd2hFHZsBIPK')
-ON CONFLICT (slug, environment) DO UPDATE
-SET product_id = EXCLUDED.product_id;
+DROP TABLE IF EXISTS public.capgo_credit_products;
 
 DO $$
 DECLARE

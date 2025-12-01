@@ -67,30 +67,44 @@ interface CompleteTopUpRequest {
 
 const DEFAULT_TOP_UP_QUANTITY = 100
 const MAX_TOP_UP_QUANTITY = 100000
-const CREDIT_TOP_UP_SLUG = 'credit_top_up'
 
 type AppContext = Context<MiddlewareKeyVariables, any, any>
 
-async function getCreditTopUpProductId(c: AppContext): Promise<{ productId: string, environment: StripeEnvironment }> {
-  const environment = resolveStripeEnvironment(c)
-  const { data, error } = await supabaseAdmin(c)
-    .from('capgo_credit_products')
+async function getCreditTopUpProductId(c: AppContext, customerId: string): Promise<{ productId: string }> {
+  const { data: stripeInfo, error: stripeInfoError } = await supabaseAdmin(c)
+    .from('stripe_info')
     .select('product_id')
-    .eq('slug', CREDIT_TOP_UP_SLUG)
-    .eq('environment', environment)
+    .eq('customer_id', customerId)
     .single()
 
-  if (error || !data?.product_id) {
+  if (stripeInfoError || !stripeInfo?.product_id) {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'credit_plan_missing',
+      customerId,
+      error: stripeInfoError,
+    })
+    throw simpleError('credit_product_not_configured', 'Organization does not have a Stripe plan configured')
+  }
+
+  const { data: plan, error: planError } = await supabaseAdmin(c)
+    .from('plans')
+    .select('credit_id, name')
+    .eq('stripe_id', stripeInfo.product_id)
+    .single()
+
+  if (planError || !plan?.credit_id) {
     cloudlogErr({
       requestId: c.get('requestId'),
       message: 'credit_top_up_product_missing',
-      environment,
-      error,
+      customerId,
+      planStripeId: stripeInfo.product_id,
+      error: planError,
     })
-    throw simpleError('credit_product_not_configured', 'Credit product is not configured for this environment')
+    throw simpleError('credit_product_not_configured', 'Credit product is not configured for this plan')
   }
 
-  return { productId: data.product_id, environment }
+  return { productId: plan.credit_id }
 }
 
 async function resolveOrgStripeContext(c: AppContext, orgId: string) {
@@ -274,7 +288,7 @@ app.post('/start-top-up', middlewareAuth, async (c) => {
   const successUrl = `${baseUrl}/settings/organization/credits?creditCheckout=success&session_id={CHECKOUT_SESSION_ID}`
   const cancelUrl = `${baseUrl}/settings/organization/credits?creditCheckout=cancelled`
 
-  const { productId, environment } = await getCreditTopUpProductId(c)
+  const { productId } = await getCreditTopUpProductId(c, customerId)
 
   cloudlog({
     requestId: c.get('requestId'),
@@ -282,7 +296,6 @@ app.post('/start-top-up', middlewareAuth, async (c) => {
     orgId: body.orgId,
     quantity,
     productId,
-    environment,
     userId,
   })
 
@@ -318,7 +331,7 @@ app.post('/complete-top-up', middlewareAuth, async (c) => {
   if (session.payment_status !== 'paid' || session.status !== 'complete')
     throw simpleError('session_not_paid', 'Checkout session is not paid')
 
-  const { productId, environment } = await getCreditTopUpProductId(c)
+  const { productId } = await getCreditTopUpProductId(c, customerId)
   const paymentIntentId = typeof session.payment_intent === 'string'
     ? session.payment_intent
     : session.payment_intent?.id ?? null
@@ -405,7 +418,6 @@ app.post('/complete-top-up', middlewareAuth, async (c) => {
     orgId: body.orgId,
     sessionId: body.sessionId,
     creditQuantity,
-    environment,
     itemsSummary,
   })
 
