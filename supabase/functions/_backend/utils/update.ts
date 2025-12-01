@@ -120,9 +120,9 @@ export async function updateWithPG(
   const pluginVersion = parse(plugin_version)
   // Ensure there is manifest and the plugin version support manifest fetching (v5.10.0+, v6.25.0+, v7.0.35+)
   const fetchManifestEntries = manifestBundleCount > 0 && (
-    greaterOrEqual(pluginVersion, parse('5.10.0')) && pluginVersion.major === 5
-    || greaterOrEqual(pluginVersion, parse('6.25.0')) && pluginVersion.major === 6
-    || greaterOrEqual(pluginVersion, parse('7.0.35')) && pluginVersion.major >= 7
+    (greaterOrEqual(pluginVersion, parse('5.10.0')) && pluginVersion.major === 5)
+    || (greaterOrEqual(pluginVersion, parse('6.25.0')) && pluginVersion.major === 6)
+    || (greaterOrEqual(pluginVersion, parse('7.0.35')) && pluginVersion.major >= 7)
   )
   cloudlog({
     requestId: c.get('requestId'),
