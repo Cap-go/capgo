@@ -128,6 +128,7 @@ async function createNewOrg() {
       },
       {
         text: t('button-confirm'),
+        role: 'primary',
         id: 'confirm-button',
         handler: async () => {
           const orgName = orgNameInput.value
@@ -188,39 +189,39 @@ function onOrgItemClick(org: Organization, e: MouseEvent) {
       <summary class="justify-between w-full text-white border border-gray-600 d-btn d-btn-outline d-btn-sm">
         <div class="flex items-center w-4/5 text-left">
           <span class="truncate">{{ currentOrganization?.name }}</span>
-          <div v-if="hasNewInvitation" class="ml-1 w-3 h-3 bg-red-500 rounded-full" />
+          <div v-if="hasNewInvitation" class="w-3 h-3 ml-1 bg-red-500 rounded-full" />
         </div>
-        <IconDown class="ml-1 w-6 h-6 fill-current shrink-0 text-slate-400" />
+        <IconDown class="w-6 h-6 ml-1 fill-current shrink-0 text-slate-400" />
       </summary>
-      <ul class="p-2 w-52 shadow cursor-pointer d-dropdown-content bg-base-200 rounded-box z-1" @click="closeDropdown()">
+      <ul class="p-2 w-52 shadow cursor-pointer d-dropdown-content bg-[#1a1d24] rounded-box z-1 text-white" @click="closeDropdown()">
         <li
           v-for="org in organizationStore.organizations"
           :key="org.gid"
           class="block px-1 my-1 rounded-lg"
-          :class="{ 'bg-gray-700': isSelected(org) }"
+          :class="isSelected(org) ? 'bg-gray-700' : 'hover:bg-gray-600'"
         >
           <a
-            class="flex justify-between items-center py-3 px-3 text-white rounded-md"
-            :class="isSelected(org) ? 'cursor-default' : 'hover:bg-gray-600 cursor-pointer'"
+            class="flex items-center justify-between px-3 py-3 text-white rounded-md"
+            :class="isSelected(org) ? 'cursor-default' : 'cursor-pointer'"
             :aria-current="isSelected(org) ? 'true' : undefined"
             @click="onOrgItemClick(org, $event)"
           >
             <span class="truncate">{{ org.name }}</span>
-            <div class="flex gap-2 items-center">
+            <div class="flex items-center gap-2">
               <div v-if="org.role.startsWith('invite')" class="w-3 h-3 bg-red-500 rounded-full" />
             </div>
           </a>
         </li>
-        <li class="block p-px from-cyan-500 to-purple-500 rounded-lg hover:bg-gray-600 bg-linear-to-r">
+        <li class="block p-px rounded-lg from-cyan-500 to-purple-500 bg-linear-to-r">
           <a
-            class="flex justify-center items-center py-3 px-3 text-center text-white rounded-lg hover:bg-gray-600 bg-base-200"
+            class="flex justify-center items-center py-3 px-3 text-center text-white rounded-lg bg-[#1a1d24] hover:bg-gray-600"
             @click="createNewOrg"
           >{{ t('add-organization') }}
           </a>
         </li>
       </ul>
     </details>
-    <div v-show="!currentOrganization" class="p-px from-cyan-500 to-purple-500 rounded-lg bg-linear-to-r">
+    <div v-show="!currentOrganization" class="p-px rounded-lg from-cyan-500 to-purple-500 bg-linear-to-r">
       <button class="block w-full text-white d-btn d-btn-outline bg-slate-800 d-btn-sm" @click="createNewOrg">
         {{ t('add-organization') }}
       </button>
@@ -232,7 +233,7 @@ function onOrgItemClick(org: Organization, e: MouseEvent) {
           v-model="orgNameInput"
           type="text"
           :placeholder="t('organization-name')"
-          class="p-3 w-full text-white bg-gray-800 rounded-lg border border-gray-600"
+          class="w-full p-3 text-gray-900 bg-white border border-gray-300 rounded-lg dark:text-white dark:bg-gray-800 dark:border-gray-600"
           @keydown.enter="$event.preventDefault()"
         >
       </div>

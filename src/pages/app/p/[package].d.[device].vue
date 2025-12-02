@@ -406,13 +406,13 @@ async function copyCurlCommand() {
     <div v-else-if="device">
       <Tabs v-model:active-tab="ActiveTab" :tabs="tabs" />
       <div v-if="ActiveTab === 'info'" id="devices" class="mt-0 md:mt-8">
-        <div class="overflow-y-auto px-0 pt-0 mx-auto mb-8 w-full h-full sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
+        <div class="px-0 pt-0 mx-auto mb-8 w-full h-full sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
           <div v-if="device.plugin_version === '0.0.0'" class="my-2 mr-auto ml-auto text-center text-white rounded-2xl border-8 bg-[#ef4444] w-fit border-[#ef4444]">
             {{ t('device-injected') }}
             <br>
             {{ t('device-injected-2') }}
           </div>
-          <div class="flex overflow-hidden overflow-y-auto flex-col bg-white border shadow-lg md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900">
+          <div class="flex flex-col bg-white border shadow-lg md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900">
             <dl :key="reloadCount" class="divide-y divide-slate-200 dark:divide-slate-500">
               <InfoRow :label="t('device-id')">
                 {{ device.device_id }}
@@ -453,18 +453,18 @@ async function copyCurlCommand() {
                     <span>{{ getChannelLabel(channelDevice?.id || 'none') }}</span>
                     <IconDown class="ml-1 w-4 h-4 fill-current" />
                   </summary>
-                  <ul class="absolute right-0 top-full z-50 p-2 mt-1 w-48 shadow-lg d-dropdown-content bg-base-200 rounded-box">
-                    <li class="block px-1 rounded-lg hover:bg-gray-600">
+                  <ul class="absolute right-0 top-full z-50 p-2 mt-1 w-48 shadow-lg d-dropdown-content bg-white dark:bg-base-200 rounded-box">
+                    <li class="block px-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600">
                       <a
-                        class="block py-2 px-3 text-white hover:bg-gray-600"
+                        class="block py-2 px-3 text-gray-900 dark:text-white"
                         @click="onSelectChannel('none')"
                       >
                         {{ t('none') }}
                       </a>
                     </li>
-                    <li v-for="ch in channels" :key="ch.id" class="block px-1 rounded-lg hover:bg-gray-600">
+                    <li v-for="ch in channels" :key="ch.id" class="block px-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600">
                       <a
-                        class="block py-2 px-3 text-white hover:bg-gray-600"
+                        class="block py-2 px-3 text-gray-900 dark:text-white"
                         @click="onSelectChannel(ch.id.toString())"
                       >
                         {{ ch.name }}

@@ -35,7 +35,7 @@ onMounted(() => {
 
 <template>
   <Teleport to="body">
-    <div v-if="dialogStore.showDialog" class="flex fixed inset-0 z-50 justify-center items-center">
+    <div v-if="dialogStore.showDialog" class="fixed inset-0 z-50 flex items-center justify-center">
       <!-- Backdrop -->
       <div
         class="fixed inset-0 bg-black/50"
@@ -53,7 +53,7 @@ onMounted(() => {
         <!-- Close button -->
         <button
           v-if="!dialogStore.dialogOptions?.preventAccidentalClose"
-          class="absolute top-4 right-4 z-10 text-black dark:text-white hover:text-white hover:bg-gray-500 d-btn d-btn-sm d-btn-circle d-btn-ghost dark:hover:bg-gray-500"
+          class="absolute z-10 text-2xl text-black top-4 right-4 dark:text-white hover:text-white hover:bg-gray-500 d-btn d-btn-sm d-btn-circle d-btn-ghost dark:hover:bg-gray-500"
           @click="close()"
         >
           ✕
@@ -89,7 +89,7 @@ onMounted(() => {
                 'd-btn d-btn-primary': button.role === 'primary',
                 'd-btn d-btn-secondary': button.role === 'secondary',
                 'd-btn d-btn-warning': button.role === 'danger',
-                'd-btn d-btn-outline text-black dark:text-white hover:text-white': button.role === 'cancel',
+                'd-btn d-btn-outline': button.role === 'cancel',
                 'd-btn': !button.role,
                 'opacity-70 cursor-not-allowed': button.disabled,
               }"
