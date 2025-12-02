@@ -7,7 +7,7 @@ concurrency:
 on:
   push:
     tags:
-      - "*"
+      - '*'
 
 jobs:
   # Tests already passed before tag was created, so just build and deploy
@@ -96,7 +96,7 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       - name: Deploy to Capgo
-        run: bunx @capgo/cli@latest bundle upload -a ${{ secrets.CAPGO_TOKEN }} --channel ${{ env.CHANNEL }}  --partial --tus
+        run: bunx @capgo/cli@latest bundle upload -a ${{ secrets.CAPGO_TOKEN }} --channel ${{ env.CHANNEL }}  --delta
         env:
           CAPGO_TOKEN: ${{ secrets.CAPGO_TOKEN }}
       - name: Create GitHub release
@@ -112,7 +112,7 @@ jobs:
 
             🔗 **Full Changelog**: https://github.com/${{ github.repository }}/compare/${{ steps.changelog.outputs.from_tag }}...${{ steps.changelog.outputs.to_tag }}
           make_latest: true
-          token: "${{ secrets.PERSONAL_ACCESS_TOKEN }}"
+          token: '${{ secrets.PERSONAL_ACCESS_TOKEN }}'
           prerelease: ${{ contains(github.ref, '-alpha.') }}
 
   deploy_api:
