@@ -440,7 +440,7 @@ VALUES
 (
     '88888888-8888-8888-8888-888888888888'::UUID,
     '88888888-8888-8888-8888-888888888888'::UUID,
-    'super_admin'::public.user_min_right
+    'super_admin'::public.USER_MIN_RIGHT
 );
 
 -- Create an app owned by this user
@@ -724,12 +724,12 @@ VALUES
 (
     '99999999-9999-9999-9999-999999999999'::UUID,
     '99999999-9999-9999-9999-999999999999'::UUID,
-    'super_admin'::public.user_min_right
+    'super_admin'::public.USER_MIN_RIGHT
 ),
 (
     '99999999-9999-9999-9999-999999999999'::UUID,
     'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'::UUID,
-    'super_admin'::public.user_min_right
+    'super_admin'::public.USER_MIN_RIGHT
 );
 
 -- Create resources owned by admin1
