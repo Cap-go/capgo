@@ -76,9 +76,10 @@ export function createStatsLogs(c: Context, app_id: string, device_id: string, a
 }
 
 export function createStatsDevices(c: Context, device: DeviceWithoutCreatedAt) {
-  if (!c.env.DB_DEVICES && getRuntimeKey() !== 'workerd')
+  // Use Analytics Engine DEVICE_INFO in workerd (Cloudflare Workers)
+  if (getRuntimeKey() !== 'workerd')
     return backgroundTask(c, trackDevicesSB(c, device))
-  // trackDevicesCF should always be as Background task as it write in D1
+  // trackDevicesCF writes to Analytics Engine (and D1 if available)
   return backgroundTask(c, trackDevicesCF(c, device))
 }
 
@@ -130,14 +131,16 @@ export function readStats(c: Context, params: ReadStatsParams) {
 }
 
 export function countDevices(c: Context, app_id: string, customIdMode: boolean) {
-  if (!c.env.DB_DEVICES && getRuntimeKey() !== 'workerd')
+  // Use Analytics Engine DEVICE_INFO if available (via CF_ANALYTICS_TOKEN)
+  if (getRuntimeKey() !== 'workerd')
     return countDevicesSB(c, app_id, customIdMode)
   return countDevicesCF(c, app_id, customIdMode)
 }
 
 export async function readDevices(c: Context, params: ReadDevicesParams, customIdMode: boolean): Promise<ReadDevicesResponse> {
   let results: Database['public']['Tables']['devices']['Row'][]
-  if (!c.env.DB_DEVICES && getRuntimeKey() !== 'workerd')
+  // Use Analytics Engine DEVICE_INFO if in workerd (Cloudflare Workers)
+  if (getRuntimeKey() !== 'workerd')
     results = await readDevicesSB(c, params, customIdMode)
   else
     results = await readDevicesCF(c, params, customIdMode)

@@ -18,7 +18,6 @@ export type Bindings = {
   VERSION_USAGE: AnalyticsEngineDataPoint
   APP_LOG: AnalyticsEngineDataPoint
   DEVICE_INFO: AnalyticsEngineDataPoint
-  DB_DEVICES: D1Database
   DB_STOREAPPS: D1Database
   DB_REPLICA_EU: D1Database
   DB_REPLICA_AS: D1Database
@@ -112,16 +111,8 @@ export function trackLogsCFExternal(c: Context, app_id: string, device_id: strin
   return Promise.resolve()
 }
 
-function getD1WriteDevicesSession(c: Context) {
-  return c.env.DB_DEVICES
-}
-
 function getD1WriteStoreAppSession(c: Context) {
   return c.env.DB_STOREAPPS
-}
-
-function getD1ReadDevicesSession(c: Context) {
-  return c.env.DB_DEVICES.withSession('first-unconstrained')
 }
 
 function getD1ReadStoreAppSession(c: Context) {
@@ -140,8 +131,11 @@ type DeviceCachePayload = DeviceComparable & {
 export async function trackDevicesCF(c: Context, device: DeviceWithoutCreatedAt) {
   cloudlog({ requestId: c.get('requestId'), message: 'trackDevicesCF', device })
 
-  if (!c.env.DB_DEVICES)
+  // Analytics Engine DEVICE_INFO is required for tracking devices
+  if (!c.env.DEVICE_INFO) {
+    cloudlog({ requestId: c.get('requestId'), message: 'DEVICE_INFO not available, skipping trackDevicesCF' })
     return
+  }
 
   try {
     const trackDeviceCache = new CacheHelper(c)
@@ -155,7 +149,7 @@ export async function trackDevicesCF(c: Context, device: DeviceWithoutCreatedAt)
     if (cachedDevice && !hasComparableDeviceChanged(cachedDevice, device)) {
       cloudlog({
         requestId: c.get('requestId'),
-        message: 'Cache hit – device unchanged, skipping D1 read',
+        message: 'Cache hit – device unchanged, skipping write',
         context: {
           device_id: device.device_id,
           app_id: device.app_id,
@@ -164,143 +158,31 @@ export async function trackDevicesCF(c: Context, device: DeviceWithoutCreatedAt)
       return
     }
 
-    const upsertQuery = `
-  INSERT INTO devices (
-    updated_at, device_id, version_name, app_id, platform,
-    plugin_version, os_version, version_build, custom_id,
-    is_prod, is_emulator, version, default_channel
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  ON CONFLICT (device_id, app_id) DO UPDATE SET
-    updated_at = excluded.updated_at,
-    version_name = excluded.version_name,
-    platform = excluded.platform,
-    plugin_version = excluded.plugin_version,
-    os_version = excluded.os_version,
-    version_build = excluded.version_build,
-    custom_id = excluded.custom_id,
-    is_prod = excluded.is_prod,
-    is_emulator = excluded.is_emulator,
-    version = 0,
-    default_channel = excluded.default_channel
-`
-    const updated_at = new Date().toISOString()
-
     const comparableDevice = toComparableDevice(device)
-    let shouldUpsert = true
 
-    let isNewDevice = false
-    let existingRow: any = null
-
-    if (!cachedDevice) {
-      existingRow = await getD1ReadDevicesSession(c).prepare(`
-        SELECT * FROM devices
-        WHERE device_id = ? AND app_id = ?
-      `).bind(device.device_id, device.app_id).first()
-
-      if (existingRow) {
-        cloudlog({
-          message: '[D1_READ] Existing row from D1:',
-          context: {
-            device_id: existingRow.device_id,
-            app_id: existingRow.app_id,
-            version_name: existingRow.version_name,
-            version_name_type: typeof existingRow.version_name,
-            default_channel: existingRow.default_channel,
-            default_channel_type: typeof existingRow.default_channel,
-            plugin_version: existingRow.plugin_version,
-            os_version: existingRow.os_version,
-            custom_id: existingRow.custom_id,
-          },
-        })
-      }
-      else {
-        isNewDevice = true
-      }
-
-      if (existingRow && !hasComparableDeviceChanged(existingRow, device)) {
-        cloudlog({ requestId: c.get('requestId'), message: 'Cache miss but row already up to date, skipping write' })
-        shouldUpsert = false
-      }
-    }
-
-    if (shouldUpsert) {
-      cloudlog({ requestId: c.get('requestId'), message: cachedDevice ? 'Cache hit – device changed, upserting' : 'Cache miss – upserting device row' })
-      cloudlog({
-        message: '[D1_WRITE] Writing to D1:',
-        context: {
-          device_id: device.device_id,
-          app_id: device.app_id,
-          version_name: comparableDevice.version_name,
-          version_name_type: typeof comparableDevice.version_name,
-          default_channel: comparableDevice.default_channel,
-          default_channel_type: typeof comparableDevice.default_channel,
-          plugin_version: comparableDevice.plugin_version,
-          os_version: comparableDevice.os_version,
-          custom_id: comparableDevice.custom_id,
-          version_build: comparableDevice.version_build,
-        },
-      })
-
-      const res = await getD1WriteDevicesSession(c).prepare(upsertQuery).bind(
-        updated_at,
+    // Write to Analytics Engine - this is the primary store now
+    cloudlog({ requestId: c.get('requestId'), message: 'Writing to Analytics Engine DEVICE_INFO' })
+    // Platform: 0 = android, 1 = ios
+    const platformValue = comparableDevice.platform?.toLowerCase() === 'ios' ? 1 : 0
+    c.env.DEVICE_INFO.writeDataPoint({
+      blobs: [
         device.device_id,
-        comparableDevice.version_name,
-        device.app_id,
-        comparableDevice.platform,
-        comparableDevice.plugin_version,
-        comparableDevice.os_version,
-        comparableDevice.version_build,
-        comparableDevice.custom_id,
+        comparableDevice.version_name ?? '',
+        comparableDevice.plugin_version ?? '',
+        comparableDevice.os_version ?? '',
+        comparableDevice.custom_id ?? '',
+        comparableDevice.version_build ?? '',
+        comparableDevice.default_channel ?? '',
+      ],
+      doubles: [
+        platformValue,
         comparableDevice.is_prod ? 1 : 0,
         comparableDevice.is_emulator ? 1 : 0,
-        device.version ?? 0,
-        comparableDevice.default_channel,
-      ).run()
-      cloudlog({ requestId: c.get('requestId'), message: 'Upsert result:', res })
+      ],
+      indexes: [device.app_id],
+    })
 
-      // Write to Analytics Engine for device info tracking
-      if (c.env.DEVICE_INFO) {
-        // Platform: 0 = android, 1 = ios
-        const platformValue = comparableDevice.platform?.toLowerCase() === 'ios' ? 1 : 0
-        c.env.DEVICE_INFO.writeDataPoint({
-          blobs: [
-            device.device_id,
-            comparableDevice.version_name ?? '',
-            comparableDevice.plugin_version ?? '',
-            comparableDevice.os_version ?? '',
-            comparableDevice.custom_id ?? '',
-            comparableDevice.version_build ?? '',
-            comparableDevice.default_channel ?? '',
-          ],
-          doubles: [
-            platformValue,
-            comparableDevice.is_prod ? 1 : 0,
-            comparableDevice.is_emulator ? 1 : 0,
-          ],
-          indexes: [device.app_id],
-        })
-      }
-
-      // Update device_counts for new devices
-      if (isNewDevice) {
-        const hasCustomId = comparableDevice.custom_id && comparableDevice.custom_id !== ''
-        const customIdIncrement = hasCustomId ? 1 : 0
-        try {
-          await getD1WriteDevicesSession(c).prepare(`
-            INSERT INTO device_counts (app_id, total_count, custom_id_count, last_updated)
-            VALUES (?, 1, ?, datetime('now'))
-            ON CONFLICT (app_id) DO UPDATE SET
-              total_count = total_count + 1,
-              custom_id_count = custom_id_count + ?,
-              last_updated = datetime('now')
-          `).bind(device.app_id, customIdIncrement, customIdIncrement).run()
-          cloudlog({ requestId: c.get('requestId'), message: 'Device count incremented for new device' })
-        }
-        catch (countErr) {
-          cloudlogErr({ requestId: c.get('requestId'), message: 'Error updating device count', error: serializeError(countErr) })
-        }
-      }
-    }
+    // Update cache
     if (trackDeviceCache.available) {
       const cachePayload: DeviceCachePayload = {
         ...comparableDevice,
@@ -559,153 +441,134 @@ ORDER BY date`
 }
 
 export async function countDevicesCF(c: Context, app_id: string, customIdMode: boolean) {
-  if (!c.env.DB_DEVICES)
-    return 0
+  // Use Analytics Engine DEVICE_INFO for counting devices
+  const customIdFilter = customIdMode ? `AND blob5 != ''` : ''
+  const query = `SELECT COUNT(DISTINCT blob1) AS total
+FROM device_info
+WHERE index1 = '${app_id}' ${customIdFilter}`
 
-  // Try fast path: use device_counts table
-  const countColumn = customIdMode ? 'custom_id_count' : 'total_count'
-  const countQuery = `SELECT ${countColumn} AS total FROM device_counts WHERE app_id = ?`
-
-  cloudlog({ requestId: c.get('requestId'), message: 'countDevicesCF fast path', query: countQuery })
+  cloudlog({ requestId: c.get('requestId'), message: 'countDevicesCF query', query })
   try {
-    const countResult = await getD1ReadDevicesSession(c)
-      .prepare(countQuery)
-      .bind(app_id)
-      .first() as { total: number } | null
-
-    if (countResult?.total !== undefined) {
-      cloudlog({ requestId: c.get('requestId'), message: 'countDevicesCF fast path hit', count: countResult.total })
-      return countResult.total
-    }
+    const res = await runQueryToCFA<{ total: number }>(c, query)
+    return res[0]?.total ?? 0
   }
   catch (e) {
-    cloudlog({ requestId: c.get('requestId'), message: 'countDevicesCF fast path miss, falling back to count query' })
-  }
-
-  // Fallback: direct count (slower but always accurate)
-  let query = `SELECT count(*) AS total FROM devices WHERE app_id = ?`
-  if (customIdMode) {
-    query = `SELECT count(*) AS total FROM devices WHERE app_id = ? AND custom_id IS NOT NULL AND custom_id != ''`
-  }
-
-  cloudlog({ requestId: c.get('requestId'), message: 'countDevicesCF fallback query', query })
-  try {
-    const readD1 = getD1ReadDevicesSession(c)
-      .prepare(query)
-      .bind(app_id)
-      .first('total')
-    const res = await readD1
-    return res ?? 0
-  }
-  catch (e) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Error reading device count', error: serializeError(e), query })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error reading device count from Analytics Engine', error: serializeError(e), query })
   }
   return 0
 }
 
-export async function readDevicesCF(c: Context, params: ReadDevicesParams, customIdMode: boolean) {
-  if (!c.env.DB_DEVICES)
-    return [] as Database['public']['Tables']['devices']['Row'][]
+interface DeviceInfoCF {
+  device_id: string
+  version_name: string
+  plugin_version: string
+  os_version: string
+  custom_id: string
+  version_build: string
+  default_channel: string
+  platform: number // 0 = android, 1 = ios
+  is_prod: number // 0 or 1
+  is_emulator: number // 0 or 1
+  updated_at: string
+}
 
-  // Build parameterized query with dynamic bindings
-  const conditions: string[] = ['app_id = ?']
-  const bindings: (string | number)[] = [params.app_id]
+export async function readDevicesCF(c: Context, params: ReadDevicesParams, customIdMode: boolean) {
+  // Use Analytics Engine DEVICE_INFO for reading devices
+  // Schema: blob1=device_id, blob2=version_name, blob3=plugin_version, blob4=os_version,
+  //         blob5=custom_id, blob6=version_build, blob7=default_channel
+  //         double1=platform (0=android, 1=ios), double2=is_prod, double3=is_emulator
+  //         index1=app_id, timestamp=updated_at
 
   const limit = params.limit ?? DEFAULT_LIMIT
+  const conditions: string[] = [`index1 = '${params.app_id}'`]
 
   if (customIdMode) {
-    conditions.push(`custom_id IS NOT NULL AND custom_id != ''`)
+    conditions.push(`blob5 != ''`)
   }
 
   if (params.deviceIds?.length) {
     cloudlog({ requestId: c.get('requestId'), message: 'deviceIds', deviceIds: params.deviceIds })
     if (params.deviceIds.length === 1) {
-      conditions.push('device_id = ?')
-      bindings.push(params.deviceIds[0])
+      conditions.push(`blob1 = '${params.deviceIds[0]}'`)
     }
     else {
-      // Create placeholders for IN clause: (?, ?, ?)
-      const placeholders = params.deviceIds.map(() => '?').join(', ')
-      conditions.push(`device_id IN (${placeholders})`)
-      bindings.push(...params.deviceIds)
+      const devicesList = params.deviceIds.map(id => `'${id}'`).join(', ')
+      conditions.push(`blob1 IN (${devicesList})`)
     }
   }
 
   if (params.search) {
     cloudlog({ requestId: c.get('requestId'), message: 'search', search: params.search })
-    const searchPattern = `${params.search}%` // Prefix-only search for index usage
+    const searchLower = params.search.toLowerCase()
     if (params.deviceIds?.length) {
-      conditions.push('custom_id LIKE ?')
-      bindings.push(searchPattern)
+      conditions.push(`position('${searchLower}' IN toLower(blob5)) > 0`)
     }
     else {
-      // Use prefix-only LIKE for better index performance
-      conditions.push('(device_id LIKE ? OR custom_id LIKE ? OR version_name LIKE ?)')
-      bindings.push(searchPattern, searchPattern, searchPattern)
+      // Search in device_id, custom_id, or version_name
+      conditions.push(`(position('${searchLower}' IN toLower(blob1)) > 0 OR position('${searchLower}' IN toLower(blob5)) > 0 OR position('${searchLower}' IN toLower(blob2)) > 0)`)
     }
   }
 
   if (params.version_name) {
-    conditions.push('version_name = ?')
-    bindings.push(params.version_name)
+    conditions.push(`blob2 = '${params.version_name}'`)
   }
 
-  // Cursor-based pagination: use updated_at + device_id for stable ordering
+  // Cursor-based pagination using timestamp
+  let cursorFilter = ''
   if (params.cursor) {
-    // Cursor format: "updated_at|device_id"
+    // Cursor format: "timestamp|device_id"
     const [cursorTime, cursorDeviceId] = params.cursor.split('|')
     if (cursorTime && cursorDeviceId) {
-      // For DESC order: get records older than cursor
-      conditions.push('(updated_at < ? OR (updated_at = ? AND device_id > ?))')
-      bindings.push(cursorTime, cursorTime, cursorDeviceId)
+      cursorFilter = `AND (timestamp < toDateTime('${cursorTime}') OR (timestamp = toDateTime('${cursorTime}') AND blob1 > '${cursorDeviceId}'))`
     }
   }
 
-  // Always order by updated_at DESC, device_id ASC for stable cursor pagination
-  const orderClause = 'ORDER BY updated_at DESC, device_id ASC'
-
+  // Query to get latest record per device_id using argMax
   const query = `SELECT
-  app_id,
-  device_id,
-  version,
-  version_name,
-  platform,
-  plugin_version,
-  os_version,
-  version_build,
-  is_prod,
-  is_emulator,
-  custom_id,
-  updated_at
-FROM devices
-WHERE ${conditions.join(' AND ')}
-${orderClause}
-LIMIT ?`
+  argMax(blob1, timestamp) AS device_id,
+  argMax(blob2, timestamp) AS version_name,
+  argMax(blob3, timestamp) AS plugin_version,
+  argMax(blob4, timestamp) AS os_version,
+  argMax(blob5, timestamp) AS custom_id,
+  argMax(blob6, timestamp) AS version_build,
+  argMax(blob7, timestamp) AS default_channel,
+  argMax(double1, timestamp) AS platform,
+  argMax(double2, timestamp) AS is_prod,
+  argMax(double3, timestamp) AS is_emulator,
+  max(timestamp) AS updated_at
+FROM device_info
+WHERE ${conditions.join(' AND ')} ${cursorFilter}
+GROUP BY blob1
+ORDER BY updated_at DESC, device_id ASC
+LIMIT ${limit + 1}`
 
-  bindings.push(limit + 1) // Fetch one extra to check if there are more results
-
-  cloudlog({ requestId: c.get('requestId'), message: 'readDevicesCF query', query, bindings })
+  cloudlog({ requestId: c.get('requestId'), message: 'readDevicesCF query', query })
   try {
-    cloudlog({ requestId: c.get('requestId'), message: 'readDevicesCF exec' })
-    const readD1 = getD1ReadDevicesSession(c)
-      .prepare(query)
-      .bind(...bindings)
-      .all()
-    cloudlog({ requestId: c.get('requestId'), message: 'readDevicesCF exec await' })
-    const res = await readD1
-    cloudlog({ requestId: c.get('requestId'), message: 'readDevicesCF res', res })
+    const res = await runQueryToCFA<DeviceInfoCF>(c, query)
+    cloudlog({ requestId: c.get('requestId'), message: 'readDevicesCF res', resLength: res.length })
 
-    // Convert SQLite integers to booleans for is_prod and is_emulator
-    const results = (res.results as any[]).map(row => ({
-      ...row,
+    // Convert Analytics Engine results to Database device format
+    const results = res.map(row => ({
+      app_id: params.app_id,
+      device_id: row.device_id,
+      version: null, // version ID not stored in Analytics Engine
+      version_name: row.version_name || null,
+      platform: row.platform === 1 ? 'ios' : 'android',
+      plugin_version: row.plugin_version,
+      os_version: row.os_version,
+      version_build: row.version_build,
       is_prod: Boolean(row.is_prod),
       is_emulator: Boolean(row.is_emulator),
+      custom_id: row.custom_id,
+      updated_at: row.updated_at,
+      default_channel: row.default_channel || null,
+      created_at: null, // Not stored in Analytics Engine
     })) as Database['public']['Tables']['devices']['Row'][]
 
     return results
   }
   catch (e) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Error reading device list', error: serializeError(e), query, bindings })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error reading device list from Analytics Engine', error: serializeError(e), query })
   }
   return [] as Database['public']['Tables']['devices']['Row'][]
 }
@@ -1199,109 +1062,4 @@ export async function getUpdateStatsCF(c: Context): Promise<UpdateStats> {
   }
 }
 
-/**
- * Clean up old devices from D1 database
- * Deletes devices where updated_at is older than 3 months
- * Runs in batches to avoid hitting D1 limits
- *
- * @param c - Hono context
- * @param batchSize - Number of devices to delete per batch (default 1000)
- * @returns Number of devices deleted
- */
-export async function cleanupOldDevicesCF(c: Context, batchSize = 1000): Promise<number> {
-  if (!c.env.DB_DEVICES)
-    return 0
-
-  const threeMonthsAgo = new Date()
-  threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3)
-  const cutoffDate = threeMonthsAgo.toISOString()
-
-  cloudlog({ requestId: c.get('requestId'), message: 'cleanupOldDevicesCF starting', cutoffDate, batchSize })
-
-  let totalDeleted = 0
-
-  try {
-    // Delete in batches to avoid timeout and memory issues
-    let deletedInBatch = 0
-    do {
-      // First get the app_ids and device_ids to delete (needed for updating device_counts)
-      const toDelete = await getD1WriteDevicesSession(c).prepare(`
-        SELECT app_id, device_id, custom_id FROM devices
-        WHERE updated_at < ?
-        LIMIT ?
-      `).bind(cutoffDate, batchSize).all()
-
-      if (!toDelete.results?.length) {
-        cloudlog({ requestId: c.get('requestId'), message: 'No more old devices to delete' })
-        break
-      }
-
-      deletedInBatch = toDelete.results.length
-
-      // Group by app_id to update device_counts
-      const countsByApp: Record<string, { total: number, withCustomId: number }> = {}
-      for (const device of toDelete.results as any[]) {
-        if (!countsByApp[device.app_id]) {
-          countsByApp[device.app_id] = { total: 0, withCustomId: 0 }
-        }
-        countsByApp[device.app_id].total++
-        if (device.custom_id && device.custom_id !== '') {
-          countsByApp[device.app_id].withCustomId++
-        }
-      }
-
-      // Delete the devices
-      const deleteResult = await getD1WriteDevicesSession(c).prepare(`
-        DELETE FROM devices
-        WHERE updated_at < ?
-        LIMIT ?
-      `).bind(cutoffDate, batchSize).run()
-
-      cloudlog({
-        requestId: c.get('requestId'),
-        message: 'Batch delete result',
-        deleted: deletedInBatch,
-        meta: deleteResult.meta,
-      })
-
-      // Update device_counts for each affected app
-      for (const [appId, counts] of Object.entries(countsByApp)) {
-        try {
-          await getD1WriteDevicesSession(c).prepare(`
-            UPDATE device_counts
-            SET total_count = MAX(0, total_count - ?),
-                custom_id_count = MAX(0, custom_id_count - ?),
-                last_updated = datetime('now')
-            WHERE app_id = ?
-          `).bind(counts.total, counts.withCustomId, appId).run()
-        }
-        catch (countErr) {
-          cloudlogErr({
-            requestId: c.get('requestId'),
-            message: 'Error updating device_counts after cleanup',
-            error: serializeError(countErr),
-            app_id: appId,
-          })
-        }
-      }
-
-      totalDeleted += deletedInBatch
-    } while (deletedInBatch === batchSize)
-
-    cloudlog({
-      requestId: c.get('requestId'),
-      message: 'cleanupOldDevicesCF completed',
-      totalDeleted,
-    })
-  }
-  catch (e) {
-    cloudlogErr({
-      requestId: c.get('requestId'),
-      message: 'Error cleaning up old devices',
-      error: serializeError(e),
-      totalDeletedBeforeError: totalDeleted,
-    })
-  }
-
-  return totalDeleted
-}
+// Note: Device cleanup is no longer needed as Analytics Engine handles data retention automatically
