@@ -190,6 +190,7 @@ async function getDevice() {
         body: JSON.stringify({
           appId: packageId.value,
           deviceIds: [id.value],
+          limit: 1,
         }),
       })
 
@@ -198,8 +199,8 @@ async function getDevice() {
         return
       }
 
-      const dataD = await response.json() as Database['public']['Tables']['devices']['Row'][]
-      const data = dataD[0]
+      const dataD = await response.json() as { data: Database['public']['Tables']['devices']['Row'][], nextCursor?: string, hasMore: boolean }
+      const data = dataD.data?.[0]
       device.value = data
       await getVersionInfo()
     }
