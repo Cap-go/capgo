@@ -149,7 +149,7 @@
     "@capgo/capacitor-mute": "^7.3.11",
     "@capgo/capacitor-native-biometric": "^7.5.1",
     "@capgo/capacitor-screen-recorder": "7.3.5",
-    "@capgo/capacitor-updater": "^7.27.5",
+    "@capgo/capacitor-updater": "^7.30.0",
     "@capgo/inappbrowser": "^7.29.0",
     "@capgo/native-audio": "^7.9.3",
     "@capgo/native-market": "^7.2.16",
