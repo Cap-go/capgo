@@ -1,6 +1,7 @@
 import type { Context } from 'hono'
 import type { Database } from './supabase.types.ts'
 import type { DeviceWithoutCreatedAt, ReadDevicesParams, ReadStatsParams, StatsActions } from './types.ts'
+import { getRuntimeKey } from 'hono/adapter'
 import { countDevicesCF, countUpdatesFromLogsCF, countUpdatesFromLogsExternalCF, createIfNotExistStoreInfo, getAppsFromCF, getUpdateStatsCF, readBandwidthUsageCF, readDevicesCF, readDeviceUsageCF, readStatsCF, readStatsVersionCF, trackBandwidthUsageCF, trackDevicesCF, trackDeviceUsageCF, trackLogsCF, trackLogsCFExternal, trackVersionUsageCF, updateStoreApp } from './cloudflare.ts'
 import { simpleError200 } from './hono.ts'
 import { cloudlog } from './logging.ts'
@@ -74,7 +75,7 @@ export function createStatsLogs(c: Context, app_id: string, device_id: string, a
 }
 
 export function createStatsDevices(c: Context, device: DeviceWithoutCreatedAt) {
-  if (!c.env.DB_DEVICES)
+  if (!c.env.DB_DEVICES && getRuntimeKey() !== 'workerd')
     return backgroundTask(c, trackDevicesSB(c, device))
   // trackDevicesCF should always be as Background task as it write in D1
   return backgroundTask(c, trackDevicesCF(c, device))
@@ -128,13 +129,13 @@ export function readStats(c: Context, params: ReadStatsParams) {
 }
 
 export function countDevices(c: Context, app_id: string, customIdMode: boolean) {
-  if (!c.env.DB_DEVICES)
+  if (!c.env.DB_DEVICES && getRuntimeKey() !== 'workerd')
     return countDevicesSB(c, app_id, customIdMode)
   return countDevicesCF(c, app_id, customIdMode)
 }
 
 export function readDevices(c: Context, params: ReadDevicesParams, customIdMode: boolean) {
-  if (!c.env.DB_DEVICES)
+  if (!c.env.DB_DEVICES && getRuntimeKey() !== 'workerd')
     return readDevicesSB(c, params, customIdMode)
   return readDevicesCF(c, params, customIdMode)
 }
