@@ -95,8 +95,8 @@
       "d1_databases": [
         {
           "binding": "DB_DEVICES",
-          "database_name": "capgo_prod_devices",
-          "database_id": "2510b55c-d6a2-4595-a2a5-d9aca82a3753"
+          "database_name": "capgo_devices_eu",
+          "database_id": "a70f2556-c0f0-48c4-a581-f98108b9e6bb"
         },
         {
           "binding": "DB_STOREAPPS",
@@ -213,8 +213,8 @@
       "d1_databases": [
         {
           "binding": "DB_DEVICES",
-          "database_name": "capgo_prod_devices",
-          "database_id": "2510b55c-d6a2-4595-a2a5-d9aca82a3753"
+          "database_name": "capgo_devices_eu",
+          "database_id": "a70f2556-c0f0-48c4-a581-f98108b9e6bb"
         },
         {
           "binding": "DB_STOREAPPS",
@@ -331,8 +331,8 @@
       "d1_databases": [
         {
           "binding": "DB_DEVICES",
-          "database_name": "capgo_prod_devices",
-          "database_id": "2510b55c-d6a2-4595-a2a5-d9aca82a3753"
+          "database_name": "capgo_devices_eu",
+          "database_id": "a70f2556-c0f0-48c4-a581-f98108b9e6bb"
         },
         {
           "binding": "DB_STOREAPPS",
@@ -449,8 +449,8 @@
       "d1_databases": [
         {
           "binding": "DB_DEVICES",
-          "database_name": "capgo_prod_devices",
-          "database_id": "2510b55c-d6a2-4595-a2a5-d9aca82a3753"
+          "database_name": "capgo_devices_eu",
+          "database_id": "a70f2556-c0f0-48c4-a581-f98108b9e6bb"
         },
         {
           "binding": "DB_STOREAPPS",
@@ -567,8 +567,8 @@
       "d1_databases": [
         {
           "binding": "DB_DEVICES",
-          "database_name": "capgo_prod_devices",
-          "database_id": "2510b55c-d6a2-4595-a2a5-d9aca82a3753"
+          "database_name": "capgo_devices_eu",
+          "database_id": "a70f2556-c0f0-48c4-a581-f98108b9e6bb"
         },
         {
           "binding": "DB_STOREAPPS",
@@ -685,8 +685,8 @@
       "d1_databases": [
         {
           "binding": "DB_DEVICES",
-          "database_name": "capgo_prod_devices",
-          "database_id": "2510b55c-d6a2-4595-a2a5-d9aca82a3753"
+          "database_name": "capgo_devices_eu",
+          "database_id": "a70f2556-c0f0-48c4-a581-f98108b9e6bb"
         },
         {
           "binding": "DB_STOREAPPS",
@@ -803,8 +803,8 @@
       "d1_databases": [
         {
           "binding": "DB_DEVICES",
-          "database_name": "capgo_prod_devices",
-          "database_id": "2510b55c-d6a2-4595-a2a5-d9aca82a3753"
+          "database_name": "capgo_devices_eu",
+          "database_id": "a70f2556-c0f0-48c4-a581-f98108b9e6bb"
         },
         {
           "binding": "DB_STOREAPPS",
@@ -921,8 +921,8 @@
       "d1_databases": [
         {
           "binding": "DB_DEVICES",
-          "database_name": "capgo_prod_devices",
-          "database_id": "2510b55c-d6a2-4595-a2a5-d9aca82a3753"
+          "database_name": "capgo_devices_eu",
+          "database_id": "a70f2556-c0f0-48c4-a581-f98108b9e6bb"
         },
         {
           "binding": "DB_STOREAPPS",
@@ -1014,8 +1014,8 @@
       "d1_databases": [
         {
           "binding": "DB_DEVICES",
-          "database_name": "capgo_prod_devices",
-          "database_id": "2510b55c-d6a2-4595-a2a5-d9aca82a3753"
+          "database_name": "capgo_devices_eu",
+          "database_id": "a70f2556-c0f0-48c4-a581-f98108b9e6bb"
         },
         {
           "binding": "DB_STOREAPPS",
@@ -1133,7 +1133,7 @@
         {
           "binding": "DB_DEVICES",
           "database_name": "capgo_alpha_devices",
-          "database_id": "2510b55c-d6a2-4595-a2a5-d9aca82a3753"
+          "database_id": "a70f2556-c0f0-48c4-a581-f98108b9e6bb"
         },
         {
           "binding": "DB_STOREAPPS",
