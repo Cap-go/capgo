@@ -2,12 +2,13 @@ import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
-import { readActiveAppsCF, readLastMonthDevicesCF, readLastMonthUpdatesCF } from '../utils/cloudflare.ts'
+import { cleanupOldDevicesCF, readActiveAppsCF, readLastMonthDevicesCF, readLastMonthUpdatesCF } from '../utils/cloudflare.ts'
 import { BRES, middlewareAPISecret } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../utils/logging.ts'
 import { logsnag, logsnagInsights } from '../utils/logsnag.ts'
 import { countAllApps, countAllUpdates, countAllUpdatesExternal, getUpdateStats } from '../utils/stats.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
+import { backgroundTask } from '../utils/utils.ts'
 
 interface PlanTotal { [key: string]: number }
 interface Actives { users: number, apps: number }
@@ -366,5 +367,19 @@ app.post('/', middlewareAPISecret, async (c) => {
     cloudlogErr({ requestId: c.get('requestId'), message: 'insights error', e })
   })
   cloudlog({ requestId: c.get('requestId'), message: 'Sent to logsnag done' })
+
+  // Cleanup old devices (older than 3 months) - run in background
+  if (c.env.DB_DEVICES) {
+    backgroundTask(c, cleanupOldDevicesCF(c)
+      .then((deletedDevices) => {
+        if (deletedDevices > 0) {
+          cloudlog({ requestId: c.get('requestId'), message: 'Cleaned up old devices', deletedDevices })
+        }
+      })
+      .catch((e) => {
+        cloudlogErr({ requestId: c.get('requestId'), message: 'cleanupOldDevicesCF error', e })
+      }))
+  }
+
   return c.json(BRES)
 })

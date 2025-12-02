@@ -17,6 +17,7 @@ export type Bindings = {
   BANDWIDTH_USAGE: AnalyticsEngineDataPoint
   VERSION_USAGE: AnalyticsEngineDataPoint
   APP_LOG: AnalyticsEngineDataPoint
+  DEVICE_INFO: AnalyticsEngineDataPoint
   DB_DEVICES: D1Database
   DB_STOREAPPS: D1Database
   DB_REPLICA_EU: D1Database
@@ -256,6 +257,29 @@ export async function trackDevicesCF(c: Context, device: DeviceWithoutCreatedAt)
         comparableDevice.default_channel,
       ).run()
       cloudlog({ requestId: c.get('requestId'), message: 'Upsert result:', res })
+
+      // Write to Analytics Engine for device info tracking
+      if (c.env.DEVICE_INFO) {
+        // Platform: 0 = android, 1 = ios
+        const platformValue = comparableDevice.platform?.toLowerCase() === 'ios' ? 1 : 0
+        c.env.DEVICE_INFO.writeDataPoint({
+          blobs: [
+            device.device_id,
+            comparableDevice.version_name ?? '',
+            comparableDevice.plugin_version ?? '',
+            comparableDevice.os_version ?? '',
+            comparableDevice.custom_id ?? '',
+            comparableDevice.version_build ?? '',
+            comparableDevice.default_channel ?? '',
+          ],
+          doubles: [
+            platformValue,
+            comparableDevice.is_prod ? 1 : 0,
+            comparableDevice.is_emulator ? 1 : 0,
+          ],
+          indexes: [device.app_id],
+        })
+      }
 
       // Update device_counts for new devices
       if (isNewDevice) {
@@ -1173,4 +1197,111 @@ export async function getUpdateStatsCF(c: Context): Promise<UpdateStats> {
       },
     }
   }
+}
+
+/**
+ * Clean up old devices from D1 database
+ * Deletes devices where updated_at is older than 3 months
+ * Runs in batches to avoid hitting D1 limits
+ *
+ * @param c - Hono context
+ * @param batchSize - Number of devices to delete per batch (default 1000)
+ * @returns Number of devices deleted
+ */
+export async function cleanupOldDevicesCF(c: Context, batchSize = 1000): Promise<number> {
+  if (!c.env.DB_DEVICES)
+    return 0
+
+  const threeMonthsAgo = new Date()
+  threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3)
+  const cutoffDate = threeMonthsAgo.toISOString()
+
+  cloudlog({ requestId: c.get('requestId'), message: 'cleanupOldDevicesCF starting', cutoffDate, batchSize })
+
+  let totalDeleted = 0
+
+  try {
+    // Delete in batches to avoid timeout and memory issues
+    let deletedInBatch = 0
+    do {
+      // First get the app_ids and device_ids to delete (needed for updating device_counts)
+      const toDelete = await getD1WriteDevicesSession(c).prepare(`
+        SELECT app_id, device_id, custom_id FROM devices
+        WHERE updated_at < ?
+        LIMIT ?
+      `).bind(cutoffDate, batchSize).all()
+
+      if (!toDelete.results?.length) {
+        cloudlog({ requestId: c.get('requestId'), message: 'No more old devices to delete' })
+        break
+      }
+
+      deletedInBatch = toDelete.results.length
+
+      // Group by app_id to update device_counts
+      const countsByApp: Record<string, { total: number, withCustomId: number }> = {}
+      for (const device of toDelete.results as any[]) {
+        if (!countsByApp[device.app_id]) {
+          countsByApp[device.app_id] = { total: 0, withCustomId: 0 }
+        }
+        countsByApp[device.app_id].total++
+        if (device.custom_id && device.custom_id !== '') {
+          countsByApp[device.app_id].withCustomId++
+        }
+      }
+
+      // Delete the devices
+      const deleteResult = await getD1WriteDevicesSession(c).prepare(`
+        DELETE FROM devices
+        WHERE updated_at < ?
+        LIMIT ?
+      `).bind(cutoffDate, batchSize).run()
+
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'Batch delete result',
+        deleted: deletedInBatch,
+        meta: deleteResult.meta,
+      })
+
+      // Update device_counts for each affected app
+      for (const [appId, counts] of Object.entries(countsByApp)) {
+        try {
+          await getD1WriteDevicesSession(c).prepare(`
+            UPDATE device_counts
+            SET total_count = MAX(0, total_count - ?),
+                custom_id_count = MAX(0, custom_id_count - ?),
+                last_updated = datetime('now')
+            WHERE app_id = ?
+          `).bind(counts.total, counts.withCustomId, appId).run()
+        }
+        catch (countErr) {
+          cloudlogErr({
+            requestId: c.get('requestId'),
+            message: 'Error updating device_counts after cleanup',
+            error: serializeError(countErr),
+            app_id: appId,
+          })
+        }
+      }
+
+      totalDeleted += deletedInBatch
+    } while (deletedInBatch === batchSize)
+
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'cleanupOldDevicesCF completed',
+      totalDeleted,
+    })
+  }
+  catch (e) {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'Error cleaning up old devices',
+      error: serializeError(e),
+      totalDeletedBeforeError: totalDeleted,
+    })
+  }
+
+  return totalDeleted
 }

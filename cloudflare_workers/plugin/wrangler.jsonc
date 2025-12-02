@@ -90,6 +90,10 @@
         {
           "binding": "APP_LOG_EXTERNAL",
           "dataset": "app_log_external"
+        },
+        {
+          "binding": "DEVICE_INFO",
+          "dataset": "device_info"
         }
       ],
       "d1_databases": [
@@ -208,6 +212,10 @@
         {
           "binding": "APP_LOG_EXTERNAL",
           "dataset": "app_log_external"
+        },
+        {
+          "binding": "DEVICE_INFO",
+          "dataset": "device_info"
         }
       ],
       "d1_databases": [
@@ -326,6 +334,10 @@
         {
           "binding": "APP_LOG_EXTERNAL",
           "dataset": "app_log_external"
+        },
+        {
+          "binding": "DEVICE_INFO",
+          "dataset": "device_info"
         }
       ],
       "d1_databases": [
@@ -444,6 +456,10 @@
         {
           "binding": "APP_LOG_EXTERNAL",
           "dataset": "app_log_external"
+        },
+        {
+          "binding": "DEVICE_INFO",
+          "dataset": "device_info"
         }
       ],
       "d1_databases": [
@@ -562,6 +578,10 @@
         {
           "binding": "APP_LOG_EXTERNAL",
           "dataset": "app_log_external"
+        },
+        {
+          "binding": "DEVICE_INFO",
+          "dataset": "device_info"
         }
       ],
       "d1_databases": [
@@ -680,6 +700,10 @@
         {
           "binding": "APP_LOG_EXTERNAL",
           "dataset": "app_log_external"
+        },
+        {
+          "binding": "DEVICE_INFO",
+          "dataset": "device_info"
         }
       ],
       "d1_databases": [
@@ -798,6 +822,10 @@
         {
           "binding": "APP_LOG_EXTERNAL",
           "dataset": "app_log_external"
+        },
+        {
+          "binding": "DEVICE_INFO",
+          "dataset": "device_info"
         }
       ],
       "d1_databases": [
@@ -916,6 +944,10 @@
         {
           "binding": "APP_LOG_EXTERNAL",
           "dataset": "app_log_external"
+        },
+        {
+          "binding": "DEVICE_INFO",
+          "dataset": "device_info"
         }
       ],
       "d1_databases": [
@@ -1176,6 +1208,10 @@
         {
           "binding": "APP_LOG_EXTERNAL",
           "dataset": "app_log_external_alpha"
+        },
+        {
+          "binding": "DEVICE_INFO",
+          "dataset": "device_info_alpha"
         }
       ],
       "hyperdrive": [
