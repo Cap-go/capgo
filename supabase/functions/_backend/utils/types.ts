@@ -47,12 +47,20 @@ export interface ReadStatsParams {
 export interface ReadDevicesParams {
   app_id: string
   version_name?: string | undefined
-  rangeStart?: number
-  rangeEnd?: number
   deviceIds?: string[]
   search?: string
   order?: Order[]
   limit?: number
+  /** Cursor for pagination - use the last updated_at from previous page */
+  cursor?: string
+}
+
+export interface ReadDevicesResponse {
+  data: Database['public']['Tables']['devices']['Row'][]
+  /** Cursor for next page - pass this as cursor param to get next page */
+  nextCursor?: string
+  /** Whether there are more results */
+  hasMore: boolean
 }
 
 export type DeviceWithoutCreatedAt = Omit<Database['public']['Tables']['devices']['Insert'], 'created_at'>

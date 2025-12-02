@@ -25,3 +25,13 @@ CREATE INDEX devices_app_id_updated_at_idx ON devices (app_id, updated_at);
 CREATE INDEX idx_app_id_created_at_devices ON devices (app_id, updated_at);
 
 CREATE INDEX idx_app_id_version_name_devices ON devices (app_id, version_name);
+
+-- Device counts table for fast count queries
+CREATE TABLE IF NOT EXISTS device_counts (
+    app_id TEXT PRIMARY KEY,
+    total_count INTEGER NOT NULL DEFAULT 0,
+    custom_id_count INTEGER NOT NULL DEFAULT 0,
+    last_updated DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_device_counts_app_id ON device_counts (app_id);

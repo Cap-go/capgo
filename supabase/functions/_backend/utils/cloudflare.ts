@@ -187,8 +187,11 @@ export async function trackDevicesCF(c: Context, device: DeviceWithoutCreatedAt)
     const comparableDevice = toComparableDevice(device)
     let shouldUpsert = true
 
+    let isNewDevice = false
+    let existingRow: any = null
+
     if (!cachedDevice) {
-      const existingRow = await getD1ReadDevicesSession(c).prepare(`
+      existingRow = await getD1ReadDevicesSession(c).prepare(`
         SELECT * FROM devices
         WHERE device_id = ? AND app_id = ?
       `).bind(device.device_id, device.app_id).first()
@@ -208,6 +211,9 @@ export async function trackDevicesCF(c: Context, device: DeviceWithoutCreatedAt)
             custom_id: existingRow.custom_id,
           },
         })
+      }
+      else {
+        isNewDevice = true
       }
 
       if (existingRow && !hasComparableDeviceChanged(existingRow, device)) {
@@ -250,6 +256,26 @@ export async function trackDevicesCF(c: Context, device: DeviceWithoutCreatedAt)
         comparableDevice.default_channel,
       ).run()
       cloudlog({ requestId: c.get('requestId'), message: 'Upsert result:', res })
+
+      // Update device_counts for new devices
+      if (isNewDevice) {
+        const hasCustomId = comparableDevice.custom_id && comparableDevice.custom_id !== ''
+        const customIdIncrement = hasCustomId ? 1 : 0
+        try {
+          await getD1WriteDevicesSession(c).prepare(`
+            INSERT INTO device_counts (app_id, total_count, custom_id_count, last_updated)
+            VALUES (?, 1, ?, datetime('now'))
+            ON CONFLICT (app_id) DO UPDATE SET
+              total_count = total_count + 1,
+              custom_id_count = custom_id_count + ?,
+              last_updated = datetime('now')
+          `).bind(device.app_id, customIdIncrement, customIdIncrement).run()
+          cloudlog({ requestId: c.get('requestId'), message: 'Device count incremented for new device' })
+        }
+        catch (countErr) {
+          cloudlogErr({ requestId: c.get('requestId'), message: 'Error updating device count', error: serializeError(countErr) })
+        }
+      }
     }
     if (trackDeviceCache.available) {
       const cachePayload: DeviceCachePayload = {
@@ -512,74 +538,107 @@ export async function countDevicesCF(c: Context, app_id: string, customIdMode: b
   if (!c.env.DB_DEVICES)
     return 0
 
-  let query = `SELECT count(*) AS total FROM devices WHERE app_id = ?1`
+  // Try fast path: use device_counts table
+  const countColumn = customIdMode ? 'custom_id_count' : 'total_count'
+  const countQuery = `SELECT ${countColumn} AS total FROM device_counts WHERE app_id = ?`
 
-  if (customIdMode) {
-    query = `SELECT count(*) AS total FROM devices WHERE app_id = ?1 AND custom_id IS NOT NULL AND custom_id != ''`
+  cloudlog({ requestId: c.get('requestId'), message: 'countDevicesCF fast path', query: countQuery })
+  try {
+    const countResult = await getD1ReadDevicesSession(c)
+      .prepare(countQuery)
+      .bind(app_id)
+      .first() as { total: number } | null
+
+    if (countResult?.total !== undefined) {
+      cloudlog({ requestId: c.get('requestId'), message: 'countDevicesCF fast path hit', count: countResult.total })
+      return countResult.total
+    }
+  }
+  catch (e) {
+    cloudlog({ requestId: c.get('requestId'), message: 'countDevicesCF fast path miss, falling back to count query' })
   }
 
-  cloudlog({ requestId: c.get('requestId'), message: 'countDevicesCF query', query })
+  // Fallback: direct count (slower but always accurate)
+  let query = `SELECT count(*) AS total FROM devices WHERE app_id = ?`
+  if (customIdMode) {
+    query = `SELECT count(*) AS total FROM devices WHERE app_id = ? AND custom_id IS NOT NULL AND custom_id != ''`
+  }
+
+  cloudlog({ requestId: c.get('requestId'), message: 'countDevicesCF fallback query', query })
   try {
     const readD1 = getD1ReadDevicesSession(c)
       .prepare(query)
       .bind(app_id)
       .first('total')
     const res = await readD1
-    return res
+    return res ?? 0
   }
   catch (e) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Error reading device list', error: serializeError(e), query })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error reading device count', error: serializeError(e), query })
   }
-  return [] as Database['public']['Tables']['devices']['Row'][]
+  return 0
 }
 
 export async function readDevicesCF(c: Context, params: ReadDevicesParams, customIdMode: boolean) {
   if (!c.env.DB_DEVICES)
     return [] as Database['public']['Tables']['devices']['Row'][]
 
-  let deviceFilter = ''
-  let rangeStart = params.rangeStart ?? 0
-  let rangeEnd = params.rangeEnd ?? DEFAULT_LIMIT
+  // Build parameterized query with dynamic bindings
+  const conditions: string[] = ['app_id = ?']
+  const bindings: (string | number)[] = [params.app_id]
+
+  const limit = params.limit ?? DEFAULT_LIMIT
 
   if (customIdMode) {
-    deviceFilter += `AND custom_id IS NOT NULL AND custom_id != ''`
+    conditions.push(`custom_id IS NOT NULL AND custom_id != ''`)
   }
+
   if (params.deviceIds?.length) {
     cloudlog({ requestId: c.get('requestId'), message: 'deviceIds', deviceIds: params.deviceIds })
     if (params.deviceIds.length === 1) {
-      deviceFilter = `AND device_id = '${params.deviceIds[0]}'`
-      rangeStart = 0
-      rangeEnd = 1
+      conditions.push('device_id = ?')
+      bindings.push(params.deviceIds[0])
     }
     else {
-      const devicesList = params.deviceIds.join(',')
-      deviceFilter = `AND device_id IN (${devicesList})`
-      rangeStart = 0
-      rangeEnd = params.deviceIds.length
+      // Create placeholders for IN clause: (?, ?, ?)
+      const placeholders = params.deviceIds.map(() => '?').join(', ')
+      conditions.push(`device_id IN (${placeholders})`)
+      bindings.push(...params.deviceIds)
     }
   }
-  let searchFilter = ''
+
   if (params.search) {
     cloudlog({ requestId: c.get('requestId'), message: 'search', search: params.search })
-    if (params.deviceIds?.length)
-      searchFilter = `AND custom_id LIKE '%${params.search}%'`
-    else
-      searchFilter = `AND (device_id LIKE '%${params.search}%' OR custom_id LIKE '%${params.search}%' OR version_name LIKE '%${params.search}%')`
+    const searchPattern = `${params.search}%` // Prefix-only search for index usage
+    if (params.deviceIds?.length) {
+      conditions.push('custom_id LIKE ?')
+      bindings.push(searchPattern)
+    }
+    else {
+      // Use prefix-only LIKE for better index performance
+      conditions.push('(device_id LIKE ? OR custom_id LIKE ? OR version_name LIKE ?)')
+      bindings.push(searchPattern, searchPattern, searchPattern)
+    }
   }
-  let versionFilter = ''
-  if (params.version_name)
-    versionFilter = `AND version_name = '${params.version_name}'`
 
-  const orderFilters: string[] = []
-  if (params.order?.length) {
-    params.order.forEach((col) => {
-      if (col.sortable && typeof col.sortable === 'string') {
-        cloudlog({ requestId: c.get('requestId'), message: 'order', colKey: col.key, colSortable: col.sortable })
-        orderFilters.push(`${col.key} ${col.sortable.toUpperCase()}`)
-      }
-    })
+  if (params.version_name) {
+    conditions.push('version_name = ?')
+    bindings.push(params.version_name)
   }
-  const orderFilter = orderFilters.length ? `ORDER BY ${orderFilters.join(', ')}` : ''
+
+  // Cursor-based pagination: use updated_at + device_id for stable ordering
+  if (params.cursor) {
+    // Cursor format: "updated_at|device_id"
+    const [cursorTime, cursorDeviceId] = params.cursor.split('|')
+    if (cursorTime && cursorDeviceId) {
+      // For DESC order: get records older than cursor
+      conditions.push('(updated_at < ? OR (updated_at = ? AND device_id > ?))')
+      bindings.push(cursorTime, cursorTime, cursorDeviceId)
+    }
+  }
+
+  // Always order by updated_at DESC, device_id ASC for stable cursor pagination
+  const orderClause = 'ORDER BY updated_at DESC, device_id ASC'
 
   const query = `SELECT
   app_id,
@@ -595,16 +654,18 @@ export async function readDevicesCF(c: Context, params: ReadDevicesParams, custo
   custom_id,
   updated_at
 FROM devices
-WHERE
-  app_id = '${params.app_id}' ${deviceFilter} ${searchFilter} ${versionFilter}
-${orderFilter}
-LIMIT ${rangeEnd} OFFSET ${rangeStart}`
+WHERE ${conditions.join(' AND ')}
+${orderClause}
+LIMIT ?`
 
-  cloudlog({ requestId: c.get('requestId'), message: 'readDevicesCF query', query })
+  bindings.push(limit + 1) // Fetch one extra to check if there are more results
+
+  cloudlog({ requestId: c.get('requestId'), message: 'readDevicesCF query', query, bindings })
   try {
     cloudlog({ requestId: c.get('requestId'), message: 'readDevicesCF exec' })
     const readD1 = getD1ReadDevicesSession(c)
       .prepare(query)
+      .bind(...bindings)
       .all()
     cloudlog({ requestId: c.get('requestId'), message: 'readDevicesCF exec await' })
     const res = await readD1
@@ -620,7 +681,7 @@ LIMIT ${rangeEnd} OFFSET ${rangeStart}`
     return results
   }
   catch (e) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Error reading device list', error: serializeError(e), query })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error reading device list', error: serializeError(e), query, bindings })
   }
   return [] as Database['public']['Tables']['devices']['Row'][]
 }

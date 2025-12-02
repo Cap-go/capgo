@@ -16,8 +16,10 @@ interface DataDevice {
   search?: string
   customIdMode?: boolean
   order?: Order[]
-  rangeStart?: number
-  rangeEnd?: number
+  /** Cursor for pagination - pass nextCursor from previous response */
+  cursor?: string
+  /** Limit for results (default 1000) */
+  limit?: number
 }
 
 export const app = new Hono<MiddlewareKeyVariables>()
@@ -36,11 +38,11 @@ app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
     return c.json({ count: await countDevices(c, body.appId, body.customIdMode ?? false) })
   return c.json(await readDevices(c, {
     app_id: body.appId,
-    rangeStart: body.rangeStart,
-    rangeEnd: body.rangeEnd,
     version_name: body.versionName,
     deviceIds: devicesIds,
     search: body.search,
     order: body.order,
+    cursor: body.cursor,
+    limit: body.limit,
   }, body.customIdMode ?? false))
 })

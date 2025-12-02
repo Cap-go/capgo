@@ -10,7 +10,10 @@ interface GetDevice {
   app_id: string
   device_id?: string
   customIdMode?: boolean
-  page?: number
+  /** Cursor for pagination - pass nextCursor from previous response */
+  cursor?: string
+  /** Limit for results (default uses fetchLimit) */
+  limit?: number
 }
 
 interface publicDevice {
@@ -47,28 +50,20 @@ export async function get(c: Context, body: GetDevice, apikey: Database['public'
     throw simpleError('cannot_access_app', 'You can\'t access this app', { app_id: body.app_id })
   }
 
-  // start is 30 days ago
-  const rangeStart = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
-  // end is now
-  const rangeEnd = (new Date()).toISOString()
-
-  cloudlog({ requestId: c.get('requestId'), message: 'rangeStart', rangeStart })
-  cloudlog({ requestId: c.get('requestId'), message: 'rangeEnd', rangeEnd })
   // if device_id get one device
   if (body.device_id) {
     const res = await readDevices(c, {
       app_id: body.app_id,
-      rangeStart: 0,
-      rangeEnd: 1,
       deviceIds: [body.device_id.toLowerCase()],
+      limit: 1,
     }, body.customIdMode ?? false)
     cloudlog({ requestId: c.get('requestId'), message: 'res', res })
 
-    if (!res?.length) {
+    if (!res?.data?.length) {
       throw quickError(404, 'device_not_found', 'Cannot find device', { device_id: body.device_id })
     }
-    const dataDevice = filterDeviceKeys(res)[0] as publicDevice
-    if (dataDevice.version_name && !res[0].version) {
+    const dataDevice = filterDeviceKeys(res.data)[0] as publicDevice
+    if (dataDevice.version_name && !res.data[0].version) {
       const { data: dataVersion, error: dbErrorVersion } = await supabaseApikey(c, apikey.key)
         .from('app_versions')
         .select('id, name')
@@ -99,19 +94,16 @@ export async function get(c: Context, body: GetDevice, apikey: Database['public'
     return c.json(dataDevice)
   }
   else {
-    const fetchOffset = body.page ?? 0
-    const rangeStart = fetchOffset * fetchLimit
-    const rangeEnd = (fetchOffset + 1) * fetchLimit - 1
     const res = await readDevices(c, {
       app_id: body.app_id,
-      rangeStart,
-      rangeEnd,
+      cursor: body.cursor,
+      limit: body.limit ?? fetchLimit,
     }, body.customIdMode ?? false)
 
-    if (!res) {
+    if (!res?.data) {
       throw quickError(404, 'devices_not_found', 'Cannot get devices')
     }
-    const dataDevices = filterDeviceKeys(res) as publicDevice[]
+    const dataDevices = filterDeviceKeys(res.data) as publicDevice[]
     // get versions from all devices
     const versionNames = [...new Set(dataDevices.map(device => device.version_name).filter(Boolean).filter(v => v !== null && v !== undefined))]
     const versionIds = [...new Set(dataDevices.map(device => device.version).filter(Boolean).filter(v => v !== null && v !== undefined))] as number[]
@@ -174,6 +166,10 @@ export async function get(c: Context, body: GetDevice, apikey: Database['public'
       })
     }
 
-    return c.json(dataDevices)
+    return c.json({
+      data: dataDevices,
+      nextCursor: res.nextCursor,
+      hasMore: res.hasMore,
+    })
   }
 }
