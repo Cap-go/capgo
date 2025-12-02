@@ -35,6 +35,9 @@ export type Bindings = {
   ATTACHMENT_UPLOAD_HANDLER: DurableObjectNamespace
 }
 
+const TRACK_DEVICE_USAGE_CACHE_PATH = '/.track-device-usage-cache'
+const TRACK_DEVICE_USAGE_CACHE_MAX_AGE_SECONDS = 29 * 24 * 60 * 60 // 29 days
+
 /**
  * Track device usage (MAU) in Cloudflare Analytics Engine
  *
@@ -44,22 +47,52 @@ export type Bindings = {
  * - Activity detection for organizations with recent MAU stats
  * - Better analytics segmentation by organization
  *
+ * Uses caching to only write once per device per 29 days to reduce Analytics Engine costs
+ * while maintaining accurate MAU counts.
+ *
  * @param c - Hono context
  * @param device_id - Unique device identifier
  * @param app_id - Application identifier
  * @param org_id - Organization identifier (optional, defaults to empty string)
  */
-export function trackDeviceUsageCF(c: Context, device_id: string, app_id: string, org_id: string) {
+export async function trackDeviceUsageCF(c: Context, device_id: string, app_id: string, org_id: string) {
   if (!c.env.DEVICE_USAGE)
-    return Promise.resolve()
+    return
 
-  // writeDataPoint returns immediately and Workers runtime handles it in background
-  c.env.DEVICE_USAGE.writeDataPoint({
-    blobs: [device_id, org_id],
-    indexes: [app_id],
-  })
+  try {
+    const usageCache = new CacheHelper(c)
+    const usageCacheRequest = usageCache.buildRequest(TRACK_DEVICE_USAGE_CACHE_PATH, {
+      app_id,
+      device_id,
+    })
 
-  return Promise.resolve()
+    // Check if device was already tracked within the cache period (29 days)
+    if (usageCache.available) {
+      const cachedUsage = await usageCache.matchJson<{ t: number }>(usageCacheRequest)
+      if (cachedUsage) {
+        // Device already tracked within 29 days, skip write
+        return
+      }
+    }
+
+    // Write to Analytics Engine
+    c.env.DEVICE_USAGE.writeDataPoint({
+      blobs: [device_id, org_id],
+      indexes: [app_id],
+    })
+
+    // Cache the write for 29 days
+    if (usageCache.available) {
+      await usageCache.putJson(usageCacheRequest, { t: Date.now() }, TRACK_DEVICE_USAGE_CACHE_MAX_AGE_SECONDS)
+    }
+  }
+  catch {
+    // On error, still try to write to Analytics Engine without caching
+    c.env.DEVICE_USAGE.writeDataPoint({
+      blobs: [device_id, org_id],
+      indexes: [app_id],
+    })
+  }
 }
 
 export function trackBandwidthUsageCF(c: Context, device_id: string, app_id: string, file_size: number) {
