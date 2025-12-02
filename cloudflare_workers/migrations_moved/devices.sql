@@ -2,7 +2,6 @@
 CREATE TABLE IF NOT EXISTS devices (
     updated_at timestamp with time zone NOT NULL,
     device_id text NOT NULL,
-    version bigint NOT NULL,
     version_name text,
     app_id character varying(50) NOT NULL,
     platform character varying(8) NOT NULL,
