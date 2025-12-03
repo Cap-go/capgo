@@ -86,18 +86,18 @@ app.post('/', middlewareAPISecret, async (c) => {
   ])
 
   cloudlog({ requestId: c.get('requestId'), message: 'stats saved', mauLength: mau.length, bandwidthLength: bandwidth.length, storageLength: storage.length, versionUsageLength: versionUsage.length })
-
-  await supabase.from('orgs')
-    .update({ stats_updated_at: new Date().toISOString() })
-    .eq('id', body.orgId)
-    .throwOnError()
-
   // Get customer_id for the organization to queue plan processing
   const { data: orgData, error: orgError } = await supabase
     .from('orgs')
-    .select('customer_id')
+    .select('customer_id,stats_updated_at')
     .eq('id', body.orgId)
     .single()
+
+  await supabase.from('orgs')
+    .update({ stats_updated_at: new Date().toISOString() })
+    .update({ last_stats_updated_at: orgData?.stats_updated_at })
+    .eq('id', body.orgId)
+    .throwOnError()
 
   if (!orgError && orgData?.customer_id) {
     // Queue plan processing for this organization

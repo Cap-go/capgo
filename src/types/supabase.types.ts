@@ -1139,6 +1139,7 @@ export type Database = {
           created_by: string
           customer_id: string | null
           id: string
+          last_stats_updated_at: string | null
           logo: string | null
           management_email: string
           name: string
@@ -1150,6 +1151,7 @@ export type Database = {
           created_by: string
           customer_id?: string | null
           id?: string
+          last_stats_updated_at?: string | null
           logo?: string | null
           management_email: string
           name: string
@@ -1161,6 +1163,7 @@ export type Database = {
           created_by?: string
           customer_id?: string | null
           id?: string
+          last_stats_updated_at?: string | null
           logo?: string | null
           management_email?: string
           name?: string

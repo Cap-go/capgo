@@ -2,6 +2,9 @@
 ALTER TABLE public.orgs
 ADD COLUMN stats_updated_at timestamp without time zone;
 
+ALTER TABLE public.orgs
+ADD COLUMN last_stats_updated_at timestamp without time zone;
+
 -- Expose stats_updated_at via get_orgs_v6 helpers
 DROP FUNCTION IF EXISTS public.get_orgs_v6();
 DROP FUNCTION IF EXISTS public.get_orgs_v6(uuid);
@@ -169,14 +172,18 @@ DECLARE
   is_target boolean := false;
 BEGIN
   next_run := public.get_next_cron_time(cron_schedule, now());
-
   WITH paying_orgs AS (
     SELECT o.id
     FROM public.orgs o
     JOIN public.stripe_info si ON o.customer_id = si.customer_id
-    WHERE si.status = 'succeeded'
-      AND (si.canceled_at IS NULL OR si.canceled_at > next_run)
-      AND si.subscription_anchor_end > next_run
+    WHERE (
+      -- Paying customers with active subscription
+      (si.status = 'succeeded'
+        AND (si.canceled_at IS NULL OR si.canceled_at > next_run)
+        AND si.subscription_anchor_end > next_run)
+      -- Trial customers
+      OR si.trial_at > next_run
+    )
     ORDER BY o.id ASC
   )
   SELECT

@@ -90,8 +90,8 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: 24
-      - name: Publish CF webapp
-        run: bun run deploy:cloudflare:webapp:${{ env.ENV }}
+      - name: Publish CF console
+        run: bun run deploy:cloudflare:console:${{ env.ENV }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

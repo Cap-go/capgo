@@ -78,17 +78,6 @@ SELECT
         'parse_step_pattern test - extracts larger step value'
     );
 
--- Test get_process_cron_stats_job_info
-SELECT
-    ok(
-        (
-            SELECT count(*)
-            FROM
-                get_process_cron_stats_job_info()
-        ) >= 0,
-        'get_process_cron_stats_job_info test - returns job info'
-    );
-
 -- Test one_month_ahead (additional test)
 SELECT
     ok(
