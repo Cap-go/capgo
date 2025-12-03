@@ -171,25 +171,26 @@ export async function trackDevicesCF(c: Context, device: DeviceWithoutCreatedAt)
   }
 
   try {
-    const trackDeviceCache = new CacheHelper(c)
-    const trackDeviceCacheRequest = trackDeviceCache.buildRequest(TRACK_DEVICE_CACHE_PATH, {
-      app_id: device.app_id,
-      device_id: device.device_id,
-    })
-    const cachedDevice = trackDeviceCache.available
-      ? await trackDeviceCache.matchJson<DeviceCachePayload>(trackDeviceCacheRequest)
-      : null
-    if (cachedDevice && !hasComparableDeviceChanged(cachedDevice, device)) {
-      cloudlog({
-        requestId: c.get('requestId'),
-        message: 'Cache hit – device unchanged, skipping write',
-        context: {
-          device_id: device.device_id,
-          app_id: device.app_id,
-        },
-      })
-      return
-    }
+    // TODO: re-enable after 72h to let devices update their info in the new database
+    // const trackDeviceCache = new CacheHelper(c)
+    // const trackDeviceCacheRequest = trackDeviceCache.buildRequest(TRACK_DEVICE_CACHE_PATH, {
+    //   app_id: device.app_id,
+    //   device_id: device.device_id,
+    // })
+    // const cachedDevice = trackDeviceCache.available
+    //   ? await trackDeviceCache.matchJson<DeviceCachePayload>(trackDeviceCacheRequest)
+    //   : null
+    // if (cachedDevice && !hasComparableDeviceChanged(cachedDevice, device)) {
+    //   cloudlog({
+    //     requestId: c.get('requestId'),
+    //     message: 'Cache hit – device unchanged, skipping write',
+    //     context: {
+    //       device_id: device.device_id,
+    //       app_id: device.app_id,
+    //     },
+    //   })
+    //   return
+    // }
 
     const comparableDevice = toComparableDevice(device)
 
