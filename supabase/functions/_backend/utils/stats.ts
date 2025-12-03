@@ -1,6 +1,6 @@
 import type { Context } from 'hono'
 import type { Database } from './supabase.types.ts'
-import type { DeviceWithoutCreatedAt, ReadDevicesParams, ReadDevicesResponse, ReadStatsParams, StatsActions } from './types.ts'
+import type { DeviceRes, DeviceWithoutCreatedAt, ReadDevicesParams, ReadDevicesResponse, ReadStatsParams, StatsActions } from './types.ts'
 import { getRuntimeKey } from 'hono/adapter'
 import { countDevicesCF, countUpdatesFromLogsCF, countUpdatesFromLogsExternalCF, createIfNotExistStoreInfo, getAppsFromCF, getUpdateStatsCF, readBandwidthUsageCF, readDevicesCF, readDeviceUsageCF, readStatsCF, readStatsVersionCF, trackBandwidthUsageCF, trackDevicesCF, trackDeviceUsageCF, trackLogsCF, trackLogsCFExternal, trackVersionUsageCF, updateStoreApp } from './cloudflare.ts'
 import { simpleError200 } from './hono.ts'
@@ -138,7 +138,7 @@ export function countDevices(c: Context, app_id: string, customIdMode: boolean) 
 }
 
 export async function readDevices(c: Context, params: ReadDevicesParams, customIdMode: boolean): Promise<ReadDevicesResponse> {
-  let results: Database['public']['Tables']['devices']['Row'][]
+  let results: DeviceRes[]
   // Use Analytics Engine DEVICE_INFO if in workerd (Cloudflare Workers)
   if (getRuntimeKey() !== 'workerd')
     results = await readDevicesSB(c, params, customIdMode)

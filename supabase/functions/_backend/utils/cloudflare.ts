@@ -2,7 +2,7 @@ import type { AnalyticsEngineDataPoint, D1Database, Hyperdrive } from '@cloudfla
 import type { Context } from 'hono'
 import type { DeviceComparable } from './deviceComparison.ts'
 import type { Database } from './supabase.types.ts'
-import type { DeviceWithoutCreatedAt, ReadDevicesParams, ReadStatsParams } from './types.ts'
+import type { DeviceRes, DeviceWithoutCreatedAt, ReadDevicesParams, ReadStatsParams } from './types.ts'
 import dayjs from 'dayjs'
 import { CacheHelper } from './cache.ts'
 import { hasComparableDeviceChanged, toComparableDevice } from './deviceComparison.ts'
@@ -505,7 +505,7 @@ interface DeviceInfoCF {
   updated_at: string
 }
 
-export async function readDevicesCF(c: Context, params: ReadDevicesParams, customIdMode: boolean) {
+export async function readDevicesCF(c: Context, params: ReadDevicesParams, customIdMode: boolean): Promise<DeviceRes[]> {
   // Use Analytics Engine DEVICE_INFO for reading devices
   // Schema: blob1=device_id, blob2=version_name, blob3=plugin_version, blob4=os_version,
   //         blob5=custom_id, blob6=version_build, blob7=default_channel
@@ -596,14 +596,14 @@ LIMIT ${limit + 1}`
       updated_at: row.updated_at,
       default_channel: row.default_channel || null,
       created_at: null, // Not stored in Analytics Engine
-    })) as Database['public']['Tables']['devices']['Row'][]
+    })) as DeviceRes[]
 
     return results
   }
   catch (e) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Error reading device list from Analytics Engine', error: serializeError(e), query })
   }
-  return [] as Database['public']['Tables']['devices']['Row'][]
+  return [] as DeviceRes[]
 }
 
 interface StatRowCF {

@@ -54,9 +54,12 @@ export interface ReadDevicesParams {
   /** Cursor for pagination - use the last updated_at from previous page */
   cursor?: string
 }
+export type DeviceRes = {
+  id?: Database['public']['Tables']['devices']['Row']['id']
+} & Omit<Database['public']['Tables']['devices']['Row'], 'id'>
 
 export interface ReadDevicesResponse {
-  data: Database['public']['Tables']['devices']['Row'][]
+  data: DeviceRes[]
   /** Cursor for next page - pass this as cursor param to get next page */
   nextCursor?: string
   /** Whether there are more results */
