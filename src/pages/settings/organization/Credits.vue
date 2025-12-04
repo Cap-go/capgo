@@ -276,9 +276,9 @@ function metricLabel(metric: Database['public']['Enums']['credit_metric_type']) 
     case 'mau':
       return 'MAU'
     case 'bandwidth':
-      return t('bandwidth') || 'Bandwidth'
+      return t('Bandwidth') || 'Bandwidth'
     case 'storage':
-      return t('storage') || 'Storage'
+      return t('Storage') || 'Storage'
     case 'build_time':
       return t('build-time') || 'Build time'
     default:
