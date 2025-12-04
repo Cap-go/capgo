@@ -94,8 +94,10 @@ app.post('/', middlewareAPISecret, async (c) => {
     .single()
 
   await supabase.from('orgs')
-    .update({ stats_updated_at: new Date().toISOString() })
-    .update({ last_stats_updated_at: orgData?.stats_updated_at })
+    .update({
+      stats_updated_at: new Date().toISOString(),
+      last_stats_updated_at: orgData?.stats_updated_at,
+    })
     .eq('id', body.orgId)
     .throwOnError()
 
