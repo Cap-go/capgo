@@ -179,7 +179,8 @@ export async function trackDevicesCF(c: Context, device: DeviceWithoutCreatedAt)
     const cachedDevice = trackDeviceCache.available
       ? await trackDeviceCache.matchJson<DeviceCachePayload>(trackDeviceCacheRequest)
       : null
-    if (cachedDevice && !hasComparableDeviceChanged(cachedDevice, device)) {
+    // TODO: re-enable caching after 10 december, to let the new DB get populated
+    if (cachedDevice && !hasComparableDeviceChanged(cachedDevice, device) && false) {
       cloudlog({
         requestId: c.get('requestId'),
         message: 'Cache hit – device unchanged, skipping write',
