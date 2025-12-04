@@ -2,7 +2,7 @@ BEGIN;
 
 CREATE EXTENSION "basejump-supabase_test_helpers";
 
-SELECT plan(17);
+SELECT plan(16);
 
 -- Test get_next_cron_time
 SELECT
