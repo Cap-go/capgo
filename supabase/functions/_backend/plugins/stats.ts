@@ -6,7 +6,7 @@ import { greaterOrEqual, parse } from '@std/semver'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod/mini'
 import { getAppStatus, setAppStatus } from '../utils/appStatus.ts'
-import { BRES, getIsV2Stats, parseBody, quickError, simpleError200, simpleRateLimit } from '../utils/hono.ts'
+import { BRES, getIsV2Stats, parseBody, simpleError200, simpleRateLimit } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { sendNotifOrg } from '../utils/notifications.ts'
 import { closeClient, getAppOwnerPostgres, getAppVersionPostgres, getDrizzleClient, getPgClient } from '../utils/pg.ts'
@@ -96,7 +96,7 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
       cloudlog({ requestId: c.get('requestId'), message: `Version name ${version_name} not found, using unknown instead`, app_id, version_name })
     }
     else {
-      return quickError(404, 'version_not_found', 'Version not found', { app_id, version_name })
+      return simpleError200(c, 'version_not_found', 'Version not found', { app_id, version_name })
     }
   }
   // device.version = appVersion.id

@@ -74,8 +74,8 @@ async function invoiceUpcoming(c: Context, LogSnag: ReturnType<typeof logsnag>, 
   return c.json(BRES)
 }
 
-async function createdOrUpdated(c: Context, stripeData: StripeData, org: Org, LogSnag: ReturnType<typeof logsnag>) {
-  const status = stripeData.data.status
+async function createdOrUpdated(c: Context, stripeData: StripeData, org: Org, LogSnag: ReturnType<typeof logsnag>, originalStatus?: string) {
+  const status = originalStatus ?? stripeData.data.status
   let statusName: string = status ?? ''
   const { data: plan } = await supabaseAdmin(c)
     .from('plans')
@@ -124,12 +124,13 @@ async function createdOrUpdated(c: Context, stripeData: StripeData, org: Org, Lo
     const eventName = `user:subscribe_${statusName}:${isMonthly ? 'monthly' : 'yearly'}`
     await trackBentoEvent(c, org.management_email, { plan_name: plan.name }, eventName)
     await addTagBento(c, org.management_email, segment)
+    const isNewSubscription = status === 'created'
     await LogSnag.track({
       channel: 'usage',
-      event: status === 'succeeded' ? 'User subscribe' : 'User update subscribe',
+      event: isNewSubscription ? 'User subscribe' : 'User update subscribe',
       icon: '💰',
       user_id: org.id,
-      notify: status === 'succeeded',
+      notify: isNewSubscription,
       tags: {
         plan_name: plan.name,
       },
@@ -238,8 +239,9 @@ app.post('/', middlewareStripeWebhook(), async (c) => {
   }
 
   if (['created', 'succeeded', 'updated'].includes(stripeData.data.status ?? '') && stripeData.data.price_id && stripeData.data.product_id) {
+    const originalStatus = stripeData.data.status
     stripeData.data.status = 'succeeded'
-    await createdOrUpdated(c, stripeData, org, LogSnag)
+    await createdOrUpdated(c, stripeData, org, LogSnag, originalStatus!)
   }
   else if (stripeData.data.status === 'failed') {
     await trackBentoEvent(c, org.management_email, {}, 'org:failed_payment')

@@ -7,30 +7,10 @@ export type Json =
   | Json[]
 
 export type Database = {
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "13.0.5"
   }
   public: {
     Tables: {
@@ -205,7 +185,6 @@ export type Database = {
           app_id: string
           checksum: string
           created_at: string | null
-          devices: number | null
           id: number
           owner_org: string
           size: number
@@ -215,7 +194,6 @@ export type Database = {
           app_id: string
           checksum: string
           created_at?: string | null
-          devices?: number | null
           id?: number
           owner_org: string
           size: number
@@ -225,7 +203,6 @@ export type Database = {
           app_id?: string
           checksum?: string
           created_at?: string | null
-          devices?: number | null
           id?: number
           owner_org?: string
           size?: number
@@ -763,7 +740,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
-          email: string
+          email?: string
           id?: string
         }
         Update: {
@@ -892,6 +869,7 @@ export type Database = {
           custom_id: string
           default_channel: string | null
           device_id: string
+          id: number
           is_emulator: boolean | null
           is_prod: boolean | null
           os_version: string | null
@@ -907,6 +885,7 @@ export type Database = {
           custom_id?: string
           default_channel?: string | null
           device_id: string
+          id?: never
           is_emulator?: boolean | null
           is_prod?: boolean | null
           os_version?: string | null
@@ -922,6 +901,7 @@ export type Database = {
           custom_id?: string
           default_channel?: string | null
           device_id?: string
+          id?: never
           is_emulator?: boolean | null
           is_prod?: boolean | null
           os_version?: string | null
@@ -1159,6 +1139,7 @@ export type Database = {
           created_by: string
           customer_id: string | null
           id: string
+          last_stats_updated_at: string | null
           logo: string | null
           management_email: string
           name: string
@@ -1170,6 +1151,7 @@ export type Database = {
           created_by: string
           customer_id?: string | null
           id?: string
+          last_stats_updated_at?: string | null
           logo?: string | null
           management_email: string
           name: string
@@ -1181,6 +1163,7 @@ export type Database = {
           created_by?: string
           customer_id?: string | null
           id?: string
+          last_stats_updated_at?: string | null
           logo?: string | null
           management_email?: string
           name?: string
@@ -1228,7 +1211,6 @@ export type Database = {
           storage_unit: number | null
           stripe_id: string
           updated_at: string
-          version: number
         }
         Insert: {
           bandwidth: number
@@ -1253,7 +1235,6 @@ export type Database = {
           storage_unit?: number | null
           stripe_id?: string
           updated_at?: string
-          version?: number
         }
         Update: {
           bandwidth?: number
@@ -1278,7 +1259,6 @@ export type Database = {
           storage_unit?: number | null
           stripe_id?: string
           updated_at?: string
-          version?: number
         }
         Relationships: []
       }
@@ -2391,6 +2371,10 @@ export type Database = {
       is_onboarded_org: { Args: { orgid: string }; Returns: boolean }
       is_onboarding_needed_org: { Args: { orgid: string }; Returns: boolean }
       is_org_yearly: { Args: { orgid: string }; Returns: boolean }
+      is_owner_of_org: {
+        Args: { org_id: string; user_id: string }
+        Returns: boolean
+      }
       is_paying_and_good_plan_org: { Args: { orgid: string }; Returns: boolean }
       is_paying_and_good_plan_org_action: {
         Args: {
@@ -2501,25 +2485,6 @@ export type Database = {
         Args: { email: string; org_id: string }
         Returns: string
       }
-      reset_and_seed_app_data: {
-        Args: {
-          p_admin_user_id?: string
-          p_app_id: string
-          p_org_id?: string
-          p_plan_product_id?: string
-          p_stripe_customer_id?: string
-          p_user_id?: string
-        }
-        Returns: undefined
-      }
-      reset_and_seed_app_stats_data: {
-        Args: { p_app_id: string }
-        Returns: undefined
-      }
-      reset_and_seed_data: { Args: never; Returns: undefined }
-      reset_and_seed_stats_data: { Args: never; Returns: undefined }
-      reset_app_data: { Args: { p_app_id: string }; Returns: undefined }
-      reset_app_stats_data: { Args: { p_app_id: string }; Returns: undefined }
       seed_get_app_metrics_caches: {
         Args: { p_end_date: string; p_org_id: string; p_start_date: string }
         Returns: {
@@ -2592,6 +2557,7 @@ export type Database = {
     }
     Enums: {
       action_type: "mau" | "storage" | "bandwidth" | "build_time"
+      app_mode: "prod" | "dev" | "livereload"
       credit_metric_type: "mau" | "bandwidth" | "storage" | "build_time"
       credit_transaction_type:
         | "grant"
@@ -2602,6 +2568,7 @@ export type Database = {
         | "refund"
       disable_update: "major" | "minor" | "patch" | "version_number" | "none"
       key_mode: "read" | "write" | "all" | "upload"
+      pay_as_you_go_type: "base" | "units"
       platform_os: "ios" | "android"
       stats_action:
         | "delete"
@@ -2651,10 +2618,9 @@ export type Database = {
         | "getChannel"
         | "rateLimited"
         | "disableAutoUpdate"
-        | "InvalidIp"
         | "ping"
+        | "InvalidIp"
         | "blocked_by_server_url"
-        | "backend_refusal"
         | "download_manifest_start"
         | "download_manifest_complete"
         | "download_zip_start"
@@ -2662,6 +2628,7 @@ export type Database = {
         | "download_manifest_file_fail"
         | "download_manifest_checksum_fail"
         | "download_manifest_brotli_fail"
+        | "backend_refusal"
       stripe_status:
         | "created"
         | "succeeded"
@@ -2669,7 +2636,7 @@ export type Database = {
         | "failed"
         | "deleted"
         | "canceled"
-      usage_mode: "last_saved" | "5min" | "day" | "cycle"
+      usage_mode: "5min" | "day" | "month" | "cycle" | "last_saved"
       user_min_right:
         | "invite_read"
         | "invite_upload"
@@ -2689,6 +2656,9 @@ export type Database = {
         file_name: string | null
         s3_path: string | null
         file_hash: string | null
+      }
+      match_plan: {
+        name: string | null
       }
       message_update: {
         msg_id: number | null
@@ -2837,12 +2807,10 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
       action_type: ["mau", "storage", "bandwidth", "build_time"],
+      app_mode: ["prod", "dev", "livereload"],
       credit_metric_type: ["mau", "bandwidth", "storage", "build_time"],
       credit_transaction_type: [
         "grant",
@@ -2854,6 +2822,7 @@ export const Constants = {
       ],
       disable_update: ["major", "minor", "patch", "version_number", "none"],
       key_mode: ["read", "write", "all", "upload"],
+      pay_as_you_go_type: ["base", "units"],
       platform_os: ["ios", "android"],
       stats_action: [
         "delete",
@@ -2903,10 +2872,9 @@ export const Constants = {
         "getChannel",
         "rateLimited",
         "disableAutoUpdate",
-        "InvalidIp",
         "ping",
+        "InvalidIp",
         "blocked_by_server_url",
-        "backend_refusal",
         "download_manifest_start",
         "download_manifest_complete",
         "download_zip_start",
@@ -2914,6 +2882,7 @@ export const Constants = {
         "download_manifest_file_fail",
         "download_manifest_checksum_fail",
         "download_manifest_brotli_fail",
+        "backend_refusal",
       ],
       stripe_status: [
         "created",
@@ -2923,7 +2892,7 @@ export const Constants = {
         "deleted",
         "canceled",
       ],
-      usage_mode: ["last_saved", "5min", "day", "cycle"],
+      usage_mode: ["5min", "day", "month", "cycle", "last_saved"],
       user_min_right: [
         "invite_read",
         "invite_upload",
@@ -2941,4 +2910,3 @@ export const Constants = {
     },
   },
 } as const
-

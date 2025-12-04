@@ -41,7 +41,7 @@
         "@capgo/capacitor-mute": "^7.3.11",
         "@capgo/capacitor-native-biometric": "^7.5.1",
         "@capgo/capacitor-screen-recorder": "7.3.5",
-        "@capgo/capacitor-updater": "^7.27.5",
+        "@capgo/capacitor-updater": "^7.30.0",
         "@capgo/inappbrowser": "^7.29.0",
         "@capgo/native-audio": "^7.9.3",
         "@capgo/native-market": "^7.2.16",
@@ -135,7 +135,7 @@
         "unplugin-vue-components": "^30.0.0",
         "unplugin-vue-macros": "^2.14.5",
         "unplugin-vue-router": "^0.16.1",
-        "vite": "7.2.2",
+        "vite": "7.2.6",
         "vite-plugin-environment": "1.1.3",
         "vite-plugin-inspect": "^11.3.3",
         "vite-plugin-pwa": "1.1.0",
@@ -143,7 +143,7 @@
         "vite-plugin-vue-layouts": "0.11.0",
         "vite-plugin-webfont-dl": "^3.11.1",
         "vitest": "^4.0.8",
-        "vue-tsc": "3.1.4",
+        "vue-tsc": "3.1.5",
         "wrangler": "^4.50.0",
       },
     },
@@ -517,7 +517,7 @@
 
     "@capgo/capacitor-screen-recorder": ["@capgo/capacitor-screen-recorder@7.3.5", "", { "peerDependencies": { "@capacitor/core": ">=7.0.0" } }, "sha512-/ufHVlNrrIbsJqMO6hWoKyVtSLPf/JwSzhHSAAPBCgvP7bxkx0sFTjNJbvtWNk5b10sYaiAwcMm+sVnCai7YrA=="],
 
-    "@capgo/capacitor-updater": ["@capgo/capacitor-updater@7.27.5", "", { "peerDependencies": { "@capacitor/core": ">=7.0.0" } }, "sha512-3UGe8u9ve1mMekt05mbg1nijm+DHP1eD+6EhmotiGJ2WYFvaFO00ja7HzMV2WAfWszSx5gmhgLCLMxD8/RxAiA=="],
+    "@capgo/capacitor-updater": ["@capgo/capacitor-updater@7.30.0", "", { "peerDependencies": { "@capacitor/core": ">=7.0.0" } }, "sha512-wKNf6vc3vOYUQwMGR/yk9okSWSIzy6n/imYeZgVCJ83CFDbzrsYPSm609ISflyXlBGJKoSRXd8tzcoFyxPHobQ=="],
 
     "@capgo/cli": ["@capgo/cli@7.21.4", "", { "bin": { "capgo": "dist/index.js" } }, "sha512-8hwoHF70OjNFraYn9GuozKVkjlIwe167Upd9WH88fFRdCJ3uU0kPgSUGDW8k/8uk64tgCLREpeO0CnP4zmcEEA=="],
 
@@ -3377,7 +3377,7 @@
 
     "vary": ["vary@1.1.2", "", {}, "sha512-BNGbWLfd0eUPabhkXUVm0j8uuvREyTh5ovRa/dyow/BqAbZJyC+5fU+IzQOzmAKzYqYRAISoRhdQr3eIZ/PXqg=="],
 
-    "vite": ["vite@7.2.2", "", { "dependencies": { "esbuild": "^0.25.0", "fdir": "^6.5.0", "picomatch": "^4.0.3", "postcss": "^8.5.6", "rollup": "^4.43.0", "tinyglobby": "^0.2.15" }, "optionalDependencies": { "fsevents": "~2.3.3" }, "peerDependencies": { "@types/node": "^20.19.0 || >=22.12.0", "jiti": ">=1.21.0", "less": "^4.0.0", "lightningcss": "^1.21.0", "sass": "^1.70.0", "sass-embedded": "^1.70.0", "stylus": ">=0.54.8", "sugarss": "^5.0.0", "terser": "^5.16.0", "tsx": "^4.8.1", "yaml": "^2.4.2" }, "optionalPeers": ["@types/node", "jiti", "less", "lightningcss", "sass", "sass-embedded", "stylus", "sugarss", "terser", "tsx", "yaml"], "bin": { "vite": "bin/vite.js" } }, "sha512-BxAKBWmIbrDgrokdGZH1IgkIk/5mMHDreLDmCJ0qpyJaAteP8NvMhkwr/ZCQNqNH97bw/dANTE9PDzqwJghfMQ=="],
+    "vite": ["vite@7.2.6", "", { "dependencies": { "esbuild": "^0.25.0", "fdir": "^6.5.0", "picomatch": "^4.0.3", "postcss": "^8.5.6", "rollup": "^4.43.0", "tinyglobby": "^0.2.15" }, "optionalDependencies": { "fsevents": "~2.3.3" }, "peerDependencies": { "@types/node": "^20.19.0 || >=22.12.0", "jiti": ">=1.21.0", "less": "^4.0.0", "lightningcss": "^1.21.0", "sass": "^1.70.0", "sass-embedded": "^1.70.0", "stylus": ">=0.54.8", "sugarss": "^5.0.0", "terser": "^5.16.0", "tsx": "^4.8.1", "yaml": "^2.4.2" }, "optionalPeers": ["@types/node", "jiti", "less", "lightningcss", "sass", "sass-embedded", "stylus", "sugarss", "terser", "tsx", "yaml"], "bin": { "vite": "bin/vite.js" } }, "sha512-tI2l/nFHC5rLh7+5+o7QjKjSR04ivXDF4jcgV0f/bTQ+OJiITy5S6gaynVsEM+7RqzufMnVbIon6Sr5x1SDYaQ=="],
 
     "vite-dev-rpc": ["vite-dev-rpc@1.1.0", "", { "dependencies": { "birpc": "^2.4.0", "vite-hot-client": "^2.1.0" }, "peerDependencies": { "vite": "^2.9.0 || ^3.0.0-0 || ^4.0.0-0 || ^5.0.0-0 || ^6.0.1 || ^7.0.0-0" } }, "sha512-pKXZlgoXGoE8sEKiKJSng4hI1sQ4wi5YT24FCrwrLt6opmkjlqPPVmiPWWJn8M8byMxRGzp1CrFuqQs4M/Z39A=="],
 
@@ -3425,7 +3425,7 @@
 
     "vue-template-es2015-compiler": ["vue-template-es2015-compiler@1.9.1", "", {}, "sha512-4gDntzrifFnCEvyoO8PqyJDmguXgVPxKiIxrBKjIowvL9l+N66196+72XVYR8BBf1Uv1Fgt3bGevJ+sEmxfZzw=="],
 
-    "vue-tsc": ["vue-tsc@3.1.4", "", { "dependencies": { "@volar/typescript": "2.4.23", "@vue/language-core": "3.1.4" }, "peerDependencies": { "typescript": ">=5.0.0" }, "bin": { "vue-tsc": "./bin/vue-tsc.js" } }, "sha512-GsRJxttj4WkmXW/zDwYPGMJAN3np/4jTzoDFQTpTsI5Vg/JKMWamBwamlmLihgSVHO66y9P7GX+uoliYxeI4Hw=="],
+    "vue-tsc": ["vue-tsc@3.1.5", "", { "dependencies": { "@volar/typescript": "2.4.23", "@vue/language-core": "3.1.5" }, "peerDependencies": { "typescript": ">=5.0.0" }, "bin": { "vue-tsc": "./bin/vue-tsc.js" } }, "sha512-L/G9IUjOWhBU0yun89rv8fKqmKC+T0HfhrFjlIml71WpfBv9eb4E9Bev8FMbyueBIU9vxQqbd+oOsVcDa5amGw=="],
 
     "vue-turnstile": ["vue-turnstile@1.0.11", "", { "peerDependencies": { "vue": "^3.2.45" } }, "sha512-iaTBoZ5oUqtNRto6bmbn6FQvW0h/sK7mPUJc1Qn4em+cELXN59U2FQTcpWfKssV3OY6lEZzmCpcn/zrb7htK3A=="],
 
@@ -4021,7 +4021,7 @@
 
     "vue-style-loader/hash-sum": ["hash-sum@1.0.2", "", {}, "sha512-fUs4B4L+mlt8/XAtSOGMUO1TXmAelItBPtJG7CyHJfYTdDjwisntGO2JQz7oUsatOY9o68+57eziUVNw/mRHmA=="],
 
-    "vue-tsc/@vue/language-core": ["@vue/language-core@3.1.4", "", { "dependencies": { "@volar/language-core": "2.4.23", "@vue/compiler-dom": "^3.5.0", "@vue/shared": "^3.5.0", "alien-signals": "^3.0.0", "muggle-string": "^0.4.1", "path-browserify": "^1.0.1", "picomatch": "^4.0.2" }, "peerDependencies": { "typescript": "*" }, "optionalPeers": ["typescript"] }, "sha512-n/58wm8SkmoxMWkUNUH/PwoovWe4hmdyPJU2ouldr3EPi1MLoS7iDN46je8CsP95SnVBs2axInzRglPNKvqMcg=="],
+    "vue-tsc/@vue/language-core": ["@vue/language-core@3.1.5", "", { "dependencies": { "@volar/language-core": "2.4.23", "@vue/compiler-dom": "^3.5.0", "@vue/shared": "^3.5.0", "alien-signals": "^3.0.0", "muggle-string": "^0.4.1", "path-browserify": "^1.0.1", "picomatch": "^4.0.2" }, "peerDependencies": { "typescript": "*" }, "optionalPeers": ["typescript"] }, "sha512-FMcqyzWN+sYBeqRMWPGT2QY0mUasZMVIuHvmb5NT3eeqPrbHBYtCP8JWEUCDCgM+Zr62uuWY/qoeBrPrzfa78w=="],
 
     "webpack/eslint-scope": ["eslint-scope@5.1.1", "", { "dependencies": { "esrecurse": "^4.3.0", "estraverse": "^4.1.1" } }, "sha512-2NxwbF/hZ0KpepYN0cNbo+FN6XoK7GaHlQhgx/hIZl6Va0bF45RQOOwhLIy8lQDbuCiadSLCBnH2CFYquit5bw=="],
 

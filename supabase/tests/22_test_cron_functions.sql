@@ -2,7 +2,7 @@ BEGIN;
 
 CREATE EXTENSION "basejump-supabase_test_helpers";
 
-SELECT plan(17);
+SELECT plan(16);
 
 -- Test get_next_cron_time
 SELECT
@@ -76,17 +76,6 @@ SELECT
         parse_step_pattern('*/10'),
         10,
         'parse_step_pattern test - extracts larger step value'
-    );
-
--- Test get_process_cron_stats_job_info
-SELECT
-    ok(
-        (
-            SELECT count(*)
-            FROM
-                get_process_cron_stats_job_info()
-        ) >= 0,
-        'get_process_cron_stats_job_info test - returns job info'
     );
 
 -- Test one_month_ahead (additional test)

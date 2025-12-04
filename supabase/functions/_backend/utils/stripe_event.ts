@@ -114,6 +114,7 @@ export function extractDataEvent(c: Context, event: Stripe.Event): StripeData {
     const res = subscriptionUpdated(c, event, data)
     data = res.data
     isUpgrade = res.isUpgrade
+    previousProductId = res.previousProductId
   }
   else if (event.type === 'charge.failed') {
     const charge = event.data.object

@@ -90,14 +90,13 @@
         {
           "binding": "APP_LOG_EXTERNAL",
           "dataset": "app_log_external"
+        },
+        {
+          "binding": "DEVICE_INFO",
+          "dataset": "device_info"
         }
       ],
       "d1_databases": [
-        {
-          "binding": "DB_DEVICES",
-          "database_name": "capgo_prod_devices",
-          "database_id": "2510b55c-d6a2-4595-a2a5-d9aca82a3753"
-        },
         {
           "binding": "DB_STOREAPPS",
           "database_name": "capgo_prod_storeapps",
@@ -208,14 +207,13 @@
         {
           "binding": "APP_LOG_EXTERNAL",
           "dataset": "app_log_external"
+        },
+        {
+          "binding": "DEVICE_INFO",
+          "dataset": "device_info"
         }
       ],
       "d1_databases": [
-        {
-          "binding": "DB_DEVICES",
-          "database_name": "capgo_prod_devices",
-          "database_id": "2510b55c-d6a2-4595-a2a5-d9aca82a3753"
-        },
         {
           "binding": "DB_STOREAPPS",
           "database_name": "capgo_prod_storeapps",
@@ -326,14 +324,13 @@
         {
           "binding": "APP_LOG_EXTERNAL",
           "dataset": "app_log_external"
+        },
+        {
+          "binding": "DEVICE_INFO",
+          "dataset": "device_info"
         }
       ],
       "d1_databases": [
-        {
-          "binding": "DB_DEVICES",
-          "database_name": "capgo_prod_devices",
-          "database_id": "2510b55c-d6a2-4595-a2a5-d9aca82a3753"
-        },
         {
           "binding": "DB_STOREAPPS",
           "database_name": "capgo_prod_storeapps",
@@ -444,14 +441,13 @@
         {
           "binding": "APP_LOG_EXTERNAL",
           "dataset": "app_log_external"
+        },
+        {
+          "binding": "DEVICE_INFO",
+          "dataset": "device_info"
         }
       ],
       "d1_databases": [
-        {
-          "binding": "DB_DEVICES",
-          "database_name": "capgo_prod_devices",
-          "database_id": "2510b55c-d6a2-4595-a2a5-d9aca82a3753"
-        },
         {
           "binding": "DB_STOREAPPS",
           "database_name": "capgo_prod_storeapps",
@@ -562,14 +558,13 @@
         {
           "binding": "APP_LOG_EXTERNAL",
           "dataset": "app_log_external"
+        },
+        {
+          "binding": "DEVICE_INFO",
+          "dataset": "device_info"
         }
       ],
       "d1_databases": [
-        {
-          "binding": "DB_DEVICES",
-          "database_name": "capgo_prod_devices",
-          "database_id": "2510b55c-d6a2-4595-a2a5-d9aca82a3753"
-        },
         {
           "binding": "DB_STOREAPPS",
           "database_name": "capgo_prod_storeapps",
@@ -680,14 +675,13 @@
         {
           "binding": "APP_LOG_EXTERNAL",
           "dataset": "app_log_external"
+        },
+        {
+          "binding": "DEVICE_INFO",
+          "dataset": "device_info"
         }
       ],
       "d1_databases": [
-        {
-          "binding": "DB_DEVICES",
-          "database_name": "capgo_prod_devices",
-          "database_id": "2510b55c-d6a2-4595-a2a5-d9aca82a3753"
-        },
         {
           "binding": "DB_STOREAPPS",
           "database_name": "capgo_prod_storeapps",
@@ -798,14 +792,13 @@
         {
           "binding": "APP_LOG_EXTERNAL",
           "dataset": "app_log_external"
+        },
+        {
+          "binding": "DEVICE_INFO",
+          "dataset": "device_info"
         }
       ],
       "d1_databases": [
-        {
-          "binding": "DB_DEVICES",
-          "database_name": "capgo_prod_devices",
-          "database_id": "2510b55c-d6a2-4595-a2a5-d9aca82a3753"
-        },
         {
           "binding": "DB_STOREAPPS",
           "database_name": "capgo_prod_storeapps",
@@ -916,14 +909,13 @@
         {
           "binding": "APP_LOG_EXTERNAL",
           "dataset": "app_log_external"
+        },
+        {
+          "binding": "DEVICE_INFO",
+          "dataset": "device_info"
         }
       ],
       "d1_databases": [
-        {
-          "binding": "DB_DEVICES",
-          "database_name": "capgo_prod_devices",
-          "database_id": "2510b55c-d6a2-4595-a2a5-d9aca82a3753"
-        },
         {
           "binding": "DB_STOREAPPS",
           "database_name": "capgo_prod_storeapps",
@@ -1012,11 +1004,6 @@
         }
       ],
       "d1_databases": [
-        {
-          "binding": "DB_DEVICES",
-          "database_name": "capgo_prod_devices",
-          "database_id": "2510b55c-d6a2-4595-a2a5-d9aca82a3753"
-        },
         {
           "binding": "DB_STOREAPPS",
           "database_name": "capgo_prod_storeapps",
@@ -1131,11 +1118,6 @@
       ],
       "d1_databases": [
         {
-          "binding": "DB_DEVICES",
-          "database_name": "capgo_alpha_devices",
-          "database_id": "2510b55c-d6a2-4595-a2a5-d9aca82a3753"
-        },
-        {
           "binding": "DB_STOREAPPS",
           "database_name": "capgo_prod_storeapps",
           "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
@@ -1176,6 +1158,10 @@
         {
           "binding": "APP_LOG_EXTERNAL",
           "dataset": "app_log_external_alpha"
+        },
+        {
+          "binding": "DEVICE_INFO",
+          "dataset": "device_info_alpha"
         }
       ],
       "hyperdrive": [

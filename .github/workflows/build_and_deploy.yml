@@ -7,7 +7,7 @@ concurrency:
 on:
   push:
     tags:
-      - "*"
+      - '*'
 
 jobs:
   # Tests already passed before tag was created, so just build and deploy
@@ -59,7 +59,7 @@ jobs:
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
-          fetch-tags: true
+          filter: blob:none
       - name: Setup bun
         uses: oven-sh/setup-bun@v2
         with:
@@ -90,13 +90,13 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: 24
-      - name: Publish CF webapp
-        run: bun run deploy:cloudflare:webapp:${{ env.ENV }}
+      - name: Publish CF console
+        run: bun run deploy:cloudflare:console:${{ env.ENV }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       - name: Deploy to Capgo
-        run: bunx @capgo/cli@latest bundle upload -a ${{ secrets.CAPGO_TOKEN }} --channel ${{ env.CHANNEL }}  --partial --tus
+        run: bunx @capgo/cli@latest bundle upload -a ${{ secrets.CAPGO_TOKEN }} --channel ${{ env.CHANNEL }}  --delta
         env:
           CAPGO_TOKEN: ${{ secrets.CAPGO_TOKEN }}
       - name: Create GitHub release
@@ -112,7 +112,7 @@ jobs:
 
             🔗 **Full Changelog**: https://github.com/${{ github.repository }}/compare/${{ steps.changelog.outputs.from_tag }}...${{ steps.changelog.outputs.to_tag }}
           make_latest: true
-          token: "${{ secrets.PERSONAL_ACCESS_TOKEN }}"
+          token: '${{ secrets.PERSONAL_ACCESS_TOKEN }}'
           prerelease: ${{ contains(github.ref, '-alpha.') }}
 
   deploy_api:

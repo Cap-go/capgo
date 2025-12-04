@@ -1753,37 +1753,6 @@ ALTER FUNCTION "public"."get_plan_usage_percent_detailed" (
   "cycle_end" "date"
 ) OWNER TO "postgres";
 
-CREATE OR REPLACE FUNCTION "public"."get_process_cron_stats_job_info" () RETURNS TABLE (
-  "last_run" timestamp with time zone,
-  "next_run" timestamp with time zone
-) LANGUAGE "plpgsql"
-SET
-  search_path = '' SECURITY DEFINER AS $$
-BEGIN
-    RETURN QUERY
-    WITH last_run AS (
-        SELECT start_time
-        FROM cron.job_run_details
-        WHERE command = 'SELECT process_cron_stats_jobs();'
-        AND status = 'succeeded'
-        ORDER BY start_time DESC
-        LIMIT 1
-    ),
-    job_info AS (
-        SELECT schedule
-        FROM cron.job
-        WHERE jobname = 'process_cron_stats_jobs'
-    )
-    SELECT
-        COALESCE(last_run.start_time, CURRENT_TIMESTAMP - INTERVAL '1 day') AS last_run,
-        public.get_next_cron_time(job_info.schedule, CURRENT_TIMESTAMP) AS next_run
-    FROM job_info
-    LEFT JOIN last_run ON true;
-END;
-$$;
-
-ALTER FUNCTION "public"."get_process_cron_stats_job_info" () OWNER TO "postgres";
-
 CREATE OR REPLACE FUNCTION "public"."get_total_app_storage_size_orgs" ("org_id" "uuid", "app_id" character varying) RETURNS double precision LANGUAGE "plpgsql"
 SET
   search_path = '' SECURITY DEFINER AS $$
@@ -5924,12 +5893,6 @@ GRANT ALL ON FUNCTION "public"."get_plan_usage_percent_detailed" (
   "cycle_start" "date",
   "cycle_end" "date"
 ) TO "service_role";
-
-GRANT ALL ON FUNCTION "public"."get_process_cron_stats_job_info" () TO "anon";
-
-GRANT ALL ON FUNCTION "public"."get_process_cron_stats_job_info" () TO "authenticated";
-
-GRANT ALL ON FUNCTION "public"."get_process_cron_stats_job_info" () TO "service_role";
 
 GRANT ALL ON FUNCTION "public"."get_total_app_storage_size_orgs" ("org_id" "uuid", "app_id" character varying) TO "anon";
 

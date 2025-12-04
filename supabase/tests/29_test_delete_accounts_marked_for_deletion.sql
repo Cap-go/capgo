@@ -2,11 +2,12 @@ BEGIN;
 
 CREATE EXTENSION "basejump-supabase_test_helpers";
 
-SELECT
-    plan (41);
+SELECT plan(41);
 
 -- Test helper function to create test users in both auth.users and public.users tables
-CREATE OR REPLACE FUNCTION create_test_user_for_deletion (user_id UUID, user_email TEXT) RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER AS $$
+CREATE OR REPLACE FUNCTION create_test_user_for_deletion(
+    user_id UUID, user_email TEXT
+) RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER AS $$
 BEGIN
   -- Insert into auth.users table
   INSERT INTO "auth"."users" (
@@ -34,7 +35,7 @@ $$;
 
 -- Test 1: Function exists and has correct signature
 SELECT
-    ok (
+    ok(
         pg_get_functiondef(
             'delete_accounts_marked_for_deletion()'::REGPROCEDURE
         ) IS NOT NULL,
@@ -43,10 +44,9 @@ SELECT
 
 -- Test 2: Function returns correct table structure
 SELECT
-    ok (
+    ok(
         (
-            SELECT
-                count(*)
+            SELECT count(*)
             FROM
                 information_schema.columns
             WHERE
@@ -58,12 +58,11 @@ SELECT
 
 -- Test 3: No accounts to delete (empty table scenario)
 SELECT
-    ok (
+    ok(
         (
-            SELECT
-                deleted_count
+            SELECT deleted_count
             FROM
-                delete_accounts_marked_for_deletion ()
+                delete_accounts_marked_for_deletion()
             LIMIT
                 1
         ) = 0,
@@ -71,12 +70,11 @@ SELECT
     );
 
 SELECT
-    ok (
+    ok(
         (
-            SELECT
-                array_length(deleted_user_ids, 1)
+            SELECT array_length(deleted_user_ids, 1)
             FROM
-                delete_accounts_marked_for_deletion ()
+                delete_accounts_marked_for_deletion()
             LIMIT
                 1
         ) IS NULL,
@@ -86,28 +84,27 @@ SELECT
 -- Test 4: Accounts with future removal dates are not deleted
 -- Create test user
 SELECT
-    create_test_user_for_deletion (
+    create_test_user_for_deletion(
         '11111111-1111-1111-1111-111111111111'::UUID,
         'future_delete@test.com'
     );
 
 -- Mark for deletion with future date
 INSERT INTO
-    public.to_delete_accounts (account_id, removal_date, removed_data)
+public.to_delete_accounts (account_id, removal_date, removed_data)
 VALUES
-    (
-        '11111111-1111-1111-1111-111111111111'::UUID,
-        now() + INTERVAL '7 days',
-        '{"email": "future_delete@test.com", "apikeys": []}'::JSONB
-    );
+(
+    '11111111-1111-1111-1111-111111111111'::UUID,
+    now() + INTERVAL '7 days',
+    '{"email": "future_delete@test.com", "apikeys": []}'::JSONB
+);
 
 SELECT
-    ok (
+    ok(
         (
-            SELECT
-                deleted_count
+            SELECT deleted_count
             FROM
-                delete_accounts_marked_for_deletion ()
+                delete_accounts_marked_for_deletion()
             LIMIT
                 1
         ) = 0,
@@ -116,10 +113,9 @@ SELECT
 
 -- Verify user still exists in both tables
 SELECT
-    ok (
+    ok(
         EXISTS (
-            SELECT
-                1
+            SELECT 1
             FROM
                 auth.users
             WHERE
@@ -129,10 +125,9 @@ SELECT
     );
 
 SELECT
-    ok (
+    ok(
         EXISTS (
-            SELECT
-                1
+            SELECT 1
             FROM
                 public.users
             WHERE
@@ -142,10 +137,9 @@ SELECT
     );
 
 SELECT
-    ok (
+    ok(
         EXISTS (
-            SELECT
-                1
+            SELECT 1
             FROM
                 public.to_delete_accounts
             WHERE
@@ -157,36 +151,35 @@ SELECT
 -- Test 5: Accounts with past removal dates are deleted successfully
 -- Create test user for deletion
 SELECT
-    create_test_user_for_deletion (
+    create_test_user_for_deletion(
         '22222222-2222-2222-2222-222222222222'::UUID,
         'past_delete@test.com'
     );
 
 -- Mark for deletion with past date
 INSERT INTO
-    public.to_delete_accounts (account_id, removal_date, removed_data)
+public.to_delete_accounts (account_id, removal_date, removed_data)
 VALUES
-    (
-        '22222222-2222-2222-2222-222222222222'::UUID,
-        now() - INTERVAL '1 day',
-        '{"email": "past_delete@test.com", "apikeys": []}'::JSONB
-    );
+(
+    '22222222-2222-2222-2222-222222222222'::UUID,
+    now() - INTERVAL '1 day',
+    '{"email": "past_delete@test.com", "apikeys": []}'::JSONB
+);
 
 -- Test deletion count by running function once and checking result
 SELECT
-    ok (
+    ok(
         (
             WITH
-                deletion_results AS (
-                    SELECT
-                        *
-                    FROM
-                        delete_accounts_marked_for_deletion ()
-                    LIMIT
-                        1
-                )
-            SELECT
-                deleted_count
+            deletion_results AS (
+                SELECT *
+                FROM
+                    delete_accounts_marked_for_deletion()
+                LIMIT
+                    1
+            )
+
+            SELECT deleted_count
             FROM
                 deletion_results
         ) = 1,
@@ -195,12 +188,11 @@ SELECT
 
 -- Test that the correct user ID is in the results (run function again, should return 0 now)
 SELECT
-    ok (
+    ok(
         (
-            SELECT
-                deleted_count
+            SELECT deleted_count
             FROM
-                delete_accounts_marked_for_deletion ()
+                delete_accounts_marked_for_deletion()
             LIMIT
                 1
         ) = 0,
@@ -209,10 +201,9 @@ SELECT
 
 -- Verify user is deleted from both auth.users and public.users
 SELECT
-    ok (
+    ok(
         NOT EXISTS (
-            SELECT
-                1
+            SELECT 1
             FROM
                 auth.users
             WHERE
@@ -222,10 +213,9 @@ SELECT
     );
 
 SELECT
-    ok (
+    ok(
         NOT EXISTS (
-            SELECT
-                1
+            SELECT 1
             FROM
                 public.users
             WHERE
@@ -235,10 +225,9 @@ SELECT
     );
 
 SELECT
-    ok (
+    ok(
         NOT EXISTS (
-            SELECT
-                1
+            SELECT 1
             FROM
                 public.to_delete_accounts
             WHERE
@@ -250,47 +239,46 @@ SELECT
 -- Test 6: Multiple accounts deletion
 -- Create multiple test users
 SELECT
-    create_test_user_for_deletion (
+    create_test_user_for_deletion(
         '33333333-3333-3333-3333-333333333333'::UUID,
         'multi_delete1@test.com'
     );
 
 SELECT
-    create_test_user_for_deletion (
+    create_test_user_for_deletion(
         '44444444-4444-4444-4444-444444444444'::UUID,
         'multi_delete2@test.com'
     );
 
 -- Mark both for deletion with past dates
 INSERT INTO
-    public.to_delete_accounts (account_id, removal_date, removed_data)
+public.to_delete_accounts (account_id, removal_date, removed_data)
 VALUES
-    (
-        '33333333-3333-3333-3333-333333333333'::UUID,
-        now() - INTERVAL '2 days',
-        '{"email": "multi_delete1@test.com", "apikeys": []}'::JSONB
-    ),
-    (
-        '44444444-4444-4444-4444-444444444444'::UUID,
-        now() - INTERVAL '3 days',
-        '{"email": "multi_delete2@test.com", "apikeys": []}'::JSONB
-    );
+(
+    '33333333-3333-3333-3333-333333333333'::UUID,
+    now() - INTERVAL '2 days',
+    '{"email": "multi_delete1@test.com", "apikeys": []}'::JSONB
+),
+(
+    '44444444-4444-4444-4444-444444444444'::UUID,
+    now() - INTERVAL '3 days',
+    '{"email": "multi_delete2@test.com", "apikeys": []}'::JSONB
+);
 
 -- Run deletion and verify results
 SELECT
-    ok (
+    ok(
         (
             WITH
-                deletion_results AS (
-                    SELECT
-                        *
-                    FROM
-                        delete_accounts_marked_for_deletion ()
-                    LIMIT
-                        1
-                )
-            SELECT
-                deleted_count
+            deletion_results AS (
+                SELECT *
+                FROM
+                    delete_accounts_marked_for_deletion()
+                LIMIT
+                    1
+            )
+
+            SELECT deleted_count
             FROM
                 deletion_results
         ) = 2,
@@ -300,48 +288,47 @@ SELECT
 -- Test 7: Mixed scenario - some accounts ready for deletion, some not
 -- Create another test user with future date
 SELECT
-    create_test_user_for_deletion (
+    create_test_user_for_deletion(
         '55555555-5555-5555-5555-555555555555'::UUID,
         'mixed_future@test.com'
     );
 
 -- Create another test user with past date
 SELECT
-    create_test_user_for_deletion (
+    create_test_user_for_deletion(
         '66666666-6666-6666-6666-666666666666'::UUID,
         'mixed_past@test.com'
     );
 
 -- Mark one for future deletion, one for past deletion
 INSERT INTO
-    public.to_delete_accounts (account_id, removal_date, removed_data)
+public.to_delete_accounts (account_id, removal_date, removed_data)
 VALUES
-    (
-        '55555555-5555-5555-5555-555555555555'::UUID,
-        now() + INTERVAL '1 day',
-        '{"email": "mixed_future@test.com", "apikeys": []}'::JSONB
-    ),
-    (
-        '66666666-6666-6666-6666-666666666666'::UUID,
-        now() - INTERVAL '1 hour',
-        '{"email": "mixed_past@test.com", "apikeys": []}'::JSONB
-    );
+(
+    '55555555-5555-5555-5555-555555555555'::UUID,
+    now() + INTERVAL '1 day',
+    '{"email": "mixed_future@test.com", "apikeys": []}'::JSONB
+),
+(
+    '66666666-6666-6666-6666-666666666666'::UUID,
+    now() - INTERVAL '1 hour',
+    '{"email": "mixed_past@test.com", "apikeys": []}'::JSONB
+);
 
 -- Run deletion and verify only past date account is deleted
 SELECT
-    ok (
+    ok(
         (
             WITH
-                deletion_results AS (
-                    SELECT
-                        *
-                    FROM
-                        delete_accounts_marked_for_deletion ()
-                    LIMIT
-                        1
-                )
-            SELECT
-                deleted_count
+            deletion_results AS (
+                SELECT *
+                FROM
+                    delete_accounts_marked_for_deletion()
+                LIMIT
+                    1
+            )
+
+            SELECT deleted_count
             FROM
                 deletion_results
         ) = 1,
@@ -350,10 +337,9 @@ SELECT
 
 -- Verify future account still exists
 SELECT
-    ok (
+    ok(
         EXISTS (
-            SELECT
-                1
+            SELECT 1
             FROM
                 public.users
             WHERE
@@ -364,10 +350,9 @@ SELECT
 
 -- Verify past account is deleted
 SELECT
-    ok (
+    ok(
         NOT EXISTS (
-            SELECT
-                1
+            SELECT 1
             FROM
                 public.users
             WHERE
@@ -379,20 +364,20 @@ SELECT
 -- Test 8: Function should fail when encountering database constraint errors
 -- Create a user and then manually delete it from auth.users to simulate error condition
 SELECT
-    create_test_user_for_deletion (
+    create_test_user_for_deletion(
         '77777777-7777-7777-7777-777777777777'::UUID,
         'error_test@test.com'
     );
 
 -- Mark for deletion
 INSERT INTO
-    public.to_delete_accounts (account_id, removal_date, removed_data)
+public.to_delete_accounts (account_id, removal_date, removed_data)
 VALUES
-    (
-        '77777777-7777-7777-7777-777777777777'::UUID,
-        now() - INTERVAL '1 day',
-        '{"email": "error_test@test.com", "apikeys": []}'::JSONB
-    );
+(
+    '77777777-7777-7777-7777-777777777777'::UUID,
+    now() - INTERVAL '1 day',
+    '{"email": "error_test@test.com", "apikeys": []}'::JSONB
+);
 
 -- Manually delete from auth.users to create an inconsistent state
 DELETE FROM auth.users
@@ -402,17 +387,16 @@ WHERE
 -- This should complete successfully since DELETE on non-existent rows doesn't error
 -- but let's verify it still works
 SELECT
-    lives_ok (
+    lives_ok(
         'SELECT delete_accounts_marked_for_deletion()',
         'delete_accounts_marked_for_deletion completes even when auth.users record already missing'
     );
 
 -- Verify the record is cleaned up from to_delete_accounts
 SELECT
-    ok (
+    ok(
         NOT EXISTS (
-            SELECT
-                1
+            SELECT 1
             FROM
                 public.to_delete_accounts
             WHERE
@@ -424,151 +408,150 @@ SELECT
 -- Test 8: Last super_admin deletion - all org resources should be deleted
 -- Create a test user who will be the only super_admin
 SELECT
-    create_test_user_for_deletion (
+    create_test_user_for_deletion(
         '88888888-8888-8888-8888-888888888888'::UUID,
         'last_admin@test.com'
     );
 
 -- Create an org for this user
 INSERT INTO
-    public.orgs (
-        id,
-        created_by,
-        created_at,
-        updated_at,
-        name,
-        management_email
-    )
+public.orgs (
+    id,
+    created_by,
+    created_at,
+    updated_at,
+    name,
+    management_email
+)
 VALUES
-    (
-        '88888888-8888-8888-8888-888888888888'::UUID,
-        '88888888-8888-8888-8888-888888888888'::UUID,
-        now(),
-        now(),
-        'Last Admin Org',
-        'last_admin@test.com'
-    );
+(
+    '88888888-8888-8888-8888-888888888888'::UUID,
+    '88888888-8888-8888-8888-888888888888'::UUID,
+    now(),
+    now(),
+    'Last Admin Org',
+    'last_admin@test.com'
+);
 
 -- Add user as super_admin to the org
 INSERT INTO
-    public.org_users (org_id, user_id, user_right)
+public.org_users (org_id, user_id, user_right)
 VALUES
-    (
-        '88888888-8888-8888-8888-888888888888'::UUID,
-        '88888888-8888-8888-8888-888888888888'::UUID,
-        'super_admin'::"public"."user_min_right"
-    );
+(
+    '88888888-8888-8888-8888-888888888888'::UUID,
+    '88888888-8888-8888-8888-888888888888'::UUID,
+    'super_admin'::public.USER_MIN_RIGHT
+);
 
 -- Create an app owned by this user
 INSERT INTO
-    public.apps (
-        app_id,
-        icon_url,
-        user_id,
-        name,
-        owner_org,
-        created_at,
-        updated_at
-    )
+public.apps (
+    app_id,
+    icon_url,
+    user_id,
+    name,
+    owner_org,
+    created_at,
+    updated_at
+)
 VALUES
-    (
-        'com.last.admin',
-        'https://example.com/icon.png',
-        '88888888-8888-8888-8888-888888888888'::UUID,
-        'Last Admin App',
-        '88888888-8888-8888-8888-888888888888'::UUID,
-        now(),
-        now()
-    );
+(
+    'com.last.admin',
+    'https://example.com/icon.png',
+    '88888888-8888-8888-8888-888888888888'::UUID,
+    'Last Admin App',
+    '88888888-8888-8888-8888-888888888888'::UUID,
+    now(),
+    now()
+);
 
 -- Create an app_version
 INSERT INTO
-    public.app_versions (
-        id,
-        app_id,
-        name,
-        user_id,
-        owner_org,
-        created_at,
-        updated_at
-    )
+public.app_versions (
+    id,
+    app_id,
+    name,
+    user_id,
+    owner_org,
+    created_at,
+    updated_at
+)
 VALUES
-    (
-        1001,
-        'com.last.admin',
-        '1.0.0',
-        '88888888-8888-8888-8888-888888888888'::UUID,
-        '88888888-8888-8888-8888-888888888888'::UUID,
-        now(),
-        now()
-    );
+(
+    1001,
+    'com.last.admin',
+    '1.0.0',
+    '88888888-8888-8888-8888-888888888888'::UUID,
+    '88888888-8888-8888-8888-888888888888'::UUID,
+    now(),
+    now()
+);
 
 -- Create a channel
 INSERT INTO
-    public.channels (
-        id,
-        name,
-        app_id,
-        version,
-        created_at,
-        updated_at,
-        created_by,
-        owner_org
-    )
+public.channels (
+    id,
+    name,
+    app_id,
+    version,
+    created_at,
+    updated_at,
+    created_by,
+    owner_org
+)
 VALUES
-    (
-        1001,
-        'production',
-        'com.last.admin',
-        1001,
-        now(),
-        now(),
-        '88888888-8888-8888-8888-888888888888'::UUID,
-        '88888888-8888-8888-8888-888888888888'::UUID
-    );
+(
+    1001,
+    'production',
+    'com.last.admin',
+    1001,
+    now(),
+    now(),
+    '88888888-8888-8888-8888-888888888888'::UUID,
+    '88888888-8888-8888-8888-888888888888'::UUID
+);
 
 -- Create a deploy_history record
 INSERT INTO
-    public.deploy_history (
-        id,
-        channel_id,
-        app_id,
-        version_id,
-        created_by,
-        owner_org,
-        created_at,
-        updated_at,
-        deployed_at
-    )
+public.deploy_history (
+    id,
+    channel_id,
+    app_id,
+    version_id,
+    created_by,
+    owner_org,
+    created_at,
+    updated_at,
+    deployed_at
+)
 VALUES
-    (
-        1001,
-        1001,
-        'com.last.admin',
-        1001,
-        '88888888-8888-8888-8888-888888888888'::UUID,
-        '88888888-8888-8888-8888-888888888888'::UUID,
-        now(),
-        now(),
-        now()
-    );
+(
+    1001,
+    1001,
+    'com.last.admin',
+    1001,
+    '88888888-8888-8888-8888-888888888888'::UUID,
+    '88888888-8888-8888-8888-888888888888'::UUID,
+    now(),
+    now(),
+    now()
+);
 
 -- Mark user for deletion
 INSERT INTO
-    public.to_delete_accounts (account_id, removal_date, removed_data)
+public.to_delete_accounts (account_id, removal_date, removed_data)
 VALUES
-    (
-        '88888888-8888-8888-8888-888888888888'::UUID,
-        now() - INTERVAL '1 day',
-        '{"email": "last_admin@test.com", "apikeys": []}'::JSONB
-    );
+(
+    '88888888-8888-8888-8888-888888888888'::UUID,
+    now() - INTERVAL '1 day',
+    '{"email": "last_admin@test.com", "apikeys": []}'::JSONB
+);
 
 -- Verify resources exist before deletion
 SELECT
-    ok (
+    ok(
         EXISTS (
-            SELECT
-                1
+            SELECT 1
             FROM
                 public.apps
             WHERE
@@ -578,10 +561,9 @@ SELECT
     );
 
 SELECT
-    ok (
+    ok(
         EXISTS (
-            SELECT
-                1
+            SELECT 1
             FROM
                 public.app_versions
             WHERE
@@ -591,10 +573,9 @@ SELECT
     );
 
 SELECT
-    ok (
+    ok(
         EXISTS (
-            SELECT
-                1
+            SELECT 1
             FROM
                 public.channels
             WHERE
@@ -604,10 +585,9 @@ SELECT
     );
 
 SELECT
-    ok (
+    ok(
         EXISTS (
-            SELECT
-                1
+            SELECT 1
             FROM
                 public.deploy_history
             WHERE
@@ -618,19 +598,18 @@ SELECT
 
 -- Run deletion
 SELECT
-    ok (
+    ok(
         (
             WITH
-                deletion_results AS (
-                    SELECT
-                        *
-                    FROM
-                        delete_accounts_marked_for_deletion ()
-                    LIMIT
-                        1
-                )
-            SELECT
-                deleted_count
+            deletion_results AS (
+                SELECT *
+                FROM
+                    delete_accounts_marked_for_deletion()
+                LIMIT
+                    1
+            )
+
+            SELECT deleted_count
             FROM
                 deletion_results
         ) = 1,
@@ -639,10 +618,9 @@ SELECT
 
 -- Verify user is deleted
 SELECT
-    ok (
+    ok(
         NOT EXISTS (
-            SELECT
-                1
+            SELECT 1
             FROM
                 public.users
             WHERE
@@ -653,10 +631,9 @@ SELECT
 
 -- Verify ALL org resources are deleted (not transferred)
 SELECT
-    ok (
+    ok(
         NOT EXISTS (
-            SELECT
-                1
+            SELECT 1
             FROM
                 public.apps
             WHERE
@@ -666,10 +643,9 @@ SELECT
     );
 
 SELECT
-    ok (
+    ok(
         NOT EXISTS (
-            SELECT
-                1
+            SELECT 1
             FROM
                 public.app_versions
             WHERE
@@ -679,10 +655,9 @@ SELECT
     );
 
 SELECT
-    ok (
+    ok(
         NOT EXISTS (
-            SELECT
-                1
+            SELECT 1
             FROM
                 public.channels
             WHERE
@@ -692,10 +667,9 @@ SELECT
     );
 
 SELECT
-    ok (
+    ok(
         NOT EXISTS (
-            SELECT
-                1
+            SELECT 1
             FROM
                 public.deploy_history
             WHERE
@@ -712,159 +686,158 @@ WHERE
 -- Test 9: Non-last super_admin deletion - ownership should be transferred
 -- Create two users
 SELECT
-    create_test_user_for_deletion (
+    create_test_user_for_deletion(
         '99999999-9999-9999-9999-999999999999'::UUID,
         'admin1@test.com'
     );
 
 SELECT
-    create_test_user_for_deletion (
+    create_test_user_for_deletion(
         'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'::UUID,
         'admin2@test.com'
     );
 
 -- Create an org
 INSERT INTO
-    public.orgs (
-        id,
-        created_by,
-        created_at,
-        updated_at,
-        name,
-        management_email
-    )
+public.orgs (
+    id,
+    created_by,
+    created_at,
+    updated_at,
+    name,
+    management_email
+)
 VALUES
-    (
-        '99999999-9999-9999-9999-999999999999'::UUID,
-        '99999999-9999-9999-9999-999999999999'::UUID,
-        now(),
-        now(),
-        'Shared Admin Org',
-        'admin1@test.com'
-    );
+(
+    '99999999-9999-9999-9999-999999999999'::UUID,
+    '99999999-9999-9999-9999-999999999999'::UUID,
+    now(),
+    now(),
+    'Shared Admin Org',
+    'admin1@test.com'
+);
 
 -- Add both users as super_admins
 INSERT INTO
-    public.org_users (org_id, user_id, user_right)
+public.org_users (org_id, user_id, user_right)
 VALUES
-    (
-        '99999999-9999-9999-9999-999999999999'::UUID,
-        '99999999-9999-9999-9999-999999999999'::UUID,
-        'super_admin'::"public"."user_min_right"
-    ),
-    (
-        '99999999-9999-9999-9999-999999999999'::UUID,
-        'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'::UUID,
-        'super_admin'::"public"."user_min_right"
-    );
+(
+    '99999999-9999-9999-9999-999999999999'::UUID,
+    '99999999-9999-9999-9999-999999999999'::UUID,
+    'super_admin'::public.USER_MIN_RIGHT
+),
+(
+    '99999999-9999-9999-9999-999999999999'::UUID,
+    'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'::UUID,
+    'super_admin'::public.USER_MIN_RIGHT
+);
 
 -- Create resources owned by admin1
 INSERT INTO
-    public.apps (
-        app_id,
-        icon_url,
-        user_id,
-        name,
-        owner_org,
-        created_at,
-        updated_at
-    )
+public.apps (
+    app_id,
+    icon_url,
+    user_id,
+    name,
+    owner_org,
+    created_at,
+    updated_at
+)
 VALUES
-    (
-        'com.shared.app',
-        'https://example.com/icon.png',
-        '99999999-9999-9999-9999-999999999999'::UUID,
-        'Shared App',
-        '99999999-9999-9999-9999-999999999999'::UUID,
-        now(),
-        now()
-    );
+(
+    'com.shared.app',
+    'https://example.com/icon.png',
+    '99999999-9999-9999-9999-999999999999'::UUID,
+    'Shared App',
+    '99999999-9999-9999-9999-999999999999'::UUID,
+    now(),
+    now()
+);
 
 INSERT INTO
-    public.app_versions (
-        id,
-        app_id,
-        name,
-        user_id,
-        owner_org,
-        created_at,
-        updated_at
-    )
+public.app_versions (
+    id,
+    app_id,
+    name,
+    user_id,
+    owner_org,
+    created_at,
+    updated_at
+)
 VALUES
-    (
-        2001,
-        'com.shared.app',
-        '1.0.0',
-        '99999999-9999-9999-9999-999999999999'::UUID,
-        '99999999-9999-9999-9999-999999999999'::UUID,
-        now(),
-        now()
-    );
+(
+    2001,
+    'com.shared.app',
+    '1.0.0',
+    '99999999-9999-9999-9999-999999999999'::UUID,
+    '99999999-9999-9999-9999-999999999999'::UUID,
+    now(),
+    now()
+);
 
 INSERT INTO
-    public.channels (
-        id,
-        name,
-        app_id,
-        version,
-        created_at,
-        updated_at,
-        created_by,
-        owner_org
-    )
+public.channels (
+    id,
+    name,
+    app_id,
+    version,
+    created_at,
+    updated_at,
+    created_by,
+    owner_org
+)
 VALUES
-    (
-        2001,
-        'production',
-        'com.shared.app',
-        2001,
-        now(),
-        now(),
-        '99999999-9999-9999-9999-999999999999'::UUID,
-        '99999999-9999-9999-9999-999999999999'::UUID
-    );
+(
+    2001,
+    'production',
+    'com.shared.app',
+    2001,
+    now(),
+    now(),
+    '99999999-9999-9999-9999-999999999999'::UUID,
+    '99999999-9999-9999-9999-999999999999'::UUID
+);
 
 INSERT INTO
-    public.deploy_history (
-        id,
-        channel_id,
-        app_id,
-        version_id,
-        created_by,
-        owner_org,
-        created_at,
-        updated_at,
-        deployed_at
-    )
+public.deploy_history (
+    id,
+    channel_id,
+    app_id,
+    version_id,
+    created_by,
+    owner_org,
+    created_at,
+    updated_at,
+    deployed_at
+)
 VALUES
-    (
-        2001,
-        2001,
-        'com.shared.app',
-        2001,
-        '99999999-9999-9999-9999-999999999999'::UUID,
-        '99999999-9999-9999-9999-999999999999'::UUID,
-        now(),
-        now(),
-        now()
-    );
+(
+    2001,
+    2001,
+    'com.shared.app',
+    2001,
+    '99999999-9999-9999-9999-999999999999'::UUID,
+    '99999999-9999-9999-9999-999999999999'::UUID,
+    now(),
+    now(),
+    now()
+);
 
 -- Mark admin1 for deletion
 INSERT INTO
-    public.to_delete_accounts (account_id, removal_date, removed_data)
+public.to_delete_accounts (account_id, removal_date, removed_data)
 VALUES
-    (
-        '99999999-9999-9999-9999-999999999999'::UUID,
-        now() - INTERVAL '1 day',
-        '{"email": "admin1@test.com", "apikeys": []}'::JSONB
-    );
+(
+    '99999999-9999-9999-9999-999999999999'::UUID,
+    now() - INTERVAL '1 day',
+    '{"email": "admin1@test.com", "apikeys": []}'::JSONB
+);
 
 -- Verify resources exist before deletion
 SELECT
-    ok (
+    ok(
         EXISTS (
-            SELECT
-                1
+            SELECT 1
             FROM
                 public.apps
             WHERE
@@ -876,19 +849,18 @@ SELECT
 
 -- Run deletion
 SELECT
-    ok (
+    ok(
         (
             WITH
-                deletion_results AS (
-                    SELECT
-                        *
-                    FROM
-                        delete_accounts_marked_for_deletion ()
-                    LIMIT
-                        1
-                )
-            SELECT
-                deleted_count
+            deletion_results AS (
+                SELECT *
+                FROM
+                    delete_accounts_marked_for_deletion()
+                LIMIT
+                    1
+            )
+
+            SELECT deleted_count
             FROM
                 deletion_results
         ) = 1,
@@ -897,10 +869,9 @@ SELECT
 
 -- Verify user is deleted
 SELECT
-    ok (
+    ok(
         NOT EXISTS (
-            SELECT
-                1
+            SELECT 1
             FROM
                 public.users
             WHERE
@@ -911,10 +882,9 @@ SELECT
 
 -- Verify resources still exist (not deleted)
 SELECT
-    ok (
+    ok(
         EXISTS (
-            SELECT
-                1
+            SELECT 1
             FROM
                 public.apps
             WHERE
@@ -924,10 +894,9 @@ SELECT
     );
 
 SELECT
-    ok (
+    ok(
         EXISTS (
-            SELECT
-                1
+            SELECT 1
             FROM
                 public.app_versions
             WHERE
@@ -937,10 +906,9 @@ SELECT
     );
 
 SELECT
-    ok (
+    ok(
         EXISTS (
-            SELECT
-                1
+            SELECT 1
             FROM
                 public.channels
             WHERE
@@ -950,10 +918,9 @@ SELECT
     );
 
 SELECT
-    ok (
+    ok(
         EXISTS (
-            SELECT
-                1
+            SELECT 1
             FROM
                 public.deploy_history
             WHERE
@@ -964,10 +931,9 @@ SELECT
 
 -- Verify ownership transferred to admin2
 SELECT
-    ok (
+    ok(
         (
-            SELECT
-                user_id
+            SELECT user_id
             FROM
                 public.apps
             WHERE
@@ -977,10 +943,9 @@ SELECT
     );
 
 SELECT
-    ok (
+    ok(
         (
-            SELECT
-                user_id
+            SELECT user_id
             FROM
                 public.app_versions
             WHERE
@@ -990,10 +955,9 @@ SELECT
     );
 
 SELECT
-    ok (
+    ok(
         (
-            SELECT
-                created_by
+            SELECT created_by
             FROM
                 public.channels
             WHERE
@@ -1003,10 +967,9 @@ SELECT
     );
 
 SELECT
-    ok (
+    ok(
         (
-            SELECT
-                created_by
+            SELECT created_by
             FROM
                 public.deploy_history
             WHERE
@@ -1049,28 +1012,25 @@ WHERE
     id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'::UUID;
 
 -- Clean up test helper function before permission tests
-DROP FUNCTION create_test_user_for_deletion (UUID, TEXT);
+DROP FUNCTION create_test_user_for_deletion(UUID, TEXT);
 
 -- Test 10: Function permissions - only service_role and postgres can execute
 -- This test verifies the REVOKE/GRANT statements in the migration
-SELECT
-    tests.authenticate_as ('test_user');
+SELECT tests.authenticate_as('test_user');
 
 -- The function should throw a permission error when called by a regular user
 SELECT
-    throws_ok (
+    throws_ok(
         'SELECT delete_accounts_marked_for_deletion()',
         '42501',
         'permission denied for function delete_accounts_marked_for_deletion',
         'delete_accounts_marked_for_deletion throws permission denied for regular users'
     );
 
-SELECT
-    tests.clear_authentication ();
+SELECT tests.clear_authentication();
 
-SELECT
-    *
+SELECT *
 FROM
-    finish ();
+    finish();
 
 ROLLBACK;

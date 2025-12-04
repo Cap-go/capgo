@@ -3,7 +3,7 @@ import type { ArrayElement, Concrete, Merge } from '~/services/types'
 import type { Database } from '~/types/supabase.types'
 import { defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
-import { getProcessCronStatsJobInfo, useSupabase } from '~/services/supabase'
+import { useSupabase } from '~/services/supabase'
 import { useMainStore } from './main'
 
 export type Organization = ArrayElement<Database['public']['Functions']['get_orgs_v6']['Returns']>
@@ -228,14 +228,6 @@ export const useOrganizationStore = defineStore('organization', () => {
 
     currentOrganization.value ??= organization
     currentOrganizationFailed.value = !(!!currentOrganization.value?.paying || (currentOrganization.value?.trial_left ?? 0) > 0)
-
-    // console.log('done', currentOrganization.value)
-    getProcessCronStatsJobInfo()
-      .then((data) => {
-        main.statsTime.last_run = data.last_run
-        main.statsTime.next_run = data.next_run
-      })
-      .catch()
   }
 
   const dedupFetchOrganizations = async () => {

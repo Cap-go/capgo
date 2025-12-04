@@ -167,7 +167,7 @@ Use the CLI to deploy to preprod
 ```bash
 bun run dev-build
 # then deploy
-bun run deploy:cloudflare:webapp:preprod
+bun run deploy:cloudflare:console:preprod
 ```
 
 or Prod
@@ -175,7 +175,7 @@ or Prod
 ```bash
 bun run build
 # then deploy
-bun run deploy:cloudflare:webapp:prod
+bun run deploy:cloudflare:console:prod
 ```
 
 ### Development

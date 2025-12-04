@@ -2,7 +2,6 @@
 CREATE TABLE IF NOT EXISTS devices (
     updated_at timestamp with time zone NOT NULL,
     device_id text NOT NULL,
-    version bigint NOT NULL,
     version_name text,
     app_id character varying(50) NOT NULL,
     platform character varying(8) NOT NULL,
@@ -20,8 +19,17 @@ CREATE INDEX devices_app_id_device_id_updated_at_idx ON devices (
     app_id, device_id, updated_at
 );
 
-CREATE INDEX devices_app_id_updated_at_idx ON devices (app_id, updated_at);
-
-CREATE INDEX idx_app_id_created_at_devices ON devices (app_id, updated_at);
+-- Index for cursor-based pagination: ORDER BY updated_at DESC, device_id ASC
+CREATE INDEX devices_app_id_updated_at_device_id_idx ON devices (
+    app_id, updated_at DESC, device_id ASC
+);
 
 CREATE INDEX idx_app_id_version_name_devices ON devices (app_id, version_name);
+
+-- Device counts table for fast count queries
+CREATE TABLE IF NOT EXISTS device_counts (
+    app_id text PRIMARY KEY,
+    total_count integer NOT NULL DEFAULT 0,
+    custom_id_count integer NOT NULL DEFAULT 0,
+    last_updated datetime DEFAULT CURRENT_TIMESTAMP
+);

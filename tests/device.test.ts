@@ -21,9 +21,10 @@ describe.concurrent('[GET] /device operations', () => {
       headers,
     })
 
-    const data = await response.json()
+    const data = await response.json<{ data: unknown[], nextCursor?: string, hasMore: boolean }>()
     expect(response.status).toBe(200)
-    expect(Array.isArray(data)).toBe(true)
+    expect(Array.isArray(data.data)).toBe(true)
+    expect(typeof data.hasMore).toBe('boolean')
   })
 
   it.concurrent('specific device', async () => {

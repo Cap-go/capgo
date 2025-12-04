@@ -914,14 +914,14 @@ export async function readStatsSB(c: Context, params: ReadStatsParams) {
 
 export async function readDevicesSB(c: Context, params: ReadDevicesParams, customIdMode: boolean) {
   const supabase = supabaseAdmin(c)
+  const limit = params.limit ?? DEFAULT_LIMIT
 
   cloudlog({ requestId: c.get('requestId'), message: 'readDevicesSB', params })
+
   let query = supabase
     .from('devices')
     .select('*')
     .eq('app_id', params.app_id)
-    .range(params.rangeStart ?? 0, params.rangeEnd ?? DEFAULT_LIMIT)
-    .limit(params.limit ?? DEFAULT_LIMIT)
 
   if (customIdMode) {
     query = query
@@ -944,16 +944,25 @@ export async function readDevicesSB(c: Context, params: ReadDevicesParams, custo
     else
       query = query.or(`device_id.ilike.${params.search}%,custom_id.ilike.${params.search}%,version_name.ilike.${params.search}%`)
   }
-  if (params.order?.length) {
-    params.order.forEach((col) => {
-      if (col.sortable && typeof col.sortable === 'string') {
-        cloudlog({ requestId: c.get('requestId'), message: 'order', key: col.key, sortable: col.sortable })
-        query = query.order(col.key as string, { ascending: col.sortable === 'asc' })
-      }
-    })
-  }
+
   if (params.version_name)
     query = query.eq('version_name', params.version_name)
+
+  // Cursor-based pagination
+  if (params.cursor) {
+    // Cursor format: "updated_at|device_id"
+    const [cursorTime, cursorDeviceId] = params.cursor.split('|')
+    if (cursorTime && cursorDeviceId) {
+      // For DESC order: get records older than cursor or same time with device_id > cursor
+      query = query.or(`updated_at.lt.${cursorTime},and(updated_at.eq.${cursorTime},device_id.gt.${cursorDeviceId})`)
+    }
+  }
+
+  // Always order by updated_at DESC, device_id ASC for stable cursor pagination
+  query = query
+    .order('updated_at', { ascending: false })
+    .order('device_id', { ascending: true })
+    .limit(limit + 1) // Fetch one extra to check if there are more results
 
   const { data, error } = await query
 

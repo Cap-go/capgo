@@ -366,5 +366,8 @@ app.post('/', middlewareAPISecret, async (c) => {
     cloudlogErr({ requestId: c.get('requestId'), message: 'insights error', e })
   })
   cloudlog({ requestId: c.get('requestId'), message: 'Sent to logsnag done' })
+
+  // Note: Device cleanup is no longer needed as Analytics Engine handles data retention automatically
+
   return c.json(BRES)
 })

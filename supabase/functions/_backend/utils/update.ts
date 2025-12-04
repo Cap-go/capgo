@@ -12,7 +12,7 @@ import {
 import { getRuntimeKey } from 'hono/adapter'
 import { getAppStatus, setAppStatus } from './appStatus.ts'
 import { getBundleUrl, getManifestUrl } from './downloadUrl.ts'
-import { getIsV2Updater, simpleError, simpleError200 } from './hono.ts'
+import { getIsV2Updater, simpleError200 } from './hono.ts'
 import { cloudlog } from './logging.ts'
 import { sendNotifOrg } from './notifications.ts'
 import { closeClient, getAppOwnerPostgres, getDrizzleClient, getPgClient, requestInfosPostgres } from './pg.ts'
@@ -20,7 +20,7 @@ import { getAppOwnerPostgresV2, getDrizzleClientD1Session, requestInfosPostgresV
 import { makeDevice } from './plugin_parser.ts'
 import { s3 } from './s3.ts'
 import { createStatsBandwidth, createStatsMau, createStatsVersion, onPremStats, sendStatsAndDevice } from './stats.ts'
-import { backgroundTask, fixSemver, isInternalVersionName } from './utils.ts'
+import { backgroundTask, BROTLI_MIN_UPDATER_VERSION_V7, fixSemver, isDeprecatedPluginVersion, isInternalVersionName } from './utils.ts'
 
 const PLAN_LIMIT: Array<'mau' | 'bandwidth' | 'storage'> = ['mau', 'bandwidth']
 const PLAN_ERROR = 'Cannot get update, upgrade plan to continue to update'
@@ -118,12 +118,10 @@ export async function updateWithPG(
   const manifestBundleCount = appOwner.manifest_bundle_count ?? 0
   const bypassChannelOverrides = channelDeviceCount <= 0
   const pluginVersion = parse(plugin_version)
+  // v5 is deprecated if < 5.10.0, v6 is deprecated if < 6.25.0, v7 is deprecated if < 7.25.0
+  const isDeprecated = isDeprecatedPluginVersion(pluginVersion)
   // Ensure there is manifest and the plugin version support manifest fetching (v5.10.0+, v6.25.0+, v7.0.35+)
-  const fetchManifestEntries = manifestBundleCount > 0 && (
-    (greaterOrEqual(pluginVersion, parse('5.10.0')) && pluginVersion.major === 5)
-    || (greaterOrEqual(pluginVersion, parse('6.25.0')) && pluginVersion.major === 6)
-    || (greaterOrEqual(pluginVersion, parse('7.0.35')) && pluginVersion.major >= 7)
-  )
+  const fetchManifestEntries = manifestBundleCount > 0 && !isDeprecatedPluginVersion(pluginVersion, undefined, undefined, BROTLI_MIN_UPDATER_VERSION_V7)
   cloudlog({
     requestId: c.get('requestId'),
     message: 'App channel device count evaluated',
@@ -145,11 +143,10 @@ export async function updateWithPG(
       version_id: version_build,
       app_id_url: app_id,
     }, appOwner.owner_org, app_id, '0 0 * * 1'))
-    return simpleError('semver_error', `Native version: ${body.version_build} doesn't follow semver convention, please check https://capgo.app/semver_tester/ to learn more about semver usage in Capgo`, { body })
+    return simpleError200(c, 'semver_error', `Native version: ${body.version_build} doesn't follow semver convention, please check https://capgo.app/semver_tester/ to learn more about semver usage in Capgo`)
   }
   // Reject v4 completely - it's no longer supported
-  const parsedPluginVersion = parse(plugin_version)
-  if (parsedPluginVersion.major === 4) {
+  if (pluginVersion.major === 4) {
     cloudlog({ requestId: c.get('requestId'), message: 'Plugin version 4.x is no longer supported', plugin_version, app_id })
     await backgroundTask(c, sendNotifOrg(c, 'user:plugin_issue', {
       app_id,
@@ -158,15 +155,10 @@ export async function updateWithPG(
       app_id_url: app_id,
     }, appOwner.owner_org, app_id, '0 0 * * 1'))
     await sendStatsAndDevice(c, device, [{ action: 'backend_refusal' }])
-    return simpleError('unsupported_plugin_version', `Plugin version ${plugin_version} (v4) is no longer supported. Please upgrade to v5.10.0 or later.`, { body })
+    return simpleError200(c, 'unsupported_plugin_version', `Plugin version ${plugin_version} (v4) is no longer supported. Please upgrade to v5.10.0 or later.`)
   }
 
   // Check if plugin_version is deprecated and send notification
-  // v5 is deprecated if < 5.10.0, v6 is deprecated if < 6.25.0, v7 is deprecated if < 7.25.0
-  const isDeprecated = (parsedPluginVersion.major === 5 && lessThan(parsedPluginVersion, parse('5.10.0')))
-    || (parsedPluginVersion.major === 6 && lessThan(parsedPluginVersion, parse('6.25.0')))
-    || (parsedPluginVersion.major === 7 && lessThan(parsedPluginVersion, parse('7.25.0')))
-
   if (isDeprecated) {
     await backgroundTask(c, sendNotifOrg(c, 'user:plugin_issue', {
       app_id,
@@ -176,7 +168,7 @@ export async function updateWithPG(
     }, appOwner.owner_org, app_id, '0 0 * * 1'))
   }
   if (!app_id || !device_id || !version_build || !version_name || !platform) {
-    return simpleError('missing_info', 'Cannot find device_id or app_id', { body })
+    return simpleError200(c, 'missing_info', 'Cannot find device_id or app_id')
   }
 
   await backgroundTask(c, createStatsMau(c, device_id, app_id, appOwner.owner_org))
