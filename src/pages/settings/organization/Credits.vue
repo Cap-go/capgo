@@ -15,9 +15,9 @@ import ScaleIcon from '~icons/heroicons/scale'
 import UserGroupIcon from '~icons/heroicons/user-group'
 import { completeCreditTopUp, startCreditTopUp } from '~/services/stripe'
 import { useSupabase } from '~/services/supabase'
-import Spinner from '~/components/Spinner.vue'
 import { useDisplayStore } from '~/stores/display'
 import { useOrganizationStore } from '~/stores/organization'
+
 const creditsV2Enabled = import.meta.env.VITE_FEATURE_CREDITS_V2
 
 interface UsageCreditLedgerRow {
