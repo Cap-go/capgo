@@ -754,11 +754,11 @@ watch(() => currentOrganization.value?.gid, async (newOrgId: string | undefined,
                     {{ day.dateLabel }}
                   </td>
                   <td class="px-4 py-3 text-xs text-gray-700 dark:text-gray-200">
-                    {{ day.transactionCount }} transactions • {{ summarizeTypes(day.typeCounts) }}
+                    {{ t('credits-daily-transaction-count', { count: day.transactionCount }) }} • {{ summarizeTypes(day.typeCounts) }}
                   </td>
                   <td class="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white">
                     <div class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                      Balance
+                      {{ t('credits-daily-balance-label') }}
                     </div>
                     <div>
                       {{ day.latestBalance !== null ? formatCredits(day.latestBalance) : '—' }}
@@ -775,7 +775,7 @@ watch(() => currentOrganization.value?.gid, async (newOrgId: string | undefined,
                   </td>
                   <td class="px-4 py-3 text-gray-700 dark:text-gray-200">
                     <div class="font-semibold text-gray-900 dark:text-white">
-                      Grants & purchases
+                      {{ t('credits-daily-grants-purchases') }}
                     </div>
                   </td>
                   <td
@@ -794,10 +794,10 @@ watch(() => currentOrganization.value?.gid, async (newOrgId: string | undefined,
                   </td>
                   <td class="px-4 py-3 text-gray-700 dark:text-gray-200">
                     <div class="font-semibold text-gray-900 dark:text-white">
-                      Deduction — {{ metricLabel(entry.metric) }}
+                      {{ t('credits-daily-deduction-title', { metric: metricLabel(entry.metric) }) }}
                     </div>
                     <div class="text-xs text-gray-500 dark:text-gray-400">
-                      {{ entry.data?.count ?? 0 }} deductions
+                      {{ t('credits-daily-deduction-count', { count: entry.data?.count ?? 0 }) }}
                     </div>
                   </td>
                   <td
@@ -816,7 +816,7 @@ watch(() => currentOrganization.value?.gid, async (newOrgId: string | undefined,
                   </td>
                   <td class="px-4 py-3 text-gray-700 dark:text-gray-200">
                     <div class="text-sm text-gray-600 dark:text-gray-300">
-                      No activity
+                      {{ t('credits-daily-no-activity') }}
                     </div>
                   </td>
                   <td class="whitespace-nowrap px-4 py-3 text-right font-semibold text-gray-700 dark:text-gray-200">
@@ -828,7 +828,7 @@ watch(() => currentOrganization.value?.gid, async (newOrgId: string | undefined,
           </table>
           <div class="mt-4 flex items-center justify-between px-6 py-4 text-sm">
             <span>
-              Page {{ currentPage }} / {{ totalPages }}
+              {{ t('credits-pagination-label', { current: currentPage, total: totalPages }) }}
             </span>
             <div class="flex items-center gap-2">
               <button
@@ -836,14 +836,14 @@ watch(() => currentOrganization.value?.gid, async (newOrgId: string | undefined,
                 :disabled="currentPage === 1"
                 @click="currentPage = Math.max(1, currentPage - 1)"
               >
-                Previous
+                {{ t('previous') }}
               </button>
               <button
                 class="d-btn d-btn-sm"
                 :disabled="currentPage >= totalPages"
                 @click="currentPage = Math.min(totalPages, currentPage + 1)"
               >
-                Next
+                {{ t('next') }}
               </button>
             </div>
           </div>
