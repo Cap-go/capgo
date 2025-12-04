@@ -23,7 +23,7 @@
     "serve:dev": "BRANCH=development vite",
     "serve:preprod": "BRANCH=preprod vite",
     "ios:dev": "cap sync && cap run ios",
-    "backend": "supabase start && supabase functions serve",
+    "backend": "bunx supabase start && bunx supabase functions serve",
     "backend:workers": "./scripts/start-cloudflare-workers.sh",
     "reset": "supabase db reset",
     "api:dev": "wrangler dev -c cloudflare_workers/api/wrangler.jsonc --env=dev --env-file=internal/cloudflare/.env.local",
