@@ -374,6 +374,44 @@ export async function getPlans(): Promise<Database['public']['Tables']['plans'][
   }
 }
 
+export type CreditUnitPricing = Partial<Record<Database['public']['Enums']['credit_metric_type'], number>>
+
+export async function getCreditUnitPricing(orgId?: string): Promise<CreditUnitPricing> {
+  try {
+    const { data, error } = await useSupabase()
+      .from('capgo_credits_steps')
+      .select('type, price_per_unit, step_min, org_id')
+      .eq('step_min', 0)
+      .order('step_min', { ascending: true })
+
+    if (error || !data)
+      throw new Error(error?.message ?? 'Failed to fetch credit pricing')
+
+    const sortedSteps = [...data].sort((a, b) => {
+      const aOrgPriority = a.org_id && orgId && a.org_id === orgId ? 0 : 1
+      const bOrgPriority = b.org_id && orgId && b.org_id === orgId ? 0 : 1
+
+      if (aOrgPriority !== bOrgPriority)
+        return aOrgPriority - bOrgPriority
+
+      return (a.step_min ?? 0) - (b.step_min ?? 0)
+    })
+
+    return sortedSteps.reduce<CreditUnitPricing>((pricing, step) => {
+      const metric = step.type as Database['public']['Enums']['credit_metric_type']
+
+      if (pricing[metric] === undefined)
+        pricing[metric] = step.price_per_unit
+
+      return pricing
+    }, {})
+  }
+  catch (err) {
+    console.error('getCreditUnitPricing error', err)
+    return {}
+  }
+}
+
 interface PlanUsage {
   total_percent: number
   mau_percent: number
