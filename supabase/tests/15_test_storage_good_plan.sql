@@ -1,7 +1,6 @@
 BEGIN;
 
--- CREATE EXTENSION "basejump-supabase_test_helpers";
--- + 2 is for the count(*)
+-- -- + 2 is for the count(*)
 -- -1 is for the pay as you go if statenent
 SELECT plan(16);
 

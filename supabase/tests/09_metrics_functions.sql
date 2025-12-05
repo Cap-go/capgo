@@ -1,7 +1,6 @@
 -- 09_usage_functions.sql
 BEGIN;
 
-CREATE EXTENSION "basejump-supabase_test_helpers";
 
 SELECT plan(12);
 
