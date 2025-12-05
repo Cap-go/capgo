@@ -85,6 +85,9 @@ enabled = true
 # The maximum file size allowed (e.g. "5MB", "500KB").
 file_size_limit = "50MiB"
 
+[storage.s3_protocol]
+enabled = true
+
 # Image transformation API is available to Supabase Pro plan.
 # [storage.image_transformation]
 # enabled = false
@@ -365,3 +368,4 @@ import_map = "./functions/deno.json"
 [functions.files]
 verify_jwt = false
 import_map = "./functions/deno.json"
+

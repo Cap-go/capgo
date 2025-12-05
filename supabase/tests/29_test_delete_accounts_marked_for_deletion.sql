@@ -1,7 +1,5 @@
 BEGIN;
 
-CREATE EXTENSION "basejump-supabase_test_helpers";
-
 SELECT plan(41);
 
 -- Test helper function to create test users in both auth.users and public.users tables
