@@ -48,13 +48,9 @@ CREATE EXTENSION IF NOT EXISTS "moddatetime"
 WITH
   SCHEMA "extensions";
 
-CREATE EXTENSION IF NOT EXISTS "pg_graphql"
-WITH
-  SCHEMA "graphql";
+DROP EXTENSION IF EXISTS "pg_graphql";
 
-CREATE EXTENSION IF NOT EXISTS "pg_stat_monitor"
-WITH
-  SCHEMA "extensions";
+DROP EXTENSION IF EXISTS "pg_stat_monitor";
 
 CREATE EXTENSION IF NOT EXISTS "pg_stat_statements"
 WITH
@@ -70,9 +66,21 @@ CREATE EXTENSION IF NOT EXISTS "pgmq"
 WITH
   SCHEMA "pgmq";
 
-CREATE EXTENSION IF NOT EXISTS "postgres_fdw"
+CREATE EXTENSION IF NOT EXISTS "pgsodium";
+
+CREATE EXTENSION IF NOT EXISTS "hypopg"
 WITH
   SCHEMA "extensions";
+
+CREATE EXTENSION IF NOT EXISTS "index_advisor"
+WITH
+  SCHEMA "extensions";
+
+CREATE EXTENSION IF NOT EXISTS "plpgsql_check"
+WITH
+  SCHEMA "extensions";
+
+DROP EXTENSION IF EXISTS "postgres_fdw";
 
 CREATE EXTENSION IF NOT EXISTS "supabase_vault"
 WITH
@@ -206,10 +214,6 @@ CREATE TYPE "public"."stripe_status" AS ENUM(
 );
 
 ALTER TYPE "public"."stripe_status" OWNER TO "postgres";
-
-CREATE TYPE "public"."usage_mode" AS ENUM('last_saved', '5min', 'day', 'cycle');
-
-ALTER TYPE "public"."usage_mode" OWNER TO "postgres";
 
 CREATE TYPE "public"."user_min_right" AS ENUM(
   'invite_read',
@@ -3398,7 +3402,6 @@ CREATE TABLE IF NOT EXISTS "public"."app_versions_meta" (
   "checksum" character varying NOT NULL,
   "size" bigint NOT NULL,
   "id" bigint NOT NULL,
-  "devices" bigint DEFAULT '0'::bigint,
   "fails" bigint DEFAULT '0'::bigint,
   "installs" bigint DEFAULT '0'::bigint,
   "uninstalls" bigint DEFAULT '0'::bigint,
@@ -3628,6 +3631,7 @@ ALTER TABLE "public"."device_usage_id_seq" OWNER TO "postgres";
 
 ALTER SEQUENCE "public"."device_usage_id_seq" OWNED BY "public"."device_usage"."id";
 
+
 CREATE TABLE IF NOT EXISTS "public"."devices" (
   "updated_at" timestamp with time zone NOT NULL,
   "device_id" "text" NOT NULL,
@@ -3639,7 +3643,8 @@ CREATE TABLE IF NOT EXISTS "public"."devices" (
   "version_build" character varying(70) DEFAULT 'builtin'::"text",
   "custom_id" character varying(36) DEFAULT ''::"text" NOT NULL,
   "is_prod" boolean DEFAULT true,
-  "is_emulator" boolean DEFAULT false
+  "is_emulator" boolean DEFAULT false,
+  id bigint generated always as identity not null
 );
 
 ALTER TABLE "public"."devices" OWNER TO "postgres";
@@ -3744,7 +3749,6 @@ CREATE TABLE IF NOT EXISTS "public"."plans" (
   "price_m" bigint DEFAULT '0'::bigint NOT NULL,
   "price_y" bigint DEFAULT '0'::bigint NOT NULL,
   "stripe_id" character varying DEFAULT ''::character varying NOT NULL,
-  "version" bigint DEFAULT '0'::bigint NOT NULL,
   "id" "uuid" DEFAULT "extensions"."uuid_generate_v4" () NOT NULL,
   "price_m_id" character varying NOT NULL,
   "price_y_id" character varying NOT NULL,

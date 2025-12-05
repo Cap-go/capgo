@@ -205,7 +205,6 @@ export type Database = {
           app_id: string
           checksum: string
           created_at: string | null
-          devices: number | null
           id: number
           owner_org: string
           size: number
@@ -215,7 +214,6 @@ export type Database = {
           app_id: string
           checksum: string
           created_at?: string | null
-          devices?: number | null
           id?: number
           owner_org: string
           size: number
@@ -225,7 +223,6 @@ export type Database = {
           app_id?: string
           checksum?: string
           created_at?: string | null
-          devices?: number | null
           id?: number
           owner_org?: string
           size?: number
@@ -892,6 +889,7 @@ export type Database = {
           custom_id: string
           default_channel: string | null
           device_id: string
+          id: number
           is_emulator: boolean | null
           is_prod: boolean | null
           os_version: string | null
@@ -907,6 +905,7 @@ export type Database = {
           custom_id?: string
           default_channel?: string | null
           device_id: string
+          id?: never
           is_emulator?: boolean | null
           is_prod?: boolean | null
           os_version?: string | null
@@ -922,6 +921,7 @@ export type Database = {
           custom_id?: string
           default_channel?: string | null
           device_id?: string
+          id?: never
           is_emulator?: boolean | null
           is_prod?: boolean | null
           os_version?: string | null
@@ -1219,13 +1219,11 @@ export type Database = {
           name: string
           price_m: number
           price_m_id: string
-          price_m_mau_id: string | null
           price_y: number
           price_y_id: string
           storage: number
           stripe_id: string
           updated_at: string
-          version: number
         }
         Insert: {
           bandwidth: number
@@ -1238,13 +1236,11 @@ export type Database = {
           name?: string
           price_m?: number
           price_m_id: string
-          price_m_mau_id?: string | null
           price_y?: number
           price_y_id: string
           storage: number
           stripe_id?: string
           updated_at?: string
-          version?: number
         }
         Update: {
           bandwidth?: number
@@ -1257,13 +1253,11 @@ export type Database = {
           name?: string
           price_m?: number
           price_m_id?: string
-          price_m_mau_id?: string | null
           price_y?: number
           price_y_id?: string
           storage?: number
           stripe_id?: string
           updated_at?: string
-          version?: number
         }
         Relationships: []
       }
@@ -2608,7 +2602,6 @@ export type Database = {
         | "failed"
         | "deleted"
         | "canceled"
-      usage_mode: "last_saved" | "5min" | "day" | "cycle"
       user_min_right:
         | "invite_read"
         | "invite_upload"
@@ -2862,7 +2855,6 @@ export const Constants = {
         "deleted",
         "canceled",
       ],
-      usage_mode: ["last_saved", "5min", "day", "cycle"],
       user_min_right: [
         "invite_read",
         "invite_upload",
