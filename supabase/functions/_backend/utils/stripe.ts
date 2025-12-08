@@ -303,25 +303,59 @@ export interface StripeCustomer {
   name: string
   metadata: {
     user_id: string
+    org_id?: string
+    console?: string
+    log_as?: string
   }
 }
 
-export async function createCustomer(c: Context, email: string, userId: string, name: string) {
-  cloudlog({ requestId: c.get('requestId'), message: 'createCustomer', email, userId, name })
+export async function createCustomer(c: Context, email: string, userId: string, orgId: string, name: string) {
+  cloudlog({ requestId: c.get('requestId'), message: 'createCustomer', email, userId, orgId, name })
+  const baseConsoleUrl = (getEnv(c, 'WEBAPP_URL') || '').replace(/\/+$/, '')
+  const metadata: Record<string, string> = {
+    user_id: userId,
+    org_id: orgId,
+  }
+  if (baseConsoleUrl) {
+    metadata.log_as = `${baseConsoleUrl}/log-as/${userId}`
+  }
   if (!existInEnv(c, 'STRIPE_SECRET_KEY')) {
     cloudlog({ requestId: c.get('requestId'), message: 'createCustomer no stripe key', email, userId, name })
     // create a fake customer id like stripe one and random id
     const randomId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
-    return { id: `cus_${randomId}`, email, name, metadata: { user_id: userId } }
+    return { id: `cus_${randomId}`, email, name, metadata }
   }
   const customer = await getStripe(c).customers.create({
     email,
     name,
-    metadata: {
-      user_id: userId,
-    },
+    metadata,
   })
   return customer
+}
+
+export async function ensureCustomerMetadata(c: Context, customerId: string, orgId: string, userId?: string | null) {
+  if (!customerId)
+    return
+  if (!existInEnv(c, 'STRIPE_SECRET_KEY'))
+    return
+
+  const baseConsoleUrl = (getEnv(c, 'WEBAPP_URL') || '').replace(/\/+$/, '')
+  const metadata: Record<string, string> = {
+    org_id: orgId,
+  }
+
+  if (userId) {
+    metadata.user_id = userId
+    if (baseConsoleUrl)
+      metadata.log_as = `${baseConsoleUrl}/log-as/${userId}`
+  }
+
+  try {
+    await getStripe(c).customers.update(customerId, { metadata })
+  }
+  catch (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'ensureCustomerMetadata', error })
+  }
 }
 
 export async function setThreshold(c: Context, subscriptionId: string) {

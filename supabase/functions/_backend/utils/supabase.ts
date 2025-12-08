@@ -683,7 +683,7 @@ export async function getDefaultPlan(c: Context) {
 }
 
 export async function createStripeCustomer(c: Context, org: Database['public']['Tables']['orgs']['Row']) {
-  const customer = await createCustomer(c, org.management_email, org.created_by, org.name)
+  const customer = await createCustomer(c, org.management_email, org.created_by, org.id, org.name)
   // create date + 15 days
   const trial_at = new Date()
   trial_at.setDate(trial_at.getDate() + 15)

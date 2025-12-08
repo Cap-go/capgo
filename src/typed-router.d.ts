@@ -135,6 +135,13 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    '/log-as/[userId]': RouteRecordInfo<
+      '/log-as/[userId]',
+      '/log-as/:userId',
+      { userId: ParamValue<true> },
+      { userId: ParamValue<false> },
+      | never
+    >,
     '/login': RouteRecordInfo<
       '/login',
       '/login',
@@ -346,6 +353,12 @@ declare module 'vue-router/auto-routes' {
     'src/pages/invitation.vue': {
       routes:
         | '/invitation'
+      views:
+        | never
+    }
+    'src/pages/log-as/[userId].vue': {
+      routes:
+        | '/log-as/[userId]'
       views:
         | never
     }
