@@ -298,7 +298,7 @@ function updateUrlParams() {
       params.set(`sort_${col.key}`, col.sortable)
   })
   const paramsString = params.toString() ? `?${params.toString()}` : ''
-  window.history.pushState({}, '', `${window.location.pathname}${paramsString}`)
+  window.history.replaceState({}, '', `${window.location.pathname}${paramsString}`)
 }
 
 function openTimePicker() {
@@ -347,7 +347,7 @@ onUnmounted(() => {
     params.delete(`sort_${col.key}`)
   })
   const paramsString = params.toString() ? `?${params.toString()}` : ''
-  window.history.pushState({}, '', `${window.location.pathname}${paramsString}`)
+  window.history.replaceState({}, '', `${window.location.pathname}${paramsString}`)
 })
 
 // Add watches

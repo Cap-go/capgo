@@ -132,7 +132,7 @@ function updateUrlParams() {
     else params.delete(`sort_${col.key}`)
   })
   const paramsString = params.toString() ? `?${params.toString()}` : ''
-  window.history.pushState(
+  window.history.replaceState(
     {},
     '',
     `${window.location.pathname}${paramsString}`,
@@ -195,7 +195,7 @@ onUnmounted(() => {
     params.delete(`sort_${col.key}`)
   })
   const paramsString = params.toString() ? `?${params.toString()}` : ''
-  window.history.pushState(
+  window.history.replaceState(
     {},
     '',
     `${window.location.pathname}${paramsString}`,
