@@ -269,6 +269,12 @@ supabase db reset
 To deploy the supabase instance in self-hosted, use the
 [Supabase official guide](https://supabase.com/docs/guides/self-hosting).
 
+Before deploying, duplicate `supabase/functions/.env.example` to
+`supabase/functions/.env`, replace the placeholder values with your
+self-hosted credentials, and keep the file local (it is gitignored). Use that
+file for commands such as
+`supabase secrets set --env-file supabase/functions/.env`.
+
 ### Deploy Supabase cloud
 
 To deploy the Supabase instance on cloud, you need a paid account, which costs
