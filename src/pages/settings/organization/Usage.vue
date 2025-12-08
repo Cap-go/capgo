@@ -8,13 +8,14 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import { bytesToGb } from '~/services/conversion'
-import { getCurrentPlanNameOrg, getPlans, getPlanUsagePercent, getTotalStorage } from '~/services/supabase'
+import { getCreditUnitPricing, getCurrentPlanNameOrg, getPlans, getPlanUsagePercent, getTotalStorage } from '~/services/supabase'
 import { sendEvent } from '~/services/tracking'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useMainStore } from '~/stores/main'
 
 const { t } = useI18n()
 const plans = ref<Database['public']['Tables']['plans']['Row'][]>([])
+const creditUnitPrices = ref<Partial<Record<Database['public']['Enums']['credit_metric_type'], number>>>({})
 
 const isLoading = ref(false)
 const initialLoad = ref(true)
@@ -49,7 +50,7 @@ watchEffect(async () => {
 async function getUsage(orgId: string) {
   const usage = main.dashboard
 
-  const plan = plans.value.find(p => p.name === 'Pay as you go')!
+  const plan = plans.value.find(p => p.name === 'Pay as you go')
   const planCurrent = await getCurrentPlanNameOrg(orgId)
   const currentPlan = plans.value.find(p => p.name === planCurrent)
 
@@ -70,17 +71,17 @@ async function getUsage(orgId: string) {
   }
 
   const payg_base = {
-    mau: plan?.mau,
-    storage: plan?.storage,
-    bandwidth: plan?.bandwidth,
-    build_time: plan?.build_time_unit || 0,
+    mau: plan?.mau ?? 0,
+    storage: plan?.storage ?? 0,
+    bandwidth: plan?.bandwidth ?? 0,
+    build_time: plan?.build_time_unit ?? 0,
   }
 
   const payg_units = {
-    mau: currentPlan?.mau_unit,
-    storage: currentPlan?.storage_unit,
-    bandwidth: currentPlan?.bandwidth_unit,
-    build_time: currentPlan?.build_time_unit || 0,
+    mau: creditUnitPrices.value.mau ?? 0,
+    storage: creditUnitPrices.value.storage ?? 0,
+    bandwidth: creditUnitPrices.value.bandwidth ?? 0,
+    build_time: currentPlan?.build_time_unit ?? 0,
   }
   const creditsUsed = Math.max(
     Number(organizationStore.currentOrganization?.credit_total ?? 0)
@@ -116,7 +117,11 @@ async function getUsage(orgId: string) {
 
   const basePrice = currentPlan?.price_m ?? 0
 
-  const calculatePrice = (total: number, base: number, unit: number) => total <= base ? 0 : (total - base) * unit
+  const calculatePrice = (total: number, base: number, unit: number) => {
+    if (unit <= 0)
+      return 0
+    return total <= base ? 0 : (total - base) * unit
+  }
 
   const isPayAsYouGo = currentPlan?.name === 'Pay as you go'
   const paygUsagePrice = isPayAsYouGo
@@ -129,7 +134,17 @@ async function getUsage(orgId: string) {
     : 0
   const totalUsagePrice = roundNumber(creditsUsed > 0 ? creditsUsed : paygUsagePrice)
 
-  const totalPrice = roundNumber(basePrice + totalUsagePrice)
+    const mauPrice = calculatePrice(totalMau, payg_base.mau, payg_units.mau)
+    const storagePrice = calculatePrice(totalStorage, payg_base.storage, payg_units.storage)
+    const bandwidthPrice = calculatePrice(totalBandwidth, payg_base.bandwidth, payg_units.bandwidth)
+    const buildTimePrice = calculatePrice(totalBuildTime, payg_base.build_time, payg_units.build_time)
+    const sum = mauPrice + storagePrice + bandwidthPrice + buildTimePrice
+    return roundNumber(sum)
+  })
+
+  const totalPrice = computed(() => {
+    return roundNumber(basePrice + totalUsagePrice.value)
+  })
 
   return {
     isPayAsYouGo,
@@ -193,27 +208,28 @@ async function loadData() {
   await Promise.all([organizationStore.awaitInitialLoad(), main.awaitInitialLoad()])
   const gid = organizationStore?.currentOrganization?.gid ?? ''
 
-  if (planUsageMap.value.has(gid) || isLoading.value)
+  if (isLoading.value)
     return
 
   isLoading.value = true
 
-  try {
-    if (initialLoad.value) {
-      const pls = await getPlans()
-      plans.value.length = 0
-      plans.value.push(...pls)
-    }
+  if (initialLoad.value) {
+    const [pls, pricing] = await Promise.all([
+      getPlans(),
+      getCreditUnitPricing(gid || undefined),
+    ])
+    plans.value.length = 0
+    plans.value.push(...pls)
+    creditUnitPrices.value = pricing
+  }
+  else if (!Object.keys(creditUnitPrices.value).length) {
+    creditUnitPrices.value = await getCreditUnitPricing(gid || undefined)
+  }
 
-    const usage = await getUsage(gid)
-    const nextMap = new Map(planUsageMap.value)
-    nextMap.set(gid, usage as any)
-    planUsageMap.value = nextMap
-  }
-  finally {
-    isLoading.value = false
-    initialLoad.value = false
-  }
+  const usageDetails = await getUsage(gid)
+  planUsageMap.value?.set(gid, usageDetails as any)
+  isLoading.value = false
+  initialLoad.value = false
 }
 
 function lastRunDate() {

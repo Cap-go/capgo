@@ -64,11 +64,11 @@ BEGIN
     INSERT INTO "public"."deleted_account" ("created_at", "email", "id") VALUES
     (now(), encode(extensions.digest('deleted@capgo.app'::bytea, 'sha256'::text)::bytea, 'hex'::text), '00000000-0000-0000-0000-000000000001');
 
-    INSERT INTO "public"."plans" ("created_at", "updated_at", "name", "description", "price_m", "price_y", "stripe_id", "credit_id", "version", "id", "price_m_id", "price_y_id", "storage", "bandwidth", "mau", "market_desc", "storage_unit", "bandwidth_unit", "mau_unit", "price_m_storage_id", "price_m_bandwidth_id", "price_m_mau_id", "build_time_unit") VALUES
-    (now(), now(), 'Maker', 'plan.maker.desc', 39, 396, 'prod_LQIs1Yucml9ChU', 'prod_TJRd2hFHZsBIPK', 100, '440cfd69-0cfd-486e-b59b-cb99f7ae76a0', 'price_1KjSGyGH46eYKnWwL4h14DsK', 'price_1KjSKIGH46eYKnWwFG9u4tNi', 3221225472, 268435456000, 10000, 'Best for small business owners', 0, 0, 0, NULL, NULL, NULL, 3600),
-    (now(), now(), 'Pay as you go', 'plan.payasyougo.desc', 239, 4799, 'prod_MH5Jh6ajC9e7ZH', 'prod_TJRd2hFHZsBIPK', 1000, '745d7ab3-6cd6-4d65-b257-de6782d5ba50', 'price_1LYX8yGH46eYKnWwzeBjISvW', 'price_1LYX8yGH46eYKnWwzeBjISvW', 12884901888, 3221225472000, 1000000, 'Best for scalling enterprises', 0.05, 0.1, 0.0002, 'price_1LYXD8GH46eYKnWwaVvggvyy', 'price_1LYXDoGH46eYKnWwPEYVZXui', 'price_1LYXE2GH46eYKnWwo5qd4BTU', 600000),
-    (now(), now(), 'Solo', 'plan.solo.desc', 14, 146, 'prod_LQIregjtNduh4q', 'prod_TJRd2hFHZsBIPK', 10, '526e11d8-3c51-4581-ac92-4770c602f47c', 'price_1LVvuZGH46eYKnWwuGKOf4DK', 'price_1LVvuIGH46eYKnWwHMDCrxcH', 1073741824, 13958643712, 1000, 'Best for independent developers', 0, 0, 0, NULL, NULL, NULL, 1800),
-    (now(), now(), 'Team', 'plan.team.desc', 99, 998, 'prod_LQIugvJcPrxhda', 'prod_TJRd2hFHZsBIPK', 1000, 'abd76414-8f90-49a5-b3a4-8ff4d2e12c77', 'price_1KjSIUGH46eYKnWwWHvg8XYs', 'price_1KjSLlGH46eYKnWwAwMW2wiW', 6442450944, 536870912000, 100000, 'Best for medium enterprises', 0, 0, 0, NULL, NULL, NULL, 18000);
+    INSERT INTO "public"."plans" ("created_at", "updated_at", "name", "description", "price_m", "price_y", "stripe_id", "id", "price_m_id", "price_y_id", "storage", "bandwidth", "mau", "market_desc", "build_time_unit") VALUES
+    (now(), now(), 'Maker', 'plan.maker.desc', 39, 396, 'prod_LQIs1Yucml9ChU', '440cfd69-0cfd-486e-b59b-cb99f7ae76a0', 'price_1KjSGyGH46eYKnWwL4h14DsK', 'price_1KjSKIGH46eYKnWwFG9u4tNi', 3221225472, 268435456000, 10000, 'Best for small business owners', 3600),
+    (now(), now(), 'Pay as you go', 'plan.payasyougo.desc', 239, 4799, 'prod_MH5Jh6ajC9e7ZH', '745d7ab3-6cd6-4d65-b257-de6782d5ba50', 'price_1LYX8yGH46eYKnWwzeBjISvW', 'price_1LYX8yGH46eYKnWwzeBjISvW', 12884901888, 3221225472000, 1000000, 'Best for scalling enterprises', 600000),
+    (now(), now(), 'Solo', 'plan.solo.desc', 14, 146, 'prod_LQIregjtNduh4q', '526e11d8-3c51-4581-ac92-4770c602f47c', 'price_1LVvuZGH46eYKnWwuGKOf4DK', 'price_1LVvuIGH46eYKnWwHMDCrxcH', 1073741824, 13958643712, 1000, 'Best for independent developers', 1800),
+    (now(), now(), 'Team', 'plan.team.desc', 99, 998, 'prod_LQIugvJcPrxhda', 'abd76414-8f90-49a5-b3a4-8ff4d2e12c77', 'price_1KjSIUGH46eYKnWwWHvg8XYs', 'price_1KjSLlGH46eYKnWwAwMW2wiW', 6442450944, 536870912000, 100000, 'Best for medium enterprises', 18000);
 
     INSERT INTO
       "public"."capgo_credits_steps" (
@@ -975,85 +975,6 @@ FROM
   PUBLIC;
 
 GRANT ALL ON FUNCTION "public"."reset_and_seed_app_stats_data" ("p_app_id" character varying) TO "service_role";
-
-/*---------------------
----- install dbdev ----
-----------------------
-Requires:
-- pg_tle: https://github.com/aws/pg_tle
-- pgsql-http: https://github.com/pramsey/pgsql-http
--- */
-DO $$
-DECLARE
-    internet_available BOOLEAN := FALSE;
-    connectivity_error TEXT;
-BEGIN
-    -- Only attempt dbdev installation if extensions are available
-    IF EXISTS (SELECT 1 FROM pg_available_extensions WHERE name = 'http') AND
-       EXISTS (SELECT 1 FROM pg_available_extensions WHERE name = 'pg_tle') THEN
-
-        -- Create extensions first
-        create extension if not exists http with schema extensions;
-        create extension if not exists pg_tle;
-
-        -- Attempt dbdev installation directly, catching network errors
-        BEGIN
-            drop extension if exists "supabase-dbdev";
-            PERFORM pgtle.uninstall_extension_if_exists('supabase-dbdev');
-
-            PERFORM pgtle.install_extension(
-                'supabase-dbdev',
-                resp.contents ->> 'version',
-                'PostgreSQL package manager',
-                resp.contents ->> 'sql'
-            )
-            from extensions.http(
-                (
-                    'GET',
-                    'https://api.database.dev/rest/v1/'
-                    || 'package_versions?select=sql,version'
-                    || '&package_name=eq.supabase-dbdev'
-                    || '&order=version.desc'
-                    || '&limit=1',
-                    array[
-                        ('apiKey', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhtdXB0cHBsZnZpaWZyYndtbXR2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE2ODAxMDczNzIsImV4cCI6MTk5NTY4MzM3Mn0.z2CN0mvO2No8wSi46Gw59DFGCTJrzM0AQKsu_5k134s')::http_header
-                    ],
-                    null,
-                    null
-                )
-            ) x,
-            lateral (
-                select
-                    ((row_to_json(x) -> 'content') #>> '{}')::json -> 0
-            ) resp(contents);
-
-            create extension if not exists "supabase-dbdev";
-
-            -- Check if dbdev schema exists before using it
-            IF EXISTS (SELECT 1 FROM information_schema.schemata WHERE schema_name = 'dbdev') THEN
-                PERFORM dbdev.install('supabase-dbdev');
-                drop extension if exists "supabase-dbdev";
-                create extension "supabase-dbdev";
-                PERFORM dbdev.install('basejump-supabase_test_helpers');
-                RAISE NOTICE 'supabase-dbdev extension installed successfully';
-            END IF;
-
-        EXCEPTION WHEN OTHERS THEN
-            -- Check if it's a network-related error
-            IF SQLERRM ILIKE '%could not connect%' OR
-               SQLERRM ILIKE '%network%' OR
-               SQLERRM ILIKE '%timeout%' OR
-               SQLERRM ILIKE '%unreachable%' OR
-               SQLERRM ILIKE '%connection%' THEN
-                RAISE NOTICE 'No internet connection available - skipping supabase-dbdev installation';
-            ELSE
-                RAISE NOTICE 'dbdev installation failed: %', SQLERRM;
-            END IF;
-        END;
-    ELSE
-        RAISE NOTICE 'Required extensions (http, pg_tle) not available for dbdev installation';
-    END IF;
-END $$;
 
 -- Seed data
 DO $$

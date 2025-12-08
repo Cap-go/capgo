@@ -1,9 +1,6 @@
 BEGIN;
 
-CREATE EXTENSION "basejump-supabase_test_helpers";
-
-SELECT
-  plan (19);
+SELECT plan(8);
 
 DO $$
 BEGIN
