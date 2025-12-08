@@ -6,7 +6,7 @@ import { computed, ref, watch, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { openCheckout } from '~/services/stripe'
-import { getCurrentPlanNameOrg } from '~/services/supabase'
+import { getCreditUnitPricing, getCurrentPlanNameOrg } from '~/services/supabase'
 import { openSupport } from '~/services/support'
 import { sendEvent } from '~/services/tracking'
 import { useDialogV2Store } from '~/stores/dialogv2'
@@ -32,6 +32,7 @@ const dialogStore = useDialogV2Store()
 const isMobile = Capacitor.isNativePlatform()
 
 const { currentOrganization } = storeToRefs(organizationStore)
+const creditUnitPrices = ref<Partial<Record<Database['public']['Enums']['credit_metric_type'], number>>>({})
 
 function planFeatures(plan: Database['public']['Tables']['plans']['Row']) {
   // Convert build time from seconds to hours or minutes for display
@@ -60,15 +61,15 @@ function planFeatures(plan: Database['public']['Tables']['plans']['Row']) {
   // Track the index of build time for "Pay as you go" pricing
   const buildTimeIndex = 3
 
-  if (plan.name.toLowerCase().includes('as you go')) {
-    if (plan.mau_unit)
-      features[0] += ` included, then $${plan.mau_unit}/user`
+  if (true) {
+    if (creditUnitPrices.value.mau)
+      features[0] += ` included, then $${creditUnitPrices.value.mau}/user`
 
-    if (plan.storage_unit)
-      features[1] += ` included, then $${plan.storage_unit} per GB`
+    if (creditUnitPrices.value.storage)
+      features[1] += ` included, then $${creditUnitPrices.value.storage} per GB`
 
-    if (plan.bandwidth_unit)
-      features[2] += ` included, then $${plan.bandwidth_unit} per GB`
+    if (creditUnitPrices.value.bandwidth)
+      features[2] += ` included, then $${creditUnitPrices.value.bandwidth} per GB`
 
     if (plan.build_time_unit && buildTimeDisplay)
       features[buildTimeIndex] += ` included, then $${plan.build_time_unit} per hour`
@@ -142,6 +143,10 @@ function isYearlyPlan(plan: Database['public']['Tables']['plans']['Row'], t: 'm'
   return t === 'y'
 }
 
+async function loadCreditPricing(orgId?: string) {
+  creditUnitPrices.value = await getCreditUnitPricing(orgId)
+}
+
 async function loadData(initial: boolean) {
   if (!initialLoad.value && !initial)
     return
@@ -153,10 +158,13 @@ async function loadData(initial: boolean) {
   if (!orgId)
     throw new Error('Cannot get current org id')
 
-  getCurrentPlanNameOrg(orgId).then((res) => {
-    console.log('getCurrentPlanNameOrg', res)
-    currentPlan.value = main.plans.find(plan => plan.name === res)
-  })
+  await Promise.all([
+    loadCreditPricing(orgId),
+    getCurrentPlanNameOrg(orgId).then((res) => {
+      console.log('getCurrentPlanNameOrg', res)
+      currentPlan.value = main.plans.find(plan => plan.name === res)
+    }),
+  ])
   initialLoad.value = true
 }
 
