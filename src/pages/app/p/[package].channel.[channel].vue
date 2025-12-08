@@ -14,9 +14,9 @@ import IconDevice from '~icons/heroicons/device-phone-mobile'
 import IconInformation from '~icons/heroicons/information-circle'
 import IconNext from '~icons/ic/round-keyboard-arrow-right'
 import IconSearch from '~icons/ic/round-search?raw'
-import plusOutline from '~icons/ion/add-outline?width=2em&height=2em'
 import IconAlertCircle from '~icons/lucide/alert-circle'
 import IconDown from '~icons/material-symbols/keyboard-arrow-down-rounded'
+import { appTabs } from '~/constants/appTabs'
 import { formatDate } from '~/services/date'
 import { checkCompatibilityNativePackages, isCompatible, useSupabase } from '~/services/supabase'
 import { isInternalVersionName } from '~/services/versions'
@@ -42,6 +42,8 @@ const loading = ref(true)
 const deviceIds = ref<string[]>([])
 const channel = ref<Database['public']['Tables']['channels']['Row'] & Channel>()
 const ActiveTab = ref(route.query.tab?.toString() || 'info')
+const appTabsActive = ref('channels')
+const appTabsConst: Tab[] = appTabs
 const deviceIdInput = ref('')
 
 // Bundle link dialog state
@@ -221,6 +223,11 @@ const tabs: Tab[] = [
     key: 'history',
   },
 ]
+
+function onAppTabChange(tabKey: string) {
+  appTabsActive.value = tabKey
+  router.push(`/app/p/${route.params.package}?tab=${tabKey}`)
+}
 function openBundle() {
   if (!channel.value || channel.value.version.storage_provider === 'revert_to_builtin')
     return
@@ -643,7 +650,16 @@ async function handleRevert() {
       <Spinner size="w-40 h-40" />
     </div>
     <div v-else-if="channel">
-      <Tabs v-model:active-tab="ActiveTab" :tabs="tabs" />
+      <Tabs
+        v-model:active-tab="appTabsActive"
+        :tabs="appTabsConst"
+        :secondary-tabs="tabs"
+        :secondary-active-tab="ActiveTab"
+        no-wrap
+        class="mb-2"
+        @update:secondary-active-tab="val => ActiveTab = val"
+        @update:active-tab="onAppTabChange"
+      />
       <div v-if="channel && ActiveTab === 'info'" class="mt-0 md:mt-8">
         <div class="w-full h-full px-0 pt-0 mx-auto mb-8 sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
           <div class="flex flex-col bg-white border shadow-lg md:rounded-lg border-slate-300 dark:border-slate-900 dark:bg-slate-800">

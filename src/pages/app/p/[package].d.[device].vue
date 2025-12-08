@@ -14,6 +14,8 @@ import IconLog from '~icons/heroicons/document'
 import IconInformation from '~icons/heroicons/information-circle'
 import IconAlertCircle from '~icons/lucide/alert-circle'
 import IconDown from '~icons/material-symbols/keyboard-arrow-down-rounded'
+import { appTabs } from '~/constants/appTabs'
+import Tabs from '~/components/Tabs.vue'
 import { useDeviceUpdateFormat } from '~/composables/useDeviceUpdateFormat'
 import { formatDate } from '~/services/date'
 import { defaultApiHost, useSupabase } from '~/services/supabase'
@@ -37,6 +39,8 @@ const packageId = ref<string>('')
 const id = ref<string>()
 const isLoading = ref(true)
 const ActiveTab = ref(route.query.tab?.toString() || 'info')
+const appTabsActive = ref('devices')
+const appTabsConst: Tab[] = appTabs
 
 watchEffect(() => {
   router.replace({ query: { ...route.query, tab: ActiveTab.value } })
@@ -74,6 +78,11 @@ const tabs: Tab[] = [
     key: 'logs',
   },
 ]
+
+function onAppTabChange(tabKey: string) {
+  appTabsActive.value = tabKey
+  router.push(`/app/p/${route.params.package}?tab=${tabKey}`)
+}
 
 async function getVersion() {
   try {
@@ -405,7 +414,16 @@ async function copyCurlCommand() {
       <Spinner size="w-40 h-40" />
     </div>
     <div v-else-if="device">
-      <Tabs v-model:active-tab="ActiveTab" :tabs="tabs" />
+      <Tabs
+        v-model:active-tab="appTabsActive"
+        :tabs="appTabsConst"
+        :secondary-tabs="tabs"
+        :secondary-active-tab="ActiveTab"
+        no-wrap
+        class="mb-2"
+        @update:active-tab="onAppTabChange"
+        @update:secondary-active-tab="val => ActiveTab = val"
+      />
       <div v-if="ActiveTab === 'info'" id="devices" class="mt-0 md:mt-8">
         <div class="px-0 pt-0 mx-auto mb-8 w-full h-full sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
           <div v-if="device.plugin_version === '0.0.0'" class="my-2 mr-auto ml-auto text-center text-white rounded-2xl border-8 bg-[#ef4444] w-fit border-[#ef4444]">

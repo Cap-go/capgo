@@ -22,6 +22,7 @@ import { useDialogV2Store } from '~/stores/dialogv2'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
+import { appTabs } from '~/constants/appTabs'
 
 const { t } = useI18n()
 const route = useRoute('/app/p/[package].bundle.[bundle]')
@@ -32,6 +33,8 @@ const organizationStore = useOrganizationStore()
 const main = useMainStore()
 const supabase = useSupabase()
 const ActiveTab = ref('info')
+const appTabsActive = ref('bundles')
+const appTabsConst: Tab[] = appTabs
 const packageId = ref<string>('')
 const id = ref<number>()
 const loading = ref(true)
@@ -125,6 +128,11 @@ const tabs: Tab[] = [
     key: 'info',
   },
 ]
+
+function onAppTabChange(tabKey: string) {
+  appTabsActive.value = tabKey
+  router.push(`/app/p/${route.params.package}?tab=${tabKey}`)
+}
 
 async function getChannels() {
   if (!version.value)
@@ -680,7 +688,16 @@ async function deleteBundle() {
       <Spinner size="w-40 h-40" />
     </div>
     <div v-else-if="version">
-      <Tabs v-model:active-tab="ActiveTab" :tabs="tabs" />
+      <Tabs
+        v-model:active-tab="appTabsActive"
+        :tabs="appTabsConst"
+        :secondary-tabs="tabs"
+        :secondary-active-tab="ActiveTab"
+        no-wrap
+        class="mb-2"
+        @update:active-tab="onAppTabChange"
+        @update:secondary-active-tab="val => ActiveTab = val"
+      />
       <div v-if="ActiveTab === 'info'" id="devices" class="mt-0 md:mt-8">
         <div class="overflow-y-auto px-0 pt-0 mx-auto mb-8 w-full h-full sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
           <div
