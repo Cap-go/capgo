@@ -71,7 +71,7 @@ function planFeatures(plan: Database['public']['Tables']['plans']['Row']) {
     features[2] += ` included, then $${creditUnitPrices.value.bandwidth} per GB`
 
   if (plan.build_time_unit && buildTimeDisplay)
-    features[buildTimeIndex] += ` included, then $${plan.build_time_unit} per hour`
+    features[buildTimeIndex] += ` included, then $${creditUnitPrices.value.build_time} per hour`
 
   features.push('Dedicated support')
   features.push('Custom Domain')
