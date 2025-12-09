@@ -1127,9 +1127,63 @@ describe('[PUT] /channel_self - new plugin version (>= 7.34.0) behavior', () => 
 })
 
 describe('[DELETE] /channel_self - new plugin version (>= 7.34.0) behavior', () => {
-  it('should return success without database operations for new plugin versions', async () => {
+  it('should return success and clean up old channel_devices entries for new plugin versions', async () => {
+    const deviceId = randomUUID()
+    const data = getBaseData(APPNAME)
+    data.device_id = deviceId
+    data.plugin_version = '7.34.0'
+
+    // First create an old channel_devices entry (simulating migration from old version)
+    const { data: productionChannel } = await getSupabaseClient()
+      .from('channels')
+      .select('id, owner_org')
+      .eq('name', 'production')
+      .eq('app_id', APPNAME)
+      .single()
+
+    expect(productionChannel).toBeTruthy()
+
+    await getSupabaseClient()
+      .from('channel_devices')
+      .insert({
+        app_id: APPNAME,
+        channel_id: productionChannel!.id,
+        device_id: deviceId,
+        owner_org: productionChannel!.owner_org,
+      })
+
+    // Verify the old entry exists
+    let { data: beforeDelete } = await getSupabaseClient()
+      .from('channel_devices')
+      .select('*')
+      .eq('device_id', deviceId)
+      .eq('app_id', APPNAME)
+      .maybeSingle()
+
+    expect(beforeDelete).toBeTruthy()
+
+    // Call DELETE with new plugin version
+    const response = await fetchEndpoint('DELETE', data)
+    expect(response.status).toBe(200)
+
+    const result = await response.json<{ status: string }>()
+    expect(result.status).toBe('ok')
+
+    // Verify the old entry was cleaned up
+    const { data: afterDelete } = await getSupabaseClient()
+      .from('channel_devices')
+      .select('*')
+      .eq('device_id', deviceId)
+      .eq('app_id', APPNAME)
+      .maybeSingle()
+
+    expect(afterDelete).toBeNull()
+  })
+
+  it('should return success even when no old channel_devices entry exists', async () => {
     const data = getBaseData(APPNAME)
     data.plugin_version = '7.34.0'
+    data.device_id = randomUUID()
 
     const response = await fetchEndpoint('DELETE', data)
     expect(response.status).toBe(200)

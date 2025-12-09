@@ -397,18 +397,23 @@ async function deleteOverride(c: Context, drizzleClient: ReturnType<typeof getDr
     cloudlog({ requestId: c.get('requestId'), message: 'Failed to parse plugin version in DELETE, assuming < 7.34.0', plugin_version: pluginVersion, error })
   }
 
-  // For v7.34.0+: No database operation needed (plugin handles locally)
-  if (isNewVersion) {
-    cloudlog({ requestId: c.get('requestId'), message: 'Plugin v7.34.0+ detected in unsetChannel, no database operation needed' })
-    await sendStatsAndDevice(c, device, [{ action: 'unsetChannel' }])
-    return c.json(BRES)
-  }
-
-  // Old behavior (< v7.34.0): Delete from channel_devices table
+  // For v7.34.0+: Still check and clean up old channel_devices entries (migration cleanup)
   // Read operation can use v2 flag
   const dataChannelOverride = isV2
     ? await getChannelDeviceOverrideD1(c, app_id, device_id, drizzleClientD1)
     : await getChannelDeviceOverridePg(c, app_id, device_id, drizzleClient as ReturnType<typeof getDrizzleClient>)
+
+  if (isNewVersion) {
+    // For v7.34.0+: Clean up old entry if it exists from previous versions
+    if (dataChannelOverride?.channel_id) {
+      cloudlog({ requestId: c.get('requestId'), message: 'Plugin v7.34.0+ detected in unsetChannel, cleaning up old channel_devices entry' })
+      await deleteChannelDevicePg(c, app_id, device_id, drizzleClient)
+    }
+    await sendStatsAndDevice(c, device, [{ action: 'setChannel' }])
+    return c.json(BRES)
+  }
+
+  // Old behavior (< v7.34.0): Validate and delete from channel_devices table
 
   if (!dataChannelOverride?.channel_id) {
     return simpleError200(c, 'cannot_override', 'Cannot change device override current channel don\'t allow it')
