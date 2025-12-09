@@ -15,7 +15,7 @@ BEGIN
   SELECT row_to_json(u)::jsonb INTO old_record_json
   FROM (
     SELECT *
-    FROM users
+    FROM public.users
     WHERE id = user_id_fn
   ) AS u;
   
@@ -24,9 +24,12 @@ BEGIN
   PERFORM "pgmq"."send"(
     'on_user_delete'::text,
     "jsonb_build_object"(
-      'old_record', old_record_json,
-      "table": "users",
-      "type": "DELETE",
+      'payload', "jsonb_build_object"(
+        'old_record', old_record_json,
+        'table', 'users',
+        'type', 'DELETE'
+      ),
+      'function_name', 'on_user_delete'
     )
   );
   
