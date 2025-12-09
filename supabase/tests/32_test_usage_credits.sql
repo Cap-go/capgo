@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(8);
+SELECT plan(19);
 
 DO $$
 BEGIN
@@ -258,7 +258,7 @@ INSERT INTO public.usage_credit_transactions (
 SELECT
   org_id,
   grant_id,
-  'purchase',
+  'purchase'::public.credit_transaction_type,
   5,
   5,
   'Idempotency test transaction',
@@ -412,7 +412,7 @@ SELECT org_id,
 FROM alert_grant;
 
 DELETE FROM pgmq.q_credit_usage_alerts
-WHERE message -> 'payload' ->> 'org_id' = (SELECT org_id FROM test_credit_alerts_context LIMIT 1);
+WHERE (message -> 'payload' ->> 'org_id')::uuid = (SELECT org_id FROM test_credit_alerts_context LIMIT 1);
 
 UPDATE public.usage_credit_grants
 SET credits_consumed = credits_consumed + 60
@@ -430,7 +430,7 @@ INSERT INTO public.usage_credit_transactions (
 SELECT
   org_id,
   grant_id,
-  'deduction',
+  'deduction'::public.credit_transaction_type,
   -60,
   40,
   'Credit alert threshold 50 test',
@@ -454,7 +454,7 @@ INSERT INTO public.usage_credit_transactions (
 SELECT
   org_id,
   grant_id,
-  'deduction',
+  'deduction'::public.credit_transaction_type,
   -20,
   20,
   'Credit alert threshold 75 test',
@@ -478,7 +478,7 @@ INSERT INTO public.usage_credit_transactions (
 SELECT
   org_id,
   grant_id,
-  'deduction',
+  'deduction'::public.credit_transaction_type,
   -20,
   0,
   'Credit alert threshold 90-100 test',
@@ -491,7 +491,7 @@ SELECT
     (
       SELECT count(*)
       FROM pgmq.q_credit_usage_alerts
-      WHERE message -> 'payload' ->> 'org_id' = (SELECT org_id FROM test_credit_alerts_context)
+      WHERE (message -> 'payload' ->> 'org_id')::uuid = (SELECT org_id FROM test_credit_alerts_context)
     ),
     4::bigint,
     'credit usage alerts enqueue once per threshold at 50/75/90/100 percent'
@@ -502,7 +502,7 @@ SELECT
     (
       SELECT array_agg((message -> 'payload' ->> 'threshold')::int ORDER BY (message -> 'payload' ->> 'threshold')::int)
       FROM pgmq.q_credit_usage_alerts
-      WHERE message -> 'payload' ->> 'org_id' = (SELECT org_id FROM test_credit_alerts_context)
+      WHERE (message -> 'payload' ->> 'org_id')::uuid = (SELECT org_id FROM test_credit_alerts_context)
     ),
     ARRAY[50, 75, 90, 100]::int[],
     'credit usage alert payloads include expected thresholds'
@@ -514,8 +514,23 @@ CREATE TEMP TABLE test_usage_ledger_context (
 
 -- usage_credit_ledger view aggregates deductions per overage event
 WITH setup AS (
+  INSERT INTO public.orgs (
+    id,
+    created_by,
+    name,
+    management_email
+  )
+  VALUES (
+    gen_random_uuid(),
+    tests.get_supabase_uid('usage_credits_user'),
+    'Usage Ledger Org',
+    'usage-ledger@example.com'
+  )
+  RETURNING id AS org_id
+),
+context_insert AS (
   INSERT INTO test_usage_ledger_context (org_id)
-  VALUES (gen_random_uuid())
+  SELECT org_id FROM setup
   RETURNING org_id
 ),
 grant_one AS (
@@ -534,7 +549,7 @@ grant_one AS (
     now(),
     now() + interval '1 year',
     'manual'
-  FROM setup
+  FROM context_insert
   RETURNING id,
     org_id
 ),
@@ -554,7 +569,7 @@ grant_two AS (
     now(),
     now() + interval '1 year',
     'manual'
-  FROM setup
+  FROM context_insert
   RETURNING id,
     org_id
 ),
@@ -571,14 +586,14 @@ overage AS (
   )
   SELECT
     org_id,
-    'mau',
+    'mau'::public.credit_metric_type,
     1000,
     10,
     10,
     current_date - interval '1 month',
     current_date,
     jsonb_build_object('note', 'ledger view test overage')
-  FROM setup
+  FROM context_insert
   RETURNING id,
     org_id
 ),
@@ -595,7 +610,7 @@ consumptions AS (
     g.id,
     g.org_id,
     o.id,
-    'mau',
+    'mau'::public.credit_metric_type,
     6,
     now()
   FROM grant_one g,
@@ -605,7 +620,7 @@ consumptions AS (
     g.id,
     g.org_id,
     o.id,
-    'mau',
+    'mau'::public.credit_metric_type,
     4,
     now()
   FROM grant_two g,
@@ -625,7 +640,7 @@ deductions AS (
   SELECT
     o.org_id,
     g.id,
-    'deduction',
+    'deduction'::public.credit_transaction_type,
     -6,
     94,
     now() - interval '2 minutes',
@@ -637,7 +652,7 @@ deductions AS (
   SELECT
     o.org_id,
     g.id,
-    'deduction',
+    'deduction'::public.credit_transaction_type,
     -4,
     90,
     now() - interval '1 minute',
