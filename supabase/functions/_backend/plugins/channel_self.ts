@@ -3,6 +3,7 @@ import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { DeviceLink } from '../utils/plugin_parser.ts'
 import type { Database } from '../utils/supabase.types.ts'
+import { greaterOrEqual, parse } from '@std/semver'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod/mini'
 import { getAppStatus, setAppStatus } from '../utils/appStatus.ts'
@@ -35,6 +36,7 @@ export const jsonRequestSchema = z.looseObject({
   is_emulator: z.boolean(),
   defaultChannel: z.optional(z.string()),
   channel: z.optional(z.string()),
+  plugin_version: z.optional(z.string()),
   is_prod: z.boolean(),
   platform: devicePlatformScheme,
 })
@@ -124,9 +126,41 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
   }
 
   if (!dataChannel.allow_device_self_set) {
-    return simpleError200(c, 'channel_set_from_plugin_not_allowed', `This channel does not allow devices to self associate`, { channel, app_id })
+    return simpleError200(c, 'channel_self_set_not_allowed', `This channel does not allow devices to self associate`, { channel, app_id })
   }
 
+  // Check if plugin version is >= 7.34.0 (new local storage behavior)
+  const pluginVersion = body.plugin_version || '0.0.0'
+  let isNewVersion = false
+  try {
+    isNewVersion = greaterOrEqual(parse(pluginVersion), parse('7.34.0'))
+  }
+  catch (error) {
+    // If version parsing fails, assume old version (< 7.34.0)
+    cloudlog({ requestId: c.get('requestId'), message: 'Failed to parse plugin version, assuming < 7.34.0', plugin_version: pluginVersion, error })
+  }
+
+  // For v7.34.0+: Only validate, don't store in channel_devices
+  if (isNewVersion) {
+    cloudlog({ requestId: c.get('requestId'), message: 'Plugin v7.34.0+ detected, cleaning up old channel_devices entry if exists' })
+
+    // Clean up any existing channel_devices entry (migration)
+    if (dataChannelOverride) {
+      const success = await deleteChannelDevicePg(c, app_id, device_id, drizzleClient)
+      if (!success) {
+        cloudlog({ requestId: c.get('requestId'), message: 'Failed to delete old channel_devices entry during migration' })
+      }
+    }
+
+    // Return validation result only (plugin will store locally)
+    await sendStatsAndDevice(c, device, [{ action: 'setChannel' }])
+    return c.json({
+      status: 'ok',
+      allowSet: dataChannel.allow_device_self_set,
+    })
+  }
+
+  // Old behavior (< v7.34.0): Store in channel_devices table
   // Get the main channel - Read operation can use v2 flag
   const mainChannel = isV2
     ? await getMainChannelsD1(c, app_id, drizzleClientD1)
@@ -220,6 +254,43 @@ async function put(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient
   }
   await setAppStatus(c, app_id, 'cloud')
 
+  // Check if plugin version is >= 7.34.0 (new local storage behavior)
+  const pluginVersion = body.plugin_version || '0.0.0'
+  let isNewVersion = false
+  try {
+    isNewVersion = greaterOrEqual(parse(pluginVersion), parse('7.34.0'))
+  }
+  catch (error) {
+    // If version parsing fails, assume old version (< 7.34.0)
+    cloudlog({ requestId: c.get('requestId'), message: 'Failed to parse plugin version in PUT, assuming < 7.34.0', plugin_version: pluginVersion, error })
+  }
+
+  // For v7.34.0+: Use channel from request body (plugin sends its local channelOverride)
+  if (isNewVersion) {
+    cloudlog({ requestId: c.get('requestId'), message: 'Plugin v7.34.0+ detected in getChannel, using channel from request body' })
+    const channelOverride = body.channel
+
+    if (channelOverride) {
+      // Return the channel they sent (it's stored locally)
+      await sendStatsAndDevice(c, device, [{ action: 'getChannel' }])
+      return c.json({
+        channel: channelOverride,
+        status: 'override',
+        allowSet: true, // Already validated when they set it
+      })
+    }
+    else {
+      // No override, use defaultChannel logic
+      const channelName = defaultChannel || 'production' // Fallback to production if no defaultChannel
+      await sendStatsAndDevice(c, device, [{ action: 'getChannel' }])
+      return c.json({
+        channel: channelName,
+        status: 'default',
+      })
+    }
+  }
+
+  // Old behavior (< v7.34.0): Query channel_devices table
   // Read operations can use v2 flag
   const versions = isV2
     ? await getAppVersionsByAppIdD1(c, app_id, version_name, drizzleClient as ReturnType<typeof getDrizzleClientD1Session>, PLAN_MAU_ACTIONS)
@@ -315,6 +386,25 @@ async function deleteOverride(c: Context, drizzleClient: ReturnType<typeof getDr
   }
   await setAppStatus(c, app_id, 'cloud')
 
+  // Check if plugin version is >= 7.34.0 (new local storage behavior)
+  const pluginVersion = body.plugin_version || '0.0.0'
+  let isNewVersion = false
+  try {
+    isNewVersion = greaterOrEqual(parse(pluginVersion), parse('7.34.0'))
+  }
+  catch (error) {
+    // If version parsing fails, assume old version (< 7.34.0)
+    cloudlog({ requestId: c.get('requestId'), message: 'Failed to parse plugin version in DELETE, assuming < 7.34.0', plugin_version: pluginVersion, error })
+  }
+
+  // For v7.34.0+: No database operation needed (plugin handles locally)
+  if (isNewVersion) {
+    cloudlog({ requestId: c.get('requestId'), message: 'Plugin v7.34.0+ detected in unsetChannel, no database operation needed' })
+    await sendStatsAndDevice(c, device, [{ action: 'unsetChannel' }])
+    return c.json(BRES)
+  }
+
+  // Old behavior (< v7.34.0): Delete from channel_devices table
   // Read operation can use v2 flag
   const dataChannelOverride = isV2
     ? await getChannelDeviceOverrideD1(c, app_id, device_id, drizzleClientD1)

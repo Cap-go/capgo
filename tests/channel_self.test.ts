@@ -991,3 +991,150 @@ it('saves default_channel when provided', async () => {
   // Clean up
   await getSupabaseClient().from('devices').delete().eq('device_id', uuid).eq('app_id', APPNAME)
 })
+
+describe('[POST] /channel_self - new plugin version (>= 7.34.0) behavior', () => {
+  it('should validate and return success without storing in channel_devices for new plugin versions', async () => {
+    const data = getBaseData(APPNAME)
+    data.plugin_version = '7.34.0' // New version
+    data.channel = 'production'
+
+    const response = await fetchEndpoint('POST', data)
+    expect(response.status).toBe(200)
+
+    const result = await response.json<{ status: string, allowSet: boolean }>()
+    expect(result.status).toBe('ok')
+    expect(result.allowSet).toBe(true)
+
+    // Verify it was NOT stored in channel_devices table
+    if (!data.device_id)
+      throw new Error('device_id is required')
+
+    const { data: channelDeviceData } = await getSupabaseClient()
+      .from('channel_devices')
+      .select('*')
+      .eq('device_id', data.device_id)
+      .eq('app_id', APPNAME)
+      .maybeSingle()
+
+    expect(channelDeviceData).toBeNull()
+  })
+
+  it('should return error when channel does not allow self-assignment for new plugin versions', async () => {
+    const data = getBaseData(APPNAME)
+    data.plugin_version = '7.34.0'
+    data.channel = 'production'
+
+    // Disable allow_device_self_set for production channel
+    await getSupabaseClient()
+      .from('channels')
+      .update({ allow_device_self_set: false })
+      .eq('name', 'production')
+      .eq('app_id', APPNAME)
+
+    await triggerD1Sync()
+
+    try {
+      const response = await fetchEndpoint('POST', data)
+      expect(response.status).toBe(200)
+
+      const result = await response.json<{ error: string }>()
+      expect(result.error).toBe('channel_self_set_not_allowed')
+    }
+    finally {
+      // Re-enable allow_device_self_set
+      await getSupabaseClient()
+        .from('channels')
+        .update({ allow_device_self_set: true })
+        .eq('name', 'production')
+        .eq('app_id', APPNAME)
+
+      await triggerD1Sync()
+    }
+  })
+
+  it('should clean up old channel_devices entry when migrating from old to new version', async () => {
+    const deviceId = randomUUID()
+    const data = getBaseData(APPNAME)
+    data.device_id = deviceId
+
+    // First, set channel with old version (stores in channel_devices)
+    data.plugin_version = '7.33.0'
+    data.channel = 'production'
+
+    const oldResponse = await fetchEndpoint('POST', data)
+    expect(oldResponse.status).toBe(200)
+
+    // Verify it was stored in channel_devices
+    let { data: oldChannelDevice } = await getSupabaseClient()
+      .from('channel_devices')
+      .select('*')
+      .eq('device_id', deviceId)
+      .eq('app_id', APPNAME)
+      .maybeSingle()
+
+    expect(oldChannelDevice).toBeTruthy()
+
+    // Then, set channel with new version (should clean up old entry)
+    data.plugin_version = '7.34.0'
+
+    const newResponse = await fetchEndpoint('POST', data)
+    expect(newResponse.status).toBe(200)
+
+    const result = await newResponse.json<{ status: string, allowSet: boolean }>()
+    expect(result.status).toBe('ok')
+    expect(result.allowSet).toBe(true)
+
+    // Verify old entry was deleted
+    const { data: newChannelDevice } = await getSupabaseClient()
+      .from('channel_devices')
+      .select('*')
+      .eq('device_id', deviceId)
+      .eq('app_id', APPNAME)
+      .maybeSingle()
+
+    expect(newChannelDevice).toBeNull()
+  })
+})
+
+describe('[PUT] /channel_self - new plugin version (>= 7.34.0) behavior', () => {
+  it('should return channel from request body for new plugin versions', async () => {
+    const data = getBaseData(APPNAME)
+    data.plugin_version = '7.34.0'
+    data.channel = 'production' // Plugin sends its local channelOverride
+    data.defaultChannel = 'production'
+
+    const response = await fetchEndpoint('PUT', data)
+    expect(response.status).toBe(200)
+
+    const result = await response.json<{ channel: string, status: string }>()
+    expect(result.channel).toBe('production')
+    expect(result.status).toBe('override')
+  })
+
+  it('should return defaultChannel when no channel override is set', async () => {
+    const data = getBaseData(APPNAME)
+    data.plugin_version = '7.34.0'
+    data.defaultChannel = 'production'
+    // No channel field - no override
+
+    const response = await fetchEndpoint('PUT', data)
+    expect(response.status).toBe(200)
+
+    const result = await response.json<{ channel: string, status: string }>()
+    expect(result.channel).toBe('production')
+    expect(result.status).toBe('default')
+  })
+})
+
+describe('[DELETE] /channel_self - new plugin version (>= 7.34.0) behavior', () => {
+  it('should return success without database operations for new plugin versions', async () => {
+    const data = getBaseData(APPNAME)
+    data.plugin_version = '7.34.0'
+
+    const response = await fetchEndpoint('DELETE', data)
+    expect(response.status).toBe(200)
+
+    const result = await response.json<{ status: string }>()
+    expect(result.status).toBe('ok')
+  })
+})
