@@ -813,7 +813,7 @@
   "picture-delete-fail": "アプリの画像を削除できません、コンソールログを確認してください",
   "picture-uploaded": "画像のアップロードに成功しました",
   "placeholder-2fa-code": "123456",
-  "plan": "Plan",
+  "plan": "プラン",
   "plan-bandwidth": "GB帯域幅",
   "plan-desc": "無料でビルドを始めて、ライブに移行するためのプランを追加してください。",
   "plan-failed": "計画が失敗しました、カードの詳細を確認してください。",

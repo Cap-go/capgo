@@ -815,7 +815,7 @@
   "picture-delete-fail": "앱 사진을 삭제할 수 없습니다, 콘솔 로그를 확인해 주세요",
   "picture-uploaded": "사진이 성공적으로 업로드되었습니다.",
   "placeholder-2fa-code": "123456",
-  "plan": "Plan",
+  "plan": "계획",
   "plan-bandwidth": "GB 대역폭",
   "plan-desc": "무료로 빌드를 시작한 후, 실시간으로 전환할 계획을 추가하세요.",
   "plan-failed": "계획이 실패했습니다, 카드 정보를 확인해 주세요.",
