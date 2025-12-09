@@ -1,9 +1,9 @@
 import type { Tab } from '~/components/comp_def'
 import IconChart from '~icons/heroicons/chart-bar'
 import IconPlan from '~icons/heroicons/credit-card'
+import IconCredits from '~icons/heroicons/currency-dollar'
 import IconInfo from '~icons/heroicons/information-circle'
 import IconUsers from '~icons/heroicons/users'
-import IconCredits from '~icons/heroicons/currency-dollar'
 
 export const organizationTabs: Tab[] = [
   { label: 'general', key: '/settings/organization', icon: IconInfo },
