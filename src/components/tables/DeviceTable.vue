@@ -228,7 +228,7 @@ async function refreshData() {
   }
 }
 async function openOne(one: Device) {
-  router.push(`/app/p/${props.appId}/d/${one.device_id}`)
+  router.push(`/app/${props.appId}/device/${one.device_id}`)
 }
 async function openOneVersion(one: Device) {
   if (!props.appId) {
@@ -237,7 +237,7 @@ async function openOneVersion(one: Device) {
   }
 
   if (one.version) {
-    router.push(`/app/p/${props.appId}/bundle/${one.version}`)
+    router.push(`/app/${props.appId}/bundle/${one.version}`)
     return
   }
 
@@ -253,7 +253,7 @@ async function openOneVersion(one: Device) {
     toast.error(t('cannot-find-version', 'Cannot find version'))
     return
   }
-  router.push(`/app/p/${props.appId}/bundle/${versionRecord.id}`)
+  router.push(`/app/${props.appId}/bundle/${versionRecord.id}`)
 }
 
 function handleAddDevice() {

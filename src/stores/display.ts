@@ -126,8 +126,8 @@ export const useDisplayStore = defineStore('display', () => {
     const breadcrumbs: BreadcrumbItem[] = []
 
     // App flow: Apps / <AppName> / <Section>
-    if (splitPath[0] === 'app' && splitPath[1] === 'p' && splitPath[2]) {
-      const appId = splitPath[2]
+    if (splitPath[0] === 'app' && splitPath[1]) {
+      const appId = splitPath[1]
       breadcrumbs.push({ path: '/app', name: 'apps' })
 
       // App name entry
@@ -136,7 +136,7 @@ export const useDisplayStore = defineStore('display', () => {
         ?? cachedName
         ?? appId
       breadcrumbs.push({
-        path: `/app/p/${appId}`,
+        path: `/app/${appId}`,
         name: resolvedName,
         translate: false,
       })
@@ -168,12 +168,37 @@ export const useDisplayStore = defineStore('display', () => {
       }
 
       // Additional segments after the app id (e.g., bundle, channel)
-      for (let i = 3; i < splitPath.length; i++) {
+      for (let i = 2; i < splitPath.length; i++) {
         const segment = splitPath[i]
         const prev = splitPath[i - 1]
 
+        // Handle plural tab names (bundles, channels, devices, etc.)
+        // Include them in breadcrumb if they're the last segment (final destination)
+        // Skip them if there are more segments after (intermediate path)
+        if (['bundles', 'channels', 'devices', 'logs', 'builds', 'info'].includes(segment)) {
+          const isLastSegment = i === splitPath.length - 1
+          if (isLastSegment) {
+            breadcrumbs.push({
+              path: `/app/${appId}/${segment}`,
+              name: segment,
+            })
+          }
+          continue
+        }
+
+        // Handle resource type segments (bundle, channel, device)
+        // These should link to the tab view in the main app page
+        if (['bundle', 'channel', 'device'].includes(segment)) {
+          const tabName = `${segment}s`
+          breadcrumbs.push({
+            path: `/app/${appId}/${tabName}`,
+            name: tabName,
+          })
+          continue
+        }
+
         // Handle ids following resource segments
-        if (/^\d+$/.test(segment) && ['bundle', 'channel', 'device', 'build'].includes(prev)) {
+        if (/^\d+$/.test(segment) && ['bundle', 'channel', 'build'].includes(prev)) {
           const pathUpToHere = `/${splitPath.slice(0, i + 1).join('/')}`
           const cached = prev === 'channel'
             ? channelNameCache.value.get(segment)
@@ -188,8 +213,8 @@ export const useDisplayStore = defineStore('display', () => {
           continue
         }
 
-        // Device ids (uuid-ish) following `/d/`
-        if (prev === 'd') {
+        // Device ids (uuid-ish) following `/device/`
+        if (prev === 'device') {
           const pathUpToHere = `/${splitPath.slice(0, i + 1).join('/')}`
           const cached = deviceNameCache.value.get(segment)
           breadcrumbs.push({

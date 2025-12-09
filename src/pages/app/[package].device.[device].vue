@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import type { Tab } from '~/components/comp_def'
 import type { OrganizationRole } from '~/stores/organization'
 import type { Database } from '~/types/supabase.types'
 import { greaterThan, parse } from '@std/semver'
@@ -11,19 +10,13 @@ import { toast } from 'vue-sonner'
 import IconExternalLink from '~icons/heroicons/arrow-top-right-on-square'
 import IconCopy from '~icons/heroicons/clipboard-document-check'
 import IconCode from '~icons/heroicons/code-bracket'
-import IconLog from '~icons/heroicons/document'
-import IconInformation from '~icons/heroicons/information-circle'
-import IconRocket from '~icons/heroicons/rocket-launch'
 import IconAlertCircle from '~icons/lucide/alert-circle'
 import IconDown from '~icons/material-symbols/keyboard-arrow-down-rounded'
-import Tabs from '~/components/Tabs.vue'
 import { useDeviceUpdateFormat } from '~/composables/useDeviceUpdateFormat'
-import { appTabs } from '~/constants/appTabs'
 import { formatDate } from '~/services/date'
 import { defaultApiHost, useSupabase } from '~/services/supabase'
-import { useDialogV2Store } from '~/stores/dialogv2'
+import { useAppDetailStore } from '~/stores/appDetail'
 import { useDisplayStore } from '~/stores/display'
-import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
 
 interface Channel {
@@ -31,28 +24,18 @@ interface Channel {
 }
 
 const displayStore = useDisplayStore()
-const dialogStore = useDialogV2Store()
 const { t } = useI18n()
-const main = useMainStore()
 const router = useRouter()
-const route = useRoute('/app/p/[package].d.[device]')
+const route = useRoute('/app/[package].device.[device]')
 const supabase = useSupabase()
 const packageId = ref<string>('')
 const id = ref<string>()
 const isLoading = ref(true)
-const ActiveTab = ref(route.query.tab?.toString() || 'info')
-const appTabsActive = ref('devices')
-const appTabsConst: Tab[] = appTabs
-
-watchEffect(() => {
-  router.replace({ query: { ...route.query, tab: ActiveTab.value } })
-})
-
+const appDetailStore = useAppDetailStore()
 const organizationStore = useOrganizationStore()
 
 const device = ref<Database['public']['Tables']['devices']['Row']>()
 const channels = ref<(Database['public']['Tables']['channels']['Row'] & Channel)[]>([])
-const versions = ref<Database['public']['Tables']['app_versions']['Row'][]>([])
 const channelDevice = ref<Database['public']['Tables']['channels']['Row']>()
 const role = ref<OrganizationRole | null>(null)
 const reloadCount = ref(0)
@@ -68,46 +51,6 @@ const showDebugSection = ref(false)
 
 onClickOutside(channelDropdown, () => closeChannelDropdown())
 
-const tabs: Tab[] = [
-  {
-    label: t('info'),
-    icon: IconInformation,
-    key: 'info',
-  },
-  {
-    label: t('deployments'),
-    icon: IconRocket,
-    key: 'deployments',
-  },
-  {
-    label: t('logs'),
-    icon: IconLog,
-    key: 'logs',
-  },
-]
-
-function onAppTabChange(tabKey: string) {
-  appTabsActive.value = tabKey
-  router.push(`/app/p/${route.params.package}?tab=${tabKey}`)
-}
-
-async function getVersion() {
-  try {
-    const { data } = await supabase
-      .from('app_versions')
-      .select()
-      .eq('app_id', packageId.value)
-      .eq('deleted', false)
-      .neq('storage_provider', 'revert_to_builtin')
-      .order('created_at', { ascending: false })
-      .throwOnError()
-    versions.value = data ?? []
-  }
-  catch (error) {
-    console.error(error)
-    versions.value = []
-  }
-}
 async function getChannels() {
   try {
     const { data } = await supabase
@@ -191,6 +134,19 @@ async function getVersionInfo() {
 async function getDevice() {
   if (!id.value)
     return
+
+  // Check if we already have this device in the store
+  if (appDetailStore.currentDeviceId === id.value && appDetailStore.currentDevice) {
+    device.value = appDetailStore.currentDevice
+    if (device.value) {
+      const pretty = device.value.device_id
+      if (pretty)
+        displayStore.setDeviceName(device.value.device_id, pretty)
+      displayStore.NavTitle = pretty || t('device')
+    }
+    return
+  }
+
   try {
     const { data: currentSession } = await supabase.auth.getSession()!
     if (!currentSession.session)
@@ -219,7 +175,11 @@ async function getDevice() {
       const dataD = await response.json() as { data: Database['public']['Tables']['devices']['Row'][], nextCursor?: string, hasMore: boolean }
       const data = dataD.data?.[0]
       device.value = data
+
+      // Store in appDetailStore
       if (device.value) {
+        appDetailStore.setDevice(id.value, device.value)
+
         const pretty = device.value.device_id
         if (pretty)
           displayStore.setDeviceName(device.value.device_id, pretty)
@@ -266,7 +226,6 @@ async function loadData() {
     getDevice(),
     getChannelOverride(),
     getChannels(),
-    getVersion(),
     getOrgRole(),
     loadRevertToNativeVersion(),
   ])
@@ -274,28 +233,9 @@ async function loadData() {
   isLoading.value = false
 }
 
-async function didCancel(name: string) {
-  dialogStore.openDialog({
-    title: t('alert-confirm-delete'),
-    description: `${t('alert-delete-message')} ${name} ${t('from-device')} ?`,
-    buttons: [
-      {
-        text: t('button-cancel'),
-        role: 'cancel',
-      },
-      {
-        text: t('button-delete'),
-        role: 'danger',
-        id: 'confirm-button',
-      },
-    ],
-  })
-  return dialogStore.onDialogDismiss()
-}
-
 async function upsertDevChannel(device: string, channelId: number) {
   const currentGid = organizationStore.currentOrganization?.gid
-  if (!main?.user?.id || !currentGid)
+  if (!currentGid)
     return
   return supabase
     .from('channel_devices')
@@ -308,9 +248,7 @@ async function upsertDevChannel(device: string, channelId: number) {
     .throwOnError()
 }
 
-async function delDevChannel(device: string, skipConfirm = false) {
-  if (!skipConfirm && await didCancel(t('channel')))
-    return
+async function delDevChannel(device: string) {
   return supabase
     .from('channel_devices')
     .delete()
@@ -338,7 +276,7 @@ async function onSelectChannel(value: string) {
     if (selectedChannel?.public === true) {
       // If trying to set override to default channel, remove any existing override
       if (channelDevice.value && device.value?.device_id) {
-        await delDevChannel(device.value?.device_id, true)
+        await delDevChannel(device.value?.device_id)
         toast.info(t('channel-override-ignored-default'))
         await loadData()
       }
@@ -386,31 +324,31 @@ async function onSelectChannel(value: string) {
 }
 
 watchEffect(async () => {
-  if (route.path.includes('/d/')) {
+  if (route.path.includes('/device/') && !route.path.includes('/deployments') && !route.path.includes('/logs')) {
     packageId.value = route.params.package as string
     id.value = route.params.device as string
     id.value = id.value!.toLowerCase()
     await loadData()
     if (!displayStore.NavTitle)
       displayStore.NavTitle = t('device')
-    displayStore.defaultBack = `/app/p/${route.params.package}/devices`
+    displayStore.defaultBack = `/app/${route.params.package}/devices`
   }
 })
 
 function openChannel() {
   if (packageId.value && channelDevice.value?.id)
-    router.push(`/app/p/${packageId.value}/channel/${channelDevice.value.id}`)
+    router.push(`/app/${packageId.value}/channel/${channelDevice.value.id}`)
 }
 function openDefaultChannel() {
   if (packageId.value && device.value?.default_channel) {
     const defaultChannel = channels.value.find(ch => ch.name === device.value?.default_channel)
     if (defaultChannel)
-      router.push(`/app/p/${packageId.value}/channel/${defaultChannel.id}`)
+      router.push(`/app/${packageId.value}/channel/${defaultChannel.id}`)
   }
 }
 function openBundle() {
   if (packageId.value && device.value?.version)
-    router.push(`/app/p/${packageId.value}/bundle/${device.value.version}`)
+    router.push(`/app/${packageId.value}/bundle/${device.value.version}`)
 }
 
 function getCurlCommand() {
@@ -445,154 +383,120 @@ async function copyCurlCommand() {
     <div v-if="isLoading" class="flex flex-col justify-center items-center min-h-[50vh]">
       <Spinner size="w-40 h-40" />
     </div>
-    <div v-else-if="device">
-      <Tabs
-        v-model:active-tab="appTabsActive"
-        :tabs="appTabsConst"
-        :secondary-tabs="tabs"
-        :secondary-active-tab="ActiveTab"
-        no-wrap
-        class="mb-2"
-        @update:active-tab="onAppTabChange"
-        @update:secondary-active-tab="val => ActiveTab = val"
-      />
-      <div v-if="ActiveTab === 'info'" id="devices" class="mt-0 md:mt-8">
-        <div class="w-full h-full px-0 pt-0 mx-auto mb-8 sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
-          <div v-if="device.plugin_version === '0.0.0'" class="my-2 mr-auto ml-auto text-center text-white rounded-2xl border-8 bg-[#ef4444] w-fit border-[#ef4444]">
-            {{ t('device-injected') }}
-            <br>
-            {{ t('device-injected-2') }}
-          </div>
-          <div class="flex flex-col bg-white border shadow-lg md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900">
-            <dl :key="reloadCount" class="divide-y divide-slate-200 dark:divide-slate-500">
-              <InfoRow :label="t('device-id')">
-                {{ device.device_id }}
-              </InfoRow>
-              <InfoRow v-if="device.custom_id" :label="t('custom-id')">
-                {{ device.custom_id }}
-              </InfoRow>
-              <InfoRow v-if="device.updated_at" :label="t('last-update')">
-                {{ formatDate(device.updated_at) }}
-              </InfoRow>
-              <InfoRow v-if="device.platform" :label="t('platform')">
-                {{ device.platform }}
-              </InfoRow>
-              <InfoRow v-if="device.plugin_version" :label="t('plugin-version')">
-                {{ device.plugin_version }}
-              </InfoRow>
-              <InfoRow v-if="device.version_name" :label="t('version')" is-link @click="openBundle()">
-                {{ device.version_name }}
-              </InfoRow>
-              <InfoRow v-if="device.version_build" :label="t('version-builtin')">
-                {{ device.version_build }}
-              </InfoRow>
-              <InfoRow v-if="device.os_version" :label="t('os-version')">
-                {{ device.os_version }}
-              </InfoRow>
-              <InfoRow v-if="minVersion(device.plugin_version) && device.is_emulator" :label="t('is-emulator')">
-                {{ device.is_emulator?.toString() }}
-              </InfoRow>
-              <InfoRow v-if="minVersion(device.plugin_version) && device.is_prod" :label="t('is-production-app')">
-                {{ device.is_prod?.toString() }}
-              </InfoRow>
-              <InfoRow v-if="device.default_channel" :label="t('default-channel')">
-                <div class="flex items-center gap-2">
-                  <span class="font-medium text-gray-900 dark:text-white">
-                    {{ device.default_channel }}
-                  </span>
-                  <IconExternalLink class="w-4 h-4 text-blue-600 dark:text-blue-400 cursor-pointer" @click="openDefaultChannel()" />
-                </div>
-              </InfoRow>
-              <InfoRow :label="t('channel-link')">
-                <div class="flex flex-col items-end gap-1">
-                  <div class="flex items-center gap-2">
-                    <details ref="channelDropdown" class="relative d-dropdown d-dropdown-end" @click.stop>
-                      <summary class="d-btn d-btn-outline d-btn-sm">
-                        <span>{{ channelDevice?.name ?? t('none') }}</span>
-                        <IconDown class="w-4 h-4 ml-1 fill-current" />
-                      </summary>
-                      <ul class="absolute right-0 z-50 w-48 p-2 mt-1 bg-white shadow-lg top-full d-dropdown-content dark:bg-base-200 rounded-box">
-                        <li class="block px-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600">
-                          <a
-                            class="block px-3 py-2 text-gray-900 dark:text-white"
-                            @click="onSelectChannel('none')"
-                          >
-                            {{ t('none') }}
-                          </a>
-                        </li>
-                        <li v-for="ch in channels" :key="ch.id" class="block px-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600">
-                          <a
-                            class="block px-3 py-2 text-gray-900 dark:text-white"
-                            @click="onSelectChannel(ch.id.toString())"
-                          >
-                            {{ ch.name }}
-                          </a>
-                        </li>
-                      </ul>
-                    </details>
-                    <IconExternalLink v-if="channelDevice" class="w-4 h-4 text-blue-600 dark:text-blue-400 cursor-pointer" @click="openChannel()" />
-                  </div>
-                  <span v-if="channelDevice" class="text-xs text-gray-500 dark:text-gray-400">
-                    {{ t('overriding-default-channel') }}
-                  </span>
-                </div>
-              </InfoRow>
-            </dl>
-
-            <!-- Debug API Section -->
-            <div class="border-t border-slate-300 dark:border-slate-700">
-              <button
-                class="flex items-center justify-between w-full px-6 py-4 transition-colors dark:hover:bg-slate-700/50 hover:bg-slate-50"
-                @click="showDebugSection = !showDebugSection"
-              >
-                <div class="flex items-center gap-2">
-                  <IconCode class="w-5 h-5 text-slate-600 dark:text-slate-300" />
-                  <span class="font-medium text-slate-700 dark:text-slate-200">{{ t('debug-api-request') }}</span>
-                </div>
-                <IconDown
-                  class="w-5 h-5 transition-transform text-slate-600 dark:text-slate-300"
-                  :class="{ 'rotate-180': showDebugSection }"
-                />
-              </button>
-
-              <div v-if="showDebugSection" class="px-6 pb-4">
-                <div class="relative">
-                  <pre class="p-4 overflow-x-auto text-sm rounded-lg bg-slate-900 text-slate-100"><code>{{ getCurlCommand() }}</code></pre>
-                  <button
-                    class="absolute p-2 transition-colors rounded top-2 right-2 hover:bg-slate-700"
-                    :title="t('copy-curl')"
-                    @click="copyCurlCommand"
-                  >
-                    <IconCopy class="w-4 h-4 text-slate-300" />
-                  </button>
-                </div>
-                <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">
-                  {{ t('debug-api-description') }}
-                </p>
+    <div v-else-if="device" id="devices" class="mt-0 md:mt-8">
+      <div class="w-full h-full px-0 pt-0 mx-auto mb-8 sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
+        <div v-if="device.plugin_version === '0.0.0'" class="my-2 mr-auto ml-auto text-center text-white rounded-2xl border-8 bg-[#ef4444] w-fit border-[#ef4444]">
+          {{ t('device-injected') }}
+          <br>
+          {{ t('device-injected-2') }}
+        </div>
+        <div class="flex flex-col bg-white border shadow-lg md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900">
+          <dl :key="reloadCount" class="divide-y divide-slate-200 dark:divide-slate-500">
+            <InfoRow :label="t('device-id')">
+              {{ device.device_id }}
+            </InfoRow>
+            <InfoRow v-if="device.custom_id" :label="t('custom-id')">
+              {{ device.custom_id }}
+            </InfoRow>
+            <InfoRow v-if="device.updated_at" :label="t('last-update')">
+              {{ formatDate(device.updated_at) }}
+            </InfoRow>
+            <InfoRow v-if="device.platform" :label="t('platform')">
+              {{ device.platform }}
+            </InfoRow>
+            <InfoRow v-if="device.plugin_version" :label="t('plugin-version')">
+              {{ device.plugin_version }}
+            </InfoRow>
+            <InfoRow v-if="device.version_name" :label="t('version')" is-link @click="openBundle()">
+              {{ device.version_name }}
+            </InfoRow>
+            <InfoRow v-if="device.version_build" :label="t('version-builtin')">
+              {{ device.version_build }}
+            </InfoRow>
+            <InfoRow v-if="device.os_version" :label="t('os-version')">
+              {{ device.os_version }}
+            </InfoRow>
+            <InfoRow v-if="minVersion(device.plugin_version) && device.is_emulator" :label="t('is-emulator')">
+              {{ device.is_emulator?.toString() }}
+            </InfoRow>
+            <InfoRow v-if="minVersion(device.plugin_version) && device.is_prod" :label="t('is-production-app')">
+              {{ device.is_prod?.toString() }}
+            </InfoRow>
+            <InfoRow v-if="device.default_channel" :label="t('default-channel')">
+              <div class="flex items-center gap-2">
+                <span class="font-medium text-gray-900 dark:text-white">
+                  {{ device.default_channel }}
+                </span>
+                <IconExternalLink class="w-4 h-4 text-blue-600 dark:text-blue-400 cursor-pointer" @click="openDefaultChannel()" />
               </div>
+            </InfoRow>
+            <InfoRow :label="t('channel-link')">
+              <div class="flex flex-col items-end gap-1">
+                <div class="flex items-center gap-2">
+                  <details ref="channelDropdown" class="relative d-dropdown d-dropdown-end" @click.stop>
+                    <summary class="d-btn d-btn-outline d-btn-sm">
+                      <span>{{ channelDevice?.name ?? t('none') }}</span>
+                      <IconDown class="w-4 h-4 ml-1 fill-current" />
+                    </summary>
+                    <ul class="absolute right-0 z-50 w-48 p-2 mt-1 bg-white shadow-lg top-full d-dropdown-content dark:bg-base-200 rounded-box">
+                      <li class="block px-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600">
+                        <a
+                          class="block px-3 py-2 text-gray-900 dark:text-white"
+                          @click="onSelectChannel('none')"
+                        >
+                          {{ t('none') }}
+                        </a>
+                      </li>
+                      <li v-for="ch in channels" :key="ch.id" class="block px-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600">
+                        <a
+                          class="block px-3 py-2 text-gray-900 dark:text-white"
+                          @click="onSelectChannel(ch.id.toString())"
+                        >
+                          {{ ch.name }}
+                        </a>
+                      </li>
+                    </ul>
+                  </details>
+                  <IconExternalLink v-if="channelDevice" class="w-4 h-4 text-blue-600 dark:text-blue-400 cursor-pointer" @click="openChannel()" />
+                </div>
+                <span v-if="channelDevice" class="text-xs text-gray-500 dark:text-gray-400">
+                  {{ t('overriding-default-channel') }}
+                </span>
+              </div>
+            </InfoRow>
+          </dl>
+
+          <!-- Debug API Section -->
+          <div class="border-t border-slate-300 dark:border-slate-700">
+            <button
+              class="flex items-center justify-between w-full px-6 py-4 transition-colors dark:hover:bg-slate-700/50 hover:bg-slate-50"
+              @click="showDebugSection = !showDebugSection"
+            >
+              <div class="flex items-center gap-2">
+                <IconCode class="w-5 h-5 text-slate-600 dark:text-slate-300" />
+                <span class="font-medium text-slate-700 dark:text-slate-200">{{ t('debug-api-request') }}</span>
+              </div>
+              <IconDown
+                class="w-5 h-5 transition-transform text-slate-600 dark:text-slate-300"
+                :class="{ 'rotate-180': showDebugSection }"
+              />
+            </button>
+
+            <div v-if="showDebugSection" class="px-6 pb-4">
+              <div class="relative">
+                <pre class="p-4 overflow-x-auto text-sm rounded-lg bg-slate-900 text-slate-100"><code>{{ getCurlCommand() }}</code></pre>
+                <button
+                  class="absolute p-2 transition-colors rounded top-2 right-2 hover:bg-slate-700"
+                  :title="t('copy-curl')"
+                  @click="copyCurlCommand"
+                >
+                  <IconCopy class="w-4 h-4 text-slate-300" />
+                </button>
+              </div>
+              <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">
+                {{ t('debug-api-description') }}
+              </p>
             </div>
-          </div>
-        </div>
-      </div>
-      <div v-else-if="ActiveTab === 'deployments'" id="deployments">
-        <div class="w-full h-full px-0 pt-0 mx-auto mb-8 overflow-y-auto sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
-          <div class="flex flex-col overflow-hidden overflow-y-auto bg-white border shadow-lg md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900">
-            <DeploymentTable
-              class="p-3"
-              :device-id="id"
-              :app-id="packageId"
-            />
-          </div>
-        </div>
-      </div>
-      <div v-else-if="ActiveTab === 'logs'" id="devices">
-        <div class="w-full h-full px-0 pt-0 mx-auto mb-8 overflow-y-auto sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
-          <div class="flex flex-col overflow-hidden overflow-y-auto bg-white border shadow-lg md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900">
-            <LogTable
-              class="p-3"
-              :device-id="id"
-              :app-id="packageId"
-            />
           </div>
         </div>
       </div>
@@ -605,9 +509,14 @@ async function copyCurlCommand() {
       <p class="mt-2 text-muted-foreground">
         {{ t('device-not-found-description') }}
       </p>
-      <button class="mt-4 text-white d-btn d-btn-primary" @click="router.push(`/app/p/${packageId}/devices`)">
+      <button class="mt-4 text-white d-btn d-btn-primary" @click="router.push(`/app/${packageId}/devices`)">
         {{ t('back-to-devices') }}
       </button>
     </div>
   </div>
 </template>
+
+<route lang="yaml">
+meta:
+  layout: device
+</route>

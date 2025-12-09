@@ -44,7 +44,7 @@ Chart.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, F
 
 const isDark = useDark()
 const { t } = useI18n()
-const route = useRoute('/app/p/[package]')
+const route = useRoute('/app/[package]')
 const organizationStore = useOrganizationStore()
 const supabase = useSupabase()
 

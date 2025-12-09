@@ -25,7 +25,7 @@ import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
 
 const { t } = useI18n()
-const route = useRoute('/app/p/[package].bundle.[bundle]')
+const route = useRoute('/app/[package].bundle.[bundle]')
 const router = useRouter()
 const dialogStore = useDialogV2Store()
 const displayStore = useDisplayStore()
@@ -33,7 +33,7 @@ const organizationStore = useOrganizationStore()
 const main = useMainStore()
 const supabase = useSupabase()
 const ActiveTab = ref('info')
-const appTabsActive = ref('bundles')
+const appTabsActive = ref('/bundles')
 const appTabsConst: Tab[] = appTabs
 const packageId = ref<string>('')
 const id = ref<number>()
@@ -131,7 +131,7 @@ const tabs: Tab[] = [
 
 function onAppTabChange(tabKey: string) {
   appTabsActive.value = tabKey
-  router.push(`/app/p/${route.params.package}?tab=${tabKey}`)
+  router.push(`/app/${route.params.package}${tabKey}`)
 }
 
 async function getChannels() {
@@ -151,7 +151,7 @@ async function getChannels() {
 async function openChannelLink() {
   if (!version.value || !channel.value)
     return
-  router.push(`/app/p/${version.value.app_id}/channel/${channel.value?.id}`)
+  router.push(`/app/${version.value.app_id}/channel/${channel.value?.id}`)
 }
 
 const showSize = computed(() => {
@@ -423,7 +423,7 @@ watchEffect(async () => {
     loading.value = false
     if (!version.value?.name)
       displayStore.NavTitle = t('bundle')
-    displayStore.defaultBack = `/app/p/${route.params.package}/bundles`
+    displayStore.defaultBack = `/app/${route.params.package}/bundles`
   }
 })
 
@@ -676,7 +676,7 @@ async function deleteBundle() {
     else {
       toast.success(t('bundle-deleted'))
       // Navigate back to the bundle list
-      router.push(`/app/p/${packageId.value}/bundles/`)
+      router.push(`/app/${packageId.value}/bundles/`)
     }
   }
   catch (error) {
@@ -848,7 +848,7 @@ async function deleteBundle() {
       <p class="mt-2 text-muted-foreground">
         {{ t('bundle-not-found-description') }}
       </p>
-      <button class="mt-4 text-white d-btn d-btn-primary" @click="router.push(`/app/p/${packageId}/bundles/`)">
+      <button class="mt-4 text-white d-btn d-btn-primary" @click="router.push(`/app/${packageId}/bundles/`)">
         {{ t('back-to-bundles') }}
       </button>
     </div>

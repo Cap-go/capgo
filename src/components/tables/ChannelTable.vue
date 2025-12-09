@@ -318,11 +318,11 @@ async function showAddModal() {
 }
 
 async function openOneVersion(one: Element) {
-  router.push(`/app/p/${props.appId}/bundle/${one.version?.id}`)
+  router.push(`/app/${props.appId}/bundle/${one.version?.id}`)
 }
 
 async function openOne(one: Element) {
-  router.push(`/app/p/${props.appId}/channel/${one.id}`)
+  router.push(`/app/${props.appId}/channel/${one.id}`)
 }
 watch(props, async () => {
   await refreshData()

@@ -430,7 +430,7 @@ columns.value = [
     onClick: async (elem: Element) => {
       if (elem.deleted || !channelCache.value[elem.id] || !channelCache.value[elem.id].id)
         return
-      router.push(`/app/p/${props.appId}/channel/${channelCache.value[elem.id].id}`)
+      router.push(`/app/${props.appId}/channel/${channelCache.value[elem.id].id}`)
     },
   },
   {
@@ -575,7 +575,7 @@ async function addOne() {
 async function openOne(one: Element) {
   if (one.deleted)
     return
-  router.push(`/app/p/${props.appId}/bundle/${one.id}`)
+  router.push(`/app/${props.appId}/bundle/${one.id}`)
 }
 
 async function updateOverallBundlesCount() {

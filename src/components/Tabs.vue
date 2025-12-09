@@ -23,7 +23,7 @@ function activeTabColor(tab: string, isSecondary = false) {
     return {
       'border border-transparent text-slate-500/75 dark:text-slate-400/75 hover:bg-slate-50/70 hover:ring-0 dark:hover:bg-slate-800/40 hover:text-slate-700 dark:hover:text-slate-200 transition-colors duration-150':
         !isActive,
-      'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/25 border border-blue-200/70 dark:border-blue-800 shadow-[0_1px_2px_rgba(0,0,0,0.06)] hover:ring-1 hover:ring-blue-200 dark:hover:ring-blue-700 hover:bg-blue-100/80 transition-colors duration-150':
+      'text-blue-600 dark:text-blue-400 bg-white dark:bg-slate-800 border border-blue-200/70 dark:border-blue-800 shadow-[0_1px_2px_rgba(0,0,0,0.06)] hover:ring-1 hover:ring-blue-200 dark:hover:ring-blue-700 hover:bg-blue-50 dark:hover:bg-slate-700 transition-colors duration-150':
         isActive,
     }
   }
@@ -33,7 +33,7 @@ function activeTabColor(tab: string, isSecondary = false) {
     return {
       'border border-transparent text-slate-500/75 dark:text-slate-400/75 hover:text-slate-700 dark:hover:text-slate-200 transition-colors duration-150':
         !isActive,
-      'text-blue-500 dark:text-blue-300 bg-blue-50/60 dark:bg-blue-900/15 border border-blue-200/60 dark:border-blue-800/70 shadow-[0_1px_2px_rgba(0,0,0,0.04)] hover:ring-1 hover:ring-blue-200 dark:hover:ring-blue-800 transition-colors duration-150':
+      'text-blue-500 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/20 border-t border-l border-r border-blue-200/60 dark:border-blue-800/70 border-b-0 shadow-none hover:ring-1 hover:ring-blue-200 dark:hover:ring-blue-800 transition-colors duration-150':
         isActive,
     }
   }
@@ -47,10 +47,14 @@ function activeTabColor(tab: string, isSecondary = false) {
 }
 
 // Keep tabs corners square to match surrounding layout
-const containerClass = 'bg-slate-200/60 dark:bg-slate-800/60'
-const ulPrimaryClass = 'flex -mb-px text-xs md:text-sm font-medium text-center text-gray-500 dark:text-gray-300 gap-1 py-1'
-const ulSecondaryClass = 'flex -mb-px text-sm font-medium text-center text-gray-600 dark:text-gray-200 gap-2 py-2'
-const buttonPrimaryClass = 'inline-flex items-center gap-2 px-3 py-2 min-w-[42px] min-h-[38px] rounded-md cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-50 dark:focus-visible:ring-offset-slate-900 transition-all duration-200 group md:relative'
+const containerClass = computed(() => hasSecondary.value
+  ? 'bg-slate-200/60 dark:bg-slate-800/60 pb-0'
+  : 'bg-slate-200/60 dark:bg-slate-800/60')
+const ulPrimaryClass = computed(() => hasSecondary.value
+  ? 'flex text-xs md:text-sm font-medium text-center text-gray-500 dark:text-gray-300 gap-1 pt-1 px-1'
+  : 'flex text-xs md:text-sm font-medium text-center text-gray-500 dark:text-gray-300 gap-1 py-1')
+const ulSecondaryClass = 'flex text-sm font-medium text-center text-gray-600 dark:text-gray-200 gap-2 py-2'
+const buttonPrimaryClass = 'inline-flex items-center gap-2 px-3 py-2 min-w-[42px] min-h-[38px] rounded-t-md cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-50 dark:focus-visible:ring-offset-slate-900 transition-all duration-200 group md:relative'
 const buttonSecondaryClass = 'inline-flex items-center gap-2 px-3 py-1.5 rounded-md cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-50 dark:focus-visible:ring-offset-slate-900 transition-colors duration-150 group'
 const iconPrimaryClass = 'w-5 h-5 transition-colors duration-150'
 const iconSecondaryClass = 'mx-auto w-5 h-5 md:mr-2 md:-ml-0.5 transition-colors duration-150'
@@ -64,8 +68,8 @@ const labelSecondaryClass = 'hidden md:block text-xs md:text-sm font-medium tran
   <div>
     <div :class="containerClass">
       <ul :class="[ulPrimaryClass, { 'flex-wrap': !noWrap, 'flex-nowrap overflow-x-scroll no-scrollbar px-1': noWrap }]">
-        <li v-for="(tab, i) in tabs" :key="i" class="mr-2">
-          <button :class="[buttonPrimaryClass, activeTabColor(tab.key)]" @click="emit('update:activeTab', tab.key)">
+        <li v-for="(tab, i) in tabs" :key="i" class="mr-2 relative" :class="[{ 'z-20': hasSecondary && props.activeTab === tab.key }]">
+          <button :class="[buttonPrimaryClass, activeTabColor(tab.key), hasSecondary && props.activeTab === tab.key ? 'rounded-b-none' : 'rounded-b-md']" @click="emit('update:activeTab', tab.key)">
             <component
               :is="tab.icon"
               :class="[
@@ -93,8 +97,8 @@ const labelSecondaryClass = 'hidden md:block text-xs md:text-sm font-medium tran
         </li>
       </ul>
     </div>
-    <div v-if="secondaryTabs?.length" class="border-t border-slate-200/70 dark:border-slate-700/60">
-      <div :class="containerClass">
+    <div v-if="secondaryTabs?.length" class="bg-blue-50 dark:bg-blue-900/20 relative border-t border-blue-200/60 dark:border-blue-800/70 -mt-px z-10">
+      <div>
         <ul :class="[ulSecondaryClass, { 'flex-wrap': !noWrap, 'flex-nowrap overflow-x-scroll no-scrollbar px-1': noWrap }]">
           <li v-for="(tab, i) in secondaryTabs" :key="i" class="mr-2">
             <button :class="[buttonSecondaryClass, activeTabColor(tab.key, true)]" @click="emit('update:secondaryActiveTab', tab.key)">
