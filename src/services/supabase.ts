@@ -87,13 +87,6 @@ export async function hashEmail(email: string) {
   return hashHex
 }
 
-export async function deleteUser() {
-  const { error } = await useSupabase()
-    .rpc('delete_user')
-    .single()
-  if (error)
-    throw new Error(error.message)
-}
 export function deleteSupabaseToken() {
   return localStorage.removeItem(`sb-${config.supbaseId}-auth-token`)
 }
