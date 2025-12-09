@@ -29,6 +29,7 @@ interface Props {
   columns: TableColumn[]
   elementList: { [key: string]: any }[]
   appId: string
+  autoReload?: boolean
 }
 const props = defineProps<Props>()
 const emit = defineEmits([
@@ -98,14 +99,6 @@ function sortClick(key: number) {
   emit('update:columns', newColumns)
 }
 
-watch(props.columns, () => {
-  emit('reload')
-})
-if (props.filters) {
-  watch(props.filters, () => {
-    emit('reload')
-  })
-}
 function rangesEqual(a?: [Date, Date], b?: [Date, Date]) {
   if (!a || !b)
     return a === b
@@ -139,16 +132,6 @@ watch(() => props.range, (newRange) => {
   }
 }, { immediate: true })
 
-watch(preciseDates, () => {
-  // console.log('preciseDates', preciseDates.value)
-  emit('update:range', preciseDates.value)
-  emit('reload')
-})
-
-watch(searchVal, useDebounceFn(() => {
-  emit('update:search', searchVal.value)
-  emit('reload')
-}, 500))
 
 function displayValueKey(elem: any, col: TableColumn | undefined) {
   if (!col)
@@ -286,16 +269,24 @@ function selectQuick(option: QuickHourOption) {
 }
 
 function updateUrlParams() {
-  const params = new URLSearchParams()
+  const params = new URLSearchParams(window.location.search)
   if (searchVal.value)
     params.set('search', searchVal.value)
+  else
+    params.delete('search')
   if (preciseDates.value) {
     params.set('start', dayjs(preciseDates.value[0]).toISOString())
     params.set('end', dayjs(preciseDates.value[1]).toISOString())
   }
+  else {
+    params.delete('start')
+    params.delete('end')
+  }
   props.columns.forEach((col) => {
     if (col.sortable && col.sortable !== true)
       params.set(`sort_${col.key}`, col.sortable)
+    else
+      params.delete(`sort_${col.key}`)
   })
   const paramsString = params.toString() ? `?${params.toString()}` : ''
   window.history.replaceState({}, '', `${window.location.pathname}${paramsString}`)
@@ -334,7 +325,6 @@ function loadFromUrlParams() {
     }
   })
   emit('update:columns', newColumns)
-  emit('reload')
 }
 
 // Cleanup on unmount
@@ -353,18 +343,24 @@ onUnmounted(() => {
 // Add watches
 watch(() => props.columns, useDebounceFn(() => {
   updateUrlParams()
+  if (props.autoReload === false)
+    return
   emit('reload')
 }, 500), { deep: true })
 
 watch(preciseDates, useDebounceFn(() => {
   updateUrlParams()
   emit('update:range', preciseDates.value)
+  if (props.autoReload === false)
+    return
   emit('reload')
 }, 500))
 
 watch(searchVal, useDebounceFn(() => {
   updateUrlParams()
   emit('update:search', searchVal.value)
+  if (props.autoReload === false)
+    return
   emit('reload')
 }, 500))
 

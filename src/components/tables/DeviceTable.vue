@@ -27,7 +27,7 @@ const router = useRouter()
 const total = ref(0)
 const search = ref('')
 const elements = ref<Device[]>([])
-const isLoading = ref(false)
+const isLoading = ref(true)
 const currentPage = ref(1)
 const nextCursor = ref<string | undefined>(undefined)
 const hasMore = ref(false)
@@ -192,6 +192,7 @@ async function getData() {
 }
 
 async function reload() {
+  isLoading.value = true
   try {
     elements.value.length = 0
     nextCursor.value = undefined
@@ -202,9 +203,14 @@ async function reload() {
   catch (error) {
     console.error(error)
   }
+  finally {
+    // getData normally resets this, but safeguard to cover early failures
+    isLoading.value = false
+  }
 }
 
 async function refreshData() {
+  isLoading.value = true
   try {
     currentPage.value = 1
     elements.value.length = 0
@@ -215,6 +221,10 @@ async function refreshData() {
   }
   catch (error) {
     console.error(error)
+  }
+  finally {
+    // getData normally resets this, but safeguard to cover early failures
+    isLoading.value = false
   }
 }
 async function openOne(one: Device) {

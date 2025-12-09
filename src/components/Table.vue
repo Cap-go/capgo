@@ -38,9 +38,12 @@ interface Props {
   columns: TableColumn[]
   elementList: { [key: string]: any }[]
   massSelect?: boolean
+  autoReload?: boolean
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+  autoReload: true,
+})
 const emit = defineEmits([
   'add',
   'reload',
@@ -59,6 +62,8 @@ const emit = defineEmits([
 ])
 const { t } = useI18n()
 const searchVal = ref(props.search ?? '')
+const pendingReset = ref(false)
+const pendingAdd = ref(false)
 // const sorts = ref<TableSort>({})
 // get columns from elementList
 
@@ -218,6 +223,7 @@ const debouncedSearch = useDebounceFn(() => {
   emit('update:search', searchVal.value)
 }, 1000)
 
+const hasRunInitialFilterSync = ref(false)
 const hasLoadingCycleCompleted = ref(false)
 const shouldShowRows = computed(
   () => !props.isLoading && props.elementList.length !== 0,
@@ -236,6 +242,8 @@ watch(
   () => props.columns,
   () => {
     debouncedUpdateUrlParams()
+    if (props.autoReload === false)
+      return
     debouncedReload()
   },
   { deep: true },
@@ -245,6 +253,13 @@ watch(
   () => props.filters,
   () => {
     debouncedUpdateUrlParams()
+    if (!hasRunInitialFilterSync.value) {
+      hasRunInitialFilterSync.value = true
+      if (props.autoReload === false)
+        return
+    }
+    if (props.autoReload === false)
+      return
     debouncedReload()
   },
   { deep: true, immediate: true },
@@ -253,6 +268,8 @@ watch(
 watch(searchVal, () => {
   debouncedSearch()
   debouncedUpdateUrlParams()
+  if (props.autoReload === false)
+    return
   debouncedReload()
 })
 
@@ -260,6 +277,8 @@ watch(
   () => props.currentPage,
   () => {
     debouncedUpdateUrlParams()
+    if (props.autoReload === false)
+      return
     debouncedReload()
   },
 )
@@ -267,6 +286,10 @@ watch(
 watch(
   () => props.isLoading,
   (loading, previousLoading) => {
+    if (!loading) {
+      pendingReset.value = false
+      pendingAdd.value = false
+    }
     if (previousLoading && !loading)
       hasLoadingCycleCompleted.value = true
   },
@@ -326,6 +349,29 @@ async function fastBackward() {
     emit('fastBackward')
     emit('update:currentPage', 1)
   }
+}
+
+function handleResetClick() {
+  pendingReset.value = true
+  emit('reset')
+  // Fallback: clear after two frames if parent doesn't toggle isLoading
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      if (!props.isLoading)
+        pendingReset.value = false
+    })
+  })
+}
+
+function handleAddClick() {
+  pendingAdd.value = true
+  emit('add')
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      if (!props.isLoading)
+        pendingAdd.value = false
+    })
+  })
 }
 watch(
   () => props.elementList,
@@ -388,6 +434,9 @@ const RenderCell = defineComponent<{
     return () => (props.renderer ? (props.renderer as any)(props.item) : null)
   },
 })
+
+const isReloading = computed(() => props.isLoading || pendingReset.value)
+const isAdding = computed(() => props.isLoading || pendingAdd.value)
 </script>
 
 <template>
@@ -396,18 +445,18 @@ const RenderCell = defineComponent<{
       <div class="flex h-10 md:mb-0">
         <button
           class="inline-flex items-center py-1.5 px-3 mr-2 text-sm font-medium text-gray-500 bg-white rounded-md border border-gray-300 cursor-pointer dark:text-white dark:bg-gray-800 dark:border-gray-600 hover:bg-gray-100 focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 focus:outline-hidden"
-          type="button" @click="emit('reset')"
+          type="button" @click="handleResetClick"
         >
-          <IconReload v-if="!isLoading" class="m-1 md:mr-2" />
+          <IconReload v-if="!isReloading" class="m-1 md:mr-2" />
           <Spinner v-else size="w-[16.8px] h-[16.8px] m-1 mr-2" />
           <span class="hidden text-sm md:block">{{ t("reload") }}</span>
         </button>
         <div v-if="showAdd" class="p-px mr-2 from-cyan-500 to-purple-500 rounded-lg bg-linear-to-r">
           <button
             class="inline-flex items-center py-1.5 px-3 text-sm font-medium text-gray-500 bg-white rounded-md cursor-pointer dark:text-white dark:bg-gray-800 hover:bg-gray-100 focus:ring-4 focus:ring-gray-200 dark:hover:bg-gray-700 dark:focus:ring-gray-700 focus:outline-hidden"
-            type="button" @click="emit('add')"
+            type="button" @click="handleAddClick"
           >
-            <plusOutline v-if="!isLoading" class="m-1 md:mr-2" />
+            <plusOutline v-if="!isAdding" class="m-1 md:mr-2" />
             <Spinner v-else size="w-[16.8px] h-[16.8px] m-1 mr-2" />
             <span class="hidden text-sm md:block">{{ t("add-one") }}</span>
           </button>

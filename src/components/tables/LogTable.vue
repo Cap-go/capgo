@@ -237,6 +237,7 @@ watch(props, async () => {
       :element-list="elements"
       filter-text="Filters"
       :is-loading="isLoading"
+      :auto-reload="false"
       :app-id="props.appId ?? ''"
       :search-placeholder="deviceId ? t('search-by-device-id-0') : t('search-by-device-id-')"
       @reload="reload()" @reset="refreshData()"

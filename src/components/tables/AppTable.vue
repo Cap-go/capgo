@@ -18,11 +18,14 @@ const props = defineProps<{
   currentPage?: number
   search?: string
   serverSidePagination?: boolean
+  isLoading?: boolean
 }>()
 const emit = defineEmits([
   'addApp',
   'update:currentPage',
   'update:search',
+  'reload',
+  'reset',
 ])
 const { t } = useI18n()
 const isMobile = Capacitor.isNativePlatform()
@@ -263,9 +266,12 @@ const filteredApps = computed(() => {
         :total="props.total ?? filteredApps.length"
         :element-list="filteredApps"
         :search-placeholder="t('search-by-name-or-app-id')"
-        :is-loading="false"
+        :is-loading="props.isLoading ?? false"
+        :auto-reload="false"
         filter-text="Filters"
         @add="emit('addApp')"
+        @reload="emit('reload')"
+        @reset="emit('reset')"
         @update:current-page="(page) => emit('update:currentPage', page)"
         @update:search="(val) => emit('update:search', val)"
       />
