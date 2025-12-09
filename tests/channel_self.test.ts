@@ -1135,6 +1135,7 @@ describe('[PUT] /channel_self - new plugin version (>= 7.34.0) behavior', () => 
     data.plugin_version = '7.34.0'
     data.defaultChannel = 'production'
     // No channel field - no override
+    delete data.channel // Remove the channel field to simulate no override
 
     const response = await fetchEndpoint('PUT', data)
     expect(response.status).toBe(200)
