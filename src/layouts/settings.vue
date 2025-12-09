@@ -17,7 +17,6 @@ import { useOrganizationStore } from '~/stores/organization'
 const { t } = useI18n()
 const organizationStore = useOrganizationStore()
 const router = useRouter()
-const creditsV2Enabled = import.meta.env.VITE_FEATURE_CREDITS_V2
 function getCurrentTab() {
   // look the path and set the active tab
   const path = router.currentRoute.value.path
@@ -91,7 +90,7 @@ watchEffect(() => {
     organizationTabs.value = organizationTabs.value.filter((tab: Tab) => tab.label !== 'usage')
   }
 
-  if (creditsV2Enabled && hasSuperAdminRights && !organizationTabs.value.find((tab: Tab) => tab.label === 'credits')) {
+  if (hasSuperAdminRights && !organizationTabs.value.find((tab: Tab) => tab.label === 'credits')) {
     const insertIndex = organizationTabs.value.findIndex((tab: Tab) => tab.label === 'members') + 1
     const creditsTab = {
       label: 'credits',
@@ -103,7 +102,7 @@ watchEffect(() => {
     else
       organizationTabs.value.push(creditsTab)
   }
-  else if ((!creditsV2Enabled || !hasSuperAdminRights) && organizationTabs.value.find((tab: Tab) => tab.label === 'credits')) {
+  else if (!hasSuperAdminRights && organizationTabs.value.find((tab: Tab) => tab.label === 'credits')) {
     organizationTabs.value = organizationTabs.value.filter((tab: Tab) => tab.label !== 'credits')
   }
   if (hasSuperAdminRights && !organizationTabs.value.find((tab: Tab) => tab.label === 'plans')) {

@@ -18,8 +18,6 @@ import { useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 import { useOrganizationStore } from '~/stores/organization'
 
-const creditsV2Enabled = import.meta.env.VITE_FEATURE_CREDITS_V2
-
 interface UsageCreditLedgerRow {
   id: number
   org_id: string
@@ -390,11 +388,6 @@ function metricsWithData(day: DailyLedgerRow) {
 }
 
 async function loadTransactions() {
-  if (!creditsV2Enabled) {
-    transactions.value = []
-    return
-  }
-
   const orgId = currentOrganization.value?.gid
   if (!orgId) {
     transactions.value = []
@@ -443,8 +436,6 @@ async function handleBuyCredits() {
 }
 
 async function handleCreditCheckoutReturn() {
-  if (!creditsV2Enabled)
-    return
   if (isCompletingTopUp.value)
     return
   const checkoutStatusRaw = route.query.creditCheckout
@@ -497,10 +488,6 @@ async function handleCreditCheckoutReturn() {
 }
 
 onMounted(async () => {
-  if (!creditsV2Enabled) {
-    router.replace('/settings/organization/')
-    return
-  }
   displayStore.NavTitle = t('credits')
   await organizationStore.awaitInitialLoad()
   await Promise.allSettled([loadTransactions()])
@@ -508,8 +495,6 @@ onMounted(async () => {
 })
 
 watch(() => currentOrganization.value?.gid, async (newOrgId: string | undefined, oldOrgId: string | undefined) => {
-  if (!creditsV2Enabled)
-    return
   if (!newOrgId || newOrgId === oldOrgId)
     return
   await Promise.allSettled([loadTransactions()])
