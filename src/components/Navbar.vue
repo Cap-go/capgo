@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Capacitor } from '@capacitor/core'
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import IconBack from '~icons/material-symbols/arrow-back-ios-rounded'
@@ -21,6 +21,8 @@ const isMobile = ref(Capacitor.isNativePlatform())
 const router = useRouter()
 
 const displayStore = useDisplayStore()
+const lastBreadcrumbName = computed(() => displayStore.pathTitle.at(-1)?.name)
+const showNavTitle = computed(() => displayStore.NavTitle && displayStore.pathTitle.length === 0)
 function back() {
   if (window.history.length > 2)
     router.back()
@@ -63,36 +65,29 @@ const { t } = useI18n()
             <div class="flex items-center space-x-2 font-bold md:text-2xl dark:text-white truncate text-md text-dark">
               <nav v-if="$route.path !== '/' && $route.path !== '/app'" class="text-sm font-normal text-slate-600 dark:text-slate-400" aria-label="Breadcrumb">
                 <ol class="inline-flex items-center space-x-1">
-                  <li>
-                    <router-link
-                      to="/"
-                      class="px-1 rounded-sm hover:underline focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 focus:outline-none first-letter:uppercase"
-                    >
-                      {{ t('home') }}
-                    </router-link>
-                  </li>
                   <li v-for="(breadcrumb, i) in displayStore.pathTitle" :key="i" class="flex items-center">
-                    <span class="mx-1" aria-hidden="true"> / </span>
+                    <span v-if="i > 0" class="mx-1" aria-hidden="true"> / </span>
                     <router-link
                       :to="breadcrumb.path"
-                      class="px-1 rounded-sm hover:underline focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 focus:outline-none first-letter:uppercase"
+                      class="px-1 rounded-sm hover:underline focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 focus:outline-none"
+                      :class="i === displayStore.pathTitle.length - 1 ? 'font-bold text-slate-800 dark:text-slate-100' : ''"
                     >
-                      {{ breadcrumb.name.includes('.') ? breadcrumb.name : t(breadcrumb.name) }}
+                      {{ breadcrumb.translate === false ? breadcrumb.name : t(breadcrumb.name) }}
                     </router-link>
                   </li>
-                  <li v-if="displayStore.NavTitle" class="flex items-center">
+                  <li v-if="displayStore.pathTitle.length && displayStore.NavTitle && displayStore.NavTitle !== lastBreadcrumbName" class="flex items-center">
                     <span class="mx-1" aria-hidden="true"> / </span>
                   </li>
                 </ol>
               </nav>
-              <span class="first-letter:uppercase">{{ displayStore.NavTitle }}</span>
+              <span v-if="showNavTitle">{{ displayStore.NavTitle }}</span>
             </div>
           </div>
         </div>
 
         <!-- Centered title on mobile -->
         <div class="flex-1 px-4 text-center lg:hidden">
-          <div class="font-bold dark:text-white truncate text-md text-dark first-letter:uppercase">
+          <div class="font-bold dark:text-white truncate text-md text-dark">
             {{ displayStore.NavTitle }}
           </div>
         </div>

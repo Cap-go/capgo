@@ -12,6 +12,7 @@ import { getCreditUnitPricing, getCurrentPlanNameOrg, getPlans, getPlanUsagePerc
 import { sendEvent } from '~/services/tracking'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useMainStore } from '~/stores/main'
+// tabs handled by settings layout
 
 const { t } = useI18n()
 const plans = ref<Database['public']['Tables']['plans']['Row'][]>([])
@@ -277,15 +278,15 @@ function nextRunDate() {
 </script>
 
 <template>
-  <div class="flex overflow-hidden flex-col h-full bg-white dark:bg-gray-800">
-    <div v-if="!isLoading" class="flex overflow-y-auto flex-col py-6 px-4 mx-auto w-full max-w-7xl h-full sm:px-6 lg:px-8">
+  <div class="flex flex-col pb-8 bg-white border shadow-lg md:p-8 md:pb-0 md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900">
+    <div v-if="!isLoading" class="flex flex-col w-full">
       <!-- Header -->
-      <div class="flex flex-col gap-4 justify-between mb-8 md:flex-row md:items-center shrink-0">
+      <div class="flex flex-col justify-between gap-4 mb-8 md:flex-row md:items-center shrink-0">
         <div>
           <h1 class="text-3xl font-bold text-gray-900 dark:text-white">
             {{ t('usage') }}
           </h1>
-          <div class="flex gap-3 items-center mt-1 text-sm text-gray-500 dark:text-gray-400">
+          <div class="flex items-center gap-3 mt-1 text-sm text-gray-500 dark:text-gray-400">
             <div class="flex gap-1.5 items-center">
               <div class="w-1.5 h-1.5 bg-green-500 rounded-full" />
               {{ lastRunDate() }}
@@ -336,7 +337,7 @@ function nextRunDate() {
               </div>
             </div>
           </div>
-          <div class="flex justify-between items-end pt-4 mt-4 border-t border-gray-100 dark:border-gray-700">
+          <div class="flex items-end justify-between pt-4 mt-4 border-t border-gray-100 dark:border-gray-700">
             <div class="text-sm text-gray-500 dark:text-gray-400">
               {{ t('total') }}
             </div>
@@ -347,9 +348,9 @@ function nextRunDate() {
         </div>
 
         <!-- Upgrade / Best Plan -->
-        <div v-if="shouldShowUpgrade" class="overflow-hidden relative p-5 from-blue-50 to-indigo-50 rounded-xl border border-blue-200 shadow-sm dark:border-blue-800 bg-linear-to-br dark:from-blue-900/20 dark:to-indigo-900/20">
+        <div v-if="shouldShowUpgrade" class="relative p-5 overflow-hidden border border-blue-200 shadow-sm from-blue-50 to-indigo-50 rounded-xl dark:border-blue-800 bg-linear-to-br dark:from-blue-900/20 dark:to-indigo-900/20">
           <div class="relative z-10">
-            <div class="flex justify-between items-start mb-2">
+            <div class="flex items-start justify-between mb-2">
               <div class="text-sm font-medium text-blue-800 dark:text-blue-200">
                 {{ t('recommended') }}
               </div>
@@ -363,12 +364,12 @@ function nextRunDate() {
             <div class="mb-4 text-sm text-gray-600 dark:text-gray-300">
               ${{ currentPlanSuggest?.price_m }}/{{ t('mo') }}
             </div>
-            <button class="py-2 w-full text-sm font-semibold text-white bg-blue-600 rounded-lg shadow-sm transition-colors hover:bg-blue-700" @click="goToPlans">
+            <button class="w-full py-2 text-sm font-semibold text-white transition-colors bg-blue-600 rounded-lg shadow-sm hover:bg-blue-700" @click="goToPlans">
               {{ t('plan-upgrade-v2') }}
             </button>
           </div>
         </div>
-        <div v-else class="flex justify-center items-center p-5 text-sm italic text-gray-400 bg-gray-50 rounded-xl border border-gray-200 dark:text-gray-500 dark:bg-gray-900 dark:border-gray-700">
+        <div v-else class="flex items-center justify-center p-5 text-sm italic text-gray-400 border border-gray-200 bg-gray-50 rounded-xl dark:text-gray-500 dark:bg-gray-900 dark:border-gray-700">
           {{ t('good') }}
         </div>
       </div>
@@ -379,8 +380,8 @@ function nextRunDate() {
       </h2>
       <div class="grid grid-cols-1 gap-6 mb-8 md:grid-cols-2 xl:grid-cols-4 shrink-0">
         <!-- MAU -->
-        <div class="p-5 bg-gray-50 rounded-xl border border-gray-200 shadow-sm transition-shadow dark:bg-gray-900 dark:border-gray-700 hover:shadow-md">
-          <div class="flex justify-between items-start mb-4">
+        <div class="p-5 transition-shadow border border-gray-200 shadow-sm bg-gray-50 rounded-xl dark:bg-gray-900 dark:border-gray-700 hover:shadow-md">
+          <div class="flex items-start justify-between mb-4">
             <div class="text-sm font-medium text-gray-500 dark:text-gray-400">
               {{ t('monthly-active-users') }}
             </div>
@@ -388,8 +389,8 @@ function nextRunDate() {
               {{ planUsage?.detailPlanUsage?.mau_percent || 0 }}%
             </div>
           </div>
-          <div class="overflow-hidden mb-4 w-full h-2 bg-gray-100 rounded-full dark:bg-gray-700">
-            <div class="h-full rounded-full transition-all duration-500" :class="(planUsage?.detailPlanUsage?.mau_percent || 0) >= 100 ? 'bg-red-500' : 'bg-blue-500'" :style="{ width: `${Math.min(planUsage?.detailPlanUsage?.mau_percent || 0, 100)}%` }" />
+          <div class="w-full h-2 mb-4 overflow-hidden bg-gray-100 rounded-full dark:bg-gray-700">
+            <div class="h-full transition-all duration-500 rounded-full" :class="(planUsage?.detailPlanUsage?.mau_percent || 0) >= 100 ? 'bg-red-500' : 'bg-blue-500'" :style="{ width: `${Math.min(planUsage?.detailPlanUsage?.mau_percent || 0, 100)}%` }" />
           </div>
           <div class="space-y-1 text-sm">
             <div class="flex justify-between text-gray-600 dark:text-gray-400">
@@ -404,8 +405,8 @@ function nextRunDate() {
         </div>
 
         <!-- Storage -->
-        <div class="p-5 bg-gray-50 rounded-xl border border-gray-200 shadow-sm transition-shadow dark:bg-gray-900 dark:border-gray-700 hover:shadow-md">
-          <div class="flex justify-between items-start mb-4">
+        <div class="p-5 transition-shadow border border-gray-200 shadow-sm bg-gray-50 rounded-xl dark:bg-gray-900 dark:border-gray-700 hover:shadow-md">
+          <div class="flex items-start justify-between mb-4">
             <div class="text-sm font-medium text-gray-500 dark:text-gray-400">
               {{ t('Storage') }}
             </div>
@@ -413,8 +414,8 @@ function nextRunDate() {
               {{ planUsage?.detailPlanUsage?.storage_percent || 0 }}%
             </div>
           </div>
-          <div class="overflow-hidden mb-4 w-full h-2 bg-gray-100 rounded-full dark:bg-gray-700">
-            <div class="h-full rounded-full transition-all duration-500" :class="(planUsage?.detailPlanUsage?.storage_percent || 0) >= 100 ? 'bg-red-500' : 'bg-purple-500'" :style="{ width: `${Math.min(planUsage?.detailPlanUsage?.storage_percent || 0, 100)}%` }" />
+          <div class="w-full h-2 mb-4 overflow-hidden bg-gray-100 rounded-full dark:bg-gray-700">
+            <div class="h-full transition-all duration-500 rounded-full" :class="(planUsage?.detailPlanUsage?.storage_percent || 0) >= 100 ? 'bg-red-500' : 'bg-purple-500'" :style="{ width: `${Math.min(planUsage?.detailPlanUsage?.storage_percent || 0, 100)}%` }" />
           </div>
           <div class="space-y-1 text-sm">
             <div class="flex justify-between text-gray-600 dark:text-gray-400">
@@ -429,8 +430,8 @@ function nextRunDate() {
         </div>
 
         <!-- Bandwidth -->
-        <div class="p-5 bg-gray-50 rounded-xl border border-gray-200 shadow-sm transition-shadow dark:bg-gray-900 dark:border-gray-700 hover:shadow-md">
-          <div class="flex justify-between items-start mb-4">
+        <div class="p-5 transition-shadow border border-gray-200 shadow-sm bg-gray-50 rounded-xl dark:bg-gray-900 dark:border-gray-700 hover:shadow-md">
+          <div class="flex items-start justify-between mb-4">
             <div class="text-sm font-medium text-gray-500 dark:text-gray-400">
               {{ t('Bandwidth') }}
             </div>
@@ -438,8 +439,8 @@ function nextRunDate() {
               {{ planUsage?.detailPlanUsage?.bandwidth_percent || 0 }}%
             </div>
           </div>
-          <div class="overflow-hidden mb-4 w-full h-2 bg-gray-100 rounded-full dark:bg-gray-700">
-            <div class="h-full rounded-full transition-all duration-500" :class="(planUsage?.detailPlanUsage?.bandwidth_percent || 0) >= 100 ? 'bg-red-500' : 'bg-green-500'" :style="{ width: `${Math.min(planUsage?.detailPlanUsage?.bandwidth_percent || 0, 100)}%` }" />
+          <div class="w-full h-2 mb-4 overflow-hidden bg-gray-100 rounded-full dark:bg-gray-700">
+            <div class="h-full transition-all duration-500 rounded-full" :class="(planUsage?.detailPlanUsage?.bandwidth_percent || 0) >= 100 ? 'bg-red-500' : 'bg-green-500'" :style="{ width: `${Math.min(planUsage?.detailPlanUsage?.bandwidth_percent || 0, 100)}%` }" />
           </div>
           <div class="space-y-1 text-sm">
             <div class="flex justify-between text-gray-600 dark:text-gray-400">
@@ -454,8 +455,8 @@ function nextRunDate() {
         </div>
 
         <!-- Build Time -->
-        <div class="p-5 bg-gray-50 rounded-xl border border-gray-200 shadow-sm transition-shadow dark:bg-gray-900 dark:border-gray-700 hover:shadow-md">
-          <div class="flex justify-between items-start mb-4">
+        <div class="p-5 transition-shadow border border-gray-200 shadow-sm bg-gray-50 rounded-xl dark:bg-gray-900 dark:border-gray-700 hover:shadow-md">
+          <div class="flex items-start justify-between mb-4">
             <div class="text-sm font-medium text-gray-500 dark:text-gray-400">
               {{ t('build-time') }}
             </div>
@@ -463,8 +464,8 @@ function nextRunDate() {
               {{ planUsage?.detailPlanUsage?.build_time_percent || 0 }}%
             </div>
           </div>
-          <div class="overflow-hidden mb-4 w-full h-2 bg-gray-100 rounded-full dark:bg-gray-700">
-            <div class="h-full rounded-full transition-all duration-500" :class="(planUsage?.detailPlanUsage?.build_time_percent || 0) >= 100 ? 'bg-red-500' : 'bg-orange-500'" :style="{ width: `${Math.min(planUsage?.detailPlanUsage?.build_time_percent || 0, 100)}%` }" />
+          <div class="w-full h-2 mb-4 overflow-hidden bg-gray-100 rounded-full dark:bg-gray-700">
+            <div class="h-full transition-all duration-500 rounded-full" :class="(planUsage?.detailPlanUsage?.build_time_percent || 0) >= 100 ? 'bg-red-500' : 'bg-orange-500'" :style="{ width: `${Math.min(planUsage?.detailPlanUsage?.build_time_percent || 0, 100)}%` }" />
           </div>
           <div class="space-y-1 text-sm">
             <div class="flex justify-between text-gray-600 dark:text-gray-400">
@@ -481,9 +482,9 @@ function nextRunDate() {
     </div>
 
     <!-- Loading State -->
-    <div v-else class="flex justify-center items-center h-full">
+    <div v-else class="flex items-center justify-center h-full">
       <div class="text-center">
-        <div class="mx-auto mb-4 w-12 h-12 rounded-full border-b-2 border-blue-600 animate-spin" />
+        <div class="w-12 h-12 mx-auto mb-4 border-b-2 border-blue-600 rounded-full animate-spin" />
         <p class="text-gray-600 dark:text-gray-400">
           {{ t('loading') }}...
         </p>

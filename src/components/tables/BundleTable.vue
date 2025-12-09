@@ -42,7 +42,7 @@ const search = ref('')
 const columns: Ref<TableColumn[]> = ref<TableColumn[]>([])
 const elements = ref<Element[]>([])
 const selectedElements = ref<Element[]>([])
-const isLoading = ref(false)
+const isLoading = ref(true)
 const currentPage = ref(1)
 const filters = ref({
   'external-storage': false,
@@ -283,6 +283,7 @@ async function fetchChannelsForVersions(versions: Element[]) {
 }
 
 async function refreshData() {
+  isLoading.value = true
   try {
     currentPage.value = 1
     elements.value.length = 0
@@ -293,6 +294,10 @@ async function refreshData() {
   }
   catch (error) {
     console.error(error)
+  }
+  finally {
+    // getData normally resets this, but guard against early failures
+    isLoading.value = false
   }
 }
 
@@ -463,6 +468,7 @@ columns.value = [
 ]
 
 async function reload() {
+  isLoading.value = true
   elements.value.length = 0
   try {
     await Promise.all([getData(), updateOverallBundlesCount()])
@@ -471,6 +477,10 @@ async function reload() {
   }
   catch (error) {
     console.error(error)
+  }
+  finally {
+    // getData normally resets this, but guard against early failures
+    isLoading.value = false
   }
 }
 

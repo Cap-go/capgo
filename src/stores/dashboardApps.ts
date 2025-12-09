@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { useSupabase } from '~/services/supabase'
+import { useDisplayStore } from '~/stores/display'
 import { useOrganizationStore } from './organization'
 
 export const useDashboardAppsStore = defineStore('dashboardApps', () => {
@@ -24,7 +25,6 @@ export const useDashboardAppsStore = defineStore('dashboardApps', () => {
     // Quick check: if already loaded and not forcing, return immediately without any async calls
     if (!force && isLoaded.value && currentOrgId.value !== null)
       return
-
     const organizationStore = useOrganizationStore()
     try {
       await organizationStore.dedupFetchOrganizations()
@@ -85,6 +85,10 @@ export const useDashboardAppsStore = defineStore('dashboardApps', () => {
 
     loadPromise = request
     await request
+
+    // After load, publish resolver for app names
+    const display = useDisplayStore()
+    display.setAppNameResolver(appId => appNames.value[appId])
   }
 
   function reset() {

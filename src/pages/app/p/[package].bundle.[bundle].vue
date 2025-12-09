@@ -14,6 +14,7 @@ import IconInformation from '~icons/heroicons/information-circle'
 import IconTrash from '~icons/heroicons/trash'
 import IconSearch from '~icons/ic/round-search?raw'
 import IconAlertCircle from '~icons/lucide/alert-circle'
+import { appTabs } from '~/constants/appTabs'
 import { bytesToMbText } from '~/services/conversion'
 import { formatDate } from '~/services/date'
 import { checkCompatibilityNativePackages, isCompatible, useSupabase } from '~/services/supabase'
@@ -32,6 +33,8 @@ const organizationStore = useOrganizationStore()
 const main = useMainStore()
 const supabase = useSupabase()
 const ActiveTab = ref('info')
+const appTabsActive = ref('bundles')
+const appTabsConst: Tab[] = appTabs
 const packageId = ref<string>('')
 const id = ref<number>()
 const loading = ref(true)
@@ -125,6 +128,11 @@ const tabs: Tab[] = [
     key: 'info',
   },
 ]
+
+function onAppTabChange(tabKey: string) {
+  appTabsActive.value = tabKey
+  router.push(`/app/p/${route.params.package}?tab=${tabKey}`)
+}
 
 async function getChannels() {
   if (!version.value)
@@ -396,6 +404,9 @@ async function getVersion() {
 
     hasManifest.value = data.manifest_count > 0
     version.value = data
+    if (version.value?.name)
+      displayStore.setBundleName(String(version.value.id), version.value.name)
+    displayStore.NavTitle = version.value?.name ?? t('bundle')
   }
   catch (error) {
     console.error(error)
@@ -410,7 +421,8 @@ watchEffect(async () => {
     await getVersion()
     await getChannels()
     loading.value = false
-    displayStore.NavTitle = t('bundle')
+    if (!version.value?.name)
+      displayStore.NavTitle = t('bundle')
     displayStore.defaultBack = `/app/p/${route.params.package}/bundles`
   }
 })
@@ -680,7 +692,16 @@ async function deleteBundle() {
       <Spinner size="w-40 h-40" />
     </div>
     <div v-else-if="version">
-      <Tabs v-model:active-tab="ActiveTab" :tabs="tabs" />
+      <Tabs
+        v-model:active-tab="appTabsActive"
+        :tabs="appTabsConst"
+        :secondary-tabs="tabs"
+        :secondary-active-tab="ActiveTab"
+        no-wrap
+        class="mb-2"
+        @update:active-tab="onAppTabChange"
+        @update:secondary-active-tab="val => ActiveTab = val"
+      />
       <div v-if="ActiveTab === 'info'" id="devices" class="mt-0 md:mt-8">
         <div class="overflow-y-auto px-0 pt-0 mx-auto mb-8 w-full h-full sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
           <div

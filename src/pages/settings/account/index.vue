@@ -18,6 +18,7 @@ import { useDialogV2Store } from '~/stores/dialogv2'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
+// tabs handled by settings layout
 
 const version = import.meta.env.VITE_APP_VERSION
 const { t } = useI18n()
@@ -544,7 +545,7 @@ onMounted(async () => {
 
 <template>
   <div>
-    <div class="pb-8 h-full md:pb-0 max-h-fit grow">
+    <div class="flex flex-col h-full pb-8 overflow-hidden overflow-y-auto bg-white border shadow-lg md:pb-0 max-h-fit grow md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900">
       <FormKit id="update-account" type="form" :actions="false" @submit="submit">
         <!-- Panel body -->
         <div class="p-6 space-y-6">
@@ -568,7 +569,7 @@ onMounted(async () => {
                   </span>
                 </div>
               </div>
-              <button id="change-org-pic" type="button" class="py-2 px-3 text-xs font-medium text-center text-gray-700 rounded-lg border cursor-pointer dark:text-white hover:bg-gray-100 focus:ring-4 focus:ring-blue-300 border-slate-500 dark:hover:bg-gray-600 dark:focus:ring-blue-800 focus:outline-hidden" @click="presentActionSheet">
+              <button id="change-org-pic" type="button" class="px-3 py-2 text-xs font-medium text-center text-gray-700 border rounded-lg cursor-pointer dark:text-white hover:bg-gray-100 focus:ring-4 focus:ring-blue-300 border-slate-500 dark:hover:bg-gray-600 dark:focus:ring-blue-800 focus:outline-hidden" @click="presentActionSheet">
                 {{ t('change') }}
               </button>
             </div>
@@ -661,7 +662,7 @@ onMounted(async () => {
               <button
                 type="button"
                 data-test="setup-mfa"
-                class="py-2 px-3 text-xs font-medium text-center text-gray-700 rounded-lg border cursor-pointer dark:text-white hover:bg-gray-100 focus:ring-4 focus:ring-blue-300 dark:hover:bg-gray-600 dark:focus:ring-blue-800 focus:outline-hidden"
+                class="px-3 py-2 text-xs font-medium text-center text-gray-700 border rounded-lg cursor-pointer dark:text-white hover:bg-gray-100 focus:ring-4 focus:ring-blue-300 dark:hover:bg-gray-600 dark:focus:ring-blue-800 focus:outline-hidden"
                 :class="{ 'border border-emerald-600 focus:ring-emerald-800': !mfaEnabled, 'border border-red-500 focus:ring-rose-600': mfaEnabled }"
                 @click="handleMfa"
               >
@@ -674,7 +675,7 @@ onMounted(async () => {
               {{ t('account-id') }}:
             </p>
             <div class="md:ml-6">
-              <button type="button" class="py-2 px-3 text-xs font-medium text-center text-gray-700 rounded-lg border cursor-pointer dark:text-white hover:bg-gray-100 focus:ring-4 focus:ring-blue-300 border-slate-500 dark:hover:bg-gray-600 dark:focus:ring-blue-800 focus:outline-hidden" @click.prevent="copyAccountId()">
+              <button type="button" class="px-3 py-2 text-xs font-medium text-center text-gray-700 border rounded-lg cursor-pointer dark:text-white hover:bg-gray-100 focus:ring-4 focus:ring-blue-300 border-slate-500 dark:hover:bg-gray-600 dark:focus:ring-blue-800 focus:outline-hidden" @click.prevent="copyAccountId()">
                 {{ t('copy-account-id') }}
               </button>
             </div>
@@ -682,28 +683,28 @@ onMounted(async () => {
           <div class="flex mb-3 text-xs font-semibold uppercase dark:text-white text-slate-400">
             <IconVersion /> <span class="pl-2"> {{ version }}</span>
           </div>
-        </div>
-        <!-- Panel footer -->
-        <footer>
-          <div class="flex flex-col py-5 px-2 border-t md:px-6 border-slate-300">
-            <div class="flex self-end">
-              <button type="button" class="p-2 text-red-600 rounded-lg border border-red-400 hover:text-white hover:bg-red-600" @click="deleteAccount()">
-                {{ t('delete-account') }}
-              </button>
-              <button
-                class="p-2 ml-3 text-white bg-blue-500 rounded-lg hover:bg-blue-600 d-btn"
-                type="submit"
-                color="secondary"
-                shape="round"
-              >
-                <span v-if="!isLoading" class="rounded-4xl">
-                  {{ t('update') }}
-                </span>
-                <Spinner v-else size="w-8 h-8" class="px-4" color="fill-gray-100 text-gray-200 dark:text-gray-600" />
-              </button>
+          <!-- Panel footer -->
+          <footer>
+            <div class="flex flex-col px-2 py-5 border-t md:px-6 border-slate-300">
+              <div class="flex self-end">
+                <button type="button" class="p-2 text-red-600 border border-red-400 rounded-lg hover:text-white hover:bg-red-600" @click="deleteAccount()">
+                  {{ t('delete-account') }}
+                </button>
+                <button
+                  class="p-2 ml-3 text-white bg-blue-500 rounded-lg hover:bg-blue-600 d-btn"
+                  type="submit"
+                  color="secondary"
+                  shape="round"
+                >
+                  <span v-if="!isLoading" class="rounded-4xl">
+                    {{ t('update') }}
+                  </span>
+                  <Spinner v-else size="w-8 h-8" class="px-4" color="fill-gray-100 text-gray-200 dark:text-gray-600" />
+                </button>
+              </div>
             </div>
-          </div>
-        </footer>
+          </footer>
+        </div>
       </FormKit>
     </div>
 
@@ -731,7 +732,7 @@ onMounted(async () => {
           v-model="mfaVerificationCode"
           type="text"
           :placeholder="t('verification-code')"
-          class="p-3 w-full rounded-lg border border-gray-300 dark:text-white dark:bg-gray-800 dark:border-gray-600"
+          class="w-full p-3 border border-gray-300 rounded-lg dark:text-white dark:bg-gray-800 dark:border-gray-600"
           @keydown.enter="$event.preventDefault()"
         >
       </div>
@@ -739,13 +740,13 @@ onMounted(async () => {
 
     <!-- Teleport for Organization Deletion Warning -->
     <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('warning-organizations-will-be-deleted')" to="#dialog-v2-content" defer>
-      <div class="p-4 mt-4 bg-red-50 rounded-lg border border-red-200 dark:border-red-800 dark:bg-red-900/20">
+      <div class="p-4 mt-4 border border-red-200 rounded-lg bg-red-50 dark:border-red-800 dark:bg-red-900/20">
         <h4 class="mb-3 font-semibold text-red-800 dark:text-red-200">
           {{ t('organizations-to-be-deleted') }}:
         </h4>
         <ul class="space-y-2">
           <li v-for="orgName in organizationsToDelete" :key="orgName" class="flex items-center text-red-700 dark:text-red-300">
-            <span class="mr-3 w-2 h-2 bg-red-500 rounded-full" />
+            <span class="w-2 h-2 mr-3 bg-red-500 rounded-full" />
             <span class="font-medium">{{ orgName }}</span>
           </li>
         </ul>
@@ -754,17 +755,17 @@ onMounted(async () => {
 
     <!-- Teleport for Paid Subscriptions Warning -->
     <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('warning-paid-subscriptions')" to="#dialog-v2-content" defer>
-      <div class="p-4 mt-4 bg-orange-50 rounded-lg border border-orange-200 dark:border-orange-800 dark:bg-orange-900/20">
+      <div class="p-4 mt-4 border border-orange-200 rounded-lg bg-orange-50 dark:border-orange-800 dark:bg-orange-900/20">
         <h4 class="mb-3 font-semibold text-orange-800 dark:text-orange-200">
           {{ t('paid-subscriptions-to-cancel') }}:
         </h4>
         <ul class="space-y-3">
-          <li v-for="org in paidOrganizationsToDelete" :key="org.name" class="flex justify-between items-center text-orange-700 dark:text-orange-300">
+          <li v-for="org in paidOrganizationsToDelete" :key="org.name" class="flex items-center justify-between text-orange-700 dark:text-orange-300">
             <div class="flex items-center">
-              <span class="mr-3 w-2 h-2 bg-orange-500 rounded-full" />
+              <span class="w-2 h-2 mr-3 bg-orange-500 rounded-full" />
               <span class="font-medium">{{ org.name }}</span>
             </div>
-            <span class="py-1 px-2 text-sm bg-orange-100 rounded-full dark:bg-orange-800">
+            <span class="px-2 py-1 text-sm bg-orange-100 rounded-full dark:bg-orange-800">
               {{ org.planName }}
             </span>
           </li>

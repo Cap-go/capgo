@@ -641,6 +641,7 @@ getKeys()
             <Table
               v-model:current-page="currentPage"
               show-add
+              :auto-reload="false"
               :columns="columns"
               :element-list="filteredAndSortedKeys"
               :is-loading="isLoading"

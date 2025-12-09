@@ -4,18 +4,12 @@ import type { Database } from '~/types/supabase.types'
 import { ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
-import IconChart from '~icons/heroicons/chart-bar'
-import IconHistory from '~icons/heroicons/clock'
-import IconCog from '~icons/heroicons/cog-6-tooth'
-import IconCube from '~icons/heroicons/cube'
-import IconDevice from '~icons/heroicons/device-phone-mobile'
-import IconChannel from '~icons/heroicons/signal'
-import IconBuild from '~icons/heroicons/wrench-screwdriver'
 import IconAlertCircle from '~icons/lucide/alert-circle'
 import AppSetting from '~/components/dashboard/AppSetting.vue'
 import BundleUploadsCard from '~/components/dashboard/BundleUploadsCard.vue'
 import DeploymentStatsCard from '~/components/dashboard/DeploymentStatsCard.vue'
 import UpdateStatsCard from '~/components/dashboard/UpdateStatsCard.vue'
+import { appTabs } from '~/constants/appTabs'
 import { getCapgoVersion, useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
@@ -37,48 +31,12 @@ const isLoading = ref(false)
 const supabase = useSupabase()
 const displayStore = useDisplayStore()
 const app = ref<Database['public']['Tables']['apps']['Row']>()
-const ActiveTab = ref(route.query.tab?.toString() || 'overview')
+const ActiveTab = ref(route.query.tab?.toString() || 'dashboard')
 const usageComponent = ref()
 const showingBuildSteps = ref(false)
 const showingBundleSteps = ref(false)
 
-const tabs: Tab[] = [
-  {
-    label: 'overview',
-    icon: IconChart,
-    key: 'overview',
-  },
-  {
-    label: 'info',
-    icon: IconCog,
-    key: 'info',
-  },
-  {
-    label: 'bundles',
-    icon: IconCube,
-    key: 'bundles',
-  },
-  {
-    label: 'channels',
-    icon: IconChannel,
-    key: 'channels',
-  },
-  {
-    label: 'devices',
-    icon: IconDevice,
-    key: 'devices',
-  },
-  {
-    label: 'logs',
-    icon: IconHistory,
-    key: 'logs',
-  },
-  {
-    label: 'builds',
-    icon: IconBuild,
-    key: 'builds',
-  },
-]
+const tabs: Tab[] = appTabs
 
 async function loadAppInfo() {
   try {
@@ -149,7 +107,7 @@ watchEffect(async () => {
 
 watchEffect(() => {
   // Clear dashboard-specific query parameters when switching away from overview
-  if (ActiveTab.value !== 'overview' && usageComponent.value?.clearDashboardParams) {
+  if (ActiveTab.value !== 'dashboard' && usageComponent.value?.clearDashboardParams) {
     usageComponent.value.clearDashboardParams()
   }
   // Always update tab parameter
@@ -159,9 +117,9 @@ watchEffect(() => {
 
 <template>
   <div>
-    <Tabs v-model:active-tab="ActiveTab" :tabs="tabs" />
+    <Tabs v-model:active-tab="ActiveTab" :tabs="tabs" no-wrap />
     <div v-if="app || isLoading">
-      <div v-if="ActiveTab === 'overview'" class="overflow-y-auto overflow-x-hidden px-4 pt-4 mb-8 w-full h-full sm:px-6 lg:px-8 max-h-fit">
+      <div v-if="ActiveTab === 'dashboard'" class="w-full h-full px-4 pt-4 mb-8 overflow-x-hidden overflow-y-auto sm:px-6 lg:px-8 max-h-fit">
         <FailedCard />
         <Usage v-if="!organizationStore.currentOrganizationFailed" ref="usageComponent" :app-id="id" />
 
@@ -189,51 +147,51 @@ watchEffect(() => {
       </div>
 
       <div v-if="ActiveTab === 'info'" class="mt-0 md:mt-8">
-        <div class="overflow-y-auto px-0 pt-0 mx-auto mb-8 w-full h-full sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
-          <div class="flex overflow-hidden overflow-y-auto flex-col bg-white border shadow-lg md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900">
+        <div class="w-full h-full px-0 pt-0 mx-auto mb-8 overflow-y-auto sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
+          <div class="flex flex-col overflow-hidden overflow-y-auto bg-white border shadow-lg md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900">
             <AppSetting :app-id="id" />
           </div>
         </div>
       </div>
 
       <div v-if="ActiveTab === 'bundles'" class="mt-0 md:mt-8">
-        <div class="overflow-y-auto px-0 pt-0 mx-auto mb-8 w-full h-full sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
+        <div class="w-full h-full px-0 pt-0 mx-auto mb-8 overflow-y-auto sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
           <BundleTable :app-id="id" @update:showing-steps="showingBundleSteps = $event" />
         </div>
       </div>
 
       <div v-if="ActiveTab === 'channels'" class="mt-0 md:mt-8">
-        <div class="overflow-y-auto px-0 pt-0 mx-auto mb-8 w-full h-full sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
-          <div class="flex overflow-hidden overflow-y-auto flex-col bg-white border shadow-lg md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900">
+        <div class="w-full h-full px-0 pt-0 mx-auto mb-8 overflow-y-auto sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
+          <div class="flex flex-col overflow-hidden overflow-y-auto bg-white border shadow-lg md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900">
             <ChannelTable :app-id="id" />
           </div>
         </div>
       </div>
 
       <div v-if="ActiveTab === 'devices'" class="mt-0 md:mt-8">
-        <div class="overflow-y-auto px-0 pt-0 mx-auto mb-8 w-full h-full sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
-          <div class="flex overflow-hidden overflow-y-auto flex-col bg-white border shadow-lg md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900">
+        <div class="w-full h-full px-0 pt-0 mx-auto mb-8 overflow-y-auto sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
+          <div class="flex flex-col overflow-hidden overflow-y-auto bg-white border shadow-lg md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900">
             <DeviceTable :app-id="id" />
           </div>
         </div>
       </div>
 
       <div v-if="ActiveTab === 'logs'" class="mt-0 md:mt-8">
-        <div class="overflow-y-auto px-0 pt-0 mx-auto mb-8 w-full h-full sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
-          <div class="flex overflow-hidden overflow-y-auto flex-col bg-white border shadow-lg md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900">
+        <div class="w-full h-full px-0 pt-0 mx-auto mb-8 overflow-y-auto sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
+          <div class="flex flex-col overflow-hidden overflow-y-auto bg-white border shadow-lg md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900">
             <LogTable :app-id="id" />
           </div>
         </div>
       </div>
 
       <div v-if="ActiveTab === 'builds'" class="mt-0 md:mt-8">
-        <div class="overflow-y-auto px-0 pt-0 mx-auto mb-8 w-full h-full sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
+        <div class="w-full h-full px-0 pt-0 mx-auto mb-8 overflow-y-auto sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
           <BuildTable :app-id="id" @update:showing-steps="showingBuildSteps = $event" />
         </div>
       </div>
     </div>
     <div v-else class="flex flex-col justify-center items-center min-h-[50vh]">
-      <IconAlertCircle class="mb-4 w-16 h-16 text-destructive" />
+      <IconAlertCircle class="w-16 h-16 mb-4 text-destructive" />
       <h2 class="text-xl font-semibold text-foreground">
         {{ t('app-not-found') }}
       </h2>

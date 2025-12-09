@@ -683,7 +683,7 @@ export async function getDefaultPlan(c: Context) {
 }
 
 export async function createStripeCustomer(c: Context, org: Database['public']['Tables']['orgs']['Row']) {
-  const customer = await createCustomer(c, org.management_email, org.created_by, org.name)
+  const customer = await createCustomer(c, org.management_email, org.created_by, org.id, org.name)
   // create date + 15 days
   const trial_at = new Date()
   trial_at.setDate(trial_at.getDate() + 15)
@@ -883,6 +883,14 @@ export async function readStatsSB(c: Context, params: ReadStatsParams) {
       query = query.eq('device_id', params.deviceIds[0])
     else
       query = query.in('device_id', params.deviceIds)
+  }
+
+  if (params.actions?.length) {
+    cloudlog({ requestId: c.get('requestId'), message: 'actions filter', actions: params.actions })
+    if (params.actions.length === 1)
+      query = query.eq('action', params.actions[0])
+    else
+      query = query.in('action', params.actions)
   }
 
   if (params.search) {

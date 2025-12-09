@@ -4,7 +4,8 @@ import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
-import { isSpoofed, saveSpoof, unspoofUser, useSupabase } from '~/services/supabase'
+import { logAsUser } from '~/services/logAs'
+import { isSpoofed, unspoofUser } from '~/services/supabase'
 import { openSupport } from '~/services/support'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useMainStore } from '~/stores/main'
@@ -50,63 +51,13 @@ async function openLogAsDialog() {
 
   if (userId) {
     isLoading.value = true
-    await setLogAs(userId)
-    isLoading.value = false
+    try {
+      await logAsUser(userId, router)
+    }
+    finally {
+      isLoading.value = false
+    }
   }
-}
-
-async function setLogAs(id: string) {
-  const toastId = toast.loading('Logging as...')
-  if (isSpoofed()) {
-    unspoofUser()
-  }
-  const supabase = await useSupabase()
-  const { data, error } = await supabase.functions.invoke('private/log_as', {
-    body: { user_id: id },
-  })
-
-  if (error) {
-    toast.dismiss(toastId)
-    toast.error('Cannot log in, see console')
-    console.error(error)
-    return
-  }
-
-  const { jwt: newJwt, refreshToken: newRefreshToken } = data
-
-  if (!newJwt || !newRefreshToken) {
-    toast.dismiss(toastId)
-    toast.error('Cannot log in, see console')
-    console.error('No data or token?', data)
-    return
-  }
-
-  const { data: currentSession, error: sessionError } = await supabase.auth.getSession()
-  if (sessionError || !currentSession?.session) {
-    toast.dismiss(toastId)
-    console.error('No current session', sessionError)
-    toast.error('Cannot log in, see console')
-    return
-  }
-
-  const { access_token: currentJwt, refresh_token: currentRefreshToken } = currentSession.session
-
-  const { error: authError } = await supabase.auth.setSession({ access_token: newJwt, refresh_token: newRefreshToken })
-  if (authError) {
-    toast.dismiss(toastId)
-    console.error('Auth error', authError)
-    toast.error('Cannot log in, see console')
-    return
-  }
-
-  saveSpoof(currentJwt, currentRefreshToken)
-  toast.dismiss(toastId)
-  toast.success('Spoofed, will reload')
-  setTimeout(() => {
-    router.replace('/dashboard').then(() => {
-      window.location.reload()
-    })
-  }, 1000)
 }
 
 function resetSpoofedUser() {

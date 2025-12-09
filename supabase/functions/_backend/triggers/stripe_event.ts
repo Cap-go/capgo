@@ -9,6 +9,7 @@ import { BRES, quickError, simpleError } from '../utils/hono.ts'
 import { middlewareStripeWebhook } from '../utils/hono_middleware_stripe.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { logsnag } from '../utils/logsnag.ts'
+import { ensureCustomerMetadata } from '../utils/stripe.ts'
 import { customerToSegmentOrg, supabaseAdmin } from '../utils/supabase.ts'
 
 export const app = new Hono<MiddlewareKeyVariablesStripe>()
@@ -16,6 +17,7 @@ export const app = new Hono<MiddlewareKeyVariablesStripe>()
 interface Org {
   id: string
   management_email: string
+  created_by: string
 }
 
 async function customerSourceCreated(c: Context, LogSnag: ReturnType<typeof logsnag>, org: Org, stripeEvent: Stripe.CustomerSourceCreatedEvent) {
@@ -173,7 +175,7 @@ async function didCancel(c: Context, org: Org, LogSnag: ReturnType<typeof logsna
 async function getOrg(c: Context, stripeData: StripeData) {
   const { error: dbError, data: org } = await supabaseAdmin(c)
     .from('orgs')
-    .select('id, management_email')
+    .select('id, management_email, created_by')
     .eq('customer_id', stripeData.data.customer_id)
     .single()
   if (dbError) {
@@ -217,6 +219,8 @@ app.post('/', middlewareStripeWebhook(), async (c) => {
 
   // find email from user with customer_id
   const org = await getOrg(c, stripeData)
+
+  await ensureCustomerMetadata(c, stripeData.data.customer_id, org.id, org.created_by)
 
   const { data: customer } = await supabaseAdmin(c)
     .from('stripe_info')

@@ -29,6 +29,7 @@ interface Props {
   columns: TableColumn[]
   elementList: { [key: string]: any }[]
   appId: string
+  autoReload?: boolean
 }
 const props = defineProps<Props>()
 const emit = defineEmits([
@@ -98,14 +99,6 @@ function sortClick(key: number) {
   emit('update:columns', newColumns)
 }
 
-watch(props.columns, () => {
-  emit('reload')
-})
-if (props.filters) {
-  watch(props.filters, () => {
-    emit('reload')
-  })
-}
 function rangesEqual(a?: [Date, Date], b?: [Date, Date]) {
   if (!a || !b)
     return a === b
@@ -138,17 +131,6 @@ watch(() => props.range, (newRange) => {
     currentSelected.value = 'precise'
   }
 }, { immediate: true })
-
-watch(preciseDates, () => {
-  // console.log('preciseDates', preciseDates.value)
-  emit('update:range', preciseDates.value)
-  emit('reload')
-})
-
-watch(searchVal, useDebounceFn(() => {
-  emit('update:search', searchVal.value)
-  emit('reload')
-}, 500))
 
 function displayValueKey(elem: any, col: TableColumn | undefined) {
   if (!col)
@@ -286,19 +268,27 @@ function selectQuick(option: QuickHourOption) {
 }
 
 function updateUrlParams() {
-  const params = new URLSearchParams()
+  const params = new URLSearchParams(window.location.search)
   if (searchVal.value)
     params.set('search', searchVal.value)
+  else
+    params.delete('search')
   if (preciseDates.value) {
     params.set('start', dayjs(preciseDates.value[0]).toISOString())
     params.set('end', dayjs(preciseDates.value[1]).toISOString())
   }
+  else {
+    params.delete('start')
+    params.delete('end')
+  }
   props.columns.forEach((col) => {
     if (col.sortable && col.sortable !== true)
       params.set(`sort_${col.key}`, col.sortable)
+    else
+      params.delete(`sort_${col.key}`)
   })
   const paramsString = params.toString() ? `?${params.toString()}` : ''
-  window.history.pushState({}, '', `${window.location.pathname}${paramsString}`)
+  window.history.replaceState({}, '', `${window.location.pathname}${paramsString}`)
 }
 
 function openTimePicker() {
@@ -334,7 +324,6 @@ function loadFromUrlParams() {
     }
   })
   emit('update:columns', newColumns)
-  emit('reload')
 }
 
 // Cleanup on unmount
@@ -347,24 +336,30 @@ onUnmounted(() => {
     params.delete(`sort_${col.key}`)
   })
   const paramsString = params.toString() ? `?${params.toString()}` : ''
-  window.history.pushState({}, '', `${window.location.pathname}${paramsString}`)
+  window.history.replaceState({}, '', `${window.location.pathname}${paramsString}`)
 })
 
 // Add watches
 watch(() => props.columns, useDebounceFn(() => {
   updateUrlParams()
+  if (props.autoReload === false)
+    return
   emit('reload')
 }, 500), { deep: true })
 
 watch(preciseDates, useDebounceFn(() => {
   updateUrlParams()
   emit('update:range', preciseDates.value)
+  if (props.autoReload === false)
+    return
   emit('reload')
 }, 500))
 
 watch(searchVal, useDebounceFn(() => {
   updateUrlParams()
   emit('update:search', searchVal.value)
+  if (props.autoReload === false)
+    return
   emit('reload')
 }, 500))
 
@@ -378,8 +373,8 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="overflow-x-auto pb-4 md:pb-0">
-    <div class="flex justify-between items-start p-3 pb-4 md:items-center">
+  <div class="pb-4 overflow-x-auto md:pb-0">
+    <div class="flex items-start justify-between p-3 pb-4 md:items-center">
       <div class="flex h-10 md:mb-0">
         <button class="inline-flex items-center py-1.5 px-3 mr-2 text-sm font-medium text-gray-500 bg-white rounded-md border border-gray-300 dark:text-white dark:bg-gray-800 dark:border-gray-600 hover:bg-gray-100 focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 focus:outline-hidden" type="button" @click="resetTime">
           <IconReload v-if="!isLoading" class="m-1 md:mr-2" />
@@ -387,7 +382,7 @@ onMounted(async () => {
           <span class="hidden text-sm md:block">{{ t('reload') }}</span>
         </button>
       </div>
-      <div class="flex mr-2 h-10 md:mr-auto">
+      <div class="flex h-10 mr-2 md:mr-auto">
         <VueDatePicker
           ref="datepicker"
           v-model="preciseDates"
@@ -410,7 +405,7 @@ onMounted(async () => {
               class="inline-flex gap-2 items-center py-1.5 px-3 h-10 text-sm font-medium text-gray-600 bg-white rounded-md border border-gray-300 transition-colors dark:text-white dark:bg-gray-800 dark:border-gray-600 hover:bg-gray-100 focus:ring-4 focus:ring-gray-200 dark:hover:bg-gray-700 dark:focus:ring-gray-700 focus:outline-hidden"
             >
               <IconCalendar class="hidden w-4 h-4 md:block" />
-              <span class="hidden md:block truncate">
+              <span class="hidden truncate md:block">
                 {{ buttonLabel }}
               </span>
               <span class="md:hidden">
@@ -420,9 +415,9 @@ onMounted(async () => {
             </button>
           </template>
           <template #calendar-icon>
-            <div class="flex gap-2 justify-center items-center w-full text-xs font-medium md:text-sm text-neutral-700 dark:text-neutral-200">
+            <div class="flex items-center justify-center w-full gap-2 text-xs font-medium md:text-sm text-neutral-700 dark:text-neutral-200">
               <IconCalendar class="hidden md:block" />
-              <div class="flex flex-1 gap-2 justify-center items-center">
+              <div class="flex items-center justify-center flex-1 gap-2">
                 <div class="flex flex-1 gap-2 justify-center items-center py-1.5 px-3 min-w-0 bg-gray-100 rounded-full dark:bg-gray-700">
                   <span class="w-full text-center truncate">{{ calendarPreview.start }}</span>
                 </div>
@@ -449,7 +444,7 @@ onMounted(async () => {
           </template>
           <template #top-extra="{ value }">
             <div class="flex flex-col gap-2 md:mb-2">
-              <div class="flex flex-wrap gap-2 items-center">
+              <div class="flex flex-wrap items-center gap-2">
                 <span class="ml-2 text-xs tracking-wide text-gray-500 uppercase dark:text-neutral-400">{{ quickGroupLabel }}</span>
                 <button
                   v-for="option in quickOptions"
@@ -467,9 +462,9 @@ onMounted(async () => {
               </div>
               <div class="flex gap-2 justify-center items-center py-1.5 px-2 w-full rounded-md transition-colors cursor-pointer hover:bg-gray-100 text-neutral-700 dark:text-neutral-200 dark:hover:bg-gray-700" @click="openTimePicker">
                 <IconClock class="hidden md:block" />
-                <div class="flex flex-1 gap-2 justify-center items-center">
+                <div class="flex items-center justify-center flex-1 gap-2">
                   <div class="flex flex-1 gap-2 justify-center items-center py-1.5 px-3 min-w-0 bg-gray-100 rounded-full dark:bg-gray-700">
-                    <span class="w-full text-xs font-medium text-center md:text-sm truncate">{{ formatValue(value as any).start }}</span>
+                    <span class="w-full text-xs font-medium text-center truncate md:text-sm">{{ formatValue(value as any).start }}</span>
                   </div>
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -487,16 +482,16 @@ onMounted(async () => {
                     <path d="m12 5 7 7-7 7" />
                   </svg>
                   <div class="flex flex-1 gap-2 justify-center items-center py-1.5 px-3 min-w-0 bg-gray-100 rounded-full dark:bg-gray-700">
-                    <span class="w-full text-xs font-medium text-center md:text-sm truncate">{{ formatValue(value as any).end }}</span>
+                    <span class="w-full text-xs font-medium text-center truncate md:text-sm">{{ formatValue(value as any).end }}</span>
                   </div>
                 </div>
               </div>
             </div>
           </template>
           <template #clock-icon>
-            <div class="flex gap-2 justify-center items-center w-full text-xs font-medium md:text-sm text-neutral-700 dark:text-neutral-200">
+            <div class="flex items-center justify-center w-full gap-2 text-xs font-medium md:text-sm text-neutral-700 dark:text-neutral-200">
               <IconClock class="hidden md:block" />
-              <div class="flex flex-1 gap-2 justify-center items-center">
+              <div class="flex items-center justify-center flex-1 gap-2">
                 <div class="flex flex-1 gap-2 justify-center items-center py-1.5 px-3 min-w-0 bg-gray-100 rounded-full dark:bg-gray-700">
                   <span class="w-full text-center truncate">{{ timePreview.start }}</span>
                 </div>
@@ -539,7 +534,7 @@ onMounted(async () => {
       <table id="custom_table" class="w-full text-sm text-left text-gray-500 dark:text-gray-400">
         <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:text-gray-400 dark:bg-gray-700">
           <tr>
-            <th v-for="(col, i) in columns" :key="i" scope="col" class="py-3 px-1 md:px-6" :class="{ 'cursor-pointer': col.sortable, 'hidden md:table-cell': !col.mobile }" @click="sortClick(i)">
+            <th v-for="(col, i) in columns" :key="i" scope="col" class="px-1 py-3 md:px-6" :class="{ 'cursor-pointer': col.sortable, 'hidden md:table-cell': !col.mobile }" @click="sortClick(i)">
               <div class="flex items-center first-letter:uppercase">
                 {{ col.label }}
                 <div v-if="col.sortable">
@@ -557,13 +552,13 @@ onMounted(async () => {
             class="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600"
           >
             <template v-for="(col, _y) in columns" :key="`${i}_${_y}`">
-              <th v-if="col.head" :class="`${col.class} ${!col.mobile ? 'hidden md:table-cell' : ''} ${col.onClick ? 'cursor-pointer hover:underline clickable-cell' : ''}`" scope="row" class="py-1 px-1 font-medium text-gray-900 whitespace-nowrap md:py-4 md:px-6 dark:text-white" @click.stop="col.onClick ? col.onClick(elem) : () => {}">
+              <th v-if="col.head" :class="`${col.class} ${!col.mobile ? 'hidden md:table-cell' : ''} ${col.onClick ? 'cursor-pointer hover:underline clickable-cell' : ''}`" scope="row" class="px-1 py-1 font-medium text-gray-900 whitespace-nowrap md:py-4 md:px-6 dark:text-white" @click.stop="col.onClick ? col.onClick(elem) : () => {}">
                 {{ displayValueKey(elem, col) }}
               </th>
-              <td v-else-if="col.icon" :class="`${col.class} ${!col.mobile ? 'hidden md:table-cell' : ''}`" class="py-1 px-1 cursor-pointer md:py-4 md:px-6" @click.stop="col.onClick ? col.onClick(elem) : () => {}">
+              <td v-else-if="col.icon" :class="`${col.class} ${!col.mobile ? 'hidden md:table-cell' : ''}`" class="px-1 py-1 cursor-pointer md:py-4 md:px-6" @click.stop="col.onClick ? col.onClick(elem) : () => {}">
                 <component :is="col.icon" />
               </td>
-              <td v-else :class="`${col.class} ${!col.mobile ? 'hidden md:table-cell' : ''} ${col.onClick ? 'cursor-pointer hover:underline clickable-cell' : ''}`" class="py-1 px-1 md:py-4 md:px-6" @click.stop="col.onClick ? col.onClick(elem) : () => {}">
+              <td v-else :class="`${col.class} ${!col.mobile ? 'hidden md:table-cell' : ''} ${col.onClick ? 'cursor-pointer hover:underline clickable-cell' : ''}`" class="px-1 py-1 md:py-4 md:px-6" @click.stop="col.onClick ? col.onClick(elem) : () => {}">
                 {{ displayValueKey(elem, col) }}
               </td>
             </template>
@@ -571,23 +566,23 @@ onMounted(async () => {
         </tbody>
         <tbody v-else-if="!isLoading && elementList.length === 0">
           <tr>
-            <td :colspan="columns.length" class="py-1 px-1 text-center text-gray-500 md:py-4 md:px-6 dark:text-gray-400">
+            <td :colspan="columns.length" class="px-1 py-1 text-center text-gray-500 md:py-4 md:px-6 dark:text-gray-400">
               {{ t('no_elements_found') }}
             </td>
           </tr>
         </tbody>
         <tbody v-else>
           <tr v-for="i in 10" :key="i" class="max-w-sm" :class="{ 'animate-pulse duration-1000': isLoading }">
-            <td v-for="(col, y) in columns" :key="`${i}_${y}`" class="py-1 px-1 md:py-4 md:px-6">
+            <td v-for="(col, y) in columns" :key="`${i}_${y}`" class="px-1 py-1 md:py-4 md:px-6">
               <div class="bg-gray-200 rounded-full dark:bg-gray-700 max-w-[300px]" :class="{ 'mb-4 h-2.5': col.head, 'h-2 mb-2.5': !col.head }" />
             </td>
           </tr>
         </tbody>
       </table>
     </div>
-    <nav class="flex fixed bottom-0 left-0 z-40 justify-between items-center p-4 w-full bg-white md:relative md:pt-4 md:bg-transparent dark:bg-gray-900 dark:md:bg-transparent" aria-label="Table navigation">
+    <nav class="fixed bottom-0 left-0 z-40 flex items-center justify-between w-full p-4 bg-white md:relative md:pt-4 md:bg-transparent dark:bg-gray-900 dark:md:bg-transparent" aria-label="Table navigation">
       <button
-        class="flex justify-center items-center py-2 px-4 space-x-2 h-10 text-sm font-medium whitespace-nowrap rounded-md border border-gray-300 transition-colors dark:text-white dark:border-gray-700 focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-background dark:hover:bg-primary/90 hover:bg-primary/10 focus-visible:outline-hidden focus-visible:ring-ring"
+        class="flex items-center justify-center h-10 px-4 py-2 space-x-2 text-sm font-medium transition-colors border border-gray-300 rounded-md whitespace-nowrap dark:text-white dark:border-gray-700 focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-background dark:hover:bg-primary/90 hover:bg-primary/10 focus-visible:outline-hidden focus-visible:ring-ring"
         @click="fastBackward"
       >
         <IconFastBackward />

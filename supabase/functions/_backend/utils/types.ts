@@ -42,6 +42,7 @@ export interface ReadStatsParams {
   search?: string
   order?: Order[]
   limit?: number
+  actions?: string[]
 }
 
 export interface ReadDevicesParams {
