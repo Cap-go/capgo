@@ -220,6 +220,38 @@ const creditPricingSectionsConfig = [
       },
     ],
   },
+  {
+    icon: ScaleIcon,
+    titleKey: 'credits-pricing-build-title',
+    subtitleKey: 'credits-pricing-build-subtitle',
+    accentClass: 'bg-sky-100 text-sky-600 dark:bg-sky-900/40 dark:text-sky-300',
+    tiers: [
+      {
+        labelKey: 'credits-pricing-build-tier-first-100',
+        priceKey: 'credits-pricing-build-tier-first-100-price',
+      },
+      {
+        labelKey: 'credits-pricing-build-tier-next-400',
+        priceKey: 'credits-pricing-build-tier-next-400-price',
+      },
+      {
+        labelKey: 'credits-pricing-build-tier-next-500',
+        priceKey: 'credits-pricing-build-tier-next-500-price',
+      },
+      {
+        labelKey: 'credits-pricing-build-tier-next-4000',
+        priceKey: 'credits-pricing-build-tier-next-4000-price',
+      },
+      {
+        labelKey: 'credits-pricing-build-tier-next-5000',
+        priceKey: 'credits-pricing-build-tier-next-5000-price',
+      },
+      {
+        labelKey: 'credits-pricing-build-tier-over-10000',
+        priceKey: 'credits-pricing-build-tier-over-10000-price',
+      },
+    ],
+  },
 ] as const
 
 const creditPricingSections = computed(() =>
