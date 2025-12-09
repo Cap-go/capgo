@@ -469,112 +469,117 @@ $$;
 DROP VIEW IF EXISTS public.usage_credit_ledger;
 
 CREATE VIEW public.usage_credit_ledger
-WITH (security_invoker = true, security_barrier = true) AS
+WITH (security_invoker = TRUE, security_barrier = TRUE) AS
 WITH overage_allocations AS (
-  SELECT
-    e.id AS overage_event_id,
-    e.org_id,
-    e.metric,
-    e.overage_amount,
-    e.credits_estimated,
-    e.credits_debited,
-    e.billing_cycle_start,
-    e.billing_cycle_end,
-    e.created_at,
-    e.details,
-    COALESCE(SUM(c.credits_used), 0) AS credits_applied,
-    jsonb_agg(
-      jsonb_build_object(
-        'grant_id', c.grant_id,
-        'credits_used', c.credits_used,
-        'grant_source', g.source,
-        'grant_expires_at', g.expires_at,
-        'grant_notes', g.notes
-      )
-      ORDER BY g.expires_at, g.granted_at
-    ) FILTER (WHERE c.grant_id IS NOT NULL) AS grant_allocations
-  FROM public.usage_overage_events e
-  LEFT JOIN public.usage_credit_consumptions c
-    ON c.overage_event_id = e.id
-  LEFT JOIN public.usage_credit_grants g
-    ON g.id = c.grant_id
-  GROUP BY
-    e.id,
-    e.org_id,
-    e.metric,
-    e.overage_amount,
-    e.credits_estimated,
-    e.credits_debited,
-    e.billing_cycle_start,
-    e.billing_cycle_end,
-    e.created_at,
-    e.details
+    SELECT
+        e.id AS overage_event_id,
+        e.org_id,
+        e.metric,
+        e.overage_amount,
+        e.credits_estimated,
+        e.credits_debited,
+        e.billing_cycle_start,
+        e.billing_cycle_end,
+        e.created_at,
+        e.details,
+        COALESCE(SUM(c.credits_used), 0) AS credits_applied,
+        JSONB_AGG(
+            JSONB_BUILD_OBJECT(
+                'grant_id', c.grant_id,
+                'credits_used', c.credits_used,
+                'grant_source', g.source,
+                'grant_expires_at', g.expires_at,
+                'grant_notes', g.notes
+            )
+            ORDER BY g.expires_at, g.granted_at
+        ) FILTER (WHERE c.grant_id IS NOT NULL) AS grant_allocations
+    FROM public.usage_overage_events AS e
+    LEFT JOIN public.usage_credit_consumptions AS c
+        ON e.id = c.overage_event_id
+    LEFT JOIN public.usage_credit_grants AS g
+        ON c.grant_id = g.id
+    GROUP BY
+        e.id,
+        e.org_id,
+        e.metric,
+        e.overage_amount,
+        e.credits_estimated,
+        e.credits_debited,
+        e.billing_cycle_start,
+        e.billing_cycle_end,
+        e.created_at,
+        e.details
 ),
+
 aggregated_deductions AS (
-  SELECT
-    MIN(t.id) AS id,
-    a.org_id,
-    'deduction'::public.credit_transaction_type AS transaction_type,
-    SUM(t.amount) AS amount,
-    MIN(t.balance_after) AS balance_after,
-    MAX(t.occurred_at) AS occurred_at,
-    MIN(t.description) AS description_raw,
-    COALESCE(
-      NULLIF(a.details ->> 'note', ''),
-      NULLIF(a.details ->> 'description', ''),
-      MIN(t.description),
-      format('Overage %s', a.metric::text)
-    ) AS description,
-    jsonb_build_object(
-      'overage_event_id', a.overage_event_id,
-      'metric', a.metric::text,
-      'overage_amount', a.overage_amount,
-      'grant_allocations', a.grant_allocations
-    ) AS source_ref,
-    a.overage_event_id,
-    a.metric,
-    a.overage_amount,
-    a.billing_cycle_start,
-    a.billing_cycle_end,
-    a.grant_allocations,
-    a.details
-  FROM public.usage_credit_transactions t
-  JOIN overage_allocations a
-    ON (t.source_ref ->> 'overage_event_id')::uuid = a.overage_event_id
-  WHERE t.transaction_type = 'deduction'
-    AND t.source_ref ? 'overage_event_id'
-  GROUP BY
-    a.overage_event_id,
-    a.metric,
-    a.overage_amount,
-    a.billing_cycle_start,
-    a.billing_cycle_end,
-    a.grant_allocations,
-    a.details,
-    a.org_id
+    SELECT
+        a.org_id,
+        'deduction'::public.credit_transaction_type AS transaction_type,
+        a.overage_event_id,
+        a.metric,
+        a.overage_amount,
+        a.billing_cycle_start,
+        a.billing_cycle_end,
+        a.grant_allocations,
+        a.details,
+        MIN(t.id) AS id,
+        SUM(t.amount) AS amount,
+        MIN(t.balance_after) AS balance_after,
+        MAX(t.occurred_at) AS occurred_at,
+        MIN(t.description) AS description_raw,
+        COALESCE(
+            NULLIF(a.details ->> 'note', ''),
+            NULLIF(a.details ->> 'description', ''),
+            MIN(t.description),
+            FORMAT('Overage %s', a.metric::text)
+        ) AS description,
+        JSONB_BUILD_OBJECT(
+            'overage_event_id', a.overage_event_id,
+            'metric', a.metric::text,
+            'overage_amount', a.overage_amount,
+            'grant_allocations', a.grant_allocations
+        ) AS source_ref
+    FROM public.usage_credit_transactions AS t
+    INNER JOIN overage_allocations AS a
+        ON (t.source_ref ->> 'overage_event_id')::uuid = a.overage_event_id
+    WHERE
+        t.transaction_type = 'deduction'
+        AND t.source_ref ? 'overage_event_id'
+    GROUP BY
+        a.overage_event_id,
+        a.metric,
+        a.overage_amount,
+        a.billing_cycle_start,
+        a.billing_cycle_end,
+        a.grant_allocations,
+        a.details,
+        a.org_id
 ),
+
 other_transactions AS (
-  SELECT
-    t.id,
-    t.org_id,
-    t.transaction_type,
-    t.amount,
-    t.balance_after,
-    t.occurred_at,
-    t.description,
-    t.source_ref,
-    NULL::uuid AS overage_event_id,
-    NULL::public.credit_metric_type AS metric,
-    NULL::numeric AS overage_amount,
-    NULL::date AS billing_cycle_start,
-    NULL::date AS billing_cycle_end,
-    NULL::jsonb AS grant_allocations
-  FROM public.usage_credit_transactions t
-  WHERE t.transaction_type <> 'deduction'
-    OR t.source_ref IS NULL
-    OR NOT (t.source_ref ? 'overage_event_id')
+    SELECT
+        t.id,
+        t.org_id,
+        t.transaction_type,
+        t.amount,
+        t.balance_after,
+        t.occurred_at,
+        t.description,
+        t.source_ref,
+        NULL::uuid AS overage_event_id,
+        NULL::public.credit_metric_type AS metric,
+        NULL::numeric AS overage_amount,
+        NULL::date AS billing_cycle_start,
+        NULL::date AS billing_cycle_end,
+        NULL::jsonb AS grant_allocations
+    FROM public.usage_credit_transactions AS t
+    WHERE
+        t.transaction_type <> 'deduction'
+        OR t.source_ref IS NULL
+        OR NOT (t.source_ref ? 'overage_event_id')
 )
-  SELECT
+
+SELECT
     id,
     org_id,
     transaction_type,
@@ -590,17 +595,17 @@ other_transactions AS (
     billing_cycle_end,
     grant_allocations,
     NULL::jsonb AS details
-  FROM aggregated_deductions
+FROM aggregated_deductions
 UNION ALL
-  SELECT
+SELECT
     id,
     org_id,
-  transaction_type,
-  amount,
-  balance_after,
-  occurred_at,
-  description,
-  source_ref,
+    transaction_type,
+    amount,
+    balance_after,
+    occurred_at,
+    description,
+    source_ref,
     overage_event_id,
     metric,
     overage_amount,
@@ -608,7 +613,7 @@ UNION ALL
     billing_cycle_end,
     grant_allocations,
     NULL::jsonb AS details
-  FROM other_transactions;
+FROM other_transactions;
 
 GRANT SELECT ON public.usage_credit_ledger TO authenticated;
 GRANT SELECT ON public.usage_credit_ledger TO service_role;
@@ -696,7 +701,7 @@ AFTER INSERT ON public.usage_credit_transactions
 FOR EACH ROW EXECUTE FUNCTION public.enqueue_credit_usage_alert();
 
 -- Process the new queue alongside other high-frequency triggers
-CREATE OR REPLACE FUNCTION public.process_all_cron_tasks () RETURNS void LANGUAGE plpgsql
+CREATE OR REPLACE FUNCTION public.process_all_cron_tasks() RETURNS void LANGUAGE plpgsql
 SET search_path = '' AS $$
 DECLARE
   current_hour int;

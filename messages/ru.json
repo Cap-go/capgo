@@ -1,5 +1,5 @@
 {
-  "$schema": "https://inlang.com/schema/inlang-message-format\n\nTranslation: https://inlang.com/schema/format-soobshcheniya-inlang",
+  "$schema": "https://inlang.com/schema/inlang-message-format",
   "2fa": "Управление 2FA",
   "2fa-code": "Код аутентификации 2FA",
   "2fa-disabled": "Отключен 2FA",
@@ -370,7 +370,6 @@
   "credit-transaction-type": "Тип",
   "create": "создать",
   "create-a-channel-first-to-link-bundles": "Сначала создайте канал для связывания пакетов",
-  "create-a-free-accoun": "Создайте бесплатный аккаунт",
   "create-a-free-account": "Создайте бесплатный аккаунт",
   "create-new-org": "Создать новую организацию",
   "created": "Создано",
@@ -598,7 +597,6 @@
   "fast-backward": "Быстрый перемот назад",
   "fast-forward": "Быстрая перемотка",
   "feel-magic-of-capgo": "Почувствуй магию:",
-  "filter-actions": "Действия",
   "first-name": "Имя",
   "first-name-required": "Требуется имя",
   "force-version": "Версия принудительно",

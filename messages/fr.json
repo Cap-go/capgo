@@ -1,5 +1,5 @@
 {
-  "$schema": "https://inlang.com/schema/format-de-message-inlang",
+  "$schema": "https://inlang.com/schema/inlang-message-format",
   "2fa": "Gérer le 2FA",
   "2fa-code": "code d'authentification 2FA",
   "2fa-disabled": "Désactivé 2FA",
@@ -369,7 +369,6 @@
   "credit-transaction-type": "Catégorie",
   "create": "créer",
   "create-a-channel-first-to-link-bundles": "Créez d'abord une chaîne pour lier des lots",
-  "create-a-free-accoun": "Créez un compte gratuit",
   "create-a-free-account": "Créez un compte gratuit",
   "create-new-org": "Créez une nouvelle organisation",
   "created": "Créé",
