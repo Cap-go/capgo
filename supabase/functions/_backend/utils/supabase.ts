@@ -888,9 +888,9 @@ export async function readStatsSB(c: Context, params: ReadStatsParams) {
   if (params.actions?.length) {
     cloudlog({ requestId: c.get('requestId'), message: 'actions filter', actions: params.actions })
     if (params.actions.length === 1)
-      query = query.eq('action', params.actions[0])
+      query = query.eq('action', params.actions[0] as Database['public']['Enums']['stats_action'])
     else
-      query = query.in('action', params.actions)
+      query = query.in('action', params.actions as Database['public']['Enums']['stats_action'][])
   }
 
   if (params.search) {
