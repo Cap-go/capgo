@@ -3,7 +3,7 @@ import type { ArrayElement } from '~/services/types'
 import type { Database } from '~/types/supabase.types'
 import dayjs from 'dayjs'
 import { storeToRefs } from 'pinia'
-import { computed, ref, shallowRef, watchEffect } from 'vue'
+import { computed, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
@@ -319,7 +319,7 @@ function nextRunDate() {
                 {{ currentPlan?.name || t('loading') }}
               </div>
             </div>
-             <div class="flex flex-col">
+            <div class="flex flex-col">
               <div class="mb-1 text-sm text-gray-500 dark:text-gray-400">
                 {{ t('base') }}
               </div>
@@ -327,12 +327,12 @@ function nextRunDate() {
                 ${{ currentPlan?.price_m }}/{{ t('mo') }}
               </div>
             </div>
-             <div class="flex flex-col">
+            <div class="flex flex-col">
               <div class="mb-1 text-sm text-gray-500 dark:text-gray-400">
                 {{ t('credits-used-in-period') }}
               </div>
               <div class="text-2xl font-bold text-gray-900 dark:text-white">
-                 ${{ planUsage?.totalUsagePrice.toLocaleString() }}
+                ${{ planUsage?.totalUsagePrice.toLocaleString() }}
               </div>
             </div>
           </div>
