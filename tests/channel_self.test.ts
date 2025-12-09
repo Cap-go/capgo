@@ -148,7 +148,7 @@ describe('invalids /channel_self tests', () => {
       expect(response.status).toBe(200)
 
       const responseError = await getResponseErrorCode(response)
-      expect(responseError).toBe('channel_set_from_plugin_not_allowed')
+      expect(responseError).toBe('channel_self_set_not_allowed')
     }
     finally {
       const { error } = await getSupabaseClient().from('channels').update({ allow_device_self_set: true }).eq('name', data.channel).eq('app_id', APPNAME).select('id').single()
