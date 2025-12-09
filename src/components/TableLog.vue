@@ -15,6 +15,7 @@ import IconSearch from '~icons/ic/round-search?raw'
 import IconSortDown from '~icons/lucide/chevron-down'
 import IconSortUp from '~icons/lucide/chevron-up'
 import IconSort from '~icons/lucide/chevrons-up-down'
+import IconFilter from '~icons/system-uicons/filtering'
 import IconReload from '~icons/tabler/reload'
 import '@vuepic/vue-datepicker/dist/main.css'
 
@@ -51,6 +52,26 @@ const datepicker = useTemplateRef<InstanceType<typeof VueDatePicker>>('datepicke
 const { t } = useI18n()
 const isDark = useDark()
 const searchVal = ref(props.search ?? '')
+
+const filterSearchVal = ref('')
+const filterList = computed(() => {
+  if (!props.filters)
+    return []
+  const allFilters = Object.keys(props.filters)
+  if (!filterSearchVal.value)
+    return allFilters
+  const search = filterSearchVal.value.toLowerCase()
+  return allFilters.filter(f => t(f).toLowerCase().includes(search))
+})
+const filterActivated = computed(() => {
+  if (!props.filters)
+    return 0
+  return Object.keys(props.filters).reduce((acc, key) => {
+    if (props.filters![key])
+      acc += 1
+    return acc
+  }, 0)
+})
 const currentSelected = ref<'general' | 'precise'>('general')
 type QuickHourOption = 1 | 3 | 6 | 12
 const quickOptions: QuickHourOption[] = [1, 3, 6, 12]
@@ -79,8 +100,7 @@ const startTime = computed(() => {
     },
   ]
 })
-function resetTime() {
-  setTime(currentGeneralTime.value)
+function reloadData() {
   emit('reset')
 }
 
@@ -259,8 +279,6 @@ const buttonLabel = computed(() => {
   return `${start.format('D MMM HH:mm')} → ${end.format('D MMM HH:mm')}`
 })
 
-const isCustomSelected = computed(() => currentSelected.value === 'precise')
-
 function selectQuick(option: QuickHourOption) {
   if (currentSelected.value === 'general' && currentGeneralTime.value === option)
     return
@@ -349,10 +367,13 @@ watch(() => props.columns, useDebounceFn(() => {
 
 watch(preciseDates, useDebounceFn(() => {
   updateUrlParams()
-  emit('update:range', preciseDates.value)
-  if (props.autoReload === false)
-    return
-  emit('reload')
+  // Only emit if the range actually changed from the prop value
+  if (!rangesEqual(preciseDates.value, props.range)) {
+    emit('update:range', preciseDates.value)
+    if (props.autoReload === false)
+      return
+    emit('reload')
+  }
 }, 500))
 
 watch(searchVal, useDebounceFn(() => {
@@ -376,13 +397,13 @@ onMounted(async () => {
   <div class="pb-4 overflow-x-auto md:pb-0">
     <div class="flex items-start justify-between p-3 pb-4 md:items-center">
       <div class="flex h-10 md:mb-0">
-        <button class="inline-flex items-center py-1.5 px-3 mr-2 text-sm font-medium text-gray-500 bg-white rounded-md border border-gray-300 dark:text-white dark:bg-gray-800 dark:border-gray-600 hover:bg-gray-100 focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 focus:outline-hidden" type="button" @click="resetTime">
+        <button class="inline-flex items-center py-1.5 px-3 mr-2 text-sm font-medium text-gray-500 bg-white rounded-md border border-gray-300 dark:text-white dark:bg-gray-800 dark:border-gray-600 hover:bg-gray-100 focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 focus:outline-hidden" type="button" @click="reloadData">
           <IconReload v-if="!isLoading" class="m-1 md:mr-2" />
           <Spinner v-else size="w-[16.8px] h-[16.8px] m-1 mr-2" />
           <span class="hidden text-sm md:block">{{ t('reload') }}</span>
         </button>
       </div>
-      <div class="flex h-10 mr-2 md:mr-auto">
+      <div class="flex h-10 mr-2" :class="{ 'md:mr-auto': !filterText || !filterList.length }">
         <VueDatePicker
           ref="datepicker"
           v-model="preciseDates"
@@ -402,16 +423,13 @@ onMounted(async () => {
           <template #trigger>
             <button
               type="button"
-              class="inline-flex gap-2 items-center py-1.5 px-3 h-10 text-sm font-medium text-gray-600 bg-white rounded-md border border-gray-300 transition-colors dark:text-white dark:bg-gray-800 dark:border-gray-600 hover:bg-gray-100 focus:ring-4 focus:ring-gray-200 dark:hover:bg-gray-700 dark:focus:ring-gray-700 focus:outline-hidden"
+              class="inline-flex gap-2 items-center py-1.5 px-3 h-10 text-sm font-medium text-gray-600 bg-white rounded-md border border-gray-300 transition-colors dark:text-white dark:bg-gray-800 dark:border-gray-600 hover:bg-gray-100 focus:ring-4 focus:ring-gray-200 dark:hover:bg-gray-700 dark:focus:ring-gray-700 focus:outline-hidden whitespace-nowrap"
             >
-              <IconCalendar class="hidden w-4 h-4 md:block" />
+              <IconCalendar class="w-4 h-4 shrink-0" />
               <span class="hidden truncate md:block">
                 {{ buttonLabel }}
               </span>
-              <span class="md:hidden">
-                {{ isCustomSelected ? buttonLabel : `${quickGroupLabel} ${quickLabel(currentGeneralTime)}` }}
-              </span>
-              <IconDown class="w-4 h-4" />
+              <IconDown class="w-4 h-4 shrink-0" />
             </button>
           </template>
           <template #calendar-icon>
@@ -517,6 +535,54 @@ onMounted(async () => {
             </div>
           </template>
         </VueDatePicker>
+      </div>
+      <div v-if="filterText && filterList.length" class="h-10 mr-2 md:mr-auto d-dropdown">
+        <button
+          tabindex="0"
+          class="relative inline-flex items-center py-1.5 px-3 h-full text-sm font-medium text-gray-500 bg-white rounded-md border border-gray-300 cursor-pointer dark:text-white dark:bg-gray-800 dark:border-gray-600 hover:bg-gray-100 focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 focus:outline-hidden"
+        >
+          <div
+            v-if="filterActivated"
+            class="inline-flex absolute -top-2 -right-2 justify-center items-center w-6 h-6 text-xs font-bold text-white bg-red-500 rounded-full border-2 border-white dark:border-gray-900"
+          >
+            {{ filterActivated }}
+          </div>
+          <IconFilter class="mr-2 w-4 h-4" />
+          <span class="hidden md:block">{{ t(filterText) }}</span>
+          <IconDown class="hidden ml-2 w-4 h-4 md:block" />
+        </button>
+        <div class="p-2 w-64 bg-white shadow d-dropdown-content rounded-box z-1 dark:bg-base-200">
+          <input
+            v-model="filterSearchVal"
+            type="text"
+            :placeholder="t('search')"
+            class="w-full px-3 py-2 mb-2 text-sm border border-gray-300 rounded-md dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            @click.stop
+          >
+          <ul class="max-h-64 overflow-y-auto">
+            <li v-for="(f, i) in filterList" :key="i">
+              <div
+                class="flex items-center p-2 rounded-sm cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
+              >
+                <input
+                  :id="`filter-radio-example-${i}`" :checked="filters?.[f]" type="checkbox"
+                  :name="`filter-radio-${i}`"
+                  class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:ring-offset-gray-800 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-600 dark:focus:ring-offset-gray-800"
+                  @change="
+                    emit('update:filters', { ...filters, [f]: !filters?.[f] })
+                  "
+                >
+                <label
+                  :for="`filter-radio-example-${i}`"
+                  class="ml-2 w-full text-sm font-medium text-gray-900 rounded-sm dark:text-gray-300"
+                >{{ t(f) }}</label>
+              </div>
+            </li>
+            <li v-if="filterList.length === 0" class="p-2 text-sm text-gray-500 dark:text-gray-400 text-center">
+              {{ t('no-results') }}
+            </li>
+          </ul>
+        </div>
       </div>
       <div class="flex overflow-hidden md:w-auto">
         <FormKit
@@ -767,14 +833,30 @@ body > .dp__outer_menu_wrap {
   overflow: visible !important;
 }
 
-/* Mobile responsive calendar */
+/* Mobile responsive calendar - only when menu is visible */
 @media (max-width: 768px) {
+  .dp__outer_menu_wrap:has(.dp__menu) {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    background: rgba(0, 0, 0, 0.5) !important;
+  }
+
   .dp__menu {
+    position: relative !important;
     width: calc(100vw - 2rem) !important;
     min-width: calc(100vw - 2rem) !important;
     max-width: calc(100vw - 2rem) !important;
-    left: 1rem !important;
-    right: 1rem !important;
+    left: auto !important;
+    right: auto !important;
+    top: auto !important;
     transform: none !important;
   }
 }

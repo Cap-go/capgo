@@ -11,6 +11,7 @@ import { toast } from 'vue-sonner'
 import IconCopy from '~icons/heroicons/clipboard-document-check'
 import IconCode from '~icons/heroicons/code-bracket'
 import IconLog from '~icons/heroicons/document'
+import IconRocket from '~icons/heroicons/rocket-launch'
 import IconInformation from '~icons/heroicons/information-circle'
 import IconAlertCircle from '~icons/lucide/alert-circle'
 import IconDown from '~icons/material-symbols/keyboard-arrow-down-rounded'
@@ -71,6 +72,11 @@ const tabs: Tab[] = [
     label: t('info'),
     icon: IconInformation,
     key: 'info',
+  },
+  {
+    label: t('deployments'),
+    icon: IconRocket,
+    key: 'deployments',
   },
   {
     label: t('logs'),
@@ -533,6 +539,17 @@ async function copyCurlCommand() {
                 </p>
               </div>
             </div>
+          </div>
+        </div>
+      </div>
+      <div v-else-if="ActiveTab === 'deployments'" id="deployments">
+        <div class="w-full h-full px-0 pt-0 mx-auto mb-8 overflow-y-auto sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
+          <div class="flex flex-col overflow-hidden overflow-y-auto bg-white border shadow-lg md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900">
+            <DeploymentTable
+              class="p-3"
+              :device-id="id"
+              :app-id="packageId"
+            />
           </div>
         </div>
       </div>
