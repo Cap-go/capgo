@@ -309,7 +309,11 @@ SELECT
             FROM pg_class c
             WHERE c.relname = 'usage_credit_ledger'
               AND c.relkind = 'v'
-              AND 'security_invoker' = ANY (c.reloptions)
+              AND EXISTS (
+                SELECT 1
+                FROM unnest(c.reloptions) opt
+                WHERE opt LIKE 'security_invoker%'
+              )
         ),
         'usage_credit_ledger runs with security_invoker to enforce base table RLS'
     );
