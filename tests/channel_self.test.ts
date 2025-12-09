@@ -1057,42 +1057,61 @@ describe('[POST] /channel_self - new plugin version (>= 7.34.0) behavior', () =>
     const data = getBaseData(APPNAME)
     data.device_id = deviceId
 
-    // First, set channel with old version (stores in channel_devices)
-    data.plugin_version = '7.33.0'
-    data.channel = 'production'
-
-    const oldResponse = await fetchEndpoint('POST', data)
-    expect(oldResponse.status).toBe(200)
-
-    // Verify it was stored in channel_devices
-    let { data: oldChannelDevice } = await getSupabaseClient()
-      .from('channel_devices')
-      .select('*')
-      .eq('device_id', deviceId)
+    // Enable allow_device_self_set for beta channel (non-default channel)
+    await getSupabaseClient()
+      .from('channels')
+      .update({ allow_device_self_set: true })
+      .eq('name', 'beta')
       .eq('app_id', APPNAME)
-      .maybeSingle()
 
-    expect(oldChannelDevice).toBeTruthy()
+    await triggerD1Sync()
 
-    // Then, set channel with new version (should clean up old entry)
-    data.plugin_version = '7.34.0'
+    try {
+      // First, set channel with old version (stores in channel_devices)
+      data.plugin_version = '7.33.0'
+      data.channel = 'beta' // Use non-default channel
 
-    const newResponse = await fetchEndpoint('POST', data)
-    expect(newResponse.status).toBe(200)
+      const oldResponse = await fetchEndpoint('POST', data)
+      expect(oldResponse.status).toBe(200)
 
-    const result = await newResponse.json<{ status: string, allowSet: boolean }>()
-    expect(result.status).toBe('ok')
-    expect(result.allowSet).toBe(true)
+      // Verify it was stored in channel_devices
+      const { data: oldChannelDevice } = await getSupabaseClient()
+        .from('channel_devices')
+        .select('*')
+        .eq('device_id', deviceId)
+        .eq('app_id', APPNAME)
+        .maybeSingle()
 
-    // Verify old entry was deleted
-    const { data: newChannelDevice } = await getSupabaseClient()
-      .from('channel_devices')
-      .select('*')
-      .eq('device_id', deviceId)
-      .eq('app_id', APPNAME)
-      .maybeSingle()
+      expect(oldChannelDevice).toBeTruthy()
 
-    expect(newChannelDevice).toBeNull()
+      // Then, set channel with new version (should clean up old entry)
+      data.plugin_version = '7.34.0'
+
+      const newResponse = await fetchEndpoint('POST', data)
+      expect(newResponse.status).toBe(200)
+
+      const result = await newResponse.json<{ status: string, allowSet: boolean }>()
+      expect(result.status).toBe('ok')
+      expect(result.allowSet).toBe(true)
+
+      // Verify old entry was deleted
+      const { data: newChannelDevice } = await getSupabaseClient()
+        .from('channel_devices')
+        .select('*')
+        .eq('device_id', deviceId)
+        .eq('app_id', APPNAME)
+        .maybeSingle()
+
+      expect(newChannelDevice).toBeNull()
+    }
+    finally {
+      // Reset beta channel
+      await getSupabaseClient()
+        .from('channels')
+        .update({ allow_device_self_set: false })
+        .eq('name', 'beta')
+        .eq('app_id', APPNAME)
+    }
   })
 })
 
