@@ -177,7 +177,10 @@ SELECT
 SELECT
     is(
         (
-            SELECT array_agg((message -> 'payload' ->> 'threshold')::int ORDER BY msg_id)
+            SELECT
+                array_agg(
+                    (message -> 'payload' ->> 'threshold')::int ORDER BY msg_id
+                )
             FROM pgmq.q_credit_usage_alerts
             WHERE
                 (message -> 'payload' ->> 'org_id')::uuid
@@ -314,7 +317,9 @@ SELECT
             LIMIT 1
         ),
         (
-            SELECT (date_part('year', now())::int * 100) + date_part('month', now())::int
+            SELECT
+                (date_part('year', now())::int * 100)
+                + date_part('month', now())::int
         ),
         'Alert cycle uses the current YYYYMM key'
     );

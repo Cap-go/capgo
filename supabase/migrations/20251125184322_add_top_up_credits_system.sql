@@ -63,7 +63,7 @@ DECLARE
   c_empty CONSTANT text := '';
   c_service_role CONSTANT text := 'service_role';
   c_default_source CONSTANT text := 'manual';
-  c_purchase CONSTANT public.credit_transaction_type := 'purchase';
+  c_purchase CONSTANT public.credit_transaction_type := 'purchase'::public.credit_transaction_type;
   c_session_id_key CONSTANT text := 'sessionId';
   c_payment_intent_key CONSTANT text := 'paymentIntentId';
   v_request_role text := current_setting('request.jwt.claim.role', true);

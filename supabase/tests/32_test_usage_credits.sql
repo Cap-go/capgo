@@ -541,7 +541,11 @@ SELECT
 SELECT
     is(
         (
-            SELECT array_agg((message -> 'payload' ->> 'threshold')::int ORDER BY (message -> 'payload' ->> 'threshold')::int)
+            SELECT
+                array_agg(
+                    (message -> 'payload' ->> 'threshold')::int
+                    ORDER BY (message -> 'payload' ->> 'threshold')::int
+                )
             FROM pgmq.q_credit_usage_alerts
             WHERE
                 (message -> 'payload' ->> 'org_id')::uuid
