@@ -186,7 +186,7 @@ function onOrgItemClick(org: Organization, e: MouseEvent) {
 <template>
   <div>
     <details v-show="currentOrganization" ref="dropdown" class="w-full d-dropdown d-dropdown-end">
-      <summary class="justify-between w-full text-white border border-gray-600 d-btn d-btn-outline d-btn-sm">
+      <summary class="justify-between shadow-none w-full d-btn d-btn-sm border border-gray-700 text-white bg-[#1a1d24] hover:bg-gray-700 hover:text-white active:text-white focus-visible:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-800">
         <div class="flex items-center w-4/5 text-left">
           <span class="truncate">{{ currentOrganization?.name }}</span>
           <div v-if="hasNewInvitation" class="w-3 h-3 ml-1 bg-red-500 rounded-full" />

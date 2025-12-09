@@ -296,6 +296,9 @@ async function getChannel() {
     }
 
     channel.value = data as unknown as Database['public']['Tables']['channels']['Row'] & Channel
+    if (channel.value?.name)
+      displayStore.setChannelName(String(channel.value.id), channel.value.name)
+    displayStore.NavTitle = channel.value?.name ?? t('channel')
   }
   catch (error) {
     console.error(error)
@@ -351,7 +354,8 @@ watchEffect(async () => {
     await getChannel()
     await getDeviceIds()
     loading.value = false
-    displayStore.NavTitle = t('channel')
+    if (!channel.value?.name)
+      displayStore.NavTitle = t('channel')
     displayStore.defaultBack = `/app/p/${route.params.package}/channels`
   }
 })

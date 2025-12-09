@@ -7,6 +7,7 @@ import { toast } from 'vue-sonner'
 import iconPassword from '~icons/ph/key?raw'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
+// tabs handled by settings layout
 
 const isLoading = ref(false)
 const dialogStore = useDialogV2Store()
@@ -84,7 +85,7 @@ async function submit(form: { password: string, password_confirm: string }) {
 
 <template>
   <div>
-    <div class="pb-8 h-full md:pb-0 max-h-fit grow">
+    <div class="flex flex-col h-full pb-8 overflow-hidden overflow-y-auto bg-white border shadow-lg md:pb-0 max-h-fit grow md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900">
       <FormKit id="change-pass" type="form" :actions="false" @submit="submit">
         <!-- Panel body -->
         <div class="p-6 space-y-6">
@@ -93,7 +94,7 @@ async function submit(form: { password: string, password_confirm: string }) {
           </h2>
           <!-- Personal Info -->
           <section>
-            <div class="mt-5 space-y-4 sm:flex sm:items-center sm:items-stretch sm:space-y-0 sm:space-x-4">
+            <div class="mt-5 space-y-4 sm:flex sm:items-stretch sm:space-y-0 sm:space-x-4">
               <FormKit
                 type="password"
                 name="password"
@@ -118,25 +119,25 @@ async function submit(form: { password: string, password_confirm: string }) {
             </div>
             <FormKitMessages />
           </section>
-        </div>
-        <!-- Panel footer -->
-        <footer>
-          <div class="flex flex-col py-5 px-2 border-t md:px-6 border-slate-300">
-            <div class="flex self-end">
-              <button
-                class="p-2 ml-3 text-white bg-blue-500 rounded-sm hover:bg-blue-600 d-btn"
-                type="submit"
-                color="secondary"
-                shape="round"
-              >
-                <span v-if="!isLoading" class="rounded-4xl">
-                  {{ t('update') }}
-                </span>
-                <Spinner v-else size="w-8 h-8" class="px-4" color="fill-gray-100 text-gray-200 dark:text-gray-600" />
-              </button>
+          <!-- Panel footer -->
+          <footer>
+            <div class="flex flex-col px-2 py-5 border-t md:px-6 border-slate-300">
+              <div class="flex self-end">
+                <button
+                  class="p-2 ml-3 text-white bg-blue-500 rounded-sm hover:bg-blue-600 d-btn"
+                  type="submit"
+                  color="secondary"
+                  shape="round"
+                >
+                  <span v-if="!isLoading" class="rounded-4xl">
+                    {{ t('update') }}
+                  </span>
+                  <Spinner v-else size="w-8 h-8" class="px-4" color="fill-gray-100 text-gray-200 dark:text-gray-600" />
+                </button>
+              </div>
             </div>
-          </div>
-        </footer>
+          </footer>
+        </div>
       </FormKit>
     </div>
 
@@ -163,6 +164,7 @@ async function submit(form: { password: string, password_confirm: string }) {
 </template>
 
 <route lang="yaml">
+path: /settings/account/change-password
 meta:
   layout: settings
 </route>

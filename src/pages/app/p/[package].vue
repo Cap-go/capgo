@@ -31,7 +31,7 @@ const isLoading = ref(false)
 const supabase = useSupabase()
 const displayStore = useDisplayStore()
 const app = ref<Database['public']['Tables']['apps']['Row']>()
-const ActiveTab = ref(route.query.tab?.toString() || 'overview')
+const ActiveTab = ref(route.query.tab?.toString() || 'dashboard')
 const usageComponent = ref()
 const showingBuildSteps = ref(false)
 const showingBundleSteps = ref(false)
@@ -107,7 +107,7 @@ watchEffect(async () => {
 
 watchEffect(() => {
   // Clear dashboard-specific query parameters when switching away from overview
-  if (ActiveTab.value !== 'overview' && usageComponent.value?.clearDashboardParams) {
+  if (ActiveTab.value !== 'dashboard' && usageComponent.value?.clearDashboardParams) {
     usageComponent.value.clearDashboardParams()
   }
   // Always update tab parameter
@@ -117,9 +117,9 @@ watchEffect(() => {
 
 <template>
   <div>
-<Tabs v-model:active-tab="ActiveTab" :tabs="tabs" no-wrap />
+    <Tabs v-model:active-tab="ActiveTab" :tabs="tabs" no-wrap />
     <div v-if="app || isLoading">
-      <div v-if="ActiveTab === 'overview'" class="w-full h-full px-4 pt-4 mb-8 overflow-x-hidden overflow-y-auto sm:px-6 lg:px-8 max-h-fit">
+      <div v-if="ActiveTab === 'dashboard'" class="w-full h-full px-4 pt-4 mb-8 overflow-x-hidden overflow-y-auto sm:px-6 lg:px-8 max-h-fit">
         <FailedCard />
         <Usage v-if="!organizationStore.currentOrganizationFailed" ref="usageComponent" :app-id="id" />
 

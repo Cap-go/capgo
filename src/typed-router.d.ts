@@ -184,23 +184,23 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
-    '/settings/Account': RouteRecordInfo<
-      '/settings/Account',
-      '/settings/Account',
+    '/settings/account/': RouteRecordInfo<
+      '/settings/account/',
+      '/settings/account',
       Record<never, never>,
       Record<never, never>,
       | never
     >,
-    '/settings/ChangePassword': RouteRecordInfo<
-      '/settings/ChangePassword',
-      '/settings/ChangePassword',
+    '/settings/account/ChangePassword': RouteRecordInfo<
+      '/settings/account/ChangePassword',
+      '/settings/account/change-password',
       Record<never, never>,
       Record<never, never>,
       | never
     >,
-    '/settings/Notifications': RouteRecordInfo<
-      '/settings/Notifications',
-      '/settings/Notifications',
+    '/settings/account/Notifications': RouteRecordInfo<
+      '/settings/account/Notifications',
+      '/settings/account/Notifications',
       Record<never, never>,
       Record<never, never>,
       | never
@@ -398,21 +398,21 @@ declare module 'vue-router/auto-routes' {
       views:
         | never
     }
-    'src/pages/settings/Account.vue': {
+    'src/pages/settings/account/index.vue': {
       routes:
-        | '/settings/Account'
+        | '/settings/account/'
       views:
         | never
     }
-    'src/pages/settings/ChangePassword.vue': {
+    'src/pages/settings/account/ChangePassword.vue': {
       routes:
-        | '/settings/ChangePassword'
+        | '/settings/account/ChangePassword'
       views:
         | never
     }
-    'src/pages/settings/Notifications.vue': {
+    'src/pages/settings/account/Notifications.vue': {
       routes:
-        | '/settings/Notifications'
+        | '/settings/account/Notifications'
       views:
         | never
     }

@@ -20,6 +20,9 @@ export const useDisplayStore = defineStore('display', () => {
   const selectedOrganizations = ref<string[]>([])
   const selectedApps = ref<Database['public']['Tables']['apps']['Row'][]>([])
   const appNameResolver = ref<(appId: string) => string | undefined>(() => undefined)
+  const channelNameCache = ref(new Map<string, string>())
+  const bundleNameCache = ref(new Map<string, string>())
+  const deviceNameCache = ref(new Map<string, string>())
   const resolverReady = ref(false)
   const appNameCache = ref(new Map<string, string>())
   const pendingFetches = new Map<string, Promise<void>>()
@@ -27,6 +30,24 @@ export const useDisplayStore = defineStore('display', () => {
   function setAppNameResolver(resolver: (appId: string) => string | undefined) {
     appNameResolver.value = resolver
     resolverReady.value = true
+  }
+
+  function setChannelName(id: string, name: string) {
+    channelNameCache.value.set(id, name)
+    if (lastPath.value)
+      updatePathTitle(lastPath.value)
+  }
+
+  function setBundleName(id: string, name: string) {
+    bundleNameCache.value.set(id, name)
+    if (lastPath.value)
+      updatePathTitle(lastPath.value)
+  }
+
+  function setDeviceName(id: string, name: string) {
+    deviceNameCache.value.set(id, name)
+    if (lastPath.value)
+      updatePathTitle(lastPath.value)
   }
 
   function getPrettyName(segment: string, index: number, allSegments: string[]): string {
@@ -52,6 +73,8 @@ export const useDisplayStore = defineStore('display', () => {
       case 'bundle':
         return 'bundles'
       case 'device':
+        return 'devices'
+      case 'd':
         return 'devices'
       case 'changepassword':
         return 'password'
@@ -121,21 +144,26 @@ export const useDisplayStore = defineStore('display', () => {
       // Kick off fetch if we still don't have a name
       if (!cachedName && !appNameResolver.value(appId) && !pendingFetches.has(appId)) {
         const supabase = useSupabase()
-        const fetchPromise = supabase
-          .from('apps')
-          .select('name')
-          .eq('app_id', appId)
-          .maybeSingle()
-          .then(({ data }) => {
+        const fetchPromise = (async () => {
+          try {
+            const { data } = await supabase
+              .from('apps')
+              .select('name')
+              .eq('app_id', appId)
+              .maybeSingle()
+
             if (data?.name)
               appNameCache.value.set(appId, data.name)
-          })
-          .catch(() => {})
-          .finally(() => {
+          }
+          catch {
+            // ignore missing names
+          }
+          finally {
             pendingFetches.delete(appId)
             if (lastPath.value)
               updatePathTitle(lastPath.value)
-          })
+          }
+        })()
         pendingFetches.set(appId, fetchPromise)
       }
 
@@ -144,9 +172,33 @@ export const useDisplayStore = defineStore('display', () => {
         const segment = splitPath[i]
         const prev = splitPath[i - 1]
 
-        // Skip numeric ids following known resource segments
-        if (/^[0-9]+$/.test(segment) && ['bundle', 'channel', 'device', 'build'].includes(prev))
+        // Handle ids following resource segments
+        if (/^\d+$/.test(segment) && ['bundle', 'channel', 'device', 'build'].includes(prev)) {
+          const pathUpToHere = `/${splitPath.slice(0, i + 1).join('/')}`
+          const cached = prev === 'channel'
+            ? channelNameCache.value.get(segment)
+            : prev === 'bundle'
+              ? bundleNameCache.value.get(segment)
+              : undefined
+          breadcrumbs.push({
+            path: pathUpToHere,
+            name: cached ?? segment,
+            translate: false,
+          })
           continue
+        }
+
+        // Device ids (uuid-ish) following `/d/`
+        if (prev === 'd') {
+          const pathUpToHere = `/${splitPath.slice(0, i + 1).join('/')}`
+          const cached = deviceNameCache.value.get(segment)
+          breadcrumbs.push({
+            path: pathUpToHere,
+            name: cached ?? segment,
+            translate: false,
+          })
+          continue
+        }
 
         const pathUpToHere = `/${splitPath.slice(0, i + 1).join('/')}`
         const prettyName = getPrettyName(segment, i, splitPath)
@@ -161,12 +213,9 @@ export const useDisplayStore = defineStore('display', () => {
       return
     }
 
-    // When viewing dashboard, show only "dashboard"
+    // Dashboard: rely on NavTitle (keep breadcrumb empty for consistent sizing)
     if (splitPath[0] === 'dashboard') {
-      pathTitle.value = [{
-        path: '/dashboard',
-        name: 'dashboard',
-      }]
+      pathTitle.value = []
       return
     }
 
@@ -225,6 +274,9 @@ export const useDisplayStore = defineStore('display', () => {
     selectedApps,
     selectedOrganizations,
     setAppNameResolver,
+    setChannelName,
+    setBundleName,
+    setDeviceName,
     updatePathTitle,
     lastPath,
   }

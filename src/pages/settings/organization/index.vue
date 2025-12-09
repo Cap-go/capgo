@@ -2,7 +2,7 @@
 import { FormKit } from '@formkit/vue'
 import { FunctionsHttpError } from '@supabase/supabase-js'
 import { storeToRefs } from 'pinia'
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import iconEmail from '~icons/oui/email?raw'
@@ -10,6 +10,7 @@ import iconName from '~icons/ph/user?raw'
 import { pickPhoto, takePhoto } from '~/services/photos'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
+import { useDisplayStore } from '~/stores/display'
 import { useOrganizationStore } from '~/stores/organization'
 import DeleteOrgDialog from './DeleteOrgDialog.vue'
 
@@ -20,7 +21,6 @@ const dialogStore = useDialogV2Store()
 const supabase = useSupabase()
 const isLoading = ref(true)
 const dialogRef = ref()
-
 displayStore.NavTitle = t('organization')
 onMounted(async () => {
   await organizationStore.dedupFetchOrganizations()
@@ -212,7 +212,7 @@ async function copyOrganizationId() {
 
 <template>
   <div>
-    <div class="pb-8 h-full md:pb-0 max-h-fit grow">
+    <div class="flex flex-col h-full pb-8 overflow-hidden overflow-y-auto bg-white border shadow-lg md:pb-0 max-h-fit grow md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900">
       <FormKit id="update-org" type="form" :actions="false" @submit="saveChanges">
         <div class="p-6 space-y-6">
           <h2 class="mb-5 text-2xl font-bold dark:text-white text-slate-800">
@@ -235,7 +235,7 @@ async function copyOrganizationId() {
                   </span>
                 </div>
               </div>
-              <button id="change-org-pic" type="button" class="py-2 px-3 text-xs font-medium text-center text-black rounded-lg border cursor-pointer dark:text-white hover:bg-gray-100 focus:ring-4 focus:ring-blue-300 border-slate-500 dark:hover:bg-gray-600 dark:focus:ring-blue-800 focus:outline-hidden" @click="presentActionSheet">
+              <button id="change-org-pic" type="button" class="px-3 py-2 text-xs font-medium text-center text-black border rounded-lg cursor-pointer dark:text-white hover:bg-gray-100 focus:ring-4 focus:ring-blue-300 border-slate-500 dark:hover:bg-gray-600 dark:focus:ring-blue-800 focus:outline-hidden" @click="presentActionSheet">
                 {{ t('change') }}
               </button>
             </div>
@@ -273,17 +273,17 @@ async function copyOrganizationId() {
                 {{ t('organization-id') }}
               </p>
               <div class="pt-2 md:pt-0 md:ml-6">
-                <button type="button" class="py-2 px-3 text-xs font-medium text-center text-gray-700 rounded-lg border cursor-pointer dark:text-white hover:bg-gray-100 focus:ring-4 focus:ring-blue-300 border-slate-500 dark:hover:bg-gray-600 dark:focus:ring-blue-800 focus:outline-hidden" @click.prevent="copyOrganizationId()">
+                <button type="button" class="px-3 py-2 text-xs font-medium text-center text-gray-700 border rounded-lg cursor-pointer dark:text-white hover:bg-gray-100 focus:ring-4 focus:ring-blue-300 border-slate-500 dark:hover:bg-gray-600 dark:focus:ring-blue-800 focus:outline-hidden" @click.prevent="copyOrganizationId()">
                   {{ t('copy-organization-id') }}
                 </button>
               </div>
             </div>
           </div>
-          <footer style="margin-top: auto">
-            <div class="flex flex-col py-5 px-2 border-t md:px-6 border-slate-300">
+          <footer class="mt-auto">
+            <div class="flex flex-col px-2 py-5 border-t md:px-6 border-slate-300">
               <div class="flex self-end">
                 <button
-                  class="p-2 text-red-600 rounded-lg border border-red-400 cursor-pointer hover:text-white hover:bg-red-600"
+                  class="p-2 text-red-600 border border-red-400 rounded-lg cursor-pointer hover:text-white hover:bg-red-600"
                   color="secondary"
                   shape="round"
                   type="button"
@@ -292,7 +292,7 @@ async function copyOrganizationId() {
                   }"
                   @click="() => deleteOrganization()"
                 >
-                  <span v-if="!isLoading" class="rounded-4xl truncate">
+                  <span v-if="!isLoading" class="truncate rounded-4xl">
                     {{ t('delete-org') }}
                   </span>
                   <Spinner v-else size="w-4 h-4" class="px-4 pt-0 pb-0" color="fill-gray-100 text-gray-200 dark:text-gray-600" />

@@ -75,7 +75,7 @@ const { t } = useI18n()
                       {{ breadcrumb.translate === false ? breadcrumb.name : t(breadcrumb.name) }}
                     </router-link>
                   </li>
-                  <li v-if="displayStore.NavTitle && displayStore.NavTitle !== lastBreadcrumbName" class="flex items-center">
+                  <li v-if="displayStore.pathTitle.length && displayStore.NavTitle && displayStore.NavTitle !== lastBreadcrumbName" class="flex items-center">
                     <span class="mx-1" aria-hidden="true"> / </span>
                   </li>
                 </ol>

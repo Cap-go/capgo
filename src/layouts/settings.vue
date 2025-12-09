@@ -1,157 +1,120 @@
 <script setup lang="ts">
+import type { Ref } from 'vue'
 import type { Tab } from '~/components/comp_def'
 import { Capacitor } from '@capacitor/core'
-import { ref, shallowRef, watch, watchEffect } from 'vue'
+import { computed, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
-import IconPlans from '~icons/material-symbols/price-change'
-import IconNotification from '~icons/mdi/message-notification'
-import IconPassword from '~icons/mdi/password'
-import IconAccount from '~icons/mdi/user'
+import { useRoute, useRouter } from 'vue-router'
 import IconBilling from '~icons/mingcute/bill-fill'
+import Tabs from '~/components/Tabs.vue'
+import { accountTabs } from '~/constants/accountTabs'
+import { organizationTabs as baseOrgTabs } from '~/constants/organizationTabs'
+import { settingsTabs } from '~/constants/settingsTabs'
 import { openPortal } from '~/services/stripe'
 import { useOrganizationStore } from '~/stores/organization'
 
 const { t } = useI18n()
 const organizationStore = useOrganizationStore()
 const router = useRouter()
-function getCurrentTab() {
-  // look the path and set the active tab
-  const path = router.currentRoute.value.path
-  if (path.includes('/settings/account'))
-    return '/settings/account'
-  else if (path.includes('/settings/organization'))
-    return '/settings/organization'
-  else if (path.includes('/settings/organization/plans'))
-    return '/settings/organization/plans'
-  return '/settings/account'
-}
+const route = useRoute()
 
-const ActiveTab = ref(getCurrentTab())
-
-const tabs = ref<Tab[]>([
-  {
-    label: 'account',
-    icon: shallowRef(IconAccount),
-    key: '/settings/account',
-  },
-  {
-    label: 'password',
-    icon: shallowRef(IconPassword),
-    key: '/settings/changepassword',
-  },
-  {
-    label: 'notifications',
-    icon: shallowRef(IconNotification),
-    key: '/settings/notifications',
-  },
-])
-
-const organizationTabs = ref<Tab[]>([
-  {
-    label: 'general-information',
-    icon: shallowRef(IconAccount),
-    key: '/settings/organization/',
-  },
-  {
-    label: 'members',
-    icon: shallowRef(IconPassword),
-    key: '/settings/organization/members',
-  },
-])
-
-const type = ref<'user' | 'organization'>(router.currentRoute.value.path.includes('organization') ? 'organization' : 'user')
-
-watch(type, (val) => {
-  let key
-  if (val === 'user')
-    key = tabs.value[0].key
-
-  else
-    key = organizationTabs.value[0].key
-
-  router.push(key)
-})
+// keep Tab icon typing (including ShallowRef) instead of Vue's UnwrapRef narrowing
+const organizationTabs = ref<Tab[]>([...baseOrgTabs]) as Ref<Tab[]>
 
 watchEffect(() => {
-  if (organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['super_admin'])
-    && (!organizationTabs.value.find(tab => tab.label === 'usage'))) {
-    // push it 2 before the last tab
-    organizationTabs.value.push({
-      label: 'usage',
-      icon: shallowRef(IconPlans) as any,
-      key: '/settings/organization/usage',
-    })
+  // ensure usage/plans tabs based on permissions (keeps icons from base)
+  const needsUsage = organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['super_admin'])
+  const hasUsage = organizationTabs.value.find(tab => tab.key === '/settings/organization/usage')
+  if (needsUsage && !hasUsage) {
+    const base = baseOrgTabs.find(t => t.key === '/settings/organization/usage')
+    if (base)
+      organizationTabs.value.push({ ...base })
   }
-  else if (organizationTabs.value.find(tab => tab.label === 'usage')) {
-    organizationTabs.value = organizationTabs.value.filter(tab => tab.label !== 'usage')
+  if (!needsUsage && hasUsage)
+    organizationTabs.value = organizationTabs.value.filter(tab => tab.key !== '/settings/organization/usage')
+
+  const needsPlans = organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['super_admin'])
+  const hasPlans = organizationTabs.value.find(tab => tab.key === '/settings/organization/plans')
+  if (needsPlans && !hasPlans) {
+    const base = baseOrgTabs.find(t => t.key === '/settings/organization/plans')
+    if (base)
+      organizationTabs.value.push({ ...base })
   }
-  if (organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['super_admin'])
-    && !organizationTabs.value.find(tab => tab.label === 'plans')) {
-    organizationTabs.value.push(
-      {
-        label: 'plans',
-        icon: shallowRef(IconPlans) as any,
-        key: '/settings/organization/plans',
-      },
-    )
-  }
-  else if (!organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['super_admin'])) {
-    organizationTabs.value = organizationTabs.value.filter(tab => tab.label !== 'plans')
-  }
+  if (!needsPlans && hasPlans)
+    organizationTabs.value = organizationTabs.value.filter(tab => tab.key !== '/settings/organization/plans')
 
   if (!Capacitor.isNativePlatform()
     && organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['super_admin'])
-    && !organizationTabs.value.find(tab => tab.label === 'billing')) {
+    && !organizationTabs.value.find(tab => tab.key === '/billing')) {
     organizationTabs.value.push({
       label: 'billing',
-      icon: shallowRef(IconBilling) as any,
+      icon: IconBilling,
       key: '/billing',
       onClick: () => openPortal(organizationStore.currentOrganization?.gid ?? '', t),
     })
   }
   else if (!organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['super_admin'])) {
-    organizationTabs.value = organizationTabs.value.filter(tab => tab.label !== 'billing')
+    organizationTabs.value = organizationTabs.value.filter(tab => tab.key !== '/billing')
   }
 })
 
-async function gotoOrgSettings() {
-  type.value = 'organization'
-}
+const activePrimary = computed(() => {
+  const path = route.path
+  if (path.startsWith('/settings/organization'))
+    return '/settings/organization'
+  return '/settings/account'
+})
 
-function gotoMainSettings() {
-  type.value = 'user'
+const secondaryTabs = computed(() => {
+  return activePrimary.value === '/settings/organization' ? organizationTabs.value : accountTabs
+})
+
+const activeSecondary = computed(() => {
+  const tabs = secondaryTabs.value
+  const path = route.path.replace(/\/$/, '')
+
+  // Prefer the most specific match (longest path) so nested routes like
+  // `/settings/organization/members` don't get claimed by the parent
+  // `/settings/organization` tab.
+  const ordered = [...tabs].sort((a, b) => b.key.length - a.key.length)
+
+  const match = ordered.find((t) => {
+    const key = t.key.replace(/\/$/, '')
+    return path === key || path.startsWith(`${key}/`)
+  })
+
+  return match?.key ?? tabs[0]?.key
+})
+
+function handlePrimary(val: string) {
+  // Clicking primary switches to the root of that section
+  router.push(val === '/settings/organization' ? '/settings/organization' : '/settings/account')
+}
+function handleSecondary(val: string) {
+  const tab = secondaryTabs.value.find(t => t.key === val)
+  if (tab?.onClick) {
+    tab.onClick(val)
+    return
+  }
+  router.push(val)
 }
 </script>
 
 <template>
-  <div class="flex overflow-hidden flex-col flex-1 h-full">
-    <div class="text-center text-gray-500 bg-gray-200 dark:text-gray-400 dark:bg-gray-800">
-      <ul class="flex flex-wrap -mb-px">
-        <li class="mr-2">
-          <a
-            class="inline-block p-1 rounded-t-lg cursor-pointer md:p-4"
-            :class="{ 'border-b-2 text-blue-600 border-blue-600 active dark:text-blue-500 dark:border-blue-500': type === 'user', 'dark:hover:text-gray-300 dark:hover:bg-gray-700 hover:text-gray-600 hover:bg-gray-300': type !== 'user' }"
-            aria-current="page"
-            @click="gotoMainSettings"
-          >{{ t('your-settings') }}</a>
-        </li>
-        <li class="mr-2">
-          <a
-            class="inline-block p-1 rounded-t-lg cursor-pointer md:p-4"
-            :class="{ 'border-b-2 text-blue-600 border-blue-600 active dark:text-blue-500 dark:border-blue-500': type === 'organization', 'dark:hover:text-gray-300 dark:hover:bg-gray-700 hover:text-gray-600 hover:bg-gray-300': type !== 'organization' }"
-            aria-current="page"
-            @click="gotoOrgSettings"
-          >{{ t('organization-settings') }} </a>
-        </li>
-      </ul>
-    </div>
-    <main class="overflow-hidden w-full h-full">
-      <TabSidebar v-model:active-tab="ActiveTab" :tabs="type === 'user' ? tabs : organizationTabs" class="mx-auto w-full h-full md:py-8 md:px-4 lg:px-8 max-w-9xl">
-        <template #default>
-          <RouterView class="overflow-y-auto h-full grow" />
-        </template>
-      </TabSidebar>
+  <div class="flex flex-col flex-1 h-full min-h-0 overflow-hidden bg-slate-50 dark:bg-slate-900">
+    <Tabs
+      :tabs="settingsTabs"
+      :active-tab="activePrimary"
+      :secondary-tabs="secondaryTabs"
+      :secondary-active-tab="activeSecondary"
+      no-wrap
+      @update:active-tab="handlePrimary"
+      @update:secondary-active-tab="handleSecondary"
+    />
+    <main class="flex flex-1 w-full min-h-0 mt-0 overflow-hidden md:mt-8">
+      <div class="flex-1 w-full min-h-0 px-0 pt-0 mx-auto mb-8 overflow-y-auto sm:px-6 md:pt-8 lg:px-8 max-w-9xl">
+        <RouterView class="w-full" />
+      </div>
     </main>
   </div>
 </template>

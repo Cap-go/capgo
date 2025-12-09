@@ -50,10 +50,10 @@ watch(currentOrganization, async () => {
 
 onMounted(async () => {
   if (route.path === '/dashboard') {
-    displayStore.NavTitle = ''
     isLoading.value = true
     await getMyApps()
     isLoading.value = false
+    displayStore.NavTitle = t('dashboard')
   }
 })
 displayStore.NavTitle = t('dashboard')

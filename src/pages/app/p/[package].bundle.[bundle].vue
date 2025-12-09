@@ -14,6 +14,7 @@ import IconInformation from '~icons/heroicons/information-circle'
 import IconTrash from '~icons/heroicons/trash'
 import IconSearch from '~icons/ic/round-search?raw'
 import IconAlertCircle from '~icons/lucide/alert-circle'
+import { appTabs } from '~/constants/appTabs'
 import { bytesToMbText } from '~/services/conversion'
 import { formatDate } from '~/services/date'
 import { checkCompatibilityNativePackages, isCompatible, useSupabase } from '~/services/supabase'
@@ -22,7 +23,6 @@ import { useDialogV2Store } from '~/stores/dialogv2'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
-import { appTabs } from '~/constants/appTabs'
 
 const { t } = useI18n()
 const route = useRoute('/app/p/[package].bundle.[bundle]')
@@ -404,6 +404,9 @@ async function getVersion() {
 
     hasManifest.value = data.manifest_count > 0
     version.value = data
+    if (version.value?.name)
+      displayStore.setBundleName(String(version.value.id), version.value.name)
+    displayStore.NavTitle = version.value?.name ?? t('bundle')
   }
   catch (error) {
     console.error(error)
@@ -418,7 +421,8 @@ watchEffect(async () => {
     await getVersion()
     await getChannels()
     loading.value = false
-    displayStore.NavTitle = t('bundle')
+    if (!version.value?.name)
+      displayStore.NavTitle = t('bundle')
     displayStore.defaultBack = `/app/p/${route.params.package}/bundles`
   }
 })

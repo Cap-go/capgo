@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
+// tabs handled by settings layout
 
 const { t } = useI18n()
 const main = useMainStore()
@@ -55,14 +56,14 @@ async function submitDoi() {
 
 <template>
   <div>
-    <div class="grow">
+    <div class="flex flex-col overflow-hidden overflow-y-auto bg-white border shadow-lg grow md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900">
       <!-- Panel body -->
       <div class="p-6 space-y-6">
         <h2 class="text-2xl font-bold dark:text-white text-slate-800">
           {{ t('my-notifications') }}
         </h2>
 
-        <div class="mx-auto w-full dark:text-white">
+        <div class="w-full mx-auto dark:text-white">
           <dl class="divide-y divide-slate-200 dark:divide-slate-500">
             <InfoRow :label="t('activation-notification')" :editable="false" :value="t('activation-notification-desc')">
               <Toggle
