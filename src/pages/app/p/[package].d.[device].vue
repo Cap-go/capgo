@@ -8,6 +8,7 @@ import { ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
+import IconExternalLink from '~icons/heroicons/arrow-top-right-on-square'
 import IconCopy from '~icons/heroicons/clipboard-document-check'
 import IconCode from '~icons/heroicons/code-bracket'
 import IconLog from '~icons/heroicons/document'
@@ -115,7 +116,8 @@ async function getChannels() {
         id,
         name,
         created_at,
-        updated_at
+        updated_at,
+        public
       `)
       .eq('app_id', packageId.value)
       .throwOnError()
@@ -306,8 +308,8 @@ async function upsertDevChannel(device: string, channelId: number) {
     .throwOnError()
 }
 
-async function delDevChannel(device: string) {
-  if (await didCancel(t('channel')))
+async function delDevChannel(device: string, skipConfirm = false) {
+  if (!skipConfirm && await didCancel(t('channel')))
     return
   return supabase
     .from('channel_devices')
@@ -321,21 +323,31 @@ function closeChannelDropdown() {
     channelDropdown.value.removeAttribute('open')
   }
 }
-
-function getChannelLabel(channelId: number | string | null) {
-  if (!channelId || channelId === 'none') {
-    return t('none')
-  }
-  const channel = channels.value.find(ch => ch.id === Number(channelId))
-  return channel?.name || t('none')
-}
-
 async function onSelectChannel(value: string) {
   const hasPerm = organizationStore.hasPermissionsInRole(role.value, ['admin', 'super_admin', 'write'])
 
   if (!hasPerm) {
     toast.error(t('no-permission'))
     return
+  }
+
+  // Check if selected channel is the public (default) channel
+  if (value !== 'none') {
+    const selectedChannel = channels.value.find(ch => ch.id === Number(value))
+
+    if (selectedChannel?.public === true) {
+      // If trying to set override to default channel, remove any existing override
+      if (channelDevice.value && device.value?.device_id) {
+        await delDevChannel(device.value?.device_id, true)
+        toast.info(t('channel-override-ignored-default'))
+        await loadData()
+      }
+      else {
+        toast.info(t('channel-override-ignored-default'))
+      }
+      closeChannelDropdown()
+      return
+    }
   }
 
   if (channelDevice.value && value === 'none') {
@@ -388,6 +400,13 @@ watchEffect(async () => {
 function openChannel() {
   if (packageId.value && channelDevice.value?.id)
     router.push(`/app/p/${packageId.value}/channel/${channelDevice.value.id}`)
+}
+function openDefaultChannel() {
+  if (packageId.value && device.value?.default_channel) {
+    const defaultChannel = channels.value.find(ch => ch.name === device.value?.default_channel)
+    if (defaultChannel)
+      router.push(`/app/p/${packageId.value}/channel/${defaultChannel.id}`)
+  }
 }
 function openBundle() {
   if (packageId.value && device.value?.version)
@@ -470,40 +489,53 @@ async function copyCurlCommand() {
               <InfoRow v-if="device.os_version" :label="t('os-version')">
                 {{ device.os_version }}
               </InfoRow>
-              <InfoRow v-if="device.default_channel" :label="t('default-channel')">
-                {{ device.default_channel }}
-              </InfoRow>
               <InfoRow v-if="minVersion(device.plugin_version) && device.is_emulator" :label="t('is-emulator')">
                 {{ device.is_emulator?.toString() }}
               </InfoRow>
               <InfoRow v-if="minVersion(device.plugin_version) && device.is_prod" :label="t('is-production-app')">
                 {{ device.is_prod?.toString() }}
               </InfoRow>
-              <InfoRow :label="t('channel-link')" :value="channelDevice?.name ?? ''" :is-link="true" @click="openChannel()">
-                <details ref="channelDropdown" class="relative d-dropdown d-dropdown-end" @click.stop>
-                  <summary class="d-btn d-btn-outline d-btn-sm">
-                    <span>{{ getChannelLabel(channelDevice?.id || 'none') }}</span>
-                    <IconDown class="w-4 h-4 ml-1 fill-current" />
-                  </summary>
-                  <ul class="absolute right-0 z-50 w-48 p-2 mt-1 bg-white shadow-lg top-full d-dropdown-content dark:bg-base-200 rounded-box">
-                    <li class="block px-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600">
-                      <a
-                        class="block px-3 py-2 text-gray-900 dark:text-white"
-                        @click="onSelectChannel('none')"
-                      >
-                        {{ t('none') }}
-                      </a>
-                    </li>
-                    <li v-for="ch in channels" :key="ch.id" class="block px-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600">
-                      <a
-                        class="block px-3 py-2 text-gray-900 dark:text-white"
-                        @click="onSelectChannel(ch.id.toString())"
-                      >
-                        {{ ch.name }}
-                      </a>
-                    </li>
-                  </ul>
-                </details>
+              <InfoRow v-if="device.default_channel" :label="t('default-channel')">
+                <div class="flex items-center gap-2">
+                  <span class="font-medium text-gray-900 dark:text-white">
+                    {{ device.default_channel }}
+                  </span>
+                  <IconExternalLink class="w-4 h-4 text-blue-600 dark:text-blue-400 cursor-pointer" @click="openDefaultChannel()" />
+                </div>
+              </InfoRow>
+              <InfoRow :label="t('channel-link')">
+                <div class="flex flex-col items-end gap-1">
+                  <div class="flex items-center gap-2">
+                    <details ref="channelDropdown" class="relative d-dropdown d-dropdown-end" @click.stop>
+                      <summary class="d-btn d-btn-outline d-btn-sm">
+                        <span>{{ channelDevice?.name ?? t('none') }}</span>
+                        <IconDown class="w-4 h-4 ml-1 fill-current" />
+                      </summary>
+                      <ul class="absolute right-0 z-50 w-48 p-2 mt-1 bg-white shadow-lg top-full d-dropdown-content dark:bg-base-200 rounded-box">
+                        <li class="block px-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600">
+                          <a
+                            class="block px-3 py-2 text-gray-900 dark:text-white"
+                            @click="onSelectChannel('none')"
+                          >
+                            {{ t('none') }}
+                          </a>
+                        </li>
+                        <li v-for="ch in channels" :key="ch.id" class="block px-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600">
+                          <a
+                            class="block px-3 py-2 text-gray-900 dark:text-white"
+                            @click="onSelectChannel(ch.id.toString())"
+                          >
+                            {{ ch.name }}
+                          </a>
+                        </li>
+                      </ul>
+                    </details>
+                    <IconExternalLink v-if="channelDevice" class="w-4 h-4 text-blue-600 dark:text-blue-400 cursor-pointer" @click="openChannel()" />
+                  </div>
+                  <span v-if="channelDevice" class="text-xs text-gray-500 dark:text-gray-400">
+                    {{ t('overriding-default-channel') }}
+                  </span>
+                </div>
               </InfoRow>
             </dl>
 

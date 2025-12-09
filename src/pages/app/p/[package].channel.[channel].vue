@@ -14,6 +14,7 @@ import IconDevice from '~icons/heroicons/device-phone-mobile'
 import IconInformation from '~icons/heroicons/information-circle'
 import IconNext from '~icons/ic/round-keyboard-arrow-right'
 import IconSearch from '~icons/ic/round-search?raw'
+import plusOutline from '~icons/ion/add-outline'
 import IconAlertCircle from '~icons/lucide/alert-circle'
 import IconDown from '~icons/material-symbols/keyboard-arrow-down-rounded'
 import { appTabs } from '~/constants/appTabs'
@@ -152,6 +153,12 @@ async function customDeviceOverwritePart5(
   deviceId: string,
   platform: 'ios' | 'android',
 ) {
+  // Check if this channel is the public (default) channel
+  if (channel.value?.public === true) {
+    toast.info(t('channel-override-ignored-default'))
+    return
+  }
+
   const { error: addDeviceError } = await supabase.functions.invoke('private/create_device', {
     body: {
       device_id: deviceId,
