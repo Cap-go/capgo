@@ -631,6 +631,19 @@ export async function readStatsCF(c: Context, params: ReadStatsParams) {
       deviceFilter = `AND device_id IN (${devicesList})`
     }
   }
+
+  let actionsFilter = ''
+  if (params.actions?.length) {
+    cloudlog({ requestId: c.get('requestId'), message: 'actions filter', actions: params.actions })
+    if (params.actions.length === 1) {
+      actionsFilter = `AND action = '${params.actions[0]}'`
+    }
+    else {
+      const actionsList = params.actions.map(a => `'${a}'`).join(',')
+      actionsFilter = `AND action IN (${actionsList})`
+    }
+  }
+
   let searchFilter = ''
   if (params.search) {
     const searchLower = params.search.toLowerCase()
@@ -659,7 +672,7 @@ export async function readStatsCF(c: Context, params: ReadStatsParams) {
   timestamp as created_at
 FROM app_log
 WHERE
-  app_id = '${params.app_id}' ${deviceFilter} ${searchFilter} ${startFilter} ${endFilter}
+  app_id = '${params.app_id}' ${deviceFilter} ${actionsFilter} ${searchFilter} ${startFilter} ${endFilter}
 GROUP BY app_id, created_at, action, device_id, version_name
 ${orderFilter}
 LIMIT ${params.limit ?? DEFAULT_LIMIT}`

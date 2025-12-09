@@ -15,6 +15,7 @@ interface DataStats {
   rangeStart?: string
   rangeEnd?: string
   limit?: number
+  actions?: string[]
 }
 
 export const app = new Hono<MiddlewareKeyVariables>()
@@ -36,5 +37,6 @@ app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
     search: body.search,
     order: body.order,
     limit: body.limit,
+    actions: body.actions,
   }))
 })

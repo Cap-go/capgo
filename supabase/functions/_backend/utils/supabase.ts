@@ -885,6 +885,14 @@ export async function readStatsSB(c: Context, params: ReadStatsParams) {
       query = query.in('device_id', params.deviceIds)
   }
 
+  if (params.actions?.length) {
+    cloudlog({ requestId: c.get('requestId'), message: 'actions filter', actions: params.actions })
+    if (params.actions.length === 1)
+      query = query.eq('action', params.actions[0])
+    else
+      query = query.in('action', params.actions)
+  }
+
   if (params.search) {
     cloudlog({ requestId: c.get('requestId'), message: 'search', search: params.search })
     if (params.deviceIds?.length)
