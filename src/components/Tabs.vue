@@ -33,7 +33,7 @@ function activeTabColor(tab: string, isSecondary = false) {
     return {
       'border border-transparent text-slate-500/75 dark:text-slate-400/75 hover:text-slate-700 dark:hover:text-slate-200 transition-colors duration-150':
         !isActive,
-      'text-blue-500 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/20 border-t border-l border-r border-blue-200/60 dark:border-blue-800/70 border-b-0 shadow-none hover:ring-1 hover:ring-blue-200 dark:hover:ring-blue-800 transition-colors duration-150':
+      'text-blue-500 dark:text-blue-300 bg-blue-50 dark:bg-[#1a2744] border-t border-l border-r border-blue-200/60 dark:border-blue-800/70 border-b-0 relative before:content-[\'\'] before:absolute before:bottom-[-2px] before:left-0 before:right-0 before:h-[2px] before:bg-blue-50 dark:before:bg-[#1a2744] before:z-[11] shadow-none hover:ring-1 hover:ring-blue-200 dark:hover:ring-blue-800 transition-colors duration-150':
         isActive,
     }
   }
@@ -48,8 +48,8 @@ function activeTabColor(tab: string, isSecondary = false) {
 
 // Keep tabs corners square to match surrounding layout
 const containerClass = computed(() => hasSecondary.value
-  ? 'bg-slate-200/60 dark:bg-slate-800/60 pb-0'
-  : 'bg-slate-200/60 dark:bg-slate-800/60')
+  ? ' pb-0'
+  : '')
 const ulPrimaryClass = computed(() => hasSecondary.value
   ? 'flex text-xs md:text-sm font-medium text-center text-gray-500 dark:text-gray-300 gap-1 pt-1 px-1'
   : 'flex text-xs md:text-sm font-medium text-center text-gray-500 dark:text-gray-300 gap-1 py-1')
@@ -68,7 +68,7 @@ const labelSecondaryClass = 'hidden md:block text-xs md:text-sm font-medium tran
   <div>
     <div :class="containerClass">
       <ul :class="[ulPrimaryClass, { 'flex-wrap': !noWrap, 'flex-nowrap overflow-x-scroll no-scrollbar px-1': noWrap }]">
-        <li v-for="(tab, i) in tabs" :key="i" class="mr-2 relative" :class="[{ 'z-20': hasSecondary && props.activeTab === tab.key }]">
+        <li v-for="(tab, i) in tabs" :key="i" class="relative mr-2" :class="[{ 'z-20': hasSecondary && props.activeTab === tab.key }]">
           <button :class="[buttonPrimaryClass, activeTabColor(tab.key), hasSecondary && props.activeTab === tab.key ? 'rounded-b-none' : 'rounded-b-md']" @click="emit('update:activeTab', tab.key)">
             <component
               :is="tab.icon"
@@ -97,7 +97,7 @@ const labelSecondaryClass = 'hidden md:block text-xs md:text-sm font-medium tran
         </li>
       </ul>
     </div>
-    <div v-if="secondaryTabs?.length" class="bg-blue-50 dark:bg-blue-900/20 relative border-t border-blue-200/60 dark:border-blue-800/70 -mt-px z-10">
+    <div v-if="secondaryTabs?.length" class="bg-blue-50 dark:bg-[#1a2744] relative border-t border-blue-200/60 dark:border-blue-800/70 -mt-px z-10">
       <div>
         <ul :class="[ulSecondaryClass, { 'flex-wrap': !noWrap, 'flex-nowrap overflow-x-scroll no-scrollbar px-1': noWrap }]">
           <li v-for="(tab, i) in secondaryTabs" :key="i" class="mr-2">
