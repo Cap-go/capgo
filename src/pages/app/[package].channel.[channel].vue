@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { OrganizationRole } from '~/stores/organization'
 import type { Database } from '~/types/supabase.types'
+import { FormKit } from '@formkit/vue'
 import { onClickOutside } from '@vueuse/core'
 import { ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -8,11 +9,11 @@ import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import Settings from '~icons/heroicons/cog-8-tooth'
 import IconInformation from '~icons/heroicons/information-circle'
-import IconNext from '~icons/ic/round-keyboard-arrow-right'
+import IconSearch from '~icons/ic/round-search?raw'
 import IconAlertCircle from '~icons/lucide/alert-circle'
 import IconDown from '~icons/material-symbols/keyboard-arrow-down-rounded'
 import { formatDate } from '~/services/date'
-import { useSupabase } from '~/services/supabase'
+import { checkCompatibilityNativePackages, isCompatible, useSupabase } from '~/services/supabase'
 import { isInternalVersionName } from '~/services/versions'
 import { useAppDetailStore } from '~/stores/appDetail'
 import { useDialogV2Store } from '~/stores/dialogv2'
@@ -23,6 +24,12 @@ interface Channel {
   version: Database['public']['Tables']['app_versions']['Row']
 }
 
+// Bundle link dialog state
+const bundleLinkVersions = ref<Database['public']['Tables']['app_versions']['Row'][]>([])
+const bundleLinkSearchVal = ref('')
+const bundleLinkSearchMode = ref(false)
+
+const main = useMainStore()
 const route = useRoute('/app/[package].channel.[channel]')
 const router = useRouter()
 const dialogStore = useDialogV2Store()
@@ -49,12 +56,12 @@ function openBundle() {
   router.push(`/app/${route.params.package}/bundle/${channel.value.version.id}`)
 }
 
-async function getChannel() {
+async function getChannel(force = false) {
   if (!id.value)
     return
 
   // Check if we already have this channel in the store
-  if (appDetailStore.currentChannelId === id.value && appDetailStore.currentChannel) {
+  if (!force && appDetailStore.currentChannelId === id.value && appDetailStore.currentChannel) {
     channel.value = appDetailStore.currentChannel as any
     if (channel.value?.name)
       displayStore.setChannelName(String(channel.value.id), channel.value.name)
@@ -140,7 +147,7 @@ async function saveChannelChange(key: string, val: any) {
       .from('channels')
       .update(update)
       .eq('id', id.value)
-    reload()
+    getChannel(true)
     if (error) {
       toast.error(t('error-update-channel'))
       console.error('no channel update', error)
@@ -172,6 +179,54 @@ function goToDefaultChannelSettings() {
   router.push(`/app/${route.params.package}/info`)
 }
 
+const currentChannelVersion = computed(() => {
+  return channel.value?.version as any
+})
+
+const showSearchAndActions = computed(() => {
+  return !bundleLinkSearchMode.value
+})
+
+async function handleVersionLink(appVersion: Database['public']['Tables']['app_versions']['Row']) {
+  if (!channel.value)
+    return
+  const {
+    finalCompatibility,
+    localDependencies,
+  } = await checkCompatibilityNativePackages(appVersion.app_id, channel.value.name, (appVersion.native_packages as any) ?? [])
+
+  // Check if any package is incompatible
+  if (localDependencies.length > 0 && finalCompatibility.find(x => !isCompatible(x))) {
+    toast.error(t('bundle-not-compatible-with-channel', { channel: channel.value.name }))
+    toast.info(t('channel-not-compatible-with-channel-description').replace('%', 'npx @capgo/cli@latest bundle compatibility'))
+
+    dialogStore.openDialog({
+      title: t('confirm-action'),
+      description: t('set-even-not-compatible').replace('%', 'npx @capgo/cli@latest bundle compatibility'),
+      buttons: [
+        {
+          text: t('button-cancel'),
+          role: 'cancel',
+        },
+        {
+          text: t('button-confirm'),
+          role: 'primary',
+        },
+      ],
+    })
+    if (await dialogStore.onDialogDismiss())
+      return
+  }
+  else if (localDependencies.length === 0) {
+    toast.info('ignore-compatibility')
+  }
+  else {
+    toast.info(t('bundle-compatible-with-channel').replace('%', channel.value.name))
+  }
+  await saveChannelChange('version', appVersion.id)
+  toast.success(t('linked-bundle'))
+}
+
 async function getUnknownVersion(): Promise<number> {
   if (!channel.value)
     return 0
@@ -194,8 +249,8 @@ async function getUnknownVersion(): Promise<number> {
   return 0
 }
 
-async function openPanel() {
-  if (!channel.value)
+async function handleUnlink() {
+  if (!channel.value || !main.auth)
     return
   if (!organizationStore.hasPermissionsInRole(role.value, ['admin', 'super_admin', 'write'])) {
     toast.error(t('no-permission'))
@@ -222,6 +277,138 @@ async function openPanel() {
   })
   return dialogStore.onDialogDismiss()
 }
+
+async function handleRevert() {
+  if (!organizationStore.hasPermissionsInRole(role.value, ['admin', 'super_admin', 'write'])) {
+    toast.error(t('no-permission'))
+    return
+  }
+  dialogStore.openDialog({
+    title: t('revert-to-builtin'),
+    description: t('revert-to-builtin-confirm'),
+    buttons: [
+      {
+        text: t('cancel'),
+        role: 'cancel',
+      },
+      {
+        text: t('confirm'),
+        role: 'primary',
+        handler: async () => {
+          const { data: revertVersionId, error } = await supabase
+            .rpc('check_revert_to_builtin_version', { appid: packageId.value })
+
+          if (error) {
+            console.error('lazy load revertVersionId fail', error)
+            toast.error(t('error-revert-to-builtin'))
+            return
+          }
+
+          if (!revertVersionId || typeof revertVersionId !== 'number') {
+            console.error('Invalid revert version ID:', revertVersionId)
+            toast.error(t('error-invalid-version'))
+            return
+          }
+
+          const { error: updateError } = await supabase
+            .from('channels')
+            .update({ version: revertVersionId })
+            .eq('id', id.value)
+
+          if (updateError) {
+            console.error(updateError)
+            toast.error(t('error-revert-to-builtin'))
+            return
+          }
+
+          await getChannel(true)
+        },
+      },
+    ],
+  })
+  await dialogStore.onDialogDismiss()
+}
+
+async function openSelectVersion() {
+  if (!channel.value)
+    return
+
+  // Fetch versions when dialog opens
+  const { data, error } = await supabase.from('app_versions')
+    .select('*')
+    .eq('app_id', channel.value.app_id)
+    .eq('deleted', false)
+    .neq('id', channel.value.version.id)
+    .order('created_at', { ascending: false })
+    .limit(5)
+
+  if (error) {
+    console.error(error)
+    toast.error(t('error-fetching-versions'))
+    return
+  }
+
+  bundleLinkVersions.value = data ?? []
+  bundleLinkSearchVal.value = ''
+  bundleLinkSearchMode.value = false
+
+  // Open the dialog
+  dialogStore.openDialog({
+    title: t('bundle-management'),
+    size: 'lg',
+    buttons: [
+      {
+        text: t('button-cancel'),
+        role: 'cancel',
+      },
+    ],
+  })
+
+  await dialogStore.onDialogDismiss()
+}
+
+async function refreshFilteredVersions() {
+  if (!channel.value)
+    return
+
+  if (bundleLinkSearchVal.value && bundleLinkSearchVal.value.trim()) {
+    const { data, error } = await supabase.from('app_versions')
+      .select('*')
+      .eq('app_id', channel.value.app_id)
+      .eq('deleted', false)
+      .neq('id', channel.value.version.id)
+      .order('created_at', { ascending: false })
+      .like('name', `%${bundleLinkSearchVal.value.trim()}%`)
+      .limit(5)
+    if (error) {
+      console.error(error)
+      toast.error(t('error-fetching-versions'))
+    }
+    bundleLinkVersions.value = data ?? []
+  }
+  else {
+    const { data, error } = await supabase.from('app_versions')
+      .select('*')
+      .eq('app_id', channel.value.app_id)
+      .eq('deleted', false)
+      .neq('id', channel.value.version.id)
+      .order('created_at', { ascending: false })
+      .limit(5)
+    if (error) {
+      console.error(error)
+      toast.error(t('error-fetching-versions'))
+    }
+    bundleLinkVersions.value = data ?? []
+  }
+}
+
+const debouncedRefreshFilteredVersions = useDebounceFn(() => {
+  refreshFilteredVersions()
+}, 500)
+
+watch(() => bundleLinkSearchVal.value, () => {
+  debouncedRefreshFilteredVersions()
+})
 
 function closeAutoUpdateDropdown() {
   if (autoUpdateDropdown.value) {
@@ -299,7 +486,7 @@ function openLink(url?: string): void {
                 <button
                   v-if="channel"
                   class="p-1 transition-colors border border-gray-200 rounded-md dark:border-gray-700 hover:bg-gray-50 hover:border-gray-300 dark:hover:border-gray-600 dark:hover:bg-gray-800"
-                  @click="() => {}"
+                  @click="openSelectVersion()"
                 >
                   <Settings class="w-4 h-4 text-gray-500 dark:text-gray-400 hover:text-blue-500 dark:hover:text-blue-400" />
                 </button>
@@ -441,11 +628,6 @@ function openLink(url?: string): void {
                 @change="saveChannelChange('allow_device_self_set', !channel?.allow_device_self_set)"
               />
             </InfoRow>
-            <InfoRow :label="t('unlink-bundle')" :is-link="true" @click="openPanel">
-              <button class="ml-auto bg-transparent w-7 h-7">
-                <IconNext />
-              </button>
-            </InfoRow>
           </dl>
         </div>
       </div>
@@ -462,6 +644,145 @@ function openLink(url?: string): void {
         {{ t('back-to-channels') }}
       </button>
     </div>
+    <!-- Teleport Content for Bundle Link Dialog -->
+    <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('bundle-management')" defer to="#dialog-v2-content">
+      <div class="w-full space-y-4">
+        <div class="text-left">
+          <p class="mb-4 text-sm text-gray-600 dark:text-gray-400">
+            {{ t('select-bundle-action-for-channel') }}
+          </p>
+        </div>
+
+        <!-- Search Input (only when in search mode) -->
+        <div v-if="bundleLinkSearchMode" class="mb-6">
+          <FormKit
+            v-model="bundleLinkSearchVal"
+            :prefix-icon="IconSearch"
+            enterkeyhint="send"
+            :placeholder="t('search-versions')"
+            :classes="{
+              outer: 'mb-0! w-full',
+            }"
+          />
+        </div>
+
+        <div class="space-y-3">
+          <!-- Current Bundle Info -->
+          <div class="flex flex-col gap-1 px-1">
+            <div class="text-sm font-medium text-gray-500 dark:text-gray-400">
+              {{ t('current-bundle') }}
+            </div>
+            <div class="flex items-center gap-2 text-base font-semibold text-gray-900 dark:text-white">
+              <div class="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+              {{ currentChannelVersion?.name || t('unknown') }}
+            </div>
+          </div>
+
+          <!-- Available Versions (when in search mode) -->
+          <div v-if="bundleLinkSearchMode && bundleLinkVersions.length > 0" class="space-y-2">
+            <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300">
+              {{ t('available-versions') }}
+            </h4>
+            <div
+              v-for="version in bundleLinkVersions"
+              :key="version.id"
+              class="p-3 border border-gray-300 rounded-lg cursor-pointer dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700"
+              @click="handleVersionLink(version as any)"
+            >
+              <div class="flex items-center justify-between">
+                <div>
+                  <div class="font-medium">
+                    {{ version.name }}
+                  </div>
+                  <div class="text-sm text-gray-600 dark:text-gray-400">
+                    {{ t('created') }}: {{ version.created_at ? new Date(version.created_at).toLocaleDateString() : t('unknown') }}
+                  </div>
+                </div>
+                <div class="text-blue-600 dark:text-blue-400">
+                  →
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Action Cards (when not in search mode) -->
+          <div v-if="showSearchAndActions" class="space-y-3">
+            <!-- Link New Bundle -->
+            <div
+              class="p-3 border border-gray-300 rounded-lg cursor-pointer dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700"
+              @click="bundleLinkSearchMode = true"
+            >
+              <div class="flex items-center justify-between">
+                <div>
+                  <div class="font-medium">
+                    {{ t('link-new-bundle') }}
+                  </div>
+                  <div class="text-sm text-gray-600 dark:text-gray-400">
+                    {{ t('search-and-select-a-different-bundle') }}
+                  </div>
+                </div>
+                <div class="text-blue-600 dark:text-blue-400">
+                  📦
+                </div>
+              </div>
+            </div>
+
+            <!-- Unlink Bundle -->
+            <div
+              class="p-3 border border-gray-300 rounded-lg cursor-pointer dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700"
+              @click="handleUnlink"
+            >
+              <div class="flex items-center justify-between">
+                <div>
+                  <div class="font-medium">
+                    {{ t('unlink-bundle') }}
+                  </div>
+                  <div class="text-sm text-gray-600 dark:text-gray-400">
+                    {{ t('remove-bundle-from-this-channel') }}
+                  </div>
+                </div>
+                <div class="text-orange-600 dark:text-orange-400">
+                  🔓
+                </div>
+              </div>
+            </div>
+
+            <!-- Revert to Built-in -->
+            <div
+              class="p-3 border border-red-300 rounded-lg cursor-pointer dark:border-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+              @click="handleRevert"
+            >
+              <div class="flex items-center justify-between">
+                <div>
+                  <div class="font-medium text-red-600 dark:text-red-400">
+                    {{ t('revert-to-builtin') }}
+                  </div>
+                  <div class="text-sm text-red-500 dark:text-red-300">
+                    {{ t('revert-channel-to-built-in-version') }}
+                  </div>
+                </div>
+                <div class="text-red-600 dark:text-red-400">
+                  ⚠️
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Empty state for search -->
+          <div v-if="bundleLinkSearchMode && bundleLinkVersions.length === 0" class="py-8 text-center text-gray-500 dark:text-gray-400">
+            <div class="mb-2 text-4xl">
+              🔍
+            </div>
+            <div class="font-medium">
+              {{ t('no-versions-found') }}
+            </div>
+            <div class="mt-1 text-sm">
+              {{ t('try-a-different-search-term') }}
+            </div>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
