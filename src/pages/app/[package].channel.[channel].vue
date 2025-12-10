@@ -119,10 +119,6 @@ async function getChannel(force = false) {
   }
 }
 
-async function reload() {
-  await getChannel()
-}
-
 async function saveChannelChange(key: string, val: any) {
   if (!organizationStore.hasPermissionsInRole(role.value, ['admin', 'super_admin'])) {
     toast.error(t('no-permission'))
