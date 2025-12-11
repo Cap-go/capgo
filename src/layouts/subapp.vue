@@ -12,9 +12,12 @@ const route = useRoute()
 
 // Detect resource type from route (channel, device, or bundle)
 const resourceType = computed(() => {
-  if (route.path.includes('/channel/')) return 'channel'
-  if (route.path.includes('/device/')) return 'device'
-  if (route.path.includes('/bundle/')) return 'bundle'
+  if (route.path.includes('/channel/'))
+    return 'channel'
+  if (route.path.includes('/device/'))
+    return 'device'
+  if (route.path.includes('/bundle/'))
+    return 'bundle'
   return null
 })
 
@@ -25,7 +28,8 @@ const appId = computed(() => {
 })
 
 const resourceId = computed(() => {
-  if (!resourceType.value) return ''
+  if (!resourceType.value)
+    return ''
   const match = route.path.match(new RegExp(`\\/${resourceType.value}\\/([^/]+)`))
   return match ? match[1] : ''
 })
