@@ -71,7 +71,7 @@ function handleSecondaryTab(key: string) {
 </script>
 
 <template>
-  <div class="flex flex-col flex-1 h-full min-h-0 overflow-hidden bg-slate-50 dark:bg-slate-900">
+  <div class="flex flex-col flex-1 h-full min-h-0 overflow-hidden">
     <Tabs
       :tabs="tabs"
       :active-tab="activeTab"
@@ -81,7 +81,7 @@ function handleSecondaryTab(key: string) {
       @update:active-tab="handleTab"
       @update:secondary-active-tab="handleSecondaryTab"
     />
-    <main class="flex flex-1 w-full min-h-0 mt-0 overflow-hidden">
+    <main class="flex flex-1 w-full min-h-0 mt-0 overflow-hidden bg-blue-50 dark:bg-[#1a2744]">
       <div class="flex-1 w-full min-h-0 mx-auto overflow-y-auto">
         <RouterView class="w-full" />
       </div>
