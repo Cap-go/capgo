@@ -518,5 +518,5 @@ async function copyCurlCommand() {
 
 <route lang="yaml">
 meta:
-  layout: subapp
+  layout: app
 </route>

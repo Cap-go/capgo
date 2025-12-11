@@ -311,5 +311,5 @@ watchEffect(async () => {
 
 <route lang="yaml">
 meta:
-  layout: subapp
+  layout: app
 </route>

@@ -50,9 +50,8 @@ const labelClass = 'hidden md:block text-xs md:text-sm font-medium transition-co
         </li>
       </ul>
     </div>
-    <div v-if="!secondaryTabs?.length" class="relative z-0 -mt-px border-t bg-blue-50 dark:bg-slate-800/40 border-blue-200/60 dark:border-blue-800/70" />
-    <div v-if="secondaryTabs?.length" class="relative z-10 -mt-px border-t bg-blue-50 dark:bg-slate-800/40 border-blue-200/60 dark:border-blue-800/70">
-      <ul :class="[ulSecondaryClass, noWrap ? 'flex-nowrap overflow-x-scroll no-scrollbar px-1' : 'flex-wrap']">
+    <div class="relative -mt-px border-t bg-blue-50 dark:bg-slate-800/40 border-blue-200/60 dark:border-blue-800/70" :class="secondaryTabs?.length ? 'z-10' : 'z-0'">
+      <ul v-if="secondaryTabs?.length" :class="[ulSecondaryClass, noWrap ? 'flex-nowrap overflow-x-scroll no-scrollbar px-1' : 'flex-wrap']">
         <li v-for="(tab, i) in secondaryTabs" :key="i" class="mr-2">
           <button :class="[buttonSecondaryClass, activeTabColor(tab.key, true)]" @click="emit('update:secondaryActiveTab', tab.key)">
             <component :is="tab.icon" :class="iconClass" />
