@@ -427,7 +427,7 @@ async function copyCurlCommand() {
                 <span class="font-medium text-gray-900 dark:text-white">
                   {{ device.default_channel }}
                 </span>
-                <IconExternalLink class="w-4 h-4 text-blue-600 dark:text-blue-400 cursor-pointer" @click="openDefaultChannel()" />
+                <IconExternalLink class="w-4 h-4 text-blue-600 cursor-pointer dark:text-blue-400" @click="openDefaultChannel()" />
               </div>
             </InfoRow>
             <InfoRow :label="t('channel-link')">
@@ -457,7 +457,7 @@ async function copyCurlCommand() {
                       </li>
                     </ul>
                   </details>
-                  <IconExternalLink v-if="channelDevice" class="w-4 h-4 text-blue-600 dark:text-blue-400 cursor-pointer" @click="openChannel()" />
+                  <IconExternalLink v-if="channelDevice" class="w-4 h-4 text-blue-600 cursor-pointer dark:text-blue-400" @click="openChannel()" />
                 </div>
                 <span v-if="channelDevice" class="text-xs text-gray-500 dark:text-gray-400">
                   {{ t('overriding-default-channel') }}
@@ -518,5 +518,5 @@ async function copyCurlCommand() {
 
 <route lang="yaml">
 meta:
-  layout: device
+  layout: subapp
 </route>

@@ -111,7 +111,7 @@ function handleSecondary(val: string) {
       @update:active-tab="handlePrimary"
       @update:secondary-active-tab="handleSecondary"
     />
-    <main class="flex flex-1 w-full min-h-0 mt-0 overflow-hidden md:mt-8 bg-blue-50 dark:bg-[#1a2744]">
+    <main class="flex flex-1 w-full min-h-0 mt-0 overflow-hidden md:mt-8 bg-blue-50 dark:bg-slate-800/40">
       <div class="flex-1 w-full min-h-0 px-0 pt-0 mx-auto mb-8 overflow-y-auto sm:px-6 md:pt-8 lg:px-8 max-w-9xl">
         <RouterView class="w-full" />
       </div>

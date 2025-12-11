@@ -1100,3 +1100,8 @@ async function deleteBundle() {
     </Teleport>
   </div>
 </template>
+
+<route lang="yaml">
+meta:
+  layout: subapp
+</route>

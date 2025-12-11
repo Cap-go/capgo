@@ -4,19 +4,29 @@ import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Tabs from '~/components/Tabs.vue'
 import { appTabs } from '~/constants/appTabs'
+import { channelTabs } from '~/constants/channelTabs'
 import { deviceTabs } from '~/constants/deviceTabs'
 
 const router = useRouter()
 const route = useRoute()
 
-// Get the app ID and device ID from the route
+// Detect resource type from route (channel, device, or bundle)
+const resourceType = computed(() => {
+  if (route.path.includes('/channel/')) return 'channel'
+  if (route.path.includes('/device/')) return 'device'
+  if (route.path.includes('/bundle/')) return 'bundle'
+  return null
+})
+
+// Get the app ID and resource ID from the route
 const appId = computed(() => {
   const match = route.path.match(/^\/app\/([^/]+)/)
   return match ? match[1] : ''
 })
 
-const deviceId = computed(() => {
-  const match = route.path.match(/\/device\/([^/]+)/)
+const resourceId = computed(() => {
+  if (!resourceType.value) return ''
+  const match = route.path.match(new RegExp(`\\/${resourceType.value}\\/([^/]+)`))
   return match ? match[1] : ''
 })
 
@@ -31,22 +41,41 @@ const tabs = computed<Tab[]>(() => {
   }))
 })
 
-// Generate secondary tabs with full paths for the current device
-const secondaryTabs = computed<Tab[]>(() => {
-  if (!appId.value || !deviceId.value)
-    return deviceTabs
+// Get appropriate secondary tabs based on resource type
+const tabsConfig: Record<string, Tab[]> = {
+  channel: channelTabs,
+  device: deviceTabs,
+  bundle: [], // Bundles don't have secondary tabs yet
+}
 
-  return deviceTabs.map(tab => ({
+// Generate secondary tabs with full paths for the current resource
+const secondaryTabs = computed<Tab[]>(() => {
+  if (!appId.value || !resourceId.value || !resourceType.value)
+    return []
+
+  const baseTabs = tabsConfig[resourceType.value] || []
+
+  return baseTabs.map(tab => ({
     ...tab,
-    key: tab.key ? `/app/${appId.value}/device/${deviceId.value}${tab.key}` : `/app/${appId.value}/device/${deviceId.value}`,
+    key: tab.key
+      ? `/app/${appId.value}/${resourceType.value}/${resourceId.value}${tab.key}`
+      : `/app/${appId.value}/${resourceType.value}/${resourceId.value}`,
   }))
 })
 
+// Parent tab mapping for each resource type
+const parentTabMap: Record<string, string> = {
+  channel: 'channels',
+  device: 'devices',
+  bundle: 'bundles',
+}
+
 const activeTab = computed(() => {
-  if (!appId.value)
+  if (!appId.value || !resourceType.value)
     return tabs.value[0]?.key ?? ''
 
-  return `/app/${appId.value}/devices`
+  const parentTab = parentTabMap[resourceType.value]
+  return `/app/${appId.value}/${parentTab}`
 })
 
 const activeSecondaryTab = computed(() => {
@@ -58,7 +87,7 @@ const activeSecondaryTab = computed(() => {
     return path === tabKey
   })
 
-  return tab?.key ?? `/app/${appId.value}/device/${deviceId.value}`
+  return tab?.key ?? `/app/${appId.value}/${resourceType.value}/${resourceId.value}`
 })
 
 function handleTab(key: string) {
@@ -81,7 +110,7 @@ function handleSecondaryTab(key: string) {
       @update:active-tab="handleTab"
       @update:secondary-active-tab="handleSecondaryTab"
     />
-    <main class="flex flex-1 w-full min-h-0 mt-0 overflow-hidden bg-blue-50 dark:bg-[#1a2744]">
+    <main class="flex flex-1 w-full min-h-0 mt-0 overflow-hidden bg-blue-50 dark:bg-slate-800/40">
       <div class="flex-1 w-full min-h-0 mx-auto overflow-y-auto">
         <RouterView class="w-full" />
       </div>

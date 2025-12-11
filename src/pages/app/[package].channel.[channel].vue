@@ -784,5 +784,5 @@ function openLink(url?: string): void {
 
 <route lang="yaml">
 meta:
-  layout: channel
+  layout: subapp
 </route>
