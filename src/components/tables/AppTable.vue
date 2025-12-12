@@ -157,11 +157,11 @@ const columns = ref<TableColumn[]>([
 ])
 
 function openSettings(app: Database['public']['Tables']['apps']['Row']) {
-  router.push(`/app/p/${app.app_id}?tab=info`)
+  router.push(`/app/${app.app_id}/info`)
 }
 
 function openPackage(app: Database['public']['Tables']['apps']['Row']) {
-  router.push(`/app/p/${app.app_id}`)
+  router.push(`/app/${app.app_id}`)
 }
 
 async function openOneVersion(app: Database['public']['Tables']['apps']['Row']) {
@@ -174,7 +174,7 @@ async function openOneVersion(app: Database['public']['Tables']['apps']['Row']) 
     .eq('name', app.last_version)
     .single()
 
-  router.push(`/app/p/${app.app_id}/bundle/${versionData?.id}`)
+  router.push(`/app/${app.app_id}/bundle/${versionData?.id}`)
 }
 
 // Filter apps based on search term
@@ -253,9 +253,9 @@ const filteredApps = computed(() => {
 </script>
 
 <template>
-  <div class="block pb-14 w-full md:pb-0">
+  <div class="block w-full pb-14 md:pb-0">
     <div
-      class="col-span-full w-full bg-transparent rounded-none border-none shadow-none md:bg-white md:rounded-lg md:border md:shadow-lg dark:bg-transparent md:dark:border-slate-800 md:dark:bg-gray-800 xl:col-span-16"
+      class="w-full bg-transparent border-none rounded-none shadow-none col-span-full md:bg-white md:rounded-lg md:border md:shadow-lg dark:bg-transparent md:dark:border-slate-800 md:dark:bg-gray-800 xl:col-span-16"
     >
       <Table
         v-model:filters="filters"

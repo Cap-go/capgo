@@ -350,14 +350,14 @@ async function openOneVersion(one: Element) {
     toast.dismiss(loadingToastId)
   }
   if (one.version)
-    router.push(`/app/p/${props.appId}/bundle/${one.version}`)
+    router.push(`/app/${props.appId}/bundle/${one.version}`)
   else
     toast.error(t('version-name-missing'))
 }
 async function openOne(one: Element) {
   if (props.deviceId || !props.appId)
     return
-  router.push(`/app/p/${props.appId}/d/${one.device_id}`)
+  router.push(`/app/${props.appId}/device/${one.device_id}`)
 }
 onMounted(async () => {
   await refreshData()

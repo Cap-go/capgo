@@ -43,8 +43,9 @@ const router = createRouter({
     { path: '/settings/change-password', redirect: '/settings/account/change-password' },
     { path: '/settings/changepassword', redirect: '/settings/account/change-password' },
     { path: '/settings/notifications', redirect: '/settings/account/notifications' },
-    { path: '/dashboard/settings/plans', redirect: '/settings/organization/plans' },
-    { path: '/dashboard/settings/usage', redirect: '/settings/organization/usage' },
+    { path: '/dashboard/settings/organization/plans', redirect: '/settings/organization/plans' },
+    { path: '/dashboard/settings/organization/usage', redirect: '/settings/organization/usage' },
+    { path: '/p/:package', redirect: to => `/app/${(to.params as { package: string }).package}` },
     { path: '/dashboard/apikeys', redirect: '/apikeys' },
     { path: '/dashboard/settings/account', redirect: '/settings/account' },
     { path: '/dashboard/settings/change-password', redirect: '/settings/account/change-password' },
@@ -53,17 +54,28 @@ const router = createRouter({
     { path: '/dashboard/settings/organization/members', redirect: '/settings/organization/members' },
     { path: '/dashboard/settings/organization/plans', redirect: '/settings/organization/plans' },
     { path: '/dashboard/settings/organization/usage', redirect: '/settings/organization/usage' },
-    { path: '/app/p/:package/bundles', redirect: to => `/app/p/${(to.params as { package: string }).package}?tab=bundles` },
-    { path: '/app/p/:package/channels', redirect: to => `/app/p/${(to.params as { package: string }).package}?tab=channels` },
-    { path: '/app/p/:package/devices', redirect: to => `/app/p/${(to.params as { package: string }).package}?tab=devices` },
-    { path: '/app/p/:package/logs', redirect: to => `/app/p/${(to.params as { package: string }).package}?tab=logs` },
-    { path: '/app/package/:package', redirect: to => `/app/p/${(to.params as { package: string }).package}?tab=logs` },
-    { path: '/app/package/:package/settings', redirect: to => `/app/p/${(to.params as { package: string }).package}?tab=info` },
+    { path: '/app/p/:package', redirect: to => `/app/${(to.params as { package: string }).package}` },
+    { path: '/app/p/:package/bundles', redirect: to => `/app/${(to.params as { package: string }).package}` },
+    { path: '/app/p/:package/channels', redirect: to => `/app/${(to.params as { package: string }).package}` },
+    { path: '/app/p/:package/devices', redirect: to => `/app/${(to.params as { package: string }).package}` },
+    { path: '/app/p/:package/logs', redirect: to => `/app/${(to.params as { package: string }).package}` },
+    { path: '/app/package/:package', redirect: to => `/app/${(to.params as { package: string }).package}` },
+    { path: '/app/package/:package/settings', redirect: to => `/app/${(to.params as { package: string }).package}` },
     ...setupLayouts(newRoutes),
   ],
   history: createWebHistory(import.meta.env.BASE_URL),
 })
 app.use(router)
+
+router.beforeEach((to, from, next) => {
+  if (to.path.startsWith('/app/') && to.query.tab) {
+    const tab = to.query.tab as string
+    const newPath = to.path.endsWith('/') ? `${to.path}${tab}` : `${to.path}/${tab}`
+    const { tab: _, ...newQuery } = to.query
+    return next({ path: newPath, query: newQuery, hash: to.hash })
+  }
+  next()
+})
 
 const config = getLocalConfig()
 initPlausible(import.meta.env.pls_domain as string)

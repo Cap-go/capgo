@@ -251,7 +251,10 @@ export async function updateWithPG(
     if (!channelData.channels.allow_device_self_set && !channelData.channels.public && !channelOverride) {
       cloudlog({ requestId: c.get('requestId'), message: 'Cannot update via a private channel', id: device_id, date: new Date().toISOString() })
       await sendStatsAndDevice(c, device, [{ action: 'cannotUpdateViaPrivateChannel', versionName: version.name }])
-      return simpleError200(c, 'cannot_update_via_private_channel', 'Cannot update via a private channel. Please ensure your defaultChannel has "Allow devices to self dissociate/associate" set to true')
+      const errorMessage = defaultChannel
+        ? `Cannot update via a private channel. The channel "${channelData.channels.name}" does not allow device self-assignment. Please ensure your defaultChannel "${defaultChannel}" has "Allow devices to self dissociate/associate" set to true.`
+        : `Cannot update via a private channel. The channel "${channelData.channels.name}" does not allow device self-assignment. Please set a defaultChannel with "Allow devices to self dissociate/associate" enabled.`
+      return simpleError200(c, 'cannot_update_via_private_channel', errorMessage)
     }
 
     if (!isInternalVersionName(version.name) && channelData.channels.disable_auto_update === 'minor' && parse(version.name).minor > parse(version_build).minor) {

@@ -35,7 +35,7 @@ const { t } = useI18n()
 <template>
   <header class="bg-slate-100 backdrop-blur-xl dark:bg-slate-900">
     <div class="px-2 sm:px-4 lg:px-6">
-      <div class="flex relative justify-between items-center -mb-px h-16">
+      <div class="relative flex items-center justify-between h-16 -mb-px">
         <!-- Header: Left side -->
         <div class="flex items-center space-x-4">
           <div v-if="displayStore.NavTitle && isMobile" class="pr-2">
@@ -62,15 +62,15 @@ const { t } = useI18n()
 
           <!-- Title on desktop -->
           <div class="hidden lg:block">
-            <div class="flex items-center space-x-2 font-bold md:text-2xl dark:text-white truncate text-md text-dark">
-              <nav v-if="$route.path !== '/' && $route.path !== '/app'" class="text-sm font-normal text-slate-600 dark:text-slate-400" aria-label="Breadcrumb">
+            <div class="flex items-center space-x-2 font-bold truncate md:text-2xl dark:text-white text-md text-dark">
+              <nav class="text-sm font-normal text-slate-600 dark:text-slate-400" aria-label="Breadcrumb">
                 <ol class="inline-flex items-center space-x-1">
                   <li v-for="(breadcrumb, i) in displayStore.pathTitle" :key="i" class="flex items-center">
                     <span v-if="i > 0" class="mx-1" aria-hidden="true"> / </span>
                     <router-link
                       :to="breadcrumb.path"
                       class="px-1 rounded-sm hover:underline focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 focus:outline-none"
-                      :class="i === displayStore.pathTitle.length - 1 ? 'font-bold text-slate-800 dark:text-slate-100' : ''"
+                      :class="i === displayStore.pathTitle.length - 1 ? 'font-bold text-slate-600 dark:text-slate-100' : ''"
                     >
                       {{ breadcrumb.translate === false ? breadcrumb.name : t(breadcrumb.name) }}
                     </router-link>
@@ -78,16 +78,19 @@ const { t } = useI18n()
                   <li v-if="displayStore.pathTitle.length && displayStore.NavTitle && displayStore.NavTitle !== lastBreadcrumbName" class="flex items-center">
                     <span class="mx-1" aria-hidden="true"> / </span>
                   </li>
+                  <li v-if="showNavTitle" class="flex items-center">
+                    <span class="mx-1 font-bold text-slate-600 dark:text-slate-100 md:text-2xl" aria-hidden="true">{{ displayStore.NavTitle }}</span>
+                  </li>
                 </ol>
               </nav>
-              <span v-if="showNavTitle">{{ displayStore.NavTitle }}</span>
+              <!-- <span v-if="showNavTitle" class="mx-1">{{ displayStore.NavTitle }}</span> -->
             </div>
           </div>
         </div>
 
         <!-- Centered title on mobile -->
         <div class="flex-1 px-4 text-center lg:hidden">
-          <div class="font-bold dark:text-white truncate text-md text-dark">
+          <div class="font-bold truncate dark:text-white text-md text-dark">
             {{ displayStore.NavTitle }}
           </div>
         </div>

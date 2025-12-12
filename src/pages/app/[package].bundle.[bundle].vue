@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import type { Tab } from '~/components/comp_def'
 import type { OrganizationRole } from '~/stores/organization'
 import type { Database } from '~/types/supabase.types'
 import { Capacitor } from '@capacitor/core'
@@ -9,12 +8,12 @@ import { computed, ref, watch, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
+import IconArchiveBoxArrowDown from '~icons/heroicons/archive-box-arrow-down'
 import Settings from '~icons/heroicons/cog-8-tooth'
-import IconInformation from '~icons/heroicons/information-circle'
+import IconDocumentDuplicate from '~icons/heroicons/document-duplicate'
 import IconTrash from '~icons/heroicons/trash'
 import IconSearch from '~icons/ic/round-search?raw'
 import IconAlertCircle from '~icons/lucide/alert-circle'
-import { appTabs } from '~/constants/appTabs'
 import { bytesToMbText } from '~/services/conversion'
 import { formatDate } from '~/services/date'
 import { checkCompatibilityNativePackages, isCompatible, useSupabase } from '~/services/supabase'
@@ -25,16 +24,13 @@ import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
 
 const { t } = useI18n()
-const route = useRoute('/app/p/[package].bundle.[bundle]')
+const route = useRoute('/app/[package].bundle.[bundle]')
 const router = useRouter()
 const dialogStore = useDialogV2Store()
 const displayStore = useDisplayStore()
 const organizationStore = useOrganizationStore()
 const main = useMainStore()
 const supabase = useSupabase()
-const ActiveTab = ref('info')
-const appTabsActive = ref('bundles')
-const appTabsConst: Tab[] = appTabs
 const packageId = ref<string>('')
 const id = ref<number>()
 const loading = ref(true)
@@ -121,19 +117,6 @@ async function copyToast(text: string) {
   }
 }
 
-const tabs: Tab[] = [
-  {
-    label: 'info',
-    icon: IconInformation,
-    key: 'info',
-  },
-]
-
-function onAppTabChange(tabKey: string) {
-  appTabsActive.value = tabKey
-  router.push(`/app/p/${route.params.package}?tab=${tabKey}`)
-}
-
 async function getChannels() {
   if (!version.value)
     return
@@ -151,7 +134,7 @@ async function getChannels() {
 async function openChannelLink() {
   if (!version.value || !channel.value)
     return
-  router.push(`/app/p/${version.value.app_id}/channel/${channel.value?.id}`)
+  router.push(`/app/${version.value.app_id}/channel/${channel.value?.id}`)
 }
 
 const showSize = computed(() => {
@@ -423,7 +406,7 @@ watchEffect(async () => {
     loading.value = false
     if (!version.value?.name)
       displayStore.NavTitle = t('bundle')
-    displayStore.defaultBack = `/app/p/${route.params.package}/bundles`
+    displayStore.defaultBack = `/app/${route.params.package}/bundles`
   }
 })
 
@@ -676,7 +659,7 @@ async function deleteBundle() {
     else {
       toast.success(t('bundle-deleted'))
       // Navigate back to the bundle list
-      router.push(`/app/p/${packageId.value}/bundles/`)
+      router.push(`/app/${packageId.value}/bundles/`)
     }
   }
   catch (error) {
@@ -692,20 +675,10 @@ async function deleteBundle() {
       <Spinner size="w-40 h-40" />
     </div>
     <div v-else-if="version">
-      <Tabs
-        v-model:active-tab="appTabsActive"
-        :tabs="appTabsConst"
-        :secondary-tabs="tabs"
-        :secondary-active-tab="ActiveTab"
-        no-wrap
-        class="mb-2"
-        @update:active-tab="onAppTabChange"
-        @update:secondary-active-tab="val => ActiveTab = val"
-      />
-      <div v-if="ActiveTab === 'info'" id="devices" class="mt-0 md:mt-8">
-        <div class="overflow-y-auto px-0 pt-0 mx-auto mb-8 w-full h-full sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
+      <div id="devices" class="mt-0 md:mt-8">
+        <div class="w-full h-full px-0 pt-0 mx-auto mb-8 overflow-y-auto sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
           <div
-            class="flex overflow-hidden overflow-y-auto flex-col bg-white border shadow-lg md:rounded-lg border-slate-300 dark:border-slate-900 dark:bg-slate-800"
+            class="flex flex-col overflow-hidden overflow-y-auto bg-white border shadow-lg md:rounded-lg border-slate-300 dark:border-slate-900 dark:bg-slate-800"
           >
             <dl class="divide-y divide-slate-200 dark:divide-slate-500">
               <InfoRow :label="t('bundle-number')">
@@ -722,10 +695,17 @@ async function deleteBundle() {
               </InfoRow>
               <!-- Checksum -->
               <InfoRow
-                v-if="version.checksum" :label="t('checksum')" :is-link="true"
-                @click="copyToast(version?.checksum ?? '')"
+                v-if="version.checksum" :label="t('checksum')"
               >
-                {{ hideString(version.checksum) }}
+                <span class="flex items-center gap-2">
+                  {{ hideString(version.checksum) }}
+                  <button
+                    class="p-1 transition-colors border border-gray-200 rounded-md dark:border-gray-700 hover:bg-gray-50 hover:border-gray-300 dark:hover:border-gray-600 dark:hover:bg-gray-800"
+                    @click="copyToast(version?.checksum ?? '')"
+                  >
+                    <IconDocumentDuplicate class="w-4 h-4 text-gray-500 cursor-pointer dark:text-gray-400 hover:text-blue-500 dark:hover:text-blue-400" />
+                  </button>
+                </span>
               </InfoRow>
               <!-- Min update version -->
               <InfoRow
@@ -738,8 +718,8 @@ async function deleteBundle() {
               </InfoRow>
 
               <InfoRow v-if="channels && channels.length > 0 && version && channels.filter(c => c.version === version!.id).length > 0" :label="t('channel')">
-                <div class="flex flex-wrap gap-3 justify-end w-full">
-                  <div v-for="chn in channels.filter(c => c.version === version!.id)" id="open-channel" :key="chn.id" class="flex gap-2 items-center">
+                <div class="flex flex-wrap justify-end w-full gap-3">
+                  <div v-for="chn in channels.filter(c => c.version === version!.id)" id="open-channel" :key="chn.id" class="flex items-center gap-2">
                     <span
                       class="font-bold text-blue-600 underline cursor-pointer dark:text-blue-500 hover:text-blue-700 underline-offset-4 dark:hover:text-blue-400"
                       @click="openChannel(chn)"
@@ -747,10 +727,10 @@ async function deleteBundle() {
                       {{ chn!.name }}
                     </span>
                     <button
-                      class="p-1 rounded-md border border-gray-200 transition-colors dark:border-gray-700 hover:bg-gray-50 hover:border-gray-300 dark:hover:border-gray-600 dark:hover:bg-gray-800"
+                      class="p-1 transition-colors border border-gray-200 rounded-md dark:border-gray-700 hover:bg-gray-50 hover:border-gray-300 dark:hover:border-gray-600 dark:hover:bg-gray-800"
                       @click="openChannelSettings(chn)"
                     >
-                      <Settings class="w-4 h-4 text-gray-500 dark:text-gray-400 hover:text-blue-500 dark:hover:text-blue-400" />
+                      <Settings class="w-4 h-4 text-gray-500 cursor-pointer dark:text-gray-400 hover:text-blue-500 dark:hover:text-blue-400" />
                     </button>
                   </div>
                 </div>
@@ -800,11 +780,27 @@ async function deleteBundle() {
                 {{ version.comment }}
               </InfoRow>
               <!-- size -->
-              <InfoRow v-if="version?.r2_path" :label="t('size')" :is-link="true" @click="openDownload()">
-                {{ showSize }}
+              <InfoRow v-if="version?.r2_path" :label="t('size')">
+                <span class="flex items-center gap-2">
+                  {{ showSize }}
+                  <button
+                    class="p-1 transition-colors border border-gray-200 rounded-md dark:border-gray-700 hover:bg-gray-50 hover:border-gray-300 dark:hover:border-gray-600 dark:hover:bg-gray-800"
+                    @click="openDownload()"
+                  >
+                    <IconArchiveBoxArrowDown class="w-4 h-4 text-gray-500 cursor-pointer dark:text-gray-400 hover:text-blue-500 dark:hover:text-blue-400" />
+                  </button>
+                </span>
               </InfoRow>
-              <InfoRow v-if="!version?.r2_path" :label="t('size')" :is-link="true" @click="openDownload()">
-                {{ t('cannot-calculate-size-of-partial-bundle') }}
+              <InfoRow v-if="!version?.r2_path" :label="t('size')">
+                <span class="flex items-center gap-2">
+                  {{ t('cannot-calculate-size-of-partial-bundle') }}
+                  <button
+                    class="p-1 transition-colors border border-gray-200 rounded-md dark:border-gray-700 hover:bg-gray-50 hover:border-gray-300 dark:hover:border-gray-600 dark:hover:bg-gray-800"
+                    @click="openDownload()"
+                  >
+                    <IconArchiveBoxArrowDown class="w-4 h-4 text-gray-500 cursor-pointer dark:text-gray-400 hover:text-blue-500 dark:hover:text-blue-400" />
+                  </button>
+                </span>
               </InfoRow>
               <InfoRow v-if="hasManifest" :label="t('partial-bundle')" :is-link="false">
                 {{ t('enabled') }}
@@ -820,10 +816,10 @@ async function deleteBundle() {
                 :icon="IconTrash"
                 :disabled="!organizationStore.hasPermissionsInRole(role, ['admin', 'write', 'super_admin'])"
               >
-                <span class="">
+                <span class="flex items-center gap-2">
                   {{ t('bundle-active') }}
                   <button
-                    class="p-1 rounded-md border border-gray-200 transition-colors dark:border-gray-700 hover:bg-gray-50 hover:border-gray-300 dark:hover:border-gray-600 dark:hover:bg-gray-800"
+                    class="p-1 transition-colors border border-gray-200 rounded-md dark:border-gray-700 hover:bg-gray-50 hover:border-gray-300 dark:hover:border-gray-600 dark:hover:bg-gray-800"
                     @click="deleteBundle"
                   >
                     <IconTrash class="w-4 h-4 text-red-500 transition-colors cursor-pointer dark:text-red-400 hover:text-red-600" />
@@ -841,14 +837,14 @@ async function deleteBundle() {
       </div>
     </div>
     <div v-else class="flex flex-col justify-center items-center min-h-[50vh]">
-      <IconAlertCircle class="mb-4 w-16 h-16 text-destructive" />
+      <IconAlertCircle class="w-16 h-16 mb-4 text-destructive" />
       <h2 class="text-xl font-semibold text-foreground">
         {{ t('bundle-not-found') }}
       </h2>
       <p class="mt-2 text-muted-foreground">
         {{ t('bundle-not-found-description') }}
       </p>
-      <button class="mt-4 text-white d-btn d-btn-primary" @click="router.push(`/app/p/${packageId}/bundles/`)">
+      <button class="mt-4 text-white d-btn d-btn-primary" @click="router.push(`/app/${packageId}/bundles/`)">
         {{ t('back-to-bundles') }}
       </button>
     </div>
@@ -885,7 +881,7 @@ async function deleteBundle() {
 
     <!-- Teleport Content for Unsafe Deletion Warning -->
     <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('alert-confirm-delete') && version?.deleted" defer to="#dialog-v2-content">
-      <div class="p-3 mt-4 bg-red-50 rounded-lg border border-red-200 dark:border-red-800 dark:bg-red-900/20">
+      <div class="p-3 mt-4 border border-red-200 rounded-lg bg-red-50 dark:border-red-800 dark:bg-red-900/20">
         <p class="text-sm text-red-800 dark:text-red-200">
           <strong class="underline">{{ t('you-are-deleting-unsafely') }}</strong>
         </p>
@@ -904,7 +900,7 @@ async function deleteBundle() {
 
     <!-- Teleport Content for Channel Linking (Set Bundle) -->
     <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('channel-linking') && currentChannelAction === 'set'" defer to="#dialog-v2-content">
-      <div class="space-y-4 w-full">
+      <div class="w-full space-y-4">
         <div class="text-center">
           <h3 class="mb-2 text-lg font-medium">
             {{ t('select-channel-to-link') }}
@@ -929,8 +925,8 @@ async function deleteBundle() {
 
         <div class="space-y-3">
           <!-- Current Bundle Info -->
-          <div v-if="version" class="p-3 bg-blue-50 rounded-lg border border-blue-300 dark:border-blue-600 dark:bg-blue-900/20">
-            <div class="flex justify-between items-center">
+          <div v-if="version" class="p-3 border border-blue-300 rounded-lg bg-blue-50 dark:border-blue-600 dark:bg-blue-900/20">
+            <div class="flex items-center justify-between">
               <div>
                 <div class="font-medium text-blue-800 dark:text-blue-200">
                   {{ t('current-bundle') }}
@@ -953,7 +949,7 @@ async function deleteBundle() {
             <div
               v-for="chan in filteredChannels"
               :key="chan.id"
-              class="p-3 rounded-lg border transition-colors cursor-pointer"
+              class="p-3 transition-colors border rounded-lg cursor-pointer"
               :class="{
                 'border-blue-500 bg-blue-50 dark:bg-blue-900/20': selectedChannelForLink?.id === chan.id,
                 'border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700': selectedChannelForLink?.id !== chan.id,
@@ -961,11 +957,11 @@ async function deleteBundle() {
               }"
               @click="selectedChannelForLink = chan"
             >
-              <div class="flex justify-between items-center">
+              <div class="flex items-center justify-between">
                 <div>
-                  <div class="flex gap-2 items-center font-medium">
+                  <div class="flex items-center gap-2 font-medium">
                     {{ chan.name }}
-                    <span v-if="version && chan.version === version.id" class="py-1 px-2 text-xs text-green-800 bg-green-100 rounded-full dark:text-green-200 dark:bg-green-800">
+                    <span v-if="version && chan.version === version.id" class="px-2 py-1 text-xs text-green-800 bg-green-100 rounded-full dark:text-green-200 dark:bg-green-800">
                       {{ t('current') }}
                     </span>
                   </div>
@@ -1021,7 +1017,7 @@ async function deleteBundle() {
 
     <!-- Teleport Content for Channel Actions (Settings) -->
     <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('channel-actions') && currentChannelAction === 'open'" defer to="#dialog-v2-content">
-      <div class="space-y-4 w-full">
+      <div class="w-full space-y-4">
         <div class="text-left">
           <p class="mb-4 text-sm text-gray-600 dark:text-gray-400">
             {{ t('select-action-for-channel', { channel: selectedChannelForLink?.name || '' }) }}
@@ -1032,10 +1028,10 @@ async function deleteBundle() {
           <!-- Set Bundle (if user has permissions) -->
           <div
             v-if="role && (role === 'admin' || role === 'super_admin' || role === 'write')"
-            class="p-3 rounded-lg border border-gray-300 cursor-pointer dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700"
+            class="p-3 border border-gray-300 rounded-lg cursor-pointer dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700"
             @click="handleChannelAction('set')"
           >
-            <div class="flex justify-between items-center">
+            <div class="flex items-center justify-between">
               <div>
                 <div class="font-medium">
                   {{ t('set-bundle') }}
@@ -1053,10 +1049,10 @@ async function deleteBundle() {
           <!-- Unlink Channel (if user has permissions) -->
           <div
             v-if="role && (role === 'admin' || role === 'super_admin' || role === 'write')"
-            class="p-3 rounded-lg border border-red-300 cursor-pointer dark:border-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+            class="p-3 border border-red-300 rounded-lg cursor-pointer dark:border-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
             @click="handleChannelAction('unlink')"
           >
-            <div class="flex justify-between items-center">
+            <div class="flex items-center justify-between">
               <div>
                 <div class="font-medium text-red-600 dark:text-red-400">
                   {{ t('unlink-channel') }}
@@ -1075,3 +1071,8 @@ async function deleteBundle() {
     </Teleport>
   </div>
 </template>
+
+<route lang="yaml">
+meta:
+  layout: app
+</route>

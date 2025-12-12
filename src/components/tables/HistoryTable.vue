@@ -124,7 +124,7 @@ const columns = computed<TableColumn[]>(() => [
 ])
 
 async function openOneVersion(item: DeployHistory) {
-  router.push(`/app/p/${props.appId}/bundle/${item.version_id}`)
+  router.push(`/app/${props.appId}/bundle/${item.version_id}`)
 }
 
 async function fetchDeployHistory() {

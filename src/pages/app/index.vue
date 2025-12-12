@@ -27,7 +27,7 @@ const { currentOrganization } = storeToRefs(organizationStore)
 
 async function NextStep(appId: string) {
   console.log('Navigating to app with ID:', appId)
-  router.push(`/app/p/${appId}`)
+  router.push(`/app/${appId}`)
 }
 async function getMyApps() {
   isTableLoading.value = true

@@ -195,7 +195,7 @@ async function openOneVersion(one: Element) {
     toast.dismiss(loadingToastId)
   }
   if (one.version)
-    router.push(`/app/p/${props.appId}/bundle/${one.version}`)
+    router.push(`/app/${props.appId}/bundle/${one.version}`)
   else
     toast.error(t('version-name-missing'))
 }
