@@ -25,13 +25,15 @@ import { backgroundTask, BROTLI_MIN_UPDATER_VERSION_V7, fixSemver, isDeprecatedP
 const PLAN_LIMIT: Array<'mau' | 'bandwidth' | 'storage'> = ['mau', 'bandwidth']
 const PLAN_ERROR = 'Cannot get update, upgrade plan to continue to update'
 
-export function resToVersion(plugin_version: string, signedURL: string, version: Database['public']['Tables']['app_versions']['Row'], manifest: ManifestEntry[]) {
+export function resToVersion(plugin_version: string, signedURL: string, version: Database['public']['Tables']['app_versions']['Row'], manifest: ManifestEntry[], expose_metadata: boolean = false) {
   const res: {
     version: string
     url: string
     session_key?: string
     checksum?: string | null
     manifest?: ManifestEntry[]
+    link?: string | null
+    comment?: string | null
   } = {
     version: version.name,
     url: signedURL,
@@ -43,6 +45,13 @@ export function resToVersion(plugin_version: string, signedURL: string, version:
     res.checksum = version.checksum
   if (greaterThan(pluginVersion, parse('6.8.0')) && manifest.length > 0)
     res.manifest = manifest
+  // Include link and comment for plugin v7.35.0+ (only if expose_metadata is enabled and they have values)
+  if (expose_metadata && greaterOrEqual(pluginVersion, parse('7.35.0'))) {
+    if (version.link)
+      res.link = version.link
+    if (version.comment)
+      res.comment = version.comment
+  }
   return res
 }
 
@@ -175,11 +184,14 @@ export async function updateWithPG(
 
   cloudlog({ requestId: c.get('requestId'), message: 'vals', platform, device })
 
+  // Only query link/comment if plugin supports it (7.35.0+) AND app has expose_metadata enabled
+  const needsMetadata = appOwner.expose_metadata && greaterOrEqual(pluginVersion, parse('7.35.0'))
+
   const requestedInto = await returnV2orV1(
     c,
     isV2,
-    () => requestInfosPostgres(c, platform, app_id, device_id, defaultChannel, drizzleClient, channelDeviceCount, manifestBundleCount),
-    () => requestInfosPostgresV2(c, platform, app_id, device_id, defaultChannel, getDrizzleClientD1(), channelDeviceCount, manifestBundleCount),
+    () => requestInfosPostgres(c, platform, app_id, device_id, defaultChannel, drizzleClient, channelDeviceCount, manifestBundleCount, needsMetadata),
+    () => requestInfosPostgresV2(c, platform, app_id, device_id, defaultChannel, getDrizzleClientD1(), channelDeviceCount, manifestBundleCount, needsMetadata),
   )
   const { channelOverride } = requestedInto
   let { channelData } = requestedInto
@@ -385,7 +397,7 @@ export async function updateWithPG(
     sendStatsAndDevice(c, device, [{ action: 'get', versionName: version.name }]),
   ])
   cloudlog({ requestId: c.get('requestId'), message: 'New version available', app_id, version: version.name, signedURL, date: new Date().toISOString() })
-  const res = resToVersion(plugin_version, signedURL, version as any, manifest)
+  const res = resToVersion(plugin_version, signedURL, version as any, manifest, needsMetadata)
   if (!res.url && !res.manifest) {
     cloudlog({ requestId: c.get('requestId'), message: 'No url or manifest', id: app_id, version: version.name, date: new Date().toISOString() })
     return simpleError200(c, 'no_url_or_manifest', 'No url or manifest')

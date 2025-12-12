@@ -42,7 +42,9 @@ CREATE TABLE IF NOT EXISTS app_versions (
     checksum TEXT,
     session_key TEXT,
     storage_provider TEXT,
-    min_update_version TEXT
+    min_update_version TEXT,
+    link TEXT,
+    comment TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_app_versions_app_id_name_cover ON app_versions (app_id, name, id, owner_org);
@@ -161,7 +163,8 @@ CREATE TABLE IF NOT EXISTS apps (
     default_upload_channel TEXT,
     transfer_history TEXT,
     channel_device_count INTEGER DEFAULT 0,
-    manifest_bundle_count INTEGER DEFAULT 0
+    manifest_bundle_count INTEGER DEFAULT 0,
+    expose_metadata INTEGER DEFAULT 0 NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_apps_id ON apps (id);

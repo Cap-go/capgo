@@ -28,6 +28,7 @@ export const apps = pgTable('apps', {
   retention: bigint('retention', { mode: 'number' }).notNull().default(2592000),
   channel_device_count: bigint('channel_device_count', { mode: 'number' }).notNull().default(0),
   manifest_bundle_count: bigint('manifest_bundle_count', { mode: 'number' }).notNull().default(0),
+  expose_metadata: boolean('expose_metadata').notNull().default(false),
 })
 
 export const app_versions = pgTable('app_versions', {
@@ -45,6 +46,8 @@ export const app_versions = pgTable('app_versions', {
   storage_provider: text('storage_provider').default('r2').notNull(),
   min_update_version: varchar('min_update_version'),
   r2_path: varchar('r2_path'),
+  link: varchar('link'),
+  comment: varchar('comment'),
 })
 
 export const manifest = pgTable('manifest', {

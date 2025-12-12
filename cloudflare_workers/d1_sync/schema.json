@@ -13,7 +13,9 @@
       "checksum": "TEXT",
       "session_key": "TEXT",
       "storage_provider": "TEXT",
-      "min_update_version": "TEXT"
+      "min_update_version": "TEXT",
+      "link": "TEXT",
+      "comment": "TEXT"
     },
     "indexes": [
       "owner_org",
@@ -84,7 +86,8 @@
       "default_upload_channel": "TEXT",
       "transfer_history": "JSON",
       "channel_device_count": "INTEGER",
-      "manifest_bundle_count": "INTEGER"
+      "manifest_bundle_count": "INTEGER",
+      "expose_metadata": "BOOLEAN"
     },
     "indexes": [
       "app_id",

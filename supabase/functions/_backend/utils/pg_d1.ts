@@ -92,10 +92,10 @@ export function getDrizzleClientD1Session(c: Context) {
   return drizzleD1(getPgClientD1(c))
 }
 
-function getSchemaUpdatesAlias() {
+function getSchemaUpdatesAlias(includeMetadata = false) {
   const { versionAlias, channelDevicesAlias, channelAlias } = getAliasV2()
 
-  const versionSelect = {
+  const versionSelect: any = {
     id: sql<number>`${versionAlias.id}`.as('vid'),
     name: sql<string>`${versionAlias.name}`.as('vname'),
     checksum: sql<string | null>`${versionAlias.checksum}`.as('vchecksum'),
@@ -104,6 +104,12 @@ function getSchemaUpdatesAlias() {
     external_url: sql<string | null>`${versionAlias.external_url}`.as('vexternal_url'),
     min_update_version: sql<string | null>`${versionAlias.min_update_version}`.as('vminUpdateVersion'),
     r2_path: sql`${versionAlias.r2_path}`.mapWith(versionAlias.r2_path).as('vr2_path'),
+  }
+
+  // Only include link and comment when needed (for plugin v7.35.0+ with expose_metadata enabled)
+  if (includeMetadata) {
+    versionSelect.link = sql<string | null>`${versionAlias.link}`.as('vlink')
+    versionSelect.comment = sql<string | null>`${versionAlias.comment}`.as('vcomment')
   }
   const channelSelect = {
     id: channelAlias.id,
@@ -132,8 +138,9 @@ export function requestInfosChannelDevicePostgres(
   device_id: string,
   drizzleClient: ReturnType<typeof getDrizzleClientD1Session>,
   includeManifest: boolean,
+  includeMetadata = false,
 ) {
-  const { versionSelect, channelDevicesAlias, channelAlias, channelSelect, manifestSelect, versionAlias } = getSchemaUpdatesAlias()
+  const { versionSelect, channelDevicesAlias, channelAlias, channelSelect, manifestSelect, versionAlias } = getSchemaUpdatesAlias(includeMetadata)
   const baseSelect = {
     channel_devices: {
       device_id: channelDevicesAlias.device_id,
@@ -171,8 +178,9 @@ export function requestInfosChannelPostgres(
   defaultChannel: string,
   drizzleClient: ReturnType<typeof getDrizzleClientD1Session>,
   includeManifest: boolean,
+  includeMetadata = false,
 ) {
-  const { versionSelect, channelAlias, channelSelect, manifestSelect, versionAlias } = getSchemaUpdatesAlias()
+  const { versionSelect, channelAlias, channelSelect, manifestSelect, versionAlias } = getSchemaUpdatesAlias(includeMetadata)
   const platformQuery = platform === 'android' ? channelAlias.android : channelAlias.ios
   const baseSelect = {
     version: versionSelect,
@@ -219,17 +227,18 @@ export function requestInfosPostgresV2(
   drizzleClient: ReturnType<typeof getDrizzleClientD1Session>,
   channelDeviceCount?: number | null,
   manifestBundleCount?: number | null,
+  includeMetadata = false,
 ) {
   const shouldQueryChannelOverride = channelDeviceCount === undefined || channelDeviceCount === null ? true : channelDeviceCount > 0
   const shouldFetchManifest = manifestBundleCount === undefined || manifestBundleCount === null ? true : manifestBundleCount > 0
 
   const channelDevice = shouldQueryChannelOverride
-    ? requestInfosChannelDevicePostgres(c, app_id, device_id, drizzleClient, shouldFetchManifest)
+    ? requestInfosChannelDevicePostgres(c, app_id, device_id, drizzleClient, shouldFetchManifest, includeMetadata)
     : Promise.resolve(undefined).then(() => {
         cloudlog({ requestId: c.get('requestId'), message: 'Skipping channel device override query' })
         return null
       })
-  const channel = requestInfosChannelPostgres(c, platform, app_id, defaultChannel, drizzleClient, shouldFetchManifest)
+  const channel = requestInfosChannelPostgres(c, platform, app_id, defaultChannel, drizzleClient, shouldFetchManifest, includeMetadata)
 
   return Promise.all([channelDevice, channel])
     .then(([channelOverride, channelData]) => {
@@ -247,7 +256,7 @@ export async function getAppOwnerPostgresV2(
   appId: string,
   drizzleClient: ReturnType<typeof getDrizzleClientD1Session>,
   actions: ('mau' | 'storage' | 'bandwidth')[] = [],
-): Promise<{ owner_org: string, orgs: { created_by: string, id: string }, plan_valid: boolean, channel_device_count: number, manifest_bundle_count: number } | null> {
+): Promise<{ owner_org: string, orgs: { created_by: string, id: string }, plan_valid: boolean, channel_device_count: number, manifest_bundle_count: number, expose_metadata: boolean } | null> {
   try {
     cloudlog({ requestId: c.get('requestId'), message: 'appOwner', appId })
     if (actions.length === 0)
@@ -260,6 +269,7 @@ export async function getAppOwnerPostgresV2(
         plan_valid: planExpression,
         channel_device_count: schemaV2.apps.channel_device_count,
         manifest_bundle_count: schemaV2.apps.manifest_bundle_count,
+        expose_metadata: schemaV2.apps.expose_metadata,
         orgs: {
           created_by: orgAlias.created_by,
           id: orgAlias.id,

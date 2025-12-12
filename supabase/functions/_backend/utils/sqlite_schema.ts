@@ -11,6 +11,7 @@ export const apps = sqliteTable('apps', {
   owner_org: text('owner_org').notNull(),
   channel_device_count: integer('channel_device_count', { mode: 'number' }).notNull().default(0),
   manifest_bundle_count: integer('manifest_bundle_count', { mode: 'number' }).notNull().default(0),
+  expose_metadata: integer('expose_metadata', { mode: 'boolean' }).notNull().default(false),
 })
 
 export const app_versions = sqliteTable('app_versions', {
@@ -26,6 +27,8 @@ export const app_versions = sqliteTable('app_versions', {
   session_key: text('session_key'),
   storage_provider: text('storage_provider').default('r2').notNull(),
   min_update_version: text('min_update_version'),
+  link: text('link'),
+  comment: text('comment'),
 })
 
 export const manifest = sqliteTable('manifest', {
