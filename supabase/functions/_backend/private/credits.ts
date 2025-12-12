@@ -142,7 +142,7 @@ async function resolveOrgStripeContext(c: AppContext, orgId: string) {
 
 export const app = new Hono<MiddlewareKeyVariables>()
 
-app.use('/', useCors)
+app.use('*', useCors)
 
 app.get('/', async (c) => {
   try {
