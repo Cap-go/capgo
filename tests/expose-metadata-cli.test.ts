@@ -3,7 +3,6 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import {
   APP_NAME,
-  APIKEY_TEST_ALL,
   getEndpointUrl,
   getSupabaseClient,
   headers,
@@ -46,7 +45,7 @@ describe('expose_metadata via CLI/API integration', () => {
       })
 
       expect(response.status).toBe(200)
-      const data = await response.json()
+      const data = await response.json() as { expose_metadata: boolean }
       expect(data.expose_metadata).toBe(true)
 
       // Verify the change persisted
@@ -79,7 +78,7 @@ describe('expose_metadata via CLI/API integration', () => {
       })
 
       expect(response.status).toBe(200)
-      const data = await response.json()
+      const data = await response.json() as { expose_metadata: boolean }
       expect(data.expose_metadata).toBe(false)
 
       // Verify the change persisted
@@ -105,7 +104,7 @@ describe('expose_metadata via CLI/API integration', () => {
       })
 
       expect(response.status).toBe(200)
-      const data = await response.json()
+      const data = await response.json() as { name: string, expose_metadata: boolean }
       expect(data.name).toBe('Updated App Name')
       expect(data.expose_metadata).toBe(true)
 
@@ -176,7 +175,7 @@ describe('expose_metadata via CLI/API integration', () => {
       })
 
       expect(response.status).toBe(200)
-      const data = await response.json()
+      const data = await response.json() as { expose_metadata: boolean, app_id: string }
       expect(data.expose_metadata).toBe(true)
       expect(data.app_id).toBe(APP_NAME_CLI)
     })
@@ -196,7 +195,7 @@ describe('expose_metadata via CLI/API integration', () => {
       })
 
       expect(response.status).toBe(200)
-      const data = await response.json()
+      const data = await response.json() as { expose_metadata: boolean }
       expect(data.expose_metadata).toBe(false)
     })
   })
@@ -218,7 +217,6 @@ describe('expose_metadata via CLI/API integration', () => {
       })
 
       expect(response.status).toBe(200)
-      const data = await response.json()
 
       // Should default to false
       const { data: appData, error } = await supabase

@@ -258,6 +258,7 @@ export type Database = {
           channel_device_count: number
           created_at: string | null
           default_upload_channel: string
+          expose_metadata: boolean
           icon_url: string
           id: string | null
           last_version: string | null
@@ -274,6 +275,7 @@ export type Database = {
           channel_device_count?: number
           created_at?: string | null
           default_upload_channel?: string
+          expose_metadata?: boolean
           icon_url: string
           id?: string | null
           last_version?: string | null
@@ -290,6 +292,7 @@ export type Database = {
           channel_device_count?: number
           created_at?: string | null
           default_upload_channel?: string
+          expose_metadata?: boolean
           icon_url?: string
           id?: string | null
           last_version?: string | null

@@ -3,7 +3,6 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import {
   APP_NAME,
-  APIKEY_TEST_ALL,
   getBaseData,
   getEndpointUrl,
   getSupabaseClient,
@@ -52,7 +51,7 @@ describe('expose_metadata feature', () => {
       })
 
       expect(response.status).toBe(200)
-      const data = await response.json()
+      const data = await response.json() as { expose_metadata: boolean }
       expect(data.expose_metadata).toBe(true)
 
       // Verify in database
@@ -85,7 +84,7 @@ describe('expose_metadata feature', () => {
       })
 
       expect(response.status).toBe(200)
-      const data = await response.json()
+      const data = await response.json() as { expose_metadata: boolean }
       expect(data.expose_metadata).toBe(false)
 
       // Verify in database
@@ -129,8 +128,6 @@ describe('expose_metadata feature', () => {
   })
 
   describe('[POST] /updates - metadata exposure with plugin version', () => {
-    let versionId: number
-
     beforeAll(async () => {
       // Add link and comment to the default version (1.0.0)
       const { data, error } = await supabase
@@ -146,8 +143,6 @@ describe('expose_metadata feature', () => {
 
       if (error || !data)
         throw error ?? new Error('Failed to update version with metadata')
-
-      versionId = data.id
 
       await triggerD1Sync()
     })
