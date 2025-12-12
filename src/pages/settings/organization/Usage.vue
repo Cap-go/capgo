@@ -8,7 +8,7 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import { bytesToGb } from '~/services/conversion'
-import { getCreditUnitPricing, getCurrentPlanNameOrg, getPlans, getPlanUsagePercent, getTotalStorage } from '~/services/supabase'
+import { getCreditUnitPricing, getCurrentPlanNameOrg, getPlans, getPlanUsagePercent, getTotalStorage, getUsageCreditDeductions } from '~/services/supabase'
 import { sendEvent } from '~/services/tracking'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useMainStore } from '~/stores/main'
@@ -51,9 +51,8 @@ watchEffect(async () => {
 async function getUsage(orgId: string) {
   const usage = main.dashboard
 
-  const plan = plans.value.find(p => p.name === 'Pay as you go')
   const planCurrent = await getCurrentPlanNameOrg(orgId)
-  const currentPlan = plans.value.find(p => p.name === planCurrent)
+  const currentPlan = plans.value.find((p: Database['public']['Tables']['plans']['Row']) => p.name === planCurrent)
 
   // Get usage percentages
   let detailPlanUsage: ArrayElement<Database['public']['Functions']['get_plan_usage_percent_detailed']['Returns']> = {
@@ -70,20 +69,23 @@ async function getUsage(orgId: string) {
   catch (err) {
     console.log('Error getting plan usage percent:', err)
   }
+  detailPlanUsage = roundUsagePercents(detailPlanUsage)
 
   const payg_base = {
-    mau: plan?.mau ?? 0,
-    storage: plan?.storage ?? 0,
-    bandwidth: plan?.bandwidth ?? 0,
-    build_time: plan?.build_time_unit ?? 0,
+    mau: currentPlan?.mau ?? 0,
+    storage: currentPlan?.storage ?? 0,
+    bandwidth: currentPlan?.bandwidth ?? 0,
+    build_time: currentPlan?.build_time_unit ?? 0,
   }
 
   const payg_units = {
     mau: creditUnitPrices.value.mau ?? 0,
     storage: creditUnitPrices.value.storage ?? 0,
     bandwidth: creditUnitPrices.value.bandwidth ?? 0,
-    build_time: currentPlan?.build_time_unit ?? 0,
+    build_time: creditUnitPrices.value?.build_time ?? 0,
   }
+
+  const creditDeductions = await getUsageCreditDeductions(orgId)
 
   const nowEndOfDay = dayjs().endOf('day')
   const billingStart = organizationStore.currentOrganization?.subscription_start
@@ -105,6 +107,31 @@ async function getUsage(orgId: string) {
 
   const relevantUsage = usageInCycle.length > 0 ? usageInCycle : usage
 
+  const totalCreditDeductions = creditDeductions.reduce((acc, entry) => {
+    if (entry.amount === null)
+      return acc
+
+    const entryStart = entry.billing_cycle_start
+      ? dayjs(entry.billing_cycle_start).startOf('day')
+      : entry.occurred_at
+        ? dayjs(entry.occurred_at).startOf('day')
+        : null
+
+    const entryEnd = entry.billing_cycle_end
+      ? dayjs(entry.billing_cycle_end).endOf('day')
+      : entry.occurred_at
+        ? dayjs(entry.occurred_at).endOf('day')
+        : null
+
+    if (billingStart && entryEnd && entryEnd.isBefore(billingStart))
+      return acc
+
+    if (billingEnd && entryStart && entryStart.isAfter(billingEnd))
+      return acc
+
+    return acc + Math.abs(entry.amount)
+  }, 0)
+
   const totalMau = relevantUsage.reduce((acc, entry) => acc + (entry.mau ?? 0), 0)
   const totalBandwidthBytes = relevantUsage.reduce((acc, entry) => acc + (entry.bandwidth ?? 0), 0)
   const totalBandwidth = bytesToGb(totalBandwidthBytes)
@@ -119,11 +146,7 @@ async function getUsage(orgId: string) {
     return total <= base ? 0 : (total - base) * unit
   }
 
-  const isPayAsYouGo = currentPlan?.name === 'Pay as you go'
-  const totalUsagePrice = computed(() => {
-    if (currentPlan?.name !== 'Pay as you go')
-      return 0
-
+  const estimatedUsagePrice = computed(() => {
     const mauPrice = calculatePrice(totalMau, payg_base.mau, payg_units.mau)
     const storagePrice = calculatePrice(totalStorage, payg_base.storage, payg_units.storage)
     const bandwidthPrice = calculatePrice(totalBandwidth, payg_base.bandwidth, payg_units.bandwidth)
@@ -132,12 +155,17 @@ async function getUsage(orgId: string) {
     return roundNumber(sum)
   })
 
+  const totalUsagePrice = computed(() => {
+    if (creditDeductions.length > 0)
+      return roundNumber(totalCreditDeductions)
+    return estimatedUsagePrice.value
+  })
+
   const totalPrice = computed(() => {
     return roundNumber(basePrice + totalUsagePrice.value)
   })
 
   return {
-    isPayAsYouGo,
     currentPlan,
     totalPrice,
     totalUsagePrice,
@@ -146,7 +174,6 @@ async function getUsage(orgId: string) {
     totalStorage,
     totalBuildTime,
     payg_units,
-    plan,
     detailPlanUsage,
     cycle: {
       subscription_anchor_start: dayjs(organizationStore.currentOrganization?.subscription_start).format('YYYY/MM/D'),
@@ -155,7 +182,6 @@ async function getUsage(orgId: string) {
   }
 }
 
-// const planUsageMap = ref<Map<string, Awaited<ReturnType<typeof getUsage>>>>()
 const planUsageMap = ref(new Map<string, Awaited<ReturnType<typeof getUsage>>>())
 const planUsage = computed(() => planUsageMap.value?.get(currentOrganization.value?.gid ?? ''))
 
@@ -165,6 +191,17 @@ const currentPlanSuggest = computed(() => main.plans.find(plan => plan.name === 
 
 function roundNumber(number: number) {
   return Math.round(number * 100) / 100
+}
+
+function roundUsagePercents(usage: ArrayElement<Database['public']['Functions']['get_plan_usage_percent_detailed']['Returns']>) {
+  return {
+    ...usage,
+    total_percent: Math.round(usage.total_percent ?? 0),
+    mau_percent: Math.round(usage.mau_percent ?? 0),
+    bandwidth_percent: Math.round(usage.bandwidth_percent ?? 0),
+    storage_percent: Math.round(usage.storage_percent ?? 0),
+    build_time_percent: Math.round(usage.build_time_percent ?? 0),
+  }
 }
 
 function formatBuildTime(seconds: number): string {
@@ -273,41 +310,39 @@ function nextRunDate() {
       <!-- Plan & Cost Overview -->
       <div class="grid grid-cols-1 gap-6 mb-8 lg:grid-cols-3 shrink-0">
         <!-- Current Plan -->
-        <div class="flex flex-col justify-between p-5 border border-gray-200 shadow-sm bg-gray-50 rounded-xl dark:bg-gray-900 dark:border-gray-700">
-          <div>
-            <div class="mb-1 text-sm text-gray-500 dark:text-gray-400">
-              {{ t('Current') }}
+        <div class="flex flex-col justify-between lg:col-span-2 p-5 bg-gray-50 rounded-xl border border-gray-200 shadow-sm dark:bg-gray-900 dark:border-gray-700">
+          <div class="flex flex-row justify-between">
+            <div class="flex flex-col">
+              <div class="mb-1 text-sm text-gray-500 dark:text-gray-400">
+                {{ t('plan') }}
+              </div>
+              <div class="text-2xl font-bold text-gray-900 dark:text-white">
+                {{ currentPlan?.name || t('loading') }}
+              </div>
             </div>
-            <div class="text-2xl font-bold text-gray-900 dark:text-white">
-              {{ currentPlan?.name || t('loading') }}
+            <div class="flex flex-col">
+              <div class="mb-1 text-sm text-gray-500 dark:text-gray-400">
+                {{ t('base') }}
+              </div>
+              <div class="text-2xl font-bold text-gray-900 dark:text-white">
+                ${{ currentPlan?.price_m }}/{{ t('mo') }}
+              </div>
+            </div>
+            <div class="flex flex-col">
+              <div class="mb-1 text-sm text-gray-500 dark:text-gray-400">
+                {{ t('credits-used-in-period') }}
+              </div>
+              <div class="text-2xl font-bold text-gray-900 dark:text-white">
+                ${{ planUsage?.totalUsagePrice.toLocaleString() }}
+              </div>
             </div>
           </div>
           <div class="flex items-end justify-between pt-4 mt-4 border-t border-gray-100 dark:border-gray-700">
             <div class="text-sm text-gray-500 dark:text-gray-400">
-              {{ t('base') }}
+              {{ t('total') }}
             </div>
             <div class="text-xl font-semibold text-gray-900 dark:text-white">
-              ${{ currentPlan?.price_m }}/{{ t('mo') }}
-            </div>
-          </div>
-        </div>
-
-        <!-- Estimated Cost -->
-        <div class="flex flex-col justify-between p-5 border border-gray-200 shadow-sm bg-gray-50 rounded-xl dark:bg-gray-900 dark:border-gray-700">
-          <div>
-            <div class="mb-1 text-sm text-gray-500 dark:text-gray-400">
-              {{ t('usage-title') }}
-            </div>
-            <div class="text-2xl font-bold text-blue-600 dark:text-blue-400">
               ${{ planUsage?.totalPrice.toLocaleString() }}
-            </div>
-          </div>
-          <div class="flex items-end justify-between pt-4 mt-4 border-t border-gray-100 dark:border-gray-700">
-            <div class="text-sm text-gray-500 dark:text-gray-400">
-              {{ t('credits-used-in-period') }}
-            </div>
-            <div class="text-xl font-semibold text-gray-900 dark:text-white">
-              +${{ planUsage?.totalUsagePrice.toLocaleString() }}
             </div>
           </div>
         </div>

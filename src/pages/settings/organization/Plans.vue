@@ -58,26 +58,22 @@ function planFeatures(plan: Database['public']['Tables']['plans']['Row']) {
     t('priority-support'),
   ]
 
-  // Track the index of build time for "Pay as you go" pricing
-  const buildTimeIndex = 3
+  if (creditUnitPrices.value.mau)
+    features[0] += ` included, then $${creditUnitPrices.value.mau}/user`
 
-  if (true) {
-    if (creditUnitPrices.value.mau)
-      features[0] += ` included, then $${creditUnitPrices.value.mau}/user`
+  if (creditUnitPrices.value.storage)
+    features[1] += ` included, then $${creditUnitPrices.value.storage} per GB`
 
-    if (creditUnitPrices.value.storage)
-      features[1] += ` included, then $${creditUnitPrices.value.storage} per GB`
+  if (creditUnitPrices.value.bandwidth)
+    features[2] += ` included, then $${creditUnitPrices.value.bandwidth} per GB`
 
-    if (creditUnitPrices.value.bandwidth)
-      features[2] += ` included, then $${creditUnitPrices.value.bandwidth} per GB`
+  if (creditUnitPrices.value.build_time)
+    features[3] += ` included, then $${creditUnitPrices.value.build_time} per minute`
 
-    if (plan.build_time_unit && buildTimeDisplay)
-      features[buildTimeIndex] += ` included, then $${plan.build_time_unit} per hour`
+  features.push('Dedicated support')
+  features.push('Custom Domain')
+  features.push('SOC II')
 
-    features.push('Dedicated support')
-    features.push('Custom Domain')
-    features.push('SOC II')
-  }
   return features.filter(Boolean)
 }
 

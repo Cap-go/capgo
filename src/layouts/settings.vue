@@ -33,6 +33,18 @@ watchEffect(() => {
   if (!needsUsage && hasUsage)
     organizationTabs.value = organizationTabs.value.filter(tab => tab.key !== '/settings/organization/usage')
 
+  const needsCredits = organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['super_admin'])
+  const hasCredits = organizationTabs.value.find(tab => tab.key === '/settings/organization/credits')
+
+  if (needsCredits && !hasCredits) {
+    const base = baseOrgTabs.find(t => t.key === '/settings/organization/credits')
+    if (base)
+      organizationTabs.value.push({ ...base })
+  }
+
+  if (!needsCredits && hasCredits)
+    organizationTabs.value = organizationTabs.value.filter(tab => tab.key !== '/settings/organization/credits')
+
   const needsPlans = organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['super_admin'])
   const hasPlans = organizationTabs.value.find(tab => tab.key === '/settings/organization/plans')
   if (needsPlans && !hasPlans) {

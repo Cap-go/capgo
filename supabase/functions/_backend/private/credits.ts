@@ -1,7 +1,11 @@
+import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
-import { parseBody, simpleError, useCors } from '../utils/hono.ts'
-import { supabaseAdmin } from '../utils/supabase.ts'
+import { middlewareAuth, parseBody, simpleError, useCors } from '../utils/hono.ts'
+import { cloudlog, cloudlogErr } from '../utils/logging.ts'
+import { createOneTimeCheckout, getStripe } from '../utils/stripe.ts'
+import { hasOrgRight, supabaseAdmin } from '../utils/supabase.ts'
+import { getEnv } from '../utils/utils.ts'
 
 interface CreditStep {
   id: number
@@ -48,6 +52,92 @@ interface CostCalculationResponse {
     bandwidth: number
     storage: number
   }
+}
+
+interface StartTopUpRequest {
+  orgId: string
+  quantity?: number
+}
+
+interface CompleteTopUpRequest {
+  orgId: string
+  sessionId: string
+}
+
+const DEFAULT_TOP_UP_QUANTITY = 100
+const MAX_TOP_UP_QUANTITY = 100000
+
+type AppContext = Context<MiddlewareKeyVariables, any, any>
+
+async function getCreditTopUpProductId(c: AppContext, customerId: string): Promise<{ productId: string }> {
+  const { data: stripeInfo, error: stripeInfoError } = await supabaseAdmin(c)
+    .from('stripe_info')
+    .select('product_id')
+    .eq('customer_id', customerId)
+    .single()
+
+  if (stripeInfoError || !stripeInfo?.product_id) {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'credit_plan_missing',
+      customerId,
+      error: stripeInfoError,
+    })
+    throw simpleError('credit_product_not_configured', 'Organization does not have a Stripe plan configured')
+  }
+
+  const { data: plan, error: planError } = await supabaseAdmin(c)
+    .from('plans')
+    .select('credit_id, name')
+    .eq('stripe_id', stripeInfo.product_id)
+    .single()
+
+  if (planError || !plan?.credit_id) {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'credit_top_up_product_missing',
+      customerId,
+      planStripeId: stripeInfo.product_id,
+      error: planError,
+    })
+    throw simpleError('credit_product_not_configured', 'Credit product is not configured for this plan')
+  }
+
+  return { productId: plan.credit_id }
+}
+
+async function resolveOrgStripeContext(c: AppContext, orgId: string) {
+  const rawAuthHeader = c.req.header('authorization')
+    ?? c.req.header('Authorization')
+    ?? c.get('authorization')
+  const tokenMatch = rawAuthHeader?.match(/^\s*Bearer\s+(\S+)\s*$/i)
+  const token = tokenMatch?.[1]
+
+  if (!token)
+    throw simpleError('not_authorized', 'Not authorized')
+
+  const { data: auth, error } = await supabaseAdmin(c).auth.getUser(token)
+
+  if (error || !auth?.user?.id)
+    throw simpleError('not_authorized', 'Not authorized')
+
+  const userId = auth.user.id
+
+  if (!await hasOrgRight(c, orgId, userId, 'super_admin'))
+    throw simpleError('not_authorized', 'Not authorized')
+
+  const { data: org, error: orgError } = await supabaseAdmin(c)
+    .from('orgs')
+    .select('customer_id')
+    .eq('id', orgId)
+    .single()
+
+  const customerId = org?.customer_id
+
+  if (orgError || !customerId)
+    throw simpleError('stripe_customer_missing', 'Organization does not have a Stripe customer')
+
+  return { customerId, userId }
 }
 
 export const app = new Hono<MiddlewareKeyVariables>()
@@ -180,4 +270,190 @@ app.post('/', async (c) => {
   }
 
   return c.json(response)
+})
+
+app.post('/start-top-up', middlewareAuth, async (c) => {
+  const body = await parseBody<StartTopUpRequest>(c)
+  const parsedQuantity = Number.isFinite(body.quantity) ? Math.floor(body.quantity!) : undefined
+  const quantity = parsedQuantity
+    ? Math.min(Math.max(parsedQuantity, 1), MAX_TOP_UP_QUANTITY)
+    : DEFAULT_TOP_UP_QUANTITY
+  if (!body.orgId)
+    throw simpleError('missing_org_id', 'Organization id is required')
+
+  const { customerId, userId } = await resolveOrgStripeContext(c, body.orgId)
+
+  const baseUrl = getEnv(c, 'WEBAPP_URL')
+  const successUrl = `${baseUrl}/settings/organization/credits?creditCheckout=success&session_id={CHECKOUT_SESSION_ID}`
+  const cancelUrl = `${baseUrl}/settings/organization/credits?creditCheckout=cancelled`
+
+  const { productId } = await getCreditTopUpProductId(c, customerId)
+
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: 'Starting credit top-up checkout',
+    orgId: body.orgId,
+    quantity,
+    productId,
+    userId,
+  })
+
+  const checkout = await createOneTimeCheckout(
+    c,
+    customerId,
+    productId,
+    quantity,
+    successUrl,
+    cancelUrl,
+    body.orgId,
+  )
+
+  return c.json({ url: checkout.url })
+})
+
+app.post('/complete-top-up', middlewareAuth, async (c) => {
+  const body = await parseBody<CompleteTopUpRequest>(c)
+  if (!body.orgId || !body.sessionId)
+    throw simpleError('missing_parameters', 'orgId and sessionId are required')
+
+  const { customerId } = await resolveOrgStripeContext(c, body.orgId)
+
+  const stripe = getStripe(c)
+  const session = await stripe.checkout.sessions.retrieve(body.sessionId)
+
+  if (!session || session.customer !== customerId)
+    throw simpleError('invalid_session_customer', 'Checkout session does not belong to this organization')
+
+  if (session.mode !== 'payment')
+    throw simpleError('invalid_session_mode', 'Checkout session is not a payment session')
+
+  if (session.payment_status !== 'paid' || session.status !== 'complete')
+    throw simpleError('session_not_paid', 'Checkout session is not paid')
+
+  const { productId } = await getCreditTopUpProductId(c, customerId)
+  const paymentIntentId = typeof session.payment_intent === 'string'
+    ? session.payment_intent
+    : session.payment_intent?.id ?? null
+
+  const lineItems = await stripe.checkout.sessions.listLineItems(body.sessionId, {
+    expand: ['data.price.product'],
+    limit: 100,
+  })
+
+  let creditQuantity = 0
+  const itemsSummary = lineItems.data.map((item) => {
+    const priceProduct = typeof item.price?.product === 'string'
+      ? item.price?.product
+      : (item.price?.product as { id?: string } | null)?.id ?? null
+    if (priceProduct === productId)
+      creditQuantity += item.quantity ?? 0
+
+    return {
+      id: item.id,
+      quantity: item.quantity,
+      priceId: item.price?.id ?? null,
+      productId: priceProduct,
+    }
+  })
+
+  if (creditQuantity <= 0)
+    throw simpleError('credit_product_not_found', 'Checkout session does not include the credit product')
+
+  const sourceMatchFilters = [`source_ref->>sessionId.eq.${body.sessionId}`]
+  if (paymentIntentId)
+    sourceMatchFilters.push(`source_ref->>paymentIntentId.eq.${paymentIntentId}`)
+
+  const { data: existingTx, error: existingTxError } = await supabaseAdmin(c)
+    .from('usage_credit_transactions')
+    .select('id, grant_id, balance_after')
+    .eq('org_id', body.orgId)
+    .eq('transaction_type', 'purchase')
+    .or(sourceMatchFilters.join(','))
+    .limit(1)
+
+  if (existingTxError) {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'credit_top_up_idempotency_check_failed',
+      error: existingTxError,
+      orgId: body.orgId,
+      sessionId: body.sessionId,
+    })
+
+    throw simpleError('idempotency_check_failed', 'Failed to verify top-up status', { error: existingTxError })
+  }
+
+  const matchedTx = existingTx?.[0]
+
+  if (matchedTx) {
+    const { data: balance } = await supabaseAdmin(c)
+      .from('usage_credit_balances')
+      .select('total_credits, available_credits, next_expiration')
+      .eq('org_id', body.orgId)
+      .single()
+
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'Skipping credit top-up RPC due to existing transaction',
+      orgId: body.orgId,
+      sessionId: body.sessionId,
+      transactionId: matchedTx.id,
+    })
+
+    return c.json({
+      grant: {
+        grant_id: matchedTx.grant_id,
+        transaction_id: matchedTx.id,
+        available_credits: balance?.available_credits ?? matchedTx.balance_after ?? 0,
+        total_credits: balance?.total_credits ?? matchedTx.balance_after ?? 0,
+        next_expiration: balance?.next_expiration ?? null,
+      },
+    })
+  }
+
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: 'Completing credit top-up',
+    orgId: body.orgId,
+    sessionId: body.sessionId,
+    creditQuantity,
+    itemsSummary,
+  })
+
+  const sourceRef = {
+    sessionId: body.sessionId,
+    paymentIntentId,
+    itemsSummary,
+  }
+
+  const { data: grant, error: rpcError } = await supabaseAdmin(c)
+    .rpc('top_up_usage_credits', {
+      p_org_id: body.orgId,
+      p_amount: creditQuantity,
+      p_source: 'stripe_top_up',
+      p_notes: 'Stripe Checkout credit top-up',
+      p_source_ref: sourceRef,
+    })
+    .single()
+
+  if (rpcError) {
+    const rpcErrorInfo = {
+      code: rpcError.code ?? null,
+      message: rpcError.message ?? null,
+      details: (rpcError as any)?.details ?? null,
+      hint: (rpcError as any)?.hint ?? null,
+    }
+
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'credit_top_up_rpc_failed',
+      orgId: body.orgId,
+      sessionId: body.sessionId,
+      rpcError: rpcErrorInfo,
+    })
+
+    throw simpleError('top_up_failed', 'Failed to top up credits', { rpcError: rpcErrorInfo }, rpcError)
+  }
+
+  return c.json({ grant })
 })

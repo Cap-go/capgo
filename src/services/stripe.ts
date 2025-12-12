@@ -84,7 +84,7 @@ async function getAttributionId() {
 }
 
 export async function openCheckout(priceId: string, successUrl: string, cancelUrl: string, isYear: boolean, orgId: string) {
-//   console.log('openCheckout')
+  //   console.log('openCheckout')
   const supabase = useSupabase()
   const session = await supabase.auth.getSession()
   if (!session)
@@ -107,5 +107,48 @@ export async function openCheckout(priceId: string, successUrl: string, cancelUr
   catch (error) {
     console.error(error)
     toast.error('Cannot get your checkout')
+  }
+}
+
+export async function startCreditTopUp(orgId: string, quantity = 100) {
+  if (!orgId)
+    return
+  const supabase = useSupabase()
+  try {
+    const { data, error } = await supabase.functions.invoke('private/credits/start-top-up', {
+      body: JSON.stringify({ orgId, quantity }),
+    })
+    if (error || !data?.url) {
+      console.error('Failed to start credit top-up', error ?? data)
+      throw error ?? new Error('Missing checkout URL')
+    }
+    window.location.href = data.url
+  }
+  catch (error) {
+    console.error('Cannot start credit top-up checkout', error)
+    toast.error('Cannot start credit checkout')
+    throw error
+  }
+}
+
+export async function completeCreditTopUp(orgId: string, sessionId: string) {
+  if (!orgId || !sessionId)
+    return null
+
+  const supabase = useSupabase()
+  try {
+    const { data, error } = await supabase.functions.invoke('private/credits/complete-top-up', {
+      body: JSON.stringify({ orgId, sessionId }),
+    })
+    if (error) {
+      console.error('Failed to complete credit top-up', error)
+      throw error
+    }
+    return data?.grant ?? null
+  }
+  catch (error) {
+    console.error('Cannot complete credit top-up', error)
+    toast.error('Cannot finalize credit checkout')
+    throw error
   }
 }

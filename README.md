@@ -325,7 +325,6 @@ All configuration keys from `configs.json` can be overridden by setting their up
 | `SUPA_URL` | Supabase URL | `https://xvwzpoazmxkqosrdewyv.supabase.co` | ✅ Yes |
 | `API_DOMAIN` | API domain | `api.capgo.app` | ✅ Yes |
 | `CAPTCHA_KEY` | Turnstile captcha key | Capgo production key | ⚠️ Optional |
-| `FEATURE_CREDITS_V2` | Enable credits v2 feature | `false` | ⚠️ Optional |
 
 #### Example Self-Hosted Configuration
 
@@ -336,7 +335,6 @@ SUPA_ANON=your-supabase-anon-key
 SUPA_URL=https://your-supabase-url.supabase.co
 API_DOMAIN=api.yourdomain.com
 CAPTCHA_KEY=your-turnstile-key
-FEATURE_CREDITS_V2=true
 ```
 
 #### How It Works

@@ -282,6 +282,13 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    '/settings/organization/Credits': RouteRecordInfo<
+      '/settings/organization/Credits',
+      '/settings/organization/Credits',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
     '/settings/organization/DeleteOrgDialog': RouteRecordInfo<
       '/settings/organization/DeleteOrgDialog',
       '/settings/organization/DeleteOrgDialog',
@@ -549,6 +556,12 @@ declare module 'vue-router/auto-routes' {
     'src/pages/settings/organization/index.vue': {
       routes:
         | '/settings/organization/'
+      views:
+        | never
+    }
+    'src/pages/settings/organization/Credits.vue': {
+      routes:
+        | '/settings/organization/Credits'
       views:
         | never
     }

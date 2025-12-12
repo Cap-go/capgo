@@ -1212,6 +1212,7 @@ export type Database = {
           bandwidth: number
           build_time_unit: number
           created_at: string
+          credit_id: string
           description: string
           id: string
           market_desc: string | null
@@ -1229,6 +1230,7 @@ export type Database = {
           bandwidth: number
           build_time_unit?: number
           created_at?: string
+          credit_id: string
           description?: string
           id?: string
           market_desc?: string | null
@@ -1246,6 +1248,7 @@ export type Database = {
           bandwidth?: number
           build_time_unit?: number
           created_at?: string
+          credit_id?: string
           description?: string
           id?: string
           market_desc?: string | null
@@ -1777,6 +1780,28 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      usage_credit_ledger: {
+        Row: {
+          amount: number | null
+          balance_after: number | null
+          billing_cycle_end: string | null
+          billing_cycle_start: string | null
+          description: string | null
+          details: Json | null
+          grant_allocations: Json | null
+          id: number | null
+          metric: Database["public"]["Enums"]["credit_metric_type"] | null
+          occurred_at: string | null
+          org_id: string | null
+          overage_amount: number | null
+          overage_event_id: string | null
+          source_ref: Json | null
+          transaction_type:
+            | Database["public"]["Enums"]["credit_transaction_type"]
+            | null
+        }
+        Relationships: []
       }
     }
     Functions: {
@@ -2502,6 +2527,23 @@ export type Database = {
       set_storage_exceeded_by_org: {
         Args: { disabled: boolean; org_id: string }
         Returns: undefined
+      }
+      top_up_usage_credits: {
+        Args: {
+          p_amount: number
+          p_expires_at?: string
+          p_notes?: string
+          p_org_id: string
+          p_source?: string
+          p_source_ref?: Json
+        }
+        Returns: {
+          available_credits: number
+          grant_id: string
+          next_expiration: string
+          total_credits: number
+          transaction_id: number
+        }[]
       }
       total_bundle_storage_bytes: { Args: never; Returns: number }
       transfer_app: {

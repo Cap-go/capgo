@@ -30,6 +30,12 @@ END $$;
 CREATE OR REPLACE FUNCTION "public"."reset_and_seed_data" () RETURNS "void" LANGUAGE "plpgsql"
 SET
   search_path = '' SECURITY DEFINER AS $_$
+DECLARE
+    admin_manual_grant_id uuid;
+    admin_top_up_grant_id uuid;
+    demo_top_up_grant_id uuid;
+    admin_bandwidth_overage_id uuid;
+    demo_mau_overage_id uuid;
 BEGIN
     -- Suppress cascade notices during truncation
     SET LOCAL client_min_messages = WARNING;
@@ -58,11 +64,11 @@ BEGIN
     INSERT INTO "public"."deleted_account" ("created_at", "email", "id") VALUES
     (now(), encode(extensions.digest('deleted@capgo.app'::bytea, 'sha256'::text)::bytea, 'hex'::text), '00000000-0000-0000-0000-000000000001');
 
-    INSERT INTO "public"."plans" ("created_at", "updated_at", "name", "description", "price_m", "price_y", "stripe_id", "id", "price_m_id", "price_y_id", "storage", "bandwidth", "mau", "market_desc", "build_time_unit") VALUES
-    (now(), now(), 'Maker', 'plan.maker.desc', 39, 396, 'prod_LQIs1Yucml9ChU', '440cfd69-0cfd-486e-b59b-cb99f7ae76a0', 'price_1KjSGyGH46eYKnWwL4h14DsK', 'price_1KjSKIGH46eYKnWwFG9u4tNi', 3221225472, 268435456000, 10000, 'Best for small business owners', 3600),
-    (now(), now(), 'Pay as you go', 'plan.payasyougo.desc', 239, 4799, 'prod_MH5Jh6ajC9e7ZH', '745d7ab3-6cd6-4d65-b257-de6782d5ba50', 'price_1LYX8yGH46eYKnWwzeBjISvW', 'price_1LYX8yGH46eYKnWwzeBjISvW', 12884901888, 3221225472000, 1000000, 'Best for scalling enterprises', 600000),
-    (now(), now(), 'Solo', 'plan.solo.desc', 14, 146, 'prod_LQIregjtNduh4q', '526e11d8-3c51-4581-ac92-4770c602f47c', 'price_1LVvuZGH46eYKnWwuGKOf4DK', 'price_1LVvuIGH46eYKnWwHMDCrxcH', 1073741824, 13958643712, 1000, 'Best for independent developers', 1800),
-    (now(), now(), 'Team', 'plan.team.desc', 99, 998, 'prod_LQIugvJcPrxhda', 'abd76414-8f90-49a5-b3a4-8ff4d2e12c77', 'price_1KjSIUGH46eYKnWwWHvg8XYs', 'price_1KjSLlGH46eYKnWwAwMW2wiW', 6442450944, 536870912000, 100000, 'Best for medium enterprises', 18000);
+    INSERT INTO "public"."plans" ("created_at", "updated_at", "name", "description", "price_m", "price_y", "stripe_id", "credit_id", "id", "price_m_id", "price_y_id", "storage", "bandwidth", "mau", "market_desc", "build_time_unit") VALUES
+    (now(), now(), 'Maker', 'plan.maker.desc', 39, 396, 'prod_LQIs1Yucml9ChU', 'prod_TJRd2hFHZsBIPK', '440cfd69-0cfd-486e-b59b-cb99f7ae76a0', 'price_1KjSGyGH46eYKnWwL4h14DsK', 'price_1KjSKIGH46eYKnWwFG9u4tNi', 3221225472, 268435456000, 10000, 'Best for small business owners', 3600),
+    (now(), now(), 'Pay as you go', 'plan.payasyougo.desc', 239, 4799, 'prod_MH5Jh6ajC9e7ZH', 'prod_TJRd2hFHZsBIPK', '745d7ab3-6cd6-4d65-b257-de6782d5ba50', 'price_1LYX8yGH46eYKnWwzeBjISvW', 'price_1LYX8yGH46eYKnWwzeBjISvW', 12884901888, 3221225472000, 1000000, 'Best for scalling enterprises', 600000),
+    (now(), now(), 'Solo', 'plan.solo.desc', 14, 146, 'prod_LQIregjtNduh4q', 'prod_TJRd2hFHZsBIPK', '526e11d8-3c51-4581-ac92-4770c602f47c', 'price_1LVvuZGH46eYKnWwuGKOf4DK', 'price_1LVvuIGH46eYKnWwHMDCrxcH', 1073741824, 13958643712, 1000, 'Best for independent developers', 1800),
+    (now(), now(), 'Team', 'plan.team.desc', 99, 998, 'prod_LQIugvJcPrxhda', 'prod_TJRd2hFHZsBIPK', 'abd76414-8f90-49a5-b3a4-8ff4d2e12c77', 'price_1KjSIUGH46eYKnWwWHvg8XYs', 'price_1KjSLlGH46eYKnWwAwMW2wiW', 6442450944, 536870912000, 100000, 'Best for medium enterprises', 18000);
 
     INSERT INTO
       "public"."capgo_credits_steps" (
@@ -268,19 +274,189 @@ BEGIN
         275,
         now() - interval '45 days',
         now() + interval '6 months',
-        'seed',
+        'manual',
         '{}'::jsonb,
         'Seed usage credits for admin org'
+      )
+    RETURNING id INTO admin_manual_grant_id;
+
+    INSERT INTO public.usage_credit_grants (
+      org_id,
+      credits_total,
+      credits_consumed,
+      granted_at,
+      expires_at,
+      source,
+      source_ref,
+      notes
+    )
+    VALUES (
+      '22dbad8a-b885-4309-9b3b-a09f8460fb6d',
+      250,
+      0,
+      now() - interval '14 days',
+      now() + interval '8 months',
+      'stripe_top_up',
+      jsonb_build_object('paymentIntentId', 'pi_seed_top_up_admin'),
+      'Stripe top-up seed for admin org'
+    )
+    RETURNING id INTO admin_top_up_grant_id;
+
+    INSERT INTO public.usage_credit_grants (
+      org_id,
+      credits_total,
+      credits_consumed,
+      granted_at,
+      expires_at,
+      source,
+      source_ref,
+      notes
+    )
+    VALUES (
+      '046a36ac-e03c-4590-9257-bd6c9dba9ee8',
+      500,
+      120,
+      now() - interval '10 days',
+      now() + interval '3 months',
+      'stripe_top_up',
+      jsonb_build_object('paymentIntentId', 'pi_seed_top_up_demo'),
+      'Seed usage credits for demo org'
+    )
+    RETURNING id INTO demo_top_up_grant_id;
+
+    -- Seed realistic credit transactions so the Credits view has ledger data
+    INSERT INTO public.usage_overage_events (
+      org_id,
+      metric,
+      overage_amount,
+      credits_estimated,
+      credits_debited,
+      billing_cycle_start,
+      billing_cycle_end,
+      details
+    )
+    VALUES
+      (
+        '22dbad8a-b885-4309-9b3b-a09f8460fb6d',
+        'bandwidth',
+        2684354560,
+        275,
+        275,
+        date_trunc('month', now()) - interval '1 month',
+        date_trunc('month', now()),
+        jsonb_build_object('note', 'Bandwidth spike from heavy release week')
+      )
+    RETURNING id INTO admin_bandwidth_overage_id;
+
+    INSERT INTO public.usage_overage_events (
+      org_id,
+      metric,
+      overage_amount,
+      credits_estimated,
+      credits_debited,
+      billing_cycle_start,
+      billing_cycle_end,
+      details
+    )
+    VALUES
+      (
+        '046a36ac-e03c-4590-9257-bd6c9dba9ee8',
+        'mau',
+        185000,
+        120,
+        120,
+        date_trunc('month', now()),
+        date_trunc('month', now()) + interval '1 month',
+        jsonb_build_object('note', 'Promo traffic pushed MAU above plan')
+      )
+    RETURNING id INTO demo_mau_overage_id;
+
+    INSERT INTO public.usage_credit_consumptions (
+      grant_id,
+      org_id,
+      overage_event_id,
+      metric,
+      credits_used,
+      applied_at
+    )
+    VALUES
+      (
+        admin_manual_grant_id,
+        '22dbad8a-b885-4309-9b3b-a09f8460fb6d',
+        admin_bandwidth_overage_id,
+        'bandwidth',
+        275,
+        now() - interval '5 days'
+      ),
+      (
+        demo_top_up_grant_id,
+        '046a36ac-e03c-4590-9257-bd6c9dba9ee8',
+        demo_mau_overage_id,
+        'mau',
+        120,
+        now() - interval '1 day'
+      );
+
+    INSERT INTO public.usage_credit_transactions (
+      org_id,
+      grant_id,
+      transaction_type,
+      amount,
+      balance_after,
+      occurred_at,
+      description,
+      source_ref
+    )
+    VALUES
+      (
+        '22dbad8a-b885-4309-9b3b-a09f8460fb6d',
+        admin_manual_grant_id,
+        'manual_grant',
+        1000,
+        1000,
+        now() - interval '45 days',
+        'Manual starter credits from support',
+        jsonb_build_object('notes', 'Initial seed allocation')
+      ),
+      (
+        '22dbad8a-b885-4309-9b3b-a09f8460fb6d',
+        admin_top_up_grant_id,
+        'purchase',
+        250,
+        1250,
+        now() - interval '14 days',
+        'Stripe top-up: 250 credits',
+        jsonb_build_object('paymentIntentId', 'pi_seed_top_up_admin', 'sessionId', 'cs_test_seed_admin')
+      ),
+      (
+        '22dbad8a-b885-4309-9b3b-a09f8460fb6d',
+        admin_manual_grant_id,
+        'deduction',
+        -275,
+        975,
+        now() - interval '5 days',
+        'Overage deduction for bandwidth usage',
+        jsonb_build_object('overage_event_id', admin_bandwidth_overage_id, 'metric', 'bandwidth')
       ),
       (
         '046a36ac-e03c-4590-9257-bd6c9dba9ee8',
+        demo_top_up_grant_id,
+        'purchase',
         500,
-        0,
-        now() - interval '7 days',
-        now() + interval '3 months',
-        'seed',
-        '{}'::jsonb,
-        'Seed usage credits for demo org'
+        500,
+        now() - interval '10 days',
+        'Stripe top-up: 500 credits',
+        jsonb_build_object('paymentIntentId', 'pi_seed_top_up_demo', 'sessionId', 'cs_test_seed_demo')
+      ),
+      (
+        '046a36ac-e03c-4590-9257-bd6c9dba9ee8',
+        demo_top_up_grant_id,
+        'deduction',
+        -120,
+        380,
+        now() - interval '1 day',
+        'Overage deduction for MAU spike',
+        jsonb_build_object('overage_event_id', demo_mau_overage_id, 'metric', 'mau')
       );
 
     INSERT INTO "public"."org_users" ("org_id", "user_id", "user_right", "app_id", "channel_id") VALUES
@@ -419,11 +595,11 @@ BEGIN
     random_mau := FLOOR(RANDOM() * 1000) + 1;
     random_bandwidth := FLOOR(RANDOM() * 1000000000) + 1;
     random_storage := FLOOR(RANDOM() * 1000000000) + 1;
-    
+
     INSERT INTO public.daily_mau (app_id, date, mau) VALUES ('com.demo.app', curr_date, random_mau);
     INSERT INTO public.daily_bandwidth (app_id, date, bandwidth) VALUES ('com.demo.app', curr_date, random_bandwidth);
     INSERT INTO public.daily_storage (app_id, date, storage) VALUES ('com.demo.app', curr_date, random_storage);
-    
+
     curr_date := curr_date + INTERVAL '1 day';
   END LOOP;
 
@@ -442,7 +618,7 @@ BEGIN
 
       INSERT INTO public.daily_version (date, app_id, version_id, get, fail, install, uninstall)
       VALUES (curr_date, 'com.demo.app', previous_version_id, FLOOR(RANDOM() * 100) + 1, FLOOR(RANDOM() * 10) + 1, 0, previous_install * random_daily_change);
-      
+
       INSERT INTO public.daily_version (date, app_id, version_id, get, fail, install, uninstall)
       VALUES (curr_date, 'com.demo.app', current_version_id, FLOOR(RANDOM() * 100) + 1, FLOOR(RANDOM() * 10) + 1, previous_install * random_daily_change, 0);
       previous_version_id := current_version_id;
@@ -512,7 +688,7 @@ SET
 BEGIN
     -- Use advisory lock to prevent concurrent execution for the same app
     PERFORM pg_advisory_xact_lock(hashtext(p_app_id));
-    
+
     -- Delete in dependency order to avoid foreign key conflicts
     DELETE FROM public.deploy_history WHERE app_id = p_app_id;
     DELETE FROM public.channel_devices WHERE app_id = p_app_id;
@@ -520,7 +696,7 @@ BEGIN
     DELETE FROM public.app_versions WHERE app_id = p_app_id;
     DELETE FROM public.build_requests WHERE app_id = p_app_id;
     DELETE FROM public.apps WHERE app_id = p_app_id;
-    
+
     -- Advisory lock is automatically released at transaction end
 END;
 $$;
@@ -713,7 +889,7 @@ SET
 BEGIN
   -- Use advisory lock to prevent concurrent execution for the same app
   PERFORM pg_advisory_xact_lock(hashtext(p_app_id || '_stats'));
-  
+
   -- Delete existing data for the specified app_id in dependency order
   DELETE FROM public.daily_mau WHERE app_id = p_app_id;
   DELETE FROM public.daily_bandwidth WHERE app_id = p_app_id;
@@ -726,7 +902,7 @@ BEGIN
   DELETE FROM public.bandwidth_usage WHERE app_id = p_app_id;
   DELETE FROM public.devices WHERE app_id = p_app_id;
   DELETE FROM public.stats WHERE app_id = p_app_id;
-  
+
   -- Advisory lock is automatically released at transaction end
 END;
 $$;
