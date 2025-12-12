@@ -44,9 +44,10 @@ BEGIN
     TRUNCATE TABLE "public"."usage_credit_transactions" CASCADE;
     TRUNCATE TABLE "public"."usage_credit_consumptions" CASCADE;
     TRUNCATE TABLE "public"."usage_overage_events" CASCADE;
-    TRUNCATE TABLE "public"."role_bindings" RESTART IDENTITY;
-    TRUNCATE TABLE "public"."group_members" RESTART IDENTITY;
-    TRUNCATE TABLE "public"."groups" RESTART IDENTITY;
+    -- RBAC tables: must truncate in order to respect foreign keys
+    TRUNCATE TABLE "public"."role_bindings" RESTART IDENTITY CASCADE;
+    TRUNCATE TABLE "public"."group_members" RESTART IDENTITY CASCADE;
+    TRUNCATE TABLE "public"."groups" RESTART IDENTITY CASCADE;
     -- Keep RBAC flags deterministic across test runs
     INSERT INTO public.rbac_settings (id, use_new_rbac)
     VALUES (1, false)

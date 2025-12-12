@@ -189,17 +189,18 @@ VALUES
   -- App permissions
   ('app.read', 'app', 'Read app metadata'),
   ('app.update_settings', 'app', 'Update app settings'),
+  ('app.delete', 'app', 'Delete an app'),
   ('app.read_bundles', 'app', 'Read app bundle metadata'),
   ('app.upload_bundle', 'app', 'Upload a bundle'),
-  ('app.delete_bundle', 'app', 'Delete a bundle'),
   ('app.create_channel', 'app', 'Create channels'),
-  ('app.delete_channel', 'app', 'Delete channels'),
   ('app.read_channels', 'app', 'List/read channels'),
   ('app.read_logs', 'app', 'Read app logs/metrics'),
   ('app.manage_devices', 'app', 'Manage devices at app scope'),
   ('app.read_devices', 'app', 'Read devices at app scope'),
   ('app.build_native', 'app', 'Trigger native builds'),
   ('app.read_audit', 'app', 'Read app-level audit trail'),
+  -- Bundle permissions
+  ('bundle.delete', 'app', 'Delete a bundle'),
   -- Channel permissions
   ('channel.read', 'channel', 'Read channel metadata'),
   ('channel.update_settings', 'channel', 'Update channel settings'),
@@ -225,10 +226,15 @@ ON CONFLICT (key) DO NOTHING;
 INSERT INTO public.roles (name, scope_type, description, is_priority, family_name, priority_rank, is_assignable, created_by)
 VALUES
   ('platform_super_admin', 'platform', 'Full platform control (not assignable to customers)', true, 'platform_base', 100, false, NULL),
+  ('org_super_admin', 'org', 'Super admin for an org (same permissions as org_admin)', true, 'org_base', 95, true, NULL),
   ('org_admin', 'org', 'Full org administration', true, 'org_base', 90, true, NULL),
   ('org_billing_admin', 'org', 'Billing-only administrator for an org', true, 'org_base', 80, true, NULL),
   ('app_admin', 'app', 'Full administration of an app', true, 'app_base', 70, true, NULL),
-  ('channel_admin', 'channel', 'Full administration of a channel', true, 'channel_base', 60, true, NULL)
+  ('app_developer', 'app', 'Developer access: upload bundles, manage devices, but no destructive operations', true, 'app_base', 68, true, NULL),
+  ('app_uploader', 'app', 'Upload-only access: read app data and upload bundles', true, 'app_base', 66, true, NULL),
+  ('app_read', 'app', 'Read-only access to an app', true, 'app_base', 65, true, NULL),
+  ('channel_admin', 'channel', 'Full administration of a channel', true, 'channel_base', 60, true, NULL),
+  ('channel_read', 'channel', 'Read-only access to a channel', true, 'channel_base', 55, true, NULL)
 ON CONFLICT (name) DO NOTHING;
 
 -- 5) Attach permissions to roles
@@ -239,22 +245,40 @@ FROM public.roles r
 JOIN public.permissions p ON TRUE
 WHERE r.name = 'platform_super_admin';
 
--- org_admin: org management, billing read/update, member/role management, and delegated app/channel control
+-- org_admin: org management, member/role management, and delegated app/channel control (no billing updates, no deletions)
+INSERT INTO public.role_permissions (role_id, permission_id)
+SELECT r.id, p.id
+FROM public.roles r
+JOIN public.permissions p ON p.key IN (
+  'org.read', 'org.update_settings', 'org.read_members', 'org.invite_user', 'org.update_user_roles',
+  'org.read_billing', 'org.read_invoices', 'org.read_audit', 'org.read_billing_audit',
+  -- app/channel control granted at org scope (no deletions)
+  'app.read', 'app.update_settings', 'app.read_bundles', 'app.upload_bundle',
+  'app.create_channel', 'app.read_channels', 'app.read_logs', 'app.manage_devices',
+  'app.read_devices', 'app.build_native', 'app.read_audit',
+  'channel.read', 'channel.update_settings', 'channel.read_history',
+  'channel.promote_bundle', 'channel.rollback_bundle', 'channel.manage_forced_devices',
+  'channel.read_forced_devices', 'channel.read_audit'
+)
+WHERE r.name = 'org_admin';
+
+-- org_super_admin: same permissions as org_admin plus app destructive operations and billing
 INSERT INTO public.role_permissions (role_id, permission_id)
 SELECT r.id, p.id
 FROM public.roles r
 JOIN public.permissions p ON p.key IN (
   'org.read', 'org.update_settings', 'org.read_members', 'org.invite_user', 'org.update_user_roles',
   'org.read_billing', 'org.update_billing', 'org.read_invoices', 'org.read_audit', 'org.read_billing_audit',
-  -- app/channel control granted at org scope
-  'app.read', 'app.update_settings', 'app.read_bundles', 'app.upload_bundle', 'app.delete_bundle',
-  'app.create_channel', 'app.delete_channel', 'app.read_channels', 'app.read_logs', 'app.manage_devices',
+  -- app/channel control granted at org scope (including deletions)
+  'app.read', 'app.update_settings', 'app.delete', 'app.read_bundles', 'app.upload_bundle',
+  'app.create_channel', 'app.read_channels', 'app.read_logs', 'app.manage_devices',
   'app.read_devices', 'app.build_native', 'app.read_audit',
+  'bundle.delete',
   'channel.read', 'channel.update_settings', 'channel.delete', 'channel.read_history',
   'channel.promote_bundle', 'channel.rollback_bundle', 'channel.manage_forced_devices',
   'channel.read_forced_devices', 'channel.read_audit'
 )
-WHERE r.name = 'org_admin';
+WHERE r.name = 'org_super_admin';
 
 -- org_billing_admin: restricted to billing views/updates
 INSERT INTO public.role_permissions (role_id, permission_id)
@@ -270,16 +294,38 @@ INSERT INTO public.role_permissions (role_id, permission_id)
 SELECT r.id, p.id
 FROM public.roles r
 JOIN public.permissions p ON p.key IN (
-  'app.read', 'app.update_settings', 'app.read_bundles', 'app.upload_bundle', 'app.delete_bundle',
-  'app.create_channel', 'app.delete_channel', 'app.read_channels', 'app.read_logs', 'app.manage_devices',
+  'app.read', 'app.update_settings', 'app.read_bundles', 'app.upload_bundle',
+  'app.create_channel', 'app.read_channels', 'app.read_logs', 'app.manage_devices',
   'app.read_devices', 'app.build_native', 'app.read_audit',
+  'bundle.delete',
   'channel.read', 'channel.update_settings', 'channel.delete', 'channel.read_history',
   'channel.promote_bundle', 'channel.rollback_bundle', 'channel.manage_forced_devices',
   'channel.read_forced_devices', 'channel.read_audit'
 )
 WHERE r.name = 'app_admin';
 
--- channel_admin: channel-scoped management
+-- app_developer: can upload, manage devices, build, update channels but no deletion or creation
+INSERT INTO public.role_permissions (role_id, permission_id)
+SELECT r.id, p.id
+FROM public.roles r
+JOIN public.permissions p ON p.key IN (
+  'app.read', 'app.read_bundles', 'app.upload_bundle', 'app.read_channels', 'app.read_logs',
+  'app.manage_devices', 'app.read_devices', 'app.build_native', 'app.read_audit',
+  'channel.read', 'channel.update_settings', 'channel.read_history', 'channel.promote_bundle',
+  'channel.rollback_bundle', 'channel.manage_forced_devices', 'channel.read_forced_devices', 'channel.read_audit'
+)
+WHERE r.name = 'app_developer';
+
+-- app_uploader: read access + upload bundle only
+INSERT INTO public.role_permissions (role_id, permission_id)
+SELECT r.id, p.id
+FROM public.roles r
+JOIN public.permissions p ON p.key IN (
+  'app.read', 'app.read_bundles', 'app.upload_bundle', 'app.read_channels', 'app.read_logs', 'app.read_devices', 'app.read_audit'
+)
+WHERE r.name = 'app_uploader';
+
+-- app_read: read-only access to app
 INSERT INTO public.role_permissions (role_id, permission_id)
 SELECT r.id, p.id
 FROM public.roles r
@@ -289,6 +335,24 @@ JOIN public.permissions p ON p.key IN (
   'channel.read_forced_devices', 'channel.read_audit'
 )
 WHERE r.name = 'channel_admin';
+
+-- app_read: read-only access to app
+INSERT INTO public.role_permissions (role_id, permission_id)
+SELECT r.id, p.id
+FROM public.roles r
+JOIN public.permissions p ON p.key IN (
+  'app.read', 'app.read_bundles', 'app.read_channels', 'app.read_logs', 'app.read_devices', 'app.read_audit'
+)
+WHERE r.name = 'app_read';
+
+-- channel_read: read-only access to channel
+INSERT INTO public.role_permissions (role_id, permission_id)
+SELECT r.id, p.id
+FROM public.roles r
+JOIN public.permissions p ON p.key IN (
+  'channel.read', 'channel.read_history', 'channel.read_forced_devices', 'channel.read_audit'
+)
+WHERE r.name = 'channel_read';
 
 -- 6) Role hierarchy (explicit inheritance)
 INSERT INTO public.role_hierarchy (parent_role_id, child_role_id)
@@ -590,21 +654,21 @@ $$;
 
 -- 12) has_app_right helpers (branch to RBAC when enabled)
 CREATE OR REPLACE FUNCTION public.has_app_right(
-  appid character varying,
-  right public.user_min_right
+  "appid" character varying,
+  "right" public.user_min_right
 ) RETURNS boolean
 LANGUAGE plpgsql
 SET search_path = ''
 SECURITY DEFINER AS $$
 BEGIN
-  RETURN public.has_app_right_userid(appid, right, (SELECT auth.uid()));
+  RETURN public.has_app_right_userid("appid", "right", (SELECT auth.uid()));
 END;
 $$;
 
 CREATE OR REPLACE FUNCTION public.has_app_right_userid(
-  appid character varying,
-  right public.user_min_right,
-  userid uuid
+  "appid" character varying,
+  "right" public.user_min_right,
+  "userid" uuid
 ) RETURNS boolean
 LANGUAGE plpgsql
 SET search_path = ''
@@ -613,21 +677,21 @@ DECLARE
   org_id uuid;
   allowed boolean;
 BEGIN
-  org_id := public.get_user_main_org_id_by_app_id(appid);
+  org_id := public.get_user_main_org_id_by_app_id("appid");
 
-  allowed := public.check_min_rights(right, userid, org_id, appid, NULL::bigint);
+  allowed := public.check_min_rights("right", "userid", org_id, "appid", NULL::bigint);
   IF NOT allowed THEN
-    PERFORM public.pg_log('deny: HAS_APP_RIGHT_USERID', jsonb_build_object('appid', appid, 'org_id', org_id, 'right', right::text, 'userid', userid));
+    PERFORM public.pg_log('deny: HAS_APP_RIGHT_USERID', jsonb_build_object('appid', "appid", 'org_id', org_id, 'right', "right"::text, 'userid', "userid"));
   END IF;
   RETURN allowed;
 END;
 $$;
 
 CREATE OR REPLACE FUNCTION public.has_app_right_apikey(
-  appid character varying,
-  right public.user_min_right,
-  userid uuid,
-  apikey text
+  "appid" character varying,
+  "right" public.user_min_right,
+  "userid" uuid,
+  "apikey" text
 ) RETURNS boolean
 LANGUAGE plpgsql
 SET search_path = ''
@@ -639,33 +703,33 @@ DECLARE
   use_rbac boolean;
   perm_key text;
 BEGIN
-  org_id := public.get_user_main_org_id_by_app_id(appid);
+  org_id := public.get_user_main_org_id_by_app_id("appid");
   use_rbac := public.rbac_is_enabled_for_org(org_id);
 
-  SELECT * FROM public.apikeys WHERE key = apikey INTO api_key;
+  SELECT * FROM public.apikeys WHERE key = "apikey" INTO api_key;
   IF COALESCE(array_length(api_key.limited_to_orgs, 1), 0) > 0 THEN
     IF NOT (org_id = ANY(api_key.limited_to_orgs)) THEN
-      PERFORM public.pg_log('deny: APIKEY_ORG_RESTRICT', jsonb_build_object('org_id', org_id, 'appid', appid));
+      PERFORM public.pg_log('deny: APIKEY_ORG_RESTRICT', jsonb_build_object('org_id', org_id, 'appid', "appid"));
       RETURN false;
     END IF;
   END IF;
 
   IF api_key.limited_to_apps IS DISTINCT FROM '{}' THEN
-    IF NOT (appid = ANY(api_key.limited_to_apps)) THEN
-      PERFORM public.pg_log('deny: APIKEY_APP_RESTRICT', jsonb_build_object('appid', appid));
+    IF NOT ("appid" = ANY(api_key.limited_to_apps)) THEN
+      PERFORM public.pg_log('deny: APIKEY_APP_RESTRICT', jsonb_build_object('appid', "appid"));
       RETURN false;
     END IF;
   END IF;
 
   IF use_rbac THEN
-    perm_key := public.rbac_permission_for_legacy(right, 'app');
-    allowed := public.rbac_has_permission('apikey', api_key.rbac_id, perm_key, org_id, appid, NULL::bigint);
+    perm_key := public.rbac_permission_for_legacy("right", 'app');
+    allowed := public.rbac_has_permission('apikey', api_key.rbac_id, perm_key, org_id, "appid", NULL::bigint);
   ELSE
-    allowed := public.check_min_rights(right, userid, org_id, appid, NULL::bigint);
+    allowed := public.check_min_rights("right", "userid", org_id, "appid", NULL::bigint);
   END IF;
 
   IF NOT allowed THEN
-    PERFORM public.pg_log('deny: HAS_APP_RIGHT_APIKEY', jsonb_build_object('appid', appid, 'org_id', org_id, 'right', right::text, 'userid', userid, 'rbac', use_rbac));
+    PERFORM public.pg_log('deny: HAS_APP_RIGHT_APIKEY', jsonb_build_object('appid', "appid", 'org_id', org_id, 'right', "right"::text, 'userid', "userid", 'rbac', use_rbac));
   END IF;
   RETURN allowed;
 END;
@@ -682,20 +746,26 @@ SET search_path = ''
 IMMUTABLE AS $$
 BEGIN
   IF p_channel_id IS NOT NULL THEN
-    IF p_user_right >= 'write'::public.user_min_right THEN
-      RETURN 'channel_admin';
-    END IF;
+    -- No channel-level role mapping for now
     RETURN NULL;
   ELSIF p_app_id IS NOT NULL THEN
-    IF p_user_right >= 'write'::public.user_min_right THEN
+    -- Legacy mapping to RBAC roles
+    IF p_user_right >= 'admin'::public.user_min_right THEN
       RETURN 'app_admin';
+    ELSIF p_user_right = 'write'::public.user_min_right THEN
+      RETURN 'app_developer';
+    ELSIF p_user_right = 'upload'::public.user_min_right THEN
+      RETURN 'app_uploader';
+    ELSIF p_user_right = 'read'::public.user_min_right THEN
+      RETURN 'app_read';
     END IF;
     RETURN NULL;
   ELSE
-    IF p_user_right >= 'admin'::public.user_min_right THEN
+    IF p_user_right >= 'super_admin'::public.user_min_right THEN
+      RETURN 'org_super_admin';
+    ELSIF p_user_right >= 'admin'::public.user_min_right THEN
       RETURN 'org_admin';
-    ELSIF p_user_right = 'read'::public.user_min_right THEN
-      RETURN 'org_billing_admin';
+    -- No mapping for 'read' at org level (org_billing_admin not auto-assigned)
     END IF;
     RETURN NULL;
   END IF;
