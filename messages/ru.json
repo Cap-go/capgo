@@ -846,6 +846,7 @@
   "platform": "Платформа",
   "platform-android": "Андроид",
   "platform-ios": "iOS",
+  "public-key-prefix": "Открытый ключ (первые 4 символа)",
   "please-ask-the-user-to-create-account-first": "Пожалуйста, попросите пользователя сначала создать аккаунт.",
   "please-choose-your-p": "Пожалуйста, выберите ваши предпочтения",
   "please-confirm-org-del": "Пожалуйста, подтвердите, что вы хотите удалить организацию \"%1\", введя ее название",

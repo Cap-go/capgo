@@ -846,6 +846,7 @@
   "platform": "プラットフォーム",
   "platform-android": "アンドロイド",
   "platform-ios": "iOS",
+  "public-key-prefix": "公開鍵（最初の4文字）",
   "please-ask-the-user-to-create-account-first": "ユーザーにまずアカウントを作成するようにお願いしてください。",
   "please-choose-your-p": "あなたの好みを選んでください",
   "please-confirm-org-del": "「%1」の組織を削除することを確認してください。その名前を入力してください。",

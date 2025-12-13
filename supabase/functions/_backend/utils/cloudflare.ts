@@ -207,6 +207,7 @@ export async function trackDevicesCF(c: Context, device: DeviceWithoutCreatedAt)
         comparableDevice.custom_id ?? '',
         comparableDevice.version_build ?? '',
         comparableDevice.default_channel ?? '',
+        comparableDevice.key_id ?? '',
       ],
       doubles: [
         platformValue,
@@ -500,6 +501,7 @@ interface DeviceInfoCF {
   custom_id: string
   version_build: string
   default_channel: string
+  key_id: string
   platform: number // 0 = android, 1 = ios
   is_prod: number // 0 or 1
   is_emulator: number // 0 or 1
@@ -509,7 +511,7 @@ interface DeviceInfoCF {
 export async function readDevicesCF(c: Context, params: ReadDevicesParams, customIdMode: boolean): Promise<DeviceRes[]> {
   // Use Analytics Engine DEVICE_INFO for reading devices
   // Schema: blob1=device_id, blob2=version_name, blob3=plugin_version, blob4=os_version,
-  //         blob5=custom_id, blob6=version_build, blob7=default_channel
+  //         blob5=custom_id, blob6=version_build, blob7=default_channel, blob8=key_id
   //         double1=platform (0=android, 1=ios), double2=is_prod, double3=is_emulator
   //         index1=app_id, timestamp=updated_at
 
@@ -566,6 +568,7 @@ export async function readDevicesCF(c: Context, params: ReadDevicesParams, custo
   argMax(blob5, timestamp) AS custom_id,
   argMax(blob6, timestamp) AS version_build,
   argMax(blob7, timestamp) AS default_channel,
+  argMax(blob8, timestamp) AS key_id,
   argMax(double1, timestamp) AS platform,
   argMax(double2, timestamp) AS is_prod,
   argMax(double3, timestamp) AS is_emulator,
@@ -597,6 +600,7 @@ LIMIT ${limit + 1}`
       updated_at: row.updated_at,
       default_channel: row.default_channel || null,
       created_at: null, // Not stored in Analytics Engine
+      key_id: row.key_id || null,
     })) as DeviceRes[]
 
     return results

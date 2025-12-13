@@ -845,6 +845,7 @@
   "platform": "플랫폼",
   "platform-android": "안드로이드",
   "platform-ios": "iOS",
+  "public-key-prefix": "공개 키 (처음 4자)",
   "please-ask-the-user-to-create-account-first": "사용자에게 먼저 계정을 생성하도록 요청해 주세요.",
   "please-choose-your-p": "당신의 선호 사항을 선택해 주세요.",
   "please-confirm-org-del": "\"%1\" org를 삭제하려는 것을 확인하려면 이름을 입력해 주세요.",

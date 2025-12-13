@@ -846,6 +846,7 @@
   "platform": "Nền tảng",
   "platform-android": "Android",
   "platform-ios": "iOS",
+  "public-key-prefix": "Khóa công khai (4 ký tự đầu tiên)",
   "please-ask-the-user-to-create-account-first": "Vui lòng yêu cầu người dùng tạo tài khoản trước tiên",
   "please-choose-your-p": "Vui lòng chọn sở thích của bạn",
   "please-confirm-org-del": "Vui lòng xác nhận rằng bạn muốn xóa tổ chức \"%1\" bằng cách gõ tên của nó",

@@ -422,6 +422,9 @@ async function copyCurlCommand() {
             <InfoRow v-if="minVersion(device.plugin_version) && device.is_prod" :label="t('is-production-app')">
               {{ device.is_prod?.toString() }}
             </InfoRow>
+            <InfoRow v-if="device.key_id" :label="t('public-key-prefix')">
+              {{ device.key_id }}
+            </InfoRow>
             <InfoRow v-if="device.default_channel" :label="t('default-channel')">
               <div class="flex items-center gap-2">
                 <span class="font-medium text-gray-900 dark:text-white">

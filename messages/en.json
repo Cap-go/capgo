@@ -898,6 +898,7 @@
   "platform": "Platform",
   "platform-android": "Android",
   "platform-ios": "iOS",
+  "public-key-prefix": "Public key (first 4 chars)",
   "please-ask-the-user-to-create-account-first": "Please ask the user to create account first",
   "please-choose-your-p": "Please choose your preferences",
   "please-confirm-org-del": "Please confirm that you want to delete \"%1\" org by typing it's name",

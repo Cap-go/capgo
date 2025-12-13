@@ -846,6 +846,7 @@
   "platform": "Platform",
   "platform-android": "Android",
   "platform-ios": "iOS",
+  "public-key-prefix": "Kunci publik (4 karakter pertama)",
   "please-ask-the-user-to-create-account-first": "Harap minta pengguna untuk membuat akun terlebih dahulu",
   "please-choose-your-p": "Silakan pilih preferensi Anda",
   "please-confirm-org-del": "Harap konfirmasi bahwa Anda ingin menghapus org \"%1\" dengan mengetik namanya",

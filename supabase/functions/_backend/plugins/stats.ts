@@ -48,6 +48,7 @@ export const jsonRequestSchema = z.object({
   plugin_version: z.optional(z.string()),
   is_emulator: z.boolean(),
   is_prod: z.boolean(),
+  key_id: z.optional(z.string().check(z.maxLength(4))),
 })
 
 async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient> | ReturnType<typeof getDrizzleClientD1Session>, isV2: boolean, body: AppStats) {

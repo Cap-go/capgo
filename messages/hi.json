@@ -846,6 +846,7 @@
   "platform": "मंच",
   "platform-android": "एंड्रॉयड",
   "platform-ios": "आईओएस",
+  "public-key-prefix": "सार्वजनिक कुंजी (पहले 4 वर्ण)",
   "please-ask-the-user-to-create-account-first": "कृपया उपयोगकर्ता से पहले खाता बनाने के लिए कहें।",
   "please-choose-your-p": "कृपया अपनी प्राथमिकताएं चुनें",
   "please-confirm-org-del": "कृपया पुष्टि करें कि आप \"%1\" संगठन को हटाना चाहते हैं, उसका नाम लिखकर।",

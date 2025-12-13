@@ -52,6 +52,7 @@ const jsonRequestSchema = z.object({
   }).check(z.refine((version: string) => canParse(version), {
     message: INVALID_STRING_PLUGIN_VERSION,
   })),
+  key_id: z.optional(z.string().check(z.maxLength(4))),
 })
 
 export const app = new Hono<MiddlewareKeyVariables>()

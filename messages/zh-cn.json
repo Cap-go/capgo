@@ -845,6 +845,7 @@
   "platform": "平台",
   "platform-android": "安卓",
   "platform-ios": "iOS",
+  "public-key-prefix": "公钥（前4个字符）",
   "please-ask-the-user-to-create-account-first": "请先要求用户创建帐户",
   "please-choose-your-p": "请选择您的喜好",
   "please-confirm-org-del": "请输入\"%1\"组织的名称来确认您要删除该组织",
