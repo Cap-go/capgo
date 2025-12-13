@@ -33,6 +33,7 @@ const globalStatsTrendData = ref<Array<{
   trial: number
   not_paying: number
   updates: number
+  updates_external: number
   success_rate: number
   bundle_storage_gb: number
   plan_solo: number
@@ -40,6 +41,7 @@ const globalStatsTrendData = ref<Array<{
   plan_team: number
   plan_payg: number
   registers_today: number
+  devices_last_month: number
 }>>([])
 
 const isLoadingGlobalStatsTrend = ref(false)
@@ -93,6 +95,38 @@ const successRateTrendSeries = computed(() => {
   ]
 })
 
+const externalUpdatesSeries = computed(() => {
+  if (globalStatsTrendData.value.length === 0)
+    return []
+
+  return [
+    {
+      label: 'Open Source Updates',
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.updates_external,
+      })),
+      color: '#8b5cf6', // purple
+    },
+  ]
+})
+
+const devicesTrendSeries = computed(() => {
+  if (globalStatsTrendData.value.length === 0)
+    return []
+
+  return [
+    {
+      label: 'Active Devices',
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.devices_last_month,
+      })),
+      color: '#06b6d4', // cyan
+    },
+  ]
+})
+
 const latestGlobalStats = computed(() => {
   if (globalStatsTrendData.value.length === 0)
     return null
@@ -102,6 +136,11 @@ const latestGlobalStats = computed(() => {
 watch(() => adminStore.activeDateRange, () => {
   loadGlobalStatsTrend()
 }, { deep: true })
+
+// Watch for refresh button clicks
+watch(() => adminStore.refreshTrigger, () => {
+  loadGlobalStatsTrend()
+})
 
 onMounted(async () => {
   if (!mainStore.isAdmin) {
@@ -182,7 +221,7 @@ displayStore.defaultBack = '/dashboard'
           </div>
 
           <!-- Charts - 2 per row -->
-          <div class="grid grid-cols-1 gap-6 xl:grid-cols-2">
+          <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <!-- Updates Trend -->
             <ChartCard
               :title="t('updates-trend')"
@@ -195,6 +234,21 @@ displayStore.defaultBack = '/dashboard'
               />
             </ChartCard>
 
+            <!-- External/Open Source Updates -->
+            <ChartCard
+              :title="t('open-source-updates')"
+              :is-loading="isLoadingGlobalStatsTrend"
+              :has-data="externalUpdatesSeries.length > 0"
+            >
+              <AdminMultiLineChart
+                :series="externalUpdatesSeries"
+                :is-loading="isLoadingGlobalStatsTrend"
+              />
+            </ChartCard>
+          </div>
+
+          <!-- More Charts - 2 per row -->
+          <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <!-- Success Rate Trend -->
             <ChartCard
               :title="t('success-rate-trend')"
@@ -203,6 +257,18 @@ displayStore.defaultBack = '/dashboard'
             >
               <AdminMultiLineChart
                 :series="successRateTrendSeries"
+                :is-loading="isLoadingGlobalStatsTrend"
+              />
+            </ChartCard>
+
+            <!-- Devices Trend -->
+            <ChartCard
+              :title="t('devices-trend')"
+              :is-loading="isLoadingGlobalStatsTrend"
+              :has-data="devicesTrendSeries.length > 0"
+            >
+              <AdminMultiLineChart
+                :series="devicesTrendSeries"
                 :is-loading="isLoadingGlobalStatsTrend"
               />
             </ChartCard>

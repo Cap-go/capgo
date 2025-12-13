@@ -77,30 +77,6 @@ const successRateTrendSeries = computed(() => {
   ]
 })
 
-const updatesAndSuccessSeries = computed(() => {
-  if (globalStatsTrendData.value.length === 0)
-    return []
-
-  return [
-    {
-      label: 'Daily Updates',
-      data: globalStatsTrendData.value.map(item => ({
-        date: item.date,
-        value: item.updates,
-      })),
-      color: '#f59e0b', // amber
-    },
-    {
-      label: 'Success Rate (%)',
-      data: globalStatsTrendData.value.map(item => ({
-        date: item.date,
-        value: item.success_rate,
-      })),
-      color: '#10b981', // green
-    },
-  ]
-})
-
 const latestGlobalStats = computed(() => {
   if (globalStatsTrendData.value.length === 0)
     return null
@@ -110,6 +86,11 @@ const latestGlobalStats = computed(() => {
 watch(() => adminStore.activeDateRange, () => {
   loadGlobalStatsTrend()
 }, { deep: true })
+
+// Watch for refresh button clicks
+watch(() => adminStore.refreshTrigger, () => {
+  loadGlobalStatsTrend()
+})
 
 onMounted(async () => {
   if (!mainStore.isAdmin) {
@@ -189,8 +170,8 @@ displayStore.defaultBack = '/dashboard'
             </div>
           </div>
 
-          <!-- Charts - 2 per row -->
-          <div class="grid grid-cols-1 gap-6 xl:grid-cols-2">
+          <!-- Success Rate Chart - Full Width -->
+          <div class="grid grid-cols-1 gap-6">
             <!-- Success Rate Trend -->
             <ChartCard
               :title="t('success-rate-trend')"
@@ -199,18 +180,6 @@ displayStore.defaultBack = '/dashboard'
             >
               <AdminMultiLineChart
                 :series="successRateTrendSeries"
-                :is-loading="isLoadingGlobalStatsTrend"
-              />
-            </ChartCard>
-
-            <!-- Updates & Success Combined -->
-            <ChartCard
-              :title="t('updates-and-success')"
-              :is-loading="isLoadingGlobalStatsTrend"
-              :has-data="updatesAndSuccessSeries.length > 0"
-            >
-              <AdminMultiLineChart
-                :series="updatesAndSuccessSeries"
                 :is-loading="isLoadingGlobalStatsTrend"
               />
             </ChartCard>

@@ -31,21 +31,9 @@ interface GlobalStats {
   bundle_storage_gb: PromiseLike<number>
 }
 
-interface DayBounds {
-  dateId: string
-  startIso: string
-  endIso: string
-}
-
-function getUtcDayBounds(reference = new Date()): DayBounds {
-  const start = new Date(Date.UTC(reference.getUTCFullYear(), reference.getUTCMonth(), reference.getUTCDate()))
-  const end = new Date(start)
-  end.setUTCDate(end.getUTCDate() + 1)
-  return {
-    dateId: start.toISOString().slice(0, 10),
-    startIso: start.toISOString(),
-    endIso: end.toISOString(),
-  }
+function getTodayDateId(): string {
+  const today = new Date()
+  return new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate())).toISOString().slice(0, 10)
 }
 
 async function getGithubStars(): Promise<number> {
@@ -68,7 +56,7 @@ async function getGithubStars(): Promise<number> {
   }
 }
 
-function getStats(c: Context, dayBounds: DayBounds): GlobalStats {
+function getStats(c: Context): GlobalStats {
   const supabase = supabaseAdmin(c)
   return {
     apps: countAllApps(c),
@@ -128,8 +116,7 @@ function getStats(c: Context, dayBounds: DayBounds): GlobalStats {
     registers_today: supabase
       .from('users')
       .select('id', { count: 'exact', head: true })
-      .gte('created_at', dayBounds.startIso)
-      .lt('created_at', dayBounds.endIso)
+      .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
       .then((res) => {
         if (res.error)
           cloudlog({ requestId: c.get('requestId'), message: 'registers_today error', error: res.error })
@@ -152,8 +139,7 @@ function getStats(c: Context, dayBounds: DayBounds): GlobalStats {
 export const app = new Hono<MiddlewareKeyVariables>()
 
 app.post('/', middlewareAPISecret, async (c) => {
-  const dayBounds = getUtcDayBounds()
-  const res = getStats(c, dayBounds)
+  const res = getStats(c)
   const [
     apps,
     updates,
@@ -209,7 +195,7 @@ app.post('/', middlewareAPISecret, async (c) => {
   })
   // cloudlog(c.get('requestId'), 'app', app.app_id, downloads, versions, shared, channels)
   // create var date_id with yearn-month-day
-  const date_id = dayBounds.dateId
+  const date_id = getTodayDateId()
   const newData: Database['public']['Tables']['global_stats']['Insert'] = {
     date_id,
     apps,

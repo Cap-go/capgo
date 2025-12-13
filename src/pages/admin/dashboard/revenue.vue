@@ -42,6 +42,17 @@ const globalStatsTrendData = ref<Array<{
   plan_payg: number
   registers_today: number
   devices_last_month: number
+  stars: number
+  need_upgrade: number
+  paying_yearly: number
+  paying_monthly: number
+  new_paying_orgs: number
+  canceled_orgs: number
+  mrrr: number
+  total_revenue: number
+  revenue_solo: number
+  revenue_maker: number
+  revenue_team: number
 }>>([])
 
 const isLoadingGlobalStatsTrend = ref(false)
@@ -50,11 +61,11 @@ async function loadGlobalStatsTrend() {
   isLoadingGlobalStatsTrend.value = true
   try {
     const data = await adminStore.fetchStats('global_stats_trend')
-    console.log('[Admin Dashboard Users] Global stats trend data:', data)
+    console.log('[Admin Dashboard Revenue] Global stats trend data:', data)
     globalStatsTrendData.value = data || []
   }
   catch (error) {
-    console.error('[Admin Dashboard Users] Error loading global stats trend:', error)
+    console.error('[Admin Dashboard Revenue] Error loading global stats trend:', error)
     globalStatsTrendData.value = []
   }
   finally {
@@ -62,114 +73,131 @@ async function loadGlobalStatsTrend() {
   }
 }
 
-// Computed properties for multi-line charts
-const usersTrendSeries = computed(() => {
+// Computed properties for charts
+const subscriptionTypeSeries = computed(() => {
   if (globalStatsTrendData.value.length === 0)
     return []
 
   return [
     {
-      label: 'Paying Organizations',
+      label: 'Yearly Subscriptions',
       data: globalStatsTrendData.value.map(item => ({
         date: item.date,
-        value: item.paying,
+        value: item.paying_yearly || 0,
       })),
       color: '#10b981', // green
     },
     {
-      label: 'Trial Organizations',
+      label: 'Monthly Subscriptions',
       data: globalStatsTrendData.value.map(item => ({
         date: item.date,
-        value: item.trial,
-      })),
-      color: '#f59e0b', // amber
-    },
-  ]
-})
-
-const registrationsTrendSeries = computed(() => {
-  if (globalStatsTrendData.value.length === 0)
-    return []
-
-  return [
-    {
-      label: 'Daily Registrations',
-      data: globalStatsTrendData.value.map(item => ({
-        date: item.date,
-        value: item.registers_today,
+        value: item.paying_monthly || 0,
       })),
       color: '#3b82f6', // blue
     },
   ]
 })
 
-const planDistributionData = computed(() => {
-  if (globalStatsTrendData.value.length === 0)
-    return []
-
-  const latest = globalStatsTrendData.value[globalStatsTrendData.value.length - 1]
-  const total = latest.plan_solo + latest.plan_maker + latest.plan_team + latest.plan_payg
-
-  return [
-    {
-      label: 'Solo',
-      value: latest.plan_solo,
-      percentage: total > 0 ? ((latest.plan_solo / total) * 100).toFixed(1) : '0',
-    },
-    {
-      label: 'Maker',
-      value: latest.plan_maker,
-      percentage: total > 0 ? ((latest.plan_maker / total) * 100).toFixed(1) : '0',
-    },
-    {
-      label: 'Team',
-      value: latest.plan_team,
-      percentage: total > 0 ? ((latest.plan_team / total) * 100).toFixed(1) : '0',
-    },
-    {
-      label: 'Pay-as-you-go',
-      value: latest.plan_payg,
-      percentage: total > 0 ? ((latest.plan_payg / total) * 100).toFixed(1) : '0',
-    },
-  ]
-})
-
-const planDistributionTrendSeries = computed(() => {
+const subscriptionFlowSeries = computed(() => {
   if (globalStatsTrendData.value.length === 0)
     return []
 
   return [
     {
-      label: 'Solo',
+      label: 'New Subscriptions',
       data: globalStatsTrendData.value.map(item => ({
         date: item.date,
-        value: item.plan_solo,
-      })),
-      color: '#8b5cf6', // purple
-    },
-    {
-      label: 'Maker',
-      data: globalStatsTrendData.value.map(item => ({
-        date: item.date,
-        value: item.plan_maker,
-      })),
-      color: '#ec4899', // pink
-    },
-    {
-      label: 'Team',
-      data: globalStatsTrendData.value.map(item => ({
-        date: item.date,
-        value: item.plan_team,
+        value: item.new_paying_orgs || 0,
       })),
       color: '#10b981', // green
     },
     {
-      label: 'Pay-as-you-go',
+      label: 'Cancellations',
       data: globalStatsTrendData.value.map(item => ({
         date: item.date,
-        value: item.plan_payg,
+        value: item.canceled_orgs || 0,
       })),
-      color: '#f59e0b', // amber
+      color: '#ef4444', // red
+    },
+  ]
+})
+
+const mrrSeries = computed(() => {
+  if (globalStatsTrendData.value.length === 0)
+    return []
+
+  return [
+    {
+      label: 'MRR - Monthly Recurring Revenue ($)',
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.mrrr || 0,
+      })),
+      color: '#3b82f6', // blue
+    },
+  ]
+})
+
+const arrSeries = computed(() => {
+  if (globalStatsTrendData.value.length === 0)
+    return []
+
+  return [
+    {
+      label: 'ARR - Annual Recurring Revenue ($)',
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.total_revenue || 0,
+      })),
+      color: '#10b981', // green
+    },
+  ]
+})
+
+const planARRSeries = computed(() => {
+  if (globalStatsTrendData.value.length === 0)
+    return []
+
+  return [
+    {
+      label: 'Solo Plan ARR ($)',
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.revenue_solo || 0,
+      })),
+      color: '#8b5cf6', // purple
+    },
+    {
+      label: 'Maker Plan ARR ($)',
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.revenue_maker || 0,
+      })),
+      color: '#ec4899', // pink
+    },
+    {
+      label: 'Team Plan ARR ($)',
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.revenue_team || 0,
+      })),
+      color: '#10b981', // green
+    },
+  ]
+})
+
+const totalPayingOrgsSeries = computed(() => {
+  if (globalStatsTrendData.value.length === 0)
+    return []
+
+  return [
+    {
+      label: 'Total Paying Organizations',
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.paying,
+      })),
+      color: '#10b981', // green
     },
   ]
 })
@@ -200,10 +228,10 @@ onMounted(async () => {
   await loadGlobalStatsTrend()
   isLoading.value = false
 
-  displayStore.NavTitle = t('users-and-revenue')
+  displayStore.NavTitle = t('revenue')
 })
 
-displayStore.NavTitle = t('users-and-revenue')
+displayStore.NavTitle = t('revenue')
 displayStore.defaultBack = '/dashboard'
 </script>
 
@@ -218,9 +246,9 @@ displayStore.defaultBack = '/dashboard'
         </div>
 
         <div v-else class="space-y-6">
-          <!-- Organization Metrics Cards -->
-          <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
-            <!-- Paying Organizations -->
+          <!-- Revenue Metrics Cards -->
+          <div class="grid grid-cols-1 gap-6 md:grid-cols-3">
+            <!-- Total Paying Organizations -->
             <div class="flex flex-col justify-between p-6 bg-white border rounded-lg shadow-lg border-slate-300 dark:bg-gray-800 dark:border-slate-900">
               <div class="flex items-start justify-between mb-4">
                 <div class="p-3 rounded-lg bg-success/10">
@@ -229,7 +257,7 @@ displayStore.defaultBack = '/dashboard'
               </div>
               <div>
                 <p class="text-sm text-slate-600 dark:text-slate-400">
-                  Paying Organizations
+                  Total Paying
                 </p>
                 <p v-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-success">
                   {{ latestGlobalStats.paying.toLocaleString() }}
@@ -243,89 +271,129 @@ displayStore.defaultBack = '/dashboard'
               </div>
             </div>
 
-            <!-- Trial Organizations -->
+            <!-- Yearly Subscriptions -->
             <div class="flex flex-col justify-between p-6 bg-white border rounded-lg shadow-lg border-slate-300 dark:bg-gray-800 dark:border-slate-900">
               <div class="flex items-start justify-between mb-4">
-                <div class="p-3 rounded-lg bg-warning/10">
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="w-6 h-6 stroke-current text-warning"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                <div class="p-3 rounded-lg bg-primary/10">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="w-6 h-6 stroke-current text-primary"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                 </div>
               </div>
               <div>
                 <p class="text-sm text-slate-600 dark:text-slate-400">
-                  Trial Organizations
+                  Yearly Subscriptions
                 </p>
-                <p v-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-warning">
-                  {{ latestGlobalStats.trial.toLocaleString() }}
+                <p v-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-primary">
+                  {{ (latestGlobalStats.paying_yearly || 0).toLocaleString() }}
                 </p>
-                <p v-else class="mt-2 text-3xl font-bold text-warning">
+                <p v-else class="mt-2 text-3xl font-bold text-primary">
                   0
                 </p>
                 <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                  Organizations in trial period
+                  Organizations on yearly plans
                 </p>
               </div>
             </div>
-          </div>
 
-          <!-- Plan Distribution - Full Width -->
-          <div class="grid grid-cols-1 gap-6">
-            <!-- Current Distribution -->
-            <div class="p-6 bg-white border rounded-lg shadow-lg border-slate-300 dark:bg-gray-800 dark:border-slate-900">
-              <h3 class="mb-4 text-lg font-semibold">
-                {{ t('plan-distribution') }}
-              </h3>
-              <div v-if="isLoadingGlobalStatsTrend" class="flex items-center justify-center h-32">
-                <span class="loading loading-spinner loading-lg" />
-              </div>
-              <div v-else-if="planDistributionData.length > 0" class="grid grid-cols-2 gap-4 md:grid-cols-4">
-                <div v-for="plan in planDistributionData" :key="plan.label" class="flex flex-col items-center p-4 bg-gray-100 rounded-lg dark:bg-gray-700">
-                  <span class="text-sm font-medium text-gray-600 dark:text-gray-400">{{ plan.label }}</span>
-                  <span class="mt-2 text-2xl font-bold">{{ plan.value.toLocaleString() }}</span>
-                  <span class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ plan.percentage }}%</span>
+            <!-- Monthly Subscriptions -->
+            <div class="flex flex-col justify-between p-6 bg-white border rounded-lg shadow-lg border-slate-300 dark:bg-gray-800 dark:border-slate-900">
+              <div class="flex items-start justify-between mb-4">
+                <div class="p-3 rounded-lg bg-info/10">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="w-6 h-6 stroke-current text-info"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                 </div>
               </div>
-              <div v-else class="flex items-center justify-center h-32 text-slate-400">
-                No data available
+              <div>
+                <p class="text-sm text-slate-600 dark:text-slate-400">
+                  Monthly Subscriptions
+                </p>
+                <p v-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-info">
+                  {{ (latestGlobalStats.paying_monthly || 0).toLocaleString() }}
+                </p>
+                <p v-else class="mt-2 text-3xl font-bold text-info">
+                  0
+                </p>
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  Organizations on monthly plans
+                </p>
               </div>
             </div>
-          </div>
-
-          <!-- Plan Distribution Trend Chart -->
-          <div class="grid grid-cols-1 gap-6">
-            <ChartCard
-              :title="t('plan-distribution-trend')"
-              :is-loading="isLoadingGlobalStatsTrend"
-              :has-data="planDistributionTrendSeries.length > 0"
-            >
-              <AdminMultiLineChart
-                :series="planDistributionTrendSeries"
-                :is-loading="isLoadingGlobalStatsTrend"
-              />
-            </ChartCard>
           </div>
 
           <!-- Charts - 2 per row -->
           <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <!-- Users Trend -->
+            <!-- Subscription Flow (New vs Canceled) -->
             <ChartCard
-              :title="t('users-trend')"
+              :title="t('subscription-flow')"
               :is-loading="isLoadingGlobalStatsTrend"
-              :has-data="usersTrendSeries.length > 0"
+              :has-data="subscriptionFlowSeries.length > 0"
             >
               <AdminMultiLineChart
-                :series="usersTrendSeries"
+                :series="subscriptionFlowSeries"
                 :is-loading="isLoadingGlobalStatsTrend"
               />
             </ChartCard>
 
-            <!-- Daily Registrations -->
+            <!-- Subscription Type (Yearly vs Monthly) -->
             <ChartCard
-              :title="t('daily-registrations')"
+              :title="t('subscription-type-trend')"
               :is-loading="isLoadingGlobalStatsTrend"
-              :has-data="registrationsTrendSeries.length > 0"
+              :has-data="subscriptionTypeSeries.length > 0"
             >
               <AdminMultiLineChart
-                :series="registrationsTrendSeries"
+                :series="subscriptionTypeSeries"
+                :is-loading="isLoadingGlobalStatsTrend"
+              />
+            </ChartCard>
+          </div>
+
+          <!-- Revenue Charts - Full Width -->
+          <div class="grid grid-cols-1 gap-6">
+            <!-- MRR - Monthly Recurring Revenue -->
+            <ChartCard
+              title="MRR - Monthly Recurring Revenue"
+              :is-loading="isLoadingGlobalStatsTrend"
+              :has-data="mrrSeries.length > 0"
+            >
+              <AdminMultiLineChart
+                :series="mrrSeries"
+                :is-loading="isLoadingGlobalStatsTrend"
+              />
+            </ChartCard>
+
+            <!-- ARR - Annual Recurring Revenue -->
+            <ChartCard
+              title="ARR - Annual Recurring Revenue Projection"
+              :is-loading="isLoadingGlobalStatsTrend"
+              :has-data="arrSeries.length > 0"
+            >
+              <AdminMultiLineChart
+                :series="arrSeries"
+                :is-loading="isLoadingGlobalStatsTrend"
+              />
+            </ChartCard>
+
+            <!-- ARR by Plan (3 lines) -->
+            <ChartCard
+              title="ARR by Plan"
+              :is-loading="isLoadingGlobalStatsTrend"
+              :has-data="planARRSeries.length > 0"
+            >
+              <AdminMultiLineChart
+                :series="planARRSeries"
+                :is-loading="isLoadingGlobalStatsTrend"
+              />
+            </ChartCard>
+          </div>
+
+          <!-- Additional Charts - 2 per row -->
+          <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <!-- Total Paying Organizations Trend -->
+            <ChartCard
+              :title="t('paying-orgs-trend')"
+              :is-loading="isLoadingGlobalStatsTrend"
+              :has-data="totalPayingOrgsSeries.length > 0"
+            >
+              <AdminMultiLineChart
+                :series="totalPayingOrgsSeries"
                 :is-loading="isLoadingGlobalStatsTrend"
               />
             </ChartCard>

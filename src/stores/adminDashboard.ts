@@ -3,7 +3,7 @@ import { computed, ref } from 'vue'
 import { defaultApiHost, useSupabase } from '~/services/supabase'
 
 export type MetricCategory = 'uploads' | 'distribution' | 'failures' | 'success_rate' | 'platform_overview' | 'org_metrics' | 'mau_trend' | 'success_rate_trend' | 'apps_trend' | 'bundles_trend' | 'deployments_trend' | 'storage_trend' | 'bandwidth_trend' | 'global_stats_trend'
-export type DateRangeMode = '30day' | '90day' | 'custom'
+export type DateRangeMode = '30day' | '90day' | 'quarter' | '6month' | '12month' | 'custom'
 
 interface DateRange {
   start: Date
@@ -43,6 +43,9 @@ export const useAdminDashboardStore = defineStore('adminDashboard', () => {
   const isLoading = ref(false)
   const loadingCategory = ref<MetricCategory | null>(null)
 
+  // Refresh trigger - increment this to force all watchers to refetch
+  const refreshTrigger = ref(0)
+
   // Computed date range based on mode
   const activeDateRange = computed<DateRange>(() => {
     const now = new Date()
@@ -55,6 +58,21 @@ export const useAdminDashboardStore = defineStore('adminDashboard', () => {
       case '90day':
         return {
           start: new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000),
+          end: now,
+        }
+      case 'quarter':
+        return {
+          start: new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000),
+          end: now,
+        }
+      case '6month':
+        return {
+          start: new Date(now.getTime() - 180 * 24 * 60 * 60 * 1000),
+          end: now,
+        }
+      case '12month':
+        return {
+          start: new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000),
           end: now,
         }
       case 'custom':
@@ -184,6 +202,7 @@ export const useAdminDashboardStore = defineStore('adminDashboard', () => {
 
   function invalidateCache() {
     cache.value.clear()
+    refreshTrigger.value++
   }
 
   // Invalidate cache when filters change
@@ -197,6 +216,7 @@ export const useAdminDashboardStore = defineStore('adminDashboard', () => {
   return {
     // State
     selectedOrgId,
+    refreshTrigger,
     selectedAppId,
     dateRangeMode,
     customDateRange,

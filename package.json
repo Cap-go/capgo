@@ -252,7 +252,7 @@
     "vite-plugin-webfont-dl": "^3.11.1",
     "vitest": "^4.0.8",
     "vue-tsc": "3.1.5",
-    "wrangler": "^4.50.0"
+    "wrangler": "^4.54.0"
   },
   "husky": {
     "hooks": {

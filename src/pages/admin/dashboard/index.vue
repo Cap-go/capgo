@@ -33,6 +33,7 @@ const globalStatsTrendData = ref<Array<{
   trial: number
   not_paying: number
   updates: number
+  updates_external: number
   success_rate: number
   bundle_storage_gb: number
   plan_solo: number
@@ -40,6 +41,9 @@ const globalStatsTrendData = ref<Array<{
   plan_team: number
   plan_payg: number
   registers_today: number
+  devices_last_month: number
+  stars: number
+  need_upgrade: number
 }>>([])
 
 const isLoadingGlobalStatsTrend = ref(false)
@@ -109,30 +113,6 @@ const totalUsersTrendSeries = computed(() => {
   ]
 })
 
-const registrationsAndUpdatesSeries = computed(() => {
-  if (globalStatsTrendData.value.length === 0)
-    return []
-
-  return [
-    {
-      label: 'Daily Registrations',
-      data: globalStatsTrendData.value.map(item => ({
-        date: item.date,
-        value: item.registers_today,
-      })),
-      color: '#3b82f6', // blue
-    },
-    {
-      label: 'Daily Updates',
-      data: globalStatsTrendData.value.map(item => ({
-        date: item.date,
-        value: item.updates,
-      })),
-      color: '#f59e0b', // amber
-    },
-  ]
-})
-
 const bundleStorageTrendSeries = computed(() => {
   if (globalStatsTrendData.value.length === 0)
     return []
@@ -149,6 +129,38 @@ const bundleStorageTrendSeries = computed(() => {
   ]
 })
 
+const githubStarsTrendSeries = computed(() => {
+  if (globalStatsTrendData.value.length === 0)
+    return []
+
+  return [
+    {
+      label: 'GitHub Stars',
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.stars,
+      })),
+      color: '#eab308', // yellow
+    },
+  ]
+})
+
+const needUpgradeTrendSeries = computed(() => {
+  if (globalStatsTrendData.value.length === 0)
+    return []
+
+  return [
+    {
+      label: 'Organizations Needing Upgrade',
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.need_upgrade,
+      })),
+      color: '#ef4444', // red
+    },
+  ]
+})
+
 // Latest metrics from global stats
 const latestGlobalStats = computed(() => {
   if (globalStatsTrendData.value.length === 0)
@@ -160,6 +172,11 @@ const latestGlobalStats = computed(() => {
 watch(() => adminStore.activeDateRange, () => {
   loadGlobalStatsTrend()
 }, { deep: true })
+
+// Watch for refresh button clicks
+watch(() => adminStore.refreshTrigger, () => {
+  loadGlobalStatsTrend()
+})
 
 onMounted(async () => {
   // Verify admin access
@@ -328,20 +345,8 @@ displayStore.defaultBack = '/dashboard'
             </ChartCard>
           </div>
 
-          <!-- Registrations & Updates - 2 per row -->
-          <div class="grid grid-cols-1 gap-6 xl:grid-cols-2">
-            <!-- Registrations + Updates -->
-            <ChartCard
-              :title="t('registrations-and-updates')"
-              :is-loading="isLoadingGlobalStatsTrend"
-              :has-data="registrationsAndUpdatesSeries.length > 0"
-            >
-              <AdminMultiLineChart
-                :series="registrationsAndUpdatesSeries"
-                :is-loading="isLoadingGlobalStatsTrend"
-              />
-            </ChartCard>
-
+          <!-- Storage Trend - Full Width -->
+          <div class="grid grid-cols-1 gap-6">
             <!-- Bundle Storage Trend -->
             <ChartCard
               :title="t('storage-trend')"
@@ -350,6 +355,33 @@ displayStore.defaultBack = '/dashboard'
             >
               <AdminMultiLineChart
                 :series="bundleStorageTrendSeries"
+                :is-loading="isLoadingGlobalStatsTrend"
+              />
+            </ChartCard>
+          </div>
+
+          <!-- GitHub & Upgrade Metrics - 2 per row -->
+          <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <!-- GitHub Stars Trend -->
+            <ChartCard
+              :title="t('github-stars-trend')"
+              :is-loading="isLoadingGlobalStatsTrend"
+              :has-data="githubStarsTrendSeries.length > 0"
+            >
+              <AdminMultiLineChart
+                :series="githubStarsTrendSeries"
+                :is-loading="isLoadingGlobalStatsTrend"
+              />
+            </ChartCard>
+
+            <!-- Need Upgrade Trend -->
+            <ChartCard
+              :title="t('need-upgrade-trend')"
+              :is-loading="isLoadingGlobalStatsTrend"
+              :has-data="needUpgradeTrendSeries.length > 0"
+            >
+              <AdminMultiLineChart
+                :series="needUpgradeTrendSeries"
                 :is-loading="isLoadingGlobalStatsTrend"
               />
             </ChartCard>

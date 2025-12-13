@@ -769,6 +769,7 @@ export interface AdminGlobalStatsTrend {
   trial: number
   not_paying: number
   updates: number
+  updates_external: number
   success_rate: number
   bundle_storage_gb: number
   plan_solo: number
@@ -776,6 +777,18 @@ export interface AdminGlobalStatsTrend {
   plan_team: number
   plan_payg: number
   registers_today: number
+  devices_last_month: number
+  stars: number
+  need_upgrade: number
+  paying_yearly: number
+  paying_monthly: number
+  new_paying_orgs: number
+  canceled_orgs: number
+  mrrr: number
+  total_revenue: number
+  revenue_solo: number
+  revenue_maker: number
+  revenue_team: number
 }
 
 export async function getAdminGlobalStatsTrend(
@@ -787,6 +800,11 @@ export async function getAdminGlobalStatsTrend(
     const pgClient = getPgClient(c, true) // Read-only query
     const drizzleClient = getDrizzleClient(pgClient)
 
+    // Extract just the date portion (YYYY-MM-DD) from ISO timestamps
+    const startDateOnly = start_date.split('T')[0]
+    const endDateOnly = end_date.split('T')[0]
+
+    // Simple query - just get global_stats data and calculate revenue separately
     const query = sql`
       SELECT
         date_id AS date,
@@ -798,39 +816,143 @@ export async function getAdminGlobalStatsTrend(
         trial::int,
         not_paying::int,
         updates::int,
+        updates_external::int,
         success_rate::float,
         bundle_storage_gb::float,
         plan_solo::int,
         plan_maker::int,
         plan_team::int,
         plan_payg::int,
-        registers_today::int
+        registers_today::int,
+        devices_last_month::int,
+        stars::int,
+        need_upgrade::int,
+        paying_yearly::int,
+        paying_monthly::int
       FROM global_stats
-      WHERE date_id >= ${start_date}
-        AND date_id < ${end_date}
+      WHERE date_id >= ${startDateOnly}
+        AND date_id < ${endDateOnly}
       ORDER BY date_id ASC
     `
 
     const result = await drizzleClient.execute(query)
 
-    const data: AdminGlobalStatsTrend[] = result.rows.map((row: any) => ({
-      date: row.date,
-      apps: Number(row.apps) || 0,
-      apps_active: Number(row.apps_active) || 0,
-      users: Number(row.users) || 0,
-      users_active: Number(row.users_active) || 0,
-      paying: Number(row.paying) || 0,
-      trial: Number(row.trial) || 0,
-      not_paying: Number(row.not_paying) || 0,
-      updates: Number(row.updates) || 0,
-      success_rate: Number(row.success_rate) || 0,
-      bundle_storage_gb: Number(row.bundle_storage_gb) || 0,
-      plan_solo: Number(row.plan_solo) || 0,
-      plan_maker: Number(row.plan_maker) || 0,
-      plan_team: Number(row.plan_team) || 0,
-      plan_payg: Number(row.plan_payg) || 0,
-      registers_today: Number(row.registers_today) || 0,
-    }))
+    // Fetch plan prices from database
+    const plansQuery = sql`
+      SELECT name, price_m, price_y, price_m_id, price_y_id
+      FROM plans
+      WHERE name IN ('Solo', 'Maker', 'Team')
+    `
+    const plansResult = await drizzleClient.execute(plansQuery)
+
+    // Build price map from database
+    const priceMap = new Map<string, { price_m: number, price_y: number, price_m_id: string, price_y_id: string }>()
+    for (const plan of plansResult.rows) {
+      const name = (plan.name as string).toLowerCase()
+      priceMap.set(name, {
+        price_m: (Number(plan.price_m) || 0) / 100, // Monthly price in dollars
+        price_y: (Number(plan.price_y) || 0) / 100, // Yearly price in dollars
+        price_m_id: plan.price_m_id as string,
+        price_y_id: plan.price_y_id as string,
+      })
+    }
+
+    // For each date, query stripe_info to get actual subscription breakdown
+    const revenueQuery = sql`
+      SELECT
+        gs.date_id,
+        p.name as plan_name,
+        COUNT(CASE WHEN si.price_id = p.price_m_id THEN 1 END)::int as monthly_count,
+        COUNT(CASE WHEN si.price_id = p.price_y_id THEN 1 END)::int as yearly_count
+      FROM global_stats gs
+      CROSS JOIN plans p
+      LEFT JOIN stripe_info si ON
+        si.status IN ('active', 'trialing')
+        AND si.product_id = p.stripe_id
+        AND si.created_at::date <= gs.date_id
+        AND (si.canceled_at IS NULL OR si.canceled_at::date > gs.date_id)
+      WHERE gs.date_id >= ${startDateOnly}
+        AND gs.date_id < ${endDateOnly}
+        AND p.name IN ('Solo', 'Maker', 'Team')
+      GROUP BY gs.date_id, p.name
+      ORDER BY gs.date_id, p.name
+    `
+    const revenueResult = await drizzleClient.execute(revenueQuery)
+
+    // Build revenue map by date
+    const revenueByDate = new Map<string, Map<string, { monthly: number, yearly: number }>>()
+    for (const row of revenueResult.rows) {
+      const date = row.date_id as string
+      const planName = (row.plan_name as string).toLowerCase()
+      const monthlyCount = Number(row.monthly_count) || 0
+      const yearlyCount = Number(row.yearly_count) || 0
+
+      if (!revenueByDate.has(date)) {
+        revenueByDate.set(date, new Map())
+      }
+      revenueByDate.get(date)!.set(planName, { monthly: monthlyCount, yearly: yearlyCount })
+    }
+
+    // Calculate revenue from actual subscription data
+    const data: AdminGlobalStatsTrend[] = result.rows.map((row: any) => {
+      const date = row.date
+      const planCounts = revenueByDate.get(date) || new Map()
+
+      // Get subscription counts by plan
+      const solo = planCounts.get('solo') || { monthly: 0, yearly: 0 }
+      const maker = planCounts.get('maker') || { monthly: 0, yearly: 0 }
+      const team = planCounts.get('team') || { monthly: 0, yearly: 0 }
+
+      // Get prices
+      const soloPrices = priceMap.get('solo') || { price_m: 0, price_y: 0, price_m_id: '', price_y_id: '' }
+      const makerPrices = priceMap.get('maker') || { price_m: 0, price_y: 0, price_m_id: '', price_y_id: '' }
+      const teamPrices = priceMap.get('team') || { price_m: 0, price_y: 0, price_m_id: '', price_y_id: '' }
+
+      // Calculate MRR (Monthly Recurring Revenue)
+      const soloMRR = (solo.monthly * soloPrices.price_m) + (solo.yearly * soloPrices.price_y / 12)
+      const makerMRR = (maker.monthly * makerPrices.price_m) + (maker.yearly * makerPrices.price_y / 12)
+      const teamMRR = (team.monthly * teamPrices.price_m) + (team.yearly * teamPrices.price_y / 12)
+      const totalMRR = soloMRR + makerMRR + teamMRR
+
+      // Calculate ARR (Annual Recurring Revenue) = MRR × 12
+      const soloARR = soloMRR * 12
+      const makerARR = makerMRR * 12
+      const teamARR = teamMRR * 12
+      const totalARR = totalMRR * 12
+
+      return {
+        date: row.date,
+        apps: Number(row.apps) || 0,
+        apps_active: Number(row.apps_active) || 0,
+        users: Number(row.users) || 0,
+        users_active: Number(row.users_active) || 0,
+        paying: Number(row.paying) || 0,
+        trial: Number(row.trial) || 0,
+        not_paying: Number(row.not_paying) || 0,
+        updates: Number(row.updates) || 0,
+        updates_external: Number(row.updates_external) || 0,
+        success_rate: Number(row.success_rate) || 0,
+        bundle_storage_gb: Number(row.bundle_storage_gb) || 0,
+        plan_solo: Number(row.plan_solo) || 0,
+        plan_maker: Number(row.plan_maker) || 0,
+        plan_team: Number(row.plan_team) || 0,
+        plan_payg: Number(row.plan_payg) || 0,
+        registers_today: Number(row.registers_today) || 0,
+        devices_last_month: Number(row.devices_last_month) || 0,
+        stars: Number(row.stars) || 0,
+        need_upgrade: Number(row.need_upgrade) || 0,
+        paying_yearly: Number(row.paying_yearly) || 0,
+        paying_monthly: Number(row.paying_monthly) || 0,
+        // Revenue metrics - MRR and ARR
+        new_paying_orgs: 0, // Would need historical stripe_info data
+        canceled_orgs: 0, // Would need historical stripe_info data
+        mrrr: totalMRR, // MRR = Monthly Recurring Revenue
+        total_revenue: totalARR, // ARR = Annual Recurring Revenue projection
+        revenue_solo: soloARR, // Solo plan ARR
+        revenue_maker: makerARR, // Maker plan ARR
+        revenue_team: teamARR, // Team plan ARR
+      }
+    })
 
     cloudlog({ requestId: c.get('requestId'), message: 'getAdminGlobalStatsTrend result', resultCount: data.length })
 
