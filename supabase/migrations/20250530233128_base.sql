@@ -516,11 +516,20 @@ CREATE OR REPLACE FUNCTION "public"."convert_number_to_percent" (
 ) RETURNS double precision LANGUAGE "plpgsql"
 SET
   search_path = '' AS $$
+DECLARE
+  percentage numeric;
 BEGIN
   IF max_val = 0 THEN
     RETURN 0;
   ELSE
-    RETURN round(((val * 100) / max_val)::numeric);
+    percentage := ((val * 100) / max_val)::numeric;
+    -- Add small epsilon for positive values to handle floating-point errors
+    -- Subtract epsilon for negative values
+    IF percentage >= 0 THEN
+      RETURN trunc(percentage + 0.0001, 0);
+    ELSE
+      RETURN trunc(percentage - 0.0001, 0);
+    END IF;
   END IF;
 END;
 $$;
