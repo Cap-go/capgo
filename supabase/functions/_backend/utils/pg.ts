@@ -857,64 +857,25 @@ export async function getAdminGlobalStatsTrend(
       })
     }
 
-    // For each date, query stripe_info to get actual subscription breakdown
-    const revenueQuery = sql`
-      SELECT
-        gs.date_id,
-        p.name as plan_name,
-        COUNT(CASE WHEN si.price_id = p.price_m_id THEN 1 END)::int as monthly_count,
-        COUNT(CASE WHEN si.price_id = p.price_y_id THEN 1 END)::int as yearly_count
-      FROM global_stats gs
-      CROSS JOIN plans p
-      LEFT JOIN stripe_info si ON
-        si.status IN ('active', 'trialing')
-        AND si.product_id = p.stripe_id
-        AND si.created_at::date <= gs.date_id
-        AND (si.canceled_at IS NULL OR si.canceled_at::date > gs.date_id)
-      WHERE gs.date_id >= ${startDateOnly}
-        AND gs.date_id < ${endDateOnly}
-        AND p.name IN ('Solo', 'Maker', 'Team')
-      GROUP BY gs.date_id, p.name
-      ORDER BY gs.date_id, p.name
-    `
-    const revenueResult = await drizzleClient.execute(revenueQuery)
-
-    // Build revenue map by date
-    const revenueByDate = new Map<string, Map<string, { monthly: number, yearly: number }>>()
-    for (const row of revenueResult.rows) {
-      const date = row.date_id as string
-      const planName = (row.plan_name as string).toLowerCase()
-      const monthlyCount = Number(row.monthly_count) || 0
-      const yearlyCount = Number(row.yearly_count) || 0
-
-      if (!revenueByDate.has(date)) {
-        revenueByDate.set(date, new Map())
-      }
-      revenueByDate.get(date)!.set(planName, { monthly: monthlyCount, yearly: yearlyCount })
-    }
-
-    // Calculate revenue from actual subscription data
+    // Simple JavaScript calculation: plan count × price
     const data: AdminGlobalStatsTrend[] = result.rows.map((row: any) => {
-      const date = row.date
-      const planCounts = revenueByDate.get(date) || new Map()
+      // Get plan counts from global_stats (already in the row)
+      const planSolo = Number(row.plan_solo) || 0
+      const planMaker = Number(row.plan_maker) || 0
+      const planTeam = Number(row.plan_team) || 0
 
-      // Get subscription counts by plan
-      const solo = planCounts.get('solo') || { monthly: 0, yearly: 0 }
-      const maker = planCounts.get('maker') || { monthly: 0, yearly: 0 }
-      const team = planCounts.get('team') || { monthly: 0, yearly: 0 }
-
-      // Get prices
+      // Get prices from database
       const soloPrices = priceMap.get('solo') || { price_m: 0, price_y: 0, price_m_id: '', price_y_id: '' }
       const makerPrices = priceMap.get('maker') || { price_m: 0, price_y: 0, price_m_id: '', price_y_id: '' }
       const teamPrices = priceMap.get('team') || { price_m: 0, price_y: 0, price_m_id: '', price_y_id: '' }
 
-      // Calculate MRR (Monthly Recurring Revenue)
-      const soloMRR = (solo.monthly * soloPrices.price_m) + (solo.yearly * soloPrices.price_y / 12)
-      const makerMRR = (maker.monthly * makerPrices.price_m) + (maker.yearly * makerPrices.price_y / 12)
-      const teamMRR = (team.monthly * teamPrices.price_m) + (team.yearly * teamPrices.price_y / 12)
+      // Calculate MRR: plan count × monthly price
+      const soloMRR = planSolo * soloPrices.price_m
+      const makerMRR = planMaker * makerPrices.price_m
+      const teamMRR = planTeam * teamPrices.price_m
       const totalMRR = soloMRR + makerMRR + teamMRR
 
-      // Calculate ARR (Annual Recurring Revenue) = MRR × 12
+      // Calculate ARR: MRR × 12
       const soloARR = soloMRR * 12
       const makerARR = makerMRR * 12
       const teamARR = teamMRR * 12
