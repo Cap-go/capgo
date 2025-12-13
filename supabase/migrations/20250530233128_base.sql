@@ -520,7 +520,7 @@ BEGIN
   IF max_val = 0 THEN
     RETURN 0;
   ELSE
-    RETURN round(((val * 100) / max_val)::numeric, 2);
+    RETURN round(((val * 100) / max_val)::numeric);
   END IF;
 END;
 $$;
