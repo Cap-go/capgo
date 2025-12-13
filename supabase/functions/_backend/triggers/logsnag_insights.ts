@@ -84,12 +84,15 @@ async function calculateRevenue(c: Context): Promise<PlanRevenue> {
     // Build price map
     const priceMap = new Map<string, { price_m: number, price_y: number, price_m_id: string, price_y_id: string }>()
     for (const plan of plansData) {
+      const price_m = Number(plan.price_m) || 0
+      const price_y = Number(plan.price_y) || 0
       priceMap.set(plan.name.toLowerCase(), {
-        price_m: (Number(plan.price_m) || 0) / 100, // Convert cents to dollars
-        price_y: (Number(plan.price_y) || 0) / 100,
+        price_m, // Already in dollars
+        price_y, // Already in dollars
         price_m_id: plan.price_m_id || '',
         price_y_id: plan.price_y_id || '',
       })
+      cloudlog({ requestId: c.get('requestId'), message: `Plan ${plan.name}: monthly=$${price_m}, yearly=$${price_y}` })
     }
 
     // Get subscription counts from stripe_info
@@ -155,6 +158,15 @@ async function calculateRevenue(c: Context): Promise<PlanRevenue> {
     const makerMRR = (maker.monthly * makerPrices.price_m) + (maker.yearly * makerPrices.price_y / 12)
     const teamMRR = (team.monthly * teamPrices.price_m) + (team.yearly * teamPrices.price_y / 12)
     const totalMRR = soloMRR + makerMRR + teamMRR
+
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'Revenue calculation',
+      solo: { monthly: solo.monthly, yearly: solo.yearly, mrr: soloMRR, prices: soloPrices },
+      maker: { monthly: maker.monthly, yearly: maker.yearly, mrr: makerMRR, prices: makerPrices },
+      team: { monthly: team.monthly, yearly: team.yearly, mrr: teamMRR, prices: teamPrices },
+      totalMRR,
+    })
 
     // ARR = MRR × 12
     const soloARR = soloMRR * 12
