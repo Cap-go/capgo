@@ -882,6 +882,7 @@ export type Database = {
           version: number | null
           version_build: string | null
           version_name: string
+          key_id: string | null
         }
         Insert: {
           app_id: string
@@ -898,6 +899,7 @@ export type Database = {
           version?: number | null
           version_build?: string | null
           version_name?: string
+          key_id?: string | null
         }
         Update: {
           app_id?: string
@@ -914,6 +916,7 @@ export type Database = {
           version?: number | null
           version_build?: string | null
           version_name?: string
+          key_id?: string | null
         }
         Relationships: []
       }
