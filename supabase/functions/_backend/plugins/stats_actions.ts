@@ -15,6 +15,7 @@ export const ALLOWED_STATS_ACTIONS = [
   'directory_path_fail',
   'unzip_fail',
   'low_mem_fail',
+  'download_0',
   'download_10',
   'download_20',
   'download_30',
