@@ -55,15 +55,15 @@ const chartData = computed<ChartData<'line'>>(() => {
 
   const labels = props.series[0].data.map(item => item.date)
 
-  const datasets = props.series.map(serie => ({
-    label: serie.label,
-    data: serie.data.map(item => item.value),
-    borderColor: serie.color,
-    backgroundColor: `${serie.color}33`, // 20% opacity
+  const datasets = props.series.map(series => ({
+    label: series.label,
+    data: series.data.map(item => item.value),
+    borderColor: series.color,
+    backgroundColor: `${series.color}33`, // 20% opacity
     fill: false,
     tension: 0.4,
     pointRadius: 3,
-    pointBackgroundColor: serie.color,
+    pointBackgroundColor: series.color,
     pointBorderWidth: 0,
     borderWidth: 2,
   }))
@@ -148,8 +148,8 @@ const chartOptions = computed<ChartOptions<'line'>>(() => ({
 </script>
 
 <template>
-  <div class="relative overflow-hidden w-full h-full">
-    <div v-if="isLoading" class="flex justify-center items-center h-full">
+  <div class="relative w-full h-full overflow-hidden">
+    <div v-if="isLoading" class="flex items-center justify-center h-full">
       <span class="loading loading-spinner loading-lg text-primary" />
     </div>
     <div v-else class="w-full h-full">
