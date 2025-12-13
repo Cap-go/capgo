@@ -36,6 +36,13 @@ ADD COLUMN plan_team_monthly integer DEFAULT 0 NOT NULL;
 ALTER TABLE public.global_stats
 ADD COLUMN plan_team_yearly integer DEFAULT 0 NOT NULL;
 
+-- Subscription flow tracking
+ALTER TABLE public.global_stats
+ADD COLUMN new_paying_orgs integer DEFAULT 0 NOT NULL;
+
+ALTER TABLE public.global_stats
+ADD COLUMN canceled_orgs integer DEFAULT 0 NOT NULL;
+
 -- Credits tracking
 ALTER TABLE public.global_stats
 ADD COLUMN credits_bought bigint DEFAULT 0 NOT NULL;
@@ -55,5 +62,7 @@ COMMENT ON COLUMN public.global_stats.plan_maker_monthly IS 'Number of Maker pla
 COMMENT ON COLUMN public.global_stats.plan_maker_yearly IS 'Number of Maker plan yearly subscriptions';
 COMMENT ON COLUMN public.global_stats.plan_team_monthly IS 'Number of Team plan monthly subscriptions';
 COMMENT ON COLUMN public.global_stats.plan_team_yearly IS 'Number of Team plan yearly subscriptions';
+COMMENT ON COLUMN public.global_stats.new_paying_orgs IS 'Number of new paying organizations today';
+COMMENT ON COLUMN public.global_stats.canceled_orgs IS 'Number of canceled subscriptions today';
 COMMENT ON COLUMN public.global_stats.credits_bought IS 'Total credits purchased today';
 COMMENT ON COLUMN public.global_stats.credits_consumed IS 'Total credits consumed today';
