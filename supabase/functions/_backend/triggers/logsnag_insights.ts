@@ -18,12 +18,15 @@ interface PlanRevenue {
   revenue_solo: number
   revenue_maker: number
   revenue_team: number
+  revenue_enterprise: number
   plan_solo_monthly: number
   plan_solo_yearly: number
   plan_maker_monthly: number
   plan_maker_yearly: number
   plan_team_monthly: number
   plan_team_yearly: number
+  plan_enterprise_monthly: number
+  plan_enterprise_yearly: number
 }
 interface GlobalStats {
   apps: PromiseLike<number>
@@ -62,7 +65,7 @@ async function calculateRevenue(c: Context): Promise<PlanRevenue> {
     const { data: plansData, error: plansError } = await supabase
       .from('plans')
       .select('name, price_m, price_y, price_m_id, price_y_id')
-      .in('name', ['Solo', 'Maker', 'Team'])
+      .in('name', ['Solo', 'Maker', 'Team', 'Pay as you go'])
 
     if (plansError || !plansData) {
       cloudlogErr({ requestId: c.get('requestId'), message: 'Failed to fetch plan prices', error: plansError })
@@ -72,12 +75,15 @@ async function calculateRevenue(c: Context): Promise<PlanRevenue> {
         revenue_solo: 0,
         revenue_maker: 0,
         revenue_team: 0,
+        revenue_enterprise: 0,
         plan_solo_monthly: 0,
         plan_solo_yearly: 0,
         plan_maker_monthly: 0,
         plan_maker_yearly: 0,
         plan_team_monthly: 0,
         plan_team_yearly: 0,
+        plan_enterprise_monthly: 0,
+        plan_enterprise_yearly: 0,
       }
     }
 
@@ -113,12 +119,15 @@ async function calculateRevenue(c: Context): Promise<PlanRevenue> {
         revenue_solo: 0,
         revenue_maker: 0,
         revenue_team: 0,
+        revenue_enterprise: 0,
         plan_solo_monthly: 0,
         plan_solo_yearly: 0,
         plan_maker_monthly: 0,
         plan_maker_yearly: 0,
         plan_team_monthly: 0,
         plan_team_yearly: 0,
+        plan_enterprise_monthly: 0,
+        plan_enterprise_yearly: 0,
       }
     }
 
@@ -126,7 +135,8 @@ async function calculateRevenue(c: Context): Promise<PlanRevenue> {
     const subCountMap = new Map<string, { monthly: number, yearly: number }>()
     for (const sub of subsData) {
       const planName = (sub.plans as any)?.name?.toLowerCase()
-      if (!planName || !['solo', 'maker', 'team'].includes(planName)) continue
+      if (!planName || !['solo', 'maker', 'team', 'pay as you go'].includes(planName))
+        continue
 
       const priceId = sub.price_id
       if (!subCountMap.has(planName)) {
@@ -148,16 +158,19 @@ async function calculateRevenue(c: Context): Promise<PlanRevenue> {
     const solo = subCountMap.get('solo') || { monthly: 0, yearly: 0 }
     const maker = subCountMap.get('maker') || { monthly: 0, yearly: 0 }
     const team = subCountMap.get('team') || { monthly: 0, yearly: 0 }
+    const enterprise = subCountMap.get('pay as you go') || { monthly: 0, yearly: 0 }
 
     const soloPrices = priceMap.get('solo') || { price_m: 0, price_y: 0, price_m_id: '', price_y_id: '' }
     const makerPrices = priceMap.get('maker') || { price_m: 0, price_y: 0, price_m_id: '', price_y_id: '' }
     const teamPrices = priceMap.get('team') || { price_m: 0, price_y: 0, price_m_id: '', price_y_id: '' }
+    const enterprisePrices = priceMap.get('pay as you go') || { price_m: 0, price_y: 0, price_m_id: '', price_y_id: '' }
 
     // MRR = (monthly subs × monthly price) + (yearly subs × yearly price / 12)
     const soloMRR = (solo.monthly * soloPrices.price_m) + (solo.yearly * soloPrices.price_y / 12)
     const makerMRR = (maker.monthly * makerPrices.price_m) + (maker.yearly * makerPrices.price_y / 12)
     const teamMRR = (team.monthly * teamPrices.price_m) + (team.yearly * teamPrices.price_y / 12)
-    const totalMRR = soloMRR + makerMRR + teamMRR
+    const enterpriseMRR = (enterprise.monthly * enterprisePrices.price_m) + (enterprise.yearly * enterprisePrices.price_y / 12)
+    const totalMRR = soloMRR + makerMRR + teamMRR + enterpriseMRR
 
     cloudlog({
       requestId: c.get('requestId'),
@@ -165,6 +178,7 @@ async function calculateRevenue(c: Context): Promise<PlanRevenue> {
       solo: { monthly: solo.monthly, yearly: solo.yearly, mrr: soloMRR, prices: soloPrices },
       maker: { monthly: maker.monthly, yearly: maker.yearly, mrr: makerMRR, prices: makerPrices },
       team: { monthly: team.monthly, yearly: team.yearly, mrr: teamMRR, prices: teamPrices },
+      enterprise: { monthly: enterprise.monthly, yearly: enterprise.yearly, mrr: enterpriseMRR, prices: enterprisePrices },
       totalMRR,
     })
 
@@ -172,6 +186,7 @@ async function calculateRevenue(c: Context): Promise<PlanRevenue> {
     const soloARR = soloMRR * 12
     const makerARR = makerMRR * 12
     const teamARR = teamMRR * 12
+    const enterpriseARR = enterpriseMRR * 12
     const totalARR = totalMRR * 12
 
     return {
@@ -180,12 +195,15 @@ async function calculateRevenue(c: Context): Promise<PlanRevenue> {
       revenue_solo: soloARR,
       revenue_maker: makerARR,
       revenue_team: teamARR,
+      revenue_enterprise: enterpriseARR,
       plan_solo_monthly: solo.monthly,
       plan_solo_yearly: solo.yearly,
       plan_maker_monthly: maker.monthly,
       plan_maker_yearly: maker.yearly,
       plan_team_monthly: team.monthly,
       plan_team_yearly: team.yearly,
+      plan_enterprise_monthly: enterprise.monthly,
+      plan_enterprise_yearly: enterprise.yearly,
     }
   }
   catch (e) {
@@ -196,12 +214,15 @@ async function calculateRevenue(c: Context): Promise<PlanRevenue> {
       revenue_solo: 0,
       revenue_maker: 0,
       revenue_team: 0,
+      revenue_enterprise: 0,
       plan_solo_monthly: 0,
       plan_solo_yearly: 0,
       plan_maker_monthly: 0,
       plan_maker_yearly: 0,
       plan_team_monthly: 0,
       plan_team_yearly: 0,
+      plan_enterprise_monthly: 0,
+      plan_enterprise_yearly: 0,
     }
   }
 }
@@ -452,19 +473,22 @@ app.post('/', middlewareAPISecret, async (c) => {
     plan_solo: plans.Solo,
     plan_maker: plans.Maker,
     plan_team: plans.Team,
-    plan_payg: plans['Pay as you go'],
+    plan_enterprise: plans.Enterprise || 0,
     // Revenue metrics
     mrrr: revenue.mrrr,
     total_revenue: revenue.total_revenue,
     revenue_solo: revenue.revenue_solo,
     revenue_maker: revenue.revenue_maker,
     revenue_team: revenue.revenue_team,
+    revenue_enterprise: revenue.revenue_enterprise,
     plan_solo_monthly: revenue.plan_solo_monthly,
     plan_solo_yearly: revenue.plan_solo_yearly,
     plan_maker_monthly: revenue.plan_maker_monthly,
     plan_maker_yearly: revenue.plan_maker_yearly,
     plan_team_monthly: revenue.plan_team_monthly,
     plan_team_yearly: revenue.plan_team_yearly,
+    plan_enterprise_monthly: revenue.plan_enterprise_monthly,
+    plan_enterprise_yearly: revenue.plan_enterprise_yearly,
     // Subscription flow tracking
     new_paying_orgs,
     canceled_orgs,
@@ -594,8 +618,8 @@ app.post('/', middlewareAPISecret, async (c) => {
       icon: '👏',
     },
     {
-      title: 'Orgs Pay as you go Plan',
-      value: `${(plans['Pay as you go'] * 100 / customers.total).toFixed(0)}% - ${plans['Pay as you go']}`,
+      title: 'Orgs Enterprise Plan',
+      value: `${((plans.Enterprise || 0) * 100 / customers.total).toFixed(0)}% - ${plans.Enterprise || 0}`,
       icon: '📈',
     },
   ]).catch((e) => {

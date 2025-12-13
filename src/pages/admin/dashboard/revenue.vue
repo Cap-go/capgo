@@ -39,7 +39,7 @@ const globalStatsTrendData = ref<Array<{
   plan_solo: number
   plan_maker: number
   plan_team: number
-  plan_payg: number
+  plan_enterprise: number
   registers_today: number
   devices_last_month: number
   stars: number
@@ -53,6 +53,7 @@ const globalStatsTrendData = ref<Array<{
   revenue_solo: number
   revenue_maker: number
   revenue_team: number
+  revenue_enterprise: number
 }>>([])
 
 const isLoadingGlobalStatsTrend = ref(false)
@@ -182,6 +183,14 @@ const planARRSeries = computed(() => {
         value: item.revenue_team || 0,
       })),
       color: '#10b981', // green
+    },
+    {
+      label: 'Enterprise Plan ARR ($)',
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.revenue_enterprise || 0,
+      })),
+      color: '#f59e0b', // amber
     },
   ]
 })

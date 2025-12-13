@@ -936,10 +936,12 @@ export type Database = {
           paying: number | null
           paying_monthly: number | null
           paying_yearly: number | null
+          plan_enterprise: number | null
+          plan_enterprise_monthly: number
+          plan_enterprise_yearly: number
           plan_maker: number | null
           plan_maker_monthly: number
           plan_maker_yearly: number
-          plan_payg: number | null
           plan_solo: number | null
           plan_solo_monthly: number
           plan_solo_yearly: number
@@ -947,6 +949,7 @@ export type Database = {
           plan_team_monthly: number
           plan_team_yearly: number
           registers_today: number
+          revenue_enterprise: number
           revenue_maker: number
           revenue_solo: number
           revenue_team: number
@@ -978,10 +981,12 @@ export type Database = {
           paying?: number | null
           paying_monthly?: number | null
           paying_yearly?: number | null
+          plan_enterprise?: number | null
+          plan_enterprise_monthly?: number
+          plan_enterprise_yearly?: number
           plan_maker?: number | null
           plan_maker_monthly?: number
           plan_maker_yearly?: number
-          plan_payg?: number | null
           plan_solo?: number | null
           plan_solo_monthly?: number
           plan_solo_yearly?: number
@@ -989,6 +994,7 @@ export type Database = {
           plan_team_monthly?: number
           plan_team_yearly?: number
           registers_today?: number
+          revenue_enterprise?: number
           revenue_maker?: number
           revenue_solo?: number
           revenue_team?: number
@@ -1020,10 +1026,12 @@ export type Database = {
           paying?: number | null
           paying_monthly?: number | null
           paying_yearly?: number | null
+          plan_enterprise?: number | null
+          plan_enterprise_monthly?: number
+          plan_enterprise_yearly?: number
           plan_maker?: number | null
           plan_maker_monthly?: number
           plan_maker_yearly?: number
-          plan_payg?: number | null
           plan_solo?: number | null
           plan_solo_monthly?: number
           plan_solo_yearly?: number
@@ -1031,6 +1039,7 @@ export type Database = {
           plan_team_monthly?: number
           plan_team_yearly?: number
           registers_today?: number
+          revenue_enterprise?: number
           revenue_maker?: number
           revenue_solo?: number
           revenue_team?: number

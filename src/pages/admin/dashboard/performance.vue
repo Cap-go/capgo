@@ -38,7 +38,7 @@ const globalStatsTrendData = ref<Array<{
   plan_solo: number
   plan_maker: number
   plan_team: number
-  plan_payg: number
+  plan_enterprise: number
   registers_today: number
 }>>([])
 

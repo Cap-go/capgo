@@ -775,7 +775,7 @@ export interface AdminGlobalStatsTrend {
   plan_solo: number
   plan_maker: number
   plan_team: number
-  plan_payg: number
+  plan_enterprise: number
   registers_today: number
   devices_last_month: number
   stars: number
@@ -789,6 +789,7 @@ export interface AdminGlobalStatsTrend {
   revenue_solo: number
   revenue_maker: number
   revenue_team: number
+  revenue_enterprise: number
 }
 
 export async function getAdminGlobalStatsTrend(
@@ -823,7 +824,7 @@ export async function getAdminGlobalStatsTrend(
         plan_solo::int,
         plan_maker::int,
         plan_team::int,
-        plan_payg::int,
+        plan_enterprise::int,
         registers_today::int,
         devices_last_month::int,
         stars::int,
@@ -836,10 +837,11 @@ export async function getAdminGlobalStatsTrend(
         total_revenue::float,
         revenue_solo::float,
         revenue_maker::float,
-        revenue_team::float
+        revenue_team::float,
+        revenue_enterprise::float
       FROM global_stats
       WHERE date_id >= ${startDateOnly}
-        AND date_id < ${endDateOnly}
+        AND date_id <= ${endDateOnly}
       ORDER BY date_id ASC
     `
 
@@ -861,7 +863,7 @@ export async function getAdminGlobalStatsTrend(
       plan_solo: Number(row.plan_solo) || 0,
       plan_maker: Number(row.plan_maker) || 0,
       plan_team: Number(row.plan_team) || 0,
-      plan_payg: Number(row.plan_payg) || 0,
+      plan_enterprise: Number(row.plan_enterprise) || 0,
       registers_today: Number(row.registers_today) || 0,
       devices_last_month: Number(row.devices_last_month) || 0,
       stars: Number(row.stars) || 0,
@@ -875,6 +877,7 @@ export async function getAdminGlobalStatsTrend(
       revenue_solo: Number(row.revenue_solo) || 0,
       revenue_maker: Number(row.revenue_maker) || 0,
       revenue_team: Number(row.revenue_team) || 0,
+      revenue_enterprise: Number(row.revenue_enterprise) || 0,
     }))
 
     cloudlog({ requestId: c.get('requestId'), message: 'getAdminGlobalStatsTrend result', resultCount: data.length })

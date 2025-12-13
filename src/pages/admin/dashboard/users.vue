@@ -39,7 +39,7 @@ const globalStatsTrendData = ref<Array<{
   plan_solo: number
   plan_maker: number
   plan_team: number
-  plan_payg: number
+  plan_enterprise: number
   registers_today: number
   devices_last_month: number
 }>>([])
@@ -108,7 +108,7 @@ const planDistributionData = computed(() => {
     return []
 
   const latest = globalStatsTrendData.value[globalStatsTrendData.value.length - 1]
-  const total = latest.plan_solo + latest.plan_maker + latest.plan_team + latest.plan_payg
+  const total = latest.plan_solo + latest.plan_maker + latest.plan_team + latest.plan_enterprise
 
   return [
     {
@@ -128,8 +128,8 @@ const planDistributionData = computed(() => {
     },
     {
       label: 'Pay-as-you-go',
-      value: latest.plan_payg,
-      percentage: total > 0 ? ((latest.plan_payg / total) * 100).toFixed(1) : '0',
+      value: latest.plan_enterprise,
+      percentage: total > 0 ? ((latest.plan_enterprise / total) * 100).toFixed(1) : '0',
     },
   ]
 })
@@ -167,7 +167,7 @@ const planDistributionTrendSeries = computed(() => {
       label: 'Pay-as-you-go',
       data: globalStatsTrendData.value.map(item => ({
         date: item.date,
-        value: item.plan_payg,
+        value: item.plan_enterprise,
       })),
       color: '#f59e0b', // amber
     },

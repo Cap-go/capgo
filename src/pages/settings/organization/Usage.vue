@@ -71,14 +71,14 @@ async function getUsage(orgId: string) {
   }
   detailPlanUsage = roundUsagePercents(detailPlanUsage)
 
-  const payg_base = {
+  const enterprise_base = {
     mau: currentPlan?.mau ?? 0,
     storage: currentPlan?.storage ?? 0,
     bandwidth: currentPlan?.bandwidth ?? 0,
     build_time: currentPlan?.build_time_unit ?? 0,
   }
 
-  const payg_units = {
+  const enterprise_units = {
     mau: creditUnitPrices.value.mau ?? 0,
     storage: creditUnitPrices.value.storage ?? 0,
     bandwidth: creditUnitPrices.value.bandwidth ?? 0,
@@ -147,10 +147,10 @@ async function getUsage(orgId: string) {
   }
 
   const estimatedUsagePrice = computed(() => {
-    const mauPrice = calculatePrice(totalMau, payg_base.mau, payg_units.mau)
-    const storagePrice = calculatePrice(totalStorage, payg_base.storage, payg_units.storage)
-    const bandwidthPrice = calculatePrice(totalBandwidth, payg_base.bandwidth, payg_units.bandwidth)
-    const buildTimePrice = calculatePrice(totalBuildTime, payg_base.build_time, payg_units.build_time)
+    const mauPrice = calculatePrice(totalMau, enterprise_base.mau, enterprise_units.mau)
+    const storagePrice = calculatePrice(totalStorage, enterprise_base.storage, enterprise_units.storage)
+    const bandwidthPrice = calculatePrice(totalBandwidth, enterprise_base.bandwidth, enterprise_units.bandwidth)
+    const buildTimePrice = calculatePrice(totalBuildTime, enterprise_base.build_time, enterprise_units.build_time)
     const sum = mauPrice + storagePrice + bandwidthPrice + buildTimePrice
     return roundNumber(sum)
   })
@@ -173,7 +173,7 @@ async function getUsage(orgId: string) {
     totalBandwidth,
     totalStorage,
     totalBuildTime,
-    payg_units,
+    enterprise_units,
     detailPlanUsage,
     cycle: {
       subscription_anchor_start: dayjs(organizationStore.currentOrganization?.subscription_start).format('YYYY/MM/D'),
