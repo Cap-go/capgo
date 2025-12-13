@@ -4,9 +4,11 @@ import type { DeviceComparable } from './deviceComparison.ts'
 import type { Database } from './supabase.types.ts'
 import type { DeviceRes, DeviceWithoutCreatedAt, ReadDevicesParams, ReadStatsParams } from './types.ts'
 import dayjs from 'dayjs'
+import { sql } from 'drizzle-orm'
 import { CacheHelper } from './cache.ts'
 import { hasComparableDeviceChanged, toComparableDevice } from './deviceComparison.ts'
 import { cloudlog, cloudlogErr, serializeError } from './logging.ts'
+import { getDrizzleClient, getPgClient } from './pg.ts'
 import { DEFAULT_LIMIT } from './types.ts'
 import { getEnv } from './utils.ts'
 
@@ -1681,31 +1683,40 @@ export async function getAdminDeploymentsTrend(
   end_date: string,
   app_id?: string,
 ): Promise<AdminDeploymentsTrend[]> {
-  if (!c.env.APP_LOG)
-    return []
-
-  const appFilter = app_id ? `AND index1 = '${app_id}'` : ''
-
-  // Count deployment actions from APP_LOG
-  const query = `SELECT
-    formatDateTime(toStartOfInterval(timestamp, INTERVAL '1' DAY), '%Y-%m-%d') AS date,
-    COUNT(*) AS deployments
-  FROM app_log
-  WHERE timestamp >= toDateTime('${formatDateCF(start_date)}')
-    AND timestamp < toDateTime('${formatDateCF(end_date)}')
-    AND blob2 = 'set'
-    ${appFilter}
-  GROUP BY date
-  ORDER BY date ASC`
-
-  cloudlog({ requestId: c.get('requestId'), message: 'getAdminDeploymentsTrend query', query })
-
   try {
-    const result = await runQueryToCFA<AdminDeploymentsTrend>(c, query)
-    return result
+    const pgClient = getPgClient(c, true) // Read-only query
+    const drizzleClient = getDrizzleClient(pgClient)
+
+    // Query channel_devices table from Postgres (deployments are stored in Supabase, not Cloudflare)
+    const appFilter = app_id ? sql`AND app_id = ${app_id}` : sql``
+
+    const query = sql`
+      SELECT
+        DATE(created_at) AS date,
+        COUNT(*)::int AS deployments
+      FROM channel_devices
+      WHERE created_at >= ${start_date}::timestamp
+        AND created_at < ${end_date}::timestamp
+        ${appFilter}
+      GROUP BY DATE(created_at)
+      ORDER BY date ASC
+    `
+
+    cloudlog({ requestId: c.get('requestId'), message: 'getAdminDeploymentsTrend query', start_date, end_date, app_id })
+
+    const result = await drizzleClient.execute(query)
+
+    const data: AdminDeploymentsTrend[] = result.rows.map((row: any) => ({
+      date: row.date instanceof Date ? row.date.toISOString().split('T')[0] : row.date,
+      deployments: Number(row.deployments),
+    }))
+
+    cloudlog({ requestId: c.get('requestId'), message: 'getAdminDeploymentsTrend result', resultCount: data.length })
+
+    return data
   }
   catch (e) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Error in getAdminDeploymentsTrend', error: serializeError(e), query })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error in getAdminDeploymentsTrend', error: serializeError(e) })
     return []
   }
 }
