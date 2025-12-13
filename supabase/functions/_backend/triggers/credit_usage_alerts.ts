@@ -38,7 +38,7 @@ app.post('/', middlewareAPISecret, async (c) => {
 
   const percentUsed = Math.min(
     100,
-    Math.round(Number(payload.percent_used ?? 0)),
+    Math.trunc(Number(payload.percent_used ?? 0)),
   )
   const totalCredits = Number(payload.total_credits ?? 0)
   const availableCredits = Number(payload.available_credits ?? 0)
@@ -46,7 +46,7 @@ app.post('/', middlewareAPISecret, async (c) => {
 
   const uniqId = `${alertCycle}:${threshold}`
   const metadata = {
-    percent_used: percentUsed,
+    percent: percentUsed,
     total_credits: totalCredits,
     available_credits: availableCredits,
     alert_cycle: alertCycle,
