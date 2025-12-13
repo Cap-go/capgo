@@ -273,16 +273,6 @@ function switchTab(tab: 'overview' | 'updates' | 'performance' | 'users') {
   <div>
     <div class="h-full pb-4 overflow-hidden">
       <div class="w-full h-full px-4 pt-2 mx-auto mb-8 overflow-y-auto sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
-        <!-- Admin Dashboard Header -->
-        <div class="mb-6">
-          <h1 class="text-3xl font-bold text-base-content">
-            {{ t('admin-dashboard') }}
-          </h1>
-          <p class="mt-2 text-base-content/60">
-            {{ t('admin-dashboard-description') }}
-          </p>
-        </div>
-
         <!-- Filter Bar -->
         <AdminFilterBar />
 
