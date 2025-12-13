@@ -43,6 +43,8 @@ interface GlobalStats {
   registers_today: PromiseLike<number>
   bundle_storage_gb: PromiseLike<number>
   revenue: PromiseLike<PlanRevenue>
+  new_paying_orgs: PromiseLike<number>
+  canceled_orgs: PromiseLike<number>
   credits_bought: PromiseLike<number>
   credits_consumed: PromiseLike<number>
 }
@@ -289,6 +291,35 @@ function getStats(c: Context): GlobalStats {
         return Number.isFinite(gigabytes) ? Number(gigabytes.toFixed(2)) : 0
       }),
     revenue: calculateRevenue(c),
+    new_paying_orgs: supabase
+      .from('stripe_info')
+      .select('customer_id', { count: 'exact', head: false })
+      .eq('status', 'succeeded')
+      .eq('is_good_plan', true)
+      .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+      .then((res) => {
+        if (res.error) {
+          cloudlog({ requestId: c.get('requestId'), message: 'new_paying_orgs error', error: res.error })
+          return 0
+        }
+        // Count unique customer_ids (orgs) that started paying today
+        const uniqueCustomers = new Set((res.data || []).map(row => row.customer_id))
+        return uniqueCustomers.size
+      }),
+    canceled_orgs: supabase
+      .from('stripe_info')
+      .select('customer_id', { count: 'exact', head: false })
+      .eq('is_canceled', true)
+      .gte('updated_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+      .then((res) => {
+        if (res.error) {
+          cloudlog({ requestId: c.get('requestId'), message: 'canceled_orgs error', error: res.error })
+          return 0
+        }
+        // Count unique customer_ids (orgs) that canceled today
+        const uniqueCustomers = new Set((res.data || []).map(row => row.customer_id))
+        return uniqueCustomers.size
+      }),
     credits_bought: supabase
       .from('usage_credit_grants')
       .select('credits_total')
@@ -336,6 +367,8 @@ app.post('/', middlewareAPISecret, async (c) => {
     bundle_storage_gb,
     success_rate,
     revenue,
+    new_paying_orgs,
+    canceled_orgs,
     credits_bought,
     credits_consumed,
   ] = await Promise.all([
@@ -356,6 +389,8 @@ app.post('/', middlewareAPISecret, async (c) => {
     res.bundle_storage_gb,
     res.success_rate,
     res.revenue,
+    res.new_paying_orgs,
+    res.canceled_orgs,
     res.credits_bought,
     res.credits_consumed,
   ])
@@ -417,6 +452,9 @@ app.post('/', middlewareAPISecret, async (c) => {
     plan_maker_yearly: revenue.plan_maker_yearly,
     plan_team_monthly: revenue.plan_team_monthly,
     plan_team_yearly: revenue.plan_team_yearly,
+    // Subscription flow tracking
+    new_paying_orgs,
+    canceled_orgs,
     // Credits tracking
     credits_bought,
     credits_consumed,
