@@ -776,6 +776,8 @@
   "onboarding-invite-option-modal-title": "Пригласите технического коллегу",
   "onboarding-invite-option-subtitle": "Пригласите технического сотрудника, и мы отправим ему на электронную почту инструкции по созданию приложения для этой организации.",
   "onboarding-invite-option-title": "Предпочитаете, чтобы кто-то другой занимался настройкой?",
+  "onboarding-manual-setup-link": "руководство по ручной настройке",
+  "onboarding-manual-setup-prefix": "Или следуйте нашему",
   "one-day-left": "Остался один день",
   "one-hour-short": "1h",
   "open": "Открыть",

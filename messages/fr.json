@@ -776,6 +776,8 @@
   "onboarding-invite-option-modal-title": "Invitez un coéquipier technique",
   "onboarding-invite-option-subtitle": "Invitez un coéquipier technique et nous lui enverrons par email les instructions pour créer l'application pour cette organisation.",
   "onboarding-invite-option-title": "Préférez-vous que quelqu'un d'autre s'occupe de la configuration?",
+  "onboarding-manual-setup-link": "guide de configuration manuelle",
+  "onboarding-manual-setup-prefix": "Ou suivez notre",
   "one-day-left": "Un jour restant",
   "one-hour-short": "1h",
   "open": "Ouvrir",

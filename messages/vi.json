@@ -776,6 +776,8 @@
   "onboarding-invite-option-modal-title": "Mời một đồng đội kỹ thuật",
   "onboarding-invite-option-subtitle": "Mời một đồng đội kỹ thuật và chúng tôi sẽ gửi email cho họ hướng dẫn để tạo ứng dụng cho tổ chức này.",
   "onboarding-invite-option-title": "Bạn muốn người khác đảm nhận việc thiết lập?",
+  "onboarding-manual-setup-link": "hướng dẫn thiết lập thủ công",
+  "onboarding-manual-setup-prefix": "Hoặc làm theo",
   "one-day-left": "Còn một ngày nữa",
   "one-hour-short": "1h",
   "open": "Mở",

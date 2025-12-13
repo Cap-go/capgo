@@ -776,6 +776,8 @@
   "onboarding-invite-option-modal-title": "技術的なチームメイトを招待する",
   "onboarding-invite-option-subtitle": "技術的なチームメイトを招待し、この組織のアプリを作成するための指示を彼らにメールで送ります。",
   "onboarding-invite-option-title": "設定は他の誰かに任せたいですか？",
+  "onboarding-manual-setup-link": "手動セットアップガイド",
+  "onboarding-manual-setup-prefix": "または",
   "one-day-left": "あと一日",
   "one-hour-short": "1h",
   "open": "開く",
