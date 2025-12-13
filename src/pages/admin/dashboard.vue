@@ -34,8 +34,6 @@ const bundlesTrendData = ref<Array<{ date: string, bundles_created: number }>>([
 const deploymentsTrendData = ref<Array<{ date: string, deployments: number }>>([])
 const storageTrendData = ref<Array<{ date: string, storage_bytes: number }>>([])
 const bandwidthTrendData = ref<Array<{ date: string, bandwidth_bytes: number }>>([])
-const distributionData = ref<Array<{ date: string, downloads: number, installs: number }>>([])
-const failureData = ref<Array<{ date: string, failures: number, failure_rate: number }>>([])
 
 const isLoadingMauTrend = ref(false)
 const isLoadingSuccessRateTrend = ref(false)
@@ -44,8 +42,6 @@ const isLoadingBundlesTrend = ref(false)
 const isLoadingDeploymentsTrend = ref(false)
 const isLoadingStorageTrend = ref(false)
 const isLoadingBandwidthTrend = ref(false)
-const isLoadingDistribution = ref(false)
-const isLoadingFailures = ref(false)
 
 async function loadPlatformOverview() {
   try {
@@ -172,38 +168,6 @@ async function loadBandwidthTrend() {
   }
   finally {
     isLoadingBandwidthTrend.value = false
-  }
-}
-
-async function loadDistributionMetrics() {
-  isLoadingDistribution.value = true
-  try {
-    const data = await adminStore.fetchStats('distribution')
-    console.log('[Admin Dashboard] Distribution data:', data)
-    distributionData.value = data || []
-  }
-  catch (error) {
-    console.error('[Admin Dashboard] Error loading distribution:', error)
-    distributionData.value = []
-  }
-  finally {
-    isLoadingDistribution.value = false
-  }
-}
-
-async function loadFailureMetrics() {
-  isLoadingFailures.value = true
-  try {
-    const data = await adminStore.fetchStats('failures')
-    console.log('[Admin Dashboard] Failure data:', data)
-    failureData.value = data || []
-  }
-  catch (error) {
-    console.error('[Admin Dashboard] Error loading failures:', error)
-    failureData.value = []
-  }
-  finally {
-    isLoadingFailures.value = false
   }
 }
 
@@ -368,8 +332,8 @@ function switchTab(tab: 'overview' | 'updates' | 'performance' | 'users') {
               <!-- Key Metrics - Properly styled cards -->
               <div class="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
                 <!-- MAU Card -->
-                <div class="flex flex-col justify-between p-6 bg-white rounded-lg border shadow-lg border-slate-300 dark:bg-gray-800 dark:border-slate-900">
-                  <div class="flex justify-between items-start mb-4">
+                <div class="flex flex-col justify-between p-6 bg-white border rounded-lg shadow-lg border-slate-300 dark:bg-gray-800 dark:border-slate-900">
+                  <div class="flex items-start justify-between mb-4">
                     <div class="p-3 rounded-lg bg-primary/10">
                       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="w-6 h-6 stroke-current text-primary"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
                     </div>
@@ -391,8 +355,8 @@ function switchTab(tab: 'overview' | 'updates' | 'performance' | 'users') {
                 </div>
 
                 <!-- Active Apps Card -->
-                <div class="flex flex-col justify-between p-6 bg-white rounded-lg border shadow-lg border-slate-300 dark:bg-gray-800 dark:border-slate-900">
-                  <div class="flex justify-between items-start mb-4">
+                <div class="flex flex-col justify-between p-6 bg-white border rounded-lg shadow-lg border-slate-300 dark:bg-gray-800 dark:border-slate-900">
+                  <div class="flex items-start justify-between mb-4">
                     <div class="p-3 rounded-lg bg-secondary/10">
                       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="w-6 h-6 stroke-current text-secondary"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
                     </div>
@@ -414,8 +378,8 @@ function switchTab(tab: 'overview' | 'updates' | 'performance' | 'users') {
                 </div>
 
                 <!-- Active Orgs Card -->
-                <div class="flex flex-col justify-between p-6 bg-white rounded-lg border shadow-lg border-slate-300 dark:bg-gray-800 dark:border-slate-900">
-                  <div class="flex justify-between items-start mb-4">
+                <div class="flex flex-col justify-between p-6 bg-white border rounded-lg shadow-lg border-slate-300 dark:bg-gray-800 dark:border-slate-900">
+                  <div class="flex items-start justify-between mb-4">
                     <div class="p-3 rounded-lg bg-accent/10">
                       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="w-6 h-6 stroke-current text-accent"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
                     </div>
@@ -437,8 +401,8 @@ function switchTab(tab: 'overview' | 'updates' | 'performance' | 'users') {
                 </div>
 
                 <!-- Success Rate Card -->
-                <div class="flex flex-col justify-between p-6 bg-white rounded-lg border shadow-lg border-slate-300 dark:bg-gray-800 dark:border-slate-900">
-                  <div class="flex justify-between items-start mb-4">
+                <div class="flex flex-col justify-between p-6 bg-white border rounded-lg shadow-lg border-slate-300 dark:bg-gray-800 dark:border-slate-900">
+                  <div class="flex items-start justify-between mb-4">
                     <div class="p-3 rounded-lg bg-success/10">
                       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="w-6 h-6 stroke-current text-success"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                     </div>

@@ -9,20 +9,6 @@ import { useAdminDashboardStore } from '~/stores/adminDashboard'
 const { t } = useI18n()
 const adminStore = useAdminDashboardStore()
 
-// Format date for display
-function formatDate(date: Date): string {
-  return date.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  })
-}
-
-const dateRangeDisplay = computed(() => {
-  const { start, end } = adminStore.activeDateRange
-  return `${formatDate(start)} - ${formatDate(end)}`
-})
-
 function handleRefresh() {
   adminStore.invalidateCache()
   window.location.reload()
