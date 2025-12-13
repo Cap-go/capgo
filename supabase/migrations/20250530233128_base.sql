@@ -3438,7 +3438,7 @@ CREATE TABLE IF NOT EXISTS "public"."apps" (
   "id" "uuid" DEFAULT "extensions"."uuid_generate_v4" (),
   "retention" bigint DEFAULT '2592000'::bigint NOT NULL,
   "owner_org" "uuid" NOT NULL,
-  "default_upload_channel" character varying DEFAULT 'dev'::character varying NOT NULL,
+  "default_upload_channel" character varying DEFAULT 'production'::character varying NOT NULL,
   "transfer_history" "jsonb" [] DEFAULT '{}'::"jsonb" []
 );
 
