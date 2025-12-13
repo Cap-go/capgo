@@ -12,6 +12,19 @@ import { supabaseAdmin } from '../utils/supabase.ts'
 interface PlanTotal { [key: string]: number }
 interface Actives { users: number, apps: number }
 interface CustomerCount { total: number, yearly: number, monthly: number }
+interface PlanRevenue {
+  mrrr: number
+  total_revenue: number
+  revenue_solo: number
+  revenue_maker: number
+  revenue_team: number
+  plan_solo_monthly: number
+  plan_solo_yearly: number
+  plan_maker_monthly: number
+  plan_maker_yearly: number
+  plan_team_monthly: number
+  plan_team_yearly: number
+}
 interface GlobalStats {
   apps: PromiseLike<number>
   updates: PromiseLike<number>
@@ -29,11 +42,153 @@ interface GlobalStats {
   devices_last_month: PromiseLike<number>
   registers_today: PromiseLike<number>
   bundle_storage_gb: PromiseLike<number>
+  revenue: PromiseLike<PlanRevenue>
+  credits_bought: PromiseLike<number>
+  credits_consumed: PromiseLike<number>
 }
 
 function getTodayDateId(): string {
   const today = new Date()
   return new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate())).toISOString().slice(0, 10)
+}
+
+async function calculateRevenue(c: Context): Promise<PlanRevenue> {
+  const supabase = supabaseAdmin(c)
+
+  try {
+    // Get plan prices from database
+    const { data: plansData, error: plansError } = await supabase
+      .from('plans')
+      .select('name, price_m, price_y, price_m_id, price_y_id')
+      .in('name', ['Solo', 'Maker', 'Team'])
+
+    if (plansError || !plansData) {
+      cloudlogErr({ requestId: c.get('requestId'), message: 'Failed to fetch plan prices', error: plansError })
+      return {
+        mrrr: 0,
+        total_revenue: 0,
+        revenue_solo: 0,
+        revenue_maker: 0,
+        revenue_team: 0,
+        plan_solo_monthly: 0,
+        plan_solo_yearly: 0,
+        plan_maker_monthly: 0,
+        plan_maker_yearly: 0,
+        plan_team_monthly: 0,
+        plan_team_yearly: 0,
+      }
+    }
+
+    // Build price map
+    const priceMap = new Map<string, { price_m: number, price_y: number, price_m_id: string, price_y_id: string }>()
+    for (const plan of plansData) {
+      priceMap.set(plan.name.toLowerCase(), {
+        price_m: (Number(plan.price_m) || 0) / 100, // Convert cents to dollars
+        price_y: (Number(plan.price_y) || 0) / 100,
+        price_m_id: plan.price_m_id || '',
+        price_y_id: plan.price_y_id || '',
+      })
+    }
+
+    // Get subscription counts from stripe_info
+    const { data: subsData, error: subsError } = await supabase
+      .from('stripe_info')
+      .select(`
+        price_id,
+        plans!stripe_info_product_id_fkey(name)
+      `)
+      .in('status', ['active', 'trialing'])
+
+    if (subsError || !subsData) {
+      cloudlogErr({ requestId: c.get('requestId'), message: 'Failed to fetch subscriptions', error: subsError })
+      return {
+        mrrr: 0,
+        total_revenue: 0,
+        revenue_solo: 0,
+        revenue_maker: 0,
+        revenue_team: 0,
+        plan_solo_monthly: 0,
+        plan_solo_yearly: 0,
+        plan_maker_monthly: 0,
+        plan_maker_yearly: 0,
+        plan_team_monthly: 0,
+        plan_team_yearly: 0,
+      }
+    }
+
+    // Count subscriptions by plan and billing period
+    const subCountMap = new Map<string, { monthly: number, yearly: number }>()
+    for (const sub of subsData) {
+      const planName = (sub.plans as any)?.name?.toLowerCase()
+      if (!planName || !['solo', 'maker', 'team'].includes(planName)) continue
+
+      const priceId = sub.price_id
+      if (!subCountMap.has(planName)) {
+        subCountMap.set(planName, { monthly: 0, yearly: 0 })
+      }
+
+      const planPrices = priceMap.get(planName)
+      if (planPrices) {
+        if (priceId === planPrices.price_m_id) {
+          subCountMap.get(planName)!.monthly++
+        }
+        else if (priceId === planPrices.price_y_id) {
+          subCountMap.get(planName)!.yearly++
+        }
+      }
+    }
+
+    // Calculate MRR and ARR
+    const solo = subCountMap.get('solo') || { monthly: 0, yearly: 0 }
+    const maker = subCountMap.get('maker') || { monthly: 0, yearly: 0 }
+    const team = subCountMap.get('team') || { monthly: 0, yearly: 0 }
+
+    const soloPrices = priceMap.get('solo') || { price_m: 0, price_y: 0, price_m_id: '', price_y_id: '' }
+    const makerPrices = priceMap.get('maker') || { price_m: 0, price_y: 0, price_m_id: '', price_y_id: '' }
+    const teamPrices = priceMap.get('team') || { price_m: 0, price_y: 0, price_m_id: '', price_y_id: '' }
+
+    // MRR = (monthly subs × monthly price) + (yearly subs × yearly price / 12)
+    const soloMRR = (solo.monthly * soloPrices.price_m) + (solo.yearly * soloPrices.price_y / 12)
+    const makerMRR = (maker.monthly * makerPrices.price_m) + (maker.yearly * makerPrices.price_y / 12)
+    const teamMRR = (team.monthly * teamPrices.price_m) + (team.yearly * teamPrices.price_y / 12)
+    const totalMRR = soloMRR + makerMRR + teamMRR
+
+    // ARR = MRR × 12
+    const soloARR = soloMRR * 12
+    const makerARR = makerMRR * 12
+    const teamARR = teamMRR * 12
+    const totalARR = totalMRR * 12
+
+    return {
+      mrrr: totalMRR,
+      total_revenue: totalARR,
+      revenue_solo: soloARR,
+      revenue_maker: makerARR,
+      revenue_team: teamARR,
+      plan_solo_monthly: solo.monthly,
+      plan_solo_yearly: solo.yearly,
+      plan_maker_monthly: maker.monthly,
+      plan_maker_yearly: maker.yearly,
+      plan_team_monthly: team.monthly,
+      plan_team_yearly: team.yearly,
+    }
+  }
+  catch (e) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'calculateRevenue error', error: e })
+    return {
+      mrrr: 0,
+      total_revenue: 0,
+      revenue_solo: 0,
+      revenue_maker: 0,
+      revenue_team: 0,
+      plan_solo_monthly: 0,
+      plan_solo_yearly: 0,
+      plan_maker_monthly: 0,
+      plan_maker_yearly: 0,
+      plan_team_monthly: 0,
+      plan_team_yearly: 0,
+    }
+  }
 }
 
 async function getGithubStars(): Promise<number> {
@@ -133,6 +288,29 @@ function getStats(c: Context): GlobalStats {
         const gigabytes = bytes / (1024 ** 3)
         return Number.isFinite(gigabytes) ? Number(gigabytes.toFixed(2)) : 0
       }),
+    revenue: calculateRevenue(c),
+    credits_bought: supabase
+      .from('usage_credit_grants')
+      .select('credits_total')
+      .gte('granted_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+      .then((res) => {
+        if (res.error) {
+          cloudlog({ requestId: c.get('requestId'), message: 'credits_bought error', error: res.error })
+          return 0
+        }
+        return (res.data || []).reduce((sum, row) => sum + (Number(row.credits_total) || 0), 0)
+      }),
+    credits_consumed: supabase
+      .from('usage_credit_consumptions')
+      .select('credits_used')
+      .gte('applied_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+      .then((res) => {
+        if (res.error) {
+          cloudlog({ requestId: c.get('requestId'), message: 'credits_consumed error', error: res.error })
+          return 0
+        }
+        return (res.data || []).reduce((sum, row) => sum + (Number(row.credits_used) || 0), 0)
+      }),
   }
 }
 
@@ -157,6 +335,9 @@ app.post('/', middlewareAPISecret, async (c) => {
     registers_today,
     bundle_storage_gb,
     success_rate,
+    revenue,
+    credits_bought,
+    credits_consumed,
   ] = await Promise.all([
     res.apps,
     res.updates,
@@ -174,6 +355,9 @@ app.post('/', middlewareAPISecret, async (c) => {
     res.registers_today,
     res.bundle_storage_gb,
     res.success_rate,
+    res.revenue,
+    res.credits_bought,
+    res.credits_consumed,
   ])
   const not_paying = users - customers.total - plans.Trial
   cloudlog({
@@ -221,6 +405,21 @@ app.post('/', middlewareAPISecret, async (c) => {
     plan_maker: plans.Maker,
     plan_team: plans.Team,
     plan_payg: plans['Pay as you go'],
+    // Revenue metrics
+    mrrr: revenue.mrrr,
+    total_revenue: revenue.total_revenue,
+    revenue_solo: revenue.revenue_solo,
+    revenue_maker: revenue.revenue_maker,
+    revenue_team: revenue.revenue_team,
+    plan_solo_monthly: revenue.plan_solo_monthly,
+    plan_solo_yearly: revenue.plan_solo_yearly,
+    plan_maker_monthly: revenue.plan_maker_monthly,
+    plan_maker_yearly: revenue.plan_maker_yearly,
+    plan_team_monthly: revenue.plan_team_monthly,
+    plan_team_yearly: revenue.plan_team_yearly,
+    // Credits tracking
+    credits_bought,
+    credits_consumed,
   }
   cloudlog({ requestId: c.get('requestId'), message: 'newData', newData })
   const { error } = await supabaseAdmin(c)

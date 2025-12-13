@@ -804,7 +804,8 @@ export async function getAdminGlobalStatsTrend(
     const startDateOnly = start_date.split('T')[0]
     const endDateOnly = end_date.split('T')[0]
 
-    // Simple query - just get global_stats data and calculate revenue separately
+    // Simple query - just SELECT all columns from global_stats
+    // Revenue metrics are already calculated and stored by logsnag_insights cron job
     const query = sql`
       SELECT
         date_id AS date,
@@ -828,7 +829,14 @@ export async function getAdminGlobalStatsTrend(
         stars::int,
         need_upgrade::int,
         paying_yearly::int,
-        paying_monthly::int
+        paying_monthly::int,
+        new_paying_orgs::int,
+        canceled_orgs::int,
+        mrrr::float,
+        total_revenue::float,
+        revenue_solo::float,
+        revenue_maker::float,
+        revenue_team::float
       FROM global_stats
       WHERE date_id >= ${startDateOnly}
         AND date_id < ${endDateOnly}
@@ -837,83 +845,37 @@ export async function getAdminGlobalStatsTrend(
 
     const result = await drizzleClient.execute(query)
 
-    // Fetch plan prices from database
-    const plansQuery = sql`
-      SELECT name, price_m, price_y, price_m_id, price_y_id
-      FROM plans
-      WHERE name IN ('Solo', 'Maker', 'Team')
-    `
-    const plansResult = await drizzleClient.execute(plansQuery)
-
-    // Build price map from database
-    const priceMap = new Map<string, { price_m: number, price_y: number, price_m_id: string, price_y_id: string }>()
-    for (const plan of plansResult.rows) {
-      const name = (plan.name as string).toLowerCase()
-      priceMap.set(name, {
-        price_m: (Number(plan.price_m) || 0) / 100, // Monthly price in dollars
-        price_y: (Number(plan.price_y) || 0) / 100, // Yearly price in dollars
-        price_m_id: plan.price_m_id as string,
-        price_y_id: plan.price_y_id as string,
-      })
-    }
-
-    // Simple JavaScript calculation: plan count × price
-    const data: AdminGlobalStatsTrend[] = result.rows.map((row: any) => {
-      // Get plan counts from global_stats (already in the row)
-      const planSolo = Number(row.plan_solo) || 0
-      const planMaker = Number(row.plan_maker) || 0
-      const planTeam = Number(row.plan_team) || 0
-
-      // Get prices from database
-      const soloPrices = priceMap.get('solo') || { price_m: 0, price_y: 0, price_m_id: '', price_y_id: '' }
-      const makerPrices = priceMap.get('maker') || { price_m: 0, price_y: 0, price_m_id: '', price_y_id: '' }
-      const teamPrices = priceMap.get('team') || { price_m: 0, price_y: 0, price_m_id: '', price_y_id: '' }
-
-      // Calculate MRR: plan count × monthly price
-      const soloMRR = planSolo * soloPrices.price_m
-      const makerMRR = planMaker * makerPrices.price_m
-      const teamMRR = planTeam * teamPrices.price_m
-      const totalMRR = soloMRR + makerMRR + teamMRR
-
-      // Calculate ARR: MRR × 12
-      const soloARR = soloMRR * 12
-      const makerARR = makerMRR * 12
-      const teamARR = teamMRR * 12
-      const totalARR = totalMRR * 12
-
-      return {
-        date: row.date,
-        apps: Number(row.apps) || 0,
-        apps_active: Number(row.apps_active) || 0,
-        users: Number(row.users) || 0,
-        users_active: Number(row.users_active) || 0,
-        paying: Number(row.paying) || 0,
-        trial: Number(row.trial) || 0,
-        not_paying: Number(row.not_paying) || 0,
-        updates: Number(row.updates) || 0,
-        updates_external: Number(row.updates_external) || 0,
-        success_rate: Number(row.success_rate) || 0,
-        bundle_storage_gb: Number(row.bundle_storage_gb) || 0,
-        plan_solo: Number(row.plan_solo) || 0,
-        plan_maker: Number(row.plan_maker) || 0,
-        plan_team: Number(row.plan_team) || 0,
-        plan_payg: Number(row.plan_payg) || 0,
-        registers_today: Number(row.registers_today) || 0,
-        devices_last_month: Number(row.devices_last_month) || 0,
-        stars: Number(row.stars) || 0,
-        need_upgrade: Number(row.need_upgrade) || 0,
-        paying_yearly: Number(row.paying_yearly) || 0,
-        paying_monthly: Number(row.paying_monthly) || 0,
-        // Revenue metrics - MRR and ARR
-        new_paying_orgs: 0, // Would need historical stripe_info data
-        canceled_orgs: 0, // Would need historical stripe_info data
-        mrrr: totalMRR, // MRR = Monthly Recurring Revenue
-        total_revenue: totalARR, // ARR = Annual Recurring Revenue projection
-        revenue_solo: soloARR, // Solo plan ARR
-        revenue_maker: makerARR, // Maker plan ARR
-        revenue_team: teamARR, // Team plan ARR
-      }
-    })
+    const data: AdminGlobalStatsTrend[] = result.rows.map((row: any) => ({
+      date: row.date,
+      apps: Number(row.apps) || 0,
+      apps_active: Number(row.apps_active) || 0,
+      users: Number(row.users) || 0,
+      users_active: Number(row.users_active) || 0,
+      paying: Number(row.paying) || 0,
+      trial: Number(row.trial) || 0,
+      not_paying: Number(row.not_paying) || 0,
+      updates: Number(row.updates) || 0,
+      updates_external: Number(row.updates_external) || 0,
+      success_rate: Number(row.success_rate) || 0,
+      bundle_storage_gb: Number(row.bundle_storage_gb) || 0,
+      plan_solo: Number(row.plan_solo) || 0,
+      plan_maker: Number(row.plan_maker) || 0,
+      plan_team: Number(row.plan_team) || 0,
+      plan_payg: Number(row.plan_payg) || 0,
+      registers_today: Number(row.registers_today) || 0,
+      devices_last_month: Number(row.devices_last_month) || 0,
+      stars: Number(row.stars) || 0,
+      need_upgrade: Number(row.need_upgrade) || 0,
+      paying_yearly: Number(row.paying_yearly) || 0,
+      paying_monthly: Number(row.paying_monthly) || 0,
+      new_paying_orgs: Number(row.new_paying_orgs) || 0,
+      canceled_orgs: Number(row.canceled_orgs) || 0,
+      mrrr: Number(row.mrrr) || 0,
+      total_revenue: Number(row.total_revenue) || 0,
+      revenue_solo: Number(row.revenue_solo) || 0,
+      revenue_maker: Number(row.revenue_maker) || 0,
+      revenue_team: Number(row.revenue_team) || 0,
+    }))
 
     cloudlog({ requestId: c.get('requestId'), message: 'getAdminGlobalStatsTrend result', resultCount: data.length })
 
