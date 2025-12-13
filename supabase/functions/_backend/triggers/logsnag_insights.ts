@@ -99,7 +99,8 @@ async function calculateRevenue(c: Context): Promise<PlanRevenue> {
         price_id,
         plans!stripe_info_product_id_fkey(name)
       `)
-      .in('status', ['active', 'trialing'])
+      .eq('status', 'succeeded')
+      .eq('is_good_plan', true)
 
     if (subsError || !subsData) {
       cloudlogErr({ requestId: c.get('requestId'), message: 'Failed to fetch subscriptions', error: subsError })
@@ -309,8 +310,8 @@ function getStats(c: Context): GlobalStats {
     canceled_orgs: supabase
       .from('stripe_info')
       .select('customer_id', { count: 'exact', head: false })
-      .eq('is_canceled', true)
-      .gte('updated_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+      .not('canceled_at', 'is', null)
+      .gte('canceled_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
       .then((res) => {
         if (res.error) {
           cloudlog({ requestId: c.get('requestId'), message: 'canceled_orgs error', error: res.error })
