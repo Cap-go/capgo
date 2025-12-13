@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { useI18n } from 'vue-i18n'
 import Spinner from '~/components/Spinner.vue'
 
 const props = defineProps({
@@ -40,8 +39,6 @@ const props = defineProps({
 
 const emit = defineEmits(['click'])
 
-const { t } = useI18n()
-
 const showEvolution = computed(() => props.evolution !== undefined && props.evolution !== null)
 const displayValue = computed(() => {
   if (props.value === undefined || props.value === null)
@@ -59,12 +56,12 @@ function handleClick() {
 
 <template>
   <div
-    class="stat bg-base-200 rounded-box shadow-lg"
+    class="shadow-lg stat bg-base-200 rounded-box"
     :class="{ 'cursor-pointer hover:shadow-xl transition-shadow': clickable }"
     @click="handleClick"
   >
     <!-- Loading state -->
-    <div v-if="isLoading" class="flex justify-center items-center h-24">
+    <div v-if="isLoading" class="flex items-center justify-center h-24">
       <Spinner size="w-12 h-12" />
     </div>
 
@@ -76,7 +73,7 @@ function handleClick() {
       </div>
 
       <!-- Value and evolution -->
-      <div class="flex gap-2 items-end">
+      <div class="flex items-end gap-2">
         <div class="stat-value" :class="colorClass">
           {{ displayValue }}<span v-if="unit" class="text-2xl font-normal">{{ unit }}</span>
         </div>

@@ -2,10 +2,8 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import ArrowPathIconSolid from '~icons/heroicons/arrow-path-solid'
-import BanknotesIcon from '~icons/heroicons/banknotes'
 import CalendarDaysIcon from '~icons/heroicons/calendar-days'
 import ClockIcon from '~icons/heroicons/clock'
-import type { DateRangeMode } from '~/stores/adminDashboard'
 import { useAdminDashboardStore } from '~/stores/adminDashboard'
 
 const { t } = useI18n()
@@ -36,19 +34,6 @@ function handleRefresh() {
     <div class="flex items-center justify-end gap-2 flex-nowrap sm:gap-4">
       <!-- Date Range Mode Selector -->
       <div class="flex items-center p-1 space-x-1 bg-gray-200 rounded-lg dark:bg-gray-800">
-        <button
-          class="flex gap-0.5 justify-center items-center py-1 px-2 text-xs font-medium text-center whitespace-nowrap rounded-md transition-colors cursor-pointer sm:gap-1.5 sm:px-3"
-          :class="[
-            adminStore.dateRangeMode === 'billing'
-              ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
-              : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white',
-          ]"
-          :aria-label="t('billing-period')"
-          @click="adminStore.setDateRangeMode('billing')"
-        >
-          <BanknotesIcon class="w-4 h-4" />
-          <span class="hidden sm:inline">{{ t('billing-period') }}</span>
-        </button>
         <button
           class="flex gap-0.5 justify-center items-center py-1 px-2 text-xs font-medium text-center whitespace-nowrap rounded-md transition-colors cursor-pointer sm:gap-1.5 sm:px-3"
           :class="[

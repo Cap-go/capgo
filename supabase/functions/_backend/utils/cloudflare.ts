@@ -1720,3 +1720,87 @@ export async function getAdminDeploymentsTrend(
     return []
   }
 }
+
+// Admin Storage Trend (from BANDWIDTH_USAGE - daily total file size)
+export interface AdminStorageTrend {
+  date: string
+  storage_bytes: number
+}
+
+export async function getAdminStorageTrend(
+  c: Context,
+  start_date: string,
+  end_date: string,
+  app_id?: string,
+): Promise<AdminStorageTrend[]> {
+  if (!c.env.BANDWIDTH_USAGE)
+    return []
+
+  const appFilter = app_id ? `AND index1 = '${app_id}'` : ''
+
+  const query = `SELECT
+  formatDateTime(toStartOfInterval(timestamp, INTERVAL '1' DAY), '%Y-%m-%d') AS date,
+  sum(double1) AS storage_bytes
+FROM bandwidth_usage
+WHERE timestamp >= toDateTime('${formatDateCF(start_date)}')
+  AND timestamp < toDateTime('${formatDateCF(end_date)}')
+  ${appFilter}
+GROUP BY date
+ORDER BY date ASC`
+
+  cloudlog({ requestId: c.get('requestId'), message: 'getAdminStorageTrend query', query })
+
+  try {
+    const result = await runQueryToCFA<AdminStorageTrend>(c, query)
+    return result.map(row => ({
+      date: row.date,
+      storage_bytes: Number(row.storage_bytes) || 0,
+    }))
+  }
+  catch (e) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error in getAdminStorageTrend', error: serializeError(e) })
+    return []
+  }
+}
+
+// Admin Bandwidth Trend (from BANDWIDTH_USAGE - daily total bandwidth)
+export interface AdminBandwidthTrend {
+  date: string
+  bandwidth_bytes: number
+}
+
+export async function getAdminBandwidthTrend(
+  c: Context,
+  start_date: string,
+  end_date: string,
+  app_id?: string,
+): Promise<AdminBandwidthTrend[]> {
+  if (!c.env.BANDWIDTH_USAGE)
+    return []
+
+  const appFilter = app_id ? `AND index1 = '${app_id}'` : ''
+
+  const query = `SELECT
+  formatDateTime(toStartOfInterval(timestamp, INTERVAL '1' DAY), '%Y-%m-%d') AS date,
+  sum(double1) AS bandwidth_bytes
+FROM bandwidth_usage
+WHERE timestamp >= toDateTime('${formatDateCF(start_date)}')
+  AND timestamp < toDateTime('${formatDateCF(end_date)}')
+  ${appFilter}
+GROUP BY date
+ORDER BY date ASC`
+
+  cloudlog({ requestId: c.get('requestId'), message: 'getAdminBandwidthTrend query', query })
+
+  try {
+    const result = await runQueryToCFA<AdminBandwidthTrend>(c, query)
+    return result.map(row => ({
+      date: row.date,
+      bandwidth_bytes: Number(row.bandwidth_bytes) || 0,
+    }))
+  }
+  catch (e) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error in getAdminBandwidthTrend', error: serializeError(e) })
+    return []
+  }
+}

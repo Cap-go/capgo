@@ -32,12 +32,20 @@ const successRateTrendData = ref<Array<{ date: string, installs: number, fails: 
 const appsTrendData = ref<Array<{ date: string, apps_created: number }>>([])
 const bundlesTrendData = ref<Array<{ date: string, bundles_created: number }>>([])
 const deploymentsTrendData = ref<Array<{ date: string, deployments: number }>>([])
+const storageTrendData = ref<Array<{ date: string, storage_bytes: number }>>([])
+const bandwidthTrendData = ref<Array<{ date: string, bandwidth_bytes: number }>>([])
+const distributionData = ref<Array<{ date: string, downloads: number, installs: number }>>([])
+const failureData = ref<Array<{ date: string, failures: number, failure_rate: number }>>([])
 
 const isLoadingMauTrend = ref(false)
 const isLoadingSuccessRateTrend = ref(false)
 const isLoadingAppsTrend = ref(false)
 const isLoadingBundlesTrend = ref(false)
 const isLoadingDeploymentsTrend = ref(false)
+const isLoadingStorageTrend = ref(false)
+const isLoadingBandwidthTrend = ref(false)
+const isLoadingDistribution = ref(false)
+const isLoadingFailures = ref(false)
 
 async function loadPlatformOverview() {
   try {
@@ -135,6 +143,70 @@ async function loadDeploymentsTrend() {
   }
 }
 
+async function loadStorageTrend() {
+  isLoadingStorageTrend.value = true
+  try {
+    const data = await adminStore.fetchStats('storage_trend')
+    console.log('[Admin Dashboard] Storage trend data:', data)
+    storageTrendData.value = data || []
+  }
+  catch (error) {
+    console.error('[Admin Dashboard] Error loading storage trend:', error)
+    storageTrendData.value = []
+  }
+  finally {
+    isLoadingStorageTrend.value = false
+  }
+}
+
+async function loadBandwidthTrend() {
+  isLoadingBandwidthTrend.value = true
+  try {
+    const data = await adminStore.fetchStats('bandwidth_trend')
+    console.log('[Admin Dashboard] Bandwidth trend data:', data)
+    bandwidthTrendData.value = data || []
+  }
+  catch (error) {
+    console.error('[Admin Dashboard] Error loading bandwidth trend:', error)
+    bandwidthTrendData.value = []
+  }
+  finally {
+    isLoadingBandwidthTrend.value = false
+  }
+}
+
+async function loadDistributionMetrics() {
+  isLoadingDistribution.value = true
+  try {
+    const data = await adminStore.fetchStats('distribution')
+    console.log('[Admin Dashboard] Distribution data:', data)
+    distributionData.value = data || []
+  }
+  catch (error) {
+    console.error('[Admin Dashboard] Error loading distribution:', error)
+    distributionData.value = []
+  }
+  finally {
+    isLoadingDistribution.value = false
+  }
+}
+
+async function loadFailureMetrics() {
+  isLoadingFailures.value = true
+  try {
+    const data = await adminStore.fetchStats('failures')
+    console.log('[Admin Dashboard] Failure data:', data)
+    failureData.value = data || []
+  }
+  catch (error) {
+    console.error('[Admin Dashboard] Error loading failures:', error)
+    failureData.value = []
+  }
+  finally {
+    isLoadingFailures.value = false
+  }
+}
+
 // Computed properties for chart data
 const mauChartData = computed(() => {
   return mauTrendData.value.map(item => ({
@@ -171,6 +243,20 @@ const deploymentsChartData = computed(() => {
   }))
 })
 
+const storageChartData = computed(() => {
+  return storageTrendData.value.map(item => ({
+    date: item.date,
+    value: item.storage_bytes / (1024 * 1024 * 1024), // Convert to GB
+  }))
+})
+
+const bandwidthChartData = computed(() => {
+  return bandwidthTrendData.value.map(item => ({
+    date: item.date,
+    value: item.bandwidth_bytes / (1024 * 1024 * 1024), // Convert to GB
+  }))
+})
+
 // Watch for date range changes and reload all data
 watch(() => adminStore.activeDateRange, () => {
   if (activeTab.value === 'overview') {
@@ -180,6 +266,8 @@ watch(() => adminStore.activeDateRange, () => {
     loadAppsTrend()
     loadBundlesTrend()
     loadDeploymentsTrend()
+    loadStorageTrend()
+    loadBandwidthTrend()
   }
 }, { deep: true })
 
@@ -201,6 +289,8 @@ onMounted(async () => {
     loadAppsTrend(),
     loadBundlesTrend(),
     loadDeploymentsTrend(),
+    loadStorageTrend(),
+    loadBandwidthTrend(),
   ])
 
   isLoading.value = false
@@ -440,6 +530,35 @@ function switchTab(tab: 'overview' | 'updates' | 'performance' | 'users') {
                     :data="deploymentsChartData"
                     :label="t('deployments-per-day')"
                     color="#ec4899"
+                  />
+                </ChartCard>
+
+                <!-- Storage Trend Chart -->
+                <ChartCard
+                  :title="t('storage-trend')"
+                  :is-loading="isLoadingStorageTrend"
+                  :has-data="storageChartData.length > 0"
+                >
+                  <AdminTrendChart
+                    :data="storageChartData"
+                    :label="t('storage-gb')"
+                    color="#06b6d4"
+                  />
+                </ChartCard>
+              </div>
+
+              <!-- Trend Charts - Row 4 -->
+              <div class="grid grid-cols-1 gap-6 xl:grid-cols-2">
+                <!-- Bandwidth Trend Chart -->
+                <ChartCard
+                  :title="t('bandwidth-trend')"
+                  :is-loading="isLoadingBandwidthTrend"
+                  :has-data="bandwidthChartData.length > 0"
+                >
+                  <AdminTrendChart
+                    :data="bandwidthChartData"
+                    :label="t('bandwidth-gb')"
+                    color="#14b8a6"
                   />
                 </ChartCard>
               </div>

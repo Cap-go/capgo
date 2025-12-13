@@ -2,8 +2,8 @@ import { acceptHMRUpdate, defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { defaultApiHost, useSupabase } from '~/services/supabase'
 
-export type MetricCategory = 'uploads' | 'distribution' | 'failures' | 'success_rate' | 'platform_overview' | 'org_metrics' | 'mau_trend' | 'success_rate_trend' | 'apps_trend' | 'bundles_trend' | 'deployments_trend'
-export type DateRangeMode = 'billing' | '30day' | '90day' | 'custom'
+export type MetricCategory = 'uploads' | 'distribution' | 'failures' | 'success_rate' | 'platform_overview' | 'org_metrics' | 'mau_trend' | 'success_rate_trend' | 'apps_trend' | 'bundles_trend' | 'deployments_trend' | 'storage_trend' | 'bandwidth_trend'
+export type DateRangeMode = '30day' | '90day' | 'custom'
 
 interface DateRange {
   start: Date
@@ -57,14 +57,6 @@ export const useAdminDashboardStore = defineStore('adminDashboard', () => {
           start: new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000),
           end: now,
         }
-      case 'billing': {
-        // Start of current month
-        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-        return {
-          start: startOfMonth,
-          end: now,
-        }
-      }
       case 'custom':
         return customDateRange.value
       default:
