@@ -5,6 +5,7 @@ import { useRouter } from 'vue-router'
 import AdminFilterBar from '~/components/admin/AdminFilterBar.vue'
 import AdminTrendChart from '~/components/admin/AdminTrendChart.vue'
 import ChartCard from '~/components/dashboard/ChartCard.vue'
+import Spinner from '~/components/Spinner.vue'
 import { useAdminDashboardStore } from '~/stores/adminDashboard'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
@@ -232,8 +233,8 @@ function switchTab(tab: 'overview' | 'updates' | 'performance' | 'users') {
         <AdminFilterBar />
 
         <!-- Loading State -->
-        <div v-if="isLoading" class="flex items-center justify-center h-64">
-          <span class="loading loading-spinner loading-lg" />
+        <div v-if="isLoading" class="flex items-center justify-center min-h-screen">
+          <Spinner size="w-24 h-24" />
         </div>
 
         <!-- Dashboard Content -->
