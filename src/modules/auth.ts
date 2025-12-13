@@ -175,6 +175,22 @@ async function guard(
         console.error('Error checking if account is disabled:', error)
       }
     }
+
+    // Check if user is trying to access admin routes
+    if (to.path.startsWith('/admin')) {
+      // Ensure isAdmin is loaded before checking
+      if (main.isAdmin === undefined) {
+        const adminStatus = await isAdmin(main.auth.id)
+        main.isAdmin = adminStatus
+      }
+
+      // Redirect non-admin users to dashboard
+      if (!main.isAdmin) {
+        console.warn('Non-admin user attempted to access admin route:', to.path)
+        return next('/dashboard')
+      }
+    }
+
     hideLoader()
     next()
   }

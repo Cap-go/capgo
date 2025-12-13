@@ -1,13 +1,13 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod/mini'
-import { getAdminDistributionMetrics, getAdminFailureMetrics, getAdminOrgMetrics, getAdminPlatformOverview, getAdminSuccessRate, getAdminUploadMetrics } from '../utils/cloudflare.ts'
+import { getAdminAppsTrend, getAdminBundlesTrend, getAdminDeploymentsTrend, getAdminDistributionMetrics, getAdminFailureMetrics, getAdminMauTrend, getAdminOrgMetrics, getAdminPlatformOverview, getAdminSuccessRate, getAdminSuccessRateTrend, getAdminUploadMetrics } from '../utils/cloudflare.ts'
 import { middlewareAuth, parseBody, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { supabaseClient as useSupabaseClient } from '../utils/supabase.ts'
 
 const bodySchema = z.object({
-  metric_category: z.enum(['uploads', 'distribution', 'failures', 'success_rate', 'platform_overview', 'org_metrics']),
+  metric_category: z.enum(['uploads', 'distribution', 'failures', 'success_rate', 'platform_overview', 'org_metrics', 'mau_trend', 'success_rate_trend', 'apps_trend', 'bundles_trend', 'deployments_trend']),
   start_date: z.string().check(z.minLength(1)),
   end_date: z.string().check(z.minLength(1)),
 })
@@ -90,6 +90,26 @@ app.post('/', middlewareAuth, async (c) => {
 
       case 'org_metrics':
         result = await getAdminOrgMetrics(c, start_date, end_date, limit || 100)
+        break
+
+      case 'mau_trend':
+        result = await getAdminMauTrend(c, start_date, end_date, org_id)
+        break
+
+      case 'success_rate_trend':
+        result = await getAdminSuccessRateTrend(c, start_date, end_date, app_id)
+        break
+
+      case 'apps_trend':
+        result = await getAdminAppsTrend(c, start_date, end_date)
+        break
+
+      case 'bundles_trend':
+        result = await getAdminBundlesTrend(c, start_date, end_date)
+        break
+
+      case 'deployments_trend':
+        result = await getAdminDeploymentsTrend(c, start_date, end_date, app_id)
         break
 
       default:

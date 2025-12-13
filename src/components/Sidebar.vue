@@ -1,15 +1,17 @@
 <script setup lang="ts">
 import type { Tab } from './comp_def'
 import { onClickOutside } from '@vueuse/core'
-import { ref, shallowRef } from 'vue'
+import { computed, ref, shallowRef } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
 import IconDoc from '~icons/gg/loadbar-doc'
 import IconChart from '~icons/heroicons/chart-bar'
+import IconShield from '~icons/heroicons/shield-check'
 import IconDiscord from '~icons/ic/round-discord'
 import IconApiKey from '~icons/mdi/shield-key'
 import IconAppStore from '~icons/simple-icons/appstore'
+import { useMainStore } from '~/stores/main'
 import DropdownProfile from '../components/dashboard/DropdownProfile.vue'
 
 const props = defineProps <{
@@ -35,37 +37,52 @@ function openTab(tab: Tab) {
     router.push(tab.key)
   emit('closeSidebar')
 }
-const tabs = ref<Tab[]>([
-  {
-    label: 'dashboard',
-    icon: shallowRef(IconChart),
-    key: '/dashboard',
-  },
-  {
-    label: 'apps',
-    icon: shallowRef(IconAppStore),
-    key: '/app',
-  },
-  {
-    label: 'api-keys',
-    icon: shallowRef(IconApiKey),
-    key: '/apikeys',
-  },
-  {
-    label: 'documentation',
-    icon: shallowRef(IconDoc),
-    key: '#',
-    onClick: () => window.open('https://docs.capgo.app', '_blank', 'noopener,noreferrer'),
-    redirect: true,
-  },
-  {
-    label: 'discord',
-    icon: shallowRef(IconDiscord),
-    key: '#',
-    onClick: () => window.open('https://discord.capgo.app', '_blank', 'noopener,noreferrer'),
-    redirect: true,
-  },
-])
+
+// Computed tabs list that includes admin link if user is admin
+const tabs = computed<Tab[]>(() => {
+  const baseTabs: Tab[] = [
+    {
+      label: 'dashboard',
+      icon: shallowRef(IconChart),
+      key: '/dashboard',
+    },
+    {
+      label: 'apps',
+      icon: shallowRef(IconAppStore),
+      key: '/app',
+    },
+    {
+      label: 'api-keys',
+      icon: shallowRef(IconApiKey),
+      key: '/apikeys',
+    },
+    {
+      label: 'documentation',
+      icon: shallowRef(IconDoc),
+      key: '#',
+      onClick: () => window.open('https://docs.capgo.app', '_blank', 'noopener,noreferrer'),
+      redirect: true,
+    },
+    {
+      label: 'discord',
+      icon: shallowRef(IconDiscord),
+      key: '#',
+      onClick: () => window.open('https://discord.capgo.app', '_blank', 'noopener,noreferrer'),
+      redirect: true,
+    },
+  ]
+
+  // Add admin dashboard link if user is admin
+  if (main.isAdmin) {
+    baseTabs.splice(2, 0, {
+      label: 'admin-dashboard',
+      icon: shallowRef(IconShield),
+      key: '/admin/dashboard',
+    })
+  }
+
+  return baseTabs
+})
 </script>
 
 <template>

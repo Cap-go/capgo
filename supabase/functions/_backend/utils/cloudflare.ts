@@ -1149,6 +1149,8 @@ export interface AdminSuccessRate {
 export interface AdminPlatformOverview {
   mau: number
   active_apps: number
+  active_orgs: number
+  success_rate: number
   total_bandwidth: number
   android_devices: number
   ios_devices: number
@@ -1163,6 +1165,33 @@ export interface AdminOrgMetrics {
   bandwidth: number
   updates: number
   apps_count: number
+}
+
+export interface AdminMauTrend {
+  date: string
+  mau: number
+}
+
+export interface AdminSuccessRateTrend {
+  date: string
+  installs: number
+  fails: number
+  success_rate: number
+}
+
+export interface AdminAppsTrend {
+  date: string
+  apps_created: number
+}
+
+export interface AdminBundlesTrend {
+  date: string
+  bundles_created: number
+}
+
+export interface AdminDeploymentsTrend {
+  date: string
+  deployments: number
 }
 
 /**
@@ -1358,16 +1387,55 @@ export async function getAdminPlatformOverview(
       WHERE timestamp >= toDateTime('${formatDateCF(start_date)}')
         AND timestamp < toDateTime('${formatDateCF(end_date)}')`
 
-    const [mauResult, appsResult, bandwidthResult, platformResult] = await Promise.all([
+    // Query 5: Active organizations count
+    const orgsQuery = `SELECT COUNT(DISTINCT blob2) AS active_orgs
+      FROM device_usage
+      WHERE timestamp >= toDateTime('${formatDateCF(start_date)}')
+        AND timestamp < toDateTime('${formatDateCF(end_date)}')
+        AND blob2 != ''`
+
+    // Query 6: Success rate from VERSION_USAGE
+    const successRateQuery = `SELECT
+      sum(if(blob3 = 'install', 1, 0)) AS installs,
+      sum(if(blob3 = 'fail', 1, 0)) AS fails
+    FROM version_usage
+    WHERE timestamp >= toDateTime('${formatDateCF(start_date)}')
+      AND timestamp < toDateTime('${formatDateCF(end_date)}')`
+
+    const [mauResult, appsResult, bandwidthResult, platformResult, orgsResult, successResult] = await Promise.all([
       c.env.DEVICE_USAGE ? runQueryToCFA<{ mau: number }>(c, mauQuery) : Promise.resolve([{ mau: 0 }]),
       c.env.APP_LOG ? runQueryToCFA<{ active_apps: number }>(c, appsQuery) : Promise.resolve([{ active_apps: 0 }]),
       c.env.BANDWIDTH_USAGE ? runQueryToCFA<{ total_bandwidth: number }>(c, bandwidthQuery) : Promise.resolve([{ total_bandwidth: 0 }]),
       c.env.DEVICE_INFO ? runQueryToCFA<{ android_devices: number, ios_devices: number, total_devices: number }>(c, platformQuery) : Promise.resolve([{ android_devices: 0, ios_devices: 0, total_devices: 0 }]),
+      c.env.DEVICE_USAGE ? runQueryToCFA<{ active_orgs: number }>(c, orgsQuery) : Promise.resolve([{ active_orgs: 0 }]),
+      c.env.VERSION_USAGE ? runQueryToCFA<{ installs: number, fails: number }>(c, successRateQuery) : Promise.resolve([{ installs: 0, fails: 0 }]),
     ])
+
+    // Log results for debugging
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'Admin platform overview query results',
+      mauResult,
+      appsResult,
+      bandwidthResult,
+      platformResult,
+      orgsResult,
+      successResult,
+      start_date,
+      end_date,
+    })
+
+    // Calculate success rate in JavaScript
+    const installs = successResult[0]?.installs || 0
+    const fails = successResult[0]?.fails || 0
+    const total = installs + fails
+    const success_rate = total > 0 ? (installs / total) * 100 : 0
 
     return {
       mau: mauResult[0]?.mau || 0,
       active_apps: appsResult[0]?.active_apps || 0,
+      active_orgs: orgsResult[0]?.active_orgs || 0,
+      success_rate,
       total_bandwidth: bandwidthResult[0]?.total_bandwidth || 0,
       android_devices: platformResult[0]?.android_devices || 0,
       ios_devices: platformResult[0]?.ios_devices || 0,
@@ -1451,6 +1519,193 @@ export async function getAdminOrgMetrics(
   }
   catch (e) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Error in getAdminOrgMetrics', error: serializeError(e), query })
+    return []
+  }
+}
+
+/**
+ * Get MAU trend over time for admin dashboard
+ * Returns daily unique device counts, optionally filtered by org_id
+ */
+export async function getAdminMauTrend(
+  c: Context,
+  start_date: string,
+  end_date: string,
+  org_id?: string,
+): Promise<AdminMauTrend[]> {
+  if (!c.env.DEVICE_USAGE)
+    return []
+
+  const orgFilter = org_id ? `AND blob2 = '${org_id}'` : ''
+
+  const query = `SELECT
+    formatDateTime(toStartOfInterval(timestamp, INTERVAL '1' DAY), '%Y-%m-%d') AS date,
+    COUNT(DISTINCT blob1) AS mau
+  FROM device_usage
+  WHERE timestamp >= toDateTime('${formatDateCF(start_date)}')
+    AND timestamp < toDateTime('${formatDateCF(end_date)}')
+    ${orgFilter}
+  GROUP BY date
+  ORDER BY date ASC`
+
+  cloudlog({ requestId: c.get('requestId'), message: 'getAdminMauTrend query', query })
+
+  try {
+    const result = await runQueryToCFA<AdminMauTrend>(c, query)
+    return result
+  }
+  catch (e) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error in getAdminMauTrend', error: serializeError(e), query })
+    return []
+  }
+}
+
+/**
+ * Get success rate trend over time for admin dashboard
+ * Returns daily install vs fail counts with calculated success rate
+ */
+export async function getAdminSuccessRateTrend(
+  c: Context,
+  start_date: string,
+  end_date: string,
+  app_id?: string,
+): Promise<AdminSuccessRateTrend[]> {
+  if (!c.env.VERSION_USAGE)
+    return []
+
+  const appFilter = app_id ? `AND blob1 = '${app_id}'` : ''
+
+  const query = `SELECT
+    formatDateTime(toStartOfInterval(timestamp, INTERVAL '1' DAY), '%Y-%m-%d') AS date,
+    sum(if(blob3 = 'install', 1, 0)) AS installs,
+    sum(if(blob3 = 'fail', 1, 0)) AS fails
+  FROM version_usage
+  WHERE timestamp >= toDateTime('${formatDateCF(start_date)}')
+    AND timestamp < toDateTime('${formatDateCF(end_date)}')
+    ${appFilter}
+  GROUP BY date
+  ORDER BY date ASC`
+
+  cloudlog({ requestId: c.get('requestId'), message: 'getAdminSuccessRateTrend query', query })
+
+  try {
+    const rawResult = await runQueryToCFA<{ date: string, installs: number, fails: number }>(c, query)
+    // Calculate success_rate in JavaScript for each day
+    const result: AdminSuccessRateTrend[] = rawResult.map(row => ({
+      date: row.date,
+      installs: row.installs,
+      fails: row.fails,
+      success_rate: (row.installs + row.fails) > 0 ? (row.installs / (row.installs + row.fails)) * 100 : 0,
+    }))
+    return result
+  }
+  catch (e) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error in getAdminSuccessRateTrend', error: serializeError(e), query })
+    return []
+  }
+}
+
+/**
+ * Get app activity trend over time (active apps per day)
+ * Queries APP_LOG to count distinct apps with activity
+ */
+export async function getAdminAppsTrend(
+  c: Context,
+  start_date: string,
+  end_date: string,
+): Promise<AdminAppsTrend[]> {
+  if (!c.env.APP_LOG)
+    return []
+
+  const query = `SELECT
+    formatDateTime(toStartOfInterval(timestamp, INTERVAL '1' DAY), '%Y-%m-%d') AS date,
+    COUNT(DISTINCT index1) AS apps_created
+  FROM app_log
+  WHERE timestamp >= toDateTime('${formatDateCF(start_date)}')
+    AND timestamp < toDateTime('${formatDateCF(end_date)}')
+  GROUP BY date
+  ORDER BY date ASC`
+
+  cloudlog({ requestId: c.get('requestId'), message: 'getAdminAppsTrend query', query })
+
+  try {
+    const result = await runQueryToCFA<AdminAppsTrend>(c, query)
+    return result
+  }
+  catch (e) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error in getAdminAppsTrend', error: serializeError(e), query })
+    return []
+  }
+}
+
+/**
+ * Get bundle uploads trend over time (unique versions uploaded per day)
+ * Queries VERSION_USAGE to count distinct version uploads
+ */
+export async function getAdminBundlesTrend(
+  c: Context,
+  start_date: string,
+  end_date: string,
+): Promise<AdminBundlesTrend[]> {
+  if (!c.env.VERSION_USAGE)
+    return []
+
+  const query = `SELECT
+    formatDateTime(toStartOfInterval(timestamp, INTERVAL '1' DAY), '%Y-%m-%d') AS date,
+    COUNT(DISTINCT blob2) AS bundles_created
+  FROM version_usage
+  WHERE timestamp >= toDateTime('${formatDateCF(start_date)}')
+    AND timestamp < toDateTime('${formatDateCF(end_date)}')
+  GROUP BY date
+  ORDER BY date ASC`
+
+  cloudlog({ requestId: c.get('requestId'), message: 'getAdminBundlesTrend query', query })
+
+  try {
+    const result = await runQueryToCFA<AdminBundlesTrend>(c, query)
+    return result
+  }
+  catch (e) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error in getAdminBundlesTrend', error: serializeError(e), query })
+    return []
+  }
+}
+
+/**
+ * Get deployments trend over time (channel_devices updates)
+ * Queries APP_LOG for deployment events
+ */
+export async function getAdminDeploymentsTrend(
+  c: Context,
+  start_date: string,
+  end_date: string,
+  app_id?: string,
+): Promise<AdminDeploymentsTrend[]> {
+  if (!c.env.APP_LOG)
+    return []
+
+  const appFilter = app_id ? `AND index1 = '${app_id}'` : ''
+
+  // Count deployment actions from APP_LOG
+  const query = `SELECT
+    formatDateTime(toStartOfInterval(timestamp, INTERVAL '1' DAY), '%Y-%m-%d') AS date,
+    COUNT(*) AS deployments
+  FROM app_log
+  WHERE timestamp >= toDateTime('${formatDateCF(start_date)}')
+    AND timestamp < toDateTime('${formatDateCF(end_date)}')
+    AND blob2 = 'set'
+    ${appFilter}
+  GROUP BY date
+  ORDER BY date ASC`
+
+  cloudlog({ requestId: c.get('requestId'), message: 'getAdminDeploymentsTrend query', query })
+
+  try {
+    const result = await runQueryToCFA<AdminDeploymentsTrend>(c, query)
+    return result
+  }
+  catch (e) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error in getAdminDeploymentsTrend', error: serializeError(e), query })
     return []
   }
 }
