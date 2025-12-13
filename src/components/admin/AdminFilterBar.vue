@@ -1,24 +1,15 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import ArrowPathIconSolid from '~icons/heroicons/arrow-path-solid'
+import BanknotesIcon from '~icons/heroicons/banknotes'
+import CalendarDaysIcon from '~icons/heroicons/calendar-days'
+import ClockIcon from '~icons/heroicons/clock'
 import type { DateRangeMode } from '~/stores/adminDashboard'
 import { useAdminDashboardStore } from '~/stores/adminDashboard'
 
 const { t } = useI18n()
 const adminStore = useAdminDashboardStore()
-
-// Date range modes
-const dateRangeModes: { value: DateRangeMode, label: string }[] = [
-  { value: 'billing', label: 'billing-period' },
-  { value: '30day', label: '30-days' },
-  { value: '90day', label: '90-days' },
-  { value: 'custom', label: 'custom-range' },
-]
-
-const dateRangeModeModel = computed({
-  get: () => adminStore.dateRangeMode,
-  set: value => adminStore.setDateRangeMode(value),
-})
 
 // Format date for display
 function formatDate(date: Date): string {
@@ -41,37 +32,60 @@ function handleRefresh() {
 </script>
 
 <template>
-  <div class="flex flex-wrap gap-4 justify-between items-center p-5 mb-6 rounded-lg shadow-sm bg-base-100">
-    <div class="flex flex-wrap gap-4 items-center">
+  <div class="mb-4">
+    <div class="flex items-center justify-end gap-2 flex-nowrap sm:gap-4">
       <!-- Date Range Mode Selector -->
-      <div class="form-control w-full max-w-xs">
-        <label class="label">
-          <span class="label-text">{{ t('date-range') }}</span>
-        </label>
-        <select v-model="dateRangeModeModel" class="w-full select select-bordered">
-          <option v-for="mode in dateRangeModes" :key="mode.value" :value="mode.value">
-            {{ t(mode.label) }}
-          </option>
-        </select>
+      <div class="flex items-center p-1 space-x-1 bg-gray-200 rounded-lg dark:bg-gray-800">
+        <button
+          class="flex gap-0.5 justify-center items-center py-1 px-2 text-xs font-medium text-center whitespace-nowrap rounded-md transition-colors cursor-pointer sm:gap-1.5 sm:px-3"
+          :class="[
+            adminStore.dateRangeMode === 'billing'
+              ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+              : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white',
+          ]"
+          :aria-label="t('billing-period')"
+          @click="adminStore.setDateRangeMode('billing')"
+        >
+          <BanknotesIcon class="w-4 h-4" />
+          <span class="hidden sm:inline">{{ t('billing-period') }}</span>
+        </button>
+        <button
+          class="flex gap-0.5 justify-center items-center py-1 px-2 text-xs font-medium text-center whitespace-nowrap rounded-md transition-colors cursor-pointer sm:gap-1.5 sm:px-3"
+          :class="[
+            adminStore.dateRangeMode === '30day'
+              ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+              : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white',
+          ]"
+          :aria-label="t('30-days')"
+          @click="adminStore.setDateRangeMode('30day')"
+        >
+          <CalendarDaysIcon class="w-4 h-4" />
+          <span class="hidden sm:inline">{{ t('30-days') }}</span>
+        </button>
+        <button
+          class="flex gap-0.5 justify-center items-center py-1 px-2 text-xs font-medium text-center whitespace-nowrap rounded-md transition-colors cursor-pointer sm:gap-1.5 sm:px-3"
+          :class="[
+            adminStore.dateRangeMode === '90day'
+              ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+              : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white',
+          ]"
+          :aria-label="t('90-days')"
+          @click="adminStore.setDateRangeMode('90day')"
+        >
+          <ClockIcon class="w-4 h-4" />
+          <span class="hidden sm:inline">{{ t('90-days') }}</span>
+        </button>
       </div>
 
-      <!-- Selected Period Display -->
-      <div class="form-control w-full max-w-xs">
-        <label class="label">
-          <span class="label-text">{{ t('selected-period') }}</span>
-        </label>
-        <div class="flex items-center px-4 py-3 font-medium rounded-lg bg-base-200">
-          {{ dateRangeDisplay }}
-        </div>
-      </div>
+      <!-- Reload Button -->
+      <button
+        type="button"
+        class="flex items-center justify-center w-8 h-8 text-gray-700 transition-colors bg-white rounded-md shadow-sm cursor-pointer sm:w-9 sm:h-9 dark:text-gray-200 dark:bg-gray-700 hover:text-gray-900 hover:bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:outline-none dark:hover:bg-gray-600 dark:hover:text-white dark:focus:ring-blue-400"
+        :aria-label="t('reload')"
+        @click="handleRefresh"
+      >
+        <ArrowPathIconSolid class="w-4 h-4" />
+      </button>
     </div>
-
-    <!-- Refresh Button -->
-    <button class="gap-2 btn btn-primary" @click="handleRefresh">
-      <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-      </svg>
-      {{ t('refresh') }}
-    </button>
   </div>
 </template>
