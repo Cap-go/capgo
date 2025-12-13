@@ -154,6 +154,7 @@ CREATE TYPE "public"."stats_action" AS ENUM(
   'directory_path_fail',
   'unzip_fail',
   'low_mem_fail',
+  'download_0',
   'download_10',
   'download_20',
   'download_30',
@@ -3639,7 +3640,6 @@ WITH
 ALTER TABLE "public"."device_usage_id_seq" OWNER TO "postgres";
 
 ALTER SEQUENCE "public"."device_usage_id_seq" OWNED BY "public"."device_usage"."id";
-
 
 CREATE TABLE IF NOT EXISTS "public"."devices" (
   "updated_at" timestamp with time zone NOT NULL,

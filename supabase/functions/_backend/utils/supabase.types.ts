@@ -2655,6 +2655,7 @@ export type Database = {
         | "download_manifest_checksum_fail"
         | "download_manifest_brotli_fail"
         | "backend_refusal"
+        | "download_0"
       stripe_status:
         | "created"
         | "succeeded"
@@ -2903,6 +2904,7 @@ export const Constants = {
         "download_manifest_checksum_fail",
         "download_manifest_brotli_fail",
         "backend_refusal",
+        "download_0",
       ],
       stripe_status: [
         "created",
