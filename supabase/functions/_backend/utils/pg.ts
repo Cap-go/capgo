@@ -710,3 +710,134 @@ export async function getCompatibleChannelsPg(
     return []
   }
 }
+
+// Admin Deployments Trend (from Supabase channel_devices table)
+export interface AdminDeploymentsTrend {
+  date: string
+  deployments: number
+}
+
+export async function getAdminDeploymentsTrend(
+  c: Context,
+  start_date: string,
+  end_date: string,
+  app_id?: string,
+): Promise<AdminDeploymentsTrend[]> {
+  try {
+    const pgClient = getPgClient(c, true) // Read-only query
+    const drizzleClient = getDrizzleClient(pgClient)
+
+    const appFilter = app_id ? sql`AND app_id = ${app_id}` : sql``
+
+    const query = sql`
+      SELECT
+        DATE(created_at) AS date,
+        COUNT(*)::int AS deployments
+      FROM channel_devices
+      WHERE created_at >= ${start_date}::timestamp
+        AND created_at < ${end_date}::timestamp
+        ${appFilter}
+      GROUP BY DATE(created_at)
+      ORDER BY date ASC
+    `
+
+    const result = await drizzleClient.execute(query)
+
+    const data: AdminDeploymentsTrend[] = result.rows.map((row: any) => ({
+      date: row.date instanceof Date ? row.date.toISOString().split('T')[0] : row.date,
+      deployments: Number(row.deployments),
+    }))
+
+    cloudlog({ requestId: c.get('requestId'), message: 'getAdminDeploymentsTrend result', resultCount: data.length })
+
+    return data
+  }
+  catch (e: unknown) {
+    logPgError(c, 'getAdminDeploymentsTrend', e)
+    return []
+  }
+}
+
+// Admin Global Stats Trend (from Supabase global_stats table)
+export interface AdminGlobalStatsTrend {
+  date: string
+  apps: number
+  apps_active: number
+  users: number
+  users_active: number
+  paying: number
+  trial: number
+  not_paying: number
+  updates: number
+  success_rate: number
+  bundle_storage_gb: number
+  plan_solo: number
+  plan_maker: number
+  plan_team: number
+  plan_payg: number
+  registers_today: number
+}
+
+export async function getAdminGlobalStatsTrend(
+  c: Context,
+  start_date: string,
+  end_date: string,
+): Promise<AdminGlobalStatsTrend[]> {
+  try {
+    const pgClient = getPgClient(c, true) // Read-only query
+    const drizzleClient = getDrizzleClient(pgClient)
+
+    const query = sql`
+      SELECT
+        date_id AS date,
+        apps::int,
+        apps_active::int,
+        users::int,
+        users_active::int,
+        paying::int,
+        trial::int,
+        not_paying::int,
+        updates::int,
+        success_rate::float,
+        bundle_storage_gb::float,
+        plan_solo::int,
+        plan_maker::int,
+        plan_team::int,
+        plan_payg::int,
+        registers_today::int
+      FROM global_stats
+      WHERE date_id >= ${start_date}
+        AND date_id < ${end_date}
+      ORDER BY date_id ASC
+    `
+
+    const result = await drizzleClient.execute(query)
+
+    const data: AdminGlobalStatsTrend[] = result.rows.map((row: any) => ({
+      date: row.date,
+      apps: Number(row.apps) || 0,
+      apps_active: Number(row.apps_active) || 0,
+      users: Number(row.users) || 0,
+      users_active: Number(row.users_active) || 0,
+      paying: Number(row.paying) || 0,
+      trial: Number(row.trial) || 0,
+      not_paying: Number(row.not_paying) || 0,
+      updates: Number(row.updates) || 0,
+      success_rate: Number(row.success_rate) || 0,
+      bundle_storage_gb: Number(row.bundle_storage_gb) || 0,
+      plan_solo: Number(row.plan_solo) || 0,
+      plan_maker: Number(row.plan_maker) || 0,
+      plan_team: Number(row.plan_team) || 0,
+      plan_payg: Number(row.plan_payg) || 0,
+      registers_today: Number(row.registers_today) || 0,
+    }))
+
+    cloudlog({ requestId: c.get('requestId'), message: 'getAdminGlobalStatsTrend result', resultCount: data.length })
+
+    return data
+  }
+  catch (e: unknown) {
+    logPgError(c, 'getAdminGlobalStatsTrend', e)
+    return []
+  }
+}

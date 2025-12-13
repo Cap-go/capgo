@@ -4,11 +4,9 @@ import type { DeviceComparable } from './deviceComparison.ts'
 import type { Database } from './supabase.types.ts'
 import type { DeviceRes, DeviceWithoutCreatedAt, ReadDevicesParams, ReadStatsParams } from './types.ts'
 import dayjs from 'dayjs'
-import { sql } from 'drizzle-orm'
 import { CacheHelper } from './cache.ts'
 import { hasComparableDeviceChanged, toComparableDevice } from './deviceComparison.ts'
 import { cloudlog, cloudlogErr, serializeError } from './logging.ts'
-import { getDrizzleClient, getPgClient } from './pg.ts'
 import { DEFAULT_LIMIT } from './types.ts'
 import { getEnv } from './utils.ts'
 
@@ -1191,11 +1189,6 @@ export interface AdminBundlesTrend {
   bundles_created: number
 }
 
-export interface AdminDeploymentsTrend {
-  date: string
-  deployments: number
-}
-
 /**
  * Get upload metrics for admin dashboard
  * Returns daily unique version uploads, optionally filtered by app_id
@@ -1677,50 +1670,6 @@ export async function getAdminBundlesTrend(
  * Get deployments trend over time (channel_devices updates)
  * Queries APP_LOG for deployment events
  */
-export async function getAdminDeploymentsTrend(
-  c: Context,
-  start_date: string,
-  end_date: string,
-  app_id?: string,
-): Promise<AdminDeploymentsTrend[]> {
-  try {
-    const pgClient = getPgClient(c, true) // Read-only query
-    const drizzleClient = getDrizzleClient(pgClient)
-
-    // Query channel_devices table from Postgres (deployments are stored in Supabase, not Cloudflare)
-    const appFilter = app_id ? sql`AND app_id = ${app_id}` : sql``
-
-    const query = sql`
-      SELECT
-        DATE(created_at) AS date,
-        COUNT(*)::int AS deployments
-      FROM channel_devices
-      WHERE created_at >= ${start_date}::timestamp
-        AND created_at < ${end_date}::timestamp
-        ${appFilter}
-      GROUP BY DATE(created_at)
-      ORDER BY date ASC
-    `
-
-    cloudlog({ requestId: c.get('requestId'), message: 'getAdminDeploymentsTrend query', start_date, end_date, app_id })
-
-    const result = await drizzleClient.execute(query)
-
-    const data: AdminDeploymentsTrend[] = result.rows.map((row: any) => ({
-      date: row.date instanceof Date ? row.date.toISOString().split('T')[0] : row.date,
-      deployments: Number(row.deployments),
-    }))
-
-    cloudlog({ requestId: c.get('requestId'), message: 'getAdminDeploymentsTrend result', resultCount: data.length })
-
-    return data
-  }
-  catch (e) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Error in getAdminDeploymentsTrend', error: serializeError(e) })
-    return []
-  }
-}
-
 // Admin Storage Trend (from BANDWIDTH_USAGE - daily total file size)
 export interface AdminStorageTrend {
   date: string
