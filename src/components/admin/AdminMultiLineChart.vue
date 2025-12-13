@@ -5,6 +5,7 @@ import {
   CategoryScale,
   Chart,
   Filler,
+  Legend,
   LinearScale,
   LineController,
   LineElement,
@@ -14,18 +15,16 @@ import {
 import { computed } from 'vue'
 import { Line } from 'vue-chartjs'
 
+interface DataSeries {
+  label: string
+  data: Array<{ date: string, value: number }>
+  color: string
+}
+
 const props = defineProps({
-  data: {
-    type: Array as () => Array<{ date: string, value: number }>,
+  series: {
+    type: Array as () => DataSeries[],
     required: true,
-  },
-  label: {
-    type: String,
-    required: true,
-  },
-  color: {
-    type: String,
-    default: '#6366f1', // indigo-500
   },
   isLoading: {
     type: Boolean,
@@ -43,28 +42,35 @@ Chart.register(
   LinearScale,
   LineElement,
   Filler,
+  Legend,
 )
 
 const chartData = computed<ChartData<'line'>>(() => {
-  const labels = props.data.map(item => item.date)
-  const values = props.data.map(item => item.value)
+  if (props.series.length === 0 || props.series[0].data.length === 0) {
+    return {
+      labels: [],
+      datasets: [],
+    }
+  }
+
+  const labels = props.series[0].data.map(item => item.date)
+
+  const datasets = props.series.map(serie => ({
+    label: serie.label,
+    data: serie.data.map(item => item.value),
+    borderColor: serie.color,
+    backgroundColor: `${serie.color}33`, // 20% opacity
+    fill: false,
+    tension: 0.4,
+    pointRadius: 3,
+    pointBackgroundColor: serie.color,
+    pointBorderWidth: 0,
+    borderWidth: 2,
+  }))
 
   return {
     labels,
-    datasets: [
-      {
-        label: props.label,
-        data: values,
-        borderColor: props.color,
-        backgroundColor: `${props.color}33`, // 20% opacity
-        fill: true,
-        tension: 0.4,
-        pointRadius: 3,
-        pointBackgroundColor: props.color,
-        pointBorderWidth: 0,
-        borderWidth: 2,
-      },
-    ],
+    datasets,
   }
 })
 
@@ -85,7 +91,13 @@ const chartOptions = computed<ChartOptions<'line'>>(() => ({
   },
   plugins: {
     legend: {
-      display: false,
+      display: true,
+      position: 'bottom',
+      labels: {
+        color: isDark.value ? '#d1d5db' : '#4b5563',
+        usePointStyle: true,
+        padding: 15,
+      },
     },
     tooltip: {
       backgroundColor: isDark.value ? 'rgba(31, 41, 55, 0.95)' : 'rgba(255, 255, 255, 0.95)',

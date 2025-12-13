@@ -37,9 +37,30 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
-    '/admin/dashboard': RouteRecordInfo<
+    '/admin/dashboard/': RouteRecordInfo<
+      '/admin/dashboard/',
       '/admin/dashboard',
-      '/admin/dashboard',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
+    '/admin/dashboard/performance': RouteRecordInfo<
+      '/admin/dashboard/performance',
+      '/admin/dashboard/performance',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
+    '/admin/dashboard/updates': RouteRecordInfo<
+      '/admin/dashboard/updates',
+      '/admin/dashboard/updates',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
+    '/admin/dashboard/users': RouteRecordInfo<
+      '/admin/dashboard/users',
+      '/admin/dashboard/users',
       Record<never, never>,
       Record<never, never>,
       | never
@@ -356,9 +377,27 @@ declare module 'vue-router/auto-routes' {
       views:
         | never
     }
-    'src/pages/admin/dashboard.vue': {
+    'src/pages/admin/dashboard/index.vue': {
       routes:
-        | '/admin/dashboard'
+        | '/admin/dashboard/'
+      views:
+        | never
+    }
+    'src/pages/admin/dashboard/performance.vue': {
+      routes:
+        | '/admin/dashboard/performance'
+      views:
+        | never
+    }
+    'src/pages/admin/dashboard/updates.vue': {
+      routes:
+        | '/admin/dashboard/updates'
+      views:
+        | never
+    }
+    'src/pages/admin/dashboard/users.vue': {
+      routes:
+        | '/admin/dashboard/users'
       views:
         | never
     }

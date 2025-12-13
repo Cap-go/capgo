@@ -13,6 +13,7 @@ export {}
 declare module 'vue' {
   export interface GlobalComponents {
     AdminFilterBar: typeof import('./components/admin/AdminFilterBar.vue')['default']
+    AdminMultiLineChart: typeof import('./components/admin/AdminMultiLineChart.vue')['default']
     AdminStatsCard: typeof import('./components/admin/AdminStatsCard.vue')['default']
     AdminTrendChart: typeof import('./components/admin/AdminTrendChart.vue')['default']
     AppSetting: typeof import('./components/dashboard/AppSetting.vue')['default']
@@ -67,6 +68,7 @@ declare module 'vue' {
 // For TSX support
 declare global {
   const AdminFilterBar: typeof import('./components/admin/AdminFilterBar.vue')['default']
+  const AdminMultiLineChart: typeof import('./components/admin/AdminMultiLineChart.vue')['default']
   const AdminStatsCard: typeof import('./components/admin/AdminStatsCard.vue')['default']
   const AdminTrendChart: typeof import('./components/admin/AdminTrendChart.vue')['default']
   const AppSetting: typeof import('./components/dashboard/AppSetting.vue')['default']
