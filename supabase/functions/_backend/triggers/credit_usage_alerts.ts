@@ -36,7 +36,10 @@ app.post('/', middlewareAPISecret, async (c) => {
   if (!eventName)
     return simpleError('unsupported_threshold', 'Threshold not supported', { threshold, payload })
 
-  const percentUsed = Math.min(100, Number(payload.percent_used ?? 0))
+  const percentUsed = Math.min(
+    100,
+    Math.round(Number(payload.percent_used ?? 0)),
+  )
   const totalCredits = Number(payload.total_credits ?? 0)
   const availableCredits = Number(payload.available_credits ?? 0)
   const alertCycle = Number(payload.alert_cycle ?? 1)
