@@ -65,7 +65,7 @@ async function calculateRevenue(c: Context): Promise<PlanRevenue> {
     const { data: plansData, error: plansError } = await supabase
       .from('plans')
       .select('name, price_m, price_y, price_m_id, price_y_id')
-      .in('name', ['Solo', 'Maker', 'Team', 'Pay as you go'])
+      .in('name', ['Solo', 'Maker', 'Team', 'Enterprise'])
 
     if (plansError || !plansData) {
       cloudlogErr({ requestId: c.get('requestId'), message: 'Failed to fetch plan prices', error: plansError })

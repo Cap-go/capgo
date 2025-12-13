@@ -433,7 +433,7 @@ BEGIN
   RETURN QUERY (SELECT plans.name FROM public.plans
     WHERE plans.mau >= find_fit_plan_v3.mau AND plans.storage >= find_fit_plan_v3.storage
       AND plans.bandwidth >= find_fit_plan_v3.bandwidth AND plans.build_time_unit >= find_fit_plan_v3.build_time_unit
-      OR plans.name = 'Pay as you go'
+      OR plans.name = 'Enterprise'
     ORDER BY plans.mau);
 END;
 $$;
@@ -460,7 +460,7 @@ BEGIN
       AND plans.storage >= find_best_plan_v3.storage
       AND plans.bandwidth >= find_best_plan_v3.bandwidth
       AND plans.build_time_unit >= find_best_plan_v3.build_time_unit
-    ) OR plans.name = 'Pay as you go'
+    ) OR plans.name = 'Enterprise'
     ORDER BY plans.mau
     LIMIT 1
   );

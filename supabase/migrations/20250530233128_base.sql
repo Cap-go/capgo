@@ -716,7 +716,7 @@ Begin
   WHERE plans.mau>=find_best_plan_v3.mau
     AND plans.storage>=find_best_plan_v3.storage
     AND plans.bandwidth>=find_best_plan_v3.bandwidth
-    OR plans.name = 'Pay as you go'
+    OR plans.name = 'Enterprise'
     ORDER BY plans.mau
     LIMIT 1);
 End;
@@ -743,7 +743,7 @@ RETURN QUERY (
   WHERE plans.mau >= find_fit_plan_v3.mau
     AND plans.storage >= find_fit_plan_v3.storage
     AND plans.bandwidth >= find_fit_plan_v3.bandwidth
-    OR plans.name = 'Pay as you go'
+    OR plans.name = 'Enterprise'
   ORDER BY plans.mau
 );
 END;
@@ -2431,7 +2431,7 @@ BEGIN
     FROM public.plans p
     WHERE p.name = current_plan_name
       AND (
-        p.name = 'Pay as you go'
+        p.name = 'Enterprise'
         OR (p.mau >= v_mau AND p.bandwidth >= v_bandwidth AND p.storage >= v_storage)
       )
   );
