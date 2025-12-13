@@ -1,8 +1,8 @@
 <script setup lang="ts">
+import type { DateRangeMode } from '~/stores/adminDashboard'
 import { useI18n } from 'vue-i18n'
 import ArrowPathIconSolid from '~icons/heroicons/arrow-path-solid'
 import CalendarDaysIcon from '~icons/heroicons/calendar-days'
-import type { DateRangeMode } from '~/stores/adminDashboard'
 import { useAdminDashboardStore } from '~/stores/adminDashboard'
 
 const { t } = useI18n()
@@ -25,10 +25,10 @@ function handleDateRangeChange(event: Event) {
     <div class="flex items-center justify-end gap-2 flex-nowrap sm:gap-4">
       <!-- Date Range Mode Selector -->
       <div class="relative flex items-center">
-        <CalendarDaysIcon class="absolute left-3 w-4 h-4 text-gray-500 pointer-events-none dark:text-gray-400" />
+        <CalendarDaysIcon class="absolute w-4 h-4 text-gray-500 pointer-events-none left-3 dark:text-gray-400" />
         <select
           :value="adminStore.dateRangeMode"
-          class="py-2 pl-9 pr-10 text-sm font-medium text-gray-900 bg-white border border-gray-300 rounded-lg cursor-pointer appearance-none dark:text-white dark:bg-gray-700 dark:border-gray-600 hover:bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:outline-none dark:hover:bg-gray-600 dark:focus:ring-blue-400"
+          class="py-2 pr-10 text-sm font-medium text-gray-900 bg-white border border-gray-300 rounded-lg appearance-none cursor-pointer pl-9 dark:text-white dark:bg-gray-700 dark:border-gray-600 hover:bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:outline-none dark:hover:bg-gray-600 dark:focus:ring-blue-400"
           @change="handleDateRangeChange"
         >
           <option value="30day">
@@ -47,7 +47,7 @@ function handleDateRangeChange(event: Event) {
             {{ t('last-12-months') }}
           </option>
         </select>
-        <svg class="absolute right-3 w-4 h-4 text-gray-500 pointer-events-none dark:text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg class="absolute w-4 h-4 text-gray-500 pointer-events-none right-3 dark:text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
         </svg>
       </div>
