@@ -65,21 +65,21 @@ const chartsLoaded = ref({
 })
 const reloadTrigger = ref(0) // Increment this to trigger reload in all charts
 
-// Cache for 30-day data (to avoid refetching when switching modes)
-const cached30DayData = ref<{
+// Per-org cache for 30-day data: Map<orgId, cachedData>
+const cacheByOrg = new Map<string, {
   mau: number[]
   storage: number[]
   bandwidth: number[]
-} | null>(null)
+}>()
 
-const cached30DayDataByApp = ref<{
+const cacheByOrgByApp = new Map<string, {
   mau: { [appId: string]: number[] }
   storage: { [appId: string]: number[] }
   bandwidth: { [appId: string]: number[] }
-} | null>(null)
+}>()
 
-// Track which org the cache belongs to
-const cachedOrgId = ref<string | null>(null)
+// Track current org for change detection
+const currentCacheOrgId = ref<string | null>(null)
 
 // View mode selectors for charts
 const route = useRoute()
@@ -294,55 +294,59 @@ async function getUsages(forceRefetch = false) {
   // Reset to start of day to match calculation in store
   billingStart.setHours(0, 0, 0, 0)
 
-  // Check if org has changed - invalidate cache if so
   const currentOrgId = organizationStore.currentOrganization?.gid ?? null
-  if (cachedOrgId.value !== currentOrgId) {
-    cached30DayData.value = null
-    cached30DayDataByApp.value = null
-    cachedOrgId.value = currentOrgId
-  }
+  currentCacheOrgId.value = currentOrgId
 
-  // Use cached 30-day data if available and not forcing refetch
-  if (cached30DayData.value && !forceRefetch) {
+  // Check per-org cache - only use if not forcing refetch
+  const cachedData = currentOrgId ? cacheByOrg.get(currentOrgId) : null
+  const cachedDataByApp = currentOrgId ? cacheByOrgByApp.get(currentOrgId) : null
+
+  if (cachedData && !forceRefetch) {
     // Filter data based on billing period mode
     if (useBillingPeriod.value) {
       // Show only data within billing period
-      const filteredData = filterToBillingPeriod(cached30DayData.value, last30DaysStart, billingStart)
+      const filteredData = filterToBillingPeriod(cachedData, last30DaysStart, billingStart)
       data.value = filteredData.data
 
       // Filter by-app data too if available
-      if (cached30DayDataByApp.value && Object.keys(cached30DayDataByApp.value.mau).length > 0) {
-        Object.keys(cached30DayDataByApp.value.mau).forEach((appId) => {
+      if (cachedDataByApp && Object.keys(cachedDataByApp.mau).length > 0) {
+        const newDataByApp = {
+          mau: {} as { [appId: string]: number[] },
+          storage: {} as { [appId: string]: number[] },
+          bandwidth: {} as { [appId: string]: number[] },
+        }
+        Object.keys(cachedDataByApp.mau).forEach((appId) => {
           const appData = {
-            mau: cached30DayDataByApp.value!.mau[appId],
-            storage: cached30DayDataByApp.value!.storage[appId],
-            bandwidth: cached30DayDataByApp.value!.bandwidth[appId],
+            mau: cachedDataByApp.mau[appId],
+            storage: cachedDataByApp.storage[appId],
+            bandwidth: cachedDataByApp.bandwidth[appId],
           }
           const filteredAppData = filterToBillingPeriod(appData, last30DaysStart, billingStart)
-          dataByApp.value.mau[appId] = filteredAppData.data.mau
-          dataByApp.value.storage[appId] = filteredAppData.data.storage
-          dataByApp.value.bandwidth[appId] = filteredAppData.data.bandwidth
+          newDataByApp.mau[appId] = filteredAppData.data.mau
+          newDataByApp.storage[appId] = filteredAppData.data.storage
+          newDataByApp.bandwidth[appId] = filteredAppData.data.bandwidth
         })
+        dataByApp.value = newDataByApp
       }
     }
     else {
       // Show all 30 days from cache - deep copy to ensure reactivity
       data.value = {
-        mau: [...cached30DayData.value.mau],
-        storage: [...cached30DayData.value.storage],
-        bandwidth: [...cached30DayData.value.bandwidth],
+        mau: [...cachedData.mau],
+        storage: [...cachedData.storage],
+        bandwidth: [...cachedData.bandwidth],
       }
-      if (cached30DayDataByApp.value) {
+      if (cachedDataByApp) {
         // Deep copy the by-app data to ensure reactivity
         const newDataByApp = {
           mau: {} as { [appId: string]: number[] },
           storage: {} as { [appId: string]: number[] },
           bandwidth: {} as { [appId: string]: number[] },
         }
-        Object.keys(cached30DayDataByApp.value.mau).forEach((appId) => {
-          newDataByApp.mau[appId] = [...cached30DayDataByApp.value!.mau[appId]]
-          newDataByApp.storage[appId] = [...cached30DayDataByApp.value!.storage[appId]]
-          newDataByApp.bandwidth[appId] = [...cached30DayDataByApp.value!.bandwidth[appId]]
+        Object.keys(cachedDataByApp.mau).forEach((appId) => {
+          newDataByApp.mau[appId] = [...cachedDataByApp.mau[appId]]
+          newDataByApp.storage[appId] = [...cachedDataByApp.storage[appId]]
+          newDataByApp.bandwidth[appId] = [...cachedDataByApp.bandwidth[appId]]
         })
         dataByApp.value = newDataByApp
       }
@@ -380,8 +384,10 @@ async function getUsages(forceRefetch = false) {
     }
   })
 
-  // Cache the full 30-day data
-  cached30DayData.value = full30DayData
+  // Store in per-org cache
+  if (currentOrgId) {
+    cacheByOrg.set(currentOrgId, full30DayData)
+  }
 
   // Process by-app data if available
   appNames.value = appNamesMap
@@ -421,8 +427,10 @@ async function getUsages(forceRefetch = false) {
     })
   }
 
-  // Cache the full 30-day by-app data
-  cached30DayDataByApp.value = full30DayDataByApp
+  // Store in per-org cache
+  if (currentOrgId) {
+    cacheByOrgByApp.set(currentOrgId, full30DayDataByApp)
+  }
   dataByApp.value = full30DayDataByApp
 
   // Filter data based on billing period mode
@@ -433,6 +441,11 @@ async function getUsages(forceRefetch = false) {
 
     // Filter by-app data too
     if (Object.keys(full30DayDataByApp.mau).length > 0) {
+      const newDataByApp = {
+        mau: {} as { [appId: string]: number[] },
+        storage: {} as { [appId: string]: number[] },
+        bandwidth: {} as { [appId: string]: number[] },
+      }
       Object.keys(full30DayDataByApp.mau).forEach((appId) => {
         const appData = {
           mau: full30DayDataByApp.mau[appId],
@@ -440,10 +453,11 @@ async function getUsages(forceRefetch = false) {
           bandwidth: full30DayDataByApp.bandwidth[appId],
         }
         const filteredAppData = filterToBillingPeriod(appData, last30DaysStart, billingStart)
-        dataByApp.value.mau[appId] = filteredAppData.data.mau
-        dataByApp.value.storage[appId] = filteredAppData.data.storage
-        dataByApp.value.bandwidth[appId] = filteredAppData.data.bandwidth
+        newDataByApp.mau[appId] = filteredAppData.data.mau
+        newDataByApp.storage[appId] = filteredAppData.data.storage
+        newDataByApp.bandwidth[appId] = filteredAppData.data.bandwidth
       })
+      dataByApp.value = newDataByApp
     }
   }
   else {
@@ -517,12 +531,9 @@ watch([showCumulative, useBillingPeriod], async (newValues, oldValues) => {
     showCumulative.value = false
   }
 
-  // Force refetch when billing period mode changes to ensure data is correct
+  // Reprocess data when billing period mode changes - use cached data if available
   if (loadedAlready.value && newBillingPeriod !== oldBillingPeriod && oldBillingPeriod !== null) {
-    // Clear cache and force refetch for clean data
-    cached30DayData.value = null
-    cached30DayDataByApp.value = null
-    await getUsages(true)
+    await getUsages(false) // Use cache if available
   }
 
   // Update URL parameters

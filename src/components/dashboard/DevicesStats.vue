@@ -394,6 +394,8 @@ const chartOptions = computed<ChartOptions<'line'>>(() => {
     maintainAspectRatio: false,
     scales: createChartScales(isDark.value, {
       suggestedMax: 100,
+      xStacked: props.accumulated,
+      yStacked: props.accumulated,
       yTickCallback: (tickValue: string | number) => {
         const numericValue = typeof tickValue === 'number' ? tickValue : Number(tickValue)
         const display = Number.isFinite(numericValue) ? numericValue : tickValue
@@ -417,19 +419,34 @@ async function loadData(forceRefetch = false) {
     await organizationStore.awaitInitialLoad()
   }
   catch (error) {
-    console.error('Error preparing organization data for mobile stats:', error)
+    console.error('[DevicesStats] Error preparing organization data for mobile stats:', error)
   }
 
   const { startDate, endDate } = getDateRange()
   const isBillingMode = props.useBillingPeriod
 
-  // Check if we have cached data for this mode
+  // Check if we have cached data for this mode that matches the current date range
   const cachedData = isBillingMode ? cachedBillingData.value : cached30DayData.value
 
-  if (cachedData && !forceRefetch) {
+  // Validate cache: dates must match (comparing timestamps to avoid reference issues)
+  const cacheIsValid = cachedData
+    && cachedData.range.startDate.getTime() === startDate.getTime()
+    && cachedData.range.endDate.getTime() === endDate.getTime()
+
+  if (cacheIsValid && !forceRefetch) {
     rawChartData.value = cachedData.data
     currentRange.value = cachedData.range
     return
+  }
+
+  // Clear invalid cache for this mode
+  if (cachedData && !cacheIsValid) {
+    if (isBillingMode) {
+      cachedBillingData.value = null
+    }
+    else {
+      cached30DayData.value = null
+    }
   }
 
   const currentToken = ++requestToken
@@ -439,6 +456,7 @@ async function loadData(forceRefetch = false) {
 
   try {
     const data = await useChartData(supabase, appId.value, startDate, endDate)
+
     if (currentToken !== requestToken)
       return
 
@@ -454,14 +472,15 @@ async function loadData(forceRefetch = false) {
     }
   }
   catch (error) {
-    console.error(error)
+    console.error('[DevicesStats] Error fetching chart data:', error)
     if (currentToken !== requestToken)
       return
     rawChartData.value = null
   }
   finally {
-    if (currentToken === requestToken)
+    if (currentToken === requestToken) {
       isLoading.value = false
+    }
   }
 }
 
@@ -481,7 +500,8 @@ watch(
   () => [route.path, route.params.package as string | undefined] as const,
   async ([path, packageId], old) => {
     const oldPackageId = old?.[1]
-    if (path.includes('/p/') && packageId) {
+    // Check for /app/[package] route pattern
+    if (path.includes('/app/') && packageId) {
       const packageChanged = packageId !== oldPackageId
       appId.value = packageId
       if (packageChanged) {
@@ -489,6 +509,10 @@ watch(
         cachedBillingData.value = null
         cached30DayData.value = null
         await loadData(true) // Force refetch for new app
+      }
+      else if (!rawChartData.value) {
+        // Initial load - no data yet
+        await loadData(true)
       }
     }
     else {
