@@ -758,6 +758,12 @@ async function deleteBundle() {
               >
                 {{ hideString(version.session_key) }}
               </InfoRow>
+              <!-- key_id (public key prefix) -->
+              <InfoRow
+                v-if="version.key_id" :label="t('public-key-prefix')"
+              >
+                {{ version.key_id }}
+              </InfoRow>
               <!-- version.external_url -->
               <InfoRow
                 v-if="version.external_url" :label="t('url')" :is-link="true"

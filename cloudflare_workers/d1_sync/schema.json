@@ -14,6 +14,7 @@
       "session_key": "TEXT",
       "storage_provider": "TEXT",
       "min_update_version": "TEXT",
+      "key_id": "TEXT",
       "link": "TEXT",
       "comment": "TEXT"
     },
@@ -144,4 +145,4 @@
       "app_version_id"
     ]
   }
-} 
+}

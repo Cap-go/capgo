@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS app_versions (
     session_key TEXT,
     storage_provider TEXT,
     min_update_version TEXT,
+    key_id TEXT,
     link TEXT,
     comment TEXT
 );
