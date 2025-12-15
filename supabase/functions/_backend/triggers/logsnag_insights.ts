@@ -135,7 +135,7 @@ async function calculateRevenue(c: Context): Promise<PlanRevenue> {
     const subCountMap = new Map<string, { monthly: number, yearly: number }>()
     for (const sub of subsData) {
       const planName = (sub.plans as any)?.name?.toLowerCase()
-      if (!planName || !['solo', 'maker', 'team', 'pay as you go'].includes(planName))
+      if (!planName || !['solo', 'maker', 'team', 'enterprise'].includes(planName))
         continue
 
       const priceId = sub.price_id
@@ -158,12 +158,12 @@ async function calculateRevenue(c: Context): Promise<PlanRevenue> {
     const solo = subCountMap.get('solo') || { monthly: 0, yearly: 0 }
     const maker = subCountMap.get('maker') || { monthly: 0, yearly: 0 }
     const team = subCountMap.get('team') || { monthly: 0, yearly: 0 }
-    const enterprise = subCountMap.get('pay as you go') || { monthly: 0, yearly: 0 }
+    const enterprise = subCountMap.get('enterprise') || { monthly: 0, yearly: 0 }
 
     const soloPrices = priceMap.get('solo') || { price_m: 0, price_y: 0, price_m_id: '', price_y_id: '' }
     const makerPrices = priceMap.get('maker') || { price_m: 0, price_y: 0, price_m_id: '', price_y_id: '' }
     const teamPrices = priceMap.get('team') || { price_m: 0, price_y: 0, price_m_id: '', price_y_id: '' }
-    const enterprisePrices = priceMap.get('pay as you go') || { price_m: 0, price_y: 0, price_m_id: '', price_y_id: '' }
+    const enterprisePrices = priceMap.get('enterprise') || { price_m: 0, price_y: 0, price_m_id: '', price_y_id: '' }
 
     // MRR = (monthly subs × monthly price) + (yearly subs × yearly price / 12)
     const soloMRR = (solo.monthly * soloPrices.price_m) + (solo.yearly * soloPrices.price_y / 12)
@@ -249,6 +249,7 @@ async function getGithubStars(): Promise<number> {
 
 function getStats(c: Context): GlobalStats {
   const supabase = supabaseAdmin(c)
+  const last24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toString()
   return {
     apps: countAllApps(c),
     updates: countAllUpdates(c),
@@ -307,7 +308,7 @@ function getStats(c: Context): GlobalStats {
     registers_today: supabase
       .from('users')
       .select('id', { count: 'exact', head: true })
-      .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+      .gte('created_at', last24h)
       .then((res) => {
         if (res.error)
           cloudlog({ requestId: c.get('requestId'), message: 'registers_today error', error: res.error })
@@ -330,7 +331,7 @@ function getStats(c: Context): GlobalStats {
       .select('customer_id', { count: 'exact', head: false })
       .eq('status', 'succeeded')
       .eq('is_good_plan', true)
-      .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+      .gte('created_at', last24h)
       .then((res) => {
         if (res.error) {
           cloudlog({ requestId: c.get('requestId'), message: 'new_paying_orgs error', error: res.error })
@@ -344,7 +345,7 @@ function getStats(c: Context): GlobalStats {
       .from('stripe_info')
       .select('customer_id', { count: 'exact', head: false })
       .not('canceled_at', 'is', null)
-      .gte('canceled_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+      .gte('canceled_at', last24h)
       .then((res) => {
         if (res.error) {
           cloudlog({ requestId: c.get('requestId'), message: 'canceled_orgs error', error: res.error })
@@ -357,7 +358,7 @@ function getStats(c: Context): GlobalStats {
     credits_bought: supabase
       .from('usage_credit_grants')
       .select('credits_total')
-      .gte('granted_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+      .gte('granted_at', last24h)
       .then((res) => {
         if (res.error) {
           cloudlog({ requestId: c.get('requestId'), message: 'credits_bought error', error: res.error })
@@ -368,7 +369,7 @@ function getStats(c: Context): GlobalStats {
     credits_consumed: supabase
       .from('usage_credit_consumptions')
       .select('credits_used')
-      .gte('applied_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+      .gte('applied_at', last24h)
       .then((res) => {
         if (res.error) {
           cloudlog({ requestId: c.get('requestId'), message: 'credits_consumed error', error: res.error })
