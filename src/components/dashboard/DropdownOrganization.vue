@@ -113,6 +113,8 @@ function onOrganizationClick(org: Organization) {
   // route.params.package
   if (router.currentRoute.value.path !== '/dashboard')
     router.push(`/dashboard`)
+  // Note: When already on dashboard, the watch on currentOrganization in
+  // organization.ts will trigger data reload via main.updateDashboard()
 }
 
 async function createNewOrg() {

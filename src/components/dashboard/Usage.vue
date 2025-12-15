@@ -78,6 +78,9 @@ const cached30DayDataByApp = ref<{
   bandwidth: { [appId: string]: number[] }
 } | null>(null)
 
+// Track which org the cache belongs to
+const cachedOrgId = ref<string | null>(null)
+
 // View mode selectors for charts
 const route = useRoute()
 const router = useRouter()
@@ -291,6 +294,14 @@ async function getUsages(forceRefetch = false) {
   // Reset to start of day to match calculation in store
   billingStart.setHours(0, 0, 0, 0)
 
+  // Check if org has changed - invalidate cache if so
+  const currentOrgId = organizationStore.currentOrganization?.gid ?? null
+  if (cachedOrgId.value !== currentOrgId) {
+    cached30DayData.value = null
+    cached30DayDataByApp.value = null
+    cachedOrgId.value = currentOrgId
+  }
+
   // Use cached 30-day data if available and not forcing refetch
   if (cached30DayData.value && !forceRefetch) {
     // Filter data based on billing period mode
@@ -474,9 +485,21 @@ async function loadData() {
   }, 300)
 }
 
+// Watch for organization changes - show loading immediately when org switches
+watch(() => organizationStore.currentOrganization?.gid, (newOrgId, oldOrgId) => {
+  if (newOrgId && oldOrgId && newOrgId !== oldOrgId && loadedAlready.value) {
+    // Show loading state immediately when org changes (before data is fetched)
+    isLoading.value = true
+    // Increment reload trigger to force all child charts to refetch
+    reloadTrigger.value++
+  }
+})
+
 watch(dashboard, async (_dashboard) => {
   if (loadedAlready.value) {
+    // Data has been refreshed (e.g., after org switch) - process it
     await getUsages(true) // Dashboard data changed, force refetch
+    isLoading.value = false
   }
   else {
     loadedAlready.value = true

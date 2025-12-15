@@ -4,6 +4,8 @@ import type { Database } from '~/types/supabase.types'
 import { defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
 import { useSupabase } from '~/services/supabase'
+import { useDashboardAppsStore } from './dashboardApps'
+import { useDisplayStore } from './display'
 import { useMainStore } from './main'
 
 export type Organization = ArrayElement<Database['public']['Functions']['get_orgs_v6']['Returns']>
@@ -58,7 +60,7 @@ export const useOrganizationStore = defineStore('organization', () => {
 
   const STORAGE_KEY = 'capgo_current_org_id'
 
-  watch(currentOrganization, async (currentOrganizationRaw) => {
+  watch(currentOrganization, async (currentOrganizationRaw, oldOrganization) => {
     if (!currentOrganizationRaw) {
       currentRole.value = null
       localStorage.removeItem(STORAGE_KEY)
@@ -68,6 +70,19 @@ export const useOrganizationStore = defineStore('organization', () => {
     localStorage.setItem(STORAGE_KEY, currentOrganizationRaw.gid)
     currentRole.value = await getCurrentRole(currentOrganizationRaw.created_by)
     currentOrganizationFailed.value = !(!!currentOrganizationRaw.paying || (currentOrganizationRaw.trial_left ?? 0) > 0)
+
+    // Clear caches when org changes to prevent showing stale data from other orgs
+    if (oldOrganization?.gid !== currentOrganizationRaw.gid) {
+      const displayStore = useDisplayStore()
+      displayStore.clearCachesForOrg(currentOrganizationRaw.gid)
+
+      // Reset and refetch dashboard apps for the new org
+      const dashboardAppsStore = useDashboardAppsStore()
+      dashboardAppsStore.reset()
+      // Fetch apps for the new org - don't await to avoid blocking other operations
+      dashboardAppsStore.fetchApps(true)
+    }
+
     // Always fetch last 30 days of data and filter client-side for billing period
     const last30DaysEnd = new Date()
     const last30DaysStart = new Date()

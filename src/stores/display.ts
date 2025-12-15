@@ -26,10 +26,24 @@ export const useDisplayStore = defineStore('display', () => {
   const resolverReady = ref(false)
   const appNameCache = ref(new Map<string, string>())
   const pendingFetches = new Map<string, Promise<void>>()
+  // Track which org the caches belong to
+  const currentCacheOrgId = ref<string | null>(null)
 
   function setAppNameResolver(resolver: (appId: string) => string | undefined) {
     appNameResolver.value = resolver
     resolverReady.value = true
+  }
+
+  // Clear all entity name caches when org changes
+  function clearCachesForOrg(newOrgId: string | null) {
+    if (currentCacheOrgId.value !== newOrgId) {
+      channelNameCache.value.clear()
+      bundleNameCache.value.clear()
+      deviceNameCache.value.clear()
+      appNameCache.value.clear()
+      pendingFetches.clear()
+      currentCacheOrgId.value = newOrgId
+    }
   }
 
   function setChannelName(id: string, name: string) {
@@ -304,6 +318,7 @@ export const useDisplayStore = defineStore('display', () => {
     setDeviceName,
     updatePathTitle,
     lastPath,
+    clearCachesForOrg,
   }
 })
 

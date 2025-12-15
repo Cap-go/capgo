@@ -83,6 +83,8 @@ const hasData = computed(() => totalDeployments.value > 0)
 
 // Cache for raw API data
 const cachedRawStats = ref<any[] | null>(null)
+// Track which org the cache belongs to
+const cachedOrgId = ref<string | null>(null)
 
 async function calculateStats(forceRefetch = false) {
   const startTime = Date.now()
@@ -99,6 +101,14 @@ async function calculateStats(forceRefetch = false) {
   appNames.value = {}
   deploymentData.value = []
   noPublicChannel.value = false
+
+  // Check if org has changed FIRST - invalidate cache and force app refetch if so
+  const currentOrgId = organizationStore.currentOrganization?.gid ?? null
+  const orgChanged = cachedOrgId.value !== currentOrgId
+  if (orgChanged) {
+    cachedRawStats.value = null
+    cachedOrgId.value = currentOrgId
+  }
 
   try {
     await organizationStore.dedupFetchOrganizations()
@@ -152,8 +162,8 @@ async function calculateStats(forceRefetch = false) {
       localAppNames[props.appId] = cachedName || props.appId
     }
     else {
-      // Only fetch apps if not already loaded in store
-      if (!dashboardAppsStore.isLoaded)
+      // Fetch apps if not loaded OR if org changed (to get fresh app list)
+      if (!dashboardAppsStore.isLoaded || orgChanged)
         await dashboardAppsStore.fetchApps()
 
       targetAppIds = [...dashboardAppsStore.appIds]
@@ -309,9 +319,20 @@ async function calculateStats(forceRefetch = false) {
   }
 }
 
-// Watch for billing period mode changes - use cached data
+// Watch for organization changes - invalidate cache and refetch
+watch(() => organizationStore.currentOrganization?.gid, async (newOrgId, oldOrgId) => {
+  if (newOrgId && oldOrgId && newOrgId !== oldOrgId) {
+    cachedRawStats.value = null // Clear cache for new org
+    cachedOrgId.value = null // Reset org tracking so calculateStats detects org change
+    await calculateStats(true) // Force refetch from API
+  }
+})
+
+// Watch for billing period mode changes - use cached data if available, otherwise fetch
 watch(() => props.useBillingPeriod, async () => {
-  await calculateStats(false) // Don't refetch, just reprocess cached data
+  // If cache is empty, force refetch
+  const needsFetch = cachedRawStats.value === null
+  await calculateStats(needsFetch)
 })
 
 // Watch for app target changes - need to refetch
@@ -320,9 +341,11 @@ watch(() => props.appId, async () => {
   await calculateStats(true) // Force refetch for new app
 })
 
-// Watch for accumulated mode changes - use cached data
+// Watch for accumulated mode changes - use cached data if available, otherwise fetch
 watch(() => props.accumulated, async () => {
-  await calculateStats(false) // Don't refetch, just reprocess cached data
+  // If cache is empty, force refetch
+  const needsFetch = cachedRawStats.value === null
+  await calculateStats(needsFetch)
 })
 
 // Watch for reload trigger - force refetch
