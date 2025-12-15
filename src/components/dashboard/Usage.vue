@@ -82,9 +82,9 @@ const cached30DayDataByApp = ref<{
 const route = useRoute()
 const router = useRouter()
 
-// Initialize from URL parameters (default: cumulative=false, billingPeriod=true)
+// Initialize from URL parameters (default: cumulative=false, billingPeriod=false)
 const showCumulative = ref(route.query.cumulative === 'true') // Switch 1: Daily vs Cumulative (daily by default)
-const useBillingPeriod = ref(route.query.billingPeriod !== 'false') // Switch 2: Billing Period vs Last 30 Days
+const useBillingPeriod = ref(route.query.billingPeriod === 'true') // Switch 2: Billing Period vs Last 30 Days (last 30 days by default)
 const main = useMainStore()
 const organizationStore = useOrganizationStore()
 const dashboardAppsStore = useDashboardAppsStore()
@@ -151,8 +151,9 @@ function updateUrlParams() {
     delete query.cumulative
   }
 
-  if (!useBillingPeriod.value) {
-    query.billingPeriod = 'false'
+  // Only add to URL if different from default (last 30 days is default)
+  if (useBillingPeriod.value) {
+    query.billingPeriod = 'true'
   }
   else {
     delete query.billingPeriod
@@ -314,10 +315,25 @@ async function getUsages(forceRefetch = false) {
       }
     }
     else {
-      // Show all 30 days from cache
-      data.value = { ...cached30DayData.value }
+      // Show all 30 days from cache - deep copy to ensure reactivity
+      data.value = {
+        mau: [...cached30DayData.value.mau],
+        storage: [...cached30DayData.value.storage],
+        bandwidth: [...cached30DayData.value.bandwidth],
+      }
       if (cached30DayDataByApp.value) {
-        dataByApp.value = { ...cached30DayDataByApp.value }
+        // Deep copy the by-app data to ensure reactivity
+        const newDataByApp = {
+          mau: {} as { [appId: string]: number[] },
+          storage: {} as { [appId: string]: number[] },
+          bandwidth: {} as { [appId: string]: number[] },
+        }
+        Object.keys(cached30DayDataByApp.value.mau).forEach((appId) => {
+          newDataByApp.mau[appId] = [...cached30DayDataByApp.value!.mau[appId]]
+          newDataByApp.storage[appId] = [...cached30DayDataByApp.value!.storage[appId]]
+          newDataByApp.bandwidth[appId] = [...cached30DayDataByApp.value!.bandwidth[appId]]
+        })
+        dataByApp.value = newDataByApp
       }
     }
 
@@ -478,10 +494,12 @@ watch([showCumulative, useBillingPeriod], async (newValues, oldValues) => {
     showCumulative.value = false
   }
 
-  // Use cached data when billing period mode changes (no refetch needed)
-  // The getUsages function will automatically use cache when forceRefetch=false
+  // Force refetch when billing period mode changes to ensure data is correct
   if (loadedAlready.value && newBillingPeriod !== oldBillingPeriod && oldBillingPeriod !== null) {
-    await getUsages(false) // Use cache
+    // Clear cache and force refetch for clean data
+    cached30DayData.value = null
+    cached30DayDataByApp.value = null
+    await getUsages(true)
   }
 
   // Update URL parameters
@@ -491,7 +509,7 @@ watch([showCumulative, useBillingPeriod], async (newValues, oldValues) => {
 // Watch for URL parameter changes (e.g., browser back/forward)
 watch(() => route.query, (newQuery) => {
   const newCumulative = newQuery.cumulative === 'true' // daily is default
-  const newBillingPeriod = newQuery.billingPeriod !== 'false'
+  const newBillingPeriod = newQuery.billingPeriod === 'true' // last 30 days is default
 
   if (showCumulative.value !== newCumulative) {
     showCumulative.value = newCumulative
