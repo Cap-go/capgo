@@ -361,7 +361,7 @@ const todayLineOptions = computed(() => {
 
 const chartOptions = computed<ChartOptions<'line'>>(() => {
   const hasMultipleDatasets = (processedChartData.value?.datasets.length ?? 0) > 1
-  const tooltipOptions = createTooltipConfig(hasMultipleDatasets, props.accumulated)
+  const tooltipOptions = createTooltipConfig(hasMultipleDatasets, props.accumulated, props.useBillingPeriod ? currentRange.value?.startDate : false)
 
   const pluginOptions = {
     legend: {
