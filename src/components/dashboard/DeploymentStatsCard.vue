@@ -81,34 +81,30 @@ const isLoading = ref(true)
 const noPublicChannel = ref(false)
 const hasData = computed(() => totalDeployments.value > 0)
 
-// Cache for raw API data
-const cachedRawStats = ref<any[] | null>(null)
-// Track which org the cache belongs to
-const cachedOrgId = ref<string | null>(null)
+// Per-org cache for raw API data: Map<orgId, {data, noPublicChannel}>
+const cacheByOrg = new Map<string, { data: any[], noPublicChannel: boolean }>()
+// Track current org for change detection
+const currentCacheOrgId = ref<string | null>(null)
 
 async function calculateStats(forceRefetch = false) {
   const startTime = Date.now()
   const requestToken = ++latestRequestToken
 
   isLoading.value = true
+
+  // Reset display data
   totalDeployments.value = 0
   lastDayEvolution.value = 0
-
-  const fallbackData = Array.from({ length: 30 }).fill(0) as number[]
-
-  // Reset data holders
   deploymentDataByApp.value = {}
   appNames.value = {}
   deploymentData.value = []
   noPublicChannel.value = false
 
-  // Check if org has changed FIRST - invalidate cache and force app refetch if so
+  const fallbackData = Array.from({ length: 30 }).fill(0) as number[]
+
   const currentOrgId = organizationStore.currentOrganization?.gid ?? null
-  const orgChanged = cachedOrgId.value !== currentOrgId
-  if (orgChanged) {
-    cachedRawStats.value = null
-    cachedOrgId.value = currentOrgId
-  }
+  const orgChanged = currentCacheOrgId.value !== currentOrgId
+  currentCacheOrgId.value = currentOrgId
 
   try {
     await organizationStore.dedupFetchOrganizations()
@@ -163,8 +159,7 @@ async function calculateStats(forceRefetch = false) {
     }
     else {
       // Fetch apps if not loaded OR if org changed (to get fresh app list)
-      if (!dashboardAppsStore.isLoaded || orgChanged)
-        await dashboardAppsStore.fetchApps()
+      await dashboardAppsStore.fetchApps(orgChanged)
 
       targetAppIds = [...dashboardAppsStore.appIds]
       Object.assign(localAppNames, dashboardAppsStore.appNames)
@@ -180,6 +175,7 @@ async function calculateStats(forceRefetch = false) {
       return
     }
 
+    // Create fresh arrays for processing
     const perApp: { [appId: string]: number[] } = {}
     targetAppIds.forEach((appId) => {
       perApp[appId] = Array.from({ length: 30 }).fill(0) as number[]
@@ -189,13 +185,13 @@ async function calculateStats(forceRefetch = false) {
     let totalDeploymentsCount = 0
     let noPublicChannelDetected = false
 
-    // Use cached data if available and not forcing refetch
-    let data, error
-    if (cachedRawStats.value && !forceRefetch) {
-      data = cachedRawStats.value
-      error = null
-      // Use cached noPublicChannel state
-      noPublicChannelDetected = noPublicChannel.value
+    // Check per-org cache - only use if not forcing refetch
+    let data: any[] | null = null
+    const cachedData = currentOrgId ? cacheByOrg.get(currentOrgId) : null
+
+    if (cachedData && !forceRefetch) {
+      data = cachedData.data
+      noPublicChannelDetected = cachedData.noPublicChannel
     }
     else {
       // Only check public channels when actually fetching new data
@@ -209,8 +205,8 @@ async function calculateStats(forceRefetch = false) {
           const hasPublic = (publicChannels?.length ?? 0) > 0
           noPublicChannelDetected = !hasPublic
         }
-        catch (error) {
-          console.error(`[DeploymentStatsCard] Failed to verify public channels`, error)
+        catch (err) {
+          console.error(`[DeploymentStatsCard] Failed to verify public channels`, err)
         }
       }
 
@@ -229,15 +225,16 @@ async function calculateStats(forceRefetch = false) {
         .lte('deployed_at', endDate)
         .order('deployed_at')
 
-      data = result.data
-      error = result.error
-      // Cache the fetched data
-      if (!error)
-        cachedRawStats.value = data
-    }
+      if (result.error)
+        throw result.error
 
-    if (error)
-      throw error
+      data = result.data
+
+      // Store in per-org cache
+      if (data && currentOrgId) {
+        cacheByOrg.set(currentOrgId, { data, noPublicChannel: noPublicChannelDetected })
+      }
+    }
 
     if (data && data.length > 0) {
       data.forEach((deployment: any) => {
@@ -319,39 +316,33 @@ async function calculateStats(forceRefetch = false) {
   }
 }
 
-// Watch for organization changes - invalidate cache and refetch
+// Watch for organization changes - use per-org cache (no need to force refetch)
 watch(() => organizationStore.currentOrganization?.gid, async (newOrgId, oldOrgId) => {
   if (newOrgId && oldOrgId && newOrgId !== oldOrgId) {
-    cachedRawStats.value = null // Clear cache for new org
-    cachedOrgId.value = null // Reset org tracking so calculateStats detects org change
-    await calculateStats(true) // Force refetch from API
+    // Per-org cache will be checked in calculateStats
+    await calculateStats(false)
   }
 })
 
-// Watch for billing period mode changes - use cached data if available, otherwise fetch
+// Watch for billing period mode changes - reprocess cached data
 watch(() => props.useBillingPeriod, async () => {
-  // If cache is empty, force refetch
-  const needsFetch = cachedRawStats.value === null
-  await calculateStats(needsFetch)
+  await calculateStats(false)
 })
 
 // Watch for app target changes - need to refetch
 watch(() => props.appId, async () => {
-  cachedRawStats.value = null // Clear cache when app changes
   await calculateStats(true) // Force refetch for new app
 })
 
-// Watch for accumulated mode changes - use cached data if available, otherwise fetch
+// Watch for accumulated mode changes - reprocess cached data
 watch(() => props.accumulated, async () => {
-  // If cache is empty, force refetch
-  const needsFetch = cachedRawStats.value === null
-  await calculateStats(needsFetch)
+  await calculateStats(false)
 })
 
-// Watch for reload trigger - force refetch
-watch(() => props.reloadTrigger, async (newVal, oldVal) => {
-  if (newVal !== oldVal && newVal > 0) {
-    await calculateStats(true) // Force refetch from API
+// Watch for reload trigger - force refetch from API
+watch(() => props.reloadTrigger, async (newVal) => {
+  if (newVal > 0) {
+    await calculateStats(true)
   }
 })
 

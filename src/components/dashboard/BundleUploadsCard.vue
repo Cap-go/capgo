@@ -75,10 +75,10 @@ const bundleDataByApp = ref<{ [appId: string]: number[] }>({})
 const appNames = ref<{ [appId: string]: string }>({})
 const isLoading = ref(true)
 
-// Cache for raw API data
-const cachedRawStats = ref<any[] | null>(null)
-// Track which org the cache belongs to
-const cachedOrgId = ref<string | null>(null)
+// Per-org cache for raw API data: Map<orgId, cachedData>
+const cacheByOrg = new Map<string, any[]>()
+// Track current org for change detection
+const currentCacheOrgId = ref<string | null>(null)
 // Cache for single app name to avoid refetching
 const singleAppNameCache = new Map<string, string>()
 
@@ -88,20 +88,17 @@ async function calculateStats(forceRefetch = false) {
   const startTime = Date.now()
   try {
     isLoading.value = true
-    total.value = 0
 
-    // Reset data
+    // Reset display data
+    total.value = 0
+    lastDayEvolution.value = 0
     bundleDataByApp.value = {}
     appNames.value = {}
     bundleData.value = []
 
-    // Check if org has changed FIRST - invalidate cache and force app refetch if so
     const currentOrgId = organizationStore.currentOrganization?.gid ?? null
-    const orgChanged = cachedOrgId.value !== currentOrgId
-    if (orgChanged) {
-      cachedRawStats.value = null
-      cachedOrgId.value = currentOrgId
-    }
+    const orgChanged = currentCacheOrgId.value !== currentOrgId
+    currentCacheOrgId.value = currentOrgId
 
     // Always work with last 30 days of data
     const last30DaysEnd = new Date()
@@ -113,9 +110,6 @@ async function calculateStats(forceRefetch = false) {
     // Get billing period dates for filtering
     const billingStart = new Date(organizationStore.currentOrganization?.subscription_start ?? new Date())
     billingStart.setHours(0, 0, 0, 0)
-
-    // Create 30-day arrays
-    const dailyCounts30Days = Array.from({ length: 30 }).fill(0) as number[]
 
     // Determine target apps
     const localAppNames: { [appId: string]: string } = {}
@@ -147,7 +141,6 @@ async function calculateStats(forceRefetch = false) {
       // Multiple apps mode - use store for shared apps data
       const dashboardAppsStore = useDashboardAppsStore()
       // Force fetch if org changed to ensure we get fresh data
-      // This is needed because organization.ts may reset the store after our fetch
       await dashboardAppsStore.fetchApps(orgChanged)
 
       targetAppIds = [...dashboardAppsStore.appIds]
@@ -155,21 +148,21 @@ async function calculateStats(forceRefetch = false) {
     }
 
     if (targetAppIds.length === 0) {
-      bundleData.value = dailyCounts30Days
+      bundleData.value = Array.from({ length: 30 }).fill(0) as number[]
       bundleDataByApp.value = {}
       return
     }
 
-    // Use cached data if available and not forcing refetch
-    // If cache is null, we must fetch even if forceRefetch is false
-    let data, error
-    const shouldUseCachedData = cachedRawStats.value !== null && !forceRefetch
-    if (shouldUseCachedData) {
-      data = cachedRawStats.value
-      error = null
+    // Check per-org cache - only use cache if not forcing refetch
+    let data: any[] | null = null
+    let error = null
+    const cachedData = currentOrgId ? cacheByOrg.get(currentOrgId) : null
+
+    if (cachedData && !forceRefetch) {
+      data = cachedData
     }
     else {
-      // Always fetch last 30 days of data
+      // Fetch last 30 days of data
       const query = useSupabase()
         .from('app_versions')
         .select('created_at, app_id')
@@ -180,21 +173,28 @@ async function calculateStats(forceRefetch = false) {
       const result = await query
       data = result.data
       error = result.error
-      // Cache the fetched data
-      if (!error) {
-        cachedRawStats.value = data
+
+      // Store in per-org cache
+      if (!error && data && currentOrgId) {
+        cacheByOrg.set(currentOrgId, data)
       }
     }
+
     if (!error && data) {
-      // Build 30-day data arrays for both global and per-app
+      // Create fresh arrays for processing
+      const dailyCounts30Days = Array.from({ length: 30 }).fill(0) as number[]
       const bundleDataByApp30Days: { [appId: string]: number[] } = {}
       targetAppIds.forEach((appId) => {
         bundleDataByApp30Days[appId] = Array.from({ length: 30 }).fill(0) as number[]
       })
 
+      // Track total separately (don't use ref during loop)
+      let totalCount = 0
+
       // Map each bundle to the correct day and app (30 days)
-      data.filter(b => b.created_at !== null && b.app_id !== null)
-        .forEach((bundle) => {
+      data
+        .filter((b: any) => b.created_at !== null && b.app_id !== null)
+        .forEach((bundle: any) => {
           if (bundle.created_at && bundle.app_id) {
             const bundleDate = new Date(bundle.created_at)
 
@@ -203,7 +203,7 @@ async function calculateStats(forceRefetch = false) {
 
             if (daysDiff >= 0 && daysDiff < 30) {
               dailyCounts30Days[daysDiff]++
-              total.value++
+              totalCount++
 
               // Also track by app
               if (bundleDataByApp30Days[bundle.app_id]) {
@@ -234,6 +234,7 @@ async function calculateStats(forceRefetch = false) {
         // Show all 30 days
         bundleData.value = dailyCounts30Days
         bundleDataByApp.value = bundleDataByApp30Days
+        total.value = totalCount
       }
 
       // Calculate evolution (compare last two days with data)
@@ -260,33 +261,28 @@ async function calculateStats(forceRefetch = false) {
   }
 }
 
-// Watch for organization changes - invalidate cache and refetch
+// Watch for organization changes - use per-org cache (no need to force refetch)
 watch(() => organizationStore.currentOrganization?.gid, async (newOrgId, oldOrgId) => {
   if (newOrgId && oldOrgId && newOrgId !== oldOrgId) {
-    cachedRawStats.value = null // Clear cache for new org
-    cachedOrgId.value = null // Reset org tracking so calculateStats detects org change
-    await calculateStats(true) // Force refetch from API
+    // Per-org cache will be checked in calculateStats
+    await calculateStats(false)
   }
 })
 
-// Watch for billing period mode changes - use cached data if available, otherwise fetch
+// Watch for billing period mode changes - reprocess cached data
 watch(() => props.useBillingPeriod, async () => {
-  // If cache is empty, force refetch
-  const needsFetch = cachedRawStats.value === null
-  await calculateStats(needsFetch)
+  await calculateStats(false)
 })
 
-// Watch for accumulated mode changes - use cached data if available, otherwise fetch
+// Watch for accumulated mode changes - reprocess cached data
 watch(() => props.accumulated, async () => {
-  // If cache is empty, force refetch
-  const needsFetch = cachedRawStats.value === null
-  await calculateStats(needsFetch)
+  await calculateStats(false)
 })
 
-// Watch for reload trigger - force refetch
+// Watch for reload trigger - force refetch from API
 watch(() => props.reloadTrigger, async (newVal, oldVal) => {
   if (newVal !== oldVal && newVal > 0) {
-    await calculateStats(true) // Force refetch from API
+    await calculateStats(true)
   }
 })
 
