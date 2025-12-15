@@ -110,8 +110,9 @@ function onOrganizationClick(org: Organization) {
 
   organizationStore.setCurrentOrganization(org.gid)
   // if current path is not home, redirect to the org home page
-  if (router.currentRoute.value.path !== '/app')
-    router.push(`/app`)
+  // route.params.package
+  if (router.currentRoute.value.path !== '/dashboard')
+    router.push(`/dashboard`)
 }
 
 async function createNewOrg() {
