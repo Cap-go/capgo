@@ -15,7 +15,7 @@ import IconTrash from '~icons/heroicons/trash'
 import IconSearch from '~icons/ic/round-search?raw'
 import IconAlertCircle from '~icons/lucide/alert-circle'
 import { bytesToMbText } from '~/services/conversion'
-import { formatDate } from '~/services/date'
+import { formatDate, formatLocalDate } from '~/services/date'
 import { checkCompatibilityNativePackages, isCompatible, useSupabase } from '~/services/supabase'
 import { openVersion } from '~/services/versions'
 import { useDialogV2Store } from '~/stores/dialogv2'
@@ -981,7 +981,7 @@ async function deleteBundle() {
                     <span v-if="chan.android">🤖 Android</span>
                   </div>
                   <div v-if="chan.created_at" class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    {{ t('created') }}: {{ new Date(chan.created_at).toLocaleDateString() }}
+                    {{ t('created') }}: {{ formatLocalDate(chan.created_at) }}
                   </div>
                 </div>
                 <div class="text-2xl">

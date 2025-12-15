@@ -1,4 +1,32 @@
 import dayjs from 'dayjs'
+import { i18n } from '~/modules/i18n'
+
+/**
+ * Get the current app locale for date formatting
+ */
+function getAppLocale(): string {
+  return i18n.global.locale.value || 'en'
+}
+
+/**
+ * Format a date using the app's locale (e.g., "12/15/2025" in English, "15/12/2025" in French)
+ */
+export function formatLocalDate(date: Date | string | undefined | null): string {
+  if (!date)
+    return ''
+  const d = typeof date === 'string' ? new Date(date) : date
+  return d.toLocaleDateString(getAppLocale())
+}
+
+/**
+ * Format a date with month name and day using the app's locale (e.g., "December 15" in English, "15 décembre" in French)
+ */
+export function formatLocalDateLong(date: Date | string | undefined | null): string {
+  if (!date)
+    return ''
+  const d = typeof date === 'string' ? new Date(date) : date
+  return d.toLocaleDateString(getAppLocale(), { month: 'long', day: 'numeric' })
+}
 
 export function formatDate(date: string | undefined) {
   return dayjs(date).format('YYYY-MM-DD HH:mm')

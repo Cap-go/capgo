@@ -12,7 +12,7 @@ import IconInformation from '~icons/heroicons/information-circle'
 import IconSearch from '~icons/ic/round-search?raw'
 import IconAlertCircle from '~icons/lucide/alert-circle'
 import IconDown from '~icons/material-symbols/keyboard-arrow-down-rounded'
-import { formatDate } from '~/services/date'
+import { formatDate, formatLocalDate } from '~/services/date'
 import { checkCompatibilityNativePackages, isCompatible, useSupabase } from '~/services/supabase'
 import { isInternalVersionName } from '~/services/versions'
 import { useAppDetailStore } from '~/stores/appDetail'
@@ -691,7 +691,7 @@ function openLink(url?: string): void {
                     {{ version.name }}
                   </div>
                   <div class="text-sm text-gray-600 dark:text-gray-400">
-                    {{ t('created') }}: {{ version.created_at ? new Date(version.created_at).toLocaleDateString() : t('unknown') }}
+                    {{ t('created') }}: {{ version.created_at ? formatLocalDate(version.created_at) : t('unknown') }}
                   </div>
                 </div>
                 <div class="text-blue-600 dark:text-blue-400">

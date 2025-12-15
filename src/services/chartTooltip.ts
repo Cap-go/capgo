@@ -1,5 +1,6 @@
 import type { Chart, TooltipItem as ChartTooltipItem, TooltipLabelStyle, TooltipModel } from 'chart.js'
 import { useDark } from '@vueuse/core'
+import { formatLocalDateLong } from '~/services/date'
 
 interface TooltipContext {
   chart: Chart
@@ -19,8 +20,6 @@ function formatTooltipValue(value: unknown) {
   const rounded = Number(value.toFixed(1))
   return Number.isInteger(rounded) ? Math.trunc(rounded).toString() : rounded.toFixed(1)
 }
-
-const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 
 /**
  * Calculate the actual date from the chart data index
@@ -46,12 +45,10 @@ function getDateFromIndex(dataIndex: number, dateStartOrUseBillingPeriod?: Date 
 }
 
 /**
- * Format a date for tooltip display (e.g., "December 10")
+ * Format a date for tooltip display using the app's locale (e.g., "December 10" in English, "10 décembre" in French)
  */
 function formatDateForTooltip(date: Date): string {
-  const monthName = MONTH_NAMES[date.getMonth()]
-  const day = date.getDate()
-  return `${monthName} ${day}`
+  return formatLocalDateLong(date)
 }
 
 function getDatasetBaseValue(chart: Chart | undefined, dataset: any, datasetIndex: number, dataIndex: number, parsedY: unknown) {
