@@ -2651,6 +2651,7 @@ export type Database = {
         | "getChannel"
         | "rateLimited"
         | "disableAutoUpdate"
+        | "keyMismatch"
         | "ping"
         | "InvalidIp"
         | "blocked_by_server_url"
@@ -2900,6 +2901,7 @@ export const Constants = {
         "getChannel",
         "rateLimited",
         "disableAutoUpdate",
+        "keyMismatch",
         "ping",
         "InvalidIp",
         "blocked_by_server_url",
