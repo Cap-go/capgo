@@ -100,6 +100,7 @@ function getSchemaUpdatesAlias(includeMetadata = false) {
     name: sql<string>`${versionAlias.name}`.as('vname'),
     checksum: sql<string | null>`${versionAlias.checksum}`.as('vchecksum'),
     session_key: sql<string | null>`${versionAlias.session_key}`.as('vsession_key'),
+    key_id: sql<string | null>`${versionAlias.key_id}`.as('vkey_id'),
     storage_provider: sql<string>`${versionAlias.storage_provider}`.as('vstorage_provider'),
     external_url: sql<string | null>`${versionAlias.external_url}`.as('vexternal_url'),
     min_update_version: sql<string | null>`${versionAlias.min_update_version}`.as('vminUpdateVersion'),

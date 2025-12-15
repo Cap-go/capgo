@@ -190,6 +190,7 @@ CREATE TYPE "public"."stats_action" AS ENUM(
   'getChannel',
   'rateLimited',
   'disableAutoUpdate',
+  'keyMismatch',
   'InvalidIp',
   'ping',
   'blocked_by_server_url'

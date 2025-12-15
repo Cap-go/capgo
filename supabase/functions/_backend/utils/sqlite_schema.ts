@@ -25,6 +25,7 @@ export const app_versions = sqliteTable('app_versions', {
   external_url: text('external_url'),
   checksum: text('checksum'),
   session_key: text('session_key'),
+  key_id: text('key_id'),
   storage_provider: text('storage_provider').default('r2').notNull(),
   min_update_version: text('min_update_version'),
   link: text('link'),

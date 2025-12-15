@@ -223,6 +223,17 @@ export async function updateWithPG(
     return simpleError200(c, 'no_bundle', 'Cannot get bundle')
   }
 
+  // Check for encryption key mismatch between device and bundle
+  // Only check if both device and bundle have key_id set (encrypted bundle)
+  if (body.key_id && version.key_id && body.key_id !== version.key_id) {
+    cloudlog({ requestId: c.get('requestId'), message: 'Encryption key mismatch', device_id, deviceKeyId: body.key_id, bundleKeyId: version.key_id, versionName: version.name })
+    await sendStatsAndDevice(c, device, [{ action: 'keyMismatch', versionName: version.name }])
+    return simpleError200(c, 'key_id_mismatch', 'Device encryption key does not match bundle encryption key. The device may have a different public key than the one used to encrypt this bundle.', {
+      deviceKeyId: body.key_id,
+      bundleKeyId: version.key_id,
+    })
+  }
+
   // cloudlog(c.get('requestId'), 'signedURL', device_id, version_name, version.name)
   if (version_name === version.name) {
     cloudlog({ requestId: c.get('requestId'), message: 'No new version available', id: device_id, version_name, version: version.name, date: new Date().toISOString() })
