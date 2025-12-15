@@ -102,6 +102,7 @@ export type Database = {
           deleted: boolean
           external_url: string | null
           id: number
+          key_id: string | null
           link: string | null
           manifest:
             | Database["public"]["CompositeTypes"]["manifest_entry"][]
@@ -125,6 +126,7 @@ export type Database = {
           deleted?: boolean
           external_url?: string | null
           id?: number
+          key_id?: string | null
           link?: string | null
           manifest?:
             | Database["public"]["CompositeTypes"]["manifest_entry"][]
@@ -148,6 +150,7 @@ export type Database = {
           deleted?: boolean
           external_url?: string | null
           id?: number
+          key_id?: string | null
           link?: string | null
           manifest?:
             | Database["public"]["CompositeTypes"]["manifest_entry"][]
@@ -875,6 +878,7 @@ export type Database = {
           id: number
           is_emulator: boolean | null
           is_prod: boolean | null
+          key_id: string | null
           os_version: string | null
           platform: Database["public"]["Enums"]["platform_os"]
           plugin_version: string
@@ -882,7 +886,6 @@ export type Database = {
           version: number | null
           version_build: string | null
           version_name: string
-          key_id: string | null
         }
         Insert: {
           app_id: string
@@ -892,6 +895,7 @@ export type Database = {
           id?: never
           is_emulator?: boolean | null
           is_prod?: boolean | null
+          key_id?: string | null
           os_version?: string | null
           platform: Database["public"]["Enums"]["platform_os"]
           plugin_version?: string
@@ -899,7 +903,6 @@ export type Database = {
           version?: number | null
           version_build?: string | null
           version_name?: string
-          key_id?: string | null
         }
         Update: {
           app_id?: string
@@ -909,6 +912,7 @@ export type Database = {
           id?: never
           is_emulator?: boolean | null
           is_prod?: boolean | null
+          key_id?: string | null
           os_version?: string | null
           platform?: Database["public"]["Enums"]["platform_os"]
           plugin_version?: string
@@ -916,7 +920,6 @@ export type Database = {
           version?: number | null
           version_build?: string | null
           version_name?: string
-          key_id?: string | null
         }
         Relationships: []
       }
@@ -2288,6 +2291,7 @@ export type Database = {
           deleted: boolean
           external_url: string | null
           id: number
+          key_id: string | null
           link: string | null
           manifest:
             | Database["public"]["CompositeTypes"]["manifest_entry"][]
