@@ -231,7 +231,7 @@
     "adm-zip": "^0.5.16",
     "cross-env": "^10.1.0",
     "discord-api-types": "^0.38.33",
-    "eslint": "9.39.1",
+    "eslint": "9.39.2",
     "eslint-plugin-format": "^1.0.2",
     "husky": "^9.1.7",
     "sass": "1.94.2",
