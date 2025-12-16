@@ -2025,8 +2025,6 @@ export type Database = {
           subscription_anchor_start: string
         }[]
       }
-      get_d1_sync_url: { Args: never; Returns: string }
-      get_d1_webhook_signature: { Args: never; Returns: string }
       get_db_url: { Args: never; Returns: string }
       get_global_metrics:
         | {
@@ -2450,7 +2448,6 @@ export type Database = {
       }
       process_cron_stats_jobs: { Args: never; Returns: undefined }
       process_cron_sync_sub_jobs: { Args: never; Returns: undefined }
-      process_d1_replication_batch: { Args: never; Returns: undefined }
       process_failed_uploads: { Args: never; Returns: undefined }
       process_free_trial_expired: { Args: never; Returns: undefined }
       process_function_queue:
