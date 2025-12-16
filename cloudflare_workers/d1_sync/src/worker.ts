@@ -21,9 +21,6 @@ const BATCH_SIZE = 998 // D1 batch size for statements
 
 interface Env {
   DB_REPLICA_EU: D1Database
-  DB_REPLICA_AS: D1Database
-  DB_REPLICA_US: D1Database
-  DB_REPLICA_OC: D1Database // Add Oceania replica
   HYPERDRIVE_CAPGO_DIRECT_EU: Hyperdrive // Add Hyperdrive binding
   HYPERDRIVE_CAPGO_DIRECT_AS: Hyperdrive // Add Hyperdrive binding
   HYPERDRIVE_CAPGO_DIRECT_NA: Hyperdrive // Add Hyperdrive binding
@@ -344,9 +341,6 @@ async function executeBatchAcrossReplicas(
 function buildReplicaTargets(env: Env): ReplicaTarget[] {
   return [
     { name: 'EU', session: env.DB_REPLICA_EU.withSession(`first-primary`) },
-    { name: 'AS', session: env.DB_REPLICA_AS.withSession(`first-primary`) },
-    { name: 'US', session: env.DB_REPLICA_US.withSession(`first-primary`) },
-    { name: 'OC', session: env.DB_REPLICA_OC.withSession(`first-primary`) },
   ]
 }
 

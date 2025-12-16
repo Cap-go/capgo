@@ -8,14 +8,8 @@ export const app = new Hono<MiddlewareKeyVariables>()
 export type TableNames = 'app_versions' | 'channels' | 'channel_devices' | 'apps' | 'orgs' | 'stripe_info' | 'manifest'
 interface ReplicationsDiff {
   d1CountEU: number
-  d1CountUS: number
-  d1CountAS: number
-  d1CountOC: number
   supabase: number
   percentEU: number
-  percentUS: number
-  percentAS: number
-  percentOC: number
   percent: number
 }
 
@@ -32,27 +26,12 @@ app.get('/', async (c) => {
 
   // Count from D1 database using pre-calculated counts
   const d1EU = c.env.DB_REPLICA_EU.withSession('first-unconstrained') as D1DatabaseSession
-  const d1US = c.env.DB_REPLICA_US.withSession('first-unconstrained') as D1DatabaseSession
-  const d1AS = c.env.DB_REPLICA_AS.withSession('first-unconstrained') as D1DatabaseSession
-  const d1OC = c.env.DB_REPLICA_OC.withSession('first-unconstrained') as D1DatabaseSession
-  const [d1CountsEU, d1CountsUS, d1CountsAS, d1CountsOC] = await Promise.all([Promise.all(
+  const [d1CountsEU] = await Promise.all([Promise.all(
     tables.map(table =>
       d1EU.prepare(`SELECT record_count as count FROM table_counts WHERE table_name = ?`).bind(table).first(),
     ),
-  ), Promise.all(
-    tables.map(table =>
-      d1US.prepare(`SELECT record_count as count FROM table_counts WHERE table_name = ?`).bind(table).first(),
-    ),
-  ), Promise.all(
-    tables.map(table =>
-      d1AS.prepare(`SELECT record_count as count FROM table_counts WHERE table_name = ?`).bind(table).first(),
-    ),
-  ), Promise.all(
-    tables.map(table =>
-      d1OC.prepare(`SELECT record_count as count FROM table_counts WHERE table_name = ?`).bind(table).first(),
-    ),
   )])
-  cloudlog({ requestId: c.get('requestId'), message: 'd1Counts', d1CountsEU, d1CountsUS, d1CountsAS, d1CountsOC })
+  cloudlog({ requestId: c.get('requestId'), message: 'd1Counts', d1CountsEU })
 
   // Count from update.ts (PostgreSQL database)
   const pgCounts = await Promise.all(
@@ -70,18 +49,12 @@ app.get('/', async (c) => {
   const diff = await tables.reduce(async (acc: Promise<Record<TableNames, ReplicationsDiff>>, table: TableNames, index: number) => {
     const result = await acc
     const d1CountEU = (d1CountsEU[index]?.count as number) ?? 0
-    const d1CountUS = (d1CountsUS[index]?.count as number) ?? 0
-    const d1CountAS = (d1CountsAS[index]?.count as number) ?? 0
-    const d1CountOC = (d1CountsOC[index]?.count as number) ?? 0
 
     const pgCount = pgCounts[index]?.count ?? 0
     const percentEU = (pgCount - d1CountEU) / d1CountEU
-    const percentUS = (pgCount - d1CountUS) / d1CountUS
-    const percentAS = (pgCount - d1CountAS) / d1CountAS
-    const percentOC = (pgCount - d1CountOC) / d1CountOC
-    const percent = Number(((percentEU + percentUS + percentAS + percentOC) / 4).toFixed(3))
+    const percent = Number((percentEU).toFixed(3))
 
-    result[table] = { d1CountEU, d1CountUS, d1CountAS, d1CountOC, supabase: pgCount, percentEU, percentUS, percentAS, percentOC, percent }
+    result[table] = { d1CountEU, supabase: pgCount, percentEU, percent }
     return result
   }, Promise.resolve({} as Record<string, ReplicationsDiff>))
   // if diff less than 1% of total rows, consider it as synced

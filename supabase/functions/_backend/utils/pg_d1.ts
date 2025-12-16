@@ -69,15 +69,6 @@ export function getPgClientD1(c: Context, session: string = 'first-unconstrained
   if (dbRegion === 'EU') {
     DB = c.env.DB_REPLICA_EU
   }
-  else if (dbRegion === 'AS') {
-    DB = c.env.DB_REPLICA_AS
-  }
-  else if (dbRegion === 'NA') {
-    DB = c.env.DB_REPLICA_NA
-  }
-  else if (dbRegion === 'OC') {
-    DB = c.env.DB_REPLICA_OC
-  }
   if (DB === undefined) {
     // Server/configuration error: surface as structured HTTP error
     return quickError(500, 'missing_binding', `REPLICATE ${dbRegion} is missing`, { dbRegion })
