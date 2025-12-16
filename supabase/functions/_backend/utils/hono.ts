@@ -260,31 +260,3 @@ export function parseBody<T>(c: Context) {
       return body
     })
 }
-
-export function getIsV2Internal(c: Context, name: string) {
-  const isV2 = getRuntimeKey() === 'workerd' ? Number.parseFloat(getEnv(c, name) ?? '0') : 0.0
-  cloudlog({ requestId: c.get('requestId'), message: name, isV2 })
-  if (c.req.url.endsWith('_v2')) {
-    cloudlog({ requestId: c.get('requestId'), message: `${name} forced to true by _v2 suffix` })
-    // allow to force v2 for update_v2 or stats_v2
-    return true
-  }
-  if (isV2 && Math.random() < isV2) {
-    cloudlog({ requestId: c.get('requestId'), message: `${name} forced to true by random chance`, isV2 })
-    return true
-  }
-  cloudlog({ requestId: c.get('requestId'), message: `${name} forced to false`, isV2 })
-  return false
-}
-
-export function getIsV2Channel(c: Context) {
-  return getIsV2Internal(c, 'IS_V2_CHANNEL')
-}
-
-export function getIsV2Updater(c: Context) {
-  return getIsV2Internal(c, 'IS_V2_UPDATER')
-}
-
-export function getIsV2Stats(c: Context) {
-  return getIsV2Internal(c, 'IS_V2_STATS')
-}

@@ -12,11 +12,10 @@ import {
 import { getRuntimeKey } from 'hono/adapter'
 import { getAppStatus, setAppStatus } from './appStatus.ts'
 import { getBundleUrl, getManifestUrl } from './downloadUrl.ts'
-import { getIsV2Updater, simpleError200 } from './hono.ts'
+import { simpleError200 } from './hono.ts'
 import { cloudlog } from './logging.ts'
 import { sendNotifOrg } from './notifications.ts'
 import { closeClient, getAppOwnerPostgres, getDrizzleClient, getPgClient, requestInfosPostgres } from './pg.ts'
-import { getAppOwnerPostgresV2, getDrizzleClientD1Session, requestInfosPostgresV2 } from './pg_d1.ts'
 import { makeDevice } from './plugin_parser.ts'
 import { s3 } from './s3.ts'
 import { createStatsBandwidth, createStatsMau, createStatsVersion, onPremStats, sendStatsAndDevice } from './stats.ts'
@@ -55,35 +54,10 @@ export function resToVersion(plugin_version: string, signedURL: string, version:
   return res
 }
 
-function returnV2orV1<T>(
-  c: Context,
-  isV2: boolean,
-  runV1: () => Promise<T>,
-  runV2: () => Promise<T>,
-): Promise<T> {
-  // When v2 is enabled, only run v2 (D1) and do NOT touch v1 (PG)
-  if (isV2) {
-    return runV2()
-  }
-  // Disabled to no overload DB
-  // In the v1 case, use PG as the source of truth, but kick off v2 in the background
-  // if (getRuntimeKey() === 'workerd' && existInEnv(c, 'DB_REPLICA_EU')) {
-  //   const replicatePromise = runV2().then((res) => {
-  //     cloudlog({ requestId: c.get('requestId'), message: 'Completed background V2 function', res })
-  //   }).catch((err) => {
-  //     cloudlog({ requestId: c.get('requestId'), message: 'Error in background V2 function', err })
-  //   })
-  //   await backgroundTask(c, replicatePromise)
-  // }
-  return runV1()
-}
-
 export async function updateWithPG(
   c: Context,
   body: AppInfos,
-  getDrizzleClientD1: () => ReturnType<typeof getDrizzleClientD1Session>,
   drizzleClient: ReturnType<typeof getDrizzleClient>,
-  isV2: boolean,
 ) {
   cloudlog({ requestId: c.get('requestId'), message: 'body', body, date: new Date().toISOString() })
   const {
@@ -106,12 +80,7 @@ export async function updateWithPG(
     await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
     return simpleError200(c, 'need_plan_upgrade', PLAN_ERROR)
   }
-  const appOwner = await returnV2orV1(
-    c,
-    isV2,
-    () => getAppOwnerPostgres(c, app_id, drizzleClient, PLAN_LIMIT),
-    () => getAppOwnerPostgresV2(c, app_id, getDrizzleClientD1(), PLAN_LIMIT),
-  )
+  const appOwner = await getAppOwnerPostgres(c, app_id, drizzleClient, PLAN_LIMIT)
   if (!appOwner) {
     await setAppStatus(c, app_id, 'onprem')
     return onPremStats(c, app_id, 'get', device)
@@ -187,12 +156,7 @@ export async function updateWithPG(
   // Only query link/comment if plugin supports it (7.35.0+) AND app has expose_metadata enabled
   const needsMetadata = appOwner.expose_metadata && greaterOrEqual(pluginVersion, parse('7.35.0'))
 
-  const requestedInto = await returnV2orV1(
-    c,
-    isV2,
-    () => requestInfosPostgres(c, platform, app_id, device_id, defaultChannel, drizzleClient, channelDeviceCount, manifestBundleCount, needsMetadata),
-    () => requestInfosPostgresV2(c, platform, app_id, device_id, defaultChannel, getDrizzleClientD1(), channelDeviceCount, manifestBundleCount, needsMetadata),
-  )
+  const requestedInto = await requestInfosPostgres(c, platform, app_id, device_id, defaultChannel, drizzleClient, channelDeviceCount, manifestBundleCount, needsMetadata)
   const { channelOverride } = requestedInto
   let { channelData } = requestedInto
   cloudlog({ requestId: c.get('requestId'), message: `channelData exists ? ${channelData !== undefined}, channelOverride exists ? ${channelOverride !== undefined}` })
@@ -417,13 +381,12 @@ export async function updateWithPG(
 }
 
 export async function update(c: Context, body: AppInfos) {
-  const isV2 = getIsV2Updater(c)
-  const pgClient = isV2 ? null : getPgClient(c, true) // READ-ONLY: writes use SDK, not Drizzle
+  const pgClient = getPgClient(c, true)
 
   const drizzlePg = pgClient ? getDrizzleClient(pgClient) : (null as any)
   // Lazily create D1 client inside updateWithPG when actually used
-  const res = await updateWithPG(c, body, () => getDrizzleClientD1Session(c), drizzlePg, !!isV2)
-  if (!isV2 && pgClient)
+  const res = await updateWithPG(c, body, drizzlePg)
+  if (pgClient)
     await closeClient(c, pgClient)
   return res
 }
