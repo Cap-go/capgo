@@ -23,12 +23,6 @@ export type Bindings = {
   HYPERDRIVE_CAPGO_DIRECT_EU: Hyperdrive // Add Hyperdrive binding
   HYPERDRIVE_CAPGO_DIRECT_AS: Hyperdrive // Add Hyperdrive binding
   HYPERDRIVE_CAPGO_DIRECT_NA: Hyperdrive // Add Hyperdrive binding
-  HYPERDRIVE_CAPGO_SESSION_EU: Hyperdrive // Add Hyperdrive binding
-  HYPERDRIVE_CAPGO_SESSION_AS: Hyperdrive // Add Hyperdrive binding
-  HYPERDRIVE_CAPGO_SESSION_NA: Hyperdrive // Add Hyperdrive binding
-  HYPERDRIVE_CAPGO_TRANSACTION_EU: Hyperdrive // Add Hyperdrive binding
-  HYPERDRIVE_CAPGO_TRANSACTION_AS: Hyperdrive // Add Hyperdrive binding
-  HYPERDRIVE_CAPGO_TRANSACTION_NA: Hyperdrive // Add Hyperdrive binding
   ATTACHMENT_UPLOAD_HANDLER: DurableObjectNamespace
 }
 

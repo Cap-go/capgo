@@ -624,8 +624,8 @@ export function getDatabaseURL(): string {
     // if (!clientContinent)
     //   return DEFAULT_DB_URL
     // Hyperdrive test
-    if (existInEnv('HYPERDRIVE_CAPGO_TRANSACTION_EU'))
-        return (getEnv('HYPERDRIVE_CAPGO_TRANSACTION_EU') as any).connectionString
+    if (existInEnv('HYPERDRIVE_CAPGO_DIRECT_EU'))
+        return (getEnv('HYPERDRIVE_CAPGO_DIRECT_EU') as any).connectionString
 
     // // Default to Germany for any other cases
     return DEFAULT_DB_URL
