@@ -98,11 +98,6 @@
           "binding": "DB_STOREAPPS",
           "database_name": "capgo_prod_storeapps",
           "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
-        },
-        {
-          "binding": "DB_REPLICA_EU",
-          "database_name": "capgo_replicate_eu",
-          "database_id": "107046f7-af0e-4126-b493-1d4e66f48947"
         }
       ],
       "hyperdrive": [
@@ -173,11 +168,6 @@
           "binding": "DB_STOREAPPS",
           "database_name": "capgo_prod_storeapps",
           "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
-        },
-        {
-          "binding": "DB_REPLICA_EU",
-          "database_name": "capgo_replicate_eu",
-          "database_id": "107046f7-af0e-4126-b493-1d4e66f48947"
         }
       ],
       "hyperdrive": [
@@ -248,11 +238,6 @@
           "binding": "DB_STOREAPPS",
           "database_name": "capgo_prod_storeapps",
           "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
-        },
-        {
-          "binding": "DB_REPLICA_EU",
-          "database_name": "capgo_replicate_eu",
-          "database_id": "107046f7-af0e-4126-b493-1d4e66f48947"
         }
       ],
       "hyperdrive": [
@@ -323,11 +308,6 @@
           "binding": "DB_STOREAPPS",
           "database_name": "capgo_prod_storeapps",
           "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
-        },
-        {
-          "binding": "DB_REPLICA_EU",
-          "database_name": "capgo_replicate_eu",
-          "database_id": "107046f7-af0e-4126-b493-1d4e66f48947"
         }
       ],
       "hyperdrive": [
@@ -398,11 +378,6 @@
           "binding": "DB_STOREAPPS",
           "database_name": "capgo_prod_storeapps",
           "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
-        },
-        {
-          "binding": "DB_REPLICA_EU",
-          "database_name": "capgo_replicate_eu",
-          "database_id": "107046f7-af0e-4126-b493-1d4e66f48947"
         }
       ],
       "hyperdrive": [
@@ -473,11 +448,6 @@
           "binding": "DB_STOREAPPS",
           "database_name": "capgo_prod_storeapps",
           "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
-        },
-        {
-          "binding": "DB_REPLICA_EU",
-          "database_name": "capgo_replicate_eu",
-          "database_id": "107046f7-af0e-4126-b493-1d4e66f48947"
         }
       ],
       "hyperdrive": [
@@ -548,11 +518,6 @@
           "binding": "DB_STOREAPPS",
           "database_name": "capgo_prod_storeapps",
           "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
-        },
-        {
-          "binding": "DB_REPLICA_EU",
-          "database_name": "capgo_replicate_eu",
-          "database_id": "107046f7-af0e-4126-b493-1d4e66f48947"
         }
       ],
       "hyperdrive": [
@@ -623,11 +588,6 @@
           "binding": "DB_STOREAPPS",
           "database_name": "capgo_prod_storeapps",
           "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
-        },
-        {
-          "binding": "DB_REPLICA_EU",
-          "database_name": "capgo_replicate_eu",
-          "database_id": "107046f7-af0e-4126-b493-1d4e66f48947"
         }
       ],
       "hyperdrive": [
@@ -669,11 +629,6 @@
           "binding": "DB_STOREAPPS",
           "database_name": "capgo_prod_storeapps",
           "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
-        },
-        {
-          "binding": "DB_REPLICA_EU",
-          "database_name": "capgo_replicate_eu",
-          "database_id": "107046f7-af0e-4126-b493-1d4e66f48947"
         }
       ],
       "analytics_engine_datasets": [
@@ -740,11 +695,6 @@
           "binding": "DB_STOREAPPS",
           "database_name": "capgo_prod_storeapps",
           "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
-        },
-        {
-          "binding": "DB_REPLICA_EU",
-          "database_name": "capgo_replicate_eu",
-          "database_id": "107046f7-af0e-4126-b493-1d4e66f48947"
         }
       ],
       "analytics_engine_datasets": [
@@ -796,14 +746,7 @@
       "vars": {
         "ENV_NAME": "capgo_plugin-local",
         "CAPGO_PREVENT_BACKGROUND_FUNCTIONS": "true"
-      },
-      "d1_databases": [
-        {
-          "binding": "DB_REPLICA_EU",
-          "database_name": "capgo_replicate_eu",
-          "database_id": "107046f7-af0e-4126-b493-1d4e66f48947"
-        }
-      ]
+      }
     }
   }
 }
