@@ -14,16 +14,12 @@ const app = createHono(functionName, version, process.env.SENTRY_DSN)
 app.route('/plugin/ok', ok)
 app.route('/plugin/channel_self', channel_self)
 app.route('/plugin/updates', updates)
-app.route('/plugin/updates_v2', updates)
 app.route('/plugin/stats', stats)
-app.route('/plugin/stats_v2', stats)
 
 // Plugin API
 app.route('/channel_self', channel_self)
 app.route('/updates', updates)
-app.route('/updates_v2', updates)
 app.route('/stats', stats)
-app.route('/stats_v2', stats)
 app.route('/ok', ok)
 app.route('/latency', latency)
 
