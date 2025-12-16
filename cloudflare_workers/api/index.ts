@@ -13,7 +13,6 @@ import { app as stats_priv } from '../../supabase/functions/_backend/private/sta
 import { app as storeTop } from '../../supabase/functions/_backend/private/store_top.ts'
 import { app as stripe_checkout } from '../../supabase/functions/_backend/private/stripe_checkout.ts'
 import { app as stripe_portal } from '../../supabase/functions/_backend/private/stripe_portal.ts'
-import { app as verify_replication } from '../../supabase/functions/_backend/private/verify_replication.ts'
 import { app as apikey } from '../../supabase/functions/_backend/public/apikey/index.ts'
 import { app as appEndpoint } from '../../supabase/functions/_backend/public/app/index.ts'
 import { app as build } from '../../supabase/functions/_backend/public/build/index.ts'
@@ -75,7 +74,6 @@ appPrivate.route('/stats', stats_priv)
 appPrivate.route('/stripe_checkout', stripe_checkout)
 appPrivate.route('/stripe_portal', stripe_portal)
 appPrivate.route('/delete_failed_version', deleted_failed_version)
-appPrivate.route('/verify_replication', verify_replication)
 appPrivate.route('/create_device', create_device)
 appPrivate.route('/events', events)
 
