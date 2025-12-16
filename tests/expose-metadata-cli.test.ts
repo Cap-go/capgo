@@ -10,7 +10,6 @@ import {
   resetAndSeedAppData,
   resetAppData,
   resetAppDataStats,
-  triggerD1Sync,
 } from './test-utils.ts'
 
 const id = randomUUID()
@@ -33,7 +32,7 @@ describe('expose_metadata via CLI/API integration', () => {
     await resetAppDataStats(APP_NAME_CLI)
   })
 
-  describe('Setting expose_metadata via PUT /app endpoint (used by CLI)', () => {
+  describe('setting expose_metadata via PUT /app endpoint (used by CLI)', () => {
     it('should enable expose_metadata using API endpoint', async () => {
       // This simulates: npx @capgo/cli app set --expose-metadata true
       const response = await fetch(`${getEndpointUrl('/app')}/${APP_NAME_CLI}`, {
@@ -65,8 +64,6 @@ describe('expose_metadata via CLI/API integration', () => {
         .from('apps')
         .update({ expose_metadata: true })
         .eq('app_id', APP_NAME_CLI)
-
-      await triggerD1Sync()
 
       // This simulates: npx @capgo/cli app set --expose-metadata false
       const response = await fetch(`${getEndpointUrl('/app')}/${APP_NAME_CLI}`, {
@@ -131,8 +128,6 @@ describe('expose_metadata via CLI/API integration', () => {
         })
         .eq('app_id', APP_NAME_CLI)
 
-      await triggerD1Sync()
-
       // Update only expose_metadata
       const response = await fetch(`${getEndpointUrl('/app')}/${APP_NAME_CLI}`, {
         method: 'PUT',
@@ -158,15 +153,13 @@ describe('expose_metadata via CLI/API integration', () => {
     })
   })
 
-  describe('Reading expose_metadata via GET /app endpoint (used by CLI)', () => {
+  describe('reading expose_metadata via GET /app endpoint (used by CLI)', () => {
     it('should return expose_metadata when getting app details', async () => {
       // Set a known state
       await supabase
         .from('apps')
         .update({ expose_metadata: true })
         .eq('app_id', APP_NAME_CLI)
-
-      await triggerD1Sync()
 
       // This simulates: npx @capgo/cli app get
       const response = await fetch(`${getEndpointUrl('/app')}/${APP_NAME_CLI}`, {
@@ -187,8 +180,6 @@ describe('expose_metadata via CLI/API integration', () => {
         .update({ expose_metadata: false })
         .eq('app_id', APP_NAME_CLI)
 
-      await triggerD1Sync()
-
       const response = await fetch(`${getEndpointUrl('/app')}/${APP_NAME_CLI}`, {
         method: 'GET',
         headers,
@@ -200,7 +191,7 @@ describe('expose_metadata via CLI/API integration', () => {
     })
   })
 
-  describe('Creating apps with expose_metadata via POST /app endpoint', () => {
+  describe('creating apps with expose_metadata via POST /app endpoint', () => {
     it('should create app with expose_metadata=true when specified', async () => {
       const newAppId = `${APP_NAME}.${randomUUID()}`
 
@@ -233,7 +224,7 @@ describe('expose_metadata via CLI/API integration', () => {
     })
   })
 
-  describe('Authorization checks for expose_metadata', () => {
+  describe('authorization checks for expose_metadata', () => {
     it('should require proper permissions to update expose_metadata', async () => {
       // This test verifies that only authorized users can update expose_metadata
       // The existing RLS policies should prevent unauthorized updates
@@ -254,7 +245,7 @@ describe('expose_metadata via CLI/API integration', () => {
     })
   })
 
-  describe('Integration with bundle metadata', () => {
+  describe('integration with bundle metadata', () => {
     it('should allow setting bundle metadata (link and comment) via bundle API', async () => {
       // Create a new version with metadata
       const versionName = '2.0.0'

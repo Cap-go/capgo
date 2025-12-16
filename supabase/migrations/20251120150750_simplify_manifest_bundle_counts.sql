@@ -42,13 +42,6 @@ BEGIN
   current_minute := EXTRACT(MINUTE FROM now());
   current_second := EXTRACT(SECOND FROM now());
 
-  -- Every second: D1 replication
-  BEGIN
-    PERFORM public.process_d1_replication_batch();
-  EXCEPTION WHEN OTHERS THEN
-    RAISE WARNING 'process_d1_replication_batch failed: %', SQLERRM;
-  END;
-
   -- Every 10 seconds: High-frequency queues (at :00, :10, :20, :30, :40, :50)
   IF current_second % 10 = 0 THEN
     -- Process high-frequency queues with default batch size (950)

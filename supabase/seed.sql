@@ -17,13 +17,6 @@ BEGIN
         PERFORM vault.create_secret('testsecret', 'apikey', 'admin user id');
     END IF;
 
-    IF NOT EXISTS (SELECT 1 FROM vault.secrets WHERE name = 'd1_webhook_signature') THEN
-        PERFORM vault.create_secret('testsecret', 'd1_webhook_signature', 'D1 sync webhook signature for local development');
-    END IF;
-
-    IF NOT EXISTS (SELECT 1 FROM vault.secrets WHERE name = 'd1_sync_url') THEN
-        PERFORM vault.create_secret('http://host.docker.internal:8790/sync', 'd1_sync_url', 'D1 sync worker URL (local: host.docker.internal:8790, prod: https://sync.capgo.app/sync)');
-    END IF;
 END $$;
 
 -- We cannot use SET search_path = 'public, extensions' because the digest function is not available in the public schema

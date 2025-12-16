@@ -12,7 +12,6 @@ import {
   resetAndSeedAppData,
   resetAppData,
   resetAppDataStats,
-  triggerD1Sync,
 } from './test-utils.ts'
 
 const id = randomUUID()
@@ -72,8 +71,7 @@ describe('expose_metadata feature', () => {
         .update({ expose_metadata: true })
         .eq('app_id', APP_NAME_METADATA)
 
-      await triggerD1Sync()
-
+      
       // Then set to false via API
       const response = await fetch(`${getEndpointUrl('/app')}/${APP_NAME_METADATA}`, {
         method: 'PUT',
@@ -144,8 +142,7 @@ describe('expose_metadata feature', () => {
       if (error || !data)
         throw error ?? new Error('Failed to update version with metadata')
 
-      await triggerD1Sync()
-    })
+          })
 
     it('should expose metadata when expose_metadata=true and plugin version >= 7.35.0', async () => {
       // Enable expose_metadata
@@ -154,8 +151,7 @@ describe('expose_metadata feature', () => {
         .update({ expose_metadata: true })
         .eq('app_id', APP_NAME_METADATA)
 
-      await triggerD1Sync()
-
+      
       const baseData = getBaseData(APP_NAME_METADATA)
       baseData.version_name = '1.1.0' // Request older version to trigger update
       baseData.plugin_version = '7.35.0' // Exact minimum version
@@ -176,8 +172,7 @@ describe('expose_metadata feature', () => {
         .update({ expose_metadata: true })
         .eq('app_id', APP_NAME_METADATA)
 
-      await triggerD1Sync()
-
+      
       const baseData = getBaseData(APP_NAME_METADATA)
       baseData.version_name = '1.1.0'
       baseData.plugin_version = '7.36.0' // Higher version
@@ -198,8 +193,7 @@ describe('expose_metadata feature', () => {
         .update({ expose_metadata: true })
         .eq('app_id', APP_NAME_METADATA)
 
-      await triggerD1Sync()
-
+      
       const baseData = getBaseData(APP_NAME_METADATA)
       baseData.version_name = '1.1.0'
       baseData.plugin_version = '7.34.9' // Older version
@@ -220,8 +214,7 @@ describe('expose_metadata feature', () => {
         .update({ expose_metadata: false })
         .eq('app_id', APP_NAME_METADATA)
 
-      await triggerD1Sync()
-
+      
       const baseData = getBaseData(APP_NAME_METADATA)
       baseData.version_name = '1.1.0'
       baseData.plugin_version = '7.35.0'
@@ -242,8 +235,7 @@ describe('expose_metadata feature', () => {
         .update({ expose_metadata: false })
         .eq('app_id', APP_NAME_METADATA)
 
-      await triggerD1Sync()
-
+      
       const baseData = getBaseData(APP_NAME_METADATA)
       baseData.version_name = '1.1.0'
       baseData.plugin_version = '7.34.0'
@@ -296,8 +288,7 @@ describe('expose_metadata feature', () => {
           .update({ expose_metadata: true })
           .eq('app_id', APP_NAME_METADATA)
 
-        await triggerD1Sync()
-
+        
         const baseData = getBaseData(APP_NAME_METADATA)
         baseData.version_name = '1.1.0'
         baseData.plugin_version = '7.35.0'
@@ -325,8 +316,7 @@ describe('expose_metadata feature', () => {
           .delete()
           .eq('id', newVersion!.id)
 
-        await triggerD1Sync()
-      }
+              }
     })
 
     it('should expose metadata with only link when comment is null', async () => {
@@ -346,8 +336,7 @@ describe('expose_metadata feature', () => {
           .update({ expose_metadata: true })
           .eq('app_id', APP_NAME_METADATA)
 
-        await triggerD1Sync()
-
+        
         const baseData = getBaseData(APP_NAME_METADATA)
         baseData.version_name = '1.1.0'
         baseData.plugin_version = '7.35.0'
@@ -373,8 +362,7 @@ describe('expose_metadata feature', () => {
           .eq('app_id', APP_NAME_METADATA)
           .eq('name', '1.0.0')
 
-        await triggerD1Sync()
-      }
+              }
     })
 
     it('should expose metadata with only comment when link is null', async () => {
@@ -394,8 +382,7 @@ describe('expose_metadata feature', () => {
           .update({ expose_metadata: true })
           .eq('app_id', APP_NAME_METADATA)
 
-        await triggerD1Sync()
-
+        
         const baseData = getBaseData(APP_NAME_METADATA)
         baseData.version_name = '1.1.0'
         baseData.plugin_version = '7.35.0'
@@ -421,8 +408,7 @@ describe('expose_metadata feature', () => {
           .eq('app_id', APP_NAME_METADATA)
           .eq('name', '1.0.0')
 
-        await triggerD1Sync()
-      }
+              }
     })
   })
 
@@ -433,8 +419,7 @@ describe('expose_metadata feature', () => {
         .update({ expose_metadata: true })
         .eq('app_id', APP_NAME_METADATA)
 
-      await triggerD1Sync()
-
+      
       const baseData = getBaseData(APP_NAME_METADATA)
       baseData.version_name = '1.1.0'
       baseData.plugin_version = '1.0.0' // Very old version
@@ -456,8 +441,7 @@ describe('expose_metadata feature', () => {
         .update({ expose_metadata: true })
         .eq('app_id', APP_NAME_METADATA)
 
-      await triggerD1Sync()
-
+      
       const baseData = getBaseData(APP_NAME_METADATA)
       baseData.version_name = '1.1.0'
       baseData.plugin_version = '8.0.0' // Future version

@@ -2,7 +2,7 @@ import type { SimpleErrorResponse } from '../supabase/functions/_backend/utils/h
 import type { DeviceLink, HttpMethod } from './test-utils.ts'
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { getBaseData, getSupabaseClient, PLUGIN_BASE_URL, resetAndSeedAppData, resetAppData, resetAppDataStats, triggerD1Sync } from './test-utils.ts'
+import { getBaseData, getSupabaseClient, PLUGIN_BASE_URL, resetAndSeedAppData, resetAppData, resetAppDataStats } from './test-utils.ts'
 
 interface ChannelInfo {
   id: string
@@ -141,7 +141,6 @@ describe('invalids /channel_self tests', () => {
     const { error } = await getSupabaseClient().from('channels').update({ allow_device_self_set: false }).eq('name', data.channel).eq('app_id', APPNAME).select('id').single()
 
     expect(error).toBeNull()
-    await triggerD1Sync() // Sync channel updates to D1
 
     try {
       const response = await fetchEndpoint('POST', data)
@@ -196,7 +195,6 @@ describe('invalids /channel_self tests', () => {
     const { error } = await getSupabaseClient().from('app_versions').update({ name: 'build_not_in' }).eq('name', 'builtin').eq('app_id', APPNAME).select('id').single()
 
     expect(error).toBeNull()
-    await triggerD1Sync() // Sync app_versions updates to D1
 
     try {
       const response = await fetchEndpoint('PUT', data)
@@ -412,7 +410,6 @@ describe('[GET] /channel_self tests', () => {
 
     expect(updateError).toBeNull()
     expect(channelData?.allow_emulator).toBe(false)
-    await triggerD1Sync() // Sync channel updates to D1
 
     try {
       const data = getBaseData(APPNAME)
@@ -470,7 +467,6 @@ describe('[GET] /channel_self tests', () => {
       .eq('app_id', APPNAME)
 
     expect(updateError).toBeNull()
-    await triggerD1Sync() // Sync channel updates to D1
 
     try {
       // Test dev device - real device (is_emulator=false) should get no channels
@@ -503,7 +499,6 @@ describe('[GET] /channel_self tests', () => {
         .update({ allow_dev: true })
         .eq('name', 'development')
         .eq('app_id', APPNAME)
-      await triggerD1Sync() // Sync the reset back to D1
     }
   })
 
@@ -778,7 +773,6 @@ it('[PUT] /channel_self (with overwrite)', async () => {
   }, { onConflict: 'device_id, app_id' })
 
   expect(error).toBeNull()
-  await triggerD1Sync() // Sync channel_devices to D1
 
   try {
     const response = await fetchEndpoint('PUT', data)
@@ -865,7 +859,6 @@ it('[DELETE] /channel_self (with overwrite)', async () => {
   }, { onConflict: 'device_id, app_id' })
 
   expect(error).toBeNull()
-  await triggerD1Sync() // Sync channel_devices to D1
 
   try {
     const response = await fetchEndpoint('DELETE', data)
@@ -973,7 +966,6 @@ it('saves default_channel when provided', async () => {
   expect(response.status).toBe(200)
 
   // Wait for data to be written
-  await triggerD1Sync()
   await new Promise(resolve => setTimeout(resolve, 1000))
 
   // Verify default_channel was saved
@@ -1031,8 +1023,6 @@ describe('[POST] /channel_self - new plugin version (>= 7.34.0) behavior', () =>
       .eq('name', 'production')
       .eq('app_id', APPNAME)
 
-    await triggerD1Sync()
-
     try {
       const response = await fetchEndpoint('POST', data)
       expect(response.status).toBe(200)
@@ -1047,8 +1037,6 @@ describe('[POST] /channel_self - new plugin version (>= 7.34.0) behavior', () =>
         .update({ allow_device_self_set: true })
         .eq('name', 'production')
         .eq('app_id', APPNAME)
-
-      await triggerD1Sync()
     }
   })
 
@@ -1063,8 +1051,6 @@ describe('[POST] /channel_self - new plugin version (>= 7.34.0) behavior', () =>
       .update({ allow_device_self_set: true })
       .eq('name', 'beta')
       .eq('app_id', APPNAME)
-
-    await triggerD1Sync()
 
     try {
       // First, set channel with old version (stores in channel_devices)

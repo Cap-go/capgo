@@ -1047,16 +1047,6 @@ $$;
 
 ALTER FUNCTION "public"."get_cycle_info_org" ("orgid" "uuid") OWNER TO "postgres";
 
-CREATE OR REPLACE FUNCTION "public"."get_d1_webhook_signature" () RETURNS "text" LANGUAGE "plpgsql"
-SET
-  search_path = '' STABLE SECURITY DEFINER PARALLEL SAFE AS $$
-BEGIN
-    RETURN (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name='d1_webhook_signature');
-END;
-$$;
-
-ALTER FUNCTION "public"."get_d1_webhook_signature" () OWNER TO "postgres";
-
 CREATE OR REPLACE FUNCTION "public"."get_db_url" () RETURNS "text" LANGUAGE "plpgsql"
 SET
   search_path = '' STABLE SECURITY DEFINER PARALLEL SAFE AS $$
@@ -2770,39 +2760,6 @@ $$;
 
 ALTER FUNCTION "public"."process_cron_stats_jobs" () OWNER TO "postgres";
 
-CREATE OR REPLACE FUNCTION "public"."process_d1_replication_batch" () RETURNS "void" LANGUAGE "plpgsql"
-SET
-  search_path = '' SECURITY DEFINER AS $$
-DECLARE
-  queue_size bigint;
-  calls_needed int;
-  i int;
-BEGIN
-  -- Check if the webhook signature is set
-  IF public.get_d1_webhook_signature() IS NOT NULL THEN
-    -- Get the queue size by counting rows in the table
-    SELECT count(*) INTO queue_size
-    FROM pgmq.q_replicate_data;
-
-    -- Call the endpoint only if the queue is not empty
-    IF queue_size > 0 THEN
-      -- Calculate how many times to call the sync endpoint (1 call per 1000 items, max 10 calls)
-      calls_needed := least(ceil(queue_size / 1000.0)::int, 10);
-
-      -- Call the endpoint multiple times if needed
-      FOR i IN 1..calls_needed LOOP
-        PERFORM net.http_post(
-          url := 'https://sync.capgo.app/sync',
-          headers := jsonb_build_object('x-webhook-signature', public.get_d1_webhook_signature())
-        );
-      END LOOP;
-    END IF;
-  END IF;
-END;
-$$;
-
-ALTER FUNCTION "public"."process_d1_replication_batch" () OWNER TO "postgres";
-
 CREATE OR REPLACE FUNCTION "public"."process_failed_uploads" () RETURNS "void" LANGUAGE "plpgsql"
 SET
   search_path = '' AS $$
@@ -3305,27 +3262,6 @@ END;
 $$;
 
 ALTER FUNCTION "public"."trigger_http_queue_post_to_function" () OWNER TO "postgres";
-
-CREATE OR REPLACE FUNCTION "public"."trigger_http_queue_post_to_function_d1" () RETURNS "trigger" LANGUAGE "plpgsql"
-SET
-  search_path = '' SECURITY DEFINER AS $$
-BEGIN
-    -- Queue the operation for batch processing
-    IF public.get_d1_webhook_signature() IS NOT NULL THEN
-      PERFORM pgmq.send('replicate_data',
-          jsonb_build_object(
-              'record', to_jsonb(NEW),
-              'old_record', to_jsonb(OLD),
-              'type', TG_OP,
-              'table', TG_TABLE_NAME
-          )
-      );
-    END IF;
-    RETURN NEW;
-END;
-$$;
-
-ALTER FUNCTION "public"."trigger_http_queue_post_to_function_d1" () OWNER TO "postgres";
 
 CREATE OR REPLACE FUNCTION "public"."update_app_versions_retention" () RETURNS void LANGUAGE "plpgsql"
 SET
@@ -4293,53 +4229,6 @@ CREATE OR REPLACE TRIGGER "record_deployment_history_trigger"
 AFTER
 UPDATE OF "version" ON "public"."channels" FOR EACH ROW
 EXECUTE FUNCTION "public"."record_deployment_history" ();
-
-CREATE OR REPLACE TRIGGER "replicate_app_versions"
-AFTER INSERT
-OR DELETE
-OR
-UPDATE ON "public"."app_versions" FOR EACH ROW
-EXECUTE FUNCTION "public"."trigger_http_queue_post_to_function_d1" ();
-
-CREATE OR REPLACE TRIGGER "replicate_apps"
-AFTER INSERT
-OR DELETE
-OR
-UPDATE ON "public"."apps" FOR EACH ROW
-EXECUTE FUNCTION "public"."trigger_http_queue_post_to_function_d1" ();
-
-CREATE OR REPLACE TRIGGER "replicate_channel_devices"
-AFTER INSERT
-OR DELETE
-OR
-UPDATE ON "public"."channel_devices" FOR EACH ROW
-EXECUTE FUNCTION "public"."trigger_http_queue_post_to_function_d1" ();
-
-CREATE OR REPLACE TRIGGER "replicate_channels"
-AFTER INSERT
-OR DELETE
-OR
-UPDATE ON "public"."channels" FOR EACH ROW
-EXECUTE FUNCTION "public"."trigger_http_queue_post_to_function_d1" ();
-
-CREATE OR REPLACE TRIGGER "replicate_manifest"
-AFTER INSERT
-OR DELETE ON "public"."manifest" FOR EACH ROW
-EXECUTE FUNCTION "public"."trigger_http_queue_post_to_function_d1" ();
-
-CREATE OR REPLACE TRIGGER "replicate_orgs"
-AFTER INSERT
-OR DELETE
-OR
-UPDATE ON "public"."orgs" FOR EACH ROW
-EXECUTE FUNCTION "public"."trigger_http_queue_post_to_function_d1" ();
-
-CREATE OR REPLACE TRIGGER "replicate_stripe_info"
-AFTER INSERT
-OR DELETE
-OR
-UPDATE ON "public"."stripe_info" FOR EACH ROW
-EXECUTE FUNCTION "public"."trigger_http_queue_post_to_function_d1" ();
 
 ALTER TABLE ONLY "public"."apikeys"
 ADD CONSTRAINT "apikeys_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."users" ("id") ON DELETE CASCADE;
@@ -5707,16 +5596,6 @@ GRANT ALL ON FUNCTION "public"."get_cycle_info_org" ("orgid" "uuid") TO "authent
 
 GRANT ALL ON FUNCTION "public"."get_cycle_info_org" ("orgid" "uuid") TO "service_role";
 
-REVOKE ALL ON FUNCTION "public"."get_d1_webhook_signature" ()
-FROM
-  PUBLIC;
-
-GRANT ALL ON FUNCTION "public"."get_d1_webhook_signature" () TO "anon";
-
-GRANT ALL ON FUNCTION "public"."get_d1_webhook_signature" () TO "authenticated";
-
-GRANT ALL ON FUNCTION "public"."get_d1_webhook_signature" () TO "service_role";
-
 GRANT ALL ON FUNCTION "public"."get_db_url" () TO "anon";
 
 GRANT ALL ON FUNCTION "public"."get_db_url" () TO "authenticated";
@@ -6304,16 +6183,6 @@ GRANT ALL ON FUNCTION "public"."process_cron_stats_jobs" () TO "authenticated";
 
 GRANT ALL ON FUNCTION "public"."process_cron_stats_jobs" () TO "service_role";
 
-REVOKE ALL ON FUNCTION "public"."process_d1_replication_batch" ()
-FROM
-  PUBLIC;
-
-GRANT ALL ON FUNCTION "public"."process_d1_replication_batch" () TO "anon";
-
-GRANT ALL ON FUNCTION "public"."process_d1_replication_batch" () TO "authenticated";
-
-GRANT ALL ON FUNCTION "public"."process_d1_replication_batch" () TO "service_role";
-
 REVOKE ALL ON FUNCTION "public"."process_failed_uploads" ()
 FROM
   PUBLIC;
@@ -6516,16 +6385,6 @@ GRANT ALL ON FUNCTION "public"."trigger_http_queue_post_to_function" () TO "anon
 GRANT ALL ON FUNCTION "public"."trigger_http_queue_post_to_function" () TO "authenticated";
 
 GRANT ALL ON FUNCTION "public"."trigger_http_queue_post_to_function" () TO "service_role";
-
-REVOKE ALL ON FUNCTION "public"."trigger_http_queue_post_to_function_d1" ()
-FROM
-  PUBLIC;
-
-GRANT ALL ON FUNCTION "public"."trigger_http_queue_post_to_function_d1" () TO "anon";
-
-GRANT ALL ON FUNCTION "public"."trigger_http_queue_post_to_function_d1" () TO "authenticated";
-
-GRANT ALL ON FUNCTION "public"."trigger_http_queue_post_to_function_d1" () TO "service_role";
 
 GRANT ALL ON FUNCTION "public"."update_app_versions_retention" () TO "anon";
 
@@ -7163,9 +7022,6 @@ SELECT
   pgmq.create ('on_version_update');
 
 SELECT
-  pgmq.create ('replicate_data');
-
-SELECT
   pgmq.create ('on_user_delete');
 
 SELECT
@@ -7256,13 +7112,6 @@ SELECT
     'Send stats email every week',
     '0 12 * * 6',
     'SELECT process_stats_email_weekly();'
-  );
-
-SELECT
-  cron.schedule (
-    'process_d1_replication_batch',
-    '1 seconds',
-    'SELECT process_d1_replication_batch();'
   );
 
 SELECT
