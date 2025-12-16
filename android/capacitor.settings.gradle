@@ -17,6 +17,9 @@ project(':capacitor-app').projectDir = new File('../node_modules/@capacitor/app/
 include ':capacitor-app-launcher'
 project(':capacitor-app-launcher').projectDir = new File('../node_modules/@capacitor/app-launcher/android')
 
+include ':capacitor-barcode-scanner'
+project(':capacitor-barcode-scanner').projectDir = new File('../node_modules/@capacitor/barcode-scanner/android')
+
 include ':capacitor-browser'
 project(':capacitor-browser').projectDir = new File('../node_modules/@capacitor/browser/android')
 
@@ -77,9 +80,6 @@ project(':capacitor-toast').projectDir = new File('../node_modules/@capacitor/to
 include ':capawesome-capacitor-file-picker'
 project(':capawesome-capacitor-file-picker').projectDir = new File('../node_modules/@capawesome/capacitor-file-picker/android')
 
-include ':capawesome-capacitor-screen-orientation'
-project(':capawesome-capacitor-screen-orientation').projectDir = new File('../node_modules/@capawesome/capacitor-screen-orientation/android')
-
 include ':capgo-capacitor-crisp'
 project(':capgo-capacitor-crisp').projectDir = new File('../node_modules/@capgo/capacitor-crisp/android')
 
@@ -91,6 +91,12 @@ project(':capgo-capacitor-mute').projectDir = new File('../node_modules/@capgo/c
 
 include ':capgo-capacitor-native-biometric'
 project(':capgo-capacitor-native-biometric').projectDir = new File('../node_modules/@capgo/capacitor-native-biometric/android')
+
+include ':capgo-capacitor-persistent-account'
+project(':capgo-capacitor-persistent-account').projectDir = new File('../node_modules/@capgo/capacitor-persistent-account/android')
+
+include ':capgo-capacitor-screen-orientation'
+project(':capgo-capacitor-screen-orientation').projectDir = new File('../node_modules/@capgo/capacitor-screen-orientation/android')
 
 include ':capgo-capacitor-screen-recorder'
 project(':capgo-capacitor-screen-recorder').projectDir = new File('../node_modules/@capgo/capacitor-screen-recorder/android')
@@ -109,9 +115,3 @@ project(':capgo-native-market').projectDir = new File('../node_modules/@capgo/na
 
 include ':revenuecat-purchases-capacitor'
 project(':revenuecat-purchases-capacitor').projectDir = new File('../node_modules/@revenuecat/purchases-capacitor/android')
-
-include ':capacitor-camera-view'
-project(':capacitor-camera-view').projectDir = new File('../node_modules/capacitor-camera-view/android')
-
-include ':capacitor-secure-storage-plugin'
-project(':capacitor-secure-storage-plugin').projectDir = new File('../node_modules/capacitor-secure-storage-plugin/android')
