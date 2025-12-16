@@ -40,7 +40,7 @@
         "@capgo/capacitor-flash": "^7.1.15",
         "@capgo/capacitor-mute": "^7.3.11",
         "@capgo/capacitor-native-biometric": "^7.5.1",
-        "@capgo/capacitor-screen-recorder": "7.3.5",
+        "@capgo/capacitor-screen-recorder": "7.3.13",
         "@capgo/capacitor-updater": "^7.30.0",
         "@capgo/inappbrowser": "^7.29.0",
         "@capgo/native-audio": "^7.9.3",
@@ -515,7 +515,7 @@
 
     "@capgo/capacitor-native-biometric": ["@capgo/capacitor-native-biometric@7.5.1", "", { "peerDependencies": { "@capacitor/core": ">=7.0.0" } }, "sha512-RPxJFCflRQI9r5QX+BnzGb9zTaJ2tGd9tMpVbTUDI/R5Hyr4C0q+FQCgaNNmPkVonKFGREdkMBTxhzbKlNDPKQ=="],
 
-    "@capgo/capacitor-screen-recorder": ["@capgo/capacitor-screen-recorder@7.3.5", "", { "peerDependencies": { "@capacitor/core": ">=7.0.0" } }, "sha512-/ufHVlNrrIbsJqMO6hWoKyVtSLPf/JwSzhHSAAPBCgvP7bxkx0sFTjNJbvtWNk5b10sYaiAwcMm+sVnCai7YrA=="],
+    "@capgo/capacitor-screen-recorder": ["@capgo/capacitor-screen-recorder@7.3.13", "", { "peerDependencies": { "@capacitor/core": ">=7.0.0" } }, "sha512-jThMF2gmi3fNmV+FsieM60Dilhm6MgH/k+4DIaHp9IgxYn/TZZhdPaYRJClJLwRqNf69hhZC5ON6gKryfYBxPg=="],
 
     "@capgo/capacitor-updater": ["@capgo/capacitor-updater@7.30.0", "", { "peerDependencies": { "@capacitor/core": ">=7.0.0" } }, "sha512-wKNf6vc3vOYUQwMGR/yk9okSWSIzy6n/imYeZgVCJ83CFDbzrsYPSm609ISflyXlBGJKoSRXd8tzcoFyxPHobQ=="],
 
