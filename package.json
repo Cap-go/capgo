@@ -77,7 +77,7 @@
     "deploy:cloudflare:api:dev": "bunx wrangler deploy --config cloudflare_workers/api/wrangler.jsonc --env=alpha --minify",
     "deploy:cloudflare:files:dev": "bunx wrangler deploy --config cloudflare_workers/files/wrangler.jsonc --env=alpha --minify",
     "deploy:cloudflare:plugin:dev": "bunx wrangler deploy --config cloudflare_workers/plugin/wrangler.jsonc --env=alpha --minify",
-    "deploy:cloudflare:plugins:prod": "bun run deploy:cloudflare:plugin_as:prod && bun run deploy:cloudflare:plugin_na:prod && bun run deploy:cloudflare:plugin_eu:prod && bun run deploy:cloudflare:plugin_af:prod && bun run deploy:cloudflare:plugin_oc:prod && bun run deploy:cloudflare:plugin_sa:prod",
+    "deploy:cloudflare:plugins:prod": "bun run deploy:cloudflare:plugin_as:prod && bun run deploy:cloudflare:plugin_na:prod && bun run deploy:cloudflare:plugin_eu:prod && bun run deploy:cloudflare:plugin_af:prod && bun run deploy:cloudflare:plugin_oc:prod && bun run deploy:cloudflare:plugin_sa:prod && bun run deploy:cloudflare:plugin_me:prod && bun run deploy:cloudflare:plugin_hk:prod",
     "deploy:cloudflare:plugin_as:prod": "bunx wrangler deploy --config cloudflare_workers/plugin/wrangler.jsonc --env=prod_as --minify",
     "deploy:cloudflare:plugin_na:prod": "bunx wrangler deploy --config cloudflare_workers/plugin/wrangler.jsonc --env=prod_na --minify",
     "deploy:cloudflare:plugin_eu:prod": "bunx wrangler deploy --config cloudflare_workers/plugin/wrangler.jsonc --env=prod_eu --minify",
