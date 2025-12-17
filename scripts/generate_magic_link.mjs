@@ -1,4 +1,4 @@
-import process from 'node:process'
+import { exit } from 'node:process'
 import { createClient } from '@supabase/supabase-js'
 
 async function run() {
@@ -7,7 +7,7 @@ async function run() {
 
   if (!email) {
     console.error('Usage: node generate_magic_link.mjs email@example.com')
-    process.exit(1)
+    exit(1)
   }
 
   // Load environment variables
@@ -17,7 +17,7 @@ async function run() {
 
   if (!supabaseUrl || !supabaseServiceKey) {
     console.error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY environment variables')
-    process.exit(1)
+    exit(1)
   }
 
   try {
@@ -39,7 +39,7 @@ async function run() {
 
     if (magicError) {
       console.error('Error generating magic link:', magicError)
-      process.exit(1)
+      exit(1)
     }
 
     console.log('\n=== Magic Link Generated Successfully ===')
@@ -50,7 +50,7 @@ async function run() {
   }
   catch (error) {
     console.error('Unexpected error:', error)
-    process.exit(1)
+    exit(1)
   }
 }
 

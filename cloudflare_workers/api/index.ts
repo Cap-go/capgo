@@ -1,4 +1,4 @@
-import process from 'node:process'
+import { env } from 'node:process'
 import { app as admin_stats } from '../../supabase/functions/_backend/private/admin_stats.ts'
 import { app as config } from '../../supabase/functions/_backend/private/config.ts'
 import { app as create_device } from '../../supabase/functions/_backend/private/create_device.ts'
@@ -48,7 +48,7 @@ import { version } from '../../supabase/functions/_backend/utils/version.ts'
 
 // Public API
 const functionName = 'api'
-const app = createHono(functionName, version, process.env.SENTRY_DSN)
+const app = createHono(functionName, version, env.SENTRY_DSN)
 app.route('/ok', ok)
 app.route('/apikey', apikey)
 app.route('/bundle', bundle)
