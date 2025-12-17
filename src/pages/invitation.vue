@@ -263,7 +263,7 @@ function openPrivacy() {
                   </div>
                 </div>
                 <div v-if="!!captchaKey">
-                  <VueTurnstile :ref="captchaComponent" v-model="turnstileToken" size="flexible" :site-key="captchaKey" />
+                  <VueTurnstile ref="captchaComponent" v-model="turnstileToken" size="flexible" :site-key="captchaKey" />
                 </div>
 
                 <!-- Submit Button -->
