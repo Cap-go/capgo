@@ -3,6 +3,7 @@ import type { RequestBuildBody } from './request.ts'
 import type { BuildStatusParams } from './status.ts'
 import { getBodyOrQuery, honoFactory } from '../../utils/hono.ts'
 import { middlewareKey } from '../../utils/hono_middleware.ts'
+import { cancelBuild } from './cancel.ts'
 import { streamBuildLogs } from './logs.ts'
 import { requestBuild } from './request.ts'
 import { startBuild } from './start.ts'
@@ -45,6 +46,17 @@ app.get('/logs/:jobId', middlewareKey(['all', 'read']), async (c) => {
   }
   const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
   return streamBuildLogs(c, jobId, appId, apikey)
+})
+
+// POST /build/cancel/:jobId - Cancel a running build
+app.post('/cancel/:jobId', middlewareKey(['all', 'write']), async (c) => {
+  const jobId = c.req.param('jobId')
+  const body = await getBodyOrQuery<{ app_id: string }>(c)
+  if (!body.app_id) {
+    throw new Error('app_id is required in request body')
+  }
+  const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
+  return cancelBuild(c, jobId, body.app_id, apikey)
 })
 
 // TUS proxy endpoints - ALL methods proxied to builder with API key injection
