@@ -59,6 +59,7 @@ onMounted(async () => {
     }).single()
 
     if (error) {
+      captchaComponent.value?.reset()
       console.error('Error fetching invite:', error)
       isError.value = error.message
       isLoading.value = false
@@ -106,6 +107,7 @@ async function submitForm() {
     })
 
     if (error) {
+      captchaComponent.value?.reset()
       throw new Error(error.message || 'Failed to accept invitation')
     }
 
@@ -118,10 +120,12 @@ async function submitForm() {
       // MagicCapgo12@#
     }
     else {
+      captchaComponent.value?.reset()
       throw new Error('No tokens received from server')
     }
   }
   catch (error: unknown) {
+    captchaComponent.value?.reset()
     console.error('Error accepting invitation:', error)
     isError.value = error instanceof Error ? error.message : String(error)
   }
@@ -145,10 +149,10 @@ function openPrivacy() {
 </script>
 
 <template>
-  <section class="flex overflow-y-auto py-10 w-full h-full sm:py-8 lg:py-2">
+  <section class="flex w-full h-full py-10 overflow-y-auto sm:py-8 lg:py-2">
     <div class="px-4 mx-auto max-w-7xl sm:px-6 lg:px-8" style="margin-top: 5vh;">
-      <div class="mx-auto max-w-2xl text-center">
-        <img src="/capgo.webp" alt="logo" class="mx-auto mb-6 w-1/6 rounded-sm invert dark:invert-0">
+      <div class="max-w-2xl mx-auto text-center">
+        <img src="/capgo.webp" alt="logo" class="w-1/6 mx-auto mb-6 rounded-sm invert dark:invert-0">
         <h1 class="text-3xl font-bold leading-tight text-black sm:text-4xl lg:text-5xl dark:text-white">
           {{ t('welcome-to') }}
           <p class="inline font-prompt">
@@ -156,10 +160,10 @@ function openPrivacy() {
           </p> !
         </h1>
         <template v-if="!isLoading && inviteRow">
-          <p class="mx-auto mt-6 max-w-xl text-base leading-relaxed text-gray-600 dark:text-gray-300">
+          <p class="max-w-xl mx-auto mt-6 text-base leading-relaxed text-gray-600 dark:text-gray-300">
             {{ t('invitation-page') }}
           </p>
-          <p class="mx-auto mt-2 max-w-xl text-base leading-relaxed text-gray-600 dark:text-gray-300">
+          <p class="max-w-xl mx-auto mt-2 text-base leading-relaxed text-gray-600 dark:text-gray-300">
             {{ t('invitation-page-description') }}
           </p>
         </template>
@@ -167,7 +171,7 @@ function openPrivacy() {
       <div v-if="!isLoading" class="relative mx-auto mt-8 max-w-md md:mt-4 pb-[10vh]">
         <div v-if="inviteRow">
           <div class="overflow-hidden bg-white rounded-md shadow-md dark:bg-slate-800">
-            <div class="py-6 px-4 text-gray-500 sm:py-7 sm:px-8">
+            <div class="px-4 py-6 text-gray-500 sm:py-7 sm:px-8">
               <div class="space-y-5">
                 <!-- Organization Section -->
                 <div class="mb-6">
@@ -175,7 +179,7 @@ function openPrivacy() {
                     Organization
                   </h2>
                   <div class="flex flex-col items-center mb-4">
-                    <img v-if="inviteRow.org_logo" :src="inviteRow.org_logo" alt="organization logo" class="mb-2 w-16 h-16 rounded-sm">
+                    <img v-if="inviteRow.org_logo" :src="inviteRow.org_logo" alt="organization logo" class="w-16 h-16 mb-2 rounded-sm">
                     <div v-else class="p-6 mb-3 text-xl bg-gray-700 d-mask d-mask-squircle">
                       <span class="font-medium text-gray-300">
                         N/A
@@ -206,7 +210,7 @@ function openPrivacy() {
                       type="password"
                       :placeholder="t('password-placeholder')"
                       autocomplete="new-password"
-                      class="py-2 px-3 w-full text-gray-700 rounded-md border border-gray-300 dark:text-gray-300 dark:bg-gray-800 dark:border-gray-600 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                      class="w-full px-3 py-2 text-gray-700 border border-gray-300 rounded-md dark:text-gray-300 dark:bg-gray-800 dark:border-gray-600 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                     >
 
                     <!-- Password requirements section -->
@@ -259,13 +263,13 @@ function openPrivacy() {
                   </div>
                 </div>
                 <div v-if="!!captchaKey">
-                  <VueTurnstile ref="captchaComponent" v-model="turnstileToken" size="flexible" :site-key="captchaKey" />
+                  <VueTurnstile :ref="captchaComponent" v-model="turnstileToken" size="flexible" :site-key="captchaKey" />
                 </div>
 
                 <!-- Submit Button -->
                 <button
                   :disabled="!isPasswordValid || !acceptTerms"
-                  class="py-3 px-4 w-full text-base font-semibold text-white rounded-md transition-all duration-200 focus:outline-none"
+                  class="w-full px-4 py-3 text-base font-semibold text-white transition-all duration-200 rounded-md focus:outline-none"
                   :class="isPasswordValid && acceptTerms ? 'bg-muted-blue-700 hover:bg-blue-700' : 'bg-gray-400 cursor-not-allowed'"
                   @click="submitForm"
                 >
@@ -276,7 +280,7 @@ function openPrivacy() {
           </div>
         </div>
         <div v-else class="p-6 mt-12 bg-white rounded-md shadow-md dark:bg-slate-800">
-          <div class="flex flex-col justify-center items-center h-full">
+          <div class="flex flex-col items-center justify-center h-full">
             <p class="text-xl text-center">
               {{ t('invitation-page-not-found') }}
             </p>
@@ -286,14 +290,14 @@ function openPrivacy() {
             <p v-if="isError" class="mt-2 text-center text-md">
               {{ t('error-message-invitation') }}: {{ isError }}
             </p>
-            <button class="py-3 px-4 mt-12 w-full text-base font-semibold text-white bg-blue-700 rounded-md transition-all duration-200 hover:scale-105 focus:outline-none" @click="joinCapgo">
+            <button class="w-full px-4 py-3 mt-12 text-base font-semibold text-white transition-all duration-200 bg-blue-700 rounded-md hover:scale-105 focus:outline-none" @click="joinCapgo">
               {{ t('join-capgo') }}
             </button>
           </div>
         </div>
       </div>
       <div v-else>
-        <div class="flex justify-center items-center mt-12 h-full">
+        <div class="flex items-center justify-center h-full mt-12">
           <Spinner size="w-40 h-40" />
         </div>
       </div>
