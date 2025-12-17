@@ -9,8 +9,6 @@ android {
 
 apply from: "../capacitor-cordova-android-plugins/cordova.variables.gradle"
 dependencies {
-    implementation project(':capacitor-community-in-app-review')
-    implementation project(':capacitor-community-keep-awake')
     implementation project(':capacitor-action-sheet')
     implementation project(':capacitor-app')
     implementation project(':capacitor-app-launcher')
@@ -34,9 +32,9 @@ dependencies {
     implementation project(':capacitor-status-bar')
     implementation project(':capacitor-text-zoom')
     implementation project(':capacitor-toast')
-    implementation project(':capawesome-capacitor-file-picker')
     implementation project(':capgo-capacitor-crisp')
     implementation project(':capgo-capacitor-flash')
+    implementation project(':capgo-capacitor-in-app-review')
     implementation project(':capgo-capacitor-mute')
     implementation project(':capgo-capacitor-native-biometric')
     implementation project(':capgo-capacitor-persistent-account')
@@ -44,6 +42,7 @@ dependencies {
     implementation project(':capgo-capacitor-screen-recorder')
     implementation project(':capgo-capacitor-updater')
     implementation project(':capgo-inappbrowser')
+    implementation project(':capgo-keep-awake')
     implementation project(':capgo-native-audio')
     implementation project(':capgo-native-market')
     implementation project(':revenuecat-purchases-capacitor')
