@@ -57,24 +57,9 @@ export async function streamBuildLogs(
     job_id: jobId,
   })
 
-  // Create a transform stream to pipe through
-  // This ensures proper streaming in Supabase Edge Functions
-  const { readable, writable } = new TransformStream()
-
-  // Pipe the builder response to the client in the background
-  if (builderResponse.body) {
-    builderResponse.body.pipeTo(writable).catch((err) => {
-      cloudlogErr({
-        requestId: c.get('requestId'),
-        message: 'Log stream pipe error',
-        job_id: jobId,
-        error: err instanceof Error ? err.message : String(err),
-      })
-    })
-  }
-
-  // Return the SSE stream
-  return new Response(readable, {
+  // Directly return the builder's response body as an SSE stream
+  // The builder already returns proper SSE format with Content-Type: text/event-stream
+  return new Response(builderResponse.body, {
     status: 200,
     headers: {
       'Content-Type': 'text/event-stream',
