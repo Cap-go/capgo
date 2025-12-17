@@ -1,4 +1,4 @@
-import type { CapacitorConfig } from '@capacitor/cli'
+import type { CapacitorConfig } from '@capacitor-plus/cli'
 import pkg from './package.json'
 
 const config: CapacitorConfig = {
