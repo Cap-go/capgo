@@ -5,6 +5,58 @@ import { cloudlog, cloudlogErr } from '../../utils/logging.ts'
 import { hasAppRightApikey } from '../../utils/supabase.ts'
 import { getEnv } from '../../utils/utils.ts'
 
+async function cancelBuildOnDisconnect(
+  builderUrl: string,
+  builderApiKey: string,
+  jobId: string,
+  appId: string,
+  requestId: string,
+): Promise<void> {
+  try {
+    cloudlog({
+      requestId,
+      message: 'Client disconnected, cancelling build',
+      job_id: jobId,
+      app_id: appId,
+    })
+
+    const response = await fetch(`${builderUrl}/jobs/${jobId}/cancel`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': builderApiKey,
+      },
+      body: JSON.stringify({ app_id: appId }),
+    })
+
+    if (response.ok) {
+      cloudlog({
+        requestId,
+        message: 'Build cancelled successfully after client disconnect',
+        job_id: jobId,
+      })
+    }
+    else {
+      const errorText = await response.text()
+      cloudlogErr({
+        requestId,
+        message: 'Failed to cancel build after client disconnect',
+        job_id: jobId,
+        status: response.status,
+        error: errorText,
+      })
+    }
+  }
+  catch (err) {
+    cloudlogErr({
+      requestId,
+      message: 'Error cancelling build after client disconnect',
+      job_id: jobId,
+      error: err instanceof Error ? err.message : String(err),
+    })
+  }
+}
+
 export async function streamBuildLogs(
   c: Context,
   jobId: string,
@@ -77,6 +129,13 @@ export async function streamBuildLogs(
     requestId: c.get('requestId'),
     message: 'Streaming build logs',
     job_id: jobId,
+  })
+
+  // Listen for client disconnect to cancel the build
+  const requestId = c.get('requestId')
+  c.req.raw.signal.addEventListener('abort', () => {
+    // Fire and forget - cancel the build when client disconnects
+    cancelBuildOnDisconnect(builderUrl, builderApiKey, jobId, appId, requestId)
   })
 
   // Directly return the builder's response body as an SSE stream
