@@ -32,10 +32,32 @@ export async function streamBuildLogs(
   }
 
   // Proxy SSE stream from builder.capgo.app
-  const builderResponse = await fetch(`${getEnv(c, 'BUILDER_URL')}/jobs/${jobId}/logs`, {
+  const builderUrl = getEnv(c, 'BUILDER_URL')
+  const builderApiKey = getEnv(c, 'BUILDER_API_KEY')
+
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: 'Connecting to builder for logs',
+    job_id: jobId,
+    builder_url: builderUrl ? `${builderUrl}/jobs/${jobId}/logs` : 'BUILDER_URL not set',
+    has_api_key: !!builderApiKey,
+  })
+
+  if (!builderUrl || !builderApiKey) {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'Builder config missing',
+      job_id: jobId,
+      has_builder_url: !!builderUrl,
+      has_builder_api_key: !!builderApiKey,
+    })
+    throw simpleError('config_error', 'Builder service not configured')
+  }
+
+  const builderResponse = await fetch(`${builderUrl}/jobs/${jobId}/logs`, {
     method: 'GET',
     headers: {
-      'x-api-key': getEnv(c, 'BUILDER_API_KEY'),
+      'x-api-key': builderApiKey,
     },
   })
 
