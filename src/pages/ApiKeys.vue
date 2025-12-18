@@ -10,6 +10,7 @@ import IconClipboard from '~icons/heroicons/clipboard-document'
 import IconPencil from '~icons/heroicons/pencil'
 import IconTrash from '~icons/heroicons/trash'
 import Table from '~/components/Table.vue'
+import { formatLocalDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useDisplayStore } from '~/stores/display'
@@ -244,7 +245,7 @@ columns.value = [
     label: t('created'),
     sortable: true,
     displayFunction: (row: Database['public']['Tables']['apikeys']['Row']) => {
-      return new Date(row.created_at || '').toLocaleDateString()
+      return formatLocalDate(row.created_at)
     },
   },
   {
@@ -641,6 +642,7 @@ getKeys()
             <Table
               v-model:current-page="currentPage"
               show-add
+              :auto-reload="false"
               :columns="columns"
               :element-list="filteredAndSortedKeys"
               :is-loading="isLoading"

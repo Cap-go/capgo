@@ -14,6 +14,7 @@ export interface DeviceComparable {
   is_prod: boolean
   is_emulator: boolean
   default_channel: string | null // D1 schema: TEXT (NULLABLE)
+  key_id: string | null
 }
 
 export type DeviceExistingRowLike = {
@@ -27,6 +28,7 @@ export type DeviceExistingRowLike = {
   is_prod?: boolean | number | null
   is_emulator?: boolean | number | null
   default_channel?: string | null
+  key_id?: string | null
 } | null | undefined
 
 export function toComparableDevice(device: DeviceWithoutCreatedAt): DeviceComparable {
@@ -38,6 +40,7 @@ export function toComparableDevice(device: DeviceWithoutCreatedAt): DeviceCompar
   const normalizedOsVersion = normalizeOptionalString(device.os_version)
   const normalizedDefaultChannel = normalizeOptionalString(device.default_channel)
   const normalizedVersionBuild = normalizeOptionalString(device.version_build)
+  const normalizedKeyId = normalizeOptionalString(device.key_id)
 
   return {
     // version: device.version ?? null,
@@ -56,6 +59,7 @@ export function toComparableDevice(device: DeviceWithoutCreatedAt): DeviceCompar
     is_emulator: device.is_emulator ?? false,
     // D1 schema: default_channel TEXT (NULLABLE - allows NULL!)
     default_channel: normalizedDefaultChannel,
+    key_id: normalizedKeyId,
   }
 }
 
@@ -67,6 +71,7 @@ export function toComparableExisting(existing: DeviceExistingRowLike): DeviceCom
   const normalizedOsVersion = normalizeOptionalString(existing?.os_version as string | null | undefined)
   const normalizedDefaultChannel = normalizeOptionalString(existing?.default_channel as string | null | undefined)
   const normalizedVersionBuild = normalizeOptionalString(existing?.version_build as string | null | undefined)
+  const normalizedKeyId = normalizeOptionalString(existing?.key_id as string | null | undefined)
 
   return {
     // version: existing?.version ?? null,
@@ -85,6 +90,7 @@ export function toComparableExisting(existing: DeviceExistingRowLike): DeviceCom
     is_emulator: existing?.is_emulator === undefined || existing?.is_emulator === null ? false : Boolean(existing.is_emulator),
     // D1 schema: default_channel TEXT (NULLABLE - allows NULL!)
     default_channel: normalizedDefaultChannel,
+    key_id: normalizedKeyId,
   }
 }
 
@@ -143,6 +149,7 @@ export function buildNormalizedDeviceForWrite(device: DeviceWithoutCreatedAt) {
     custom_id: comparableDevice.custom_id,
     is_prod: comparableDevice.is_prod,
     is_emulator: comparableDevice.is_emulator,
+    key_id: comparableDevice.key_id,
   }
 }
 

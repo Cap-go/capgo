@@ -212,18 +212,25 @@ export function getAlias() {
   return { versionAlias, channelDevicesAlias, channelAlias }
 }
 
-function getSchemaUpdatesAlias() {
+function getSchemaUpdatesAlias(includeMetadata = false) {
   const { versionAlias, channelDevicesAlias, channelAlias } = getAlias()
 
-  const versionSelect = {
+  const versionSelect: any = {
     id: sql<number>`${versionAlias.id}`.as('vid'),
     name: sql<string>`${versionAlias.name}`.as('vname'),
     checksum: sql<string | null>`${versionAlias.checksum}`.as('vchecksum'),
     session_key: sql<string | null>`${versionAlias.session_key}`.as('vsession_key'),
+    key_id: sql<string | null>`${versionAlias.key_id}`.as('vkey_id'),
     storage_provider: sql<string>`${versionAlias.storage_provider}`.as('vstorage_provider'),
     external_url: sql<string | null>`${versionAlias.external_url}`.as('vexternal_url'),
     min_update_version: sql<string | null>`${versionAlias.min_update_version}`.as('vminUpdateVersion'),
     r2_path: sql`${versionAlias.r2_path}`.mapWith(versionAlias.r2_path).as('vr2_path'),
+  }
+
+  // Only include link and comment when needed (for plugin v7.35.0+ with expose_metadata enabled)
+  if (includeMetadata) {
+    versionSelect.link = sql<string | null>`${versionAlias.link}`.as('vlink')
+    versionSelect.comment = sql<string | null>`${versionAlias.comment}`.as('vcomment')
   }
   const channelSelect = {
     id: channelAlias.id,
@@ -254,8 +261,9 @@ export function requestInfosChannelDevicePostgres(
   device_id: string,
   drizzleClient: ReturnType<typeof getDrizzleClient>,
   includeManifest: boolean,
+  includeMetadata = false,
 ) {
-  const { versionSelect, channelDevicesAlias, channelAlias, channelSelect, manifestSelect, versionAlias } = getSchemaUpdatesAlias()
+  const { versionSelect, channelDevicesAlias, channelAlias, channelSelect, manifestSelect, versionAlias } = getSchemaUpdatesAlias(includeMetadata)
   const baseSelect = {
     channel_devices: {
       device_id: channelDevicesAlias.device_id,
@@ -290,8 +298,9 @@ export function requestInfosChannelPostgres(
   defaultChannel: string,
   drizzleClient: ReturnType<typeof getDrizzleClient>,
   includeManifest: boolean,
+  includeMetadata = false,
 ) {
-  const { versionSelect, channelAlias, channelSelect, manifestSelect, versionAlias } = getSchemaUpdatesAlias()
+  const { versionSelect, channelAlias, channelSelect, manifestSelect, versionAlias } = getSchemaUpdatesAlias(includeMetadata)
   const platformQuery = platform === 'android' ? channelAlias.android : channelAlias.ios
   const baseSelect = {
     version: versionSelect,
@@ -335,17 +344,18 @@ export function requestInfosPostgres(
   drizzleClient: ReturnType<typeof getDrizzleClient>,
   channelDeviceCount?: number | null,
   manifestBundleCount?: number | null,
+  includeMetadata = false,
 ) {
   const shouldQueryChannelOverride = channelDeviceCount === undefined || channelDeviceCount === null ? true : channelDeviceCount > 0
   const shouldFetchManifest = manifestBundleCount === undefined || manifestBundleCount === null ? true : manifestBundleCount > 0
 
   const channelDevice = shouldQueryChannelOverride
-    ? requestInfosChannelDevicePostgres(c, app_id, device_id, drizzleClient, shouldFetchManifest)
+    ? requestInfosChannelDevicePostgres(c, app_id, device_id, drizzleClient, shouldFetchManifest, includeMetadata)
     : Promise.resolve(undefined).then(() => {
         cloudlog({ requestId: c.get('requestId'), message: 'Skipping channel device override query' })
         return null
       })
-  const channel = requestInfosChannelPostgres(c, platform, app_id, defaultChannel, drizzleClient, shouldFetchManifest)
+  const channel = requestInfosChannelPostgres(c, platform, app_id, defaultChannel, drizzleClient, shouldFetchManifest, includeMetadata)
 
   return Promise.all([channelDevice, channel])
     .then(([channelOverride, channelData]) => ({ channelData, channelOverride }))
@@ -360,7 +370,7 @@ export async function getAppOwnerPostgres(
   appId: string,
   drizzleClient: ReturnType<typeof getDrizzleClient>,
   actions: ('mau' | 'storage' | 'bandwidth')[] = [],
-): Promise<{ owner_org: string, orgs: { created_by: string, id: string }, plan_valid: boolean, channel_device_count: number, manifest_bundle_count: number } | null> {
+): Promise<{ owner_org: string, orgs: { created_by: string, id: string }, plan_valid: boolean, channel_device_count: number, manifest_bundle_count: number, expose_metadata: boolean } | null> {
   try {
     if (actions.length === 0)
       return null
@@ -373,6 +383,7 @@ export async function getAppOwnerPostgres(
         plan_valid: planExpression,
         channel_device_count: schema.apps.channel_device_count,
         manifest_bundle_count: schema.apps.manifest_bundle_count,
+        expose_metadata: schema.apps.expose_metadata,
         orgs: {
           created_by: orgAlias.created_by,
           id: orgAlias.id,
@@ -697,6 +708,185 @@ export async function getCompatibleChannelsPg(
   }
   catch (e: unknown) {
     logPgError(c, 'getCompatibleChannelsPg', e)
+    return []
+  }
+}
+
+// Admin Deployments Trend (from Supabase channel_devices table)
+export interface AdminDeploymentsTrend {
+  date: string
+  deployments: number
+}
+
+export async function getAdminDeploymentsTrend(
+  c: Context,
+  start_date: string,
+  end_date: string,
+  app_id?: string,
+): Promise<AdminDeploymentsTrend[]> {
+  try {
+    const pgClient = getPgClient(c, true) // Read-only query
+    const drizzleClient = getDrizzleClient(pgClient)
+
+    const appFilter = app_id ? sql`AND app_id = ${app_id}` : sql``
+
+    const query = sql`
+      SELECT
+        DATE(created_at) AS date,
+        COUNT(*)::int AS deployments
+      FROM channel_devices
+      WHERE created_at >= ${start_date}::timestamp
+        AND created_at < ${end_date}::timestamp
+        ${appFilter}
+      GROUP BY DATE(created_at)
+      ORDER BY date ASC
+    `
+
+    const result = await drizzleClient.execute(query)
+
+    const data: AdminDeploymentsTrend[] = result.rows.map((row: any) => ({
+      date: row.date instanceof Date ? row.date.toISOString().split('T')[0] : row.date,
+      deployments: Number(row.deployments),
+    }))
+
+    cloudlog({ requestId: c.get('requestId'), message: 'getAdminDeploymentsTrend result', resultCount: data.length })
+
+    return data
+  }
+  catch (e: unknown) {
+    logPgError(c, 'getAdminDeploymentsTrend', e)
+    return []
+  }
+}
+
+// Admin Global Stats Trend (from Supabase global_stats table)
+export interface AdminGlobalStatsTrend {
+  date: string
+  apps: number
+  apps_active: number
+  users: number
+  users_active: number
+  paying: number
+  trial: number
+  not_paying: number
+  updates: number
+  updates_external: number
+  success_rate: number
+  bundle_storage_gb: number
+  plan_solo: number
+  plan_maker: number
+  plan_team: number
+  plan_enterprise: number
+  registers_today: number
+  devices_last_month: number
+  stars: number
+  need_upgrade: number
+  paying_yearly: number
+  paying_monthly: number
+  new_paying_orgs: number
+  canceled_orgs: number
+  mrrr: number
+  total_revenue: number
+  revenue_solo: number
+  revenue_maker: number
+  revenue_team: number
+  revenue_enterprise: number
+}
+
+export async function getAdminGlobalStatsTrend(
+  c: Context,
+  start_date: string,
+  end_date: string,
+): Promise<AdminGlobalStatsTrend[]> {
+  try {
+    const pgClient = getPgClient(c, true) // Read-only query
+    const drizzleClient = getDrizzleClient(pgClient)
+
+    // Extract just the date portion (YYYY-MM-DD) from ISO timestamps
+    const startDateOnly = start_date.split('T')[0]
+    const endDateOnly = end_date.split('T')[0]
+
+    // Simple query - just SELECT all columns from global_stats
+    // Revenue metrics are already calculated and stored by logsnag_insights cron job
+    const query = sql`
+      SELECT
+        date_id AS date,
+        apps::int,
+        apps_active::int,
+        users::int,
+        users_active::int,
+        paying::int,
+        trial::int,
+        not_paying::int,
+        updates::int,
+        updates_external::int,
+        success_rate::float,
+        bundle_storage_gb::float,
+        plan_solo::int,
+        plan_maker::int,
+        plan_team::int,
+        plan_enterprise::int,
+        registers_today::int,
+        devices_last_month::int,
+        stars::int,
+        need_upgrade::int,
+        paying_yearly::int,
+        paying_monthly::int,
+        new_paying_orgs::int,
+        canceled_orgs::int,
+        mrrr::float,
+        total_revenue::float,
+        revenue_solo::float,
+        revenue_maker::float,
+        revenue_team::float,
+        revenue_enterprise::float
+      FROM global_stats
+      WHERE date_id >= ${startDateOnly}
+        AND date_id <= ${endDateOnly}
+      ORDER BY date_id ASC
+    `
+
+    const result = await drizzleClient.execute(query)
+
+    const data: AdminGlobalStatsTrend[] = result.rows.map((row: any) => ({
+      date: row.date,
+      apps: Number(row.apps) || 0,
+      apps_active: Number(row.apps_active) || 0,
+      users: Number(row.users) || 0,
+      users_active: Number(row.users_active) || 0,
+      paying: Number(row.paying) || 0,
+      trial: Number(row.trial) || 0,
+      not_paying: Number(row.not_paying) || 0,
+      updates: Number(row.updates) || 0,
+      updates_external: Number(row.updates_external) || 0,
+      success_rate: Number(row.success_rate) || 0,
+      bundle_storage_gb: Number(row.bundle_storage_gb) || 0,
+      plan_solo: Number(row.plan_solo) || 0,
+      plan_maker: Number(row.plan_maker) || 0,
+      plan_team: Number(row.plan_team) || 0,
+      plan_enterprise: Number(row.plan_enterprise) || 0,
+      registers_today: Number(row.registers_today) || 0,
+      devices_last_month: Number(row.devices_last_month) || 0,
+      stars: Number(row.stars) || 0,
+      need_upgrade: Number(row.need_upgrade) || 0,
+      paying_yearly: Number(row.paying_yearly) || 0,
+      paying_monthly: Number(row.paying_monthly) || 0,
+      new_paying_orgs: Number(row.new_paying_orgs) || 0,
+      canceled_orgs: Number(row.canceled_orgs) || 0,
+      mrrr: Number(row.mrrr) || 0,
+      total_revenue: Number(row.total_revenue) || 0,
+      revenue_solo: Number(row.revenue_solo) || 0,
+      revenue_maker: Number(row.revenue_maker) || 0,
+      revenue_team: Number(row.revenue_team) || 0,
+      revenue_enterprise: Number(row.revenue_enterprise) || 0,
+    }))
+
+    cloudlog({ requestId: c.get('requestId'), message: 'getAdminGlobalStatsTrend result', resultCount: data.length })
+
+    return data
+  }
+  catch (e: unknown) {
+    logPgError(c, 'getAdminGlobalStatsTrend', e)
     return []
   }
 }

@@ -75,8 +75,10 @@ const bundleDataByApp = ref<{ [appId: string]: number[] }>({})
 const appNames = ref<{ [appId: string]: string }>({})
 const isLoading = ref(true)
 
-// Cache for raw API data
-const cachedRawStats = ref<any[] | null>(null)
+// Per-org cache for raw API data: Map<orgId, cachedData>
+const cacheByOrg = new Map<string, any[]>()
+// Track current org for change detection
+const currentCacheOrgId = ref<string | null>(null)
 // Cache for single app name to avoid refetching
 const singleAppNameCache = new Map<string, string>()
 
@@ -86,12 +88,17 @@ async function calculateStats(forceRefetch = false) {
   const startTime = Date.now()
   try {
     isLoading.value = true
-    total.value = 0
 
-    // Reset data
+    // Reset display data
+    total.value = 0
+    lastDayEvolution.value = 0
     bundleDataByApp.value = {}
     appNames.value = {}
     bundleData.value = []
+
+    const currentOrgId = organizationStore.currentOrganization?.gid ?? null
+    const orgChanged = currentCacheOrgId.value !== currentOrgId
+    currentCacheOrgId.value = currentOrgId
 
     // Always work with last 30 days of data
     const last30DaysEnd = new Date()
@@ -103,9 +110,6 @@ async function calculateStats(forceRefetch = false) {
     // Get billing period dates for filtering
     const billingStart = new Date(organizationStore.currentOrganization?.subscription_start ?? new Date())
     billingStart.setHours(0, 0, 0, 0)
-
-    // Create 30-day arrays
-    const dailyCounts30Days = Array.from({ length: 30 }).fill(0) as number[]
 
     // Determine target apps
     const localAppNames: { [appId: string]: string } = {}
@@ -136,32 +140,29 @@ async function calculateStats(forceRefetch = false) {
     else {
       // Multiple apps mode - use store for shared apps data
       const dashboardAppsStore = useDashboardAppsStore()
-      // Only fetch apps if not already loaded in store
-      if (!dashboardAppsStore.isLoaded)
-        await dashboardAppsStore.fetchApps()
+      // Force fetch if org changed to ensure we get fresh data
+      await dashboardAppsStore.fetchApps(orgChanged)
 
       targetAppIds = [...dashboardAppsStore.appIds]
       appNames.value = dashboardAppsStore.appNames
     }
 
     if (targetAppIds.length === 0) {
-      bundleData.value = dailyCounts30Days
+      bundleData.value = Array.from({ length: 30 }).fill(0) as number[]
+      bundleDataByApp.value = {}
       return
     }
 
-    // Initialize data arrays for each app (30 days)
-    targetAppIds.forEach((appId) => {
-      bundleDataByApp.value[appId] = Array.from({ length: 30 }).fill(0) as number[]
-    })
+    // Check per-org cache - only use cache if not forcing refetch
+    let data: any[] | null = null
+    let error = null
+    const cachedData = currentOrgId ? cacheByOrg.get(currentOrgId) : null
 
-    // Use cached data if available and not forcing refetch
-    let data, error
-    if (cachedRawStats.value && !forceRefetch) {
-      data = cachedRawStats.value
-      error = null
+    if (cachedData && !forceRefetch) {
+      data = cachedData
     }
     else {
-      // Always fetch last 30 days of data
+      // Fetch last 30 days of data
       const query = useSupabase()
         .from('app_versions')
         .select('created_at, app_id')
@@ -172,16 +173,28 @@ async function calculateStats(forceRefetch = false) {
       const result = await query
       data = result.data
       error = result.error
-      // Cache the fetched data
-      if (!error) {
-        cachedRawStats.value = data
+
+      // Store in per-org cache
+      if (!error && data && currentOrgId) {
+        cacheByOrg.set(currentOrgId, data)
       }
     }
 
     if (!error && data) {
+      // Create fresh arrays for processing
+      const dailyCounts30Days = Array.from({ length: 30 }).fill(0) as number[]
+      const bundleDataByApp30Days: { [appId: string]: number[] } = {}
+      targetAppIds.forEach((appId) => {
+        bundleDataByApp30Days[appId] = Array.from({ length: 30 }).fill(0) as number[]
+      })
+
+      // Track total separately (don't use ref during loop)
+      let totalCount = 0
+
       // Map each bundle to the correct day and app (30 days)
-      data.filter(b => b.created_at !== null && b.app_id !== null)
-        .forEach((bundle) => {
+      data
+        .filter((b: any) => b.created_at !== null && b.app_id !== null)
+        .forEach((bundle: any) => {
           if (bundle.created_at && bundle.app_id) {
             const bundleDate = new Date(bundle.created_at)
 
@@ -190,11 +203,11 @@ async function calculateStats(forceRefetch = false) {
 
             if (daysDiff >= 0 && daysDiff < 30) {
               dailyCounts30Days[daysDiff]++
-              total.value++
+              totalCount++
 
               // Also track by app
-              if (bundleDataByApp.value[bundle.app_id]) {
-                bundleDataByApp.value[bundle.app_id][daysDiff]++
+              if (bundleDataByApp30Days[bundle.app_id]) {
+                bundleDataByApp30Days[bundle.app_id][daysDiff]++
               }
             }
           }
@@ -207,10 +220,12 @@ async function calculateStats(forceRefetch = false) {
         bundleData.value = filteredData.data
 
         // Filter by-app data too
-        Object.keys(bundleDataByApp.value).forEach((appId) => {
-          const filteredAppData = filterToBillingPeriod(bundleDataByApp.value[appId], last30DaysStart, billingStart)
-          bundleDataByApp.value[appId] = filteredAppData.data
+        const filteredByApp: { [appId: string]: number[] } = {}
+        Object.keys(bundleDataByApp30Days).forEach((appId) => {
+          const filteredAppData = filterToBillingPeriod(bundleDataByApp30Days[appId], last30DaysStart, billingStart)
+          filteredByApp[appId] = filteredAppData.data
         })
+        bundleDataByApp.value = filteredByApp
 
         // Recalculate total for billing period only
         total.value = filteredData.data.reduce((sum, count) => sum + count, 0)
@@ -218,6 +233,8 @@ async function calculateStats(forceRefetch = false) {
       else {
         // Show all 30 days
         bundleData.value = dailyCounts30Days
+        bundleDataByApp.value = bundleDataByApp30Days
+        total.value = totalCount
       }
 
       // Calculate evolution (compare last two days with data)
@@ -244,20 +261,28 @@ async function calculateStats(forceRefetch = false) {
   }
 }
 
-// Watch for billing period mode changes - use cached data
+// Watch for organization changes - use per-org cache (no need to force refetch)
+watch(() => organizationStore.currentOrganization?.gid, async (newOrgId, oldOrgId) => {
+  if (newOrgId && oldOrgId && newOrgId !== oldOrgId) {
+    // Per-org cache will be checked in calculateStats
+    await calculateStats(false)
+  }
+})
+
+// Watch for billing period mode changes - reprocess cached data
 watch(() => props.useBillingPeriod, async () => {
-  await calculateStats(false) // Don't refetch, just reprocess cached data
+  await calculateStats(false)
 })
 
-// Watch for accumulated mode changes - use cached data
+// Watch for accumulated mode changes - reprocess cached data
 watch(() => props.accumulated, async () => {
-  await calculateStats(false) // Don't refetch, just reprocess cached data
+  await calculateStats(false)
 })
 
-// Watch for reload trigger - force refetch
+// Watch for reload trigger - force refetch from API
 watch(() => props.reloadTrigger, async (newVal, oldVal) => {
   if (newVal !== oldVal && newVal > 0) {
-    await calculateStats(true) // Force refetch from API
+    await calculateStats(true)
   }
 })
 

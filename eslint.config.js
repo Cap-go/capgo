@@ -1,4 +1,4 @@
-import process from 'node:process'
+import { env } from 'node:process'
 import antfu from '@antfu/eslint-config'
 
 export default antfu(
@@ -6,8 +6,8 @@ export default antfu(
     vue: true,
     formatters: true,
     rules: {
-      'no-console': process.env.NODE_ENV === 'production' ? 'warn' : 'off',
-      'no-debugger': process.env.NODE_ENV === 'production' ? 'warn' : 'off',
+      'no-console': env.NODE_ENV === 'production' ? 'warn' : 'off',
+      'no-debugger': env.NODE_ENV === 'production' ? 'warn' : 'off',
     },
     ignores: [
       'dist',

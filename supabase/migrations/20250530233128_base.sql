@@ -48,13 +48,9 @@ CREATE EXTENSION IF NOT EXISTS "moddatetime"
 WITH
   SCHEMA "extensions";
 
-CREATE EXTENSION IF NOT EXISTS "pg_graphql"
-WITH
-  SCHEMA "graphql";
+DROP EXTENSION IF EXISTS "pg_graphql";
 
-CREATE EXTENSION IF NOT EXISTS "pg_stat_monitor"
-WITH
-  SCHEMA "extensions";
+DROP EXTENSION IF EXISTS "pg_stat_monitor";
 
 CREATE EXTENSION IF NOT EXISTS "pg_stat_statements"
 WITH
@@ -70,9 +66,21 @@ CREATE EXTENSION IF NOT EXISTS "pgmq"
 WITH
   SCHEMA "pgmq";
 
-CREATE EXTENSION IF NOT EXISTS "postgres_fdw"
+CREATE EXTENSION IF NOT EXISTS "pgsodium";
+
+CREATE EXTENSION IF NOT EXISTS "hypopg"
 WITH
   SCHEMA "extensions";
+
+CREATE EXTENSION IF NOT EXISTS "index_advisor"
+WITH
+  SCHEMA "extensions";
+
+CREATE EXTENSION IF NOT EXISTS "plpgsql_check"
+WITH
+  SCHEMA "extensions";
+
+DROP EXTENSION IF EXISTS "postgres_fdw";
 
 CREATE EXTENSION IF NOT EXISTS "supabase_vault"
 WITH
@@ -146,6 +154,7 @@ CREATE TYPE "public"."stats_action" AS ENUM(
   'directory_path_fail',
   'unzip_fail',
   'low_mem_fail',
+  'download_0',
   'download_10',
   'download_20',
   'download_30',
@@ -181,6 +190,7 @@ CREATE TYPE "public"."stats_action" AS ENUM(
   'getChannel',
   'rateLimited',
   'disableAutoUpdate',
+  'keyMismatch',
   'InvalidIp',
   'ping',
   'blocked_by_server_url'
@@ -206,10 +216,6 @@ CREATE TYPE "public"."stripe_status" AS ENUM(
 );
 
 ALTER TYPE "public"."stripe_status" OWNER TO "postgres";
-
-CREATE TYPE "public"."usage_mode" AS ENUM('last_saved', '5min', 'day', 'cycle');
-
-ALTER TYPE "public"."usage_mode" OWNER TO "postgres";
 
 CREATE TYPE "public"."user_min_right" AS ENUM(
   'invite_read',
@@ -512,11 +518,20 @@ CREATE OR REPLACE FUNCTION "public"."convert_number_to_percent" (
 ) RETURNS double precision LANGUAGE "plpgsql"
 SET
   search_path = '' AS $$
+DECLARE
+  percentage numeric;
 BEGIN
   IF max_val = 0 THEN
     RETURN 0;
   ELSE
-    RETURN round(((val * 100) / max_val)::numeric, 2);
+    percentage := ((val * 100) / max_val)::numeric;
+    -- Add small epsilon for positive values to handle floating-point errors
+    -- Subtract epsilon for negative values
+    IF percentage >= 0 THEN
+      RETURN trunc(percentage + 0.0001, 0);
+    ELSE
+      RETURN trunc(percentage - 0.0001, 0);
+    END IF;
   END IF;
 END;
 $$;
@@ -703,7 +718,7 @@ Begin
   WHERE plans.mau>=find_best_plan_v3.mau
     AND plans.storage>=find_best_plan_v3.storage
     AND plans.bandwidth>=find_best_plan_v3.bandwidth
-    OR plans.name = 'Pay as you go'
+    OR plans.name = 'Enterprise'
     ORDER BY plans.mau
     LIMIT 1);
 End;
@@ -730,7 +745,7 @@ RETURN QUERY (
   WHERE plans.mau >= find_fit_plan_v3.mau
     AND plans.storage >= find_fit_plan_v3.storage
     AND plans.bandwidth >= find_fit_plan_v3.bandwidth
-    OR plans.name = 'Pay as you go'
+    OR plans.name = 'Enterprise'
   ORDER BY plans.mau
 );
 END;
@@ -1031,16 +1046,6 @@ END;
 $$;
 
 ALTER FUNCTION "public"."get_cycle_info_org" ("orgid" "uuid") OWNER TO "postgres";
-
-CREATE OR REPLACE FUNCTION "public"."get_d1_webhook_signature" () RETURNS "text" LANGUAGE "plpgsql"
-SET
-  search_path = '' STABLE SECURITY DEFINER PARALLEL SAFE AS $$
-BEGIN
-    RETURN (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name='d1_webhook_signature');
-END;
-$$;
-
-ALTER FUNCTION "public"."get_d1_webhook_signature" () OWNER TO "postgres";
 
 CREATE OR REPLACE FUNCTION "public"."get_db_url" () RETURNS "text" LANGUAGE "plpgsql"
 SET
@@ -1753,37 +1758,6 @@ ALTER FUNCTION "public"."get_plan_usage_percent_detailed" (
   "cycle_end" "date"
 ) OWNER TO "postgres";
 
-CREATE OR REPLACE FUNCTION "public"."get_process_cron_stats_job_info" () RETURNS TABLE (
-  "last_run" timestamp with time zone,
-  "next_run" timestamp with time zone
-) LANGUAGE "plpgsql"
-SET
-  search_path = '' SECURITY DEFINER AS $$
-BEGIN
-    RETURN QUERY
-    WITH last_run AS (
-        SELECT start_time
-        FROM cron.job_run_details
-        WHERE command = 'SELECT process_cron_stats_jobs();'
-        AND status = 'succeeded'
-        ORDER BY start_time DESC
-        LIMIT 1
-    ),
-    job_info AS (
-        SELECT schedule
-        FROM cron.job
-        WHERE jobname = 'process_cron_stats_jobs'
-    )
-    SELECT
-        COALESCE(last_run.start_time, CURRENT_TIMESTAMP - INTERVAL '1 day') AS last_run,
-        public.get_next_cron_time(job_info.schedule, CURRENT_TIMESTAMP) AS next_run
-    FROM job_info
-    LEFT JOIN last_run ON true;
-END;
-$$;
-
-ALTER FUNCTION "public"."get_process_cron_stats_job_info" () OWNER TO "postgres";
-
 CREATE OR REPLACE FUNCTION "public"."get_total_app_storage_size_orgs" ("org_id" "uuid", "app_id" character varying) RETURNS double precision LANGUAGE "plpgsql"
 SET
   search_path = '' SECURITY DEFINER AS $$
@@ -2449,7 +2423,7 @@ BEGIN
     FROM public.plans p
     WHERE p.name = current_plan_name
       AND (
-        p.name = 'Pay as you go'
+        p.name = 'Enterprise'
         OR (p.mau >= v_mau AND p.bandwidth >= v_bandwidth AND p.storage >= v_storage)
       )
   );
@@ -2785,39 +2759,6 @@ END;
 $$;
 
 ALTER FUNCTION "public"."process_cron_stats_jobs" () OWNER TO "postgres";
-
-CREATE OR REPLACE FUNCTION "public"."process_d1_replication_batch" () RETURNS "void" LANGUAGE "plpgsql"
-SET
-  search_path = '' SECURITY DEFINER AS $$
-DECLARE
-  queue_size bigint;
-  calls_needed int;
-  i int;
-BEGIN
-  -- Check if the webhook signature is set
-  IF public.get_d1_webhook_signature() IS NOT NULL THEN
-    -- Get the queue size by counting rows in the table
-    SELECT count(*) INTO queue_size
-    FROM pgmq.q_replicate_data;
-
-    -- Call the endpoint only if the queue is not empty
-    IF queue_size > 0 THEN
-      -- Calculate how many times to call the sync endpoint (1 call per 1000 items, max 10 calls)
-      calls_needed := least(ceil(queue_size / 1000.0)::int, 10);
-
-      -- Call the endpoint multiple times if needed
-      FOR i IN 1..calls_needed LOOP
-        PERFORM net.http_post(
-          url := 'https://sync.capgo.app/sync',
-          headers := jsonb_build_object('x-webhook-signature', public.get_d1_webhook_signature())
-        );
-      END LOOP;
-    END IF;
-  END IF;
-END;
-$$;
-
-ALTER FUNCTION "public"."process_d1_replication_batch" () OWNER TO "postgres";
 
 CREATE OR REPLACE FUNCTION "public"."process_failed_uploads" () RETURNS "void" LANGUAGE "plpgsql"
 SET
@@ -3322,27 +3263,6 @@ $$;
 
 ALTER FUNCTION "public"."trigger_http_queue_post_to_function" () OWNER TO "postgres";
 
-CREATE OR REPLACE FUNCTION "public"."trigger_http_queue_post_to_function_d1" () RETURNS "trigger" LANGUAGE "plpgsql"
-SET
-  search_path = '' SECURITY DEFINER AS $$
-BEGIN
-    -- Queue the operation for batch processing
-    IF public.get_d1_webhook_signature() IS NOT NULL THEN
-      PERFORM pgmq.send('replicate_data',
-          jsonb_build_object(
-              'record', to_jsonb(NEW),
-              'old_record', to_jsonb(OLD),
-              'type', TG_OP,
-              'table', TG_TABLE_NAME
-          )
-      );
-    END IF;
-    RETURN NEW;
-END;
-$$;
-
-ALTER FUNCTION "public"."trigger_http_queue_post_to_function_d1" () OWNER TO "postgres";
-
 CREATE OR REPLACE FUNCTION "public"."update_app_versions_retention" () RETURNS void LANGUAGE "plpgsql"
 SET
   search_path = '' AS $$
@@ -3429,7 +3349,6 @@ CREATE TABLE IF NOT EXISTS "public"."app_versions_meta" (
   "checksum" character varying NOT NULL,
   "size" bigint NOT NULL,
   "id" bigint NOT NULL,
-  "devices" bigint DEFAULT '0'::bigint,
   "fails" bigint DEFAULT '0'::bigint,
   "installs" bigint DEFAULT '0'::bigint,
   "uninstalls" bigint DEFAULT '0'::bigint,
@@ -3457,7 +3376,7 @@ CREATE TABLE IF NOT EXISTS "public"."apps" (
   "id" "uuid" DEFAULT "extensions"."uuid_generate_v4" (),
   "retention" bigint DEFAULT '2592000'::bigint NOT NULL,
   "owner_org" "uuid" NOT NULL,
-  "default_upload_channel" character varying DEFAULT 'dev'::character varying NOT NULL,
+  "default_upload_channel" character varying DEFAULT 'production'::character varying NOT NULL,
   "transfer_history" "jsonb" [] DEFAULT '{}'::"jsonb" []
 );
 
@@ -3670,7 +3589,8 @@ CREATE TABLE IF NOT EXISTS "public"."devices" (
   "version_build" character varying(70) DEFAULT 'builtin'::"text",
   "custom_id" character varying(36) DEFAULT ''::"text" NOT NULL,
   "is_prod" boolean DEFAULT true,
-  "is_emulator" boolean DEFAULT false
+  "is_emulator" boolean DEFAULT false,
+  id bigint generated always as identity not null
 );
 
 ALTER TABLE "public"."devices" OWNER TO "postgres";
@@ -3697,7 +3617,7 @@ CREATE TABLE IF NOT EXISTS "public"."global_stats" (
   "plan_solo" integer DEFAULT 0,
   "plan_maker" integer DEFAULT 0,
   "plan_team" integer DEFAULT 0,
-  "plan_payg" integer DEFAULT 0
+  "plan_enterprise" integer DEFAULT 0
 );
 
 ALTER TABLE "public"."global_stats" OWNER TO "postgres";
@@ -3775,7 +3695,6 @@ CREATE TABLE IF NOT EXISTS "public"."plans" (
   "price_m" bigint DEFAULT '0'::bigint NOT NULL,
   "price_y" bigint DEFAULT '0'::bigint NOT NULL,
   "stripe_id" character varying DEFAULT ''::character varying NOT NULL,
-  "version" bigint DEFAULT '0'::bigint NOT NULL,
   "id" "uuid" DEFAULT "extensions"."uuid_generate_v4" () NOT NULL,
   "price_m_id" character varying NOT NULL,
   "price_y_id" character varying NOT NULL,
@@ -4310,53 +4229,6 @@ CREATE OR REPLACE TRIGGER "record_deployment_history_trigger"
 AFTER
 UPDATE OF "version" ON "public"."channels" FOR EACH ROW
 EXECUTE FUNCTION "public"."record_deployment_history" ();
-
-CREATE OR REPLACE TRIGGER "replicate_app_versions"
-AFTER INSERT
-OR DELETE
-OR
-UPDATE ON "public"."app_versions" FOR EACH ROW
-EXECUTE FUNCTION "public"."trigger_http_queue_post_to_function_d1" ();
-
-CREATE OR REPLACE TRIGGER "replicate_apps"
-AFTER INSERT
-OR DELETE
-OR
-UPDATE ON "public"."apps" FOR EACH ROW
-EXECUTE FUNCTION "public"."trigger_http_queue_post_to_function_d1" ();
-
-CREATE OR REPLACE TRIGGER "replicate_channel_devices"
-AFTER INSERT
-OR DELETE
-OR
-UPDATE ON "public"."channel_devices" FOR EACH ROW
-EXECUTE FUNCTION "public"."trigger_http_queue_post_to_function_d1" ();
-
-CREATE OR REPLACE TRIGGER "replicate_channels"
-AFTER INSERT
-OR DELETE
-OR
-UPDATE ON "public"."channels" FOR EACH ROW
-EXECUTE FUNCTION "public"."trigger_http_queue_post_to_function_d1" ();
-
-CREATE OR REPLACE TRIGGER "replicate_manifest"
-AFTER INSERT
-OR DELETE ON "public"."manifest" FOR EACH ROW
-EXECUTE FUNCTION "public"."trigger_http_queue_post_to_function_d1" ();
-
-CREATE OR REPLACE TRIGGER "replicate_orgs"
-AFTER INSERT
-OR DELETE
-OR
-UPDATE ON "public"."orgs" FOR EACH ROW
-EXECUTE FUNCTION "public"."trigger_http_queue_post_to_function_d1" ();
-
-CREATE OR REPLACE TRIGGER "replicate_stripe_info"
-AFTER INSERT
-OR DELETE
-OR
-UPDATE ON "public"."stripe_info" FOR EACH ROW
-EXECUTE FUNCTION "public"."trigger_http_queue_post_to_function_d1" ();
 
 ALTER TABLE ONLY "public"."apikeys"
 ADD CONSTRAINT "apikeys_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."users" ("id") ON DELETE CASCADE;
@@ -5724,16 +5596,6 @@ GRANT ALL ON FUNCTION "public"."get_cycle_info_org" ("orgid" "uuid") TO "authent
 
 GRANT ALL ON FUNCTION "public"."get_cycle_info_org" ("orgid" "uuid") TO "service_role";
 
-REVOKE ALL ON FUNCTION "public"."get_d1_webhook_signature" ()
-FROM
-  PUBLIC;
-
-GRANT ALL ON FUNCTION "public"."get_d1_webhook_signature" () TO "anon";
-
-GRANT ALL ON FUNCTION "public"."get_d1_webhook_signature" () TO "authenticated";
-
-GRANT ALL ON FUNCTION "public"."get_d1_webhook_signature" () TO "service_role";
-
 GRANT ALL ON FUNCTION "public"."get_db_url" () TO "anon";
 
 GRANT ALL ON FUNCTION "public"."get_db_url" () TO "authenticated";
@@ -5924,12 +5786,6 @@ GRANT ALL ON FUNCTION "public"."get_plan_usage_percent_detailed" (
   "cycle_start" "date",
   "cycle_end" "date"
 ) TO "service_role";
-
-GRANT ALL ON FUNCTION "public"."get_process_cron_stats_job_info" () TO "anon";
-
-GRANT ALL ON FUNCTION "public"."get_process_cron_stats_job_info" () TO "authenticated";
-
-GRANT ALL ON FUNCTION "public"."get_process_cron_stats_job_info" () TO "service_role";
 
 GRANT ALL ON FUNCTION "public"."get_total_app_storage_size_orgs" ("org_id" "uuid", "app_id" character varying) TO "anon";
 
@@ -6327,16 +6183,6 @@ GRANT ALL ON FUNCTION "public"."process_cron_stats_jobs" () TO "authenticated";
 
 GRANT ALL ON FUNCTION "public"."process_cron_stats_jobs" () TO "service_role";
 
-REVOKE ALL ON FUNCTION "public"."process_d1_replication_batch" ()
-FROM
-  PUBLIC;
-
-GRANT ALL ON FUNCTION "public"."process_d1_replication_batch" () TO "anon";
-
-GRANT ALL ON FUNCTION "public"."process_d1_replication_batch" () TO "authenticated";
-
-GRANT ALL ON FUNCTION "public"."process_d1_replication_batch" () TO "service_role";
-
 REVOKE ALL ON FUNCTION "public"."process_failed_uploads" ()
 FROM
   PUBLIC;
@@ -6539,16 +6385,6 @@ GRANT ALL ON FUNCTION "public"."trigger_http_queue_post_to_function" () TO "anon
 GRANT ALL ON FUNCTION "public"."trigger_http_queue_post_to_function" () TO "authenticated";
 
 GRANT ALL ON FUNCTION "public"."trigger_http_queue_post_to_function" () TO "service_role";
-
-REVOKE ALL ON FUNCTION "public"."trigger_http_queue_post_to_function_d1" ()
-FROM
-  PUBLIC;
-
-GRANT ALL ON FUNCTION "public"."trigger_http_queue_post_to_function_d1" () TO "anon";
-
-GRANT ALL ON FUNCTION "public"."trigger_http_queue_post_to_function_d1" () TO "authenticated";
-
-GRANT ALL ON FUNCTION "public"."trigger_http_queue_post_to_function_d1" () TO "service_role";
 
 GRANT ALL ON FUNCTION "public"."update_app_versions_retention" () TO "anon";
 
@@ -7186,9 +7022,6 @@ SELECT
   pgmq.create ('on_version_update');
 
 SELECT
-  pgmq.create ('replicate_data');
-
-SELECT
   pgmq.create ('on_user_delete');
 
 SELECT
@@ -7279,13 +7112,6 @@ SELECT
     'Send stats email every week',
     '0 12 * * 6',
     'SELECT process_stats_email_weekly();'
-  );
-
-SELECT
-  cron.schedule (
-    'process_d1_replication_batch',
-    '1 seconds',
-    'SELECT process_d1_replication_batch();'
   );
 
 SELECT

@@ -9,8 +9,7 @@ ADD COLUMN manifest_count integer NOT NULL DEFAULT 0;
 UPDATE public.app_versions av
 SET
     manifest_count = (
-        SELECT
-            COUNT(*)::integer
+        SELECT COUNT(*)::integer
         FROM
             public.manifest AS m
         WHERE
@@ -20,9 +19,9 @@ SET
 -- Drop the old complex trigger and function
 DROP TRIGGER IF EXISTS manifest_bundle_count_enqueue ON public.manifest;
 
-DROP FUNCTION IF EXISTS public.enqueue_manifest_bundle_counts ();
+DROP FUNCTION IF EXISTS public.enqueue_manifest_bundle_counts();
 
-DROP FUNCTION IF EXISTS public.process_manifest_bundle_counts_queue (integer);
+DROP FUNCTION IF EXISTS public.process_manifest_bundle_counts_queue(integer);
 
 -- Drop the queue (note: no schedule to drop as it was already removed in another migration)
 -- TODO: FIX IT IN PROD 
@@ -30,9 +29,9 @@ DROP FUNCTION IF EXISTS public.process_manifest_bundle_counts_queue (integer);
 --     pgmq.drop_queue ('manifest_bundle_counts');
 -- Create a single consolidated function that runs every second and intelligently decides what to execute
 -- Uses exception handling to prevent one task from blocking others
-CREATE OR REPLACE FUNCTION public.process_all_cron_tasks () RETURNS void LANGUAGE plpgsql
+CREATE OR REPLACE FUNCTION public.process_all_cron_tasks() RETURNS void LANGUAGE plpgsql
 SET
-    search_path = '' AS $$
+search_path = '' AS $$
 DECLARE
   current_hour int;
   current_minute int;
@@ -42,13 +41,6 @@ BEGIN
   current_hour := EXTRACT(HOUR FROM now());
   current_minute := EXTRACT(MINUTE FROM now());
   current_second := EXTRACT(SECOND FROM now());
-
-  -- Every second: D1 replication
-  BEGIN
-    PERFORM public.process_d1_replication_batch();
-  EXCEPTION WHEN OTHERS THEN
-    RAISE WARNING 'process_d1_replication_batch failed: %', SQLERRM;
-  END;
 
   -- Every 10 seconds: High-frequency queues (at :00, :10, :20, :30, :40, :50)
   IF current_second % 10 = 0 THEN

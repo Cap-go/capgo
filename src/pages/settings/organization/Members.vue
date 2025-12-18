@@ -9,9 +9,9 @@ import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import VueTurnstile from 'vue-turnstile'
 import IconInformation from '~icons/heroicons/information-circle'
+import IconSearch from '~icons/heroicons/magnifying-glass'
 import IconTrash from '~icons/heroicons/trash'
 import IconWrench from '~icons/heroicons/wrench'
-import IconSearch from '~icons/ic/round-search?raw'
 import Table from '~/components/Table.vue'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
@@ -763,8 +763,8 @@ async function handleInviteNewUserSubmit() {
 
 <template>
   <div>
-    <div class="overflow-hidden h-full md:p-8 md:pb-0 max-h-fit grow">
-      <div class="flex justify-between mb-5 ml-2 w-full md:ml-0">
+    <div class="flex flex-col h-full pb-8 overflow-hidden overflow-y-auto bg-white border shadow-lg md:p-8 md:pb-0 max-h-fit grow md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900">
+      <div class="flex justify-between w-full mb-5 ml-2 md:ml-0">
         <h2 class="text-2xl font-bold dark:text-white text-slate-800">
           {{ t('members') }}
         </h2>
@@ -800,7 +800,7 @@ async function handleInviteNewUserSubmit() {
           v-model="emailInput"
           type="email"
           :placeholder="t('email')"
-          class="p-3 w-full rounded-lg border border-gray-300 dark:text-white dark:bg-gray-800 dark:border-gray-600"
+          class="w-full p-3 border border-gray-300 rounded-lg dark:text-white dark:bg-gray-800 dark:border-gray-600"
           @keydown.enter="$event.preventDefault()"
         >
       </div>
@@ -819,7 +819,7 @@ async function handleInviteNewUserSubmit() {
               v-model="inviteUserEmail"
               type="email"
               disabled
-              class="py-2 px-4 w-full bg-gray-100 rounded-lg border border-gray-300 cursor-not-allowed dark:bg-gray-700 dark:border-gray-600"
+              class="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-lg cursor-not-allowed dark:bg-gray-700 dark:border-gray-600"
             >
           </div>
 
@@ -832,7 +832,7 @@ async function handleInviteNewUserSubmit() {
               v-model="inviteUserRole"
               type="text"
               disabled
-              class="py-2 px-4 w-full bg-gray-100 rounded-lg border border-gray-300 cursor-not-allowed dark:bg-gray-700 dark:border-gray-600"
+              class="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-lg cursor-not-allowed dark:bg-gray-700 dark:border-gray-600"
             >
           </div>
 
@@ -844,7 +844,7 @@ async function handleInviteNewUserSubmit() {
             <input
               v-model="inviteUserFirstName"
               type="text"
-              class="py-2 px-4 w-full rounded-lg border border-gray-300 dark:bg-gray-800 dark:border-gray-600"
+              class="w-full px-4 py-2 border border-gray-300 rounded-lg dark:bg-gray-800 dark:border-gray-600"
             >
           </div>
 
@@ -856,7 +856,7 @@ async function handleInviteNewUserSubmit() {
             <input
               v-model="inviteUserLastName"
               type="text"
-              class="py-2 px-4 w-full rounded-lg border border-gray-300 dark:bg-gray-800 dark:border-gray-600"
+              class="w-full px-4 py-2 border border-gray-300 rounded-lg dark:bg-gray-800 dark:border-gray-600"
             >
           </div>
 
@@ -866,7 +866,7 @@ async function handleInviteNewUserSubmit() {
               {{ t('captcha', 'Captcha') }}
             </label>
             <VueTurnstile v-if="captchaKey" ref="captchaElement" v-model="captchaToken" size="flexible" :site-key="captchaKey" />
-            <div v-else class="py-3 text-sm text-center text-gray-600 rounded-lg border border-gray-300 border-dashed dark:text-gray-400 dark:border-gray-600">
+            <div v-else class="py-3 text-sm text-center text-gray-600 border border-gray-300 border-dashed rounded-lg dark:text-gray-400 dark:border-gray-600">
               {{ t('captcha-not-available', 'Captcha not available') }}
             </div>
           </div>
@@ -877,15 +877,15 @@ async function handleInviteNewUserSubmit() {
               {{ t('complete-all-fields', 'Please complete all required fields to continue') }}
             </p>
 
-            <div class="flex relative items-center text-xs text-blue-600 cursor-pointer dark:text-blue-400 group" :class="{ 'mt-2': isInviteFormValid }">
-              <IconInformation class="mr-1 w-4 h-4" />
+            <div class="relative flex items-center text-xs text-blue-600 cursor-pointer dark:text-blue-400 group" :class="{ 'mt-2': isInviteFormValid }">
+              <IconInformation class="w-4 h-4 mr-1" />
               <span class="font-medium">Why do I need this?</span>
 
               <!-- Tooltip that appears on hover -->
-              <div class="absolute left-1/2 bottom-full py-2 px-3 mb-2 w-60 text-xs text-center text-white bg-gray-800 rounded-lg shadow-lg opacity-0 transition-opacity transform -translate-x-1/2 pointer-events-none group-hover:opacity-100">
+              <div class="absolute px-3 py-2 mb-2 text-xs text-center text-white transition-opacity transform -translate-x-1/2 bg-gray-800 rounded-lg shadow-lg opacity-0 pointer-events-none left-1/2 bottom-full w-60 group-hover:opacity-100">
                 {{ t('captcha-new-user-org-d-tooltip') }}
                 <!-- Tooltip arrow -->
-                <div class="absolute left-1/2 top-full w-0 h-0 border-t-4 border-r-4 border-l-4 border-transparent transform -translate-x-1/2 border-t-gray-800" />
+                <div class="absolute w-0 h-0 transform -translate-x-1/2 border-t-4 border-l-4 border-r-4 border-transparent left-1/2 top-full border-t-gray-800" />
               </div>
             </div>
           </div>
@@ -900,10 +900,10 @@ async function handleInviteNewUserSubmit() {
       to="#dialog-v2-content"
     >
       <div class="w-full">
-        <div class="p-4 rounded-lg border dark:border-gray-600">
+        <div class="p-4 border rounded-lg dark:border-gray-600">
           <div class="space-y-3">
             <div v-for="option in permissionOptions" :key="option.value" class="form-control">
-              <label class="gap-3 justify-start p-3 rounded-lg cursor-pointer hover:bg-gray-50 label dark:hover:bg-gray-800">
+              <label class="justify-start gap-3 p-3 rounded-lg cursor-pointer hover:bg-gray-50 label dark:hover:bg-gray-800">
                 <input
                   v-model="selectedPermissionForm"
                   type="radio"
@@ -923,22 +923,22 @@ async function handleInviteNewUserSubmit() {
     <!-- Teleport for super admin delegation -->
     <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('delegate-super-admin-title')" defer to="#dialog-v2-content">
       <div class="w-full">
-        <div class="flex overflow-hidden mb-5 md:w-auto">
+        <div class="flex mb-5 overflow-hidden md:w-auto">
           <div class="relative w-full">
             <input
               v-model="searchUserForAdminDelegation"
               type="text"
               :placeholder="t('search-by-name-or-email')"
               :disabled="isLoading"
-              class="pl-10 w-full rounded-full input input-bordered"
+              class="w-full pl-10 rounded-full input input-bordered"
             >
-            <IconSearch class="absolute left-3 top-1/2 w-4 h-4 text-gray-400 transform -translate-y-1/2" />
+            <IconSearch class="absolute w-4 h-4 text-gray-400 transform -translate-y-1/2 left-3 top-1/2" />
           </div>
         </div>
-        <div class="p-4 rounded-lg border dark:border-gray-600">
+        <div class="p-4 border rounded-lg dark:border-gray-600">
           <div v-show="membersOptions?.length && membersOptions.length > 0" class="space-y-2">
             <div v-for="option in membersOptions" :key="option.value" class="form-control">
-              <label class="gap-3 justify-start p-2 rounded-lg cursor-pointer hover:bg-gray-50 label dark:hover:bg-gray-800">
+              <label class="justify-start gap-3 p-2 rounded-lg cursor-pointer hover:bg-gray-50 label dark:hover:bg-gray-800">
                 <input
                   v-model="selectedUserToDelegateAdmin"
                   type="radio"

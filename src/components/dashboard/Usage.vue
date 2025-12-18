@@ -46,8 +46,6 @@ const dataByApp = ref({
   bandwidth: {} as { [appId: string]: number[] },
 })
 
-const creditsV2Enabled = import.meta.env.VITE_FEATURE_CREDITS_V2 === 'true'
-
 const appNames = ref<{ [appId: string]: string }>({})
 
 // Create computed properties to ensure reactivity when switching between modes
@@ -67,26 +65,29 @@ const chartsLoaded = ref({
 })
 const reloadTrigger = ref(0) // Increment this to trigger reload in all charts
 
-// Cache for 30-day data (to avoid refetching when switching modes)
-const cached30DayData = ref<{
+// Per-org cache for 30-day data: Map<orgId, cachedData>
+const cacheByOrg = new Map<string, {
   mau: number[]
   storage: number[]
   bandwidth: number[]
-} | null>(null)
+}>()
 
-const cached30DayDataByApp = ref<{
+const cacheByOrgByApp = new Map<string, {
   mau: { [appId: string]: number[] }
   storage: { [appId: string]: number[] }
   bandwidth: { [appId: string]: number[] }
-} | null>(null)
+}>()
+
+// Track current org for change detection
+const currentCacheOrgId = ref<string | null>(null)
 
 // View mode selectors for charts
 const route = useRoute()
 const router = useRouter()
 
-// Initialize from URL parameters (default: cumulative=false, billingPeriod=true)
+// Initialize from URL parameters (default: cumulative=false, billingPeriod=false)
 const showCumulative = ref(route.query.cumulative === 'true') // Switch 1: Daily vs Cumulative (daily by default)
-const useBillingPeriod = ref(route.query.billingPeriod !== 'false') // Switch 2: Billing Period vs Last 30 Days
+const useBillingPeriod = ref(route.query.billingPeriod === 'true') // Switch 2: Billing Period vs Last 30 Days (last 30 days by default)
 const main = useMainStore()
 const organizationStore = useOrganizationStore()
 const dashboardAppsStore = useDashboardAppsStore()
@@ -110,24 +111,6 @@ const nextRunDisplay = computed(() => {
   const source = organizationStore.currentOrganization?.next_stats_update_at
   return source ? dayjs(source).format('MMMM D, YYYY HH:mm') : t('unknown')
 })
-
-const creditTotal = computed(() => Number(organizationStore.currentOrganization?.credit_total ?? 0))
-const creditAvailable = computed(() => Number(organizationStore.currentOrganization?.credit_available ?? 0))
-const creditUsed = computed(() => Math.max(creditTotal.value - creditAvailable.value, 0))
-const creditUsagePercent = computed(() => {
-  if (creditTotal.value <= 0)
-    return 0
-  return Math.min(100, Math.round((creditUsed.value / creditTotal.value) * 100))
-})
-const creditNextExpiration = computed(() => {
-  const expiresAt = organizationStore.currentOrganization?.credit_next_expiration
-  return expiresAt ? dayjs(expiresAt).format('MMMM D, YYYY') : null
-})
-const hasCreditSummary = computed(() => creditTotal.value > 0 || creditAvailable.value > 0)
-
-function formatCredits(value: number) {
-  return new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)
-}
 
 // Confirmation logic for cumulative mode in 30-day view
 async function handleCumulativeClick() {
@@ -171,8 +154,9 @@ function updateUrlParams() {
     delete query.cumulative
   }
 
-  if (!useBillingPeriod.value) {
-    query.billingPeriod = 'false'
+  // Only add to URL if different from default (last 30 days is default)
+  if (useBillingPeriod.value) {
+    query.billingPeriod = 'true'
   }
   else {
     delete query.billingPeriod
@@ -310,34 +294,61 @@ async function getUsages(forceRefetch = false) {
   // Reset to start of day to match calculation in store
   billingStart.setHours(0, 0, 0, 0)
 
-  // Use cached 30-day data if available and not forcing refetch
-  if (cached30DayData.value && !forceRefetch) {
+  const currentOrgId = organizationStore.currentOrganization?.gid ?? null
+  currentCacheOrgId.value = currentOrgId
+
+  // Check per-org cache - only use if not forcing refetch
+  const cachedData = currentOrgId ? cacheByOrg.get(currentOrgId) : null
+  const cachedDataByApp = currentOrgId ? cacheByOrgByApp.get(currentOrgId) : null
+
+  if (cachedData && !forceRefetch) {
     // Filter data based on billing period mode
     if (useBillingPeriod.value) {
       // Show only data within billing period
-      const filteredData = filterToBillingPeriod(cached30DayData.value, last30DaysStart, billingStart)
+      const filteredData = filterToBillingPeriod(cachedData, last30DaysStart, billingStart)
       data.value = filteredData.data
 
       // Filter by-app data too if available
-      if (cached30DayDataByApp.value && Object.keys(cached30DayDataByApp.value.mau).length > 0) {
-        Object.keys(cached30DayDataByApp.value.mau).forEach((appId) => {
+      if (cachedDataByApp && Object.keys(cachedDataByApp.mau).length > 0) {
+        const newDataByApp = {
+          mau: {} as { [appId: string]: number[] },
+          storage: {} as { [appId: string]: number[] },
+          bandwidth: {} as { [appId: string]: number[] },
+        }
+        Object.keys(cachedDataByApp.mau).forEach((appId) => {
           const appData = {
-            mau: cached30DayDataByApp.value!.mau[appId],
-            storage: cached30DayDataByApp.value!.storage[appId],
-            bandwidth: cached30DayDataByApp.value!.bandwidth[appId],
+            mau: cachedDataByApp.mau[appId],
+            storage: cachedDataByApp.storage[appId],
+            bandwidth: cachedDataByApp.bandwidth[appId],
           }
           const filteredAppData = filterToBillingPeriod(appData, last30DaysStart, billingStart)
-          dataByApp.value.mau[appId] = filteredAppData.data.mau
-          dataByApp.value.storage[appId] = filteredAppData.data.storage
-          dataByApp.value.bandwidth[appId] = filteredAppData.data.bandwidth
+          newDataByApp.mau[appId] = filteredAppData.data.mau
+          newDataByApp.storage[appId] = filteredAppData.data.storage
+          newDataByApp.bandwidth[appId] = filteredAppData.data.bandwidth
         })
+        dataByApp.value = newDataByApp
       }
     }
     else {
-      // Show all 30 days from cache
-      data.value = { ...cached30DayData.value }
-      if (cached30DayDataByApp.value) {
-        dataByApp.value = { ...cached30DayDataByApp.value }
+      // Show all 30 days from cache - deep copy to ensure reactivity
+      data.value = {
+        mau: [...cachedData.mau],
+        storage: [...cachedData.storage],
+        bandwidth: [...cachedData.bandwidth],
+      }
+      if (cachedDataByApp) {
+        // Deep copy the by-app data to ensure reactivity
+        const newDataByApp = {
+          mau: {} as { [appId: string]: number[] },
+          storage: {} as { [appId: string]: number[] },
+          bandwidth: {} as { [appId: string]: number[] },
+        }
+        Object.keys(cachedDataByApp.mau).forEach((appId) => {
+          newDataByApp.mau[appId] = [...cachedDataByApp.mau[appId]]
+          newDataByApp.storage[appId] = [...cachedDataByApp.storage[appId]]
+          newDataByApp.bandwidth[appId] = [...cachedDataByApp.bandwidth[appId]]
+        })
+        dataByApp.value = newDataByApp
       }
     }
 
@@ -373,8 +384,10 @@ async function getUsages(forceRefetch = false) {
     }
   })
 
-  // Cache the full 30-day data
-  cached30DayData.value = full30DayData
+  // Store in per-org cache
+  if (currentOrgId) {
+    cacheByOrg.set(currentOrgId, full30DayData)
+  }
 
   // Process by-app data if available
   appNames.value = appNamesMap
@@ -414,8 +427,10 @@ async function getUsages(forceRefetch = false) {
     })
   }
 
-  // Cache the full 30-day by-app data
-  cached30DayDataByApp.value = full30DayDataByApp
+  // Store in per-org cache
+  if (currentOrgId) {
+    cacheByOrgByApp.set(currentOrgId, full30DayDataByApp)
+  }
   dataByApp.value = full30DayDataByApp
 
   // Filter data based on billing period mode
@@ -426,6 +441,11 @@ async function getUsages(forceRefetch = false) {
 
     // Filter by-app data too
     if (Object.keys(full30DayDataByApp.mau).length > 0) {
+      const newDataByApp = {
+        mau: {} as { [appId: string]: number[] },
+        storage: {} as { [appId: string]: number[] },
+        bandwidth: {} as { [appId: string]: number[] },
+      }
       Object.keys(full30DayDataByApp.mau).forEach((appId) => {
         const appData = {
           mau: full30DayDataByApp.mau[appId],
@@ -433,10 +453,11 @@ async function getUsages(forceRefetch = false) {
           bandwidth: full30DayDataByApp.bandwidth[appId],
         }
         const filteredAppData = filterToBillingPeriod(appData, last30DaysStart, billingStart)
-        dataByApp.value.mau[appId] = filteredAppData.data.mau
-        dataByApp.value.storage[appId] = filteredAppData.data.storage
-        dataByApp.value.bandwidth[appId] = filteredAppData.data.bandwidth
+        newDataByApp.mau[appId] = filteredAppData.data.mau
+        newDataByApp.storage[appId] = filteredAppData.data.storage
+        newDataByApp.bandwidth[appId] = filteredAppData.data.bandwidth
       })
+      dataByApp.value = newDataByApp
     }
   }
   else {
@@ -478,9 +499,21 @@ async function loadData() {
   }, 300)
 }
 
+// Watch for organization changes - show loading immediately when org switches
+watch(() => organizationStore.currentOrganization?.gid, (newOrgId, oldOrgId) => {
+  if (newOrgId && oldOrgId && newOrgId !== oldOrgId && loadedAlready.value) {
+    // Show loading state immediately when org changes (before data is fetched)
+    isLoading.value = true
+    // Increment reload trigger to force all child charts to refetch
+    reloadTrigger.value++
+  }
+})
+
 watch(dashboard, async (_dashboard) => {
   if (loadedAlready.value) {
+    // Data has been refreshed (e.g., after org switch) - process it
     await getUsages(true) // Dashboard data changed, force refetch
+    isLoading.value = false
   }
   else {
     loadedAlready.value = true
@@ -498,10 +531,9 @@ watch([showCumulative, useBillingPeriod], async (newValues, oldValues) => {
     showCumulative.value = false
   }
 
-  // Use cached data when billing period mode changes (no refetch needed)
-  // The getUsages function will automatically use cache when forceRefetch=false
+  // Reprocess data when billing period mode changes - use cached data if available
   if (loadedAlready.value && newBillingPeriod !== oldBillingPeriod && oldBillingPeriod !== null) {
-    await getUsages(false) // Use cache
+    await getUsages(false) // Use cache if available
   }
 
   // Update URL parameters
@@ -511,7 +543,7 @@ watch([showCumulative, useBillingPeriod], async (newValues, oldValues) => {
 // Watch for URL parameter changes (e.g., browser back/forward)
 watch(() => route.query, (newQuery) => {
   const newCumulative = newQuery.cumulative === 'true' // daily is default
-  const newBillingPeriod = newQuery.billingPeriod !== 'false'
+  const newBillingPeriod = newQuery.billingPeriod === 'true' // last 30 days is default
 
   if (showCumulative.value !== newCumulative) {
     showCumulative.value = newCumulative
@@ -531,7 +563,7 @@ onMounted(() => {
 <template>
   <!-- View Mode Selectors -->
   <div v-if="!noData" class="mb-4">
-    <div class="flex flex-nowrap gap-2 justify-end items-center sm:gap-4">
+    <div class="flex items-center justify-end gap-2 flex-nowrap sm:gap-4">
       <!-- Daily vs Cumulative Switch -->
       <div class="flex items-center p-1 space-x-1 bg-gray-200 rounded-lg dark:bg-gray-800">
         <button
@@ -581,7 +613,7 @@ onMounted(() => {
       <!-- Reload Button -->
       <button
         type="button"
-        class="flex justify-center items-center w-8 h-8 text-gray-700 bg-white rounded-md shadow-sm transition-colors cursor-pointer sm:w-9 sm:h-9 dark:text-gray-200 dark:bg-gray-700 hover:text-gray-900 hover:bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:outline-none dark:hover:bg-gray-600 dark:hover:text-white dark:focus:ring-blue-400"
+        class="flex items-center justify-center w-8 h-8 text-gray-700 transition-colors bg-white rounded-md shadow-sm cursor-pointer sm:w-9 sm:h-9 dark:text-gray-200 dark:bg-gray-700 hover:text-gray-900 hover:bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:outline-none dark:hover:bg-gray-600 dark:hover:text-white dark:focus:ring-blue-400"
         :aria-label="t('reload')"
         @click="reloadAllCharts"
       >
@@ -589,10 +621,10 @@ onMounted(() => {
       </button>
 
       <!-- Usage Info Tooltip -->
-      <div class="flex relative items-center group">
+      <div class="relative flex items-center group">
         <button
           type="button"
-          class="flex justify-center items-center w-8 h-8 text-gray-700 bg-white rounded-md shadow-sm transition-colors cursor-pointer sm:w-9 sm:h-9 dark:text-gray-200 dark:bg-gray-700 hover:text-gray-900 hover:bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:outline-none dark:hover:bg-gray-600 dark:hover:text-white dark:focus:ring-blue-400"
+          class="flex items-center justify-center w-8 h-8 text-gray-700 transition-colors bg-white rounded-md shadow-sm cursor-pointer sm:w-9 sm:h-9 dark:text-gray-200 dark:bg-gray-700 hover:text-gray-900 hover:bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:outline-none dark:hover:bg-gray-600 dark:hover:text-white dark:focus:ring-blue-400"
           :aria-label="t('info')"
         >
           <InformationInfo class="w-4 h-4" />
@@ -600,7 +632,7 @@ onMounted(() => {
         <div class="hidden absolute right-0 top-full z-10 p-4 text-sm text-gray-800 bg-white rounded-lg border border-gray-200 shadow-2xl translate-y-2 pointer-events-none dark:text-white dark:bg-gray-800 dark:border-gray-600 group-hover:block w-[min(320px,calc(100vw-32px))] group-focus-within:block">
           <div class="space-y-3">
             <div class="flex items-start space-x-2">
-              <div class="mt-2 w-2 h-2 bg-green-500 rounded-full shrink-0" />
+              <div class="w-2 h-2 mt-2 bg-green-500 rounded-full shrink-0" />
               <div>
                 <div class="text-xs font-medium tracking-wide text-gray-500 uppercase dark:text-gray-400">
                   {{ t('last-run') }}
@@ -611,7 +643,7 @@ onMounted(() => {
               </div>
             </div>
             <div class="flex items-start space-x-2">
-              <div class="mt-2 w-2 h-2 bg-blue-500 rounded-full shrink-0" />
+              <div class="w-2 h-2 mt-2 bg-blue-500 rounded-full shrink-0" />
               <div>
                 <div class="text-xs font-medium tracking-wide text-gray-500 uppercase dark:text-gray-400">
                   {{ t('next-run') }}
@@ -623,7 +655,7 @@ onMounted(() => {
             </div>
             <div class="pt-2 border-t border-gray-200 dark:border-gray-600">
               <div class="flex items-start space-x-2">
-                <div class="mt-2 w-2 h-2 bg-purple-500 rounded-full shrink-0" />
+                <div class="w-2 h-2 mt-2 bg-purple-500 rounded-full shrink-0" />
                 <div>
                   <div class="text-xs font-medium tracking-wide text-gray-500 uppercase dark:text-gray-400">
                     {{ t('billing-cycle') }}
@@ -636,53 +668,6 @@ onMounted(() => {
             </div>
           </div>
         </div>
-      </div>
-    </div>
-  </div>
-
-  <div v-if="creditsV2Enabled && !isLoading" class="mb-6">
-    <div class="grid grid-cols-1 gap-4 sm:grid-cols-12">
-      <div class="col-span-full p-5 bg-white rounded-lg border border-gray-200 shadow-sm sm:col-span-6 xl:col-span-4 dark:bg-gray-800 dark:border-gray-700">
-        <div class="flex gap-4 justify-between items-start">
-          <div>
-            <div class="flex gap-2 items-center text-xs font-semibold tracking-wide text-gray-500 uppercase dark:text-gray-400">
-              <BanknotesIcon class="w-4 h-4 text-emerald-500" />
-              {{ t('credits-balance') }}
-            </div>
-            <div class="mt-2 text-2xl font-semibold text-gray-900 dark:text-white">
-              {{ formatCredits(creditAvailable) }}
-            </div>
-            <p class="text-sm text-gray-500 dark:text-gray-400">
-              {{ t('credits-available') }}
-              <span class="font-medium text-gray-900 dark:text-white">/ {{ formatCredits(creditTotal) }}</span>
-            </p>
-          </div>
-          <div v-if="creditNextExpiration" class="text-right">
-            <div class="text-xs font-semibold tracking-wide text-gray-500 uppercase dark:text-gray-400">
-              {{ t('credits-next-expiration') }}
-            </div>
-            <div class="mt-1 text-sm font-medium text-gray-900 dark:text-white">
-              {{ creditNextExpiration }}
-            </div>
-          </div>
-        </div>
-        <div class="mt-4">
-          <div class="flex justify-between items-center mb-1 text-xs text-gray-500 dark:text-gray-400">
-            <span>{{ t('credits-used-in-period') }}</span>
-            <span class="font-medium text-gray-900 dark:text-white">
-              {{ formatCredits(creditUsed) }}
-            </span>
-          </div>
-          <div class="overflow-hidden w-full h-2 bg-gray-200 rounded-full dark:bg-gray-700">
-            <div
-              class="h-full bg-emerald-500 rounded-full transition-all"
-              :style="{ width: `${creditUsagePercent}%` }"
-            />
-          </div>
-        </div>
-        <p v-if="!hasCreditSummary" class="mt-4 text-sm text-gray-500 dark:text-gray-400">
-          {{ t('no-credits-available') }}
-        </p>
       </div>
     </div>
   </div>

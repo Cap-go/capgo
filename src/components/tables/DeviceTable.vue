@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { TableColumn } from '../comp_def'
 import type { Database } from '~/types/supabase.types'
-import { computed, h, ref } from 'vue'
+import { h, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
@@ -27,23 +27,21 @@ const router = useRouter()
 const total = ref(0)
 const search = ref('')
 const elements = ref<Device[]>([])
-const isLoading = ref(false)
+const isLoading = ref(true)
 const currentPage = ref(1)
+const nextCursor = ref<string | undefined>(undefined)
+const hasMore = ref(false)
 const filters = ref({
   Override: false,
   CustomId: false,
 })
 const offset = 10
-const currentVersionsNumber = computed(() => {
-  return (currentPage.value - 1) * offset
-})
 const columns = ref<TableColumn[]>([
   {
     label: t('device-id'),
     key: 'device_id',
     class: 'truncate max-w-10',
     mobile: true,
-    sortable: true,
     head: true,
     onClick: (elem: Device) => openOne(elem),
     renderFunction: (item) => {
@@ -60,14 +58,12 @@ const columns = ref<TableColumn[]>([
     label: t('updated-at'),
     key: 'updated_at',
     mobile: false,
-    sortable: 'desc',
     displayFunction: (elem: Device) => formatDate(elem.updated_at ?? ''),
   },
   {
     label: t('platform'),
     key: 'platform',
     mobile: true,
-    sortable: true,
     head: true,
     displayFunction: (elem: Device) => `${elem.platform} ${elem.os_version}`,
   },
@@ -75,7 +71,6 @@ const columns = ref<TableColumn[]>([
     label: t('bundle'),
     key: 'version_name',
     mobile: true,
-    sortable: true,
     head: true,
     displayFunction: (elem: Device) => elem.version_name ?? elem.version ?? 'unknown',
     onClick: (elem: Device) => openOneVersion(elem),
@@ -135,6 +130,12 @@ async function countDevices() {
   }
 }
 
+interface DevicesResponse {
+  data: Device[]
+  nextCursor?: string
+  hasMore: boolean
+}
+
 async function getData() {
   isLoading.value = true
   try {
@@ -161,9 +162,8 @@ async function getData() {
           versionName: props.versionName,
           devicesId: ids.length ? ids : undefined,
           search: search.value ? search.value : undefined,
-          order: columns.value.filter(elem => elem.sortable).map(elem => ({ key: elem.key as string, sortable: elem.sortable })),
-          rangeStart: currentVersionsNumber.value,
-          rangeEnd: currentVersionsNumber.value + offset - 1,
+          cursor: nextCursor.value,
+          limit: offset,
           customIdMode: filters.value.CustomId,
         }),
       })
@@ -173,11 +173,13 @@ async function getData() {
         return
       }
 
-      const dataD = await response.json() as Device[]
+      const dataD = await response.json() as DevicesResponse
 
-      await ensureVersionNames(dataD)
+      await ensureVersionNames(dataD.data)
 
-      elements.value.push(...dataD)
+      elements.value.push(...dataD.data)
+      nextCursor.value = dataD.nextCursor
+      hasMore.value = dataD.hasMore
     }
     catch (err) {
       console.log('Cannot get devices', err)
@@ -190,29 +192,43 @@ async function getData() {
 }
 
 async function reload() {
+  isLoading.value = true
   try {
     elements.value.length = 0
+    nextCursor.value = undefined
+    hasMore.value = false
     total.value = await countDevices()
     await getData()
   }
   catch (error) {
     console.error(error)
+  }
+  finally {
+    // getData normally resets this, but safeguard to cover early failures
+    isLoading.value = false
   }
 }
 
 async function refreshData() {
+  isLoading.value = true
   try {
     currentPage.value = 1
     elements.value.length = 0
+    nextCursor.value = undefined
+    hasMore.value = false
     total.value = await countDevices()
     await getData()
   }
   catch (error) {
     console.error(error)
   }
+  finally {
+    // getData normally resets this, but safeguard to cover early failures
+    isLoading.value = false
+  }
 }
 async function openOne(one: Device) {
-  router.push(`/app/p/${props.appId}/d/${one.device_id}`)
+  router.push(`/app/${props.appId}/device/${one.device_id}`)
 }
 async function openOneVersion(one: Device) {
   if (!props.appId) {
@@ -221,7 +237,7 @@ async function openOneVersion(one: Device) {
   }
 
   if (one.version) {
-    router.push(`/app/p/${props.appId}/bundle/${one.version}`)
+    router.push(`/app/${props.appId}/bundle/${one.version}`)
     return
   }
 
@@ -237,7 +253,7 @@ async function openOneVersion(one: Device) {
     toast.error(t('cannot-find-version', 'Cannot find version'))
     return
   }
-  router.push(`/app/p/${props.appId}/bundle/${versionRecord.id}`)
+  router.push(`/app/${props.appId}/bundle/${versionRecord.id}`)
 }
 
 function handleAddDevice() {

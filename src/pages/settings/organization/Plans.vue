@@ -6,7 +6,7 @@ import { computed, ref, watch, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { openCheckout } from '~/services/stripe'
-import { getCurrentPlanNameOrg } from '~/services/supabase'
+import { getCreditUnitPricing, getCurrentPlanNameOrg } from '~/services/supabase'
 import { openSupport } from '~/services/support'
 import { sendEvent } from '~/services/tracking'
 import { useDialogV2Store } from '~/stores/dialogv2'
@@ -32,6 +32,7 @@ const dialogStore = useDialogV2Store()
 const isMobile = Capacitor.isNativePlatform()
 
 const { currentOrganization } = storeToRefs(organizationStore)
+const creditUnitPrices = ref<Partial<Record<Database['public']['Enums']['credit_metric_type'], number>>>({})
 
 function planFeatures(plan: Database['public']['Tables']['plans']['Row']) {
   // Convert build time from seconds to hours or minutes for display
@@ -57,26 +58,22 @@ function planFeatures(plan: Database['public']['Tables']['plans']['Row']) {
     t('priority-support'),
   ]
 
-  // Track the index of build time for "Pay as you go" pricing
-  const buildTimeIndex = 3
+  if (creditUnitPrices.value.mau)
+    features[0] += ` included, then $${creditUnitPrices.value.mau}/user`
 
-  if (plan.name.toLowerCase().includes('as you go')) {
-    if (plan.mau_unit)
-      features[0] += ` included, then $${plan.mau_unit}/user`
+  if (creditUnitPrices.value.storage)
+    features[1] += ` included, then $${creditUnitPrices.value.storage} per GB`
 
-    if (plan.storage_unit)
-      features[1] += ` included, then $${plan.storage_unit} per GB`
+  if (creditUnitPrices.value.bandwidth)
+    features[2] += ` included, then $${creditUnitPrices.value.bandwidth} per GB`
 
-    if (plan.bandwidth_unit)
-      features[2] += ` included, then $${plan.bandwidth_unit} per GB`
+  if (creditUnitPrices.value.build_time)
+    features[3] += ` included, then $${creditUnitPrices.value.build_time} per minute`
 
-    if (plan.build_time_unit && buildTimeDisplay)
-      features[buildTimeIndex] += ` included, then $${plan.build_time_unit} per hour`
+  features.push('Dedicated support')
+  features.push('Custom Domain')
+  features.push('SOC II')
 
-    features.push('Dedicated support')
-    features.push('Custom Domain')
-    features.push('SOC II')
-  }
   return features.filter(Boolean)
 }
 
@@ -142,6 +139,10 @@ function isYearlyPlan(plan: Database['public']['Tables']['plans']['Row'], t: 'm'
   return t === 'y'
 }
 
+async function loadCreditPricing(orgId?: string) {
+  creditUnitPrices.value = await getCreditUnitPricing(orgId)
+}
+
 async function loadData(initial: boolean) {
   if (!initialLoad.value && !initial)
     return
@@ -153,10 +154,13 @@ async function loadData(initial: boolean) {
   if (!orgId)
     throw new Error('Cannot get current org id')
 
-  getCurrentPlanNameOrg(orgId).then((res) => {
-    console.log('getCurrentPlanNameOrg', res)
-    currentPlan.value = main.plans.find(plan => plan.name === res)
-  })
+  await Promise.all([
+    loadCreditPricing(orgId),
+    getCurrentPlanNameOrg(orgId).then((res) => {
+      console.log('getCurrentPlanNameOrg', res)
+      currentPlan.value = main.plans.find(plan => plan.name === res)
+    }),
+  ])
   initialLoad.value = true
 }
 
@@ -253,18 +257,18 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
 </script>
 
 <template>
-  <div class="flex overflow-hidden flex-col h-full bg-white dark:bg-gray-800">
-    <div v-if="!thankYouPage" class="flex flex-col py-6 px-4 mx-auto w-full max-w-7xl h-full sm:px-6 lg:px-8">
+  <div class="flex flex-col pb-8 bg-white border shadow-lg md:p-8 md:pb-0 md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900">
+    <div v-if="!thankYouPage" class="flex flex-col w-full h-full">
       <!-- Header Section -->
-      <div class="flex flex-col gap-4 justify-between items-center mb-6 sm:flex-row shrink-0">
+      <div class="flex flex-col items-center justify-between gap-4 mb-6 sm:flex-row shrink-0">
         <div class="flex-1">
-          <div class="flex gap-3 items-center">
+          <div class="flex items-center gap-3">
             <h1 class="text-3xl font-bold text-gray-900 dark:text-white">
               {{ t('plan-pricing-plans') }}
             </h1>
             <!-- Custom Plan Trigger -->
             <button
-              class="hidden items-center py-1 px-3 text-xs font-medium text-blue-700 bg-blue-50 rounded-full transition-colors lg:inline-flex dark:text-blue-300 hover:bg-blue-100 dark:bg-blue-900/30"
+              class="items-center hidden px-3 py-1 text-xs font-medium text-blue-700 transition-colors rounded-full bg-blue-50 lg:inline-flex dark:text-blue-300 hover:bg-blue-100 dark:bg-blue-900/30"
               @click="openSupport()"
             >
               {{ t('need-more-contact-us') }}
@@ -296,16 +300,16 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
       </div>
 
       <!-- Error Message -->
-      <div v-if="organizationStore.currentOrganizationFailed" class="py-2 px-4 mb-4 font-medium text-center text-white bg-red-500 rounded-lg shrink-0">
+      <div v-if="organizationStore.currentOrganizationFailed" class="px-4 py-2 mb-4 font-medium text-center text-white bg-red-500 rounded-lg shrink-0">
         {{ t('plan-failed') }}
       </div>
 
       <!-- Plans Grid -->
-      <div class="grid overflow-y-auto grid-cols-1 gap-4 content-start p-1 min-h-0 md:grid-cols-2 xl:grid-cols-4 grow">
+      <div class="grid content-start min-h-0 grid-cols-1 gap-4 p-1 overflow-y-auto md:grid-cols-2 xl:grid-cols-4 grow">
         <div
           v-for="(p, index) in mainStore.plans"
           :key="p.price_m"
-          class="flex overflow-hidden relative flex-col p-5 bg-gray-100 rounded-2xl border transition-all duration-200 group dark:bg-base-200"
+          class="relative flex flex-col p-5 overflow-hidden transition-all duration-200 bg-gray-100 border rounded-2xl group dark:bg-base-200"
           :class="[
             p.name === currentPlan?.name ? 'border-2 border-blue-500' : 'border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-700',
             isRecommended(p) ? 'shadow-lg shadow-blue-500/10' : 'shadow-sm',
@@ -321,13 +325,13 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
 
           <!-- Plan Header -->
           <div class="mb-4 shrink-0">
-            <h3 class="flex gap-2 items-center text-lg font-bold text-gray-900 dark:text-white">
+            <h3 class="flex items-center gap-2 text-lg font-bold text-gray-900 dark:text-white">
               {{ p.name }}
               <span v-if="isTrial && currentPlanSuggest?.name === p.name" class="py-0.5 px-2 text-xs font-medium text-white bg-blue-600 rounded-full">
                 {{ t('free-trial') }}
               </span>
             </h3>
-            <p class="mt-1 h-8 text-xs text-gray-500 dark:text-gray-400 line-clamp-2">
+            <p class="h-8 mt-1 text-xs text-gray-500 dark:text-gray-400 line-clamp-2">
               {{ t(convertKey(p.description)) }}
             </p>
           </div>
@@ -348,7 +352,7 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
           <!-- Action Button -->
           <button
             :class="buttonStyle(p)"
-            class="flex gap-2 justify-center items-center py-2 px-4 mb-6 w-full text-sm font-semibold rounded-lg shadow-sm transition-all duration-200 shrink-0"
+            class="flex items-center justify-center w-full gap-2 px-4 py-2 mb-6 text-sm font-semibold transition-all duration-200 rounded-lg shadow-sm shrink-0"
             :disabled="isDisabled(p)"
             @click="openChangePlan(p, index)"
           >
@@ -360,9 +364,9 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
           </button>
 
           <!-- Features -->
-          <div class="overflow-y-auto px-2 -mx-2 grow custom-scrollbar">
+          <div class="px-2 -mx-2 overflow-y-auto grow custom-scrollbar">
             <ul class="space-y-3">
-              <li v-for="(f, indexx) in planFeatures(p)" :key="indexx" class="flex gap-3 items-start text-sm">
+              <li v-for="(f, indexx) in planFeatures(p)" :key="indexx" class="flex items-start gap-3 text-sm">
                 <svg class="w-5 h-5 text-green-500 shrink-0" viewBox="0 0 20 20" fill="currentColor">
                   <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
                 </svg>
@@ -381,16 +385,16 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
     </div>
 
     <!-- Thank You Page -->
-    <div v-else class="flex justify-center items-center w-full h-full bg-gray-50 dark:bg-base-300">
+    <div v-else class="flex items-center justify-center w-full h-full bg-gray-50 dark:bg-base-300">
       <div class="text-center">
-        <img src="/capgo.webp" alt="logo" class="mx-auto mb-8 w-20 h-20 animate-bounce">
+        <img src="/capgo.webp" alt="logo" class="w-20 h-20 mx-auto mb-8 animate-bounce">
         <h2 class="mb-4 text-3xl font-bold text-gray-900 dark:text-white">
           {{ t('thank-you-for-sub') }}
         </h2>
         <div class="mb-8 text-6xl">
           🎉
         </div>
-        <router-link to="/app" class="inline-flex items-center py-3 px-6 text-base font-medium text-white bg-blue-600 rounded-md border border-transparent hover:bg-blue-700">
+        <router-link to="/app" class="inline-flex items-center px-6 py-3 text-base font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700">
           {{ t('use-capgo') }} 🚀
         </router-link>
       </div>

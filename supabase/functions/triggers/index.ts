@@ -1,5 +1,6 @@
 import { app as clear_app_cache } from '../_backend/triggers/clear_app_cache.ts'
 import { app as clear_device_cache } from '../_backend/triggers/clear_device_cache.ts'
+import { app as credit_usage_alerts } from '../_backend/triggers/credit_usage_alerts.ts'
 import { app as cron_clear_versions } from '../_backend/triggers/cron_clear_versions.ts'
 import { app as cron_email } from '../_backend/triggers/cron_email.ts'
 import { app as cron_stat_app } from '../_backend/triggers/cron_stat_app.ts'
@@ -47,6 +48,7 @@ appGlobal.route('/cron_stat_app', cron_stat_app)
 appGlobal.route('/cron_stat_org', cron_stat_org)
 appGlobal.route('/cron_sync_sub', cron_sync_sub)
 appGlobal.route('/cron_clear_versions', cron_clear_versions)
+appGlobal.route('/credit_usage_alerts', credit_usage_alerts)
 appGlobal.route('/on_organization_delete', on_organization_delete)
 appGlobal.route('/on_deploy_history_create', on_deploy_history_create)
 appGlobal.route('/queue_consumer', queue_consumer)

@@ -374,7 +374,7 @@ const chartOptions = computed<ChartOptions & { plugins: { inlineAnnotationPlugin
       title: {
         display: false,
       },
-      tooltip: createTooltipConfig(hasAppData, props.accumulated),
+      tooltip: createTooltipConfig(hasAppData, props.accumulated, props.useBillingPeriod ? cycleStart : false),
       filler: {
         propagate: false,
       },

@@ -1,23 +1,7 @@
 BEGIN;
 
-CREATE EXTENSION "basejump-supabase_test_helpers";
 
-SELECT plan(5);
-
--- Test get_d1_webhook_signature (may return null if secret not configured)
-SELECT
-    ok(
-        get_d1_webhook_signature() IS NULL
-        OR length(get_d1_webhook_signature()) >= 0,
-        'get_d1_webhook_signature test - returns null or valid string'
-    );
-
-SELECT
-    ok(
-        get_d1_webhook_signature() IS NULL
-        OR get_d1_webhook_signature() IS NOT NULL,
-        'get_d1_webhook_signature test - consistent return value'
-    );
+SELECT plan(3);
 
 -- Test is_org_yearly
 SELECT

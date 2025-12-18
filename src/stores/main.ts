@@ -32,7 +32,6 @@ export const useMainStore = defineStore('main', () => {
     build_time_unit: 0,
   })
   const bestPlan = ref<string>('')
-  // getProcessCronStatsJobInfo
   const statsTime = ref<{ next_run: string, last_run: string }>({
     next_run: '',
     last_run: '',

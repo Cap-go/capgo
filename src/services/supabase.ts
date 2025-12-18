@@ -18,7 +18,7 @@ export interface CapgoConfig {
 }
 
 export function isLocal(supaHost: string) {
-  return supaHost !== 'https://xvwzpoazmxkqosrdewyv.supabase.co'
+  return supaHost !== 'https://xvwzpoazmxkqosrdewyv-all.supabase.co' && supaHost !== 'https://xvwzpoazmxkqosrdewyv.supabase.co'
 }
 
 export function getLocalConfig() {
@@ -87,13 +87,6 @@ export async function hashEmail(email: string) {
   return hashHex
 }
 
-export async function deleteUser() {
-  const { error } = await useSupabase()
-    .rpc('delete_user')
-    .single()
-  if (error)
-    throw new Error(error.message)
-}
 export function deleteSupabaseToken() {
   return localStorage.removeItem(`sb-${config.supbaseId}-auth-token`)
 }
@@ -148,18 +141,6 @@ export async function downloadUrl(provider: string, userId: string, appId: strin
   catch (e) {
     throw new Error(`downloadUrl error: ${e instanceof Error ? e.message : String(e)}`)
   }
-}
-
-// do a function to get get_process_cron_stats_job_info for supabase
-
-export async function getProcessCronStatsJobInfo() {
-  const { data, error } = await useSupabase()
-    .rpc('get_process_cron_stats_job_info')
-    .single()
-  if (error)
-    throw new Error(error.message)
-
-  return data
 }
 
 export async function autoAuth(route: RouteLocationNormalizedLoaded) {
@@ -382,6 +363,68 @@ export async function getPlans(): Promise<Database['public']['Tables']['plans'][
     return await response.json() as Database['public']['Tables']['plans']['Row'][]
   }
   catch {
+    return []
+  }
+}
+
+export type CreditUnitPricing = Partial<Record<Database['public']['Enums']['credit_metric_type'], number>>
+export type UsageCreditLedgerRow = Database['public']['Views']['usage_credit_ledger']['Row']
+
+export async function getCreditUnitPricing(orgId?: string): Promise<CreditUnitPricing> {
+  try {
+    const { data, error } = await useSupabase()
+      .from('capgo_credits_steps')
+      .select('type, price_per_unit, step_min, org_id')
+      .eq('step_min', 0)
+      .order('step_min', { ascending: true })
+
+    if (error || !data)
+      throw new Error(error?.message ?? 'Failed to fetch credit pricing')
+
+    const sortedSteps = [...data].sort((a, b) => {
+      const aOrgPriority = a.org_id && orgId && a.org_id === orgId ? 0 : 1
+      const bOrgPriority = b.org_id && orgId && b.org_id === orgId ? 0 : 1
+
+      if (aOrgPriority !== bOrgPriority)
+        return aOrgPriority - bOrgPriority
+
+      return (a.step_min ?? 0) - (b.step_min ?? 0)
+    })
+
+    return sortedSteps.reduce<CreditUnitPricing>((pricing, step) => {
+      const metric = step.type as Database['public']['Enums']['credit_metric_type']
+
+      if (pricing[metric] === undefined)
+        pricing[metric] = step.price_per_unit
+
+      return pricing
+    }, {})
+  }
+  catch (err) {
+    console.error('getCreditUnitPricing error', err)
+    return {}
+  }
+}
+
+export async function getUsageCreditDeductions(orgId: string): Promise<UsageCreditLedgerRow[]> {
+  if (!orgId)
+    return []
+
+  try {
+    const { data, error } = await useSupabase()
+      .from('usage_credit_ledger')
+      .select('*')
+      .eq('org_id', orgId)
+      .eq('transaction_type', 'deduction')
+      .order('occurred_at', { ascending: false })
+
+    if (error)
+      throw new Error(error.message)
+
+    return data ?? []
+  }
+  catch (err) {
+    console.error('getUsageCreditDeductions error', err)
     return []
   }
 }

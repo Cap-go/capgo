@@ -12,6 +12,22 @@ import { supabaseAdmin } from '../utils/supabase.ts'
 interface PlanTotal { [key: string]: number }
 interface Actives { users: number, apps: number }
 interface CustomerCount { total: number, yearly: number, monthly: number }
+interface PlanRevenue {
+  mrrr: number
+  total_revenue: number
+  revenue_solo: number
+  revenue_maker: number
+  revenue_team: number
+  revenue_enterprise: number
+  plan_solo_monthly: number
+  plan_solo_yearly: number
+  plan_maker_monthly: number
+  plan_maker_yearly: number
+  plan_team_monthly: number
+  plan_team_yearly: number
+  plan_enterprise_monthly: number
+  plan_enterprise_yearly: number
+}
 interface GlobalStats {
   apps: PromiseLike<number>
   updates: PromiseLike<number>
@@ -29,22 +45,185 @@ interface GlobalStats {
   devices_last_month: PromiseLike<number>
   registers_today: PromiseLike<number>
   bundle_storage_gb: PromiseLike<number>
+  revenue: PromiseLike<PlanRevenue>
+  new_paying_orgs: PromiseLike<number>
+  canceled_orgs: PromiseLike<number>
+  credits_bought: PromiseLike<number>
+  credits_consumed: PromiseLike<number>
 }
 
-interface DayBounds {
-  dateId: string
-  startIso: string
-  endIso: string
+function getTodayDateId(): string {
+  const today = new Date()
+  return new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate())).toISOString().slice(0, 10)
 }
 
-function getUtcDayBounds(reference = new Date()): DayBounds {
-  const start = new Date(Date.UTC(reference.getUTCFullYear(), reference.getUTCMonth(), reference.getUTCDate()))
-  const end = new Date(start)
-  end.setUTCDate(end.getUTCDate() + 1)
-  return {
-    dateId: start.toISOString().slice(0, 10),
-    startIso: start.toISOString(),
-    endIso: end.toISOString(),
+async function calculateRevenue(c: Context): Promise<PlanRevenue> {
+  const supabase = supabaseAdmin(c)
+
+  try {
+    // Get plan prices from database
+    const { data: plansData, error: plansError } = await supabase
+      .from('plans')
+      .select('name, price_m, price_y, price_m_id, price_y_id')
+      .in('name', ['Solo', 'Maker', 'Team', 'Enterprise'])
+
+    if (plansError || !plansData) {
+      cloudlogErr({ requestId: c.get('requestId'), message: 'Failed to fetch plan prices', error: plansError })
+      return {
+        mrrr: 0,
+        total_revenue: 0,
+        revenue_solo: 0,
+        revenue_maker: 0,
+        revenue_team: 0,
+        revenue_enterprise: 0,
+        plan_solo_monthly: 0,
+        plan_solo_yearly: 0,
+        plan_maker_monthly: 0,
+        plan_maker_yearly: 0,
+        plan_team_monthly: 0,
+        plan_team_yearly: 0,
+        plan_enterprise_monthly: 0,
+        plan_enterprise_yearly: 0,
+      }
+    }
+
+    // Build price map
+    const priceMap = new Map<string, { price_m: number, price_y: number, price_m_id: string, price_y_id: string }>()
+    for (const plan of plansData) {
+      const price_m = Number(plan.price_m) || 0
+      const price_y = Number(plan.price_y) || 0
+      priceMap.set(plan.name.toLowerCase(), {
+        price_m, // Already in dollars
+        price_y, // Already in dollars
+        price_m_id: plan.price_m_id || '',
+        price_y_id: plan.price_y_id || '',
+      })
+      cloudlog({ requestId: c.get('requestId'), message: `Plan ${plan.name}: monthly=$${price_m}, yearly=$${price_y}` })
+    }
+
+    // Get subscription counts from stripe_info
+    const { data: subsData, error: subsError } = await supabase
+      .from('stripe_info')
+      .select(`
+        price_id,
+        plans!stripe_info_product_id_fkey(name)
+      `)
+      .eq('status', 'succeeded')
+      .eq('is_good_plan', true)
+
+    if (subsError || !subsData) {
+      cloudlogErr({ requestId: c.get('requestId'), message: 'Failed to fetch subscriptions', error: subsError })
+      return {
+        mrrr: 0,
+        total_revenue: 0,
+        revenue_solo: 0,
+        revenue_maker: 0,
+        revenue_team: 0,
+        revenue_enterprise: 0,
+        plan_solo_monthly: 0,
+        plan_solo_yearly: 0,
+        plan_maker_monthly: 0,
+        plan_maker_yearly: 0,
+        plan_team_monthly: 0,
+        plan_team_yearly: 0,
+        plan_enterprise_monthly: 0,
+        plan_enterprise_yearly: 0,
+      }
+    }
+
+    // Count subscriptions by plan and billing period
+    const subCountMap = new Map<string, { monthly: number, yearly: number }>()
+    for (const sub of subsData) {
+      const planName = (sub.plans as any)?.name?.toLowerCase()
+      if (!planName || !['solo', 'maker', 'team', 'enterprise'].includes(planName))
+        continue
+
+      const priceId = sub.price_id
+      if (!subCountMap.has(planName)) {
+        subCountMap.set(planName, { monthly: 0, yearly: 0 })
+      }
+
+      const planPrices = priceMap.get(planName)
+      if (planPrices) {
+        if (priceId === planPrices.price_m_id) {
+          subCountMap.get(planName)!.monthly++
+        }
+        else if (priceId === planPrices.price_y_id) {
+          subCountMap.get(planName)!.yearly++
+        }
+      }
+    }
+
+    // Calculate MRR and ARR
+    const solo = subCountMap.get('solo') || { monthly: 0, yearly: 0 }
+    const maker = subCountMap.get('maker') || { monthly: 0, yearly: 0 }
+    const team = subCountMap.get('team') || { monthly: 0, yearly: 0 }
+    const enterprise = subCountMap.get('enterprise') || { monthly: 0, yearly: 0 }
+
+    const soloPrices = priceMap.get('solo') || { price_m: 0, price_y: 0, price_m_id: '', price_y_id: '' }
+    const makerPrices = priceMap.get('maker') || { price_m: 0, price_y: 0, price_m_id: '', price_y_id: '' }
+    const teamPrices = priceMap.get('team') || { price_m: 0, price_y: 0, price_m_id: '', price_y_id: '' }
+    const enterprisePrices = priceMap.get('enterprise') || { price_m: 0, price_y: 0, price_m_id: '', price_y_id: '' }
+
+    // MRR = (monthly subs × monthly price) + (yearly subs × yearly price / 12)
+    const soloMRR = (solo.monthly * soloPrices.price_m) + (solo.yearly * soloPrices.price_y / 12)
+    const makerMRR = (maker.monthly * makerPrices.price_m) + (maker.yearly * makerPrices.price_y / 12)
+    const teamMRR = (team.monthly * teamPrices.price_m) + (team.yearly * teamPrices.price_y / 12)
+    const enterpriseMRR = (enterprise.monthly * enterprisePrices.price_m) + (enterprise.yearly * enterprisePrices.price_y / 12)
+    const totalMRR = soloMRR + makerMRR + teamMRR + enterpriseMRR
+
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'Revenue calculation',
+      solo: { monthly: solo.monthly, yearly: solo.yearly, mrr: soloMRR, prices: soloPrices },
+      maker: { monthly: maker.monthly, yearly: maker.yearly, mrr: makerMRR, prices: makerPrices },
+      team: { monthly: team.monthly, yearly: team.yearly, mrr: teamMRR, prices: teamPrices },
+      enterprise: { monthly: enterprise.monthly, yearly: enterprise.yearly, mrr: enterpriseMRR, prices: enterprisePrices },
+      totalMRR,
+    })
+
+    // ARR = MRR × 12
+    const soloARR = soloMRR * 12
+    const makerARR = makerMRR * 12
+    const teamARR = teamMRR * 12
+    const enterpriseARR = enterpriseMRR * 12
+    const totalARR = totalMRR * 12
+
+    return {
+      mrrr: totalMRR,
+      total_revenue: totalARR,
+      revenue_solo: soloARR,
+      revenue_maker: makerARR,
+      revenue_team: teamARR,
+      revenue_enterprise: enterpriseARR,
+      plan_solo_monthly: solo.monthly,
+      plan_solo_yearly: solo.yearly,
+      plan_maker_monthly: maker.monthly,
+      plan_maker_yearly: maker.yearly,
+      plan_team_monthly: team.monthly,
+      plan_team_yearly: team.yearly,
+      plan_enterprise_monthly: enterprise.monthly,
+      plan_enterprise_yearly: enterprise.yearly,
+    }
+  }
+  catch (e) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'calculateRevenue error', error: e })
+    return {
+      mrrr: 0,
+      total_revenue: 0,
+      revenue_solo: 0,
+      revenue_maker: 0,
+      revenue_team: 0,
+      revenue_enterprise: 0,
+      plan_solo_monthly: 0,
+      plan_solo_yearly: 0,
+      plan_maker_monthly: 0,
+      plan_maker_yearly: 0,
+      plan_team_monthly: 0,
+      plan_team_yearly: 0,
+      plan_enterprise_monthly: 0,
+      plan_enterprise_yearly: 0,
+    }
   }
 }
 
@@ -68,8 +247,9 @@ async function getGithubStars(): Promise<number> {
   }
 }
 
-function getStats(c: Context, dayBounds: DayBounds): GlobalStats {
+function getStats(c: Context): GlobalStats {
   const supabase = supabaseAdmin(c)
+  const last24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toString()
   return {
     apps: countAllApps(c),
     updates: countAllUpdates(c),
@@ -128,8 +308,7 @@ function getStats(c: Context, dayBounds: DayBounds): GlobalStats {
     registers_today: supabase
       .from('users')
       .select('id', { count: 'exact', head: true })
-      .gte('created_at', dayBounds.startIso)
-      .lt('created_at', dayBounds.endIso)
+      .gte('created_at', last24h)
       .then((res) => {
         if (res.error)
           cloudlog({ requestId: c.get('requestId'), message: 'registers_today error', error: res.error })
@@ -146,14 +325,65 @@ function getStats(c: Context, dayBounds: DayBounds): GlobalStats {
         const gigabytes = bytes / (1024 ** 3)
         return Number.isFinite(gigabytes) ? Number(gigabytes.toFixed(2)) : 0
       }),
+    revenue: calculateRevenue(c),
+    new_paying_orgs: supabase
+      .from('stripe_info')
+      .select('customer_id', { count: 'exact', head: false })
+      .eq('status', 'succeeded')
+      .eq('is_good_plan', true)
+      .gte('created_at', last24h)
+      .then((res) => {
+        if (res.error) {
+          cloudlog({ requestId: c.get('requestId'), message: 'new_paying_orgs error', error: res.error })
+          return 0
+        }
+        // Count unique customer_ids (orgs) that started paying today
+        const uniqueCustomers = new Set((res.data || []).map(row => row.customer_id))
+        return uniqueCustomers.size
+      }),
+    canceled_orgs: supabase
+      .from('stripe_info')
+      .select('customer_id', { count: 'exact', head: false })
+      .not('canceled_at', 'is', null)
+      .gte('canceled_at', last24h)
+      .then((res) => {
+        if (res.error) {
+          cloudlog({ requestId: c.get('requestId'), message: 'canceled_orgs error', error: res.error })
+          return 0
+        }
+        // Count unique customer_ids (orgs) that canceled today
+        const uniqueCustomers = new Set((res.data || []).map(row => row.customer_id))
+        return uniqueCustomers.size
+      }),
+    credits_bought: supabase
+      .from('usage_credit_grants')
+      .select('credits_total')
+      .gte('granted_at', last24h)
+      .then((res) => {
+        if (res.error) {
+          cloudlog({ requestId: c.get('requestId'), message: 'credits_bought error', error: res.error })
+          return 0
+        }
+        return (res.data || []).reduce((sum, row) => sum + (Number(row.credits_total) || 0), 0)
+      }),
+    credits_consumed: supabase
+      .from('usage_credit_consumptions')
+      .select('credits_used')
+      .gte('applied_at', last24h)
+      .then((res) => {
+        if (res.error) {
+          cloudlog({ requestId: c.get('requestId'), message: 'credits_consumed error', error: res.error })
+          return 0
+        }
+        return (res.data || []).reduce((sum, row) => sum + (Number(row.credits_used) || 0), 0)
+      }),
   }
 }
 
 export const app = new Hono<MiddlewareKeyVariables>()
 
 app.post('/', middlewareAPISecret, async (c) => {
-  const dayBounds = getUtcDayBounds()
-  const res = getStats(c, dayBounds)
+  const res = getStats(c)
   const [
     apps,
     updates,
@@ -171,6 +401,11 @@ app.post('/', middlewareAPISecret, async (c) => {
     registers_today,
     bundle_storage_gb,
     success_rate,
+    revenue,
+    new_paying_orgs,
+    canceled_orgs,
+    credits_bought,
+    credits_consumed,
   ] = await Promise.all([
     res.apps,
     res.updates,
@@ -188,6 +423,11 @@ app.post('/', middlewareAPISecret, async (c) => {
     res.registers_today,
     res.bundle_storage_gb,
     res.success_rate,
+    res.revenue,
+    res.new_paying_orgs,
+    res.canceled_orgs,
+    res.credits_bought,
+    res.credits_consumed,
   ])
   const not_paying = users - customers.total - plans.Trial
   cloudlog({
@@ -209,7 +449,7 @@ app.post('/', middlewareAPISecret, async (c) => {
   })
   // cloudlog(c.get('requestId'), 'app', app.app_id, downloads, versions, shared, channels)
   // create var date_id with yearn-month-day
-  const date_id = dayBounds.dateId
+  const date_id = getTodayDateId()
   const newData: Database['public']['Tables']['global_stats']['Insert'] = {
     date_id,
     apps,
@@ -234,7 +474,28 @@ app.post('/', middlewareAPISecret, async (c) => {
     plan_solo: plans.Solo,
     plan_maker: plans.Maker,
     plan_team: plans.Team,
-    plan_payg: plans['Pay as you go'],
+    plan_enterprise: plans.Enterprise || 0,
+    // Revenue metrics
+    mrrr: revenue.mrrr,
+    total_revenue: revenue.total_revenue,
+    revenue_solo: revenue.revenue_solo,
+    revenue_maker: revenue.revenue_maker,
+    revenue_team: revenue.revenue_team,
+    revenue_enterprise: revenue.revenue_enterprise,
+    plan_solo_monthly: revenue.plan_solo_monthly,
+    plan_solo_yearly: revenue.plan_solo_yearly,
+    plan_maker_monthly: revenue.plan_maker_monthly,
+    plan_maker_yearly: revenue.plan_maker_yearly,
+    plan_team_monthly: revenue.plan_team_monthly,
+    plan_team_yearly: revenue.plan_team_yearly,
+    plan_enterprise_monthly: revenue.plan_enterprise_monthly,
+    plan_enterprise_yearly: revenue.plan_enterprise_yearly,
+    // Subscription flow tracking
+    new_paying_orgs,
+    canceled_orgs,
+    // Credits tracking
+    credits_bought,
+    credits_consumed,
   }
   cloudlog({ requestId: c.get('requestId'), message: 'newData', newData })
   const { error } = await supabaseAdmin(c)
@@ -358,13 +619,16 @@ app.post('/', middlewareAPISecret, async (c) => {
       icon: '👏',
     },
     {
-      title: 'Orgs Pay as you go Plan',
-      value: `${(plans['Pay as you go'] * 100 / customers.total).toFixed(0)}% - ${plans['Pay as you go']}`,
+      title: 'Orgs Enterprise Plan',
+      value: `${((plans.Enterprise || 0) * 100 / customers.total).toFixed(0)}% - ${plans.Enterprise || 0}`,
       icon: '📈',
     },
   ]).catch((e) => {
     cloudlogErr({ requestId: c.get('requestId'), message: 'insights error', e })
   })
   cloudlog({ requestId: c.get('requestId'), message: 'Sent to logsnag done' })
+
+  // Note: Device cleanup is no longer needed as Analytics Engine handles data retention automatically
+
   return c.json(BRES)
 })

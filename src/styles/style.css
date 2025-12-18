@@ -8,16 +8,52 @@ layer(base);
 @plugin "@tailwindcss/container-queries";
 
 @plugin "daisyui" {
-  themes: capgotheme --default, dark --prefersdark;
+  themes: capgolight --default, capgodark --prefersdark;
   logs: true;
   prefix: "d-";
 }
 
+/* Light theme */
 @plugin "daisyui/theme" {
-  name: "capgotheme";
+  name: "capgolight";
   default: true;
-  prefersdark: true;
   color-scheme: light;
+
+  --color-primary: #515271;
+  --color-primary-content: #ffffff;
+  --color-secondary: #119eff;
+  --color-secondary-content: #ffffff;
+  --color-accent: #1FB2A5;
+  --color-accent-content: #ffffff;
+  --color-neutral: #64748b;
+  --color-neutral-content: #ffffff;
+  --color-base-100: #ffffff;
+  --color-base-200: #f8fafc;
+  --color-base-300: #f1f5f9;
+  --color-base-content: #1e293b;
+  --color-info: #3ABFF8;
+  --color-info-content: #ffffff;
+  --color-success: #36d399;
+  --color-success-content: #ffffff;
+  --color-warning: #ff7211;
+  --color-warning-content: #ffffff;
+  --color-error: #f87272;
+  --color-error-content: #ffffff;
+  --radius-selector: 1rem;
+  --radius-field: 0.5rem;
+  --radius-box: 1rem;
+  --size-selector: 0.3125rem;
+  --size-field: 0.28125rem;
+  --border: 1px;
+  --depth: 1;
+  --noise: 0;
+}
+
+/* Dark theme */
+@plugin "daisyui/theme" {
+  name: "capgodark";
+  prefersdark: true;
+  color-scheme: dark;
 
   --color-primary: #515271;
   --color-secondary: #119eff;
@@ -279,4 +315,16 @@ html {
 
 #the-stunning-bar p {
   padding: 20px;
+}
+
+/* Fix outline button appearance in light mode */
+[data-theme="capgolight"] .d-btn-outline {
+  --btn-color: #64748b;
+  border-color: #cbd5e1;
+}
+
+[data-theme="capgolight"] .d-btn-outline:hover {
+  --btn-color: #475569;
+  border-color: #94a3b8;
+  background-color: #f1f5f9;
 }

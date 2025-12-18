@@ -5,6 +5,15 @@ import { cloudlog, cloudlogErr } from './logging.ts'
 import { supabaseAdmin } from './supabase.ts'
 import { existInEnv, getEnv } from './utils.ts'
 
+export type StripeEnvironment = 'live' | 'test'
+
+export function resolveStripeEnvironment(c: Context): StripeEnvironment {
+  const secretKey = getEnv(c, 'STRIPE_SECRET_KEY') || ''
+  if (secretKey.startsWith('sk_live'))
+    return 'live'
+  return 'test'
+}
+
 export function getStripe(c: Context) {
   return new Stripe(getEnv(c, 'STRIPE_SECRET_KEY'), {
     apiVersion: '2025-10-29.clover',
@@ -297,31 +306,134 @@ export async function createCheckout(c: Context, customerId: string, recurrence:
   return { url: session.url }
 }
 
+async function getOneTimePriceId(c: Context, productId: string): Promise<string | null> {
+  if (!existInEnv(c, 'STRIPE_SECRET_KEY'))
+    return null
+  try {
+    const prices = await getStripe(c).prices.search({
+      query: `product:"${productId}" AND active:'true'`,
+    })
+
+    for (const price of prices.data) {
+      if (price.type === 'one_time' && price.active)
+        return price.id
+    }
+  }
+  catch (err) {
+    cloudlog({ requestId: c.get('requestId'), message: 'search one-time price error', error: err })
+  }
+  return null
+}
+
+export async function createOneTimeCheckout(
+  c: Context,
+  customerId: string,
+  productId: string,
+  quantity: number,
+  successUrl: string,
+  cancelUrl: string,
+  clientReferenceId?: string,
+) {
+  if (!existInEnv(c, 'STRIPE_SECRET_KEY'))
+    return { url: '' }
+
+  const priceId = await getOneTimePriceId(c, productId)
+  if (!priceId)
+    throw new Error(`Cannot find one-time price for product ${productId}`)
+
+  const successUrlWithFlag = successUrl.includes('?') ? `${successUrl}&success=true` : `${successUrl}?success=true`
+
+  const session = await getStripe(c).checkout.sessions.create({
+    billing_address_collection: 'auto',
+    mode: 'payment',
+    customer: customerId,
+    success_url: successUrlWithFlag,
+    cancel_url: cancelUrl,
+    automatic_tax: { enabled: true },
+    client_reference_id: clientReferenceId,
+    customer_update: {
+      address: 'auto',
+      name: 'auto',
+    },
+    tax_id_collection: { enabled: true },
+    line_items: [
+      {
+        price: priceId,
+        quantity,
+        adjustable_quantity: {
+          enabled: true,
+          minimum: 1,
+          maximum: 100000,
+        },
+      },
+    ],
+    metadata: {
+      productId,
+      intendedQuantity: String(quantity),
+    },
+  })
+  return { url: session.url }
+}
+
 export interface StripeCustomer {
   id: string
   email: string
   name: string
   metadata: {
     user_id: string
+    org_id?: string
+    console?: string
+    log_as?: string
   }
 }
 
-export async function createCustomer(c: Context, email: string, userId: string, name: string) {
-  cloudlog({ requestId: c.get('requestId'), message: 'createCustomer', email, userId, name })
+export async function createCustomer(c: Context, email: string, userId: string, orgId: string, name: string) {
+  cloudlog({ requestId: c.get('requestId'), message: 'createCustomer', email, userId, orgId, name })
+  const baseConsoleUrl = (getEnv(c, 'WEBAPP_URL') || '').replace(/\/+$/, '')
+  const metadata: Record<string, string> = {
+    user_id: userId,
+    org_id: orgId,
+  }
+  if (baseConsoleUrl) {
+    metadata.log_as = `${baseConsoleUrl}/log-as/${userId}`
+  }
   if (!existInEnv(c, 'STRIPE_SECRET_KEY')) {
     cloudlog({ requestId: c.get('requestId'), message: 'createCustomer no stripe key', email, userId, name })
     // create a fake customer id like stripe one and random id
     const randomId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
-    return { id: `cus_${randomId}`, email, name, metadata: { user_id: userId } }
+    return { id: `cus_${randomId}`, email, name, metadata }
   }
   const customer = await getStripe(c).customers.create({
     email,
     name,
-    metadata: {
-      user_id: userId,
-    },
+    metadata,
   })
   return customer
+}
+
+export async function ensureCustomerMetadata(c: Context, customerId: string, orgId: string, userId?: string | null) {
+  if (!customerId)
+    return
+  if (!existInEnv(c, 'STRIPE_SECRET_KEY'))
+    return
+
+  const baseConsoleUrl = (getEnv(c, 'WEBAPP_URL') || '').replace(/\/+$/, '')
+  const metadata: Record<string, string> = {
+    org_id: orgId,
+  }
+
+  if (userId) {
+    metadata.user_id = userId
+    if (baseConsoleUrl)
+      metadata.log_as = `${baseConsoleUrl}/log-as/${userId}`
+  }
+
+  try {
+    await getStripe(c).customers.update(customerId, { metadata })
+  }
+  catch (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'ensureCustomerMetadata', error })
+  }
 }
 
 export async function setThreshold(c: Context, subscriptionId: string) {

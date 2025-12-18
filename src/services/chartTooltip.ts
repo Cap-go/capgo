@@ -1,5 +1,6 @@
 import type { Chart, TooltipItem as ChartTooltipItem, TooltipLabelStyle, TooltipModel } from 'chart.js'
 import { useDark } from '@vueuse/core'
+import { formatLocalDateLong } from '~/services/date'
 
 interface TooltipContext {
   chart: Chart
@@ -18,6 +19,36 @@ function formatTooltipValue(value: unknown) {
 
   const rounded = Number(value.toFixed(1))
   return Number.isInteger(rounded) ? Math.trunc(rounded).toString() : rounded.toFixed(1)
+}
+
+/**
+ * Calculate the actual date from the chart data index
+ * @param dataIndex The index in the chart data array
+ * @param dateStartOrUseBillingPeriod Either a Date for billing start, or boolean (false = last 30 days mode)
+ */
+function getDateFromIndex(dataIndex: number, dateStartOrUseBillingPeriod?: Date | boolean): Date {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  if (dateStartOrUseBillingPeriod instanceof Date) {
+    // Billing period mode: start from billing start date
+    const date = new Date(dateStartOrUseBillingPeriod)
+    date.setHours(0, 0, 0, 0)
+    date.setDate(date.getDate() + dataIndex)
+    return date
+  }
+
+  // Last 30 days mode (dateStartOrUseBillingPeriod is false or undefined)
+  const date = new Date(today)
+  date.setDate(date.getDate() - 29 + dataIndex) // 29 days ago + index
+  return date
+}
+
+/**
+ * Format a date for tooltip display using the app's locale (e.g., "December 10" in English, "10 décembre" in French)
+ */
+function formatDateForTooltip(date: Date): string {
+  return formatLocalDateLong(date)
 }
 
 function getDatasetBaseValue(chart: Chart | undefined, dataset: any, datasetIndex: number, dataIndex: number, parsedY: unknown) {
@@ -46,8 +77,9 @@ function getDatasetBaseValue(chart: Chart | undefined, dataset: any, datasetInde
  * @param context Chart.js tooltip context
  * @param isAccumulated Whether the chart is in accumulated mode
  * @param hasMultipleDatasets Whether the chart has multiple datasets (apps)
+ * @param dateStartOrUseBillingPeriod Either a Date for billing start, or boolean for mode
  */
-export function createCustomTooltip(context: TooltipContext, isAccumulated: boolean = false, hasMultipleDatasets: boolean = true) {
+export function createCustomTooltip(context: TooltipContext, isAccumulated: boolean = false, hasMultipleDatasets: boolean = true, dateStartOrUseBillingPeriod?: Date | boolean) {
   const { chart, tooltip } = context
   const { canvas } = chart
   const isDark = useDark()
@@ -117,8 +149,12 @@ export function createCustomTooltip(context: TooltipContext, isAccumulated: bool
 
   // Set content
   if (tooltip.body) {
-    const titleLines = tooltip.title || []
     const dataPoints = tooltip.dataPoints || []
+
+    // Calculate the formatted date title from the data index
+    const dataIndex = dataPoints[0]?.dataIndex ?? 0
+    const tooltipDate = getDateFromIndex(dataIndex, dateStartOrUseBillingPeriod)
+    const formattedTitle = formatDateForTooltip(tooltipDate)
 
     // Create an array of items with their values, colors, and labels
     const items: ProcessedTooltipItem[] = dataPoints.map((dataPoint, index) => {
@@ -163,10 +199,8 @@ export function createCustomTooltip(context: TooltipContext, isAccumulated: bool
     const totalColor = isDark.value ? '#60a5fa' : '#2563eb'
     let innerHtml = '<div style="padding: 12px;">'
 
-    // Add title
-    if (titleLines.length) {
-      innerHtml += `<div style="font-weight: 600; margin-bottom: 4px; color: ${titleColor};">${titleLines[0]}</div>`
-    }
+    // Add title with formatted date
+    innerHtml += `<div style="font-weight: 600; margin-bottom: 4px; color: ${titleColor};">${formattedTitle}</div>`
 
     // Add total value
     if (items.length > 1) {
@@ -443,20 +477,22 @@ export const todayLinePlugin = {
  * Creates tooltip configuration for Chart.js options
  * @param hasMultipleDatasets Whether the chart has multiple datasets (apps)
  * @param isAccumulated Whether the chart is in accumulated/cumulative mode
+ * @param dateStartOrUseBillingPeriod Either a Date for billing start, or boolean for mode
  * @returns Chart.js tooltip configuration object
  */
-export function createTooltipConfig(hasMultipleDatasets: boolean, isAccumulated: boolean = false) {
+export function createTooltipConfig(hasMultipleDatasets: boolean, isAccumulated: boolean = false, dateStartOrUseBillingPeriod?: Date | boolean) {
   return {
     mode: 'index' as const,
     intersect: false,
     position: 'nearest' as const,
-    external: hasMultipleDatasets ? (context: TooltipContext) => createCustomTooltip(context, isAccumulated, hasMultipleDatasets) : undefined,
+    external: hasMultipleDatasets ? (context: TooltipContext) => createCustomTooltip(context, isAccumulated, hasMultipleDatasets, dateStartOrUseBillingPeriod) : undefined,
     enabled: !hasMultipleDatasets, // Disable default tooltip when using custom
     callbacks: {
       title(tooltipItems: ChartTooltipItem<any>[]) {
-        // Format the title to show "Day X" instead of just the number
-        const day = tooltipItems[0].label
-        return `Day ${day}`
+        // Format the title to show full date like "December 10"
+        const dataIndex = tooltipItems[0].dataIndex
+        const date = getDateFromIndex(dataIndex, dateStartOrUseBillingPeriod)
+        return formatDateForTooltip(date)
       },
       label(context: ChartTooltipItem<any>) {
         if (isAccumulated && !hasMultipleDatasets) {

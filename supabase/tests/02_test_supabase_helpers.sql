@@ -1,7 +1,5 @@
 BEGIN;
 
-CREATE EXTENSION "basejump-supabase_test_helpers";
-
 SELECT plan(1);
 
 -- create a table, which will have RLS disabled by default

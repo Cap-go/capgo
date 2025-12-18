@@ -2,7 +2,7 @@ import type { SimpleErrorResponse } from '../supabase/functions/_backend/utils/h
 import type { DeviceLink, HttpMethod } from './test-utils.ts'
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { getBaseData, getSupabaseClient, PLUGIN_BASE_URL, resetAndSeedAppData, resetAppData, resetAppDataStats, triggerD1Sync } from './test-utils.ts'
+import { getBaseData, getSupabaseClient, PLUGIN_BASE_URL, resetAndSeedAppData, resetAppData, resetAppDataStats } from './test-utils.ts'
 
 interface ChannelInfo {
   id: string
@@ -116,7 +116,7 @@ describe('invalids /channel_self tests', () => {
     delete data.channel
 
     const response = await fetchEndpoint('POST', data)
-    expect(response.status).toBe(400)
+    expect(response.status).toBe(200)
 
     const error = await getResponseErrorCode(response)
     expect(error).toBe('missing_channel')
@@ -127,7 +127,7 @@ describe('invalids /channel_self tests', () => {
     data.channel = 'unexisting_channel'
 
     const response = await fetchEndpoint('POST', data)
-    expect(response.status).toBe(404)
+    expect(response.status).toBe(200)
 
     const error = await getResponseErrorCode(response)
     expect(error).toBe('channel_not_found')
@@ -141,14 +141,13 @@ describe('invalids /channel_self tests', () => {
     const { error } = await getSupabaseClient().from('channels').update({ allow_device_self_set: false }).eq('name', data.channel).eq('app_id', APPNAME).select('id').single()
 
     expect(error).toBeNull()
-    await triggerD1Sync() // Sync channel updates to D1
 
     try {
       const response = await fetchEndpoint('POST', data)
-      expect(response.status).toBe(400)
+      expect(response.status).toBe(200)
 
       const responseError = await getResponseErrorCode(response)
-      expect(responseError).toBe('channel_set_from_plugin_not_allowed')
+      expect(responseError).toBe('channel_self_set_not_allowed')
     }
     finally {
       const { error } = await getSupabaseClient().from('channels').update({ allow_device_self_set: true }).eq('name', data.channel).eq('app_id', APPNAME).select('id').single()
@@ -196,11 +195,10 @@ describe('invalids /channel_self tests', () => {
     const { error } = await getSupabaseClient().from('app_versions').update({ name: 'build_not_in' }).eq('name', 'builtin').eq('app_id', APPNAME).select('id').single()
 
     expect(error).toBeNull()
-    await triggerD1Sync() // Sync app_versions updates to D1
 
     try {
       const response = await fetchEndpoint('PUT', data)
-      expect(response.status).toBe(400)
+      expect(response.status).toBe(200)
 
       const responseError = await getResponseErrorCode(response)
       expect(responseError).toBe('version_error')
@@ -291,7 +289,7 @@ describe('[GET] /channel_self tests', () => {
     data.app_id = 'com.nonexistent.app'
     const response = await fetchGetChannels(data as any)
 
-    expect(response.status).toBe(404)
+    expect(response.status).toBe(200)
     const error = await getResponseErrorCode(response)
     expect(error).toBe('app_not_found')
   })
@@ -412,7 +410,6 @@ describe('[GET] /channel_self tests', () => {
 
     expect(updateError).toBeNull()
     expect(channelData?.allow_emulator).toBe(false)
-    await triggerD1Sync() // Sync channel updates to D1
 
     try {
       const data = getBaseData(APPNAME)
@@ -470,7 +467,6 @@ describe('[GET] /channel_self tests', () => {
       .eq('app_id', APPNAME)
 
     expect(updateError).toBeNull()
-    await triggerD1Sync() // Sync channel updates to D1
 
     try {
       // Test dev device - real device (is_emulator=false) should get no channels
@@ -503,7 +499,6 @@ describe('[GET] /channel_self tests', () => {
         .update({ allow_dev: true })
         .eq('name', 'development')
         .eq('app_id', APPNAME)
-      await triggerD1Sync() // Sync the reset back to D1
     }
   })
 
@@ -704,6 +699,58 @@ it('[PUT] /channel_self (no overwrite)', async () => {
   expect(channel).toBe(data.channel)
 })
 
+it('[PUT] /channel_self with minimum required fields', async () => {
+  await resetAndSeedAppData(APPNAME)
+
+  // Test with only the minimum required fields according to jsonRequestSchema
+  const minimalData = {
+    app_id: APPNAME,
+    device_id: randomUUID().toLowerCase(),
+    version_name: '1.0.0',
+    version_build: '1.0.0',
+    is_emulator: false,
+    is_prod: true,
+    platform: 'android',
+  }
+
+  const response = await fetchEndpoint('PUT', minimalData)
+  expect(response.ok).toBe(true)
+
+  const responseJSON = await response.json<{ channel: string, status: string }>()
+  expect(responseJSON.channel).toBeTruthy()
+  expect(responseJSON.status).toBe('default')
+})
+
+it('[PUT] /channel_self with all optional fields included', async () => {
+  await resetAndSeedAppData(APPNAME)
+
+  // Test with all fields including optional ones
+  const fullData = {
+    app_id: APPNAME,
+    device_id: randomUUID().toLowerCase(),
+    version_name: '1.0.0',
+    version_build: '1.0.0',
+    is_emulator: true,
+    is_prod: false,
+    platform: 'ios',
+    channel: 'production',
+    custom_id: 'test-custom-id',
+    version_code: '100',
+    version_os: '17.0',
+    plugin_version: '6.0.0',
+    defaultChannel: 'production',
+  }
+
+  const response = await fetchEndpoint('PUT', fullData)
+  expect(response.ok).toBe(true)
+
+  const responseJSON = await response.json<{ channel: string, status: string }>()
+  expect(responseJSON.channel).toBeTruthy()
+  expect(responseJSON.status).toBe('default')
+  // When defaultChannel is provided, it should return that channel
+  expect(responseJSON.channel).toBe('production')
+})
+
 it('[PUT] /channel_self (with overwrite)', async () => {
   await resetAndSeedAppData(APPNAME)
 
@@ -726,7 +773,6 @@ it('[PUT] /channel_self (with overwrite)', async () => {
   }, { onConflict: 'device_id, app_id' })
 
   expect(error).toBeNull()
-  await triggerD1Sync() // Sync channel_devices to D1
 
   try {
     const response = await fetchEndpoint('PUT', data)
@@ -772,7 +818,7 @@ it('[PUT] /channel_self with non-existent defaultChannel', async () => {
   data.defaultChannel = 'non_existent_channel'
 
   const response = await fetchEndpoint('PUT', data)
-  expect(response.ok).toBe(false)
+  expect(response.ok).toBe(true)
 
   const error = await getResponseErrorCode(response)
   expect(error).toBe('channel_not_found')
@@ -785,7 +831,7 @@ it('[DELETE] /channel_self (no overwrite)', async () => {
   data.device_id = randomUUID().toLowerCase()
 
   const response = await fetchEndpoint('DELETE', data)
-  expect(response.status).toBe(400)
+  expect(response.status).toBe(200)
 
   const error = await getResponseErrorCode(response)
   expect(error).toBe('cannot_override')
@@ -813,7 +859,6 @@ it('[DELETE] /channel_self (with overwrite)', async () => {
   }, { onConflict: 'device_id, app_id' })
 
   expect(error).toBeNull()
-  await triggerD1Sync() // Sync channel_devices to D1
 
   try {
     const response = await fetchEndpoint('DELETE', data)
@@ -921,7 +966,6 @@ it('saves default_channel when provided', async () => {
   expect(response.status).toBe(200)
 
   // Wait for data to be written
-  await triggerD1Sync()
   await new Promise(resolve => setTimeout(resolve, 1000))
 
   // Verify default_channel was saved
@@ -938,4 +982,219 @@ it('saves default_channel when provided', async () => {
 
   // Clean up
   await getSupabaseClient().from('devices').delete().eq('device_id', uuid).eq('app_id', APPNAME)
+})
+
+describe('[POST] /channel_self - new plugin version (>= 7.34.0) behavior', () => {
+  it('should validate and return success without storing in channel_devices for new plugin versions', async () => {
+    const data = getBaseData(APPNAME)
+    data.plugin_version = '7.34.0' // New version
+    data.channel = 'production'
+
+    const response = await fetchEndpoint('POST', data)
+    expect(response.status).toBe(200)
+
+    const result = await response.json<{ status: string, allowSet: boolean }>()
+    expect(result.status).toBe('ok')
+    expect(result.allowSet).toBe(true)
+
+    // Verify it was NOT stored in channel_devices table
+    if (!data.device_id)
+      throw new Error('device_id is required')
+
+    const { data: channelDeviceData } = await getSupabaseClient()
+      .from('channel_devices')
+      .select('*')
+      .eq('device_id', data.device_id)
+      .eq('app_id', APPNAME)
+      .maybeSingle()
+
+    expect(channelDeviceData).toBeNull()
+  })
+
+  it('should return error when channel does not allow self-assignment for new plugin versions', async () => {
+    const data = getBaseData(APPNAME)
+    data.plugin_version = '7.34.0'
+    data.channel = 'production'
+
+    // Disable allow_device_self_set for production channel
+    await getSupabaseClient()
+      .from('channels')
+      .update({ allow_device_self_set: false })
+      .eq('name', 'production')
+      .eq('app_id', APPNAME)
+
+    try {
+      const response = await fetchEndpoint('POST', data)
+      expect(response.status).toBe(200)
+
+      const result = await response.json<{ error: string }>()
+      expect(result.error).toBe('channel_self_set_not_allowed')
+    }
+    finally {
+      // Re-enable allow_device_self_set
+      await getSupabaseClient()
+        .from('channels')
+        .update({ allow_device_self_set: true })
+        .eq('name', 'production')
+        .eq('app_id', APPNAME)
+    }
+  })
+
+  it('should clean up old channel_devices entry when migrating from old to new version', async () => {
+    const deviceId = randomUUID()
+    const data = getBaseData(APPNAME)
+    data.device_id = deviceId
+
+    // Enable allow_device_self_set for beta channel (non-default channel)
+    await getSupabaseClient()
+      .from('channels')
+      .update({ allow_device_self_set: true })
+      .eq('name', 'beta')
+      .eq('app_id', APPNAME)
+
+    try {
+      // First, set channel with old version (stores in channel_devices)
+      data.plugin_version = '7.33.0'
+      data.channel = 'beta' // Use non-default channel
+
+      const oldResponse = await fetchEndpoint('POST', data)
+      expect(oldResponse.status).toBe(200)
+
+      // Verify it was stored in channel_devices
+      const { data: oldChannelDevice } = await getSupabaseClient()
+        .from('channel_devices')
+        .select('*')
+        .eq('device_id', deviceId)
+        .eq('app_id', APPNAME)
+        .maybeSingle()
+
+      expect(oldChannelDevice).toBeTruthy()
+
+      // Then, set channel with new version (should clean up old entry)
+      data.plugin_version = '7.34.0'
+
+      const newResponse = await fetchEndpoint('POST', data)
+      expect(newResponse.status).toBe(200)
+
+      const result = await newResponse.json<{ status: string, allowSet: boolean }>()
+      expect(result.status).toBe('ok')
+      expect(result.allowSet).toBe(true)
+
+      // Verify old entry was deleted
+      const { data: newChannelDevice } = await getSupabaseClient()
+        .from('channel_devices')
+        .select('*')
+        .eq('device_id', deviceId)
+        .eq('app_id', APPNAME)
+        .maybeSingle()
+
+      expect(newChannelDevice).toBeNull()
+    }
+    finally {
+      // Reset beta channel
+      await getSupabaseClient()
+        .from('channels')
+        .update({ allow_device_self_set: false })
+        .eq('name', 'beta')
+        .eq('app_id', APPNAME)
+    }
+  })
+})
+
+describe('[PUT] /channel_self - new plugin version (>= 7.34.0) behavior', () => {
+  it('should return channel from request body for new plugin versions', async () => {
+    const data = getBaseData(APPNAME)
+    data.plugin_version = '7.34.0'
+    data.channel = 'production' // Plugin sends its local channelOverride
+    data.defaultChannel = 'production'
+
+    const response = await fetchEndpoint('PUT', data)
+    expect(response.status).toBe(200)
+
+    const result = await response.json<{ channel: string, status: string }>()
+    expect(result.channel).toBe('production')
+    expect(result.status).toBe('override')
+  })
+
+  it('should return defaultChannel when no channel override is set', async () => {
+    const data = getBaseData(APPNAME)
+    data.plugin_version = '7.34.0'
+    data.defaultChannel = 'production'
+    // No channel field - no override
+    delete data.channel // Remove the channel field to simulate no override
+
+    const response = await fetchEndpoint('PUT', data)
+    expect(response.status).toBe(200)
+
+    const result = await response.json<{ channel: string, status: string }>()
+    expect(result.channel).toBe('production')
+    expect(result.status).toBe('default')
+  })
+})
+
+describe('[DELETE] /channel_self - new plugin version (>= 7.34.0) behavior', () => {
+  it('should return success and clean up old channel_devices entries for new plugin versions', async () => {
+    const deviceId = randomUUID()
+    const data = getBaseData(APPNAME)
+    data.device_id = deviceId
+    data.plugin_version = '7.34.0'
+
+    // First create an old channel_devices entry (simulating migration from old version)
+    const { data: productionChannel } = await getSupabaseClient()
+      .from('channels')
+      .select('id, owner_org')
+      .eq('name', 'production')
+      .eq('app_id', APPNAME)
+      .single()
+
+    expect(productionChannel).toBeTruthy()
+
+    await getSupabaseClient()
+      .from('channel_devices')
+      .insert({
+        app_id: APPNAME,
+        channel_id: productionChannel!.id,
+        device_id: deviceId,
+        owner_org: productionChannel!.owner_org,
+      })
+
+    // Verify the old entry exists
+    let { data: beforeDelete } = await getSupabaseClient()
+      .from('channel_devices')
+      .select('*')
+      .eq('device_id', deviceId)
+      .eq('app_id', APPNAME)
+      .maybeSingle()
+
+    expect(beforeDelete).toBeTruthy()
+
+    // Call DELETE with new plugin version
+    const response = await fetchEndpoint('DELETE', data)
+    expect(response.status).toBe(200)
+
+    const result = await response.json<{ status: string }>()
+    expect(result.status).toBe('ok')
+
+    // Verify the old entry was cleaned up
+    const { data: afterDelete } = await getSupabaseClient()
+      .from('channel_devices')
+      .select('*')
+      .eq('device_id', deviceId)
+      .eq('app_id', APPNAME)
+      .maybeSingle()
+
+    expect(afterDelete).toBeNull()
+  })
+
+  it('should return success even when no old channel_devices entry exists', async () => {
+    const data = getBaseData(APPNAME)
+    data.plugin_version = '7.34.0'
+    data.device_id = randomUUID()
+
+    const response = await fetchEndpoint('DELETE', data)
+    expect(response.status).toBe(200)
+
+    const result = await response.json<{ status: string }>()
+    expect(result.status).toBe('ok')
+  })
 })

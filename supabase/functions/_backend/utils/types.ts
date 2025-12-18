@@ -17,6 +17,7 @@ export interface AppInfos {
   app_id: string
   device_id: string
   defaultChannel: string
+  key_id?: string
 }
 
 export interface AppStats extends AppInfos {
@@ -42,17 +43,29 @@ export interface ReadStatsParams {
   search?: string
   order?: Order[]
   limit?: number
+  actions?: string[]
 }
 
 export interface ReadDevicesParams {
   app_id: string
   version_name?: string | undefined
-  rangeStart?: number
-  rangeEnd?: number
   deviceIds?: string[]
   search?: string
   order?: Order[]
   limit?: number
+  /** Cursor for pagination - use the last updated_at from previous page */
+  cursor?: string
+}
+export type DeviceRes = {
+  id?: Database['public']['Tables']['devices']['Row']['id']
+} & Omit<Database['public']['Tables']['devices']['Row'], 'id'>
+
+export interface ReadDevicesResponse {
+  data: DeviceRes[]
+  /** Cursor for next page - pass this as cursor param to get next page */
+  nextCursor?: string
+  /** Whether there are more results */
+  hasMore: boolean
 }
 
 export type DeviceWithoutCreatedAt = Omit<Database['public']['Tables']['devices']['Insert'], 'created_at'>

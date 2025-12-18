@@ -53,6 +53,9 @@ BEGIN
           -- Delete deploy_history for this org
           DELETE FROM "public"."deploy_history" WHERE "owner_org" = org_record.org_id;
 
+          -- Delete channel_devices for this org
+          DELETE FROM "public"."channel_devices" WHERE "owner_org" = org_record.org_id;
+
           -- Delete channels for this org
           DELETE FROM "public"."channels" WHERE "owner_org" = org_record.org_id;
 

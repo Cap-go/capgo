@@ -35,7 +35,7 @@ jobs:
         run: bunx @capgo/cli@latest -v
       - name: Check for console statements
         run: |
-          if grep -r --exclude="logging.ts" "console\." supabase/functions/; then
+          if grep -r --exclude="logging.ts" --exclude=".env" --exclude=".env.*" "console\." supabase/functions/; then
             echo "❌ Found console statements in supabase/functions directory, use cloudlog instead"
             exit 1
           else
@@ -54,7 +54,7 @@ jobs:
       - name: Install Supabase CLI
         uses: supabase/setup-cli@v1
         with:
-          version: 2.54.11
+          version: latest
       - name: Show Supabase CLI version
         run: supabase --version
       - name: Run Supabase Start

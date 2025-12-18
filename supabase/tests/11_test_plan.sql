@@ -1,7 +1,6 @@
 -- 08_plan_functions.sql
 BEGIN;
 
-CREATE EXTENSION "basejump-supabase_test_helpers";
 
 -- + 2 is for the count(*)
 -- -1 is for the pay as you go if statenent
@@ -147,7 +146,7 @@ BEGIN
     RETURN NEXT ok(total_metrics.bandwidth > 0, format('Org total_metrics.bandwidth > 0 for "%s" plan', plan.name));
 
     -- TODO test those fns for pay as you go
-    IF plan.name IS DISTINCT FROM 'Pay as you go' THEN
+    IF plan.name IS DISTINCT FROM 'Enterprise' THEN
       RETURN NEXT ok(
         (select * from find_fit_plan_v3(
           total_metrics.mau, 

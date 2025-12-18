@@ -683,7 +683,7 @@ export async function getDefaultPlan(c: Context) {
 }
 
 export async function createStripeCustomer(c: Context, org: Database['public']['Tables']['orgs']['Row']) {
-  const customer = await createCustomer(c, org.management_email, org.created_by, org.name)
+  const customer = await createCustomer(c, org.management_email, org.created_by, org.id, org.name)
   // create date + 15 days
   const trial_at = new Date()
   trial_at.setDate(trial_at.getDate() + 15)
@@ -787,7 +787,7 @@ export async function trackDevicesSB(c: Context, device: DeviceWithoutCreatedAt)
 
   const { data: existingRow, error } = await client
     .from('devices')
-    .select('version_name, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator, default_channel')
+    .select('version_name, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator, default_channel, key_id')
     .eq('app_id', device.app_id)
     .eq('device_id', device.device_id)
     .maybeSingle()
@@ -817,6 +817,7 @@ export async function trackDevicesSB(c: Context, device: DeviceWithoutCreatedAt)
     is_prod: normalizedDevice.is_prod,
     is_emulator: normalizedDevice.is_emulator,
     default_channel: device.default_channel ?? null,
+    key_id: normalizedDevice.key_id ?? undefined,
   } as Database['public']['Tables']['devices']['Insert']
 
   return client
@@ -885,6 +886,14 @@ export async function readStatsSB(c: Context, params: ReadStatsParams) {
       query = query.in('device_id', params.deviceIds)
   }
 
+  if (params.actions?.length) {
+    cloudlog({ requestId: c.get('requestId'), message: 'actions filter', actions: params.actions })
+    if (params.actions.length === 1)
+      query = query.eq('action', params.actions[0] as Database['public']['Enums']['stats_action'])
+    else
+      query = query.in('action', params.actions as Database['public']['Enums']['stats_action'][])
+  }
+
   if (params.search) {
     cloudlog({ requestId: c.get('requestId'), message: 'search', search: params.search })
     if (params.deviceIds?.length)
@@ -914,14 +923,14 @@ export async function readStatsSB(c: Context, params: ReadStatsParams) {
 
 export async function readDevicesSB(c: Context, params: ReadDevicesParams, customIdMode: boolean) {
   const supabase = supabaseAdmin(c)
+  const limit = params.limit ?? DEFAULT_LIMIT
 
   cloudlog({ requestId: c.get('requestId'), message: 'readDevicesSB', params })
+
   let query = supabase
     .from('devices')
     .select('*')
     .eq('app_id', params.app_id)
-    .range(params.rangeStart ?? 0, params.rangeEnd ?? DEFAULT_LIMIT)
-    .limit(params.limit ?? DEFAULT_LIMIT)
 
   if (customIdMode) {
     query = query
@@ -944,16 +953,25 @@ export async function readDevicesSB(c: Context, params: ReadDevicesParams, custo
     else
       query = query.or(`device_id.ilike.${params.search}%,custom_id.ilike.${params.search}%,version_name.ilike.${params.search}%`)
   }
-  if (params.order?.length) {
-    params.order.forEach((col) => {
-      if (col.sortable && typeof col.sortable === 'string') {
-        cloudlog({ requestId: c.get('requestId'), message: 'order', key: col.key, sortable: col.sortable })
-        query = query.order(col.key as string, { ascending: col.sortable === 'asc' })
-      }
-    })
-  }
+
   if (params.version_name)
     query = query.eq('version_name', params.version_name)
+
+  // Cursor-based pagination
+  if (params.cursor) {
+    // Cursor format: "updated_at|device_id"
+    const [cursorTime, cursorDeviceId] = params.cursor.split('|')
+    if (cursorTime && cursorDeviceId) {
+      // For DESC order: get records older than cursor or same time with device_id > cursor
+      query = query.or(`updated_at.lt.${cursorTime},and(updated_at.eq.${cursorTime},device_id.gt.${cursorDeviceId})`)
+    }
+  }
+
+  // Always order by updated_at DESC, device_id ASC for stable cursor pagination
+  query = query
+    .order('updated_at', { ascending: false })
+    .order('device_id', { ascending: true })
+    .limit(limit + 1) // Fetch one extra to check if there are more results
 
   const { data, error } = await query
 

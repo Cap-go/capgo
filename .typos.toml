@@ -24,6 +24,7 @@ extend-exclude = [
   "*.generated.ts",
   "src/typed-router.d.ts",
   "src/components.d.ts",
+  "supabase/tests/00-supabase_test_helpers.sql",
 
   # Database and Supabase
   "supabase/.branches/",

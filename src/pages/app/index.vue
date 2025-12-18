@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import type { Database } from '~/types/supabase.types'
-import { useDebounceFn } from '@vueuse/core'
 import { storeToRefs } from 'pinia'
 import { ref, watch, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -13,6 +12,7 @@ const route = useRoute('/app/')
 const router = useRouter()
 const organizationStore = useOrganizationStore()
 const isLoading = ref(true)
+const isTableLoading = ref(false)
 const stepsOpen = ref(false)
 const supabase = useSupabase()
 const { t } = useI18n()
@@ -27,56 +27,62 @@ const { currentOrganization } = storeToRefs(organizationStore)
 
 async function NextStep(appId: string) {
   console.log('Navigating to app with ID:', appId)
-  router.push(`/app/p/${appId}`)
+  router.push(`/app/${appId}`)
 }
 async function getMyApps() {
-  await organizationStore.awaitInitialLoad()
-  const currentGid = organizationStore.currentOrganization?.gid
+  isTableLoading.value = true
+  try {
+    await organizationStore.awaitInitialLoad()
+    const currentGid = organizationStore.currentOrganization?.gid
 
-  if (!currentGid) {
-    console.error('Current organization is null, cannot fetch apps')
-    apps.value = []
-    totalApps.value = 0
-    return
+    if (!currentGid) {
+      console.error('Current organization is null, cannot fetch apps')
+      apps.value = []
+      totalApps.value = 0
+      return
+    }
+
+    const offset = (currentPage.value - 1) * pageSize
+
+    // Build base query
+    let countQuery = supabase
+      .from('apps')
+      .select('*', { count: 'exact', head: true })
+      .eq('owner_org', currentGid)
+
+    let dataQuery = supabase
+      .from('apps')
+      .select()
+      .eq('owner_org', currentGid)
+
+    // Apply search filters if search query exists
+    if (searchQuery.value) {
+      const search = searchQuery.value.trim()
+      // Search by name (case-insensitive) or app_id (exact match)
+      countQuery = countQuery.or(`name.ilike.%${search}%,app_id.ilike.%${search}%`)
+      dataQuery = dataQuery.or(`name.ilike.%${search}%,app_id.ilike.%${search}%`)
+    }
+
+    // Get total count with filters
+    const { count } = await countQuery
+    totalApps.value = count || 0
+
+    // Get paginated data with filters
+    const { data } = await dataQuery
+      .range(offset, offset + pageSize - 1)
+      .order('updated_at', { ascending: false })
+
+    if (data && data.length) {
+      apps.value = data
+      stepsOpen.value = false
+    }
+    else {
+      apps.value = []
+      stepsOpen.value = totalApps.value === 0
+    }
   }
-
-  const offset = (currentPage.value - 1) * pageSize
-
-  // Build base query
-  let countQuery = supabase
-    .from('apps')
-    .select('*', { count: 'exact', head: true })
-    .eq('owner_org', currentGid)
-
-  let dataQuery = supabase
-    .from('apps')
-    .select()
-    .eq('owner_org', currentGid)
-
-  // Apply search filters if search query exists
-  if (searchQuery.value) {
-    const search = searchQuery.value.trim()
-    // Search by name (case-insensitive) or app_id (exact match)
-    countQuery = countQuery.or(`name.ilike.%${search}%,app_id.ilike.%${search}%`)
-    dataQuery = dataQuery.or(`name.ilike.%${search}%,app_id.ilike.%${search}%`)
-  }
-
-  // Get total count with filters
-  const { count } = await countQuery
-  totalApps.value = count || 0
-
-  // Get paginated data with filters
-  const { data } = await dataQuery
-    .range(offset, offset + pageSize - 1)
-    .order('updated_at', { ascending: false })
-
-  if (data && data.length) {
-    apps.value = data
-    stepsOpen.value = false
-  }
-  else {
-    apps.value = []
-    stepsOpen.value = totalApps.value === 0
+  finally {
+    isTableLoading.value = false
   }
 }
 
@@ -84,24 +90,6 @@ watch(currentOrganization, async () => {
   currentPage.value = 1
   searchQuery.value = ''
   await getMyApps()
-})
-
-watch(currentPage, async () => {
-  isLoading.value = true
-  await getMyApps()
-  isLoading.value = false
-})
-
-// Debounced search watcher - reset to page 1 when search changes
-const debouncedSearch = useDebounceFn(async () => {
-  currentPage.value = 1
-  isLoading.value = true
-  await getMyApps()
-  isLoading.value = false
-}, 300)
-
-watch(searchQuery, () => {
-  debouncedSearch()
 })
 
 watchEffect(async () => {
@@ -130,7 +118,10 @@ displayStore.defaultBack = '/app'
               :total="totalApps"
               :delete-button="true"
               :server-side-pagination="true"
+              :is-loading="isTableLoading"
               @add-app="stepsOpen = !stepsOpen"
+              @reload="getMyApps()"
+              @reset="getMyApps()"
             />
           </div>
         </div>

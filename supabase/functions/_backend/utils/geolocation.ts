@@ -31,27 +31,15 @@ export function getContinentSB(c: Context): RegionsAWS | undefined {
  * Get database region from request context based on deployment platform
  * Maps client location to database regions: EU (Europe/Africa), US (Americas), AS (Asia/Oceania)
  * @param c Hono context
- * @returns Database region code: 'EU', 'US', 'AS', or undefined
+ * @returns Database region code: 'EU'
  */
 export function getClientDbRegionD1(c: Context): DbRegionD1 {
   const continent = getContinentCF(c)
   cloudlog({ requestId: c.get('requestId'), message: 'nameContinent', continent, source: 'env-check' })
   if (continent) {
     switch (continent) {
-      case 'EU': // Europe
-      case 'AF': // Africa
-      case 'ME': // Middle East
-        return 'EU'
-      case 'AS': // Asia
-      case 'HK': // Hong Kong / China
-        return 'AS'
-      case 'OC': // Oceania
-        return 'OC'
-      case 'NA': // North America
-      case 'SA': // South America
-        return 'NA'
       default:
-        return undefined
+        return 'EU' // Default to EU if unknown
     }
   }
 }

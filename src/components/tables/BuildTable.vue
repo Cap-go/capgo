@@ -180,19 +180,6 @@ function getStatusColor(status: string): string {
   }
 }
 
-function getPlatformBadgeColor(platform: string): string {
-  switch (platform) {
-    case 'ios':
-      return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-    case 'android':
-      return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-    case 'both':
-      return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
-    default:
-      return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
-  }
-}
-
 columns.value = [
   {
     label: t('created-at'),
@@ -203,11 +190,15 @@ columns.value = [
     displayFunction: (elem: Element) => formatDate(elem.created_at ?? ''),
   },
   {
-    label: t('platform'),
-    key: 'platform',
+    label: t('build-mode'),
+    key: 'build_mode',
     mobile: true,
-    class: 'truncate max-w-24',
-    displayFunction: (elem: Element) => elem.platform,
+    class: 'truncate max-w-32',
+    displayFunction: (elem: Element) => {
+      const platform = elem.platform || ''
+      const mode = elem.build_mode || ''
+      return `${platform} ${mode}`.trim() || '-'
+    },
   },
   {
     label: t('status'),
@@ -215,18 +206,6 @@ columns.value = [
     mobile: true,
     class: 'truncate max-w-24',
     displayFunction: (elem: Element) => elem.status,
-  },
-  {
-    label: t('build-mode'),
-    key: 'build_mode',
-    class: 'truncate max-w-24',
-    displayFunction: (elem: Element) => elem.build_mode || '-',
-  },
-  {
-    label: t('job-id'),
-    key: 'builder_job_id',
-    class: 'truncate max-w-32 font-mono text-xs',
-    displayFunction: (elem: Element) => elem.builder_job_id?.substring(0, 8) || '-',
   },
   {
     label: t('error'),
@@ -276,14 +255,6 @@ watch(showSteps, (newValue) => {
         @reset="reload()"
         @reload="getData()"
       >
-        <template #platform="{ element }">
-          <span
-            class="px-2 py-1 text-xs font-semibold rounded-full"
-            :class="getPlatformBadgeColor(element.platform)"
-          >
-            {{ element.platform }}
-          </span>
-        </template>
         <template #status="{ element }">
           <span
             class="font-semibold"

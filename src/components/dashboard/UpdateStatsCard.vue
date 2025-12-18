@@ -46,8 +46,10 @@ const updateDataByAction = ref<{ [action: string]: (number | undefined)[] }>({})
 const appNames = ref<{ [appId: string]: string }>({})
 const isLoading = ref(true)
 
-// Cache for raw API data
-const cachedRawStats = ref<any[] | null>(null)
+// Per-org cache for raw API data, keyed by "orgId:billingMode"
+const cacheByOrgAndMode = new Map<string, any[]>()
+// Track current org for change detection
+const currentCacheOrgId = ref<string | null>(null)
 
 const dashboardAppsStore = useDashboardAppsStore()
 
@@ -78,14 +80,19 @@ const hasData = computed(() => chartUpdateData.value?.length > 0)
 async function calculateStats(forceRefetch = false) {
   const startTime = Date.now()
   isLoading.value = true
+
+  // Reset display data
   totalInstalled.value = 0
   totalFailed.value = 0
   totalRequested.value = 0
-
-  // Reset data
+  lastDayEvolution.value = 0
   updateDataByApp.value = {}
   updateDataByAction.value = {}
   updateData.value = []
+
+  const currentOrgId = organizationStore.currentOrganization?.gid ?? null
+  const orgChanged = currentCacheOrgId.value !== currentOrgId
+  currentCacheOrgId.value = currentOrgId
 
   // Determine the date range based on mode
   const today = new Date()
@@ -111,18 +118,11 @@ async function calculateStats(forceRefetch = false) {
   // Calculate number of days in range
   const dayCount = Math.floor((rangeEnd.getTime() - rangeStart.getTime()) / (1000 * 60 * 60 * 24)) + 1
 
-  // Initialize arrays for the actual range
-  const dailyCounts = createUndefinedArray(dayCount) as (number | undefined)[]
-
-  // Initialize action-specific data arrays
-  updateDataByAction.value = {
-    install: createUndefinedArray(dayCount) as (number | undefined)[],
-    fail: createUndefinedArray(dayCount) as (number | undefined)[],
-    requested: createUndefinedArray(dayCount) as (number | undefined)[],
-  }
-
   const startDate = rangeStart.toISOString().split('T')[0]
   const endDate = rangeEnd.toISOString().split('T')[0]
+
+  // Cache key includes org and billing mode since date range differs
+  const cacheKey = `${currentOrgId}:${props.useBillingPeriod ? 'billing' : '30days'}`
 
   try {
     // Determine target apps
@@ -132,50 +132,43 @@ async function calculateStats(forceRefetch = false) {
     if (props.appId) {
       // Single app mode
       targetAppIds = [props.appId]
-      if (!cachedRawStats.value || forceRefetch) {
-        try {
-          const { data: appRow } = await useSupabase()
-            .from('apps')
-            .select('name')
-            .eq('app_id', props.appId)
-            .single()
-          localAppNames[props.appId] = appRow?.name ?? props.appId
-        }
-        catch (error) {
-          console.error('Error fetching app name for update stats:', error)
-          localAppNames[props.appId] = props.appId
-        }
-        appNames.value = localAppNames
+      try {
+        const { data: appRow } = await useSupabase()
+          .from('apps')
+          .select('name')
+          .eq('app_id', props.appId)
+          .single()
+        localAppNames[props.appId] = appRow?.name ?? props.appId
       }
+      catch (error) {
+        console.error('Error fetching app name for update stats:', error)
+        localAppNames[props.appId] = props.appId
+      }
+      appNames.value = localAppNames
     }
     else {
       // Multiple apps mode - use store for shared apps data
-      // Only fetch apps if not already loaded in store
-      if (!dashboardAppsStore.isLoaded) {
-        await dashboardAppsStore.fetchApps()
-      }
+      await dashboardAppsStore.fetchApps(orgChanged)
 
       targetAppIds = [...dashboardAppsStore.appIds]
       appNames.value = dashboardAppsStore.appNames
     }
 
     if (targetAppIds.length === 0) {
-      updateData.value = dailyCounts
+      updateData.value = createUndefinedArray(dayCount) as (number | undefined)[]
+      updateDataByApp.value = {}
       return
     }
 
-    // Initialize app data arrays for the actual range
-    targetAppIds.forEach((appId) => {
-      updateDataByApp.value[appId] = createUndefinedArray(dayCount) as (number | undefined)[]
-    })
+    // Check per-org cache - only use if not forcing refetch
+    let data: any[] | null = null
+    const cachedData = cacheByOrgAndMode.get(cacheKey)
 
-    // Use cached data if available and not forcing refetch
-    let data
-    if (cachedRawStats.value && !forceRefetch) {
-      data = cachedRawStats.value
+    if (cachedData && !forceRefetch) {
+      data = cachedData
     }
     else {
-      // Get update stats from daily_version table for last 30 days
+      // Get update stats from daily_version table
       const result = await useSupabase()
         .from('daily_version')
         .select('date, app_id, install, fail, get')
@@ -184,9 +177,29 @@ async function calculateStats(forceRefetch = false) {
         .lte('date', endDate)
         .order('date')
       data = result.data
-      // Cache the fetched data
-      cachedRawStats.value = data
+
+      // Store in per-org cache
+      if (data) {
+        cacheByOrgAndMode.set(cacheKey, data)
+      }
     }
+
+    // Create fresh arrays for processing
+    const dailyCounts = createUndefinedArray(dayCount) as (number | undefined)[]
+    const actionData = {
+      install: createUndefinedArray(dayCount) as (number | undefined)[],
+      fail: createUndefinedArray(dayCount) as (number | undefined)[],
+      requested: createUndefinedArray(dayCount) as (number | undefined)[],
+    }
+    const appData: { [appId: string]: (number | undefined)[] } = {}
+    targetAppIds.forEach((appId) => {
+      appData[appId] = createUndefinedArray(dayCount) as (number | undefined)[]
+    })
+
+    // Track totals separately
+    let installedTotal = 0
+    let failedTotal = 0
+    let requestedTotal = 0
 
     if (data && data.length > 0) {
       // Process each stat entry
@@ -207,28 +220,25 @@ async function calculateStats(forceRefetch = false) {
             // Increment arrays
             incrementArrayValue(dailyCounts, daysDiff, totalForDay)
 
-            totalInstalled.value += installedCount
-            totalFailed.value += failedCount
-            totalRequested.value += requestedCount
+            installedTotal += installedCount
+            failedTotal += failedCount
+            requestedTotal += requestedCount
 
             // Track by action type
-            incrementArrayValue(updateDataByAction.value.install, daysDiff, installedCount)
-            incrementArrayValue(updateDataByAction.value.fail, daysDiff, failedCount)
-            incrementArrayValue(updateDataByAction.value.requested, daysDiff, requestedCount)
+            incrementArrayValue(actionData.install, daysDiff, installedCount)
+            incrementArrayValue(actionData.fail, daysDiff, failedCount)
+            incrementArrayValue(actionData.requested, daysDiff, requestedCount)
 
             // Track by app
-            if (updateDataByApp.value[stat.app_id]) {
-              incrementArrayValue(updateDataByApp.value[stat.app_id], daysDiff, totalForDay)
+            if (appData[stat.app_id]) {
+              incrementArrayValue(appData[stat.app_id], daysDiff, totalForDay)
             }
           }
         }
       })
 
-      // Set the data (no filtering needed - we already queried the right range)
-      updateData.value = dailyCounts
-
       // Calculate evolution (compare last two days with data)
-      const nonZeroDays = updateData.value.filter(count => (count || 0) > 0)
+      const nonZeroDays = dailyCounts.filter(count => (count || 0) > 0)
       if (nonZeroDays.length >= 2) {
         const lastDayCount = nonZeroDays[nonZeroDays.length - 1] || 0
         const previousDayCount = nonZeroDays[nonZeroDays.length - 2] || 0
@@ -237,13 +247,18 @@ async function calculateStats(forceRefetch = false) {
         }
       }
     }
-    else {
-      updateData.value = dailyCounts
-    }
+
+    // Set all display values at once
+    updateData.value = dailyCounts
+    updateDataByAction.value = actionData
+    updateDataByApp.value = appData
+    totalInstalled.value = installedTotal
+    totalFailed.value = failedTotal
+    totalRequested.value = requestedTotal
   }
   catch (error) {
     console.error('Error fetching update stats:', error)
-    updateData.value = dailyCounts
+    updateData.value = createUndefinedArray(dayCount) as (number | undefined)[]
   }
   finally {
     // Ensure spinner shows for at least 300ms for better UX
@@ -255,21 +270,28 @@ async function calculateStats(forceRefetch = false) {
   }
 }
 
-// Watch for billing period mode changes - must refetch since date range changes
+// Watch for organization changes - use per-org cache (no need to force refetch)
+watch(() => organizationStore.currentOrganization?.gid, async (newOrgId, oldOrgId) => {
+  if (newOrgId && oldOrgId && newOrgId !== oldOrgId) {
+    // Per-org cache will be checked in calculateStats
+    await calculateStats(false)
+  }
+})
+
+// Watch for billing period mode changes - cache is keyed by mode, so no force needed
 watch(() => props.useBillingPeriod, async () => {
-  cachedRawStats.value = null // Clear cache since we're querying different date range
-  await calculateStats(true) // Must refetch for new date range
+  await calculateStats(false)
 })
 
-// Watch for accumulated mode changes - use cached data
+// Watch for accumulated mode changes - reprocess cached data
 watch(() => props.accumulated, async () => {
-  await calculateStats(false) // Don't refetch, just reprocess cached data
+  await calculateStats(false)
 })
 
-// Watch for reload trigger - force refetch
+// Watch for reload trigger - force refetch from API
 watch(() => props.reloadTrigger, async (newVal) => {
   if (newVal > 0) {
-    await calculateStats(true) // Force refetch from API
+    await calculateStats(true)
   }
 })
 

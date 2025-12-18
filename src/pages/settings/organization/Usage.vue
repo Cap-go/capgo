@@ -8,13 +8,15 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import { bytesToGb } from '~/services/conversion'
-import { getCurrentPlanNameOrg, getPlans, getPlanUsagePercent, getTotalStorage } from '~/services/supabase'
+import { getCreditUnitPricing, getCurrentPlanNameOrg, getPlans, getPlanUsagePercent, getTotalStorage, getUsageCreditDeductions } from '~/services/supabase'
 import { sendEvent } from '~/services/tracking'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useMainStore } from '~/stores/main'
+// tabs handled by settings layout
 
 const { t } = useI18n()
 const plans = ref<Database['public']['Tables']['plans']['Row'][]>([])
+const creditUnitPrices = ref<Partial<Record<Database['public']['Enums']['credit_metric_type'], number>>>({})
 
 const isLoading = ref(false)
 const initialLoad = ref(true)
@@ -49,9 +51,8 @@ watchEffect(async () => {
 async function getUsage(orgId: string) {
   const usage = main.dashboard
 
-  const plan = plans.value.find(p => p.name === 'Pay as you go')!
   const planCurrent = await getCurrentPlanNameOrg(orgId)
-  const currentPlan = plans.value.find(p => p.name === planCurrent)
+  const currentPlan = plans.value.find((p: Database['public']['Tables']['plans']['Row']) => p.name === planCurrent)
 
   // Get usage percentages
   let detailPlanUsage: ArrayElement<Database['public']['Functions']['get_plan_usage_percent_detailed']['Returns']> = {
@@ -68,20 +69,23 @@ async function getUsage(orgId: string) {
   catch (err) {
     console.log('Error getting plan usage percent:', err)
   }
+  detailPlanUsage = roundUsagePercents(detailPlanUsage)
 
-  const payg_base = {
-    mau: plan?.mau,
-    storage: plan?.storage,
-    bandwidth: plan?.bandwidth,
-    build_time: plan?.build_time_unit || 0,
+  const enterprise_base = {
+    mau: currentPlan?.mau ?? 0,
+    storage: currentPlan?.storage ?? 0,
+    bandwidth: currentPlan?.bandwidth ?? 0,
+    build_time: currentPlan?.build_time_unit ?? 0,
   }
 
-  const payg_units = {
-    mau: currentPlan?.mau_unit,
-    storage: currentPlan?.storage_unit,
-    bandwidth: currentPlan?.bandwidth_unit,
-    build_time: currentPlan?.build_time_unit || 0,
+  const enterprise_units = {
+    mau: creditUnitPrices.value.mau ?? 0,
+    storage: creditUnitPrices.value.storage ?? 0,
+    bandwidth: creditUnitPrices.value.bandwidth ?? 0,
+    build_time: creditUnitPrices.value?.build_time ?? 0,
   }
+
+  const creditDeductions = await getUsageCreditDeductions(orgId)
 
   const nowEndOfDay = dayjs().endOf('day')
   const billingStart = organizationStore.currentOrganization?.subscription_start
@@ -103,6 +107,31 @@ async function getUsage(orgId: string) {
 
   const relevantUsage = usageInCycle.length > 0 ? usageInCycle : usage
 
+  const totalCreditDeductions = creditDeductions.reduce((acc, entry) => {
+    if (entry.amount === null)
+      return acc
+
+    const entryStart = entry.billing_cycle_start
+      ? dayjs(entry.billing_cycle_start).startOf('day')
+      : entry.occurred_at
+        ? dayjs(entry.occurred_at).startOf('day')
+        : null
+
+    const entryEnd = entry.billing_cycle_end
+      ? dayjs(entry.billing_cycle_end).endOf('day')
+      : entry.occurred_at
+        ? dayjs(entry.occurred_at).endOf('day')
+        : null
+
+    if (billingStart && entryEnd && entryEnd.isBefore(billingStart))
+      return acc
+
+    if (billingEnd && entryStart && entryStart.isAfter(billingEnd))
+      return acc
+
+    return acc + Math.abs(entry.amount)
+  }, 0)
+
   const totalMau = relevantUsage.reduce((acc, entry) => acc + (entry.mau ?? 0), 0)
   const totalBandwidthBytes = relevantUsage.reduce((acc, entry) => acc + (entry.bandwidth ?? 0), 0)
   const totalBandwidth = bytesToGb(totalBandwidthBytes)
@@ -111,19 +140,25 @@ async function getUsage(orgId: string) {
 
   const basePrice = currentPlan?.price_m ?? 0
 
-  const calculatePrice = (total: number, base: number, unit: number) => total <= base ? 0 : (total - base) * unit
-
-  const isPayAsYouGo = currentPlan?.name === 'Pay as you go'
-  const totalUsagePrice = computed(() => {
-    if (currentPlan?.name !== 'Pay as you go')
+  const calculatePrice = (total: number, base: number, unit: number) => {
+    if (unit <= 0)
       return 0
+    return total <= base ? 0 : (total - base) * unit
+  }
 
-    const mauPrice = calculatePrice(totalMau, payg_base.mau, payg_units!.mau!)
-    const storagePrice = calculatePrice(totalStorage, payg_base.storage, payg_units!.storage!)
-    const bandwidthPrice = calculatePrice(totalBandwidth, payg_base.bandwidth, payg_units!.bandwidth!)
-    const buildTimePrice = calculatePrice(totalBuildTime, payg_base.build_time, payg_units!.build_time!)
+  const estimatedUsagePrice = computed(() => {
+    const mauPrice = calculatePrice(totalMau, enterprise_base.mau, enterprise_units.mau)
+    const storagePrice = calculatePrice(totalStorage, enterprise_base.storage, enterprise_units.storage)
+    const bandwidthPrice = calculatePrice(totalBandwidth, enterprise_base.bandwidth, enterprise_units.bandwidth)
+    const buildTimePrice = calculatePrice(totalBuildTime, enterprise_base.build_time, enterprise_units.build_time)
     const sum = mauPrice + storagePrice + bandwidthPrice + buildTimePrice
     return roundNumber(sum)
+  })
+
+  const totalUsagePrice = computed(() => {
+    if (creditDeductions.length > 0)
+      return roundNumber(totalCreditDeductions)
+    return estimatedUsagePrice.value
   })
 
   const totalPrice = computed(() => {
@@ -131,7 +166,6 @@ async function getUsage(orgId: string) {
   })
 
   return {
-    isPayAsYouGo,
     currentPlan,
     totalPrice,
     totalUsagePrice,
@@ -139,8 +173,7 @@ async function getUsage(orgId: string) {
     totalBandwidth,
     totalStorage,
     totalBuildTime,
-    payg_units,
-    plan,
+    enterprise_units,
     detailPlanUsage,
     cycle: {
       subscription_anchor_start: dayjs(organizationStore.currentOrganization?.subscription_start).format('YYYY/MM/D'),
@@ -149,7 +182,6 @@ async function getUsage(orgId: string) {
   }
 }
 
-// const planUsageMap = ref<Map<string, Awaited<ReturnType<typeof getUsage>>>>()
 const planUsageMap = ref(new Map<string, Awaited<ReturnType<typeof getUsage>>>())
 const planUsage = computed(() => planUsageMap.value?.get(currentOrganization.value?.gid ?? ''))
 
@@ -159,6 +191,17 @@ const currentPlanSuggest = computed(() => main.plans.find(plan => plan.name === 
 
 function roundNumber(number: number) {
   return Math.round(number * 100) / 100
+}
+
+function roundUsagePercents(usage: ArrayElement<Database['public']['Functions']['get_plan_usage_percent_detailed']['Returns']>) {
+  return {
+    ...usage,
+    total_percent: Math.round(usage.total_percent ?? 0),
+    mau_percent: Math.round(usage.mau_percent ?? 0),
+    bandwidth_percent: Math.round(usage.bandwidth_percent ?? 0),
+    storage_percent: Math.round(usage.storage_percent ?? 0),
+    build_time_percent: Math.round(usage.build_time_percent ?? 0),
+  }
 }
 
 function formatBuildTime(seconds: number): string {
@@ -192,20 +235,26 @@ async function loadData() {
   await Promise.all([organizationStore.awaitInitialLoad(), main.awaitInitialLoad()])
   const gid = organizationStore?.currentOrganization?.gid ?? ''
 
-  if (planUsageMap.value.has(gid) || isLoading.value)
+  if (isLoading.value)
     return
 
   isLoading.value = true
 
   if (initialLoad.value) {
-    await getPlans().then((pls) => {
-      plans.value.length = 0
-      plans.value.push(...pls)
-    })
+    const [pls, pricing] = await Promise.all([
+      getPlans(),
+      getCreditUnitPricing(gid || undefined),
+    ])
+    plans.value.length = 0
+    plans.value.push(...pls)
+    creditUnitPrices.value = pricing
   }
-  getUsage(gid).then((res) => {
-    planUsageMap.value?.set(gid, res as any)
-  })
+  else if (!Object.keys(creditUnitPrices.value).length) {
+    creditUnitPrices.value = await getCreditUnitPricing(gid || undefined)
+  }
+
+  const usageDetails = await getUsage(gid)
+  planUsageMap.value?.set(gid, usageDetails as any)
   isLoading.value = false
   initialLoad.value = false
 }
@@ -229,15 +278,15 @@ function nextRunDate() {
 </script>
 
 <template>
-  <div class="flex overflow-hidden flex-col h-full bg-white dark:bg-gray-800">
-    <div v-if="!isLoading" class="flex overflow-y-auto flex-col py-6 px-4 mx-auto w-full max-w-7xl h-full sm:px-6 lg:px-8">
+  <div class="flex flex-col pb-8 bg-white border shadow-lg md:p-8 md:pb-0 md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900">
+    <div v-if="!isLoading" class="flex flex-col w-full">
       <!-- Header -->
-      <div class="flex flex-col gap-4 justify-between mb-8 md:flex-row md:items-center shrink-0">
+      <div class="flex flex-col justify-between gap-4 mb-8 md:flex-row md:items-center shrink-0">
         <div>
           <h1 class="text-3xl font-bold text-gray-900 dark:text-white">
             {{ t('usage') }}
           </h1>
-          <div class="flex gap-3 items-center mt-1 text-sm text-gray-500 dark:text-gray-400">
+          <div class="flex items-center gap-3 mt-1 text-sm text-gray-500 dark:text-gray-400">
             <div class="flex gap-1.5 items-center">
               <div class="w-1.5 h-1.5 bg-green-500 rounded-full" />
               {{ lastRunDate() }}
@@ -261,49 +310,47 @@ function nextRunDate() {
       <!-- Plan & Cost Overview -->
       <div class="grid grid-cols-1 gap-6 mb-8 lg:grid-cols-3 shrink-0">
         <!-- Current Plan -->
-        <div class="flex flex-col justify-between p-5 bg-gray-50 rounded-xl border border-gray-200 shadow-sm dark:bg-gray-900 dark:border-gray-700">
-          <div>
-            <div class="mb-1 text-sm text-gray-500 dark:text-gray-400">
-              {{ t('Current') }}
+        <div class="flex flex-col justify-between lg:col-span-2 p-5 bg-gray-50 rounded-xl border border-gray-200 shadow-sm dark:bg-gray-900 dark:border-gray-700">
+          <div class="flex flex-row justify-between">
+            <div class="flex flex-col">
+              <div class="mb-1 text-sm text-gray-500 dark:text-gray-400">
+                {{ t('plan') }}
+              </div>
+              <div class="text-2xl font-bold text-gray-900 dark:text-white">
+                {{ currentPlan?.name || t('loading') }}
+              </div>
             </div>
-            <div class="text-2xl font-bold text-gray-900 dark:text-white">
-              {{ currentPlan?.name || t('loading') }}
+            <div class="flex flex-col">
+              <div class="mb-1 text-sm text-gray-500 dark:text-gray-400">
+                {{ t('base') }}
+              </div>
+              <div class="text-2xl font-bold text-gray-900 dark:text-white">
+                ${{ currentPlan?.price_m }}/{{ t('mo') }}
+              </div>
+            </div>
+            <div class="flex flex-col">
+              <div class="mb-1 text-sm text-gray-500 dark:text-gray-400">
+                {{ t('credits-used-in-period') }}
+              </div>
+              <div class="text-2xl font-bold text-gray-900 dark:text-white">
+                ${{ planUsage?.totalUsagePrice.toLocaleString() }}
+              </div>
             </div>
           </div>
-          <div class="flex justify-between items-end pt-4 mt-4 border-t border-gray-100 dark:border-gray-700">
+          <div class="flex items-end justify-between pt-4 mt-4 border-t border-gray-100 dark:border-gray-700">
             <div class="text-sm text-gray-500 dark:text-gray-400">
-              {{ t('base') }}
+              {{ t('total') }}
             </div>
             <div class="text-xl font-semibold text-gray-900 dark:text-white">
-              ${{ currentPlan?.price_m }}/{{ t('mo') }}
-            </div>
-          </div>
-        </div>
-
-        <!-- Estimated Cost -->
-        <div class="flex flex-col justify-between p-5 bg-gray-50 rounded-xl border border-gray-200 shadow-sm dark:bg-gray-900 dark:border-gray-700">
-          <div>
-            <div class="mb-1 text-sm text-gray-500 dark:text-gray-400">
-              {{ t('usage-title') }}
-            </div>
-            <div class="text-2xl font-bold text-blue-600 dark:text-blue-400">
               ${{ planUsage?.totalPrice.toLocaleString() }}
-            </div>
-          </div>
-          <div class="flex justify-between items-end pt-4 mt-4 border-t border-gray-100 dark:border-gray-700">
-            <div class="text-sm text-gray-500 dark:text-gray-400">
-              {{ t('credits-used-in-period') }}
-            </div>
-            <div class="text-xl font-semibold text-gray-900 dark:text-white">
-              +${{ planUsage?.totalUsagePrice.toLocaleString() }}
             </div>
           </div>
         </div>
 
         <!-- Upgrade / Best Plan -->
-        <div v-if="shouldShowUpgrade" class="overflow-hidden relative p-5 from-blue-50 to-indigo-50 rounded-xl border border-blue-200 shadow-sm dark:border-blue-800 bg-linear-to-br dark:from-blue-900/20 dark:to-indigo-900/20">
+        <div v-if="shouldShowUpgrade" class="relative p-5 overflow-hidden border border-blue-200 shadow-sm from-blue-50 to-indigo-50 rounded-xl dark:border-blue-800 bg-linear-to-br dark:from-blue-900/20 dark:to-indigo-900/20">
           <div class="relative z-10">
-            <div class="flex justify-between items-start mb-2">
+            <div class="flex items-start justify-between mb-2">
               <div class="text-sm font-medium text-blue-800 dark:text-blue-200">
                 {{ t('recommended') }}
               </div>
@@ -317,12 +364,12 @@ function nextRunDate() {
             <div class="mb-4 text-sm text-gray-600 dark:text-gray-300">
               ${{ currentPlanSuggest?.price_m }}/{{ t('mo') }}
             </div>
-            <button class="py-2 w-full text-sm font-semibold text-white bg-blue-600 rounded-lg shadow-sm transition-colors hover:bg-blue-700" @click="goToPlans">
+            <button class="w-full py-2 text-sm font-semibold text-white transition-colors bg-blue-600 rounded-lg shadow-sm hover:bg-blue-700" @click="goToPlans">
               {{ t('plan-upgrade-v2') }}
             </button>
           </div>
         </div>
-        <div v-else class="flex justify-center items-center p-5 text-sm italic text-gray-400 bg-gray-50 rounded-xl border border-gray-200 dark:text-gray-500 dark:bg-gray-900 dark:border-gray-700">
+        <div v-else class="flex items-center justify-center p-5 text-sm italic text-gray-400 border border-gray-200 bg-gray-50 rounded-xl dark:text-gray-500 dark:bg-gray-900 dark:border-gray-700">
           {{ t('good') }}
         </div>
       </div>
@@ -333,8 +380,8 @@ function nextRunDate() {
       </h2>
       <div class="grid grid-cols-1 gap-6 mb-8 md:grid-cols-2 xl:grid-cols-4 shrink-0">
         <!-- MAU -->
-        <div class="p-5 bg-gray-50 rounded-xl border border-gray-200 shadow-sm transition-shadow dark:bg-gray-900 dark:border-gray-700 hover:shadow-md">
-          <div class="flex justify-between items-start mb-4">
+        <div class="p-5 transition-shadow border border-gray-200 shadow-sm bg-gray-50 rounded-xl dark:bg-gray-900 dark:border-gray-700 hover:shadow-md">
+          <div class="flex items-start justify-between mb-4">
             <div class="text-sm font-medium text-gray-500 dark:text-gray-400">
               {{ t('monthly-active-users') }}
             </div>
@@ -342,8 +389,8 @@ function nextRunDate() {
               {{ planUsage?.detailPlanUsage?.mau_percent || 0 }}%
             </div>
           </div>
-          <div class="overflow-hidden mb-4 w-full h-2 bg-gray-100 rounded-full dark:bg-gray-700">
-            <div class="h-full rounded-full transition-all duration-500" :class="(planUsage?.detailPlanUsage?.mau_percent || 0) >= 100 ? 'bg-red-500' : 'bg-blue-500'" :style="{ width: `${Math.min(planUsage?.detailPlanUsage?.mau_percent || 0, 100)}%` }" />
+          <div class="w-full h-2 mb-4 overflow-hidden bg-gray-100 rounded-full dark:bg-gray-700">
+            <div class="h-full transition-all duration-500 rounded-full" :class="(planUsage?.detailPlanUsage?.mau_percent || 0) >= 100 ? 'bg-red-500' : 'bg-blue-500'" :style="{ width: `${Math.min(planUsage?.detailPlanUsage?.mau_percent || 0, 100)}%` }" />
           </div>
           <div class="space-y-1 text-sm">
             <div class="flex justify-between text-gray-600 dark:text-gray-400">
@@ -358,8 +405,8 @@ function nextRunDate() {
         </div>
 
         <!-- Storage -->
-        <div class="p-5 bg-gray-50 rounded-xl border border-gray-200 shadow-sm transition-shadow dark:bg-gray-900 dark:border-gray-700 hover:shadow-md">
-          <div class="flex justify-between items-start mb-4">
+        <div class="p-5 transition-shadow border border-gray-200 shadow-sm bg-gray-50 rounded-xl dark:bg-gray-900 dark:border-gray-700 hover:shadow-md">
+          <div class="flex items-start justify-between mb-4">
             <div class="text-sm font-medium text-gray-500 dark:text-gray-400">
               {{ t('Storage') }}
             </div>
@@ -367,8 +414,8 @@ function nextRunDate() {
               {{ planUsage?.detailPlanUsage?.storage_percent || 0 }}%
             </div>
           </div>
-          <div class="overflow-hidden mb-4 w-full h-2 bg-gray-100 rounded-full dark:bg-gray-700">
-            <div class="h-full rounded-full transition-all duration-500" :class="(planUsage?.detailPlanUsage?.storage_percent || 0) >= 100 ? 'bg-red-500' : 'bg-purple-500'" :style="{ width: `${Math.min(planUsage?.detailPlanUsage?.storage_percent || 0, 100)}%` }" />
+          <div class="w-full h-2 mb-4 overflow-hidden bg-gray-100 rounded-full dark:bg-gray-700">
+            <div class="h-full transition-all duration-500 rounded-full" :class="(planUsage?.detailPlanUsage?.storage_percent || 0) >= 100 ? 'bg-red-500' : 'bg-purple-500'" :style="{ width: `${Math.min(planUsage?.detailPlanUsage?.storage_percent || 0, 100)}%` }" />
           </div>
           <div class="space-y-1 text-sm">
             <div class="flex justify-between text-gray-600 dark:text-gray-400">
@@ -383,8 +430,8 @@ function nextRunDate() {
         </div>
 
         <!-- Bandwidth -->
-        <div class="p-5 bg-gray-50 rounded-xl border border-gray-200 shadow-sm transition-shadow dark:bg-gray-900 dark:border-gray-700 hover:shadow-md">
-          <div class="flex justify-between items-start mb-4">
+        <div class="p-5 transition-shadow border border-gray-200 shadow-sm bg-gray-50 rounded-xl dark:bg-gray-900 dark:border-gray-700 hover:shadow-md">
+          <div class="flex items-start justify-between mb-4">
             <div class="text-sm font-medium text-gray-500 dark:text-gray-400">
               {{ t('Bandwidth') }}
             </div>
@@ -392,8 +439,8 @@ function nextRunDate() {
               {{ planUsage?.detailPlanUsage?.bandwidth_percent || 0 }}%
             </div>
           </div>
-          <div class="overflow-hidden mb-4 w-full h-2 bg-gray-100 rounded-full dark:bg-gray-700">
-            <div class="h-full rounded-full transition-all duration-500" :class="(planUsage?.detailPlanUsage?.bandwidth_percent || 0) >= 100 ? 'bg-red-500' : 'bg-green-500'" :style="{ width: `${Math.min(planUsage?.detailPlanUsage?.bandwidth_percent || 0, 100)}%` }" />
+          <div class="w-full h-2 mb-4 overflow-hidden bg-gray-100 rounded-full dark:bg-gray-700">
+            <div class="h-full transition-all duration-500 rounded-full" :class="(planUsage?.detailPlanUsage?.bandwidth_percent || 0) >= 100 ? 'bg-red-500' : 'bg-green-500'" :style="{ width: `${Math.min(planUsage?.detailPlanUsage?.bandwidth_percent || 0, 100)}%` }" />
           </div>
           <div class="space-y-1 text-sm">
             <div class="flex justify-between text-gray-600 dark:text-gray-400">
@@ -408,8 +455,8 @@ function nextRunDate() {
         </div>
 
         <!-- Build Time -->
-        <div class="p-5 bg-gray-50 rounded-xl border border-gray-200 shadow-sm transition-shadow dark:bg-gray-900 dark:border-gray-700 hover:shadow-md">
-          <div class="flex justify-between items-start mb-4">
+        <div class="p-5 transition-shadow border border-gray-200 shadow-sm bg-gray-50 rounded-xl dark:bg-gray-900 dark:border-gray-700 hover:shadow-md">
+          <div class="flex items-start justify-between mb-4">
             <div class="text-sm font-medium text-gray-500 dark:text-gray-400">
               {{ t('build-time') }}
             </div>
@@ -417,8 +464,8 @@ function nextRunDate() {
               {{ planUsage?.detailPlanUsage?.build_time_percent || 0 }}%
             </div>
           </div>
-          <div class="overflow-hidden mb-4 w-full h-2 bg-gray-100 rounded-full dark:bg-gray-700">
-            <div class="h-full rounded-full transition-all duration-500" :class="(planUsage?.detailPlanUsage?.build_time_percent || 0) >= 100 ? 'bg-red-500' : 'bg-orange-500'" :style="{ width: `${Math.min(planUsage?.detailPlanUsage?.build_time_percent || 0, 100)}%` }" />
+          <div class="w-full h-2 mb-4 overflow-hidden bg-gray-100 rounded-full dark:bg-gray-700">
+            <div class="h-full transition-all duration-500 rounded-full" :class="(planUsage?.detailPlanUsage?.build_time_percent || 0) >= 100 ? 'bg-red-500' : 'bg-orange-500'" :style="{ width: `${Math.min(planUsage?.detailPlanUsage?.build_time_percent || 0, 100)}%` }" />
           </div>
           <div class="space-y-1 text-sm">
             <div class="flex justify-between text-gray-600 dark:text-gray-400">
@@ -435,9 +482,9 @@ function nextRunDate() {
     </div>
 
     <!-- Loading State -->
-    <div v-else class="flex justify-center items-center h-full">
+    <div v-else class="flex items-center justify-center h-full">
       <div class="text-center">
-        <div class="mx-auto mb-4 w-12 h-12 rounded-full border-b-2 border-blue-600 animate-spin" />
+        <div class="w-12 h-12 mx-auto mb-4 border-b-2 border-blue-600 rounded-full animate-spin" />
         <p class="text-gray-600 dark:text-gray-400">
           {{ t('loading') }}...
         </p>

@@ -202,7 +202,7 @@ const chartOptions = computed(() => {
       title: {
         display: false,
       },
-      tooltip: createTooltipConfig(true, props.accumulated),
+      tooltip: createTooltipConfig(true, props.accumulated, props.useBillingPeriod ? cycleStart : false),
       todayLine: todayLineOptions.value,
     },
   }

@@ -342,6 +342,15 @@ onUnmounted(() => {
               >
                 {{ t('onboarding-invite-option-cta') }}
               </button>
+              <p class="mt-4 text-xs text-gray-400">
+                {{ t('onboarding-manual-setup-prefix') }}
+                <a
+                  href="https://capgo.app/docs/getting-started/add-an-app/#manual-setup"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="underline hover:text-gray-600"
+                >{{ t('onboarding-manual-setup-link') }}</a>
+              </p>
             </div>
           </div>
         </template>

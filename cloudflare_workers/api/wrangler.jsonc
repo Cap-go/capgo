@@ -52,38 +52,17 @@
         {
           "binding": "APP_LOG_EXTERNAL",
           "dataset": "app_log_external"
+        },
+        {
+          "binding": "DEVICE_INFO",
+          "dataset": "device_info"
         }
       ],
       "d1_databases": [
         {
-          "binding": "DB_DEVICES",
-          "database_name": "capgo_prod_devices",
-          "database_id": "2510b55c-d6a2-4595-a2a5-d9aca82a3753"
-        },
-        {
           "binding": "DB_STOREAPPS",
           "database_name": "capgo_prod_storeapps",
           "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
-        },
-        {
-          "binding": "DB_REPLICA_EU",
-          "database_name": "capgo_replicate_eu",
-          "database_id": "107046f7-af0e-4126-b493-1d4e66f48947"
-        },
-        {
-          "binding": "DB_REPLICA_AS",
-          "database_name": "capgo_replicate_as",
-          "database_id": "c01d7197-67b8-4b23-99d9-cceb76d3e7f6"
-        },
-        {
-          "binding": "DB_REPLICA_US",
-          "database_name": "capgo_replicate_us",
-          "database_id": "320c32be-d3d9-4c7c-a84c-e20ef01fd20d"
-        },
-        {
-          "binding": "DB_REPLICA_OC",
-          "database_name": "capgo_replicate_oc",
-          "database_id": "58dbd199-4629-4bd0-a02c-ce019b5ab2e0"
         }
       ]
     },
@@ -125,38 +104,17 @@
         {
           "binding": "APP_LOG_EXTERNAL",
           "dataset": "app_log_external"
+        },
+        {
+          "binding": "DEVICE_INFO",
+          "dataset": "device_info"
         }
       ],
       "d1_databases": [
         {
-          "binding": "DB_DEVICES",
-          "database_name": "capgo_prod_devices",
-          "database_id": "2510b55c-d6a2-4595-a2a5-d9aca82a3753"
-        },
-        {
           "binding": "DB_STOREAPPS",
           "database_name": "capgo_prod_storeapps",
           "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
-        },
-        {
-          "binding": "DB_REPLICA_EU",
-          "database_name": "capgo_replicate_eu",
-          "database_id": "107046f7-af0e-4126-b493-1d4e66f48947"
-        },
-        {
-          "binding": "DB_REPLICA_AS",
-          "database_name": "capgo_replicate_as",
-          "database_id": "c01d7197-67b8-4b23-99d9-cceb76d3e7f6"
-        },
-        {
-          "binding": "DB_REPLICA_US",
-          "database_name": "capgo_replicate_us",
-          "database_id": "320c32be-d3d9-4c7c-a84c-e20ef01fd20d"
-        },
-        {
-          "binding": "DB_REPLICA_OC",
-          "database_name": "capgo_replicate_oc",
-          "database_id": "58dbd199-4629-4bd0-a02c-ce019b5ab2e0"
         }
       ]
     },
@@ -198,38 +156,17 @@
         {
           "binding": "APP_LOG_EXTERNAL",
           "dataset": "app_log_external_alpha"
+        },
+        {
+          "binding": "DEVICE_INFO",
+          "dataset": "device_info_alpha"
         }
       ],
       "d1_databases": [
         {
-          "binding": "DB_DEVICES",
-          "database_name": "capgo_alpha_devices",
-          "database_id": "2510b55c-d6a2-4595-a2a5-d9aca82a3753"
-        },
-        {
           "binding": "DB_STOREAPPS",
           "database_name": "capgo_prod_storeapps",
           "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
-        },
-        {
-          "binding": "DB_REPLICA_EU",
-          "database_name": "capgo_replicate_eu",
-          "database_id": "107046f7-af0e-4126-b493-1d4e66f48947"
-        },
-        {
-          "binding": "DB_REPLICA_AS",
-          "database_name": "capgo_replicate_as",
-          "database_id": "c01d7197-67b8-4b23-99d9-cceb76d3e7f6"
-        },
-        {
-          "binding": "DB_REPLICA_US",
-          "database_name": "capgo_replicate_us",
-          "database_id": "320c32be-d3d9-4c7c-a84c-e20ef01fd20d"
-        },
-        {
-          "binding": "DB_REPLICA_OC",
-          "database_name": "capgo_replicate_oc",
-          "database_id": "58dbd199-4629-4bd0-a02c-ce019b5ab2e0"
         }
       ]
     },
@@ -237,24 +174,7 @@
       "name": "capgo_api-local",
       "vars": {
         "ENV_NAME": "capgo_api-local"
-      },
-      "d1_databases": [
-        {
-          "binding": "DB_REPLICA_EU",
-          "database_name": "capgo_replicate_eu",
-          "database_id": "107046f7-af0e-4126-b493-1d4e66f48947"
-        },
-        {
-          "binding": "DB_REPLICA_AS",
-          "database_name": "capgo_replicate_as",
-          "database_id": "c01d7197-67b8-4b23-99d9-cceb76d3e7f6"
-        },
-        {
-          "binding": "DB_REPLICA_US",
-          "database_name": "capgo_replicate_us",
-          "database_id": "320c32be-d3d9-4c7c-a84c-e20ef01fd20d"
-        }
-      ]
+      }
     }
   }
 }

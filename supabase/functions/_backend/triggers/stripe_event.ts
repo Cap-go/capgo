@@ -9,6 +9,7 @@ import { BRES, quickError, simpleError } from '../utils/hono.ts'
 import { middlewareStripeWebhook } from '../utils/hono_middleware_stripe.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { logsnag } from '../utils/logsnag.ts'
+import { ensureCustomerMetadata } from '../utils/stripe.ts'
 import { customerToSegmentOrg, supabaseAdmin } from '../utils/supabase.ts'
 
 export const app = new Hono<MiddlewareKeyVariablesStripe>()
@@ -16,6 +17,7 @@ export const app = new Hono<MiddlewareKeyVariablesStripe>()
 interface Org {
   id: string
   management_email: string
+  created_by: string
 }
 
 async function customerSourceCreated(c: Context, LogSnag: ReturnType<typeof logsnag>, org: Org, stripeEvent: Stripe.CustomerSourceCreatedEvent) {
@@ -74,8 +76,8 @@ async function invoiceUpcoming(c: Context, LogSnag: ReturnType<typeof logsnag>, 
   return c.json(BRES)
 }
 
-async function createdOrUpdated(c: Context, stripeData: StripeData, org: Org, LogSnag: ReturnType<typeof logsnag>) {
-  const status = stripeData.data.status
+async function createdOrUpdated(c: Context, stripeData: StripeData, org: Org, LogSnag: ReturnType<typeof logsnag>, originalStatus?: string) {
+  const status = originalStatus ?? stripeData.data.status
   let statusName: string = status ?? ''
   const { data: plan } = await supabaseAdmin(c)
     .from('plans')
@@ -124,12 +126,13 @@ async function createdOrUpdated(c: Context, stripeData: StripeData, org: Org, Lo
     const eventName = `user:subscribe_${statusName}:${isMonthly ? 'monthly' : 'yearly'}`
     await trackBentoEvent(c, org.management_email, { plan_name: plan.name }, eventName)
     await addTagBento(c, org.management_email, segment)
+    const isNewSubscription = status === 'created'
     await LogSnag.track({
       channel: 'usage',
-      event: status === 'succeeded' ? 'User subscribe' : 'User update subscribe',
+      event: isNewSubscription ? 'User subscribe' : 'User update subscribe',
       icon: '💰',
       user_id: org.id,
-      notify: status === 'succeeded',
+      notify: isNewSubscription,
       tags: {
         plan_name: plan.name,
       },
@@ -172,7 +175,7 @@ async function didCancel(c: Context, org: Org, LogSnag: ReturnType<typeof logsna
 async function getOrg(c: Context, stripeData: StripeData) {
   const { error: dbError, data: org } = await supabaseAdmin(c)
     .from('orgs')
-    .select('id, management_email')
+    .select('id, management_email, created_by')
     .eq('customer_id', stripeData.data.customer_id)
     .single()
   if (dbError) {
@@ -217,6 +220,8 @@ app.post('/', middlewareStripeWebhook(), async (c) => {
   // find email from user with customer_id
   const org = await getOrg(c, stripeData)
 
+  await ensureCustomerMetadata(c, stripeData.data.customer_id, org.id, org.created_by)
+
   const { data: customer } = await supabaseAdmin(c)
     .from('stripe_info')
     .select()
@@ -238,8 +243,9 @@ app.post('/', middlewareStripeWebhook(), async (c) => {
   }
 
   if (['created', 'succeeded', 'updated'].includes(stripeData.data.status ?? '') && stripeData.data.price_id && stripeData.data.product_id) {
+    const originalStatus = stripeData.data.status
     stripeData.data.status = 'succeeded'
-    await createdOrUpdated(c, stripeData, org, LogSnag)
+    await createdOrUpdated(c, stripeData, org, LogSnag, originalStatus!)
   }
   else if (stripeData.data.status === 'failed') {
     await trackBentoEvent(c, org.management_email, {}, 'org:failed_payment')

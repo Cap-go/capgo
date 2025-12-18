@@ -17,17 +17,6 @@ echo -e "${YELLOW}Cleaning up existing wrangler processes...${NC}"
 pkill -f "wrangler dev" || true
 sleep 2
 
-# Clean up D1 local database to ensure fresh state
-echo -e "${YELLOW}Cleaning up D1 local database (.wrangler)...${NC}"
-rm -rf .wrangler-shared
-mkdir -p .wrangler-shared
-echo -e "${GREEN}✓ D1 database cleaned${NC}"
-
-# Start D1 Sync worker on port 8790
-echo -e "${GREEN}Starting D1 Sync worker on port 8790...${NC}"
-(cd cloudflare_workers/d1_sync && bunx wrangler dev -c wrangler.jsonc --port 8790 --env-file=.env.local --env=local --persist-to ../../.wrangler-shared) &
-SYNC_PID=$!
-
 # Wait a bit for the sync worker to start
 sleep 3
 

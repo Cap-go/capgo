@@ -1,4 +1,4 @@
-import process from 'node:process'
+import { env } from 'node:process'
 import { app as download_link } from '../../supabase/functions/_backend/private/download_link.ts'
 import { app as files } from '../../supabase/functions/_backend/private/files.ts'
 import { app as upload_link } from '../../supabase/functions/_backend/private/upload_link.ts'
@@ -9,7 +9,7 @@ import { version } from '../../supabase/functions/_backend/utils/version.ts'
 export { AttachmentUploadHandler, UploadHandler } from '../../supabase/functions/_backend/tus/uploadHandler.ts'
 
 const functionName = 'files'
-const app = createHono(functionName, version, process.env.SENTRY_DSN)
+const app = createHono(functionName, version, env.SENTRY_DSN)
 
 // Files API
 app.route('/files', files)

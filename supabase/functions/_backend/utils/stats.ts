@@ -1,10 +1,12 @@
 import type { Context } from 'hono'
 import type { Database } from './supabase.types.ts'
-import type { DeviceWithoutCreatedAt, ReadDevicesParams, ReadStatsParams, StatsActions } from './types.ts'
+import type { DeviceRes, DeviceWithoutCreatedAt, ReadDevicesParams, ReadDevicesResponse, ReadStatsParams, StatsActions } from './types.ts'
+import { getRuntimeKey } from 'hono/adapter'
 import { countDevicesCF, countUpdatesFromLogsCF, countUpdatesFromLogsExternalCF, createIfNotExistStoreInfo, getAppsFromCF, getUpdateStatsCF, readBandwidthUsageCF, readDevicesCF, readDeviceUsageCF, readStatsCF, readStatsVersionCF, trackBandwidthUsageCF, trackDevicesCF, trackDeviceUsageCF, trackLogsCF, trackLogsCFExternal, trackVersionUsageCF, updateStoreApp } from './cloudflare.ts'
 import { simpleError200 } from './hono.ts'
 import { cloudlog } from './logging.ts'
 import { countDevicesSB, getAppsFromSB, getUpdateStatsSB, readBandwidthUsageSB, readDevicesSB, readDeviceUsageSB, readStatsSB, readStatsStorageSB, readStatsVersionSB, trackBandwidthUsageSB, trackDevicesSB, trackDeviceUsageSB, trackLogsSB, trackMetaSB, trackVersionUsageSB } from './supabase.ts'
+import { DEFAULT_LIMIT } from './types.ts'
 import { backgroundTask } from './utils.ts'
 
 export function createStatsMau(c: Context, device_id: string, app_id: string, org_id: string) {
@@ -74,9 +76,10 @@ export function createStatsLogs(c: Context, app_id: string, device_id: string, a
 }
 
 export function createStatsDevices(c: Context, device: DeviceWithoutCreatedAt) {
-  if (!c.env.DB_DEVICES)
+  // Use Analytics Engine DEVICE_INFO in workerd (Cloudflare Workers)
+  if (getRuntimeKey() !== 'workerd')
     return backgroundTask(c, trackDevicesSB(c, device))
-  // trackDevicesCF should always be as Background task as it write in D1
+  // trackDevicesCF writes to Analytics Engine (and D1 if available)
   return backgroundTask(c, trackDevicesCF(c, device))
 }
 
@@ -128,15 +131,32 @@ export function readStats(c: Context, params: ReadStatsParams) {
 }
 
 export function countDevices(c: Context, app_id: string, customIdMode: boolean) {
-  if (!c.env.DB_DEVICES)
+  // Use Analytics Engine DEVICE_INFO if available (via CF_ANALYTICS_TOKEN)
+  if (getRuntimeKey() !== 'workerd')
     return countDevicesSB(c, app_id, customIdMode)
   return countDevicesCF(c, app_id, customIdMode)
 }
 
-export function readDevices(c: Context, params: ReadDevicesParams, customIdMode: boolean) {
-  if (!c.env.DB_DEVICES)
-    return readDevicesSB(c, params, customIdMode)
-  return readDevicesCF(c, params, customIdMode)
+export async function readDevices(c: Context, params: ReadDevicesParams, customIdMode: boolean): Promise<ReadDevicesResponse> {
+  let results: DeviceRes[]
+  // Use Analytics Engine DEVICE_INFO if in workerd (Cloudflare Workers)
+  if (getRuntimeKey() !== 'workerd')
+    results = await readDevicesSB(c, params, customIdMode)
+  else
+    results = await readDevicesCF(c, params, customIdMode)
+
+  const limit = params.limit ?? DEFAULT_LIMIT
+  const hasMore = results.length > limit
+  const data = hasMore ? results.slice(0, limit) : results
+
+  // Build next cursor from last item
+  let nextCursor: string | undefined
+  if (hasMore && data.length > 0) {
+    const lastItem = data[data.length - 1]
+    nextCursor = `${lastItem.updated_at}|${lastItem.device_id}`
+  }
+
+  return { data, nextCursor, hasMore }
 }
 
 export async function countAllApps(c: Context): Promise<number> {

@@ -1,4 +1,5 @@
-import process from 'node:process'
+import { env } from 'node:process'
+import { app as admin_stats } from '../../supabase/functions/_backend/private/admin_stats.ts'
 import { app as config } from '../../supabase/functions/_backend/private/config.ts'
 import { app as create_device } from '../../supabase/functions/_backend/private/create_device.ts'
 import { app as credits } from '../../supabase/functions/_backend/private/credits.ts'
@@ -12,7 +13,6 @@ import { app as stats_priv } from '../../supabase/functions/_backend/private/sta
 import { app as storeTop } from '../../supabase/functions/_backend/private/store_top.ts'
 import { app as stripe_checkout } from '../../supabase/functions/_backend/private/stripe_checkout.ts'
 import { app as stripe_portal } from '../../supabase/functions/_backend/private/stripe_portal.ts'
-import { app as verify_replication } from '../../supabase/functions/_backend/private/verify_replication.ts'
 import { app as apikey } from '../../supabase/functions/_backend/public/apikey/index.ts'
 import { app as appEndpoint } from '../../supabase/functions/_backend/public/app/index.ts'
 import { app as build } from '../../supabase/functions/_backend/public/build/index.ts'
@@ -48,7 +48,7 @@ import { version } from '../../supabase/functions/_backend/utils/version.ts'
 
 // Public API
 const functionName = 'api'
-const app = createHono(functionName, version, process.env.SENTRY_DSN)
+const app = createHono(functionName, version, env.SENTRY_DSN)
 app.route('/ok', ok)
 app.route('/apikey', apikey)
 app.route('/bundle', bundle)
@@ -69,11 +69,11 @@ appPrivate.route('/website_stats', publicStats)
 appPrivate.route('/config', config)
 appPrivate.route('/devices', devices_priv)
 appPrivate.route('/log_as', log_as)
+appPrivate.route('/admin_stats', admin_stats)
 appPrivate.route('/stats', stats_priv)
 appPrivate.route('/stripe_checkout', stripe_checkout)
 appPrivate.route('/stripe_portal', stripe_portal)
 appPrivate.route('/delete_failed_version', deleted_failed_version)
-appPrivate.route('/verify_replication', verify_replication)
 appPrivate.route('/create_device', create_device)
 appPrivate.route('/events', events)
 
