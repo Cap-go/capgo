@@ -12,6 +12,7 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
+    AppAccess: typeof import('./components/dashboard/AppAccess.vue')['default']
     AppSetting: typeof import('./components/dashboard/AppSetting.vue')['default']
     AppTable: typeof import('./components/tables/AppTable.vue')['default']
     Banner: typeof import('./components/Banner.vue')['default']
@@ -62,6 +63,7 @@ declare module 'vue' {
 
 // For TSX support
 declare global {
+  const AppAccess: typeof import('./components/dashboard/AppAccess.vue')['default']
   const AppSetting: typeof import('./components/dashboard/AppSetting.vue')['default']
   const AppTable: typeof import('./components/tables/AppTable.vue')['default']
   const Banner: typeof import('./components/Banner.vue')['default']
