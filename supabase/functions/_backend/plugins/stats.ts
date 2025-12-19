@@ -11,7 +11,7 @@ import { cloudlog } from '../utils/logging.ts'
 import { sendNotifOrg } from '../utils/notifications.ts'
 import { closeClient, getAppOwnerPostgres, getAppVersionPostgres, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import { makeDevice, parsePluginBody } from '../utils/plugin_parser.ts'
-import { createStatsVersion, onPremStats, sendStatsAndDevice } from '../utils/stats.ts'
+import { createStatsLogs, createStatsVersion, onPremStats, sendStatsAndDevice } from '../utils/stats.ts'
 import { deviceIdRegex, INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, isLimited, MISSING_STRING_APP_ID, MISSING_STRING_DEVICE_ID, MISSING_STRING_PLATFORM, MISSING_STRING_VERSION_NAME, MISSING_STRING_VERSION_OS, NON_STRING_APP_ID, NON_STRING_DEVICE_ID, NON_STRING_PLATFORM, NON_STRING_VERSION_NAME, NON_STRING_VERSION_OS, reverseDomainRegex } from '../utils/utils.ts'
 import { ALLOWED_STATS_ACTIONS } from './stats_actions.ts'
 
@@ -126,7 +126,10 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
     }
   }
   statsActions.push({ action: action as Database['public']['Enums']['stats_action'] })
-  await sendStatsAndDevice(c, device, statsActions)
+
+  // Don't update device record on failure actions - the version_name in the request
+  // is the failed version, not the actual running version on the device
+  await sendStatsAndDevice(c, device, statsActions, action.endsWith('_fail'))
   return c.json(BRES)
 }
 
