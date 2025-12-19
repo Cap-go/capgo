@@ -846,6 +846,7 @@
   "platform-android": "Android",
   "platform-ios": "iOS",
   "public-key-prefix": "Açık anahtar (ilk 4 karakter)",
+  "cli-version": "CLI sürümü",
   "please-ask-the-user-to-create-account-first": "Lütfen kullanıcının önce hesap oluşturmasını isteyin.",
   "please-choose-your-p": "Lütfen tercihlerinizi seçin",
   "please-confirm-org-del": "Lütfen \"%1\" org'ı silmek istediğinizi, adını yazarak onaylayın.",

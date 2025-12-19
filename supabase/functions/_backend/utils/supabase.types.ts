@@ -97,6 +97,7 @@ export type Database = {
         Row: {
           app_id: string
           checksum: string | null
+          cli_version: string | null
           comment: string | null
           created_at: string | null
           deleted: boolean
@@ -121,6 +122,7 @@ export type Database = {
         Insert: {
           app_id: string
           checksum?: string | null
+          cli_version?: string | null
           comment?: string | null
           created_at?: string | null
           deleted?: boolean
@@ -145,6 +147,7 @@ export type Database = {
         Update: {
           app_id?: string
           checksum?: string | null
+          cli_version?: string | null
           comment?: string | null
           created_at?: string | null
           deleted?: boolean

@@ -846,6 +846,7 @@
   "platform-android": "Android",
   "platform-ios": "iOS",
   "public-key-prefix": "Öffentlicher Schlüssel (erste 4 Zeichen)",
+  "cli-version": "CLI-Version",
   "please-ask-the-user-to-create-account-first": "Bitte bitten Sie den Benutzer, zuerst ein Konto zu erstellen.",
   "please-choose-your-p": "Bitte wählen Sie Ihre Vorlieben",
   "please-confirm-org-del": "Bitte bestätigen Sie, dass Sie die Organisation \"%1\" löschen möchten, indem Sie ihren Namen eingeben.",

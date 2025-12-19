@@ -764,6 +764,12 @@ async function deleteBundle() {
               >
                 {{ version.key_id }}
               </InfoRow>
+              <!-- cli_version -->
+              <InfoRow
+                v-if="version.cli_version" :label="t('cli-version')"
+              >
+                {{ version.cli_version }}
+              </InfoRow>
               <!-- version.external_url -->
               <InfoRow
                 v-if="version.external_url" :label="t('url')" :is-link="true"
