@@ -361,3 +361,101 @@ ALTER FUNCTION public.get_total_metrics(uuid) OWNER TO "postgres";
 GRANT ALL ON FUNCTION public.get_total_metrics(uuid) TO "anon";
 GRANT ALL ON FUNCTION public.get_total_metrics(uuid) TO "authenticated";
 GRANT ALL ON FUNCTION public.get_total_metrics(uuid) TO "service_role";
+
+-- Step 8: Optimize get_orgs_v6(userid uuid)
+-- Problem: Calls 7+ functions per row (is_paying_org, is_trial_org, is_allowed_action_org, etc.)
+-- Each function queries orgs → stripe_info separately
+-- Solution: Single JOIN to stripe_info, compute all flags inline
+DROP FUNCTION IF EXISTS public.get_orgs_v6(uuid);
+
+CREATE FUNCTION public.get_orgs_v6(userid uuid)
+RETURNS TABLE (
+    gid uuid,
+    created_by uuid,
+    logo text,
+    name text,
+    role character varying,
+    paying boolean,
+    trial_left integer,
+    can_use_more boolean,
+    is_canceled boolean,
+    app_count bigint,
+    subscription_start timestamptz,
+    subscription_end timestamptz,
+    management_email text,
+    is_yearly boolean,
+    stats_updated_at timestamp without time zone,
+    next_stats_update_at timestamptz,
+    credit_available numeric,
+    credit_total numeric,
+    credit_next_expiration timestamptz
+) LANGUAGE plpgsql STABLE SECURITY DEFINER
+SET search_path = '' AS $$
+BEGIN
+  RETURN QUERY
+  WITH app_counts AS (
+    SELECT owner_org, COUNT(*) as cnt
+    FROM public.apps
+    GROUP BY owner_org
+  ),
+  -- Compute next stats update info for all paying orgs at once
+  paying_orgs_ordered AS (
+    SELECT
+      o.id,
+      ROW_NUMBER() OVER (ORDER BY o.id ASC) - 1 as preceding_count
+    FROM public.orgs o
+    JOIN public.stripe_info si ON o.customer_id = si.customer_id
+    WHERE (
+      (si.status = 'succeeded'
+        AND (si.canceled_at IS NULL OR si.canceled_at > now())
+        AND si.subscription_anchor_end > now())
+      OR si.trial_at > now()
+    )
+  )
+  SELECT
+    o.id AS gid,
+    o.created_by,
+    o.logo,
+    o.name,
+    ou.user_right::varchar AS role,
+    -- is_paying_org: status = 'succeeded'
+    (si.status = 'succeeded') AS paying,
+    -- is_trial_org: days left in trial
+    GREATEST(COALESCE((si.trial_at::date - now()::date), 0), 0)::integer AS trial_left,
+    -- is_allowed_action_org (= is_paying_and_good_plan_org): paying with good plan OR in trial
+    ((si.status = 'succeeded' AND si.is_good_plan = true) OR (si.trial_at::date - now()::date > 0)) AS can_use_more,
+    -- is_canceled_org: status = 'canceled'
+    (si.status = 'canceled') AS is_canceled,
+    -- app_count
+    COALESCE(ac.cnt, 0) AS app_count,
+    -- subscription dates (inlined get_cycle_info_org)
+    si.subscription_anchor_start AS subscription_start,
+    si.subscription_anchor_end AS subscription_end,
+    o.management_email,
+    -- is_org_yearly
+    COALESCE(si.price_id = p.price_y_id, false) AS is_yearly,
+    o.stats_updated_at,
+    -- get_next_stats_update_date (simplified - just add 4 min intervals based on position)
+    CASE
+      WHEN poo.id IS NOT NULL THEN
+        public.get_next_cron_time('0 3 * * *', now()) + make_interval(mins => poo.preceding_count::int * 4)
+      ELSE NULL
+    END AS next_stats_update_at,
+    COALESCE(ucb.available_credits, 0) AS credit_available,
+    COALESCE(ucb.total_credits, 0) AS credit_total,
+    ucb.next_expiration AS credit_next_expiration
+  FROM public.orgs o
+  JOIN public.org_users ou ON ou.user_id = userid AND o.id = ou.org_id
+  LEFT JOIN public.stripe_info si ON o.customer_id = si.customer_id
+  LEFT JOIN public.plans p ON si.product_id = p.stripe_id
+  LEFT JOIN app_counts ac ON ac.owner_org = o.id
+  LEFT JOIN public.usage_credit_balances ucb ON ucb.org_id = o.id
+  LEFT JOIN paying_orgs_ordered poo ON poo.id = o.id;
+END;
+$$;
+
+ALTER FUNCTION public.get_orgs_v6(uuid) OWNER TO "postgres";
+
+GRANT ALL ON FUNCTION public.get_orgs_v6(uuid) TO "anon";
+GRANT ALL ON FUNCTION public.get_orgs_v6(uuid) TO "authenticated";
+GRANT ALL ON FUNCTION public.get_orgs_v6(uuid) TO "service_role";
