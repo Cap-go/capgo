@@ -360,7 +360,7 @@ const processedChartData = computed<ChartData<'line'> | null>(() => {
       tension: 0.3,
       pointRadius: props.accumulated ? 0 : 2,
       pointBorderWidth: 0,
-      borderWidth: 1,
+      borderWidth: 2,
     } as ChartData<'line'>['datasets'][number]
     Object.assign(chartDataset, { metaBaseValues: tooltipBaseValues })
     datasets.push(chartDataset)
@@ -440,11 +440,14 @@ const chartOptions = computed<ChartOptions<'line'>>(() => {
   return {
     maintainAspectRatio: false,
     scales: createChartScales(isDark.value, {
-      suggestedMax: 100,
+      max: 110,
       xStacked: props.accumulated,
       yStacked: props.accumulated,
       yTickCallback: (tickValue: string | number) => {
         const numericValue = typeof tickValue === 'number' ? tickValue : Number(tickValue)
+        // Hide the 110% tick - it's only there for visual spacing
+        if (numericValue > 100)
+          return ''
         const display = Number.isFinite(numericValue) ? numericValue : tickValue
         return `${display}%`
       },
