@@ -357,6 +357,7 @@ onMounted(async () => {
       :accumulated="accumulated"
       :data-by-app="chartUpdateDataByAction"
       :app-names="actionDisplayNames"
+      :app-id="appId"
     />
   </ChartCard>
 </template>

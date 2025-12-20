@@ -74,11 +74,18 @@ let latestRequestToken = 0
 const totalDeployments = ref(0)
 const lastDayEvolution = ref(0)
 const deploymentData = ref<number[]>([])
+// For single app view: breakdown by channel
 const deploymentDataByChannel = ref<{ [channelId: string]: number[] }>({})
 const channelNames = ref<{ [channelId: string]: string }>({})
 const channelAppIds = ref<{ [channelId: string]: string }>({})
+// For dashboard view: breakdown by app
+const deploymentDataByApp = ref<{ [appId: string]: number[] }>({})
+const appNames = ref<{ [appId: string]: string }>({})
 const isLoading = ref(true)
 const hasData = computed(() => totalDeployments.value > 0)
+
+// Determine if we're in single app mode (show channels) or multi-app mode (show apps)
+const isSingleAppMode = computed(() => !!props.appId)
 
 // Per-org cache for raw API data: Map<orgId, {data, channelNames, channelAppIds}>
 const cacheByOrg = new Map<string, { data: any[], channelNames: { [channelId: string]: string }, channelAppIds: { [channelId: string]: string } }>()
@@ -97,6 +104,8 @@ async function calculateStats(forceRefetch = false) {
   deploymentDataByChannel.value = {}
   channelNames.value = {}
   channelAppIds.value = {}
+  deploymentDataByApp.value = {}
+  appNames.value = {}
   deploymentData.value = []
 
   const fallbackData = Array.from({ length: 30 }).fill(0) as number[]
@@ -150,6 +159,8 @@ async function calculateStats(forceRefetch = false) {
         deploymentDataByChannel.value = {}
         channelNames.value = {}
         channelAppIds.value = {}
+        deploymentDataByApp.value = {}
+        appNames.value = {}
       }
       return
     }
@@ -213,6 +224,10 @@ async function calculateStats(forceRefetch = false) {
       perChannel[channelId] = Array.from({ length: 30 }).fill(0) as number[]
     })
 
+    // Create fresh arrays for processing per app (multi-app mode)
+    const perApp: { [appId: string]: number[] } = {}
+    const localAppNames: { [appId: string]: string } = {}
+
     if (data && data.length > 0) {
       data.forEach((deployment: any) => {
         if (!deployment.deployed_at || !deployment.channel_id)
@@ -234,11 +249,22 @@ async function calculateStats(forceRefetch = false) {
           perChannel[deployment.channel_id] = Array.from({ length: 30 }).fill(0) as number[]
         }
         perChannel[deployment.channel_id][daysDiff] += 1
+
+        // For multi-app mode: aggregate by app_id
+        if (!isSingleAppMode.value && deployment.app_id) {
+          if (!perApp[deployment.app_id]) {
+            perApp[deployment.app_id] = Array.from({ length: 30 }).fill(0) as number[]
+            // Get app name from dashboardAppsStore
+            localAppNames[deployment.app_id] = dashboardAppsStore.appNames[deployment.app_id] || deployment.app_id
+          }
+          perApp[deployment.app_id][daysDiff] += 1
+        }
       })
     }
 
     let finalDeploymentData = dailyCounts30Days
     let finalPerChannel = perChannel
+    let finalPerApp = perApp
     let finalTotal = totalDeploymentsCount
 
     if (props.useBillingPeriod) {
@@ -251,6 +277,14 @@ async function calculateStats(forceRefetch = false) {
         filteredPerChannel[channelId] = filteredChannelData.data
       })
       finalPerChannel = filteredPerChannel
+
+      const filteredPerApp: { [appId: string]: number[] } = {}
+      Object.keys(perApp).forEach((appId) => {
+        const filteredAppData = filterToBillingPeriod(perApp[appId], last30DaysStart, billingStart)
+        filteredPerApp[appId] = filteredAppData.data
+      })
+      finalPerApp = filteredPerApp
+
       finalTotal = finalDeploymentData.reduce((sum, count) => sum + count, 0)
     }
 
@@ -270,6 +304,8 @@ async function calculateStats(forceRefetch = false) {
     deploymentDataByChannel.value = finalPerChannel
     channelNames.value = { ...localChannelNames }
     channelAppIds.value = { ...localChannelAppIds }
+    deploymentDataByApp.value = finalPerApp
+    appNames.value = { ...localAppNames }
     totalDeployments.value = finalTotal
     lastDayEvolution.value = evolution
   }
@@ -280,6 +316,8 @@ async function calculateStats(forceRefetch = false) {
       deploymentDataByChannel.value = {}
       channelNames.value = {}
       channelAppIds.value = {}
+      deploymentDataByApp.value = {}
+      appNames.value = {}
       totalDeployments.value = 0
       lastDayEvolution.value = 0
     }
@@ -340,15 +378,17 @@ onMounted(async () => {
     :has-data="hasData"
   >
     <DeploymentStatsChart
-      :key="JSON.stringify(deploymentDataByChannel)"
+      :key="isSingleAppMode ? JSON.stringify(deploymentDataByChannel) : JSON.stringify(deploymentDataByApp)"
       :title="t('deployment_statistics')"
       :colors="colors.blue"
       :data="deploymentData"
       :use-billing-period="useBillingPeriod"
       :accumulated="accumulated"
-      :data-by-channel="deploymentDataByChannel"
-      :channel-names="channelNames"
-      :channel-app-ids="channelAppIds"
+      :data-by-channel="isSingleAppMode ? deploymentDataByChannel : {}"
+      :channel-names="isSingleAppMode ? channelNames : {}"
+      :channel-app-ids="isSingleAppMode ? channelAppIds : {}"
+      :data-by-app="!isSingleAppMode ? deploymentDataByApp : {}"
+      :app-names="!isSingleAppMode ? appNames : {}"
     />
   </ChartCard>
 </template>

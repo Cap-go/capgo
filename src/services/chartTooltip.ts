@@ -16,7 +16,7 @@ interface ProcessedTooltipItem {
 }
 
 export interface TooltipClickHandler {
-  onAppClick?: (appId: string) => void
+  onAppClick?: (appId: string, clickContext?: { date: Date, dataIndex: number }) => void
   appIdByLabel?: Record<string, string> // Maps app label/name to app ID
 }
 
@@ -285,10 +285,10 @@ export function createCustomTooltip(context: TooltipContext, isAccumulated: bool
           element.addEventListener('mouseleave', () => {
             element.style.backgroundColor = 'transparent'
           })
-          // Add click handler
+          // Add click handler with date context
           element.addEventListener('click', (e) => {
             e.stopPropagation()
-            clickHandler.onAppClick!(appId)
+            clickHandler.onAppClick!(appId, { date: tooltipDate, dataIndex })
             // Hide tooltip after click
             tooltipEl.style.opacity = '0'
           })
