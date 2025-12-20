@@ -49,7 +49,7 @@ BEGIN
   SELECT p.name INTO v_plan_name
   FROM public.plans p
   WHERE p.stripe_id = v_product_id;
-
+ 
   -- Early exit for Enterprise plans (skip expensive metrics calculation)
   IF v_plan_name = 'Enterprise' THEN
     RETURN TRUE;
@@ -118,7 +118,6 @@ RETURNS TABLE (
 ) LANGUAGE plpgsql STABLE SECURITY DEFINER
 SET search_path = '' AS $$
 DECLARE
-  v_product_id text;
   v_start_date date;
   v_end_date date;
   v_plan_mau bigint;
@@ -133,14 +132,13 @@ DECLARE
 BEGIN
   -- Single query for org/stripe info and plan limits
   SELECT
-    si.product_id,
     si.subscription_anchor_start::date,
     si.subscription_anchor_end::date,
     p.mau,
     p.bandwidth,
     p.storage,
     p.build_time_unit
-  INTO v_product_id, v_start_date, v_end_date,
+  INTO v_start_date, v_end_date,
        v_plan_mau, v_plan_bandwidth, v_plan_storage, v_plan_build_time
   FROM public.orgs o
   LEFT JOIN public.stripe_info si ON o.customer_id = si.customer_id
