@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { ChartData, ChartOptions, Plugin } from 'chart.js'
+import type { TooltipClickHandler } from '~/services/chartTooltip'
 import { useDark } from '@vueuse/core'
 import {
   BarController,
@@ -15,6 +16,7 @@ import {
 import { computed } from 'vue'
 import { Bar, Line } from 'vue-chartjs'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
 import { createLegendConfig, createStackedChartScales } from '~/services/chartConfig'
 import { createTooltipConfig, todayLinePlugin, verticalLinePlugin } from '~/services/chartTooltip'
 import { generateMonthDays, getDaysInCurrentMonth } from '~/services/date'
@@ -25,14 +27,16 @@ const props = defineProps({
   colors: { type: Object, default: () => ({}) },
   limits: { type: Object, default: () => ({}) },
   data: { type: Array, default: () => Array.from({ length: getDaysInCurrentMonth() }).fill(0) as number[] },
-  dataByApp: { type: Object, default: () => ({}) },
-  appNames: { type: Object, default: () => ({}) },
+  dataByChannel: { type: Object, default: () => ({}) },
+  channelNames: { type: Object, default: () => ({}) },
+  channelAppIds: { type: Object, default: () => ({}) },
   useBillingPeriod: { type: Boolean, default: true },
   accumulated: { type: Boolean, default: false },
 })
 
 const isDark = useDark()
 const { t } = useI18n()
+const router = useRouter()
 const organizationStore = useOrganizationStore()
 const cycleStart = new Date(organizationStore.currentOrganization?.subscription_start ?? new Date())
 const cycleEnd = new Date(organizationStore.currentOrganization?.subscription_end ?? new Date())
@@ -41,6 +45,26 @@ cycleStart.setHours(0, 0, 0, 0)
 cycleEnd.setHours(0, 0, 0, 0)
 
 const DAY_IN_MS = 1000 * 60 * 60 * 24
+
+// Create a reverse mapping from channel name to channel ID for tooltip clicks
+const channelIdByLabel = computed(() => {
+  const mapping: Record<string, string> = {}
+  Object.entries(props.channelNames as Record<string, string>).forEach(([channelId, channelName]) => {
+    mapping[channelName] = channelId
+  })
+  return mapping
+})
+
+// Click handler for tooltip items - navigates to channel page
+const tooltipClickHandler = computed<TooltipClickHandler>(() => ({
+  onAppClick: (channelId: string) => {
+    const appId = (props.channelAppIds as Record<string, string>)[channelId]
+    if (appId) {
+      router.push(`/app/${appId}/channel/${channelId}`)
+    }
+  },
+  appIdByLabel: channelIdByLabel.value,
+}))
 
 Chart.register(
   Tooltip,
@@ -104,10 +128,10 @@ function monthdays() {
 }
 
 // Generate infinite distinct pastel colors starting with blue
-function generateAppColors(appCount: number) {
+function generateChannelColors(channelCount: number) {
   const colors = []
 
-  for (let i = 0; i < appCount; i++) {
+  for (let i = 0; i < channelCount; i++) {
     // Start with blue (210°) and use golden ratio for distribution
     const hue = (210 + i * 137.508) % 360 // Start at blue, then golden angle
 
@@ -124,12 +148,12 @@ function generateAppColors(appCount: number) {
 }
 
 const chartData = computed<ChartData<any>>(() => {
-  const appIds = Object.keys(props.dataByApp)
+  const channelIds = Object.keys(props.dataByChannel)
   const labels = monthdays()
   const labelCount = labels.length
 
-  if (appIds.length === 0) {
-    // Single app view - show total deployments
+  if (channelIds.length === 0) {
+    // No channel data - show total deployments
     let backgroundColor: string
     let borderColor: string
     let processed: { display: Array<number | null>, base: Array<number | null> }
@@ -174,10 +198,10 @@ const chartData = computed<ChartData<any>>(() => {
     }
   }
 
-  // Multiple apps view - show breakdown by app
-  const appColors = generateAppColors(appIds.length)
-  const datasets = appIds.map((appId, index) => {
-    const appData = props.dataByApp[appId] as number[]
+  // Multiple channels view - show breakdown by channel
+  const channelColors = generateChannelColors(channelIds.length)
+  const datasets = channelIds.map((channelId, index) => {
+    const channelData = props.dataByChannel[channelId] as number[]
 
     let backgroundColor: string
     let borderColor: string
@@ -185,7 +209,7 @@ const chartData = computed<ChartData<any>>(() => {
 
     // Process data for cumulative mode
     if (props.accumulated) {
-      processed = transformSeries(appData, true, labelCount)
+      processed = transformSeries(channelData, true, labelCount)
       // Use LineChartStats color scheme for line mode
       const hue = (210 + index * 137.508) % 360
       const saturation = 50 + (index % 3) * 8
@@ -194,9 +218,9 @@ const chartData = computed<ChartData<any>>(() => {
       backgroundColor = `hsla(${hue}, ${saturation}%, ${lightness}%, 0.6)`
     }
     else {
-      processed = transformSeries(appData, false, labelCount)
+      processed = transformSeries(channelData, false, labelCount)
       // Use existing bar chart colors for bar mode
-      backgroundColor = appColors[index]
+      backgroundColor = channelColors[index]
       borderColor = backgroundColor.replace('hsla', 'hsl').replace(', 0.8)', ')').replace(/(\d+)%\)/, (_, lightness) => {
         const newLightness = Math.max(Number(lightness) - 15, 30)
         return `${newLightness}%)`
@@ -204,7 +228,7 @@ const chartData = computed<ChartData<any>>(() => {
     }
 
     const baseDataset: any = {
-      label: props.appNames[appId] || appId,
+      label: props.channelNames[channelId] || channelId,
       data: processed.display,
       backgroundColor,
       borderColor,
@@ -258,7 +282,7 @@ const todayLineOptions = computed(() => {
 })
 
 const chartOptions = computed(() => {
-  const datasetCount = Object.keys(props.dataByApp).length
+  const datasetCount = Object.keys(props.dataByChannel).length
   const hasMultipleDatasets = datasetCount > 0
   const stacked = hasMultipleDatasets
 
@@ -270,7 +294,7 @@ const chartOptions = computed(() => {
       title: {
         display: false,
       },
-      tooltip: createTooltipConfig(hasMultipleDatasets, props.accumulated, props.useBillingPeriod ? cycleStart : false),
+      tooltip: createTooltipConfig(hasMultipleDatasets, props.accumulated, props.useBillingPeriod ? cycleStart : false, hasMultipleDatasets ? tooltipClickHandler.value : undefined),
       todayLine: todayLineOptions.value,
     },
   }

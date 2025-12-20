@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { ChartData, ChartOptions, Plugin } from 'chart.js'
 import type { AnnotationOptions } from '../../services/chartAnnotations'
+import type { TooltipClickHandler } from '../../services/chartTooltip'
 import { useDark } from '@vueuse/core'
 import {
   BarController,
@@ -17,6 +18,7 @@ import {
 import { computed } from 'vue'
 import { Bar, Line } from 'vue-chartjs'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
 import { createLegendConfig, createStackedChartScales } from '~/services/chartConfig'
 import { generateMonthDays, getCurrentDayMonth, getDaysInCurrentMonth } from '~/services/date'
 import { useOrganizationStore } from '~/stores/organization'
@@ -47,12 +49,31 @@ const props = defineProps({
 })
 const isDark = useDark()
 const { t } = useI18n()
+const router = useRouter()
 const organizationStore = useOrganizationStore()
 const cycleStart = new Date(organizationStore.currentOrganization?.subscription_start ?? new Date())
 const cycleEnd = new Date(organizationStore.currentOrganization?.subscription_end ?? new Date())
 // Reset to start of day for consistent date handling
 cycleStart.setHours(0, 0, 0, 0)
 cycleEnd.setHours(0, 0, 0, 0)
+
+// Create a reverse mapping from app name to app ID for tooltip clicks
+const appIdByLabel = computed(() => {
+  const mapping: Record<string, string> = {}
+  // appNames prop is { appId: appName }, we need { appName: appId }
+  Object.entries(props.appNames as Record<string, string>).forEach(([appId, appName]) => {
+    mapping[appName] = appId
+  })
+  return mapping
+})
+
+// Click handler for tooltip items - navigates to app detail page
+const tooltipClickHandler = computed<TooltipClickHandler>(() => ({
+  onAppClick: (appId: string) => {
+    router.push(`/app/${appId}`)
+  },
+  appIdByLabel: appIdByLabel.value,
+}))
 
 // View mode is now controlled by parent component
 const viewMode = computed(() => props.accumulated ? 'cumulative' : 'daily')
@@ -374,7 +395,7 @@ const chartOptions = computed<ChartOptions & { plugins: { inlineAnnotationPlugin
       title: {
         display: false,
       },
-      tooltip: createTooltipConfig(hasAppData, props.accumulated, props.useBillingPeriod ? cycleStart : false),
+      tooltip: createTooltipConfig(hasAppData, props.accumulated, props.useBillingPeriod ? cycleStart : false, hasAppData ? tooltipClickHandler.value : undefined),
       filler: {
         propagate: false,
       },
