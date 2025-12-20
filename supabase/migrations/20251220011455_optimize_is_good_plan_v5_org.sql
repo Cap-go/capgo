@@ -34,16 +34,24 @@ DECLARE
   v_end_date date;
   v_plan_name text;
   total_metrics RECORD;
+  v_anchor_day INTERVAL;
 BEGIN
-  -- Single query for all org/stripe info (eliminates 2 separate subqueries)
+  -- Get product_id and calculate current billing cycle (properly inlined get_cycle_info_org)
   SELECT
     si.product_id,
-    si.subscription_anchor_start::date,
-    si.subscription_anchor_end::date
-  INTO v_product_id, v_start_date, v_end_date
+    COALESCE(si.subscription_anchor_start - date_trunc('MONTH', si.subscription_anchor_start), '0 DAYS'::INTERVAL)
+  INTO v_product_id, v_anchor_day
   FROM public.orgs o
   LEFT JOIN public.stripe_info si ON o.customer_id = si.customer_id
   WHERE o.id = orgid;
+
+  -- Calculate current billing cycle dates based on anchor day
+  IF v_anchor_day > now() - date_trunc('MONTH', now()) THEN
+    v_start_date := (date_trunc('MONTH', now() - INTERVAL '1 MONTH') + v_anchor_day)::date;
+  ELSE
+    v_start_date := (date_trunc('MONTH', now()) + v_anchor_day)::date;
+  END IF;
+  v_end_date := (v_start_date + INTERVAL '1 MONTH')::date;
 
   -- Get plan name directly (inlined, avoids get_current_plan_name_org function call)
   SELECT p.name INTO v_plan_name
@@ -124,26 +132,33 @@ DECLARE
   v_plan_bandwidth bigint;
   v_plan_storage bigint;
   v_plan_build_time bigint;
+  v_anchor_day INTERVAL;
   total_stats RECORD;
   percent_mau double precision;
   percent_bandwidth double precision;
   percent_storage double precision;
   percent_build_time double precision;
 BEGIN
-  -- Single query for org/stripe info and plan limits
+  -- Single query for org/stripe info and plan limits (get anchor day for cycle calculation)
   SELECT
-    si.subscription_anchor_start::date,
-    si.subscription_anchor_end::date,
+    COALESCE(si.subscription_anchor_start - date_trunc('MONTH', si.subscription_anchor_start), '0 DAYS'::INTERVAL),
     p.mau,
     p.bandwidth,
     p.storage,
     p.build_time_unit
-  INTO v_start_date, v_end_date,
-       v_plan_mau, v_plan_bandwidth, v_plan_storage, v_plan_build_time
+  INTO v_anchor_day, v_plan_mau, v_plan_bandwidth, v_plan_storage, v_plan_build_time
   FROM public.orgs o
   LEFT JOIN public.stripe_info si ON o.customer_id = si.customer_id
   LEFT JOIN public.plans p ON si.product_id = p.stripe_id
   WHERE o.id = orgid;
+
+  -- Calculate current billing cycle dates based on anchor day
+  IF v_anchor_day > now() - date_trunc('MONTH', now()) THEN
+    v_start_date := (date_trunc('MONTH', now() - INTERVAL '1 MONTH') + v_anchor_day)::date;
+  ELSE
+    v_start_date := (date_trunc('MONTH', now()) + v_anchor_day)::date;
+  END IF;
+  v_end_date := (v_start_date + INTERVAL '1 MONTH')::date;
 
   -- Get metrics using optimized function
   SELECT * INTO total_stats
@@ -342,15 +357,23 @@ SET search_path = '' AS $$
 DECLARE
     v_start_date date;
     v_end_date date;
+    v_anchor_day INTERVAL;
 BEGIN
-    -- Get cycle dates in single query (inlined get_cycle_info_org)
+    -- Get anchor day for cycle calculation (properly inlined get_cycle_info_org)
     SELECT
-        si.subscription_anchor_start::date,
-        si.subscription_anchor_end::date
-    INTO v_start_date, v_end_date
+        COALESCE(si.subscription_anchor_start - date_trunc('MONTH', si.subscription_anchor_start), '0 DAYS'::INTERVAL)
+    INTO v_anchor_day
     FROM public.orgs o
     LEFT JOIN public.stripe_info si ON o.customer_id = si.customer_id
     WHERE o.id = org_id;
+
+    -- Calculate current billing cycle dates based on anchor day
+    IF v_anchor_day > now() - date_trunc('MONTH', now()) THEN
+        v_start_date := (date_trunc('MONTH', now() - INTERVAL '1 MONTH') + v_anchor_day)::date;
+    ELSE
+        v_start_date := (date_trunc('MONTH', now()) + v_anchor_day)::date;
+    END IF;
+    v_end_date := (v_start_date + INTERVAL '1 MONTH')::date;
 
     RETURN QUERY SELECT * FROM public.get_total_metrics(org_id, v_start_date, v_end_date);
 END;
@@ -411,6 +434,24 @@ BEGIN
         AND si.subscription_anchor_end > now())
       OR si.trial_at > now()
     )
+  ),
+  -- Calculate current billing cycle for each org (properly inlined get_cycle_info_org logic)
+  -- anchor_day = day of month when billing cycle starts (extracted from original subscription_anchor_start)
+  -- If we're before anchor_day this month, cycle started last month; otherwise cycle started this month
+  billing_cycles AS (
+    SELECT
+      o.id AS org_id,
+      -- Calculate cycle_start based on anchor day and current date
+      CASE
+        WHEN COALESCE(si.subscription_anchor_start - date_trunc('MONTH', si.subscription_anchor_start), '0 DAYS'::INTERVAL)
+             > now() - date_trunc('MONTH', now())
+        THEN date_trunc('MONTH', now() - INTERVAL '1 MONTH')
+             + COALESCE(si.subscription_anchor_start - date_trunc('MONTH', si.subscription_anchor_start), '0 DAYS'::INTERVAL)
+        ELSE date_trunc('MONTH', now())
+             + COALESCE(si.subscription_anchor_start - date_trunc('MONTH', si.subscription_anchor_start), '0 DAYS'::INTERVAL)
+      END AS cycle_start
+    FROM public.orgs o
+    LEFT JOIN public.stripe_info si ON o.customer_id = si.customer_id
   )
   SELECT
     o.id AS gid,
@@ -428,9 +469,9 @@ BEGIN
     (si.status = 'canceled') AS is_canceled,
     -- app_count
     COALESCE(ac.cnt, 0) AS app_count,
-    -- subscription dates (inlined get_cycle_info_org)
-    si.subscription_anchor_start AS subscription_start,
-    si.subscription_anchor_end AS subscription_end,
+    -- subscription dates (properly calculated current billing cycle)
+    bc.cycle_start AS subscription_start,
+    (bc.cycle_start + INTERVAL '1 MONTH') AS subscription_end,
     o.management_email,
     -- is_org_yearly
     COALESCE(si.price_id = p.price_y_id, false) AS is_yearly,
@@ -450,7 +491,8 @@ BEGIN
   LEFT JOIN public.plans p ON si.product_id = p.stripe_id
   LEFT JOIN app_counts ac ON ac.owner_org = o.id
   LEFT JOIN public.usage_credit_balances ucb ON ucb.org_id = o.id
-  LEFT JOIN paying_orgs_ordered poo ON poo.id = o.id;
+  LEFT JOIN paying_orgs_ordered poo ON poo.id = o.id
+  LEFT JOIN billing_cycles bc ON bc.org_id = o.id;
 END;
 $$;
 
