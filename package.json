@@ -60,6 +60,7 @@
     "lint:fix": "eslint \"src/**/*.{vue,ts,js}\" --fix",
     "lint:backend": "eslint \"supabase/**/*.{vue,ts,js}\"",
     "lint:sql": "sqlfluff fix --dialect postgres",
+    "schemas": "bunx supabase db dump > supabase/schemas/prod.sql",
     "types": "bun ./scripts/getTypes.mjs",
     "types:dev": "BRANCH=development bun ./scripts/getTypes.mjs",
     "types:local": "BRANCH=local bun ./scripts/getTypes.mjs",
