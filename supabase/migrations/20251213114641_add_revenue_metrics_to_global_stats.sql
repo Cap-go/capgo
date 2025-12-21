@@ -3,7 +3,7 @@
 
 -- Revenue metrics (in dollars)
 ALTER TABLE public.global_stats
-ADD COLUMN mrrr double precision DEFAULT 0 NOT NULL;
+ADD COLUMN mrr double precision DEFAULT 0 NOT NULL;
 
 ALTER TABLE public.global_stats
 ADD COLUMN total_revenue double precision DEFAULT 0 NOT NULL;
@@ -60,7 +60,7 @@ ALTER TABLE public.global_stats
 ADD COLUMN credits_consumed bigint DEFAULT 0 NOT NULL;
 
 -- Comments
-COMMENT ON COLUMN public.global_stats.mrrr IS 'Total Monthly Recurring Revenue in dollars';
+COMMENT ON COLUMN public.global_stats.mrr IS 'Total Monthly Recurring Revenue in dollars';
 COMMENT ON COLUMN public.global_stats.total_revenue IS 'Total Annual Recurring Revenue (ARR) in dollars';
 COMMENT ON COLUMN public.global_stats.revenue_solo IS 'Solo plan ARR in dollars';
 COMMENT ON COLUMN public.global_stats.revenue_maker IS 'Maker plan ARR in dollars';

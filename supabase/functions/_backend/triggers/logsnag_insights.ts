@@ -13,7 +13,7 @@ interface PlanTotal { [key: string]: number }
 interface Actives { users: number, apps: number }
 interface CustomerCount { total: number, yearly: number, monthly: number }
 interface PlanRevenue {
-  mrrr: number
+  mrr: number
   total_revenue: number
   revenue_solo: number
   revenue_maker: number
@@ -70,7 +70,7 @@ async function calculateRevenue(c: Context): Promise<PlanRevenue> {
     if (plansError || !plansData) {
       cloudlogErr({ requestId: c.get('requestId'), message: 'Failed to fetch plan prices', error: plansError })
       return {
-        mrrr: 0,
+        mrr: 0,
         total_revenue: 0,
         revenue_solo: 0,
         revenue_maker: 0,
@@ -114,7 +114,7 @@ async function calculateRevenue(c: Context): Promise<PlanRevenue> {
     if (subsError || !subsData) {
       cloudlogErr({ requestId: c.get('requestId'), message: 'Failed to fetch subscriptions', error: subsError })
       return {
-        mrrr: 0,
+        mrr: 0,
         total_revenue: 0,
         revenue_solo: 0,
         revenue_maker: 0,
@@ -190,7 +190,7 @@ async function calculateRevenue(c: Context): Promise<PlanRevenue> {
     const totalARR = totalMRR * 12
 
     return {
-      mrrr: totalMRR,
+      mrr: totalMRR,
       total_revenue: totalARR,
       revenue_solo: soloARR,
       revenue_maker: makerARR,
@@ -209,7 +209,7 @@ async function calculateRevenue(c: Context): Promise<PlanRevenue> {
   catch (e) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'calculateRevenue error', error: e })
     return {
-      mrrr: 0,
+      mrr: 0,
       total_revenue: 0,
       revenue_solo: 0,
       revenue_maker: 0,
@@ -476,7 +476,7 @@ app.post('/', middlewareAPISecret, async (c) => {
     plan_team: plans.Team,
     plan_enterprise: plans.Enterprise || 0,
     // Revenue metrics
-    mrrr: revenue.mrrr,
+    mrr: revenue.mrr,
     total_revenue: revenue.total_revenue,
     revenue_solo: revenue.revenue_solo,
     revenue_maker: revenue.revenue_maker,
