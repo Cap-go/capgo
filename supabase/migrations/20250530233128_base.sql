@@ -3631,7 +3631,7 @@ CREATE TABLE IF NOT EXISTS "public"."manifest" (
   "file_size" bigint DEFAULT 0
 );
 
-ALTER TABLE manifest SET (
+ALTER TABLE "public"."manifest" SET (
   autovacuum_vacuum_scale_factor = 0.05,  -- vacuum after 5% dead rows (default 20%)
   autovacuum_analyze_scale_factor = 0.02  -- analyze after 2% changes
 );
