@@ -64,17 +64,17 @@ export function getDatabaseURL(c: Context, readOnly = false): string {
     // Hyperdrive main read replica regional routing in Cloudflare Workers
     // When using Hyperdrive we use session databases directly to avoid supabase pooler overhead and allow prepared statements
     // Asia region
-    if (c.env.HYPERDRIVE_CAPGO_DIRECT_AS && dbRegion === 'AS') {
-      c.header('X-Database-Source', 'HYPERDRIVE_CAPGO_DIRECT_AS')
-      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_DIRECT_AS for read-only' })
-      return c.env.HYPERDRIVE_CAPGO_DIRECT_AS.connectionString
-    }
-    // US region
-    if (c.env.HYPERDRIVE_CAPGO_DIRECT_NA && dbRegion === 'NA') {
-      c.header('X-Database-Source', 'HYPERDRIVE_CAPGO_DIRECT_NA')
-      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_DIRECT_NA for read-only' })
-      return c.env.HYPERDRIVE_CAPGO_DIRECT_NA.connectionString
-    }
+    // if (c.env.HYPERDRIVE_CAPGO_DIRECT_AS && dbRegion === 'AS') {
+    //   c.header('X-Database-Source', 'HYPERDRIVE_CAPGO_DIRECT_AS')
+    //   cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_DIRECT_AS for read-only' })
+    //   return c.env.HYPERDRIVE_CAPGO_DIRECT_AS.connectionString
+    // }
+    // // US region
+    // if (c.env.HYPERDRIVE_CAPGO_DIRECT_NA && dbRegion === 'NA') {
+    //   c.header('X-Database-Source', 'HYPERDRIVE_CAPGO_DIRECT_NA')
+    //   cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_DIRECT_NA for read-only' })
+    //   return c.env.HYPERDRIVE_CAPGO_DIRECT_NA.connectionString
+    // }
 
     // Custom Supabase Region Read replicate Poolers
     // Asia region
