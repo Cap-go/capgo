@@ -30,21 +30,18 @@ ADD VALUE IF NOT EXISTS 'build_time';
 
 -- Build logs - BILLING ONLY: tracks build time for charging orgs
 -- Platform multipliers: android=1x, ios=2x
-CREATE TABLE IF NOT EXISTS public.build_logs (
-    id uuid DEFAULT extensions.uuid_generate_v4() PRIMARY KEY,
-    created_at timestamptz DEFAULT now() NOT NULL,
-    -- Who to bill
-    org_id uuid NOT NULL REFERENCES public.orgs (id) ON DELETE CASCADE,
-    user_id uuid REFERENCES auth.users (id) ON DELETE SET NULL,
-    -- External reference
-    build_id character varying NOT NULL,
-    -- Raw build time
-    platform character varying NOT NULL CHECK (platform IN ('ios', 'android')),
-    build_time_unit bigint NOT NULL CHECK (build_time_unit >= 0),
-    -- Billable amount (with platform multiplier applied: android=1x, ios=2x)
-    -- This locks in the price at time of build
-    billable_seconds bigint NOT NULL CHECK (billable_seconds >= 0),
-    UNIQUE (build_id, org_id)
+CREATE TABLE IF NOT EXISTS "public"."build_logs" (
+    "id" "uuid" DEFAULT "extensions"."uuid_generate_v4"() NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "org_id" "uuid" NOT NULL,
+    "user_id" "uuid",
+    "build_id" character varying NOT NULL,
+    "platform" character varying NOT NULL,
+    "billable_seconds" bigint NOT NULL,
+    "build_time_unit" bigint NOT NULL,
+    CONSTRAINT "build_logs_billable_seconds_check" CHECK (("billable_seconds" >= 0)),
+    CONSTRAINT "build_logs_build_time_unit_check" CHECK (("build_time_unit" >= 0)),
+    CONSTRAINT "build_logs_platform_check" CHECK ((("platform")::"text" = ANY ((ARRAY['ios'::character varying, 'android'::character varying])::"text"[])))
 );
 
 CREATE INDEX idx_build_logs_org_created ON public.build_logs (
