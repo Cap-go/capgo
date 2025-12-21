@@ -790,14 +790,12 @@ CREATE OR REPLACE FUNCTION "public"."check_org_user_privileges"() RETURNS "trigg
 
   IF NEW.user_right IS NOT DISTINCT FROM 'super_admin'::"public"."user_min_right"
   THEN
-    PERFORM public.pg_log('deny: ELEVATE_SUPER_ADMIN', jsonb_build_object('org_id', NEW.org_id, 'uid', auth.uid()));
-    RAISE EXCEPTION 'Admins cannot elevate privilages!';
+    RAISE EXCEPTION 'Admins cannot elevate privileges!';
   END IF;
 
   IF NEW.user_right IS NOT DISTINCT FROM 'invite_super_admin'::"public"."user_min_right"
   THEN
-    PERFORM public.pg_log('deny: ELEVATE_INVITE_SUPER_ADMIN', jsonb_build_object('org_id', NEW.org_id, 'uid', auth.uid()));
-    RAISE EXCEPTION 'Admins cannot elevate privilages!';
+    RAISE EXCEPTION 'Admins cannot elevate privileges!';
   END IF;
 
   RETURN NEW;
@@ -930,11 +928,20 @@ CREATE OR REPLACE FUNCTION "public"."convert_number_to_percent"("val" double pre
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
     AS $$
+DECLARE
+  percentage numeric;
 BEGIN
   IF max_val = 0 THEN
     RETURN 0;
   ELSE
-    RETURN floor(((val * 100) / max_val)::numeric);
+    percentage := ((val * 100) / max_val)::numeric;
+    -- Add small epsilon for positive values to handle floating-point errors
+    -- Subtract epsilon for negative values
+    IF percentage >= 0 THEN
+      RETURN trunc(percentage + 0.0001, 0);
+    ELSE
+      RETURN trunc(percentage - 0.0001, 0);
+    END IF;
   END IF;
 END;
 $$;
@@ -1392,7 +1399,7 @@ ALTER FUNCTION "public"."exist_app_v2"("appid" character varying) OWNER TO "post
 
 CREATE OR REPLACE FUNCTION "public"."exist_app_versions"("appid" character varying, "name_version" character varying) RETURNS boolean
     LANGUAGE "plpgsql"
-    SET "search_path" TO 'public'
+    SET "search_path" TO ''
     AS $$
 Begin
   RETURN (SELECT EXISTS (SELECT 1
@@ -1572,7 +1579,7 @@ ALTER FUNCTION "public"."generate_org_user_on_org_create"() OWNER TO "postgres";
 
 CREATE OR REPLACE FUNCTION "public"."get_account_removal_date"("user_id" "uuid") RETURNS timestamp with time zone
     LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO 'public'
+    SET "search_path" TO ''
     AS $$
 DECLARE
     removal_date TIMESTAMPTZ;
@@ -1878,7 +1885,7 @@ DECLARE
 Begin
   SELECT auth.uid() into auth_uid;
 
-  -- JWT auth.uid is not null, reutrn
+  -- JWT auth.uid is not null, return
   IF auth_uid IS NOT NULL THEN
     return auth_uid;
   END IF;
@@ -2049,7 +2056,7 @@ Begin
           RETURN NULL;
       END IF;
     END IF;
-    IF COALESCE(array_length(api_key.limited_to_apps, 1), 0) > 0 THEN
+    IF api_key.limited_to_apps IS DISTINCT FROM '{}' THEN
       IF NOT (app_id = ANY(api_key.limited_to_apps)) THEN
           PERFORM public.pg_log('deny: IDENTITY_APP_UNALLOWED', jsonb_build_object('app_id', app_id));
           RETURN NULL;
@@ -2070,7 +2077,7 @@ ALTER FUNCTION "public"."get_identity_org_appid"("keymode" "public"."key_mode"[]
 
 CREATE OR REPLACE FUNCTION "public"."get_invite_by_magic_lookup"("lookup" "text") RETURNS TABLE("org_name" "text", "org_logo" "text", "role" "public"."user_min_right")
     LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO 'public'
+    SET "search_path" TO ''
     AS $$
 BEGIN
   RETURN QUERY 
@@ -2192,27 +2199,8 @@ DECLARE
   next_run timestamptz;
   preceding_count integer := 0;
   is_target boolean := false;
-  org_customer_id text;
-  org_trial_at timestamptz;
-  org_status text;
-  org_has_stripe_info boolean;
 BEGIN
   next_run := public.get_next_cron_time(cron_schedule, now());
-
-  -- Debug: Get org info
-  SELECT o.customer_id INTO org_customer_id FROM public.orgs o WHERE o.id = org;
-  RAISE NOTICE 'get_next_stats_update_date: org=%, customer_id=%, next_run=%', org, org_customer_id, next_run;
-
-  -- Debug: Get stripe_info for this org
-  SELECT si.trial_at, si.status::text, true
-  INTO org_trial_at, org_status, org_has_stripe_info
-  FROM public.stripe_info si
-  WHERE si.customer_id = org_customer_id;
-
-  RAISE NOTICE 'get_next_stats_update_date: has_stripe_info=%, trial_at=%, status=%, trial_at > next_run=%',
-    COALESCE(org_has_stripe_info, false), org_trial_at, org_status,
-    CASE WHEN org_trial_at IS NOT NULL THEN org_trial_at > next_run ELSE NULL END;
-
   WITH paying_orgs AS (
     SELECT o.id
     FROM public.orgs o
@@ -2232,8 +2220,6 @@ BEGIN
     COALESCE(BOOL_OR(id = org), false)
   INTO preceding_count, is_target
   FROM paying_orgs;
-
-  RAISE NOTICE 'get_next_stats_update_date: is_target=%, preceding_count=%', is_target, preceding_count;
 
   IF NOT is_target THEN
     RETURN NULL;
@@ -3105,7 +3091,7 @@ ALTER FUNCTION "public"."invite_user_to_org"("email" character varying, "org_id"
 
 CREATE OR REPLACE FUNCTION "public"."is_account_disabled"("user_id" "uuid") RETURNS boolean
     LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO 'public'
+    SET "search_path" TO ''
     AS $$
 BEGIN
     -- Check if the user_id exists in the to_delete_accounts table
@@ -3581,7 +3567,7 @@ ALTER FUNCTION "public"."is_trial_org"("orgid" "uuid") OWNER TO "postgres";
 
 CREATE OR REPLACE FUNCTION "public"."mass_edit_queue_messages_cf_ids"("updates" "public"."message_update"[]) RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO 'public'
+    SET "search_path" TO ''
     AS $_$
 DECLARE
   update_record public.message_update;
@@ -3660,7 +3646,7 @@ CREATE OR REPLACE FUNCTION "public"."noupdate"() RETURNS "trigger"
     AS $_$
 DECLARE
     val RECORD;
-    is_diffrent boolean;
+    is_different boolean;
 BEGIN
     -- API key? We do not care
     IF (select auth.uid()) IS NULL THEN
@@ -3678,9 +3664,9 @@ BEGIN
       -- raise warning '?? % % %', val.key, val.value, format('SELECT (NEW."%s" <> OLD."%s")', val.key, val.key);
 
       EXECUTE format('SELECT ($1."%s" is distinct from $2."%s")', val.key, val.key) using NEW, OLD
-      INTO is_diffrent;
+      INTO is_different;
 
-      IF is_diffrent AND val.key <> 'version' AND val.key <> 'updated_at' THEN
+      IF is_different AND val.key <> 'version' AND val.key <> 'updated_at' THEN
           RAISE EXCEPTION 'not allowed %', val.key;
       END IF;
     end loop;
@@ -4090,7 +4076,7 @@ ALTER FUNCTION "public"."process_cron_stats_jobs"() OWNER TO "postgres";
 
 CREATE OR REPLACE FUNCTION "public"."process_cron_sync_sub_jobs"() RETURNS "void"
     LANGUAGE "plpgsql"
-    SET "search_path" TO 'public'
+    SET "search_path" TO ''
     AS $$
 DECLARE
     org_record RECORD;
@@ -4098,20 +4084,18 @@ BEGIN
     -- Process each organization that has a customer_id (paying customers only)
     FOR org_record IN 
         SELECT DISTINCT o.id, si.customer_id
-        FROM orgs o
-        INNER JOIN stripe_info si ON o.customer_id = si.customer_id
+        FROM public.orgs o
+        INNER JOIN public.stripe_info si ON o.customer_id = si.customer_id
         WHERE o.customer_id IS NOT NULL 
           AND si.customer_id IS NOT NULL
     LOOP
         -- Queue sync_sub processing for this organization
-          PERFORM pgmq.send('cron_sync_sub',
-            jsonb_build_object(
-              'function_name', 'cron_sync_sub',
-              'payload', jsonb_build_object(
+        PERFORM pgmq.send('cron_sync_sub',
+            json_build_object(
+                'function_name', 'cron_sync_sub',
                 'orgId', org_record.id,
                 'customerId', org_record.customer_id
-              )
-            )
+            )::jsonb
         );
     END LOOP;
 END;
@@ -4976,7 +4960,7 @@ COMMENT ON FUNCTION "public"."transfer_app"("p_app_id" character varying, "p_new
 
 CREATE OR REPLACE FUNCTION "public"."transform_role_to_invite"("role_input" "public"."user_min_right") RETURNS "public"."user_min_right"
     LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO 'public'
+    SET "search_path" TO ''
     AS $$
 BEGIN
   CASE role_input
@@ -4996,7 +4980,7 @@ ALTER FUNCTION "public"."transform_role_to_invite"("role_input" "public"."user_m
 
 CREATE OR REPLACE FUNCTION "public"."transform_role_to_non_invite"("role_input" "public"."user_min_right") RETURNS "public"."user_min_right"
     LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO 'public'
+    SET "search_path" TO ''
     AS $$
 BEGIN
   CASE role_input
@@ -5077,7 +5061,7 @@ ALTER FUNCTION "public"."update_app_versions_retention"() OWNER TO "postgres";
 
 CREATE OR REPLACE FUNCTION "public"."upsert_version_meta"("p_app_id" character varying, "p_version_id" bigint, "p_size" bigint) RETURNS boolean
     LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO 'public'
+    SET "search_path" TO ''
     AS $$
 DECLARE
   existing_count INTEGER;
@@ -5453,17 +5437,6 @@ ALTER TABLE "public"."channels" ALTER COLUMN "id" ADD GENERATED BY DEFAULT AS ID
 
 
 
-CREATE SEQUENCE IF NOT EXISTS "public"."clickhouse_logs_id_seq"
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
-ALTER SEQUENCE "public"."clickhouse_logs_id_seq" OWNER TO "postgres";
-
-
 CREATE TABLE IF NOT EXISTS "public"."daily_bandwidth" (
     "id" integer NOT NULL,
     "app_id" character varying(255) NOT NULL,
@@ -5574,7 +5547,7 @@ ALTER TABLE "public"."daily_version" OWNER TO "postgres";
 
 CREATE TABLE IF NOT EXISTS "public"."deleted_account" (
     "created_at" timestamp with time zone DEFAULT "now"(),
-    "email" character varying DEFAULT "encode"("extensions"."digest"("auth"."email"(), 'sha256'::"text"), 'hex'::"text") NOT NULL,
+    "email" character varying DEFAULT ''::character varying NOT NULL,
     "id" "uuid" DEFAULT "extensions"."uuid_generate_v4"() NOT NULL
 );
 
@@ -5724,10 +5697,9 @@ CREATE TABLE IF NOT EXISTS "public"."global_stats" (
     "plan_solo" bigint DEFAULT 0,
     "plan_maker" bigint DEFAULT 0,
     "plan_team" bigint DEFAULT 0,
-    "plan_enterprise" bigint DEFAULT 0,
     "registers_today" bigint DEFAULT 0 NOT NULL,
     "bundle_storage_gb" double precision DEFAULT 0 NOT NULL,
-    "mrrr" double precision DEFAULT 0 NOT NULL,
+    "mrr" double precision DEFAULT 0 NOT NULL,
     "total_revenue" double precision DEFAULT 0 NOT NULL,
     "revenue_solo" double precision DEFAULT 0 NOT NULL,
     "revenue_maker" double precision DEFAULT 0 NOT NULL,
@@ -5751,7 +5723,7 @@ CREATE TABLE IF NOT EXISTS "public"."global_stats" (
 ALTER TABLE "public"."global_stats" OWNER TO "postgres";
 
 
-COMMENT ON COLUMN "public"."global_stats"."mrrr" IS 'Total Monthly Recurring Revenue in dollars';
+COMMENT ON COLUMN "public"."global_stats"."mrr" IS 'Total Monthly Recurring Revenue in dollars';
 
 
 
@@ -9354,15 +9326,6 @@ GRANT ALL ON SEQUENCE "public"."channel_id_seq" TO "service_role";
 GRANT ALL ON SEQUENCE "public"."channel_id_seq" TO "hyperdrive_main";
 GRANT SELECT,USAGE ON SEQUENCE "public"."channel_id_seq" TO "hyperdrive_sg";
 GRANT SELECT,USAGE ON SEQUENCE "public"."channel_id_seq" TO "hyperdrive_us";
-
-
-
-GRANT ALL ON SEQUENCE "public"."clickhouse_logs_id_seq" TO "anon";
-GRANT ALL ON SEQUENCE "public"."clickhouse_logs_id_seq" TO "authenticated";
-GRANT ALL ON SEQUENCE "public"."clickhouse_logs_id_seq" TO "service_role";
-GRANT ALL ON SEQUENCE "public"."clickhouse_logs_id_seq" TO "hyperdrive_main";
-GRANT SELECT,USAGE ON SEQUENCE "public"."clickhouse_logs_id_seq" TO "hyperdrive_sg";
-GRANT SELECT,USAGE ON SEQUENCE "public"."clickhouse_logs_id_seq" TO "hyperdrive_us";
 
 
 
