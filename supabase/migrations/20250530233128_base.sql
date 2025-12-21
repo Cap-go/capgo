@@ -3997,7 +3997,7 @@ CREATE INDEX "finx_channels_owner_org" ON "public"."channels" USING "btree" ("ow
 
 CREATE INDEX "finx_channels_version" ON "public"."channels" USING "btree" ("version");
 
-CREATE INDEX "finx_notifications_owner_org" ON "public"."notifications" USING "btree" ("owner_org");
+CREATE INDEX idx_notifications_uniq_lookup ON public.notifications (uniq_id, owner_org, event);
 
 CREATE INDEX "finx_org_users_channel_id" ON "public"."org_users" USING "btree" ("channel_id");
 
@@ -4083,8 +4083,6 @@ WHERE
 CREATE INDEX "idx_stripe_info_trial" ON "public"."stripe_info" USING "btree" ("trial_at")
 WHERE
   ("trial_at" IS NOT NULL);
-
-CREATE INDEX "notifications_uniq_id_idx" ON "public"."notifications" USING "btree" ("uniq_id");
 
 CREATE INDEX "org_users_app_id_idx" ON "public"."org_users" USING "btree" ("app_id");
 
