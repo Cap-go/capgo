@@ -3997,8 +3997,6 @@ CREATE INDEX "finx_channels_owner_org" ON "public"."channels" USING "btree" ("ow
 
 CREATE INDEX "finx_channels_version" ON "public"."channels" USING "btree" ("version");
 
-CREATE INDEX idx_notifications_uniq_lookup ON public.notifications (uniq_id, owner_org, event);
-
 CREATE INDEX "finx_org_users_channel_id" ON "public"."org_users" USING "btree" ("channel_id");
 
 CREATE INDEX "finx_org_users_org_id" ON "public"."org_users" USING "btree" ("org_id");
