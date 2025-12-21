@@ -734,7 +734,7 @@ END;
 $$;
 
 -- 5) public.public.check_org_user_privileges() – log on privilege escalation
-CREATE OR REPLACE FUNCTION "public"."public.check_org_user_privileges" () RETURNS "trigger" LANGUAGE "plpgsql"
+CREATE OR REPLACE FUNCTION "public"."check_org_user_privileges" () RETURNS "trigger" LANGUAGE "plpgsql"
 SET
   search_path = '' AS $$BEGIN
 
