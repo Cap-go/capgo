@@ -10,6 +10,7 @@ export interface DialogV2Button {
 }
 
 export interface DialogV2Options {
+  id?: string
   title?: string
   description?: string
   size?: 'sm' | 'md' | 'lg' | 'xl'
