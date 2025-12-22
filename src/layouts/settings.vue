@@ -22,6 +22,29 @@ const route = useRoute()
 const organizationTabs = ref<Tab[]>([...baseOrgTabs]) as Ref<Tab[]>
 
 watchEffect(() => {
+  // RBAC tabs - show only when use_new_rbac is enabled
+  const useNewRbac = (organizationStore.currentOrganization as any)?.use_new_rbac
+  const hasGroups = organizationTabs.value.find(tab => tab.key === '/settings/organization/groups')
+  const hasRoleAssignments = organizationTabs.value.find(tab => tab.key === '/settings/organization/role-assignments')
+
+  if (useNewRbac && !hasGroups) {
+    const base = baseOrgTabs.find(t => t.key === '/settings/organization/groups')
+    if (base)
+      organizationTabs.value.splice(2, 0, { ...base })
+  }
+  if (!useNewRbac && hasGroups)
+    organizationTabs.value = organizationTabs.value.filter(tab => tab.key !== '/settings/organization/groups')
+
+  if (useNewRbac && !hasRoleAssignments) {
+    const base = baseOrgTabs.find(t => t.key === '/settings/organization/role-assignments')
+    if (base) {
+      const idx = organizationTabs.value.findIndex(t => t.key === '/settings/organization/groups')
+      organizationTabs.value.splice(idx >= 0 ? idx + 1 : 3, 0, { ...base })
+    }
+  }
+  if (!useNewRbac && hasRoleAssignments)
+    organizationTabs.value = organizationTabs.value.filter(tab => tab.key !== '/settings/organization/role-assignments')
+
   // ensure usage/plans tabs based on permissions (keeps icons from base)
   const needsUsage = organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['super_admin'])
   const hasUsage = organizationTabs.value.find(tab => tab.key === '/settings/organization/usage')

@@ -1,15 +1,35 @@
 <script setup lang="ts">
+import type { Ref } from 'vue'
 import type { Tab } from '~/components/comp_def'
-import { computed } from 'vue'
+import { computed, ref, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Tabs from '~/components/Tabs.vue'
-import { appTabs } from '~/constants/appTabs'
+import { appTabs as baseAppTabs } from '~/constants/appTabs'
 import { bundleTabs } from '~/constants/bundleTabs'
 import { channelTabs } from '~/constants/channelTabs'
 import { deviceTabs } from '~/constants/deviceTabs'
+import { useOrganizationStore } from '~/stores/organization'
 
 const router = useRouter()
 const route = useRoute()
+const organizationStore = useOrganizationStore()
+
+// Reactive tabs list that can be modified based on RBAC
+const appTabs = ref<Tab[]>([...baseAppTabs]) as Ref<Tab[]>
+
+watchEffect(() => {
+  // Show access tab only when RBAC is enabled
+  const useNewRbac = (organizationStore.currentOrganization as any)?.use_new_rbac
+  const hasAccess = appTabs.value.find(tab => tab.label === 'access')
+
+  if (useNewRbac && !hasAccess) {
+    const base = baseAppTabs.find(t => t.label === 'access')
+    if (base)
+      appTabs.value.push({ ...base })
+  }
+  if (!useNewRbac && hasAccess)
+    appTabs.value = appTabs.value.filter(tab => tab.label !== 'access')
+})
 
 // Detect resource type from route (channel, device, or bundle)
 const resourceType = computed(() => {
@@ -38,9 +58,9 @@ const resourceId = computed(() => {
 // Generate tabs with full paths for the current app
 const tabs = computed<Tab[]>(() => {
   if (!appId.value)
-    return appTabs
+    return appTabs.value
 
-  return appTabs.map(tab => ({
+  return appTabs.value.map(tab => ({
     ...tab,
     key: tab.key ? `/app/${appId.value}${tab.key}` : `/app/${appId.value}`,
   }))

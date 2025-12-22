@@ -7,6 +7,7 @@ import { app as deleted_failed_version } from '../_backend/private/delete_failed
 import { app as devices_priv } from '../_backend/private/devices.ts'
 import { app as download_link } from '../_backend/private/download_link.ts'
 import { app as events } from '../_backend/private/events.ts'
+import { app as groups } from '../_backend/private/groups.ts'
 import { app as invite_new_user_to_org } from '../_backend/private/invite_new_user_to_org.ts'
 import { app as latency } from '../_backend/private/latency.ts'
 import { app as log_as } from '../_backend/private/log_as.ts'
@@ -45,6 +46,7 @@ appGlobal.route('/delete_failed_version', deleted_failed_version)
 appGlobal.route('/set_org_email', set_org_email)
 appGlobal.route('/latency', latency)
 appGlobal.route('/events', events)
+appGlobal.route('/groups', groups)
 appGlobal.route('/invite_new_user_to_org', invite_new_user_to_org)
 appGlobal.route('/accept_invitation', accept_invitation)
 

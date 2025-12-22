@@ -772,8 +772,12 @@ async function handleInviteNewUserSubmit() {
       <div v-if="rbacSystemEnabled" class="mb-4 d-alert d-alert-info gap-3 items-start">
         <IconInformation class="w-6 h-6 text-sky-400 shrink-0" />
         <div class="text-sm text-slate-100">
-          <p class="font-semibold">{{ t('rbac-system-enabled', 'RBAC role management preview') }}</p>
-          <p class="text-slate-200">{{ t('rbac-system-enabled-body', 'Editing roles here will use the RBAC system. Legacy roles stay visible during migration.') }}</p>
+          <p class="font-semibold">
+            {{ t('rbac-system-enabled', 'RBAC role management preview') }}
+          </p>
+          <p class="text-slate-200">
+            {{ t('rbac-system-enabled-body', 'Editing roles here will use the RBAC system. Legacy roles stay visible during migration.') }}
+          </p>
         </div>
       </div>
       <Table

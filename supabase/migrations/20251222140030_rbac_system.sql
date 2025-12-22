@@ -1,9 +1,8 @@
--- Phase 1 RBAC introduction (coexists with legacy org_users rights)
--- Scope: schema objects, seed data for priority roles/perms, feature flags, and helper functions.
--- Notes:
---   * Default behavior remains legacy; RBAC is opt-in via global/org flag.
---   * We do not modify or drop legacy columns. Compatibility helpers are added instead.
---   * Scope identifiers use UUIDs; extra UUID columns are added where the existing schema used non-UUID keys.
+-- Consolidated RBAC migration: merges 20251122120000_rbac_phase1.sql,
+-- 20251122120001_rbac_migrate_org_users.sql,
+-- 20251218131955_fix_invite_user_to_org_permission_check.sql,
+-- and 20251218132202_add_use_new_rbac_to_get_orgs_v6.sql into one file.
+-- This preserves the original behavior while making the rollout atomic for new environments.
 
 -- 1) Feature flag and supporting identifiers
 ALTER TABLE public.orgs
@@ -31,19 +30,52 @@ ALTER TABLE public.apikeys
 ADD COLUMN IF NOT EXISTS rbac_id uuid DEFAULT gen_random_uuid();
 UPDATE public.apikeys SET rbac_id = gen_random_uuid() WHERE rbac_id IS NULL;
 ALTER TABLE public.apikeys ALTER COLUMN rbac_id SET NOT NULL;
-ALTER TABLE public.apikeys ADD CONSTRAINT apikeys_rbac_id_key UNIQUE (rbac_id);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'apikeys_rbac_id_key'
+      AND conrelid = 'public.apikeys'::regclass
+  ) THEN
+    ALTER TABLE public.apikeys ADD CONSTRAINT apikeys_rbac_id_key UNIQUE (rbac_id);
+  END IF;
+END;
+$$;
 COMMENT ON COLUMN public.apikeys.rbac_id IS 'Stable UUID to bind RBAC roles to api keys.';
 
 ALTER TABLE public.channels
 ADD COLUMN IF NOT EXISTS rbac_id uuid DEFAULT gen_random_uuid();
 UPDATE public.channels SET rbac_id = gen_random_uuid() WHERE rbac_id IS NULL;
 ALTER TABLE public.channels ALTER COLUMN rbac_id SET NOT NULL;
-ALTER TABLE public.channels ADD CONSTRAINT channels_rbac_id_key UNIQUE (rbac_id);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'channels_rbac_id_key'
+      AND conrelid = 'public.channels'::regclass
+  ) THEN
+    ALTER TABLE public.channels ADD CONSTRAINT channels_rbac_id_key UNIQUE (rbac_id);
+  END IF;
+END;
+$$;
 COMMENT ON COLUMN public.channels.rbac_id IS 'Stable UUID to bind RBAC roles to channel scope.';
 
 -- apps.id already exists but was not unique; make it an addressable scope identifier.
-ALTER TABLE public.apps
-ADD CONSTRAINT apps_id_unique UNIQUE (id);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'apps_id_unique'
+      AND conrelid = 'public.apps'::regclass
+  ) THEN
+    ALTER TABLE public.apps
+    ADD CONSTRAINT apps_id_unique UNIQUE (id);
+  END IF;
+END;
+$$;
 COMMENT ON COLUMN public.apps.id IS 'UUID scope id for RBAC (app-level roles reference this id).';
 
 -- 2) Core RBAC tables
@@ -131,22 +163,22 @@ CREATE TABLE IF NOT EXISTS public.role_bindings (
 COMMENT ON TABLE public.role_bindings IS 'Assign roles to principals at a scope. family_name is duplicated for SSD enforcement.';
 
 -- SSD: only one role per family per scope/principal.
-CREATE UNIQUE INDEX role_bindings_platform_family_uniq
+CREATE UNIQUE INDEX IF NOT EXISTS role_bindings_platform_family_uniq
   ON public.role_bindings (principal_type, principal_id, family_name)
   WHERE scope_type = 'platform';
-CREATE UNIQUE INDEX role_bindings_org_family_uniq
+CREATE UNIQUE INDEX IF NOT EXISTS role_bindings_org_family_uniq
   ON public.role_bindings (principal_type, principal_id, org_id, family_name)
   WHERE scope_type = 'org';
-CREATE UNIQUE INDEX role_bindings_app_family_uniq
+CREATE UNIQUE INDEX IF NOT EXISTS role_bindings_app_family_uniq
   ON public.role_bindings (principal_type, principal_id, app_id, family_name)
   WHERE scope_type = 'app';
-CREATE UNIQUE INDEX role_bindings_channel_family_uniq
+CREATE UNIQUE INDEX IF NOT EXISTS role_bindings_channel_family_uniq
   ON public.role_bindings (principal_type, principal_id, channel_id, family_name)
   WHERE scope_type = 'channel';
 
-CREATE INDEX role_bindings_principal_scope_idx
+CREATE INDEX IF NOT EXISTS role_bindings_principal_scope_idx
   ON public.role_bindings (principal_type, principal_id, scope_type, org_id, app_id, channel_id);
-CREATE INDEX role_bindings_scope_idx
+CREATE INDEX IF NOT EXISTS role_bindings_scope_idx
   ON public.role_bindings (scope_type, org_id, app_id, channel_id);
 
 -- Keep family_name in sync with roles
@@ -243,7 +275,8 @@ INSERT INTO public.role_permissions (role_id, permission_id)
 SELECT r.id, p.id
 FROM public.roles r
 JOIN public.permissions p ON TRUE
-WHERE r.name = 'platform_super_admin';
+WHERE r.name = 'platform_super_admin'
+ON CONFLICT DO NOTHING;
 
 -- org_admin: org management, member/role management, and delegated app/channel control (no billing updates, no deletions)
 INSERT INTO public.role_permissions (role_id, permission_id)
@@ -260,7 +293,8 @@ JOIN public.permissions p ON p.key IN (
   'channel.promote_bundle', 'channel.rollback_bundle', 'channel.manage_forced_devices',
   'channel.read_forced_devices', 'channel.read_audit'
 )
-WHERE r.name = 'org_admin';
+WHERE r.name = 'org_admin'
+ON CONFLICT DO NOTHING;
 
 -- org_super_admin: same permissions as org_admin plus app destructive operations and billing
 INSERT INTO public.role_permissions (role_id, permission_id)
@@ -278,7 +312,8 @@ JOIN public.permissions p ON p.key IN (
   'channel.promote_bundle', 'channel.rollback_bundle', 'channel.manage_forced_devices',
   'channel.read_forced_devices', 'channel.read_audit'
 )
-WHERE r.name = 'org_super_admin';
+WHERE r.name = 'org_super_admin'
+ON CONFLICT DO NOTHING;
 
 -- org_billing_admin: restricted to billing views/updates
 INSERT INTO public.role_permissions (role_id, permission_id)
@@ -287,7 +322,8 @@ FROM public.roles r
 JOIN public.permissions p ON p.key IN (
   'org.read', 'org.read_billing', 'org.update_billing', 'org.read_invoices', 'org.read_billing_audit'
 )
-WHERE r.name = 'org_billing_admin';
+WHERE r.name = 'org_billing_admin'
+ON CONFLICT DO NOTHING;
 
 -- app_admin: full control of app + channels under that app
 INSERT INTO public.role_permissions (role_id, permission_id)
@@ -302,7 +338,8 @@ JOIN public.permissions p ON p.key IN (
   'channel.promote_bundle', 'channel.rollback_bundle', 'channel.manage_forced_devices',
   'channel.read_forced_devices', 'channel.read_audit'
 )
-WHERE r.name = 'app_admin';
+WHERE r.name = 'app_admin'
+ON CONFLICT DO NOTHING;
 
 -- app_developer: can upload, manage devices, build, update channels but no deletion or creation
 INSERT INTO public.role_permissions (role_id, permission_id)
@@ -314,7 +351,8 @@ JOIN public.permissions p ON p.key IN (
   'channel.read', 'channel.update_settings', 'channel.read_history', 'channel.promote_bundle',
   'channel.rollback_bundle', 'channel.manage_forced_devices', 'channel.read_forced_devices', 'channel.read_audit'
 )
-WHERE r.name = 'app_developer';
+WHERE r.name = 'app_developer'
+ON CONFLICT DO NOTHING;
 
 -- app_uploader: read access + upload bundle only
 INSERT INTO public.role_permissions (role_id, permission_id)
@@ -323,7 +361,8 @@ FROM public.roles r
 JOIN public.permissions p ON p.key IN (
   'app.read', 'app.read_bundles', 'app.upload_bundle', 'app.read_channels', 'app.read_logs', 'app.read_devices', 'app.read_audit'
 )
-WHERE r.name = 'app_uploader';
+WHERE r.name = 'app_uploader'
+ON CONFLICT DO NOTHING;
 
 -- app_read: read-only access to app
 INSERT INTO public.role_permissions (role_id, permission_id)
@@ -334,7 +373,8 @@ JOIN public.permissions p ON p.key IN (
   'channel.promote_bundle', 'channel.rollback_bundle', 'channel.manage_forced_devices',
   'channel.read_forced_devices', 'channel.read_audit'
 )
-WHERE r.name = 'channel_admin';
+WHERE r.name = 'channel_admin'
+ON CONFLICT DO NOTHING;
 
 -- app_read: read-only access to app
 INSERT INTO public.role_permissions (role_id, permission_id)
@@ -343,7 +383,8 @@ FROM public.roles r
 JOIN public.permissions p ON p.key IN (
   'app.read', 'app.read_bundles', 'app.read_channels', 'app.read_logs', 'app.read_devices', 'app.read_audit'
 )
-WHERE r.name = 'app_read';
+WHERE r.name = 'app_read'
+ON CONFLICT DO NOTHING;
 
 -- channel_read: read-only access to channel
 INSERT INTO public.role_permissions (role_id, permission_id)
@@ -352,7 +393,8 @@ FROM public.roles r
 JOIN public.permissions p ON p.key IN (
   'channel.read', 'channel.read_history', 'channel.read_forced_devices', 'channel.read_audit'
 )
-WHERE r.name = 'channel_read';
+WHERE r.name = 'channel_read'
+ON CONFLICT DO NOTHING;
 
 -- 6) Role hierarchy (explicit inheritance)
 INSERT INTO public.role_hierarchy (parent_role_id, child_role_id)
@@ -784,3 +826,801 @@ SELECT
   public.rbac_legacy_role_hint(ou.user_right, ou.app_id, ou.channel_id) AS suggested_role
 FROM public.org_users ou;
 COMMENT ON VIEW public.legacy_org_user_role_hints IS 'Read-only view to help reconcile legacy rights with new RBAC roles during migration.';
+
+-- 14) Migration utility to convert org_users to role_bindings
+CREATE OR REPLACE FUNCTION public.rbac_migrate_org_users_to_bindings(
+  p_org_id uuid,
+  p_granted_by uuid DEFAULT NULL
+) RETURNS jsonb
+LANGUAGE plpgsql
+SET search_path = ''
+SECURITY DEFINER AS $$
+DECLARE
+  v_granted_by uuid;
+  v_org_user RECORD;
+  v_role_name text;
+  v_role_id uuid;
+  v_scope_type text;
+  v_app_uuid uuid;
+  v_channel_uuid uuid;
+  v_binding_id uuid;
+  v_migrated_count int := 0;
+  v_skipped_count int := 0;
+  v_error_count int := 0;
+  v_errors jsonb := '[]'::jsonb;
+BEGIN
+  -- Use provided granted_by or find org owner
+  IF p_granted_by IS NULL THEN
+    SELECT created_by INTO v_granted_by FROM public.orgs WHERE id = p_org_id LIMIT 1;
+    IF v_granted_by IS NULL THEN
+      -- Fallback: use first admin user in org
+      SELECT user_id INTO v_granted_by
+      FROM public.org_users
+      WHERE org_id = p_org_id
+        AND user_right >= 'admin'::public.user_min_right
+        AND app_id IS NULL
+        AND channel_id IS NULL
+      ORDER BY created_at ASC
+      LIMIT 1;
+    END IF;
+    IF v_granted_by IS NULL THEN
+      RAISE EXCEPTION 'Cannot determine granted_by user for org %', p_org_id;
+    END IF;
+  ELSE
+    v_granted_by := p_granted_by;
+  END IF;
+
+  -- Iterate through all org_users for this org
+  FOR v_org_user IN
+    SELECT id, user_id, org_id, app_id, channel_id, user_right
+    FROM public.org_users
+    WHERE org_id = p_org_id
+  LOOP
+    BEGIN
+      -- Get suggested role name using our hint function
+      v_role_name := public.rbac_legacy_role_hint(
+        v_org_user.user_right,
+        v_org_user.app_id,
+        v_org_user.channel_id
+      );
+
+      -- Skip if no suitable role (e.g., read-only at app/channel level)
+      IF v_role_name IS NULL THEN
+        v_skipped_count := v_skipped_count + 1;
+        v_errors := v_errors || jsonb_build_object(
+          'org_user_id', v_org_user.id,
+          'user_id', v_org_user.user_id,
+          'reason', 'no_suitable_role',
+          'user_right', v_org_user.user_right::text,
+          'app_id', v_org_user.app_id,
+          'channel_id', v_org_user.channel_id
+        );
+        CONTINUE;
+      END IF;
+
+      -- Get role ID
+      SELECT id INTO v_role_id FROM public.roles WHERE name = v_role_name LIMIT 1;
+      IF v_role_id IS NULL THEN
+        v_error_count := v_error_count + 1;
+        v_errors := v_errors || jsonb_build_object(
+          'org_user_id', v_org_user.id,
+          'user_id', v_org_user.user_id,
+          'reason', 'role_not_found',
+          'role_name', v_role_name
+        );
+        CONTINUE;
+      END IF;
+
+      -- Determine scope type and resolve IDs
+      IF v_org_user.channel_id IS NOT NULL THEN
+        v_scope_type := 'channel';
+        SELECT id INTO v_app_uuid FROM public.apps
+        WHERE app_id = v_org_user.app_id LIMIT 1;
+        SELECT rbac_id INTO v_channel_uuid FROM public.channels
+        WHERE id = v_org_user.channel_id LIMIT 1;
+
+        IF v_app_uuid IS NULL OR v_channel_uuid IS NULL THEN
+          v_error_count := v_error_count + 1;
+          v_errors := v_errors || jsonb_build_object(
+            'org_user_id', v_org_user.id,
+            'reason', 'channel_or_app_not_found',
+            'app_id', v_org_user.app_id,
+            'channel_id', v_org_user.channel_id
+          );
+          CONTINUE;
+        END IF;
+      ELSIF v_org_user.app_id IS NOT NULL THEN
+        v_scope_type := 'app';
+        SELECT id INTO v_app_uuid FROM public.apps
+        WHERE app_id = v_org_user.app_id LIMIT 1;
+        v_channel_uuid := NULL;
+
+        IF v_app_uuid IS NULL THEN
+          v_error_count := v_error_count + 1;
+          v_errors := v_errors || jsonb_build_object(
+            'org_user_id', v_org_user.id,
+            'reason', 'app_not_found',
+            'app_id', v_org_user.app_id
+          );
+          CONTINUE;
+        END IF;
+      ELSE
+        v_scope_type := 'org';
+        v_app_uuid := NULL;
+        v_channel_uuid := NULL;
+      END IF;
+
+      -- Check if binding already exists (idempotency)
+      SELECT id INTO v_binding_id FROM public.role_bindings
+      WHERE principal_type = 'user'
+        AND principal_id = v_org_user.user_id
+        AND role_id = v_role_id
+        AND scope_type = v_scope_type
+        AND org_id = p_org_id
+        AND (app_id = v_app_uuid OR (app_id IS NULL AND v_app_uuid IS NULL))
+        AND (channel_id = v_channel_uuid OR (channel_id IS NULL AND v_channel_uuid IS NULL))
+      LIMIT 1;
+
+      IF v_binding_id IS NOT NULL THEN
+        v_skipped_count := v_skipped_count + 1;
+        CONTINUE;
+      END IF;
+
+      -- Create role binding
+      INSERT INTO public.role_bindings (
+        principal_type,
+        principal_id,
+        role_id,
+        scope_type,
+        org_id,
+        app_id,
+        channel_id,
+        granted_by,
+        granted_at,
+        reason,
+        is_direct
+      ) VALUES (
+        'user',
+        v_org_user.user_id,
+        v_role_id,
+        v_scope_type,
+        p_org_id,
+        v_app_uuid,
+        v_channel_uuid,
+        v_granted_by,
+        now(),
+        'Migrated from org_users (legacy)',
+        true
+      );
+
+      v_migrated_count := v_migrated_count + 1;
+
+    EXCEPTION WHEN OTHERS THEN
+      v_error_count := v_error_count + 1;
+      v_errors := v_errors || jsonb_build_object(
+        'org_user_id', v_org_user.id,
+        'user_id', v_org_user.user_id,
+        'reason', 'exception',
+        'error', SQLERRM
+      );
+    END;
+  END LOOP;
+
+  RETURN jsonb_build_object(
+    'org_id', p_org_id,
+    'granted_by', v_granted_by,
+    'migrated_count', v_migrated_count,
+    'skipped_count', v_skipped_count,
+    'error_count', v_error_count,
+    'errors', v_errors
+  );
+END;
+$$;
+COMMENT ON FUNCTION public.rbac_migrate_org_users_to_bindings(uuid, uuid) IS 'Migrates org_users records to role_bindings for a specific org. Idempotent and returns migration report.';
+
+-- Convenience function: migrate and enable RBAC for an org in one call
+CREATE OR REPLACE FUNCTION public.rbac_enable_for_org(
+  p_org_id uuid,
+  p_granted_by uuid DEFAULT NULL
+) RETURNS jsonb
+LANGUAGE plpgsql
+SET search_path = ''
+SECURITY DEFINER AS $$
+DECLARE
+  v_migration_result jsonb;
+  v_was_enabled boolean;
+BEGIN
+  -- Check if already enabled
+  SELECT use_new_rbac INTO v_was_enabled FROM public.orgs WHERE id = p_org_id;
+  IF v_was_enabled THEN
+    RETURN jsonb_build_object(
+      'status', 'already_enabled',
+      'org_id', p_org_id,
+      'message', 'RBAC was already enabled for this org'
+    );
+  END IF;
+
+  -- Migrate org_users to role_bindings
+  v_migration_result := public.rbac_migrate_org_users_to_bindings(p_org_id, p_granted_by);
+
+  -- Enable RBAC flag
+  UPDATE public.orgs SET use_new_rbac = true WHERE id = p_org_id;
+
+  RETURN jsonb_build_object(
+    'status', 'success',
+    'org_id', p_org_id,
+    'migration_result', v_migration_result,
+    'rbac_enabled', true
+  );
+END;
+$$;
+COMMENT ON FUNCTION public.rbac_enable_for_org(uuid, uuid) IS 'Migrates org_users to role_bindings and enables RBAC for an org in one transaction.';
+
+-- Helper: preview migration without executing it
+CREATE OR REPLACE FUNCTION public.rbac_preview_migration(
+  p_org_id uuid
+) RETURNS TABLE(
+  org_user_id bigint,
+  user_id uuid,
+  user_right text,
+  app_id character varying,
+  channel_id bigint,
+  suggested_role text,
+  scope_type text,
+  will_migrate boolean,
+  skip_reason text
+)
+LANGUAGE plpgsql
+SET search_path = ''
+AS $$
+BEGIN
+  RETURN QUERY
+  SELECT
+    ou.id AS org_user_id,
+    ou.user_id,
+    ou.user_right::text AS user_right,
+    ou.app_id,
+    ou.channel_id,
+    public.rbac_legacy_role_hint(ou.user_right, ou.app_id, ou.channel_id) AS suggested_role,
+    CASE
+      WHEN ou.channel_id IS NOT NULL THEN 'channel'
+      WHEN ou.app_id IS NOT NULL THEN 'app'
+      ELSE 'org'
+    END AS scope_type,
+    public.rbac_legacy_role_hint(ou.user_right, ou.app_id, ou.channel_id) IS NOT NULL AS will_migrate,
+    CASE
+      WHEN public.rbac_legacy_role_hint(ou.user_right, ou.app_id, ou.channel_id) IS NULL THEN 'no_suitable_role'
+      ELSE NULL
+    END AS skip_reason
+  FROM public.org_users ou
+  WHERE ou.org_id = p_org_id
+  ORDER BY ou.user_id, ou.app_id NULLS FIRST, ou.channel_id NULLS FIRST;
+END;
+$$;
+COMMENT ON FUNCTION public.rbac_preview_migration(uuid) IS 'Preview what would be migrated for an org without making changes.';
+
+-- Helper: rollback migration (remove migrated bindings and disable RBAC)
+CREATE OR REPLACE FUNCTION public.rbac_rollback_org(
+  p_org_id uuid
+) RETURNS jsonb
+LANGUAGE plpgsql
+SET search_path = ''
+SECURITY DEFINER AS $$
+DECLARE
+  v_deleted_count int;
+BEGIN
+  -- Delete all role_bindings that were migrated from org_users
+  DELETE FROM public.role_bindings
+  WHERE org_id = p_org_id
+    AND reason = 'Migrated from org_users (legacy)'
+    AND is_direct = true;
+
+  GET DIAGNOSTICS v_deleted_count = ROW_COUNT;
+
+  -- Disable RBAC flag
+  UPDATE public.orgs SET use_new_rbac = false WHERE id = p_org_id;
+
+  RETURN jsonb_build_object(
+    'status', 'success',
+    'org_id', p_org_id,
+    'deleted_bindings', v_deleted_count,
+    'rbac_enabled', false
+  );
+END;
+$$;
+COMMENT ON FUNCTION public.rbac_rollback_org(uuid) IS 'Removes migrated role_bindings and disables RBAC for an org (rollback migration).';
+
+-- 15) Fix invite_user_to_org permission check logic
+CREATE OR REPLACE FUNCTION "public"."invite_user_to_org" (
+  "email" varchar,
+  "org_id" uuid,
+  "invite_type" public.user_min_right
+) RETURNS varchar LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = '' AS $$
+DECLARE
+  org record;
+  invited_user record;
+  current_record record;
+  current_tmp_user record;
+  calling_user_id uuid;
+BEGIN
+  -- Get the calling user's ID
+  SELECT public.get_identity_org_allowed('{read,upload,write,all}'::public.key_mode[], invite_user_to_org.org_id)
+  INTO calling_user_id;
+
+  -- Check if org exists
+  SELECT * INTO org FROM public.orgs WHERE public.orgs.id=invite_user_to_org.org_id;
+  IF org IS NULL THEN
+    RETURN 'NO_ORG';
+  END IF;
+
+  -- Check if user has at least 'admin' rights
+  IF NOT public.check_min_rights('admin'::public.user_min_right, calling_user_id, invite_user_to_org.org_id, NULL::varchar, NULL::bigint) THEN
+    PERFORM public.pg_log('deny: NO_RIGHTS_ADMIN', jsonb_build_object('org_id', invite_user_to_org.org_id, 'email', invite_user_to_org.email, 'invite_type', invite_user_to_org.invite_type, 'calling_user', calling_user_id));
+    RETURN 'NO_RIGHTS';
+  END IF;
+
+  -- If inviting as super_admin, caller must be super_admin
+  IF (invite_type = 'super_admin'::public.user_min_right OR invite_type = 'invite_super_admin'::public.user_min_right) THEN
+    IF NOT public.check_min_rights('super_admin'::public.user_min_right, calling_user_id, invite_user_to_org.org_id, NULL::varchar, NULL::bigint) THEN
+      PERFORM public.pg_log('deny: NO_RIGHTS_SUPER_ADMIN', jsonb_build_object('org_id', invite_user_to_org.org_id, 'email', invite_user_to_org.email, 'invite_type', invite_user_to_org.invite_type, 'calling_user', calling_user_id));
+      RETURN 'NO_RIGHTS';
+    END IF;
+  END IF;
+
+  -- Check if user already exists
+  SELECT public.users.id INTO invited_user FROM public.users WHERE public.users.email=invite_user_to_org.email;
+
+  IF invited_user IS NOT NULL THEN
+    -- User exists, check if already in org
+    SELECT public.org_users.id INTO current_record
+    FROM public.org_users
+    WHERE public.org_users.user_id=invited_user.id
+    AND public.org_users.org_id=invite_user_to_org.org_id;
+
+    IF current_record IS NOT NULL THEN
+      RETURN 'ALREADY_INVITED';
+    ELSE
+      -- Add user to org
+      INSERT INTO public.org_users (user_id, org_id, user_right)
+      VALUES (invited_user.id, invite_user_to_org.org_id, invite_type);
+      RETURN 'OK';
+    END IF;
+  ELSE
+    -- User doesn't exist, check tmp_users for pending invitations
+    SELECT * INTO current_tmp_user
+    FROM public.tmp_users
+    WHERE public.tmp_users.email=invite_user_to_org.email
+    AND public.tmp_users.org_id=invite_user_to_org.org_id;
+
+    IF current_tmp_user IS NOT NULL THEN
+      -- Invitation already exists
+      IF current_tmp_user.cancelled_at IS NOT NULL THEN
+        -- Invitation was cancelled, check if recent
+        IF current_tmp_user.cancelled_at > (CURRENT_TIMESTAMP - INTERVAL '3 hours') THEN
+          RETURN 'TOO_RECENT_INVITATION_CANCELATION';
+        ELSE
+          RETURN 'NO_EMAIL';
+        END IF;
+      ELSE
+        RETURN 'ALREADY_INVITED';
+      END IF;
+    ELSE
+      -- No invitation exists, need to create one (handled elsewhere)
+      RETURN 'NO_EMAIL';
+    END IF;
+  END IF;
+END;
+$$;
+
+COMMENT ON FUNCTION public.invite_user_to_org(varchar, uuid, public.user_min_right) IS
+'Invite a user to an organization. Admins can invite read/upload/write/admin roles. Super admins can invite super_admin roles.';
+
+-- 16) Add use_new_rbac flag to get_orgs_v6 return type
+DROP FUNCTION IF EXISTS public.get_orgs_v6();
+DROP FUNCTION IF EXISTS public.get_orgs_v6(uuid);
+
+-- Update the overload with user_id parameter
+CREATE OR REPLACE FUNCTION "public"."get_orgs_v6" ("userid" "uuid") RETURNS TABLE (
+  "gid" "uuid",
+  "created_by" "uuid",
+  "logo" "text",
+  "name" "text",
+  "role" character varying,
+  "paying" boolean,
+  "trial_left" integer,
+  "can_use_more" boolean,
+  "is_canceled" boolean,
+  "app_count" bigint,
+  "subscription_start" timestamp with time zone,
+  "subscription_end" timestamp with time zone,
+  "management_email" "text",
+  "is_yearly" boolean,
+  "use_new_rbac" boolean
+) LANGUAGE "plpgsql"
+SET search_path = '' SECURITY DEFINER AS $$
+BEGIN
+  RETURN QUERY
+  SELECT
+    sub.id AS gid,
+    sub.created_by,
+    sub.logo,
+    sub.name,
+    org_users.user_right::varchar AS role,
+    public.is_paying_org(sub.id) AS paying,
+    public.is_trial_org(sub.id) AS trial_left,
+    public.is_allowed_action_org(sub.id) AS can_use_more,
+    public.is_canceled_org(sub.id) AS is_canceled,
+    (SELECT count(*) FROM public.apps WHERE owner_org = sub.id) AS app_count,
+    (sub.f).subscription_anchor_start AS subscription_start,
+    (sub.f).subscription_anchor_end AS subscription_end,
+    sub.management_email AS management_email,
+    public.is_org_yearly(sub.id) AS is_yearly,
+    sub.use_new_rbac AS use_new_rbac
+  FROM (
+    SELECT public.get_cycle_info_org(o.id) AS f, o.* FROM public.orgs AS o
+  ) sub
+  JOIN public.org_users ON (org_users."user_id" = get_orgs_v6.userid AND sub.id = org_users."org_id");
+END;
+$$;
+
+-- Update the overload without parameters (calls the one above)
+CREATE OR REPLACE FUNCTION "public"."get_orgs_v6" () RETURNS TABLE (
+  "gid" "uuid",
+  "created_by" "uuid",
+  "logo" "text",
+  "name" "text",
+  "role" character varying,
+  "paying" boolean,
+  "trial_left" integer,
+  "can_use_more" boolean,
+  "is_canceled" boolean,
+  "app_count" bigint,
+  "subscription_start" timestamp with time zone,
+  "subscription_end" timestamp with time zone,
+  "management_email" "text",
+  "is_yearly" boolean,
+  "use_new_rbac" boolean
+) LANGUAGE "plpgsql"
+SET search_path = '' SECURITY DEFINER AS $$
+DECLARE
+  api_key_text text;
+  api_key record;
+  user_id uuid;
+BEGIN
+  SELECT "public"."get_apikey_header"() into api_key_text;
+  user_id := NULL;
+
+  -- Check for API key first
+  IF api_key_text IS NOT NULL THEN
+    SELECT * FROM public.apikeys WHERE key=api_key_text into api_key;
+
+    IF api_key IS NULL THEN
+      PERFORM public.pg_log('deny: INVALID_API_KEY', jsonb_build_object('source', 'header'));
+      RAISE EXCEPTION 'Invalid API key provided';
+    END IF;
+
+    user_id := api_key.user_id;
+
+    -- Check limited_to_orgs only if api_key exists and has restrictions
+    IF COALESCE(array_length(api_key.limited_to_orgs, 1), 0) > 0 THEN
+      return query select orgs.* FROM public.get_orgs_v6(user_id) orgs
+      where orgs.gid = ANY(api_key.limited_to_orgs::uuid[]);
+      RETURN;
+    END IF;
+  END IF;
+
+  -- If no valid API key user_id yet, try to get FROM public.identity
+  IF user_id IS NULL THEN
+    SELECT public.get_identity() into user_id;
+
+    IF user_id IS NULL THEN
+      PERFORM public.pg_log('deny: UNAUTHENTICATED', '{}'::jsonb);
+      RAISE EXCEPTION 'No authentication provided - API key or valid session required';
+    END IF;
+  END IF;
+
+  return query select * FROM public.get_orgs_v6(user_id);
+END;
+$$;
+
+COMMENT ON FUNCTION public.get_orgs_v6(uuid) IS 'Get organizations for a user, including use_new_rbac flag for per-org RBAC rollout';
+COMMENT ON FUNCTION public.get_orgs_v6() IS 'Get organizations for authenticated user or API key, including use_new_rbac flag';
+
+-- ============================================================================
+-- RBAC-AWARE is_admin() OVERRIDE
+-- ============================================================================
+
+-- Override is_admin() to check RBAC platform roles when RBAC is enabled globally
+CREATE OR REPLACE FUNCTION public.is_admin(userid uuid)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  admin_ids_jsonb jsonb;
+  is_admin_legacy boolean := false;
+  mfa_verified boolean;
+  rbac_enabled boolean;
+  has_platform_admin boolean := false;
+BEGIN
+  -- Always check MFA first
+  SELECT public.verify_mfa() INTO mfa_verified;
+  IF NOT mfa_verified THEN
+    RETURN false;
+  END IF;
+
+  -- Always check legacy vault list (for bootstrapping and backward compatibility)
+  SELECT decrypted_secret::jsonb INTO admin_ids_jsonb
+  FROM vault.decrypted_secrets WHERE name = 'admin_users';
+  is_admin_legacy := (admin_ids_jsonb ? userid::text);
+
+  -- Check if RBAC is enabled globally
+  SELECT use_new_rbac INTO rbac_enabled FROM public.rbac_settings WHERE id = 1;
+
+  IF COALESCE(rbac_enabled, false) THEN
+    -- RBAC mode: also check for platform_super_admin role binding
+    SELECT EXISTS (
+      SELECT 1
+      FROM public.role_bindings rb
+      JOIN public.roles r ON r.id = rb.role_id
+      WHERE rb.principal_type = 'user'
+        AND rb.principal_id = userid
+        AND rb.scope_type = 'platform'
+        AND r.name = 'platform_super_admin'
+    ) INTO has_platform_admin;
+
+    -- In RBAC mode: admin if EITHER in vault list OR has platform role
+    RETURN is_admin_legacy OR has_platform_admin;
+  ELSE
+    -- Legacy mode: only use vault secret list
+    RETURN is_admin_legacy;
+  END IF;
+END;
+$$;
+
+COMMENT ON FUNCTION public.is_admin(uuid) IS 'Check if user is platform admin. In RBAC mode: checks vault list OR platform_super_admin role (allows bootstrapping). In legacy mode: only checks vault list. Always requires MFA.';
+
+-- ============================================================================
+-- ROW LEVEL SECURITY POLICIES
+-- ============================================================================
+
+-- 1) rbac_settings: Global singleton, admin-only writes, authenticated reads
+ALTER TABLE public.rbac_settings ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY rbac_settings_read_authenticated ON public.rbac_settings
+  FOR SELECT
+  TO authenticated
+  USING (true);
+
+CREATE POLICY rbac_settings_admin_all ON public.rbac_settings
+  FOR ALL
+  TO authenticated
+  USING (public.is_admin(auth.uid()))
+  WITH CHECK (public.is_admin(auth.uid()));
+
+-- 2) roles: Public read (needed for UI role lists), admin-only writes
+ALTER TABLE public.roles ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY roles_read_all ON public.roles
+  FOR SELECT
+  TO authenticated
+  USING (true);
+
+CREATE POLICY roles_admin_write ON public.roles
+  FOR ALL
+  TO authenticated
+  USING (public.is_admin(auth.uid()))
+  WITH CHECK (public.is_admin(auth.uid()));
+
+-- 3) permissions: Public read (needed for permission resolution), admin-only writes
+ALTER TABLE public.permissions ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY permissions_read_all ON public.permissions
+  FOR SELECT
+  TO authenticated
+  USING (true);
+
+CREATE POLICY permissions_admin_write ON public.permissions
+  FOR ALL
+  TO authenticated
+  USING (public.is_admin(auth.uid()))
+  WITH CHECK (public.is_admin(auth.uid()));
+
+-- 4) role_permissions: Public read (needed for permission resolution), admin-only writes
+ALTER TABLE public.role_permissions ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY role_permissions_read_all ON public.role_permissions
+  FOR SELECT
+  TO authenticated
+  USING (true);
+
+CREATE POLICY role_permissions_admin_write ON public.role_permissions
+  FOR ALL
+  TO authenticated
+  USING (public.is_admin(auth.uid()))
+  WITH CHECK (public.is_admin(auth.uid()));
+
+-- 5) role_hierarchy: Public read (needed for permission resolution), admin-only writes
+ALTER TABLE public.role_hierarchy ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY role_hierarchy_read_all ON public.role_hierarchy
+  FOR SELECT
+  TO authenticated
+  USING (true);
+
+CREATE POLICY role_hierarchy_admin_write ON public.role_hierarchy
+  FOR ALL
+  TO authenticated
+  USING (public.is_admin(auth.uid()))
+  WITH CHECK (public.is_admin(auth.uid()));
+
+-- 6) groups: Read/write for org members with appropriate rights
+ALTER TABLE public.groups ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY groups_read_org_member ON public.groups
+  FOR SELECT
+  TO authenticated
+  USING (
+    -- User is member of the org
+    EXISTS (
+      SELECT 1 FROM public.org_users
+      WHERE org_users.org_id = groups.org_id
+        AND org_users.user_id = auth.uid()
+    )
+    OR
+    -- User is platform admin
+    public.is_admin(auth.uid())
+  );
+
+CREATE POLICY groups_write_org_admin ON public.groups
+  FOR ALL
+  TO authenticated
+  USING (
+    -- User has admin rights in the org
+    public.check_min_rights('admin'::public.user_min_right, auth.uid(), org_id, NULL::varchar, NULL::bigint)
+    OR
+    -- User is platform admin
+    public.is_admin(auth.uid())
+  )
+  WITH CHECK (
+    -- User has admin rights in the org
+    public.check_min_rights('admin'::public.user_min_right, auth.uid(), org_id, NULL::varchar, NULL::bigint)
+    OR
+    -- User is platform admin
+    public.is_admin(auth.uid())
+  );
+
+-- 7) group_members: Read/write for org members with appropriate rights
+ALTER TABLE public.group_members ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY group_members_read_org_member ON public.group_members
+  FOR SELECT
+  TO authenticated
+  USING (
+    -- User is member of the org that owns the group
+    EXISTS (
+      SELECT 1 FROM public.groups
+      JOIN public.org_users ON org_users.org_id = groups.org_id
+      WHERE groups.id = group_members.group_id
+        AND org_users.user_id = auth.uid()
+    )
+    OR
+    -- User is platform admin
+    public.is_admin(auth.uid())
+  );
+
+CREATE POLICY group_members_write_org_admin ON public.group_members
+  FOR ALL
+  TO authenticated
+  USING (
+    -- User has admin rights in the org that owns the group
+    EXISTS (
+      SELECT 1 FROM public.groups
+      WHERE groups.id = group_members.group_id
+        AND (
+          public.check_min_rights('admin'::public.user_min_right, auth.uid(), groups.org_id, NULL::varchar, NULL::bigint)
+          OR public.is_admin(auth.uid())
+        )
+    )
+  )
+  WITH CHECK (
+    -- User has admin rights in the org that owns the group
+    EXISTS (
+      SELECT 1 FROM public.groups
+      WHERE groups.id = group_members.group_id
+        AND (
+          public.check_min_rights('admin'::public.user_min_right, auth.uid(), groups.org_id, NULL::varchar, NULL::bigint)
+          OR public.is_admin(auth.uid())
+        )
+    )
+  );
+
+-- 8) role_bindings: Read/write based on scope and org membership
+ALTER TABLE public.role_bindings ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY role_bindings_read_scope_member ON public.role_bindings
+  FOR SELECT
+  TO authenticated
+  USING (
+    -- Platform scope: admin only
+    (scope_type = 'platform' AND public.is_admin(auth.uid()))
+    OR
+    -- Org scope: org member
+    (scope_type = 'org' AND EXISTS (
+      SELECT 1 FROM public.org_users
+      WHERE org_users.org_id = role_bindings.org_id
+        AND org_users.user_id = auth.uid()
+    ))
+    OR
+    -- App scope: org member (app belongs to org)
+    (scope_type = 'app' AND EXISTS (
+      SELECT 1 FROM public.apps
+      JOIN public.org_users ON org_users.org_id = apps.owner_org
+      WHERE apps.id = role_bindings.app_id
+        AND org_users.user_id = auth.uid()
+    ))
+    OR
+    -- Channel scope: org member (channel belongs to app belongs to org)
+    (scope_type = 'channel' AND EXISTS (
+      SELECT 1 FROM public.channels
+      JOIN public.apps ON apps.app_id = channels.app_id
+      JOIN public.org_users ON org_users.org_id = apps.owner_org
+      WHERE channels.rbac_id = role_bindings.channel_id
+        AND org_users.user_id = auth.uid()
+    ))
+    OR
+    -- Platform admin sees all
+    public.is_admin(auth.uid())
+  );
+
+CREATE POLICY role_bindings_write_scope_admin ON public.role_bindings
+  FOR ALL
+  TO authenticated
+  USING (
+    -- Platform scope: admin only
+    (scope_type = 'platform' AND public.is_admin(auth.uid()))
+    OR
+    -- Org scope: org admin
+    (scope_type = 'org' AND public.check_min_rights('admin'::public.user_min_right, auth.uid(), org_id, NULL::varchar, NULL::bigint))
+    OR
+    -- App scope: app admin
+    (scope_type = 'app' AND EXISTS (
+      SELECT 1 FROM public.apps
+      WHERE apps.id = role_bindings.app_id
+        AND public.check_min_rights('admin'::public.user_min_right, auth.uid(), apps.owner_org, apps.app_id, NULL::bigint)
+    ))
+    OR
+    -- Channel scope: channel admin
+    (scope_type = 'channel' AND EXISTS (
+      SELECT 1 FROM public.channels
+      JOIN public.apps ON apps.app_id = channels.app_id
+      WHERE channels.rbac_id = role_bindings.channel_id
+        AND public.check_min_rights('admin'::public.user_min_right, auth.uid(), apps.owner_org, channels.app_id, channels.id)
+    ))
+    OR
+    -- Platform admin can write all
+    public.is_admin(auth.uid())
+  )
+  WITH CHECK (
+    -- Same as USING clause
+    (scope_type = 'platform' AND public.is_admin(auth.uid()))
+    OR
+    (scope_type = 'org' AND public.check_min_rights('admin'::public.user_min_right, auth.uid(), org_id, NULL::varchar, NULL::bigint))
+    OR
+    (scope_type = 'app' AND EXISTS (
+      SELECT 1 FROM public.apps
+      WHERE apps.id = role_bindings.app_id
+        AND public.check_min_rights('admin'::public.user_min_right, auth.uid(), apps.owner_org, apps.app_id, NULL::bigint)
+    ))
+    OR
+    (scope_type = 'channel' AND EXISTS (
+      SELECT 1 FROM public.channels
+      JOIN public.apps ON apps.app_id = channels.app_id
+      WHERE channels.rbac_id = role_bindings.channel_id
+        AND public.check_min_rights('admin'::public.user_min_right, auth.uid(), apps.owner_org, channels.app_id, channels.id)
+    ))
+    OR
+    public.is_admin(auth.uid())
+  );
