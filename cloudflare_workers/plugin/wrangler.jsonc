@@ -112,6 +112,14 @@
         {
           "binding": "HYPERDRIVE_CAPGO_DIRECT_NA",
           "id": "8d3cfaace1fc4f66a6c0da5dbc41c4bf"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_PS_AS",
+          "id": "1da208dc0b8a4a18924a5393ea5a56a5"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_PS_US",
+          "id": "63190ba747924f1eb7c251c994ad465f"
         }
       ]
     },
@@ -182,6 +190,14 @@
         {
           "binding": "HYPERDRIVE_CAPGO_DIRECT_NA",
           "id": "8d3cfaace1fc4f66a6c0da5dbc41c4bf"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_PS_AS",
+          "id": "1da208dc0b8a4a18924a5393ea5a56a5"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_PS_US",
+          "id": "63190ba747924f1eb7c251c994ad465f"
         }
       ]
     },
@@ -252,6 +268,14 @@
         {
           "binding": "HYPERDRIVE_CAPGO_DIRECT_NA",
           "id": "8d3cfaace1fc4f66a6c0da5dbc41c4bf"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_PS_AS",
+          "id": "1da208dc0b8a4a18924a5393ea5a56a5"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_PS_US",
+          "id": "63190ba747924f1eb7c251c994ad465f"
         }
       ]
     },
@@ -322,6 +346,14 @@
         {
           "binding": "HYPERDRIVE_CAPGO_DIRECT_NA",
           "id": "8d3cfaace1fc4f66a6c0da5dbc41c4bf"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_PS_AS",
+          "id": "1da208dc0b8a4a18924a5393ea5a56a5"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_PS_US",
+          "id": "63190ba747924f1eb7c251c994ad465f"
         }
       ]
     },
@@ -392,6 +424,14 @@
         {
           "binding": "HYPERDRIVE_CAPGO_DIRECT_NA",
           "id": "8d3cfaace1fc4f66a6c0da5dbc41c4bf"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_PS_AS",
+          "id": "1da208dc0b8a4a18924a5393ea5a56a5"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_PS_US",
+          "id": "63190ba747924f1eb7c251c994ad465f"
         }
       ]
     },
@@ -462,6 +502,14 @@
         {
           "binding": "HYPERDRIVE_CAPGO_DIRECT_NA",
           "id": "8d3cfaace1fc4f66a6c0da5dbc41c4bf"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_PS_AS",
+          "id": "1da208dc0b8a4a18924a5393ea5a56a5"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_PS_US",
+          "id": "63190ba747924f1eb7c251c994ad465f"
         }
       ]
     },
@@ -532,6 +580,14 @@
         {
           "binding": "HYPERDRIVE_CAPGO_DIRECT_NA",
           "id": "8d3cfaace1fc4f66a6c0da5dbc41c4bf"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_PS_AS",
+          "id": "1da208dc0b8a4a18924a5393ea5a56a5"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_PS_US",
+          "id": "63190ba747924f1eb7c251c994ad465f"
         }
       ]
     },
@@ -602,6 +658,14 @@
         {
           "binding": "HYPERDRIVE_CAPGO_DIRECT_NA",
           "id": "8d3cfaace1fc4f66a6c0da5dbc41c4bf"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_PS_AS",
+          "id": "1da208dc0b8a4a18924a5393ea5a56a5"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_PS_US",
+          "id": "63190ba747924f1eb7c251c994ad465f"
         }
       ]
     },
@@ -665,6 +729,14 @@
         {
           "binding": "HYPERDRIVE_CAPGO_DIRECT_NA",
           "id": "8d3cfaace1fc4f66a6c0da5dbc41c4bf"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_PS_AS",
+          "id": "1da208dc0b8a4a18924a5393ea5a56a5"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_PS_US",
+          "id": "63190ba747924f1eb7c251c994ad465f"
         }
       ],
       "placement": {
@@ -735,6 +807,14 @@
         {
           "binding": "HYPERDRIVE_CAPGO_DIRECT_NA",
           "id": "8d3cfaace1fc4f66a6c0da5dbc41c4bf"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_PS_AS",
+          "id": "1da208dc0b8a4a18924a5393ea5a56a5"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_PS_US",
+          "id": "63190ba747924f1eb7c251c994ad465f"
         }
       ],
       "placement": {

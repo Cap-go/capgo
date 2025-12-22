@@ -64,11 +64,24 @@ export function getDatabaseURL(c: Context, readOnly = false): string {
     // Hyperdrive main read replica regional routing in Cloudflare Workers
     // When using Hyperdrive we use session databases directly to avoid supabase pooler overhead and allow prepared statements
     // Asia region
-    // if (c.env.HYPERDRIVE_CAPGO_DIRECT_AS && dbRegion === 'AS') {
-    //   c.header('X-Database-Source', 'HYPERDRIVE_CAPGO_DIRECT_AS')
-    //   cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_DIRECT_AS for read-only' })
-    //   return c.env.HYPERDRIVE_CAPGO_DIRECT_AS.connectionString
-    // }
+    if (c.env.HYPERDRIVE_CAPGO_PS_AS && dbRegion === 'AS') {
+      c.header('X-Database-Source', 'HYPERDRIVE_CAPGO_PLANETSCALE_AS')
+      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_PLANETSCALE_AS for read-only' })
+      return c.env.HYPERDRIVE_CAPGO_PS_AS.connectionString
+    }
+    // // US region
+    if (c.env.HYPERDRIVE_CAPGO_PS_NA && dbRegion === 'NA') {
+      c.header('X-Database-Source', 'HYPERDRIVE_CAPGO_PLANETSCALE_NA')
+      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_PLANETSCALE_NA for read-only' })
+      return c.env.HYPERDRIVE_CAPGO_PS_NA.connectionString
+    }
+
+    // Asia region
+    if (c.env.HYPERDRIVE_CAPGO_DIRECT_AS && dbRegion === 'AS') {
+      c.header('X-Database-Source', 'HYPERDRIVE_CAPGO_DIRECT_AS')
+      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_DIRECT_AS for read-only' })
+      return c.env.HYPERDRIVE_CAPGO_DIRECT_AS.connectionString
+    }
     // // US region
     // if (c.env.HYPERDRIVE_CAPGO_DIRECT_NA && dbRegion === 'NA') {
     //   c.header('X-Database-Source', 'HYPERDRIVE_CAPGO_DIRECT_NA')
@@ -78,18 +91,18 @@ export function getDatabaseURL(c: Context, readOnly = false): string {
 
     // Custom Supabase Region Read replicate Poolers
     // Asia region
-    if (existInEnv(c, 'READ_SUPABASE_DB_URL_AS') && dbRegion === 'AS') {
-      c.header('X-Database-Source', 'read_pooler_as')
-      cloudlog({ requestId: c.get('requestId'), message: 'Using READ_SUPABASE_DB_URL_AS for read-only' })
-      return getEnv(c, 'READ_SUPABASE_DB_URL_AS')
-    }
+    // if (existInEnv(c, 'READ_SUPABASE_DB_URL_AS') && dbRegion === 'AS') {
+    //   c.header('X-Database-Source', 'read_pooler_as')
+    //   cloudlog({ requestId: c.get('requestId'), message: 'Using READ_SUPABASE_DB_URL_AS for read-only' })
+    //   return getEnv(c, 'READ_SUPABASE_DB_URL_AS')
+    // }
 
-    // NA region
-    if (existInEnv(c, 'READ_SUPABASE_DB_URL_NA') && dbRegion === 'NA') {
-      c.header('X-Database-Source', 'read_pooler_na')
-      cloudlog({ requestId: c.get('requestId'), message: 'Using READ_SUPABASE_DB_URL_NA for read-only' })
-      return getEnv(c, 'READ_SUPABASE_DB_URL_NA')
-    }
+    // // NA region
+    // if (existInEnv(c, 'READ_SUPABASE_DB_URL_NA') && dbRegion === 'NA') {
+    //   c.header('X-Database-Source', 'read_pooler_na')
+    //   cloudlog({ requestId: c.get('requestId'), message: 'Using READ_SUPABASE_DB_URL_NA for read-only' })
+    //   return getEnv(c, 'READ_SUPABASE_DB_URL_NA')
+    // }
   }
 
   // Fallback to single Hyperdrive if available

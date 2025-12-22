@@ -5277,7 +5277,7 @@ CREATE TABLE IF NOT EXISTS "public"."build_logs" (
     "build_time_unit" bigint NOT NULL,
     CONSTRAINT "build_logs_billable_seconds_check" CHECK (("billable_seconds" >= 0)),
     CONSTRAINT "build_logs_build_time_unit_check" CHECK (("build_time_unit" >= 0)),
-    CONSTRAINT "build_logs_platform_check" CHECK ((("platform")::"text" = ANY ((ARRAY['ios'::character varying, 'android'::character varying])::"text"[])))
+    CONSTRAINT "build_logs_platform_check" CHECK ((("platform")::"text" = ANY (ARRAY[('ios'::character varying)::"text", ('android'::character varying)::"text"])))
 );
 
 
@@ -5301,7 +5301,7 @@ CREATE TABLE IF NOT EXISTS "public"."build_requests" (
     "upload_url" character varying NOT NULL,
     "upload_expires_at" timestamp with time zone NOT NULL,
     "last_error" "text",
-    CONSTRAINT "build_requests_platform_check" CHECK ((("platform")::"text" = ANY ((ARRAY['ios'::character varying, 'android'::character varying, 'both'::character varying])::"text"[])))
+    CONSTRAINT "build_requests_platform_check" CHECK ((("platform")::"text" = ANY (ARRAY[('ios'::character varying)::"text", ('android'::character varying)::"text", ('both'::character varying)::"text"])))
 );
 
 
@@ -7424,7 +7424,7 @@ CREATE POLICY "Allow insert org for apikey or user" ON "public"."orgs" FOR INSER
 
 
 
-CREATE POLICY "Allow memeber and owner to select" ON "public"."org_users" FOR SELECT TO "anon", "authenticated" USING ("public"."is_member_of_org"(( SELECT "public"."get_identity_org_allowed"('{read,upload,write,all}'::"public"."key_mode"[], "org_users"."org_id") AS "get_identity_org_allowed"), "org_id"));
+CREATE POLICY "Allow member and owner to select" ON "public"."org_users" TO "anon", "authenticated" USING ("public"."is_member_of_org"(( SELECT "public"."get_identity_org_allowed"('{read,upload,write,all}'::"public"."key_mode"[], "org_users"."org_id") AS "get_identity_org_allowed"), "org_id"));
 
 
 
@@ -7863,12 +7863,50 @@ ALTER TABLE "public"."version_meta" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."version_usage" ENABLE ROW LEVEL SECURITY;
 
 
+CREATE PUBLICATION "planetscale_replicate" WITH (publish = 'insert, update, delete, truncate');
+
+
+ALTER PUBLICATION "planetscale_replicate" OWNER TO "postgres";
+
+
 
 
 ALTER PUBLICATION "supabase_realtime" OWNER TO "postgres";
 
 
 
+
+
+
+ALTER PUBLICATION "planetscale_replicate" ADD TABLE ONLY "public"."app_versions";
+
+
+
+ALTER PUBLICATION "planetscale_replicate" ADD TABLE ONLY "public"."apps";
+
+
+
+ALTER PUBLICATION "planetscale_replicate" ADD TABLE ONLY "public"."channel_devices";
+
+
+
+ALTER PUBLICATION "planetscale_replicate" ADD TABLE ONLY "public"."channels";
+
+
+
+ALTER PUBLICATION "planetscale_replicate" ADD TABLE ONLY "public"."manifest";
+
+
+
+ALTER PUBLICATION "planetscale_replicate" ADD TABLE ONLY "public"."org_users";
+
+
+
+ALTER PUBLICATION "planetscale_replicate" ADD TABLE ONLY "public"."orgs";
+
+
+
+ALTER PUBLICATION "planetscale_replicate" ADD TABLE ONLY "public"."stripe_info";
 
 
 
@@ -7879,10 +7917,6 @@ REVOKE USAGE ON SCHEMA "public" FROM PUBLIC;
 GRANT USAGE ON SCHEMA "public" TO "anon";
 GRANT USAGE ON SCHEMA "public" TO "authenticated";
 GRANT USAGE ON SCHEMA "public" TO "service_role";
-GRANT USAGE ON SCHEMA "public" TO "clickhouse";
-GRANT USAGE ON SCHEMA "public" TO "hyperdrive_main";
-GRANT USAGE ON SCHEMA "public" TO "hyperdrive_sg";
-GRANT USAGE ON SCHEMA "public" TO "hyperdrive_us";
 
 
 
@@ -8694,9 +8728,6 @@ GRANT ALL ON FUNCTION "public"."get_user_main_org_id_by_app_id"("app_id" "text")
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."app_versions" TO "anon";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."app_versions" TO "authenticated";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."app_versions" TO "service_role";
-GRANT ALL ON TABLE "public"."app_versions" TO "hyperdrive_main";
-GRANT SELECT ON TABLE "public"."app_versions" TO "hyperdrive_sg";
-GRANT SELECT ON TABLE "public"."app_versions" TO "hyperdrive_us";
 
 
 
@@ -9073,9 +9104,6 @@ GRANT ALL ON FUNCTION "public"."rescind_invitation"("email" "text", "org_id" "uu
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."app_metrics_cache" TO "anon";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."app_metrics_cache" TO "authenticated";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."app_metrics_cache" TO "service_role";
-GRANT ALL ON TABLE "public"."app_metrics_cache" TO "hyperdrive_main";
-GRANT SELECT ON TABLE "public"."app_metrics_cache" TO "hyperdrive_sg";
-GRANT SELECT ON TABLE "public"."app_metrics_cache" TO "hyperdrive_us";
 
 
 
@@ -9181,567 +9209,378 @@ GRANT ALL ON FUNCTION "public"."verify_mfa"() TO "service_role";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."apikeys" TO "anon";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."apikeys" TO "authenticated";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."apikeys" TO "service_role";
-GRANT ALL ON TABLE "public"."apikeys" TO "hyperdrive_main";
-GRANT SELECT ON TABLE "public"."apikeys" TO "hyperdrive_sg";
-GRANT SELECT ON TABLE "public"."apikeys" TO "hyperdrive_us";
 
 
 
 GRANT ALL ON SEQUENCE "public"."apikeys_id_seq" TO "anon";
 GRANT ALL ON SEQUENCE "public"."apikeys_id_seq" TO "authenticated";
 GRANT ALL ON SEQUENCE "public"."apikeys_id_seq" TO "service_role";
-GRANT ALL ON SEQUENCE "public"."apikeys_id_seq" TO "hyperdrive_main";
-GRANT SELECT,USAGE ON SEQUENCE "public"."apikeys_id_seq" TO "hyperdrive_sg";
-GRANT SELECT,USAGE ON SEQUENCE "public"."apikeys_id_seq" TO "hyperdrive_us";
 
 
 
 GRANT ALL ON SEQUENCE "public"."app_metrics_cache_id_seq" TO "anon";
 GRANT ALL ON SEQUENCE "public"."app_metrics_cache_id_seq" TO "authenticated";
 GRANT ALL ON SEQUENCE "public"."app_metrics_cache_id_seq" TO "service_role";
-GRANT ALL ON SEQUENCE "public"."app_metrics_cache_id_seq" TO "hyperdrive_main";
-GRANT SELECT,USAGE ON SEQUENCE "public"."app_metrics_cache_id_seq" TO "hyperdrive_sg";
-GRANT SELECT,USAGE ON SEQUENCE "public"."app_metrics_cache_id_seq" TO "hyperdrive_us";
 
 
 
 GRANT ALL ON SEQUENCE "public"."app_versions_id_seq" TO "anon";
 GRANT ALL ON SEQUENCE "public"."app_versions_id_seq" TO "authenticated";
 GRANT ALL ON SEQUENCE "public"."app_versions_id_seq" TO "service_role";
-GRANT ALL ON SEQUENCE "public"."app_versions_id_seq" TO "hyperdrive_main";
-GRANT SELECT,USAGE ON SEQUENCE "public"."app_versions_id_seq" TO "hyperdrive_sg";
-GRANT SELECT,USAGE ON SEQUENCE "public"."app_versions_id_seq" TO "hyperdrive_us";
 
 
 
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."app_versions_meta" TO "anon";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."app_versions_meta" TO "authenticated";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."app_versions_meta" TO "service_role";
-GRANT ALL ON TABLE "public"."app_versions_meta" TO "hyperdrive_main";
-GRANT SELECT ON TABLE "public"."app_versions_meta" TO "hyperdrive_sg";
-GRANT SELECT ON TABLE "public"."app_versions_meta" TO "hyperdrive_us";
 
 
 
 GRANT ALL ON SEQUENCE "public"."app_versions_meta_id_seq" TO "anon";
 GRANT ALL ON SEQUENCE "public"."app_versions_meta_id_seq" TO "authenticated";
 GRANT ALL ON SEQUENCE "public"."app_versions_meta_id_seq" TO "service_role";
-GRANT ALL ON SEQUENCE "public"."app_versions_meta_id_seq" TO "hyperdrive_main";
-GRANT SELECT,USAGE ON SEQUENCE "public"."app_versions_meta_id_seq" TO "hyperdrive_sg";
-GRANT SELECT,USAGE ON SEQUENCE "public"."app_versions_meta_id_seq" TO "hyperdrive_us";
 
 
 
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."apps" TO "anon";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."apps" TO "authenticated";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."apps" TO "service_role";
-GRANT ALL ON TABLE "public"."apps" TO "hyperdrive_main";
-GRANT SELECT ON TABLE "public"."apps" TO "hyperdrive_sg";
-GRANT SELECT ON TABLE "public"."apps" TO "hyperdrive_us";
 
 
 
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."bandwidth_usage" TO "anon";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."bandwidth_usage" TO "authenticated";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."bandwidth_usage" TO "service_role";
-GRANT ALL ON TABLE "public"."bandwidth_usage" TO "hyperdrive_main";
-GRANT SELECT ON TABLE "public"."bandwidth_usage" TO "hyperdrive_sg";
-GRANT SELECT ON TABLE "public"."bandwidth_usage" TO "hyperdrive_us";
 
 
 
 GRANT ALL ON SEQUENCE "public"."bandwidth_usage_id_seq" TO "anon";
 GRANT ALL ON SEQUENCE "public"."bandwidth_usage_id_seq" TO "authenticated";
 GRANT ALL ON SEQUENCE "public"."bandwidth_usage_id_seq" TO "service_role";
-GRANT ALL ON SEQUENCE "public"."bandwidth_usage_id_seq" TO "hyperdrive_main";
-GRANT SELECT,USAGE ON SEQUENCE "public"."bandwidth_usage_id_seq" TO "hyperdrive_sg";
-GRANT SELECT,USAGE ON SEQUENCE "public"."bandwidth_usage_id_seq" TO "hyperdrive_us";
 
 
 
 GRANT ALL ON TABLE "public"."build_logs" TO "anon";
 GRANT ALL ON TABLE "public"."build_logs" TO "authenticated";
 GRANT ALL ON TABLE "public"."build_logs" TO "service_role";
-GRANT ALL ON TABLE "public"."build_logs" TO "hyperdrive_main";
-GRANT SELECT ON TABLE "public"."build_logs" TO "hyperdrive_sg";
-GRANT SELECT ON TABLE "public"."build_logs" TO "hyperdrive_us";
 
 
 
 GRANT ALL ON TABLE "public"."build_requests" TO "anon";
 GRANT ALL ON TABLE "public"."build_requests" TO "authenticated";
 GRANT ALL ON TABLE "public"."build_requests" TO "service_role";
-GRANT ALL ON TABLE "public"."build_requests" TO "hyperdrive_main";
-GRANT SELECT ON TABLE "public"."build_requests" TO "hyperdrive_sg";
-GRANT SELECT ON TABLE "public"."build_requests" TO "hyperdrive_us";
 
 
 
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."capgo_credits_steps" TO "anon";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."capgo_credits_steps" TO "authenticated";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."capgo_credits_steps" TO "service_role";
-GRANT ALL ON TABLE "public"."capgo_credits_steps" TO "hyperdrive_main";
-GRANT SELECT ON TABLE "public"."capgo_credits_steps" TO "hyperdrive_sg";
-GRANT SELECT ON TABLE "public"."capgo_credits_steps" TO "hyperdrive_us";
 
 
 
 GRANT ALL ON SEQUENCE "public"."capgo_credits_steps_id_seq" TO "anon";
 GRANT ALL ON SEQUENCE "public"."capgo_credits_steps_id_seq" TO "authenticated";
 GRANT ALL ON SEQUENCE "public"."capgo_credits_steps_id_seq" TO "service_role";
-GRANT ALL ON SEQUENCE "public"."capgo_credits_steps_id_seq" TO "hyperdrive_main";
-GRANT SELECT,USAGE ON SEQUENCE "public"."capgo_credits_steps_id_seq" TO "hyperdrive_sg";
-GRANT SELECT,USAGE ON SEQUENCE "public"."capgo_credits_steps_id_seq" TO "hyperdrive_us";
 
 
 
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."channel_devices" TO "anon";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."channel_devices" TO "authenticated";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."channel_devices" TO "service_role";
-GRANT ALL ON TABLE "public"."channel_devices" TO "hyperdrive_main";
-GRANT SELECT ON TABLE "public"."channel_devices" TO "hyperdrive_sg";
-GRANT SELECT ON TABLE "public"."channel_devices" TO "hyperdrive_us";
 
 
 
 GRANT ALL ON SEQUENCE "public"."channel_devices_id_seq" TO "anon";
 GRANT ALL ON SEQUENCE "public"."channel_devices_id_seq" TO "authenticated";
 GRANT ALL ON SEQUENCE "public"."channel_devices_id_seq" TO "service_role";
-GRANT ALL ON SEQUENCE "public"."channel_devices_id_seq" TO "hyperdrive_main";
-GRANT SELECT,USAGE ON SEQUENCE "public"."channel_devices_id_seq" TO "hyperdrive_sg";
-GRANT SELECT,USAGE ON SEQUENCE "public"."channel_devices_id_seq" TO "hyperdrive_us";
 
 
 
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."channels" TO "anon";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."channels" TO "authenticated";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."channels" TO "service_role";
-GRANT ALL ON TABLE "public"."channels" TO "hyperdrive_main";
-GRANT SELECT ON TABLE "public"."channels" TO "hyperdrive_sg";
-GRANT SELECT ON TABLE "public"."channels" TO "hyperdrive_us";
 
 
 
 GRANT ALL ON SEQUENCE "public"."channel_id_seq" TO "anon";
 GRANT ALL ON SEQUENCE "public"."channel_id_seq" TO "authenticated";
 GRANT ALL ON SEQUENCE "public"."channel_id_seq" TO "service_role";
-GRANT ALL ON SEQUENCE "public"."channel_id_seq" TO "hyperdrive_main";
-GRANT SELECT,USAGE ON SEQUENCE "public"."channel_id_seq" TO "hyperdrive_sg";
-GRANT SELECT,USAGE ON SEQUENCE "public"."channel_id_seq" TO "hyperdrive_us";
 
 
 
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."daily_bandwidth" TO "anon";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."daily_bandwidth" TO "authenticated";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."daily_bandwidth" TO "service_role";
-GRANT ALL ON TABLE "public"."daily_bandwidth" TO "hyperdrive_main";
-GRANT SELECT ON TABLE "public"."daily_bandwidth" TO "hyperdrive_sg";
-GRANT SELECT ON TABLE "public"."daily_bandwidth" TO "hyperdrive_us";
 
 
 
 GRANT ALL ON SEQUENCE "public"."daily_bandwidth_id_seq" TO "anon";
 GRANT ALL ON SEQUENCE "public"."daily_bandwidth_id_seq" TO "authenticated";
 GRANT ALL ON SEQUENCE "public"."daily_bandwidth_id_seq" TO "service_role";
-GRANT ALL ON SEQUENCE "public"."daily_bandwidth_id_seq" TO "hyperdrive_main";
-GRANT SELECT,USAGE ON SEQUENCE "public"."daily_bandwidth_id_seq" TO "hyperdrive_sg";
-GRANT SELECT,USAGE ON SEQUENCE "public"."daily_bandwidth_id_seq" TO "hyperdrive_us";
 
 
 
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."daily_build_time" TO "anon";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."daily_build_time" TO "authenticated";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."daily_build_time" TO "service_role";
-GRANT ALL ON TABLE "public"."daily_build_time" TO "hyperdrive_main";
-GRANT SELECT ON TABLE "public"."daily_build_time" TO "hyperdrive_sg";
-GRANT SELECT ON TABLE "public"."daily_build_time" TO "hyperdrive_us";
 
 
 
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."daily_mau" TO "anon";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."daily_mau" TO "authenticated";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."daily_mau" TO "service_role";
-GRANT ALL ON TABLE "public"."daily_mau" TO "hyperdrive_main";
-GRANT SELECT ON TABLE "public"."daily_mau" TO "hyperdrive_sg";
-GRANT SELECT ON TABLE "public"."daily_mau" TO "hyperdrive_us";
 
 
 
 GRANT ALL ON SEQUENCE "public"."daily_mau_id_seq" TO "anon";
 GRANT ALL ON SEQUENCE "public"."daily_mau_id_seq" TO "authenticated";
 GRANT ALL ON SEQUENCE "public"."daily_mau_id_seq" TO "service_role";
-GRANT ALL ON SEQUENCE "public"."daily_mau_id_seq" TO "hyperdrive_main";
-GRANT SELECT,USAGE ON SEQUENCE "public"."daily_mau_id_seq" TO "hyperdrive_sg";
-GRANT SELECT,USAGE ON SEQUENCE "public"."daily_mau_id_seq" TO "hyperdrive_us";
 
 
 
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."daily_storage" TO "anon";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."daily_storage" TO "authenticated";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."daily_storage" TO "service_role";
-GRANT ALL ON TABLE "public"."daily_storage" TO "hyperdrive_main";
-GRANT SELECT ON TABLE "public"."daily_storage" TO "hyperdrive_sg";
-GRANT SELECT ON TABLE "public"."daily_storage" TO "hyperdrive_us";
 
 
 
 GRANT ALL ON SEQUENCE "public"."daily_storage_id_seq" TO "anon";
 GRANT ALL ON SEQUENCE "public"."daily_storage_id_seq" TO "authenticated";
 GRANT ALL ON SEQUENCE "public"."daily_storage_id_seq" TO "service_role";
-GRANT ALL ON SEQUENCE "public"."daily_storage_id_seq" TO "hyperdrive_main";
-GRANT SELECT,USAGE ON SEQUENCE "public"."daily_storage_id_seq" TO "hyperdrive_sg";
-GRANT SELECT,USAGE ON SEQUENCE "public"."daily_storage_id_seq" TO "hyperdrive_us";
 
 
 
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."daily_version" TO "anon";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."daily_version" TO "authenticated";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."daily_version" TO "service_role";
-GRANT ALL ON TABLE "public"."daily_version" TO "hyperdrive_main";
-GRANT SELECT ON TABLE "public"."daily_version" TO "hyperdrive_sg";
-GRANT SELECT ON TABLE "public"."daily_version" TO "hyperdrive_us";
 
 
 
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."deleted_account" TO "anon";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."deleted_account" TO "authenticated";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."deleted_account" TO "service_role";
-GRANT ALL ON TABLE "public"."deleted_account" TO "hyperdrive_main";
-GRANT SELECT ON TABLE "public"."deleted_account" TO "hyperdrive_sg";
-GRANT SELECT ON TABLE "public"."deleted_account" TO "hyperdrive_us";
 
 
 
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."deleted_apps" TO "anon";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."deleted_apps" TO "authenticated";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."deleted_apps" TO "service_role";
-GRANT ALL ON TABLE "public"."deleted_apps" TO "hyperdrive_main";
-GRANT SELECT ON TABLE "public"."deleted_apps" TO "hyperdrive_sg";
-GRANT SELECT ON TABLE "public"."deleted_apps" TO "hyperdrive_us";
 
 
 
 GRANT ALL ON SEQUENCE "public"."deleted_apps_id_seq" TO "anon";
 GRANT ALL ON SEQUENCE "public"."deleted_apps_id_seq" TO "authenticated";
 GRANT ALL ON SEQUENCE "public"."deleted_apps_id_seq" TO "service_role";
-GRANT ALL ON SEQUENCE "public"."deleted_apps_id_seq" TO "hyperdrive_main";
-GRANT SELECT,USAGE ON SEQUENCE "public"."deleted_apps_id_seq" TO "hyperdrive_sg";
-GRANT SELECT,USAGE ON SEQUENCE "public"."deleted_apps_id_seq" TO "hyperdrive_us";
 
 
 
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."deploy_history" TO "anon";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."deploy_history" TO "authenticated";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."deploy_history" TO "service_role";
-GRANT ALL ON TABLE "public"."deploy_history" TO "hyperdrive_main";
-GRANT SELECT ON TABLE "public"."deploy_history" TO "hyperdrive_sg";
-GRANT SELECT ON TABLE "public"."deploy_history" TO "hyperdrive_us";
 
 
 
 GRANT ALL ON SEQUENCE "public"."deploy_history_id_seq" TO "anon";
 GRANT ALL ON SEQUENCE "public"."deploy_history_id_seq" TO "authenticated";
 GRANT ALL ON SEQUENCE "public"."deploy_history_id_seq" TO "service_role";
-GRANT ALL ON SEQUENCE "public"."deploy_history_id_seq" TO "hyperdrive_main";
-GRANT SELECT,USAGE ON SEQUENCE "public"."deploy_history_id_seq" TO "hyperdrive_sg";
-GRANT SELECT,USAGE ON SEQUENCE "public"."deploy_history_id_seq" TO "hyperdrive_us";
 
 
 
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."device_usage" TO "anon";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."device_usage" TO "authenticated";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."device_usage" TO "service_role";
-GRANT ALL ON TABLE "public"."device_usage" TO "hyperdrive_main";
-GRANT SELECT ON TABLE "public"."device_usage" TO "hyperdrive_sg";
-GRANT SELECT ON TABLE "public"."device_usage" TO "hyperdrive_us";
 
 
 
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."devices" TO "anon";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."devices" TO "authenticated";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."devices" TO "service_role";
-GRANT ALL ON TABLE "public"."devices" TO "hyperdrive_main";
-GRANT SELECT ON TABLE "public"."devices" TO "hyperdrive_sg";
-GRANT SELECT ON TABLE "public"."devices" TO "hyperdrive_us";
 
 
 
 GRANT ALL ON SEQUENCE "public"."devices_id_seq" TO "anon";
 GRANT ALL ON SEQUENCE "public"."devices_id_seq" TO "authenticated";
 GRANT ALL ON SEQUENCE "public"."devices_id_seq" TO "service_role";
-GRANT ALL ON SEQUENCE "public"."devices_id_seq" TO "hyperdrive_main";
-GRANT SELECT,USAGE ON SEQUENCE "public"."devices_id_seq" TO "hyperdrive_sg";
-GRANT SELECT,USAGE ON SEQUENCE "public"."devices_id_seq" TO "hyperdrive_us";
 
 
 
 GRANT ALL ON SEQUENCE "public"."devices_usage_id_seq" TO "anon";
 GRANT ALL ON SEQUENCE "public"."devices_usage_id_seq" TO "authenticated";
 GRANT ALL ON SEQUENCE "public"."devices_usage_id_seq" TO "service_role";
-GRANT ALL ON SEQUENCE "public"."devices_usage_id_seq" TO "hyperdrive_main";
-GRANT SELECT,USAGE ON SEQUENCE "public"."devices_usage_id_seq" TO "hyperdrive_sg";
-GRANT SELECT,USAGE ON SEQUENCE "public"."devices_usage_id_seq" TO "hyperdrive_us";
 
 
 
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."global_stats" TO "anon";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."global_stats" TO "authenticated";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."global_stats" TO "service_role";
-GRANT ALL ON TABLE "public"."global_stats" TO "hyperdrive_main";
-GRANT SELECT ON TABLE "public"."global_stats" TO "hyperdrive_sg";
-GRANT SELECT ON TABLE "public"."global_stats" TO "hyperdrive_us";
 
 
 
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."manifest" TO "anon";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."manifest" TO "authenticated";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."manifest" TO "service_role";
-GRANT ALL ON TABLE "public"."manifest" TO "hyperdrive_main";
-GRANT SELECT ON TABLE "public"."manifest" TO "hyperdrive_sg";
-GRANT SELECT ON TABLE "public"."manifest" TO "hyperdrive_us";
 
 
 
 GRANT ALL ON SEQUENCE "public"."manifest_id_seq" TO "anon";
 GRANT ALL ON SEQUENCE "public"."manifest_id_seq" TO "authenticated";
 GRANT ALL ON SEQUENCE "public"."manifest_id_seq" TO "service_role";
-GRANT ALL ON SEQUENCE "public"."manifest_id_seq" TO "hyperdrive_main";
-GRANT SELECT,USAGE ON SEQUENCE "public"."manifest_id_seq" TO "hyperdrive_sg";
-GRANT SELECT,USAGE ON SEQUENCE "public"."manifest_id_seq" TO "hyperdrive_us";
 
 
 
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."notifications" TO "anon";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."notifications" TO "authenticated";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."notifications" TO "service_role";
-GRANT ALL ON TABLE "public"."notifications" TO "hyperdrive_main";
-GRANT SELECT ON TABLE "public"."notifications" TO "hyperdrive_sg";
-GRANT SELECT ON TABLE "public"."notifications" TO "hyperdrive_us";
 
 
 
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."org_users" TO "anon";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."org_users" TO "authenticated";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."org_users" TO "service_role";
-GRANT ALL ON TABLE "public"."org_users" TO "hyperdrive_main";
-GRANT SELECT ON TABLE "public"."org_users" TO "hyperdrive_sg";
-GRANT SELECT ON TABLE "public"."org_users" TO "hyperdrive_us";
 
 
 
 GRANT ALL ON SEQUENCE "public"."org_users_id_seq" TO "anon";
 GRANT ALL ON SEQUENCE "public"."org_users_id_seq" TO "authenticated";
 GRANT ALL ON SEQUENCE "public"."org_users_id_seq" TO "service_role";
-GRANT ALL ON SEQUENCE "public"."org_users_id_seq" TO "hyperdrive_main";
-GRANT SELECT,USAGE ON SEQUENCE "public"."org_users_id_seq" TO "hyperdrive_sg";
-GRANT SELECT,USAGE ON SEQUENCE "public"."org_users_id_seq" TO "hyperdrive_us";
 
 
 
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."orgs" TO "anon";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."orgs" TO "authenticated";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."orgs" TO "service_role";
-GRANT ALL ON TABLE "public"."orgs" TO "hyperdrive_main";
-GRANT SELECT ON TABLE "public"."orgs" TO "hyperdrive_sg";
-GRANT SELECT ON TABLE "public"."orgs" TO "hyperdrive_us";
 
 
 
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."plans" TO "anon";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."plans" TO "authenticated";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."plans" TO "service_role";
-GRANT ALL ON TABLE "public"."plans" TO "hyperdrive_main";
-GRANT SELECT ON TABLE "public"."plans" TO "hyperdrive_sg";
-GRANT SELECT ON TABLE "public"."plans" TO "hyperdrive_us";
 
 
 
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."stats" TO "anon";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."stats" TO "authenticated";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."stats" TO "service_role";
-GRANT ALL ON TABLE "public"."stats" TO "hyperdrive_main";
-GRANT SELECT ON TABLE "public"."stats" TO "hyperdrive_sg";
-GRANT SELECT ON TABLE "public"."stats" TO "hyperdrive_us";
 
 
 
 GRANT ALL ON SEQUENCE "public"."stats_id_seq" TO "anon";
 GRANT ALL ON SEQUENCE "public"."stats_id_seq" TO "authenticated";
 GRANT ALL ON SEQUENCE "public"."stats_id_seq" TO "service_role";
-GRANT ALL ON SEQUENCE "public"."stats_id_seq" TO "hyperdrive_main";
-GRANT SELECT,USAGE ON SEQUENCE "public"."stats_id_seq" TO "hyperdrive_sg";
-GRANT SELECT,USAGE ON SEQUENCE "public"."stats_id_seq" TO "hyperdrive_us";
 
 
 
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."storage_usage" TO "anon";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."storage_usage" TO "authenticated";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."storage_usage" TO "service_role";
-GRANT ALL ON TABLE "public"."storage_usage" TO "hyperdrive_main";
-GRANT SELECT ON TABLE "public"."storage_usage" TO "hyperdrive_sg";
-GRANT SELECT ON TABLE "public"."storage_usage" TO "hyperdrive_us";
 
 
 
 GRANT ALL ON SEQUENCE "public"."storage_usage_id_seq" TO "anon";
 GRANT ALL ON SEQUENCE "public"."storage_usage_id_seq" TO "authenticated";
 GRANT ALL ON SEQUENCE "public"."storage_usage_id_seq" TO "service_role";
-GRANT ALL ON SEQUENCE "public"."storage_usage_id_seq" TO "hyperdrive_main";
-GRANT SELECT,USAGE ON SEQUENCE "public"."storage_usage_id_seq" TO "hyperdrive_sg";
-GRANT SELECT,USAGE ON SEQUENCE "public"."storage_usage_id_seq" TO "hyperdrive_us";
 
 
 
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."stripe_info" TO "anon";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."stripe_info" TO "authenticated";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."stripe_info" TO "service_role";
-GRANT ALL ON TABLE "public"."stripe_info" TO "hyperdrive_main";
-GRANT SELECT ON TABLE "public"."stripe_info" TO "hyperdrive_sg";
-GRANT SELECT ON TABLE "public"."stripe_info" TO "hyperdrive_us";
 
 
 
 GRANT ALL ON SEQUENCE "public"."stripe_info_id_seq" TO "anon";
 GRANT ALL ON SEQUENCE "public"."stripe_info_id_seq" TO "authenticated";
 GRANT ALL ON SEQUENCE "public"."stripe_info_id_seq" TO "service_role";
-GRANT ALL ON SEQUENCE "public"."stripe_info_id_seq" TO "hyperdrive_main";
-GRANT SELECT,USAGE ON SEQUENCE "public"."stripe_info_id_seq" TO "hyperdrive_sg";
-GRANT SELECT,USAGE ON SEQUENCE "public"."stripe_info_id_seq" TO "hyperdrive_us";
 
 
 
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."tmp_users" TO "anon";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."tmp_users" TO "authenticated";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."tmp_users" TO "service_role";
-GRANT ALL ON TABLE "public"."tmp_users" TO "hyperdrive_main";
-GRANT SELECT ON TABLE "public"."tmp_users" TO "hyperdrive_sg";
-GRANT SELECT ON TABLE "public"."tmp_users" TO "hyperdrive_us";
 
 
 
 GRANT ALL ON SEQUENCE "public"."tmp_users_id_seq" TO "anon";
 GRANT ALL ON SEQUENCE "public"."tmp_users_id_seq" TO "authenticated";
 GRANT ALL ON SEQUENCE "public"."tmp_users_id_seq" TO "service_role";
-GRANT ALL ON SEQUENCE "public"."tmp_users_id_seq" TO "hyperdrive_main";
-GRANT SELECT,USAGE ON SEQUENCE "public"."tmp_users_id_seq" TO "hyperdrive_sg";
-GRANT SELECT,USAGE ON SEQUENCE "public"."tmp_users_id_seq" TO "hyperdrive_us";
 
 
 
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."to_delete_accounts" TO "anon";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."to_delete_accounts" TO "authenticated";
 GRANT ALL ON TABLE "public"."to_delete_accounts" TO "service_role";
-GRANT ALL ON TABLE "public"."to_delete_accounts" TO "hyperdrive_main";
-GRANT SELECT ON TABLE "public"."to_delete_accounts" TO "hyperdrive_sg";
-GRANT SELECT ON TABLE "public"."to_delete_accounts" TO "hyperdrive_us";
 
 
 
 GRANT ALL ON SEQUENCE "public"."to_delete_accounts_id_seq" TO "anon";
 GRANT ALL ON SEQUENCE "public"."to_delete_accounts_id_seq" TO "authenticated";
 GRANT ALL ON SEQUENCE "public"."to_delete_accounts_id_seq" TO "service_role";
-GRANT ALL ON SEQUENCE "public"."to_delete_accounts_id_seq" TO "hyperdrive_main";
-GRANT SELECT,USAGE ON SEQUENCE "public"."to_delete_accounts_id_seq" TO "hyperdrive_sg";
-GRANT SELECT,USAGE ON SEQUENCE "public"."to_delete_accounts_id_seq" TO "hyperdrive_us";
 
 
 
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."usage_credit_grants" TO "anon";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."usage_credit_grants" TO "authenticated";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."usage_credit_grants" TO "service_role";
-GRANT ALL ON TABLE "public"."usage_credit_grants" TO "hyperdrive_main";
-GRANT SELECT ON TABLE "public"."usage_credit_grants" TO "hyperdrive_sg";
-GRANT SELECT ON TABLE "public"."usage_credit_grants" TO "hyperdrive_us";
 
 
 
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."usage_credit_balances" TO "anon";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."usage_credit_balances" TO "authenticated";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."usage_credit_balances" TO "service_role";
-GRANT ALL ON TABLE "public"."usage_credit_balances" TO "hyperdrive_main";
-GRANT SELECT ON TABLE "public"."usage_credit_balances" TO "hyperdrive_sg";
-GRANT SELECT ON TABLE "public"."usage_credit_balances" TO "hyperdrive_us";
 
 
 
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."usage_credit_consumptions" TO "anon";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."usage_credit_consumptions" TO "authenticated";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."usage_credit_consumptions" TO "service_role";
-GRANT ALL ON TABLE "public"."usage_credit_consumptions" TO "hyperdrive_main";
-GRANT SELECT ON TABLE "public"."usage_credit_consumptions" TO "hyperdrive_sg";
-GRANT SELECT ON TABLE "public"."usage_credit_consumptions" TO "hyperdrive_us";
 
 
 
 GRANT ALL ON SEQUENCE "public"."usage_credit_consumptions_id_seq" TO "anon";
 GRANT ALL ON SEQUENCE "public"."usage_credit_consumptions_id_seq" TO "authenticated";
 GRANT ALL ON SEQUENCE "public"."usage_credit_consumptions_id_seq" TO "service_role";
-GRANT ALL ON SEQUENCE "public"."usage_credit_consumptions_id_seq" TO "hyperdrive_main";
-GRANT SELECT,USAGE ON SEQUENCE "public"."usage_credit_consumptions_id_seq" TO "hyperdrive_sg";
-GRANT SELECT,USAGE ON SEQUENCE "public"."usage_credit_consumptions_id_seq" TO "hyperdrive_us";
 
 
 
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."usage_credit_transactions" TO "anon";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."usage_credit_transactions" TO "authenticated";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."usage_credit_transactions" TO "service_role";
-GRANT ALL ON TABLE "public"."usage_credit_transactions" TO "hyperdrive_main";
-GRANT SELECT ON TABLE "public"."usage_credit_transactions" TO "hyperdrive_sg";
-GRANT SELECT ON TABLE "public"."usage_credit_transactions" TO "hyperdrive_us";
 
 
 
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."usage_overage_events" TO "anon";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."usage_overage_events" TO "authenticated";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."usage_overage_events" TO "service_role";
-GRANT ALL ON TABLE "public"."usage_overage_events" TO "hyperdrive_main";
-GRANT SELECT ON TABLE "public"."usage_overage_events" TO "hyperdrive_sg";
-GRANT SELECT ON TABLE "public"."usage_overage_events" TO "hyperdrive_us";
 
 
 
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."usage_credit_ledger" TO "anon";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."usage_credit_ledger" TO "authenticated";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."usage_credit_ledger" TO "service_role";
-GRANT ALL ON TABLE "public"."usage_credit_ledger" TO "hyperdrive_main";
-GRANT SELECT ON TABLE "public"."usage_credit_ledger" TO "hyperdrive_sg";
-GRANT SELECT ON TABLE "public"."usage_credit_ledger" TO "hyperdrive_us";
 
 
 
 GRANT ALL ON SEQUENCE "public"."usage_credit_transactions_id_seq" TO "anon";
 GRANT ALL ON SEQUENCE "public"."usage_credit_transactions_id_seq" TO "authenticated";
 GRANT ALL ON SEQUENCE "public"."usage_credit_transactions_id_seq" TO "service_role";
-GRANT ALL ON SEQUENCE "public"."usage_credit_transactions_id_seq" TO "hyperdrive_main";
-GRANT SELECT,USAGE ON SEQUENCE "public"."usage_credit_transactions_id_seq" TO "hyperdrive_sg";
-GRANT SELECT,USAGE ON SEQUENCE "public"."usage_credit_transactions_id_seq" TO "hyperdrive_us";
 
 
 
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."users" TO "anon";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."users" TO "authenticated";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."users" TO "service_role";
-GRANT ALL ON TABLE "public"."users" TO "hyperdrive_main";
-GRANT SELECT ON TABLE "public"."users" TO "hyperdrive_sg";
-GRANT SELECT ON TABLE "public"."users" TO "hyperdrive_us";
 
 
 
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."version_meta" TO "anon";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."version_meta" TO "authenticated";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."version_meta" TO "service_role";
-GRANT ALL ON TABLE "public"."version_meta" TO "hyperdrive_main";
-GRANT SELECT ON TABLE "public"."version_meta" TO "hyperdrive_sg";
-GRANT SELECT ON TABLE "public"."version_meta" TO "hyperdrive_us";
 
 
 
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."version_usage" TO "anon";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."version_usage" TO "authenticated";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."version_usage" TO "service_role";
-GRANT ALL ON TABLE "public"."version_usage" TO "hyperdrive_main";
-GRANT SELECT ON TABLE "public"."version_usage" TO "hyperdrive_sg";
-GRANT SELECT ON TABLE "public"."version_usage" TO "hyperdrive_us";
 
 
 
@@ -9755,9 +9594,6 @@ ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON SEQ
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON SEQUENCES TO "anon";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON SEQUENCES TO "authenticated";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON SEQUENCES TO "service_role";
-ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON SEQUENCES TO "hyperdrive_main";
-ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT SELECT,USAGE ON SEQUENCES TO "hyperdrive_sg";
-ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT SELECT,USAGE ON SEQUENCES TO "hyperdrive_us";
 
 
 
@@ -9781,9 +9617,6 @@ ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT SELECT,INS
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLES TO "anon";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLES TO "authenticated";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLES TO "service_role";
-ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES TO "hyperdrive_main";
-ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT SELECT ON TABLES TO "hyperdrive_sg";
-ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT SELECT ON TABLES TO "hyperdrive_us";
 
 
 
