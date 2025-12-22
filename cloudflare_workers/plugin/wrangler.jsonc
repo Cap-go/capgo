@@ -106,20 +106,16 @@
           "id": "ae1fe6178b564adc9fc9a71ccc769a35"
         },
         {
-          "binding": "HYPERDRIVE_CAPGO_DIRECT_AS",
-          "id": "fcb24f3a06144ed2a940cf682321f312"
-        },
-        {
-          "binding": "HYPERDRIVE_CAPGO_DIRECT_NA",
-          "id": "8d3cfaace1fc4f66a6c0da5dbc41c4bf"
-        },
-        {
           "binding": "HYPERDRIVE_CAPGO_PS_AS",
           "id": "1da208dc0b8a4a18924a5393ea5a56a5"
         },
         {
           "binding": "HYPERDRIVE_CAPGO_PS_NA",
           "id": "63190ba747924f1eb7c251c994ad465f"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_PS_EU",
+          "id": "e91b4ce278c04854b80a66183b4fe9bc"
         }
       ]
     },
@@ -184,20 +180,16 @@
           "id": "ae1fe6178b564adc9fc9a71ccc769a35"
         },
         {
-          "binding": "HYPERDRIVE_CAPGO_DIRECT_AS",
-          "id": "fcb24f3a06144ed2a940cf682321f312"
-        },
-        {
-          "binding": "HYPERDRIVE_CAPGO_DIRECT_NA",
-          "id": "8d3cfaace1fc4f66a6c0da5dbc41c4bf"
-        },
-        {
           "binding": "HYPERDRIVE_CAPGO_PS_AS",
           "id": "1da208dc0b8a4a18924a5393ea5a56a5"
         },
         {
           "binding": "HYPERDRIVE_CAPGO_PS_NA",
           "id": "63190ba747924f1eb7c251c994ad465f"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_PS_EU",
+          "id": "e91b4ce278c04854b80a66183b4fe9bc"
         }
       ]
     },
@@ -262,20 +254,16 @@
           "id": "ae1fe6178b564adc9fc9a71ccc769a35"
         },
         {
-          "binding": "HYPERDRIVE_CAPGO_DIRECT_AS",
-          "id": "fcb24f3a06144ed2a940cf682321f312"
-        },
-        {
-          "binding": "HYPERDRIVE_CAPGO_DIRECT_NA",
-          "id": "8d3cfaace1fc4f66a6c0da5dbc41c4bf"
-        },
-        {
           "binding": "HYPERDRIVE_CAPGO_PS_AS",
           "id": "1da208dc0b8a4a18924a5393ea5a56a5"
         },
         {
           "binding": "HYPERDRIVE_CAPGO_PS_NA",
           "id": "63190ba747924f1eb7c251c994ad465f"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_PS_EU",
+          "id": "e91b4ce278c04854b80a66183b4fe9bc"
         }
       ]
     },
@@ -340,20 +328,16 @@
           "id": "ae1fe6178b564adc9fc9a71ccc769a35"
         },
         {
-          "binding": "HYPERDRIVE_CAPGO_DIRECT_AS",
-          "id": "fcb24f3a06144ed2a940cf682321f312"
-        },
-        {
-          "binding": "HYPERDRIVE_CAPGO_DIRECT_NA",
-          "id": "8d3cfaace1fc4f66a6c0da5dbc41c4bf"
-        },
-        {
           "binding": "HYPERDRIVE_CAPGO_PS_AS",
           "id": "1da208dc0b8a4a18924a5393ea5a56a5"
         },
         {
           "binding": "HYPERDRIVE_CAPGO_PS_NA",
           "id": "63190ba747924f1eb7c251c994ad465f"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_PS_EU",
+          "id": "e91b4ce278c04854b80a66183b4fe9bc"
         }
       ]
     },
@@ -418,20 +402,16 @@
           "id": "ae1fe6178b564adc9fc9a71ccc769a35"
         },
         {
-          "binding": "HYPERDRIVE_CAPGO_DIRECT_AS",
-          "id": "fcb24f3a06144ed2a940cf682321f312"
-        },
-        {
-          "binding": "HYPERDRIVE_CAPGO_DIRECT_NA",
-          "id": "8d3cfaace1fc4f66a6c0da5dbc41c4bf"
-        },
-        {
           "binding": "HYPERDRIVE_CAPGO_PS_AS",
           "id": "1da208dc0b8a4a18924a5393ea5a56a5"
         },
         {
           "binding": "HYPERDRIVE_CAPGO_PS_NA",
           "id": "63190ba747924f1eb7c251c994ad465f"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_PS_EU",
+          "id": "e91b4ce278c04854b80a66183b4fe9bc"
         }
       ]
     },
@@ -496,20 +476,16 @@
           "id": "ae1fe6178b564adc9fc9a71ccc769a35"
         },
         {
-          "binding": "HYPERDRIVE_CAPGO_DIRECT_AS",
-          "id": "fcb24f3a06144ed2a940cf682321f312"
-        },
-        {
-          "binding": "HYPERDRIVE_CAPGO_DIRECT_NA",
-          "id": "8d3cfaace1fc4f66a6c0da5dbc41c4bf"
-        },
-        {
           "binding": "HYPERDRIVE_CAPGO_PS_AS",
           "id": "1da208dc0b8a4a18924a5393ea5a56a5"
         },
         {
           "binding": "HYPERDRIVE_CAPGO_PS_NA",
           "id": "63190ba747924f1eb7c251c994ad465f"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_PS_EU",
+          "id": "e91b4ce278c04854b80a66183b4fe9bc"
         }
       ]
     },
@@ -574,20 +550,16 @@
           "id": "ae1fe6178b564adc9fc9a71ccc769a35"
         },
         {
-          "binding": "HYPERDRIVE_CAPGO_DIRECT_AS",
-          "id": "fcb24f3a06144ed2a940cf682321f312"
-        },
-        {
-          "binding": "HYPERDRIVE_CAPGO_DIRECT_NA",
-          "id": "8d3cfaace1fc4f66a6c0da5dbc41c4bf"
-        },
-        {
           "binding": "HYPERDRIVE_CAPGO_PS_AS",
           "id": "1da208dc0b8a4a18924a5393ea5a56a5"
         },
         {
           "binding": "HYPERDRIVE_CAPGO_PS_NA",
           "id": "63190ba747924f1eb7c251c994ad465f"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_PS_EU",
+          "id": "e91b4ce278c04854b80a66183b4fe9bc"
         }
       ]
     },
@@ -652,20 +624,16 @@
           "id": "ae1fe6178b564adc9fc9a71ccc769a35"
         },
         {
-          "binding": "HYPERDRIVE_CAPGO_DIRECT_AS",
-          "id": "fcb24f3a06144ed2a940cf682321f312"
-        },
-        {
-          "binding": "HYPERDRIVE_CAPGO_DIRECT_NA",
-          "id": "8d3cfaace1fc4f66a6c0da5dbc41c4bf"
-        },
-        {
           "binding": "HYPERDRIVE_CAPGO_PS_AS",
           "id": "1da208dc0b8a4a18924a5393ea5a56a5"
         },
         {
           "binding": "HYPERDRIVE_CAPGO_PS_NA",
           "id": "63190ba747924f1eb7c251c994ad465f"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_PS_EU",
+          "id": "e91b4ce278c04854b80a66183b4fe9bc"
         }
       ]
     },
@@ -723,20 +691,16 @@
           "id": "ae1fe6178b564adc9fc9a71ccc769a35"
         },
         {
-          "binding": "HYPERDRIVE_CAPGO_DIRECT_AS",
-          "id": "fcb24f3a06144ed2a940cf682321f312"
-        },
-        {
-          "binding": "HYPERDRIVE_CAPGO_DIRECT_NA",
-          "id": "8d3cfaace1fc4f66a6c0da5dbc41c4bf"
-        },
-        {
           "binding": "HYPERDRIVE_CAPGO_PS_AS",
           "id": "1da208dc0b8a4a18924a5393ea5a56a5"
         },
         {
           "binding": "HYPERDRIVE_CAPGO_PS_NA",
           "id": "63190ba747924f1eb7c251c994ad465f"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_PS_EU",
+          "id": "e91b4ce278c04854b80a66183b4fe9bc"
         }
       ],
       "placement": {
@@ -801,20 +765,16 @@
           "id": "ae1fe6178b564adc9fc9a71ccc769a35"
         },
         {
-          "binding": "HYPERDRIVE_CAPGO_DIRECT_AS",
-          "id": "fcb24f3a06144ed2a940cf682321f312"
-        },
-        {
-          "binding": "HYPERDRIVE_CAPGO_DIRECT_NA",
-          "id": "8d3cfaace1fc4f66a6c0da5dbc41c4bf"
-        },
-        {
           "binding": "HYPERDRIVE_CAPGO_PS_AS",
           "id": "1da208dc0b8a4a18924a5393ea5a56a5"
         },
         {
           "binding": "HYPERDRIVE_CAPGO_PS_NA",
           "id": "63190ba747924f1eb7c251c994ad465f"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_PS_EU",
+          "id": "e91b4ce278c04854b80a66183b4fe9bc"
         }
       ],
       "placement": {
