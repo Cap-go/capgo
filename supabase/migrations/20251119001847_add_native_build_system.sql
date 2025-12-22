@@ -48,6 +48,10 @@ CREATE INDEX idx_build_logs_org_created ON public.build_logs (
     org_id, created_at DESC
 );
 
+-- Unique constraint for ON CONFLICT in record_build_time function
+ALTER TABLE public.build_logs
+ADD CONSTRAINT build_logs_build_id_org_id_unique UNIQUE (build_id, org_id);
+
 ALTER TABLE public.build_logs ENABLE ROW LEVEL SECURITY;
 
 -- Users can view:
@@ -307,42 +311,6 @@ service_role;
 DROP FUNCTION IF EXISTS public.get_app_metrics(uuid);
 
 DROP FUNCTION IF EXISTS public.get_app_metrics(uuid, date, date);
-
-CREATE FUNCTION public.get_app_metrics(
-    org_id uuid, start_date date, end_date date
-) RETURNS TABLE (
-    app_id character varying,
-    date date,
-    mau bigint,
-    storage bigint,
-    bandwidth bigint,
-    build_time_unit bigint,
-    get bigint,
-    fail bigint,
-    install bigint,
-    uninstall bigint
-) LANGUAGE plpgsql STABLE SECURITY DEFINER
-SET
-search_path = '' AS $$
-BEGIN
-  RETURN QUERY
-  WITH DateSeries AS (SELECT generate_series(start_date, end_date, '1 day'::interval)::date AS "date"),
-  all_apps AS (SELECT apps.app_id FROM public.apps WHERE apps.owner_org = get_app_metrics.org_id
-    UNION SELECT deleted_apps.app_id FROM public.deleted_apps WHERE deleted_apps.owner_org = get_app_metrics.org_id)
-  SELECT aa.app_id, ds.date::date, COALESCE(dm.mau, 0) AS mau, COALESCE(dst.storage, 0) AS storage,
-    COALESCE(db.bandwidth, 0) AS bandwidth, COALESCE(dbt.build_time_unit, 0) AS build_time_unit,
-    COALESCE(SUM(dv.get)::bigint, 0) AS get, COALESCE(SUM(dv.fail)::bigint, 0) AS fail,
-    COALESCE(SUM(dv.install)::bigint, 0) AS install, COALESCE(SUM(dv.uninstall)::bigint, 0) AS uninstall
-  FROM all_apps aa CROSS JOIN DateSeries ds
-  LEFT JOIN public.daily_mau dm ON aa.app_id = dm.app_id AND ds.date = dm.date
-  LEFT JOIN public.daily_storage dst ON aa.app_id = dst.app_id AND ds.date = dst.date
-  LEFT JOIN public.daily_bandwidth db ON aa.app_id = db.app_id AND ds.date = db.date
-  LEFT JOIN public.daily_build_time dbt ON aa.app_id = dbt.app_id AND ds.date = dbt.date
-  LEFT JOIN public.daily_version dv ON aa.app_id = dv.app_id AND ds.date = dv.date
-  GROUP BY aa.app_id, ds.date, dm.mau, dst.storage, db.bandwidth, dbt.build_time_unit
-  ORDER BY aa.app_id, ds.date;
-END;
-$$;
 
 CREATE FUNCTION public.get_app_metrics(org_id uuid) RETURNS TABLE (
     app_id character varying,
