@@ -70,10 +70,6 @@ CREATE EXTENSION IF NOT EXISTS "hypopg"
 WITH
   SCHEMA "extensions";
 
-CREATE EXTENSION IF NOT EXISTS "index_advisor"
-WITH
-  SCHEMA "extensions";
-
 CREATE EXTENSION IF NOT EXISTS "plpgsql_check"
 WITH
   SCHEMA "extensions";
