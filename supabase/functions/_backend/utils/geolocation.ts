@@ -1,13 +1,10 @@
 import type { Context } from 'hono'
-import { cloudlog } from './logging.ts'
 import { existInEnv, getEnv } from './utils.ts'
 
 // Antartica and Tor are redirected to EU in our snippet
 type ContinentsCFWorker = 'EU' | 'NA' | 'AS' | 'OC' | 'SA' | 'AF' | 'ME' | 'HK'
 type RegionsAWS = 'EU' | 'NA' | 'SA' | 'AF' | 'AP' | 'ME' | 'IL' | 'CA' | 'MX'
-type DbRegionD1 = 'EU' | 'NA' | 'AS' | 'OC' | undefined
-// type DbRegionD1 = 'EU' | 'NA' | 'AS' | 'OC' | undefined
-type DbRegionSB = 'EU' | 'NA' | 'AS' | undefined
+type DbRegionSB = 'EU' | 'NA' | 'AS' | 'SA' | 'OC' | undefined
 
 export function getContinentCF(c: Context): ContinentsCFWorker | undefined {
   if (!existInEnv(c, 'ENV_NAME')) {
@@ -27,22 +24,6 @@ export function getContinentSB(c: Context): RegionsAWS | undefined {
   const sbRegion = getEnv(c, 'SB_REGION')!.split('-')[0].toUpperCase()
   return sbRegion as RegionsAWS
 }
-/**
- * Get database region from request context based on deployment platform
- * Maps client location to database regions: EU (Europe/Africa), US (Americas), AS (Asia/Oceania)
- * @param c Hono context
- * @returns Database region code: 'EU'
- */
-export function getClientDbRegionD1(c: Context): DbRegionD1 {
-  const continent = getContinentCF(c)
-  cloudlog({ requestId: c.get('requestId'), message: 'nameContinent', continent, source: 'env-check' })
-  if (continent) {
-    switch (continent) {
-      default:
-        return 'EU' // Default to EU if unknown
-    }
-  }
-}
 
 export function getClientDbRegionSB(c: Context): DbRegionSB {
   // 1. Supabase Edge Functions provide region in ENV VAR SB_REGION (e.g., eu-west-3, us-east-1, ap-southeast-1)
@@ -56,13 +37,15 @@ export function getClientDbRegionSB(c: Context): DbRegionSB {
       return 'EU'
     case 'AS': // Asia CF
     case 'AP': // Asia Pacific AWS
-    case 'OC': // Oceania CF
       return 'AS'
+    case 'OC': // Oceania CF
+      return 'OC'
     case 'NA': // North America CF, AWS
     case 'CA': // Canada AWS
     case 'MX': // Mexico AWS
-    case 'SA': // South America CF, AWS
       return 'NA'
+    case 'SA': // South America
+      return 'SA'
     default:
       return undefined
   }
