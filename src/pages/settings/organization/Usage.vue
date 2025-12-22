@@ -7,6 +7,7 @@ import { computed, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
+import Spinner from '~/components/Spinner.vue'
 import { bytesToGb } from '~/services/conversion'
 import { getCreditUnitPricing, getCurrentPlanNameOrg, getPlans, getPlanUsagePercent, getTotalStorage, getUsageCreditDeductions } from '~/services/supabase'
 import { sendEvent } from '~/services/tracking'
@@ -310,7 +311,7 @@ function nextRunDate() {
       <!-- Plan & Cost Overview -->
       <div class="grid grid-cols-1 gap-6 mb-8 lg:grid-cols-3 shrink-0">
         <!-- Current Plan -->
-        <div class="flex flex-col justify-between lg:col-span-2 p-5 bg-gray-50 rounded-xl border border-gray-200 shadow-sm dark:bg-gray-900 dark:border-gray-700">
+        <div class="flex flex-col justify-between p-5 border border-gray-200 shadow-sm lg:col-span-2 bg-gray-50 rounded-xl dark:bg-gray-900 dark:border-gray-700">
           <div class="flex flex-row justify-between">
             <div class="flex flex-col">
               <div class="mb-1 text-sm text-gray-500 dark:text-gray-400">
@@ -483,8 +484,8 @@ function nextRunDate() {
 
     <!-- Loading State -->
     <div v-else class="flex items-center justify-center h-full">
-      <div class="text-center">
-        <div class="w-12 h-12 mx-auto mb-4 border-b-2 border-blue-600 rounded-full animate-spin" />
+      <div class="mb-4 text-center">
+        <Spinner size="w-12 h-12" class="mx-auto" />
         <p class="text-gray-600 dark:text-gray-400">
           {{ t('loading') }}...
         </p>
