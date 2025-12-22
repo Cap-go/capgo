@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "13.0.5"
+    PostgrestVersion: "14.1"
   }
   public: {
     Tables: {
@@ -937,7 +937,7 @@ export type Database = {
           credits_consumed: number
           date_id: string
           devices_last_month: number | null
-          mrrr: number
+          mrr: number
           need_upgrade: number | null
           new_paying_orgs: number
           not_paying: number | null
@@ -945,7 +945,6 @@ export type Database = {
           paying: number | null
           paying_monthly: number | null
           paying_yearly: number | null
-          plan_enterprise: number | null
           plan_enterprise_monthly: number
           plan_enterprise_yearly: number
           plan_maker: number | null
@@ -982,7 +981,7 @@ export type Database = {
           credits_consumed?: number
           date_id: string
           devices_last_month?: number | null
-          mrrr?: number
+          mrr?: number
           need_upgrade?: number | null
           new_paying_orgs?: number
           not_paying?: number | null
@@ -990,7 +989,6 @@ export type Database = {
           paying?: number | null
           paying_monthly?: number | null
           paying_yearly?: number | null
-          plan_enterprise?: number | null
           plan_enterprise_monthly?: number
           plan_enterprise_yearly?: number
           plan_maker?: number | null
@@ -1027,7 +1025,7 @@ export type Database = {
           credits_consumed?: number
           date_id?: string
           devices_last_month?: number | null
-          mrrr?: number
+          mrr?: number
           need_upgrade?: number | null
           new_paying_orgs?: number
           not_paying?: number | null
@@ -1035,7 +1033,6 @@ export type Database = {
           paying?: number | null
           paying_monthly?: number | null
           paying_yearly?: number | null
-          plan_enterprise?: number | null
           plan_enterprise_monthly?: number
           plan_enterprise_yearly?: number
           plan_maker?: number | null
@@ -2287,6 +2284,7 @@ export type Database = {
         Returns: {
           app_id: string
           checksum: string | null
+          cli_version: string | null
           comment: string | null
           created_at: string | null
           deleted: boolean
