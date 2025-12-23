@@ -130,6 +130,7 @@ async function guard(
 
     // Check for auto-join to organizations based on email domain
     try {
+      const config = getLocalConfig()
       await fetch(`${config.hostWeb}/private/check_auto_join_orgs`, {
         method: 'POST',
         headers: {

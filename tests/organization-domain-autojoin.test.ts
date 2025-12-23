@@ -301,7 +301,6 @@ describe('Organization Email Domain Auto-Join', () => {
 
     describe('Auto-Join Functionality', () => {
         it('should auto-join user to org on signup with matching email domain', async () => {
-            const testUserId = randomUUID()
             const testEmail = `testuser@${TEST_DOMAIN}`
 
             // Set org to have test domain
