@@ -86,10 +86,40 @@ describe('Organization Email Domain Auto-Join', () => {
             await getSupabaseClient().from('stripe_info').delete().eq('customer_id', emptyCustomerId)
         })
 
-        it('should reject request without read permissions', async () => {
-            // This would require creating a separate API key without permissions
-            // For now, this test case is documented
-            expect(true).toBe(true)
+        it('should reject request without org membership', async () => {
+            // Create an org where the test user is NOT a member
+            const unauthorizedOrgId = randomUUID()
+            const unauthorizedCustomerId = `cus_unauthorized_${randomUUID()}`
+
+            // Create stripe_info
+            await getSupabaseClient().from('stripe_info').insert({
+                customer_id: unauthorizedCustomerId,
+                status: 'succeeded',
+                product_id: 'prod_LQIregjtNduh4q',
+            })
+
+            // Create org owned by a different user (USER_ID_2)
+            await getSupabaseClient().from('orgs').insert({
+                id: unauthorizedOrgId,
+                name: `Unauthorized Org ${randomUUID()}`,
+                management_email: 'other@example.com',
+                created_by: '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5', // USER_ID_2 - different from test user
+                customer_id: unauthorizedCustomerId,
+                allowed_email_domains: ['unauthorized.com'],
+            })
+
+            // Try to access org domains without membership
+            const response = await fetch(`${BASE_URL}/organization/domains?orgId=${unauthorizedOrgId}`, {
+                headers,
+            })
+
+            expect(response.status).toBe(400)
+            const data = await response.json() as any
+            expect(data.error).toBe('cannot_access_organization')
+
+            // Cleanup
+            await getSupabaseClient().from('orgs').delete().eq('id', unauthorizedOrgId)
+            await getSupabaseClient().from('stripe_info').delete().eq('customer_id', unauthorizedCustomerId)
         })
     })
 
@@ -196,10 +226,57 @@ describe('Organization Email Domain Auto-Join', () => {
             expect(data.allowed_email_domains).toEqual([])
         })
 
-        it('should reject request without admin permissions', async () => {
-            // This would require creating a separate API key without admin permissions
-            // For now, this test case is documented
-            expect(true).toBe(true)
+        it('should reject request from non-admin user', async () => {
+            // Create an org and add test user as 'read' member (not admin)
+            const readOnlyOrgId = randomUUID()
+            const readOnlyCustomerId = `cus_readonly_${randomUUID()}`
+
+            // Create stripe_info
+            await getSupabaseClient().from('stripe_info').insert({
+                customer_id: readOnlyCustomerId,
+                status: 'succeeded',
+                product_id: 'prod_LQIregjtNduh4q',
+            })
+
+            // Create org owned by a different user
+            await getSupabaseClient().from('orgs').insert({
+                id: readOnlyOrgId,
+                name: `ReadOnly Org ${randomUUID()}`,
+                management_email: 'readonly@example.com',
+                created_by: '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5', // USER_ID_2
+                customer_id: readOnlyCustomerId,
+                allowed_email_domains: ['readonly.com'],
+            })
+
+            // Add test user as 'read' member (not admin)
+            await getSupabaseClient().from('org_users').insert({
+                org_id: readOnlyOrgId,
+                user_id: USER_ID, // Test user
+                user_right: 'read', // Not admin or super_admin
+                app_id: null,
+                channel_id: null,
+            })
+
+            // Try to update domains with read-only permission
+            const response = await fetch(`${BASE_URL}/organization/domains`, {
+                method: 'PUT',
+                headers,
+                body: JSON.stringify({
+                    orgId: readOnlyOrgId,
+                    domains: ['newdomain.com'],
+                    enabled: true,
+                }),
+            })
+
+            expect(response.status).toBe(400)
+            const data = await response.json() as any
+            expect(data.error).toBe('insufficient_permissions')
+            expect(data.message).toContain('admin rights')
+
+            // Cleanup
+            await getSupabaseClient().from('org_users').delete().eq('org_id', readOnlyOrgId).eq('user_id', USER_ID)
+            await getSupabaseClient().from('orgs').delete().eq('id', readOnlyOrgId)
+            await getSupabaseClient().from('stripe_info').delete().eq('customer_id', readOnlyCustomerId)
         })
     })
 
