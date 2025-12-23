@@ -81,6 +81,18 @@ export function getDatabaseURL(c: Context, readOnly = false): string {
       cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_PLANETSCALE_EU for read-only' })
       return c.env.HYPERDRIVE_CAPGO_PS_EU.connectionString
     }
+    // // OC region
+    if (c.env.HYPERDRIVE_CAPGO_PS_OC && dbRegion === 'OC') {
+      c.header('X-Database-Source', 'HYPERDRIVE_CAPGO_PLANETSCALE_OC')
+      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_PLANETSCALE_OC for read-only' })
+      return c.env.HYPERDRIVE_CAPGO_PS_OC.connectionString
+    }
+    // // SA region
+    if (c.env.HYPERDRIVE_CAPGO_PS_SA && dbRegion === 'SA') {
+      c.header('X-Database-Source', 'HYPERDRIVE_CAPGO_PLANETSCALE_SA')
+      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_PLANETSCALE_SA for read-only' })
+      return c.env.HYPERDRIVE_CAPGO_PS_SA.connectionString
+    }
     // Custom Supabase Region Read replicate Poolers
     // Asia region
     // if (existInEnv(c, 'READ_SUPABASE_DB_URL_AS') && dbRegion === 'AS') {
