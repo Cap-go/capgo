@@ -51,13 +51,6 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
-    '/admin/dashboard/replication': RouteRecordInfo<
-      '/admin/dashboard/replication',
-      '/admin/dashboard/replication',
-      Record<never, never>,
-      Record<never, never>,
-      | never
-    >,
     '/admin/dashboard/revenue': RouteRecordInfo<
       '/admin/dashboard/revenue',
       '/admin/dashboard/revenue',
@@ -110,20 +103,6 @@ declare module 'vue-router/auto-routes' {
     '/app/[package].bundle.[bundle]': RouteRecordInfo<
       '/app/[package].bundle.[bundle]',
       '/app/:package/bundle/:bundle',
-      { package: ParamValue<true>, bundle: ParamValue<true> },
-      { package: ParamValue<false>, bundle: ParamValue<false> },
-      | never
-    >,
-    '/app/[package].bundle.[bundle].dependencies': RouteRecordInfo<
-      '/app/[package].bundle.[bundle].dependencies',
-      '/app/:package/bundle/:bundle/dependencies',
-      { package: ParamValue<true>, bundle: ParamValue<true> },
-      { package: ParamValue<false>, bundle: ParamValue<false> },
-      | never
-    >,
-    '/app/[package].bundle.[bundle].history': RouteRecordInfo<
-      '/app/[package].bundle.[bundle].history',
-      '/app/:package/bundle/:bundle/history',
       { package: ParamValue<true>, bundle: ParamValue<true> },
       { package: ParamValue<false>, bundle: ParamValue<false> },
       | never
@@ -338,16 +317,9 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
-    '/settings/organization/Security': RouteRecordInfo<
-      '/settings/organization/Security',
-      '/settings/organization/security',
-      Record<never, never>,
-      Record<never, never>,
-      | never
-    >,
-    '/settings/organization/AuditLogs': RouteRecordInfo<
-      '/settings/organization/AuditLogs',
-      '/settings/organization/AuditLogs',
+    '/settings/organization/autojoin': RouteRecordInfo<
+      '/settings/organization/autojoin',
+      '/settings/organization/autojoin',
       Record<never, never>,
       Record<never, never>,
       | never
@@ -373,13 +345,6 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
-    '/settings/organization/Notifications': RouteRecordInfo<
-      '/settings/organization/Notifications',
-      '/settings/organization/Notifications',
-      Record<never, never>,
-      Record<never, never>,
-      | never
-    >,
     '/settings/organization/Plans': RouteRecordInfo<
       '/settings/organization/Plans',
       '/settings/organization/Plans',
@@ -390,13 +355,6 @@ declare module 'vue-router/auto-routes' {
     '/settings/organization/Usage': RouteRecordInfo<
       '/settings/organization/Usage',
       '/settings/organization/Usage',
-      Record<never, never>,
-      Record<never, never>,
-      | never
-    >,
-    '/settings/organization/Webhooks': RouteRecordInfo<
-      '/settings/organization/Webhooks',
-      '/settings/organization/Webhooks',
       Record<never, never>,
       Record<never, never>,
       | never
@@ -445,12 +403,6 @@ declare module 'vue-router/auto-routes' {
       views:
         | never
     }
-    'src/pages/admin/dashboard/replication.vue': {
-      routes:
-        | '/admin/dashboard/replication'
-      views:
-        | never
-    }
     'src/pages/admin/dashboard/revenue.vue': {
       routes:
         | '/admin/dashboard/revenue'
@@ -496,18 +448,6 @@ declare module 'vue-router/auto-routes' {
     'src/pages/app/[package].bundle.[bundle].vue': {
       routes:
         | '/app/[package].bundle.[bundle]'
-      views:
-        | never
-    }
-    'src/pages/app/[package].bundle.[bundle].dependencies.vue': {
-      routes:
-        | '/app/[package].bundle.[bundle].dependencies'
-      views:
-        | never
-    }
-    'src/pages/app/[package].bundle.[bundle].history.vue': {
-      routes:
-        | '/app/[package].bundle.[bundle].history'
       views:
         | never
     }
@@ -691,15 +631,9 @@ declare module 'vue-router/auto-routes' {
       views:
         | never
     }
-    'src/pages/settings/organization/Security.vue': {
+    'src/pages/settings/organization/autojoin.vue': {
       routes:
-        | '/settings/organization/Security'
-      views:
-        | never
-    }
-    'src/pages/settings/organization/AuditLogs.vue': {
-      routes:
-        | '/settings/organization/AuditLogs'
+        | '/settings/organization/autojoin'
       views:
         | never
     }
@@ -721,12 +655,6 @@ declare module 'vue-router/auto-routes' {
       views:
         | never
     }
-    'src/pages/settings/organization/Notifications.vue': {
-      routes:
-        | '/settings/organization/Notifications'
-      views:
-        | never
-    }
     'src/pages/settings/organization/Plans.vue': {
       routes:
         | '/settings/organization/Plans'
@@ -736,12 +664,6 @@ declare module 'vue-router/auto-routes' {
     'src/pages/settings/organization/Usage.vue': {
       routes:
         | '/settings/organization/Usage'
-      views:
-        | never
-    }
-    'src/pages/settings/organization/Webhooks.vue': {
-      routes:
-        | '/settings/organization/Webhooks'
       views:
         | never
     }

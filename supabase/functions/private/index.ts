@@ -1,5 +1,6 @@
 import { app as accept_invitation } from '../_backend/private/accept_invitation.ts'
 import { app as admin_stats } from '../_backend/private/admin_stats.ts'
+import { app as check_auto_join_orgs } from '../_backend/private/check_auto_join_orgs.ts'
 import { app as config } from '../_backend/private/config.ts'
 import { app as create_device } from '../_backend/private/create_device.ts'
 import { app as credits } from '../_backend/private/credits.ts'
@@ -10,6 +11,8 @@ import { app as events } from '../_backend/private/events.ts'
 import { app as invite_new_user_to_org } from '../_backend/private/invite_new_user_to_org.ts'
 import { app as latency } from '../_backend/private/latency.ts'
 import { app as log_as } from '../_backend/private/log_as.ts'
+import { app as organization_domains_get } from '../_backend/private/organization_domains_get.ts'
+import { app as organization_domains_put } from '../_backend/private/organization_domains_put.ts'
 // Webapps API
 import { app as plans } from '../_backend/private/plans.ts'
 import { app as publicStats } from '../_backend/private/public_stats.ts'
@@ -48,6 +51,9 @@ appGlobal.route('/latency', latency)
 appGlobal.route('/events', events)
 appGlobal.route('/invite_new_user_to_org', invite_new_user_to_org)
 appGlobal.route('/accept_invitation', accept_invitation)
+appGlobal.route('/check_auto_join_orgs', check_auto_join_orgs)
+appGlobal.route('/organization_domains_get', organization_domains_get)
+appGlobal.route('/organization_domains_put', organization_domains_put)
 appGlobal.route('/validate_password_compliance', validate_password_compliance)
 
 createAllCatch(appGlobal, functionName)
