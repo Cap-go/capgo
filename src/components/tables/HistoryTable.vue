@@ -23,6 +23,10 @@ interface DeployHistory {
     created_at: string
     deleted?: boolean
   }
+  channel?: {
+    id: number
+    name: string
+  }
   created_by: string
   user: {
     uid: string
@@ -31,7 +35,8 @@ interface DeployHistory {
 }
 
 const props = defineProps<{
-  channelId: number
+  channelId?: number
+  bundleId?: number
   appId: string
 }>()
 
@@ -53,8 +58,15 @@ const pageSize = ref(10)
 const total = ref(0)
 const currentVersionId = ref<number | null>(null)
 
-// Fetch current channel's version_id
+// Fetch current channel's version_id (only relevant for channel mode)
 async function fetchCurrentVersion() {
+  // Skip if in bundle mode
+  if (props.bundleId)
+    return
+
+  if (!props.channelId)
+    return
+
   try {
     const { data, error } = await supabase
       .from('channels')
@@ -79,49 +91,88 @@ function isCurrentVersion(item: DeployHistory): boolean {
   return item.version_id === currentVersionId.value
 }
 
-const columns = computed<TableColumn[]>(() => [
-  {
-    label: t('bundle-number'),
-    key: 'version.name',
-    mobile: true,
-    sortable: true,
-    displayFunction: item => item.version.name,
-    onClick: (item: DeployHistory) => openOneVersion(item),
-  },
-  {
-    label: t('deploy-date'),
-    key: 'deployed_at',
-    mobile: true,
-    sortable: true,
-    displayFunction: item => formatDate(item.deployed_at),
-  },
-  {
-    label: t('deployed-by'),
-    key: 'created_by',
-    mobile: false,
-    displayFunction: item => item.user?.email || '-',
-  },
-  {
-    label: t('action'),
-    key: 'rollback',
-    mobile: true,
-    class: 'text-center',
-    displayFunction: (item) => {
-      if (item.version?.deleted) {
-        return t('bundle-deleted')
-      }
-      return isCurrentVersion(item) ? t('current') : t('rollback')
+// Check if we're in bundle mode (showing deployment history for a specific bundle)
+const isBundleMode = computed(() => !!props.bundleId)
+
+function openOneChannel(item: DeployHistory) {
+  if (item.channel?.id) {
+    router.push(`/app/${props.appId}/channel/${item.channel.id}`)
+  }
+}
+
+const columns = computed<TableColumn[]>(() => {
+  // Bundle mode: show channel name instead of bundle name, and no rollback
+  if (isBundleMode.value) {
+    return [
+      {
+        label: t('channel'),
+        key: 'channel.name',
+        mobile: true,
+        sortable: false,
+        displayFunction: item => item.channel?.name || '-',
+        onClick: (item: DeployHistory) => openOneChannel(item),
+      },
+      {
+        label: t('deploy-date'),
+        key: 'deployed_at',
+        mobile: true,
+        sortable: true,
+        displayFunction: item => formatDate(item.deployed_at),
+      },
+      {
+        label: t('deployed-by'),
+        key: 'created_by',
+        mobile: false,
+        displayFunction: item => item.user?.email || '-',
+      },
+    ]
+  }
+
+  // Channel mode: show bundle name and rollback action
+  return [
+    {
+      label: t('bundle-number'),
+      key: 'version.name',
+      mobile: true,
+      sortable: true,
+      displayFunction: item => item.version.name,
+      onClick: (item: DeployHistory) => openOneVersion(item),
     },
-    onClick: (item) => {
-      if (!isCurrentVersion(item) && !item.version?.deleted) {
-        handleRollback(item)
-      }
-      else {
-        toast.error(t('cannot-rollback-to-current-version'))
-      }
+    {
+      label: t('deploy-date'),
+      key: 'deployed_at',
+      mobile: true,
+      sortable: true,
+      displayFunction: item => formatDate(item.deployed_at),
     },
-  },
-])
+    {
+      label: t('deployed-by'),
+      key: 'created_by',
+      mobile: false,
+      displayFunction: item => item.user?.email || '-',
+    },
+    {
+      label: t('action'),
+      key: 'rollback',
+      mobile: true,
+      class: 'text-center',
+      displayFunction: (item) => {
+        if (item.version?.deleted) {
+          return t('bundle-deleted')
+        }
+        return isCurrentVersion(item) ? t('current') : t('rollback')
+      },
+      onClick: (item) => {
+        if (!isCurrentVersion(item) && !item.version?.deleted) {
+          handleRollback(item)
+        }
+        else {
+          toast.error(t('cannot-rollback-to-current-version'))
+        }
+      },
+    },
+  ]
+})
 
 async function openOneVersion(item: DeployHistory) {
   router.push(`/app/${props.appId}/bundle/${item.version_id}`)
@@ -134,10 +185,23 @@ async function fetchDeployHistory() {
     await fetchCurrentVersion()
     members.value = await organizationStore.getMembers()
 
-    // Using "deploy_history" as a string rather than a type reference
-    let query = supabase
-      .from('deploy_history')
-      .select(`
+    // Build select query based on mode
+    const selectFields = isBundleMode.value
+      ? `
+        *,
+        version:version_id (
+          id,
+          name,
+          app_id,
+          created_at,
+          deleted
+        ),
+        channel:channel_id (
+          id,
+          name
+        )
+      `
+      : `
         *,
         version:version_id (
           id,
@@ -146,14 +210,33 @@ async function fetchDeployHistory() {
           created_at,
           deleted
         )
-      `, { count: 'exact' })
-      .eq('channel_id', props.channelId)
+      `
+
+    // Using "deploy_history" as a string rather than a type reference
+    let query = supabase
+      .from('deploy_history')
+      .select(selectFields, { count: 'exact' })
       .eq('app_id', props.appId)
       .order(Object.keys(sort.value)[0], { ascending: Object.values(sort.value)[0] === 'asc' })
 
-    // Apply search filter on version name if search value exists
+    // Apply filter based on mode
+    if (isBundleMode.value) {
+      query = query.eq('version_id', props.bundleId!)
+    }
+    else if (props.channelId) {
+      query = query.eq('channel_id', props.channelId)
+    }
+
+    // Apply search filter based on mode
     if (search.value) {
-      query = query.like('version.name', `%${search.value}%`)
+      if (isBundleMode.value) {
+        // In bundle mode, search by channel name
+        query = query.like('channel.name', `%${search.value}%`)
+      }
+      else {
+        // In channel mode, search by version name
+        query = query.like('version.name', `%${search.value}%`)
+      }
     }
 
     const { data, error, count } = await query
@@ -164,8 +247,12 @@ async function fetchDeployHistory() {
       toast.error(t('error-fetching-deploy-history'))
       return
     }
-    // filter out data with no version name
+
+    // Filter out data based on mode
     const filteredData = data.filter((item) => {
+      if (isBundleMode.value) {
+        return item?.channel !== null
+      }
       return item?.version !== null
     }) as unknown as DeployHistory[]
 
@@ -240,7 +327,7 @@ async function handleRollback(item: DeployHistory) {
   await dialogStore.onDialogDismiss()
 }
 
-watch([() => props.channelId, () => props.appId], () => {
+watch([() => props.channelId, () => props.bundleId, () => props.appId], () => {
   fetchDeployHistory()
 })
 </script>
