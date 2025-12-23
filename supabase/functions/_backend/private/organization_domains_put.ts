@@ -56,7 +56,7 @@ app.post('/', middlewareV2(['all', 'write']), async (c) => {
     const auth = c.get('auth')
     const requestId = c.get('requestId')
 
-    if (!auth || !auth.userId) {
+    if (!auth?.userId) {
         return simpleError('unauthorized', 'Authentication required')
     }
 
