@@ -203,7 +203,7 @@ function stripHtml(html: string): string {
 
   let text = html
     // Remove <script> and <style> blocks (including their contents)
-    .replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1>/gi, '')
+    .replace(/<(script|style)\b[^>]*?>[\s\S]*?<\/\1\s*>/gi, '')
     // Remove all remaining HTML tags
     .replace(/<[^>]+>/g, ' ')
 
