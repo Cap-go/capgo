@@ -8,6 +8,18 @@ const bodySchema = z.object({
   orgId: z.string(),
 })
 
+/**
+ * Retrieves allowed email domains and SSO status for the specified organization.
+ *
+ * Validates the request body, enforces read access for the provided API key, queries the org record, and returns the organization's allowed email domains and SSO enabled flag.
+ *
+ * @param bodyRaw - Request body expected to contain `{ orgId: string }`
+ * @param apikey - The API key row used to authorize and scope the query
+ * @returns A JSON object with `status: 'ok'`, `orgId`, `allowed_email_domains` (array), and `sso_enabled` (boolean)
+ * @throws `invalid_body` when the request body fails validation
+ * @throws `cannot_access_organization` when the API key does not have read rights for the organization
+ * @throws `cannot_get_org_domains` when the database query for the organization fails
+ */
 export async function getDomains(c: Context, bodyRaw: any, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
   const bodyParsed = bodySchema.safeParse(bodyRaw)
   if (!bodyParsed.success) {
