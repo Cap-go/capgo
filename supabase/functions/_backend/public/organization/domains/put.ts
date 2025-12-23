@@ -80,6 +80,11 @@ export async function putDomains(c: Context, bodyRaw: any, apikey: Database['pub
     throw simpleError('cannot_update_org_domains', 'Cannot update organization allowed email domains', { error: errorOrg.message })
   }
 
+  // Verify the update affected a row
+  if (!dataOrg || dataOrg.length === 0) {
+    return c.json({ status: 'Organization not found', orgId: body.orgId }, 404)
+  }
+
   return c.json({
     status: 'Organization allowed email domains updated',
     orgId: body.orgId,
