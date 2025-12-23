@@ -7,10 +7,30 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "14.1"
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
   }
   public: {
     Tables: {
@@ -362,15 +382,7 @@ export type Database = {
           platform?: string
           user_id?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "build_logs_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "orgs"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       build_requests: {
         Row: {
@@ -1198,6 +1210,7 @@ export type Database = {
       }
       orgs: {
         Row: {
+          allowed_email_domains: string[] | null
           created_at: string | null
           created_by: string
           customer_id: string | null
@@ -1206,10 +1219,13 @@ export type Database = {
           logo: string | null
           management_email: string
           name: string
+          sso_domain_keys: string[] | null
+          sso_enabled: boolean | null
           stats_updated_at: string | null
           updated_at: string | null
         }
         Insert: {
+          allowed_email_domains?: string[] | null
           created_at?: string | null
           created_by: string
           customer_id?: string | null
@@ -1218,10 +1234,13 @@ export type Database = {
           logo?: string | null
           management_email: string
           name: string
+          sso_domain_keys?: string[] | null
+          sso_enabled?: boolean | null
           stats_updated_at?: string | null
           updated_at?: string | null
         }
         Update: {
+          allowed_email_domains?: string[] | null
           created_at?: string | null
           created_by?: string
           customer_id?: string | null
@@ -1230,6 +1249,8 @@ export type Database = {
           logo?: string | null
           management_email?: string
           name?: string
+          sso_domain_keys?: string[] | null
+          sso_enabled?: boolean | null
           stats_updated_at?: string | null
           updated_at?: string | null
         }
@@ -1869,6 +1890,10 @@ export type Database = {
           overage_unpaid: number
         }[]
       }
+      auto_join_user_to_orgs_by_email: {
+        Args: { p_email: string; p_user_id: string }
+        Returns: number
+      }
       calculate_credit_cost: {
         Args: {
           p_metric: Database["public"]["Enums"]["credit_metric_type"]
@@ -1942,6 +1967,7 @@ export type Database = {
             Returns: boolean
           }
       expire_usage_credits: { Args: never; Returns: number }
+      extract_email_domain: { Args: { email: string }; Returns: string }
       find_best_plan_v3: {
         Args: {
           bandwidth: number
@@ -1960,6 +1986,13 @@ export type Database = {
         }
         Returns: {
           name: string
+        }[]
+      }
+      find_orgs_by_email_domain: {
+        Args: { user_email: string }
+        Returns: {
+          org_id: string
+          org_name: string
         }[]
       }
       get_account_removal_date: { Args: { user_id: string }; Returns: string }
@@ -2393,6 +2426,7 @@ export type Database = {
         Args: { org_id: string }
         Returns: boolean
       }
+      is_blocked_email_domain: { Args: { domain: string }; Returns: boolean }
       is_build_time_exceeded_by_org: {
         Args: { org_id: string }
         Returns: boolean
@@ -2518,6 +2552,25 @@ export type Database = {
         Args: { email: string; org_id: string }
         Returns: string
       }
+      reset_and_seed_app_data: {
+        Args: {
+          p_admin_user_id?: string
+          p_app_id: string
+          p_org_id?: string
+          p_plan_product_id?: string
+          p_stripe_customer_id?: string
+          p_user_id?: string
+        }
+        Returns: undefined
+      }
+      reset_and_seed_app_stats_data: {
+        Args: { p_app_id: string }
+        Returns: undefined
+      }
+      reset_and_seed_data: { Args: never; Returns: undefined }
+      reset_and_seed_stats_data: { Args: never; Returns: undefined }
+      reset_app_data: { Args: { p_app_id: string }; Returns: undefined }
+      reset_app_stats_data: { Args: { p_app_id: string }; Returns: undefined }
       seed_get_app_metrics_caches: {
         Args: { p_end_date: string; p_org_id: string; p_start_date: string }
         Returns: {
@@ -2836,6 +2889,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       action_type: ["mau", "storage", "bandwidth", "build_time"],
@@ -2938,3 +2994,4 @@ export const Constants = {
     },
   },
 } as const
+
