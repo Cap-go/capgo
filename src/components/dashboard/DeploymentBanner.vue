@@ -3,7 +3,7 @@
  * DeploymentBanner Component
  *
  * An intelligent banner component that automatically detects when new bundles are available
- * and provides one-click deployment to production with proper permission checks.
+ * and provides one-click deployment to default channels with proper permission checks.
  *
  * @component
  *
@@ -23,8 +23,9 @@
  * <DeploymentBanner :app-id="appId" @deployed="refreshData" />
  */
 
+import type { OrganizationRole } from '~/stores/organization'
 import type { Database } from '~/types/supabase.types'
-import { computed, onMounted, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import IconInfo from '~icons/lucide/info'
@@ -44,7 +45,7 @@ const props = defineProps<Props>()
 
 /**
  * Component events
- * @event deployed - Emitted after successful deployment to production
+ * @event deployed - Emitted after successful deployment to default channels
  */
 const emit = defineEmits<{
   deployed: []
@@ -62,11 +63,28 @@ const loading = ref(true)
 /** Indicates if a deployment is currently in progress */
 const deploying = ref(false)
 /** User's role for the current app (determines permission level) */
-const userRole = ref<string | null>(null)
+const userRole = ref<OrganizationRole | null>(null)
 /** The most recent bundle available for deployment */
 const latestBundle = ref<Database['public']['Tables']['app_versions']['Row'] | null>(null)
-/** The production channel configuration */
-const productionChannel = ref<Database['public']['Tables']['channels']['Row'] | null>(null)
+type DefaultChannel = Pick<
+  Database['public']['Tables']['channels']['Row'],
+  'id' | 'name' | 'ios' | 'android' | 'public' | 'version'
+>
+
+/** Default channels configured for downloads (public channels) */
+const defaultChannels = ref<DefaultChannel[]>([])
+/** Selected default channel IDs for deployment */
+const selectedChannelIds = ref<number[]>([])
+
+const deployDialogId = 'deploy-default-channels'
+
+type PlatformKey = 'ios' | 'android'
+interface DeployTarget {
+  id: number
+  name: string
+  platforms: PlatformKey[]
+  needsDeploy: boolean
+}
 
 /**
  * Computed property that checks if the user has admin-level permissions.
@@ -78,25 +96,44 @@ const hasAdminPermission = computed(() => {
   return userRole.value ? organizationStore.hasPermissionsInRole(userRole.value, ['admin', 'super_admin']) : false
 })
 
+const deployTargets = computed<DeployTarget[]>(() => {
+  const bundle = latestBundle.value
+  if (!bundle)
+    return []
+
+  return defaultChannels.value
+    .filter(channel => channel.ios || channel.android)
+    .map(channel => ({
+      id: channel.id,
+      name: channel.name,
+      platforms: [
+        ...(channel.ios ? ['ios'] as PlatformKey[] : []),
+        ...(channel.android ? ['android'] as PlatformKey[] : []),
+      ],
+      needsDeploy: channel.version !== bundle.id,
+    }))
+})
+
 /**
  * Computed property that determines if the banner should be visible.
  * Banner appears when:
  * 1. Data has finished loading
- * 2. A production channel exists
+ * 2. Default channels exist
  * 3. A latest bundle exists
  * 4. User has admin permissions
- * 5. Latest bundle differs from production channel's current version
+ * 5. At least one default channel differs from the latest bundle
  *
  * @returns {boolean} True if banner should be shown, false otherwise
  */
 const showBanner = computed(() => {
   // Don't show banner during initial load or if data is missing
-  if (loading.value || !latestBundle.value || !productionChannel.value || !hasAdminPermission.value)
+  if (loading.value || !latestBundle.value || !hasAdminPermission.value)
     return false
 
-  // Show banner only if there's a newer bundle available than what's currently in production
-  // This is the core detection logic: compare bundle IDs to determine if deployment is needed
-  return latestBundle.value.id !== productionChannel.value.version
+  if (!deployTargets.value.length)
+    return false
+
+  return deployTargets.value.some(target => target.needsDeploy)
 })
 
 /**
@@ -104,7 +141,7 @@ const showBanner = computed(() => {
  *
  * This function performs three main queries:
  * 1. Fetches the user's role/permission level for the app
- * 2. Retrieves the production channel configuration
+ * 2. Retrieves the default channel configuration
  * 3. Gets the latest deployable bundle
  *
  * The banner will only show if all three pieces of data are available
@@ -114,29 +151,32 @@ const showBanner = computed(() => {
  * @returns {Promise<void>}
  */
 async function loadData() {
+  if (!props.appId) {
+    loading.value = false
+    return
+  }
   loading.value = true
+  defaultChannels.value = []
+  latestBundle.value = null
+  selectedChannelIds.value = []
   console.log('[DeploymentBanner] Loading data for app:', props.appId)
 
   try {
+    await organizationStore.awaitInitialLoad()
+
     // Step 1: Get user's role for this app from the organization store
     // This determines if the user has permission to see and use the banner
     userRole.value = await organizationStore.getCurrentRoleForApp(props.appId)
 
-    // Step 2: Get production channel configuration
-    // The banner specifically looks for a channel named "production"
-    // Using maybeSingle() instead of single() to avoid errors if channel doesn't exist
-    const { data: prodChannel } = await supabase
+    // Step 2: Get default channels configuration (public download channels)
+    const { data: publicChannels } = await supabase
       .from('channels')
-      .select('*')
+      .select('id, name, ios, android, public, version')
       .eq('app_id', props.appId)
-      .eq('name', 'production')
-      .maybeSingle()
+      .eq('public', true)
 
-    console.log('[DeploymentBanner] Production channel:', prodChannel)
-
-    if (prodChannel) {
-      productionChannel.value = prodChannel
-    }
+    defaultChannels.value = publicChannels?.filter(channel => channel.ios || channel.android) ?? []
+    console.log('[DeploymentBanner] Default channels:', defaultChannels.value)
 
     // Step 3: Get latest bundle (excluding special bundle types)
     // We filter out 'unknown' and 'builtin' bundles as these are not deployable
@@ -153,9 +193,7 @@ async function loadData() {
 
     console.log('[DeploymentBanner] Latest bundle:', bundles?.[0])
 
-    if (bundles && bundles.length > 0) {
-      latestBundle.value = bundles[0]
-    }
+    latestBundle.value = bundles?.[0] ?? null
   }
   catch (error) {
     // Errors are logged but don't block the UI
@@ -169,17 +207,17 @@ async function loadData() {
 }
 
 /**
- * Executes the actual deployment to production.
+ * Executes the actual deployment to default channels.
  *
  * This is the core deployment function that:
- * 1. Updates the production channel's version field to point to the latest bundle
+ * 1. Updates the default channels' version fields to point to the latest bundle
  * 2. Updates local state for immediate UI feedback (optimistic update)
  * 3. Shows success animation and notification
  * 4. Emits event for parent component to refresh data
  * 5. Reloads banner data in background to hide the banner
  *
  * The deployment is essentially a simple database update that changes which bundle
- * the production channel points to. All actual deployment logic (distributing updates
+ * the default channels point to. All actual deployment logic (distributing updates
  * to devices) happens automatically through existing channel mechanisms.
  *
  * @async
@@ -187,27 +225,28 @@ async function loadData() {
  */
 async function executeDeployment() {
   // Safety check: validate required data is present
-  if (!latestBundle.value || !productionChannel.value)
+  if (!latestBundle.value || selectedChannelIds.value.length === 0)
     return
+
+  const bundle = latestBundle.value
+  const targetIds = [...selectedChannelIds.value]
 
   deploying.value = true
 
   try {
     console.log('[DeploymentBanner] Starting deployment:', {
-      bundleId: latestBundle.value.id,
-      bundleName: latestBundle.value.name,
-      channelId: productionChannel.value.id,
+      bundleId: bundle.id,
+      bundleName: bundle.name,
+      channelIds: targetIds,
     })
 
-    // Perform the deployment by updating the channel's version field
-    // This is the critical database operation that changes which bundle is "live"
+    // Perform the deployment by updating the channel versions in bulk
     const { data, error } = await supabase
       .from('channels')
-      .update({ version: latestBundle.value.id })
-      .eq('id', productionChannel.value.id)
-      .eq('app_id', props.appId) // Extra safety: ensure we're updating the right channel
+      .update({ version: bundle.id })
+      .in('id', targetIds)
+      .eq('app_id', props.appId) // Extra safety: ensure we're updating the right channels
       .select()
-      .single()
 
     console.log('[DeploymentBanner] Deployment result:', { data, error })
 
@@ -220,11 +259,14 @@ async function executeDeployment() {
 
     // Success! Update local state immediately (optimistic update)
     // This hides the banner instantly without waiting for data reload
-    if (productionChannel.value)
-      productionChannel.value.version = latestBundle.value.id
+    defaultChannels.value = defaultChannels.value.map(channel =>
+      targetIds.includes(channel.id)
+        ? { ...channel, version: bundle.id }
+        : channel,
+    )
 
     // Show success feedback to user
-    toast.success(t('deployment-success'))
+    toast.success(t('deployment-success', { bundle: bundle.name }))
     showCelebration()
 
     // Notify parent component that deployment occurred
@@ -242,36 +284,86 @@ async function executeDeployment() {
   }
 }
 
+function seedSelectedTargets() {
+  const deployableTargets = deployTargets.value.filter(target => target.needsDeploy)
+  selectedChannelIds.value = deployableTargets.length
+    ? deployableTargets.map(target => target.id)
+    : deployTargets.value.map(target => target.id)
+}
+
+function toggleTargetSelection(id: number) {
+  if (selectedChannelIds.value.includes(id)) {
+    selectedChannelIds.value = selectedChannelIds.value.filter(existingId => existingId !== id)
+  }
+  else {
+    selectedChannelIds.value = [...selectedChannelIds.value, id]
+  }
+}
+
+function isTargetSelected(id: number) {
+  return selectedChannelIds.value.includes(id)
+}
+
+function getPlatformLabel(platforms: PlatformKey[]) {
+  if (platforms.includes('ios') && platforms.includes('android'))
+    return `${t('platform-ios')} & ${t('platform-android')}`
+  if (platforms.includes('ios'))
+    return t('channel-platform-ios')
+  if (platforms.includes('android'))
+    return t('channel-platform-android')
+  return t('unknown')
+}
+
 /**
  * Handles the deploy button click by showing a confirmation dialog.
  *
  * This is the first step in the deployment flow. It validates that we have
- * the necessary data (bundle and channel) and then shows a confirmation dialog
+ * the necessary data (bundle and default channels) and then shows a confirmation dialog
  * to prevent accidental deployments.
  *
  * The dialog uses the 'danger' role for the confirm button to emphasize
- * that this is a production deployment action.
+ * that this is a high-impact deployment action.
  *
  * @async
  * @returns {Promise<void>}
  */
 async function handleDeploy() {
-  // Safety check: ensure we have both bundle and channel data
-  // This should always be true if the banner is visible, but we check defensively
-  if (!latestBundle.value || !productionChannel.value)
+  // Safety check: ensure we have both bundle and default channels
+  if (!latestBundle.value || deployTargets.value.length === 0)
     return
 
-  const bundleName = latestBundle.value.name
+  const bundle = latestBundle.value
+  seedSelectedTargets()
+
+  const bundleName = bundle.name
 
   // Open confirmation dialog with deployment details
   // User must explicitly confirm before deployment proceeds
   dialogStore.openDialog({
-    title: t('deploy-to-production-title'),
-    description: t('deploy-to-production-description', { bundle: bundleName }),
-    confirmText: t('deploy-confirm'),
-    cancelText: t('cancel'),
-    confirmRole: 'danger',
-    onConfirm: executeDeployment,
+    id: deployDialogId,
+    title: t('deploy-default-title'),
+    description: t('deploy-default-description', { bundle: bundleName }),
+    size: 'lg',
+    preventAccidentalClose: true,
+    buttons: [
+      {
+        text: t('button-cancel'),
+        role: 'cancel',
+      },
+      {
+        text: t('deploy-confirm'),
+        role: 'danger',
+        preventClose: true,
+        handler: async () => {
+          if (!selectedChannelIds.value.length) {
+            toast.error(t('deploy-select-channel'))
+            return
+          }
+          dialogStore.closeDialog({ text: t('deploy-confirm'), role: 'danger' })
+          await executeDeployment()
+        },
+      },
+    ],
   })
 }
 
@@ -349,9 +441,15 @@ function createConfetti(color: string) {
 }
 
 // Lifecycle: Load data when component mounts
-onMounted(() => {
-  loadData()
-})
+watch(
+  () => props.appId,
+  (appId) => {
+    if (!appId)
+      return
+    loadData()
+  },
+  { immediate: true },
+)
 
 /**
  * Expose public methods for parent component access.
@@ -370,8 +468,8 @@ defineExpose({
 
     Conditionally rendered banner that appears when:
     - User has admin permissions
-    - Production channel exists
-    - Latest bundle differs from production channel's current version
+    - Default channels exist
+    - Latest bundle differs from at least one default channel's current version
 
     The banner provides:
     - Visual notification (info icon + message)
@@ -380,12 +478,12 @@ defineExpose({
    -->
   <div
     v-if="showBanner"
-    class="mb-4 flex items-center justify-between px-4 py-3 bg-blue-900/60 dark:bg-blue-900/70 rounded-lg border border-blue-800/100 dark:border-blue-700/100 animate-fade-in"
+    class="mb-4 flex flex-col gap-4 rounded-lg border border-blue-200/80 bg-blue-100/40 px-5 py-3 shadow-sm animate-fade-in dark:border-blue-700/70 dark:bg-[#121b3a] sm:flex-row sm:items-center sm:justify-between"
   >
     <!-- Left side: Info icon and message -->
     <div class="flex items-center gap-3">
-      <IconInfo class="flex-shrink-0 w-5 h-5 text-blue-400" />
-      <span class="text-sm text-gray-200 dark:text-gray-100">
+      <IconInfo class="h-5 w-5 text-blue-500 dark:text-blue-300" />
+      <span class="text-sm text-slate-700 dark:text-blue-100">
         {{ t('new-bundle-ready-banner') }}
       </span>
     </div>
@@ -393,13 +491,53 @@ defineExpose({
     <!-- Right side: Deploy action button -->
     <button
       :disabled="deploying"
-      class="flex-shrink-0 inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
+      class="flex-shrink-0 inline-flex items-center justify-center rounded-md bg-blue-500 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-300 focus:ring-offset-2 focus:ring-offset-blue-100/40 dark:focus:ring-offset-[#121b3a] disabled:opacity-50 disabled:cursor-not-allowed"
       @click="handleDeploy"
     >
       <!-- Button text changes during deployment -->
       <span>{{ deploying ? t('deploying') : t('deploy-now-button') }}</span>
     </button>
   </div>
+
+  <!-- Deploy dialog content -->
+  <Teleport
+    v-if="dialogStore.showDialog && dialogStore.dialogOptions?.id === deployDialogId"
+    defer
+    to="#dialog-v2-content"
+  >
+    <div class="space-y-4">
+      <div class="p-3 rounded-lg border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-900/40">
+        <p class="text-sm font-medium text-slate-800 dark:text-slate-100">
+          {{ t('deploy-default-channels-label') }}
+        </p>
+        <p class="text-xs text-slate-500 dark:text-slate-400">
+          {{ t('deploy-default-channels-help') }}
+        </p>
+      </div>
+      <div class="space-y-2">
+        <label
+          v-for="target in deployTargets"
+          :key="target.id"
+          class="flex items-start gap-3 p-3 rounded-lg border border-slate-200 hover:border-slate-300 dark:border-slate-700 dark:hover:border-slate-600"
+        >
+          <input
+            type="checkbox"
+            class="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-800"
+            :checked="isTargetSelected(target.id)"
+            @change="toggleTargetSelection(target.id)"
+          >
+          <div class="space-y-0.5">
+            <p class="text-sm font-medium text-slate-900 dark:text-slate-100">
+              {{ target.name }}
+            </p>
+            <p class="text-xs text-slate-500 dark:text-slate-400">
+              {{ getPlatformLabel(target.platforms) }}
+            </p>
+          </div>
+        </label>
+      </div>
+    </div>
+  </Teleport>
 </template>
 
 <style scoped>

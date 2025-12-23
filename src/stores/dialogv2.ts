@@ -3,7 +3,7 @@ import { acceptHMRUpdate, defineStore } from 'pinia'
 export interface DialogV2Button {
   text: string
   id?: string
-  handler?: () => void
+  handler?: () => void | boolean | Promise<void | boolean>
   role?: 'primary' | 'secondary' | 'danger' | 'cancel'
   preventClose?: boolean
   disabled?: boolean
@@ -30,11 +30,7 @@ export const useDialogV2Store = defineStore('dialogv2', () => {
     dialogCanceled.value = false
   }
 
-  const closeDialog = (button?: DialogV2Button) => {
-    if (!button?.preventClose) {
-      showDialog.value = false
-    }
-
+  const closeDialog = async (button?: DialogV2Button) => {
     if (button) {
       lastButtonRole.value = button.id ?? button.role ?? ''
       if (button.role === 'cancel') {
@@ -45,12 +41,20 @@ export const useDialogV2Store = defineStore('dialogv2', () => {
       }
 
       if (button.handler) {
-        button.handler()
+        const result = await button.handler()
+        // If handler returns false, don't close the dialog
+        if (result === false) {
+          return
+        }
       }
     }
     else {
       // Dialog was dismissed without a button (ESC, backdrop, X button)
       dialogCanceled.value = true
+    }
+
+    if (!button?.preventClose) {
+      showDialog.value = false
     }
   }
 

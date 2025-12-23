@@ -260,6 +260,7 @@ async function handleChannelLink(chan: Database['public']['Tables']['channels'][
     }
     await setChannel(chan, version.value.id)
     await getChannels()
+    toast.success(t('linked-bundle'))
   }
   catch (error) {
     console.error(error)
@@ -305,6 +306,9 @@ async function handleChannelAction(action: 'set' | 'open' | 'unlink') {
   if (!channel.value)
     return
 
+  // Close the channel actions modal before performing actions
+  dialogStore.closeDialog()
+
   if (action === 'set') {
     await ASChannelChooser()
   }
@@ -318,6 +322,7 @@ async function handleChannelAction(action: 'set' | 'open' | 'unlink') {
         return
       await setChannel(channel.value, id)
       await getChannels()
+      toast.success(t('channels-unlinked-successfully'))
     }
     catch (error) {
       console.error(error)
