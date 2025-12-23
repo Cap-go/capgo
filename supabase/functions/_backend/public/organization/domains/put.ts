@@ -15,7 +15,9 @@ const bodySchema = z.object({
  *
  * Normalizes and validates the provided domains, rejects public email providers, and requires admin rights for the target organization.
  *
+ * @param c - Hono context object
  * @param bodyRaw - Request body containing `orgId: string`, `domains: string[]`, and optional `enabled: boolean` to set `sso_enabled`
+ * @param apikey - The API key row used to authorize and scope the query
  * @returns A JSON Response with `status`, `orgId`, `allowed_email_domains` (array of strings), and `sso_enabled` (boolean)
  * @throws simpleError with code `invalid_body` when the request body fails validation
  * @throws simpleError with code `cannot_access_organization` when the caller lacks admin rights for the organization

@@ -193,22 +193,17 @@ function truncateText(text: string, maxLength: number): string {
 /**
  * Basic HTML stripping (for simple cases)
  *
- * Removes script/style blocks and all HTML tags, then normalizes whitespace.
- * Also removes any remaining `<` or `>` characters so that sequences like
- * `<script` cannot appear in the output, even if reconstructed.
+ * Removes all angle brackets to prevent any HTML injection, then normalizes whitespace.
+ * This is safe for Discord forum posts where we only need plain text content.
  */
 function stripHtml(html: string): string {
   if (!html)
     return ''
 
-  // Multi-stage sanitization to prevent HTML injection:
-  // 1. Remove script/style blocks with contents
-  // 2. Remove all HTML tags
-  // 3. Remove all angle brackets (prevents token reconstruction like "<script")
-  // 4. Normalize whitespace
+  // Remove all angle brackets immediately to prevent HTML tag reconstruction
+  // (e.g., "<scr<script>ipt>" could become "<script>" after partial removal)
+  // This eliminates any possibility of incomplete sanitization
   return html
-    .replace(/<(script|style)\b[^>]*?>[\s\S]*?<\/\1\s*>/gi, '')
-    .replace(/<[^>]+>/g, ' ')
     .replace(/[<>]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()

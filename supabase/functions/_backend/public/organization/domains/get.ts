@@ -13,6 +13,7 @@ const bodySchema = z.object({
  *
  * Validates the request body, enforces read access for the provided API key, queries the org record, and returns the organization's allowed email domains and SSO enabled flag.
  *
+ * @param c - Hono context object
  * @param bodyRaw - Request body expected to contain `{ orgId: string }`
  * @param apikey - The API key row used to authorize and scope the query
  * @returns A JSON object with `status: 'ok'`, `orgId`, `allowed_email_domains` (array), and `sso_enabled` (boolean)
