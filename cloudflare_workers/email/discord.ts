@@ -201,15 +201,14 @@ function stripHtml(html: string): string {
   if (!html)
     return ''
 
-  let text = html
-    // Remove <script> and <style> blocks (including their contents)
+  // Multi-stage sanitization to prevent HTML injection:
+  // 1. Remove script/style blocks with contents
+  // 2. Remove all HTML tags
+  // 3. Remove all angle brackets (prevents token reconstruction like "<script")
+  // 4. Normalize whitespace
+  return html
     .replace(/<(script|style)\b[^>]*?>[\s\S]*?<\/\1\s*>/gi, '')
-    // Remove all remaining HTML tags
     .replace(/<[^>]+>/g, ' ')
-
-  // Remove any stray angle brackets so multi-character tokens like "<script"
-  // cannot remain, then collapse whitespace.
-  return text
     .replace(/[<>]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
