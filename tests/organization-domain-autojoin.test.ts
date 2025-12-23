@@ -498,10 +498,10 @@ describe('Organization Email Domain Auto-Join', () => {
                 created_by: USER_ID,
                 customer_id: secondCustomerId,
                 allowed_email_domains: [sharedDomain],
-                sso_enabled: true,
+                sso_enabled: false, // Non-SSO org to allow sharing domain
             })
 
-            // Update first org to also have shared domain
+            // Update first org to have shared domain with SSO enabled
             await getSupabaseClient()
                 .from('orgs')
                 .update({ allowed_email_domains: [sharedDomain], sso_enabled: true })

@@ -264,25 +264,25 @@ bun test organization-domain-autojoin
 ```bash
 # Get current domain configuration
 curl -X POST http://127.0.0.1:54321/functions/v1/private/organization_domains_get \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -H "Authorization: Bearer $JWT_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"orgId": "YOUR_ORG_ID"}'
+  -d "{\"orgId\": \"$ORG_ID\"}"
 
 # Update domain configuration
 curl -X POST http://127.0.0.1:54321/functions/v1/private/organization_domains_put \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -H "Authorization: Bearer $JWT_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{
-    "orgId": "YOUR_ORG_ID",
-    "domains": ["yourcompany.com"],
-    "enabled": true
-  }'
+  -d "{
+    \"orgId\": \"$ORG_ID\",
+    \"domains\": [\"yourcompany.com\"],
+    \"enabled\": true
+  }"
 
 # Check auto-join on login
 curl -X POST http://127.0.0.1:54321/functions/v1/private/check_auto_join_orgs \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -H "Authorization: Bearer $JWT_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"user_id": "YOUR_USER_ID"}'
+  -d "{\"user_id\": \"$USER_ID\"}"
 ```
 
 ### Database Query Testing
@@ -317,7 +317,7 @@ SELECT auto_join_user_to_orgs_by_email(
 - **Typical Impact**: < 50ms additional latency
 
 ### Benchmarks (Local Testing)
-```
+```text
 Permission check query:
   Before: ~3-5ms (table heap lookup required)
   After:  ~1-2ms (index-only scan)
