@@ -128,6 +128,22 @@ async function guard(
       console.error('Error checking if account is disabled:', error)
     }
 
+    // Check for auto-join to organizations based on email domain
+    try {
+      await fetch(`${config.hostWeb}/private/check_auto_join_orgs`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+        },
+        body: JSON.stringify({ user_id: auth.user.id }),
+      })
+    }
+    catch (error) {
+      // Non-blocking: log error but don't prevent login
+      console.error('Error checking auto-join organizations:', error)
+    }
+
     if (!main.user) {
       await updateUser(main, supabase)
     }
