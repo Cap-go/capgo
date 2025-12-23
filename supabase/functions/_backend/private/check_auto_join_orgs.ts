@@ -28,6 +28,7 @@ import { Hono } from 'hono/tiny'
 import { z } from 'zod/mini'
 import { middlewareAuth, parseBody, simpleError, useCors } from '../utils/hono.ts'
 import { supabaseClient as useSupabaseClient } from '../utils/supabase.ts'
+import { cloudlog } from '../utils/logging.ts'
 
 /** Request body validation schema */
 const bodySchema = z.object({
@@ -69,7 +70,7 @@ app.post('/', middlewareAuth, async (c) => {
     .single()
 
   if (userError || !user) {
-    console.error('User not found', { requestId, error: userError })
+    cloudlog('User not found', { requestId, error: userError })
     return c.json({ error: 'user_not_found' }, 404)
   }
 
@@ -81,10 +82,10 @@ app.post('/', middlewareAuth, async (c) => {
     })
 
   if (error) {
-    console.error('Error auto-joining user to orgs', { requestId, error })
+    cloudlog('Error auto-joining user to orgs', { requestId, error })
     return c.json({ error: 'auto_join_failed' }, 500)
   }
 
-  console.log('Auto-join check completed', { requestId, user_id, orgs_joined: data })
+  cloudlog('Auto-join check completed', { requestId, user_id, orgs_joined: data })
   return c.json({ status: 'ok', orgs_joined: data })
 })

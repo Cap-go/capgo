@@ -23,6 +23,7 @@ import { z } from 'zod/mini'
 import { parseBody, simpleError, useCors } from '../utils/hono.ts'
 import { middlewareV2 } from '../utils/hono_middleware.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
+import { cloudlog } from '../utils/logging.ts'
 
 /** Request body validation schema */
 const bodySchema = z.object({
@@ -78,7 +79,7 @@ app.post('/', middlewareV2(['all', 'write']), async (c) => {
         .eq('user_id', auth.userId)
 
     if (orgUserError) {
-        console.error('[organization_domains_put] Error fetching org permissions', { requestId, error: orgUserError })
+        cloudlog('[organization_domains_put] Error fetching org permissions', { requestId, error: orgUserError })
         return simpleError('cannot_access_organization', 'Error checking organization access', { orgId: safeBody.orgId })
     }
 
@@ -109,7 +110,7 @@ app.post('/', middlewareV2(['all', 'write']), async (c) => {
         .single() as any
 
     if (error) {
-        console.error('[organization_domains_put] Error updating org domains', { requestId, error })
+        cloudlog('[organization_domains_put] Error updating org domains', { requestId, error })
         // Check if it's a constraint violation
         if (error.code === '23514' || error.message?.includes('blocked_domain')) {
             return simpleError('blocked_domain', 'This domain is a public email provider and cannot be used', { domains: safeBody.domains })

@@ -17,6 +17,7 @@ import { z } from 'zod/mini'
 import { parseBody, simpleError, useCors } from '../utils/hono.ts'
 import { middlewareV2 } from '../utils/hono_middleware.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
+import { cloudlog } from '../utils/logging.ts'
 
 /** Request body validation schema */
 const bodySchema = z.object({
@@ -66,7 +67,7 @@ app.post('/', middlewareV2(['all', 'write', 'read']), async (c) => {
         .eq('user_id', auth.userId)
 
     if (orgUserError) {
-        console.error('[organization_domains_get] Error fetching org permissions', { requestId, error: orgUserError })
+        cloudlog('[organization_domains_get] Error fetching org permissions', { requestId, error: orgUserError })
         return simpleError('cannot_access_organization', 'Error checking organization access', { orgId: safeBody.orgId })
     }
 
@@ -88,7 +89,7 @@ app.post('/', middlewareV2(['all', 'write', 'read']), async (c) => {
         .single() as any
 
     if (error) {
-        console.error('[organization_domains_get] Error fetching org domains', { requestId, error })
+        cloudlog('[organization_domains_get] Error fetching org domains', { requestId, error })
         return simpleError('cannot_get_org_domains', 'Cannot get organization allowed email domains', { error: error.message })
     }
 
