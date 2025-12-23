@@ -1,5 +1,6 @@
 import { env } from 'node:process'
 import { app as admin_stats } from '../../supabase/functions/_backend/private/admin_stats.ts'
+import { app as check_auto_join_orgs } from '../../supabase/functions/_backend/private/check_auto_join_orgs.ts'
 import { app as config } from '../../supabase/functions/_backend/private/config.ts'
 import { app as create_device } from '../../supabase/functions/_backend/private/create_device.ts'
 import { app as credits } from '../../supabase/functions/_backend/private/credits.ts'
@@ -7,6 +8,8 @@ import { app as deleted_failed_version } from '../../supabase/functions/_backend
 import { app as devices_priv } from '../../supabase/functions/_backend/private/devices.ts'
 import { app as events } from '../../supabase/functions/_backend/private/events.ts'
 import { app as log_as } from '../../supabase/functions/_backend/private/log_as.ts'
+import { app as organization_domains_get } from '../../supabase/functions/_backend/private/organization_domains_get.ts'
+import { app as organization_domains_put } from '../../supabase/functions/_backend/private/organization_domains_put.ts'
 import { app as plans } from '../../supabase/functions/_backend/private/plans.ts'
 import { app as publicStats } from '../../supabase/functions/_backend/private/public_stats.ts'
 import { app as stats_priv } from '../../supabase/functions/_backend/private/stats.ts'
@@ -76,6 +79,9 @@ appPrivate.route('/stripe_portal', stripe_portal)
 appPrivate.route('/delete_failed_version', deleted_failed_version)
 appPrivate.route('/create_device', create_device)
 appPrivate.route('/events', events)
+appPrivate.route('/check_auto_join_orgs', check_auto_join_orgs)
+appPrivate.route('/organization_domains_get', organization_domains_get)
+appPrivate.route('/organization_domains_put', organization_domains_put)
 
 // Triggers
 const functionNameTriggers = 'triggers'
