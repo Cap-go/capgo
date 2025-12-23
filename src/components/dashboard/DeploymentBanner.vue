@@ -24,6 +24,7 @@
  */
 
 import type { Database } from '~/types/supabase.types'
+import type { OrganizationRole } from '~/stores/organization'
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
@@ -62,7 +63,7 @@ const loading = ref(true)
 /** Indicates if a deployment is currently in progress */
 const deploying = ref(false)
 /** User's role for the current app (determines permission level) */
-const userRole = ref<string | null>(null)
+const userRole = ref<OrganizationRole | null>(null)
 /** The most recent bundle available for deployment */
 const latestBundle = ref<Database['public']['Tables']['app_versions']['Row'] | null>(null)
 /** The production channel configuration */
