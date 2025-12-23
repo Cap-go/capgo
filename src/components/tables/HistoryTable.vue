@@ -248,13 +248,14 @@ async function fetchDeployHistory() {
       return
     }
 
+    const rows = (data ?? []) as unknown as DeployHistory[]
     // Filter out data based on mode
-    const filteredData = data.filter((item) => {
+    const filteredData = rows.filter((item) => {
       if (isBundleMode.value) {
-        return item?.channel !== null
+        return item?.channel != null
       }
       return item?.version !== null
-    }) as unknown as DeployHistory[]
+    })
 
     deployHistory.value = filteredData
     for (const item of deployHistory.value) {
@@ -277,6 +278,14 @@ async function fetchDeployHistory() {
 }
 
 async function handleRollback(item: DeployHistory) {
+  if (isBundleMode.value)
+    return
+
+  if (!props.channelId)
+    return
+
+  const channelId = props.channelId
+
   const role = await organizationStore.getCurrentRoleForApp(props.appId)
   if (!organizationStore.hasPermissionsInRole(role, ['admin', 'super_admin', 'write'])) {
     toast.error(t('no-permission'))
@@ -300,7 +309,7 @@ async function handleRollback(item: DeployHistory) {
             const { error } = await supabase
               .from('channels')
               .update({ version: item.version_id })
-              .eq('id', props.channelId)
+              .eq('id', channelId)
 
             if (error) {
               console.error('Error rolling back version:', error)
