@@ -18,8 +18,8 @@
  */
 
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
-import { Hono } from 'hono'
 import { eq } from 'drizzle-orm'
+import { Hono } from 'hono'
 import { z } from 'zod/mini'
 import { parseBody, simpleError, useCors } from '../utils/hono.ts'
 import { middlewareV2 } from '../utils/hono_middleware.ts'
@@ -30,8 +30,8 @@ import { supabaseAdmin } from '../utils/supabase.ts'
 
 /** Request body validation schema */
 const bodySchema = z.object({
-    orgId: z.string(),
-    domains: z.array(z.string()),
+  orgId: z.string(),
+  domains: z.array(z.string()),
 })
 
 export const app = new Hono<MiddlewareKeyVariables>()
@@ -54,96 +54,96 @@ app.use('/', useCors)
  * - Handles SSO domain conflicts gracefully
  */
 app.post('/', middlewareV2(['all', 'write']), async (c) => {
-    const auth = c.get('auth')
-    const requestId = c.get('requestId')
+  const auth = c.get('auth')
+  const requestId = c.get('requestId')
 
-    if (!auth?.userId) {
-        return simpleError('unauthorized', 'Authentication required')
+  if (!auth?.userId) {
+    return simpleError('unauthorized', 'Authentication required')
+  }
+
+  const body = await parseBody<any>(c)
+
+  // Read enabled from bodyRaw directly (not in zod schema since zod/mini doesn't support optional/nullable)
+  const enabled = body.enabled === true || body.enabled === false ? body.enabled : false
+
+  const parsedBodyResult = bodySchema.safeParse(body)
+  if (!parsedBodyResult.success) {
+    return simpleError('invalid_json_body', 'Invalid json body', { body, parsedBodyResult })
+  }
+
+  const safeBody = parsedBodyResult.data
+
+  // Check if user has admin rights for this org (query org-level permissions only)
+  const supabase = supabaseAdmin(c)
+  const { data: orgUsers, error: orgUserError } = await supabase
+    .from('org_users')
+    .select('user_right, app_id, channel_id')
+    .eq('org_id', safeBody.orgId)
+    .eq('user_id', auth.userId)
+
+  if (orgUserError) {
+    cloudlog({ requestId, message: '[organization_domains_put] Error fetching org permissions', error: orgUserError })
+    return simpleError('cannot_access_organization', 'Error checking organization access', { orgId: safeBody.orgId })
+  }
+
+  if (!orgUsers || orgUsers.length === 0) {
+    return simpleError('cannot_access_organization', 'You can\'t access this organization', { orgId: safeBody.orgId })
+  }
+
+  // Find org-level permission (where app_id and channel_id are null)
+  const orgLevelPerm = orgUsers.find(u => u.app_id === null && u.channel_id === null)
+  if (!orgLevelPerm) {
+    return simpleError('cannot_access_organization', 'You don\'t have org-level access', { orgId: safeBody.orgId })
+  }
+
+  // Check if user has admin or super_admin rights
+  if (orgLevelPerm.user_right !== 'admin' && orgLevelPerm.user_right !== 'super_admin') {
+    return simpleError('insufficient_permissions', 'You need admin rights to modify organization domains', { orgId: safeBody.orgId, userRight: orgLevelPerm.user_right })
+  }
+
+  // Update the allowed domains and enabled state using Drizzle ORM
+  const pgClient = getPgClient(c, true)
+  const drizzleClient = getDrizzleClient(pgClient)
+
+  try {
+    const updatedOrgs = await drizzleClient
+      .update(orgs)
+      .set({
+        allowed_email_domains: safeBody.domains,
+        sso_enabled: enabled,
+      })
+      .where(eq(orgs.id, safeBody.orgId))
+      .returning({
+        allowed_email_domains: orgs.allowed_email_domains,
+        sso_enabled: orgs.sso_enabled,
+      })
+
+    await closeClient(c, pgClient)
+
+    // Verify the update affected a row
+    if (!updatedOrgs || updatedOrgs.length === 0) {
+      cloudlog({ requestId, message: '[organization_domains_put] No organization found to update', orgId: safeBody.orgId })
+      return c.json({ status: 'Organization not found', orgId: safeBody.orgId }, 404)
     }
 
-    const body = await parseBody<any>(c)
+    const data = updatedOrgs[0]
+    return c.json({
+      allowed_email_domains: data?.allowed_email_domains || [],
+      sso_enabled: data?.sso_enabled || false,
+    }, 200)
+  }
+  catch (error: any) {
+    await closeClient(c, pgClient)
+    cloudlog({ requestId, message: '[organization_domains_put] Error updating org domains', error })
 
-    // Read enabled from bodyRaw directly (not in zod schema since zod/mini doesn't support optional/nullable)
-    const enabled = body.enabled === true || body.enabled === false ? body.enabled : false
-
-    const parsedBodyResult = bodySchema.safeParse(body)
-    if (!parsedBodyResult.success) {
-        return simpleError('invalid_json_body', 'Invalid json body', { body, parsedBodyResult })
+    // Check for PostgreSQL constraint violations
+    // Drizzle returns error.code for PostgreSQL error codes
+    if (error.code === '23514' || error.message?.includes('blocked_domain') || error.message?.includes('public email provider')) {
+      return simpleError('blocked_domain', 'This domain is a public email provider and cannot be used', { domains: safeBody.domains })
     }
-
-    const safeBody = parsedBodyResult.data
-
-    // Check if user has admin rights for this org (query org-level permissions only)
-    const supabase = supabaseAdmin(c)
-    const { data: orgUsers, error: orgUserError } = await supabase
-        .from('org_users')
-        .select('user_right, app_id, channel_id')
-        .eq('org_id', safeBody.orgId)
-        .eq('user_id', auth.userId)
-
-    if (orgUserError) {
-        cloudlog({ requestId, message: '[organization_domains_put] Error fetching org permissions', error: orgUserError })
-        return simpleError('cannot_access_organization', 'Error checking organization access', { orgId: safeBody.orgId })
+    if (error.code === '23505' || error.message?.includes('unique_sso_domain') || error.message?.includes('already claimed')) {
+      return simpleError('domain_already_used', 'This domain is already in use by another organization', { domains: safeBody.domains })
     }
-
-    if (!orgUsers || orgUsers.length === 0) {
-        return simpleError('cannot_access_organization', 'You can\'t access this organization', { orgId: safeBody.orgId })
-    }
-
-    // Find org-level permission (where app_id and channel_id are null)
-    const orgLevelPerm = orgUsers.find(u => u.app_id === null && u.channel_id === null)
-    if (!orgLevelPerm) {
-        return simpleError('cannot_access_organization', 'You don\'t have org-level access', { orgId: safeBody.orgId })
-    }
-
-    // Check if user has admin or super_admin rights
-    if (orgLevelPerm.user_right !== 'admin' && orgLevelPerm.user_right !== 'super_admin') {
-        return simpleError('insufficient_permissions', 'You need admin rights to modify organization domains', { orgId: safeBody.orgId, userRight: orgLevelPerm.user_right })
-    }
-
-    // Update the allowed domains and enabled state using Drizzle ORM
-    const pgClient = getPgClient(c, true)
-    const drizzleClient = getDrizzleClient(pgClient)
-
-    try {
-        const updatedOrgs = await drizzleClient
-            .update(orgs)
-            .set({
-                allowed_email_domains: safeBody.domains,
-                sso_enabled: enabled,
-            })
-            .where(eq(orgs.id, safeBody.orgId))
-            .returning({
-                allowed_email_domains: orgs.allowed_email_domains,
-                sso_enabled: orgs.sso_enabled,
-            })
-
-        await closeClient(c, pgClient)
-
-        // Verify the update affected a row
-        if (!updatedOrgs || updatedOrgs.length === 0) {
-            cloudlog({ requestId, message: '[organization_domains_put] No organization found to update', orgId: safeBody.orgId })
-            return c.json({ status: 'Organization not found', orgId: safeBody.orgId }, 404)
-        }
-
-        const data = updatedOrgs[0]
-        return c.json({
-            allowed_email_domains: data?.allowed_email_domains || [],
-            sso_enabled: data?.sso_enabled || false,
-        }, 200)
-    }
-    catch (error: any) {
-        await closeClient(c, pgClient)
-        cloudlog({ requestId, message: '[organization_domains_put] Error updating org domains', error })
-
-        // Check for PostgreSQL constraint violations
-        // Drizzle returns error.code for PostgreSQL error codes
-        if (error.code === '23514' || error.message?.includes('blocked_domain') || error.message?.includes('public email provider')) {
-            return simpleError('blocked_domain', 'This domain is a public email provider and cannot be used', { domains: safeBody.domains })
-        }
-        if (error.code === '23505' || error.message?.includes('unique_sso_domain') || error.message?.includes('already claimed')) {
-            return simpleError('domain_already_used', 'This domain is already in use by another organization', { domains: safeBody.domains })
-        }
-        return simpleError('cannot_update_org_domains', 'Cannot update organization allowed email domains', { error: error.message })
-    }
+    return simpleError('cannot_update_org_domains', 'Cannot update organization allowed email domains', { error: error.message })
+  }
 })
