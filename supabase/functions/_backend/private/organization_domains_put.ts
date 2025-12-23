@@ -18,9 +18,10 @@
  */
 
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
+import { Hono } from 'hono'
 import { eq } from 'drizzle-orm'
 import { z } from 'zod/mini'
-import { createHono, parseBody, simpleError, useCors } from '../utils/hono.ts'
+import { parseBody, simpleError, useCors } from '../utils/hono.ts'
 import { middlewareV2 } from '../utils/hono_middleware.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
@@ -33,7 +34,7 @@ const bodySchema = z.object({
     domains: z.array(z.string()),
 })
 
-export const app = createHono<MiddlewareKeyVariables>()
+export const app = new Hono<MiddlewareKeyVariables>()
 
 app.use('/', useCors)
 

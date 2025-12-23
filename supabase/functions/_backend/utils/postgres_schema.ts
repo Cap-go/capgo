@@ -96,8 +96,8 @@ export const orgs = pgTable('orgs', {
   name: text('name').notNull(),
   management_email: text('management_email').notNull(),
   customer_id: text('customer_id'),
-  allowed_email_domains: text('allowed_email_domains').array(),
-  sso_enabled: boolean('sso_enabled'),
+  allowed_email_domains: text('allowed_email_domains').array().default([]),
+  sso_enabled: boolean('sso_enabled').default(false),
 })
 
 export const stripe_info = pgTable('stripe_info', {

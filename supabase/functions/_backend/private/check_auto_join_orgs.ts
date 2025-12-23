@@ -24,8 +24,9 @@
  */
 
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
+import { Hono } from 'hono'
 import { z } from 'zod/mini'
-import { createHono, middlewareAuth, parseBody, simpleError, useCors } from '../utils/hono.ts'
+import { middlewareAuth, parseBody, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { supabaseClient as useSupabaseClient } from '../utils/supabase.ts'
 
@@ -34,7 +35,7 @@ const bodySchema = z.object({
   user_id: z.uuid(),
 })
 
-export const app = createHono<MiddlewareKeyVariables>()
+export const app = new Hono<MiddlewareKeyVariables>()
 
 app.use('/', useCors)
 
@@ -74,7 +75,7 @@ app.post('/', middlewareAuth, async (c) => {
   }
 
   // Call the auto-join function
-  const { data, error } = await (supabaseClient as any)
+  const { data, error } = await supabaseClient
     .rpc('auto_join_user_to_orgs_by_email', {
       p_user_id: user_id,
       p_email: user.email,
