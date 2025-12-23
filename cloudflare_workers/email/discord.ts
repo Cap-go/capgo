@@ -192,12 +192,25 @@ function truncateText(text: string, maxLength: number): string {
 
 /**
  * Basic HTML stripping (for simple cases)
+ *
+ * Removes script/style blocks and all HTML tags, then normalizes whitespace.
+ * Also removes any remaining `<` or `>` characters so that sequences like
+ * `<script` cannot appear in the output, even if reconstructed.
  */
 function stripHtml(html: string): string {
-  return html
-    .replace(/<style[^>]*?>.*?<\/style>/gis, '')
-    .replace(/<script[^>]*?>.*?<\/script>/gis, '')
-    .replace(/<[^>]+?>/g, ' ')
+  if (!html)
+    return ''
+
+  let text = html
+    // Remove <script> and <style> blocks (including their contents)
+    .replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1>/gi, '')
+    // Remove all remaining HTML tags
+    .replace(/<[^>]+>/g, ' ')
+
+  // Remove any stray angle brackets so multi-character tokens like "<script"
+  // cannot remain, then collapse whitespace.
+  return text
+    .replace(/[<>]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
 }
