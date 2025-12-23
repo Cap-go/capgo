@@ -42,7 +42,7 @@ import { storeToRefs } from 'pinia'
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
-import { useSupabase } from '~/services/supabase'
+import { getLocalConfig, useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 import { useOrganizationStore } from '~/stores/organization'
 
@@ -93,25 +93,35 @@ async function loadAllowedDomain() {
     return
 
   try {
-    const { data, error } = await supabase.functions.invoke('private/organization_domains_get', {
-      body: { orgId: currentOrganization.value.gid },
+    const config = getLocalConfig()
+    const session = await supabase.auth.getSession()
+    const token = session.data.session?.access_token
+
+    if (!token) {
+      toast.error(t('error-loading-domain', 'Failed to load allowed domain'))
+      return
+    }
+
+    const response = await fetch(`${config.hostWeb}/private/organization_domains_get`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({ orgId: currentOrganization.value.gid }),
     })
 
-    if (error) {
-      console.error('Error from API:', error)
+    const data = await response.json()
+
+    if (!response.ok || data.error) {
+      console.error('Error from API:', data)
       // Check for specific error types
-      if (error.message?.includes('cannot_access_organization')) {
+      if (data.error?.includes('cannot_access_organization')) {
         toast.error(t('no-org-access', 'You don\'t have access to this organization'))
       }
       else {
         toast.error(t('error-loading-domain', 'Failed to load allowed domain'))
       }
-      return
-    }
-
-    if (!data) {
-      console.error('No data returned from API')
-      toast.error(t('error-loading-domain', 'Failed to load allowed domain'))
       return
     }
 
@@ -167,24 +177,40 @@ async function saveDomain() {
 
   isSaving.value = true
   try {
-    const { data, error } = await supabase.functions.invoke('private/organization_domains_put', {
-      body: {
+    const config = getLocalConfig()
+    const session = await supabase.auth.getSession()
+    const token = session.data.session?.access_token
+
+    if (!token) {
+      toast.error(t('error-saving-domain', 'Failed to save domain. Please try again.'))
+      return
+    }
+
+    const response = await fetch(`${config.hostWeb}/private/organization_domains_put`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({
         orgId: currentOrganization.value.gid,
         domains: [domain], // Array structure allows future multi-domain support
         enabled: autoJoinEnabled.value,
-      },
+      }),
     })
 
-    if (error) {
-      console.error('Error from API (save):', error)
+    const data = await response.json()
+
+    if (!response.ok || data.error) {
+      console.error('Error from API (save):', data)
       // Check for specific error types and show appropriate user messages
-      if (error.message?.includes('blocked_domain') || error.message?.includes('public email provider')) {
+      if (data.error?.includes('blocked_domain') || data.error?.includes('public email provider')) {
         toast.error(t('blocked-domain-error', 'This domain is a public email provider (like Gmail, Yahoo, etc.) and cannot be used. Please use your organization\'s custom domain.'))
       }
-      else if (error.message?.includes('domain_already_used')) {
+      else if (data.error?.includes('domain_already_used')) {
         toast.error(t('domain-already-used', 'This domain is already in use by another organization'))
       }
-      else if (error.message?.includes('insufficient_permissions')) {
+      else if (data.error?.includes('insufficient_permissions')) {
         toast.error(t('no-admin-permission', 'You need admin permissions to configure domains'))
       }
       else {
@@ -231,15 +257,31 @@ async function removeDomain() {
 
   isSaving.value = true
   try {
-    const { error } = await supabase.functions.invoke('private/organization_domains_put', {
-      body: {
+    const config = getLocalConfig()
+    const session = await supabase.auth.getSession()
+    const token = session.data.session?.access_token
+
+    if (!token) {
+      toast.error(t('error-removing-domain', 'Failed to remove domain. Please try again.'))
+      return
+    }
+
+    const response = await fetch(`${config.hostWeb}/private/organization_domains_put`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({
         orgId: currentOrganization.value.gid,
         domains: [], // Empty array clears all domains
         enabled: false, // Also disable auto-join
-      },
+      }),
     })
 
-    if (error)
+    const data = await response.json()
+
+    if (!response.ok || data.error) {
       throw error
 
     // Reset UI state
@@ -275,16 +317,34 @@ async function toggleAutoJoinEnabled() {
 
   isSaving.value = true
   try {
-    const { error } = await supabase.functions.invoke('private/organization_domains_put', {
-      body: {
+    const config = getLocalConfig()
+    const session = await supabase.auth.getSession()
+    const token = session.data.session?.access_token
+
+    if (!token) {
+      // Revert checkbox on error
+      autoJoinEnabled.value = !autoJoinEnabled.value
+      toast.error(t('error-toggling-autojoin', 'Failed to update auto-join setting'))
+      return
+    }
+
+    const response = await fetch(`${config.hostWeb}/private/organization_domains_put`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({
         orgId: currentOrganization.value.gid,
         domains: [allowedDomain.value], // Keep existing domain
         enabled: autoJoinEnabled.value, // Update enabled state
-      },
+      }),
     })
 
-    if (error)
-      throw error
+    const data = await response.json()
+
+    if (!response.ok || data.error)
+      throw new Error(data.error || 'Failed to update')
 
     toast.success(
       autoJoinEnabled.value
