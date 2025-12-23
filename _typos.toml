@@ -1,3 +1,9 @@
 [default.extend-words]
 # French words that are valid
 cours = "cours"
+appareil = "appareil"
+periode = "periode"
+
+# Indonesian words that are valid
+bundel = "bundel"
+periode = "periode"
