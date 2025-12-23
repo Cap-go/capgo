@@ -100,6 +100,8 @@ export const orgs = pgTable('orgs', {
   customer_id: text('customer_id'),
   require_apikey_expiration: boolean('require_apikey_expiration').notNull().default(false),
   max_apikey_expiration_days: integer('max_apikey_expiration_days'),
+  allowed_email_domains: text('allowed_email_domains').array(),
+  sso_enabled: boolean('sso_enabled'),
 })
 
 export const stripe_info = pgTable('stripe_info', {
