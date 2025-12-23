@@ -62,17 +62,17 @@ ANALYZE org_users;
 
 -- Performance rationale:
 -- 1. Composite index (org_id, user_id) optimizes the WHERE clause perfectly
---    - Postgres can use both columns for filtering efficiently
---    - Much faster than using two separate single-column indexes (no index intersection needed)
+--    Postgres can use both columns for filtering efficiently
+--    Much faster than using two separate single-column indexes (no index intersection needed)
 --
 -- 2. INCLUDE clause creates a "covering index" 
---    - Index contains all columns needed by the query (org_id, user_id, user_right, app_id, channel_id)
---    - Eliminates table heap lookups entirely (index-only scan)
---    - Reduces I/O significantly for frequent permission checks
+--    Index contains all columns needed by the query (org_id, user_id, user_right, app_id, channel_id)
+--    Eliminates table heap lookups entirely (index-only scan)
+--    Reduces I/O significantly for frequent permission checks
 --
 -- 3. Column order (org_id, user_id) is optimal because:
---    - org_id is the higher-cardinality column (many orgs)
---    - user_id is the more selective filter within an org
---    - Allows efficient range scans if needed in the future
+--    org_id is the higher-cardinality column (many orgs)
+--    user_id is the more selective filter within an org
+--    Allows efficient range scans if needed in the future
 --
 -- This is used by all permission checks in private API endpoints
