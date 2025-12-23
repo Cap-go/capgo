@@ -2,8 +2,9 @@
 # French words that are valid
 cours = "cours"
 appareil = "appareil"
+
+# Words valid in multiple languages
 periode = "periode"
 
 # Indonesian words that are valid
 bundel = "bundel"
-periode = "periode"
