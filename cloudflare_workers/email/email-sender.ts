@@ -154,19 +154,19 @@ function markdownToPlainText(markdown: string): string {
       part = part.replace(/_([^_]+)_/g, '*$1*')
 
       // Inline code: `code` -> "code"
-      part = part.replace(/`([^`]+)`/g, '"$1"')
+      part = part.replace(/`([^`]+?)`/g, '"$1"')
 
       // Links: [text](url) -> text (url)
-      part = part.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '$1 ($2)')
+      part = part.replace(/\[([^\]]+?)\]\(([^)]+?)\)/g, '$1 ($2)')
 
       // Headers: # Header -> Header (match at start of line)
-      part = part.replace(/^(#{1,6}) +(.+)$/gm, '$2')
+      part = part.replace(/^(#{1,6}) +(.+?)$/gm, '$2')
 
       // Bullet lists: - item or * item -> • item
-      part = part.replace(/^[*-] +(.+)$/gm, '• $1')
+      part = part.replace(/^[*-] +(.+?)$/gm, '• $1')
 
       // Blockquotes: > quote -> | quote
-      part = part.replace(/^> +(.+)$/gm, '| $1')
+      part = part.replace(/^> +(.+?)$/gm, '| $1')
 
       // Horizontal rules: --- or *** -> ────────
       part = part.replace(/^[*-]{3,}$/gm, '────────')

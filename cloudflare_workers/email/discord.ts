@@ -195,9 +195,9 @@ function truncateText(text: string, maxLength: number): string {
  */
 function stripHtml(html: string): string {
   return html
-    .replace(/<style[^>]*>.*?<\/style>/gis, '')
-    .replace(/<script[^>]*>.*?<\/script>/gis, '')
-    .replace(/<[^>]+>/g, ' ')
+    .replace(/<style[^>]*?>.*?<\/style>/gis, '')
+    .replace(/<script[^>]*?>.*?<\/script>/gis, '')
+    .replace(/<[^>]+?>/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
 }
