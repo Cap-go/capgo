@@ -62,4 +62,13 @@ extend-exclude = [
 capgo = "capgo"
 forgr = "forgr"
 supabase = "supabase"
-# Add more project-specific terms as needed
+
+# French words that are valid
+cours = "cours"
+appareil = "appareil"
+
+# Indonesian words that are valid
+bundel = "bundel"
+
+# Words valid in multiple languages
+periode = "periode"
