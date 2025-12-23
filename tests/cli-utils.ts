@@ -29,7 +29,7 @@ export const BASE_PACKAGE_JSON = `{
 export const BASE_DEPENDENCIES = {
   '@capacitor/android': '^7.0.0',
   '@capacitor/core': '7.0.0',
-  '@capgo/capacitor-updater': '7.0.38',
+  '@capgo/capacitor-updater': '7.30.0',
 }
 export const BASE_DEPENDENCIES_OLD = {
   '@capacitor/android': '^6.0.0',

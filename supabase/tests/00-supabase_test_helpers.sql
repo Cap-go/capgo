@@ -17,14 +17,18 @@ GRANT USAGE ON SCHEMA tests TO anon, authenticated, service_role;
 -- Don't allow public to execute any functions in the tests schema
 ALTER DEFAULT PRIVILEGES IN SCHEMA tests REVOKE EXECUTE ON FUNCTIONS FROM public;
 -- Grant execute to anon, authenticated, and service_role for testing purposes
-ALTER DEFAULT PRIVILEGES IN SCHEMA tests GRANT EXECUTE ON FUNCTIONS TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA tests GRANT EXECUTE ON FUNCTIONS TO anon,
+authenticated,
+service_role;
 
 -- anon, authenticated, and service_role should have access to test_overrides schema
 GRANT USAGE ON SCHEMA test_overrides TO anon, authenticated, service_role;
 -- Don't allow public to execute any functions in the test_overrides schema
 ALTER DEFAULT PRIVILEGES IN SCHEMA test_overrides REVOKE EXECUTE ON FUNCTIONS FROM public;
 -- Grant execute to anon, authenticated, and service_role for testing purposes
-ALTER DEFAULT PRIVILEGES IN SCHEMA test_overrides GRANT EXECUTE ON FUNCTIONS TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA test_overrides GRANT EXECUTE ON FUNCTIONS TO anon,
+authenticated,
+service_role;
 
 /**
     * ### tests.create_supabase_user(identifier text, email text, phone text)
@@ -48,10 +52,15 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA test_overrides GRANT EXECUTE ON FUNCTIONS TO 
     *   SELECT tests.create_supabase_user('test_member', 'member@test.com', '555-555-5555', '{"key": "value"}'::jsonb);
     * ```
  */
-CREATE OR REPLACE FUNCTION tests.create_supabase_user(identifier text, email text default null, phone text default null, metadata jsonb default null)
+CREATE OR REPLACE FUNCTION tests.create_supabase_user(
+    identifier text,
+    email text DEFAULT null,
+    phone text DEFAULT null,
+    metadata jsonb DEFAULT null
+)
 RETURNS uuid
-    SECURITY DEFINER
-    SET search_path = auth, pg_temp
+SECURITY DEFINER
+SET search_path = auth, pg_temp
 AS $$
 DECLARE
     user_id uuid;
@@ -126,9 +135,9 @@ $$ LANGUAGE plpgsql;
     * ```
  */
 CREATE OR REPLACE FUNCTION tests.get_supabase_uid(identifier text)
-    RETURNS uuid
-    SECURITY DEFINER
-    SET search_path = auth, pg_temp
+RETURNS uuid
+SECURITY DEFINER
+SET search_path = auth, pg_temp
 AS $$
 DECLARE
     supabase_user uuid;
@@ -157,9 +166,9 @@ $$ LANGUAGE plpgsql;
     *   SELECT tests.authenticate_as('test_owner');
     * ```
  */
-CREATE OR REPLACE FUNCTION tests.authenticate_as (identifier text)
-    RETURNS void
-    AS $$
+CREATE OR REPLACE FUNCTION tests.authenticate_as(identifier text)
+RETURNS void
+AS $$
         DECLARE
                 user_data json;
                 original_auth_data text;
@@ -203,9 +212,9 @@ CREATE OR REPLACE FUNCTION tests.authenticate_as (identifier text)
     *   SELECT tests.authenticate_as_service_role();
     * ```
  */
-CREATE OR REPLACE FUNCTION tests.authenticate_as_service_role ()
-    RETURNS void
-    AS $$
+CREATE OR REPLACE FUNCTION tests.authenticate_as_service_role()
+RETURNS void
+AS $$
         BEGIN
             perform set_config('role', 'service_role', true);
             perform set_config('request.jwt.claims', null, true);
@@ -228,7 +237,7 @@ CREATE OR REPLACE FUNCTION tests.authenticate_as_service_role ()
     * ```
  */
 CREATE OR REPLACE FUNCTION tests.clear_authentication()
-    RETURNS void AS $$
+RETURNS void AS $$
 BEGIN
     perform set_config('role', 'anon', true);
     perform set_config('request.jwt.claims', null, true);
@@ -251,7 +260,7 @@ $$ LANGUAGE plpgsql;
 *   ROLLBACK;
 * ```
 */
-CREATE OR REPLACE FUNCTION tests.rls_enabled (testing_schema text)
+CREATE OR REPLACE FUNCTION tests.rls_enabled(testing_schema text)
 RETURNS text AS $$
     select is(
         (select
@@ -282,8 +291,10 @@ $$ LANGUAGE sql;
 *    ROLLBACK;
 * ```
 */
-CREATE OR REPLACE FUNCTION tests.rls_enabled (testing_schema text, testing_table text)
-RETURNS TEXT AS $$
+CREATE OR REPLACE FUNCTION tests.rls_enabled(
+    testing_schema text, testing_table text
+)
+RETURNS text AS $$
     select is(
         (select
            	count(*)::integer
@@ -301,7 +312,7 @@ $$ LANGUAGE sql;
 --  of freezing time in tests. This should not be used directly.
 --
 CREATE OR REPLACE FUNCTION test_overrides.now()
-    RETURNS timestamp with time zone
+RETURNS timestamp with time zone
 AS $$
 BEGIN
 
@@ -321,9 +332,9 @@ $$ LANGUAGE plpgsql;
     *
     * Overwrites the current time from now() to the provided time.
     *
-    * Works out of the box for any normal usage of now(), if you have a function that sets its own search path, such as security definers, then you will need to alter the function to set the search path to include test_overrides BEFORE pg_catalog. 
+    * Works out of the box for any normal usage of now(), if you have a function that sets its own search path, such as security definers, then you will need to alter the function to set the search path to include test_overrides BEFORE pg_catalog.
     * **ONLY do this inside of a pgtap test transaction.**
-    * Example: 
+    * Example:
     *
     * ```sql
     * ALTER FUNCTION auth.your_function() SET search_path = test_overrides, public, pg_temp, pg_catalog;
@@ -342,8 +353,10 @@ $$ LANGUAGE plpgsql;
     * ```
  */
 
-CREATE OR REPLACE FUNCTION tests.freeze_time(frozen_time timestamp with time zone)
-    RETURNS void
+CREATE OR REPLACE FUNCTION tests.freeze_time(
+    frozen_time timestamp with time zone
+)
+RETURNS void
 AS $$
 BEGIN
 
@@ -377,7 +390,7 @@ $$ LANGUAGE plpgsql;
  */
 
 CREATE OR REPLACE FUNCTION tests.unfreeze_time()
-    RETURNS void
+RETURNS void
 AS $$
 BEGIN
     -- restore the original now function
@@ -392,13 +405,13 @@ $$ LANGUAGE plpgsql;
 -- investigating options to make this better.  Maybe a dedicated test harness
 -- but we dont' want these functions to always exist on the database.
 BEGIN;
-    select plan(7);
-    select function_returns('tests', 'create_supabase_user', Array['text', 'text', 'text', 'jsonb'], 'uuid');
-    select function_returns('tests', 'get_supabase_uid', Array['text'], 'uuid');
-    select function_returns('tests', 'get_supabase_user', Array['text'], 'json');
-    select function_returns('tests', 'authenticate_as', Array['text'], 'void');
-    select function_returns('tests', 'clear_authentication', Array[null], 'void');
-    select function_returns('tests', 'rls_enabled', Array['text', 'text'], 'text');
-    select function_returns('tests', 'rls_enabled', Array['text'], 'text');
-    select * from finish();
+SELECT plan(7);
+SELECT function_returns('tests', 'create_supabase_user', ARRAY['text', 'text', 'text', 'jsonb'], 'uuid');
+SELECT function_returns('tests', 'get_supabase_uid', ARRAY['text'], 'uuid');
+SELECT function_returns('tests', 'get_supabase_user', ARRAY['text'], 'json');
+SELECT function_returns('tests', 'authenticate_as', ARRAY['text'], 'void');
+SELECT function_returns('tests', 'clear_authentication', ARRAY[null], 'void');
+SELECT function_returns('tests', 'rls_enabled', ARRAY['text', 'text'], 'text');
+SELECT function_returns('tests', 'rls_enabled', ARRAY['text'], 'text');
+SELECT * FROM finish();
 ROLLBACK;

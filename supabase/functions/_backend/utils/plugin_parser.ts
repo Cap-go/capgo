@@ -15,7 +15,7 @@ function getInvalidCode(c: Context) {
 }
 
 export function makeDevice(devBody: AppInfos | DeviceLink | AppStats): DeviceWithoutCreatedAt {
-  const device: DeviceWithoutCreatedAt = {
+  const device = {
     platform: devBody.platform as Database['public']['Enums']['platform_os'],
     device_id: devBody.device_id,
     app_id: devBody.app_id,
@@ -28,29 +28,35 @@ export function makeDevice(devBody: AppInfos | DeviceLink | AppStats): DeviceWit
     custom_id: devBody.custom_id,
     updated_at: new Date().toISOString(),
     default_channel: devBody.defaultChannel ?? null,
-  }
+    key_id: devBody.key_id ?? null,
+  } as DeviceWithoutCreatedAt
   return device
 }
 
-export function parsePluginBody<T extends AppInfos | DeviceLink | AppStats>(c: Context, body: T, schema: ZodMiniObject) {
+export function parsePluginBody<T extends AppInfos | DeviceLink | AppStats>(c: Context, body: T, schema: ZodMiniObject, requireDevice = true) {
   if (Object.keys(body ?? {}).length === 0) {
     return simpleError(getInvalidCode(c), 'Cannot parse body', { body })
   }
-  if (!body.device_id) {
+  if (requireDevice && !body.device_id) {
     return simpleError('missing_device_id', 'Cannot find device_id', { body })
   }
   if (!body.app_id) {
     return simpleError('missing_app_id', 'Cannot find app_id', { body })
   }
-  const coerce = tryParse(fixSemver(body.version_build))
-  if (!coerce) {
-    return simpleError('semver_error', `Native version: ${body.version_build} doesn't follow semver convention, please check https://capgo.app/semver_tester/ to learn more about semver usage in Capgo`, { version_build: body.version_build })
+  // Only validate version_build if it's provided (not required for GET /channel_self)
+  if (body.version_build) {
+    const coerce = tryParse(fixSemver(body.version_build))
+    if (!coerce) {
+      return simpleError('semver_error', `Native version: ${body.version_build} doesn't follow semver convention, please check https://capgo.app/semver_tester/ to learn more about semver usage in Capgo`, { version_build: body.version_build })
+    }
+    body.version_build = format(coerce)
   }
-  body.version_build = format(coerce)
   // For plugin below 5.0.0, we need to set the default values of is_emulator and is_prod
   body.is_emulator ??= false
   body.is_prod ??= true
-  body.version_name = (body.version_name === 'builtin' || !body.version_name) ? body.version_build : body.version_name
+  if (body.version_name) {
+    body.version_name = (body.version_name === 'builtin' || !body.version_name) ? body.version_build : body.version_name
+  }
   const parseResult = schema.safeParse(body)
   if (!parseResult.success) {
     return simpleError(getInvalidCode(c), 'Cannot parse body', { parseResult })
@@ -80,6 +86,7 @@ export function convertQueryToBody(query: Record<string, string>): DeviceLink {
     is_emulator: query.is_emulator === 'true',
     is_prod: query.is_prod === 'true',
     version_os: query.version_os,
+    key_id: query.key_id,
   }
   return body
 }

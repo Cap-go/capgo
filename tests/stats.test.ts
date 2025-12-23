@@ -4,7 +4,7 @@ import { env } from 'node:process'
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { ALLOWED_STATS_ACTIONS } from '../supabase/functions/_backend/plugins/stats_actions.ts'
-import { APP_NAME, createAppVersions, getBaseData, getSupabaseClient, getVersionFromAction, headers, PLUGIN_BASE_URL, resetAndSeedAppData, resetAndSeedAppDataStats, resetAppData, resetAppDataStats, triggerD1Sync } from './test-utils.ts'
+import { APP_NAME, createAppVersions, getBaseData, getSupabaseClient, getVersionFromAction, headers, PLUGIN_BASE_URL, resetAndSeedAppData, resetAndSeedAppDataStats, resetAppData, resetAppDataStats } from './test-utils.ts'
 
 const id = randomUUID()
 const APP_NAME_STATS = `${APP_NAME}.${id}`
@@ -71,7 +71,6 @@ describe('test valid and invalid cases of version_build', () => {
     baseData.version_build = getVersionFromAction('set')
     const version = await createAppVersions(baseData.version_build, APP_NAME_STATS)
     baseData.version_name = version.name
-    await triggerD1Sync() // Sync the newly created version to D1
 
     let response = await postStats(baseData)
     if (response.status !== 200) {
@@ -129,7 +128,6 @@ describe('[POST] /stats', () => {
 
     const version = await createAppVersions(baseData.version_build, APP_NAME_STATS)
     baseData.version_name = version.name
-    await triggerD1Sync() // Sync the newly created version to D1
     const response = await postStats(baseData)
     expect(response.status).toBe(200)
     expect(await response.json<StatsRes>()).toEqual({ status: 'ok' })
@@ -171,7 +169,6 @@ describe('[POST] /stats', () => {
         baseData.version_code = '2'
         baseData.version_os = '16.1'
         baseData.custom_id = 'test2'
-        await triggerD1Sync() // Sync the newly created version to D1
 
         const response = await postStats(baseData)
         const responseData = await response.json<StatsRes>()
@@ -192,24 +189,27 @@ describe('[POST] /stats', () => {
         expect(statsData?.action).toBe(action)
         expect(statsData?.device_id).toBe(uuid)
 
-        // Verify device state
-        const { error: deviceError, data: deviceData } = await getSupabaseClient()
-          .from('devices')
-          .select()
-          .eq('device_id', uuid)
-          .eq('app_id', APP_NAME_STATS)
-          .single()
+        // Verify device state - fail actions should NOT create/update device records
+        // because the version_name in fail requests is the failed version, not the actual running version
+        if (!action.endsWith('_fail')) {
+          const { error: deviceError, data: deviceData } = await getSupabaseClient()
+            .from('devices')
+            .select()
+            .eq('device_id', uuid)
+            .eq('app_id', APP_NAME_STATS)
+            .single()
 
-        expect(deviceError).toBeNull()
-        expect(deviceData).toBeTruthy()
-        expect(deviceData?.version_build).toBe(baseData.version_build)
-        expect(deviceData?.version_name).toBe(version.name)
-        expect(deviceData?.os_version).toBe('16.1')
-        expect(deviceData?.plugin_version).toBe('7.0.0')
-        expect(deviceData?.custom_id).toBe('test2')
+          expect(deviceError).toBeNull()
+          expect(deviceData).toBeTruthy()
+          expect(deviceData?.version_build).toBe(baseData.version_build)
+          expect(deviceData?.version_name).toBe(version.name)
+          expect(deviceData?.os_version).toBe('16.1')
+          expect(deviceData?.plugin_version).toBe('7.0.0')
+          expect(deviceData?.custom_id).toBe('test2')
 
-        // Clean up
-        await getSupabaseClient().from('devices').delete().eq('device_id', uuid).eq('app_id', APP_NAME_STATS)
+          // Clean up
+          await getSupabaseClient().from('devices').delete().eq('device_id', uuid).eq('app_id', APP_NAME_STATS)
+        }
       })
     }
   })
@@ -221,7 +221,6 @@ describe('[POST] /stats', () => {
     baseData.version_build = getVersionFromAction('get')
     const version = await createAppVersions(baseData.version_build, APP_NAME_STATS)
     baseData.version_name = version.name
-    await triggerD1Sync() // Sync the newly created version to D1
 
     const response = await postStats(baseData)
     expect(response.status).toBe(429)
@@ -236,7 +235,6 @@ describe('[POST] /stats', () => {
     baseData.version_build = getVersionFromAction('invalid_action')
     const version = await createAppVersions(baseData.version_build, APP_NAME_STATS)
     baseData.version_name = version.name
-    await triggerD1Sync() // Sync the newly created version to D1
 
     const response = await postStats(baseData)
     expect(response.status).toBe(400)
@@ -255,13 +253,11 @@ describe('[POST] /stats', () => {
     baseData.version_build = getVersionFromAction('set')
     const version = await createAppVersions(baseData.version_build, APP_NAME_STATS)
     baseData.version_name = version.name
-    await triggerD1Sync()
 
     const response = await postStats(baseData)
     expect(response.status).toBe(200)
 
     // Wait for data to be written
-    await triggerD1Sync()
 
     // Verify default_channel was saved
     const { error, data } = await getSupabaseClient()
@@ -291,13 +287,10 @@ describe('[POST] /stats', () => {
     baseData.version_build = getVersionFromAction('set')
     const version = await createAppVersions(baseData.version_build, APP_NAME_STATS)
     baseData.version_name = version.name
-    await triggerD1Sync()
 
     // First request with initial channel
     let response = await postStats(baseData)
     expect(response.status).toBe(200)
-
-    await triggerD1Sync()
 
     // Verify initial channel was saved
     let result = await getSupabaseClient()
@@ -314,8 +307,6 @@ describe('[POST] /stats', () => {
     baseData.defaultChannel = updatedChannel
     response = await postStats(baseData)
     expect(response.status).toBe(200)
-
-    await triggerD1Sync()
 
     // Verify channel was updated
     result = await getSupabaseClient()
@@ -343,13 +334,10 @@ describe('[POST] /stats', () => {
     baseData.version_build = getVersionFromAction('set')
     const version = await createAppVersions(baseData.version_build, APP_NAME_STATS)
     baseData.version_name = version.name
-    await triggerD1Sync()
 
     // First request with channel set
     let response = await postStats(baseData)
     expect(response.status).toBe(200)
-
-    await triggerD1Sync()
 
     // Verify channel was saved
     let result = await getSupabaseClient()
@@ -366,8 +354,6 @@ describe('[POST] /stats', () => {
     delete baseData.defaultChannel
     response = await postStats(baseData)
     expect(response.status).toBe(200)
-
-    await triggerD1Sync()
 
     // Verify channel was unset (should be null)
     result = await getSupabaseClient()

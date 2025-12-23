@@ -12,6 +12,10 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
+    AdminFilterBar: typeof import('./components/admin/AdminFilterBar.vue')['default']
+    AdminMultiLineChart: typeof import('./components/admin/AdminMultiLineChart.vue')['default']
+    AdminStatsCard: typeof import('./components/admin/AdminStatsCard.vue')['default']
+    AdminTrendChart: typeof import('./components/admin/AdminTrendChart.vue')['default']
     AppSetting: typeof import('./components/dashboard/AppSetting.vue')['default']
     AppTable: typeof import('./components/tables/AppTable.vue')['default']
     Banner: typeof import('./components/Banner.vue')['default']
@@ -22,8 +26,10 @@ declare module 'vue' {
     BundleUploadsChart: typeof import('./components/dashboard/BundleUploadsChart.vue')['default']
     ChannelTable: typeof import('./components/tables/ChannelTable.vue')['default']
     ChartCard: typeof import('./components/dashboard/ChartCard.vue')['default']
+    DeploymentBanner: typeof import('./components/dashboard/DeploymentBanner.vue')['default']
     DeploymentStatsCard: typeof import('./components/dashboard/DeploymentStatsCard.vue')['default']
     DeploymentStatsChart: typeof import('./components/dashboard/DeploymentStatsChart.vue')['default']
+    DeploymentTable: typeof import('./components/tables/DeploymentTable.vue')['default']
     DevicesStats: typeof import('./components/dashboard/DevicesStats.vue')['default']
     DeviceTable: typeof import('./components/tables/DeviceTable.vue')['default']
     DialogV2: typeof import('./components/DialogV2.vue')['default']
@@ -62,6 +68,10 @@ declare module 'vue' {
 
 // For TSX support
 declare global {
+  const AdminFilterBar: typeof import('./components/admin/AdminFilterBar.vue')['default']
+  const AdminMultiLineChart: typeof import('./components/admin/AdminMultiLineChart.vue')['default']
+  const AdminStatsCard: typeof import('./components/admin/AdminStatsCard.vue')['default']
+  const AdminTrendChart: typeof import('./components/admin/AdminTrendChart.vue')['default']
   const AppSetting: typeof import('./components/dashboard/AppSetting.vue')['default']
   const AppTable: typeof import('./components/tables/AppTable.vue')['default']
   const Banner: typeof import('./components/Banner.vue')['default']
@@ -72,8 +82,10 @@ declare global {
   const BundleUploadsChart: typeof import('./components/dashboard/BundleUploadsChart.vue')['default']
   const ChannelTable: typeof import('./components/tables/ChannelTable.vue')['default']
   const ChartCard: typeof import('./components/dashboard/ChartCard.vue')['default']
+  const DeploymentBanner: typeof import('./components/dashboard/DeploymentBanner.vue')['default']
   const DeploymentStatsCard: typeof import('./components/dashboard/DeploymentStatsCard.vue')['default']
   const DeploymentStatsChart: typeof import('./components/dashboard/DeploymentStatsChart.vue')['default']
+  const DeploymentTable: typeof import('./components/tables/DeploymentTable.vue')['default']
   const DevicesStats: typeof import('./components/dashboard/DevicesStats.vue')['default']
   const DeviceTable: typeof import('./components/tables/DeviceTable.vue')['default']
   const DialogV2: typeof import('./components/DialogV2.vue')['default']

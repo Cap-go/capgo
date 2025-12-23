@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import type { ChartData, ChartOptions, Plugin } from 'chart.js'
+import type { TooltipClickHandler } from '~/services/chartTooltip'
 import type { Organization } from '~/stores/organization'
 import { useDark } from '@vueuse/core'
 import { CategoryScale, Chart, Filler, LinearScale, LineElement, PointElement, Tooltip } from 'chart.js'
 import { computed, ref, watch } from 'vue'
 import { Line } from 'vue-chartjs'
 import { useI18n } from 'vue-i18n'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { createChartScales } from '~/services/chartConfig'
 import { useChartData } from '~/services/chartDataService'
 import { createTooltipConfig, todayLinePlugin, verticalLinePlugin } from '~/services/chartTooltip'
@@ -44,13 +45,59 @@ Chart.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, F
 
 const isDark = useDark()
 const { t } = useI18n()
-const route = useRoute('/app/p/[package]')
+const route = useRoute('/app/[package]')
+const router = useRouter()
 const organizationStore = useOrganizationStore()
 const supabase = useSupabase()
+const rawChartData = ref<ChartApiData | null>(null)
 
 const appId = ref('')
+
+// Cache for bundle ID lookups (version name -> bundle ID)
+const bundleIdCache = ref<Record<string, number>>({})
+
+// Create a mapping from version label to itself for tooltip clicks
+// Version names are the labels (e.g., "1.0.0")
+const versionByLabel = computed(() => {
+  const mapping: Record<string, string> = {}
+  const datasets = rawChartData.value?.datasets ?? []
+  datasets.forEach((dataset) => {
+    // The label is the version name, we use it as both key and value
+    mapping[dataset.label] = dataset.label
+  })
+  return mapping
+})
+
+// Look up bundle ID and navigate directly to bundle page
+async function navigateToBundle(versionName: string) {
+  // Check cache first
+  if (bundleIdCache.value[versionName]) {
+    router.push(`/app/${appId.value}/bundle/${bundleIdCache.value[versionName]}`)
+    return
+  }
+
+  // Query the database to get the bundle ID from version name
+  const { data } = await supabase
+    .from('app_versions')
+    .select('id')
+    .eq('app_id', appId.value)
+    .eq('name', versionName)
+    .limit(1)
+    .single()
+
+  if (data?.id) {
+    // Cache the result
+    bundleIdCache.value[versionName] = data.id
+    router.push(`/app/${appId.value}/bundle/${data.id}`)
+  }
+}
+
+// Click handler for tooltip items - navigates directly to bundle page
+const tooltipClickHandler = computed<TooltipClickHandler>(() => ({
+  onAppClick: navigateToBundle,
+  appIdByLabel: versionByLabel.value,
+}))
 const isLoading = ref(true)
-const rawChartData = ref<ChartApiData | null>(null)
 const currentRange = ref<{ startDate: Date, endDate: Date } | null>(null)
 let requestToken = 0
 
@@ -313,7 +360,7 @@ const processedChartData = computed<ChartData<'line'> | null>(() => {
       tension: 0.3,
       pointRadius: props.accumulated ? 0 : 2,
       pointBorderWidth: 0,
-      borderWidth: 1,
+      borderWidth: 2,
     } as ChartData<'line'>['datasets'][number]
     Object.assign(chartDataset, { metaBaseValues: tooltipBaseValues })
     datasets.push(chartDataset)
@@ -361,7 +408,7 @@ const todayLineOptions = computed(() => {
 
 const chartOptions = computed<ChartOptions<'line'>>(() => {
   const hasMultipleDatasets = (processedChartData.value?.datasets.length ?? 0) > 1
-  const tooltipOptions = createTooltipConfig(hasMultipleDatasets, props.accumulated)
+  const tooltipOptions = createTooltipConfig(hasMultipleDatasets, props.accumulated, props.useBillingPeriod ? currentRange.value?.startDate : false, hasMultipleDatasets ? tooltipClickHandler.value : undefined)
 
   const pluginOptions = {
     legend: {
@@ -393,9 +440,14 @@ const chartOptions = computed<ChartOptions<'line'>>(() => {
   return {
     maintainAspectRatio: false,
     scales: createChartScales(isDark.value, {
-      suggestedMax: 100,
+      max: 110,
+      xStacked: props.accumulated,
+      yStacked: props.accumulated,
       yTickCallback: (tickValue: string | number) => {
         const numericValue = typeof tickValue === 'number' ? tickValue : Number(tickValue)
+        // Hide the 110% tick - it's only there for visual spacing
+        if (numericValue > 100)
+          return ''
         const display = Number.isFinite(numericValue) ? numericValue : tickValue
         return `${display}%`
       },
@@ -417,19 +469,34 @@ async function loadData(forceRefetch = false) {
     await organizationStore.awaitInitialLoad()
   }
   catch (error) {
-    console.error('Error preparing organization data for mobile stats:', error)
+    console.error('[DevicesStats] Error preparing organization data for mobile stats:', error)
   }
 
   const { startDate, endDate } = getDateRange()
   const isBillingMode = props.useBillingPeriod
 
-  // Check if we have cached data for this mode
+  // Check if we have cached data for this mode that matches the current date range
   const cachedData = isBillingMode ? cachedBillingData.value : cached30DayData.value
 
-  if (cachedData && !forceRefetch) {
+  // Validate cache: dates must match (comparing timestamps to avoid reference issues)
+  const cacheIsValid = cachedData
+    && cachedData.range.startDate.getTime() === startDate.getTime()
+    && cachedData.range.endDate.getTime() === endDate.getTime()
+
+  if (cacheIsValid && !forceRefetch) {
     rawChartData.value = cachedData.data
     currentRange.value = cachedData.range
     return
+  }
+
+  // Clear invalid cache for this mode
+  if (cachedData && !cacheIsValid) {
+    if (isBillingMode) {
+      cachedBillingData.value = null
+    }
+    else {
+      cached30DayData.value = null
+    }
   }
 
   const currentToken = ++requestToken
@@ -439,6 +506,7 @@ async function loadData(forceRefetch = false) {
 
   try {
     const data = await useChartData(supabase, appId.value, startDate, endDate)
+
     if (currentToken !== requestToken)
       return
 
@@ -454,14 +522,15 @@ async function loadData(forceRefetch = false) {
     }
   }
   catch (error) {
-    console.error(error)
+    console.error('[DevicesStats] Error fetching chart data:', error)
     if (currentToken !== requestToken)
       return
     rawChartData.value = null
   }
   finally {
-    if (currentToken === requestToken)
+    if (currentToken === requestToken) {
       isLoading.value = false
+    }
   }
 }
 
@@ -481,7 +550,8 @@ watch(
   () => [route.path, route.params.package as string | undefined] as const,
   async ([path, packageId], old) => {
     const oldPackageId = old?.[1]
-    if (path.includes('/p/') && packageId) {
+    // Check for /app/[package] route pattern
+    if (path.includes('/app/') && packageId) {
       const packageChanged = packageId !== oldPackageId
       appId.value = packageId
       if (packageChanged) {
@@ -489,6 +559,10 @@ watch(
         cachedBillingData.value = null
         cached30DayData.value = null
         await loadData(true) // Force refetch for new app
+      }
+      else if (!rawChartData.value) {
+        // Initial load - no data yet
+        await loadData(true)
       }
     }
     else {
@@ -509,14 +583,14 @@ watch(
     :has-data="hasData"
   >
     <template #header>
-      <div class="flex flex-1 gap-2 justify-between items-start">
+      <div class="flex items-start justify-between flex-1 gap-2">
         <h2 class="flex-1 min-w-0 text-2xl font-semibold leading-tight dark:text-white text-slate-600">
           {{ t('active_users_by_version') }}
         </h2>
 
         <div class="flex flex-col items-end text-right shrink-0">
           <div
-            class="inline-flex justify-center items-center py-1 px-2 text-xs font-bold text-white whitespace-nowrap bg-emerald-500 rounded-full shadow-lg"
+            class="inline-flex items-center justify-center px-2 py-1 text-xs font-bold text-white rounded-full shadow-lg whitespace-nowrap bg-emerald-500"
           >
             {{ latestVersionPercentageDisplay }}
           </div>

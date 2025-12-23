@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { ChartData, ChartOptions, Plugin } from 'chart.js'
+import type { TooltipClickHandler } from '~/services/chartTooltip'
 import { useDark } from '@vueuse/core'
 import {
   BarController,
@@ -12,9 +13,11 @@ import {
   PointElement,
   Tooltip,
 } from 'chart.js'
+import dayjs from 'dayjs'
 import { computed } from 'vue'
 import { Bar, Line } from 'vue-chartjs'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
 import { createLegendConfig, createStackedChartScales } from '~/services/chartConfig'
 import { generateMonthDays, getDaysInCurrentMonth } from '~/services/date'
 import { useOrganizationStore } from '~/stores/organization'
@@ -29,10 +32,12 @@ const props = defineProps({
   appNames: { type: Object, default: () => ({}) },
   useBillingPeriod: { type: Boolean, default: true },
   accumulated: { type: Boolean, default: false },
+  appId: { type: String, default: '' },
 })
 
 const isDark = useDark()
 const { t } = useI18n()
+const router = useRouter()
 const organizationStore = useOrganizationStore()
 const cycleStart = new Date(organizationStore.currentOrganization?.subscription_start ?? new Date())
 const cycleEnd = new Date(organizationStore.currentOrganization?.subscription_end ?? new Date())
@@ -41,6 +46,46 @@ cycleStart.setHours(0, 0, 0, 0)
 cycleEnd.setHours(0, 0, 0, 0)
 
 const DAY_IN_MS = 1000 * 60 * 60 * 24
+
+// Map action display names back to action filter keys for navigation
+const actionToFilterKey: Record<string, string> = {
+  requested: 'get',
+  install: 'set',
+  fail: 'set_fail',
+}
+
+// Click handler for tooltip items - navigates to logs page filtered by action type and date
+const tooltipClickHandler = computed<TooltipClickHandler | undefined>(() => {
+  if (!props.appId)
+    return undefined
+
+  // Create mapping from display names to action keys
+  const actionIdByLabel: Record<string, string> = {}
+  Object.entries(props.appNames as Record<string, string>).forEach(([actionKey, displayName]) => {
+    actionIdByLabel[displayName] = actionKey
+  })
+
+  return {
+    onAppClick: (actionKey: string, clickContext?: { date: Date, dataIndex: number }) => {
+      // Navigate to logs page with action filter and date range
+      // The actionKey here is the internal key like 'requested', 'install', 'fail'
+      const filterAction = actionToFilterKey[actionKey] || actionKey
+      const params = new URLSearchParams()
+      params.set('action', filterAction)
+
+      // Add date range if provided (start of day to end of day)
+      if (clickContext?.date) {
+        const startOfDay = dayjs(clickContext.date).startOf('day')
+        const endOfDay = dayjs(clickContext.date).endOf('day')
+        params.set('start', startOfDay.toISOString())
+        params.set('end', endOfDay.toISOString())
+      }
+
+      router.push(`/app/${props.appId}/logs?${params.toString()}`)
+    },
+    appIdByLabel: actionIdByLabel,
+  }
+})
 
 Chart.register(
   Tooltip,
@@ -202,7 +247,7 @@ const chartOptions = computed(() => {
       title: {
         display: false,
       },
-      tooltip: createTooltipConfig(true, props.accumulated),
+      tooltip: createTooltipConfig(true, props.accumulated, props.useBillingPeriod ? cycleStart : false, tooltipClickHandler.value),
       todayLine: todayLineOptions.value,
     },
   }

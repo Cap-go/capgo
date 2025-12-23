@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { useSupabase } from '~/services/supabase'
+import { useDisplayStore } from '~/stores/display'
 import { useOrganizationStore } from './organization'
 
 export const useDashboardAppsStore = defineStore('dashboardApps', () => {
@@ -21,11 +22,14 @@ export const useDashboardAppsStore = defineStore('dashboardApps', () => {
   const appIds = computed(() => apps.value.map(app => app.app_id))
 
   async function fetchApps(force = false) {
-    // Quick check: if already loaded and not forcing, return immediately without any async calls
-    if (!force && isLoaded.value && currentOrgId.value !== null)
-      return
-
     const organizationStore = useOrganizationStore()
+    const targetOrgId = organizationStore.currentOrganization?.gid
+
+    // Quick check: if already loaded for the SAME org and not forcing, return immediately
+    if (!force && isLoaded.value && currentOrgId.value === targetOrgId) {
+      return
+    }
+
     try {
       await organizationStore.dedupFetchOrganizations()
       await organizationStore.awaitInitialLoad()
@@ -46,13 +50,11 @@ export const useDashboardAppsStore = defineStore('dashboardApps', () => {
     if (isLoading.value) {
       if (loadPromise)
         await loadPromise
-      if (!force)
+      // After waiting, check if we now have the right org's data
+      if (!force && isLoaded.value && currentOrgId.value === orgId) {
         return
+      }
     }
-
-    // Return cached data if same organization and not forcing
-    if (!force && isLoaded.value && currentOrgId.value === orgId)
-      return
 
     // Reset if organization changed
     if (currentOrgId.value !== orgId) {
@@ -74,7 +76,7 @@ export const useDashboardAppsStore = defineStore('dashboardApps', () => {
         isLoaded.value = true
       }
       catch (error) {
-        console.error('[dashboardAppsStore] Error fetching apps:', error)
+        console.error('Error fetching apps:', error)
         apps.value = []
       }
       finally {
@@ -85,6 +87,10 @@ export const useDashboardAppsStore = defineStore('dashboardApps', () => {
 
     loadPromise = request
     await request
+
+    // After load, publish resolver for app names
+    const display = useDisplayStore()
+    display.setAppNameResolver(appId => appNames.value[appId])
   }
 
   function reset() {
@@ -99,6 +105,7 @@ export const useDashboardAppsStore = defineStore('dashboardApps', () => {
     apps,
     isLoading,
     isLoaded,
+    currentOrgId,
 
     // Getters
     appNames,

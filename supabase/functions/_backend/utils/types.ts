@@ -17,6 +17,7 @@ export interface AppInfos {
   app_id: string
   device_id: string
   defaultChannel: string
+  key_id?: string
 }
 
 export interface AppStats extends AppInfos {
@@ -42,6 +43,7 @@ export interface ReadStatsParams {
   search?: string
   order?: Order[]
   limit?: number
+  actions?: string[]
 }
 
 export interface ReadDevicesParams {

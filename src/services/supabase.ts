@@ -87,13 +87,6 @@ export async function hashEmail(email: string) {
   return hashHex
 }
 
-export async function deleteUser() {
-  const { error } = await useSupabase()
-    .rpc('delete_user')
-    .single()
-  if (error)
-    throw new Error(error.message)
-}
 export function deleteSupabaseToken() {
   return localStorage.removeItem(`sb-${config.supbaseId}-auth-token`)
 }
@@ -375,6 +368,7 @@ export async function getPlans(): Promise<Database['public']['Tables']['plans'][
 }
 
 export type CreditUnitPricing = Partial<Record<Database['public']['Enums']['credit_metric_type'], number>>
+export type UsageCreditLedgerRow = Database['public']['Views']['usage_credit_ledger']['Row']
 
 export async function getCreditUnitPricing(orgId?: string): Promise<CreditUnitPricing> {
   try {
@@ -409,6 +403,29 @@ export async function getCreditUnitPricing(orgId?: string): Promise<CreditUnitPr
   catch (err) {
     console.error('getCreditUnitPricing error', err)
     return {}
+  }
+}
+
+export async function getUsageCreditDeductions(orgId: string): Promise<UsageCreditLedgerRow[]> {
+  if (!orgId)
+    return []
+
+  try {
+    const { data, error } = await useSupabase()
+      .from('usage_credit_ledger')
+      .select('*')
+      .eq('org_id', orgId)
+      .eq('transaction_type', 'deduction')
+      .order('occurred_at', { ascending: false })
+
+    if (error)
+      throw new Error(error.message)
+
+    return data ?? []
+  }
+  catch (err) {
+    console.error('getUsageCreditDeductions error', err)
+    return []
   }
 }
 

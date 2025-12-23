@@ -6,11 +6,10 @@ import { greaterOrEqual, parse } from '@std/semver'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod/mini'
 import { getAppStatus, setAppStatus } from '../utils/appStatus.ts'
-import { BRES, getIsV2Stats, parseBody, simpleError200, simpleRateLimit } from '../utils/hono.ts'
+import { BRES, parseBody, simpleError200, simpleRateLimit } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { sendNotifOrg } from '../utils/notifications.ts'
 import { closeClient, getAppOwnerPostgres, getAppVersionPostgres, getDrizzleClient, getPgClient } from '../utils/pg.ts'
-import { getAppOwnerPostgresV2, getAppVersionPostgresV2, getDrizzleClientD1Session } from '../utils/pg_d1.ts'
 import { makeDevice, parsePluginBody } from '../utils/plugin_parser.ts'
 import { createStatsVersion, onPremStats, sendStatsAndDevice } from '../utils/stats.ts'
 import { deviceIdRegex, INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, isLimited, MISSING_STRING_APP_ID, MISSING_STRING_DEVICE_ID, MISSING_STRING_PLATFORM, MISSING_STRING_VERSION_NAME, MISSING_STRING_VERSION_OS, NON_STRING_APP_ID, NON_STRING_DEVICE_ID, NON_STRING_PLATFORM, NON_STRING_VERSION_NAME, NON_STRING_VERSION_OS, reverseDomainRegex } from '../utils/utils.ts'
@@ -48,9 +47,10 @@ export const jsonRequestSchema = z.object({
   plugin_version: z.optional(z.string()),
   is_emulator: z.boolean(),
   is_prod: z.boolean(),
+  key_id: z.optional(z.string().check(z.maxLength(4))),
 })
 
-async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient> | ReturnType<typeof getDrizzleClientD1Session>, isV2: boolean, body: AppStats) {
+async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient>, body: AppStats) {
   const device = makeDevice(body)
   const { app_id, action, version_name, old_version_name, plugin_version } = body
 
@@ -63,9 +63,7 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
     await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
     return simpleError200(c, 'need_plan_upgrade', PLAN_ERROR)
   }
-  const appOwner = isV2
-    ? await getAppOwnerPostgresV2(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClientD1Session>, planActions)
-    : await getAppOwnerPostgres(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>, planActions)
+  const appOwner = await getAppOwnerPostgres(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>, planActions)
   if (!appOwner) {
     await setAppStatus(c, app_id, 'onprem')
     return onPremStats(c, app_id, action, device)
@@ -88,9 +86,9 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
   if (versionOnly === 'builtin' || versionOnly === 'unknown') {
     allowedDeleted = true
   }
-  let appVersion = isV2 ? await getAppVersionPostgresV2(c, app_id, versionOnly, allowedDeleted, drizzleClient as ReturnType<typeof getDrizzleClientD1Session>) : await getAppVersionPostgres(c, app_id, versionOnly, allowedDeleted, drizzleClient as ReturnType<typeof getDrizzleClient>)
+  let appVersion = await getAppVersionPostgres(c, app_id, versionOnly, allowedDeleted, drizzleClient as ReturnType<typeof getDrizzleClient>)
   if (!appVersion) {
-    const appVersion2 = isV2 ? await getAppVersionPostgresV2(c, app_id, 'unknown', allowedDeleted, drizzleClient as ReturnType<typeof getDrizzleClientD1Session>) : await getAppVersionPostgres(c, app_id, 'unknown', allowedDeleted, drizzleClient as ReturnType<typeof getDrizzleClient>)
+    const appVersion2 = await getAppVersionPostgres(c, app_id, 'unknown', allowedDeleted, drizzleClient as ReturnType<typeof getDrizzleClient>)
     if (appVersion2) {
       appVersion = appVersion2
       cloudlog({ requestId: c.get('requestId'), message: `Version name ${version_name} not found, using unknown instead`, app_id, version_name })
@@ -103,7 +101,7 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
   if (action === 'set' && !device.is_emulator && device.is_prod) {
     await createStatsVersion(c, appVersion.id, app_id, 'install')
     if (old_version_name) {
-      const oldVersion = isV2 ? await getAppVersionPostgresV2(c, app_id, old_version_name, undefined, drizzleClient as ReturnType<typeof getDrizzleClientD1Session>) : await getAppVersionPostgres(c, app_id, old_version_name, undefined, drizzleClient as ReturnType<typeof getDrizzleClient>)
+      const oldVersion = await getAppVersionPostgres(c, app_id, old_version_name, undefined, drizzleClient as ReturnType<typeof getDrizzleClient>)
       if (oldVersion && oldVersion.id !== appVersion.id) {
         await createStatsVersion(c, oldVersion.id, app_id, 'uninstall')
         statsActions.push({ action: 'uninstall', versionName: old_version_name ?? 'unknown' })
@@ -128,7 +126,10 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
     }
   }
   statsActions.push({ action: action as Database['public']['Enums']['stats_action'] })
-  await sendStatsAndDevice(c, device, statsActions)
+
+  // Don't update device record on failure actions - the version_name in the request
+  // is the failed version, not the actual running version on the device
+  await sendStatsAndDevice(c, device, statsActions, action.endsWith('_fail'))
   return c.json(BRES)
 }
 
@@ -139,12 +140,11 @@ app.post('/', async (c) => {
   if (isLimited(c, body.app_id)) {
     return simpleRateLimit(body)
   }
-  const isV2 = getIsV2Stats(c)
-  const pgClient = isV2 ? null : getPgClient(c, true) // READ-ONLY: writes use SDK, not Drizzle
+  const pgClient = getPgClient(c, true)
 
   const bodyParsed = parsePluginBody<AppStats>(c, body, jsonRequestSchema)
-  const res = await post(c, isV2 ? getDrizzleClientD1Session(c) : getDrizzleClient(pgClient!), !!isV2, bodyParsed)
-  if (!isV2 && pgClient)
+  const res = await post(c, getDrizzleClient(pgClient!), bodyParsed)
+  if (pgClient)
     await closeClient(c, pgClient)
   return res
 })

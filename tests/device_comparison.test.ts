@@ -25,6 +25,7 @@ function simulateD1Storage(device: DeviceWithoutCreatedAt): DeviceExistingRowLik
     is_prod: comparable.is_prod ? 1 : 0,
     is_emulator: comparable.is_emulator ? 1 : 0,
     default_channel: comparable.default_channel,
+    key_id: comparable.key_id,
   }
 }
 
@@ -79,6 +80,7 @@ describe('deviceComparison utilities', () => {
         is_prod: true,
         is_emulator: false,
         default_channel: 'production',
+        key_id: null,
       })
     })
 
@@ -109,6 +111,7 @@ describe('deviceComparison utilities', () => {
         is_prod: false,
         is_emulator: false,
         default_channel: null, // D1 NULLABLE
+        key_id: null,
       })
     })
 
@@ -140,6 +143,7 @@ describe('deviceComparison utilities', () => {
         is_prod: false,
         is_emulator: false,
         default_channel: null, // D1 NULLABLE
+        key_id: null,
       })
     })
   })
@@ -170,6 +174,7 @@ describe('deviceComparison utilities', () => {
         is_prod: true,
         is_emulator: false,
         default_channel: 'production',
+        key_id: null,
       })
     })
 
@@ -212,6 +217,7 @@ describe('deviceComparison utilities', () => {
         is_prod: false,
         is_emulator: false,
         default_channel: null, // D1 NULLABLE
+        key_id: null,
       })
     })
 
@@ -228,6 +234,7 @@ describe('deviceComparison utilities', () => {
         is_prod: false,
         is_emulator: false,
         default_channel: null, // D1 NULLABLE
+        key_id: null,
       })
     })
   })
@@ -568,6 +575,7 @@ describe('deviceComparison utilities', () => {
         custom_id: 'custom-123',
         is_prod: true,
         is_emulator: false,
+        key_id: null,
       })
     })
 
@@ -596,6 +604,7 @@ describe('deviceComparison utilities', () => {
         custom_id: '', // D1 DEFAULT '' NOT NULL
         is_prod: false,
         is_emulator: false,
+        key_id: null,
       })
     })
 
@@ -841,6 +850,528 @@ describe('deviceComparison utilities', () => {
       // storedInD1.default_channel = '' (from device.default_channel ?? null when device had '')
       // But when compared, both normalize to null, so should be false
       expect(changed).toBe(false)
+    })
+  })
+
+  describe('key_id field tests', () => {
+    describe('device tracking with key_id present', () => {
+      it('should include key_id in comparable device', () => {
+        const device: DeviceWithoutCreatedAt = {
+          device_id: 'test-device',
+          app_id: 'test-app',
+          platform: 'android',
+          plugin_version: '1.0.0',
+          is_prod: true,
+          is_emulator: false,
+          key_id: 'encryption-key-123',
+        }
+
+        const comparable = toComparableDevice(device)
+
+        expect(comparable.key_id).toBe('encryption-key-123')
+      })
+
+      it('should include key_id in normalized device for write', () => {
+        const device: DeviceWithoutCreatedAt = {
+          device_id: 'test-device',
+          app_id: 'test-app',
+          platform: 'android',
+          plugin_version: '1.0.0',
+          is_prod: true,
+          is_emulator: false,
+          key_id: 'encryption-key-456',
+        }
+
+        const normalized = buildNormalizedDeviceForWrite(device)
+
+        expect(normalized.key_id).toBe('encryption-key-456')
+      })
+
+      it('should track devices with key_id correctly', () => {
+        const device: DeviceWithoutCreatedAt = {
+          device_id: 'device-with-key',
+          app_id: 'test-app',
+          platform: 'ios',
+          plugin_version: '2.0.0',
+          os_version: '17.0',
+          version_build: '200',
+          custom_id: 'custom-abc',
+          version_name: 'v2.0.0',
+          is_prod: true,
+          is_emulator: false,
+          default_channel: 'production',
+          key_id: 'my-encryption-key',
+        }
+
+        const comparable = toComparableDevice(device)
+
+        expect(comparable).toEqual({
+          platform: 'ios',
+          plugin_version: '2.0.0',
+          os_version: '17.0',
+          version_build: '200',
+          custom_id: 'custom-abc',
+          version_name: 'v2.0.0',
+          is_prod: true,
+          is_emulator: false,
+          default_channel: 'production',
+          key_id: 'my-encryption-key',
+        })
+      })
+    })
+
+    describe('device tracking with key_id null/missing (backward compatibility)', () => {
+      it('should handle null key_id', () => {
+        const device: DeviceWithoutCreatedAt = {
+          device_id: 'test-device',
+          app_id: 'test-app',
+          platform: 'android',
+          plugin_version: '1.0.0',
+          is_prod: true,
+          is_emulator: false,
+          key_id: null,
+        }
+
+        const comparable = toComparableDevice(device)
+
+        expect(comparable.key_id).toBe(null)
+      })
+
+      it('should handle undefined key_id', () => {
+        const device: DeviceWithoutCreatedAt = {
+          device_id: 'test-device',
+          app_id: 'test-app',
+          platform: 'android',
+          plugin_version: '1.0.0',
+          is_prod: true,
+          is_emulator: false,
+          key_id: undefined,
+        }
+
+        const comparable = toComparableDevice(device)
+
+        expect(comparable.key_id).toBe(null)
+      })
+
+      it('should handle empty string key_id', () => {
+        const device: DeviceWithoutCreatedAt = {
+          device_id: 'test-device',
+          app_id: 'test-app',
+          platform: 'android',
+          plugin_version: '1.0.0',
+          is_prod: true,
+          is_emulator: false,
+          key_id: '',
+        }
+
+        const comparable = toComparableDevice(device)
+
+        expect(comparable.key_id).toBe(null)
+      })
+
+      it('should handle missing key_id field (backward compatibility)', () => {
+        const device = {
+          device_id: 'test-device',
+          app_id: 'test-app',
+          platform: 'android',
+          plugin_version: '1.0.0',
+          is_prod: true,
+          is_emulator: false,
+          // key_id is not present at all
+        } as DeviceWithoutCreatedAt
+
+        const comparable = toComparableDevice(device)
+
+        expect(comparable.key_id).toBe(null)
+      })
+
+      it('should normalize device for write with null key_id', () => {
+        const device: DeviceWithoutCreatedAt = {
+          device_id: 'test-device',
+          app_id: 'test-app',
+          platform: 'android',
+          plugin_version: '1.0.0',
+          is_prod: true,
+          is_emulator: false,
+          key_id: null,
+        }
+
+        const normalized = buildNormalizedDeviceForWrite(device)
+
+        expect(normalized.key_id).toBe(null)
+      })
+    })
+
+    describe('device change detection includes key_id changes', () => {
+      it('should detect change when key_id is added', () => {
+        const existing: DeviceExistingRowLike = {
+          platform: 'android',
+          plugin_version: '1.0.0',
+          is_prod: false,
+          is_emulator: false,
+          key_id: null,
+        }
+
+        const device: DeviceWithoutCreatedAt = {
+          device_id: 'test-device',
+          app_id: 'test-app',
+          platform: 'android',
+          plugin_version: '1.0.0',
+          is_prod: false,
+          is_emulator: false,
+          key_id: 'new-encryption-key',
+        }
+
+        expect(hasComparableDeviceChanged(existing, device)).toBe(true)
+      })
+
+      it('should detect change when key_id is removed', () => {
+        const existing: DeviceExistingRowLike = {
+          platform: 'android',
+          plugin_version: '1.0.0',
+          is_prod: false,
+          is_emulator: false,
+          key_id: 'old-encryption-key',
+        }
+
+        const device: DeviceWithoutCreatedAt = {
+          device_id: 'test-device',
+          app_id: 'test-app',
+          platform: 'android',
+          plugin_version: '1.0.0',
+          is_prod: false,
+          is_emulator: false,
+          key_id: null,
+        }
+
+        expect(hasComparableDeviceChanged(existing, device)).toBe(true)
+      })
+
+      it('should detect change when key_id value changes', () => {
+        const existing: DeviceExistingRowLike = {
+          platform: 'android',
+          plugin_version: '1.0.0',
+          is_prod: false,
+          is_emulator: false,
+          key_id: 'key-version-1',
+        }
+
+        const device: DeviceWithoutCreatedAt = {
+          device_id: 'test-device',
+          app_id: 'test-app',
+          platform: 'android',
+          plugin_version: '1.0.0',
+          is_prod: false,
+          is_emulator: false,
+          key_id: 'key-version-2',
+        }
+
+        expect(hasComparableDeviceChanged(existing, device)).toBe(true)
+      })
+
+      it('should NOT detect change when key_id remains the same', () => {
+        const existing: DeviceExistingRowLike = {
+          platform: 'android',
+          plugin_version: '1.0.0',
+          is_prod: false,
+          is_emulator: false,
+          key_id: 'same-key',
+        }
+
+        const device: DeviceWithoutCreatedAt = {
+          device_id: 'test-device',
+          app_id: 'test-app',
+          platform: 'android',
+          plugin_version: '1.0.0',
+          is_prod: false,
+          is_emulator: false,
+          key_id: 'same-key',
+        }
+
+        expect(hasComparableDeviceChanged(existing, device)).toBe(false)
+      })
+
+      it('should NOT detect change when key_id is null in both', () => {
+        const existing: DeviceExistingRowLike = {
+          platform: 'android',
+          plugin_version: '1.0.0',
+          is_prod: false,
+          is_emulator: false,
+          key_id: null,
+        }
+
+        const device: DeviceWithoutCreatedAt = {
+          device_id: 'test-device',
+          app_id: 'test-app',
+          platform: 'android',
+          plugin_version: '1.0.0',
+          is_prod: false,
+          is_emulator: false,
+          key_id: null,
+        }
+
+        expect(hasComparableDeviceChanged(existing, device)).toBe(false)
+      })
+
+      it('should handle key_id normalization (empty string vs null)', () => {
+        const existing: DeviceExistingRowLike = {
+          platform: 'android',
+          plugin_version: '1.0.0',
+          is_prod: false,
+          is_emulator: false,
+          key_id: '', // Empty string
+        }
+
+        const device: DeviceWithoutCreatedAt = {
+          device_id: 'test-device',
+          app_id: 'test-app',
+          platform: 'android',
+          plugin_version: '1.0.0',
+          is_prod: false,
+          is_emulator: false,
+          key_id: null, // null
+        }
+
+        // Both normalize to null, so no change
+        expect(hasComparableDeviceChanged(existing, device)).toBe(false)
+      })
+
+      it('should handle key_id normalization (undefined vs null)', () => {
+        const existing: DeviceExistingRowLike = {
+          platform: 'android',
+          plugin_version: '1.0.0',
+          is_prod: false,
+          is_emulator: false,
+          key_id: undefined, // undefined
+        }
+
+        const device: DeviceWithoutCreatedAt = {
+          device_id: 'test-device',
+          app_id: 'test-app',
+          platform: 'android',
+          plugin_version: '1.0.0',
+          is_prod: false,
+          is_emulator: false,
+          key_id: null, // null
+        }
+
+        // Both normalize to null, so no change
+        expect(hasComparableDeviceChanged(existing, device)).toBe(false)
+      })
+    })
+
+    describe('D1 write/read cycle simulation with key_id', () => {
+      it('should NOT detect change after D1 write/read cycle with key_id', () => {
+        const deviceFromClient: DeviceWithoutCreatedAt = {
+          device_id: 'test-device-key',
+          app_id: 'test-app',
+          platform: 'android',
+          plugin_version: '1.0.0',
+          os_version: '14',
+          version_build: '100',
+          custom_id: 'custom-123',
+          version_name: 'v1.0.0',
+          is_prod: true,
+          is_emulator: false,
+          default_channel: 'production',
+          key_id: 'my-encryption-key',
+        }
+
+        // Simulate D1 storage
+        const storedInD1 = simulateD1Storage(deviceFromClient)
+
+        // Next request: same device
+        const deviceFromClientAgain: DeviceWithoutCreatedAt = {
+          device_id: 'test-device-key',
+          app_id: 'test-app',
+          platform: 'android',
+          plugin_version: '1.0.0',
+          os_version: '14',
+          version_build: '100',
+          custom_id: 'custom-123',
+          version_name: 'v1.0.0',
+          is_prod: true,
+          is_emulator: false,
+          default_channel: 'production',
+          key_id: 'my-encryption-key',
+        }
+
+        const changed = hasComparableDeviceChanged(storedInD1, deviceFromClientAgain)
+        expect(changed).toBe(false)
+      })
+
+      it('should NOT detect change when key_id transitions from null to empty string', () => {
+        const deviceFromClient: DeviceWithoutCreatedAt = {
+          device_id: 'test-device',
+          app_id: 'test-app',
+          platform: 'android',
+          plugin_version: '1.0.0',
+          is_prod: true,
+          is_emulator: false,
+          key_id: null,
+        }
+
+        const storedInD1 = simulateD1Storage(deviceFromClient)
+
+        // Next request with empty string
+        const deviceAgain: DeviceWithoutCreatedAt = {
+          device_id: 'test-device',
+          app_id: 'test-app',
+          platform: 'android',
+          plugin_version: '1.0.0',
+          is_prod: true,
+          is_emulator: false,
+          key_id: '',
+        }
+
+        expect(hasComparableDeviceChanged(storedInD1, deviceAgain)).toBe(false)
+      })
+
+      it('should NOT detect change when key_id transitions from undefined to null', () => {
+        const deviceFromClient: DeviceWithoutCreatedAt = {
+          device_id: 'test-device',
+          app_id: 'test-app',
+          platform: 'android',
+          plugin_version: '1.0.0',
+          is_prod: true,
+          is_emulator: false,
+          key_id: undefined,
+        }
+
+        const storedInD1 = simulateD1Storage(deviceFromClient)
+
+        // Next request with null
+        const deviceAgain: DeviceWithoutCreatedAt = {
+          device_id: 'test-device',
+          app_id: 'test-app',
+          platform: 'android',
+          plugin_version: '1.0.0',
+          is_prod: true,
+          is_emulator: false,
+          key_id: null,
+        }
+
+        expect(hasComparableDeviceChanged(storedInD1, deviceAgain)).toBe(false)
+      })
+
+      it('should DETECT change when key_id rotates', () => {
+        const deviceFromClient: DeviceWithoutCreatedAt = {
+          device_id: 'test-device',
+          app_id: 'test-app',
+          platform: 'android',
+          plugin_version: '1.0.0',
+          is_prod: true,
+          is_emulator: false,
+          key_id: 'encryption-key-v1',
+        }
+
+        const storedInD1 = simulateD1Storage(deviceFromClient)
+
+        // Key rotation happens
+        const deviceAfterRotation: DeviceWithoutCreatedAt = {
+          device_id: 'test-device',
+          app_id: 'test-app',
+          platform: 'android',
+          plugin_version: '1.0.0',
+          is_prod: true,
+          is_emulator: false,
+          key_id: 'encryption-key-v2',
+        }
+
+        expect(hasComparableDeviceChanged(storedInD1, deviceAfterRotation)).toBe(true)
+      })
+
+      it('should handle typical production device with key_id', () => {
+        const typicalDevice: DeviceWithoutCreatedAt = {
+          device_id: '12345-abcde',
+          app_id: 'com.example.app',
+          platform: 'ios',
+          plugin_version: '6.3.3',
+          os_version: '17.5.1',
+          version_build: '1.0.0',
+          custom_id: '',
+          version_name: '1.0.0',
+          is_prod: true,
+          is_emulator: false,
+          default_channel: 'production',
+          key_id: 'prod-encryption-key',
+        }
+
+        const storedInD1 = simulateD1Storage(typicalDevice)
+
+        // Same device on next update check
+        const sameDeviceAgain: DeviceWithoutCreatedAt = {
+          device_id: '12345-abcde',
+          app_id: 'com.example.app',
+          platform: 'ios',
+          plugin_version: '6.3.3',
+          os_version: '17.5.1',
+          version_build: '1.0.0',
+          custom_id: '',
+          version_name: '1.0.0',
+          is_prod: true,
+          is_emulator: false,
+          default_channel: 'production',
+          key_id: 'prod-encryption-key',
+        }
+
+        expect(hasComparableDeviceChanged(storedInD1, sameDeviceAgain)).toBe(false)
+      })
+    })
+
+    describe('toComparableExisting with key_id', () => {
+      it('should handle existing device with key_id', () => {
+        const existing: DeviceExistingRowLike = {
+          platform: 'android',
+          plugin_version: '1.0.0',
+          os_version: '14',
+          version_build: '100',
+          custom_id: 'custom-123',
+          version_name: 'v1.0.0',
+          is_prod: true,
+          is_emulator: false,
+          default_channel: 'production',
+          key_id: 'test-key-id',
+        }
+
+        const comparable = toComparableExisting(existing)
+
+        expect(comparable.key_id).toBe('test-key-id')
+      })
+
+      it('should handle null existing device with key_id field', () => {
+        const comparable = toComparableExisting(null)
+
+        expect(comparable.key_id).toBe(null)
+      })
+
+      it('should handle undefined existing device with key_id field', () => {
+        const comparable = toComparableExisting(undefined)
+
+        expect(comparable.key_id).toBe(null)
+      })
+
+      it('should normalize empty string key_id to null', () => {
+        const existing: DeviceExistingRowLike = {
+          platform: 'android',
+          key_id: '',
+        }
+
+        const comparable = toComparableExisting(existing)
+
+        expect(comparable.key_id).toBe(null)
+      })
+
+      it('should normalize undefined key_id to null', () => {
+        const existing: DeviceExistingRowLike = {
+          platform: 'android',
+          key_id: undefined,
+        }
+
+        const comparable = toComparableExisting(existing)
+
+        expect(comparable.key_id).toBe(null)
+      })
     })
 
     it('should handle D1 NOT NULL constraints correctly', () => {

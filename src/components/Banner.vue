@@ -17,14 +17,14 @@ const main = useMainStore()
 const { t } = useI18n()
 const organizationStore = useOrganizationStore()
 
-const route = useRoute('/app/p/[package]')
+const route = useRoute('/app/[package]')
 const appId = ref('')
 // const organization = ref(null as null | Organization)
 const isOrgOwner = ref(false)
 
 watchEffect(async () => {
   try {
-    if (route.path.includes('/app/p/')) {
+    if (route.path.includes('/app/')) {
       appId.value = route.params.package as string
       if (!appId.value) {
         console.error('cannot get app id. Params:', route.params)

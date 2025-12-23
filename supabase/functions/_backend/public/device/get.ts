@@ -29,14 +29,15 @@ interface publicDevice {
   plugin_version: string
   os_version: string
   version_build: string
+  key_id: string | null
   version?: number
   channel?: string
 }
 
 export function filterDeviceKeys(devices: DeviceRes[]) {
   return devices.map((device) => {
-    const { updated_at, device_id, custom_id, is_prod, is_emulator, version_name, version, app_id, platform, plugin_version, os_version, version_build } = device
-    return { updated_at, device_id, custom_id, is_prod, is_emulator, version_name, version, app_id, platform, plugin_version, os_version, version_build }
+    const { updated_at, device_id, custom_id, is_prod, is_emulator, version_name, version, app_id, platform, plugin_version, os_version, version_build, key_id } = device
+    return { updated_at, device_id, custom_id, is_prod, is_emulator, version_name, version, app_id, platform, plugin_version, os_version, version_build, key_id }
   })
 }
 

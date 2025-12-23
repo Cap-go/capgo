@@ -4,7 +4,7 @@ import type { Database } from './supabase.types.ts'
 import { and, eq, inArray } from 'drizzle-orm'
 import { honoFactory, quickError } from './hono.ts'
 import { cloudlog } from './logging.ts'
-import { getDrizzleClient, getPgClient, logPgError } from './pg.ts'
+import { closeClient, getDrizzleClient, getPgClient, logPgError } from './pg.ts'
 import * as schema from './postgres_schema.ts'
 import { checkKey, checkKeyById, supabaseAdmin, supabaseClient } from './supabase.ts'
 
@@ -228,13 +228,7 @@ export function middlewareKey(rights: Database['public']['Enums']['key_mode'][],
       }
       finally {
         if (pgClient) {
-          pgClient.end().catch((err) => {
-            cloudlog({
-              requestId: c.get('requestId'),
-              message: 'middlewareKey - PG connection close error',
-              error: err instanceof Error ? err.message : String(err),
-            })
-          })
+          await closeClient(c, pgClient)
         }
       }
     }

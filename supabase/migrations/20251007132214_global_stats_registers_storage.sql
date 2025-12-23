@@ -6,12 +6,32 @@ ALTER TABLE public.global_stats
 ADD COLUMN bundle_storage_gb double precision DEFAULT 0 NOT NULL;
 
 -- Helper function to compute total bundle storage in bytes
-CREATE OR REPLACE FUNCTION public.total_bundle_storage_bytes() RETURNS bigint LANGUAGE sql SECURITY DEFINER
-SET
-search_path = '' AS $$
-  SELECT COALESCE(SUM(size), 0)::bigint
-  FROM public.app_versions_meta;
+CREATE OR REPLACE FUNCTION "public"."total_bundle_storage_bytes"() RETURNS bigint
+    LANGUAGE "sql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  SELECT (
+    -- Sum of bundle sizes from app_versions_meta
+    COALESCE(
+      (SELECT SUM(size) FROM public.app_versions_meta),
+      0
+    ) +
+    -- Sum of manifest file sizes for non-deleted versions
+    COALESCE(
+      (SELECT SUM(m.file_size)
+       FROM public.manifest m
+       WHERE EXISTS (
+         SELECT 1
+         FROM public.app_versions av
+         WHERE av.id = m.app_version_id
+         AND av.deleted = false
+       )),
+      0
+    )
+  )::bigint;
 $$;
+
+COMMENT ON FUNCTION "public"."total_bundle_storage_bytes"() IS 'Returns total storage in bytes including both bundle sizes (app_versions_meta.size) and manifest file sizes';
 
 REVOKE ALL ON FUNCTION public.total_bundle_storage_bytes()
 FROM

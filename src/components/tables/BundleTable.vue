@@ -42,7 +42,7 @@ const search = ref('')
 const columns: Ref<TableColumn[]> = ref<TableColumn[]>([])
 const elements = ref<Element[]>([])
 const selectedElements = ref<Element[]>([])
-const isLoading = ref(false)
+const isLoading = ref(true)
 const currentPage = ref(1)
 const filters = ref({
   'external-storage': false,
@@ -283,6 +283,7 @@ async function fetchChannelsForVersions(versions: Element[]) {
 }
 
 async function refreshData() {
+  isLoading.value = true
   try {
     currentPage.value = 1
     elements.value.length = 0
@@ -293,6 +294,10 @@ async function refreshData() {
   }
   catch (error) {
     console.error(error)
+  }
+  finally {
+    // getData normally resets this, but guard against early failures
+    isLoading.value = false
   }
 }
 
@@ -425,7 +430,7 @@ columns.value = [
     onClick: async (elem: Element) => {
       if (elem.deleted || !channelCache.value[elem.id] || !channelCache.value[elem.id].id)
         return
-      router.push(`/app/p/${props.appId}/channel/${channelCache.value[elem.id].id}`)
+      router.push(`/app/${props.appId}/channel/${channelCache.value[elem.id].id}`)
     },
   },
   {
@@ -463,6 +468,7 @@ columns.value = [
 ]
 
 async function reload() {
+  isLoading.value = true
   elements.value.length = 0
   try {
     await Promise.all([getData(), updateOverallBundlesCount()])
@@ -471,6 +477,10 @@ async function reload() {
   }
   catch (error) {
     console.error(error)
+  }
+  finally {
+    // getData normally resets this, but guard against early failures
+    isLoading.value = false
   }
 }
 
@@ -565,7 +575,7 @@ async function addOne() {
 async function openOne(one: Element) {
   if (one.deleted)
     return
-  router.push(`/app/p/${props.appId}/bundle/${one.id}`)
+  router.push(`/app/${props.appId}/bundle/${one.id}`)
 }
 
 async function updateOverallBundlesCount() {

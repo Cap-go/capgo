@@ -3,7 +3,7 @@
 BEGIN;
 
 -- Plan the number of tests
-SELECT plan(35);
+SELECT plan(37);
 
 -- Test app_versions policies
 SELECT
@@ -293,6 +293,32 @@ SELECT
             'Prevent non 2FA access'
         ],
         'apikeys should have correct policies'
+    );
+
+-- usage_credit_ledger should respect caller RLS and allow authenticated reads
+SELECT
+    ok(
+        has_table_privilege(
+            'authenticated', 'public.usage_credit_ledger', 'SELECT'
+        ),
+        'usage_credit_ledger grants SELECT to authenticated'
+    );
+
+SELECT
+    ok(
+        EXISTS (
+            SELECT 1
+            FROM pg_class AS c
+            WHERE
+                c.relname = 'usage_credit_ledger'
+                AND c.relkind = 'v'
+                AND EXISTS (
+                    SELECT 1
+                    FROM unnest(c.reloptions) AS opt
+                    WHERE opt LIKE 'security_invoker%'
+                )
+        ),
+        'usage_credit_ledger runs with security_invoker to enforce base table RLS'
     );
 
 -- Test plans policies

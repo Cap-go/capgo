@@ -104,6 +104,25 @@ export async function startBuild(
       status: builderJob.status,
     })
 
+    // Update build_requests status to running
+    const supabase = supabaseAdmin(c)
+    const { error: updateError } = await supabase
+      .from('build_requests')
+      .update({
+        status: builderJob.status || 'running',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('builder_job_id', jobId)
+
+    if (updateError) {
+      cloudlogErr({
+        requestId: c.get('requestId'),
+        message: 'Failed to update build_requests status to running',
+        job_id: jobId,
+        error: updateError.message,
+      })
+    }
+
     return c.json({
       job_id: jobId,
       status: builderJob.status || 'running',

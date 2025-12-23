@@ -5,6 +5,58 @@ import { cloudlog, cloudlogErr } from '../../utils/logging.ts'
 import { hasAppRightApikey } from '../../utils/supabase.ts'
 import { getEnv } from '../../utils/utils.ts'
 
+async function cancelBuildOnDisconnect(
+  builderUrl: string,
+  builderApiKey: string,
+  jobId: string,
+  appId: string,
+  requestId: string,
+): Promise<void> {
+  try {
+    cloudlog({
+      requestId,
+      message: 'Client disconnected, cancelling build',
+      job_id: jobId,
+      app_id: appId,
+    })
+
+    const response = await fetch(`${builderUrl}/jobs/${jobId}/cancel`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': builderApiKey,
+      },
+      body: JSON.stringify({ app_id: appId }),
+    })
+
+    if (response.ok) {
+      cloudlog({
+        requestId,
+        message: 'Build cancelled successfully after client disconnect',
+        job_id: jobId,
+      })
+    }
+    else {
+      const errorText = await response.text()
+      cloudlogErr({
+        requestId,
+        message: 'Failed to cancel build after client disconnect',
+        job_id: jobId,
+        status: response.status,
+        error: errorText,
+      })
+    }
+  }
+  catch (err) {
+    cloudlogErr({
+      requestId,
+      message: 'Error cancelling build after client disconnect',
+      job_id: jobId,
+      error: err instanceof Error ? err.message : String(err),
+    })
+  }
+}
+
 export async function streamBuildLogs(
   c: Context,
   jobId: string,
@@ -32,10 +84,32 @@ export async function streamBuildLogs(
   }
 
   // Proxy SSE stream from builder.capgo.app
-  const builderResponse = await fetch(`${getEnv(c, 'BUILDER_URL')}/jobs/${jobId}/logs`, {
+  const builderUrl = getEnv(c, 'BUILDER_URL')
+  const builderApiKey = getEnv(c, 'BUILDER_API_KEY')
+
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: 'Connecting to builder for logs',
+    job_id: jobId,
+    builder_url: builderUrl ? `${builderUrl}/jobs/${jobId}/logs` : 'BUILDER_URL not set',
+    has_api_key: !!builderApiKey,
+  })
+
+  if (!builderUrl || !builderApiKey) {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'Builder config missing',
+      job_id: jobId,
+      has_builder_url: !!builderUrl,
+      has_builder_api_key: !!builderApiKey,
+    })
+    throw simpleError('config_error', 'Builder service not configured')
+  }
+
+  const builderResponse = await fetch(`${builderUrl}/jobs/${jobId}/logs`, {
     method: 'GET',
     headers: {
-      'x-api-key': getEnv(c, 'BUILDER_API_KEY'),
+      'x-api-key': builderApiKey,
     },
   })
 
@@ -57,13 +131,22 @@ export async function streamBuildLogs(
     job_id: jobId,
   })
 
-  // Return the SSE stream directly
+  // Listen for client disconnect to cancel the build
+  const requestId = c.get('requestId')
+  c.req.raw.signal.addEventListener('abort', () => {
+    // Fire and forget - cancel the build when client disconnects
+    cancelBuildOnDisconnect(builderUrl, builderApiKey, jobId, appId, requestId)
+  })
+
+  // Directly return the builder's response body as an SSE stream
+  // The builder already returns proper SSE format with Content-Type: text/event-stream
   return new Response(builderResponse.body, {
     status: 200,
     headers: {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',
       'Connection': 'keep-alive',
+      'X-Accel-Buffering': 'no', // Disable nginx buffering
     },
   })
 }

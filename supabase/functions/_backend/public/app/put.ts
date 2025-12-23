@@ -8,6 +8,7 @@ interface UpdateApp {
   name?: string
   icon?: string
   retention?: number
+  expose_metadata?: boolean
 }
 
 export async function put(c: Context, appId: string, body: UpdateApp, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
@@ -34,6 +35,7 @@ export async function put(c: Context, appId: string, body: UpdateApp, apikey: Da
       name: body.name,
       icon_url: body.icon,
       retention: body.retention,
+      expose_metadata: body.expose_metadata,
     })
     .eq('app_id', appId)
     .select()

@@ -23,14 +23,11 @@ Code lives in `supabase/functions/_backend/` and is deployed to all three platfo
 
 Use `cloudflare_workers/{api,plugin,files}/index.ts` to see routing. All routes use Hono framework (`createHono` from `utils/hono.ts`).
 
-### Database Layer: V1 (Postgres) → V2 (D1) Migration
+### Database Layer: Postgres
 
 Active migration from Supabase Postgres to Cloudflare D1. Patterns:
-- **V1 functions**: `pg.ts` - `getPgClient()`, `getDrizzleClient()` using `postgres` package
-- **V2 functions**: `pg_d1.ts` - `getPgClientD1()`, `getDrizzleClientD1()` using Cloudflare D1
+- **functions**: `pg.ts` - `getPgClient()`, `getDrizzleClient()` using `postgres` package
 - Schema defined in `utils/postgress_schema.ts` with Drizzle ORM
-- Code uses `getIsV2(c)` to switch between implementations
-- D1 queries use sessions: `getPgClientD1(c, 'first-unconstrained')` for read-only operations
 
 **Never edit committed migrations** in `supabase/migrations/`. Create new migrations with `supabase migration new <feature_slug>`.
 
@@ -203,15 +200,13 @@ bun deploy:supabase:prod
 | `supabase/functions/_backend/` | Shared backend code for all platforms |
 | `cloudflare_workers/{api,plugin,files}/index.ts` | Platform-specific entry points |
 | `supabase/functions/_backend/utils/hono.ts` | Hono app factory, middleware, error handling |
-| `supabase/functions/_backend/utils/pg.ts` | Postgres V1 database layer |
-| `supabase/functions/_backend/utils/pg_d1.ts` | D1 V2 database layer |
+| `supabase/functions/_backend/utils/pg.ts` | Postgres database layer |
 | `tests/test-utils.ts` | Test helpers, endpoint routing, seeding |
 | `scripts/utils.mjs` | Environment config, branch detection |
 | `src/services/supabase.ts` | Frontend Supabase client setup |
 
 ## Common Pitfalls
-
-1. **Mixing V1/V2 database code**: Check `getIsV2(c)` and use correct `pg.ts` vs `pg_d1.ts` functions
+1. **Mixing backend platforms**: Use shared code in `supabase/functions/_backend/`
 2. **Editing old migrations**: Always create new migration files
 3. **Forgetting lint before commit**: `bun lint:fix` is required
 4. **Hard-coding URLs**: Use `getRightKey()` from `scripts/utils.mjs` for environment-specific config

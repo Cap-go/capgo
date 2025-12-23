@@ -202,9 +202,6 @@ SELECT
 SELECT
   cron.unschedule ('process_manifest_bundle_counts_queue');
 
-SELECT
-  cron.unschedule ('process_d1_replication_batch');
-
 -- Create a single consolidated function that runs every second and intelligently decides what to execute
 -- Uses exception handling to prevent one task from blocking others
 CREATE OR REPLACE FUNCTION public.process_all_cron_tasks () RETURNS void LANGUAGE plpgsql
@@ -219,13 +216,6 @@ BEGIN
   current_hour := EXTRACT(HOUR FROM now());
   current_minute := EXTRACT(MINUTE FROM now());
   current_second := EXTRACT(SECOND FROM now());
-
-  -- Every second: D1 replication
-  BEGIN
-    PERFORM public.process_d1_replication_batch();
-  EXCEPTION WHEN OTHERS THEN
-    RAISE WARNING 'process_d1_replication_batch failed: %', SQLERRM;
-  END;
 
   -- Every 10 seconds: High-frequency queues (at :00, :10, :20, :30, :40, :50)
   IF current_second % 10 = 0 THEN

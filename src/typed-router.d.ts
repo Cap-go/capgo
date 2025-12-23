@@ -37,6 +37,41 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    '/admin/dashboard/': RouteRecordInfo<
+      '/admin/dashboard/',
+      '/admin/dashboard',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
+    '/admin/dashboard/performance': RouteRecordInfo<
+      '/admin/dashboard/performance',
+      '/admin/dashboard/performance',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
+    '/admin/dashboard/revenue': RouteRecordInfo<
+      '/admin/dashboard/revenue',
+      '/admin/dashboard/revenue',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
+    '/admin/dashboard/updates': RouteRecordInfo<
+      '/admin/dashboard/updates',
+      '/admin/dashboard/updates',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
+    '/admin/dashboard/users': RouteRecordInfo<
+      '/admin/dashboard/users',
+      '/admin/dashboard/users',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
     '/ApiKeys': RouteRecordInfo<
       '/ApiKeys',
       '/ApiKeys',
@@ -51,6 +86,111 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    '/app/[package]': RouteRecordInfo<
+      '/app/[package]',
+      '/app/:package',
+      { package: ParamValue<true> },
+      { package: ParamValue<false> },
+      | never
+    >,
+    '/app/[package].builds': RouteRecordInfo<
+      '/app/[package].builds',
+      '/app/:package/builds',
+      { package: ParamValue<true> },
+      { package: ParamValue<false> },
+      | never
+    >,
+    '/app/[package].bundle.[bundle]': RouteRecordInfo<
+      '/app/[package].bundle.[bundle]',
+      '/app/:package/bundle/:bundle',
+      { package: ParamValue<true>, bundle: ParamValue<true> },
+      { package: ParamValue<false>, bundle: ParamValue<false> },
+      | never
+    >,
+    '/app/[package].bundle.[bundle].history': RouteRecordInfo<
+      '/app/[package].bundle.[bundle].history',
+      '/app/:package/bundle/:bundle/history',
+      { package: ParamValue<true>, bundle: ParamValue<true> },
+      { package: ParamValue<false>, bundle: ParamValue<false> },
+      | never
+    >,
+    '/app/[package].bundles': RouteRecordInfo<
+      '/app/[package].bundles',
+      '/app/:package/bundles',
+      { package: ParamValue<true> },
+      { package: ParamValue<false> },
+      | never
+    >,
+    '/app/[package].channel.[channel]': RouteRecordInfo<
+      '/app/[package].channel.[channel]',
+      '/app/:package/channel/:channel',
+      { package: ParamValue<true>, channel: ParamValue<true> },
+      { package: ParamValue<false>, channel: ParamValue<false> },
+      | never
+    >,
+    '/app/[package].channel.[channel].devices': RouteRecordInfo<
+      '/app/[package].channel.[channel].devices',
+      '/app/:package/channel/:channel/devices',
+      { package: ParamValue<true>, channel: ParamValue<true> },
+      { package: ParamValue<false>, channel: ParamValue<false> },
+      | never
+    >,
+    '/app/[package].channel.[channel].history': RouteRecordInfo<
+      '/app/[package].channel.[channel].history',
+      '/app/:package/channel/:channel/history',
+      { package: ParamValue<true>, channel: ParamValue<true> },
+      { package: ParamValue<false>, channel: ParamValue<false> },
+      | never
+    >,
+    '/app/[package].channels': RouteRecordInfo<
+      '/app/[package].channels',
+      '/app/:package/channels',
+      { package: ParamValue<true> },
+      { package: ParamValue<false> },
+      | never
+    >,
+    '/app/[package].device.[device]': RouteRecordInfo<
+      '/app/[package].device.[device]',
+      '/app/:package/device/:device',
+      { package: ParamValue<true>, device: ParamValue<true> },
+      { package: ParamValue<false>, device: ParamValue<false> },
+      | never
+    >,
+    '/app/[package].device.[device].deployments': RouteRecordInfo<
+      '/app/[package].device.[device].deployments',
+      '/app/:package/device/:device/deployments',
+      { package: ParamValue<true>, device: ParamValue<true> },
+      { package: ParamValue<false>, device: ParamValue<false> },
+      | never
+    >,
+    '/app/[package].device.[device].logs': RouteRecordInfo<
+      '/app/[package].device.[device].logs',
+      '/app/:package/device/:device/logs',
+      { package: ParamValue<true>, device: ParamValue<true> },
+      { package: ParamValue<false>, device: ParamValue<false> },
+      | never
+    >,
+    '/app/[package].devices': RouteRecordInfo<
+      '/app/[package].devices',
+      '/app/:package/devices',
+      { package: ParamValue<true> },
+      { package: ParamValue<false> },
+      | never
+    >,
+    '/app/[package].info': RouteRecordInfo<
+      '/app/[package].info',
+      '/app/:package/info',
+      { package: ParamValue<true> },
+      { package: ParamValue<false> },
+      | never
+    >,
+    '/app/[package].logs': RouteRecordInfo<
+      '/app/[package].logs',
+      '/app/:package/logs',
+      { package: ParamValue<true> },
+      { package: ParamValue<false> },
+      | never
+    >,
     '/app/modules': RouteRecordInfo<
       '/app/modules',
       '/app/modules',
@@ -63,34 +203,6 @@ declare module 'vue-router/auto-routes' {
       '/app/modules_test',
       Record<never, never>,
       Record<never, never>,
-      | never
-    >,
-    '/app/p/[package]': RouteRecordInfo<
-      '/app/p/[package]',
-      '/app/p/:package',
-      { package: ParamValue<true> },
-      { package: ParamValue<false> },
-      | never
-    >,
-    '/app/p/[package].bundle.[bundle]': RouteRecordInfo<
-      '/app/p/[package].bundle.[bundle]',
-      '/app/p/:package/bundle/:bundle',
-      { package: ParamValue<true>, bundle: ParamValue<true> },
-      { package: ParamValue<false>, bundle: ParamValue<false> },
-      | never
-    >,
-    '/app/p/[package].channel.[channel]': RouteRecordInfo<
-      '/app/p/[package].channel.[channel]',
-      '/app/p/:package/channel/:channel',
-      { package: ParamValue<true>, channel: ParamValue<true> },
-      { package: ParamValue<false>, channel: ParamValue<false> },
-      | never
-    >,
-    '/app/p/[package].d.[device]': RouteRecordInfo<
-      '/app/p/[package].d.[device]',
-      '/app/p/:package/d/:device',
-      { package: ParamValue<true>, device: ParamValue<true> },
-      { package: ParamValue<false>, device: ParamValue<false> },
       | never
     >,
     '/confirm-signup': RouteRecordInfo<
@@ -135,6 +247,13 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    '/log-as/[userId]': RouteRecordInfo<
+      '/log-as/[userId]',
+      '/log-as/:userId',
+      { userId: ParamValue<true> },
+      { userId: ParamValue<false> },
+      | never
+    >,
     '/login': RouteRecordInfo<
       '/login',
       '/login',
@@ -177,23 +296,23 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
-    '/settings/Account': RouteRecordInfo<
-      '/settings/Account',
-      '/settings/Account',
+    '/settings/account/': RouteRecordInfo<
+      '/settings/account/',
+      '/settings/account',
       Record<never, never>,
       Record<never, never>,
       | never
     >,
-    '/settings/ChangePassword': RouteRecordInfo<
-      '/settings/ChangePassword',
-      '/settings/ChangePassword',
+    '/settings/account/ChangePassword': RouteRecordInfo<
+      '/settings/account/ChangePassword',
+      '/settings/account/change-password',
       Record<never, never>,
       Record<never, never>,
       | never
     >,
-    '/settings/Notifications': RouteRecordInfo<
-      '/settings/Notifications',
-      '/settings/Notifications',
+    '/settings/account/Notifications': RouteRecordInfo<
+      '/settings/account/Notifications',
+      '/settings/account/Notifications',
       Record<never, never>,
       Record<never, never>,
       | never
@@ -201,6 +320,13 @@ declare module 'vue-router/auto-routes' {
     '/settings/organization/': RouteRecordInfo<
       '/settings/organization/',
       '/settings/organization',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
+    '/settings/organization/Credits': RouteRecordInfo<
+      '/settings/organization/Credits',
+      '/settings/organization/Credits',
       Record<never, never>,
       Record<never, never>,
       | never
@@ -265,6 +391,36 @@ declare module 'vue-router/auto-routes' {
       views:
         | never
     }
+    'src/pages/admin/dashboard/index.vue': {
+      routes:
+        | '/admin/dashboard/'
+      views:
+        | never
+    }
+    'src/pages/admin/dashboard/performance.vue': {
+      routes:
+        | '/admin/dashboard/performance'
+      views:
+        | never
+    }
+    'src/pages/admin/dashboard/revenue.vue': {
+      routes:
+        | '/admin/dashboard/revenue'
+      views:
+        | never
+    }
+    'src/pages/admin/dashboard/updates.vue': {
+      routes:
+        | '/admin/dashboard/updates'
+      views:
+        | never
+    }
+    'src/pages/admin/dashboard/users.vue': {
+      routes:
+        | '/admin/dashboard/users'
+      views:
+        | never
+    }
     'src/pages/ApiKeys.vue': {
       routes:
         | '/ApiKeys'
@@ -277,6 +433,96 @@ declare module 'vue-router/auto-routes' {
       views:
         | never
     }
+    'src/pages/app/[package].vue': {
+      routes:
+        | '/app/[package]'
+      views:
+        | never
+    }
+    'src/pages/app/[package].builds.vue': {
+      routes:
+        | '/app/[package].builds'
+      views:
+        | never
+    }
+    'src/pages/app/[package].bundle.[bundle].vue': {
+      routes:
+        | '/app/[package].bundle.[bundle]'
+      views:
+        | never
+    }
+    'src/pages/app/[package].bundle.[bundle].history.vue': {
+      routes:
+        | '/app/[package].bundle.[bundle].history'
+      views:
+        | never
+    }
+    'src/pages/app/[package].bundles.vue': {
+      routes:
+        | '/app/[package].bundles'
+      views:
+        | never
+    }
+    'src/pages/app/[package].channel.[channel].vue': {
+      routes:
+        | '/app/[package].channel.[channel]'
+      views:
+        | never
+    }
+    'src/pages/app/[package].channel.[channel].devices.vue': {
+      routes:
+        | '/app/[package].channel.[channel].devices'
+      views:
+        | never
+    }
+    'src/pages/app/[package].channel.[channel].history.vue': {
+      routes:
+        | '/app/[package].channel.[channel].history'
+      views:
+        | never
+    }
+    'src/pages/app/[package].channels.vue': {
+      routes:
+        | '/app/[package].channels'
+      views:
+        | never
+    }
+    'src/pages/app/[package].device.[device].vue': {
+      routes:
+        | '/app/[package].device.[device]'
+      views:
+        | never
+    }
+    'src/pages/app/[package].device.[device].deployments.vue': {
+      routes:
+        | '/app/[package].device.[device].deployments'
+      views:
+        | never
+    }
+    'src/pages/app/[package].device.[device].logs.vue': {
+      routes:
+        | '/app/[package].device.[device].logs'
+      views:
+        | never
+    }
+    'src/pages/app/[package].devices.vue': {
+      routes:
+        | '/app/[package].devices'
+      views:
+        | never
+    }
+    'src/pages/app/[package].info.vue': {
+      routes:
+        | '/app/[package].info'
+      views:
+        | never
+    }
+    'src/pages/app/[package].logs.vue': {
+      routes:
+        | '/app/[package].logs'
+      views:
+        | never
+    }
     'src/pages/app/modules.vue': {
       routes:
         | '/app/modules'
@@ -286,30 +532,6 @@ declare module 'vue-router/auto-routes' {
     'src/pages/app/modules_test.vue': {
       routes:
         | '/app/modules_test'
-      views:
-        | never
-    }
-    'src/pages/app/p/[package].vue': {
-      routes:
-        | '/app/p/[package]'
-      views:
-        | never
-    }
-    'src/pages/app/p/[package].bundle.[bundle].vue': {
-      routes:
-        | '/app/p/[package].bundle.[bundle]'
-      views:
-        | never
-    }
-    'src/pages/app/p/[package].channel.[channel].vue': {
-      routes:
-        | '/app/p/[package].channel.[channel]'
-      views:
-        | never
-    }
-    'src/pages/app/p/[package].d.[device].vue': {
-      routes:
-        | '/app/p/[package].d.[device]'
       views:
         | never
     }
@@ -349,6 +571,12 @@ declare module 'vue-router/auto-routes' {
       views:
         | never
     }
+    'src/pages/log-as/[userId].vue': {
+      routes:
+        | '/log-as/[userId]'
+      views:
+        | never
+    }
     'src/pages/login.vue': {
       routes:
         | '/login'
@@ -385,27 +613,33 @@ declare module 'vue-router/auto-routes' {
       views:
         | never
     }
-    'src/pages/settings/Account.vue': {
+    'src/pages/settings/account/index.vue': {
       routes:
-        | '/settings/Account'
+        | '/settings/account/'
       views:
         | never
     }
-    'src/pages/settings/ChangePassword.vue': {
+    'src/pages/settings/account/ChangePassword.vue': {
       routes:
-        | '/settings/ChangePassword'
+        | '/settings/account/ChangePassword'
       views:
         | never
     }
-    'src/pages/settings/Notifications.vue': {
+    'src/pages/settings/account/Notifications.vue': {
       routes:
-        | '/settings/Notifications'
+        | '/settings/account/Notifications'
       views:
         | never
     }
     'src/pages/settings/organization/index.vue': {
       routes:
         | '/settings/organization/'
+      views:
+        | never
+    }
+    'src/pages/settings/organization/Credits.vue': {
+      routes:
+        | '/settings/organization/Credits'
       views:
         | never
     }

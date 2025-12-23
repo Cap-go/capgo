@@ -18,11 +18,14 @@ const props = defineProps<{
   currentPage?: number
   search?: string
   serverSidePagination?: boolean
+  isLoading?: boolean
 }>()
 const emit = defineEmits([
   'addApp',
   'update:currentPage',
   'update:search',
+  'reload',
+  'reset',
 ])
 const { t } = useI18n()
 const isMobile = Capacitor.isNativePlatform()
@@ -39,33 +42,16 @@ const appsWithMau = ref<any[]>([])
 const mauDataLoaded = ref(false)
 
 async function loadMauNumbers() {
-  // Wait for dashboard data to be loaded
+// Wait for dashboard data to be loaded
   await main.awaitInitialLoad()
 
-  // Calculate how many days into the billing cycle we are
-  const billingStart = new Date(organizationStore.currentOrganization?.subscription_start ?? new Date())
-  const currentDate = new Date()
-
-  // Reset to start of day for consistent comparison
-  billingStart.setHours(0, 0, 0, 0)
-  currentDate.setHours(0, 0, 0, 0)
-
-  // Calculate current billing day (how many days of data to accumulate)
-  const daysInBillingCycle = Math.floor((currentDate.getTime() - billingStart.getTime()) / (1000 * 60 * 60 * 24)) + 1
-
-  // Map apps with their MAU values from the dashboard
+  // Map apps with their MAU values from the dashboard (last 30 days)
   appsWithMau.value = props.apps.map((app: any) => {
     // Get the app's dashboard data
     const appDashboard = main.dashboardByapp.filter(d => d.app_id === app.app_id)
 
-    // Accumulate only the MAU values within the current billing cycle
-    let mau = 0
-    const dataLength = Math.min(daysInBillingCycle, appDashboard.length)
-    for (let i = 0; i < dataLength; i++) {
-      if (appDashboard[i]?.mau !== undefined) {
-        mau += appDashboard[i].mau
-      }
-    }
+    // Accumulate MAU values for the last 30 days (same default as usage charts)
+    const mau = appDashboard.reduce((acc, entry) => acc + (entry.mau ?? 0), 0)
 
     return {
       ...app,
@@ -154,11 +140,11 @@ const columns = ref<TableColumn[]>([
 ])
 
 function openSettings(app: Database['public']['Tables']['apps']['Row']) {
-  router.push(`/app/p/${app.app_id}?tab=info`)
+  router.push(`/app/${app.app_id}/info`)
 }
 
 function openPackage(app: Database['public']['Tables']['apps']['Row']) {
-  router.push(`/app/p/${app.app_id}`)
+  router.push(`/app/${app.app_id}`)
 }
 
 async function openOneVersion(app: Database['public']['Tables']['apps']['Row']) {
@@ -171,7 +157,7 @@ async function openOneVersion(app: Database['public']['Tables']['apps']['Row']) 
     .eq('name', app.last_version)
     .single()
 
-  router.push(`/app/p/${app.app_id}/bundle/${versionData?.id}`)
+  router.push(`/app/${app.app_id}/bundle/${versionData?.id}`)
 }
 
 // Filter apps based on search term
@@ -250,9 +236,9 @@ const filteredApps = computed(() => {
 </script>
 
 <template>
-  <div class="block pb-14 w-full md:pb-0">
+  <div class="block w-full pb-14 md:pb-0">
     <div
-      class="col-span-full w-full bg-transparent rounded-none border-none shadow-none md:bg-white md:rounded-lg md:border md:shadow-lg dark:bg-transparent md:dark:border-slate-800 md:dark:bg-gray-800 xl:col-span-16"
+      class="w-full bg-transparent border-none rounded-none shadow-none col-span-full md:bg-white md:rounded-lg md:border md:shadow-lg dark:bg-transparent md:dark:border-slate-800 md:dark:bg-gray-800 xl:col-span-16"
     >
       <Table
         v-model:filters="filters"
@@ -263,9 +249,12 @@ const filteredApps = computed(() => {
         :total="props.total ?? filteredApps.length"
         :element-list="filteredApps"
         :search-placeholder="t('search-by-name-or-app-id')"
-        :is-loading="false"
+        :is-loading="props.isLoading ?? false"
+        :auto-reload="false"
         filter-text="Filters"
         @add="emit('addApp')"
+        @reload="emit('reload')"
+        @reset="emit('reset')"
         @update:current-page="(page) => emit('update:currentPage', page)"
         @update:search="(val) => emit('update:search', val)"
       />

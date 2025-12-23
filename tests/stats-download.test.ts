@@ -2,7 +2,7 @@ import type { Database } from '../src/types/supabase.types.ts'
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { ALLOWED_STATS_ACTIONS } from '../supabase/functions/_backend/plugins/stats_actions.ts'
-import { createAppVersions, getBaseData, getSupabaseClient, getVersionFromAction, headers, PLUGIN_BASE_URL, resetAndSeedAppData, resetAndSeedAppDataStats, resetAppData, resetAppDataStats, triggerD1Sync } from './test-utils.ts'
+import { createAppVersions, getBaseData, getSupabaseClient, getVersionFromAction, headers, PLUGIN_BASE_URL, resetAndSeedAppData, resetAndSeedAppDataStats, resetAppData, resetAppDataStats } from './test-utils.ts'
 
 const id = randomUUID().substring(0, 8)
 const APP_NAME_DOWNLOAD_STATS = `com.download.${id}`
@@ -87,7 +87,6 @@ describe('download Stats Actions', () => {
 
         const version = await createAppVersions(baseData.version_build, APP_NAME_DOWNLOAD_STATS)
         baseData.version_name = version.name
-        await triggerD1Sync()
 
         const response = await postStats(baseData)
         if (response.status !== 200) {
@@ -128,7 +127,6 @@ describe('download Stats Actions', () => {
 
       const version = await createAppVersions(baseData.version_build, APP_NAME_DOWNLOAD_STATS)
       baseData.version_name = version.name
-      await triggerD1Sync()
 
       // Log start
       baseData.action = 'download_manifest_start'
@@ -177,7 +175,6 @@ describe('download Stats Actions', () => {
         // Use composite format: version:filename
         const filename = 'main.js'
         baseData.version_name = `${version.name}:${filename}`
-        await triggerD1Sync()
 
         const response = await postStats(baseData)
         expect(response.status).toBe(200)
@@ -223,7 +220,6 @@ describe('download Stats Actions', () => {
 
         const version = await createAppVersions(baseData.version_build, APP_NAME_DOWNLOAD_STATS)
         baseData.version_name = `${version.name}:${testCase.filename}`
-        await triggerD1Sync()
 
         const response = await postStats(baseData)
         expect(response.status).toBe(200)
@@ -253,7 +249,6 @@ describe('download Stats Actions', () => {
       baseData.version_build = '3.0.0'
 
       const version = await createAppVersions(baseData.version_build, APP_NAME_DOWNLOAD_STATS)
-      await triggerD1Sync()
 
       const files = ['main.js', 'vendor.js', 'styles.css']
 
@@ -297,7 +292,6 @@ describe('download Stats Actions', () => {
 
       const version = await createAppVersions(baseData.version_build, APP_NAME_DOWNLOAD_STATS)
       baseData.version_name = `${version.name}:test.js`
-      await triggerD1Sync()
 
       const response = await postStats(baseData)
       expect(response.status).toBe(200)
@@ -330,7 +324,6 @@ describe('download Stats Actions', () => {
       const version = await createAppVersions(baseData.version_build, APP_NAME_DOWNLOAD_STATS)
       const filename = 'unique-test-file.js'
       baseData.version_name = `${version.name}:${filename}`
-      await triggerD1Sync()
 
       const response = await postStats(baseData)
       expect(response.status).toBe(200)
@@ -360,7 +353,6 @@ describe('download Stats Actions', () => {
       baseData.version_build = '6.0.0'
 
       const version = await createAppVersions(baseData.version_build, APP_NAME_DOWNLOAD_STATS)
-      await triggerD1Sync()
 
       // Regular format
       baseData.device_id = uuid1
@@ -413,7 +405,6 @@ describe('download Stats Actions', () => {
       const version = await createAppVersions(baseData.version_build, APP_NAME_DOWNLOAD_STATS)
       // Edge case: filename with colon (e.g., Windows paths)
       baseData.version_name = `${version.name}:C:/path/to/file.js`
-      await triggerD1Sync()
 
       const response = await postStats(baseData)
       expect(response.status).toBe(200)
@@ -451,7 +442,6 @@ describe('download Stats Actions', () => {
 
         const version = await createAppVersions(baseData.version_build, APP_NAME_DOWNLOAD_STATS)
         baseData.version_name = `${version.name}:${filename}`
-        await triggerD1Sync()
 
         const response = await postStats(baseData)
         expect(response.status).toBe(200)
@@ -482,7 +472,6 @@ describe('download Stats Actions', () => {
       const version = await createAppVersions(baseData.version_build, APP_NAME_DOWNLOAD_STATS)
       // Edge case: colon but empty filename
       baseData.version_name = `${version.name}:`
-      await triggerD1Sync()
 
       const response = await postStats(baseData)
       expect(response.status).toBe(200)

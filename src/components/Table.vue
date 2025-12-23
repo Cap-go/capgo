@@ -38,9 +38,12 @@ interface Props {
   columns: TableColumn[]
   elementList: { [key: string]: any }[]
   massSelect?: boolean
+  autoReload?: boolean
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+  autoReload: true,
+})
 const emit = defineEmits([
   'add',
   'reload',
@@ -59,6 +62,8 @@ const emit = defineEmits([
 ])
 const { t } = useI18n()
 const searchVal = ref(props.search ?? '')
+const pendingReset = ref(false)
+const pendingAdd = ref(false)
 // const sorts = ref<TableSort>({})
 // get columns from elementList
 
@@ -132,7 +137,7 @@ function updateUrlParams() {
     else params.delete(`sort_${col.key}`)
   })
   const paramsString = params.toString() ? `?${params.toString()}` : ''
-  window.history.pushState(
+  window.history.replaceState(
     {},
     '',
     `${window.location.pathname}${paramsString}`,
@@ -195,7 +200,7 @@ onUnmounted(() => {
     params.delete(`sort_${col.key}`)
   })
   const paramsString = params.toString() ? `?${params.toString()}` : ''
-  window.history.pushState(
+  window.history.replaceState(
     {},
     '',
     `${window.location.pathname}${paramsString}`,
@@ -218,6 +223,7 @@ const debouncedSearch = useDebounceFn(() => {
   emit('update:search', searchVal.value)
 }, 1000)
 
+const hasRunInitialFilterSync = ref(false)
 const hasLoadingCycleCompleted = ref(false)
 const shouldShowRows = computed(
   () => !props.isLoading && props.elementList.length !== 0,
@@ -236,6 +242,8 @@ watch(
   () => props.columns,
   () => {
     debouncedUpdateUrlParams()
+    if (props.autoReload === false)
+      return
     debouncedReload()
   },
   { deep: true },
@@ -245,6 +253,13 @@ watch(
   () => props.filters,
   () => {
     debouncedUpdateUrlParams()
+    if (!hasRunInitialFilterSync.value) {
+      hasRunInitialFilterSync.value = true
+      if (props.autoReload === false)
+        return
+    }
+    if (props.autoReload === false)
+      return
     debouncedReload()
   },
   { deep: true, immediate: true },
@@ -253,6 +268,8 @@ watch(
 watch(searchVal, () => {
   debouncedSearch()
   debouncedUpdateUrlParams()
+  if (props.autoReload === false)
+    return
   debouncedReload()
 })
 
@@ -260,6 +277,8 @@ watch(
   () => props.currentPage,
   () => {
     debouncedUpdateUrlParams()
+    if (props.autoReload === false)
+      return
     debouncedReload()
   },
 )
@@ -267,6 +286,10 @@ watch(
 watch(
   () => props.isLoading,
   (loading, previousLoading) => {
+    if (!loading) {
+      pendingReset.value = false
+      pendingAdd.value = false
+    }
     if (previousLoading && !loading)
       hasLoadingCycleCompleted.value = true
   },
@@ -326,6 +349,29 @@ async function fastBackward() {
     emit('fastBackward')
     emit('update:currentPage', 1)
   }
+}
+
+function handleResetClick() {
+  pendingReset.value = true
+  emit('reset')
+  // Fallback: clear after two frames if parent doesn't toggle isLoading
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      if (!props.isLoading)
+        pendingReset.value = false
+    })
+  })
+}
+
+function handleAddClick() {
+  pendingAdd.value = true
+  emit('add')
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      if (!props.isLoading)
+        pendingAdd.value = false
+    })
+  })
 }
 watch(
   () => props.elementList,
@@ -388,26 +434,29 @@ const RenderCell = defineComponent<{
     return () => (props.renderer ? (props.renderer as any)(props.item) : null)
   },
 })
+
+const isReloading = computed(() => props.isLoading || pendingReset.value)
+const isAdding = computed(() => props.isLoading || pendingAdd.value)
 </script>
 
 <template>
-  <div class="overflow-x-auto pb-4 md:pb-0">
-    <div class="flex justify-between items-start p-3 pb-4 md:items-center">
+  <div class="pb-4 overflow-x-auto md:pb-0">
+    <div class="flex items-start justify-between p-3 pb-4 md:items-center">
       <div class="flex h-10 md:mb-0">
         <button
           class="inline-flex items-center py-1.5 px-3 mr-2 text-sm font-medium text-gray-500 bg-white rounded-md border border-gray-300 cursor-pointer dark:text-white dark:bg-gray-800 dark:border-gray-600 hover:bg-gray-100 focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 focus:outline-hidden"
-          type="button" @click="emit('reset')"
+          type="button" @click="handleResetClick"
         >
-          <IconReload v-if="!isLoading" class="m-1 md:mr-2" />
+          <IconReload v-if="!isReloading" class="m-1 md:mr-2" />
           <Spinner v-else size="w-[16.8px] h-[16.8px] m-1 mr-2" />
           <span class="hidden text-sm md:block">{{ t("reload") }}</span>
         </button>
-        <div v-if="showAdd" class="p-px mr-2 from-cyan-500 to-purple-500 rounded-lg bg-linear-to-r">
+        <div v-if="showAdd" class="p-px mr-2 rounded-lg from-cyan-500 to-purple-500 bg-linear-to-r">
           <button
             class="inline-flex items-center py-1.5 px-3 text-sm font-medium text-gray-500 bg-white rounded-md cursor-pointer dark:text-white dark:bg-gray-800 hover:bg-gray-100 focus:ring-4 focus:ring-gray-200 dark:hover:bg-gray-700 dark:focus:ring-gray-700 focus:outline-hidden"
-            type="button" @click="emit('add')"
+            type="button" @click="handleAddClick"
           >
-            <plusOutline v-if="!isLoading" class="m-1 md:mr-2" />
+            <plusOutline v-if="!isAdding" class="m-1 md:mr-2" />
             <Spinner v-else size="w-[16.8px] h-[16.8px] m-1 mr-2" />
             <span class="hidden text-sm md:block">{{ t("add-one") }}</span>
           </button>
@@ -419,15 +468,15 @@ const RenderCell = defineComponent<{
           >
             <div
               v-if="filterActivated"
-              class="inline-flex absolute -top-2 -right-2 justify-center items-center w-6 h-6 text-xs font-bold text-white bg-red-500 rounded-full border-2 border-white dark:border-gray-900"
+              class="absolute inline-flex items-center justify-center w-6 h-6 text-xs font-bold text-white bg-red-500 border-2 border-white rounded-full -top-2 -right-2 dark:border-gray-900"
             >
               {{ filterActivated }}
             </div>
-            <IconFilter class="mr-2 w-4 h-4" />
+            <IconFilter class="w-4 h-4 mr-2" />
             <span class="hidden md:block">{{ t(filterText) }}</span>
-            <IconDown class="hidden ml-2 w-4 h-4 md:block" />
+            <IconDown class="hidden w-4 h-4 ml-2 md:block" />
           </button>
-          <ul class="p-2 w-52 bg-white shadow d-dropdown-content d-menu rounded-box z-1 dark:bg-base-200">
+          <ul class="p-2 bg-white shadow w-52 d-dropdown-content d-menu rounded-box z-1 dark:bg-base-200">
             <li v-for="(f, i) in filterList" :key="i">
               <div
                 class="flex items-center p-2 rounded-sm cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
@@ -442,7 +491,7 @@ const RenderCell = defineComponent<{
                 >
                 <label
                   :for="`filter-radio-example-${i}`"
-                  class="ml-2 w-full text-sm font-medium text-gray-900 rounded-sm cursor-pointer dark:text-gray-300 first-letter:uppercase"
+                  class="w-full ml-2 text-sm font-medium text-gray-900 rounded-sm cursor-pointer dark:text-gray-300 first-letter:uppercase"
                 >{{
                   t(f) }}</label>
               </div>
@@ -452,7 +501,7 @@ const RenderCell = defineComponent<{
       </div>
       <button
         v-if="isSelectAllEnabled"
-        class="inline-flex items-center self-end py-2 px-3 mr-2 ml-auto text-sm font-medium text-gray-500 bg-white rounded-lg border border-gray-300 cursor-pointer dark:text-white dark:bg-gray-800 dark:border-gray-600 hover:bg-gray-100 focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 focus:outline-hidden"
+        class="inline-flex items-center self-end px-3 py-2 ml-auto mr-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-lg cursor-pointer dark:text-white dark:bg-gray-800 dark:border-gray-600 hover:bg-gray-100 focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 focus:outline-hidden"
         type="button" @click="
           selectedRows = selectedRows.map(() => true);
           emit('selectRow', selectedRows);
@@ -477,12 +526,12 @@ const RenderCell = defineComponent<{
       </div>
     </div>
     <div class="block">
-      <table id="custom_table" class="pb-14 w-full text-sm text-left text-gray-500 md:pb-0 dark:text-gray-400">
+      <table id="custom_table" class="w-full text-sm text-left text-gray-500 pb-14 md:pb-0 dark:text-gray-400">
         <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:text-gray-400 dark:bg-gray-700">
           <tr>
             <th v-if="props.massSelect" class="px-4 md:px-6" />
             <th
-              v-for="(col, i) in columns" :key="i" scope="col" class="py-1 px-4 md:py-3 md:px-6" :class="{
+              v-for="(col, i) in columns" :key="i" scope="col" class="px-4 py-1 md:py-3 md:px-6" :class="{
                 'cursor-pointer': col.sortable,
                 'hidden md:table-cell': !col.mobile,
               }" @click="sortClick(i)"
@@ -516,7 +565,7 @@ const RenderCell = defineComponent<{
                   } ${col.onClick
                     ? 'cursor-pointer hover:underline clickable-cell'
                     : ''
-                  }`" scope="row" class="py-2 px-4 font-medium text-gray-900 whitespace-nowrap md:py-4 md:px-6 dark:text-white"
+                  }`" scope="row" class="px-4 py-2 font-medium text-gray-900 whitespace-nowrap md:py-4 md:px-6 dark:text-white"
                   @click.stop="col.onClick ? col.onClick(elem) : () => { }"
                 >
                   <RenderCell v-if="col.renderFunction" :renderer="col.renderFunction" :item="elem" />
@@ -526,7 +575,7 @@ const RenderCell = defineComponent<{
                 </th>
                 <td
                   v-else-if="col.actions || col.icon" :class="`${col.class ?? ''} ${!col.mobile ? 'hidden md:table-cell' : ''
-                  }`" class="py-2 px-4 md:py-4 md:px-6"
+                  }`" class="px-4 py-2 md:py-4 md:px-6"
                 >
                   <div class="flex items-center space-x-1">
                     <template v-if="col.actions">
@@ -555,7 +604,7 @@ const RenderCell = defineComponent<{
                   } ${col.onClick
                     ? 'cursor-pointer hover:underline clickable-cell'
                     : ''
-                  } overflow-hidden text-ellipsis whitespace-nowrap`" class="py-2 px-4 md:py-4 md:px-6"
+                  } overflow-hidden text-ellipsis whitespace-nowrap`" class="px-4 py-2 md:py-4 md:px-6"
                   @click.stop="col.onClick ? col.onClick(elem) : () => { }"
                 >
                   <RenderCell v-if="col.renderFunction" :renderer="col.renderFunction" :item="elem" />
@@ -571,7 +620,7 @@ const RenderCell = defineComponent<{
           <tr>
             <td
               :colspan="columns.length + (props.massSelect ? 1 : 0)"
-              class="py-2 px-4 text-center text-gray-500 md:py-4 md:px-6 dark:text-gray-400"
+              class="px-4 py-2 text-center text-gray-500 md:py-4 md:px-6 dark:text-gray-400"
             >
               {{ t("no_elements_found") }}
             </td>
@@ -580,13 +629,13 @@ const RenderCell = defineComponent<{
         <tbody v-else>
           <tr v-for="i in 10" :key="i" :class="{ 'animate-pulse duration-1000': shouldShowSkeleton }">
             <td
-              v-if="props.massSelect" class="py-2 px-4 md:py-4 md:px-6"
+              v-if="props.massSelect" class="px-4 py-2 md:py-4 md:px-6"
               :style="`width: ${getSkeletonWidth()}`"
             >
               <div class="mb-4 w-full h-2.5 bg-gray-200 rounded-full dark:bg-gray-700" />
             </td>
             <td
-              v-for="(col, y) in columns" :key="`${i}_${y}`" class="py-2 px-4 md:py-4 md:px-6"
+              v-for="(col, y) in columns" :key="`${i}_${y}`" class="px-4 py-2 md:py-4 md:px-6"
               :class="{ 'hidden md:table-cell': !col.mobile }" :style="`width: ${getSkeletonWidth(y)}`"
             >
               <div
@@ -600,22 +649,25 @@ const RenderCell = defineComponent<{
     </div>
 
     <nav
-      class="flex fixed bottom-0 left-0 z-40 justify-between items-center p-4 w-full bg-white md:relative md:pt-4 md:bg-transparent dark:bg-gray-900 dark:md:bg-transparent"
+      class="fixed bottom-0 left-0 z-40 flex items-center justify-between w-full p-4 bg-white md:relative md:pt-4 md:bg-transparent dark:bg-gray-900 dark:md:bg-transparent"
       aria-label="Table navigation"
     >
-      <span class="text-sm font-normal text-gray-500 dark:text-gray-400"><span class="hidden md:inline-block">{{
-                                                                           t("showing") }}</span>
-        <span class="font-semibold text-gray-900 dark:text-white">{{
-          displayElemRange
-        }}</span>
-        of
-        <span class="font-semibold text-gray-900 dark:text-white">{{
-          total
-        }}</span></span>
+      <span class="text-sm font-normal text-gray-500 dark:text-gray-400">
+        <span class="hidden mr-1 md:inline-block">
+          {{ t("showing") }}
+        </span>
+        <span class="font-semibold text-gray-900 dark:text-white">
+          {{ displayElemRange }}
+        </span>
+        {{ t('of') }}
+        <span class="font-semibold text-gray-900 dark:text-white">
+          {{ total }}
+        </span>
+      </span>
       <ul class="inline-flex items-center -space-x-px">
         <li>
           <button
-            class="block py-2 px-3 ml-0 leading-tight text-gray-500 bg-white rounded-l-lg border border-gray-300 cursor-pointer dark:text-gray-400 dark:bg-gray-800 dark:border-gray-700"
+            class="block px-3 py-2 ml-0 leading-tight text-gray-500 bg-white border border-gray-300 rounded-l-lg cursor-pointer dark:text-gray-400 dark:bg-gray-800 dark:border-gray-700"
             :class="{
               'hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-700 dark:hover:text-white':
                 canPrev(),
@@ -627,7 +679,7 @@ const RenderCell = defineComponent<{
         </li>
         <li>
           <button
-            class="block py-2 px-3 ml-0 leading-tight text-gray-500 bg-white border border-gray-300 cursor-pointer dark:text-gray-400 dark:bg-gray-800 dark:border-gray-700"
+            class="block px-3 py-2 ml-0 leading-tight text-gray-500 bg-white border border-gray-300 cursor-pointer dark:text-gray-400 dark:bg-gray-800 dark:border-gray-700"
             :class="{
               'hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-700 dark:hover:text-white':
                 canPrev(),
@@ -640,7 +692,7 @@ const RenderCell = defineComponent<{
         <li>
           <button
             aria-current="page"
-            class="z-10 py-2 px-3 leading-tight text-blue-600 bg-blue-50 border border-blue-300 dark:text-white dark:bg-gray-700 dark:border-gray-700"
+            class="z-10 px-3 py-2 leading-tight text-blue-600 border border-blue-300 bg-blue-50 dark:text-white dark:bg-gray-700 dark:border-gray-700"
             disabled
           >
             {{ currentPage }}
@@ -648,7 +700,7 @@ const RenderCell = defineComponent<{
         </li>
         <li>
           <button
-            class="block py-2 px-3 leading-tight text-gray-500 bg-white border border-gray-300 cursor-pointer dark:text-gray-400 dark:bg-gray-800 dark:border-gray-700"
+            class="block px-3 py-2 leading-tight text-gray-500 bg-white border border-gray-300 cursor-pointer dark:text-gray-400 dark:bg-gray-800 dark:border-gray-700"
             :class="{
               'hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-700 dark:hover:text-white':
                 canNext(),
@@ -660,7 +712,7 @@ const RenderCell = defineComponent<{
         </li>
         <li>
           <button
-            class="block py-2 px-3 leading-tight text-gray-500 bg-white rounded-r-lg border border-gray-300 cursor-pointer dark:text-gray-400 dark:bg-gray-800 dark:border-gray-700"
+            class="block px-3 py-2 leading-tight text-gray-500 bg-white border border-gray-300 rounded-r-lg cursor-pointer dark:text-gray-400 dark:bg-gray-800 dark:border-gray-700"
             :class="{
               'hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-700 dark:hover:text-white':
                 canNext(),

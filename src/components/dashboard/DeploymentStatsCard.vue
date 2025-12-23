@@ -69,36 +69,50 @@ const { t } = useI18n()
 const organizationStore = useOrganizationStore()
 const dashboardAppsStore = useDashboardAppsStore()
 const supabase = useSupabase()
-const singleAppNameCache = new Map<string, string>()
 let latestRequestToken = 0
 
 const totalDeployments = ref(0)
 const lastDayEvolution = ref(0)
 const deploymentData = ref<number[]>([])
+// For single app view: breakdown by channel
+const deploymentDataByChannel = ref<{ [channelId: string]: number[] }>({})
+const channelNames = ref<{ [channelId: string]: string }>({})
+const channelAppIds = ref<{ [channelId: string]: string }>({})
+// For dashboard view: breakdown by app
 const deploymentDataByApp = ref<{ [appId: string]: number[] }>({})
 const appNames = ref<{ [appId: string]: string }>({})
 const isLoading = ref(true)
-const noPublicChannel = ref(false)
 const hasData = computed(() => totalDeployments.value > 0)
 
-// Cache for raw API data
-const cachedRawStats = ref<any[] | null>(null)
+// Determine if we're in single app mode (show channels) or multi-app mode (show apps)
+const isSingleAppMode = computed(() => !!props.appId)
+
+// Per-org cache for raw API data: Map<orgId, {data, channelNames, channelAppIds}>
+const cacheByOrg = new Map<string, { data: any[], channelNames: { [channelId: string]: string }, channelAppIds: { [channelId: string]: string } }>()
+// Track current org for change detection
+const currentCacheOrgId = ref<string | null>(null)
 
 async function calculateStats(forceRefetch = false) {
   const startTime = Date.now()
   const requestToken = ++latestRequestToken
 
   isLoading.value = true
+
+  // Reset display data
   totalDeployments.value = 0
   lastDayEvolution.value = 0
-
-  const fallbackData = Array.from({ length: 30 }).fill(0) as number[]
-
-  // Reset data holders
+  deploymentDataByChannel.value = {}
+  channelNames.value = {}
+  channelAppIds.value = {}
   deploymentDataByApp.value = {}
   appNames.value = {}
   deploymentData.value = []
-  noPublicChannel.value = false
+
+  const fallbackData = Array.from({ length: 30 }).fill(0) as number[]
+
+  const currentOrgId = organizationStore.currentOrganization?.gid ?? null
+  const orgChanged = currentCacheOrgId.value !== currentOrgId
+  currentCacheOrgId.value = currentOrgId
 
   try {
     await organizationStore.dedupFetchOrganizations()
@@ -128,110 +142,95 @@ async function calculateStats(forceRefetch = false) {
     const startDate = last30DaysStart.toISOString().split('T')[0]
     const endDate = last30DaysEnd.toISOString().split('T')[0]
 
-    const localAppNames: { [appId: string]: string } = {}
     let targetAppIds: string[] = []
 
     if (props.appId) {
       targetAppIds = [props.appId]
-      let cachedName = singleAppNameCache.get(props.appId) ?? ''
-      if (!cachedName) {
-        try {
-          const { data: appRow } = await supabase
-            .from('apps')
-            .select('name')
-            .eq('app_id', props.appId)
-            .single()
-          cachedName = appRow?.name ?? props.appId
-        }
-        catch (error) {
-          console.error('Error fetching app name for deployment stats:', error)
-          cachedName = props.appId
-        }
-        singleAppNameCache.set(props.appId, cachedName)
-      }
-      localAppNames[props.appId] = cachedName || props.appId
     }
     else {
-      // Only fetch apps if not already loaded in store
-      if (!dashboardAppsStore.isLoaded)
-        await dashboardAppsStore.fetchApps()
-
+      // Fetch apps if not loaded OR if org changed (to get fresh app list)
+      await dashboardAppsStore.fetchApps(orgChanged)
       targetAppIds = [...dashboardAppsStore.appIds]
-      Object.assign(localAppNames, dashboardAppsStore.appNames)
     }
 
     if (targetAppIds.length === 0) {
       if (requestToken === latestRequestToken) {
         deploymentData.value = fallbackData
+        deploymentDataByChannel.value = {}
+        channelNames.value = {}
+        channelAppIds.value = {}
         deploymentDataByApp.value = {}
-        appNames.value = { ...localAppNames }
-        noPublicChannel.value = false
+        appNames.value = {}
       }
       return
     }
 
-    const perApp: { [appId: string]: number[] } = {}
-    targetAppIds.forEach((appId) => {
-      perApp[appId] = Array.from({ length: 30 }).fill(0) as number[]
-    })
-
     const dailyCounts30Days = Array.from({ length: 30 }).fill(0) as number[]
     let totalDeploymentsCount = 0
-    let noPublicChannelDetected = false
 
-    // Use cached data if available and not forcing refetch
-    let data, error
-    if (cachedRawStats.value && !forceRefetch) {
-      data = cachedRawStats.value
-      error = null
-      // Use cached noPublicChannel state
-      noPublicChannelDetected = noPublicChannel.value
+    // Check per-org cache - only use if not forcing refetch
+    let data: any[] | null = null
+    let localChannelNames: { [channelId: string]: string } = {}
+    let localChannelAppIds: { [channelId: string]: string } = {}
+    const cachedData = currentOrgId ? cacheByOrg.get(currentOrgId) : null
+
+    if (cachedData && !forceRefetch) {
+      data = cachedData.data
+      localChannelNames = cachedData.channelNames
+      localChannelAppIds = cachedData.channelAppIds
     }
     else {
-      // Only check public channels when actually fetching new data
-      if (targetAppIds.length > 0) {
-        try {
-          const { data: publicChannels } = await supabase
-            .from('channels')
-            .select('app_id')
-            .in('app_id', targetAppIds)
-            .eq('public', true)
-          const hasPublic = (publicChannels?.length ?? 0) > 0
-          noPublicChannelDetected = !hasPublic
-        }
-        catch (error) {
-          console.error(`[DeploymentStatsCard] Failed to verify public channels`, error)
-        }
-      }
-
+      // Fetch deployment history with channel info for all channels
       const result = await supabase
         .from('deploy_history')
         .select(`
           deployed_at,
           app_id,
+          channel_id,
           channels(
-            public
+            id,
+            name
           )
         `)
-        .eq('channels.public', true)
         .in('app_id', targetAppIds)
         .gte('deployed_at', startDate)
         .lte('deployed_at', endDate)
         .order('deployed_at')
 
+      if (result.error)
+        throw result.error
+
       data = result.data
-      error = result.error
-      // Cache the fetched data
-      if (!error)
-        cachedRawStats.value = data
+
+      // Extract channel names and app IDs from the data
+      if (data) {
+        data.forEach((deployment: any) => {
+          if (deployment.channel_id && deployment.channels?.name) {
+            localChannelNames[deployment.channel_id] = deployment.channels.name
+            localChannelAppIds[deployment.channel_id] = deployment.app_id
+          }
+        })
+      }
+
+      // Store in per-org cache
+      if (data && currentOrgId) {
+        cacheByOrg.set(currentOrgId, { data, channelNames: localChannelNames, channelAppIds: localChannelAppIds })
+      }
     }
 
-    if (error)
-      throw error
+    // Create fresh arrays for processing per channel
+    const perChannel: { [channelId: string]: number[] } = {}
+    Object.keys(localChannelNames).forEach((channelId) => {
+      perChannel[channelId] = Array.from({ length: 30 }).fill(0) as number[]
+    })
+
+    // Create fresh arrays for processing per app (multi-app mode)
+    const perApp: { [appId: string]: number[] } = {}
+    const localAppNames: { [appId: string]: string } = {}
 
     if (data && data.length > 0) {
       data.forEach((deployment: any) => {
-        if (!deployment.deployed_at || !deployment.app_id)
+        if (!deployment.deployed_at || !deployment.channel_id)
           return
 
         const deployDate = new Date(deployment.deployed_at)
@@ -245,12 +244,26 @@ async function calculateStats(forceRefetch = false) {
         dailyCounts30Days[daysDiff] += 1
         totalDeploymentsCount += 1
 
-        if (perApp[deployment.app_id])
+        // Initialize channel array if not already (for channels discovered during iteration)
+        if (!perChannel[deployment.channel_id]) {
+          perChannel[deployment.channel_id] = Array.from({ length: 30 }).fill(0) as number[]
+        }
+        perChannel[deployment.channel_id][daysDiff] += 1
+
+        // For multi-app mode: aggregate by app_id
+        if (!isSingleAppMode.value && deployment.app_id) {
+          if (!perApp[deployment.app_id]) {
+            perApp[deployment.app_id] = Array.from({ length: 30 }).fill(0) as number[]
+            // Get app name from dashboardAppsStore
+            localAppNames[deployment.app_id] = dashboardAppsStore.appNames[deployment.app_id] || deployment.app_id
+          }
           perApp[deployment.app_id][daysDiff] += 1
+        }
       })
     }
 
     let finalDeploymentData = dailyCounts30Days
+    let finalPerChannel = perChannel
     let finalPerApp = perApp
     let finalTotal = totalDeploymentsCount
 
@@ -258,12 +271,20 @@ async function calculateStats(forceRefetch = false) {
       const filteredData = filterToBillingPeriod(dailyCounts30Days, last30DaysStart, billingStart)
       finalDeploymentData = filteredData.data
 
+      const filteredPerChannel: { [channelId: string]: number[] } = {}
+      Object.keys(perChannel).forEach((channelId) => {
+        const filteredChannelData = filterToBillingPeriod(perChannel[channelId], last30DaysStart, billingStart)
+        filteredPerChannel[channelId] = filteredChannelData.data
+      })
+      finalPerChannel = filteredPerChannel
+
       const filteredPerApp: { [appId: string]: number[] } = {}
-      targetAppIds.forEach((appId) => {
+      Object.keys(perApp).forEach((appId) => {
         const filteredAppData = filterToBillingPeriod(perApp[appId], last30DaysStart, billingStart)
         filteredPerApp[appId] = filteredAppData.data
       })
       finalPerApp = filteredPerApp
+
       finalTotal = finalDeploymentData.reduce((sum, count) => sum + count, 0)
     }
 
@@ -280,21 +301,25 @@ async function calculateStats(forceRefetch = false) {
       return
 
     deploymentData.value = finalDeploymentData
+    deploymentDataByChannel.value = finalPerChannel
+    channelNames.value = { ...localChannelNames }
+    channelAppIds.value = { ...localChannelAppIds }
     deploymentDataByApp.value = finalPerApp
     appNames.value = { ...localAppNames }
     totalDeployments.value = finalTotal
     lastDayEvolution.value = evolution
-    noPublicChannel.value = noPublicChannelDetected
   }
   catch (error) {
     console.error('Error fetching deployment stats:', error)
     if (requestToken === latestRequestToken) {
       deploymentData.value = fallbackData
+      deploymentDataByChannel.value = {}
+      channelNames.value = {}
+      channelAppIds.value = {}
       deploymentDataByApp.value = {}
       appNames.value = {}
       totalDeployments.value = 0
       lastDayEvolution.value = 0
-      noPublicChannel.value = false
     }
   }
   finally {
@@ -309,26 +334,33 @@ async function calculateStats(forceRefetch = false) {
   }
 }
 
-// Watch for billing period mode changes - use cached data
+// Watch for organization changes - use per-org cache (no need to force refetch)
+watch(() => organizationStore.currentOrganization?.gid, async (newOrgId, oldOrgId) => {
+  if (newOrgId && oldOrgId && newOrgId !== oldOrgId) {
+    // Per-org cache will be checked in calculateStats
+    await calculateStats(false)
+  }
+})
+
+// Watch for billing period mode changes - reprocess cached data
 watch(() => props.useBillingPeriod, async () => {
-  await calculateStats(false) // Don't refetch, just reprocess cached data
+  await calculateStats(false)
 })
 
 // Watch for app target changes - need to refetch
 watch(() => props.appId, async () => {
-  cachedRawStats.value = null // Clear cache when app changes
   await calculateStats(true) // Force refetch for new app
 })
 
-// Watch for accumulated mode changes - use cached data
+// Watch for accumulated mode changes - reprocess cached data
 watch(() => props.accumulated, async () => {
-  await calculateStats(false) // Don't refetch, just reprocess cached data
+  await calculateStats(false)
 })
 
-// Watch for reload trigger - force refetch
-watch(() => props.reloadTrigger, async (newVal, oldVal) => {
-  if (newVal !== oldVal && newVal > 0) {
-    await calculateStats(true) // Force refetch from API
+// Watch for reload trigger - force refetch from API
+watch(() => props.reloadTrigger, async (newVal) => {
+  if (newVal > 0) {
+    await calculateStats(true)
   }
 })
 
@@ -344,17 +376,19 @@ onMounted(async () => {
     :last-day-evolution="lastDayEvolution"
     :is-loading="isLoading"
     :has-data="hasData"
-    :error-message="noPublicChannel ? t('no-public-channel') : undefined"
   >
     <DeploymentStatsChart
-      :key="JSON.stringify(deploymentDataByApp)"
+      :key="isSingleAppMode ? JSON.stringify(deploymentDataByChannel) : JSON.stringify(deploymentDataByApp)"
       :title="t('deployment_statistics')"
       :colors="colors.blue"
       :data="deploymentData"
       :use-billing-period="useBillingPeriod"
       :accumulated="accumulated"
-      :data-by-app="deploymentDataByApp"
-      :app-names="appNames"
+      :data-by-channel="isSingleAppMode ? deploymentDataByChannel : {}"
+      :channel-names="isSingleAppMode ? channelNames : {}"
+      :channel-app-ids="isSingleAppMode ? channelAppIds : {}"
+      :data-by-app="!isSingleAppMode ? deploymentDataByApp : {}"
+      :app-names="!isSingleAppMode ? appNames : {}"
     />
   </ChartCard>
 </template>

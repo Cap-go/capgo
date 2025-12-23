@@ -10,6 +10,7 @@ import IconClipboard from '~icons/heroicons/clipboard-document'
 import IconPencil from '~icons/heroicons/pencil'
 import IconTrash from '~icons/heroicons/trash'
 import Table from '~/components/Table.vue'
+import { formatLocalDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useDisplayStore } from '~/stores/display'
@@ -244,7 +245,7 @@ columns.value = [
     label: t('created'),
     sortable: true,
     displayFunction: (row: Database['public']['Tables']['apikeys']['Row']) => {
-      return new Date(row.created_at || '').toLocaleDateString()
+      return formatLocalDate(row.created_at)
     },
   },
   {
@@ -321,7 +322,15 @@ async function getKeys(retry = true): Promise<void> {
 
 async function loadAllApps() {
   try {
-    const { data: apps, error } = await supabase.from('apps').select('*')
+    const orgIds = organizationStore.organizations.map(org => org.gid)
+    if (orgIds.length === 0) {
+      availableApps.value = []
+      return
+    }
+    const { data: apps, error } = await supabase
+      .from('apps')
+      .select('*')
+      .in('owner_org', orgIds)
     if (error) {
       console.error('Cannot load apps:', error)
       return
@@ -641,6 +650,7 @@ getKeys()
             <Table
               v-model:current-page="currentPage"
               show-add
+              :auto-reload="false"
               :columns="columns"
               :element-list="filteredAndSortedKeys"
               :is-loading="isLoading"

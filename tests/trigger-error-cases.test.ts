@@ -385,7 +385,7 @@ describe('[POST] /triggers/on_version_update - Error Cases', () => {
 })
 
 describe('[POST] /triggers/stripe_event - Error Cases', () => {
-  it('should return 500 when event parsing fails', async () => {
+  it('should return 500 when signature is missing', async () => {
     const response = await fetch(`${BASE_URL}/triggers/stripe_event`, {
       method: 'POST',
       headers: triggerHeaders,
@@ -397,6 +397,6 @@ describe('[POST] /triggers/stripe_event - Error Cases', () => {
     })
 
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('webhook_error_no_secret')
+    expect(data.error).toBe('webhook_error_no_signature')
   })
 })

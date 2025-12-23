@@ -79,6 +79,25 @@ export async function getBuildStatus(
     completed_at: builderJob.job.completed_at,
   })
 
+  // Update build_requests table with current status
+  const { error: updateError } = await supabase
+    .from('build_requests')
+    .update({
+      status: builderJob.job.status,
+      last_error: builderJob.job.error || null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('builder_job_id', job_id)
+
+  if (updateError) {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'Failed to update build_requests status',
+      job_id,
+      error: updateError.message,
+    })
+  }
+
   // Track build time if job completed
   if (builderJob.job.started_at && builderJob.job.completed_at) {
     const buildTimeSeconds = Math.floor((builderJob.job.completed_at - builderJob.job.started_at) / 1000)

@@ -12,8 +12,8 @@
     "local": "sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH"
   },
   "supa_url": {
-    "prod": "https://xvwzpoazmxkqosrdewyv-all.supabase.co",
-    "preprod": "https://xvwzpoazmxkqosrdewyv-all.supabase.co",
+    "prod": "https://xvwzpoazmxkqosrdewyv.supabase.co",
+    "preprod": "https://xvwzpoazmxkqosrdewyv.supabase.co",
     "development": "https://aucsybvnhavogdmzwtcw.supabase.co",
     "local": "http://localhost:54321"
   },
@@ -28,11 +28,5 @@
     "preprod": "0x4AAAAAAAxItBa5rCQ3Vvhl",
     "development": "0x4AAAAAAAxDbvW2bw7mcEZs",
     "local": ""
-  },
-  "feature_credits_v2": {
-    "prod": false,
-    "preprod": false,
-    "development": true,
-    "local": true
   }
 }

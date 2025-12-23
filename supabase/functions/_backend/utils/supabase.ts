@@ -683,7 +683,7 @@ export async function getDefaultPlan(c: Context) {
 }
 
 export async function createStripeCustomer(c: Context, org: Database['public']['Tables']['orgs']['Row']) {
-  const customer = await createCustomer(c, org.management_email, org.created_by, org.name)
+  const customer = await createCustomer(c, org.management_email, org.created_by, org.id, org.name)
   // create date + 15 days
   const trial_at = new Date()
   trial_at.setDate(trial_at.getDate() + 15)
@@ -787,7 +787,7 @@ export async function trackDevicesSB(c: Context, device: DeviceWithoutCreatedAt)
 
   const { data: existingRow, error } = await client
     .from('devices')
-    .select('version_name, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator, default_channel')
+    .select('version_name, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator, default_channel, key_id')
     .eq('app_id', device.app_id)
     .eq('device_id', device.device_id)
     .maybeSingle()
@@ -817,6 +817,7 @@ export async function trackDevicesSB(c: Context, device: DeviceWithoutCreatedAt)
     is_prod: normalizedDevice.is_prod,
     is_emulator: normalizedDevice.is_emulator,
     default_channel: device.default_channel ?? null,
+    key_id: normalizedDevice.key_id ?? undefined,
   } as Database['public']['Tables']['devices']['Insert']
 
   return client
@@ -883,6 +884,14 @@ export async function readStatsSB(c: Context, params: ReadStatsParams) {
       query = query.eq('device_id', params.deviceIds[0])
     else
       query = query.in('device_id', params.deviceIds)
+  }
+
+  if (params.actions?.length) {
+    cloudlog({ requestId: c.get('requestId'), message: 'actions filter', actions: params.actions })
+    if (params.actions.length === 1)
+      query = query.eq('action', params.actions[0] as Database['public']['Enums']['stats_action'])
+    else
+      query = query.in('action', params.actions as Database['public']['Enums']['stats_action'][])
   }
 
   if (params.search) {

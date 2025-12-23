@@ -15,6 +15,7 @@ interface AxisConfig {
   beginAtZero?: boolean
   stacked?: boolean
   suggestedMax?: number
+  max?: number
 }
 
 interface LegendConfig {
@@ -59,6 +60,7 @@ export function createYAxisConfig(
   options: {
     stacked?: boolean
     suggestedMax?: number
+    max?: number
     tickCallback?: (value: string | number) => string
   } = {},
 ) {
@@ -80,6 +82,10 @@ export function createYAxisConfig(
     config.suggestedMax = options.suggestedMax
   }
 
+  if (options.max !== undefined) {
+    config.max = options.max
+  }
+
   if (options.tickCallback) {
     config.ticks!.callback = options.tickCallback
   }
@@ -96,6 +102,7 @@ export function createChartScales(
     xStacked?: boolean
     yStacked?: boolean
     suggestedMax?: number
+    max?: number
     yTickCallback?: (value: string | number) => string
   } = {},
 ) {
@@ -104,6 +111,7 @@ export function createChartScales(
     y: createYAxisConfig(isDark, {
       stacked: options.yStacked,
       suggestedMax: options.suggestedMax,
+      max: options.max,
       tickCallback: options.yTickCallback,
     }),
   }

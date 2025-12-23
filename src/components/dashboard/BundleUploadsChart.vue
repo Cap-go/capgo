@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { ChartData, ChartOptions, Plugin } from 'chart.js'
+import type { TooltipClickHandler } from '~/services/chartTooltip'
 import { useDark } from '@vueuse/core'
 import {
   BarController,
@@ -15,6 +16,7 @@ import {
 import { computed } from 'vue'
 import { Bar, Line } from 'vue-chartjs'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
 import { createLegendConfig, createStackedChartScales } from '~/services/chartConfig'
 import { createTooltipConfig, todayLinePlugin, verticalLinePlugin } from '~/services/chartTooltip'
 import { generateMonthDays, getDaysInCurrentMonth } from '~/services/date'
@@ -33,6 +35,7 @@ const props = defineProps({
 
 const isDark = useDark()
 const { t } = useI18n()
+const router = useRouter()
 const organizationStore = useOrganizationStore()
 const cycleStart = new Date(organizationStore.currentOrganization?.subscription_start ?? new Date())
 const cycleEnd = new Date(organizationStore.currentOrganization?.subscription_end ?? new Date())
@@ -41,6 +44,23 @@ cycleStart.setHours(0, 0, 0, 0)
 cycleEnd.setHours(0, 0, 0, 0)
 
 const DAY_IN_MS = 1000 * 60 * 60 * 24
+
+// Create a reverse mapping from app name to app ID for tooltip clicks
+const appIdByLabel = computed(() => {
+  const mapping: Record<string, string> = {}
+  Object.entries(props.appNames as Record<string, string>).forEach(([appId, appName]) => {
+    mapping[appName] = appId
+  })
+  return mapping
+})
+
+// Click handler for tooltip items - navigates to app detail page
+const tooltipClickHandler = computed<TooltipClickHandler>(() => ({
+  onAppClick: (appId: string) => {
+    router.push(`/app/${appId}`)
+  },
+  appIdByLabel: appIdByLabel.value,
+}))
 
 Chart.register(
   Tooltip,
@@ -270,7 +290,7 @@ const chartOptions = computed(() => {
       title: {
         display: false,
       },
-      tooltip: createTooltipConfig(hasMultipleDatasets, props.accumulated),
+      tooltip: createTooltipConfig(hasMultipleDatasets, props.accumulated, props.useBillingPeriod ? cycleStart : false, hasMultipleDatasets ? tooltipClickHandler.value : undefined),
       todayLine: todayLineOptions.value,
     },
   }

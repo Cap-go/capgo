@@ -121,7 +121,7 @@ async function deleteApp() {
   }
 }
 
-async function submit(form: { app_name: string, retention: number }) {
+async function submit(form: { app_name: string, retention: number, expose_metadata: boolean }) {
   isLoading.value = true
   if (role.value && !organizationStore.hasPermissionsInRole(role.value, ['super_admin'])) {
     toast.error(t('no-permission'))
@@ -138,6 +138,13 @@ async function submit(form: { app_name: string, retention: number }) {
 
   try {
     await updateAppRetention(form.retention)
+  }
+  catch (error) {
+    toast.error(error as string)
+  }
+
+  try {
+    await updateExposeMetadata(form.expose_metadata)
   }
   catch (error) {
     toast.error(error as string)
@@ -188,6 +195,20 @@ async function updateAppRetention(newRetention: number) {
   toast.success(t('changed-app-retention'))
   if (appRef.value)
     appRef.value.retention = newRetention
+}
+
+async function updateExposeMetadata(newExposeMetadata: boolean) {
+  if (newExposeMetadata === appRef.value?.expose_metadata) {
+    return Promise.resolve()
+  }
+
+  const { error } = await supabase.from('apps').update({ expose_metadata: newExposeMetadata }).eq('app_id', props.appId)
+  if (error) {
+    return Promise.reject(t('cannot-change-expose-metadata'))
+  }
+  toast.success(t('changed-expose-metadata'))
+  if (appRef.value)
+    appRef.value.expose_metadata = newExposeMetadata
 }
 
 async function loadChannels() {
@@ -946,6 +967,13 @@ async function transferAppOwnership() {
                 :prefix-icon="gearSix"
                 :value="appRef?.retention ?? 0"
                 :label="t('retention')"
+              />
+              <FormKit
+                type="checkbox"
+                name="expose_metadata"
+                :value="appRef?.expose_metadata ?? false"
+                :label="t('expose-metadata')"
+                :help="t('expose-metadata-help')"
               />
               <FormKit
                 type="button"

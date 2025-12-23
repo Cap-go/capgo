@@ -143,7 +143,7 @@ function planToInt(plan: string) {
       return 2
     case 'Team':
       return 3
-    case 'Pay as you go':
+    case 'Enterprise':
       return 4
     default:
       return 1

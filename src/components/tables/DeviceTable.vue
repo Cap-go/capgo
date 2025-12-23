@@ -27,7 +27,7 @@ const router = useRouter()
 const total = ref(0)
 const search = ref('')
 const elements = ref<Device[]>([])
-const isLoading = ref(false)
+const isLoading = ref(true)
 const currentPage = ref(1)
 const nextCursor = ref<string | undefined>(undefined)
 const hasMore = ref(false)
@@ -192,6 +192,7 @@ async function getData() {
 }
 
 async function reload() {
+  isLoading.value = true
   try {
     elements.value.length = 0
     nextCursor.value = undefined
@@ -202,9 +203,14 @@ async function reload() {
   catch (error) {
     console.error(error)
   }
+  finally {
+    // getData normally resets this, but safeguard to cover early failures
+    isLoading.value = false
+  }
 }
 
 async function refreshData() {
+  isLoading.value = true
   try {
     currentPage.value = 1
     elements.value.length = 0
@@ -216,9 +222,13 @@ async function refreshData() {
   catch (error) {
     console.error(error)
   }
+  finally {
+    // getData normally resets this, but safeguard to cover early failures
+    isLoading.value = false
+  }
 }
 async function openOne(one: Device) {
-  router.push(`/app/p/${props.appId}/d/${one.device_id}`)
+  router.push(`/app/${props.appId}/device/${one.device_id}`)
 }
 async function openOneVersion(one: Device) {
   if (!props.appId) {
@@ -227,7 +237,7 @@ async function openOneVersion(one: Device) {
   }
 
   if (one.version) {
-    router.push(`/app/p/${props.appId}/bundle/${one.version}`)
+    router.push(`/app/${props.appId}/bundle/${one.version}`)
     return
   }
 
@@ -243,7 +253,7 @@ async function openOneVersion(one: Device) {
     toast.error(t('cannot-find-version', 'Cannot find version'))
     return
   }
-  router.push(`/app/p/${props.appId}/bundle/${versionRecord.id}`)
+  router.push(`/app/${props.appId}/bundle/${versionRecord.id}`)
 }
 
 function handleAddDevice() {

@@ -12,6 +12,12 @@ function formatDateParam(date: Date) {
   return normalized.toISOString().slice(0, 10)
 }
 
+function clampToToday(date: Date): Date {
+  const today = new Date()
+  today.setUTCHours(0, 0, 0, 0)
+  return date > today ? today : date
+}
+
 function buildCacheKey(appId: string, from: Date, to: Date) {
   return `${appId}|${formatDateParam(from)}|${formatDateParam(to)}`
 }
@@ -22,8 +28,10 @@ export async function useChartData(supabase: SupabaseClient, appId: string, from
   if (chartDataCache.value.has(cacheKey))
     return chartDataCache.value.get(cacheKey)
 
+  // Clamp the 'to' date to today - we can't fetch data for future dates
+  const clampedTo = clampToToday(to)
   const fromParam = formatDateParam(from)
-  const toParam = formatDateParam(to)
+  const toParam = formatDateParam(clampedTo)
   const { error, data } = await supabase.functions.invoke(`statistics/app/${appId}/bundle_usage?from=${fromParam}&to=${toParam}`, {
     method: 'GET',
   })
