@@ -24,41 +24,47 @@ const organizationTabs = ref<Tab[]>([...baseOrgTabs]) as Ref<Tab[]>
 watchEffect(() => {
   // Rebuild tabs array in correct order based on permissions
   const newTabs: Tab[] = []
-  
+
   // Always show general and members
   const general = baseOrgTabs.find(t => t.key === '/settings/organization')
   const members = baseOrgTabs.find(t => t.key === '/settings/organization/members')
-  if (general) newTabs.push({ ...general })
-  
+  if (general)
+    newTabs.push({ ...general })
+
   // Add autojoin after general if user is admin
   const needsAutojoin = organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['admin', 'super_admin'])
   if (needsAutojoin) {
     const autojoin = baseOrgTabs.find(t => t.key === '/settings/organization/autojoin')
-    if (autojoin) newTabs.push({ ...autojoin })
+    if (autojoin)
+      newTabs.push({ ...autojoin })
   }
-  
+
   // Add members
-  if (members) newTabs.push({ ...members })
-  
+  if (members)
+    newTabs.push({ ...members })
+
   // Add plans if super_admin
   const needsPlans = organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['super_admin'])
   if (needsPlans) {
     const plans = baseOrgTabs.find(t => t.key === '/settings/organization/plans')
-    if (plans) newTabs.push({ ...plans })
+    if (plans)
+      newTabs.push({ ...plans })
   }
-  
+
   // Add usage if super_admin
   const needsUsage = organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['super_admin'])
   if (needsUsage) {
     const usage = baseOrgTabs.find(t => t.key === '/settings/organization/usage')
-    if (usage) newTabs.push({ ...usage })
+    if (usage)
+      newTabs.push({ ...usage })
   }
-  
+
   // Add credits if super_admin
   const needsCredits = organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['super_admin'])
   if (needsCredits) {
     const credits = baseOrgTabs.find(t => t.key === '/settings/organization/credits')
-    if (credits) newTabs.push({ ...credits })
+    if (credits)
+      newTabs.push({ ...credits })
   }
 
   // Add billing if super_admin and not native platform
@@ -71,7 +77,7 @@ watchEffect(() => {
       onClick: () => openPortal(organizationStore.currentOrganization?.gid ?? '', t),
     })
   }
-  
+
   organizationTabs.value = newTabs
 })
 
