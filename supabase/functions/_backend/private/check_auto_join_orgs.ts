@@ -70,22 +70,22 @@ app.post('/', middlewareAuth, async (c) => {
     .single()
 
   if (userError || !user) {
-    cloudlog('User not found', { requestId, error: userError })
+    cloudlog({ requestId, message: 'User not found', error: userError })
     return c.json({ error: 'user_not_found' }, 404)
   }
 
   // Call the auto-join function
-  const { data, error } = await supabaseClient
+  const { data, error } = await (supabaseClient as any)
     .rpc('auto_join_user_to_orgs_by_email', {
       p_user_id: user_id,
       p_email: user.email,
     })
 
   if (error) {
-    cloudlog('Error auto-joining user to orgs', { requestId, error })
+    cloudlog({ requestId, message: 'Error auto-joining user to orgs', error })
     return c.json({ error: 'auto_join_failed' }, 500)
   }
 
-  cloudlog('Auto-join check completed', { requestId, user_id, orgs_joined: data })
+  cloudlog({ requestId, message: 'Auto-join check completed', user_id, orgs_joined: data })
   return c.json({ status: 'ok', orgs_joined: data })
 })

@@ -67,7 +67,7 @@ app.post('/', middlewareV2(['all', 'write', 'read']), async (c) => {
         .eq('user_id', auth.userId)
 
     if (orgUserError) {
-        cloudlog('[organization_domains_get] Error fetching org permissions', { requestId, error: orgUserError })
+        cloudlog({ requestId, message: '[organization_domains_get] Error fetching org permissions', error: orgUserError })
         return simpleError('cannot_access_organization', 'Error checking organization access', { orgId: safeBody.orgId })
     }
 
@@ -89,7 +89,7 @@ app.post('/', middlewareV2(['all', 'write', 'read']), async (c) => {
         .single() as any
 
     if (error) {
-        cloudlog('[organization_domains_get] Error fetching org domains', { requestId, error })
+        cloudlog({ requestId, message: '[organization_domains_get] Error fetching org domains', error })
         return simpleError('cannot_get_org_domains', 'Cannot get organization allowed email domains', { error: error.message })
     }
 

@@ -79,7 +79,7 @@ app.post('/', middlewareV2(['all', 'write']), async (c) => {
         .eq('user_id', auth.userId)
 
     if (orgUserError) {
-        cloudlog('[organization_domains_put] Error fetching org permissions', { requestId, error: orgUserError })
+        cloudlog({ requestId, message: '[organization_domains_put] Error fetching org permissions', error: orgUserError })
         return simpleError('cannot_access_organization', 'Error checking organization access', { orgId: safeBody.orgId })
     }
 
@@ -110,7 +110,7 @@ app.post('/', middlewareV2(['all', 'write']), async (c) => {
         .single() as any
 
     if (error) {
-        cloudlog('[organization_domains_put] Error updating org domains', { requestId, error })
+        cloudlog({ requestId, message: '[organization_domains_put] Error updating org domains', error })
         // Check if it's a constraint violation
         if (error.code === '23514' || error.message?.includes('blocked_domain')) {
             return simpleError('blocked_domain', 'This domain is a public email provider and cannot be used', { domains: safeBody.domains })
