@@ -1,0 +1,3 @@
+[default.extend-words]
+# French words that are valid
+cours = "cours"
