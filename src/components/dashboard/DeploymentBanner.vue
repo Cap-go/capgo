@@ -23,8 +23,8 @@
  * <DeploymentBanner :app-id="appId" @deployed="refreshData" />
  */
 
-import type { Database } from '~/types/supabase.types'
 import type { OrganizationRole } from '~/stores/organization'
+import type { Database } from '~/types/supabase.types'
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
