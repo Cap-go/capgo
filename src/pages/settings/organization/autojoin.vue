@@ -282,7 +282,10 @@ async function removeDomain() {
     const data = await response.json()
 
     if (!response.ok || data.error) {
-      throw error
+      console.error('Error from API (remove):', data)
+      toast.error(t('error-removing-domain', 'Failed to remove domain'))
+      return
+    }
 
     // Reset UI state
     allowedDomain.value = ''
