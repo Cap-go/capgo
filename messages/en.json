@@ -1121,5 +1121,13 @@
   "manifest": "Manifest",
   "no-manifest-bundle": "No manifest",
   "no-zip-bundle": "No zip bundle",
-  "of": "of"
+  "of": "of",
+  "new-bundle-ready-banner": "A new bundle is available and ready to deploy to production",
+  "deploy-now-button": "Deploy Now",
+  "deploying": "Deploying...",
+  "deploy-to-production-title": "Deploy to Production",
+  "deploy-to-production-description": "Are you sure you want to deploy bundle {bundle} to production?",
+  "deploy-confirm": "Deploy to Production",
+  "deployment-success": "Successfully deployed to production!",
+  "deployment-failed": "Deployment failed"
 }

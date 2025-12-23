@@ -268,10 +268,17 @@ async function handleDeploy() {
   dialogStore.openDialog({
     title: t('deploy-to-production-title'),
     description: t('deploy-to-production-description', { bundle: bundleName }),
-    confirmText: t('deploy-confirm'),
-    cancelText: t('cancel'),
-    confirmRole: 'danger',
-    onConfirm: executeDeployment,
+    buttons: [
+      {
+        text: t('cancel'),
+        role: 'cancel',
+      },
+      {
+        text: t('deploy-confirm'),
+        role: 'danger',
+        handler: executeDeployment,
+      },
+    ],
   })
 }
 
