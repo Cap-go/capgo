@@ -120,7 +120,6 @@
   "all-organizations": "All Organizations",
   "all-apps": "All Apps",
   "date-range": "Date Range",
-  "billing-period": "Billing Period",
   "30-days": "Last 30 Days",
   "90-days": "Last 90 Days",
   "last-quarter": "Last Quarter",
@@ -131,7 +130,6 @@
   "clear-filters": "Clear Filters",
   "mau-trend": "MAU Trend",
   "success-rate-trend": "Success Rate Trend",
-  "monthly-active-users": "Monthly Active Users",
   "success-rate": "Success Rate",
   "apps-activity-trend": "Apps Activity Trend",
   "active-apps-per-day": "Active Apps Per Day",
@@ -1119,5 +1117,9 @@
   "your-role-in-org": "Your role in the organization",
   "your-settings": "Your settings",
   "your-usage": "Your usage:",
-  "zip-bundle": "Zip app bundle"
+  "zip-bundle": "Zip app bundle",
+  "manifest": "Manifest",
+  "no-manifest-bundle": "No manifest",
+  "no-zip-bundle": "No zip bundle",
+  "of": "of"
 }
