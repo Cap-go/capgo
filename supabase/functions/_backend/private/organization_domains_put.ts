@@ -104,10 +104,10 @@ app.post('/', middlewareV2(['all', 'write']), async (c) => {
         .update({
             allowed_email_domains: safeBody.domains,
             sso_enabled: enabled,
-        } as any)
+        })
         .eq('id', safeBody.orgId)
         .select('allowed_email_domains, sso_enabled')
-        .single() as any
+        .single()
 
     if (error) {
         cloudlog({ requestId, message: '[organization_domains_put] Error updating org domains', error })
@@ -127,9 +127,8 @@ app.post('/', middlewareV2(['all', 'write']), async (c) => {
         return c.json({ status: 'Organization not found', orgId: safeBody.orgId }, 404)
     }
 
-    const orgData = data as any
     return c.json({
-        allowed_email_domains: orgData.allowed_email_domains || [],
-        sso_enabled: orgData.sso_enabled || false,
+        allowed_email_domains: data?.allowed_email_domains || [],
+        sso_enabled: data?.sso_enabled || false,
     }, 200)
 })

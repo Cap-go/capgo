@@ -447,7 +447,7 @@ async function toggleAutoJoinEnabled() {
           <div v-else class="space-y-4">
             <!-- Domain Input -->
             <div class="w-full md:pr-[50%]">
-              <label class="block mb-2 text-sm font-medium dark:text-white text-slate-800">
+              <label for="new-domain-input" class="block mb-2 text-sm font-medium dark:text-white text-slate-800">
                 {{ t('add-email-domain', 'Organization Email Domain') }}
               </label>
               <div class="relative">
@@ -455,6 +455,7 @@ async function toggleAutoJoinEnabled() {
                   @
                 </span>
                 <input
+                  id="new-domain-input"
                   v-model="newDomain"
                   type="text"
                   :placeholder="t('domain-placeholder', 'yourcompany.com')"

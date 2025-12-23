@@ -6,10 +6,7 @@
  * the auto-join feature and other organization-related API endpoints.
  * 
  * PROBLEM ADDRESSED:
- * The auto-join feature's GET/PUT endpoints query org_users table to verify permissions:
- *   SELECT user_right, app_id, channel_id 
- *   FROM org_users 
- *   WHERE org_id = ? AND user_id = ?
+ * The auto-join feature's GET/PUT endpoints query org_users table to verify permissions.
  * 
  * Previous state:
  * - Separate single-column indexes on org_id and user_id
@@ -77,10 +74,5 @@ ANALYZE org_users;
 --    - org_id is the higher-cardinality column (many orgs)
 --    - user_id is the more selective filter within an org
 --    - Allows efficient range scans if needed in the future
---
--- Query pattern this optimizes:
--- SELECT user_right, app_id, channel_id 
--- FROM org_users 
--- WHERE org_id = ? AND user_id = ?
 --
 -- This is used by all permission checks in private API endpoints
