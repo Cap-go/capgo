@@ -42,9 +42,16 @@ import { storeToRefs } from 'pinia'
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
-import { getLocalConfig, useSupabase } from '~/services/supabase'
+import { defaultApiHost, useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 import { useOrganizationStore } from '~/stores/organization'
+
+// Type for API responses
+interface OrganizationDomainsResponse {
+  allowed_email_domains?: string[]
+  sso_enabled?: boolean
+  error?: string
+}
 
 const { t } = useI18n()
 const displayStore = useDisplayStore()
@@ -93,7 +100,6 @@ async function loadAllowedDomain() {
     return
 
   try {
-    const config = getLocalConfig()
     const session = await supabase.auth.getSession()
     const token = session.data.session?.access_token
 
@@ -102,7 +108,7 @@ async function loadAllowedDomain() {
       return
     }
 
-    const response = await fetch(`${config.hostWeb}/private/organization_domains_get`, {
+    const response = await fetch(`${defaultApiHost}/private/organization_domains_get`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -111,7 +117,7 @@ async function loadAllowedDomain() {
       body: JSON.stringify({ orgId: currentOrganization.value.gid }),
     })
 
-    const data = await response.json()
+    const data = await response.json() as OrganizationDomainsResponse
 
     if (!response.ok || data.error) {
       console.error('Error from API:', data)
@@ -177,7 +183,6 @@ async function saveDomain() {
 
   isSaving.value = true
   try {
-    const config = getLocalConfig()
     const session = await supabase.auth.getSession()
     const token = session.data.session?.access_token
 
@@ -186,7 +191,7 @@ async function saveDomain() {
       return
     }
 
-    const response = await fetch(`${config.hostWeb}/private/organization_domains_put`, {
+    const response = await fetch(`${defaultApiHost}/private/organization_domains_put`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -199,7 +204,7 @@ async function saveDomain() {
       }),
     })
 
-    const data = await response.json()
+    const data = await response.json() as OrganizationDomainsResponse
 
     if (!response.ok || data.error) {
       console.error('Error from API (save):', data)
@@ -257,7 +262,6 @@ async function removeDomain() {
 
   isSaving.value = true
   try {
-    const config = getLocalConfig()
     const session = await supabase.auth.getSession()
     const token = session.data.session?.access_token
 
@@ -266,7 +270,7 @@ async function removeDomain() {
       return
     }
 
-    const response = await fetch(`${config.hostWeb}/private/organization_domains_put`, {
+    const response = await fetch(`${defaultApiHost}/private/organization_domains_put`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -279,7 +283,7 @@ async function removeDomain() {
       }),
     })
 
-    const data = await response.json()
+    const data = await response.json() as OrganizationDomainsResponse
 
     if (!response.ok || data.error) {
       console.error('Error from API (remove):', data)
@@ -320,7 +324,6 @@ async function toggleAutoJoinEnabled() {
 
   isSaving.value = true
   try {
-    const config = getLocalConfig()
     const session = await supabase.auth.getSession()
     const token = session.data.session?.access_token
 
@@ -331,7 +334,7 @@ async function toggleAutoJoinEnabled() {
       return
     }
 
-    const response = await fetch(`${config.hostWeb}/private/organization_domains_put`, {
+    const response = await fetch(`${defaultApiHost}/private/organization_domains_put`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -344,7 +347,7 @@ async function toggleAutoJoinEnabled() {
       }),
     })
 
-    const data = await response.json()
+    const data = await response.json() as OrganizationDomainsResponse
 
     if (!response.ok || data.error)
       throw new Error(data.error || 'Failed to update')
