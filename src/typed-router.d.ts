@@ -317,6 +317,13 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    '/settings/organization/autojoin': RouteRecordInfo<
+      '/settings/organization/autojoin',
+      '/settings/organization/autojoin',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
     '/settings/organization/Credits': RouteRecordInfo<
       '/settings/organization/Credits',
       '/settings/organization/Credits',
@@ -621,6 +628,12 @@ declare module 'vue-router/auto-routes' {
     'src/pages/settings/organization/index.vue': {
       routes:
         | '/settings/organization/'
+      views:
+        | never
+    }
+    'src/pages/settings/organization/autojoin.vue': {
+      routes:
+        | '/settings/organization/autojoin'
       views:
         | never
     }
