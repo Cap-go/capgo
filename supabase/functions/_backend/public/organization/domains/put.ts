@@ -10,6 +10,20 @@ const bodySchema = z.object({
   domains: z.array(z.string().check(z.minLength(1))),
 })
 
+/**
+ * Update an organization's allowed email domains and optionally its SSO enabled flag.
+ *
+ * Normalizes and validates the provided domains, rejects public email providers, and requires admin rights for the target organization.
+ *
+ * @param bodyRaw - Request body containing `orgId: string`, `domains: string[]`, and optional `enabled: boolean` to set `sso_enabled`
+ * @returns A JSON Response with `status`, `orgId`, `allowed_email_domains` (array of strings), and `sso_enabled` (boolean)
+ * @throws simpleError with code `invalid_body` when the request body fails validation
+ * @throws simpleError with code `cannot_access_organization` when the caller lacks admin rights for the organization
+ * @throws simpleError with code `invalid_domain` when any provided domain is syntactically invalid
+ * @throws simpleError with code `blocked_domain` when any provided domain is a blocked/public email provider
+ * @throws simpleError with code `domain_conflict` when a domain conflict prevents the update
+ * @throws simpleError with code `cannot_update_org_domains` for other update failures
+ */
 export async function putDomains(c: Context, bodyRaw: any, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
   const bodyParsed = bodySchema.safeParse(bodyRaw)
   if (!bodyParsed.success) {

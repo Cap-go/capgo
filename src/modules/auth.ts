@@ -78,6 +78,15 @@ async function updateUser(
   }
 }
 
+/**
+ * Route guard that enforces authentication, MFA requirements, account-disabled status, auto-join checks, and admin access control before allowing navigation.
+ *
+ * Performs these checks and actions as needed: redirects to login when unauthenticated, redirects to an account-disabled page if the account is marked disabled, prevents navigation when MFA level escalation is required, triggers a non-blocking auto-join check for organizations, ensures public user/profile data and plans/admin status are loaded for newly authenticated users, and restricts access to admin routes for non-admin users.
+ *
+ * @param next - Navigation continuation function; call with a route or nothing to proceed.
+ * @param to - Target route for the navigation.
+ * @param from - Current route being navigated away from.
+ */
 async function guard(
   next: NavigationGuardNext,
   to: RouteLocationNormalized,
