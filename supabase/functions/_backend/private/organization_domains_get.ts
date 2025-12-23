@@ -12,8 +12,9 @@
  */
 
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
+import { Hono } from 'hono'
 import { z } from 'zod/mini'
-import { createHono, parseBody, simpleError, useCors } from '../utils/hono.ts'
+import { parseBody, simpleError, useCors } from '../utils/hono.ts'
 import { middlewareV2 } from '../utils/hono_middleware.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
@@ -23,7 +24,7 @@ const bodySchema = z.object({
   orgId: z.string(),
 })
 
-export const app = createHono<MiddlewareKeyVariables>()
+export const app = new Hono<MiddlewareKeyVariables>()
 
 app.use('/', useCors)
 
