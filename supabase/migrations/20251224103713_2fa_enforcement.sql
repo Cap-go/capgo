@@ -325,9 +325,14 @@ $$;
 
 ALTER FUNCTION public.get_orgs_v7(uuid) OWNER TO "postgres";
 
-GRANT ALL ON FUNCTION public.get_orgs_v7(uuid) TO "anon";
-GRANT ALL ON FUNCTION public.get_orgs_v7(uuid) TO "authenticated";
-GRANT ALL ON FUNCTION public.get_orgs_v7(uuid) TO "service_role";
+-- Revoke from public roles (security: prevents users from querying other users' orgs)
+REVOKE ALL ON FUNCTION public.get_orgs_v7(uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.get_orgs_v7(uuid) FROM "anon";
+REVOKE ALL ON FUNCTION public.get_orgs_v7(uuid) FROM "authenticated";
+
+-- Grant only to postgres and service_role (private function)
+GRANT EXECUTE ON FUNCTION public.get_orgs_v7(uuid) TO "postgres";
+GRANT EXECUTE ON FUNCTION public.get_orgs_v7(uuid) TO "service_role";
 
 -- Create get_orgs_v7() - wrapper function
 CREATE OR REPLACE FUNCTION public.get_orgs_v7()
@@ -538,6 +543,16 @@ BEGIN
 END;
 $$;
 
+ALTER FUNCTION public.get_orgs_v6(uuid) OWNER TO "postgres";
+
+-- Revoke from public roles (security: prevents users from querying other users' orgs)
+REVOKE ALL ON FUNCTION public.get_orgs_v6(uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.get_orgs_v6(uuid) FROM "anon";
+REVOKE ALL ON FUNCTION public.get_orgs_v6(uuid) FROM "authenticated";
+
+-- Grant only to postgres and service_role (private function)
+GRANT EXECUTE ON FUNCTION public.get_orgs_v6(uuid) TO "postgres";
+GRANT EXECUTE ON FUNCTION public.get_orgs_v6(uuid) TO "service_role";
 
 -- ============================================================================
 -- Section 5: reject_access_due_to_2fa function
