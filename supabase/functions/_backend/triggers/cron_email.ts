@@ -4,6 +4,7 @@ import { Hono } from 'hono/tiny'
 import { trackBentoEvent } from '../utils/bento.ts'
 import { BRES, middlewareAPISecret, parseBody, simpleError } from '../utils/hono.ts'
 import { cloudlogErr } from '../utils/logging.ts'
+import { readStatsVersion } from '../utils/stats.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 
 const thresholds = {
@@ -64,7 +65,31 @@ function getFunComparison(comparison: keyof typeof funComparisons, stat: number)
 export const app = new Hono<MiddlewareKeyVariables>()
 
 app.post('/', middlewareAPISecret, async (c) => {
-  const { email, appId, type } = await parseBody<{ email: string, appId: string, type: string }>(c)
+  const {
+    email,
+    appId,
+    type,
+    deployId,
+    versionId,
+    versionName,
+    channelId,
+    channelName,
+    platform,
+    appName,
+    deployedAt,
+  } = await parseBody<{
+    email: string
+    appId: string
+    type: string
+    deployId?: number
+    versionId?: number
+    versionName?: string
+    channelId?: number
+    channelName?: string
+    platform?: string
+    appName?: string
+    deployedAt?: string
+  }>(c)
 
   if (!email || !appId || !type) {
     return simpleError('missing_email_appId_type', 'Missing email, appId, or type', { email, appId, type })
@@ -83,6 +108,20 @@ app.post('/', middlewareAPISecret, async (c) => {
   }
   else if (type === 'monthly_create_stats') {
     return await handleMonthlyCreateStats(c, email, appId)
+  }
+  else if (type === 'deploy_install_stats') {
+    return await handleDeployInstallStats(c, {
+      email,
+      appId,
+      deployId,
+      versionId,
+      versionName,
+      channelId,
+      channelName,
+      platform,
+      appName,
+      deployedAt,
+    })
   }
   else {
     return simpleError('invalid_stats_type', 'Invalid stats type', { email, appId, type })
@@ -166,6 +205,82 @@ async function handleMonthlyCreateStats(c: Context, email: string, appId: string
   }
 
   await trackBentoEvent(c, email, metadata, 'org:monthly_create_stats')
+
+  return c.json(BRES)
+}
+
+async function handleDeployInstallStats(
+  c: Context,
+  payload: {
+    email: string
+    appId: string
+    deployId?: number
+    versionId?: number
+    versionName?: string
+    channelId?: number
+    channelName?: string
+    platform?: string
+    appName?: string
+    deployedAt?: string
+  },
+) {
+  const {
+    email,
+    appId,
+    deployId,
+    versionId,
+    versionName,
+    channelId,
+    channelName,
+    platform,
+    appName,
+    deployedAt,
+  } = payload
+
+  if (!versionId) {
+    return simpleError('missing_version_id', 'Missing versionId', { appId, deployId })
+  }
+
+  let deployTime = deployedAt ? new Date(deployedAt) : null
+  if (!deployTime || Number.isNaN(deployTime.getTime())) {
+    if (deployId) {
+      const { data: deploy, error: deployError } = await supabaseAdmin(c)
+        .from('deploy_history')
+        .select('deployed_at')
+        .eq('id', deployId)
+        .single()
+      if (deployError || !deploy?.deployed_at) {
+        return simpleError('missing_deployed_at', 'Missing deployedAt', { appId, deployId, deployError })
+      }
+      deployTime = new Date(deploy.deployed_at)
+    }
+    else {
+      return simpleError('missing_deployed_at', 'Missing deployedAt', { appId, deployId, versionId })
+    }
+  }
+
+  const windowStart = deployTime.toISOString()
+  const windowEnd = new Date(deployTime.getTime() + 24 * 60 * 60 * 1000).toISOString()
+  const versionStats = await readStatsVersion(c, appId, windowStart, windowEnd)
+  const installs = versionStats
+    .filter(row => Number(row.version_id) === Number(versionId))
+    .reduce((sum, row) => sum + (row.install ?? 0), 0)
+
+  const metadata = {
+    app_id: appId,
+    app_name: appName ?? '',
+    deploy_id: deployId?.toString(),
+    version_id: versionId?.toString(),
+    version_name: versionName ?? '',
+    channel_id: channelId?.toString(),
+    channel_name: channelName ?? '',
+    platform: platform ?? '',
+    deployed_at: windowStart,
+    install_count_24h: installs.toString(),
+    window_hours: '24',
+  }
+
+  await trackBentoEvent(c, email, metadata, 'bundle:install_stats_24h')
 
   return c.json(BRES)
 }
