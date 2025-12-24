@@ -4,7 +4,7 @@ import type { TableColumn } from '../comp_def'
 import dayjs from 'dayjs'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import { formatDate } from '~/services/date'
 import { defaultApiHost, useSupabase } from '~/services/supabase'
@@ -48,13 +48,38 @@ function parseVersionName(versionName: string): ParsedVersionName {
 }
 const columns: Ref<TableColumn[]> = ref<TableColumn[]>([])
 const router = useRouter()
+const route = useRoute()
 const { t } = useI18n()
 const supabase = useSupabase()
 const search = ref('')
 const elements = ref<Element[]>([])
 const isLoading = ref(false)
 const currentPage = ref(1)
-const range = ref<[Date, Date]>([dayjs().subtract(1, 'hour').toDate(), new Date()])
+
+// Initialize date range from query parameters if provided, otherwise default to last hour
+function initializeDateRange(): [Date, Date] {
+  const startParam = route.query.start
+  const endParam = route.query.end
+
+  if (startParam && endParam && typeof startParam === 'string' && typeof endParam === 'string') {
+    try {
+      const startDate = new Date(startParam)
+      const endDate = new Date(endParam)
+
+      // Validate dates
+      if (!Number.isNaN(startDate.getTime()) && !Number.isNaN(endDate.getTime())) {
+        return [startDate, endDate]
+      }
+    }
+    catch (error) {
+      console.warn('Invalid date parameters in URL:', error)
+    }
+  }
+
+  return [dayjs().subtract(1, 'hour').toDate(), new Date()]
+}
+
+const range = ref<[Date, Date]>(initializeDateRange())
 const DOC_LOGS = 'https://capgo.app/docs/plugin/debugging/#sent-from-the-backend'
 
 // All available actions - none selected by default (shows all results)
@@ -181,6 +206,24 @@ const filterToAction: Record<string, string> = {
   'action-invalid-ip': 'InvalidIp',
   'action-blocked-by-server-url': 'blocked_by_server_url',
   'action-backend-refusal': 'backend_refusal',
+}
+
+// Create reverse mapping from action values to filter keys
+const actionToFilter: Record<string, string> = {}
+Object.entries(filterToAction).forEach(([filterKey, actionValue]) => {
+  actionToFilter[actionValue] = filterKey
+})
+
+// Initialize action filters from URL query parameter
+function initializeActionFilters(): void {
+  const actionParam = route.query.action
+  if (actionParam && typeof actionParam === 'string') {
+    // Find the filter key for this action
+    const filterKey = actionToFilter[actionParam]
+    if (filterKey && actionFilters.value[filterKey] !== undefined) {
+      actionFilters.value[filterKey] = true
+    }
+  }
 }
 
 // Compute active actions based on filters
@@ -362,6 +405,7 @@ async function openOne(one: Element) {
   router.push(`/app/${props.appId}/device/${one.device_id}`)
 }
 onMounted(async () => {
+  initializeActionFilters()
   await refreshData()
 })
 watch(props, async () => {

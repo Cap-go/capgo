@@ -42,33 +42,16 @@ const appsWithMau = ref<any[]>([])
 const mauDataLoaded = ref(false)
 
 async function loadMauNumbers() {
-  // Wait for dashboard data to be loaded
+// Wait for dashboard data to be loaded
   await main.awaitInitialLoad()
 
-  // Calculate how many days into the billing cycle we are
-  const billingStart = new Date(organizationStore.currentOrganization?.subscription_start ?? new Date())
-  const currentDate = new Date()
-
-  // Reset to start of day for consistent comparison
-  billingStart.setHours(0, 0, 0, 0)
-  currentDate.setHours(0, 0, 0, 0)
-
-  // Calculate current billing day (how many days of data to accumulate)
-  const daysInBillingCycle = Math.floor((currentDate.getTime() - billingStart.getTime()) / (1000 * 60 * 60 * 24)) + 1
-
-  // Map apps with their MAU values from the dashboard
+  // Map apps with their MAU values from the dashboard (last 30 days)
   appsWithMau.value = props.apps.map((app: any) => {
     // Get the app's dashboard data
     const appDashboard = main.dashboardByapp.filter(d => d.app_id === app.app_id)
 
-    // Accumulate only the MAU values within the current billing cycle
-    let mau = 0
-    const dataLength = Math.min(daysInBillingCycle, appDashboard.length)
-    for (let i = 0; i < dataLength; i++) {
-      if (appDashboard[i]?.mau !== undefined) {
-        mau += appDashboard[i].mau
-      }
-    }
+    // Accumulate MAU values for the last 30 days (same default as usage charts)
+    const mau = appDashboard.reduce((acc, entry) => acc + (entry.mau ?? 0), 0)
 
     return {
       ...app,

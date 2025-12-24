@@ -19,6 +19,7 @@ interface Props {
 
 async function open() {
   dialogStore.openDialog({
+    id: 'delete-org-confirm',
     title: t('delete-org'),
     description: `${t('please-confirm-org-del')}`.replace('%1', props.org?.name ?? ''),
     size: 'lg',
@@ -66,7 +67,7 @@ defineExpose({
 
 <template>
   <div>
-    <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('delete-org')" to="#dialog-v2-content" defer>
+    <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.id === 'delete-org-confirm'" to="#dialog-v2-content" defer>
       <div class="w-full">
         <input
           v-model="deleteInput"

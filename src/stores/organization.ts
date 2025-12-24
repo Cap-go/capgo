@@ -96,8 +96,17 @@ export const useOrganizationStore = defineStore('organization', () => {
       return
 
     const organizations = Array.from(organizationsMap.values())
+    const orgIds = organizations.map(org => org.gid)
 
-    const { error, data: allAppsByOwner } = await supabase.from('apps').select('app_id, owner_org')
+    if (orgIds.length === 0) {
+      _initialLoadPromise.value.resolve(true)
+      return
+    }
+
+    const { error, data: allAppsByOwner } = await supabase
+      .from('apps')
+      .select('app_id, owner_org')
+      .in('owner_org', orgIds)
 
     if (error) {
       console.error('Cannot get app apps for org store', error)

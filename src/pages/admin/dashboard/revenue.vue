@@ -48,7 +48,7 @@ const globalStatsTrendData = ref<Array<{
   paying_monthly: number
   new_paying_orgs: number
   canceled_orgs: number
-  mrrr: number
+  mrr: number
   total_revenue: number
   revenue_solo: number
   revenue_maker: number
@@ -132,7 +132,7 @@ const mrrSeries = computed(() => {
       label: 'MRR - Monthly Recurring Revenue ($)',
       data: globalStatsTrendData.value.map(item => ({
         date: item.date,
-        value: item.mrrr || 0,
+        value: item.mrr || 0,
       })),
       color: '#3b82f6', // blue
     },
@@ -269,7 +269,7 @@ displayStore.defaultBack = '/dashboard'
                   MRR - Monthly Recurring Revenue
                 </p>
                 <p v-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-primary">
-                  ${{ latestGlobalStats.mrrr.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}
+                  ${{ latestGlobalStats.mrr.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}
                 </p>
                 <p v-else class="mt-2 text-3xl font-bold text-primary">
                   $0.00

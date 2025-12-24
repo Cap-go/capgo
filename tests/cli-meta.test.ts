@@ -133,11 +133,11 @@ describe('tests CLI metadata', () => {
     it.concurrent('should handle additional local plugins', async () => {
       const customPkgPath = await createCustomPackageJson(APPNAME, 'plugins', {
         '@capacitor/android': '7.0.0',
-        '@capgo/capacitor-updater': '7.0.38',
+        '@capgo/capacitor-updater': '7.30.0',
       })
       // Check that both dependencies show up in the compatibility table with remote versions
       await assertCompatibilityTableColumns(APPNAME, '@capacitor/android', '7.0.0', '7.0.0', '✅', customPkgPath)
-      await assertCompatibilityTableColumns(APPNAME, '@capgo/capacitor-updater', '7.0.38', '7.0.38', '✅', customPkgPath)
+      await assertCompatibilityTableColumns(APPNAME, '@capgo/capacitor-updater', '7.30.0', '7.30.0', '✅', customPkgPath)
     })
   })
 })

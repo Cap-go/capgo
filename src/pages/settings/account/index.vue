@@ -144,6 +144,7 @@ async function deleteAccount() {
     organizationsToDelete.value = orgsToBeDeleted
 
     dialogStore.openDialog({
+      id: 'delete-account-warning-orgs',
       title: t('warning-organizations-will-be-deleted'),
       description: t('warning-organizations-will-be-deleted-message'),
       size: 'lg',
@@ -176,6 +177,7 @@ async function deleteAccount() {
     }))
 
     dialogStore.openDialog({
+      id: 'delete-account-warning-paid',
       title: t('warning-paid-subscriptions'),
       description: t('warning-paid-subscriptions-message'),
       size: 'lg',
@@ -204,7 +206,8 @@ async function deleteAccount() {
 
   // Show final confirmation
   dialogStore.openDialog({
-    title: t('are-u-sure'),
+    id: 'delete-account-confirm',
+    title: t('delete-account'),
     description: '', // We'll use Teleport for custom content
     buttons: [
       {
@@ -739,7 +742,7 @@ onMounted(async () => {
     </Teleport>
 
     <!-- Teleport for Organization Deletion Warning -->
-    <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('warning-organizations-will-be-deleted')" to="#dialog-v2-content" defer>
+    <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.id === 'delete-account-warning-orgs'" to="#dialog-v2-content" defer>
       <div class="p-4 mt-4 border border-red-200 rounded-lg bg-red-50 dark:border-red-800 dark:bg-red-900/20">
         <h4 class="mb-3 font-semibold text-red-800 dark:text-red-200">
           {{ t('organizations-to-be-deleted') }}:
@@ -754,7 +757,7 @@ onMounted(async () => {
     </Teleport>
 
     <!-- Teleport for Paid Subscriptions Warning -->
-    <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('warning-paid-subscriptions')" to="#dialog-v2-content" defer>
+    <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.id === 'delete-account-warning-paid'" to="#dialog-v2-content" defer>
       <div class="p-4 mt-4 border border-orange-200 rounded-lg bg-orange-50 dark:border-orange-800 dark:bg-orange-900/20">
         <h4 class="mb-3 font-semibold text-orange-800 dark:text-orange-200">
           {{ t('paid-subscriptions-to-cancel') }}:
@@ -774,7 +777,7 @@ onMounted(async () => {
     </Teleport>
 
     <!-- Teleport for Final Account Deletion Warning -->
-    <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('are-u-sure')" to="#dialog-v2-content" defer>
+    <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.id === 'delete-account-confirm'" to="#dialog-v2-content" defer>
       <div class="text-base text-gray-500 dark:text-gray-400">
         <p class="mb-4">
           This action cannot be undone. Your account and all associated data will be permanently deleted.

@@ -11,6 +11,13 @@ interface ProcessedTooltipItem {
   body: string[]
   value: number
   colors: TooltipLabelStyle
+  appId?: string
+  label?: string
+}
+
+export interface TooltipClickHandler {
+  onAppClick?: (appId: string, clickContext?: { date: Date, dataIndex: number }) => void
+  appIdByLabel?: Record<string, string> // Maps app label/name to app ID
 }
 
 function formatTooltipValue(value: unknown) {
@@ -78,8 +85,9 @@ function getDatasetBaseValue(chart: Chart | undefined, dataset: any, datasetInde
  * @param isAccumulated Whether the chart is in accumulated mode
  * @param hasMultipleDatasets Whether the chart has multiple datasets (apps)
  * @param dateStartOrUseBillingPeriod Either a Date for billing start, or boolean for mode
+ * @param clickHandler Optional click handler for interactive tooltip items
  */
-export function createCustomTooltip(context: TooltipContext, isAccumulated: boolean = false, hasMultipleDatasets: boolean = true, dateStartOrUseBillingPeriod?: Date | boolean) {
+export function createCustomTooltip(context: TooltipContext, isAccumulated: boolean = false, hasMultipleDatasets: boolean = true, dateStartOrUseBillingPeriod?: Date | boolean, clickHandler?: TooltipClickHandler) {
   const { chart, tooltip } = context
   const { canvas } = chart
   const isDark = useDark()
@@ -97,7 +105,8 @@ export function createCustomTooltip(context: TooltipContext, isAccumulated: bool
     tooltipEl.style.borderRadius = '8px'
     tooltipEl.style.color = isDark.value ? 'white' : 'black'
     tooltipEl.style.border = isDark.value ? '1px solid rgba(55, 65, 81, 0.6)' : '1px solid rgba(209, 213, 219, 0.8)'
-    tooltipEl.style.pointerEvents = 'none'
+    // Enable pointer events when we have clickable items
+    tooltipEl.style.pointerEvents = clickHandler?.onAppClick ? 'auto' : 'none'
     tooltipEl.style.transform = 'translate(-50%, 0)'
     tooltipEl.style.transition = 'all .1s ease'
     tooltipEl.style.boxShadow = '0 10px 30px rgba(0, 0, 0, 0.15), 0 4px 10px rgba(0, 0, 0, 0.1)'
@@ -108,6 +117,26 @@ export function createCustomTooltip(context: TooltipContext, isAccumulated: bool
     tooltipEl.style.minWidth = '200px'
     tooltipEl.style.maxWidth = '300px'
     chart.canvas.parentNode?.appendChild(tooltipEl)
+
+    // Track hover state for interactive tooltips
+    if (clickHandler?.onAppClick) {
+      tooltipEl.addEventListener('mouseenter', () => {
+        (tooltipEl as any).isHovered = true
+        // Clear any pending hide timer when entering tooltip
+        if ((tooltipEl as any).hideTimer) {
+          clearTimeout((tooltipEl as any).hideTimer)
+        }
+      })
+      tooltipEl.addEventListener('mouseleave', () => {
+        ;(tooltipEl as any).isHovered = false
+        // Hide tooltip after leaving with a small delay
+        ;(tooltipEl as any).hideTimer = setTimeout(() => {
+          if (!(tooltipEl as any).isHovered) {
+            tooltipEl!.style.opacity = '0'
+          }
+        }, 100)
+      })
+    }
 
     // Add touch event listener for mobile to dismiss tooltip
     if (isMobile) {
@@ -131,8 +160,12 @@ export function createCustomTooltip(context: TooltipContext, isAccumulated: bool
     clearTimeout((tooltipEl as any).hideTimer)
   }
 
-  // Hide if no tooltip
+  // Hide if no tooltip (but not if user is hovering over the tooltip for interactive mode)
   if (tooltip.opacity === 0) {
+    // If tooltip is being hovered and we have click handlers, don't hide it
+    if ((tooltipEl as any).isHovered && clickHandler?.onAppClick) {
+      return
+    }
     tooltipEl.style.opacity = '0'
     return
   }
@@ -163,11 +196,16 @@ export function createCustomTooltip(context: TooltipContext, isAccumulated: bool
       const dataset = dataPoint.dataset as any
       const baseValue = getDatasetBaseValue(chart, dataset, datasetIndex, dataIndex, dataPoint.parsed?.y)
       const numericValue = typeof baseValue === 'number' && Number.isFinite(baseValue) ? baseValue : 0
+      const label = dataset?.label ?? ''
+      // Look up the app ID from the label using the provided mapping
+      const appId = clickHandler?.appIdByLabel?.[label]
 
       return {
-        body: [`${formatTooltipValue(numericValue)} - ${dataset?.label ?? ''}`],
+        body: [`${formatTooltipValue(numericValue)} - ${label}`],
         value: numericValue,
         colors: tooltip.labelColors[index],
+        appId,
+        label,
       }
     }).filter(item => item.value !== 0)
 
@@ -209,19 +247,54 @@ export function createCustomTooltip(context: TooltipContext, isAccumulated: bool
 
     // Add body with scrollable content (now sorted)
     innerHtml += '<div style="max-height: 40vh; overflow-y: auto;">'
+    const hasClickHandler = !!clickHandler?.onAppClick
     items.forEach((item) => {
       // Convert color to string if it's not already
       const bgColor = typeof item.colors.backgroundColor === 'string' ? item.colors.backgroundColor : '#666'
       const borderColor = typeof item.colors.borderColor === 'string' ? item.colors.borderColor : '#999'
 
-      const colorIndicator = `<div style="width: 12px; height: 12px; background-color: ${bgColor}; border: 1px solid ${borderColor}; border-radius: 2px; margin-right: 8px; shrink: 0;"></div>`
+      const colorIndicator = `<div style="width: 12px; height: 12px; background-color: ${bgColor}; border: 1px solid ${borderColor}; border-radius: 2px; margin-right: 8px; flex-shrink: 0;"></div>`
+
+      // Make item clickable if we have a click handler and app ID
+      const isClickable = hasClickHandler && item.appId
+      const hoverStyles = isClickable
+        ? `cursor: pointer; transition: background-color 0.15s ease;`
+        : ''
+      const dataAttr = isClickable ? `data-app-id="${item.appId}"` : ''
+      const hoverClass = isClickable ? 'tooltip-app-item' : ''
+
       const textContent = `<span style="font-size: 11px;">${item.body.join(' ')}</span>`
 
-      innerHtml += `<div style="display: flex; align-items: center; margin-bottom: 4px;">${colorIndicator}${textContent}</div>`
+      innerHtml += `<div class="${hoverClass}" ${dataAttr} style="display: flex; align-items: center; margin-bottom: 4px; padding: 4px 6px; margin-left: -6px; margin-right: -6px; border-radius: 4px; ${hoverStyles}">${colorIndicator}${textContent}</div>`
     })
     innerHtml += '</div></div>'
 
     tooltipEl.innerHTML = innerHtml
+
+    // Add click handlers to clickable items
+    if (hasClickHandler) {
+      const clickableItems = tooltipEl.querySelectorAll('.tooltip-app-item[data-app-id]')
+      clickableItems.forEach((el) => {
+        const element = el as HTMLElement
+        const appId = element.dataset.appId
+        if (appId) {
+          // Add hover effect
+          element.addEventListener('mouseenter', () => {
+            element.style.backgroundColor = isDark.value ? 'rgba(55, 65, 81, 0.5)' : 'rgba(229, 231, 235, 0.8)'
+          })
+          element.addEventListener('mouseleave', () => {
+            element.style.backgroundColor = 'transparent'
+          })
+          // Add click handler with date context
+          element.addEventListener('click', (e) => {
+            e.stopPropagation()
+            clickHandler.onAppClick!(appId, { date: tooltipDate, dataIndex })
+            // Hide tooltip after click
+            tooltipEl.style.opacity = '0'
+          })
+        }
+      })
+    }
   }
 
   // Position tooltip with smart viewport bounds checking
@@ -478,15 +551,17 @@ export const todayLinePlugin = {
  * @param hasMultipleDatasets Whether the chart has multiple datasets (apps)
  * @param isAccumulated Whether the chart is in accumulated/cumulative mode
  * @param dateStartOrUseBillingPeriod Either a Date for billing start, or boolean for mode
+ * @param clickHandler Optional click handler for interactive tooltip items
  * @returns Chart.js tooltip configuration object
  */
-export function createTooltipConfig(hasMultipleDatasets: boolean, isAccumulated: boolean = false, dateStartOrUseBillingPeriod?: Date | boolean) {
+export function createTooltipConfig(hasMultipleDatasets: boolean, isAccumulated: boolean = false, dateStartOrUseBillingPeriod?: Date | boolean, clickHandler?: TooltipClickHandler) {
   return {
     mode: 'index' as const,
     intersect: false,
     position: 'nearest' as const,
-    external: hasMultipleDatasets ? (context: TooltipContext) => createCustomTooltip(context, isAccumulated, hasMultipleDatasets, dateStartOrUseBillingPeriod) : undefined,
-    enabled: !hasMultipleDatasets, // Disable default tooltip when using custom
+    // Always use custom tooltip for consistent design across single and multi-app views
+    external: (context: TooltipContext) => createCustomTooltip(context, isAccumulated, hasMultipleDatasets, dateStartOrUseBillingPeriod, clickHandler),
+    enabled: false, // Always disable default tooltip since we use custom
     callbacks: {
       title(tooltipItems: ChartTooltipItem<any>[]) {
         // Format the title to show full date like "December 10"

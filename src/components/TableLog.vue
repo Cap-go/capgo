@@ -54,6 +54,34 @@ const isDark = useDark()
 const searchVal = ref(props.search ?? '')
 
 const filterSearchVal = ref('')
+const filterDropdownOpen = ref(false)
+const filterDropdownRef = ref<HTMLElement | null>(null)
+const filterDropdownStyle = ref<{ top: string, left: string }>({ top: '0px', left: '0px' })
+
+function toggleFilterDropdown() {
+  if (filterDropdownOpen.value) {
+    filterDropdownOpen.value = false
+    return
+  }
+  if (filterDropdownRef.value) {
+    const rect = filterDropdownRef.value.getBoundingClientRect()
+    filterDropdownStyle.value = {
+      top: `${rect.bottom + 4}px`,
+      left: `${rect.left}px`,
+    }
+  }
+  filterDropdownOpen.value = true
+}
+
+function handleClickOutside(event: MouseEvent) {
+  if (filterDropdownOpen.value && filterDropdownRef.value && !filterDropdownRef.value.contains(event.target as Node)) {
+    const dropdown = document.querySelector('.fixed.p-2.w-64.bg-white')
+    if (dropdown && !dropdown.contains(event.target as Node)) {
+      filterDropdownOpen.value = false
+    }
+  }
+}
+
 const filterList = computed(() => {
   if (!props.filters)
     return []
@@ -355,6 +383,7 @@ onUnmounted(() => {
   })
   const paramsString = params.toString() ? `?${params.toString()}` : ''
   window.history.replaceState({}, '', `${window.location.pathname}${paramsString}`)
+  document.removeEventListener('click', handleClickOutside)
 })
 
 // Add watches
@@ -390,12 +419,13 @@ onMounted(async () => {
   if (!thisOrganization.value)
     console.error('Invalid app??')
   loadFromUrlParams()
+  document.addEventListener('click', handleClickOutside)
 })
 </script>
 
 <template>
-  <div class="pb-4 overflow-x-auto md:pb-0">
-    <div class="flex items-start justify-between p-3 pb-4 md:items-center">
+  <div class="pb-4 md:pb-0">
+    <div class="flex items-start justify-between p-3 pb-4 overflow-visible md:items-center">
       <div class="flex h-10 md:mb-0">
         <button class="inline-flex items-center py-1.5 px-3 mr-2 text-sm font-medium text-gray-500 bg-white rounded-md border border-gray-300 dark:text-white dark:bg-gray-800 dark:border-gray-600 hover:bg-gray-100 focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 focus:outline-hidden" type="button" @click="reloadData">
           <IconReload v-if="!isLoading" class="m-1 md:mr-2" />
@@ -536,10 +566,11 @@ onMounted(async () => {
           </template>
         </VueDatePicker>
       </div>
-      <div v-if="filterText && filterList.length" class="h-10 mr-2 md:mr-auto d-dropdown">
+      <div v-if="filterText && filterList.length" ref="filterDropdownRef" class="relative h-10 mr-2 md:mr-auto">
         <button
-          tabindex="0"
+          type="button"
           class="relative inline-flex items-center py-1.5 px-3 h-full text-sm font-medium text-gray-500 bg-white rounded-md border border-gray-300 cursor-pointer dark:text-white dark:bg-gray-800 dark:border-gray-600 hover:bg-gray-100 focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 focus:outline-hidden"
+          @click="toggleFilterDropdown"
         >
           <div
             v-if="filterActivated"
@@ -551,38 +582,45 @@ onMounted(async () => {
           <span class="hidden md:block">{{ t(filterText) }}</span>
           <IconDown class="hidden ml-2 w-4 h-4 md:block" />
         </button>
-        <div class="p-2 w-64 bg-white shadow d-dropdown-content rounded-box z-1 dark:bg-base-200">
-          <input
-            v-model="filterSearchVal"
-            type="text"
-            :placeholder="t('search')"
-            class="w-full px-3 py-2 mb-2 text-sm border border-gray-300 rounded-md dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+        <Teleport to="body">
+          <div
+            v-if="filterDropdownOpen"
+            class="fixed p-2 w-64 bg-white shadow-lg rounded-lg z-9999 dark:bg-gray-800 border border-gray-200 dark:border-gray-700"
+            :style="filterDropdownStyle"
             @click.stop
           >
-          <ul class="max-h-64 overflow-y-auto">
-            <li v-for="(f, i) in filterList" :key="i">
-              <div
-                class="flex items-center p-2 rounded-sm cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
-              >
-                <input
-                  :id="`filter-radio-example-${i}`" :checked="filters?.[f]" type="checkbox"
-                  :name="`filter-radio-${i}`"
-                  class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:ring-offset-gray-800 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-600 dark:focus:ring-offset-gray-800"
-                  @change="
-                    emit('update:filters', { ...filters, [f]: !filters?.[f] })
-                  "
+            <input
+              v-model="filterSearchVal"
+              type="text"
+              :placeholder="t('search')"
+              class="w-full px-3 py-2 mb-2 text-sm border border-gray-300 rounded-md dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              @click.stop
+            >
+            <ul class="max-h-64 overflow-y-auto">
+              <li v-for="(f, i) in filterList" :key="i">
+                <div
+                  class="flex items-center p-2 rounded-sm cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
                 >
-                <label
-                  :for="`filter-radio-example-${i}`"
-                  class="ml-2 w-full text-sm font-medium text-gray-900 rounded-sm dark:text-gray-300"
-                >{{ t(f) }}</label>
-              </div>
-            </li>
-            <li v-if="filterList.length === 0" class="p-2 text-sm text-gray-500 dark:text-gray-400 text-center">
-              {{ t('no-results') }}
-            </li>
-          </ul>
-        </div>
+                  <input
+                    :id="`filter-radio-example-${i}`" :checked="filters?.[f]" type="checkbox"
+                    :name="`filter-radio-${i}`"
+                    class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:ring-offset-gray-800 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-600 dark:focus:ring-offset-gray-800"
+                    @change="
+                      emit('update:filters', { ...filters, [f]: !filters?.[f] })
+                    "
+                  >
+                  <label
+                    :for="`filter-radio-example-${i}`"
+                    class="ml-2 w-full text-sm font-medium text-gray-900 rounded-sm dark:text-gray-300"
+                  >{{ t(f) }}</label>
+                </div>
+              </li>
+              <li v-if="filterList.length === 0" class="p-2 text-sm text-gray-500 dark:text-gray-400 text-center">
+                {{ t('no-results') }}
+              </li>
+            </ul>
+          </div>
+        </Teleport>
       </div>
       <div class="flex overflow-hidden md:w-auto">
         <FormKit
@@ -596,7 +634,7 @@ onMounted(async () => {
         />
       </div>
     </div>
-    <div class="block">
+    <div class="block overflow-x-auto">
       <table id="custom_table" class="w-full text-sm text-left text-gray-500 dark:text-gray-400">
         <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:text-gray-400 dark:bg-gray-700">
           <tr>

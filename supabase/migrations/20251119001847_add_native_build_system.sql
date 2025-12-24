@@ -30,26 +30,27 @@ ADD VALUE IF NOT EXISTS 'build_time';
 
 -- Build logs - BILLING ONLY: tracks build time for charging orgs
 -- Platform multipliers: android=1x, ios=2x
-CREATE TABLE IF NOT EXISTS public.build_logs (
-    id uuid DEFAULT extensions.uuid_generate_v4() PRIMARY KEY,
-    created_at timestamptz DEFAULT now() NOT NULL,
-    -- Who to bill
-    org_id uuid NOT NULL REFERENCES public.orgs (id) ON DELETE CASCADE,
-    user_id uuid REFERENCES auth.users (id) ON DELETE SET NULL,
-    -- External reference
-    build_id character varying NOT NULL,
-    -- Raw build time
-    platform character varying NOT NULL CHECK (platform IN ('ios', 'android')),
-    build_time_unit bigint NOT NULL CHECK (build_time_unit >= 0),
-    -- Billable amount (with platform multiplier applied: android=1x, ios=2x)
-    -- This locks in the price at time of build
-    billable_seconds bigint NOT NULL CHECK (billable_seconds >= 0),
-    UNIQUE (build_id, org_id)
+CREATE TABLE IF NOT EXISTS "public"."build_logs" (
+    "id" "uuid" DEFAULT "extensions"."uuid_generate_v4"() NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "org_id" "uuid" NOT NULL,
+    "user_id" "uuid",
+    "build_id" character varying NOT NULL,
+    "platform" character varying NOT NULL,
+    "billable_seconds" bigint NOT NULL,
+    "build_time_unit" bigint NOT NULL,
+    CONSTRAINT "build_logs_billable_seconds_check" CHECK (("billable_seconds" >= 0)),
+    CONSTRAINT "build_logs_build_time_unit_check" CHECK (("build_time_unit" >= 0)),
+    CONSTRAINT "build_logs_platform_check" CHECK ((("platform")::"text" = ANY ((ARRAY['ios'::character varying, 'android'::character varying])::"text"[])))
 );
 
 CREATE INDEX idx_build_logs_org_created ON public.build_logs (
     org_id, created_at DESC
 );
+
+-- Unique constraint for ON CONFLICT in record_build_time function
+ALTER TABLE public.build_logs
+ADD CONSTRAINT build_logs_build_id_org_id_unique UNIQUE (build_id, org_id);
 
 ALTER TABLE public.build_logs ENABLE ROW LEVEL SECURITY;
 
@@ -310,42 +311,6 @@ service_role;
 DROP FUNCTION IF EXISTS public.get_app_metrics(uuid);
 
 DROP FUNCTION IF EXISTS public.get_app_metrics(uuid, date, date);
-
-CREATE FUNCTION public.get_app_metrics(
-    org_id uuid, start_date date, end_date date
-) RETURNS TABLE (
-    app_id character varying,
-    date date,
-    mau bigint,
-    storage bigint,
-    bandwidth bigint,
-    build_time_unit bigint,
-    get bigint,
-    fail bigint,
-    install bigint,
-    uninstall bigint
-) LANGUAGE plpgsql STABLE SECURITY DEFINER
-SET
-search_path = '' AS $$
-BEGIN
-  RETURN QUERY
-  WITH DateSeries AS (SELECT generate_series(start_date, end_date, '1 day'::interval)::date AS "date"),
-  all_apps AS (SELECT apps.app_id FROM public.apps WHERE apps.owner_org = get_app_metrics.org_id
-    UNION SELECT deleted_apps.app_id FROM public.deleted_apps WHERE deleted_apps.owner_org = get_app_metrics.org_id)
-  SELECT aa.app_id, ds.date::date, COALESCE(dm.mau, 0) AS mau, COALESCE(dst.storage, 0) AS storage,
-    COALESCE(db.bandwidth, 0) AS bandwidth, COALESCE(dbt.build_time_unit, 0) AS build_time_unit,
-    COALESCE(SUM(dv.get)::bigint, 0) AS get, COALESCE(SUM(dv.fail)::bigint, 0) AS fail,
-    COALESCE(SUM(dv.install)::bigint, 0) AS install, COALESCE(SUM(dv.uninstall)::bigint, 0) AS uninstall
-  FROM all_apps aa CROSS JOIN DateSeries ds
-  LEFT JOIN public.daily_mau dm ON aa.app_id = dm.app_id AND ds.date = dm.date
-  LEFT JOIN public.daily_storage dst ON aa.app_id = dst.app_id AND ds.date = dst.date
-  LEFT JOIN public.daily_bandwidth db ON aa.app_id = db.app_id AND ds.date = db.date
-  LEFT JOIN public.daily_build_time dbt ON aa.app_id = dbt.app_id AND ds.date = dbt.date
-  LEFT JOIN public.daily_version dv ON aa.app_id = dv.app_id AND ds.date = dv.date
-  GROUP BY aa.app_id, ds.date, dm.mau, dst.storage, db.bandwidth, dbt.build_time_unit
-  ORDER BY aa.app_id, ds.date;
-END;
-$$;
 
 CREATE FUNCTION public.get_app_metrics(org_id uuid) RETURNS TABLE (
     app_id character varying,

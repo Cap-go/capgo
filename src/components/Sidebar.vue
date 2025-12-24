@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { Tab } from './comp_def'
 import { onClickOutside } from '@vueuse/core'
-import { computed, shallowRef } from 'vue'
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
@@ -43,29 +43,29 @@ const tabs = computed<Tab[]>(() => {
   const baseTabs: Tab[] = [
     {
       label: 'dashboard',
-      icon: shallowRef(IconChart),
+      icon: IconChart,
       key: '/dashboard',
     },
     {
       label: 'apps',
-      icon: shallowRef(IconAppStore),
+      icon: IconAppStore,
       key: '/app',
     },
     {
       label: 'api-keys',
-      icon: shallowRef(IconApiKey),
+      icon: IconApiKey,
       key: '/apikeys',
     },
     {
       label: 'documentation',
-      icon: shallowRef(IconDoc),
+      icon: IconDoc,
       key: '#',
       onClick: () => window.open('https://docs.capgo.app', '_blank', 'noopener,noreferrer'),
       redirect: true,
     },
     {
       label: 'discord',
-      icon: shallowRef(IconDiscord),
+      icon: IconDiscord,
       key: '#',
       onClick: () => window.open('https://discord.capgo.app', '_blank', 'noopener,noreferrer'),
       redirect: true,
@@ -76,7 +76,7 @@ const tabs = computed<Tab[]>(() => {
   if (main.isAdmin) {
     baseTabs.splice(2, 0, {
       label: 'admin-dashboard',
-      icon: shallowRef(IconShield),
+      icon: IconShield,
       key: '/admin/dashboard',
     })
   }

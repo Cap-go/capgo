@@ -6,7 +6,7 @@ SELECT plan(5);
 -- Authenticate to simulate real JWT-based session
 SELECT tests.authenticate_as('test_user');
 
--- Case 1: Authorization contains a JWT with Bearer prefix
+-- Case 1: Authorization contains a JWT with Bearer prefix (should be ignored for API key)
 SELECT
     set_config(
         'request.headers',
@@ -37,7 +37,7 @@ SELECT
         'get_identity returns authenticated user when JWT session present'
     );
 
--- Case 2: Authorization contains a raw token without Bearer prefix (should be treated as API key value)
+-- Case 2: Authorization contains a raw token without Bearer prefix (should be ignored for API key)
 SELECT
     set_config(
         'request.headers',
@@ -48,8 +48,8 @@ SELECT
 SELECT
     is(
         public.get_apikey_header(),
-        'aaa.bbb.ccc',
-        'get_apikey_header returns Authorization value when not starting with Bearer'
+        null,
+        'get_apikey_header ignores Authorization header even without Bearer'
     );
 
 -- Case 3: capgkey present alongside JWT Authorization; capgkey should be returned

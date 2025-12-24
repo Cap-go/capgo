@@ -66,13 +66,7 @@ CREATE EXTENSION IF NOT EXISTS "pgmq"
 WITH
   SCHEMA "pgmq";
 
-CREATE EXTENSION IF NOT EXISTS "pgsodium";
-
 CREATE EXTENSION IF NOT EXISTS "hypopg"
-WITH
-  SCHEMA "extensions";
-
-CREATE EXTENSION IF NOT EXISTS "index_advisor"
 WITH
   SCHEMA "extensions";
 
@@ -141,59 +135,67 @@ CREATE TYPE "public"."platform_os" AS ENUM('ios', 'android');
 
 ALTER TYPE "public"."platform_os" OWNER TO "postgres";
 
-CREATE TYPE "public"."stats_action" AS ENUM(
-  'delete',
-  'reset',
-  'set',
-  'get',
-  'set_fail',
-  'update_fail',
-  'download_fail',
-  'windows_path_fail',
-  'canonical_path_fail',
-  'directory_path_fail',
-  'unzip_fail',
-  'low_mem_fail',
-  'download_0',
-  'download_10',
-  'download_20',
-  'download_30',
-  'download_40',
-  'download_50',
-  'download_60',
-  'download_70',
-  'download_80',
-  'download_90',
-  'download_complete',
-  'decrypt_fail',
-  'app_moved_to_foreground',
-  'app_moved_to_background',
-  'uninstall',
-  'needPlanUpgrade',
-  'missingBundle',
-  'noNew',
-  'disablePlatformIos',
-  'disablePlatformAndroid',
-  'disableAutoUpdateToMajor',
-  'cannotUpdateViaPrivateChannel',
-  'disableAutoUpdateToMinor',
-  'disableAutoUpdateToPatch',
-  'channelMisconfigured',
-  'disableAutoUpdateMetadata',
-  'disableAutoUpdateUnderNative',
-  'disableDevBuild',
-  'disableEmulator',
-  'cannotGetBundle',
-  'checksum_fail',
-  'NoChannelOrOverride',
-  'setChannel',
-  'getChannel',
-  'rateLimited',
-  'disableAutoUpdate',
-  'keyMismatch',
-  'InvalidIp',
-  'ping',
-  'blocked_by_server_url'
+CREATE TYPE "public"."stats_action" AS ENUM (
+    'delete',
+    'reset',
+    'set',
+    'get',
+    'set_fail',
+    'update_fail',
+    'download_fail',
+    'windows_path_fail',
+    'canonical_path_fail',
+    'directory_path_fail',
+    'unzip_fail',
+    'low_mem_fail',
+    'download_10',
+    'download_20',
+    'download_30',
+    'download_40',
+    'download_50',
+    'download_60',
+    'download_70',
+    'download_80',
+    'download_90',
+    'download_complete',
+    'decrypt_fail',
+    'app_moved_to_foreground',
+    'app_moved_to_background',
+    'uninstall',
+    'needPlanUpgrade',
+    'missingBundle',
+    'noNew',
+    'disablePlatformIos',
+    'disablePlatformAndroid',
+    'disableAutoUpdateToMajor',
+    'cannotUpdateViaPrivateChannel',
+    'disableAutoUpdateToMinor',
+    'disableAutoUpdateToPatch',
+    'channelMisconfigured',
+    'disableAutoUpdateMetadata',
+    'disableAutoUpdateUnderNative',
+    'disableDevBuild',
+    'disableEmulator',
+    'cannotGetBundle',
+    'checksum_fail',
+    'NoChannelOrOverride',
+    'setChannel',
+    'getChannel',
+    'rateLimited',
+    'disableAutoUpdate',
+    'keyMismatch',
+    'ping',
+    'InvalidIp',
+    'blocked_by_server_url',
+    'download_manifest_start',
+    'download_manifest_complete',
+    'download_zip_start',
+    'download_zip_complete',
+    'download_manifest_file_fail',
+    'download_manifest_checksum_fail',
+    'download_manifest_brotli_fail',
+    'backend_refusal',
+    'download_0'
 );
 
 ALTER TYPE "public"."stats_action" OWNER TO "postgres";
@@ -2000,39 +2002,30 @@ CREATE TABLE IF NOT EXISTS "public"."app_versions" (
 
 ALTER TABLE "public"."app_versions" OWNER TO "postgres";
 
-CREATE OR REPLACE FUNCTION "public"."get_apikey_header" () RETURNS "text" LANGUAGE "plpgsql"
-SET
-  search_path = '' SECURITY DEFINER AS $$
+CREATE OR REPLACE FUNCTION "public"."get_apikey_header"()
+ RETURNS text
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $$
 DECLARE
   headers_text text;
-  api_key text;
 BEGIN
   headers_text := "current_setting"('request.headers'::"text", true);
-
+  
   IF headers_text IS NULL OR headers_text = '' THEN
     RETURN NULL;
   END IF;
-
+  
   BEGIN
-    -- First try to get from capgkey header
-    api_key := (headers_text::"json" ->> 'capgkey'::"text");
-
-    -- If not found, try Authorization header
-    IF api_key IS NULL OR api_key = '' THEN
-      api_key := (headers_text::"json" ->> 'authorization'::"text");
-      -- Ignore Authorization when it starts with the Bearer scheme (JWT)
-      IF api_key IS NOT NULL AND api_key <> '' AND api_key ~* '^\s*bearer\s+' THEN
-        RETURN NULL;
-      END IF;
-    END IF;
-
-    RETURN api_key;
+    RETURN (headers_text::"json" ->> 'capgkey'::"text");
   EXCEPTION
     WHEN OTHERS THEN
       RETURN NULL;
   END;
 END;
 $$;
+
 
 ALTER FUNCTION "public"."get_apikey_header" () OWNER TO "postgres";
 
@@ -3513,9 +3506,9 @@ CREATE TABLE IF NOT EXISTS "public"."daily_version" (
 ALTER TABLE "public"."daily_version" OWNER TO "postgres";
 
 CREATE TABLE IF NOT EXISTS "public"."deleted_account" (
-  "created_at" timestamp with time zone DEFAULT "now" (),
-  "email" character varying NOT NULL,
-  "id" "uuid" DEFAULT "extensions"."uuid_generate_v4" () NOT NULL
+    "created_at" timestamp with time zone DEFAULT "now"(),
+    "email" character varying DEFAULT ''::character varying NOT NULL,
+    "id" "uuid" DEFAULT "extensions"."uuid_generate_v4"() NOT NULL
 );
 
 ALTER TABLE "public"."deleted_account" OWNER TO "postgres";
@@ -3561,11 +3554,11 @@ ADD GENERATED BY DEFAULT AS IDENTITY (
 );
 
 CREATE TABLE IF NOT EXISTS "public"."device_usage" (
-  "id" integer NOT NULL,
-  "device_id" character varying(255) NOT NULL,
-  "app_id" character varying(255) NOT NULL,
-  "org_id" character varying(255) NOT NULL,
-  "timestamp" timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+    "id" integer NOT NULL,
+    "device_id" character varying(255) NOT NULL,
+    "app_id" character varying(255) NOT NULL,
+    "timestamp" timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    "org_id" character varying(255) NOT NULL
 );
 
 ALTER TABLE "public"."device_usage" OWNER TO "postgres";
@@ -3596,28 +3589,27 @@ CREATE TABLE IF NOT EXISTS "public"."devices" (
 ALTER TABLE "public"."devices" OWNER TO "postgres";
 
 CREATE TABLE IF NOT EXISTS "public"."global_stats" (
-  "created_at" timestamp with time zone DEFAULT "now" (),
-  "date_id" character varying NOT NULL,
-  "apps" bigint NOT NULL,
-  "updates" bigint NOT NULL,
-  "updates_external" bigint DEFAULT '0'::bigint,
-  "stars" bigint NOT NULL,
-  "users" bigint DEFAULT '0'::bigint,
-  "paying" bigint DEFAULT '0'::bigint,
-  "trial" bigint DEFAULT '0'::bigint,
-  "need_upgrade" bigint DEFAULT '0'::bigint,
-  "not_paying" bigint DEFAULT '0'::bigint,
-  "onboarded" bigint DEFAULT '0'::bigint,
-  "apps_active" integer DEFAULT 0,
-  "users_active" integer DEFAULT 0,
-  "paying_yearly" integer DEFAULT 0,
-  "paying_monthly" integer DEFAULT 0,
-  "updates_last_month" integer DEFAULT 0,
-  "success_rate" FLOAT DEFAULT 0,
-  "plan_solo" integer DEFAULT 0,
-  "plan_maker" integer DEFAULT 0,
-  "plan_team" integer DEFAULT 0,
-  "plan_enterprise" integer DEFAULT 0
+    "created_at" timestamp with time zone DEFAULT "now"(),
+    "date_id" character varying NOT NULL,
+    "apps" bigint NOT NULL,
+    "updates" bigint NOT NULL,
+    "stars" bigint NOT NULL,
+    "users" bigint DEFAULT '0'::bigint,
+    "paying" bigint DEFAULT '0'::bigint,
+    "trial" bigint DEFAULT '0'::bigint,
+    "need_upgrade" bigint DEFAULT '0'::bigint,
+    "not_paying" bigint DEFAULT '0'::bigint,
+    "onboarded" bigint DEFAULT '0'::bigint,
+    "apps_active" integer DEFAULT 0,
+    "users_active" integer DEFAULT 0,
+    "paying_monthly" integer DEFAULT 0,
+    "paying_yearly" integer DEFAULT 0,
+    "updates_last_month" bigint DEFAULT '0'::bigint,
+    "updates_external" bigint DEFAULT '0'::bigint,
+    "success_rate" double precision,
+    "plan_solo" bigint DEFAULT 0,
+    "plan_maker" bigint DEFAULT 0,
+    "plan_team" bigint DEFAULT 0
 );
 
 ALTER TABLE "public"."global_stats" OWNER TO "postgres";
@@ -3629,6 +3621,11 @@ CREATE TABLE IF NOT EXISTS "public"."manifest" (
   "s3_path" character varying NOT NULL,
   "file_hash" character varying NOT NULL,
   "file_size" bigint DEFAULT 0
+);
+
+ALTER TABLE "public"."manifest" SET (
+  autovacuum_vacuum_scale_factor = 0.05,  -- vacuum after 5% dead rows (default 20%)
+  autovacuum_analyze_scale_factor = 0.02  -- analyze after 2% changes
 );
 
 ALTER TABLE "public"."manifest" OWNER TO "postgres";
@@ -3955,8 +3952,6 @@ CREATE INDEX "apikeys_key_idx" ON "public"."apikeys" USING "btree" ("key");
 
 CREATE INDEX "app_versions_meta_app_id_idx" ON "public"."app_versions_meta" USING "btree" ("app_id");
 
-CREATE INDEX "channel_devices_device_id_idx" ON "public"."channel_devices" USING "btree" ("device_id");
-
 CREATE INDEX "deploy_history_app_id_idx" ON "public"."deploy_history" USING "btree" ("app_id");
 
 CREATE INDEX "deploy_history_app_version_idx" ON "public"."deploy_history" USING "btree" ("app_id", "version_id");
@@ -3996,8 +3991,6 @@ CREATE INDEX "finx_channels_app_id" ON "public"."channels" USING "btree" ("app_i
 CREATE INDEX "finx_channels_owner_org" ON "public"."channels" USING "btree" ("owner_org");
 
 CREATE INDEX "finx_channels_version" ON "public"."channels" USING "btree" ("version");
-
-CREATE INDEX "finx_notifications_owner_org" ON "public"."notifications" USING "btree" ("owner_org");
 
 CREATE INDEX "finx_org_users_channel_id" ON "public"."org_users" USING "btree" ("channel_id");
 
@@ -4083,8 +4076,6 @@ WHERE
 CREATE INDEX "idx_stripe_info_trial" ON "public"."stripe_info" USING "btree" ("trial_at")
 WHERE
   ("trial_at" IS NOT NULL);
-
-CREATE INDEX "notifications_uniq_id_idx" ON "public"."notifications" USING "btree" ("uniq_id");
 
 CREATE INDEX "org_users_app_id_idx" ON "public"."org_users" USING "btree" ("app_id");
 

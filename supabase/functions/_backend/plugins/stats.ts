@@ -126,7 +126,10 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
     }
   }
   statsActions.push({ action: action as Database['public']['Enums']['stats_action'] })
-  await sendStatsAndDevice(c, device, statsActions)
+
+  // Don't update device record on failure actions - the version_name in the request
+  // is the failed version, not the actual running version on the device
+  await sendStatsAndDevice(c, device, statsActions, action.endsWith('_fail'))
   return c.json(BRES)
 }
 

@@ -322,7 +322,15 @@ async function getKeys(retry = true): Promise<void> {
 
 async function loadAllApps() {
   try {
-    const { data: apps, error } = await supabase.from('apps').select('*')
+    const orgIds = organizationStore.organizations.map(org => org.gid)
+    if (orgIds.length === 0) {
+      availableApps.value = []
+      return
+    }
+    const { data: apps, error } = await supabase
+      .from('apps')
+      .select('*')
+      .in('owner_org', orgIds)
     if (error) {
       console.error('Cannot load apps:', error)
       return

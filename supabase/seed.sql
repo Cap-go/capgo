@@ -364,7 +364,7 @@ BEGIN
         '046a36ac-e03c-4590-9257-bd6c9dba9ee8',
         'mau',
         185000,
-        120,
+        555,
         120,
         date_trunc('month', now()),
         date_trunc('month', now()) + interval '1 month',

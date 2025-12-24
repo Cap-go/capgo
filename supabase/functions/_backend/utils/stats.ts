@@ -83,13 +83,14 @@ export function createStatsDevices(c: Context, device: DeviceWithoutCreatedAt) {
   return backgroundTask(c, trackDevicesCF(c, device))
 }
 
-export function sendStatsAndDevice(c: Context, device: DeviceWithoutCreatedAt, statsActions: StatsActions[]) {
+export function sendStatsAndDevice(c: Context, device: DeviceWithoutCreatedAt, statsActions: StatsActions[], isFailedStat = false) {
   const jobs = []
   statsActions.forEach(({ action, versionName }) => {
     jobs.push(createStatsLogs(c, device.app_id, device.device_id, action, versionName ?? device.version_name))
   })
 
-  jobs.push(createStatsDevices(c, device))
+  if (!isFailedStat)
+    jobs.push(createStatsDevices(c, device))
 
   return Promise.all(jobs)
 }
