@@ -1053,6 +1053,7 @@
   "what-to-do-with-photo-dec": "Que souhaitez-vous faire avec l'application photo ?",
   "write-key": "Écrire",
   "wrong-name-org-del": "Vous n'avez pas tapé le nom de l'organisation. Vous étiez censé taper : %1",
+  "minutes-short": "{minutes}m",
   "x-hours-short": "{hours}h",
   "yearly": "Annuellement",
   "yes": "oui",

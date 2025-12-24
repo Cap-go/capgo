@@ -1050,6 +1050,7 @@
   "what-to-do-with-photo-dec": "앱 사진으로 무엇을 하고 싶으신가요?",
   "write-key": "쓰다",
   "wrong-name-org-del": "당신은 조직 이름을 입력하지 않았습니다. 당신이 입력해야 할 것은: %1입니다.",
+  "minutes-short": "{minutes}분",
   "x-hours-short": "{hours}h",
   "yearly": "매년",
   "yes": "네",

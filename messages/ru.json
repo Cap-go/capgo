@@ -1051,6 +1051,7 @@
   "what-to-do-with-photo-dec": "Что вы хотите сделать с фото в приложении?",
   "write-key": "Пишите",
   "wrong-name-org-del": "Вы не ввели название организации. Вы должны были ввести: %1",
+  "minutes-short": "{minutes}м",
   "x-hours-short": "{hours}h",
   "yearly": "Ежегодно",
   "yes": "да",

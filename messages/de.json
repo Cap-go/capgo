@@ -1050,6 +1050,7 @@
   "what-to-do-with-photo-dec": "Was möchten Sie mit der Foto-App machen?",
   "write-key": "Schreiben",
   "wrong-name-org-del": "Sie haben den Organisationsnamen nicht eingegeben. Sie sollten eingeben: %1",
+  "minutes-short": "{minutes}m",
   "x-hours-short": "{hours}h",
   "yearly": "Jährlich",
   "yes": "ja",
