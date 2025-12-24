@@ -7,8 +7,8 @@ meta:
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
-import Spinner from '~/components/Spinner.vue'
 import AdminStatsCard from '~/components/admin/AdminStatsCard.vue'
+import Spinner from '~/components/Spinner.vue'
 import { defaultApiHost } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
@@ -147,7 +147,7 @@ displayStore.defaultBack = '/dashboard'
   <div>
     <div class="h-full pb-4 overflow-hidden">
       <div class="w-full h-full px-4 pt-2 mx-auto mb-8 overflow-y-auto sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
-          <div class="flex flex-col gap-4 mb-6 md:flex-row md:items-center md:justify-between">
+        <div class="flex flex-col gap-4 mb-6 md:flex-row md:items-center md:justify-between">
           <div>
             <h1 class="text-2xl font-semibold text-slate-700 dark:text-white">
               {{ t('replication') }}

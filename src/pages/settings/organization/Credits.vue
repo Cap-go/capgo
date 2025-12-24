@@ -279,6 +279,7 @@ function formatCurrency(value: number) {
 }
 
 function formatMetricAmount(metric: Database['public']['Enums']['credit_metric_type'], value: number) {
+  const min = new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(value)
   switch (metric) {
     case 'mau':
       return `${new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(value)} ${t('users')}`
@@ -292,9 +293,8 @@ function formatMetricAmount(metric: Database['public']['Enums']['credit_metric_t
       // Convert minutes to hours if > 60
       if (value >= 60) {
         const hours = new Intl.NumberFormat(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(value / 60)
-        return t('x-hours-short', { hours: hours })
+        return t('x-hours-short', { hours })
       }
-      const min = new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(value)
       return t('minutes-short', { minutes: min })
     default:
       return new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(value)
