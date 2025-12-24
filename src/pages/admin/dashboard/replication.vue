@@ -82,11 +82,11 @@ const maxLagSlot = computed(() => data.value?.max_lag_slot ?? '-')
 
 const maxLagMinutes = computed(() => {
   if (!data.value)
-    return null
-  if (data.value.max_lag_minutes !== undefined)
+    return undefined
+  if (data.value.max_lag_minutes !== undefined && data.value.max_lag_minutes !== null)
     return data.value.max_lag_minutes
   if (data.value.max_lag_seconds === null || data.value.max_lag_seconds === undefined)
-    return null
+    return undefined
   return Number((data.value.max_lag_seconds / 60).toFixed(2))
 })
 

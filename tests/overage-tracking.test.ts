@@ -1,15 +1,15 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { createClient } from '@supabase/supabase-js'
 import type { Database } from '../src/types/supabase.types'
 import { env } from 'node:process'
-import { ORG_ID, POSTGRES_URL, STRIPE_INFO_CUSTOMER_ID } from './test-utils'
+import { createClient } from '@supabase/supabase-js'
 import { Pool } from 'pg'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { ORG_ID, POSTGRES_URL } from './test-utils'
 
 const supabaseUrl = env.SUPABASE_URL as string
 const supabaseServiceKey = env.SUPABASE_SERVICE_KEY as string
 const supabase = createClient<Database>(supabaseUrl, supabaseServiceKey)
 
-describe('Overage Tracking - Duplicate Prevention', () => {
+describe('overage Tracking - Duplicate Prevention', () => {
   let pgPool: Pool
 
   beforeAll(async () => {
@@ -129,7 +129,7 @@ describe('Overage Tracking - Duplicate Prevention', () => {
     expect(Number(firstResult?.credits_applied)).toBeGreaterThan(0)
 
     // Second call with same params - should NOT create new record (no new credits, same overage)
-    const { data: secondCall, error: secondError } = await supabase.rpc('apply_usage_overage', {
+    const { error: secondError } = await supabase.rpc('apply_usage_overage', {
       p_org_id: ORG_ID,
       p_metric: testMetric,
       p_overage_amount: overageAmount,
