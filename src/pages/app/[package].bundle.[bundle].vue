@@ -40,6 +40,7 @@ const channel = ref<(Database['public']['Tables']['channels']['Row'])>()
 const version_meta = ref<Database['public']['Tables']['app_versions_meta']['Row']>()
 const showBundleMetadataInput = ref<boolean>(false)
 const hasManifest = ref<boolean>(false)
+const manifestSize = ref<number | null>(null)
 
 // Channel chooser state
 const selectedChannelForLink = ref<Database['public']['Tables']['channels']['Row'] | null>(null)
@@ -137,13 +138,22 @@ async function openChannelLink() {
   router.push(`/app/${version.value.app_id}/channel/${channel.value?.id}`)
 }
 
-const showSize = computed(() => {
+const hasZip = computed(() => {
+  return Boolean(version.value?.r2_path || version.value?.external_url)
+})
+
+const zipSizeLabel = computed(() => {
   if (version_meta.value?.size)
     return bytesToMbText(version_meta.value.size)
-  else if (version.value?.external_url)
+  if (version.value?.external_url)
     return t('stored-externally')
-  else
-    return t('metadata-not-found')
+  return t('metadata-not-found')
+})
+
+const manifestSizeLabel = computed(() => {
+  if (manifestSize.value !== null)
+    return bytesToMbText(manifestSize.value)
+  return t('metadata-not-found')
 })
 
 async function getUnknownBundleId() {
@@ -250,6 +260,7 @@ async function handleChannelLink(chan: Database['public']['Tables']['channels'][
     }
     await setChannel(chan, version.value.id)
     await getChannels()
+    toast.success(t('linked-bundle'))
   }
   catch (error) {
     console.error(error)
@@ -295,6 +306,9 @@ async function handleChannelAction(action: 'set' | 'open' | 'unlink') {
   if (!channel.value)
     return
 
+  // Close the channel actions modal before performing actions
+  dialogStore.closeDialog()
+
   if (action === 'set') {
     await ASChannelChooser()
   }
@@ -308,6 +322,7 @@ async function handleChannelAction(action: 'set' | 'open' | 'unlink') {
         return
       await setChannel(channel.value, id)
       await getChannels()
+      toast.success(t('channels-unlinked-successfully'))
     }
     catch (error) {
       console.error(error)
@@ -367,6 +382,7 @@ async function getVersion() {
   if (!id.value)
     return
   try {
+    manifestSize.value = null
     const { data } = await supabase
       .from('app_versions')
       .select()
@@ -386,6 +402,23 @@ async function getVersion() {
       version_meta.value = dataVersionsMeta
 
     hasManifest.value = data.manifest_count > 0
+    if (hasManifest.value) {
+      const { data: manifestEntries } = await supabase
+        .from('manifest')
+        .select('file_size')
+        .eq('app_version_id', data.id)
+      if (manifestEntries && manifestEntries.length > 0) {
+        let total = 0
+        let hasSize = false
+        for (const entry of manifestEntries) {
+          if (typeof entry.file_size === 'number' && entry.file_size > 0) {
+            total += entry.file_size
+            hasSize = true
+          }
+        }
+        manifestSize.value = hasSize ? total : null
+      }
+    }
     version.value = data
     if (version.value?.name)
       displayStore.setBundleName(String(version.value.id), version.value.name)
@@ -791,34 +824,33 @@ async function deleteBundle() {
               >
                 {{ version.comment }}
               </InfoRow>
-              <!-- size -->
-              <InfoRow v-if="version?.r2_path" :label="t('size')">
+              <!-- zip -->
+              <InfoRow :label="t('zip-bundle')">
                 <span class="flex items-center gap-2">
-                  {{ showSize }}
-                  <button
-                    class="p-1 transition-colors border border-gray-200 rounded-md dark:border-gray-700 hover:bg-gray-50 hover:border-gray-300 dark:hover:border-gray-600 dark:hover:bg-gray-800"
-                    @click="openDownload()"
-                  >
-                    <IconArchiveBoxArrowDown class="w-4 h-4 text-gray-500 cursor-pointer dark:text-gray-400 hover:text-blue-500 dark:hover:text-blue-400" />
-                  </button>
+                  <template v-if="hasZip">
+                    {{ zipSizeLabel }}
+                    <button
+                      class="p-1 transition-colors border border-gray-200 rounded-md dark:border-gray-700 hover:bg-gray-50 hover:border-gray-300 dark:hover:border-gray-600 dark:hover:bg-gray-800"
+                      @click="openDownload()"
+                    >
+                      <IconArchiveBoxArrowDown class="w-4 h-4 text-gray-500 cursor-pointer dark:text-gray-400 hover:text-blue-500 dark:hover:text-blue-400" />
+                    </button>
+                  </template>
+                  <template v-else>
+                    {{ t('no-zip-bundle') }}
+                  </template>
                 </span>
               </InfoRow>
-              <InfoRow v-if="!version?.r2_path" :label="t('size')">
+              <!-- manifest -->
+              <InfoRow :label="t('manifest')" :is-link="false">
                 <span class="flex items-center gap-2">
-                  {{ t('cannot-calculate-size-of-partial-bundle') }}
-                  <button
-                    class="p-1 transition-colors border border-gray-200 rounded-md dark:border-gray-700 hover:bg-gray-50 hover:border-gray-300 dark:hover:border-gray-600 dark:hover:bg-gray-800"
-                    @click="openDownload()"
-                  >
-                    <IconArchiveBoxArrowDown class="w-4 h-4 text-gray-500 cursor-pointer dark:text-gray-400 hover:text-blue-500 dark:hover:text-blue-400" />
-                  </button>
+                  <template v-if="hasManifest">
+                    {{ manifestSizeLabel }}
+                  </template>
+                  <template v-else>
+                    {{ t('no-manifest-bundle') }}
+                  </template>
                 </span>
-              </InfoRow>
-              <InfoRow v-if="hasManifest" :label="t('partial-bundle')" :is-link="false">
-                {{ t('enabled') }}
-              </InfoRow>
-              <InfoRow v-if="version?.r2_path" :label="t('zip-bundle')" :is-link="false">
-                {{ t('enabled') }}
               </InfoRow>
 
               <!-- Delete Bundle Action -->

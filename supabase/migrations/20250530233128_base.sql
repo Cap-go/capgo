@@ -2002,39 +2002,30 @@ CREATE TABLE IF NOT EXISTS "public"."app_versions" (
 
 ALTER TABLE "public"."app_versions" OWNER TO "postgres";
 
-CREATE OR REPLACE FUNCTION "public"."get_apikey_header" () RETURNS "text" LANGUAGE "plpgsql"
-SET
-  search_path = '' SECURITY DEFINER AS $$
+CREATE OR REPLACE FUNCTION "public"."get_apikey_header"()
+ RETURNS text
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $$
 DECLARE
   headers_text text;
-  api_key text;
 BEGIN
   headers_text := "current_setting"('request.headers'::"text", true);
-
+  
   IF headers_text IS NULL OR headers_text = '' THEN
     RETURN NULL;
   END IF;
-
+  
   BEGIN
-    -- First try to get from capgkey header
-    api_key := (headers_text::"json" ->> 'capgkey'::"text");
-
-    -- If not found, try Authorization header
-    IF api_key IS NULL OR api_key = '' THEN
-      api_key := (headers_text::"json" ->> 'authorization'::"text");
-      -- Ignore Authorization when it starts with the Bearer scheme (JWT)
-      IF api_key IS NOT NULL AND api_key <> '' AND api_key ~* '^\s*bearer\s+' THEN
-        RETURN NULL;
-      END IF;
-    END IF;
-
-    RETURN api_key;
+    RETURN (headers_text::"json" ->> 'capgkey'::"text");
   EXCEPTION
     WHEN OTHERS THEN
       RETURN NULL;
   END;
 END;
 $$;
+
 
 ALTER FUNCTION "public"."get_apikey_header" () OWNER TO "postgres";
 
