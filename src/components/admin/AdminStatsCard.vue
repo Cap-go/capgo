@@ -79,7 +79,7 @@ function handleClick() {
 
     <div>
       <div v-if="isLoading" class="my-2">
-        <span :class="['loading loading-spinner loading-lg', colorClass]" />
+        <span class="loading loading-spinner loading-lg" :class="[colorClass]" />
       </div>
 
       <p v-else class="mt-2 text-3xl font-bold" :class="colorClass">
