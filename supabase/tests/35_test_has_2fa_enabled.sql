@@ -100,7 +100,9 @@ SELECT
 -- Test 6: has_2fa_enabled(user_id) with service_role for user with UNVERIFIED 2FA
 SELECT
     is(
-        has_2fa_enabled(tests.get_supabase_uid('test_user_with_unverified_2fa')),
+        has_2fa_enabled(
+            tests.get_supabase_uid('test_user_with_unverified_2fa')
+        ),
         false,
         'has_2fa_enabled(user_id) test - service_role can check user with unverified 2FA returns false'
     );
@@ -112,7 +114,10 @@ SELECT tests.authenticate_as('test_user_with_2fa');
 
 SELECT
     throws_ok(
-        format('SELECT has_2fa_enabled(''%s'')', tests.get_supabase_uid('test_user_without_2fa')),
+        format(
+            'SELECT has_2fa_enabled(''%s'')',
+            tests.get_supabase_uid('test_user_without_2fa')
+        ),
         'permission denied for function has_2fa_enabled',
         'has_2fa_enabled(user_id) test - authenticated user cannot call function with user_id parameter'
     );
@@ -124,7 +129,10 @@ SELECT tests.clear_authentication();
 
 SELECT
     throws_ok(
-        format('SELECT has_2fa_enabled(''%s'')', tests.get_supabase_uid('test_user_without_2fa')),
+        format(
+            'SELECT has_2fa_enabled(''%s'')',
+            tests.get_supabase_uid('test_user_without_2fa')
+        ),
         'permission denied for function has_2fa_enabled',
         'has_2fa_enabled(user_id) test - anon user cannot call function with user_id parameter'
     );
@@ -140,13 +148,13 @@ SELECT
 -- Test 10: Verify function exists and has correct signature
 SELECT
     ok(
-        pg_get_functiondef('has_2fa_enabled()'::regprocedure) IS NOT NULL,
+        pg_get_functiondef('has_2fa_enabled()'::regprocedure) IS NOT null,
         'has_2fa_enabled() test - function exists'
     );
 
 SELECT
     ok(
-        pg_get_functiondef('has_2fa_enabled(uuid)'::regprocedure) IS NOT NULL,
+        pg_get_functiondef('has_2fa_enabled(uuid)'::regprocedure) IS NOT null,
         'has_2fa_enabled(user_id) test - function exists'
     );
 
@@ -155,4 +163,3 @@ FROM
     finish();
 
 ROLLBACK;
-

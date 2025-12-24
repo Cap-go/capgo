@@ -13,9 +13,14 @@ END $$;
 -- Create entries in public.users for the test members
 INSERT INTO public.users (id, email, created_at, updated_at)
 VALUES
-    (tests.get_supabase_uid('test_2fa_user'), '2fa@test.com', now(), now()),
-    (tests.get_supabase_uid('test_no_2fa_user'), 'no2fa@test.com', now(), now()),
-    (tests.get_supabase_uid('test_unverified_2fa_user'), 'unverified2fa@test.com', now(), now())
+(tests.get_supabase_uid('test_2fa_user'), '2fa@test.com', now(), now()),
+(tests.get_supabase_uid('test_no_2fa_user'), 'no2fa@test.com', now(), now()),
+(
+    tests.get_supabase_uid('test_unverified_2fa_user'),
+    'unverified2fa@test.com',
+    now(),
+    now()
+)
 ON CONFLICT (id) DO NOTHING;
 
 -- Create test orgs
@@ -111,7 +116,7 @@ SELECT
             NULL::character varying,
             NULL::bigint
         ),
-        true,
+        TRUE,
         'check_min_rights 2FA enforcement test - user with 2FA can access org without enforcement'
     );
 
@@ -125,7 +130,7 @@ SELECT
             NULL::character varying,
             NULL::bigint
         ),
-        true,
+        TRUE,
         'check_min_rights 2FA enforcement test - user without 2FA can access org without enforcement'
     );
 
@@ -139,7 +144,7 @@ SELECT
             NULL::character varying,
             NULL::bigint
         ),
-        true,
+        TRUE,
         'check_min_rights 2FA enforcement test - user with unverified 2FA can access org without enforcement'
     );
 
@@ -157,7 +162,7 @@ SELECT
             NULL::character varying,
             NULL::bigint
         ),
-        true,
+        TRUE,
         'check_min_rights 2FA enforcement test - user with verified 2FA can access org with enforcement'
     );
 
@@ -171,7 +176,7 @@ SELECT
             NULL::character varying,
             NULL::bigint
         ),
-        false,
+        FALSE,
         'check_min_rights 2FA enforcement test - user without 2FA cannot access org with enforcement'
     );
 
@@ -185,7 +190,7 @@ SELECT
             NULL::character varying,
             NULL::bigint
         ),
-        false,
+        FALSE,
         'check_min_rights 2FA enforcement test - user with unverified 2FA cannot access org with enforcement'
     );
 
@@ -203,7 +208,7 @@ SELECT
             NULL::character varying,
             NULL::bigint
         ),
-        true,
+        TRUE,
         'check_min_rights 2FA enforcement test - user with 2FA can access with read permission'
     );
 
@@ -217,7 +222,7 @@ SELECT
             NULL::character varying,
             NULL::bigint
         ),
-        true,
+        TRUE,
         'check_min_rights 2FA enforcement test - user with 2FA can access with write permission'
     );
 
@@ -231,7 +236,7 @@ SELECT
             NULL::character varying,
             NULL::bigint
         ),
-        true,
+        TRUE,
         'check_min_rights 2FA enforcement test - user with 2FA can access with admin permission'
     );
 
@@ -245,7 +250,7 @@ SELECT
             NULL::character varying,
             NULL::bigint
         ),
-        false,
+        FALSE,
         'check_min_rights 2FA enforcement test - user without 2FA cannot access with read permission'
     );
 
@@ -259,7 +264,7 @@ SELECT
             NULL::character varying,
             NULL::bigint
         ),
-        false,
+        FALSE,
         'check_min_rights 2FA enforcement test - user without 2FA cannot access with write permission'
     );
 
@@ -273,7 +278,7 @@ SELECT
             NULL::character varying,
             NULL::bigint
         ),
-        false,
+        FALSE,
         'check_min_rights 2FA enforcement test - user without 2FA cannot access with admin permission'
     );
 
@@ -314,7 +319,7 @@ SELECT
             current_setting('test.app_id')::character varying,
             NULL::bigint
         ),
-        true,
+        TRUE,
         'check_min_rights 2FA enforcement test - user with 2FA can access app-scoped permission'
     );
 
@@ -328,7 +333,7 @@ SELECT
             current_setting('test.app_id')::character varying,
             NULL::bigint
         ),
-        false,
+        FALSE,
         'check_min_rights 2FA enforcement test - user without 2FA cannot access app-scoped permission'
     );
 
@@ -346,7 +351,7 @@ SELECT
             NULL::character varying,
             NULL::bigint
         ),
-        false,
+        FALSE,
         'check_min_rights 2FA enforcement test - NULL user_id returns false'
     );
 
@@ -360,7 +365,7 @@ SELECT
             NULL::character varying,
             NULL::bigint
         ),
-        false,
+        FALSE,
         'check_min_rights 2FA enforcement test - non-existent org returns false'
     );
 
@@ -374,7 +379,7 @@ SELECT
             NULL::character varying,
             NULL::bigint
         ),
-        false,
+        FALSE,
         'check_min_rights 2FA enforcement test - user not in org returns false'
     );
 
@@ -393,7 +398,7 @@ SELECT
             NULL::character varying,
             NULL::bigint
         ),
-        false,
+        FALSE,
         'check_min_rights 2FA enforcement test - 2FA check happens before permission check'
     );
 
@@ -412,7 +417,7 @@ SELECT
             NULL::character varying,
             NULL::bigint
         ),
-        false,
+        FALSE,
         'check_min_rights 2FA enforcement test - super_admin without 2FA cannot access org with enforcement'
     );
 
@@ -430,7 +435,7 @@ SELECT
             NULL::character varying,
             NULL::bigint
         ),
-        false,
+        FALSE,
         'check_min_rights 2FA enforcement test - normal permission check still works'
     );
 
@@ -439,4 +444,3 @@ FROM
     finish();
 
 ROLLBACK;
-

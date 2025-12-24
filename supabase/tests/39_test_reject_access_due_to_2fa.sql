@@ -12,8 +12,18 @@ END $$;
 -- Create entries in public.users for the test members
 INSERT INTO public.users (id, email, created_at, updated_at)
 VALUES
-    (tests.get_supabase_uid('test_2fa_user_reject'), '2fa_reject@test.com', now(), now()),
-    (tests.get_supabase_uid('test_no_2fa_user_reject'), 'no2fa_reject@test.com', now(), now())
+(
+    tests.get_supabase_uid('test_2fa_user_reject'),
+    '2fa_reject@test.com',
+    now(),
+    now()
+),
+(
+    tests.get_supabase_uid('test_no_2fa_user_reject'),
+    'no2fa_reject@test.com',
+    now(),
+    now()
+)
 ON CONFLICT (id) DO NOTHING;
 
 -- Create test orgs
@@ -149,7 +159,8 @@ SELECT tests.clear_authentication();
 SELECT tests.authenticate_as('test_2fa_user_reject');
 SELECT
     throws_ok(
-        format('SELECT reject_access_due_to_2fa(''%s'', ''%s'')', 
+        format(
+            'SELECT reject_access_due_to_2fa(''%s'', ''%s'')',
             current_setting('test.org_with_2fa_reject')::uuid,
             tests.get_supabase_uid('test_2fa_user_reject')
         ),
@@ -162,7 +173,8 @@ SELECT tests.clear_authentication();
 SELECT tests.authenticate_as('test_no_2fa_user_reject');
 SELECT
     throws_ok(
-        format('SELECT reject_access_due_to_2fa(''%s'', ''%s'')', 
+        format(
+            'SELECT reject_access_due_to_2fa(''%s'', ''%s'')',
             current_setting('test.org_with_2fa_reject')::uuid,
             tests.get_supabase_uid('test_no_2fa_user_reject')
         ),
@@ -175,7 +187,8 @@ SELECT tests.clear_authentication();
 SELECT tests.clear_authentication();
 SELECT
     throws_ok(
-        format('SELECT reject_access_due_to_2fa(''%s'', ''%s'')', 
+        format(
+            'SELECT reject_access_due_to_2fa(''%s'', ''%s'')',
             current_setting('test.org_with_2fa_reject')::uuid,
             tests.get_supabase_uid('test_2fa_user_reject')
         ),
@@ -186,7 +199,9 @@ SELECT
 -- Test 9: Verify function exists
 SELECT
     ok(
-        pg_get_functiondef('reject_access_due_to_2fa(uuid, uuid)'::regprocedure) IS NOT NULL,
+        pg_get_functiondef(
+            'reject_access_due_to_2fa(uuid, uuid)'::regprocedure
+        ) IS NOT null,
         'reject_access_due_to_2fa test - function exists'
     );
 
@@ -219,7 +234,7 @@ SELECT
         reject_access_due_to_2fa(
             current_setting('test.org_with_2fa_reject')::uuid,
             tests.get_supabase_uid('test_2fa_user_reject')
-        ) IS NOT NULL,
+        ) IS NOT null,
         'reject_access_due_to_2fa test - service_role can call function'
     );
 SELECT tests.clear_authentication();
@@ -229,4 +244,3 @@ FROM
     finish();
 
 ROLLBACK;
-

@@ -14,10 +14,10 @@ END $$;
 -- Create entries in public.users for the test members
 INSERT INTO public.users (id, email, created_at, updated_at)
 VALUES
-    (tests.get_supabase_uid('test_org_member_1'), 'member1@test.com', now(), now()),
-    (tests.get_supabase_uid('test_org_member_2'), 'member2@test.com', now(), now()),
-    (tests.get_supabase_uid('test_org_member_3'), 'member3@test.com', now(), now()),
-    (tests.get_supabase_uid('test_org_member_4'), 'member4@test.com', now(), now())
+(tests.get_supabase_uid('test_org_member_1'), 'member1@test.com', now(), now()),
+(tests.get_supabase_uid('test_org_member_2'), 'member2@test.com', now(), now()),
+(tests.get_supabase_uid('test_org_member_3'), 'member3@test.com', now(), now()),
+(tests.get_supabase_uid('test_org_member_4'), 'member4@test.com', now(), now())
 ON CONFLICT (id) DO NOTHING;
 
 -- Create a test org
@@ -114,7 +114,10 @@ SELECT
     ok(
         (
             SELECT count(*) >= 0
-            FROM check_org_members_2fa_enabled(current_setting('test.org_id')::uuid)
+            FROM
+                check_org_members_2fa_enabled(
+                    current_setting('test.org_id')::uuid
+                )
         ),
         'check_org_members_2fa_enabled test - super_admin can call function'
     );
@@ -125,7 +128,10 @@ SELECT
     is(
         (
             SELECT count(*)::int
-            FROM check_org_members_2fa_enabled(current_setting('test.org_id')::uuid)
+            FROM
+                check_org_members_2fa_enabled(
+                    current_setting('test.org_id')::uuid
+                )
         ),
         5,
         'check_org_members_2fa_enabled test - returns correct number of members'
@@ -136,7 +142,10 @@ SELECT
     is(
         (
             SELECT "2fa_enabled"
-            FROM check_org_members_2fa_enabled(current_setting('test.org_id')::uuid)
+            FROM
+                check_org_members_2fa_enabled(
+                    current_setting('test.org_id')::uuid
+                )
             WHERE user_id = tests.get_supabase_uid('test_org_member_1')
         ),
         true,
@@ -147,8 +156,11 @@ SELECT
 SELECT
     ok(
         (
-            SELECT "2fa_enabled" IS NOT NULL
-            FROM check_org_members_2fa_enabled(current_setting('test.org_id')::uuid)
+            SELECT "2fa_enabled" IS NOT null
+            FROM
+                check_org_members_2fa_enabled(
+                    current_setting('test.org_id')::uuid
+                )
             WHERE user_id = tests.get_supabase_uid('test_admin')
         ),
         'check_org_members_2fa_enabled test - super_admin 2FA status is included in results'
@@ -159,7 +171,10 @@ SELECT
     is(
         (
             SELECT "2fa_enabled"
-            FROM check_org_members_2fa_enabled(current_setting('test.org_id')::uuid)
+            FROM
+                check_org_members_2fa_enabled(
+                    current_setting('test.org_id')::uuid
+                )
             WHERE user_id = tests.get_supabase_uid('test_admin')
         ),
         false,
@@ -171,7 +186,10 @@ SELECT
     is(
         (
             SELECT "2fa_enabled"
-            FROM check_org_members_2fa_enabled(current_setting('test.org_id')::uuid)
+            FROM
+                check_org_members_2fa_enabled(
+                    current_setting('test.org_id')::uuid
+                )
             WHERE user_id = tests.get_supabase_uid('test_org_member_2')
         ),
         false,
@@ -183,7 +201,10 @@ SELECT
     is(
         (
             SELECT "2fa_enabled"
-            FROM check_org_members_2fa_enabled(current_setting('test.org_id')::uuid)
+            FROM
+                check_org_members_2fa_enabled(
+                    current_setting('test.org_id')::uuid
+                )
             WHERE user_id = tests.get_supabase_uid('test_org_member_3')
         ),
         false,
@@ -195,7 +216,10 @@ SELECT
     is(
         (
             SELECT "2fa_enabled"
-            FROM check_org_members_2fa_enabled(current_setting('test.org_id')::uuid)
+            FROM
+                check_org_members_2fa_enabled(
+                    current_setting('test.org_id')::uuid
+                )
             WHERE user_id = tests.get_supabase_uid('test_org_member_4')
         ),
         true,
@@ -207,7 +231,10 @@ SELECT
     is(
         (
             SELECT count(*)::int
-            FROM check_org_members_2fa_enabled(current_setting('test.org_id')::uuid)
+            FROM
+                check_org_members_2fa_enabled(
+                    current_setting('test.org_id')::uuid
+                )
             WHERE "2fa_enabled" = true
         ),
         2,
@@ -221,7 +248,10 @@ SELECT tests.authenticate_as('test_user');
 
 SELECT
     throws_ok(
-        format('SELECT * FROM check_org_members_2fa_enabled(''%s'')', current_setting('test.org_id')::uuid),
+        format(
+            'SELECT * FROM check_org_members_2fa_enabled(''%s'')',
+            current_setting('test.org_id')::uuid
+        ),
         'NO_RIGHTS',
         'check_org_members_2fa_enabled test - non-super_admin cannot call function'
     );
@@ -233,7 +263,10 @@ SELECT tests.authenticate_as('test_admin');
 
 SELECT
     throws_ok(
-        format('SELECT * FROM check_org_members_2fa_enabled(''%s'')', extensions.uuid_generate_v4()),
+        format(
+            'SELECT * FROM check_org_members_2fa_enabled(''%s'')',
+            extensions.uuid_generate_v4()
+        ),
         'Organization does not exist',
         'check_org_members_2fa_enabled test - non-existent org raises exception'
     );
@@ -243,7 +276,9 @@ SELECT tests.clear_authentication();
 -- Test 8: Verify function exists
 SELECT
     ok(
-        pg_get_functiondef('check_org_members_2fa_enabled(uuid)'::regprocedure) IS NOT NULL,
+        pg_get_functiondef(
+            'check_org_members_2fa_enabled(uuid)'::regprocedure
+        ) IS NOT null,
         'check_org_members_2fa_enabled test - function exists'
     );
 
@@ -252,4 +287,3 @@ FROM
     finish();
 
 ROLLBACK;
-
