@@ -168,7 +168,15 @@ BEGIN
       v_calc.credit_step_id,
       p_billing_cycle_start,
       p_billing_cycle_end,
-      p_details
+      COALESCE(p_details, '{}'::jsonb) || jsonb_build_object(
+        'credits_available', v_credits_available,
+        'credits_to_apply', v_credits_to_apply,
+        'debit_status', CASE
+          WHEN v_credits_available = 0 THEN 'no_grants_available'
+          WHEN v_credits_to_apply = 0 THEN 'already_debited'
+          ELSE 'pending_debit'
+        END
+      )
     )
     RETURNING id INTO v_event_id;
 
@@ -243,7 +251,16 @@ BEGIN
 
       -- Update the event with actual credits applied
       UPDATE public.usage_overage_events
-      SET credits_debited = v_applied
+      SET
+        credits_debited = v_applied,
+        details = COALESCE(details, '{}'::jsonb) || jsonb_build_object(
+          'credits_actually_applied', v_applied,
+          'debit_status', CASE
+            WHEN v_applied >= v_credits_to_apply THEN 'fully_debited'
+            WHEN v_applied > 0 THEN 'partially_debited'
+            ELSE 'no_debit'
+          END
+        )
       WHERE id = v_event_id;
     END IF;
   ELSE
