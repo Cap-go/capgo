@@ -249,7 +249,7 @@ async function getGithubStars(): Promise<number> {
 
 function getStats(c: Context): GlobalStats {
   const supabase = supabaseAdmin(c)
-  const last24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toString()
+  const last24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
   return {
     apps: countAllApps(c),
     updates: countAllUpdates(c),
