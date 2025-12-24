@@ -1117,6 +1117,7 @@
   "what-to-do-with-photo-dec": "What would you like to do with the app photo?",
   "write-key": "Write",
   "wrong-name-org-del": "You have not typed the organization name. You were supposed to type: %1",
+  "minutes-short": "{minutes}m",
   "x-hours-short": "{hours}h",
   "yearly": "Yearly",
   "yes": "yes",

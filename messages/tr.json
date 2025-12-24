@@ -1121,6 +1121,7 @@
   "what-to-do-with-photo-dec": "Uygulama fotoğrafıyla ne yapmak istersiniz?",
   "write-key": "Yaz",
   "wrong-name-org-del": "Organizasyon adını yazmadınız. Yazmanız gereken: %1",
+  "minutes-short": "{minutes}dk",
   "x-hours-short": "{hours}h",
   "yearly": "Yıllık",
   "yes": "evet",

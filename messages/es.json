@@ -1121,6 +1121,7 @@
   "what-to-do-with-photo-dec": "¿Qué te gustaría hacer con la aplicación de fotos?",
   "write-key": "Escribe",
   "wrong-name-org-del": "No has escrito el nombre de la organización. Se suponía que debías escribir: %1",
+  "minutes-short": "{minutes}m",
   "x-hours-short": "{hours}h",
   "yearly": "Anualmente",
   "yes": "sí",

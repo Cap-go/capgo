@@ -1121,6 +1121,7 @@
   "what-to-do-with-photo-dec": "您想对应用程序照片做什么？",
   "write-key": "写",
   "wrong-name-org-del": "您尚未输入组织名称。\n您应该输入：%1",
+  "minutes-short": "{minutes}分钟",
   "x-hours-short": "{hours}小时",
   "yearly": "每年",
   "yes": "是的",
