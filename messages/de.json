@@ -935,6 +935,7 @@
   "remove-bundle-from-channel": "Entfernen Sie das Bündel aus dem Kanal",
   "remove-bundle-from-this-channel": "Bundle von diesem Kanal entfernen",
   "removed-apikey": "API-Schlüssel wurde erfolgreich gelöscht",
+  "replication": "Replikation",
   "request-new-build": "Fordern Sie einen neuen Build an",
   "requested": "angefordert",
   "resend": "Erneut senden",

@@ -935,6 +935,7 @@
   "remove-bundle-from-channel": "从频道中移除捆绑包",
   "remove-bundle-from-this-channel": "从此频道中移除捆绑包",
   "removed-apikey": "API密钥已成功删除",
+  "replication": "复制",
   "request-new-build": "请求新的构建",
   "requested": "请求的",
   "resend": "重新发送",

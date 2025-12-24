@@ -935,6 +935,7 @@
   "remove-bundle-from-channel": "채널에서 번들을 제거하십시오.",
   "remove-bundle-from-this-channel": "이 채널에서 번들을 제거하십시오.",
   "removed-apikey": "API 키가 성공적으로 삭제되었습니다.",
+  "replication": "복제",
   "request-new-build": "새로운 빌드를 요청하십시오",
   "requested": "요청된",
   "resend": "재전송",

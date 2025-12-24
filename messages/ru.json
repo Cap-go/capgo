@@ -935,6 +935,7 @@
   "remove-bundle-from-channel": "Удалить пакет из канала",
   "remove-bundle-from-this-channel": "Удалите пакет из этого канала",
   "removed-apikey": "API-ключ был успешно удален",
+  "replication": "Репликация",
   "request-new-build": "Запросить новую сборку",
   "requested": "запрошенный",
   "resend": "Отправить повторно",

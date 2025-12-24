@@ -935,6 +935,7 @@
   "remove-bundle-from-channel": "Kanaldan paketi kaldırın",
   "remove-bundle-from-this-channel": "Bu kanaldan paketi kaldırın",
   "removed-apikey": "API anahtarı başarıyla silindi",
+  "replication": "Çoğaltma",
   "request-new-build": "Yeni bir yapı talep et",
   "requested": "talep edilen",
   "resend": "Yeniden gönder",

@@ -935,6 +935,7 @@
   "remove-bundle-from-channel": "チャンネルからバンドルを削除する",
   "remove-bundle-from-this-channel": "このチャンネルからバンドルを削除します",
   "removed-apikey": "APIキーは正常に削除されました",
+  "replication": "複製",
   "request-new-build": "新しいビルドをリクエストする",
   "requested": "要求された",
   "resend": "再送信",

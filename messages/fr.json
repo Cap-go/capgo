@@ -935,6 +935,7 @@
   "remove-bundle-from-channel": "Retirez le paquet de la chaîne",
   "remove-bundle-from-this-channel": "Retirez le paquet de cette chaîne",
   "removed-apikey": "La clé API a été supprimée avec succès",
+  "replication": "Réplication",
   "request-new-build": "Demander une nouvelle construction",
   "requested": "demandé",
   "resend": "Renvoyer",
