@@ -35,7 +35,6 @@ DECLARE
   v_use numeric;
   v_balance numeric;
   v_overage_paid numeric := 0;
-  v_existing_credits_estimated numeric := 0;
   v_existing_credits_debited numeric := 0;
   v_required numeric := 0;
   v_credits_to_apply numeric := 0;
@@ -106,16 +105,6 @@ BEGIN
 
   v_per_unit := v_calc.credit_cost_per_unit;
   v_required := v_calc.credits_required;
-
-  -- Calculate total credits already ESTIMATED (not debited) for this cycle
-  -- We use credits_estimated because credits_debited might be 0 if no grants are available
-  SELECT COALESCE(SUM(credits_estimated), 0)
-  INTO v_existing_credits_estimated
-  FROM public.usage_overage_events
-  WHERE org_id = p_org_id
-    AND metric = p_metric
-    AND (billing_cycle_start IS NOT DISTINCT FROM p_billing_cycle_start::date)
-    AND (billing_cycle_end IS NOT DISTINCT FROM p_billing_cycle_end::date);
 
   -- Get the most recent event for this cycle
   SELECT uoe.id, uoe.overage_amount

@@ -198,8 +198,8 @@ displayStore.defaultBack = '/dashboard'
             />
           </div>
 
-          <div class="rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
-            <div class="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 px-6 py-4 dark:border-gray-700">
+          <div class="rounded-lg border border-slate-300 bg-white shadow-lg dark:border-slate-900 dark:bg-gray-800">
+            <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-6 py-4 dark:border-slate-700">
               <div>
                 <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
                   Replication slots
@@ -218,8 +218,8 @@ displayStore.defaultBack = '/dashboard'
             </div>
 
             <div v-else class="-mx-4 overflow-x-auto sm:mx-0">
-              <table class="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-700">
-                <thead class="bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:bg-gray-900 dark:text-gray-400">
+              <table class="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-700">
+                <thead class="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:bg-slate-900 dark:text-slate-400">
                   <tr>
                     <th scope="col" class="px-4 py-3">
                       Slot
@@ -241,11 +241,11 @@ displayStore.defaultBack = '/dashboard'
                     </th>
                   </tr>
                 </thead>
-                <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                <tbody class="divide-y divide-slate-200 dark:divide-slate-700">
                   <tr
                     v-for="slot in slots"
                     :key="slot.slot_name"
-                    class="transition hover:bg-gray-50 dark:hover:bg-gray-700/60"
+                    class="transition hover:bg-slate-50 dark:hover:bg-slate-700/60"
                   >
                     <td class="whitespace-nowrap px-4 py-3 font-semibold text-gray-900 dark:text-white">
                       {{ slot.slot_name }}
