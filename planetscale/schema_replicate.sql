@@ -4,7 +4,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- PostgreSQL database dump
 --
 
-\restrict Yu0msKkTNMTLkbSRHXUbpwqXZ2VVyy0kaCpaqYxmFzK8ZYPgfwcPOtRnflyZwFN
+\restrict za0Tqae5TFia06Ql10OfsMoQPHLzi4egPwzOQpjOitoeoXOpMC1VX6MUqec1LRQ
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 18.1
@@ -658,5 +658,5 @@ CREATE INDEX si_customer_status_trial_idx ON public.stripe_info USING btree (cus
 -- PostgreSQL database dump complete
 --
 
-\unrestrict Yu0msKkTNMTLkbSRHXUbpwqXZ2VVyy0kaCpaqYxmFzK8ZYPgfwcPOtRnflyZwFN
+\unrestrict za0Tqae5TFia06Ql10OfsMoQPHLzi4egPwzOQpjOitoeoXOpMC1VX6MUqec1LRQ
 

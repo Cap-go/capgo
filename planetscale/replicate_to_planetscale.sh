@@ -16,7 +16,7 @@ else
 fi
 
 # Select which region to use (change this to switch regions)
-DB_T="$PLANETSCALE_OC"
+DB_T="$PLANETSCALE_EU"
 
 host=${DB_T#*@}     # remove up to @
 host=${host%%:*}    # remove :port...
@@ -37,14 +37,35 @@ else
 fi
 
 # Parse connection string: postgresql://user.project:password@host:port/db
-# Extract components from URL
+# Extract components from URL (handle passwords with special chars by matching from the end)
 SOURCE_USER=$(echo "$DB_URL" | sed -E 's|postgresql://([^:]+):.*|\1|')
-SOURCE_PASSWORD=$(echo "$DB_URL" | sed -E 's|postgresql://[^:]+:([^@]+)@.*|\1|')
-SOURCE_HOST=$(echo "$DB_URL" | sed -E 's|postgresql://[^@]+@([^:]+):.*|\1|')
-SOURCE_PORT=$(echo "$DB_URL" | sed -E 's|postgresql://[^@]+@[^:]+:([0-9]+)/.*|\1|')
-SOURCE_DB=$(echo "$DB_URL" | sed -E 's|postgresql://[^/]+/([^?]+).*|\1|')
+# Extract password: everything between first : after user and last @ before host
+SOURCE_PASSWORD=$(echo "$DB_URL" | sed -E 's|postgresql://[^:]+:(.*)@[^@]+$|\1|')
+# Extract host:port/db from after the last @
+_HOST_PORT_DB=$(echo "$DB_URL" | sed -E 's|.*@([^@]+)$|\1|')
+SOURCE_HOST=$(echo "$_HOST_PORT_DB" | sed -E 's|([^:]+):.*|\1|')
+SOURCE_PORT=$(echo "$_HOST_PORT_DB" | sed -E 's|[^:]+:([0-9]+)/.*|\1|')
+SOURCE_DB=$(echo "$_HOST_PORT_DB" | sed -E 's|[^/]+/([^?]+).*|\1|')
+
+# Convert pooler URL to direct connection for logical replication
+# Pooler (aws-0-eu-west-2.pooler.supabase.com:6543) -> Direct (db.PROJECT.supabase.co:5432)
+# User: postgres.PROJECT_ID -> postgres
+if [[ "$SOURCE_HOST" == *".pooler.supabase.com" ]]; then
+  # Extract project ID from user (format: postgres.PROJECT_ID)
+  PROJECT_ID=$(echo "$SOURCE_USER" | sed -E 's|postgres\.(.+)|\1|')
+  SOURCE_HOST="db.${PROJECT_ID}.supabase.co"
+  SOURCE_PORT="5432"
+  SOURCE_USER="postgres"
+  echo "==> Converted pooler URL to direct connection: $SOURCE_HOST:$SOURCE_PORT (user: $SOURCE_USER)"
+fi
 SOURCE_SSLMODE='require'
 
+echo "SOURCE_USER: $SOURCE_USER"
+echo "SOURCE_PASSWORD: $SOURCE_PASSWORD"
+echo "HOST: $SOURCE_HOST"
+echo "PORT: $SOURCE_PORT"
+echo "DB: $SOURCE_DB"
+# exit() 
 # Restore file
 DUMP_FILE='data_replicate.dump'
 
@@ -64,6 +85,20 @@ SUBSCRIPTION_NAME="planetscale_subscription_${REGION}"
 #   --disable-triggers \
 #   --dbname "$TARGET_DB_URL" \
 #   "$DUMP_FILE"
+
+echo "==> Truncating tables on target before replication..."
+psql "$TARGET_DB_URL" -v ON_ERROR_STOP=1 <<'SQL'
+TRUNCATE TABLE
+  channel_devices,
+  apps,
+  app_versions,
+  manifest,
+  channels,
+  orgs,
+  stripe_info,
+  org_users
+CASCADE;
+SQL
 
 echo "==> Fixing sequences on target..."
 psql "$TARGET_DB_URL" -v ON_ERROR_STOP=1 <<'SQL'
@@ -97,8 +132,7 @@ $$;
 SQL
 
 echo "==> Creating subscription on target..."
-psql "$TARGET_DB_URL" -v ON_ERROR_STOP=1 <<SQL
-CREATE SUBSCRIPTION ${SUBSCRIPTION_NAME}
+SQL_QUERY_SUB="CREATE SUBSCRIPTION ${SUBSCRIPTION_NAME}
 CONNECTION 'host=${SOURCE_HOST}
             port=${SOURCE_PORT}
             dbname=${SOURCE_DB}
@@ -109,9 +143,12 @@ PUBLICATION ${PUBLICATION_NAME}
 WITH (
   copy_data = true,
   create_slot = true,
-  enabled = true,
-  max_sync_workers_per_subscription = 1
-);
+  enabled = true
+);"
+echo "Subscription creation SQL:"
+echo "$SQL_QUERY_SUB"
+psql "$TARGET_DB_URL" -v ON_ERROR_STOP=1 <<SQL
+$SQL_QUERY_SUB
 SQL
 
 echo "==> Done."
