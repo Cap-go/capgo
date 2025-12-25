@@ -20,7 +20,7 @@ else
 fi
 
 # Select which region to use (change this to switch regions)
-SELECTED_REGION="PLANETSCALE_AS"
+SELECTED_REGION="PLANETSCALE_NA"
 DB_T="${!SELECTED_REGION}"
 
 if [[ -z "$DB_T" ]]; then
@@ -60,15 +60,19 @@ SOURCE_PORT=$(echo "$_HOST_PORT_DB" | sed -E 's|[^:]+:([0-9]+)/.*|\1|')
 SOURCE_DB=$(echo "$_HOST_PORT_DB" | sed -E 's|[^/]+/([^?]+).*|\1|')
 
 # Convert pooler URL to direct connection for logical replication
-# Pooler (aws-0-eu-west-2.pooler.supabase.com:6543) -> Direct (db.PROJECT.supabase.co:5432)
-# User: postgres.PROJECT_ID -> postgres
-if [[ "$SOURCE_HOST" == *".pooler.supabase.com" ]]; then
+# Pooler uses port 6543, direct uses port 5432
+# User format: postgres.PROJECT_ID -> postgres
+if [[ "$SOURCE_USER" == postgres.* ]]; then
   # Extract project ID from user (format: postgres.PROJECT_ID)
   PROJECT_ID=$(echo "$SOURCE_USER" | sed -E 's|postgres\.(.+)|\1|')
   SOURCE_HOST="db.${PROJECT_ID}.supabase.co"
   SOURCE_PORT="5432"
   SOURCE_USER="postgres"
-  echo "==> Converted pooler URL to direct connection: $SOURCE_HOST:$SOURCE_PORT (user: $SOURCE_USER)"
+  echo "==> Converted to direct connection: $SOURCE_HOST:$SOURCE_PORT (user: $SOURCE_USER)"
+elif [[ "$SOURCE_PORT" == "6543" ]]; then
+  # Port 6543 is the pooler port, change to direct port 5432
+  SOURCE_PORT="5432"
+  echo "==> Changed port from 6543 to 5432 for direct connection"
 fi
 SOURCE_SSLMODE='require'
 
