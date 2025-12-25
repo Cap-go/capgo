@@ -125,7 +125,7 @@ function parseEmailBody(rawEmail: string | any): { text?: string, html?: string 
   }
   else {
     // Simple plain text email
-    const bodyMatch = rawEmail.match(/\r?\n\r?\n([\s\S]+)$/)
+    const bodyMatch = rawEmail.match(/\r?\n\r?\n([\s\S]+?)$/)
     if (bodyMatch)
       body.text = bodyMatch[1].trim()
   }

@@ -2,6 +2,8 @@ import type { Database } from '../../utils/supabase.types.ts'
 import { getBodyOrQuery, honoFactory } from '../../utils/hono.ts'
 import { middlewareKey } from '../../utils/hono_middleware.ts'
 import { deleteOrg } from './delete.ts'
+import { getDomains } from './domains/get.ts'
+import { putDomains } from './domains/put.ts'
 import { get } from './get.ts'
 import { deleteMember } from './members/delete.ts'
 import { get as getMembers } from './members/get.ts'
@@ -51,4 +53,16 @@ app.delete('/members', middlewareKey(['all', 'write', 'read', 'upload']), async 
   const body = await getBodyOrQuery<any>(c)
   const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
   return deleteMember(c, body, apikey)
+})
+
+app.get('/domains', middlewareKey(['all', 'write', 'read', 'upload']), async (c) => {
+  const body = await getBodyOrQuery<any>(c)
+  const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
+  return getDomains(c, body, apikey)
+})
+
+app.put('/domains', middlewareKey(['all', 'write', 'read', 'upload']), async (c) => {
+  const body = await getBodyOrQuery<any>(c)
+  const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
+  return putDomains(c, body, apikey)
 })

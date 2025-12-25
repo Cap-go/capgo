@@ -149,8 +149,8 @@ Examples:
  */
 function parseClassificationResponse(response: string): ClassificationResult {
   try {
-    // Try to extract JSON from the response
-    const jsonMatch = response.match(/\{[\s\S]*\}/)
+    // Try to extract JSON from the response (non-greedy to prevent ReDoS)
+    const jsonMatch = response.match(/\{[\s\S]*?\}/)
     if (!jsonMatch) {
       throw new Error('No JSON found in response')
     }
