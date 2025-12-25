@@ -23,8 +23,6 @@ import { app as ok } from '../../supabase/functions/_backend/public/ok.ts'
 import { app as organization } from '../../supabase/functions/_backend/public/organization/index.ts'
 import { app as replication } from '../../supabase/functions/_backend/public/replication.ts'
 import { app as statistics } from '../../supabase/functions/_backend/public/statistics/index.ts'
-import { app as clear_app_cache } from '../../supabase/functions/_backend/triggers/clear_app_cache.ts'
-import { app as clear_device_cache } from '../../supabase/functions/_backend/triggers/clear_device_cache.ts'
 import { app as cron_clear_versions } from '../../supabase/functions/_backend/triggers/cron_clear_versions.ts'
 import { app as cron_email } from '../../supabase/functions/_backend/triggers/cron_email.ts'
 import { app as cron_stat_app } from '../../supabase/functions/_backend/triggers/cron_stat_app.ts'
@@ -82,8 +80,6 @@ appPrivate.route('/events', events)
 // Triggers
 const functionNameTriggers = 'triggers'
 const appTriggers = createHono(functionNameTriggers, version)
-appTriggers.route('/clear_app_cache', clear_app_cache)
-appTriggers.route('/clear_device_cache', clear_device_cache)
 appTriggers.route('/cron_email', cron_email)
 appTriggers.route('/cron_clear_versions', cron_clear_versions)
 appTriggers.route('/logsnag_insights', logsnag_insights)

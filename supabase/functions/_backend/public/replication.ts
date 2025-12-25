@@ -65,6 +65,7 @@ function buildReplicationQuery(mode: ReplicationQueryMode) {
           pg_size_pretty(pg_wal_lsn_diff(pg_current_wal_lsn(), confirmed_flush_lsn)) AS slot_lag
         FROM pg_replication_slots
         WHERE slot_type = 'logical'
+          AND slot_name !~ '^pg_[0-9]+_sync_[0-9]+_[0-9]+$'
       )
   `
 
@@ -86,6 +87,7 @@ function buildReplicationQuery(mode: ReplicationQueryMode) {
           pg_size_pretty(pg_wal_lsn_diff(pg_current_wal_lsn(), confirmed_flush_lsn)) AS slot_lag
         FROM pg_replication_slots
         WHERE slot_type = 'logical'
+          AND slot_name !~ '^pg_[0-9]+_sync_[0-9]+_[0-9]+$'
       )
       SELECT
         slots.*,
