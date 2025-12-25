@@ -2,21 +2,33 @@
 set -euo pipefail
 
 # -------- Config (edit these) --------
-# Load PlanetScale connection strings from .env.preprod
-ENV_FILE="$(dirname "$0")/../internal/cloudflare/.env.preprod"
+# Load PlanetScale connection strings from .env.prod
+ENV_FILE="$(dirname "$0")/../internal/cloudflare/.env.prod"
+echo "==> Starting replication to PlanetScale..."
+
 if [[ -f "$ENV_FILE" ]]; then
-  PLANETSCALE_US=$(grep '^PLANETSCALE_US=' "$ENV_FILE" | cut -d'=' -f2-)
-  PLANETSCALE_AS=$(grep '^PLANETSCALE_AS=' "$ENV_FILE" | cut -d'=' -f2-)
-  PLANETSCALE_EU=$(grep '^PLANETSCALE_EU=' "$ENV_FILE" | cut -d'=' -f2-)
-  PLANETSCALE_SA=$(grep '^PLANETSCALE_SA=' "$ENV_FILE" | cut -d'=' -f2-)
-  PLANETSCALE_OC=$(grep '^PLANETSCALE_OC=' "$ENV_FILE" | cut -d'=' -f2-)
+  echo "==> Loading PlanetScale connection strings from $ENV_FILE"
+  PLANETSCALE_NA=$(grep '^PLANETSCALE_NA=' "$ENV_FILE" | cut -d'=' -f2- || true)
+  PLANETSCALE_AS=$(grep '^PLANETSCALE_AS=' "$ENV_FILE" | cut -d'=' -f2- || true)
+  PLANETSCALE_EU=$(grep '^PLANETSCALE_EU=' "$ENV_FILE" | cut -d'=' -f2- || true)
+  PLANETSCALE_SA=$(grep '^PLANETSCALE_SA=' "$ENV_FILE" | cut -d'=' -f2- || true)
+  PLANETSCALE_OC=$(grep '^PLANETSCALE_OC=' "$ENV_FILE" | cut -d'=' -f2- || true)
+  echo "==> Loaded PlanetScale connection strings."
 else
   echo "Error: $ENV_FILE not found"
   exit 1
 fi
 
 # Select which region to use (change this to switch regions)
-DB_T="$PLANETSCALE_EU"
+SELECTED_REGION="PLANETSCALE_AS"
+DB_T="${!SELECTED_REGION}"
+
+if [[ -z "$DB_T" ]]; then
+  echo "Error: $SELECTED_REGION not found in $ENV_FILE"
+  echo "Available variables:"
+  grep '^PLANETSCALE_' "$ENV_FILE" | cut -d'=' -f1 || echo "  (none)"
+  exit 1
+fi
 
 host=${DB_T#*@}     # remove up to @
 host=${host%%:*}    # remove :port...
@@ -129,6 +141,11 @@ BEGIN
   END LOOP;
 END
 $$;
+SQL
+
+echo "==> Dropping existing subscription if exists..."
+psql "$TARGET_DB_URL" -v ON_ERROR_STOP=0 <<SQL
+DROP SUBSCRIPTION IF EXISTS ${SUBSCRIPTION_NAME};
 SQL
 
 echo "==> Creating subscription on target..."
