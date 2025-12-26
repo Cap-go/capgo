@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import type { TableColumn } from '~/components/comp_def'
-import type { Database } from '~/types/supabase.types'
 
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -11,9 +10,21 @@ import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
 import { useOrganizationStore } from '~/stores/organization'
 
-type AuditLog = Database['public']['Tables']['audit_logs']['Row']
+// Define a simplified interface to avoid TypeScript excessive type instantiation with Json type
+interface AuditLogRow {
+  id: number
+  created_at: string
+  table_name: string
+  record_id: string
+  operation: string
+  user_id: string | null
+  org_id: string
+  old_record: Record<string, unknown> | null
+  new_record: Record<string, unknown> | null
+  changed_fields: string[] | null
+}
 
-interface ExtendedAuditLog extends AuditLog {
+interface ExtendedAuditLog extends AuditLogRow {
   user?: {
     uid: string
     email: string
@@ -244,6 +255,17 @@ function getChangeDiff(oldRecord: unknown, newRecord: unknown, changedFields: st
   })
 }
 
+const selectedLogChanges = computed(() => {
+  if (!selectedLog.value || selectedLog.value.operation !== 'UPDATE') {
+    return []
+  }
+  return getChangeDiff(
+    selectedLog.value.old_record,
+    selectedLog.value.new_record,
+    selectedLog.value.changed_fields,
+  )
+})
+
 watch([() => props.orgId, selectedTableFilter, selectedOperationFilter], () => {
   page.value = 1
   fetchAuditLogs()
@@ -334,7 +356,7 @@ onMounted(() => {
             </h4>
             <div class="space-y-3">
               <div
-                v-for="change in getChangeDiff(selectedLog.old_record, selectedLog.new_record, selectedLog.changed_fields)"
+                v-for="change in selectedLogChanges"
                 :key="change.field"
                 class="border border-base-300 rounded-lg p-3"
               >
