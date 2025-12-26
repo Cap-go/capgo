@@ -150,7 +150,7 @@
     "@capgo/capacitor-persistent-account": "^8.0.1",
     "@capgo/capacitor-screen-orientation": "^8.1.0",
     "@capgo/capacitor-screen-recorder": "8",
-    "@capgo/capacitor-updater": "^8.3.0",
+    "@capgo/capacitor-updater": "^8.40.6",
     "@capgo/inappbrowser": "^8.0.1",
     "@capgo/keep-awake": "^8.0.0",
     "@capgo/native-audio": "^8.1.0",

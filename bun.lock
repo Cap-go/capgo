@@ -41,7 +41,7 @@
         "@capgo/capacitor-persistent-account": "^8.0.1",
         "@capgo/capacitor-screen-orientation": "^8.1.0",
         "@capgo/capacitor-screen-recorder": "8",
-        "@capgo/capacitor-updater": "^8.3.0",
+        "@capgo/capacitor-updater": "^8.40.6",
         "@capgo/inappbrowser": "^8.0.1",
         "@capgo/keep-awake": "^8.0.0",
         "@capgo/native-audio": "^8.1.0",
@@ -514,7 +514,7 @@
 
     "@capgo/capacitor-screen-recorder": ["@capgo/capacitor-screen-recorder@8.2.2", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-WFTxFw2JDIYyFAdtj0gs+7JLtMXXYtRrfzxDUBVPIS0EnSvooWf3a4tV8w3yOHQs6rSbGeta3BpP9G6NmlDNpA=="],
 
-    "@capgo/capacitor-updater": ["@capgo/capacitor-updater@8.3.0", "", { "peerDependencies": { "@capacitor/core": "^8.0.0" } }, "sha512-0X1Qn9AYqZHnA9wigHx1UW+6gJ2tUciL8ZbRBDXDGKzM6auEqJ/vcqTrvftv5i6HHGGLyeD6k4XV+kfyLOE19w=="],
+    "@capgo/capacitor-updater": ["@capgo/capacitor-updater@8.40.6", "", { "peerDependencies": { "@capacitor/core": "^8.0.0" } }, "sha512-Z2uG8E9VKClYeZRhvkN8p/w3tXqxj5DB61M3uKwuHyHgPWEOoBv+drlRtnwDL8+XhSljNLG7yGPWUg8WAi8cBQ=="],
 
     "@capgo/cli": ["@capgo/cli@7.21.4", "", { "bin": { "capgo": "dist/index.js" } }, "sha512-8hwoHF70OjNFraYn9GuozKVkjlIwe167Upd9WH88fFRdCJ3uU0kPgSUGDW8k/8uk64tgCLREpeO0CnP4zmcEEA=="],
 
