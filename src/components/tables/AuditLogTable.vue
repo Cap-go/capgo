@@ -2,7 +2,7 @@
 import type { TableColumn } from '~/components/comp_def'
 import type { Database } from '~/types/supabase.types'
 
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import IconX from '~icons/heroicons/x-mark'
@@ -250,6 +250,10 @@ watch([() => props.orgId, selectedTableFilter, selectedOperationFilter], () => {
 })
 
 watch([page, search], () => {
+  fetchAuditLogs()
+})
+
+onMounted(() => {
   fetchAuditLogs()
 })
 </script>
