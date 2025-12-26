@@ -2,13 +2,14 @@ import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { z } from 'zod/mini'
 import { simpleError } from '../../utils/hono.ts'
-import { apikeyHasOrgRight, hasOrgRightApikey, supabaseAdmin } from '../../utils/supabase.ts'
+import { supabaseAdmin } from '../../utils/supabase.ts'
 import {
   createDeliveryRecord,
   createTestPayload,
   deliverWebhook,
   updateDeliveryResult,
 } from '../../utils/webhook.ts'
+import { checkWebhookPermission } from './index.ts'
 
 const bodySchema = z.object({
   orgId: z.string(),
@@ -22,14 +23,7 @@ export async function test(c: Context, bodyRaw: any, apikey: Database['public'][
   }
   const body = bodyParsed.data
 
-  // Check org access - admin or above required
-  if (!(await hasOrgRightApikey(c, body.orgId, apikey.user_id, 'admin', c.get('capgkey') as string))) {
-    throw simpleError('no_permission', 'You need admin access to manage webhooks', { org_id: body.orgId })
-  }
-
-  if (!apikeyHasOrgRight(apikey, body.orgId)) {
-    throw simpleError('invalid_org_id', 'You can\'t access this organization', { org_id: body.orgId })
-  }
+  await checkWebhookPermission(c, body.orgId, apikey)
 
   // Get webhook
   // Note: Using type assertion as webhooks table types are not yet generated

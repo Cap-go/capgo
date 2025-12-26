@@ -2,12 +2,13 @@ import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { z } from 'zod/mini'
 import { simpleError } from '../../utils/hono.ts'
-import { apikeyHasOrgRight, hasOrgRightApikey, supabaseAdmin } from '../../utils/supabase.ts'
+import { supabaseAdmin } from '../../utils/supabase.ts'
 import {
   getDeliveryById,
   getWebhookById,
   queueWebhookDelivery,
 } from '../../utils/webhook.ts'
+import { checkWebhookPermission } from './index.ts'
 
 const getDeliveriesSchema = z.object({
   orgId: z.string(),
@@ -30,14 +31,7 @@ export async function getDeliveries(c: Context, bodyRaw: any, apikey: Database['
   }
   const body = bodyParsed.data
 
-  // Check org access - admin or above required
-  if (!(await hasOrgRightApikey(c, body.orgId, apikey.user_id, 'admin', c.get('capgkey') as string))) {
-    throw simpleError('no_permission', 'You need admin access to view webhook deliveries', { org_id: body.orgId })
-  }
-
-  if (!apikeyHasOrgRight(apikey, body.orgId)) {
-    throw simpleError('invalid_org_id', 'You can\'t access this organization', { org_id: body.orgId })
-  }
+  await checkWebhookPermission(c, body.orgId, apikey)
 
   // Verify webhook belongs to org
   // Note: Using type assertion as webhooks table types are not yet generated
@@ -101,14 +95,7 @@ export async function retryDelivery(c: Context, bodyRaw: any, apikey: Database['
   }
   const body = bodyParsed.data
 
-  // Check org access - admin or above required
-  if (!(await hasOrgRightApikey(c, body.orgId, apikey.user_id, 'admin', c.get('capgkey') as string))) {
-    throw simpleError('no_permission', 'You need admin access to retry webhook deliveries', { org_id: body.orgId })
-  }
-
-  if (!apikeyHasOrgRight(apikey, body.orgId)) {
-    throw simpleError('invalid_org_id', 'You can\'t access this organization', { org_id: body.orgId })
-  }
+  await checkWebhookPermission(c, body.orgId, apikey)
 
   // Get delivery
   const delivery = await getDeliveryById(c, body.deliveryId)
