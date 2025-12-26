@@ -174,7 +174,7 @@ const columns = computed<TableColumn[]>(() => [
 async function fetchAuditLogs() {
   loading.value = true
   try {
-    auditLogs.value.length = 0
+    auditLogs.value = []
     members.value = await organizationStore.getMembers()
 
     let query = supabase
@@ -249,8 +249,8 @@ function getChangeDiff(oldRecord: unknown, newRecord: unknown, changedFields: st
   const newObj = (newRecord || {}) as Record<string, unknown>
 
   return changedFields.map((field) => {
-    const oldVal = JSON.stringify(oldObj[field], null, 2) ?? 'null'
-    const newVal = JSON.stringify(newObj[field], null, 2) ?? 'null'
+    const oldVal = field in oldObj ? JSON.stringify(oldObj[field], null, 2) : '(not set)'
+    const newVal = field in newObj ? JSON.stringify(newObj[field], null, 2) : '(not set)'
     return { field, oldValue: oldVal, newValue: newVal }
   })
 }
