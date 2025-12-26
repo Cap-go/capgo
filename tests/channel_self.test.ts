@@ -147,7 +147,7 @@ describe('invalids /channel_self tests', () => {
       expect(response.status).toBe(200)
 
       const responseError = await getResponseErrorCode(response)
-      expect(responseError).toBe('channel_self_set_not_allowed')
+      expect(responseError).toBe('public_channel_self_set_not_allowed')
     }
     finally {
       const { error } = await getSupabaseClient().from('channels').update({ allow_device_self_set: true }).eq('name', data.channel).eq('app_id', APPNAME).select('id').single()
@@ -1059,7 +1059,7 @@ describe('[POST] /channel_self - new plugin version (>= 7.34.0) behavior', () =>
       expect(response.status).toBe(200)
 
       const result = await response.json<{ error: string }>()
-      expect(result.error).toBe('channel_self_set_not_allowed')
+      expect(result.error).toBe('public_channel_self_set_not_allowed')
     }
     finally {
       // Re-enable allow_device_self_set

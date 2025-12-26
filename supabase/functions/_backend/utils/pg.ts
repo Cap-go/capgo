@@ -522,13 +522,14 @@ export async function getChannelByNamePg(
   appId: string,
   channelName: string,
   drizzleClient: ReturnType<typeof getDrizzleClient>,
-): Promise<{ id: number, name: string, allow_device_self_set: boolean, owner_org: string } | null> {
+): Promise<{ id: number, name: string, allow_device_self_set: boolean, public: boolean, owner_org: string } | null> {
   try {
     const channel = await drizzleClient
       .select({
         id: schema.channels.id,
         name: schema.channels.name,
         allow_device_self_set: schema.channels.allow_device_self_set,
+        public: schema.channels.public,
         owner_org: schema.channels.owner_org,
       })
       .from(schema.channels)

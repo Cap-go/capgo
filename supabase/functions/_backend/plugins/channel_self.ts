@@ -124,7 +124,15 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
   }
 
   if (!dataChannel.allow_device_self_set) {
-    return simpleError200(c, 'channel_self_set_not_allowed', `This channel does not allow devices to self associate`, { channel, app_id })
+    if (dataChannel.public) {
+      return simpleError200(
+        c,
+        'public_channel_self_set_not_allowed',
+        'This channel is public and does not allow device self-assignment. Unset the channel and the device will automatically use the public channel.',
+        { channel, app_id },
+      )
+    }
+    return simpleError200(c, 'channel_self_set_not_allowed', 'This channel does not allow devices to self associate', { channel, app_id })
   }
 
   // Check if plugin version supports local channel storage (5.34.0+, 6.34.0+, 7.34.0+)
