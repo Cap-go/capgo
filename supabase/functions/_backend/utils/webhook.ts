@@ -1,5 +1,6 @@
 import type { Context } from 'hono'
 import { cloudlog, cloudlogErr, serializeError } from './logging.ts'
+import { closeClient, getPgClient } from './pg.ts'
 import { supabaseAdmin } from './supabase.ts'
 
 // Webhook payload structure sent to user endpoints
@@ -399,7 +400,7 @@ export function createTestPayload(orgId: string): WebhookPayload {
 }
 
 /**
- * Queue a webhook delivery message for processing
+ * Queue a webhook delivery message for processing using direct SQL via pg client
  */
 export async function queueWebhookDelivery(
   c: Context,
@@ -419,15 +420,12 @@ export async function queueWebhookDelivery(
     },
   }
 
-  const { error } = await supabaseAdmin(c).rpc('pgmq_send' as any, {
-    queue_name: 'webhook_delivery',
-    message,
-  })
-
-  if (error) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Error queuing webhook delivery', error: serializeError(error) })
-  }
-  else {
+  const db = getPgClient(c)
+  try {
+    await db.query(
+      'SELECT pgmq.send($1, $2::jsonb)',
+      ['webhook_delivery', JSON.stringify(message)],
+    )
     cloudlog({
       requestId: c.get('requestId'),
       message: 'Queued webhook delivery',
@@ -435,10 +433,16 @@ export async function queueWebhookDelivery(
       webhookId,
     })
   }
+  catch (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error queuing webhook delivery', error: serializeError(error) })
+  }
+  finally {
+    closeClient(c, db)
+  }
 }
 
 /**
- * Queue a webhook delivery with delay (for retries)
+ * Queue a webhook delivery with delay (for retries) using direct SQL via pg client
  */
 export async function queueWebhookDeliveryWithDelay(
   c: Context,
@@ -459,22 +463,35 @@ export async function queueWebhookDeliveryWithDelay(
     },
   }
 
-  // For pgmq delay, we use pgmq.send with a delay
-  // If pgmq_send_delay doesn't exist, we fall back to regular send
+  const db = getPgClient(c)
   try {
-    const { error } = await supabaseAdmin(c).rpc('pgmq_send' as any, {
-      queue_name: 'webhook_delivery',
-      message,
-      delay: delaySeconds,
+    // pgmq.send with delay parameter
+    await db.query(
+      'SELECT pgmq.send($1, $2::jsonb, $3)',
+      ['webhook_delivery', JSON.stringify(message), delaySeconds],
+    )
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'Queued webhook delivery with delay',
+      deliveryId,
+      webhookId,
+      delaySeconds,
     })
-
-    if (error) {
-      // Fallback to regular queue if delay not supported
-      await queueWebhookDelivery(c, deliveryId, webhookId, url, payload)
+  }
+  catch (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error queuing webhook delivery with delay, falling back to immediate', error: serializeError(error) })
+    // Fallback to regular queue without delay
+    try {
+      await db.query(
+        'SELECT pgmq.send($1, $2::jsonb)',
+        ['webhook_delivery', JSON.stringify(message)],
+      )
+    }
+    catch (fallbackError) {
+      cloudlogErr({ requestId: c.get('requestId'), message: 'Error in fallback queue', error: serializeError(fallbackError) })
     }
   }
-  catch {
-    // Fallback to regular queue
-    await queueWebhookDelivery(c, deliveryId, webhookId, url, payload)
+  finally {
+    closeClient(c, db)
   }
 }
