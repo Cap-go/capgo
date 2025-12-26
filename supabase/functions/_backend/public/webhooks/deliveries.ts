@@ -40,7 +40,8 @@ export async function getDeliveries(c: Context, bodyRaw: any, apikey: Database['
   }
 
   // Verify webhook belongs to org
-  const { data: webhook, error: webhookError } = await supabaseAdmin(c)
+  // Note: Using type assertion as webhooks table types are not yet generated
+  const { data: webhook, error: webhookError } = await (supabaseAdmin(c) as any)
     .from('webhooks')
     .select('id, org_id')
     .eq('id', body.webhookId)
@@ -59,7 +60,7 @@ export async function getDeliveries(c: Context, bodyRaw: any, apikey: Database['
   const from = page * DELIVERIES_PER_PAGE
   const to = (page + 1) * DELIVERIES_PER_PAGE - 1
 
-  let query = supabaseAdmin(c)
+  let query = (supabaseAdmin(c) as any)
     .from('webhook_deliveries')
     .select('*')
     .eq('webhook_id', body.webhookId)
@@ -77,7 +78,7 @@ export async function getDeliveries(c: Context, bodyRaw: any, apikey: Database['
   }
 
   // Get total count for pagination
-  const { count } = await supabaseAdmin(c)
+  const { count } = await (supabaseAdmin(c) as any)
     .from('webhook_deliveries')
     .select('*', { count: 'exact', head: true })
     .eq('webhook_id', body.webhookId)
@@ -135,7 +136,7 @@ export async function retryDelivery(c: Context, bodyRaw: any, apikey: Database['
   }
 
   // Reset delivery status and queue for retry
-  await supabaseAdmin(c)
+  await (supabaseAdmin(c) as any)
     .from('webhook_deliveries')
     .update({
       status: 'pending',

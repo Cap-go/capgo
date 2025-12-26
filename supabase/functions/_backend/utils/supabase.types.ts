@@ -444,6 +444,33 @@ export type Database = {
           },
         ]
       }
+      cache_entry: {
+        Row: {
+          cached_at: string | null
+          end_date: string | null
+          id: number | null
+          org_id: string | null
+          response: Json | null
+          start_date: string | null
+        }
+        Insert: {
+          cached_at?: string | null
+          end_date?: string | null
+          id?: number | null
+          org_id?: string | null
+          response?: Json | null
+          start_date?: string | null
+        }
+        Update: {
+          cached_at?: string | null
+          end_date?: string | null
+          id?: number | null
+          org_id?: string | null
+          response?: Json | null
+          start_date?: string | null
+        }
+        Relationships: []
+      }
       capgo_credits_steps: {
         Row: {
           created_at: string

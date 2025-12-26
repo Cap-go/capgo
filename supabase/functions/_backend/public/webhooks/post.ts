@@ -45,7 +45,8 @@ export async function post(c: Context, bodyRaw: any, apikey: Database['public'][
   }
 
   // Create webhook
-  const { data, error } = await supabaseAdmin(c)
+  // Note: Using type assertion as webhooks table types are not yet generated
+  const { data, error } = await (supabaseAdmin(c) as any)
     .from('webhooks')
     .insert({
       org_id: body.orgId,

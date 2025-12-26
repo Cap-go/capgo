@@ -104,7 +104,8 @@ export async function findWebhooksForEvent(
   orgId: string,
   tableName: string,
 ): Promise<Webhook[]> {
-  const { data: webhooks, error } = await supabaseAdmin(c)
+  // Note: Using type assertion as webhooks table types are not yet generated
+  const { data: webhooks, error } = await (supabaseAdmin(c) as any)
     .from('webhooks')
     .select('*')
     .eq('org_id', orgId)
@@ -130,7 +131,8 @@ export async function createDeliveryRecord(
   eventType: string,
   payload: WebhookPayload,
 ): Promise<WebhookDelivery | null> {
-  const { data: delivery, error } = await supabaseAdmin(c)
+  // Note: Using type assertion as webhook_deliveries table types are not yet generated
+  const { data: delivery, error } = await (supabaseAdmin(c) as any)
     .from('webhook_deliveries')
     .insert({
       webhook_id: webhookId,
@@ -235,7 +237,7 @@ export async function updateDeliveryResult(
   responseBody: string | null,
   duration: number,
 ): Promise<void> {
-  const { error } = await supabaseAdmin(c)
+  const { error } = await (supabaseAdmin(c) as any)
     .from('webhook_deliveries')
     .update({
       status: success ? 'success' : 'failed',
@@ -258,7 +260,7 @@ export async function incrementAttemptCount(
   c: Context,
   deliveryId: string,
 ): Promise<number> {
-  const { data, error } = await supabaseAdmin(c)
+  const { data, error } = await (supabaseAdmin(c) as any)
     .from('webhook_deliveries')
     .select('attempt_count')
     .eq('id', deliveryId)
@@ -271,7 +273,7 @@ export async function incrementAttemptCount(
 
   const newCount = data.attempt_count + 1
 
-  await supabaseAdmin(c)
+  await (supabaseAdmin(c) as any)
     .from('webhook_deliveries')
     .update({ attempt_count: newCount })
     .eq('id', deliveryId)
@@ -292,7 +294,7 @@ export async function scheduleRetry(
 
   const nextRetryAt = new Date(Date.now() + retryDelaySeconds * 1000).toISOString()
 
-  const { error } = await supabaseAdmin(c)
+  const { error } = await (supabaseAdmin(c) as any)
     .from('webhook_deliveries')
     .update({
       next_retry_at: nextRetryAt,
@@ -321,7 +323,7 @@ export async function markDeliveryFailed(
   c: Context,
   deliveryId: string,
 ): Promise<void> {
-  const { error } = await supabaseAdmin(c)
+  const { error } = await (supabaseAdmin(c) as any)
     .from('webhook_deliveries')
     .update({
       status: 'failed',
@@ -341,7 +343,7 @@ export async function getWebhookById(
   c: Context,
   webhookId: string,
 ): Promise<Webhook | null> {
-  const { data, error } = await supabaseAdmin(c)
+  const { data, error } = await (supabaseAdmin(c) as any)
     .from('webhooks')
     .select('*')
     .eq('id', webhookId)
@@ -362,7 +364,7 @@ export async function getDeliveryById(
   c: Context,
   deliveryId: string,
 ): Promise<WebhookDelivery | null> {
-  const { data, error } = await supabaseAdmin(c)
+  const { data, error } = await (supabaseAdmin(c) as any)
     .from('webhook_deliveries')
     .select('*')
     .eq('id', deliveryId)

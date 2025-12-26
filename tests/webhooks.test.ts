@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-import { BASE_URL, getSupabaseClient, headers, ORG_ID, TEST_EMAIL, USER_ID } from './test-utils.ts'
+import { BASE_URL, getSupabaseClient, headers, TEST_EMAIL, USER_ID } from './test-utils.ts'
 
 // Test org and webhook IDs
 const WEBHOOK_TEST_ORG_ID = randomUUID()
@@ -39,8 +39,9 @@ beforeAll(async () => {
 
 afterAll(async () => {
   // Clean up created webhooks
+  // Note: Using type assertion as webhooks table types are not yet generated
   if (createdWebhookId) {
-    await getSupabaseClient().from('webhooks').delete().eq('id', createdWebhookId)
+    await (getSupabaseClient() as any).from('webhooks').delete().eq('id', createdWebhookId)
   }
   // Clean up test organization and stripe_info
   await getSupabaseClient().from('orgs').delete().eq('id', WEBHOOK_TEST_ORG_ID)
@@ -205,8 +206,8 @@ describe('[POST] /webhooks', () => {
     })
     expect(response.status).toBe(201)
     const data = await response.json() as { webhook: { id: string } }
-    // Clean up
-    await getSupabaseClient().from('webhooks').delete().eq('id', data.webhook.id)
+    // Clean up - Using type assertion as webhooks table types are not yet generated
+    await (getSupabaseClient() as any).from('webhooks').delete().eq('id', data.webhook.id)
   })
 })
 

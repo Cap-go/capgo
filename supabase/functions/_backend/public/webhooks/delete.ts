@@ -26,7 +26,8 @@ export async function deleteWebhook(c: Context, bodyRaw: any, apikey: Database['
   }
 
   // Verify webhook belongs to org
-  const { data: existingWebhook, error: fetchError } = await supabaseAdmin(c)
+  // Note: Using type assertion as webhooks table types are not yet generated
+  const { data: existingWebhook, error: fetchError } = await (supabaseAdmin(c) as any)
     .from('webhooks')
     .select('id, org_id')
     .eq('id', body.webhookId)
@@ -41,7 +42,7 @@ export async function deleteWebhook(c: Context, bodyRaw: any, apikey: Database['
   }
 
   // Delete webhook (cascade will delete deliveries)
-  const { error } = await supabaseAdmin(c)
+  const { error } = await (supabaseAdmin(c) as any)
     .from('webhooks')
     .delete()
     .eq('id', body.webhookId)

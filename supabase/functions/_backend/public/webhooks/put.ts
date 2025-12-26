@@ -31,7 +31,8 @@ export async function put(c: Context, bodyRaw: any, apikey: Database['public']['
   }
 
   // Verify webhook belongs to org
-  const { data: existingWebhook, error: fetchError } = await supabaseAdmin(c)
+  // Note: Using type assertion as webhooks table types are not yet generated
+  const { data: existingWebhook, error: fetchError } = await (supabaseAdmin(c) as any)
     .from('webhooks')
     .select('id, org_id')
     .eq('id', body.webhookId)
@@ -80,7 +81,7 @@ export async function put(c: Context, bodyRaw: any, apikey: Database['public']['
   }
 
   // Update webhook
-  const { data, error } = await supabaseAdmin(c)
+  const { data, error } = await (supabaseAdmin(c) as any)
     .from('webhooks')
     .update(updateData)
     .eq('id', body.webhookId)

@@ -32,7 +32,8 @@ export async function test(c: Context, bodyRaw: any, apikey: Database['public'][
   }
 
   // Get webhook
-  const { data: webhook, error: fetchError } = await supabaseAdmin(c)
+  // Note: Using type assertion as webhooks table types are not yet generated
+  const { data: webhook, error: fetchError } = await (supabaseAdmin(c) as any)
     .from('webhooks')
     .select('*')
     .eq('id', body.webhookId)
@@ -77,7 +78,7 @@ export async function test(c: Context, bodyRaw: any, apikey: Database['public'][
   )
 
   // Update attempt count
-  await supabaseAdmin(c)
+  await (supabaseAdmin(c) as any)
     .from('webhook_deliveries')
     .update({ attempt_count: 1 })
     .eq('id', delivery.id)

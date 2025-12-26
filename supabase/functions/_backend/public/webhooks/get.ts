@@ -40,8 +40,9 @@ export async function get(c: Context, bodyRaw: any, apikey: Database['public']['
   }
 
   // Get single webhook
+  // Note: Using type assertion as webhooks table types are not yet generated
   if (body.webhookId) {
-    const { data, error } = await supabaseAdmin(c)
+    const { data, error } = await (supabaseAdmin(c) as any)
       .from('webhooks')
       .select('*')
       .eq('id', body.webhookId)
@@ -58,15 +59,15 @@ export async function get(c: Context, bodyRaw: any, apikey: Database['public']['
     }
 
     // Get recent delivery stats for this webhook
-    const { data: stats } = await supabaseAdmin(c)
+    const { data: stats } = await (supabaseAdmin(c) as any)
       .from('webhook_deliveries')
       .select('status', { count: 'exact' })
       .eq('webhook_id', body.webhookId)
       .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
 
-    const successCount = stats?.filter(s => s.status === 'success').length || 0
-    const failedCount = stats?.filter(s => s.status === 'failed').length || 0
-    const pendingCount = stats?.filter(s => s.status === 'pending').length || 0
+    const successCount = stats?.filter((s: any) => s.status === 'success').length || 0
+    const failedCount = stats?.filter((s: any) => s.status === 'failed').length || 0
+    const pendingCount = stats?.filter((s: any) => s.status === 'pending').length || 0
 
     return c.json({
       ...dataParsed.data,
@@ -83,7 +84,7 @@ export async function get(c: Context, bodyRaw: any, apikey: Database['public']['
   const from = fetchOffset * fetchLimit
   const to = (fetchOffset + 1) * fetchLimit - 1
 
-  const { data, error } = await supabaseAdmin(c)
+  const { data, error } = await (supabaseAdmin(c) as any)
     .from('webhooks')
     .select('*')
     .eq('org_id', body.orgId)
