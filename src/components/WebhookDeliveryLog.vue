@@ -1,15 +1,15 @@
 <script setup lang="ts">
 import type { Webhook, WebhookDelivery } from '~/stores/webhooks'
 import { storeToRefs } from 'pinia'
-import { computed, onMounted, ref, watch } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
+import IconRefresh from '~icons/heroicons/arrow-path'
 import IconCheck from '~icons/heroicons/check-circle'
 import IconChevronDown from '~icons/heroicons/chevron-down'
 import IconChevronLeft from '~icons/heroicons/chevron-left'
 import IconChevronRight from '~icons/heroicons/chevron-right'
 import IconClock from '~icons/heroicons/clock'
-import IconRefresh from '~icons/heroicons/arrow-path'
 import IconX from '~icons/heroicons/x-circle'
 import IconXMark from '~icons/heroicons/x-mark'
 import Spinner from '~/components/Spinner.vue'
@@ -181,7 +181,7 @@ function formatJson(data: any): string {
           :disabled="isLoadingDeliveries"
           @click="loadDeliveries"
         >
-          <IconRefresh :class="['w-4 h-4', isLoadingDeliveries ? 'animate-spin' : '']" />
+          <IconRefresh class="w-4 h-4" :class="[isLoadingDeliveries ? 'animate-spin' : '']" />
           {{ t('refresh') }}
         </button>
       </div>
@@ -257,8 +257,7 @@ function formatJson(data: any): string {
                   {{ t('retry') }}
                 </button>
                 <IconChevronDown
-                  :class="[
-                    'w-5 h-5 text-gray-400 transition-transform',
+                  class="w-5 h-5 text-gray-400 transition-transform" :class="[
                     expandedDeliveryId === delivery.id ? 'rotate-180' : '',
                   ]"
                 />

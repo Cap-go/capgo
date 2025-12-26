@@ -4,10 +4,10 @@ import { supabaseAdmin } from './supabase.ts'
 
 // Webhook payload structure sent to user endpoints
 export interface WebhookPayload {
-  event: string        // e.g., 'app_versions.INSERT'
-  event_id: string     // Unique event identifier
-  timestamp: string    // ISO timestamp
-  org_id: string       // Organization ID
+  event: string // e.g., 'app_versions.INSERT'
+  event_id: string // Unique event identifier
+  timestamp: string // ISO timestamp
+  org_id: string // Organization ID
   data: {
     table: string
     operation: string
@@ -67,10 +67,10 @@ export interface WebhookDelivery {
 
 // Supported event types that users can subscribe to
 export const WEBHOOK_EVENT_TYPES = [
-  'app_versions',  // Bundle changes (INSERT, UPDATE, DELETE)
-  'channels',      // Channel updates
-  'org_users',     // Member changes
-  'orgs',          // Organization changes
+  'app_versions', // Bundle changes (INSERT, UPDATE, DELETE)
+  'channels', // Channel updates
+  'org_users', // Member changes
+  'orgs', // Organization changes
 ] as const
 
 export type WebhookEventType = typeof WEBHOOK_EVENT_TYPES[number]
@@ -287,7 +287,7 @@ export async function scheduleRetry(
   attemptCount: number,
 ): Promise<void> {
   // Exponential backoff: 2min, 4min, 8min
-  const retryDelaySeconds = Math.pow(2, attemptCount) * 60
+  const retryDelaySeconds = 2 ** attemptCount * 60
 
   const nextRetryAt = new Date(Date.now() + retryDelaySeconds * 1000).toISOString()
 

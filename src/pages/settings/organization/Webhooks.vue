@@ -250,8 +250,7 @@ function formatDate(dateString: string): string {
               <div class="flex items-center justify-between">
                 <div class="flex items-center gap-3">
                   <div
-                    :class="[
-                      'w-3 h-3 rounded-full',
+                    class="w-3 h-3 rounded-full" :class="[
                       webhook.enabled ? 'bg-green-500' : 'bg-gray-400',
                     ]"
                     :title="webhook.enabled ? t('enabled') : t('disabled')"
@@ -283,8 +282,7 @@ function formatDate(dateString: string): string {
                     </span>
                   </div>
                   <IconChevronDown
-                    :class="[
-                      'w-5 h-5 text-gray-400 transition-transform',
+                    class="w-5 h-5 text-gray-400 transition-transform" :class="[
                       expandedWebhookId === webhook.id ? 'rotate-180' : '',
                     ]"
                   />

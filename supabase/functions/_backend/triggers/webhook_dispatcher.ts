@@ -1,10 +1,11 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
+import type { AuditLogData } from '../utils/webhook.ts'
 import { Hono } from 'hono/tiny'
 import { BRES, middlewareAPISecret } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr, serializeError } from '../utils/logging.ts'
 import { backgroundTask } from '../utils/utils.ts'
 import {
-  type AuditLogData,
+
   buildWebhookPayload,
   createDeliveryRecord,
   findWebhooksForEvent,

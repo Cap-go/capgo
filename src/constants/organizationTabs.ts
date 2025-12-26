@@ -2,9 +2,9 @@ import type { Tab } from '~/components/comp_def'
 import IconChart from '~icons/heroicons/chart-bar'
 import IconPlan from '~icons/heroicons/credit-card'
 import IconCredits from '~icons/heroicons/currency-dollar'
+import IconWebhook from '~icons/heroicons/globe-alt'
 import IconInfo from '~icons/heroicons/information-circle'
 import IconUsers from '~icons/heroicons/users'
-import IconWebhook from '~icons/heroicons/globe-alt'
 
 export const organizationTabs: Tab[] = [
   { label: 'general', key: '/settings/organization', icon: IconInfo },

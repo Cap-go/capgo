@@ -1,13 +1,11 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
+import type { WebhookPayload } from '../utils/webhook.ts'
 import { Hono } from 'hono/tiny'
-import { trackBentoEvent } from '../utils/bento.ts'
 import { BRES, middlewareAPISecret } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr, serializeError } from '../utils/logging.ts'
 import { sendNotifOrg } from '../utils/notifications.ts'
-import { supabaseAdmin } from '../utils/supabase.ts'
 import { backgroundTask } from '../utils/utils.ts'
 import {
-  type WebhookPayload,
   deliverWebhook,
   getDeliveryById,
   getWebhookById,
@@ -15,6 +13,7 @@ import {
   markDeliveryFailed,
   queueWebhookDeliveryWithDelay,
   updateDeliveryResult,
+
 } from '../utils/webhook.ts'
 
 export const app = new Hono<MiddlewareKeyVariables>()
@@ -120,7 +119,7 @@ app.post('/', middlewareAPISecret, async (c) => {
 
     if (attemptCount < maxAttempts) {
       // Schedule retry with exponential backoff
-      const retryDelaySeconds = Math.pow(2, attemptCount) * 60 // 2min, 4min, 8min
+      const retryDelaySeconds = 2 ** attemptCount * 60 // 2min, 4min, 8min
 
       cloudlog({
         requestId: c.get('requestId'),
