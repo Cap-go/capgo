@@ -40,7 +40,8 @@ const supabase = useSupabase()
 const organizationStore = useOrganizationStore()
 
 const auditLogs = ref<ExtendedAuditLog[]>([])
-const members = ref<{ uid: string, email: string }[]>([])
+const membersMap = ref<Map<string, { uid: string, email: string }>>(new Map())
+const membersLoaded = ref(false)
 const loading = ref(true)
 const search = ref('')
 const page = ref(1)
@@ -171,11 +172,28 @@ const columns = computed<TableColumn[]>(() => [
   },
 ])
 
+async function loadMembers() {
+  if (membersLoaded.value)
+    return
+
+  try {
+    const membersList = await organizationStore.getMembers()
+    membersMap.value = new Map(membersList.map(m => [m.uid, m]))
+    membersLoaded.value = true
+  }
+  catch (error) {
+    console.error('Error fetching members:', error)
+    // Continue without member data - audit logs will show without user emails
+  }
+}
+
 async function fetchAuditLogs() {
   loading.value = true
   try {
     auditLogs.value = []
-    members.value = await organizationStore.getMembers()
+
+    // Load members once (cached for session)
+    await loadMembers()
 
     let query = supabase
       .from('audit_logs')
@@ -193,7 +211,7 @@ async function fetchAuditLogs() {
       query = query.eq('operation', selectedOperationFilter.value)
     }
 
-    // Apply search filter (search in record_id)
+    // Apply search filter (search in record_id - partial match for flexibility)
     if (search.value) {
       query = query.ilike('record_id', `%${search.value}%`)
     }
@@ -209,11 +227,13 @@ async function fetchAuditLogs() {
 
     const rows = (data ?? []) as ExtendedAuditLog[]
 
-    // Add user email to each row
+    // Add user email to each row using Map for O(1) lookup
     for (const item of rows) {
-      const member = members.value.find(m => m.uid === item.user_id)
-      if (member) {
-        item.user = member
+      if (item.user_id) {
+        const member = membersMap.value.get(item.user_id)
+        if (member) {
+          item.user = member
+        }
       }
     }
 
