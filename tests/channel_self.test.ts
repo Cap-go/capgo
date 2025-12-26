@@ -309,9 +309,12 @@ describe('[GET] /channel_self tests', () => {
     expect(json).toBeDefined()
     expect(Array.isArray(json)).toBe(true)
 
-    // Real device (is_emulator=false) should only get channels with allow_emulator=false
-    // All seeded channels have allow_emulator=true, so should return empty array
-    expect(json).toHaveLength(0)
+    const channelNames = json.map(ch => ch.name)
+    expect(channelNames).toContain('beta')
+    expect(channelNames).toContain('development')
+    expect(channelNames).not.toContain('production')
+    expect(channelNames).not.toContain('no_access')
+    expect(json).toHaveLength(2)
   })
 
   it('[GET] should return compatible channels for Android', async () => {
@@ -329,9 +332,12 @@ describe('[GET] /channel_self tests', () => {
     expect(json).toBeDefined()
     expect(Array.isArray(json)).toBe(true)
 
-    // Real device (is_emulator=false) should only get channels with allow_emulator=false
-    // All seeded channels have allow_emulator=true, so should return empty array
-    expect(json).toHaveLength(0)
+    const channelNames = json.map(ch => ch.name)
+    expect(channelNames).toContain('production')
+    expect(channelNames).toContain('beta')
+    expect(channelNames).not.toContain('development')
+    expect(channelNames).not.toContain('no_access')
+    expect(json).toHaveLength(2)
   })
 
   it('[GET] should return empty list when no channels allow self set', async () => {
@@ -356,7 +362,12 @@ describe('[GET] /channel_self tests', () => {
 
     expect(json).toBeDefined()
     expect(Array.isArray(json)).toBe(true)
-    expect(json).toHaveLength(0)
+    const channelNames = json.map(ch => ch.name)
+    expect(channelNames).toContain('development')
+    expect(channelNames).not.toContain('production')
+    expect(channelNames).not.toContain('beta')
+    expect(channelNames).not.toContain('no_access')
+    expect(json).toHaveLength(1)
   })
 
   it('[GET] should only return channels compatible with platform', async () => {
@@ -380,8 +391,12 @@ describe('[GET] /channel_self tests', () => {
     expect(iosResponse.ok).toBe(true)
     const iosJson = await iosResponse.json() as ChannelsListResponse
 
-    // Real device should get no channels since all have allow_emulator=true
-    expect(iosJson).toHaveLength(0)
+    const iosChannelNames = iosJson.map(ch => ch.name)
+    expect(iosChannelNames).toContain('beta')
+    expect(iosChannelNames).toContain('development')
+    expect(iosChannelNames).not.toContain('production')
+    expect(iosChannelNames).not.toContain('no_access')
+    expect(iosJson).toHaveLength(2)
 
     // Request Android channels - real device (is_emulator=false)
     data.platform = 'android'
@@ -392,8 +407,12 @@ describe('[GET] /channel_self tests', () => {
     expect(androidResponse.ok).toBe(true)
     const androidJson = await androidResponse.json() as ChannelsListResponse
 
-    // Real device should get no channels since all have allow_emulator=true
-    expect(androidJson).toHaveLength(0)
+    const androidChannelNames = androidJson.map(ch => ch.name)
+    expect(androidChannelNames).toContain('production')
+    expect(androidChannelNames).toContain('beta')
+    expect(androidChannelNames).not.toContain('development')
+    expect(androidChannelNames).not.toContain('no_access')
+    expect(androidJson).toHaveLength(2)
   })
 
   it('[GET] should filter channels based on emulator compatibility', async () => {
@@ -426,7 +445,7 @@ describe('[GET] /channel_self tests', () => {
       expect(emulatorChannelNames).toContain('development') // should be included for emulators
       expect(emulatorChannelNames).not.toContain('beta') // should be filtered out for emulators
 
-      // Test real device - should get beta channel since it now has allow_emulator=false
+      // Test real device - allow_emulator does not affect physical devices
       data.is_emulator = false
       data.is_prod = true
       const prodResponse = await fetchGetChannels(data as any)
@@ -435,11 +454,11 @@ describe('[GET] /channel_self tests', () => {
       const prodJson = await prodResponse.json() as ChannelsListResponse
       const prodChannelNames = prodJson.map(ch => ch.name)
 
-      // Real device should get beta channel since it has allow_emulator=false (matches device)
       expect(prodChannelNames).toContain('beta')
-      // Should not get development since it still has allow_emulator=true
-      expect(prodChannelNames).not.toContain('development')
-      expect(prodJson).toHaveLength(1)
+      expect(prodChannelNames).toContain('development')
+      expect(prodChannelNames).not.toContain('production')
+      expect(prodChannelNames).not.toContain('no_access')
+      expect(prodJson).toHaveLength(2)
     }
     finally {
       // Reset beta channel to allow emulators
@@ -469,7 +488,7 @@ describe('[GET] /channel_self tests', () => {
     expect(updateError).toBeNull()
 
     try {
-      // Test dev device - real device (is_emulator=false) should get no channels
+      // Test dev device - should only get channels that allow dev builds
       const data = getBaseData(APPNAME)
       data.platform = 'ios'
       data.is_emulator = false
@@ -479,18 +498,26 @@ describe('[GET] /channel_self tests', () => {
       expect(devResponse.ok).toBe(true)
       const devJson = await devResponse.json() as ChannelsListResponse
 
-      // Real device should get no channels since all have allow_emulator=true
-      expect(devJson).toHaveLength(0)
+      const devChannelNames = devJson.map(ch => ch.name)
+      expect(devChannelNames).toContain('beta')
+      expect(devChannelNames).not.toContain('development')
+      expect(devChannelNames).not.toContain('production')
+      expect(devChannelNames).not.toContain('no_access')
+      expect(devJson).toHaveLength(1)
 
-      // Test production device - real device should still get no channels
+      // Test production device - should get channels that allow prod builds
       data.is_prod = true
       const prodResponse = await fetchGetChannels(data as any)
 
       expect(prodResponse.ok).toBe(true)
       const prodJson = await prodResponse.json() as ChannelsListResponse
 
-      // Real device should get no channels since all have allow_emulator=true
-      expect(prodJson).toHaveLength(0)
+      const prodChannelNames = prodJson.map(ch => ch.name)
+      expect(prodChannelNames).toContain('beta')
+      expect(prodChannelNames).toContain('development')
+      expect(prodChannelNames).not.toContain('production')
+      expect(prodChannelNames).not.toContain('no_access')
+      expect(prodJson).toHaveLength(2)
     }
     finally {
       // Reset development channel to allow dev devices
@@ -514,9 +541,13 @@ describe('[GET] /channel_self tests', () => {
     expect(response.ok).toBe(true)
     const json = await response.json() as ChannelsListResponse
 
-    // Real device should get no channels since all have allow_emulator=true
+    const channelNames = json.map(ch => ch.name)
+    expect(channelNames).toContain('beta')
+    expect(channelNames).toContain('development')
+    expect(channelNames).not.toContain('production')
+    expect(channelNames).not.toContain('no_access')
     expect(Array.isArray(json)).toBe(true)
-    expect(json).toHaveLength(0)
+    expect(json).toHaveLength(2)
   })
 
   it('[GET] should return channels for emulator devices', async () => {

@@ -265,7 +265,9 @@ CREATE TYPE "public"."stats_action" AS ENUM (
     'disableAutoUpdateMetadata',
     'disableAutoUpdateUnderNative',
     'disableDevBuild',
+    'disableProdBuild',
     'disableEmulator',
+    'disableDevice',
     'cannotGetBundle',
     'checksum_fail',
     'NoChannelOrOverride',
@@ -5416,7 +5418,9 @@ CREATE TABLE IF NOT EXISTS "public"."channels" (
     "android" boolean DEFAULT true NOT NULL,
     "allow_device_self_set" boolean DEFAULT false NOT NULL,
     "allow_emulator" boolean DEFAULT true NOT NULL,
+    "allow_device" boolean DEFAULT true NOT NULL,
     "allow_dev" boolean DEFAULT true NOT NULL,
+    "allow_prod" boolean DEFAULT true NOT NULL,
     "disable_auto_update" "public"."disable_update" DEFAULT 'major'::"public"."disable_update" NOT NULL,
     "owner_org" "uuid" NOT NULL,
     "created_by" "uuid" NOT NULL
@@ -9617,8 +9621,6 @@ ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT SELECT,INS
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLES TO "anon";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLES TO "authenticated";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLES TO "service_role";
-
-
 
 
 

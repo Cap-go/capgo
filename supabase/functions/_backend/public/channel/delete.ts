@@ -15,7 +15,9 @@ export interface ChannelSet {
   android?: boolean
   allow_device_self_set?: boolean
   allow_emulator?: boolean
+  allow_device?: boolean
   allow_dev?: boolean
+  allow_prod?: boolean
 }
 
 export async function deleteChannel(c: Context, body: ChannelSet, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {

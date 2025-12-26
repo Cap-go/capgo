@@ -130,7 +130,9 @@ CREATE TABLE public.channels (
     android boolean DEFAULT true NOT NULL,
     allow_device_self_set boolean DEFAULT false NOT NULL,
     allow_emulator boolean DEFAULT true NOT NULL,
+    allow_device boolean DEFAULT true NOT NULL,
     allow_dev boolean DEFAULT true NOT NULL,
+    allow_prod boolean DEFAULT true NOT NULL,
     disable_auto_update public.disable_update DEFAULT 'major'::public.disable_update NOT NULL,
     owner_org uuid NOT NULL,
     created_by uuid NOT NULL
@@ -659,4 +661,3 @@ CREATE INDEX si_customer_status_trial_idx ON public.stripe_info USING btree (cus
 --
 
 \unrestrict za0Tqae5TFia06Ql10OfsMoQPHLzi4egPwzOQpjOitoeoXOpMC1VX6MUqec1LRQ
-

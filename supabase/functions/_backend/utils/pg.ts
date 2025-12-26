@@ -241,7 +241,9 @@ function getSchemaUpdatesAlias(includeMetadata = false) {
     name: channelAlias.name,
     app_id: channelAlias.app_id,
     allow_dev: channelAlias.allow_dev,
+    allow_prod: channelAlias.allow_prod,
     allow_emulator: channelAlias.allow_emulator,
+    allow_device: channelAlias.allow_device,
     disable_auto_update_under_native: channelAlias.disable_auto_update_under_native,
     disable_auto_update: channelAlias.disable_auto_update,
     ios: channelAlias.ios,
@@ -687,15 +689,23 @@ export async function getCompatibleChannelsPg(
   isEmulator: boolean,
   isProd: boolean,
   drizzleClient: ReturnType<typeof getDrizzleClient>,
-): Promise<{ id: number, name: string, allow_device_self_set: boolean, allow_emulator: boolean, allow_dev: boolean, ios: boolean, android: boolean, public: boolean }[]> {
+): Promise<{ id: number, name: string, allow_device_self_set: boolean, allow_emulator: boolean, allow_device: boolean, allow_dev: boolean, allow_prod: boolean, ios: boolean, android: boolean, public: boolean }[]> {
   try {
-    const channels = await drizzleClient
+    const deviceCondition = isEmulator
+      ? eq(schema.channels.allow_emulator, true)
+      : eq(schema.channels.allow_device, true)
+    const buildCondition = isProd
+      ? eq(schema.channels.allow_prod, true)
+      : eq(schema.channels.allow_dev, true)
+  const channels = await drizzleClient
       .select({
         id: schema.channels.id,
         name: schema.channels.name,
         allow_device_self_set: schema.channels.allow_device_self_set,
         allow_emulator: schema.channels.allow_emulator,
+        allow_device: schema.channels.allow_device,
         allow_dev: schema.channels.allow_dev,
+        allow_prod: schema.channels.allow_prod,
         ios: schema.channels.ios,
         android: schema.channels.android,
         public: schema.channels.public,
@@ -703,9 +713,9 @@ export async function getCompatibleChannelsPg(
       .from(schema.channels)
       .where(and(
         eq(schema.channels.app_id, appId),
-        eq(schema.channels.allow_device_self_set, true),
-        eq(schema.channels.allow_emulator, isEmulator),
-        eq(schema.channels.allow_dev, isProd),
+        or(eq(schema.channels.allow_device_self_set, true), eq(schema.channels.public, true)),
+        deviceCondition,
+        buildCondition,
         eq(platform === 'ios' ? schema.channels.ios : schema.channels.android, true),
       ))
     return channels

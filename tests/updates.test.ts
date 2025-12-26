@@ -381,6 +381,24 @@ describe('update scenarios', () => {
     expect(json.error).toBe('disable_emulator')
   })
 
+  it('disallow device', async () => {
+    await getSupabaseClient().from('channels').update({ allow_device: false }).eq('name', 'production').eq('app_id', APP_NAME_UPDATE)
+
+    try {
+      const baseData = getBaseData(APP_NAME_UPDATE)
+      baseData.version_name = '1.1.0'
+      baseData.is_emulator = false
+
+      const response = await postUpdate(baseData)
+      expect(response.status).toBe(200)
+      const json = await response.json<UpdateRes>()
+      expect(json.error).toBe('disable_device')
+    }
+    finally {
+      await getSupabaseClient().from('channels').update({ allow_device: true }).eq('name', 'production').eq('app_id', APP_NAME_UPDATE)
+    }
+  })
+
   it('development build', async () => {
     await getSupabaseClient().from('channels').update({ allow_dev: false }).eq('name', 'production').eq('app_id', APP_NAME_UPDATE)
 
@@ -392,6 +410,24 @@ describe('update scenarios', () => {
     expect(response.status).toBe(200)
     const json = await response.json<UpdateRes>()
     expect(json.error).toBe('disable_dev_build')
+  })
+
+  it('production build', async () => {
+    await getSupabaseClient().from('channels').update({ allow_prod: false }).eq('name', 'production').eq('app_id', APP_NAME_UPDATE)
+
+    try {
+      const baseData = getBaseData(APP_NAME_UPDATE)
+      baseData.version_name = '1.1.0'
+      baseData.is_prod = true
+
+      const response = await postUpdate(baseData)
+      expect(response.status).toBe(200)
+      const json = await response.json<UpdateRes>()
+      expect(json.error).toBe('disable_prod_build')
+    }
+    finally {
+      await getSupabaseClient().from('channels').update({ allow_prod: true }).eq('name', 'production').eq('app_id', APP_NAME_UPDATE)
+    }
   })
 
   it('channel overwrite', async () => {
@@ -412,7 +448,7 @@ describe('update scenarios', () => {
 
     expect(data2?.length).toBe(1)
 
-    await getSupabaseClient().from('channels').update({ disable_auto_update: 'none', allow_dev: true, allow_emulator: true, android: true }).eq('name', 'no_access').eq('app_id', APP_NAME_UPDATE)
+    await getSupabaseClient().from('channels').update({ disable_auto_update: 'none', allow_dev: true, allow_prod: true, allow_emulator: true, allow_device: true, android: true }).eq('name', 'no_access').eq('app_id', APP_NAME_UPDATE)
 
     const baseData = getBaseData(APP_NAME_UPDATE)
     baseData.device_id = uuid
