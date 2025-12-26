@@ -238,6 +238,60 @@ export type Database = {
           },
         ]
       }
+      audit_logs: {
+        Row: {
+          id: number
+          created_at: string
+          table_name: string
+          record_id: string
+          operation: string
+          user_id: string | null
+          org_id: string
+          old_record: Json | null
+          new_record: Json | null
+          changed_fields: string[] | null
+        }
+        Insert: {
+          id?: number
+          created_at?: string
+          table_name: string
+          record_id: string
+          operation: string
+          user_id?: string | null
+          org_id: string
+          old_record?: Json | null
+          new_record?: Json | null
+          changed_fields?: string[] | null
+        }
+        Update: {
+          id?: number
+          created_at?: string
+          table_name?: string
+          record_id?: string
+          operation?: string
+          user_id?: string | null
+          org_id?: string
+          old_record?: Json | null
+          new_record?: Json | null
+          changed_fields?: string[] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_logs_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "audit_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       apps: {
         Row: {
           app_id: string
@@ -443,6 +497,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      cache_entry: {
+        Row: {
+          cached_at: string | null
+          end_date: string | null
+          id: number | null
+          org_id: string | null
+          response: Json | null
+          start_date: string | null
+        }
+        Insert: {
+          cached_at?: string | null
+          end_date?: string | null
+          id?: number | null
+          org_id?: string | null
+          response?: Json | null
+          start_date?: string | null
+        }
+        Update: {
+          cached_at?: string | null
+          end_date?: string | null
+          id?: number | null
+          org_id?: string | null
+          response?: Json | null
+          start_date?: string | null
+        }
+        Relationships: []
       }
       capgo_credits_steps: {
         Row: {
