@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
-import { onMounted, ref, watch } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AuditLogTable from '~/components/tables/AuditLogTable.vue'
 import { useDisplayStore } from '~/stores/display'

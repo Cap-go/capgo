@@ -306,7 +306,7 @@ watch([page, search], () => {
         <div v-if="selectedLog" class="space-y-4">
           <!-- Header info -->
           <div class="flex flex-wrap items-center gap-2">
-            <span :class="['badge', getOperationClass(selectedLog.operation)]">
+            <span class="badge" :class="getOperationClass(selectedLog.operation)">
               {{ getOperationLabel(selectedLog.operation) }}
             </span>
             <span class="text-sm text-base-content/70">
