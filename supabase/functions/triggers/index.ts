@@ -19,6 +19,8 @@ import { app as on_version_create } from '../_backend/triggers/on_version_create
 import { app as on_version_delete } from '../_backend/triggers/on_version_delete.ts'
 import { app as on_version_update } from '../_backend/triggers/on_version_update.ts'
 import { app as queue_consumer } from '../_backend/triggers/queue_consumer.ts'
+import { app as webhook_delivery } from '../_backend/triggers/webhook_delivery.ts'
+import { app as webhook_dispatcher } from '../_backend/triggers/webhook_dispatcher.ts'
 import { app as stripe_event } from '../_backend/triggers/stripe_event.ts'
 import { createAllCatch, createHono } from '../_backend/utils/hono.ts'
 import { version } from '../_backend/utils/version.ts'
@@ -48,6 +50,8 @@ appGlobal.route('/credit_usage_alerts', credit_usage_alerts)
 appGlobal.route('/on_organization_delete', on_organization_delete)
 appGlobal.route('/on_deploy_history_create', on_deploy_history_create)
 appGlobal.route('/queue_consumer', queue_consumer)
+appGlobal.route('/webhook_delivery', webhook_delivery)
+appGlobal.route('/webhook_dispatcher', webhook_dispatcher)
 
 createAllCatch(appGlobal, functionName)
 Deno.serve(appGlobal.fetch)
