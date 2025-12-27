@@ -5733,8 +5733,6 @@ REVOKE ALL ON FUNCTION "public"."get_orgs_v6" ("userid" "uuid")
 FROM
   PUBLIC;
 
-GRANT ALL ON FUNCTION "public"."get_orgs_v6" ("userid" "uuid") TO "anon";
-
 GRANT ALL ON FUNCTION "public"."get_orgs_v6" ("userid" "uuid") TO "authenticated";
 
 GRANT ALL ON FUNCTION "public"."get_orgs_v6" ("userid" "uuid") TO "service_role";
