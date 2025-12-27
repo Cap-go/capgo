@@ -286,12 +286,12 @@ const selectedLogChanges = computed(() => {
   )
 })
 
-watch([() => props.orgId, selectedTableFilter, selectedOperationFilter], () => {
+watch([() => props.orgId, selectedTableFilter, selectedOperationFilter, search], () => {
   page.value = 1
   fetchAuditLogs()
 })
 
-watch([page, search], () => {
+watch(page, () => {
   fetchAuditLogs()
 })
 
