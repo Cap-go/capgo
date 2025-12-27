@@ -334,7 +334,7 @@ BEGIN
   IF current_second % 10 = 0 THEN
     -- Process high-frequency queues with default batch size (950)
     BEGIN
-      PERFORM public.process_function_queue(ARRAY['on_channel_update', 'on_user_create', 'on_user_update', 'on_version_delete', 'on_version_update', 'on_app_delete', 'on_organization_create', 'on_user_delete', 'on_app_create', 'webhook_dispatcher', 'webhook_delivery']);
+      PERFORM public.process_function_queue(ARRAY['on_channel_update', 'on_user_create', 'on_user_update', 'on_version_create', 'on_version_delete', 'on_version_update', 'on_app_delete', 'on_organization_create', 'on_user_delete', 'on_app_create', 'credit_usage_alerts', 'webhook_dispatcher', 'webhook_delivery']);
     EXCEPTION WHEN OTHERS THEN
       RAISE WARNING 'process_function_queue (high-frequency) failed: %', SQLERRM;
     END;
@@ -346,12 +346,6 @@ BEGIN
       RAISE WARNING 'process_channel_device_counts_queue failed: %', SQLERRM;
     END;
 
-    -- Process manifest bundle counts with batch size 1000
-    BEGIN
-      PERFORM public.process_manifest_bundle_counts_queue(1000);
-    EXCEPTION WHEN OTHERS THEN
-      RAISE WARNING 'process_manifest_bundle_counts_queue failed: %', SQLERRM;
-    END;
   END IF;
 
   -- Every minute (at :00 seconds): Per-minute tasks
@@ -398,7 +392,7 @@ BEGIN
   -- Every 2 hours (at :00:00): Low-frequency queues with default batch size
   IF current_hour % 2 = 0 AND current_minute = 0 AND current_second = 0 THEN
     BEGIN
-      PERFORM public.process_function_queue(ARRAY['admin_stats', 'cron_email', 'on_version_create', 'on_organization_delete', 'on_deploy_history_create', 'cron_clear_versions']);
+      PERFORM public.process_function_queue(ARRAY['admin_stats', 'cron_email', 'on_organization_delete', 'on_deploy_history_create', 'cron_clear_versions']);
     EXCEPTION WHEN OTHERS THEN
       RAISE WARNING 'process_function_queue (low-frequency) failed: %', SQLERRM;
     END;
