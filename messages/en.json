@@ -9,6 +9,8 @@
   "CustomId": "Custom ID",
   "Filters": "Filters",
   "filter-actions": "Actions",
+  "filter-by-table": "Filter by table",
+  "filter-by-operation": "Filter by operation",
   "Information": "Information",
   "Logs": "Logs",
   "general": "General",

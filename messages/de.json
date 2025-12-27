@@ -651,6 +651,8 @@
   "fast-forward": "Schneller Vorlauf",
   "feel-magic-of-capgo": "Fühle die Magie von:",
   "filter-actions": "Aktionen",
+  "filter-by-table": "Nach Tabelle filtern",
+  "filter-by-operation": "Nach Operation filtern",
   "first-name": "Vorname",
   "first-name-required": "Vorname erforderlich",
   "force-version": "Versionskraft",

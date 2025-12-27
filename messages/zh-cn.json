@@ -651,6 +651,8 @@
   "fast-forward": "快进",
   "feel-magic-of-capgo": "感受这种魔力：",
   "filter-actions": "行动",
+  "filter-by-table": "按表格筛选",
+  "filter-by-operation": "按操作筛选",
   "first-name": "名",
   "first-name-required": "需要名字",
   "force-version": "强制版本",

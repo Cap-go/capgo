@@ -54,20 +54,20 @@ const selectedOperationFilter = ref<string>('')
 const selectedLog = ref<ExtendedAuditLog | null>(null)
 const isModalOpen = ref(false)
 
-const tableOptions = [
+const tableOptions = computed(() => [
   { value: '', label: t('all-tables') },
   { value: 'orgs', label: t('organizations') },
   { value: 'channels', label: t('channels') },
   { value: 'app_versions', label: t('bundles') },
   { value: 'org_users', label: t('members') },
-]
+])
 
-const operationOptions = [
+const operationOptions = computed(() => [
   { value: '', label: t('all-operations') },
   { value: 'INSERT', label: t('created') },
   { value: 'UPDATE', label: t('updated') },
   { value: 'DELETE', label: t('deleted') },
-]
+])
 
 function getOperationLabel(operation: string): string {
   switch (operation) {
@@ -306,6 +306,7 @@ onMounted(() => {
     <div class="flex flex-wrap gap-4 items-center">
       <select
         v-model="selectedTableFilter"
+        :aria-label="t('filter-by-table')"
         class="select select-bordered select-sm"
       >
         <option v-for="option in tableOptions" :key="option.value" :value="option.value">
@@ -315,6 +316,7 @@ onMounted(() => {
 
       <select
         v-model="selectedOperationFilter"
+        :aria-label="t('filter-by-operation')"
         class="select select-bordered select-sm"
       >
         <option v-for="option in operationOptions" :key="option.value" :value="option.value">

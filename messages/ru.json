@@ -651,6 +651,8 @@
   "fast-forward": "Быстрая перемотка",
   "feel-magic-of-capgo": "Почувствуй магию:",
   "filter-actions": "Действия",
+  "filter-by-table": "Фильтровать по таблице",
+  "filter-by-operation": "Фильтровать по операции",
   "first-name": "Имя",
   "first-name-required": "Требуется имя",
   "force-version": "Версия принудительно",

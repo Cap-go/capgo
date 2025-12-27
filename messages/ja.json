@@ -651,6 +651,8 @@
   "fast-forward": "早送り",
   "feel-magic-of-capgo": "の魔法を感じてみてください：",
   "filter-actions": "アクション",
+  "filter-by-table": "テーブルでフィルター",
+  "filter-by-operation": "操作でフィルター",
   "first-name": "名前",
   "first-name-required": "名前が必要です",
   "force-version": "強制バージョン",

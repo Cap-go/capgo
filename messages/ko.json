@@ -651,6 +651,8 @@
   "fast-forward": "빨리 감기",
   "feel-magic-of-capgo": "다음의 마법을 느껴보세요:",
   "filter-actions": "행동들",
+  "filter-by-table": "테이블별 필터",
+  "filter-by-operation": "작업별 필터",
   "first-name": "이름",
   "first-name-required": "이름이 필요합니다",
   "force-version": "강제 버전",

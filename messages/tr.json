@@ -651,6 +651,8 @@
   "fast-forward": "Hızlı İleri Sar",
   "feel-magic-of-capgo": "Şunun büyüsünü hisset:",
   "filter-actions": "Eylemler",
+  "filter-by-table": "Tabloya göre filtrele",
+  "filter-by-operation": "İşleme göre filtrele",
   "first-name": "İsim",
   "first-name-required": "İsim gereklidir",
   "force-version": "Zorunlu sürüm",
