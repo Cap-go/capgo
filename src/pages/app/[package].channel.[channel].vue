@@ -90,7 +90,9 @@ async function getChannel(force = false) {
           created_at,
           app_id,
           allow_emulator,
+          allow_device,
           allow_dev,
+          allow_prod,
           allow_device_self_set,
           disable_auto_update_under_native,
           disable_auto_update,
@@ -612,10 +614,22 @@ function openLink(url?: string): void {
                 @change="saveChannelChange('allow_dev', !channel?.allow_dev)"
               />
             </InfoRow>
+            <InfoRow :label="t('allow-prod-build')">
+              <Toggle
+                :value="channel?.allow_prod"
+                @change="saveChannelChange('allow_prod', !channel?.allow_prod)"
+              />
+            </InfoRow>
             <InfoRow :label="t('allow-emulator')">
               <Toggle
                 :value="channel?.allow_emulator"
                 @change="saveChannelChange('allow_emulator', !channel?.allow_emulator)"
+              />
+            </InfoRow>
+            <InfoRow :label="t('allow-physical-device')">
+              <Toggle
+                :value="channel?.allow_device"
+                @change="saveChannelChange('allow_device', !channel?.allow_device)"
               />
             </InfoRow>
             <InfoRow :label="t('allow-device-to-self')">

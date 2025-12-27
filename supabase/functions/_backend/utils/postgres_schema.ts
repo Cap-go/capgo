@@ -76,7 +76,9 @@ export const channels = pgTable('channels', {
   android: boolean('android').notNull().default(true),
   allow_device_self_set: boolean('allow_device_self_set').default(false).notNull(),
   allow_emulator: boolean('allow_emulator').notNull().default(true),
+  allow_device: boolean('allow_device').notNull().default(true),
   allow_dev: boolean('allow_dev').notNull().default(true),
+  allow_prod: boolean('allow_prod').notNull().default(true),
 })
 
 export const channel_devices = pgTable('channel_devices', {

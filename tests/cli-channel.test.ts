@@ -39,7 +39,9 @@ async function createChannel(channelName: string, appId: string) {
       disable_auto_update: 'major' as const,
       allow_device_self_set: false,
       allow_emulator: false,
+      allow_device: false,
       allow_dev: false,
+      allow_prod: false,
       ios: false,
       android: false,
     })
