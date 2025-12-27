@@ -18,6 +18,7 @@ import { useDebounceFn } from '@vueuse/core'
 import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
 import { useOrganizationStore } from '~/stores/organization'
+import { useDialogV2Store } from '~/stores/dialogv2'
 
 interface AuditLogRow {
   id: number
@@ -46,6 +47,7 @@ const props = defineProps<{
 const { t } = useI18n()
 const supabase = useSupabase()
 const organizationStore = useOrganizationStore()
+const dialogStore = useDialogV2Store()
 
 const auditLogs = ref<ExtendedAuditLog[]>([])
 const membersMap = ref<Map<string, { uid: string, email: string }>>(new Map())
@@ -58,7 +60,6 @@ const pageSize = 20
 
 // Modal state
 const selectedLog = ref<ExtendedAuditLog | null>(null)
-const isModalOpen = ref(false)
 
 // Filter dropdown state - similar to LogTable
 const filterDropdownOpen = ref(false)
@@ -243,13 +244,13 @@ function getOperationClass(operation: string): string {
   }
 }
 
-function openDetails(item: ExtendedAuditLog) {
+async function openDetails(item: ExtendedAuditLog) {
   selectedLog.value = item
-  isModalOpen.value = true
-}
-
-function closeModal() {
-  isModalOpen.value = false
+  dialogStore.openDialog({
+    title: t('audit-log-details'),
+    size: 'xl',
+  })
+  await dialogStore.onDialogDismiss()
   selectedLog.value = null
 }
 
@@ -572,91 +573,78 @@ onUnmounted(() => {
       </button>
     </nav>
 
-    <!-- Details Modal -->
-    <dialog :open="isModalOpen" class="modal modal-bottom sm:modal-middle">
-      <div class="modal-box max-w-3xl">
-        <div class="flex justify-between items-center mb-4">
-          <h3 class="font-bold text-lg">
-            {{ t('audit-log-details') }}
-          </h3>
-          <button class="btn btn-sm btn-circle btn-ghost" @click="closeModal">
-            <IconX class="w-5 h-5" />
-          </button>
+    <!-- Details Modal Content -->
+    <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('audit-log-details')" defer to="#dialog-v2-content">
+      <div v-if="selectedLog" class="space-y-4">
+        <div class="flex flex-wrap items-center gap-2">
+          <span
+            class="px-2 py-1 text-xs font-medium rounded"
+            :class="{
+              'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300': selectedLog.operation === 'INSERT',
+              'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300': selectedLog.operation === 'UPDATE',
+              'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300': selectedLog.operation === 'DELETE',
+            }"
+          >
+            {{ getOperationLabel(selectedLog.operation) }}
+          </span>
+          <span class="text-sm text-gray-600 dark:text-gray-400">
+            {{ getTableLabel(selectedLog.table_name) }} #{{ selectedLog.record_id }}
+          </span>
+          <span class="text-sm text-gray-500 dark:text-gray-500">
+            {{ formatDate(selectedLog.created_at) }}
+          </span>
         </div>
 
-        <div v-if="selectedLog" class="space-y-4">
-          <div class="flex flex-wrap items-center gap-2">
-            <span class="badge" :class="getOperationClass(selectedLog.operation)">
-              {{ getOperationLabel(selectedLog.operation) }}
-            </span>
-            <span class="text-sm text-base-content/70">
-              {{ getTableLabel(selectedLog.table_name) }} #{{ selectedLog.record_id }}
-            </span>
-            <span class="text-sm text-base-content/50">
-              {{ formatDate(selectedLog.created_at) }}
-            </span>
-          </div>
+        <div v-if="selectedLog.user" class="text-sm text-gray-700 dark:text-gray-300">
+          <span class="font-medium">{{ t('email') }}:</span>
+          {{ selectedLog.user.email }}
+        </div>
 
-          <div v-if="selectedLog.user" class="text-sm">
-            <span class="font-medium">{{ t('email') }}:</span>
-            {{ selectedLog.user.email }}
-          </div>
-
-          <div v-if="selectedLog.operation === 'UPDATE' && selectedLog.changed_fields?.length">
-            <h4 class="font-semibold mb-2">
-              {{ t('changes') }}
-            </h4>
-            <div class="space-y-3">
-              <div
-                v-for="change in selectedLogChanges"
-                :key="change.field"
-                class="border border-base-300 rounded-lg p-3"
-              >
-                <div class="font-medium text-sm mb-2">
-                  {{ change.field }}
+        <div v-if="selectedLog.operation === 'UPDATE' && selectedLog.changed_fields?.length">
+          <h4 class="font-semibold mb-2 text-gray-900 dark:text-white">
+            {{ t('changes') }}
+          </h4>
+          <div class="space-y-3">
+            <div
+              v-for="change in selectedLogChanges"
+              :key="change.field"
+              class="border border-gray-200 dark:border-gray-700 rounded-lg p-3"
+            >
+              <div class="font-medium text-sm mb-2 text-gray-900 dark:text-white">
+                {{ change.field }}
+              </div>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                <div class="bg-red-50 dark:bg-red-900/20 p-2 rounded text-xs overflow-x-auto">
+                  <div class="text-red-600 dark:text-red-400 text-xs mb-1">
+                    {{ t('before') }}
+                  </div>
+                  <pre class="text-red-700 dark:text-red-300 font-mono whitespace-pre-wrap break-all">{{ change.oldValue }}</pre>
                 </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
-                  <div class="bg-error/10 p-2 rounded text-xs overflow-x-auto">
-                    <div class="text-error/70 text-xs mb-1">
-                      {{ t('before') }}
-                    </div>
-                    <pre class="text-error font-mono whitespace-pre-wrap break-all">{{ change.oldValue }}</pre>
+                <div class="bg-green-50 dark:bg-green-900/20 p-2 rounded text-xs overflow-x-auto">
+                  <div class="text-green-600 dark:text-green-400 text-xs mb-1">
+                    {{ t('after') }}
                   </div>
-                  <div class="bg-success/10 p-2 rounded text-xs overflow-x-auto">
-                    <div class="text-success/70 text-xs mb-1">
-                      {{ t('after') }}
-                    </div>
-                    <pre class="text-success font-mono whitespace-pre-wrap break-all">{{ change.newValue }}</pre>
-                  </div>
+                  <pre class="text-green-700 dark:text-green-300 font-mono whitespace-pre-wrap break-all">{{ change.newValue }}</pre>
                 </div>
               </div>
             </div>
           </div>
-
-          <div v-else-if="selectedLog.operation === 'INSERT'">
-            <h4 class="font-semibold mb-2">
-              {{ t('new-record') }}
-            </h4>
-            <pre class="bg-base-200 p-4 rounded-lg text-xs overflow-x-auto whitespace-pre-wrap">{{ formatJson(selectedLog.new_record) }}</pre>
-          </div>
-
-          <div v-else-if="selectedLog.operation === 'DELETE'">
-            <h4 class="font-semibold mb-2">
-              {{ t('deleted-record') }}
-            </h4>
-            <pre class="bg-base-200 p-4 rounded-lg text-xs overflow-x-auto whitespace-pre-wrap">{{ formatJson(selectedLog.old_record) }}</pre>
-          </div>
         </div>
 
-        <div class="modal-action">
-          <button class="btn" @click="closeModal">
-            {{ t('close') }}
-          </button>
+        <div v-else-if="selectedLog.operation === 'INSERT'">
+          <h4 class="font-semibold mb-2 text-gray-900 dark:text-white">
+            {{ t('new-record') }}
+          </h4>
+          <pre class="bg-gray-100 dark:bg-gray-700 p-4 rounded-lg text-xs overflow-x-auto whitespace-pre-wrap text-gray-800 dark:text-gray-200">{{ formatJson(selectedLog.new_record) }}</pre>
+        </div>
+
+        <div v-else-if="selectedLog.operation === 'DELETE'">
+          <h4 class="font-semibold mb-2 text-gray-900 dark:text-white">
+            {{ t('deleted-record') }}
+          </h4>
+          <pre class="bg-gray-100 dark:bg-gray-700 p-4 rounded-lg text-xs overflow-x-auto whitespace-pre-wrap text-gray-800 dark:text-gray-200">{{ formatJson(selectedLog.old_record) }}</pre>
         </div>
       </div>
-      <form method="dialog" class="modal-backdrop" @click="closeModal">
-        <button>close</button>
-      </form>
-    </dialog>
+    </Teleport>
   </div>
 </template>
