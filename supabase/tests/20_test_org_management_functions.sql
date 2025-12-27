@@ -55,7 +55,8 @@ SELECT
 
 SELECT tests.clear_authentication();
 
--- Test get_orgs_v6 with userid
+-- Test get_orgs_v6 with userid (requires service_role since function is private)
+SELECT tests.authenticate_as_service_role();
 SELECT
     ok(
         (
@@ -65,6 +66,7 @@ SELECT
         ) >= 0,
         'get_orgs_v6 test - returns organizations for admin user'
     );
+SELECT tests.clear_authentication();
 
 -- Test get_orgs_v6 with API key
 -- Test 1: Valid API key without limitations

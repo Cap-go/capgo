@@ -62,13 +62,13 @@ VALUES (test_app_id_minimal, '1.0.old.zero', 'r2', '2020-01-01 00:00:00'::timest
 RETURNING id INTO version_id_zero;
 
 -- Create a channel for our test app to test channel protection
-INSERT INTO channels (created_at, name, app_id, version, updated_at, public, 
-                     disable_auto_update_under_native, disable_auto_update, ios, android, 
-                     allow_device_self_set, allow_emulator, allow_dev, created_by, owner_org)
-VALUES (now(), 'production', test_app_id, version_id_linked, now(), 't', 
-        't', 'major'::"public"."disable_update", 'f', 't', 
-        't', 't', 't', 
-        '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid, 
+INSERT INTO channels (created_at, name, app_id, version, updated_at, public,
+                     disable_auto_update_under_native, disable_auto_update, ios, android,
+                     allow_device_self_set, allow_emulator, allow_device, allow_dev, allow_prod, created_by, owner_org)
+VALUES (now(), 'production', test_app_id, version_id_linked, now(), 't',
+        't', 'major'::"public"."disable_update", 'f', 't',
+        't', 't', 't', 't', 't',
+        '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid,
         (SELECT owner_org FROM apps WHERE app_id = test_app_id));
 
 -- Freeze time to 2035 to ensure retention periods have passed
