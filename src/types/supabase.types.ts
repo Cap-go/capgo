@@ -624,8 +624,10 @@ export type Database = {
       channels: {
         Row: {
           allow_dev: boolean
+          allow_device: boolean
           allow_device_self_set: boolean
           allow_emulator: boolean
+          allow_prod: boolean
           android: boolean
           app_id: string
           created_at: string
@@ -642,8 +644,10 @@ export type Database = {
         }
         Insert: {
           allow_dev?: boolean
+          allow_device?: boolean
           allow_device_self_set?: boolean
           allow_emulator?: boolean
+          allow_prod?: boolean
           android?: boolean
           app_id: string
           created_at?: string
@@ -660,8 +664,10 @@ export type Database = {
         }
         Update: {
           allow_dev?: boolean
+          allow_device?: boolean
           allow_device_self_set?: boolean
           allow_emulator?: boolean
+          allow_prod?: boolean
           android?: boolean
           app_id?: string
           created_at?: string
@@ -2725,7 +2731,9 @@ export type Database = {
         | "disableAutoUpdateMetadata"
         | "disableAutoUpdateUnderNative"
         | "disableDevBuild"
+        | "disableProdBuild"
         | "disableEmulator"
+        | "disableDevice"
         | "cannotGetBundle"
         | "checksum_fail"
         | "NoChannelOrOverride"
@@ -2975,7 +2983,9 @@ export const Constants = {
         "disableAutoUpdateMetadata",
         "disableAutoUpdateUnderNative",
         "disableDevBuild",
+        "disableProdBuild",
         "disableEmulator",
+        "disableDevice",
         "cannotGetBundle",
         "checksum_fail",
         "NoChannelOrOverride",

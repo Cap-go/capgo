@@ -304,10 +304,26 @@ export async function updateWithPG(
       })
     }
 
+    if (!channelData.channels.allow_prod && body.is_prod) {
+      cloudlog({ requestId: c.get('requestId'), message: 'Cannot update prod build is disabled', id: device_id, date: new Date().toISOString() })
+      await sendStatsAndDevice(c, device, [{ action: 'disableProdBuild', versionName: version.name }])
+      return simpleError200(c, 'disable_prod_build', 'Cannot update, prod build is disabled', {
+        version: version.name,
+        old: version_name,
+      })
+    }
     if (!channelData.channels.allow_dev && !body.is_prod) {
       cloudlog({ requestId: c.get('requestId'), message: 'Cannot update dev build is disabled', id: device_id, date: new Date().toISOString() })
       await sendStatsAndDevice(c, device, [{ action: 'disableDevBuild', versionName: version.name }])
       return simpleError200(c, 'disable_dev_build', 'Cannot update, dev build is disabled', {
+        version: version.name,
+        old: version_name,
+      })
+    }
+    if (!channelData.channels.allow_device && !body.is_emulator) {
+      cloudlog({ requestId: c.get('requestId'), message: 'Cannot update device is disabled', id: device_id, date: new Date().toISOString() })
+      await sendStatsAndDevice(c, device, [{ action: 'disableDevice', versionName: version.name }])
+      return simpleError200(c, 'disable_device', 'Cannot update, device is disabled', {
         version: version.name,
         old: version_name,
       })

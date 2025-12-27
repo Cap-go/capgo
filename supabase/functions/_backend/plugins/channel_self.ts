@@ -124,7 +124,15 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
   }
 
   if (!dataChannel.allow_device_self_set) {
-    return simpleError200(c, 'channel_self_set_not_allowed', `This channel does not allow devices to self associate`, { channel, app_id })
+    if (dataChannel.public) {
+      return simpleError200(
+        c,
+        'public_channel_self_set_not_allowed',
+        'This channel is public and does not allow device self-assignment. Unset the channel and the device will automatically use the public channel.',
+        { channel, app_id },
+      )
+    }
+    return simpleError200(c, 'channel_self_set_not_allowed', 'This channel does not allow devices to self associate', { channel, app_id })
   }
 
   // Check if plugin version supports local channel storage (5.34.0+, 6.34.0+, 7.34.0+)
@@ -456,14 +464,13 @@ async function listCompatibleChannels(c: Context, drizzleClient: ReturnType<type
   }
   await setAppStatus(c, app_id, 'cloud')
 
-  // Get channels that allow device self set and are compatible with the platform - Read operation can use v2 flag
+  // Channels compatible with platform/device/build AND (public OR allow_device_self_set)
   const channels = await getCompatibleChannelsPg(c, app_id, platform as 'ios' | 'android', is_emulator!, is_prod!, drizzleClient as ReturnType<typeof getDrizzleClient>)
 
   if (!channels || channels.length === 0) {
     return c.json([])
   }
 
-  // Return the compatible channels
   const compatibleChannels = channels.map((channel: { id: number, name: string, public: boolean, allow_device_self_set: boolean }) => ({
     id: channel.id,
     name: channel.name,

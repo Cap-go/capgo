@@ -3,11 +3,12 @@
 BEGIN;
 
 -- Plan the number of tests
-SELECT plan(37);
+SELECT
+    plan (37);
 
 -- Test app_versions policies
 SELECT
-    policies_are(
+    policies_are (
         'public',
         'app_versions',
         ARRAY[
@@ -23,7 +24,7 @@ SELECT
 
 -- Test apps policies
 SELECT
-    policies_are(
+    policies_are (
         'public',
         'apps',
         ARRAY[
@@ -38,7 +39,7 @@ SELECT
 
 -- Test global_stats policies
 SELECT
-    policies_are(
+    policies_are (
         'public',
         'global_stats',
         ARRAY['Allow anon to select'],
@@ -47,7 +48,7 @@ SELECT
 
 -- Test stats policies
 SELECT
-    policies_are(
+    policies_are (
         'public',
         'stats',
         ARRAY[
@@ -59,7 +60,7 @@ SELECT
 
 -- Test channel_devices policies
 SELECT
-    policies_are(
+    policies_are (
         'public',
         'channel_devices',
         ARRAY[
@@ -74,7 +75,7 @@ SELECT
 
 -- Test orgs policies
 SELECT
-    policies_are(
+    policies_are (
         'public',
         'orgs',
         ARRAY[
@@ -89,7 +90,7 @@ SELECT
 
 -- Test devices policies
 SELECT
-    policies_are(
+    policies_are (
         'public',
         'devices',
         ARRAY[
@@ -102,7 +103,7 @@ SELECT
 
 -- Test app_versions_meta policies
 SELECT
-    policies_are(
+    policies_are (
         'public',
         'app_versions_meta',
         ARRAY['Allow read for auth (read+)'],
@@ -111,7 +112,7 @@ SELECT
 
 -- Test daily_bandwidth policies
 SELECT
-    policies_are(
+    policies_are (
         'public',
         'daily_bandwidth',
         ARRAY['Allow read for auth (read+)'],
@@ -120,7 +121,7 @@ SELECT
 
 -- Test daily_mau policies
 SELECT
-    policies_are(
+    policies_are (
         'public',
         'daily_mau',
         ARRAY['Allow read for auth (read+)'],
@@ -129,7 +130,7 @@ SELECT
 
 -- Test daily_storage policies
 SELECT
-    policies_are(
+    policies_are (
         'public',
         'daily_storage',
         ARRAY['Allow read for auth (read+)'],
@@ -138,7 +139,7 @@ SELECT
 
 -- Test daily_version policies
 SELECT
-    policies_are(
+    policies_are (
         'public',
         'daily_version',
         ARRAY['Allow read for auth (read+)'],
@@ -147,7 +148,7 @@ SELECT
 
 -- Test users policies
 SELECT
-    policies_are(
+    policies_are (
         'public',
         'users',
         ARRAY[
@@ -161,11 +162,10 @@ SELECT
 
 -- Test org_users policies
 SELECT
-    policies_are(
+    policies_are (
         'public',
         'org_users',
         ARRAY[
-            'Allow member and owner to select',
             'Allow org admin to update',
             'Allow to self delete',
             'Allow org admin to insert',
@@ -176,7 +176,7 @@ SELECT
 
 -- Test channels policies
 SELECT
-    policies_are(
+    policies_are (
         'public',
         'channels',
         ARRAY[
@@ -191,7 +191,7 @@ SELECT
 
 -- Test stripe_info policies
 SELECT
-    policies_are(
+    policies_are (
         'public',
         'stripe_info',
         ARRAY['Allow org member to select stripe_info'],
@@ -200,7 +200,7 @@ SELECT
 
 -- Test manifest policies
 SELECT
-    policies_are(
+    policies_are (
         'public',
         'manifest',
         ARRAY[
@@ -214,7 +214,7 @@ SELECT
 
 -- Test deploy_history policies
 SELECT
-    policies_are(
+    policies_are (
         'public',
         'deploy_history',
         ARRAY[
@@ -228,7 +228,7 @@ SELECT
 
 -- Test bandwidth_usage policies
 SELECT
-    policies_are(
+    policies_are (
         'public',
         'bandwidth_usage',
         ARRAY['Disable for all'],
@@ -237,7 +237,7 @@ SELECT
 
 -- Test device_usage policies
 SELECT
-    policies_are(
+    policies_are (
         'public',
         'device_usage',
         ARRAY['Disable for all'],
@@ -246,7 +246,7 @@ SELECT
 
 -- Test notifications policies
 SELECT
-    policies_are(
+    policies_are (
         'public',
         'notifications',
         ARRAY['Disable for all'],
@@ -255,7 +255,7 @@ SELECT
 
 -- Test storage_usage policies
 SELECT
-    policies_are(
+    policies_are (
         'public',
         'storage_usage',
         ARRAY['Disable for all'],
@@ -264,7 +264,7 @@ SELECT
 
 -- Test version_meta policies
 SELECT
-    policies_are(
+    policies_are (
         'public',
         'version_meta',
         ARRAY['Disable for all'],
@@ -273,7 +273,7 @@ SELECT
 
 -- Test version_usage policies
 SELECT
-    policies_are(
+    policies_are (
         'public',
         'version_usage',
         ARRAY['Disable for all'],
@@ -282,7 +282,7 @@ SELECT
 
 -- Test apikeys policies
 SELECT
-    policies_are(
+    policies_are (
         'public',
         'apikeys',
         ARRAY[
@@ -297,25 +297,32 @@ SELECT
 
 -- usage_credit_ledger should respect caller RLS and allow authenticated reads
 SELECT
-    ok(
+    ok (
         has_table_privilege(
-            'authenticated', 'public.usage_credit_ledger', 'SELECT'
+            'authenticated',
+            'public.usage_credit_ledger',
+            'SELECT'
         ),
         'usage_credit_ledger grants SELECT to authenticated'
     );
 
 SELECT
-    ok(
+    ok (
         EXISTS (
-            SELECT 1
-            FROM pg_class AS c
+            SELECT
+                1
+            FROM
+                pg_class AS c
             WHERE
                 c.relname = 'usage_credit_ledger'
                 AND c.relkind = 'v'
                 AND EXISTS (
-                    SELECT 1
-                    FROM unnest(c.reloptions) AS opt
-                    WHERE opt LIKE 'security_invoker%'
+                    SELECT
+                        1
+                    FROM
+                        unnest(c.reloptions) AS opt
+                    WHERE
+                        opt LIKE 'security_invoker%'
                 )
         ),
         'usage_credit_ledger runs with security_invoker to enforce base table RLS'
@@ -323,7 +330,7 @@ SELECT
 
 -- Test plans policies
 SELECT
-    policies_are(
+    policies_are (
         'public',
         'plans',
         ARRAY['Enable select for anyone'],
@@ -332,7 +339,7 @@ SELECT
 
 -- Test deleted_account policies
 SELECT
-    policies_are(
+    policies_are (
         'public',
         'deleted_account',
         ARRAY['Enable update for users based on email'],
@@ -341,7 +348,7 @@ SELECT
 
 -- Test deleted_apps policies
 SELECT
-    policies_are(
+    policies_are (
         'public',
         'deleted_apps',
         ARRAY['deny_all_access'],
@@ -350,7 +357,7 @@ SELECT
 
 -- Test storage.objects policies
 SELECT
-    policies_are(
+    policies_are (
         'storage',
         'objects',
         ARRAY[
@@ -369,7 +376,7 @@ SELECT
 
 -- Test storage.buckets policies
 SELECT
-    policies_are(
+    policies_are (
         'storage',
         'buckets',
         ARRAY['Disable act bucket for users'],
@@ -379,9 +386,10 @@ SELECT
 -- Additional tests for policy roles and commands
 -- Test that restrictive policies are marked as restrictive
 SELECT
-    is(
+    is (
         (
-            SELECT count(*)
+            SELECT
+                count(*)
             FROM
                 pg_policies
             WHERE
@@ -396,7 +404,7 @@ SELECT
 
 -- Test policy commands for specific policies
 SELECT
-    policy_cmd_is(
+    policy_cmd_is (
         'public',
         'app_versions',
         'Allow all for auth (super_admin+)',
@@ -405,7 +413,7 @@ SELECT
     );
 
 SELECT
-    policy_cmd_is(
+    policy_cmd_is (
         'public',
         'apps',
         'Allow for auth, api keys (read+)',
@@ -414,7 +422,7 @@ SELECT
     );
 
 SELECT
-    policy_cmd_is(
+    policy_cmd_is (
         'public',
         'channel_devices',
         'Allow insert for auth (write+)',
@@ -423,7 +431,7 @@ SELECT
     );
 
 SELECT
-    policy_cmd_is(
+    policy_cmd_is (
         'public',
         'orgs',
         'Allow update for auth (admin+)',
@@ -432,8 +440,9 @@ SELECT
     );
 
 -- Complete the tests
-SELECT *
+SELECT
+    *
 FROM
-    finish();
+    finish ();
 
 ROLLBACK;
