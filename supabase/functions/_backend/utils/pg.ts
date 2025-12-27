@@ -122,8 +122,9 @@ export function getPgClient(c: Context, readOnly = false) {
   const dbName = c.res.headers.get('X-Database-Source') ?? 'unknown source'
   cloudlog({ requestId, message: 'SUPABASE_DB_URL', dbUrl, dbName, appName })
 
+  const prepare = !dbName.startsWith('sb_pooler')
   const options = {
-    prepare: true,
+    prepare,
     connectionString: dbUrl,
     max: 4,
     application_name: `${appName}-${dbName}`,
