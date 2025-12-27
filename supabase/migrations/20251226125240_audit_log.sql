@@ -56,7 +56,15 @@ DECLARE
   v_record_id TEXT;
   v_user_id UUID;
   v_key TEXT;
+  v_org_exists BOOLEAN;
 BEGIN
+  -- Skip audit logging for org DELETE operations
+  -- When an org is deleted, we can't insert into audit_logs because the org_id
+  -- foreign key would reference a non-existent org
+  IF TG_TABLE_NAME = 'orgs' AND TG_OP = 'DELETE' THEN
+    RETURN OLD;
+  END IF;
+
   -- Get current user from auth context or API key
   -- Uses get_identity() to support both JWT auth and API key authentication
   v_user_id := public.get_identity();
@@ -101,15 +109,21 @@ BEGIN
       v_record_id := NULL;
   END CASE;
 
-  -- Only insert if we have a valid org_id
+  -- Only insert if we have a valid org_id and the org still exists
+  -- This handles edge cases where related tables are deleted after the org
   IF v_org_id IS NOT NULL THEN
-    INSERT INTO "public"."audit_logs" (
-      table_name, record_id, operation, user_id, org_id,
-      old_record, new_record, changed_fields
-    ) VALUES (
-      TG_TABLE_NAME, v_record_id, TG_OP, v_user_id, v_org_id,
-      v_old_record, v_new_record, v_changed_fields
-    );
+    -- Check if the org still exists (important for DELETE operations on child tables)
+    SELECT EXISTS(SELECT 1 FROM public.orgs WHERE id = v_org_id) INTO v_org_exists;
+
+    IF v_org_exists THEN
+      INSERT INTO "public"."audit_logs" (
+        table_name, record_id, operation, user_id, org_id,
+        old_record, new_record, changed_fields
+      ) VALUES (
+        TG_TABLE_NAME, v_record_id, TG_OP, v_user_id, v_org_id,
+        v_old_record, v_new_record, v_changed_fields
+      );
+    END IF;
   END IF;
 
   RETURN COALESCE(NEW, OLD);
