@@ -54,7 +54,9 @@ export async function put(c: Context, bodyRaw: any, apikey: Database['public']['
   // Validate URL if provided
   if (body.url) {
     const url = new URL(body.url)
-    if (url.protocol !== 'https:' && !url.hostname.includes('localhost') && !url.hostname.includes('127.0.0.1')) {
+    const isLocalhost = url.hostname === 'localhost' || url.hostname.endsWith('.localhost')
+    const isLoopback = url.hostname === '127.0.0.1' || url.hostname === '::1'
+    if (url.protocol !== 'https:' && !isLocalhost && !isLoopback) {
       throw simpleError('invalid_url', 'Webhook URL must use HTTPS', { url: body.url })
     }
   }

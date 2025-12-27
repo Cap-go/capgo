@@ -58,12 +58,13 @@ export async function getDeliveries(c: Context, bodyRaw: any, apikey: Database['
     .from('webhook_deliveries')
     .select('*')
     .eq('webhook_id', body.webhookId)
-    .order('created_at', { ascending: false })
-    .range(from, to)
 
+  // Apply status filter before ordering and pagination
   if (body.status) {
     query = query.eq('status', body.status)
   }
+
+  query = query.order('created_at', { ascending: false }).range(from, to)
 
   const { data, error } = await query
 
@@ -71,11 +72,17 @@ export async function getDeliveries(c: Context, bodyRaw: any, apikey: Database['
     throw simpleError('cannot_get_deliveries', 'Cannot get deliveries', { error })
   }
 
-  // Get total count for pagination
-  const { count } = await (supabaseAdmin(c) as any)
+  // Get total count for pagination (include status filter)
+  let countQuery = (supabaseAdmin(c) as any)
     .from('webhook_deliveries')
     .select('*', { count: 'exact', head: true })
     .eq('webhook_id', body.webhookId)
+
+  if (body.status) {
+    countQuery = countQuery.eq('status', body.status)
+  }
+
+  const { count } = await countQuery
 
   return c.json({
     deliveries: data,

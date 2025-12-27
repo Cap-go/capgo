@@ -50,7 +50,9 @@ function validateUrl() {
 
   try {
     const parsedUrl = new URL(url.value)
-    if (parsedUrl.protocol !== 'https:' && !parsedUrl.hostname.includes('localhost') && !parsedUrl.hostname.includes('127.0.0.1')) {
+    const isLocalhost = parsedUrl.hostname === 'localhost' || parsedUrl.hostname.endsWith('.localhost')
+    const isLoopback = parsedUrl.hostname === '127.0.0.1' || parsedUrl.hostname === '::1'
+    if (parsedUrl.protocol !== 'https:' && !isLocalhost && !isLoopback) {
       urlError.value = t('webhook-url-https-required')
     }
   }

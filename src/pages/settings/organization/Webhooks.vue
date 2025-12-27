@@ -149,7 +149,8 @@ async function toggleWebhook(webhook: Webhook) {
 
   const result = await webhooksStore.toggleWebhook(webhook.id)
   if (result.success) {
-    toast.success(webhook.enabled ? t('webhook-disabled') : t('webhook-enabled'))
+    // After toggle, the webhook's enabled state is now the opposite
+    toast.success(!webhook.enabled ? t('webhook-enabled') : t('webhook-disabled'))
   }
   else {
     toast.error(result.error || t('webhook-toggle-failed'))

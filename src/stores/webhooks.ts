@@ -68,7 +68,6 @@ const supabase = useSupabase()
 
 export const useWebhooksStore = defineStore('webhooks', () => {
   const webhooks: Ref<Webhook[]> = ref([])
-  const selectedWebhook: Ref<Webhook | null> = ref(null)
   const deliveries: Ref<WebhookDelivery[]> = ref([])
   const deliveryPagination: Ref<DeliveryPagination | null> = ref(null)
   const isLoading = ref(false)
@@ -400,7 +399,6 @@ export const useWebhooksStore = defineStore('webhooks', () => {
    */
   function reset(): void {
     webhooks.value = []
-    selectedWebhook.value = null
     deliveries.value = []
     deliveryPagination.value = null
     isLoading.value = false
@@ -410,7 +408,6 @@ export const useWebhooksStore = defineStore('webhooks', () => {
   return {
     // State
     webhooks,
-    selectedWebhook,
     deliveries,
     deliveryPagination,
     isLoading,
