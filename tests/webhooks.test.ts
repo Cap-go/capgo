@@ -439,7 +439,8 @@ describe('[POST] /webhooks/test', () => {
     })
     expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('invalid_body')
+    // Empty body {} returns 'invalid_json_parse_body' since getBodyOrQuery checks for empty objects
+    expect(data.error).toBe('invalid_json_parse_body')
   })
 })
 
@@ -527,7 +528,8 @@ describe('[POST] /webhooks/deliveries/retry', () => {
     })
     expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('invalid_body')
+    // Empty body {} returns 'invalid_json_parse_body' since getBodyOrQuery checks for empty objects
+    expect(data.error).toBe('invalid_json_parse_body')
   })
 })
 
@@ -550,7 +552,8 @@ describe('[DELETE] /webhooks', () => {
     })
     expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('invalid_body')
+    // No body in request returns 'invalid_json_parse_body' since getBodyOrQuery checks for empty body
+    expect(data.error).toBe('invalid_json_parse_body')
   })
 
   it('delete webhook', async () => {

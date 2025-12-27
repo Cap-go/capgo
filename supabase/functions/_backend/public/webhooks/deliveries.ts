@@ -13,7 +13,7 @@ import { checkWebhookPermission } from './index.ts'
 const getDeliveriesSchema = z.object({
   orgId: z.string(),
   webhookId: z.string(),
-  page: z.optional(z.number()),
+  page: z.optional(z.coerce.number()),
   status: z.optional(z.string()), // 'pending', 'success', 'failed'
 })
 
