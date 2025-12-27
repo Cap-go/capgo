@@ -2,6 +2,7 @@
 import { storeToRefs } from 'pinia'
 import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import IconAlertCircle from '~icons/lucide/alert-circle'
 import AuditLogTable from '~/components/tables/AuditLogTable.vue'
 import { useDisplayStore } from '~/stores/display'
 import { useOrganizationStore } from '~/stores/organization'
@@ -21,25 +22,28 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="flex flex-col h-full">
-    <div v-if="isLoading" class="flex items-center justify-center h-64">
-      <span class="loading loading-spinner loading-lg" />
-    </div>
-
-    <div v-else-if="currentOrganization" class="flex-1">
-      <div class="mb-4">
-        <p class="text-sm text-base-content/70">
-          {{ t('audit-logs-description') }}
-        </p>
+  <div>
+    <div v-if="currentOrganization || isLoading" class="flex flex-col h-full pb-8 overflow-hidden overflow-y-auto bg-white border shadow-lg md:p-8 md:pb-0 max-h-fit grow md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900">
+      <div class="flex justify-between w-full mb-5 ml-2 md:ml-0">
+        <h2 class="text-2xl font-bold dark:text-white text-slate-800">
+          {{ t('audit-logs') }}
+        </h2>
       </div>
-
-      <AuditLogTable :org-id="currentOrganization.gid" />
+      <div v-if="isLoading" class="flex items-center justify-center h-64">
+        <Spinner size="w-6 h-6" class="text-blue-500" />
+      </div>
+      <AuditLogTable v-else-if="currentOrganization" :org-id="currentOrganization.gid" />
     </div>
-
-    <div v-else class="flex items-center justify-center h-64">
-      <p class="text-base-content/70">
+    <div v-else class="flex flex-col justify-center items-center min-h-[50vh]">
+      <IconAlertCircle class="w-16 h-16 mb-4 text-destructive" />
+      <h2 class="text-xl font-semibold text-foreground">
         {{ t('no-organization-selected') }}
-      </p>
+      </h2>
     </div>
   </div>
 </template>
+
+<route lang="yaml">
+meta:
+  layout: settings
+</route>

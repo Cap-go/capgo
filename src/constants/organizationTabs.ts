@@ -9,7 +9,7 @@ import IconUsers from '~icons/heroicons/users'
 export const organizationTabs: Tab[] = [
   { label: 'general', key: '/settings/organization', icon: IconInfo },
   { label: 'members', key: '/settings/organization/members', icon: IconUsers },
-  { label: 'audit-logs', key: '/settings/organization/audit-logs', icon: IconAudit },
+  { label: 'audit-logs', key: '/settings/organization/auditlogs', icon: IconAudit },
   { label: 'plans', key: '/settings/organization/plans', icon: IconPlan },
   { label: 'usage', key: '/settings/organization/usage', icon: IconChart },
   { label: 'credits', key: '/settings/organization/credits', icon: IconCredits },
