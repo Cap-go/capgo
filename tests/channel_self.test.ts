@@ -340,7 +340,7 @@ describe('[GET] /channel_self tests', () => {
     expect(json).toHaveLength(2)
   })
 
-  it('[GET] should return empty list when no channels allow self set', async () => {
+  it('[GET] should return public channels matching platform/device when self-set is disabled', async () => {
     await resetAndSeedAppData(APPNAME)
 
     // Ensure all channels have self set disabled (should be default)
