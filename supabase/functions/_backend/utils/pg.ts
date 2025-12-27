@@ -698,7 +698,7 @@ export async function getCompatibleChannelsPg(
     const buildCondition = isProd
       ? eq(schema.channels.allow_prod, true)
       : eq(schema.channels.allow_dev, true)
-  const channels = await drizzleClient
+    const channels = await drizzleClient
       .select({
         id: schema.channels.id,
         name: schema.channels.name,
