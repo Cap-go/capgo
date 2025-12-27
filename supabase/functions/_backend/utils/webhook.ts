@@ -68,6 +68,7 @@ export interface WebhookDelivery {
 
 // Supported event types that users can subscribe to
 export const WEBHOOK_EVENT_TYPES = [
+  'apps', // App changes (INSERT, UPDATE, DELETE)
   'app_versions', // Bundle changes (INSERT, UPDATE, DELETE)
   'channels', // Channel updates
   'org_users', // Member changes

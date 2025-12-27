@@ -53,6 +53,7 @@ export interface TestResult {
 
 // Supported event types
 export const WEBHOOK_EVENT_TYPES = [
+  { value: 'apps', label: 'App Changes', description: 'When apps are created, updated, or deleted' },
   { value: 'app_versions', label: 'Bundle Changes', description: 'When bundles are created, updated, or deleted' },
   { value: 'channels', label: 'Channel Updates', description: 'When channels are modified' },
   { value: 'org_users', label: 'Member Changes', description: 'When members are added or removed' },
