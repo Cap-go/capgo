@@ -183,11 +183,13 @@ AS $$
 
 
             perform set_config('role', 'authenticated', true);
+            perform set_config('request.jwt.claim.role', 'authenticated', true);
+            perform set_config('request.jwt.claim.email', user_data ->> 'email', true);
             perform set_config('request.jwt.claims', json_build_object(
-                'sub', user_data ->> 'id', 
-                'email', user_data ->> 'email', 
-                'phone', user_data ->> 'phone', 
-                'user_metadata', user_data -> 'raw_user_meta_data', 
+                'sub', user_data ->> 'id',
+                'email', user_data ->> 'email',
+                'phone', user_data ->> 'phone',
+                'user_metadata', user_data -> 'raw_user_meta_data',
                 'app_metadata', user_data -> 'raw_app_meta_data'
             )::text, true);
 
@@ -241,6 +243,8 @@ RETURNS void AS $$
 BEGIN
     perform set_config('role', 'anon', true);
     perform set_config('request.jwt.claims', null, true);
+    perform set_config('request.jwt.claim.role', null, true);
+    perform set_config('request.jwt.claim.email', null, true);
 END
 $$ LANGUAGE plpgsql;
 
