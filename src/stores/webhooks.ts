@@ -9,6 +9,7 @@ export interface Webhook {
   org_id: string
   name: string
   url: string
+  secret: string
   enabled: boolean
   events: string[]
   created_at: string

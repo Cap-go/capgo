@@ -82,15 +82,27 @@ app.post('/', middlewareAPISecret, async (c) => {
       return c.json(BRES)
     }
 
+    // Get webhook to retrieve secret for signing
+    const webhook = await getWebhookById(c, deliveryData.webhook_id)
+    if (!webhook) {
+      cloudlogErr({
+        requestId: c.get('requestId'),
+        message: 'Webhook not found for delivery',
+        webhookId: deliveryData.webhook_id,
+      })
+      return c.json(BRES)
+    }
+
     // Increment attempt count
     const attemptCount = await incrementAttemptCount(c, deliveryData.delivery_id)
 
-    // Attempt delivery
+    // Attempt delivery with signature
     const result = await deliverWebhook(
       c,
       deliveryData.delivery_id,
       deliveryData.url,
       deliveryData.payload,
+      webhook.secret,
     )
 
     // Update delivery record with result
@@ -152,11 +164,8 @@ app.post('/', middlewareAPISecret, async (c) => {
         maxAttempts,
       })
 
-      // Get webhook details for notification
-      const webhook = await getWebhookById(c, deliveryData.webhook_id)
-
+      // Send failure notification via Bento (webhook already fetched above)
       if (webhook) {
-        // Send failure notification via Bento
         await backgroundTask(c, sendNotifOrg(
           c,
           'webhook:delivery_failed',

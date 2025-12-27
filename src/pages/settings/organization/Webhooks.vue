@@ -7,6 +7,7 @@ import { toast } from 'vue-sonner'
 import IconBeaker from '~icons/heroicons/beaker'
 import IconCheck from '~icons/heroicons/check-circle'
 import IconChevronDown from '~icons/heroicons/chevron-down'
+import IconClipboard from '~icons/heroicons/clipboard-document'
 import IconClock from '~icons/heroicons/clock'
 import IconPencil from '~icons/heroicons/pencil'
 import IconPlus from '~icons/heroicons/plus'
@@ -183,6 +184,16 @@ function formatDate(dateString: string): string {
     minute: '2-digit',
   })
 }
+
+async function copySecret(secret: string) {
+  try {
+    await navigator.clipboard.writeText(secret)
+    toast.success(t('secret-copied'))
+  }
+  catch {
+    toast.error(t('secret-copy-failed'))
+  }
+}
 </script>
 
 <template>
@@ -313,6 +324,28 @@ function formatDate(dateString: string): string {
                     {{ getEventLabel(event) }}
                   </span>
                 </div>
+              </div>
+
+              <!-- Signing Secret -->
+              <div class="mb-4">
+                <h4 class="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                  {{ t('signing-secret') }}
+                </h4>
+                <div class="flex items-center gap-2">
+                  <code class="flex-1 px-3 py-2 text-sm font-mono bg-gray-100 dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 truncate">
+                    {{ webhook.secret }}
+                  </code>
+                  <button
+                    class="p-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                    :title="t('copy-secret')"
+                    @click.stop="copySecret(webhook.secret)"
+                  >
+                    <IconClipboard class="w-4 h-4" />
+                  </button>
+                </div>
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  {{ t('signing-secret-hint') }}
+                </p>
               </div>
 
               <!-- Metadata -->

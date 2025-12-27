@@ -59,7 +59,7 @@ export async function test(c: Context, bodyRaw: any, apikey: Database['public'][
   }
 
   // Immediately deliver the test webhook (bypass queue)
-  const result = await deliverWebhook(c, delivery.id, webhook.url, payload)
+  const result = await deliverWebhook(c, delivery.id, webhook.url, payload, webhook.secret)
 
   // Update delivery record with result
   await updateDeliveryResult(

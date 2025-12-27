@@ -39,6 +39,7 @@ export interface Webhook {
   org_id: string
   name: string
   url: string
+  secret: string
   enabled: boolean
   events: string[]
   created_at: string
@@ -155,6 +156,40 @@ export async function createDeliveryRecord(
 }
 
 /**
+ * Generate HMAC-SHA256 signature for webhook payload
+ * The signature format is: v1={timestamp}.{hmac}
+ * This allows receivers to verify the request came from Capgo
+ */
+export async function generateWebhookSignature(
+  secret: string,
+  timestamp: string,
+  payload: string,
+): Promise<string> {
+  const signaturePayload = `${timestamp}.${payload}`
+
+  const encoder = new TextEncoder()
+  const key = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  )
+
+  const signature = await crypto.subtle.sign(
+    'HMAC',
+    key,
+    encoder.encode(signaturePayload),
+  )
+
+  const hexSignature = Array.from(new Uint8Array(signature))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('')
+
+  return `v1=${timestamp}.${hexSignature}`
+}
+
+/**
  * Deliver a webhook to the user's endpoint
  */
 export async function deliverWebhook(
@@ -162,16 +197,22 @@ export async function deliverWebhook(
   deliveryId: string,
   url: string,
   payload: WebhookPayload,
+  secret: string,
 ): Promise<{ success: boolean, status?: number, body?: string, duration?: number }> {
   const startTime = Date.now()
   const payloadString = JSON.stringify(payload)
+  const timestamp = Math.floor(Date.now() / 1000).toString()
+
+  // Generate HMAC signature for verification
+  const signature = await generateWebhookSignature(secret, timestamp, payloadString)
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     'User-Agent': 'Capgo-Webhook/1.0',
     'X-Capgo-Event': payload.event,
     'X-Capgo-Event-ID': payload.event_id,
-    'X-Capgo-Timestamp': payload.timestamp,
+    'X-Capgo-Timestamp': timestamp,
+    'X-Capgo-Signature': signature,
   }
 
   try {
