@@ -71,6 +71,7 @@ function openEditForm(webhook: Webhook) {
 
 async function handleFormSubmit(data: { name: string, url: string, events: string[], enabled: boolean }) {
   if (editingWebhook.value) {
+    // When editing, pass all fields including enabled
     const result = await webhooksStore.updateWebhook(editingWebhook.value.id, data)
     if (result.success) {
       toast.success(t('webhook-updated'))
@@ -81,7 +82,9 @@ async function handleFormSubmit(data: { name: string, url: string, events: strin
     }
   }
   else {
-    const result = await webhooksStore.createWebhook(data)
+    // When creating, omit enabled (webhooks are always enabled on creation)
+    const { enabled: _enabled, ...createData } = data
+    const result = await webhooksStore.createWebhook(createData)
     if (result.success) {
       toast.success(t('webhook-created'))
       showForm.value = false

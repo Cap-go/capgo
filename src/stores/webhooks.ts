@@ -14,11 +14,6 @@ export interface Webhook {
   created_at: string
   updated_at: string
   created_by: string | null
-  stats_24h?: {
-    success: number
-    failed: number
-    pending: number
-  }
 }
 
 export interface WebhookDelivery {
@@ -64,6 +59,8 @@ export const WEBHOOK_EVENT_TYPES = [
   { value: 'orgs', label: 'Organization Changes', description: 'When organization settings are updated' },
 ] as const
 
+const DELIVERIES_PER_PAGE = 50
+
 const supabase = useSupabase()
 
 export const useWebhooksStore = defineStore('webhooks', () => {
@@ -75,6 +72,7 @@ export const useWebhooksStore = defineStore('webhooks', () => {
 
   /**
    * Fetch all webhooks for the current organization
+   * Uses direct Supabase SDK - RLS handles permissions
    */
   async function fetchWebhooks(): Promise<void> {
     const organizationStore = useOrganizationStore()
@@ -87,10 +85,11 @@ export const useWebhooksStore = defineStore('webhooks', () => {
 
     isLoading.value = true
     try {
-      const { data, error } = await supabase.functions.invoke('webhooks', {
-        method: 'GET',
-        body: { orgId },
-      })
+      const { data, error } = await (supabase as any)
+        .from('webhooks')
+        .select('*')
+        .eq('org_id', orgId)
+        .order('created_at', { ascending: false })
 
       if (error) {
         console.error('Failed to fetch webhooks:', error)
@@ -108,7 +107,8 @@ export const useWebhooksStore = defineStore('webhooks', () => {
   }
 
   /**
-   * Get a single webhook with stats
+   * Get a single webhook
+   * Uses direct Supabase SDK - RLS handles permissions
    */
   async function getWebhook(webhookId: string): Promise<Webhook | null> {
     const organizationStore = useOrganizationStore()
@@ -120,10 +120,12 @@ export const useWebhooksStore = defineStore('webhooks', () => {
     }
 
     try {
-      const { data, error } = await supabase.functions.invoke('webhooks', {
-        method: 'GET',
-        body: { orgId, webhookId },
-      })
+      const { data, error } = await (supabase as any)
+        .from('webhooks')
+        .select('*')
+        .eq('id', webhookId)
+        .eq('org_id', orgId)
+        .single()
 
       if (error) {
         console.error('Failed to fetch webhook:', error)
@@ -140,12 +142,12 @@ export const useWebhooksStore = defineStore('webhooks', () => {
 
   /**
    * Create a new webhook
+   * Uses direct Supabase SDK - RLS handles permissions
    */
   async function createWebhook(webhookData: {
     name: string
     url: string
     events: string[]
-    enabled?: boolean
   }): Promise<{ success: boolean, webhook?: Webhook, error?: string }> {
     const organizationStore = useOrganizationStore()
     const orgId = organizationStore.currentOrganization?.gid
@@ -154,25 +156,49 @@ export const useWebhooksStore = defineStore('webhooks', () => {
       return { success: false, error: 'No organization selected' }
     }
 
+    // Validate URL is HTTPS (except localhost for testing)
     try {
-      const { data, error } = await supabase.functions.invoke('webhooks', {
-        method: 'POST',
-        body: {
-          orgId,
-          ...webhookData,
-        },
-      })
+      const parsedUrl = new URL(webhookData.url)
+      const isLocalhost = parsedUrl.hostname === 'localhost' || parsedUrl.hostname.endsWith('.localhost')
+      const isLoopback = parsedUrl.hostname === '127.0.0.1' || parsedUrl.hostname === '::1'
+      if (parsedUrl.protocol !== 'https:' && !isLocalhost && !isLoopback) {
+        return { success: false, error: 'Webhook URL must use HTTPS' }
+      }
+    }
+    catch {
+      return { success: false, error: 'Invalid URL' }
+    }
+
+    // Validate events
+    const validEvents = WEBHOOK_EVENT_TYPES.map(e => e.value)
+    const invalidEvents = webhookData.events.filter(e => !validEvents.includes(e as any))
+    if (invalidEvents.length > 0) {
+      return { success: false, error: `Invalid event types: ${invalidEvents.join(', ')}` }
+    }
+
+    try {
+      const { data, error } = await (supabase as any)
+        .from('webhooks')
+        .insert({
+          org_id: orgId,
+          name: webhookData.name,
+          url: webhookData.url,
+          events: webhookData.events,
+          enabled: true, // Always enabled on creation
+        })
+        .select()
+        .single()
 
       if (error) {
         return { success: false, error: error.message || 'Failed to create webhook' }
       }
 
       // Add to local list
-      if (data?.webhook) {
-        webhooks.value.unshift(data.webhook)
+      if (data) {
+        webhooks.value.unshift(data)
       }
 
-      return { success: true, webhook: data?.webhook }
+      return { success: true, webhook: data }
     }
     catch (err: any) {
       return { success: false, error: err?.message || 'Error creating webhook' }
@@ -181,6 +207,7 @@ export const useWebhooksStore = defineStore('webhooks', () => {
 
   /**
    * Update an existing webhook
+   * Uses direct Supabase SDK - RLS handles permissions
    */
   async function updateWebhook(
     webhookId: string,
@@ -198,29 +225,52 @@ export const useWebhooksStore = defineStore('webhooks', () => {
       return { success: false, error: 'No organization selected' }
     }
 
+    // Validate URL if provided
+    if (webhookData.url) {
+      try {
+        const parsedUrl = new URL(webhookData.url)
+        const isLocalhost = parsedUrl.hostname === 'localhost' || parsedUrl.hostname.endsWith('.localhost')
+        const isLoopback = parsedUrl.hostname === '127.0.0.1' || parsedUrl.hostname === '::1'
+        if (parsedUrl.protocol !== 'https:' && !isLocalhost && !isLoopback) {
+          return { success: false, error: 'Webhook URL must use HTTPS' }
+        }
+      }
+      catch {
+        return { success: false, error: 'Invalid URL' }
+      }
+    }
+
+    // Validate events if provided
+    if (webhookData.events) {
+      const validEvents = WEBHOOK_EVENT_TYPES.map(e => e.value)
+      const invalidEvents = webhookData.events.filter(e => !validEvents.includes(e as any))
+      if (invalidEvents.length > 0) {
+        return { success: false, error: `Invalid event types: ${invalidEvents.join(', ')}` }
+      }
+    }
+
     try {
-      const { data, error } = await supabase.functions.invoke('webhooks', {
-        method: 'PUT',
-        body: {
-          orgId,
-          webhookId,
-          ...webhookData,
-        },
-      })
+      const { data, error } = await (supabase as any)
+        .from('webhooks')
+        .update(webhookData)
+        .eq('id', webhookId)
+        .eq('org_id', orgId)
+        .select()
+        .single()
 
       if (error) {
         return { success: false, error: error.message || 'Failed to update webhook' }
       }
 
       // Update local list
-      if (data?.webhook) {
+      if (data) {
         const index = webhooks.value.findIndex(w => w.id === webhookId)
         if (index !== -1) {
-          webhooks.value[index] = data.webhook
+          webhooks.value[index] = data
         }
       }
 
-      return { success: true, webhook: data?.webhook }
+      return { success: true, webhook: data }
     }
     catch (err: any) {
       return { success: false, error: err?.message || 'Error updating webhook' }
@@ -229,6 +279,7 @@ export const useWebhooksStore = defineStore('webhooks', () => {
 
   /**
    * Delete a webhook
+   * Uses direct Supabase SDK - RLS handles permissions
    */
   async function deleteWebhook(webhookId: string): Promise<{ success: boolean, error?: string }> {
     const organizationStore = useOrganizationStore()
@@ -239,10 +290,11 @@ export const useWebhooksStore = defineStore('webhooks', () => {
     }
 
     try {
-      const { error } = await supabase.functions.invoke('webhooks', {
-        method: 'DELETE',
-        body: { orgId, webhookId },
-      })
+      const { error } = await (supabase as any)
+        .from('webhooks')
+        .delete()
+        .eq('id', webhookId)
+        .eq('org_id', orgId)
 
       if (error) {
         return { success: false, error: error.message || 'Failed to delete webhook' }
@@ -259,7 +311,7 @@ export const useWebhooksStore = defineStore('webhooks', () => {
   }
 
   /**
-   * Test a webhook
+   * Test a webhook - requires edge function to make actual HTTP call
    */
   async function testWebhook(webhookId: string): Promise<TestResult> {
     const organizationStore = useOrganizationStore()
@@ -309,6 +361,7 @@ export const useWebhooksStore = defineStore('webhooks', () => {
 
   /**
    * Fetch deliveries for a webhook
+   * Uses direct Supabase SDK - RLS handles permissions
    */
   async function fetchDeliveries(webhookId: string, page = 0, status?: string): Promise<void> {
     const organizationStore = useOrganizationStore()
@@ -321,23 +374,35 @@ export const useWebhooksStore = defineStore('webhooks', () => {
 
     isLoadingDeliveries.value = true
     try {
-      const body: any = { orgId, webhookId, page }
+      const from = page * DELIVERIES_PER_PAGE
+      const to = (page + 1) * DELIVERIES_PER_PAGE - 1
+
+      let query = (supabase as any)
+        .from('webhook_deliveries')
+        .select('*', { count: 'exact' })
+        .eq('webhook_id', webhookId)
+        .eq('org_id', orgId)
+
       if (status) {
-        body.status = status
+        query = query.eq('status', status)
       }
 
-      const { data, error } = await supabase.functions.invoke('webhooks/deliveries', {
-        method: 'GET',
-        body,
-      })
+      query = query.order('created_at', { ascending: false }).range(from, to)
+
+      const { data, error, count } = await query
 
       if (error) {
         console.error('Failed to fetch deliveries:', error)
         return
       }
 
-      deliveries.value = data?.deliveries || []
-      deliveryPagination.value = data?.pagination || null
+      deliveries.value = data || []
+      deliveryPagination.value = {
+        page,
+        per_page: DELIVERIES_PER_PAGE,
+        total: count ?? 0,
+        has_more: (data?.length ?? 0) === DELIVERIES_PER_PAGE,
+      }
     }
     catch (err) {
       console.error('Error fetching deliveries:', err)
@@ -348,7 +413,7 @@ export const useWebhooksStore = defineStore('webhooks', () => {
   }
 
   /**
-   * Retry a failed delivery
+   * Retry a failed delivery - requires edge function to queue the retry
    */
   async function retryDelivery(deliveryId: string): Promise<{ success: boolean, error?: string }> {
     const organizationStore = useOrganizationStore()

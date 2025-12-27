@@ -185,8 +185,8 @@ function handleBackdropClick(event: MouseEvent) {
           </p>
         </div>
 
-        <!-- Enabled Toggle -->
-        <div class="flex items-center gap-3">
+        <!-- Enabled Toggle (only shown when editing) -->
+        <div v-if="isEditing" class="flex items-center gap-3">
           <label class="relative inline-flex items-center cursor-pointer">
             <input
               v-model="enabled"
