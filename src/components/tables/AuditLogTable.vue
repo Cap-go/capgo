@@ -71,6 +71,9 @@ const actionFilters = ref<Record<string, boolean>>({
   'audit-orgs-insert': false,
   'audit-orgs-update': false,
   'audit-orgs-delete': false,
+  'audit-apps-insert': false,
+  'audit-apps-update': false,
+  'audit-apps-delete': false,
   'audit-channels-insert': false,
   'audit-channels-update': false,
   'audit-channels-delete': false,
@@ -87,6 +90,9 @@ const filterToTableOperation: Record<string, { table: string, operation: string 
   'audit-orgs-insert': { table: 'orgs', operation: 'INSERT' },
   'audit-orgs-update': { table: 'orgs', operation: 'UPDATE' },
   'audit-orgs-delete': { table: 'orgs', operation: 'DELETE' },
+  'audit-apps-insert': { table: 'apps', operation: 'INSERT' },
+  'audit-apps-update': { table: 'apps', operation: 'UPDATE' },
+  'audit-apps-delete': { table: 'apps', operation: 'DELETE' },
   'audit-channels-insert': { table: 'channels', operation: 'INSERT' },
   'audit-channels-update': { table: 'channels', operation: 'UPDATE' },
   'audit-channels-delete': { table: 'channels', operation: 'DELETE' },
@@ -211,6 +217,8 @@ function getTableLabel(tableName: string): string {
   switch (tableName) {
     case 'orgs':
       return t('organization')
+    case 'apps':
+      return t('app')
     case 'channels':
       return t('channel')
     case 'app_versions':

@@ -1,5 +1,5 @@
 -- Audit Log Table for tracking CRUD operations
--- Tables tracked: orgs, channels, app_versions, org_users
+-- Tables tracked: orgs, apps, channels, app_versions, org_users
 
 -- Create the audit_logs table
 CREATE TABLE IF NOT EXISTS "public"."audit_logs" (
@@ -16,8 +16,8 @@ CREATE TABLE IF NOT EXISTS "public"."audit_logs" (
 );
 
 -- Add comments
-COMMENT ON TABLE "public"."audit_logs" IS 'Audit log for tracking changes to orgs, channels, app_versions, and org_users tables';
-COMMENT ON COLUMN "public"."audit_logs"."table_name" IS 'Name of the table that was modified (orgs, channels, app_versions, org_users)';
+COMMENT ON TABLE "public"."audit_logs" IS 'Audit log for tracking changes to orgs, apps, channels, app_versions, and org_users tables';
+COMMENT ON COLUMN "public"."audit_logs"."table_name" IS 'Name of the table that was modified (orgs, apps, channels, app_versions, org_users)';
 COMMENT ON COLUMN "public"."audit_logs"."record_id" IS 'Primary key of the affected record';
 COMMENT ON COLUMN "public"."audit_logs"."operation" IS 'Type of operation: INSERT, UPDATE, or DELETE';
 COMMENT ON COLUMN "public"."audit_logs"."user_id" IS 'User who made the change (from auth.uid() or API key)';
@@ -47,7 +47,11 @@ CREATE INDEX idx_audit_logs_operation ON "public"."audit_logs"("operation");
 
 -- Create the audit trigger function
 CREATE OR REPLACE FUNCTION "public"."audit_log_trigger"()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
 DECLARE
   v_old_record JSONB;
   v_new_record JSONB;
@@ -68,6 +72,12 @@ BEGIN
   -- Get current user from auth context or API key
   -- Uses get_identity() to support both JWT auth and API key authentication
   v_user_id := public.get_identity();
+
+  -- Skip audit logging if no user is identified
+  -- We only want to log actions performed by authenticated users
+  IF v_user_id IS NULL THEN
+    RETURN COALESCE(NEW, OLD);
+  END IF;
 
   -- Convert records to JSONB based on operation type
   IF TG_OP = 'DELETE' THEN
@@ -94,6 +104,9 @@ BEGIN
     WHEN 'orgs' THEN
       v_org_id := COALESCE(NEW.id, OLD.id);
       v_record_id := COALESCE(NEW.id, OLD.id)::TEXT;
+    WHEN 'apps' THEN
+      v_org_id := COALESCE(NEW.owner_org, OLD.owner_org);
+      v_record_id := COALESCE(NEW.app_id, OLD.app_id)::TEXT;
     WHEN 'channels' THEN
       v_org_id := COALESCE(NEW.owner_org, OLD.owner_org);
       v_record_id := COALESCE(NEW.id, OLD.id)::TEXT;
@@ -128,7 +141,7 @@ BEGIN
 
   RETURN COALESCE(NEW, OLD);
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
 -- Attach triggers to tracked tables
 
@@ -152,20 +165,28 @@ CREATE TRIGGER audit_org_users_trigger
   AFTER INSERT OR UPDATE OR DELETE ON "public"."org_users"
   FOR EACH ROW EXECUTE FUNCTION "public"."audit_log_trigger"();
 
+-- Apps audit trigger
+CREATE TRIGGER audit_apps_trigger
+  AFTER INSERT OR UPDATE OR DELETE ON "public"."apps"
+  FOR EACH ROW EXECUTE FUNCTION "public"."audit_log_trigger"();
+
 -- Enable Row Level Security
 ALTER TABLE "public"."audit_logs" ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policy: Only super_admins can view audit logs for their organizations
--- Uses get_identity() to support both JWT auth and API key authentication
-CREATE POLICY "Super admins can view audit logs for their orgs"
-  ON "public"."audit_logs"
-  FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM "public"."org_users" ou
-      WHERE ou.org_id = audit_logs.org_id
-        AND ou.user_id = public.get_identity('{all,write,read}'::public.key_mode[])
-        AND ou.user_right = 'super_admin'
+CREATE POLICY "Allow select for auth, api keys (super_admin+)" ON "public"."audit_logs" FOR
+SELECT
+  TO "authenticated",
+  "anon" USING (
+    "public"."check_min_rights" (
+      'super_admin'::"public"."user_min_right",
+      "public"."get_identity_org_allowed" (
+        '{read,upload,write,all}'::"public"."key_mode" [],
+        "org_id"
+      ),
+      "org_id",
+      NULL::character varying,
+      NULL::bigint
     )
   );
 
@@ -173,12 +194,16 @@ CREATE POLICY "Super admins can view audit logs for their orgs"
 
 -- Cleanup function for 90-day retention
 CREATE OR REPLACE FUNCTION "public"."cleanup_old_audit_logs"()
-RETURNS void AS $$
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
 BEGIN
   DELETE FROM "public"."audit_logs"
   WHERE created_at < NOW() - INTERVAL '90 days';
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
 -- Update delete_accounts_marked_for_deletion to transfer audit_logs ownership
 -- This ensures audit log entries are transferred to another super_admin instead of being orphaned
