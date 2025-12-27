@@ -5,7 +5,7 @@ SELECT plan(4);
 
 CREATE OR REPLACE FUNCTION my_tests() RETURNS SETOF TEXT AS $$
 DECLARE
-  rls_failed BOOLEAN := false;
+  exception_raised BOOLEAN := false;
 BEGIN
 
 truncate table org_users;
@@ -19,38 +19,34 @@ VALUES ((tests.get_supabase_uid('test_member')), '046a36ac-e03c-4590-9257-bd6c9d
 
 PERFORM tests.authenticate_as('test_member');
 
+-- Switch to authenticated role to properly test RLS
+SET LOCAL ROLE authenticated;
+
+-- Test 1: Verify that trigger prevents direct update to super_admin
+-- The UPDATE should raise an exception from the check_org_user_privileges trigger
+exception_raised := false;
 BEGIN
-  -- Attempt to update the user_right
   UPDATE org_users SET user_right = 'super_admin'::"public"."user_min_right" WHERE user_id = (select tests.get_supabase_uid('test_member'));
-  
-  -- If successful, no further action is taken
-
-  EXCEPTION
-    WHEN OTHERS THEN
-      -- Mark the test as passed if an exception is caught as expected
-      rls_failed := TRUE;
-      -- RAISE NOTICE 'Expected exception caught successfully';
+EXCEPTION WHEN OTHERS THEN
+  exception_raised := true;
 END;
 
-RETURN NEXT IS(rls_failed, true, 'Expect admin -> super_admin to fail');
+RETURN NEXT ok(exception_raised, 'Expect admin -> super_admin to fail (trigger blocks update)');
 
-rls_failed := false;
-
+-- Test 2: Verify that trigger prevents direct update to invite_super_admin
+exception_raised := false;
 BEGIN
-  -- Attempt to update the user_right
   UPDATE org_users SET user_right = 'invite_super_admin'::"public"."user_min_right" WHERE user_id = (select tests.get_supabase_uid('test_member'));
-  
-  -- If successful, no further action is taken
-
-  EXCEPTION
-    WHEN OTHERS THEN
-      -- Mark the test as passed if an exception is caught as expected
-      rls_failed := TRUE;
-      -- RAISE NOTICE 'Expected exception caught successfully';
+EXCEPTION WHEN OTHERS THEN
+  exception_raised := true;
 END;
 
-RETURN NEXT IS(rls_failed, true, 'Expect admin -> invite_super_admin to fail');
+RETURN NEXT ok(exception_raised, 'Expect admin -> invite_super_admin to fail (trigger blocks update)');
 
+-- Reset role back to postgres for remaining tests
+RESET ROLE;
+
+-- Test 3-4: Verify that invite_user_to_org function also rejects super_admin invites
 RETURN NEXT IS((select invite_user_to_org('test@capgo.app', '046a36ac-e03c-4590-9257-bd6c9dba9ee8', 'super_admin'::"public"."user_min_right")), 'NO_RIGHTS', 'Invite as super admin should fail for admin role');
 RETURN NEXT IS((select invite_user_to_org('test@capgo.app', '046a36ac-e03c-4590-9257-bd6c9dba9ee8', 'invite_super_admin'::"public"."user_min_right")), 'NO_RIGHTS', 'invite as invited_super_admin should fail for admin role');
 
