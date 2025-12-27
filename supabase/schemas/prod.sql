@@ -194,9 +194,7 @@ CREATE TYPE "public"."stats_action" AS ENUM(
   'disableAutoUpdateMetadata',
   'disableAutoUpdateUnderNative',
   'disableDevBuild',
-  'disableProdBuild',
   'disableEmulator',
-  'disableDevice',
   'cannotGetBundle',
   'checksum_fail',
   'NoChannelOrOverride',
@@ -216,7 +214,9 @@ CREATE TYPE "public"."stats_action" AS ENUM(
   'download_manifest_checksum_fail',
   'download_manifest_brotli_fail',
   'backend_refusal',
-  'download_0'
+  'download_0',
+  'disableProdBuild',
+  'disableDevice'
 );
 
 ALTER TYPE "public"."stats_action" OWNER TO "postgres";
@@ -320,22 +320,119 @@ DECLARE
   v_use numeric;
   v_balance numeric;
   v_overage_paid numeric := 0;
-  v_existing_credits numeric := 0;
+  v_existing_credits_debited numeric := 0;
   v_required numeric := 0;
   v_credits_to_apply numeric := 0;
+  v_credits_available numeric := 0;
+  v_latest_event_id uuid;
+  v_latest_overage_amount numeric;
+  v_needs_new_record boolean := false;
   grant_rec public.usage_credit_grants%ROWTYPE;
 BEGIN
+  -- Early exit for invalid input
   IF p_overage_amount IS NULL OR p_overage_amount <= 0 THEN
     RETURN QUERY SELECT 0::numeric, 0::numeric, 0::numeric, 0::numeric, NULL::bigint, 0::numeric, 0::numeric, NULL::uuid;
     RETURN;
   END IF;
 
+  -- Calculate credit cost for this overage
   SELECT *
   INTO v_calc
   FROM public.calculate_credit_cost(p_metric, p_overage_amount)
   LIMIT 1;
 
+  -- If no pricing step found, create a single record and exit
   IF v_calc.credit_step_id IS NULL THEN
+    -- Check if we already have a record for this cycle with NULL step
+    SELECT uoe.id, uoe.overage_amount INTO v_latest_event_id, v_latest_overage_amount
+    FROM public.usage_overage_events uoe
+    WHERE uoe.org_id = p_org_id
+      AND uoe.metric = p_metric
+      AND uoe.credit_step_id IS NULL
+      AND (uoe.billing_cycle_start IS NOT DISTINCT FROM p_billing_cycle_start::date)
+      AND (uoe.billing_cycle_end IS NOT DISTINCT FROM p_billing_cycle_end::date)
+    ORDER BY uoe.created_at DESC
+    LIMIT 1;
+
+    -- Only create new record if overage amount changed significantly (more than 1% or first record)
+    IF v_latest_event_id IS NULL OR ABS(v_latest_overage_amount - p_overage_amount) / NULLIF(v_latest_overage_amount, 0) > 0.01 THEN
+      INSERT INTO public.usage_overage_events (
+        org_id,
+        metric,
+        overage_amount,
+        credits_estimated,
+        credits_debited,
+        credit_step_id,
+        billing_cycle_start,
+        billing_cycle_end,
+        details
+      )
+      VALUES (
+        p_org_id,
+        p_metric,
+        p_overage_amount,
+        0,
+        0,
+        NULL,
+        p_billing_cycle_start,
+        p_billing_cycle_end,
+        p_details
+      )
+      RETURNING id INTO v_event_id;
+    ELSE
+      -- Reuse existing event
+      v_event_id := v_latest_event_id;
+    END IF;
+
+    RETURN QUERY SELECT p_overage_amount, 0::numeric, 0::numeric, 0::numeric, NULL::bigint, 0::numeric, p_overage_amount, v_event_id;
+    RETURN;
+  END IF;
+
+  v_per_unit := v_calc.credit_cost_per_unit;
+  v_required := v_calc.credits_required;
+
+  -- Get the most recent event for this cycle
+  SELECT uoe.id, uoe.overage_amount
+  INTO v_latest_event_id, v_latest_overage_amount
+  FROM public.usage_overage_events uoe
+  WHERE uoe.org_id = p_org_id
+    AND uoe.metric = p_metric
+    AND (uoe.billing_cycle_start IS NOT DISTINCT FROM p_billing_cycle_start::date)
+    AND (uoe.billing_cycle_end IS NOT DISTINCT FROM p_billing_cycle_end::date)
+  ORDER BY uoe.created_at DESC
+  LIMIT 1;
+
+  -- Calculate how many credits we can still try to apply
+  -- Use credits_debited for this since it reflects actual consumption
+  SELECT COALESCE(SUM(credits_debited), 0)
+  INTO v_existing_credits_debited
+  FROM public.usage_overage_events
+  WHERE org_id = p_org_id
+    AND metric = p_metric
+    AND (billing_cycle_start IS NOT DISTINCT FROM p_billing_cycle_start::date)
+    AND (billing_cycle_end IS NOT DISTINCT FROM p_billing_cycle_end::date);
+
+  v_credits_to_apply := GREATEST(v_required - v_existing_credits_debited, 0);
+  v_remaining := v_credits_to_apply;
+
+  -- Check if there are any credits available in grants
+  SELECT COALESCE(SUM(GREATEST(credits_total - credits_consumed, 0)), 0)
+  INTO v_credits_available
+  FROM public.usage_credit_grants
+  WHERE org_id = p_org_id
+    AND expires_at >= now();
+
+  -- Determine if we need a new record:
+  -- 1. No existing record for this cycle (first overage)
+  -- 2. Overage amount changed significantly (more than 1%)
+  -- 3. We have NEW credits available AND we need to apply them
+  v_needs_new_record := v_latest_event_id IS NULL
+    OR (v_latest_overage_amount IS NOT NULL
+        AND ABS(v_latest_overage_amount - p_overage_amount) / NULLIF(v_latest_overage_amount, 0) > 0.01)
+    OR (v_credits_to_apply > 0 AND v_credits_available > 0 AND v_existing_credits_debited = 0);
+
+  -- Only create new record if needed
+  IF v_needs_new_record THEN
     INSERT INTO public.usage_overage_events (
       org_id,
       metric,
@@ -351,130 +448,97 @@ BEGIN
       p_org_id,
       p_metric,
       p_overage_amount,
+      v_required,
       0,
-      0,
-      NULL,
+      v_calc.credit_step_id,
       p_billing_cycle_start,
       p_billing_cycle_end,
       p_details
     )
     RETURNING id INTO v_event_id;
 
-    RETURN QUERY SELECT p_overage_amount, 0::numeric, 0::numeric, 0::numeric, NULL::bigint, 0::numeric, p_overage_amount, v_event_id;
-    RETURN;
+    -- Apply credits from available grants if any
+    IF v_credits_to_apply > 0 THEN
+      FOR grant_rec IN
+        SELECT *
+        FROM public.usage_credit_grants
+        WHERE org_id = p_org_id
+          AND expires_at >= now()
+          AND credits_consumed < credits_total
+        ORDER BY expires_at ASC, granted_at ASC
+        FOR UPDATE
+      LOOP
+        EXIT WHEN v_remaining <= 0;
+
+        v_available := grant_rec.credits_total - grant_rec.credits_consumed;
+        IF v_available <= 0 THEN
+          CONTINUE;
+        END IF;
+
+        v_use := LEAST(v_available, v_remaining);
+        v_remaining := v_remaining - v_use;
+        v_applied := v_applied + v_use;
+
+        UPDATE public.usage_credit_grants
+        SET credits_consumed = credits_consumed + v_use
+        WHERE id = grant_rec.id;
+
+        INSERT INTO public.usage_credit_consumptions (
+          grant_id,
+          org_id,
+          overage_event_id,
+          metric,
+          credits_used
+        )
+        VALUES (
+          grant_rec.id,
+          p_org_id,
+          v_event_id,
+          p_metric,
+          v_use
+        );
+
+        SELECT COALESCE(SUM(GREATEST(credits_total - credits_consumed, 0)), 0)
+        INTO v_balance
+        FROM public.usage_credit_grants
+        WHERE org_id = p_org_id
+          AND expires_at >= now();
+
+        INSERT INTO public.usage_credit_transactions (
+          org_id,
+          grant_id,
+          transaction_type,
+          amount,
+          balance_after,
+          occurred_at,
+          description,
+          source_ref
+        )
+        VALUES (
+          p_org_id,
+          grant_rec.id,
+          'deduction',
+          -v_use,
+          v_balance,
+          now(),
+          format('Overage deduction for %s usage', p_metric::text),
+          jsonb_build_object('overage_event_id', v_event_id, 'metric', p_metric::text)
+        );
+      END LOOP;
+
+      -- Update the event with actual credits applied
+      UPDATE public.usage_overage_events
+      SET credits_debited = v_applied
+      WHERE id = v_event_id;
+    END IF;
+  ELSE
+    -- Reuse latest event ID, no new record needed
+    v_event_id := v_latest_event_id;
   END IF;
 
-  v_per_unit := v_calc.credit_cost_per_unit;
-  v_required := v_calc.credits_required;
-
-  SELECT COALESCE(SUM(credits_debited), 0)
-  INTO v_existing_credits
-  FROM public.usage_overage_events
-  WHERE org_id = p_org_id
-    AND metric = p_metric
-    AND (billing_cycle_start IS NOT DISTINCT FROM p_billing_cycle_start::date)
-    AND (billing_cycle_end IS NOT DISTINCT FROM p_billing_cycle_end::date);
-
-  v_credits_to_apply := GREATEST(v_required - v_existing_credits, 0);
-  v_remaining := v_credits_to_apply;
-
-  INSERT INTO public.usage_overage_events (
-    org_id,
-    metric,
-    overage_amount,
-    credits_estimated,
-    credits_debited,
-    credit_step_id,
-    billing_cycle_start,
-    billing_cycle_end,
-    details
-  )
-  VALUES (
-    p_org_id,
-    p_metric,
-    p_overage_amount,
-    v_required,
-    0,
-    v_calc.credit_step_id,
-    p_billing_cycle_start,
-    p_billing_cycle_end,
-    p_details
-  )
-  RETURNING id INTO v_event_id;
-
-  FOR grant_rec IN
-    SELECT *
-    FROM public.usage_credit_grants
-    WHERE org_id = p_org_id
-      AND expires_at >= now()
-      AND credits_consumed < credits_total
-    ORDER BY expires_at ASC, granted_at ASC
-    FOR UPDATE
-  LOOP
-    EXIT WHEN v_remaining <= 0;
-
-    v_available := grant_rec.credits_total - grant_rec.credits_consumed;
-    IF v_available <= 0 THEN
-      CONTINUE;
-    END IF;
-
-    v_use := LEAST(v_available, v_remaining);
-    v_remaining := v_remaining - v_use;
-    v_applied := v_applied + v_use;
-
-    UPDATE public.usage_credit_grants
-    SET credits_consumed = credits_consumed + v_use
-    WHERE id = grant_rec.id;
-
-    INSERT INTO public.usage_credit_consumptions (
-      grant_id,
-      org_id,
-      overage_event_id,
-      metric,
-      credits_used
-    )
-    VALUES (
-      grant_rec.id,
-      p_org_id,
-      v_event_id,
-      p_metric,
-      v_use
-    );
-
-    SELECT COALESCE(SUM(GREATEST(credits_total - credits_consumed, 0)), 0)
-    INTO v_balance
-    FROM public.usage_credit_grants
-    WHERE org_id = p_org_id
-      AND expires_at >= now();
-
-    INSERT INTO public.usage_credit_transactions (
-      org_id,
-      grant_id,
-      transaction_type,
-      amount,
-      balance_after,
-      occurred_at,
-      description,
-      source_ref
-    )
-    VALUES (
-      p_org_id,
-      grant_rec.id,
-      'deduction',
-      -v_use,
-      v_balance,
-      now(),
-      format('Overage deduction for %s usage', p_metric::text),
-      jsonb_build_object('overage_event_id', v_event_id, 'metric', p_metric::text)
-    );
-  END LOOP;
-
-  UPDATE public.usage_overage_events
-  SET credits_debited = v_applied
-  WHERE id = v_event_id;
-
+  -- Calculate how much overage is covered by credits
   IF v_per_unit > 0 THEN
-    v_overage_paid := LEAST(p_overage_amount, (v_applied + v_existing_credits) / v_per_unit);
+    v_overage_paid := LEAST(p_overage_amount, (v_applied + v_existing_credits_debited) / v_per_unit);
   ELSE
     v_overage_paid := p_overage_amount;
   END IF;
@@ -483,7 +547,7 @@ BEGIN
     p_overage_amount,
     v_required,
     v_applied,
-    GREATEST(v_required - v_existing_credits - v_applied, 0),
+    GREATEST(v_required - v_existing_credits_debited - v_applied, 0),
     v_calc.credit_step_id,
     v_overage_paid,
     GREATEST(p_overage_amount - v_overage_paid, 0),
@@ -681,9 +745,21 @@ SET
   "search_path" TO '' AS $$
 DECLARE
     user_right_record RECORD;
+    org_enforcing_2fa boolean;
 BEGIN
     IF user_id IS NULL THEN
         PERFORM public.pg_log('deny: CHECK_MIN_RIGHTS_NO_UID', jsonb_build_object('org_id', org_id, 'app_id', app_id, 'channel_id', channel_id, 'min_right', min_right::text));
+        RETURN false;
+    END IF;
+
+    -- Check if org has 2FA enforcement enabled
+    SELECT enforcing_2fa INTO org_enforcing_2fa
+    FROM public.orgs
+    WHERE public.orgs.id = check_min_rights.org_id;
+
+    -- If org enforces 2FA and user doesn't have 2FA enabled, deny access
+    IF org_enforcing_2fa = true AND NOT public.has_2fa_enabled(user_id) THEN
+        PERFORM public.pg_log('deny: CHECK_MIN_RIGHTS_2FA_ENFORCEMENT', jsonb_build_object('org_id', org_id, 'app_id', app_id, 'channel_id', channel_id, 'min_right', min_right::text, 'user_id', user_id));
         RETURN false;
     END IF;
 
@@ -712,6 +788,40 @@ ALTER FUNCTION "public"."check_min_rights" (
   "app_id" character varying,
   "channel_id" bigint
 ) OWNER TO "postgres";
+
+CREATE OR REPLACE FUNCTION "public"."check_org_members_2fa_enabled" ("org_id" "uuid") RETURNS TABLE ("user_id" "uuid", "2fa_enabled" boolean) LANGUAGE "plpgsql" SECURITY DEFINER
+SET
+  "search_path" TO '' AS $$
+BEGIN
+    -- Check if org exists
+    IF NOT EXISTS (SELECT 1 FROM public.orgs WHERE public.orgs.id = check_org_members_2fa_enabled.org_id) THEN
+        RAISE EXCEPTION 'Organization does not exist';
+    END IF;
+
+    -- Check if the current user is a super_admin of the organization
+    IF NOT (
+        public.check_min_rights(
+            'super_admin'::public.user_min_right,
+            (SELECT public.get_identity_org_allowed('{read,upload,write,all}'::public.key_mode[], check_org_members_2fa_enabled.org_id)),
+            check_org_members_2fa_enabled.org_id,
+            NULL::character varying,
+            NULL::bigint
+        )
+    ) THEN
+        RAISE EXCEPTION 'NO_RIGHTS';
+    END IF;
+
+    -- Return list of org members with their 2FA status
+    RETURN QUERY
+    SELECT 
+        ou.user_id,
+        COALESCE(public.has_2fa_enabled(ou.user_id), false) AS "2fa_enabled"
+    FROM public.org_users ou
+    WHERE ou.org_id = check_org_members_2fa_enabled.org_id;
+END;
+$$;
+
+ALTER FUNCTION "public"."check_org_members_2fa_enabled" ("org_id" "uuid") OWNER TO "postgres";
 
 CREATE OR REPLACE FUNCTION "public"."check_org_user_privileges" () RETURNS "trigger" LANGUAGE "plpgsql"
 SET
@@ -1572,26 +1682,63 @@ CREATE OR REPLACE FUNCTION "public"."get_app_metrics" (
   "fail" bigint,
   "install" bigint,
   "uninstall" bigint
-) LANGUAGE "plpgsql" STABLE SECURITY DEFINER
+) LANGUAGE "plpgsql" SECURITY DEFINER
 SET
   "search_path" TO '' AS $$
+DECLARE
+    cache_entry public.app_metrics_cache%ROWTYPE;
+    org_exists boolean;
 BEGIN
-  RETURN QUERY
-  WITH DateSeries AS (SELECT generate_series(start_date, end_date, '1 day'::interval)::date AS "date"),
-  all_apps AS (SELECT apps.app_id FROM public.apps WHERE apps.owner_org = get_app_metrics.org_id
-    UNION SELECT deleted_apps.app_id FROM public.deleted_apps WHERE deleted_apps.owner_org = get_app_metrics.org_id)
-  SELECT aa.app_id, ds.date::date, COALESCE(dm.mau, 0) AS mau, COALESCE(dst.storage, 0) AS storage,
-    COALESCE(db.bandwidth, 0) AS bandwidth, COALESCE(dbt.build_time_unit, 0) AS build_time_unit,
-    COALESCE(SUM(dv.get)::bigint, 0) AS get, COALESCE(SUM(dv.fail)::bigint, 0) AS fail,
-    COALESCE(SUM(dv.install)::bigint, 0) AS install, COALESCE(SUM(dv.uninstall)::bigint, 0) AS uninstall
-  FROM all_apps aa CROSS JOIN DateSeries ds
-  LEFT JOIN public.daily_mau dm ON aa.app_id = dm.app_id AND ds.date = dm.date
-  LEFT JOIN public.daily_storage dst ON aa.app_id = dst.app_id AND ds.date = dst.date
-  LEFT JOIN public.daily_bandwidth db ON aa.app_id = db.app_id AND ds.date = db.date
-  LEFT JOIN public.daily_build_time dbt ON aa.app_id = dbt.app_id AND ds.date = dbt.date
-  LEFT JOIN public.daily_version dv ON aa.app_id = dv.app_id AND ds.date = dv.date
-  GROUP BY aa.app_id, ds.date, dm.mau, dst.storage, db.bandwidth, dbt.build_time_unit
-  ORDER BY aa.app_id, ds.date;
+    SELECT EXISTS (
+        SELECT 1 FROM public.orgs WHERE id = get_app_metrics.org_id
+    ) INTO org_exists;
+
+    IF NOT org_exists THEN
+        RETURN;
+    END IF;
+
+    SELECT *
+    INTO cache_entry
+    FROM public.app_metrics_cache
+    WHERE app_metrics_cache.org_id = get_app_metrics.org_id;
+
+    IF cache_entry.id IS NULL
+        OR cache_entry.start_date IS DISTINCT FROM get_app_metrics.start_date
+        OR cache_entry.end_date IS DISTINCT FROM get_app_metrics.end_date
+        OR cache_entry.cached_at IS NULL
+        OR cache_entry.cached_at < (now() - interval '5 minutes') THEN
+        cache_entry := public.seed_get_app_metrics_caches(get_app_metrics.org_id, get_app_metrics.start_date, get_app_metrics.end_date);
+    END IF;
+
+    IF cache_entry.response IS NULL THEN
+        RETURN;
+    END IF;
+
+    RETURN QUERY
+    SELECT
+        metrics.app_id,
+        metrics.date,
+        metrics.mau,
+        metrics.storage,
+        metrics.bandwidth,
+        metrics.build_time_unit,
+        metrics.get,
+        metrics.fail,
+        metrics.install,
+        metrics.uninstall
+    FROM jsonb_to_recordset(cache_entry.response) AS metrics(
+        app_id character varying,
+        date date,
+        mau bigint,
+        storage bigint,
+        bandwidth bigint,
+        build_time_unit bigint,
+        get bigint,
+        fail bigint,
+        install bigint,
+        uninstall bigint
+    )
+    ORDER BY metrics.app_id, metrics.date;
 END;
 $$;
 
@@ -2417,6 +2564,207 @@ BEGIN
     FROM public.apps
     GROUP BY owner_org
   ),
+  paying_orgs_ordered AS (
+    SELECT
+      o.id,
+      ROW_NUMBER() OVER (ORDER BY o.id ASC) - 1 as preceding_count
+    FROM public.orgs o
+    JOIN public.stripe_info si ON o.customer_id = si.customer_id
+    WHERE (
+      (si.status = 'succeeded'
+        AND (si.canceled_at IS NULL OR si.canceled_at > now())
+        AND si.subscription_anchor_end > now())
+      OR si.trial_at > now()
+    )
+  ),
+  billing_cycles AS (
+    SELECT
+      o.id AS org_id,
+      CASE
+        WHEN COALESCE(si.subscription_anchor_start - date_trunc('MONTH', si.subscription_anchor_start), '0 DAYS'::INTERVAL)
+             > now() - date_trunc('MONTH', now())
+        THEN date_trunc('MONTH', now() - INTERVAL '1 MONTH')
+             + COALESCE(si.subscription_anchor_start - date_trunc('MONTH', si.subscription_anchor_start), '0 DAYS'::INTERVAL)
+        ELSE date_trunc('MONTH', now())
+             + COALESCE(si.subscription_anchor_start - date_trunc('MONTH', si.subscription_anchor_start), '0 DAYS'::INTERVAL)
+      END AS cycle_start
+    FROM public.orgs o
+    LEFT JOIN public.stripe_info si ON o.customer_id = si.customer_id
+  ),
+  -- Calculate 2FA access status for user/org combinations
+  two_fa_access AS (
+    SELECT
+      o.id AS org_id,
+      -- should_redact: true if org enforces 2FA and user doesn't have 2FA
+      (o.enforcing_2fa = true AND NOT public.has_2fa_enabled(userid)) AS should_redact
+    FROM public.orgs o
+    JOIN public.org_users ou ON ou.user_id = userid AND o.id = ou.org_id
+  )
+  SELECT
+    o.id AS gid,
+    o.created_by,
+    o.logo,
+    o.name,
+    ou.user_right::varchar AS role,
+    -- Redact sensitive fields if user doesn't have 2FA access
+    CASE
+      WHEN tfa.should_redact THEN false
+      ELSE (si.status = 'succeeded')
+    END AS paying,
+    CASE
+      WHEN tfa.should_redact THEN 0
+      ELSE GREATEST(COALESCE((si.trial_at::date - now()::date), 0), 0)::integer
+    END AS trial_left,
+    CASE
+      WHEN tfa.should_redact THEN false
+      ELSE ((si.status = 'succeeded' AND si.is_good_plan = true) OR (si.trial_at::date - now()::date > 0))
+    END AS can_use_more,
+    CASE
+      WHEN tfa.should_redact THEN false
+      ELSE (si.status = 'canceled')
+    END AS is_canceled,
+    CASE
+      WHEN tfa.should_redact THEN 0::bigint
+      ELSE COALESCE(ac.cnt, 0)
+    END AS app_count,
+    CASE
+      WHEN tfa.should_redact THEN NULL::timestamptz
+      ELSE bc.cycle_start
+    END AS subscription_start,
+    CASE
+      WHEN tfa.should_redact THEN NULL::timestamptz
+      ELSE (bc.cycle_start + INTERVAL '1 MONTH')
+    END AS subscription_end,
+    CASE
+      WHEN tfa.should_redact THEN NULL::text
+      ELSE o.management_email
+    END AS management_email,
+    CASE
+      WHEN tfa.should_redact THEN false
+      ELSE COALESCE(si.price_id = p.price_y_id, false)
+    END AS is_yearly,
+    o.stats_updated_at,
+    CASE
+      WHEN poo.id IS NOT NULL THEN
+        public.get_next_cron_time('0 3 * * *', now()) + make_interval(mins => poo.preceding_count::int * 4)
+      ELSE NULL
+    END AS next_stats_update_at,
+    COALESCE(ucb.available_credits, 0) AS credit_available,
+    COALESCE(ucb.total_credits, 0) AS credit_total,
+    ucb.next_expiration AS credit_next_expiration
+  FROM public.orgs o
+  JOIN public.org_users ou ON ou.user_id = userid AND o.id = ou.org_id
+  JOIN two_fa_access tfa ON tfa.org_id = o.id
+  LEFT JOIN public.stripe_info si ON o.customer_id = si.customer_id
+  LEFT JOIN public.plans p ON si.product_id = p.stripe_id
+  LEFT JOIN app_counts ac ON ac.owner_org = o.id
+  LEFT JOIN public.usage_credit_balances ucb ON ucb.org_id = o.id
+  LEFT JOIN paying_orgs_ordered poo ON poo.id = o.id
+  LEFT JOIN billing_cycles bc ON bc.org_id = o.id;
+END;
+$$;
+
+ALTER FUNCTION "public"."get_orgs_v6" ("userid" "uuid") OWNER TO "postgres";
+
+CREATE OR REPLACE FUNCTION "public"."get_orgs_v7" () RETURNS TABLE (
+  "gid" "uuid",
+  "created_by" "uuid",
+  "logo" "text",
+  "name" "text",
+  "role" character varying,
+  "paying" boolean,
+  "trial_left" integer,
+  "can_use_more" boolean,
+  "is_canceled" boolean,
+  "app_count" bigint,
+  "subscription_start" timestamp with time zone,
+  "subscription_end" timestamp with time zone,
+  "management_email" "text",
+  "is_yearly" boolean,
+  "stats_updated_at" timestamp without time zone,
+  "next_stats_update_at" timestamp with time zone,
+  "credit_available" numeric,
+  "credit_total" numeric,
+  "credit_next_expiration" timestamp with time zone,
+  "enforcing_2fa" boolean,
+  "2fa_has_access" boolean
+) LANGUAGE "plpgsql" SECURITY DEFINER
+SET
+  "search_path" TO '' AS $$
+DECLARE
+  api_key_text text;
+  api_key record;
+  user_id uuid;
+BEGIN
+  SELECT public.get_apikey_header() INTO api_key_text;
+  user_id := NULL;
+
+  IF api_key_text IS NOT NULL THEN
+    SELECT * FROM public.apikeys WHERE key = api_key_text INTO api_key;
+
+    IF api_key IS NULL THEN
+      PERFORM public.pg_log('deny: INVALID_API_KEY', jsonb_build_object('source', 'header'));
+      RAISE EXCEPTION 'Invalid API key provided';
+    END IF;
+
+    user_id := api_key.user_id;
+
+    IF COALESCE(array_length(api_key.limited_to_orgs, 1), 0) > 0 THEN
+      RETURN QUERY
+      SELECT orgs.*
+      FROM public.get_orgs_v7(user_id) AS orgs
+      WHERE orgs.gid = ANY(api_key.limited_to_orgs::uuid[]);
+      RETURN;
+    END IF;
+  END IF;
+
+  IF user_id IS NULL THEN
+    SELECT public.get_identity() INTO user_id;
+
+    IF user_id IS NULL THEN
+      PERFORM public.pg_log('deny: UNAUTHENTICATED', '{}'::jsonb);
+      RAISE EXCEPTION 'No authentication provided - API key or valid session required';
+    END IF;
+  END IF;
+
+  RETURN QUERY SELECT * FROM public.get_orgs_v7(user_id);
+END;
+$$;
+
+ALTER FUNCTION "public"."get_orgs_v7" () OWNER TO "postgres";
+
+CREATE OR REPLACE FUNCTION "public"."get_orgs_v7" ("userid" "uuid") RETURNS TABLE (
+  "gid" "uuid",
+  "created_by" "uuid",
+  "logo" "text",
+  "name" "text",
+  "role" character varying,
+  "paying" boolean,
+  "trial_left" integer,
+  "can_use_more" boolean,
+  "is_canceled" boolean,
+  "app_count" bigint,
+  "subscription_start" timestamp with time zone,
+  "subscription_end" timestamp with time zone,
+  "management_email" "text",
+  "is_yearly" boolean,
+  "stats_updated_at" timestamp without time zone,
+  "next_stats_update_at" timestamp with time zone,
+  "credit_available" numeric,
+  "credit_total" numeric,
+  "credit_next_expiration" timestamp with time zone,
+  "enforcing_2fa" boolean,
+  "2fa_has_access" boolean
+) LANGUAGE "plpgsql" STABLE SECURITY DEFINER
+SET
+  "search_path" TO '' AS $$
+BEGIN
+  RETURN QUERY
+  WITH app_counts AS (
+    SELECT owner_org, COUNT(*) as cnt
+    FROM public.apps
+    GROUP BY owner_org
+  ),
   -- Compute next stats update info for all paying orgs at once
   paying_orgs_ordered AS (
     SELECT
@@ -2431,13 +2779,10 @@ BEGIN
       OR si.trial_at > now()
     )
   ),
-  -- Calculate current billing cycle for each org (properly inlined get_cycle_info_org logic)
-  -- anchor_day = day of month when billing cycle starts (extracted from original subscription_anchor_start)
-  -- If we're before anchor_day this month, cycle started last month; otherwise cycle started this month
+  -- Calculate current billing cycle for each org
   billing_cycles AS (
     SELECT
       o.id AS org_id,
-      -- Calculate cycle_start based on anchor day and current date
       CASE
         WHEN COALESCE(si.subscription_anchor_start - date_trunc('MONTH', si.subscription_anchor_start), '0 DAYS'::INTERVAL)
              > now() - date_trunc('MONTH', now())
@@ -2448,6 +2793,21 @@ BEGIN
       END AS cycle_start
     FROM public.orgs o
     LEFT JOIN public.stripe_info si ON o.customer_id = si.customer_id
+  ),
+  -- Calculate 2FA access status for user/org combinations
+  two_fa_access AS (
+    SELECT
+      o.id AS org_id,
+      o.enforcing_2fa,
+      -- 2fa_has_access: true if enforcing_2fa is false OR (enforcing_2fa is true AND user has 2FA)
+      CASE
+        WHEN o.enforcing_2fa = false THEN true
+        ELSE public.has_2fa_enabled(userid)
+      END AS "2fa_has_access",
+      -- should_redact: true if org enforces 2FA and user doesn't have 2FA
+      (o.enforcing_2fa = true AND NOT public.has_2fa_enabled(userid)) AS should_redact
+    FROM public.orgs o
+    JOIN public.org_users ou ON ou.user_id = userid AND o.id = ou.org_id
   )
   SELECT
     o.id AS gid,
@@ -2455,24 +2815,44 @@ BEGIN
     o.logo,
     o.name,
     ou.user_right::varchar AS role,
-    -- is_paying_org: status = 'succeeded'
-    (si.status = 'succeeded') AS paying,
-    -- is_trial_org: days left in trial
-    GREATEST(COALESCE((si.trial_at::date - now()::date), 0), 0)::integer AS trial_left,
-    -- is_allowed_action_org (= is_paying_and_good_plan_org): paying with good plan OR in trial
-    ((si.status = 'succeeded' AND si.is_good_plan = true) OR (si.trial_at::date - now()::date > 0)) AS can_use_more,
-    -- is_canceled_org: status = 'canceled'
-    (si.status = 'canceled') AS is_canceled,
-    -- app_count
-    COALESCE(ac.cnt, 0) AS app_count,
-    -- subscription dates (properly calculated current billing cycle)
-    bc.cycle_start AS subscription_start,
-    (bc.cycle_start + INTERVAL '1 MONTH') AS subscription_end,
-    o.management_email,
-    -- is_org_yearly
-    COALESCE(si.price_id = p.price_y_id, false) AS is_yearly,
+    -- Redact sensitive fields if user doesn't have 2FA access
+    CASE
+      WHEN tfa.should_redact THEN false
+      ELSE (si.status = 'succeeded')
+    END AS paying,
+    CASE
+      WHEN tfa.should_redact THEN 0
+      ELSE GREATEST(COALESCE((si.trial_at::date - now()::date), 0), 0)::integer
+    END AS trial_left,
+    CASE
+      WHEN tfa.should_redact THEN false
+      ELSE ((si.status = 'succeeded' AND si.is_good_plan = true) OR (si.trial_at::date - now()::date > 0))
+    END AS can_use_more,
+    CASE
+      WHEN tfa.should_redact THEN false
+      ELSE (si.status = 'canceled')
+    END AS is_canceled,
+    CASE
+      WHEN tfa.should_redact THEN 0::bigint
+      ELSE COALESCE(ac.cnt, 0)
+    END AS app_count,
+    CASE
+      WHEN tfa.should_redact THEN NULL::timestamptz
+      ELSE bc.cycle_start
+    END AS subscription_start,
+    CASE
+      WHEN tfa.should_redact THEN NULL::timestamptz
+      ELSE (bc.cycle_start + INTERVAL '1 MONTH')
+    END AS subscription_end,
+    CASE
+      WHEN tfa.should_redact THEN NULL::text
+      ELSE o.management_email
+    END AS management_email,
+    CASE
+      WHEN tfa.should_redact THEN false
+      ELSE COALESCE(si.price_id = p.price_y_id, false)
+    END AS is_yearly,
     o.stats_updated_at,
-    -- get_next_stats_update_date (simplified - just add 4 min intervals based on position)
     CASE
       WHEN poo.id IS NOT NULL THEN
         public.get_next_cron_time('0 3 * * *', now()) + make_interval(mins => poo.preceding_count::int * 4)
@@ -2480,9 +2860,12 @@ BEGIN
     END AS next_stats_update_at,
     COALESCE(ucb.available_credits, 0) AS credit_available,
     COALESCE(ucb.total_credits, 0) AS credit_total,
-    ucb.next_expiration AS credit_next_expiration
+    ucb.next_expiration AS credit_next_expiration,
+    tfa.enforcing_2fa,
+    tfa."2fa_has_access"
   FROM public.orgs o
   JOIN public.org_users ou ON ou.user_id = userid AND o.id = ou.org_id
+  JOIN two_fa_access tfa ON tfa.org_id = o.id
   LEFT JOIN public.stripe_info si ON o.customer_id = si.customer_id
   LEFT JOIN public.plans p ON si.product_id = p.stripe_id
   LEFT JOIN app_counts ac ON ac.owner_org = o.id
@@ -2492,7 +2875,7 @@ BEGIN
 END;
 $$;
 
-ALTER FUNCTION "public"."get_orgs_v6" ("userid" "uuid") OWNER TO "postgres";
+ALTER FUNCTION "public"."get_orgs_v7" ("userid" "uuid") OWNER TO "postgres";
 
 CREATE OR REPLACE FUNCTION "public"."get_plan_usage_percent_detailed" ("orgid" "uuid") RETURNS TABLE (
   "total_percent" double precision,
@@ -2967,6 +3350,38 @@ END;
 $$;
 
 ALTER FUNCTION "public"."get_weekly_stats" ("app_id" character varying) OWNER TO "postgres";
+
+CREATE OR REPLACE FUNCTION "public"."has_2fa_enabled" () RETURNS boolean LANGUAGE "plpgsql" SECURITY DEFINER
+SET
+  "search_path" TO '' AS $$
+BEGIN
+  -- Check if the current user has any verified MFA factors
+  RETURN EXISTS(
+    SELECT 1
+    FROM auth.mfa_factors
+    WHERE (SELECT auth.uid()) = user_id 
+      AND status = 'verified'
+  );
+END;
+$$;
+
+ALTER FUNCTION "public"."has_2fa_enabled" () OWNER TO "postgres";
+
+CREATE OR REPLACE FUNCTION "public"."has_2fa_enabled" ("user_id" "uuid") RETURNS boolean LANGUAGE "plpgsql" SECURITY DEFINER
+SET
+  "search_path" TO '' AS $$
+BEGIN
+  -- Check if the specified user has any verified MFA factors
+  RETURN EXISTS(
+    SELECT 1
+    FROM auth.mfa_factors mfa
+    WHERE mfa.user_id = has_2fa_enabled.user_id 
+      AND mfa.status = 'verified'
+  );
+END;
+$$;
+
+ALTER FUNCTION "public"."has_2fa_enabled" ("user_id" "uuid") OWNER TO "postgres";
 
 CREATE OR REPLACE FUNCTION "public"."has_app_right" (
   "appid" character varying,
@@ -3804,6 +4219,12 @@ BEGIN
     EXCEPTION WHEN OTHERS THEN
       RAISE WARNING 'cleanup_frequent_job_details failed: %', SQLERRM;
     END;
+
+    BEGIN
+      PERFORM public.process_deploy_install_stats_email();
+    EXCEPTION WHEN OTHERS THEN
+      RAISE WARNING 'process_deploy_install_stats_email failed: %', SQLERRM;
+    END;
   END IF;
 
   -- Every 2 hours (at :00:00): Low-frequency queues with default batch size
@@ -4028,6 +4449,99 @@ END;
 $$;
 
 ALTER FUNCTION "public"."process_cron_sync_sub_jobs" () OWNER TO "postgres";
+
+CREATE OR REPLACE FUNCTION "public"."process_deploy_install_stats_email" () RETURNS "void" LANGUAGE "plpgsql"
+SET
+  "search_path" TO '' AS $$
+DECLARE
+  record RECORD;
+BEGIN
+  FOR record IN
+    WITH latest AS (
+      SELECT DISTINCT ON (dh.app_id, channel_platform)
+        dh.id,
+        dh.app_id,
+        dh.version_id,
+        dh.deployed_at,
+        dh.owner_org,
+        dh.channel_id,
+        CASE
+          WHEN c.ios = true AND c.android = false THEN 'ios'
+          WHEN c.android = true AND c.ios = false THEN 'android'
+          ELSE 'all'
+        END AS channel_platform
+      FROM public.deploy_history dh
+      JOIN public.channels c ON c.id = dh.channel_id
+      WHERE c.public = true
+        AND (c.ios = true OR c.android = true)
+      ORDER BY dh.app_id, channel_platform, dh.deployed_at DESC NULLS LAST
+    ),
+    eligible AS (
+      SELECT l.*
+      FROM latest l
+      WHERE l.deployed_at IS NOT NULL
+        AND l.deployed_at <= now() - interval '24 hours'
+    ),
+    updated AS (
+      UPDATE public.deploy_history dh
+      SET install_stats_email_sent_at = now()
+      FROM eligible e
+      WHERE dh.id = e.id
+        AND dh.install_stats_email_sent_at IS NULL
+      RETURNING dh.id, dh.app_id, dh.version_id, dh.deployed_at, dh.owner_org, dh.channel_id
+    ),
+    details AS (
+      SELECT
+        u.id,
+        u.app_id,
+        u.version_id,
+        u.deployed_at,
+        u.owner_org,
+        u.channel_id,
+        e.channel_platform,
+        o.management_email,
+        c.name AS channel_name,
+        v.name AS version_name,
+        a.name AS app_name
+      FROM updated u
+      JOIN eligible e ON e.id = u.id
+      JOIN public.orgs o ON o.id = u.owner_org
+      JOIN public.channels c ON c.id = u.channel_id
+      JOIN public.app_versions v ON v.id = u.version_id
+      JOIN public.apps a ON a.app_id = u.app_id
+    )
+    SELECT
+      d.*
+    FROM details d
+  LOOP
+    IF record.management_email IS NULL OR record.management_email = '' THEN
+      CONTINUE;
+    END IF;
+
+    PERFORM pgmq.send('cron_email',
+      jsonb_build_object(
+        'function_name', 'cron_email',
+        'function_type', 'cloudflare',
+        'payload', jsonb_build_object(
+          'email', record.management_email,
+          'appId', record.app_id,
+          'type', 'deploy_install_stats',
+          'deployId', record.id,
+          'versionId', record.version_id,
+          'versionName', record.version_name,
+          'channelId', record.channel_id,
+          'channelName', record.channel_name,
+          'platform', record.channel_platform,
+          'appName', record.app_name,
+          'deployedAt', record.deployed_at
+        )
+      )
+    );
+  END LOOP;
+END;
+$$;
+
+ALTER FUNCTION "public"."process_deploy_install_stats_email" () OWNER TO "postgres";
 
 CREATE OR REPLACE FUNCTION "public"."process_failed_uploads" () RETURNS "void" LANGUAGE "plpgsql"
 SET
@@ -4453,6 +4967,40 @@ END;
 $$;
 
 ALTER FUNCTION "public"."record_deployment_history" () OWNER TO "postgres";
+
+CREATE OR REPLACE FUNCTION "public"."reject_access_due_to_2fa" ("org_id" "uuid", "user_id" "uuid") RETURNS boolean LANGUAGE "plpgsql" SECURITY DEFINER
+SET
+  "search_path" TO '' AS $$
+DECLARE
+    org_enforcing_2fa boolean;
+BEGIN
+    -- Check if org exists
+    IF NOT EXISTS (SELECT 1 FROM public.orgs WHERE public.orgs.id = reject_access_due_to_2fa.org_id) THEN
+        RETURN false;
+    END IF;
+
+    -- Check if org has 2FA enforcement enabled
+    SELECT enforcing_2fa INTO org_enforcing_2fa
+    FROM public.orgs
+    WHERE public.orgs.id = reject_access_due_to_2fa.org_id;
+
+    -- 7.1 If a given org does not enable 2FA enforcement, return false
+    IF org_enforcing_2fa = false THEN
+        RETURN false;
+    END IF;
+
+    -- 7.2 If a given org REQUIRES 2FA, and has_2fa_enabled(user_id) == false, return true
+    IF org_enforcing_2fa = true AND NOT public.has_2fa_enabled(reject_access_due_to_2fa.user_id) THEN
+        PERFORM public.pg_log('deny: REJECT_ACCESS_DUE_TO_2FA', jsonb_build_object('org_id', org_id, 'user_id', user_id));
+        RETURN true;
+    END IF;
+
+    -- 7.3 Otherwise, return false
+    RETURN false;
+END;
+$$;
+
+ALTER FUNCTION "public"."reject_access_due_to_2fa" ("org_id" "uuid", "user_id" "uuid") OWNER TO "postgres";
 
 CREATE OR REPLACE FUNCTION "public"."remove_old_jobs" () RETURNS "void" LANGUAGE "plpgsql"
 SET
@@ -5315,12 +5863,12 @@ CREATE TABLE IF NOT EXISTS "public"."channels" (
   "android" boolean DEFAULT true NOT NULL,
   "allow_device_self_set" boolean DEFAULT false NOT NULL,
   "allow_emulator" boolean DEFAULT true NOT NULL,
-  "allow_device" boolean DEFAULT true NOT NULL,
   "allow_dev" boolean DEFAULT true NOT NULL,
-  "allow_prod" boolean DEFAULT true NOT NULL,
   "disable_auto_update" "public"."disable_update" DEFAULT 'major'::"public"."disable_update" NOT NULL,
   "owner_org" "uuid" NOT NULL,
-  "created_by" "uuid" NOT NULL
+  "created_by" "uuid" NOT NULL,
+  "allow_device" boolean DEFAULT true NOT NULL,
+  "allow_prod" boolean DEFAULT true NOT NULL
 );
 
 ALTER TABLE ONLY "public"."channels" REPLICA IDENTITY FULL;
@@ -5444,7 +5992,8 @@ CREATE TABLE IF NOT EXISTS "public"."deploy_history" (
   "version_id" bigint NOT NULL,
   "deployed_at" timestamp with time zone DEFAULT "now" (),
   "created_by" "uuid" NOT NULL,
-  "owner_org" "uuid" NOT NULL
+  "owner_org" "uuid" NOT NULL,
+  "install_stats_email_sent_at" timestamp with time zone
 );
 
 ALTER TABLE "public"."deploy_history" OWNER TO "postgres";
@@ -5549,7 +6098,8 @@ CREATE TABLE IF NOT EXISTS "public"."global_stats" (
   "canceled_orgs" integer DEFAULT 0 NOT NULL,
   "revenue_enterprise" double precision DEFAULT 0 NOT NULL,
   "plan_enterprise_monthly" integer DEFAULT 0 NOT NULL,
-  "plan_enterprise_yearly" integer DEFAULT 0 NOT NULL
+  "plan_enterprise_yearly" integer DEFAULT 0 NOT NULL,
+  "plan_enterprise" integer DEFAULT 0
 );
 
 ALTER TABLE "public"."global_stats" OWNER TO "postgres";
@@ -5655,12 +6205,15 @@ CREATE TABLE IF NOT EXISTS "public"."orgs" (
   "management_email" "text" NOT NULL,
   "customer_id" character varying,
   "stats_updated_at" timestamp without time zone,
-  "last_stats_updated_at" timestamp without time zone
+  "last_stats_updated_at" timestamp without time zone,
+  "enforcing_2fa" boolean DEFAULT false NOT NULL
 );
 
 ALTER TABLE ONLY "public"."orgs" REPLICA IDENTITY FULL;
 
 ALTER TABLE "public"."orgs" OWNER TO "postgres";
+
+COMMENT ON COLUMN "public"."orgs"."enforcing_2fa" IS 'When true, all members of this organization must have 2FA enabled to access the organization';
 
 CREATE TABLE IF NOT EXISTS "public"."plans" (
   "created_at" timestamp with time zone DEFAULT "now" () NOT NULL,
@@ -6238,7 +6791,7 @@ ALTER TABLE ONLY "public"."bandwidth_usage"
 ADD CONSTRAINT "bandwidth_usage_pkey" PRIMARY KEY ("id");
 
 ALTER TABLE ONLY "public"."build_logs"
-ADD CONSTRAINT "build_logs_build_id_org_id_key" UNIQUE ("build_id", "org_id");
+ADD CONSTRAINT "build_logs_build_id_org_id_unique" UNIQUE ("build_id", "org_id");
 
 ALTER TABLE ONLY "public"."build_logs"
 ADD CONSTRAINT "build_logs_pkey" PRIMARY KEY ("id");
@@ -8368,6 +8921,12 @@ GRANT ALL ON FUNCTION "public"."check_min_rights" (
   "channel_id" bigint
 ) TO "authenticated";
 
+GRANT ALL ON FUNCTION "public"."check_org_members_2fa_enabled" ("org_id" "uuid") TO "anon";
+
+GRANT ALL ON FUNCTION "public"."check_org_members_2fa_enabled" ("org_id" "uuid") TO "authenticated";
+
+GRANT ALL ON FUNCTION "public"."check_org_members_2fa_enabled" ("org_id" "uuid") TO "service_role";
+
 GRANT ALL ON FUNCTION "public"."check_org_user_privileges" () TO "anon";
 
 GRANT ALL ON FUNCTION "public"."check_org_user_privileges" () TO "authenticated";
@@ -8833,11 +9392,23 @@ GRANT ALL ON FUNCTION "public"."get_orgs_v6" () TO "authenticated";
 
 GRANT ALL ON FUNCTION "public"."get_orgs_v6" () TO "service_role";
 
-GRANT ALL ON FUNCTION "public"."get_orgs_v6" ("userid" "uuid") TO "anon";
-
-GRANT ALL ON FUNCTION "public"."get_orgs_v6" ("userid" "uuid") TO "authenticated";
+REVOKE ALL ON FUNCTION "public"."get_orgs_v6" ("userid" "uuid")
+FROM
+  PUBLIC;
 
 GRANT ALL ON FUNCTION "public"."get_orgs_v6" ("userid" "uuid") TO "service_role";
+
+GRANT ALL ON FUNCTION "public"."get_orgs_v7" () TO "anon";
+
+GRANT ALL ON FUNCTION "public"."get_orgs_v7" () TO "authenticated";
+
+GRANT ALL ON FUNCTION "public"."get_orgs_v7" () TO "service_role";
+
+REVOKE ALL ON FUNCTION "public"."get_orgs_v7" ("userid" "uuid")
+FROM
+  PUBLIC;
+
+GRANT ALL ON FUNCTION "public"."get_orgs_v7" ("userid" "uuid") TO "service_role";
 
 GRANT ALL ON FUNCTION "public"."get_plan_usage_percent_detailed" ("orgid" "uuid") TO "anon";
 
@@ -8970,6 +9541,18 @@ GRANT ALL ON FUNCTION "public"."get_weekly_stats" ("app_id" character varying) T
 GRANT ALL ON FUNCTION "public"."get_weekly_stats" ("app_id" character varying) TO "authenticated";
 
 GRANT ALL ON FUNCTION "public"."get_weekly_stats" ("app_id" character varying) TO "service_role";
+
+GRANT ALL ON FUNCTION "public"."has_2fa_enabled" () TO "anon";
+
+GRANT ALL ON FUNCTION "public"."has_2fa_enabled" () TO "authenticated";
+
+GRANT ALL ON FUNCTION "public"."has_2fa_enabled" () TO "service_role";
+
+REVOKE ALL ON FUNCTION "public"."has_2fa_enabled" ("user_id" "uuid")
+FROM
+  PUBLIC;
+
+GRANT ALL ON FUNCTION "public"."has_2fa_enabled" ("user_id" "uuid") TO "service_role";
 
 GRANT ALL ON FUNCTION "public"."has_app_right" (
   "appid" character varying,
@@ -9349,6 +9932,12 @@ FROM
 
 GRANT ALL ON FUNCTION "public"."process_cron_sync_sub_jobs" () TO "service_role";
 
+GRANT ALL ON FUNCTION "public"."process_deploy_install_stats_email" () TO "anon";
+
+GRANT ALL ON FUNCTION "public"."process_deploy_install_stats_email" () TO "authenticated";
+
+GRANT ALL ON FUNCTION "public"."process_deploy_install_stats_email" () TO "service_role";
+
 REVOKE ALL ON FUNCTION "public"."process_failed_uploads" ()
 FROM
   PUBLIC;
@@ -9526,6 +10115,12 @@ GRANT ALL ON FUNCTION "public"."record_deployment_history" () TO "anon";
 GRANT ALL ON FUNCTION "public"."record_deployment_history" () TO "authenticated";
 
 GRANT ALL ON FUNCTION "public"."record_deployment_history" () TO "service_role";
+
+REVOKE ALL ON FUNCTION "public"."reject_access_due_to_2fa" ("org_id" "uuid", "user_id" "uuid")
+FROM
+  PUBLIC;
+
+GRANT ALL ON FUNCTION "public"."reject_access_due_to_2fa" ("org_id" "uuid", "user_id" "uuid") TO "service_role";
 
 REVOKE ALL ON FUNCTION "public"."remove_old_jobs" ()
 FROM

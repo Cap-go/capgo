@@ -5,8 +5,7 @@ SELECT plan(4);
 
 CREATE OR REPLACE FUNCTION my_tests() RETURNS SETOF TEXT AS $$
 DECLARE
-  rls_failed BOOLEAN := false;
-  rows_updated INTEGER := 0;
+  exception_raised BOOLEAN := false;
 BEGIN
 
 truncate table org_users;
@@ -21,22 +20,28 @@ VALUES ((tests.get_supabase_uid('test_member')), '046a36ac-e03c-4590-9257-bd6c9d
 PERFORM tests.authenticate_as('test_member');
 
 -- Switch to authenticated role to properly test RLS
--- RLS should prevent authenticated users from updating org_users directly
 SET LOCAL ROLE authenticated;
 
--- Test 1: Verify that RLS prevents direct update to super_admin
--- The UPDATE should not match any rows because RLS blocks SELECT
-UPDATE org_users SET user_right = 'super_admin'::"public"."user_min_right" WHERE user_id = (select tests.get_supabase_uid('test_member'));
-GET DIAGNOSTICS rows_updated = ROW_COUNT;
+-- Test 1: Verify that trigger prevents direct update to super_admin
+-- The UPDATE should raise an exception from the check_org_user_privileges trigger
+exception_raised := false;
+BEGIN
+  UPDATE org_users SET user_right = 'super_admin'::"public"."user_min_right" WHERE user_id = (select tests.get_supabase_uid('test_member'));
+EXCEPTION WHEN OTHERS THEN
+  exception_raised := true;
+END;
 
--- If no rows were updated, RLS blocked the update (which is the desired behavior)
-RETURN NEXT IS(rows_updated, 0, 'Expect admin -> super_admin to fail (RLS blocks update)');
+RETURN NEXT ok(exception_raised, 'Expect admin -> super_admin to fail (trigger blocks update)');
 
--- Test 2: Verify that RLS prevents direct update to invite_super_admin
-UPDATE org_users SET user_right = 'invite_super_admin'::"public"."user_min_right" WHERE user_id = (select tests.get_supabase_uid('test_member'));
-GET DIAGNOSTICS rows_updated = ROW_COUNT;
+-- Test 2: Verify that trigger prevents direct update to invite_super_admin
+exception_raised := false;
+BEGIN
+  UPDATE org_users SET user_right = 'invite_super_admin'::"public"."user_min_right" WHERE user_id = (select tests.get_supabase_uid('test_member'));
+EXCEPTION WHEN OTHERS THEN
+  exception_raised := true;
+END;
 
-RETURN NEXT IS(rows_updated, 0, 'Expect admin -> invite_super_admin to fail (RLS blocks update)');
+RETURN NEXT ok(exception_raised, 'Expect admin -> invite_super_admin to fail (trigger blocks update)');
 
 -- Reset role back to postgres for remaining tests
 RESET ROLE;

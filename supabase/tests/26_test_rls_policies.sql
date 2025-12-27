@@ -169,7 +169,8 @@ SELECT
             'Allow org admin to update',
             'Allow to self delete',
             'Allow org admin to insert',
-            'Prevent non 2FA access'
+            'Prevent non 2FA access',
+            'Allow member and owner to select'
         ],
         'org_users should have correct policies'
     );
