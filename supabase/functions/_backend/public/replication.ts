@@ -65,6 +65,7 @@ function buildReplicationQuery(mode: ReplicationQueryMode) {
           pg_size_pretty(pg_wal_lsn_diff(pg_current_wal_lsn(), confirmed_flush_lsn)) AS slot_lag
         FROM pg_replication_slots
         WHERE slot_type = 'logical'
+          AND slot_name !~ '^pg_[0-9]+_sync_[0-9]+_[0-9]+$'
       )
   `
 
@@ -86,10 +87,11 @@ function buildReplicationQuery(mode: ReplicationQueryMode) {
           pg_size_pretty(pg_wal_lsn_diff(pg_current_wal_lsn(), confirmed_flush_lsn)) AS slot_lag
         FROM pg_replication_slots
         WHERE slot_type = 'logical'
+          AND slot_name !~ '^pg_[0-9]+_sync_[0-9]+_[0-9]+$'
       )
       SELECT
         slots.*,
-        EXTRACT(EPOCH FROM COALESCE(sr.flush_lag, sr.write_lag, sr.replay_lag))::numeric AS lag_seconds,
+        NULL::numeric AS lag_seconds,
         CASE
           WHEN wal_stats.seconds_since_reset > 0
             AND wal_stats.wal_bytes > 0
@@ -98,7 +100,6 @@ function buildReplicationQuery(mode: ReplicationQueryMode) {
           ELSE NULL
         END AS lag_seconds_est
       FROM slots
-      LEFT JOIN pg_stat_replication sr ON sr.slot_name = slots.slot_name
       CROSS JOIN wal_stats
       ORDER BY slots.slot_name
     `
@@ -132,7 +133,7 @@ async function executeReplicationQuery(
   c: Parameters<typeof cloudlogErr>[0],
   drizzleClient: ReturnType<typeof getDrizzleClient>,
 ): Promise<{ rows: any[], mode: ReplicationQueryMode }> {
-  const modes: ReplicationQueryMode[] = ['wal_stats', 'replication_stats', 'slots_only']
+  const modes: ReplicationQueryMode[] = ['wal_stats', 'slots_only']
   let lastError: unknown = null
 
   for (const mode of modes) {

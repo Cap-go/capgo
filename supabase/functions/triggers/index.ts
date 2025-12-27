@@ -1,5 +1,3 @@
-import { app as clear_app_cache } from '../_backend/triggers/clear_app_cache.ts'
-import { app as clear_device_cache } from '../_backend/triggers/clear_device_cache.ts'
 import { app as credit_usage_alerts } from '../_backend/triggers/credit_usage_alerts.ts'
 import { app as cron_clear_versions } from '../_backend/triggers/cron_clear_versions.ts'
 import { app as cron_email } from '../_backend/triggers/cron_email.ts'
@@ -28,8 +26,6 @@ import { version } from '../_backend/utils/version.ts'
 const functionName = 'triggers'
 const appGlobal = createHono(functionName, version, Deno.env.get('SENTRY_DSN_SUPABASE'))
 
-appGlobal.route('/clear_app_cache', clear_app_cache)
-appGlobal.route('/clear_device_cache', clear_device_cache)
 appGlobal.route('/cron_email', cron_email)
 appGlobal.route('/logsnag_insights', logsnag_insights)
 appGlobal.route('/on_channel_update', on_channel_update)

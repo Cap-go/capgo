@@ -49,7 +49,7 @@ interface DailyLedgerRow {
   grantsCount: number
   deductionsTotal: number
   deductionsCount: number
-  deductionsByMetric: Partial<Record<Database['public']['Enums']['credit_metric_type'], { total: number, count: number, overageMetricTotal: number, overageCount: number }>>
+  deductionsByMetric: Partial<Record<Database['public']['Enums']['credit_metric_type'], { total: number, count: number, overageMetricTotal: number, overageCount: number, overageMetricIndividual: number }>>
 }
 
 const router = useRouter()
@@ -279,25 +279,27 @@ function formatCurrency(value: number) {
 }
 
 function formatMetricAmount(metric: Database['public']['Enums']['credit_metric_type'], value: number) {
-  const min = new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(value)
+  // Apply ceil to round up the metric value
+  const ceiledValue = Math.ceil(value)
+  const min = new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(ceiledValue)
   switch (metric) {
     case 'mau':
-      return `${new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(value)} ${t('users')}`
+      return `${new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(ceiledValue)} ${t('users')}`
     case 'bandwidth':
     case 'storage': {
       // Convert bytes to GiB (1 GiB = 1073741824 bytes)
-      const gib = value / 1073741824
+      const gib = ceiledValue / 1073741824
       return `${new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(gib)} GiB`
     }
     case 'build_time':
       // Convert minutes to hours if > 60
-      if (value >= 60) {
-        const hours = new Intl.NumberFormat(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(value / 60)
+      if (ceiledValue >= 60) {
+        const hours = new Intl.NumberFormat(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(ceiledValue / 60)
         return t('x-hours-short', { hours })
       }
       return t('minutes-short', { minutes: min })
     default:
-      return new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(value)
+      return new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(ceiledValue)
   }
 }
 
@@ -384,6 +386,7 @@ const dailyTransactions = computed<DailyLedgerRow[]>(() => {
           count: 1,
           overageMetricTotal: tx.overage_amount ?? 0,
           overageCount: tx.overage_amount ? 1 : 0,
+          overageMetricIndividual: tx.overage_amount ?? 0,
         }
       }
       groups.set(dateKey, initial)
@@ -401,11 +404,13 @@ const dailyTransactions = computed<DailyLedgerRow[]>(() => {
         existing.deductionsTotal += tx.amount
         existing.deductionsCount += 1
         if (tx.transaction_type === 'deduction' && tx.metric) {
-          const metricEntry = existing.deductionsByMetric[tx.metric as Database['public']['Enums']['credit_metric_type']] ?? { total: 0, count: 0, overageMetricTotal: 0, overageCount: 0 }
+          const metricEntry = existing.deductionsByMetric[tx.metric as Database['public']['Enums']['credit_metric_type']] ?? { total: 0, count: 0, overageMetricTotal: 0, overageCount: 0, overageMetricIndividual: 0 }
           metricEntry.total += tx.amount
           metricEntry.count += 1
           metricEntry.overageMetricTotal += tx.overage_amount ?? 0
           metricEntry.overageCount += tx.overage_amount ? 1 : 0
+          // Store individual overage amount (delta), not cumulative
+          metricEntry.overageMetricIndividual = tx.overage_amount ?? 0
           existing.deductionsByMetric[tx.metric as Database['public']['Enums']['credit_metric_type']] = metricEntry
         }
       }
@@ -846,7 +851,7 @@ watch(() => currentOrganization.value?.gid, async (newOrgId: string | undefined,
                     <div class="text-xs text-gray-500 dark:text-gray-400">
                       {{ t('credits-daily-deduction-count', { count: entry.data?.count ?? 0 }) }}
                       <span v-if="entry.data?.overageCount && entry.data.overageCount > 0" class="ml-2 inline-flex items-center rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-700 dark:bg-orange-900/40 dark:text-orange-300">
-                        {{ formatMetricAmount(entry.metric, entry.data.overageMetricTotal) }}
+                        {{ formatMetricAmount(entry.metric, entry.data.overageMetricIndividual ?? entry.data.overageMetricTotal) }}
                       </span>
                     </div>
                   </td>

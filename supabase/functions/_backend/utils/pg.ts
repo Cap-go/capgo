@@ -93,20 +93,6 @@ export function getDatabaseURL(c: Context, readOnly = false): string {
       cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_PLANETSCALE_SA for read-only' })
       return c.env.HYPERDRIVE_CAPGO_PS_SA.connectionString
     }
-    // Custom Supabase Region Read replicate Poolers
-    // Asia region
-    // if (existInEnv(c, 'READ_SUPABASE_DB_URL_AS') && dbRegion === 'AS') {
-    //   c.header('X-Database-Source', 'read_pooler_as')
-    //   cloudlog({ requestId: c.get('requestId'), message: 'Using READ_SUPABASE_DB_URL_AS for read-only' })
-    //   return getEnv(c, 'READ_SUPABASE_DB_URL_AS')
-    // }
-
-    // // NA region
-    // if (existInEnv(c, 'READ_SUPABASE_DB_URL_NA') && dbRegion === 'NA') {
-    //   c.header('X-Database-Source', 'read_pooler_na')
-    //   cloudlog({ requestId: c.get('requestId'), message: 'Using READ_SUPABASE_DB_URL_NA for read-only' })
-    //   return getEnv(c, 'READ_SUPABASE_DB_URL_NA')
-    // }
   }
 
   // Fallback to single Hyperdrive if available
@@ -144,6 +130,7 @@ export function getPgClient(c: Context, readOnly = false) {
     idleTimeoutMillis: 20000, // Increase from 2 to 20 seconds
     connectionTimeoutMillis: 10000, // Add explicit connect timeout
     maxLifetimeMillis: 30 * 60 * 1000, // 30 minutes
+    options: readOnly ? '-c default_transaction_read_only=on' : undefined,
   }
 
   const pool = new Pool(options)

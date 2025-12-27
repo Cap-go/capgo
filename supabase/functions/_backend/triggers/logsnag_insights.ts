@@ -249,7 +249,7 @@ async function getGithubStars(): Promise<number> {
 
 function getStats(c: Context): GlobalStats {
   const supabase = supabaseAdmin(c)
-  const last24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toString()
+  const last24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
   return {
     apps: countAllApps(c),
     updates: countAllUpdates(c),
@@ -474,6 +474,7 @@ app.post('/', middlewareAPISecret, async (c) => {
     plan_solo: plans.Solo,
     plan_maker: plans.Maker,
     plan_team: plans.Team,
+    plan_enterprise: plans.Enterprise || 0,
     // Revenue metrics
     mrr: revenue.mrr,
     total_revenue: revenue.total_revenue,
