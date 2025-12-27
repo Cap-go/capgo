@@ -357,28 +357,39 @@ describe('update scenarios', () => {
 
   it('disable auto update to minor', async () => {
     const versionId = await getSupabaseClient().from('app_versions').select('id').eq('name', '1.361.0').eq('app_id', APP_NAME_UPDATE).single().throwOnError().then(({ data }) => data?.id)
+    const originalVersionId = await getSupabaseClient().from('app_versions').select('id').eq('name', '1.0.0').eq('app_id', APP_NAME_UPDATE).single().throwOnError().then(({ data }) => data?.id)
     await getSupabaseClient().from('channels').update({ disable_auto_update: 'minor', version: versionId }).eq('name', 'production').eq('app_id', APP_NAME_UPDATE).throwOnError()
 
-    const baseData = getBaseData(APP_NAME_UPDATE)
-    baseData.version_name = '1.1.0'
+    try {
+      const baseData = getBaseData(APP_NAME_UPDATE)
+      baseData.version_name = '1.1.0'
 
-    const response = await postUpdate(baseData)
-    expect(response.status).toBe(200)
-    const json = await response.json<UpdateRes>()
-    expect(json.error).toBe('disable_auto_update_to_minor')
+      const response = await postUpdate(baseData)
+      expect(response.status).toBe(200)
+      const json = await response.json<UpdateRes>()
+      expect(json.error).toBe('disable_auto_update_to_minor')
+    }
+    finally {
+      await getSupabaseClient().from('channels').update({ disable_auto_update: 'major', version: originalVersionId }).eq('name', 'production').eq('app_id', APP_NAME_UPDATE)
+    }
   })
 
   it('disallow emulator', async () => {
     await getSupabaseClient().from('channels').update({ allow_emulator: false, disable_auto_update: 'major' }).eq('name', 'production').eq('app_id', APP_NAME_UPDATE)
 
-    const baseData = getBaseData(APP_NAME_UPDATE)
-    baseData.version_name = '1.1.0'
-    baseData.is_emulator = true
+    try {
+      const baseData = getBaseData(APP_NAME_UPDATE)
+      baseData.version_name = '1.1.0'
+      baseData.is_emulator = true
 
-    const response = await postUpdate(baseData)
-    expect(response.status).toBe(200)
-    const json = await response.json<UpdateRes>()
-    expect(json.error).toBe('disable_emulator')
+      const response = await postUpdate(baseData)
+      expect(response.status).toBe(200)
+      const json = await response.json<UpdateRes>()
+      expect(json.error).toBe('disable_emulator')
+    }
+    finally {
+      await getSupabaseClient().from('channels').update({ allow_emulator: true }).eq('name', 'production').eq('app_id', APP_NAME_UPDATE)
+    }
   })
 
   it('disallow device', async () => {
@@ -402,14 +413,19 @@ describe('update scenarios', () => {
   it('development build', async () => {
     await getSupabaseClient().from('channels').update({ allow_dev: false }).eq('name', 'production').eq('app_id', APP_NAME_UPDATE)
 
-    const baseData = getBaseData(APP_NAME_UPDATE)
-    baseData.version_name = '1.1.0'
-    baseData.is_prod = false
+    try {
+      const baseData = getBaseData(APP_NAME_UPDATE)
+      baseData.version_name = '1.1.0'
+      baseData.is_prod = false
 
-    const response = await postUpdate(baseData)
-    expect(response.status).toBe(200)
-    const json = await response.json<UpdateRes>()
-    expect(json.error).toBe('disable_dev_build')
+      const response = await postUpdate(baseData)
+      expect(response.status).toBe(200)
+      const json = await response.json<UpdateRes>()
+      expect(json.error).toBe('disable_dev_build')
+    }
+    finally {
+      await getSupabaseClient().from('channels').update({ allow_dev: true }).eq('name', 'production').eq('app_id', APP_NAME_UPDATE)
+    }
   })
 
   it('production build', async () => {
@@ -448,6 +464,9 @@ describe('update scenarios', () => {
 
     expect(data2?.length).toBe(1)
 
+    // Process the channel device count queue to update the app's channel_device_count
+    await getSupabaseClient().rpc('process_channel_device_counts_queue' as any, { batch_size: 10 })
+
     await getSupabaseClient().from('channels').update({ disable_auto_update: 'none', allow_dev: true, allow_prod: true, allow_emulator: true, allow_device: true, android: true }).eq('name', 'no_access').eq('app_id', APP_NAME_UPDATE)
 
     const baseData = getBaseData(APP_NAME_UPDATE)
@@ -463,6 +482,7 @@ describe('update scenarios', () => {
 
     // Clean up
     await getSupabaseClient().from('channel_devices').delete().eq('device_id', uuid).eq('app_id', APP_NAME_UPDATE)
+    await getSupabaseClient().rpc('process_channel_device_counts_queue' as any, { batch_size: 10 })
   })
 
   it('disallowed public channel update', async () => {
