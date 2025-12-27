@@ -4656,6 +4656,23 @@ WITH
     )
   );
 
+-- SELECT
+CREATE POLICY "Allow member and owner to select" ON "public"."org_users" FOR
+SELECT
+  TO "authenticated",
+  "anon" USING (
+    "public"."is_member_of_org" (
+      (
+        SELECT
+          "public"."get_identity_org_allowed" (
+            '{read,upload,write,all}'::"public"."key_mode" [],
+            "org_users"."org_id"
+          ) AS "get_identity_org_allowed"
+      ),
+      "org_id"
+    )
+  );
+
 -- UPDATE
 CREATE POLICY "Allow org admin to update" ON "public"."org_users"
 FOR UPDATE
