@@ -540,7 +540,7 @@ onUnmounted(() => {
         </tbody>
         <tbody v-else>
           <tr v-for="i in 10" :key="i" class="max-w-sm" :class="{ 'animate-pulse duration-1000': isLoading }">
-            <td v-for="(col, y) in columns" :key="`${i}_${y}`" class="px-1 py-1 md:py-4 md:px-6">
+            <td v-for="(_, y) in columns" :key="`${i}_${y}`" class="px-1 py-1 md:py-4 md:px-6">
               <div class="bg-gray-200 rounded-full dark:bg-gray-700 max-w-[300px] h-2 mb-2.5" />
             </td>
           </tr>
