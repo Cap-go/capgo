@@ -1,24 +1,23 @@
 <script setup lang="ts">
 import type { Ref } from 'vue'
 import type { TableColumn } from '../comp_def'
+import { FormKit } from '@formkit/vue'
+import { useDebounceFn } from '@vueuse/core'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import IconDown from '~icons/ic/round-keyboard-arrow-down'
+import IconFastBackward from '~icons/ic/round-keyboard-double-arrow-left'
 import IconSearch from '~icons/ic/round-search?raw'
 import IconSortDown from '~icons/lucide/chevron-down'
 import IconSortUp from '~icons/lucide/chevron-up'
 import IconSort from '~icons/lucide/chevrons-up-down'
-import IconX from '~icons/heroicons/x-mark'
 import IconFilter from '~icons/system-uicons/filtering'
 import IconReload from '~icons/tabler/reload'
-import IconFastBackward from '~icons/ic/round-keyboard-double-arrow-left'
-import { FormKit } from '@formkit/vue'
-import { useDebounceFn } from '@vueuse/core'
 import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
-import { useOrganizationStore } from '~/stores/organization'
 import { useDialogV2Store } from '~/stores/dialogv2'
+import { useOrganizationStore } from '~/stores/organization'
 
 interface AuditLogRow {
   id: number
@@ -228,19 +227,6 @@ function getTableLabel(tableName: string): string {
       return t('member')
     default:
       return tableName
-  }
-}
-
-function getOperationClass(operation: string): string {
-  switch (operation) {
-    case 'INSERT':
-      return 'badge-success'
-    case 'UPDATE':
-      return 'badge-warning'
-    case 'DELETE':
-      return 'badge-error'
-    default:
-      return 'badge-neutral'
   }
 }
 
