@@ -26,6 +26,17 @@ COMMENT ON COLUMN "public"."audit_logs"."old_record" IS 'Previous state of the r
 COMMENT ON COLUMN "public"."audit_logs"."new_record" IS 'New state of the record (null for DELETE)';
 COMMENT ON COLUMN "public"."audit_logs"."changed_fields" IS 'Array of field names that changed (for UPDATE operations)';
 
+-- Add foreign key constraints for referential integrity
+ALTER TABLE "public"."audit_logs"
+  ADD CONSTRAINT audit_logs_org_id_fkey
+  FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id")
+  ON DELETE CASCADE;
+
+ALTER TABLE "public"."audit_logs"
+  ADD CONSTRAINT audit_logs_user_id_fkey
+  FOREIGN KEY ("user_id") REFERENCES "public"."users"("id")
+  ON DELETE SET NULL;
+
 -- Create indexes for efficient querying
 CREATE INDEX idx_audit_logs_org_id ON "public"."audit_logs"("org_id");
 CREATE INDEX idx_audit_logs_table_name ON "public"."audit_logs"("table_name");
