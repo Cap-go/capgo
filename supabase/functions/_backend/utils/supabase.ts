@@ -5,6 +5,7 @@ import type { Database } from './supabase.types.ts'
 import type { DeviceWithoutCreatedAt, Order, ReadDevicesParams, ReadStatsParams } from './types.ts'
 import { createClient } from '@supabase/supabase-js'
 import { buildNormalizedDeviceForWrite, hasComparableDeviceChanged } from './deviceComparison.ts'
+import { hashApiKey } from './hash.ts'
 import { simpleError } from './hono.ts'
 import { cloudlog, cloudlogErr } from './logging.ts'
 import { createCustomer } from './stripe.ts'
@@ -1091,17 +1092,33 @@ export async function checkKey(c: Context, authorization: string | undefined, su
   if (!authorization)
     return null
   try {
-    const { data, error } = await supabase
+    // First try plain-text lookup (for legacy keys where key column is not null)
+    const { data: plainKey, error: plainError } = await supabase
       .from('apikeys')
       .select()
       .eq('key', authorization)
       .in('mode', allowed)
       .single()
-    if (!data || error) {
-      cloudlog({ requestId: c.get('requestId'), message: 'Invalid apikey', authorization, allowed, error })
-      return null
+
+    if (plainKey && !plainError) {
+      return plainKey
     }
-    return data
+
+    // If not found, try hashed lookup
+    const keyHash = await hashApiKey(authorization)
+    const { data: hashedKey, error: hashError } = await supabase
+      .from('apikeys')
+      .select()
+      .eq('key_hash', keyHash)
+      .in('mode', allowed)
+      .single()
+
+    if (hashedKey && !hashError) {
+      return hashedKey
+    }
+
+    cloudlog({ requestId: c.get('requestId'), message: 'Invalid apikey', authorization, allowed, plainError, hashError })
+    return null
   }
   catch (error) {
     cloudlog({ requestId: c.get('requestId'), message: 'checkKey error', error })
@@ -1126,5 +1143,53 @@ export async function checkKeyById(c: Context, id: number, supabase: SupabaseCli
   catch (error) {
     cloudlog({ requestId: c.get('requestId'), message: 'checkKeyById error', error })
     return null
+  }
+}
+
+/**
+ * Check if an API key is valid for a specific organization based on its hashed key enforcement setting.
+ * Returns true if the key can access the org, false if the org requires hashed keys and this is a plain-text key.
+ */
+export async function checkKeyOrgEnforcement(
+  c: Context,
+  apikey: Database['public']['Tables']['apikeys']['Row'],
+  orgId: string,
+  supabase: SupabaseClient<Database>,
+): Promise<boolean> {
+  try {
+    // Check if org enforces hashed keys
+    const { data: org, error } = await supabase
+      .from('orgs')
+      .select('enforce_hashed_api_keys')
+      .eq('id', orgId)
+      .single()
+
+    if (error || !org) {
+      // Org not found or error - allow (will fail on other checks)
+      return true
+    }
+
+    if (!org.enforce_hashed_api_keys) {
+      // Org doesn't enforce hashed keys
+      return true
+    }
+
+    // Org enforces hashed keys - check if this is a hashed key
+    // A hashed key has key_hash set and key is null
+    const isHashedKey = apikey.key_hash !== null && apikey.key === null
+    if (!isHashedKey) {
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'Org enforces hashed keys but key is plain-text',
+        orgId,
+        apikeyId: apikey.id,
+      })
+      return false
+    }
+    return true
+  }
+  catch (error) {
+    cloudlog({ requestId: c.get('requestId'), message: 'checkKeyOrgEnforcement error', error })
+    return true // Allow on error - will fail on other checks
   }
 }

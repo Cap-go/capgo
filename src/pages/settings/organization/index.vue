@@ -30,11 +30,13 @@ onMounted(async () => {
 const { currentOrganization } = storeToRefs(organizationStore)
 const orgName = ref(currentOrganization.value?.name ?? '')
 const email = ref(currentOrganization.value?.management_email ?? '')
+const enforceHashedApiKeys = ref(currentOrganization.value?.enforce_hashed_api_keys ?? false)
 
 watch(currentOrganization, (newOrg) => {
   if (newOrg) {
     orgName.value = newOrg.name
     email.value = newOrg.management_email
+    enforceHashedApiKeys.value = newOrg.enforce_hashed_api_keys ?? false
   }
 })
 
@@ -208,6 +210,40 @@ async function copyOrganizationId() {
     await dialogStore.onDialogDismiss()
   }
 }
+
+async function toggleEnforceHashedApiKeys() {
+  if (!currentOrganization.value || !hasOrgPerm.value) {
+    toast.error(t('no-permission'))
+    return
+  }
+
+  const newValue = !enforceHashedApiKeys.value
+  const previousValue = enforceHashedApiKeys.value
+
+  // Optimistic update
+  enforceHashedApiKeys.value = newValue
+  if (currentOrganization.value) {
+    currentOrganization.value.enforce_hashed_api_keys = newValue
+  }
+
+  const { error } = await supabase
+    .from('orgs')
+    .update({ enforce_hashed_api_keys: newValue })
+    .eq('id', currentOrganization.value.gid)
+
+  if (error) {
+    console.error('Failed to update enforce_hashed_api_keys:', error)
+    // Revert optimistic update
+    enforceHashedApiKeys.value = previousValue
+    if (currentOrganization.value) {
+      currentOrganization.value.enforce_hashed_api_keys = previousValue
+    }
+    toast.error(t('org-changes-set-email-other-error'))
+    return
+  }
+
+  toast.success(t('org-changes-saved'))
+}
 </script>
 
 <template>
@@ -279,6 +315,47 @@ async function copyOrganizationId() {
               </div>
             </div>
           </div>
+
+          <!-- Security Settings Section -->
+          <div class="pt-6 mt-6 border-t border-slate-300">
+            <h3 class="mb-4 text-lg font-semibold dark:text-white text-slate-800">
+              {{ t('security-settings') }}
+            </h3>
+            <div class="space-y-4">
+              <div class="flex items-center justify-between p-4 rounded-lg bg-gray-50 dark:bg-gray-700">
+                <div class="flex-1">
+                  <p class="font-medium dark:text-white text-slate-800">
+                    {{ t('enforce-hashed-api-keys') }}
+                  </p>
+                  <p class="text-sm text-gray-500 dark:text-gray-400">
+                    {{ t('enforce-hashed-api-keys-description') }}
+                  </p>
+                </div>
+                <div class="ml-4">
+                  <button
+                    type="button"
+                    :disabled="!hasOrgPerm"
+                    :class="[
+                      enforceHashedApiKeys ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600',
+                      'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2',
+                      !hasOrgPerm ? 'opacity-50 cursor-not-allowed' : '',
+                    ]"
+                    role="switch"
+                    :aria-checked="enforceHashedApiKeys"
+                    @click="toggleEnforceHashedApiKeys"
+                  >
+                    <span
+                      :class="[
+                        enforceHashedApiKeys ? 'translate-x-5' : 'translate-x-0',
+                        'pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out',
+                      ]"
+                    />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <footer class="mt-auto">
             <div class="flex flex-col px-2 py-5 border-t md:px-6 border-slate-300">
               <div class="flex self-end">
