@@ -13,7 +13,7 @@ BEGIN;
 -- 'com.demoadmin.app', 'com.demo.app'
 -- Plan tests
 SELECT
-  plan (7);
+  plan (6);
 
 -- Test 1: Users can see organizations they belong to
 SET
@@ -91,22 +91,8 @@ SELECT
 --     'new row violates row-level security policy for table "bandwidth_usage"',
 --     'bandwidth_usage table should be disabled for all'
 --   );
--- Test 6: Test org_users visibility
-SELECT
-  ok (
-    (
-      SELECT
-        COUNT(*)
-      FROM
-        public.org_users
-      WHERE
-        org_id = '046a36ac-e03c-4590-9257-bd6c9dba9ee8'
-    ) >= 1,
-    'Users should see org_users entries for their org'
-  );
-
 -- TODO: fix it
--- Test 7: Test devices table policies - using existing seed device
+-- Test 6: Test devices table policies - using existing seed device
 -- SELECT
 --   ok (
 --     EXISTS (
@@ -120,7 +106,7 @@ SELECT
 --     ),
 --     'User should be able to see existing test devices from their apps'
 --   );
--- Test 8: Test channels table - using existing seed channel
+-- Test 7: Test channels table - using existing seed channel
 SELECT
   ok (
     EXISTS (

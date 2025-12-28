@@ -189,7 +189,8 @@ export async function updateWithPG(
 
   // Check for encryption key mismatch between device and bundle
   // Only check if both device and bundle have key_id set (encrypted bundle)
-  if (body.key_id && version.key_id && body.key_id !== version.key_id) {
+  // Only enforce for plugin_version > 8.40.7 (transitional period for key_id format change from 4 to 20 chars)
+  if (body.key_id && version.key_id && body.key_id !== version.key_id && greaterThan(pluginVersion, parse('8.40.7'))) {
     cloudlog({ requestId: c.get('requestId'), message: 'Encryption key mismatch', device_id, deviceKeyId: body.key_id, bundleKeyId: version.key_id, versionName: version.name })
     await sendStatsAndDevice(c, device, [{ action: 'keyMismatch', versionName: version.name }])
     return simpleError200(c, 'key_id_mismatch', 'Device encryption key does not match bundle encryption key. The device may have a different public key than the one used to encrypt this bundle.', {
@@ -304,10 +305,26 @@ export async function updateWithPG(
       })
     }
 
+    if (!channelData.channels.allow_prod && body.is_prod) {
+      cloudlog({ requestId: c.get('requestId'), message: 'Cannot update prod build is disabled', id: device_id, date: new Date().toISOString() })
+      await sendStatsAndDevice(c, device, [{ action: 'disableProdBuild', versionName: version.name }])
+      return simpleError200(c, 'disable_prod_build', 'Cannot update, prod build is disabled', {
+        version: version.name,
+        old: version_name,
+      })
+    }
     if (!channelData.channels.allow_dev && !body.is_prod) {
       cloudlog({ requestId: c.get('requestId'), message: 'Cannot update dev build is disabled', id: device_id, date: new Date().toISOString() })
       await sendStatsAndDevice(c, device, [{ action: 'disableDevBuild', versionName: version.name }])
       return simpleError200(c, 'disable_dev_build', 'Cannot update, dev build is disabled', {
+        version: version.name,
+        old: version_name,
+      })
+    }
+    if (!channelData.channels.allow_device && !body.is_emulator) {
+      cloudlog({ requestId: c.get('requestId'), message: 'Cannot update device is disabled', id: device_id, date: new Date().toISOString() })
+      await sendStatsAndDevice(c, device, [{ action: 'disableDevice', versionName: version.name }])
+      return simpleError200(c, 'disable_device', 'Cannot update, device is disabled', {
         version: version.name,
         old: version_name,
       })

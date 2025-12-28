@@ -16,7 +16,9 @@ interface ChannelSet {
   android?: boolean
   allow_device_self_set?: boolean
   allow_emulator?: boolean
+  allow_device?: boolean
   allow_dev?: boolean
+  allow_prod?: boolean
 }
 
 async function findVersion(c: Context, appID: string, version: string, ownerOrg: string, apikey: Database['public']['Tables']['apikeys']['Row']) {
@@ -58,7 +60,9 @@ export async function post(c: Context, body: ChannelSet, apikey: Database['publi
     ...(body.disableAutoUpdate == null ? {} : { disable_auto_update: body.disableAutoUpdate }),
     ...(body.allow_device_self_set == null ? {} : { allow_device_self_set: body.allow_device_self_set }),
     ...(body.allow_emulator == null ? {} : { allow_emulator: body.allow_emulator }),
+    ...(body.allow_device == null ? {} : { allow_device: body.allow_device }),
     ...(body.allow_dev == null ? {} : { allow_dev: body.allow_dev }),
+    ...(body.allow_prod == null ? {} : { allow_prod: body.allow_prod }),
     ...(body.ios == null ? {} : { ios: body.ios }),
     ...(body.android == null ? {} : { android: body.android }),
     version: -1,

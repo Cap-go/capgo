@@ -67,18 +67,16 @@ export async function getAll(c: Context, apikey: Database['public']['Tables']['a
   }
   // Otherwise, get all organizations the user is a member of and filter by those
   else {
-    // Get list of orgs the user is a member of
+    // Get list of orgs the user is a member of via RPC (avoids direct org_users select).
     const { data: userOrgs, error: orgsError } = await supabaseApikey(c, apikey.key)
-      .from('org_users')
-      .select('org_id')
-      .eq('user_id', apikey.user_id)
+      .rpc('get_orgs_v6')
 
     if (orgsError) {
       throw simpleError('cannot_get_user_organizations', 'Cannot get user organizations', { supabaseError: orgsError })
     }
 
     if (userOrgs && userOrgs.length > 0) {
-      const orgIds = userOrgs.map(org => org.org_id)
+      const orgIds = userOrgs.map(org => org.gid)
       query = query.in('owner_org', orgIds)
     }
   }

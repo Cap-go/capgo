@@ -3,8 +3,9 @@ BEGIN;
 ALTER TABLE public.deploy_history
 ADD COLUMN IF NOT EXISTS install_stats_email_sent_at timestamp with time zone;
 
-CREATE OR REPLACE FUNCTION public.process_deploy_install_stats_email() RETURNS void LANGUAGE plpgsql
-SET search_path = '' AS $$
+CREATE OR REPLACE FUNCTION public.process_deploy_install_stats_email () RETURNS void LANGUAGE plpgsql
+SET
+  search_path = '' AS $$
 DECLARE
   record RECORD;
 BEGIN
@@ -93,10 +94,11 @@ BEGIN
 END;
 $$;
 
-ALTER FUNCTION public.process_deploy_install_stats_email() OWNER TO postgres;
+ALTER FUNCTION public.process_deploy_install_stats_email () OWNER TO postgres;
 
-CREATE OR REPLACE FUNCTION public.process_all_cron_tasks() RETURNS void LANGUAGE plpgsql
-SET search_path = '' AS $$
+CREATE OR REPLACE FUNCTION public.process_all_cron_tasks () RETURNS void LANGUAGE plpgsql
+SET
+  search_path = '' AS $$
 DECLARE
   current_hour int;
   current_minute int;
