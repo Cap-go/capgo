@@ -47,28 +47,11 @@ CREATE TABLE IF NOT EXISTS public.cron_tasks (
 CREATE INDEX IF NOT EXISTS idx_cron_tasks_enabled ON public.cron_tasks(enabled) WHERE enabled = true;
 
 -- Security: Restrict access to cron_tasks table to service_role only
--- This table should not be accessible by authenticated users or anonymous users
-ALTER TABLE public.cron_tasks OWNER TO postgres;
-
--- Revoke all permissions from public and authenticated users
 REVOKE ALL ON public.cron_tasks FROM PUBLIC;
-REVOKE ALL ON public.cron_tasks FROM anon;
-REVOKE ALL ON public.cron_tasks FROM authenticated;
-
--- Grant full access only to service_role (used by backend functions)
-GRANT ALL ON public.cron_tasks TO service_role;
-
--- Also secure the sequence
 REVOKE ALL ON SEQUENCE public.cron_tasks_id_seq FROM PUBLIC;
-REVOKE ALL ON SEQUENCE public.cron_tasks_id_seq FROM anon;
-REVOKE ALL ON SEQUENCE public.cron_tasks_id_seq FROM authenticated;
+GRANT ALL ON public.cron_tasks TO service_role;
 GRANT ALL ON SEQUENCE public.cron_tasks_id_seq TO service_role;
-
--- Enable RLS and create restrictive policy (belt and suspenders)
 ALTER TABLE public.cron_tasks ENABLE ROW LEVEL SECURITY;
-
--- No policies = no access for RLS-enabled roles (anon, authenticated)
--- service_role bypasses RLS by default
 
 -- Insert all existing cron tasks
 INSERT INTO public.cron_tasks (name, description, task_type, target, batch_size, second_interval, minute_interval, hour_interval, run_at_hour, run_at_minute, run_at_second, run_on_dow, run_on_day) VALUES
@@ -190,7 +173,9 @@ BEGIN
 END;
 $$;
 
-ALTER FUNCTION public.cleanup_job_run_details_7days() OWNER TO postgres;
+-- Security: internal function only
+REVOKE EXECUTE ON FUNCTION public.cleanup_job_run_details_7days() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.cleanup_job_run_details_7days() TO service_role;
 
 -- Create the new table-driven process_all_cron_tasks function
 CREATE OR REPLACE FUNCTION public.process_all_cron_tasks() RETURNS void
@@ -280,4 +265,6 @@ BEGIN
 END;
 $$;
 
-ALTER FUNCTION public.process_all_cron_tasks() OWNER TO postgres;
+-- Security: internal function only
+REVOKE EXECUTE ON FUNCTION public.process_all_cron_tasks() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.process_all_cron_tasks() TO service_role;
