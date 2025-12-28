@@ -551,15 +551,6 @@ BEGIN
         RAISE WARNING 'process_stats_email_monthly failed: %', SQLERRM;
       END;
     END IF;
-
-    -- Production deploy/install stats email (1st of month at noon)
-    IF EXTRACT(DAY FROM now()) = 1 THEN
-      BEGIN
-        PERFORM public.process_production_deploy_install_stats_email();
-      EXCEPTION WHEN OTHERS THEN
-        RAISE WARNING 'process_production_deploy_install_stats_email failed: %', SQLERRM;
-      END;
-    END IF;
   END IF;
 END;
 $$;
