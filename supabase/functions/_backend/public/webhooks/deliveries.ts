@@ -1,5 +1,5 @@
 import type { Context } from 'hono'
-import type { AuthInfo } from '../../utils/hono.ts'
+import type { AuthInfo, MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
 import { z } from 'zod/mini'
 import { simpleError } from '../../utils/hono.ts'
@@ -25,7 +25,7 @@ const retryDeliverySchema = z.object({
 
 const DELIVERIES_PER_PAGE = 50
 
-export async function getDeliveries(c: Context, bodyRaw: any, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
+export async function getDeliveries(c: Context<MiddlewareKeyVariables, any, any>, bodyRaw: any, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
   const bodyParsed = getDeliveriesSchema.safeParse(bodyRaw)
   if (!bodyParsed.success) {
     throw simpleError('invalid_body', 'Invalid body', { error: bodyParsed.error })
@@ -96,7 +96,7 @@ export async function getDeliveries(c: Context, bodyRaw: any, apikey: Database['
   })
 }
 
-export async function retryDelivery(c: Context, bodyRaw: any, auth: AuthInfo): Promise<Response> {
+export async function retryDelivery(c: Context<MiddlewareKeyVariables, any, any>, bodyRaw: any, auth: AuthInfo): Promise<Response> {
   const bodyParsed = retryDeliverySchema.safeParse(bodyRaw)
   if (!bodyParsed.success) {
     throw simpleError('invalid_body', 'Invalid body', { error: bodyParsed.error })

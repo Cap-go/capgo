@@ -1,5 +1,5 @@
 import type { Context } from 'hono'
-import type { AuthInfo } from '../../utils/hono.ts'
+import type { AuthInfo, MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
 import { getBodyOrQuery, honoFactory, simpleError } from '../../utils/hono.ts'
 import { middlewareKey, middlewareV2 } from '../../utils/hono_middleware.ts'
@@ -18,7 +18,7 @@ export const app = honoFactory.createApp()
  * Validates admin access to organization
  */
 export async function checkWebhookPermission(
-  c: Context,
+  c: Context<MiddlewareKeyVariables, any, any>,
   orgId: string,
   apikey: Database['public']['Tables']['apikeys']['Row'],
 ): Promise<void> {
@@ -35,7 +35,7 @@ export async function checkWebhookPermission(
  * Validates admin access to organization using the unified auth info
  */
 export async function checkWebhookPermissionV2(
-  c: Context,
+  c: Context<MiddlewareKeyVariables, any, any>,
   orgId: string,
   auth: AuthInfo,
 ): Promise<void> {
