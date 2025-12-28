@@ -220,6 +220,7 @@ CREATE OR REPLACE FUNCTION "public"."trigger_webhook_on_audit_log"()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = ''
 AS $$
 BEGIN
   -- Queue the audit log event for webhook dispatch
@@ -272,6 +273,7 @@ $$;
 CREATE OR REPLACE FUNCTION "public"."update_webhook_updated_at"()
 RETURNS TRIGGER
 LANGUAGE plpgsql
+SET search_path = ''
 AS $$
 BEGIN
   NEW.updated_at = now();
@@ -291,6 +293,7 @@ CREATE OR REPLACE FUNCTION "public"."cleanup_webhook_deliveries"()
 RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = ''
 AS $$
 BEGIN
   DELETE FROM "public"."webhook_deliveries"
