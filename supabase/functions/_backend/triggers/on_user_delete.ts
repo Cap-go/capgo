@@ -77,9 +77,34 @@ async function deleteUser(c: Context, record: Database['public']['Tables']['user
   if (record.email) {
     promises.push(unsubscribeBento(c, record.email))
   }
+
+  // 3. Delete user avatar images from storage
+  // User avatars are stored at: images/{user_id}/*
+  const deleteUserImages = async () => {
+    try {
+      const { data: files } = await supabaseAdmin(c)
+        .storage
+        .from('images')
+        .list(record.id)
+
+      if (files && files.length > 0) {
+        const filePaths = files.map(file => `${record.id}/${file.name}`)
+        await supabaseAdmin(c)
+          .storage
+          .from('images')
+          .remove(filePaths)
+        cloudlog({ requestId: c.get('requestId'), message: 'deleted user images', count: files.length, user_id: record.id })
+      }
+    }
+    catch (error) {
+      cloudlog({ requestId: c.get('requestId'), message: 'error deleting user images', error, user_id: record.id })
+    }
+  }
+  promises.push(deleteUserImages())
+
   await Promise.all(promises)
 
-  // 3. Track performance metrics
+  // 4. Track performance metrics
   const endTime = Date.now()
   const duration = endTime - startTime
 
