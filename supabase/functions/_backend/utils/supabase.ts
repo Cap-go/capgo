@@ -1111,23 +1111,24 @@ export async function getUpdateStatsSB(c: Context): Promise<UpdateStats> {
   }
 }
 
+/**
+ * Check API key by key string
+ * Expiration is checked directly in SQL query: expires_at IS NULL OR expires_at > now()
+ */
 export async function checkKey(c: Context, authorization: string | undefined, supabase: SupabaseClient<Database>, allowed: Database['public']['Enums']['key_mode'][]): Promise<Database['public']['Tables']['apikeys']['Row'] | null> {
   if (!authorization)
     return null
   try {
+    // Expiration check is done in SQL: expires_at IS NULL OR expires_at > now()
     const { data, error } = await supabase
       .from('apikeys')
       .select()
       .eq('key', authorization)
       .in('mode', allowed)
+      .or('expires_at.is.null,expires_at.gt.now()')
       .single()
     if (!data || error) {
       cloudlog({ requestId: c.get('requestId'), message: 'Invalid apikey', authorization, allowed, error })
-      return null
-    }
-    // Check if API key is expired
-    if (data.expires_at && new Date(data.expires_at) < new Date()) {
-      cloudlog({ requestId: c.get('requestId'), message: 'API key expired', keyId: data.id })
       return null
     }
     return data
@@ -1138,23 +1139,24 @@ export async function checkKey(c: Context, authorization: string | undefined, su
   }
 }
 
+/**
+ * Check API key by ID
+ * Expiration is checked directly in SQL query: expires_at IS NULL OR expires_at > now()
+ */
 export async function checkKeyById(c: Context, id: number, supabase: SupabaseClient<Database>, allowed: Database['public']['Enums']['key_mode'][]): Promise<Database['public']['Tables']['apikeys']['Row'] | null> {
   if (!id)
     return null
   try {
+    // Expiration check is done in SQL: expires_at IS NULL OR expires_at > now()
     const { data, error } = await supabase
       .from('apikeys')
       .select('*')
       .eq('id', id)
       .in('mode', allowed)
+      .or('expires_at.is.null,expires_at.gt.now()')
       .single()
     if (!data || error)
       return null
-    // Check if API key is expired
-    if (data.expires_at && new Date(data.expires_at) < new Date()) {
-      cloudlog({ requestId: c.get('requestId'), message: 'API key expired', keyId: data.id })
-      return null
-    }
     return data
   }
   catch (error) {

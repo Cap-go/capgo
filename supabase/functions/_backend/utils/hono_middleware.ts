@@ -1,7 +1,7 @@
 import type { Context } from 'hono'
 import type { AuthInfo } from './hono.ts'
 import type { Database } from './supabase.types.ts'
-import { and, eq, inArray } from 'drizzle-orm'
+import { and, eq, inArray, isNull, or, sql } from 'drizzle-orm'
 import { honoFactory, quickError } from './hono.ts'
 import { cloudlog } from './logging.ts'
 import { closeClient, getDrizzleClient, getPgClient, logPgError } from './pg.ts'
@@ -27,43 +27,37 @@ function isUUID(str: string) {
 }
 
 /**
- * Check if an API key is expired
+ * SQL condition for non-expired API keys: expires_at IS NULL OR expires_at > now()
  */
-function isApiKeyExpired(expiresAt: string | Date | null | undefined): boolean {
-  if (!expiresAt) {
-    return false
-  }
-  const expirationDate = typeof expiresAt === 'string' ? new Date(expiresAt) : expiresAt
-  return expirationDate < new Date()
-}
+const notExpiredCondition = or(
+  isNull(schema.apikeys.expires_at),
+  sql`${schema.apikeys.expires_at} > now()`,
+)
 
 /**
  * Check API key using Postgres/Drizzle instead of Supabase SDK
+ * Expiration is checked directly in SQL query - no JS check needed
  */
 async function checkKeyPg(
-  c: Context,
+  _c: Context,
   keyString: string,
   rights: Database['public']['Enums']['key_mode'][],
   drizzleClient: ReturnType<typeof getDrizzleClient>,
 ): Promise<Database['public']['Tables']['apikeys']['Row'] | null> {
   try {
+    // Expiration check is done in SQL: expires_at IS NULL OR expires_at > now()
     const result = await drizzleClient
       .select()
       .from(schema.apikeys)
       .where(and(
         eq(schema.apikeys.key, keyString),
         inArray(schema.apikeys.mode, rights),
+        notExpiredCondition,
       ))
       .limit(1)
       .then(data => data[0])
 
     if (!result) {
-      return null
-    }
-
-    // Check if API key is expired
-    if (isApiKeyExpired(result.expires_at)) {
-      cloudlog({ requestId: c.get('requestId'), message: 'API key expired', keyId: result.id })
       return null
     }
 
@@ -82,38 +76,35 @@ async function checkKeyPg(
     } as Database['public']['Tables']['apikeys']['Row']
   }
   catch (e: unknown) {
-    logPgError(c, 'checkKeyPg', e)
+    logPgError(_c, 'checkKeyPg', e)
     return null
   }
 }
 
 /**
  * Check API key by ID using Postgres/Drizzle instead of Supabase SDK
+ * Expiration is checked directly in SQL query - no JS check needed
  */
 async function checkKeyByIdPg(
-  c: Context,
+  _c: Context,
   id: number,
   rights: Database['public']['Enums']['key_mode'][],
   drizzleClient: ReturnType<typeof getDrizzleClient>,
 ): Promise<Database['public']['Tables']['apikeys']['Row'] | null> {
   try {
+    // Expiration check is done in SQL: expires_at IS NULL OR expires_at > now()
     const result = await drizzleClient
       .select()
       .from(schema.apikeys)
       .where(and(
         eq(schema.apikeys.id, id),
         inArray(schema.apikeys.mode, rights),
+        notExpiredCondition,
       ))
       .limit(1)
       .then(data => data[0])
 
     if (!result) {
-      return null
-    }
-
-    // Check if API key is expired
-    if (isApiKeyExpired(result.expires_at)) {
-      cloudlog({ requestId: c.get('requestId'), message: 'API key expired', keyId: result.id })
       return null
     }
 
@@ -132,7 +123,7 @@ async function checkKeyByIdPg(
     } as Database['public']['Tables']['apikeys']['Row']
   }
   catch (e: unknown) {
-    logPgError(c, 'checkKeyByIdPg', e)
+    logPgError(_c, 'checkKeyByIdPg', e)
     return null
   }
 }
