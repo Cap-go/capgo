@@ -207,7 +207,7 @@
   },
   "devDependencies": {
     "@antfu/eslint-config": "6.2.0",
-    "@capacitor-plus/cli": "^8.0.4",
+    "@capacitor/cli": "^8.0.0",
     "@capacitor/core": "^8.0.0",
     "@capgo/cli": "7.21.4",
     "@cloudflare/workers-types": "4.20251113.0",
