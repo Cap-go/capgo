@@ -121,8 +121,6 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
       {
         channel_name: dataChannelOverride.channel_id.name,
         app_id,
-        device_id,
-        reason: 'current_channel_not_allowed',
       },
       appOwner.owner_org,
       `${app_id}`,
@@ -146,9 +144,6 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
       {
         channel_name: dataChannel.name,
         app_id,
-        device_id,
-        is_public: dataChannel.public,
-        reason: dataChannel.public ? 'public_channel_not_allowed' : 'channel_not_allowed',
       },
       appOwner.owner_org,
       `${app_id}`,
@@ -451,8 +446,6 @@ async function deleteOverride(c: Context, drizzleClient: ReturnType<typeof getDr
       {
         channel_name: dataChannelOverride.channel_id.name,
         app_id,
-        device_id,
-        reason: 'current_channel_not_allowed',
       },
       appOwner.owner_org,
       `${app_id}`,
