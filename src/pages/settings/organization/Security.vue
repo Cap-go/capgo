@@ -295,16 +295,23 @@ onMounted(async () => {
                 </div>
               </div>
               <div class="flex items-center gap-4">
-                <label class="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    :checked="enforcing2fa"
-                    :disabled="!hasOrgPerm || isSaving"
-                    class="sr-only peer"
-                    @change="toggle2faEnforcement"
+                <button
+                  type="button"
+                  :disabled="!hasOrgPerm || isSaving"
+                  class="relative inline-flex items-center cursor-pointer"
+                  :class="{ 'opacity-50 cursor-not-allowed': !hasOrgPerm || isSaving }"
+                  @click="toggle2faEnforcement"
+                >
+                  <div
+                    class="w-11 h-6 rounded-full transition-colors duration-200 ease-in-out"
+                    :class="enforcing2fa ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-700'"
                   >
-                  <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600" />
-                </label>
+                    <div
+                      class="absolute top-[2px] left-[2px] bg-white border-gray-300 border rounded-full h-5 w-5 transition-transform duration-200 ease-in-out"
+                      :class="enforcing2fa ? 'translate-x-full border-white' : ''"
+                    />
+                  </div>
+                </button>
                 <span v-if="enforcing2fa" class="px-3 py-1 text-sm font-medium text-green-700 bg-green-100 rounded-full dark:bg-green-900/30 dark:text-green-400">
                   {{ t('enabled') }}
                 </span>
