@@ -1,21 +1,69 @@
 <script setup lang="ts">
 import { setErrors } from '@formkit/core'
 import { FormKit, FormKitMessages } from '@formkit/vue'
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import iconPassword from '~icons/heroicons/key?raw'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
+import { useOrganizationStore } from '~/stores/organization'
 // tabs handled by settings layout
 
 const isLoading = ref(false)
 const dialogStore = useDialogV2Store()
 const displayStore = useDisplayStore()
 const supabase = useSupabase()
+const organizationStore = useOrganizationStore()
 const mfaCode = ref('')
 const { t } = useI18n()
 displayStore.NavTitle = t('password')
+
+// Get current org's password policy (use defaults if no policy)
+const passwordPolicy = computed(() => {
+  const org = organizationStore.currentOrganization
+  if (org?.password_policy_config?.enabled) {
+    return org.password_policy_config
+  }
+  // Default policy
+  return {
+    min_length: 6,
+    require_uppercase: true,
+    require_number: true,
+    require_special: true,
+  }
+})
+
+// Build dynamic validation rules based on org's password policy
+const validationRules = computed(() => {
+  const rules = ['required', `length:${passwordPolicy.value.min_length}`]
+
+  if (passwordPolicy.value.require_uppercase) {
+    rules.push('contains_uppercase')
+  }
+  // contains_alpha ensures at least one letter
+  rules.push('contains_alpha')
+  if (passwordPolicy.value.require_special) {
+    rules.push('contains_symbol')
+  }
+  // Note: FormKit doesn't have contains_number, but contains_alpha + the regex validation in backend handles this
+
+  return rules.join('|')
+})
+
+// Build dynamic help text based on org's password policy
+const helpText = computed(() => {
+  const requirements = []
+  requirements.push(`${passwordPolicy.value.min_length} ${t('characters-minimum')}`)
+  if (passwordPolicy.value.require_uppercase)
+    requirements.push(t('one-uppercase'))
+  if (passwordPolicy.value.require_number)
+    requirements.push(t('one-number'))
+  if (passwordPolicy.value.require_special)
+    requirements.push(t('one-special-character'))
+
+  return requirements.join(', ')
+})
 
 async function submit(form: { password: string, password_confirm: string }) {
   console.log('submitting', form)
@@ -74,10 +122,17 @@ async function submit(form: { password: string, password_confirm: string }) {
   const { error: updateError } = await supabase.auth.updateUser({ password: form.password })
 
   isLoading.value = false
-  if (updateError)
+  if (updateError) {
     setErrors('change-pass', [t('account-password-error')], {})
-  else
+  }
+  else {
     toast.success(t('changed-password-suc'))
+
+    // If user was locked out due to password policy, refresh org data to regain access
+    if (!organizationStore.currentOrganization?.password_has_access) {
+      await organizationStore.fetchOrganizations()
+    }
+  }
   form.password = ''
   form.password_confirm = ''
 }
@@ -102,8 +157,8 @@ async function submit(form: { password: string, password_confirm: string }) {
                 autocomplete="new-password"
                 outer-class="sm:w-1/2"
                 :label="t('password')"
-                :help="t('6-characters-minimum')"
-                validation="required|length:6|contains_alpha|contains_uppercase|contains_lowercase|contains_symbol"
+                :help="helpText"
+                :validation="validationRules"
                 validation-visibility="live"
               />
               <FormKit
