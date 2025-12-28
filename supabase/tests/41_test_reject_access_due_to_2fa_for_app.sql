@@ -222,13 +222,13 @@ BEGIN
   PERFORM set_config('request.headers', '{}', true);
 END $$;
 
--- Test 9: Anonymous user (no auth) returns true (rejection)
+-- Test 9: Anonymous user (no auth, no API key) returns true (rejection - no user identity found)
 SELECT tests.clear_authentication();
 SELECT
     is(
         reject_access_due_to_2fa_for_app(current_setting('test.app_with_2fa')),
         true,
-        'reject_access_due_to_2fa_for_app test - anonymous user returns true'
+        'reject_access_due_to_2fa_for_app test - anonymous user returns true (no user identity)'
     );
 
 -- Test 10: Verify function exists

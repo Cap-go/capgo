@@ -63,7 +63,9 @@ $$;
 
 ALTER FUNCTION "public"."reject_access_due_to_2fa_for_app"("app_id" character varying) OWNER TO "postgres";
 
--- Grant permissions - accessible to authenticated users (CLI and frontend)
+-- Grant permissions - accessible to authenticated, anon (for API key usage), and service_role
+-- Note: anon is needed because API key requests come in as anon role with capgkey header
 GRANT EXECUTE ON FUNCTION "public"."reject_access_due_to_2fa_for_app"("app_id" character varying) TO "authenticated";
+GRANT EXECUTE ON FUNCTION "public"."reject_access_due_to_2fa_for_app"("app_id" character varying) TO "anon";
 GRANT EXECUTE ON FUNCTION "public"."reject_access_due_to_2fa_for_app"("app_id" character varying) TO "service_role";
 
