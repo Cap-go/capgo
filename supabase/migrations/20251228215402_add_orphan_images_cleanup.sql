@@ -4,14 +4,12 @@
 -- Create the queue for orphan image cleanup
 SELECT pgmq.create('cron_clean_orphan_images');
 
--- Update process_combined_cron_jobs to include orphan image cleanup
--- This is based on the latest version from 20251228033417_webhooks.sql
--- Only adding: weekly orphan image cleanup on Sunday at 03:00
-CREATE OR REPLACE FUNCTION "public"."process_combined_cron_jobs"() RETURNS void
-    LANGUAGE plpgsql
-    SECURITY DEFINER
-    SET search_path TO ''
-    AS $$
+-- Update process_all_cron_tasks to include orphan image cleanup
+-- This is based on the latest version from prod.sql
+-- Adding: weekly orphan image cleanup on Sunday at 03:00
+CREATE OR REPLACE FUNCTION "public"."process_all_cron_tasks" () RETURNS "void" LANGUAGE "plpgsql"
+SET
+  "search_path" TO '' AS $$
 DECLARE
   current_hour int;
   current_minute int;
@@ -26,7 +24,7 @@ BEGIN
   IF current_second % 10 = 0 THEN
     -- Process high-frequency queues with default batch size (950)
     BEGIN
-      PERFORM public.process_function_queue(ARRAY['on_channel_update', 'on_user_create', 'on_user_update', 'on_version_create', 'on_version_delete', 'on_version_update', 'on_app_delete', 'on_organization_create', 'on_user_delete', 'on_app_create', 'credit_usage_alerts', 'webhook_dispatcher', 'webhook_delivery']);
+      PERFORM public.process_function_queue(ARRAY['on_channel_update', 'on_user_create', 'on_user_update', 'on_version_create', 'on_version_delete', 'on_version_update', 'on_app_delete', 'on_organization_create', 'on_user_delete', 'on_app_create', 'credit_usage_alerts']);
     EXCEPTION WHEN OTHERS THEN
       RAISE WARNING 'process_function_queue (high-frequency) failed: %', SQLERRM;
     END;
@@ -61,6 +59,13 @@ BEGIN
     EXCEPTION WHEN OTHERS THEN
       RAISE WARNING 'process_function_queue (manifest_create) failed: %', SQLERRM;
     END;
+
+    -- Process cron_clean_orphan_images queue (will only have messages on Sunday)
+    BEGIN
+      PERFORM public.process_function_queue(ARRAY['cron_clean_orphan_images']);
+    EXCEPTION WHEN OTHERS THEN
+      RAISE WARNING 'process_function_queue (cron_clean_orphan_images) failed: %', SQLERRM;
+    END;
   END IF;
 
   -- Every 5 minutes (at :00 seconds): Org stats with batch size 10
@@ -90,7 +95,7 @@ BEGIN
   -- Every 2 hours (at :00:00): Low-frequency queues with default batch size
   IF current_hour % 2 = 0 AND current_minute = 0 AND current_second = 0 THEN
     BEGIN
-      PERFORM public.process_function_queue(ARRAY['admin_stats', 'cron_email', 'on_version_create', 'on_organization_delete', 'on_deploy_history_create', 'cron_clear_versions']);
+      PERFORM public.process_function_queue(ARRAY['admin_stats', 'cron_email', 'on_organization_delete', 'on_deploy_history_create', 'cron_clear_versions']);
     EXCEPTION WHEN OTHERS THEN
       RAISE WARNING 'process_function_queue (low-frequency) failed: %', SQLERRM;
     END;
@@ -124,13 +129,6 @@ BEGIN
     EXCEPTION WHEN OTHERS THEN
       RAISE WARNING 'remove_old_jobs failed: %', SQLERRM;
     END;
-
-    -- Cleanup old webhook deliveries (7 days retention)
-    BEGIN
-      PERFORM public.cleanup_webhook_deliveries();
-    EXCEPTION WHEN OTHERS THEN
-      RAISE WARNING 'cleanup_webhook_deliveries failed: %', SQLERRM;
-    END;
   END IF;
 
   -- Daily at 00:40:00 - Old app version retention
@@ -151,7 +149,7 @@ BEGIN
     END;
   END IF;
 
-  -- Daily at 03:00:00 - Free trial, credits, audit log cleanup, and orphan images
+  -- Daily at 03:00:00 - Free trial, credits, and orphan images cleanup
   IF current_hour = 3 AND current_minute = 0 AND current_second = 0 THEN
     BEGIN
       PERFORM public.process_free_trial_expired();
@@ -163,13 +161,6 @@ BEGIN
       PERFORM public.expire_usage_credits();
     EXCEPTION WHEN OTHERS THEN
       RAISE WARNING 'expire_usage_credits failed: %', SQLERRM;
-    END;
-
-    -- Cleanup old audit logs (90-day retention)
-    BEGIN
-      PERFORM public.cleanup_old_audit_logs();
-    EXCEPTION WHEN OTHERS THEN
-      RAISE WARNING 'cleanup_old_audit_logs failed: %', SQLERRM;
     END;
 
     -- Weekly on Sunday: Orphan images cleanup
@@ -220,17 +211,7 @@ BEGIN
       END;
     END IF;
   END IF;
-
-  -- Process cron_clean_orphan_images queue every minute (will only have messages on Sunday)
-  IF current_second = 0 THEN
-    BEGIN
-      PERFORM public.process_function_queue(ARRAY['cron_clean_orphan_images']);
-    EXCEPTION WHEN OTHERS THEN
-      RAISE WARNING 'process_function_queue (cron_clean_orphan_images) failed: %', SQLERRM;
-    END;
-  END IF;
-
 END;
 $$;
 
-ALTER FUNCTION "public"."process_combined_cron_jobs"() OWNER TO "postgres";
+ALTER FUNCTION "public"."process_all_cron_tasks" () OWNER TO "postgres";
