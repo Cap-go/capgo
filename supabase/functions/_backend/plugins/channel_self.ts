@@ -44,7 +44,7 @@ export const jsonRequestSchema = z.looseObject({
   plugin_version: z.optional(z.string()),
   is_prod: z.boolean(),
   platform: devicePlatformScheme,
-  key_id: z.optional(z.string().check(z.maxLength(4))),
+  key_id: z.optional(z.string().check(z.maxLength(20))),
 })
 
 // TODO: delete when all mirgrated to jsonRequestSchema
@@ -55,7 +55,7 @@ export const jsonRequestSchemaGet = z.looseObject({
   is_emulator: z.boolean(),
   is_prod: z.boolean(),
   platform: devicePlatformScheme,
-  key_id: z.optional(z.string().check(z.maxLength(4))),
+  key_id: z.optional(z.string().check(z.maxLength(20))),
 })
 
 async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient>, body: DeviceLink): Promise<Response> {
