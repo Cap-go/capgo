@@ -353,6 +353,12 @@ BEGIN
       RAISE WARNING 'process_channel_device_counts_queue failed: %', SQLERRM;
     END;
 
+    -- Process manifest bundle counts with batch size 1000
+    BEGIN
+      PERFORM public.process_manifest_bundle_counts_queue(1000);
+    EXCEPTION WHEN OTHERS THEN
+      RAISE WARNING 'process_manifest_bundle_counts_queue failed: %', SQLERRM;
+    END;
   END IF;
 
   -- Every minute (at :00 seconds): Per-minute tasks
@@ -405,7 +411,7 @@ BEGIN
   -- Every 2 hours (at :00:00): Low-frequency queues with default batch size
   IF current_hour % 2 = 0 AND current_minute = 0 AND current_second = 0 THEN
     BEGIN
-      PERFORM public.process_function_queue(ARRAY['admin_stats', 'cron_email', 'on_organization_delete', 'on_deploy_history_create', 'cron_clear_versions']);
+      PERFORM public.process_function_queue(ARRAY['admin_stats', 'cron_email', 'on_version_create', 'on_organization_delete', 'on_deploy_history_create', 'cron_clear_versions']);
     EXCEPTION WHEN OTHERS THEN
       RAISE WARNING 'process_function_queue (low-frequency) failed: %', SQLERRM;
     END;
@@ -466,7 +472,7 @@ BEGIN
     END;
   END IF;
 
-  -- Daily at 03:00:00 - Free trial and credits
+  -- Daily at 03:00:00 - Free trial, credits, and audit log cleanup
   IF current_hour = 3 AND current_minute = 0 AND current_second = 0 THEN
     BEGIN
       PERFORM public.process_free_trial_expired();
@@ -478,6 +484,13 @@ BEGIN
       PERFORM public.expire_usage_credits();
     EXCEPTION WHEN OTHERS THEN
       RAISE WARNING 'expire_usage_credits failed: %', SQLERRM;
+    END;
+
+    -- Cleanup old audit logs (90-day retention)
+    BEGIN
+      PERFORM public.cleanup_old_audit_logs();
+    EXCEPTION WHEN OTHERS THEN
+      RAISE WARNING 'cleanup_old_audit_logs failed: %', SQLERRM;
     END;
   END IF;
 
@@ -513,6 +526,15 @@ BEGIN
         PERFORM public.process_stats_email_monthly();
       EXCEPTION WHEN OTHERS THEN
         RAISE WARNING 'process_stats_email_monthly failed: %', SQLERRM;
+      END;
+    END IF;
+
+    -- Production deploy/install stats email (1st of month at noon)
+    IF EXTRACT(DAY FROM now()) = 1 THEN
+      BEGIN
+        PERFORM public.process_production_deploy_install_stats_email();
+      EXCEPTION WHEN OTHERS THEN
+        RAISE WARNING 'process_production_deploy_install_stats_email failed: %', SQLERRM;
       END;
     END IF;
   END IF;
