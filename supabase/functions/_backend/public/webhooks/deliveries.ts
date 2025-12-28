@@ -85,13 +85,16 @@ export async function getDeliveries(c: Context<MiddlewareKeyVariables, any, any>
 
   const { count } = await countQuery
 
+  const totalCount = count ?? 0
+  const nextPageStart = (page + 1) * DELIVERIES_PER_PAGE
+
   return c.json({
     deliveries: data,
     pagination: {
       page,
       per_page: DELIVERIES_PER_PAGE,
-      total: count ?? 0,
-      has_more: (data?.length ?? 0) === DELIVERIES_PER_PAGE,
+      total: totalCount,
+      has_more: nextPageStart < totalCount,
     },
   })
 }
