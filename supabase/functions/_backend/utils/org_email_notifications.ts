@@ -4,19 +4,19 @@ import { cloudlog } from './logging.ts'
 import { supabaseAdmin } from './supabase.ts'
 
 /**
- * Email preference keys that map to the JSONB email_preferences column in the users table.
- * These control which types of emails a user wants to receive.
+ * Email preference keys that map to the JSONB email_preferences column in both users and orgs tables.
+ * These control which types of emails a user/org wants to receive.
  */
-export type EmailPreferenceKey =
-  | 'usage_limit'
-  | 'credit_usage'
-  | 'onboarding'
-  | 'weekly_stats'
-  | 'monthly_stats'
-  | 'deploy_stats_24h'
-  | 'bundle_created'
-  | 'bundle_deployed'
-  | 'device_error'
+export type EmailPreferenceKey
+  = | 'usage_limit'
+    | 'credit_usage'
+    | 'onboarding'
+    | 'weekly_stats'
+    | 'monthly_stats'
+    | 'deploy_stats_24h'
+    | 'bundle_created'
+    | 'bundle_deployed'
+    | 'device_error'
 
 interface EmailPreferences {
   usage_limit?: boolean
@@ -30,6 +30,41 @@ interface EmailPreferences {
   device_error?: boolean
 }
 
+interface OrgWithPreferences {
+  management_email: string
+  email_preferences?: EmailPreferences | null
+}
+
+/**
+ * Get org info including management_email and email_preferences
+ */
+async function getOrgInfo(c: Context, orgId: string): Promise<OrgWithPreferences | null> {
+  const { data: org, error } = await supabaseAdmin(c)
+    .from('orgs')
+    .select('management_email')
+    .eq('id', orgId)
+    .single()
+
+  if (error || !org) {
+    cloudlog({ requestId: c.get('requestId'), message: 'getOrgInfo error', orgId, error })
+    return null
+  }
+
+  // email_preferences may not be in generated types yet
+  const orgWithPrefs = org as OrgWithPreferences
+  orgWithPrefs.email_preferences = ((org as any).email_preferences as EmailPreferences | null) ?? {}
+
+  return orgWithPrefs
+}
+
+/**
+ * Check if org has the specified email preference enabled
+ */
+function isOrgPreferenceEnabled(org: OrgWithPreferences, preferenceKey: EmailPreferenceKey): boolean {
+  const prefs = org.email_preferences ?? {}
+  const prefValue = prefs[preferenceKey]
+  return prefValue === undefined ? true : prefValue
+}
 
 /**
  * Get all admin/super_admin members of an organization who have the specified email preference enabled.
@@ -95,8 +130,44 @@ async function getEligibleOrgMemberEmails(
 }
 
 /**
+ * Get all eligible emails for org notifications, including management_email if:
+ * 1. It's different from any admin user's email
+ * 2. The org's email preference for this notification type is enabled
+ */
+async function getAllEligibleEmails(
+  c: Context,
+  orgId: string,
+  preferenceKey: EmailPreferenceKey,
+): Promise<{ adminEmails: string[], managementEmail: string | null }> {
+  // Get org info
+  const org = await getOrgInfo(c, orgId)
+  if (!org) {
+    return { adminEmails: [], managementEmail: null }
+  }
+
+  // Get eligible admin emails
+  const adminEmails = await getEligibleOrgMemberEmails(c, orgId, preferenceKey)
+
+  // Check if management_email should receive the notification:
+  // 1. Must be different from all admin emails
+  // 2. Org must have the preference enabled
+  let managementEmail: string | null = null
+
+  if (org.management_email) {
+    const isDifferentFromAdmins = !adminEmails.includes(org.management_email)
+    const isOrgPrefEnabled = isOrgPreferenceEnabled(org, preferenceKey)
+
+    if (isDifferentFromAdmins && isOrgPrefEnabled) {
+      managementEmail = org.management_email
+    }
+  }
+
+  return { adminEmails, managementEmail }
+}
+
+/**
  * Send an email notification to all eligible org members (admin/super_admin with preference enabled).
- * This is the main function to use for sending operational emails to org members.
+ * Also sends to management_email if it's different from admin emails and org preference is enabled.
  *
  * @param c - Hono context
  * @param eventName - The Bento event name (e.g., 'user:weekly_stats')
@@ -112,9 +183,15 @@ export async function sendEmailToOrgMembers(
   eventData: Record<string, any>,
   orgId: string,
 ): Promise<number> {
-  const emails = await getEligibleOrgMemberEmails(c, orgId, preferenceKey)
+  const { adminEmails, managementEmail } = await getAllEligibleEmails(c, orgId, preferenceKey)
 
-  if (emails.length === 0) {
+  // Combine all emails (admin emails + management email if applicable)
+  const allEmails = [...adminEmails]
+  if (managementEmail) {
+    allEmails.push(managementEmail)
+  }
+
+  if (allEmails.length === 0) {
     cloudlog({
       requestId: c.get('requestId'),
       message: 'sendEmailToOrgMembers: no eligible recipients',
@@ -127,7 +204,7 @@ export async function sendEmailToOrgMembers(
 
   let successCount = 0
 
-  for (const email of emails) {
+  for (const email of allEmails) {
     const result = await trackBentoEvent(c, email, eventData, eventName)
     if (result) {
       successCount++
@@ -149,7 +226,9 @@ export async function sendEmailToOrgMembers(
     eventName,
     preferenceKey,
     orgId,
-    totalRecipients: emails.length,
+    totalRecipients: allEmails.length,
+    adminRecipients: adminEmails.length,
+    managementEmailIncluded: !!managementEmail,
     successCount,
   })
 
@@ -159,6 +238,7 @@ export async function sendEmailToOrgMembers(
 /**
  * Send an email notification to org members with rate limiting via notifications table.
  * Uses the same cron-based throttling as sendNotifOrg but sends to all eligible members.
+ * Also sends to management_email if it's different from admin emails and org preference is enabled.
  *
  * @param c - Hono context
  * @param eventName - The Bento event name
@@ -181,18 +261,9 @@ export async function sendNotifToOrgMembers(
   // Import dynamically to avoid circular dependency
   const { sendNotifOrg } = await import('./notifications.ts')
 
-  // First check if we should send based on cron/throttling
-  // We use sendNotifOrg's internal logic by passing a dummy check
-  // But we need to intercept and handle multiple recipients
-
-  // Get the org's management email for the notification table check
-  const { data: org, error: orgError } = await supabaseAdmin(c)
-    .from('orgs')
-    .select('management_email')
-    .eq('id', orgId)
-    .single()
-
-  if (!org || orgError) {
+  // Get the org's info including management email
+  const org = await getOrgInfo(c, orgId)
+  if (!org) {
     cloudlog({ requestId: c.get('requestId'), message: 'sendNotifToOrgMembers: org not found', orgId })
     return false
   }
@@ -206,9 +277,16 @@ export async function sendNotifToOrgMembers(
     return false
   }
 
-  // Now send to additional eligible members (excluding org management email since sendNotifOrg handled it)
-  const emails = await getEligibleOrgMemberEmails(c, orgId, preferenceKey)
-  const additionalEmails = emails.filter(email => email !== org.management_email)
+  // Get all eligible emails
+  const { adminEmails, managementEmail } = await getAllEligibleEmails(c, orgId, preferenceKey)
+
+  // sendNotifOrg already sent to management_email, so filter it out from admin emails
+  // to avoid duplicate sends
+  const additionalEmails = adminEmails.filter(email => email !== org.management_email)
+
+  // If management_email is eligible (different from admins and org pref enabled)
+  // and wasn't in the admin list, it was already sent by sendNotifOrg, so we're good
+  // We just need to send to the additional admin emails
 
   for (const email of additionalEmails) {
     await trackBentoEvent(c, email, eventData, eventName)
@@ -222,6 +300,7 @@ export async function sendNotifToOrgMembers(
     orgId,
     orgEmail: org.management_email,
     additionalRecipients: additionalEmails.length,
+    managementEmailIncluded: !!managementEmail,
   })
 
   return true

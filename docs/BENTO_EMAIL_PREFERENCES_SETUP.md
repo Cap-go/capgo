@@ -1,10 +1,15 @@
 # Bento Configuration for Email Preferences
 
-This document describes the Bento setup required to support the granular per-user email notification preferences system.
+This document describes the Bento setup required to support the granular email notification preferences system.
 
 ## Overview
 
 The email preferences system uses Bento tags to control which users receive specific email types. When a user disables a preference, a `_disabled` tag is added to their Bento profile. Bento automations should be configured to exclude users with these disabled tags.
+
+### Two Levels of Preferences
+
+1. **User-level preferences** (`users.email_preferences`): Controls which emails individual admin users receive
+2. **Organization-level preferences** (`orgs.email_preferences`): Controls which emails are sent to the organization's management email (when different from admin emails)
 
 ## Disabled Tags
 
@@ -135,12 +140,36 @@ The following legacy tags continue to work alongside the new granular preference
 | `notifications_opt_in` | General notifications toggle (from `enable_notifications` column) |
 | `newsletter_opt_in` | Newsletter subscription (from `opt_for_newsletters` column) |
 
+## Organization Management Email
+
+The system also supports sending notifications to the organization's management email (billing email). This email receives notifications only when:
+
+1. The management email is **different** from all admin user emails
+2. The organization has the corresponding email preference **enabled**
+
+### How Organization Preferences Work
+
+- Organization preferences are stored in `orgs.email_preferences` (JSONB column)
+- Admins can configure these in **Organization Settings > Notifications**
+- When an org notification is sent, the system:
+  1. Sends to all admin/super_admin users who have the preference enabled
+  2. Also sends to the org's management email if it's different AND org preference is enabled
+
+### Management Email vs User Emails
+
+| Scenario | Who receives the email? |
+|----------|------------------------|
+| Management email = Admin email | Only the admin (not duplicated) |
+| Management email ≠ Any admin email, org pref ON | Admin(s) + Management email |
+| Management email ≠ Any admin email, org pref OFF | Admin(s) only |
+
 ## Technical Notes
 
-- Tags are synced via `syncUserPreferenceTags()` in `user_preferences.ts`
+- User tags are synced via `syncUserPreferenceTags()` in `user_preferences.ts`
 - The sync happens whenever a user record is updated
 - Tag operations use `addTagBento()` which handles both adding and removing tags
 - The backend also checks preferences before sending emails as a fallback (defense in depth)
+- Organization preferences are checked in `org_email_notifications.ts` via `getAllEligibleEmails()`
 
 ## Troubleshooting
 
