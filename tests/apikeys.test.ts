@@ -308,3 +308,130 @@ describe('[DELETE] /apikey/:id operations', () => {
     expect(data).toHaveProperty('error')
   })
 })
+
+describe('[POST] /apikey hashed key operations', () => {
+  it('create hashed api key', async () => {
+    const keyName = 'test-hashed-key'
+    const response = await fetch(`${BASE_URL}/apikey`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        name: keyName,
+        hashed: true,
+      }),
+    })
+    const data = await response.json<{ key: string, key_hash: string, id: number }>()
+    expect(response.status).toBe(200)
+    expect(data).toHaveProperty('key')
+    expect(data).toHaveProperty('key_hash')
+    expect(data).toHaveProperty('id')
+    expect(typeof data.key).toBe('string')
+    expect(typeof data.key_hash).toBe('string')
+    // The key should be a UUID format
+    expect(data.key).toMatch(/^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i)
+    // The key_hash should be a SHA-256 hex string (64 characters)
+    expect(data.key_hash).toMatch(/^[\da-f]{64}$/i)
+
+    // Verify the created key exists but key column in DB should be null
+    const verifyResponse = await fetch(`${BASE_URL}/apikey/${data.id}`, { headers })
+    const verifyData = await verifyResponse.json() as { name: string, key: string | null, key_hash: string }
+    expect(verifyData.name).toBe(keyName)
+    // In the database, the key should be null for hashed keys
+    expect(verifyData.key).toBeNull()
+    expect(verifyData.key_hash).toBe(data.key_hash)
+
+    // Cleanup
+    await fetch(`${BASE_URL}/apikey/${data.id}`, {
+      method: 'DELETE',
+      headers,
+    })
+  })
+
+  it('create plain api key (hashed: false)', async () => {
+    const keyName = 'test-plain-key-explicit'
+    const response = await fetch(`${BASE_URL}/apikey`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        name: keyName,
+        hashed: false,
+      }),
+    })
+    const data = await response.json<{ key: string, key_hash: string | null, id: number }>()
+    expect(response.status).toBe(200)
+    expect(data).toHaveProperty('key')
+    expect(typeof data.key).toBe('string')
+    // Plain key should not have key_hash set
+    expect(data.key_hash).toBeNull()
+
+    // Verify the key is stored in plain
+    const verifyResponse = await fetch(`${BASE_URL}/apikey/${data.id}`, { headers })
+    const verifyData = await verifyResponse.json() as { key: string, key_hash: string | null }
+    expect(verifyData.key).toBe(data.key)
+    expect(verifyData.key_hash).toBeNull()
+
+    // Cleanup
+    await fetch(`${BASE_URL}/apikey/${data.id}`, {
+      method: 'DELETE',
+      headers,
+    })
+  })
+
+  it('create hashed api key with mode and limitations', async () => {
+    const response = await fetch(`${BASE_URL}/apikey`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        name: 'hashed-key-with-options',
+        hashed: true,
+        mode: 'read',
+      }),
+    })
+    const data = await response.json<{ key: string, key_hash: string, id: number, mode: string }>()
+    expect(response.status).toBe(200)
+    expect(data).toHaveProperty('key')
+    expect(data).toHaveProperty('key_hash')
+    expect(data.mode).toBe('read')
+
+    // Cleanup
+    await fetch(`${BASE_URL}/apikey/${data.id}`, {
+      method: 'DELETE',
+      headers,
+    })
+  })
+
+  it('hashed key can be used for authentication', async () => {
+    // Create a hashed key
+    const createResponse = await fetch(`${BASE_URL}/apikey`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        name: 'hashed-key-for-auth-test',
+        hashed: true,
+      }),
+    })
+    const createData = await createResponse.json<{ key: string, id: number }>()
+    expect(createResponse.status).toBe(200)
+
+    // Use the plain key value to authenticate (the system should hash it and find the key)
+    const authHeaders = {
+      'Content-Type': 'application/json',
+      'Authorization': createData.key,
+    }
+
+    // Try to list API keys using the hashed key for auth
+    const listResponse = await fetch(`${BASE_URL}/apikey`, {
+      method: 'GET',
+      headers: authHeaders,
+    })
+    expect(listResponse.status).toBe(200)
+    const listData = await listResponse.json()
+    expect(Array.isArray(listData)).toBe(true)
+
+    // Cleanup - use original headers since new key might have restrictions
+    await fetch(`${BASE_URL}/apikey/${createData.id}`, {
+      method: 'DELETE',
+      headers,
+    })
+  })
+})

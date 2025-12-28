@@ -385,3 +385,145 @@ ALTER FUNCTION public.get_orgs_v7() OWNER TO "postgres";
 GRANT ALL ON FUNCTION public.get_orgs_v7() TO "anon";
 GRANT ALL ON FUNCTION public.get_orgs_v7() TO "authenticated";
 GRANT ALL ON FUNCTION public.get_orgs_v7() TO "service_role";
+
+-- ============================================================================
+-- Section 8: SQL Tests for Hashed API Key Functions
+-- ============================================================================
+-- These tests verify the hash functions work correctly during migration.
+-- They use DO blocks to run inline tests that will fail the migration if broken.
+
+DO $$
+DECLARE
+  test_plain_key text := 'test-api-key-12345';
+  test_hash text;
+  expected_hash text;
+  found_key record;
+  test_org_id uuid;
+  test_user_id uuid;
+  test_apikey_id bigint;
+  enforcement_result boolean;
+BEGIN
+  -- ========================================
+  -- Test 1: verify_api_key_hash function
+  -- ========================================
+  -- SHA-256 hash of 'test-api-key-12345' should be deterministic
+  expected_hash := encode(digest(test_plain_key, 'sha256'), 'hex');
+
+  -- Test that verification returns true for matching hash
+  IF NOT public.verify_api_key_hash(test_plain_key, expected_hash) THEN
+    RAISE EXCEPTION 'TEST FAILED: verify_api_key_hash should return true for matching key and hash';
+  END IF;
+
+  -- Test that verification returns false for non-matching hash
+  IF public.verify_api_key_hash(test_plain_key, 'wronghash123') THEN
+    RAISE EXCEPTION 'TEST FAILED: verify_api_key_hash should return false for non-matching hash';
+  END IF;
+
+  -- Test that verification returns false for wrong key
+  IF public.verify_api_key_hash('wrong-key', expected_hash) THEN
+    RAISE EXCEPTION 'TEST FAILED: verify_api_key_hash should return false for wrong key';
+  END IF;
+
+  RAISE NOTICE 'TEST PASSED: verify_api_key_hash function works correctly';
+
+  -- ========================================
+  -- Test 2: find_apikey_by_value function
+  -- ========================================
+  -- Get existing test user and org from seed data
+  SELECT id INTO test_user_id FROM public.users WHERE email = 'test@capgo.app' LIMIT 1;
+  SELECT id INTO test_org_id FROM public.orgs LIMIT 1;
+
+  IF test_user_id IS NULL THEN
+    RAISE NOTICE 'SKIPPING find_apikey_by_value tests: No test user found (seed data may not be loaded)';
+  ELSE
+    -- Create a test hashed API key
+    INSERT INTO public.apikeys (user_id, key, key_hash, mode, name)
+    VALUES (test_user_id, NULL, encode(digest('hashed-test-key-xyz', 'sha256'), 'hex'), 'read', 'Test Hashed Key')
+    RETURNING id INTO test_apikey_id;
+
+    -- Test finding by hashed key value
+    SELECT * INTO found_key FROM public.find_apikey_by_value('hashed-test-key-xyz');
+    IF found_key.id IS NULL THEN
+      -- Cleanup
+      DELETE FROM public.apikeys WHERE id = test_apikey_id;
+      RAISE EXCEPTION 'TEST FAILED: find_apikey_by_value should find hashed key';
+    END IF;
+
+    IF found_key.id != test_apikey_id THEN
+      -- Cleanup
+      DELETE FROM public.apikeys WHERE id = test_apikey_id;
+      RAISE EXCEPTION 'TEST FAILED: find_apikey_by_value returned wrong key';
+    END IF;
+
+    -- Test that wrong key value returns nothing
+    SELECT * INTO found_key FROM public.find_apikey_by_value('non-existent-key-abc');
+    IF found_key.id IS NOT NULL THEN
+      -- Cleanup
+      DELETE FROM public.apikeys WHERE id = test_apikey_id;
+      RAISE EXCEPTION 'TEST FAILED: find_apikey_by_value should not find non-existent key';
+    END IF;
+
+    -- Cleanup test key
+    DELETE FROM public.apikeys WHERE id = test_apikey_id;
+
+    RAISE NOTICE 'TEST PASSED: find_apikey_by_value function works correctly';
+  END IF;
+
+  -- ========================================
+  -- Test 3: check_org_hashed_key_enforcement function
+  -- ========================================
+  IF test_user_id IS NULL OR test_org_id IS NULL THEN
+    RAISE NOTICE 'SKIPPING check_org_hashed_key_enforcement tests: No test data found';
+  ELSE
+    -- Create test keys for enforcement testing
+    -- Plain key (not hashed)
+    INSERT INTO public.apikeys (user_id, key, key_hash, mode, name)
+    VALUES (test_user_id, 'plain-key-test-123', NULL, 'read', 'Test Plain Key')
+    RETURNING id INTO test_apikey_id;
+
+    -- Test with org that doesn't enforce hashed keys (default)
+    UPDATE public.orgs SET enforce_hashed_api_keys = false WHERE id = test_org_id;
+
+    SELECT * INTO found_key FROM public.apikeys WHERE id = test_apikey_id;
+    enforcement_result := public.check_org_hashed_key_enforcement(test_org_id, found_key);
+    IF NOT enforcement_result THEN
+      DELETE FROM public.apikeys WHERE id = test_apikey_id;
+      RAISE EXCEPTION 'TEST FAILED: Plain key should be allowed when org does not enforce hashed keys';
+    END IF;
+
+    -- Test with org that enforces hashed keys
+    UPDATE public.orgs SET enforce_hashed_api_keys = true WHERE id = test_org_id;
+
+    enforcement_result := public.check_org_hashed_key_enforcement(test_org_id, found_key);
+    IF enforcement_result THEN
+      DELETE FROM public.apikeys WHERE id = test_apikey_id;
+      UPDATE public.orgs SET enforce_hashed_api_keys = false WHERE id = test_org_id;
+      RAISE EXCEPTION 'TEST FAILED: Plain key should be rejected when org enforces hashed keys';
+    END IF;
+
+    -- Cleanup plain key
+    DELETE FROM public.apikeys WHERE id = test_apikey_id;
+
+    -- Create hashed key for testing
+    INSERT INTO public.apikeys (user_id, key, key_hash, mode, name)
+    VALUES (test_user_id, NULL, encode(digest('enforcement-test-key', 'sha256'), 'hex'), 'read', 'Test Enforcement Key')
+    RETURNING id INTO test_apikey_id;
+
+    SELECT * INTO found_key FROM public.apikeys WHERE id = test_apikey_id;
+    enforcement_result := public.check_org_hashed_key_enforcement(test_org_id, found_key);
+    IF NOT enforcement_result THEN
+      DELETE FROM public.apikeys WHERE id = test_apikey_id;
+      UPDATE public.orgs SET enforce_hashed_api_keys = false WHERE id = test_org_id;
+      RAISE EXCEPTION 'TEST FAILED: Hashed key should be allowed when org enforces hashed keys';
+    END IF;
+
+    -- Cleanup
+    DELETE FROM public.apikeys WHERE id = test_apikey_id;
+    UPDATE public.orgs SET enforce_hashed_api_keys = false WHERE id = test_org_id;
+
+    RAISE NOTICE 'TEST PASSED: check_org_hashed_key_enforcement function works correctly';
+  END IF;
+
+  RAISE NOTICE 'All SQL tests for hashed API keys passed successfully!';
+END;
+$$;
