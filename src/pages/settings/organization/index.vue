@@ -31,10 +31,16 @@ const { currentOrganization } = storeToRefs(organizationStore)
 const orgName = ref(currentOrganization.value?.name ?? '')
 const email = ref(currentOrganization.value?.management_email ?? '')
 
+// API key policy state
+const requireApikeyExpiration = ref(false)
+const maxApikeyExpirationDays = ref<number | null>(null)
+
 watch(currentOrganization, (newOrg) => {
   if (newOrg) {
     orgName.value = newOrg.name
     email.value = newOrg.management_email
+    requireApikeyExpiration.value = newOrg.require_apikey_expiration ?? false
+    maxApikeyExpirationDays.value = newOrg.max_apikey_expiration_days ?? null
   }
 })
 
@@ -130,12 +136,18 @@ async function saveChanges(form: { orgName: string, email: string }) {
   // Optimistic update
   currentOrganization.value.name = form.orgName
   currentOrganization.value.management_email = form.email
+  currentOrganization.value.require_apikey_expiration = requireApikeyExpiration.value
+  currentOrganization.value.max_apikey_expiration_days = maxApikeyExpirationDays.value ?? 0
   isLoading.value = true
 
-  // Update name only
+  // Update name and API key policy
   const { error } = await supabase
     .from('orgs')
-    .update({ name: form.orgName })
+    .update({
+      name: form.orgName,
+      require_apikey_expiration: requireApikeyExpiration.value,
+      max_apikey_expiration_days: maxApikeyExpirationDays.value,
+    })
     .eq('id', gid)
 
   if (error) {
@@ -144,6 +156,8 @@ async function saveChanges(form: { orgName: string, email: string }) {
 
     // Revert the optimistic update
     currentOrganization.value.name = orgCopy.name
+    currentOrganization.value.require_apikey_expiration = orgCopy.require_apikey_expiration ?? false
+    currentOrganization.value.max_apikey_expiration_days = orgCopy.max_apikey_expiration_days ?? 0
     isLoading.value = false
     return
   }
@@ -279,6 +293,45 @@ async function copyOrganizationId() {
               </div>
             </div>
           </div>
+
+          <!-- API Key Policy Section -->
+          <div v-if="hasOrgPerm" class="mt-8 pt-6 border-t border-slate-300 dark:border-slate-600">
+            <h3 class="mb-4 text-lg font-semibold dark:text-white text-slate-800">
+              {{ t('api-key-policy') }}
+            </h3>
+            <p class="mb-4 text-sm dark:text-gray-300 text-slate-600">
+              {{ t('api-key-policy-description') }}
+            </p>
+            <div class="space-y-4">
+              <label class="flex items-center gap-3 cursor-pointer">
+                <input
+                  v-model="requireApikeyExpiration"
+                  type="checkbox"
+                  class="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                >
+                <span class="dark:text-white text-slate-800">
+                  {{ t('require-apikey-expiration') }}
+                </span>
+              </label>
+              <div v-if="requireApikeyExpiration" class="ml-8">
+                <label class="block mb-2 text-sm dark:text-gray-300 text-slate-600">
+                  {{ t('max-apikey-expiration-days') }}
+                </label>
+                <input
+                  v-model.number="maxApikeyExpirationDays"
+                  type="number"
+                  min="1"
+                  max="365"
+                  :placeholder="t('max-apikey-expiration-days-placeholder')"
+                  class="w-full max-w-xs px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white border-slate-300 focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                >
+                <p class="mt-1 text-xs dark:text-gray-400 text-slate-500">
+                  {{ t('max-apikey-expiration-days-help') }}
+                </p>
+              </div>
+            </div>
+          </div>
+
           <footer class="mt-auto">
             <div class="flex flex-col px-2 py-5 border-t md:px-6 border-slate-300">
               <div class="flex self-end">

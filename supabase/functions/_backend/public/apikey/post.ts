@@ -1,7 +1,7 @@
 import type { Database } from '../../utils/supabase.types.ts'
 import { honoFactory, parseBody, quickError, simpleError } from '../../utils/hono.ts'
 import { middlewareKey } from '../../utils/hono_middleware.ts'
-import { supabaseApikey } from '../../utils/supabase.ts'
+import { supabaseApikey, validateApikeyExpirationForOrg } from '../../utils/supabase.ts'
 import { Constants } from '../../utils/supabase.types.ts'
 
 const app = honoFactory.createApp()
@@ -19,6 +19,7 @@ app.post('/', middlewareKey(['all']), async (c) => {
   const name = body.name ?? ''
   const limitedToApps = body.limited_to_apps ?? []
   const limitedToOrgs = body.limited_to_orgs ?? []
+  const expiresAt = body.expires_at ?? null
 
   const mode = body.mode ?? 'all'
   if (!name) {
@@ -32,8 +33,23 @@ app.post('/', middlewareKey(['all']), async (c) => {
     throw simpleError('invalid_mode', 'Invalid mode')
   }
 
+  // Validate expiration date if provided
+  if (expiresAt) {
+    const expirationDate = new Date(expiresAt)
+    if (Number.isNaN(expirationDate.getTime())) {
+      throw simpleError('invalid_expiration_date', 'Invalid expiration date format')
+    }
+    if (expirationDate <= new Date()) {
+      throw simpleError('invalid_expiration_date', 'Expiration date must be in the future')
+    }
+  }
+
   // Use anon client with capgkey header; RLS enforces ownership via user_id
   const supabase = supabaseApikey(c, key.key)
+
+  // Collect all org IDs for policy validation
+  let allOrgIds: string[] = [...limitedToOrgs]
+
   const newData: Database['public']['Tables']['apikeys']['Insert'] = {
     user_id: key.user_id,
     key: crypto.randomUUID(),
@@ -41,6 +57,7 @@ app.post('/', middlewareKey(['all']), async (c) => {
     name,
     limited_to_apps: limitedToApps,
     limited_to_orgs: limitedToOrgs,
+    expires_at: expiresAt,
   }
   if (orgId) {
     const { data: org, error } = await supabase.from('orgs').select('*').eq('id', orgId).single()
@@ -48,6 +65,7 @@ app.post('/', middlewareKey(['all']), async (c) => {
       throw quickError(404, 'org_not_found', 'Org not found', { supabaseError: error })
     }
     newData.limited_to_orgs = [org.id]
+    allOrgIds = [org.id]
   }
   if (appId) {
     const { data: app, error } = await supabase.from('apps').select('*').eq('id', appId).single()
@@ -55,6 +73,19 @@ app.post('/', middlewareKey(['all']), async (c) => {
       throw quickError(404, 'app_not_found', 'App not found', { supabaseError: error })
     }
     newData.limited_to_apps = [app.app_id]
+  }
+
+  // Validate expiration against org policies
+  for (const limitedOrgId of allOrgIds) {
+    const validation = await validateApikeyExpirationForOrg(c, limitedOrgId, expiresAt, supabase)
+    if (!validation.valid) {
+      if (validation.error === 'expiration_required') {
+        throw simpleError('expiration_required', 'This organization requires API keys to have an expiration date')
+      }
+      if (validation.error === 'expiration_exceeds_max') {
+        throw simpleError('expiration_exceeds_max', `API key expiration cannot exceed ${validation.maxDays} days for this organization`)
+      }
+    }
   }
 
   const { data: apikeyData, error: apikeyError } = await supabase.from('apikeys')

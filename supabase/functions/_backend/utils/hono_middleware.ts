@@ -27,6 +27,17 @@ function isUUID(str: string) {
 }
 
 /**
+ * Check if an API key is expired
+ */
+function isApiKeyExpired(expiresAt: string | Date | null | undefined): boolean {
+  if (!expiresAt) {
+    return false
+  }
+  const expirationDate = typeof expiresAt === 'string' ? new Date(expiresAt) : expiresAt
+  return expirationDate < new Date()
+}
+
+/**
  * Check API key using Postgres/Drizzle instead of Supabase SDK
  */
 async function checkKeyPg(
@@ -50,6 +61,12 @@ async function checkKeyPg(
       return null
     }
 
+    // Check if API key is expired
+    if (isApiKeyExpired(result.expires_at)) {
+      cloudlog({ requestId: c.get('requestId'), message: 'API key expired', keyId: result.id })
+      return null
+    }
+
     // Convert to the expected format, ensuring arrays are properly handled
     return {
       id: result.id,
@@ -61,6 +78,7 @@ async function checkKeyPg(
       name: result.name,
       limited_to_orgs: result.limited_to_orgs || [],
       limited_to_apps: result.limited_to_apps || [],
+      expires_at: result.expires_at?.toISOString() || null,
     } as Database['public']['Tables']['apikeys']['Row']
   }
   catch (e: unknown) {
@@ -93,6 +111,12 @@ async function checkKeyByIdPg(
       return null
     }
 
+    // Check if API key is expired
+    if (isApiKeyExpired(result.expires_at)) {
+      cloudlog({ requestId: c.get('requestId'), message: 'API key expired', keyId: result.id })
+      return null
+    }
+
     // Convert to the expected format, ensuring arrays are properly handled
     return {
       id: result.id,
@@ -104,6 +128,7 @@ async function checkKeyByIdPg(
       name: result.name,
       limited_to_orgs: result.limited_to_orgs || [],
       limited_to_apps: result.limited_to_apps || [],
+      expires_at: result.expires_at?.toISOString() || null,
     } as Database['public']['Tables']['apikeys']['Row']
   }
   catch (e: unknown) {

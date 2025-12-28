@@ -247,6 +247,30 @@ export function apikeyHasOrgRight(key: Database['public']['Tables']['apikeys']['
   return key.limited_to_orgs.includes(orgId)
 }
 
+/**
+ * Check if API key has org access AND meets org's API key policy requirements
+ * Returns { valid: true } if all checks pass, or { valid: false, error: string } if not
+ */
+export async function apikeyHasOrgRightWithPolicy(
+  c: Context,
+  key: Database['public']['Tables']['apikeys']['Row'],
+  orgId: string,
+  supabase: SupabaseClient<Database>,
+): Promise<{ valid: boolean, error?: string }> {
+  // First check basic org access
+  if (!apikeyHasOrgRight(key, orgId)) {
+    return { valid: false, error: 'invalid_org_id' }
+  }
+
+  // Then check if org requires expiring keys
+  const policyCheck = await checkApikeyMeetsOrgPolicy(c, key, orgId, supabase)
+  if (!policyCheck.valid) {
+    return policyCheck
+  }
+
+  return { valid: true }
+}
+
 export async function hasOrgRight(c: Context, orgId: string, userId: string, right: Database['public']['Enums']['user_min_right']) {
   const userRight = await supabaseAdmin(c).rpc('check_min_rights', {
     min_right: right,
@@ -1101,6 +1125,11 @@ export async function checkKey(c: Context, authorization: string | undefined, su
       cloudlog({ requestId: c.get('requestId'), message: 'Invalid apikey', authorization, allowed, error })
       return null
     }
+    // Check if API key is expired
+    if (data.expires_at && new Date(data.expires_at) < new Date()) {
+      cloudlog({ requestId: c.get('requestId'), message: 'API key expired', keyId: data.id })
+      return null
+    }
     return data
   }
   catch (error) {
@@ -1121,10 +1150,77 @@ export async function checkKeyById(c: Context, id: number, supabase: SupabaseCli
       .single()
     if (!data || error)
       return null
+    // Check if API key is expired
+    if (data.expires_at && new Date(data.expires_at) < new Date()) {
+      cloudlog({ requestId: c.get('requestId'), message: 'API key expired', keyId: data.id })
+      return null
+    }
     return data
   }
   catch (error) {
     cloudlog({ requestId: c.get('requestId'), message: 'checkKeyById error', error })
     return null
   }
+}
+
+/**
+ * Validate API key expiration against org policy during key creation/update
+ */
+export async function validateApikeyExpirationForOrg(
+  c: Context,
+  orgId: string,
+  expiresAt: string | null,
+  supabase: SupabaseClient<Database>,
+): Promise<{ valid: boolean, error?: string, maxDays?: number }> {
+  const { data: org } = await supabase
+    .from('orgs')
+    .select('require_apikey_expiration, max_apikey_expiration_days')
+    .eq('id', orgId)
+    .single()
+
+  if (!org) {
+    return { valid: true }
+  }
+
+  // Check if expiration is required but not provided
+  if (org.require_apikey_expiration && !expiresAt) {
+    return { valid: false, error: 'expiration_required' }
+  }
+
+  // Check if expiration exceeds max allowed
+  if (org.max_apikey_expiration_days && expiresAt) {
+    const maxDate = new Date()
+    maxDate.setDate(maxDate.getDate() + org.max_apikey_expiration_days)
+    if (new Date(expiresAt) > maxDate) {
+      return { valid: false, error: 'expiration_exceeds_max', maxDays: org.max_apikey_expiration_days }
+    }
+  }
+
+  return { valid: true }
+}
+
+/**
+ * Check if an API key meets org policy at usage time
+ */
+export async function checkApikeyMeetsOrgPolicy(
+  c: Context,
+  key: Database['public']['Tables']['apikeys']['Row'],
+  orgId: string,
+  supabase: SupabaseClient<Database>,
+): Promise<{ valid: boolean, error?: string }> {
+  const { data: org } = await supabase
+    .from('orgs')
+    .select('require_apikey_expiration')
+    .eq('id', orgId)
+    .single()
+
+  if (!org) {
+    return { valid: true }
+  }
+
+  if (org.require_apikey_expiration && !key.expires_at) {
+    return { valid: false, error: 'org_requires_expiring_key' }
+  }
+
+  return { valid: true }
 }
