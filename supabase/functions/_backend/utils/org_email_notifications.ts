@@ -2,6 +2,7 @@ import type { Context } from 'hono'
 import { trackBentoEvent } from './bento.ts'
 import { cloudlog } from './logging.ts'
 import { supabaseAdmin } from './supabase.ts'
+import { backgroundTask } from './utils.ts'
 
 /**
  * Email preference keys that map to the JSONB email_preferences column in both users and orgs tables.
@@ -202,37 +203,23 @@ export async function sendEmailToOrgMembers(
     return 0
   }
 
-  let successCount = 0
-
+  // Send emails in background - don't await
   for (const email of allEmails) {
-    const result = await trackBentoEvent(c, email, eventData, eventName)
-    if (result) {
-      successCount++
-    }
-    else {
-      cloudlog({
-        requestId: c.get('requestId'),
-        message: 'sendEmailToOrgMembers: trackBentoEvent failed',
-        eventName,
-        email,
-        orgId,
-      })
-    }
+    backgroundTask(c, trackBentoEvent(c, email, eventData, eventName))
   }
 
   cloudlog({
     requestId: c.get('requestId'),
-    message: 'sendEmailToOrgMembers: completed',
+    message: 'sendEmailToOrgMembers: queued',
     eventName,
     preferenceKey,
     orgId,
     totalRecipients: allEmails.length,
     adminRecipients: adminEmails.length,
     managementEmailIncluded: !!managementEmail,
-    successCount,
   })
 
-  return successCount
+  return allEmails.length
 }
 
 /**
@@ -286,15 +273,15 @@ export async function sendNotifToOrgMembers(
 
   // If management_email is eligible (different from admins and org pref enabled)
   // and wasn't in the admin list, it was already sent by sendNotifOrg, so we're good
-  // We just need to send to the additional admin emails
+  // We just need to send to the additional admin emails in background
 
   for (const email of additionalEmails) {
-    await trackBentoEvent(c, email, eventData, eventName)
+    backgroundTask(c, trackBentoEvent(c, email, eventData, eventName))
   }
 
   cloudlog({
     requestId: c.get('requestId'),
-    message: 'sendNotifToOrgMembers: completed',
+    message: 'sendNotifToOrgMembers: queued',
     eventName,
     preferenceKey,
     orgId,
