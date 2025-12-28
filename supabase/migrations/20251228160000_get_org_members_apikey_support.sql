@@ -27,3 +27,8 @@ BEGIN
 END;
 $$;
 
+-- Revoke public access to inner function to prevent bypassing authorization
+-- The inner function should only be called by the wrapper or service_role
+REVOKE ALL ON FUNCTION "public"."get_org_members" ("user_id" uuid, "guild_id" uuid) FROM "anon";
+REVOKE ALL ON FUNCTION "public"."get_org_members" ("user_id" uuid, "guild_id" uuid) FROM "authenticated";
+
