@@ -395,12 +395,6 @@ BEGIN
       RAISE WARNING 'process_channel_device_counts_queue failed: %', SQLERRM;
     END;
 
-    -- Process manifest bundle counts with batch size 1000
-    BEGIN
-      PERFORM public.process_manifest_bundle_counts_queue(1000);
-    EXCEPTION WHEN OTHERS THEN
-      RAISE WARNING 'process_manifest_bundle_counts_queue failed: %', SQLERRM;
-    END;
   END IF;
 
   -- Every minute (at :00 seconds): Per-minute tasks
