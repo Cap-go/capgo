@@ -52,7 +52,8 @@ const appCache = ref(new Map<string, string>())
 
 // Function to truncate strings (show first 5 and last 5 characters)
 function hideString(str: string | null) {
-  if (!str) return ''
+  if (!str)
+    return ''
   const first = str.slice(0, 5)
   const last = str.slice(-5)
   return `${first}...${last}`
