@@ -1,5 +1,5 @@
 import type { Context } from 'hono'
-import type { Database } from '../../utils/supabase.types.ts'
+import type { AuthInfo } from '../../utils/hono.ts'
 import { z } from 'zod/mini'
 import { simpleError } from '../../utils/hono.ts'
 import { supabaseAdmin } from '../../utils/supabase.ts'
@@ -9,21 +9,21 @@ import {
   deliverWebhook,
   updateDeliveryResult,
 } from '../../utils/webhook.ts'
-import { checkWebhookPermission } from './index.ts'
+import { checkWebhookPermissionV2 } from './index.ts'
 
 const bodySchema = z.object({
   orgId: z.string(),
   webhookId: z.string(),
 })
 
-export async function test(c: Context, bodyRaw: any, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
+export async function test(c: Context, bodyRaw: any, auth: AuthInfo): Promise<Response> {
   const bodyParsed = bodySchema.safeParse(bodyRaw)
   if (!bodyParsed.success) {
     throw simpleError('invalid_body', 'Invalid body', { error: bodyParsed.error })
   }
   const body = bodyParsed.data
 
-  await checkWebhookPermission(c, body.orgId, apikey)
+  await checkWebhookPermissionV2(c, body.orgId, auth)
 
   // Get webhook
   // Note: Using type assertion as webhooks table types are not yet generated

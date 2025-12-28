@@ -1,8 +1,9 @@
 import type { Context } from 'hono'
+import type { AuthInfo } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
 import { getBodyOrQuery, honoFactory, simpleError } from '../../utils/hono.ts'
-import { middlewareKey } from '../../utils/hono_middleware.ts'
-import { apikeyHasOrgRight, hasOrgRightApikey } from '../../utils/supabase.ts'
+import { middlewareKey, middlewareV2 } from '../../utils/hono_middleware.ts'
+import { apikeyHasOrgRight, hasOrgRight, hasOrgRightApikey } from '../../utils/supabase.ts'
 import { deleteWebhook } from './delete.ts'
 import { getDeliveries, retryDelivery } from './deliveries.ts'
 import { get } from './get.ts'
@@ -13,7 +14,7 @@ import { test } from './test.ts'
 export const app = honoFactory.createApp()
 
 /**
- * Shared permission check for webhook endpoints
+ * Shared permission check for webhook endpoints (API key auth)
  * Validates admin access to organization
  */
 export async function checkWebhookPermission(
@@ -26,6 +27,28 @@ export async function checkWebhookPermission(
   }
   if (!apikeyHasOrgRight(apikey, orgId)) {
     throw simpleError('invalid_org_id', 'You can\'t access this organization', { org_id: orgId })
+  }
+}
+
+/**
+ * Shared permission check for webhook endpoints (JWT or API key auth)
+ * Validates admin access to organization using the unified auth info
+ */
+export async function checkWebhookPermissionV2(
+  c: Context,
+  orgId: string,
+  auth: AuthInfo,
+): Promise<void> {
+  // Check org admin access
+  if (!(await hasOrgRight(c, orgId, auth.userId, 'admin'))) {
+    throw simpleError('no_permission', 'You need admin access to manage webhooks', { org_id: orgId })
+  }
+
+  // If using API key, also check the key has org access
+  if (auth.authType === 'apikey' && auth.apikey) {
+    if (!apikeyHasOrgRight(auth.apikey, orgId)) {
+      throw simpleError('invalid_org_id', 'You can\'t access this organization', { org_id: orgId })
+    }
   }
 }
 
@@ -57,11 +80,11 @@ app.delete('/', middlewareKey(['all', 'write']), async (c) => {
   return deleteWebhook(c, body, apikey)
 })
 
-// Test webhook
-app.post('/test', middlewareKey(['all', 'write']), async (c) => {
+// Test webhook (supports both JWT and API key auth)
+app.post('/test', middlewareV2(['all', 'write']), async (c) => {
   const body = await getBodyOrQuery<any>(c)
-  const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
-  return test(c, body, apikey)
+  const auth = c.get('auth') as AuthInfo
+  return test(c, body, auth)
 })
 
 // Get webhook deliveries
@@ -71,9 +94,9 @@ app.get('/deliveries', middlewareKey(['all', 'write']), async (c) => {
   return getDeliveries(c, body, apikey)
 })
 
-// Retry a failed delivery
-app.post('/deliveries/retry', middlewareKey(['all', 'write']), async (c) => {
+// Retry a failed delivery (supports both JWT and API key auth)
+app.post('/deliveries/retry', middlewareV2(['all', 'write']), async (c) => {
   const body = await getBodyOrQuery<any>(c)
-  const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
-  return retryDelivery(c, body, apikey)
+  const auth = c.get('auth') as AuthInfo
+  return retryDelivery(c, body, auth)
 })

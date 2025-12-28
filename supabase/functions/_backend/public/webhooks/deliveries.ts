@@ -1,4 +1,5 @@
 import type { Context } from 'hono'
+import type { AuthInfo } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
 import { z } from 'zod/mini'
 import { simpleError } from '../../utils/hono.ts'
@@ -8,7 +9,7 @@ import {
   getWebhookById,
   queueWebhookDelivery,
 } from '../../utils/webhook.ts'
-import { checkWebhookPermission } from './index.ts'
+import { checkWebhookPermission, checkWebhookPermissionV2 } from './index.ts'
 
 const getDeliveriesSchema = z.object({
   orgId: z.string(),
@@ -95,14 +96,14 @@ export async function getDeliveries(c: Context, bodyRaw: any, apikey: Database['
   })
 }
 
-export async function retryDelivery(c: Context, bodyRaw: any, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
+export async function retryDelivery(c: Context, bodyRaw: any, auth: AuthInfo): Promise<Response> {
   const bodyParsed = retryDeliverySchema.safeParse(bodyRaw)
   if (!bodyParsed.success) {
     throw simpleError('invalid_body', 'Invalid body', { error: bodyParsed.error })
   }
   const body = bodyParsed.data
 
-  await checkWebhookPermission(c, body.orgId, apikey)
+  await checkWebhookPermissionV2(c, body.orgId, auth)
 
   // Get delivery
   const delivery = await getDeliveryById(c, body.deliveryId)
