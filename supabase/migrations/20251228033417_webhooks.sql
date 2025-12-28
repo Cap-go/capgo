@@ -394,6 +394,12 @@ BEGIN
     EXCEPTION WHEN OTHERS THEN
       RAISE WARNING 'cleanup_frequent_job_details failed: %', SQLERRM;
     END;
+
+    BEGIN
+      PERFORM public.process_deploy_install_stats_email();
+    EXCEPTION WHEN OTHERS THEN
+      RAISE WARNING 'process_deploy_install_stats_email failed: %', SQLERRM;
+    END;
   END IF;
 
   -- Every 2 hours (at :00:00): Low-frequency queues with default batch size
