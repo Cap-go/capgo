@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { z } from 'zod'
 
-import { BASE_URL, getSupabaseClient, headers, TEST_EMAIL, USER_ID } from './test-utils.ts'
+import { APIKEY_TEST_ALL, BASE_URL, getSupabaseClient, headers, ORG_ID as SEED_ORG_ID, TEST_EMAIL, USER_ID } from './test-utils.ts'
 
 const ORG_ID = randomUUID()
 const globalId = randomUUID()
@@ -331,6 +331,189 @@ describe('Audit log triggers', () => {
       expect(latestDelete.org_id).toBe(ORG_ID)
       expect(latestDelete.new_record).toBeNull() // DELETE has no new record
       expect(latestDelete.old_record).toBeTruthy()
+    }
+  })
+})
+
+// These tests verify that audit logs are created when using API key authentication
+// This was a bug where CLI/API users were not logged because get_identity() didn't check API keys
+describe('Audit logs for app_versions via API key', () => {
+  const testVersionName = `99.0.0-audit-test-${randomUUID()}`
+  let createdVersionId: number | null = null
+
+  afterAll(async () => {
+    // Clean up: delete the test version if it was created
+    if (createdVersionId) {
+      await getSupabaseClient().from('app_versions').delete().eq('id', createdVersionId)
+      // Also clean up any audit logs for this version
+      await getSupabaseClient().from('audit_logs').delete().eq('record_id', createdVersionId.toString())
+    }
+  })
+
+  it('app_version INSERT via API creates audit log with user_id from API key', async () => {
+    // Create a bundle via the API (uses API key authentication)
+    const response = await fetch(`${BASE_URL}/bundle`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        app_id: 'com.demo.app',
+        version: testVersionName,
+        external_url: 'https://example.com/test-audit-bundle.zip',
+        checksum: 'abc123def456',
+      }),
+    })
+
+    expect(response.status).toBe(200)
+    const responseData = await response.json() as { status: string, bundle: { id: number } }
+    expect(responseData.status).toBe('success')
+    expect(responseData.bundle).toBeTruthy()
+    createdVersionId = responseData.bundle.id
+
+    // Wait for the trigger to execute
+    await new Promise(resolve => setTimeout(resolve, 200))
+
+    // Fetch audit logs for this org - use the seed org ID since that's where the app belongs
+    const auditResponse = await fetch(`${BASE_URL}/organization/audit?orgId=${SEED_ORG_ID}&tableName=app_versions&operation=INSERT`, {
+      headers,
+    })
+    expect(auditResponse.status).toBe(200)
+    const auditData = await auditResponse.json()
+    const safe = auditLogsResponseSchema.safeParse(auditData)
+    expect(safe.success).toBe(true)
+
+    if (safe.success) {
+      // Find the audit log for our created version
+      const versionAuditLog = safe.data.data.find(
+        log => log.record_id === createdVersionId?.toString(),
+      )
+
+      expect(versionAuditLog).toBeTruthy()
+      if (versionAuditLog) {
+        expect(versionAuditLog.operation).toBe('INSERT')
+        expect(versionAuditLog.table_name).toBe('app_versions')
+        expect(versionAuditLog.org_id).toBe(SEED_ORG_ID)
+        // This is the key assertion: user_id should be set from the API key
+        expect(versionAuditLog.user_id).toBe(USER_ID)
+        expect(versionAuditLog.old_record).toBeNull()
+        expect(versionAuditLog.new_record).toBeTruthy()
+        if (versionAuditLog.new_record && typeof versionAuditLog.new_record === 'object') {
+          expect((versionAuditLog.new_record as Record<string, unknown>).name).toBe(testVersionName)
+        }
+      }
+    }
+  })
+
+  it('app_version UPDATE via API creates audit log with user_id from API key', async () => {
+    // Skip if we don't have a version to update
+    if (!createdVersionId) {
+      console.warn('Skipping UPDATE test: no version was created')
+      return
+    }
+
+    // Update the bundle via the API - note: endpoint requires version_id (number), not version name
+    const response = await fetch(`${BASE_URL}/bundle/metadata`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        app_id: 'com.demo.app',
+        version_id: createdVersionId,
+        comment: 'Updated via API key test',
+      }),
+    })
+
+    expect(response.status).toBe(200)
+
+    // Wait for the trigger to execute
+    await new Promise(resolve => setTimeout(resolve, 200))
+
+    // Fetch audit logs for UPDATE operations
+    const auditResponse = await fetch(`${BASE_URL}/organization/audit?orgId=${SEED_ORG_ID}&tableName=app_versions&operation=UPDATE`, {
+      headers,
+    })
+    expect(auditResponse.status).toBe(200)
+    const auditData = await auditResponse.json()
+    const safe = auditLogsResponseSchema.safeParse(auditData)
+    expect(safe.success).toBe(true)
+
+    if (safe.success) {
+      // Find the audit log for our updated version
+      const updateAuditLog = safe.data.data.find(
+        log => log.record_id === createdVersionId?.toString(),
+      )
+
+      expect(updateAuditLog).toBeTruthy()
+      if (updateAuditLog) {
+        expect(updateAuditLog.operation).toBe('UPDATE')
+        expect(updateAuditLog.table_name).toBe('app_versions')
+        expect(updateAuditLog.org_id).toBe(SEED_ORG_ID)
+        // user_id should be set from the API key
+        expect(updateAuditLog.user_id).toBe(USER_ID)
+        expect(updateAuditLog.old_record).toBeTruthy()
+        expect(updateAuditLog.new_record).toBeTruthy()
+        // changed_fields should include 'comment'
+        expect(Array.isArray(updateAuditLog.changed_fields)).toBe(true)
+        expect(updateAuditLog.changed_fields).toContain('comment')
+      }
+    }
+  })
+
+  it('app_version soft-DELETE via API creates UPDATE audit log with user_id from API key', async () => {
+    // Skip if we don't have a version to delete
+    if (!createdVersionId) {
+      console.warn('Skipping DELETE test: no version was created')
+      return
+    }
+
+    const versionIdToDelete = createdVersionId
+
+    // Delete the bundle via the API - note: this is a soft-delete (sets deleted=true)
+    const response = await fetch(`${BASE_URL}/bundle`, {
+      method: 'DELETE',
+      headers,
+      body: JSON.stringify({
+        app_id: 'com.demo.app',
+        version: testVersionName,
+      }),
+    })
+
+    expect(response.status).toBe(200)
+
+    // Wait for the trigger to execute
+    await new Promise(resolve => setTimeout(resolve, 200))
+
+    // Fetch audit logs for UPDATE operations (soft-delete creates UPDATE, not DELETE)
+    const auditResponse = await fetch(`${BASE_URL}/organization/audit?orgId=${SEED_ORG_ID}&tableName=app_versions&operation=UPDATE`, {
+      headers,
+    })
+    expect(auditResponse.status).toBe(200)
+    const auditData = await auditResponse.json()
+    const safe = auditLogsResponseSchema.safeParse(auditData)
+    expect(safe.success).toBe(true)
+
+    if (safe.success) {
+      // Find the audit log for our soft-deleted version (look for 'deleted' in changed_fields)
+      const deleteAuditLog = safe.data.data.find(
+        log => log.record_id === versionIdToDelete.toString()
+          && log.changed_fields?.includes('deleted'),
+      )
+
+      expect(deleteAuditLog).toBeTruthy()
+      if (deleteAuditLog) {
+        expect(deleteAuditLog.operation).toBe('UPDATE')
+        expect(deleteAuditLog.table_name).toBe('app_versions')
+        expect(deleteAuditLog.org_id).toBe(SEED_ORG_ID)
+        // user_id should be set from the API key
+        expect(deleteAuditLog.user_id).toBe(USER_ID)
+        // Both old and new record should exist for UPDATE
+        expect(deleteAuditLog.old_record).toBeTruthy()
+        expect(deleteAuditLog.new_record).toBeTruthy()
+        // changed_fields should include 'deleted'
+        expect(deleteAuditLog.changed_fields).toContain('deleted')
+        // Verify the deleted flag was set to true
+        if (deleteAuditLog.new_record && typeof deleteAuditLog.new_record === 'object') {
+          expect((deleteAuditLog.new_record as Record<string, unknown>).deleted).toBe(true)
+        }
+      }
     }
   })
 })
