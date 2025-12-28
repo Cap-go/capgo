@@ -9,7 +9,7 @@ import { z } from 'zod/mini'
 import { getAppStatus, setAppStatus } from '../utils/appStatus.ts'
 import { BRES, parseBody, simpleError200, simpleRateLimit } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
-import { sendNotifOrg } from '../utils/notifications.ts'
+import { sendNotifToOrgMembers } from '../utils/org_email_notifications.ts'
 import { closeClient, deleteChannelDevicePg, getAppByIdPg, getAppOwnerPostgres, getAppVersionsByAppIdPg, getChannelByNamePg, getChannelDeviceOverridePg, getChannelsPg, getCompatibleChannelsPg, getDrizzleClient, getMainChannelsPg, getPgClient, upsertChannelDevicePg } from '../utils/pg.ts'
 import { convertQueryToBody, makeDevice, parsePluginBody } from '../utils/plugin_parser.ts'
 import { sendStatsAndDevice } from '../utils/stats.ts'
@@ -115,9 +115,10 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
   }
   if (dataChannelOverride && !dataChannelOverride.channel_id.allow_device_self_set) {
     // Send weekly notification to org about self-assignment rejection
-    await backgroundTask(c, sendNotifOrg(
+    backgroundTask(c, sendNotifToOrgMembers(
       c,
       'device:channel_self_set_rejected',
+      'channel_self_rejected',
       {
         channel_name: dataChannelOverride.channel_id.name,
         app_id,
@@ -138,9 +139,10 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
 
   if (!dataChannel.allow_device_self_set) {
     // Send weekly notification to org about self-assignment rejection
-    await backgroundTask(c, sendNotifOrg(
+    backgroundTask(c, sendNotifToOrgMembers(
       c,
       'device:channel_self_set_rejected',
+      'channel_self_rejected',
       {
         channel_name: dataChannel.name,
         app_id,
@@ -440,9 +442,10 @@ async function deleteOverride(c: Context, drizzleClient: ReturnType<typeof getDr
 
   if (!dataChannelOverride.channel_id.allow_device_self_set) {
     // Send weekly notification to org about self-assignment rejection
-    await backgroundTask(c, sendNotifOrg(
+    backgroundTask(c, sendNotifToOrgMembers(
       c,
       'device:channel_self_set_rejected',
+      'channel_self_rejected',
       {
         channel_name: dataChannelOverride.channel_id.name,
         app_id,

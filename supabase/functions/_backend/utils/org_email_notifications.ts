@@ -18,6 +18,7 @@ export type EmailPreferenceKey
     | 'bundle_created'
     | 'bundle_deployed'
     | 'device_error'
+    | 'channel_self_rejected'
 
 interface EmailPreferences {
   usage_limit?: boolean
@@ -29,6 +30,7 @@ interface EmailPreferences {
   bundle_created?: boolean
   bundle_deployed?: boolean
   device_error?: boolean
+  channel_self_rejected?: boolean
 }
 
 interface OrgWithPreferences {

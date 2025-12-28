@@ -28,6 +28,7 @@ interface EmailPreferences {
   bundle_created?: boolean
   bundle_deployed?: boolean
   device_error?: boolean
+  channel_self_rejected?: boolean
 }
 
 type EmailPreferenceKey = keyof EmailPreferences
@@ -178,6 +179,13 @@ async function toggleEmailPref(key: EmailPreferenceKey) {
                 :value="getEmailPref('device_error')"
                 :disabled="!hasOrgPerm"
                 @change="toggleEmailPref('device_error')"
+              />
+            </InfoRow>
+            <InfoRow :label="t('notifications-channel-self-rejected')" :editable="false" :value="t('org-notifications-channel-self-rejected-desc')">
+              <Toggle
+                :value="getEmailPref('channel_self_rejected')"
+                :disabled="!hasOrgPerm"
+                @change="toggleEmailPref('channel_self_rejected')"
               />
             </InfoRow>
           </dl>
