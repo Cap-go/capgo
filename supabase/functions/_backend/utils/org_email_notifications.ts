@@ -42,7 +42,7 @@ interface OrgWithPreferences {
 async function getOrgInfo(c: Context, orgId: string): Promise<OrgWithPreferences | null> {
   const { data: org, error } = await supabaseAdmin(c)
     .from('orgs')
-    .select('management_email')
+    .select('management_email, email_preferences')
     .eq('id', orgId)
     .single()
 
@@ -99,7 +99,7 @@ async function getEligibleOrgMemberEmails(
   const userIds = members.map(m => m.user_id)
   const { data: users } = await supabaseAdmin(c)
     .from('users')
-    .select('id, email')
+    .select('id, email, email_preferences')
     .in('id', userIds)
 
   const userPrefsMap = new Map<string, EmailPreferences>()
