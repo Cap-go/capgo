@@ -1166,39 +1166,64 @@ export async function checkKeyById(c: Context, id: number, supabase: SupabaseCli
 }
 
 /**
- * Validate API key expiration against org policy during key creation/update
+ * Validate expiration date format and that it's in the future.
+ * Throws simpleError if validation fails.
+ * @param expiresAt - The expiration date string (can be null/undefined to skip validation)
  */
-export async function validateApikeyExpirationForOrg(
-  c: Context,
-  orgId: string,
+export function validateExpirationDate(expiresAt: string | null | undefined): void {
+  if (expiresAt === null || expiresAt === undefined) {
+    return
+  }
+  const expirationDate = new Date(expiresAt)
+  if (Number.isNaN(expirationDate.getTime())) {
+    throw simpleError('invalid_expiration_date', 'Invalid expiration date format')
+  }
+  if (expirationDate <= new Date()) {
+    throw simpleError('invalid_expiration_date', 'Expiration date must be in the future')
+  }
+}
+
+/**
+ * Validate API key expiration against org policies for multiple orgs.
+ * Throws simpleError if any org policy is violated.
+ * @param orgIds - Array of org IDs to validate against
+ * @param expiresAt - The expiration date string
+ * @param supabase - Supabase client
+ */
+export async function validateExpirationAgainstOrgPolicies(
+  orgIds: string[],
   expiresAt: string | null,
   supabase: SupabaseClient<Database>,
-): Promise<{ valid: boolean, error?: string, maxDays?: number }> {
-  const { data: org } = await supabase
+): Promise<void> {
+  if (orgIds.length === 0) {
+    return
+  }
+
+  // Fetch all org policies in a single query
+  const { data: orgs } = await supabase
     .from('orgs')
-    .select('require_apikey_expiration, max_apikey_expiration_days')
-    .eq('id', orgId)
-    .single()
+    .select('id, require_apikey_expiration, max_apikey_expiration_days')
+    .in('id', orgIds)
 
-  if (!org) {
-    return { valid: true }
+  if (!orgs || orgs.length === 0) {
+    return
   }
 
-  // Check if expiration is required but not provided
-  if (org.require_apikey_expiration && !expiresAt) {
-    return { valid: false, error: 'expiration_required' }
-  }
+  for (const org of orgs) {
+    // Check if expiration is required but not provided
+    if (org.require_apikey_expiration && !expiresAt) {
+      throw simpleError('expiration_required', 'This organization requires API keys to have an expiration date')
+    }
 
-  // Check if expiration exceeds max allowed
-  if (org.max_apikey_expiration_days && expiresAt) {
-    const maxDate = new Date()
-    maxDate.setDate(maxDate.getDate() + org.max_apikey_expiration_days)
-    if (new Date(expiresAt) > maxDate) {
-      return { valid: false, error: 'expiration_exceeds_max', maxDays: org.max_apikey_expiration_days }
+    // Check if expiration exceeds max allowed
+    if (org.max_apikey_expiration_days && expiresAt) {
+      const maxDate = new Date()
+      maxDate.setDate(maxDate.getDate() + org.max_apikey_expiration_days)
+      if (new Date(expiresAt) > maxDate) {
+        throw simpleError('expiration_exceeds_max', `API key expiration cannot exceed ${org.max_apikey_expiration_days} days for this organization`)
+      }
     }
   }
-
-  return { valid: true }
 }
 
 /**

@@ -1,7 +1,7 @@
 import type { Database } from '../../utils/supabase.types.ts'
 import { honoFactory, parseBody, quickError, simpleError } from '../../utils/hono.ts'
 import { middlewareKey } from '../../utils/hono_middleware.ts'
-import { supabaseApikey, validateApikeyExpirationForOrg } from '../../utils/supabase.ts'
+import { supabaseApikey, validateExpirationAgainstOrgPolicies, validateExpirationDate } from '../../utils/supabase.ts'
 import { Constants } from '../../utils/supabase.types.ts'
 
 const app = honoFactory.createApp()
@@ -33,16 +33,8 @@ app.post('/', middlewareKey(['all']), async (c) => {
     throw simpleError('invalid_mode', 'Invalid mode')
   }
 
-  // Validate expiration date if provided
-  if (expiresAt) {
-    const expirationDate = new Date(expiresAt)
-    if (Number.isNaN(expirationDate.getTime())) {
-      throw simpleError('invalid_expiration_date', 'Invalid expiration date format')
-    }
-    if (expirationDate <= new Date()) {
-      throw simpleError('invalid_expiration_date', 'Expiration date must be in the future')
-    }
-  }
+  // Validate expiration date format (throws if invalid)
+  validateExpirationDate(expiresAt)
 
   // Use anon client with capgkey header; RLS enforces ownership via user_id
   const supabase = supabaseApikey(c, key.key)
@@ -75,18 +67,8 @@ app.post('/', middlewareKey(['all']), async (c) => {
     newData.limited_to_apps = [app.app_id]
   }
 
-  // Validate expiration against org policies
-  for (const limitedOrgId of allOrgIds) {
-    const validation = await validateApikeyExpirationForOrg(c, limitedOrgId, expiresAt, supabase)
-    if (!validation.valid) {
-      if (validation.error === 'expiration_required') {
-        throw simpleError('expiration_required', 'This organization requires API keys to have an expiration date')
-      }
-      if (validation.error === 'expiration_exceeds_max') {
-        throw simpleError('expiration_exceeds_max', `API key expiration cannot exceed ${validation.maxDays} days for this organization`)
-      }
-    }
-  }
+  // Validate expiration against org policies (throws if invalid)
+  await validateExpirationAgainstOrgPolicies(allOrgIds, expiresAt, supabase)
 
   const { data: apikeyData, error: apikeyError } = await supabase.from('apikeys')
     .insert(newData)

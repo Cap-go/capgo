@@ -1,7 +1,7 @@
 import type { Database } from '../../utils/supabase.types.ts'
 import { honoFactory, parseBody, quickError, simpleError } from '../../utils/hono.ts'
 import { middlewareKey } from '../../utils/hono_middleware.ts'
-import { supabaseApikey, validateApikeyExpirationForOrg } from '../../utils/supabase.ts'
+import { supabaseApikey, validateExpirationAgainstOrgPolicies, validateExpirationDate } from '../../utils/supabase.ts'
 import { Constants } from '../../utils/supabase.types.ts'
 
 const app = honoFactory.createApp()
@@ -29,16 +29,8 @@ app.put('/:id', middlewareKey(['all']), async (c) => {
   const body = await parseBody<ApiKeyPut>(c)
   const { name, mode, limited_to_apps, limited_to_orgs, expires_at } = body
 
-  // Validate expiration date if provided
-  if (expires_at !== undefined && expires_at !== null) {
-    const expirationDate = new Date(expires_at)
-    if (Number.isNaN(expirationDate.getTime())) {
-      throw simpleError('invalid_expiration_date', 'Invalid expiration date format')
-    }
-    if (expirationDate <= new Date()) {
-      throw simpleError('invalid_expiration_date', 'Expiration date must be in the future')
-    }
-  }
+  // Validate expiration date format (throws if invalid)
+  validateExpirationDate(expires_at)
 
   const updateData: Partial<Database['public']['Tables']['apikeys']['Update']> = {
     name,
@@ -96,21 +88,9 @@ app.put('/:id', middlewareKey(['all']), async (c) => {
   // Determine the org IDs to validate against (use new ones if provided, otherwise existing)
   const orgsToValidate = limited_to_orgs?.length ? limited_to_orgs : (existingApikey.limited_to_orgs || [])
 
-  // Validate expiration against org policies
-  for (const orgId of orgsToValidate) {
-    const expiresAtToValidate = expires_at !== undefined ? expires_at : undefined
-    // Only validate if expires_at is being set or if orgs are being changed
-    if (expiresAtToValidate !== undefined || limited_to_orgs?.length) {
-      const validation = await validateApikeyExpirationForOrg(c, orgId, expiresAtToValidate ?? null, supabase)
-      if (!validation.valid) {
-        if (validation.error === 'expiration_required') {
-          throw simpleError('expiration_required', 'This organization requires API keys to have an expiration date')
-        }
-        if (validation.error === 'expiration_exceeds_max') {
-          throw simpleError('expiration_exceeds_max', `API key expiration cannot exceed ${validation.maxDays} days for this organization`)
-        }
-      }
-    }
+  // Validate expiration against org policies (only if expires_at is being set or orgs are being changed)
+  if (expires_at !== undefined || limited_to_orgs?.length) {
+    await validateExpirationAgainstOrgPolicies(orgsToValidate, expires_at ?? null, supabase)
   }
 
   const { data: updatedApikey, error: updateError } = await supabase
