@@ -1,11 +1,50 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
+import type { EmailPreferenceKey } from '../utils/org_email_notifications.ts'
 import { Hono } from 'hono/tiny'
 import { trackBentoEvent } from '../utils/bento.ts'
 import { BRES, middlewareAPISecret, parseBody, simpleError } from '../utils/hono.ts'
-import { cloudlogErr } from '../utils/logging.ts'
+import { cloudlog, cloudlogErr } from '../utils/logging.ts'
 import { readStatsVersion } from '../utils/stats.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
+
+interface EmailPreferences {
+  usage_limit?: boolean
+  credit_usage?: boolean
+  onboarding?: boolean
+  weekly_stats?: boolean
+  monthly_stats?: boolean
+  deploy_stats_24h?: boolean
+  bundle_created?: boolean
+  bundle_deployed?: boolean
+  device_error?: boolean
+}
+
+/**
+ * Check if a user has a specific email preference enabled.
+ * Defaults to true if preference is not set.
+ */
+async function isEmailPreferenceEnabled(
+  c: Context,
+  email: string,
+  preferenceKey: EmailPreferenceKey,
+): Promise<boolean> {
+  // email_preferences is a JSONB column added in migration 20251228064121
+  const { data: user, error } = await supabaseAdmin(c)
+    .from('users')
+    .select('*')
+    .eq('email', email)
+    .single()
+
+  if (error || !user) {
+    // Default to true if user not found (shouldn't happen)
+    return true
+  }
+
+  const prefs = ((user as any).email_preferences as EmailPreferences | null) ?? {}
+  const prefValue = prefs[preferenceKey]
+  return prefValue === undefined ? true : prefValue
+}
 
 const thresholds = {
   // Number of updates in plain number
@@ -129,6 +168,13 @@ app.post('/', middlewareAPISecret, async (c) => {
 })
 
 async function handleWeeklyInstallStats(c: Context, email: string, appId: string) {
+  // Check if user has weekly_stats preference enabled
+  const isEnabled = await isEmailPreferenceEnabled(c, email, 'weekly_stats')
+  if (!isEnabled) {
+    cloudlog({ requestId: c.get('requestId'), message: 'Weekly stats email disabled for user', email, appId })
+    return c.json({ status: 'Email preference disabled' }, 200)
+  }
+
   const supabase = await supabaseAdmin(c)
 
   const { data: weeklyStats, error: generateStatsError } = await supabase.rpc('get_weekly_stats', {
@@ -170,6 +216,13 @@ async function handleWeeklyInstallStats(c: Context, email: string, appId: string
 }
 
 async function handleMonthlyCreateStats(c: Context, email: string, appId: string) {
+  // Check if user has monthly_stats preference enabled
+  const isEnabled = await isEmailPreferenceEnabled(c, email, 'monthly_stats')
+  if (!isEnabled) {
+    cloudlog({ requestId: c.get('requestId'), message: 'Monthly stats email disabled for user', email, appId })
+    return c.json({ status: 'Email preference disabled' }, 200)
+  }
+
   const supabase = await supabaseAdmin(c)
   // Fetch additional stats for bundle creation, channel creation, and publishing
   const { data: appVersions, error: _appVersionsError } = await supabase
@@ -236,6 +289,13 @@ async function handleDeployInstallStats(
     appName,
     deployedAt,
   } = payload
+
+  // Check if user has deploy_stats_24h preference enabled
+  const isEnabled = await isEmailPreferenceEnabled(c, email, 'deploy_stats_24h')
+  if (!isEnabled) {
+    cloudlog({ requestId: c.get('requestId'), message: 'Deploy install stats email disabled for user', email, appId })
+    return c.json({ status: 'Email preference disabled' }, 200)
+  }
 
   if (!versionId) {
     return simpleError('missing_version_id', 'Missing versionId', { appId, deployId })
