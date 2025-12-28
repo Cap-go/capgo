@@ -10,8 +10,9 @@ CREATE TABLE IF NOT EXISTS "public"."webhooks" (
   "org_id" UUID NOT NULL,
   "name" TEXT NOT NULL,
   "url" TEXT NOT NULL,
+  "secret" TEXT DEFAULT 'whsec_' || replace(gen_random_uuid()::text, '-', '') NOT NULL,  -- Secret for HMAC-SHA256 signing
   "enabled" BOOLEAN DEFAULT true NOT NULL,
-  "events" TEXT[] NOT NULL,  -- ['app_versions', 'channels', 'org_users', 'orgs']
+  "events" TEXT[] NOT NULL,  -- ['apps', 'app_versions', 'channels', 'org_users', 'orgs']
   "created_at" TIMESTAMPTZ DEFAULT now() NOT NULL,
   "updated_at" TIMESTAMPTZ DEFAULT now() NOT NULL,
   "created_by" UUID,
@@ -19,6 +20,9 @@ CREATE TABLE IF NOT EXISTS "public"."webhooks" (
   CONSTRAINT "webhooks_org_id_fkey" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE CASCADE,
   CONSTRAINT "webhooks_created_by_fkey" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE SET NULL
 );
+
+-- Add comment for secret column
+COMMENT ON COLUMN "public"."webhooks"."secret" IS 'Secret key for HMAC-SHA256 signature verification. Format: whsec_{32-char-hex}';
 
 -- Indexes for efficient org lookups
 CREATE INDEX IF NOT EXISTS "webhooks_org_id_idx" ON "public"."webhooks" ("org_id");
