@@ -5,11 +5,13 @@ import IconPlan from '~icons/heroicons/credit-card'
 import IconCredits from '~icons/heroicons/currency-dollar'
 import IconWebhook from '~icons/heroicons/globe-alt'
 import IconInfo from '~icons/heroicons/information-circle'
+import IconSSO from '~icons/heroicons/key'
 import IconUsers from '~icons/heroicons/users'
 
 export const organizationTabs: Tab[] = [
   { label: 'general', key: '/settings/organization', icon: IconInfo },
   { label: 'members', key: '/settings/organization/members', icon: IconUsers },
+  { label: 'sso', key: '/settings/organization/sso', icon: IconSSO },
   { label: 'audit-logs', key: '/settings/organization/auditlogs', icon: IconAudit },
   { label: 'plans', key: '/settings/organization/plans', icon: IconPlan },
   { label: 'usage', key: '/settings/organization/usage', icon: IconChart },
