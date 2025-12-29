@@ -1220,5 +1220,15 @@
   "webhook-url-invalid": "Silakan masukkan URL yang valid",
   "webhook-url-placeholder": "https://contoh.com/webhook",
   "webhooks": "Webhook",
-  "webhooks-description": "Konfigurasikan webhook untuk menerima notifikasi HTTP saat terjadi peristiwa di organisasi Anda."
+  "webhooks-description": "Konfigurasikan webhook untuk menerima notifikasi HTTP saat terjadi peristiwa di organisasi Anda.",
+  "password-verification-required": "Verifikasi kata sandi diperlukan",
+  "password-verification-required-message": "Organisasi Anda memiliki kebijakan kata sandi yang memerlukan verifikasi. Silakan masukkan kata sandi saat ini untuk memverifikasi bahwa kata sandi memenuhi persyaratan.",
+  "verify-current-password": "Verifikasi kata sandi Anda",
+  "current-password": "Kata sandi saat ini",
+  "verify-password": "Verifikasi kata sandi",
+  "password-verified-successfully": "Kata sandi berhasil diverifikasi",
+  "invalid-password": "Kata sandi tidak valid",
+  "password-does-not-meet-requirements": "Kata sandi Anda tidak memenuhi persyaratan organisasi. Silakan ubah kata sandi Anda.",
+  "verification-failed": "Verifikasi gagal",
+  "no-organization-selected": "Tidak ada organisasi yang dipilih"
 }

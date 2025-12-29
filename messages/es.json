@@ -1228,5 +1228,15 @@
   "webhook-url-invalid": "Por favor ingresa una URL válida",
   "webhook-url-placeholder": "https://example.com/webhook",
   "webhooks": "Webhooks",
-  "webhooks-description": "Configura webhooks para recibir notificaciones HTTP cuando ocurran eventos en tu organización."
+  "webhooks-description": "Configura webhooks para recibir notificaciones HTTP cuando ocurran eventos en tu organización.",
+  "password-verification-required": "Verificación de contraseña requerida",
+  "password-verification-required-message": "Tu organización tiene una política de contraseñas que requiere verificación. Por favor ingresa tu contraseña actual para verificar que cumple con los requisitos.",
+  "verify-current-password": "Verificar tu contraseña",
+  "current-password": "Contraseña actual",
+  "verify-password": "Verificar contraseña",
+  "password-verified-successfully": "Contraseña verificada exitosamente",
+  "invalid-password": "Contraseña inválida",
+  "password-does-not-meet-requirements": "Tu contraseña no cumple con los requisitos de la organización. Por favor cambia tu contraseña.",
+  "verification-failed": "Verificación fallida",
+  "no-organization-selected": "Ninguna organización seleccionada"
 }

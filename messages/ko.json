@@ -1220,5 +1220,15 @@
   "webhook-url-invalid": "유효한 URL을 입력해주세요",
   "webhook-url-placeholder": "https://example.com/webhook",
   "webhooks": "웹훅",
-  "webhooks-description": "조직에서 이벤트가 발생할 때 HTTP 알림을 받도록 웹훅을 구성합니다."
+  "webhooks-description": "조직에서 이벤트가 발생할 때 HTTP 알림을 받도록 웹훅을 구성합니다.",
+  "password-verification-required": "비밀번호 확인 필요",
+  "password-verification-required-message": "조직에서 비밀번호 정책 확인이 필요합니다. 현재 비밀번호를 입력하여 요구 사항을 충족하는지 확인하세요.",
+  "verify-current-password": "비밀번호 확인하기",
+  "current-password": "현재 비밀번호",
+  "verify-password": "비밀번호 확인",
+  "password-verified-successfully": "비밀번호가 성공적으로 확인되었습니다",
+  "invalid-password": "잘못된 비밀번호",
+  "password-does-not-meet-requirements": "비밀번호가 조직의 요구 사항을 충족하지 않습니다. 비밀번호를 변경해주세요.",
+  "verification-failed": "확인 실패",
+  "no-organization-selected": "선택된 조직이 없습니다"
 }

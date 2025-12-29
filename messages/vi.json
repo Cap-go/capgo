@@ -1220,5 +1220,15 @@
   "webhook-url-invalid": "Vui lòng nhập một URL hợp lệ",
   "webhook-url-placeholder": "https://example.com/webhook",
   "webhooks": "Webhooks",
-  "webhooks-description": "Cấu hình webhooks để nhận thông báo HTTP khi có sự kiện xảy ra trong tổ chức của bạn."
+  "webhooks-description": "Cấu hình webhooks để nhận thông báo HTTP khi có sự kiện xảy ra trong tổ chức của bạn.",
+  "password-verification-required": "Yêu cầu xác minh mật khẩu",
+  "password-verification-required-message": "Tổ chức của bạn có chính sách mật khẩu yêu cầu xác minh. Vui lòng nhập mật khẩu hiện tại để xác minh rằng nó đáp ứng các yêu cầu.",
+  "verify-current-password": "Xác minh mật khẩu của bạn",
+  "current-password": "Mật khẩu hiện tại",
+  "verify-password": "Xác minh mật khẩu",
+  "password-verified-successfully": "Mật khẩu đã được xác minh thành công",
+  "invalid-password": "Mật khẩu không hợp lệ",
+  "password-does-not-meet-requirements": "Mật khẩu của bạn không đáp ứng yêu cầu của tổ chức. Vui lòng thay đổi mật khẩu.",
+  "verification-failed": "Xác minh thất bại",
+  "no-organization-selected": "Không có tổ chức nào được chọn"
 }

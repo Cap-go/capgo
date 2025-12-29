@@ -1220,5 +1220,15 @@
   "webhook-url-invalid": "Inserisci un URL valido",
   "webhook-url-placeholder": "https://esempio.com/webhook",
   "webhooks": "Webhook",
-  "webhooks-description": "Configura i webhook per ricevere notifiche HTTP quando si verificano eventi nella tua organizzazione."
+  "webhooks-description": "Configura i webhook per ricevere notifiche HTTP quando si verificano eventi nella tua organizzazione.",
+  "password-verification-required": "Verifica password richiesta",
+  "password-verification-required-message": "La tua organizzazione ha una politica sulle password che richiede la verifica. Inserisci la tua password attuale per verificare che soddisfi i requisiti.",
+  "verify-current-password": "Verifica la tua password",
+  "current-password": "Password attuale",
+  "verify-password": "Verifica password",
+  "password-verified-successfully": "Password verificata con successo",
+  "invalid-password": "Password non valida",
+  "password-does-not-meet-requirements": "La tua password non soddisfa i requisiti dell'organizzazione. Per favore cambia la tua password.",
+  "verification-failed": "Verifica fallita",
+  "no-organization-selected": "Nessuna organizzazione selezionata"
 }

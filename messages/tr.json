@@ -1220,5 +1220,15 @@
   "webhook-url-invalid": "Lütfen geçerli bir URL girin",
   "webhook-url-placeholder": "https://ornek.com/webhook",
   "webhooks": "Webhooklar",
-  "webhooks-description": "Kuruluşunuzda olaylar meydana geldiğinde HTTP bildirimleri almak için webhookları yapılandırın."
+  "webhooks-description": "Kuruluşunuzda olaylar meydana geldiğinde HTTP bildirimleri almak için webhookları yapılandırın.",
+  "password-verification-required": "Şifre doğrulaması gerekli",
+  "password-verification-required-message": "Kuruluşunuzun doğrulama gerektiren bir şifre politikası var. Gereksinimleri karşıladığını doğrulamak için lütfen mevcut şifrenizi girin.",
+  "verify-current-password": "Şifrenizi doğrulayın",
+  "current-password": "Mevcut şifre",
+  "verify-password": "Şifreyi doğrula",
+  "password-verified-successfully": "Şifre başarıyla doğrulandı",
+  "invalid-password": "Geçersiz şifre",
+  "password-does-not-meet-requirements": "Şifreniz kuruluş gereksinimlerini karşılamıyor. Lütfen şifrenizi değiştirin.",
+  "verification-failed": "Doğrulama başarısız",
+  "no-organization-selected": "Kuruluş seçilmedi"
 }

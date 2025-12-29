@@ -16,25 +16,7 @@ VALUES
 (tests.get_supabase_uid('test_pwd_noncompliant_user'), 'noncompliant@test.com', now(), now())
 ON CONFLICT (id) DO NOTHING;
 
--- Update auth.users updated_at for testing password policy compliance
--- Compliant user: updated_at is AFTER policy was enabled
--- Non-compliant user: updated_at is BEFORE policy was enabled
-DO $$
-DECLARE
-    compliant_user_id uuid;
-    noncompliant_user_id uuid;
-BEGIN
-    compliant_user_id := tests.get_supabase_uid('test_pwd_compliant_user');
-    noncompliant_user_id := tests.get_supabase_uid('test_pwd_noncompliant_user');
-
-    -- Set compliant user's updated_at to a very recent time (after policy)
-    UPDATE auth.users SET updated_at = now() + interval '1 hour' WHERE id = compliant_user_id;
-
-    -- Set non-compliant user's updated_at to an older time (before policy)
-    UPDATE auth.users SET updated_at = now() - interval '1 year' WHERE id = noncompliant_user_id;
-END $$;
-
--- Create test orgs
+-- Create test orgs and add compliance records for compliant users
 DO $$
 DECLARE
     org_with_pwd_policy_id uuid;
@@ -42,6 +24,8 @@ DECLARE
     compliant_user_id uuid;
     noncompliant_user_id uuid;
     test_admin_id uuid;
+    policy_config jsonb;
+    policy_hash text;
 BEGIN
     org_with_pwd_policy_id := extensions.uuid_generate_v4();
     org_without_pwd_policy_id := extensions.uuid_generate_v4();
@@ -49,25 +33,26 @@ BEGIN
     noncompliant_user_id := tests.get_supabase_uid('test_pwd_noncompliant_user');
     test_admin_id := tests.get_supabase_uid('test_admin');
 
+    -- Define password policy config
+    policy_config := '{"enabled": true, "min_length": 10, "require_uppercase": true, "require_number": true, "require_special": true}'::jsonb;
+
     -- Create org WITH password policy enforcement
-    INSERT INTO public.orgs (id, created_by, name, management_email, password_policy_config, password_policy_updated_at)
+    INSERT INTO public.orgs (id, created_by, name, management_email, password_policy_config)
     VALUES (
         org_with_pwd_policy_id,
         test_admin_id,
         'Pwd Policy Org',
         'pwd@org.com',
-        '{"enabled": true, "min_length": 10, "require_uppercase": true, "require_number": true, "require_special": true}'::jsonb,
-        now() -- Policy was just enabled
+        policy_config
     );
 
     -- Create org WITHOUT password policy enforcement
-    INSERT INTO public.orgs (id, created_by, name, management_email, password_policy_config, password_policy_updated_at)
+    INSERT INTO public.orgs (id, created_by, name, management_email, password_policy_config)
     VALUES (
         org_without_pwd_policy_id,
         test_admin_id,
         'No Pwd Policy Org',
         'nopwd@org.com',
-        NULL,
         NULL
     );
 
@@ -82,6 +67,12 @@ BEGIN
     VALUES
         (org_without_pwd_policy_id, compliant_user_id, 'read'::public.user_min_right),
         (org_without_pwd_policy_id, noncompliant_user_id, 'write'::public.user_min_right);
+
+    -- Add compliance record for the compliant user (password verified)
+    -- This simulates a user who has successfully validated their password via the backend
+    policy_hash := public.get_password_policy_hash(policy_config);
+    INSERT INTO public.user_password_compliance (user_id, org_id, policy_hash, validated_at)
+    VALUES (compliant_user_id, org_with_pwd_policy_id, policy_hash, now());
 
     -- Store org IDs for later use
     PERFORM set_config('test.org_with_pwd_policy', org_with_pwd_policy_id::text, false);
@@ -266,14 +257,13 @@ BEGIN
     test_admin_id := tests.get_supabase_uid('test_admin');
     noncompliant_user_id := tests.get_supabase_uid('test_pwd_noncompliant_user');
 
-    INSERT INTO public.orgs (id, created_by, name, management_email, password_policy_config, password_policy_updated_at)
+    INSERT INTO public.orgs (id, created_by, name, management_email, password_policy_config)
     VALUES (
         org_disabled_policy_id,
         test_admin_id,
         'Disabled Policy Org',
         'disabled@org.com',
-        '{"enabled": false, "min_length": 10}'::jsonb,
-        now()
+        '{"enabled": false, "min_length": 10}'::jsonb
     );
 
     INSERT INTO public.org_users (org_id, user_id, user_right)
@@ -343,16 +333,22 @@ SELECT
 -- Test super_admin access (should still be subject to password policy)
 -- ============================================================================
 
--- Make test_admin non-compliant with password policy
+-- Add test_admin to org but without compliance record
 DO $$
 DECLARE
     test_admin_id uuid;
+    org_id uuid;
 BEGIN
     test_admin_id := tests.get_supabase_uid('test_admin');
-    UPDATE auth.users SET updated_at = now() - interval '1 year' WHERE id = test_admin_id;
+    org_id := current_setting('test.org_with_pwd_policy')::uuid;
+
+    -- Add test_admin to org as super_admin (but no compliance record)
+    INSERT INTO public.org_users (org_id, user_id, user_right)
+    VALUES (org_id, test_admin_id, 'super_admin'::public.user_min_right)
+    ON CONFLICT (org_id, user_id, app_id, channel_id) DO NOTHING;
 END $$;
 
--- Test 17: Super admin without compliant password cannot access org with policy
+-- Test 17: Super admin without compliance record cannot access org with policy
 SELECT
     is(
         check_min_rights(
@@ -363,7 +359,7 @@ SELECT
             NULL::bigint
         ),
         FALSE,
-        'check_min_rights password policy - super_admin without compliant password cannot access'
+        'check_min_rights password policy - super_admin without compliance record cannot access'
     );
 
 -- ============================================================================
@@ -377,21 +373,23 @@ DECLARE
     test_admin_id uuid;
     compliant_user_id uuid;
     noncompliant_user_id uuid;
+    policy_config jsonb;
+    policy_hash text;
 BEGIN
     org_both_policies_id := extensions.uuid_generate_v4();
     test_admin_id := tests.get_supabase_uid('test_admin');
     compliant_user_id := tests.get_supabase_uid('test_pwd_compliant_user');
     noncompliant_user_id := tests.get_supabase_uid('test_pwd_noncompliant_user');
+    policy_config := '{"enabled": true, "min_length": 10, "require_uppercase": true}'::jsonb;
 
-    INSERT INTO public.orgs (id, created_by, name, management_email, enforcing_2fa, password_policy_config, password_policy_updated_at)
+    INSERT INTO public.orgs (id, created_by, name, management_email, enforcing_2fa, password_policy_config)
     VALUES (
         org_both_policies_id,
         test_admin_id,
         'Both Policies Org',
         'both@org.com',
         true,
-        '{"enabled": true, "min_length": 10, "require_uppercase": true}'::jsonb,
-        now()
+        policy_config
     );
 
     INSERT INTO public.org_users (org_id, user_id, user_right)
@@ -399,12 +397,16 @@ BEGIN
         (org_both_policies_id, compliant_user_id, 'admin'::public.user_min_right),
         (org_both_policies_id, noncompliant_user_id, 'write'::public.user_min_right);
 
+    -- Add password compliance record for compliant user
+    policy_hash := public.get_password_policy_hash(policy_config);
+    INSERT INTO public.user_password_compliance (user_id, org_id, policy_hash, validated_at)
+    VALUES (compliant_user_id, org_both_policies_id, policy_hash, now());
+
     PERFORM set_config('test.org_both_policies', org_both_policies_id::text, false);
 END $$;
 
--- Test 18: User with both compliant password AND 2FA can access org with both policies
--- Note: test_pwd_compliant_user needs 2FA for this test
--- We'll test that without 2FA they're still denied even with compliant password
+-- Test 18: User with compliant password but without 2FA can't access org with both policies
+-- (because 2FA is still required)
 SELECT
     is(
         check_min_rights(

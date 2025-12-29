@@ -7,17 +7,27 @@ import { toast } from 'vue-sonner'
 import iconPassword from '~icons/heroicons/key?raw'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
+import { useDisplayStore } from '~/stores/display'
+import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
 // tabs handled by settings layout
 
 const isLoading = ref(false)
+const isVerifying = ref(false)
 const dialogStore = useDialogV2Store()
 const displayStore = useDisplayStore()
 const supabase = useSupabase()
 const organizationStore = useOrganizationStore()
+const mainStore = useMainStore()
 const mfaCode = ref('')
 const { t } = useI18n()
 displayStore.NavTitle = t('password')
+
+// Check if user needs to verify password for current org
+const needsPasswordVerification = computed(() => {
+  const org = organizationStore.currentOrganization
+  return org?.password_policy_config?.enabled && org?.password_has_access === false
+})
 
 // Get current org's password policy (use defaults if no policy)
 const passwordPolicy = computed(() => {
@@ -64,6 +74,66 @@ const helpText = computed(() => {
 
   return requirements.join(', ')
 })
+
+// Verify existing password meets org requirements (no password change needed)
+async function verifyPassword(form: { current_password: string }) {
+  if (isVerifying.value)
+    return
+  isVerifying.value = true
+
+  try {
+    const user = mainStore.user
+    if (!user?.email) {
+      setErrors('verify-password', [t('user-not-found')], {})
+      return
+    }
+
+    const orgId = organizationStore.currentOrganization?.gid
+    if (!orgId) {
+      setErrors('verify-password', [t('no-organization-selected')], {})
+      return
+    }
+
+    // Call the backend to validate password compliance
+    const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/private/validate_password_compliance`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+      },
+      body: JSON.stringify({
+        email: user.email,
+        password: form.current_password,
+        org_id: orgId,
+      }),
+    })
+
+    const result = await response.json()
+
+    if (!response.ok) {
+      if (result.error === 'invalid_credentials') {
+        setErrors('verify-password', [t('invalid-password')], {})
+      }
+      else if (result.error === 'password_does_not_meet_policy') {
+        setErrors('verify-password', [t('password-does-not-meet-requirements')], {})
+      }
+      else {
+        setErrors('verify-password', [result.message || t('verification-failed')], {})
+      }
+      return
+    }
+
+    toast.success(t('password-verified-successfully'))
+
+    // Refresh org data to update access status
+    await organizationStore.fetchOrganizations()
+
+    form.current_password = ''
+  }
+  finally {
+    isVerifying.value = false
+  }
+}
 
 async function submit(form: { password: string, password_confirm: string }) {
   console.log('submitting', form)
@@ -141,6 +211,55 @@ async function submit(form: { password: string, password_confirm: string }) {
 <template>
   <div>
     <div class="flex flex-col h-full pb-8 overflow-hidden overflow-y-auto bg-white border shadow-lg md:pb-0 max-h-fit grow md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900">
+      <!-- Password Verification Section (shown when user needs to verify) -->
+      <div v-if="needsPasswordVerification" class="p-6 space-y-6 border-b border-slate-300">
+        <div class="p-4 mb-4 text-yellow-800 bg-yellow-100 rounded-lg dark:bg-yellow-900 dark:text-yellow-200">
+          <h3 class="mb-2 font-semibold">
+            {{ t('password-verification-required') }}
+          </h3>
+          <p class="text-sm">
+            {{ t('password-verification-required-message') }}
+          </p>
+        </div>
+
+        <FormKit id="verify-password" type="form" :actions="false" @submit="verifyPassword">
+          <section>
+            <h2 class="mb-4 text-xl font-bold dark:text-white text-slate-800">
+              {{ t('verify-current-password') }}
+            </h2>
+            <div class="space-y-4">
+              <FormKit
+                type="password"
+                name="current_password"
+                :prefix-icon="iconPassword"
+                autocomplete="current-password"
+                outer-class="sm:w-1/2"
+                :label="t('current-password')"
+                :help="helpText"
+                validation="required"
+              />
+            </div>
+            <FormKitMessages />
+          </section>
+          <footer>
+            <div class="flex flex-col py-5">
+              <div class="flex self-start">
+                <button
+                  class="p-2 text-white bg-green-500 rounded-sm hover:bg-green-600 d-btn"
+                  type="submit"
+                >
+                  <span v-if="!isVerifying" class="rounded-4xl">
+                    {{ t('verify-password') }}
+                  </span>
+                  <Spinner v-else size="w-8 h-8" class="px-4" color="fill-gray-100 text-gray-200 dark:text-gray-600" />
+                </button>
+              </div>
+            </div>
+          </footer>
+        </FormKit>
+      </div>
+
+      <!-- Change Password Section -->
       <FormKit id="change-pass" type="form" :actions="false" @submit="submit">
         <!-- Panel body -->
         <div class="p-6 space-y-6">

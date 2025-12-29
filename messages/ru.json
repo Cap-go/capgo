@@ -1220,5 +1220,15 @@
   "webhook-url-invalid": "Введите действительный URL",
   "webhook-url-placeholder": "https://example.com/webhook",
   "webhooks": "Вебхуки",
-  "webhooks-description": "Настройте вебхуки для получения HTTP-уведомлений при возникновении событий в вашей организации."
+  "webhooks-description": "Настройте вебхуки для получения HTTP-уведомлений при возникновении событий в вашей организации.",
+  "password-verification-required": "Требуется подтверждение пароля",
+  "password-verification-required-message": "В вашей организации действует политика паролей, требующая подтверждения. Пожалуйста, введите текущий пароль, чтобы подтвердить его соответствие требованиям.",
+  "verify-current-password": "Подтвердить ваш пароль",
+  "current-password": "Текущий пароль",
+  "verify-password": "Подтвердить пароль",
+  "password-verified-successfully": "Пароль успешно подтвержден",
+  "invalid-password": "Неверный пароль",
+  "password-does-not-meet-requirements": "Ваш пароль не соответствует требованиям организации. Пожалуйста, измените пароль.",
+  "verification-failed": "Ошибка подтверждения",
+  "no-organization-selected": "Организация не выбрана"
 }

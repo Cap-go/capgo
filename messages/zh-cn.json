@@ -1220,5 +1220,15 @@
   "webhook-url-invalid": "请输入有效的URL",
   "webhook-url-placeholder": "https://example.com/webhook",
   "webhooks": "Webhooks",
-  "webhooks-description": "配置Webhooks以在您的组织发生事件时接收HTTP通知。"
+  "webhooks-description": "配置Webhooks以在您的组织发生事件时接收HTTP通知。",
+  "password-verification-required": "需要密码验证",
+  "password-verification-required-message": "您的组织有一项需要验证的密码策略。请输入您的当前密码以验证其是否符合要求。",
+  "verify-current-password": "验证您的密码",
+  "current-password": "当前密码",
+  "verify-password": "验证密码",
+  "password-verified-successfully": "密码验证成功",
+  "invalid-password": "无效密码",
+  "password-does-not-meet-requirements": "您的密码不符合组织的要求。请更改您的密码。",
+  "verification-failed": "验证失败",
+  "no-organization-selected": "未选择组织"
 }

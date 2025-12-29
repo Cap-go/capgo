@@ -1276,5 +1276,15 @@
   "characters-minimum": "characters minimum",
   "one-uppercase": "1 uppercase",
   "one-number": "1 number",
-  "one-special-character": "1 special character"
+  "one-special-character": "1 special character",
+  "password-verification-required": "Password Verification Required",
+  "password-verification-required-message": "Your organization has a password policy that requires verification. Please enter your current password to verify it meets the requirements.",
+  "verify-current-password": "Verify Your Password",
+  "current-password": "Current Password",
+  "verify-password": "Verify Password",
+  "password-verified-successfully": "Password verified successfully",
+  "invalid-password": "Invalid password",
+  "password-does-not-meet-requirements": "Your password does not meet the organization's requirements. Please change your password.",
+  "verification-failed": "Verification failed",
+  "no-organization-selected": "No organization selected"
 }

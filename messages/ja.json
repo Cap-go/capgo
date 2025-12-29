@@ -1220,5 +1220,15 @@
   "webhook-url-invalid": "有効なURLを入力してください",
   "webhook-url-placeholder": "https://example.com/webhook",
   "webhooks": "Webhook",
-  "webhooks-description": "組織でイベントが発生した時にHTTP通知を受け取るようにWebhookを設定します。"
+  "webhooks-description": "組織でイベントが発生した時にHTTP通知を受け取るようにWebhookを設定します。",
+  "password-verification-required": "パスワードの確認が必要です",
+  "password-verification-required-message": "お客様の組織には確認が必要なパスワードポリシーがあります。現在のパスワードを入力して、要件を満たしていることを確認してください。",
+  "verify-current-password": "パスワードを確認する",
+  "current-password": "現在のパスワード",
+  "verify-password": "パスワードを確認",
+  "password-verified-successfully": "パスワードの確認に成功しました",
+  "invalid-password": "無効なパスワード",
+  "password-does-not-meet-requirements": "パスワードが組織の要件を満たしていません。パスワードを変更してください。",
+  "verification-failed": "確認に失敗しました",
+  "no-organization-selected": "組織が選択されていません"
 }

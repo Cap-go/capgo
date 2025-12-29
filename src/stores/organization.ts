@@ -17,7 +17,7 @@ export interface PasswordPolicyConfig {
   require_special: boolean
 }
 
-// Extended organization type with password policy fields (from get_orgs_v8)
+// Extended organization type with password policy fields (from get_orgs_v7)
 // Once types are regenerated, this can be replaced with the generated type
 export type Organization = ArrayElement<Database['public']['Functions']['get_orgs_v6']['Returns']> & {
   enforcing_2fa?: boolean
@@ -233,9 +233,9 @@ export const useOrganizationStore = defineStore('organization', () => {
     }
 
     // We have RLS that ensure that we only select rows where we are member or owner
-    // Using get_orgs_v8 which includes 2FA and password policy fields
+    // Using get_orgs_v7 which includes 2FA and password policy fields
     const { data, error } = await supabase
-      .rpc('get_orgs_v8')
+      .rpc('get_orgs_v7')
 
     if (error) {
       console.error('Cannot get orgs!', error)
