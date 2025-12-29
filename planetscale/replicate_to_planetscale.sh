@@ -90,6 +90,13 @@ PUBLICATION_NAME='planetscale_replicate'
 SUBSCRIPTION_NAME="planetscale_subscription_${REGION}"
 # ------------------------------------
 
+echo "==> Cleaning up public schema on target..."
+psql-17 "$TARGET_DB_URL" -v ON_ERROR_STOP=1 <<'SQL'
+DROP SCHEMA IF EXISTS public CASCADE;
+CREATE SCHEMA public;
+GRANT ALL ON SCHEMA public TO PUBLIC;
+SQL
+
 echo "==> Importing schema into target..."
 psql-17 "$TARGET_DB_URL" -v ON_ERROR_STOP=1 -f "schema_replicate.sql"
 
@@ -102,78 +109,87 @@ psql-17 "$TARGET_DB_URL" -v ON_ERROR_STOP=1 -f "schema_replicate.sql"
 #   --dbname "$TARGET_DB_URL" \
 #   "$DUMP_FILE"
 
-echo "==> Truncating tables on target before replication..."
-psql-17 "$TARGET_DB_URL" -v ON_ERROR_STOP=1 <<'SQL'
-TRUNCATE TABLE
-  channel_devices,
-  apps,
-  app_versions,
-  manifest,
-  channels,
-  orgs,
-  stripe_info,
-  org_users
-RESTART IDENTITY CASCADE;
-SQL
+# echo "==> Truncating tables on target before replication..."
+# psql-17 "$TARGET_DB_URL" -v ON_ERROR_STOP=1 <<'SQL'
+# TRUNCATE TABLE
+#   channel_devices,
+#   apps,
+#   app_versions,
+#   manifest,
+#   channels,
+#   orgs,
+#   stripe_info,
+#   org_users
+# RESTART IDENTITY CASCADE;
+# SQL
 
-echo "==> Reclaiming disk space and rebuilding indexes..."
-psql-17 "$TARGET_DB_URL" -v ON_ERROR_STOP=1 <<'SQL'
-VACUUM FULL channel_devices, apps, app_versions, manifest, channels, orgs, stripe_info, org_users;
-REINDEX TABLE channel_devices;
-REINDEX TABLE apps;
-REINDEX TABLE app_versions;
-REINDEX TABLE manifest;
-REINDEX TABLE channels;
-REINDEX TABLE orgs;
-REINDEX TABLE stripe_info;
-REINDEX TABLE org_users;
-ANALYZE channel_devices, apps, app_versions, manifest, channels, orgs, stripe_info, org_users;
-SQL
+# echo "==> Reclaiming disk space and rebuilding indexes..."
+# psql-17 "$TARGET_DB_URL" -v ON_ERROR_STOP=1 <<'SQL'
+# VACUUM FULL channel_devices, apps, app_versions, manifest, channels, orgs, stripe_info, org_users;
+# REINDEX TABLE channel_devices;
+# REINDEX TABLE apps;
+# REINDEX TABLE app_versions;
+# REINDEX TABLE manifest;
+# REINDEX TABLE channels;
+# REINDEX TABLE orgs;
+# REINDEX TABLE stripe_info;
+# REINDEX TABLE org_users;
+# ANALYZE channel_devices, apps, app_versions, manifest, channels, orgs, stripe_info, org_users;
+# SQL
 
-echo "==> Resetting sequences on target after truncate..."
-psql-17 "$TARGET_DB_URL" -v ON_ERROR_STOP=1 <<'SQL'
-DO $$
-DECLARE
-  r RECORD;
-  seq_name text;
-  max_val bigint;
-BEGIN
-  FOR r IN
-    SELECT table_schema, table_name, column_name
-    FROM information_schema.columns
-    WHERE column_default LIKE 'nextval%'
-  LOOP
-    seq_name := pg_get_serial_sequence(
-      format('%I.%I', r.table_schema, r.table_name),
-      r.column_name
-    );
+# echo "==> Resetting sequences on target after truncate..."
+# psql-17 "$TARGET_DB_URL" -v ON_ERROR_STOP=1 <<'SQL'
+# DO $$
+# DECLARE
+#   r RECORD;
+#   seq_name text;
+#   max_val bigint;
+# BEGIN
+#   FOR r IN
+#     SELECT table_schema, table_name, column_name
+#     FROM information_schema.columns
+#     WHERE column_default LIKE 'nextval%'
+#   LOOP
+#     seq_name := pg_get_serial_sequence(
+#       format('%I.%I', r.table_schema, r.table_name),
+#       r.column_name
+#     );
 
-    IF seq_name IS NOT NULL THEN
-      EXECUTE format(
-        'SELECT MAX(%I) FROM %I.%I',
-        r.column_name,
-        r.table_schema,
-        r.table_name
-      ) INTO max_val;
+#     IF seq_name IS NOT NULL THEN
+#       EXECUTE format(
+#         'SELECT MAX(%I) FROM %I.%I',
+#         r.column_name,
+#         r.table_schema,
+#         r.table_name
+#       ) INTO max_val;
 
-      IF max_val IS NULL THEN
-        -- Table is empty (after truncate), reset sequence to start at 1
-        EXECUTE format('ALTER SEQUENCE %s RESTART WITH 1', seq_name);
-        RAISE NOTICE 'Reset sequence % to start at 1 (table empty)', seq_name;
-      ELSE
-        -- Table has data, set sequence to max value + 1
-        EXECUTE format('SELECT setval(%L, %s, true)', seq_name, max_val);
-        RAISE NOTICE 'Set sequence % to % (max value)', seq_name, max_val;
-      END IF;
-    END IF;
-  END LOOP;
-END
-$$;
-SQL
+#       IF max_val IS NULL THEN
+#         -- Table is empty (after truncate), reset sequence to start at 1
+#         EXECUTE format('ALTER SEQUENCE %s RESTART WITH 1', seq_name);
+#         RAISE NOTICE 'Reset sequence % to start at 1 (table empty)', seq_name;
+#       ELSE
+#         -- Table has data, set sequence to max value + 1
+#         EXECUTE format('SELECT setval(%L, %s, true)', seq_name, max_val);
+#         RAISE NOTICE 'Set sequence % to % (max value)', seq_name, max_val;
+#       END IF;
+#     END IF;
+#   END LOOP;
+# END
+# $$;
+# SQL
 
 echo "==> Dropping existing subscription if exists..."
 psql-17 "$TARGET_DB_URL" -v ON_ERROR_STOP=0 <<SQL
 DROP SUBSCRIPTION IF EXISTS ${SUBSCRIPTION_NAME};
+SQL
+
+# Build source DB URL for direct connection
+SOURCE_DB_URL="postgresql://${SOURCE_USER}:${SOURCE_PASSWORD}@${SOURCE_HOST}:${SOURCE_PORT}/${SOURCE_DB}?sslmode=${SOURCE_SSLMODE}"
+
+echo "==> Dropping existing replication slot on source if exists..."
+psql-17 "$SOURCE_DB_URL" -v ON_ERROR_STOP=0 <<SQL
+SELECT pg_drop_replication_slot('${SUBSCRIPTION_NAME}')
+WHERE EXISTS (SELECT 1 FROM pg_replication_slots WHERE slot_name = '${SUBSCRIPTION_NAME}');
 SQL
 
 echo "==> Creating subscription on target..."
