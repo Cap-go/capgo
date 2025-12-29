@@ -90,8 +90,8 @@ PUBLICATION_NAME='planetscale_replicate'
 SUBSCRIPTION_NAME="planetscale_subscription_${REGION}"
 # ------------------------------------
 
-# echo "==> Importing schema into target..."
-# psql "$TARGET_DB_URL" -v ON_ERROR_STOP=1 -f "schema_replicate.sql"
+echo "==> Importing schema into target..."
+psql-17 "$TARGET_DB_URL" -v ON_ERROR_STOP=1 -f "schema_replicate.sql"
 
 # echo "==> Restoring data into target..."
 # pg_restore \
