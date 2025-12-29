@@ -2,6 +2,8 @@
   <img src='https://raw.githubusercontent.com/Cap-go/capgo/main/assets/capgo_banner.png' alt='Capgo - Instant updates for capacitor'/>
 </p>
 
+Console to manage and distribute your live update
+
 [![Bugs](https://sonarcloud.io/api/project_badges/measure?project=Cap-go_capgo&metric=bugs)](https://sonarcloud.io/summary/new_code?id=Cap-go_capgo)
 [![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=Cap-go_capgo&metric=security_rating)](https://sonarcloud.io/summary/new_code?id=Cap-go_capgo)
 [![Maintainability Rating](https://sonarcloud.io/api/project_badges/measure?project=Cap-go_capgo&metric=sqale_rating)](https://sonarcloud.io/summary/new_code?id=Cap-go_capgo)
@@ -45,12 +47,21 @@
 - ⚔️ **Battle-Tested**: Used in more than 3000 projects.
 - 📊 View your deployment statistics
 - 🔋 Supports Android and iOS
-- ⚡️ Capacitor 6/7 support
+- ⚡️ Capacitor 8/7/6/5 support
 - 🌐 **Open Source**: Licensed under GNU AFFERO GENERAL PUBLIC LICENSE
 - 🌐 **Open Source Backend**: Self install
   [our backend](https://github.com/Cap-go/capgo) in your infra
 
 <br>
+
+## Usage
+
+Capgo is deployed to production on Cloudflare workers and Supabase.
+
+Cloudflare workers take 99% of the traffic. Supabase is used for internal calls,
+for internal tasks such as CRON jobs that call functions.
+
+When self-hosted, installing only Supabase is sufficient.
 
 ## Documentation
 
@@ -151,14 +162,6 @@ All the following official plugins are already installed and pre-configured:
     IDE support for Windi CSS
   - [ESLint](https://marketplace.visualstudio.com/items?itemName=dbaeumer.vscode-eslint)
 
-## Usage
-
-Capgo is deployed to production on Cloudflare workers and Supabase.
-
-Cloudflare workers take 99% of the traffic. Supabase is used for internal calls,
-for internal tasks such as CRON jobs that call functions.
-
-When self-hosted, installing only Supabase is sufficient.
 
 ### Deploy on Cloudflare Pages
 
