@@ -1,24 +1,12 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
-import type { EmailPreferenceKey } from '../utils/org_email_notifications.ts'
+import type { EmailPreferenceKey, EmailPreferences } from '../utils/org_email_notifications.ts'
 import { Hono } from 'hono/tiny'
 import { trackBentoEvent } from '../utils/bento.ts'
 import { BRES, middlewareAPISecret, parseBody, simpleError } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../utils/logging.ts'
 import { readStatsVersion } from '../utils/stats.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
-
-interface EmailPreferences {
-  usage_limit?: boolean
-  credit_usage?: boolean
-  onboarding?: boolean
-  weekly_stats?: boolean
-  monthly_stats?: boolean
-  deploy_stats_24h?: boolean
-  bundle_created?: boolean
-  bundle_deployed?: boolean
-  device_error?: boolean
-}
 
 /**
  * Check if a user has a specific email preference enabled.
@@ -29,7 +17,7 @@ async function isEmailPreferenceEnabled(
   email: string,
   preferenceKey: EmailPreferenceKey,
 ): Promise<boolean> {
-  // email_preferences is a JSONB column added in migration 20251228064121
+  // email_preferences is a JSONB column added in migration 20251228065406
   const { data: user, error } = await supabaseAdmin(c)
     .from('users')
     .select('*')

@@ -46,7 +46,7 @@ For each automation listed below, add a segment filter:
 **Events**: `user:usage_50_percent_of_plan`, `user:usage_70_percent_of_plan`, `user:usage_90_percent_of_plan`, `user:upgrade_to_*`
 
 **Filter to add**:
-```
+```text
 Tag does NOT contain: usage_limit_disabled
 ```
 
@@ -55,7 +55,7 @@ Tag does NOT contain: usage_limit_disabled
 **Events**: `org:credits_usage_50_percent`, `org:credits_usage_75_percent`, `org:credits_usage_90_percent`, `org:credits_usage_100_percent`
 
 **Filter to add**:
-```
+```text
 Tag does NOT contain: credit_usage_disabled
 ```
 
@@ -64,7 +64,7 @@ Tag does NOT contain: credit_usage_disabled
 **Events**: `user:need_onboarding`
 
 **Filter to add**:
-```
+```text
 Tag does NOT contain: onboarding_disabled
 ```
 
@@ -73,7 +73,7 @@ Tag does NOT contain: onboarding_disabled
 **Events**: `user:weekly_stats`
 
 **Filter to add**:
-```
+```text
 Tag does NOT contain: weekly_stats_disabled
 ```
 
@@ -82,7 +82,7 @@ Tag does NOT contain: weekly_stats_disabled
 **Events**: `org:monthly_create_stats`
 
 **Filter to add**:
-```
+```text
 Tag does NOT contain: monthly_stats_disabled
 ```
 
@@ -91,7 +91,7 @@ Tag does NOT contain: monthly_stats_disabled
 **Events**: `bundle:install_stats_24h`
 
 **Filter to add**:
-```
+```text
 Tag does NOT contain: deploy_stats_24h_disabled
 ```
 
@@ -100,7 +100,7 @@ Tag does NOT contain: deploy_stats_24h_disabled
 **Events**: `bundle:created`
 
 **Filter to add**:
-```
+```text
 Tag does NOT contain: bundle_created_disabled
 ```
 
@@ -109,7 +109,7 @@ Tag does NOT contain: bundle_created_disabled
 **Events**: `bundle:deployed`
 
 **Filter to add**:
-```
+```text
 Tag does NOT contain: bundle_deployed_disabled
 ```
 
@@ -118,7 +118,7 @@ Tag does NOT contain: bundle_deployed_disabled
 **Events**: `user:update_fail`
 
 **Filter to add**:
-```
+```text
 Tag does NOT contain: device_error_disabled
 ```
 

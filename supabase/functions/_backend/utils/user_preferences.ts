@@ -1,4 +1,5 @@
 import type { Context } from 'hono'
+import type { EmailPreferenceKey, EmailPreferences } from './org_email_notifications.ts'
 import type { Database } from './supabase.types.ts'
 import { addTagBento } from './bento.ts'
 import { cloudlog } from './logging.ts'
@@ -9,7 +10,7 @@ const NEWSLETTER_TAG = 'newsletter_opt_in'
 
 // Email preference disabled tags - when a user opts OUT, we add these tags
 // Bento automations should exclude users with these tags
-const EMAIL_PREF_DISABLED_TAGS = {
+const EMAIL_PREF_DISABLED_TAGS: Record<EmailPreferenceKey, string> = {
   usage_limit: 'usage_limit_disabled',
   credit_usage: 'credit_usage_disabled',
   onboarding: 'onboarding_disabled',
@@ -19,20 +20,7 @@ const EMAIL_PREF_DISABLED_TAGS = {
   bundle_created: 'bundle_created_disabled',
   bundle_deployed: 'bundle_deployed_disabled',
   device_error: 'device_error_disabled',
-} as const
-
-type EmailPreferenceKey = keyof typeof EMAIL_PREF_DISABLED_TAGS
-
-interface EmailPreferences {
-  usage_limit?: boolean
-  credit_usage?: boolean
-  onboarding?: boolean
-  weekly_stats?: boolean
-  monthly_stats?: boolean
-  deploy_stats_24h?: boolean
-  bundle_created?: boolean
-  bundle_deployed?: boolean
-  device_error?: boolean
+  channel_self_rejected: 'channel_self_rejected_disabled',
 }
 
 const ALL_LEGACY_TAGS = [NOTIFICATION_TAG, NEWSLETTER_TAG]

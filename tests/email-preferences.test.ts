@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import type { EmailPreferences } from '../supabase/functions/_backend/utils/org_email_notifications.ts'
 import { APP_NAME, BASE_URL, getSupabaseClient, ORG_ID, resetAndSeedAppData, resetAppData, USER_EMAIL, USER_ID } from './test-utils.ts'
 
 const id = randomUUID()
@@ -8,18 +9,6 @@ const APPNAME_PREFS = `${APP_NAME}.ep.${id}`
 const triggerHeaders = {
   'Content-Type': 'application/json',
   'apisecret': 'testsecret',
-}
-
-interface EmailPreferences {
-  usage_limit?: boolean
-  credit_usage?: boolean
-  onboarding?: boolean
-  weekly_stats?: boolean
-  monthly_stats?: boolean
-  deploy_stats_24h?: boolean
-  bundle_created?: boolean
-  bundle_deployed?: boolean
-  device_error?: boolean
 }
 
 beforeAll(async () => {
@@ -41,6 +30,7 @@ afterAll(async () => {
       bundle_created: true,
       bundle_deployed: true,
       device_error: true,
+      channel_self_rejected: true,
     },
   } as any).eq('id', USER_ID)
 })

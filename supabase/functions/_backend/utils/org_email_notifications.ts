@@ -20,7 +20,7 @@ export type EmailPreferenceKey
     | 'device_error'
     | 'channel_self_rejected'
 
-interface EmailPreferences {
+export interface EmailPreferences {
   usage_limit?: boolean
   credit_usage?: boolean
   onboarding?: boolean
