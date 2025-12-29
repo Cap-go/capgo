@@ -1227,5 +1227,21 @@
   "package-name": "Nama Paket",
   "no-native-dependencies": "Tidak Ada Dependensi Native",
   "no-native-dependencies-description": "Bundle ini tidak berisi informasi paket native. Dependensi native ditangkap saat mengunggah dengan CLI.",
-  "view-on-npm": "Lihat di npm"
+  "view-on-npm": "Lihat di npm",
+  "password-verification-required": "Verifikasi kata sandi diperlukan",
+  "password-verification-required-message": "Organisasi Anda memiliki kebijakan kata sandi yang memerlukan verifikasi. Silakan masukkan kata sandi saat ini untuk memverifikasi bahwa kata sandi memenuhi persyaratan.",
+  "verify-current-password": "Verifikasi kata sandi Anda",
+  "current-password": "Kata sandi saat ini",
+  "verify-password": "Verifikasi kata sandi",
+  "password-verified-successfully": "Kata sandi berhasil diverifikasi",
+  "password-policy-members-status": "Status Kebijakan Kata Sandi Anggota",
+  "password-policy-compliant": "Sesuai Kebijakan",
+  "password-policy-non-compliant": "Tidak Sesuai",
+  "password-policy-impacted-members-title": "Anggota yang Tidak Memenuhi Kebijakan Kata Sandi",
+  "password-policy-impacted-members-description": "Anggota ini belum memverifikasi bahwa kata sandi mereka memenuhi persyaratan kebijakan saat ini. Mereka akan dikunci sampai mereka memverifikasi atau mengubah kata sandi mereka.",
+  "password-policy-all-members-compliant": "Semua anggota memenuhi persyaratan kebijakan kata sandi!",
+  "invalid-password": "Kata sandi tidak valid",
+  "password-does-not-meet-requirements": "Kata sandi Anda tidak memenuhi persyaratan organisasi. Silakan ubah kata sandi Anda.",
+  "verification-failed": "Verifikasi gagal",
+  "no-organization-selected": "Tidak ada organisasi yang dipilih"
 }

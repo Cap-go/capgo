@@ -1235,5 +1235,21 @@
   "package-name": "Nombre del Paquete",
   "no-native-dependencies": "Sin Dependencias Nativas",
   "no-native-dependencies-description": "Este bundle no contiene información de paquetes nativos. Las dependencias nativas se capturan al subir con la CLI.",
-  "view-on-npm": "Ver en npm"
+  "view-on-npm": "Ver en npm",
+  "password-verification-required": "Verificación de contraseña requerida",
+  "password-verification-required-message": "Tu organización tiene una política de contraseñas que requiere verificación. Por favor ingresa tu contraseña actual para verificar que cumple con los requisitos.",
+  "verify-current-password": "Verificar tu contraseña",
+  "current-password": "Contraseña actual",
+  "verify-password": "Verificar contraseña",
+  "password-verified-successfully": "Contraseña verificada exitosamente",
+  "password-policy-members-status": "Estado de Política de Contraseña de Miembros",
+  "password-policy-compliant": "Cumple con la Política",
+  "password-policy-non-compliant": "No Cumple",
+  "password-policy-impacted-members-title": "Miembros que No Cumplen con la Política de Contraseña",
+  "password-policy-impacted-members-description": "Estos miembros no han verificado que su contraseña cumpla con los requisitos actuales de la política. Serán bloqueados hasta que verifiquen o cambien su contraseña.",
+  "password-policy-all-members-compliant": "¡Todos los miembros cumplen con los requisitos de la política de contraseñas!",
+  "invalid-password": "Contraseña inválida",
+  "password-does-not-meet-requirements": "Tu contraseña no cumple con los requisitos de la organización. Por favor cambia tu contraseña.",
+  "verification-failed": "Verificación fallida",
+  "no-organization-selected": "Ninguna organización seleccionada"
 }

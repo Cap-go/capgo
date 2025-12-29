@@ -1227,5 +1227,21 @@
   "package-name": "Tên Gói",
   "no-native-dependencies": "Không Có Phụ Thuộc Native",
   "no-native-dependencies-description": "Bundle này không chứa thông tin gói native. Các phụ thuộc native được ghi lại khi tải lên bằng CLI.",
-  "view-on-npm": "Xem trên npm"
+  "view-on-npm": "Xem trên npm",
+  "password-verification-required": "Yêu cầu xác minh mật khẩu",
+  "password-verification-required-message": "Tổ chức của bạn có chính sách mật khẩu yêu cầu xác minh. Vui lòng nhập mật khẩu hiện tại để xác minh rằng nó đáp ứng các yêu cầu.",
+  "verify-current-password": "Xác minh mật khẩu của bạn",
+  "current-password": "Mật khẩu hiện tại",
+  "verify-password": "Xác minh mật khẩu",
+  "password-verified-successfully": "Mật khẩu đã được xác minh thành công",
+  "password-policy-members-status": "Trạng Thái Chính Sách Mật Khẩu Của Thành Viên",
+  "password-policy-compliant": "Tuân Thủ Chính Sách",
+  "password-policy-non-compliant": "Không Tuân Thủ",
+  "password-policy-impacted-members-title": "Thành Viên Không Đáp Ứng Chính Sách Mật Khẩu",
+  "password-policy-impacted-members-description": "Các thành viên này chưa xác minh rằng mật khẩu của họ đáp ứng các yêu cầu chính sách hiện tại. Họ sẽ bị khóa cho đến khi xác minh hoặc thay đổi mật khẩu.",
+  "password-policy-all-members-compliant": "Tất cả thành viên đều đáp ứng các yêu cầu chính sách mật khẩu!",
+  "invalid-password": "Mật khẩu không hợp lệ",
+  "password-does-not-meet-requirements": "Mật khẩu của bạn không đáp ứng yêu cầu của tổ chức. Vui lòng thay đổi mật khẩu.",
+  "verification-failed": "Xác minh thất bại",
+  "no-organization-selected": "Không có tổ chức nào được chọn"
 }

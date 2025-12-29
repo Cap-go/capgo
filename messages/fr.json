@@ -1235,5 +1235,21 @@
   "package-name": "Nom du Paquet",
   "no-native-dependencies": "Aucune Dépendance Native",
   "no-native-dependencies-description": "Ce bundle ne contient aucune information sur les paquets natifs. Les dépendances natives sont capturées lors du téléversement avec la CLI.",
-  "view-on-npm": "Voir sur npm"
+  "view-on-npm": "Voir sur npm",
+  "password-verification-required": "Vérification du mot de passe requise",
+  "password-verification-required-message": "Votre organisation a une politique de mot de passe qui nécessite une vérification. Veuillez entrer votre mot de passe actuel pour vérifier qu'il répond aux exigences.",
+  "verify-current-password": "Vérifier votre mot de passe",
+  "current-password": "Mot de passe actuel",
+  "verify-password": "Vérifier le mot de passe",
+  "password-verified-successfully": "Mot de passe vérifié avec succès",
+  "password-policy-members-status": "Statut de la Politique de Mot de Passe des Membres",
+  "password-policy-compliant": "Conforme à la Politique",
+  "password-policy-non-compliant": "Non Conforme",
+  "password-policy-impacted-members-title": "Membres ne Respectant pas la Politique de Mot de Passe",
+  "password-policy-impacted-members-description": "Ces membres n'ont pas vérifié que leur mot de passe répond aux exigences actuelles de la politique. Ils seront bloqués jusqu'à ce qu'ils vérifient ou changent leur mot de passe.",
+  "password-policy-all-members-compliant": "Tous les membres respectent les exigences de la politique de mot de passe !",
+  "invalid-password": "Mot de passe invalide",
+  "password-does-not-meet-requirements": "Votre mot de passe ne répond pas aux exigences de l'organisation. Veuillez changer votre mot de passe.",
+  "verification-failed": "Échec de la vérification",
+  "no-organization-selected": "Aucune organisation sélectionnée"
 }

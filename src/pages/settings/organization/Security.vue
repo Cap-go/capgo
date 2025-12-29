@@ -21,6 +21,17 @@ interface MemberWithMfaStatus {
   has_2fa: boolean
 }
 
+interface MemberWithPasswordPolicyStatus {
+  uid: string
+  email: string
+  first_name: string | null
+  last_name: string | null
+  image_url: string
+  role: string
+  is_tmp: boolean
+  password_policy_compliant: boolean
+}
+
 const { t } = useI18n()
 const displayStore = useDisplayStore()
 const organizationStore = useOrganizationStore()
@@ -32,9 +43,25 @@ const isSaving = ref(false)
 displayStore.NavTitle = t('security')
 
 const { currentOrganization } = storeToRefs(organizationStore)
+
+// 2FA enforcement state
 const enforcing2fa = ref(false)
 const membersWithMfaStatus = ref<MemberWithMfaStatus[]>([])
 const impactedMembers = ref<MemberWithMfaStatus[]>([])
+
+// Password policy state
+const policyEnabled = ref(false)
+const minLength = ref(10)
+const requireUppercase = ref(true)
+const requireNumber = ref(true)
+const requireSpecial = ref(true)
+
+// Members to be affected when enabling password policy
+const affectedMembers = ref<Array<{ email: string, first_name: string | null, last_name: string | null }>>([])
+
+// Password policy compliance tracking
+const membersWithPasswordPolicyStatus = ref<MemberWithPasswordPolicyStatus[]>([])
+const nonCompliantPasswordMembers = ref<MemberWithPasswordPolicyStatus[]>([])
 
 const hasOrgPerm = computed(() => {
   return organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['super_admin'])
@@ -50,6 +77,19 @@ const nonCompliantMembersCount = computed(() => {
 
 const totalMembersCount = computed(() => {
   return membersWithMfaStatus.value.filter(m => !m.is_tmp).length
+})
+
+// Password policy compliance computed properties
+const passwordCompliantMembersCount = computed(() => {
+  return membersWithPasswordPolicyStatus.value.filter(m => m.password_policy_compliant && !m.is_tmp).length
+})
+
+const passwordNonCompliantMembersCount = computed(() => {
+  return membersWithPasswordPolicyStatus.value.filter(m => !m.password_policy_compliant && !m.is_tmp).length
+})
+
+const totalPasswordPolicyMembersCount = computed(() => {
+  return membersWithPasswordPolicyStatus.value.filter(m => !m.is_tmp).length
 })
 
 function acronym(email: string) {
@@ -73,6 +113,25 @@ function acronym(email: string) {
     res = (`${prefix[0]}X`).toUpperCase()
   }
   return res
+}
+
+// Load current password policy settings
+function loadPolicyFromOrg() {
+  const config = currentOrganization.value?.password_policy_config
+  if (config?.enabled) {
+    policyEnabled.value = config.enabled
+    minLength.value = config.min_length ?? 10
+    requireUppercase.value = config.require_uppercase ?? true
+    requireNumber.value = config.require_number ?? true
+    requireSpecial.value = config.require_special ?? true
+  }
+  else {
+    policyEnabled.value = false
+    minLength.value = 10
+    requireUppercase.value = true
+    requireNumber.value = true
+    requireSpecial.value = true
+  }
 }
 
 async function loadData() {
@@ -99,6 +158,12 @@ async function loadData() {
 
     // Load members with their 2FA status
     await loadMembersWithMfaStatus()
+
+    // Load password policy settings
+    loadPolicyFromOrg()
+
+    // Load members with their password policy compliance status
+    await loadMembersWithPasswordPolicyStatus()
   }
   catch (error) {
     console.error('Error loading security settings:', error)
@@ -159,6 +224,73 @@ async function loadMembersWithMfaStatus() {
   }
   catch (error) {
     console.error('Error loading members with MFA status:', error)
+  }
+}
+
+async function loadMembersWithPasswordPolicyStatus() {
+  if (!currentOrganization.value?.gid || !hasOrgPerm.value)
+    return
+
+  // Only load if password policy is enabled
+  const config = currentOrganization.value?.password_policy_config
+  if (!config?.enabled)
+    return
+
+  try {
+    // Get org members
+    const { data: members, error: membersError } = await supabase
+      .rpc('get_org_members', {
+        guild_id: currentOrganization.value.gid,
+      })
+
+    if (membersError) {
+      console.error('Error loading members:', membersError)
+      return
+    }
+
+    // Get password policy compliance status for all members
+    const { data: complianceStatus, error: complianceError } = await supabase
+      .rpc('check_org_members_password_policy', {
+        org_id: currentOrganization.value.gid,
+      })
+
+    if (complianceError) {
+      console.error('Error loading password policy compliance status:', complianceError)
+      // Still continue with members, just mark compliance as unknown
+    }
+
+    // Create a map of user_id to compliance status
+    const complianceMap = new Map<string, { compliant: boolean, first_name: string | null, last_name: string | null }>()
+    if (complianceStatus) {
+      for (const status of complianceStatus) {
+        complianceMap.set(status.user_id, {
+          compliant: status.password_policy_compliant,
+          first_name: status.first_name,
+          last_name: status.last_name,
+        })
+      }
+    }
+
+    // Merge members with password policy compliance status
+    membersWithPasswordPolicyStatus.value = (members || []).map((member) => {
+      const compliance = complianceMap.get(member.uid)
+      return {
+        uid: member.uid,
+        email: member.email,
+        first_name: compliance?.first_name || null,
+        last_name: compliance?.last_name || null,
+        image_url: member.image_url || '',
+        role: member.role,
+        is_tmp: member.is_tmp,
+        password_policy_compliant: compliance?.compliant ?? false,
+      }
+    })
+
+    // Calculate non-compliant members (excluding pending invites)
+    nonCompliantPasswordMembers.value = membersWithPasswordPolicyStatus.value.filter(m => !m.password_policy_compliant && !m.is_tmp)
+  }
+  catch (error) {
+    console.error('Error loading members with password policy status:', error)
   }
 }
 
@@ -249,6 +381,128 @@ async function copyEmailList() {
       ],
     })
     await dialogStore.onDialogDismiss()
+  }
+}
+
+async function copyPasswordPolicyEmailList() {
+  const emails = nonCompliantPasswordMembers.value.map(m => m.email).join(', ')
+  try {
+    await navigator.clipboard.writeText(emails)
+    toast.success(t('copied-to-clipboard'))
+  }
+  catch (err) {
+    console.error('Failed to copy: ', err)
+    dialogStore.openDialog({
+      title: t('cannot-copy'),
+      description: emails,
+      buttons: [
+        {
+          text: t('button-cancel'),
+          role: 'cancel',
+        },
+      ],
+    })
+    await dialogStore.onDialogDismiss()
+  }
+}
+
+// Check impact before enabling password policy
+async function checkPasswordPolicyImpact() {
+  if (!currentOrganization.value)
+    return
+
+  const impact = await organizationStore.checkPasswordPolicyImpact(currentOrganization.value.gid)
+  if (impact) {
+    affectedMembers.value = impact.nonCompliantUsers.map(u => ({
+      email: u.email,
+      first_name: u.first_name,
+      last_name: u.last_name,
+    }))
+  }
+}
+
+// Handle password policy toggle
+async function handlePolicyToggle() {
+  if (!hasOrgPerm.value || !currentOrganization.value) {
+    toast.error(t('no-permission'))
+    policyEnabled.value = !policyEnabled.value // Revert
+    return
+  }
+
+  if (policyEnabled.value) {
+    // Enabling policy - show impact warning
+    await checkPasswordPolicyImpact()
+
+    if (affectedMembers.value.length > 0) {
+      // Show warning dialog
+      dialogStore.openDialog({
+        id: 'password-policy-warning',
+        title: t('enable-password-policy'),
+        description: t('password-policy-impact-warning'),
+        size: 'lg',
+        buttons: [
+          { text: t('button-cancel'), role: 'cancel' },
+          { text: t('enable-policy'), role: 'danger', id: 'confirm' },
+        ],
+      })
+
+      const cancelled = await dialogStore.onDialogDismiss()
+      if (cancelled) {
+        policyEnabled.value = false
+        affectedMembers.value = []
+        return
+      }
+    }
+  }
+
+  await updatePasswordPolicy()
+}
+
+// Update password policy via Supabase SDK directly
+async function updatePasswordPolicy() {
+  if (!currentOrganization.value || !hasOrgPerm.value) {
+    toast.error(t('no-permission'))
+    return
+  }
+
+  isSaving.value = true
+
+  const policyConfig = {
+    enabled: policyEnabled.value,
+    min_length: minLength.value,
+    require_uppercase: requireUppercase.value,
+    require_number: requireNumber.value,
+    require_special: requireSpecial.value,
+  }
+
+  const { error } = await supabase
+    .from('orgs')
+    .update({ password_policy_config: policyConfig })
+    .eq('id', currentOrganization.value.gid)
+
+  isSaving.value = false
+
+  if (error) {
+    toast.error(t('failed-to-update-policy'))
+    console.error('Failed to update password policy:', error)
+    // Reload to revert optimistic updates
+    await organizationStore.fetchOrganizations()
+    loadPolicyFromOrg()
+    return
+  }
+
+  toast.success(t('password-policy-updated'))
+  await organizationStore.fetchOrganizations()
+  affectedMembers.value = []
+
+  // Reload password policy compliance status after policy update
+  await loadMembersWithPasswordPolicyStatus()
+}
+
+// Update policy when settings change (debounced save)
+async function handleSettingChange() {
+  if (policyEnabled.value) {
+    await updatePasswordPolicy()
   }
 }
 
@@ -427,12 +681,213 @@ onMounted(async () => {
             </div>
           </section>
 
+          <!-- Password Policy Section -->
+          <section class="p-6 border rounded-lg border-slate-200 dark:border-slate-700">
+            <h3 class="mb-4 text-lg font-semibold dark:text-white text-slate-800">
+              {{ t('password-policy') }}
+            </h3>
+
+            <p class="mb-4 text-sm text-gray-600 dark:text-gray-400">
+              {{ t('password-policy-description') }}
+            </p>
+
+            <!-- Enable/Disable Toggle -->
+            <div class="flex items-center justify-between p-3 mb-4 rounded-lg bg-gray-50 dark:bg-gray-700/50">
+              <div>
+                <span class="font-medium dark:text-white text-slate-800">{{ t('enforce-password-policy') }}</span>
+                <p class="text-sm text-gray-500 dark:text-gray-400">
+                  {{ t('enforce-password-policy-description') }}
+                </p>
+              </div>
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input
+                  v-model="policyEnabled"
+                  type="checkbox"
+                  :disabled="!hasOrgPerm || isSaving"
+                  class="sr-only peer"
+                  @change="handlePolicyToggle"
+                >
+                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-600 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-500 peer-checked:bg-blue-600 peer-disabled:opacity-50 peer-disabled:cursor-not-allowed" />
+              </label>
+            </div>
+
+            <!-- Policy Configuration (shown when enabled) -->
+            <div v-if="policyEnabled" class="pl-4 space-y-4 border-l-2 border-blue-500">
+              <!-- Minimum Length -->
+              <div class="flex items-center justify-between">
+                <label class="dark:text-white text-slate-800">{{ t('minimum-length') }}</label>
+                <div class="flex items-center space-x-2">
+                  <input
+                    v-model.number="minLength"
+                    type="number"
+                    min="6"
+                    max="128"
+                    :disabled="!hasOrgPerm || isSaving"
+                    class="w-20 px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white disabled:opacity-50"
+                    @change="handleSettingChange"
+                  >
+                  <span class="text-sm text-gray-500 dark:text-gray-400">{{ t('characters') }}</span>
+                </div>
+              </div>
+
+              <!-- Require Uppercase -->
+              <div class="flex items-center justify-between">
+                <label class="dark:text-white text-slate-800">{{ t('require-uppercase') }}</label>
+                <input
+                  v-model="requireUppercase"
+                  type="checkbox"
+                  :disabled="!hasOrgPerm || isSaving"
+                  class="w-5 h-5 text-blue-600 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 dark:bg-gray-700 dark:border-gray-600 disabled:opacity-50"
+                  @change="handleSettingChange"
+                >
+              </div>
+
+              <!-- Require Number -->
+              <div class="flex items-center justify-between">
+                <label class="dark:text-white text-slate-800">{{ t('require-number') }}</label>
+                <input
+                  v-model="requireNumber"
+                  type="checkbox"
+                  :disabled="!hasOrgPerm || isSaving"
+                  class="w-5 h-5 text-blue-600 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 dark:bg-gray-700 dark:border-gray-600 disabled:opacity-50"
+                  @change="handleSettingChange"
+                >
+              </div>
+
+              <!-- Require Special Character -->
+              <div class="flex items-center justify-between">
+                <label class="dark:text-white text-slate-800">{{ t('require-special-character') }}</label>
+                <input
+                  v-model="requireSpecial"
+                  type="checkbox"
+                  :disabled="!hasOrgPerm || isSaving"
+                  class="w-5 h-5 text-blue-600 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 dark:bg-gray-700 dark:border-gray-600 disabled:opacity-50"
+                  @change="handleSettingChange"
+                >
+              </div>
+            </div>
+
+            <!-- Saving Indicator -->
+            <div v-if="isSaving" class="flex items-center mt-4 space-x-2 text-sm text-gray-500 dark:text-gray-400">
+              <Spinner size="w-4 h-4" color="fill-blue-500 text-gray-200" />
+              <span>{{ t('saving') }}...</span>
+            </div>
+          </section>
+
+          <!-- Password Policy Members Status Overview -->
+          <section v-if="hasOrgPerm && policyEnabled" class="p-6 border rounded-lg border-slate-200 dark:border-slate-700">
+            <h3 class="mb-4 text-lg font-semibold dark:text-white text-slate-800">
+              {{ t('password-policy-members-status') }}
+            </h3>
+
+            <!-- Stats cards -->
+            <div class="grid grid-cols-1 gap-4 mb-6 md:grid-cols-3">
+              <div class="p-4 rounded-lg bg-slate-50 dark:bg-slate-700/50">
+                <div class="flex items-center gap-3">
+                  <IconUser class="w-5 h-5 text-slate-500" />
+                  <div>
+                    <p class="text-2xl font-bold dark:text-white text-slate-800">
+                      {{ totalPasswordPolicyMembersCount }}
+                    </p>
+                    <p class="text-sm text-slate-600 dark:text-slate-400">
+                      {{ t('total-members') }}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div class="p-4 rounded-lg bg-green-50 dark:bg-green-900/20">
+                <div class="flex items-center gap-3">
+                  <IconCheck class="w-5 h-5 text-green-600 dark:text-green-400" />
+                  <div>
+                    <p class="text-2xl font-bold text-green-700 dark:text-green-400">
+                      {{ passwordCompliantMembersCount }}
+                    </p>
+                    <p class="text-sm text-green-600 dark:text-green-500">
+                      {{ t('password-policy-compliant') }}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div class="p-4 rounded-lg bg-amber-50 dark:bg-amber-900/20">
+                <div class="flex items-center gap-3">
+                  <IconWarning class="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                  <div>
+                    <p class="text-2xl font-bold text-amber-700 dark:text-amber-400">
+                      {{ passwordNonCompliantMembersCount }}
+                    </p>
+                    <p class="text-sm text-amber-600 dark:text-amber-500">
+                      {{ t('password-policy-non-compliant') }}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Non-compliant Members List (shown if there are non-compliant members) -->
+            <div v-if="nonCompliantPasswordMembers.length > 0" class="p-4 border rounded-lg border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20">
+              <div class="flex flex-col gap-4 mb-4 md:flex-row md:items-center md:justify-between">
+                <div class="flex items-center gap-2">
+                  <IconWarning class="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                  <h4 class="font-semibold text-amber-800 dark:text-amber-200">
+                    {{ t('password-policy-impacted-members-title') }}
+                  </h4>
+                </div>
+                <button
+                  type="button"
+                  class="px-3 py-2 text-xs font-medium text-center border rounded-lg cursor-pointer text-amber-700 dark:text-amber-300 hover:bg-amber-100 focus:ring-4 focus:ring-amber-300 border-amber-400 dark:border-amber-600 dark:hover:bg-amber-800/30 dark:focus:ring-amber-800 focus:outline-hidden"
+                  @click="copyPasswordPolicyEmailList"
+                >
+                  {{ t('copy-email-list') }}
+                </button>
+              </div>
+              <p class="mb-4 text-sm text-amber-700 dark:text-amber-300">
+                {{ t('password-policy-impacted-members-description') }}
+              </p>
+              <ul class="space-y-2">
+                <li v-for="member in nonCompliantPasswordMembers" :key="member.uid" class="flex items-center gap-3 p-2 rounded-lg bg-white/50 dark:bg-slate-800/50">
+                  <img
+                    v-if="member.image_url"
+                    :src="member.image_url"
+                    :alt="`Profile picture for ${member.email}`"
+                    class="w-8 h-8 rounded-full shrink-0"
+                  >
+                  <div v-else class="flex items-center justify-center w-8 h-8 text-sm bg-gray-700 rounded-full shrink-0">
+                    <span class="font-medium text-gray-300">
+                      {{ acronym(member.email) }}
+                    </span>
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <p class="text-sm font-medium truncate text-slate-800 dark:text-white">
+                      <span v-if="member.first_name || member.last_name">
+                        {{ member.first_name }} {{ member.last_name }} -
+                      </span>
+                      {{ member.email }}
+                    </p>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">
+                      {{ member.role.replace('_', ' ') }}
+                    </p>
+                  </div>
+                </li>
+              </ul>
+            </div>
+
+            <!-- All compliant message -->
+            <div v-else-if="totalPasswordPolicyMembersCount > 0" class="p-4 border rounded-lg border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/20">
+              <div class="flex items-center gap-3">
+                <IconCheck class="w-6 h-6 text-green-600 dark:text-green-400" />
+                <p class="font-medium text-green-700 dark:text-green-300">
+                  {{ t('password-policy-all-members-compliant') }}
+                </p>
+              </div>
+            </div>
+          </section>
+
           <!-- Permission notice for non-super-admins -->
           <section v-if="!hasOrgPerm" class="p-4 border rounded-lg border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20">
             <div class="flex items-center gap-3">
               <IconWarning class="w-5 h-5 text-amber-600 dark:text-amber-400" />
               <p class="text-sm text-amber-700 dark:text-amber-300">
-                {{ t('2fa-enforcement-super-admin-only') }}
+                {{ t('security-settings-super-admin-only') }}
               </p>
             </div>
           </section>
@@ -465,10 +920,34 @@ onMounted(async () => {
         </button>
       </div>
     </Teleport>
+
+    <!-- Teleport for Password Policy Warning -->
+    <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.id === 'password-policy-warning'" to="#dialog-v2-content" defer>
+      <div v-if="affectedMembers.length > 0" class="p-4 mt-4 border border-red-200 rounded-lg bg-red-50 dark:border-red-800 dark:bg-red-900/20">
+        <h4 class="mb-3 font-semibold text-red-800 dark:text-red-200">
+          {{ t('users-will-be-locked-out') }} ({{ affectedMembers.length }}):
+        </h4>
+        <ul class="space-y-2 overflow-y-auto max-h-48">
+          <li v-for="member in affectedMembers" :key="member.email" class="flex items-center text-red-700 dark:text-red-300">
+            <span class="w-2 h-2 mr-3 bg-red-500 rounded-full" />
+            <div>
+              <span v-if="member.first_name || member.last_name" class="font-medium">
+                {{ member.first_name }} {{ member.last_name }}
+              </span>
+              <span class="text-sm">{{ member.email }}</span>
+            </div>
+          </li>
+        </ul>
+        <p class="mt-3 text-sm text-red-600 dark:text-red-400">
+          {{ t('users-must-change-password') }}
+        </p>
+      </div>
+    </Teleport>
   </div>
 </template>
 
 <route lang="yaml">
+path: /settings/organization/security
 meta:
   layout: settings
 </route>

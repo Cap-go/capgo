@@ -1227,5 +1227,21 @@
   "package-name": "पैकेज का नाम",
   "no-native-dependencies": "कोई नेटिव निर्भरता नहीं",
   "no-native-dependencies-description": "इस बंडल में कोई नेटिव पैकेज जानकारी नहीं है। CLI के साथ अपलोड करते समय नेटिव निर्भरताएं कैप्चर की जाती हैं।",
-  "view-on-npm": "npm पर देखें"
+  "view-on-npm": "npm पर देखें",
+  "password-verification-required": "पासवर्ड सत्यापन आवश्यक",
+  "password-verification-required-message": "आपके संगठन की पासवर्ड नीति सत्यापन की आवश्यकता है। कृपया यह पुष्टि करने के लिए अपना वर्तमान पासवर्ड दर्ज करें कि यह आवश्यकताओं को पूरा करता है।",
+  "verify-current-password": "अपना पासवर्ड सत्यापित करें",
+  "current-password": "वर्तमान पासवर्ड",
+  "verify-password": "पासवर्ड सत्यापित करें",
+  "password-verified-successfully": "पासवर्ड सफलतापूर्वक सत्यापित",
+  "password-policy-members-status": "सदस्य पासवर्ड नीति स्थिति",
+  "password-policy-compliant": "नीति अनुरूप",
+  "password-policy-non-compliant": "गैर-अनुरूप",
+  "password-policy-impacted-members-title": "पासवर्ड नीति पूर्ण न करने वाले सदस्य",
+  "password-policy-impacted-members-description": "इन सदस्यों ने यह सत्यापित नहीं किया है कि उनका पासवर्ड वर्तमान नीति आवश्यकताओं को पूरा करता है। जब तक वे अपना पासवर्ड सत्यापित या बदल नहीं लेते, वे लॉक आउट रहेंगे।",
+  "password-policy-all-members-compliant": "सभी सदस्य पासवर्ड नीति आवश्यकताओं को पूरा करते हैं!",
+  "invalid-password": "अमान्य पासवर्ड",
+  "password-does-not-meet-requirements": "आपका पासवर्ड संगठन की आवश्यकताओं को पूरा नहीं करता। कृपया अपना पासवर्ड बदलें।",
+  "verification-failed": "सत्यापन विफल",
+  "no-organization-selected": "कोई संगठन चयनित नहीं"
 }
