@@ -20,10 +20,10 @@ export interface PasswordPolicyConfig {
 // Extended organization type with password policy fields (from get_orgs_v7)
 // Once types are regenerated, this can be replaced with the generated type
 export type Organization = ArrayElement<Database['public']['Functions']['get_orgs_v6']['Returns']> & {
-  enforcing_2fa?: boolean
+  'enforcing_2fa'?: boolean
   '2fa_has_access'?: boolean
-  password_policy_config?: PasswordPolicyConfig | null
-  password_has_access?: boolean
+  'password_policy_config'?: PasswordPolicyConfig | null
+  'password_has_access'?: boolean
 }
 export type OrganizationRole = Database['public']['Enums']['user_min_right'] | 'owner'
 export type ExtendedOrganizationMember = Concrete<Merge<ArrayElement<Database['public']['Functions']['get_org_members']['Returns']>, { id: number }>>
