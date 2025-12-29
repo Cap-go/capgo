@@ -18,7 +18,8 @@ export type Database = {
         Row: {
           created_at: string | null
           id: number
-          key: string
+          key: string | null
+          key_hash: string | null
           limited_to_apps: string[] | null
           limited_to_orgs: string[] | null
           mode: Database["public"]["Enums"]["key_mode"]
@@ -29,7 +30,8 @@ export type Database = {
         Insert: {
           created_at?: string | null
           id?: number
-          key: string
+          key?: string | null
+          key_hash?: string | null
           limited_to_apps?: string[] | null
           limited_to_orgs?: string[] | null
           mode: Database["public"]["Enums"]["key_mode"]
@@ -40,7 +42,8 @@ export type Database = {
         Update: {
           created_at?: string | null
           id?: number
-          key?: string
+          key?: string | null
+          key_hash?: string | null
           limited_to_apps?: string[] | null
           limited_to_orgs?: string[] | null
           mode?: Database["public"]["Enums"]["key_mode"]
@@ -1267,6 +1270,7 @@ export type Database = {
           created_at: string | null
           created_by: string
           customer_id: string | null
+          enforce_hashed_api_keys: boolean
           enforcing_2fa: boolean
           id: string
           last_stats_updated_at: string | null
@@ -1280,6 +1284,7 @@ export type Database = {
           created_at?: string | null
           created_by: string
           customer_id?: string | null
+          enforce_hashed_api_keys?: boolean
           enforcing_2fa?: boolean
           id?: string
           last_stats_updated_at?: string | null
@@ -1293,6 +1298,7 @@ export type Database = {
           created_at?: string | null
           created_by?: string
           customer_id?: string | null
+          enforce_hashed_api_keys?: boolean
           enforcing_2fa?: boolean
           id?: string
           last_stats_updated_at?: string | null
@@ -2422,6 +2428,7 @@ export type Database = {
               credit_available: number
               credit_next_expiration: string
               credit_total: number
+              enforce_hashed_api_keys: boolean
               enforcing_2fa: boolean
               gid: string
               is_canceled: boolean
@@ -2448,6 +2455,7 @@ export type Database = {
               credit_available: number
               credit_next_expiration: string
               credit_total: number
+              enforce_hashed_api_keys: boolean
               enforcing_2fa: boolean
               gid: string
               is_canceled: boolean

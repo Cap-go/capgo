@@ -92,10 +92,8 @@ $$;
 
 ALTER FUNCTION "public"."find_apikey_by_value"(text) OWNER TO "postgres";
 
--- Grant permissions
-GRANT EXECUTE ON FUNCTION "public"."find_apikey_by_value"(text) TO "authenticated";
+-- Grant permissions (only service_role - this function is for internal backend use only)
 GRANT EXECUTE ON FUNCTION "public"."find_apikey_by_value"(text) TO "service_role";
-GRANT EXECUTE ON FUNCTION "public"."find_apikey_by_value"(text) TO "anon";
 
 -- ============================================================================
 -- Section 5: Create function to check if org enforces hashed API keys

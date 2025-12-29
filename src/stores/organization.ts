@@ -8,7 +8,7 @@ import { useDashboardAppsStore } from './dashboardApps'
 import { useDisplayStore } from './display'
 import { useMainStore } from './main'
 
-export type Organization = ArrayElement<Database['public']['Functions']['get_orgs_v6']['Returns']>
+export type Organization = ArrayElement<Database['public']['Functions']['get_orgs_v7']['Returns']>
 export type OrganizationRole = Database['public']['Enums']['user_min_right'] | 'owner'
 export type ExtendedOrganizationMember = Concrete<Merge<ArrayElement<Database['public']['Functions']['get_org_members']['Returns']>, { id: number }>>
 export type ExtendedOrganizationMembers = ExtendedOrganizationMember[]
@@ -218,7 +218,7 @@ export const useOrganizationStore = defineStore('organization', () => {
 
     // We have RLS that ensure that we only select rows where we are member or owner
     const { data, error } = await supabase
-      .rpc('get_orgs_v6')
+      .rpc('get_orgs_v7')
 
     if (error) {
       console.error('Cannot get orgs!', error)

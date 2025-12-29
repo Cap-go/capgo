@@ -174,7 +174,7 @@ const filteredAndSortedKeys = computed(() => {
     const query = searchQuery.value.toLowerCase()
     result = result.filter(key =>
       key.name?.toLowerCase().includes(query)
-      || key.key.toLowerCase().includes(query),
+      || key.key?.toLowerCase().includes(query),
     )
   }
 
@@ -438,6 +438,11 @@ async function createApiKey(keyType: 'read' | 'write' | 'all' | 'upload') {
       createdKey = data[0]
     }
 
+    // For hashed keys, clear the key field before adding to the list
+    // (the plainkey was only returned for one-time display)
+    if (isHashed) {
+      createdKey.key = null as any
+    }
     keys.value?.push(createdKey)
     // Fetch org and app names for the new key
     await fetchOrgAndAppNames()
@@ -551,7 +556,7 @@ async function regenrateKey(apikey: Database['public']['Tables']['apikeys']['Row
       .from('apikeys')
       .update({ key: newApiKey })
       .eq('user_id', user.id)
-      .eq('key', apikey.key)
+      .eq('id', apikey.id)
 
     if (error || typeof newApiKey !== 'string')
       throw error
@@ -568,13 +573,13 @@ async function deleteKey(key: Database['public']['Tables']['apikeys']['Row']) {
   const { error } = await supabase
     .from('apikeys')
     .delete()
-    .eq('key', key.key)
+    .eq('id', key.id)
 
   if (error)
     throw error
 
   toast.success(t('removed-apikey'))
-  keys.value = keys.value?.filter(filterKey => filterKey.key !== key.key)
+  keys.value = keys.value?.filter(filterKey => filterKey.id !== key.id)
 }
 
 async function changeName(key: Database['public']['Tables']['apikeys']['Row']) {

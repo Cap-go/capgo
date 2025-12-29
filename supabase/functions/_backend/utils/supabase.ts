@@ -53,6 +53,7 @@ export function supabaseWithAuth(c: Context, auth: AuthInfo) {
     return supabaseClient(c, auth.jwt)
   }
   else if (auth.authType === 'apikey' && auth.apikey) {
+    // supabaseApikey now handles the fallback to capgkey for hashed keys
     return supabaseApikey(c, auth.apikey.key)
   }
   else {
@@ -83,15 +84,20 @@ export function supabaseAdmin(c: Context) {
   return createClient<Database>(getEnv(c, 'SUPABASE_URL'), getEnv(c, 'SUPABASE_SERVICE_ROLE_KEY'), options)
 }
 
-export function supabaseApikey(c: Context, apikey: string) {
-  cloudlog({ requestId: c.get('requestId'), message: 'supabaseApikey', apikey })
+export function supabaseApikey(c: Context, apikey: string | null | undefined) {
+  // For hashed keys, the key column is null, so we use the capgkey from the request header
+  const effectiveApikey = apikey ?? c.get('capgkey')
+  if (!effectiveApikey) {
+    throw new Error('No API key available for authentication')
+  }
+  cloudlog({ requestId: c.get('requestId'), message: 'supabaseApikey', apikeyPrefix: effectiveApikey.substring(0, 8) })
   return createClient<Database>(getEnv(c, 'SUPABASE_URL'), getEnv(c, 'SUPABASE_ANON_KEY'), {
     auth: {
       persistSession: false,
     },
     global: {
       headers: {
-        capgkey: apikey,
+        capgkey: effectiveApikey,
       },
     },
   })
@@ -217,16 +223,23 @@ export async function hasAppRight(c: Context, appId: string | undefined, userid:
   return data
 }
 
-export async function hasAppRightApikey(c: Context<MiddlewareKeyVariables, any, object>, appId: string | undefined, userid: string, right: Database['public']['Enums']['user_min_right'], apikey: string) {
+export async function hasAppRightApikey(c: Context<MiddlewareKeyVariables, any, object>, appId: string | undefined, userid: string, right: Database['public']['Enums']['user_min_right'], apikey: string | null | undefined) {
   if (!appId) {
     cloudlog({ requestId: c.get('requestId'), message: 'hasAppRightApikey - appId is undefined' })
     return false
   }
 
-  cloudlog({ requestId: c.get('requestId'), message: 'hasAppRightApikey - calling RPC', appId, userid, right, apikeyPrefix: apikey?.substring(0, 15) })
+  // For hashed keys, use the capgkey from the request header
+  const effectiveApikey = apikey ?? c.get('capgkey')
+  if (!effectiveApikey) {
+    cloudlog({ requestId: c.get('requestId'), message: 'hasAppRightApikey - no API key available' })
+    return false
+  }
+
+  cloudlog({ requestId: c.get('requestId'), message: 'hasAppRightApikey - calling RPC', appId, userid, right, apikeyPrefix: effectiveApikey?.substring(0, 15) })
 
   const { data, error } = await supabaseAdmin(c)
-    .rpc('has_app_right_apikey', { appid: appId, right, userid, apikey })
+    .rpc('has_app_right_apikey', { appid: appId, right, userid, apikey: effectiveApikey })
 
   cloudlog({ requestId: c.get('requestId'), message: 'hasAppRightApikey - RPC result', data, hasError: !!error, error })
 
@@ -236,7 +249,7 @@ export async function hasAppRightApikey(c: Context<MiddlewareKeyVariables, any, 
   }
 
   if (!data) {
-    cloudlog({ requestId: c.get('requestId'), message: 'hasAppRightApikey - permission denied', appId, userid, right, apikeyPrefix: apikey?.substring(0, 15) })
+    cloudlog({ requestId: c.get('requestId'), message: 'hasAppRightApikey - permission denied', appId, userid, right, apikeyPrefix: effectiveApikey?.substring(0, 15) })
   }
 
   return data
@@ -267,7 +280,7 @@ export async function hasOrgRight(c: Context, orgId: string, userId: string, rig
   return userRight.data
 }
 
-export async function hasOrgRightApikey(c: Context, orgId: string, userId: string, right: Database['public']['Enums']['user_min_right'], apikey: string) {
+export async function hasOrgRightApikey(c: Context, orgId: string, userId: string, right: Database['public']['Enums']['user_min_right'], apikey: string | null | undefined) {
   const userRight = await supabaseApikey(c, apikey).rpc('check_min_rights', {
     min_right: right,
     org_id: orgId,
@@ -1117,7 +1130,7 @@ export async function checkKey(c: Context, authorization: string | undefined, su
       return hashedKey
     }
 
-    cloudlog({ requestId: c.get('requestId'), message: 'Invalid apikey', authorization, allowed, plainError, hashError })
+    cloudlog({ requestId: c.get('requestId'), message: 'Invalid apikey', authorizationPrefix: authorization?.substring(0, 8), allowed, plainError, hashError })
     return null
   }
   catch (error) {

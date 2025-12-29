@@ -39,7 +39,7 @@ app.post('/', middlewareKey(['all']), async (c) => {
 
   // Use anon client with capgkey header; RLS enforces ownership via user_id
   // For hashed keys, we need to use the parent key for authentication
-  const supabase = supabaseApikey(c, key.key ?? c.get('capgkey'))
+  const supabase = supabaseApikey(c, key.key)
   const newData: Database['public']['Tables']['apikeys']['Insert'] = {
     user_id: key.user_id,
     // For hashed keys: key is null, key_hash stores the hash
