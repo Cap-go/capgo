@@ -30,18 +30,33 @@ ADD VALUE IF NOT EXISTS 'build_time';
 
 -- Build logs - BILLING ONLY: tracks build time for charging orgs
 -- Platform multipliers: android=1x, ios=2x
-CREATE TABLE IF NOT EXISTS "public"."build_logs" (
-    "id" "uuid" DEFAULT "extensions"."uuid_generate_v4"() NOT NULL,
-    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "org_id" "uuid" NOT NULL,
-    "user_id" "uuid",
-    "build_id" character varying NOT NULL,
-    "platform" character varying NOT NULL,
-    "billable_seconds" bigint NOT NULL,
-    "build_time_unit" bigint NOT NULL,
-    CONSTRAINT "build_logs_billable_seconds_check" CHECK (("billable_seconds" >= 0)),
-    CONSTRAINT "build_logs_build_time_unit_check" CHECK (("build_time_unit" >= 0)),
-    CONSTRAINT "build_logs_platform_check" CHECK ((("platform")::"text" = ANY ((ARRAY['ios'::character varying, 'android'::character varying])::"text"[])))
+CREATE TABLE IF NOT EXISTS public.build_logs (
+    id uuid DEFAULT extensions.uuid_generate_v4() NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    org_id uuid NOT NULL,
+    user_id uuid,
+    build_id character varying NOT NULL,
+    platform character varying NOT NULL,
+    billable_seconds bigint NOT NULL,
+    build_time_unit bigint NOT NULL,
+    CONSTRAINT build_logs_billable_seconds_check CHECK (
+        (billable_seconds >= 0)
+    ),
+    CONSTRAINT build_logs_build_time_unit_check CHECK (
+        (build_time_unit >= 0)
+    ),
+    CONSTRAINT build_logs_platform_check CHECK (
+        (
+            (platform)::text
+            = ANY(
+                (
+                    ARRAY[
+                        'ios'::character varying, 'android'::character varying
+                    ]
+                )::text []
+            )
+        )
+    )
 );
 
 CREATE INDEX idx_build_logs_org_created ON public.build_logs (
@@ -133,8 +148,8 @@ CHECK (true);
 -- Build requests - stores native build jobs requested via API
 CREATE TABLE IF NOT EXISTS public.build_requests (
     id uuid DEFAULT extensions.uuid_generate_v4() PRIMARY KEY,
-    created_at timestamptz DEFAULT now() NOT NULL,
-    updated_at timestamptz DEFAULT now() NOT NULL,
+    created_at timestamptz DEFAULT NOW() NOT NULL,
+    updated_at timestamptz DEFAULT NOW() NOT NULL,
     app_id character varying NOT NULL REFERENCES public.apps (
         app_id
     ) ON DELETE CASCADE,
@@ -186,7 +201,7 @@ CHECK (true);
 
 CREATE TRIGGER handle_build_requests_updated_at BEFORE
 UPDATE ON public.build_requests FOR EACH ROW
-EXECUTE FUNCTION moddatetime('updated_at');
+EXECUTE FUNCTION MODDATETIME('updated_at');
 
 -- Note: No daily aggregation needed - just query build_logs for billing
 -- Note: builder.capgo.app manages its own R2 storage; this table only stores metadata
