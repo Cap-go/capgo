@@ -1249,5 +1249,12 @@
   "manifest": "Manifest",
   "no-manifest-bundle": "No manifest",
   "no-zip-bundle": "No zip bundle",
-  "of": "of"
+  "of": "of",
+  "dependencies": "Dependencies",
+  "native-dependencies": "Native Dependencies",
+  "native-dependencies-description": "Native packages and their versions included in this bundle",
+  "package-name": "Package Name",
+  "no-native-dependencies": "No Native Dependencies",
+  "no-native-dependencies-description": "This bundle does not contain any native package information. Native dependencies are captured when uploading with the CLI.",
+  "view-on-npm": "View on npm"
 }
