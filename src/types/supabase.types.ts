@@ -1342,6 +1342,7 @@ export type Database = {
           created_at: string | null
           created_by: string
           customer_id: string | null
+          email_preferences: Json
           enforcing_2fa: boolean
           id: string
           last_stats_updated_at: string | null
@@ -1349,6 +1350,7 @@ export type Database = {
           management_email: string
           max_apikey_expiration_days: number | null
           name: string
+          password_policy_config: Json | null
           require_apikey_expiration: boolean
           stats_updated_at: string | null
           updated_at: string | null
@@ -1357,6 +1359,7 @@ export type Database = {
           created_at?: string | null
           created_by: string
           customer_id?: string | null
+          email_preferences?: Json
           enforcing_2fa?: boolean
           id?: string
           last_stats_updated_at?: string | null
@@ -1364,6 +1367,7 @@ export type Database = {
           management_email: string
           max_apikey_expiration_days?: number | null
           name: string
+          password_policy_config?: Json | null
           require_apikey_expiration?: boolean
           stats_updated_at?: string | null
           updated_at?: string | null
@@ -1372,6 +1376,7 @@ export type Database = {
           created_at?: string | null
           created_by?: string
           customer_id?: string | null
+          email_preferences?: Json
           enforcing_2fa?: boolean
           id?: string
           last_stats_updated_at?: string | null
@@ -1379,6 +1384,7 @@ export type Database = {
           management_email?: string
           max_apikey_expiration_days?: number | null
           name?: string
+          password_policy_config?: Json | null
           require_apikey_expiration?: boolean
           stats_updated_at?: string | null
           updated_at?: string | null
@@ -1871,12 +1877,51 @@ export type Database = {
           },
         ]
       }
+      user_password_compliance: {
+        Row: {
+          created_at: string
+          id: number
+          org_id: string
+          policy_hash: string
+          updated_at: string
+          user_id: string
+          validated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: number
+          org_id: string
+          policy_hash: string
+          updated_at?: string
+          user_id: string
+          validated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: number
+          org_id?: string
+          policy_hash?: string
+          updated_at?: string
+          user_id?: string
+          validated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_password_compliance_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       users: {
         Row: {
           ban_time: string | null
           country: string | null
           created_at: string | null
           email: string
+          email_preferences: Json
           enable_notifications: boolean
           first_name: string | null
           id: string
@@ -1890,6 +1935,7 @@ export type Database = {
           country?: string | null
           created_at?: string | null
           email: string
+          email_preferences?: Json
           enable_notifications?: boolean
           first_name?: string | null
           id: string
@@ -1903,6 +1949,7 @@ export type Database = {
           country?: string | null
           created_at?: string | null
           email?: string
+          email_preferences?: Json
           enable_notifications?: boolean
           first_name?: string | null
           id?: string
@@ -2180,6 +2227,16 @@ export type Database = {
         Args: { org_id: string }
         Returns: {
           "2fa_enabled": boolean
+          user_id: string
+        }[]
+      }
+      check_org_members_password_policy: {
+        Args: { org_id: string }
+        Returns: {
+          email: string
+          first_name: string
+          last_name: string
+          password_policy_compliant: boolean
           user_id: string
         }[]
       }
@@ -2570,6 +2627,8 @@ export type Database = {
               management_email: string
               name: string
               next_stats_update_at: string
+              password_has_access: boolean
+              password_policy_config: Json
               paying: boolean
               role: string
               stats_updated_at: string
@@ -2596,6 +2655,8 @@ export type Database = {
               management_email: string
               name: string
               next_stats_update_at: string
+              password_has_access: boolean
+              password_policy_config: Json
               paying: boolean
               role: string
               stats_updated_at: string
@@ -2604,6 +2665,10 @@ export type Database = {
               trial_left: number
             }[]
           }
+      get_password_policy_hash: {
+        Args: { policy_config: Json }
+        Returns: string
+      }
       get_plan_usage_percent_detailed:
         | {
             Args: { orgid: string }
@@ -2919,6 +2984,14 @@ export type Database = {
         Args: { org_id: string; user_id: string }
         Returns: boolean
       }
+      reject_access_due_to_2fa_for_app: {
+        Args: { app_id: string }
+        Returns: boolean
+      }
+      reject_access_due_to_password_policy: {
+        Args: { org_id: string; user_id: string }
+        Returns: boolean
+      }
       remove_old_jobs: { Args: never; Returns: undefined }
       rescind_invitation: {
         Args: { email: string; org_id: string }
@@ -3011,6 +3084,10 @@ export type Database = {
         Args: { p_app_id: string; p_size: number; p_version_id: number }
         Returns: boolean
       }
+      user_meets_password_policy: {
+        Args: { org_id: string; user_id: string }
+        Returns: boolean
+      }
       verify_mfa: { Args: never; Returns: boolean }
     }
     Enums: {
@@ -3067,7 +3144,9 @@ export type Database = {
         | "disableAutoUpdateMetadata"
         | "disableAutoUpdateUnderNative"
         | "disableDevBuild"
+        | "disableProdBuild"
         | "disableEmulator"
+        | "disableDevice"
         | "cannotGetBundle"
         | "checksum_fail"
         | "NoChannelOrOverride"
@@ -3088,8 +3167,6 @@ export type Database = {
         | "download_manifest_brotli_fail"
         | "backend_refusal"
         | "download_0"
-        | "disableProdBuild"
-        | "disableDevice"
       stripe_status:
         | "created"
         | "succeeded"
@@ -3323,7 +3400,9 @@ export const Constants = {
         "disableAutoUpdateMetadata",
         "disableAutoUpdateUnderNative",
         "disableDevBuild",
+        "disableProdBuild",
         "disableEmulator",
+        "disableDevice",
         "cannotGetBundle",
         "checksum_fail",
         "NoChannelOrOverride",
@@ -3344,8 +3423,6 @@ export const Constants = {
         "download_manifest_brotli_fail",
         "backend_refusal",
         "download_0",
-        "disableProdBuild",
-        "disableDevice",
       ],
       stripe_status: [
         "created",

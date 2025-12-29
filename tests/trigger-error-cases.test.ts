@@ -265,7 +265,9 @@ describe('[POST] /triggers/on_app_create - Error Cases', () => {
 })
 
 describe('[POST] /triggers/on_version_create - Error Cases', () => {
-  it('should return 400 when organization fetching fails', async () => {
+  it('should return 200 for nonexistent app (trigger logs error but does not fail)', async () => {
+    // Triggers are designed to be fire-and-forget - they log errors but return success
+    // The update to apps table will simply update 0 rows when app doesn't exist
     const response = await fetch(`${BASE_URL}/triggers/on_version_create`, {
       method: 'POST',
       headers: triggerHeaders,
@@ -276,13 +278,12 @@ describe('[POST] /triggers/on_version_create - Error Cases', () => {
           id: randomUUID(),
           app_id: 'nonexistent.app',
           name: '1.0.0',
+          owner_org: randomUUID(),
         },
       }),
     })
 
-    expect(response.status).toBe(400)
-    const data = await response.json() as { error: string }
-    expect(data.error).toBe('error_fetching_organization')
+    expect(response.status).toBe(200)
   })
 
   it('should return 400 when version creation fails', async () => {

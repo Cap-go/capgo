@@ -5,65 +5,90 @@
 -- TABLE: webhooks
 -- Stores webhook endpoint configurations per organization
 -- =====================================================
-CREATE TABLE IF NOT EXISTS "public"."webhooks" (
-  "id" UUID DEFAULT gen_random_uuid() NOT NULL,
-  "org_id" UUID NOT NULL,
-  "name" TEXT NOT NULL,
-  "url" TEXT NOT NULL,
-  "secret" TEXT DEFAULT 'whsec_' || replace(gen_random_uuid()::text, '-', '') NOT NULL,  -- Secret for HMAC-SHA256 signing
-  "enabled" BOOLEAN DEFAULT true NOT NULL,
-  "events" TEXT[] NOT NULL,  -- ['apps', 'app_versions', 'channels', 'org_users', 'orgs']
-  "created_at" TIMESTAMPTZ DEFAULT now() NOT NULL,
-  "updated_at" TIMESTAMPTZ DEFAULT now() NOT NULL,
-  "created_by" UUID,
-  CONSTRAINT "webhooks_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "webhooks_org_id_fkey" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE CASCADE,
-  CONSTRAINT "webhooks_created_by_fkey" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE SET NULL
+CREATE TABLE IF NOT EXISTS public.webhooks (
+    id UUID DEFAULT gen_random_uuid() NOT NULL,
+    org_id UUID NOT NULL,
+    name TEXT NOT NULL,
+    url TEXT NOT NULL,
+    -- Secret for HMAC-SHA256 signing
+    secret TEXT DEFAULT 'whsec_'
+    || replace(gen_random_uuid()::TEXT, '-', '') NOT NULL,
+    enabled BOOLEAN DEFAULT true NOT NULL,
+    -- ['apps', 'app_versions', 'channels', 'org_users', 'orgs']
+    events TEXT [] NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT now() NOT NULL,
+    created_by UUID,
+    CONSTRAINT webhooks_pkey PRIMARY KEY (id),
+    CONSTRAINT webhooks_org_id_fkey FOREIGN KEY (
+        org_id
+    ) REFERENCES public.orgs (id) ON DELETE CASCADE,
+    CONSTRAINT webhooks_created_by_fkey FOREIGN KEY (
+        created_by
+    ) REFERENCES public.users (id) ON DELETE SET NULL
 );
 
 -- Add comment for secret column
-COMMENT ON COLUMN "public"."webhooks"."secret" IS 'Secret key for HMAC-SHA256 signature verification. Format: whsec_{32-char-hex}';
+COMMENT ON COLUMN public.webhooks.secret IS 'Secret key for HMAC-SHA256 signature verification. Format: whsec_{32-char-hex}';
 
 -- Indexes for efficient org lookups
-CREATE INDEX IF NOT EXISTS "webhooks_org_id_idx" ON "public"."webhooks" ("org_id");
-CREATE INDEX IF NOT EXISTS "webhooks_enabled_idx" ON "public"."webhooks" ("org_id", "enabled") WHERE "enabled" = true;
+CREATE INDEX IF NOT EXISTS webhooks_org_id_idx ON public.webhooks (
+    org_id
+);
+CREATE INDEX IF NOT EXISTS webhooks_enabled_idx ON public.webhooks (
+    org_id, enabled
+) WHERE enabled
+= true;
 
 -- =====================================================
 -- TABLE: webhook_deliveries
 -- Stores delivery history for each webhook call (Stripe-like experience)
 -- =====================================================
-CREATE TABLE IF NOT EXISTS "public"."webhook_deliveries" (
-  "id" UUID DEFAULT gen_random_uuid() NOT NULL,
-  "webhook_id" UUID NOT NULL,
-  "org_id" UUID NOT NULL,
-  "audit_log_id" BIGINT,  -- Reference to audit_logs (nullable for test events)
-  "event_type" TEXT NOT NULL,  -- table_name.operation (e.g., 'app_versions.INSERT')
-  "status" TEXT NOT NULL DEFAULT 'pending',  -- pending, success, failed
-  "request_payload" JSONB NOT NULL,
-  "response_status" INTEGER,
-  "response_body" TEXT,
-  "response_headers" JSONB,
-  "attempt_count" INTEGER DEFAULT 0 NOT NULL,
-  "max_attempts" INTEGER DEFAULT 3 NOT NULL,
-  "next_retry_at" TIMESTAMPTZ,
-  "created_at" TIMESTAMPTZ DEFAULT now() NOT NULL,
-  "completed_at" TIMESTAMPTZ,
-  "duration_ms" INTEGER,
-  CONSTRAINT "webhook_deliveries_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "webhook_deliveries_webhook_id_fkey" FOREIGN KEY ("webhook_id") REFERENCES "public"."webhooks"("id") ON DELETE CASCADE,
-  CONSTRAINT "webhook_deliveries_org_id_fkey" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE CASCADE
+CREATE TABLE IF NOT EXISTS public.webhook_deliveries (
+    id UUID DEFAULT gen_random_uuid() NOT NULL,
+    webhook_id UUID NOT NULL,
+    org_id UUID NOT NULL,
+    -- Reference to audit_logs (nullable for test events)
+    audit_log_id BIGINT,
+    -- table_name.operation (e.g., 'app_versions.INSERT')
+    event_type TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',  -- pending, success, failed
+    request_payload JSONB NOT NULL,
+    response_status INTEGER,
+    response_body TEXT,
+    response_headers JSONB,
+    attempt_count INTEGER DEFAULT 0 NOT NULL,
+    max_attempts INTEGER DEFAULT 3 NOT NULL,
+    next_retry_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
+    completed_at TIMESTAMPTZ,
+    duration_ms INTEGER,
+    CONSTRAINT webhook_deliveries_pkey PRIMARY KEY (id),
+    CONSTRAINT webhook_deliveries_webhook_id_fkey FOREIGN KEY (
+        webhook_id
+    ) REFERENCES public.webhooks (id) ON DELETE CASCADE,
+    CONSTRAINT webhook_deliveries_org_id_fkey FOREIGN KEY (
+        org_id
+    ) REFERENCES public.orgs (id) ON DELETE CASCADE
 );
 
 -- Indexes for efficient queries
-CREATE INDEX IF NOT EXISTS "webhook_deliveries_webhook_id_idx" ON "public"."webhook_deliveries" ("webhook_id");
-CREATE INDEX IF NOT EXISTS "webhook_deliveries_org_id_created_idx" ON "public"."webhook_deliveries" ("org_id", "created_at" DESC);
-CREATE INDEX IF NOT EXISTS "webhook_deliveries_pending_retry_idx" ON "public"."webhook_deliveries" ("status", "next_retry_at") WHERE "status" = 'pending';
+CREATE INDEX IF NOT EXISTS webhook_deliveries_webhook_id_idx ON public.webhook_deliveries (
+    webhook_id
+);
+CREATE INDEX IF NOT EXISTS webhook_deliveries_org_id_created_idx ON public.webhook_deliveries (
+    org_id, created_at DESC
+);
+CREATE INDEX IF NOT EXISTS webhook_deliveries_pending_retry_idx ON public.webhook_deliveries (
+    status, next_retry_at
+) WHERE status
+= 'pending';
 
 -- =====================================================
 -- Enable RLS
 -- =====================================================
-ALTER TABLE "public"."webhooks" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE "public"."webhook_deliveries" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.webhooks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.webhook_deliveries ENABLE ROW LEVEL SECURITY;
 
 -- =====================================================
 -- RLS Policies for webhooks table
@@ -71,72 +96,72 @@ ALTER TABLE "public"."webhook_deliveries" ENABLE ROW LEVEL SECURITY;
 
 -- Allow org members to view webhooks
 CREATE POLICY "Allow org members to select webhooks"
-  ON "public"."webhooks"
-  FOR SELECT
-  TO "authenticated"
-  USING (
-    "public"."check_min_rights"(
-      'read'::"public"."user_min_right",
-      (SELECT "public"."get_identity"()),
-      "org_id",
-      NULL::character varying,
-      NULL::bigint
+ON public.webhooks
+FOR SELECT
+TO authenticated
+USING (
+    public.check_min_rights(
+        'read'::public.user_min_right,
+        (SELECT public.get_identity()),
+        org_id,
+        null::CHARACTER VARYING,
+        null::BIGINT
     )
-  );
+);
 
 -- Only admin/super_admin can create webhooks
 CREATE POLICY "Allow admin to insert webhooks"
-  ON "public"."webhooks"
-  FOR INSERT
-  TO "authenticated"
-  WITH CHECK (
-    "public"."check_min_rights"(
-      'admin'::"public"."user_min_right",
-      (SELECT "public"."get_identity"()),
-      "org_id",
-      NULL::character varying,
-      NULL::bigint
+ON public.webhooks
+FOR INSERT
+TO authenticated
+WITH CHECK (
+    public.check_min_rights(
+        'admin'::public.user_min_right,
+        (SELECT public.get_identity()),
+        org_id,
+        null::CHARACTER VARYING,
+        null::BIGINT
     )
-  );
+);
 
 -- Only admin/super_admin can update webhooks
 CREATE POLICY "Allow admin to update webhooks"
-  ON "public"."webhooks"
-  FOR UPDATE
-  TO "authenticated"
-  USING (
-    "public"."check_min_rights"(
-      'admin'::"public"."user_min_right",
-      (SELECT "public"."get_identity"()),
-      "org_id",
-      NULL::character varying,
-      NULL::bigint
+ON public.webhooks
+FOR UPDATE
+TO authenticated
+USING (
+    public.check_min_rights(
+        'admin'::public.user_min_right,
+        (SELECT public.get_identity()),
+        org_id,
+        null::CHARACTER VARYING,
+        null::BIGINT
     )
-  )
-  WITH CHECK (
-    "public"."check_min_rights"(
-      'admin'::"public"."user_min_right",
-      (SELECT "public"."get_identity"()),
-      "org_id",
-      NULL::character varying,
-      NULL::bigint
+)
+WITH CHECK (
+    public.check_min_rights(
+        'admin'::public.user_min_right,
+        (SELECT public.get_identity()),
+        org_id,
+        null::CHARACTER VARYING,
+        null::BIGINT
     )
-  );
+);
 
 -- Only admin/super_admin can delete webhooks
 CREATE POLICY "Allow admin to delete webhooks"
-  ON "public"."webhooks"
-  FOR DELETE
-  TO "authenticated"
-  USING (
-    "public"."check_min_rights"(
-      'admin'::"public"."user_min_right",
-      (SELECT "public"."get_identity"()),
-      "org_id",
-      NULL::character varying,
-      NULL::bigint
+ON public.webhooks
+FOR DELETE
+TO authenticated
+USING (
+    public.check_min_rights(
+        'admin'::public.user_min_right,
+        (SELECT public.get_identity()),
+        org_id,
+        null::CHARACTER VARYING,
+        null::BIGINT
     )
-  );
+);
 
 -- =====================================================
 -- RLS Policies for webhook_deliveries table
@@ -144,48 +169,48 @@ CREATE POLICY "Allow admin to delete webhooks"
 
 -- Allow org members to view delivery logs
 CREATE POLICY "Allow org members to select webhook_deliveries"
-  ON "public"."webhook_deliveries"
-  FOR SELECT
-  TO "authenticated"
-  USING (
-    "public"."check_min_rights"(
-      'read'::"public"."user_min_right",
-      (SELECT "public"."get_identity"()),
-      "org_id",
-      NULL::character varying,
-      NULL::bigint
+ON public.webhook_deliveries
+FOR SELECT
+TO authenticated
+USING (
+    public.check_min_rights(
+        'read'::public.user_min_right,
+        (SELECT public.get_identity()),
+        org_id,
+        null::CHARACTER VARYING,
+        null::BIGINT
     )
-  );
+);
 
 -- Only admin/super_admin can insert (for test events via API)
 CREATE POLICY "Allow admin to insert webhook_deliveries"
-  ON "public"."webhook_deliveries"
-  FOR INSERT
-  TO "authenticated"
-  WITH CHECK (
-    "public"."check_min_rights"(
-      'admin'::"public"."user_min_right",
-      (SELECT "public"."get_identity"()),
-      "org_id",
-      NULL::character varying,
-      NULL::bigint
+ON public.webhook_deliveries
+FOR INSERT
+TO authenticated
+WITH CHECK (
+    public.check_min_rights(
+        'admin'::public.user_min_right,
+        (SELECT public.get_identity()),
+        org_id,
+        null::CHARACTER VARYING,
+        null::BIGINT
     )
-  );
+);
 
 -- Only admin/super_admin can update (for retry functionality)
 CREATE POLICY "Allow admin to update webhook_deliveries"
-  ON "public"."webhook_deliveries"
-  FOR UPDATE
-  TO "authenticated"
-  USING (
-    "public"."check_min_rights"(
-      'admin'::"public"."user_min_right",
-      (SELECT "public"."get_identity"()),
-      "org_id",
-      NULL::character varying,
-      NULL::bigint
+ON public.webhook_deliveries
+FOR UPDATE
+TO authenticated
+USING (
+    public.check_min_rights(
+        'admin'::public.user_min_right,
+        (SELECT public.get_identity()),
+        org_id,
+        null::CHARACTER VARYING,
+        null::BIGINT
     )
-  );
+);
 
 -- =====================================================
 -- Service role policies (for triggers and background jobs)
@@ -193,19 +218,19 @@ CREATE POLICY "Allow admin to update webhook_deliveries"
 
 -- Allow service role full access to webhooks
 CREATE POLICY "Allow service_role full access to webhooks"
-  ON "public"."webhooks"
-  FOR ALL
-  TO "service_role"
-  USING (true)
-  WITH CHECK (true);
+ON public.webhooks
+FOR ALL
+TO service_role
+USING (true)
+WITH CHECK (true);
 
 -- Allow service role full access to webhook_deliveries
 CREATE POLICY "Allow service_role full access to webhook_deliveries"
-  ON "public"."webhook_deliveries"
-  FOR ALL
-  TO "service_role"
-  USING (true)
-  WITH CHECK (true);
+ON public.webhook_deliveries
+FOR ALL
+TO service_role
+USING (true)
+WITH CHECK (true);
 
 -- =====================================================
 -- PGMQ Queue for webhook delivery
@@ -216,7 +241,7 @@ SELECT pgmq.create('webhook_delivery');
 -- =====================================================
 -- Trigger function: Queue webhook on audit_log INSERT
 -- =====================================================
-CREATE OR REPLACE FUNCTION "public"."trigger_webhook_on_audit_log"()
+CREATE OR REPLACE FUNCTION public.trigger_webhook_on_audit_log()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -270,7 +295,7 @@ $$;
 -- =====================================================
 -- Updated_at trigger for webhooks
 -- =====================================================
-CREATE OR REPLACE FUNCTION "public"."update_webhook_updated_at"()
+CREATE OR REPLACE FUNCTION public.update_webhook_updated_at()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 SET search_path = ''
@@ -281,16 +306,16 @@ BEGIN
 END;
 $$;
 
-CREATE TRIGGER "update_webhooks_updated_at"
-BEFORE UPDATE ON "public"."webhooks"
+CREATE TRIGGER update_webhooks_updated_at
+BEFORE UPDATE ON public.webhooks
 FOR EACH ROW
-EXECUTE FUNCTION "public"."update_webhook_updated_at"();
+EXECUTE FUNCTION public.update_webhook_updated_at();
 
 -- =====================================================
 -- Cleanup function for old webhook deliveries (7 days)
 -- =====================================================
-CREATE OR REPLACE FUNCTION "public"."cleanup_webhook_deliveries"()
-RETURNS void
+CREATE OR REPLACE FUNCTION public.cleanup_webhook_deliveries()
+RETURNS VOID
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
@@ -306,27 +331,27 @@ $$;
 -- =====================================================
 
 -- Webhooks table grants
-GRANT ALL ON TABLE "public"."webhooks" TO "anon";
-GRANT ALL ON TABLE "public"."webhooks" TO "authenticated";
-GRANT ALL ON TABLE "public"."webhooks" TO "service_role";
+GRANT ALL ON TABLE public.webhooks TO anon;
+GRANT ALL ON TABLE public.webhooks TO authenticated;
+GRANT ALL ON TABLE public.webhooks TO service_role;
 
 -- Webhook deliveries table grants
-GRANT ALL ON TABLE "public"."webhook_deliveries" TO "anon";
-GRANT ALL ON TABLE "public"."webhook_deliveries" TO "authenticated";
-GRANT ALL ON TABLE "public"."webhook_deliveries" TO "service_role";
+GRANT ALL ON TABLE public.webhook_deliveries TO anon;
+GRANT ALL ON TABLE public.webhook_deliveries TO authenticated;
+GRANT ALL ON TABLE public.webhook_deliveries TO service_role;
 
 -- Function grants
-GRANT ALL ON FUNCTION "public"."trigger_webhook_on_audit_log"() TO "service_role";
-GRANT ALL ON FUNCTION "public"."update_webhook_updated_at"() TO "service_role";
-GRANT ALL ON FUNCTION "public"."cleanup_webhook_deliveries"() TO "service_role";
+GRANT ALL ON FUNCTION public.trigger_webhook_on_audit_log() TO service_role;
+GRANT ALL ON FUNCTION public.update_webhook_updated_at() TO service_role;
+GRANT ALL ON FUNCTION public.cleanup_webhook_deliveries() TO service_role;
 
 -- =====================================================
 -- Add webhook_dispatcher and webhook_delivery to CRON processing
 -- Update process_all_cron_tasks to include webhook queues
 -- =====================================================
-CREATE OR REPLACE FUNCTION public.process_all_cron_tasks () RETURNS void LANGUAGE plpgsql
+CREATE OR REPLACE FUNCTION public.process_all_cron_tasks() RETURNS VOID LANGUAGE plpgsql
 SET
-  search_path = '' AS $$
+search_path = '' AS $$
 DECLARE
   current_hour int;
   current_minute int;

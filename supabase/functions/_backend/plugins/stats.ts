@@ -8,7 +8,7 @@ import { z } from 'zod/mini'
 import { getAppStatus, setAppStatus } from '../utils/appStatus.ts'
 import { BRES, parseBody, simpleError200, simpleRateLimit } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
-import { sendNotifOrg } from '../utils/notifications.ts'
+import { sendNotifToOrgMembers } from '../utils/org_email_notifications.ts'
 import { closeClient, getAppOwnerPostgres, getAppVersionPostgres, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import { makeDevice, parsePluginBody } from '../utils/plugin_parser.ts'
 import { createStatsVersion, onPremStats, sendStatsAndDevice } from '../utils/stats.ts'
@@ -117,7 +117,7 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
     if (shouldCountDownloadFail) {
       await createStatsVersion(c, appVersion.id, app_id, 'fail')
       cloudlog({ requestId: c.get('requestId'), message: 'FAIL!' })
-      await sendNotifOrg(c, 'user:update_fail', {
+      await sendNotifToOrgMembers(c, 'user:update_fail', 'device_error', {
         app_id,
         device_id: body.device_id,
         version_id: appVersion.id,

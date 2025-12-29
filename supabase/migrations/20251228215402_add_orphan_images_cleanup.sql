@@ -17,150 +17,222 @@ END $$;
 
 -- Create the cron_tasks table
 CREATE TABLE IF NOT EXISTS public.cron_tasks (
-  id serial PRIMARY KEY,
-  name text NOT NULL UNIQUE,
-  description text,
-  task_type public.cron_task_type NOT NULL DEFAULT 'function',
-  -- For 'function' type: the function to call (e.g., 'public.cleanup_queue_messages')
-  -- For 'queue' type: the queue name to send message to
-  -- For 'function_queue' type: array of queue names as JSON
-  target text NOT NULL,
-  -- Optional batch size for function_queue type
-  batch_size int,
-  -- Optional payload for queue type (as JSONB)
-  payload jsonb,
-  -- Schedule configuration
-  second_interval int,        -- Run every N seconds (e.g., 10 for every 10 seconds)
-  minute_interval int,        -- Run every N minutes (e.g., 5 for every 5 minutes)
-  hour_interval int,          -- Run every N hours (e.g., 2 for every 2 hours)
-  run_at_hour int,            -- Run at specific hour (0-23)
-  run_at_minute int,          -- Run at specific minute (0-59)
-  run_at_second int DEFAULT 0,-- Run at specific second (0-59)
-  run_on_dow int,             -- Run on specific day of week (0=Sunday, 6=Saturday)
-  run_on_day int,             -- Run on specific day of month (1-31)
-  enabled boolean NOT NULL DEFAULT true,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now()
+    id serial PRIMARY KEY,
+    name text NOT NULL UNIQUE,
+    description text,
+    task_type public.cron_task_type NOT NULL DEFAULT 'function',
+    -- For 'function' type: the function to call (e.g., 'public.cleanup_queue_messages')
+    -- For 'queue' type: the queue name to send message to
+    -- For 'function_queue' type: array of queue names as JSON
+    target text NOT NULL,
+    -- Optional batch size for function_queue type
+    batch_size int,
+    -- Optional payload for queue type (as JSONB)
+    payload jsonb,
+    -- Schedule configuration
+    -- Run every N seconds (e.g., 10 for every 10 seconds)
+    second_interval int,
+    -- Run every N minutes (e.g., 5 for every 5 minutes)
+    minute_interval int,
+    hour_interval int,          -- Run every N hours (e.g., 2 for every 2 hours)
+    run_at_hour int,            -- Run at specific hour (0-23)
+    run_at_minute int,          -- Run at specific minute (0-59)
+    run_at_second int DEFAULT 0,-- Run at specific second (0-59)
+    -- Run on specific day of week (0=Sunday, 6=Saturday)
+    run_on_dow int,
+    run_on_day int,             -- Run on specific day of month (1-31)
+    enabled boolean NOT NULL DEFAULT true,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now()
 );
 
 -- Create index for enabled tasks
-CREATE INDEX IF NOT EXISTS idx_cron_tasks_enabled ON public.cron_tasks(enabled) WHERE enabled = true;
+CREATE INDEX IF NOT EXISTS idx_cron_tasks_enabled ON public.cron_tasks (
+    enabled
+) WHERE enabled
+= true;
 
 -- Security: Restrict access to cron_tasks table to service_role only
-REVOKE ALL ON public.cron_tasks FROM PUBLIC;
-REVOKE ALL ON SEQUENCE public.cron_tasks_id_seq FROM PUBLIC;
+REVOKE ALL ON public.cron_tasks FROM public;
+REVOKE ALL ON SEQUENCE public.cron_tasks_id_seq FROM public;
 GRANT ALL ON public.cron_tasks TO service_role;
 GRANT ALL ON SEQUENCE public.cron_tasks_id_seq TO service_role;
 ALTER TABLE public.cron_tasks ENABLE ROW LEVEL SECURITY;
 
 -- Insert all existing cron tasks
-INSERT INTO public.cron_tasks (name, description, task_type, target, batch_size, second_interval, minute_interval, hour_interval, run_at_hour, run_at_minute, run_at_second, run_on_dow, run_on_day) VALUES
-  -- Every 10 seconds: High-frequency queues
-  ('high_frequency_queues', 'Process high-frequency event queues', 'function_queue',
-   '["on_channel_update", "on_user_create", "on_user_update", "on_version_create", "on_version_delete", "on_version_update", "on_app_delete", "on_organization_create", "on_user_delete", "on_app_create", "credit_usage_alerts"]',
-   NULL, 10, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+INSERT INTO public.cron_tasks (
+    name,
+    description,
+    task_type,
+    target,
+    batch_size,
+    second_interval,
+    minute_interval,
+    hour_interval,
+    run_at_hour,
+    run_at_minute,
+    run_at_second,
+    run_on_dow,
+    run_on_day
+) VALUES
+-- Every 10 seconds: High-frequency queues
+(
+    'high_frequency_queues',
+    'Process high-frequency event queues',
+    'function_queue',
+    '["on_channel_update", "on_user_create", "on_user_update", "on_version_create", "on_version_delete", "on_version_update", "on_app_delete", "on_organization_create", "on_user_delete", "on_app_create", "credit_usage_alerts"]',
+    null, 10, null, null, null, null, null, null, null
+),
 
-  ('channel_device_counts', 'Process channel device counts queue', 'function',
-   'public.process_channel_device_counts_queue(1000)',
-   NULL, 10, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+(
+    'channel_device_counts', 'Process channel device counts queue', 'function',
+    'public.process_channel_device_counts_queue(1000)',
+    null, 10, null, null, null, null, null, null, null
+),
 
-  -- Every minute
-  ('delete_marked_accounts', 'Delete accounts marked for deletion', 'function',
-   'public.delete_accounts_marked_for_deletion()',
-   NULL, NULL, 1, NULL, NULL, NULL, 0, NULL, NULL),
+-- Every minute
+(
+    'delete_marked_accounts', 'Delete accounts marked for deletion', 'function',
+    'public.delete_accounts_marked_for_deletion()',
+    null, null, 1, null, null, null, 0, null, null
+),
 
-  ('per_minute_queues', 'Process per-minute queues', 'function_queue',
-   '["cron_sync_sub", "cron_stat_app"]',
-   10, NULL, 1, NULL, NULL, NULL, 0, NULL, NULL),
+(
+    'per_minute_queues', 'Process per-minute queues', 'function_queue',
+    '["cron_sync_sub", "cron_stat_app"]',
+    10, null, 1, null, null, null, 0, null, null
+),
 
-  ('manifest_create_queue', 'Process manifest create queue', 'function_queue',
-   '["on_manifest_create"]',
-   NULL, NULL, 1, NULL, NULL, NULL, 0, NULL, NULL),
+(
+    'manifest_create_queue', 'Process manifest create queue', 'function_queue',
+    '["on_manifest_create"]',
+    null, null, 1, null, null, null, 0, null, null
+),
 
-  ('orphan_images_queue', 'Process orphan images cleanup queue', 'function_queue',
-   '["cron_clean_orphan_images"]',
-   NULL, NULL, 1, NULL, NULL, NULL, 0, NULL, NULL),
+(
+    'orphan_images_queue',
+    'Process orphan images cleanup queue',
+    'function_queue',
+    '["cron_clean_orphan_images"]',
+    null, null, 1, null, null, null, 0, null, null
+),
 
-  -- Every 5 minutes
-  ('org_stats_queue', 'Process org stats queue', 'function_queue',
-   '["cron_stat_org"]',
-   10, NULL, 5, NULL, NULL, NULL, 0, NULL, NULL),
+-- Every 5 minutes
+(
+    'org_stats_queue', 'Process org stats queue', 'function_queue',
+    '["cron_stat_org"]',
+    10, null, 5, null, null, null, 0, null, null
+),
 
-  -- Every hour
-  ('cleanup_job_details', 'Cleanup frequent job details', 'function',
-   'public.cleanup_frequent_job_details()',
-   NULL, NULL, NULL, NULL, NULL, 0, 0, NULL, NULL),
+-- Every hour
+(
+    'cleanup_job_details', 'Cleanup frequent job details', 'function',
+    'public.cleanup_frequent_job_details()',
+    null, null, null, null, null, 0, 0, null, null
+),
 
-  ('deploy_install_stats_email', 'Process deploy install stats email', 'function',
-   'public.process_deploy_install_stats_email()',
-   NULL, NULL, NULL, NULL, NULL, 0, 0, NULL, NULL),
+(
+    'deploy_install_stats_email',
+    'Process deploy install stats email',
+    'function',
+    'public.process_deploy_install_stats_email()',
+    null, null, null, null, null, 0, 0, null, null
+),
 
-  -- Every 2 hours
-  ('low_frequency_queues', 'Process low-frequency queues', 'function_queue',
-   '["admin_stats", "cron_email", "on_organization_delete", "on_deploy_history_create", "cron_clear_versions"]',
-   NULL, NULL, NULL, 2, NULL, 0, 0, NULL, NULL),
+-- Every 2 hours
+(
+    'low_frequency_queues', 'Process low-frequency queues', 'function_queue',
+    '["admin_stats", "cron_email", "on_organization_delete", "on_deploy_history_create", "cron_clear_versions"]',
+    null, null, null, 2, null, 0, 0, null, null
+),
 
-  -- Every 6 hours
-  ('stats_jobs', 'Process cron stats jobs', 'function',
-   'public.process_cron_stats_jobs()',
-   NULL, NULL, NULL, 6, NULL, 0, 0, NULL, NULL),
+-- Every 6 hours
+(
+    'stats_jobs', 'Process cron stats jobs', 'function',
+    'public.process_cron_stats_jobs()',
+    null, null, null, 6, null, 0, 0, null, null
+),
 
-  -- Daily at 00:00:00
-  ('cleanup_queue_messages', 'Cleanup old queue messages', 'function',
-   'public.cleanup_queue_messages()',
-   NULL, NULL, NULL, NULL, 0, 0, 0, NULL, NULL),
+-- Daily at 00:00:00
+(
+    'cleanup_queue_messages', 'Cleanup old queue messages', 'function',
+    'public.cleanup_queue_messages()',
+    null, null, null, null, 0, 0, 0, null, null
+),
 
-  ('delete_old_apps', 'Delete old deleted apps', 'function',
-   'public.delete_old_deleted_apps()',
-   NULL, NULL, NULL, NULL, 0, 0, 0, NULL, NULL),
+(
+    'delete_old_apps', 'Delete old deleted apps', 'function',
+    'public.delete_old_deleted_apps()',
+    null, null, null, null, 0, 0, 0, null, null
+),
 
-  ('remove_old_jobs', 'Remove old cron jobs', 'function',
-   'public.remove_old_jobs()',
-   NULL, NULL, NULL, NULL, 0, 0, 0, NULL, NULL),
+(
+    'remove_old_jobs', 'Remove old cron jobs', 'function',
+    'public.remove_old_jobs()',
+    null, null, null, null, 0, 0, 0, null, null
+),
 
-  -- Daily at 00:40:00
-  ('version_retention', 'Update app versions retention', 'function',
-   'public.update_app_versions_retention()',
-   NULL, NULL, NULL, NULL, 0, 40, 0, NULL, NULL),
+-- Daily at 00:40:00
+(
+    'version_retention', 'Update app versions retention', 'function',
+    'public.update_app_versions_retention()',
+    null, null, null, null, 0, 40, 0, null, null
+),
 
-  -- Daily at 01:01:00
-  ('admin_stats', 'Process admin stats', 'function',
-   'public.process_admin_stats()',
-   NULL, NULL, NULL, NULL, 1, 1, 0, NULL, NULL),
+-- Daily at 01:01:00
+(
+    'admin_stats', 'Process admin stats', 'function',
+    'public.process_admin_stats()',
+    null, null, null, null, 1, 1, 0, null, null
+),
 
-  -- Daily at 03:00:00
-  ('free_trial_expired', 'Process free trial expired', 'function',
-   'public.process_free_trial_expired()',
-   NULL, NULL, NULL, NULL, 3, 0, 0, NULL, NULL),
+-- Daily at 03:00:00
+(
+    'free_trial_expired', 'Process free trial expired', 'function',
+    'public.process_free_trial_expired()',
+    null, null, null, null, 3, 0, 0, null, null
+),
 
-  ('expire_credits', 'Expire usage credits', 'function',
-   'public.expire_usage_credits()',
-   NULL, NULL, NULL, NULL, 3, 0, 0, NULL, NULL),
+(
+    'expire_credits', 'Expire usage credits', 'function',
+    'public.expire_usage_credits()',
+    null, null, null, null, 3, 0, 0, null, null
+),
 
-  -- Weekly on Sunday at 03:00:00
-  ('orphan_images_cleanup', 'Queue orphan images cleanup job', 'queue',
-   'cron_clean_orphan_images',
-   NULL, NULL, NULL, NULL, 3, 0, 0, 0, NULL),
+-- Weekly on Sunday at 03:00:00
+(
+    'orphan_images_cleanup', 'Queue orphan images cleanup job', 'queue',
+    'cron_clean_orphan_images',
+    null, null, null, null, 3, 0, 0, 0, null
+),
 
-  -- Daily at 04:00:00
-  ('sync_sub_jobs', 'Process cron sync sub jobs', 'function',
-   'public.process_cron_sync_sub_jobs()',
-   NULL, NULL, NULL, NULL, 4, 0, 0, NULL, NULL),
+-- Daily at 04:00:00
+(
+    'sync_sub_jobs', 'Process cron sync sub jobs', 'function',
+    'public.process_cron_sync_sub_jobs()',
+    null, null, null, null, 4, 0, 0, null, null
+),
 
-  -- Daily at 12:00:00
-  ('cleanup_job_run_details', 'Cleanup old job run details', 'function',
-   'public.cleanup_job_run_details_7days()',
-   NULL, NULL, NULL, NULL, 12, 0, 0, NULL, NULL),
+-- Daily at 12:00:00
+(
+    'cleanup_job_run_details', 'Cleanup old job run details', 'function',
+    'public.cleanup_job_run_details_7days()',
+    null, null, null, null, 12, 0, 0, null, null
+),
 
-  -- Weekly on Saturday at 12:00:00
-  ('weekly_stats_email', 'Process weekly stats email', 'function',
-   'public.process_stats_email_weekly()',
-   NULL, NULL, NULL, NULL, 12, 0, 0, 6, NULL),
+-- Weekly on Saturday at 12:00:00
+(
+    'weekly_stats_email', 'Process weekly stats email', 'function',
+    'public.process_stats_email_weekly()',
+    null, null, null, null, 12, 0, 0, 6, null
+),
 
-  -- Monthly on 1st at 12:00:00
-  ('monthly_stats_email', 'Process monthly stats email', 'function',
-   'public.process_stats_email_monthly()',
-   NULL, NULL, NULL, NULL, 12, 0, 0, NULL, 1)
+-- Monthly on 1st at 12:00:00
+(
+    'monthly_stats_email', 'Process monthly stats email', 'function',
+    'public.process_stats_email_monthly()',
+    null, null, null, null, 12, 0, 0, null, 1
+)
 ON CONFLICT (name) DO NOTHING;
 
 -- Create helper function to cleanup job run details (extracted from inline SQL)
@@ -174,7 +246,7 @@ END;
 $$;
 
 -- Security: internal function only
-REVOKE EXECUTE ON FUNCTION public.cleanup_job_run_details_7days() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.cleanup_job_run_details_7days() FROM public;
 GRANT EXECUTE ON FUNCTION public.cleanup_job_run_details_7days() TO service_role;
 
 -- Create the new table-driven process_all_cron_tasks function
@@ -266,5 +338,5 @@ END;
 $$;
 
 -- Security: internal function only
-REVOKE EXECUTE ON FUNCTION public.process_all_cron_tasks() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.process_all_cron_tasks() FROM public;
 GRANT EXECUTE ON FUNCTION public.process_all_cron_tasks() TO service_role;

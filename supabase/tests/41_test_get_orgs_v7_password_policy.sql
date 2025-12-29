@@ -12,8 +12,18 @@ END $$;
 -- Create entries in public.users for the test members
 INSERT INTO public.users (id, email, created_at, updated_at)
 VALUES
-    (tests.get_supabase_uid('test_pwd_compliant_v7'), 'pwd_compliant_v7@test.com', now(), now()),
-    (tests.get_supabase_uid('test_pwd_noncompliant_v7'), 'pwd_noncompliant_v7@test.com', now(), now())
+(
+    tests.get_supabase_uid('test_pwd_compliant_v7'),
+    'pwd_compliant_v7@test.com',
+    now(),
+    now()
+),
+(
+    tests.get_supabase_uid('test_pwd_noncompliant_v7'),
+    'pwd_noncompliant_v7@test.com',
+    now(),
+    now()
+)
 ON CONFLICT (id) DO NOTHING;
 
 -- Create test orgs and add compliance records for compliant users
@@ -117,7 +127,10 @@ SELECT
     is(
         (
             SELECT password_has_access
-            FROM public.get_orgs_v7(tests.get_supabase_uid('test_pwd_compliant_v7'))
+            FROM
+                public.get_orgs_v7(
+                    tests.get_supabase_uid('test_pwd_compliant_v7')
+                )
             WHERE gid = current_setting('test.org_with_pwd_policy_v7')::uuid
         ),
         true,
@@ -129,7 +142,10 @@ SELECT
     is(
         (
             SELECT password_has_access
-            FROM public.get_orgs_v7(tests.get_supabase_uid('test_pwd_noncompliant_v7'))
+            FROM
+                public.get_orgs_v7(
+                    tests.get_supabase_uid('test_pwd_noncompliant_v7')
+                )
             WHERE gid = current_setting('test.org_with_pwd_policy_v7')::uuid
         ),
         false,
@@ -141,7 +157,10 @@ SELECT
     is(
         (
             SELECT password_has_access
-            FROM public.get_orgs_v7(tests.get_supabase_uid('test_pwd_noncompliant_v7'))
+            FROM
+                public.get_orgs_v7(
+                    tests.get_supabase_uid('test_pwd_noncompliant_v7')
+                )
             WHERE gid = current_setting('test.org_without_pwd_policy_v7')::uuid
         ),
         true,
@@ -156,8 +175,11 @@ SELECT
 SELECT
     is(
         (
-            SELECT (password_policy_config->>'enabled')::boolean
-            FROM public.get_orgs_v7(tests.get_supabase_uid('test_pwd_compliant_v7'))
+            SELECT (password_policy_config ->> 'enabled')::boolean
+            FROM
+                public.get_orgs_v7(
+                    tests.get_supabase_uid('test_pwd_compliant_v7')
+                )
             WHERE gid = current_setting('test.org_with_pwd_policy_v7')::uuid
         ),
         true,
@@ -168,8 +190,11 @@ SELECT
 SELECT
     is(
         (
-            SELECT (password_policy_config->>'min_length')::int
-            FROM public.get_orgs_v7(tests.get_supabase_uid('test_pwd_compliant_v7'))
+            SELECT (password_policy_config ->> 'min_length')::int
+            FROM
+                public.get_orgs_v7(
+                    tests.get_supabase_uid('test_pwd_compliant_v7')
+                )
             WHERE gid = current_setting('test.org_with_pwd_policy_v7')::uuid
         ),
         10,
@@ -180,8 +205,11 @@ SELECT
 SELECT
     is(
         (
-            SELECT (password_policy_config->>'enabled')::boolean
-            FROM public.get_orgs_v7(tests.get_supabase_uid('test_pwd_noncompliant_v7'))
+            SELECT (password_policy_config ->> 'enabled')::boolean
+            FROM
+                public.get_orgs_v7(
+                    tests.get_supabase_uid('test_pwd_noncompliant_v7')
+                )
             WHERE gid = current_setting('test.org_with_pwd_policy_v7')::uuid
         ),
         true,
@@ -193,10 +221,13 @@ SELECT
     is(
         (
             SELECT password_policy_config
-            FROM public.get_orgs_v7(tests.get_supabase_uid('test_pwd_compliant_v7'))
+            FROM
+                public.get_orgs_v7(
+                    tests.get_supabase_uid('test_pwd_compliant_v7')
+                )
             WHERE gid = current_setting('test.org_without_pwd_policy_v7')::uuid
         ),
-        NULL::jsonb,
+        null::jsonb,
         'get_orgs_v7 test - org without policy has NULL password_policy_config'
     );
 
@@ -209,7 +240,10 @@ SELECT
     is(
         (
             SELECT paying
-            FROM public.get_orgs_v7(tests.get_supabase_uid('test_pwd_noncompliant_v7'))
+            FROM
+                public.get_orgs_v7(
+                    tests.get_supabase_uid('test_pwd_noncompliant_v7')
+                )
             WHERE gid = current_setting('test.org_with_pwd_policy_v7')::uuid
         ),
         false,
@@ -221,7 +255,10 @@ SELECT
     is(
         (
             SELECT trial_left
-            FROM public.get_orgs_v7(tests.get_supabase_uid('test_pwd_noncompliant_v7'))
+            FROM
+                public.get_orgs_v7(
+                    tests.get_supabase_uid('test_pwd_noncompliant_v7')
+                )
             WHERE gid = current_setting('test.org_with_pwd_policy_v7')::uuid
         ),
         0,
@@ -233,7 +270,10 @@ SELECT
     is(
         (
             SELECT can_use_more
-            FROM public.get_orgs_v7(tests.get_supabase_uid('test_pwd_noncompliant_v7'))
+            FROM
+                public.get_orgs_v7(
+                    tests.get_supabase_uid('test_pwd_noncompliant_v7')
+                )
             WHERE gid = current_setting('test.org_with_pwd_policy_v7')::uuid
         ),
         false,
@@ -245,7 +285,10 @@ SELECT
     is(
         (
             SELECT is_canceled
-            FROM public.get_orgs_v7(tests.get_supabase_uid('test_pwd_noncompliant_v7'))
+            FROM
+                public.get_orgs_v7(
+                    tests.get_supabase_uid('test_pwd_noncompliant_v7')
+                )
             WHERE gid = current_setting('test.org_with_pwd_policy_v7')::uuid
         ),
         false,
@@ -257,7 +300,10 @@ SELECT
     is(
         (
             SELECT app_count
-            FROM public.get_orgs_v7(tests.get_supabase_uid('test_pwd_noncompliant_v7'))
+            FROM
+                public.get_orgs_v7(
+                    tests.get_supabase_uid('test_pwd_noncompliant_v7')
+                )
             WHERE gid = current_setting('test.org_with_pwd_policy_v7')::uuid
         ),
         0::bigint,
@@ -269,10 +315,13 @@ SELECT
     is(
         (
             SELECT subscription_start
-            FROM public.get_orgs_v7(tests.get_supabase_uid('test_pwd_noncompliant_v7'))
+            FROM
+                public.get_orgs_v7(
+                    tests.get_supabase_uid('test_pwd_noncompliant_v7')
+                )
             WHERE gid = current_setting('test.org_with_pwd_policy_v7')::uuid
         ),
-        NULL::timestamptz,
+        null::timestamptz,
         'get_orgs_v7 test - non-compliant user sees redacted subscription_start field'
     );
 
@@ -281,10 +330,13 @@ SELECT
     is(
         (
             SELECT subscription_end
-            FROM public.get_orgs_v7(tests.get_supabase_uid('test_pwd_noncompliant_v7'))
+            FROM
+                public.get_orgs_v7(
+                    tests.get_supabase_uid('test_pwd_noncompliant_v7')
+                )
             WHERE gid = current_setting('test.org_with_pwd_policy_v7')::uuid
         ),
-        NULL::timestamptz,
+        null::timestamptz,
         'get_orgs_v7 test - non-compliant user sees redacted subscription_end field'
     );
 
@@ -293,10 +345,13 @@ SELECT
     is(
         (
             SELECT management_email
-            FROM public.get_orgs_v7(tests.get_supabase_uid('test_pwd_noncompliant_v7'))
+            FROM
+                public.get_orgs_v7(
+                    tests.get_supabase_uid('test_pwd_noncompliant_v7')
+                )
             WHERE gid = current_setting('test.org_with_pwd_policy_v7')::uuid
         ),
-        NULL::text,
+        null::text,
         'get_orgs_v7 test - non-compliant user sees redacted management_email field'
     );
 
@@ -305,7 +360,10 @@ SELECT
     is(
         (
             SELECT is_yearly
-            FROM public.get_orgs_v7(tests.get_supabase_uid('test_pwd_noncompliant_v7'))
+            FROM
+                public.get_orgs_v7(
+                    tests.get_supabase_uid('test_pwd_noncompliant_v7')
+                )
             WHERE gid = current_setting('test.org_with_pwd_policy_v7')::uuid
         ),
         false,
@@ -317,7 +375,10 @@ SELECT
     is(
         (
             SELECT management_email
-            FROM public.get_orgs_v7(tests.get_supabase_uid('test_pwd_compliant_v7'))
+            FROM
+                public.get_orgs_v7(
+                    tests.get_supabase_uid('test_pwd_compliant_v7')
+                )
             WHERE gid = current_setting('test.org_with_pwd_policy_v7')::uuid
         ),
         'pwd_v7@org.com',
@@ -329,7 +390,10 @@ SELECT
     is(
         (
             SELECT name
-            FROM public.get_orgs_v7(tests.get_supabase_uid('test_pwd_compliant_v7'))
+            FROM
+                public.get_orgs_v7(
+                    tests.get_supabase_uid('test_pwd_compliant_v7')
+                )
             WHERE gid = current_setting('test.org_with_pwd_policy_v7')::uuid
         ),
         'Pwd Policy Org V7',
@@ -341,7 +405,10 @@ SELECT
     is(
         (
             SELECT name
-            FROM public.get_orgs_v7(tests.get_supabase_uid('test_pwd_noncompliant_v7'))
+            FROM
+                public.get_orgs_v7(
+                    tests.get_supabase_uid('test_pwd_noncompliant_v7')
+                )
             WHERE gid = current_setting('test.org_with_pwd_policy_v7')::uuid
         ),
         'Pwd Policy Org V7',
@@ -358,7 +425,10 @@ SELECT
     is(
         (
             SELECT password_has_access
-            FROM public.get_orgs_v7(tests.get_supabase_uid('test_pwd_compliant_v7'))
+            FROM
+                public.get_orgs_v7(
+                    tests.get_supabase_uid('test_pwd_compliant_v7')
+                )
             WHERE gid = current_setting('test.org_with_both_policies_v7')::uuid
         ),
         true,
@@ -370,7 +440,10 @@ SELECT
     is(
         (
             SELECT "2fa_has_access"
-            FROM public.get_orgs_v7(tests.get_supabase_uid('test_pwd_compliant_v7'))
+            FROM
+                public.get_orgs_v7(
+                    tests.get_supabase_uid('test_pwd_compliant_v7')
+                )
             WHERE gid = current_setting('test.org_with_both_policies_v7')::uuid
         ),
         false,
@@ -381,9 +454,11 @@ SELECT
 SELECT
     ok(
         (
-            SELECT
-                password_has_access = false
-            FROM public.get_orgs_v7(tests.get_supabase_uid('test_pwd_noncompliant_v7'))
+            SELECT password_has_access = false
+            FROM
+                public.get_orgs_v7(
+                    tests.get_supabase_uid('test_pwd_noncompliant_v7')
+                )
             WHERE gid = current_setting('test.org_with_both_policies_v7')::uuid
         ),
         'get_orgs_v7 test - non-compliant user has password_has_access=false in org with both policies'
@@ -398,7 +473,10 @@ SELECT
     is(
         (
             SELECT paying
-            FROM public.get_orgs_v6(tests.get_supabase_uid('test_pwd_noncompliant_v7'))
+            FROM
+                public.get_orgs_v6(
+                    tests.get_supabase_uid('test_pwd_noncompliant_v7')
+                )
             WHERE gid = current_setting('test.org_with_pwd_policy_v7')::uuid
         ),
         false,
@@ -410,10 +488,13 @@ SELECT
     is(
         (
             SELECT management_email
-            FROM public.get_orgs_v6(tests.get_supabase_uid('test_pwd_noncompliant_v7'))
+            FROM
+                public.get_orgs_v6(
+                    tests.get_supabase_uid('test_pwd_noncompliant_v7')
+                )
             WHERE gid = current_setting('test.org_with_pwd_policy_v7')::uuid
         ),
-        NULL::text,
+        null::text,
         'get_orgs_v6 test - non-compliant password user sees redacted management_email field'
     );
 
@@ -439,7 +520,10 @@ SELECT
     is(
         (
             SELECT password_has_access
-            FROM public.get_orgs_v7(tests.get_supabase_uid('test_pwd_compliant_v7'))
+            FROM
+                public.get_orgs_v7(
+                    tests.get_supabase_uid('test_pwd_compliant_v7')
+                )
             WHERE gid = current_setting('test.org_with_pwd_policy_v7')::uuid
         ),
         false,
@@ -494,7 +578,10 @@ SELECT
     is(
         (
             SELECT password_has_access
-            FROM public.get_orgs_v7(tests.get_supabase_uid('test_pwd_noncompliant_v7'))
+            FROM
+                public.get_orgs_v7(
+                    tests.get_supabase_uid('test_pwd_noncompliant_v7')
+                )
             WHERE gid = current_setting('test.org_disabled_policy_v7')::uuid
         ),
         true,
@@ -506,7 +593,10 @@ SELECT
     is(
         (
             SELECT management_email
-            FROM public.get_orgs_v7(tests.get_supabase_uid('test_pwd_noncompliant_v7'))
+            FROM
+                public.get_orgs_v7(
+                    tests.get_supabase_uid('test_pwd_noncompliant_v7')
+                )
             WHERE gid = current_setting('test.org_disabled_policy_v7')::uuid
         ),
         'disabled_v7@org.com',
@@ -527,11 +617,14 @@ SELECT
                 AND can_use_more = false
                 AND is_canceled = false
                 AND app_count = 0
-                AND subscription_start IS NULL
-                AND subscription_end IS NULL
-                AND management_email IS NULL
+                AND subscription_start IS null
+                AND subscription_end IS null
+                AND management_email IS null
                 AND is_yearly = false
-            FROM public.get_orgs_v7(tests.get_supabase_uid('test_pwd_noncompliant_v7'))
+            FROM
+                public.get_orgs_v7(
+                    tests.get_supabase_uid('test_pwd_noncompliant_v7')
+                )
             WHERE gid = current_setting('test.org_with_pwd_policy_v7')::uuid
         ),
         'get_orgs_v7 test - non-compliant user sees all sensitive fields redacted simultaneously'
@@ -542,7 +635,10 @@ SELECT
     is(
         (
             SELECT management_email
-            FROM public.get_orgs_v7(tests.get_supabase_uid('test_pwd_compliant_v7'))
+            FROM
+                public.get_orgs_v7(
+                    tests.get_supabase_uid('test_pwd_compliant_v7')
+                )
             WHERE gid = current_setting('test.org_without_pwd_policy_v7')::uuid
         ),
         'nopwd_v7@org.com',
@@ -559,8 +655,10 @@ SELECT
         EXISTS (
             SELECT 1
             FROM public.user_password_compliance
-            WHERE user_id = tests.get_supabase_uid('test_pwd_compliant_v7')
-              AND org_id = current_setting('test.org_with_pwd_policy_v7')::uuid
+            WHERE
+                user_id = tests.get_supabase_uid('test_pwd_compliant_v7')
+                AND org_id
+                = current_setting('test.org_with_pwd_policy_v7')::uuid
         ),
         'user_password_compliance test - compliance record exists for compliant user'
     );

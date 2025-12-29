@@ -1,10 +1,10 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
-import { trackBentoEvent } from '../utils/bento.ts'
 import { BRES, middlewareAPISecret, simpleError, triggerValidator } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { logsnag } from '../utils/logsnag.ts'
+import { sendEmailToOrgMembers } from '../utils/org_email_notifications.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 import { backgroundTask } from '../utils/utils.ts'
 
@@ -41,21 +41,11 @@ app.post('/', middlewareAPISecret, triggerValidator('app_versions', 'INSERT'), a
     },
     notify: false,
   }))
-  await backgroundTask(c, supabaseAdmin(c)
-    .from('orgs')
-    .select('*')
-    .eq('id', record.owner_org)
-    .single()
-    .then(({ data, error }) => {
-      if (error || !data) {
-        return simpleError('error_fetching_organization', 'Error fetching organization', { error })
-      }
-      return trackBentoEvent(c, data.management_email, {
-        org_id: record.owner_org,
-        app_id: record.app_id,
-        bundle_name: record.name,
-      }, 'bundle:created') as any
-    }))
+  await backgroundTask(c, sendEmailToOrgMembers(c, 'bundle:created', 'bundle_created', {
+    org_id: record.owner_org,
+    app_id: record.app_id,
+    bundle_name: record.name,
+  }, record.owner_org))
 
   return c.json(BRES)
 })
