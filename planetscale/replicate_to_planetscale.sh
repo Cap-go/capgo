@@ -20,7 +20,7 @@ else
 fi
 
 # Select which region to use (change this to switch regions)
-SELECTED_REGION="PLANETSCALE_AS"
+SELECTED_REGION="PLANETSCALE_SA"
 DB_T="${!SELECTED_REGION}"
 
 if [[ -z "$DB_T" ]]; then
@@ -113,15 +113,30 @@ TRUNCATE TABLE
   orgs,
   stripe_info,
   org_users
-CASCADE;
+RESTART IDENTITY CASCADE;
 SQL
 
-echo "==> Fixing sequences on target..."
+echo "==> Reclaiming disk space and rebuilding indexes..."
+psql-17 "$TARGET_DB_URL" -v ON_ERROR_STOP=1 <<'SQL'
+VACUUM FULL channel_devices, apps, app_versions, manifest, channels, orgs, stripe_info, org_users;
+REINDEX TABLE channel_devices;
+REINDEX TABLE apps;
+REINDEX TABLE app_versions;
+REINDEX TABLE manifest;
+REINDEX TABLE channels;
+REINDEX TABLE orgs;
+REINDEX TABLE stripe_info;
+REINDEX TABLE org_users;
+ANALYZE channel_devices, apps, app_versions, manifest, channels, orgs, stripe_info, org_users;
+SQL
+
+echo "==> Resetting sequences on target after truncate..."
 psql-17 "$TARGET_DB_URL" -v ON_ERROR_STOP=1 <<'SQL'
 DO $$
 DECLARE
   r RECORD;
   seq_name text;
+  max_val bigint;
 BEGIN
   FOR r IN
     SELECT table_schema, table_name, column_name
@@ -135,12 +150,21 @@ BEGIN
 
     IF seq_name IS NOT NULL THEN
       EXECUTE format(
-        'SELECT setval(%L, COALESCE((SELECT MAX(%I) FROM %I.%I), 1), true)',
-        seq_name,
+        'SELECT MAX(%I) FROM %I.%I',
         r.column_name,
         r.table_schema,
         r.table_name
-      );
+      ) INTO max_val;
+
+      IF max_val IS NULL THEN
+        -- Table is empty (after truncate), reset sequence to start at 1
+        EXECUTE format('ALTER SEQUENCE %s RESTART WITH 1', seq_name);
+        RAISE NOTICE 'Reset sequence % to start at 1 (table empty)', seq_name;
+      ELSE
+        -- Table has data, set sequence to max value + 1
+        EXECUTE format('SELECT setval(%L, %s, true)', seq_name, max_val);
+        RAISE NOTICE 'Set sequence % to % (max value)', seq_name, max_val;
+      END IF;
     END IF;
   END LOOP;
 END
