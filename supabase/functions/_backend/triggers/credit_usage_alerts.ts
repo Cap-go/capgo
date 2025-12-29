@@ -3,7 +3,7 @@ import { Hono } from 'hono/tiny'
 import { BRES, middlewareAPISecret, parseBody, simpleError } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { logsnag } from '../utils/logsnag.ts'
-import { sendNotifOrg } from '../utils/notifications.ts'
+import { sendNotifToOrgMembers } from '../utils/org_email_notifications.ts'
 
 interface CreditUsageAlertPayload {
   org_id: string
@@ -54,9 +54,10 @@ app.post('/', middlewareAPISecret, async (c) => {
     threshold,
   }
 
-  const sent = await sendNotifOrg(
+  const sent = await sendNotifToOrgMembers(
     c,
     eventName,
+    'credit_usage',
     metadata,
     orgId,
     uniqId,

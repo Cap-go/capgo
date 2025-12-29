@@ -4,7 +4,7 @@ import type { Database } from './supabase.types.ts'
 import { quickError } from './hono.ts'
 import { cloudlog, cloudlogErr } from './logging.ts'
 import { logsnag } from './logsnag.ts'
-import { sendNotifOrg } from './notifications.ts'
+import { sendNotifToOrgMembers } from './org_email_notifications.ts'
 import { recordUsage, setThreshold, syncSubscriptionData } from './stripe.ts'
 import {
   getCurrentPlanNameOrg,
@@ -321,7 +321,7 @@ async function userAbovePlan(c: Context, org: {
   }
 
   const bestPlanKey = bestPlan.toLowerCase().replace(' ', '_')
-  const sent = await sendNotifOrg(c, `user:upgrade_to_${bestPlanKey}`, { best_plan: bestPlanKey, plan_name: currentPlanName }, orgId, orgId, '0 0 * * 1')
+  const sent = await sendNotifToOrgMembers(c, `user:upgrade_to_${bestPlanKey}`, 'usage_limit', { best_plan: bestPlanKey, plan_name: currentPlanName }, orgId, orgId, '0 0 * * 1')
   if (sent) {
     cloudlog({ requestId: c.get('requestId'), message: `user:upgrade_to_${bestPlanKey}`, orgId })
     await logsnag(c).track({
@@ -345,10 +345,9 @@ async function userIsAtPlanUsage(c: Context, orgId: string, percentUsage: PlanUs
 
   // check if user is at more than 90%, 50% or 70% of plan usage
   if (percentUsage.total_percent >= 90) {
-    // cron every month * * * * 1
-    const sent = await sendNotifOrg(c, 'user:usage_90_percent_of_plan', { percent: percentUsage }, orgId, orgId, '0 0 1 * *')
+    // cron every month
+    const sent = await sendNotifToOrgMembers(c, 'user:usage_90_percent_of_plan', 'usage_limit', { percent: percentUsage }, orgId, orgId, '0 0 1 * *')
     if (sent) {
-      // await addEventPerson(user.email, {}, 'user:90_percent_of_plan', 'red')
       await logsnag(c).track({
         channel: 'usage',
         event: 'User is at 90% of plan usage',
@@ -359,10 +358,9 @@ async function userIsAtPlanUsage(c: Context, orgId: string, percentUsage: PlanUs
     }
   }
   else if (percentUsage.total_percent >= 70) {
-    // cron every month * * * * 1
-    const sent = await sendNotifOrg(c, 'user:usage_70_percent_of_plan', { percent: percentUsage }, orgId, orgId, '0 0 1 * *')
+    // cron every month
+    const sent = await sendNotifToOrgMembers(c, 'user:usage_70_percent_of_plan', 'usage_limit', { percent: percentUsage }, orgId, orgId, '0 0 1 * *')
     if (sent) {
-      // await addEventPerson(user.email, {}, 'user:70_percent_of_plan', 'orange')
       await logsnag(c).track({
         channel: 'usage',
         event: 'User is at 70% of plan usage',
@@ -373,9 +371,8 @@ async function userIsAtPlanUsage(c: Context, orgId: string, percentUsage: PlanUs
     }
   }
   else if (percentUsage.total_percent >= 50) {
-    const sent = await sendNotifOrg(c, 'user:usage_50_percent_of_plan', { percent: percentUsage }, orgId, orgId, '0 0 1 * *')
+    const sent = await sendNotifToOrgMembers(c, 'user:usage_50_percent_of_plan', 'usage_limit', { percent: percentUsage }, orgId, orgId, '0 0 1 * *')
     if (sent) {
-      // await addEventPerson(user.email, {}, 'user:70_percent_of_plan', 'orange')
       await logsnag(c).track({
         channel: 'usage',
         event: 'User is at 50% of plan usage',
@@ -440,7 +437,7 @@ export async function handleOrgNotificationsAndEvents(c: Context, org: any, orgI
     finalIsGoodPlan = !needsUpgrade
   }
   else if (!is_onboarded && is_onboarding_needed) {
-    const sent = await sendNotifOrg(c, 'user:need_onboarding', {}, orgId, orgId, '0 0 1 * *')
+    const sent = await sendNotifToOrgMembers(c, 'user:need_onboarding', 'onboarding', {}, orgId, orgId, '0 0 1 * *')
     if (sent) {
       await logsnag(c).track({
         channel: 'usage',
