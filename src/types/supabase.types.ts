@@ -694,6 +694,69 @@ export type Database = {
           },
         ]
       }
+      cron_tasks: {
+        Row: {
+          batch_size: number | null
+          created_at: string
+          description: string | null
+          enabled: boolean
+          hour_interval: number | null
+          id: number
+          minute_interval: number | null
+          name: string
+          payload: Json | null
+          run_at_hour: number | null
+          run_at_minute: number | null
+          run_at_second: number | null
+          run_on_day: number | null
+          run_on_dow: number | null
+          second_interval: number | null
+          target: string
+          task_type: Database["public"]["Enums"]["cron_task_type"]
+          updated_at: string
+        }
+        Insert: {
+          batch_size?: number | null
+          created_at?: string
+          description?: string | null
+          enabled?: boolean
+          hour_interval?: number | null
+          id?: number
+          minute_interval?: number | null
+          name: string
+          payload?: Json | null
+          run_at_hour?: number | null
+          run_at_minute?: number | null
+          run_at_second?: number | null
+          run_on_day?: number | null
+          run_on_dow?: number | null
+          second_interval?: number | null
+          target: string
+          task_type?: Database["public"]["Enums"]["cron_task_type"]
+          updated_at?: string
+        }
+        Update: {
+          batch_size?: number | null
+          created_at?: string
+          description?: string | null
+          enabled?: boolean
+          hour_interval?: number | null
+          id?: number
+          minute_interval?: number | null
+          name?: string
+          payload?: Json | null
+          run_at_hour?: number | null
+          run_at_minute?: number | null
+          run_at_second?: number | null
+          run_on_day?: number | null
+          run_on_dow?: number | null
+          second_interval?: number | null
+          target?: string
+          task_type?: Database["public"]["Enums"]["cron_task_type"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
       daily_bandwidth: {
         Row: {
           app_id: string
@@ -2116,8 +2179,8 @@ export type Database = {
       check_org_members_2fa_enabled: {
         Args: { org_id: string }
         Returns: {
-          user_id: string
           "2fa_enabled": boolean
+          user_id: string
         }[]
       }
       check_revert_to_builtin_version: {
@@ -2126,6 +2189,7 @@ export type Database = {
       }
       cleanup_expired_apikeys: { Args: never; Returns: undefined }
       cleanup_frequent_job_details: { Args: never; Returns: undefined }
+      cleanup_job_run_details_7days: { Args: never; Returns: undefined }
       cleanup_old_audit_logs: { Args: never; Returns: undefined }
       cleanup_queue_messages: { Args: never; Returns: undefined }
       cleanup_webhook_deliveries: { Args: never; Returns: undefined }
@@ -2427,6 +2491,59 @@ export type Database = {
               next_stats_update_at: string
               paying: boolean
               require_apikey_expiration: boolean
+              role: string
+              stats_updated_at: string
+              subscription_end: string
+              subscription_start: string
+              trial_left: number
+            }[]
+          }
+      get_orgs_v7:
+        | {
+            Args: never
+            Returns: {
+              "2fa_has_access": boolean
+              app_count: number
+              can_use_more: boolean
+              created_by: string
+              credit_available: number
+              credit_next_expiration: string
+              credit_total: number
+              enforcing_2fa: boolean
+              gid: string
+              is_canceled: boolean
+              is_yearly: boolean
+              logo: string
+              management_email: string
+              name: string
+              next_stats_update_at: string
+              paying: boolean
+              role: string
+              stats_updated_at: string
+              subscription_end: string
+              subscription_start: string
+              trial_left: number
+            }[]
+          }
+        | {
+            Args: { userid: string }
+            Returns: {
+              "2fa_has_access": boolean
+              app_count: number
+              can_use_more: boolean
+              created_by: string
+              credit_available: number
+              credit_next_expiration: string
+              credit_total: number
+              enforcing_2fa: boolean
+              gid: string
+              is_canceled: boolean
+              is_yearly: boolean
+              logo: string
+              management_email: string
+              name: string
+              next_stats_update_at: string
+              paying: boolean
               role: string
               stats_updated_at: string
               subscription_end: string
@@ -2906,6 +3023,7 @@ export type Database = {
         | "deduction"
         | "expiry"
         | "refund"
+      cron_task_type: "function" | "queue" | "function_queue"
       disable_update: "major" | "minor" | "patch" | "version_number" | "none"
       key_mode: "read" | "write" | "all" | "upload"
       platform_os: "ios" | "android"
@@ -2949,9 +3067,7 @@ export type Database = {
         | "disableAutoUpdateMetadata"
         | "disableAutoUpdateUnderNative"
         | "disableDevBuild"
-        | "disableProdBuild"
         | "disableEmulator"
-        | "disableDevice"
         | "cannotGetBundle"
         | "checksum_fail"
         | "NoChannelOrOverride"
@@ -2972,6 +3088,8 @@ export type Database = {
         | "download_manifest_brotli_fail"
         | "backend_refusal"
         | "download_0"
+        | "disableProdBuild"
+        | "disableDevice"
       stripe_status:
         | "created"
         | "succeeded"
@@ -3161,6 +3279,7 @@ export const Constants = {
         "expiry",
         "refund",
       ],
+      cron_task_type: ["function", "queue", "function_queue"],
       disable_update: ["major", "minor", "patch", "version_number", "none"],
       key_mode: ["read", "write", "all", "upload"],
       platform_os: ["ios", "android"],
@@ -3204,9 +3323,7 @@ export const Constants = {
         "disableAutoUpdateMetadata",
         "disableAutoUpdateUnderNative",
         "disableDevBuild",
-        "disableProdBuild",
         "disableEmulator",
-        "disableDevice",
         "cannotGetBundle",
         "checksum_fail",
         "NoChannelOrOverride",
@@ -3227,6 +3344,8 @@ export const Constants = {
         "download_manifest_brotli_fail",
         "backend_refusal",
         "download_0",
+        "disableProdBuild",
+        "disableDevice",
       ],
       stripe_status: [
         "created",
