@@ -258,4 +258,3 @@ SELECT test_billing_cycle_functions();
 SELECT * FROM finish();
 
 ROLLBACK;
-

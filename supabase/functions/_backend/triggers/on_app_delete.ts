@@ -27,6 +27,29 @@ app.post('/', middlewareAPISecret, triggerValidator('apps', 'DELETE'), async (c)
       owner_org: record.owner_org,
     })
 
+  // Delete app icon from storage
+  // App icons are stored at: images/org/{org_id}/{app_id}/icon
+  if (record.owner_org) {
+    try {
+      const { data: files } = await supabaseAdmin(c)
+        .storage
+        .from('images')
+        .list(`org/${record.owner_org}/${record.app_id}`)
+
+      if (files && files.length > 0) {
+        const filePaths = files.map(file => `org/${record.owner_org}/${record.app_id}/${file.name}`)
+        await supabaseAdmin(c)
+          .storage
+          .from('images')
+          .remove(filePaths)
+        cloudlog({ requestId: c.get('requestId'), message: 'deleted app images', count: files.length, app_id: record.app_id })
+      }
+    }
+    catch (error) {
+      cloudlog({ requestId: c.get('requestId'), message: 'error deleting app images', error, app_id: record.app_id })
+    }
+  }
+
   // Run most deletions in parallel
   await Promise.all([
     // Delete version related data
