@@ -1220,5 +1220,12 @@
   "webhook-url-invalid": "Lütfen geçerli bir URL girin",
   "webhook-url-placeholder": "https://ornek.com/webhook",
   "webhooks": "Webhooklar",
-  "webhooks-description": "Kuruluşunuzda olaylar meydana geldiğinde HTTP bildirimleri almak için webhookları yapılandırın."
+  "webhooks-description": "Kuruluşunuzda olaylar meydana geldiğinde HTTP bildirimleri almak için webhookları yapılandırın.",
+  "dependencies": "Bağımlılıklar",
+  "native-dependencies": "Yerel Bağımlılıklar",
+  "native-dependencies-description": "Bu pakete dahil olan yerel paketler ve sürümleri",
+  "package-name": "Paket Adı",
+  "no-native-dependencies": "Yerel Bağımlılık Yok",
+  "no-native-dependencies-description": "Bu paket yerel paket bilgisi içermiyor. Yerel bağımlılıklar CLI ile yüklerken yakalanır.",
+  "view-on-npm": "npm'de görüntüle"
 }

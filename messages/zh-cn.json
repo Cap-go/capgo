@@ -1220,5 +1220,12 @@
   "webhook-url-invalid": "请输入有效的URL",
   "webhook-url-placeholder": "https://example.com/webhook",
   "webhooks": "Webhooks",
-  "webhooks-description": "配置Webhooks以在您的组织发生事件时接收HTTP通知。"
+  "webhooks-description": "配置Webhooks以在您的组织发生事件时接收HTTP通知。",
+  "dependencies": "依赖项",
+  "native-dependencies": "原生依赖",
+  "native-dependencies-description": "此包中包含的原生包及其版本",
+  "package-name": "包名称",
+  "no-native-dependencies": "无原生依赖",
+  "no-native-dependencies-description": "此包不包含原生包信息。原生依赖在使用CLI上传时捕获。",
+  "view-on-npm": "在npm上查看"
 }

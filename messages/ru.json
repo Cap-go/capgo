@@ -1220,5 +1220,12 @@
   "webhook-url-invalid": "Введите действительный URL",
   "webhook-url-placeholder": "https://example.com/webhook",
   "webhooks": "Вебхуки",
-  "webhooks-description": "Настройте вебхуки для получения HTTP-уведомлений при возникновении событий в вашей организации."
+  "webhooks-description": "Настройте вебхуки для получения HTTP-уведомлений при возникновении событий в вашей организации.",
+  "dependencies": "Зависимости",
+  "native-dependencies": "Нативные Зависимости",
+  "native-dependencies-description": "Нативные пакеты и их версии, включенные в этот бандл",
+  "package-name": "Название Пакета",
+  "no-native-dependencies": "Нет Нативных Зависимостей",
+  "no-native-dependencies-description": "Этот бандл не содержит информации о нативных пакетах. Нативные зависимости фиксируются при загрузке через CLI.",
+  "view-on-npm": "Посмотреть на npm"
 }

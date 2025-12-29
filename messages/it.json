@@ -1220,5 +1220,12 @@
   "webhook-url-invalid": "Inserisci un URL valido",
   "webhook-url-placeholder": "https://esempio.com/webhook",
   "webhooks": "Webhook",
-  "webhooks-description": "Configura i webhook per ricevere notifiche HTTP quando si verificano eventi nella tua organizzazione."
+  "webhooks-description": "Configura i webhook per ricevere notifiche HTTP quando si verificano eventi nella tua organizzazione.",
+  "dependencies": "Dipendenze",
+  "native-dependencies": "Dipendenze Native",
+  "native-dependencies-description": "Pacchetti nativi e le loro versioni inclusi in questo bundle",
+  "package-name": "Nome Pacchetto",
+  "no-native-dependencies": "Nessuna Dipendenza Nativa",
+  "no-native-dependencies-description": "Questo bundle non contiene informazioni sui pacchetti nativi. Le dipendenze native vengono acquisite durante il caricamento con la CLI.",
+  "view-on-npm": "Visualizza su npm"
 }
