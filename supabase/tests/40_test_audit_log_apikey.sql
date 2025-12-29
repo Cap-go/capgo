@@ -18,7 +18,7 @@ END $$;
 
 SELECT
     is(
-        public.get_identity('{read,upload,write,all}'::public.key_mode[]),
+        public.get_identity('{read,upload,write,all}'::public.key_mode []),
         '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid,
         'get_identity with key_mode returns API key user_id'
     );
@@ -61,7 +61,7 @@ BEGIN
   RAISE NOTICE 'Audit log created for app_version INSERT (version_id: %)', v_version_id;
 END $$;
 
-SELECT ok(true, 'app_version INSERT with API key creates audit log');
+SELECT ok(TRUE, 'app_version INSERT with API key creates audit log');
 
 -- Test 4: Update app_version with API key context and verify audit log is created
 DO $$
@@ -91,7 +91,8 @@ BEGIN
   RAISE NOTICE 'Audit log created for app_version UPDATE';
 END $$;
 
-SELECT ok(true, 'app_version UPDATE with API key creates audit log with changed_fields');
+SELECT
+    ok(TRUE, 'app_version UPDATE with API key creates audit log with changed_fields');
 
 -- Test 5: Delete app_version with API key context and verify audit log is created
 DO $$
@@ -126,7 +127,7 @@ BEGIN
   RAISE NOTICE 'Audit log created for app_version DELETE (version_id: %)', v_version_id;
 END $$;
 
-SELECT ok(true, 'app_version DELETE with API key creates audit log');
+SELECT ok(TRUE, 'app_version DELETE with API key creates audit log');
 
 -- Test 6: Verify audit log contains correct old_record and new_record data
 DO $$
@@ -199,7 +200,7 @@ BEGIN
   RAISE NOTICE 'Audit log old_record and new_record verification passed';
 END $$;
 
-SELECT ok(true, 'audit log contains correct old_record and new_record data');
+SELECT ok(TRUE, 'audit log contains correct old_record and new_record data');
 
 -- Finish
 SELECT *

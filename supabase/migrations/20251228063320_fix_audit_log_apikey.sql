@@ -3,7 +3,7 @@
 -- This meant API key users (CLI, API) were not logged because get_identity() returned NULL
 -- Now we call get_identity with key_mode parameter to also check for API key authentication
 
-CREATE OR REPLACE FUNCTION "public"."audit_log_trigger"()
+CREATE OR REPLACE FUNCTION public.audit_log_trigger()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 SECURITY DEFINER

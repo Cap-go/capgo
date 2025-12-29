@@ -7,10 +7,30 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "14.1"
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
   }
   public: {
     Tables: {
@@ -419,15 +439,7 @@ export type Database = {
           platform?: string
           user_id?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "build_logs_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "orgs"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       build_requests: {
         Row: {
@@ -681,6 +693,69 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      cron_tasks: {
+        Row: {
+          batch_size: number | null
+          created_at: string
+          description: string | null
+          enabled: boolean
+          hour_interval: number | null
+          id: number
+          minute_interval: number | null
+          name: string
+          payload: Json | null
+          run_at_hour: number | null
+          run_at_minute: number | null
+          run_at_second: number | null
+          run_on_day: number | null
+          run_on_dow: number | null
+          second_interval: number | null
+          target: string
+          task_type: Database["public"]["Enums"]["cron_task_type"]
+          updated_at: string
+        }
+        Insert: {
+          batch_size?: number | null
+          created_at?: string
+          description?: string | null
+          enabled?: boolean
+          hour_interval?: number | null
+          id?: number
+          minute_interval?: number | null
+          name: string
+          payload?: Json | null
+          run_at_hour?: number | null
+          run_at_minute?: number | null
+          run_at_second?: number | null
+          run_on_day?: number | null
+          run_on_dow?: number | null
+          second_interval?: number | null
+          target: string
+          task_type?: Database["public"]["Enums"]["cron_task_type"]
+          updated_at?: string
+        }
+        Update: {
+          batch_size?: number | null
+          created_at?: string
+          description?: string | null
+          enabled?: boolean
+          hour_interval?: number | null
+          id?: number
+          minute_interval?: number | null
+          name?: string
+          payload?: Json | null
+          run_at_hour?: number | null
+          run_at_minute?: number | null
+          run_at_second?: number | null
+          run_on_day?: number | null
+          run_on_dow?: number | null
+          second_interval?: number | null
+          target?: string
+          task_type?: Database["public"]["Enums"]["cron_task_type"]
+          updated_at?: string
+        }
+        Relationships: []
       }
       daily_bandwidth: {
         Row: {
@@ -1011,7 +1086,6 @@ export type Database = {
           paying: number | null
           paying_monthly: number | null
           paying_yearly: number | null
-          plan_enterprise: number | null
           plan_enterprise_monthly: number
           plan_enterprise_yearly: number
           plan_maker: number | null
@@ -1056,7 +1130,6 @@ export type Database = {
           paying?: number | null
           paying_monthly?: number | null
           paying_yearly?: number | null
-          plan_enterprise?: number | null
           plan_enterprise_monthly?: number
           plan_enterprise_yearly?: number
           plan_maker?: number | null
@@ -1101,7 +1174,6 @@ export type Database = {
           paying?: number | null
           paying_monthly?: number | null
           paying_yearly?: number | null
-          plan_enterprise?: number | null
           plan_enterprise_monthly?: number
           plan_enterprise_yearly?: number
           plan_maker?: number | null
@@ -1270,6 +1342,7 @@ export type Database = {
           created_at: string | null
           created_by: string
           customer_id: string | null
+          email_preferences: Json
           enforce_hashed_api_keys: boolean
           enforcing_2fa: boolean
           id: string
@@ -1284,6 +1357,7 @@ export type Database = {
           created_at?: string | null
           created_by: string
           customer_id?: string | null
+          email_preferences?: Json
           enforce_hashed_api_keys?: boolean
           enforcing_2fa?: boolean
           id?: string
@@ -1298,6 +1372,7 @@ export type Database = {
           created_at?: string | null
           created_by?: string
           customer_id?: string | null
+          email_preferences?: Json
           enforce_hashed_api_keys?: boolean
           enforcing_2fa?: boolean
           id?: string
@@ -1802,6 +1877,7 @@ export type Database = {
           country: string | null
           created_at: string | null
           email: string
+          email_preferences: Json
           enable_notifications: boolean
           first_name: string | null
           id: string
@@ -1815,6 +1891,7 @@ export type Database = {
           country?: string | null
           created_at?: string | null
           email: string
+          email_preferences?: Json
           enable_notifications?: boolean
           first_name?: string | null
           id: string
@@ -1828,6 +1905,7 @@ export type Database = {
           country?: string | null
           created_at?: string | null
           email?: string
+          email_preferences?: Json
           enable_notifications?: boolean
           first_name?: string | null
           id?: string
@@ -2104,8 +2182,8 @@ export type Database = {
       check_org_members_2fa_enabled: {
         Args: { org_id: string }
         Returns: {
-          user_id: string
           "2fa_enabled": boolean
+          user_id: string
         }[]
       }
       check_revert_to_builtin_version: {
@@ -2113,6 +2191,7 @@ export type Database = {
         Returns: number
       }
       cleanup_frequent_job_details: { Args: never; Returns: undefined }
+      cleanup_job_run_details_7days: { Args: never; Returns: undefined }
       cleanup_old_audit_logs: { Args: never; Returns: undefined }
       cleanup_queue_messages: { Args: never; Returns: undefined }
       cleanup_webhook_deliveries: { Args: never; Returns: undefined }
@@ -2791,6 +2870,25 @@ export type Database = {
         Args: { email: string; org_id: string }
         Returns: string
       }
+      reset_and_seed_app_data: {
+        Args: {
+          p_admin_user_id?: string
+          p_app_id: string
+          p_org_id?: string
+          p_plan_product_id?: string
+          p_stripe_customer_id?: string
+          p_user_id?: string
+        }
+        Returns: undefined
+      }
+      reset_and_seed_app_stats_data: {
+        Args: { p_app_id: string }
+        Returns: undefined
+      }
+      reset_and_seed_data: { Args: never; Returns: undefined }
+      reset_and_seed_stats_data: { Args: never; Returns: undefined }
+      reset_app_data: { Args: { p_app_id: string }; Returns: undefined }
+      reset_app_stats_data: { Args: { p_app_id: string }; Returns: undefined }
       seed_get_app_metrics_caches: {
         Args: { p_end_date: string; p_org_id: string; p_start_date: string }
         Returns: {
@@ -2871,6 +2969,7 @@ export type Database = {
         | "deduction"
         | "expiry"
         | "refund"
+      cron_task_type: "function" | "queue" | "function_queue"
       disable_update: "major" | "minor" | "patch" | "version_number" | "none"
       key_mode: "read" | "write" | "all" | "upload"
       platform_os: "ios" | "android"
@@ -3111,6 +3210,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       action_type: ["mau", "storage", "bandwidth", "build_time"],
@@ -3123,6 +3225,7 @@ export const Constants = {
         "expiry",
         "refund",
       ],
+      cron_task_type: ["function", "queue", "function_queue"],
       disable_update: ["major", "minor", "patch", "version_number", "none"],
       key_mode: ["read", "write", "all", "upload"],
       platform_os: ["ios", "android"],
@@ -3215,3 +3318,4 @@ export const Constants = {
     },
   },
 } as const
+

@@ -1061,7 +1061,9 @@ VALUES
 -- Manually insert audit log entries for admin1
 -- (Normally these would be created by triggers, but we insert directly for testing)
 INSERT INTO
-public.audit_logs (table_name, record_id, operation, user_id, org_id, old_record, new_record)
+public.audit_logs (
+    table_name, record_id, operation, user_id, org_id, old_record, new_record
+)
 VALUES
 (
     'apps',
@@ -1087,7 +1089,7 @@ VALUES
 SELECT
     ok(
         (
-            SELECT COUNT(*)
+            SELECT count(*)
             FROM
                 public.audit_logs
             WHERE
@@ -1145,7 +1147,7 @@ SELECT
 SELECT
     ok(
         (
-            SELECT COUNT(*)
+            SELECT count(*)
             FROM
                 public.audit_logs
             WHERE
@@ -1159,7 +1161,7 @@ SELECT
 SELECT
     ok(
         (
-            SELECT COUNT(*)
+            SELECT count(*)
             FROM
                 public.audit_logs
             WHERE

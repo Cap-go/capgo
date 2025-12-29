@@ -1,19 +1,21 @@
 <script setup lang="ts">
+import { storeToRefs } from 'pinia'
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { toast } from 'vue-sonner'
 import { useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
-import { useMainStore } from '~/stores/main'
-// tabs handled by settings layout
+import { useOrganizationStore } from '~/stores/organization'
 
 const { t } = useI18n()
-const main = useMainStore()
+const displayStore = useDisplayStore()
+const organizationStore = useOrganizationStore()
 const supabase = useSupabase()
 const isLoading = ref(false)
-const enableNotifications = ref(main.user?.enable_notifications ?? true)
-const optForNewsletters = ref(main.user?.opt_for_newsletters ?? true)
-const displayStore = useDisplayStore()
-displayStore.NavTitle = t('notifications')
+
+displayStore.NavTitle = t('org-notifications')
+
+const { currentOrganization } = storeToRefs(organizationStore)
 
 // Email preferences with defaults
 interface EmailPreferences {
@@ -32,8 +34,8 @@ interface EmailPreferences {
 type EmailPreferenceKey = keyof EmailPreferences
 
 const emailPrefs = computed<EmailPreferences>(() => {
-  // email_preferences is a JSONB column added in migration 20251228064121
-  const prefs = (main.user as any)?.email_preferences as EmailPreferences | null | undefined
+  // email_preferences is a JSONB column added in migration 20251228215146
+  const prefs = (currentOrganization.value as any)?.email_preferences as EmailPreferences | null | undefined
   return prefs ?? {}
 })
 
@@ -41,65 +43,44 @@ function getEmailPref(key: EmailPreferenceKey): boolean {
   return emailPrefs.value[key] ?? true
 }
 
-async function submitNotif() {
-  if (!main.user?.id)
-    return
-
-  isLoading.value = true
-  enableNotifications.value = !enableNotifications.value
-  const { data, error } = await supabase
-    .from('users')
-    .update({
-      enable_notifications: enableNotifications.value,
-    })
-    .eq('id', main.user.id)
-    .select()
-    .single()
-  if (!error && data)
-    main.user = data
-  isLoading.value = false
-}
-
-async function submitDoi() {
-  if (!main.user?.id)
-    return
-
-  isLoading.value = true
-
-  optForNewsletters.value = !optForNewsletters.value
-  const { data, error } = await supabase
-    .from('users')
-    .update({
-      opt_for_newsletters: optForNewsletters.value,
-    })
-    .eq('id', main.user.id)
-    .select()
-    .single()
-  if (!error && data)
-    main.user = data
-  isLoading.value = false
-}
+// Check if user has permission to edit org settings
+const hasOrgPerm = computed(() => {
+  return organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['admin', 'super_admin'])
+})
 
 async function toggleEmailPref(key: EmailPreferenceKey) {
-  if (!main.user?.id)
+  if (!currentOrganization.value?.gid || !hasOrgPerm.value) {
+    toast.error(t('no-permission'))
     return
+  }
 
   isLoading.value = true
   const currentPrefs = emailPrefs.value
   const newValue = !(currentPrefs[key] ?? true)
   const updatedPrefs = { ...currentPrefs, [key]: newValue }
 
-  // email_preferences is a JSONB column added in migration 20251228064121
+  // email_preferences is a JSONB column added in migration 20251228215146
   const { data, error } = await supabase
-    .from('users')
+    .from('orgs')
     .update({
       email_preferences: updatedPrefs,
     } as any)
-    .eq('id', main.user.id)
+    .eq('id', currentOrganization.value.gid)
     .select()
     .single()
-  if (!error && data)
-    main.user = data
+
+  if (error) {
+    toast.error(t('org-notification-update-failed'))
+    console.error('Failed to update org email preferences:', error)
+  }
+  else if (data) {
+    // Update the local organization data
+    if (currentOrganization.value) {
+      (currentOrganization.value as any).email_preferences = updatedPrefs
+    }
+    toast.success(t('org-notification-updated'))
+  }
+
   isLoading.value = false
 }
 </script>
@@ -110,43 +91,30 @@ async function toggleEmailPref(key: EmailPreferenceKey) {
       <!-- Panel body -->
       <div class="p-6 space-y-6">
         <h2 class="text-2xl font-bold dark:text-white text-slate-800">
-          {{ t('my-notifications') }}
+          {{ t('org-notifications-title') }}
         </h2>
 
-        <div class="w-full mx-auto dark:text-white">
-          <!-- General Settings Section -->
-          <h3 class="text-lg font-semibold mb-4 dark:text-white text-slate-700">
-            {{ t('notifications-general') }}
-          </h3>
-          <dl class="divide-y divide-slate-200 dark:divide-slate-500 mb-8">
-            <InfoRow :label="t('activation-notification')" :editable="false" :value="t('activation-notification-desc')">
-              <Toggle
-                :value="enableNotifications"
-                @change="submitNotif()"
-              />
-            </InfoRow>
-            <InfoRow :label="t('activation-doi')" :editable="false" :value="t('activation-doi-desc')">
-              <Toggle
-                :value="optForNewsletters"
-                @change="submitDoi()"
-              />
-            </InfoRow>
-          </dl>
+        <p class="text-sm text-slate-600 dark:text-slate-400">
+          {{ t('org-notifications-description') }}
+        </p>
 
+        <div class="w-full mx-auto dark:text-white">
           <!-- Usage Alerts Section -->
           <h3 class="text-lg font-semibold mb-4 dark:text-white text-slate-700">
             {{ t('notifications-usage-alerts') }}
           </h3>
           <dl class="divide-y divide-slate-200 dark:divide-slate-500 mb-8">
-            <InfoRow :label="t('notifications-usage-limit')" :editable="false" :value="t('notifications-usage-limit-desc')">
+            <InfoRow :label="t('notifications-usage-limit')" :editable="false" :value="t('org-notifications-usage-limit-desc')">
               <Toggle
                 :value="getEmailPref('usage_limit')"
+                :disabled="!hasOrgPerm"
                 @change="toggleEmailPref('usage_limit')"
               />
             </InfoRow>
-            <InfoRow :label="t('notifications-credit-usage')" :editable="false" :value="t('notifications-credit-usage-desc')">
+            <InfoRow :label="t('notifications-credit-usage')" :editable="false" :value="t('org-notifications-credit-usage-desc')">
               <Toggle
                 :value="getEmailPref('credit_usage')"
+                :disabled="!hasOrgPerm"
                 @change="toggleEmailPref('credit_usage')"
               />
             </InfoRow>
@@ -157,21 +125,24 @@ async function toggleEmailPref(key: EmailPreferenceKey) {
             {{ t('notifications-activity') }}
           </h3>
           <dl class="divide-y divide-slate-200 dark:divide-slate-500 mb-8">
-            <InfoRow :label="t('notifications-bundle-created')" :editable="false" :value="t('notifications-bundle-created-desc')">
+            <InfoRow :label="t('notifications-bundle-created')" :editable="false" :value="t('org-notifications-bundle-created-desc')">
               <Toggle
                 :value="getEmailPref('bundle_created')"
+                :disabled="!hasOrgPerm"
                 @change="toggleEmailPref('bundle_created')"
               />
             </InfoRow>
-            <InfoRow :label="t('notifications-bundle-deployed')" :editable="false" :value="t('notifications-bundle-deployed-desc')">
+            <InfoRow :label="t('notifications-bundle-deployed')" :editable="false" :value="t('org-notifications-bundle-deployed-desc')">
               <Toggle
                 :value="getEmailPref('bundle_deployed')"
+                :disabled="!hasOrgPerm"
                 @change="toggleEmailPref('bundle_deployed')"
               />
             </InfoRow>
-            <InfoRow :label="t('notifications-deploy-stats')" :editable="false" :value="t('notifications-deploy-stats-desc')">
+            <InfoRow :label="t('notifications-deploy-stats')" :editable="false" :value="t('org-notifications-deploy-stats-desc')">
               <Toggle
                 :value="getEmailPref('deploy_stats_24h')"
+                :disabled="!hasOrgPerm"
                 @change="toggleEmailPref('deploy_stats_24h')"
               />
             </InfoRow>
@@ -182,15 +153,17 @@ async function toggleEmailPref(key: EmailPreferenceKey) {
             {{ t('notifications-statistics') }}
           </h3>
           <dl class="divide-y divide-slate-200 dark:divide-slate-500 mb-8">
-            <InfoRow :label="t('notifications-weekly-stats')" :editable="false" :value="t('notifications-weekly-stats-desc')">
+            <InfoRow :label="t('notifications-weekly-stats')" :editable="false" :value="t('org-notifications-weekly-stats-desc')">
               <Toggle
                 :value="getEmailPref('weekly_stats')"
+                :disabled="!hasOrgPerm"
                 @change="toggleEmailPref('weekly_stats')"
               />
             </InfoRow>
-            <InfoRow :label="t('notifications-monthly-stats')" :editable="false" :value="t('notifications-monthly-stats-desc')">
+            <InfoRow :label="t('notifications-monthly-stats')" :editable="false" :value="t('org-notifications-monthly-stats-desc')">
               <Toggle
                 :value="getEmailPref('monthly_stats')"
+                :disabled="!hasOrgPerm"
                 @change="toggleEmailPref('monthly_stats')"
               />
             </InfoRow>
@@ -201,15 +174,17 @@ async function toggleEmailPref(key: EmailPreferenceKey) {
             {{ t('notifications-issues') }}
           </h3>
           <dl class="divide-y divide-slate-200 dark:divide-slate-500 mb-8">
-            <InfoRow :label="t('notifications-device-error')" :editable="false" :value="t('notifications-device-error-desc')">
+            <InfoRow :label="t('notifications-device-error')" :editable="false" :value="t('org-notifications-device-error-desc')">
               <Toggle
                 :value="getEmailPref('device_error')"
+                :disabled="!hasOrgPerm"
                 @change="toggleEmailPref('device_error')"
               />
             </InfoRow>
-            <InfoRow :label="t('notifications-channel-self-rejected')" :editable="false" :value="t('notifications-channel-self-rejected-desc')">
+            <InfoRow :label="t('notifications-channel-self-rejected')" :editable="false" :value="t('org-notifications-channel-self-rejected-desc')">
               <Toggle
                 :value="getEmailPref('channel_self_rejected')"
+                :disabled="!hasOrgPerm"
                 @change="toggleEmailPref('channel_self_rejected')"
               />
             </InfoRow>
@@ -220,9 +195,10 @@ async function toggleEmailPref(key: EmailPreferenceKey) {
             {{ t('notifications-onboarding') }}
           </h3>
           <dl class="divide-y divide-slate-200 dark:divide-slate-500">
-            <InfoRow :label="t('notifications-onboarding-emails')" :editable="false" :value="t('notifications-onboarding-emails-desc')">
+            <InfoRow :label="t('notifications-onboarding-emails')" :editable="false" :value="t('org-notifications-onboarding-desc')">
               <Toggle
                 :value="getEmailPref('onboarding')"
+                :disabled="!hasOrgPerm"
                 @change="toggleEmailPref('onboarding')"
               />
             </InfoRow>
