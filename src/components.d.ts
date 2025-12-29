@@ -63,6 +63,8 @@ declare module 'vue' {
     UpdateStatsChart: typeof import('./components/dashboard/UpdateStatsChart.vue')['default']
     Usage: typeof import('./components/dashboard/Usage.vue')['default']
     UsageCard: typeof import('./components/dashboard/UsageCard.vue')['default']
+    WebhookDeliveryLog: typeof import('./components/WebhookDeliveryLog.vue')['default']
+    WebhookForm: typeof import('./components/WebhookForm.vue')['default']
     WelcomeBanner: typeof import('./components/dashboard/WelcomeBanner.vue')['default']
   }
 }
@@ -120,5 +122,7 @@ declare global {
   const UpdateStatsChart: typeof import('./components/dashboard/UpdateStatsChart.vue')['default']
   const Usage: typeof import('./components/dashboard/Usage.vue')['default']
   const UsageCard: typeof import('./components/dashboard/UsageCard.vue')['default']
+  const WebhookDeliveryLog: typeof import('./components/WebhookDeliveryLog.vue')['default']
+  const WebhookForm: typeof import('./components/WebhookForm.vue')['default']
   const WelcomeBanner: typeof import('./components/dashboard/WelcomeBanner.vue')['default']
 }

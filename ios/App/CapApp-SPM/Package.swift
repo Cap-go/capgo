@@ -4,19 +4,18 @@ import PackageDescription
 // DO NOT MODIFY THIS FILE - managed by Capacitor CLI commands
 let package = Package(
     name: "CapApp-SPM",
-    platforms: [.iOS(.v14)],
+    platforms: [.iOS(.v15)],
     products: [
         .library(
             name: "CapApp-SPM",
             targets: ["CapApp-SPM"])
     ],
     dependencies: [
-        .package(url: "https://github.com/ionic-team/capacitor-swift-pm.git", exact: "7.4.4"),
-        .package(name: "CapacitorCommunityInAppReview", path: "../../../node_modules/@capacitor-community/in-app-review"),
-        .package(name: "CapacitorCommunityKeepAwake", path: "../../../node_modules/@capacitor-community/keep-awake"),
+        .package(url: "https://github.com/ionic-team/capacitor-swift-pm.git", exact: "8.0.0"),
         .package(name: "CapacitorActionSheet", path: "../../../node_modules/@capacitor/action-sheet"),
         .package(name: "CapacitorApp", path: "../../../node_modules/@capacitor/app"),
         .package(name: "CapacitorAppLauncher", path: "../../../node_modules/@capacitor/app-launcher"),
+        .package(name: "CapacitorBarcodeScanner", path: "../../../node_modules/@capacitor/barcode-scanner"),
         .package(name: "CapacitorBrowser", path: "../../../node_modules/@capacitor/browser"),
         .package(name: "CapacitorCamera", path: "../../../node_modules/@capacitor/camera"),
         .package(name: "CapacitorClipboard", path: "../../../node_modules/@capacitor/clipboard"),
@@ -36,19 +35,19 @@ let package = Package(
         .package(name: "CapacitorStatusBar", path: "../../../node_modules/@capacitor/status-bar"),
         .package(name: "CapacitorTextZoom", path: "../../../node_modules/@capacitor/text-zoom"),
         .package(name: "CapacitorToast", path: "../../../node_modules/@capacitor/toast"),
-        .package(name: "CapawesomeCapacitorFilePicker", path: "../../../node_modules/@capawesome/capacitor-file-picker"),
-        .package(name: "CapawesomeCapacitorScreenOrientation", path: "../../../node_modules/@capawesome/capacitor-screen-orientation"),
         .package(name: "CapgoCapacitorCrisp", path: "../../../node_modules/@capgo/capacitor-crisp"),
         .package(name: "CapgoCapacitorFlash", path: "../../../node_modules/@capgo/capacitor-flash"),
+        .package(name: "CapgoCapacitorInAppReview", path: "../../../node_modules/@capgo/capacitor-in-app-review"),
         .package(name: "CapgoCapacitorMute", path: "../../../node_modules/@capgo/capacitor-mute"),
         .package(name: "CapgoCapacitorNativeBiometric", path: "../../../node_modules/@capgo/capacitor-native-biometric"),
+        .package(name: "CapgoCapacitorPersistentAccount", path: "../../../node_modules/@capgo/capacitor-persistent-account"),
+        .package(name: "CapgoCapacitorScreenOrientation", path: "../../../node_modules/@capgo/capacitor-screen-orientation"),
         .package(name: "CapgoCapacitorScreenRecorder", path: "../../../node_modules/@capgo/capacitor-screen-recorder"),
         .package(name: "CapgoCapacitorUpdater", path: "../../../node_modules/@capgo/capacitor-updater"),
         .package(name: "CapgoInappbrowser", path: "../../../node_modules/@capgo/inappbrowser"),
+        .package(name: "CapgoKeepAwake", path: "../../../node_modules/@capgo/keep-awake"),
         .package(name: "CapgoNativeAudio", path: "../../../node_modules/@capgo/native-audio"),
-        .package(name: "CapgoNativeMarket", path: "../../../node_modules/@capgo/native-market"),
-        .package(name: "CapacitorCameraView", path: "../../../node_modules/capacitor-camera-view"),
-        .package(name: "CapacitorSecureStoragePlugin", path: "../../../node_modules/capacitor-secure-storage-plugin")
+        .package(name: "CapgoNativeMarket", path: "../../../node_modules/@capgo/native-market")
     ],
     targets: [
         .target(
@@ -56,11 +55,10 @@ let package = Package(
             dependencies: [
                 .product(name: "Capacitor", package: "capacitor-swift-pm"),
                 .product(name: "Cordova", package: "capacitor-swift-pm"),
-                .product(name: "CapacitorCommunityInAppReview", package: "CapacitorCommunityInAppReview"),
-                .product(name: "CapacitorCommunityKeepAwake", package: "CapacitorCommunityKeepAwake"),
                 .product(name: "CapacitorActionSheet", package: "CapacitorActionSheet"),
                 .product(name: "CapacitorApp", package: "CapacitorApp"),
                 .product(name: "CapacitorAppLauncher", package: "CapacitorAppLauncher"),
+                .product(name: "CapacitorBarcodeScanner", package: "CapacitorBarcodeScanner"),
                 .product(name: "CapacitorBrowser", package: "CapacitorBrowser"),
                 .product(name: "CapacitorCamera", package: "CapacitorCamera"),
                 .product(name: "CapacitorClipboard", package: "CapacitorClipboard"),
@@ -80,19 +78,19 @@ let package = Package(
                 .product(name: "CapacitorStatusBar", package: "CapacitorStatusBar"),
                 .product(name: "CapacitorTextZoom", package: "CapacitorTextZoom"),
                 .product(name: "CapacitorToast", package: "CapacitorToast"),
-                .product(name: "CapawesomeCapacitorFilePicker", package: "CapawesomeCapacitorFilePicker"),
-                .product(name: "CapawesomeCapacitorScreenOrientation", package: "CapawesomeCapacitorScreenOrientation"),
                 .product(name: "CapgoCapacitorCrisp", package: "CapgoCapacitorCrisp"),
                 .product(name: "CapgoCapacitorFlash", package: "CapgoCapacitorFlash"),
+                .product(name: "CapgoCapacitorInAppReview", package: "CapgoCapacitorInAppReview"),
                 .product(name: "CapgoCapacitorMute", package: "CapgoCapacitorMute"),
                 .product(name: "CapgoCapacitorNativeBiometric", package: "CapgoCapacitorNativeBiometric"),
+                .product(name: "CapgoCapacitorPersistentAccount", package: "CapgoCapacitorPersistentAccount"),
+                .product(name: "CapgoCapacitorScreenOrientation", package: "CapgoCapacitorScreenOrientation"),
                 .product(name: "CapgoCapacitorScreenRecorder", package: "CapgoCapacitorScreenRecorder"),
                 .product(name: "CapgoCapacitorUpdater", package: "CapgoCapacitorUpdater"),
                 .product(name: "CapgoInappbrowser", package: "CapgoInappbrowser"),
+                .product(name: "CapgoKeepAwake", package: "CapgoKeepAwake"),
                 .product(name: "CapgoNativeAudio", package: "CapgoNativeAudio"),
-                .product(name: "CapgoNativeMarket", package: "CapgoNativeMarket"),
-                .product(name: "CapacitorCameraView", package: "CapacitorCameraView"),
-                .product(name: "CapacitorSecureStoragePlugin", package: "CapacitorSecureStoragePlugin")
+                .product(name: "CapgoNativeMarket", package: "CapgoNativeMarket")
             ]
         )
     ]

@@ -9,10 +9,11 @@ import { z } from 'zod/mini'
 import { getAppStatus, setAppStatus } from '../utils/appStatus.ts'
 import { BRES, parseBody, simpleError200, simpleRateLimit } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
+import { sendNotifOrg } from '../utils/notifications.ts'
 import { closeClient, deleteChannelDevicePg, getAppByIdPg, getAppOwnerPostgres, getAppVersionsByAppIdPg, getChannelByNamePg, getChannelDeviceOverridePg, getChannelsPg, getCompatibleChannelsPg, getDrizzleClient, getMainChannelsPg, getPgClient, upsertChannelDevicePg } from '../utils/pg.ts'
 import { convertQueryToBody, makeDevice, parsePluginBody } from '../utils/plugin_parser.ts'
 import { sendStatsAndDevice } from '../utils/stats.ts'
-import { deviceIdRegex, INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, isDeprecatedPluginVersion, isLimited, MISSING_STRING_APP_ID, MISSING_STRING_DEVICE_ID, MISSING_STRING_VERSION_BUILD, MISSING_STRING_VERSION_NAME, NON_STRING_APP_ID, NON_STRING_DEVICE_ID, NON_STRING_VERSION_BUILD, NON_STRING_VERSION_NAME, reverseDomainRegex } from '../utils/utils.ts'
+import { backgroundTask, deviceIdRegex, INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, isDeprecatedPluginVersion, isLimited, MISSING_STRING_APP_ID, MISSING_STRING_DEVICE_ID, MISSING_STRING_VERSION_BUILD, MISSING_STRING_VERSION_NAME, NON_STRING_APP_ID, NON_STRING_DEVICE_ID, NON_STRING_VERSION_BUILD, NON_STRING_VERSION_NAME, reverseDomainRegex } from '../utils/utils.ts'
 
 // Minimum versions for local channel storage behavior
 const CHANNEL_SELF_MIN_V5 = '5.34.0'
@@ -113,6 +114,18 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
     return simpleError200(c, 'cannot_override', 'Missing channel')
   }
   if (dataChannelOverride && !dataChannelOverride.channel_id.allow_device_self_set) {
+    // Send weekly notification to org about self-assignment rejection
+    await backgroundTask(c, sendNotifOrg(
+      c,
+      'device:channel_self_set_rejected',
+      {
+        channel_name: dataChannelOverride.channel_id.name,
+        app_id,
+      },
+      appOwner.owner_org,
+      `${app_id}`,
+      '0 0 * * 0', // Weekly on Sunday at midnight
+    ))
     return simpleError200(c, 'cannot_override', 'Cannot change device override current channel don\'t allow it')
   }
   // if channel set channel_override to it
@@ -124,6 +137,18 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
   }
 
   if (!dataChannel.allow_device_self_set) {
+    // Send weekly notification to org about self-assignment rejection
+    await backgroundTask(c, sendNotifOrg(
+      c,
+      'device:channel_self_set_rejected',
+      {
+        channel_name: dataChannel.name,
+        app_id,
+      },
+      appOwner.owner_org,
+      `${app_id}`,
+      '0 0 * * 0', // Weekly on Sunday at midnight
+    ))
     if (dataChannel.public) {
       return simpleError200(
         c,
@@ -414,6 +439,18 @@ async function deleteOverride(c: Context, drizzleClient: ReturnType<typeof getDr
   }
 
   if (!dataChannelOverride.channel_id.allow_device_self_set) {
+    // Send weekly notification to org about self-assignment rejection
+    await backgroundTask(c, sendNotifOrg(
+      c,
+      'device:channel_self_set_rejected',
+      {
+        channel_name: dataChannelOverride.channel_id.name,
+        app_id,
+      },
+      appOwner.owner_org,
+      `${app_id}`,
+      '0 0 * * 0', // Weekly on Sunday at midnight
+    ))
     return simpleError200(c, 'cannot_override', 'Cannot change device override current channel don\'t allow it')
   }
 

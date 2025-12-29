@@ -2,12 +2,6 @@
 include ':capacitor-android'
 project(':capacitor-android').projectDir = new File('../node_modules/@capacitor/android/capacitor')
 
-include ':capacitor-community-in-app-review'
-project(':capacitor-community-in-app-review').projectDir = new File('../node_modules/@capacitor-community/in-app-review/android')
-
-include ':capacitor-community-keep-awake'
-project(':capacitor-community-keep-awake').projectDir = new File('../node_modules/@capacitor-community/keep-awake/android')
-
 include ':capacitor-action-sheet'
 project(':capacitor-action-sheet').projectDir = new File('../node_modules/@capacitor/action-sheet/android')
 
@@ -16,6 +10,9 @@ project(':capacitor-app').projectDir = new File('../node_modules/@capacitor/app/
 
 include ':capacitor-app-launcher'
 project(':capacitor-app-launcher').projectDir = new File('../node_modules/@capacitor/app-launcher/android')
+
+include ':capacitor-barcode-scanner'
+project(':capacitor-barcode-scanner').projectDir = new File('../node_modules/@capacitor/barcode-scanner/android')
 
 include ':capacitor-browser'
 project(':capacitor-browser').projectDir = new File('../node_modules/@capacitor/browser/android')
@@ -74,23 +71,26 @@ project(':capacitor-text-zoom').projectDir = new File('../node_modules/@capacito
 include ':capacitor-toast'
 project(':capacitor-toast').projectDir = new File('../node_modules/@capacitor/toast/android')
 
-include ':capawesome-capacitor-file-picker'
-project(':capawesome-capacitor-file-picker').projectDir = new File('../node_modules/@capawesome/capacitor-file-picker/android')
-
-include ':capawesome-capacitor-screen-orientation'
-project(':capawesome-capacitor-screen-orientation').projectDir = new File('../node_modules/@capawesome/capacitor-screen-orientation/android')
-
 include ':capgo-capacitor-crisp'
 project(':capgo-capacitor-crisp').projectDir = new File('../node_modules/@capgo/capacitor-crisp/android')
 
 include ':capgo-capacitor-flash'
 project(':capgo-capacitor-flash').projectDir = new File('../node_modules/@capgo/capacitor-flash/android')
 
+include ':capgo-capacitor-in-app-review'
+project(':capgo-capacitor-in-app-review').projectDir = new File('../node_modules/@capgo/capacitor-in-app-review/android')
+
 include ':capgo-capacitor-mute'
 project(':capgo-capacitor-mute').projectDir = new File('../node_modules/@capgo/capacitor-mute/android')
 
 include ':capgo-capacitor-native-biometric'
 project(':capgo-capacitor-native-biometric').projectDir = new File('../node_modules/@capgo/capacitor-native-biometric/android')
+
+include ':capgo-capacitor-persistent-account'
+project(':capgo-capacitor-persistent-account').projectDir = new File('../node_modules/@capgo/capacitor-persistent-account/android')
+
+include ':capgo-capacitor-screen-orientation'
+project(':capgo-capacitor-screen-orientation').projectDir = new File('../node_modules/@capgo/capacitor-screen-orientation/android')
 
 include ':capgo-capacitor-screen-recorder'
 project(':capgo-capacitor-screen-recorder').projectDir = new File('../node_modules/@capgo/capacitor-screen-recorder/android')
@@ -101,6 +101,9 @@ project(':capgo-capacitor-updater').projectDir = new File('../node_modules/@capg
 include ':capgo-inappbrowser'
 project(':capgo-inappbrowser').projectDir = new File('../node_modules/@capgo/inappbrowser/android')
 
+include ':capgo-keep-awake'
+project(':capgo-keep-awake').projectDir = new File('../node_modules/@capgo/keep-awake/android')
+
 include ':capgo-native-audio'
 project(':capgo-native-audio').projectDir = new File('../node_modules/@capgo/native-audio/android')
 
@@ -109,9 +112,3 @@ project(':capgo-native-market').projectDir = new File('../node_modules/@capgo/na
 
 include ':revenuecat-purchases-capacitor'
 project(':revenuecat-purchases-capacitor').projectDir = new File('../node_modules/@revenuecat/purchases-capacitor/android')
-
-include ':capacitor-camera-view'
-project(':capacitor-camera-view').projectDir = new File('../node_modules/capacitor-camera-view/android')
-
-include ':capacitor-secure-storage-plugin'
-project(':capacitor-secure-storage-plugin').projectDir = new File('../node_modules/capacitor-secure-storage-plugin/android')

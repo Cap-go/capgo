@@ -374,6 +374,75 @@ describe('update scenarios', () => {
     }
   })
 
+  it('disable auto update to minor blocks cross-major updates', async () => {
+    // Minor strategy: blocks if major OR minor changed
+    // This test ensures that updates across major versions are blocked even if minor is the same
+    const versionId = await getSupabaseClient().from('app_versions').select('id').eq('name', '1.361.0').eq('app_id', APP_NAME_UPDATE).single().throwOnError().then(({ data }) => data?.id)
+    const originalVersionId = await getSupabaseClient().from('app_versions').select('id').eq('name', '1.0.0').eq('app_id', APP_NAME_UPDATE).single().throwOnError().then(({ data }) => data?.id)
+    await getSupabaseClient().from('channels').update({ disable_auto_update: 'minor', version: versionId }).eq('name', 'production').eq('app_id', APP_NAME_UPDATE).throwOnError()
+
+    try {
+      const baseData = getBaseData(APP_NAME_UPDATE)
+      // Device is on 0.361.0, channel has 1.361.0 - same minor, different major
+      baseData.version_name = '0.361.0'
+
+      const response = await postUpdate(baseData)
+      expect(response.status).toBe(200)
+      const json = await response.json<UpdateRes>()
+      // Should block because major version changed (0 -> 1)
+      expect(json.error).toBe('disable_auto_update_to_minor')
+    }
+    finally {
+      await getSupabaseClient().from('channels').update({ disable_auto_update: 'major', version: originalVersionId }).eq('name', 'production').eq('app_id', APP_NAME_UPDATE)
+    }
+  })
+
+  it('disable auto update to patch blocks cross-minor updates', async () => {
+    // Patch strategy: blocks if major OR minor OR patch changed
+    // This test ensures that updates across minor versions are blocked
+    const versionId = await getSupabaseClient().from('app_versions').select('id').eq('name', '1.361.0').eq('app_id', APP_NAME_UPDATE).single().throwOnError().then(({ data }) => data?.id)
+    const originalVersionId = await getSupabaseClient().from('app_versions').select('id').eq('name', '1.0.0').eq('app_id', APP_NAME_UPDATE).single().throwOnError().then(({ data }) => data?.id)
+    await getSupabaseClient().from('channels').update({ disable_auto_update: 'patch', version: versionId }).eq('name', 'production').eq('app_id', APP_NAME_UPDATE).throwOnError()
+
+    try {
+      const baseData = getBaseData(APP_NAME_UPDATE)
+      // Device is on 1.360.0, channel has 1.361.0 - different minor
+      baseData.version_name = '1.360.0'
+
+      const response = await postUpdate(baseData)
+      expect(response.status).toBe(200)
+      const json = await response.json<UpdateRes>()
+      // Should block because minor version changed (360 -> 361)
+      expect(json.error).toBe('disable_auto_update_to_patch')
+    }
+    finally {
+      await getSupabaseClient().from('channels').update({ disable_auto_update: 'major', version: originalVersionId }).eq('name', 'production').eq('app_id', APP_NAME_UPDATE)
+    }
+  })
+
+  it('disable auto update to patch blocks cross-major updates', async () => {
+    // Patch strategy: blocks if major OR minor OR patch changed
+    // This test ensures that updates across major versions are blocked
+    const versionId = await getSupabaseClient().from('app_versions').select('id').eq('name', '1.361.0').eq('app_id', APP_NAME_UPDATE).single().throwOnError().then(({ data }) => data?.id)
+    const originalVersionId = await getSupabaseClient().from('app_versions').select('id').eq('name', '1.0.0').eq('app_id', APP_NAME_UPDATE).single().throwOnError().then(({ data }) => data?.id)
+    await getSupabaseClient().from('channels').update({ disable_auto_update: 'patch', version: versionId }).eq('name', 'production').eq('app_id', APP_NAME_UPDATE).throwOnError()
+
+    try {
+      const baseData = getBaseData(APP_NAME_UPDATE)
+      // Device is on 0.361.0, channel has 1.361.0 - different major
+      baseData.version_name = '0.361.0'
+
+      const response = await postUpdate(baseData)
+      expect(response.status).toBe(200)
+      const json = await response.json<UpdateRes>()
+      // Should block because major version changed (0 -> 1)
+      expect(json.error).toBe('disable_auto_update_to_patch')
+    }
+    finally {
+      await getSupabaseClient().from('channels').update({ disable_auto_update: 'major', version: originalVersionId }).eq('name', 'production').eq('app_id', APP_NAME_UPDATE)
+    }
+  })
+
   it('disallow emulator', async () => {
     await getSupabaseClient().from('channels').update({ allow_emulator: false, disable_auto_update: 'major' }).eq('name', 'production').eq('app_id', APP_NAME_UPDATE)
 

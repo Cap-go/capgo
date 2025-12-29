@@ -366,9 +366,23 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    '/settings/organization/Security': RouteRecordInfo<
+      '/settings/organization/Security',
+      '/settings/organization/Security',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
     '/settings/organization/Usage': RouteRecordInfo<
       '/settings/organization/Usage',
       '/settings/organization/Usage',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
+    '/settings/organization/Webhooks': RouteRecordInfo<
+      '/settings/organization/Webhooks',
+      '/settings/organization/Webhooks',
       Record<never, never>,
       Record<never, never>,
       | never
@@ -687,9 +701,21 @@ declare module 'vue-router/auto-routes' {
       views:
         | never
     }
+    'src/pages/settings/organization/Security.vue': {
+      routes:
+        | '/settings/organization/Security'
+      views:
+        | never
+    }
     'src/pages/settings/organization/Usage.vue': {
       routes:
         | '/settings/organization/Usage'
+      views:
+        | never
+    }
+    'src/pages/settings/organization/Webhooks.vue': {
+      routes:
+        | '/settings/organization/Webhooks'
       views:
         | never
     }
