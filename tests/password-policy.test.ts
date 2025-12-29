@@ -399,8 +399,8 @@ describe('Password Policy Enforcement Integration', () => {
       min_right: 'read',
       user_id: USER_ID,
       org_id: orgWithPolicyId,
-      app_id: null,
-      channel_id: null,
+      app_id: '' as any,
+      channel_id: 0 as any,
     })
 
     // The result depends on whether the test user has a compliance record
@@ -425,7 +425,7 @@ describe('Password Policy Enforcement Integration', () => {
     // Verify password policy fields exist
     expect(testOrg).toHaveProperty('password_policy_config')
     expect(testOrg).toHaveProperty('password_has_access')
-    expect(typeof testOrg.password_has_access).toBe('boolean')
+    expect(typeof testOrg!.password_has_access).toBe('boolean')
   })
 })
 
@@ -489,7 +489,7 @@ describe('user_password_compliance table', () => {
       .upsert({
         user_id: USER_ID,
         org_id: ORG_ID,
-        policy_hash: hashResult,
+        policy_hash: hashResult || '',
         validated_at: new Date().toISOString(),
       }, {
         onConflict: 'user_id,org_id',
