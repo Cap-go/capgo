@@ -1220,5 +1220,12 @@
   "webhook-url-invalid": "कृपया एक वैध URL दर्ज करें",
   "webhook-url-placeholder": "https://example.com/webhook",
   "webhooks": "वेबहुक्स",
-  "webhooks-description": "जब आपके संगठन में घटनाएं हों तो HTTP सूचनाएं प्राप्त करने के लिए वेबहुक कॉन्फ़िगर करें।"
+  "webhooks-description": "जब आपके संगठन में घटनाएं हों तो HTTP सूचनाएं प्राप्त करने के लिए वेबहुक कॉन्फ़िगर करें।",
+  "dependencies": "निर्भरताएं",
+  "native-dependencies": "नेटिव निर्भरताएं",
+  "native-dependencies-description": "इस बंडल में शामिल नेटिव पैकेज और उनके संस्करण",
+  "package-name": "पैकेज का नाम",
+  "no-native-dependencies": "कोई नेटिव निर्भरता नहीं",
+  "no-native-dependencies-description": "इस बंडल में कोई नेटिव पैकेज जानकारी नहीं है। CLI के साथ अपलोड करते समय नेटिव निर्भरताएं कैप्चर की जाती हैं।",
+  "view-on-npm": "npm पर देखें"
 }
