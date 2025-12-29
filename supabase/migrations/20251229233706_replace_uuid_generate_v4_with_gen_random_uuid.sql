@@ -33,3 +33,5 @@ ALTER TABLE "public"."usage_credit_grants"
 -- Update usage_overage_events table
 ALTER TABLE "public"."usage_overage_events"
   ALTER COLUMN "id" SET DEFAULT gen_random_uuid();
+
+DROP EXTENSION IF EXISTS "uuid-ossp";
