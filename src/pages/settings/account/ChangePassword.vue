@@ -108,7 +108,7 @@ async function verifyPassword(form: { current_password: string }) {
       }),
     })
 
-    const result = await response.json()
+    const result: { error?: string, message?: string } = await response.json()
 
     if (!response.ok) {
       if (result.error === 'invalid_credentials') {
