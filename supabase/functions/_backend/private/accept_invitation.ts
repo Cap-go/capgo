@@ -32,21 +32,21 @@ const DEFAULT_PASSWORD_POLICY: PasswordPolicy = {
 
 // Build dynamic password validation schema based on org's policy
 function buildPasswordSchema(policy: PasswordPolicy) {
-  const checks: z.$ZodCheck<string>[] = [
+  let schema = z.string().check(
     z.minLength(policy.min_length, `Password must be at least ${policy.min_length} characters`),
-  ]
+  )
 
   if (policy.require_uppercase) {
-    checks.push(z.regex(/[A-Z]/, 'Password must contain at least one uppercase letter'))
+    schema = schema.check(z.regex(/[A-Z]/, 'Password must contain at least one uppercase letter'))
   }
   if (policy.require_number) {
-    checks.push(z.regex(/\d/, 'Password must contain at least one number'))
+    schema = schema.check(z.regex(/\d/, 'Password must contain at least one number'))
   }
   if (policy.require_special) {
-    checks.push(z.regex(/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/, 'Password must contain at least one special character'))
+    schema = schema.check(z.regex(/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/, 'Password must contain at least one special character'))
   }
 
-  return z.string().check(...checks)
+  return schema
 }
 
 // Base schema for initial validation (without password)
@@ -100,8 +100,9 @@ app.post('/', async (c) => {
   }
 
   // Use org's password policy if enabled, otherwise use default
-  const passwordPolicy: PasswordPolicy = (org?.password_policy_config as PasswordPolicy | null)?.enabled
-    ? (org.password_policy_config as PasswordPolicy)
+  const policyConfig = org?.password_policy_config as unknown as PasswordPolicy | null
+  const passwordPolicy: PasswordPolicy = policyConfig?.enabled
+    ? policyConfig
     : DEFAULT_PASSWORD_POLICY
 
   // Validate password against the policy

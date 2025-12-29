@@ -14,7 +14,7 @@ interface NativePackage {
   version: string
 }
 
-const route = useRoute('/app/[package].bundle.[bundle].dependencies')
+const route = useRoute()
 const router = useRouter()
 const displayStore = useDisplayStore()
 const { t } = useI18n()
@@ -27,7 +27,7 @@ const version = ref<Database['public']['Tables']['app_versions']['Row']>()
 const nativePackages = computed<NativePackage[]>(() => {
   if (!version.value?.native_packages)
     return []
-  return (version.value.native_packages as NativePackage[]) ?? []
+  return (version.value.native_packages as unknown as NativePackage[]) ?? []
 })
 
 function openNpmPackage(packageName: string) {
@@ -64,14 +64,15 @@ async function getVersion() {
 
 watchEffect(async () => {
   if (route.path.includes('/bundle/') && route.path.includes('/dependencies')) {
+    const params = route.params as { package?: string, bundle?: string }
     loading.value = true
-    packageId.value = route.params.package as string
-    id.value = Number(route.params.bundle as string)
+    packageId.value = params.package as string
+    id.value = Number(params.bundle as string)
     await getVersion()
     loading.value = false
     if (!version.value?.name)
       displayStore.NavTitle = t('bundle')
-    displayStore.defaultBack = `/app/${route.params.package}/bundles`
+    displayStore.defaultBack = `/app/${params.package}/bundles`
   }
 })
 </script>
