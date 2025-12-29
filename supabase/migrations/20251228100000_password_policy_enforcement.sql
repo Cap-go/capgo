@@ -180,8 +180,8 @@ BEGIN
     SELECT
         ou.user_id,
         au.email::text,
-        u.first_name,
-        u.last_name,
+        u.first_name::text,
+        u.last_name::text,
         public.user_meets_password_policy(ou.user_id, check_org_members_password_policy.org_id) AS "password_policy_compliant"
     FROM public.org_users ou
     JOIN auth.users au ON au.id = ou.user_id
