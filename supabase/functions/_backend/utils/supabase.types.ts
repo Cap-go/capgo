@@ -2098,8 +2098,8 @@ export type Database = {
       check_org_members_2fa_enabled: {
         Args: { org_id: string }
         Returns: {
-          "2fa_enabled": boolean
           user_id: string
+          "2fa_enabled": boolean
         }[]
       }
       check_revert_to_builtin_version: {

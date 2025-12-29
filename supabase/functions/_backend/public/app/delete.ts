@@ -1,6 +1,7 @@
 import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { BRES, simpleError } from '../../utils/hono.ts'
+import { cloudlog } from '../../utils/logging.ts'
 import { hasAppRightApikey, supabaseAdmin } from '../../utils/supabase.ts'
 import { isValidAppId } from '../../utils/utils.ts'
 
@@ -13,6 +14,36 @@ export async function deleteApp(c: Context, appId: string, apikey: Database['pub
   }
   if (!(await hasAppRightApikey(c, appId, apikey.user_id, 'write', apikey.key))) {
     throw simpleError('cannot_delete_app', 'You can\'t access this app', { app_id: appId })
+  }
+
+  // Get the app's owner_org for image cleanup
+  const { data: app } = await supabaseAdmin(c)
+    .from('apps')
+    .select('owner_org')
+    .eq('app_id', appId)
+    .single()
+
+  // Delete app icon from storage before deleting the app
+  // App icons are stored at: images/org/{org_id}/{app_id}/icon
+  if (app?.owner_org) {
+    try {
+      const { data: files } = await supabaseAdmin(c)
+        .storage
+        .from('images')
+        .list(`org/${app.owner_org}/${appId}`)
+
+      if (files && files.length > 0) {
+        const filePaths = files.map(file => `org/${app.owner_org}/${appId}/${file.name}`)
+        await supabaseAdmin(c)
+          .storage
+          .from('images')
+          .remove(filePaths)
+        cloudlog({ requestId: c.get('requestId'), message: 'deleted app images', count: files.length, app_id: appId })
+      }
+    }
+    catch (error) {
+      cloudlog({ requestId: c.get('requestId'), message: 'error deleting app images', error, app_id: appId })
+    }
   }
 
   // Run most deletions in parallel
