@@ -72,7 +72,7 @@ app.put('/:id', middlewareKey(['all']), async (c) => {
   // Check if the apikey to update exists (RLS handles ownership)
   const { data: existingApikey, error: fetchError } = await supabase
     .from('apikeys')
-    .select('id, limited_to_orgs') // Also fetch limited_to_orgs for policy validation
+    .select('id, limited_to_orgs, expires_at') // Also fetch expires_at for policy validation
     .or(`key.eq.${id},id.eq.${id}`)
     .eq('user_id', key.user_id)
     .single()
@@ -90,7 +90,9 @@ app.put('/:id', middlewareKey(['all']), async (c) => {
 
   // Validate expiration against org policies (only if expires_at is being set or orgs are being changed)
   if (expires_at !== undefined || limited_to_orgs?.length) {
-    await validateExpirationAgainstOrgPolicies(orgsToValidate, expires_at ?? null, supabase)
+    // Use new expires_at if provided, otherwise fall back to existing
+    const expirationToValidate = expires_at !== undefined ? expires_at : (existingApikey.expires_at ?? null)
+    await validateExpirationAgainstOrgPolicies(orgsToValidate, expirationToValidate, supabase)
   }
 
   const { data: updatedApikey, error: updateError } = await supabase

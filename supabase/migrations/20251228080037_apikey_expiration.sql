@@ -66,9 +66,11 @@ $$;
 -- =============================================================================
 
 -- Update get_identity(keymode key_mode[]) to check expiration
-CREATE OR REPLACE FUNCTION "public"."get_identity" ("keymode" "public"."key_mode" []) RETURNS "uuid" LANGUAGE "plpgsql"
-SET
-  search_path = '' SECURITY DEFINER AS $$
+CREATE OR REPLACE FUNCTION "public"."get_identity" ("keymode" "public"."key_mode" []) RETURNS "uuid"
+LANGUAGE "plpgsql"
+SECURITY DEFINER
+SET search_path = ''
+AS $$
 DECLARE
     auth_uid uuid;
     api_key_text text;
@@ -107,9 +109,11 @@ End;
 $$;
 
 -- Update get_identity_apikey_only(keymode key_mode[]) to check expiration
-CREATE OR REPLACE FUNCTION "public"."get_identity_apikey_only" ("keymode" "public"."key_mode" []) RETURNS "uuid" LANGUAGE "plpgsql"
-SET
-  search_path = '' SECURITY DEFINER AS $$
+CREATE OR REPLACE FUNCTION "public"."get_identity_apikey_only" ("keymode" "public"."key_mode" []) RETURNS "uuid"
+LANGUAGE "plpgsql"
+SECURITY DEFINER
+SET search_path = ''
+AS $$
 DECLARE
     api_key_text text;
     api_key record;

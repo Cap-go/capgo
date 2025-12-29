@@ -175,7 +175,9 @@ RETURNS TABLE (
     require_apikey_expiration boolean,
     max_apikey_expiration_days integer
 ) LANGUAGE plpgsql
-SET search_path = '' SECURITY DEFINER AS $$
+SECURITY DEFINER
+SET search_path = ''
+AS $$
 DECLARE
   api_key_text text;
   api_key record;
@@ -190,6 +192,12 @@ BEGIN
     IF api_key IS NULL THEN
       PERFORM public.pg_log('deny: INVALID_API_KEY', jsonb_build_object('source', 'header'));
       RAISE EXCEPTION 'Invalid API key provided';
+    END IF;
+
+    -- Check if API key is expired
+    IF public.is_apikey_expired(api_key.expires_at) THEN
+      PERFORM public.pg_log('deny: API_KEY_EXPIRED', jsonb_build_object('key_id', api_key.id));
+      RAISE EXCEPTION 'API key has expired';
     END IF;
 
     user_id := api_key.user_id;

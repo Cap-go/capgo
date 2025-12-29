@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(18);
+SELECT plan(22);
 
 -- =============================================================================
 -- Test is_apikey_expired() function
@@ -198,10 +198,94 @@ BEGIN
 END $$;
 
 -- =============================================================================
+-- Test get_orgs_v6 with expired API key
+-- =============================================================================
+
+-- Create test API keys for get_orgs_v6 tests
+INSERT INTO apikeys (id, user_id, key, mode, name, expires_at)
+VALUES
+    (99909, '6aa76066-55ef-4238-ade6-0b32334a4097', 'test-key-orgs-expired', 'all', 'Test Orgs Expired', now() - interval '1 day'),
+    (99910, '6aa76066-55ef-4238-ade6-0b32334a4097', 'test-key-orgs-valid', 'all', 'Test Orgs Valid', now() + interval '30 days');
+
+-- Set up request headers with expired key
+DO $$
+BEGIN
+    PERFORM set_config('request.headers', '{"capgkey": "test-key-orgs-expired"}', true);
+END $$;
+
+-- Test 18: get_orgs_v6 should raise exception for expired key
+SELECT
+    throws_ok(
+        'SELECT * FROM get_orgs_v6()',
+        'P0001',
+        'API key has expired',
+        'get_orgs_v6: Raises exception for expired API key'
+    );
+
+-- Set up request headers with valid key
+DO $$
+BEGIN
+    PERFORM set_config('request.headers', '{"capgkey": "test-key-orgs-valid"}', true);
+END $$;
+
+-- Test 19: get_orgs_v6 should return results for valid key
+SELECT
+    ok(
+        (SELECT COUNT(*) > 0 FROM get_orgs_v6()),
+        'get_orgs_v6: Returns results for valid (not expired) API key'
+    );
+
+-- Test 20: get_orgs_v6 with no expiration key should work
+INSERT INTO apikeys (id, user_id, key, mode, name, expires_at)
+VALUES
+    (99911, '6aa76066-55ef-4238-ade6-0b32334a4097', 'test-key-orgs-no-expiry', 'all', 'Test Orgs No Expiry', NULL);
+
+DO $$
+BEGIN
+    PERFORM set_config('request.headers', '{"capgkey": "test-key-orgs-no-expiry"}', true);
+END $$;
+
+SELECT
+    ok(
+        (SELECT COUNT(*) > 0 FROM get_orgs_v6()),
+        'get_orgs_v6: Returns results for API key with no expiration (NULL)'
+    );
+
+-- Reset headers
+DO $$
+BEGIN
+    PERFORM set_config('request.headers', '{}', true);
+END $$;
+
+-- =============================================================================
 -- Test organization API key policy columns
 -- =============================================================================
 
--- Test 18: Verify org policy columns exist and have correct defaults
+-- Test 21: get_orgs_v6 with expired key AND limited_to_orgs should also reject
+INSERT INTO apikeys (id, user_id, key, mode, name, expires_at, limited_to_orgs)
+VALUES
+    (99912, '6aa76066-55ef-4238-ade6-0b32334a4097', 'test-key-orgs-expired-limited', 'all', 'Test Orgs Expired Limited', now() - interval '1 day', '{046a36ac-e03c-4590-9257-bd6c9dba9ee8}');
+
+DO $$
+BEGIN
+    PERFORM set_config('request.headers', '{"capgkey": "test-key-orgs-expired-limited"}', true);
+END $$;
+
+SELECT
+    throws_ok(
+        'SELECT * FROM get_orgs_v6()',
+        'P0001',
+        'API key has expired',
+        'get_orgs_v6: Raises exception for expired API key with limited_to_orgs'
+    );
+
+-- Reset headers
+DO $$
+BEGIN
+    PERFORM set_config('request.headers', '{}', true);
+END $$;
+
+-- Test 22: Verify org policy columns exist and have correct defaults
 SELECT
     ok(
         (SELECT require_apikey_expiration = false AND max_apikey_expiration_days IS NULL

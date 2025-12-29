@@ -53,7 +53,9 @@ const minExpirationDate = computed(() => {
 
 // Check if a key is expired
 function isKeyExpired(expiresAt: string | null): boolean {
-  if (!expiresAt) return false
+  if (!expiresAt)
+    return false
+
   return new Date(expiresAt) < new Date()
 }
 
@@ -270,7 +272,9 @@ columns.value = [
     label: t('expires'),
     sortable: true,
     displayFunction: (row: Database['public']['Tables']['apikeys']['Row']) => {
-      if (!row.expires_at) return t('never')
+      if (!row.expires_at)
+        return t('never')
+
       const expired = isKeyExpired(row.expires_at)
       const dateStr = formatLocalDate(row.expires_at)
       return expired ? `${dateStr} (${t('expired')})` : dateStr

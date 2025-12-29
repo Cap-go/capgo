@@ -137,7 +137,7 @@ async function saveChanges(form: { orgName: string, email: string }) {
   currentOrganization.value.name = form.orgName
   currentOrganization.value.management_email = form.email
   currentOrganization.value.require_apikey_expiration = requireApikeyExpiration.value
-  currentOrganization.value.max_apikey_expiration_days = maxApikeyExpirationDays.value ?? 0
+  currentOrganization.value.max_apikey_expiration_days = maxApikeyExpirationDays.value
   isLoading.value = true
 
   // Update name and API key policy
@@ -157,7 +157,7 @@ async function saveChanges(form: { orgName: string, email: string }) {
     // Revert the optimistic update
     currentOrganization.value.name = orgCopy.name
     currentOrganization.value.require_apikey_expiration = orgCopy.require_apikey_expiration ?? false
-    currentOrganization.value.max_apikey_expiration_days = orgCopy.max_apikey_expiration_days ?? 0
+    currentOrganization.value.max_apikey_expiration_days = orgCopy.max_apikey_expiration_days ?? null
     isLoading.value = false
     return
   }
