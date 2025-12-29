@@ -67,7 +67,7 @@ CREATE TABLE public.apps (
     name character varying,
     last_version character varying,
     updated_at timestamp with time zone,
-    id uuid DEFAULT extensions.uuid_generate_v4(),
+    id uuid DEFAULT gen_random_uuid(),
     retention bigint DEFAULT '2592000'::bigint NOT NULL,
     owner_org uuid NOT NULL,
     default_upload_channel character varying DEFAULT 'production'::character varying NOT NULL,

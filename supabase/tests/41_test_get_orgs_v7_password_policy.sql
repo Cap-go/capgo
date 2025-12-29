@@ -38,9 +38,9 @@ DECLARE
     policy_config jsonb;
     policy_hash text;
 BEGIN
-    org_with_pwd_policy_id := extensions.uuid_generate_v4();
-    org_without_pwd_policy_id := extensions.uuid_generate_v4();
-    org_with_both_policies_id := extensions.uuid_generate_v4();
+    org_with_pwd_policy_id := gen_random_uuid();
+    org_without_pwd_policy_id := gen_random_uuid();
+    org_with_both_policies_id := gen_random_uuid();
     compliant_user_id := tests.get_supabase_uid('test_pwd_compliant_v7');
     noncompliant_user_id := tests.get_supabase_uid('test_pwd_noncompliant_v7');
     test_admin_id := tests.get_supabase_uid('test_admin');
@@ -554,7 +554,7 @@ DECLARE
     test_admin_id uuid;
     noncompliant_user_id uuid;
 BEGIN
-    org_disabled_policy_id := extensions.uuid_generate_v4();
+    org_disabled_policy_id := gen_random_uuid();
     test_admin_id := tests.get_supabase_uid('test_admin');
     noncompliant_user_id := tests.get_supabase_uid('test_pwd_noncompliant_v7');
 

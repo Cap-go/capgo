@@ -30,7 +30,7 @@ DECLARE
     member3_id uuid;
     member4_id uuid;
 BEGIN
-    test_org_id := extensions.uuid_generate_v4();
+    test_org_id := gen_random_uuid();
     super_admin_id := tests.get_supabase_uid('test_admin');
     member1_id := tests.get_supabase_uid('test_org_member_1');
     member2_id := tests.get_supabase_uid('test_org_member_2');
@@ -71,7 +71,7 @@ BEGIN
     -- Insert verified MFA factor for member1
     INSERT INTO auth.mfa_factors (id, user_id, friendly_name, factor_type, status, created_at, updated_at)
     VALUES (
-        extensions.uuid_generate_v4(),
+        gen_random_uuid(),
         member1_id,
         'Test TOTP',
         'totp'::auth.factor_type,
@@ -83,7 +83,7 @@ BEGIN
     -- Insert verified MFA factor for member4 (to test multiple members with 2FA)
     INSERT INTO auth.mfa_factors (id, user_id, friendly_name, factor_type, status, created_at, updated_at)
     VALUES (
-        extensions.uuid_generate_v4(),
+        gen_random_uuid(),
         member4_id,
         'Test TOTP Member4',
         'totp'::auth.factor_type,
@@ -95,7 +95,7 @@ BEGIN
     -- Insert unverified MFA factor for member2 (should not count)
     INSERT INTO auth.mfa_factors (id, user_id, friendly_name, factor_type, status, created_at, updated_at)
     VALUES (
-        extensions.uuid_generate_v4(),
+        gen_random_uuid(),
         member2_id,
         'Test TOTP Unverified',
         'totp'::auth.factor_type,
@@ -265,7 +265,7 @@ SELECT
     throws_ok(
         format(
             'SELECT * FROM check_org_members_2fa_enabled(''%s'')',
-            extensions.uuid_generate_v4()
+            gen_random_uuid()
         ),
         'Organization does not exist',
         'check_org_members_2fa_enabled test - non-existent org raises exception'

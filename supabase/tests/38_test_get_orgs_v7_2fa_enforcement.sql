@@ -25,8 +25,8 @@ DECLARE
     test_no_2fa_user_id uuid;
     test_admin_id uuid;
 BEGIN
-    org_with_2fa_enforcement_id := extensions.uuid_generate_v4();
-    org_without_2fa_enforcement_id := extensions.uuid_generate_v4();
+    org_with_2fa_enforcement_id := gen_random_uuid();
+    org_without_2fa_enforcement_id := gen_random_uuid();
     test_2fa_user_id := tests.get_supabase_uid('test_2fa_user_v7');
     test_no_2fa_user_id := tests.get_supabase_uid('test_no_2fa_user_v7');
     test_admin_id := tests.get_supabase_uid('test_admin');
@@ -66,7 +66,7 @@ BEGIN
     -- Insert verified MFA factor for test_2fa_user_v7
     INSERT INTO auth.mfa_factors (id, user_id, friendly_name, factor_type, status, created_at, updated_at)
     VALUES (
-        extensions.uuid_generate_v4(),
+        gen_random_uuid(),
         test_2fa_user_id,
         'Test TOTP V7',
         'totp'::auth.factor_type,
