@@ -782,6 +782,8 @@
   "create-secure-key-description": "The key will only be visible once after creation. We store only a hash - we cannot recover it later.",
   "enforce-hashed-api-keys": "Enforce Secure API Keys",
   "enforce-hashed-api-keys-description": "When enabled, only secure (hashed) API keys can access this organization. Plain-text API keys will be rejected.",
+  "hashed-api-keys-enforcement-enabled": "Secure API keys enforcement has been enabled.",
+  "hashed-api-keys-enforcement-disabled": "Secure API keys enforcement has been disabled.",
   "secure-key-created": "Secure API Key Created",
   "secure-key-hidden": "Secure key (hidden)",
   "secure-key-warning": "This key will only be shown once. Copy it now and store it securely. You will not be able to see it again.",
