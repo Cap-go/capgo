@@ -1399,7 +1399,6 @@
   "sso-config-saved": "SSO configuration saved successfully",
   "configure": "Configure",
   "hide-config": "Hide Configuration",
-  "copy-failed": "Failed to copy to clipboard",
   "view-plans": "View Plans",
   "role-read": "Read",
   "role-upload": "Upload",

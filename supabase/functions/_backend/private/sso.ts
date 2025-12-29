@@ -399,30 +399,32 @@ app.post('/domains/verify', middlewareV2(['all', 'write']), async (c) => {
   }
   catch (dnsError) {
     // DNS lookup failed - domain not configured
+    // Note: We don't expose the verification token in error responses for security
     return c.json({
       success: false,
       verified: false,
       error: 'dns_lookup_failed',
       message: `Could not find DNS TXT record at ${dnsRecord}. Please add the verification record and try again.`,
       expected_record: dnsRecord,
-      expected_value: domainInfo.verification_token,
     })
   }
 
   if (!verified) {
+    // Note: We don't expose the expected token value in error responses for security
     return c.json({
       success: false,
       verified: false,
       error: 'verification_token_mismatch',
-      message: `DNS TXT record found but value doesn't match. Expected: ${domainInfo.verification_token}`,
+      message: 'DNS TXT record found but value does not match the expected verification token.',
       expected_record: dnsRecord,
-      expected_value: domainInfo.verification_token,
     })
   }
 
   // Mark domain as verified (this triggers backfill)
+  // Pass user_id for service-role client compatibility
   const { data, error } = await supabaseAdmin.rpc('verify_org_domain', {
     p_domain_id: domain_id,
+    p_user_id: auth.userId,
   })
 
   if (error) {
