@@ -249,7 +249,11 @@ export const useOrganizationStore = defineStore('organization', () => {
     }
 
     const mappedData = data.map((item, id) => {
-      return { id, ...item } as Organization & { id: number }
+      return {
+        id,
+        ...item,
+        password_policy_config: item.password_policy_config as PasswordPolicyConfig | null,
+      } as Organization & { id: number }
     })
 
     _organizations.value = new Map(mappedData.map(item => [item.gid, item as Organization]))
@@ -258,14 +262,14 @@ export const useOrganizationStore = defineStore('organization', () => {
     if (!currentOrganization.value) {
       const storedOrgId = localStorage.getItem(STORAGE_KEY)
       if (storedOrgId) {
-        const storedOrg = data.find(org => org.gid === storedOrgId && !org.role.includes('invite'))
+        const storedOrg = mappedData.find(org => org.gid === storedOrgId && !org.role.includes('invite'))
         if (storedOrg) {
           currentOrganization.value = storedOrg as Organization
         }
       }
     }
 
-    currentOrganization.value ??= organization as Organization
+    currentOrganization.value ??= mappedData.find(org => org.gid === organization.gid) as Organization | undefined
     currentOrganizationFailed.value = !(!!currentOrganization.value?.paying || (currentOrganization.value?.trial_left ?? 0) > 0)
   }
 

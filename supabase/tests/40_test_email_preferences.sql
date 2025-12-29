@@ -218,9 +218,15 @@ SELECT
   );
 
 -- Test 13: New user gets default preferences
+DO $$
+BEGIN
+  PERFORM tests.create_supabase_user('new_email_pref_user', 'new-email-pref-user@example.com', '555-001-0002');
+END;
+$$ LANGUAGE plpgsql;
+
 INSERT INTO public.users (id, email, created_at, updated_at)
 VALUES (
-  gen_random_uuid(),
+  tests.get_supabase_uid('new_email_pref_user'),
   'new-email-pref-user@example.com',
   now(),
   now()

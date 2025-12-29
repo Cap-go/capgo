@@ -347,15 +347,20 @@ SELECT
 DO $$
 DECLARE
     test_admin_id uuid;
-    org_id uuid;
+    target_org_id uuid;
 BEGIN
     test_admin_id := tests.get_supabase_uid('test_admin');
-    org_id := current_setting('test.org_with_pwd_policy')::uuid;
+    target_org_id := current_setting('test.org_with_pwd_policy')::uuid;
 
     -- Add test_admin to org as super_admin (but no compliance record)
-    INSERT INTO public.org_users (org_id, user_id, user_right)
-    VALUES (org_id, test_admin_id, 'super_admin'::public.user_min_right)
-    ON CONFLICT (org_id, user_id, app_id, channel_id) DO NOTHING;
+    -- Only insert if not already exists
+    IF NOT EXISTS (
+        SELECT 1 FROM public.org_users
+        WHERE org_id = target_org_id AND user_id = test_admin_id
+    ) THEN
+        INSERT INTO public.org_users (org_id, user_id, user_right)
+        VALUES (target_org_id, test_admin_id, 'super_admin'::public.user_min_right);
+    END IF;
 END $$;
 
 -- Test 17: Super admin without compliance record cannot access org with policy

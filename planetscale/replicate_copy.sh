@@ -25,7 +25,7 @@ fi
 #   --table=org_users \
 
 echo "==> Using target database for region: $DB_SB"
-pg_dump --data-only \
+pg_dump-17 --data-only \
   --no-owner --no-privileges \
   --table=channel_devices \
   "$DB_SB" \
