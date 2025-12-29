@@ -17,13 +17,11 @@ export interface PasswordPolicyConfig {
   require_special: boolean
 }
 
-// Extended organization type with password policy fields (from get_orgs_v7)
-// Once types are regenerated, this can be replaced with the generated type
-export type Organization = ArrayElement<Database['public']['Functions']['get_orgs_v6']['Returns']> & {
-  'enforcing_2fa'?: boolean
-  '2fa_has_access'?: boolean
-  'password_policy_config'?: PasswordPolicyConfig | null
-  'password_has_access'?: boolean
+// Extended organization type with password policy and 2FA fields (from get_orgs_v7)
+// Note: Using get_orgs_v7 return type with explicit JSON parsing for password_policy_config
+type RawOrganization = ArrayElement<Database['public']['Functions']['get_orgs_v7']['Returns']>
+export type Organization = Omit<RawOrganization, 'password_policy_config'> & {
+  password_policy_config: PasswordPolicyConfig | null
 }
 export type OrganizationRole = Database['public']['Enums']['user_min_right'] | 'owner'
 export type ExtendedOrganizationMember = Concrete<Merge<ArrayElement<Database['public']['Functions']['get_org_members']['Returns']>, { id: number }>>
@@ -255,10 +253,10 @@ export const useOrganizationStore = defineStore('organization', () => {
         id,
         ...item,
         password_policy_config: item.password_policy_config as PasswordPolicyConfig | null,
-      }
+      } as Organization & { id: number }
     })
 
-    _organizations.value = new Map(mappedData.map(item => [item.gid, item]))
+    _organizations.value = new Map(mappedData.map(item => [item.gid, item as Organization]))
 
     // Try to restore from localStorage first
     if (!currentOrganization.value) {
@@ -266,12 +264,12 @@ export const useOrganizationStore = defineStore('organization', () => {
       if (storedOrgId) {
         const storedOrg = mappedData.find(org => org.gid === storedOrgId && !org.role.includes('invite'))
         if (storedOrg) {
-          currentOrganization.value = storedOrg
+          currentOrganization.value = storedOrg as Organization
         }
       }
     }
 
-    currentOrganization.value ??= mappedData.find(org => org.gid === organization.gid)
+    currentOrganization.value ??= mappedData.find(org => org.gid === organization.gid) as Organization | undefined
     currentOrganizationFailed.value = !(!!currentOrganization.value?.paying || (currentOrganization.value?.trial_left ?? 0) > 0)
   }
 

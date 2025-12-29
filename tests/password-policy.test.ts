@@ -399,8 +399,8 @@ describe('Password Policy Enforcement Integration', () => {
       min_right: 'read',
       user_id: USER_ID,
       org_id: orgWithPolicyId,
-      app_id: null as unknown as string,
-      channel_id: null as unknown as number,
+      app_id: '' as any,
+      channel_id: 0 as any,
     })
 
     // The result depends on whether the test user has a compliance record
@@ -489,7 +489,7 @@ describe('user_password_compliance table', () => {
       .upsert({
         user_id: USER_ID,
         org_id: ORG_ID,
-        policy_hash: hashResult ?? '',
+        policy_hash: hashResult || '',
         validated_at: new Date().toISOString(),
       }, {
         onConflict: 'user_id,org_id',
