@@ -20,7 +20,7 @@ else
 fi
 
 # Select which region to use (change this to switch regions)
-SELECTED_REGION="PLANETSCALE_NA"
+SELECTED_REGION="PLANETSCALE_AS"
 DB_T="${!SELECTED_REGION}"
 
 if [[ -z "$DB_T" ]]; then
@@ -103,7 +103,7 @@ SUBSCRIPTION_NAME="planetscale_subscription_${REGION}"
 #   "$DUMP_FILE"
 
 echo "==> Truncating tables on target before replication..."
-psql "$TARGET_DB_URL" -v ON_ERROR_STOP=1 <<'SQL'
+psql-17 "$TARGET_DB_URL" -v ON_ERROR_STOP=1 <<'SQL'
 TRUNCATE TABLE
   channel_devices,
   apps,
@@ -117,7 +117,7 @@ CASCADE;
 SQL
 
 echo "==> Fixing sequences on target..."
-psql "$TARGET_DB_URL" -v ON_ERROR_STOP=1 <<'SQL'
+psql-17 "$TARGET_DB_URL" -v ON_ERROR_STOP=1 <<'SQL'
 DO $$
 DECLARE
   r RECORD;
@@ -148,7 +148,7 @@ $$;
 SQL
 
 echo "==> Dropping existing subscription if exists..."
-psql "$TARGET_DB_URL" -v ON_ERROR_STOP=0 <<SQL
+psql-17 "$TARGET_DB_URL" -v ON_ERROR_STOP=0 <<SQL
 DROP SUBSCRIPTION IF EXISTS ${SUBSCRIPTION_NAME};
 SQL
 
@@ -168,10 +168,10 @@ WITH (
 );"
 echo "Subscription creation SQL:"
 echo "$SQL_QUERY_SUB"
-psql "$TARGET_DB_URL" -v ON_ERROR_STOP=1 <<SQL
+psql-17 "$TARGET_DB_URL" -v ON_ERROR_STOP=1 <<SQL
 $SQL_QUERY_SUB
 SQL
 
 echo "==> Done."
 echo "Check status with:"
-echo "psql \"$TARGET_DB_URL\" -c \"SELECT subname, status, received_lsn, last_msg_receipt_time FROM pg_stat_subscription;\""
+echo "psql-17 \"$TARGET_DB_URL\" -c \"SELECT subname, status, received_lsn, last_msg_receipt_time FROM pg_stat_subscription;\""
