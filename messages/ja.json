@@ -1220,5 +1220,12 @@
   "webhook-url-invalid": "有効なURLを入力してください",
   "webhook-url-placeholder": "https://example.com/webhook",
   "webhooks": "Webhook",
-  "webhooks-description": "組織でイベントが発生した時にHTTP通知を受け取るようにWebhookを設定します。"
+  "webhooks-description": "組織でイベントが発生した時にHTTP通知を受け取るようにWebhookを設定します。",
+  "dependencies": "依存関係",
+  "native-dependencies": "ネイティブ依存関係",
+  "native-dependencies-description": "このバンドルに含まれるネイティブパッケージとそのバージョン",
+  "package-name": "パッケージ名",
+  "no-native-dependencies": "ネイティブ依存関係なし",
+  "no-native-dependencies-description": "このバンドルにはネイティブパッケージ情報が含まれていません。ネイティブ依存関係はCLIでアップロード時にキャプチャされます。",
+  "view-on-npm": "npmで表示"
 }
