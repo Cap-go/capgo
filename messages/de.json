@@ -1235,5 +1235,21 @@
   "package-name": "Paketname",
   "no-native-dependencies": "Keine nativen Abhängigkeiten",
   "no-native-dependencies-description": "Dieses Bundle enthält keine Informationen zu nativen Paketen. Native Abhängigkeiten werden beim Hochladen mit der CLI erfasst.",
-  "view-on-npm": "Auf npm anzeigen"
+  "view-on-npm": "Auf npm anzeigen",
+  "password-verification-required": "Passwortüberprüfung erforderlich",
+  "password-verification-required-message": "Ihre Organisation hat eine Passwortrichtlinie, die eine Überprüfung erfordert. Bitte geben Sie Ihr aktuelles Passwort ein, um zu bestätigen, dass es die Anforderungen erfüllt.",
+  "verify-current-password": "Passwort überprüfen",
+  "current-password": "Aktuelles Passwort",
+  "verify-password": "Passwort überprüfen",
+  "password-verified-successfully": "Passwort erfolgreich überprüft",
+  "password-policy-members-status": "Passwortrichtlinien-Status der Mitglieder",
+  "password-policy-compliant": "Richtlinienkonform",
+  "password-policy-non-compliant": "Nicht konform",
+  "password-policy-impacted-members-title": "Mitglieder, die Passwortrichtlinie nicht erfüllen",
+  "password-policy-impacted-members-description": "Diese Mitglieder haben nicht bestätigt, dass ihr Passwort den aktuellen Richtlinienanforderungen entspricht. Sie werden gesperrt, bis sie ihr Passwort überprüfen oder ändern.",
+  "password-policy-all-members-compliant": "Alle Mitglieder erfüllen die Passwortrichtlinien-Anforderungen!",
+  "invalid-password": "Ungültiges Passwort",
+  "password-does-not-meet-requirements": "Ihr Passwort erfüllt nicht die Anforderungen der Organisation. Bitte ändern Sie Ihr Passwort.",
+  "verification-failed": "Überprüfung fehlgeschlagen",
+  "no-organization-selected": "Keine Organisation ausgewählt"
 }

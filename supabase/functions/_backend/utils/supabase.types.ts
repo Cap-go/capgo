@@ -238,60 +238,6 @@ export type Database = {
           },
         ]
       }
-      audit_logs: {
-        Row: {
-          id: number
-          created_at: string
-          table_name: string
-          record_id: string
-          operation: string
-          user_id: string | null
-          org_id: string
-          old_record: Json | null
-          new_record: Json | null
-          changed_fields: string[] | null
-        }
-        Insert: {
-          id?: number
-          created_at?: string
-          table_name: string
-          record_id: string
-          operation: string
-          user_id?: string | null
-          org_id: string
-          old_record?: Json | null
-          new_record?: Json | null
-          changed_fields?: string[] | null
-        }
-        Update: {
-          id?: number
-          created_at?: string
-          table_name?: string
-          record_id?: string
-          operation?: string
-          user_id?: string | null
-          org_id?: string
-          old_record?: Json | null
-          new_record?: Json | null
-          changed_fields?: string[] | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "audit_logs_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "orgs"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "audit_logs_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       apps: {
         Row: {
           app_id: string
@@ -357,6 +303,60 @@ export type Database = {
             columns: ["owner_org"]
             isOneToOne: false
             referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      audit_logs: {
+        Row: {
+          changed_fields: string[] | null
+          created_at: string
+          id: number
+          new_record: Json | null
+          old_record: Json | null
+          operation: string
+          org_id: string
+          record_id: string
+          table_name: string
+          user_id: string | null
+        }
+        Insert: {
+          changed_fields?: string[] | null
+          created_at?: string
+          id?: number
+          new_record?: Json | null
+          old_record?: Json | null
+          operation: string
+          org_id: string
+          record_id: string
+          table_name: string
+          user_id?: string | null
+        }
+        Update: {
+          changed_fields?: string[] | null
+          created_at?: string
+          id?: number
+          new_record?: Json | null
+          old_record?: Json | null
+          operation?: string
+          org_id?: string
+          record_id?: string
+          table_name?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_logs_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "audit_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
             referencedColumns: ["id"]
           },
         ]
@@ -497,33 +497,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      cache_entry: {
-        Row: {
-          cached_at: string | null
-          end_date: string | null
-          id: number | null
-          org_id: string | null
-          response: Json | null
-          start_date: string | null
-        }
-        Insert: {
-          cached_at?: string | null
-          end_date?: string | null
-          id?: number | null
-          org_id?: string | null
-          response?: Json | null
-          start_date?: string | null
-        }
-        Update: {
-          cached_at?: string | null
-          end_date?: string | null
-          id?: number | null
-          org_id?: string | null
-          response?: Json | null
-          start_date?: string | null
-        }
-        Relationships: []
       }
       capgo_credits_steps: {
         Row: {
@@ -706,6 +679,69 @@ export type Database = {
           },
         ]
       }
+      cron_tasks: {
+        Row: {
+          batch_size: number | null
+          created_at: string
+          description: string | null
+          enabled: boolean
+          hour_interval: number | null
+          id: number
+          minute_interval: number | null
+          name: string
+          payload: Json | null
+          run_at_hour: number | null
+          run_at_minute: number | null
+          run_at_second: number | null
+          run_on_day: number | null
+          run_on_dow: number | null
+          second_interval: number | null
+          target: string
+          task_type: Database["public"]["Enums"]["cron_task_type"]
+          updated_at: string
+        }
+        Insert: {
+          batch_size?: number | null
+          created_at?: string
+          description?: string | null
+          enabled?: boolean
+          hour_interval?: number | null
+          id?: number
+          minute_interval?: number | null
+          name: string
+          payload?: Json | null
+          run_at_hour?: number | null
+          run_at_minute?: number | null
+          run_at_second?: number | null
+          run_on_day?: number | null
+          run_on_dow?: number | null
+          second_interval?: number | null
+          target: string
+          task_type?: Database["public"]["Enums"]["cron_task_type"]
+          updated_at?: string
+        }
+        Update: {
+          batch_size?: number | null
+          created_at?: string
+          description?: string | null
+          enabled?: boolean
+          hour_interval?: number | null
+          id?: number
+          minute_interval?: number | null
+          name?: string
+          payload?: Json | null
+          run_at_hour?: number | null
+          run_at_minute?: number | null
+          run_at_second?: number | null
+          run_on_day?: number | null
+          run_on_dow?: number | null
+          second_interval?: number | null
+          target?: string
+          task_type?: Database["public"]["Enums"]["cron_task_type"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
       daily_bandwidth: {
         Row: {
           app_id: string
@@ -878,6 +914,7 @@ export type Database = {
           created_by: string
           deployed_at: string | null
           id: number
+          install_stats_email_sent_at: string | null
           owner_org: string
           updated_at: string | null
           version_id: number
@@ -889,6 +926,7 @@ export type Database = {
           created_by: string
           deployed_at?: string | null
           id?: number
+          install_stats_email_sent_at?: string | null
           owner_org: string
           updated_at?: string | null
           version_id: number
@@ -900,6 +938,7 @@ export type Database = {
           created_by?: string
           deployed_at?: string | null
           id?: number
+          install_stats_email_sent_at?: string | null
           owner_org?: string
           updated_at?: string | null
           version_id?: number
@@ -1898,6 +1937,132 @@ export type Database = {
         }
         Relationships: []
       }
+      webhook_deliveries: {
+        Row: {
+          attempt_count: number
+          audit_log_id: number | null
+          completed_at: string | null
+          created_at: string
+          duration_ms: number | null
+          event_type: string
+          id: string
+          max_attempts: number
+          next_retry_at: string | null
+          org_id: string
+          request_payload: Json
+          response_body: string | null
+          response_headers: Json | null
+          response_status: number | null
+          status: string
+          webhook_id: string
+        }
+        Insert: {
+          attempt_count?: number
+          audit_log_id?: number | null
+          completed_at?: string | null
+          created_at?: string
+          duration_ms?: number | null
+          event_type: string
+          id?: string
+          max_attempts?: number
+          next_retry_at?: string | null
+          org_id: string
+          request_payload: Json
+          response_body?: string | null
+          response_headers?: Json | null
+          response_status?: number | null
+          status?: string
+          webhook_id: string
+        }
+        Update: {
+          attempt_count?: number
+          audit_log_id?: number | null
+          completed_at?: string | null
+          created_at?: string
+          duration_ms?: number | null
+          event_type?: string
+          id?: string
+          max_attempts?: number
+          next_retry_at?: string | null
+          org_id?: string
+          request_payload?: Json
+          response_body?: string | null
+          response_headers?: Json | null
+          response_status?: number | null
+          status?: string
+          webhook_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "webhook_deliveries_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "webhook_deliveries_webhook_id_fkey"
+            columns: ["webhook_id"]
+            isOneToOne: false
+            referencedRelation: "webhooks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      webhooks: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          enabled: boolean
+          events: string[]
+          id: string
+          name: string
+          org_id: string
+          secret: string
+          updated_at: string
+          url: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          enabled?: boolean
+          events: string[]
+          id?: string
+          name: string
+          org_id: string
+          secret?: string
+          updated_at?: string
+          url: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          enabled?: boolean
+          events?: string[]
+          id?: string
+          name?: string
+          org_id?: string
+          secret?: string
+          updated_at?: string
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "webhooks_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "webhooks_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       usage_credit_balances: {
@@ -1996,8 +2161,8 @@ export type Database = {
       check_org_members_2fa_enabled: {
         Args: { org_id: string }
         Returns: {
-          user_id: string
           "2fa_enabled": boolean
+          user_id: string
         }[]
       }
       check_revert_to_builtin_version: {
@@ -2005,7 +2170,10 @@ export type Database = {
         Returns: number
       }
       cleanup_frequent_job_details: { Args: never; Returns: undefined }
+      cleanup_job_run_details_7days: { Args: never; Returns: undefined }
+      cleanup_old_audit_logs: { Args: never; Returns: undefined }
       cleanup_queue_messages: { Args: never; Returns: undefined }
+      cleanup_webhook_deliveries: { Args: never; Returns: undefined }
       convert_bytes_to_gb: { Args: { bytes_value: number }; Returns: number }
       convert_bytes_to_mb: { Args: { bytes_value: number }; Returns: number }
       convert_gb_to_bytes: { Args: { gb: number }; Returns: number }
@@ -2307,6 +2475,59 @@ export type Database = {
               trial_left: number
             }[]
           }
+      get_orgs_v7:
+        | {
+            Args: never
+            Returns: {
+              "2fa_has_access": boolean
+              app_count: number
+              can_use_more: boolean
+              created_by: string
+              credit_available: number
+              credit_next_expiration: string
+              credit_total: number
+              enforcing_2fa: boolean
+              gid: string
+              is_canceled: boolean
+              is_yearly: boolean
+              logo: string
+              management_email: string
+              name: string
+              next_stats_update_at: string
+              paying: boolean
+              role: string
+              stats_updated_at: string
+              subscription_end: string
+              subscription_start: string
+              trial_left: number
+            }[]
+          }
+        | {
+            Args: { userid: string }
+            Returns: {
+              "2fa_has_access": boolean
+              app_count: number
+              can_use_more: boolean
+              created_by: string
+              credit_available: number
+              credit_next_expiration: string
+              credit_total: number
+              enforcing_2fa: boolean
+              gid: string
+              is_canceled: boolean
+              is_yearly: boolean
+              logo: string
+              management_email: string
+              name: string
+              next_stats_update_at: string
+              paying: boolean
+              role: string
+              stats_updated_at: string
+              subscription_end: string
+              subscription_start: string
+              trial_left: number
+            }[]
+          }
       get_plan_usage_percent_detailed:
         | {
             Args: { orgid: string }
@@ -2421,6 +2642,9 @@ export type Database = {
           open_app: number
         }[]
       }
+      has_2fa_enabled:
+        | { Args: never; Returns: boolean }
+        | { Args: { user_id: string }; Returns: boolean }
       has_app_right: {
         Args: {
           appid: string
@@ -2549,6 +2773,7 @@ export type Database = {
       }
       process_cron_stats_jobs: { Args: never; Returns: undefined }
       process_cron_sync_sub_jobs: { Args: never; Returns: undefined }
+      process_deploy_install_stats_email: { Args: never; Returns: undefined }
       process_failed_uploads: { Args: never; Returns: undefined }
       process_free_trial_expired: { Args: never; Returns: undefined }
       process_function_queue:
@@ -2612,6 +2837,10 @@ export type Database = {
           p_user_id: string
         }
         Returns: string
+      }
+      reject_access_due_to_2fa: {
+        Args: { org_id: string; user_id: string }
+        Returns: boolean
       }
       remove_old_jobs: { Args: never; Returns: undefined }
       rescind_invitation: {
@@ -2698,6 +2927,7 @@ export type Database = {
         | "deduction"
         | "expiry"
         | "refund"
+      cron_task_type: "function" | "queue" | "function_queue"
       disable_update: "major" | "minor" | "patch" | "version_number" | "none"
       key_mode: "read" | "write" | "all" | "upload"
       platform_os: "ios" | "android"
@@ -2741,9 +2971,7 @@ export type Database = {
         | "disableAutoUpdateMetadata"
         | "disableAutoUpdateUnderNative"
         | "disableDevBuild"
-        | "disableProdBuild"
         | "disableEmulator"
-        | "disableDevice"
         | "cannotGetBundle"
         | "checksum_fail"
         | "NoChannelOrOverride"
@@ -2764,6 +2992,8 @@ export type Database = {
         | "download_manifest_brotli_fail"
         | "backend_refusal"
         | "download_0"
+        | "disableProdBuild"
+        | "disableDevice"
       stripe_status:
         | "created"
         | "succeeded"
@@ -2950,6 +3180,7 @@ export const Constants = {
         "expiry",
         "refund",
       ],
+      cron_task_type: ["function", "queue", "function_queue"],
       disable_update: ["major", "minor", "patch", "version_number", "none"],
       key_mode: ["read", "write", "all", "upload"],
       platform_os: ["ios", "android"],
@@ -2993,9 +3224,7 @@ export const Constants = {
         "disableAutoUpdateMetadata",
         "disableAutoUpdateUnderNative",
         "disableDevBuild",
-        "disableProdBuild",
         "disableEmulator",
-        "disableDevice",
         "cannotGetBundle",
         "checksum_fail",
         "NoChannelOrOverride",
@@ -3016,6 +3245,8 @@ export const Constants = {
         "download_manifest_brotli_fail",
         "backend_refusal",
         "download_0",
+        "disableProdBuild",
+        "disableDevice",
       ],
       stripe_status: [
         "created",

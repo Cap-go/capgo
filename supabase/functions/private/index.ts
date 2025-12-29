@@ -20,6 +20,7 @@ import { app as storeTop } from '../_backend/private/store_top.ts'
 import { app as stripe_checkout } from '../_backend/private/stripe_checkout.ts'
 import { app as stripe_portal } from '../_backend/private/stripe_portal.ts'
 import { app as upload_link } from '../_backend/private/upload_link.ts'
+import { app as validate_password_compliance } from '../_backend/private/validate_password_compliance.ts'
 import { createAllCatch, createHono } from '../_backend/utils/hono.ts'
 import { version } from '../_backend/utils/version.ts'
 
@@ -49,6 +50,7 @@ appGlobal.route('/events', events)
 appGlobal.route('/invite_new_user_to_org', invite_new_user_to_org)
 appGlobal.route('/accept_invitation', accept_invitation)
 appGlobal.route('/sso', sso)
+appGlobal.route('/validate_password_compliance', validate_password_compliance)
 
 createAllCatch(appGlobal, functionName)
 Deno.serve(appGlobal.fetch)
