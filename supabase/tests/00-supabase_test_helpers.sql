@@ -67,7 +67,7 @@ DECLARE
 BEGIN
 
     -- create the user
-    user_id := extensions.uuid_generate_v4();
+    user_id := gen_random_uuid();
     INSERT INTO auth.users (id, email, phone, raw_user_meta_data, raw_app_meta_data, created_at, updated_at)
     VALUES (user_id, coalesce(email, concat(user_id, '@test.com')), phone, jsonb_build_object('test_identifier', identifier) || coalesce(metadata, '{}'::jsonb), '{}'::jsonb, now(), now())
     RETURNING id INTO user_id;
