@@ -748,7 +748,7 @@ BEGIN
     plan_product_id,
     'sub_seeded_demo',
     'succeeded',
-    now() - interval '15 days',
+    now() + interval '15 days',
     true,
     2,
     '{}'::json,
