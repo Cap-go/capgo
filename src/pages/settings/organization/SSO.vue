@@ -14,10 +14,10 @@ import IconShield from '~icons/heroicons/shield-check'
 import IconTrash from '~icons/heroicons/trash'
 import IconX from '~icons/heroicons/x-circle'
 import Spinner from '~/components/Spinner.vue'
+import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useDisplayStore } from '~/stores/display'
 import { useOrganizationStore } from '~/stores/organization'
-import { useSupabase } from '~/services/supabase'
 
 interface SSOConfig {
   id: string
@@ -73,10 +73,6 @@ const isSavingSSO = ref(false)
 
 const hasSuperAdminPermission = computed(() => {
   return organizationStore.hasPermissionsInRole(currentRole.value, ['super_admin'])
-})
-
-const hasAdminPermission = computed(() => {
-  return organizationStore.hasPermissionsInRole(currentRole.value, ['admin', 'super_admin'])
 })
 
 onMounted(async () => {
@@ -296,7 +292,7 @@ async function copyToClipboard(text: string) {
     toast.success(t('copied-to-clipboard'))
   }
   catch {
-    toast.error(t('copy-failed'))
+    toast.error(t('copy-fail'))
   }
 }
 
