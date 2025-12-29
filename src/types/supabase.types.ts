@@ -1291,6 +1291,7 @@ export type Database = {
           created_at: string | null
           created_by: string
           customer_id: string | null
+          enforcing_2fa: boolean
           id: string
           last_stats_updated_at: string | null
           logo: string | null
@@ -1303,6 +1304,7 @@ export type Database = {
           created_at?: string | null
           created_by: string
           customer_id?: string | null
+          enforcing_2fa?: boolean
           id?: string
           last_stats_updated_at?: string | null
           logo?: string | null
@@ -1315,6 +1317,7 @@ export type Database = {
           created_at?: string | null
           created_by?: string
           customer_id?: string | null
+          enforcing_2fa?: boolean
           id?: string
           last_stats_updated_at?: string | null
           logo?: string | null
@@ -1990,6 +1993,13 @@ export type Database = {
             }
             Returns: boolean
           }
+      check_org_members_2fa_enabled: {
+        Args: { org_id: string }
+        Returns: {
+          user_id: string
+          "2fa_enabled": boolean
+        }[]
+      }
       check_revert_to_builtin_version: {
         Args: { appid: string }
         Returns: number
