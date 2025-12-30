@@ -1131,6 +1131,8 @@
   "you-can-still-join-capgo": "Anda masih bisa bergabung dengan Capgo, tetapi Anda tidak akan menjadi anggota organisasi yang awalnya mengundang Anda.",
   "you-cannot-reuse": "Anda tidak dapat menggunakan kembali versi bundel ini setelah penghapusan",
   "you-reached-the-limi": "Batas tercapai",
+  "limit-reached-no-credits": "Batas paket tercapai - Isi ulang kredit sekarang",
+  "limit-reached-with-credits": "Penggunaan dibayar dengan kredit",
   "your-role-in-org": "Peran Anda dalam organisasi",
   "your-settings": "Pengaturan Anda",
   "your-usage": "Penggunaan Anda:",

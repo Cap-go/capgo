@@ -1127,6 +1127,8 @@
   "you-can-still-join-capgo": "You can still join  Capgo, but you won't be a member of the organization that originally invited you.",
   "you-cannot-reuse": "You cannot reuse this bundle version after deletion",
   "you-reached-the-limi": "Limit reached",
+  "limit-reached-no-credits": "Plan limit reached - Top up credits now",
+  "limit-reached-with-credits": "Usage paid with credits",
   "your-role-in-org": "Your role in the organization",
   "your-settings": "Your settings",
   "your-usage": "Your usage:",

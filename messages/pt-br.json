@@ -1131,6 +1131,8 @@
   "you-can-still-join-capgo": "Você ainda pode se juntar à Capgo, mas não será um membro da organização que originalmente o convidou.",
   "you-cannot-reuse": "Você não pode reutilizar esta versão do pacote após a exclusão",
   "you-reached-the-limi": "Limite atingido",
+  "limit-reached-no-credits": "Limite do plano atingido - Recarregue créditos agora",
+  "limit-reached-with-credits": "Uso pago com créditos",
   "your-role-in-org": "O seu papel na organização",
   "your-settings": "Suas configurações",
   "your-usage": "O seu uso:",

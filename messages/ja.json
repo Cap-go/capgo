@@ -1131,6 +1131,8 @@
   "you-can-still-join-capgo": "あなたはまだCapgoに参加することができますが、元々あなたを招待した組織のメンバーにはなれません。",
   "you-cannot-reuse": "このバンドルバージョンは削除後に再利用できません",
   "you-reached-the-limi": "制限に達しました",
+  "limit-reached-no-credits": "プラン制限に達しました - 今すぐクレジットを追加",
+  "limit-reached-with-credits": "クレジットで支払われた使用量",
   "your-role-in-org": "組織におけるあなたの役割",
   "your-settings": "あなたの設定",
   "your-usage": "あなたの使用法：",

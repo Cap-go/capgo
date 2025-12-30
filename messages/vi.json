@@ -1131,6 +1131,8 @@
   "you-can-still-join-capgo": "Bạn vẫn có thể tham gia Capgo, nhưng bạn sẽ không phải là thành viên của tổ chức đã mời bạn ban đầu.",
   "you-cannot-reuse": "Bạn không thể sử dụng lại phiên bản gói này sau khi xóa",
   "you-reached-the-limi": "Đã đạt giới hạn",
+  "limit-reached-no-credits": "Đã đạt giới hạn gói - Nạp tín dụng ngay",
+  "limit-reached-with-credits": "Sử dụng được thanh toán bằng tín dụng",
   "your-role-in-org": "Vai trò của bạn trong tổ chức",
   "your-settings": "Cài đặt của bạn",
   "your-usage": "Sử dụng của bạn:",

@@ -1131,6 +1131,8 @@
   "you-can-still-join-capgo": "您仍然可以加入CAPGO，但您将不会成为最初邀请您的组织的成员。",
   "you-cannot-reuse": "删除后您无法重复使用此捆绑包版本",
   "you-reached-the-limi": "达到限制",
+  "limit-reached-no-credits": "套餐限额已达 - 立即充值积分",
+  "limit-reached-with-credits": "使用积分支付",
   "your-role-in-org": "您在组织中的角色",
   "your-settings": "您的设置",
   "your-usage": "您的使用情况：",
