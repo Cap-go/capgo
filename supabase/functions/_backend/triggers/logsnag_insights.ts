@@ -474,6 +474,7 @@ app.post('/', middlewareAPISecret, async (c) => {
     plan_solo: plans.Solo,
     plan_maker: plans.Maker,
     plan_team: plans.Team,
+    plan_enterprise: plans.Enterprise || 0,
     // Revenue metrics
     mrr: revenue.mrr,
     total_revenue: revenue.total_revenue,
@@ -492,9 +493,9 @@ app.post('/', middlewareAPISecret, async (c) => {
     // Subscription flow tracking
     new_paying_orgs,
     canceled_orgs,
-    // Credits tracking
-    credits_bought,
-    credits_consumed,
+    // Credits tracking (round to integers for bigint column)
+    credits_bought: Math.round(credits_bought),
+    credits_consumed: Math.round(credits_consumed),
   }
   cloudlog({ requestId: c.get('requestId'), message: 'newData', newData })
   const { error } = await supabaseAdmin(c)
