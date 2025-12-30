@@ -111,19 +111,22 @@ describe('build Time Tracking System', () => {
   it('should handle too big build time correctly', async () => {
     const supabase = getSupabaseClient()
 
-    // Insert high build time usage using build_logs via record_build_time RPC
-    // iOS builds have a 2x multiplier, so 18000 seconds raw = 36000 billable (way over Solo plan limit of 1800 seconds)
-    for (let i = 0; i < 10; i++) {
-      const buildId = `${randomUUID()}-excessive-${i}`
-      const { error: rpcError } = await supabase.rpc('record_build_time', {
-        p_org_id: ORG_ID,
-        p_user_id: USER_ID,
-        p_build_id: buildId,
-        p_platform: 'ios',
-        p_build_time_unit: 1800, // 30 min each, 2x multiplier = 60 min billable each
+    // Clear any existing daily_build_time data for this app
+    await supabase.from('daily_build_time').delete().eq('app_id', APPNAME)
+
+    // Insert high build time usage directly into daily_build_time
+    // (get_total_metrics reads from daily_build_time, not build_logs)
+    // Solo plan limit is 1800 seconds (30 min), so we insert way over that
+    const today = new Date().toISOString().split('T')[0]
+    const { error: buildTimeInsertError } = await supabase
+      .from('daily_build_time')
+      .insert({
+        app_id: APPNAME,
+        date: today,
+        build_time_unit: 36000, // 10 hours in seconds (way over Solo plan limit of 1800 seconds)
+        build_count: 10,
       })
-      expect(rpcError).toBeFalsy()
-    }
+    expect(buildTimeInsertError).toBeFalsy()
 
     const { error } = await supabase
       .from('stripe_info')
@@ -132,11 +135,12 @@ describe('build Time Tracking System', () => {
     if (error)
       throw error
 
-    // First verify the metrics can be retrieved
+    // First verify the metrics can be retrieved and show excessive build time
     const { data: totalMetrics, error: totalMetricsError } = await supabase
       .rpc('get_total_metrics', { org_id: ORG_ID })
     expect(totalMetricsError).toBeFalsy()
     console.log('Total metrics before cron:', totalMetrics)
+    expect((totalMetrics as any)?.[0]?.build_time_unit).toBeGreaterThan(1800)
 
     const response = await fetch(`${BASE_URL}/triggers/cron_stat_org`, {
       method: 'POST',

@@ -60,6 +60,10 @@ describe('[POST] /private/events operations', () => {
 
     const jwt = authData.session?.access_token
 
+    if (!jwt) {
+      throw new Error('Failed to obtain access token from session')
+    }
+
     const response = await fetch(`${BASE_URL}/private/events`, {
       method: 'POST',
       headers: {
