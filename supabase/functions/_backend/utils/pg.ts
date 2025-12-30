@@ -41,8 +41,10 @@ function buildPlanValidationExpression(
   )`
 }
 
-export function selectOne(drizzleClient: ReturnType<typeof getDrizzleClient>) {
-  return drizzleClient.execute(sql`select 1`)
+export function selectOne(pgClient: ReturnType<typeof getPgClient>) {
+  // Use pg Pool directly to avoid Drizzle's prepared statement handling
+  // which doesn't work with Supabase pooler in transaction mode
+  return pgClient.query('SELECT 1')
 }
 
 function fixSupabaseHost(host: string): string {
@@ -63,11 +65,17 @@ export function getDatabaseURL(c: Context, readOnly = false): string {
   if (readOnly) {
     // Hyperdrive main read replica regional routing in Cloudflare Workers
     // When using Hyperdrive we use session databases directly to avoid supabase pooler overhead and allow prepared statements
-    // Asia region
-    if (c.env.HYPERDRIVE_CAPGO_PS_AS && dbRegion === 'AS') {
-      c.header('X-Database-Source', 'HYPERDRIVE_CAPGO_PLANETSCALE_AS')
-      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_PLANETSCALE_AS for read-only' })
-      return c.env.HYPERDRIVE_CAPGO_PS_AS.connectionString
+    // Asia region - Japan
+    if (c.env.HYPERDRIVE_CAPGO_PS_AS_JAPAN && dbRegion === 'AS_JAPAN') {
+      c.header('X-Database-Source', 'HYPERDRIVE_CAPGO_PLANETSCALE_AS_JAPAN')
+      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_PLANETSCALE_AS_JAPAN for read-only' })
+      return c.env.HYPERDRIVE_CAPGO_PS_AS_JAPAN.connectionString
+    }
+    // Asia region - India
+    if (c.env.HYPERDRIVE_CAPGO_PS_AS_INDIA && dbRegion === 'AS_INDIA') {
+      c.header('X-Database-Source', 'HYPERDRIVE_CAPGO_PLANETSCALE_AS_INDIA')
+      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_PLANETSCALE_AS_INDIA for read-only' })
+      return c.env.HYPERDRIVE_CAPGO_PS_AS_INDIA.connectionString
     }
     // // US region
     if (c.env.HYPERDRIVE_CAPGO_PS_NA && dbRegion === 'NA') {
@@ -122,16 +130,16 @@ export function getPgClient(c: Context, readOnly = false) {
   const dbName = c.res.headers.get('X-Database-Source') ?? 'unknown source'
   cloudlog({ requestId, message: 'SUPABASE_DB_URL', dbUrl, dbName, appName })
 
-  const prepare = !dbName.startsWith('sb_pooler')
+  const isPooler = dbName.startsWith('sb_pooler')
   const options = {
-    prepare,
     connectionString: dbUrl,
     max: 4,
     application_name: `${appName}-${dbName}`,
     idleTimeoutMillis: 20000, // Increase from 2 to 20 seconds
     connectionTimeoutMillis: 10000, // Add explicit connect timeout
     maxLifetimeMillis: 30 * 60 * 1000, // 30 minutes
-    options: readOnly ? '-c default_transaction_read_only=on' : undefined,
+    // PgBouncer/Supabase pooler doesn't support the 'options' startup parameter
+    options: readOnly && !isPooler ? '-c default_transaction_read_only=on' : undefined,
   }
 
   const pool = new Pool(options)

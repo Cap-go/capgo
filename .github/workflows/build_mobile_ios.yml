@@ -40,7 +40,7 @@ jobs:
         run: bun x cap sync ios
       - uses: ruby/setup-ruby@v1
         with:
-          ruby-version: "3.0"
+          ruby-version: "3.4.8"
           bundler-cache: true
       - uses: maierj/fastlane-action@v3.1.0
         env:
