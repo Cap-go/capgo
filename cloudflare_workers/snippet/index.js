@@ -66,7 +66,7 @@ export default {
       BGR: NorthAmericaZone,
       BGW: MiddleEastZone,
       BHY: HongKongZone,
-      BKK: AsiaZone,
+      BKK: HongKongZone,  // Bangkok, Thailand -> AS_JAPAN
       BLR: AsiaZone,
       BNA: NorthAmericaZone,
       BNE: OceaniaZone,
@@ -81,7 +81,7 @@ export default {
       BTS: EuropeZone,
       BUD: EuropeZone,
       BUF: NorthAmericaZone,
-      BWN: AsiaZone,
+      BWN: HongKongZone,  // Brunei -> AS_JAPAN
       CAI: AfricaZone,
       CAN: HongKongZone,
       CAW: SouthAmericaZone,
@@ -89,14 +89,14 @@ export default {
       CCP: SouthAmericaZone,
       CCU: AsiaZone,
       CDG: EuropeZone,
-      CEB: AsiaZone,
+      CEB: HongKongZone,  // Cebu, Philippines -> AS_JAPAN
       CFC: SouthAmericaZone,
       CGB: SouthAmericaZone,
       CGD: HongKongZone,
-      CGK: AsiaZone,
+      CGK: HongKongZone,  // Jakarta, Indonesia -> AS_JAPAN
       CGO: HongKongZone,
       CGP: AsiaZone,
-      CGY: AsiaZone,
+      CGY: HongKongZone,  // Cagayan de Oro, Philippines -> AS_JAPAN
       CHC: OceaniaZone,
       CKG: HongKongZone,
       CLE: NorthAmericaZone,
@@ -106,18 +106,18 @@ export default {
       CMH: NorthAmericaZone,
       CNF: SouthAmericaZone,
       CNN: AsiaZone,
-      CNX: AsiaZone,
+      CNX: HongKongZone,  // Chiang Mai, Thailand -> AS_JAPAN
       COK: AsiaZone,
       COR: SouthAmericaZone,
       CPH: EuropeZone,
       CPT: AfricaZone,
-      CRK: AsiaZone,
+      CRK: HongKongZone,  // Clark, Philippines -> AS_JAPAN
       CSX: HongKongZone,
       CWB: SouthAmericaZone,
       CZL: AfricaZone,
       CZX: HongKongZone,
       DAC: AsiaZone,
-      DAD: AsiaZone,
+      DAD: HongKongZone,  // Da Nang, Vietnam -> AS_JAPAN
       DAR: AfricaZone,
       DEL: AsiaZone,
       DEN: NorthAmericaZone,
@@ -127,7 +127,7 @@ export default {
       DME: EuropeZone,
       DMM: MiddleEastZone,
       DOH: MiddleEastZone,
-      DPS: AsiaZone,
+      DPS: HongKongZone,  // Bali, Indonesia -> AS_JAPAN
       DTW: NorthAmericaZone,
       DUB: EuropeZone,
       DUR: AfricaZone,
@@ -146,7 +146,7 @@ export default {
       FRA: EuropeZone,
       FRU: AsiaZone,
       FSD: NorthAmericaZone,
-      FUK: AsiaZone,
+      FUK: HongKongZone,  // Fukuoka, Japan -> AS_JAPAN
       FUO: HongKongZone,
       GBE: AfricaZone,
       GDL: NorthAmericaZone,
@@ -163,7 +163,7 @@ export default {
       GYN: SouthAmericaZone,
       HAK: HongKongZone,
       HAM: EuropeZone,
-      HAN: AsiaZone,
+      HAN: HongKongZone,  // Hanoi, Vietnam -> AS_JAPAN
       HBA: OceaniaZone,
       HEL: EuropeZone,
       HFA: MiddleEastZone,
@@ -175,7 +175,7 @@ export default {
       HYN: AsiaZone,
       IAD: NorthAmericaZone,
       IAH: NorthAmericaZone,
-      ICN: AsiaZone,
+      ICN: HongKongZone,  // Seoul, Korea -> AS_JAPAN
       IND: NorthAmericaZone,
       ISB: AsiaZone,
       IST: EuropeZone,
@@ -185,27 +185,27 @@ export default {
       JAX: NorthAmericaZone,
       JDO: SouthAmericaZone,
       JED: MiddleEastZone,
-      JHB: AsiaZone,
+      JHB: HongKongZone,  // Johor Bahru, Malaysia -> AS_JAPAN
       JIB: AfricaZone,
       JNB: AfricaZone,
-      JOG: AsiaZone,
+      JOG: HongKongZone,  // Yogyakarta, Indonesia -> AS_JAPAN
       JOI: SouthAmericaZone,
       JXG: AsiaZone,
       KBP: EuropeZone,
-      KCH: AsiaZone,
+      KCH: HongKongZone,  // Kuching, Malaysia -> AS_JAPAN
       KEF: EuropeZone,
       KGL: AfricaZone,
-      KHH: AsiaZone,
+      KHH: HongKongZone,  // Kaohsiung, Taiwan -> AS_JAPAN
       KHI: AsiaZone,
       KHN: HongKongZone,
       KIN: NorthAmericaZone,
       KIV: EuropeZone,
-      KIX: AsiaZone,
+      KIX: HongKongZone,  // Osaka, Japan -> AS_JAPAN
       KJA: AsiaZone,
       KMG: HongKongZone,
       KNU: AsiaZone,
       KTM: AsiaZone,
-      KUL: AsiaZone,
+      KUL: HongKongZone,  // Kuala Lumpur, Malaysia -> AS_JAPAN
       KWE: HongKongZone,
       KWI: MiddleEastZone,
       LAD: AfricaZone,
@@ -237,7 +237,7 @@ export default {
       MFM: HongKongZone,
       MIA: NorthAmericaZone,
       MLE: AsiaZone,
-      MNL: AsiaZone,
+      MNL: HongKongZone,  // Manila, Philippines -> AS_JAPAN
       MPM: AfricaZone,
       MRS: EuropeZone,
       MRU: AfricaZone,
@@ -252,9 +252,9 @@ export default {
       NOU: OceaniaZone,
       NQN: SouthAmericaZone,
       NQZ: AsiaZone,
-      NRT: AsiaZone,
+      NRT: HongKongZone,  // Tokyo Narita, Japan -> AS_JAPAN
       NVT: SouthAmericaZone,
-      OKA: AsiaZone,
+      OKA: HongKongZone,  // Okinawa, Japan -> AS_JAPAN
       OKC: NorthAmericaZone,
       OMA: NorthAmericaZone,
       ORD: NorthAmericaZone,
@@ -274,7 +274,7 @@ export default {
       PKX: HongKongZone,
       PMO: EuropeZone,
       PMW: SouthAmericaZone,
-      PNH: AsiaZone,
+      PNH: HongKongZone,  // Phnom Penh, Cambodia -> AS_JAPAN
       POA: SouthAmericaZone,
       POS: SouthAmericaZone,
       PPT: OceaniaZone,
@@ -296,9 +296,9 @@ export default {
       SDQ: NorthAmericaZone,
       SEA: NorthAmericaZone,
       SFO: NorthAmericaZone,
-      SGN: AsiaZone,
+      SGN: HongKongZone,  // Ho Chi Minh, Vietnam -> AS_JAPAN
       SHA: HongKongZone,
-      SIN: AsiaZone,
+      SIN: HongKongZone,  // Singapore -> AS_JAPAN
       SJC: NorthAmericaZone,
       SJK: SouthAmericaZone,
       SJO: SouthAmericaZone,
@@ -329,19 +329,19 @@ export default {
       TNA: HongKongZone,
       TNR: AfricaZone,
       TPA: NorthAmericaZone,
-      TPE: AsiaZone,
+      TPE: HongKongZone,  // Taipei, Taiwan -> AS_JAPAN
       TUN: AfricaZone,
       TXL: EuropeZone,
       TYN: HongKongZone,
       UDI: SouthAmericaZone,
       UIO: SouthAmericaZone,
       ULN: AsiaZone,
-      URT: AsiaZone,
+      URT: HongKongZone,  // Surat Thani, Thailand -> AS_JAPAN
       VCP: SouthAmericaZone,
       VIE: EuropeZone,
       VIX: SouthAmericaZone,
       VNO: EuropeZone,
-      VTE: AsiaZone,
+      VTE: HongKongZone,  // Vientiane, Laos -> AS_JAPAN
       WAW: EuropeZone,
       WDH: AfricaZone,
       XAP: SouthAmericaZone,
