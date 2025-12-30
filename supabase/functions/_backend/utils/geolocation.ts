@@ -36,6 +36,7 @@ export function getClientDbRegionSB(c: Context): DbRegionSB {
     case 'ME': // Middle East AWS
     case 'AF': // Africa, CF, AWS
       return 'AS_INDIA'
+    case 'HK': // Asia CF
     case 'AS': // Asia CF
     case 'AP': // Asia Pacific AWS
       return 'AS_JAPAN'
