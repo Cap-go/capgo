@@ -16,8 +16,10 @@ DECLARE
     v_org_enforcing_2fa boolean;
 BEGIN
     -- Get the current user identity (works for both JWT auth and API key)
-    -- Using get_identity_org_allowed to support CLI API key authentication
-    -- and respect org-limited API keys
+    -- NOTE: We use get_identity_org_allowed (not get_identity like the app version) because
+    -- this function takes an org_id directly, so we must validate that the API key
+    -- has access to this specific org before checking 2FA compliance.
+    -- This prevents org-limited API keys from bypassing org access restrictions.
     v_user_id := public.get_identity_org_allowed('{read,upload,write,all}'::public.key_mode[], reject_access_due_to_2fa_for_org.org_id);
 
     -- If no user identity found, reject access
@@ -31,6 +33,9 @@ BEGIN
     WHERE public.orgs.id = reject_access_due_to_2fa_for_org.org_id;
 
     -- If org not found, reject access
+    -- NOTE: This differs from the private reject_access_due_to_2fa function which returns false
+    -- when org doesn't exist. For a PUBLIC function, rejecting access (returning true) is safer
+    -- as it prevents potential information leakage about org existence.
     IF v_org_enforcing_2fa IS NULL THEN
         RETURN true;
     END IF;

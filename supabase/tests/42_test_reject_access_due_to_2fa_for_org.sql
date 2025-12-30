@@ -224,6 +224,11 @@ END $$;
 
 -- Test 9: Anonymous user (no auth, no API key) returns true (rejection - no user identity found)
 SELECT tests.clear_authentication();
+-- Ensure clean state: explicitly clear any residual API key headers from previous tests
+DO $$
+BEGIN
+  PERFORM set_config('request.headers', '{}', true);
+END $$;
 SELECT
     is(
         reject_access_due_to_2fa_for_org(current_setting('test.org_with_2fa_direct')::uuid),
