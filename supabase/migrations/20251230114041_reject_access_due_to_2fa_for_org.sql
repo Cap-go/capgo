@@ -32,12 +32,9 @@ BEGIN
     FROM public.orgs
     WHERE public.orgs.id = reject_access_due_to_2fa_for_org.org_id;
 
-    -- If org not found, reject access
-    -- NOTE: This differs from the private reject_access_due_to_2fa function which returns false
-    -- when org doesn't exist. For a PUBLIC function, rejecting access (returning true) is safer
-    -- as it prevents potential information leakage about org existence.
+    -- If org not found, allow access (no 2FA enforcement can apply to a non-existent org)
     IF v_org_enforcing_2fa IS NULL THEN
-        RETURN true;
+        RETURN false;
     END IF;
 
     -- If org does not enforce 2FA, allow access

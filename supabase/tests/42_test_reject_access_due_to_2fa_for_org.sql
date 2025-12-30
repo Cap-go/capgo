@@ -162,13 +162,13 @@ SELECT
     );
 SELECT tests.clear_authentication();
 
--- Test 5: Non-existent org returns true (rejection)
+-- Test 5: Non-existent org returns false (no 2FA enforcement can apply to a non-existent org)
 SELECT tests.authenticate_as('test_2fa_user_org');
 SELECT
     is(
         reject_access_due_to_2fa_for_org(gen_random_uuid()),
-        true,
-        'reject_access_due_to_2fa_for_org test - non-existent org returns true'
+        false,
+        'reject_access_due_to_2fa_for_org test - non-existent org returns false'
     );
 SELECT tests.clear_authentication();
 
