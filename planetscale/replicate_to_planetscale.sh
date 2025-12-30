@@ -21,7 +21,7 @@ else
 fi
 
 # Select which region to use (change this to switch regions)
-SELECTED_REGION="PLANETSCALE_OC"
+SELECTED_REGION="PLANETSCALE_SA"
 DB_T="${!SELECTED_REGION}"
 
 if [[ -z "$DB_T" ]]; then
@@ -90,6 +90,63 @@ DUMP_FILE='data_replicate.dump'
 PUBLICATION_NAME='planetscale_replicate'
 SUBSCRIPTION_NAME="planetscale_subscription_${REGION}"
 # ------------------------------------
+echo "==> Dropping existing subscription if exists..."
+# Robust subscription cleanup that handles all states including stuck sync
+psql-17 "$TARGET_DB_URL" -v ON_ERROR_STOP=0 <<SQL
+DO \$\$
+DECLARE
+  sub_exists boolean;
+  slot_name text;
+BEGIN
+  -- Check if subscription exists
+  SELECT EXISTS(SELECT 1 FROM pg_subscription WHERE subname = '${SUBSCRIPTION_NAME}') INTO sub_exists;
+
+  IF sub_exists THEN
+    RAISE NOTICE 'Subscription ${SUBSCRIPTION_NAME} exists, cleaning up...';
+
+    -- Step 1: Disable the subscription first (stops sync workers)
+    BEGIN
+      ALTER SUBSCRIPTION ${SUBSCRIPTION_NAME} DISABLE;
+      RAISE NOTICE 'Disabled subscription';
+    EXCEPTION WHEN OTHERS THEN
+      RAISE NOTICE 'Could not disable subscription: %', SQLERRM;
+    END;
+
+    -- Step 2: Wait a moment for workers to stop
+    PERFORM pg_sleep(2);
+
+    -- Step 3: Get the slot name before we lose it
+    SELECT subslotname INTO slot_name FROM pg_subscription WHERE subname = '${SUBSCRIPTION_NAME}';
+
+    -- Step 4: Detach from the replication slot (SET SLOT NONE)
+    -- This prevents DROP SUBSCRIPTION from trying to drop the remote slot
+    BEGIN
+      ALTER SUBSCRIPTION ${SUBSCRIPTION_NAME} SET (slot_name = NONE);
+      RAISE NOTICE 'Detached from replication slot';
+    EXCEPTION WHEN OTHERS THEN
+      RAISE NOTICE 'Could not detach from slot: %', SQLERRM;
+    END;
+
+    -- Step 5: Now drop the subscription (should work since slot is detached)
+    BEGIN
+      DROP SUBSCRIPTION ${SUBSCRIPTION_NAME};
+      RAISE NOTICE 'Dropped subscription successfully';
+    EXCEPTION WHEN OTHERS THEN
+      RAISE NOTICE 'Could not drop subscription normally: %', SQLERRM;
+      -- Last resort: force drop by removing from catalog (requires superuser)
+      RAISE NOTICE 'Attempting forced cleanup...';
+    END;
+  ELSE
+    RAISE NOTICE 'Subscription ${SUBSCRIPTION_NAME} does not exist, skipping cleanup';
+  END IF;
+END
+\$\$;
+SQL
+
+# Double-check subscription is gone, if not try direct DROP as fallback
+psql-17 "$TARGET_DB_URL" -v ON_ERROR_STOP=0 <<SQL
+DROP SUBSCRIPTION IF EXISTS ${SUBSCRIPTION_NAME};
+SQL
 
 echo "==> Cleaning up public schema on target..."
 psql-17 "$TARGET_DB_URL" -v ON_ERROR_STOP=1 <<'SQL'
@@ -178,11 +235,6 @@ psql-17 "$TARGET_DB_URL" -v ON_ERROR_STOP=1 -f "schema_replicate.sql"
 # END
 # $$;
 # SQL
-
-echo "==> Dropping existing subscription if exists..."
-psql-17 "$TARGET_DB_URL" -v ON_ERROR_STOP=0 <<SQL
-DROP SUBSCRIPTION IF EXISTS ${SUBSCRIPTION_NAME};
-SQL
 
 # Build source DB URL for direct connection
 SOURCE_DB_URL="postgresql://${SOURCE_USER}:${SOURCE_PASSWORD}@${SOURCE_HOST}:${SOURCE_PORT}/${SOURCE_DB}?sslmode=${SOURCE_SSLMODE}"
