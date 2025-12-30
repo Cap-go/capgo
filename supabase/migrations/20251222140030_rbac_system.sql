@@ -82,9 +82,8 @@ COMMENT ON COLUMN public.apps.id IS 'UUID scope id for RBAC (app-level roles ref
 CREATE TABLE IF NOT EXISTS public.roles (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   name text UNIQUE NOT NULL,
-  scope_type text NOT NULL CHECK (scope_type IN ('platform', 'org', 'app', 'channel')),
+  scope_type text NOT NULL CHECK (scope_type IN ('platform', 'org', 'app', 'bundle', 'channel')),
   description text,
-  is_priority boolean NOT NULL DEFAULT true,
   family_name text NOT NULL,
   priority_rank int NOT NULL DEFAULT 0,
   is_assignable boolean NOT NULL DEFAULT true,
@@ -255,18 +254,21 @@ VALUES
 ON CONFLICT (key) DO NOTHING;
 
 -- 4) Seed priority roles
-INSERT INTO public.roles (name, scope_type, description, is_priority, family_name, priority_rank, is_assignable, created_by)
+INSERT INTO public.roles (name, scope_type, description, family_name, priority_rank, is_assignable, created_by)
 VALUES
-  ('platform_super_admin', 'platform', 'Full platform control (not assignable to customers)', true, 'platform_base', 100, false, NULL),
-  ('org_super_admin', 'org', 'Super admin for an org (same permissions as org_admin)', true, 'org_base', 95, true, NULL),
-  ('org_admin', 'org', 'Full org administration', true, 'org_base', 90, true, NULL),
-  ('org_billing_admin', 'org', 'Billing-only administrator for an org', true, 'org_base', 80, true, NULL),
-  ('app_admin', 'app', 'Full administration of an app', true, 'app_base', 70, true, NULL),
-  ('app_developer', 'app', 'Developer access: upload bundles, manage devices, but no destructive operations', true, 'app_base', 68, true, NULL),
-  ('app_uploader', 'app', 'Upload-only access: read app data and upload bundles', true, 'app_base', 66, true, NULL),
-  ('app_read', 'app', 'Read-only access to an app', true, 'app_base', 65, true, NULL),
-  ('channel_admin', 'channel', 'Full administration of a channel', true, 'channel_base', 60, true, NULL),
-  ('channel_read', 'channel', 'Read-only access to a channel', true, 'channel_base', 55, true, NULL)
+  ('platform_super_admin', 'platform', 'Full platform control (not assignable to customers)', 'platform_base', 100, false, NULL),
+  ('org_super_admin', 'org', 'Super admin for an org (same permissions as org_admin)', 'org_base', 95, true, NULL),
+  ('org_admin', 'org', 'Full org administration', 'org_base', 90, true, NULL),
+  ('org_billing_admin', 'org', 'Billing-only administrator for an org', 'org_base', 80, true, NULL),
+  ('org_member', 'org', 'Basic org member: read-only access to org and all apps', 'org_base', 75, true, NULL),
+  ('app_admin', 'app', 'Full administration of an app', 'app_base', 70, true, NULL),
+  ('app_developer', 'app', 'Developer access: upload bundles, manage devices, but no destructive operations', 'app_base', 68, true, NULL),
+  ('app_uploader', 'app', 'Upload-only access: read app data and upload bundles', 'app_base', 66, true, NULL),
+  ('app_read', 'app', 'Read-only access to an app', 'app_base', 65, true, NULL),
+  ('bundle_admin', 'bundle', 'Full administration of a bundle', 'bundle_base', 62, true, NULL),
+  ('bundle_read', 'bundle', 'Read-only access to a bundle', 'bundle_base', 61, true, NULL),
+  ('channel_admin', 'channel', 'Full administration of a channel', 'channel_base', 60, true, NULL),
+  ('channel_read', 'channel', 'Read-only access to a channel', 'channel_base', 55, true, NULL)
 ON CONFLICT (name) DO NOTHING;
 
 -- 5) Attach permissions to roles
@@ -323,6 +325,23 @@ JOIN public.permissions p ON p.key IN (
   'org.read', 'org.read_billing', 'org.update_billing', 'org.read_invoices', 'org.read_billing_audit'
 )
 WHERE r.name = 'org_billing_admin'
+ON CONFLICT DO NOTHING;
+
+-- org_member: basic member with read-only access to org and all apps (for self-service and visibility)
+INSERT INTO public.role_permissions (role_id, permission_id)
+SELECT r.id, p.id
+FROM public.roles r
+JOIN public.permissions p ON p.key IN (
+  -- Org permissions: read metadata and members (allows self-service removal)
+  'org.read', 'org.read_members',
+  -- App permissions: read-only access to all apps in org
+  'app.read', 'app.list_bundles', 'app.list_channels', 'app.read_logs', 'app.read_devices', 'app.read_audit',
+  -- Bundle permissions: read-only
+  'bundle.read',
+  -- Channel permissions: read-only
+  'channel.read', 'channel.read_history', 'channel.read_forced_devices', 'channel.read_audit'
+)
+WHERE r.name = 'org_member'
 ON CONFLICT DO NOTHING;
 
 -- app_admin: full control of app + channels under that app
@@ -396,17 +415,83 @@ JOIN public.permissions p ON p.key IN (
 WHERE r.name = 'channel_read'
 ON CONFLICT DO NOTHING;
 
+-- bundle_admin: full control of a bundle
+INSERT INTO public.role_permissions (role_id, permission_id)
+SELECT r.id, p.id
+FROM public.roles r
+JOIN public.permissions p ON p.key IN (
+  'bundle.read', 'bundle.update', 'bundle.delete'
+)
+WHERE r.name = 'bundle_admin'
+ON CONFLICT DO NOTHING;
+
+-- bundle_read: read-only access to bundle
+INSERT INTO public.role_permissions (role_id, permission_id)
+SELECT r.id, p.id
+FROM public.roles r
+JOIN public.permissions p ON p.key IN (
+  'bundle.read'
+)
+WHERE r.name = 'bundle_read'
+ON CONFLICT DO NOTHING;
+
 -- 6) Role hierarchy (explicit inheritance)
+-- Org hierarchy
+INSERT INTO public.role_hierarchy (parent_role_id, child_role_id)
+SELECT parent.id, child.id
+FROM public.roles parent, public.roles child
+WHERE parent.name = 'org_super_admin' AND child.name = 'org_admin'
+ON CONFLICT DO NOTHING;
+
 INSERT INTO public.role_hierarchy (parent_role_id, child_role_id)
 SELECT parent.id, child.id
 FROM public.roles parent, public.roles child
 WHERE parent.name = 'org_admin' AND child.name = 'app_admin'
 ON CONFLICT DO NOTHING;
 
+-- App hierarchy
+INSERT INTO public.role_hierarchy (parent_role_id, child_role_id)
+SELECT parent.id, child.id
+FROM public.roles parent, public.roles child
+WHERE parent.name = 'app_admin' AND child.name = 'app_developer'
+ON CONFLICT DO NOTHING;
+
+INSERT INTO public.role_hierarchy (parent_role_id, child_role_id)
+SELECT parent.id, child.id
+FROM public.roles parent, public.roles child
+WHERE parent.name = 'app_developer' AND child.name = 'app_uploader'
+ON CONFLICT DO NOTHING;
+
+INSERT INTO public.role_hierarchy (parent_role_id, child_role_id)
+SELECT parent.id, child.id
+FROM public.roles parent, public.roles child
+WHERE parent.name = 'app_uploader' AND child.name = 'app_read'
+ON CONFLICT DO NOTHING;
+
+INSERT INTO public.role_hierarchy (parent_role_id, child_role_id)
+SELECT parent.id, child.id
+FROM public.roles parent, public.roles child
+WHERE parent.name = 'app_admin' AND child.name = 'bundle_admin'
+ON CONFLICT DO NOTHING;
+
 INSERT INTO public.role_hierarchy (parent_role_id, child_role_id)
 SELECT parent.id, child.id
 FROM public.roles parent, public.roles child
 WHERE parent.name = 'app_admin' AND child.name = 'channel_admin'
+ON CONFLICT DO NOTHING;
+
+-- Bundle hierarchy
+INSERT INTO public.role_hierarchy (parent_role_id, child_role_id)
+SELECT parent.id, child.id
+FROM public.roles parent, public.roles child
+WHERE parent.name = 'bundle_admin' AND child.name = 'bundle_read'
+ON CONFLICT DO NOTHING;
+
+-- Channel hierarchy
+INSERT INTO public.role_hierarchy (parent_role_id, child_role_id)
+SELECT parent.id, child.id
+FROM public.roles parent, public.roles child
+WHERE parent.name = 'channel_admin' AND child.name = 'channel_read'
 ON CONFLICT DO NOTHING;
 
 -- 7) Helper: feature flag resolution
@@ -791,7 +876,7 @@ BEGIN
     -- No channel-level role mapping for now
     RETURN NULL;
   ELSIF p_app_id IS NOT NULL THEN
-    -- Legacy mapping to RBAC roles
+    -- App-level legacy mapping to RBAC roles
     IF p_user_right >= 'admin'::public.user_min_right THEN
       RETURN 'app_admin';
     ELSIF p_user_right = 'write'::public.user_min_right THEN
@@ -803,17 +888,26 @@ BEGIN
     END IF;
     RETURN NULL;
   ELSE
+    -- Org-level legacy mapping
     IF p_user_right >= 'super_admin'::public.user_min_right THEN
       RETURN 'org_super_admin';
     ELSIF p_user_right >= 'admin'::public.user_min_right THEN
       RETURN 'org_admin';
-    -- No mapping for 'read' at org level (org_billing_admin not auto-assigned)
+    ELSIF p_user_right = 'write'::public.user_min_right THEN
+      -- Org-level write creates org_member + app_developer for each app
+      RETURN 'org_member + app_developer(per-app)';
+    ELSIF p_user_right = 'upload'::public.user_min_right THEN
+      -- Org-level upload creates org_member + app_uploader for each app
+      RETURN 'org_member + app_uploader(per-app)';
+    ELSIF p_user_right = 'read'::public.user_min_right THEN
+      -- Org-level read creates org_member + app_read for each app
+      RETURN 'org_member + app_read(per-app)';
     END IF;
     RETURN NULL;
   END IF;
 END;
 $$;
-COMMENT ON FUNCTION public.rbac_legacy_role_hint(public.user_min_right, character varying, bigint) IS 'Heuristic mapping from legacy org_users rows to Phase 1 priority roles (for migration planning only).';
+COMMENT ON FUNCTION public.rbac_legacy_role_hint(public.user_min_right, character varying, bigint) IS 'Heuristic mapping from legacy org_users rows to Phase 1 priority roles. For org-level read/upload/write, returns composite string indicating org_member + per-app role pattern used during migration.';
 
 CREATE OR REPLACE VIEW public.legacy_org_user_role_hints AS
 SELECT
@@ -838,8 +932,11 @@ SECURITY DEFINER AS $$
 DECLARE
   v_granted_by uuid;
   v_org_user RECORD;
+  v_app RECORD;
   v_role_name text;
+  v_app_role_name text;
   v_role_id uuid;
+  v_app_role_id uuid;
   v_scope_type text;
   v_app_uuid uuid;
   v_channel_uuid uuid;
@@ -877,14 +974,92 @@ BEGIN
     WHERE org_id = p_org_id
   LOOP
     BEGIN
-      -- Get suggested role name using our hint function
+      -- Special handling for org-level read/upload/write: create org_member + app-level roles
+      IF v_org_user.app_id IS NULL AND v_org_user.channel_id IS NULL
+         AND v_org_user.user_right IN ('read', 'upload', 'write') THEN
+
+        -- 1) Create org_member binding
+        SELECT id INTO v_role_id FROM public.roles WHERE name = 'org_member' LIMIT 1;
+        IF v_role_id IS NOT NULL THEN
+          -- Check if org_member binding already exists
+          SELECT id INTO v_binding_id FROM public.role_bindings
+          WHERE principal_type = 'user'
+            AND principal_id = v_org_user.user_id
+            AND role_id = v_role_id
+            AND scope_type = 'org'
+            AND org_id = p_org_id
+          LIMIT 1;
+
+          IF v_binding_id IS NULL THEN
+            INSERT INTO public.role_bindings (
+              principal_type, principal_id, role_id, scope_type, org_id,
+              granted_by, granted_at, reason, is_direct
+            ) VALUES (
+              'user', v_org_user.user_id, v_role_id, 'org', p_org_id,
+              v_granted_by, now(), 'Migrated from org_users (legacy)', true
+            );
+            v_migrated_count := v_migrated_count + 1;
+          END IF;
+        END IF;
+
+        -- 2) Determine app-level role based on user_right
+        IF v_org_user.user_right = 'read' THEN
+          v_app_role_name := 'app_read';
+        ELSIF v_org_user.user_right = 'upload' THEN
+          v_app_role_name := 'app_uploader';
+        ELSIF v_org_user.user_right = 'write' THEN
+          v_app_role_name := 'app_developer';
+        END IF;
+
+        SELECT id INTO v_app_role_id FROM public.roles WHERE name = v_app_role_name LIMIT 1;
+        IF v_app_role_id IS NULL THEN
+          v_error_count := v_error_count + 1;
+          v_errors := v_errors || jsonb_build_object(
+            'org_user_id', v_org_user.id,
+            'reason', 'app_role_not_found',
+            'role_name', v_app_role_name
+          );
+          CONTINUE;
+        END IF;
+
+        -- 3) Create app-level binding for EACH app in the org
+        FOR v_app IN
+          SELECT id, app_id FROM public.apps WHERE owner_org = p_org_id
+        LOOP
+          -- Check if app binding already exists
+          SELECT id INTO v_binding_id FROM public.role_bindings
+          WHERE principal_type = 'user'
+            AND principal_id = v_org_user.user_id
+            AND role_id = v_app_role_id
+            AND scope_type = 'app'
+            AND app_id = v_app.id
+          LIMIT 1;
+
+          IF v_binding_id IS NULL THEN
+            INSERT INTO public.role_bindings (
+              principal_type, principal_id, role_id, scope_type, org_id, app_id,
+              granted_by, granted_at, reason, is_direct
+            ) VALUES (
+              'user', v_org_user.user_id, v_app_role_id, 'app', p_org_id, v_app.id,
+              v_granted_by, now(), 'Migrated from org_users (legacy)', true
+            );
+            v_migrated_count := v_migrated_count + 1;
+          ELSE
+            v_skipped_count := v_skipped_count + 1;
+          END IF;
+        END LOOP;
+
+        CONTINUE; -- Skip standard processing for this org_user
+      END IF;
+
+      -- Standard processing for app/channel-specific rights or admin rights
       v_role_name := public.rbac_legacy_role_hint(
         v_org_user.user_right,
         v_org_user.app_id,
         v_org_user.channel_id
       );
 
-      -- Skip if no suitable role (e.g., read-only at app/channel level)
+      -- Skip if no suitable role
       IF v_role_name IS NULL THEN
         v_skipped_count := v_skipped_count + 1;
         v_errors := v_errors || jsonb_build_object(
@@ -1624,3 +1799,64 @@ CREATE POLICY role_bindings_write_scope_admin ON public.role_bindings
     OR
     public.is_admin(auth.uid())
   );
+
+-- =============================================================================
+-- AUTO-MIGRATION: Convert all existing org_users to role_bindings
+-- =============================================================================
+-- This block runs automatically when the migration is applied in production.
+-- It's idempotent - safe to run multiple times as it skips existing bindings.
+
+DO $$
+DECLARE
+  v_org RECORD;
+  v_migration_result jsonb;
+  v_total_migrated int := 0;
+  v_total_skipped int := 0;
+  v_total_errors int := 0;
+  v_orgs_processed int := 0;
+BEGIN
+  RAISE NOTICE 'Starting automatic RBAC migration for all organizations...';
+
+  -- Migrate org_users to role_bindings for each organization
+  FOR v_org IN SELECT id, name FROM public.orgs ORDER BY created_at
+  LOOP
+    BEGIN
+      v_orgs_processed := v_orgs_processed + 1;
+
+      -- Call migration function for this org
+      SELECT public.rbac_migrate_org_users_to_bindings(v_org.id) INTO v_migration_result;
+
+      -- Accumulate statistics
+      v_total_migrated := v_total_migrated + (v_migration_result->>'migrated_count')::int;
+      v_total_skipped := v_total_skipped + (v_migration_result->>'skipped_count')::int;
+      v_total_errors := v_total_errors + (v_migration_result->>'error_count')::int;
+
+      RAISE NOTICE 'Org [%] "%": migrated=%, skipped=%, errors=%',
+        v_org.id, v_org.name,
+        v_migration_result->>'migrated_count',
+        v_migration_result->>'skipped_count',
+        v_migration_result->>'error_count';
+
+      -- Log errors if any
+      IF (v_migration_result->>'error_count')::int > 0 THEN
+        RAISE WARNING 'Errors during migration for org %: %', v_org.id, v_migration_result->'errors';
+      END IF;
+
+    EXCEPTION WHEN OTHERS THEN
+      RAISE WARNING 'Failed to migrate org % (%): %', v_org.id, v_org.name, SQLERRM;
+      v_total_errors := v_total_errors + 1;
+    END;
+  END LOOP;
+
+  RAISE NOTICE '=============================================================================';
+  RAISE NOTICE 'RBAC auto-migration completed:';
+  RAISE NOTICE '  Organizations processed: %', v_orgs_processed;
+  RAISE NOTICE '  Total bindings created: %', v_total_migrated;
+  RAISE NOTICE '  Total bindings skipped: %', v_total_skipped;
+  RAISE NOTICE '  Total errors: %', v_total_errors;
+  RAISE NOTICE '=============================================================================';
+
+  IF v_total_errors > 0 THEN
+    RAISE WARNING 'Migration completed with % errors. Review logs above.', v_total_errors;
+  END IF;
+END $$;
