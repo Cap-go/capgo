@@ -63,11 +63,17 @@ export function getDatabaseURL(c: Context, readOnly = false): string {
   if (readOnly) {
     // Hyperdrive main read replica regional routing in Cloudflare Workers
     // When using Hyperdrive we use session databases directly to avoid supabase pooler overhead and allow prepared statements
-    // Asia region
-    if (c.env.HYPERDRIVE_CAPGO_PS_AS && dbRegion === 'AS') {
-      c.header('X-Database-Source', 'HYPERDRIVE_CAPGO_PLANETSCALE_AS')
-      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_PLANETSCALE_AS for read-only' })
-      return c.env.HYPERDRIVE_CAPGO_PS_AS.connectionString
+    // Asia region - Japan
+    if (c.env.HYPERDRIVE_CAPGO_PS_AS_JAPAN && dbRegion === 'AS_JAPAN') {
+      c.header('X-Database-Source', 'HYPERDRIVE_CAPGO_PLANETSCALE_AS_JAPAN')
+      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_PLANETSCALE_AS_JAPAN for read-only' })
+      return c.env.HYPERDRIVE_CAPGO_PS_AS_JAPAN.connectionString
+    }
+    // Asia region - India
+    if (c.env.HYPERDRIVE_CAPGO_PS_AS_INDIA && dbRegion === 'AS_INDIA') {
+      c.header('X-Database-Source', 'HYPERDRIVE_CAPGO_PLANETSCALE_AS_INDIA')
+      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_PLANETSCALE_AS_INDIA for read-only' })
+      return c.env.HYPERDRIVE_CAPGO_PS_AS_INDIA.connectionString
     }
     // // US region
     if (c.env.HYPERDRIVE_CAPGO_PS_NA && dbRegion === 'NA') {

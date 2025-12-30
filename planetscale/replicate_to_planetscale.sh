@@ -9,10 +9,11 @@ echo "==> Starting replication to PlanetScale..."
 if [[ -f "$ENV_FILE" ]]; then
   echo "==> Loading PlanetScale connection strings from $ENV_FILE"
   PLANETSCALE_NA=$(grep '^PLANETSCALE_NA=' "$ENV_FILE" | cut -d'=' -f2- || true)
-  PLANETSCALE_AS=$(grep '^PLANETSCALE_AS=' "$ENV_FILE" | cut -d'=' -f2- || true)
   PLANETSCALE_EU=$(grep '^PLANETSCALE_EU=' "$ENV_FILE" | cut -d'=' -f2- || true)
   PLANETSCALE_SA=$(grep '^PLANETSCALE_SA=' "$ENV_FILE" | cut -d'=' -f2- || true)
   PLANETSCALE_OC=$(grep '^PLANETSCALE_OC=' "$ENV_FILE" | cut -d'=' -f2- || true)
+  PLANETSCALE_AS_INDIA=$(grep '^PLANETSCALE_AS_INDIA=' "$ENV_FILE" | cut -d'=' -f2- || true)
+  PLANETSCALE_AS_JAPAN=$(grep '^PLANETSCALE_AS_JAPAN=' "$ENV_FILE" | cut -d'=' -f2- || true)
   echo "==> Loaded PlanetScale connection strings."
 else
   echo "Error: $ENV_FILE not found"
@@ -20,7 +21,7 @@ else
 fi
 
 # Select which region to use (change this to switch regions)
-SELECTED_REGION="PLANETSCALE_SA"
+SELECTED_REGION="PLANETSCALE_AS_INDIA"
 DB_T="${!SELECTED_REGION}"
 
 if [[ -z "$DB_T" ]]; then

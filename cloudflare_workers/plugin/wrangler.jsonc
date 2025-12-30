@@ -106,10 +106,6 @@
           "id": "ae1fe6178b564adc9fc9a71ccc769a35"
         },
         {
-          "binding": "HYPERDRIVE_CAPGO_PS_AS",
-          "id": "1da208dc0b8a4a18924a5393ea5a56a5"
-        },
-        {
           "binding": "HYPERDRIVE_CAPGO_PS_NA",
           "id": "63190ba747924f1eb7c251c994ad465f"
         },
@@ -124,6 +120,14 @@
         {
           "binding": "HYPERDRIVE_CAPGO_PS_OC",
           "id": "4671114a1f0c49e98130d7e84ad63272"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_PS_AS_JAPAN",
+          "id": "d2bd04c8ad4547f58afe0bcb6fd58924"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_PS_AS_INDIA",
+          "id": "287a560493e04b82bd6d1b114edbad91"
         }
       ]
     },
@@ -188,10 +192,6 @@
           "id": "ae1fe6178b564adc9fc9a71ccc769a35"
         },
         {
-          "binding": "HYPERDRIVE_CAPGO_PS_AS",
-          "id": "1da208dc0b8a4a18924a5393ea5a56a5"
-        },
-        {
           "binding": "HYPERDRIVE_CAPGO_PS_NA",
           "id": "63190ba747924f1eb7c251c994ad465f"
         },
@@ -206,6 +206,14 @@
         {
           "binding": "HYPERDRIVE_CAPGO_PS_OC",
           "id": "4671114a1f0c49e98130d7e84ad63272"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_PS_AS_JAPAN",
+          "id": "d2bd04c8ad4547f58afe0bcb6fd58924"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_PS_AS_INDIA",
+          "id": "287a560493e04b82bd6d1b114edbad91"
         }
       ]
     },
@@ -270,10 +278,6 @@
           "id": "ae1fe6178b564adc9fc9a71ccc769a35"
         },
         {
-          "binding": "HYPERDRIVE_CAPGO_PS_AS",
-          "id": "1da208dc0b8a4a18924a5393ea5a56a5"
-        },
-        {
           "binding": "HYPERDRIVE_CAPGO_PS_NA",
           "id": "63190ba747924f1eb7c251c994ad465f"
         },
@@ -288,6 +292,14 @@
         {
           "binding": "HYPERDRIVE_CAPGO_PS_OC",
           "id": "4671114a1f0c49e98130d7e84ad63272"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_PS_AS_JAPAN",
+          "id": "d2bd04c8ad4547f58afe0bcb6fd58924"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_PS_AS_INDIA",
+          "id": "287a560493e04b82bd6d1b114edbad91"
         }
       ]
     },
@@ -352,10 +364,6 @@
           "id": "ae1fe6178b564adc9fc9a71ccc769a35"
         },
         {
-          "binding": "HYPERDRIVE_CAPGO_PS_AS",
-          "id": "1da208dc0b8a4a18924a5393ea5a56a5"
-        },
-        {
           "binding": "HYPERDRIVE_CAPGO_PS_NA",
           "id": "63190ba747924f1eb7c251c994ad465f"
         },
@@ -370,6 +378,14 @@
         {
           "binding": "HYPERDRIVE_CAPGO_PS_OC",
           "id": "4671114a1f0c49e98130d7e84ad63272"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_PS_AS_JAPAN",
+          "id": "d2bd04c8ad4547f58afe0bcb6fd58924"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_PS_AS_INDIA",
+          "id": "287a560493e04b82bd6d1b114edbad91"
         }
       ]
     },
@@ -434,10 +450,6 @@
           "id": "ae1fe6178b564adc9fc9a71ccc769a35"
         },
         {
-          "binding": "HYPERDRIVE_CAPGO_PS_AS",
-          "id": "1da208dc0b8a4a18924a5393ea5a56a5"
-        },
-        {
           "binding": "HYPERDRIVE_CAPGO_PS_NA",
           "id": "63190ba747924f1eb7c251c994ad465f"
         },
@@ -452,6 +464,14 @@
         {
           "binding": "HYPERDRIVE_CAPGO_PS_OC",
           "id": "4671114a1f0c49e98130d7e84ad63272"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_PS_AS_JAPAN",
+          "id": "d2bd04c8ad4547f58afe0bcb6fd58924"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_PS_AS_INDIA",
+          "id": "287a560493e04b82bd6d1b114edbad91"
         }
       ]
     },
@@ -516,10 +536,6 @@
           "id": "ae1fe6178b564adc9fc9a71ccc769a35"
         },
         {
-          "binding": "HYPERDRIVE_CAPGO_PS_AS",
-          "id": "1da208dc0b8a4a18924a5393ea5a56a5"
-        },
-        {
           "binding": "HYPERDRIVE_CAPGO_PS_NA",
           "id": "63190ba747924f1eb7c251c994ad465f"
         },
@@ -534,6 +550,14 @@
         {
           "binding": "HYPERDRIVE_CAPGO_PS_OC",
           "id": "4671114a1f0c49e98130d7e84ad63272"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_PS_AS_JAPAN",
+          "id": "d2bd04c8ad4547f58afe0bcb6fd58924"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_PS_AS_INDIA",
+          "id": "287a560493e04b82bd6d1b114edbad91"
         }
       ]
     },
@@ -598,10 +622,6 @@
           "id": "ae1fe6178b564adc9fc9a71ccc769a35"
         },
         {
-          "binding": "HYPERDRIVE_CAPGO_PS_AS",
-          "id": "1da208dc0b8a4a18924a5393ea5a56a5"
-        },
-        {
           "binding": "HYPERDRIVE_CAPGO_PS_NA",
           "id": "63190ba747924f1eb7c251c994ad465f"
         },
@@ -616,6 +636,14 @@
         {
           "binding": "HYPERDRIVE_CAPGO_PS_OC",
           "id": "4671114a1f0c49e98130d7e84ad63272"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_PS_AS_JAPAN",
+          "id": "d2bd04c8ad4547f58afe0bcb6fd58924"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_PS_AS_INDIA",
+          "id": "287a560493e04b82bd6d1b114edbad91"
         }
       ]
     },
@@ -680,10 +708,6 @@
           "id": "ae1fe6178b564adc9fc9a71ccc769a35"
         },
         {
-          "binding": "HYPERDRIVE_CAPGO_PS_AS",
-          "id": "1da208dc0b8a4a18924a5393ea5a56a5"
-        },
-        {
           "binding": "HYPERDRIVE_CAPGO_PS_NA",
           "id": "63190ba747924f1eb7c251c994ad465f"
         },
@@ -698,6 +722,14 @@
         {
           "binding": "HYPERDRIVE_CAPGO_PS_OC",
           "id": "4671114a1f0c49e98130d7e84ad63272"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_PS_AS_JAPAN",
+          "id": "d2bd04c8ad4547f58afe0bcb6fd58924"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_PS_AS_INDIA",
+          "id": "287a560493e04b82bd6d1b114edbad91"
         }
       ]
     },
@@ -755,10 +787,6 @@
           "id": "ae1fe6178b564adc9fc9a71ccc769a35"
         },
         {
-          "binding": "HYPERDRIVE_CAPGO_PS_AS",
-          "id": "1da208dc0b8a4a18924a5393ea5a56a5"
-        },
-        {
           "binding": "HYPERDRIVE_CAPGO_PS_NA",
           "id": "63190ba747924f1eb7c251c994ad465f"
         },
@@ -773,6 +801,14 @@
         {
           "binding": "HYPERDRIVE_CAPGO_PS_OC",
           "id": "4671114a1f0c49e98130d7e84ad63272"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_PS_AS_JAPAN",
+          "id": "d2bd04c8ad4547f58afe0bcb6fd58924"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_PS_AS_INDIA",
+          "id": "287a560493e04b82bd6d1b114edbad91"
         }
       ],
       "placement": {
@@ -837,10 +873,6 @@
           "id": "ae1fe6178b564adc9fc9a71ccc769a35"
         },
         {
-          "binding": "HYPERDRIVE_CAPGO_PS_AS",
-          "id": "1da208dc0b8a4a18924a5393ea5a56a5"
-        },
-        {
           "binding": "HYPERDRIVE_CAPGO_PS_NA",
           "id": "63190ba747924f1eb7c251c994ad465f"
         },
@@ -855,6 +887,14 @@
         {
           "binding": "HYPERDRIVE_CAPGO_PS_OC",
           "id": "4671114a1f0c49e98130d7e84ad63272"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_PS_AS_JAPAN",
+          "id": "d2bd04c8ad4547f58afe0bcb6fd58924"
+        },
+        {
+          "binding": "HYPERDRIVE_CAPGO_PS_AS_INDIA",
+          "id": "287a560493e04b82bd6d1b114edbad91"
         }
       ],
       "placement": {
