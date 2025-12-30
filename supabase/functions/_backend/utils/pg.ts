@@ -41,8 +41,10 @@ function buildPlanValidationExpression(
   )`
 }
 
-export function selectOne(drizzleClient: ReturnType<typeof getDrizzleClient>) {
-  return drizzleClient.execute(sql`select 1`)
+export function selectOne(pgClient: ReturnType<typeof getPgClient>) {
+  // Use pg Pool directly to avoid Drizzle's prepared statement handling
+  // which doesn't work with Supabase pooler in transaction mode
+  return pgClient.query('SELECT 1')
 }
 
 function fixSupabaseHost(host: string): string {
@@ -128,16 +130,16 @@ export function getPgClient(c: Context, readOnly = false) {
   const dbName = c.res.headers.get('X-Database-Source') ?? 'unknown source'
   cloudlog({ requestId, message: 'SUPABASE_DB_URL', dbUrl, dbName, appName })
 
-  const prepare = !dbName.startsWith('sb_pooler')
+  const isPooler = dbName.startsWith('sb_pooler')
   const options = {
-    prepare,
     connectionString: dbUrl,
     max: 4,
     application_name: `${appName}-${dbName}`,
     idleTimeoutMillis: 20000, // Increase from 2 to 20 seconds
     connectionTimeoutMillis: 10000, // Add explicit connect timeout
     maxLifetimeMillis: 30 * 60 * 1000, // 30 minutes
-    options: readOnly ? '-c default_transaction_read_only=on' : undefined,
+    // PgBouncer/Supabase pooler doesn't support the 'options' startup parameter
+    options: readOnly && !isPooler ? '-c default_transaction_read_only=on' : undefined,
   }
 
   const pool = new Pool(options)
