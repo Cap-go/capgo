@@ -21,7 +21,7 @@ BEGIN
     -- Insert verified MFA factor for test_user_with_2fa
     INSERT INTO auth.mfa_factors (id, user_id, friendly_name, factor_type, status, created_at, updated_at)
     VALUES (
-        extensions.uuid_generate_v4(),
+        gen_random_uuid(),
         user_with_2fa_id,
         'Test TOTP',
         'totp'::auth.factor_type,
@@ -33,7 +33,7 @@ BEGIN
     -- Insert unverified MFA factor for test_user_with_unverified_2fa
     INSERT INTO auth.mfa_factors (id, user_id, friendly_name, factor_type, status, created_at, updated_at)
     VALUES (
-        extensions.uuid_generate_v4(),
+        gen_random_uuid(),
         user_unverified_2fa_id,
         'Test TOTP Unverified',
         'totp'::auth.factor_type,

@@ -9,10 +9,11 @@ echo "==> Starting replication to PlanetScale..."
 if [[ -f "$ENV_FILE" ]]; then
   echo "==> Loading PlanetScale connection strings from $ENV_FILE"
   PLANETSCALE_NA=$(grep '^PLANETSCALE_NA=' "$ENV_FILE" | cut -d'=' -f2- || true)
-  PLANETSCALE_AS=$(grep '^PLANETSCALE_AS=' "$ENV_FILE" | cut -d'=' -f2- || true)
   PLANETSCALE_EU=$(grep '^PLANETSCALE_EU=' "$ENV_FILE" | cut -d'=' -f2- || true)
   PLANETSCALE_SA=$(grep '^PLANETSCALE_SA=' "$ENV_FILE" | cut -d'=' -f2- || true)
   PLANETSCALE_OC=$(grep '^PLANETSCALE_OC=' "$ENV_FILE" | cut -d'=' -f2- || true)
+  PLANETSCALE_AS_INDIA=$(grep '^PLANETSCALE_AS_INDIA=' "$ENV_FILE" | cut -d'=' -f2- || true)
+  PLANETSCALE_AS_JAPAN=$(grep '^PLANETSCALE_AS_JAPAN=' "$ENV_FILE" | cut -d'=' -f2- || true)
   echo "==> Loaded PlanetScale connection strings."
 else
   echo "Error: $ENV_FILE not found"
@@ -20,7 +21,7 @@ else
 fi
 
 # Select which region to use (change this to switch regions)
-SELECTED_REGION="PLANETSCALE_AS"
+SELECTED_REGION="PLANETSCALE_SA"
 DB_T="${!SELECTED_REGION}"
 
 if [[ -z "$DB_T" ]]; then
@@ -89,9 +90,73 @@ DUMP_FILE='data_replicate.dump'
 PUBLICATION_NAME='planetscale_replicate'
 SUBSCRIPTION_NAME="planetscale_subscription_${REGION}"
 # ------------------------------------
+echo "==> Dropping existing subscription if exists..."
+# Robust subscription cleanup that handles all states including stuck sync
+psql-17 "$TARGET_DB_URL" -v ON_ERROR_STOP=0 <<SQL
+DO \$\$
+DECLARE
+  sub_exists boolean;
+  slot_name text;
+BEGIN
+  -- Check if subscription exists
+  SELECT EXISTS(SELECT 1 FROM pg_subscription WHERE subname = '${SUBSCRIPTION_NAME}') INTO sub_exists;
 
-# echo "==> Importing schema into target..."
-# psql "$TARGET_DB_URL" -v ON_ERROR_STOP=1 -f "schema_replicate.sql"
+  IF sub_exists THEN
+    RAISE NOTICE 'Subscription ${SUBSCRIPTION_NAME} exists, cleaning up...';
+
+    -- Step 1: Disable the subscription first (stops sync workers)
+    BEGIN
+      ALTER SUBSCRIPTION ${SUBSCRIPTION_NAME} DISABLE;
+      RAISE NOTICE 'Disabled subscription';
+    EXCEPTION WHEN OTHERS THEN
+      RAISE NOTICE 'Could not disable subscription: %', SQLERRM;
+    END;
+
+    -- Step 2: Wait a moment for workers to stop
+    PERFORM pg_sleep(2);
+
+    -- Step 3: Get the slot name before we lose it
+    SELECT subslotname INTO slot_name FROM pg_subscription WHERE subname = '${SUBSCRIPTION_NAME}';
+
+    -- Step 4: Detach from the replication slot (SET SLOT NONE)
+    -- This prevents DROP SUBSCRIPTION from trying to drop the remote slot
+    BEGIN
+      ALTER SUBSCRIPTION ${SUBSCRIPTION_NAME} SET (slot_name = NONE);
+      RAISE NOTICE 'Detached from replication slot';
+    EXCEPTION WHEN OTHERS THEN
+      RAISE NOTICE 'Could not detach from slot: %', SQLERRM;
+    END;
+
+    -- Step 5: Now drop the subscription (should work since slot is detached)
+    BEGIN
+      DROP SUBSCRIPTION ${SUBSCRIPTION_NAME};
+      RAISE NOTICE 'Dropped subscription successfully';
+    EXCEPTION WHEN OTHERS THEN
+      RAISE NOTICE 'Could not drop subscription normally: %', SQLERRM;
+      -- Last resort: force drop by removing from catalog (requires superuser)
+      RAISE NOTICE 'Attempting forced cleanup...';
+    END;
+  ELSE
+    RAISE NOTICE 'Subscription ${SUBSCRIPTION_NAME} does not exist, skipping cleanup';
+  END IF;
+END
+\$\$;
+SQL
+
+# Double-check subscription is gone, if not try direct DROP as fallback
+psql-17 "$TARGET_DB_URL" -v ON_ERROR_STOP=0 <<SQL
+DROP SUBSCRIPTION IF EXISTS ${SUBSCRIPTION_NAME};
+SQL
+
+echo "==> Cleaning up public schema on target..."
+psql-17 "$TARGET_DB_URL" -v ON_ERROR_STOP=1 <<'SQL'
+DROP SCHEMA IF EXISTS public CASCADE;
+CREATE SCHEMA public;
+GRANT ALL ON SCHEMA public TO PUBLIC;
+SQL
+
+echo "==> Importing schema into target..."
+psql-17 "$TARGET_DB_URL" -v ON_ERROR_STOP=1 -f "schema_replicate.sql"
 
 # echo "==> Restoring data into target..."
 # pg_restore \
@@ -102,54 +167,82 @@ SUBSCRIPTION_NAME="planetscale_subscription_${REGION}"
 #   --dbname "$TARGET_DB_URL" \
 #   "$DUMP_FILE"
 
-echo "==> Truncating tables on target before replication..."
-psql-17 "$TARGET_DB_URL" -v ON_ERROR_STOP=1 <<'SQL'
-TRUNCATE TABLE
-  channel_devices,
-  apps,
-  app_versions,
-  manifest,
-  channels,
-  orgs,
-  stripe_info,
-  org_users
-CASCADE;
-SQL
+# echo "==> Truncating tables on target before replication..."
+# psql-17 "$TARGET_DB_URL" -v ON_ERROR_STOP=1 <<'SQL'
+# TRUNCATE TABLE
+#   channel_devices,
+#   apps,
+#   app_versions,
+#   manifest,
+#   channels,
+#   orgs,
+#   stripe_info,
+#   org_users
+# RESTART IDENTITY CASCADE;
+# SQL
 
-echo "==> Fixing sequences on target..."
-psql-17 "$TARGET_DB_URL" -v ON_ERROR_STOP=1 <<'SQL'
-DO $$
-DECLARE
-  r RECORD;
-  seq_name text;
-BEGIN
-  FOR r IN
-    SELECT table_schema, table_name, column_name
-    FROM information_schema.columns
-    WHERE column_default LIKE 'nextval%'
-  LOOP
-    seq_name := pg_get_serial_sequence(
-      format('%I.%I', r.table_schema, r.table_name),
-      r.column_name
-    );
+# echo "==> Reclaiming disk space and rebuilding indexes..."
+# psql-17 "$TARGET_DB_URL" -v ON_ERROR_STOP=1 <<'SQL'
+# VACUUM FULL channel_devices, apps, app_versions, manifest, channels, orgs, stripe_info, org_users;
+# REINDEX TABLE channel_devices;
+# REINDEX TABLE apps;
+# REINDEX TABLE app_versions;
+# REINDEX TABLE manifest;
+# REINDEX TABLE channels;
+# REINDEX TABLE orgs;
+# REINDEX TABLE stripe_info;
+# REINDEX TABLE org_users;
+# ANALYZE channel_devices, apps, app_versions, manifest, channels, orgs, stripe_info, org_users;
+# SQL
 
-    IF seq_name IS NOT NULL THEN
-      EXECUTE format(
-        'SELECT setval(%L, COALESCE((SELECT MAX(%I) FROM %I.%I), 1), true)',
-        seq_name,
-        r.column_name,
-        r.table_schema,
-        r.table_name
-      );
-    END IF;
-  END LOOP;
-END
-$$;
-SQL
+# echo "==> Resetting sequences on target after truncate..."
+# psql-17 "$TARGET_DB_URL" -v ON_ERROR_STOP=1 <<'SQL'
+# DO $$
+# DECLARE
+#   r RECORD;
+#   seq_name text;
+#   max_val bigint;
+# BEGIN
+#   FOR r IN
+#     SELECT table_schema, table_name, column_name
+#     FROM information_schema.columns
+#     WHERE column_default LIKE 'nextval%'
+#   LOOP
+#     seq_name := pg_get_serial_sequence(
+#       format('%I.%I', r.table_schema, r.table_name),
+#       r.column_name
+#     );
 
-echo "==> Dropping existing subscription if exists..."
-psql-17 "$TARGET_DB_URL" -v ON_ERROR_STOP=0 <<SQL
-DROP SUBSCRIPTION IF EXISTS ${SUBSCRIPTION_NAME};
+#     IF seq_name IS NOT NULL THEN
+#       EXECUTE format(
+#         'SELECT MAX(%I) FROM %I.%I',
+#         r.column_name,
+#         r.table_schema,
+#         r.table_name
+#       ) INTO max_val;
+
+#       IF max_val IS NULL THEN
+#         -- Table is empty (after truncate), reset sequence to start at 1
+#         EXECUTE format('ALTER SEQUENCE %s RESTART WITH 1', seq_name);
+#         RAISE NOTICE 'Reset sequence % to start at 1 (table empty)', seq_name;
+#       ELSE
+#         -- Table has data, set sequence to max value + 1
+#         EXECUTE format('SELECT setval(%L, %s, true)', seq_name, max_val);
+#         RAISE NOTICE 'Set sequence % to % (max value)', seq_name, max_val;
+#       END IF;
+#     END IF;
+#   END LOOP;
+# END
+# $$;
+# SQL
+
+# Build source DB URL for direct connection
+SOURCE_DB_URL="postgresql://${SOURCE_USER}:${SOURCE_PASSWORD}@${SOURCE_HOST}:${SOURCE_PORT}/${SOURCE_DB}?sslmode=${SOURCE_SSLMODE}"
+
+echo "==> Dropping existing replication slot on source if exists..."
+psql-17 "$SOURCE_DB_URL" -v ON_ERROR_STOP=0 <<SQL
+SELECT pg_drop_replication_slot('${SUBSCRIPTION_NAME}')
+WHERE EXISTS (SELECT 1 FROM pg_replication_slots WHERE slot_name = '${SUBSCRIPTION_NAME}');
 SQL
 
 echo "==> Creating subscription on target..."

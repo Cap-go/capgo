@@ -99,23 +99,20 @@ if [[ -f "$TYPES_DUMP" ]]; then
   rm -f "$TYPES_DUMP"
 fi
 
-# 5) Prepend extension(s) and create extensions schema compatibility
-perl -0777 -i -pe 's/\A/CREATE SCHEMA IF NOT EXISTS extensions;\nCREATE EXTENSION IF NOT EXISTS "uuid-ossp" SCHEMA extensions;\n\n/' "$OUT_SQL"
-
-# 6) Optional: drop pg_dump SET noise
+# 5) Optional: drop pg_dump SET noise
 perl -0777 -i -pe '
   s/^SET[^\n]*\n//mg;
   s/^SELECT pg_catalog\.set_config\([^\n]*\);\n//mg;
 ' "$OUT_SQL"
 
-# 7) Sanity checks (should be empty; indexes should still exist)
+# 6) Sanity checks (should be empty; indexes should still exist)
 echo "==> Should be empty:"
 grep -nE 'CREATE POLICY|ROW LEVEL SECURITY|FK CONSTRAINT|FOREIGN KEY|CREATE TRIGGER' "$OUT_SQL" || true
 
 echo "==> Index count:"
 grep -cE '^\s*CREATE (UNIQUE )?INDEX\b' "$OUT_SQL" || true
 
-# 8) Cleanup temporary files
+# 7) Cleanup temporary files
 echo "==> Cleaning up temporary files..."
 rm -f "$DUMP_FILE" "$LIST_FILE" "$FILTERED_LIST" "$TYPES_DUMP" "$TYPES_SQL" 2>/dev/null || true
 echo "==> Done. Output: $OUT_SQL"
