@@ -8,7 +8,21 @@ import { useDashboardAppsStore } from './dashboardApps'
 import { useDisplayStore } from './display'
 import { useMainStore } from './main'
 
-export type Organization = ArrayElement<Database['public']['Functions']['get_orgs_v6']['Returns']>
+// Password policy configuration interface
+export interface PasswordPolicyConfig {
+  enabled: boolean
+  min_length: number
+  require_uppercase: boolean
+  require_number: boolean
+  require_special: boolean
+}
+
+// Extended organization type with password policy and 2FA fields (from get_orgs_v7)
+// Note: Using get_orgs_v7 return type with explicit JSON parsing for password_policy_config
+type RawOrganization = ArrayElement<Database['public']['Functions']['get_orgs_v7']['Returns']>
+export type Organization = Omit<RawOrganization, 'password_policy_config'> & {
+  password_policy_config: PasswordPolicyConfig | null
+}
 export type OrganizationRole = Database['public']['Enums']['user_min_right'] | 'owner'
 export type ExtendedOrganizationMember = Concrete<Merge<ArrayElement<Database['public']['Functions']['get_org_members']['Returns']>, { id: number }>>
 export type ExtendedOrganizationMembers = ExtendedOrganizationMember[]
@@ -217,8 +231,9 @@ export const useOrganizationStore = defineStore('organization', () => {
     }
 
     // We have RLS that ensure that we only select rows where we are member or owner
+    // Using get_orgs_v7 which includes 2FA and password policy fields
     const { data, error } = await supabase
-      .rpc('get_orgs_v6')
+      .rpc('get_orgs_v7')
 
     if (error) {
       console.error('Cannot get orgs!', error)
@@ -234,23 +249,27 @@ export const useOrganizationStore = defineStore('organization', () => {
     }
 
     const mappedData = data.map((item, id) => {
-      return { id, ...item }
+      return {
+        id,
+        ...item,
+        password_policy_config: item.password_policy_config as PasswordPolicyConfig | null,
+      } as Organization & { id: number }
     })
 
-    _organizations.value = new Map(mappedData.map(item => [item.gid, item]))
+    _organizations.value = new Map(mappedData.map(item => [item.gid, item as Organization]))
 
     // Try to restore from localStorage first
     if (!currentOrganization.value) {
       const storedOrgId = localStorage.getItem(STORAGE_KEY)
       if (storedOrgId) {
-        const storedOrg = data.find(org => org.gid === storedOrgId && !org.role.includes('invite'))
+        const storedOrg = mappedData.find(org => org.gid === storedOrgId && !org.role.includes('invite'))
         if (storedOrg) {
-          currentOrganization.value = storedOrg
+          currentOrganization.value = storedOrg as Organization
         }
       }
     }
 
-    currentOrganization.value ??= organization
+    currentOrganization.value ??= mappedData.find(org => org.gid === organization.gid) as Organization | undefined
     currentOrganizationFailed.value = !(!!currentOrganization.value?.paying || (currentOrganization.value?.trial_left ?? 0) > 0)
   }
 
@@ -261,6 +280,35 @@ export const useOrganizationStore = defineStore('organization', () => {
 
   const getAllOrgs = () => {
     return _organizations.value
+  }
+
+  // Check password policy compliance for all org members (for super_admin preview)
+  const checkPasswordPolicyImpact = async (orgId: string) => {
+    const { data, error } = await supabase.rpc('check_org_members_password_policy', {
+      org_id: orgId,
+    })
+
+    if (error) {
+      console.error('Failed to check password policy impact:', error)
+      return null
+    }
+
+    return {
+      totalUsers: data.length,
+      compliantUsers: data.filter(u => u.password_policy_compliant),
+      nonCompliantUsers: data.filter(u => !u.password_policy_compliant),
+    }
+  }
+
+  // Get current org's password policy status
+  const getPasswordPolicyStatus = () => {
+    if (!currentOrganization.value)
+      return null
+    return {
+      hasPolicy: !!currentOrganization.value.password_policy_config?.enabled,
+      isCompliant: currentOrganization.value.password_has_access ?? true,
+      config: currentOrganization.value.password_policy_config,
+    }
   }
 
   const deleteOrganization = async (orgId: string) => {
@@ -313,5 +361,7 @@ export const useOrganizationStore = defineStore('organization', () => {
     getOrgByAppId,
     awaitInitialLoad,
     deleteOrganization,
+    checkPasswordPolicyImpact,
+    getPasswordPolicyStatus,
   }
 })

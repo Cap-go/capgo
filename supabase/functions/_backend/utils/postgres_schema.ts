@@ -43,7 +43,7 @@ export const app_versions = pgTable('app_versions', {
   external_url: varchar('external_url'),
   checksum: varchar('checksum'),
   session_key: varchar('session_key'),
-  key_id: varchar('key_id', { length: 4 }),
+  key_id: varchar('key_id', { length: 20 }),
   storage_provider: text('storage_provider').default('r2').notNull(),
   min_update_version: varchar('min_update_version'),
   r2_path: varchar('r2_path'),
@@ -76,7 +76,9 @@ export const channels = pgTable('channels', {
   android: boolean('android').notNull().default(true),
   allow_device_self_set: boolean('allow_device_self_set').default(false).notNull(),
   allow_emulator: boolean('allow_emulator').notNull().default(true),
+  allow_device: boolean('allow_device').notNull().default(true),
   allow_dev: boolean('allow_dev').notNull().default(true),
+  allow_prod: boolean('allow_prod').notNull().default(true),
 })
 
 export const channel_devices = pgTable('channel_devices', {

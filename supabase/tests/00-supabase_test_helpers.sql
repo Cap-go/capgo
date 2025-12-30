@@ -67,7 +67,7 @@ DECLARE
 BEGIN
 
     -- create the user
-    user_id := extensions.uuid_generate_v4();
+    user_id := gen_random_uuid();
     INSERT INTO auth.users (id, email, phone, raw_user_meta_data, raw_app_meta_data, created_at, updated_at)
     VALUES (user_id, coalesce(email, concat(user_id, '@test.com')), phone, jsonb_build_object('test_identifier', identifier) || coalesce(metadata, '{}'::jsonb), '{}'::jsonb, now(), now())
     RETURNING id INTO user_id;
@@ -183,11 +183,13 @@ AS $$
 
 
             perform set_config('role', 'authenticated', true);
+            perform set_config('request.jwt.claim.role', 'authenticated', true);
+            perform set_config('request.jwt.claim.email', user_data ->> 'email', true);
             perform set_config('request.jwt.claims', json_build_object(
-                'sub', user_data ->> 'id', 
-                'email', user_data ->> 'email', 
-                'phone', user_data ->> 'phone', 
-                'user_metadata', user_data -> 'raw_user_meta_data', 
+                'sub', user_data ->> 'id',
+                'email', user_data ->> 'email',
+                'phone', user_data ->> 'phone',
+                'user_metadata', user_data -> 'raw_user_meta_data',
                 'app_metadata', user_data -> 'raw_app_meta_data'
             )::text, true);
 
@@ -241,6 +243,8 @@ RETURNS void AS $$
 BEGIN
     perform set_config('role', 'anon', true);
     perform set_config('request.jwt.claims', null, true);
+    perform set_config('request.jwt.claim.role', null, true);
+    perform set_config('request.jwt.claim.email', null, true);
 END
 $$ LANGUAGE plpgsql;
 
@@ -406,7 +410,8 @@ $$ LANGUAGE plpgsql;
 -- but we dont' want these functions to always exist on the database.
 BEGIN;
 SELECT plan(7);
-SELECT function_returns('tests', 'create_supabase_user', ARRAY['text', 'text', 'text', 'jsonb'], 'uuid');
+SELECT
+    function_returns('tests', 'create_supabase_user', ARRAY['text', 'text', 'text', 'jsonb'], 'uuid');
 SELECT function_returns('tests', 'get_supabase_uid', ARRAY['text'], 'uuid');
 SELECT function_returns('tests', 'get_supabase_user', ARRAY['text'], 'json');
 SELECT function_returns('tests', 'authenticate_as', ARRAY['text'], 'void');

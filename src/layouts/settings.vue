@@ -55,6 +55,28 @@ watchEffect(() => {
   if (!needsPlans && hasPlans)
     organizationTabs.value = organizationTabs.value.filter(tab => tab.key !== '/settings/organization/plans')
 
+  // Audit logs - visible only to super_admins
+  const needsAuditLogs = organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['super_admin'])
+  const hasAuditLogs = organizationTabs.value.find(tab => tab.key === '/settings/organization/audit-logs')
+  if (needsAuditLogs && !hasAuditLogs) {
+    const base = baseOrgTabs.find(t => t.key === '/settings/organization/audit-logs')
+    if (base)
+      organizationTabs.value.push({ ...base })
+  }
+  if (!needsAuditLogs && hasAuditLogs)
+    organizationTabs.value = organizationTabs.value.filter(tab => tab.key !== '/settings/organization/audit-logs')
+
+  // Security - visible only to super_admins
+  const needsSecurity = organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['super_admin'])
+  const hasSecurity = organizationTabs.value.find(tab => tab.key === '/settings/organization/security')
+  if (needsSecurity && !hasSecurity) {
+    const base = baseOrgTabs.find(t => t.key === '/settings/organization/security')
+    if (base)
+      organizationTabs.value.push({ ...base })
+  }
+  if (!needsSecurity && hasSecurity)
+    organizationTabs.value = organizationTabs.value.filter(tab => tab.key !== '/settings/organization/security')
+
   if (!Capacitor.isNativePlatform()
     && organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['super_admin'])
     && !organizationTabs.value.find(tab => tab.key === '/billing')) {

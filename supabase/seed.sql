@@ -507,11 +507,11 @@ BEGIN
     (10, now(), 'com.demoadmin.app', now(), 'admin123', 1500000),
     (13, now(), 'com.stats.app', now(), 'stats123', 850000);
 
-    INSERT INTO "public"."channels" ("id", "created_at", "name", "app_id", "version", "updated_at", "public", "disable_auto_update_under_native", "disable_auto_update", "ios", "android", "allow_device_self_set", "allow_emulator", "allow_dev", "created_by") VALUES
-    (1, now(), 'production', 'com.demo.app', 3, now(), 't', 't', 'major'::"public"."disable_update", 'f', 't', 't', 't', 't', '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid),
-    (2, now(), 'no_access', 'com.demo.app', 5, now(), 'f', 't', 'major'::"public"."disable_update", 't', 't', 't', 't', 't', '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid),
-    (3, now(), 'two_default', 'com.demo.app', 3, now(), 't', 't', 'major'::"public"."disable_update", 't', 'f', 't', 't', 't', '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid),
-    (4, now(), 'production', 'com.stats.app', 13, now(), 't', 't', 'major'::"public"."disable_update", 'f', 't', 't', 't', 't', '7a1b2c3d-4e5f-4a6b-7c8d-9e0f1a2b3c4d'::uuid);
+    INSERT INTO "public"."channels" ("id", "created_at", "name", "app_id", "version", "updated_at", "public", "disable_auto_update_under_native", "disable_auto_update", "ios", "android", "allow_device_self_set", "allow_emulator", "allow_device", "allow_dev", "allow_prod", "created_by") VALUES
+    (1, now(), 'production', 'com.demo.app', 3, now(), 't', 't', 'major'::"public"."disable_update", 'f', 't', 't', 't', 't', 't', 't', '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid),
+    (2, now(), 'no_access', 'com.demo.app', 5, now(), 'f', 't', 'major'::"public"."disable_update", 't', 't', 't', 't', 't', 't', 't', '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid),
+    (3, now(), 'two_default', 'com.demo.app', 3, now(), 't', 't', 'major'::"public"."disable_update", 't', 'f', 't', 't', 't', 't', 't', '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid),
+    (4, now(), 'production', 'com.stats.app', 13, now(), 't', 't', 'major'::"public"."disable_update", 'f', 't', 't', 't', 't', 't', 't', '7a1b2c3d-4e5f-4a6b-7c8d-9e0f1a2b3c4d'::uuid);
 
     INSERT INTO "public"."deploy_history" ("id", "created_at", "updated_at", "channel_id", "app_id", "version_id", "deployed_at", "owner_org", "created_by") VALUES
     (1, now() - interval '15 days', now() - interval '15 days', 1, 'com.demo.app', 3, now() - interval '15 days', '046a36ac-e03c-4590-9257-bd6c9dba9ee8'::uuid, '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid),
@@ -748,7 +748,7 @@ BEGIN
     plan_product_id,
     'sub_seeded_demo',
     'succeeded',
-    now() - interval '15 days',
+    now() + interval '15 days',
     true,
     2,
     '{}'::json,
@@ -827,12 +827,12 @@ BEGIN
   SELECT MAX(CASE WHEN name='builtin' THEN id END), MAX(CASE WHEN name='unknown' THEN id END), MAX(CASE WHEN name='1.0.1' THEN id END), MAX(CASE WHEN name='1.0.0' THEN id END), MAX(CASE WHEN name='1.361.0' THEN id END), MAX(CASE WHEN name='1.360.0' THEN id END), MAX(CASE WHEN name='1.359.0' THEN id END)
   INTO builtin_version_id, unknown_version_id, v1_0_1_version_id, v1_0_0_version_id, v1_361_0_version_id, v1_360_0_version_id, v1_359_0_version_id FROM version_inserts;
   WITH channel_inserts AS (
-    INSERT INTO public.channels (created_at, name, app_id, version, updated_at, public, disable_auto_update_under_native, disable_auto_update, ios, android, allow_device_self_set, allow_emulator, allow_dev, created_by, owner_org)
+    INSERT INTO public.channels (created_at, name, app_id, version, updated_at, public, disable_auto_update_under_native, disable_auto_update, ios, android, allow_device_self_set, allow_emulator, allow_device, allow_dev, allow_prod, created_by, owner_org)
     VALUES
-      (now(), 'production', p_app_id, v1_0_0_version_id, now(), 't', 't', 'major'::public.disable_update, 'f', 't', 't', 't', 't', user_id, org_id),
-      (now(), 'beta', p_app_id, v1_361_0_version_id, now(), 'f', 't', 'major'::public.disable_update, 't', 't', 't', 't', 't', user_id, org_id),
-      (now(), 'development', p_app_id, v1_359_0_version_id, now(), 't', 't', 'major'::public.disable_update, 't', 'f', 't', 't', 't', user_id, org_id),
-      (now(), 'no_access', p_app_id, v1_361_0_version_id, now(), 'f', 't', 'major'::public.disable_update, 'f', 'f', 't', 't', 't', user_id, org_id)
+      (now(), 'production', p_app_id, v1_0_0_version_id, now(), 't', 't', 'major'::public.disable_update, 'f', 't', 't', 't', 't', 't', 't', user_id, org_id),
+      (now(), 'beta', p_app_id, v1_361_0_version_id, now(), 'f', 't', 'major'::public.disable_update, 't', 't', 't', 't', 't', 't', 't', user_id, org_id),
+      (now(), 'development', p_app_id, v1_359_0_version_id, now(), 't', 't', 'major'::public.disable_update, 't', 'f', 't', 't', 't', 't', 't', user_id, org_id),
+      (now(), 'no_access', p_app_id, v1_361_0_version_id, now(), 'f', 't', 'major'::public.disable_update, 'f', 'f', 't', 't', 't', 't', 't', user_id, org_id)
     RETURNING id, name
   )
   SELECT MAX(CASE WHEN name='production' THEN id END), MAX(CASE WHEN name='beta' THEN id END), MAX(CASE WHEN name='development' THEN id END), MAX(CASE WHEN name='no_access' THEN id END)

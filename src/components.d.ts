@@ -18,6 +18,7 @@ declare module 'vue' {
     AdminTrendChart: typeof import('./components/admin/AdminTrendChart.vue')['default']
     AppSetting: typeof import('./components/dashboard/AppSetting.vue')['default']
     AppTable: typeof import('./components/tables/AppTable.vue')['default']
+    AuditLogTable: typeof import('./components/tables/AuditLogTable.vue')['default']
     Banner: typeof import('./components/Banner.vue')['default']
     BlurBg: typeof import('./components/BlurBg.vue')['default']
     BuildTable: typeof import('./components/tables/BuildTable.vue')['default']
@@ -62,6 +63,8 @@ declare module 'vue' {
     UpdateStatsChart: typeof import('./components/dashboard/UpdateStatsChart.vue')['default']
     Usage: typeof import('./components/dashboard/Usage.vue')['default']
     UsageCard: typeof import('./components/dashboard/UsageCard.vue')['default']
+    WebhookDeliveryLog: typeof import('./components/WebhookDeliveryLog.vue')['default']
+    WebhookForm: typeof import('./components/WebhookForm.vue')['default']
     WelcomeBanner: typeof import('./components/dashboard/WelcomeBanner.vue')['default']
   }
 }
@@ -74,6 +77,7 @@ declare global {
   const AdminTrendChart: typeof import('./components/admin/AdminTrendChart.vue')['default']
   const AppSetting: typeof import('./components/dashboard/AppSetting.vue')['default']
   const AppTable: typeof import('./components/tables/AppTable.vue')['default']
+  const AuditLogTable: typeof import('./components/tables/AuditLogTable.vue')['default']
   const Banner: typeof import('./components/Banner.vue')['default']
   const BlurBg: typeof import('./components/BlurBg.vue')['default']
   const BuildTable: typeof import('./components/tables/BuildTable.vue')['default']
@@ -118,5 +122,7 @@ declare global {
   const UpdateStatsChart: typeof import('./components/dashboard/UpdateStatsChart.vue')['default']
   const Usage: typeof import('./components/dashboard/Usage.vue')['default']
   const UsageCard: typeof import('./components/dashboard/UsageCard.vue')['default']
+  const WebhookDeliveryLog: typeof import('./components/WebhookDeliveryLog.vue')['default']
+  const WebhookForm: typeof import('./components/WebhookForm.vue')['default']
   const WelcomeBanner: typeof import('./components/dashboard/WelcomeBanner.vue')['default']
 }

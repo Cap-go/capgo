@@ -12,15 +12,46 @@ interface AcceptInvitation {
   opt_for_newsletters: boolean
   captchaToken: string
 }
-const MIN_PASSWORD_LENGTH = 'Password must be at least 6 characters'
-const MIN_PASSWORD_UPPERCASE = 'Password must contain at least one uppercase letter'
-const MIN_PASSWORD_NUMBER = 'Password must contain at least one number'
-const MIN_PASSWORD_SPECIAL = 'Password must contain at least one special character'
 
-// Define the schema for the accept invitation request
-const acceptInvitationSchema = z.object({
-  password: z.string()
-    .check(z.minLength(6, MIN_PASSWORD_LENGTH), z.regex(/[A-Z]/, MIN_PASSWORD_UPPERCASE), z.regex(/\d/, MIN_PASSWORD_NUMBER), z.regex(/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/, MIN_PASSWORD_SPECIAL)),
+interface PasswordPolicy {
+  enabled: boolean
+  min_length: number
+  require_uppercase: boolean
+  require_number: boolean
+  require_special: boolean
+}
+
+// Default password policy (when org has no policy set)
+const DEFAULT_PASSWORD_POLICY: PasswordPolicy = {
+  enabled: true,
+  min_length: 6,
+  require_uppercase: true,
+  require_number: true,
+  require_special: true,
+}
+
+// Build dynamic password validation schema based on org's policy
+function buildPasswordSchema(policy: PasswordPolicy) {
+  let schema = z.string().check(
+    z.minLength(policy.min_length, `Password must be at least ${policy.min_length} characters`),
+  )
+
+  if (policy.require_uppercase) {
+    schema = schema.check(z.regex(/[A-Z]/, 'Password must contain at least one uppercase letter'))
+  }
+  if (policy.require_number) {
+    schema = schema.check(z.regex(/\d/, 'Password must contain at least one number'))
+  }
+  if (policy.require_special) {
+    schema = schema.check(z.regex(/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/, 'Password must contain at least one special character'))
+  }
+
+  return schema
+}
+
+// Base schema for initial validation (without password)
+const baseInvitationSchema = z.object({
+  password: z.string(),
   magic_invite_string: z.string().check(z.minLength(1)),
   opt_for_newsletters: z.boolean(),
   captchaToken: z.string().check(z.minLength(1)),
@@ -34,22 +65,20 @@ app.post('/', async (c) => {
   const rawBody = await parseBody<AcceptInvitation>(c)
   cloudlog({ requestId: c.get('requestId'), context: 'accept_invitation raw body', rawBody })
 
-  // Validate the request body using Zod
-  const validationResult = acceptInvitationSchema.safeParse(rawBody)
-  if (!validationResult.success) {
-    return simpleError('invalid_json_body', 'Invalid request', { errors: z.prettifyError(validationResult.error) })
+  // First, validate base schema (without password policy checks)
+  const baseValidationResult = baseInvitationSchema.safeParse(rawBody)
+  if (!baseValidationResult.success) {
+    return simpleError('invalid_json_body', 'Invalid request', { errors: z.prettifyError(baseValidationResult.error) })
   }
 
-  const body = validationResult.data
-  cloudlog({ requestId: c.get('requestId'), context: 'accept_invitation validated body', body })
-
-  // For now, we're just doing validation without additional logic
-  // This will be expanded with the actual invitation acceptance logic
+  const baseBody = baseValidationResult.data
 
   const supabaseAdmin = useSupabaseAdmin(c)
+
+  // Get the invitation to find the org_id
   const { data: invitation, error: invitationError } = await supabaseAdmin.from('tmp_users')
     .select('*')
-    .eq('invite_magic_string', body.magic_invite_string)
+    .eq('invite_magic_string', baseBody.magic_invite_string)
     .single()
 
   if (invitationError) {
@@ -59,6 +88,43 @@ app.post('/', async (c) => {
   if (!invitation) {
     return quickError(404, 'failed_to_accept_invitation', 'Invitation not found', { error: 'Invitation not found' })
   }
+
+  // Get the org's password policy
+  const { data: org, error: orgError } = await supabaseAdmin.from('orgs')
+    .select('password_policy_config')
+    .eq('id', invitation.org_id)
+    .single()
+
+  if (orgError) {
+    return quickError(500, 'failed_to_accept_invitation', 'Failed to get org password policy', { error: orgError.message })
+  }
+
+  // Use org's password policy if enabled, otherwise use default
+  const policyConfig = org?.password_policy_config as unknown as PasswordPolicy | null
+  const passwordPolicy: PasswordPolicy = policyConfig?.enabled
+    ? policyConfig
+    : DEFAULT_PASSWORD_POLICY
+
+  // Validate password against the policy
+  const passwordSchema = buildPasswordSchema(passwordPolicy)
+  const passwordValidationResult = passwordSchema.safeParse(baseBody.password)
+  if (!passwordValidationResult.success) {
+    return simpleError('invalid_password', 'Password does not meet requirements', {
+      errors: z.prettifyError(passwordValidationResult.error),
+      policy: {
+        min_length: passwordPolicy.min_length,
+        require_uppercase: passwordPolicy.require_uppercase,
+        require_number: passwordPolicy.require_number,
+        require_special: passwordPolicy.require_special,
+      },
+    })
+  }
+
+  const body = {
+    ...baseBody,
+    password: passwordValidationResult.data,
+  }
+  cloudlog({ requestId: c.get('requestId'), context: 'accept_invitation validated body', body })
 
   // here the real magic happens
   const { data: user, error: userError } = await supabaseAdmin.auth.admin.createUser({

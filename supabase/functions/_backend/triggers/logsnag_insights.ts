@@ -249,7 +249,7 @@ async function getGithubStars(): Promise<number> {
 
 function getStats(c: Context): GlobalStats {
   const supabase = supabaseAdmin(c)
-  const last24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toString()
+  const last24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
   return {
     apps: countAllApps(c),
     updates: countAllUpdates(c),
@@ -493,9 +493,9 @@ app.post('/', middlewareAPISecret, async (c) => {
     // Subscription flow tracking
     new_paying_orgs,
     canceled_orgs,
-    // Credits tracking
-    credits_bought,
-    credits_consumed,
+    // Credits tracking (round to integers for bigint column)
+    credits_bought: Math.round(credits_bought),
+    credits_consumed: Math.round(credits_consumed),
   }
   cloudlog({ requestId: c.get('requestId'), message: 'newData', newData })
   const { error } = await supabaseAdmin(c)

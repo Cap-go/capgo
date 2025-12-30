@@ -2,15 +2,14 @@ import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
 import { BRES, simpleError } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
-import { closeClient, getDrizzleClient, getPgClient, selectOne } from '../utils/pg.ts'
+import { closeClient, getPgClient, selectOne } from '../utils/pg.ts'
 
 export const app = new Hono<MiddlewareKeyVariables>()
 
 app.get('/', async (c) => {
   cloudlog({ requestId: c.get('requestId'), message: 'Latency check' })
   const pgClient = getPgClient(c, true)
-  const db = getDrizzleClient(pgClient)
-  const res = await selectOne(db)
+  const res = await selectOne(pgClient)
 
   await closeClient(c, pgClient)
   if (!res)

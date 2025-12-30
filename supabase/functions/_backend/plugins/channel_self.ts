@@ -9,10 +9,11 @@ import { z } from 'zod/mini'
 import { getAppStatus, setAppStatus } from '../utils/appStatus.ts'
 import { BRES, parseBody, simpleError200, simpleRateLimit } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
+import { sendNotifToOrgMembers } from '../utils/org_email_notifications.ts'
 import { closeClient, deleteChannelDevicePg, getAppByIdPg, getAppOwnerPostgres, getAppVersionsByAppIdPg, getChannelByNamePg, getChannelDeviceOverridePg, getChannelsPg, getCompatibleChannelsPg, getDrizzleClient, getMainChannelsPg, getPgClient, upsertChannelDevicePg } from '../utils/pg.ts'
 import { convertQueryToBody, makeDevice, parsePluginBody } from '../utils/plugin_parser.ts'
 import { sendStatsAndDevice } from '../utils/stats.ts'
-import { deviceIdRegex, INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, isDeprecatedPluginVersion, isLimited, MISSING_STRING_APP_ID, MISSING_STRING_DEVICE_ID, MISSING_STRING_VERSION_BUILD, MISSING_STRING_VERSION_NAME, NON_STRING_APP_ID, NON_STRING_DEVICE_ID, NON_STRING_VERSION_BUILD, NON_STRING_VERSION_NAME, reverseDomainRegex } from '../utils/utils.ts'
+import { backgroundTask, deviceIdRegex, INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, isDeprecatedPluginVersion, isLimited, MISSING_STRING_APP_ID, MISSING_STRING_DEVICE_ID, MISSING_STRING_VERSION_BUILD, MISSING_STRING_VERSION_NAME, NON_STRING_APP_ID, NON_STRING_DEVICE_ID, NON_STRING_VERSION_BUILD, NON_STRING_VERSION_NAME, reverseDomainRegex } from '../utils/utils.ts'
 
 // Minimum versions for local channel storage behavior
 const CHANNEL_SELF_MIN_V5 = '5.34.0'
@@ -44,7 +45,7 @@ export const jsonRequestSchema = z.looseObject({
   plugin_version: z.optional(z.string()),
   is_prod: z.boolean(),
   platform: devicePlatformScheme,
-  key_id: z.optional(z.string().check(z.maxLength(4))),
+  key_id: z.optional(z.string().check(z.maxLength(20))),
 })
 
 // TODO: delete when all mirgrated to jsonRequestSchema
@@ -55,7 +56,7 @@ export const jsonRequestSchemaGet = z.looseObject({
   is_emulator: z.boolean(),
   is_prod: z.boolean(),
   platform: devicePlatformScheme,
-  key_id: z.optional(z.string().check(z.maxLength(4))),
+  key_id: z.optional(z.string().check(z.maxLength(20))),
 })
 
 async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient>, body: DeviceLink): Promise<Response> {
@@ -113,6 +114,19 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
     return simpleError200(c, 'cannot_override', 'Missing channel')
   }
   if (dataChannelOverride && !dataChannelOverride.channel_id.allow_device_self_set) {
+    // Send weekly notification to org about self-assignment rejection
+    backgroundTask(c, sendNotifToOrgMembers(
+      c,
+      'device:channel_self_set_rejected',
+      'channel_self_rejected',
+      {
+        channel_name: dataChannelOverride.channel_id.name,
+        app_id,
+      },
+      appOwner.owner_org,
+      `${app_id}`,
+      '0 0 * * 0', // Weekly on Sunday at midnight
+    ))
     return simpleError200(c, 'cannot_override', 'Cannot change device override current channel don\'t allow it')
   }
   // if channel set channel_override to it
@@ -124,7 +138,28 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
   }
 
   if (!dataChannel.allow_device_self_set) {
-    return simpleError200(c, 'channel_self_set_not_allowed', `This channel does not allow devices to self associate`, { channel, app_id })
+    // Send weekly notification to org about self-assignment rejection
+    backgroundTask(c, sendNotifToOrgMembers(
+      c,
+      'device:channel_self_set_rejected',
+      'channel_self_rejected',
+      {
+        channel_name: dataChannel.name,
+        app_id,
+      },
+      appOwner.owner_org,
+      `${app_id}`,
+      '0 0 * * 0', // Weekly on Sunday at midnight
+    ))
+    if (dataChannel.public) {
+      return simpleError200(
+        c,
+        'public_channel_self_set_not_allowed',
+        'This channel is public and does not allow device self-assignment. Unset the channel and the device will automatically use the public channel.',
+        { channel, app_id },
+      )
+    }
+    return simpleError200(c, 'channel_self_set_not_allowed', 'This channel does not allow devices to self associate', { channel, app_id })
   }
 
   // Check if plugin version supports local channel storage (5.34.0+, 6.34.0+, 7.34.0+)
@@ -406,6 +441,19 @@ async function deleteOverride(c: Context, drizzleClient: ReturnType<typeof getDr
   }
 
   if (!dataChannelOverride.channel_id.allow_device_self_set) {
+    // Send weekly notification to org about self-assignment rejection
+    backgroundTask(c, sendNotifToOrgMembers(
+      c,
+      'device:channel_self_set_rejected',
+      'channel_self_rejected',
+      {
+        channel_name: dataChannelOverride.channel_id.name,
+        app_id,
+      },
+      appOwner.owner_org,
+      `${app_id}`,
+      '0 0 * * 0', // Weekly on Sunday at midnight
+    ))
     return simpleError200(c, 'cannot_override', 'Cannot change device override current channel don\'t allow it')
   }
 
@@ -456,14 +504,13 @@ async function listCompatibleChannels(c: Context, drizzleClient: ReturnType<type
   }
   await setAppStatus(c, app_id, 'cloud')
 
-  // Get channels that allow device self set and are compatible with the platform - Read operation can use v2 flag
+  // Channels compatible with platform/device/build AND (public OR allow_device_self_set)
   const channels = await getCompatibleChannelsPg(c, app_id, platform as 'ios' | 'android', is_emulator!, is_prod!, drizzleClient as ReturnType<typeof getDrizzleClient>)
 
   if (!channels || channels.length === 0) {
     return c.json([])
   }
 
-  // Return the compatible channels
   const compatibleChannels = channels.map((channel: { id: number, name: string, public: boolean, allow_device_self_set: boolean }) => ({
     id: channel.id,
     name: channel.name,

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { DownloadEvent } from '@capgo/capacitor-updater'
+import { CapacitorBarcodeScanner } from '@capacitor/barcode-scanner'
 import { CapacitorUpdater } from '@capgo/capacitor-updater'
-import { CameraView } from 'capacitor-camera-view'
 import { onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
@@ -28,12 +28,9 @@ onMounted(async () => {
 })
 
 onUnmounted(async () => {
-  await stopScanner()
   if (downloadListener) {
     downloadListener.remove()
   }
-  // Ensure camera class is removed
-  document.body.classList.remove('camera-running')
 })
 
 async function startScanner() {
@@ -41,42 +38,27 @@ async function startScanner() {
     isScanning.value = true
     errorMessage.value = ''
 
-    // Make WebView transparent for camera
-    document.body.classList.add('camera-running')
-
-    await CameraView.start({
-      enableBarcodeDetection: true,
+    const result = await CapacitorBarcodeScanner.scanBarcode({
+      hint: 0, // QR_CODE
     })
 
-    CameraView.addListener('barcodeDetected', handleBarcodeScan)
-  }
-  catch (error) {
-    console.error('Failed to start camera:', error)
-    errorMessage.value = 'Failed to start camera. Please check permissions.'
     isScanning.value = false
-    document.body.classList.remove('camera-running')
-  }
-}
 
-async function stopScanner() {
-  try {
-    if (isScanning.value) {
-      await CameraView.stop()
-      CameraView.removeAllListeners()
-      isScanning.value = false
-
-      // Restore WebView visibility
-      document.body.classList.remove('camera-running')
+    if (result.ScanResult) {
+      await handleBarcodeScan(result.ScanResult)
+    }
+    else {
+      errorMessage.value = 'No barcode detected'
     }
   }
   catch (error) {
-    console.error('Failed to stop camera:', error)
+    console.error('Failed to scan:', error)
+    errorMessage.value = 'Failed to start scanner. Please check permissions.'
+    isScanning.value = false
   }
 }
 
-async function handleBarcodeScan(data: any) {
-  const scannedValue = data.displayValue || data.value || data.barcode?.displayValue || ''
-
+async function handleBarcodeScan(scannedValue: string) {
   // Check if the scanned value is a valid URL
   if (!URL.canParse(scannedValue)) {
     toast.error('Scanned value is not a valid URL')
@@ -84,7 +66,6 @@ async function handleBarcodeScan(data: any) {
   }
 
   scannedUrl.value = scannedValue
-  await stopScanner()
   await downloadUpdate(scannedValue)
 }
 
@@ -136,9 +117,6 @@ async function retryScanning() {
 }
 
 async function goBack() {
-  await stopScanner()
-  // Ensure camera class is removed
-  document.body.classList.remove('camera-running')
   router.back()
 }
 </script>
@@ -146,7 +124,7 @@ async function goBack() {
 <template>
   <div class="min-h-screen text-white bg-gray-900 camera-modal">
     <!-- Header -->
-    <div class="flex justify-between items-center p-4 bg-gray-800">
+    <div class="flex items-center justify-between p-4 bg-gray-800">
       <button class="p-2 rounded-lg hover:bg-gray-700" @click="goBack">
         <IconClose class="w-6 h-6" />
       </button>
@@ -158,32 +136,32 @@ async function goBack() {
 
     <!-- Camera Preview -->
     <div class="relative flex-1">
-      <div v-if="isScanning" class="relative w-full h-96 bg-black rounded-lg">
+      <div v-if="isScanning" class="relative w-full bg-black rounded-lg h-96">
         <!-- Scanning instructions -->
-        <div class="flex absolute inset-0 z-10 flex-col justify-center items-center pointer-events-none">
-          <div class="w-64 h-64 rounded-lg border-2 border-white border-dashed opacity-50" />
+        <div class="absolute inset-0 z-10 flex flex-col items-center justify-center pointer-events-none">
+          <div class="w-64 h-64 border-2 border-white border-dashed rounded-lg opacity-50" />
           <p class="px-4 mt-4 text-center text-white">
             Point your camera at a QR code containing an update URL
           </p>
         </div>
 
         <!-- Corner decorators -->
-        <div class="absolute top-1/2 left-1/2 z-10 w-64 h-64 transform -translate-x-1/2 -translate-y-1/2">
-          <div class="absolute top-0 left-0 w-8 h-8 rounded-tl-lg border-t-4 border-l-4 border-blue-500" />
-          <div class="absolute top-0 right-0 w-8 h-8 rounded-tr-lg border-t-4 border-r-4 border-blue-500" />
-          <div class="absolute bottom-0 left-0 w-8 h-8 rounded-bl-lg border-b-4 border-l-4 border-blue-500" />
-          <div class="absolute right-0 bottom-0 w-8 h-8 rounded-br-lg border-r-4 border-b-4 border-blue-500" />
+        <div class="absolute z-10 w-64 h-64 transform -translate-x-1/2 -translate-y-1/2 top-1/2 left-1/2">
+          <div class="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-blue-500 rounded-tl-lg" />
+          <div class="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-blue-500 rounded-tr-lg" />
+          <div class="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-blue-500 rounded-bl-lg" />
+          <div class="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-blue-500 rounded-br-lg" />
         </div>
       </div>
 
       <!-- Error State -->
-      <div v-if="errorMessage && !isScanning" class="flex flex-col justify-center items-center p-8 h-96">
-        <IconQrCode class="mb-4 w-16 h-16 text-gray-500" />
+      <div v-if="errorMessage && !isScanning" class="flex flex-col items-center justify-center p-8 h-96">
+        <IconQrCode class="w-16 h-16 mb-4 text-gray-500" />
         <p class="mb-4 text-center text-gray-400">
           {{ errorMessage }}
         </p>
         <button
-          class="py-3 px-6 text-white bg-blue-600 rounded-lg transition-colors hover:bg-blue-700"
+          class="px-6 py-3 text-white transition-colors bg-blue-600 rounded-lg hover:bg-blue-700"
           @click="retryScanning"
         >
           Retry Scanning
@@ -191,8 +169,8 @@ async function goBack() {
       </div>
 
       <!-- Loading State -->
-      <div v-if="isLoading" class="flex absolute inset-0 z-10 flex-col justify-center items-center bg-black bg-opacity-75">
-        <IconDownload class="mb-4 w-16 h-16 text-blue-500 animate-bounce" />
+      <div v-if="isLoading" class="absolute inset-0 z-10 flex flex-col items-center justify-center bg-black bg-opacity-75">
+        <IconDownload class="w-16 h-16 mb-4 text-blue-500 animate-bounce" />
         <h3 class="mb-2 text-xl font-semibold">
           Downloading Update
         </h3>
@@ -201,9 +179,9 @@ async function goBack() {
         </p>
 
         <!-- Progress Bar -->
-        <div class="overflow-hidden w-64 h-3 bg-gray-700 rounded-full">
+        <div class="w-64 h-3 overflow-hidden bg-gray-700 rounded-full">
           <div
-            class="h-full bg-blue-500 transition-all duration-300 ease-out"
+            class="h-full transition-all duration-300 ease-out bg-blue-500"
             :style="{ width: `${downloadProgress}%` }"
           />
         </div>
@@ -217,7 +195,7 @@ async function goBack() {
     <!-- Instructions -->
     <div class="p-6 bg-gray-800">
       <div class="flex items-center mb-3">
-        <IconQrCode class="mr-2 w-5 h-5 text-blue-500" />
+        <IconQrCode class="w-5 h-5 mr-2 text-blue-500" />
         <h3 class="font-semibold">
           How to use
         </h3>
@@ -233,35 +211,6 @@ async function goBack() {
 </template>
 
 <style scoped>
-/* Make WebView transparent when camera is running */
-body.camera-running {
-  visibility: hidden;
-  --background: transparent;
-  --ion-background-color: transparent;
-}
-
-/* Show only the camera modal */
-body.camera-running .camera-modal {
-  visibility: visible;
-}
-
-/* Ensure camera modal has transparent background */
-.camera-modal {
-  --background: transparent;
-}
-
-/* Dark mode support */
-@media (prefers-color-scheme: dark) {
-  body.camera-running {
-    --background: transparent;
-    --ion-background-color: transparent;
-  }
-
-  .camera-modal {
-    --background: transparent;
-    --ion-background-color: transparent;
-  }
-}
 </style>
 
 <route lang="yaml">
