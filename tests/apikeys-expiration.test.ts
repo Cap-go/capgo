@@ -344,9 +344,19 @@ describe('[PUT] /organization with API key policy', () => {
     })
     if (orgError)
       throw orgError
+
+    // Add user as super_admin to be able to update the org
+    const { error: memberError } = await getSupabaseClient().from('org_users').insert({
+      org_id: updateOrgId,
+      user_id: USER_ID,
+      user_right: 'super_admin',
+    })
+    if (memberError)
+      throw memberError
   })
 
   afterAll(async () => {
+    await getSupabaseClient().from('org_users').delete().eq('org_id', updateOrgId)
     await getSupabaseClient().from('orgs').delete().eq('id', updateOrgId)
     await getSupabaseClient().from('stripe_info').delete().eq('customer_id', updateOrgCustomerId)
   })
