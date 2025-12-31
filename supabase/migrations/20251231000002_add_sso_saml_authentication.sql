@@ -135,36 +135,36 @@ COMMENT ON COLUMN public.sso_audit_logs.event_type IS 'Type of SSO event (login,
 -- ============================================================================
 
 -- org_saml_connections indexes
-CREATE INDEX idx_saml_connections_org_enabled ON public.org_saml_connections(org_id) 
+CREATE INDEX IF NOT EXISTS idx_saml_connections_org_enabled ON public.org_saml_connections(org_id) 
   WHERE enabled = true;
 
-CREATE INDEX idx_saml_connections_provider ON public.org_saml_connections(sso_provider_id);
+CREATE INDEX IF NOT EXISTS idx_saml_connections_provider ON public.org_saml_connections(sso_provider_id);
 
-CREATE INDEX idx_saml_connections_cert_expiry ON public.org_saml_connections(certificate_expires_at) 
+CREATE INDEX IF NOT EXISTS idx_saml_connections_cert_expiry ON public.org_saml_connections(certificate_expires_at) 
   WHERE certificate_expires_at IS NOT NULL AND enabled = true;
 
 -- saml_domain_mappings indexes
-CREATE INDEX idx_saml_domains_domain_verified ON public.saml_domain_mappings(domain) 
+CREATE INDEX IF NOT EXISTS idx_saml_domains_domain_verified ON public.saml_domain_mappings(domain) 
   WHERE verified = true;
 
-CREATE INDEX idx_saml_domains_connection ON public.saml_domain_mappings(sso_connection_id);
+CREATE INDEX IF NOT EXISTS idx_saml_domains_connection ON public.saml_domain_mappings(sso_connection_id);
 
-CREATE INDEX idx_saml_domains_org ON public.saml_domain_mappings(org_id);
+CREATE INDEX IF NOT EXISTS idx_saml_domains_org ON public.saml_domain_mappings(org_id);
 
 -- sso_audit_logs indexes
-CREATE INDEX idx_sso_audit_user_time ON public.sso_audit_logs(user_id, timestamp DESC) 
+CREATE INDEX IF NOT EXISTS idx_sso_audit_user_time ON public.sso_audit_logs(user_id, timestamp DESC) 
   WHERE user_id IS NOT NULL;
 
-CREATE INDEX idx_sso_audit_org_time ON public.sso_audit_logs(org_id, timestamp DESC) 
+CREATE INDEX IF NOT EXISTS idx_sso_audit_org_time ON public.sso_audit_logs(org_id, timestamp DESC) 
   WHERE org_id IS NOT NULL;
 
-CREATE INDEX idx_sso_audit_event_time ON public.sso_audit_logs(event_type, timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_sso_audit_event_time ON public.sso_audit_logs(event_type, timestamp DESC);
 
-CREATE INDEX idx_sso_audit_provider ON public.sso_audit_logs(sso_provider_id, timestamp DESC) 
+CREATE INDEX IF NOT EXISTS idx_sso_audit_provider ON public.sso_audit_logs(sso_provider_id, timestamp DESC) 
   WHERE sso_provider_id IS NOT NULL;
 
 -- Failed login monitoring
-CREATE INDEX idx_sso_audit_failures ON public.sso_audit_logs(ip_address, timestamp DESC) 
+CREATE INDEX IF NOT EXISTS idx_sso_audit_failures ON public.sso_audit_logs(ip_address, timestamp DESC) 
   WHERE event_type = 'login_failed';
 
 -- ============================================================================
