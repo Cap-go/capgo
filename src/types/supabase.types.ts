@@ -2563,9 +2563,13 @@ export type Database = {
               is_yearly: boolean
               logo: string
               management_email: string
+              max_apikey_expiration_days: number | null
               name: string
               next_stats_update_at: string
+              password_has_access: boolean
+              password_policy_config: Json
               paying: boolean
+              require_apikey_expiration: boolean
               role: string
               stats_updated_at: string
               subscription_end: string
@@ -2589,66 +2593,13 @@ export type Database = {
               is_yearly: boolean
               logo: string
               management_email: string
-              name: string
-              next_stats_update_at: string
-              paying: boolean
-              role: string
-              stats_updated_at: string
-              subscription_end: string
-              subscription_start: string
-              trial_left: number
-            }[]
-          }
-      get_orgs_v7:
-        | {
-            Args: never
-            Returns: {
-              "2fa_has_access": boolean
-              app_count: number
-              can_use_more: boolean
-              created_by: string
-              credit_available: number
-              credit_next_expiration: string
-              credit_total: number
-              enforcing_2fa: boolean
-              gid: string
-              is_canceled: boolean
-              is_yearly: boolean
-              logo: string
-              management_email: string
+              max_apikey_expiration_days: number | null
               name: string
               next_stats_update_at: string
               password_has_access: boolean
               password_policy_config: Json
               paying: boolean
-              role: string
-              stats_updated_at: string
-              subscription_end: string
-              subscription_start: string
-              trial_left: number
-            }[]
-          }
-        | {
-            Args: { userid: string }
-            Returns: {
-              "2fa_has_access": boolean
-              app_count: number
-              can_use_more: boolean
-              created_by: string
-              credit_available: number
-              credit_next_expiration: string
-              credit_total: number
-              enforcing_2fa: boolean
-              gid: string
-              is_canceled: boolean
-              is_yearly: boolean
-              logo: string
-              management_email: string
-              name: string
-              next_stats_update_at: string
-              password_has_access: boolean
-              password_policy_config: Json
-              paying: boolean
+              require_apikey_expiration: boolean
               role: string
               stats_updated_at: string
               subscription_end: string
