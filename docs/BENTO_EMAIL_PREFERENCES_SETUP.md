@@ -22,6 +22,7 @@ The following tags are automatically synced to Bento when users update their ema
 | `onboarding` | `onboarding_disabled` | Onboarding reminder emails |
 | `weekly_stats` | `weekly_stats_disabled` | Weekly statistics emails |
 | `monthly_stats` | `monthly_stats_disabled` | Monthly creation statistics |
+| `billing_period_stats` | `billing_period_stats_disabled` | Billing period usage statistics with upgrade recommendations |
 | `deploy_stats_24h` | `deploy_stats_24h_disabled` | 24-hour deploy install statistics |
 | `bundle_created` | `bundle_created_disabled` | New bundle upload notifications |
 | `bundle_deployed` | `bundle_deployed_disabled` | Bundle deployment notifications |
@@ -86,7 +87,16 @@ Tag does NOT contain: weekly_stats_disabled
 Tag does NOT contain: monthly_stats_disabled
 ```
 
-#### 6. Deploy Install Statistics (24h)
+#### 6. Billing Period Statistics
+
+**Events**: `org:billing_period_stats`
+
+**Filter to add**:
+```text
+Tag does NOT contain: billing_period_stats_disabled
+```
+
+#### 7. Deploy Install Statistics (24h)
 
 **Events**: `bundle:install_stats_24h`
 
@@ -95,7 +105,7 @@ Tag does NOT contain: monthly_stats_disabled
 Tag does NOT contain: deploy_stats_24h_disabled
 ```
 
-#### 7. Bundle Created Notifications
+#### 8. Bundle Created Notifications
 
 **Events**: `bundle:created`
 
@@ -104,7 +114,7 @@ Tag does NOT contain: deploy_stats_24h_disabled
 Tag does NOT contain: bundle_created_disabled
 ```
 
-#### 8. Bundle Deployed Notifications
+#### 9. Bundle Deployed Notifications
 
 **Events**: `bundle:deployed`
 
@@ -113,7 +123,7 @@ Tag does NOT contain: bundle_created_disabled
 Tag does NOT contain: bundle_deployed_disabled
 ```
 
-#### 9. Device Error Notifications
+#### 10. Device Error Notifications
 
 **Events**: `user:update_fail`
 

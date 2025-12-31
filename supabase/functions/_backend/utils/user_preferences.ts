@@ -16,6 +16,7 @@ const EMAIL_PREF_DISABLED_TAGS: Record<EmailPreferenceKey, string> = {
   onboarding: 'onboarding_disabled',
   weekly_stats: 'weekly_stats_disabled',
   monthly_stats: 'monthly_stats_disabled',
+  billing_period_stats: 'billing_period_stats_disabled',
   deploy_stats_24h: 'deploy_stats_24h_disabled',
   bundle_created: 'bundle_created_disabled',
   bundle_deployed: 'bundle_deployed_disabled',

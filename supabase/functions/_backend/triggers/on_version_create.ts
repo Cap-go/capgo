@@ -45,6 +45,7 @@ app.post('/', middlewareAPISecret, triggerValidator('app_versions', 'INSERT'), a
     org_id: record.owner_org,
     app_id: record.app_id,
     bundle_name: record.name,
+    bundle_id: record.id,
   }, record.owner_org))
 
   return c.json(BRES)

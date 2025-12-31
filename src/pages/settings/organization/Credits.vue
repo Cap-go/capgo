@@ -49,7 +49,13 @@ interface DailyLedgerRow {
   grantsCount: number
   deductionsTotal: number
   deductionsCount: number
-  deductionsByMetric: Partial<Record<Database['public']['Enums']['credit_metric_type'], { total: number, count: number, overageMetricTotal: number, overageCount: number, overageMetricIndividual: number }>>
+  deductionsByMetric: Partial<Record<Database['public']['Enums']['credit_metric_type'], { total: number, count: number }>>
+}
+
+interface PricingStep {
+  type: string
+  price_per_unit: number
+  unit_factor: number
 }
 
 const router = useRouter()
@@ -61,6 +67,7 @@ const { currentOrganization } = storeToRefs(organizationStore)
 const displayStore = useDisplayStore()
 
 const transactions = ref<UsageCreditLedgerRow[]>([])
+const pricingSteps = ref<PricingStep[]>([])
 const isLoadingTransactions = ref(false)
 const loadError = ref<string | null>(null)
 const creditUsdRate = ref(1)
@@ -287,9 +294,9 @@ function formatMetricAmount(metric: Database['public']['Enums']['credit_metric_t
       return `${new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(ceiledValue)} ${t('users')}`
     case 'bandwidth':
     case 'storage': {
-      // Convert bytes to GiB (1 GiB = 1073741824 bytes)
-      const gib = ceiledValue / 1073741824
-      return `${new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(gib)} GiB`
+      // Convert bytes to GiB (1 GiB = 1073741824 bytes) and round up to match pricing
+      const gib = Math.ceil(ceiledValue / 1073741824)
+      return `${new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(gib)} GiB`
     }
     case 'build_time':
       // Convert minutes to hours if > 60
@@ -384,9 +391,6 @@ const dailyTransactions = computed<DailyLedgerRow[]>(() => {
         initial.deductionsByMetric[tx.metric as Database['public']['Enums']['credit_metric_type']] = {
           total: tx.amount,
           count: 1,
-          overageMetricTotal: tx.overage_amount ?? 0,
-          overageCount: tx.overage_amount ? 1 : 0,
-          overageMetricIndividual: tx.overage_amount ?? 0,
         }
       }
       groups.set(dateKey, initial)
@@ -404,13 +408,9 @@ const dailyTransactions = computed<DailyLedgerRow[]>(() => {
         existing.deductionsTotal += tx.amount
         existing.deductionsCount += 1
         if (tx.transaction_type === 'deduction' && tx.metric) {
-          const metricEntry = existing.deductionsByMetric[tx.metric as Database['public']['Enums']['credit_metric_type']] ?? { total: 0, count: 0, overageMetricTotal: 0, overageCount: 0, overageMetricIndividual: 0 }
+          const metricEntry = existing.deductionsByMetric[tx.metric as Database['public']['Enums']['credit_metric_type']] ?? { total: 0, count: 0 }
           metricEntry.total += tx.amount
           metricEntry.count += 1
-          metricEntry.overageMetricTotal += tx.overage_amount ?? 0
-          metricEntry.overageCount += tx.overage_amount ? 1 : 0
-          // Store individual overage amount (delta), not cumulative
-          metricEntry.overageMetricIndividual = tx.overage_amount ?? 0
           existing.deductionsByMetric[tx.metric as Database['public']['Enums']['credit_metric_type']] = metricEntry
         }
       }
@@ -431,6 +431,19 @@ const paginatedDailyTransactions = computed(() => {
 })
 
 const deductionMetricsOrder: Database['public']['Enums']['credit_metric_type'][] = ['mau', 'bandwidth', 'storage', 'build_time']
+
+// Compute estimated usage from credits consumed using first-tier pricing
+// This is an approximation since actual pricing is tiered, but gives a reasonable estimate
+function computeUsageFromCredits(metric: Database['public']['Enums']['credit_metric_type'], credits: number): number {
+  // Find first-tier pricing for this metric (lowest step_min)
+  const step = pricingSteps.value.find(s => s.type === metric)
+  if (!step || step.price_per_unit <= 0)
+    return 0
+
+  // credits is negative for deductions, so we use Math.abs
+  // Formula: usage = (credits / price_per_unit) * unit_factor
+  return (Math.abs(credits) / step.price_per_unit) * step.unit_factor
+}
 
 function metricsWithData(day: DailyLedgerRow) {
   const entries = Object.entries(day.deductionsByMetric || {})
@@ -481,6 +494,28 @@ async function loadTransactions() {
   }
 
   isLoadingTransactions.value = false
+}
+
+async function loadPricingSteps() {
+  const { data, error } = await supabase
+    .from('capgo_credits_steps')
+    .select('type, price_per_unit, unit_factor')
+    .is('org_id', null) // Only global pricing, not org-specific overrides
+    .order('step_min', { ascending: true })
+
+  if (error) {
+    console.error('Failed to load pricing steps', error)
+    return
+  }
+
+  // Keep only first tier per metric type (lowest step_min)
+  const seen = new Set<string>()
+  pricingSteps.value = (data ?? []).filter((step) => {
+    if (seen.has(step.type))
+      return false
+    seen.add(step.type)
+    return true
+  })
 }
 
 async function handleBuyCredits() {
@@ -557,7 +592,7 @@ async function handleCreditCheckoutReturn() {
 onMounted(async () => {
   displayStore.NavTitle = t('credits')
   await organizationStore.awaitInitialLoad()
-  await Promise.allSettled([loadTransactions()])
+  await Promise.allSettled([loadTransactions(), loadPricingSteps()])
   await handleCreditCheckoutReturn()
 })
 
@@ -850,8 +885,8 @@ watch(() => currentOrganization.value?.gid, async (newOrgId: string | undefined,
                     </div>
                     <div class="text-xs text-gray-500 dark:text-gray-400">
                       {{ t('credits-daily-deduction-count', { count: entry.data?.count ?? 0 }) }}
-                      <span v-if="entry.data?.overageCount && entry.data.overageCount > 0" class="ml-2 inline-flex items-center rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-700 dark:bg-orange-900/40 dark:text-orange-300">
-                        {{ formatMetricAmount(entry.metric, entry.data.overageMetricIndividual ?? entry.data.overageMetricTotal) }}
+                      <span v-if="entry.data?.total && pricingSteps.length > 0" class="ml-2 inline-flex items-center rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-700 dark:bg-orange-900/40 dark:text-orange-300">
+                        ~{{ formatMetricAmount(entry.metric, computeUsageFromCredits(entry.metric, entry.data.total)) }}
                       </span>
                     </div>
                   </td>

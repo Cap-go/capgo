@@ -14,6 +14,7 @@ export type EmailPreferenceKey
     | 'onboarding'
     | 'weekly_stats'
     | 'monthly_stats'
+    | 'billing_period_stats'
     | 'deploy_stats_24h'
     | 'bundle_created'
     | 'bundle_deployed'
@@ -26,6 +27,7 @@ export interface EmailPreferences {
   onboarding?: boolean
   weekly_stats?: boolean
   monthly_stats?: boolean
+  billing_period_stats?: boolean
   deploy_stats_24h?: boolean
   bundle_created?: boolean
   bundle_deployed?: boolean

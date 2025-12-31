@@ -233,7 +233,8 @@ describe('trigger Endpoint Error Cases', () => {
     })
     expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('missing_email_appId_type')
+    // Validation now checks email and type first before appId
+    expect(data.error).toBe('missing_email_type')
   })
 
   it('should return 400 for cron_email with invalid type', async () => {
