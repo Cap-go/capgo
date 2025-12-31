@@ -5,8 +5,9 @@ import { Hono } from 'hono/tiny'
 import { trackBentoEvent } from '../utils/bento.ts'
 import { BRES, middlewareAPISecret, parseBody, simpleError } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../utils/logging.ts'
+import { findBestPlan } from '../utils/plans.ts'
 import { readStatsVersion } from '../utils/stats.ts'
-import { supabaseAdmin } from '../utils/supabase.ts'
+import { getCurrentPlanNameOrg, supabaseAdmin } from '../utils/supabase.ts'
 
 /**
  * Check if a user has a specific email preference enabled.
@@ -95,6 +96,7 @@ app.post('/', middlewareAPISecret, async (c) => {
   const {
     email,
     appId,
+    orgId,
     type,
     deployId,
     versionId,
@@ -104,9 +106,12 @@ app.post('/', middlewareAPISecret, async (c) => {
     platform,
     appName,
     deployedAt,
+    cycleStart,
+    cycleEnd,
   } = await parseBody<{
     email: string
-    appId: string
+    appId?: string
+    orgId?: string
     type: string
     deployId?: number
     versionId?: number
@@ -116,11 +121,27 @@ app.post('/', middlewareAPISecret, async (c) => {
     platform?: string
     appName?: string
     deployedAt?: string
+    cycleStart?: string
+    cycleEnd?: string
   }>(c)
 
-  if (!email || !appId || !type) {
-    return simpleError('missing_email_appId_type', 'Missing email, appId, or type', { email, appId, type })
+  if (!email || !type) {
+    return simpleError('missing_email_type', 'Missing email or type', { email, type })
   }
+
+  // billing_period_stats uses orgId instead of appId
+  if (type === 'billing_period_stats') {
+    if (!orgId) {
+      return simpleError('missing_orgId', 'Missing orgId for billing_period_stats', { email, type })
+    }
+    return await handleBillingPeriodStats(c, email, orgId, cycleStart, cycleEnd)
+  }
+
+  // All other types require appId
+  if (!appId) {
+    return simpleError('missing_appId', 'Missing appId', { email, type })
+  }
+
   // check if email exists
   const { data: user, error: userError } = await supabaseAdmin(c)
     .from('users')
@@ -329,6 +350,209 @@ async function handleDeployInstallStats(
   }
 
   await trackBentoEvent(c, email, metadata, 'bundle:install_stats_24h')
+
+  return c.json(BRES)
+}
+
+/**
+ * Format bytes to human readable format (e.g., 1.5 GB, 250 MB)
+ */
+function formatBytes(bytes: number): string {
+  if (bytes === 0)
+    return '0 B'
+  const k = 1024
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return `${Number.parseFloat((bytes / k ** i).toFixed(2))} ${sizes[i]}`
+}
+
+/**
+ * Format large numbers with commas (e.g., 1,234,567)
+ */
+function formatNumber(num: number): string {
+  return num.toLocaleString('en-US')
+}
+
+async function handleBillingPeriodStats(c: Context, email: string, orgId: string, cycleStart?: string, cycleEnd?: string) {
+  // Check if user has billing_period_stats preference enabled
+  const isEnabled = await isEmailPreferenceEnabled(c, email, 'billing_period_stats')
+  if (!isEnabled) {
+    cloudlog({ requestId: c.get('requestId'), message: 'Billing period stats email disabled for user', email, orgId })
+    return c.json({ status: 'Email preference disabled' }, 200)
+  }
+
+  const supabase = await supabaseAdmin(c)
+
+  // Get organization info
+  const { data: org, error: orgError } = await supabase
+    .from('orgs')
+    .select('id, name')
+    .eq('id', orgId)
+    .single()
+
+  if (orgError || !org) {
+    return simpleError('org_not_found', 'Organization not found', { orgId, orgError })
+  }
+
+  // Use cycle dates passed from the SQL function if available,
+  // otherwise fall back to get_cycle_info_org (for backwards compatibility)
+  let startDate: string
+  let endDate: string
+
+  if (cycleStart && cycleEnd) {
+    // Use dates passed from the SQL function (guaranteed to be the completed billing period)
+    startDate = new Date(cycleStart).toISOString().split('T')[0]
+    endDate = new Date(cycleEnd).toISOString().split('T')[0]
+  }
+  else {
+    // Fallback: get cycle info from RPC
+    const { data: cycleInfo, error: cycleError } = await supabase
+      .rpc('get_cycle_info_org', { orgid: orgId })
+      .single()
+
+    if (cycleError || !cycleInfo) {
+      cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot get cycle info', error: cycleError, metadata: { orgId, email } })
+      return simpleError('cannot_get_cycle_info', 'Cannot get cycle info', { error: cycleError })
+    }
+
+    startDate = new Date(cycleInfo.subscription_anchor_start).toISOString().split('T')[0]
+    endDate = new Date(cycleInfo.subscription_anchor_end).toISOString().split('T')[0]
+  }
+
+  // Get total metrics for the billing period
+  const { data: metrics, error: metricsError } = await supabase
+    .rpc('get_total_metrics', {
+      org_id: orgId,
+      start_date: startDate,
+      end_date: endDate,
+    })
+    .single()
+
+  if (metricsError) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot get total metrics', error: metricsError, metadata: { orgId, email } })
+    return simpleError('cannot_get_metrics', 'Cannot get metrics', { error: metricsError })
+  }
+
+  // Get credits used in the billing period
+  let creditsUsed = 0
+  const { data: credits } = await supabase
+    .from('usage_credit_consumptions')
+    .select('credits_used')
+    .eq('org_id', orgId)
+    .gte('applied_at', startDate)
+    .lt('applied_at', endDate)
+
+  if (credits) {
+    creditsUsed = credits.reduce((sum, row) => sum + Number(row.credits_used || 0), 0)
+  }
+
+  // Format the metrics for the email
+  const mau = metrics?.mau ?? 0
+  const bandwidth = metrics?.bandwidth ?? 0
+  const storage = metrics?.storage ?? 0
+  const buildTimeUnit = metrics?.build_time_unit ?? 0
+
+  // Get current plan and find the best plan for this usage
+  const currentPlanName = await getCurrentPlanNameOrg(c, orgId)
+
+  // Get current plan limits
+  const { data: currentPlan } = await supabase
+    .from('plans')
+    .select('mau, bandwidth, storage, build_time_unit')
+    .eq('name', currentPlanName)
+    .single()
+
+  // Find the best plan for the actual usage
+  const bestPlanName = await findBestPlan(c, {
+    mau,
+    bandwidth,
+    storage,
+    build_time_unit: buildTimeUnit,
+  })
+
+  // Calculate usage percentages against current plan limits
+  const mauPercent = currentPlan?.mau ? Math.round((mau / currentPlan.mau) * 100) : 0
+  const bandwidthPercent = currentPlan?.bandwidth ? Math.round((bandwidth / currentPlan.bandwidth) * 100) : 0
+  const storagePercent = currentPlan?.storage ? Math.round((storage / currentPlan.storage) * 100) : 0
+  const buildTimePercent = currentPlan?.build_time_unit ? Math.round((buildTimeUnit / currentPlan.build_time_unit) * 100) : 0
+
+  // The highest usage percentage determines if we should recommend an upgrade
+  const maxUsagePercent = Math.max(mauPercent, bandwidthPercent, storagePercent, buildTimePercent)
+
+  // Determine if the user should consider upgrading
+  // If usage is >= 90% of any limit, or if the best plan is higher than current plan
+  const planOrder = ['Solo', 'Maker', 'Team', 'Enterprise']
+  const rawCurrentPlanIndex = planOrder.indexOf(currentPlanName)
+  const rawBestPlanIndex = planOrder.indexOf(bestPlanName)
+
+  // Handle unknown plan names (e.g., Free, custom plans, legacy plans)
+  // Treat unknown plans as lowest tier (index 0) for comparison purposes
+  const currentPlanIndex = rawCurrentPlanIndex === -1 ? 0 : rawCurrentPlanIndex
+  const bestPlanIndex = rawBestPlanIndex === -1 ? 0 : rawBestPlanIndex
+
+  // Should upgrade if:
+  // 1. Best plan is higher tier than current plan (user exceeded their plan), OR
+  // 2. Usage is >= 90% of any metric limit (user is close to exceeding)
+  const exceededPlan = bestPlanIndex > currentPlanIndex
+  const nearingLimits = maxUsagePercent >= 90
+  const shouldUpgrade = exceededPlan || nearingLimits
+
+  // If should upgrade, recommend the best plan for their usage
+  // If best plan equals current (user is within limits but near 90%), recommend next tier
+  let recommendedPlan = currentPlanName
+  if (shouldUpgrade) {
+    if (exceededPlan) {
+      // User already exceeded their plan, recommend the best fitting plan
+      recommendedPlan = bestPlanName
+    }
+    else if (nearingLimits && currentPlanIndex < planOrder.length - 1) {
+      // User is near limits but hasn't exceeded, recommend next tier up
+      recommendedPlan = planOrder[currentPlanIndex + 1]
+    }
+  }
+
+  // Determine which metrics are at high usage (>= 90%)
+  const highUsageMetrics: string[] = []
+  if (mauPercent >= 90)
+    highUsageMetrics.push('MAU')
+  if (bandwidthPercent >= 90)
+    highUsageMetrics.push('Bandwidth')
+  if (storagePercent >= 90)
+    highUsageMetrics.push('Storage')
+  if (buildTimePercent >= 90)
+    highUsageMetrics.push('Build Time')
+
+  const metadata = {
+    org_id: orgId,
+    org_name: org.name ?? '',
+    monthly_active_users: formatNumber(mau),
+    bandwidth_used: formatBytes(bandwidth),
+    storage_used: formatBytes(storage),
+    credits_used: formatNumber(Math.round(creditsUsed * 100) / 100),
+    // Raw values for potential use in email templates
+    mau_raw: mau.toString(),
+    bandwidth_raw: bandwidth.toString(),
+    storage_raw: storage.toString(),
+    credits_raw: creditsUsed.toString(),
+    // Include period dates for context
+    period_start: startDate,
+    period_end: endDate,
+    // Plan information
+    current_plan: currentPlanName,
+    recommended_plan: recommendedPlan,
+    should_upgrade: shouldUpgrade ? 'true' : 'false',
+    // Upgrade reason details
+    exceeded_plan: exceededPlan ? 'true' : 'false',
+    nearing_limits: nearingLimits ? 'true' : 'false',
+    high_usage_metrics: highUsageMetrics.join(', ') || 'none',
+    // Usage percentages
+    mau_percent: mauPercent.toString(),
+    bandwidth_percent: bandwidthPercent.toString(),
+    storage_percent: storagePercent.toString(),
+    max_usage_percent: maxUsagePercent.toString(),
+  }
+
+  await trackBentoEvent(c, email, metadata, 'org:billing_period_stats')
 
   return c.json(BRES)
 }

@@ -62,20 +62,27 @@ const bannerText = computed(() => {
   if (organizationStore.currentOrganizationFailed)
     return t('subscription-required')
 
-  if (org.is_canceled)
+  if (org.is_canceled) {
     return t('plan-inactive')
+  }
 
-  else if (!org.paying && org.trial_left > 1)
+  else if (!org.paying && org.trial_left > 1) {
     return `${org.trial_left} ${t('trial-left')}`
+  }
 
-  else if (!org.paying && org.trial_left === 1)
+  else if (!org.paying && org.trial_left === 1) {
     return t('one-day-left')
+  }
 
-  else if (!org.paying && !org.can_use_more)
+  else if (!org.paying && !org.can_use_more) {
     return t('trial-plan-expired')
+  }
 
-  else if (org.paying && !org.can_use_more)
-    return t('you-reached-the-limi')
+  else if (org.paying && !org.can_use_more) {
+    // Si l'org a des crédits, afficher un message différent
+    const hasCredits = (org.credit_available ?? 0) > 0
+    return hasCredits ? t('limit-reached-with-credits') : t('limit-reached-no-credits')
+  }
 
   return null
 })

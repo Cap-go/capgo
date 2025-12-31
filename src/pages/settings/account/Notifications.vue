@@ -22,6 +22,7 @@ interface EmailPreferences {
   onboarding?: boolean
   weekly_stats?: boolean
   monthly_stats?: boolean
+  billing_period_stats?: boolean
   deploy_stats_24h?: boolean
   bundle_created?: boolean
   bundle_deployed?: boolean
@@ -192,6 +193,12 @@ async function toggleEmailPref(key: EmailPreferenceKey) {
               <Toggle
                 :value="getEmailPref('monthly_stats')"
                 @change="toggleEmailPref('monthly_stats')"
+              />
+            </InfoRow>
+            <InfoRow :label="t('notifications-billing-period-stats')" :editable="false" :value="t('notifications-billing-period-stats-desc')">
+              <Toggle
+                :value="getEmailPref('billing_period_stats')"
+                @change="toggleEmailPref('billing_period_stats')"
               />
             </InfoRow>
           </dl>

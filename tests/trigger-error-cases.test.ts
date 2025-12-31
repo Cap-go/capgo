@@ -79,7 +79,8 @@ describe('[POST] /triggers/cron_email - Error Cases', () => {
     })
     expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('missing_email_appId_type')
+    // First validation checks email and type
+    expect(data.error).toBe('missing_email_type')
   })
 
   it('should return 400 when email is missing', async () => {
@@ -93,10 +94,10 @@ describe('[POST] /triggers/cron_email - Error Cases', () => {
     })
     expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('missing_email_appId_type')
+    expect(data.error).toBe('missing_email_type')
   })
 
-  it('should return 400 when appId is missing', async () => {
+  it('should return 400 when appId is missing for non-billing_period_stats type', async () => {
     const response = await fetch(`${BASE_URL}/triggers/cron_email`, {
       method: 'POST',
       headers: triggerHeaders,
@@ -107,7 +108,8 @@ describe('[POST] /triggers/cron_email - Error Cases', () => {
     })
     expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('missing_email_appId_type')
+    // For non-billing_period_stats types, appId is required
+    expect(data.error).toBe('missing_appId')
   })
 
   it('should return 400 when type is missing', async () => {
@@ -121,7 +123,22 @@ describe('[POST] /triggers/cron_email - Error Cases', () => {
     })
     expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('missing_email_appId_type')
+    expect(data.error).toBe('missing_email_type')
+  })
+
+  it('should return 400 when orgId is missing for billing_period_stats type', async () => {
+    const response = await fetch(`${BASE_URL}/triggers/cron_email`, {
+      method: 'POST',
+      headers: triggerHeaders,
+      body: JSON.stringify({
+        email: 'test@example.com',
+        type: 'billing_period_stats',
+      }),
+    })
+    expect(response.status).toBe(400)
+    const data = await response.json() as { error: string }
+    // billing_period_stats requires orgId instead of appId
+    expect(data.error).toBe('missing_orgId')
   })
 
   it('should return 400 when email type is invalid', async () => {
