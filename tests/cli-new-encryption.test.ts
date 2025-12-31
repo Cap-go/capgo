@@ -190,11 +190,12 @@ describe.concurrent('tests CLI encryption encrypt/upload/download/decrypt', () =
 
       const result = await uploadBundleSDK(APPNAME, semver, 'production', {
         ignoreCompatibilityCheck: true,
+        encrypt: true,
         encryptionKey: privateKeyPath,
       })
       expect(result.success).toBe(true)
 
-      await testEncryption(publicKeyFile, semver, APPNAME, true)
+      await testEncryption(publicKeyFile, semver, APPNAME)
     }
     finally {
       await cleanupCli(APPNAME)
@@ -227,11 +228,12 @@ describe.concurrent('tests CLI encryption encrypt/upload/download/decrypt', () =
       semver = getSemver(semver)
       const result = await uploadBundleSDK(APPNAME, semver, 'production', {
         ignoreCompatibilityCheck: true,
+        encrypt: true,
         encryptionKey: join(tempFileFolder(APPNAME), 'weird_file'),
       })
       expect(result.success).toBe(true)
 
-      await testEncryption(publicKeyFile, semver, APPNAME, true)
+      await testEncryption(publicKeyFile, semver, APPNAME)
     }
     finally {
       await cleanupCli(APPNAME)
