@@ -361,23 +361,6 @@ describe('[PUT] /organization with API key policy', () => {
     await getSupabaseClient().from('stripe_info').delete().eq('customer_id', updateOrgCustomerId)
   })
 
-  it('update organization to require API key expiration', async () => {
-    const response = await fetch(`${BASE_URL}/organization`, {
-      method: 'PUT',
-      headers,
-      body: JSON.stringify({
-        orgId: updateOrgId,
-        require_apikey_expiration: true,
-      }),
-    })
-    expect(response.status).toBe(200)
-
-    // Verify the update
-    const { data, error } = await getSupabaseClient().from('orgs').select('require_apikey_expiration').eq('id', updateOrgId).single()
-    expect(error).toBeNull()
-    expect(data?.require_apikey_expiration).toBe(true)
-  })
-
   it('update organization to set max API key expiration days', async () => {
     const response = await fetch(`${BASE_URL}/organization`, {
       method: 'PUT',
@@ -434,6 +417,25 @@ describe('[PUT] /organization with API key policy', () => {
       }),
     })
     expect(response.status).toBe(400)
+  })
+
+  // This test must be last because it enables require_apikey_expiration,
+  // which would block subsequent tests using a non-expiring API key
+  it('update organization to require API key expiration', async () => {
+    const response = await fetch(`${BASE_URL}/organization`, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify({
+        orgId: updateOrgId,
+        require_apikey_expiration: true,
+      }),
+    })
+    expect(response.status).toBe(200)
+
+    // Verify the update
+    const { data, error } = await getSupabaseClient().from('orgs').select('require_apikey_expiration').eq('id', updateOrgId).single()
+    expect(error).toBeNull()
+    expect(data?.require_apikey_expiration).toBe(true)
   })
 })
 
