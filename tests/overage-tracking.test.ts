@@ -9,6 +9,23 @@ const supabaseUrl = env.SUPABASE_URL as string
 const supabaseServiceKey = env.SUPABASE_SERVICE_KEY as string
 const supabase = createClient<Database>(supabaseUrl, supabaseServiceKey)
 
+// Helper to retry RPC calls that may fail due to transient network issues in CI
+async function retryRpc<T>(
+  fn: () => Promise<{ data: T | null, error: any }>,
+  maxRetries = 3,
+): Promise<{ data: T | null, error: any }> {
+  let lastResult: { data: T | null, error: any } = { data: null, error: null }
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    lastResult = await fn()
+    if (!lastResult.error || !lastResult.error.message?.includes('fetch failed')) {
+      return lastResult
+    }
+    // Wait before retry with exponential backoff
+    await new Promise(resolve => setTimeout(resolve, 500 * (attempt + 1)))
+  }
+  return lastResult
+}
+
 describe('overage Tracking - Duplicate Prevention', () => {
   let pgPool: Pool
 
@@ -35,14 +52,14 @@ describe('overage Tracking - Duplicate Prevention', () => {
 
     // Call apply_usage_overage 5 times with identical parameters
     for (let i = 0; i < 5; i++) {
-      const { data, error } = await supabase.rpc('apply_usage_overage', {
+      const { data, error } = await retryRpc(() => supabase.rpc('apply_usage_overage', {
         p_org_id: ORG_ID,
         p_metric: testMetric,
         p_overage_amount: overageAmount,
         p_billing_cycle_start: billingStart.toISOString(),
         p_billing_cycle_end: billingEnd.toISOString(),
         p_details: details,
-      })
+      }))
 
       expect(error).toBeNull()
       expect(data).toBeDefined()
@@ -69,24 +86,24 @@ describe('overage Tracking - Duplicate Prevention', () => {
     const billingEnd = new Date('2026-01-07')
 
     // First call with initial overage
-    await supabase.rpc('apply_usage_overage', {
+    await retryRpc(() => supabase.rpc('apply_usage_overage', {
       p_org_id: ORG_ID,
       p_metric: testMetric,
       p_overage_amount: 1000000,
       p_billing_cycle_start: billingStart.toISOString(),
       p_billing_cycle_end: billingEnd.toISOString(),
       p_details: { limit: 10000000, usage: 11000000 },
-    })
+    }))
 
     // Second call with significantly higher overage (>1% increase)
-    await supabase.rpc('apply_usage_overage', {
+    await retryRpc(() => supabase.rpc('apply_usage_overage', {
       p_org_id: ORG_ID,
       p_metric: testMetric,
       p_overage_amount: 2000000, // 100% increase
       p_billing_cycle_start: billingStart.toISOString(),
       p_billing_cycle_end: billingEnd.toISOString(),
       p_details: { limit: 10000000, usage: 12000000 },
-    })
+    }))
 
     // Should create 2 records
     const result = await pgPool.query(
@@ -114,14 +131,14 @@ describe('overage Tracking - Duplicate Prevention', () => {
     )
 
     // Call with credits available - should apply them
-    const { data: firstCall, error: firstError } = await supabase.rpc('apply_usage_overage', {
+    const { data: firstCall, error: firstError } = await retryRpc(() => supabase.rpc('apply_usage_overage', {
       p_org_id: ORG_ID,
       p_metric: testMetric,
       p_overage_amount: overageAmount,
       p_billing_cycle_start: billingStart.toISOString(),
       p_billing_cycle_end: billingEnd.toISOString(),
       p_details: { limit: 5000, usage: 15000 },
-    })
+    }))
 
     expect(firstError).toBeNull()
     const firstResult = Array.isArray(firstCall) ? firstCall[0] : firstCall
@@ -129,14 +146,14 @@ describe('overage Tracking - Duplicate Prevention', () => {
     expect(Number(firstResult?.credits_applied)).toBeGreaterThan(0)
 
     // Second call with same params - should NOT create new record (no new credits, same overage)
-    const { error: secondError } = await supabase.rpc('apply_usage_overage', {
+    const { error: secondError } = await retryRpc(() => supabase.rpc('apply_usage_overage', {
       p_org_id: ORG_ID,
       p_metric: testMetric,
       p_overage_amount: overageAmount,
       p_billing_cycle_start: billingStart.toISOString(),
       p_billing_cycle_end: billingEnd.toISOString(),
       p_details: { limit: 5000, usage: 15000 },
-    })
+    }))
 
     expect(secondError).toBeNull()
 
@@ -158,24 +175,24 @@ describe('overage Tracking - Duplicate Prevention', () => {
     const billingEnd = new Date('2025-12-01')
 
     // First call
-    await supabase.rpc('apply_usage_overage', {
+    await retryRpc(() => supabase.rpc('apply_usage_overage', {
       p_org_id: ORG_ID,
       p_metric: testMetric,
       p_overage_amount: 100000,
       p_billing_cycle_start: billingStart.toISOString(),
       p_billing_cycle_end: billingEnd.toISOString(),
       p_details: { limit: 1000000, usage: 1100000 },
-    })
+    }))
 
     // Second call with tiny increase (0.5%)
-    await supabase.rpc('apply_usage_overage', {
+    await retryRpc(() => supabase.rpc('apply_usage_overage', {
       p_org_id: ORG_ID,
       p_metric: testMetric,
       p_overage_amount: 100500, // Only 0.5% increase
       p_billing_cycle_start: billingStart.toISOString(),
       p_billing_cycle_end: billingEnd.toISOString(),
       p_details: { limit: 1000000, usage: 1100500 },
-    })
+    }))
 
     // Should only have 1 record
     const result = await pgPool.query(
