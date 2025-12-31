@@ -22,52 +22,63 @@ const route = useRoute()
 const organizationTabs = ref<Tab[]>([...baseOrgTabs]) as Ref<Tab[]>
 
 watchEffect(() => {
-  // ensure usage/plans tabs based on permissions (keeps icons from base)
-  const needsUsage = organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['super_admin'])
-  const hasUsage = organizationTabs.value.find(tab => tab.key === '/settings/organization/usage')
-  if (needsUsage && !hasUsage) {
-    const base = baseOrgTabs.find(t => t.key === '/settings/organization/usage')
-    if (base)
-      organizationTabs.value.push({ ...base })
-  }
-  if (!needsUsage && hasUsage)
-    organizationTabs.value = organizationTabs.value.filter(tab => tab.key !== '/settings/organization/usage')
+  // Rebuild tabs array in correct order based on permissions
+  const newTabs: Tab[] = []
 
-  const needsCredits = organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['super_admin'])
-  const hasCredits = organizationTabs.value.find(tab => tab.key === '/settings/organization/credits')
+  // Always show general and members
+  const general = baseOrgTabs.find(t => t.key === '/settings/organization')
+  const members = baseOrgTabs.find(t => t.key === '/settings/organization/members')
+  if (general)
+    newTabs.push({ ...general })
 
-  if (needsCredits && !hasCredits) {
-    const base = baseOrgTabs.find(t => t.key === '/settings/organization/credits')
-    if (base)
-      organizationTabs.value.push({ ...base })
+  // Add autojoin after general if user is admin
+  const needsAutojoin = organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['admin', 'super_admin'])
+  if (needsAutojoin) {
+    const autojoin = baseOrgTabs.find(t => t.key === '/settings/organization/autojoin')
+    if (autojoin)
+      newTabs.push({ ...autojoin })
   }
 
-  if (!needsCredits && hasCredits)
-    organizationTabs.value = organizationTabs.value.filter(tab => tab.key !== '/settings/organization/credits')
+  // Add members
+  if (members)
+    newTabs.push({ ...members })
 
+  // Add plans if super_admin
   const needsPlans = organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['super_admin'])
-  const hasPlans = organizationTabs.value.find(tab => tab.key === '/settings/organization/plans')
-  if (needsPlans && !hasPlans) {
-    const base = baseOrgTabs.find(t => t.key === '/settings/organization/plans')
-    if (base)
-      organizationTabs.value.push({ ...base })
+  if (needsPlans) {
+    const plans = baseOrgTabs.find(t => t.key === '/settings/organization/plans')
+    if (plans)
+      newTabs.push({ ...plans })
   }
-  if (!needsPlans && hasPlans)
-    organizationTabs.value = organizationTabs.value.filter(tab => tab.key !== '/settings/organization/plans')
 
+  // Add usage if super_admin
+  const needsUsage = organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['super_admin'])
+  if (needsUsage) {
+    const usage = baseOrgTabs.find(t => t.key === '/settings/organization/usage')
+    if (usage)
+      newTabs.push({ ...usage })
+  }
+
+  // Add credits if super_admin
+  const needsCredits = organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['super_admin'])
+  if (needsCredits) {
+    const credits = baseOrgTabs.find(t => t.key === '/settings/organization/credits')
+    if (credits)
+      newTabs.push({ ...credits })
+  }
+
+  // Add billing if super_admin and not native platform
   if (!Capacitor.isNativePlatform()
-    && organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['super_admin'])
-    && !organizationTabs.value.find(tab => tab.key === '/billing')) {
-    organizationTabs.value.push({
+    && organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['super_admin'])) {
+    newTabs.push({
       label: 'billing',
       icon: IconBilling,
       key: '/billing',
       onClick: () => openPortal(organizationStore.currentOrganization?.gid ?? '', t),
     })
   }
-  else if (!organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['super_admin'])) {
-    organizationTabs.value = organizationTabs.value.filter(tab => tab.key !== '/billing')
-  }
+
+  organizationTabs.value = newTabs
 })
 
 const activePrimary = computed(() => {
