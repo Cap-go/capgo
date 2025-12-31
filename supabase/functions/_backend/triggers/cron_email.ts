@@ -106,6 +106,8 @@ app.post('/', middlewareAPISecret, async (c) => {
     platform,
     appName,
     deployedAt,
+    cycleStart,
+    cycleEnd,
   } = await parseBody<{
     email: string
     appId?: string
@@ -119,6 +121,8 @@ app.post('/', middlewareAPISecret, async (c) => {
     platform?: string
     appName?: string
     deployedAt?: string
+    cycleStart?: string
+    cycleEnd?: string
   }>(c)
 
   if (!email || !type) {
@@ -130,7 +134,7 @@ app.post('/', middlewareAPISecret, async (c) => {
     if (!orgId) {
       return simpleError('missing_orgId', 'Missing orgId for billing_period_stats', { email, type })
     }
-    return await handleBillingPeriodStats(c, email, orgId)
+    return await handleBillingPeriodStats(c, email, orgId, cycleStart, cycleEnd)
   }
 
   // All other types require appId
@@ -369,7 +373,7 @@ function formatNumber(num: number): string {
   return num.toLocaleString('en-US')
 }
 
-async function handleBillingPeriodStats(c: Context, email: string, orgId: string) {
+async function handleBillingPeriodStats(c: Context, email: string, orgId: string, cycleStart?: string, cycleEnd?: string) {
   // Check if user has billing_period_stats preference enabled
   const isEnabled = await isEmailPreferenceEnabled(c, email, 'billing_period_stats')
   if (!isEnabled) {
@@ -377,7 +381,7 @@ async function handleBillingPeriodStats(c: Context, email: string, orgId: string
     return c.json({ status: 'Email preference disabled' }, 200)
   }
 
-  const supabase = supabaseAdmin(c)
+  const supabase = await supabaseAdmin(c)
 
   // Get organization info
   const { data: org, error: orgError } = await supabase
@@ -390,21 +394,30 @@ async function handleBillingPeriodStats(c: Context, email: string, orgId: string
     return simpleError('org_not_found', 'Organization not found', { orgId, orgError })
   }
 
-  // Get the billing cycle dates
-  // This email is sent on the renewal day (cycle end date) at 12:00 UTC
-  // At that time, get_cycle_info_org returns the ENDING cycle (which is what we want)
-  const { data: cycleInfo, error: cycleError } = await supabase
-    .rpc('get_cycle_info_org', { orgid: orgId })
-    .single()
+  // Use cycle dates passed from the SQL function if available,
+  // otherwise fall back to get_cycle_info_org (for backwards compatibility)
+  let startDate: string
+  let endDate: string
 
-  if (cycleError || !cycleInfo) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot get cycle info', error: cycleError, metadata: { orgId, email } })
-    return simpleError('cannot_get_cycle_info', 'Cannot get cycle info', { error: cycleError })
+  if (cycleStart && cycleEnd) {
+    // Use dates passed from the SQL function (guaranteed to be the completed billing period)
+    startDate = new Date(cycleStart).toISOString().split('T')[0]
+    endDate = new Date(cycleEnd).toISOString().split('T')[0]
   }
+  else {
+    // Fallback: get cycle info from RPC
+    const { data: cycleInfo, error: cycleError } = await supabase
+      .rpc('get_cycle_info_org', { orgid: orgId })
+      .single()
 
-  // Format dates for the RPC call (YYYY-MM-DD)
-  const startDate = new Date(cycleInfo.subscription_anchor_start).toISOString().split('T')[0]
-  const endDate = new Date(cycleInfo.subscription_anchor_end).toISOString().split('T')[0]
+    if (cycleError || !cycleInfo) {
+      cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot get cycle info', error: cycleError, metadata: { orgId, email } })
+      return simpleError('cannot_get_cycle_info', 'Cannot get cycle info', { error: cycleError })
+    }
+
+    startDate = new Date(cycleInfo.subscription_anchor_start).toISOString().split('T')[0]
+    endDate = new Date(cycleInfo.subscription_anchor_end).toISOString().split('T')[0]
+  }
 
   // Get total metrics for the billing period
   const { data: metrics, error: metricsError } = await supabase
@@ -426,8 +439,8 @@ async function handleBillingPeriodStats(c: Context, email: string, orgId: string
     .from('usage_credit_consumptions')
     .select('credits_used')
     .eq('org_id', orgId)
-    .gte('applied_at', cycleInfo.subscription_anchor_start)
-    .lt('applied_at', cycleInfo.subscription_anchor_end)
+    .gte('applied_at', startDate)
+    .lt('applied_at', endDate)
 
   if (credits) {
     creditsUsed = credits.reduce((sum, row) => sum + Number(row.credits_used || 0), 0)
@@ -469,8 +482,13 @@ async function handleBillingPeriodStats(c: Context, email: string, orgId: string
   // Determine if the user should consider upgrading
   // If usage is >= 90% of any limit, or if the best plan is higher than current plan
   const planOrder = ['Solo', 'Maker', 'Team', 'Enterprise']
-  const currentPlanIndex = planOrder.indexOf(currentPlanName)
-  const bestPlanIndex = planOrder.indexOf(bestPlanName)
+  const rawCurrentPlanIndex = planOrder.indexOf(currentPlanName)
+  const rawBestPlanIndex = planOrder.indexOf(bestPlanName)
+
+  // Handle unknown plan names (e.g., Free, custom plans, legacy plans)
+  // Treat unknown plans as lowest tier (index 0) for comparison purposes
+  const currentPlanIndex = rawCurrentPlanIndex === -1 ? 0 : rawCurrentPlanIndex
+  const bestPlanIndex = rawBestPlanIndex === -1 ? 0 : rawBestPlanIndex
 
   // Should upgrade if:
   // 1. Best plan is higher tier than current plan (user exceeded their plan), OR
