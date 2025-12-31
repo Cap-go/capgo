@@ -1,13 +1,17 @@
 import type { ManifestEntry } from 'supabase/functions/_backend/utils/downloadUrl.ts'
 
 import { randomUUID } from 'node:crypto'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { getBaseData, getSupabaseClient, postUpdate, resetAndSeedAppData, resetAppData, resetAppDataStats } from './test-utils.ts'
 
 const id = randomUUID()
 const APPNAME = `com.demo.app.updates.${id}`
 
 const manifestData = { file_name: 'test', s3_path: '/test_file.html', file_hash: '1234567890' }
+
+// Store initial state for cleanup
+let initialR2Path: string | null = null
+let versionId: number | null = null
 
 interface UpdateRes {
   error?: string
@@ -54,7 +58,45 @@ async function removeManifestEntries(appVersionId: number) {
 
 beforeAll(async () => {
   await resetAndSeedAppData(APPNAME)
+
+  // Store initial state for version 1.0.0 for cleanup
+  const supabase = getSupabaseClient()
+  const { data: versionData } = await supabase
+    .from('app_versions')
+    .select('id, r2_path')
+    .eq('name', '1.0.0')
+    .eq('app_id', APPNAME)
+    .single()
+
+  if (versionData) {
+    versionId = versionData.id
+    initialR2Path = versionData.r2_path
+  }
 })
+
+afterEach(async () => {
+  // Reset the version to its initial state after each test
+  // This ensures test isolation and prevents interdependencies
+  const supabase = getSupabaseClient()
+
+  if (versionId) {
+    // Remove any manifest entries added during the test
+    await supabase.from('manifest').delete().eq('app_version_id', versionId)
+
+    // Reset app_versions fields to initial state
+    await supabase
+      .from('app_versions')
+      .update({
+        r2_path: initialR2Path,
+        manifest_count: 0,
+      })
+      .eq('id', versionId)
+  }
+
+  // Reset app-level manifest_bundle_count
+  await supabase.from('apps').update({ manifest_bundle_count: 0 }).eq('app_id', APPNAME)
+})
+
 afterAll(async () => {
   await resetAppData(APPNAME)
   await resetAppDataStats(APPNAME)
