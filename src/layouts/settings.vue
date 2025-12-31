@@ -31,12 +31,12 @@ watchEffect(() => {
   if (general)
     newTabs.push({ ...general })
 
-  // Add autojoin after general if user is admin
-  const needsAutojoin = organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['admin', 'super_admin'])
-  if (needsAutojoin) {
-    const autojoin = baseOrgTabs.find(t => t.key === '/settings/organization/autojoin')
-    if (autojoin)
-      newTabs.push({ ...autojoin })
+  // Add SSO after general if user is super_admin
+  const needsSSO = organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['super_admin'])
+  if (needsSSO) {
+    const sso = baseOrgTabs.find(t => t.key === '/settings/organization/sso')
+    if (sso)
+      newTabs.push({ ...sso })
   }
 
   // Add members
