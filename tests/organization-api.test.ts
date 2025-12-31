@@ -575,7 +575,7 @@ describe('[PUT] /organization - enforce_hashed_api_keys setting', () => {
     const testOrg = data?.find((org: { gid: string }) => org.gid === ORG_ID)
     expect(testOrg).toBeTruthy()
     expect(testOrg).toHaveProperty('enforce_hashed_api_keys')
-    expect(testOrg.enforce_hashed_api_keys).toBe(true)
+    expect(testOrg!.enforce_hashed_api_keys).toBe(true)
 
     // Reset
     await getSupabaseClient().from('orgs').update({ enforce_hashed_api_keys: false }).eq('id', ORG_ID)
@@ -602,11 +602,11 @@ describe('Hashed API key enforcement integration', () => {
     const { data, error } = await getSupabaseClient().rpc('find_apikey_by_value', { key_value: createData.key })
     expect(error).toBeNull()
     expect(Array.isArray(data)).toBe(true)
-    expect(data.length).toBe(1)
-    expect(data[0].id).toBe(createData.id)
-    expect(data[0].key_hash).toBe(createData.key_hash)
+    expect(data!.length).toBe(1)
+    expect(data![0].id).toBe(createData.id)
+    expect(data![0].key_hash).toBe(createData.key_hash)
     // The key column should be null for hashed keys
-    expect(data[0].key).toBeNull()
+    expect(data![0].key).toBeNull()
 
     // Cleanup
     await fetch(`${BASE_URL}/apikey/${createData.id}`, {
@@ -619,7 +619,7 @@ describe('Hashed API key enforcement integration', () => {
     const { data, error } = await getSupabaseClient().rpc('find_apikey_by_value', { key_value: 'non-existent-key-abc123' })
     expect(error).toBeNull()
     expect(Array.isArray(data)).toBe(true)
-    expect(data.length).toBe(0)
+    expect(data!.length).toBe(0)
   })
 
   it('verify_api_key_hash works correctly', async () => {

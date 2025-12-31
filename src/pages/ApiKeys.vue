@@ -537,17 +537,26 @@ async function regenrateKey(apikey: Database['public']['Tables']['apikeys']['Row
       return
     }
 
+    // Extract the plaintext key for one-time display before clearing it
+    const plainKeyForDisplay = data.key as string | undefined
+
+    // Clear the key field before caching to maintain the "hashed" state
+    // This ensures isHashedKey() returns true and the key cannot be copied
+    data.key = null as any
+
     // Delete the old key
     await supabase.from('apikeys').delete().eq('id', apikey.id)
 
-    // Update the local key reference with the new one
+    // Update the local key reference with the new hashed row (key = null)
     const idx = keys.value.findIndex(k => k.id === apikey.id)
     if (idx !== -1) {
       keys.value[idx] = data
     }
 
     // Show the new key one time
-    await showOneTimeKeyModal(data.key)
+    if (plainKeyForDisplay) {
+      await showOneTimeKeyModal(plainKeyForDisplay)
+    }
     toast.success(t('generated-new-apikey'))
   }
   else {

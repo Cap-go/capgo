@@ -45,7 +45,7 @@ LANGUAGE "plpgsql" SECURITY DEFINER
 SET "search_path" TO ''
 AS $$
 BEGIN
-  RETURN encode(digest(plain_key, 'sha256'), 'hex') = stored_hash;
+  RETURN encode(extensions.digest(plain_key, 'sha256'), 'hex') = stored_hash;
 END;
 $$;
 
@@ -78,7 +78,7 @@ BEGIN
 
   -- Try hashed lookup
   SELECT * INTO found_key FROM public.apikeys
-  WHERE key_hash = encode(digest(key_value, 'sha256'), 'hex')
+  WHERE key_hash = encode(extensions.digest(key_value, 'sha256'), 'hex')
   LIMIT 1;
   IF FOUND THEN
     RETURN NEXT found_key;
@@ -405,7 +405,7 @@ BEGIN
   -- Test 1: verify_api_key_hash function
   -- ========================================
   -- SHA-256 hash of 'test-api-key-12345' should be deterministic
-  expected_hash := encode(digest(test_plain_key, 'sha256'), 'hex');
+  expected_hash := encode(extensions.digest(test_plain_key, 'sha256'), 'hex');
 
   -- Test that verification returns true for matching hash
   IF NOT public.verify_api_key_hash(test_plain_key, expected_hash) THEN
@@ -436,7 +436,7 @@ BEGIN
   ELSE
     -- Create a test hashed API key
     INSERT INTO public.apikeys (user_id, key, key_hash, mode, name)
-    VALUES (test_user_id, NULL, encode(digest('hashed-test-key-xyz', 'sha256'), 'hex'), 'read', 'Test Hashed Key')
+    VALUES (test_user_id, NULL, encode(extensions.digest('hashed-test-key-xyz', 'sha256'), 'hex'), 'read', 'Test Hashed Key')
     RETURNING id INTO test_apikey_id;
 
     -- Test finding by hashed key value
@@ -504,7 +504,7 @@ BEGIN
 
     -- Create hashed key for testing
     INSERT INTO public.apikeys (user_id, key, key_hash, mode, name)
-    VALUES (test_user_id, NULL, encode(digest('enforcement-test-key', 'sha256'), 'hex'), 'read', 'Test Enforcement Key')
+    VALUES (test_user_id, NULL, encode(extensions.digest('enforcement-test-key', 'sha256'), 'hex'), 'read', 'Test Enforcement Key')
     RETURNING id INTO test_apikey_id;
 
     SELECT * INTO found_key FROM public.apikeys WHERE id = test_apikey_id;
