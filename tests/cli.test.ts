@@ -6,6 +6,24 @@ import { uploadBundleSDK } from './cli-sdk-utils'
 import { cleanupCli, getSemver, prepareCli, tempFileFolder } from './cli-utils'
 import { getSupabaseClient, ORG_ID, resetAndSeedAppData, resetAppData, resetAppDataStats, USER_ID } from './test-utils'
 
+// Helper to retry SDK operations that may fail due to transient network issues in CI
+async function retryUpload<T extends { success: boolean, error?: string }>(
+  fn: () => Promise<T>,
+  maxRetries = 3,
+): Promise<T> {
+  let lastResult: T | null = null
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    lastResult = await fn()
+    // Only retry on transient network errors, not on actual failures
+    if (lastResult.success || !lastResult.error?.includes('fetch failed')) {
+      return lastResult
+    }
+    // Wait before retry with exponential backoff
+    await new Promise(resolve => setTimeout(resolve, 500 * (attempt + 1)))
+  }
+  return lastResult!
+}
+
 describe('tests CLI upload', () => {
   const id_one = randomUUID()
   const APPNAME_one = `com.cli_${id_one}`
@@ -165,10 +183,10 @@ describe.concurrent('tests CLI upload options in parallel', () => {
           limited_to_orgs: [ORG_ID],
         })
 
-      const result = await uploadBundleSDK(app.APPNAME, semver, 'production', {
+      const result = await retryUpload(() => uploadBundleSDK(app.APPNAME, semver, 'production', {
         ignoreCompatibilityCheck: true,
         apikey: testApiKey,
-      })
+      }))
       expect(result.success).toBe(true)
     }
     finally {

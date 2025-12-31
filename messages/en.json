@@ -1362,5 +1362,10 @@
   "invalid-password": "Invalid password",
   "password-does-not-meet-requirements": "Your password does not meet the organization's requirements. Please change your password.",
   "verification-failed": "Verification failed",
-  "no-organization-selected": "No organization selected"
+  "no-organization-selected": "No organization selected",
+  "assigned": "Assigned",
+  "removed": "Removed",
+  "event": "Event",
+  "by": "By",
+  "date": "Date"
 }
