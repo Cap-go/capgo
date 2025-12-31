@@ -2,8 +2,53 @@
 -- This email is sent on each organization's billing anniversary date (renewal day)
 -- with their usage stats for the billing period
 
--- Add billing_period_stats preference to the email_preferences type documentation
--- (The preference is stored in the JSONB column and doesn't require schema changes)
+-- Add billing_period_stats preference to existing email_preferences
+-- Set it to true by default for all existing users and orgs
+UPDATE public.users
+SET email_preferences = email_preferences || '{"billing_period_stats": true}'::jsonb
+WHERE email_preferences IS NOT NULL
+  AND NOT (email_preferences ? 'billing_period_stats');
+
+UPDATE public.orgs
+SET email_preferences = email_preferences || '{"billing_period_stats": true}'::jsonb
+WHERE email_preferences IS NOT NULL
+  AND NOT (email_preferences ? 'billing_period_stats');
+
+-- Update the default value for email_preferences on users table
+ALTER TABLE public.users
+ALTER COLUMN email_preferences SET DEFAULT '{
+  "usage_limit": true,
+  "credit_usage": true,
+  "onboarding": true,
+  "weekly_stats": true,
+  "monthly_stats": true,
+  "billing_period_stats": true,
+  "deploy_stats_24h": true,
+  "bundle_created": true,
+  "bundle_deployed": true,
+  "device_error": true,
+  "channel_self_rejected": true
+}'::jsonb;
+
+-- Update the default value for email_preferences on orgs table
+ALTER TABLE public.orgs
+ALTER COLUMN email_preferences SET DEFAULT '{
+  "usage_limit": true,
+  "credit_usage": true,
+  "onboarding": true,
+  "weekly_stats": true,
+  "monthly_stats": true,
+  "billing_period_stats": true,
+  "deploy_stats_24h": true,
+  "bundle_created": true,
+  "bundle_deployed": true,
+  "device_error": true,
+  "channel_self_rejected": true
+}'::jsonb;
+
+-- Update column comments
+COMMENT ON COLUMN public.users.email_preferences IS 'Per-user email notification preferences. Keys: usage_limit, credit_usage, onboarding, weekly_stats, monthly_stats, billing_period_stats, deploy_stats_24h, bundle_created, bundle_deployed, device_error, channel_self_rejected. Values are booleans.';
+COMMENT ON COLUMN public.orgs.email_preferences IS 'JSONB object containing email notification preferences for the organization. When enabled, emails are also sent to the management_email if it differs from admin user emails. Keys: usage_limit, credit_usage, onboarding, weekly_stats, monthly_stats, billing_period_stats, deploy_stats_24h, bundle_created, bundle_deployed, device_error, channel_self_rejected. All default to true.';
 
 -- Create the function to process billing period stats emails
 -- This function finds all orgs whose billing cycle ends TODAY and queues emails for them
