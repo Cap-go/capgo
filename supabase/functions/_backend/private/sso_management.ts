@@ -366,6 +366,7 @@ export const ssoUpdateSchema = z.object({
   metadataXml: z.string().optional(),
   domains: z.array(domainSchema).optional(),
   enabled: z.boolean().optional(),
+  autoJoinEnabled: z.boolean().optional(),
   attributeMapping: z.record(z.string(), z.any()).optional(),
 })
 
@@ -1143,6 +1144,8 @@ export async function updateSAML(
       updateData.metadata_url = update.metadataUrl
     if (update.enabled !== undefined)
       updateData.enabled = update.enabled
+    if (update.autoJoinEnabled !== undefined)
+      updateData.auto_join_enabled = update.autoJoinEnabled
     if (update.attributeMapping)
       updateData.attribute_mapping = update.attributeMapping
 
@@ -1182,6 +1185,8 @@ export async function updateSAML(
       updatedFields.push('domains')
     if (update.enabled !== undefined)
       updatedFields.push('enabled')
+    if (update.autoJoinEnabled !== undefined)
+      updatedFields.push('auto_join_enabled')
     if (update.attributeMapping)
       updatedFields.push('attribute_mapping')
 
@@ -1347,6 +1352,7 @@ export async function getSSOStatus(
         entity_id: conn.entity_id,
         enabled: conn.enabled,
         verified: conn.verified,
+        auto_join_enabled: conn.auto_join_enabled,
         domains: domains.map(d => d.domain),
         metadata_url: conn.metadata_url,
         metadata_xml: conn.metadata_xml,

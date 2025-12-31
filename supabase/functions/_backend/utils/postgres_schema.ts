@@ -146,6 +146,7 @@ export const org_saml_connections = pgTable('org_saml_connections', {
   certificate_last_checked: timestamp('certificate_last_checked').defaultNow(),
   enabled: boolean('enabled').notNull().default(false),
   verified: boolean('verified').notNull().default(false),
+  auto_join_enabled: boolean('auto_join_enabled').notNull().default(true),
   attribute_mapping: jsonb('attribute_mapping').default('{}'),
   created_at: timestamp('created_at').notNull().defaultNow(),
   updated_at: timestamp('updated_at').notNull().defaultNow(),

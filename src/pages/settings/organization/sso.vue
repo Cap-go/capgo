@@ -68,6 +68,7 @@ interface SSOConfigResponse {
   domains?: string[]
   enabled?: boolean
   verified?: boolean
+  auto_join_enabled?: boolean
   error?: string
 }
 
@@ -110,6 +111,7 @@ const metadataXml = ref('')
 const singleDomain = ref('')
 const configuredDomains = ref<string[]>([])
 const ssoEnabled = ref(false)
+const autoJoinEnabled = ref(true)
 
 // Computed Capgo metadata
 const capgoMetadata = computed(() => {
@@ -189,6 +191,7 @@ async function loadSSOConfig() {
 
     ssoConfig.value = data
     ssoEnabled.value = data.enabled || false
+    autoJoinEnabled.value = data.auto_join_enabled !== undefined ? data.auto_join_enabled : true
     configuredDomains.value = data.domains || []
 
     // Debug log
@@ -528,6 +531,63 @@ async function toggleSSO() {
   catch (error: any) {
     console.error('Error toggling SSO:', error)
     toast.error(t('error-toggling-sso', 'Failed to update SSO setting'))
+  }
+  finally {
+    isSaving.value = false
+  }
+}
+
+/**
+ * Toggle Auto-Join enabled/disabled state
+ */
+async function toggleAutoJoin() {
+  if (!currentOrganization.value?.gid || !hasExistingConfig.value)
+    return
+
+  const newAutoJoinState = !autoJoinEnabled.value
+  isSaving.value = true
+  try {
+    const session = await supabase.auth.getSession()
+    const token = session.data.session?.access_token
+
+    if (!token) {
+      toast.error(t('error-toggling-auto-join', 'Failed to update auto-join setting'))
+      return
+    }
+
+    const response = await fetch(`${defaultApiHost}/private/sso_update`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        orgId: currentOrganization.value.gid,
+        providerId: ssoConfig.value.sso_provider_id,
+        autoJoinEnabled: newAutoJoinState,
+      }),
+    })
+
+    const data = await response.json() as SSOConfigResponse
+
+    if (!response.ok || data.error) {
+      console.error('Error toggling auto-join:', data)
+      toast.error(t('error-toggling-auto-join', 'Failed to update auto-join setting'))
+      return
+    }
+
+    // Only update state after successful API response
+    autoJoinEnabled.value = newAutoJoinState
+
+    toast.success(
+      autoJoinEnabled.value
+        ? t('auto-join-enabled-toast', 'Auto-join enabled')
+        : t('auto-join-disabled-toast', 'Auto-join disabled'),
+    )
+  }
+  catch (error: any) {
+    console.error('Error toggling auto-join:', error)
+    toast.error(t('error-toggling-auto-join', 'Failed to update auto-join setting'))
   }
   finally {
     isSaving.value = false
@@ -1110,6 +1170,29 @@ function copyToClipboard(text: string, label: string) {
                 </div>
                 <label class="relative inline-flex items-center cursor-pointer">
                   <input v-model="ssoEnabled" type="checkbox" class="sr-only peer" :disabled="isSaving" @change="toggleSSO">
+                  <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600" />
+                </label>
+              </div>
+
+              <!-- Auto-Join Banner -->
+              <div class="flex items-center justify-between p-4 border rounded-lg" :class="autoJoinEnabled ? 'bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800' : 'bg-gray-50 border-gray-200 dark:bg-gray-800 dark:border-gray-700'">
+                <div class="flex items-center gap-3">
+                  <div class="flex items-center justify-center w-10 h-10 rounded-full" :class="autoJoinEnabled ? 'bg-blue-100 dark:bg-blue-900/40' : 'bg-gray-100 dark:bg-gray-700'">
+                    <svg class="w-6 h-6" :class="autoJoinEnabled ? 'text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <div class="font-medium" :class="autoJoinEnabled ? 'text-blue-800 dark:text-blue-300' : 'text-gray-800 dark:text-gray-300'">
+                      {{ autoJoinEnabled ? t('auto-join-enabled', 'Auto-Join Enabled') : t('auto-join-disabled', 'Auto-Join Disabled') }}
+                    </div>
+                    <div class="text-sm" :class="autoJoinEnabled ? 'text-blue-700 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400'">
+                      {{ autoJoinEnabled ? t('auto-join-enabled-description', 'SSO users are automatically added to the organization') : t('auto-join-disabled-description', 'SSO users must be manually invited') }}
+                    </div>
+                  </div>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer">
+                  <input v-model="autoJoinEnabled" type="checkbox" class="sr-only peer" :disabled="isSaving" @change="toggleAutoJoin">
                   <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600" />
                 </label>
               </div>
