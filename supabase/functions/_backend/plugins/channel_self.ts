@@ -121,6 +121,8 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
       'channel_self_rejected',
       {
         channel_name: dataChannelOverride.channel_id.name,
+        channel_id: dataChannelOverride.channel_id.id,
+        device_id: dataChannelOverride.device_id,
         app_id,
       },
       appOwner.owner_org,
