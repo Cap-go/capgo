@@ -522,6 +522,11 @@ async function toggleSSO() {
     // Only update state after successful API response
     ssoEnabled.value = newEnabledState
 
+    // If SSO is disabled, also disable auto-join
+    if (!newEnabledState) {
+      autoJoinEnabled.value = false
+    }
+
     toast.success(
       ssoEnabled.value
         ? t('sso-enabled', 'SSO enabled')
@@ -543,6 +548,13 @@ async function toggleSSO() {
 async function toggleAutoJoin() {
   if (!currentOrganization.value?.gid || !hasExistingConfig.value)
     return
+
+  // Auto-join can only be toggled when SSO is enabled
+  if (!ssoEnabled.value) {
+    toast.error(t('auto-join-requires-sso-enabled', 'SSO must be enabled to use auto-join'))
+    autoJoinEnabled.value = false // Reset toggle
+    return
+  }
 
   const newAutoJoinState = !autoJoinEnabled.value
   isSaving.value = true
@@ -1175,25 +1187,25 @@ function copyToClipboard(text: string, label: string) {
               </div>
 
               <!-- Auto-Join Banner -->
-              <div class="flex items-center justify-between p-4 border rounded-lg" :class="autoJoinEnabled ? 'bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800' : 'bg-gray-50 border-gray-200 dark:bg-gray-800 dark:border-gray-700'">
+              <div class="flex items-center justify-between p-4 border rounded-lg" :class="ssoEnabled && autoJoinEnabled ? 'bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800' : 'bg-gray-50 border-gray-200 dark:bg-gray-800 dark:border-gray-700'">
                 <div class="flex items-center gap-3">
-                  <div class="flex items-center justify-center w-10 h-10 rounded-full" :class="autoJoinEnabled ? 'bg-blue-100 dark:bg-blue-900/40' : 'bg-gray-100 dark:bg-gray-700'">
-                    <svg class="w-6 h-6" :class="autoJoinEnabled ? 'text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div class="flex items-center justify-center w-10 h-10 rounded-full" :class="ssoEnabled && autoJoinEnabled ? 'bg-blue-100 dark:bg-blue-900/40' : 'bg-gray-100 dark:bg-gray-700'">
+                    <svg class="w-6 h-6" :class="ssoEnabled && autoJoinEnabled ? 'text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
                     </svg>
                   </div>
                   <div>
-                    <div class="font-medium" :class="autoJoinEnabled ? 'text-blue-800 dark:text-blue-300' : 'text-gray-800 dark:text-gray-300'">
+                    <div class="font-medium" :class="ssoEnabled && autoJoinEnabled ? 'text-blue-800 dark:text-blue-300' : 'text-gray-800 dark:text-gray-300'">
                       {{ autoJoinEnabled ? t('auto-join-enabled', 'Auto-Join Enabled') : t('auto-join-disabled', 'Auto-Join Disabled') }}
                     </div>
-                    <div class="text-sm" :class="autoJoinEnabled ? 'text-blue-700 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400'">
-                      {{ autoJoinEnabled ? t('auto-join-enabled-description', 'SSO users are automatically added to the organization') : t('auto-join-disabled-description', 'SSO users must be manually invited') }}
+                    <div class="text-sm" :class="ssoEnabled && autoJoinEnabled ? 'text-blue-700 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400'">
+                      {{ !ssoEnabled ? t('auto-join-requires-sso', 'Enable SSO to use auto-join') : (autoJoinEnabled ? t('auto-join-enabled-description', 'SSO users are automatically added to the organization') : t('auto-join-disabled-description', 'SSO users must be manually invited')) }}
                     </div>
                   </div>
                 </div>
-                <label class="relative inline-flex items-center cursor-pointer">
-                  <input v-model="autoJoinEnabled" type="checkbox" class="sr-only peer" :disabled="isSaving" @change="toggleAutoJoin">
-                  <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600" />
+                <label class="relative inline-flex items-center" :class="ssoEnabled ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'">
+                  <input v-model="autoJoinEnabled" type="checkbox" class="sr-only peer" :disabled="isSaving || !ssoEnabled" @change="toggleAutoJoin">
+                  <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600 peer-disabled:cursor-not-allowed" />
                 </label>
               </div>
 
