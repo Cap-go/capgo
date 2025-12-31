@@ -38,7 +38,7 @@ export type Database = {
         Row: {
           created_at: string | null
           id: number
-          key: string
+          key: string | null
           key_hash: string | null
           limited_to_apps: string[] | null
           limited_to_orgs: string[] | null
@@ -50,7 +50,7 @@ export type Database = {
         Insert: {
           created_at?: string | null
           id?: number
-          key: string
+          key?: string | null
           key_hash?: string | null
           limited_to_apps?: string[] | null
           limited_to_orgs?: string[] | null
@@ -62,7 +62,7 @@ export type Database = {
         Update: {
           created_at?: string | null
           id?: number
-          key?: string
+          key?: string | null
           key_hash?: string | null
           limited_to_apps?: string[] | null
           limited_to_orgs?: string[] | null
@@ -2294,7 +2294,7 @@ export type Database = {
         Returns: {
           created_at: string | null
           id: number
-          key: string
+          key: string | null
           key_hash: string | null
           limited_to_apps: string[] | null
           limited_to_orgs: string[] | null
@@ -2877,6 +2877,7 @@ export type Database = {
       pg_log: { Args: { decision: string; input?: Json }; Returns: undefined }
       process_admin_stats: { Args: never; Returns: undefined }
       process_all_cron_tasks: { Args: never; Returns: undefined }
+      process_billing_period_stats_email: { Args: never; Returns: undefined }
       process_channel_device_counts_queue: {
         Args: { batch_size?: number }
         Returns: number

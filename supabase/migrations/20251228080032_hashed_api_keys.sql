@@ -14,6 +14,10 @@
 ALTER TABLE "public"."apikeys"
 ADD COLUMN IF NOT EXISTS "key_hash" text;
 
+-- Allow NULL in the key column for hashed keys (key is NULL when key_hash is set)
+ALTER TABLE "public"."apikeys"
+ALTER COLUMN "key" DROP NOT NULL;
+
 -- Add a partial index for efficient hash lookups
 CREATE INDEX IF NOT EXISTS idx_apikeys_key_hash ON public.apikeys(key_hash)
 WHERE key_hash IS NOT NULL;
