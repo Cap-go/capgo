@@ -209,7 +209,7 @@
     "@antfu/eslint-config": "6.7.3",
     "@capacitor/cli": "^8.0.0",
     "@capacitor/core": "^8.0.0",
-    "@capgo/cli": "7.21.4",
+    "@capgo/cli": "7.63.0",
     "@cloudflare/workers-types": "4.20251229.0",
     "@formkit/core": "1.6.9",
     "@iconify/json": "^2.2.406",
