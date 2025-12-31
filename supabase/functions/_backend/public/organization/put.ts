@@ -9,6 +9,7 @@ const bodySchema = z.object({
   logo: z.optional(z.string()),
   name: z.optional(z.string()),
   management_email: z.optional(z.email()),
+  enforce_hashed_api_keys: z.optional(z.boolean()),
 })
 export async function put(c: Context, bodyRaw: any, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
   const bodyParsed = bodySchema.safeParse(bodyRaw)
@@ -33,6 +34,7 @@ export async function put(c: Context, bodyRaw: any, apikey: Database['public']['
       name: body.name,
       logo: body.logo,
       management_email: body.management_email,
+      enforce_hashed_api_keys: body.enforce_hashed_api_keys,
     })
     .eq('id', body.orgId)
     .select()
