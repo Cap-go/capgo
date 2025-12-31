@@ -32,6 +32,8 @@ interface DeployHistory {
     uid: string
     email: string
   } | null
+  // For bundle history: distinguish between assigned and removed events
+  event_type?: 'assigned' | 'removed'
 }
 
 const props = defineProps<{
@@ -113,14 +115,21 @@ const columns = computed<TableColumn[]>(() => {
         onClick: (item: DeployHistory) => openOneChannel(item),
       },
       {
-        label: t('deploy-date'),
+        label: t('event'),
+        key: 'event_type',
+        mobile: true,
+        sortable: false,
+        displayFunction: item => item.event_type === 'removed' ? t('removed') : t('assigned'),
+      },
+      {
+        label: t('date'),
         key: 'deployed_at',
         mobile: true,
         sortable: true,
         displayFunction: item => formatDate(item.deployed_at),
       },
       {
-        label: t('deployed-by'),
+        label: t('by'),
         key: 'created_by',
         mobile: false,
         displayFunction: item => item.user?.email || '-',
@@ -185,88 +194,14 @@ async function fetchDeployHistory() {
     await fetchCurrentVersion()
     members.value = await organizationStore.getMembers()
 
-    // Build select query based on mode
-    const selectFields = isBundleMode.value
-      ? `
-        *,
-        version:version_id (
-          id,
-          name,
-          app_id,
-          created_at,
-          deleted
-        ),
-        channel:channel_id (
-          id,
-          name
-        )
-      `
-      : `
-        *,
-        version:version_id (
-          id,
-          name,
-          app_id,
-          created_at,
-          deleted
-        )
-      `
-
-    // Using "deploy_history" as a string rather than a type reference
-    let query = supabase
-      .from('deploy_history')
-      .select(selectFields, { count: 'exact' })
-      .eq('app_id', props.appId)
-      .order(Object.keys(sort.value)[0], { ascending: Object.values(sort.value)[0] === 'asc' })
-
-    // Apply filter based on mode
     if (isBundleMode.value) {
-      query = query.eq('version_id', props.bundleId!)
+      // Bundle mode: fetch both assignments and removals
+      await fetchBundleHistory()
     }
-    else if (props.channelId) {
-      query = query.eq('channel_id', props.channelId)
+    else {
+      // Channel mode: only fetch assignments from deploy_history
+      await fetchChannelHistory()
     }
-
-    // Apply search filter based on mode
-    if (search.value) {
-      if (isBundleMode.value) {
-        // In bundle mode, search by channel name
-        query = query.like('channel.name', `%${search.value}%`)
-      }
-      else {
-        // In channel mode, search by version name
-        query = query.like('version.name', `%${search.value}%`)
-      }
-    }
-
-    const { data, error, count } = await query
-      .range((page.value - 1) * pageSize.value, page.value * pageSize.value - 1)
-
-    if (error) {
-      console.error('Error fetching deploy history:', error)
-      toast.error(t('error-fetching-deploy-history'))
-      return
-    }
-
-    const rows = (data ?? []) as unknown as DeployHistory[]
-    // Filter out data based on mode
-    const filteredData = rows.filter((item) => {
-      if (isBundleMode.value) {
-        return item?.channel != null
-      }
-      return item?.version !== null
-    })
-
-    deployHistory.value = filteredData
-    for (const item of deployHistory.value) {
-      const member = members.value.find(m => m.uid === item.created_by)
-      if (member) {
-        item.user = member
-      }
-    }
-    console.log('Deploy History:', deployHistory.value)
-
-    total.value = count ?? 0
   }
   catch (error) {
     console.error('Error fetching deploy history:', error)
@@ -275,6 +210,199 @@ async function fetchDeployHistory() {
   finally {
     loading.value = false
   }
+}
+
+async function fetchChannelHistory() {
+  const selectFields = `
+    *,
+    version:version_id (
+      id,
+      name,
+      app_id,
+      created_at,
+      deleted
+    )
+  `
+
+  let query = supabase
+    .from('deploy_history')
+    .select(selectFields, { count: 'exact' })
+    .eq('app_id', props.appId)
+    .order(Object.keys(sort.value)[0], { ascending: Object.values(sort.value)[0] === 'asc' })
+
+  if (props.channelId) {
+    query = query.eq('channel_id', props.channelId)
+  }
+
+  if (search.value) {
+    query = query.like('version.name', `%${search.value}%`)
+  }
+
+  const { data, error, count } = await query
+    .range((page.value - 1) * pageSize.value, page.value * pageSize.value - 1)
+
+  if (error) {
+    console.error('Error fetching deploy history:', error)
+    toast.error(t('error-fetching-deploy-history'))
+    return
+  }
+
+  const rows = (data ?? []) as unknown as DeployHistory[]
+  const filteredData = rows.filter(item => item?.version !== null)
+
+  deployHistory.value = filteredData
+  for (const item of deployHistory.value) {
+    item.event_type = 'assigned'
+    const member = members.value.find(m => m.uid === item.created_by)
+    if (member) {
+      item.user = member
+    }
+  }
+
+  total.value = count ?? 0
+}
+
+async function fetchBundleHistory() {
+  // In bundle mode, we need to fetch both:
+  // 1. Assignments from deploy_history (when this bundle was assigned to channels)
+  // 2. Removals from audit_logs (when this bundle was replaced by another bundle)
+
+  const bundleId = props.bundleId!
+
+  // Fetch assignments from deploy_history
+  const assignmentSelectFields = `
+    *,
+    version:version_id (
+      id,
+      name,
+      app_id,
+      created_at,
+      deleted
+    ),
+    channel:channel_id (
+      id,
+      name
+    )
+  `
+
+  const { data: assignmentData, error: assignmentError } = await supabase
+    .from('deploy_history')
+    .select(assignmentSelectFields)
+    .eq('app_id', props.appId)
+    .eq('version_id', bundleId)
+
+  if (assignmentError) {
+    console.error('Error fetching deploy history:', assignmentError)
+    toast.error(t('error-fetching-deploy-history'))
+    return
+  }
+
+  // Fetch removals from audit_logs
+  // When a channel's version changes FROM this bundle TO another bundle, that's a removal
+  const { data: auditData, error: auditError } = await supabase
+    .from('audit_logs')
+    .select('*')
+    .eq('table_name', 'channels')
+    .eq('operation', 'UPDATE')
+    .contains('changed_fields', ['version'])
+
+  if (auditError) {
+    console.error('Error fetching audit logs:', auditError)
+    // Don't fail completely, just show assignments
+  }
+
+  // Process assignments
+  const assignments: DeployHistory[] = ((assignmentData ?? []) as unknown as DeployHistory[])
+    .filter(item => item?.channel != null)
+    .map((item) => {
+      const member = members.value.find(m => m.uid === item.created_by)
+      return {
+        ...item,
+        event_type: 'assigned' as const,
+        user: member || null,
+      }
+    })
+
+  // Process removals from audit_logs
+  const removals: DeployHistory[] = []
+  if (auditData) {
+    // We need to fetch channel names for the removals
+    const channelIds = new Set<number>()
+
+    for (const audit of auditData) {
+      const oldRecord = audit.old_record as Record<string, unknown> | null
+      if (oldRecord && oldRecord.version === bundleId && oldRecord.app_id === props.appId) {
+        channelIds.add(Number(audit.record_id))
+      }
+    }
+
+    // Fetch channel names
+    const channelMap = new Map<number, { id: number, name: string }>()
+    if (channelIds.size > 0) {
+      const { data: channelsData } = await supabase
+        .from('channels')
+        .select('id, name')
+        .in('id', Array.from(channelIds))
+
+      if (channelsData) {
+        for (const ch of channelsData) {
+          channelMap.set(ch.id, { id: ch.id, name: ch.name })
+        }
+      }
+    }
+
+    // Build removal entries
+    for (const audit of auditData) {
+      const oldRecord = audit.old_record as Record<string, unknown> | null
+      if (oldRecord && oldRecord.version === bundleId && oldRecord.app_id === props.appId) {
+        const channelId = Number(audit.record_id)
+        const channel = channelMap.get(channelId)
+        const member = members.value.find(m => m.uid === audit.user_id)
+
+        // Apply search filter if present
+        if (search.value && channel) {
+          if (!channel.name.toLowerCase().includes(search.value.toLowerCase())) {
+            continue
+          }
+        }
+
+        removals.push({
+          id: Number(audit.id),
+          version_id: bundleId,
+          app_id: props.appId,
+          channel_id: channelId,
+          deployed_at: audit.created_at,
+          version: {
+            id: bundleId,
+            name: '',
+            app_id: props.appId,
+            created_at: '',
+          },
+          channel: channel || { id: channelId, name: `Channel #${channelId}` },
+          created_by: audit.user_id || '',
+          user: member || null,
+          event_type: 'removed' as const,
+        })
+      }
+    }
+  }
+
+  // Merge and sort by date
+  const allHistory = [...assignments, ...removals]
+  const sortDir = Object.values(sort.value)[0]
+
+  allHistory.sort((a, b) => {
+    const aDate = new Date(a.deployed_at).getTime()
+    const bDate = new Date(b.deployed_at).getTime()
+    return sortDir === 'asc' ? aDate - bDate : bDate - aDate
+  })
+
+  // Apply pagination
+  const startIdx = (page.value - 1) * pageSize.value
+  const endIdx = startIdx + pageSize.value
+
+  deployHistory.value = allHistory.slice(startIdx, endIdx)
+  total.value = allHistory.length
 }
 
 async function handleRollback(item: DeployHistory) {
