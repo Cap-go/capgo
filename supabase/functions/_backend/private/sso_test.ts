@@ -26,10 +26,10 @@ import { Hono } from 'hono'
 import { z } from 'zod'
 import { parseBody, simpleError, useCors } from '../utils/hono.ts'
 import { middlewareV2 } from '../utils/hono_middleware.ts'
-import { getEnv } from '../utils/utils.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import { org_saml_connections, saml_domain_mappings } from '../utils/postgres_schema.ts'
+import { getEnv } from '../utils/utils.ts'
 
 const testSSOSchema = z.object({
   orgId: z.string().uuid(),

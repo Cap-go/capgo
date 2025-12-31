@@ -135,10 +135,6 @@ const ssoConfigured = computed(() => {
   return hasExistingConfig.value && ssoConfig.value.verified
 })
 
-const ssoFullyConfigured = computed(() => {
-  return ssoConfigured.value && ssoEnabled.value
-})
-
 onMounted(async () => {
   await organizationStore.dedupFetchOrganizations()
   await loadSSOConfig()
@@ -522,7 +518,7 @@ async function toggleSSO() {
 
     // Only update state after successful API response
     ssoEnabled.value = newEnabledState
-    
+
     toast.success(
       ssoEnabled.value
         ? t('sso-enabled', 'SSO enabled')
@@ -802,358 +798,358 @@ function copyToClipboard(text: string, label: string) {
           <!-- Wizard Steps (shown only when showWizard is true) -->
           <div v-if="showWizard">
             <!-- Step 1: Capgo SAML Metadata -->
-          <div v-show="currentStep === 1" class="space-y-4">
-            <div class="p-4 border rounded-lg bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800">
-              <div class="flex items-start gap-2 mb-2">
-                <svg class="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <div class="flex-1">
-                  <h3 class="font-medium text-blue-800 dark:text-blue-300">
-                    {{ t('step-1-title', 'Step 1: Configure your Identity Provider (IdP)') }}
-                  </h3>
-                  <p class="mt-1 text-sm text-blue-700 dark:text-blue-400">
-                    {{ t('step-1-description', 'Copy these values and configure them in your IdP (Okta, Azure AD, Google Workspace, etc.)') }}
-                  </p>
+            <div v-show="currentStep === 1" class="space-y-4">
+              <div class="p-4 border rounded-lg bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800">
+                <div class="flex items-start gap-2 mb-2">
+                  <svg class="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <div class="flex-1">
+                    <h3 class="font-medium text-blue-800 dark:text-blue-300">
+                      {{ t('step-1-title', 'Step 1: Configure your Identity Provider (IdP)') }}
+                    </h3>
+                    <p class="mt-1 text-sm text-blue-700 dark:text-blue-400">
+                      {{ t('step-1-description', 'Copy these values and configure them in your IdP (Okta, Azure AD, Google Workspace, etc.)') }}
+                    </p>
+                  </div>
                 </div>
+              </div>
+
+              <div class="space-y-3">
+                <div class="p-4 border rounded-lg dark:bg-gray-800 dark:border-gray-600 border-slate-300">
+                  <label class="block mb-2 text-sm font-medium dark:text-white text-slate-800">
+                    {{ t('entity-id', 'Entity ID / Issuer') }}
+                  </label>
+                  <div class="flex gap-2">
+                    <input :value="capgoMetadata.entityId" type="text" readonly class="flex-1 px-3 py-2 border rounded-lg bg-gray-50 dark:bg-gray-900 dark:border-gray-600 dark:text-white border-slate-300 font-mono text-sm">
+                    <button type="button" class="px-3 py-2 text-xs font-medium text-center text-blue-600 border rounded-lg cursor-pointer hover:text-white hover:bg-blue-600 focus:ring-4 focus:ring-blue-300 border-blue-400 dark:hover:bg-blue-600 dark:focus:ring-blue-800 focus:outline-hidden" @click="copyToClipboard(capgoMetadata.entityId, 'Entity ID')">
+                      {{ t('copy', 'Copy') }}
+                    </button>
+                  </div>
+                </div>
+
+                <div class="p-4 border rounded-lg dark:bg-gray-800 dark:border-gray-600 border-slate-300">
+                  <label class="block mb-2 text-sm font-medium dark:text-white text-slate-800">
+                    {{ t('acs-url', 'ACS URL / Reply URL') }}
+                  </label>
+                  <div class="flex gap-2">
+                    <input :value="capgoMetadata.acsUrl" type="text" readonly class="flex-1 px-3 py-2 border rounded-lg bg-gray-50 dark:bg-gray-900 dark:border-gray-600 dark:text-white border-slate-300 font-mono text-sm">
+                    <button type="button" class="px-3 py-2 text-xs font-medium text-center text-blue-600 border rounded-lg cursor-pointer hover:text-white hover:bg-blue-600 focus:ring-4 focus:ring-blue-300 border-blue-400 dark:hover:bg-blue-600 dark:focus:ring-blue-800 focus:outline-hidden" @click="copyToClipboard(capgoMetadata.acsUrl, 'ACS URL')">
+                      {{ t('copy', 'Copy') }}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="flex justify-end">
+                <button type="button" class="px-4 py-2 text-sm font-medium text-white rounded-lg cursor-pointer bg-blue-600 hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 dark:hover:bg-blue-700 dark:focus:ring-blue-800 focus:outline-hidden" @click="currentStep = 2">
+                  {{ t('next', 'Next') }} →
+                </button>
               </div>
             </div>
 
-            <div class="space-y-3">
-              <div class="p-4 border rounded-lg dark:bg-gray-800 dark:border-gray-600 border-slate-300">
-                <label class="block mb-2 text-sm font-medium dark:text-white text-slate-800">
-                  {{ t('entity-id', 'Entity ID / Issuer') }}
+            <!-- Step 2: IdP Metadata Configuration -->
+            <div v-show="currentStep === 2" class="space-y-4">
+              <div class="p-4 border rounded-lg bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800">
+                <h3 class="font-medium text-blue-800 dark:text-blue-300">
+                  {{ t('step-2-title', 'Step 2: Enter your IdP Metadata') }}
+                </h3>
+                <p class="mt-1 text-sm text-blue-700 dark:text-blue-400">
+                  {{ t('step-2-description', 'Provide your Identity Provider\'s SAML metadata URL or paste the XML directly') }}
+                </p>
+              </div>
+
+              <!-- Metadata Input Type Toggle -->
+              <div class="flex gap-2 p-1 bg-gray-100 rounded-lg dark:bg-gray-700 w-fit">
+                <button type="button" class="px-4 py-2 text-sm font-medium rounded-md transition-colors" :class="metadataInputType === 'url' ? 'bg-white dark:bg-gray-800 text-blue-600 shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'" @click="metadataInputType = 'url'">
+                  {{ t('metadata-url', 'Metadata URL') }}
+                </button>
+                <button type="button" class="px-4 py-2 text-sm font-medium rounded-md transition-colors" :class="metadataInputType === 'xml' ? 'bg-white dark:bg-gray-800 text-blue-600 shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'" @click="metadataInputType = 'xml'">
+                  {{ t('metadata-xml', 'Metadata XML') }}
+                </button>
+              </div>
+
+              <!-- Metadata URL Input -->
+              <div v-if="metadataInputType === 'url'" class="space-y-2">
+                <label for="metadata-url-input" class="block text-sm font-medium dark:text-white text-slate-800">
+                  {{ t('idp-metadata-url', 'IdP Metadata URL') }}
                 </label>
-                <div class="flex gap-2">
-                  <input :value="capgoMetadata.entityId" type="text" readonly class="flex-1 px-3 py-2 border rounded-lg bg-gray-50 dark:bg-gray-900 dark:border-gray-600 dark:text-white border-slate-300 font-mono text-sm">
-                  <button type="button" class="px-3 py-2 text-xs font-medium text-center text-blue-600 border rounded-lg cursor-pointer hover:text-white hover:bg-blue-600 focus:ring-4 focus:ring-blue-300 border-blue-400 dark:hover:bg-blue-600 dark:focus:ring-blue-800 focus:outline-hidden" @click="copyToClipboard(capgoMetadata.entityId, 'Entity ID')">
-                    {{ t('copy', 'Copy') }}
-                  </button>
-                </div>
+                <input id="metadata-url-input" v-model="metadataUrl" type="url" :placeholder="t('metadata-url-placeholder', 'https://idp.example.com/metadata')" class="w-full px-3 py-2 border rounded-lg dark:bg-gray-800 dark:border-gray-600 dark:text-white border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" :disabled="isSaving">
+                <p class="text-xs text-gray-600 dark:text-gray-400">
+                  {{ t('metadata-url-help', 'Enter the public HTTPS URL where your IdP\'s SAML metadata can be accessed') }}
+                </p>
               </div>
 
-              <div class="p-4 border rounded-lg dark:bg-gray-800 dark:border-gray-600 border-slate-300">
-                <label class="block mb-2 text-sm font-medium dark:text-white text-slate-800">
-                  {{ t('acs-url', 'ACS URL / Reply URL') }}
+              <!-- Metadata XML Input -->
+              <div v-else class="space-y-2">
+                <label for="metadata-xml-input" class="block text-sm font-medium dark:text-white text-slate-800">
+                  {{ t('idp-metadata-xml', 'IdP Metadata XML') }}
                 </label>
-                <div class="flex gap-2">
-                  <input :value="capgoMetadata.acsUrl" type="text" readonly class="flex-1 px-3 py-2 border rounded-lg bg-gray-50 dark:bg-gray-900 dark:border-gray-600 dark:text-white border-slate-300 font-mono text-sm">
-                  <button type="button" class="px-3 py-2 text-xs font-medium text-center text-blue-600 border rounded-lg cursor-pointer hover:text-white hover:bg-blue-600 focus:ring-4 focus:ring-blue-300 border-blue-400 dark:hover:bg-blue-600 dark:focus:ring-blue-800 focus:outline-hidden" @click="copyToClipboard(capgoMetadata.acsUrl, 'ACS URL')">
-                    {{ t('copy', 'Copy') }}
-                  </button>
-                </div>
+                <textarea id="metadata-xml-input" v-model="metadataXml" rows="8" :placeholder="t('metadata-xml-placeholder', 'Paste your IdP SAML metadata XML here...')" class="w-full px-3 py-2 border rounded-lg dark:bg-gray-800 dark:border-gray-600 dark:text-white border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all font-mono text-sm" :disabled="isSaving" />
+                <p class="text-xs text-gray-600 dark:text-gray-400">
+                  {{ t('metadata-xml-help', 'Paste the complete SAML metadata XML from your Identity Provider') }}
+                </p>
               </div>
-            </div>
 
-            <div class="flex justify-end">
-              <button type="button" class="px-4 py-2 text-sm font-medium text-white rounded-lg cursor-pointer bg-blue-600 hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 dark:hover:bg-blue-700 dark:focus:ring-blue-800 focus:outline-hidden" @click="currentStep = 2">
-                {{ t('next', 'Next') }} →
-              </button>
-            </div>
-          </div>
-
-          <!-- Step 2: IdP Metadata Configuration -->
-          <div v-show="currentStep === 2" class="space-y-4">
-            <div class="p-4 border rounded-lg bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800">
-              <h3 class="font-medium text-blue-800 dark:text-blue-300">
-                {{ t('step-2-title', 'Step 2: Enter your IdP Metadata') }}
-              </h3>
-              <p class="mt-1 text-sm text-blue-700 dark:text-blue-400">
-                {{ t('step-2-description', 'Provide your Identity Provider\'s SAML metadata URL or paste the XML directly') }}
-              </p>
-            </div>
-
-            <!-- Metadata Input Type Toggle -->
-            <div class="flex gap-2 p-1 bg-gray-100 rounded-lg dark:bg-gray-700 w-fit">
-              <button type="button" class="px-4 py-2 text-sm font-medium rounded-md transition-colors" :class="metadataInputType === 'url' ? 'bg-white dark:bg-gray-800 text-blue-600 shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'" @click="metadataInputType = 'url'">
-                {{ t('metadata-url', 'Metadata URL') }}
-              </button>
-              <button type="button" class="px-4 py-2 text-sm font-medium rounded-md transition-colors" :class="metadataInputType === 'xml' ? 'bg-white dark:bg-gray-800 text-blue-600 shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'" @click="metadataInputType = 'xml'">
-                {{ t('metadata-xml', 'Metadata XML') }}
-              </button>
-            </div>
-
-            <!-- Metadata URL Input -->
-            <div v-if="metadataInputType === 'url'" class="space-y-2">
-              <label for="metadata-url-input" class="block text-sm font-medium dark:text-white text-slate-800">
-                {{ t('idp-metadata-url', 'IdP Metadata URL') }}
-              </label>
-              <input id="metadata-url-input" v-model="metadataUrl" type="url" :placeholder="t('metadata-url-placeholder', 'https://idp.example.com/metadata')" class="w-full px-3 py-2 border rounded-lg dark:bg-gray-800 dark:border-gray-600 dark:text-white border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" :disabled="isSaving">
-              <p class="text-xs text-gray-600 dark:text-gray-400">
-                {{ t('metadata-url-help', 'Enter the public HTTPS URL where your IdP\'s SAML metadata can be accessed') }}
-              </p>
-            </div>
-
-            <!-- Metadata XML Input -->
-            <div v-else class="space-y-2">
-              <label for="metadata-xml-input" class="block text-sm font-medium dark:text-white text-slate-800">
-                {{ t('idp-metadata-xml', 'IdP Metadata XML') }}
-              </label>
-              <textarea id="metadata-xml-input" v-model="metadataXml" rows="8" :placeholder="t('metadata-xml-placeholder', 'Paste your IdP SAML metadata XML here...')" class="w-full px-3 py-2 border rounded-lg dark:bg-gray-800 dark:border-gray-600 dark:text-white border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all font-mono text-sm" :disabled="isSaving" />
-              <p class="text-xs text-gray-600 dark:text-gray-400">
-                {{ t('metadata-xml-help', 'Paste the complete SAML metadata XML from your Identity Provider') }}
-              </p>
-            </div>
-
-            <div class="flex justify-between">
-              <button type="button" class="px-4 py-2 text-sm font-medium text-gray-700 border rounded-lg cursor-pointer hover:bg-gray-50 focus:ring-4 focus:ring-gray-200 border-gray-300 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 focus:outline-hidden" @click="currentStep = 1">
-                ← {{ t('back', 'Back') }}
-              </button>
-              <button type="button" class="px-4 py-2 text-sm font-medium text-white rounded-lg cursor-pointer bg-blue-600 hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 dark:hover:bg-blue-700 dark:focus:ring-blue-800 focus:outline-hidden disabled:opacity-50 disabled:cursor-not-allowed" :disabled="isSaving || !(metadataInputType === 'url' ? metadataUrl.trim() : metadataXml.trim())" @click="saveSSOConfig">
-                <span v-if="!isSaving">
-                  {{ t('save-and-continue', 'Save & Continue') }}
-                </span>
-                <Spinner v-else size="w-4 h-4" class="inline-block" color="fill-white text-blue-300" />
-              </button>
-            </div>
-          </div>
-
-          <!-- Step 3: Domain Configuration -->
-          <div v-show="currentStep === 3" class="space-y-4">
-            <div class="p-4 border rounded-lg bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800">
-              <h3 class="font-medium text-blue-800 dark:text-blue-300">
-                {{ t('step-3-title', 'Step 3: Configure Email Domain') }}
-              </h3>
-              <p class="mt-1 text-sm text-blue-700 dark:text-blue-400">
-                {{ t('step-3-description', 'Add the email domain that should use SSO for authentication') }}
-              </p>
-            </div>
-
-            <!-- Single Domain Input -->
-            <div class="space-y-2">
-              <label for="domain-input" class="block text-sm font-medium dark:text-white text-slate-800">
-                {{ t('add-email-domain', 'Add Email Domain') }}
-              </label>
-              <div class="flex gap-2">
-                <div class="relative flex-1">
-                  <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400">
-                    @
+              <div class="flex justify-between">
+                <button type="button" class="px-4 py-2 text-sm font-medium text-gray-700 border rounded-lg cursor-pointer hover:bg-gray-50 focus:ring-4 focus:ring-gray-200 border-gray-300 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 focus:outline-hidden" @click="currentStep = 1">
+                  ← {{ t('back', 'Back') }}
+                </button>
+                <button type="button" class="px-4 py-2 text-sm font-medium text-white rounded-lg cursor-pointer bg-blue-600 hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 dark:hover:bg-blue-700 dark:focus:ring-blue-800 focus:outline-hidden disabled:opacity-50 disabled:cursor-not-allowed" :disabled="isSaving || !(metadataInputType === 'url' ? metadataUrl.trim() : metadataXml.trim())" @click="saveSSOConfig">
+                  <span v-if="!isSaving">
+                    {{ t('save-and-continue', 'Save & Continue') }}
                   </span>
-                  <input id="domain-input" v-model="singleDomain" type="text" :placeholder="t('domain-placeholder', 'yourcompany.com')" class="w-full pl-8 pr-3 py-2 border rounded-lg dark:bg-gray-800 dark:border-gray-600 dark:text-white border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" :disabled="isSaving" @keydown.enter.prevent="saveDomain">
-                </div>
-                <button type="button" class="px-4 py-2 text-sm font-medium text-white rounded-lg cursor-pointer bg-blue-600 hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 dark:hover:bg-blue-700 dark:focus:ring-blue-800 focus:outline-hidden disabled:opacity-50 disabled:cursor-not-allowed" :disabled="isSaving || !singleDomain.trim()" @click="saveDomain">
-                  <span v-if="!isSaving">{{ t('add', 'Add') }}</span>
                   <Spinner v-else size="w-4 h-4" class="inline-block" color="fill-white text-blue-300" />
                 </button>
               </div>
-              <p class="text-xs text-gray-600 dark:text-gray-400">
-                {{ t('domain-sso-help', 'Users with emails from this domain will use SSO for authentication') }}
-              </p>
             </div>
 
-            <!-- Configured Domains List -->
-            <div v-if="configuredDomains.length > 0" class="space-y-2">
-              <label class="block text-sm font-medium dark:text-white text-slate-800">
-                {{ t('configured-domains', 'Configured Domains') }} ({{ configuredDomains.length }})
-              </label>
+            <!-- Step 3: Domain Configuration -->
+            <div v-show="currentStep === 3" class="space-y-4">
+              <div class="p-4 border rounded-lg bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800">
+                <h3 class="font-medium text-blue-800 dark:text-blue-300">
+                  {{ t('step-3-title', 'Step 3: Configure Email Domain') }}
+                </h3>
+                <p class="mt-1 text-sm text-blue-700 dark:text-blue-400">
+                  {{ t('step-3-description', 'Add the email domain that should use SSO for authentication') }}
+                </p>
+              </div>
+
+              <!-- Single Domain Input -->
               <div class="space-y-2">
-                <div v-for="domain in configuredDomains" :key="domain" class="flex items-center justify-between p-3 border rounded-lg dark:bg-gray-800 dark:border-gray-600 border-slate-300">
-                  <span class="font-mono text-sm dark:text-white text-slate-800">@{{ domain }}</span>
-                  <button type="button" class="px-2 py-1 text-xs font-medium text-red-600 border rounded hover:text-white hover:bg-red-600 focus:ring-2 focus:ring-red-300 border-red-400 dark:hover:bg-red-600 dark:focus:ring-red-800 focus:outline-hidden disabled:opacity-50 disabled:cursor-not-allowed" :disabled="isSaving" @click="removeDomain(domain)">
-                    {{ t('remove', 'Remove') }}
+                <label for="domain-input" class="block text-sm font-medium dark:text-white text-slate-800">
+                  {{ t('add-email-domain', 'Add Email Domain') }}
+                </label>
+                <div class="flex gap-2">
+                  <div class="relative flex-1">
+                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400">
+                      @
+                    </span>
+                    <input id="domain-input" v-model="singleDomain" type="text" :placeholder="t('domain-placeholder', 'yourcompany.com')" class="w-full pl-8 pr-3 py-2 border rounded-lg dark:bg-gray-800 dark:border-gray-600 dark:text-white border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" :disabled="isSaving" @keydown.enter.prevent="saveDomain">
+                  </div>
+                  <button type="button" class="px-4 py-2 text-sm font-medium text-white rounded-lg cursor-pointer bg-blue-600 hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 dark:hover:bg-blue-700 dark:focus:ring-blue-800 focus:outline-hidden disabled:opacity-50 disabled:cursor-not-allowed" :disabled="isSaving || !singleDomain.trim()" @click="saveDomain">
+                    <span v-if="!isSaving">{{ t('add', 'Add') }}</span>
+                    <Spinner v-else size="w-4 h-4" class="inline-block" color="fill-white text-blue-300" />
                   </button>
                 </div>
+                <p class="text-xs text-gray-600 dark:text-gray-400">
+                  {{ t('domain-sso-help', 'Users with emails from this domain will use SSO for authentication') }}
+                </p>
+              </div>
+
+              <!-- Configured Domains List -->
+              <div v-if="configuredDomains.length > 0" class="space-y-2">
+                <label class="block text-sm font-medium dark:text-white text-slate-800">
+                  {{ t('configured-domains', 'Configured Domains') }} ({{ configuredDomains.length }})
+                </label>
+                <div class="space-y-2">
+                  <div v-for="domain in configuredDomains" :key="domain" class="flex items-center justify-between p-3 border rounded-lg dark:bg-gray-800 dark:border-gray-600 border-slate-300">
+                    <span class="font-mono text-sm dark:text-white text-slate-800">@{{ domain }}</span>
+                    <button type="button" class="px-2 py-1 text-xs font-medium text-red-600 border rounded hover:text-white hover:bg-red-600 focus:ring-2 focus:ring-red-300 border-red-400 dark:hover:bg-red-600 dark:focus:ring-red-800 focus:outline-hidden disabled:opacity-50 disabled:cursor-not-allowed" :disabled="isSaving" @click="removeDomain(domain)">
+                      {{ t('remove', 'Remove') }}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="flex justify-between">
+                <button type="button" class="px-4 py-2 text-sm font-medium text-gray-700 border rounded-lg cursor-pointer hover:bg-gray-50 focus:ring-4 focus:ring-gray-200 border-gray-300 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 focus:outline-hidden" @click="currentStep = 2">
+                  ← {{ t('back', 'Back') }}
+                </button>
+                <button type="button" class="px-4 py-2 text-sm font-medium text-white rounded-lg cursor-pointer bg-blue-600 hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 dark:hover:bg-blue-700 dark:focus:ring-blue-800 focus:outline-hidden disabled:opacity-50 disabled:cursor-not-allowed" :disabled="configuredDomains.length === 0" @click="proceedToTestStep">
+                  {{ t('next', 'Next') }} →
+                </button>
               </div>
             </div>
 
-            <div class="flex justify-between">
-              <button type="button" class="px-4 py-2 text-sm font-medium text-gray-700 border rounded-lg cursor-pointer hover:bg-gray-50 focus:ring-4 focus:ring-gray-200 border-gray-300 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 focus:outline-hidden" @click="currentStep = 2">
-                ← {{ t('back', 'Back') }}
-              </button>
-              <button type="button" class="px-4 py-2 text-sm font-medium text-white rounded-lg cursor-pointer bg-blue-600 hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 dark:hover:bg-blue-700 dark:focus:ring-blue-800 focus:outline-hidden disabled:opacity-50 disabled:cursor-not-allowed" :disabled="configuredDomains.length === 0" @click="proceedToTestStep">
-                {{ t('next', 'Next') }} →
-              </button>
-            </div>
-          </div>
+            <!-- Step 4: Test Connection -->
+            <div v-show="currentStep === 4" class="space-y-4">
+              <div class="p-4 border rounded-lg bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800">
+                <h3 class="font-medium text-blue-800 dark:text-blue-300">
+                  {{ t('step-4-title', 'Step 4: Test SSO Connection') }}
+                </h3>
+                <p class="mt-1 text-sm text-blue-700 dark:text-blue-400">
+                  {{ t('step-4-description', 'Test your SSO configuration to ensure it works correctly before enabling it.') }}
+                </p>
+              </div>
 
-          <!-- Step 4: Test Connection -->
-          <div v-show="currentStep === 4" class="space-y-4">
-            <div class="p-4 border rounded-lg bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800">
-              <h3 class="font-medium text-blue-800 dark:text-blue-300">
-                {{ t('step-4-title', 'Step 4: Test SSO Connection') }}
-              </h3>
-              <p class="mt-1 text-sm text-blue-700 dark:text-blue-400">
-                {{ t('step-4-description', 'Test your SSO configuration to ensure it works correctly before enabling it.') }}
-              </p>
-            </div>
+              <!-- Configuration Review -->
+              <div class="p-4 space-y-3 border rounded-lg dark:bg-gray-800 dark:border-gray-600 border-slate-300">
+                <h4 class="font-medium dark:text-white text-slate-800">
+                  {{ t('configuration-review', 'Configuration Review') }}
+                </h4>
 
-            <!-- Configuration Review -->
-            <div class="p-4 space-y-3 border rounded-lg dark:bg-gray-800 dark:border-gray-600 border-slate-300">
-              <h4 class="font-medium dark:text-white text-slate-800">
-                {{ t('configuration-review', 'Configuration Review') }}
-              </h4>
+                <div class="space-y-2 text-sm">
+                  <div class="flex justify-between">
+                    <span class="text-gray-600 dark:text-gray-400">{{ t('provider', 'Provider') }}:</span>
+                    <span class="font-medium dark:text-white text-slate-800">{{ ssoConfig.provider_name || 'SAML 2.0' }}</span>
+                  </div>
 
-              <div class="space-y-2 text-sm">
-                <div class="flex justify-between">
-                  <span class="text-gray-600 dark:text-gray-400">{{ t('provider', 'Provider') }}:</span>
-                  <span class="font-medium dark:text-white text-slate-800">{{ ssoConfig.provider_name || 'SAML 2.0' }}</span>
-                </div>
+                  <div class="flex justify-between">
+                    <span class="text-gray-600 dark:text-gray-400">{{ t('email-domain', 'Email Domain') }}:</span>
+                    <span class="font-mono font-medium dark:text-white text-slate-800">@{{ ssoConfig.domains?.[0] || 'N/A' }}</span>
+                  </div>
 
-                <div class="flex justify-between">
-                  <span class="text-gray-600 dark:text-gray-400">{{ t('email-domain', 'Email Domain') }}:</span>
-                  <span class="font-mono font-medium dark:text-white text-slate-800">@{{ ssoConfig.domains?.[0] || 'N/A' }}</span>
-                </div>
-
-                <div class="flex justify-between items-start gap-4">
-                  <span class="text-gray-600 dark:text-gray-400">{{ t('metadata-url', 'Metadata URL') }}:</span>
-                  <a v-if="ssoConfig.metadata_url" :href="ssoConfig.metadata_url" target="_blank" class="font-mono text-xs text-blue-600 dark:text-blue-400 hover:underline break-all text-right">{{ ssoConfig.metadata_url }}</a>
-                  <span v-else class="font-mono text-xs dark:text-white text-slate-800 text-right">{{ ssoConfig.metadata_xml ? 'XML Uploaded' : 'N/A' }}</span>
+                  <div class="flex justify-between items-start gap-4">
+                    <span class="text-gray-600 dark:text-gray-400">{{ t('metadata-url', 'Metadata URL') }}:</span>
+                    <a v-if="ssoConfig.metadata_url" :href="ssoConfig.metadata_url" target="_blank" class="font-mono text-xs text-blue-600 dark:text-blue-400 hover:underline break-all text-right">{{ ssoConfig.metadata_url }}</a>
+                    <span v-else class="font-mono text-xs dark:text-white text-slate-800 text-right">{{ ssoConfig.metadata_xml ? 'XML Uploaded' : 'N/A' }}</span>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <!-- Test Connection -->
-            <div class="p-4 space-y-3 border rounded-lg dark:bg-gray-800 dark:border-gray-600 border-slate-300">
-              <h4 class="font-medium dark:text-white text-slate-800">
-                {{ t('test-sso-connection', 'Test SSO Connection') }}
-              </h4>
-              <p class="text-sm text-gray-600 dark:text-gray-400">
-                {{ t('test-sso-description', 'Click the button below to test your SSO configuration in a new window. After successful authentication, you can proceed to enable SSO.') }}
-              </p>
-              <button type="button" class="px-4 py-2 text-sm font-medium text-white rounded-lg cursor-pointer bg-blue-600 hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 dark:hover:bg-blue-700 dark:focus:ring-blue-800 focus:outline-hidden disabled:opacity-50 disabled:cursor-not-allowed" :disabled="isTesting" @click="testSSO">
-                <span v-if="!isTesting">
-                  {{ t('test-connection', 'Test Connection') }}
-                </span>
-                <Spinner v-else size="w-4 h-4" class="inline-block" color="fill-white text-blue-300" />
-              </button>
+              <!-- Test Connection -->
+              <div class="p-4 space-y-3 border rounded-lg dark:bg-gray-800 dark:border-gray-600 border-slate-300">
+                <h4 class="font-medium dark:text-white text-slate-800">
+                  {{ t('test-sso-connection', 'Test SSO Connection') }}
+                </h4>
+                <p class="text-sm text-gray-600 dark:text-gray-400">
+                  {{ t('test-sso-description', 'Click the button below to test your SSO configuration in a new window. After successful authentication, you can proceed to enable SSO.') }}
+                </p>
+                <button type="button" class="px-4 py-2 text-sm font-medium text-white rounded-lg cursor-pointer bg-blue-600 hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 dark:hover:bg-blue-700 dark:focus:ring-blue-800 focus:outline-hidden disabled:opacity-50 disabled:cursor-not-allowed" :disabled="isTesting" @click="testSSO">
+                  <span v-if="!isTesting">
+                    {{ t('test-connection', 'Test Connection') }}
+                  </span>
+                  <Spinner v-else size="w-4 h-4" class="inline-block" color="fill-white text-blue-300" />
+                </button>
 
-              <!-- Test Results -->
-              <div v-if="testResults" class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-600">
-                <h5 class="text-sm font-medium mb-3" :class="testResults.success ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'">
-                  {{ testResults.success ? t('test-passed', '✓ Test Passed') : t('test-failed', '✗ Test Failed') }}
-                </h5>
+                <!-- Test Results -->
+                <div v-if="testResults" class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-600">
+                  <h5 class="text-sm font-medium mb-3" :class="testResults.success ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'">
+                    {{ testResults.success ? t('test-passed', '✓ Test Passed') : t('test-failed', '✗ Test Failed') }}
+                  </h5>
 
-                <!-- Checks Grid -->
-                <div v-if="testResults.checks" class="grid grid-cols-2 gap-2 text-sm">
-                  <div class="flex items-center gap-2">
-                    <span v-if="testResults.checks.config_exists" class="text-green-500">✓</span>
-                    <span v-else class="text-red-500">✗</span>
-                    <span class="text-gray-600 dark:text-gray-400">{{ t('check-config-exists', 'Configuration exists') }}</span>
+                  <!-- Checks Grid -->
+                  <div v-if="testResults.checks" class="grid grid-cols-2 gap-2 text-sm">
+                    <div class="flex items-center gap-2">
+                      <span v-if="testResults.checks.config_exists" class="text-green-500">✓</span>
+                      <span v-else class="text-red-500">✗</span>
+                      <span class="text-gray-600 dark:text-gray-400">{{ t('check-config-exists', 'Configuration exists') }}</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <span v-if="testResults.checks.supabase_auth_provider" class="text-green-500">✓</span>
+                      <span v-else class="text-red-500">✗</span>
+                      <span class="text-gray-600 dark:text-gray-400">{{ t('check-auth-provider', 'Auth provider registered') }}</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <span v-if="testResults.checks.metadata_valid" class="text-green-500">✓</span>
+                      <span v-else class="text-red-500">✗</span>
+                      <span class="text-gray-600 dark:text-gray-400">{{ t('check-metadata-valid', 'SAML metadata valid') }}</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <span v-if="testResults.checks.domains_configured" class="text-green-500">✓</span>
+                      <span v-else class="text-red-500">✗</span>
+                      <span class="text-gray-600 dark:text-gray-400">{{ t('check-domains', 'Domains configured') }}</span>
+                    </div>
                   </div>
-                  <div class="flex items-center gap-2">
-                    <span v-if="testResults.checks.supabase_auth_provider" class="text-green-500">✓</span>
-                    <span v-else class="text-red-500">✗</span>
-                    <span class="text-gray-600 dark:text-gray-400">{{ t('check-auth-provider', 'Auth provider registered') }}</span>
-                  </div>
-                  <div class="flex items-center gap-2">
-                    <span v-if="testResults.checks.metadata_valid" class="text-green-500">✓</span>
-                    <span v-else class="text-red-500">✗</span>
-                    <span class="text-gray-600 dark:text-gray-400">{{ t('check-metadata-valid', 'SAML metadata valid') }}</span>
-                  </div>
-                  <div class="flex items-center gap-2">
-                    <span v-if="testResults.checks.domains_configured" class="text-green-500">✓</span>
-                    <span v-else class="text-red-500">✗</span>
-                    <span class="text-gray-600 dark:text-gray-400">{{ t('check-domains', 'Domains configured') }}</span>
-                  </div>
-                </div>
 
-                <!-- Error Message -->
-                <div v-if="!testResults.success && testResults.error" class="mt-3 p-2 bg-red-50 dark:bg-red-900/20 rounded text-sm text-red-700 dark:text-red-400">
-                  {{ testResults.error }}
-                </div>
+                  <!-- Error Message -->
+                  <div v-if="!testResults.success && testResults.error" class="mt-3 p-2 bg-red-50 dark:bg-red-900/20 rounded text-sm text-red-700 dark:text-red-400">
+                    {{ testResults.error }}
+                  </div>
 
-                <!-- Warnings -->
-                <div v-if="testResults.warnings && testResults.warnings.length > 0" class="mt-3 space-y-1">
-                  <p class="text-sm font-medium text-yellow-700 dark:text-yellow-400">
-                    {{ t('warnings', 'Warnings') }}:
-                  </p>
-                  <ul class="text-sm text-yellow-600 dark:text-yellow-500 list-disc list-inside">
-                    <li v-for="(warning, idx) in testResults.warnings" :key="idx">
-                      {{ warning }}
-                    </li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-
-            <!-- Success Message (only after test is run) -->
-            <div v-if="testPassed" class="p-4 border rounded-lg bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800">
-              <div class="flex items-start gap-2">
-                <svg class="w-5 h-5 text-green-600 dark:text-green-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <div>
-                  <p class="font-medium text-green-800 dark:text-green-300">
-                    {{ t('sso-test-successful', 'SSO Test Successful!') }}
-                  </p>
-                  <p class="text-sm text-green-700 dark:text-green-400">
-                    {{ t('sso-test-success-message', 'Your SSO configuration is working correctly. Click Next to enable it.') }}
-                  </p>
+                  <!-- Warnings -->
+                  <div v-if="testResults.warnings && testResults.warnings.length > 0" class="mt-3 space-y-1">
+                    <p class="text-sm font-medium text-yellow-700 dark:text-yellow-400">
+                      {{ t('warnings', 'Warnings') }}:
+                    </p>
+                    <ul class="text-sm text-yellow-600 dark:text-yellow-500 list-disc list-inside">
+                      <li v-for="(warning, idx) in testResults.warnings" :key="idx">
+                        {{ warning }}
+                      </li>
+                    </ul>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div class="flex justify-between">
-              <button type="button" class="px-4 py-2 text-sm font-medium text-gray-700 border rounded-lg cursor-pointer hover:bg-gray-50 focus:ring-4 focus:ring-gray-200 border-gray-300 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 focus:outline-hidden" @click="currentStep = 3">
-                ← {{ t('back', 'Back') }}
-              </button>
-              <button type="button" class="px-4 py-2 text-sm font-medium text-white rounded-lg cursor-pointer bg-blue-600 hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 dark:hover:bg-blue-700 dark:focus:ring-blue-800 focus:outline-hidden disabled:opacity-50 disabled:cursor-not-allowed" :disabled="!testPassed" @click="currentStep = 5">
-                {{ t('next', 'Next') }} →
-              </button>
-            </div>
-          </div>
-
-          <!-- Step 5: Enable SSO -->
-          <div v-show="currentStep === 5" class="space-y-4">
-            <!-- SSO Status Banner -->
-            <div class="flex items-center justify-between p-4 border rounded-lg" :class="ssoEnabled ? 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800' : 'bg-gray-50 border-gray-200 dark:bg-gray-800 dark:border-gray-700'">
-              <div class="flex items-center gap-3">
-                <div class="flex items-center justify-center w-10 h-10 rounded-full" :class="ssoEnabled ? 'bg-green-100 dark:bg-green-900/40' : 'bg-gray-100 dark:bg-gray-700'">
-                  <svg class="w-6 h-6" :class="ssoEnabled ? 'text-green-600 dark:text-green-400' : 'text-gray-600 dark:text-gray-400'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+              <!-- Success Message (only after test is run) -->
+              <div v-if="testPassed" class="p-4 border rounded-lg bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800">
+                <div class="flex items-start gap-2">
+                  <svg class="w-5 h-5 text-green-600 dark:text-green-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                </div>
-                <div>
-                  <div class="font-medium" :class="ssoEnabled ? 'text-green-800 dark:text-green-300' : 'text-gray-800 dark:text-gray-300'">
-                    {{ ssoEnabled ? t('sso-active', 'SSO Active') : t('sso-inactive', 'SSO Inactive') }}
-                  </div>
-                  <div class="text-sm" :class="ssoEnabled ? 'text-green-700 dark:text-green-400' : 'text-gray-600 dark:text-gray-400'">
-                    {{ ssoEnabled ? t('sso-active-description', 'Users can sign in with SSO') : t('sso-inactive-description', 'SSO is configured but not active') }}
+                  <div>
+                    <p class="font-medium text-green-800 dark:text-green-300">
+                      {{ t('sso-test-successful', 'SSO Test Successful!') }}
+                    </p>
+                    <p class="text-sm text-green-700 dark:text-green-400">
+                      {{ t('sso-test-success-message', 'Your SSO configuration is working correctly. Click Next to enable it.') }}
+                    </p>
                   </div>
                 </div>
               </div>
-              <label class="relative inline-flex items-center cursor-pointer">
-                <input v-model="ssoEnabled" type="checkbox" class="sr-only peer" :disabled="isSaving" @change="toggleSSO">
-                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600" />
-              </label>
-            </div>
 
-            <!-- Current Configuration Summary -->
-            <div class="p-4 space-y-3 border rounded-lg dark:bg-gray-800 dark:border-gray-600 border-slate-300">
-              <h4 class="font-medium dark:text-white text-slate-800">
-                {{ t('current-configuration', 'Current Configuration') }}
-              </h4>
-
-              <div class="space-y-2 text-sm">
-                <div class="flex justify-between">
-                  <span class="text-gray-600 dark:text-gray-400">{{ t('provider', 'Provider') }}:</span>
-                  <span class="font-medium dark:text-white text-slate-800">{{ ssoConfig.provider_name || 'SAML 2.0' }}</span>
-                </div>
-
-                <div class="flex justify-between items-start gap-4">
-                  <span class="text-gray-600 dark:text-gray-400">{{ t('email-domains', 'Email Domains') }}:</span>
-                  <div class="flex flex-wrap gap-1 justify-end">
-                    <span v-for="domain in configuredDomains" :key="domain" class="px-2 py-0.5 text-xs font-mono rounded bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300">
-                      @{{ domain }}
-                    </span>
-                  </div>
-                </div>
-
-                <div class="flex justify-between items-start gap-4">
-                  <span class="text-gray-600 dark:text-gray-400">{{ t('metadata-url', 'Metadata URL') }}:</span>
-                  <a v-if="ssoConfig.metadata_url" :href="ssoConfig.metadata_url" target="_blank" class="font-mono text-xs text-blue-600 dark:text-blue-400 hover:underline break-all text-right">{{ ssoConfig.metadata_url }}</a>
-                  <span v-else class="font-mono text-xs dark:text-white text-slate-800 text-right">{{ ssoConfig.metadata_xml ? 'XML Uploaded' : 'N/A' }}</span>
-                </div>
+              <div class="flex justify-between">
+                <button type="button" class="px-4 py-2 text-sm font-medium text-gray-700 border rounded-lg cursor-pointer hover:bg-gray-50 focus:ring-4 focus:ring-gray-200 border-gray-300 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 focus:outline-hidden" @click="currentStep = 3">
+                  ← {{ t('back', 'Back') }}
+                </button>
+                <button type="button" class="px-4 py-2 text-sm font-medium text-white rounded-lg cursor-pointer bg-blue-600 hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 dark:hover:bg-blue-700 dark:focus:ring-blue-800 focus:outline-hidden disabled:opacity-50 disabled:cursor-not-allowed" :disabled="!testPassed" @click="currentStep = 5">
+                  {{ t('next', 'Next') }} →
+                </button>
               </div>
             </div>
 
-            <!-- Edit Configuration Button -->
-            <div class="flex justify-between">
-              <button type="button" class="px-4 py-2 text-sm font-medium text-gray-700 border rounded-lg cursor-pointer hover:bg-gray-50 focus:ring-4 focus:ring-gray-200 border-gray-300 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 focus:outline-hidden" @click="editConfiguration">
-                {{ t('edit-configuration', 'Edit Configuration') }}
-              </button>
+            <!-- Step 5: Enable SSO -->
+            <div v-show="currentStep === 5" class="space-y-4">
+              <!-- SSO Status Banner -->
+              <div class="flex items-center justify-between p-4 border rounded-lg" :class="ssoEnabled ? 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800' : 'bg-gray-50 border-gray-200 dark:bg-gray-800 dark:border-gray-700'">
+                <div class="flex items-center gap-3">
+                  <div class="flex items-center justify-center w-10 h-10 rounded-full" :class="ssoEnabled ? 'bg-green-100 dark:bg-green-900/40' : 'bg-gray-100 dark:bg-gray-700'">
+                    <svg class="w-6 h-6" :class="ssoEnabled ? 'text-green-600 dark:text-green-400' : 'text-gray-600 dark:text-gray-400'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <div class="font-medium" :class="ssoEnabled ? 'text-green-800 dark:text-green-300' : 'text-gray-800 dark:text-gray-300'">
+                      {{ ssoEnabled ? t('sso-active', 'SSO Active') : t('sso-inactive', 'SSO Inactive') }}
+                    </div>
+                    <div class="text-sm" :class="ssoEnabled ? 'text-green-700 dark:text-green-400' : 'text-gray-600 dark:text-gray-400'">
+                      {{ ssoEnabled ? t('sso-active-description', 'Users can sign in with SSO') : t('sso-inactive-description', 'SSO is configured but not active') }}
+                    </div>
+                  </div>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer">
+                  <input v-model="ssoEnabled" type="checkbox" class="sr-only peer" :disabled="isSaving" @change="toggleSSO">
+                  <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600" />
+                </label>
+              </div>
+
+              <!-- Current Configuration Summary -->
+              <div class="p-4 space-y-3 border rounded-lg dark:bg-gray-800 dark:border-gray-600 border-slate-300">
+                <h4 class="font-medium dark:text-white text-slate-800">
+                  {{ t('current-configuration', 'Current Configuration') }}
+                </h4>
+
+                <div class="space-y-2 text-sm">
+                  <div class="flex justify-between">
+                    <span class="text-gray-600 dark:text-gray-400">{{ t('provider', 'Provider') }}:</span>
+                    <span class="font-medium dark:text-white text-slate-800">{{ ssoConfig.provider_name || 'SAML 2.0' }}</span>
+                  </div>
+
+                  <div class="flex justify-between items-start gap-4">
+                    <span class="text-gray-600 dark:text-gray-400">{{ t('email-domains', 'Email Domains') }}:</span>
+                    <div class="flex flex-wrap gap-1 justify-end">
+                      <span v-for="domain in configuredDomains" :key="domain" class="px-2 py-0.5 text-xs font-mono rounded bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300">
+                        @{{ domain }}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div class="flex justify-between items-start gap-4">
+                    <span class="text-gray-600 dark:text-gray-400">{{ t('metadata-url', 'Metadata URL') }}:</span>
+                    <a v-if="ssoConfig.metadata_url" :href="ssoConfig.metadata_url" target="_blank" class="font-mono text-xs text-blue-600 dark:text-blue-400 hover:underline break-all text-right">{{ ssoConfig.metadata_url }}</a>
+                    <span v-else class="font-mono text-xs dark:text-white text-slate-800 text-right">{{ ssoConfig.metadata_xml ? 'XML Uploaded' : 'N/A' }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Edit Configuration Button -->
+              <div class="flex justify-between">
+                <button type="button" class="px-4 py-2 text-sm font-medium text-gray-700 border rounded-lg cursor-pointer hover:bg-gray-50 focus:ring-4 focus:ring-gray-200 border-gray-300 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 focus:outline-hidden" @click="editConfiguration">
+                  {{ t('edit-configuration', 'Edit Configuration') }}
+                </button>
+              </div>
             </div>
-          </div>
           <!-- End of wizard steps -->
           </div>
 

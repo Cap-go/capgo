@@ -1,9 +1,9 @@
 /**
  * Mock SSO Callback Endpoint
- * 
+ *
  * This simulates Okta's SAML callback to Supabase for local development.
  * In production, Okta POSTs a SAML assertion to /auth/v1/sso/saml/acs
- * 
+ *
  * Flow:
  * 1. User clicks SSO login → Redirects to this mock endpoint
  * 2. Mock validates email domain and finds SSO provider
@@ -16,33 +16,33 @@ import { createClient } from '@supabase/supabase-js'
 
 // Mock Okta SAML response structure
 interface MockSAMLResponse {
-    email: string
-    firstName?: string
-    lastName?: string
-    providerId: string
-    orgId: string
+  email: string
+  firstName?: string
+  lastName?: string
+  providerId: string
+  orgId: string
 }
 
 // Extract email from query params (simulates pre-filled form)
 function getMockEmail(req: Request): string | null {
-    const url = new URL(req.url)
-    return url.searchParams.get('email')
+  const url = new URL(req.url)
+  return url.searchParams.get('email')
 }
 
 // Get redirect URL from RelayState (SAML standard parameter)
 function getRelayState(req: Request): string {
-    const url = new URL(req.url)
-    return url.searchParams.get('RelayState') || '/dashboard'
+  const url = new URL(req.url)
+  return url.searchParams.get('RelayState') || '/dashboard'
 }
 
 // Validate SSO provider configuration
 async function validateSSOProvider(supabase: any, email: string): Promise<{ providerId: string, orgId: string } | null> {
-    const domain = email.split('@')[1]
+  const domain = email.split('@')[1]
 
-    // Check if domain has SSO configured
-    const { data: domainMapping, error: domainError } = await supabase
-        .from('saml_domain_mappings')
-        .select(`
+  // Check if domain has SSO configured
+  const { data: domainMapping, error: domainError } = await supabase
+    .from('saml_domain_mappings')
+    .select(`
       domain,
       sso_connection_id,
       verified,
@@ -55,199 +55,201 @@ async function validateSSOProvider(supabase: any, email: string): Promise<{ prov
         entity_id
       )
     `)
-        .eq('domain', domain)
-        .eq('verified', true)
-        .eq('org_saml_connections.enabled', true)
-        .single()
+    .eq('domain', domain)
+    .eq('verified', true)
+    .eq('org_saml_connections.enabled', true)
+    .single()
 
-    if (domainError || !domainMapping) {
-        console.error('SSO provider not found for domain:', domain, domainError)
-        return null
-    }
+  if (domainError || !domainMapping) {
+    console.error('SSO provider not found for domain:', domain, domainError)
+    return null
+  }
 
-    return {
-        providerId: domainMapping.org_saml_connections.sso_provider_id,
-        orgId: domainMapping.org_saml_connections.org_id,
-    }
+  return {
+    providerId: domainMapping.org_saml_connections.sso_provider_id,
+    orgId: domainMapping.org_saml_connections.org_id,
+  }
 }
 
 // For local mock SSO: use admin API to create sessions directly
 // This simulates the SSO flow without needing passwords
 async function authenticateUser(supabaseAdmin: any, mockResponse: MockSAMLResponse): Promise<{ accessToken: string, refreshToken: string } | null> {
-    console.log('[Mock SSO] Authenticating user:', mockResponse.email)
+  console.log('[Mock SSO] Authenticating user:', mockResponse.email)
 
-    // Check if user exists
-    const { data: existingUsers, error: fetchError } = await supabaseAdmin.auth.admin.listUsers()
+  // Check if user exists
+  const { data: existingUsers, error: fetchError } = await supabaseAdmin.auth.admin.listUsers()
 
-    if (fetchError) {
-        console.error('[Mock SSO] Failed to fetch users:', fetchError)
-        return null
-    }
+  if (fetchError) {
+    console.error('[Mock SSO] Failed to fetch users:', fetchError)
+    return null
+  }
 
-    const existingUser = existingUsers.users.find((u: any) => u.email === mockResponse.email)
+  const existingUser = existingUsers.users.find((u: any) => u.email === mockResponse.email)
 
-    if (existingUser) {
-        // User exists - try to sign in with testtest password
-        console.log('[Mock SSO] Existing user found:', existingUser.id)
+  if (existingUser) {
+    // User exists - try to sign in with testtest password
+    console.log('[Mock SSO] Existing user found:', existingUser.id)
 
-        const { data: signInData, error: signInError } = await supabaseAdmin.auth.signInWithPassword({
-            email: mockResponse.email,
-            password: 'testtest',
-        })
-
-        if (signInError || !signInData?.session) {
-            console.error('[Mock SSO] Failed to sign in existing user:', signInError)
-            console.error('[Mock SSO] Note: Existing users must have password "testtest" for mock SSO')
-            return null
-        }
-
-        console.log('[Mock SSO] Existing user authenticated successfully')
-        return {
-            accessToken: signInData.session.access_token,
-            refreshToken: signInData.session.refresh_token,
-        }
-    }
-
-    // User doesn't exist - create them using admin API (bypasses triggers)
-    console.log('[Mock SSO] Creating new user with admin.createUser')
-    const defaultPassword = 'testtest' // Use known password for testing
-
-    const { data: createData, error: createError } = await supabaseAdmin.auth.admin.createUser({
-        email: mockResponse.email,
-        password: defaultPassword,
-        email_confirm: true, // Auto-confirm email for SSO users
-        user_metadata: {
-            first_name: mockResponse.firstName || mockResponse.email.split('@')[0],
-            last_name: mockResponse.lastName || '',
-            sso_provider: mockResponse.providerId,
-            sso_provider_id: mockResponse.providerId,
-        },
-    })
-
-    if (createError || !createData.user) {
-        console.error('[Mock SSO] Failed to create user via admin API:', createError)
-        return null
-    }
-
-    console.log('[Mock SSO] New user created via admin API:', createData.user.id)
-
-    if (mockResponse.orgId) {
-        console.log('[Mock SSO] Adding user to org:', mockResponse.orgId)
-        const { error: orgError } = await supabaseAdmin
-            .from('org_users')
-            .insert({
-                org_id: mockResponse.orgId,
-                user_id: createData.user.id,
-                user_right: 'read',
-            })
-
-        if (orgError) {
-            console.error('[Mock SSO] Failed to add user to org:', orgError)
-        } else {
-            console.log('[Mock SSO] User added to org successfully')
-        }
-    } else {
-        console.error('[Mock SSO] Missing orgId while assigning user to org')
-    }
-
-    // Sign in with the password we just set
     const { data: signInData, error: signInError } = await supabaseAdmin.auth.signInWithPassword({
-        email: mockResponse.email,
-        password: defaultPassword,
+      email: mockResponse.email,
+      password: 'testtest',
     })
 
     if (signInError || !signInData?.session) {
-        console.error('[Mock SSO] Failed to sign in new user:', signInError)
-        return null
+      console.error('[Mock SSO] Failed to sign in existing user:', signInError)
+      console.error('[Mock SSO] Note: Existing users must have password "testtest" for mock SSO')
+      return null
     }
 
-    console.log('[Mock SSO] New user authenticated successfully')
+    console.log('[Mock SSO] Existing user authenticated successfully')
     return {
-        accessToken: signInData.session.access_token,
-        refreshToken: signInData.session.refresh_token,
+      accessToken: signInData.session.access_token,
+      refreshToken: signInData.session.refresh_token,
     }
+  }
+
+  // User doesn't exist - create them using admin API (bypasses triggers)
+  console.log('[Mock SSO] Creating new user with admin.createUser')
+  const defaultPassword = 'testtest' // Use known password for testing
+
+  const { data: createData, error: createError } = await supabaseAdmin.auth.admin.createUser({
+    email: mockResponse.email,
+    password: defaultPassword,
+    email_confirm: true, // Auto-confirm email for SSO users
+    user_metadata: {
+      first_name: mockResponse.firstName || mockResponse.email.split('@')[0],
+      last_name: mockResponse.lastName || '',
+      sso_provider: mockResponse.providerId,
+      sso_provider_id: mockResponse.providerId,
+    },
+  })
+
+  if (createError || !createData.user) {
+    console.error('[Mock SSO] Failed to create user via admin API:', createError)
+    return null
+  }
+
+  console.log('[Mock SSO] New user created via admin API:', createData.user.id)
+
+  if (mockResponse.orgId) {
+    console.log('[Mock SSO] Adding user to org:', mockResponse.orgId)
+    const { error: orgError } = await supabaseAdmin
+      .from('org_users')
+      .insert({
+        org_id: mockResponse.orgId,
+        user_id: createData.user.id,
+        user_right: 'read',
+      })
+
+    if (orgError) {
+      console.error('[Mock SSO] Failed to add user to org:', orgError)
+    }
+    else {
+      console.log('[Mock SSO] User added to org successfully')
+    }
+  }
+  else {
+    console.error('[Mock SSO] Missing orgId while assigning user to org')
+  }
+
+  // Sign in with the password we just set
+  const { data: signInData, error: signInError } = await supabaseAdmin.auth.signInWithPassword({
+    email: mockResponse.email,
+    password: defaultPassword,
+  })
+
+  if (signInError || !signInData?.session) {
+    console.error('[Mock SSO] Failed to sign in new user:', signInError)
+    return null
+  }
+
+  console.log('[Mock SSO] New user authenticated successfully')
+  return {
+    accessToken: signInData.session.access_token,
+    refreshToken: signInData.session.refresh_token,
+  }
 }
 
 Deno.serve(async (req) => {
-    // Only allow GET requests (simulating redirect from IdP)
-    if (req.method !== 'GET') {
-        return new Response('Method not allowed', { status: 405 })
-    }
+  // Only allow GET requests (simulating redirect from IdP)
+  if (req.method !== 'GET') {
+    return new Response('Method not allowed', { status: 405 })
+  }
 
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
-        auth: {
-            autoRefreshToken: false,
-            persistSession: false,
-        },
-    })
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  })
 
-    // Get email from query params (in real SAML, this comes from SAML assertion)
-    const email = getMockEmail(req)
-    if (!email) {
-        return new Response(
-            renderErrorPage('Missing email parameter. Add ?email=user@domain.com to the URL'),
-            {
-                status: 400,
-                headers: { 'Content-Type': 'text/html' },
-            },
-        )
-    }
-
-    // Get redirect URL from RelayState
-    const relayState = getRelayState(req)
-
-    // Validate SSO provider
-    const ssoConfig = await validateSSOProvider(supabaseAdmin, email)
-    if (!ssoConfig) {
-        return new Response(
-            renderErrorPage(`SSO is not configured for domain: ${email.split('@')[1]}`),
-            {
-                status: 400,
-                headers: { 'Content-Type': 'text/html' },
-            },
-        )
-    }
-
-    // Mock SAML response data
-    const mockSAMLResponse: MockSAMLResponse = {
-        email,
-        firstName: email.split('@')[0],
-        lastName: 'User',
-        providerId: ssoConfig.providerId,
-        orgId: ssoConfig.orgId,
-    }
-
-    // Authenticate user
-    const tokens = await authenticateUser(supabaseAdmin, mockSAMLResponse)
-    if (!tokens) {
-        return new Response(
-            renderErrorPage('Failed to authenticate user'),
-            {
-                status: 500,
-                headers: { 'Content-Type': 'text/html' },
-            },
-        )
-    }
-
-    // Redirect to /login with tokens as query params (matching the invitation flow)
-    // Use localhost:5173 for local frontend, not the edge runtime container origin
-    const frontendUrl = 'http://localhost:5173'
-    const redirectUrl = `${frontendUrl}/login?access_token=${tokens.accessToken}&refresh_token=${tokens.refreshToken}&to=${encodeURIComponent(relayState)}&from_sso=true`
-
+  // Get email from query params (in real SAML, this comes from SAML assertion)
+  const email = getMockEmail(req)
+  if (!email) {
     return new Response(
-        renderSuccessPage(email, redirectUrl),
-        {
-            status: 200,
-            headers: { 'Content-Type': 'text/html' },
-        },
+      renderErrorPage('Missing email parameter. Add ?email=user@domain.com to the URL'),
+      {
+        status: 400,
+        headers: { 'Content-Type': 'text/html' },
+      },
     )
+  }
+
+  // Get redirect URL from RelayState
+  const relayState = getRelayState(req)
+
+  // Validate SSO provider
+  const ssoConfig = await validateSSOProvider(supabaseAdmin, email)
+  if (!ssoConfig) {
+    return new Response(
+      renderErrorPage(`SSO is not configured for domain: ${email.split('@')[1]}`),
+      {
+        status: 400,
+        headers: { 'Content-Type': 'text/html' },
+      },
+    )
+  }
+
+  // Mock SAML response data
+  const mockSAMLResponse: MockSAMLResponse = {
+    email,
+    firstName: email.split('@')[0],
+    lastName: 'User',
+    providerId: ssoConfig.providerId,
+    orgId: ssoConfig.orgId,
+  }
+
+  // Authenticate user
+  const tokens = await authenticateUser(supabaseAdmin, mockSAMLResponse)
+  if (!tokens) {
+    return new Response(
+      renderErrorPage('Failed to authenticate user'),
+      {
+        status: 500,
+        headers: { 'Content-Type': 'text/html' },
+      },
+    )
+  }
+
+  // Redirect to /login with tokens as query params (matching the invitation flow)
+  // Use localhost:5173 for local frontend, not the edge runtime container origin
+  const frontendUrl = 'http://localhost:5173'
+  const redirectUrl = `${frontendUrl}/login?access_token=${tokens.accessToken}&refresh_token=${tokens.refreshToken}&to=${encodeURIComponent(relayState)}&from_sso=true`
+
+  return new Response(
+    renderSuccessPage(email, redirectUrl),
+    {
+      status: 200,
+      headers: { 'Content-Type': 'text/html' },
+    },
+  )
 })
 
 // Render success page with auto-redirect
 function renderSuccessPage(email: string, redirectUrl: string): string {
-    return `
+  return `
 <!DOCTYPE html>
 <html>
 <head>
@@ -336,7 +338,7 @@ function renderSuccessPage(email: string, redirectUrl: string): string {
 
 // Render error page
 function renderErrorPage(message: string): string {
-    return `
+  return `
 <!DOCTYPE html>
 <html>
 <head>
