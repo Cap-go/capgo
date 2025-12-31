@@ -111,8 +111,14 @@ describe('build Time Tracking System', () => {
   it('should handle too big build time correctly', async () => {
     const supabase = getSupabaseClient()
 
-    // Clear any existing daily_build_time data for this app
-    await supabase.from('daily_build_time').delete().eq('app_id', APPNAME)
+    // Get all apps owned by this org and clear their daily_build_time data
+    // This is necessary because get_total_metrics aggregates across all apps in the org
+    const { data: orgApps } = await supabase.from('apps').select('app_id').eq('owner_org', ORG_ID)
+    if (orgApps) {
+      for (const app of orgApps) {
+        await supabase.from('daily_build_time').delete().eq('app_id', app.app_id)
+      }
+    }
 
     // Insert high build time usage directly into daily_build_time
     // (get_total_metrics reads from daily_build_time, not build_logs)
@@ -140,7 +146,8 @@ describe('build Time Tracking System', () => {
       .rpc('get_total_metrics', { org_id: ORG_ID })
     expect(totalMetricsError).toBeFalsy()
     console.log('Total metrics before cron:', totalMetrics)
-    expect((totalMetrics as any)?.[0]?.build_time_unit).toBeGreaterThan(1800)
+    // Verify our inserted build time is the only one (should be exactly 36000)
+    expect((totalMetrics as any)?.[0]?.build_time_unit).toBe(36000)
 
     const response = await fetch(`${BASE_URL}/triggers/cron_stat_org`, {
       method: 'POST',
