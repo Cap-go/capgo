@@ -1,0 +1,580 @@
+-- ============================================================================
+-- Migration: SSO SAML Authentication Feature
+-- Description: Enables SAML-based Single Sign-On authentication via identity providers (Okta, Azure AD, Google Workspace)
+-- ============================================================================
+-- This feature is INDEPENDENT from domain-based auto-join and provides:
+-- 1. SAML SSO authentication via external identity providers
+-- 2. Domain-to-provider mappings for SSO detection
+-- 3. Automatic enrollment of SSO-authenticated users
+-- 4. Comprehensive audit logging for SSO events
+-- ============================================================================
+
+-- ============================================================================
+-- TABLE: org_saml_connections
+-- Stores SAML SSO configuration per organization
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS public.org_saml_connections (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  org_id uuid NOT NULL REFERENCES public.orgs(id) ON DELETE CASCADE,
+  
+  -- Supabase SSO Provider Info (from CLI output)
+  sso_provider_id uuid NOT NULL UNIQUE,
+  provider_name text NOT NULL,  -- "Okta", "Azure AD", "Google Workspace", etc.
+  
+  -- SAML Configuration
+  metadata_url text,  -- IdP metadata URL (preferred for auto-refresh)
+  metadata_xml text,  -- Stored XML if URL not available
+  entity_id text NOT NULL,  -- IdP's SAML EntityID
+  
+  -- Certificate Management (for rotation detection)
+  current_certificate text,
+  certificate_expires_at timestamptz,
+  certificate_last_checked timestamptz DEFAULT now(),
+  
+  -- Status Flags
+  enabled boolean NOT NULL DEFAULT false,
+  verified boolean NOT NULL DEFAULT false,
+  
+  -- Optional Attribute Mapping
+  -- Maps SAML attributes to user properties
+  -- Example: {"email": {"name": "mail"}, "first_name": {"name": "givenName"}}
+  attribute_mapping jsonb DEFAULT '{}'::jsonb,
+  
+  -- Audit Fields
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  created_by uuid REFERENCES auth.users(id),
+  
+  -- Constraints
+  CONSTRAINT org_saml_connections_org_provider_unique UNIQUE(org_id, sso_provider_id),
+  CONSTRAINT org_saml_connections_metadata_check CHECK (
+    metadata_url IS NOT NULL OR metadata_xml IS NOT NULL
+  )
+);
+
+COMMENT ON TABLE public.org_saml_connections IS 'Tracks SAML SSO configurations per organization';
+COMMENT ON COLUMN public.org_saml_connections.sso_provider_id IS 'UUID returned by Supabase CLI when adding SSO provider';
+COMMENT ON COLUMN public.org_saml_connections.metadata_url IS 'IdP metadata URL for automatic refresh';
+COMMENT ON COLUMN public.org_saml_connections.verified IS 'Whether SSO connection has been successfully tested';
+
+-- ============================================================================
+-- TABLE: saml_domain_mappings
+-- Maps email domains to SSO providers (supports multi-provider setups)
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS public.saml_domain_mappings (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  
+  -- Domain Configuration
+  domain text NOT NULL,
+  org_id uuid NOT NULL REFERENCES public.orgs(id) ON DELETE CASCADE,
+  sso_connection_id uuid NOT NULL REFERENCES public.org_saml_connections(id) ON DELETE CASCADE,
+  
+  -- Priority for multiple providers (higher = shown first)
+  priority int NOT NULL DEFAULT 0,
+  
+  -- Verification Status (future: DNS TXT validation if needed)
+  verified boolean NOT NULL DEFAULT true,  -- Auto-verified via SSO by default
+  verification_code text,
+  verified_at timestamptz,
+  
+  -- Audit
+  created_at timestamptz NOT NULL DEFAULT now(),
+  
+  -- Constraints
+  CONSTRAINT saml_domain_mappings_domain_connection_unique UNIQUE(domain, sso_connection_id)
+);
+
+COMMENT ON TABLE public.saml_domain_mappings IS 'Maps email domains to SSO providers for auto-join';
+COMMENT ON COLUMN public.saml_domain_mappings.priority IS 'Display order when multiple providers exist (higher first)';
+
+-- ============================================================================
+-- TABLE: sso_audit_logs
+-- Comprehensive audit trail for SSO authentication events
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS public.sso_audit_logs (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  timestamp timestamptz NOT NULL DEFAULT now(),
+  
+  -- User Identity
+  user_id uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  email text,
+  
+  -- Event Type
+  event_type text NOT NULL,
+  -- Possible values: 'login_success', 'login_failed', 'logout', 'session_expired',
+  --                  'config_created', 'config_updated', 'config_deleted',
+  --                  'provider_added', 'provider_removed', 'auto_join_success'
+  
+  -- Context
+  org_id uuid REFERENCES public.orgs(id) ON DELETE SET NULL,
+  sso_provider_id uuid,
+  sso_connection_id uuid REFERENCES public.org_saml_connections(id) ON DELETE SET NULL,
+  
+  -- Technical Details
+  ip_address inet,
+  user_agent text,
+  country text,
+  
+  -- SAML-Specific Fields
+  saml_assertion_id text,  -- SAML assertion ID for tracing
+  saml_session_index text,  -- Session identifier from IdP
+  
+  -- Error Details (for failed events)
+  error_code text,
+  error_message text,
+  
+  -- Additional Metadata
+  metadata jsonb DEFAULT '{}'::jsonb
+);
+
+COMMENT ON TABLE public.sso_audit_logs IS 'Audit trail for all SSO authentication and configuration events';
+COMMENT ON COLUMN public.sso_audit_logs.event_type IS 'Type of SSO event (login, logout, config change, etc.)';
+
+-- ============================================================================
+-- INDEXES for Performance
+-- ============================================================================
+
+-- org_saml_connections indexes
+CREATE INDEX idx_saml_connections_org_enabled ON public.org_saml_connections(org_id) 
+  WHERE enabled = true;
+
+CREATE INDEX idx_saml_connections_provider ON public.org_saml_connections(sso_provider_id);
+
+CREATE INDEX idx_saml_connections_cert_expiry ON public.org_saml_connections(certificate_expires_at) 
+  WHERE certificate_expires_at IS NOT NULL AND enabled = true;
+
+-- saml_domain_mappings indexes
+CREATE INDEX idx_saml_domains_domain_verified ON public.saml_domain_mappings(domain) 
+  WHERE verified = true;
+
+CREATE INDEX idx_saml_domains_connection ON public.saml_domain_mappings(sso_connection_id);
+
+CREATE INDEX idx_saml_domains_org ON public.saml_domain_mappings(org_id);
+
+-- sso_audit_logs indexes
+CREATE INDEX idx_sso_audit_user_time ON public.sso_audit_logs(user_id, timestamp DESC) 
+  WHERE user_id IS NOT NULL;
+
+CREATE INDEX idx_sso_audit_org_time ON public.sso_audit_logs(org_id, timestamp DESC) 
+  WHERE org_id IS NOT NULL;
+
+CREATE INDEX idx_sso_audit_event_time ON public.sso_audit_logs(event_type, timestamp DESC);
+
+CREATE INDEX idx_sso_audit_provider ON public.sso_audit_logs(sso_provider_id, timestamp DESC) 
+  WHERE sso_provider_id IS NOT NULL;
+
+-- Failed login monitoring
+CREATE INDEX idx_sso_audit_failures ON public.sso_audit_logs(ip_address, timestamp DESC) 
+  WHERE event_type = 'login_failed';
+
+-- ============================================================================
+-- FUNCTIONS: SSO Provider Lookup
+-- ============================================================================
+
+-- Function to lookup SSO provider by email domain
+CREATE OR REPLACE FUNCTION public.lookup_sso_provider_by_domain(
+  p_email text
+)
+RETURNS TABLE (
+  provider_id uuid,
+  entity_id text,
+  org_id uuid,
+  org_name text,
+  provider_name text,
+  metadata_url text,
+  enabled boolean
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_domain text;
+BEGIN
+  -- Extract domain from email
+  v_domain := lower(split_part(p_email, '@', 2));
+  
+  IF v_domain IS NULL OR v_domain = '' THEN
+    RETURN;
+  END IF;
+  
+  -- Return all matching SSO providers ordered by priority
+  RETURN QUERY
+  SELECT 
+    osc.sso_provider_id as provider_id,
+    osc.entity_id,
+    osc.org_id,
+    o.name as org_name,
+    osc.provider_name,
+    osc.metadata_url,
+    osc.enabled
+  FROM public.saml_domain_mappings sdm
+  JOIN public.org_saml_connections osc ON osc.id = sdm.sso_connection_id
+  JOIN public.orgs o ON o.id = osc.org_id
+  WHERE sdm.domain = v_domain
+    AND sdm.verified = true
+    AND osc.enabled = true
+  ORDER BY sdm.priority DESC, osc.created_at DESC;
+END;
+$$;
+
+COMMENT ON FUNCTION public.lookup_sso_provider_by_domain IS 'Finds SSO providers configured for an email domain';
+
+-- ============================================================================
+-- FUNCTIONS: Auto-Enrollment for SSO Users
+-- ============================================================================
+
+-- Function to auto-enroll SSO-authenticated user to their organization
+CREATE OR REPLACE FUNCTION public.auto_enroll_sso_user(
+  p_user_id uuid,
+  p_email text,
+  p_sso_provider_id uuid
+)
+RETURNS TABLE (
+  enrolled_org_id uuid,
+  org_name text
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_org record;
+  v_already_member boolean;
+BEGIN
+  -- Find organizations with this SSO provider
+  FOR v_org IN
+    SELECT DISTINCT 
+      osc.org_id,
+      o.name as org_name
+    FROM public.org_saml_connections osc
+    JOIN public.orgs o ON o.id = osc.org_id
+    WHERE osc.sso_provider_id = p_sso_provider_id
+      AND osc.enabled = true
+  LOOP
+    -- Check if already a member
+    SELECT EXISTS (
+      SELECT 1 FROM public.org_users 
+      WHERE user_id = p_user_id AND org_id = v_org.org_id
+    ) INTO v_already_member;
+    
+    IF NOT v_already_member THEN
+      -- Add user to organization with read permission
+      INSERT INTO public.org_users (user_id, org_id, user_right, created_at)
+      VALUES (p_user_id, v_org.org_id, 'read', now());
+      
+      -- Log the auto-enrollment
+      INSERT INTO public.sso_audit_logs (
+        user_id,
+        email,
+        event_type,
+        org_id,
+        sso_provider_id,
+        metadata
+      ) VALUES (
+        p_user_id,
+        p_email,
+        'auto_join_success',
+        v_org.org_id,
+        p_sso_provider_id,
+        jsonb_build_object(
+          'enrollment_method', 'sso_auto_join',
+          'timestamp', now()
+        )
+      );
+      
+      -- Return enrolled org
+      enrolled_org_id := v_org.org_id;
+      org_name := v_org.org_name;
+      RETURN NEXT;
+    END IF;
+  END LOOP;
+END;
+$$;
+
+COMMENT ON FUNCTION public.auto_enroll_sso_user IS 'Automatically enrolls SSO user to their organization based on provider ID';
+
+-- Note: This migration does NOT include domain-based auto-join logic
+-- Domain-based auto-join (orgs.allowed_email_domains) is a separate feature
+-- See migration: 20251231000001_add_domain_based_auto_join.sql
+
+-- ============================================================================
+-- TRIGGERS: SSO User Auto-Enrollment
+-- ============================================================================
+
+-- Trigger to auto-enroll SSO users when they create accounts or update metadata
+CREATE OR REPLACE FUNCTION public.trigger_sso_user_auto_enroll()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_sso_provider_id uuid;
+  v_email text;
+BEGIN
+  v_email := NEW.email;
+  
+  -- Extract SSO provider ID from user metadata (if SSO authentication)
+  -- Supabase stores this in raw_app_meta_data after SAML authentication
+  v_sso_provider_id := (NEW.raw_app_meta_data->>'sso_provider_id')::uuid;
+  
+  -- If no sso_provider_id in app metadata, check user metadata
+  IF v_sso_provider_id IS NULL THEN
+    v_sso_provider_id := (NEW.raw_user_meta_data->>'sso_provider_id')::uuid;
+  END IF;
+  
+  -- Only perform SSO auto-enrollment if provider ID exists
+  IF v_email IS NOT NULL AND v_sso_provider_id IS NOT NULL THEN
+    BEGIN
+      PERFORM public.auto_enroll_sso_user(NEW.id, v_email, v_sso_provider_id);
+    EXCEPTION WHEN OTHERS THEN
+      RAISE WARNING 'SSO auto-enroll failed for user %: %', NEW.id, SQLERRM;
+    END;
+  END IF;
+  
+  RETURN NEW;
+END;
+$$;
+
+-- Drop existing triggers if they exist
+DROP TRIGGER IF EXISTS auto_join_user_to_orgs_on_create ON auth.users;
+DROP TRIGGER IF EXISTS sso_user_auto_enroll_on_create ON auth.users;
+
+-- Create SSO-specific trigger
+CREATE TRIGGER sso_user_auto_enroll_on_create
+  AFTER INSERT ON auth.users
+  FOR EACH ROW
+  EXECUTE FUNCTION public.trigger_sso_user_auto_enroll();
+
+COMMENT ON FUNCTION public.trigger_sso_user_auto_enroll IS 'Triggers SSO-based auto-enrollment when users authenticate via SAML';
+END;
+$$;
+
+-- Drop existing trigger if it exists
+DROP TRIGGER IF EXISTS auto_join_user_to_orgs_on_create ON auth.users;
+
+-- Create new trigger
+CREATE TRIGGER auto_join_user_to_orgs_on_create
+  AFTER INSERT ON auth.users
+  FOR EACH ROW
+  EXECUTE FUNCTION public.trigger_auto_join_on_user_create();
+
+-- Note: Cannot add comment on auth schema trigger (requires ownership)
+
+-- ============================================================================
+-- TRIGGERS: Validation and Audit
+-- ============================================================================
+
+-- Validation trigger for SSO configuration
+CREATE OR REPLACE FUNCTION public.validate_sso_configuration()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  -- Validate metadata exists
+  IF NEW.metadata_url IS NULL AND NEW.metadata_xml IS NULL THEN
+    RAISE EXCEPTION 'Either metadata_url or metadata_xml must be provided';
+  END IF;
+  
+  -- Validate entity_id format
+  IF NEW.entity_id IS NULL OR NEW.entity_id = '' THEN
+    RAISE EXCEPTION 'entity_id is required';
+  END IF;
+  
+  -- Update timestamp
+  NEW.updated_at := now();
+  
+  -- Log configuration change
+  IF TG_OP = 'INSERT' THEN
+    INSERT INTO public.sso_audit_logs (
+      event_type,
+      org_id,
+      sso_provider_id,
+      metadata
+    ) VALUES (
+      'config_created',
+      NEW.org_id,
+      NEW.sso_provider_id,
+      jsonb_build_object(
+        'provider_name', NEW.provider_name,
+        'entity_id', NEW.entity_id,
+        'created_by', NEW.created_by
+      )
+    );
+  ELSIF TG_OP = 'UPDATE' THEN
+    INSERT INTO public.sso_audit_logs (
+      event_type,
+      org_id,
+      sso_provider_id,
+      metadata
+    ) VALUES (
+      'config_updated',
+      NEW.org_id,
+      NEW.sso_provider_id,
+      jsonb_build_object(
+        'provider_name', NEW.provider_name,
+        'changes', jsonb_build_object(
+          'enabled', jsonb_build_object('old', OLD.enabled, 'new', NEW.enabled),
+          'verified', jsonb_build_object('old', OLD.verified, 'new', NEW.verified)
+        )
+      )
+    );
+  END IF;
+  
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trigger_validate_sso_configuration
+  BEFORE INSERT OR UPDATE ON public.org_saml_connections
+  FOR EACH ROW
+  EXECUTE FUNCTION public.validate_sso_configuration();
+
+COMMENT ON TRIGGER trigger_validate_sso_configuration ON public.org_saml_connections IS 'Validates SSO config and logs changes';
+
+-- ============================================================================
+-- ROW LEVEL SECURITY (RLS) POLICIES
+-- ============================================================================
+
+-- Enable RLS on all tables
+ALTER TABLE public.org_saml_connections ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.saml_domain_mappings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.sso_audit_logs ENABLE ROW LEVEL SECURITY;
+
+-- ============================================================================
+-- RLS POLICIES: org_saml_connections
+-- ============================================================================
+
+-- Super admins can manage SSO connections
+CREATE POLICY "Super admins can manage SSO connections"
+  ON public.org_saml_connections
+  FOR ALL
+  TO authenticated
+  USING (
+    public.check_min_rights(
+      'super_admin'::public.user_min_right,
+      public.get_identity_org_allowed('{all,write}'::public.key_mode[], org_id),
+      org_id,
+      NULL::character varying,
+      NULL::bigint
+    )
+  )
+  WITH CHECK (
+    public.check_min_rights(
+      'super_admin'::public.user_min_right,
+      public.get_identity_org_allowed('{all,write}'::public.key_mode[], org_id),
+      org_id,
+      NULL::character varying,
+      NULL::bigint
+    )
+  );
+
+-- Org members can read their org's SSO status (for UI display)
+CREATE POLICY "Org members can read SSO status"
+  ON public.org_saml_connections
+  FOR SELECT
+  TO authenticated
+  USING (
+    public.check_min_rights(
+      'read'::public.user_min_right,
+      public.get_identity_org_allowed('{read,write,all}'::public.key_mode[], org_id),
+      org_id,
+      NULL::character varying,
+      NULL::bigint
+    )
+  );
+
+-- ============================================================================
+-- RLS POLICIES: saml_domain_mappings
+-- ============================================================================
+
+-- Anyone (including anon) can read verified domain mappings for SSO detection
+CREATE POLICY "Anyone can read verified domain mappings"
+  ON public.saml_domain_mappings
+  FOR SELECT
+  TO authenticated, anon
+  USING (verified = true);
+
+-- Super admins can manage domain mappings
+CREATE POLICY "Super admins can manage domain mappings"
+  ON public.saml_domain_mappings
+  FOR ALL
+  TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.org_saml_connections osc
+      WHERE osc.id = sso_connection_id
+        AND public.check_min_rights(
+          'super_admin'::public.user_min_right,
+          public.get_identity_org_allowed('{all,write}'::public.key_mode[], osc.org_id),
+          osc.org_id,
+          NULL::character varying,
+          NULL::bigint
+        )
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.org_saml_connections osc
+      WHERE osc.id = sso_connection_id
+        AND public.check_min_rights(
+          'super_admin'::public.user_min_right,
+          public.get_identity_org_allowed('{all,write}'::public.key_mode[], osc.org_id),
+          osc.org_id,
+          NULL::character varying,
+          NULL::bigint
+        )
+    )
+  );
+
+-- ============================================================================
+-- RLS POLICIES: sso_audit_logs
+-- ============================================================================
+
+-- Users can view their own audit logs
+CREATE POLICY "Users can view own SSO audit logs"
+  ON public.sso_audit_logs
+  FOR SELECT
+  TO authenticated
+  USING (user_id = auth.uid());
+
+-- Org admins can view org audit logs
+CREATE POLICY "Org admins can view org SSO audit logs"
+  ON public.sso_audit_logs
+  FOR SELECT
+  TO authenticated
+  USING (
+    org_id IS NOT NULL
+    AND public.check_min_rights(
+      'admin'::public.user_min_right,
+      public.get_identity_org_allowed('{read,write,all}'::public.key_mode[], org_id),
+      org_id,
+      NULL::character varying,
+      NULL::bigint
+    )
+  );
+
+-- System can insert audit logs (SECURITY DEFINER functions)
+CREATE POLICY "System can insert audit logs"
+  ON public.sso_audit_logs
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (true);
+
+-- ============================================================================
+-- GRANTS: Ensure proper permissions
+-- ============================================================================
+
+-- Grant usage on public schema
+GRANT USAGE ON SCHEMA public TO authenticated, anon;
+
+-- Grant access to tables
+GRANT SELECT ON public.org_saml_connections TO authenticated, anon;
+GRANT SELECT ON public.saml_domain_mappings TO authenticated, anon;
+GRANT SELECT ON public.sso_audit_logs TO authenticated;
+
+-- Grant function execution
+GRANT EXECUTE ON FUNCTION public.lookup_sso_provider_by_domain TO authenticated, anon;
+GRANT EXECUTE ON FUNCTION public.auto_enroll_sso_user TO authenticated;
+GRANT EXECUTE ON FUNCTION public.trigger_sso_user_auto_enroll TO authenticated;
