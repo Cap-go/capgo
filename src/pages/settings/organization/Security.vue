@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import IconCheck from '~icons/heroicons/check-circle'
 import IconWarning from '~icons/heroicons/exclamation-triangle'
+import IconKey from '~icons/heroicons/key'
 import IconShield from '~icons/heroicons/shield-check'
 import IconUser from '~icons/heroicons/user'
 import { useSupabase } from '~/services/supabase'
@@ -43,6 +44,9 @@ const isSaving = ref(false)
 displayStore.NavTitle = t('security')
 
 const { currentOrganization } = storeToRefs(organizationStore)
+
+// Hashed API keys enforcement state
+const enforceHashedApiKeys = ref(false)
 
 // 2FA enforcement state
 const enforcing2fa = ref(false)
@@ -141,10 +145,10 @@ async function loadData() {
   isLoading.value = true
 
   try {
-    // Load current org's enforcing_2fa setting
+    // Load current org's security settings
     const { data: orgData, error: orgError } = await supabase
       .from('orgs')
-      .select('enforcing_2fa')
+      .select('enforcing_2fa, enforce_hashed_api_keys')
       .eq('id', currentOrganization.value.gid)
       .single()
 
@@ -155,6 +159,7 @@ async function loadData() {
     }
 
     enforcing2fa.value = orgData?.enforcing_2fa ?? false
+    enforceHashedApiKeys.value = orgData?.enforce_hashed_api_keys ?? false
 
     // Load members with their 2FA status
     await loadMembersWithMfaStatus()
@@ -355,6 +360,46 @@ async function save2faEnforcement(value: boolean) {
   }
   catch (error) {
     console.error('Error saving 2FA enforcement:', error)
+    toast.error(t('error-saving-settings'))
+  }
+  finally {
+    isSaving.value = false
+  }
+}
+
+async function toggleEnforceHashedApiKeys() {
+  if (!currentOrganization.value || !hasOrgPerm.value) {
+    toast.error(t('no-permission'))
+    return
+  }
+
+  const newValue = !enforceHashedApiKeys.value
+  const previousValue = enforceHashedApiKeys.value
+
+  // Optimistic update
+  enforceHashedApiKeys.value = newValue
+
+  isSaving.value = true
+
+  try {
+    const { error } = await supabase
+      .from('orgs')
+      .update({ enforce_hashed_api_keys: newValue })
+      .eq('id', currentOrganization.value.gid)
+
+    if (error) {
+      console.error('Failed to update enforce_hashed_api_keys:', error)
+      // Revert optimistic update
+      enforceHashedApiKeys.value = previousValue
+      toast.error(t('error-saving-settings'))
+      return
+    }
+
+    toast.success(newValue ? t('hashed-api-keys-enforcement-enabled') : t('hashed-api-keys-enforcement-disabled'))
+  }
+  catch (error) {
+    console.error('Error saving hashed API keys enforcement:', error)
+    enforceHashedApiKeys.value = previousValue
     toast.error(t('error-saving-settings'))
   }
   finally {
@@ -567,6 +612,50 @@ onMounted(async () => {
                   </div>
                 </button>
                 <span v-if="enforcing2fa" class="px-3 py-1 text-sm font-medium text-green-700 bg-green-100 rounded-full dark:bg-green-900/30 dark:text-green-400">
+                  {{ t('enabled') }}
+                </span>
+                <span v-else class="px-3 py-1 text-sm font-medium text-gray-700 bg-gray-100 rounded-full dark:bg-gray-700 dark:text-gray-300">
+                  {{ t('disabled') }}
+                </span>
+              </div>
+            </div>
+          </section>
+
+          <!-- Hashed API Keys Enforcement Section -->
+          <section class="p-6 border rounded-lg border-slate-200 dark:border-slate-700">
+            <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <div class="flex items-start gap-4">
+                <div class="p-3 rounded-lg bg-amber-50 dark:bg-amber-900/30">
+                  <IconKey class="w-6 h-6 text-amber-600 dark:text-amber-400" />
+                </div>
+                <div>
+                  <h3 class="text-lg font-semibold dark:text-white text-slate-800">
+                    {{ t('enforce-hashed-api-keys') }}
+                  </h3>
+                  <p class="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                    {{ t('enforce-hashed-api-keys-description') }}
+                  </p>
+                </div>
+              </div>
+              <div class="flex items-center gap-4">
+                <button
+                  type="button"
+                  :disabled="!hasOrgPerm || isSaving"
+                  class="relative inline-flex items-center cursor-pointer"
+                  :class="{ 'opacity-50 cursor-not-allowed': !hasOrgPerm || isSaving }"
+                  @click="toggleEnforceHashedApiKeys"
+                >
+                  <div
+                    class="w-11 h-6 rounded-full transition-colors duration-200 ease-in-out"
+                    :class="enforceHashedApiKeys ? 'bg-amber-600' : 'bg-gray-200 dark:bg-gray-700'"
+                  >
+                    <div
+                      class="absolute top-[2px] left-[2px] bg-white border-gray-300 border rounded-full h-5 w-5 transition-transform duration-200 ease-in-out"
+                      :class="enforceHashedApiKeys ? 'translate-x-full border-white' : ''"
+                    />
+                  </div>
+                </button>
+                <span v-if="enforceHashedApiKeys" class="px-3 py-1 text-sm font-medium text-amber-700 bg-amber-100 rounded-full dark:bg-amber-900/30 dark:text-amber-400">
                   {{ t('enabled') }}
                 </span>
                 <span v-else class="px-3 py-1 text-sm font-medium text-gray-700 bg-gray-100 rounded-full dark:bg-gray-700 dark:text-gray-300">

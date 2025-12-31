@@ -102,6 +102,7 @@
         "@capacitor/core": "^8.0.0",
         "@capgo/cli": "7.21.4",
         "@cloudflare/workers-types": "4.20251229.0",
+        "@formkit/core": "1.6.9",
         "@iconify/json": "^2.2.406",
         "@playwright/test": "1.57.0",
         "@tailwindcss/aspect-ratio": "^0.4.2",
@@ -748,7 +749,7 @@
 
     "@formkit/auto-animate": ["@formkit/auto-animate@0.9.0", "", {}, "sha512-VhP4zEAacXS3dfTpJpJ88QdLqMTcabMg0jwpOSxZ/VzfQVfl3GkZSCZThhGC5uhq/TxPHPzW0dzr4H9Bb1OgKA=="],
 
-    "@formkit/core": ["@formkit/core@1.7.2", "", { "dependencies": { "@formkit/utils": "^1.7.2" } }, "sha512-XDRVqkDtOziU3z44hdvgWEqGpiv6nTNeCmP8cnESKkr24a4keQuEwmfDVvibYV0ywyTMg6ylp2lyklCYeRHykQ=="],
+    "@formkit/core": ["@formkit/core@1.6.9", "", { "dependencies": { "@formkit/utils": "1.6.9" } }, "sha512-Zb5OkYKMf7Rp1pd4iUMv0TJQvfgl1PdKtRRQoGiTA0XIFLB/7tcRMr1wc5isA2JS+hllfxMTh3RWF8N+64fTMg=="],
 
     "@formkit/dev": ["@formkit/dev@1.6.9", "", { "dependencies": { "@formkit/core": "1.6.9", "@formkit/utils": "1.6.9" } }, "sha512-4ueBpZAOiKr8/LZnq3mNePCX4ZB1j1JuJscBEwugWMnDeDwCNo5XWBrng1ER/LlitTRQ3mtEBNy2Qpm0yAHlwA=="],
 
@@ -762,7 +763,7 @@
 
     "@formkit/themes": ["@formkit/themes@1.6.9", "", { "dependencies": { "@formkit/core": "1.6.9" }, "peerDependencies": { "tailwindcss": "^3.2.0", "unocss": "0.x.x", "windicss": "^3.0.0" }, "optionalPeers": ["tailwindcss", "unocss", "windicss"] }, "sha512-/UD+MehQEdcCEadt73eIBGGAMEK8ODN0yq9r9299WvQxIELCOP2MbcxuWCV/g2Vd15Xhl8YFdn4KCzQi4X7QXA=="],
 
-    "@formkit/utils": ["@formkit/utils@1.7.2", "", {}, "sha512-bBF6alUBOqFfJHjVB95Vck0hp36vlw4QfFJxGfTO6BX68AEaFzzzabtpwfy0DbcHtwHh4Yn7l/rOWGxXEve+QQ=="],
+    "@formkit/utils": ["@formkit/utils@1.6.9", "", {}, "sha512-vSFhB/Sm/A+SdwKdBi4WhJcdbePqSYRaB878Ol9HL8roTmmmgQpThvkv6EjLM6aRRP27Il5rS8XtIAIeh8vdTA=="],
 
     "@formkit/validation": ["@formkit/validation@1.7.2", "", { "dependencies": { "@formkit/core": "^1.7.2", "@formkit/observer": "^1.7.2", "@formkit/utils": "^1.7.2" } }, "sha512-JJsLP7AI/++VujdwtBeUcPhCqY3FXSKZ7hajT7Ow5Feab7JLqVPjxVMFbXDgEOLjq0ex1NX/I+EQHfm5sqMRsA=="],
 
@@ -3564,33 +3565,19 @@
 
     "@eslint/eslintrc/globals": ["globals@14.0.0", "", {}, "sha512-oahGvuMGQlPw/ivIYBjVSrWAfWLBeku5tpPE2fOPLi+WHffIWbuh2tCjhyQhTBPMf5E9jDEH4FOmTYgYwbKwtQ=="],
 
-    "@formkit/dev/@formkit/core": ["@formkit/core@1.6.9", "", { "dependencies": { "@formkit/utils": "1.6.9" } }, "sha512-Zb5OkYKMf7Rp1pd4iUMv0TJQvfgl1PdKtRRQoGiTA0XIFLB/7tcRMr1wc5isA2JS+hllfxMTh3RWF8N+64fTMg=="],
+    "@formkit/i18n/@formkit/core": ["@formkit/core@1.7.2", "", { "dependencies": { "@formkit/utils": "^1.7.2" } }, "sha512-XDRVqkDtOziU3z44hdvgWEqGpiv6nTNeCmP8cnESKkr24a4keQuEwmfDVvibYV0ywyTMg6ylp2lyklCYeRHykQ=="],
 
-    "@formkit/dev/@formkit/utils": ["@formkit/utils@1.6.9", "", {}, "sha512-vSFhB/Sm/A+SdwKdBi4WhJcdbePqSYRaB878Ol9HL8roTmmmgQpThvkv6EjLM6aRRP27Il5rS8XtIAIeh8vdTA=="],
-
-    "@formkit/inputs/@formkit/core": ["@formkit/core@1.6.9", "", { "dependencies": { "@formkit/utils": "1.6.9" } }, "sha512-Zb5OkYKMf7Rp1pd4iUMv0TJQvfgl1PdKtRRQoGiTA0XIFLB/7tcRMr1wc5isA2JS+hllfxMTh3RWF8N+64fTMg=="],
-
-    "@formkit/inputs/@formkit/utils": ["@formkit/utils@1.6.9", "", {}, "sha512-vSFhB/Sm/A+SdwKdBi4WhJcdbePqSYRaB878Ol9HL8roTmmmgQpThvkv6EjLM6aRRP27Il5rS8XtIAIeh8vdTA=="],
-
-    "@formkit/observer/@formkit/core": ["@formkit/core@1.6.9", "", { "dependencies": { "@formkit/utils": "1.6.9" } }, "sha512-Zb5OkYKMf7Rp1pd4iUMv0TJQvfgl1PdKtRRQoGiTA0XIFLB/7tcRMr1wc5isA2JS+hllfxMTh3RWF8N+64fTMg=="],
-
-    "@formkit/observer/@formkit/utils": ["@formkit/utils@1.6.9", "", {}, "sha512-vSFhB/Sm/A+SdwKdBi4WhJcdbePqSYRaB878Ol9HL8roTmmmgQpThvkv6EjLM6aRRP27Il5rS8XtIAIeh8vdTA=="],
-
-    "@formkit/rules/@formkit/core": ["@formkit/core@1.6.9", "", { "dependencies": { "@formkit/utils": "1.6.9" } }, "sha512-Zb5OkYKMf7Rp1pd4iUMv0TJQvfgl1PdKtRRQoGiTA0XIFLB/7tcRMr1wc5isA2JS+hllfxMTh3RWF8N+64fTMg=="],
-
-    "@formkit/rules/@formkit/utils": ["@formkit/utils@1.6.9", "", {}, "sha512-vSFhB/Sm/A+SdwKdBi4WhJcdbePqSYRaB878Ol9HL8roTmmmgQpThvkv6EjLM6aRRP27Il5rS8XtIAIeh8vdTA=="],
+    "@formkit/i18n/@formkit/utils": ["@formkit/utils@1.7.2", "", {}, "sha512-bBF6alUBOqFfJHjVB95Vck0hp36vlw4QfFJxGfTO6BX68AEaFzzzabtpwfy0DbcHtwHh4Yn7l/rOWGxXEve+QQ=="],
 
     "@formkit/rules/@formkit/validation": ["@formkit/validation@1.6.9", "", { "dependencies": { "@formkit/core": "1.6.9", "@formkit/observer": "1.6.9", "@formkit/utils": "1.6.9" } }, "sha512-9PGwN0ZDJt3hsrMyaL8KTG3diSQDik1OGogVG6/nFcZhWUycpeamFfXZSQ5pfzmwnvrTHsvyT0FtKitUnWWuPA=="],
 
-    "@formkit/themes/@formkit/core": ["@formkit/core@1.6.9", "", { "dependencies": { "@formkit/utils": "1.6.9" } }, "sha512-Zb5OkYKMf7Rp1pd4iUMv0TJQvfgl1PdKtRRQoGiTA0XIFLB/7tcRMr1wc5isA2JS+hllfxMTh3RWF8N+64fTMg=="],
+    "@formkit/validation/@formkit/core": ["@formkit/core@1.7.2", "", { "dependencies": { "@formkit/utils": "^1.7.2" } }, "sha512-XDRVqkDtOziU3z44hdvgWEqGpiv6nTNeCmP8cnESKkr24a4keQuEwmfDVvibYV0ywyTMg6ylp2lyklCYeRHykQ=="],
 
     "@formkit/validation/@formkit/observer": ["@formkit/observer@1.7.2", "", { "dependencies": { "@formkit/core": "^1.7.2", "@formkit/utils": "^1.7.2" } }, "sha512-KUr5mcu2SAeHOOK1FaMyFigtA8hkHLsUkaPFWpTC81j79o1AUjJppmfPaX6PbtlHLeMs2Zq8Qhp6VAhi7D2WJg=="],
 
-    "@formkit/vue/@formkit/core": ["@formkit/core@1.6.9", "", { "dependencies": { "@formkit/utils": "1.6.9" } }, "sha512-Zb5OkYKMf7Rp1pd4iUMv0TJQvfgl1PdKtRRQoGiTA0XIFLB/7tcRMr1wc5isA2JS+hllfxMTh3RWF8N+64fTMg=="],
+    "@formkit/validation/@formkit/utils": ["@formkit/utils@1.7.2", "", {}, "sha512-bBF6alUBOqFfJHjVB95Vck0hp36vlw4QfFJxGfTO6BX68AEaFzzzabtpwfy0DbcHtwHh4Yn7l/rOWGxXEve+QQ=="],
 
     "@formkit/vue/@formkit/i18n": ["@formkit/i18n@1.6.9", "", { "dependencies": { "@formkit/core": "1.6.9", "@formkit/utils": "1.6.9", "@formkit/validation": "1.6.9" } }, "sha512-8NA5bALlspCBEwInuZVgBqgQr0lDfproZdmbs2LciQpGi2B15u74JCjAkEwaKlMs+qgf/ds3QcIgUv2ztyyVEA=="],
-
-    "@formkit/vue/@formkit/utils": ["@formkit/utils@1.6.9", "", {}, "sha512-vSFhB/Sm/A+SdwKdBi4WhJcdbePqSYRaB878Ol9HL8roTmmmgQpThvkv6EjLM6aRRP27Il5rS8XtIAIeh8vdTA=="],
 
     "@formkit/vue/@formkit/validation": ["@formkit/validation@1.6.9", "", { "dependencies": { "@formkit/core": "1.6.9", "@formkit/observer": "1.6.9", "@formkit/utils": "1.6.9" } }, "sha512-9PGwN0ZDJt3hsrMyaL8KTG3diSQDik1OGogVG6/nFcZhWUycpeamFfXZSQ5pfzmwnvrTHsvyT0FtKitUnWWuPA=="],
 
@@ -4013,8 +4000,6 @@
     "@aws-crypto/sha256-browser/@smithy/util-utf8/@smithy/util-buffer-from": ["@smithy/util-buffer-from@2.2.0", "", { "dependencies": { "@smithy/is-array-buffer": "^2.2.0", "tslib": "^2.6.2" } }, "sha512-IJdWBbTcMQ6DA0gdNhh/BwrLkDR+ADW5Kr1aZmd4k3DIF6ezMV4R2NIAmT08wQJ3yUK82thHWmC/TnK/wpMMIA=="],
 
     "@aws-crypto/util/@smithy/util-utf8/@smithy/util-buffer-from": ["@smithy/util-buffer-from@2.2.0", "", { "dependencies": { "@smithy/is-array-buffer": "^2.2.0", "tslib": "^2.6.2" } }, "sha512-IJdWBbTcMQ6DA0gdNhh/BwrLkDR+ADW5Kr1aZmd4k3DIF6ezMV4R2NIAmT08wQJ3yUK82thHWmC/TnK/wpMMIA=="],
-
-    "@formkit/themes/@formkit/core/@formkit/utils": ["@formkit/utils@1.6.9", "", {}, "sha512-vSFhB/Sm/A+SdwKdBi4WhJcdbePqSYRaB878Ol9HL8roTmmmgQpThvkv6EjLM6aRRP27Il5rS8XtIAIeh8vdTA=="],
 
     "@grpc/proto-loader/yargs/cliui": ["cliui@8.0.1", "", { "dependencies": { "string-width": "^4.2.0", "strip-ansi": "^6.0.1", "wrap-ansi": "^7.0.0" } }, "sha512-BSeNnyus75C4//NQ9gQt1/csTXyo/8Sb+afLAkzAptFuMsod9HFokGNudZpi/oQV73hnVK+sR+5PVRMd+Dr7YQ=="],
 

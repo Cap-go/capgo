@@ -7,10 +7,30 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "14.1"
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
   }
   public: {
     Tables: {
@@ -18,7 +38,8 @@ export type Database = {
         Row: {
           created_at: string | null
           id: number
-          key: string
+          key: string | null
+          key_hash: string | null
           limited_to_apps: string[] | null
           limited_to_orgs: string[] | null
           mode: Database["public"]["Enums"]["key_mode"]
@@ -29,7 +50,8 @@ export type Database = {
         Insert: {
           created_at?: string | null
           id?: number
-          key: string
+          key?: string | null
+          key_hash?: string | null
           limited_to_apps?: string[] | null
           limited_to_orgs?: string[] | null
           mode: Database["public"]["Enums"]["key_mode"]
@@ -40,7 +62,8 @@ export type Database = {
         Update: {
           created_at?: string | null
           id?: number
-          key?: string
+          key?: string | null
+          key_hash?: string | null
           limited_to_apps?: string[] | null
           limited_to_orgs?: string[] | null
           mode?: Database["public"]["Enums"]["key_mode"]
@@ -416,15 +439,7 @@ export type Database = {
           platform?: string
           user_id?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "build_logs_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "orgs"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       build_requests: {
         Row: {
@@ -1071,7 +1086,6 @@ export type Database = {
           paying: number | null
           paying_monthly: number | null
           paying_yearly: number | null
-          plan_enterprise: number | null
           plan_enterprise_monthly: number
           plan_enterprise_yearly: number
           plan_maker: number | null
@@ -1116,7 +1130,6 @@ export type Database = {
           paying?: number | null
           paying_monthly?: number | null
           paying_yearly?: number | null
-          plan_enterprise?: number | null
           plan_enterprise_monthly?: number
           plan_enterprise_yearly?: number
           plan_maker?: number | null
@@ -1161,7 +1174,6 @@ export type Database = {
           paying?: number | null
           paying_monthly?: number | null
           paying_yearly?: number | null
-          plan_enterprise?: number | null
           plan_enterprise_monthly?: number
           plan_enterprise_yearly?: number
           plan_maker?: number | null
@@ -1331,6 +1343,7 @@ export type Database = {
           created_by: string
           customer_id: string | null
           email_preferences: Json
+          enforce_hashed_api_keys: boolean
           enforcing_2fa: boolean
           id: string
           last_stats_updated_at: string | null
@@ -1346,6 +1359,7 @@ export type Database = {
           created_by: string
           customer_id?: string | null
           email_preferences?: Json
+          enforce_hashed_api_keys?: boolean
           enforcing_2fa?: boolean
           id?: string
           last_stats_updated_at?: string | null
@@ -1361,6 +1375,7 @@ export type Database = {
           created_by?: string
           customer_id?: string | null
           email_preferences?: Json
+          enforce_hashed_api_keys?: boolean
           enforcing_2fa?: boolean
           id?: string
           last_stats_updated_at?: string | null
@@ -2205,6 +2220,13 @@ export type Database = {
             }
             Returns: boolean
           }
+      check_org_hashed_key_enforcement: {
+        Args: {
+          apikey_row: Database["public"]["Tables"]["apikeys"]["Row"]
+          org_id: string
+        }
+        Returns: boolean
+      }
       check_org_members_2fa_enabled: {
         Args: { org_id: string }
         Returns: {
@@ -2267,6 +2289,27 @@ export type Database = {
             Returns: boolean
           }
       expire_usage_credits: { Args: never; Returns: number }
+      find_apikey_by_value: {
+        Args: { key_value: string }
+        Returns: {
+          created_at: string | null
+          id: number
+          key: string | null
+          key_hash: string | null
+          limited_to_apps: string[] | null
+          limited_to_orgs: string[] | null
+          mode: Database["public"]["Enums"]["key_mode"]
+          name: string
+          updated_at: string | null
+          user_id: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "apikeys"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       find_best_plan_v3: {
         Args: {
           bandwidth: number
@@ -2543,6 +2586,7 @@ export type Database = {
               credit_available: number
               credit_next_expiration: string
               credit_total: number
+              enforce_hashed_api_keys: boolean
               enforcing_2fa: boolean
               gid: string
               is_canceled: boolean
@@ -2571,6 +2615,7 @@ export type Database = {
               credit_available: number
               credit_next_expiration: string
               credit_total: number
+              enforce_hashed_api_keys: boolean
               enforcing_2fa: boolean
               gid: string
               is_canceled: boolean
@@ -2832,6 +2877,7 @@ export type Database = {
       pg_log: { Args: { decision: string; input?: Json }; Returns: undefined }
       process_admin_stats: { Args: never; Returns: undefined }
       process_all_cron_tasks: { Args: never; Returns: undefined }
+      process_billing_period_stats_email: { Args: never; Returns: undefined }
       process_channel_device_counts_queue: {
         Args: { batch_size?: number }
         Returns: number
@@ -2850,7 +2896,6 @@ export type Database = {
             Args: { batch_size?: number; queue_names: string[] }
             Returns: undefined
           }
-      process_billing_period_stats_email: { Args: never; Returns: undefined }
       process_stats_email_monthly: { Args: never; Returns: undefined }
       process_stats_email_weekly: { Args: never; Returns: undefined }
       process_subscribed_orgs: { Args: never; Returns: undefined }
@@ -2921,6 +2966,25 @@ export type Database = {
         Args: { email: string; org_id: string }
         Returns: string
       }
+      reset_and_seed_app_data: {
+        Args: {
+          p_admin_user_id?: string
+          p_app_id: string
+          p_org_id?: string
+          p_plan_product_id?: string
+          p_stripe_customer_id?: string
+          p_user_id?: string
+        }
+        Returns: undefined
+      }
+      reset_and_seed_app_stats_data: {
+        Args: { p_app_id: string }
+        Returns: undefined
+      }
+      reset_and_seed_data: { Args: never; Returns: undefined }
+      reset_and_seed_stats_data: { Args: never; Returns: undefined }
+      reset_app_data: { Args: { p_app_id: string }; Returns: undefined }
+      reset_app_stats_data: { Args: { p_app_id: string }; Returns: undefined }
       seed_get_app_metrics_caches: {
         Args: { p_end_date: string; p_org_id: string; p_start_date: string }
         Returns: {
@@ -2993,6 +3057,10 @@ export type Database = {
         Args: { org_id: string; user_id: string }
         Returns: boolean
       }
+      verify_api_key_hash: {
+        Args: { plain_key: string; stored_hash: string }
+        Returns: boolean
+      }
       verify_mfa: { Args: never; Returns: boolean }
     }
     Enums: {
@@ -3049,7 +3117,9 @@ export type Database = {
         | "disableAutoUpdateMetadata"
         | "disableAutoUpdateUnderNative"
         | "disableDevBuild"
+        | "disableProdBuild"
         | "disableEmulator"
+        | "disableDevice"
         | "cannotGetBundle"
         | "checksum_fail"
         | "NoChannelOrOverride"
@@ -3070,8 +3140,6 @@ export type Database = {
         | "download_manifest_brotli_fail"
         | "backend_refusal"
         | "download_0"
-        | "disableProdBuild"
-        | "disableDevice"
       stripe_status:
         | "created"
         | "succeeded"
@@ -3246,6 +3314,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       action_type: ["mau", "storage", "bandwidth", "build_time"],
@@ -3302,7 +3373,9 @@ export const Constants = {
         "disableAutoUpdateMetadata",
         "disableAutoUpdateUnderNative",
         "disableDevBuild",
+        "disableProdBuild",
         "disableEmulator",
+        "disableDevice",
         "cannotGetBundle",
         "checksum_fail",
         "NoChannelOrOverride",
@@ -3323,8 +3396,6 @@ export const Constants = {
         "download_manifest_brotli_fail",
         "backend_refusal",
         "download_0",
-        "disableProdBuild",
-        "disableDevice",
       ],
       stripe_status: [
         "created",
@@ -3351,3 +3422,4 @@ export const Constants = {
     },
   },
 } as const
+

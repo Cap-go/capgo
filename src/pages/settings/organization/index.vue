@@ -279,6 +279,7 @@ async function copyOrganizationId() {
               </div>
             </div>
           </div>
+
           <footer class="mt-auto">
             <div class="flex flex-col px-2 py-5 border-t md:px-6 border-slate-300">
               <div class="flex self-end">
