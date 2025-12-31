@@ -12,6 +12,7 @@ import {
   resetAndSeedAppData,
   resetAppData,
   resetAppDataStats,
+  STRIPE_INFO_CUSTOMER_ID,
 } from './test-utils.ts'
 
 const id = randomUUID()
@@ -127,6 +128,18 @@ describe('expose_metadata feature', () => {
 
   describe('[POST] /updates - metadata exposure with plugin version', () => {
     beforeAll(async () => {
+      // Ensure the org has a valid plan (reset exceeded flags that might be set by other tests)
+      await supabase
+        .from('stripe_info')
+        .update({
+          is_good_plan: true,
+          mau_exceeded: false,
+          bandwidth_exceeded: false,
+          storage_exceeded: false,
+          build_time_exceeded: false,
+        })
+        .eq('customer_id', STRIPE_INFO_CUSTOMER_ID)
+
       // Add link and comment to the default version (1.0.0)
       const { data, error } = await supabase
         .from('app_versions')
@@ -141,8 +154,7 @@ describe('expose_metadata feature', () => {
 
       if (error || !data)
         throw error ?? new Error('Failed to update version with metadata')
-
-          })
+    })
 
     it('should expose metadata when expose_metadata=true and plugin version >= 7.35.0', async () => {
       // Enable expose_metadata

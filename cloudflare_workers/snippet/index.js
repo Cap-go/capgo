@@ -8,18 +8,71 @@
 // or (http.request.full_uri wildcard "*api.capgo.app/plugin/*")
 // or (http.request.full_uri wildcard "*api.capgo.app/stats")
 // or (http.request.full_uri wildcard "*api.capgo.app/channel_self")
+// Circuit breaker configuration
+const TIMEOUT_MS = 3000 // 3 seconds - matches plugin timeout
+const CIRCUIT_RESET_MS = 5 * 60 * 1000 // 5 minutes before retrying unhealthy worker
+const CACHE_KEY_PREFIX = 'https://circuit-breaker.internal/'
+
+// Cache helper functions for circuit breaker
+async function markUnhealthy(colo, workerUrl) {
+  try {
+    const cache = caches.default
+    const key = `${CACHE_KEY_PREFIX}${colo}/${encodeURIComponent(workerUrl)}`
+    const response = new Response(JSON.stringify({ unhealthyAt: Date.now() }), {
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': `max-age=${Math.floor(CIRCUIT_RESET_MS / 1000)}`,
+      },
+    })
+    await cache.put(key, response)
+    console.log(`Circuit OPEN for ${colo} → ${workerUrl}`)
+  }
+  catch (e) {
+    console.log(`Failed to mark unhealthy: ${e.message}`)
+  }
+}
+
+async function markHealthy(colo, workerUrl) {
+  try {
+    const cache = caches.default
+    const key = `${CACHE_KEY_PREFIX}${colo}/${encodeURIComponent(workerUrl)}`
+    await cache.delete(key)
+  }
+  catch {
+    // Ignore errors - cache miss is fine
+  }
+}
+
+async function isHealthy(colo, workerUrl) {
+  try {
+    const cache = caches.default
+    const key = `${CACHE_KEY_PREFIX}${colo}/${encodeURIComponent(workerUrl)}`
+    const cached = await cache.match(key)
+    if (!cached)
+      return true // No cache entry = healthy
+
+    const data = await cached.json()
+    const elapsed = Date.now() - data.unhealthyAt
+    // Circuit resets after CIRCUIT_RESET_MS (handled by Cache-Control, but double-check)
+    return elapsed >= CIRCUIT_RESET_MS
+  }
+  catch {
+    return true // On error, assume healthy
+  }
+}
+
 export default {
   async fetch(request) {
     // Regional worker URLs - each worker is co-located with its database replica
     const WORKER_URL = {
-      ASIA: 'https://plugin.as.capgo.app',         // AS_INDIA DB (Mumbai)
-      EUROPE: 'https://plugin.eu.capgo.app',       // EU DB
+      ASIA: 'https://plugin.as.capgo.app', // AS_INDIA DB (Mumbai)
+      EUROPE: 'https://plugin.eu.capgo.app', // EU DB
       NORTH_AMERICA: 'https://plugin.na.capgo.app', // NA DB
       SOUTH_AMERICA: 'https://plugin.sa.capgo.app', // SA DB
-      OCEANIA: 'https://plugin.oc.capgo.app',      // OC DB
-      AFRICA: 'https://plugin.af.capgo.app',       // AS_INDIA DB (via smart placement)
-      MIDDLE_EAST: 'https://plugin.me.capgo.app',  // AS_INDIA DB (via smart placement)
-      HONG_KONG: 'https://plugin.hk.capgo.app',    // AS_JAPAN DB (Tokyo)
+      OCEANIA: 'https://plugin.oc.capgo.app', // OC DB
+      AFRICA: 'https://plugin.af.capgo.app', // AS_INDIA DB (via smart placement)
+      MIDDLE_EAST: 'https://plugin.me.capgo.app', // AS_INDIA DB (via smart placement)
+      HONG_KONG: 'https://plugin.hk.capgo.app', // AS_JAPAN DB (Tokyo)
     }
 
     // Zone codes used for routing decisions
@@ -37,335 +90,335 @@ export default {
     // Maps Cloudflare colo (data center) codes to zones
     // Full list: https://github.com/Netrvin/cloudflare-colo-list/blob/main/DC-Colos.json
     const coloToZone = {
-      AAE: ZONE.AFRICA,
-      ABJ: ZONE.AFRICA,
-      ABQ: ZONE.NORTH_AMERICA,
-      ACC: ZONE.AFRICA,
-      ADB: ZONE.EUROPE,
-      ADD: ZONE.AFRICA,
-      ADL: ZONE.OCEANIA,
-      AKL: ZONE.OCEANIA,
-      AKX: ZONE.ASIA,
-      ALA: ZONE.ASIA,
-      ALG: ZONE.AFRICA,
-      AMD: ZONE.ASIA,
-      AMM: ZONE.EUROPE,
-      AMS: ZONE.EUROPE,
-      ANC: ZONE.NORTH_AMERICA,
-      ARI: ZONE.SOUTH_AMERICA,
-      ARN: ZONE.EUROPE,
-      ARU: ZONE.SOUTH_AMERICA,
-      ASK: ZONE.AFRICA,
-      ASU: ZONE.SOUTH_AMERICA,
-      ATH: ZONE.EUROPE,
-      ATL: ZONE.NORTH_AMERICA,
-      AUS: ZONE.NORTH_AMERICA,
-      BAH: ZONE.EUROPE,
-      BAQ: ZONE.SOUTH_AMERICA,
-      BCN: ZONE.EUROPE,
-      BEG: ZONE.EUROPE,
-      BEL: ZONE.SOUTH_AMERICA,
-      BGI: ZONE.NORTH_AMERICA,
-      BGR: ZONE.NORTH_AMERICA,
-      BGW: ZONE.MIDDLE_EAST,
-      BHY: ZONE.HONG_KONG,
-      BKK: ZONE.HONG_KONG,  // Bangkok, Thailand -> AS_JAPAN
-      BLR: ZONE.ASIA,
-      BNA: ZONE.NORTH_AMERICA,
-      BNE: ZONE.OCEANIA,
-      BNU: ZONE.SOUTH_AMERICA,
-      BOD: ZONE.EUROPE,
-      BOG: ZONE.SOUTH_AMERICA,
-      BOM: ZONE.ASIA,
-      BOS: ZONE.NORTH_AMERICA,
-      BRU: ZONE.EUROPE,
-      BSB: ZONE.SOUTH_AMERICA,
-      BSR: ZONE.MIDDLE_EAST,
-      BTS: ZONE.EUROPE,
-      BUD: ZONE.EUROPE,
-      BUF: ZONE.NORTH_AMERICA,
-      BWN: ZONE.HONG_KONG,  // Brunei -> AS_JAPAN
-      CAI: ZONE.AFRICA,
-      CAN: ZONE.HONG_KONG,
-      CAW: ZONE.SOUTH_AMERICA,
-      CBR: ZONE.OCEANIA,
-      CCP: ZONE.SOUTH_AMERICA,
-      CCU: ZONE.ASIA,
-      CDG: ZONE.EUROPE,
-      CEB: ZONE.HONG_KONG,  // Cebu, Philippines -> AS_JAPAN
-      CFC: ZONE.SOUTH_AMERICA,
-      CGB: ZONE.SOUTH_AMERICA,
-      CGD: ZONE.HONG_KONG,
-      CGK: ZONE.HONG_KONG,  // Jakarta, Indonesia -> AS_JAPAN
-      CGO: ZONE.HONG_KONG,
-      CGP: ZONE.ASIA,
-      CGY: ZONE.HONG_KONG,  // Cagayan de Oro, Philippines -> AS_JAPAN
-      CHC: ZONE.OCEANIA,
-      CKG: ZONE.HONG_KONG,
-      CLE: ZONE.NORTH_AMERICA,
-      CLO: ZONE.SOUTH_AMERICA,
-      CLT: ZONE.NORTH_AMERICA,
-      CMB: ZONE.ASIA,
-      CMH: ZONE.NORTH_AMERICA,
-      CNF: ZONE.SOUTH_AMERICA,
-      CNN: ZONE.ASIA,
-      CNX: ZONE.HONG_KONG,  // Chiang Mai, Thailand -> AS_JAPAN
-      COK: ZONE.ASIA,
-      COR: ZONE.SOUTH_AMERICA,
-      CPH: ZONE.EUROPE,
-      CPT: ZONE.AFRICA,
-      CRK: ZONE.HONG_KONG,  // Clark, Philippines -> AS_JAPAN
-      CSX: ZONE.HONG_KONG,
-      CWB: ZONE.SOUTH_AMERICA,
-      CZL: ZONE.AFRICA,
-      CZX: ZONE.HONG_KONG,
-      DAC: ZONE.ASIA,
-      DAD: ZONE.HONG_KONG,  // Da Nang, Vietnam -> AS_JAPAN
-      DAR: ZONE.AFRICA,
-      DEL: ZONE.ASIA,
-      DEN: ZONE.NORTH_AMERICA,
-      DFW: ZONE.NORTH_AMERICA,
-      DKR: ZONE.AFRICA,
-      DLC: ZONE.HONG_KONG,
-      DME: ZONE.EUROPE,
-      DMM: ZONE.MIDDLE_EAST,
-      DOH: ZONE.MIDDLE_EAST,
-      DPS: ZONE.HONG_KONG,  // Bali, Indonesia -> AS_JAPAN
-      DTW: ZONE.NORTH_AMERICA,
-      DUB: ZONE.EUROPE,
-      DUR: ZONE.AFRICA,
-      DUS: ZONE.EUROPE,
-      DXB: ZONE.MIDDLE_EAST,
-      EBB: ZONE.AFRICA,
-      EBL: ZONE.MIDDLE_EAST,
-      EVN: ZONE.ASIA,
-      EWR: ZONE.NORTH_AMERICA,
-      EZE: ZONE.SOUTH_AMERICA,
-      FCO: ZONE.EUROPE,
-      FIH: ZONE.AFRICA,
-      FLN: ZONE.SOUTH_AMERICA,
-      FOC: ZONE.HONG_KONG,
-      FOR: ZONE.SOUTH_AMERICA,
-      FRA: ZONE.EUROPE,
-      FRU: ZONE.ASIA,
-      FSD: ZONE.NORTH_AMERICA,
-      FUK: ZONE.HONG_KONG,  // Fukuoka, Japan -> AS_JAPAN
-      FUO: ZONE.HONG_KONG,
-      GBE: ZONE.AFRICA,
-      GDL: ZONE.NORTH_AMERICA,
-      GEO: ZONE.SOUTH_AMERICA,
-      GIG: ZONE.SOUTH_AMERICA,
-      GND: ZONE.SOUTH_AMERICA,
-      GOT: ZONE.EUROPE,
-      GRU: ZONE.SOUTH_AMERICA,
-      GUA: ZONE.NORTH_AMERICA,
-      GUM: ZONE.ASIA,
-      GVA: ZONE.EUROPE,
-      GYD: ZONE.ASIA,
-      GYE: ZONE.SOUTH_AMERICA,
-      GYN: ZONE.SOUTH_AMERICA,
-      HAK: ZONE.HONG_KONG,
-      HAM: ZONE.EUROPE,
-      HAN: ZONE.HONG_KONG,  // Hanoi, Vietnam -> AS_JAPAN
-      HBA: ZONE.OCEANIA,
-      HEL: ZONE.EUROPE,
-      HFA: ZONE.MIDDLE_EAST,
-      HGH: ZONE.HONG_KONG,
-      HKG: ZONE.HONG_KONG,
-      HNL: ZONE.NORTH_AMERICA,
-      HRE: ZONE.AFRICA,
-      HYD: ZONE.ASIA,
-      HYN: ZONE.ASIA,
-      IAD: ZONE.NORTH_AMERICA,
-      IAH: ZONE.NORTH_AMERICA,
-      ICN: ZONE.HONG_KONG,  // Seoul, Korea -> AS_JAPAN
-      IND: ZONE.NORTH_AMERICA,
-      ISB: ZONE.ASIA,
-      IST: ZONE.EUROPE,
-      ISU: ZONE.MIDDLE_EAST,
-      ITJ: ZONE.SOUTH_AMERICA,
-      IXC: ZONE.ASIA,
-      JAX: ZONE.NORTH_AMERICA,
-      JDO: ZONE.SOUTH_AMERICA,
-      JED: ZONE.MIDDLE_EAST,
-      JHB: ZONE.HONG_KONG,  // Johor Bahru, Malaysia -> AS_JAPAN
-      JIB: ZONE.AFRICA,
-      JNB: ZONE.AFRICA,
-      JOG: ZONE.HONG_KONG,  // Yogyakarta, Indonesia -> AS_JAPAN
-      JOI: ZONE.SOUTH_AMERICA,
-      JXG: ZONE.ASIA,
-      KBP: ZONE.EUROPE,
-      KCH: ZONE.HONG_KONG,  // Kuching, Malaysia -> AS_JAPAN
-      KEF: ZONE.EUROPE,
-      KGL: ZONE.AFRICA,
-      KHH: ZONE.HONG_KONG,  // Kaohsiung, Taiwan -> AS_JAPAN
-      KHI: ZONE.ASIA,
-      KHN: ZONE.HONG_KONG,
-      KIN: ZONE.NORTH_AMERICA,
-      KIV: ZONE.EUROPE,
-      KIX: ZONE.HONG_KONG,  // Osaka, Japan -> AS_JAPAN
-      KJA: ZONE.ASIA,
-      KMG: ZONE.HONG_KONG,
-      KNU: ZONE.ASIA,
-      KTM: ZONE.ASIA,
-      KUL: ZONE.HONG_KONG,  // Kuala Lumpur, Malaysia -> AS_JAPAN
-      KWE: ZONE.HONG_KONG,
-      KWI: ZONE.MIDDLE_EAST,
-      LAD: ZONE.AFRICA,
-      LAS: ZONE.NORTH_AMERICA,
-      LAX: ZONE.NORTH_AMERICA,
-      LCA: ZONE.EUROPE,
-      LED: ZONE.EUROPE,
-      LHR: ZONE.EUROPE,
-      LIM: ZONE.SOUTH_AMERICA,
-      LIS: ZONE.EUROPE,
-      LLK: ZONE.ASIA,
-      LLW: ZONE.AFRICA,
-      LOS: ZONE.AFRICA,
-      LPB: ZONE.SOUTH_AMERICA,
-      LUN: ZONE.AFRICA,
-      LUX: ZONE.EUROPE,
-      LYS: ZONE.EUROPE,
-      MAA: ZONE.ASIA,
-      MAD: ZONE.EUROPE,
-      MAN: ZONE.EUROPE,
-      MAO: ZONE.SOUTH_AMERICA,
-      MBA: ZONE.AFRICA,
-      MCI: ZONE.NORTH_AMERICA,
-      MCT: ZONE.MIDDLE_EAST,
-      MDE: ZONE.SOUTH_AMERICA,
-      MEL: ZONE.OCEANIA,
-      MEM: ZONE.NORTH_AMERICA,
-      MEX: ZONE.NORTH_AMERICA,
-      MFM: ZONE.HONG_KONG,
-      MIA: ZONE.NORTH_AMERICA,
-      MLE: ZONE.ASIA,
-      MNL: ZONE.HONG_KONG,  // Manila, Philippines -> AS_JAPAN
-      MPM: ZONE.AFRICA,
-      MRS: ZONE.EUROPE,
-      MRU: ZONE.AFRICA,
-      MSP: ZONE.NORTH_AMERICA,
-      MSQ: ZONE.EUROPE,
-      MUC: ZONE.EUROPE,
-      MXP: ZONE.EUROPE,
-      NAG: ZONE.ASIA,
-      NBO: ZONE.AFRICA,
-      NJF: ZONE.MIDDLE_EAST,
-      NNG: ZONE.HONG_KONG,
-      NOU: ZONE.OCEANIA,
-      NQN: ZONE.SOUTH_AMERICA,
-      NQZ: ZONE.ASIA,
-      NRT: ZONE.HONG_KONG,  // Tokyo Narita, Japan -> AS_JAPAN
-      NVT: ZONE.SOUTH_AMERICA,
-      OKA: ZONE.HONG_KONG,  // Okinawa, Japan -> AS_JAPAN
-      OKC: ZONE.NORTH_AMERICA,
-      OMA: ZONE.NORTH_AMERICA,
-      ORD: ZONE.NORTH_AMERICA,
-      ORF: ZONE.NORTH_AMERICA,
-      ORN: ZONE.AFRICA,
-      OSL: ZONE.EUROPE,
-      OTP: ZONE.EUROPE,
-      OUA: ZONE.AFRICA,
-      PAT: ZONE.ASIA,
-      PBH: ZONE.ASIA,
-      PBM: ZONE.SOUTH_AMERICA,
-      PDX: ZONE.NORTH_AMERICA,
-      PER: ZONE.OCEANIA,
-      PHL: ZONE.NORTH_AMERICA,
-      PHX: ZONE.NORTH_AMERICA,
-      PIT: ZONE.NORTH_AMERICA,
-      PKX: ZONE.HONG_KONG,
-      PMO: ZONE.EUROPE,
-      PMW: ZONE.SOUTH_AMERICA,
-      PNH: ZONE.HONG_KONG,  // Phnom Penh, Cambodia -> AS_JAPAN
-      POA: ZONE.SOUTH_AMERICA,
-      POS: ZONE.SOUTH_AMERICA,
-      PPT: ZONE.OCEANIA,
-      PRG: ZONE.EUROPE,
-      PTY: ZONE.SOUTH_AMERICA,
-      QRO: ZONE.NORTH_AMERICA,
-      QWJ: ZONE.SOUTH_AMERICA,
-      RAO: ZONE.SOUTH_AMERICA,
-      RDU: ZONE.NORTH_AMERICA,
-      REC: ZONE.SOUTH_AMERICA,
-      RIC: ZONE.NORTH_AMERICA,
-      RIX: ZONE.EUROPE,
-      RUH: ZONE.MIDDLE_EAST,
-      RUN: ZONE.AFRICA,
-      SAN: ZONE.NORTH_AMERICA,
-      SAP: ZONE.SOUTH_AMERICA,
-      SAT: ZONE.NORTH_AMERICA,
-      SCL: ZONE.SOUTH_AMERICA,
-      SDQ: ZONE.NORTH_AMERICA,
-      SEA: ZONE.NORTH_AMERICA,
-      SFO: ZONE.NORTH_AMERICA,
-      SGN: ZONE.HONG_KONG,  // Ho Chi Minh, Vietnam -> AS_JAPAN
-      SHA: ZONE.HONG_KONG,
-      SIN: ZONE.HONG_KONG,  // Singapore -> AS_JAPAN
-      SJC: ZONE.NORTH_AMERICA,
-      SJK: ZONE.SOUTH_AMERICA,
-      SJO: ZONE.SOUTH_AMERICA,
-      SJP: ZONE.SOUTH_AMERICA,
-      SJU: ZONE.NORTH_AMERICA,
-      SJW: ZONE.HONG_KONG,
-      SKG: ZONE.EUROPE,
-      SKP: ZONE.EUROPE,
-      SLC: ZONE.NORTH_AMERICA,
-      SMF: ZONE.NORTH_AMERICA,
-      SOD: ZONE.SOUTH_AMERICA,
-      SOF: ZONE.EUROPE,
-      SSA: ZONE.SOUTH_AMERICA,
-      STI: ZONE.NORTH_AMERICA,
-      STL: ZONE.NORTH_AMERICA,
-      STR: ZONE.EUROPE,
-      SUV: ZONE.OCEANIA,
-      SYD: ZONE.OCEANIA,
-      SZX: ZONE.HONG_KONG,
-      TAO: ZONE.HONG_KONG,
-      TBS: ZONE.EUROPE,
-      TEN: ZONE.HONG_KONG,
-      TGU: ZONE.SOUTH_AMERICA,
-      TIA: ZONE.EUROPE,
-      TLH: ZONE.NORTH_AMERICA,
-      TLL: ZONE.EUROPE,
-      TLV: ZONE.MIDDLE_EAST,
-      TNA: ZONE.HONG_KONG,
-      TNR: ZONE.AFRICA,
-      TPA: ZONE.NORTH_AMERICA,
-      TPE: ZONE.HONG_KONG,  // Taipei, Taiwan -> AS_JAPAN
-      TUN: ZONE.AFRICA,
-      TXL: ZONE.EUROPE,
-      TYN: ZONE.HONG_KONG,
-      UDI: ZONE.SOUTH_AMERICA,
-      UIO: ZONE.SOUTH_AMERICA,
-      ULN: ZONE.ASIA,
-      URT: ZONE.HONG_KONG,  // Surat Thani, Thailand -> AS_JAPAN
-      VCP: ZONE.SOUTH_AMERICA,
-      VIE: ZONE.EUROPE,
-      VIX: ZONE.SOUTH_AMERICA,
-      VNO: ZONE.EUROPE,
-      VTE: ZONE.HONG_KONG,  // Vientiane, Laos -> AS_JAPAN
-      WAW: ZONE.EUROPE,
-      WDH: ZONE.AFRICA,
-      XAP: ZONE.SOUTH_AMERICA,
-      XFN: ZONE.HONG_KONG,
-      XIY: ZONE.HONG_KONG,
-      XNH: ZONE.HONG_KONG,
-      XNN: ZONE.HONG_KONG,
-      YHZ: ZONE.NORTH_AMERICA,
-      YOW: ZONE.NORTH_AMERICA,
-      YUL: ZONE.NORTH_AMERICA,
-      YVR: ZONE.NORTH_AMERICA,
-      YWG: ZONE.NORTH_AMERICA,
-      YXE: ZONE.NORTH_AMERICA,
-      YYC: ZONE.NORTH_AMERICA,
-      YYZ: ZONE.NORTH_AMERICA,
-      ZAG: ZONE.EUROPE,
-      ZDM: ZONE.MIDDLE_EAST,
-      ZRH: ZONE.EUROPE,
+      AAE: ZONE.AFRICA, // Annaba, Algeria
+      ABJ: ZONE.AFRICA, // Abidjan, Ivory Coast
+      ABQ: ZONE.NORTH_AMERICA, // Albuquerque, USA
+      ACC: ZONE.AFRICA, // Accra, Ghana
+      ADB: ZONE.EUROPE, // Izmir, Turkey
+      ADD: ZONE.AFRICA, // Addis Ababa, Ethiopia
+      ADL: ZONE.OCEANIA, // Adelaide, Australia
+      AKL: ZONE.OCEANIA, // Auckland, New Zealand
+      AKX: ZONE.ASIA, // Aktobe, Kazakhstan
+      ALA: ZONE.ASIA, // Almaty, Kazakhstan
+      ALG: ZONE.AFRICA, // Algiers, Algeria
+      AMD: ZONE.ASIA, // Ahmedabad, India
+      AMM: ZONE.EUROPE, // Amman, Jordan
+      AMS: ZONE.EUROPE, // Amsterdam, Netherlands
+      ANC: ZONE.NORTH_AMERICA, // Anchorage, USA
+      ARI: ZONE.SOUTH_AMERICA, // Arica, Chile
+      ARN: ZONE.EUROPE, // Stockholm, Sweden
+      ARU: ZONE.SOUTH_AMERICA, // Aracatuba, Brazil
+      ASK: ZONE.AFRICA, // Yamoussoukro, Ivory Coast
+      ASU: ZONE.SOUTH_AMERICA, // Asunción, Paraguay
+      ATH: ZONE.EUROPE, // Athens, Greece
+      ATL: ZONE.NORTH_AMERICA, // Atlanta, USA
+      AUS: ZONE.NORTH_AMERICA, // Austin, USA
+      BAH: ZONE.EUROPE, // Manama, Bahrain
+      BAQ: ZONE.SOUTH_AMERICA, // Barranquilla, Colombia
+      BCN: ZONE.EUROPE, // Barcelona, Spain
+      BEG: ZONE.EUROPE, // Belgrade, Serbia
+      BEL: ZONE.SOUTH_AMERICA, // Belém, Brazil
+      BGI: ZONE.NORTH_AMERICA, // Bridgetown, Barbados
+      BGR: ZONE.NORTH_AMERICA, // Bangor, USA
+      BGW: ZONE.MIDDLE_EAST, // Baghdad, Iraq
+      BHY: ZONE.HONG_KONG, // Beihai, China
+      BKK: ZONE.HONG_KONG, // Bangkok, Thailand
+      BLR: ZONE.ASIA, // Bangalore, India
+      BNA: ZONE.NORTH_AMERICA, // Nashville, USA
+      BNE: ZONE.OCEANIA, // Brisbane, Australia
+      BNU: ZONE.SOUTH_AMERICA, // Blumenau, Brazil
+      BOD: ZONE.EUROPE, // Bordeaux, France
+      BOG: ZONE.SOUTH_AMERICA, // Bogota, Colombia
+      BOM: ZONE.ASIA, // Mumbai, India
+      BOS: ZONE.NORTH_AMERICA, // Boston, USA
+      BRU: ZONE.EUROPE, // Brussels, Belgium
+      BSB: ZONE.SOUTH_AMERICA, // Brasilia, Brazil
+      BSR: ZONE.MIDDLE_EAST, // Basra, Iraq
+      BTS: ZONE.EUROPE, // Bratislava, Slovakia
+      BUD: ZONE.EUROPE, // Budapest, Hungary
+      BUF: ZONE.NORTH_AMERICA, // Buffalo, USA
+      BWN: ZONE.HONG_KONG, // Bandar Seri Begawan, Brunei
+      CAI: ZONE.AFRICA, // Cairo, Egypt
+      CAN: ZONE.HONG_KONG, // Guangzhou, China
+      CAW: ZONE.SOUTH_AMERICA, // Campos dos Goytacazes, Brazil
+      CBR: ZONE.OCEANIA, // Canberra, Australia
+      CCP: ZONE.SOUTH_AMERICA, // Concepción, Chile
+      CCU: ZONE.ASIA, // Kolkata, India
+      CDG: ZONE.EUROPE, // Paris, France
+      CEB: ZONE.HONG_KONG, // Cebu, Philippines
+      CFC: ZONE.SOUTH_AMERICA, // Cacador, Brazil
+      CGB: ZONE.SOUTH_AMERICA, // Cuiaba, Brazil
+      CGD: ZONE.HONG_KONG, // Changde, China
+      CGK: ZONE.HONG_KONG, // Jakarta, Indonesia
+      CGO: ZONE.HONG_KONG, // Zhengzhou, China
+      CGP: ZONE.ASIA, // Chittagong, Bangladesh
+      CGY: ZONE.HONG_KONG, // Cagayan de Oro, Philippines
+      CHC: ZONE.OCEANIA, // Christchurch, New Zealand
+      CKG: ZONE.HONG_KONG, // Chongqing, China
+      CLE: ZONE.NORTH_AMERICA, // Cleveland, USA
+      CLO: ZONE.SOUTH_AMERICA, // Cali, Colombia
+      CLT: ZONE.NORTH_AMERICA, // Charlotte, USA
+      CMB: ZONE.ASIA, // Colombo, Sri Lanka
+      CMH: ZONE.NORTH_AMERICA, // Columbus, USA
+      CNF: ZONE.SOUTH_AMERICA, // Belo Horizonte, Brazil
+      CNN: ZONE.ASIA, // Kannur, India
+      CNX: ZONE.HONG_KONG, // Chiang Mai, Thailand
+      COK: ZONE.ASIA, // Kochi, India
+      COR: ZONE.SOUTH_AMERICA, // Córdoba, Argentina
+      CPH: ZONE.EUROPE, // Copenhagen, Denmark
+      CPT: ZONE.AFRICA, // Cape Town, South Africa
+      CRK: ZONE.HONG_KONG, // Tarlac City (Clark), Philippines
+      CSX: ZONE.HONG_KONG, // Changsha, China
+      CWB: ZONE.SOUTH_AMERICA, // Curitiba, Brazil
+      CZL: ZONE.AFRICA, // Constantine, Algeria
+      CZX: ZONE.HONG_KONG, // Changzhou, China
+      DAC: ZONE.ASIA, // Dhaka, Bangladesh
+      DAD: ZONE.HONG_KONG, // Da Nang, Vietnam
+      DAR: ZONE.AFRICA, // Dar es Salaam, Tanzania
+      DEL: ZONE.ASIA, // New Delhi, India
+      DEN: ZONE.NORTH_AMERICA, // Denver, USA
+      DFW: ZONE.NORTH_AMERICA, // Dallas, USA
+      DKR: ZONE.AFRICA, // Dakar, Senegal
+      DLC: ZONE.HONG_KONG, // Dalian, China
+      DME: ZONE.EUROPE, // Moscow, Russia
+      DMM: ZONE.MIDDLE_EAST, // Dammam, Saudi Arabia
+      DOH: ZONE.MIDDLE_EAST, // Doha, Qatar
+      DPS: ZONE.HONG_KONG, // Denpasar (Bali), Indonesia
+      DTW: ZONE.NORTH_AMERICA, // Detroit, USA
+      DUB: ZONE.EUROPE, // Dublin, Ireland
+      DUR: ZONE.AFRICA, // Durban, South Africa
+      DUS: ZONE.EUROPE, // Düsseldorf, Germany
+      DXB: ZONE.MIDDLE_EAST, // Dubai, UAE
+      EBB: ZONE.AFRICA, // Kampala, Uganda
+      EBL: ZONE.MIDDLE_EAST, // Erbil, Iraq
+      EVN: ZONE.ASIA, // Yerevan, Armenia
+      EWR: ZONE.NORTH_AMERICA, // Newark, USA
+      EZE: ZONE.SOUTH_AMERICA, // Buenos Aires, Argentina
+      FCO: ZONE.EUROPE, // Rome, Italy
+      FIH: ZONE.AFRICA, // Kinshasa, DR Congo
+      FLN: ZONE.SOUTH_AMERICA, // Florianopolis, Brazil
+      FOC: ZONE.HONG_KONG, // Fuzhou, China
+      FOR: ZONE.SOUTH_AMERICA, // Fortaleza, Brazil
+      FRA: ZONE.EUROPE, // Frankfurt, Germany
+      FRU: ZONE.ASIA, // Bishkek, Kyrgyzstan
+      FSD: ZONE.NORTH_AMERICA, // Sioux Falls, USA
+      FUK: ZONE.HONG_KONG, // Fukuoka, Japan
+      FUO: ZONE.HONG_KONG, // Foshan, China
+      GBE: ZONE.AFRICA, // Gaborone, Botswana
+      GDL: ZONE.NORTH_AMERICA, // Guadalajara, Mexico
+      GEO: ZONE.SOUTH_AMERICA, // Georgetown, Guyana
+      GIG: ZONE.SOUTH_AMERICA, // Rio de Janeiro, Brazil
+      GND: ZONE.SOUTH_AMERICA, // St. George's, Grenada
+      GOT: ZONE.EUROPE, // Gothenburg, Sweden
+      GRU: ZONE.SOUTH_AMERICA, // São Paulo, Brazil
+      GUA: ZONE.NORTH_AMERICA, // Guatemala City, Guatemala
+      GUM: ZONE.ASIA, // Hagatna, Guam
+      GVA: ZONE.EUROPE, // Geneva, Switzerland
+      GYD: ZONE.ASIA, // Baku, Azerbaijan
+      GYE: ZONE.SOUTH_AMERICA, // Guayaquil, Ecuador
+      GYN: ZONE.SOUTH_AMERICA, // Goiania, Brazil
+      HAK: ZONE.HONG_KONG, // Chengmai (Haikou), China
+      HAM: ZONE.EUROPE, // Hamburg, Germany
+      HAN: ZONE.HONG_KONG, // Hanoi, Vietnam
+      HBA: ZONE.OCEANIA, // Hobart, Australia
+      HEL: ZONE.EUROPE, // Helsinki, Finland
+      HFA: ZONE.MIDDLE_EAST, // Haifa, Israel
+      HGH: ZONE.HONG_KONG, // Shaoxing (Hangzhou), China
+      HKG: ZONE.HONG_KONG, // Hong Kong
+      HNL: ZONE.NORTH_AMERICA, // Honolulu, USA
+      HRE: ZONE.AFRICA, // Harare, Zimbabwe
+      HYD: ZONE.ASIA, // Hyderabad, India
+      HYN: ZONE.ASIA, // Taizhou, China
+      IAD: ZONE.NORTH_AMERICA, // Ashburn (Washington DC), USA
+      IAH: ZONE.NORTH_AMERICA, // Houston, USA
+      ICN: ZONE.HONG_KONG, // Seoul, South Korea
+      IND: ZONE.NORTH_AMERICA, // Indianapolis, USA
+      ISB: ZONE.ASIA, // Islamabad, Pakistan
+      IST: ZONE.EUROPE, // Istanbul, Turkey
+      ISU: ZONE.MIDDLE_EAST, // Sulaymaniyah, Iraq
+      ITJ: ZONE.SOUTH_AMERICA, // Itajai, Brazil
+      IXC: ZONE.ASIA, // Chandigarh, India
+      JAX: ZONE.NORTH_AMERICA, // Jacksonville, USA
+      JDO: ZONE.SOUTH_AMERICA, // Juazeiro do Norte, Brazil
+      JED: ZONE.MIDDLE_EAST, // Jeddah, Saudi Arabia
+      JHB: ZONE.HONG_KONG, // Johor Bahru, Malaysia
+      JIB: ZONE.AFRICA, // Djibouti
+      JNB: ZONE.AFRICA, // Johannesburg, South Africa
+      JOG: ZONE.HONG_KONG, // Yogyakarta, Indonesia
+      JOI: ZONE.SOUTH_AMERICA, // Joinville, Brazil
+      JXG: ZONE.ASIA, // Jiaxing, China
+      KBP: ZONE.EUROPE, // Kyiv, Ukraine
+      KCH: ZONE.HONG_KONG, // Kuching, Malaysia
+      KEF: ZONE.EUROPE, // Reykjavík, Iceland
+      KGL: ZONE.AFRICA, // Kigali, Rwanda
+      KHH: ZONE.HONG_KONG, // Kaohsiung City, Taiwan
+      KHI: ZONE.ASIA, // Karachi, Pakistan
+      KHN: ZONE.HONG_KONG, // Nanchang, China
+      KIN: ZONE.NORTH_AMERICA, // Kingston, Jamaica
+      KIV: ZONE.EUROPE, // Chișinău, Moldova
+      KIX: ZONE.HONG_KONG, // Osaka, Japan
+      KJA: ZONE.ASIA, // Krasnoyarsk, Russia
+      KMG: ZONE.HONG_KONG, // Kunming, China
+      KNU: ZONE.ASIA, // Kanpur, India
+      KTM: ZONE.ASIA, // Kathmandu, Nepal
+      KUL: ZONE.HONG_KONG, // Kuala Lumpur, Malaysia
+      KWE: ZONE.HONG_KONG, // Guiyang, China
+      KWI: ZONE.MIDDLE_EAST, // Kuwait City, Kuwait
+      LAD: ZONE.AFRICA, // Luanda, Angola
+      LAS: ZONE.NORTH_AMERICA, // Las Vegas, USA
+      LAX: ZONE.NORTH_AMERICA, // Los Angeles, USA
+      LCA: ZONE.EUROPE, // Nicosia, Cyprus
+      LED: ZONE.EUROPE, // Saint Petersburg, Russia
+      LHR: ZONE.EUROPE, // London, UK
+      LIM: ZONE.SOUTH_AMERICA, // Lima, Peru
+      LIS: ZONE.EUROPE, // Lisbon, Portugal
+      LLK: ZONE.ASIA, // Astara, Azerbaijan
+      LLW: ZONE.AFRICA, // Lilongwe, Malawi
+      LOS: ZONE.AFRICA, // Lagos, Nigeria
+      LPB: ZONE.SOUTH_AMERICA, // La Paz, Bolivia
+      LUN: ZONE.AFRICA, // Lusaka, Zambia
+      LUX: ZONE.EUROPE, // Luxembourg City, Luxembourg
+      LYS: ZONE.EUROPE, // Lyon, France
+      MAA: ZONE.ASIA, // Chennai, India
+      MAD: ZONE.EUROPE, // Madrid, Spain
+      MAN: ZONE.EUROPE, // Manchester, UK
+      MAO: ZONE.SOUTH_AMERICA, // Manaus, Brazil
+      MBA: ZONE.AFRICA, // Mombasa, Kenya
+      MCI: ZONE.NORTH_AMERICA, // Kansas City, USA
+      MCT: ZONE.MIDDLE_EAST, // Muscat, Oman
+      MDE: ZONE.SOUTH_AMERICA, // Medellín, Colombia
+      MEL: ZONE.OCEANIA, // Melbourne, Australia
+      MEM: ZONE.NORTH_AMERICA, // Memphis, USA
+      MEX: ZONE.NORTH_AMERICA, // Mexico City, Mexico
+      MFM: ZONE.HONG_KONG, // Macau
+      MIA: ZONE.NORTH_AMERICA, // Miami, USA
+      MLE: ZONE.ASIA, // Male, Maldives
+      MNL: ZONE.HONG_KONG, // Manila, Philippines
+      MPM: ZONE.AFRICA, // Maputo, Mozambique
+      MRS: ZONE.EUROPE, // Marseille, France
+      MRU: ZONE.AFRICA, // Port Louis, Mauritius
+      MSP: ZONE.NORTH_AMERICA, // Minneapolis, USA
+      MSQ: ZONE.EUROPE, // Minsk, Belarus
+      MUC: ZONE.EUROPE, // Munich, Germany
+      MXP: ZONE.EUROPE, // Milan, Italy
+      NAG: ZONE.ASIA, // Nagpur, India
+      NBO: ZONE.AFRICA, // Nairobi, Kenya
+      NJF: ZONE.MIDDLE_EAST, // Najaf, Iraq
+      NNG: ZONE.HONG_KONG, // Nanning, China
+      NOU: ZONE.OCEANIA, // Noumea, New Caledonia
+      NQN: ZONE.SOUTH_AMERICA, // Neuquen, Argentina
+      NQZ: ZONE.ASIA, // Astana, Kazakhstan
+      NRT: ZONE.HONG_KONG, // Tokyo Narita, Japan
+      NVT: ZONE.SOUTH_AMERICA, // Timbo (Navegantes), Brazil
+      OKA: ZONE.HONG_KONG, // Naha (Okinawa), Japan
+      OKC: ZONE.NORTH_AMERICA, // Oklahoma City, USA
+      OMA: ZONE.NORTH_AMERICA, // Omaha, USA
+      ORD: ZONE.NORTH_AMERICA, // Chicago, USA
+      ORF: ZONE.NORTH_AMERICA, // Norfolk, USA
+      ORN: ZONE.AFRICA, // Oran, Algeria
+      OSL: ZONE.EUROPE, // Oslo, Norway
+      OTP: ZONE.EUROPE, // Bucharest, Romania
+      OUA: ZONE.AFRICA, // Ouagadougou, Burkina Faso
+      PAT: ZONE.ASIA, // Patna, India
+      PBH: ZONE.ASIA, // Thimphu, Bhutan
+      PBM: ZONE.SOUTH_AMERICA, // Paramaribo, Suriname
+      PDX: ZONE.NORTH_AMERICA, // Portland, USA
+      PER: ZONE.OCEANIA, // Perth, Australia
+      PHL: ZONE.NORTH_AMERICA, // Philadelphia, USA
+      PHX: ZONE.NORTH_AMERICA, // Phoenix, USA
+      PIT: ZONE.NORTH_AMERICA, // Pittsburgh, USA
+      PKX: ZONE.HONG_KONG, // Langfang (Beijing), China
+      PMO: ZONE.EUROPE, // Palermo, Italy
+      PMW: ZONE.SOUTH_AMERICA, // Palmas, Brazil
+      PNH: ZONE.HONG_KONG, // Phnom Penh, Cambodia
+      POA: ZONE.SOUTH_AMERICA, // Porto Alegre, Brazil
+      POS: ZONE.SOUTH_AMERICA, // Port of Spain, Trinidad
+      PPT: ZONE.OCEANIA, // Tahiti, French Polynesia
+      PRG: ZONE.EUROPE, // Prague, Czech Republic
+      PTY: ZONE.SOUTH_AMERICA, // Panama City, Panama
+      QRO: ZONE.NORTH_AMERICA, // Queretaro, Mexico
+      QWJ: ZONE.SOUTH_AMERICA, // Americana, Brazil
+      RAO: ZONE.SOUTH_AMERICA, // Ribeirao Preto, Brazil
+      RDU: ZONE.NORTH_AMERICA, // Durham (Raleigh), USA
+      REC: ZONE.SOUTH_AMERICA, // Recife, Brazil
+      RIC: ZONE.NORTH_AMERICA, // Richmond, USA
+      RIX: ZONE.EUROPE, // Riga, Latvia
+      RUH: ZONE.MIDDLE_EAST, // Riyadh, Saudi Arabia
+      RUN: ZONE.AFRICA, // Saint-Denis, Réunion
+      SAN: ZONE.NORTH_AMERICA, // San Diego, USA
+      SAP: ZONE.SOUTH_AMERICA, // San Pedro Sula, Honduras
+      SAT: ZONE.NORTH_AMERICA, // San Antonio, USA
+      SCL: ZONE.SOUTH_AMERICA, // Santiago, Chile
+      SDQ: ZONE.NORTH_AMERICA, // Santo Domingo, Dominican Republic
+      SEA: ZONE.NORTH_AMERICA, // Seattle, USA
+      SFO: ZONE.NORTH_AMERICA, // San Francisco, USA
+      SGN: ZONE.HONG_KONG, // Ho Chi Minh City, Vietnam
+      SHA: ZONE.HONG_KONG, // Shanghai, China
+      SIN: ZONE.HONG_KONG, // Singapore
+      SJC: ZONE.NORTH_AMERICA, // San Jose, USA
+      SJK: ZONE.SOUTH_AMERICA, // São José dos Campos, Brazil
+      SJO: ZONE.SOUTH_AMERICA, // San José, Costa Rica
+      SJP: ZONE.SOUTH_AMERICA, // São José do Rio Preto, Brazil
+      SJU: ZONE.NORTH_AMERICA, // San Juan, Puerto Rico
+      SJW: ZONE.HONG_KONG, // Shijiazhuang, China
+      SKG: ZONE.EUROPE, // Thessaloniki, Greece
+      SKP: ZONE.EUROPE, // Skopje, North Macedonia
+      SLC: ZONE.NORTH_AMERICA, // Salt Lake City, USA
+      SMF: ZONE.NORTH_AMERICA, // Sacramento, USA
+      SOD: ZONE.SOUTH_AMERICA, // Sorocaba, Brazil
+      SOF: ZONE.EUROPE, // Sofia, Bulgaria
+      SSA: ZONE.SOUTH_AMERICA, // Salvador, Brazil
+      STI: ZONE.NORTH_AMERICA, // Santiago de los Caballeros, Dominican Republic
+      STL: ZONE.NORTH_AMERICA, // St. Louis, USA
+      STR: ZONE.EUROPE, // Stuttgart, Germany
+      SUV: ZONE.OCEANIA, // Suva, Fiji
+      SYD: ZONE.OCEANIA, // Sydney, Australia
+      SZX: ZONE.HONG_KONG, // Shenzhen, China
+      TAO: ZONE.HONG_KONG, // Qingdao, China
+      TBS: ZONE.EUROPE, // Tbilisi, Georgia
+      TEN: ZONE.HONG_KONG, // Tongren, China
+      TGU: ZONE.SOUTH_AMERICA, // Tegucigalpa, Honduras
+      TIA: ZONE.EUROPE, // Tirana, Albania
+      TLH: ZONE.NORTH_AMERICA, // Tallahassee, USA
+      TLL: ZONE.EUROPE, // Tallinn, Estonia
+      TLV: ZONE.MIDDLE_EAST, // Tel Aviv, Israel
+      TNA: ZONE.HONG_KONG, // Zibo (Jinan), China
+      TNR: ZONE.AFRICA, // Antananarivo, Madagascar
+      TPA: ZONE.NORTH_AMERICA, // Tampa, USA
+      TPE: ZONE.HONG_KONG, // Taipei, Taiwan
+      TUN: ZONE.AFRICA, // Tunis, Tunisia
+      TXL: ZONE.EUROPE, // Berlin, Germany
+      TYN: ZONE.HONG_KONG, // Yangquan (Taiyuan), China
+      UDI: ZONE.SOUTH_AMERICA, // Uberlandia, Brazil
+      UIO: ZONE.SOUTH_AMERICA, // Quito, Ecuador
+      ULN: ZONE.ASIA, // Ulaanbaatar, Mongolia
+      URT: ZONE.HONG_KONG, // Surat Thani, Thailand
+      VCP: ZONE.SOUTH_AMERICA, // Campinas, Brazil
+      VIE: ZONE.EUROPE, // Vienna, Austria
+      VIX: ZONE.SOUTH_AMERICA, // Vitoria, Brazil
+      VNO: ZONE.EUROPE, // Vilnius, Lithuania
+      VTE: ZONE.HONG_KONG, // Vientiane, Laos
+      WAW: ZONE.EUROPE, // Warsaw, Poland
+      WDH: ZONE.AFRICA, // Windhoek, Namibia
+      XAP: ZONE.SOUTH_AMERICA, // Chapeco, Brazil
+      XFN: ZONE.HONG_KONG, // Xiangyang, China
+      XIY: ZONE.HONG_KONG, // Baoji (Xi'an), China
+      XNH: ZONE.HONG_KONG, // Nasiriyah, Iraq
+      XNN: ZONE.HONG_KONG, // Xining, China
+      YHZ: ZONE.NORTH_AMERICA, // Halifax, Canada
+      YOW: ZONE.NORTH_AMERICA, // Ottawa, Canada
+      YUL: ZONE.NORTH_AMERICA, // Montréal, Canada
+      YVR: ZONE.NORTH_AMERICA, // Vancouver, Canada
+      YWG: ZONE.NORTH_AMERICA, // Winnipeg, Canada
+      YXE: ZONE.NORTH_AMERICA, // Saskatoon, Canada
+      YYC: ZONE.NORTH_AMERICA, // Calgary, Canada
+      YYZ: ZONE.NORTH_AMERICA, // Toronto, Canada
+      ZAG: ZONE.EUROPE, // Zagreb, Croatia
+      ZDM: ZONE.MIDDLE_EAST, // Ramallah, Palestine
+      ZRH: ZONE.EUROPE, // Zurich, Switzerland
     }
 
-    // Fallback order for each zone (if primary times out after 500ms, try next)
+    // Fallback order for each zone
     const zoneFallbackUrls = {
       [ZONE.HONG_KONG]: [WORKER_URL.HONG_KONG, WORKER_URL.ASIA, WORKER_URL.EUROPE],
       [ZONE.ASIA]: [WORKER_URL.ASIA, WORKER_URL.HONG_KONG, WORKER_URL.EUROPE],
@@ -377,39 +430,59 @@ export default {
       [ZONE.OCEANIA]: [WORKER_URL.OCEANIA, WORKER_URL.HONG_KONG, WORKER_URL.ASIA],
     }
 
-    const TIMEOUT_MS = 500
-
     // Use the cf object to obtain the colo of the request
     // colo: The three-letter IATA airport code of the data center that the request hit, for example, "DFW".
     // more on the cf object: https://developers.cloudflare.com/workers/runtime-apis/request#incomingrequestcfproperties
-    const zone = coloToZone[request.cf.colo] ?? ZONE.EUROPE
+    const colo = request.cf.colo
+    const zone = coloToZone[colo] ?? ZONE.EUROPE
     const url = new URL(request.url)
     const pathWithQuery = url.pathname + url.search
 
     const fallbackUrls = zoneFallbackUrls[zone] || [WORKER_URL.EUROPE]
 
-    for (let attemptIndex = 0; attemptIndex < fallbackUrls.length; attemptIndex++) {
-      const workerUrl = fallbackUrls[attemptIndex]
-      const isFinalAttempt = attemptIndex === fallbackUrls.length - 1
+    for (const workerUrl of fallbackUrls) {
+      // Skip unhealthy workers (circuit is open)
+      const healthy = await isHealthy(colo, workerUrl)
+      if (!healthy) {
+        console.log(`Skipping ${workerUrl} (circuit open for ${colo})`)
+        continue
+      }
 
       try {
         const abortController = new AbortController()
-        const timeoutId = isFinalAttempt ? null : setTimeout(() => abortController.abort(), TIMEOUT_MS)
+        const timeoutId = setTimeout(() => abortController.abort(), TIMEOUT_MS)
 
         const response = await fetch(`${workerUrl}${pathWithQuery}`, {
-          ...request,
-          signal: isFinalAttempt ? undefined : abortController.signal,
+          method: request.method,
+          headers: request.headers,
+          body: request.body,
+          signal: abortController.signal,
         })
 
-        if (timeoutId) clearTimeout(timeoutId)
+        clearTimeout(timeoutId)
 
+        // Check for server errors (5xx) - infrastructure problem
+        if (response.status >= 500) {
+          console.log(`${workerUrl} returned ${response.status}, marking unhealthy`)
+          await markUnhealthy(colo, workerUrl)
+          continue // try fallback
+        }
+
+        // Success (2xx, 3xx, 4xx) - worker is healthy
+        await markHealthy(colo, workerUrl)
         console.log(`Request served by ${workerUrl}`)
         return response
-      } catch (error) {
-        console.log(`${workerUrl} failed: ${error.message}, trying fallback...`)
+      }
+      catch (error) {
+        // Network failure or timeout - mark unhealthy
+        console.log(`${workerUrl} failed: ${error.message}, marking unhealthy`)
+        await markUnhealthy(colo, workerUrl)
+        // continue to next fallback
       }
     }
 
+    // All workers failed or are unhealthy - try the original request as last resort
+    console.log('All workers failed, falling back to original request')
     return fetch(request)
   },
 }

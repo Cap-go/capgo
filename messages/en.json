@@ -906,6 +906,8 @@
   "notifications-weekly-stats-desc": "Receive weekly email summaries of your app usage",
   "notifications-monthly-stats": "Monthly statistics",
   "notifications-monthly-stats-desc": "Receive monthly email summaries of bundles and deployments",
+  "notifications-billing-period-stats": "Billing period statistics",
+  "notifications-billing-period-stats-desc": "Receive usage statistics on your billing anniversary date with plan upgrade recommendations",
   "notifications-issues": "Issues & Errors",
   "notifications-device-error": "Device update errors",
   "notifications-device-error-desc": "Receive emails when devices fail to update",
@@ -924,6 +926,7 @@
   "org-notifications-deploy-stats-desc": "Send 24-hour deployment statistics to the organization's management email",
   "org-notifications-weekly-stats-desc": "Send weekly statistics to the organization's management email",
   "org-notifications-monthly-stats-desc": "Send monthly statistics to the organization's management email",
+  "org-notifications-billing-period-stats-desc": "Send billing period usage statistics to the organization's management email with plan upgrade recommendations",
   "org-notifications-device-error-desc": "Send device update error notifications to the organization's management email",
   "org-notifications-channel-self-rejected-desc": "Send channel self-assignment rejection notifications to the organization's management email",
   "org-notifications-onboarding-desc": "Send onboarding reminders to the organization's management email",
@@ -1283,6 +1286,8 @@
   "you-can-still-join-capgo": "You can still join  Capgo, but you won't be a member of the organization that originally invited you.",
   "you-cannot-reuse": "You cannot reuse this bundle version after deletion",
   "you-reached-the-limi": "Limit reached",
+  "limit-reached-no-credits": "Plan limit reached - Top up credits now",
+  "limit-reached-with-credits": "Usage paid with credits",
   "your-role-in-org": "Your role in the organization",
   "your-settings": "Your settings",
   "your-usage": "Your usage:",
@@ -1340,5 +1345,10 @@
   "invalid-password": "Invalid password",
   "password-does-not-meet-requirements": "Your password does not meet the organization's requirements. Please change your password.",
   "verification-failed": "Verification failed",
-  "no-organization-selected": "No organization selected"
+  "no-organization-selected": "No organization selected",
+  "assigned": "Assigned",
+  "removed": "Removed",
+  "event": "Event",
+  "by": "By",
+  "date": "Date"
 }
