@@ -19,6 +19,12 @@ import { app as storeTop } from '../_backend/private/store_top.ts'
 import { app as stripe_checkout } from '../_backend/private/stripe_checkout.ts'
 import { app as stripe_portal } from '../_backend/private/stripe_portal.ts'
 import { app as upload_link } from '../_backend/private/upload_link.ts'
+// SSO SAML endpoints
+import { app as sso_configure } from '../_backend/private/sso_configure.ts'
+import { app as sso_remove } from '../_backend/private/sso_remove.ts'
+import { app as sso_status } from '../_backend/private/sso_status.ts'
+import { app as sso_test } from '../_backend/private/sso_test.ts'
+import { app as sso_update } from '../_backend/private/sso_update.ts'
 import { createAllCatch, createHono } from '../_backend/utils/hono.ts'
 import { version } from '../_backend/utils/version.ts'
 
@@ -47,6 +53,13 @@ appGlobal.route('/latency', latency)
 appGlobal.route('/events', events)
 appGlobal.route('/invite_new_user_to_org', invite_new_user_to_org)
 appGlobal.route('/accept_invitation', accept_invitation)
+
+// SSO SAML routes
+appGlobal.route('/sso/configure', sso_configure)
+appGlobal.route('/sso/update', sso_update)
+appGlobal.route('/sso/remove', sso_remove)
+appGlobal.route('/sso/test', sso_test)
+appGlobal.route('/sso/status', sso_status)
 
 createAllCatch(appGlobal, functionName)
 Deno.serve(appGlobal.fetch)
