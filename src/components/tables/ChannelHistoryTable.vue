@@ -223,7 +223,6 @@ async function fetchHistory() {
     const versionIds = new Set<number>()
     for (const audit of (auditData || [])) {
       const newRecord = audit.new_record as Record<string, unknown> | null
-      const oldRecord = audit.old_record as Record<string, unknown> | null
       if (audit.operation === 'INSERT' && newRecord?.version)
         versionIds.add(Number(newRecord.version))
       if (audit.changed_fields?.includes('version') && newRecord?.version)
