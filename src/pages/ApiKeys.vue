@@ -40,6 +40,25 @@ const limitToOrgCheckbox = ref(false)
 // State for API key type selection
 const selectedKeyType = ref('')
 
+// State for expiration date
+const setExpirationCheckbox = ref(false)
+const expirationDate = ref('')
+
+// Computed properties for expiration date limits
+const minExpirationDate = computed(() => {
+  const tomorrow = new Date()
+  tomorrow.setDate(tomorrow.getDate() + 1)
+  return tomorrow.toISOString().split('T')[0]
+})
+
+// Check if a key is expired
+function isKeyExpired(expiresAt: string | null): boolean {
+  if (!expiresAt)
+    return false
+
+  return new Date(expiresAt) < new Date()
+}
+
 // State for hashed key creation
 const createAsHashed = ref(false)
 
@@ -262,6 +281,19 @@ columns.value = [
     },
   },
   {
+    key: 'expires_at',
+    label: t('expires'),
+    sortable: true,
+    displayFunction: (row: Database['public']['Tables']['apikeys']['Row']) => {
+      if (!row.expires_at)
+        return t('never')
+
+      const expired = isKeyExpired(row.expires_at)
+      const dateStr = formatLocalDate(row.expires_at)
+      return expired ? `${dateStr} (${t('expired')})` : dateStr
+    },
+  },
+  {
     key: 'limited_to_orgs',
     label: t('organizations'),
     displayFunction: (row: Database['public']['Tables']['apikeys']['Row']) => {
@@ -379,6 +411,12 @@ async function createApiKey(keyType: 'read' | 'write' | 'all' | 'upload') {
     }
   }
 
+  // Get expiration date if set
+  let expiresAt: string | null = null
+  if (setExpirationCheckbox.value && expirationDate.value) {
+    expiresAt = new Date(expirationDate.value).toISOString()
+  }
+
   try {
     const newApiKey = crypto.randomUUID()
     const { data: { user } } = await supabase.auth.getUser()
@@ -402,6 +440,7 @@ async function createApiKey(keyType: 'read' | 'write' | 'all' | 'upload') {
           name: newApiKeyName.value.trim(),
           limited_to_orgs: finalSelectedOrganizations.length > 0 ? finalSelectedOrganizations : [],
           limited_to_apps: finalSelectedApps.length > 0 ? finalSelectedApps.map(app => app.app_id) : [],
+          expires_at: expiresAt,
           hashed: true,
         },
       })
@@ -426,6 +465,7 @@ async function createApiKey(keyType: 'read' | 'write' | 'all' | 'upload') {
           name: newApiKeyName.value.trim(),
           limited_to_orgs: finalSelectedOrganizations.length > 0 ? finalSelectedOrganizations : [],
           limited_to_apps: finalSelectedApps.length > 0 ? finalSelectedApps.map(app => app.app_id) : [],
+          expires_at: expiresAt,
         })
         .select()
 
@@ -494,6 +534,8 @@ async function addNewApiKey() {
   limitToAppCheckbox.value = false
   createAsHashed.value = false
   newApiKeyName.value = ''
+  setExpirationCheckbox.value = false
+  expirationDate.value = ''
 
   // Load all apps for selection
   await loadAllApps()
@@ -981,6 +1023,31 @@ getKeys()
               </label>
             </div>
           </div>
+        </div>
+
+        <!-- Set Expiration Date -->
+        <div class="flex gap-2 items-center">
+          <input
+            id="set-expiration"
+            v-model="setExpirationCheckbox"
+            type="checkbox"
+            class="border-gray-500 dark:border-gray-700 checkbox"
+          >
+          <label for="set-expiration" class="text-sm">
+            {{ t('set-expiration-date') }}
+          </label>
+        </div>
+        <div v-if="setExpirationCheckbox" class="pl-6">
+          <FormKit
+            v-model="expirationDate"
+            type="date"
+            :label="t('expiration-date')"
+            :min="minExpirationDate"
+            validation="required"
+            :validation-messages="{
+              required: t('expiration-date-required'),
+            }"
+          />
         </div>
       </div>
     </Teleport>

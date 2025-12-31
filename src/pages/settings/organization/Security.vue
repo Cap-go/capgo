@@ -67,6 +67,10 @@ const affectedMembers = ref<Array<{ email: string, first_name: string | null, la
 const membersWithPasswordPolicyStatus = ref<MemberWithPasswordPolicyStatus[]>([])
 const nonCompliantPasswordMembers = ref<MemberWithPasswordPolicyStatus[]>([])
 
+// API key expiration policy state
+const requireApikeyExpiration = ref(false)
+const maxApikeyExpirationDays = ref<number | null>(null)
+
 const hasOrgPerm = computed(() => {
   return organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['super_admin'])
 })
@@ -138,6 +142,12 @@ function loadPolicyFromOrg() {
   }
 }
 
+// Load API key expiration policy settings
+function loadApikeyPolicyFromOrg() {
+  requireApikeyExpiration.value = currentOrganization.value?.require_apikey_expiration ?? false
+  maxApikeyExpirationDays.value = currentOrganization.value?.max_apikey_expiration_days ?? null
+}
+
 async function loadData() {
   if (!currentOrganization.value?.gid)
     return
@@ -166,6 +176,9 @@ async function loadData() {
 
     // Load password policy settings
     loadPolicyFromOrg()
+
+    // Load API key expiration policy settings
+    loadApikeyPolicyFromOrg()
 
     // Load members with their password policy compliance status
     await loadMembersWithPasswordPolicyStatus()
@@ -549,6 +562,38 @@ async function handleSettingChange() {
   if (policyEnabled.value) {
     await updatePasswordPolicy()
   }
+}
+
+// Save API key expiration policy
+async function saveApikeyPolicy() {
+  if (!currentOrganization.value || !hasOrgPerm.value) {
+    toast.error(t('no-permission'))
+    return
+  }
+
+  isSaving.value = true
+
+  const { error } = await supabase
+    .from('orgs')
+    .update({
+      require_apikey_expiration: requireApikeyExpiration.value,
+      max_apikey_expiration_days: maxApikeyExpirationDays.value,
+    })
+    .eq('id', currentOrganization.value.gid)
+
+  isSaving.value = false
+
+  if (error) {
+    toast.error(t('error-saving-settings'))
+    console.error('Failed to update API key policy:', error)
+    // Reload to revert optimistic updates
+    await organizationStore.fetchOrganizations()
+    loadApikeyPolicyFromOrg()
+    return
+  }
+
+  toast.success(t('api-key-policy-updated'))
+  await organizationStore.fetchOrganizations()
 }
 
 watch(currentOrganization, loadData)
@@ -968,6 +1013,67 @@ onMounted(async () => {
                   {{ t('password-policy-all-members-compliant') }}
                 </p>
               </div>
+            </div>
+          </section>
+
+          <!-- API Key Expiration Policy Section -->
+          <section v-if="hasOrgPerm" class="p-6 border rounded-lg border-slate-200 dark:border-slate-700">
+            <h3 class="mb-4 text-lg font-semibold dark:text-white text-slate-800">
+              {{ t('api-key-policy') }}
+            </h3>
+
+            <p class="mb-4 text-sm text-gray-600 dark:text-gray-400">
+              {{ t('api-key-policy-description') }}
+            </p>
+
+            <div class="space-y-4">
+              <!-- Require API key expiration toggle -->
+              <div class="flex items-center justify-between p-3 rounded-lg bg-gray-50 dark:bg-gray-700/50">
+                <div>
+                  <span class="font-medium dark:text-white text-slate-800">{{ t('require-apikey-expiration') }}</span>
+                  <p class="text-sm text-gray-500 dark:text-gray-400">
+                    {{ t('require-apikey-expiration-description') }}
+                  </p>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer">
+                  <input
+                    v-model="requireApikeyExpiration"
+                    type="checkbox"
+                    :disabled="isSaving"
+                    class="sr-only peer"
+                    @change="saveApikeyPolicy"
+                  >
+                  <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-600 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-500 peer-checked:bg-blue-600 peer-disabled:opacity-50 peer-disabled:cursor-not-allowed" />
+                </label>
+              </div>
+
+              <!-- Max expiration days (shown when require expiration is enabled) -->
+              <div v-if="requireApikeyExpiration" class="pl-4 border-l-2 border-blue-500">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <label class="dark:text-white text-slate-800">{{ t('max-apikey-expiration-days') }}</label>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">
+                      {{ t('max-apikey-expiration-days-help') }}
+                    </p>
+                  </div>
+                  <input
+                    v-model.number="maxApikeyExpirationDays"
+                    type="number"
+                    min="1"
+                    max="365"
+                    :placeholder="t('max-apikey-expiration-days-placeholder')"
+                    :disabled="isSaving"
+                    class="w-24 px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white disabled:opacity-50"
+                    @change="saveApikeyPolicy"
+                  >
+                </div>
+              </div>
+            </div>
+
+            <!-- Saving Indicator -->
+            <div v-if="isSaving" class="flex items-center mt-4 space-x-2 text-sm text-gray-500 dark:text-gray-400">
+              <Spinner size="w-4 h-4" color="fill-blue-500 text-gray-200" />
+              <span>{{ t('saving') }}...</span>
             </div>
           </section>
 

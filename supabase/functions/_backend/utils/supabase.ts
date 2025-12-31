@@ -261,6 +261,30 @@ export function apikeyHasOrgRight(key: Database['public']['Tables']['apikeys']['
   return key.limited_to_orgs.includes(orgId)
 }
 
+/**
+ * Check if API key has org access AND meets org's API key policy requirements
+ * Returns { valid: true } if all checks pass, or { valid: false, error: string } if not
+ */
+export async function apikeyHasOrgRightWithPolicy(
+  c: Context,
+  key: Database['public']['Tables']['apikeys']['Row'],
+  orgId: string,
+  supabase: SupabaseClient<Database>,
+): Promise<{ valid: boolean, error?: string }> {
+  // First check basic org access
+  if (!apikeyHasOrgRight(key, orgId)) {
+    return { valid: false, error: 'invalid_org_id' }
+  }
+
+  // Then check if org requires expiring keys
+  const policyCheck = await checkApikeyMeetsOrgPolicy(c, key, orgId, supabase)
+  if (!policyCheck.valid) {
+    return policyCheck
+  }
+
+  return { valid: true }
+}
+
 export async function hasOrgRight(c: Context, orgId: string, userId: string, right: Database['public']['Enums']['user_min_right']) {
   const userRight = await supabaseAdmin(c).rpc('check_min_rights', {
     min_right: right,
@@ -1101,16 +1125,22 @@ export async function getUpdateStatsSB(c: Context): Promise<UpdateStats> {
   }
 }
 
+/**
+ * Check API key by key string
+ * Expiration is checked directly in SQL query: expires_at IS NULL OR expires_at > now()
+ */
 export async function checkKey(c: Context, authorization: string | undefined, supabase: SupabaseClient<Database>, allowed: Database['public']['Enums']['key_mode'][]): Promise<Database['public']['Tables']['apikeys']['Row'] | null> {
   if (!authorization)
     return null
   try {
     // First try plain-text lookup (for legacy keys where key column is not null)
+    // Expiration check is done in SQL: expires_at IS NULL OR expires_at > now()
     const { data: plainKey, error: plainError } = await supabase
       .from('apikeys')
       .select()
       .eq('key', authorization)
       .in('mode', allowed)
+      .or('expires_at.is.null,expires_at.gt.now()')
       .single()
 
     if (plainKey && !plainError) {
@@ -1118,12 +1148,14 @@ export async function checkKey(c: Context, authorization: string | undefined, su
     }
 
     // If not found, try hashed lookup
+    // Also check expiration for hashed keys
     const keyHash = await hashApiKey(authorization)
     const { data: hashedKey, error: hashError } = await supabase
       .from('apikeys')
       .select()
       .eq('key_hash', keyHash)
       .in('mode', allowed)
+      .or('expires_at.is.null,expires_at.gt.now()')
       .single()
 
     if (hashedKey && !hashError) {
@@ -1139,15 +1171,21 @@ export async function checkKey(c: Context, authorization: string | undefined, su
   }
 }
 
+/**
+ * Check API key by ID
+ * Expiration is checked directly in SQL query: expires_at IS NULL OR expires_at > now()
+ */
 export async function checkKeyById(c: Context, id: number, supabase: SupabaseClient<Database>, allowed: Database['public']['Enums']['key_mode'][]): Promise<Database['public']['Tables']['apikeys']['Row'] | null> {
   if (!id)
     return null
   try {
+    // Expiration check is done in SQL: expires_at IS NULL OR expires_at > now()
     const { data, error } = await supabase
       .from('apikeys')
       .select('*')
       .eq('id', id)
       .in('mode', allowed)
+      .or('expires_at.is.null,expires_at.gt.now()')
       .single()
     if (!data || error)
       return null
@@ -1157,6 +1195,93 @@ export async function checkKeyById(c: Context, id: number, supabase: SupabaseCli
     cloudlog({ requestId: c.get('requestId'), message: 'checkKeyById error', error })
     return null
   }
+}
+
+/**
+ * Validate expiration date format and that it's in the future.
+ * Throws simpleError if validation fails.
+ * @param expiresAt - The expiration date string (can be null/undefined to skip validation)
+ */
+export function validateExpirationDate(expiresAt: string | null | undefined): void {
+  if (expiresAt === null || expiresAt === undefined) {
+    return
+  }
+  const expirationDate = new Date(expiresAt)
+  if (Number.isNaN(expirationDate.getTime())) {
+    throw simpleError('invalid_expiration_date', 'Invalid expiration date format')
+  }
+  if (expirationDate <= new Date()) {
+    throw simpleError('invalid_expiration_date', 'Expiration date must be in the future')
+  }
+}
+
+/**
+ * Validate API key expiration against org policies for multiple orgs.
+ * Throws simpleError if any org policy is violated.
+ * @param orgIds - Array of org IDs to validate against
+ * @param expiresAt - The expiration date string
+ * @param supabase - Supabase client
+ */
+export async function validateExpirationAgainstOrgPolicies(
+  orgIds: string[],
+  expiresAt: string | null,
+  supabase: SupabaseClient<Database>,
+): Promise<void> {
+  if (orgIds.length === 0) {
+    return
+  }
+
+  // Fetch all org policies in a single query
+  const { data: orgs } = await supabase
+    .from('orgs')
+    .select('id, require_apikey_expiration, max_apikey_expiration_days')
+    .in('id', orgIds)
+
+  if (!orgs || orgs.length === 0) {
+    return
+  }
+
+  for (const org of orgs) {
+    // Check if expiration is required but not provided
+    if (org.require_apikey_expiration && !expiresAt) {
+      throw simpleError('expiration_required', 'This organization requires API keys to have an expiration date')
+    }
+
+    // Check if expiration exceeds max allowed
+    if (org.max_apikey_expiration_days && expiresAt) {
+      const maxDate = new Date()
+      maxDate.setDate(maxDate.getDate() + org.max_apikey_expiration_days)
+      if (new Date(expiresAt) > maxDate) {
+        throw simpleError('expiration_exceeds_max', `API key expiration cannot exceed ${org.max_apikey_expiration_days} days for this organization`)
+      }
+    }
+  }
+}
+
+/**
+ * Check if an API key meets org policy at usage time
+ */
+export async function checkApikeyMeetsOrgPolicy(
+  c: Context,
+  key: Database['public']['Tables']['apikeys']['Row'],
+  orgId: string,
+  supabase: SupabaseClient<Database>,
+): Promise<{ valid: boolean, error?: string }> {
+  const { data: org } = await supabase
+    .from('orgs')
+    .select('require_apikey_expiration')
+    .eq('id', orgId)
+    .single()
+
+  if (!org) {
+    return { valid: true }
+  }
+
+  if (org.require_apikey_expiration && !key.expires_at) {
+    return { valid: false, error: 'org_requires_expiring_key' }
+  }
+
+  return { valid: true }
 }
 
 /**

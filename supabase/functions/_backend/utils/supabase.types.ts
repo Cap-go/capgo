@@ -37,6 +37,7 @@ export type Database = {
       apikeys: {
         Row: {
           created_at: string | null
+          expires_at: string | null
           id: number
           key: string | null
           key_hash: string | null
@@ -49,6 +50,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          expires_at?: string | null
           id?: number
           key?: string | null
           key_hash?: string | null
@@ -61,6 +63,7 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          expires_at?: string | null
           id?: number
           key?: string | null
           key_hash?: string | null
@@ -1349,8 +1352,10 @@ export type Database = {
           last_stats_updated_at: string | null
           logo: string | null
           management_email: string
+          max_apikey_expiration_days: number | null
           name: string
           password_policy_config: Json | null
+          require_apikey_expiration: boolean
           stats_updated_at: string | null
           updated_at: string | null
         }
@@ -1365,8 +1370,10 @@ export type Database = {
           last_stats_updated_at?: string | null
           logo?: string | null
           management_email: string
+          max_apikey_expiration_days?: number | null
           name: string
           password_policy_config?: Json | null
+          require_apikey_expiration?: boolean
           stats_updated_at?: string | null
           updated_at?: string | null
         }
@@ -1381,8 +1388,10 @@ export type Database = {
           last_stats_updated_at?: string | null
           logo?: string | null
           management_email?: string
+          max_apikey_expiration_days?: number | null
           name?: string
           password_policy_config?: Json | null
+          require_apikey_expiration?: boolean
           stats_updated_at?: string | null
           updated_at?: string | null
         }
@@ -2248,6 +2257,7 @@ export type Database = {
         Args: { appid: string }
         Returns: number
       }
+      cleanup_expired_apikeys: { Args: never; Returns: undefined }
       cleanup_frequent_job_details: { Args: never; Returns: undefined }
       cleanup_job_run_details_7days: { Args: never; Returns: undefined }
       cleanup_old_audit_logs: { Args: never; Returns: undefined }
@@ -2541,9 +2551,11 @@ export type Database = {
               is_yearly: boolean
               logo: string
               management_email: string
+              max_apikey_expiration_days: number
               name: string
               next_stats_update_at: string
               paying: boolean
+              require_apikey_expiration: boolean
               role: string
               stats_updated_at: string
               subscription_end: string
@@ -2565,9 +2577,11 @@ export type Database = {
               is_yearly: boolean
               logo: string
               management_email: string
+              max_apikey_expiration_days: number
               name: string
               next_stats_update_at: string
               paying: boolean
+              require_apikey_expiration: boolean
               role: string
               stats_updated_at: string
               subscription_end: string
@@ -2593,11 +2607,13 @@ export type Database = {
               is_yearly: boolean
               logo: string
               management_email: string
+              max_apikey_expiration_days: number | null
               name: string
               next_stats_update_at: string
               password_has_access: boolean
               password_policy_config: Json
               paying: boolean
+              require_apikey_expiration: boolean
               role: string
               stats_updated_at: string
               subscription_end: string
@@ -2622,11 +2638,13 @@ export type Database = {
               is_yearly: boolean
               logo: string
               management_email: string
+              max_apikey_expiration_days: number | null
               name: string
               next_stats_update_at: string
               password_has_access: boolean
               password_policy_config: Json
               paying: boolean
+              require_apikey_expiration: boolean
               role: string
               stats_updated_at: string
               subscription_end: string
@@ -2819,6 +2837,7 @@ export type Database = {
             }
             Returns: boolean
           }
+      is_apikey_expired: { Args: { key_expires_at: string }; Returns: boolean }
       is_app_owner:
         | { Args: { apikey: string; appid: string }; Returns: boolean }
         | { Args: { appid: string }; Returns: boolean }

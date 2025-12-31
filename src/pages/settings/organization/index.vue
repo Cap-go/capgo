@@ -132,10 +132,12 @@ async function saveChanges(form: { orgName: string, email: string }) {
   currentOrganization.value.management_email = form.email
   isLoading.value = true
 
-  // Update name only
+  // Update name
   const { error } = await supabase
     .from('orgs')
-    .update({ name: form.orgName })
+    .update({
+      name: form.orgName,
+    })
     .eq('id', gid)
 
   if (error) {

@@ -2,7 +2,7 @@ import type { Database } from '../../utils/supabase.types.ts'
 import { hashApiKey } from '../../utils/hash.ts'
 import { honoFactory, parseBody, quickError, simpleError } from '../../utils/hono.ts'
 import { middlewareKey } from '../../utils/hono_middleware.ts'
-import { supabaseApikey } from '../../utils/supabase.ts'
+import { supabaseApikey, validateExpirationAgainstOrgPolicies, validateExpirationDate } from '../../utils/supabase.ts'
 import { Constants } from '../../utils/supabase.types.ts'
 
 const app = honoFactory.createApp()
@@ -20,6 +20,7 @@ app.post('/', middlewareKey(['all']), async (c) => {
   const name = body.name ?? ''
   const limitedToApps = body.limited_to_apps ?? []
   const limitedToOrgs = body.limited_to_orgs ?? []
+  const expiresAt = body.expires_at ?? null
   const isHashed = body.hashed === true
 
   const mode = body.mode ?? 'all'
@@ -34,12 +35,19 @@ app.post('/', middlewareKey(['all']), async (c) => {
     throw simpleError('invalid_mode', 'Invalid mode')
   }
 
+  // Validate expiration date format (throws if invalid)
+  validateExpirationDate(expiresAt)
+
   // Generate the plain key
   const plainKey = crypto.randomUUID()
 
   // Use anon client with capgkey header; RLS enforces ownership via user_id
   // For hashed keys, we need to use the parent key for authentication
   const supabase = supabaseApikey(c, key.key)
+
+  // Collect all org IDs for policy validation
+  let allOrgIds: string[] = [...limitedToOrgs]
+
   const newData: Database['public']['Tables']['apikeys']['Insert'] = {
     user_id: key.user_id,
     // For hashed keys: key is null, key_hash stores the hash
@@ -50,6 +58,7 @@ app.post('/', middlewareKey(['all']), async (c) => {
     name,
     limited_to_apps: limitedToApps,
     limited_to_orgs: limitedToOrgs,
+    expires_at: expiresAt,
   }
   if (orgId) {
     const { data: org, error } = await supabase.from('orgs').select('*').eq('id', orgId).single()
@@ -57,6 +66,7 @@ app.post('/', middlewareKey(['all']), async (c) => {
       throw quickError(404, 'org_not_found', 'Org not found', { supabaseError: error })
     }
     newData.limited_to_orgs = [org.id]
+    allOrgIds = [org.id]
   }
   if (appId) {
     const { data: app, error } = await supabase.from('apps').select('*').eq('id', appId).single()
@@ -65,6 +75,9 @@ app.post('/', middlewareKey(['all']), async (c) => {
     }
     newData.limited_to_apps = [app.app_id]
   }
+
+  // Validate expiration against org policies (throws if invalid)
+  await validateExpirationAgainstOrgPolicies(allOrgIds, expiresAt, supabase)
 
   const { data: apikeyData, error: apikeyError } = await supabase.from('apikeys')
     .insert(newData)
