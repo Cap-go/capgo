@@ -5,6 +5,7 @@ import type { Database } from './supabase.types.ts'
 import type { DeviceWithoutCreatedAt, Order, ReadDevicesParams, ReadStatsParams } from './types.ts'
 import { createClient } from '@supabase/supabase-js'
 import { buildNormalizedDeviceForWrite, hasComparableDeviceChanged } from './deviceComparison.ts'
+import { hashApiKey } from './hash.ts'
 import { simpleError } from './hono.ts'
 import { cloudlog, cloudlogErr } from './logging.ts'
 import { createCustomer } from './stripe.ts'
@@ -52,6 +53,7 @@ export function supabaseWithAuth(c: Context, auth: AuthInfo) {
     return supabaseClient(c, auth.jwt)
   }
   else if (auth.authType === 'apikey' && auth.apikey) {
+    // supabaseApikey now handles the fallback to capgkey for hashed keys
     return supabaseApikey(c, auth.apikey.key)
   }
   else {
@@ -82,15 +84,20 @@ export function supabaseAdmin(c: Context) {
   return createClient<Database>(getEnv(c, 'SUPABASE_URL'), getEnv(c, 'SUPABASE_SERVICE_ROLE_KEY'), options)
 }
 
-export function supabaseApikey(c: Context, apikey: string) {
-  cloudlog({ requestId: c.get('requestId'), message: 'supabaseApikey', apikey })
+export function supabaseApikey(c: Context, apikey: string | null | undefined) {
+  // For hashed keys, the key column is null, so we use the capgkey from the request header
+  const effectiveApikey = apikey ?? c.get('capgkey')
+  if (!effectiveApikey) {
+    throw new Error('No API key available for authentication')
+  }
+  cloudlog({ requestId: c.get('requestId'), message: 'supabaseApikey', apikeyPrefix: effectiveApikey.substring(0, 8) })
   return createClient<Database>(getEnv(c, 'SUPABASE_URL'), getEnv(c, 'SUPABASE_ANON_KEY'), {
     auth: {
       persistSession: false,
     },
     global: {
       headers: {
-        capgkey: apikey,
+        capgkey: effectiveApikey,
       },
     },
   })
@@ -216,16 +223,23 @@ export async function hasAppRight(c: Context, appId: string | undefined, userid:
   return data
 }
 
-export async function hasAppRightApikey(c: Context<MiddlewareKeyVariables, any, object>, appId: string | undefined, userid: string, right: Database['public']['Enums']['user_min_right'], apikey: string) {
+export async function hasAppRightApikey(c: Context<MiddlewareKeyVariables, any, object>, appId: string | undefined, userid: string, right: Database['public']['Enums']['user_min_right'], apikey: string | null | undefined) {
   if (!appId) {
     cloudlog({ requestId: c.get('requestId'), message: 'hasAppRightApikey - appId is undefined' })
     return false
   }
 
-  cloudlog({ requestId: c.get('requestId'), message: 'hasAppRightApikey - calling RPC', appId, userid, right, apikeyPrefix: apikey?.substring(0, 15) })
+  // For hashed keys, use the capgkey from the request header
+  const effectiveApikey = apikey ?? c.get('capgkey')
+  if (!effectiveApikey) {
+    cloudlog({ requestId: c.get('requestId'), message: 'hasAppRightApikey - no API key available' })
+    return false
+  }
+
+  cloudlog({ requestId: c.get('requestId'), message: 'hasAppRightApikey - calling RPC', appId, userid, right, apikeyPrefix: effectiveApikey?.substring(0, 15) })
 
   const { data, error } = await supabaseAdmin(c)
-    .rpc('has_app_right_apikey', { appid: appId, right, userid, apikey })
+    .rpc('has_app_right_apikey', { appid: appId, right, userid, apikey: effectiveApikey })
 
   cloudlog({ requestId: c.get('requestId'), message: 'hasAppRightApikey - RPC result', data, hasError: !!error, error })
 
@@ -235,7 +249,7 @@ export async function hasAppRightApikey(c: Context<MiddlewareKeyVariables, any, 
   }
 
   if (!data) {
-    cloudlog({ requestId: c.get('requestId'), message: 'hasAppRightApikey - permission denied', appId, userid, right, apikeyPrefix: apikey?.substring(0, 15) })
+    cloudlog({ requestId: c.get('requestId'), message: 'hasAppRightApikey - permission denied', appId, userid, right, apikeyPrefix: effectiveApikey?.substring(0, 15) })
   }
 
   return data
@@ -290,7 +304,7 @@ export async function hasOrgRight(c: Context, orgId: string, userId: string, rig
   return userRight.data
 }
 
-export async function hasOrgRightApikey(c: Context, orgId: string, userId: string, right: Database['public']['Enums']['user_min_right'], apikey: string) {
+export async function hasOrgRightApikey(c: Context, orgId: string, userId: string, right: Database['public']['Enums']['user_min_right'], apikey: string | null | undefined) {
   const userRight = await supabaseApikey(c, apikey).rpc('check_min_rights', {
     min_right: right,
     org_id: orgId,
@@ -1119,19 +1133,37 @@ export async function checkKey(c: Context, authorization: string | undefined, su
   if (!authorization)
     return null
   try {
+    // First try plain-text lookup (for legacy keys where key column is not null)
     // Expiration check is done in SQL: expires_at IS NULL OR expires_at > now()
-    const { data, error } = await supabase
+    const { data: plainKey, error: plainError } = await supabase
       .from('apikeys')
       .select()
       .eq('key', authorization)
       .in('mode', allowed)
       .or('expires_at.is.null,expires_at.gt.now()')
       .single()
-    if (!data || error) {
-      cloudlog({ requestId: c.get('requestId'), message: 'Invalid apikey', authorization, allowed, error })
-      return null
+
+    if (plainKey && !plainError) {
+      return plainKey
     }
-    return data
+
+    // If not found, try hashed lookup
+    // Also check expiration for hashed keys
+    const keyHash = await hashApiKey(authorization)
+    const { data: hashedKey, error: hashError } = await supabase
+      .from('apikeys')
+      .select()
+      .eq('key_hash', keyHash)
+      .in('mode', allowed)
+      .or('expires_at.is.null,expires_at.gt.now()')
+      .single()
+
+    if (hashedKey && !hashError) {
+      return hashedKey
+    }
+
+    cloudlog({ requestId: c.get('requestId'), message: 'Invalid apikey', authorizationPrefix: authorization?.substring(0, 8), allowed, plainError, hashError })
+    return null
   }
   catch (error) {
     cloudlog({ requestId: c.get('requestId'), message: 'checkKey error', error })
@@ -1250,4 +1282,52 @@ export async function checkApikeyMeetsOrgPolicy(
   }
 
   return { valid: true }
+}
+
+/**
+ * Check if an API key is valid for a specific organization based on its hashed key enforcement setting.
+ * Returns true if the key can access the org, false if the org requires hashed keys and this is a plain-text key.
+ */
+export async function checkKeyOrgEnforcement(
+  c: Context,
+  apikey: Database['public']['Tables']['apikeys']['Row'],
+  orgId: string,
+  supabase: SupabaseClient<Database>,
+): Promise<boolean> {
+  try {
+    // Check if org enforces hashed keys
+    const { data: org, error } = await supabase
+      .from('orgs')
+      .select('enforce_hashed_api_keys')
+      .eq('id', orgId)
+      .single()
+
+    if (error || !org) {
+      // Org not found or error - allow (will fail on other checks)
+      return true
+    }
+
+    if (!org.enforce_hashed_api_keys) {
+      // Org doesn't enforce hashed keys
+      return true
+    }
+
+    // Org enforces hashed keys - check if this is a hashed key
+    // A hashed key has key_hash set and key is null
+    const isHashedKey = apikey.key_hash !== null && apikey.key === null
+    if (!isHashedKey) {
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'Org enforces hashed keys but key is plain-text',
+        orgId,
+        apikeyId: apikey.id,
+      })
+      return false
+    }
+    return true
+  }
+  catch (error) {
+    cloudlog({ requestId: c.get('requestId'), message: 'checkKeyOrgEnforcement error', error })
+    return true // Allow on error - will fail on other checks
+  }
 }

@@ -59,6 +59,9 @@ function isKeyExpired(expiresAt: string | null): boolean {
   return new Date(expiresAt) < new Date()
 }
 
+// State for hashed key creation
+const createAsHashed = ref(false)
+
 // Available apps for selection (populated when showing app dialog)
 const availableApps = ref<Database['public']['Tables']['apps']['Row'][]>([])
 
@@ -67,10 +70,17 @@ const orgCache = ref(new Map<string, string>())
 const appCache = ref(new Map<string, string>())
 
 // Function to truncate strings (show first 5 and last 5 characters)
-function hideString(str: string) {
+function hideString(str: string | null) {
+  if (!str)
+    return ''
   const first = str.slice(0, 5)
   const last = str.slice(-5)
   return `${first}...${last}`
+}
+
+// Check if a key is a hashed (secure) key
+function isHashedKey(key: Database['public']['Tables']['apikeys']['Row']) {
+  return key.key === null && key.key_hash !== null
 }
 
 // Computed property to get unique organization IDs from all API keys
@@ -183,7 +193,7 @@ const filteredAndSortedKeys = computed(() => {
     const query = searchQuery.value.toLowerCase()
     result = result.filter(key =>
       key.name?.toLowerCase().includes(query)
-      || key.key.toLowerCase().includes(query),
+      || key.key?.toLowerCase().includes(query),
     )
   }
 
@@ -249,6 +259,9 @@ columns.value = [
     label: t('api-key'),
     head: true,
     displayFunction: (row: Database['public']['Tables']['apikeys']['Row']) => {
+      if (isHashedKey(row)) {
+        return t('secure-key-hidden')
+      }
       return hideString(row.key)
     },
   },
@@ -378,6 +391,7 @@ async function createApiKey(keyType: 'read' | 'write' | 'all' | 'upload') {
   // Get selections from the dialog
   const limitToOrg = limitToOrgCheckbox.value
   const limitToApp = limitToAppCheckbox.value
+  const isHashed = createAsHashed.value
 
   let finalSelectedOrganizations: string[] = []
   if (limitToOrg) {
@@ -413,28 +427,71 @@ async function createApiKey(keyType: 'read' | 'write' | 'all' | 'upload') {
       return false
     }
 
-    const { data, error } = await supabase
-      .from('apikeys')
-      .upsert({
-        user_id: user.id,
-        key: newApiKey,
-        mode: keyType,
-        name: newApiKeyName.value.trim(),
-        limited_to_orgs: finalSelectedOrganizations.length > 0 ? finalSelectedOrganizations : [],
-        limited_to_apps: finalSelectedApps.length > 0 ? finalSelectedApps.map(app => app.app_id) : [],
-        expires_at: expiresAt,
-      })
-      .select()
+    let createdKey: Database['public']['Tables']['apikeys']['Row']
+    let plainKeyForDisplay: string | null = null
 
-    if (error) {
-      console.error('Error creating API key:', error)
-      toast.error('Failed to create API key')
-      return false
+    if (isHashed) {
+      // For hashed keys, we use the backend API which will hash the key
+      // and return the plain key only once for display
+      const { data, error } = await supabase.functions.invoke('public/apikey', {
+        method: 'POST',
+        body: {
+          mode: keyType,
+          name: newApiKeyName.value.trim(),
+          limited_to_orgs: finalSelectedOrganizations.length > 0 ? finalSelectedOrganizations : [],
+          limited_to_apps: finalSelectedApps.length > 0 ? finalSelectedApps.map(app => app.app_id) : [],
+          expires_at: expiresAt,
+          hashed: true,
+        },
+      })
+
+      if (error) {
+        console.error('Error creating hashed API key:', error)
+        toast.error('Failed to create API key')
+        return false
+      }
+
+      createdKey = data
+      plainKeyForDisplay = data.key // This is the one-time visible key
+    }
+    else {
+      // For plain-text keys, use direct database insert
+      const { data, error } = await supabase
+        .from('apikeys')
+        .upsert({
+          user_id: user.id,
+          key: newApiKey,
+          mode: keyType,
+          name: newApiKeyName.value.trim(),
+          limited_to_orgs: finalSelectedOrganizations.length > 0 ? finalSelectedOrganizations : [],
+          limited_to_apps: finalSelectedApps.length > 0 ? finalSelectedApps.map(app => app.app_id) : [],
+          expires_at: expiresAt,
+        })
+        .select()
+
+      if (error) {
+        console.error('Error creating API key:', error)
+        toast.error('Failed to create API key')
+        return false
+      }
+
+      createdKey = data[0]
     }
 
-    keys.value?.push(data[0])
+    // For hashed keys, clear the key field before adding to the list
+    // (the plainkey was only returned for one-time display)
+    if (isHashed) {
+      createdKey.key = null as any
+    }
+    keys.value?.push(createdKey)
     // Fetch org and app names for the new key
     await fetchOrgAndAppNames()
+
+    // For hashed keys, show the key one time in a modal
+    if (isHashed && plainKeyForDisplay) {
+      await showOneTimeKeyModal(plainKeyForDisplay)
+    }
+
     toast.success(t('add-api-key'))
     return true
   }
@@ -445,12 +502,37 @@ async function createApiKey(keyType: 'read' | 'write' | 'all' | 'upload') {
   }
 }
 
+async function showOneTimeKeyModal(plainKey: string) {
+  dialogStore.openDialog({
+    title: t('secure-key-created'),
+    description: t('secure-key-warning'),
+    size: 'lg',
+    buttons: [
+      {
+        text: t('copy-and-close'),
+        role: 'primary',
+        handler: async () => {
+          try {
+            await navigator.clipboard.writeText(plainKey)
+            toast.success(t('key-copied'))
+          }
+          catch (err) {
+            console.error('Failed to copy:', err)
+          }
+        },
+      },
+    ],
+  })
+  return dialogStore.onDialogDismiss()
+}
+
 async function addNewApiKey() {
   // Clear global state
   displayStore.selectedOrganizations = []
   displayStore.selectedApps = []
   limitToOrgCheckbox.value = false
   limitToAppCheckbox.value = false
+  createAsHashed.value = false
   newApiKeyName.value = ''
   setExpirationCheckbox.value = false
   expirationDate.value = ''
@@ -462,7 +544,7 @@ async function addNewApiKey() {
   await showAddNewKeyModal()
 }
 
-async function regenrateKey(app: Database['public']['Tables']['apikeys']['Row']) {
+async function regenrateKey(apikey: Database['public']['Tables']['apikeys']['Row']) {
   if (await showRegenerateKeyModal())
     return
 
@@ -474,18 +556,65 @@ async function regenrateKey(app: Database['public']['Tables']['apikeys']['Row'])
     return
   }
 
-  const { error } = await supabase
-    .from('apikeys')
-    .update({ key: newApiKey })
-    .eq('user_id', user.id)
-    .eq('key', app.key)
+  const wasHashed = isHashedKey(apikey)
 
-  if (error || typeof newApiKey !== 'string')
-    throw error
+  if (wasHashed) {
+    // For hashed keys, we need to hash the new key too
+    // We'll update both key_hash with the new hash and keep key as null
+    // Use the backend API which handles hashing
+    const { data, error } = await supabase.functions.invoke('public/apikey', {
+      method: 'POST',
+      body: {
+        mode: apikey.mode,
+        name: apikey.name,
+        limited_to_orgs: apikey.limited_to_orgs ?? [],
+        limited_to_apps: apikey.limited_to_apps ?? [],
+        hashed: true,
+      },
+    })
 
-  app.key = newApiKey
+    if (error) {
+      console.error('Error regenerating hashed API key:', error)
+      toast.error('Failed to regenerate API key')
+      return
+    }
 
-  toast.success(t('generated-new-apikey'))
+    // Extract the plaintext key for one-time display before clearing it
+    const plainKeyForDisplay = data.key as string | undefined
+
+    // Clear the key field before caching to maintain the "hashed" state
+    // This ensures isHashedKey() returns true and the key cannot be copied
+    data.key = null as any
+
+    // Delete the old key
+    await supabase.from('apikeys').delete().eq('id', apikey.id)
+
+    // Update the local key reference with the new hashed row (key = null)
+    const idx = keys.value.findIndex(k => k.id === apikey.id)
+    if (idx !== -1) {
+      keys.value[idx] = data
+    }
+
+    // Show the new key one time
+    if (plainKeyForDisplay) {
+      await showOneTimeKeyModal(plainKeyForDisplay)
+    }
+    toast.success(t('generated-new-apikey'))
+  }
+  else {
+    // For plain-text keys, update directly
+    const { error } = await supabase
+      .from('apikeys')
+      .update({ key: newApiKey })
+      .eq('user_id', user.id)
+      .eq('id', apikey.id)
+
+    if (error || typeof newApiKey !== 'string')
+      throw error
+
+    apikey.key = newApiKey
+    toast.success(t('generated-new-apikey'))
+  }
 }
 
 async function deleteKey(key: Database['public']['Tables']['apikeys']['Row']) {
@@ -495,13 +624,13 @@ async function deleteKey(key: Database['public']['Tables']['apikeys']['Row']) {
   const { error } = await supabase
     .from('apikeys')
     .delete()
-    .eq('key', key.key)
+    .eq('id', key.id)
 
   if (error)
     throw error
 
   toast.success(t('removed-apikey'))
-  keys.value = keys.value?.filter(filterKey => filterKey.key !== key.key)
+  keys.value = keys.value?.filter(filterKey => filterKey.id !== key.id)
 }
 
 async function changeName(key: Database['public']['Tables']['apikeys']['Row']) {
@@ -647,9 +776,15 @@ function handleAppSelection(app: Database['public']['Tables']['apps']['Row'], ch
   }
 }
 
-async function copyKey(app: Database['public']['Tables']['apikeys']['Row']) {
+async function copyKey(apikey: Database['public']['Tables']['apikeys']['Row']) {
+  // Cannot copy hashed keys - they are never stored in plain text
+  if (isHashedKey(apikey)) {
+    toast.error(t('cannot-copy-secure-key'))
+    return
+  }
+
   try {
-    await navigator.clipboard.writeText(app.key)
+    await navigator.clipboard.writeText(apikey.key!)
     toast.success(t('key-copied'))
   }
   catch (err) {
@@ -657,7 +792,7 @@ async function copyKey(app: Database['public']['Tables']['apikeys']['Row']) {
     // Display a modal with the copied key
     dialogStore.openDialog({
       title: t('cannot-copy-key'),
-      description: app.key,
+      description: apikey.key!,
       buttons: [
         {
           text: t('ok'),
@@ -808,6 +943,26 @@ getKeys()
                   <span class="text-base label-text">{{ t('key-all') }}</span>
                 </label>
               </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Create as Secure (Hashed) Key -->
+        <div class="p-4 rounded-lg border bg-blue-50 dark:bg-blue-900/20 dark:border-blue-700 border-blue-200">
+          <div class="flex gap-3 items-start">
+            <input
+              id="create-as-hashed"
+              v-model="createAsHashed"
+              type="checkbox"
+              class="mt-1 border-blue-500 dark:border-blue-400 checkbox checkbox-primary"
+            >
+            <div>
+              <label for="create-as-hashed" class="font-medium text-blue-800 cursor-pointer dark:text-blue-200">
+                {{ t('create-secure-key') }}
+              </label>
+              <p class="mt-1 text-sm text-blue-600 dark:text-blue-300">
+                {{ t('create-secure-key-description') }}
+              </p>
             </div>
           </div>
         </div>

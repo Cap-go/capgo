@@ -11,6 +11,7 @@ const bodySchema = z.object({
   management_email: z.optional(z.email()),
   require_apikey_expiration: z.optional(z.boolean()),
   max_apikey_expiration_days: z.optional(z.nullable(z.number())),
+  enforce_hashed_api_keys: z.optional(z.boolean()),
 })
 export async function put(c: Context, bodyRaw: any, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
   const bodyParsed = bodySchema.safeParse(bodyRaw)
@@ -58,6 +59,8 @@ export async function put(c: Context, bodyRaw: any, apikey: Database['public']['
     updateFields.require_apikey_expiration = body.require_apikey_expiration
   if (body.max_apikey_expiration_days !== undefined)
     updateFields.max_apikey_expiration_days = body.max_apikey_expiration_days
+  if (body.enforce_hashed_api_keys !== undefined)
+    updateFields.enforce_hashed_api_keys = body.enforce_hashed_api_keys
 
   const { error: errorOrg, data: dataOrg } = await supabase
     .from('orgs')

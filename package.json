@@ -1,7 +1,7 @@
 {
   "name": "capgo-app",
   "type": "module",
-  "version": "12.84.1",
+  "version": "12.84.2",
   "private": true,
   "license": "GPL-3.0",
   "scripts": {
@@ -211,6 +211,7 @@
     "@capacitor/core": "^8.0.0",
     "@capgo/cli": "7.21.4",
     "@cloudflare/workers-types": "4.20251229.0",
+    "@formkit/core": "1.6.9",
     "@iconify/json": "^2.2.406",
     "@playwright/test": "1.57.0",
     "@tailwindcss/aspect-ratio": "^0.4.2",

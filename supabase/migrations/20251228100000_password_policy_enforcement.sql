@@ -342,6 +342,7 @@ RETURNS TABLE (
     credit_next_expiration timestamptz,
     enforcing_2fa boolean,
     "2fa_has_access" boolean,
+    enforce_hashed_api_keys boolean,
     password_policy_config jsonb,
     password_has_access boolean
 ) LANGUAGE plpgsql STABLE SECURITY DEFINER
@@ -463,6 +464,7 @@ BEGIN
     ucb.next_expiration AS credit_next_expiration,
     tfa.enforcing_2fa,
     tfa."2fa_has_access",
+    o.enforce_hashed_api_keys,
     ppa.password_policy_config,
     ppa.password_has_access
   FROM public.orgs o
@@ -515,6 +517,7 @@ RETURNS TABLE (
     credit_next_expiration timestamptz,
     enforcing_2fa boolean,
     "2fa_has_access" boolean,
+    enforce_hashed_api_keys boolean,
     password_policy_config jsonb,
     password_has_access boolean
 ) LANGUAGE plpgsql
@@ -528,7 +531,7 @@ BEGIN
   user_id := NULL;
 
   IF api_key_text IS NOT NULL THEN
-    SELECT * FROM public.apikeys WHERE key = api_key_text INTO api_key;
+    SELECT * FROM public.find_apikey_by_value(api_key_text) INTO api_key;
 
     IF api_key IS NULL THEN
       PERFORM public.pg_log('deny: INVALID_API_KEY', jsonb_build_object('source', 'header'));
@@ -764,7 +767,7 @@ BEGIN
   user_id := NULL;
 
   IF api_key_text IS NOT NULL THEN
-    SELECT * FROM public.apikeys WHERE key = api_key_text INTO api_key;
+    SELECT * FROM public.find_apikey_by_value(api_key_text) INTO api_key;
 
     IF api_key IS NULL THEN
       PERFORM public.pg_log('deny: INVALID_API_KEY', jsonb_build_object('source', 'header'));
