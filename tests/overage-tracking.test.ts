@@ -11,7 +11,7 @@ const supabase = createClient<Database>(supabaseUrl, supabaseServiceKey)
 
 // Helper to retry RPC calls that may fail due to transient network issues in CI
 async function retryRpc<T>(
-  fn: () => Promise<{ data: T | null, error: any }>,
+  fn: () => PromiseLike<{ data: T | null, error: any }>,
   maxRetries = 3,
 ): Promise<{ data: T | null, error: any }> {
   let lastResult: { data: T | null, error: any } = { data: null, error: null }
