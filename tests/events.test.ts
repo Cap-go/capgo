@@ -41,13 +41,25 @@ describe('[POST] /private/events operations', () => {
   it('track event with authorization jwt', async () => {
     const supabase = getSupabaseClient()
 
-    const { data: magicLink, error: magicError } = await supabase.auth.admin.generateLink({
-      type: 'magiclink',
-      email: USER_EMAIL,
-    })
+    // Retry logic for auth service which can be flaky in CI (503 errors)
+    let magicLink
+    let lastError
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const { data, error } = await supabase.auth.admin.generateLink({
+        type: 'magiclink',
+        email: USER_EMAIL,
+      })
+      if (!error) {
+        magicLink = data
+        break
+      }
+      lastError = error
+      // Wait before retry with exponential backoff
+      await new Promise(resolve => setTimeout(resolve, 500 * (attempt + 1)))
+    }
 
-    if (magicError) {
-      console.error('generate_magic_link_error', magicError)
+    if (!magicLink) {
+      console.error('generate_magic_link_error after retries', lastError)
       throw new Error('generate_magic_link_error')
     }
 
