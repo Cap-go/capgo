@@ -1350,5 +1350,17 @@
   "removed": "Removed",
   "event": "Event",
   "by": "By",
-  "date": "Date"
+  "date": "Date",
+  "bundle-deployed": "Bundle Deployed",
+  "channel-created": "Channel Created",
+  "channel-created-with-bundle": "Channel created with bundle",
+  "setting-changed": "Setting Changed",
+  "setting-change-details": "Setting Change Details",
+  "error-fetching-history": "Error fetching history",
+  "allow-dev-builds": "Allow Dev Builds",
+  "allow-prod-builds": "Allow Prod Builds",
+  "allow-device": "Allow Device Updates",
+  "channel-allow-device-self-set": "Allow Device Self-Assignment",
+  "channel-disable-auto-update": "Disable Auto Update",
+  "channel-disable-auto-update-under-native": "Disable Auto Update Under Native"
 }
