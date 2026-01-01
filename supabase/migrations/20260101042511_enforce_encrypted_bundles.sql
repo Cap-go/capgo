@@ -103,13 +103,31 @@ SECURITY DEFINER
 SET search_path = ''
 AS $$
 DECLARE
+  org_id uuid;
   org_enforcing boolean;
   bundle_is_encrypted boolean;
 BEGIN
-  -- Get the org's enforcement setting for this app
+  -- Derive org_id from app_id directly to avoid trigger ordering issues.
+  -- The force_valid_owner_org_app_versions trigger runs after this one
+  -- (alphabetically), so NEW.owner_org may not be populated yet.
+  -- We look up the org from the apps table using the app_id.
+  IF NEW.owner_org IS NOT NULL THEN
+    org_id := NEW.owner_org;
+  ELSE
+    SELECT apps.owner_org INTO org_id
+    FROM public.apps
+    WHERE apps.app_id = NEW.app_id;
+  END IF;
+
+  -- If org not found, allow (will fail on other checks)
+  IF org_id IS NULL THEN
+    RETURN NEW;
+  END IF;
+
+  -- Get the org's enforcement setting
   SELECT enforce_encrypted_bundles INTO org_enforcing
   FROM public.orgs
-  WHERE id = NEW.owner_org;
+  WHERE id = org_id;
 
   -- If org doesn't exist or doesn't enforce encrypted bundles, allow
   IF org_enforcing IS NULL OR org_enforcing = false THEN
@@ -123,7 +141,7 @@ BEGIN
     -- Log the rejection for audit
     PERFORM public.pg_log('deny: ORG_REQUIRES_ENCRYPTED_BUNDLES_TRIGGER',
       jsonb_build_object(
-        'org_id', NEW.owner_org,
+        'org_id', org_id,
         'app_id', NEW.app_id,
         'version_name', NEW.name,
         'user_id', NEW.user_id
