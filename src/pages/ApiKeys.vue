@@ -509,7 +509,7 @@ async function createApiKey(keyType: 'read' | 'write' | 'all' | 'upload') {
 async function showOneTimeKeyModal(plainKey: string) {
   dialogStore.openDialog({
     title: t('secure-key-created'),
-    description: t('secure-key-warning'),
+    description: `${t('secure-key-warning')}\n\n${t('your-api-key')}: ${plainKey}`,
     size: 'lg',
     buttons: [
       {

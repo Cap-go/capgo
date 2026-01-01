@@ -798,6 +798,7 @@
   "secure-key-created": "Secure API Key Created",
   "secure-key-hidden": "Secure key (hidden)",
   "secure-key-warning": "This key will only be shown once. Copy it now and store it securely. You will not be able to see it again.",
+  "your-api-key": "Your API Key",
   "language": "Language",
   "last": "Last",
   "last-12-hours": "Last 12 hours",
