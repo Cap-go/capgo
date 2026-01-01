@@ -61,6 +61,10 @@ interface GoTrueSSOProvider {
  *
  * @param c - Hono context
  * @param config - Provider configuration
+ * @param config.metadataUrl - Optional IdP metadata URL
+ * @param config.metadataXml - Optional IdP metadata XML
+ * @param config.domains - List of domains for this provider
+ * @param config.attributeMapping - SAML attribute mapping configuration
  * @returns Created provider info from GoTrue
  */
 async function registerWithSupabaseAuth(
@@ -233,6 +237,10 @@ async function removeFromSupabaseAuth(
  * @param c - Hono context
  * @param providerId - Existing provider ID
  * @param config - Update configuration
+ * @param config.metadataUrl - Optional IdP metadata URL
+ * @param config.metadataXml - Optional IdP metadata XML
+ * @param config.domains - List of domains for this provider
+ * @param config.attributeMapping - SAML attribute mapping configuration
  * @returns Updated provider info
  */
 async function updateWithSupabaseAuth(

@@ -82,7 +82,7 @@ export function useSSODetection() {
       ssoAvailable.value = false
       return false
     }
-    catch (error) {
+    catch {
       ssoAvailable.value = false
       return false
     }
@@ -101,7 +101,6 @@ export function useSSODetection() {
   async function initiateSSO(redirectTo?: string, email?: string): Promise<void> {
     if (!ssoProviderId.value)
       return
-    }
 
     try {
       // Check if Supabase URL is local (meaning truly local testing)
