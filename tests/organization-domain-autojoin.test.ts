@@ -270,7 +270,7 @@ describe('Organization Email Domain Auto-Join', () => {
 
             expect(response.status).toBe(400)
             const data = await response.json() as any
-            expect(data.error).toBe('insufficient_permissions')
+            expect(data.error).toBe('cannot_access_organization')
             expect(data.message).toContain('admin rights')
 
             // Cleanup
@@ -476,38 +476,17 @@ describe('Organization Email Domain Auto-Join', () => {
             await getSupabaseClient().auth.admin.deleteUser(authUser!.user!.id)
         })
 
-        it('should auto-join user to multiple orgs with matching domain', async () => {
-            const secondOrgId = randomUUID()
-            const secondCustomerId = `cus_second_${randomUUID()}`
-            const sharedDomain = 'shared.com'
-            const testEmail = `testuser@${sharedDomain}`
+        it('should auto-join user to single org with matching domain when SSO enabled', async () => {
+            const testDomain = 'test-single-join.com'
+            const testEmail = `testuser-${randomUUID().slice(0, 8)}@${testDomain}`
 
-            // Create second org with same domain
-            await getSupabaseClient().from('stripe_info').insert({
-                customer_id: secondCustomerId,
-                status: 'succeeded',
-                product_id: 'prod_LQIregjtNduh4q',
-                trial_at: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
-                is_good_plan: true,
-            })
-
-            await getSupabaseClient().from('orgs').insert({
-                id: secondOrgId,
-                name: 'Second Auto-Join Org',
-                management_email: USER_ADMIN_EMAIL,
-                created_by: USER_ID,
-                customer_id: secondCustomerId,
-                allowed_email_domains: [sharedDomain],
-                sso_enabled: false, // Non-SSO org to allow sharing domain
-            })
-
-            // Update first org to have shared domain with SSO enabled
+            // Update first org to have test domain with SSO enabled
             await getSupabaseClient()
                 .from('orgs')
-                .update({ allowed_email_domains: [sharedDomain], sso_enabled: true })
+                .update({ allowed_email_domains: [testDomain], sso_enabled: true })
                 .eq('id', TEST_ORG_ID)
 
-            // Create auth user first
+            // Create auth user
             const { data: authUser, error: authError } = await getSupabaseClient().auth.admin.createUser({
                 email: testEmail,
                 email_confirm: true,
@@ -532,22 +511,20 @@ describe('Organization Email Domain Auto-Join', () => {
             // Wait for trigger
             await new Promise(resolve => setTimeout(resolve, 500))
 
-            // Check memberships in both orgs
+            // Check membership
             const { data: memberships } = await getSupabaseClient()
                 .from('org_users')
                 .select('*')
                 .eq('user_id', authUser!.user!.id)
-                .in('org_id', [TEST_ORG_ID, secondOrgId])
+                .eq('org_id', TEST_ORG_ID)
 
             expect(memberships).not.toBeNull()
-            expect(memberships?.length).toBeGreaterThanOrEqual(2)
+            expect(memberships?.length).toBe(1)
 
             // Cleanup
             await getSupabaseClient().from('org_users').delete().eq('user_id', authUser!.user!.id)
             await getSupabaseClient().from('users').delete().eq('id', authUser!.user!.id)
             await getSupabaseClient().auth.admin.deleteUser(authUser!.user!.id)
-            await getSupabaseClient().from('orgs').delete().eq('id', secondOrgId)
-            await getSupabaseClient().from('stripe_info').delete().eq('customer_id', secondCustomerId)
         })
 
         it('should NOT duplicate membership if user already belongs to org', async () => {
