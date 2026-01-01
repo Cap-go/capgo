@@ -1330,5 +1330,5 @@
   "invalid-password": "अमान्य पासवर्ड",
   "password-does-not-meet-requirements": "आपका पासवर्ड संगठन की आवश्यकताओं को पूरा नहीं करता। कृपया अपना पासवर्ड बदलें।",
   "verification-failed": "सत्यापन विफल",
-  "no-organization-selected": "कोई संगठन चयनित नहीं"
+  "cloud-replication-delay": "परिवर्तनों को विश्व स्तर पर प्रसारित होने में 60 सेकंड तक का समय लगेगा"
 }

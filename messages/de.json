@@ -1339,5 +1339,5 @@
   "invalid-password": "Ungültiges Passwort",
   "password-does-not-meet-requirements": "Ihr Passwort erfüllt nicht die Anforderungen der Organisation. Bitte ändern Sie Ihr Passwort.",
   "verification-failed": "Überprüfung fehlgeschlagen",
-  "no-organization-selected": "Keine Organisation ausgewählt"
+  "cloud-replication-delay": "Änderungen werden innerhalb von 60 Sekunden weltweit übertragen"
 }

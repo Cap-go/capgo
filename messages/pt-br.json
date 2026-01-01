@@ -1331,5 +1331,5 @@
   "invalid-password": "Senha inválida",
   "password-does-not-meet-requirements": "Sua senha não atende aos requisitos da organização. Por favor, altere sua senha.",
   "verification-failed": "Verificação falhou",
-  "no-organization-selected": "Nenhuma organização selecionada"
+  "cloud-replication-delay": "As alterações levarão até 60 segundos para se propagar globalmente"
 }
