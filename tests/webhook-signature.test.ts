@@ -1,3 +1,22 @@
+/**
+ * Webhook Signature Verification Tests
+ *
+ * This test suite validates the end-to-end webhook signature verification system.
+ * It creates a local HTTP server to receive webhooks, sends test webhooks via the API,
+ * and verifies that the HMAC-SHA256 signatures are correctly generated and can be validated.
+ *
+ * Signature Scheme:
+ * - Header: X-Capgo-Signature
+ * - Format: v1={timestamp}.{hmac_hex}
+ * - Signing payload: {timestamp}.{json_payload}
+ * - Algorithm: HMAC-SHA256
+ *
+ * To run these tests:
+ * - Ensure Supabase is running: `supabase start`
+ * - Run backend tests: `bun test:backend tests/webhook-signature.test.ts`
+ * - Or all tests: `bun test:all`
+ */
+
 import { createServer } from 'node:http'
 import { randomUUID } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
@@ -197,13 +216,15 @@ describe('Webhook Signature Verification', () => {
 
     createdWebhookId = data.webhook.id
 
-    // Fetch the webhook to get its secret
-    const webhookResponse = await fetch(
-      `${BASE_URL}/webhooks?orgId=${WEBHOOK_SIGNATURE_TEST_ORG_ID}&webhookId=${createdWebhookId}`,
-      { headers },
-    )
-    expect(webhookResponse.status).toBe(200)
-    const webhookData = await webhookResponse.json() as { id: string, secret: string }
+    // Fetch the webhook secret directly from database (secret is not exposed via API for security)
+    const { data: webhookData, error: webhookError } = await (getSupabaseClient() as any)
+      .from('webhooks')
+      .select('secret')
+      .eq('id', createdWebhookId)
+      .single()
+
+    expect(webhookError).toBeNull()
+    expect(webhookData).toBeDefined()
     expect(webhookData.secret).toBeDefined()
     expect(webhookData.secret).toMatch(/^whsec_/)
 
