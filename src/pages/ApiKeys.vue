@@ -437,7 +437,7 @@ async function createApiKey(keyType: 'read' | 'write' | 'all' | 'upload') {
     if (isHashed) {
       // For hashed keys, we use the backend API which will hash the key
       // and return the plain key only once for display
-      const { data, error } = await supabase.functions.invoke('public/apikey', {
+      const { data, error } = await supabase.functions.invoke('apikey', {
         method: 'POST',
         body: {
           mode: keyType,
@@ -566,7 +566,7 @@ async function regenrateKey(apikey: Database['public']['Tables']['apikeys']['Row
     // For hashed keys, we need to hash the new key too
     // We'll update both key_hash with the new hash and keep key as null
     // Use the backend API which handles hashing
-    const { data, error } = await supabase.functions.invoke('public/apikey', {
+    const { data, error } = await supabase.functions.invoke('apikey', {
       method: 'POST',
       body: {
         mode: apikey.mode,
