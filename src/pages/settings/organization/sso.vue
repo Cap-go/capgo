@@ -635,11 +635,18 @@ async function testSSO() {
         'Authorization': `Bearer ${token}`,
       },
       body: JSON.stringify({
-        orgId: currentOrganization.value.gid,
+        orgId: currentOrganization.value?.gid,
       }),
     })
 
-    const data = await response.json()
+    const data = await response.json() as {
+      message?: string
+      errors?: string[]
+      checks?: any
+      provider?: any
+      domains?: string[]
+      warnings?: string[]
+    }
 
     if (!response.ok) {
       console.error('Error testing SSO:', data)

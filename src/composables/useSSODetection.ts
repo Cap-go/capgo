@@ -70,12 +70,12 @@ export function useSSODetection() {
         return false
       }
 
-      const result = await response.json()
+      const result = await response.json() as { available: boolean, provider_id?: string, entity_id?: string }
 
       if (result.available && result.provider_id) {
         ssoAvailable.value = true
         ssoProviderId.value = result.provider_id
-        ssoEntityId.value = result.entity_id
+        ssoEntityId.value = result.entity_id || null
         return true
       }
 
