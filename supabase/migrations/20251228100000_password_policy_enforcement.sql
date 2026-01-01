@@ -51,7 +51,7 @@ CREATE POLICY "Users can read own password compliance"
 ON "public"."user_password_compliance"
 FOR SELECT
 TO authenticated
-USING (user_id = auth.uid());
+USING (user_id = (select auth.uid()));
 
 -- No INSERT/UPDATE/DELETE for authenticated users - only service_role can write
 -- (Default behavior when no policy exists for those operations)
