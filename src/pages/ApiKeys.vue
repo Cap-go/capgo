@@ -1050,6 +1050,8 @@ getKeys()
             :min-date="minExpirationDate"
             :enable-time-picker="false"
             :time-picker-inline="false"
+            :time-picker="false"
+            :time-config="{ enableTimePicker: false }"
             :dark="isDark"
             teleport="body"
             :auto-apply="true"
