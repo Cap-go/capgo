@@ -1049,6 +1049,7 @@ getKeys()
             v-model="expirationDate"
             :min-date="minExpirationDate"
             :enable-time-picker="false"
+            :time-picker="false"
             :dark="isDark"
             teleport="body"
             :auto-apply="true"
