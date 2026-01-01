@@ -763,6 +763,7 @@
   "secure-key-created": "Sicherer API-Schlüssel erstellt",
   "secure-key-hidden": "Sicherer Schlüssel (verborgen)",
   "secure-key-warning": "Dieser Schlüssel wird nur einmal angezeigt. Kopieren Sie ihn jetzt und speichern Sie ihn sicher. Sie werden ihn nicht wieder sehen können.",
+  "your-api-key": "Your API Key",
   "language": "Sprache",
   "last": "Letzte",
   "last-12-hours": "Letzte 12 Stunden",

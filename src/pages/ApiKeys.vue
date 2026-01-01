@@ -13,7 +13,6 @@ import IconCalendar from '~icons/heroicons/calendar'
 import IconClipboard from '~icons/heroicons/clipboard-document'
 import IconPencil from '~icons/heroicons/pencil'
 import IconTrash from '~icons/heroicons/trash'
-import '@vuepic/vue-datepicker/dist/main.css'
 import Table from '~/components/Table.vue'
 import { formatLocalDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
@@ -21,6 +20,7 @@ import { useDialogV2Store } from '~/stores/dialogv2'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
+import '@vuepic/vue-datepicker/dist/main.css'
 
 const { t } = useI18n()
 const isDark = useDark()
@@ -437,7 +437,7 @@ async function createApiKey(keyType: 'read' | 'write' | 'all' | 'upload') {
     if (isHashed) {
       // For hashed keys, we use the backend API which will hash the key
       // and return the plain key only once for display
-      const { data, error } = await supabase.functions.invoke('public/apikey', {
+      const { data, error } = await supabase.functions.invoke('apikey', {
         method: 'POST',
         body: {
           mode: keyType,
@@ -509,7 +509,7 @@ async function createApiKey(keyType: 'read' | 'write' | 'all' | 'upload') {
 async function showOneTimeKeyModal(plainKey: string) {
   dialogStore.openDialog({
     title: t('secure-key-created'),
-    description: t('secure-key-warning'),
+    description: `${t('secure-key-warning')}\n\n${t('your-api-key')}: ${plainKey}`,
     size: 'lg',
     buttons: [
       {
@@ -566,7 +566,7 @@ async function regenrateKey(apikey: Database['public']['Tables']['apikeys']['Row
     // For hashed keys, we need to hash the new key too
     // We'll update both key_hash with the new hash and keep key as null
     // Use the backend API which handles hashing
-    const { data, error } = await supabase.functions.invoke('public/apikey', {
+    const { data, error } = await supabase.functions.invoke('apikey', {
       method: 'POST',
       body: {
         mode: apikey.mode,
