@@ -1892,7 +1892,7 @@ export type Database = {
       }
       auto_join_user_to_orgs_by_email: {
         Args: { p_email: string; p_user_id: string }
-        Returns: number
+        Returns: undefined
       }
       calculate_credit_cost: {
         Args: {
