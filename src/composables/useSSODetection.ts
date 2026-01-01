@@ -37,70 +37,57 @@ export function useSSODetection() {
    * Calls the database function lookup_sso_provider_by_domain
    */
   async function checkSSO(email: string): Promise<boolean> {
-    console.log('🔍 [useSSODetection] checkSSO called with email:', email)
-
     if (!email || !email.includes('@')) {
-      console.log('❌ [useSSODetection] Invalid email format')
       ssoAvailable.value = false
       return false
     }
 
     const domain = extractDomain(email)
     emailDomain.value = domain
-    console.log('🔍 [useSSODetection] Extracted domain:', domain)
 
     // Don't check for public email providers
     const publicDomains = ['gmail.com', 'yahoo.com', 'outlook.com', 'hotmail.com', 'icloud.com']
     if (publicDomains.includes(domain)) {
-      console.log('❌ [useSSODetection] Public domain detected, skipping SSO check')
       ssoAvailable.value = false
       return false
     }
 
     isCheckingSSO.value = true
-    console.log('🔍 [useSSODetection] Calling RPC: lookup_sso_provider_by_domain with p_email:', email)
 
     try {
-      const { data, error } = await supabase
-        .rpc('lookup_sso_provider_by_domain', { p_email: email })
+      // Use public backend endpoint that doesn't require authentication
+      const apiUrl = import.meta.env.VITE_SUPABASE_URL?.replace('/rest/v1', '') || ''
+      const response = await fetch(`${apiUrl}/functions/v1/sso_check`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email }),
+      })
 
-      console.log('🔍 [useSSODetection] RPC response - data:', data, 'error:', error)
-
-      if (error) {
-        console.error('❌ [useSSODetection] Error checking SSO availability:', error)
+      if (!response.ok) {
         ssoAvailable.value = false
         return false
       }
 
-      // RPC returns an array, get the first result
-      const result: any = Array.isArray(data) ? data[0] : data
-      console.log('🔍 [useSSODetection] Parsed result:', result)
-      console.log('🔍 [useSSODetection] Result type:', typeof result, 'Is array:', Array.isArray(data))
+      const result = await response.json()
 
-      if (result && result.provider_id) {
-        console.log('✅ [useSSODetection] SSO provider found!')
-        console.log('  - Provider ID:', result.provider_id)
-        console.log('  - Entity ID:', result.entity_id)
-        console.log('  - Org ID:', result.org_id)
-        console.log('  - Org Name:', result.org_name)
+      if (result.available && result.provider_id) {
         ssoAvailable.value = true
         ssoProviderId.value = result.provider_id
         ssoEntityId.value = result.entity_id
         return true
       }
 
-      console.log('❌ [useSSODetection] No SSO provider found for domain:', domain)
       ssoAvailable.value = false
       return false
     }
     catch (error) {
-      console.error('❌ [useSSODetection] Exception checking SSO:', error)
       ssoAvailable.value = false
       return false
     }
     finally {
       isCheckingSSO.value = false
-      console.log('🔍 [useSSODetection] checkSSO completed. ssoAvailable:', ssoAvailable.value)
     }
   }
 
@@ -112,8 +99,7 @@ export function useSSODetection() {
    * In local dev: Redirects to mock SSO endpoint
    */
   async function initiateSSO(redirectTo?: string, email?: string): Promise<void> {
-    if (!ssoProviderId.value) {
-      console.error('No SSO provider ID available')
+    if (!ssoProviderId.value)
       return
     }
 
@@ -127,17 +113,11 @@ export function useSSODetection() {
         const relayState = redirectTo || '/dashboard'
         const mockSSOUrl = `${supabaseUrl}/functions/v1/mock-sso-callback?email=${encodeURIComponent(email)}&RelayState=${encodeURIComponent(relayState)}`
 
-        console.log('🔧 Local Supabase detected: Using mock SSO endpoint')
-        console.log('Mock SSO URL:', mockSSOUrl)
-        console.log('Email:', email)
-        console.log('RelayState:', relayState)
-
         window.location.href = mockSSOUrl
         return
       }
 
       // Production/Development/Preprod: Use real Supabase SAML SSO
-      console.log('🔐 Using real SAML SSO with provider:', ssoProviderId.value)
       const options: any = {
         provider: 'saml',
         options: {
@@ -152,10 +132,8 @@ export function useSSODetection() {
 
       const { data, error } = await supabase.auth.signInWithSSO(options)
 
-      if (error) {
-        console.error('Error initiating SSO:', error)
+      if (error)
         throw error
-      }
 
       // Redirect to SSO provider (Okta)
       if (data?.url) {

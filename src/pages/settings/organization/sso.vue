@@ -111,7 +111,7 @@ const metadataXml = ref('')
 const singleDomain = ref('')
 const configuredDomains = ref<string[]>([])
 const ssoEnabled = ref(false)
-const autoJoinEnabled = ref(true)
+const autoJoinEnabled = ref(false)
 
 // Computed Capgo metadata
 const capgoMetadata = computed(() => {
@@ -191,11 +191,8 @@ async function loadSSOConfig() {
 
     ssoConfig.value = data
     ssoEnabled.value = data.enabled || false
-    autoJoinEnabled.value = data.auto_join_enabled !== undefined ? data.auto_join_enabled : true
+    autoJoinEnabled.value = data.auto_join_enabled !== undefined ? data.auto_join_enabled : false
     configuredDomains.value = data.domains || []
-
-    // Debug log
-    console.log('[SSO Config Loaded]', JSON.stringify(data, null, 2))
 
     // Populate form fields if config exists
     if (data.metadata_url) {
@@ -519,11 +516,13 @@ async function toggleSSO() {
       return
     }
 
-    // Only update state after successful API response
-    ssoEnabled.value = newEnabledState
+    // Update config and state from API response
+    ssoConfig.value = data || {}
+    ssoEnabled.value = data.enabled ?? newEnabledState
+    autoJoinEnabled.value = data.auto_join_enabled ?? autoJoinEnabled.value
 
     // If SSO is disabled, also disable auto-join
-    if (!newEnabledState) {
+    if (!ssoEnabled.value) {
       autoJoinEnabled.value = false
     }
 
@@ -588,8 +587,10 @@ async function toggleAutoJoin() {
       return
     }
 
-    // Only update state after successful API response
-    autoJoinEnabled.value = newAutoJoinState
+    // Update config and state from API response
+    ssoConfig.value = data || {}
+    autoJoinEnabled.value = data.auto_join_enabled ?? newAutoJoinState
+    ssoEnabled.value = data.enabled ?? ssoEnabled.value
 
     toast.success(
       autoJoinEnabled.value
@@ -817,15 +818,45 @@ function copyToClipboard(text: string, label: string) {
               </div>
             </div>
 
+            <!-- Auto-Join Banner -->
+            <div class="flex items-center justify-between p-4 border rounded-lg" :class="ssoEnabled && autoJoinEnabled ? 'bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800' : 'bg-gray-50 border-gray-200 dark:bg-gray-800 dark:border-gray-700'">
+              <div class="flex items-center gap-3">
+                <div class="flex items-center justify-center w-10 h-10 rounded-full" :class="ssoEnabled && autoJoinEnabled ? 'bg-blue-100 dark:bg-blue-900/40' : 'bg-gray-100 dark:bg-gray-700'">
+                  <svg class="w-6 h-6" :class="ssoEnabled && autoJoinEnabled ? 'text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                  </svg>
+                </div>
+                <div class="flex-1">
+                  <div class="font-medium" :class="ssoEnabled && autoJoinEnabled ? 'text-blue-800 dark:text-blue-300' : 'text-gray-800 dark:text-gray-300'">
+                    {{ autoJoinEnabled ? t('auto-join-enabled', 'Auto-Join Enabled') : t('auto-join-disabled', 'Auto-Join Disabled') }}
+                  </div>
+                  <div class="text-sm" :class="ssoEnabled && autoJoinEnabled ? 'text-blue-700 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400'">
+                    {{ !ssoEnabled ? t('auto-join-requires-sso', 'Enable SSO to use auto-join') : (autoJoinEnabled ? t('auto-join-enabled-description', 'SSO users are automatically added to the organization') : t('auto-join-disabled-description', 'SSO users must be manually invited')) }}
+                  </div>
+                </div>
+              </div>
+              <label class="relative inline-flex items-center" :class="ssoEnabled ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'">
+                <input :checked="autoJoinEnabled" type="checkbox" class="sr-only peer" :disabled="isSaving || !ssoEnabled" @change="toggleAutoJoin">
+                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600 peer-disabled:cursor-not-allowed" />
+              </label>
+            </div>
+
             <div class="p-4 border rounded-lg dark:bg-gray-800 dark:border-gray-600 border-slate-300">
               <h4 class="mb-3 font-medium dark:text-white text-slate-800">
                 {{ t('current-configuration', 'Current Configuration') }}
               </h4>
               <div class="space-y-2">
                 <div class="flex justify-between">
-                  <span class="text-gray-600 dark:text-gray-400">{{ t('status', 'Status') }}:</span>
+                  <span class="text-gray-600 dark:text-gray-400">{{ t('sso-status', 'SSO Status') }}:</span>
                   <span class="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full" :class="ssoEnabled ? 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300' : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'">
                     {{ ssoEnabled ? t('enabled', 'Enabled') : t('disabled', 'Disabled') }}
+                  </span>
+                </div>
+
+                <div class="flex justify-between">
+                  <span class="text-gray-600 dark:text-gray-400">{{ t('auto-join-status', 'Auto-Join Status') }}:</span>
+                  <span class="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full" :class="autoJoinEnabled ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300' : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'">
+                    {{ autoJoinEnabled ? t('enabled', 'Enabled') : t('disabled', 'Disabled') }}
                   </span>
                 </div>
 
@@ -852,8 +883,8 @@ function copyToClipboard(text: string, label: string) {
             </div>
           </div>
 
-          <!-- Wizard Steps Indicator (shown when wizard is visible and not fully configured) -->
-          <div v-if="showWizard && !ssoConfigured" class="flex items-center justify-center gap-2 p-4">
+          <!-- Wizard Steps Indicator (shown when wizard is visible and not fully configured, hidden on step 5) -->
+          <div v-if="showWizard && !ssoConfigured && currentStep < 5" class="flex items-center justify-center gap-2 p-4">
             <div v-for="step in 5" :key="step" class="flex items-center">
               <div class="flex flex-col items-center">
                 <div class="flex items-center justify-center w-8 h-8 rounded-full font-medium text-sm transition-colors" :class="currentStep >= step ? 'bg-blue-600 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400'">
@@ -1181,7 +1212,7 @@ function copyToClipboard(text: string, label: string) {
                   </div>
                 </div>
                 <label class="relative inline-flex items-center cursor-pointer">
-                  <input v-model="ssoEnabled" type="checkbox" class="sr-only peer" :disabled="isSaving" @change="toggleSSO">
+                  <input :checked="ssoEnabled" type="checkbox" class="sr-only peer" :disabled="isSaving" @change="toggleSSO">
                   <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600" />
                 </label>
               </div>
@@ -1204,7 +1235,7 @@ function copyToClipboard(text: string, label: string) {
                   </div>
                 </div>
                 <label class="relative inline-flex items-center" :class="ssoEnabled ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'">
-                  <input v-model="autoJoinEnabled" type="checkbox" class="sr-only peer" :disabled="isSaving || !ssoEnabled" @change="toggleAutoJoin">
+                  <input :checked="autoJoinEnabled" type="checkbox" class="sr-only peer" :disabled="isSaving || !ssoEnabled" @change="toggleAutoJoin">
                   <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600 peer-disabled:cursor-not-allowed" />
                 </label>
               </div>
