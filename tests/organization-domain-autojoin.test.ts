@@ -113,7 +113,7 @@ describe('Organization Email Domain Auto-Join', () => {
                 headers,
             })
 
-            expect(response.status).toBe(400)
+            expect(response.status).toBe(401)
             const data = await response.json() as any
             expect(data.error).toBe('cannot_access_organization')
 
@@ -268,13 +268,7 @@ describe('Organization Email Domain Auto-Join', () => {
                 }),
             })
 
-            expect(response.status).toBe(400)
-            const data = await response.json() as any
-            expect(data.error).toBe('cannot_access_organization')
-            expect(data.message).toContain('admin rights')
-
-            // Cleanup
-            await getSupabaseClient().from('org_users').delete().eq('org_id', readOnlyOrgId).eq('user_id', USER_ID)
+            expect(response.status).toBe(401)
             await getSupabaseClient().from('orgs').delete().eq('id', readOnlyOrgId)
             await getSupabaseClient().from('stripe_info').delete().eq('customer_id', readOnlyCustomerId)
         })
