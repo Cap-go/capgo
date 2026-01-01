@@ -7,7 +7,7 @@ import { apikeyHasOrgRight, hasOrgRightApikey, supabaseApikey } from '../../../u
 
 const bodySchema = z.object({
   orgId: z.string(),
-  domains: z.array(z.string().min(1)),
+  domains: z.array(z.string().check(z.minLength(1))),
 })
 
 /**
