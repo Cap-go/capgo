@@ -687,6 +687,7 @@
   "expose-metadata-help": "Когда включено, ссылка на пакет и поля комментариев будут отправлены в плагин Capacitor Updater (требуется версия плагина 7.35.0 или выше)",
   "expiration-date": "Дата истечения",
   "expiration-date-required": "Пожалуйста, выберите дату истечения",
+  "select-expiration-date": "Выберите дату истечения",
   "expired": "Истёк",
   "expires": "Истекает",
   "external-storage": "Внешнее хранилище",

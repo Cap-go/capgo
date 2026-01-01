@@ -687,6 +687,7 @@
   "expose-metadata-help": "Cuando está habilitado, los campos de enlace y comentario del paquete se enviarán al complemento Capacitor Updater (requiere la versión 7.35.0 o superior del complemento)",
   "expiration-date": "Fecha de expiración",
   "expiration-date-required": "Por favor seleccione una fecha de expiración",
+  "select-expiration-date": "Seleccionar fecha de expiración",
   "expired": "Expirado",
   "expires": "Expira",
   "external-storage": "Almacenamiento externo",

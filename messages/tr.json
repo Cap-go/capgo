@@ -687,6 +687,7 @@
   "expose-metadata-help": "Etkinleştirildiğinde, paket bağlantısı ve yorum alanları Capacitor Updater eklentisine gönderilecektir (eklenti sürümü 7.35.0 veya daha yüksek olmalıdır)",
   "expiration-date": "Son kullanma tarihi",
   "expiration-date-required": "Lütfen bir son kullanma tarihi seçin",
+  "select-expiration-date": "Son kullanma tarihi seçin",
   "expired": "Süresi doldu",
   "expires": "Sona eriyor",
   "external-storage": "Dış depolama",

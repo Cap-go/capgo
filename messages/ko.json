@@ -687,6 +687,7 @@
   "expose-metadata-help": "활성화되면 번들 링크와 댓글 필드가 Capacitor Updater 플러그인으로 전송됩니다 (플러그인 버전 7.35.0 이상 필요)",
   "expiration-date": "만료일",
   "expiration-date-required": "만료일을 선택해주세요",
+  "select-expiration-date": "만료일 선택",
   "expired": "만료됨",
   "expires": "만료",
   "external-storage": "외부 저장소",
