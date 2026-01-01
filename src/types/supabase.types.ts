@@ -1346,6 +1346,7 @@ export type Database = {
           created_by: string
           customer_id: string | null
           email_preferences: Json
+          enforce_encrypted_bundles: boolean
           enforce_hashed_api_keys: boolean
           enforcing_2fa: boolean
           id: string
@@ -1364,6 +1365,7 @@ export type Database = {
           created_by: string
           customer_id?: string | null
           email_preferences?: Json
+          enforce_encrypted_bundles?: boolean
           enforce_hashed_api_keys?: boolean
           enforcing_2fa?: boolean
           id?: string
@@ -1382,6 +1384,7 @@ export type Database = {
           created_by?: string
           customer_id?: string | null
           email_preferences?: Json
+          enforce_encrypted_bundles?: boolean
           enforce_hashed_api_keys?: boolean
           enforcing_2fa?: boolean
           id?: string
@@ -2229,6 +2232,10 @@ export type Database = {
             }
             Returns: boolean
           }
+      check_org_encrypted_bundle_enforcement: {
+        Args: { org_id: string; session_key: string }
+        Returns: boolean
+      }
       check_org_hashed_key_enforcement: {
         Args: {
           apikey_row: Database["public"]["Tables"]["apikeys"]["Row"]
@@ -2303,6 +2310,7 @@ export type Database = {
         Args: { key_value: string }
         Returns: {
           created_at: string | null
+          expires_at: string | null
           id: number
           key: string | null
           key_hash: string | null
@@ -2600,6 +2608,7 @@ export type Database = {
               credit_available: number
               credit_next_expiration: string
               credit_total: number
+              enforce_encrypted_bundles: boolean
               enforce_hashed_api_keys: boolean
               enforcing_2fa: boolean
               gid: string
@@ -2607,7 +2616,7 @@ export type Database = {
               is_yearly: boolean
               logo: string
               management_email: string
-              max_apikey_expiration_days: number | null
+              max_apikey_expiration_days: number
               name: string
               next_stats_update_at: string
               password_has_access: boolean
@@ -2631,6 +2640,7 @@ export type Database = {
               credit_available: number
               credit_next_expiration: string
               credit_total: number
+              enforce_encrypted_bundles: boolean
               enforce_hashed_api_keys: boolean
               enforcing_2fa: boolean
               gid: string
@@ -2638,7 +2648,7 @@ export type Database = {
               is_yearly: boolean
               logo: string
               management_email: string
-              max_apikey_expiration_days: number | null
+              max_apikey_expiration_days: number
               name: string
               next_stats_update_at: string
               password_has_access: boolean
@@ -2850,6 +2860,7 @@ export type Database = {
         Args: { org_id: string }
         Returns: boolean
       }
+      is_bundle_encrypted: { Args: { session_key: string }; Returns: boolean }
       is_canceled_org: { Args: { orgid: string }; Returns: boolean }
       is_good_plan_v5_org: { Args: { orgid: string }; Returns: boolean }
       is_mau_exceeded_by_org: { Args: { org_id: string }; Returns: boolean }
@@ -2974,6 +2985,10 @@ export type Database = {
       }
       reject_access_due_to_2fa_for_app: {
         Args: { app_id: string }
+        Returns: boolean
+      }
+      reject_access_due_to_2fa_for_org: {
+        Args: { org_id: string }
         Returns: boolean
       }
       reject_access_due_to_password_policy: {
