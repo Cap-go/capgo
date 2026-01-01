@@ -21,7 +21,7 @@ else
 fi
 
 # Select which region to use (change this to switch regions)
-SELECTED_REGION="PLANETSCALE_SA"
+SELECTED_REGION="PLANETSCALE_EU"
 DB_T="${!SELECTED_REGION}"
 
 if [[ -z "$DB_T" ]]; then
