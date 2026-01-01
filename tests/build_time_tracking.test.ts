@@ -1,13 +1,12 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { BASE_URL, BUILD_TIME_ORG_ID, BUILD_TIME_STRIPE_CUSTOMER_ID, fetchWithRetry, getSupabaseClient, PRODUCT_ID, resetAndSeedAppDataStats, resetAppData, resetAppDataStats, TEST_EMAIL, USER_ID } from './test-utils.ts'
+import { BASE_URL, fetchWithRetry, getSupabaseClient, PRODUCT_ID, resetAndSeedAppDataStats, resetAppData, resetAppDataStats, TEST_EMAIL, USER_ID } from './test-utils.ts'
 
-// Use dedicated org/customer IDs to avoid interference with other tests
-const ORG_ID = BUILD_TIME_ORG_ID
-const STRIPE_CUSTOMER_ID = BUILD_TIME_STRIPE_CUSTOMER_ID
-
-const id = randomUUID()
-const APPNAME = `com.build_time.${id}`
+// Generate unique IDs per test run to avoid conflicts with parallel test runs
+const testRunId = randomUUID()
+const ORG_ID = testRunId // Use UUID directly as org_id
+const STRIPE_CUSTOMER_ID = `cus_build_time_${testRunId.slice(0, 8)}`
+const APPNAME = `com.build_time.${testRunId.slice(0, 8)}`
 const headers = {
   'Content-Type': 'application/json',
   'apisecret': 'testsecret',

@@ -50,9 +50,6 @@ export const APIKEY_STATS = '8b2c3d4e-5f6a-4c7b-8d9e-0f1a2b3c4d5e' // Dedicated 
 export const APP_NAME_STATS = 'com.stats.app' // Dedicated app for statistics tests
 export const PLAN_ORG_ID = '0f2f8c2a-6a1d-4a6c-a9a8-b1b2c3d4e5f6'
 export const PLAN_STRIPE_CUSTOMER_ID = 'cus_plan_test_123456'
-// Dedicated IDs for build_time_tracking tests to avoid interference with other tests
-export const BUILD_TIME_ORG_ID = 'c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f'
-export const BUILD_TIME_STRIPE_CUSTOMER_ID = 'cus_build_time_test_123456'
 export const USER_EMAIL = 'test@capgo.app'
 export const TEST_EMAIL = 'test@test.com'
 export const PRODUCT_ID = 'prod_LQIregjtNduh4q'
