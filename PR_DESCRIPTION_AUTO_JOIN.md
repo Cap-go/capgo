@@ -2,7 +2,9 @@
 
 ## 🎯 Summary
 
-Implements domain-based automatic member enrollment for organizations, allowing admins to configure email domains (e.g., `@company.com`) that automatically add new users to their organization when they sign up or log in. This eliminates the need for manual invitations for team members from the same company.
+Implements **standalone** domain-based automatic member enrollment for organizations. This feature allows admins to configure email domains (e.g., `@company.com`) that automatically add new users to their organization when they sign up or log in. This eliminates the need for manual invitations for team members from the same company.
+
+**🔑 Key Point**: Auto-join is now a **separate, reusable feature independent of SSO/SAML**. While it shares some database columns for domain management, it operates independently and can be used in any project requiring automatic team enrollment based on email domains.
 
 ## 💡 Motivation
 
@@ -12,9 +14,25 @@ Implements domain-based automatic member enrollment for organizations, allowing 
 
 **Use Cases**:
 - Enterprise teams onboarding new developers
-- Companies wanting seamless team access without invitation emails
+- Companies wanting seamless team access without invitation emails  
 - Educational institutions managing student accounts
 - SaaS platforms with multi-tenant organizations
+- **Any application requiring domain-based automatic team enrollment**
+
+## 🏗️ Architecture
+
+### Feature Independence
+- **Standalone functionality**: Does not require SSO/SAML to be implemented
+- **Reusable design**: Can be extracted and used in other projects
+- **Separate endpoints**: `/organization/domains` API for domain management
+- **Independent toggle**: `sso_enabled` flag controls auto-join (naming for historical reasons, not SSO-dependent)
+- **Database triggers**: Automatic enrollment handled at database level for reliability
+
+### Integration Points
+- Works with any authentication system (email/password, OAuth, SSO, etc.)
+- Triggers on user creation (`auth.users` table insert)
+- Can be combined with SSO but doesn't require it
+- Domain uniqueness enforcement optional (controlled by `sso_enabled` flag)
 
 ## 🔧 Implementation Details
 
@@ -22,8 +40,8 @@ Implements domain-based automatic member enrollment for organizations, allowing 
 
 #### New Columns (`orgs` table)
 - `allowed_email_domains` (text[]): Array of domains allowed for auto-join
-- `sso_enabled` (boolean): Master toggle for auto-join functionality
-- `sso_domain_keys` (text[]): Internal keys for SSO domain uniqueness enforcement
+- `sso_enabled` (boolean): Toggle for auto-join functionality (naming is historical)
+- `sso_domain_keys` (text[]): Internal keys for domain uniqueness enforcement when enabled
 
 #### New Database Functions
 1. **`extract_email_domain(email)`**: Extracts domain from email address
@@ -133,6 +151,29 @@ Complete list in [`is_blocked_email_domain` function](supabase/migrations/202512
 - Free providers: gmail.com, yahoo.com, outlook.com, hotmail.com, icloud.com, etc.
 - Disposable email: tempmail.com, 10minutemail.com, guerrillamail.com, etc.
 - Total: 50+ blocked domains
+
+## 🔄 Reusability & Portability
+
+### Using Auto-Join in Other Projects
+
+This feature is designed to be **standalone and portable**. To integrate into another project:
+
+1. **Copy database migrations**: All 5 migration files contain self-contained logic
+2. **Copy backend endpoints**: `/organization/domains` API endpoints are framework-agnostic
+3. **Adapt database triggers**: Modify trigger to match your auth table structure
+4. **Configure domain validation**: Customize blocked domain list for your use case
+5. **Optional: Copy frontend UI**: Vue component can be adapted or rebuilt for your framework
+
+**Key Files to Port**:
+- Migrations: `supabase/migrations/202512220*.sql`, `20251231000001_add_domain_based_auto_join.sql`
+- Backend API: `supabase/functions/_backend/public/organization/domains/`
+- Frontend UI: `src/pages/settings/organization/autojoin.vue`
+- Tests: `tests/organization-domain-autojoin.test.ts`
+
+**Requirements**:
+- PostgreSQL database (or adaptable to other SQL databases)
+- User authentication system with email addresses
+- Organization/team structure with membership table
 
 ### User Flow Examples
 
