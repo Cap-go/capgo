@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import IconCheck from '~icons/heroicons/check-circle'
 import IconWarning from '~icons/heroicons/exclamation-triangle'
+import IconFingerprint from '~icons/heroicons/finger-print'
 import IconKey from '~icons/heroicons/key'
 import IconLock from '~icons/heroicons/lock-closed'
 import IconShield from '~icons/heroicons/shield-check'
@@ -863,13 +864,19 @@ onMounted(async () => {
 
           <!-- Password Policy Section -->
           <section class="p-6 border rounded-lg border-slate-200 dark:border-slate-700">
-            <h3 class="mb-4 text-lg font-semibold dark:text-white text-slate-800">
-              {{ t('password-policy') }}
-            </h3>
-
-            <p class="mb-4 text-sm text-gray-600 dark:text-gray-400">
-              {{ t('password-policy-description') }}
-            </p>
+            <div class="flex items-start gap-4 mb-4">
+              <div class="p-3 rounded-lg bg-indigo-50 dark:bg-indigo-900/30">
+                <IconFingerprint class="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
+              </div>
+              <div>
+                <h3 class="text-lg font-semibold dark:text-white text-slate-800">
+                  {{ t('password-policy') }}
+                </h3>
+                <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                  {{ t('password-policy-description') }}
+                </p>
+              </div>
+            </div>
 
             <!-- Enable/Disable Toggle -->
             <div class="flex items-center justify-between p-3 mb-4 rounded-lg bg-gray-50 dark:bg-gray-700/50">
