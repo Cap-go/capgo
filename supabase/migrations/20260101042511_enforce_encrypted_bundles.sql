@@ -233,8 +233,8 @@ BEGIN
         WHEN o.enforcing_2fa = false THEN true
         ELSE public.has_2fa_enabled(userid)
       END AS "2fa_has_access",
-      -- should_redact: true if org enforces 2FA and user doesn't have 2FA
-      (o.enforcing_2fa = true AND NOT public.has_2fa_enabled(userid)) AS should_redact
+      -- should_redact_2fa: true if org enforces 2FA and user doesn't have 2FA
+      (o.enforcing_2fa = true AND NOT public.has_2fa_enabled(userid)) AS should_redact_2fa
     FROM public.orgs o
     JOIN public.org_users ou ON ou.user_id = userid AND o.id = ou.org_id
   ),
@@ -243,7 +243,9 @@ BEGIN
     SELECT
       o.id AS org_id,
       o.password_policy_config,
-      public.user_meets_password_policy(userid, o.id) AS "password_has_access"
+      public.user_meets_password_policy(userid, o.id) AS "password_has_access",
+      -- should_redact_password: true if org has policy and user doesn't meet it
+      NOT public.user_meets_password_policy(userid, o.id) AS should_redact_password
     FROM public.orgs o
     JOIN public.org_users ou ON ou.user_id = userid AND o.id = ou.org_id
   )
@@ -253,41 +255,41 @@ BEGIN
     o.logo,
     o.name,
     ou.user_right::varchar AS role,
-    -- Redact sensitive fields if user doesn't have 2FA access
+    -- Redact sensitive fields if user doesn't have 2FA or password policy access
     CASE
-      WHEN tfa.should_redact THEN false
+      WHEN tfa.should_redact_2fa OR pa.should_redact_password THEN false
       ELSE (si.status = 'succeeded')
     END AS paying,
     CASE
-      WHEN tfa.should_redact THEN 0
+      WHEN tfa.should_redact_2fa OR pa.should_redact_password THEN 0
       ELSE GREATEST(COALESCE((si.trial_at::date - now()::date), 0), 0)::integer
     END AS trial_left,
     CASE
-      WHEN tfa.should_redact THEN false
+      WHEN tfa.should_redact_2fa OR pa.should_redact_password THEN false
       ELSE ((si.status = 'succeeded' AND si.is_good_plan = true) OR (si.trial_at::date - now()::date > 0))
     END AS can_use_more,
     CASE
-      WHEN tfa.should_redact THEN false
+      WHEN tfa.should_redact_2fa OR pa.should_redact_password THEN false
       ELSE (si.status = 'canceled')
     END AS is_canceled,
     CASE
-      WHEN tfa.should_redact THEN 0::bigint
+      WHEN tfa.should_redact_2fa OR pa.should_redact_password THEN 0::bigint
       ELSE COALESCE(ac.cnt, 0)
     END AS app_count,
     CASE
-      WHEN tfa.should_redact THEN NULL::timestamptz
+      WHEN tfa.should_redact_2fa OR pa.should_redact_password THEN NULL::timestamptz
       ELSE bc.cycle_start
     END AS subscription_start,
     CASE
-      WHEN tfa.should_redact THEN NULL::timestamptz
+      WHEN tfa.should_redact_2fa OR pa.should_redact_password THEN NULL::timestamptz
       ELSE (bc.cycle_start + INTERVAL '1 MONTH')
     END AS subscription_end,
     CASE
-      WHEN tfa.should_redact THEN NULL::text
+      WHEN tfa.should_redact_2fa OR pa.should_redact_password THEN NULL::text
       ELSE o.management_email
     END AS management_email,
     CASE
-      WHEN tfa.should_redact THEN false
+      WHEN tfa.should_redact_2fa OR pa.should_redact_password THEN false
       ELSE COALESCE(si.price_id = p.price_y_id, false)
     END AS is_yearly,
     o.stats_updated_at,
