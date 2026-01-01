@@ -143,6 +143,9 @@ async function foundAPIKey(c: Context, capgkeyString: string, rights: Database['
     apikey,
   } as AuthInfo)
   c.set('apikey', apikey)
+  // Store the original key string for hashed key authentication
+  // This is needed because hashed keys have key=null in the database
+  c.set('capgkey', capgkeyString)
   if (subkey_id) {
     cloudlog({ requestId: c.get('requestId'), message: 'Subkey id provided', subkey_id })
     const subkey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKeyById(c, subkey_id, supabaseAdmin(c), rights)
