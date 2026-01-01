@@ -31,6 +31,9 @@ COMMENT ON COLUMN public.orgs.sso_enabled IS 'Whether domain-based auto-join is 
 -- This is the NON-SSO version that uses orgs.allowed_email_domains
 -- ============================================================================
 
+-- Drop existing function if return type changed
+DROP FUNCTION IF EXISTS public.auto_join_user_to_orgs_by_email(uuid, text);
+
 CREATE OR REPLACE FUNCTION public.auto_join_user_to_orgs_by_email(
   p_user_id uuid,
   p_email text
