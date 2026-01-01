@@ -666,50 +666,6 @@ onMounted(async () => {
             </div>
           </section>
 
-          <!-- Hashed API Keys Enforcement Section -->
-          <section class="p-6 border rounded-lg border-slate-200 dark:border-slate-700">
-            <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-              <div class="flex items-start gap-4">
-                <div class="p-3 rounded-lg bg-amber-50 dark:bg-amber-900/30">
-                  <IconKey class="w-6 h-6 text-amber-600 dark:text-amber-400" />
-                </div>
-                <div>
-                  <h3 class="text-lg font-semibold dark:text-white text-slate-800">
-                    {{ t('enforce-hashed-api-keys') }}
-                  </h3>
-                  <p class="mt-1 text-sm text-slate-600 dark:text-slate-400">
-                    {{ t('enforce-hashed-api-keys-description') }}
-                  </p>
-                </div>
-              </div>
-              <div class="flex items-center gap-4">
-                <button
-                  type="button"
-                  :disabled="!hasOrgPerm || isSaving"
-                  class="relative inline-flex items-center cursor-pointer"
-                  :class="{ 'opacity-50 cursor-not-allowed': !hasOrgPerm || isSaving }"
-                  @click="toggleEnforceHashedApiKeys"
-                >
-                  <div
-                    class="w-11 h-6 rounded-full transition-colors duration-200 ease-in-out"
-                    :class="enforceHashedApiKeys ? 'bg-amber-600' : 'bg-gray-200 dark:bg-gray-700'"
-                  >
-                    <div
-                      class="absolute top-[2px] left-[2px] bg-white border-gray-300 border rounded-full h-5 w-5 transition-transform duration-200 ease-in-out"
-                      :class="enforceHashedApiKeys ? 'translate-x-full border-white' : ''"
-                    />
-                  </div>
-                </button>
-                <span v-if="enforceHashedApiKeys" class="px-3 py-1 text-sm font-medium text-amber-700 bg-amber-100 rounded-full dark:bg-amber-900/30 dark:text-amber-400">
-                  {{ t('enabled') }}
-                </span>
-                <span v-else class="px-3 py-1 text-sm font-medium text-gray-700 bg-gray-100 rounded-full dark:bg-gray-700 dark:text-gray-300">
-                  {{ t('disabled') }}
-                </span>
-              </div>
-            </div>
-          </section>
-
           <!-- Members 2FA Status Overview -->
           <section v-if="hasOrgPerm" class="p-6 border rounded-lg border-slate-200 dark:border-slate-700">
             <h3 class="mb-4 text-lg font-semibold dark:text-white text-slate-800">
@@ -900,12 +856,6 @@ onMounted(async () => {
                 >
               </div>
             </div>
-
-            <!-- Saving Indicator -->
-            <div v-if="isSaving" class="flex items-center mt-4 space-x-2 text-sm text-gray-500 dark:text-gray-400">
-              <Spinner size="w-4 h-4" color="fill-blue-500 text-gray-200" />
-              <span>{{ t('saving') }}...</span>
-            </div>
           </section>
 
           <!-- Password Policy Members Status Overview -->
@@ -1016,17 +966,43 @@ onMounted(async () => {
             </div>
           </section>
 
-          <!-- API Key Expiration Policy Section -->
+          <!-- API Key Policy Section -->
           <section v-if="hasOrgPerm" class="p-6 border rounded-lg border-slate-200 dark:border-slate-700">
-            <h3 class="mb-4 text-lg font-semibold dark:text-white text-slate-800">
-              {{ t('api-key-policy') }}
-            </h3>
-
-            <p class="mb-4 text-sm text-gray-600 dark:text-gray-400">
-              {{ t('api-key-policy-description') }}
-            </p>
+            <div class="flex items-start gap-4 mb-4">
+              <div class="p-3 rounded-lg bg-amber-50 dark:bg-amber-900/30">
+                <IconKey class="w-6 h-6 text-amber-600 dark:text-amber-400" />
+              </div>
+              <div>
+                <h3 class="text-lg font-semibold dark:text-white text-slate-800">
+                  {{ t('api-key-policy') }}
+                </h3>
+                <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                  {{ t('api-key-policy-description') }}
+                </p>
+              </div>
+            </div>
 
             <div class="space-y-4">
+              <!-- Enforce Secure API Keys toggle -->
+              <div class="flex items-center justify-between p-3 rounded-lg bg-gray-50 dark:bg-gray-700/50">
+                <div>
+                  <span class="font-medium dark:text-white text-slate-800">{{ t('enforce-hashed-api-keys') }}</span>
+                  <p class="text-sm text-gray-500 dark:text-gray-400">
+                    {{ t('enforce-hashed-api-keys-description') }}
+                  </p>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    :checked="enforceHashedApiKeys"
+                    :disabled="isSaving"
+                    class="sr-only peer"
+                    @change="toggleEnforceHashedApiKeys"
+                  >
+                  <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-amber-300 dark:peer-focus:ring-amber-800 rounded-full peer dark:bg-gray-600 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-500 peer-checked:bg-amber-600 peer-disabled:opacity-50 peer-disabled:cursor-not-allowed" />
+                </label>
+              </div>
+
               <!-- Require API key expiration toggle -->
               <div class="flex items-center justify-between p-3 rounded-lg bg-gray-50 dark:bg-gray-700/50">
                 <div>
@@ -1068,12 +1044,6 @@ onMounted(async () => {
                   >
                 </div>
               </div>
-            </div>
-
-            <!-- Saving Indicator -->
-            <div v-if="isSaving" class="flex items-center mt-4 space-x-2 text-sm text-gray-500 dark:text-gray-400">
-              <Spinner size="w-4 h-4" color="fill-blue-500 text-gray-200" />
-              <span>{{ t('saving') }}...</span>
             </div>
           </section>
 
