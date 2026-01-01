@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
-import { BASE_URL, getSupabaseClient, ORG_ID, PRODUCT_ID, resetAndSeedAppDataStats, resetAppData, resetAppDataStats, STRIPE_INFO_CUSTOMER_ID, TEST_EMAIL, USER_ID } from './test-utils.ts'
+import { BASE_URL, fetchWithRetry, getSupabaseClient, ORG_ID, PRODUCT_ID, resetAndSeedAppDataStats, resetAppData, resetAppDataStats, STRIPE_INFO_CUSTOMER_ID, TEST_EMAIL, USER_ID } from './test-utils.ts'
 
 const id = randomUUID()
 const APPNAME = `com.cp.${id}`
@@ -149,7 +149,7 @@ describe('build Time Tracking System', () => {
     // Verify our inserted build time is the only one (should be exactly 36000)
     expect((totalMetrics as any)?.[0]?.build_time_unit).toBe(36000)
 
-    const response = await fetch(`${BASE_URL}/triggers/cron_stat_org`, {
+    const response = await fetchWithRetry(`${BASE_URL}/triggers/cron_stat_org`, {
       method: 'POST',
       headers,
       body: JSON.stringify({ orgId: ORG_ID }),

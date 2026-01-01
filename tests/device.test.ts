@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { APP_NAME, BASE_URL, headers, resetAndSeedAppData, resetAndSeedAppDataStats, resetAppData, resetAppDataStats } from './test-utils.ts'
+import { APP_NAME, BASE_URL, fetchWithRetry, headers, resetAndSeedAppData, resetAndSeedAppDataStats, resetAppData, resetAppDataStats } from './test-utils.ts'
 
 const id = randomUUID()
 const APPNAME_DEVICE = `${APP_NAME}.d.${id}`
@@ -130,11 +130,13 @@ describe('[POST] /device operations', () => {
 
 describe('[DELETE] /device operations', () => {
   it('unlink device', async () => {
-    const response = await fetch(`${BASE_URL}/device`, {
+    // Use the device ID that was linked in the POST test
+    const deviceId = '11111111-1111-1111-1111-111111111111'
+    const response = await fetchWithRetry(`${BASE_URL}/device`, {
       method: 'DELETE',
       headers,
       body: JSON.stringify({
-        device_id: 'test_device',
+        device_id: deviceId,
         app_id: APPNAME_DEVICE,
       }),
     })
