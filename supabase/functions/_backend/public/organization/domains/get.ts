@@ -29,7 +29,7 @@ export async function getDomains(c: Context, bodyRaw: any, apikey: Database['pub
   const body = bodyParsed.data
 
   // Check if user has read rights for this org
-  if (!(await hasOrgRightApikey(c, body.orgId, apikey.user_id, 'read', c.get('capgkey') as string)) || !(apikeyHasOrgRight(apikey, body.orgId))) {
+  if (!(await hasOrgRightApikey(c, body.orgId, apikey.user_id, 'read', c.get('capgkey') as string) && apikeyHasOrgRight(apikey, body.orgId))) {
     throw simpleError('cannot_access_organization', 'You can\'t access this organization', { orgId: body.orgId })
   }
 

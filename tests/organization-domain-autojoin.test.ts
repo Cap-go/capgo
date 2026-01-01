@@ -8,6 +8,11 @@ const TEST_ORG_NAME = `Auto-Join Test Org ${randomUUID()}`
 const TEST_CUSTOMER_ID = `cus_autojoin_${randomUUID()}`
 
 beforeAll(async () => {
+    // Clean up any leftover test data first
+    await getSupabaseClient().from('org_users').delete().eq('org_id', TEST_ORG_ID)
+    await getSupabaseClient().from('orgs').delete().eq('id', TEST_ORG_ID)
+    await getSupabaseClient().from('stripe_info').delete().eq('customer_id', TEST_CUSTOMER_ID)
+
     // Create stripe_info for test org
     const { error: stripeError } = await getSupabaseClient().from('stripe_info').insert({
         customer_id: TEST_CUSTOMER_ID,
@@ -30,10 +35,20 @@ beforeAll(async () => {
     })
     if (error)
         throw error
+
+    // Add test user as super_admin of the test org (ignore if already exists)
+    await getSupabaseClient().from('org_users').upsert({
+        org_id: TEST_ORG_ID,
+        user_id: USER_ID,
+        user_right: 'super_admin',
+    }, {
+        onConflict: 'user_id,org_id',
+    })
 })
 
 afterAll(async () => {
-    // Clean up test organization and stripe_info
+    // Clean up test organization membership, stripe_info, and org
+    await getSupabaseClient().from('org_users').delete().eq('org_id', TEST_ORG_ID)
     await getSupabaseClient().from('orgs').delete().eq('id', TEST_ORG_ID)
     await getSupabaseClient().from('stripe_info').delete().eq('customer_id', TEST_CUSTOMER_ID)
 })
