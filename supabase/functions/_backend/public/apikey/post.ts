@@ -1,18 +1,22 @@
+import type { AuthInfo } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
 import { hashApiKey } from '../../utils/hash.ts'
 import { honoFactory, parseBody, quickError, simpleError } from '../../utils/hono.ts'
-import { middlewareKey } from '../../utils/hono_middleware.ts'
-import { supabaseApikey, validateExpirationAgainstOrgPolicies, validateExpirationDate } from '../../utils/supabase.ts'
+import { middlewareV2 } from '../../utils/hono_middleware.ts'
+import { supabaseWithAuth, validateExpirationAgainstOrgPolicies, validateExpirationDate } from '../../utils/supabase.ts'
 import { Constants } from '../../utils/supabase.types.ts'
 
 const app = honoFactory.createApp()
 
-app.post('/', middlewareKey(['all']), async (c) => {
-  const key = c.get('apikey')!
+app.post('/', middlewareV2(['all']), async (c) => {
+  const auth = c.get('auth') as AuthInfo
+  const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row'] | undefined
 
-  if (key.limited_to_orgs?.length) {
-    throw simpleError('cannot_create_apikey', 'You cannot do that as a limited API key', { key })
+  // Only check limited_to_orgs constraint for API key auth (not JWT)
+  if (auth.authType === 'apikey' && apikey?.limited_to_orgs?.length) {
+    throw simpleError('cannot_create_apikey', 'You cannot do that as a limited API key', { apikey })
   }
+
   const body = await parseBody<any>(c)
 
   const orgId = body.org_id
@@ -41,15 +45,14 @@ app.post('/', middlewareKey(['all']), async (c) => {
   // Generate the plain key
   const plainKey = crypto.randomUUID()
 
-  // Use anon client with capgkey header; RLS enforces ownership via user_id
-  // For hashed keys, we need to use the parent key for authentication
-  const supabase = supabaseApikey(c, key.key)
+  // Use supabaseWithAuth which handles both JWT and API key authentication
+  const supabase = supabaseWithAuth(c, auth)
 
   // Collect all org IDs for policy validation
   let allOrgIds: string[] = [...limitedToOrgs]
 
   const newData: Database['public']['Tables']['apikeys']['Insert'] = {
-    user_id: key.user_id,
+    user_id: auth.userId,
     // For hashed keys: key is null, key_hash stores the hash
     // For plain keys: key stores the plain value, key_hash is null
     key: isHashed ? null : plainKey,
