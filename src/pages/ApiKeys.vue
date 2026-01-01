@@ -13,7 +13,6 @@ import IconCalendar from '~icons/heroicons/calendar'
 import IconClipboard from '~icons/heroicons/clipboard-document'
 import IconPencil from '~icons/heroicons/pencil'
 import IconTrash from '~icons/heroicons/trash'
-import '@vuepic/vue-datepicker/dist/main.css'
 import Table from '~/components/Table.vue'
 import { formatLocalDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
@@ -21,6 +20,7 @@ import { useDialogV2Store } from '~/stores/dialogv2'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
+import '@vuepic/vue-datepicker/dist/main.css'
 
 const { t } = useI18n()
 const isDark = useDark()
