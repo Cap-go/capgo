@@ -499,3 +499,99 @@ describe('Expired API key rejection', () => {
     expect(response.status).toBe(200)
   })
 })
+
+describe('API key expiration boundary conditions', () => {
+  it('API key expiring exactly at current time should be rejected', async () => {
+    // Create an API key with future expiration
+    const response = await fetch(`${BASE_URL}/apikey`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        name: 'key-boundary-test',
+        expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      }),
+    })
+    const data = await response.json<{ id: number, key: string }>()
+    expect(response.status).toBe(200)
+
+    // Set expiration to exactly now (should be considered expired since condition is > now)
+    const { error } = await getSupabaseClient().from('apikeys')
+      .update({ expires_at: new Date().toISOString() })
+      .eq('id', data.id)
+    expect(error).toBeNull()
+
+    // Wait a tiny bit to ensure we're past the exact timestamp
+    await new Promise(resolve => setTimeout(resolve, 50))
+
+    // Try to use the key - should be rejected
+    const authResponse = await fetch(`${BASE_URL}/apikey`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': data.key,
+      },
+    })
+    expect(authResponse.status).toBe(401)
+  })
+
+  it('API key expiring 1 second in the future should still work', async () => {
+    // Create an API key with 1 second future expiration
+    const futureDate = new Date(Date.now() + 5000).toISOString() // 5 seconds from now
+    const response = await fetch(`${BASE_URL}/apikey`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        name: 'key-near-expiration',
+        expires_at: futureDate,
+      }),
+    })
+    const data = await response.json<{ id: number, key: string }>()
+    expect(response.status).toBe(200)
+
+    // Use the key immediately - should work
+    const authResponse = await fetch(`${BASE_URL}/apikey`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': data.key,
+      },
+    })
+    expect(authResponse.status).toBe(200)
+
+    // Cleanup
+    await fetch(`${BASE_URL}/apikey/${data.id}`, {
+      method: 'DELETE',
+      headers,
+    })
+  })
+
+  it('API key with null expiration should never expire', async () => {
+    // Create an API key without expiration
+    const response = await fetch(`${BASE_URL}/apikey`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        name: 'key-no-expiration-test',
+      }),
+    })
+    const data = await response.json<{ id: number, key: string, expires_at: string | null }>()
+    expect(response.status).toBe(200)
+    expect(data.expires_at).toBeNull()
+
+    // Use the key - should always work
+    const authResponse = await fetch(`${BASE_URL}/apikey`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': data.key,
+      },
+    })
+    expect(authResponse.status).toBe(200)
+
+    // Cleanup
+    await fetch(`${BASE_URL}/apikey/${data.id}`, {
+      method: 'DELETE',
+      headers,
+    })
+  })
+})

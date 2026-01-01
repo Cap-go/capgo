@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { BASE_URL, headers, resetAndSeedAppData, resetAppData } from './test-utils.ts'
+import { BASE_URL, getSupabaseClient, headers, resetAndSeedAppData, resetAppData } from './test-utils.ts'
 
 const id = randomUUID()
 const APPNAME = `com.app.key.${id}`
@@ -433,5 +433,113 @@ describe('[POST] /apikey hashed key operations', () => {
       method: 'DELETE',
       headers,
     })
+  })
+})
+
+describe('[POST] /apikey hashed key with expiration', () => {
+  it('create hashed api key with expiration date', async () => {
+    const futureDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 days from now
+    const response = await fetch(`${BASE_URL}/apikey`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        name: 'hashed-key-with-expiration',
+        hashed: true,
+        expires_at: futureDate,
+      }),
+    })
+    const data = await response.json<{ key: string, key_hash: string, id: number, expires_at: string }>()
+    expect(response.status).toBe(200)
+    expect(data).toHaveProperty('key')
+    expect(data).toHaveProperty('key_hash')
+    expect(data).toHaveProperty('expires_at')
+    // Key should be UUID format
+    expect(data.key).toMatch(/^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i)
+    // key_hash should be SHA-256 hex (64 chars)
+    expect(data.key_hash).toMatch(/^[\da-f]{64}$/i)
+    // expires_at should match what we sent
+    expect(new Date(data.expires_at).getTime()).toBeCloseTo(new Date(futureDate).getTime(), -3)
+
+    // Verify in DB: key should be null, key_hash and expires_at should be set
+    const verifyResponse = await fetch(`${BASE_URL}/apikey/${data.id}`, { headers })
+    const verifyData = await verifyResponse.json() as { key: string | null, key_hash: string, expires_at: string }
+    expect(verifyData.key).toBeNull()
+    expect(verifyData.key_hash).toBe(data.key_hash)
+    expect(verifyData.expires_at).not.toBeNull()
+
+    // Cleanup
+    await fetch(`${BASE_URL}/apikey/${data.id}`, {
+      method: 'DELETE',
+      headers,
+    })
+  })
+
+  it('hashed key with expiration can be used for authentication', async () => {
+    const futureDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+    const createResponse = await fetch(`${BASE_URL}/apikey`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        name: 'hashed-key-expiration-auth-test',
+        hashed: true,
+        expires_at: futureDate,
+      }),
+    })
+    const createData = await createResponse.json<{ key: string, id: number }>()
+    expect(createResponse.status).toBe(200)
+
+    // Use the plain key value to authenticate
+    const authHeaders = {
+      'Content-Type': 'application/json',
+      'Authorization': createData.key,
+    }
+
+    const listResponse = await fetch(`${BASE_URL}/apikey`, {
+      method: 'GET',
+      headers: authHeaders,
+    })
+    expect(listResponse.status).toBe(200)
+    const listData = await listResponse.json()
+    expect(Array.isArray(listData)).toBe(true)
+
+    // Cleanup
+    await fetch(`${BASE_URL}/apikey/${createData.id}`, {
+      method: 'DELETE',
+      headers,
+    })
+  })
+
+  it('expired hashed key should be rejected for authentication', async () => {
+    // Create a hashed key with future expiration
+    const createResponse = await fetch(`${BASE_URL}/apikey`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        name: 'hashed-key-to-expire',
+        hashed: true,
+        expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      }),
+    })
+    const createData = await createResponse.json<{ key: string, id: number }>()
+    expect(createResponse.status).toBe(200)
+
+    // Manually set the key to expired via direct DB update
+    const { error } = await getSupabaseClient().from('apikeys')
+      .update({ expires_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString() })
+      .eq('id', createData.id)
+    expect(error).toBeNull()
+
+    // Try to use the expired hashed key for authentication
+    const authHeaders = {
+      'Content-Type': 'application/json',
+      'Authorization': createData.key,
+    }
+
+    const listResponse = await fetch(`${BASE_URL}/apikey`, {
+      method: 'GET',
+      headers: authHeaders,
+    })
+    // Should be rejected as unauthorized
+    expect(listResponse.status).toBe(401)
   })
 })
