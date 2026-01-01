@@ -194,6 +194,36 @@ async function copySecret(secret: string) {
     toast.error(t('secret-copy-failed'))
   }
 }
+
+const signatureVerificationCode = `import crypto from 'crypto'
+
+function verifyWebhookSignature(req, secret) {
+  const signature = req.headers['x-capgo-signature']
+  const timestamp = req.headers['x-capgo-timestamp']
+  const payload = JSON.stringify(req.body)
+
+  // Check timestamp to prevent replay attacks (5 min tolerance)
+  const currentTime = Math.floor(Date.now() / 1000)
+  if (Math.abs(currentTime - parseInt(timestamp)) > 300) {
+    throw new Error('Webhook timestamp too old')
+  }
+
+  // Compute expected signature
+  const signaturePayload = \`\${timestamp}.\${payload}\`
+  const hmac = crypto.createHmac('sha256', secret)
+  hmac.update(signaturePayload)
+  const expectedSignature = \`v1=\${timestamp}.\${hmac.digest('hex')}\`
+
+  // Compare signatures (timing-safe)
+  if (!crypto.timingSafeEqual(
+    Buffer.from(signature),
+    Buffer.from(expectedSignature)
+  )) {
+    throw new Error('Invalid webhook signature')
+  }
+
+  return true
+}`
 </script>
 
 <template>
@@ -346,6 +376,28 @@ async function copySecret(secret: string) {
                 <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
                   {{ t('signing-secret-hint') }}
                 </p>
+
+                <!-- Signature Verification Guide -->
+                <details class="mt-3">
+                  <summary class="text-xs font-medium text-blue-600 dark:text-blue-400 cursor-pointer hover:underline">
+                    {{ t('how-to-verify-signature') }}
+                  </summary>
+                  <div class="mt-2 p-3 bg-gray-100 dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700">
+                    <p class="text-xs text-gray-600 dark:text-gray-400 mb-2">
+                      {{ t('signature-verification-intro') }}
+                    </p>
+                    <ul class="text-xs text-gray-600 dark:text-gray-400 mb-3 list-disc list-inside space-y-1">
+                      <li><code class="px-1 bg-gray-200 dark:bg-gray-700 rounded">X-Capgo-Signature</code>: {{ t('header-signature-desc') }}</li>
+                      <li><code class="px-1 bg-gray-200 dark:bg-gray-700 rounded">X-Capgo-Timestamp</code>: {{ t('header-timestamp-desc') }}</li>
+                      <li><code class="px-1 bg-gray-200 dark:bg-gray-700 rounded">X-Capgo-Event</code>: {{ t('header-event-desc') }}</li>
+                      <li><code class="px-1 bg-gray-200 dark:bg-gray-700 rounded">X-Capgo-Event-ID</code>: {{ t('header-event-id-desc') }}</li>
+                    </ul>
+                    <p class="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      {{ t('signature-example-title') }}
+                    </p>
+                    <pre class="text-xs bg-gray-900 text-gray-100 p-3 rounded overflow-x-auto"><code>{{ signatureVerificationCode }}</code></pre>
+                  </div>
+                </details>
               </div>
 
               <!-- Metadata -->
