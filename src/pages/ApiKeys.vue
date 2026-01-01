@@ -1052,6 +1052,8 @@ getKeys()
             :dark="isDark"
             teleport="body"
             :auto-apply="true"
+            hide-input-icon
+            :action-row="{ showCancel: false, showSelect: false, showNow: false, showPreview: false }"
             :placeholder="t('select-expiration-date')"
             :ui="{ menu: 'apikey-datepicker-menu' }"
           >
