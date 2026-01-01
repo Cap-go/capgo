@@ -323,7 +323,7 @@ describe('[Encrypted Bundles Enforcement]', () => {
   describe('Helper Functions', () => {
     it('is_bundle_encrypted should return false for null session_key', async () => {
       const { data, error } = await getSupabaseClient()
-        .rpc('is_bundle_encrypted', { session_key: null })
+        .rpc('is_bundle_encrypted', { session_key: null as unknown as string })
 
       expect(error).toBeNull()
       expect(data).toBe(false)
@@ -355,7 +355,7 @@ describe('[Encrypted Bundles Enforcement]', () => {
       const { data, error } = await getSupabaseClient()
         .rpc('check_org_encrypted_bundle_enforcement', {
           org_id: testOrgId,
-          session_key: null,
+          session_key: null as unknown as string,
         })
 
       expect(error).toBeNull()
@@ -372,7 +372,7 @@ describe('[Encrypted Bundles Enforcement]', () => {
       const { data, error } = await getSupabaseClient()
         .rpc('check_org_encrypted_bundle_enforcement', {
           org_id: testOrgId,
-          session_key: null,
+          session_key: null as unknown as string,
         })
 
       expect(error).toBeNull()
@@ -420,10 +420,10 @@ describe('[Encrypted Bundles Enforcement]', () => {
       expect(Array.isArray(data)).toBe(true)
 
       // Find our test org
-      const testOrg = data.find((org: any) => org.gid === testOrgId)
+      const testOrg = data!.find((org: any) => org.gid === testOrgId)
       expect(testOrg).toBeDefined()
-      expect(testOrg.enforce_encrypted_bundles).toBeDefined()
-      expect(typeof testOrg.enforce_encrypted_bundles).toBe('boolean')
+      expect(testOrg!.enforce_encrypted_bundles).toBeDefined()
+      expect(typeof testOrg!.enforce_encrypted_bundles).toBe('boolean')
     })
   })
 })
