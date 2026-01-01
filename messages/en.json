@@ -710,6 +710,7 @@
   "error": "Error",
   "expiration-date": "Expiration date",
   "expiration-date-required": "Please select an expiration date",
+  "select-expiration-date": "Select expiration date",
   "expired": "Expired",
   "expires": "Expires",
   "error-checking-channels": "Error reading channels",

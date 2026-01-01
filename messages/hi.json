@@ -687,6 +687,7 @@
   "expose-metadata-help": "जब सक्षम होता है, तो बंडल लिंक और कमेंट फील्ड्स को Capacitor Updater प्लगिन के पास भेजा जाएगा (प्लगिन संस्करण 7.35.0 या उससे ऊपर की आवश्यकता है)",
   "expiration-date": "समाप्ति तिथि",
   "expiration-date-required": "कृपया समाप्ति तिथि चुनें",
+  "select-expiration-date": "समाप्ति तिथि चुनें",
   "expired": "समाप्त",
   "expires": "समाप्ति",
   "external-storage": "बाह्य संग्रहण",

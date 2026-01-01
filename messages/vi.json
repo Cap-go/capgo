@@ -687,6 +687,7 @@
   "expose-metadata-help": "Khi được kích hoạt, liên kết gói và trường bình luận sẽ được gửi đến plugin Cập nhật Capacitor (yêu cầu phiên bản plugin 7.35.0 hoặc cao hơn)",
   "expiration-date": "Ngày hết hạn",
   "expiration-date-required": "Vui lòng chọn ngày hết hạn",
+  "select-expiration-date": "Chọn ngày hết hạn",
   "expired": "Đã hết hạn",
   "expires": "Hết hạn",
   "external-storage": "Bộ nhớ ngoại vi",

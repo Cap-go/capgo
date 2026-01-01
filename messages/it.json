@@ -687,6 +687,7 @@
   "expose-metadata-help": "Quando attivato, i campi del link del pacchetto e dei commenti verranno inviati al plugin Capacitor Updater (richiede la versione del plugin 7.35.0 o superiore)",
   "expiration-date": "Data di scadenza",
   "expiration-date-required": "Seleziona una data di scadenza",
+  "select-expiration-date": "Seleziona data di scadenza",
   "expired": "Scaduto",
   "expires": "Scade",
   "external-storage": "Memoria esterna",

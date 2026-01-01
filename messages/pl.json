@@ -687,6 +687,7 @@
   "expose-metadata-help": "Gdy jest włączony, link do pakietu i pola komentarzy zostaną wysłane do wtyczki Capacitor Updater (wymaga wersji wtyczki 7.35.0 lub wyższej)",
   "expiration-date": "Data wygaśnięcia",
   "expiration-date-required": "Proszę wybrać datę wygaśnięcia",
+  "select-expiration-date": "Wybierz datę wygaśnięcia",
   "expired": "Wygasł",
   "expires": "Wygasa",
   "external-storage": "Przechowywanie zewnętrzne",

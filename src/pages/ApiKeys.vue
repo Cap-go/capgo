@@ -2,13 +2,18 @@
 import type { TableColumn } from '~/components/comp_def'
 import type { Database } from '~/types/supabase.types'
 import { FormKit } from '@formkit/vue'
+import { VueDatePicker } from '@vuepic/vue-datepicker'
+import { useDark } from '@vueuse/core'
+import dayjs from 'dayjs'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import IconArrowPath from '~icons/heroicons/arrow-path'
+import IconCalendar from '~icons/heroicons/calendar'
 import IconClipboard from '~icons/heroicons/clipboard-document'
 import IconPencil from '~icons/heroicons/pencil'
 import IconTrash from '~icons/heroicons/trash'
+import '@vuepic/vue-datepicker/dist/main.css'
 import Table from '~/components/Table.vue'
 import { formatLocalDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
@@ -18,6 +23,7 @@ import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
 
 const { t } = useI18n()
+const isDark = useDark()
 const dialogStore = useDialogV2Store()
 const displayStore = useDisplayStore()
 const main = useMainStore()
@@ -42,13 +48,11 @@ const selectedKeyType = ref('')
 
 // State for expiration date
 const setExpirationCheckbox = ref(false)
-const expirationDate = ref('')
+const expirationDate = ref<Date | null>(null)
 
 // Computed properties for expiration date limits
 const minExpirationDate = computed(() => {
-  const tomorrow = new Date()
-  tomorrow.setDate(tomorrow.getDate() + 1)
-  return tomorrow.toISOString().split('T')[0]
+  return dayjs().add(1, 'day').toDate()
 })
 
 // Check if a key is expired
@@ -414,7 +418,7 @@ async function createApiKey(keyType: 'read' | 'write' | 'all' | 'upload') {
   // Get expiration date if set
   let expiresAt: string | null = null
   if (setExpirationCheckbox.value && expirationDate.value) {
-    expiresAt = new Date(expirationDate.value).toISOString()
+    expiresAt = dayjs(expirationDate.value).toISOString()
   }
 
   try {
@@ -535,7 +539,7 @@ async function addNewApiKey() {
   createAsHashed.value = false
   newApiKeyName.value = ''
   setExpirationCheckbox.value = false
-  expirationDate.value = ''
+  expirationDate.value = null
 
   // Load all apps for selection
   await loadAllApps()
@@ -1038,16 +1042,36 @@ getKeys()
           </label>
         </div>
         <div v-if="setExpirationCheckbox" class="pl-6">
-          <FormKit
+          <label class="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-200">
+            {{ t('expiration-date') }}
+          </label>
+          <VueDatePicker
             v-model="expirationDate"
-            type="date"
-            :label="t('expiration-date')"
-            :min="minExpirationDate"
-            validation="required"
-            :validation-messages="{
-              required: t('expiration-date-required'),
-            }"
-          />
+            :min-date="minExpirationDate"
+            :enable-time-picker="false"
+            :time-picker-inline="false"
+            :time-picker="false"
+            :time-config="{ enableTimePicker: false }"
+            :dark="isDark"
+            teleport="body"
+            :auto-apply="true"
+            hide-input-icon
+            :action-row="{ showCancel: false, showSelect: false, showNow: false, showPreview: false }"
+            :placeholder="t('select-expiration-date')"
+            :ui="{ menu: 'apikey-datepicker-menu' }"
+          >
+            <template #trigger>
+              <button
+                type="button"
+                class="flex gap-2 items-center py-2 px-3 w-full text-sm text-left bg-white rounded-md border transition-colors border-gray-300 dark:text-white dark:bg-gray-800 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 focus:ring-2 focus:ring-primary-500 focus:outline-none"
+              >
+                <IconCalendar class="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                <span :class="expirationDate ? 'text-gray-900 dark:text-white' : 'text-gray-500 dark:text-gray-400'">
+                  {{ expirationDate ? dayjs(expirationDate).format('YYYY-MM-DD') : t('select-expiration-date') }}
+                </span>
+              </button>
+            </template>
+          </VueDatePicker>
         </div>
       </div>
     </Teleport>

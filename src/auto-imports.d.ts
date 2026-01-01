@@ -329,7 +329,7 @@ declare global {
   export type { BreadcrumbItem } from './stores/display'
   import('./stores/display')
   // @ts-ignore
-  export type { Organization, OrganizationRole, ExtendedOrganizationMember, ExtendedOrganizationMembers } from './stores/organization'
+  export type { PasswordPolicyConfig, Organization, OrganizationRole, ExtendedOrganizationMember, ExtendedOrganizationMembers } from './stores/organization'
   import('./stores/organization')
   // @ts-ignore
   export type { Webhook, WebhookDelivery, DeliveryPagination, TestResult } from './stores/webhooks'

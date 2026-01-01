@@ -687,6 +687,7 @@
   "expose-metadata-help": "启用后，捆绑链接和评论字段将被发送到Capacitor Updater插件（需要7.35.0或更高版本的插件）",
   "expiration-date": "过期日期",
   "expiration-date-required": "请选择过期日期",
+  "select-expiration-date": "选择过期日期",
   "expired": "已过期",
   "expires": "过期",
   "external-storage": "外部存储",

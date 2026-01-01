@@ -687,6 +687,7 @@
   "expose-metadata-help": "有効にすると、バンドルリンクとコメントフィールドがCapacitor Updaterプラグインに送信されます（プラグインバージョン7.35.0以上が必要です）",
   "expiration-date": "有効期限日",
   "expiration-date-required": "有効期限を選択してください",
+  "select-expiration-date": "有効期限を選択",
   "expired": "期限切れ",
   "expires": "有効期限",
   "external-storage": "外部ストレージ",

@@ -687,6 +687,7 @@
   "expose-metadata-help": "Ketika diaktifkan, tautan bundel dan bidang komentar akan dikirim ke plugin Capacitor Updater (memerlukan versi plugin 7.35.0 atau lebih tinggi)",
   "expiration-date": "Tanggal kedaluwarsa",
   "expiration-date-required": "Silakan pilih tanggal kedaluwarsa",
+  "select-expiration-date": "Pilih tanggal kedaluwarsa",
   "expired": "Kedaluwarsa",
   "expires": "Berakhir",
   "external-storage": "Penyimpanan eksternal",

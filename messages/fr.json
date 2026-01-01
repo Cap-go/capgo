@@ -687,6 +687,7 @@
   "expose-metadata-help": "Lorsque activé, les champs lien et commentaire du bundle seront envoyés au plugin Capacitor Updater (nécessite la version 7.35.0 ou supérieure du plugin)",
   "expiration-date": "Date d'expiration",
   "expiration-date-required": "Veuillez sélectionner une date d'expiration",
+  "select-expiration-date": "Sélectionner la date d'expiration",
   "expired": "Expiré",
   "expires": "Expire",
   "external-storage": "Stockage externe",
