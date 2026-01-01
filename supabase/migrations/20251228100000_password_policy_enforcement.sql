@@ -51,7 +51,7 @@ CREATE POLICY "Users can read own password compliance"
 ON "public"."user_password_compliance"
 FOR SELECT
 TO authenticated
-USING (user_id = auth.uid());
+USING (user_id = (select auth.uid()));
 
 -- No INSERT/UPDATE/DELETE for authenticated users - only service_role can write
 -- (Default behavior when no policy exists for those operations)
@@ -342,6 +342,7 @@ RETURNS TABLE (
     credit_next_expiration timestamptz,
     enforcing_2fa boolean,
     "2fa_has_access" boolean,
+    enforce_hashed_api_keys boolean,
     password_policy_config jsonb,
     password_has_access boolean
 ) LANGUAGE plpgsql STABLE SECURITY DEFINER
@@ -463,6 +464,7 @@ BEGIN
     ucb.next_expiration AS credit_next_expiration,
     tfa.enforcing_2fa,
     tfa."2fa_has_access",
+    o.enforce_hashed_api_keys,
     ppa.password_policy_config,
     ppa.password_has_access
   FROM public.orgs o
@@ -515,6 +517,7 @@ RETURNS TABLE (
     credit_next_expiration timestamptz,
     enforcing_2fa boolean,
     "2fa_has_access" boolean,
+    enforce_hashed_api_keys boolean,
     password_policy_config jsonb,
     password_has_access boolean
 ) LANGUAGE plpgsql
@@ -528,7 +531,7 @@ BEGIN
   user_id := NULL;
 
   IF api_key_text IS NOT NULL THEN
-    SELECT * FROM public.apikeys WHERE key = api_key_text INTO api_key;
+    SELECT * FROM public.find_apikey_by_value(api_key_text) INTO api_key;
 
     IF api_key IS NULL THEN
       PERFORM public.pg_log('deny: INVALID_API_KEY', jsonb_build_object('source', 'header'));
@@ -591,7 +594,9 @@ RETURNS TABLE (
     next_stats_update_at timestamptz,
     credit_available numeric,
     credit_total numeric,
-    credit_next_expiration timestamptz
+    credit_next_expiration timestamptz,
+    require_apikey_expiration boolean,
+    max_apikey_expiration_days integer
 ) LANGUAGE plpgsql STABLE SECURITY DEFINER
 SET search_path = '' AS $$
 BEGIN
@@ -696,7 +701,9 @@ BEGIN
     END AS next_stats_update_at,
     COALESCE(ucb.available_credits, 0) AS credit_available,
     COALESCE(ucb.total_credits, 0) AS credit_total,
-    ucb.next_expiration AS credit_next_expiration
+    ucb.next_expiration AS credit_next_expiration,
+    o.require_apikey_expiration,
+    o.max_apikey_expiration_days
   FROM public.orgs o
   JOIN public.org_users ou ON ou.user_id = userid AND o.id = ou.org_id
   JOIN two_fa_access tfa ON tfa.org_id = o.id
@@ -744,9 +751,13 @@ RETURNS TABLE (
     next_stats_update_at timestamptz,
     credit_available numeric,
     credit_total numeric,
-    credit_next_expiration timestamptz
+    credit_next_expiration timestamptz,
+    require_apikey_expiration boolean,
+    max_apikey_expiration_days integer
 ) LANGUAGE plpgsql
-SET search_path = '' SECURITY DEFINER AS $$
+SECURITY DEFINER
+SET search_path = ''
+AS $$
 DECLARE
   api_key_text text;
   api_key record;
@@ -756,11 +767,17 @@ BEGIN
   user_id := NULL;
 
   IF api_key_text IS NOT NULL THEN
-    SELECT * FROM public.apikeys WHERE key = api_key_text INTO api_key;
+    SELECT * FROM public.find_apikey_by_value(api_key_text) INTO api_key;
 
     IF api_key IS NULL THEN
       PERFORM public.pg_log('deny: INVALID_API_KEY', jsonb_build_object('source', 'header'));
       RAISE EXCEPTION 'Invalid API key provided';
+    END IF;
+
+    -- Check if API key is expired
+    IF public.is_apikey_expired(api_key.expires_at) THEN
+      PERFORM public.pg_log('deny: API_KEY_EXPIRED', jsonb_build_object('key_id', api_key.id));
+      RAISE EXCEPTION 'API key has expired';
     END IF;
 
     user_id := api_key.user_id;

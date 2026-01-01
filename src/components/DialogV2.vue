@@ -70,7 +70,7 @@ onMounted(() => {
         <div class="px-6" :class="{ 'pt-6': !dialogStore.dialogOptions?.title }">
           <!-- Default description -->
           <div v-if="dialogStore.dialogOptions?.description" class="pb-4">
-            <p class="text-base text-gray-500 dark:text-gray-400">
+            <p class="text-base text-gray-500 whitespace-pre-wrap break-all dark:text-gray-400">
               {{ dialogStore.dialogOptions.description }}
             </p>
           </div>

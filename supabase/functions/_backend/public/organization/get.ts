@@ -1,8 +1,8 @@
 import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { z } from 'zod/mini'
-import { simpleError } from '../../utils/hono.ts'
-import { apikeyHasOrgRight, hasOrgRightApikey, supabaseApikey } from '../../utils/supabase.ts'
+import { quickError, simpleError } from '../../utils/hono.ts'
+import { apikeyHasOrgRightWithPolicy, hasOrgRightApikey, supabaseApikey } from '../../utils/supabase.ts'
 import { fetchLimit } from '../../utils/utils.ts'
 
 const bodySchema = z.object({
@@ -26,16 +26,22 @@ export async function get(c: Context, bodyRaw: any, apikey: Database['public']['
     throw simpleError('invalid_body', 'Invalid body', { error: bodyParsed.error })
   }
   const body = bodyParsed.data
+  const supabase = supabaseApikey(c, c.get('capgkey') as string)
 
   if (body.orgId && !(await hasOrgRightApikey(c, body.orgId, apikey.user_id, 'read', c.get('capgkey') as string))) {
     throw simpleError('invalid_org_id', 'You can\'t access this organization', { org_id: body.orgId })
   }
 
   if (body.orgId) {
-    if (!apikeyHasOrgRight(apikey, body.orgId)) {
+    // Check org access AND policy requirements
+    const orgCheck = await apikeyHasOrgRightWithPolicy(c, apikey, body.orgId, supabase)
+    if (!orgCheck.valid) {
+      if (orgCheck.error === 'org_requires_expiring_key') {
+        throw quickError(401, 'org_requires_expiring_key', 'This organization requires API keys with an expiration date. Please use a different key or update this key with an expiration date.')
+      }
       throw simpleError('invalid_org_id', 'You can\'t access this organization', { org_id: body.orgId })
     }
-    const { data, error } = await supabaseApikey(c, c.get('capgkey') as string)
+    const { data, error } = await supabase
       .from('orgs')
       .select('*')
       .eq('id', body.orgId)
@@ -54,7 +60,7 @@ export async function get(c: Context, bodyRaw: any, apikey: Database['public']['
     const from = fetchOffset * fetchLimit
     const to = (fetchOffset + 1) * fetchLimit - 1
 
-    const { data, error } = await supabaseApikey(c, c.get('capgkey') as string)
+    const { data, error } = await supabase
       .from('orgs')
       .select('*')
       .range(from, to)
