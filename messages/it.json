@@ -762,7 +762,7 @@
   "enforce-hashed-api-keys-description": "Quando abilitato, solo le chiavi API sicure (hash) possono accedere a questa organizzazione. Le chiavi API in testo normale verranno rifiutate.",
   "secure-key-created": "Chiave API Sicura Creata",
   "secure-key-hidden": "Chiave sicura (nascosta)",
-  "secure-key-warning": ""secure-key-warning": "Questa chiave verrà mostrata solo una volta. Copiala ora e conservala in modo sicuro. Non potrai vederla di nuovo.",
+  "secure-key-warning": "Questa chiave verrà mostrata solo una volta. Copiala ora e conservala in modo sicuro. Non potrai vederla di nuovo.",
   "your-api-key": "Your API Key",
   "language": "Lingua",
   "last": "Ultimo",
