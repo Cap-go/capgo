@@ -5,6 +5,7 @@ import { storeToRefs } from 'pinia'
 import { computed, ref, watch, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
+import CreditsCta from '~/components/CreditsCta.vue'
 import { openCheckout } from '~/services/stripe'
 import { getCreditUnitPricing, getCurrentPlanNameOrg } from '~/services/supabase'
 import { openSupport } from '~/services/support'
@@ -303,6 +304,9 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
       <div v-if="organizationStore.currentOrganizationFailed" class="px-4 py-2 mb-4 font-medium text-center text-white bg-red-500 rounded-lg shrink-0">
         {{ t('plan-failed') }}
       </div>
+
+      <!-- Credits CTA -->
+      <CreditsCta class="mb-6 shrink-0" />
 
       <!-- Plans Grid -->
       <div class="grid content-start min-h-0 grid-cols-1 gap-4 p-1 overflow-y-auto md:grid-cols-2 xl:grid-cols-4 grow">
