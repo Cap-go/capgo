@@ -1,50 +1,58 @@
 import { randomUUID } from 'node:crypto'
-import { afterAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { BASE_URL, fetchWithRetry, getSupabaseClient, ORG_ID, PRODUCT_ID, resetAndSeedAppDataStats, resetAppData, resetAppDataStats, STRIPE_INFO_CUSTOMER_ID, TEST_EMAIL, USER_ID } from './test-utils.ts'
 
 const id = randomUUID()
-const APPNAME = `com.cp.${id}`
+const APPNAME = `com.build_time.${id}`
 const headers = {
   'Content-Type': 'application/json',
   'apisecret': 'testsecret',
 }
 
+// Use a mutex-like approach: save original state and restore after tests
+let originalStripeInfo: any = null
+
+beforeAll(async () => {
+  const supabase = getSupabaseClient()
+  // Save original stripe_info state for this customer
+  const { data } = await supabase
+    .from('stripe_info')
+    .select('*')
+    .eq('customer_id', STRIPE_INFO_CUSTOMER_ID)
+    .single()
+  originalStripeInfo = data
+})
+
 beforeEach(async () => {
   await resetAndSeedAppDataStats(APPNAME)
   const supabase = getSupabaseClient()
 
+  // Force reset stripe_info to clean state before each test
   const { error } = await supabase
     .from('stripe_info')
-    .upsert([
-      {
-        subscription_id: 'sub_2',
-        customer_id: STRIPE_INFO_CUSTOMER_ID,
-        status: 'succeeded' as const,
-        product_id: PRODUCT_ID,
-        trial_at: new Date(0).toISOString(),
-        is_good_plan: true,
-        plan_usage: 2,
-        subscription_metered: {},
-        subscription_anchor_start: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
-        subscription_anchor_end: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
-        mau_exceeded: false,
-        storage_exceeded: false,
-        bandwidth_exceeded: false,
-        build_time_exceeded: false,
-      },
-    ], { onConflict: 'customer_id' })
+    .update({
+      status: 'succeeded' as const,
+      product_id: PRODUCT_ID,
+      trial_at: new Date(0).toISOString(),
+      is_good_plan: true,
+      plan_usage: 2,
+      subscription_metered: {},
+      subscription_anchor_start: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
+      subscription_anchor_end: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
+      mau_exceeded: false,
+      storage_exceeded: false,
+      bandwidth_exceeded: false,
+      build_time_exceeded: false,
+      plan_calculated_at: null,
+    })
+    .eq('customer_id', STRIPE_INFO_CUSTOMER_ID)
   if (error)
     throw error
 
-  const { error: orgError } = await supabase.from('orgs').upsert([
-    {
-      id: ORG_ID,
-      customer_id: STRIPE_INFO_CUSTOMER_ID,
-      name: 'Test Org Build Time',
-      created_by: USER_ID,
-      management_email: TEST_EMAIL,
-    },
-  ], { onConflict: 'id' })
+  // Ensure org is properly linked
+  const { error: orgError } = await supabase.from('orgs').update({
+    customer_id: STRIPE_INFO_CUSTOMER_ID,
+  }).eq('id', ORG_ID)
   if (orgError)
     throw orgError
 
@@ -66,12 +74,20 @@ beforeEach(async () => {
     .eq('org_id', ORG_ID)
   expect(buildTimeError).toBeFalsy()
 
-  // Clear app metrics cache
+  // Clear app metrics cache for this org
   const { error: appMetricsCacheError } = await supabase
     .from('app_metrics_cache')
     .delete()
     .eq('org_id', ORG_ID)
   expect(appMetricsCacheError).toBeFalsy()
+
+  // Clear daily_build_time for all apps in this org
+  const { data: orgApps } = await supabase.from('apps').select('app_id').eq('owner_org', ORG_ID)
+  if (orgApps) {
+    for (const app of orgApps) {
+      await supabase.from('daily_build_time').delete().eq('app_id', app.app_id)
+    }
+  }
 
   // Clear all credit-related data for this org
   await supabase
@@ -105,20 +121,26 @@ afterAll(async () => {
     .from('build_logs')
     .delete()
     .eq('org_id', ORG_ID)
+
+  // Restore original stripe_info state if we saved it
+  if (originalStripeInfo) {
+    await supabase
+      .from('stripe_info')
+      .update({
+        status: originalStripeInfo.status,
+        is_good_plan: originalStripeInfo.is_good_plan,
+        mau_exceeded: originalStripeInfo.mau_exceeded,
+        storage_exceeded: originalStripeInfo.storage_exceeded,
+        bandwidth_exceeded: originalStripeInfo.bandwidth_exceeded,
+        build_time_exceeded: originalStripeInfo.build_time_exceeded,
+      })
+      .eq('customer_id', STRIPE_INFO_CUSTOMER_ID)
+  }
 })
 
 describe('build Time Tracking System', () => {
   it('should handle too big build time correctly', async () => {
     const supabase = getSupabaseClient()
-
-    // Get all apps owned by this org and clear their daily_build_time data
-    // This is necessary because get_total_metrics aggregates across all apps in the org
-    const { data: orgApps } = await supabase.from('apps').select('app_id').eq('owner_org', ORG_ID)
-    if (orgApps) {
-      for (const app of orgApps) {
-        await supabase.from('daily_build_time').delete().eq('app_id', app.app_id)
-      }
-    }
 
     // Insert high build time usage directly into daily_build_time
     // (get_total_metrics reads from daily_build_time, not build_logs)
