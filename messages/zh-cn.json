@@ -1331,5 +1331,5 @@
   "invalid-password": "无效密码",
   "password-does-not-meet-requirements": "您的密码不符合组织的要求。请更改您的密码。",
   "verification-failed": "验证失败",
-  "no-organization-selected": "未选择组织"
+  "cloud-replication-delay": "更改将需要最多60秒才能在全球范围内生效"
 }

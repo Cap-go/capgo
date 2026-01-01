@@ -1330,5 +1330,5 @@
   "invalid-password": "Неверный пароль",
   "password-does-not-meet-requirements": "Ваш пароль не соответствует требованиям организации. Пожалуйста, измените пароль.",
   "verification-failed": "Ошибка подтверждения",
-  "no-organization-selected": "Организация не выбрана"
+  "cloud-replication-delay": "Изменения займут до 60 секунд для глобального распространения"
 }

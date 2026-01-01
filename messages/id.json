@@ -1330,5 +1330,5 @@
   "invalid-password": "Kata sandi tidak valid",
   "password-does-not-meet-requirements": "Kata sandi Anda tidak memenuhi persyaratan organisasi. Silakan ubah kata sandi Anda.",
   "verification-failed": "Verifikasi gagal",
-  "no-organization-selected": "Tidak ada organisasi yang dipilih"
+  "cloud-replication-delay": "Perubahan akan membutuhkan hingga 60 detik untuk menyebar secara global"
 }

@@ -1400,5 +1400,6 @@
   "allow-device": "Allow Device Updates",
   "channel-allow-device-self-set": "Allow Device Self-Assignment",
   "channel-disable-auto-update": "Disable Auto Update",
-  "channel-disable-auto-update-under-native": "Disable Auto Update Under Native"
+  "channel-disable-auto-update-under-native": "Disable Auto Update Under Native",
+  "cloud-replication-delay": "Changes will take up to 60 seconds to propagate globally"
 }

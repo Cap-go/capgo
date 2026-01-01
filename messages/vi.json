@@ -879,7 +879,7 @@
   "no-device-data": "Không có dữ liệu thiết bị nào",
   "no-error-message": "Không có thông báo lỗi nào sẵn có",
   "no-manifest-bundle": "Không có manifest",
-  "no-organization-selected": "Chưa chọn tổ chức",
+  "no-organization-selected": "Không có tổ chức nào được chọn",
   "no-permission": "Quyền hạn không đủ",
   "no-permission-ask-super-admin": "quyền không đủ, vui lòng yêu cầu quản trị viên cao cấp để xóa gói này một cách không an toàn",
   "no-public-channel": "Ứng dụng không có kênh công khai, chúng tôi không thể đếm số lần triển khai mà không có nó",
@@ -1330,5 +1330,5 @@
   "invalid-password": "Mật khẩu không hợp lệ",
   "password-does-not-meet-requirements": "Mật khẩu của bạn không đáp ứng yêu cầu của tổ chức. Vui lòng thay đổi mật khẩu.",
   "verification-failed": "Xác minh thất bại",
-  "no-organization-selected": "Không có tổ chức nào được chọn"
+  "cloud-replication-delay": "Các thay đổi sẽ mất đến 60 giây để lan truyền toàn cầu"
 }

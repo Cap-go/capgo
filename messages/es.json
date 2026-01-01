@@ -1339,5 +1339,5 @@
   "invalid-password": "Contraseña inválida",
   "password-does-not-meet-requirements": "Tu contraseña no cumple con los requisitos de la organización. Por favor cambia tu contraseña.",
   "verification-failed": "Verificación fallida",
-  "no-organization-selected": "Ninguna organización seleccionada"
+  "cloud-replication-delay": "Los cambios tardarán hasta 60 segundos en propagarse globalmente"
 }

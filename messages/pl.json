@@ -1330,5 +1330,5 @@
   "invalid-password": "Nieprawidłowe hasło",
   "password-does-not-meet-requirements": "Twoje hasło nie spełnia wymagań organizacji. Proszę zmienić hasło.",
   "verification-failed": "Weryfikacja nie powiodła się",
-  "no-organization-selected": "Nie wybrano organizacji"
+  "cloud-replication-delay": "Zmiany zajmą do 60 sekund, aby rozprzestrzenić się globalnie"
 }

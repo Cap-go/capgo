@@ -1331,5 +1331,5 @@
   "invalid-password": "無効なパスワード",
   "password-does-not-meet-requirements": "パスワードが組織の要件を満たしていません。パスワードを変更してください。",
   "verification-failed": "確認に失敗しました",
-  "no-organization-selected": "組織が選択されていません"
+  "cloud-replication-delay": "変更がグローバルに反映されるまで最大60秒かかります"
 }

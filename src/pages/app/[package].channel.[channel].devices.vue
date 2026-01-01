@@ -150,8 +150,10 @@ async function customDeviceOverwritePart5(
   if (overwriteError) {
     console.error('overwriteError', overwriteError)
     toast.error(t('cannot-create-overwrite'))
+    return
   }
 
+  toast.info(t('cloud-replication-delay'))
   reload()
 }
 

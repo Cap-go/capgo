@@ -1339,5 +1339,5 @@
   "invalid-password": "Mot de passe invalide",
   "password-does-not-meet-requirements": "Votre mot de passe ne répond pas aux exigences de l'organisation. Veuillez changer votre mot de passe.",
   "verification-failed": "Échec de la vérification",
-  "no-organization-selected": "Aucune organisation sélectionnée"
+  "cloud-replication-delay": "Les modifications prendront jusqu'à 60 secondes pour se propager globalement"
 }

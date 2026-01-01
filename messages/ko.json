@@ -880,7 +880,7 @@
   "no-device-data": "사용 가능한 장치 데이터가 없습니다.",
   "no-error-message": "사용 가능한 오류 메시지가 없습니다",
   "no-manifest-bundle": "매니페스트 없음",
-  "no-organization-selected": "조직이 선택되지 않았습니다",
+  "no-organization-selected": "선택된 조직이 없습니다",
   "no-permission": "권한이 부족합니다",
   "no-permission-ask-super-admin": "권한이 부족하므로, 이 번들을 안전하지 않게 삭제하도록 슈퍼 관리자에게 요청하십시오.",
   "no-public-channel": "이 앱은 공개 채널이 없으므로, 이를 통하지 않고 배포를 계산할 수 없습니다.",
@@ -1331,5 +1331,5 @@
   "invalid-password": "잘못된 비밀번호",
   "password-does-not-meet-requirements": "비밀번호가 조직의 요구 사항을 충족하지 않습니다. 비밀번호를 변경해주세요.",
   "verification-failed": "확인 실패",
-  "no-organization-selected": "선택된 조직이 없습니다"
+  "cloud-replication-delay": "변경 사항이 전 세계에 반영되는 데 최대 60초가 걸립니다"
 }
