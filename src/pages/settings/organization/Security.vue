@@ -143,9 +143,28 @@ function loadPolicyFromOrg() {
 }
 
 // Load API key expiration policy settings
-function loadApikeyPolicyFromOrg() {
-  requireApikeyExpiration.value = currentOrganization.value?.require_apikey_expiration ?? false
-  maxApikeyExpirationDays.value = currentOrganization.value?.max_apikey_expiration_days ?? null
+async function loadApikeyPolicyFromOrg() {
+  if (!currentOrganization.value?.gid)
+    return
+
+  try {
+    const { data: policyData, error: policyError } = await supabase
+      .from('orgs')
+      .select('require_apikey_expiration, max_apikey_expiration_days')
+      .eq('id', currentOrganization.value.gid)
+      .single()
+
+    if (policyError) {
+      console.error('Error loading API key policy:', policyError)
+      return
+    }
+
+    requireApikeyExpiration.value = policyData?.require_apikey_expiration ?? false
+    maxApikeyExpirationDays.value = policyData?.max_apikey_expiration_days ?? null
+  }
+  catch (error) {
+    console.error('Error loading API key policy:', error)
+  }
 }
 
 async function loadData() {
@@ -156,7 +175,7 @@ async function loadData() {
 
   try {
     // Load current org's security settings
-    const { data: orgData, error: orgError } = await supabase
+    const { data: orgData, error: orgError} = await supabase
       .from('orgs')
       .select('enforcing_2fa, enforce_hashed_api_keys')
       .eq('id', currentOrganization.value.gid)
@@ -178,7 +197,7 @@ async function loadData() {
     loadPolicyFromOrg()
 
     // Load API key expiration policy settings
-    loadApikeyPolicyFromOrg()
+    await loadApikeyPolicyFromOrg()
 
     // Load members with their password policy compliance status
     await loadMembersWithPasswordPolicyStatus()

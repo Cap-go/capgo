@@ -70,48 +70,52 @@ describe('Organization Email Domain Auto-Join', () => {
             const emptyOrgId = randomUUID()
             const emptyCustomerId = `cus_empty_${randomUUID()}`
 
-            // Create stripe_info
-            await getSupabaseClient().from('stripe_info').insert({
-                customer_id: emptyCustomerId,
-                status: 'succeeded',
-                product_id: 'prod_LQIregjtNduh4q',
-                trial_at: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
-                is_good_plan: true,
-            })
+            try {
+                // Create stripe_info
+                await getSupabaseClient().from('stripe_info').insert({
+                    customer_id: emptyCustomerId,
+                    status: 'succeeded',
+                    product_id: 'prod_LQIregjtNduh4q',
+                    trial_at: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
+                    is_good_plan: true,
+                })
 
-            // Create org without domains
-            const { error: orgError } = await getSupabaseClient().from('orgs').insert({
-                id: emptyOrgId,
-                name: `Empty Domains Org`,
-                management_email: USER_ADMIN_EMAIL,
-                created_by: USER_ID,
-                customer_id: emptyCustomerId,
-                allowed_email_domains: [],
-            })
-            if (orgError)
-                throw orgError
+                // Create org without domains (unique name)
+                const { error: orgError } = await getSupabaseClient().from('orgs').insert({
+                    id: emptyOrgId,
+                    name: `Empty Domains Org ${randomUUID()}`,
+                    management_email: USER_ADMIN_EMAIL,
+                    created_by: USER_ID,
+                    customer_id: emptyCustomerId,
+                    allowed_email_domains: [],
+                })
+                if (orgError)
+                    throw orgError
 
-            // Add user as member
-            const { error: orgUserError } = await getSupabaseClient().from('org_users').insert({
-                org_id: emptyOrgId,
-                user_id: USER_ID,
-                user_right: 'admin',
-                app_id: null,
-                channel_id: null,
-            })
-            if (orgUserError)
-                throw orgUserError
+                // Add user as member (use upsert to avoid duplicate key errors)
+                await getSupabaseClient().from('org_users').upsert({
+                    org_id: emptyOrgId,
+                    user_id: USER_ID,
+                    user_right: 'admin',
+                    app_id: null,
+                    channel_id: null,
+                }, {
+                    onConflict: 'user_id,org_id',
+                })
 
-            const response = await fetch(`${BASE_URL}/organization/domains?orgId=${emptyOrgId}`, {
-                headers,
-            })
-            expect(response.status).toBe(200)
-            const data = await response.json() as any
-            expect(data.allowed_email_domains).toEqual([])
-
-            // Cleanup
-            await getSupabaseClient().from('orgs').delete().eq('id', emptyOrgId)
-            await getSupabaseClient().from('stripe_info').delete().eq('customer_id', emptyCustomerId)
+                const response = await fetch(`${BASE_URL}/organization/domains?orgId=${emptyOrgId}`, {
+                    headers,
+                })
+                expect(response.status).toBe(200)
+                const data = await response.json() as any
+                expect(data.allowed_email_domains).toEqual([])
+            }
+            finally {
+                // Cleanup
+                await getSupabaseClient().from('org_users').delete().eq('org_id', emptyOrgId)
+                await getSupabaseClient().from('orgs').delete().eq('id', emptyOrgId)
+                await getSupabaseClient().from('stripe_info').delete().eq('customer_id', emptyCustomerId)
+            }
         })
 
         it('should reject request without org membership', async () => {
@@ -153,7 +157,7 @@ describe('Organization Email Domain Auto-Join', () => {
 
     describe('[PUT] /organization/domains', () => {
         it('should update allowed email domains', async () => {
-            const newDomains = ['newdomain.com', 'another.org']
+            const newDomains = [`newdomain-${randomUUID().substring(0, 8)}.com`, `another-${randomUUID().substring(0, 8)}.org`]
             const response = await fetch(`${BASE_URL}/organization/domains`, {
                 method: 'PUT',
                 headers,
@@ -164,6 +168,10 @@ describe('Organization Email Domain Auto-Join', () => {
                 }),
             })
 
+            if (response.status !== 200) {
+                const errorData = await response.json()
+                console.error('Error response:', errorData)
+            }
             expect(response.status).toBe(200)
             const data = await response.json() as any
             expect(data.status).toBe('Organization allowed email domains updated')
