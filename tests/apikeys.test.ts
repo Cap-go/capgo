@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { createClient } from '@supabase/supabase-js'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { BASE_URL, getSupabaseClient, headers, resetAndSeedAppData, resetAppData } from './test-utils.ts'
 
@@ -560,7 +561,6 @@ describe('[RLS] hashed API key with direct Supabase SDK', () => {
 
     // Now use the hashed key directly with Supabase SDK (bypassing our API)
     // This simulates how the CLI uses the SDK with capgkey header
-    const { createClient } = await import('@supabase/supabase-js')
     const supabaseWithHashedKey = createClient(
       process.env.SUPABASE_URL!,
       process.env.SUPABASE_ANON_KEY!,
@@ -610,7 +610,6 @@ describe('[RLS] hashed API key with direct Supabase SDK', () => {
     expect(createResponse.status).toBe(200)
 
     // Use plain key with Supabase SDK
-    const { createClient } = await import('@supabase/supabase-js')
     const supabaseWithPlainKey = createClient(
       process.env.SUPABASE_URL!,
       process.env.SUPABASE_ANON_KEY!,
