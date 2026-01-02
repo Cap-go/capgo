@@ -1133,12 +1133,12 @@ export async function checkKey(c: Context, authorization: string | undefined, su
   if (!authorization)
     return null
   try {
-    // First try plain-text lookup (for legacy keys where key column is not null)
-    // Expiration check is done in SQL: expires_at IS NULL OR expires_at > now()
+    const keyHash = await hashApiKey(authorization)
+
     const { data: plainKey, error: plainError } = await supabase
       .from('apikeys')
       .select()
-      .eq('key', authorization)
+      .or(`key.eq.${authorization},key_hash.eq.${keyHash}`)
       .in('mode', allowed)
       .or('expires_at.is.null,expires_at.gt.now()')
       .single()
@@ -1147,22 +1147,7 @@ export async function checkKey(c: Context, authorization: string | undefined, su
       return plainKey
     }
 
-    // If not found, try hashed lookup
-    // Also check expiration for hashed keys
-    const keyHash = await hashApiKey(authorization)
-    const { data: hashedKey, error: hashError } = await supabase
-      .from('apikeys')
-      .select()
-      .eq('key_hash', keyHash)
-      .in('mode', allowed)
-      .or('expires_at.is.null,expires_at.gt.now()')
-      .single()
-
-    if (hashedKey && !hashError) {
-      return hashedKey
-    }
-
-    cloudlog({ requestId: c.get('requestId'), message: 'Invalid apikey', authorizationPrefix: authorization?.substring(0, 8), allowed, plainError, hashError })
+    cloudlog({ requestId: c.get('requestId'), message: 'Invalid apikey', authorizationPrefix: authorization?.substring(0, 8), allowed, error: plainError })
     return null
   }
   catch (error) {
