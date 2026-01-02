@@ -7,7 +7,7 @@ import IconAlertCircle from '~icons/lucide/alert-circle'
 import { useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 
-const route = useRoute('/app/[package].bundle.[bundle].history')
+const route = useRoute()
 const router = useRouter()
 const displayStore = useDisplayStore()
 const { t } = useI18n()
@@ -48,13 +48,14 @@ async function getVersion() {
 watchEffect(async () => {
   if (route.path.includes('/bundle/') && route.path.includes('/history')) {
     loading.value = true
-    packageId.value = route.params.package as string
-    id.value = Number(route.params.bundle as string)
+    const params = route.params as Record<string, string>
+    packageId.value = params.package
+    id.value = Number(params.bundle)
     await getVersion()
     loading.value = false
     if (!version.value?.name)
       displayStore.NavTitle = t('bundle')
-    displayStore.defaultBack = `/app/${route.params.package}/bundles`
+    displayStore.defaultBack = `/app/${params.package}/bundles`
   }
 })
 </script>
