@@ -261,6 +261,7 @@ async function handleChannelLink(chan: Database['public']['Tables']['channels'][
     await setChannel(chan, version.value.id)
     await getChannels()
     toast.success(t('linked-bundle'))
+    toast.info(t('cloud-replication-delay'))
   }
   catch (error) {
     console.error(error)
@@ -323,6 +324,7 @@ async function handleChannelAction(action: 'set' | 'open' | 'unlink') {
       await setChannel(channel.value, id)
       await getChannels()
       toast.success(t('channels-unlinked-successfully'))
+      toast.info(t('cloud-replication-delay'))
     }
     catch (error) {
       console.error(error)

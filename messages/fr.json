@@ -458,6 +458,9 @@
   "credits-daily-no-activity": "Aucune activité",
   "credits-daily-transaction-count": "{count} transactions",
   "credits-empty-state": "Aucune transaction de crédits pour le moment.",
+  "credits-flexibility-cta-title": "Vous ne souhaitez pas changer d'offre ?",
+  "credits-flexibility-cta-description": "Payez uniquement ce que vous consommez grâce aux crédits — sans engagement, flexibilité maximale.",
+  "credits-flexibility-cta-link": "En savoir plus sur les crédits",
   "credits-load-error": "Nous n'avons pas pu charger votre historique de crédits. Veuillez réessayer.",
   "credits-next-expiration": "Prochaine expiration de crédits",
   "credits-pagination-label": "Page {current} / {total}",
@@ -1336,5 +1339,5 @@
   "invalid-password": "Mot de passe invalide",
   "password-does-not-meet-requirements": "Votre mot de passe ne répond pas aux exigences de l'organisation. Veuillez changer votre mot de passe.",
   "verification-failed": "Échec de la vérification",
-  "no-organization-selected": "Aucune organisation sélectionnée"
+  "cloud-replication-delay": "Les modifications prendront jusqu'à 60 secondes pour se propager globalement"
 }

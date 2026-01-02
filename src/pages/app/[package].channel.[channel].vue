@@ -150,6 +150,9 @@ async function saveChannelChange(key: string, val: any) {
       toast.error(t('error-update-channel'))
       console.error('no channel update', error)
     }
+    else {
+      toast.info(t('cloud-replication-delay'))
+    }
   }
   catch (error) {
     console.error(error)
@@ -320,6 +323,7 @@ async function handleRevert() {
           }
 
           await getChannel(true)
+          toast.info(t('cloud-replication-delay'))
         },
       },
     ],
@@ -447,8 +451,12 @@ async function onSelectAutoUpdate(value: Database['public']['Enums']['disable_up
     .update({ disable_auto_update: value })
     .eq('id', id.value)
 
-  if (error)
+  if (error) {
     console.error(error)
+  }
+  else {
+    toast.info(t('cloud-replication-delay'))
+  }
 
   if (channel.value?.disable_auto_update)
     channel.value.disable_auto_update = value

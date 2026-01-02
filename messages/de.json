@@ -458,6 +458,9 @@
   "credits-daily-no-activity": "Keine Aktivität",
   "credits-daily-transaction-count": "{count} Transaktionen",
   "credits-empty-state": "Noch keine Guthaben-Transaktionen.",
+  "credits-flexibility-cta-title": "Kein Upgrade gewünscht?",
+  "credits-flexibility-cta-description": "Zahlen Sie nur für das, was Sie nutzen — mit Credits. Keine Verpflichtung, maximale Flexibilität.",
+  "credits-flexibility-cta-link": "Mehr über Credits erfahren",
   "credits-load-error": "Wir konnten Ihren Guthabenverlauf nicht laden. Bitte versuchen Sie es erneut.",
   "credits-next-expiration": "Nächste Credit-Ablauffrist",
   "credits-pagination-label": "Seite {current} / {total}",
@@ -1336,5 +1339,5 @@
   "invalid-password": "Ungültiges Passwort",
   "password-does-not-meet-requirements": "Ihr Passwort erfüllt nicht die Anforderungen der Organisation. Bitte ändern Sie Ihr Passwort.",
   "verification-failed": "Überprüfung fehlgeschlagen",
-  "no-organization-selected": "Keine Organisation ausgewählt"
+  "cloud-replication-delay": "Änderungen werden innerhalb von 60 Sekunden weltweit übertragen"
 }

@@ -25,6 +25,7 @@ const memberSchema = z.array(z.object({
     'admin',
     'super_admin',
   ]),
+  is_tmp: z.boolean(),
 }))
 
 export async function get(c: Context, bodyRaw: any, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {

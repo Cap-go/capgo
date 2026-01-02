@@ -109,6 +109,115 @@ describe('[GET] /organization/members', () => {
     const responseData = await response.json() as { error: string }
     expect(responseData.error).toBe('cannot_access_organization')
   })
+
+  it('get organization members includes pending invitations (tmp_users)', async () => {
+    const testEmail = `pending-invite-${randomUUID()}@test.com`
+
+    // Insert a pending invitation directly into tmp_users
+    const { error: insertError } = await getSupabaseClient().from('tmp_users').insert({
+      email: testEmail,
+      org_id: ORG_ID,
+      role: 'admin',
+      first_name: 'Test',
+      last_name: 'User',
+    })
+    expect(insertError).toBeNull()
+
+    // Fetch members via API
+    const response = await fetch(`${BASE_URL}/organization/members?orgId=${ORG_ID}`, {
+      headers,
+    })
+    expect(response.status).toBe(200)
+
+    const members = await response.json() as Array<{
+      uid: string
+      email: string
+      role: string
+      is_tmp?: boolean
+    }>
+
+    // Find the pending invitation
+    const pendingMember = members.find(m => m.email === testEmail)
+    expect(pendingMember).toBeTruthy()
+    expect(pendingMember?.is_tmp).toBe(true)
+    expect(pendingMember?.role).toBe('invite_admin') // Role should be prefixed with invite_
+
+    // Cleanup
+    await getSupabaseClient().from('tmp_users').delete().eq('email', testEmail).eq('org_id', ORG_ID)
+  })
+
+  it('get organization members excludes cancelled pending invitations', async () => {
+    const testEmail = `cancelled-invite-${randomUUID()}@test.com`
+
+    // Insert a cancelled pending invitation
+    const { error: insertError } = await getSupabaseClient().from('tmp_users').insert({
+      email: testEmail,
+      org_id: ORG_ID,
+      role: 'admin',
+      first_name: 'Cancelled',
+      last_name: 'User',
+      cancelled_at: new Date().toISOString(),
+    })
+    expect(insertError).toBeNull()
+
+    // Fetch members via API
+    const response = await fetch(`${BASE_URL}/organization/members?orgId=${ORG_ID}`, {
+      headers,
+    })
+    expect(response.status).toBe(200)
+
+    const members = await response.json() as Array<{
+      uid: string
+      email: string
+      role: string
+      is_tmp?: boolean
+    }>
+
+    // The cancelled invitation should NOT be in the list
+    const cancelledMember = members.find(m => m.email === testEmail)
+    expect(cancelledMember).toBeUndefined()
+
+    // Cleanup
+    await getSupabaseClient().from('tmp_users').delete().eq('email', testEmail).eq('org_id', ORG_ID)
+  })
+
+  it('get organization members excludes expired pending invitations (older than 7 days)', async () => {
+    const testEmail = `expired-invite-${randomUUID()}@test.com`
+
+    // Insert an expired pending invitation (8 days ago)
+    const expiredDate = new Date()
+    expiredDate.setDate(expiredDate.getDate() - 8)
+
+    const { error: insertError } = await getSupabaseClient().from('tmp_users').insert({
+      email: testEmail,
+      org_id: ORG_ID,
+      role: 'read',
+      first_name: 'Expired',
+      last_name: 'User',
+      created_at: expiredDate.toISOString(),
+    })
+    expect(insertError).toBeNull()
+
+    // Fetch members via API
+    const response = await fetch(`${BASE_URL}/organization/members?orgId=${ORG_ID}`, {
+      headers,
+    })
+    expect(response.status).toBe(200)
+
+    const members = await response.json() as Array<{
+      uid: string
+      email: string
+      role: string
+      is_tmp?: boolean
+    }>
+
+    // The expired invitation should NOT be in the list
+    const expiredMember = members.find(m => m.email === testEmail)
+    expect(expiredMember).toBeUndefined()
+
+    // Cleanup
+    await getSupabaseClient().from('tmp_users').delete().eq('email', testEmail).eq('org_id', ORG_ID)
+  })
 })
 
 describe('[POST] /organization/members', () => {

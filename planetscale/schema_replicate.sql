@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict ZwH3p7XlUKDizAYboIgNwqB7wpcSYpM6l04Q7VHLxjeFapeoANc0VWokeRDcLeV
+\restrict YsYZEaO3BszkE6LdZGbQtoK6rTI2vSwskiAAtdvLaVd19vUlmb87YLnjI7ykEy2
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.7 (Homebrew)
@@ -82,13 +82,13 @@ $$;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict ZwH3p7XlUKDizAYboIgNwqB7wpcSYpM6l04Q7VHLxjeFapeoANc0VWokeRDcLeV
+\unrestrict YsYZEaO3BszkE6LdZGbQtoK6rTI2vSwskiAAtdvLaVd19vUlmb87YLnjI7ykEy2
 
 --
 -- PostgreSQL database dump
 --
 
-\restrict ZVrrWBtwCsoIGnpWRHixoyl6jNxkaACyUCEhI0PnXnU3SKIUtkK99EvfasMVWxm
+\restrict pbCT0yc029IeBjc8FCsV1lorh1n1SPb373suxARvFyTDkbau37xN9hJfxUUtsO2
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.7 (Homebrew)
@@ -322,8 +322,11 @@ CREATE TABLE public.orgs (
     stats_updated_at timestamp without time zone,
     last_stats_updated_at timestamp without time zone,
     enforcing_2fa boolean DEFAULT false NOT NULL,
-    email_preferences jsonb DEFAULT '{"onboarding": true, "usage_limit": true, "credit_usage": true, "device_error": true, "weekly_stats": true, "monthly_stats": true, "bundle_created": true, "bundle_deployed": true, "deploy_stats_24h": true, "channel_self_rejected": true}'::jsonb NOT NULL,
-    password_policy_config jsonb
+    email_preferences jsonb DEFAULT '{"onboarding": true, "usage_limit": true, "credit_usage": true, "device_error": true, "weekly_stats": true, "monthly_stats": true, "bundle_created": true, "bundle_deployed": true, "deploy_stats_24h": true, "billing_period_stats": true, "channel_self_rejected": true}'::jsonb NOT NULL,
+    password_policy_config jsonb,
+    enforce_hashed_api_keys boolean DEFAULT false NOT NULL,
+    require_apikey_expiration boolean DEFAULT false NOT NULL,
+    max_apikey_expiration_days integer
 );
 
 ALTER TABLE ONLY public.orgs REPLICA IDENTITY FULL;
@@ -754,5 +757,5 @@ CREATE INDEX si_customer_status_trial_idx ON public.stripe_info USING btree (cus
 -- PostgreSQL database dump complete
 --
 
-\unrestrict ZVrrWBtwCsoIGnpWRHixoyl6jNxkaACyUCEhI0PnXnU3SKIUtkK99EvfasMVWxm
+\unrestrict pbCT0yc029IeBjc8FCsV1lorh1n1SPb373suxARvFyTDkbau37xN9hJfxUUtsO2
 

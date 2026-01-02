@@ -458,6 +458,9 @@
   "credits-daily-no-activity": "कोई गतिविधि नहीं",
   "credits-daily-transaction-count": "{count} लेनदेन",
   "credits-empty-state": "अभी तक कोई क्रेडिट लेन-देन नहीं है।",
+  "credits-flexibility-cta-title": "अपग्रेड नहीं करना चाहते?",
+  "credits-flexibility-cta-description": "क्रेडिट के साथ सिर्फ उतना भुगतान करें जितना आप उपयोग करें — कोई प्रतिबद्धता नहीं, अधिकतम लचीलापन।",
+  "credits-flexibility-cta-link": "क्रेडिट के बारे में जानें",
   "credits-load-error": "हम आपका क्रेडिट इतिहास लोड नहीं कर सके। कृपया दोबारा प्रयास करें।",
   "credits-next-expiration": "अगली क्रेडिट समाप्ति",
   "credits-pagination-label": "पृष्ठ {current} / {total}",
@@ -1327,5 +1330,5 @@
   "invalid-password": "अमान्य पासवर्ड",
   "password-does-not-meet-requirements": "आपका पासवर्ड संगठन की आवश्यकताओं को पूरा नहीं करता। कृपया अपना पासवर्ड बदलें।",
   "verification-failed": "सत्यापन विफल",
-  "no-organization-selected": "कोई संगठन चयनित नहीं"
+  "cloud-replication-delay": "परिवर्तनों को विश्व स्तर पर प्रसारित होने में 60 सेकंड तक का समय लगेगा"
 }

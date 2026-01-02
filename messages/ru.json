@@ -458,6 +458,9 @@
   "credits-daily-no-activity": "Нет активности",
   "credits-daily-transaction-count": "{count} транзакций",
   "credits-empty-state": "Операций с кредитами пока нет.",
+  "credits-flexibility-cta-title": "Не хотите повышать тариф?",
+  "credits-flexibility-cta-description": "Платите только за то, что используете, с помощью кредитов — без обязательств, максимальная гибкость.",
+  "credits-flexibility-cta-link": "Узнать о кредитах",
   "credits-load-error": "Не удалось загрузить историю кредитов. Попробуйте еще раз.",
   "credits-next-expiration": "Ближайшая дата истечения кредитов",
   "credits-pagination-label": "Страница {current} / {total}",
@@ -1327,5 +1330,5 @@
   "invalid-password": "Неверный пароль",
   "password-does-not-meet-requirements": "Ваш пароль не соответствует требованиям организации. Пожалуйста, измените пароль.",
   "verification-failed": "Ошибка подтверждения",
-  "no-organization-selected": "Организация не выбрана"
+  "cloud-replication-delay": "Изменения займут до 60 секунд для глобального распространения"
 }

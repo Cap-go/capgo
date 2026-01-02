@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { createClient } from '@supabase/supabase-js'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { BASE_URL, getSupabaseClient, headers, resetAndSeedAppData, resetAppData } from './test-utils.ts'
 
@@ -541,5 +542,99 @@ describe('[POST] /apikey hashed key with expiration', () => {
     })
     // Should be rejected as unauthorized
     expect(listResponse.status).toBe(401)
+  })
+})
+
+describe('[RLS] hashed API key with direct Supabase SDK', () => {
+  it('hashed key works with RLS via Supabase SDK (simulating CLI usage)', async () => {
+    // Create a hashed key via API
+    const createResponse = await fetch(`${BASE_URL}/apikey`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        name: 'hashed-key-rls-test',
+        hashed: true,
+      }),
+    })
+    const createData = await createResponse.json<{ key: string, id: number }>()
+    expect(createResponse.status).toBe(200)
+
+    // Now use the hashed key directly with Supabase SDK (bypassing our API)
+    // This simulates how the CLI uses the SDK with capgkey header
+    const supabaseWithHashedKey = createClient(
+      process.env.SUPABASE_URL!,
+      process.env.SUPABASE_ANON_KEY!,
+      {
+        global: {
+          headers: {
+            capgkey: createData.key, // The plain key that user received
+          },
+        },
+      },
+    )
+
+    // Try to query apps table - this goes through RLS which uses get_identity()
+    const { data: apps, error: appsError } = await supabaseWithHashedKey
+      .from('apps')
+      .select('app_id, name')
+      .limit(5)
+
+    expect(appsError).toBeNull()
+    expect(Array.isArray(apps)).toBe(true)
+
+    // Also test calling an RPC that uses get_identity
+    const { data: orgs, error: orgsError } = await supabaseWithHashedKey
+      .rpc('get_orgs_v7')
+
+    expect(orgsError).toBeNull()
+    expect(Array.isArray(orgs)).toBe(true)
+
+    // Cleanup
+    await fetch(`${BASE_URL}/apikey/${createData.id}`, {
+      method: 'DELETE',
+      headers,
+    })
+  })
+
+  it('plain key still works with RLS via Supabase SDK', async () => {
+    // Create a plain (non-hashed) key via API
+    const createResponse = await fetch(`${BASE_URL}/apikey`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        name: 'plain-key-rls-test',
+        hashed: false,
+      }),
+    })
+    const createData = await createResponse.json<{ key: string, id: number }>()
+    expect(createResponse.status).toBe(200)
+
+    // Use plain key with Supabase SDK
+    const supabaseWithPlainKey = createClient(
+      process.env.SUPABASE_URL!,
+      process.env.SUPABASE_ANON_KEY!,
+      {
+        global: {
+          headers: {
+            capgkey: createData.key,
+          },
+        },
+      },
+    )
+
+    // Try to query apps table
+    const { data: apps, error: appsError } = await supabaseWithPlainKey
+      .from('apps')
+      .select('app_id, name')
+      .limit(5)
+
+    expect(appsError).toBeNull()
+    expect(Array.isArray(apps)).toBe(true)
+
+    // Cleanup
+    await fetch(`${BASE_URL}/apikey/${createData.id}`, {
+      method: 'DELETE',
+      headers,
+    })
   })
 })

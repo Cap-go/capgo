@@ -458,6 +458,9 @@
   "credits-daily-no-activity": "Sem atividade",
   "credits-daily-transaction-count": "{count} transações",
   "credits-empty-state": "Ainda não há transações de créditos.",
+  "credits-flexibility-cta-title": "Não quer fazer upgrade?",
+  "credits-flexibility-cta-description": "Pague apenas pelo que usar com créditos — sem compromisso, máxima flexibilidade.",
+  "credits-flexibility-cta-link": "Saiba mais sobre créditos",
   "credits-load-error": "Não conseguimos carregar seu histórico de créditos. Tente novamente.",
   "credits-next-expiration": "Próximo vencimento dos créditos",
   "credits-pagination-label": "Página {current} / {total}",
@@ -1328,5 +1331,5 @@
   "invalid-password": "Senha inválida",
   "password-does-not-meet-requirements": "Sua senha não atende aos requisitos da organização. Por favor, altere sua senha.",
   "verification-failed": "Verificação falhou",
-  "no-organization-selected": "Nenhuma organização selecionada"
+  "cloud-replication-delay": "As alterações levarão até 60 segundos para se propagar globalmente"
 }

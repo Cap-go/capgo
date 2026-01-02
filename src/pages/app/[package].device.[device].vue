@@ -292,6 +292,7 @@ async function onSelectChannel(value: string) {
     if (device.value?.device_id)
       await delDevChannel(device.value?.device_id)
     toast.success(t('unlink-channel'))
+    toast.info(t('cloud-replication-delay'))
     await loadData()
   }
   else if (value !== 'none') {
@@ -304,6 +305,7 @@ async function onSelectChannel(value: string) {
       await upsertDevChannel(device.value?.device_id, Number(value))
         .then(async () => {
           toast.success(t('channel-linked'))
+          toast.info(t('cloud-replication-delay'))
           return loadData()
         })
         .catch(async (error) => {

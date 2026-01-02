@@ -458,6 +458,9 @@
   "credits-daily-no-activity": "Tidak ada aktivitas",
   "credits-daily-transaction-count": "{count} transaksi",
   "credits-empty-state": "Belum ada transaksi kredit.",
+  "credits-flexibility-cta-title": "Tidak ingin upgrade?",
+  "credits-flexibility-cta-description": "Bayar hanya untuk yang Anda gunakan dengan kredit — tanpa komitmen, fleksibilitas maksimal.",
+  "credits-flexibility-cta-link": "Pelajari tentang kredit",
   "credits-load-error": "Kami tidak dapat memuat riwayat kredit Anda. Silakan coba lagi.",
   "credits-next-expiration": "Kedaluwarsa kredit berikutnya",
   "credits-pagination-label": "Halaman {current} / {total}",
@@ -1327,5 +1330,5 @@
   "invalid-password": "Kata sandi tidak valid",
   "password-does-not-meet-requirements": "Kata sandi Anda tidak memenuhi persyaratan organisasi. Silakan ubah kata sandi Anda.",
   "verification-failed": "Verifikasi gagal",
-  "no-organization-selected": "Tidak ada organisasi yang dipilih"
+  "cloud-replication-delay": "Perubahan akan membutuhkan hingga 60 detik untuk menyebar secara global"
 }

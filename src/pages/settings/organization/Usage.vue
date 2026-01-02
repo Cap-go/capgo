@@ -7,6 +7,7 @@ import { computed, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
+import CreditsCta from '~/components/CreditsCta.vue'
 import Spinner from '~/components/Spinner.vue'
 import { bytesToGb } from '~/services/conversion'
 import { getCreditUnitPricing, getCurrentPlanNameOrg, getPlans, getPlanUsagePercent, getTotalStorage, getUsageCreditDeductions } from '~/services/supabase'
@@ -374,6 +375,9 @@ function nextRunDate() {
           {{ t('good') }}
         </div>
       </div>
+
+      <!-- Credits CTA -->
+      <CreditsCta class="mb-8 shrink-0" />
 
       <!-- Usage Metrics Grid -->
       <h2 class="mb-4 text-lg font-semibold text-gray-900 dark:text-white shrink-0">
