@@ -80,6 +80,36 @@ async function registerWithSupabaseAuth(
   const supabaseUrl = getEnv(c, 'SUPABASE_URL')
   const serviceRoleKey = getEnv(c, 'SUPABASE_SERVICE_ROLE_KEY')
 
+  // For local development, skip Supabase Auth registration and use mock
+  const isLocal = supabaseUrl.includes('localhost') || supabaseUrl.includes('127.0.0.1')
+
+  if (isLocal) {
+    cloudlog({
+      requestId,
+      message: '[SSO Auth] Local development detected - using mock provider',
+      hasMetadataUrl: !!config.metadataUrl,
+      hasMetadataXml: !!config.metadataXml,
+      domainCount: config.domains?.length || 0,
+    })
+
+    // Generate mock provider for local development
+    const mockProviderId = crypto.randomUUID()
+    const extractedEntityId = config.metadataXml
+      ? extractEntityIdFromMetadata(config.metadataXml)
+      : `mock-entity-${mockProviderId}`
+
+    return {
+      id: mockProviderId,
+      saml: {
+        entity_id: extractedEntityId || `mock-entity-${mockProviderId}`,
+        metadata_url: config.metadataUrl,
+        metadata_xml: config.metadataXml,
+      },
+      domains: config.domains?.map(d => ({ domain: d, id: crypto.randomUUID() })),
+      created_at: new Date().toISOString(),
+    }
+  }
+
   cloudlog({
     requestId,
     message: '[SSO Auth] Registering SAML provider with Supabase Auth',
@@ -1202,8 +1232,8 @@ export async function updateSAML(
     const eventType = update.enabled !== undefined
       ? (update.enabled ? 'provider_enabled' : 'provider_disabled')
       : (update.metadataUrl
-          ? 'metadata_updated'
-          : (update.domains ? 'domains_updated' : 'provider_updated'))
+        ? 'metadata_updated'
+        : (update.domains ? 'domains_updated' : 'provider_updated'))
 
     await logSSOAuditEvent(c, drizzleClient, {
       eventType,
@@ -1267,9 +1297,9 @@ export async function removeSAML(
     // Get associated domains before deletion
     const domains = connection
       ? await drizzleClient
-          .select({ domain: saml_domain_mappings.domain })
-          .from(saml_domain_mappings)
-          .where(eq(saml_domain_mappings.sso_connection_id, connection.id))
+        .select({ domain: saml_domain_mappings.domain })
+        .from(saml_domain_mappings)
+        .where(eq(saml_domain_mappings.sso_connection_id, connection.id))
       : []
 
     // Remove from Supabase Auth (GoTrue Admin API)

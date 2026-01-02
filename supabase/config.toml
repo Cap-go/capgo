@@ -363,6 +363,14 @@ import_map = "./functions/deno.json"
 verify_jwt = false
 import_map = "./functions/deno.json"
 
+[functions.mock-sso-callback]
+verify_jwt = false
+import_map = "./functions/deno.json"
+
+[functions.sso_check]
+verify_jwt = false
+import_map = "./functions/deno.json"
+
 # FILES ENDPOINTS
 
 [functions.files]

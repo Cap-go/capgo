@@ -21,6 +21,7 @@ import { app as channel } from '../../supabase/functions/_backend/public/channel
 import { app as device } from '../../supabase/functions/_backend/public/device/index.ts'
 import { app as ok } from '../../supabase/functions/_backend/public/ok.ts'
 import { app as organization } from '../../supabase/functions/_backend/public/organization/index.ts'
+import { app as sso_check } from '../../supabase/functions/_backend/public/sso_check.ts'
 import { app as statistics } from '../../supabase/functions/_backend/public/statistics/index.ts'
 import { app as clear_app_cache } from '../../supabase/functions/_backend/triggers/clear_app_cache.ts'
 import { app as clear_device_cache } from '../../supabase/functions/_backend/triggers/clear_device_cache.ts'
@@ -55,6 +56,7 @@ app.route('/bundle', bundle)
 app.route('/channel', channel)
 app.route('/device', device)
 app.route('/organization', organization)
+app.route('/sso_check', sso_check)
 app.route('/statistics', statistics)
 app.route('/app', appEndpoint)
 app.route('/build', build)

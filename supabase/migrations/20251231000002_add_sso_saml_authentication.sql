@@ -348,19 +348,6 @@ CREATE TRIGGER sso_user_auto_enroll_on_create
   EXECUTE FUNCTION public.trigger_sso_user_auto_enroll();
 
 COMMENT ON FUNCTION public.trigger_sso_user_auto_enroll IS 'Triggers SSO-based auto-enrollment when users authenticate via SAML';
-END;
-$$;
-
--- Drop existing trigger if it exists
-DROP TRIGGER IF EXISTS auto_join_user_to_orgs_on_create ON auth.users;
-
--- Create new trigger
-CREATE TRIGGER auto_join_user_to_orgs_on_create
-  AFTER INSERT ON auth.users
-  FOR EACH ROW
-  EXECUTE FUNCTION public.trigger_auto_join_on_user_create();
-
--- Note: Cannot add comment on auth schema trigger (requires ownership)
 
 -- ============================================================================
 -- TRIGGERS: Validation and Audit
@@ -426,6 +413,8 @@ BEGIN
 END;
 $$;
 
+DROP TRIGGER IF EXISTS trigger_validate_sso_configuration ON public.org_saml_connections;
+
 CREATE TRIGGER trigger_validate_sso_configuration
   BEFORE INSERT OR UPDATE ON public.org_saml_connections
   FOR EACH ROW
@@ -441,6 +430,15 @@ COMMENT ON TRIGGER trigger_validate_sso_configuration ON public.org_saml_connect
 ALTER TABLE public.org_saml_connections ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.saml_domain_mappings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.sso_audit_logs ENABLE ROW LEVEL SECURITY;
+
+-- Drop all existing policies first (idempotent)
+DROP POLICY IF EXISTS "Super admins can manage SSO connections" ON public.org_saml_connections;
+DROP POLICY IF EXISTS "Org members can read SSO status" ON public.org_saml_connections;
+DROP POLICY IF EXISTS "Anyone can read verified domain mappings" ON public.saml_domain_mappings;
+DROP POLICY IF EXISTS "Super admins can manage domain mappings" ON public.saml_domain_mappings;
+DROP POLICY IF EXISTS "Users can view own SSO audit logs" ON public.sso_audit_logs;
+DROP POLICY IF EXISTS "Org admins can view org SSO audit logs" ON public.sso_audit_logs;
+DROP POLICY IF EXISTS "System can insert audit logs" ON public.sso_audit_logs;
 
 -- ============================================================================
 -- RLS POLICIES: org_saml_connections
@@ -488,6 +486,9 @@ CREATE POLICY "Org members can read SSO status"
 -- ============================================================================
 -- RLS POLICIES: saml_domain_mappings
 -- ============================================================================
+
+DROP POLICY IF EXISTS "Anyone can read verified domain mappings" ON public.saml_domain_mappings;
+DROP POLICY IF EXISTS "Super admins can manage domain mappings" ON public.saml_domain_mappings;
 
 -- Anyone (including anon) can read verified domain mappings for SSO detection
 CREATE POLICY "Anyone can read verified domain mappings"

@@ -161,5 +161,4 @@ function goBack() {
 <route lang="yaml">
 meta:
   layout: naked
-  requiresAuth: false
 </route>

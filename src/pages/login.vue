@@ -30,6 +30,9 @@ const router = useRouter()
 const { t } = useI18n()
 const captchaComponent = ref<InstanceType<typeof VueTurnstile> | null>(null)
 
+// Detect if user is being redirected from SSO
+const isFromSSO = ref(false)
+
 const version = import.meta.env.VITE_APP_VERSION
 
 const registerUrl = window.location.host === 'console.capgo.app' ? 'https://capgo.app/register/' : `/register/`
@@ -263,6 +266,13 @@ async function checkLogin() {
   const params = new URLSearchParams(parsedUrl.search)
   const accessToken = params.get('access_token')
   const refreshToken = params.get('refresh_token')
+  const fromSSO = params.get('from_sso')
+
+  // Set SSO redirect state
+  if (fromSSO === 'true') {
+    isFromSSO.value = true
+    isLoading.value = true
+  }
 
   if (!!accessToken && !!refreshToken) {
     const res = await supabase.auth.setSession({
@@ -271,6 +281,8 @@ async function checkLogin() {
     })
     if (res.error) {
       console.error('Cannot set auth', res.error)
+      isFromSSO.value = false
+      isLoading.value = false
       return
     }
     nextLogin()
@@ -327,12 +339,36 @@ onMounted(checkLogin)
             Capgo
           </p> !
         </h1>
-        <p class="mx-auto mt-4 max-w-xl text-base leading-relaxed text-gray-600 dark:text-gray-300">
+
+        <!-- Show loading message when redirected from SSO -->
+        <div v-if="isFromSSO" class="mx-auto mt-8 max-w-xl">
+          <div class="flex flex-col items-center justify-center gap-4 p-8">
+            <svg
+              class="w-12 h-12 text-muted-blue-700 animate-spin"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+              <path
+                class="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+              />
+            </svg>
+            <p class="text-lg text-gray-600 dark:text-gray-300">
+              {{ t('sso-signing-in', 'Signing you in...') }}
+            </p>
+          </div>
+        </div>
+
+        <!-- Show normal login message when not from SSO -->
+        <p v-else class="mx-auto mt-4 max-w-xl text-base leading-relaxed text-gray-600 dark:text-gray-300">
           {{ t('login-to-your-account') }}
         </p>
       </div>
 
-      <div v-if="statusAuth === 'login'" class="relative mx-auto mt-8 max-w-md md:mt-4">
+      <div v-if="statusAuth === 'login' && !isFromSSO" class="relative mx-auto mt-8 max-w-md md:mt-4">
         <div class="overflow-hidden bg-white rounded-md shadow-md dark:bg-slate-800">
           <div class="py-6 px-4 text-gray-500 sm:py-7 sm:px-8">
             <FormKit id="login-account" type="form" :actions="false" @submit="submit">
@@ -375,32 +411,50 @@ onMounted(checkLogin)
                     </button>
                   </div>
                 </div>
-
-                <div class="text-center">
-                  <p class="pt-2 text-gray-300">
-                    {{ version }}
-                  </p>
-                  <div class="">
-                    <a
-                      :href="registerUrl"
-                      data-test="register"
-                      class="text-sm font-medium text-orange-500 transition-all duration-200 hover:text-orange-600 hover:underline focus:text-orange-600"
-                    >
-                      {{ t('create-a-free-account') }}
-                    </a>
-                  </div>
-                  <div class="">
-                    <router-link
-                      to="/forgot_password"
-                      data-test="forgot-password"
-                      class="text-sm font-medium text-orange-500 transition-all duration-200 hover:text-orange-600 hover:underline focus:text-orange-600"
-                    >
-                      {{ t('forgot') }} {{ t('password') }} ?
-                    </router-link>
-                  </div>
-                </div>
               </div>
             </FormKit>
+
+            <!-- SSO Login Option -->
+            <div class="flex items-center justify-center gap-3 my-5">
+              <div class="flex-1 h-px bg-gray-300 dark:bg-gray-600" />
+              <span class="text-sm text-gray-500 dark:text-gray-400">{{ t('or') }}</span>
+              <div class="flex-1 h-px bg-gray-300 dark:bg-gray-600" />
+            </div>
+
+            <router-link
+              to="/sso-login"
+              data-test="sso-login-link"
+              class="inline-flex justify-center items-center gap-3 py-3 px-4 w-full text-base font-medium text-gray-700 bg-white rounded-md border transition-all duration-200 border-gray-300 hover:bg-gray-50 focus:bg-gray-50 focus:outline-none dark:bg-slate-700 dark:text-gray-200 dark:border-slate-600 dark:hover:bg-slate-600"
+            >
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+              </svg>
+              {{ t('sign-in-with-sso', 'Sign in with SSO') }}
+            </router-link>
+
+            <div class="mt-5 text-center">
+              <p class="pt-2 text-gray-300">
+                {{ version }}
+              </p>
+              <div class="">
+                <a
+                  :href="registerUrl"
+                  data-test="register"
+                  class="text-sm font-medium text-orange-500 transition-all duration-200 hover:text-orange-600 hover:underline focus:text-orange-600"
+                >
+                  {{ t('create-a-free-account') }}
+                </a>
+              </div>
+              <div class="">
+                <router-link
+                  to="/forgot_password"
+                  data-test="forgot-password"
+                  class="text-sm font-medium text-orange-500 transition-all duration-200 hover:text-orange-600 hover:underline focus:text-orange-600"
+                >
+                  {{ t('forgot') }} {{ t('password') }} ?
+                </router-link>
+              </div>
+            </div>
           </div>
         </div>
         <section class="flex flex-col items-center mt-6">
@@ -415,7 +469,7 @@ onMounted(checkLogin)
           </button>
         </section>
       </div>
-      <div v-else class="relative mx-auto mt-8 max-w-md md:mt-4">
+      <div v-else-if="statusAuth === '2fa' && !isFromSSO" class="relative mx-auto mt-8 max-w-md md:mt-4">
         <div class="overflow-hidden bg-white rounded-md shadow-md dark:bg-slate-800">
           <div class="py-6 px-4 sm:py-7 sm:px-8">
             <FormKit id="2fa-account" type="form" :actions="false" autocapitalize="off" data-test="2fa-form" @submit="submit">

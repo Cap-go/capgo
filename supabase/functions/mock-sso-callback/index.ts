@@ -102,6 +102,28 @@ async function authenticateUser(supabaseAdmin: any, mockResponse: MockSAMLRespon
     }
 
     console.log('[Mock SSO] Existing user authenticated successfully')
+
+    // For existing users, manually call auto_enroll in case they weren't auto-enrolled before
+    // Wait briefly to ensure public.users record exists (should already exist for existing users)
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    console.log('[Mock SSO] Calling auto_enroll_sso_user for existing user:', existingUser.id)
+    const { data: enrollResult, error: enrollError } = await supabaseAdmin.rpc('auto_enroll_sso_user', {
+      p_user_id: existingUser.id,
+      p_email: mockResponse.email,
+      p_sso_provider_id: mockResponse.providerId,
+    })
+
+    if (enrollError) {
+      console.error('[Mock SSO] Failed to auto-enroll existing user:', enrollError)
+    }
+    else if (enrollResult && enrollResult.length > 0) {
+      console.log('[Mock SSO] Existing user auto-enrolled to org:', enrollResult[0].org_name)
+    }
+    else {
+      console.log('[Mock SSO] No auto-enrollment needed (user may already be a member)')
+    }
+
     return {
       accessToken: signInData.session.access_token,
       refreshToken: signInData.session.refresh_token,
@@ -131,27 +153,31 @@ async function authenticateUser(supabaseAdmin: any, mockResponse: MockSAMLRespon
 
   console.log('[Mock SSO] New user created via admin API:', createData.user.id)
 
-  if (mockResponse.orgId) {
-    console.log('[Mock SSO] Adding user to org:', mockResponse.orgId)
-    const { error: orgError } = await supabaseAdmin
-      .from('org_users')
-      .insert({
-        org_id: mockResponse.orgId,
-        user_id: createData.user.id,
-        user_right: 'read',
-      })
+  // Create public.users record (normally done by Supabase auth hooks in production)
+  // Admin API doesn't trigger these hooks, so we must create manually for local testing
+  console.log('[Mock SSO] Creating public.users record...')
+  const { error: publicUserError } = await supabaseAdmin
+    .from('users')
+    .insert({
+      id: createData.user.id,
+      email: mockResponse.email,
+      first_name: mockResponse.firstName || mockResponse.email.split('@')[0],
+      last_name: mockResponse.lastName || '',
+      image_url: '',
+      country: null,
+      enable_notifications: true,
+      opt_for_newsletters: true,
+    })
 
-    if (orgError) {
-      console.error('[Mock SSO] Failed to add user to org:', orgError)
-    }
-    else {
-      console.log('[Mock SSO] User added to org successfully')
-    }
+  if (publicUserError) {
+    console.error('[Mock SSO] ✗ Failed to create public.users record:', publicUserError)
+    // Continue anyway - user exists in auth.users, they can sign in
   }
   else {
-    console.error('[Mock SSO] Missing orgId while assigning user to org')
+    console.log('[Mock SSO] ✓ public.users record created')
   }
 
+  console.log('[Mock SSO] Attempting sign in...')
   // Sign in with the password we just set
   const { data: signInData, error: signInError } = await supabaseAdmin.auth.signInWithPassword({
     email: mockResponse.email,
@@ -159,11 +185,55 @@ async function authenticateUser(supabaseAdmin: any, mockResponse: MockSAMLRespon
   })
 
   if (signInError || !signInData?.session) {
-    console.error('[Mock SSO] Failed to sign in new user:', signInError)
+    console.error('[Mock SSO] ✗ Failed to sign in new user:', signInError)
     return null
   }
 
-  console.log('[Mock SSO] New user authenticated successfully')
+  console.log('[Mock SSO] ✓ User authenticated successfully')
+
+  // The database trigger might fail due to timing (public.users not ready yet)
+  // Try auto-enrollment - if it fails due to FK constraint, we'll retry
+  console.log('[Mock SSO] Attempting auto_enroll_sso_user for user:', createData.user.id, 'with provider:', mockResponse.providerId)
+
+  let enrollSuccess = false
+  let retries = 0
+  const maxEnrollRetries = 6  // 6 retries × 150ms = 900ms total
+
+  while (!enrollSuccess && retries < maxEnrollRetries) {
+    const { data: enrollResult, error: enrollError } = await supabaseAdmin.rpc('auto_enroll_sso_user', {
+      p_user_id: createData.user.id,
+      p_email: mockResponse.email,
+      p_sso_provider_id: mockResponse.providerId,
+    })
+
+    if (enrollError) {
+      // Check if it's a foreign key constraint error (user doesn't exist in public.users yet)
+      if (enrollError.message?.includes('foreign key') || enrollError.message?.includes('violates')) {
+        retries++
+        if (retries < maxEnrollRetries) {
+          console.log(`[Mock SSO] ⏳ FK constraint error, user not in public.users yet, retrying in 150ms... (attempt ${retries})`)
+          await new Promise(resolve => setTimeout(resolve, 150))
+        }
+        else {
+          console.error('[Mock SSO] ✗ Failed to auto-enroll after', maxEnrollRetries, 'attempts:', enrollError)
+        }
+      }
+      else {
+        console.error('[Mock SSO] ✗ Failed to auto-enroll user:', enrollError)
+      }
+    }
+    else if (enrollResult && enrollResult.length > 0) {
+      console.log('[Mock SSO] ✓ User auto-enrolled to org:', enrollResult[0].org_name)
+      enrollSuccess = true
+    }
+    else {
+      console.log('[Mock SSO] ℹ No auto-enrollment performed (may already be member or auto_join disabled)')
+      enrollSuccess = true  // Not an error, just nothing to enroll
+    }
+
+    break  // Exit loop if no error occurred
+  }
+
   return {
     accessToken: signInData.session.access_token,
     refreshToken: signInData.session.refresh_token,
