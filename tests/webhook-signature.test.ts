@@ -1,66 +1,53 @@
-import { createHmac } from 'node:crypto'
-import { describe, expect, it } from 'vitest'
+import type { Server } from 'node:http'
+import { createHmac, randomUUID } from 'node:crypto'
+import { createServer } from 'node:http'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { BASE_URL, getSupabaseClient, headers, TEST_EMAIL, USER_ID } from './test-utils.ts'
 
-// Recreate the signature generation function for testing
-// This mirrors the implementation in supabase/functions/_backend/utils/webhook.ts
-async function generateWebhookSignature(
-  secret: string,
-  timestamp: string,
-  payload: string,
-): Promise<string> {
-  const signaturePayload = `${timestamp}.${payload}`
-
-  const encoder = new TextEncoder()
-  const key = await crypto.subtle.importKey(
-    'raw',
-    encoder.encode(secret),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign'],
-  )
-
-  const signature = await crypto.subtle.sign(
-    'HMAC',
-    key,
-    encoder.encode(signaturePayload),
-  )
-
-  const hexSignature = Array.from(new Uint8Array(signature))
-    .map(b => b.toString(16).padStart(2, '0'))
-    .join('')
-
-  return `v1=${timestamp}.${hexSignature}`
+// Webhook receiver state
+interface ReceivedWebhook {
+  headers: Record<string, string | string[] | undefined>
+  body: string
+  timestamp: number
 }
 
-// Verification function that receivers would use
+let webhookServer: Server | null = null
+let receivedWebhooks: ReceivedWebhook[] = []
+let serverPort: number = 0
+
+// Test data
+const WEBHOOK_TEST_ORG_ID = randomUUID()
+const globalId = randomUUID()
+const customerId = `cus_test_${WEBHOOK_TEST_ORG_ID}`
+let createdWebhookId: string | null = null
+let webhookSecret: string | null = null
+
+/**
+ * Verify webhook signature using the same algorithm as documented
+ * This is what a real webhook receiver would implement
+ */
 function verifyWebhookSignature(
   signature: string,
   secret: string,
-  timestamp: string,
-  payload: string,
-): boolean {
-  // Parse the signature format: v1={timestamp}.{hmac}
+  body: string,
+): { valid: boolean, timestamp: string | null, error?: string } {
+  // Parse signature format: v1={timestamp}.{hmac}
   const match = signature.match(/^v1=(\d+)\.([a-f0-9]+)$/i)
   if (!match) {
-    return false
+    return { valid: false, timestamp: null, error: 'Invalid signature format' }
   }
 
-  const [, sigTimestamp, receivedHmac] = match
+  const [, timestamp, receivedHmac] = match
 
-  // Verify timestamp matches
-  if (sigTimestamp !== timestamp) {
-    return false
-  }
-
-  // Compute expected HMAC
-  const signaturePayload = `${timestamp}.${payload}`
+  // Compute expected HMAC using the documented algorithm
+  const signaturePayload = `${timestamp}.${body}`
   const expectedHmac = createHmac('sha256', secret)
     .update(signaturePayload)
     .digest('hex')
 
-  // Constant-time comparison to prevent timing attacks
+  // Constant-time comparison
   if (expectedHmac.length !== receivedHmac.length) {
-    return false
+    return { valid: false, timestamp, error: 'HMAC length mismatch' }
   }
 
   let result = 0
@@ -68,362 +55,335 @@ function verifyWebhookSignature(
     result |= expectedHmac.charCodeAt(i) ^ receivedHmac.charCodeAt(i)
   }
 
-  return result === 0
+  if (result !== 0) {
+    return { valid: false, timestamp, error: 'HMAC verification failed' }
+  }
+
+  return { valid: true, timestamp }
 }
 
-// Parse signature to extract components
-function parseSignature(signature: string): { version: string, timestamp: string, hmac: string } | null {
-  const match = signature.match(/^(v\d+)=(\d+)\.([a-f0-9]+)$/i)
-  if (!match) {
-    return null
-  }
-  return {
-    version: match[1],
-    timestamp: match[2],
-    hmac: match[3],
-  }
+/**
+ * Start a local HTTP server to receive webhooks
+ */
+function startWebhookServer(): Promise<number> {
+  return new Promise((resolve, reject) => {
+    receivedWebhooks = []
+
+    webhookServer = createServer((req, res) => {
+      let body = ''
+
+      req.on('data', (chunk) => {
+        body += chunk.toString()
+      })
+
+      req.on('end', () => {
+        // Store received webhook
+        receivedWebhooks.push({
+          headers: req.headers,
+          body,
+          timestamp: Date.now(),
+        })
+
+        // Always return 200 to indicate successful receipt
+        res.writeHead(200, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ received: true }))
+      })
+
+      req.on('error', (err) => {
+        console.error('Webhook server request error:', err)
+        res.writeHead(500)
+        res.end()
+      })
+    })
+
+    webhookServer.on('error', reject)
+
+    // Listen on random available port
+    webhookServer.listen(0, '127.0.0.1', () => {
+      const address = webhookServer!.address()
+      if (typeof address === 'object' && address !== null) {
+        serverPort = address.port
+        resolve(serverPort)
+      }
+      else {
+        reject(new Error('Failed to get server port'))
+      }
+    })
+  })
 }
 
-describe('Webhook Signature Generation', () => {
-  const testSecret = 'whsec_test_secret_key_12345'
-  const testTimestamp = '1704067200' // 2024-01-01 00:00:00 UTC
-  const testPayload = JSON.stringify({
-    event: 'app_versions.INSERT',
-    event_id: '123e4567-e89b-12d3-a456-426614174000',
-    timestamp: '2024-01-01T00:00:00.000Z',
-    org_id: 'org-123',
-    data: {
-      table: 'app_versions',
-      operation: 'INSERT',
-      record_id: 'version-123',
-      old_record: null,
-      new_record: { id: 'version-123', name: '1.0.0' },
-      changed_fields: null,
-    },
-  })
-
-  it('should generate signature in correct format', async () => {
-    const signature = await generateWebhookSignature(testSecret, testTimestamp, testPayload)
-
-    // Should match format: v1={timestamp}.{hmac}
-    expect(signature).toMatch(/^v1=\d+\.[a-f0-9]{64}$/i)
-  })
-
-  it('should include timestamp in signature', async () => {
-    const signature = await generateWebhookSignature(testSecret, testTimestamp, testPayload)
-
-    expect(signature).toContain(`v1=${testTimestamp}.`)
-  })
-
-  it('should generate consistent signatures for same inputs', async () => {
-    const signature1 = await generateWebhookSignature(testSecret, testTimestamp, testPayload)
-    const signature2 = await generateWebhookSignature(testSecret, testTimestamp, testPayload)
-
-    expect(signature1).toBe(signature2)
-  })
-
-  it('should generate different signatures for different secrets', async () => {
-    const signature1 = await generateWebhookSignature(testSecret, testTimestamp, testPayload)
-    const signature2 = await generateWebhookSignature('different_secret', testTimestamp, testPayload)
-
-    expect(signature1).not.toBe(signature2)
-  })
-
-  it('should generate different signatures for different timestamps', async () => {
-    const signature1 = await generateWebhookSignature(testSecret, testTimestamp, testPayload)
-    const signature2 = await generateWebhookSignature(testSecret, '1704153600', testPayload)
-
-    expect(signature1).not.toBe(signature2)
-  })
-
-  it('should generate different signatures for different payloads', async () => {
-    const signature1 = await generateWebhookSignature(testSecret, testTimestamp, testPayload)
-    const signature2 = await generateWebhookSignature(testSecret, testTimestamp, '{"different":"payload"}')
-
-    expect(signature1).not.toBe(signature2)
-  })
-
-  it('should handle empty payload', async () => {
-    const signature = await generateWebhookSignature(testSecret, testTimestamp, '')
-
-    expect(signature).toMatch(/^v1=\d+\.[a-f0-9]{64}$/i)
-  })
-
-  it('should handle payload with special characters', async () => {
-    const specialPayload = JSON.stringify({
-      message: 'Hello "world" with <special> & characters!',
-      unicode: '\u0000\u001F\u007F',
-      emoji: '🚀🔥💯',
-    })
-    const signature = await generateWebhookSignature(testSecret, testTimestamp, specialPayload)
-
-    expect(signature).toMatch(/^v1=\d+\.[a-f0-9]{64}$/i)
-  })
-
-  it('should handle very long payload', async () => {
-    const longPayload = JSON.stringify({
-      data: 'x'.repeat(100000),
-    })
-    const signature = await generateWebhookSignature(testSecret, testTimestamp, longPayload)
-
-    expect(signature).toMatch(/^v1=\d+\.[a-f0-9]{64}$/i)
-  })
-})
-
-describe('Webhook Signature Verification', () => {
-  const testSecret = 'whsec_test_secret_key_12345'
-  const testTimestamp = '1704067200'
-  const testPayload = JSON.stringify({ event: 'test.ping' })
-
-  it('should verify valid signature', async () => {
-    const signature = await generateWebhookSignature(testSecret, testTimestamp, testPayload)
-    const isValid = verifyWebhookSignature(signature, testSecret, testTimestamp, testPayload)
-
-    expect(isValid).toBe(true)
-  })
-
-  it('should reject signature with wrong secret', async () => {
-    const signature = await generateWebhookSignature(testSecret, testTimestamp, testPayload)
-    const isValid = verifyWebhookSignature(signature, 'wrong_secret', testTimestamp, testPayload)
-
-    expect(isValid).toBe(false)
-  })
-
-  it('should reject signature with wrong timestamp', async () => {
-    const signature = await generateWebhookSignature(testSecret, testTimestamp, testPayload)
-    const isValid = verifyWebhookSignature(signature, testSecret, '9999999999', testPayload)
-
-    expect(isValid).toBe(false)
-  })
-
-  it('should reject signature with wrong payload', async () => {
-    const signature = await generateWebhookSignature(testSecret, testTimestamp, testPayload)
-    const isValid = verifyWebhookSignature(signature, testSecret, testTimestamp, '{"tampered":"payload"}')
-
-    expect(isValid).toBe(false)
-  })
-
-  it('should reject malformed signature - missing version', async () => {
-    const isValid = verifyWebhookSignature('1704067200.abc123', testSecret, testTimestamp, testPayload)
-
-    expect(isValid).toBe(false)
-  })
-
-  it('should reject malformed signature - invalid format', async () => {
-    const isValid = verifyWebhookSignature('invalid-signature', testSecret, testTimestamp, testPayload)
-
-    expect(isValid).toBe(false)
-  })
-
-  it('should reject empty signature', async () => {
-    const isValid = verifyWebhookSignature('', testSecret, testTimestamp, testPayload)
-
-    expect(isValid).toBe(false)
-  })
-
-  it('should reject signature with wrong hmac length', async () => {
-    // Create signature with truncated HMAC
-    const isValid = verifyWebhookSignature(`v1=${testTimestamp}.abc123`, testSecret, testTimestamp, testPayload)
-
-    expect(isValid).toBe(false)
-  })
-
-  it('should reject signature with invalid hex characters', async () => {
-    // Create signature with invalid hex
-    const fakeHmac = 'g'.repeat(64) // 'g' is not a valid hex char
-    const isValid = verifyWebhookSignature(`v1=${testTimestamp}.${fakeHmac}`, testSecret, testTimestamp, testPayload)
-
-    expect(isValid).toBe(false)
-  })
-})
-
-describe('Webhook Signature Parsing', () => {
-  it('should parse valid v1 signature', () => {
-    const signature = 'v1=1704067200.a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2'
-    const parsed = parseSignature(signature)
-
-    expect(parsed).toEqual({
-      version: 'v1',
-      timestamp: '1704067200',
-      hmac: 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2',
-    })
-  })
-
-  it('should return null for invalid signature format', () => {
-    expect(parseSignature('invalid')).toBeNull()
-    expect(parseSignature('')).toBeNull()
-    expect(parseSignature('v1=')).toBeNull()
-    expect(parseSignature('v1=.')).toBeNull()
-    expect(parseSignature('v1=timestamp.hmac')).toBeNull() // timestamp must be digits
-  })
-
-  it('should handle future signature versions', () => {
-    const signature = 'v2=1704067200.a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2'
-    const parsed = parseSignature(signature)
-
-    expect(parsed?.version).toBe('v2')
-  })
-})
-
-describe('Webhook Signature Security', () => {
-  const testSecret = 'whsec_test_secret_key_12345'
-  const testTimestamp = '1704067200'
-  const testPayload = JSON.stringify({ event: 'test.ping' })
-
-  it('should use HMAC-SHA256 algorithm', async () => {
-    const signature = await generateWebhookSignature(testSecret, testTimestamp, testPayload)
-    const parsed = parseSignature(signature)
-
-    // SHA256 produces 32 bytes = 64 hex characters
-    expect(parsed?.hmac.length).toBe(64)
-  })
-
-  it('should produce cryptographically strong signatures', async () => {
-    // Generate multiple signatures and ensure they're all different
-    const signatures = new Set<string>()
-    for (let i = 0; i < 100; i++) {
-      const payload = JSON.stringify({ event: 'test.ping', nonce: i })
-      const signature = await generateWebhookSignature(testSecret, testTimestamp, payload)
-      signatures.add(signature)
+function stopWebhookServer(): Promise<void> {
+  return new Promise((resolve) => {
+    if (webhookServer) {
+      webhookServer.close(() => {
+        webhookServer = null
+        resolve()
+      })
     }
+    else {
+      resolve()
+    }
+  })
+}
 
-    // All signatures should be unique
-    expect(signatures.size).toBe(100)
+beforeAll(async () => {
+  // Start webhook receiver server
+  await startWebhookServer()
+
+  // Create stripe_info for this test org
+  const { error: stripeError } = await getSupabaseClient().from('stripe_info').insert({
+    customer_id: customerId,
+    status: 'succeeded',
+    product_id: 'prod_LQIregjtNduh4q',
+    subscription_id: `sub_${globalId}`,
+    trial_at: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
+    is_good_plan: true,
+  })
+  if (stripeError)
+    throw stripeError
+
+  // Create test organization
+  const { error } = await getSupabaseClient().from('orgs').insert({
+    id: WEBHOOK_TEST_ORG_ID,
+    name: `Webhook Signature Test Org ${globalId}`,
+    management_email: TEST_EMAIL,
+    created_by: USER_ID,
+    customer_id: customerId,
+  })
+  if (error)
+    throw error
+})
+
+afterAll(async () => {
+  // Stop webhook server
+  await stopWebhookServer()
+
+  // Clean up created webhooks
+  if (createdWebhookId) {
+    await (getSupabaseClient() as any).from('webhooks').delete().eq('id', createdWebhookId)
+  }
+  // Clean up test organization and stripe_info
+  await getSupabaseClient().from('orgs').delete().eq('id', WEBHOOK_TEST_ORG_ID)
+  await getSupabaseClient().from('stripe_info').delete().eq('customer_id', customerId)
+})
+
+describe('end-to-end webhook signature verification', () => {
+  it('should create webhook pointing to local server', async () => {
+    const webhookUrl = `http://127.0.0.1:${serverPort}/webhook`
+
+    const response = await fetch(`${BASE_URL}/webhooks`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        orgId: WEBHOOK_TEST_ORG_ID,
+        name: `E2E Signature Test Webhook ${globalId}`,
+        url: webhookUrl,
+        events: ['app_versions'],
+      }),
+    })
+
+    expect(response.status).toBe(201)
+    const data = await response.json() as { status: string, webhook: { id: string, name: string, url: string } }
+    expect(data.status).toBe('Webhook created')
+    expect(data.webhook.url).toBe(webhookUrl)
+
+    createdWebhookId = data.webhook.id
   })
 
-  it('should be resistant to timing attacks via constant-time comparison', async () => {
-    const signature = await generateWebhookSignature(testSecret, testTimestamp, testPayload)
+  it('should fetch webhook secret from database', async () => {
+    expect(createdWebhookId).not.toBeNull()
 
-    // The verifyWebhookSignature function should use constant-time comparison
-    // We can't directly test timing, but we verify the implementation handles
-    // both matching and non-matching HMACs
-    const validResult = verifyWebhookSignature(signature, testSecret, testTimestamp, testPayload)
-    const invalidResult = verifyWebhookSignature(signature, testSecret, testTimestamp, '{"wrong":"payload"}')
+    // Fetch the webhook secret directly from database
+    const { data: webhook, error } = await (getSupabaseClient() as any)
+      .from('webhooks')
+      .select('secret')
+      .eq('id', createdWebhookId)
+      .single()
 
-    expect(validResult).toBe(true)
-    expect(invalidResult).toBe(false)
+    expect(error).toBeNull()
+    expect(webhook).not.toBeNull()
+    expect(webhook.secret).toBeDefined()
+    expect(typeof webhook.secret).toBe('string')
+    expect(webhook.secret.length).toBeGreaterThan(0)
+
+    webhookSecret = webhook.secret
   })
 
-  it('should include timestamp to prevent replay attacks', async () => {
-    const oldTimestamp = '1609459200' // 2021-01-01
-    const newTimestamp = '1704067200' // 2024-01-01
+  it('should trigger test webhook and receive it with valid signature', async () => {
+    expect(createdWebhookId).not.toBeNull()
+    expect(webhookSecret).not.toBeNull()
 
-    const oldSignature = await generateWebhookSignature(testSecret, oldTimestamp, testPayload)
-    const newSignature = await generateWebhookSignature(testSecret, newTimestamp, testPayload)
+    // Clear previous webhooks
+    receivedWebhooks = []
 
-    // Signatures should be different for different timestamps
-    expect(oldSignature).not.toBe(newSignature)
+    // Trigger the test webhook
+    const response = await fetch(`${BASE_URL}/webhooks/test`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        orgId: WEBHOOK_TEST_ORG_ID,
+        webhookId: createdWebhookId,
+      }),
+    })
 
-    // Old signature should not verify with new timestamp
-    const isValid = verifyWebhookSignature(oldSignature, testSecret, newTimestamp, testPayload)
-    expect(isValid).toBe(false)
+    expect(response.status).toBe(200)
+    const data = await response.json() as { success: boolean, delivery_id: string }
+    expect(data.success).toBe(true)
+    expect(data.delivery_id).toBeDefined()
+
+    // Verify we received the webhook
+    expect(receivedWebhooks.length).toBe(1)
+
+    const received = receivedWebhooks[0]
+
+    // Verify required headers are present
+    expect(received.headers['x-capgo-signature']).toBeDefined()
+    expect(received.headers['x-capgo-timestamp']).toBeDefined()
+    expect(received.headers['x-capgo-event']).toBe('test.ping')
+    expect(received.headers['x-capgo-event-id']).toBeDefined()
+    expect(received.headers['content-type']).toBe('application/json')
+    expect(received.headers['user-agent']).toBe('Capgo-Webhook/1.0')
+
+    // Verify the signature
+    const signature = received.headers['x-capgo-signature'] as string
+    const verification = verifyWebhookSignature(signature, webhookSecret!, received.body)
+
+    expect(verification.valid).toBe(true)
+    expect(verification.timestamp).toBe(received.headers['x-capgo-timestamp'])
+    expect(verification.error).toBeUndefined()
   })
 
-  it('should sign the complete payload to prevent tampering', async () => {
-    const originalPayload = JSON.stringify({ amount: 100 })
-    const tamperedPayload = JSON.stringify({ amount: 1000000 })
+  it('should fail verification with wrong secret', async () => {
+    expect(receivedWebhooks.length).toBe(1)
 
-    const signature = await generateWebhookSignature(testSecret, testTimestamp, originalPayload)
+    const received = receivedWebhooks[0]
+    const signature = received.headers['x-capgo-signature'] as string
 
-    // Tampered payload should not verify
-    const isValid = verifyWebhookSignature(signature, testSecret, testTimestamp, tamperedPayload)
-    expect(isValid).toBe(false)
+    // Try to verify with wrong secret
+    const verification = verifyWebhookSignature(signature, 'wrong_secret_12345', received.body)
+
+    expect(verification.valid).toBe(false)
+    expect(verification.error).toBe('HMAC verification failed')
+  })
+
+  it('should fail verification with tampered body', async () => {
+    expect(receivedWebhooks.length).toBe(1)
+
+    const received = receivedWebhooks[0]
+    const signature = received.headers['x-capgo-signature'] as string
+
+    // Try to verify with tampered body
+    const tamperedBody = JSON.stringify({ ...JSON.parse(received.body), tampered: true })
+    const verification = verifyWebhookSignature(signature, webhookSecret!, tamperedBody)
+
+    expect(verification.valid).toBe(false)
+    expect(verification.error).toBe('HMAC verification failed')
+  })
+
+  it('should have valid payload structure', async () => {
+    expect(receivedWebhooks.length).toBe(1)
+
+    const received = receivedWebhooks[0]
+    const payload = JSON.parse(received.body)
+
+    // Verify payload structure matches WebhookPayload interface
+    expect(payload.event).toBe('test.ping')
+    expect(payload.event_id).toBeDefined()
+    expect(typeof payload.event_id).toBe('string')
+    expect(payload.timestamp).toBeDefined()
+    expect(payload.org_id).toBe(WEBHOOK_TEST_ORG_ID)
+    expect(payload.data).toBeDefined()
+    expect(payload.data.table).toBe('test')
+    expect(payload.data.operation).toBe('TEST')
+    expect(payload.data.record_id).toBe('test-record-id')
+  })
+
+  it('should verify timestamp is recent (within 5 minutes)', async () => {
+    expect(receivedWebhooks.length).toBe(1)
+
+    const received = receivedWebhooks[0]
+    const signature = received.headers['x-capgo-signature'] as string
+    const verification = verifyWebhookSignature(signature, webhookSecret!, received.body)
+
+    expect(verification.valid).toBe(true)
+    expect(verification.timestamp).toBeDefined()
+
+    // Timestamp should be within 5 minutes of now
+    const signatureTimestamp = Number.parseInt(verification.timestamp!, 10)
+    const nowSeconds = Math.floor(Date.now() / 1000)
+    const fiveMinutesSeconds = 5 * 60
+
+    expect(Math.abs(nowSeconds - signatureTimestamp)).toBeLessThan(fiveMinutesSeconds)
+  })
+
+  it('should trigger another webhook and verify unique event_id', async () => {
+    expect(createdWebhookId).not.toBeNull()
+
+    const previousWebhookCount = receivedWebhooks.length
+    const previousEventId = JSON.parse(receivedWebhooks[0].body).event_id
+
+    // Trigger another test webhook
+    const response = await fetch(`${BASE_URL}/webhooks/test`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        orgId: WEBHOOK_TEST_ORG_ID,
+        webhookId: createdWebhookId,
+      }),
+    })
+
+    expect(response.status).toBe(200)
+
+    // Should have received another webhook
+    expect(receivedWebhooks.length).toBe(previousWebhookCount + 1)
+
+    const newWebhook = receivedWebhooks[receivedWebhooks.length - 1]
+    const newPayload = JSON.parse(newWebhook.body)
+
+    // Event ID should be unique
+    expect(newPayload.event_id).not.toBe(previousEventId)
+
+    // Signature should still be valid
+    const signature = newWebhook.headers['x-capgo-signature'] as string
+    const verification = verifyWebhookSignature(signature, webhookSecret!, newWebhook.body)
+    expect(verification.valid).toBe(true)
   })
 })
 
-describe('Webhook Signature Node.js Crypto Compatibility', () => {
-  const testSecret = 'whsec_test_secret_key_12345'
-  const testTimestamp = '1704067200'
-  const testPayload = JSON.stringify({ event: 'test.ping' })
+describe('webhook signature format validation', () => {
+  it('should reject malformed signatures', () => {
+    const body = '{"test": true}'
+    const secret = 'test_secret'
 
-  it('should produce signatures verifiable by Node.js crypto', async () => {
-    // Generate signature using Web Crypto API (like the production code)
-    const signature = await generateWebhookSignature(testSecret, testTimestamp, testPayload)
-    const parsed = parseSignature(signature)
+    // Missing version prefix
+    expect(verifyWebhookSignature('1234567890.abc123', secret, body).valid).toBe(false)
 
-    // Verify using Node.js crypto (like a receiver would)
-    const signaturePayload = `${testTimestamp}.${testPayload}`
-    const expectedHmac = createHmac('sha256', testSecret)
-      .update(signaturePayload)
-      .digest('hex')
+    // Invalid format
+    expect(verifyWebhookSignature('invalid', secret, body).valid).toBe(false)
 
-    expect(parsed?.hmac).toBe(expectedHmac)
+    // Empty signature
+    expect(verifyWebhookSignature('', secret, body).valid).toBe(false)
+
+    // Missing HMAC
+    expect(verifyWebhookSignature('v1=1234567890.', secret, body).valid).toBe(false)
+
+    // Missing timestamp
+    expect(verifyWebhookSignature('v1=.abc123', secret, body).valid).toBe(false)
   })
 
-  it('should match Node.js crypto HMAC generation', async () => {
-    // Generate HMAC using Node.js crypto
-    const signaturePayload = `${testTimestamp}.${testPayload}`
-    const nodeHmac = createHmac('sha256', testSecret)
-      .update(signaturePayload)
-      .digest('hex')
-
-    // Generate signature using Web Crypto API
-    const signature = await generateWebhookSignature(testSecret, testTimestamp, testPayload)
-    const parsed = parseSignature(signature)
-
-    expect(parsed?.hmac).toBe(nodeHmac)
-  })
-})
-
-describe('Webhook Signature Edge Cases', () => {
-  it('should handle secret with special characters', async () => {
-    const specialSecret = 'secret!@#$%^&*()_+-=[]{}|;:,.<>?'
-    const timestamp = '1704067200'
-    const payload = JSON.stringify({ event: 'test' })
-
-    const signature = await generateWebhookSignature(specialSecret, timestamp, payload)
-    const isValid = verifyWebhookSignature(signature, specialSecret, timestamp, payload)
-
-    expect(isValid).toBe(true)
-  })
-
-  it('should handle unicode in payload', async () => {
+  it('should parse signature components correctly', () => {
+    const body = '{"test": true}'
     const secret = 'test_secret'
     const timestamp = '1704067200'
-    const payload = JSON.stringify({
-      message: '日本語テスト',
-      emoji: '🎉🚀',
-      chinese: '中文测试',
-    })
 
-    const signature = await generateWebhookSignature(secret, timestamp, payload)
-    const isValid = verifyWebhookSignature(signature, secret, timestamp, payload)
+    // Create a valid signature manually
+    const signaturePayload = `${timestamp}.${body}`
+    const hmac = createHmac('sha256', secret).update(signaturePayload).digest('hex')
+    const signature = `v1=${timestamp}.${hmac}`
 
-    expect(isValid).toBe(true)
-  })
+    const result = verifyWebhookSignature(signature, secret, body)
 
-  it('should handle newlines in payload', async () => {
-    const secret = 'test_secret'
-    const timestamp = '1704067200'
-    const payload = JSON.stringify({
-      message: 'line1\nline2\r\nline3',
-    })
-
-    const signature = await generateWebhookSignature(secret, timestamp, payload)
-    const isValid = verifyWebhookSignature(signature, secret, timestamp, payload)
-
-    expect(isValid).toBe(true)
-  })
-
-  it('should handle very short secret', async () => {
-    const shortSecret = 'a'
-    const timestamp = '1704067200'
-    const payload = JSON.stringify({ event: 'test' })
-
-    const signature = await generateWebhookSignature(shortSecret, timestamp, payload)
-    const isValid = verifyWebhookSignature(signature, shortSecret, timestamp, payload)
-
-    expect(isValid).toBe(true)
-  })
-
-  it('should handle very long secret', async () => {
-    const longSecret = 'x'.repeat(10000)
-    const timestamp = '1704067200'
-    const payload = JSON.stringify({ event: 'test' })
-
-    const signature = await generateWebhookSignature(longSecret, timestamp, payload)
-    const isValid = verifyWebhookSignature(signature, longSecret, timestamp, payload)
-
-    expect(isValid).toBe(true)
+    expect(result.valid).toBe(true)
+    expect(result.timestamp).toBe(timestamp)
   })
 })
