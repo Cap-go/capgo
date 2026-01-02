@@ -226,8 +226,8 @@ async function showInviteModal() {
     return
   }
 
-  let permissionPromise: Promise<Database['public']['Enums']['user_min_right'] | undefined> | undefined
   let email: string | undefined
+  let emailValid = false
 
   emailInput.value = ''
 
@@ -242,7 +242,7 @@ async function showInviteModal() {
         text: t('button-invite'),
         id: 'confirm-button',
         role: 'primary',
-        handler: async () => {
+        handler: () => {
           email = emailInput.value
 
           if (!email) {
@@ -255,15 +255,21 @@ async function showInviteModal() {
             return false
           }
 
-          permissionPromise = showPermModal(true)
+          emailValid = true
+          return true
         },
       },
     ],
   })
-  await dialogStore.onDialogDismiss()
-  const permission = permissionPromise ? await permissionPromise : undefined
 
-  if (!permission || !email)
+  const wasCancelled = await dialogStore.onDialogDismiss()
+
+  if (wasCancelled || !emailValid || !email)
+    return
+
+  const permission = await showPermModal(true)
+
+  if (!permission)
     return
 
   await sendInvitation(email, permission)
