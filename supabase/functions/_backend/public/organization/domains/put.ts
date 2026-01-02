@@ -1,7 +1,7 @@
 import type { Context } from 'hono'
 import type { Database } from '../../../utils/supabase.types.ts'
 import { z } from 'zod/mini'
-import { quickError, simpleError } from '../../../utils/hono.ts'
+import { simpleError } from '../../../utils/hono.ts'
 import { cloudlog } from '../../../utils/logging.ts'
 import { apikeyHasOrgRight, hasOrgRightApikey, supabaseApikey } from '../../../utils/supabase.ts'
 
@@ -35,10 +35,8 @@ export async function putDomains(c: Context, bodyRaw: any, apikey: Database['pub
   const enabled = typeof bodyRaw.enabled === 'boolean' ? bodyRaw.enabled : undefined
 
   // Check if user has admin rights for this org
-  const hasUserRight = await hasOrgRightApikey(c, body.orgId, apikey.user_id, 'admin', c.get('capgkey') as string)
-  const hasApiKeyRight = apikeyHasOrgRight(apikey, body.orgId)
-  if (!hasUserRight || !hasApiKeyRight) {
-    throw quickError(401, 'cannot_access_organization', 'You can\'t access this organization (requires admin rights)', { orgId: body.orgId })
+  if (!(await hasOrgRightApikey(c, body.orgId, apikey.user_id, 'admin', c.get('capgkey') as string)) || !(apikeyHasOrgRight(apikey, body.orgId))) {
+    throw simpleError('cannot_access_organization', 'You can\'t access this organization (requires admin rights)', { orgId: body.orgId })
   }
 
   // Validate and normalize domains
