@@ -187,27 +187,57 @@ function validateEmail(email: string) {
     )
 }
 
-async function showPermModal(invite: boolean): Promise<Database['public']['Enums']['user_min_right'] | undefined> {
+async function showPermModal(invite: boolean, onConfirm?: (permission: Database['public']['Enums']['user_min_right']) => Promise<boolean>): Promise<Database['public']['Enums']['user_min_right'] | undefined> {
   selectedPermission.value = undefined
   selectedPermissionForm.value = ''
   isInvitePermissionModal.value = invite
+
+  const confirmButtonId = 'perm-confirm-button'
+
+  function updateConfirmButton(loading: boolean) {
+    const buttons = dialogStore.dialogOptions?.buttons
+    if (!buttons)
+      return
+    const confirmButton = buttons.find(b => b.id === confirmButtonId)
+    if (confirmButton) {
+      confirmButton.disabled = loading
+      confirmButton.text = loading ? t('sending-invitation') : t('button-confirm')
+    }
+  }
 
   dialogStore.openDialog({
     title: t('select-user-perms'),
     description: t('select-user-perms-expanded'),
     size: 'lg',
+    preventAccidentalClose: !!onConfirm,
     buttons: [
       {
         text: t('button-cancel'),
         role: 'cancel',
+        disabled: false,
       },
       {
         text: t('button-confirm'),
+        id: confirmButtonId,
         role: 'primary',
-        handler: () => {
+        preventClose: !!onConfirm,
+        handler: async () => {
           if (!selectedPermission.value) {
             toast.error(t('please-select-permission'))
             return false
+          }
+          if (onConfirm) {
+            updateConfirmButton(true)
+            try {
+              const success = await onConfirm(selectedPermission.value)
+              if (success) {
+                dialogStore.closeDialog()
+              }
+              return false
+            }
+            finally {
+              updateConfirmButton(false)
+            }
           }
           return true
         },
@@ -267,21 +297,19 @@ async function showInviteModal() {
   if (wasCancelled || !emailValid || !email)
     return
 
-  const permission = await showPermModal(true)
-
-  if (!permission)
-    return
-
-  await sendInvitation(email, permission)
+  const emailToInvite = email
+  await showPermModal(true, async (permission) => {
+    return await sendInvitation(emailToInvite, permission)
+  })
 }
 
-async function sendInvitation(email: string, type: Database['public']['Enums']['user_min_right']) {
+async function sendInvitation(email: string, type: Database['public']['Enums']['user_min_right']): Promise<boolean> {
   console.log(`Invite ${email} with perm ${type}`)
 
   const orgId = currentOrganization.value?.gid
   if (!orgId) {
     toast.error('Organization ID not found.')
-    return
+    return false
   }
 
   isLoading.value = true
@@ -295,56 +323,58 @@ async function sendInvitation(email: string, type: Database['public']['Enums']['
     if (error) {
       console.error('Error inviting user:', error)
       toast.error(`${t('error-inviting-user')}: ${error.message}`)
-      return
+      return false
     }
 
-    await handleSendInvitationOutput(data, email, type)
-    await reloadData()
+    const success = await handleSendInvitationOutput(data, email, type)
+    if (success) {
+      await reloadData()
+    }
+    return success
   }
   catch (error) {
     console.error('Invitation failed:', error)
     toast.error(t('invitation-failed'))
+    return false
   }
   finally {
     isLoading.value = false
   }
 }
 
-async function handleSendInvitationOutput(output: string, email: string, type: Database['public']['Enums']['user_min_right']) {
+async function handleSendInvitationOutput(output: string, email: string, type: Database['public']['Enums']['user_min_right']): Promise<boolean> {
   console.log('Output: ', output)
   if (!output)
-    return
+    return false
   if (output === 'OK') {
     toast.success(t('org-invited-user'))
+    return true
   }
   else if (output === 'TOO_RECENT_INVITATION_CANCELATION') {
-    dialogStore.openDialog({
-      title: t('error'),
-      description: t('too-recent-invitation-cancelation'),
-      buttons: [
-        {
-          text: t('ok'),
-          role: 'primary',
-        },
-      ],
-    })
+    toast.error(t('too-recent-invitation-cancelation'))
+    return false
   }
   else if (output === 'NO_EMAIL') {
     if (captchaKey.value) {
       await showInviteNewUserDialog(email, type)
+      return true
     }
     else {
       toast.error(t('cannot_invite_user_without_account'))
+      return false
     }
   }
   else if (output === 'ALREADY_INVITED') {
     toast.error(t('user-already-invited'))
+    return false
   }
   else if (output === 'CAN_NOT_INVITE_OWNER') {
     toast.error(t('cannot-invite-owner'))
+    return false
   }
   else {
     toast.warning(`${t('unexpected-invitation-response')}: ${output}`)
+    return false
   }
 }
 
