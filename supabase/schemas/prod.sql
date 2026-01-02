@@ -2366,9 +2366,26 @@ SET
   "search_path" TO '' AS $$
 BEGIN
   PERFORM user_id;
-  RETURN QUERY SELECT o.id, users.id, users.email, users.image_url, o.user_right, false
-  FROM public.org_users o JOIN public.users ON users.id = o.user_id
-  WHERE o.org_id=get_org_members.guild_id AND public.is_member_of_org(users.id, o.org_id);
+  RETURN QUERY
+    -- Get existing org members
+    SELECT o.id AS aid, users.id AS uid, users.email, users.image_url, o.user_right AS role, false AS is_tmp
+    FROM public.org_users o
+    JOIN public.users ON users.id = o.user_id
+    WHERE o.org_id = get_org_members.guild_id
+    AND public.is_member_of_org(users.id, o.org_id)
+  UNION
+    -- Get pending invitations from tmp_users
+    SELECT
+      ((SELECT COALESCE(MAX(id), 0) FROM public.org_users) + tmp.id)::bigint AS aid,
+      tmp.future_uuid AS uid,
+      tmp.email::varchar,
+      ''::varchar AS image_url,
+      public.transform_role_to_invite(tmp.role) AS role,
+      true AS is_tmp
+    FROM public.tmp_users tmp
+    WHERE tmp.org_id = get_org_members.guild_id
+    AND tmp.cancelled_at IS NULL
+    AND tmp.created_at > (CURRENT_TIMESTAMP - INTERVAL '7 days');
 END;
 $$;
 
