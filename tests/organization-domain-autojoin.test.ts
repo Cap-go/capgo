@@ -80,7 +80,7 @@ describe('Organization Email Domain Auto-Join', () => {
             })
 
             // Create org without domains
-            await getSupabaseClient().from('orgs').insert({
+            const { error: orgError } = await getSupabaseClient().from('orgs').insert({
                 id: emptyOrgId,
                 name: `Empty Domains Org`,
                 management_email: USER_ADMIN_EMAIL,
@@ -88,6 +88,19 @@ describe('Organization Email Domain Auto-Join', () => {
                 customer_id: emptyCustomerId,
                 allowed_email_domains: [],
             })
+            if (orgError)
+                throw orgError
+
+            // Add user as member
+            const { error: orgUserError } = await getSupabaseClient().from('org_users').insert({
+                org_id: emptyOrgId,
+                user_id: USER_ID,
+                user_right: 'admin',
+                app_id: null,
+                channel_id: null,
+            })
+            if (orgUserError)
+                throw orgUserError
 
             const response = await fetch(`${BASE_URL}/organization/domains?orgId=${emptyOrgId}`, {
                 headers,

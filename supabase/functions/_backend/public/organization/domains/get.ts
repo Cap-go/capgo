@@ -1,7 +1,7 @@
 import type { Context } from 'hono'
 import type { Database } from '../../../utils/supabase.types.ts'
 import { z } from 'zod/mini'
-import { simpleError } from '../../../utils/hono.ts'
+import { quickError, simpleError } from '../../../utils/hono.ts'
 import { apikeyHasOrgRight, hasOrgRightApikey, supabaseApikey } from '../../../utils/supabase.ts'
 
 const bodySchema = z.object({
@@ -29,8 +29,8 @@ export async function getDomains(c: Context, bodyRaw: any, apikey: Database['pub
   const body = bodyParsed.data
 
   // Check if user has read rights for this org
-  if (!(await hasOrgRightApikey(c, body.orgId, apikey.user_id, 'read', c.get('capgkey') as string) && apikeyHasOrgRight(apikey, body.orgId))) {
-    throw simpleError('cannot_access_organization', 'You can\'t access this organization', { orgId: body.orgId })
+  if (!((await hasOrgRightApikey(c, body.orgId, apikey.user_id, 'read', c.get('capgkey') as string)) && apikeyHasOrgRight(apikey, body.orgId))) {
+    throw quickError(401, 'cannot_access_organization', 'You can\'t access this organization', { orgId: body.orgId })
   }
 
   const { error, data } = await supabaseApikey(c, apikey.key)
