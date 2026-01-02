@@ -35,7 +35,9 @@ export async function putDomains(c: Context, bodyRaw: any, apikey: Database['pub
   const enabled = typeof bodyRaw.enabled === 'boolean' ? bodyRaw.enabled : undefined
 
   // Check if user has admin rights for this org
-  if (!((await hasOrgRightApikey(c, body.orgId, apikey.user_id, 'admin', c.get('capgkey') as string)) && apikeyHasOrgRight(apikey, body.orgId))) {
+  const hasUserRight = await hasOrgRightApikey(c, body.orgId, apikey.user_id, 'admin', c.get('capgkey') as string)
+  const hasApiKeyRight = apikeyHasOrgRight(apikey, body.orgId)
+  if (!hasUserRight || !hasApiKeyRight) {
     throw quickError(401, 'cannot_access_organization', 'You can\'t access this organization (requires admin rights)', { orgId: body.orgId })
   }
 
