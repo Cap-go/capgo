@@ -175,7 +175,7 @@ async function loadData() {
 
   try {
     // Load current org's security settings
-    const { data: orgData, error: orgError} = await supabase
+    const { data: orgData, error: orgError } = await supabase
       .from('orgs')
       .select('enforcing_2fa, enforce_hashed_api_keys')
       .eq('id', currentOrganization.value.gid)
