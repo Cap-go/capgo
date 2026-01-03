@@ -397,7 +397,7 @@ $$;
 SELECT
   cron.schedule (
     'process_all_cron_tasks',
-    '1 seconds',
+    '10 seconds',
     $$SELECT public.process_all_cron_tasks();$$
   );
 

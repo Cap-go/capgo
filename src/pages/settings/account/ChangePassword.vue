@@ -212,14 +212,53 @@ async function submit(form: { password: string, password_confirm: string }) {
   <div>
     <div class="flex flex-col h-full pb-8 overflow-hidden overflow-y-auto bg-white border shadow-lg md:pb-0 max-h-fit grow md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900">
       <!-- Password Verification Section (shown when user needs to verify) -->
-      <div v-if="needsPasswordVerification" class="p-6 space-y-6 border-b border-slate-300">
-        <div class="p-4 mb-4 text-yellow-800 bg-yellow-100 rounded-lg dark:bg-yellow-900 dark:text-yellow-200">
-          <h3 class="mb-2 font-semibold">
-            {{ t('password-verification-required') }}
+      <div v-if="needsPasswordVerification" class="p-6 space-y-6 border-b border-slate-300 dark:border-slate-700">
+        <!-- Info banner with requirements -->
+        <div class="p-4 text-[#BB4D00] bg-[#FFFBEC] rounded-lg border border-orange-200">
+          <h3 class="mb-3 text-lg font-semibold text-[#973C00]">
+            {{ t('password-action-required') }}
           </h3>
-          <p class="text-sm">
-            {{ t('password-verification-required-message') }}
-          </p>
+
+          <!-- Password requirements list -->
+          <div class="mb-4 p-3 bg-[#FFFBEC] rounded-md">
+            <p class="text-sm font-medium text-[#973C00] mb-2">{{ t('password-must-meet') }}</p>
+            <ul class="text-sm space-y-1">
+              <li class="flex items-center gap-2">
+                <svg class="w-4 h-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                </svg>
+                {{ passwordPolicy.min_length }} {{ t('characters-minimum') }}
+              </li>
+              <li v-if="passwordPolicy.require_uppercase" class="flex items-center gap-2">
+                <svg class="w-4 h-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                </svg>
+                {{ t('one-uppercase') }}
+              </li>
+              <li v-if="passwordPolicy.require_number" class="flex items-center gap-2">
+                <svg class="w-4 h-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                </svg>
+                {{ t('one-number') }}
+              </li>
+              <li v-if="passwordPolicy.require_special" class="flex items-center gap-2">
+                <svg class="w-4 h-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                </svg>
+                {{ t('one-special-character') }}
+              </li>
+            </ul>
+          </div>
+
+          <!-- Instructions -->
+          <div class="text-sm space-y-2">
+            <p>
+              <strong>{{ t('password-if-meets') }}</strong> {{ t('password-verify-it') }}
+            </p>
+            <p>
+              <strong>{{ t('password-if-not-meets') }}</strong> {{ t('password-change-then-verify') }}
+            </p>
+          </div>
         </div>
 
         <FormKit id="verify-password" type="form" :actions="false" @submit="verifyPassword">
