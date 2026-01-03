@@ -1133,21 +1133,34 @@ export async function checkKey(c: Context, authorization: string | undefined, su
   if (!authorization)
     return null
   try {
-    const keyHash = await hashApiKey(authorization)
-
+    // First, try to find by plain-text key
     const { data: plainKey, error: plainError } = await supabase
       .from('apikeys')
       .select()
-      .or(`key.eq.${authorization},key_hash.eq.${keyHash}`)
+      .eq('key', authorization)
       .in('mode', allowed)
       .or('expires_at.is.null,expires_at.gt.now()')
-      .single()
+      .maybeSingle()
 
     if (plainKey && !plainError) {
       return plainKey
     }
 
-    cloudlog({ requestId: c.get('requestId'), message: 'Invalid apikey', authorizationPrefix: authorization?.substring(0, 8), allowed, error: plainError })
+    // If not found by plain key, try by hash
+    const keyHash = await hashApiKey(authorization)
+    const { data: hashedKey, error: hashError } = await supabase
+      .from('apikeys')
+      .select()
+      .eq('key_hash', keyHash)
+      .in('mode', allowed)
+      .or('expires_at.is.null,expires_at.gt.now()')
+      .maybeSingle()
+
+    if (hashedKey && !hashError) {
+      return hashedKey
+    }
+
+    cloudlog({ requestId: c.get('requestId'), message: 'Invalid apikey', authorizationPrefix: authorization?.substring(0, 8), allowed, error: plainError || hashError })
     return null
   }
   catch (error) {
