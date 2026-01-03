@@ -64,7 +64,7 @@ app.post('/', async (c) => {
   }
 
   const body = validationResult.data
-  const supabaseAdmin = useSupabaseAdmin(c)
+  let supabaseAdmin = useSupabaseAdmin(c)
 
   // Get the org's password policy
   const { data: org, error: orgError } = await supabaseAdmin
@@ -139,6 +139,8 @@ app.post('/', async (c) => {
     cloudlog({ requestId: c.get('requestId'), context: 'validate_password_compliance - hash error', error: hashError?.message })
     return quickError(500, 'hash_failed', 'Failed to compute policy hash', { error: hashError?.message })
   }
+
+  supabaseAdmin = useSupabaseAdmin(c)
 
   // Upsert the compliance record
   const { error: upsertError } = await supabaseAdmin
