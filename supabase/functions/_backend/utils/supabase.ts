@@ -1160,7 +1160,16 @@ export async function checkKey(c: Context, authorization: string | undefined, su
       return hashedKey
     }
 
-    cloudlog({ requestId: c.get('requestId'), message: 'Invalid apikey', authorizationPrefix: authorization?.substring(0, 8), allowed, error: plainError || hashError })
+    // Log with context about which lookups failed
+    const errorDetails = {
+      requestId: c.get('requestId'),
+      message: 'Invalid apikey',
+      authorizationPrefix: authorization?.substring(0, 8),
+      allowed,
+      ...(plainError && { plainKeyError: plainError }),
+      ...(hashError && { hashedKeyError: hashError }),
+    }
+    cloudlog(errorDetails)
     return null
   }
   catch (error) {
