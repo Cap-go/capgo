@@ -55,11 +55,11 @@ appGlobal.route('/invite_new_user_to_org', invite_new_user_to_org)
 appGlobal.route('/accept_invitation', accept_invitation)
 
 // SSO SAML routes
-appGlobal.route('/sso_configure', sso_configure)
-appGlobal.route('/sso_update', sso_update)
-appGlobal.route('/sso_remove', sso_remove)
-appGlobal.route('/sso_test', sso_test)
-appGlobal.route('/sso_status', sso_status)
+appGlobal.route('/sso/configure', sso_configure)
+appGlobal.route('/sso/update', sso_update)
+appGlobal.route('/sso/remove', sso_remove)
+appGlobal.route('/sso/test', sso_test)
+appGlobal.route('/sso/status', sso_status)
 
 createAllCatch(appGlobal, functionName)
 Deno.serve(appGlobal.fetch)

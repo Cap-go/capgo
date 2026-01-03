@@ -28,6 +28,7 @@ import { middlewareAPISecret, parseBody, simpleError, useCors } from '../utils/h
 import { cloudlog } from '../utils/logging.ts'
 import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import { org_saml_connections, orgs, saml_domain_mappings, sso_audit_logs } from '../utils/postgres_schema.ts'
+import { hasOrgRight } from '../utils/supabase.ts'
 
 /**
  * =============================================================================
@@ -81,7 +82,8 @@ async function registerWithSupabaseAuth(
   const serviceRoleKey = getEnv(c, 'SUPABASE_SERVICE_ROLE_KEY')
 
   // For local development, skip Supabase Auth registration and use mock
-  const isLocal = supabaseUrl.includes('localhost') || supabaseUrl.includes('127.0.0.1')
+  // Check for localhost, 127.0.0.1, or kong (Supabase local docker network)
+  const isLocal = supabaseUrl.includes('localhost') || supabaseUrl.includes('127.0.0.1') || supabaseUrl.includes('kong')
 
   if (isLocal) {
     cloudlog({
@@ -162,15 +164,22 @@ async function registerWithSupabaseAuth(
 
       // Parse error for better messaging
       let errorMessage = 'Failed to register SSO provider with Supabase Auth'
+      let errorCode = 'sso_auth_registration_failed'
       try {
         const errorJson = JSON.parse(errorText)
-        errorMessage = errorJson.message || errorJson.error || errorMessage
+        errorMessage = errorJson.msg || errorJson.message || errorJson.error || errorMessage
+
+        // Check if this is a duplicate provider error
+        if (errorJson.error_code === 'saml_idp_already_exists') {
+          errorCode = 'sso_provider_already_exists'
+          errorMessage = 'An SSO provider with this Entity ID already exists. Please use a different Entity ID or update the existing provider.'
+        }
       }
       catch {
         // Use default message
       }
 
-      throw simpleError('sso_auth_registration_failed', errorMessage, {
+      throw simpleError(errorCode, errorMessage, {
         status: response.status,
         details: errorText,
       })
@@ -287,6 +296,37 @@ async function updateWithSupabaseAuth(
   const supabaseUrl = getEnv(c, 'SUPABASE_URL')
   const serviceRoleKey = getEnv(c, 'SUPABASE_SERVICE_ROLE_KEY')
 
+  // For local development, skip Supabase Auth update and return mock
+  const isLocal = supabaseUrl.includes('localhost') || supabaseUrl.includes('127.0.0.1') || supabaseUrl.includes('kong')
+
+  if (isLocal) {
+    cloudlog({
+      requestId,
+      message: '[SSO Auth] Local development detected - skipping Supabase Auth update',
+      providerId,
+      hasMetadataUrl: !!config.metadataUrl,
+      hasMetadataXml: !!config.metadataXml,
+      domainCount: config.domains?.length || 0,
+    })
+
+    // Return mock updated provider
+    const extractedEntityId = config.metadataXml
+      ? extractEntityIdFromMetadata(config.metadataXml)
+      : `mock-entity-${providerId}`
+
+    return {
+      id: providerId,
+      saml: {
+        entity_id: extractedEntityId || `mock-entity-${providerId}`,
+        metadata_url: config.metadataUrl,
+        metadata_xml: config.metadataXml,
+      },
+      domains: config.domains?.map(d => ({ domain: d, id: crypto.randomUUID() })),
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }
+  }
+
   cloudlog({
     requestId,
     message: '[SSO Auth] Updating SAML provider with Supabase Auth',
@@ -383,6 +423,7 @@ const metadataUrlSchema = z.string().url().regex(
  */
 export const ssoConfigSchema = z.object({
   orgId: z.string().uuid(),
+  userId: z.string().uuid().optional(), // For internal API calls to specify acting user
   providerName: z.string().min(1).max(100).optional(),
   metadataUrl: metadataUrlSchema.optional(),
   metadataXml: z.string().optional(),
@@ -391,6 +432,8 @@ export const ssoConfigSchema = z.object({
   attributeMapping: z.record(z.string(), z.any()).optional(),
 }).refine((data: any) => data.metadataUrl || data.metadataXml, {
   message: 'Either metadataUrl or metadataXml is required',
+}).refine((data: any) => !data.domains || data.domains.length > 0, {
+  message: 'At least one domain is required if domains array is provided',
 })
 
 /**
@@ -409,30 +452,6 @@ export const ssoUpdateSchema = z.object({
 })
 
 /**
- * CLI Command Result Interface
- */
-interface CLIResult {
-  success: boolean
-  stdout: string
-  stderr: string
-  exitCode: number
-}
-
-/**
- * Parsed SSO Provider Info from CLI Output
- */
-interface SSOProviderInfo {
-  id: string
-  domains: string[]
-  saml: {
-    entity_id: string
-    metadata_url?: string
-    metadata_xml?: string
-    attribute_mapping?: Record<string, any>
-  }
-}
-
-/**
  * Extract entity ID from SAML metadata XML
  * @param metadataXml - SAML metadata XML string
  * @returns Extracted entity ID or fallback placeholder
@@ -449,183 +468,6 @@ function extractEntityIdFromMetadata(metadataXml: string): string {
     // Fall through to default
   }
   return 'https://example.com/saml/entity' // Fallback only if extraction fails
-}
-
-/**
- * Execute Supabase CLI command with security validations
- *
- * DEPRECATED: This function is kept for reference but no longer used.
- * SSO providers are now registered directly via the GoTrue Admin API.
- *
- * @param _c - Hono context
- * @param _args - Command arguments (pre-validated)
- * @returns CLI execution result
- */
-async function _executeSupabaseCLI(
-  _c: Context,
-  _args: string[],
-  _metadataXml?: string,
-): Promise<CLIResult> {
-  const requestId = c.get('requestId')
-  const projectRef = getEnv(c, 'SUPABASE_PROJECT_REF')
-
-  // In test/development environment or when project ref is not set, return mock response
-  const isTestEnv = Deno.env.get('SUPABASE_URL')?.includes('localhost')
-    || Deno.env.get('ENVIRONMENT') === 'test'
-    || Deno.env.get('NODE_ENV') === 'test'
-    || !projectRef
-
-  if (isTestEnv) {
-    cloudlog({
-      requestId,
-      message: '[SSO CLI] Using mock response (local/test environment)',
-    })
-
-    // Extract entity_id from metadata if provided
-    const entityId = metadataXml ? extractEntityIdFromMetadata(metadataXml) : 'https://example.com/saml/entity'
-
-    // Return mock success response for testing
-    const mockProviderId = crypto.randomUUID()
-    return {
-      success: true,
-      stdout: JSON.stringify({
-        id: mockProviderId,
-        domains: [],
-        saml: {
-          entity_id: entityId,
-          metadata_url: 'https://example.com/saml/metadata',
-        },
-      }),
-      stderr: '',
-      exitCode: 0,
-    }
-  }
-
-  // Production path with actual project ref
-  const fullArgs = ['sso', ...args, '--project-ref', projectRef]
-
-  cloudlog({
-    requestId,
-    message: '[SSO CLI] Executing command',
-    command: `supabase ${fullArgs.join(' ')}`,
-  })
-
-  // Note: Deno.Command is not available in edge runtime
-  // Return mock for now until proper CLI integration is implemented
-  cloudlog({
-    requestId,
-    message: '[SSO CLI] Using mock implementation',
-    warning: 'Real CLI execution not implemented',
-  })
-
-  // Extract entity_id from metadata if provided
-  const entityId = metadataXml ? extractEntityIdFromMetadata(metadataXml) : 'https://example.com/saml/entity'
-
-  const mockProviderId = crypto.randomUUID()
-  return {
-    success: true,
-    stdout: JSON.stringify({
-      id: mockProviderId,
-      domains: [],
-      saml: {
-        entity_id: entityId,
-        metadata_url: 'https://example.com/saml/metadata',
-      },
-    }),
-    stderr: '',
-    exitCode: 0,
-  }
-
-  /* Original Deno.Command implementation - not available in current runtime
-  try {
-    // Execute Supabase CLI command using Deno.Command
-    const command = new Deno.Command('supabase', {
-      args: fullArgs,
-      stdout: 'piped',
-      stderr: 'piped',
-      env: {
-        // Pass through necessary environment variables
-        SUPABASE_ACCESS_TOKEN: getEnv(c, 'SUPABASE_ACCESS_TOKEN'),
-        HOME: Deno.env.get('HOME') || '/tmp',
-      },
-    })
-
-    const { code, stdout, stderr } = await command.output()
-    const stdoutText = new TextDecoder().decode(stdout)
-    const stderrText = new TextDecoder().decode(stderr)
-
-    cloudlog({
-      requestId,
-      message: '[SSO CLI] Command completed',
-      exitCode: code,
-      stdoutLength: stdoutText.length,
-      stderrLength: stderrText.length,
-    })
-
-    // Log stderr if present (may contain warnings even on success)
-    if (stderrText) {
-      cloudlog({
-        requestId,
-        message: '[SSO CLI] Stderr output',
-        stderr: stderrText,
-      })
-    }
-
-    return {
-      success: code === 0,
-      stdout: stdoutText,
-      stderr: stderrText,
-      exitCode: code,
-    }
-  }
-  catch (error) {
-    cloudlog({
-      requestId,
-      message: '[SSO CLI] Command execution failed',
-      error: error instanceof Error ? error.message : String(error),
-    })
-
-    return {
-      success: false,
-      stdout: '',
-      stderr: error instanceof Error ? error.message : String(error),
-      exitCode: -1,
-    }
-  }
-  */
-}
-
-/**
- * Parse SSO provider info from CLI JSON output
- *
- * DEPRECATED: This function is kept for reference but no longer used.
- * SSO providers are now registered directly via the GoTrue Admin API.
- *
- * @param _stdout - CLI output (JSON format)
- * @returns Parsed SSO provider info
- */
-function _parseSSOProviderInfo(_stdout: string): SSOProviderInfo {
-  try {
-    const parsed = JSON.parse(stdout)
-
-    // Supabase CLI returns different formats depending on command
-    // Handle both single provider and array formats
-    const provider = Array.isArray(parsed) ? parsed[0] : parsed
-
-    return {
-      id: provider.id,
-      domains: provider.domains || [],
-      saml: {
-        entity_id: provider.saml?.entity_id || provider.saml?.metadata?.entity_id,
-        metadata_url: provider.saml?.metadata_url,
-        metadata_xml: provider.saml?.metadata_xml,
-        attribute_mapping: provider.saml?.attribute_mapping,
-      },
-    }
-  }
-  catch (error) {
-    throw simpleError('sso_parse_error', 'Failed to parse SSO provider info from CLI output', { error })
-  }
 }
 
 /**
@@ -803,34 +645,56 @@ async function checkRateLimit(
 ): Promise<void> {
   const requestId = c.get('requestId')
 
-  // Count domain-related changes in the last hour
-  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000)
+  try {
+    // Count domain-related changes in the last hour
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000)
 
-  const pgClient = getPgClient(c)
-  const result = await pgClient.query(
-    `SELECT COUNT(*) as count
-     FROM sso_audit_logs
-     WHERE org_id = $1
-     AND event_type IN ('provider_added', 'domains_updated')
-     AND timestamp > $2`,
-    [orgId, oneHourAgo.toISOString()],
-  )
+    const pgClient = getPgClient(c)
+    const result = await pgClient.query(
+      `SELECT COUNT(*) as count
+       FROM sso_audit_logs
+       WHERE org_id = $1
+       AND event_type IN ('provider_added', 'domains_updated')
+       AND timestamp > $2`,
+      [orgId, oneHourAgo.toISOString()],
+    )
 
-  const changeCount = Number.parseInt(result.rows[0].count, 10)
+    const changeCount = Number.parseInt(result.rows[0].count, 10)
 
-  cloudlog({
-    requestId,
-    message: 'SSO rate limit check',
-    orgId,
-    changeCount,
-    limit,
-  })
-
-  if (changeCount >= limit) {
-    throw simpleError('rate_limit_exceeded', `Too many SSO domain changes. Limit: ${limit} per hour. Try again later.`, {
-      current: changeCount,
+    cloudlog({
+      requestId,
+      message: 'SSO rate limit check',
+      orgId,
+      changeCount,
       limit,
-      resetAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+    })
+
+    if (changeCount >= limit) {
+      throw simpleError('rate_limit_exceeded', `Too many SSO domain changes. Limit: ${limit} per hour. Try again later.`, {
+        current: changeCount,
+        limit,
+        resetAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+      })
+    }
+  }
+  catch (error: any) {
+    // If table doesn't exist, skip rate limiting (development/test environment)
+    if (error.message?.includes('relation "sso_audit_logs" does not exist')) {
+      cloudlog({
+        requestId,
+        message: 'SSO audit logs table not found - skipping rate limit check',
+      })
+      return
+    }
+    // Re-throw rate limit errors
+    if (error.code === 'rate_limit_exceeded') {
+      throw error
+    }
+    // Log other errors but don't block the request
+    cloudlog({
+      requestId,
+      message: 'Error checking SSO rate limit',
+      error: error.message,
     })
   }
 }
@@ -1163,9 +1027,11 @@ export async function updateSAML(
     }
 
     // Update with Supabase Auth (GoTrue Admin API) if metadata or domains changed
-    if (update.metadataUrl || update.domains) {
-      await updateWithSupabaseAuth(c, update.providerId, {
+    let authProvider = null
+    if (update.metadataUrl || update.metadataXml || update.domains) {
+      authProvider = await updateWithSupabaseAuth(c, update.providerId, {
         metadataUrl: update.metadataUrl,
+        metadataXml: update.metadataXml,
         domains: update.domains,
         attributeMapping: update.attributeMapping,
       })
@@ -1180,12 +1046,22 @@ export async function updateSAML(
       updateData.provider_name = update.providerName
     if (update.metadataUrl)
       updateData.metadata_url = update.metadataUrl
+    if (update.metadataXml)
+      updateData.metadata_xml = update.metadataXml
     if (update.enabled !== undefined)
       updateData.enabled = update.enabled
     if (update.autoJoinEnabled !== undefined)
       updateData.auto_join_enabled = update.autoJoinEnabled
     if (update.attributeMapping)
       updateData.attribute_mapping = update.attributeMapping
+
+    // Update entity_id if we have metadata
+    if (authProvider?.saml?.entity_id) {
+      updateData.entity_id = authProvider.saml.entity_id
+    }
+    else if (update.metadataXml) {
+      updateData.entity_id = extractEntityIdFromMetadata(update.metadataXml)
+    }
 
     await drizzleClient
       .update(org_saml_connections)
@@ -1232,8 +1108,8 @@ export async function updateSAML(
     const eventType = update.enabled !== undefined
       ? (update.enabled ? 'provider_enabled' : 'provider_disabled')
       : (update.metadataUrl
-        ? 'metadata_updated'
-        : (update.domains ? 'domains_updated' : 'provider_updated'))
+          ? 'metadata_updated'
+          : (update.domains ? 'domains_updated' : 'provider_updated'))
 
     await logSSOAuditEvent(c, drizzleClient, {
       eventType,
@@ -1297,9 +1173,9 @@ export async function removeSAML(
     // Get associated domains before deletion
     const domains = connection
       ? await drizzleClient
-        .select({ domain: saml_domain_mappings.domain })
-        .from(saml_domain_mappings)
-        .where(eq(saml_domain_mappings.sso_connection_id, connection.id))
+          .select({ domain: saml_domain_mappings.domain })
+          .from(saml_domain_mappings)
+          .where(eq(saml_domain_mappings.sso_connection_id, connection.id))
       : []
 
     // Remove from Supabase Auth (GoTrue Admin API)
@@ -1428,6 +1304,34 @@ app.post('/configure', middlewareAPISecret, async (c: Context<MiddlewareKeyVaria
 
     const config = result.data
 
+    // Check permission early, before other validations
+    // Use userId from body if provided (for internal API calls), otherwise from auth context
+    const auth = c.get('auth')
+    const effectiveUserId = config.userId || auth?.userId
+    if (!effectiveUserId) {
+      throw simpleError('unauthorized', 'Authentication required - userId must be provided', 401)
+    }
+
+    cloudlog({
+      requestId,
+      message: '[SSO Configure] Checking permissions',
+      orgId: config.orgId,
+      effectiveUserId,
+      requiredRight: 'super_admin',
+    })
+
+    const hasPermission = await hasOrgRight(c, config.orgId, effectiveUserId, 'super_admin')
+
+    cloudlog({
+      requestId,
+      message: '[SSO Configure] Permission check result',
+      hasPermission,
+    })
+
+    if (!hasPermission) {
+      throw simpleError('insufficient_permissions', 'Only super administrators can configure SSO', 403)
+    }
+
     cloudlog({
       requestId,
       message: '[SSO Configure] Request received',
@@ -1435,7 +1339,8 @@ app.post('/configure', middlewareAPISecret, async (c: Context<MiddlewareKeyVaria
       domains: config.domains || [],
     })
 
-    const response = await configureSAML(c, config)
+    // Pass userId to configureSAML
+    const response = await configureSAML(c, config, effectiveUserId)
     return c.json(response, 200)
   }
   catch (error: any) {

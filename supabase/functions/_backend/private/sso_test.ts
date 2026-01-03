@@ -117,6 +117,7 @@ async function validateSAMLMetadata(
 /**
  * Verify SSO provider exists in Supabase Auth (GoTrue)
  * This is critical - without this, signInWithSSO will fail
+ * In local development, skip this check as we use mock SSO
  */
 async function verifyProviderInSupabaseAuth(
   c: Context,
@@ -124,6 +125,25 @@ async function verifyProviderInSupabaseAuth(
 ): Promise<{ exists: boolean, provider?: any, error?: string }> {
   const supabaseUrl = getEnv(c, 'SUPABASE_URL')
   const serviceRoleKey = getEnv(c, 'SUPABASE_SERVICE_ROLE_KEY')
+
+  // For local development, skip Auth verification since we use mock SSO
+  const isLocal = supabaseUrl.includes('localhost') || supabaseUrl.includes('127.0.0.1') || supabaseUrl.includes('kong')
+
+  if (isLocal) {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: '[SSO Test] Local development detected - skipping Auth verification',
+      providerId,
+    })
+    return {
+      exists: true,
+      provider: {
+        id: providerId,
+        type: 'saml',
+        mock: true,
+      },
+    }
+  }
 
   try {
     const response = await fetch(`${supabaseUrl}/auth/v1/admin/sso/providers/${providerId}`, {

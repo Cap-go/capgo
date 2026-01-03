@@ -531,6 +531,9 @@ async function toggleSSO() {
         ? t('sso-enabled', 'SSO enabled')
         : t('sso-disabled', 'SSO disabled'),
     )
+
+    // Force update to ensure UI reflects changes
+    await loadSSOConfig()
   }
   catch (error: any) {
     console.error('Error toggling SSO:', error)

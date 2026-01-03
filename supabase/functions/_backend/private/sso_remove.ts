@@ -37,7 +37,7 @@ export const app = new Hono<MiddlewareKeyVariables>()
 
 app.use('/', useCors)
 
-app.delete('/', middlewareV2(['super_admin']), async (c) => {
+app.delete('/', middlewareV2(['all']), async (c) => {
   const auth = c.get('auth')
   const requestId = c.get('requestId')
 

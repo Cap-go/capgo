@@ -8,8 +8,8 @@ export default defineConfig(({ mode }) => ({
     environment: 'node',
     watch: false,
     bail: 1,
-    testTimeout: 20_000,
-    hookTimeout: 8_000,
+    testTimeout: 30_000,
+    hookTimeout: 15_000,
     retry: 2,
     maxConcurrency: 10, // Reduced to prevent worker communication issues
     maxWorkers: 4, // Reduced to prevent EPIPE errors

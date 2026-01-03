@@ -66,6 +66,8 @@ export const headersStats = {
 }
 export const headersInternal = {
   'Content-Type': 'application/json',
+  'apikey': APIKEY_TEST_ALL,
+  'Authorization': APIKEY_TEST_ALL,
   'apisecret': API_SECRET,
 }
 

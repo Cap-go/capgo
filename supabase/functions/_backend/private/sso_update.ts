@@ -37,7 +37,7 @@ export const app = new Hono<MiddlewareKeyVariables>()
 
 app.use('/', useCors)
 
-app.put('/', middlewareV2(['super_admin']), async (c) => {
+app.put('/', middlewareV2(['all']), async (c) => {
   const auth = c.get('auth')
   const requestId = c.get('requestId')
 

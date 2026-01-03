@@ -197,7 +197,7 @@ async function authenticateUser(supabaseAdmin: any, mockResponse: MockSAMLRespon
 
   let enrollSuccess = false
   let retries = 0
-  const maxEnrollRetries = 6  // 6 retries × 150ms = 900ms total
+  const maxEnrollRetries = 6 // 6 retries × 150ms = 900ms total
 
   while (!enrollSuccess && retries < maxEnrollRetries) {
     const { data: enrollResult, error: enrollError } = await supabaseAdmin.rpc('auto_enroll_sso_user', {
@@ -213,25 +213,28 @@ async function authenticateUser(supabaseAdmin: any, mockResponse: MockSAMLRespon
         if (retries < maxEnrollRetries) {
           console.log(`[Mock SSO] ⏳ FK constraint error, user not in public.users yet, retrying in 150ms... (attempt ${retries})`)
           await new Promise(resolve => setTimeout(resolve, 150))
+          continue // Retry the loop
         }
         else {
           console.error('[Mock SSO] ✗ Failed to auto-enroll after', maxEnrollRetries, 'attempts:', enrollError)
+          break
         }
       }
       else {
         console.error('[Mock SSO] ✗ Failed to auto-enroll user:', enrollError)
+        break
       }
     }
     else if (enrollResult && enrollResult.length > 0) {
       console.log('[Mock SSO] ✓ User auto-enrolled to org:', enrollResult[0].org_name)
       enrollSuccess = true
+      break
     }
     else {
       console.log('[Mock SSO] ℹ No auto-enrollment performed (may already be member or auto_join disabled)')
-      enrollSuccess = true  // Not an error, just nothing to enroll
+      enrollSuccess = true // Not an error, just nothing to enroll
+      break
     }
-
-    break  // Exit loop if no error occurred
   }
 
   return {

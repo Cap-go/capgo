@@ -20,11 +20,6 @@ async function run() {
         },
         app_metadata: {
             provider: `sso:${TARGET_SSO_PROVIDER_ID}`,
-        },
-        raw_user_meta_data: {
-            sso_provider_id: TARGET_SSO_PROVIDER_ID,
-        },
-        raw_app_meta_data: {
             sso_provider_id: TARGET_SSO_PROVIDER_ID,
         },
     })
