@@ -2613,6 +2613,7 @@ export type Database = {
               password_has_access: boolean
               password_policy_config: Json
               paying: boolean
+              require_apikey_expiration: boolean
               role: string
               stats_updated_at: string
               subscription_end: string
@@ -2644,6 +2645,7 @@ export type Database = {
               password_has_access: boolean
               password_policy_config: Json
               paying: boolean
+              require_apikey_expiration: boolean
               role: string
               stats_updated_at: string
               subscription_end: string
