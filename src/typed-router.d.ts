@@ -128,6 +128,13 @@ declare module 'vue-router/auto-routes' {
       { package: ParamValue<false>, bundle: ParamValue<false> },
       | never
     >,
+    '/app/[package].bundle.[bundle].preview': RouteRecordInfo<
+      '/app/[package].bundle.[bundle].preview',
+      '/app/:package/bundle/:bundle/preview',
+      { package: ParamValue<true>, bundle: ParamValue<true> },
+      { package: ParamValue<false>, bundle: ParamValue<false> },
+      | never
+    >,
     '/app/[package].bundles': RouteRecordInfo<
       '/app/[package].bundles',
       '/app/:package/bundles',
@@ -508,6 +515,12 @@ declare module 'vue-router/auto-routes' {
     'src/pages/app/[package].bundle.[bundle].history.vue': {
       routes:
         | '/app/[package].bundle.[bundle].history'
+      views:
+        | never
+    }
+    'src/pages/app/[package].bundle.[bundle].preview.vue': {
+      routes:
+        | '/app/[package].bundle.[bundle].preview'
       views:
         | never
     }
