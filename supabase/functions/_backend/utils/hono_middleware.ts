@@ -8,6 +8,7 @@ import { cloudlog } from './logging.ts'
 import { closeClient, getDrizzleClient, getPgClient, logPgError } from './pg.ts'
 import * as schema from './postgres_schema.ts'
 import { checkKey, checkKeyById, supabaseAdmin, supabaseClient } from './supabase.ts'
+import { isSafeAlphanumeric } from './utils.ts'
 
 // TODO: make universal middleware who
 //  Accept authorization header (JWT)
@@ -45,6 +46,12 @@ async function checkKeyPg(
   rights: Database['public']['Enums']['key_mode'][],
   drizzleClient: ReturnType<typeof getDrizzleClient>,
 ): Promise<Database['public']['Tables']['apikeys']['Row'] | null> {
+  // Validate API key contains only safe characters (alphanumeric + dashes)
+  if (!isSafeAlphanumeric(keyString)) {
+    cloudlog({ requestId: _c.get('requestId'), message: 'Invalid apikey format (pg)', keyStringPrefix: keyString?.substring(0, 8) })
+    return null
+  }
+
   try {
     // Compute hash upfront so we can check both plain-text and hashed keys in one query
     const keyHash = await hashApiKey(keyString)
