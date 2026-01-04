@@ -1099,7 +1099,7 @@
   "allow-preview-help": "When enabled, bundles can be previewed in the dashboard using an embedded device frame",
   "cannot-change-allow-preview": "Cannot change allow preview setting, please check the browser console",
   "changed-allow-preview": "Successfully changed allow preview setting",
-  "preview": "Preview",
+  "preview-tab": "Preview",
   "preview-not-available": "Preview not available",
   "preview-no-manifest": "This bundle cannot be previewed because it doesn't have a manifest. Bundles need to be uploaded with manifest support to enable preview.",
   "preview-disabled": "Preview is disabled",

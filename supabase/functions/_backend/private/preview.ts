@@ -1,7 +1,9 @@
+import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
-import { middlewareAuth, simpleError, useCors } from '../utils/hono.ts'
+import { simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
+import { s3 } from '../utils/s3.ts'
 import { hasAppRight, supabaseAdmin } from '../utils/supabase.ts'
 
 export const app = new Hono<MiddlewareKeyVariables>()
@@ -9,10 +11,12 @@ export const app = new Hono<MiddlewareKeyVariables>()
 app.use('/*', useCors)
 
 // GET /preview/:app_id/:version_id or GET /preview/:app_id/:version_id/*filepath
-app.get('/:app_id/:version_id', middlewareAuth, handlePreview)
-app.get('/:app_id/:version_id/*', middlewareAuth, handlePreview)
+// Note: We don't use middlewareAuth here because iframes can't send headers
+// Instead, we accept the token from either Authorization header or query param
+app.get('/:app_id/:version_id', handlePreview)
+app.get('/:app_id/:version_id/*', handlePreview)
 
-async function handlePreview(c: any) {
+async function handlePreview(c: Context<MiddlewareKeyVariables>) {
   const appId = c.req.param('app_id')
   const versionId = Number(c.req.param('version_id'))
   // Get the file path from the wildcard - default to index.html
@@ -21,13 +25,15 @@ async function handlePreview(c: any) {
 
   cloudlog({ requestId: c.get('requestId'), message: 'preview request', appId, versionId, filePath })
 
+  // Accept token from Authorization header OR query param (for iframe support)
   const authorization = c.req.header('authorization')
-  if (!authorization)
-    return simpleError('cannot_find_authorization', 'Cannot find authorization')
+  const tokenFromQuery = c.req.query('token')
+  const token = authorization?.split('Bearer ')[1] || tokenFromQuery
 
-  const { data: auth, error: authError } = await supabaseAdmin(c).auth.getUser(
-    authorization?.split('Bearer ')[1],
-  )
+  if (!token)
+    return simpleError('cannot_find_authorization', 'Cannot find authorization. Pass token as query param or Authorization header.')
+
+  const { data: auth, error: authError } = await supabaseAdmin(c).auth.getUser(token)
   if (authError || !auth?.user?.id)
     return simpleError('not_authorize', 'Not authorized')
 
@@ -87,16 +93,16 @@ async function handlePreview(c: any) {
     return simpleError('file_not_found', 'File not found in bundle', { filePath })
   }
 
-  // Generate the download URL for this file
-  const url = new URL(c.req.url)
-  let basePath = 'files/read/attachments'
-  if (url.host === 'supabase_edge_runtime_capgo:8081' || url.host === 'supabase_edge_runtime_capgo-app:8081') {
-    url.host = 'localhost:54321'
-    basePath = `functions/v1/files/read/attachments`
+  // Generate a time-limited signed URL for this file (expires in 1 hour)
+  // This is more secure than redirecting to the unauthenticated files endpoint
+  const PREVIEW_URL_EXPIRY_SECONDS = 3600
+  try {
+    const signedUrl = await s3.getSignedUrl(c, manifestEntry.s3_path, PREVIEW_URL_EXPIRY_SECONDS)
+    cloudlog({ requestId: c.get('requestId'), message: 'generated signed preview URL', filePath })
+    return c.redirect(signedUrl, 302)
   }
-
-  const fileUrl = `${url.protocol}//${url.host}/${basePath}/${manifestEntry.s3_path}`
-
-  // Redirect to the file
-  return c.redirect(fileUrl, 302)
+  catch (error) {
+    cloudlog({ requestId: c.get('requestId'), message: 'failed to generate signed URL', error, s3_path: manifestEntry.s3_path })
+    return simpleError('signed_url_failed', 'Failed to generate preview URL')
+  }
 }

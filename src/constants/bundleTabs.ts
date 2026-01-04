@@ -8,5 +8,5 @@ export const bundleTabs: Tab[] = [
   { label: 'info', icon: IconInfo, key: '' },
   { label: 'dependencies', icon: IconPuzzle, key: '/dependencies' },
   { label: 'history', icon: IconHistory, key: '/history' },
-  { label: 'preview', icon: IconEye, key: '/preview' },
+  { label: 'preview-tab', icon: IconEye, key: '/preview' },
 ]

@@ -104,18 +104,16 @@ function goToAppSettings() {
 }
 
 watchEffect(async () => {
-  if (route.path.includes('/bundle/') && route.path.includes('/preview')) {
+  // Use route.name for more specific matching instead of path.includes()
+  if (route.name === '/app/[package].bundle.[bundle].preview') {
     loading.value = true
     previewState.value = 'loading'
-    const params = route.params as { package: string, bundle: string }
-    packageId.value = params.package
-    id.value = Number(params.bundle)
+    packageId.value = route.params.package as string
+    id.value = Number(route.params.bundle)
     await Promise.all([getVersion(), getApp()])
     determinePreviewState()
     loading.value = false
-    if (!version.value?.name)
-      displayStore.NavTitle = t('bundle')
-    displayStore.defaultBack = `/app/${params.package}/bundles`
+    displayStore.defaultBack = `/app/${packageId.value}/bundles`
   }
 })
 </script>
