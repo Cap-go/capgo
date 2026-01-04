@@ -1,4 +1,4 @@
-import type { R2UploadedPart } from '@cloudflare/workers-types'
+import type { R2HTTPMetadata, R2UploadedPart } from '@cloudflare/workers-types'
 import type { Context } from 'hono'
 import type { BlankSchema } from 'hono/types'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
@@ -56,6 +56,7 @@ interface StoredUploadInfo {
   uploadLength?: number
   checksum?: Uint8Array
   multipartUploadId?: string
+  contentType?: string
 }
 
 function optionsHandler(c: Context) {
@@ -325,6 +326,9 @@ export class UploadHandler extends DurableObject {
     if (checksum != null) {
       uploadInfo.checksum = checksum
     }
+    if (uploadMetadata.filetype) {
+      uploadInfo.contentType = uploadMetadata.filetype
+    }
     await this.ctx.storage.put(UPLOAD_OFFSET_KEY, 0)
     await this.ctx.storage.put(UPLOAD_INFO_KEY, uploadInfo)
 
@@ -465,7 +469,7 @@ export class UploadHandler extends DurableObject {
         else if (!this.multipart) {
           // all the bytes fit into a single in memory buffer, so we can just upload
           // it directly without using multipart
-          await this.r2Put(c, r2Key, part.bytes, checksum)
+          await this.r2Put(c, r2Key, part.bytes, checksum, uploadInfo.contentType)
           uploadOffset += part.bytes.byteLength
           await this.cleanup()
         }
@@ -637,7 +641,8 @@ export class UploadHandler extends DurableObject {
     if (uploadInfo.checksum != null) {
       customMetadata[X_CHECKSUM_SHA256] = toBase64(uploadInfo.checksum)
     }
-    const upload = await this.retryBucket.createMultipartUpload(r2Key, { customMetadata })
+    const httpMetadata: R2HTTPMetadata | undefined = uploadInfo.contentType ? { contentType: uploadInfo.contentType } : undefined
+    const upload = await this.retryBucket.createMultipartUpload(r2Key, { customMetadata, httpMetadata })
     uploadInfo.multipartUploadId = upload.r2MultipartUpload.uploadId
     await this.ctx.storage.put(UPLOAD_INFO_KEY, uploadInfo)
     return upload
@@ -647,9 +652,10 @@ export class UploadHandler extends DurableObject {
     return this.retryBucket.resumeMultipartUpload(r2Key, multipartUploadId)
   }
 
-  async r2Put(c: Context, r2Key: string, bytes: Uint8Array, checksum?: Uint8Array) {
+  async r2Put(c: Context, r2Key: string, bytes: Uint8Array, checksum?: Uint8Array, contentType?: string) {
     try {
-      await this.retryBucket.put(r2Key, bytes, checksum as any)
+      const httpMetadata: R2HTTPMetadata | undefined = contentType ? { contentType } : undefined
+      await this.retryBucket.put(r2Key, bytes, checksum as any, httpMetadata)
     }
     catch (e) {
       if (isR2ChecksumError(e)) {

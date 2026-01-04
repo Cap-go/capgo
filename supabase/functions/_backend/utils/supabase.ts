@@ -9,7 +9,7 @@ import { hashApiKey } from './hash.ts'
 import { simpleError } from './hono.ts'
 import { cloudlog, cloudlogErr } from './logging.ts'
 import { createCustomer } from './stripe.ts'
-import { getEnv } from './utils.ts'
+import { getEnv, isSafeAlphanumeric } from './utils.ts'
 
 const DEFAULT_LIMIT = 1000
 // Import Supabase client
@@ -1132,37 +1132,31 @@ export async function getUpdateStatsSB(c: Context): Promise<UpdateStats> {
 export async function checkKey(c: Context, authorization: string | undefined, supabase: SupabaseClient<Database>, allowed: Database['public']['Enums']['key_mode'][]): Promise<Database['public']['Tables']['apikeys']['Row'] | null> {
   if (!authorization)
     return null
+
+  // Validate API key contains only safe characters (alphanumeric + dashes)
+  if (!isSafeAlphanumeric(authorization)) {
+    cloudlog({ requestId: c.get('requestId'), message: 'Invalid apikey format', authorizationPrefix: authorization?.substring(0, 8) })
+    return null
+  }
+
   try {
-    // First try plain-text lookup (for legacy keys where key column is not null)
-    // Expiration check is done in SQL: expires_at IS NULL OR expires_at > now()
-    const { data: plainKey, error: plainError } = await supabase
-      .from('apikeys')
-      .select()
-      .eq('key', authorization)
-      .in('mode', allowed)
-      .or('expires_at.is.null,expires_at.gt.now()')
-      .single()
-
-    if (plainKey && !plainError) {
-      return plainKey
-    }
-
-    // If not found, try hashed lookup
-    // Also check expiration for hashed keys
     const keyHash = await hashApiKey(authorization)
-    const { data: hashedKey, error: hashError } = await supabase
+
+    // Single query to check both plain-text key and hashed key
+    // Safe because both values contain only alphanumeric chars and dashes
+    const { data, error } = await supabase
       .from('apikeys')
       .select()
-      .eq('key_hash', keyHash)
+      .or(`key.eq.${authorization},key_hash.eq.${keyHash}`)
       .in('mode', allowed)
       .or('expires_at.is.null,expires_at.gt.now()')
       .single()
 
-    if (hashedKey && !hashError) {
-      return hashedKey
+    if (data && !error) {
+      return data
     }
 
-    cloudlog({ requestId: c.get('requestId'), message: 'Invalid apikey', authorizationPrefix: authorization?.substring(0, 8), allowed, plainError, hashError })
+    cloudlog({ requestId: c.get('requestId'), message: 'Invalid apikey', authorizationPrefix: authorization?.substring(0, 8), allowed, error })
     return null
   }
   catch (error) {
