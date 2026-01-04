@@ -121,7 +121,7 @@ async function deleteApp() {
   }
 }
 
-async function submit(form: { app_name: string, retention: number, expose_metadata: boolean }) {
+async function submit(form: { app_name: string, retention: number, expose_metadata: boolean, allow_preview: boolean }) {
   isLoading.value = true
   if (role.value && !organizationStore.hasPermissionsInRole(role.value, ['super_admin'])) {
     toast.error(t('no-permission'))
@@ -145,6 +145,13 @@ async function submit(form: { app_name: string, retention: number, expose_metada
 
   try {
     await updateExposeMetadata(form.expose_metadata)
+  }
+  catch (error) {
+    toast.error(error as string)
+  }
+
+  try {
+    await updateAllowPreview(form.allow_preview)
   }
   catch (error) {
     toast.error(error as string)
@@ -209,6 +216,20 @@ async function updateExposeMetadata(newExposeMetadata: boolean) {
   toast.success(t('changed-expose-metadata'))
   if (appRef.value)
     appRef.value.expose_metadata = newExposeMetadata
+}
+
+async function updateAllowPreview(newAllowPreview: boolean) {
+  if (newAllowPreview === appRef.value?.allow_preview) {
+    return Promise.resolve()
+  }
+
+  const { error } = await supabase.from('apps').update({ allow_preview: newAllowPreview }).eq('app_id', props.appId)
+  if (error) {
+    return Promise.reject(t('cannot-change-allow-preview'))
+  }
+  toast.success(t('changed-allow-preview'))
+  if (appRef.value)
+    appRef.value.allow_preview = newAllowPreview
 }
 
 async function loadChannels() {
@@ -974,6 +995,13 @@ async function transferAppOwnership() {
                 :value="appRef?.expose_metadata ?? false"
                 :label="t('expose-metadata')"
                 :help="t('expose-metadata-help')"
+              />
+              <FormKit
+                type="checkbox"
+                name="allow_preview"
+                :value="appRef?.allow_preview ?? false"
+                :label="t('allow-preview')"
+                :help="t('allow-preview-help')"
               />
               <FormKit
                 type="button"
