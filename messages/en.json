@@ -1431,7 +1431,8 @@
   "test-sso-connection": "Test SSO Connection",
   "test-sso-description": "Click the button below to test your SSO configuration. You will be redirected to your identity provider to authenticate",
   "verified": "Verified",
-  "verify-domain": "Verify Domain",
+  "verify-domain": "Verify Domain"
+}
   "manifest": "Manifest",
   "no-manifest-bundle": "No manifest",
   "no-zip-bundle": "No zip bundle",

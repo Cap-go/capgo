@@ -7,10 +7,30 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "14.1"
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
   }
   public: {
     Tables: {
@@ -425,15 +445,7 @@ export type Database = {
           platform?: string
           user_id?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "build_logs_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "orgs"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       build_requests: {
         Row: {
@@ -1272,6 +1284,74 @@ export type Database = {
           },
         ]
       }
+      org_saml_connections: {
+        Row: {
+          attribute_mapping: Json | null
+          auto_join_enabled: boolean
+          certificate_expires_at: string | null
+          certificate_last_checked: string | null
+          created_at: string
+          created_by: string | null
+          current_certificate: string | null
+          enabled: boolean
+          entity_id: string
+          id: string
+          metadata_url: string | null
+          metadata_xml: string | null
+          org_id: string
+          provider_name: string
+          sso_provider_id: string
+          updated_at: string
+          verified: boolean
+        }
+        Insert: {
+          attribute_mapping?: Json | null
+          auto_join_enabled?: boolean
+          certificate_expires_at?: string | null
+          certificate_last_checked?: string | null
+          created_at?: string
+          created_by?: string | null
+          current_certificate?: string | null
+          enabled?: boolean
+          entity_id: string
+          id?: string
+          metadata_url?: string | null
+          metadata_xml?: string | null
+          org_id: string
+          provider_name: string
+          sso_provider_id: string
+          updated_at?: string
+          verified?: boolean
+        }
+        Update: {
+          attribute_mapping?: Json | null
+          auto_join_enabled?: boolean
+          certificate_expires_at?: string | null
+          certificate_last_checked?: string | null
+          created_at?: string
+          created_by?: string | null
+          current_certificate?: string | null
+          enabled?: boolean
+          entity_id?: string
+          id?: string
+          metadata_url?: string | null
+          metadata_xml?: string | null
+          org_id?: string
+          provider_name?: string
+          sso_provider_id?: string
+          updated_at?: string
+          verified?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "org_saml_connections_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: true
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       org_users: {
         Row: {
           app_id: string | null
@@ -1462,6 +1542,129 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      saml_domain_mappings: {
+        Row: {
+          created_at: string
+          domain: string
+          id: string
+          org_id: string
+          priority: number
+          sso_connection_id: string
+          verification_code: string | null
+          verified: boolean
+          verified_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          domain: string
+          id?: string
+          org_id: string
+          priority?: number
+          sso_connection_id: string
+          verification_code?: string | null
+          verified?: boolean
+          verified_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          domain?: string
+          id?: string
+          org_id?: string
+          priority?: number
+          sso_connection_id?: string
+          verification_code?: string | null
+          verified?: boolean
+          verified_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saml_domain_mappings_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saml_domain_mappings_sso_connection_id_fkey"
+            columns: ["sso_connection_id"]
+            isOneToOne: false
+            referencedRelation: "org_saml_connections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sso_audit_logs: {
+        Row: {
+          country: string | null
+          email: string | null
+          error_code: string | null
+          error_message: string | null
+          event_type: string
+          id: string
+          ip_address: unknown
+          metadata: Json | null
+          org_id: string | null
+          saml_assertion_id: string | null
+          saml_session_index: string | null
+          sso_connection_id: string | null
+          sso_provider_id: string | null
+          timestamp: string
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          country?: string | null
+          email?: string | null
+          error_code?: string | null
+          error_message?: string | null
+          event_type: string
+          id?: string
+          ip_address?: unknown
+          metadata?: Json | null
+          org_id?: string | null
+          saml_assertion_id?: string | null
+          saml_session_index?: string | null
+          sso_connection_id?: string | null
+          sso_provider_id?: string | null
+          timestamp?: string
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          country?: string | null
+          email?: string | null
+          error_code?: string | null
+          error_message?: string | null
+          event_type?: string
+          id?: string
+          ip_address?: unknown
+          metadata?: Json | null
+          org_id?: string | null
+          saml_assertion_id?: string | null
+          saml_session_index?: string | null
+          sso_connection_id?: string | null
+          sso_provider_id?: string | null
+          timestamp?: string
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sso_audit_logs_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sso_audit_logs_sso_connection_id_fkey"
+            columns: ["sso_connection_id"]
+            isOneToOne: false
+            referencedRelation: "org_saml_connections"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       stats: {
         Row: {
@@ -2192,6 +2395,17 @@ export type Database = {
           overage_unpaid: number
         }[]
       }
+      auto_enroll_sso_user: {
+        Args: { p_email: string; p_sso_provider_id: string; p_user_id: string }
+        Returns: {
+          enrolled_org_id: string
+          org_name: string
+        }[]
+      }
+      auto_join_user_to_orgs_by_email: {
+        Args: { p_email: string; p_sso_provider_id?: string; p_user_id: string }
+        Returns: undefined
+      }
       calculate_credit_cost: {
         Args: {
           p_metric: Database["public"]["Enums"]["credit_metric_type"]
@@ -2250,6 +2464,10 @@ export type Database = {
       check_revert_to_builtin_version: {
         Args: { appid: string }
         Returns: number
+      }
+      check_sso_required_for_domain: {
+        Args: { p_email: string }
+        Returns: boolean
       }
       cleanup_expired_apikeys: { Args: never; Returns: undefined }
       cleanup_frequent_job_details: { Args: never; Returns: undefined }
@@ -2672,6 +2890,10 @@ export type Database = {
               total_percent: number
             }[]
           }
+      get_sso_provider_id_for_user: {
+        Args: { p_user_id: string }
+        Returns: string
+      }
       get_total_app_storage_size_orgs: {
         Args: { app_id: string; org_id: string }
         Returns: number
@@ -2868,6 +3090,18 @@ export type Database = {
       is_paying_org: { Args: { orgid: string }; Returns: boolean }
       is_storage_exceeded_by_org: { Args: { org_id: string }; Returns: boolean }
       is_trial_org: { Args: { orgid: string }; Returns: number }
+      lookup_sso_provider_by_domain: {
+        Args: { p_email: string }
+        Returns: {
+          enabled: boolean
+          entity_id: string
+          metadata_url: string
+          org_id: string
+          org_name: string
+          provider_id: string
+          provider_name: string
+        }[]
+      }
       mass_edit_queue_messages_cf_ids: {
         Args: {
           updates: Database["public"]["CompositeTypes"]["message_update"][]
@@ -2883,6 +3117,7 @@ export type Database = {
         Returns: string
       }
       one_month_ahead: { Args: never; Returns: string }
+      org_has_sso_configured: { Args: { p_org_id: string }; Returns: boolean }
       parse_cron_field: {
         Args: { current_val: number; field: string; max_val: number }
         Returns: number
@@ -2984,6 +3219,25 @@ export type Database = {
         Args: { email: string; org_id: string }
         Returns: string
       }
+      reset_and_seed_app_data: {
+        Args: {
+          p_admin_user_id?: string
+          p_app_id: string
+          p_org_id?: string
+          p_plan_product_id?: string
+          p_stripe_customer_id?: string
+          p_user_id?: string
+        }
+        Returns: undefined
+      }
+      reset_and_seed_app_stats_data: {
+        Args: { p_app_id: string }
+        Returns: undefined
+      }
+      reset_and_seed_data: { Args: never; Returns: undefined }
+      reset_and_seed_stats_data: { Args: never; Returns: undefined }
+      reset_app_data: { Args: { p_app_id: string }; Returns: undefined }
+      reset_app_stats_data: { Args: { p_app_id: string }; Returns: undefined }
       seed_get_app_metrics_caches: {
         Args: { p_end_date: string; p_org_id: string; p_start_date: string }
         Returns: {
@@ -3313,6 +3567,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       action_type: ["mau", "storage", "bandwidth", "build_time"],
@@ -3418,3 +3675,4 @@ export const Constants = {
     },
   },
 } as const
+
