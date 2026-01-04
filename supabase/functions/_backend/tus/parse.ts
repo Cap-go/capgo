@@ -8,6 +8,7 @@ import { fromBase64, X_CHECKSUM_SHA256 } from './util.ts'
 
 export interface UploadMetadata {
   filename?: string
+  filetype?: string
 }
 
 // Parse "Upload-Metadata" header as described in the TUS creation extension
@@ -38,6 +39,9 @@ export function parseUploadMetadata(c: Context, headers: Headers): UploadMetadat
 
     if (key === 'filename') {
       ret.filename = new TextDecoder().decode(valueBytes)
+    }
+    else if (key === 'filetype') {
+      ret.filetype = new TextDecoder().decode(valueBytes)
     }
   }
   return ret
