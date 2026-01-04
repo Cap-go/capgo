@@ -207,8 +207,18 @@ async function handleWeeklyInstallStats(c: Context, email: string, appId: string
 
   const successPercentage = Math.round((successUpdates / weeklyStats.all_updates) * 10_000) / 10_000
 
+  // Calculate week number and month name for the reported period
+  const now = new Date()
+  const monthName = now.toLocaleString('en-US', { month: 'long' })
+  // Calculate ISO week number
+  const startOfYear = new Date(now.getFullYear(), 0, 1)
+  const days = Math.floor((now.getTime() - startOfYear.getTime()) / (24 * 60 * 60 * 1000))
+  const weekNumber = Math.ceil((days + startOfYear.getDay() + 1) / 7)
+
   const metadata = {
     app_id: appId,
+    month_name: monthName,
+    week_number: weekNumber.toString(),
     weekly_updates: (weeklyStats.all_updates).toString(),
     fun_comparison: getFunComparison('updates', weeklyStats.all_updates),
     weekly_install: successUpdates.toString(),
@@ -233,40 +243,43 @@ async function handleMonthlyCreateStats(c: Context, email: string, appId: string
   }
 
   const supabase = await supabaseAdmin(c)
-  // Fetch additional stats for bundle creation, channel creation, and publishing
+
+  // Calculate the previous month's date range
+  const now = new Date()
+  const previousMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+  const previousMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0) // Last day of previous month
+
+  // Get full month name for the reported period
+  const monthName = previousMonth.toLocaleString('en-US', { month: 'long' })
+
+  // Fetch stats for bundle creation and publishing
   const { data: appVersions, error: _appVersionsError } = await supabase
     .from('app_versions')
     .select('id, created_at')
     .eq('app_id', appId)
-    .gte('created_at', new Date(new Date().setFullYear(new Date().getFullYear(), new Date().getMonth() - 1)).toISOString())
-    .lte('created_at', new Date().toISOString())
-
-  const { data: channels, error: _channelsError } = await supabase
-    .from('channels')
-    .select('id, created_at')
-    .eq('app_id', appId)
-    .gte('created_at', new Date(new Date().setFullYear(new Date().getFullYear(), new Date().getMonth() - 1)).toISOString())
-    .lte('created_at', new Date().toISOString())
+    .gte('created_at', previousMonth.toISOString())
+    .lte('created_at', previousMonthEnd.toISOString())
 
   const { data: deployHistory, error: _deployHistoryError } = await supabase
     .from('deploy_history')
     .select('id, deployed_at')
     .eq('app_id', appId)
-    .gte('deployed_at', new Date(new Date().setFullYear(new Date().getFullYear(), new Date().getMonth() - 1)).toISOString())
-    .lte('deployed_at', new Date().toISOString())
+    .gte('deployed_at', previousMonth.toISOString())
+    .lte('deployed_at', previousMonthEnd.toISOString())
 
   const bundleCount = appVersions?.length ?? 0
-  const channelCount = channels?.length ?? 0
   const publishCount = deployHistory?.length ?? 0
 
   const metadata = {
     app_id: appId,
+    month_name: monthName,
     monthly_bundles_created: bundleCount.toString(),
-    monthly_channels_created: channelCount.toString(),
     monthly_publishes: publishCount.toString(),
   }
 
-  await trackBentoEvent(c, email, metadata, 'org:monthly_create_stats')
+  if (bundleCount > 0 || publishCount > 0) {
+    await trackBentoEvent(c, email, metadata, 'org:monthly_create_stats')
+  }
 
   return c.json(BRES)
 }
