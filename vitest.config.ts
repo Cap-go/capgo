@@ -8,13 +8,11 @@ export default defineConfig(({ mode }) => ({
     environment: 'node',
     watch: false,
     bail: 1,
-    testTimeout: 30_000, // Increased from 20s to handle slow edge function responses
-    hookTimeout: 15_000, // Increased from 8s to handle slow setup/teardown
-    retry: 3, // Increased retries for network flakiness
-    maxConcurrency: 5, // Reduced to prevent connection exhaustion
-    // Vitest 4: pool options are now top-level
-    isolate: true,
-    fileParallelism: true,
+    testTimeout: 30_000,
+    hookTimeout: 15_000,
+    retry: 2,
+    maxConcurrency: 1, // Run tests sequentially to prevent worker pool issues
+    maxWorkers: 1, // Single worker to avoid EPIPE errors
     // Allow graceful shutdown of workers
     teardownTimeout: 15_000,
     // Sequence to reduce parallel load on edge functions
