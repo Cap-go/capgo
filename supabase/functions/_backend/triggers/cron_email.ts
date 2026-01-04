@@ -349,7 +349,9 @@ async function handleDeployInstallStats(
     window_hours: '24',
   }
 
-  await trackBentoEvent(c, email, metadata, 'bundle:install_stats_24h')
+  if (installs > 1) {
+    await trackBentoEvent(c, email, metadata, 'bundle:install_stats_24h')
+  }
 
   return c.json(BRES)
 }
