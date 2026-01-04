@@ -7,6 +7,22 @@ const TEST_SSO_ORG_ID = randomUUID()
 const TEST_SSO_ORG_NAME = `SSO Test Org ${randomUUID()}`
 const TEST_CUSTOMER_ID = `cus_sso_${randomUUID()}`
 const TEST_DOMAIN = 'ssotest.com'
+
+// Helper functions to generate unique entity IDs (required since migration 20260104064028 enforces uniqueness)
+function generateTestEntityId(): string {
+  return `https://example.com/sso/entity/${randomUUID()}`
+}
+
+function generateTestMetadataXml(entityId: string): string {
+  return `<?xml version="1.0"?>
+<EntityDescriptor xmlns="urn:oasis:names:tc:SAML:2.0:metadata" entityID="${entityId}">
+  <IDPSSODescriptor protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol">
+    <SingleSignOnService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect" Location="https://example.com/sso/login"/>
+  </IDPSSODescriptor>
+</EntityDescriptor>`
+}
+
+// Legacy constants (kept for backward compatibility with skipped tests)
 const TEST_ENTITY_ID = 'https://example.com/sso/entity'
 const TEST_METADATA_XML = `<?xml version="1.0"?>
 <EntityDescriptor xmlns="urn:oasis:names:tc:SAML:2.0:metadata" entityID="${TEST_ENTITY_ID}">
@@ -55,7 +71,7 @@ beforeAll(async () => {
           success: true,
           stdout: new TextEncoder().encode(JSON.stringify({
             provider_id: randomUUID(),
-            entity_id: TEST_ENTITY_ID,
+            entity_id: testEntityId,
             acs_url: 'https://api.supabase.com/v1/sso/acs',
             domains: [TEST_DOMAIN],
           })),
@@ -160,6 +176,7 @@ describe('auto-join integration', () => {
     const testUserEmail = `testuser@${domain}`
     const uniqueId = randomUUID().slice(0, 8)
     const ssoProviderId = randomUUID()
+    const testEntityId = generateTestEntityId()
 
     // Setup org with SSO - manual DB inserts to bypass edge function
     const { error: stripeError } = await getSupabaseClient().from('stripe_info').insert({
@@ -199,8 +216,8 @@ describe('auto-join integration', () => {
       org_id: orgId,
       sso_provider_id: ssoProviderId,
       provider_name: 'Test Provider',
-      entity_id: TEST_ENTITY_ID,
-      metadata_xml: TEST_METADATA_XML,
+      entity_id: testEntityId,
+      metadata_xml: generateTestMetadataXml(testEntityId),
       enabled: true,
       verified: true,
     })
@@ -331,13 +348,14 @@ describe.skip('domain verification (mocked metadata fetch)', () => {
 
     // Manually insert SSO connection and domain mapping (bypass /private/sso/configure to avoid CLI dependency)
     const ssoProviderId = randomUUID()
+    const testEntityId = generateTestEntityId()
 
     const { error: ssoError } = await getSupabaseClient().from('org_saml_connections').insert({
       org_id: orgId,
       sso_provider_id: ssoProviderId,
       provider_name: 'Test Provider',
-      entity_id: TEST_ENTITY_ID,
-      metadata_xml: TEST_METADATA_XML,
+      entity_id: testEntityId,
+      metadata_xml: generateTestMetadataXml(testEntityId),
       enabled: true,
     })
 
@@ -407,8 +425,8 @@ describe.skip('domain verification (mocked metadata fetch)', () => {
       org_id: orgId,
       sso_provider_id: ssoProviderId,
       provider_name: 'Test Provider',
-      entity_id: TEST_ENTITY_ID,
-      metadata_xml: TEST_METADATA_XML,
+      entity_id: testEntityId,
+      metadata_xml: generateTestMetadataXml(testEntityId),
       enabled: true,
     })
 
@@ -461,6 +479,7 @@ describe('auto-join integration', () => {
     const testUserEmail = `testuser@${domain}`
     const uniqueId = randomUUID().slice(0, 8)
     const ssoProviderId = randomUUID()
+    const testEntityId = generateTestEntityId()
 
     // Setup org with SSO - manual DB inserts to bypass edge function
     const { error: stripeError } = await getSupabaseClient().from('stripe_info').insert({
@@ -500,8 +519,8 @@ describe('auto-join integration', () => {
       org_id: orgId,
       sso_provider_id: ssoProviderId,
       provider_name: 'Test Provider',
-      entity_id: TEST_ENTITY_ID,
-      metadata_xml: TEST_METADATA_XML,
+      entity_id: testEntityId,
+      metadata_xml: generateTestMetadataXml(testEntityId),
       enabled: true,
       verified: true,
     })
@@ -578,6 +597,7 @@ describe('auto-join integration', () => {
     const testUserEmail = `existing@${domain}`
     const uniqueId = randomUUID().slice(0, 8)
     const ssoProviderId = randomUUID()
+    const testEntityId = generateTestEntityId()
 
     // Create user first (existing user)
     const { error: userCreateError, data: userData } = await getSupabaseClient().auth.admin.createUser({
@@ -641,8 +661,8 @@ describe('auto-join integration', () => {
       org_id: orgId,
       sso_provider_id: ssoProviderId,
       provider_name: 'Test Provider',
-      entity_id: TEST_ENTITY_ID,
-      metadata_xml: TEST_METADATA_XML,
+      entity_id: testEntityId,
+      metadata_xml: generateTestMetadataXml(testEntityId),
       enabled: true,
       verified: true,
     })
@@ -696,6 +716,7 @@ describe('auto-join integration', () => {
     const testUserEmail = `perms@${domain}`
     const uniqueId = randomUUID().slice(0, 8)
     const ssoProviderId = randomUUID()
+    const testEntityId = generateTestEntityId()
 
     const { error: stripeError } = await getSupabaseClient().from('stripe_info').insert({
       customer_id: customerId,
@@ -734,8 +755,8 @@ describe('auto-join integration', () => {
       org_id: orgId,
       sso_provider_id: ssoProviderId,
       provider_name: 'Test Provider',
-      entity_id: TEST_ENTITY_ID,
-      metadata_xml: TEST_METADATA_XML,
+      entity_id: testEntityId,
+      metadata_xml: generateTestMetadataXml(testEntityId),
       enabled: true,
       verified: true,
     })
