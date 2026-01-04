@@ -4,9 +4,9 @@ import { Capacitor } from '@capacitor/core'
 import { setErrors } from '@formkit/core'
 import { FormKit, FormKitMessages, reset } from '@formkit/vue'
 import dayjs from 'dayjs'
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import IconVersion from '~icons/heroicons/arrow-path'
 import iconEmail from '~icons/heroicons/envelope?raw'
@@ -25,6 +25,7 @@ const { t } = useI18n()
 const supabase = useSupabase()
 const displayStore = useDisplayStore()
 const router = useRouter()
+const route = useRoute()
 const main = useMainStore()
 const dialogStore = useDialogV2Store()
 const organizationStore = useOrganizationStore()
@@ -543,6 +544,15 @@ onMounted(async () => {
 
   if (hasMfa)
     mfaFactorId.value = hasMfa.id
+
+  // Auto-trigger 2FA setup if redirected from enforcement card
+  if (route.query.setup2fa === 'true' && !mfaEnabled.value) {
+    // Clear the query param first, wait for it to complete, then open dialog
+    // This prevents the DialogV2's route watcher from closing the dialog
+    await router.replace({ query: {} })
+    await nextTick()
+    handleMfa()
+  }
 })
 </script>
 

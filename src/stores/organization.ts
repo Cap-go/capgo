@@ -83,7 +83,15 @@ export const useOrganizationStore = defineStore('organization', () => {
 
     localStorage.setItem(STORAGE_KEY, currentOrganizationRaw.gid)
     currentRole.value = await getCurrentRole(currentOrganizationRaw.created_by)
-    currentOrganizationFailed.value = !(!!currentOrganizationRaw.paying || (currentOrganizationRaw.trial_left ?? 0) > 0)
+    // Don't mark as failed if user lacks 2FA or password access - the data is redacted and unreliable
+    const lacks2FAAccess = currentOrganizationRaw.enforcing_2fa === true && currentOrganizationRaw['2fa_has_access'] === false
+    const lacksPasswordAccess = currentOrganizationRaw.password_policy_config?.enabled && currentOrganizationRaw.password_has_access === false
+    if (lacks2FAAccess || lacksPasswordAccess) {
+      currentOrganizationFailed.value = false
+    }
+    else {
+      currentOrganizationFailed.value = !(!!currentOrganizationRaw.paying || (currentOrganizationRaw.trial_left ?? 0) > 0)
+    }
 
     // Clear caches when org changes to prevent showing stale data from other orgs
     if (oldOrganization?.gid !== currentOrganizationRaw.gid) {
@@ -101,7 +109,13 @@ export const useOrganizationStore = defineStore('organization', () => {
     const last30DaysEnd = new Date()
     const last30DaysStart = new Date()
     last30DaysStart.setDate(last30DaysStart.getDate() - 29) // 30 days including today
-    await main.updateDashboard(currentOrganizationRaw.gid, last30DaysStart.toISOString(), last30DaysEnd.toISOString())
+    try {
+      await main.updateDashboard(currentOrganizationRaw.gid, last30DaysStart.toISOString(), last30DaysEnd.toISOString())
+    }
+    catch (error) {
+      // Silently catch dashboard errors - they're logged elsewhere and shouldn't block UI
+      console.error('Failed to update dashboard:', error)
+    }
   })
 
   watch(_organizations, async (organizationsMap) => {
@@ -270,7 +284,15 @@ export const useOrganizationStore = defineStore('organization', () => {
     }
 
     currentOrganization.value ??= mappedData.find(org => org.gid === organization.gid) as Organization | undefined
-    currentOrganizationFailed.value = !(!!currentOrganization.value?.paying || (currentOrganization.value?.trial_left ?? 0) > 0)
+    // Don't mark as failed if user lacks 2FA or password access - the data is redacted and unreliable
+    const lacks2FAAccess = currentOrganization.value?.enforcing_2fa === true && currentOrganization.value?.['2fa_has_access'] === false
+    const lacksPasswordAccess = currentOrganization.value?.password_policy_config?.enabled && currentOrganization.value?.password_has_access === false
+    if (lacks2FAAccess || lacksPasswordAccess) {
+      currentOrganizationFailed.value = false
+    }
+    else {
+      currentOrganizationFailed.value = !(!!currentOrganization.value?.paying || (currentOrganization.value?.trial_left ?? 0) > 0)
+    }
   }
 
   const dedupFetchOrganizations = async () => {

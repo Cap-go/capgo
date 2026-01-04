@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { Database } from '~/types/supabase.types'
 import { storeToRefs } from 'pinia'
-import { ref, watch, watchEffect } from 'vue'
+import { computed, ref, watch, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { useSupabase } from '~/services/supabase'
@@ -25,6 +25,14 @@ const searchQuery = ref('')
 
 const { currentOrganization } = storeToRefs(organizationStore)
 
+// Check if user lacks security compliance (2FA or password) - don't load data in this case
+const lacksSecurityAccess = computed(() => {
+  const org = organizationStore.currentOrganization
+  const lacks2FA = org?.enforcing_2fa === true && org?.['2fa_has_access'] === false
+  const lacksPassword = org?.password_policy_config?.enabled && org?.password_has_access === false
+  return lacks2FA || lacksPassword
+})
+
 async function NextStep(appId: string) {
   console.log('Navigating to app with ID:', appId)
   router.push(`/app/${appId}`)
@@ -33,6 +41,14 @@ async function getMyApps() {
   isTableLoading.value = true
   try {
     await organizationStore.awaitInitialLoad()
+
+    // Don't fetch apps if user lacks security access - data would be rejected anyway
+    if (lacksSecurityAccess.value) {
+      apps.value = []
+      totalApps.value = 0
+      return
+    }
+
     const currentGid = organizationStore.currentOrganization?.gid
 
     if (!currentGid) {
@@ -106,7 +122,11 @@ displayStore.defaultBack = '/app'
 
 <template>
   <div>
-    <div v-if="!isLoading">
+    <!-- Show FailedCard when user lacks security access -->
+    <div v-if="lacksSecurityAccess" class="overflow-y-auto px-0 pt-0 mx-auto mb-8 w-full h-full sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
+      <FailedCard />
+    </div>
+    <div v-else-if="!isLoading">
       <StepsApp v-if="stepsOpen" :onboarding="!apps.length" @done="NextStep" @close-step="stepsOpen = !stepsOpen" />
       <div v-else class="overflow-hidden pb-4 h-full">
         <div class="overflow-y-auto px-0 pt-0 mx-auto mb-8 w-full h-full sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
