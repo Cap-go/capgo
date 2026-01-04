@@ -1,10 +1,44 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
+import { getRuntimeKey } from 'hono/adapter'
 import { Hono } from 'hono/tiny'
+import { DEFAULT_RETRY_PARAMS, RetryBucket } from '../tus/retry.ts'
 import { simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { s3 } from '../utils/s3.ts'
 import { hasAppRight, supabaseAdmin } from '../utils/supabase.ts'
+
+// MIME type mapping for common file extensions
+const MIME_TYPES: Record<string, string> = {
+  html: 'text/html',
+  htm: 'text/html',
+  css: 'text/css',
+  js: 'application/javascript',
+  mjs: 'application/javascript',
+  json: 'application/json',
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  gif: 'image/gif',
+  svg: 'image/svg+xml',
+  ico: 'image/x-icon',
+  webp: 'image/webp',
+  woff: 'font/woff',
+  woff2: 'font/woff2',
+  ttf: 'font/ttf',
+  eot: 'application/vnd.ms-fontobject',
+  otf: 'font/otf',
+  map: 'application/json',
+  txt: 'text/plain',
+  xml: 'application/xml',
+  webmanifest: 'application/manifest+json',
+  wasm: 'application/wasm',
+}
+
+function getContentType(filePath: string): string {
+  const ext = filePath.split('.').pop()?.toLowerCase() || ''
+  return MIME_TYPES[ext] || 'application/octet-stream'
+}
 
 export const app = new Hono<MiddlewareKeyVariables>()
 
@@ -80,29 +114,99 @@ async function handlePreview(c: Context<MiddlewareKeyVariables>) {
     return simpleError('no_manifest', 'Bundle has no manifest and cannot be previewed')
   }
 
-  // Look up the file in manifest
-  const { data: manifestEntry, error: manifestError } = await supabaseAdmin(c)
+  // Look up the file in manifest - try exact match first, then with common prefixes
+  let manifestEntry: { s3_path: string, file_name: string } | null = null
+
+  // Try exact match first
+  const { data: exactMatch, error: exactError } = await supabaseAdmin(c)
     .from('manifest')
     .select('s3_path, file_name')
     .eq('app_version_id', versionId)
     .eq('file_name', filePath)
     .single()
 
-  if (manifestError || !manifestEntry) {
+  if (!exactError && exactMatch) {
+    manifestEntry = exactMatch
+  }
+  else {
+    // Try with common prefixes (www/, public/, dist/)
+    const prefixesToTry = ['www/', 'public/', 'dist/', '']
+    for (const prefix of prefixesToTry) {
+      const tryPath = prefix + filePath
+      if (tryPath === filePath)
+        continue // Already tried exact match
+
+      const { data: prefixMatch, error: prefixError } = await supabaseAdmin(c)
+        .from('manifest')
+        .select('s3_path, file_name')
+        .eq('app_version_id', versionId)
+        .eq('file_name', tryPath)
+        .single()
+
+      if (!prefixError && prefixMatch) {
+        manifestEntry = prefixMatch
+        cloudlog({ requestId: c.get('requestId'), message: 'found file with prefix', originalPath: filePath, foundPath: tryPath })
+        break
+      }
+    }
+  }
+
+  if (!manifestEntry) {
     cloudlog({ requestId: c.get('requestId'), message: 'file not found in manifest', filePath, versionId })
     return simpleError('file_not_found', 'File not found in bundle', { filePath })
   }
 
-  // Generate a time-limited signed URL for this file (expires in 1 hour)
-  // This is more secure than redirecting to the unauthenticated files endpoint
-  const PREVIEW_URL_EXPIRY_SECONDS = 3600
+  // Serve the file - use R2 bucket directly in Cloudflare Workers, or fetch via presigned URL in Supabase
   try {
-    const signedUrl = await s3.getSignedUrl(c, manifestEntry.s3_path, PREVIEW_URL_EXPIRY_SECONDS)
-    cloudlog({ requestId: c.get('requestId'), message: 'generated signed preview URL', filePath })
-    return c.redirect(signedUrl, 302)
+    if (getRuntimeKey() === 'workerd') {
+      // Cloudflare Workers - use R2 bucket directly
+      const bucket = c.env.ATTACHMENT_BUCKET
+      if (!bucket) {
+        cloudlog({ requestId: c.get('requestId'), message: 'preview bucket is null' })
+        return simpleError('bucket_not_configured', 'Storage bucket not configured')
+      }
+
+      const object = await new RetryBucket(bucket, DEFAULT_RETRY_PARAMS).get(manifestEntry.s3_path)
+      if (!object) {
+        cloudlog({ requestId: c.get('requestId'), message: 'file not found in R2', s3_path: manifestEntry.s3_path })
+        return simpleError('file_not_found', 'File not found in storage', { filePath })
+      }
+
+      // Use our own MIME type detection - R2 rewrites text/html to text/plain without custom domains
+      const contentType = getContentType(filePath)
+      const headers = new Headers()
+      headers.set('Content-Type', contentType)
+      headers.set('etag', object.httpEtag)
+      headers.set('Cache-Control', 'private, max-age=3600')
+      headers.set('X-Content-Type-Options', 'nosniff')
+
+      cloudlog({ requestId: c.get('requestId'), message: 'serving preview file from R2', filePath, contentType })
+      return new Response(object.body, { headers })
+    }
+    else {
+      // Supabase Edge Functions - fetch via presigned URL
+      const response = await s3.getObject(c, manifestEntry.s3_path)
+      if (!response) {
+        cloudlog({ requestId: c.get('requestId'), message: 'failed to fetch file from S3', s3_path: manifestEntry.s3_path })
+        return simpleError('file_fetch_failed', 'Failed to fetch file')
+      }
+
+      // Use our MIME type detection based on file extension
+      const contentType = getContentType(filePath)
+      cloudlog({ requestId: c.get('requestId'), message: 'serving preview file via S3', filePath, contentType })
+
+      return new Response(response.body, {
+        status: 200,
+        headers: {
+          'Content-Type': contentType,
+          'Cache-Control': 'private, max-age=3600',
+          'X-Content-Type-Options': 'nosniff',
+        },
+      })
+    }
   }
   catch (error) {
-    cloudlog({ requestId: c.get('requestId'), message: 'failed to generate signed URL', error, s3_path: manifestEntry.s3_path })
-    return simpleError('signed_url_failed', 'Failed to generate preview URL')
+    cloudlog({ requestId: c.get('requestId'), message: 'failed to serve preview file', error, s3_path: manifestEntry.s3_path })
+    return simpleError('preview_failed', 'Failed to serve preview file')
   }
 }

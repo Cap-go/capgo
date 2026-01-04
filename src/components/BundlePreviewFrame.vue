@@ -6,7 +6,7 @@ import { useRoute } from 'vue-router'
 import IconExpand from '~icons/lucide/expand'
 import IconMinimize from '~icons/lucide/minimize-2'
 import IconSmartphone from '~icons/lucide/smartphone'
-import { useSupabase } from '~/services/supabase'
+import { defaultApiHost, useSupabase } from '~/services/supabase'
 
 const props = defineProps<{
   appId: string
@@ -75,11 +75,10 @@ const currentDevice = computed(() => devices[selectedDevice.value])
 
 // Build the preview URL with auth token
 const previewUrl = computed(() => {
-  const baseUrl = import.meta.env.VITE_SUPABASE_URL || ''
-  // The preview endpoint is at /functions/v1/private/preview/:app_id/:version_id/
+  // Use Cloudflare Workers API for preview (supports streaming and proper file serving)
   // Pass token as query param since iframes can't send headers
   const tokenParam = accessToken.value ? `?token=${accessToken.value}` : ''
-  return `${baseUrl}/functions/v1/private/preview/${props.appId}/${props.versionId}/${tokenParam}`
+  return `${defaultApiHost}/private/preview/${props.appId}/${props.versionId}/${tokenParam}`
 })
 
 // Build URL for QR code (includes fullscreen param)

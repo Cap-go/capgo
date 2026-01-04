@@ -124,10 +124,30 @@ async function getSize(c: Context, fileId: string) {
   }
 }
 
+async function getObject(c: Context, fileId: string): Promise<Response | null> {
+  const client = initS3(c)
+  try {
+    const url = await client.getPresignedUrl('GET', fileId, {
+      expirySeconds: 60,
+    })
+    const response = await fetch(url)
+    if (!response.ok) {
+      cloudlog({ requestId: c.get('requestId'), message: 'getObject failed', fileId, status: response.status })
+      return null
+    }
+    return response
+  }
+  catch (error) {
+    cloudlog({ requestId: c.get('requestId'), message: 'getObject error', fileId, error })
+    return null
+  }
+}
+
 export const s3 = {
   getSize,
   deleteObject,
   checkIfExist,
   getSignedUrl,
   getUploadUrl,
+  getObject,
 }
