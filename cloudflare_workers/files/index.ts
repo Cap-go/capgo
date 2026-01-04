@@ -12,10 +12,24 @@ export { AttachmentUploadHandler, UploadHandler } from '../../supabase/functions
 const functionName = 'files'
 const app = createHono(functionName, version, env.SENTRY_DSN)
 
+// Check if request is from a preview subdomain (*.preview[.env].capgo.app)
+function isPreviewSubdomain(hostname: string): boolean {
+  return /^[^.]+\.preview(?:\.[^.]+)?\.(?:capgo\.app|usecapgo\.com)$/.test(hostname)
+}
+
+// Middleware to route preview subdomain requests
+app.use('/*', async (c, next) => {
+  const hostname = c.req.header('host') || ''
+  if (isPreviewSubdomain(hostname)) {
+    // Route all requests from preview subdomains to the subdomain handler
+    return preview.fetch(c.req.raw, c.env, c.executionCtx)
+  }
+  return next()
+})
+
 // Files API
 app.route('/files', files)
 app.route('/ok', ok)
-app.route('/preview', preview)
 
 // TODO: remove deprecated path when all users have been migrated
 app.route('/private/download_link', download_link)

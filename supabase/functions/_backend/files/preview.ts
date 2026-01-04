@@ -1,6 +1,7 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { getRuntimeKey } from 'hono/adapter'
+import { getCookie, setCookie } from 'hono/cookie'
 import { Hono } from 'hono/tiny'
 import { simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
@@ -39,32 +40,72 @@ function getContentType(filePath: string): string {
   return MIME_TYPES[ext] || 'application/octet-stream'
 }
 
+// Cookie name for storing the auth token
+const TOKEN_COOKIE_NAME = 'capgo_preview_token'
+
+// Parse subdomain format: {app_id_with_dots_as_underscores}-{version_id}.preview[.env].capgo.app
+// Example: ee__forgr__capacitor_go-222063.preview.capgo.app
+function parsePreviewSubdomain(hostname: string): { appId: string, versionId: number } | null {
+  // Match pattern: {something}.preview[.optional-env].capgo.app or usecapgo.com
+  const match = hostname.match(/^([^.]+)\.preview(?:\.[^.]+)?\.(?:capgo\.app|usecapgo\.com)$/)
+  if (!match)
+    return null
+
+  const subdomain = match[1]
+  // Split by last hyphen to get app_id and version_id
+  // app_id has dots replaced with double underscores
+  const lastHyphen = subdomain.lastIndexOf('-')
+  if (lastHyphen === -1)
+    return null
+
+  const appIdEncoded = subdomain.substring(0, lastHyphen)
+  const versionIdStr = subdomain.substring(lastHyphen + 1)
+
+  // Decode app_id: replace __ with .
+  const appId = appIdEncoded.replace(/__/g, '.')
+  const versionId = Number.parseInt(versionIdStr, 10)
+
+  if (!appId || Number.isNaN(versionId))
+    return null
+
+  return { appId, versionId }
+}
+
 export const app = new Hono<MiddlewareKeyVariables>()
 
 app.use('/*', useCors)
 
-// GET /preview/:app_id/:version_id or GET /preview/:app_id/:version_id/*filepath
-// Note: We don't use middlewareAuth here because iframes can't send headers
-// Instead, we accept the token from either Authorization header or query param
-app.get('/:app_id/:version_id', handlePreview)
-app.get('/:app_id/:version_id/*', handlePreview)
+// Handle all requests from subdomain - files are served from root
+app.get('/*', handlePreviewSubdomain)
 
-async function handlePreview(c: Context<MiddlewareKeyVariables>) {
-  const appId = c.req.param('app_id')
-  const versionId = Number(c.req.param('version_id'))
-  // Get the file path from the wildcard - default to index.html
-  const rawFilePath = c.req.path.split(`/${appId}/${versionId}/`)[1] || 'index.html'
-  const filePath = decodeURIComponent(rawFilePath)
+async function handlePreviewSubdomain(c: Context<MiddlewareKeyVariables>) {
+  const hostname = c.req.header('host') || ''
+  const parsed = parsePreviewSubdomain(hostname)
 
-  cloudlog({ requestId: c.get('requestId'), message: 'preview request', appId, versionId, filePath })
+  if (!parsed) {
+    cloudlog({ requestId: c.get('requestId'), message: 'invalid preview subdomain', hostname })
+    return simpleError('invalid_subdomain', 'Invalid preview subdomain format. Expected: {app_id}-{version_id}.preview.capgo.app')
+  }
 
-  // Accept token from Authorization header OR query param (for iframe support)
+  const { appId, versionId } = parsed
+
+  // Get the file path from the request path - default to index.html
+  let filePath = c.req.path.slice(1) || 'index.html' // Remove leading slash
+  filePath = decodeURIComponent(filePath)
+  // Remove query string if present
+  if (filePath.includes('?'))
+    filePath = filePath.split('?')[0]
+
+  cloudlog({ requestId: c.get('requestId'), message: 'preview subdomain request', hostname, appId, versionId, filePath })
+
+  // Accept token from: query param (first request), cookie (subsequent requests), or Authorization header
   const authorization = c.req.header('authorization')
   const tokenFromQuery = c.req.query('token')
-  const token = authorization?.split('Bearer ')[1] || tokenFromQuery
+  const tokenFromCookie = getCookie(c, TOKEN_COOKIE_NAME)
+  const token = authorization?.split('Bearer ')[1] || tokenFromQuery || tokenFromCookie
 
   if (!token)
-    return simpleError('cannot_find_authorization', 'Cannot find authorization. Pass token as query param or Authorization header.')
+    return simpleError('cannot_find_authorization', 'Cannot find authorization. Pass token as query param on first request.')
 
   const { data: auth, error: authError } = await supabaseAdmin(c).auth.getUser(token)
   if (authError || !auth?.user?.id)
@@ -156,7 +197,6 @@ async function handlePreview(c: Context<MiddlewareKeyVariables>) {
   }
 
   // Preview only works on Cloudflare Workers where the R2 bucket is available.
-  // Supabase Edge Functions cannot serve HTML files properly due to platform limitations.
   if (getRuntimeKey() !== 'workerd') {
     cloudlog({ requestId: c.get('requestId'), message: 'preview not supported on Supabase Edge Functions' })
     return simpleError('preview_not_supported', 'Preview is not supported on Supabase Edge Functions. This feature requires Cloudflare Workers with R2 bucket access.')
@@ -183,11 +223,36 @@ async function handlePreview(c: Context<MiddlewareKeyVariables>) {
     headers.set('Cache-Control', 'private, max-age=3600')
     headers.set('X-Content-Type-Options', 'nosniff')
 
-    cloudlog({ requestId: c.get('requestId'), message: 'serving preview file from R2', filePath, contentType })
+    cloudlog({ requestId: c.get('requestId'), message: 'serving preview file from R2 (subdomain)', filePath, contentType })
+
+    // If token came from query param, set it in a cookie for subsequent requests
+    // This allows assets to load without needing the token in every URL
+    if (tokenFromQuery && !tokenFromCookie) {
+      // Set cookie with same-site strict for security, httpOnly to prevent JS access
+      // Path=/ so it works for all paths in this subdomain
+      setCookie(c, TOKEN_COOKIE_NAME, token, {
+        path: '/',
+        httpOnly: true,
+        secure: true,
+        sameSite: 'Strict',
+        maxAge: 3600, // 1 hour, matches cache control
+      })
+    }
+
     return new Response(object.body, { headers })
   }
   catch (error) {
     cloudlog({ requestId: c.get('requestId'), message: 'failed to serve preview file', error, s3_path: manifestEntry.s3_path })
     return simpleError('preview_failed', 'Failed to serve preview file')
   }
+}
+
+// Export helper for generating preview URLs
+export function generatePreviewUrl(appId: string, versionId: number, env: 'prod' | 'preprod' | 'dev' = 'prod'): string {
+  // Encode app_id: replace . with __
+  const encodedAppId = appId.replace(/\./g, '__')
+  const subdomain = `${encodedAppId}-${versionId}`
+
+  const envPrefix = env === 'prod' ? '' : `.${env}`
+  return `https://${subdomain}.preview${envPrefix}.capgo.app`
 }
