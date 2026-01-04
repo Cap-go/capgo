@@ -1,6 +1,13 @@
 // @ts-expect-error - Legacy Deno import
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
+function serializeError(err: unknown) {
+  if (err instanceof Error) {
+    return { name: err.name, message: err.message, stack: err.stack }
+  }
+  return { message: String(err) }
+}
+
 Deno.serve(async (req) => {
   if (req.method !== 'POST') {
     return new Response(JSON.stringify({ error: 'method_not_allowed' }), {
@@ -95,7 +102,9 @@ Deno.serve(async (req) => {
     )
   }
   catch (error) {
-    console.error('Error checking SSO availability:', error)
+    // Log error using structured logging (console in Deno context)
+    const serialized = serializeError(error)
+    console.log(JSON.stringify({ message: 'Error checking SSO availability:', error: serialized }))
     return new Response(
       JSON.stringify({
         error: 'internal_error',

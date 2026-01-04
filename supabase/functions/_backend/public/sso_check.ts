@@ -1,6 +1,7 @@
 import type { Context } from 'hono'
 import { honoFactory } from '../utils/hono.ts'
 import { getPgClient } from '../utils/pg.ts'
+import { cloudlogErr, serializeError } from '../utils/logging.ts'
 
 export const app = honoFactory.createApp()
 
@@ -74,7 +75,7 @@ app.post('/', async (c: Context) => {
     })
   }
   catch (error) {
-    console.error('Error checking SSO availability:', error)
+    cloudlogErr({ message: 'Error checking SSO availability:', error: serializeError(error) })
     return c.json({
       error: 'internal_error',
       message: 'Failed to check SSO availability',
