@@ -75,10 +75,11 @@ const currentDevice = computed(() => devices[selectedDevice.value])
 
 // Build the preview URL with auth token
 const previewUrl = computed(() => {
-  // Use Cloudflare Workers API for preview (supports streaming and proper file serving)
+  // Use Cloudflare Workers Files endpoint for preview (has R2 bucket access for serving HTML files)
+  // Note: Preview does NOT work on Supabase Edge Functions due to platform limitations
   // Pass token as query param since iframes can't send headers
   const tokenParam = accessToken.value ? `?token=${accessToken.value}` : ''
-  return `${defaultApiHost}/private/preview/${props.appId}/${props.versionId}/${tokenParam}`
+  return `${defaultApiHost}/files/preview/${props.appId}/${props.versionId}/${tokenParam}`
 })
 
 // Build URL for QR code (includes fullscreen param)

@@ -2,11 +2,10 @@ import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { getRuntimeKey } from 'hono/adapter'
 import { Hono } from 'hono/tiny'
-import { DEFAULT_RETRY_PARAMS, RetryBucket } from '../tus/retry.ts'
 import { simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
-import { s3 } from '../utils/s3.ts'
 import { hasAppRight, supabaseAdmin } from '../utils/supabase.ts'
+import { DEFAULT_RETRY_PARAMS, RetryBucket } from './retry.ts'
 
 // MIME type mapping for common file extensions
 const MIME_TYPES: Record<string, string> = {
@@ -156,54 +155,36 @@ async function handlePreview(c: Context<MiddlewareKeyVariables>) {
     return simpleError('file_not_found', 'File not found in bundle', { filePath })
   }
 
-  // Serve the file - use R2 bucket directly in Cloudflare Workers, or fetch via presigned URL in Supabase
+  // Preview only works on Cloudflare Workers where the R2 bucket is available.
+  // Supabase Edge Functions cannot serve HTML files properly due to platform limitations.
+  if (getRuntimeKey() !== 'workerd') {
+    cloudlog({ requestId: c.get('requestId'), message: 'preview not supported on Supabase Edge Functions' })
+    return simpleError('preview_not_supported', 'Preview is not supported on Supabase Edge Functions. This feature requires Cloudflare Workers with R2 bucket access.')
+  }
+
+  const bucket = c.env.ATTACHMENT_BUCKET
+  if (!bucket) {
+    cloudlog({ requestId: c.get('requestId'), message: 'preview bucket is null' })
+    return simpleError('bucket_not_configured', 'Storage bucket not configured')
+  }
+
   try {
-    if (getRuntimeKey() === 'workerd') {
-      // Cloudflare Workers - use R2 bucket directly
-      const bucket = c.env.ATTACHMENT_BUCKET
-      if (!bucket) {
-        cloudlog({ requestId: c.get('requestId'), message: 'preview bucket is null' })
-        return simpleError('bucket_not_configured', 'Storage bucket not configured')
-      }
-
-      const object = await new RetryBucket(bucket, DEFAULT_RETRY_PARAMS).get(manifestEntry.s3_path)
-      if (!object) {
-        cloudlog({ requestId: c.get('requestId'), message: 'file not found in R2', s3_path: manifestEntry.s3_path })
-        return simpleError('file_not_found', 'File not found in storage', { filePath })
-      }
-
-      // Use our own MIME type detection - R2 rewrites text/html to text/plain without custom domains
-      const contentType = getContentType(filePath)
-      const headers = new Headers()
-      headers.set('Content-Type', contentType)
-      headers.set('etag', object.httpEtag)
-      headers.set('Cache-Control', 'private, max-age=3600')
-      headers.set('X-Content-Type-Options', 'nosniff')
-
-      cloudlog({ requestId: c.get('requestId'), message: 'serving preview file from R2', filePath, contentType })
-      return new Response(object.body, { headers })
+    const object = await new RetryBucket(bucket, DEFAULT_RETRY_PARAMS).get(manifestEntry.s3_path)
+    if (!object) {
+      cloudlog({ requestId: c.get('requestId'), message: 'file not found in R2', s3_path: manifestEntry.s3_path })
+      return simpleError('file_not_found', 'File not found in storage', { filePath })
     }
-    else {
-      // Supabase Edge Functions - fetch via presigned URL
-      const response = await s3.getObject(c, manifestEntry.s3_path)
-      if (!response) {
-        cloudlog({ requestId: c.get('requestId'), message: 'failed to fetch file from S3', s3_path: manifestEntry.s3_path })
-        return simpleError('file_fetch_failed', 'Failed to fetch file')
-      }
 
-      // Use our MIME type detection based on file extension
-      const contentType = getContentType(filePath)
-      cloudlog({ requestId: c.get('requestId'), message: 'serving preview file via S3', filePath, contentType })
+    // Use our own MIME type detection - R2 rewrites text/html to text/plain without custom domains
+    const contentType = getContentType(filePath)
+    const headers = new Headers()
+    headers.set('Content-Type', contentType)
+    headers.set('etag', object.httpEtag)
+    headers.set('Cache-Control', 'private, max-age=3600')
+    headers.set('X-Content-Type-Options', 'nosniff')
 
-      return new Response(response.body, {
-        status: 200,
-        headers: {
-          'Content-Type': contentType,
-          'Cache-Control': 'private, max-age=3600',
-          'X-Content-Type-Options': 'nosniff',
-        },
-      })
-    }
+    cloudlog({ requestId: c.get('requestId'), message: 'serving preview file from R2', filePath, contentType })
+    return new Response(object.body, { headers })
   }
   catch (error) {
     cloudlog({ requestId: c.get('requestId'), message: 'failed to serve preview file', error, s3_path: manifestEntry.s3_path })

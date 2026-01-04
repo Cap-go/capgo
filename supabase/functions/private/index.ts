@@ -12,7 +12,6 @@ import { app as latency } from '../_backend/private/latency.ts'
 import { app as log_as } from '../_backend/private/log_as.ts'
 // Webapps API
 import { app as plans } from '../_backend/private/plans.ts'
-import { app as preview } from '../_backend/private/preview.ts'
 import { app as publicStats } from '../_backend/private/public_stats.ts'
 import { app as set_org_email } from '../_backend/private/set_org_email.ts'
 import { app as stats_priv } from '../_backend/private/stats.ts'
@@ -50,7 +49,6 @@ appGlobal.route('/events', events)
 appGlobal.route('/invite_new_user_to_org', invite_new_user_to_org)
 appGlobal.route('/accept_invitation', accept_invitation)
 appGlobal.route('/validate_password_compliance', validate_password_compliance)
-appGlobal.route('/preview', preview)
 
 createAllCatch(appGlobal, functionName)
 Deno.serve(appGlobal.fetch)

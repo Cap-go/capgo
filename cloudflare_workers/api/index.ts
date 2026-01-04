@@ -8,7 +8,6 @@ import { app as devices_priv } from '../../supabase/functions/_backend/private/d
 import { app as events } from '../../supabase/functions/_backend/private/events.ts'
 import { app as log_as } from '../../supabase/functions/_backend/private/log_as.ts'
 import { app as plans } from '../../supabase/functions/_backend/private/plans.ts'
-import { app as preview } from '../../supabase/functions/_backend/private/preview.ts'
 import { app as publicStats } from '../../supabase/functions/_backend/private/public_stats.ts'
 import { app as stats_priv } from '../../supabase/functions/_backend/private/stats.ts'
 import { app as storeTop } from '../../supabase/functions/_backend/private/store_top.ts'
@@ -78,7 +77,6 @@ appPrivate.route('/stripe_portal', stripe_portal)
 appPrivate.route('/delete_failed_version', deleted_failed_version)
 appPrivate.route('/create_device', create_device)
 appPrivate.route('/events', events)
-appPrivate.route('/preview', preview)
 
 // Triggers
 const functionNameTriggers = 'triggers'
