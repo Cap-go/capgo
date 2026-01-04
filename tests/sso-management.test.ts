@@ -269,8 +269,7 @@ describe('auto-join integration', () => {
     await getSupabaseClient().from('stripe_info').delete().eq('customer_id', customerId)
   }, 120000)
 
-  it.skip('should auto-enroll existing users on first SSO login', async () => {
-    // NOTE: Skipped - requires sso_audit_logs table which doesn't exist yet
+  it('should auto-enroll existing users on first SSO login', async () => {
     const testIp = '203.0.113.42'
 
     await fetch(`${BASE_URL}/private/sso/status`, {
