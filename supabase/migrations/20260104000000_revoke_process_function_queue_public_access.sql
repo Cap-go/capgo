@@ -116,8 +116,11 @@ REVOKE ALL ON FUNCTION "public"."generate_org_on_user_create"() FROM "authentica
 REVOKE ALL ON FUNCTION "public"."generate_org_user_on_org_create"() FROM "anon";
 REVOKE ALL ON FUNCTION "public"."generate_org_user_on_org_create"() FROM "authenticated";
 
-REVOKE ALL ON FUNCTION "public"."noupdate"() FROM "anon";
-REVOKE ALL ON FUNCTION "public"."noupdate"() FROM "authenticated";
+-- NOTE: noupdate() is a trigger function used on the channels table.
+-- Users need EXECUTE permission on trigger functions to perform table operations.
+-- Revoking access would break channel updates for authenticated users.
+-- REVOKE ALL ON FUNCTION "public"."noupdate"() FROM "anon";
+-- REVOKE ALL ON FUNCTION "public"."noupdate"() FROM "authenticated";
 
 REVOKE ALL ON FUNCTION "public"."record_deployment_history"() FROM "anon";
 REVOKE ALL ON FUNCTION "public"."record_deployment_history"() FROM "authenticated";
