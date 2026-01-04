@@ -221,7 +221,9 @@ async function submit(form: { password: string, password_confirm: string }) {
 
           <!-- Password requirements list -->
           <div class="mb-4 p-3 bg-[#FFFBEC] rounded-md">
-            <p class="text-sm font-medium text-[#973C00] mb-2">{{ t('password-must-meet') }}</p>
+            <p class="text-sm font-medium text-[#973C00] mb-2">
+              {{ t('password-must-meet') }}
+            </p>
             <ul class="text-sm space-y-1">
               <li class="flex items-center gap-2">
                 <svg class="w-4 h-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
