@@ -3,16 +3,23 @@ import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { DeviceLink } from '../utils/plugin_parser.ts'
 import type { Database } from '../utils/supabase.types.ts'
-import { greaterOrEqual, parse } from '@std/semver'
+import { parse } from '@std/semver'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod/mini'
 import { getAppStatus, setAppStatus } from '../utils/appStatus.ts'
 import { BRES, parseBody, simpleError200, simpleRateLimit } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
+import { sendNotifToOrgMembers } from '../utils/org_email_notifications.ts'
 import { closeClient, deleteChannelDevicePg, getAppByIdPg, getAppOwnerPostgres, getAppVersionsByAppIdPg, getChannelByNamePg, getChannelDeviceOverridePg, getChannelsPg, getCompatibleChannelsPg, getDrizzleClient, getMainChannelsPg, getPgClient, upsertChannelDevicePg } from '../utils/pg.ts'
 import { convertQueryToBody, makeDevice, parsePluginBody } from '../utils/plugin_parser.ts'
 import { sendStatsAndDevice } from '../utils/stats.ts'
-import { deviceIdRegex, INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, isLimited, MISSING_STRING_APP_ID, MISSING_STRING_DEVICE_ID, MISSING_STRING_VERSION_BUILD, MISSING_STRING_VERSION_NAME, NON_STRING_APP_ID, NON_STRING_DEVICE_ID, NON_STRING_VERSION_BUILD, NON_STRING_VERSION_NAME, reverseDomainRegex } from '../utils/utils.ts'
+import { backgroundTask, deviceIdRegex, INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, isDeprecatedPluginVersion, isLimited, MISSING_STRING_APP_ID, MISSING_STRING_DEVICE_ID, MISSING_STRING_VERSION_BUILD, MISSING_STRING_VERSION_NAME, NON_STRING_APP_ID, NON_STRING_DEVICE_ID, NON_STRING_VERSION_BUILD, NON_STRING_VERSION_NAME, reverseDomainRegex } from '../utils/utils.ts'
+
+// Minimum versions for local channel storage behavior
+const CHANNEL_SELF_MIN_V5 = '5.34.0'
+const CHANNEL_SELF_MIN_V6 = '6.34.0'
+const CHANNEL_SELF_MIN_V7 = '7.34.0'
+const CHANNEL_SELF_MIN_V8 = '8.0.0'
 
 z.config(z.locales.en())
 const devicePlatformScheme = z.literal(['ios', 'android'])
@@ -38,7 +45,7 @@ export const jsonRequestSchema = z.looseObject({
   plugin_version: z.optional(z.string()),
   is_prod: z.boolean(),
   platform: devicePlatformScheme,
-  key_id: z.optional(z.string().check(z.maxLength(4))),
+  key_id: z.optional(z.string().check(z.maxLength(20))),
 })
 
 // TODO: delete when all mirgrated to jsonRequestSchema
@@ -49,7 +56,7 @@ export const jsonRequestSchemaGet = z.looseObject({
   is_emulator: z.boolean(),
   is_prod: z.boolean(),
   platform: devicePlatformScheme,
-  key_id: z.optional(z.string().check(z.maxLength(4))),
+  key_id: z.optional(z.string().check(z.maxLength(20))),
 })
 
 async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient>, body: DeviceLink): Promise<Response> {
@@ -107,6 +114,21 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
     return simpleError200(c, 'cannot_override', 'Missing channel')
   }
   if (dataChannelOverride && !dataChannelOverride.channel_id.allow_device_self_set) {
+    // Send weekly notification to org about self-assignment rejection
+    backgroundTask(c, sendNotifToOrgMembers(
+      c,
+      'device:channel_self_set_rejected',
+      'channel_self_rejected',
+      {
+        channel_name: dataChannelOverride.channel_id.name,
+        channel_id: dataChannelOverride.channel_id.id,
+        device_id: dataChannelOverride.device_id,
+        app_id,
+      },
+      appOwner.owner_org,
+      `${app_id}`,
+      '0 0 * * 0', // Weekly on Sunday at midnight
+    ))
     return simpleError200(c, 'cannot_override', 'Cannot change device override current channel don\'t allow it')
   }
   // if channel set channel_override to it
@@ -118,23 +140,45 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
   }
 
   if (!dataChannel.allow_device_self_set) {
-    return simpleError200(c, 'channel_self_set_not_allowed', `This channel does not allow devices to self associate`, { channel, app_id })
+    // Send weekly notification to org about self-assignment rejection
+    backgroundTask(c, sendNotifToOrgMembers(
+      c,
+      'device:channel_self_set_rejected',
+      'channel_self_rejected',
+      {
+        channel_name: dataChannel.name,
+        app_id,
+      },
+      appOwner.owner_org,
+      `${app_id}`,
+      '0 0 * * 0', // Weekly on Sunday at midnight
+    ))
+    if (dataChannel.public) {
+      return simpleError200(
+        c,
+        'public_channel_self_set_not_allowed',
+        'This channel is public and does not allow device self-assignment. Unset the channel and the device will automatically use the public channel.',
+        { channel, app_id },
+      )
+    }
+    return simpleError200(c, 'channel_self_set_not_allowed', 'This channel does not allow devices to self associate', { channel, app_id })
   }
 
-  // Check if plugin version is >= 7.34.0 (new local storage behavior)
+  // Check if plugin version supports local channel storage (5.34.0+, 6.34.0+, 7.34.0+)
   const pluginVersion = body.plugin_version || '0.0.0'
   let isNewVersion = false
   try {
-    isNewVersion = greaterOrEqual(parse(pluginVersion), parse('7.34.0'))
+    const parsed = parse(pluginVersion)
+    isNewVersion = !isDeprecatedPluginVersion(parsed, CHANNEL_SELF_MIN_V5, CHANNEL_SELF_MIN_V6, CHANNEL_SELF_MIN_V7, CHANNEL_SELF_MIN_V8)
   }
   catch (error) {
-    // If version parsing fails, assume old version (< 7.34.0)
-    cloudlog({ requestId: c.get('requestId'), message: 'Failed to parse plugin version, assuming < 7.34.0', plugin_version: pluginVersion, error })
+    // If version parsing fails, assume old version
+    cloudlog({ requestId: c.get('requestId'), message: 'Failed to parse plugin version, assuming old version', plugin_version: pluginVersion, error })
   }
 
-  // For v7.34.0+: Only validate, don't store in channel_devices
+  // For vX.34.0+: Only validate, don't store in channel_devices
   if (isNewVersion) {
-    cloudlog({ requestId: c.get('requestId'), message: 'Plugin v7.34.0+ detected, cleaning up old channel_devices entry if exists' })
+    cloudlog({ requestId: c.get('requestId'), message: 'Plugin vX.34.0+ detected, cleaning up old channel_devices entry if exists' })
 
     // Clean up any existing channel_devices entry (migration)
     if (dataChannelOverride) {
@@ -242,20 +286,21 @@ async function put(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient
   }
   await setAppStatus(c, app_id, 'cloud')
 
-  // Check if plugin version is >= 7.34.0 (new local storage behavior)
+  // Check if plugin version supports local channel storage (5.34.0+, 6.34.0+, 7.34.0+)
   const pluginVersion = body.plugin_version || '0.0.0'
   let isNewVersion = false
   try {
-    isNewVersion = greaterOrEqual(parse(pluginVersion), parse('7.34.0'))
+    const parsed = parse(pluginVersion)
+    isNewVersion = !isDeprecatedPluginVersion(parsed, CHANNEL_SELF_MIN_V5, CHANNEL_SELF_MIN_V6, CHANNEL_SELF_MIN_V7, CHANNEL_SELF_MIN_V8)
   }
   catch (error) {
-    // If version parsing fails, assume old version (< 7.34.0)
-    cloudlog({ requestId: c.get('requestId'), message: 'Failed to parse plugin version in PUT, assuming < 7.34.0', plugin_version: pluginVersion, error })
+    // If version parsing fails, assume old version
+    cloudlog({ requestId: c.get('requestId'), message: 'Failed to parse plugin version in PUT, assuming old version', plugin_version: pluginVersion, error })
   }
 
-  // For v7.34.0+: Use channel from request body (plugin sends its local channelOverride)
+  // For vX.34.0+: Use channel from request body (plugin sends its local channelOverride)
   if (isNewVersion) {
-    cloudlog({ requestId: c.get('requestId'), message: 'Plugin v7.34.0+ detected in getChannel, using channel from request body' })
+    cloudlog({ requestId: c.get('requestId'), message: 'Plugin vX.34.0+ detected in getChannel, using channel from request body' })
     const channelOverride = body.channel
 
     if (channelOverride) {
@@ -365,25 +410,26 @@ async function deleteOverride(c: Context, drizzleClient: ReturnType<typeof getDr
   }
   await setAppStatus(c, app_id, 'cloud')
 
-  // Check if plugin version is >= 7.34.0 (new local storage behavior)
+  // Check if plugin version supports local channel storage (5.34.0+, 6.34.0+, 7.34.0+)
   const pluginVersion = body.plugin_version || '0.0.0'
   let isNewVersion = false
   try {
-    isNewVersion = greaterOrEqual(parse(pluginVersion), parse('7.34.0'))
+    const parsed = parse(pluginVersion)
+    isNewVersion = !isDeprecatedPluginVersion(parsed, CHANNEL_SELF_MIN_V5, CHANNEL_SELF_MIN_V6, CHANNEL_SELF_MIN_V7, CHANNEL_SELF_MIN_V8)
   }
   catch (error) {
-    // If version parsing fails, assume old version (< 7.34.0)
-    cloudlog({ requestId: c.get('requestId'), message: 'Failed to parse plugin version in DELETE, assuming < 7.34.0', plugin_version: pluginVersion, error })
+    // If version parsing fails, assume old version
+    cloudlog({ requestId: c.get('requestId'), message: 'Failed to parse plugin version in DELETE, assuming old version', plugin_version: pluginVersion, error })
   }
 
-  // For v7.34.0+: Still check and clean up old channel_devices entries (migration cleanup)
+  // For vX.34.0+: Still check and clean up old channel_devices entries (migration cleanup)
   // Read operation can use v2 flag
   const dataChannelOverride = await getChannelDeviceOverridePg(c, app_id, device_id, drizzleClient as ReturnType<typeof getDrizzleClient>)
 
   if (isNewVersion) {
-    // For v7.34.0+: Clean up old entry if it exists from previous versions
+    // For vX.34.0+: Clean up old entry if it exists from previous versions
     if (dataChannelOverride?.channel_id) {
-      cloudlog({ requestId: c.get('requestId'), message: 'Plugin v7.34.0+ detected in unsetChannel, cleaning up old channel_devices entry' })
+      cloudlog({ requestId: c.get('requestId'), message: 'Plugin vX.34.0+ detected in unsetChannel, cleaning up old channel_devices entry' })
       await deleteChannelDevicePg(c, app_id, device_id, drizzleClient)
     }
     await sendStatsAndDevice(c, device, [{ action: 'setChannel' }])
@@ -397,6 +443,19 @@ async function deleteOverride(c: Context, drizzleClient: ReturnType<typeof getDr
   }
 
   if (!dataChannelOverride.channel_id.allow_device_self_set) {
+    // Send weekly notification to org about self-assignment rejection
+    backgroundTask(c, sendNotifToOrgMembers(
+      c,
+      'device:channel_self_set_rejected',
+      'channel_self_rejected',
+      {
+        channel_name: dataChannelOverride.channel_id.name,
+        app_id,
+      },
+      appOwner.owner_org,
+      `${app_id}`,
+      '0 0 * * 0', // Weekly on Sunday at midnight
+    ))
     return simpleError200(c, 'cannot_override', 'Cannot change device override current channel don\'t allow it')
   }
 
@@ -447,14 +506,13 @@ async function listCompatibleChannels(c: Context, drizzleClient: ReturnType<type
   }
   await setAppStatus(c, app_id, 'cloud')
 
-  // Get channels that allow device self set and are compatible with the platform - Read operation can use v2 flag
+  // Channels compatible with platform/device/build AND (public OR allow_device_self_set)
   const channels = await getCompatibleChannelsPg(c, app_id, platform as 'ios' | 'android', is_emulator!, is_prod!, drizzleClient as ReturnType<typeof getDrizzleClient>)
 
   if (!channels || channels.length === 0) {
     return c.json([])
   }
 
-  // Return the compatible channels
   const compatibleChannels = channels.map((channel: { id: number, name: string, public: boolean, allow_device_self_set: boolean }) => ({
     id: channel.id,
     name: channel.name,

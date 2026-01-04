@@ -28,7 +28,9 @@ async function getAll(c: Context, body: GetDevice, apikey: Database['public']['T
       disable_auto_update,
       allow_device_self_set,
       allow_emulator,
+      allow_device,
       allow_dev,
+      allow_prod,
       version (
         name,
         id
@@ -65,6 +67,9 @@ async function getOne(c: Context, body: GetDevice, apikey: Database['public']['T
     disable_auto_update,
     allow_device_self_set,
     allow_emulator,
+    allow_device,
+    allow_dev,
+    allow_prod,
     public,
     version (
       name,

@@ -1,38 +1,64 @@
+import type { AuthInfo } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
 import { honoFactory, parseBody, quickError, simpleError } from '../../utils/hono.ts'
-import { middlewareKey } from '../../utils/hono_middleware.ts'
-import { supabaseApikey } from '../../utils/supabase.ts'
+import { middlewareV2 } from '../../utils/hono_middleware.ts'
+import { supabaseWithAuth, validateExpirationAgainstOrgPolicies, validateExpirationDate } from '../../utils/supabase.ts'
 import { Constants } from '../../utils/supabase.types.ts'
 
 const app = honoFactory.createApp()
+
+// Validate id format to prevent PostgREST filter injection
+// ID must be a valid UUID or numeric string
+function isValidIdFormat(id: string): boolean {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  const numericRegex = /^\d+$/
+  return uuidRegex.test(id) || numericRegex.test(id)
+}
 
 interface ApiKeyPut {
   name: string
   mode: 'read' | 'write' | 'all' | 'upload'
   limited_to_apps: string[]
   limited_to_orgs: string[]
+  expires_at?: string | null
 }
 
-app.put('/:id', middlewareKey(['all']), async (c) => {
-  const key = c.get('apikey')!
+app.put('/:id', middlewareV2(['all']), async (c) => {
+  const auth = c.get('auth') as AuthInfo
+  const authApikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row'] | undefined
 
-  if (key.limited_to_orgs?.length) {
-    throw quickError(401, 'cannot_update_apikey', 'You cannot do that as a limited API key', { key })
+  // Only check limited_to_orgs constraint for API key auth (not JWT)
+  if (auth.authType === 'apikey' && authApikey?.limited_to_orgs?.length) {
+    throw quickError(401, 'cannot_update_apikey', 'You cannot do that as a limited API key', { apikeyId: authApikey.id })
   }
 
   const id = c.req.param('id')
   if (!id) {
-    throw simpleError('api_key_id_required', 'API key ID is required', { id })
+    throw simpleError('api_key_id_required', 'API key ID is required')
+  }
+
+  // Validate id format to prevent PostgREST filter injection
+  if (!isValidIdFormat(id)) {
+    throw simpleError('invalid_id_format', 'API key ID must be a valid UUID or number')
   }
 
   const body = await parseBody<ApiKeyPut>(c)
-  const { name, mode, limited_to_apps, limited_to_orgs } = body
+  const { name, mode, limited_to_apps, limited_to_orgs, expires_at } = body
+
+  // Validate expiration date format (throws if invalid)
+  validateExpirationDate(expires_at)
+
   const updateData: Partial<Database['public']['Tables']['apikeys']['Update']> = {
     name,
     mode,
     // we use undefined to remove the field from the update
     limited_to_apps: limited_to_apps?.length > 0 ? limited_to_apps : undefined,
     limited_to_orgs: limited_to_orgs?.length > 0 ? limited_to_orgs : undefined,
+  }
+
+  // Handle expires_at: null means remove expiration, undefined means don't update
+  if (expires_at !== undefined) {
+    updateData.expires_at = expires_at
   }
 
   if (name !== undefined && typeof name !== 'string') {
@@ -53,18 +79,18 @@ app.put('/:id', middlewareKey(['all']), async (c) => {
   }
 
   if (Object.keys(updateData).length === 0) {
-    throw simpleError('no_valid_fields_provided_for_update', 'No valid fields provided for update. Provide name, mode, limited_to_apps, or limited_to_orgs.')
+    throw simpleError('no_valid_fields_provided_for_update', 'No valid fields provided for update. Provide name, mode, limited_to_apps, limited_to_orgs, or expires_at.')
   }
 
-  // Use anon client with capgkey header; RLS enforces ownership via user_id
-  const supabase = supabaseApikey(c, key.key)
+  // Use supabaseWithAuth which handles both JWT and API key authentication
+  const supabase = supabaseWithAuth(c, auth)
 
   // Check if the apikey to update exists (RLS handles ownership)
   const { data: existingApikey, error: fetchError } = await supabase
     .from('apikeys')
-    .select('id') // Select only id, RLS implicitly filters by user_id
+    .select('id, limited_to_orgs, expires_at') // Also fetch expires_at for policy validation
     .or(`key.eq.${id},id.eq.${id}`)
-    .eq('user_id', key.user_id)
+    .eq('user_id', auth.userId)
     .single()
 
   if (fetchError) {
@@ -75,11 +101,21 @@ app.put('/:id', middlewareKey(['all']), async (c) => {
     throw quickError(404, 'api_key_not_found_or_access_denied', 'API key not found or access denied')
   }
 
+  // Determine the org IDs to validate against (use new ones if provided, otherwise existing)
+  const orgsToValidate = limited_to_orgs?.length ? limited_to_orgs : (existingApikey.limited_to_orgs || [])
+
+  // Validate expiration against org policies (only if expires_at is being set or orgs are being changed)
+  if (expires_at !== undefined || limited_to_orgs?.length) {
+    // Use new expires_at if provided, otherwise fall back to existing
+    const expirationToValidate = expires_at !== undefined ? expires_at : (existingApikey.expires_at ?? null)
+    await validateExpirationAgainstOrgPolicies(orgsToValidate, expirationToValidate, supabase)
+  }
+
   const { data: updatedApikey, error: updateError } = await supabase
     .from('apikeys')
     .update(updateData)
     .eq('id', existingApikey.id) // Use the fetched ID to ensure we update the correct record
-    .eq('user_id', key.user_id)
+    .eq('user_id', auth.userId)
     .select()
     .single()
 

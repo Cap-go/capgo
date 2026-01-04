@@ -1,5 +1,4 @@
 import { randomUUID } from 'node:crypto'
-import { fetch } from 'undici'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { APIKEY_TEST_ALL, getSupabaseClient, ORG_ID, resetAndSeedAppData, resetAppData, resetAppDataStats, USER_ID } from './test-utils'
 

@@ -377,3 +377,9 @@ import_map = "./functions/deno.json"
 verify_jwt = false
 import_map = "./functions/deno.json"
 
+# WEBHOOKS ENDPOINTS
+
+[functions.webhooks]
+verify_jwt = false
+import_map = "./functions/deno.json"
+

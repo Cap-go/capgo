@@ -46,6 +46,14 @@ watchEffect(async () => {
 
 const isMobile = Capacitor.isNativePlatform()
 
+// Check if user lacks security compliance (2FA or password) - data is unreliable in this case
+const lacksSecurityAccess = computed(() => {
+  const org = organizationStore.currentOrganization
+  const lacks2FA = org?.enforcing_2fa === true && org?.['2fa_has_access'] === false
+  const lacksPassword = org?.password_policy_config?.enabled && org?.password_has_access === false
+  return lacks2FA || lacksPassword
+})
+
 const bannerLeftText = computed(() => {
   const org = organizationStore.currentOrganization
   if (org?.paying)
@@ -59,23 +67,34 @@ const bannerText = computed(() => {
   if (!org)
     return
 
+  // Don't show billing banner when user lacks 2FA or password access - data is unreliable
+  if (lacksSecurityAccess.value)
+    return null
+
   if (organizationStore.currentOrganizationFailed)
     return t('subscription-required')
 
-  if (org.is_canceled)
+  if (org.is_canceled) {
     return t('plan-inactive')
+  }
 
-  else if (!org.paying && org.trial_left > 1)
+  else if (!org.paying && org.trial_left > 1) {
     return `${org.trial_left} ${t('trial-left')}`
+  }
 
-  else if (!org.paying && org.trial_left === 1)
+  else if (!org.paying && org.trial_left === 1) {
     return t('one-day-left')
+  }
 
-  else if (!org.paying && !org.can_use_more)
+  else if (!org.paying && !org.can_use_more) {
     return t('trial-plan-expired')
+  }
 
-  else if (org.paying && !org.can_use_more)
-    return t('you-reached-the-limi')
+  else if (org.paying && !org.can_use_more) {
+    // Si l'org a des crédits, afficher un message différent
+    const hasCredits = (org.credit_available ?? 0) > 0
+    return hasCredits ? t('limit-reached-with-credits') : t('limit-reached-no-credits')
+  }
 
   return null
 })

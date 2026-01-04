@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import IconAlertCircle from '~icons/lucide/alert-circle'
 import BundleUploadsCard from '~/components/dashboard/BundleUploadsCard.vue'
+import DeploymentBanner from '~/components/dashboard/DeploymentBanner.vue'
 import DeploymentStatsCard from '~/components/dashboard/DeploymentStatsCard.vue'
 import UpdateStatsCard from '~/components/dashboard/UpdateStatsCard.vue'
 import { getCapgoVersion, useSupabase } from '~/services/supabase'
@@ -101,6 +102,7 @@ watchEffect(async () => {
     <div v-if="app || isLoading">
       <div class="w-full h-full px-4 pt-4 mb-8 overflow-x-hidden overflow-y-auto sm:px-6 lg:px-8 max-h-fit">
         <FailedCard />
+        <DeploymentBanner :app-id="id" @deployed="refreshData" />
         <Usage v-if="!organizationStore.currentOrganizationFailed" ref="usageComponent" :app-id="id" />
 
         <!-- New charts section -->

@@ -17,6 +17,40 @@ import { getRemoteConfig } from './services/supabase'
 // your custom styles here
 import './styles/style.css'
 
+// Handle chunk load errors (stale chunks after deployment)
+// When a new version is deployed, old chunk URLs return 404/HTML instead of JS
+const CHUNK_RELOAD_KEY = 'capgo_chunk_reload'
+
+function handleChunkError(message: string) {
+  console.warn('Chunk load error detected, reloading page...', message)
+  // Store flag to show toast after reload
+  localStorage.setItem(CHUNK_RELOAD_KEY, 'true')
+  window.location.reload()
+}
+
+function isChunkLoadError(message: string | undefined): boolean {
+  if (!message)
+    return false
+  return message.includes('Failed to fetch dynamically imported module')
+    || message.includes('is not a valid JavaScript MIME type')
+    || message.includes('Loading chunk')
+    || message.includes('Loading CSS chunk')
+}
+
+window.addEventListener('error', (event) => {
+  if (isChunkLoadError(event.message))
+    handleChunkError(event.message)
+}, true)
+
+// Also handle unhandled promise rejections for dynamic imports
+window.addEventListener('unhandledrejection', (event) => {
+  const message = event.reason?.message || String(event.reason)
+  if (isChunkLoadError(message)) {
+    event.preventDefault()
+    handleChunkError(message)
+  }
+})
+
 const guestPath = ['/login', '/delete_account', '/confirm-signup', '/forgot_password', '/resend_email', '/onboarding', '/register', '/invitation', '/scan', '/sso-login']
 
 getRemoteConfig()
@@ -87,6 +121,18 @@ type UserModule = (ctx: { app: typeof app, router: Router }) => void
 Object.values(import.meta.glob<{ install: UserModule }>('./modules/*.ts', { eager: true }))
   .forEach(i => i.install?.({ app, router }))
 
-router.isReady().then(() => {
+router.isReady().then(async () => {
   app.mount('#app')
+
+  // Wait for vue-sonner component to be mounted
+  setTimeout(async () => {
+    const key = localStorage.getItem(CHUNK_RELOAD_KEY)
+    console.log('Checking for chunk reload toast...', key)
+    // Show toast if we just reloaded due to chunk error
+    if (key) {
+      localStorage.removeItem(CHUNK_RELOAD_KEY)
+      const { toast } = await import('vue-sonner')
+      toast.info('App updated! Page was refreshed to load the latest version.')
+    }
+  }, 500)
 })

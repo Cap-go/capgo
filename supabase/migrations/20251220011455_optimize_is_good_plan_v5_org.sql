@@ -81,9 +81,9 @@ $$;
 
 ALTER FUNCTION public.is_good_plan_v5_org(uuid) OWNER TO "postgres";
 
-GRANT ALL ON FUNCTION public.is_good_plan_v5_org(uuid) TO "anon";
-GRANT ALL ON FUNCTION public.is_good_plan_v5_org(uuid) TO "authenticated";
-GRANT ALL ON FUNCTION public.is_good_plan_v5_org(uuid) TO "service_role";
+GRANT ALL ON FUNCTION public.is_good_plan_v5_org(uuid) TO anon;
+GRANT ALL ON FUNCTION public.is_good_plan_v5_org(uuid) TO authenticated;
+GRANT ALL ON FUNCTION public.is_good_plan_v5_org(uuid) TO service_role;
 
 -- Step 3: Optimize get_current_plan_max_org (eliminates 3 nested subqueries)
 DROP FUNCTION IF EXISTS public.get_current_plan_max_org(uuid);
@@ -107,9 +107,9 @@ $$;
 
 ALTER FUNCTION public.get_current_plan_max_org(uuid) OWNER TO "postgres";
 
-GRANT ALL ON FUNCTION public.get_current_plan_max_org(uuid) TO "anon";
-GRANT ALL ON FUNCTION public.get_current_plan_max_org(uuid) TO "authenticated";
-GRANT ALL ON FUNCTION public.get_current_plan_max_org(uuid) TO "service_role";
+GRANT ALL ON FUNCTION public.get_current_plan_max_org(uuid) TO anon;
+GRANT ALL ON FUNCTION public.get_current_plan_max_org(uuid) TO authenticated;
+GRANT ALL ON FUNCTION public.get_current_plan_max_org(uuid) TO service_role;
 
 -- Step 4: Optimize get_plan_usage_percent_detailed (1-arg version)
 -- Problem: Calls get_current_plan_max_org + get_total_metrics separately
@@ -181,12 +181,18 @@ $$;
 
 ALTER FUNCTION public.get_plan_usage_percent_detailed(uuid) OWNER TO "postgres";
 
-GRANT ALL ON FUNCTION public.get_plan_usage_percent_detailed(uuid) TO "anon";
-GRANT ALL ON FUNCTION public.get_plan_usage_percent_detailed(uuid) TO "authenticated";
-GRANT ALL ON FUNCTION public.get_plan_usage_percent_detailed(uuid) TO "service_role";
+GRANT ALL ON FUNCTION public.get_plan_usage_percent_detailed(uuid) TO anon;
+GRANT ALL ON FUNCTION public.get_plan_usage_percent_detailed(
+    uuid
+) TO authenticated;
+GRANT ALL ON FUNCTION public.get_plan_usage_percent_detailed(
+    uuid
+) TO service_role;
 
 -- Step 5: Optimize get_plan_usage_percent_detailed (3-arg version with cycle dates)
-DROP FUNCTION IF EXISTS public.get_plan_usage_percent_detailed(uuid, date, date);
+DROP FUNCTION IF EXISTS public.get_plan_usage_percent_detailed(
+    uuid, date, date
+);
 
 CREATE FUNCTION public.get_plan_usage_percent_detailed(
     orgid uuid,
@@ -238,11 +244,19 @@ BEGIN
 END;
 $$;
 
-ALTER FUNCTION public.get_plan_usage_percent_detailed(uuid, date, date) OWNER TO "postgres";
+ALTER FUNCTION public.get_plan_usage_percent_detailed(
+    uuid, date, date
+) OWNER TO "postgres";
 
-GRANT ALL ON FUNCTION public.get_plan_usage_percent_detailed(uuid, date, date) TO "anon";
-GRANT ALL ON FUNCTION public.get_plan_usage_percent_detailed(uuid, date, date) TO "authenticated";
-GRANT ALL ON FUNCTION public.get_plan_usage_percent_detailed(uuid, date, date) TO "service_role";
+GRANT ALL ON FUNCTION public.get_plan_usage_percent_detailed(
+    uuid, date, date
+) TO anon;
+GRANT ALL ON FUNCTION public.get_plan_usage_percent_detailed(
+    uuid, date, date
+) TO authenticated;
+GRANT ALL ON FUNCTION public.get_plan_usage_percent_detailed(
+    uuid, date, date
+) TO service_role;
 
 -- Step 6: Optimize get_total_metrics (3-arg version)
 -- Problem: Aggregates from get_app_metrics which returns per-app per-day data, then sums
@@ -334,9 +348,13 @@ $$;
 
 ALTER FUNCTION public.get_total_metrics(uuid, date, date) OWNER TO "postgres";
 
-GRANT ALL ON FUNCTION public.get_total_metrics(uuid, date, date) TO "anon";
-GRANT ALL ON FUNCTION public.get_total_metrics(uuid, date, date) TO "authenticated";
-GRANT ALL ON FUNCTION public.get_total_metrics(uuid, date, date) TO "service_role";
+GRANT ALL ON FUNCTION public.get_total_metrics(uuid, date, date) TO anon;
+GRANT ALL ON FUNCTION public.get_total_metrics(
+    uuid, date, date
+) TO authenticated;
+GRANT ALL ON FUNCTION public.get_total_metrics(
+    uuid, date, date
+) TO service_role;
 
 -- Step 7: Optimize get_total_metrics (1-arg version)
 -- Problem: Calls get_cycle_info_org with nested subqueries
@@ -381,9 +399,9 @@ $$;
 
 ALTER FUNCTION public.get_total_metrics(uuid) OWNER TO "postgres";
 
-GRANT ALL ON FUNCTION public.get_total_metrics(uuid) TO "anon";
-GRANT ALL ON FUNCTION public.get_total_metrics(uuid) TO "authenticated";
-GRANT ALL ON FUNCTION public.get_total_metrics(uuid) TO "service_role";
+GRANT ALL ON FUNCTION public.get_total_metrics(uuid) TO anon;
+GRANT ALL ON FUNCTION public.get_total_metrics(uuid) TO authenticated;
+GRANT ALL ON FUNCTION public.get_total_metrics(uuid) TO service_role;
 
 -- Step 8: Optimize get_orgs_v6(userid uuid)
 -- Problem: Calls 7+ functions per row (is_paying_org, is_trial_org, is_allowed_action_org, etc.)
@@ -498,6 +516,6 @@ $$;
 
 ALTER FUNCTION public.get_orgs_v6(uuid) OWNER TO "postgres";
 
-GRANT ALL ON FUNCTION public.get_orgs_v6(uuid) TO "anon";
-GRANT ALL ON FUNCTION public.get_orgs_v6(uuid) TO "authenticated";
-GRANT ALL ON FUNCTION public.get_orgs_v6(uuid) TO "service_role";
+GRANT ALL ON FUNCTION public.get_orgs_v6(uuid) TO anon;
+GRANT ALL ON FUNCTION public.get_orgs_v6(uuid) TO authenticated;
+GRANT ALL ON FUNCTION public.get_orgs_v6(uuid) TO service_role;

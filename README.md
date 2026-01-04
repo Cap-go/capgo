@@ -1,3 +1,5 @@
+# Console to manage and distribute your live update
+
 <p align='center'>
   <img src='https://raw.githubusercontent.com/Cap-go/capgo/main/assets/capgo_banner.png' alt='Capgo - Instant updates for capacitor'/>
 </p>
@@ -45,12 +47,21 @@
 - ⚔️ **Battle-Tested**: Used in more than 3000 projects.
 - 📊 View your deployment statistics
 - 🔋 Supports Android and iOS
-- ⚡️ Capacitor 6/7 support
+- ⚡️ Capacitor 8/7/6/5 support
 - 🌐 **Open Source**: Licensed under GNU AFFERO GENERAL PUBLIC LICENSE
 - 🌐 **Open Source Backend**: Self install
   [our backend](https://github.com/Cap-go/capgo) in your infra
 
 <br>
+
+## Usage
+
+Capgo is deployed to production on Cloudflare workers and Supabase.
+
+Cloudflare workers take 99% of the traffic. Supabase is used for internal calls,
+for internal tasks such as CRON jobs that call functions.
+
+When self-hosted, installing only Supabase is sufficient.
 
 ## Documentation
 
@@ -151,14 +162,6 @@ All the following official plugins are already installed and pre-configured:
     IDE support for Windi CSS
   - [ESLint](https://marketplace.visualstudio.com/items?itemName=dbaeumer.vscode-eslint)
 
-## Usage
-
-Capgo is deployed to production on Cloudflare workers and Supabase.
-
-Cloudflare workers take 99% of the traffic. Supabase is used for internal calls,
-for internal tasks such as CRON jobs that call functions.
-
-When self-hosted, installing only Supabase is sufficient.
 
 ### Deploy on Cloudflare Pages
 
@@ -268,6 +271,12 @@ supabase db reset
 
 To deploy the supabase instance in self-hosted, use the
 [Supabase official guide](https://supabase.com/docs/guides/self-hosting).
+
+Before deploying, duplicate `supabase/functions/.env.example` to
+`supabase/functions/.env`, replace the placeholder values with your
+self-hosted credentials, and keep the file local (it is gitignored). Use that
+file for commands such as
+`supabase secrets set --env-file supabase/functions/.env`.
 
 ### Deploy Supabase cloud
 

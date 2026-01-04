@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
-import { BASE_URL, getBaseData, getSupabaseClient, PLAN_ORG_ID, PLAN_STRIPE_CUSTOMER_ID, postUpdate, PRODUCT_ID, resetAndSeedAppData, resetAndSeedAppDataStats, resetAppData, resetAppDataStats, TEST_EMAIL, USER_ID } from './test-utils.ts'
+import { BASE_URL, fetchWithRetry, getBaseData, getSupabaseClient, PLAN_ORG_ID, PLAN_STRIPE_CUSTOMER_ID, postUpdate, PRODUCT_ID, resetAndSeedAppData, resetAndSeedAppDataStats, resetAppData, resetAppDataStats, TEST_EMAIL, USER_ID } from './test-utils.ts'
 
 const id = randomUUID()
 const APPNAME = `com.cp.${id}`
@@ -115,7 +115,7 @@ afterAll(async () => {
 // caching and/or database transaction boundaries.
 describe.skip('[POST] /triggers/cron_stat_org', () => {
   it('should return 400 when orgId is missing', async () => {
-    const response = await fetch(`${BASE_URL}/triggers/cron_stat_org`, {
+    const response = await fetchWithRetry(`${BASE_URL}/triggers/cron_stat_org`, {
       method: 'POST',
       headers,
       body: JSON.stringify({}),
@@ -151,7 +151,7 @@ describe.skip('[POST] /triggers/cron_stat_org', () => {
     if (error)
       throw error
 
-    const response = await fetch(`${BASE_URL}/triggers/cron_stat_org`, {
+    const response = await fetchWithRetry(`${BASE_URL}/triggers/cron_stat_org`, {
       method: 'POST',
       headers,
       body: JSON.stringify({ orgId: PLAN_ORG_ID }),
@@ -243,7 +243,7 @@ describe.skip('[POST] /triggers/cron_stat_org', () => {
     if (error)
       throw error
 
-    const response = await fetch(`${BASE_URL}/triggers/cron_stat_org`, {
+    const response = await fetchWithRetry(`${BASE_URL}/triggers/cron_stat_org`, {
       method: 'POST',
       headers,
       body: JSON.stringify({ orgId: PLAN_ORG_ID }),
@@ -320,7 +320,7 @@ describe.skip('[POST] /triggers/cron_stat_org', () => {
     if (error)
       throw error
 
-    const response = await fetch(`${BASE_URL}/triggers/cron_stat_org`, {
+    const response = await fetchWithRetry(`${BASE_URL}/triggers/cron_stat_org`, {
       method: 'POST',
       headers,
       body: JSON.stringify({ orgId: PLAN_ORG_ID }),
@@ -391,7 +391,7 @@ describe.skip('[POST] /triggers/cron_stat_org', () => {
     expect(setMauError).toBeFalsy()
 
     // Run cron plan to set exceeded status
-    const response = await fetch(`${BASE_URL}/triggers/cron_stat_org`, {
+    const response = await fetchWithRetry(`${BASE_URL}/triggers/cron_stat_org`, {
       method: 'POST',
       headers,
       body: JSON.stringify({ orgId: PLAN_ORG_ID }),
@@ -420,7 +420,7 @@ describe.skip('[POST] /triggers/cron_stat_org', () => {
     expect(appMetricsCacheError).toBeFalsy()
 
     // Run cron plan again
-    const response2 = await fetch(`${BASE_URL}/triggers/cron_stat_org`, {
+    const response2 = await fetchWithRetry(`${BASE_URL}/triggers/cron_stat_org`, {
       method: 'POST',
       headers,
       body: JSON.stringify({ orgId: PLAN_ORG_ID }),
@@ -445,7 +445,7 @@ describe.skip('[POST] /triggers/cron_stat_org', () => {
     expect(setStorageError).toBeFalsy()
 
     // Run cron plan to set exceeded status
-    const response = await fetch(`${BASE_URL}/triggers/cron_stat_org`, {
+    const response = await fetchWithRetry(`${BASE_URL}/triggers/cron_stat_org`, {
       method: 'POST',
       headers,
       body: JSON.stringify({ orgId: PLAN_ORG_ID }),
@@ -473,7 +473,7 @@ describe.skip('[POST] /triggers/cron_stat_org', () => {
     expect(storageCacheError).toBeFalsy()
 
     // Run cron plan again
-    const response2 = await fetch(`${BASE_URL}/triggers/cron_stat_org`, {
+    const response2 = await fetchWithRetry(`${BASE_URL}/triggers/cron_stat_org`, {
       method: 'POST',
       headers,
       body: JSON.stringify({ orgId: PLAN_ORG_ID }),
@@ -507,7 +507,7 @@ describe.skip('[POST] /triggers/cron_stat_org', () => {
     expect(setBandwidthError).toBeFalsy()
 
     // Run cron plan to set exceeded status
-    const response = await fetch(`${BASE_URL}/triggers/cron_stat_org`, {
+    const response = await fetchWithRetry(`${BASE_URL}/triggers/cron_stat_org`, {
       method: 'POST',
       headers,
       body: JSON.stringify({ orgId: PLAN_ORG_ID }),
@@ -536,7 +536,7 @@ describe.skip('[POST] /triggers/cron_stat_org', () => {
     expect(appMetricsCacheError).toBeFalsy()
 
     // Run cron plan again
-    const response2 = await fetch(`${BASE_URL}/triggers/cron_stat_org`, {
+    const response2 = await fetchWithRetry(`${BASE_URL}/triggers/cron_stat_org`, {
       method: 'POST',
       headers,
       body: JSON.stringify({ orgId: PLAN_ORG_ID }),
@@ -589,7 +589,7 @@ describe.skip('[POST] /triggers/cron_stat_org', () => {
   //   expect(deletedApp).toBeTruthy()
 
   //   // Wait for the trigger to process by calling cron_plan
-  //   const response = await fetch(`${BASE_URL}/triggers/cron_stat_org`, {
+  //   const response = await fetchWithRetry(`${BASE_URL}/triggers/cron_stat_org`, {
   //     method: 'POST',
   //     headers,
   //     body: JSON.stringify({ orgId: PLAN_ORG_ID }),

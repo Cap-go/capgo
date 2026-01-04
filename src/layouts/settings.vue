@@ -6,6 +6,7 @@ import { computed, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import IconBilling from '~icons/mingcute/bill-fill'
+import FailedCard from '~/components/FailedCard.vue'
 import Tabs from '~/components/Tabs.vue'
 import { accountTabs } from '~/constants/accountTabs'
 import { organizationTabs as baseOrgTabs } from '~/constants/organizationTabs'
@@ -17,6 +18,19 @@ const { t } = useI18n()
 const organizationStore = useOrganizationStore()
 const router = useRouter()
 const route = useRoute()
+
+// Check if user needs to setup 2FA or update password for organization access
+const needsSecurityCompliance = computed(() => {
+  const org = organizationStore.currentOrganization
+  const needs2FA = org?.enforcing_2fa === true && org?.['2fa_has_access'] === false
+  const needsPassword = org?.password_policy_config?.enabled && org?.password_has_access === false
+  return needs2FA || needsPassword
+})
+
+// Only block organization settings, not account settings (user needs access to account to fix the issue)
+const shouldBlockContent = computed(() => {
+  return needsSecurityCompliance.value && route.path.startsWith('/settings/organization')
+})
 
 // keep Tab icon typing (including ShallowRef) instead of Vue's UnwrapRef narrowing
 const organizationTabs = ref<Tab[]>([...baseOrgTabs]) as Ref<Tab[]>
@@ -65,6 +79,22 @@ watchEffect(() => {
     const credits = baseOrgTabs.find(t => t.key === '/settings/organization/credits')
     if (credits)
       newTabs.push({ ...credits })
+  }
+
+  // Add audit logs if super_admin
+  const needsAuditLogs = organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['super_admin'])
+  if (needsAuditLogs) {
+    const auditLogs = baseOrgTabs.find(t => t.key === '/settings/organization/audit-logs')
+    if (auditLogs)
+      newTabs.push({ ...auditLogs })
+  }
+
+  // Add security if super_admin
+  const needsSecurity = organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['super_admin'])
+  if (needsSecurity) {
+    const security = baseOrgTabs.find(t => t.key === '/settings/organization/security')
+    if (security)
+      newTabs.push({ ...security })
   }
 
   // Add billing if super_admin and not native platform
@@ -128,7 +158,7 @@ function handleSecondary(val: string) {
     <Tabs
       :tabs="settingsTabs"
       :active-tab="activePrimary"
-      :secondary-tabs="secondaryTabs"
+      :secondary-tabs="shouldBlockContent ? [] : secondaryTabs"
       :secondary-active-tab="activeSecondary"
       no-wrap
       @update:active-tab="handlePrimary"
@@ -136,7 +166,9 @@ function handleSecondary(val: string) {
     />
     <main class="flex flex-1 w-full min-h-0 mt-0 overflow-hidden bg-blue-50 dark:bg-slate-800/40">
       <div class="flex-1 w-full min-h-0 px-0 pt-0 mx-auto mb-8 overflow-y-auto sm:px-6 md:pt-16 lg:px-8 max-w-9xl">
-        <RouterView class="w-full" />
+        <!-- Show FailedCard instead of normal content when security compliance is required -->
+        <FailedCard v-if="shouldBlockContent" />
+        <RouterView v-else class="w-full" />
       </div>
     </main>
   </div>

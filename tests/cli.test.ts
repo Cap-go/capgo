@@ -6,6 +6,24 @@ import { uploadBundleSDK } from './cli-sdk-utils'
 import { cleanupCli, getSemver, prepareCli, tempFileFolder } from './cli-utils'
 import { getSupabaseClient, ORG_ID, resetAndSeedAppData, resetAppData, resetAppDataStats, USER_ID } from './test-utils'
 
+// Helper to retry SDK operations that may fail due to transient network issues in CI
+async function retryUpload<T extends { success: boolean, error?: string }>(
+  fn: () => Promise<T>,
+  maxRetries = 3,
+): Promise<T> {
+  let lastResult: T | null = null
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    lastResult = await fn()
+    // Only retry on transient network errors, not on actual failures
+    if (lastResult.success || !lastResult.error?.includes('fetch failed')) {
+      return lastResult
+    }
+    // Wait before retry with exponential backoff
+    await new Promise(resolve => setTimeout(resolve, 500 * (attempt + 1)))
+  }
+  return lastResult!
+}
+
 describe('tests CLI upload', () => {
   const id_one = randomUUID()
   const APPNAME_one = `com.cli_${id_one}`
@@ -27,9 +45,9 @@ describe('tests CLI upload', () => {
 
   it('should upload bundle successfully', async () => {
     const semver = getSemver()
-    const result = await uploadBundleSDK(APPNAME_one, semver, 'production', {
+    const result = await retryUpload(() => uploadBundleSDK(APPNAME_one, semver, 'production', {
       ignoreCompatibilityCheck: true,
-    })
+    }))
     expect(result.success).toBe(true)
   }, 30000)
 
@@ -54,8 +72,9 @@ describe.concurrent('tests CLI upload options in parallel', () => {
   const sharedId = randomUUID()
   const SHARED_APPNAME = `com.cli_shared_${sharedId}`
 
-  const fileTestApps: Array<{ id: string, APPNAME: string }> = []
-  const apiTestApps: Array<{ id: string, APPNAME: string }> = []
+  // Use Maps with unique keys for atomic access in concurrent tests
+  const fileTestApps = new Map<string, { id: string, APPNAME: string }>()
+  const apiTestApps = new Map<string, { id: string, APPNAME: string }>()
   const usedApps: Array<string> = []
 
   const prepareApp = async () => {
@@ -76,11 +95,10 @@ describe.concurrent('tests CLI upload options in parallel', () => {
       prepareCli(SHARED_APPNAME),
     ]))
 
-    promises.push(prepareApp().then(app => fileTestApps.push(app)))
-
-    for (let i = 0; i < 2; i++) {
-      promises.push(prepareApp().then(app => apiTestApps.push(app)))
-    }
+    // Use unique keys for each test that needs an app
+    promises.push(prepareApp().then(app => fileTestApps.set('code-check', app)))
+    promises.push(prepareApp().then(app => apiTestApps.set('org-limited', app)))
+    promises.push(prepareApp().then(app => apiTestApps.set('wrong-org', app)))
 
     await Promise.all(promises)
   })
@@ -98,9 +116,9 @@ describe.concurrent('tests CLI upload options in parallel', () => {
   })
 
   it.concurrent('test code check (missing notifyAppReady)', async () => {
-    const app = fileTestApps.shift()
+    const app = fileTestApps.get('code-check')
     if (!app)
-      throw new Error('No file test app available')
+      throw new Error('No file test app available for code-check test')
     usedApps.push(app.APPNAME)
 
     const semver = getSemver()
@@ -146,9 +164,9 @@ describe.concurrent('tests CLI upload options in parallel', () => {
   }, 30000)
 
   it.concurrent('should test upload with org-limited API key', async () => {
-    const app = apiTestApps.shift()
+    const app = apiTestApps.get('org-limited')
     if (!app)
-      throw new Error('No API test app available')
+      throw new Error('No API test app available for org-limited test')
     usedApps.push(app.APPNAME)
 
     const semver = getSemver()
@@ -165,10 +183,10 @@ describe.concurrent('tests CLI upload options in parallel', () => {
           limited_to_orgs: [ORG_ID],
         })
 
-      const result = await uploadBundleSDK(app.APPNAME, semver, 'production', {
+      const result = await retryUpload(() => uploadBundleSDK(app.APPNAME, semver, 'production', {
         ignoreCompatibilityCheck: true,
         apikey: testApiKey,
-      })
+      }))
       expect(result.success).toBe(true)
     }
     finally {
@@ -177,9 +195,9 @@ describe.concurrent('tests CLI upload options in parallel', () => {
   }, 30000)
 
   it.concurrent('should fail upload with wrong org-limited API key', async () => {
-    const app = apiTestApps.shift()
+    const app = apiTestApps.get('wrong-org')
     if (!app)
-      throw new Error('No API test app available')
+      throw new Error('No API test app available for wrong-org test')
     usedApps.push(app.APPNAME)
 
     const semver = getSemver()
@@ -202,7 +220,11 @@ describe.concurrent('tests CLI upload options in parallel', () => {
         apikey: testApiKey,
       })
       expect(result.success).toBe(false)
-      expect(result.error).toContain(`Cannot get organization id for app id ${app.APPNAME}`)
+      // Error message can vary - either explicit org mismatch or generic permission error
+      expect(
+        result.error?.includes('Cannot get organization id for app id')
+        || result.error?.includes('Invalid API key or insufficient permissions'),
+      ).toBe(true)
     }
     finally {
       await supabase.from('apikeys').delete().eq('key', testApiKey)

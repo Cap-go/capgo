@@ -9,7 +9,7 @@ let testOrgId: string
 beforeAll(async () => {
   await resetAndSeedAppData(APPNAME)
 
-  // Create test organization
+  // Create test organization (without a customer_id)
   const { data: orgData, error: orgError } = await getSupabaseClient().from('orgs').insert({
     id: randomUUID(),
     name: `Test Private Error Org ${id}`,
@@ -20,6 +20,15 @@ beforeAll(async () => {
   if (orgError)
     throw orgError
   testOrgId = orgData.id
+
+  // Add test user as super_admin to the org
+  const { error: orgUserError } = await getSupabaseClient().from('org_users').insert({
+    org_id: testOrgId,
+    user_id: USER_ID,
+    user_right: 'super_admin' as const,
+  })
+  if (orgUserError)
+    throw orgUserError
 })
 
 afterAll(async () => {
@@ -332,20 +341,20 @@ describe('[POST] /private/set_org_email - Error Cases', () => {
     expect(data.error).toBe('invalid_json_parse_body')
   })
 
-  // it('should return 400 when org does not have customer', async () => {
-  //   const response = await fetch(`${BASE_URL}/private/set_org_email`, {
-  //     method: 'POST',
-  //     headers,
-  //     body: JSON.stringify({
-  //       org_id: testOrgId,
-  //       email: 'test@example.com',
-  //     }),
-  //   })
+  it('should return 400 when org does not have customer', async () => {
+    const response = await fetch(`${BASE_URL}/private/set_org_email`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        org_id: testOrgId,
+        email: 'test@example.com',
+      }),
+    })
 
-  //   expect(response.status).toBe(400)
-  //   const data = await response.json() as { error: string }
-  //   expect(data.error).toBe('org_does_not_have_customer')
-  // })
+    expect(response.status).toBe(400)
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('org_does_not_have_customer')
+  })
 
   it('should return 403 when not authorized for org', async () => {
     const response = await fetch(`${BASE_URL}/private/set_org_email`, {

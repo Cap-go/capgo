@@ -56,11 +56,13 @@ SELECT
             SELECT id
             FROM
                 orgs
+            WHERE
+                created_by = tests.get_supabase_uid('test_user')
             LIMIT
                 1
         ),
         '046a36ac-e03c-4590-9257-bd6c9dba9ee8',
-        'test get supabase_uid - org created by test_admin'
+        'test get supabase_uid - org created by test_user'
     );
 
 SELECT tests.clear_authentication();
@@ -149,13 +151,15 @@ SELECT
 SELECT tests.clear_authentication();
 
 -- -- Test 3: Check if the function updates the user_right correctly and returns 'OK' when given a valid invite
-SELECT tests.authenticate_as('test_admin');
+-- Use service_role to bypass RLS for the UPDATE
+SELECT tests.authenticate_as_service_role();
 
 UPDATE org_users
 SET
     user_right = 'invite_admin'
 WHERE
-    user_id = tests.get_supabase_uid('test_user');
+    user_id = tests.get_supabase_uid('test_user')
+    AND org_id = '22dbad8a-b885-4309-9b3b-a09f8460fb6d';
 
 SELECT tests.clear_authentication();
 
@@ -167,6 +171,11 @@ SELECT
         'OK',
         'accept_invitation_to_org test - valid input'
     );
+
+SELECT tests.clear_authentication();
+
+-- Use service_role to bypass RLS for verification
+SELECT tests.authenticate_as_service_role();
 
 SELECT
     is(

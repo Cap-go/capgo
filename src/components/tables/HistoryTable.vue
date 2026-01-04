@@ -23,15 +23,22 @@ interface DeployHistory {
     created_at: string
     deleted?: boolean
   }
+  channel?: {
+    id: number
+    name: string
+  }
   created_by: string
   user: {
     uid: string
     email: string
   } | null
+  // For bundle history: distinguish between assigned and removed events
+  event_type?: 'assigned' | 'removed'
 }
 
 const props = defineProps<{
-  channelId: number
+  channelId?: number
+  bundleId?: number
   appId: string
 }>()
 
@@ -53,8 +60,15 @@ const pageSize = ref(10)
 const total = ref(0)
 const currentVersionId = ref<number | null>(null)
 
-// Fetch current channel's version_id
+// Fetch current channel's version_id (only relevant for channel mode)
 async function fetchCurrentVersion() {
+  // Skip if in bundle mode
+  if (props.bundleId)
+    return
+
+  if (!props.channelId)
+    return
+
   try {
     const { data, error } = await supabase
       .from('channels')
@@ -79,49 +93,95 @@ function isCurrentVersion(item: DeployHistory): boolean {
   return item.version_id === currentVersionId.value
 }
 
-const columns = computed<TableColumn[]>(() => [
-  {
-    label: t('bundle-number'),
-    key: 'version.name',
-    mobile: true,
-    sortable: true,
-    displayFunction: item => item.version.name,
-    onClick: (item: DeployHistory) => openOneVersion(item),
-  },
-  {
-    label: t('deploy-date'),
-    key: 'deployed_at',
-    mobile: true,
-    sortable: true,
-    displayFunction: item => formatDate(item.deployed_at),
-  },
-  {
-    label: t('deployed-by'),
-    key: 'created_by',
-    mobile: false,
-    displayFunction: item => item.user?.email || '-',
-  },
-  {
-    label: t('action'),
-    key: 'rollback',
-    mobile: true,
-    class: 'text-center',
-    displayFunction: (item) => {
-      if (item.version?.deleted) {
-        return t('bundle-deleted')
-      }
-      return isCurrentVersion(item) ? t('current') : t('rollback')
+// Check if we're in bundle mode (showing deployment history for a specific bundle)
+const isBundleMode = computed(() => !!props.bundleId)
+
+function openOneChannel(item: DeployHistory) {
+  if (item.channel?.id) {
+    router.push(`/app/${props.appId}/channel/${item.channel.id}`)
+  }
+}
+
+const columns = computed<TableColumn[]>(() => {
+  // Bundle mode: show channel name instead of bundle name, and no rollback
+  if (isBundleMode.value) {
+    return [
+      {
+        label: t('channel'),
+        key: 'channel.name',
+        mobile: true,
+        sortable: false,
+        displayFunction: item => item.channel?.name || '-',
+        onClick: (item: DeployHistory) => openOneChannel(item),
+      },
+      {
+        label: t('event'),
+        key: 'event_type',
+        mobile: true,
+        sortable: false,
+        displayFunction: item => item.event_type === 'removed' ? t('removed') : t('assigned'),
+      },
+      {
+        label: t('date'),
+        key: 'deployed_at',
+        mobile: true,
+        sortable: true,
+        displayFunction: item => formatDate(item.deployed_at),
+      },
+      {
+        label: t('by'),
+        key: 'created_by',
+        mobile: false,
+        displayFunction: item => item.user?.email || '-',
+      },
+    ]
+  }
+
+  // Channel mode: show bundle name and rollback action
+  return [
+    {
+      label: t('bundle-number'),
+      key: 'version.name',
+      mobile: true,
+      sortable: true,
+      displayFunction: item => item.version.name,
+      onClick: (item: DeployHistory) => openOneVersion(item),
     },
-    onClick: (item) => {
-      if (!isCurrentVersion(item) && !item.version?.deleted) {
-        handleRollback(item)
-      }
-      else {
-        toast.error(t('cannot-rollback-to-current-version'))
-      }
+    {
+      label: t('deploy-date'),
+      key: 'deployed_at',
+      mobile: true,
+      sortable: true,
+      displayFunction: item => formatDate(item.deployed_at),
     },
-  },
-])
+    {
+      label: t('deployed-by'),
+      key: 'created_by',
+      mobile: false,
+      displayFunction: item => item.user?.email || '-',
+    },
+    {
+      label: t('action'),
+      key: 'rollback',
+      mobile: true,
+      class: 'text-center',
+      displayFunction: (item) => {
+        if (item.version?.deleted) {
+          return t('bundle-deleted')
+        }
+        return isCurrentVersion(item) ? t('current') : t('rollback')
+      },
+      onClick: (item) => {
+        if (!isCurrentVersion(item) && !item.version?.deleted) {
+          handleRollback(item)
+        }
+        else {
+          toast.error(t('cannot-rollback-to-current-version'))
+        }
+      },
+    },
+  ]
+})
 
 async function openOneVersion(item: DeployHistory) {
   router.push(`/app/${props.appId}/bundle/${item.version_id}`)
@@ -134,51 +194,14 @@ async function fetchDeployHistory() {
     await fetchCurrentVersion()
     members.value = await organizationStore.getMembers()
 
-    // Using "deploy_history" as a string rather than a type reference
-    let query = supabase
-      .from('deploy_history')
-      .select(`
-        *,
-        version:version_id (
-          id,
-          name,
-          app_id,
-          created_at,
-          deleted
-        )
-      `, { count: 'exact' })
-      .eq('channel_id', props.channelId)
-      .eq('app_id', props.appId)
-      .order(Object.keys(sort.value)[0], { ascending: Object.values(sort.value)[0] === 'asc' })
-
-    // Apply search filter on version name if search value exists
-    if (search.value) {
-      query = query.like('version.name', `%${search.value}%`)
+    if (isBundleMode.value) {
+      // Bundle mode: fetch both assignments and removals
+      await fetchBundleHistory()
     }
-
-    const { data, error, count } = await query
-      .range((page.value - 1) * pageSize.value, page.value * pageSize.value - 1)
-
-    if (error) {
-      console.error('Error fetching deploy history:', error)
-      toast.error(t('error-fetching-deploy-history'))
-      return
+    else {
+      // Channel mode: only fetch assignments from deploy_history
+      await fetchChannelHistory()
     }
-    // filter out data with no version name
-    const filteredData = data.filter((item) => {
-      return item?.version !== null
-    }) as unknown as DeployHistory[]
-
-    deployHistory.value = filteredData
-    for (const item of deployHistory.value) {
-      const member = members.value.find(m => m.uid === item.created_by)
-      if (member) {
-        item.user = member
-      }
-    }
-    console.log('Deploy History:', deployHistory.value)
-
-    total.value = count ?? 0
   }
   catch (error) {
     console.error('Error fetching deploy history:', error)
@@ -189,7 +212,208 @@ async function fetchDeployHistory() {
   }
 }
 
+async function fetchChannelHistory() {
+  const selectFields = `
+    *,
+    version:version_id (
+      id,
+      name,
+      app_id,
+      created_at,
+      deleted
+    )
+  `
+
+  let query = supabase
+    .from('deploy_history')
+    .select(selectFields, { count: 'exact' })
+    .eq('app_id', props.appId)
+    .order(Object.keys(sort.value)[0], { ascending: Object.values(sort.value)[0] === 'asc' })
+
+  if (props.channelId) {
+    query = query.eq('channel_id', props.channelId)
+  }
+
+  if (search.value) {
+    query = query.like('version.name', `%${search.value}%`)
+  }
+
+  const { data, error, count } = await query
+    .range((page.value - 1) * pageSize.value, page.value * pageSize.value - 1)
+
+  if (error) {
+    console.error('Error fetching deploy history:', error)
+    toast.error(t('error-fetching-deploy-history'))
+    return
+  }
+
+  const rows = (data ?? []) as unknown as DeployHistory[]
+  const filteredData = rows.filter(item => item?.version !== null)
+
+  deployHistory.value = filteredData
+  for (const item of deployHistory.value) {
+    item.event_type = 'assigned'
+    const member = members.value.find(m => m.uid === item.created_by)
+    if (member) {
+      item.user = member
+    }
+  }
+
+  total.value = count ?? 0
+}
+
+async function fetchBundleHistory() {
+  // In bundle mode, we need to fetch both:
+  // 1. Assignments from deploy_history (when this bundle was assigned to channels)
+  // 2. Removals from audit_logs (when this bundle was replaced by another bundle)
+
+  const bundleId = props.bundleId!
+
+  // Fetch assignments from deploy_history
+  const assignmentSelectFields = `
+    *,
+    version:version_id (
+      id,
+      name,
+      app_id,
+      created_at,
+      deleted
+    ),
+    channel:channel_id (
+      id,
+      name
+    )
+  `
+
+  const { data: assignmentData, error: assignmentError } = await supabase
+    .from('deploy_history')
+    .select(assignmentSelectFields)
+    .eq('app_id', props.appId)
+    .eq('version_id', bundleId)
+
+  if (assignmentError) {
+    console.error('Error fetching deploy history:', assignmentError)
+    toast.error(t('error-fetching-deploy-history'))
+    return
+  }
+
+  // Fetch removals from audit_logs
+  // When a channel's version changes FROM this bundle TO another bundle, that's a removal
+  const { data: auditData, error: auditError } = await supabase
+    .from('audit_logs')
+    .select('*')
+    .eq('table_name', 'channels')
+    .eq('operation', 'UPDATE')
+    .contains('changed_fields', ['version'])
+
+  if (auditError) {
+    console.error('Error fetching audit logs:', auditError)
+    // Don't fail completely, just show assignments
+  }
+
+  // Process assignments
+  const assignments: DeployHistory[] = ((assignmentData ?? []) as unknown as DeployHistory[])
+    .filter(item => item?.channel != null)
+    .map((item) => {
+      const member = members.value.find(m => m.uid === item.created_by)
+      return {
+        ...item,
+        event_type: 'assigned' as const,
+        user: member || null,
+      }
+    })
+
+  // Process removals from audit_logs
+  const removals: DeployHistory[] = []
+  if (auditData) {
+    // We need to fetch channel names for the removals
+    const channelIds = new Set<number>()
+
+    for (const audit of auditData) {
+      const oldRecord = audit.old_record as Record<string, unknown> | null
+      if (oldRecord && oldRecord.version === bundleId && oldRecord.app_id === props.appId) {
+        channelIds.add(Number(audit.record_id))
+      }
+    }
+
+    // Fetch channel names
+    const channelMap = new Map<number, { id: number, name: string }>()
+    if (channelIds.size > 0) {
+      const { data: channelsData } = await supabase
+        .from('channels')
+        .select('id, name')
+        .in('id', Array.from(channelIds))
+
+      if (channelsData) {
+        for (const ch of channelsData) {
+          channelMap.set(ch.id, { id: ch.id, name: ch.name })
+        }
+      }
+    }
+
+    // Build removal entries
+    for (const audit of auditData) {
+      const oldRecord = audit.old_record as Record<string, unknown> | null
+      if (oldRecord && oldRecord.version === bundleId && oldRecord.app_id === props.appId) {
+        const channelId = Number(audit.record_id)
+        const channel = channelMap.get(channelId)
+        const member = members.value.find(m => m.uid === audit.user_id)
+
+        // Apply search filter if present
+        if (search.value && channel) {
+          if (!channel.name.toLowerCase().includes(search.value.toLowerCase())) {
+            continue
+          }
+        }
+
+        removals.push({
+          id: Number(audit.id),
+          version_id: bundleId,
+          app_id: props.appId,
+          channel_id: channelId,
+          deployed_at: audit.created_at,
+          version: {
+            id: bundleId,
+            name: '',
+            app_id: props.appId,
+            created_at: '',
+          },
+          channel: channel || { id: channelId, name: `Channel #${channelId}` },
+          created_by: audit.user_id || '',
+          user: member || null,
+          event_type: 'removed' as const,
+        })
+      }
+    }
+  }
+
+  // Merge and sort by date
+  const allHistory = [...assignments, ...removals]
+  const sortDir = Object.values(sort.value)[0]
+
+  allHistory.sort((a, b) => {
+    const aDate = new Date(a.deployed_at).getTime()
+    const bDate = new Date(b.deployed_at).getTime()
+    return sortDir === 'asc' ? aDate - bDate : bDate - aDate
+  })
+
+  // Apply pagination
+  const startIdx = (page.value - 1) * pageSize.value
+  const endIdx = startIdx + pageSize.value
+
+  deployHistory.value = allHistory.slice(startIdx, endIdx)
+  total.value = allHistory.length
+}
+
 async function handleRollback(item: DeployHistory) {
+  if (isBundleMode.value)
+    return
+
+  if (!props.channelId)
+    return
+
+  const channelId = props.channelId
+
   const role = await organizationStore.getCurrentRoleForApp(props.appId)
   if (!organizationStore.hasPermissionsInRole(role, ['admin', 'super_admin', 'write'])) {
     toast.error(t('no-permission'))
@@ -213,7 +437,7 @@ async function handleRollback(item: DeployHistory) {
             const { error } = await supabase
               .from('channels')
               .update({ version: item.version_id })
-              .eq('id', props.channelId)
+              .eq('id', channelId)
 
             if (error) {
               console.error('Error rolling back version:', error)
@@ -240,7 +464,7 @@ async function handleRollback(item: DeployHistory) {
   await dialogStore.onDialogDismiss()
 }
 
-watch([() => props.channelId, () => props.appId], () => {
+watch([() => props.channelId, () => props.bundleId, () => props.appId], () => {
   fetchDeployHistory()
 })
 </script>
