@@ -2,6 +2,7 @@ import type { Context } from 'hono'
 import type { AuthInfo } from './hono.ts'
 import type { Database } from './supabase.types.ts'
 import { and, eq, inArray, isNull, or, sql } from 'drizzle-orm'
+import { hashApiKey } from './hash.ts'
 import { honoFactory, quickError } from './hono.ts'
 import { cloudlog } from './logging.ts'
 import { closeClient, getDrizzleClient, getPgClient, logPgError } from './pg.ts'
@@ -45,12 +46,19 @@ async function checkKeyPg(
   drizzleClient: ReturnType<typeof getDrizzleClient>,
 ): Promise<Database['public']['Tables']['apikeys']['Row'] | null> {
   try {
+    // Compute hash upfront so we can check both plain-text and hashed keys in one query
+    const keyHash = await hashApiKey(keyString)
+
+    // Single query: match by plain-text key OR hashed key
     // Expiration check is done in SQL: expires_at IS NULL OR expires_at > now()
     const result = await drizzleClient
       .select()
       .from(schema.apikeys)
       .where(and(
-        eq(schema.apikeys.key, keyString),
+        or(
+          eq(schema.apikeys.key, keyString),
+          eq(schema.apikeys.key_hash, keyHash),
+        ),
         inArray(schema.apikeys.mode, rights),
         notExpiredCondition,
       ))
@@ -58,6 +66,7 @@ async function checkKeyPg(
       .then(data => data[0])
 
     if (!result) {
+      cloudlog({ requestId: _c.get('requestId'), message: 'Invalid apikey (pg)', keyStringPrefix: keyString?.substring(0, 8), rights })
       return null
     }
 

@@ -1149,6 +1149,7 @@ export async function checkKey(c: Context, authorization: string | undefined, su
 
     // If not found, try hashed lookup
     // Also check expiration for hashed keys
+    // We do it in two steps to prevent sql injection via string interpolation like .or(`key.eq.${authorization},key_hash.eq.${keyHash}`)
     const keyHash = await hashApiKey(authorization)
     const { data: hashedKey, error: hashError } = await supabase
       .from('apikeys')
