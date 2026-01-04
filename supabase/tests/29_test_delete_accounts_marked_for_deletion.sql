@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(41);
+SELECT plan(47);
 
 -- Test helper function to create test users in both auth.users and public.users tables
 CREATE OR REPLACE FUNCTION create_test_user_for_deletion(
@@ -1008,6 +1008,205 @@ WHERE
 DELETE FROM auth.users
 WHERE
     id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'::UUID;
+
+-- Test 10: Audit logs ownership transfer during user deletion
+-- Create two users for audit log test
+SELECT
+    create_test_user_for_deletion(
+        'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'::UUID,
+        'audit_admin1@test.com'
+    );
+
+SELECT
+    create_test_user_for_deletion(
+        'cccccccc-cccc-cccc-cccc-cccccccccccc'::UUID,
+        'audit_admin2@test.com'
+    );
+
+-- Create an org for audit log test
+INSERT INTO
+public.orgs (
+    id,
+    created_by,
+    created_at,
+    updated_at,
+    name,
+    management_email
+)
+VALUES
+(
+    'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'::UUID,
+    'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'::UUID,
+    now(),
+    now(),
+    'Audit Log Test Org',
+    'audit_admin1@test.com'
+);
+
+-- Add both users as super_admins
+INSERT INTO
+public.org_users (org_id, user_id, user_right)
+VALUES
+(
+    'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'::UUID,
+    'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'::UUID,
+    'super_admin'::public.USER_MIN_RIGHT
+),
+(
+    'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'::UUID,
+    'cccccccc-cccc-cccc-cccc-cccccccccccc'::UUID,
+    'super_admin'::public.USER_MIN_RIGHT
+);
+
+-- Manually insert audit log entries for admin1
+-- (Normally these would be created by triggers, but we insert directly for testing)
+INSERT INTO
+public.audit_logs (
+    table_name, record_id, operation, user_id, org_id, old_record, new_record
+)
+VALUES
+(
+    'apps',
+    'com.audit.test',
+    'INSERT',
+    'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'::UUID,
+    'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'::UUID,
+    NULL,
+    '{"app_id": "com.audit.test"}'::JSONB
+),
+(
+    'channels',
+    '3001',
+    'UPDATE',
+    'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'::UUID,
+    'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'::UUID,
+    '{"name": "old_channel"}'::JSONB,
+    '{"name": "new_channel"}'::JSONB
+);
+
+-- Count audit logs before deletion (includes trigger-created entries from org/org_users inserts)
+-- We need to track the count before and compare after
+SELECT
+    ok(
+        (
+            SELECT count(*)
+            FROM
+                public.audit_logs
+            WHERE
+                user_id = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'::UUID
+                AND org_id = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'::UUID
+        ) >= 2,
+        'At least two audit log entries exist for admin1 before deletion'
+    );
+
+-- Mark admin1 for deletion
+INSERT INTO
+public.to_delete_accounts (account_id, removal_date, removed_data)
+VALUES
+(
+    'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'::UUID,
+    now() - INTERVAL '1 day',
+    '{"email": "audit_admin1@test.com", "apikeys": []}'::JSONB
+);
+
+-- Run deletion
+SELECT
+    ok(
+        (
+            WITH
+            deletion_results AS (
+                SELECT *
+                FROM
+                    delete_accounts_marked_for_deletion()
+                LIMIT
+                    1
+            )
+
+            SELECT deleted_count
+            FROM
+                deletion_results
+        ) = 1,
+        'User with audit logs deleted successfully'
+    );
+
+-- Verify user is deleted
+SELECT
+    ok(
+        NOT EXISTS (
+            SELECT 1
+            FROM
+                public.users
+            WHERE
+                id = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'::UUID
+        ),
+        'Admin1 removed from public.users'
+    );
+
+-- Verify audit logs still exist (not deleted) - should have at least 2 entries
+-- Note: triggers may have created additional entries when creating the org/org_users
+SELECT
+    ok(
+        (
+            SELECT count(*)
+            FROM
+                public.audit_logs
+            WHERE
+                org_id = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'::UUID
+        ) >= 2,
+        'Audit log entries still exist after user deletion'
+    );
+
+-- Verify audit logs that were owned by admin1 are now owned by admin2
+-- The key test is that entries originally created by admin1 are transferred
+SELECT
+    ok(
+        (
+            SELECT count(*)
+            FROM
+                public.audit_logs
+            WHERE
+                user_id = 'cccccccc-cccc-cccc-cccc-cccccccccccc'::UUID
+                AND org_id = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'::UUID
+                AND table_name IN ('apps', 'channels')
+                AND record_id IN ('com.audit.test', '3001')
+        ) = 2,
+        'Audit log entries ownership transferred to remaining super_admin'
+    );
+
+-- Verify no audit logs owned by admin1 remain (they should have been transferred)
+SELECT
+    ok(
+        NOT EXISTS (
+            SELECT 1
+            FROM
+                public.audit_logs
+            WHERE
+                org_id = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'::UUID
+                AND user_id = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'::UUID
+        ),
+        'No audit log entries remain owned by deleted user'
+    );
+
+-- Clean up audit log test
+DELETE FROM public.audit_logs
+WHERE
+    org_id = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'::UUID;
+
+DELETE FROM public.org_users
+WHERE
+    org_id = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'::UUID;
+
+DELETE FROM public.orgs
+WHERE
+    id = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'::UUID;
+
+DELETE FROM public.users
+WHERE
+    id = 'cccccccc-cccc-cccc-cccc-cccccccccccc'::UUID;
+
+DELETE FROM auth.users
+WHERE
+    id = 'cccccccc-cccc-cccc-cccc-cccccccccccc'::UUID;
 
 -- Clean up test helper function before permission tests
 DROP FUNCTION create_test_user_for_deletion(UUID, TEXT);

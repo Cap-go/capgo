@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
+import { createClient } from '@supabase/supabase-js'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { BASE_URL, headers, resetAndSeedAppData, resetAppData } from './test-utils.ts'
+import { BASE_URL, getSupabaseClient, headers, resetAndSeedAppData, resetAppData } from './test-utils.ts'
 
 const id = randomUUID()
 const APPNAME = `com.app.key.${id}`
@@ -306,5 +307,334 @@ describe('[DELETE] /apikey/:id operations', () => {
     expect(response.status).toBe(404)
     const data = await response.json() as { error: string }
     expect(data).toHaveProperty('error')
+  })
+})
+
+describe('[POST] /apikey hashed key operations', () => {
+  it('create hashed api key', async () => {
+    const keyName = 'test-hashed-key'
+    const response = await fetch(`${BASE_URL}/apikey`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        name: keyName,
+        hashed: true,
+      }),
+    })
+    const data = await response.json<{ key: string, key_hash: string, id: number }>()
+    expect(response.status).toBe(200)
+    expect(data).toHaveProperty('key')
+    expect(data).toHaveProperty('key_hash')
+    expect(data).toHaveProperty('id')
+    expect(typeof data.key).toBe('string')
+    expect(typeof data.key_hash).toBe('string')
+    // The key should be a UUID format
+    expect(data.key).toMatch(/^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i)
+    // The key_hash should be a SHA-256 hex string (64 characters)
+    expect(data.key_hash).toMatch(/^[\da-f]{64}$/i)
+
+    // Verify the created key exists but key column in DB should be null
+    const verifyResponse = await fetch(`${BASE_URL}/apikey/${data.id}`, { headers })
+    const verifyData = await verifyResponse.json() as { name: string, key: string | null, key_hash: string }
+    expect(verifyData.name).toBe(keyName)
+    // In the database, the key should be null for hashed keys
+    expect(verifyData.key).toBeNull()
+    expect(verifyData.key_hash).toBe(data.key_hash)
+
+    // Cleanup
+    await fetch(`${BASE_URL}/apikey/${data.id}`, {
+      method: 'DELETE',
+      headers,
+    })
+  })
+
+  it('create plain api key (hashed: false)', async () => {
+    const keyName = 'test-plain-key-explicit'
+    const response = await fetch(`${BASE_URL}/apikey`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        name: keyName,
+        hashed: false,
+      }),
+    })
+    const data = await response.json<{ key: string, key_hash: string | null, id: number }>()
+    expect(response.status).toBe(200)
+    expect(data).toHaveProperty('key')
+    expect(typeof data.key).toBe('string')
+    // Plain key should not have key_hash set
+    expect(data.key_hash).toBeNull()
+
+    // Verify the key is stored in plain
+    const verifyResponse = await fetch(`${BASE_URL}/apikey/${data.id}`, { headers })
+    const verifyData = await verifyResponse.json() as { key: string, key_hash: string | null }
+    expect(verifyData.key).toBe(data.key)
+    expect(verifyData.key_hash).toBeNull()
+
+    // Cleanup
+    await fetch(`${BASE_URL}/apikey/${data.id}`, {
+      method: 'DELETE',
+      headers,
+    })
+  })
+
+  it('create hashed api key with mode and limitations', async () => {
+    const response = await fetch(`${BASE_URL}/apikey`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        name: 'hashed-key-with-options',
+        hashed: true,
+        mode: 'read',
+      }),
+    })
+    const data = await response.json<{ key: string, key_hash: string, id: number, mode: string }>()
+    expect(response.status).toBe(200)
+    expect(data).toHaveProperty('key')
+    expect(data).toHaveProperty('key_hash')
+    expect(data.mode).toBe('read')
+
+    // Cleanup
+    await fetch(`${BASE_URL}/apikey/${data.id}`, {
+      method: 'DELETE',
+      headers,
+    })
+  })
+
+  it('hashed key can be used for authentication', async () => {
+    // Create a hashed key
+    const createResponse = await fetch(`${BASE_URL}/apikey`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        name: 'hashed-key-for-auth-test',
+        hashed: true,
+      }),
+    })
+    const createData = await createResponse.json<{ key: string, id: number }>()
+    expect(createResponse.status).toBe(200)
+
+    // Use the plain key value to authenticate (the system should hash it and find the key)
+    const authHeaders = {
+      'Content-Type': 'application/json',
+      'Authorization': createData.key,
+    }
+
+    // Try to list API keys using the hashed key for auth
+    const listResponse = await fetch(`${BASE_URL}/apikey`, {
+      method: 'GET',
+      headers: authHeaders,
+    })
+    expect(listResponse.status).toBe(200)
+    const listData = await listResponse.json()
+    expect(Array.isArray(listData)).toBe(true)
+
+    // Cleanup - use original headers since new key might have restrictions
+    await fetch(`${BASE_URL}/apikey/${createData.id}`, {
+      method: 'DELETE',
+      headers,
+    })
+  })
+})
+
+describe('[POST] /apikey hashed key with expiration', () => {
+  it('create hashed api key with expiration date', async () => {
+    const futureDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 days from now
+    const response = await fetch(`${BASE_URL}/apikey`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        name: 'hashed-key-with-expiration',
+        hashed: true,
+        expires_at: futureDate,
+      }),
+    })
+    const data = await response.json<{ key: string, key_hash: string, id: number, expires_at: string }>()
+    expect(response.status).toBe(200)
+    expect(data).toHaveProperty('key')
+    expect(data).toHaveProperty('key_hash')
+    expect(data).toHaveProperty('expires_at')
+    // Key should be UUID format
+    expect(data.key).toMatch(/^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i)
+    // key_hash should be SHA-256 hex (64 chars)
+    expect(data.key_hash).toMatch(/^[\da-f]{64}$/i)
+    // expires_at should match what we sent
+    expect(new Date(data.expires_at).getTime()).toBeCloseTo(new Date(futureDate).getTime(), -3)
+
+    // Verify in DB: key should be null, key_hash and expires_at should be set
+    const verifyResponse = await fetch(`${BASE_URL}/apikey/${data.id}`, { headers })
+    const verifyData = await verifyResponse.json() as { key: string | null, key_hash: string, expires_at: string }
+    expect(verifyData.key).toBeNull()
+    expect(verifyData.key_hash).toBe(data.key_hash)
+    expect(verifyData.expires_at).not.toBeNull()
+
+    // Cleanup
+    await fetch(`${BASE_URL}/apikey/${data.id}`, {
+      method: 'DELETE',
+      headers,
+    })
+  })
+
+  it('hashed key with expiration can be used for authentication', async () => {
+    const futureDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+    const createResponse = await fetch(`${BASE_URL}/apikey`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        name: 'hashed-key-expiration-auth-test',
+        hashed: true,
+        expires_at: futureDate,
+      }),
+    })
+    const createData = await createResponse.json<{ key: string, id: number }>()
+    expect(createResponse.status).toBe(200)
+
+    // Use the plain key value to authenticate
+    const authHeaders = {
+      'Content-Type': 'application/json',
+      'Authorization': createData.key,
+    }
+
+    const listResponse = await fetch(`${BASE_URL}/apikey`, {
+      method: 'GET',
+      headers: authHeaders,
+    })
+    expect(listResponse.status).toBe(200)
+    const listData = await listResponse.json()
+    expect(Array.isArray(listData)).toBe(true)
+
+    // Cleanup
+    await fetch(`${BASE_URL}/apikey/${createData.id}`, {
+      method: 'DELETE',
+      headers,
+    })
+  })
+
+  it('expired hashed key should be rejected for authentication', async () => {
+    // Create a hashed key with future expiration
+    const createResponse = await fetch(`${BASE_URL}/apikey`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        name: 'hashed-key-to-expire',
+        hashed: true,
+        expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      }),
+    })
+    const createData = await createResponse.json<{ key: string, id: number }>()
+    expect(createResponse.status).toBe(200)
+
+    // Manually set the key to expired via direct DB update
+    const { error } = await getSupabaseClient().from('apikeys')
+      .update({ expires_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString() })
+      .eq('id', createData.id)
+    expect(error).toBeNull()
+
+    // Try to use the expired hashed key for authentication
+    const authHeaders = {
+      'Content-Type': 'application/json',
+      'Authorization': createData.key,
+    }
+
+    const listResponse = await fetch(`${BASE_URL}/apikey`, {
+      method: 'GET',
+      headers: authHeaders,
+    })
+    // Should be rejected as unauthorized
+    expect(listResponse.status).toBe(401)
+  })
+})
+
+describe('[RLS] hashed API key with direct Supabase SDK', () => {
+  it('hashed key works with RLS via Supabase SDK (simulating CLI usage)', async () => {
+    // Create a hashed key via API
+    const createResponse = await fetch(`${BASE_URL}/apikey`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        name: 'hashed-key-rls-test',
+        hashed: true,
+      }),
+    })
+    const createData = await createResponse.json<{ key: string, id: number }>()
+    expect(createResponse.status).toBe(200)
+
+    // Now use the hashed key directly with Supabase SDK (bypassing our API)
+    // This simulates how the CLI uses the SDK with capgkey header
+    const supabaseWithHashedKey = createClient(
+      process.env.SUPABASE_URL!,
+      process.env.SUPABASE_ANON_KEY!,
+      {
+        global: {
+          headers: {
+            capgkey: createData.key, // The plain key that user received
+          },
+        },
+      },
+    )
+
+    // Try to query apps table - this goes through RLS which uses get_identity()
+    const { data: apps, error: appsError } = await supabaseWithHashedKey
+      .from('apps')
+      .select('app_id, name')
+      .limit(5)
+
+    expect(appsError).toBeNull()
+    expect(Array.isArray(apps)).toBe(true)
+
+    // Also test calling an RPC that uses get_identity
+    const { data: orgs, error: orgsError } = await supabaseWithHashedKey
+      .rpc('get_orgs_v7')
+
+    expect(orgsError).toBeNull()
+    expect(Array.isArray(orgs)).toBe(true)
+
+    // Cleanup
+    await fetch(`${BASE_URL}/apikey/${createData.id}`, {
+      method: 'DELETE',
+      headers,
+    })
+  })
+
+  it('plain key still works with RLS via Supabase SDK', async () => {
+    // Create a plain (non-hashed) key via API
+    const createResponse = await fetch(`${BASE_URL}/apikey`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        name: 'plain-key-rls-test',
+        hashed: false,
+      }),
+    })
+    const createData = await createResponse.json<{ key: string, id: number }>()
+    expect(createResponse.status).toBe(200)
+
+    // Use plain key with Supabase SDK
+    const supabaseWithPlainKey = createClient(
+      process.env.SUPABASE_URL!,
+      process.env.SUPABASE_ANON_KEY!,
+      {
+        global: {
+          headers: {
+            capgkey: createData.key,
+          },
+        },
+      },
+    )
+
+    // Try to query apps table
+    const { data: apps, error: appsError } = await supabaseWithPlainKey
+      .from('apps')
+      .select('app_id, name')
+      .limit(5)
+
+    expect(appsError).toBeNull()
+    expect(Array.isArray(apps)).toBe(true)
+
+    // Cleanup
+    await fetch(`${BASE_URL}/apikey/${createData.id}`, {
+      method: 'DELETE',
+      headers,
+    })
   })
 })

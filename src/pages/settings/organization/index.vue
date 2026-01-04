@@ -132,10 +132,12 @@ async function saveChanges(form: { orgName: string, email: string }) {
   currentOrganization.value.management_email = form.email
   isLoading.value = true
 
-  // Update name only
+  // Update name
   const { error } = await supabase
     .from('orgs')
-    .update({ name: form.orgName })
+    .update({
+      name: form.orgName,
+    })
     .eq('id', gid)
 
   if (error) {
@@ -279,6 +281,7 @@ async function copyOrganizationId() {
               </div>
             </div>
           </div>
+
           <footer class="mt-auto">
             <div class="flex flex-col px-2 py-5 border-t md:px-6 border-slate-300">
               <div class="flex self-end">

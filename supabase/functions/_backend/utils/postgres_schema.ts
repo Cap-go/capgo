@@ -43,7 +43,7 @@ export const app_versions = pgTable('app_versions', {
   external_url: varchar('external_url'),
   checksum: varchar('checksum'),
   session_key: varchar('session_key'),
-  key_id: varchar('key_id', { length: 4 }),
+  key_id: varchar('key_id', { length: 20 }),
   storage_provider: text('storage_provider').default('r2').notNull(),
   min_update_version: varchar('min_update_version'),
   r2_path: varchar('r2_path'),
@@ -76,7 +76,9 @@ export const channels = pgTable('channels', {
   android: boolean('android').notNull().default(true),
   allow_device_self_set: boolean('allow_device_self_set').default(false).notNull(),
   allow_emulator: boolean('allow_emulator').notNull().default(true),
+  allow_device: boolean('allow_device').notNull().default(true),
   allow_dev: boolean('allow_dev').notNull().default(true),
+  allow_prod: boolean('allow_prod').notNull().default(true),
 })
 
 export const channel_devices = pgTable('channel_devices', {
@@ -96,6 +98,8 @@ export const orgs = pgTable('orgs', {
   name: text('name').notNull(),
   management_email: text('management_email').notNull(),
   customer_id: text('customer_id'),
+  require_apikey_expiration: boolean('require_apikey_expiration').notNull().default(false),
+  max_apikey_expiration_days: integer('max_apikey_expiration_days'),
 })
 
 export const stripe_info = pgTable('stripe_info', {
@@ -113,12 +117,14 @@ export const apikeys = pgTable('apikeys', {
   id: bigint('id', { mode: 'number' }).primaryKey().notNull(),
   created_at: timestamp('created_at').defaultNow(),
   user_id: uuid('user_id').notNull(),
-  key: varchar('key').notNull(),
+  key: varchar('key'),
+  key_hash: varchar('key_hash'),
   mode: keyModePgEnum('mode').notNull(),
   updated_at: timestamp('updated_at').defaultNow(),
   name: varchar('name').notNull(),
   limited_to_orgs: uuid('limited_to_orgs').array(),
   limited_to_apps: varchar('limited_to_apps').array(),
+  expires_at: timestamp('expires_at', { withTimezone: true }),
 })
 
 export const org_users = pgTable('org_users', {

@@ -87,6 +87,18 @@ type UserModule = (ctx: { app: typeof app, router: Router }) => void
 Object.values(import.meta.glob<{ install: UserModule }>('./modules/*.ts', { eager: true }))
   .forEach(i => i.install?.({ app, router }))
 
-router.isReady().then(() => {
+router.isReady().then(async () => {
   app.mount('#app')
+
+  // Wait for vue-sonner component to be mounted
+  setTimeout(async () => {
+    const key = localStorage.getItem(CHUNK_RELOAD_KEY)
+    console.log('Checking for chunk reload toast...', key)
+    // Show toast if we just reloaded due to chunk error
+    if (key) {
+      localStorage.removeItem(CHUNK_RELOAD_KEY)
+      const { toast } = await import('vue-sonner')
+      toast.info('App updated! Page was refreshed to load the latest version.')
+    }
+  }, 500)
 })

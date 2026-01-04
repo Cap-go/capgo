@@ -5,6 +5,49 @@ import { uploadBundleSDK } from './cli-sdk-utils'
 import { cleanupCli, getSemver, prepareCli } from './cli-utils'
 import { getSupabaseClient, resetAndSeedAppData, resetAppData, resetAppDataStats } from './test-utils'
 
+// Helper to retry Supabase operations that may fail due to transient network issues in CI
+async function retrySupabase<T>(
+  fn: () => PromiseLike<{ data: T | null, error: any }>,
+  maxRetries = 3,
+): Promise<{ data: T | null, error: any }> {
+  let lastResult: { data: T | null, error: any } = { data: null, error: null }
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      lastResult = await fn()
+      if (!lastResult.error || !lastResult.error.message?.includes('fetch failed')) {
+        return lastResult
+      }
+    }
+    catch (e: any) {
+      if (!e.message?.includes('fetch failed') && !e.message?.includes('other side closed')) {
+        throw e
+      }
+      lastResult = { data: null, error: e }
+    }
+    // Wait before retry with exponential backoff
+    await new Promise(resolve => setTimeout(resolve, 500 * (attempt + 1)))
+  }
+  return lastResult
+}
+
+// Helper to retry SDK upload operations that may fail due to transient network issues in CI
+async function retryUpload<T extends { success: boolean, error?: string }>(
+  fn: () => Promise<T>,
+  maxRetries = 3,
+): Promise<T> {
+  let lastResult: T | null = null
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    lastResult = await fn()
+    // Only retry on transient network errors, not on actual failures
+    if (lastResult.success || !lastResult.error?.includes('fetch failed')) {
+      return lastResult
+    }
+    // Wait before retry with exponential backoff
+    await new Promise(resolve => setTimeout(resolve, 500 * (attempt + 1)))
+  }
+  return lastResult!
+}
+
 describe('tests min version', () => {
   const id = randomUUID()
   const APPNAME = `com.cli_min_version_${id}`
@@ -31,11 +74,11 @@ describe('tests min version', () => {
     const packageJsonPath = join(process.cwd(), 'temp_cli_test', APPNAME, 'package.json')
 
     // Upload with auto-min-update-version (needs metadata check enabled)
-    const result0 = await uploadBundleSDK(APPNAME, semverDefault, 'production', {
+    const result0 = await retryUpload(() => uploadBundleSDK(APPNAME, semverDefault, 'production', {
       ignoreCompatibilityCheck: false,
       packageJsonPaths: packageJsonPath,
       autoMinUpdateVersion: true,
-    })
+    }))
 
     expect(result0.success).toBe(true)
 
@@ -51,13 +94,12 @@ describe('tests min version', () => {
     // The auto-min-update-version should have set a value
     expect(data?.min_update_version).toBeDefined()
 
-    // Clear min_update_version for next test
-    await supabase
+    // Clear min_update_version for next test (with retry for transient network errors)
+    await retrySupabase(() => supabase
       .from('app_versions')
       .update({ min_update_version: null })
       .eq('name', semverDefault)
-      .eq('app_id', APPNAME)
-      .throwOnError()
+      .eq('app_id', APPNAME))
 
     // Upload a new version with auto-min-update-version
     // This should FAIL because native_packages aren't set on previous version

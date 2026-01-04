@@ -71,6 +71,41 @@ export const headersInternal = {
   'apisecret': API_SECRET,
 }
 
+/**
+ * Fetch with automatic retry for transient network failures.
+ * Useful for tests that may fail due to edge function cold starts or connection issues.
+ */
+export async function fetchWithRetry(
+  url: string,
+  options?: RequestInit,
+  maxRetries = 3,
+  delayMs = 500,
+): Promise<Response> {
+  let lastError: Error | null = null
+
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      const response = await fetch(url, options)
+      // Only retry on 503 (service unavailable) or network errors
+      if (response.status === 503 && attempt < maxRetries - 1) {
+        await new Promise(resolve => setTimeout(resolve, delayMs * (attempt + 1)))
+        continue
+      }
+      return response
+    }
+    catch (error) {
+      lastError = error as Error
+      // Retry on network errors (fetch failed, socket closed, etc.)
+      if (attempt < maxRetries - 1) {
+        await new Promise(resolve => setTimeout(resolve, delayMs * (attempt + 1)))
+        continue
+      }
+    }
+  }
+
+  throw lastError || new Error(`Failed after ${maxRetries} retries`)
+}
+
 // Cache for prepared apps to avoid repeated seeding
 const seededApps = new Map<string, Set<string>>()
 const seedPromises = new Map<string, Promise<void>>()

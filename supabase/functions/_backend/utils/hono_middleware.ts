@@ -1,12 +1,14 @@
 import type { Context } from 'hono'
 import type { AuthInfo } from './hono.ts'
 import type { Database } from './supabase.types.ts'
-import { and, eq, inArray } from 'drizzle-orm'
+import { and, eq, inArray, isNull, or, sql } from 'drizzle-orm'
+import { hashApiKey } from './hash.ts'
 import { honoFactory, quickError } from './hono.ts'
 import { cloudlog } from './logging.ts'
 import { closeClient, getDrizzleClient, getPgClient, logPgError } from './pg.ts'
 import * as schema from './postgres_schema.ts'
 import { checkKey, checkKeyById, supabaseAdmin, supabaseClient } from './supabase.ts'
+import { isSafeAlphanumeric } from './utils.ts'
 
 // TODO: make universal middleware who
 //  Accept authorization header (JWT)
@@ -27,26 +29,51 @@ function isUUID(str: string) {
 }
 
 /**
+ * SQL condition for non-expired API keys: expires_at IS NULL OR expires_at > now()
+ */
+const notExpiredCondition = or(
+  isNull(schema.apikeys.expires_at),
+  sql`${schema.apikeys.expires_at} > now()`,
+)
+
+/**
  * Check API key using Postgres/Drizzle instead of Supabase SDK
+ * Expiration is checked directly in SQL query - no JS check needed
  */
 async function checkKeyPg(
-  c: Context,
+  _c: Context,
   keyString: string,
   rights: Database['public']['Enums']['key_mode'][],
   drizzleClient: ReturnType<typeof getDrizzleClient>,
 ): Promise<Database['public']['Tables']['apikeys']['Row'] | null> {
+  // Validate API key contains only safe characters (alphanumeric + dashes)
+  if (!isSafeAlphanumeric(keyString)) {
+    cloudlog({ requestId: _c.get('requestId'), message: 'Invalid apikey format (pg)', keyStringPrefix: keyString?.substring(0, 8) })
+    return null
+  }
+
   try {
+    // Compute hash upfront so we can check both plain-text and hashed keys in one query
+    const keyHash = await hashApiKey(keyString)
+
+    // Single query: match by plain-text key OR hashed key
+    // Expiration check is done in SQL: expires_at IS NULL OR expires_at > now()
     const result = await drizzleClient
       .select()
       .from(schema.apikeys)
       .where(and(
-        eq(schema.apikeys.key, keyString),
+        or(
+          eq(schema.apikeys.key, keyString),
+          eq(schema.apikeys.key_hash, keyHash),
+        ),
         inArray(schema.apikeys.mode, rights),
+        notExpiredCondition,
       ))
       .limit(1)
       .then(data => data[0])
 
     if (!result) {
+      cloudlog({ requestId: _c.get('requestId'), message: 'Invalid apikey (pg)', keyStringPrefix: keyString?.substring(0, 8), rights })
       return null
     }
 
@@ -61,30 +88,34 @@ async function checkKeyPg(
       name: result.name,
       limited_to_orgs: result.limited_to_orgs || [],
       limited_to_apps: result.limited_to_apps || [],
+      expires_at: result.expires_at?.toISOString() || null,
     } as Database['public']['Tables']['apikeys']['Row']
   }
   catch (e: unknown) {
-    logPgError(c, 'checkKeyPg', e)
+    logPgError(_c, 'checkKeyPg', e)
     return null
   }
 }
 
 /**
  * Check API key by ID using Postgres/Drizzle instead of Supabase SDK
+ * Expiration is checked directly in SQL query - no JS check needed
  */
 async function checkKeyByIdPg(
-  c: Context,
+  _c: Context,
   id: number,
   rights: Database['public']['Enums']['key_mode'][],
   drizzleClient: ReturnType<typeof getDrizzleClient>,
 ): Promise<Database['public']['Tables']['apikeys']['Row'] | null> {
   try {
+    // Expiration check is done in SQL: expires_at IS NULL OR expires_at > now()
     const result = await drizzleClient
       .select()
       .from(schema.apikeys)
       .where(and(
         eq(schema.apikeys.id, id),
         inArray(schema.apikeys.mode, rights),
+        notExpiredCondition,
       ))
       .limit(1)
       .then(data => data[0])
@@ -104,10 +135,11 @@ async function checkKeyByIdPg(
       name: result.name,
       limited_to_orgs: result.limited_to_orgs || [],
       limited_to_apps: result.limited_to_apps || [],
+      expires_at: result.expires_at?.toISOString() || null,
     } as Database['public']['Tables']['apikeys']['Row']
   }
   catch (e: unknown) {
-    logPgError(c, 'checkKeyByIdPg', e)
+    logPgError(_c, 'checkKeyByIdPg', e)
     return null
   }
 }
@@ -127,6 +159,9 @@ async function foundAPIKey(c: Context, capgkeyString: string, rights: Database['
     apikey,
   } as AuthInfo)
   c.set('apikey', apikey)
+  // Store the original key string for hashed key authentication
+  // This is needed because hashed keys have key=null in the database
+  c.set('capgkey', capgkeyString)
   if (subkey_id) {
     cloudlog({ requestId: c.get('requestId'), message: 'Subkey id provided', subkey_id })
     const subkey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKeyById(c, subkey_id, supabaseAdmin(c), rights)

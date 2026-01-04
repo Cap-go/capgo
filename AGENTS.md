@@ -41,3 +41,22 @@
 - Cover customer-facing flows with the Playwright MCP suite. Add scenarios under
   `playwright/e2e` and run them locally with `bun run test:front` before
   shipping UI changes.
+
+## Database replication
+
+Our main database is hosted on Supabase. We use custom replice hosted in Planet
+scale
+
+We have 5 read replicas for our main database to ensure high availability and
+low latency for read operations. These replicas are synchronized with the
+primary database using logical replication. We have one replicate by continent:
+
+- North America (Ohio)
+- Europe (Frankfurt)
+- Asia (Seoul)
+- Australia (Sydney)
+- South America (Sao Paulo) Applications are configured to read from the nearest
+  replica based on the user's
+
+This repartition is done by Cloudflare snippets
+cloudflare_workers/snippet/index.js

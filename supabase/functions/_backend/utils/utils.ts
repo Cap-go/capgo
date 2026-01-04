@@ -70,8 +70,8 @@ export const BROTLI_MIN_UPDATER_VERSION_V5 = '5.10.0'
 export const BROTLI_MIN_UPDATER_VERSION_V6 = '6.25.0'
 export const BROTLI_MIN_UPDATER_VERSION_V7 = '7.0.35'
 
-export function isDeprecatedPluginVersion(parsedPluginVersion: SemVer, minFive = '5.10.0', minSix = '6.25.0', minSeven = '7.25.0'): boolean {
-  // v5 is deprecated if < 5.10.0, v6 is deprecated if < 6.25.0, v7 is deprecated if < 7.25.0
+export function isDeprecatedPluginVersion(parsedPluginVersion: SemVer, minFive = '5.10.0', minSix = '6.25.0', minSeven = '7.25.0', minEight = '8.0.0'): boolean {
+  // v5 is deprecated if < 5.10.0, v6 is deprecated if < 6.25.0, v7 is deprecated if < 7.25.0, v8 is deprecated if < 8.0.0
   if (parsedPluginVersion.major === 5 && lessThan(parsedPluginVersion, parse(minFive))) {
     return true
   }
@@ -79,6 +79,9 @@ export function isDeprecatedPluginVersion(parsedPluginVersion: SemVer, minFive =
     return true
   }
   if (parsedPluginVersion.major === 7 && lessThan(parsedPluginVersion, parse(minSeven))) {
+    return true
+  }
+  if (parsedPluginVersion.major === 8 && lessThan(parsedPluginVersion, parse(minEight))) {
     return true
   }
   return false
@@ -103,6 +106,14 @@ export function isValidAppId(appId: string): boolean {
   if (!appId)
     return false
   return reverseDomainRegex.test(appId)
+}
+
+/**
+ * Validate that a string contains only safe characters (alphanumeric and dashes)
+ * This prevents SQL injection - dangerous chars are quotes, semicolons, parentheses, etc.
+ */
+export function isSafeAlphanumeric(value: string): boolean {
+  return /^[0-9a-z-]+$/i.test(value)
 }
 
 interface LimitedApp {

@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import Spinner from '~/components/Spinner.vue'
 
 const props = defineProps({
   title: {
@@ -56,45 +55,40 @@ function handleClick() {
 
 <template>
   <div
-    class="shadow-lg stat bg-base-200 rounded-box"
+    class="flex flex-col justify-between p-6 bg-white border rounded-lg shadow-lg border-slate-300 dark:bg-gray-800 dark:border-slate-900"
     :class="{ 'cursor-pointer hover:shadow-xl transition-shadow': clickable }"
     @click="handleClick"
   >
     <!-- Loading state -->
-    <div v-if="isLoading" class="flex items-center justify-center h-24">
-      <Spinner size="w-12 h-12" />
+    <div class="flex items-start justify-between">
+      <p class="text-sm text-slate-600 dark:text-slate-400">
+        {{ title }}
+      </p>
+
+      <div
+        v-if="showEvolution"
+        class="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full shadow-sm"
+        :class="{
+          'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-200': (evolution ?? 0) >= 0,
+          'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-200': (evolution ?? 0) < 0,
+        }"
+      >
+        {{ (evolution ?? 0) < 0 ? '' : '+' }}{{ (evolution ?? 0).toFixed(1) }}%
+      </div>
     </div>
 
-    <!-- Content -->
-    <template v-else>
-      <!-- Title -->
-      <div class="stat-title text-base-content/70">
-        {{ title }}
+    <div>
+      <div v-if="isLoading" class="my-2">
+        <span class="loading loading-spinner loading-lg" :class="[colorClass]" />
       </div>
 
-      <!-- Value and evolution -->
-      <div class="flex items-end gap-2">
-        <div class="stat-value" :class="colorClass">
-          {{ displayValue }}<span v-if="unit" class="text-2xl font-normal">{{ unit }}</span>
-        </div>
+      <p v-else class="mt-2 text-3xl font-bold" :class="colorClass">
+        {{ displayValue }}<span v-if="unit" class="text-2xl font-normal"> {{ unit }}</span>
+      </p>
 
-        <!-- Evolution badge -->
-        <div
-          v-if="showEvolution"
-          class="mb-2 badge"
-          :class="{
-            'badge-success': (evolution ?? 0) >= 0,
-            'badge-warning': (evolution ?? 0) < 0,
-          }"
-        >
-          {{ (evolution ?? 0) < 0 ? '' : '+' }}{{ (evolution ?? 0).toFixed(1) }}%
-        </div>
-      </div>
-
-      <!-- Subtitle -->
-      <div v-if="subtitle" class="stat-desc text-base-content/60">
+      <p v-if="subtitle" class="mt-1 text-xs text-slate-500 dark:text-slate-400">
         {{ subtitle }}
-      </div>
-    </template>
+      </p>
+    </div>
   </div>
 </template>

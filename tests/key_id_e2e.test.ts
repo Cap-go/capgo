@@ -69,7 +69,7 @@ describe('e2E: /updates endpoint with key_id', () => {
     expect(data?.key_id).toBe('MIIB')
   })
 
-  it('should reject key_id longer than 4 characters', async () => {
+  it('should reject key_id longer than 20 characters', async () => {
     const baseData = getBaseData(APP_NAME_KEY_ID)
 
     const response = await fetch(getEndpointUrl('/updates'), {
@@ -77,7 +77,7 @@ describe('e2E: /updates endpoint with key_id', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         ...baseData,
-        key_id: 'TOOLONG', // 7 characters
+        key_id: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', // 26 characters
       }),
     })
 
@@ -179,7 +179,7 @@ describe('e2E: /stats endpoint with key_id', () => {
     expect(data?.key_id).toBe('TEST')
   })
 
-  it('should reject key_id longer than 4 characters', async () => {
+  it('should reject key_id longer than 20 characters', async () => {
     const baseData = getBaseData(APP_NAME_KEY_ID)
 
     const response = await fetch(getEndpointUrl('/stats'), {
@@ -188,7 +188,7 @@ describe('e2E: /stats endpoint with key_id', () => {
       body: JSON.stringify({
         ...baseData,
         action: 'set',
-        key_id: 'WAYTOLONG',
+        key_id: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
       }),
     })
 
@@ -250,7 +250,7 @@ describe('e2E: /channel_self endpoint with key_id', () => {
     expect(data?.key_id).toBe('CHAN')
   })
 
-  it('should reject key_id longer than 4 characters in POST', async () => {
+  it('should reject key_id longer than 20 characters in POST', async () => {
     const baseData = getBaseData(APP_NAME_KEY_ID)
 
     const response = await fetch(getEndpointUrl('/channel_self'), {
@@ -258,7 +258,7 @@ describe('e2E: /channel_self endpoint with key_id', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         ...baseData,
-        key_id: 'INVALID',
+        key_id: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
       }),
     })
 

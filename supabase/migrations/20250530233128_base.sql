@@ -135,67 +135,69 @@ CREATE TYPE "public"."platform_os" AS ENUM('ios', 'android');
 
 ALTER TYPE "public"."platform_os" OWNER TO "postgres";
 
-CREATE TYPE "public"."stats_action" AS ENUM (
-    'delete',
-    'reset',
-    'set',
-    'get',
-    'set_fail',
-    'update_fail',
-    'download_fail',
-    'windows_path_fail',
-    'canonical_path_fail',
-    'directory_path_fail',
-    'unzip_fail',
-    'low_mem_fail',
-    'download_10',
-    'download_20',
-    'download_30',
-    'download_40',
-    'download_50',
-    'download_60',
-    'download_70',
-    'download_80',
-    'download_90',
-    'download_complete',
-    'decrypt_fail',
-    'app_moved_to_foreground',
-    'app_moved_to_background',
-    'uninstall',
-    'needPlanUpgrade',
-    'missingBundle',
-    'noNew',
-    'disablePlatformIos',
-    'disablePlatformAndroid',
-    'disableAutoUpdateToMajor',
-    'cannotUpdateViaPrivateChannel',
-    'disableAutoUpdateToMinor',
-    'disableAutoUpdateToPatch',
-    'channelMisconfigured',
-    'disableAutoUpdateMetadata',
-    'disableAutoUpdateUnderNative',
-    'disableDevBuild',
-    'disableEmulator',
-    'cannotGetBundle',
-    'checksum_fail',
-    'NoChannelOrOverride',
-    'setChannel',
-    'getChannel',
-    'rateLimited',
-    'disableAutoUpdate',
-    'keyMismatch',
-    'ping',
-    'InvalidIp',
-    'blocked_by_server_url',
-    'download_manifest_start',
-    'download_manifest_complete',
-    'download_zip_start',
-    'download_zip_complete',
-    'download_manifest_file_fail',
-    'download_manifest_checksum_fail',
-    'download_manifest_brotli_fail',
-    'backend_refusal',
-    'download_0'
+CREATE TYPE "public"."stats_action" AS ENUM(
+  'delete',
+  'reset',
+  'set',
+  'get',
+  'set_fail',
+  'update_fail',
+  'download_fail',
+  'windows_path_fail',
+  'canonical_path_fail',
+  'directory_path_fail',
+  'unzip_fail',
+  'low_mem_fail',
+  'download_10',
+  'download_20',
+  'download_30',
+  'download_40',
+  'download_50',
+  'download_60',
+  'download_70',
+  'download_80',
+  'download_90',
+  'download_complete',
+  'decrypt_fail',
+  'app_moved_to_foreground',
+  'app_moved_to_background',
+  'uninstall',
+  'needPlanUpgrade',
+  'missingBundle',
+  'noNew',
+  'disablePlatformIos',
+  'disablePlatformAndroid',
+  'disableAutoUpdateToMajor',
+  'cannotUpdateViaPrivateChannel',
+  'disableAutoUpdateToMinor',
+  'disableAutoUpdateToPatch',
+  'channelMisconfigured',
+  'disableAutoUpdateMetadata',
+  'disableAutoUpdateUnderNative',
+  'disableDevBuild',
+  'disableProdBuild',
+  'disableEmulator',
+  'disableDevice',
+  'cannotGetBundle',
+  'checksum_fail',
+  'NoChannelOrOverride',
+  'setChannel',
+  'getChannel',
+  'rateLimited',
+  'disableAutoUpdate',
+  'keyMismatch',
+  'ping',
+  'InvalidIp',
+  'blocked_by_server_url',
+  'download_manifest_start',
+  'download_manifest_complete',
+  'download_zip_start',
+  'download_zip_complete',
+  'download_manifest_file_fail',
+  'download_manifest_checksum_fail',
+  'download_manifest_brotli_fail',
+  'backend_refusal',
+  'download_0'
 );
 
 ALTER TYPE "public"."stats_action" OWNER TO "postgres";
@@ -247,7 +249,7 @@ SET
   search_path = '' SECURITY DEFINER AS $$
 Declare
  invite record;
-Begin
+BEGIN
   SELECT org_users.* FROM public.org_users
   INTO invite
   WHERE org_users.org_id=accept_invitation_to_org.org_id and (select auth.uid())=org_users.user_id;
@@ -265,7 +267,7 @@ Begin
 
     return 'OK';
   end if;
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."accept_invitation_to_org" ("org_id" "uuid") OWNER TO "postgres";
@@ -477,9 +479,9 @@ ALTER FUNCTION "public"."cleanup_queue_messages" () OWNER TO "postgres";
 CREATE OR REPLACE FUNCTION "public"."convert_bytes_to_gb" ("bytes_value" double precision) RETURNS double precision LANGUAGE "plpgsql"
 SET
   search_path = '' AS $$
-Begin
+BEGIN
   RETURN bytes_value / 1024.0 / 1024.0 / 1024.0;
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."convert_bytes_to_gb" ("bytes_value" double precision) OWNER TO "postgres";
@@ -487,9 +489,9 @@ ALTER FUNCTION "public"."convert_bytes_to_gb" ("bytes_value" double precision) O
 CREATE OR REPLACE FUNCTION "public"."convert_bytes_to_mb" ("bytes_value" double precision) RETURNS double precision LANGUAGE "plpgsql"
 SET
   search_path = '' AS $$
-Begin
+BEGIN
   RETURN bytes_value / 1024.0 / 1024.0;
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."convert_bytes_to_mb" ("bytes_value" double precision) OWNER TO "postgres";
@@ -497,9 +499,9 @@ ALTER FUNCTION "public"."convert_bytes_to_mb" ("bytes_value" double precision) O
 CREATE OR REPLACE FUNCTION "public"."convert_gb_to_bytes" ("gb" double precision) RETURNS double precision LANGUAGE "plpgsql"
 SET
   search_path = '' AS $$
-Begin
+BEGIN
   RETURN gb * 1024 * 1024 * 1024;
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."convert_gb_to_bytes" ("gb" double precision) OWNER TO "postgres";
@@ -507,9 +509,9 @@ ALTER FUNCTION "public"."convert_gb_to_bytes" ("gb" double precision) OWNER TO "
 CREATE OR REPLACE FUNCTION "public"."convert_mb_to_bytes" ("gb" double precision) RETURNS double precision LANGUAGE "plpgsql"
 SET
   search_path = '' AS $$
-Begin
+BEGIN
   RETURN gb * 1024 * 1024;
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."convert_mb_to_bytes" ("gb" double precision) OWNER TO "postgres";
@@ -560,9 +562,9 @@ ALTER FUNCTION "public"."count_active_users" ("app_ids" character varying[]) OWN
 CREATE OR REPLACE FUNCTION "public"."count_all_need_upgrade" () RETURNS integer LANGUAGE "plpgsql"
 SET
   search_path = '' AS $$
-Begin
+BEGIN
   RETURN (SELECT COUNT(*) FROM public.stripe_info WHERE is_good_plan = false AND status = 'succeeded');
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."count_all_need_upgrade" () OWNER TO "postgres";
@@ -570,9 +572,9 @@ ALTER FUNCTION "public"."count_all_need_upgrade" () OWNER TO "postgres";
 CREATE OR REPLACE FUNCTION "public"."count_all_onboarded" () RETURNS integer LANGUAGE "plpgsql"
 SET
   search_path = '' AS $$
-Begin
+BEGIN
   RETURN (SELECT COUNT(DISTINCT owner_org) FROM public.apps);
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."count_all_onboarded" () OWNER TO "postgres";
@@ -677,11 +679,11 @@ ALTER FUNCTION "public"."delete_user" () OWNER TO "postgres";
 CREATE OR REPLACE FUNCTION "public"."exist_app_v2" ("appid" character varying) RETURNS boolean LANGUAGE "plpgsql"
 SET
   search_path = '' SECURITY DEFINER AS $$
-Begin
+BEGIN
   RETURN (SELECT EXISTS (SELECT 1
   FROM public.apps
   WHERE app_id=appid));
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."exist_app_v2" ("appid" character varying) OWNER TO "postgres";
@@ -693,12 +695,12 @@ CREATE OR REPLACE FUNCTION "public"."exist_app_versions" (
 ) RETURNS boolean LANGUAGE "plpgsql"
 SET
   search_path = '' AS $$
-Begin
+BEGIN
   RETURN (SELECT EXISTS (SELECT 1
   FROM public.app_versions
   WHERE app_id=appid
   AND name=name_version));
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."exist_app_versions" (
@@ -714,7 +716,7 @@ CREATE OR REPLACE FUNCTION "public"."find_best_plan_v3" (
 ) RETURNS character varying LANGUAGE "plpgsql"
 SET
   search_path = '' SECURITY DEFINER AS $$
-Begin
+BEGIN
   RETURN (SELECT name
   FROM public.plans
   WHERE plans.mau>=find_best_plan_v3.mau
@@ -723,7 +725,7 @@ Begin
     OR plans.name = 'Enterprise'
     ORDER BY plans.mau
     LIMIT 1);
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."find_best_plan_v3" (
@@ -922,7 +924,7 @@ CREATE OR REPLACE FUNCTION "public"."get_app_versions" (
 ) RETURNS integer LANGUAGE "plpgsql"
 SET
   search_path = '' SECURITY DEFINER AS $$
-Begin
+BEGIN
   RETURN (SELECT id
   FROM public.app_versions
   WHERE app_id=appid
@@ -930,7 +932,7 @@ Begin
   AND owner_org=(select public.get_user_main_org_id_by_app_id(appid))
   AND public.is_member_of_org(public.get_user_id(apikey), (SELECT public.get_user_main_org_id_by_app_id(appid)))
   );
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."get_app_versions" (
@@ -946,7 +948,7 @@ CREATE OR REPLACE FUNCTION "public"."get_current_plan_max_org" ("orgid" "uuid") 
 ) LANGUAGE "plpgsql"
 SET
   search_path = '' SECURITY DEFINER AS $$
-Begin
+BEGIN
   RETURN QUERY
   (SELECT plans.mau, plans.bandwidth, plans.storage
   FROM public.plans
@@ -958,7 +960,7 @@ Begin
         FROM public.orgs
         where id=orgid)
   ));
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."get_current_plan_max_org" ("orgid" "uuid") OWNER TO "postgres";
@@ -966,7 +968,7 @@ ALTER FUNCTION "public"."get_current_plan_max_org" ("orgid" "uuid") OWNER TO "po
 CREATE OR REPLACE FUNCTION "public"."get_current_plan_name_org" ("orgid" "uuid") RETURNS character varying LANGUAGE "plpgsql"
 SET
   search_path = '' SECURITY DEFINER AS $$
-Begin
+BEGIN
   RETURN
   (SELECT name
   FROM public.plans
@@ -974,7 +976,7 @@ Begin
     FROM public.stripe_info
     where customer_id=(SELECT customer_id FROM public.orgs where id=orgid)
     ));
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."get_current_plan_name_org" ("orgid" "uuid") OWNER TO "postgres";
@@ -1133,7 +1135,7 @@ SET
   search_path = '' SECURITY DEFINER AS $$
 DECLARE
     auth_uid uuid;
-Begin
+BEGIN
   SELECT auth.uid() into auth_uid;
 
   -- JWT auth.uid is not null, return
@@ -1143,7 +1145,7 @@ Begin
 
   -- JWT is null
   RETURN NULL;
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."get_identity" () OWNER TO "postgres";
@@ -1154,7 +1156,7 @@ SET
 DECLARE
     api_key_text text;
     api_key record;
-Begin
+BEGIN
   SELECT "public"."get_apikey_header"() into api_key_text;
 
   -- No api key found in headers, return
@@ -1173,7 +1175,7 @@ Begin
   END IF;
 
   RETURN NULL;
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."get_identity_apikey_only" ("keymode" "public"."key_mode" []) OWNER TO "postgres";
@@ -1185,7 +1187,7 @@ DECLARE
     auth_uid uuid;
     api_key_text text;
     api_key record;
-Begin
+BEGIN
   SELECT auth.uid() into auth_uid;
 
   IF auth_uid IS NOT NULL THEN
@@ -1210,7 +1212,7 @@ Begin
   END IF;
 
   RETURN NULL;
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."get_identity" ("keymode" "public"."key_mode" []) OWNER TO "postgres";
@@ -1222,7 +1224,7 @@ DECLARE
     auth_uid uuid;
     api_key_text text;
     api_key record;
-Begin
+BEGIN
   SELECT auth.uid() into auth_uid;
 
   IF auth_uid IS NOT NULL THEN
@@ -1252,7 +1254,7 @@ Begin
   END IF;
 
   RETURN NULL;
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."get_identity_org_allowed" ("keymode" "public"."key_mode" [], "org_id" "uuid") OWNER TO "postgres";
@@ -1268,7 +1270,7 @@ DECLARE
     auth_uid uuid;
     api_key_text text;
     api_key record;
-Begin
+BEGIN
   SELECT auth.uid() into auth_uid;
 
   IF auth_uid IS NOT NULL THEN
@@ -1304,7 +1306,7 @@ Begin
   END IF;
 
   RETURN NULL;
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."get_identity_org_appid" (
@@ -1458,7 +1460,7 @@ begin
   END IF;
 
   return query select * FROM public.get_org_members((select auth.uid()), get_org_members.guild_id);
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."get_org_members" ("guild_id" "uuid") OWNER TO "postgres";
@@ -1477,7 +1479,7 @@ begin
   JOIN public.users on users.id = o.user_id
   where o.org_id=get_org_members.guild_id
   AND public.is_member_of_org(users.id, o.org_id);
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."get_org_members" ("user_id" "uuid", "guild_id" "uuid") OWNER TO "postgres";
@@ -1489,7 +1491,7 @@ Declare
  org_owner_id uuid;
  real_user_id uuid;
  org_id uuid;
-Begin
+BEGIN
   SELECT apps.user_id FROM public.apps WHERE apps.app_id=get_org_owner_id.app_id into org_owner_id;
   SELECT public.get_user_main_org_id_by_app_id(app_id) INTO org_id;
 
@@ -1504,7 +1506,7 @@ Begin
   END IF;
 
   RETURN org_owner_id;
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."get_org_owner_id" ("apikey" "text", "app_id" "text") OWNER TO "postgres";
@@ -1914,13 +1916,13 @@ SET
   search_path = '' SECURITY DEFINER AS $$
 Declare
  is_found uuid;
-Begin
+BEGIN
   SELECT user_id
   INTO is_found
   FROM public.apikeys
   WHERE key=apikey;
   RETURN is_found;
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."get_user_id" ("apikey" "text") OWNER TO "postgres";
@@ -1930,11 +1932,11 @@ SET
   search_path = '' SECURITY DEFINER AS $$
 Declare
  real_user_id uuid;
-Begin
+BEGIN
   SELECT public.get_user_id(apikey) into real_user_id;
 
   RETURN real_user_id;
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."get_user_id" ("apikey" "text", "app_id" "text") OWNER TO "postgres";
@@ -1951,7 +1953,7 @@ begin
   limit 1;
 
   return org_id;
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."get_user_main_org_id" ("user_id" "uuid") OWNER TO "postgres";
@@ -1968,7 +1970,7 @@ begin
   limit 1;
 
   return org_id;
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."get_user_main_org_id_by_app_id" ("app_id" "text") OWNER TO "postgres";
@@ -2002,33 +2004,20 @@ CREATE TABLE IF NOT EXISTS "public"."app_versions" (
 
 ALTER TABLE "public"."app_versions" OWNER TO "postgres";
 
-CREATE OR REPLACE FUNCTION "public"."get_apikey_header" () RETURNS "text" LANGUAGE "plpgsql"
+CREATE OR REPLACE FUNCTION "public"."get_apikey_header" () RETURNS text LANGUAGE plpgsql SECURITY DEFINER
 SET
-  search_path = '' SECURITY DEFINER AS $$
+  search_path TO '' AS $$
 DECLARE
   headers_text text;
-  api_key text;
 BEGIN
   headers_text := "current_setting"('request.headers'::"text", true);
-
+  
   IF headers_text IS NULL OR headers_text = '' THEN
     RETURN NULL;
   END IF;
-
+  
   BEGIN
-    -- First try to get from capgkey header
-    api_key := (headers_text::"json" ->> 'capgkey'::"text");
-
-    -- If not found, try Authorization header
-    IF api_key IS NULL OR api_key = '' THEN
-      api_key := (headers_text::"json" ->> 'authorization'::"text");
-      -- Ignore Authorization when it starts with the Bearer scheme (JWT)
-      IF api_key IS NOT NULL AND api_key <> '' AND api_key ~* '^\s*bearer\s+' THEN
-        RETURN NULL;
-      END IF;
-    END IF;
-
-    RETURN api_key;
+    RETURN (headers_text::"json" ->> 'capgkey'::"text");
   EXCEPTION
     WHEN OTHERS THEN
       RETURN NULL;
@@ -2098,9 +2087,9 @@ CREATE OR REPLACE FUNCTION "public"."has_app_right" (
 ) RETURNS boolean LANGUAGE "plpgsql"
 SET
   search_path = '' SECURITY DEFINER AS $$
-Begin
+BEGIN
   RETURN public.has_app_right_userid("appid", "right", (select auth.uid()));
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."has_app_right" (
@@ -2119,7 +2108,7 @@ SET
 DECLARE
   org_id uuid;
   api_key record;
-Begin
+BEGIN
   org_id := public.get_user_main_org_id_by_app_id(appid);
 
   SELECT * FROM public.apikeys WHERE key = apikey INTO api_key;
@@ -2136,7 +2125,7 @@ Begin
   END IF;
 
   RETURN (public.check_min_rights("right", userid, org_id, "appid", NULL::bigint));
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."has_app_right_apikey" (
@@ -2155,11 +2144,11 @@ SET
   search_path = '' SECURITY DEFINER AS $$
 DECLARE
   org_id uuid;
-Begin
+BEGIN
   org_id := public.get_user_main_org_id_by_app_id(appid);
 
   RETURN public.check_min_rights("right", userid, org_id, "appid", NULL::bigint);
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."has_app_right_userid" (
@@ -2179,7 +2168,7 @@ Declare
   org record;
   invited_user record;
   current_record record;
-Begin
+BEGIN
   SELECT * FROM public.orgs
   INTO org
   WHERE orgs.id=invite_user_to_org.org_id;
@@ -2221,7 +2210,7 @@ Begin
   ELSE
     return 'NO_EMAIL';
   END IF;
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."invite_user_to_org" (
@@ -2267,9 +2256,9 @@ ALTER FUNCTION "public"."is_admin" ("userid" "uuid") OWNER TO "postgres";
 CREATE OR REPLACE FUNCTION "public"."is_allowed_action" ("apikey" "text", "appid" "text") RETURNS boolean LANGUAGE "plpgsql"
 SET
   search_path = '' AS $$
-Begin
+BEGIN
   RETURN public.is_allowed_action_org((select owner_org FROM public.apps where app_id=appid));
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."is_allowed_action" ("apikey" "text", "appid" "text") OWNER TO "postgres";
@@ -2277,9 +2266,9 @@ ALTER FUNCTION "public"."is_allowed_action" ("apikey" "text", "appid" "text") OW
 CREATE OR REPLACE FUNCTION "public"."is_allowed_action_org" ("orgid" "uuid") RETURNS boolean LANGUAGE "plpgsql"
 SET
   search_path = '' SECURITY DEFINER AS $$
-Begin
+BEGIN
     RETURN public.is_paying_and_good_plan_org(orgid);
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."is_allowed_action_org" ("orgid" "uuid") OWNER TO "postgres";
@@ -2290,9 +2279,9 @@ CREATE OR REPLACE FUNCTION "public"."is_allowed_action_org_action" (
 ) RETURNS boolean LANGUAGE "plpgsql"
 SET
   search_path = '' SECURITY DEFINER AS $$
-Begin
+BEGIN
     RETURN public.is_paying_and_good_plan_org_action(orgid, actions);
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."is_allowed_action_org_action" (
@@ -2303,12 +2292,12 @@ ALTER FUNCTION "public"."is_allowed_action_org_action" (
 CREATE OR REPLACE FUNCTION "public"."is_allowed_capgkey" ("apikey" "text", "keymode" "public"."key_mode" []) RETURNS boolean LANGUAGE "plpgsql"
 SET
   search_path = '' SECURITY DEFINER AS $$
-Begin
+BEGIN
   RETURN (SELECT EXISTS (SELECT 1
   FROM public.apikeys
   WHERE key=apikey
   AND mode=ANY(keymode)));
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."is_allowed_capgkey" ("apikey" "text", "keymode" "public"."key_mode" []) OWNER TO "postgres";
@@ -2320,12 +2309,12 @@ CREATE OR REPLACE FUNCTION "public"."is_allowed_capgkey" (
 ) RETURNS boolean LANGUAGE "plpgsql"
 SET
   search_path = '' SECURITY DEFINER AS $$
-Begin
+BEGIN
   RETURN (SELECT EXISTS (SELECT 1
   FROM public.apikeys
   WHERE key=apikey
   AND mode=ANY(keymode))) AND public.is_app_owner(public.get_user_id(apikey), app_id);
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."is_allowed_capgkey" (
@@ -2347,9 +2336,9 @@ ALTER FUNCTION "public"."is_app_owner" ("appid" character varying) OWNER TO "pos
 CREATE OR REPLACE FUNCTION "public"."is_app_owner" ("apikey" "text", "appid" character varying) RETURNS boolean LANGUAGE "plpgsql"
 SET
   search_path = '' SECURITY DEFINER AS $$
-Begin
+BEGIN
   RETURN public.is_app_owner(public.get_user_id(apikey), appid);
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."is_app_owner" ("apikey" "text", "appid" character varying) OWNER TO "postgres";
@@ -2357,12 +2346,12 @@ ALTER FUNCTION "public"."is_app_owner" ("apikey" "text", "appid" character varyi
 CREATE OR REPLACE FUNCTION "public"."is_app_owner" ("userid" "uuid", "appid" character varying) RETURNS boolean LANGUAGE "plpgsql"
 SET
   search_path = '' SECURITY DEFINER AS $$
-Begin
+BEGIN
   RETURN (SELECT EXISTS (SELECT 1
   FROM public.apps
   WHERE app_id=appid
   AND user_id=userid));
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."is_app_owner" ("userid" "uuid", "appid" character varying) OWNER TO "postgres";
@@ -2382,12 +2371,12 @@ ALTER FUNCTION "public"."is_bandwidth_exceeded_by_org" ("org_id" "uuid") OWNER T
 CREATE OR REPLACE FUNCTION "public"."is_canceled_org" ("orgid" "uuid") RETURNS boolean LANGUAGE "plpgsql"
 SET
   search_path = '' SECURITY DEFINER AS $$
-Begin
+BEGIN
   RETURN (SELECT EXISTS (SELECT 1
   FROM public.stripe_info
   where customer_id=(SELECT customer_id FROM public.orgs where id=orgid)
   AND status = 'canceled'));
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."is_canceled_org" ("orgid" "uuid") OWNER TO "postgres";
@@ -2451,7 +2440,7 @@ SET
   search_path = '' SECURITY DEFINER AS $$
 Declare
  is_found integer;
-Begin
+BEGIN
   SELECT count(*)
   INTO is_found
   FROM public.orgs
@@ -2459,7 +2448,7 @@ Begin
   WhERE org_users.user_id = is_member_of_org.user_id AND
   orgs.id = is_member_of_org.org_id;
   RETURN is_found != 0;
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."is_member_of_org" ("user_id" "uuid", "org_id" "uuid") OWNER TO "postgres";
@@ -2469,13 +2458,13 @@ SET
   search_path = '' SECURITY DEFINER AS $$
 Declare
  is_found integer;
-Begin
+BEGIN
   SELECT count(*)
   INTO is_found
   FROM public.deleted_account
   WHERE email=email_check;
   RETURN is_found = 0;
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."is_not_deleted" ("email_check" character varying) OWNER TO "postgres";
@@ -2493,13 +2482,13 @@ ALTER FUNCTION "public"."is_numeric" ("text") OWNER TO "postgres";
 CREATE OR REPLACE FUNCTION "public"."is_onboarded_org" ("orgid" "uuid") RETURNS boolean LANGUAGE "plpgsql"
 SET
   search_path = '' SECURITY DEFINER AS $$
-Begin
+BEGIN
   RETURN (SELECT EXISTS (SELECT 1
   FROM public.apps
   WHERE owner_org=orgid)) AND (SELECT EXISTS (SELECT 1
   FROM public.app_versions
   WHERE owner_org=orgid));
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."is_onboarded_org" ("orgid" "uuid") OWNER TO "postgres";
@@ -2507,9 +2496,9 @@ ALTER FUNCTION "public"."is_onboarded_org" ("orgid" "uuid") OWNER TO "postgres";
 CREATE OR REPLACE FUNCTION "public"."is_onboarding_needed_org" ("orgid" "uuid") RETURNS boolean LANGUAGE "plpgsql"
 SET
   search_path = '' SECURITY DEFINER AS $$
-Begin
+BEGIN
   RETURN (NOT public.is_onboarded_org(orgid)) AND public.is_trial_org(orgid) = 0;
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."is_onboarding_needed_org" ("orgid" "uuid") OWNER TO "postgres";
@@ -2540,7 +2529,7 @@ ALTER FUNCTION "public"."is_org_yearly" ("orgid" "uuid") OWNER TO "postgres";
 CREATE OR REPLACE FUNCTION "public"."is_paying_and_good_plan_org" ("orgid" "uuid") RETURNS boolean LANGUAGE "plpgsql"
 SET
   search_path = '' SECURITY DEFINER AS $$
-Begin
+BEGIN
   RETURN (SELECT EXISTS (SELECT 1
   FROM public.stripe_info
   where customer_id=(SELECT customer_id FROM public.orgs where id=orgid)
@@ -2550,7 +2539,7 @@ Begin
   )
   )
 );
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."is_paying_and_good_plan_org" ("orgid" "uuid") OWNER TO "postgres";
@@ -2584,12 +2573,12 @@ ALTER FUNCTION "public"."is_paying_and_good_plan_org_action" (
 CREATE OR REPLACE FUNCTION "public"."is_paying_org" ("orgid" "uuid") RETURNS boolean LANGUAGE "plpgsql"
 SET
   search_path = '' SECURITY DEFINER AS $$
-Begin
+BEGIN
   RETURN (SELECT EXISTS (SELECT 1
   FROM public.stripe_info
   where customer_id=(SELECT customer_id FROM public.orgs where id=orgid)
   AND status = 'succeeded'));
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."is_paying_org" ("orgid" "uuid") OWNER TO "postgres";
@@ -2609,11 +2598,11 @@ ALTER FUNCTION "public"."is_storage_exceeded_by_org" ("org_id" "uuid") OWNER TO 
 CREATE OR REPLACE FUNCTION "public"."is_trial_org" ("orgid" "uuid") RETURNS integer LANGUAGE "plpgsql"
 SET
   search_path = '' SECURITY DEFINER AS $$
-Begin
+BEGIN
   RETURN (SELECT GREATEST((trial_at::date - (now())::date), 0) AS days
   FROM public.stripe_info
   where customer_id=(SELECT customer_id FROM public.orgs where id=orgid));
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."is_trial_org" ("orgid" "uuid") OWNER TO "postgres";
@@ -3292,7 +3281,7 @@ ALTER FUNCTION "public"."update_app_versions_retention" () OWNER TO "postgres";
 CREATE OR REPLACE FUNCTION "public"."verify_mfa" () RETURNS boolean LANGUAGE "plpgsql"
 SET
   search_path = '' SECURITY DEFINER AS $_$
-Begin
+BEGIN
   RETURN (
     array[(select coalesce(auth.jwt()->>'aal', 'aal1'))] <@ (
       select
@@ -3309,7 +3298,7 @@ Begin
       WHERE amr_elem->>'method' = 'otp'
     )
   );
-End;
+END;
 $_$;
 
 ALTER FUNCTION "public"."verify_mfa" () OWNER TO "postgres";
@@ -3435,7 +3424,9 @@ CREATE TABLE IF NOT EXISTS "public"."channels" (
   "android" boolean DEFAULT true NOT NULL,
   "allow_device_self_set" boolean DEFAULT false NOT NULL,
   "allow_emulator" boolean DEFAULT true NOT NULL,
+  "allow_device" boolean DEFAULT true NOT NULL,
   "allow_dev" boolean DEFAULT true NOT NULL,
+  "allow_prod" boolean DEFAULT true NOT NULL,
   "disable_auto_update" "public"."disable_update" DEFAULT 'major'::"public"."disable_update" NOT NULL,
   "owner_org" "uuid" NOT NULL,
   "created_by" "uuid" NOT NULL
@@ -3515,9 +3506,9 @@ CREATE TABLE IF NOT EXISTS "public"."daily_version" (
 ALTER TABLE "public"."daily_version" OWNER TO "postgres";
 
 CREATE TABLE IF NOT EXISTS "public"."deleted_account" (
-    "created_at" timestamp with time zone DEFAULT "now"(),
-    "email" character varying DEFAULT ''::character varying NOT NULL,
-    "id" "uuid" DEFAULT "extensions"."uuid_generate_v4"() NOT NULL
+  "created_at" timestamp with time zone DEFAULT "now" (),
+  "email" character varying DEFAULT ''::character varying NOT NULL,
+  "id" "uuid" DEFAULT "extensions"."uuid_generate_v4" () NOT NULL
 );
 
 ALTER TABLE "public"."deleted_account" OWNER TO "postgres";
@@ -3563,11 +3554,11 @@ ADD GENERATED BY DEFAULT AS IDENTITY (
 );
 
 CREATE TABLE IF NOT EXISTS "public"."device_usage" (
-    "id" integer NOT NULL,
-    "device_id" character varying(255) NOT NULL,
-    "app_id" character varying(255) NOT NULL,
-    "timestamp" timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    "org_id" character varying(255) NOT NULL
+  "id" integer NOT NULL,
+  "device_id" character varying(255) NOT NULL,
+  "app_id" character varying(255) NOT NULL,
+  "timestamp" timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  "org_id" character varying(255) NOT NULL
 );
 
 ALTER TABLE "public"."device_usage" OWNER TO "postgres";
@@ -3598,27 +3589,27 @@ CREATE TABLE IF NOT EXISTS "public"."devices" (
 ALTER TABLE "public"."devices" OWNER TO "postgres";
 
 CREATE TABLE IF NOT EXISTS "public"."global_stats" (
-    "created_at" timestamp with time zone DEFAULT "now"(),
-    "date_id" character varying NOT NULL,
-    "apps" bigint NOT NULL,
-    "updates" bigint NOT NULL,
-    "stars" bigint NOT NULL,
-    "users" bigint DEFAULT '0'::bigint,
-    "paying" bigint DEFAULT '0'::bigint,
-    "trial" bigint DEFAULT '0'::bigint,
-    "need_upgrade" bigint DEFAULT '0'::bigint,
-    "not_paying" bigint DEFAULT '0'::bigint,
-    "onboarded" bigint DEFAULT '0'::bigint,
-    "apps_active" integer DEFAULT 0,
-    "users_active" integer DEFAULT 0,
-    "paying_monthly" integer DEFAULT 0,
-    "paying_yearly" integer DEFAULT 0,
-    "updates_last_month" bigint DEFAULT '0'::bigint,
-    "updates_external" bigint DEFAULT '0'::bigint,
-    "success_rate" double precision,
-    "plan_solo" bigint DEFAULT 0,
-    "plan_maker" bigint DEFAULT 0,
-    "plan_team" bigint DEFAULT 0
+  "created_at" timestamp with time zone DEFAULT "now" (),
+  "date_id" character varying NOT NULL,
+  "apps" bigint NOT NULL,
+  "updates" bigint NOT NULL,
+  "stars" bigint NOT NULL,
+  "users" bigint DEFAULT '0'::bigint,
+  "paying" bigint DEFAULT '0'::bigint,
+  "trial" bigint DEFAULT '0'::bigint,
+  "need_upgrade" bigint DEFAULT '0'::bigint,
+  "not_paying" bigint DEFAULT '0'::bigint,
+  "onboarded" bigint DEFAULT '0'::bigint,
+  "apps_active" integer DEFAULT 0,
+  "users_active" integer DEFAULT 0,
+  "paying_monthly" integer DEFAULT 0,
+  "paying_yearly" integer DEFAULT 0,
+  "updates_last_month" bigint DEFAULT '0'::bigint,
+  "updates_external" bigint DEFAULT '0'::bigint,
+  "success_rate" double precision,
+  "plan_solo" bigint DEFAULT 0,
+  "plan_maker" bigint DEFAULT 0,
+  "plan_team" bigint DEFAULT 0
 );
 
 ALTER TABLE "public"."global_stats" OWNER TO "postgres";
@@ -3632,10 +3623,12 @@ CREATE TABLE IF NOT EXISTS "public"."manifest" (
   "file_size" bigint DEFAULT 0
 );
 
-ALTER TABLE "public"."manifest" SET (
-  autovacuum_vacuum_scale_factor = 0.05,  -- vacuum after 5% dead rows (default 20%)
-  autovacuum_analyze_scale_factor = 0.02  -- analyze after 2% changes
-);
+ALTER TABLE "public"."manifest"
+SET
+  (
+    autovacuum_vacuum_scale_factor = 0.05, -- vacuum after 5% dead rows (default 20%)
+    autovacuum_analyze_scale_factor = 0.02 -- analyze after 2% changes
+  );
 
 ALTER TABLE "public"."manifest" OWNER TO "postgres";
 
@@ -5756,8 +5749,6 @@ GRANT ALL ON FUNCTION "public"."get_orgs_v6" () TO "service_role";
 REVOKE ALL ON FUNCTION "public"."get_orgs_v6" ("userid" "uuid")
 FROM
   PUBLIC;
-
-GRANT ALL ON FUNCTION "public"."get_orgs_v6" ("userid" "uuid") TO "anon";
 
 GRANT ALL ON FUNCTION "public"."get_orgs_v6" ("userid" "uuid") TO "authenticated";
 

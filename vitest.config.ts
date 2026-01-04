@@ -21,8 +21,17 @@ export default defineConfig(({ mode }) => ({
         execArgv: [],
       },
     },
+
+    maxConcurrency: 5, // Reduced to prevent connection exhaustion
+    // Vitest 4: pool options are now top-level
+    isolate: true,
+    fileParallelism: true,
     // Allow graceful shutdown of workers
-    teardownTimeout: 10_000,
+    teardownTimeout: 15_000,
+    // Sequence to reduce parallel load on edge functions
+    sequence: {
+      shuffle: false, // Run in predictable order
+    },
     env: loadEnv(mode, cwd(), ''),
   },
 }))

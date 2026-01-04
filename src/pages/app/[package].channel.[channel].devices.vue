@@ -150,8 +150,10 @@ async function customDeviceOverwritePart5(
   if (overwriteError) {
     console.error('overwriteError', overwriteError)
     toast.error(t('cannot-create-overwrite'))
+    return
   }
 
+  toast.info(t('cloud-replication-delay'))
   reload()
 }
 
@@ -208,7 +210,9 @@ async function getChannel() {
           created_at,
           app_id,
           allow_emulator,
+          allow_device,
           allow_dev,
+          allow_prod,
           allow_device_self_set,
           disable_auto_update_under_native,
           disable_auto_update,
