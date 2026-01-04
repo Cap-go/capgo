@@ -1,4 +1,4 @@
-import type { AnalyticsEngineDataPoint, D1Database, Hyperdrive } from '@cloudflare/workers-types'
+import type { AnalyticsEngineDataPoint, D1Database, Hyperdrive, R2Bucket } from '@cloudflare/workers-types'
 import type { Context } from 'hono'
 import type { DeviceComparable } from './deviceComparison.ts'
 import type { Database } from './supabase.types.ts'
@@ -24,6 +24,7 @@ export type Bindings = {
   HYPERDRIVE_CAPGO_PS_AS: Hyperdrive // Add Hyperdrive binding
   HYPERDRIVE_CAPGO_PS_NA: Hyperdrive // Add Hyperdrive binding
   ATTACHMENT_UPLOAD_HANDLER: DurableObjectNamespace
+  ATTACHMENT_BUCKET: R2Bucket
 }
 
 const TRACK_DEVICE_USAGE_CACHE_PATH = '/.track-device-usage-cache'
