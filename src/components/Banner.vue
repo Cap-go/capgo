@@ -46,6 +46,14 @@ watchEffect(async () => {
 
 const isMobile = Capacitor.isNativePlatform()
 
+// Check if user lacks security compliance (2FA or password) - data is unreliable in this case
+const lacksSecurityAccess = computed(() => {
+  const org = organizationStore.currentOrganization
+  const lacks2FA = org?.enforcing_2fa === true && org?.['2fa_has_access'] === false
+  const lacksPassword = org?.password_policy_config?.enabled && org?.password_has_access === false
+  return lacks2FA || lacksPassword
+})
+
 const bannerLeftText = computed(() => {
   const org = organizationStore.currentOrganization
   if (org?.paying)
@@ -58,6 +66,10 @@ const bannerText = computed(() => {
   const org = organizationStore.currentOrganization
   if (!org)
     return
+
+  // Don't show billing banner when user lacks 2FA or password access - data is unreliable
+  if (lacksSecurityAccess.value)
+    return null
 
   if (organizationStore.currentOrganizationFailed)
     return t('subscription-required')
