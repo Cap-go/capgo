@@ -27,37 +27,41 @@ SELECT
 
 SELECT tests.clear_authentication();
 
--- Test cleanup_frequent_job_details (admin function - may fail due to cron schema permissions)
+-- Test cleanup_frequent_job_details (internal cron function - should be denied to authenticated users)
 SELECT tests.authenticate_as('test_admin');
 
 SELECT
     throws_ok(
         'SELECT cleanup_frequent_job_details()',
-        'permission denied for schema cron',
+        '42501',
+        'permission denied for function cleanup_frequent_job_details',
         'cleanup_frequent_job_details test - throws permission error as expected'
     );
 
 SELECT tests.clear_authentication();
 
--- Test remove_old_jobs (admin function - may fail due to cron schema permissions)
+-- Test remove_old_jobs (internal cron function - should be denied to authenticated users)
 SELECT tests.authenticate_as('test_admin');
 
 SELECT
     throws_ok(
         'SELECT remove_old_jobs()',
-        'permission denied for schema cron',
+        '42501',
+        'permission denied for function remove_old_jobs',
         'remove_old_jobs test - throws permission error as expected'
     );
 
 SELECT tests.clear_authentication();
 
--- Test delete_http_response (admin function)
+-- Test delete_http_response (internal function - should be denied to authenticated users)
 SELECT tests.authenticate_as('test_admin');
 
 SELECT
-    lives_ok(
+    throws_ok(
         'SELECT delete_http_response(999999)',
-        'delete_http_response test - function executes without error'
+        '42501',
+        'permission denied for function delete_http_response',
+        'delete_http_response test - throws permission error as expected'
     );
 
 SELECT tests.clear_authentication();

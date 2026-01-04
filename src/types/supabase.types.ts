@@ -7,30 +7,10 @@ export type Json =
   | Json[]
 
 export type Database = {
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "14.1"
   }
   public: {
     Tables: {
@@ -266,6 +246,7 @@ export type Database = {
       }
       apps: {
         Row: {
+          allow_preview: boolean
           app_id: string
           channel_device_count: number
           created_at: string | null
@@ -283,6 +264,7 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          allow_preview?: boolean
           app_id: string
           channel_device_count?: number
           created_at?: string | null
@@ -300,6 +282,7 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          allow_preview?: boolean
           app_id?: string
           channel_device_count?: number
           created_at?: string | null
@@ -442,7 +425,15 @@ export type Database = {
           platform?: string
           user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "build_logs_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       build_requests: {
         Row: {
@@ -1089,6 +1080,7 @@ export type Database = {
           paying: number | null
           paying_monthly: number | null
           paying_yearly: number | null
+          plan_enterprise: number | null
           plan_enterprise_monthly: number
           plan_enterprise_yearly: number
           plan_maker: number | null
@@ -1133,6 +1125,7 @@ export type Database = {
           paying?: number | null
           paying_monthly?: number | null
           paying_yearly?: number | null
+          plan_enterprise?: number | null
           plan_enterprise_monthly?: number
           plan_enterprise_yearly?: number
           plan_maker?: number | null
@@ -1177,6 +1170,7 @@ export type Database = {
           paying?: number | null
           paying_monthly?: number | null
           paying_yearly?: number | null
+          plan_enterprise?: number | null
           plan_enterprise_monthly?: number
           plan_enterprise_yearly?: number
           plan_maker?: number | null
@@ -3008,25 +3002,6 @@ export type Database = {
         Args: { email: string; org_id: string }
         Returns: string
       }
-      reset_and_seed_app_data: {
-        Args: {
-          p_admin_user_id?: string
-          p_app_id: string
-          p_org_id?: string
-          p_plan_product_id?: string
-          p_stripe_customer_id?: string
-          p_user_id?: string
-        }
-        Returns: undefined
-      }
-      reset_and_seed_app_stats_data: {
-        Args: { p_app_id: string }
-        Returns: undefined
-      }
-      reset_and_seed_data: { Args: never; Returns: undefined }
-      reset_and_seed_stats_data: { Args: never; Returns: undefined }
-      reset_app_data: { Args: { p_app_id: string }; Returns: undefined }
-      reset_app_stats_data: { Args: { p_app_id: string }; Returns: undefined }
       seed_get_app_metrics_caches: {
         Args: { p_end_date: string; p_org_id: string; p_start_date: string }
         Returns: {
@@ -3159,9 +3134,7 @@ export type Database = {
         | "disableAutoUpdateMetadata"
         | "disableAutoUpdateUnderNative"
         | "disableDevBuild"
-        | "disableProdBuild"
         | "disableEmulator"
-        | "disableDevice"
         | "cannotGetBundle"
         | "checksum_fail"
         | "NoChannelOrOverride"
@@ -3182,6 +3155,8 @@ export type Database = {
         | "download_manifest_brotli_fail"
         | "backend_refusal"
         | "download_0"
+        | "disableProdBuild"
+        | "disableDevice"
       stripe_status:
         | "created"
         | "succeeded"
@@ -3356,9 +3331,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
       action_type: ["mau", "storage", "bandwidth", "build_time"],
@@ -3415,9 +3387,7 @@ export const Constants = {
         "disableAutoUpdateMetadata",
         "disableAutoUpdateUnderNative",
         "disableDevBuild",
-        "disableProdBuild",
         "disableEmulator",
-        "disableDevice",
         "cannotGetBundle",
         "checksum_fail",
         "NoChannelOrOverride",
@@ -3438,6 +3408,8 @@ export const Constants = {
         "download_manifest_brotli_fail",
         "backend_refusal",
         "download_0",
+        "disableProdBuild",
+        "disableDevice",
       ],
       stripe_status: [
         "created",
@@ -3464,4 +3436,3 @@ export const Constants = {
     },
   },
 } as const
-

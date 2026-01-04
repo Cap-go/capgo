@@ -108,6 +108,14 @@ export function isValidAppId(appId: string): boolean {
   return reverseDomainRegex.test(appId)
 }
 
+/**
+ * Validate that a string contains only safe characters (alphanumeric and dashes)
+ * This prevents SQL injection - dangerous chars are quotes, semicolons, parentheses, etc.
+ */
+export function isSafeAlphanumeric(value: string): boolean {
+  return /^[0-9a-z-]+$/i.test(value)
+}
+
 interface LimitedApp {
   id: string
   ignore: number

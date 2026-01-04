@@ -1,4 +1,4 @@
-import type { Blob, R2UploadedPart } from '@cloudflare/workers-types'
+import type { Blob, R2HTTPMetadata, R2UploadedPart } from '@cloudflare/workers-types'
 
 // Retries with backoff of [100ms, 200ms, 400ms, 800ms, 1600ms]
 export const DEFAULT_RETRY_PARAMS = { maxRetries: 5, durationMillis: 100 }
@@ -84,9 +84,10 @@ export class RetryBucket {
     key: string,
     value: (ArrayBuffer | ArrayBufferView) | string | Blob,
     checksum?: string | ArrayBuffer,
+    httpMetadata?: R2HTTPMetadata,
   ): ReturnType<R2Bucket['put']> {
     return retry(
-      () => this.bucket.put(key, value as any, { sha256: checksum }),
+      () => this.bucket.put(key, value as any, { sha256: checksum, httpMetadata }),
       {
         params: this.params,
         shouldRetry: error => !isR2ChecksumError(error),
