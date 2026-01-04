@@ -61,7 +61,6 @@ async function validateSSOProvider(supabase: any, email: string): Promise<{ prov
     .single()
 
   if (domainError || !domainMapping) {
-    console.error('SSO provider not found for domain:', domain, domainError)
     return null
   }
 
@@ -74,13 +73,10 @@ async function validateSSOProvider(supabase: any, email: string): Promise<{ prov
 // For local mock SSO: use admin API to create sessions directly
 // This simulates the SSO flow without needing passwords
 async function authenticateUser(supabaseAdmin: any, mockResponse: MockSAMLResponse): Promise<{ accessToken: string, refreshToken: string } | null> {
-  console.log('[Mock SSO] Authenticating user:', mockResponse.email)
-
   // Check if user exists
   const { data: existingUsers, error: fetchError } = await supabaseAdmin.auth.admin.listUsers()
 
   if (fetchError) {
-    console.error('[Mock SSO] Failed to fetch users:', fetchError)
     return null
   }
 
@@ -88,7 +84,6 @@ async function authenticateUser(supabaseAdmin: any, mockResponse: MockSAMLRespon
 
   if (existingUser) {
     // User exists - try to sign in with testtest password
-    console.log('[Mock SSO] Existing user found:', existingUser.id)
 
     const { data: signInData, error: signInError } = await supabaseAdmin.auth.signInWithPassword({
       email: mockResponse.email,
@@ -96,18 +91,13 @@ async function authenticateUser(supabaseAdmin: any, mockResponse: MockSAMLRespon
     })
 
     if (signInError || !signInData?.session) {
-      console.error('[Mock SSO] Failed to sign in existing user:', signInError)
-      console.error('[Mock SSO] Note: Existing users must have password "testtest" for mock SSO')
       return null
     }
-
-    console.log('[Mock SSO] Existing user authenticated successfully')
 
     // For existing users, manually call auto_enroll in case they weren't auto-enrolled before
     // Wait briefly to ensure public.users record exists (should already exist for existing users)
     await new Promise(resolve => setTimeout(resolve, 100))
 
-    console.log('[Mock SSO] Calling auto_enroll_sso_user for existing user:', existingUser.id)
     const { data: enrollResult, error: enrollError } = await supabaseAdmin.rpc('auto_enroll_sso_user', {
       p_user_id: existingUser.id,
       p_email: mockResponse.email,
@@ -115,13 +105,13 @@ async function authenticateUser(supabaseAdmin: any, mockResponse: MockSAMLRespon
     })
 
     if (enrollError) {
-      console.error('[Mock SSO] Failed to auto-enroll existing user:', enrollError)
+      // Continue despite enrollment error
     }
     else if (enrollResult && enrollResult.length > 0) {
-      console.log('[Mock SSO] Existing user auto-enrolled to org:', enrollResult[0].org_name)
+      // User auto-enrolled
     }
     else {
-      console.log('[Mock SSO] No auto-enrollment needed (user may already be a member)')
+      // No auto-enrollment needed
     }
 
     return {
@@ -131,7 +121,6 @@ async function authenticateUser(supabaseAdmin: any, mockResponse: MockSAMLRespon
   }
 
   // User doesn't exist - create them using admin API (bypasses triggers)
-  console.log('[Mock SSO] Creating new user with admin.createUser')
   const defaultPassword = 'testtest' // Use known password for testing
 
   const { data: createData, error: createError } = await supabaseAdmin.auth.admin.createUser({
@@ -147,15 +136,11 @@ async function authenticateUser(supabaseAdmin: any, mockResponse: MockSAMLRespon
   })
 
   if (createError || !createData.user) {
-    console.error('[Mock SSO] Failed to create user via admin API:', createError)
     return null
   }
 
-  console.log('[Mock SSO] New user created via admin API:', createData.user.id)
-
   // Create public.users record (normally done by Supabase auth hooks in production)
   // Admin API doesn't trigger these hooks, so we must create manually for local testing
-  console.log('[Mock SSO] Creating public.users record...')
   const { error: publicUserError } = await supabaseAdmin
     .from('users')
     .insert({
@@ -170,14 +155,9 @@ async function authenticateUser(supabaseAdmin: any, mockResponse: MockSAMLRespon
     })
 
   if (publicUserError) {
-    console.error('[Mock SSO] ✗ Failed to create public.users record:', publicUserError)
     // Continue anyway - user exists in auth.users, they can sign in
   }
-  else {
-    console.log('[Mock SSO] ✓ public.users record created')
-  }
 
-  console.log('[Mock SSO] Attempting sign in...')
   // Sign in with the password we just set
   const { data: signInData, error: signInError } = await supabaseAdmin.auth.signInWithPassword({
     email: mockResponse.email,
@@ -185,16 +165,11 @@ async function authenticateUser(supabaseAdmin: any, mockResponse: MockSAMLRespon
   })
 
   if (signInError || !signInData?.session) {
-    console.error('[Mock SSO] ✗ Failed to sign in new user:', signInError)
     return null
   }
 
-  console.log('[Mock SSO] ✓ User authenticated successfully')
-
   // The database trigger might fail due to timing (public.users not ready yet)
   // Try auto-enrollment - if it fails due to FK constraint, we'll retry
-  console.log('[Mock SSO] Attempting auto_enroll_sso_user for user:', createData.user.id, 'with provider:', mockResponse.providerId)
-
   let enrollSuccess = false
   let retries = 0
   const maxEnrollRetries = 6 // 6 retries × 150ms = 900ms total
@@ -211,27 +186,22 @@ async function authenticateUser(supabaseAdmin: any, mockResponse: MockSAMLRespon
       if (enrollError.message?.includes('foreign key') || enrollError.message?.includes('violates')) {
         retries++
         if (retries < maxEnrollRetries) {
-          console.log(`[Mock SSO] ⏳ FK constraint error, user not in public.users yet, retrying in 150ms... (attempt ${retries})`)
           await new Promise(resolve => setTimeout(resolve, 150))
           continue // Retry the loop
         }
         else {
-          console.error('[Mock SSO] ✗ Failed to auto-enroll after', maxEnrollRetries, 'attempts:', enrollError)
           break
         }
       }
       else {
-        console.error('[Mock SSO] ✗ Failed to auto-enroll user:', enrollError)
         break
       }
     }
     else if (enrollResult && enrollResult.length > 0) {
-      console.log('[Mock SSO] ✓ User auto-enrolled to org:', enrollResult[0].org_name)
       enrollSuccess = true
       break
     }
     else {
-      console.log('[Mock SSO] ℹ No auto-enrollment performed (may already be member or auto_join disabled)')
       enrollSuccess = true // Not an error, just nothing to enroll
       break
     }

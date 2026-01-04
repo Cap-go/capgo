@@ -98,7 +98,6 @@ Deno.serve(async (req) => {
       .single()
 
     if (domainError || !domainMapping) {
-      console.log('[SSO Check] No SSO configured for domain:', domain)
       return new Response(
         JSON.stringify({ available: false }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
@@ -108,8 +107,6 @@ Deno.serve(async (req) => {
     // Access nested data - org_saml_connections is an object due to inner join
     const connection = domainMapping.org_saml_connections as any
     const org = Array.isArray(connection.orgs) ? connection.orgs[0] : connection.orgs
-
-    console.log('[SSO Check] SSO available for domain:', domain, 'org:', org.name)
 
     const response: SSOCheckResponse = {
       available: true,
@@ -125,7 +122,6 @@ Deno.serve(async (req) => {
     )
   }
   catch (error: any) {
-    console.error('[SSO Check] Error:', error)
     return new Response(
       JSON.stringify({ available: false, error: error.message }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
