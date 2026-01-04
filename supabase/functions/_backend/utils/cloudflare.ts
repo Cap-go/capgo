@@ -1,4 +1,4 @@
-import type { AnalyticsEngineDataPoint, D1Database, Hyperdrive, R2Bucket } from '@cloudflare/workers-types'
+import type { AnalyticsEngineDataPoint, D1Database, Hyperdrive } from '@cloudflare/workers-types'
 import type { Context } from 'hono'
 import type { DeviceComparable } from './deviceComparison.ts'
 import type { Database } from './supabase.types.ts'

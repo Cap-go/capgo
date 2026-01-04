@@ -160,7 +160,7 @@ async function handlePreview(c: Context<MiddlewareKeyVariables>) {
   try {
     if (getRuntimeKey() === 'workerd') {
       // Cloudflare Workers - use R2 bucket directly
-      const bucket: R2Bucket = c.env.ATTACHMENT_BUCKET
+      const bucket = c.env.ATTACHMENT_BUCKET
       if (!bucket) {
         cloudlog({ requestId: c.get('requestId'), message: 'preview bucket is null' })
         return simpleError('bucket_not_configured', 'Storage bucket not configured')
