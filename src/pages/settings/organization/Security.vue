@@ -5,7 +5,9 @@ import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import IconCheck from '~icons/heroicons/check-circle'
 import IconWarning from '~icons/heroicons/exclamation-triangle'
+import IconFingerprint from '~icons/heroicons/finger-print'
 import IconKey from '~icons/heroicons/key'
+import IconLock from '~icons/heroicons/lock-closed'
 import IconShield from '~icons/heroicons/shield-check'
 import IconUser from '~icons/heroicons/user'
 import { useSupabase } from '~/services/supabase'
@@ -47,6 +49,9 @@ const { currentOrganization } = storeToRefs(organizationStore)
 
 // Hashed API keys enforcement state
 const enforceHashedApiKeys = ref(false)
+
+// Encrypted bundles enforcement state
+const enforceEncryptedBundles = ref(false)
 
 // 2FA enforcement state
 const enforcing2fa = ref(false)
@@ -158,7 +163,7 @@ async function loadData() {
     // Load current org's security settings
     const { data: orgData, error: orgError } = await supabase
       .from('orgs')
-      .select('enforcing_2fa, enforce_hashed_api_keys')
+      .select('enforcing_2fa, enforce_hashed_api_keys, enforce_encrypted_bundles')
       .eq('id', currentOrganization.value.gid)
       .single()
 
@@ -170,6 +175,7 @@ async function loadData() {
 
     enforcing2fa.value = orgData?.enforcing_2fa ?? false
     enforceHashedApiKeys.value = orgData?.enforce_hashed_api_keys ?? false
+    enforceEncryptedBundles.value = orgData?.enforce_encrypted_bundles ?? false
 
     // Load members with their 2FA status
     await loadMembersWithMfaStatus()
@@ -420,6 +426,46 @@ async function toggleEnforceHashedApiKeys() {
   }
 }
 
+async function toggleEnforceEncryptedBundles() {
+  if (!currentOrganization.value || !hasOrgPerm.value) {
+    toast.error(t('no-permission'))
+    return
+  }
+
+  const newValue = !enforceEncryptedBundles.value
+  const previousValue = enforceEncryptedBundles.value
+
+  // Optimistic update
+  enforceEncryptedBundles.value = newValue
+
+  isSaving.value = true
+
+  try {
+    const { error } = await supabase
+      .from('orgs')
+      .update({ enforce_encrypted_bundles: newValue })
+      .eq('id', currentOrganization.value.gid)
+
+    if (error) {
+      console.error('Failed to update enforce_encrypted_bundles:', error)
+      // Revert optimistic update
+      enforceEncryptedBundles.value = previousValue
+      toast.error(t('error-saving-settings'))
+      return
+    }
+
+    toast.success(newValue ? t('encrypted-bundles-enforcement-enabled') : t('encrypted-bundles-enforcement-disabled'))
+  }
+  catch (error) {
+    console.error('Error saving encrypted bundles enforcement:', error)
+    enforceEncryptedBundles.value = previousValue
+    toast.error(t('error-saving-settings'))
+  }
+  finally {
+    isSaving.value = false
+  }
+}
+
 async function copyEmailList() {
   const emails = impactedMembers.value.map(m => m.email).join(', ')
   try {
@@ -622,8 +668,9 @@ onMounted(async () => {
 
         <!-- Content -->
         <template v-else>
-          <!-- 2FA Enforcement Toggle Section -->
+          <!-- 2FA Enforcement Section (Combined Toggle + Members Status) -->
           <section class="p-6 border rounded-lg border-slate-200 dark:border-slate-700">
+            <!-- 2FA Enforcement Toggle -->
             <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div class="flex items-start gap-4">
                 <div class="p-3 rounded-lg bg-blue-50 dark:bg-blue-900/30">
@@ -664,122 +711,172 @@ onMounted(async () => {
                 </span>
               </div>
             </div>
+
+            <!-- Members 2FA Status Overview -->
+            <div v-if="hasOrgPerm" class="mt-6 pt-6 border-t border-slate-200 dark:border-slate-700">
+              <h4 class="mb-4 text-base font-semibold dark:text-white text-slate-800">
+                {{ t('2fa-members-status') }}
+              </h4>
+
+              <!-- Stats cards -->
+              <div class="grid grid-cols-1 gap-4 mb-6 md:grid-cols-3">
+                <div class="p-4 rounded-lg bg-slate-50 dark:bg-slate-700/50">
+                  <div class="flex items-center gap-3">
+                    <IconUser class="w-5 h-5 text-slate-500" />
+                    <div>
+                      <p class="text-2xl font-bold dark:text-white text-slate-800">
+                        {{ totalMembersCount }}
+                      </p>
+                      <p class="text-sm text-slate-600 dark:text-slate-400">
+                        {{ t('total-members') }}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <div class="p-4 rounded-lg bg-green-50 dark:bg-green-900/20">
+                  <div class="flex items-center gap-3">
+                    <IconCheck class="w-5 h-5 text-green-600 dark:text-green-400" />
+                    <div>
+                      <p class="text-2xl font-bold text-green-700 dark:text-green-400">
+                        {{ compliantMembersCount }}
+                      </p>
+                      <p class="text-sm text-green-600 dark:text-green-500">
+                        {{ t('2fa-enabled') }}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <div class="p-4 rounded-lg bg-amber-50 dark:bg-amber-900/20">
+                  <div class="flex items-center gap-3">
+                    <IconWarning class="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                    <div>
+                      <p class="text-2xl font-bold text-amber-700 dark:text-amber-400">
+                        {{ nonCompliantMembersCount }}
+                      </p>
+                      <p class="text-sm text-amber-600 dark:text-amber-500">
+                        {{ t('2fa-not-enabled') }}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Impacted Members List (shown if there are non-compliant members) -->
+              <div v-if="impactedMembers.length > 0" class="p-4 border rounded-lg border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20">
+                <div class="flex flex-col gap-4 mb-4 md:flex-row md:items-center md:justify-between">
+                  <div class="flex items-center gap-2">
+                    <IconWarning class="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                    <h4 class="font-semibold text-amber-800 dark:text-amber-200">
+                      {{ t('2fa-impacted-members-title') }}
+                    </h4>
+                  </div>
+                  <button
+                    type="button"
+                    class="px-3 py-2 text-xs font-medium text-center border rounded-lg cursor-pointer text-amber-700 dark:text-amber-300 hover:bg-amber-100 focus:ring-4 focus:ring-amber-300 border-amber-400 dark:border-amber-600 dark:hover:bg-amber-800/30 dark:focus:ring-amber-800 focus:outline-hidden"
+                    @click="copyEmailList"
+                  >
+                    {{ t('copy-email-list') }}
+                  </button>
+                </div>
+                <p class="mb-4 text-sm text-amber-700 dark:text-amber-300">
+                  {{ t('2fa-impacted-members-description') }}
+                </p>
+                <ul class="space-y-2">
+                  <li v-for="member in impactedMembers" :key="member.uid" class="flex items-center gap-3 p-2 rounded-lg bg-white/50 dark:bg-slate-800/50">
+                    <img
+                      v-if="member.image_url"
+                      :src="member.image_url"
+                      :alt="`Profile picture for ${member.email}`"
+                      class="w-8 h-8 rounded-full shrink-0"
+                    >
+                    <div v-else class="flex items-center justify-center w-8 h-8 text-sm bg-gray-700 rounded-full shrink-0">
+                      <span class="font-medium text-gray-300">
+                        {{ acronym(member.email) }}
+                      </span>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                      <p class="text-sm font-medium truncate text-slate-800 dark:text-white">
+                        {{ member.email }}
+                      </p>
+                      <p class="text-xs text-slate-500 dark:text-slate-400">
+                        {{ member.role.replace('_', ' ') }}
+                      </p>
+                    </div>
+                  </li>
+                </ul>
+              </div>
+
+              <!-- All compliant message -->
+              <div v-else-if="totalMembersCount > 0" class="p-4 border rounded-lg border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/20">
+                <div class="flex items-center gap-3">
+                  <IconCheck class="w-6 h-6 text-green-600 dark:text-green-400" />
+                  <p class="font-medium text-green-700 dark:text-green-300">
+                    {{ t('2fa-all-members-compliant') }}
+                  </p>
+                </div>
+              </div>
+            </div>
           </section>
 
-          <!-- Members 2FA Status Overview -->
-          <section v-if="hasOrgPerm" class="p-6 border rounded-lg border-slate-200 dark:border-slate-700">
-            <h3 class="mb-4 text-lg font-semibold dark:text-white text-slate-800">
-              {{ t('2fa-members-status') }}
-            </h3>
-
-            <!-- Stats cards -->
-            <div class="grid grid-cols-1 gap-4 mb-6 md:grid-cols-3">
-              <div class="p-4 rounded-lg bg-slate-50 dark:bg-slate-700/50">
-                <div class="flex items-center gap-3">
-                  <IconUser class="w-5 h-5 text-slate-500" />
-                  <div>
-                    <p class="text-2xl font-bold dark:text-white text-slate-800">
-                      {{ totalMembersCount }}
-                    </p>
-                    <p class="text-sm text-slate-600 dark:text-slate-400">
-                      {{ t('total-members') }}
-                    </p>
-                  </div>
+          <!-- Encrypted Bundles Enforcement Section -->
+          <section class="p-6 border rounded-lg border-slate-200 dark:border-slate-700">
+            <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <div class="flex items-start gap-4">
+                <div class="p-3 rounded-lg bg-purple-50 dark:bg-purple-900/30">
+                  <IconLock class="w-6 h-6 text-purple-600 dark:text-purple-400" />
+                </div>
+                <div>
+                  <h3 class="text-lg font-semibold dark:text-white text-slate-800">
+                    {{ t('enforce-encrypted-bundles') }}
+                  </h3>
+                  <p class="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                    {{ t('enforce-encrypted-bundles-description') }}
+                  </p>
                 </div>
               </div>
-              <div class="p-4 rounded-lg bg-green-50 dark:bg-green-900/20">
-                <div class="flex items-center gap-3">
-                  <IconCheck class="w-5 h-5 text-green-600 dark:text-green-400" />
-                  <div>
-                    <p class="text-2xl font-bold text-green-700 dark:text-green-400">
-                      {{ compliantMembersCount }}
-                    </p>
-                    <p class="text-sm text-green-600 dark:text-green-500">
-                      {{ t('2fa-enabled') }}
-                    </p>
-                  </div>
-                </div>
-              </div>
-              <div class="p-4 rounded-lg bg-amber-50 dark:bg-amber-900/20">
-                <div class="flex items-center gap-3">
-                  <IconWarning class="w-5 h-5 text-amber-600 dark:text-amber-400" />
-                  <div>
-                    <p class="text-2xl font-bold text-amber-700 dark:text-amber-400">
-                      {{ nonCompliantMembersCount }}
-                    </p>
-                    <p class="text-sm text-amber-600 dark:text-amber-500">
-                      {{ t('2fa-not-enabled') }}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Impacted Members List (shown if there are non-compliant members) -->
-            <div v-if="impactedMembers.length > 0" class="p-4 border rounded-lg border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20">
-              <div class="flex flex-col gap-4 mb-4 md:flex-row md:items-center md:justify-between">
-                <div class="flex items-center gap-2">
-                  <IconWarning class="w-5 h-5 text-amber-600 dark:text-amber-400" />
-                  <h4 class="font-semibold text-amber-800 dark:text-amber-200">
-                    {{ t('2fa-impacted-members-title') }}
-                  </h4>
-                </div>
+              <div class="flex items-center gap-4">
                 <button
                   type="button"
-                  class="px-3 py-2 text-xs font-medium text-center border rounded-lg cursor-pointer text-amber-700 dark:text-amber-300 hover:bg-amber-100 focus:ring-4 focus:ring-amber-300 border-amber-400 dark:border-amber-600 dark:hover:bg-amber-800/30 dark:focus:ring-amber-800 focus:outline-hidden"
-                  @click="copyEmailList"
+                  :disabled="!hasOrgPerm || isSaving"
+                  class="relative inline-flex items-center cursor-pointer"
+                  :class="{ 'opacity-50 cursor-not-allowed': !hasOrgPerm || isSaving }"
+                  @click="toggleEnforceEncryptedBundles"
                 >
-                  {{ t('copy-email-list') }}
-                </button>
-              </div>
-              <p class="mb-4 text-sm text-amber-700 dark:text-amber-300">
-                {{ t('2fa-impacted-members-description') }}
-              </p>
-              <ul class="space-y-2">
-                <li v-for="member in impactedMembers" :key="member.uid" class="flex items-center gap-3 p-2 rounded-lg bg-white/50 dark:bg-slate-800/50">
-                  <img
-                    v-if="member.image_url"
-                    :src="member.image_url"
-                    :alt="`Profile picture for ${member.email}`"
-                    class="w-8 h-8 rounded-full shrink-0"
+                  <div
+                    class="w-11 h-6 rounded-full transition-colors duration-200 ease-in-out"
+                    :class="enforceEncryptedBundles ? 'bg-purple-600' : 'bg-gray-200 dark:bg-gray-700'"
                   >
-                  <div v-else class="flex items-center justify-center w-8 h-8 text-sm bg-gray-700 rounded-full shrink-0">
-                    <span class="font-medium text-gray-300">
-                      {{ acronym(member.email) }}
-                    </span>
+                    <div
+                      class="absolute top-[2px] left-[2px] bg-white border-gray-300 border rounded-full h-5 w-5 transition-transform duration-200 ease-in-out"
+                      :class="enforceEncryptedBundles ? 'translate-x-full border-white' : ''"
+                    />
                   </div>
-                  <div class="flex-1 min-w-0">
-                    <p class="text-sm font-medium truncate text-slate-800 dark:text-white">
-                      {{ member.email }}
-                    </p>
-                    <p class="text-xs text-slate-500 dark:text-slate-400">
-                      {{ member.role.replace('_', ' ') }}
-                    </p>
-                  </div>
-                </li>
-              </ul>
-            </div>
-
-            <!-- All compliant message -->
-            <div v-else-if="totalMembersCount > 0" class="p-4 border rounded-lg border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/20">
-              <div class="flex items-center gap-3">
-                <IconCheck class="w-6 h-6 text-green-600 dark:text-green-400" />
-                <p class="font-medium text-green-700 dark:text-green-300">
-                  {{ t('2fa-all-members-compliant') }}
-                </p>
+                </button>
+                <span v-if="enforceEncryptedBundles" class="px-3 py-1 text-sm font-medium text-purple-700 bg-purple-100 rounded-full dark:bg-purple-900/30 dark:text-purple-400">
+                  {{ t('enabled') }}
+                </span>
+                <span v-else class="px-3 py-1 text-sm font-medium text-gray-700 bg-gray-100 rounded-full dark:bg-gray-700 dark:text-gray-300">
+                  {{ t('disabled') }}
+                </span>
               </div>
             </div>
           </section>
 
           <!-- Password Policy Section -->
           <section class="p-6 border rounded-lg border-slate-200 dark:border-slate-700">
-            <h3 class="mb-4 text-lg font-semibold dark:text-white text-slate-800">
-              {{ t('password-policy') }}
-            </h3>
-
-            <p class="mb-4 text-sm text-gray-600 dark:text-gray-400">
-              {{ t('password-policy-description') }}
-            </p>
+            <div class="flex items-start gap-4 mb-4">
+              <div class="p-3 rounded-lg bg-indigo-50 dark:bg-indigo-900/30">
+                <IconFingerprint class="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
+              </div>
+              <div>
+                <h3 class="text-lg font-semibold dark:text-white text-slate-800">
+                  {{ t('password-policy') }}
+                </h3>
+                <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                  {{ t('password-policy-description') }}
+                </p>
+              </div>
+            </div>
 
             <!-- Enable/Disable Toggle -->
             <div class="flex items-center justify-between p-3 mb-4 rounded-lg bg-gray-50 dark:bg-gray-700/50">
