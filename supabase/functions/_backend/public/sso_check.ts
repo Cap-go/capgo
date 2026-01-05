@@ -1,7 +1,7 @@
 import type { Context } from 'hono'
 import { honoFactory } from '../utils/hono.ts'
-import { getPgClient } from '../utils/pg.ts'
 import { cloudlogErr, serializeError } from '../utils/logging.ts'
+import { getPgClient } from '../utils/pg.ts'
 
 export const app = honoFactory.createApp()
 
