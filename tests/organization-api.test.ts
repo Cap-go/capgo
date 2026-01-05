@@ -309,9 +309,13 @@ describe('[DELETE] /organization/members', () => {
     })
     expect(error).toBeNull()
 
-    const response = await fetch(`${BASE_URL}/organization/members?orgId=${ORG_ID}&email=${USER_ADMIN_EMAIL}`, {
+    const response = await fetch(`${BASE_URL}/organization/members`, {
       headers,
       method: 'DELETE',
+      body: JSON.stringify({
+        orgId: ORG_ID,
+        email: USER_ADMIN_EMAIL,
+      }),
     })
     expect(response.status).toBe(200)
     const type = z.object({
@@ -330,17 +334,22 @@ describe('[DELETE] /organization/members', () => {
     const response = await fetch(`${BASE_URL}/organization/members`, {
       headers,
       method: 'DELETE',
+      body: JSON.stringify({}), // Empty body with missing required fields
     })
     expect(response.status).toBe(400)
     const responseData = await response.json() as { error: string }
-    expect(responseData.error).toBe('invalid_json_parse_body')
+    expect(responseData.error).toBe('invalid_body')
   })
 
   it('delete organization member with invalid orgId', async () => {
     const invalidOrgId = randomUUID()
-    const response = await fetch(`${BASE_URL}/organization/members?orgId=${invalidOrgId}&email=${USER_ADMIN_EMAIL}`, {
+    const response = await fetch(`${BASE_URL}/organization/members`, {
       headers,
       method: 'DELETE',
+      body: JSON.stringify({
+        orgId: invalidOrgId,
+        email: USER_ADMIN_EMAIL,
+      }),
     })
     expect(response.status).toBe(400)
     const responseData = await response.json() as { error: string }
@@ -349,9 +358,13 @@ describe('[DELETE] /organization/members', () => {
 
   it('delete organization member with non-existent email', async () => {
     const nonExistentEmail = `nonexistent-${randomUUID()}@example.com`
-    const response = await fetch(`${BASE_URL}/organization/members?orgId=${ORG_ID}&email=${nonExistentEmail}`, {
+    const response = await fetch(`${BASE_URL}/organization/members`, {
       headers,
       method: 'DELETE',
+      body: JSON.stringify({
+        orgId: ORG_ID,
+        email: nonExistentEmail,
+      }),
     })
     expect(response.status).toBe(404)
     const responseData = await response.json() as { error: string }
