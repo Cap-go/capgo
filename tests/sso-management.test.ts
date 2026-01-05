@@ -250,44 +250,44 @@ describe('auto-join integration', () => {
         actualUserId = authUserData.user.id
       }
       else {
-        // No user returned - check if there's a real error message
-        // Empty object {} or stringified "{}" means user likely exists (Supabase quirk on retry)
+        // No user returned - this could be:
+        // 1. User already exists (empty error on retry)
+        // 2. Some other failure
+        // Check if there's a real error message first
         const errorMsg = authUserError?.message
         const isUsefulError = errorMsg && errorMsg.trim() !== '' && errorMsg !== '{}'
-        if (isUsefulError) {
-          throw new Error(`Auth user creation failed: ${errorMsg}`)
+
+        // Try to find existing user before giving up
+        const { data: existingUser } = await getSupabaseClient()
+          .from('users')
+          .select('id')
+          .eq('email', testUserEmail)
+          .maybeSingle()
+
+        if (existingUser) {
+          actualUserId = existingUser.id
+          console.log('Found existing user in public.users:', actualUserId)
         }
-        // No useful message means empty error object - fall through to catch for retry lookup
-        throw new Error('User likely exists (empty error response)')
+        else {
+          // Also check auth.users
+          const { data: authUsers } = await getSupabaseClient().auth.admin.listUsers()
+          const existingAuthUser = authUsers?.users?.find(u => u.email === testUserEmail)
+          if (existingAuthUser) {
+            actualUserId = existingAuthUser.id
+            console.log('Found existing user in auth.users:', actualUserId)
+          }
+          else if (isUsefulError) {
+            throw new Error(`Auth user creation failed: ${errorMsg}`)
+          }
+          else {
+            throw new Error('Auth user creation failed with no user returned and user not found in database')
+          }
+        }
       }
     }
     catch (err: any) {
-      // If user already exists (retry scenario), skip user creation
-      // The user will already have a public.users record and org_users enrollment from the first attempt
-      console.log('User creation failed (likely exists from retry), looking up by email')
-
-      // First try public.users table
-      const { data: existingUser } = await getSupabaseClient()
-        .from('users')
-        .select('id')
-        .eq('email', testUserEmail)
-        .maybeSingle()
-
-      if (existingUser) {
-        actualUserId = existingUser.id
-      }
-      else {
-        // If not in public.users, try auth.users via admin API
-        const { data: authUsers } = await getSupabaseClient().auth.admin.listUsers()
-        const existingAuthUser = authUsers?.users?.find(u => u.email === testUserEmail)
-        if (existingAuthUser) {
-          actualUserId = existingAuthUser.id
-        }
-        else {
-          // If we can't find the user anywhere, re-throw the original error
-          throw err
-        }
-      }
+      // Re-throw - we've already tried to look up the user above
+      throw err
     }
 
     if (!actualUserId) {
