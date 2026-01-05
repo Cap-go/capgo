@@ -28,7 +28,7 @@ BEGIN
   UPDATE stripe_info 
   SET mau_exceeded = false, storage_exceeded = false, bandwidth_exceeded = false, 
       status = 'succeeded', is_good_plan = true,
-      trial_at = now() - interval '1 year'
+      trial_at = NOW() - interval '1 year'
   WHERE customer_id = 'cus_Q38uE91NP8Ufqc';
   
   RETURN NEXT ok(
@@ -77,7 +77,7 @@ BEGIN
 
   -- Test trial period
   UPDATE stripe_info 
-  SET trial_at = now() + interval '1 day',
+  SET trial_at = NOW() + interval '1 day',
       mau_exceeded = true, storage_exceeded = true, bandwidth_exceeded = true,
       is_good_plan = false
   WHERE customer_id = 'cus_Q38uE91NP8Ufqc';

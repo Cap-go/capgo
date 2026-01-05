@@ -5,7 +5,7 @@ import { quickError } from './hono.ts'
 import { cloudlog, cloudlogErr } from './logging.ts'
 import { logsnag } from './logsnag.ts'
 import { sendNotifToOrgMembers } from './org_email_notifications.ts'
-import { recordUsage, setThreshold, syncSubscriptionData } from './stripe.ts'
+import { syncSubscriptionData } from './stripe.ts'
 import {
   getCurrentPlanNameOrg,
   getPlanUsagePercent,
@@ -176,56 +176,6 @@ export async function findBestPlan(c: Context, stats: Database['public']['Functi
   return data ?? 'Team'
 }
 
-export async function getMeterdUsage(c: Context, orgId: string): Promise<Database['public']['CompositeTypes']['stats_table']> {
-  const { data, error } = await supabaseAdmin(c)
-    .rpc('get_metered_usage', { orgid: orgId })
-
-  if (error) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'getMeterdUsage', error })
-    throw new Error(error.message)
-  }
-
-  return {
-    mau: data?.mau ?? 0,
-    storage: data?.storage ?? 0,
-    bandwidth: data?.bandwidth ?? 0,
-  }
-}
-interface Prices {
-  mau: string
-  storage: string
-  bandwidth: string
-}
-
-async function setMetered(c: Context, customer_id: string | null, orgId: string) {
-  if (customer_id === null)
-    return Promise.resolve()
-  cloudlog({ requestId: c.get('requestId'), message: 'setMetered', customer_id, orgId })
-  // return await Promise.resolve({} as Prices)
-  const { data } = await supabaseAdmin(c)
-    .from('stripe_info')
-    .select()
-    .eq('customer_id', customer_id)
-    .single()
-  if (data?.subscription_metered && Object.keys(data.subscription_metered).length > 0) {
-    try {
-      await setThreshold(c, customer_id)
-    }
-    catch (error) {
-      cloudlog({ requestId: c.get('requestId'), message: 'error setThreshold', error })
-    }
-    const prices = data.subscription_metered as any as Prices
-    const get_metered_usage = await getMeterdUsage(c, orgId)
-    if (get_metered_usage.mau && get_metered_usage.mau > 0 && prices.mau)
-      await recordUsage(c, customer_id, prices.mau, get_metered_usage.mau)
-    if (get_metered_usage.storage && get_metered_usage.storage > 0)
-      await recordUsage(c, customer_id, prices.storage, get_metered_usage.storage)
-    if (get_metered_usage.bandwidth && get_metered_usage.bandwidth > 0)
-      await recordUsage(c, customer_id, prices.bandwidth, get_metered_usage.bandwidth)
-    // Note: build_minutes uses credits-only billing, not Stripe metered pricing
-  }
-}
-
 async function userAbovePlan(c: Context, org: {
   customer_id: string | null
   stripe_info: {
@@ -247,8 +197,6 @@ async function userAbovePlan(c: Context, org: {
   if (currentPlanError) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'currentPlanError', error: currentPlanError })
   }
-
-  await setMetered(c, org.customer_id, orgId)
 
   const billingCycle = await getBillingCycleRange(c, orgId)
   const planId = currentPlan?.id

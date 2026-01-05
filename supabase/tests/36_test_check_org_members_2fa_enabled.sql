@@ -14,10 +14,10 @@ END $$;
 -- Create entries in public.users for the test members
 INSERT INTO public.users (id, email, created_at, updated_at)
 VALUES
-(tests.get_supabase_uid('test_org_member_1'), 'member1@test.com', now(), now()),
-(tests.get_supabase_uid('test_org_member_2'), 'member2@test.com', now(), now()),
-(tests.get_supabase_uid('test_org_member_3'), 'member3@test.com', now(), now()),
-(tests.get_supabase_uid('test_org_member_4'), 'member4@test.com', now(), now())
+(tests.get_supabase_uid('test_org_member_1'), 'member1@test.com', NOW(), NOW()),
+(tests.get_supabase_uid('test_org_member_2'), 'member2@test.com', NOW(), NOW()),
+(tests.get_supabase_uid('test_org_member_3'), 'member3@test.com', NOW(), NOW()),
+(tests.get_supabase_uid('test_org_member_4'), 'member4@test.com', NOW(), NOW())
 ON CONFLICT (id) DO NOTHING;
 
 -- Create a test org
@@ -76,8 +76,8 @@ BEGIN
         'Test TOTP',
         'totp'::auth.factor_type,
         'verified'::auth.factor_status,
-        now(),
-        now()
+        NOW(),
+        NOW()
     );
 
     -- Insert verified MFA factor for member4 (to test multiple members with 2FA)
@@ -88,8 +88,8 @@ BEGIN
         'Test TOTP Member4',
         'totp'::auth.factor_type,
         'verified'::auth.factor_status,
-        now(),
-        now()
+        NOW(),
+        NOW()
     );
 
     -- Insert unverified MFA factor for member2 (should not count)
@@ -100,8 +100,8 @@ BEGIN
         'Test TOTP Unverified',
         'totp'::auth.factor_type,
         'unverified'::auth.factor_status,
-        now(),
-        now()
+        NOW(),
+        NOW()
     );
 
     -- member3 has no MFA factors

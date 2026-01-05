@@ -24,8 +24,8 @@ WITH user_insert AS (
   VALUES (
     tests.get_supabase_uid('email_pref_user'),
     'email-pref@example.com',
-    now(),
-    now()
+    NOW(),
+    NOW()
   )
   RETURNING id
 )
@@ -228,8 +228,8 @@ INSERT INTO public.users (id, email, created_at, updated_at)
 VALUES (
   tests.get_supabase_uid('new_email_pref_user'),
   'new-email-pref-user@example.com',
-  now(),
-  now()
+  NOW(),
+  NOW()
 );
 
 SELECT

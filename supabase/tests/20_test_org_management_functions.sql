@@ -556,7 +556,7 @@ SET
     storage_exceeded = TRUE,
     mau_exceeded = FALSE,
     bandwidth_exceeded = FALSE,
-    trial_at = now() - interval '30 days',
+    trial_at = NOW() - interval '30 days',
     status = 'succeeded',
     is_good_plan = TRUE
 WHERE
@@ -700,7 +700,7 @@ SET
     storage_exceeded = FALSE,
     mau_exceeded = FALSE,
     bandwidth_exceeded = FALSE,
-    trial_at = now() + interval '15 days'
+    trial_at = NOW() + interval '15 days'
 WHERE
     customer_id = (
         SELECT customer_id

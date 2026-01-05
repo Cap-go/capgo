@@ -628,7 +628,7 @@ BEGIN
   -- Check if enough time has passed since last transfer
   IF v_last_transfer IS NOT NULL THEN
     v_last_transfer_date := (v_last_transfer->>'transferred_at')::timestamp;
-    IF v_last_transfer_date + interval '32 days' > now() THEN
+    IF v_last_transfer_date + interval '32 days' > NOW() THEN
       RAISE EXCEPTION 'Cannot transfer app. Must wait at least 32 days between transfers. Last transfer was on %', v_last_transfer_date;
     END IF;
   END IF;
@@ -637,9 +637,9 @@ BEGIN
   UPDATE public.apps
   SET
       owner_org = p_new_org_id,
-      updated_at = now(),
+      updated_at = NOW(),
       transfer_history = COALESCE(transfer_history, '{}') || jsonb_build_object(
-          'transferred_at', now(),
+          'transferred_at', NOW(),
           'transferred_from', v_old_org_id,
           'transferred_to', p_new_org_id,
           'initiated_by', v_user_id

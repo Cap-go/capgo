@@ -135,7 +135,7 @@ BEGIN
   INTO v_credits_available
   FROM public.usage_credit_grants
   WHERE org_id = p_org_id
-    AND expires_at >= now();
+    AND expires_at >= NOW();
 
   -- Determine if we need a new record:
   -- 1. No existing record for this cycle (first overage)
@@ -186,7 +186,7 @@ BEGIN
         SELECT *
         FROM public.usage_credit_grants
         WHERE org_id = p_org_id
-          AND expires_at >= now()
+          AND expires_at >= NOW()
           AND credits_consumed < credits_total
         ORDER BY expires_at ASC, granted_at ASC
         FOR UPDATE
@@ -225,7 +225,7 @@ BEGIN
         INTO v_balance
         FROM public.usage_credit_grants
         WHERE org_id = p_org_id
-          AND expires_at >= now();
+          AND expires_at >= NOW();
 
         INSERT INTO public.usage_credit_transactions (
           org_id,
@@ -243,7 +243,7 @@ BEGIN
           'deduction',
           -v_use,
           v_balance,
-          now(),
+          NOW(),
           format('Overage deduction for %s usage', p_metric::text),
           jsonb_build_object('overage_event_id', v_event_id, 'metric', p_metric::text)
         );

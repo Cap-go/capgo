@@ -16,8 +16,8 @@ CREATE TABLE IF NOT EXISTS public.webhooks (
     enabled BOOLEAN DEFAULT true NOT NULL,
     -- ['apps', 'app_versions', 'channels', 'org_users', 'orgs']
     events TEXT [] NOT NULL,
-    created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
-    updated_at TIMESTAMPTZ DEFAULT now() NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
     created_by UUID,
     CONSTRAINT webhooks_pkey PRIMARY KEY (id),
     CONSTRAINT webhooks_org_id_fkey FOREIGN KEY (
@@ -60,7 +60,7 @@ CREATE TABLE IF NOT EXISTS public.webhook_deliveries (
     attempt_count INTEGER DEFAULT 0 NOT NULL,
     max_attempts INTEGER DEFAULT 3 NOT NULL,
     next_retry_at TIMESTAMPTZ,
-    created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
     completed_at TIMESTAMPTZ,
     duration_ms INTEGER,
     CONSTRAINT webhook_deliveries_pkey PRIMARY KEY (id),
@@ -301,7 +301,7 @@ LANGUAGE plpgsql
 SET search_path = ''
 AS $$
 BEGIN
-  NEW.updated_at = now();
+  NEW.updated_at = NOW();
   RETURN NEW;
 END;
 $$;
@@ -358,9 +358,9 @@ DECLARE
   current_second int;
 BEGIN
   -- Get current time components in UTC
-  current_hour := EXTRACT(HOUR FROM now());
-  current_minute := EXTRACT(MINUTE FROM now());
-  current_second := EXTRACT(SECOND FROM now());
+  current_hour := EXTRACT(HOUR FROM NOW());
+  current_minute := EXTRACT(MINUTE FROM NOW());
+  current_second := EXTRACT(SECOND FROM NOW());
 
   -- Every 10 seconds: High-frequency queues (at :00, :10, :20, :30, :40, :50)
   IF current_second % 10 = 0 THEN
@@ -525,13 +525,13 @@ BEGIN
   -- Daily at 12:00:00 - Noon tasks
   IF current_hour = 12 AND current_minute = 0 AND current_second = 0 THEN
     BEGIN
-      DELETE FROM cron.job_run_details WHERE end_time < now() - interval '7 days';
+      DELETE FROM cron.job_run_details WHERE end_time < NOW() - interval '7 days';
     EXCEPTION WHEN OTHERS THEN
       RAISE WARNING 'cleanup job_run_details failed: %', SQLERRM;
     END;
 
     -- Weekly stats email (every Saturday at noon)
-    IF EXTRACT(DOW FROM now()) = 6 THEN
+    IF EXTRACT(DOW FROM NOW()) = 6 THEN
       BEGIN
         PERFORM public.process_stats_email_weekly();
       EXCEPTION WHEN OTHERS THEN
@@ -540,7 +540,7 @@ BEGIN
     END IF;
 
     -- Monthly stats email (1st of month at noon)
-    IF EXTRACT(DAY FROM now()) = 1 THEN
+    IF EXTRACT(DAY FROM NOW()) = 1 THEN
       BEGIN
         PERFORM public.process_stats_email_monthly();
       EXCEPTION WHEN OTHERS THEN

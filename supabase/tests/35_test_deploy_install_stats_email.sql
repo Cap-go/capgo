@@ -27,8 +27,8 @@ WITH user_insert AS (
     VALUES (
         tests.get_supabase_uid('deploy_stats_user'),
         'deploy-stats@example.com',
-        now(),
-        now()
+        NOW(),
+        NOW()
     )
     RETURNING id
 )
@@ -155,7 +155,7 @@ WITH ios_deploy AS (
         ios_channel_id,
         app_id,
         ios_version_id,
-        now() - interval '25 hours',
+        NOW() - interval '25 hours',
         user_id,
         org_id
     FROM deploy_stats_context
@@ -175,7 +175,7 @@ android_deploy AS (
         android_channel_id,
         app_id,
         android_version_id,
-        now() - interval '25 hours',
+        NOW() - interval '25 hours',
         user_id,
         org_id
     FROM deploy_stats_context
@@ -195,7 +195,7 @@ private_deploy AS (
         private_channel_id,
         app_id,
         ios_version_id,
-        now() - interval '25 hours',
+        NOW() - interval '25 hours',
         user_id,
         org_id
     FROM deploy_stats_context

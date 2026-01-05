@@ -13,13 +13,13 @@ END $$;
 -- Create entries in public.users for the test members
 INSERT INTO public.users (id, email, created_at, updated_at)
 VALUES
-(tests.get_supabase_uid('test_2fa_user'), '2fa@test.com', now(), now()),
-(tests.get_supabase_uid('test_no_2fa_user'), 'no2fa@test.com', now(), now()),
+(tests.get_supabase_uid('test_2fa_user'), '2fa@test.com', NOW(), NOW()),
+(tests.get_supabase_uid('test_no_2fa_user'), 'no2fa@test.com', NOW(), NOW()),
 (
     tests.get_supabase_uid('test_unverified_2fa_user'),
     'unverified2fa@test.com',
-    now(),
-    now()
+    NOW(),
+    NOW()
 )
 ON CONFLICT (id) DO NOTHING;
 
@@ -85,8 +85,8 @@ BEGIN
         'Test TOTP',
         'totp'::auth.factor_type,
         'verified'::auth.factor_status,
-        now(),
-        now()
+        NOW(),
+        NOW()
     );
 
     -- Insert unverified MFA factor for test_unverified_2fa_user
@@ -97,8 +97,8 @@ BEGIN
         'Test TOTP Unverified',
         'totp'::auth.factor_type,
         'unverified'::auth.factor_status,
-        now(),
-        now()
+        NOW(),
+        NOW()
     );
 END $$;
 
@@ -298,7 +298,7 @@ BEGIN
 
     -- Create app
     INSERT INTO public.apps (app_id, name, owner_org, user_id, icon_url, created_at, updated_at)
-    VALUES (test_app_id, 'Test 2FA App', org_with_2fa_id, test_2fa_user_id, '', now(), now())
+    VALUES (test_app_id, 'Test 2FA App', org_with_2fa_id, test_2fa_user_id, '', NOW(), NOW())
     ON CONFLICT (app_id) DO NOTHING;
 
     -- Add app-specific permission

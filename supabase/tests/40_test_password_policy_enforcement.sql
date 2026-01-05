@@ -15,14 +15,14 @@ VALUES
 (
     tests.get_supabase_uid('test_pwd_compliant_user'),
     'compliant@test.com',
-    now(),
-    now()
+    NOW(),
+    NOW()
 ),
 (
     tests.get_supabase_uid('test_pwd_noncompliant_user'),
     'noncompliant@test.com',
-    now(),
-    now()
+    NOW(),
+    NOW()
 )
 ON CONFLICT (id) DO NOTHING;
 
@@ -82,7 +82,7 @@ BEGIN
     -- This simulates a user who has successfully validated their password via the backend
     policy_hash := public.get_password_policy_hash(policy_config);
     INSERT INTO public.user_password_compliance (user_id, org_id, policy_hash, validated_at)
-    VALUES (compliant_user_id, org_with_pwd_policy_id, policy_hash, now());
+    VALUES (compliant_user_id, org_with_pwd_policy_id, policy_hash, NOW());
 
     -- Store org IDs for later use
     PERFORM set_config('test.org_with_pwd_policy', org_with_pwd_policy_id::text, false);
@@ -415,7 +415,7 @@ BEGIN
     -- Add password compliance record for compliant user
     policy_hash := public.get_password_policy_hash(policy_config);
     INSERT INTO public.user_password_compliance (user_id, org_id, policy_hash, validated_at)
-    VALUES (compliant_user_id, org_both_policies_id, policy_hash, now());
+    VALUES (compliant_user_id, org_both_policies_id, policy_hash, NOW());
 
     PERFORM set_config('test.org_both_policies', org_both_policies_id::text, false);
 END $$;

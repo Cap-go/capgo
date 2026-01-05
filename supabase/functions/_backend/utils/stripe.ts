@@ -213,11 +213,10 @@ export async function cancelSubscription(c: Context, customerId: string) {
   })
 }
 
-async function getPriceIds(c: Context, planId: string, recurrence: string): Promise<{ priceId: string | null, meteredIds: string[] }> {
+async function getPriceIds(c: Context, planId: string, recurrence: string): Promise<{ priceId: string | null }> {
   let priceId = null
-  const meteredIds: string[] = []
   if (!existInEnv(c, 'STRIPE_SECRET_KEY'))
-    return { priceId, meteredIds }
+    return { priceId }
   try {
     const prices = await getStripe(c).prices.search({
       query: `product:"${planId}"`,
@@ -226,14 +225,12 @@ async function getPriceIds(c: Context, planId: string, recurrence: string): Prom
     prices.data.forEach((price) => {
       if (price.recurring && price.recurring.interval === recurrence && price.active && price.recurring.usage_type === 'licensed')
         priceId = price.id
-      if (price.billing_scheme === 'per_unit' && price.active && price?.recurring?.usage_type !== 'licensed')
-        meteredIds.push(price.id)
     })
   }
   catch (err) {
     cloudlog({ requestId: c.get('requestId'), message: 'search err', error: err })
   }
-  return { priceId, meteredIds }
+  return { priceId }
 }
 
 export interface MeteredData {
@@ -246,12 +243,11 @@ export interface StripeData {
   previousProductId: string | undefined
 }
 
-export function parsePriceIds(c: Context, prices: Stripe.SubscriptionItem[]): { priceId: string | null, productId: string | null, meteredData: MeteredData } {
+export function parsePriceIds(c: Context, prices: Stripe.SubscriptionItem[]): { priceId: string | null, productId: string | null } {
   let priceId: string | null = null
   let productId: string | null = null
-  const meteredData: { [key: string]: string } = {}
   if (!existInEnv(c, 'STRIPE_SECRET_KEY'))
-    return { priceId, productId, meteredData }
+    return { priceId, productId }
   try {
     cloudlog({ requestId: c.get('requestId'), message: 'prices stripe', prices })
     prices.forEach((price) => {
@@ -259,16 +255,12 @@ export function parsePriceIds(c: Context, prices: Stripe.SubscriptionItem[]): { 
         priceId = price.plan.id
         productId = price.plan.product as string
       }
-      if (price.plan.billing_scheme === 'per_unit' && price?.plan?.usage_type !== 'licensed' && price.plan.nickname) {
-        meteredData[price.plan.nickname.toLowerCase()] = price.plan.id
-        cloudlog({ requestId: c.get('requestId'), message: 'metered price', price })
-      }
     })
   }
   catch (err) {
     cloudlog({ requestId: c.get('requestId'), message: 'search err', error: err })
   }
-  return { priceId, productId, meteredData }
+  return { priceId, productId }
 }
 
 export async function createCheckout(c: Context, customerId: string, recurrence: string, planId: string, successUrl: string, cancelUrl: string, clientReferenceId?: string, attributionId?: string) {
@@ -298,9 +290,6 @@ export async function createCheckout(c: Context, customerId: string, recurrence:
         price: prices.priceId,
         quantity: 1,
       },
-      ...prices.meteredIds.map(priceId => ({
-        price: priceId,
-      })),
     ],
   })
   return { url: session.url }
@@ -433,62 +422,6 @@ export async function ensureCustomerMetadata(c: Context, customerId: string, org
   }
   catch (error) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'ensureCustomerMetadata', error })
-  }
-}
-
-export async function setThreshold(c: Context, subscriptionId: string) {
-  if (!existInEnv(c, 'STRIPE_SECRET_KEY'))
-    return Promise.resolve()
-  const subscription = await getStripe(c).subscriptions.update(subscriptionId, {
-    billing_thresholds: {
-      amount_gte: 5000,
-      reset_billing_cycle_anchor: false,
-    },
-  })
-  return subscription
-}
-
-export async function recordUsage(c: Context, customerId: string, eventName: string, value: number, meterId?: string) {
-  if (!existInEnv(c, 'STRIPE_SECRET_KEY'))
-    return Promise.resolve()
-
-  if (!eventName) {
-    cloudlog({ requestId: c.get('requestId'), message: 'recordUsage no eventName', customerId, eventName, value, meterId })
-    return Promise.reject(new Error('No event name'))
-  }
-  try {
-    // Create a meter event for usage tracking
-    const meterEvent = await getStripe(c).billing.meterEvents.create({
-      event_name: eventName,
-      payload: {
-        value: value.toString(),
-        stripe_customer_id: customerId,
-      },
-      // Optional: specify meter ID if you have multiple meters
-      ...(meterId && { meter: meterId }),
-    })
-
-    cloudlog({
-      requestId: c.get('requestId'),
-      message: 'Meter event recorded',
-      customerId,
-      eventName,
-      value,
-      meterEventId: meterEvent.identifier,
-    })
-
-    return meterEvent
-  }
-  catch (error) {
-    cloudlogErr({
-      requestId: c.get('requestId'),
-      message: 'Failed to record meter usage',
-      customerId,
-      eventName,
-      value,
-      error,
-    })
-    throw error
   }
 }
 

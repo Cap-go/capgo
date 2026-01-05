@@ -16,7 +16,7 @@ DECLARE
   v_usage_result RECORD;
   v_original_anchor_start timestamptz;
   v_original_anchor_end timestamptz;
-  v_now timestamptz := now();
+  v_now timestamptz := NOW();
   v_expected_cycle_start timestamptz;
   v_expected_cycle_end timestamptz;
   v_anchor_day int;

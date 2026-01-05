@@ -171,7 +171,7 @@ DECLARE
   preceding_count integer := 0;
   is_target boolean := false;
 BEGIN
-  next_run := public.get_next_cron_time(cron_schedule, now());
+  next_run := public.get_next_cron_time(cron_schedule, NOW());
   WITH paying_orgs AS (
     SELECT o.id
     FROM public.orgs o
