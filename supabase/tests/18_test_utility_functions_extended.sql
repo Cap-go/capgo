@@ -248,18 +248,6 @@ SELECT
         'is_not_deleted test - invalid email format returns true'
     );
 
--- Test check_revert_to_builtin_version
-SELECT tests.authenticate_as('test_user');
-
-SELECT
-    ok(
-        check_revert_to_builtin_version('com.demo.app') > 0,
-        'check_revert_to_builtin_version test - returns version id'
-    );
-
--- Test check_revert_to_builtin_version negative case (skipped due to missing app_versions table in test environment)
-SELECT tests.clear_authentication();
-
 -- Test find_best_plan_v3
 SELECT
     is(
@@ -305,7 +293,7 @@ SELECT
 -- Test one_month_ahead
 SELECT
     ok(
-        one_month_ahead() > now(),
+        one_month_ahead() > NOW(),
         'one_month_ahead test - returns future date'
     );
 
@@ -333,6 +321,18 @@ SELECT
         ) >= 0,
         'get_update_stats test - returns results'
     );
+
+-- Test check_revert_to_builtin_version
+SELECT tests.authenticate_as('test_user');
+
+SELECT
+    ok(
+        check_revert_to_builtin_version('com.demo.app') > 0,
+        'check_revert_to_builtin_version test - returns version id'
+    );
+
+-- Test check_revert_to_builtin_version negative case (skipped due to missing app_versions table in test environment)
+SELECT tests.clear_authentication();
 
 SELECT *
 FROM

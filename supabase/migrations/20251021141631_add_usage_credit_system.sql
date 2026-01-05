@@ -35,8 +35,8 @@ CREATE TABLE IF NOT EXISTS public.usage_credit_grants (
     credits_consumed numeric(18, 6) DEFAULT 0 NOT NULL CHECK (
         credits_consumed >= 0
     ),
-    granted_at timestamptz DEFAULT now() NOT NULL,
-    expires_at timestamptz DEFAULT (now() + interval '1 year') NOT NULL,
+    granted_at timestamptz DEFAULT NOW() NOT NULL,
+    expires_at timestamptz DEFAULT (NOW() + interval '1 year') NOT NULL,
     source text DEFAULT 'manual'::text NOT NULL,
     source_ref jsonb,
     notes text,
@@ -59,7 +59,7 @@ CREATE TABLE IF NOT EXISTS public.usage_credit_transactions (
     transaction_type public.credit_transaction_type NOT NULL,
     amount numeric(18, 6) NOT NULL,
     balance_after numeric(18, 6),
-    occurred_at timestamptz DEFAULT now() NOT NULL,
+    occurred_at timestamptz DEFAULT NOW() NOT NULL,
     description text,
     source_ref jsonb
 );
@@ -87,7 +87,7 @@ CREATE TABLE IF NOT EXISTS public.usage_overage_events (
     ) ON DELETE SET NULL,
     billing_cycle_start date,
     billing_cycle_end date,
-    created_at timestamptz DEFAULT now() NOT NULL,
+    created_at timestamptz DEFAULT NOW() NOT NULL,
     details jsonb
 );
 
@@ -111,7 +111,7 @@ CREATE TABLE IF NOT EXISTS public.usage_credit_consumptions (
     ) ON DELETE SET NULL,
     metric public.credit_metric_type NOT NULL,
     credits_used numeric(18, 6) NOT NULL CHECK (credits_used > 0),
-    applied_at timestamptz DEFAULT now() NOT NULL
+    applied_at timestamptz DEFAULT NOW() NOT NULL
 );
 
 COMMENT ON TABLE public.usage_credit_consumptions IS 'Detailed allocation records showing which grants covered each overage event and how many credits were used.';
@@ -312,7 +312,7 @@ BEGIN
     SELECT *
     FROM public.usage_credit_grants
     WHERE org_id = p_org_id
-      AND expires_at >= now()
+      AND expires_at >= NOW()
       AND credits_consumed < credits_total
     ORDER BY expires_at ASC, granted_at ASC
     FOR UPDATE
@@ -351,7 +351,7 @@ BEGIN
     INTO v_balance
     FROM public.usage_credit_grants
     WHERE org_id = p_org_id
-      AND expires_at >= now();
+      AND expires_at >= NOW();
 
     INSERT INTO public.usage_credit_transactions (
       org_id,
@@ -369,7 +369,7 @@ BEGIN
       'deduction',
       -v_use,
       v_balance,
-      now(),
+      NOW(),
       format('Overage deduction for %s usage', p_metric::text),
       jsonb_build_object('overage_event_id', v_event_id, 'metric', p_metric::text)
     );
@@ -406,7 +406,7 @@ SELECT
         greatest(
             CASE
                 WHEN
-                    expires_at >= now()
+                    expires_at >= NOW()
                     THEN credits_total - credits_consumed
                 ELSE 0
             END,
@@ -571,7 +571,7 @@ BEGIN
   FOR grant_rec IN
     SELECT *
     FROM public.usage_credit_grants
-    WHERE expires_at < now()
+    WHERE expires_at < NOW()
       AND credits_total > credits_consumed
     ORDER BY expires_at ASC
     FOR UPDATE
@@ -586,7 +586,7 @@ BEGIN
     INTO balance_after
     FROM public.usage_credit_grants
     WHERE org_id = grant_rec.org_id
-      AND expires_at >= now();
+      AND expires_at >= NOW();
 
     INSERT INTO public.usage_credit_transactions (
       org_id,
@@ -604,7 +604,7 @@ BEGIN
       'expiry',
       -credits_to_expire,
       balance_after,
-      now(),
+      NOW(),
       'Expired usage credits',
       jsonb_build_object('reason', 'expiry', 'expires_at', grant_rec.expires_at)
     );

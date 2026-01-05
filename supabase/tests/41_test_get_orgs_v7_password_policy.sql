@@ -15,14 +15,14 @@ VALUES
 (
     tests.get_supabase_uid('test_pwd_compliant_v7'),
     'pwd_compliant_v7@test.com',
-    now(),
-    now()
+    NOW(),
+    NOW()
 ),
 (
     tests.get_supabase_uid('test_pwd_noncompliant_v7'),
     'pwd_noncompliant_v7@test.com',
-    now(),
-    now()
+    NOW(),
+    NOW()
 )
 ON CONFLICT (id) DO NOTHING;
 
@@ -101,7 +101,7 @@ BEGIN
     -- This simulates a user who has successfully validated their password via the backend
     policy_hash := public.get_password_policy_hash(policy_config);
     INSERT INTO public.user_password_compliance (user_id, org_id, policy_hash, validated_at)
-    VALUES (compliant_user_id, org_with_pwd_policy_id, policy_hash, now());
+    VALUES (compliant_user_id, org_with_pwd_policy_id, policy_hash, NOW());
 
     -- Also add compliance for org with both policies
     INSERT INTO public.user_password_compliance (user_id, org_id, policy_hash, validated_at)
@@ -109,7 +109,7 @@ BEGIN
         compliant_user_id,
         org_with_both_policies_id,
         public.get_password_policy_hash('{"enabled": true, "min_length": 12, "require_uppercase": true, "require_number": true, "require_special": true}'::jsonb),
-        now()
+        NOW()
     );
 
     -- Store org IDs for later use

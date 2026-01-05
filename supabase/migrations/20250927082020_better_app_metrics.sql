@@ -4,7 +4,7 @@ CREATE TABLE IF NOT EXISTS public.app_metrics_cache (
     start_date date NOT NULL,
     end_date date NOT NULL,
     response jsonb NOT NULL,
-    cached_at timestamp with time zone NOT NULL DEFAULT now()
+    cached_at timestamp with time zone NOT NULL DEFAULT NOW()
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS app_metrics_cache_org_id_key ON public.app_metrics_cache (
@@ -188,7 +188,7 @@ BEGIN
         OR cache_entry.start_date IS DISTINCT FROM p_start_date
         OR cache_entry.end_date IS DISTINCT FROM p_end_date
         OR cache_entry.cached_at IS NULL
-        OR cache_entry.cached_at < (now() - interval '5 minutes') THEN
+        OR cache_entry.cached_at < (NOW() - interval '5 minutes') THEN
         cache_entry := public.seed_get_app_metrics_caches(p_org_id, p_start_date, p_end_date);
     END IF;
 

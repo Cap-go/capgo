@@ -24,7 +24,6 @@ beforeEach(async () => {
         trial_at: new Date(0).toISOString(),
         is_good_plan: true,
         plan_usage: 2,
-        subscription_metered: {},
         subscription_anchor_start: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
         subscription_anchor_end: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
         mau_exceeded: false,

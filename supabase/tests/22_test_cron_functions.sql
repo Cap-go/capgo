@@ -80,7 +80,7 @@ SELECT
 -- Test one_month_ahead (additional test)
 SELECT
     ok(
-        one_month_ahead() > now()::timestamp,
+        one_month_ahead() > NOW()::timestamp,
         'one_month_ahead test - returns timestamp one month in future'
     );
 
@@ -145,9 +145,9 @@ VALUES
     'cust_future_active',
     'succeeded',
     'prod_LQIregjtNduh4q',
-    now() - interval '15 days',
-    public.get_next_cron_time('0 3 * * *', now()) + interval '2 days',
-    now() - interval '30 days',
+    NOW() - interval '15 days',
+    public.get_next_cron_time('0 3 * * *', NOW()) + interval '2 days',
+    NOW() - interval '30 days',
     true,
     0
 ),
@@ -155,9 +155,9 @@ VALUES
     'cust_expiring_today',
     'succeeded',
     'prod_LQIregjtNduh4q',
-    now() - interval '30 days',
-    public.get_next_cron_time('0 3 * * *', now()) + interval '1 hour',
-    now() - interval '60 days',
+    NOW() - interval '30 days',
+    public.get_next_cron_time('0 3 * * *', NOW()) + interval '1 hour',
+    NOW() - interval '60 days',
     true,
     0
 ),
@@ -165,9 +165,9 @@ VALUES
     'cust_canceled_past',
     'succeeded',
     'prod_LQIregjtNduh4q',
-    now() - interval '10 days',
-    now() + interval '20 days',
-    now() - interval '40 days',
+    NOW() - interval '10 days',
+    NOW() + interval '20 days',
+    NOW() - interval '40 days',
     true,
     0
 ),
@@ -175,9 +175,9 @@ VALUES
     'cust_fourth_active',
     'succeeded',
     'prod_LQIregjtNduh4q',
-    now() - interval '5 days',
-    public.get_next_cron_time('0 3 * * *', now()) + interval '3 days',
-    now() - interval '10 days',
+    NOW() - interval '5 days',
+    public.get_next_cron_time('0 3 * * *', NOW()) + interval '3 days',
+    NOW() - interval '10 days',
     true,
     0
 );
@@ -208,7 +208,7 @@ WHERE
 
 WITH
 next_run AS (
-    SELECT public.get_next_cron_time('0 3 * * *', now()) AS t
+    SELECT public.get_next_cron_time('0 3 * * *', NOW()) AS t
 )
 
 UPDATE public.stripe_info si
@@ -255,7 +255,7 @@ SELECT
 SELECT
     is(
         get_next_stats_update_date('00000000-0000-0000-0000-000000000004')
-        - public.get_next_cron_time('0 3 * * *', now()),
+        - public.get_next_cron_time('0 3 * * *', NOW()),
         interval '8 minutes',
         'Fourth active org is scheduled 8 minutes after cron start (two slots)'
     );

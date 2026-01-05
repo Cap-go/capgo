@@ -65,7 +65,7 @@ RETURNING id INTO version_id_zero;
 INSERT INTO channels (created_at, name, app_id, version, updated_at, public,
                      disable_auto_update_under_native, disable_auto_update, ios, android,
                      allow_device_self_set, allow_emulator, allow_device, allow_dev, allow_prod, created_by, owner_org)
-VALUES (now(), 'production', test_app_id, version_id_linked, now(), 't',
+VALUES (NOW(), 'production', test_app_id, version_id_linked, NOW(), 't',
         't', 'major'::"public"."disable_update", 'f', 't',
         't', 't', 't', 't', 't',
         '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid,

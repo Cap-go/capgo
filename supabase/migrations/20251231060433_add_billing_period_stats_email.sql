@@ -68,26 +68,26 @@ BEGIN
       o.management_email,
       si.subscription_anchor_start,
       -- Calculate the previous billing cycle dates
-      -- We use (now() - interval '1 day') to get yesterday's cycle end date calculation
+      -- We use (NOW() - interval '1 day') to get yesterday's cycle end date calculation
       -- This ensures we're always looking at the just-completed cycle
       CASE
         WHEN COALESCE(
           si.subscription_anchor_start - date_trunc('MONTH', si.subscription_anchor_start),
           '0 DAYS'::INTERVAL
-        ) > (now() - interval '1 day') - date_trunc('MONTH', now() - interval '1 day')
-        THEN date_trunc('MONTH', (now() - interval '1 day') - INTERVAL '1 MONTH') +
+        ) > (NOW() - interval '1 day') - date_trunc('MONTH', NOW() - interval '1 day')
+        THEN date_trunc('MONTH', (NOW() - interval '1 day') - INTERVAL '1 MONTH') +
              COALESCE(si.subscription_anchor_start - date_trunc('MONTH', si.subscription_anchor_start), '0 DAYS'::INTERVAL)
-        ELSE date_trunc('MONTH', now() - interval '1 day') +
+        ELSE date_trunc('MONTH', NOW() - interval '1 day') +
              COALESCE(si.subscription_anchor_start - date_trunc('MONTH', si.subscription_anchor_start), '0 DAYS'::INTERVAL)
       END AS prev_cycle_start,
       CASE
         WHEN COALESCE(
           si.subscription_anchor_start - date_trunc('MONTH', si.subscription_anchor_start),
           '0 DAYS'::INTERVAL
-        ) > (now() - interval '1 day') - date_trunc('MONTH', now() - interval '1 day')
-        THEN (date_trunc('MONTH', (now() - interval '1 day') - INTERVAL '1 MONTH') +
+        ) > (NOW() - interval '1 day') - date_trunc('MONTH', NOW() - interval '1 day')
+        THEN (date_trunc('MONTH', (NOW() - interval '1 day') - INTERVAL '1 MONTH') +
               COALESCE(si.subscription_anchor_start - date_trunc('MONTH', si.subscription_anchor_start), '0 DAYS'::INTERVAL)) + INTERVAL '1 MONTH'
-        ELSE (date_trunc('MONTH', now() - interval '1 day') +
+        ELSE (date_trunc('MONTH', NOW() - interval '1 day') +
               COALESCE(si.subscription_anchor_start - date_trunc('MONTH', si.subscription_anchor_start), '0 DAYS'::INTERVAL)) + INTERVAL '1 MONTH'
       END AS prev_cycle_end
     FROM public.orgs o
@@ -131,9 +131,9 @@ DECLARE
   current_second int;
 BEGIN
   -- Get current time components in UTC
-  current_hour := EXTRACT(HOUR FROM now());
-  current_minute := EXTRACT(MINUTE FROM now());
-  current_second := EXTRACT(SECOND FROM now());
+  current_hour := EXTRACT(HOUR FROM NOW());
+  current_minute := EXTRACT(MINUTE FROM NOW());
+  current_second := EXTRACT(SECOND FROM NOW());
 
   -- Every 10 seconds: High-frequency queues (at :00, :10, :20, :30, :40, :50)
   IF current_second % 10 = 0 THEN
@@ -284,7 +284,7 @@ BEGIN
   -- Daily at 12:00:00 - Noon tasks
   IF current_hour = 12 AND current_minute = 0 AND current_second = 0 THEN
     BEGIN
-      DELETE FROM cron.job_run_details WHERE end_time < now() - interval '7 days';
+      DELETE FROM cron.job_run_details WHERE end_time < NOW() - interval '7 days';
     EXCEPTION WHEN OTHERS THEN
       RAISE WARNING 'cleanup job_run_details failed: %', SQLERRM;
     END;
@@ -297,7 +297,7 @@ BEGIN
     END;
 
     -- Weekly stats email (every Saturday at noon)
-    IF EXTRACT(DOW FROM now()) = 6 THEN
+    IF EXTRACT(DOW FROM NOW()) = 6 THEN
       BEGIN
         PERFORM public.process_stats_email_weekly();
       EXCEPTION WHEN OTHERS THEN
@@ -306,7 +306,7 @@ BEGIN
     END IF;
 
     -- Monthly stats email (1st of month at noon)
-    IF EXTRACT(DAY FROM now()) = 1 THEN
+    IF EXTRACT(DAY FROM NOW()) = 1 THEN
       BEGIN
         PERFORM public.process_stats_email_monthly();
       EXCEPTION WHEN OTHERS THEN

@@ -42,8 +42,8 @@ CREATE TABLE IF NOT EXISTS public.cron_tasks (
     run_on_dow int,
     run_on_day int,             -- Run on specific day of month (1-31)
     enabled boolean NOT NULL DEFAULT true,
-    created_at timestamptz NOT NULL DEFAULT now(),
-    updated_at timestamptz NOT NULL DEFAULT now()
+    created_at timestamptz NOT NULL DEFAULT NOW(),
+    updated_at timestamptz NOT NULL DEFAULT NOW()
 );
 
 -- Create index for enabled tasks
@@ -241,7 +241,7 @@ LANGUAGE plpgsql
 SET search_path TO ''
 AS $$
 BEGIN
-  DELETE FROM cron.job_run_details WHERE end_time < now() - interval '7 days';
+  DELETE FROM cron.job_run_details WHERE end_time < NOW() - interval '7 days';
 END;
 $$;
 
@@ -265,11 +265,11 @@ DECLARE
   should_run boolean;
 BEGIN
   -- Get current time components in UTC
-  current_hour := EXTRACT(HOUR FROM now());
-  current_minute := EXTRACT(MINUTE FROM now());
-  current_second := EXTRACT(SECOND FROM now());
-  current_dow := EXTRACT(DOW FROM now());
-  current_day := EXTRACT(DAY FROM now());
+  current_hour := EXTRACT(HOUR FROM NOW());
+  current_minute := EXTRACT(MINUTE FROM NOW());
+  current_second := EXTRACT(SECOND FROM NOW());
+  current_dow := EXTRACT(DOW FROM NOW());
+  current_day := EXTRACT(DAY FROM NOW());
 
   -- Loop through all enabled tasks
   FOR task IN SELECT * FROM public.cron_tasks WHERE enabled = true LOOP
