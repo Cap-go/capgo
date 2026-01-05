@@ -1533,7 +1533,6 @@ export type Database = {
           subscription_anchor_end: string
           subscription_anchor_start: string
           subscription_id: string | null
-          subscription_metered: Json
           trial_at: string
           updated_at: string
         }
@@ -1555,7 +1554,6 @@ export type Database = {
           subscription_anchor_end?: string
           subscription_anchor_start?: string
           subscription_id?: string | null
-          subscription_metered?: Json
           trial_at?: string
           updated_at?: string
         }
@@ -1577,7 +1575,6 @@ export type Database = {
           subscription_anchor_end?: string
           subscription_anchor_start?: string
           subscription_id?: string | null
-          subscription_metered?: Json
           trial_at?: string
           updated_at?: string
         }
@@ -2459,27 +2456,6 @@ export type Database = {
           role: Database["public"]["Enums"]["user_min_right"]
         }[]
       }
-      get_metered_usage:
-        | {
-            Args: never
-            Returns: Database["public"]["CompositeTypes"]["stats_table"]
-            SetofOptions: {
-              from: "*"
-              to: "stats_table"
-              isOneToOne: true
-              isSetofReturn: false
-            }
-          }
-        | {
-            Args: { orgid: string }
-            Returns: Database["public"]["CompositeTypes"]["stats_table"]
-            SetofOptions: {
-              from: "*"
-              to: "stats_table"
-              isOneToOne: true
-              isSetofReturn: false
-            }
-          }
       get_next_cron_time: {
         Args: { p_schedule: string; p_timestamp: string }
         Returns: string
@@ -2602,7 +2578,7 @@ export type Database = {
               is_yearly: boolean
               logo: string
               management_email: string
-              max_apikey_expiration_days: number | null
+              max_apikey_expiration_days: number
               name: string
               next_stats_update_at: string
               password_has_access: boolean
@@ -2633,7 +2609,7 @@ export type Database = {
               is_yearly: boolean
               logo: string
               management_email: string
-              max_apikey_expiration_days: number | null
+              max_apikey_expiration_days: number
               name: string
               next_stats_update_at: string
               password_has_access: boolean

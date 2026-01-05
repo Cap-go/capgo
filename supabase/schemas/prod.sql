@@ -363,25 +363,25 @@ CREATE OR REPLACE FUNCTION "public"."accept_invitation_to_org"("org_id" "uuid") 
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
-Declare  
+DECLARE  
  invite record;
 BEGIN
   SELECT org_users.* FROM public.org_users
   INTO invite
-  WHERE org_users.org_id=accept_invitation_to_org.org_id and (select auth.uid())=org_users.user_id;
+  WHERE org_users.org_id=accept_invitation_to_org.org_id AND (SELECT auth.uid())=org_users.user_id;
 
   IF invite IS NULL THEN
-    return 'NO_INVITE';
+    RETURN 'NO_INVITE';
   ELSE
     IF NOT (invite.user_right::varchar ilike 'invite_'||'%') THEN
-      return 'INVALID_ROLE';
+      RETURN 'INVALID_ROLE';
     END IF;
 
     UPDATE public.org_users
     SET user_right = REPLACE(invite.user_right::varchar, 'invite_', '')::"public"."user_min_right"
     WHERE org_users.id=invite.id;
 
-    return 'OK';
+    RETURN 'OK';
   END IF;
 END;
 $$;
@@ -766,7 +766,7 @@ CREATE OR REPLACE FUNCTION "public"."auto_owner_org_by_app_id"() RETURNS "trigge
     SET "search_path" TO ''
     AS $$
 BEGIN
-  IF NEW."app_id" is distinct from OLD."app_id" AND OLD."app_id" is distinct from NULL THEN
+  IF NEW."app_id" IS DISTINCT FROM OLD."app_id" AND OLD."app_id" IS DISTINCT FROM NULL THEN
     RAISE EXCEPTION 'changing the app_id is not allowed';
   END IF;
 
@@ -873,15 +873,15 @@ CREATE OR REPLACE FUNCTION "public"."check_if_org_can_exist"() RETURNS "trigger"
     SET "search_path" TO ''
     AS $$
 BEGIN
-  delete FROM public.orgs
-  where
+  DELETE FROM public.orgs
+  WHERE
   (
       (
-      select
+      SELECT
           count(*)
-      from
+      FROM
           public.org_users
-      where
+      WHERE
           org_users.user_right = 'super_admin'
           AND org_users.user_id != OLD.user_id
           AND org_users.org_id=orgs.id
@@ -904,7 +904,7 @@ CREATE OR REPLACE FUNCTION "public"."check_min_rights"("min_right" "public"."use
 DECLARE
   allowed boolean;
 BEGIN
-  allowed := public.check_min_rights(min_right, (select auth.uid()), org_id, app_id, channel_id);
+  allowed := public.check_min_rights(min_right, (SELECT auth.uid()), org_id, app_id, channel_id);
   RETURN allowed;
 END;
 $$;
@@ -1131,11 +1131,11 @@ CREATE OR REPLACE FUNCTION "public"."check_org_user_privileges"() RETURNS "trigg
 BEGIN
 
   -- here we check if the user is a service role in order to bypass this permission check
-  IF (((SELECT auth.jwt() ->> 'role')='service_role') OR ((select current_user) IS NOT DISTINCT FROM 'postgres')) THEN
+  IF (((SELECT auth.jwt() ->> 'role')='service_role') OR ((SELECT current_user) IS NOT DISTINCT FROM 'postgres')) THEN
     RETURN NEW;
   END IF;
 
-  IF ("public"."check_min_rights"('super_admin'::"public"."user_min_right", (select auth.uid()), NEW.org_id, NULL::character varying, NULL::bigint))
+  IF ("public"."check_min_rights"('super_admin'::"public"."user_min_right", (SELECT auth.uid()), NEW.org_id, NULL::character varying, NULL::bigint))
   THEN
     RETURN NEW;
   END IF;
@@ -1199,17 +1199,17 @@ ALTER FUNCTION "public"."cleanup_expired_apikeys"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."cleanup_frequent_job_details"() RETURNS "void"
-    LANGUAGE "plpgsql"
+    LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
 BEGIN
-    DELETE FROM cron.job_run_details 
+    DELETE FROM cron.job_run_details
     WHERE job_pid IN (
-        SELECT jobid 
-        FROM cron.job 
+        SELECT jobid
+        FROM cron.job
         WHERE schedule = '5 seconds' OR schedule = '1 seconds' OR schedule = '10 seconds'
-    ) 
-    AND end_time < now() - interval '1 hour';
+    )
+    AND end_time < NOW() - interval '1 hour';
 END;
 $$;
 
@@ -1218,7 +1218,7 @@ ALTER FUNCTION "public"."cleanup_frequent_job_details"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."cleanup_job_run_details_7days"() RETURNS "void"
-    LANGUAGE "plpgsql"
+    LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
 BEGIN
@@ -1425,7 +1425,7 @@ BEGIN
       si.customer_id
     FROM public.stripe_info si
     WHERE si.trial_at > NOW() 
-    AND si.status is NULL
+    AND si.status IS NULL
     AND NOT EXISTS (
       SELECT 1 FROM ActiveSubscriptions a 
       WHERE a.customer_id = si.customer_id
@@ -1984,7 +1984,7 @@ CREATE OR REPLACE FUNCTION "public"."force_valid_user_id_on_app"() RETURNS "trig
     SET "search_path" TO ''
     AS $$
 BEGIN
-  NEW.user_id = (select created_by FROM public.orgs where id = (NEW."owner_org"));
+  NEW.user_id = (SELECT created_by FROM public.orgs WHERE id = (NEW."owner_org"));
 
    RETURN NEW;
 END;
@@ -2182,7 +2182,7 @@ BEGIN
   FROM public.app_versions
   WHERE app_id=appid
   AND name=name_version
-  AND owner_org=(select public.get_user_main_org_id_by_app_id(appid))
+  AND owner_org=(SELECT public.get_user_main_org_id_by_app_id(appid))
   AND public.is_member_of_org(public.get_user_id(apikey), (SELECT public.get_user_main_org_id_by_app_id(appid)))
   );
 END;  
@@ -2220,7 +2220,7 @@ BEGIN
   FROM public.plans
     WHERE stripe_id=(SELECT product_id
     FROM public.stripe_info
-    where customer_id=(SELECT customer_id FROM public.orgs where id=orgid)
+    WHERE customer_id=(SELECT customer_id FROM public.orgs WHERE id=orgid)
     ));
 END;  
 $$;
@@ -2375,7 +2375,7 @@ BEGIN
 
   -- JWT auth.uid is not null, return
   IF auth_uid IS NOT NULL THEN
-    return auth_uid;
+    RETURN auth_uid;
   END IF;
 
   -- JWT is null
@@ -2602,41 +2602,6 @@ $$;
 
 
 ALTER FUNCTION "public"."get_invite_by_magic_lookup"("lookup" "text") OWNER TO "postgres";
-
-
-CREATE OR REPLACE FUNCTION "public"."get_metered_usage"() RETURNS "public"."stats_table"
-    LANGUAGE "plpgsql"
-    SET "search_path" TO ''
-    AS $$
-BEGIN
-    RETURN public.get_metered_usage((select auth.uid()));
-END;  
-$$;
-
-
-ALTER FUNCTION "public"."get_metered_usage"() OWNER TO "postgres";
-
-
-CREATE OR REPLACE FUNCTION "public"."get_metered_usage"("orgid" "uuid") RETURNS "public"."stats_table"
-    LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO ''
-    AS $$
-DECLARE
-  current_usage public.stats_table;
-  max_plan public.stats_table;
-  result public.stats_table;
-BEGIN
-  SELECT mau, bandwidth, storage INTO current_usage FROM public.get_total_metrics(orgid);
-  SELECT mau, bandwidth, storage INTO max_plan FROM public.get_current_plan_max_org(orgid);
-  result.mau := GREATEST(current_usage.mau - max_plan.mau, 0);
-  result.bandwidth := GREATEST(current_usage.bandwidth - max_plan.bandwidth, 0);
-  result.storage := GREATEST(current_usage.storage - max_plan.storage, 0);
-  RETURN result;
-END;
-$$;
-
-
-ALTER FUNCTION "public"."get_metered_usage"("orgid" "uuid") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."get_next_cron_time"("p_schedule" "text", "p_timestamp" timestamp with time zone) RETURNS timestamp with time zone
@@ -3655,7 +3620,7 @@ BEGIN
   WHERE orgs.created_by=get_user_main_org_id.user_id
   LIMIT 1;
 
-  return org_id;
+  RETURN org_id;
 END;
 $$;
 
@@ -3729,10 +3694,10 @@ BEGIN
   RETURN QUERY
   SELECT app_versions.* FROM public.app_versions
   LEFT JOIN public.app_versions_meta ON app_versions_meta.id=app_versions.id
-  where coalesce(app_versions_meta.size, 0) = 0
+  WHERE COALESCE(app_versions_meta.size, 0) = 0
   AND app_versions.deleted=false
   AND app_versions.storage_provider != 'external'
-  AND now() - app_versions.created_at > interval '120 seconds';
+  AND NOW() - app_versions.created_at > interval '120 seconds';
 END;
 $$;
 
@@ -3877,8 +3842,8 @@ DECLARE org record; invited_user record; current_record record; current_tmp_user
 BEGIN
   SELECT * INTO org FROM public.orgs WHERE public.orgs.id=invite_user_to_org.org_id;
   IF org IS NULL THEN RETURN 'NO_ORG'; END IF;
-  IF NOT (public.check_min_rights('admin'::public.user_min_right, (select public.get_identity_org_allowed('{read,upload,write,all}'::public.key_mode[], invite_user_to_org.org_id)), invite_user_to_org.org_id, NULL::varchar, NULL::bigint)) THEN RETURN 'NO_RIGHTS'; END IF;
-  IF NOT (public.check_min_rights('super_admin'::public.user_min_right, (select public.get_identity_org_allowed('{read,upload,write,all}'::public.key_mode[], invite_user_to_org.org_id)), invite_user_to_org.org_id, NULL::varchar, NULL::bigint) AND (invite_type is distinct from 'super_admin'::public.user_min_right or invite_type is distinct from 'invite_super_admin'::public.user_min_right)) THEN RETURN 'NO_RIGHTS'; END IF;
+  IF NOT (public.check_min_rights('admin'::public.user_min_right, (SELECT public.get_identity_org_allowed('{read,upload,write,all}'::public.key_mode[], invite_user_to_org.org_id)), invite_user_to_org.org_id, NULL::varchar, NULL::bigint)) THEN RETURN 'NO_RIGHTS'; END IF;
+  IF NOT (public.check_min_rights('super_admin'::public.user_min_right, (SELECT public.get_identity_org_allowed('{read,upload,write,all}'::public.key_mode[], invite_user_to_org.org_id)), invite_user_to_org.org_id, NULL::varchar, NULL::bigint) AND (invite_type IS DISTINCT FROM 'super_admin'::public.user_min_right or invite_type IS DISTINCT from 'invite_super_admin'::public.user_min_right)) THEN RETURN 'NO_RIGHTS'; END IF;
   SELECT public.users.id INTO invited_user FROM public.users WHERE public.users.email=invite_user_to_org.email;
   IF invited_user IS NOT NULL THEN
     SELECT public.org_users.id INTO current_record FROM public.org_users WHERE public.org_users.user_id=invited_user.id AND public.org_users.org_id=invite_user_to_org.org_id;
@@ -3922,7 +3887,7 @@ CREATE OR REPLACE FUNCTION "public"."is_admin"() RETURNS boolean
     SET "search_path" TO ''
     AS $$
 BEGIN
-    RETURN public.is_admin((select auth.uid()));
+    RETURN public.is_admin((SELECT auth.uid()));
 END;  
 $$;
 
@@ -3953,7 +3918,7 @@ CREATE OR REPLACE FUNCTION "public"."is_allowed_action"("apikey" "text", "appid"
     AS $$
 BEGIN
   PERFORM apikey;
-  RETURN public.is_allowed_action_org((select owner_org FROM public.apps where app_id=appid));
+  RETURN public.is_allowed_action_org((SELECT owner_org FROM public.apps WHERE app_id=appid));
 END;
 $$;
 
@@ -4043,7 +4008,7 @@ CREATE OR REPLACE FUNCTION "public"."is_app_owner"("appid" character varying) RE
     SET "search_path" TO ''
     AS $$
 BEGIN
-    RETURN public.is_app_owner((select auth.uid()), appid);
+    RETURN public.is_app_owner((SELECT auth.uid()), appid);
 END;  
 $$;
 
@@ -4116,7 +4081,7 @@ CREATE OR REPLACE FUNCTION "public"."is_canceled_org"("orgid" "uuid") RETURNS bo
 BEGIN
   RETURN (SELECT EXISTS (SELECT 1
   FROM public.stripe_info
-  where customer_id=(SELECT customer_id FROM public.orgs where id=orgid)
+  WHERE customer_id=(SELECT customer_id FROM public.orgs WHERE id=orgid)
   AND status = 'canceled'));
 END;  
 $$;
@@ -4315,7 +4280,7 @@ CREATE OR REPLACE FUNCTION "public"."is_paying_and_good_plan_org"("orgid" "uuid"
 BEGIN
   RETURN (SELECT EXISTS (SELECT 1
   FROM public.stripe_info
-  where customer_id=(SELECT customer_id FROM public.orgs where id=orgid)
+  WHERE customer_id=(SELECT customer_id FROM public.orgs WHERE id=orgid)
   AND (
     (status = 'succeeded' AND is_good_plan = true)
     OR (trial_at::date - (now())::date > 0)
@@ -4453,7 +4418,7 @@ DECLARE tmp_user record; non_invite_role public.user_min_right;
 BEGIN
   non_invite_role := public.transform_role_to_non_invite(new_role);
   PERFORM 1 FROM public.orgs WHERE public.orgs.id = modify_permissions_tmp.org_id; IF NOT FOUND THEN RETURN 'NO_ORG'; END IF;
-  IF NOT (public.check_min_rights('admin'::public.user_min_right, (select public.get_identity_org_allowed('{read,upload,write,all}'::public.key_mode[], modify_permissions_tmp.org_id)), modify_permissions_tmp.org_id, NULL::varchar, NULL::bigint)) THEN RETURN 'NO_RIGHTS'; END IF;
+  IF NOT (public.check_min_rights('admin'::public.user_min_right, (SELECT public.get_identity_org_allowed('{read,upload,write,all}'::public.key_mode[], modify_permissions_tmp.org_id)), modify_permissions_tmp.org_id, NULL::varchar, NULL::bigint)) THEN RETURN 'NO_RIGHTS'; END IF;
   IF (non_invite_role = 'super_admin'::public.user_min_right) THEN
     IF NOT (public.check_min_rights('super_admin'::public.user_min_right, (select public.get_identity_org_allowed('{read,upload,write,all}'::public.key_mode[], modify_permissions_tmp.org_id)), modify_permissions_tmp.org_id, NULL::varchar, NULL::bigint)) THEN RETURN 'NO_RIGHTS_FOR_SUPER_ADMIN'; END IF;
   END IF;
@@ -4470,7 +4435,7 @@ ALTER FUNCTION "public"."modify_permissions_tmp"("email" "text", "org_id" "uuid"
 
 
 CREATE OR REPLACE FUNCTION "public"."noupdate"() RETURNS "trigger"
-    LANGUAGE "plpgsql"
+    LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $_$
 DECLARE
@@ -5616,12 +5581,12 @@ ALTER FUNCTION "public"."reject_access_due_to_password_policy"("org_id" "uuid", 
 
 
 CREATE OR REPLACE FUNCTION "public"."remove_old_jobs"() RETURNS "void"
-    LANGUAGE "plpgsql"
+    LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
 BEGIN
-    DELETE FROM cron.job_run_details 
-    WHERE end_time < now() - interval '1 day';
+    DELETE FROM cron.job_run_details
+    WHERE end_time < NOW() - interval '1 day';
 END;
 $$;
 
@@ -5636,7 +5601,7 @@ CREATE OR REPLACE FUNCTION "public"."rescind_invitation"("email" "text", "org_id
 DECLARE tmp_user record;
 BEGIN
   PERFORM 1 FROM public.orgs WHERE public.orgs.id = rescind_invitation.org_id; IF NOT FOUND THEN RETURN 'NO_ORG'; END IF;
-  IF NOT (public.check_min_rights('admin'::public.user_min_right, (select public.get_identity_org_allowed('{read,upload,write,all}'::public.key_mode[], rescind_invitation.org_id)), rescind_invitation.org_id, NULL::varchar, NULL::bigint)) THEN RETURN 'NO_RIGHTS'; END IF;
+  IF NOT (public.check_min_rights('admin'::public.user_min_right, (SELECT public.get_identity_org_allowed('{read,upload,write,all}'::public.key_mode[], rescind_invitation.org_id)), rescind_invitation.org_id, NULL::varchar, NULL::bigint)) THEN RETURN 'NO_RIGHTS'; END IF;
   SELECT * INTO tmp_user FROM public.tmp_users WHERE public.tmp_users.email = rescind_invitation.email AND public.tmp_users.org_id = rescind_invitation.org_id;
   IF NOT FOUND THEN RETURN 'NO_INVITATION'; END IF;
   IF tmp_user.cancelled_at IS NOT NULL THEN RETURN 'ALREADY_CANCELLED'; END IF;
@@ -6003,7 +5968,7 @@ BEGIN
   END IF;
 
   -- Get the current user ID
-  v_user_id := (select auth.uid());
+  v_user_id := (SELECT auth.uid());
 
   IF NOT (public.check_min_rights('super_admin'::"public"."user_min_right", v_user_id, v_old_org_id, NULL::character varying, NULL::bigint)) THEN
     PERFORM public.pg_log('deny: TRANSFER_OLD_ORG_RIGHTS', jsonb_build_object('app_id', p_app_id, 'old_org_id', v_old_org_id, 'new_org_id', p_new_org_id, 'uid', v_user_id));
@@ -7318,7 +7283,6 @@ CREATE TABLE IF NOT EXISTS "public"."stripe_info" (
     "price_id" character varying,
     "is_good_plan" boolean DEFAULT true,
     "plan_usage" bigint DEFAULT '0'::bigint,
-    "subscription_metered" json DEFAULT '{}'::json NOT NULL,
     "subscription_anchor_start" timestamp with time zone DEFAULT "now"() NOT NULL,
     "subscription_anchor_end" timestamp with time zone DEFAULT "public"."one_month_ahead"() NOT NULL,
     "canceled_at" timestamp with time zone,
@@ -9901,27 +9865,28 @@ GRANT ALL ON FUNCTION "public"."accept_invitation_to_org"("org_id" "uuid") TO "s
 
 
 
+REVOKE ALL ON FUNCTION "public"."apply_usage_overage"("p_org_id" "uuid", "p_metric" "public"."credit_metric_type", "p_overage_amount" numeric, "p_billing_cycle_start" timestamp with time zone, "p_billing_cycle_end" timestamp with time zone, "p_details" "jsonb") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."apply_usage_overage"("p_org_id" "uuid", "p_metric" "public"."credit_metric_type", "p_overage_amount" numeric, "p_billing_cycle_start" timestamp with time zone, "p_billing_cycle_end" timestamp with time zone, "p_details" "jsonb") TO "service_role";
 
 
 
-GRANT ALL ON FUNCTION "public"."audit_log_trigger"() TO "service_role";
+REVOKE ALL ON FUNCTION "public"."audit_log_trigger"() FROM PUBLIC;
 
 
 
-GRANT ALL ON FUNCTION "public"."auto_apikey_name_by_id"() TO "service_role";
+REVOKE ALL ON FUNCTION "public"."auto_apikey_name_by_id"() FROM PUBLIC;
 
 
 
-GRANT ALL ON FUNCTION "public"."auto_owner_org_by_app_id"() TO "service_role";
+REVOKE ALL ON FUNCTION "public"."auto_owner_org_by_app_id"() FROM PUBLIC;
 
 
 
-GRANT ALL ON FUNCTION "public"."calculate_credit_cost"("p_metric" "public"."credit_metric_type", "p_overage_amount" numeric) TO "service_role";
+REVOKE ALL ON FUNCTION "public"."calculate_credit_cost"("p_metric" "public"."credit_metric_type", "p_overage_amount" numeric) FROM PUBLIC;
 
 
 
-GRANT ALL ON FUNCTION "public"."check_if_org_can_exist"() TO "service_role";
+REVOKE ALL ON FUNCTION "public"."check_if_org_can_exist"() FROM PUBLIC;
 
 
 
@@ -9961,7 +9926,7 @@ GRANT ALL ON FUNCTION "public"."check_org_members_password_policy"("org_id" "uui
 
 
 
-GRANT ALL ON FUNCTION "public"."check_org_user_privileges"() TO "service_role";
+REVOKE ALL ON FUNCTION "public"."check_org_user_privileges"() FROM PUBLIC;
 
 
 
@@ -9971,30 +9936,27 @@ GRANT ALL ON FUNCTION "public"."check_revert_to_builtin_version"("appid" charact
 
 
 
-GRANT ALL ON FUNCTION "public"."cleanup_expired_apikeys"() TO "service_role";
+REVOKE ALL ON FUNCTION "public"."cleanup_expired_apikeys"() FROM PUBLIC;
 
 
 
 REVOKE ALL ON FUNCTION "public"."cleanup_frequent_job_details"() FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."cleanup_frequent_job_details"() TO "service_role";
 
 
 
 REVOKE ALL ON FUNCTION "public"."cleanup_job_run_details_7days"() FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."cleanup_job_run_details_7days"() TO "service_role";
 
 
 
-GRANT ALL ON FUNCTION "public"."cleanup_old_audit_logs"() TO "service_role";
+REVOKE ALL ON FUNCTION "public"."cleanup_old_audit_logs"() FROM PUBLIC;
 
 
 
 REVOKE ALL ON FUNCTION "public"."cleanup_queue_messages"() FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."cleanup_queue_messages"() TO "service_role";
 
 
 
-GRANT ALL ON FUNCTION "public"."cleanup_webhook_deliveries"() TO "service_role";
+REVOKE ALL ON FUNCTION "public"."cleanup_webhook_deliveries"() FROM PUBLIC;
 
 
 
@@ -10055,11 +10017,10 @@ GRANT ALL ON FUNCTION "public"."delete_accounts_marked_for_deletion"() TO "servi
 
 
 REVOKE ALL ON FUNCTION "public"."delete_http_response"("request_id" bigint) FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."delete_http_response"("request_id" bigint) TO "service_role";
 
 
 
-GRANT ALL ON FUNCTION "public"."delete_old_deleted_apps"() TO "service_role";
+REVOKE ALL ON FUNCTION "public"."delete_old_deleted_apps"() FROM PUBLIC;
 
 
 
@@ -10069,11 +10030,11 @@ GRANT ALL ON FUNCTION "public"."delete_user"() TO "service_role";
 
 
 
-GRANT ALL ON FUNCTION "public"."enqueue_channel_device_counts"() TO "service_role";
+REVOKE ALL ON FUNCTION "public"."enqueue_channel_device_counts"() FROM PUBLIC;
 
 
 
-GRANT ALL ON FUNCTION "public"."enqueue_credit_usage_alert"() TO "service_role";
+REVOKE ALL ON FUNCTION "public"."enqueue_credit_usage_alert"() FROM PUBLIC;
 
 
 
@@ -10095,7 +10056,7 @@ GRANT ALL ON FUNCTION "public"."exist_app_versions"("appid" character varying, "
 
 
 
-GRANT ALL ON FUNCTION "public"."expire_usage_credits"() TO "service_role";
+REVOKE ALL ON FUNCTION "public"."expire_usage_credits"() FROM PUBLIC;
 
 
 
@@ -10111,15 +10072,15 @@ GRANT ALL ON FUNCTION "public"."find_apikey_by_value"("key_value" "text") TO "se
 
 
 
-GRANT ALL ON FUNCTION "public"."force_valid_user_id_on_app"() TO "service_role";
+REVOKE ALL ON FUNCTION "public"."force_valid_user_id_on_app"() FROM PUBLIC;
 
 
 
-GRANT ALL ON FUNCTION "public"."generate_org_on_user_create"() TO "service_role";
+REVOKE ALL ON FUNCTION "public"."generate_org_on_user_create"() FROM PUBLIC;
 
 
 
-GRANT ALL ON FUNCTION "public"."generate_org_user_on_org_create"() TO "service_role";
+REVOKE ALL ON FUNCTION "public"."generate_org_user_on_org_create"() FROM PUBLIC;
 
 
 
@@ -10170,7 +10131,7 @@ GRANT ALL ON FUNCTION "public"."get_current_plan_name_org"("orgid" "uuid") TO "s
 
 
 
-GRANT ALL ON FUNCTION "public"."get_customer_counts"() TO "service_role";
+REVOKE ALL ON FUNCTION "public"."get_customer_counts"() FROM PUBLIC;
 
 
 
@@ -10180,7 +10141,7 @@ GRANT ALL ON FUNCTION "public"."get_cycle_info_org"("orgid" "uuid") TO "service_
 
 
 
-GRANT ALL ON FUNCTION "public"."get_db_url"() TO "service_role";
+REVOKE ALL ON FUNCTION "public"."get_db_url"() FROM PUBLIC;
 
 
 
@@ -10229,18 +10190,6 @@ GRANT ALL ON FUNCTION "public"."get_identity_org_appid"("keymode" "public"."key_
 GRANT ALL ON FUNCTION "public"."get_invite_by_magic_lookup"("lookup" "text") TO "anon";
 GRANT ALL ON FUNCTION "public"."get_invite_by_magic_lookup"("lookup" "text") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."get_invite_by_magic_lookup"("lookup" "text") TO "service_role";
-
-
-
-GRANT ALL ON FUNCTION "public"."get_metered_usage"() TO "anon";
-GRANT ALL ON FUNCTION "public"."get_metered_usage"() TO "authenticated";
-GRANT ALL ON FUNCTION "public"."get_metered_usage"() TO "service_role";
-
-
-
-GRANT ALL ON FUNCTION "public"."get_metered_usage"("orgid" "uuid") TO "anon";
-GRANT ALL ON FUNCTION "public"."get_metered_usage"("orgid" "uuid") TO "authenticated";
-GRANT ALL ON FUNCTION "public"."get_metered_usage"("orgid" "uuid") TO "service_role";
 
 
 
@@ -10362,7 +10311,7 @@ GRANT ALL ON FUNCTION "public"."get_total_storage_size_org"("org_id" "uuid") TO 
 
 
 
-GRANT ALL ON FUNCTION "public"."get_update_stats"() TO "service_role";
+REVOKE ALL ON FUNCTION "public"."get_update_stats"() FROM PUBLIC;
 
 
 
@@ -10397,7 +10346,6 @@ GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public".
 
 
 REVOKE ALL ON FUNCTION "public"."get_versions_with_no_metadata"() FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."get_versions_with_no_metadata"() TO "service_role";
 
 
 
@@ -10612,19 +10560,12 @@ GRANT ALL ON FUNCTION "public"."is_trial_org"("orgid" "uuid") TO "service_role";
 
 
 REVOKE ALL ON FUNCTION "public"."mass_edit_queue_messages_cf_ids"("updates" "public"."message_update"[]) FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."mass_edit_queue_messages_cf_ids"("updates" "public"."message_update"[]) TO "service_role";
 
 
 
 GRANT ALL ON FUNCTION "public"."modify_permissions_tmp"("email" "text", "org_id" "uuid", "new_role" "public"."user_min_right") TO "anon";
 GRANT ALL ON FUNCTION "public"."modify_permissions_tmp"("email" "text", "org_id" "uuid", "new_role" "public"."user_min_right") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."modify_permissions_tmp"("email" "text", "org_id" "uuid", "new_role" "public"."user_min_right") TO "service_role";
-
-
-
-GRANT ALL ON FUNCTION "public"."noupdate"() TO "anon";
-GRANT ALL ON FUNCTION "public"."noupdate"() TO "authenticated";
-GRANT ALL ON FUNCTION "public"."noupdate"() TO "service_role";
 
 
 
@@ -10647,30 +10588,27 @@ GRANT ALL ON FUNCTION "public"."parse_step_pattern"("pattern" "text") TO "servic
 
 
 REVOKE ALL ON FUNCTION "public"."pg_log"("decision" "text", "input" "jsonb") FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."pg_log"("decision" "text", "input" "jsonb") TO "service_role";
 
 
 
 REVOKE ALL ON FUNCTION "public"."process_admin_stats"() FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."process_admin_stats"() TO "service_role";
 
 
 
 REVOKE ALL ON FUNCTION "public"."process_all_cron_tasks"() FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."process_all_cron_tasks"() TO "service_role";
 
 
 
 REVOKE ALL ON FUNCTION "public"."process_billing_period_stats_email"() FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."process_billing_period_stats_email"() TO "service_role";
 
 
 
+REVOKE ALL ON FUNCTION "public"."process_channel_device_counts_queue"("batch_size" integer) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."process_channel_device_counts_queue"("batch_size" integer) TO "service_role";
 
 
 
-GRANT ALL ON FUNCTION "public"."process_cron_stats_jobs"() TO "service_role";
+REVOKE ALL ON FUNCTION "public"."process_cron_stats_jobs"() FROM PUBLIC;
 
 
 
@@ -10679,35 +10617,31 @@ GRANT ALL ON FUNCTION "public"."process_cron_sync_sub_jobs"() TO "service_role";
 
 
 
-GRANT ALL ON FUNCTION "public"."process_deploy_install_stats_email"() TO "service_role";
+REVOKE ALL ON FUNCTION "public"."process_deploy_install_stats_email"() FROM PUBLIC;
 
 
 
 REVOKE ALL ON FUNCTION "public"."process_failed_uploads"() FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."process_failed_uploads"() TO "service_role";
 
 
 
 REVOKE ALL ON FUNCTION "public"."process_free_trial_expired"() FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."process_free_trial_expired"() TO "service_role";
 
 
 
-GRANT ALL ON FUNCTION "public"."process_function_queue"("queue_names" "text"[], "batch_size" integer) TO "service_role";
+REVOKE ALL ON FUNCTION "public"."process_function_queue"("queue_names" "text"[], "batch_size" integer) FROM PUBLIC;
 
 
 
-GRANT ALL ON FUNCTION "public"."process_function_queue"("queue_name" "text", "batch_size" integer) TO "service_role";
+REVOKE ALL ON FUNCTION "public"."process_function_queue"("queue_name" "text", "batch_size" integer) FROM PUBLIC;
 
 
 
 REVOKE ALL ON FUNCTION "public"."process_stats_email_monthly"() FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."process_stats_email_monthly"() TO "service_role";
 
 
 
 REVOKE ALL ON FUNCTION "public"."process_stats_email_weekly"() FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."process_stats_email_weekly"() TO "service_role";
 
 
 
@@ -10754,7 +10688,6 @@ GRANT ALL ON FUNCTION "public"."record_build_time"("p_org_id" "uuid", "p_user_id
 
 
 REVOKE ALL ON FUNCTION "public"."record_deployment_history"() FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."record_deployment_history"() TO "service_role";
 
 
 
@@ -10781,7 +10714,6 @@ GRANT ALL ON FUNCTION "public"."reject_access_due_to_password_policy"("org_id" "
 
 
 REVOKE ALL ON FUNCTION "public"."remove_old_jobs"() FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."remove_old_jobs"() TO "service_role";
 
 
 
@@ -10806,8 +10738,7 @@ GRANT ALL ON FUNCTION "public"."set_bandwidth_exceeded_by_org"("org_id" "uuid", 
 
 
 
-GRANT ALL ON FUNCTION "public"."set_build_time_exceeded_by_org"("org_id" "uuid", "disabled" boolean) TO "anon";
-GRANT ALL ON FUNCTION "public"."set_build_time_exceeded_by_org"("org_id" "uuid", "disabled" boolean) TO "authenticated";
+REVOKE ALL ON FUNCTION "public"."set_build_time_exceeded_by_org"("org_id" "uuid", "disabled" boolean) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."set_build_time_exceeded_by_org"("org_id" "uuid", "disabled" boolean) TO "service_role";
 
 
@@ -10822,13 +10753,11 @@ GRANT ALL ON FUNCTION "public"."set_storage_exceeded_by_org"("org_id" "uuid", "d
 
 
 
-GRANT ALL ON FUNCTION "public"."top_up_usage_credits"("p_org_id" "uuid", "p_amount" numeric, "p_expires_at" timestamp with time zone, "p_source" "text", "p_source_ref" "jsonb", "p_notes" "text") TO "service_role";
+REVOKE ALL ON FUNCTION "public"."top_up_usage_credits"("p_org_id" "uuid", "p_amount" numeric, "p_expires_at" timestamp with time zone, "p_source" "text", "p_source_ref" "jsonb", "p_notes" "text") FROM PUBLIC;
 
 
 
 REVOKE ALL ON FUNCTION "public"."total_bundle_storage_bytes"() FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."total_bundle_storage_bytes"() TO "anon";
-GRANT ALL ON FUNCTION "public"."total_bundle_storage_bytes"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."total_bundle_storage_bytes"() TO "service_role";
 
 
@@ -10851,11 +10780,11 @@ GRANT ALL ON FUNCTION "public"."transform_role_to_non_invite"("role_input" "publ
 
 
 
-GRANT ALL ON FUNCTION "public"."trigger_http_queue_post_to_function"() TO "service_role";
+REVOKE ALL ON FUNCTION "public"."trigger_http_queue_post_to_function"() FROM PUBLIC;
 
 
 
-GRANT ALL ON FUNCTION "public"."trigger_webhook_on_audit_log"() TO "service_role";
+REVOKE ALL ON FUNCTION "public"."trigger_webhook_on_audit_log"() FROM PUBLIC;
 
 
 
@@ -10864,7 +10793,7 @@ GRANT ALL ON FUNCTION "public"."update_app_versions_retention"() TO "service_rol
 
 
 
-GRANT ALL ON FUNCTION "public"."update_webhook_updated_at"() TO "service_role";
+REVOKE ALL ON FUNCTION "public"."update_webhook_updated_at"() FROM PUBLIC;
 
 
 
