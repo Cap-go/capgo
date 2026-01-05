@@ -338,7 +338,7 @@ describe('[DELETE] /organization/members', () => {
     })
     expect(response.status).toBe(400)
     const responseData = await response.json() as { error: string }
-    expect(responseData.error).toBe('invalid_body')
+    expect(responseData.error).toBe('invalid_json_parse_body')
   })
 
   it('delete organization member with invalid orgId', async () => {
