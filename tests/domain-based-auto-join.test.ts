@@ -29,6 +29,39 @@ async function retryWithBackoff<T>(
     throw lastError
 }
 
+// Utility function to create auth user with retry for 503 errors
+async function createAuthUserWithRetry(
+    email: string,
+    metadata: { first_name: string; last_name: string },
+    maxRetries = 5,
+) {
+    let lastError: any = null
+    for (let i = 0; i < maxRetries; i++) {
+        const result = await getSupabaseClient().auth.admin.createUser({
+            email,
+            email_confirm: true,
+            user_metadata: metadata,
+        })
+
+        // If successful, return the result
+        if (!result.error)
+            return result
+
+        lastError = result.error
+        // If it's a 503, retry; otherwise return the error
+        if (result.error.status !== 503)
+            return result
+
+        // Wait before retrying
+        if (i < maxRetries - 1) {
+            const delay = 100 * Math.pow(2, i)
+            await new Promise(resolve => setTimeout(resolve, delay))
+        }
+    }
+    // Return last error result
+    return { data: null, error: lastError }
+}
+
 beforeAll(async () => {
     // Clean up any leftover test data first
     await getSupabaseClient().from('org_users').delete().eq('org_id', TEST_ORG_ID)
@@ -439,15 +472,12 @@ describe('Organization Email Domain Auto-Join', () => {
                 .eq('id', TEST_ORG_ID)
 
             // Create user in auth.users first (required for foreign key)
-            const { data: authUser, error: authError } = await retryWithBackoff(() =>
-                getSupabaseClient().auth.admin.createUser({
-                    email: testEmail,
-                    email_confirm: true,
-                    user_metadata: {
-                        first_name: 'Test',
-                        last_name: 'User',
-                    },
-                }),
+            const { data: authUser, error: authError } = await createAuthUserWithRetry(
+                testEmail,
+                {
+                    first_name: 'Test',
+                    last_name: 'User',
+                },
             )
 
             expect(authError).toBeNull()
@@ -489,15 +519,12 @@ describe('Organization Email Domain Auto-Join', () => {
             const testEmail = `testuser@otherdomain.com`
 
             // Create user in auth.users first
-            const { data: authUser, error: authError } = await retryWithBackoff(() =>
-                getSupabaseClient().auth.admin.createUser({
-                    email: testEmail,
-                    email_confirm: true,
-                    user_metadata: {
-                        first_name: 'Test',
-                        last_name: 'User',
-                    },
-                }),
+            const { data: authUser, error: authError } = await createAuthUserWithRetry(
+                testEmail,
+                {
+                    first_name: 'Test',
+                    last_name: 'User',
+                },
             )
 
             expect(authError).toBeNull()
@@ -543,15 +570,12 @@ describe('Organization Email Domain Auto-Join', () => {
                 .eq('id', TEST_ORG_ID)
 
             // Create auth user
-            const { data: authUser, error: authError } = await retryWithBackoff(() =>
-                getSupabaseClient().auth.admin.createUser({
-                    email: testEmail,
-                    email_confirm: true,
-                    user_metadata: {
-                        first_name: 'Test',
-                        last_name: 'User',
-                    },
-                }),
+            const { data: authUser, error: authError } = await createAuthUserWithRetry(
+                testEmail,
+                {
+                    first_name: 'Test',
+                    last_name: 'User',
+                },
             )
 
             expect(authError).toBeNull()
@@ -595,15 +619,12 @@ describe('Organization Email Domain Auto-Join', () => {
                 .eq('id', TEST_ORG_ID)
 
             // Create auth user first
-            const { data: authUser, error: authError } = await retryWithBackoff(() =>
-                getSupabaseClient().auth.admin.createUser({
-                    email: testEmail,
-                    email_confirm: true,
-                    user_metadata: {
-                        first_name: 'Existing',
-                        last_name: 'User',
-                    },
-                }),
+            const { data: authUser, error: authError } = await createAuthUserWithRetry(
+                testEmail,
+                {
+                    first_name: 'Existing',
+                    last_name: 'User',
+                },
             )
 
             expect(authError).toBeNull()
