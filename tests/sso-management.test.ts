@@ -240,7 +240,14 @@ describe('auto-join integration', () => {
         },
       })
 
-      if (authUserError || !authUserData.user) {
+      // Check if error is meaningful (not empty object) and no user data
+      const hasRealError = authUserError && (authUserError.message || Object.keys(authUserError).length > 0)
+
+      if (hasRealError || !authUserData?.user) {
+        // If error is empty object {}, treat as "user exists" and fall through to catch
+        if (!authUserError?.message && (!authUserData?.user)) {
+          throw new Error('User likely exists (empty error response)')
+        }
         const errorMsg = authUserError?.message || JSON.stringify(authUserError) || 'No user returned'
         throw new Error(`Auth user creation failed: ${errorMsg}`)
       }
