@@ -1,7 +1,7 @@
 BEGIN;
 
 
-SELECT plan(7);
+SELECT plan(15);
 
 -- Test is_admin
 SELECT tests.authenticate_as('test_admin');
@@ -69,6 +69,82 @@ SELECT
         ),
         false,
         'is_allowed_capgkey test with app_id - user is not app owner'
+    );
+
+-- ============================================================================
+-- Test is_allowed_capgkey with hashed API keys
+-- ============================================================================
+-- Test data is seeded in seed.sql:
+--   - id=100: hashed key 'test-hashed-apikey-for-auth-test' (all mode)
+--   - id=101: expired hashed key 'expired-hashed-key-for-test' (all mode)
+--   - id=102: expired plain key 'expired-plain-key-for-test' (all mode)
+
+SELECT
+    is(
+        is_allowed_capgkey('test-hashed-apikey-for-auth-test', '{all}'),
+        true,
+        'is_allowed_capgkey test - hashed key has correct mode'
+    );
+
+SELECT
+    is(
+        is_allowed_capgkey('test-hashed-apikey-for-auth-test', '{read}'),
+        false,
+        'is_allowed_capgkey test - hashed key does not have correct mode'
+    );
+
+SELECT
+    is(
+        is_allowed_capgkey(
+            'test-hashed-apikey-for-auth-test',
+            '{all}',
+            'com.demo.app'
+        ),
+        true,
+        'is_allowed_capgkey test with app_id - hashed key user is app owner'
+    );
+
+-- ============================================================================
+-- Test is_allowed_capgkey with expired API keys
+-- ============================================================================
+
+SELECT
+    is(
+        is_allowed_capgkey('expired-hashed-key-for-test', '{all}'),
+        false,
+        'is_allowed_capgkey test - expired hashed key should fail'
+    );
+
+SELECT
+    is(
+        is_allowed_capgkey('expired-plain-key-for-test', '{all}'),
+        false,
+        'is_allowed_capgkey test - expired plain key should fail'
+    );
+
+-- ============================================================================
+-- Test get_user_id with hashed API keys
+-- ============================================================================
+
+SELECT
+    is(
+        get_user_id('test-hashed-apikey-for-auth-test'),
+        '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid,
+        'get_user_id test - hashed key returns correct user_id'
+    );
+
+SELECT
+    is(
+        get_user_id('expired-hashed-key-for-test'),
+        NULL,
+        'get_user_id test - expired hashed key returns null'
+    );
+
+SELECT
+    is(
+        get_user_id('expired-plain-key-for-test'),
+        NULL,
+        'get_user_id test - expired plain key returns null'
     );
 
 SELECT *
