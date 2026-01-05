@@ -45,9 +45,13 @@ BEGIN
       )
   LOOP
     -- Add user to org with read permission
+    -- Use conditional INSERT to avoid conflicts
     INSERT INTO public.org_users (user_id, org_id, user_right, created_at)
-    VALUES (p_user_id, v_org.id, 'read', now())
-    ON CONFLICT (user_id, org_id) DO NOTHING;
+    SELECT p_user_id, v_org.id, 'read', now()
+    WHERE NOT EXISTS (
+      SELECT 1 FROM public.org_users ou
+      WHERE ou.user_id = p_user_id AND ou.org_id = v_org.id
+    );
     
     -- Log domain-based auto-join
     INSERT INTO public.sso_audit_logs (
