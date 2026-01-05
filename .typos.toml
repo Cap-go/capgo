@@ -29,6 +29,7 @@ extend-exclude = [
   # Database and Supabase
   "supabase/.branches/",
   "supabase/.temp/",
+  "supabase/schemas/prod.sql",
 
   # Assets and data files
   "*.json",
