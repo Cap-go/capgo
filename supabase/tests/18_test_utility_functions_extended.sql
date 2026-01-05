@@ -293,7 +293,7 @@ SELECT
 -- Test one_month_ahead
 SELECT
     ok(
-        one_month_ahead() > now(),
+        one_month_ahead() > NOW(),
         'one_month_ahead test - returns future date'
     );
 

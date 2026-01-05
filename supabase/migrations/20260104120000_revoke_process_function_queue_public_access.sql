@@ -23,7 +23,7 @@ CREATE OR REPLACE FUNCTION "public"."cleanup_job_run_details_7days"() RETURNS "v
     SET "search_path" TO ''
     AS $$
 BEGIN
-  DELETE FROM cron.job_run_details WHERE end_time < now() - interval '7 days';
+  DELETE FROM cron.job_run_details WHERE end_time < NOW() - interval '7 days';
 END;
 $$;
 

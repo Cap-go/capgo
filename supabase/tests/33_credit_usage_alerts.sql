@@ -19,8 +19,8 @@ WITH user_insert AS (
     VALUES (
         tests.get_supabase_uid('credit_alert_user'),
         'credit-alert@example.com',
-        now(),
-        now()
+        NOW(),
+        NOW()
     )
     RETURNING id
 ),
@@ -49,8 +49,8 @@ grant_insert AS (
         org_insert.id,
         100,
         0,
-        now(),
-        now() + interval '1 year',
+        NOW(),
+        NOW() + interval '1 year',
         'manual'
     FROM org_insert
     RETURNING
@@ -204,8 +204,8 @@ WITH top_up AS (
         org_id,
         50,
         0,
-        now(),
-        now() + interval '1 year',
+        NOW(),
+        NOW() + interval '1 year',
         'manual'
     FROM credit_alert_context
     RETURNING id
@@ -318,8 +318,8 @@ SELECT
         ),
         (
             SELECT
-                (date_part('year', now())::int * 100)
-                + date_part('month', now())::int
+                (date_part('year', NOW())::int * 100)
+                + date_part('month', NOW())::int
         ),
         'Alert cycle uses the current YYYYMM key'
     );

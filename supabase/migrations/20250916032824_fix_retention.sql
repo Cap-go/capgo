@@ -9,7 +9,7 @@ BEGIN
       AND (SELECT retention FROM public.apps WHERE apps.app_id = app_versions.app_id) >= 0
       AND (SELECT retention FROM public.apps WHERE apps.app_id = app_versions.app_id) < 63113904
       AND app_versions.created_at < (
-          SELECT now() - make_interval(secs => apps.retention)
+          SELECT NOW() - make_interval(secs => apps.retention)
           FROM public.apps
           WHERE apps.app_id = app_versions.app_id
       )

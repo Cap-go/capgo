@@ -69,7 +69,7 @@ BEGIN
     -- create the user
     user_id := gen_random_uuid();
     INSERT INTO auth.users (id, email, phone, raw_user_meta_data, raw_app_meta_data, created_at, updated_at)
-    VALUES (user_id, coalesce(email, concat(user_id, '@test.com')), phone, jsonb_build_object('test_identifier', identifier) || coalesce(metadata, '{}'::jsonb), '{}'::jsonb, now(), now())
+    VALUES (user_id, coalesce(email, concat(user_id, '@test.com')), phone, jsonb_build_object('test_identifier', identifier) || coalesce(metadata, '{}'::jsonb), '{}'::jsonb, NOW(), NOW())
     RETURNING id INTO user_id;
 
     RETURN user_id;
@@ -312,10 +312,10 @@ RETURNS text AS $$
 $$ LANGUAGE sql;
 
 --
---  Generated now() function used to replace pg_catalog.now() for the purpose
+--  Generated NOW() function used to replace pg_catalog.NOW() for the purpose
 --  of freezing time in tests. This should not be used directly.
 --
-CREATE OR REPLACE FUNCTION test_overrides.now()
+CREATE OR REPLACE FUNCTION test_overrides.NOW()
 RETURNS timestamp with time zone
 AS $$
 BEGIN
@@ -326,7 +326,7 @@ BEGIN
         RETURN current_setting('tests.frozen_time')::timestamptz;
     END IF;
 
-    RETURN pg_catalog.now();
+    RETURN pg_catalog.NOW();
 END
 $$ LANGUAGE plpgsql;
 
@@ -334,9 +334,9 @@ $$ LANGUAGE plpgsql;
 /**
     * ### tests.freeze_time(frozen_time timestamp with time zone)
     *
-    * Overwrites the current time from now() to the provided time.
+    * Overwrites the current time from NOW() to the provided time.
     *
-    * Works out of the box for any normal usage of now(), if you have a function that sets its own search path, such as security definers, then you will need to alter the function to set the search path to include test_overrides BEFORE pg_catalog.
+    * Works out of the box for any normal usage of NOW(), if you have a function that sets its own search path, such as security definers, then you will need to alter the function to set the search path to include test_overrides BEFORE pg_catalog.
     * **ONLY do this inside of a pgtap test transaction.**
     * Example:
     *
@@ -382,7 +382,7 @@ $$ LANGUAGE plpgsql;
 /**
     * ### tests.unfreeze_time()
     *
-    * Unfreezes the time and restores the original now() function.
+    * Unfreezes the time and restores the original NOW() function.
     *
     * Returns:
     * - void

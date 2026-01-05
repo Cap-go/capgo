@@ -17,14 +17,14 @@ VALUES
 (
     tests.get_supabase_uid('test_2fa_user_org'),
     '2fa_org@test.com',
-    now(),
-    now()
+    NOW(),
+    NOW()
 ),
 (
     tests.get_supabase_uid('test_no_2fa_user_org'),
     'no2fa_org@test.com',
-    now(),
-    now()
+    NOW(),
+    NOW()
 )
 ON CONFLICT (id) DO NOTHING;
 
@@ -109,8 +109,8 @@ BEGIN
         'Test TOTP Org',
         'totp'::auth.factor_type,
         'verified'::auth.factor_status,
-        now(),
-        now()
+        NOW(),
+        NOW()
     );
 END $$;
 

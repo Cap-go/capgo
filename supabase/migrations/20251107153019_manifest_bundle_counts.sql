@@ -139,7 +139,7 @@ BEGIN
 
     UPDATE public.apps
     SET manifest_bundle_count = GREATEST(manifest_bundle_count + v_delta, 0),
-        updated_at = now()
+        updated_at = NOW()
     WHERE app_id = v_app_id;
 
     processed := processed + 1;

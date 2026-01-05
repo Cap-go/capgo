@@ -26,8 +26,8 @@ BEGIN
         'Test TOTP',
         'totp'::auth.factor_type,
         'verified'::auth.factor_status,
-        now(),
-        now()
+        NOW(),
+        NOW()
     );
 
     -- Insert unverified MFA factor for test_user_with_unverified_2fa
@@ -38,8 +38,8 @@ BEGIN
         'Test TOTP Unverified',
         'totp'::auth.factor_type,
         'unverified'::auth.factor_status,
-        now(),
-        now()
+        NOW(),
+        NOW()
     );
 END $$;
 
