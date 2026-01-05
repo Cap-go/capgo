@@ -33,40 +33,6 @@ export interface AuditLogData {
   created_at: string
 }
 
-// Webhook database row
-export interface Webhook {
-  id: string
-  org_id: string
-  name: string
-  url: string
-  secret: string
-  enabled: boolean
-  events: string[]
-  created_at: string
-  updated_at: string
-  created_by: string | null
-}
-
-// Webhook delivery database row
-export interface WebhookDelivery {
-  id: string
-  webhook_id: string
-  org_id: string
-  audit_log_id: number | null
-  event_type: string
-  status: 'pending' | 'success' | 'failed'
-  request_payload: WebhookPayload
-  response_status: number | null
-  response_body: string | null
-  response_headers: Record<string, string> | null
-  attempt_count: number
-  max_attempts: number
-  next_retry_at: string | null
-  created_at: string
-  completed_at: string | null
-  duration_ms: number | null
-}
-
 // Supported event types that users can subscribe to
 export const WEBHOOK_EVENT_TYPES = [
   'apps', // App changes (INSERT, UPDATE, DELETE)
@@ -107,7 +73,7 @@ export async function findWebhooksForEvent(
   tableName: string,
 ): Promise<Webhook[]> {
   // Note: Using type assertion as webhooks table types are not yet generated
-  const { data: webhooks, error } = await (supabaseAdmin(c) as any)
+  const { data: webhooks, error } = await supabaseAdmin(c)
     .from('webhooks')
     .select('*')
     .eq('org_id', orgId)
@@ -132,16 +98,16 @@ export async function createDeliveryRecord(
   auditLogId: number | null,
   eventType: string,
   payload: WebhookPayload,
-): Promise<WebhookDelivery | null> {
+) {
   // Note: Using type assertion as webhook_deliveries table types are not yet generated
-  const { data: delivery, error } = await (supabaseAdmin(c) as any)
+  const { data: delivery, error } = await supabaseAdmin(c)
     .from('webhook_deliveries')
     .insert({
       webhook_id: webhookId,
       org_id: orgId,
       audit_log_id: auditLogId,
       event_type: eventType,
-      request_payload: payload,
+      request_payload: payload as any,
       status: 'pending',
     })
     .select()
@@ -152,7 +118,7 @@ export async function createDeliveryRecord(
     return null
   }
 
-  return delivery as WebhookDelivery
+  return delivery
 }
 
 /**
@@ -279,7 +245,7 @@ export async function updateDeliveryResult(
   responseBody: string | null,
   duration: number,
 ): Promise<void> {
-  const { error } = await (supabaseAdmin(c) as any)
+  const { error } = await supabaseAdmin(c)
     .from('webhook_deliveries')
     .update({
       status: success ? 'success' : 'failed',
@@ -302,7 +268,7 @@ export async function incrementAttemptCount(
   c: Context,
   deliveryId: string,
 ): Promise<number> {
-  const { data, error } = await (supabaseAdmin(c) as any)
+  const { data, error } = await supabaseAdmin(c)
     .from('webhook_deliveries')
     .select('attempt_count')
     .eq('id', deliveryId)
@@ -315,7 +281,7 @@ export async function incrementAttemptCount(
 
   const newCount = data.attempt_count + 1
 
-  await (supabaseAdmin(c) as any)
+  await supabaseAdmin(c)
     .from('webhook_deliveries')
     .update({ attempt_count: newCount })
     .eq('id', deliveryId)
@@ -336,7 +302,7 @@ export async function scheduleRetry(
 
   const nextRetryAt = new Date(Date.now() + retryDelaySeconds * 1000).toISOString()
 
-  const { error } = await (supabaseAdmin(c) as any)
+  const { error } = await supabaseAdmin(c)
     .from('webhook_deliveries')
     .update({
       next_retry_at: nextRetryAt,
@@ -365,7 +331,7 @@ export async function markDeliveryFailed(
   c: Context,
   deliveryId: string,
 ): Promise<void> {
-  const { error } = await (supabaseAdmin(c) as any)
+  const { error } = await supabaseAdmin(c)
     .from('webhook_deliveries')
     .update({
       status: 'failed',
@@ -385,7 +351,7 @@ export async function getWebhookById(
   c: Context,
   webhookId: string,
 ): Promise<Webhook | null> {
-  const { data, error } = await (supabaseAdmin(c) as any)
+  const { data, error } = await supabaseAdmin(c)
     .from('webhooks')
     .select('*')
     .eq('id', webhookId)
@@ -405,8 +371,8 @@ export async function getWebhookById(
 export async function getDeliveryById(
   c: Context,
   deliveryId: string,
-): Promise<WebhookDelivery | null> {
-  const { data, error } = await (supabaseAdmin(c) as any)
+) {
+  const { data, error } = await supabaseAdmin(c)
     .from('webhook_deliveries')
     .select('*')
     .eq('id', deliveryId)
@@ -417,7 +383,7 @@ export async function getDeliveryById(
     return null
   }
 
-  return data as WebhookDelivery
+  return data
 }
 
 /**
