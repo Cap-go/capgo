@@ -420,6 +420,7 @@ describe.skip('domain verification (mocked metadata fetch)', () => {
 
     // Manually insert SSO connection and domain mapping (bypass /private/sso/configure to avoid CLI dependency)
     const ssoProviderId = randomUUID()
+    const testEntityId = `https://sso.test.com/${randomUUID()}`
 
     const { error: ssoError } = await getSupabaseClient().from('org_saml_connections').insert({
       org_id: orgId,
@@ -472,240 +473,239 @@ describe.skip('domain verification (mocked metadata fetch)', () => {
 
 describe.skip('domain verification', () => {
   it('should mark domains as verified when added via SSO config', async () => {
-    it('should mark domains as verified when added via SSO config', async () => {
-      const orgId = randomUUID()
-      const customerId = `cus_verify_${randomUUID()}`
-      const domain = `verify${randomUUID().slice(0, 8)}.com`
+    const orgId = randomUUID()
+    const customerId = `cus_verify_${randomUUID()}`
+    const domain = `verify${randomUUID().slice(0, 8)}.com`
 
-      await getSupabaseClient().from('stripe_info').insert({
-        customer_id: customerId,
-        status: 'succeeded',
-        product_id: 'prod_LQIregjtNduh4q',
-      })
-
-      await getSupabaseClient().from('orgs').insert({
-        id: orgId,
-        name: 'Verification Test Org',
-        management_email: USER_ADMIN_EMAIL,
-        created_by: USER_ID,
-        customer_id: customerId,
-      })
-
-      await getSupabaseClient().from('org_users').insert({
-        user_id: USER_ID,
-        org_id: orgId,
-        user_right: 'super_admin',
-      })
-
-      await fetch(`${BASE_URL}/private/sso/configure`, {
-        method: 'POST',
-        headers: headersInternal,
-        body: JSON.stringify({
-          orgId,
-          userId: USER_ID,
-          metadataXml: TEST_METADATA_XML,
-          domains: [domain],
-        }),
-      })
-
-      const { data: mapping } = await getSupabaseClient()
-        .from('saml_domain_mappings')
-        .select('verified')
-        .eq('domain', domain)
-        .single()
-
-      expect(mapping!.verified).toBe(true)
-
-      // Cleanup
-      await getSupabaseClient().from('saml_domain_mappings').delete().eq('domain', domain)
-      await getSupabaseClient().from('org_saml_connections').delete().eq('org_id', orgId)
-      await getSupabaseClient().from('org_users').delete().eq('org_id', orgId)
-      await getSupabaseClient().from('orgs').delete().eq('id', orgId)
-      await getSupabaseClient().from('stripe_info').delete().eq('customer_id', customerId)
+    await getSupabaseClient().from('stripe_info').insert({
+      customer_id: customerId,
+      status: 'succeeded',
+      product_id: 'prod_LQIregjtNduh4q',
     })
 
-    it('should create domain mappings with correct SSO provider reference', async () => {
-      const orgId = randomUUID()
-      const customerId = `cus_mapping_${randomUUID()}`
-      const domain = `mapping${randomUUID().slice(0, 8)}.com`
-
-      await getSupabaseClient().from('stripe_info').insert({
-        customer_id: customerId,
-        status: 'succeeded',
-        product_id: 'prod_LQIregjtNduh4q',
-      })
-
-      await getSupabaseClient().from('orgs').insert({
-        id: orgId,
-        name: 'Mapping Test Org',
-        management_email: USER_ADMIN_EMAIL,
-        created_by: USER_ID,
-        customer_id: customerId,
-      })
-
-      await getSupabaseClient().from('org_users').insert({
-        user_id: USER_ID,
-        org_id: orgId,
-        user_right: 'super_admin',
-      })
-
-      await fetch(`${BASE_URL}/private/sso/configure`, {
-        method: 'POST',
-        headers: headersInternal,
-        body: JSON.stringify({
-          orgId,
-          userId: USER_ID,
-          metadataXml: TEST_METADATA_XML,
-          domains: [domain],
-        }),
-      })
-
-      const { data: _ssoProvider } = await getSupabaseClient()
-        .from('org_saml_connections')
-        .select('id')
-        .eq('org_id', orgId)
-        .single()
-
-      const { data: mapping } = await getSupabaseClient()
-        .from('saml_domain_mappings')
-        .select('sso_connection_id, domain, org_id')
-        .eq('domain', domain)
-        .single()
-
-      expect((mapping as any)!.sso_connection_id).toBeDefined()
-      expect((mapping as any)!.org_id).toBe(orgId)
-      expect((mapping as any)!.domain).toBe(domain)
-
-      // Cleanup
-      await getSupabaseClient().from('saml_domain_mappings').delete().eq('domain', domain)
-      await getSupabaseClient().from('org_saml_connections').delete().eq('org_id', orgId)
-      await getSupabaseClient().from('org_users').delete().eq('org_id', orgId)
-      await getSupabaseClient().from('orgs').delete().eq('id', orgId)
-      await getSupabaseClient().from('stripe_info').delete().eq('customer_id', customerId)
+    await getSupabaseClient().from('orgs').insert({
+      id: orgId,
+      name: 'Verification Test Org',
+      management_email: USER_ADMIN_EMAIL,
+      created_by: USER_ID,
+      customer_id: customerId,
     })
 
-    it('should allow lookup_sso_provider_by_domain to find provider', async () => {
-      const orgId = randomUUID()
-      const customerId = `cus_lookup_${randomUUID()}`
-      const domain = `lookup${randomUUID().slice(0, 8)}.com`
-
-      await getSupabaseClient().from('stripe_info').insert({
-        customer_id: customerId,
-        status: 'succeeded',
-        product_id: 'prod_LQIregjtNduh4q',
-      })
-
-      await getSupabaseClient().from('orgs').insert({
-        id: orgId,
-        name: 'Lookup Test Org',
-        management_email: USER_ADMIN_EMAIL,
-        created_by: USER_ID,
-        customer_id: customerId,
-      })
-
-      await getSupabaseClient().from('org_users').insert({
-        user_id: USER_ID,
-        org_id: orgId,
-        user_right: 'super_admin',
-      })
-
-      await fetch(`${BASE_URL}/private/sso/configure`, {
-        method: 'POST',
-        headers: headersInternal,
-        body: JSON.stringify({
-          orgId,
-          userId: USER_ID,
-          metadataXml: TEST_METADATA_XML,
-          domains: [domain],
-        }),
-      })
-
-      const { data: ssoProvider } = await getSupabaseClient()
-        .from('org_saml_connections')
-        .select('id')
-        .eq('org_id', orgId)
-        .single()
-
-      // Call the lookup function
-      const { data: lookupResult } = await getSupabaseClient()
-        .rpc('lookup_sso_provider_by_domain', { p_email: `test@${domain}` })
-
-      // The RPC returns an array of provider objects, not just the ID
-      expect(lookupResult).toBeDefined()
-      expect(lookupResult).not.toBeNull()
-      expect(Array.isArray(lookupResult)).toBe(true)
-      expect(lookupResult!.length).toBeGreaterThan(0)
-
-      // Verify the provider_id matches what we created
-      const foundProvider = lookupResult![0]
-      expect(foundProvider.provider_id).toBe(ssoProvider!.id)
-      expect(foundProvider.org_id).toBe(orgId)
-      expect(foundProvider.enabled).toBe(true)
-
-      // Cleanup
-      await getSupabaseClient().from('saml_domain_mappings').delete().eq('domain', domain)
-      await getSupabaseClient().from('org_saml_connections').delete().eq('org_id', orgId)
-      await getSupabaseClient().from('org_users').delete().eq('org_id', orgId)
-      await getSupabaseClient().from('orgs').delete().eq('id', orgId)
-      await getSupabaseClient().from('stripe_info').delete().eq('customer_id', customerId)
+    await getSupabaseClient().from('org_users').insert({
+      user_id: USER_ID,
+      org_id: orgId,
+      user_right: 'super_admin',
     })
 
-    it('should include verified domains in SSO status response', async () => {
-      const orgId = randomUUID()
-      const customerId = `cus_status_${randomUUID()}`
-      const domain1 = `status1${randomUUID().slice(0, 8)}.com`
-      const domain2 = `status2${randomUUID().slice(0, 8)}.com`
-
-      await getSupabaseClient().from('stripe_info').insert({
-        customer_id: customerId,
-        status: 'succeeded',
-        product_id: 'prod_LQIregjtNduh4q',
-      })
-
-      await getSupabaseClient().from('orgs').insert({
-        id: orgId,
-        name: 'Status Test Org',
-        management_email: USER_ADMIN_EMAIL,
-        created_by: USER_ID,
-        customer_id: customerId,
-      })
-
-      await getSupabaseClient().from('org_users').insert({
-        user_id: USER_ID,
-        org_id: orgId,
-        user_right: 'super_admin',
-      })
-
-      await fetch(`${BASE_URL}/private/sso/configure`, {
-        method: 'POST',
-        headers: headersInternal,
-        body: JSON.stringify({
-          orgId,
-          userId: USER_ID,
-          metadataXml: TEST_METADATA_XML,
-          domains: [domain1, domain2],
-        }),
-      })
-
-      const response = await fetch(`${BASE_URL}/private/sso/status`, {
-        method: 'POST',
-        headers: headersInternal,
-        body: JSON.stringify({
-          orgId,
-        }),
-      })
-
-      const data = await response.json() as any
-      expect(data.configured).toBe(true)
-      expect(data.domains).toContain(domain1)
-      expect(data.domains).toContain(domain2)
-      expect(data.domains.length).toBe(2)
-
-      // Cleanup
-      await getSupabaseClient().from('saml_domain_mappings').delete().in('domain', [domain1, domain2])
-      await getSupabaseClient().from('org_saml_connections').delete().eq('org_id', orgId)
-      await getSupabaseClient().from('org_users').delete().eq('org_id', orgId)
-      await getSupabaseClient().from('orgs').delete().eq('id', orgId)
-      await getSupabaseClient().from('stripe_info').delete().eq('customer_id', customerId)
+    await fetch(`${BASE_URL}/private/sso/configure`, {
+      method: 'POST',
+      headers: headersInternal,
+      body: JSON.stringify({
+        orgId,
+        userId: USER_ID,
+        metadataXml: TEST_METADATA_XML,
+        domains: [domain],
+      }),
     })
+
+    const { data: mapping } = await getSupabaseClient()
+      .from('saml_domain_mappings')
+      .select('verified')
+      .eq('domain', domain)
+      .single()
+
+    expect(mapping!.verified).toBe(true)
+
+    // Cleanup
+    await getSupabaseClient().from('saml_domain_mappings').delete().eq('domain', domain)
+    await getSupabaseClient().from('org_saml_connections').delete().eq('org_id', orgId)
+    await getSupabaseClient().from('org_users').delete().eq('org_id', orgId)
+    await getSupabaseClient().from('orgs').delete().eq('id', orgId)
+    await getSupabaseClient().from('stripe_info').delete().eq('customer_id', customerId)
   })
+
+  it('should create domain mappings with correct SSO provider reference', async () => {
+    const orgId = randomUUID()
+    const customerId = `cus_mapping_${randomUUID()}`
+    const domain = `mapping${randomUUID().slice(0, 8)}.com`
+
+    await getSupabaseClient().from('stripe_info').insert({
+      customer_id: customerId,
+      status: 'succeeded',
+      product_id: 'prod_LQIregjtNduh4q',
+    })
+
+    await getSupabaseClient().from('orgs').insert({
+      id: orgId,
+      name: 'Mapping Test Org',
+      management_email: USER_ADMIN_EMAIL,
+      created_by: USER_ID,
+      customer_id: customerId,
+    })
+
+    await getSupabaseClient().from('org_users').insert({
+      user_id: USER_ID,
+      org_id: orgId,
+      user_right: 'super_admin',
+    })
+
+    await fetch(`${BASE_URL}/private/sso/configure`, {
+      method: 'POST',
+      headers: headersInternal,
+      body: JSON.stringify({
+        orgId,
+        userId: USER_ID,
+        metadataXml: TEST_METADATA_XML,
+        domains: [domain],
+      }),
+    })
+
+    const { data: _ssoProvider } = await getSupabaseClient()
+      .from('org_saml_connections')
+      .select('id')
+      .eq('org_id', orgId)
+      .single()
+
+    const { data: mapping } = await getSupabaseClient()
+      .from('saml_domain_mappings')
+      .select('sso_connection_id, domain, org_id')
+      .eq('domain', domain)
+      .single()
+
+    expect((mapping as any)!.sso_connection_id).toBeDefined()
+    expect((mapping as any)!.org_id).toBe(orgId)
+    expect((mapping as any)!.domain).toBe(domain)
+
+    // Cleanup
+    await getSupabaseClient().from('saml_domain_mappings').delete().eq('domain', domain)
+    await getSupabaseClient().from('org_saml_connections').delete().eq('org_id', orgId)
+    await getSupabaseClient().from('org_users').delete().eq('org_id', orgId)
+    await getSupabaseClient().from('orgs').delete().eq('id', orgId)
+    await getSupabaseClient().from('stripe_info').delete().eq('customer_id', customerId)
+  })
+
+  it('should allow lookup_sso_provider_by_domain to find provider', async () => {
+    const orgId = randomUUID()
+    const customerId = `cus_lookup_${randomUUID()}`
+    const domain = `lookup${randomUUID().slice(0, 8)}.com`
+
+    await getSupabaseClient().from('stripe_info').insert({
+      customer_id: customerId,
+      status: 'succeeded',
+      product_id: 'prod_LQIregjtNduh4q',
+    })
+
+    await getSupabaseClient().from('orgs').insert({
+      id: orgId,
+      name: 'Lookup Test Org',
+      management_email: USER_ADMIN_EMAIL,
+      created_by: USER_ID,
+      customer_id: customerId,
+    })
+
+    await getSupabaseClient().from('org_users').insert({
+      user_id: USER_ID,
+      org_id: orgId,
+      user_right: 'super_admin',
+    })
+
+    await fetch(`${BASE_URL}/private/sso/configure`, {
+      method: 'POST',
+      headers: headersInternal,
+      body: JSON.stringify({
+        orgId,
+        userId: USER_ID,
+        metadataXml: TEST_METADATA_XML,
+        domains: [domain],
+      }),
+    })
+
+    const { data: ssoProvider } = await getSupabaseClient()
+      .from('org_saml_connections')
+      .select('id')
+      .eq('org_id', orgId)
+      .single()
+
+    // Call the lookup function
+    const { data: lookupResult } = await getSupabaseClient()
+      .rpc('lookup_sso_provider_by_domain', { p_email: `test@${domain}` })
+
+    // The RPC returns an array of provider objects, not just the ID
+    expect(lookupResult).toBeDefined()
+    expect(lookupResult).not.toBeNull()
+    expect(Array.isArray(lookupResult)).toBe(true)
+    expect(lookupResult!.length).toBeGreaterThan(0)
+
+    // Verify the provider_id matches what we created
+    const foundProvider = lookupResult![0]
+    expect(foundProvider.provider_id).toBe(ssoProvider!.id)
+    expect(foundProvider.org_id).toBe(orgId)
+    expect(foundProvider.enabled).toBe(true)
+
+    // Cleanup
+    await getSupabaseClient().from('saml_domain_mappings').delete().eq('domain', domain)
+    await getSupabaseClient().from('org_saml_connections').delete().eq('org_id', orgId)
+    await getSupabaseClient().from('org_users').delete().eq('org_id', orgId)
+    await getSupabaseClient().from('orgs').delete().eq('id', orgId)
+    await getSupabaseClient().from('stripe_info').delete().eq('customer_id', customerId)
+  })
+
+  it('should include verified domains in SSO status response', async () => {
+    const orgId = randomUUID()
+    const customerId = `cus_status_${randomUUID()}`
+    const domain1 = `status1${randomUUID().slice(0, 8)}.com`
+    const domain2 = `status2${randomUUID().slice(0, 8)}.com`
+
+    await getSupabaseClient().from('stripe_info').insert({
+      customer_id: customerId,
+      status: 'succeeded',
+      product_id: 'prod_LQIregjtNduh4q',
+    })
+
+    await getSupabaseClient().from('orgs').insert({
+      id: orgId,
+      name: 'Status Test Org',
+      management_email: USER_ADMIN_EMAIL,
+      created_by: USER_ID,
+      customer_id: customerId,
+    })
+
+    await getSupabaseClient().from('org_users').insert({
+      user_id: USER_ID,
+      org_id: orgId,
+      user_right: 'super_admin',
+    })
+
+    await fetch(`${BASE_URL}/private/sso/configure`, {
+      method: 'POST',
+      headers: headersInternal,
+      body: JSON.stringify({
+        orgId,
+        userId: USER_ID,
+        metadataXml: TEST_METADATA_XML,
+        domains: [domain1, domain2],
+      }),
+    })
+
+    const response = await fetch(`${BASE_URL}/private/sso/status`, {
+      method: 'POST',
+      headers: headersInternal,
+      body: JSON.stringify({
+        orgId,
+      }),
+    })
+
+    const data = await response.json() as any
+    expect(data.configured).toBe(true)
+    expect(data.domains).toContain(domain1)
+    expect(data.domains).toContain(domain2)
+    expect(data.domains.length).toBe(2)
+
+    // Cleanup
+    await getSupabaseClient().from('saml_domain_mappings').delete().in('domain', [domain1, domain2])
+    await getSupabaseClient().from('org_saml_connections').delete().eq('org_id', orgId)
+    await getSupabaseClient().from('org_users').delete().eq('org_id', orgId)
+    await getSupabaseClient().from('orgs').delete().eq('id', orgId)
+    await getSupabaseClient().from('stripe_info').delete().eq('customer_id', customerId)
+  })
+})

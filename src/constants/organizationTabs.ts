@@ -6,8 +6,9 @@ import IconCredits from '~icons/heroicons/currency-dollar'
 import IconWebhook from '~icons/heroicons/globe-alt'
 import IconInfo from '~icons/heroicons/information-circle'
 import IconShield from '~icons/heroicons/shield-check'
-import IconSecurity from '~icons/heroicons/shield-check'
 import IconUsers from '~icons/heroicons/users'
+
+const IconSecurity = IconShield
 
 export const organizationTabs: Tab[] = [
   { label: 'general', key: '/settings/organization', icon: IconInfo },
