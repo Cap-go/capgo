@@ -311,12 +311,13 @@ describe('auto-join integration', () => {
       throw new Error(`Manual enrollment failed: ${enrollError.message}`)
     }
 
-    // Check if user was enrolled - use maybeSingle() to avoid error when no rows exist
+    // Check if user was enrolled - use limit(1) then maybeSingle() to avoid error when no rows exist
     const { data: membership, error: membershipError } = await getSupabaseClient()
       .from('org_users')
       .select('*')
       .eq('user_id', actualUserId)
       .eq('org_id', orgId)
+      .limit(1)
       .maybeSingle()
 
     if (membershipError) {
