@@ -100,7 +100,7 @@ BEGIN
 
     UPDATE public.apps
     SET channel_device_count = GREATEST(channel_device_count + v_delta, 0),
-        updated_at = now()
+        updated_at = NOW()
     WHERE app_id = v_app_id;
 
     processed := processed + 1;

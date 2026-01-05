@@ -1,158 +1,10 @@
--- ============================================================================
--- Hashed API Keys Migration
--- ============================================================================
--- This migration adds support for hashed API keys with organization-level
--- enforcement. Hashed keys are stored as SHA-256 hashes, with the plain key
--- only visible once during creation.
--- ============================================================================
+-- Add API key policy columns to get_orgs_v7 function return type
+-- This was missing from the original get_orgs_v7 implementation which was based on get_orgs_v6
+-- The require_apikey_expiration and max_apikey_expiration_days fields were added to get_orgs_v6
+-- but not carried over when get_orgs_v7 was created
 
--- ============================================================================
--- Section 1: Add key_hash column to apikeys table
--- ============================================================================
-
--- Add key_hash column for storing hashed API keys
-ALTER TABLE "public"."apikeys"
-ADD COLUMN IF NOT EXISTS "key_hash" text;
-
--- Allow NULL in the key column for hashed keys (key is NULL when key_hash is set)
-ALTER TABLE "public"."apikeys"
-ALTER COLUMN "key" DROP NOT NULL;
-
--- Add a partial index for efficient hash lookups
-CREATE INDEX IF NOT EXISTS idx_apikeys_key_hash ON public.apikeys(key_hash)
-WHERE key_hash IS NOT NULL;
-
--- Add comment to document the column
-COMMENT ON COLUMN "public"."apikeys"."key_hash" IS 'SHA-256 hash of the API key. When set, the key column is cleared to null for security.';
-
--- ============================================================================
--- Section 2: Add enforce_hashed_api_keys column to orgs table
--- ============================================================================
-
--- Add organization-level enforcement setting
-ALTER TABLE "public"."orgs"
-ADD COLUMN IF NOT EXISTS "enforce_hashed_api_keys" boolean NOT NULL DEFAULT false;
-
--- Add comment to document the column
-COMMENT ON COLUMN "public"."orgs"."enforce_hashed_api_keys" IS 'When true, only hashed API keys can access this organization. Plain-text keys will be rejected.';
-
--- ============================================================================
--- Section 3: Create hash verification function
--- ============================================================================
-
--- Function to verify if a plain key matches a stored hash
-CREATE OR REPLACE FUNCTION "public"."verify_api_key_hash"(
-  "plain_key" text,
-  "stored_hash" text
-) RETURNS boolean
-LANGUAGE "plpgsql" SECURITY DEFINER
-SET "search_path" TO ''
-AS $$
-BEGIN
-  RETURN encode(extensions.digest(plain_key, 'sha256'), 'hex') = stored_hash;
-END;
-$$;
-
-ALTER FUNCTION "public"."verify_api_key_hash"(text, text) OWNER TO "postgres";
-
--- Grant permissions
-GRANT EXECUTE ON FUNCTION "public"."verify_api_key_hash"(text, text) TO "authenticated";
-GRANT EXECUTE ON FUNCTION "public"."verify_api_key_hash"(text, text) TO "service_role";
-
--- ============================================================================
--- Section 4: Create function to find apikey by value (plain or hashed)
--- ============================================================================
-
--- Function to find apikey by plain key value (checks both plain and hashed)
-CREATE OR REPLACE FUNCTION "public"."find_apikey_by_value"(
-  "key_value" text
-) RETURNS SETOF "public"."apikeys"
-LANGUAGE "plpgsql" SECURITY DEFINER
-SET "search_path" TO ''
-AS $$
-DECLARE
-  found_key public.apikeys%ROWTYPE;
-BEGIN
-  -- First try plain-text lookup
-  SELECT * INTO found_key FROM public.apikeys WHERE key = key_value LIMIT 1;
-  IF FOUND THEN
-    RETURN NEXT found_key;
-    RETURN;
-  END IF;
-
-  -- Try hashed lookup
-  SELECT * INTO found_key FROM public.apikeys
-  WHERE key_hash = encode(extensions.digest(key_value, 'sha256'), 'hex')
-  LIMIT 1;
-  IF FOUND THEN
-    RETURN NEXT found_key;
-    RETURN;
-  END IF;
-
-  -- No key found
-  RETURN;
-END;
-$$;
-
-ALTER FUNCTION "public"."find_apikey_by_value"(text) OWNER TO "postgres";
-
--- Grant permissions (only service_role - this function is for internal backend use only)
-GRANT EXECUTE ON FUNCTION "public"."find_apikey_by_value"(text) TO "service_role";
-
--- ============================================================================
--- Section 5: Create function to check if org enforces hashed API keys
--- ============================================================================
-
--- Function to check if an org requires hashed API keys
-CREATE OR REPLACE FUNCTION "public"."check_org_hashed_key_enforcement"(
-  "org_id" uuid,
-  "apikey_row" public.apikeys
-) RETURNS boolean
-LANGUAGE "plpgsql" SECURITY DEFINER
-SET "search_path" TO ''
-AS $$
-DECLARE
-  org_enforcing boolean;
-  is_hashed_key boolean;
-BEGIN
-  -- Check if org exists and get enforcement setting
-  SELECT enforce_hashed_api_keys INTO org_enforcing
-  FROM public.orgs
-  WHERE id = check_org_hashed_key_enforcement.org_id;
-
-  IF NOT FOUND THEN
-    RETURN true; -- Org not found, allow (will fail on other checks)
-  END IF;
-
-  -- If org doesn't enforce hashed keys, allow
-  IF org_enforcing = false THEN
-    RETURN true;
-  END IF;
-
-  -- Check if this is a hashed key (key is null, key_hash is not null)
-  is_hashed_key := (apikey_row.key IS NULL AND apikey_row.key_hash IS NOT NULL);
-
-  IF NOT is_hashed_key THEN
-    PERFORM public.pg_log('deny: ORG_REQUIRES_HASHED_API_KEY',
-      jsonb_build_object('org_id', org_id, 'apikey_id', apikey_row.id));
-    RETURN false;
-  END IF;
-
-  RETURN true;
-END;
-$$;
-
-ALTER FUNCTION "public"."check_org_hashed_key_enforcement"(uuid, public.apikeys) OWNER TO "postgres";
-
--- Grant permissions
-GRANT EXECUTE ON FUNCTION "public"."check_org_hashed_key_enforcement"(uuid, public.apikeys) TO "authenticated";
-GRANT EXECUTE ON FUNCTION "public"."check_org_hashed_key_enforcement"(uuid, public.apikeys) TO "service_role";
-
--- ============================================================================
--- Section 6: Update get_orgs_v7 to include enforce_hashed_api_keys
--- ============================================================================
-
--- Drop and recreate get_orgs_v7(userid uuid) to add enforce_hashed_api_keys field
+-- Drop both overloads of get_orgs_v7 (with and without parameters)
+DROP FUNCTION IF EXISTS public.get_orgs_v7();
 DROP FUNCTION IF EXISTS public.get_orgs_v7(uuid);
 
 CREATE FUNCTION public.get_orgs_v7(userid uuid)
@@ -178,7 +30,11 @@ RETURNS TABLE (
     credit_next_expiration timestamptz,
     enforcing_2fa boolean,
     "2fa_has_access" boolean,
-    enforce_hashed_api_keys boolean
+    enforce_hashed_api_keys boolean,
+    password_policy_config jsonb,
+    password_has_access boolean,
+    require_apikey_expiration boolean,
+    max_apikey_expiration_days integer
 ) LANGUAGE plpgsql STABLE SECURITY DEFINER
 SET search_path = '' AS $$
 BEGIN
@@ -228,7 +84,19 @@ BEGIN
         ELSE public.has_2fa_enabled(userid)
       END AS "2fa_has_access",
       -- should_redact: true if org enforces 2FA and user doesn't have 2FA
-      (o.enforcing_2fa = true AND NOT public.has_2fa_enabled(userid)) AS should_redact
+      (o.enforcing_2fa = true AND NOT public.has_2fa_enabled(userid)) AS should_redact_2fa
+    FROM public.orgs o
+    JOIN public.org_users ou ON ou.user_id = userid AND o.id = ou.org_id
+  ),
+  -- Calculate password policy access status for user/org combinations
+  password_policy_access AS (
+    SELECT
+      o.id AS org_id,
+      o.password_policy_config,
+      -- password_has_access: true if no policy OR (has policy AND user meets it)
+      public.user_meets_password_policy(userid, o.id) AS password_has_access,
+      -- should_redact: true if org has policy and user doesn't meet it
+      NOT public.user_meets_password_policy(userid, o.id) AS should_redact_password
     FROM public.orgs o
     JOIN public.org_users ou ON ou.user_id = userid AND o.id = ou.org_id
   )
@@ -238,41 +106,41 @@ BEGIN
     o.logo,
     o.name,
     ou.user_right::varchar AS role,
-    -- Redact sensitive fields if user doesn't have 2FA access
+    -- Redact sensitive fields if user doesn't have 2FA or password policy access
     CASE
-      WHEN tfa.should_redact THEN false
+      WHEN tfa.should_redact_2fa OR ppa.should_redact_password THEN false
       ELSE (si.status = 'succeeded')
     END AS paying,
     CASE
-      WHEN tfa.should_redact THEN 0
+      WHEN tfa.should_redact_2fa OR ppa.should_redact_password THEN 0
       ELSE GREATEST(COALESCE((si.trial_at::date - NOW()::date), 0), 0)::integer
     END AS trial_left,
     CASE
-      WHEN tfa.should_redact THEN false
+      WHEN tfa.should_redact_2fa OR ppa.should_redact_password THEN false
       ELSE ((si.status = 'succeeded' AND si.is_good_plan = true) OR (si.trial_at::date - NOW()::date > 0))
     END AS can_use_more,
     CASE
-      WHEN tfa.should_redact THEN false
+      WHEN tfa.should_redact_2fa OR ppa.should_redact_password THEN false
       ELSE (si.status = 'canceled')
     END AS is_canceled,
     CASE
-      WHEN tfa.should_redact THEN 0::bigint
+      WHEN tfa.should_redact_2fa OR ppa.should_redact_password THEN 0::bigint
       ELSE COALESCE(ac.cnt, 0)
     END AS app_count,
     CASE
-      WHEN tfa.should_redact THEN NULL::timestamptz
+      WHEN tfa.should_redact_2fa OR ppa.should_redact_password THEN NULL::timestamptz
       ELSE bc.cycle_start
     END AS subscription_start,
     CASE
-      WHEN tfa.should_redact THEN NULL::timestamptz
+      WHEN tfa.should_redact_2fa OR ppa.should_redact_password THEN NULL::timestamptz
       ELSE (bc.cycle_start + INTERVAL '1 MONTH')
     END AS subscription_end,
     CASE
-      WHEN tfa.should_redact THEN NULL::text
+      WHEN tfa.should_redact_2fa OR ppa.should_redact_password THEN NULL::text
       ELSE o.management_email
     END AS management_email,
     CASE
-      WHEN tfa.should_redact THEN false
+      WHEN tfa.should_redact_2fa OR ppa.should_redact_password THEN false
       ELSE COALESCE(si.price_id = p.price_y_id, false)
     END AS is_yearly,
     o.stats_updated_at,
@@ -286,10 +154,15 @@ BEGIN
     ucb.next_expiration AS credit_next_expiration,
     tfa.enforcing_2fa,
     tfa."2fa_has_access",
-    o.enforce_hashed_api_keys
+    o.enforce_hashed_api_keys,
+    ppa.password_policy_config,
+    ppa.password_has_access,
+    o.require_apikey_expiration,
+    o.max_apikey_expiration_days
   FROM public.orgs o
   JOIN public.org_users ou ON ou.user_id = userid AND o.id = ou.org_id
   JOIN two_fa_access tfa ON tfa.org_id = o.id
+  JOIN password_policy_access ppa ON ppa.org_id = o.id
   LEFT JOIN public.stripe_info si ON o.customer_id = si.customer_id
   LEFT JOIN public.plans p ON si.product_id = p.stripe_id
   LEFT JOIN app_counts ac ON ac.owner_org = o.id
@@ -310,12 +183,7 @@ REVOKE ALL ON FUNCTION public.get_orgs_v7(uuid) FROM "authenticated";
 GRANT EXECUTE ON FUNCTION public.get_orgs_v7(uuid) TO "postgres";
 GRANT EXECUTE ON FUNCTION public.get_orgs_v7(uuid) TO "service_role";
 
--- ============================================================================
--- Section 7: Update get_orgs_v7() wrapper to match new signature
--- ============================================================================
-
-DROP FUNCTION IF EXISTS public.get_orgs_v7();
-
+-- Update the get_orgs_v7() wrapper function with updated return type
 CREATE OR REPLACE FUNCTION public.get_orgs_v7()
 RETURNS TABLE (
     gid uuid,
@@ -339,7 +207,11 @@ RETURNS TABLE (
     credit_next_expiration timestamptz,
     enforcing_2fa boolean,
     "2fa_has_access" boolean,
-    enforce_hashed_api_keys boolean
+    enforce_hashed_api_keys boolean,
+    password_policy_config jsonb,
+    password_has_access boolean,
+    require_apikey_expiration boolean,
+    max_apikey_expiration_days integer
 ) LANGUAGE plpgsql
 SET search_path = '' SECURITY DEFINER AS $$
 DECLARE
@@ -356,6 +228,12 @@ BEGIN
     IF api_key IS NULL THEN
       PERFORM public.pg_log('deny: INVALID_API_KEY', jsonb_build_object('source', 'header'));
       RAISE EXCEPTION 'Invalid API key provided';
+    END IF;
+
+    -- Check if API key is expired
+    IF public.is_apikey_expired(api_key.expires_at) THEN
+      PERFORM public.pg_log('deny: API_KEY_EXPIRED', jsonb_build_object('key_id', api_key.id));
+      RAISE EXCEPTION 'API key has expired';
     END IF;
 
     user_id := api_key.user_id;
@@ -387,4 +265,3 @@ ALTER FUNCTION public.get_orgs_v7() OWNER TO "postgres";
 GRANT ALL ON FUNCTION public.get_orgs_v7() TO "anon";
 GRANT ALL ON FUNCTION public.get_orgs_v7() TO "authenticated";
 GRANT ALL ON FUNCTION public.get_orgs_v7() TO "service_role";
-

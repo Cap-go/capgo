@@ -247,27 +247,27 @@ ALTER TYPE "public"."version_action" OWNER TO "postgres";
 CREATE OR REPLACE FUNCTION "public"."accept_invitation_to_org" ("org_id" "uuid") RETURNS character varying LANGUAGE "plpgsql"
 SET
   search_path = '' SECURITY DEFINER AS $$
-Declare
+DECLARE
  invite record;
-Begin
+BEGIN
   SELECT org_users.* FROM public.org_users
   INTO invite
-  WHERE org_users.org_id=accept_invitation_to_org.org_id and (select auth.uid())=org_users.user_id;
+  WHERE org_users.org_id=accept_invitation_to_org.org_id AND (SELECT auth.uid())=org_users.user_id;
 
   IF invite IS NULL THEN
-    return 'NO_INVITE';
+    RETURN  'NO_INVITE';
   else
     IF NOT (invite.user_right::varchar ilike 'invite_'||'%') THEN
-      return 'INVALID_ROLE';
+      RETURN  'INVALID_ROLE';
     END IF;
 
     UPDATE public.org_users
     SET user_right = REPLACE(invite.user_right::varchar, 'invite_', '')::"public"."user_min_right"
     WHERE org_users.id=invite.id;
 
-    return 'OK';
+    RETURN  'OK';
   end if;
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."accept_invitation_to_org" ("org_id" "uuid") OWNER TO "postgres";
@@ -288,7 +288,7 @@ ALTER FUNCTION "public"."auto_apikey_name_by_id" () OWNER TO "postgres";
 CREATE OR REPLACE FUNCTION "public"."auto_owner_org_by_app_id" () RETURNS "trigger" LANGUAGE "plpgsql"
 SET
   search_path = '' AS $$BEGIN
-  IF NEW."app_id" is distinct from OLD."app_id" AND OLD."app_id" is distinct from NULL THEN
+  IF NEW."app_id" IS DISTINCT FROM OLD."app_id" AND OLD."app_id" IS DISTINCT FROM NULL THEN
     RAISE EXCEPTION 'changing the app_id is not allowed';
   END IF;
 
@@ -303,15 +303,15 @@ CREATE OR REPLACE FUNCTION "public"."check_if_org_can_exist" () RETURNS "trigger
 SET
   search_path = '' SECURITY DEFINER AS $$
 BEGIN
-  delete FROM public.orgs
-  where
+  DELETE FROM public.orgs
+  WHERE
   (
       (
-      select
+      SELECT
           count(*)
-      from
+      FROM
           public.org_users
-      where
+      WHERE
           org_users.user_right = 'super_admin'
           AND org_users.user_id != OLD.user_id
           AND org_users.org_id=orgs.id
@@ -333,7 +333,7 @@ CREATE OR REPLACE FUNCTION "public"."check_min_rights" (
 SET
   search_path = '' AS $$
 BEGIN
-    RETURN check_min_rights(min_right, (select auth.uid()), org_id, app_id, channel_id);
+    RETURN check_min_rights(min_right, (SELECT auth.uid()), org_id, app_id, channel_id);
 END;
 $$;
 
@@ -388,11 +388,11 @@ ALTER FUNCTION "public"."check_min_rights" (
 CREATE OR REPLACE FUNCTION "public"."check_org_user_privileges" () RETURNS "trigger" LANGUAGE "plpgsql"
 SET
   search_path = '' AS $$BEGIN
-  IF (select current_user) IS NOT DISTINCT FROM 'postgres' THEN
+  IF (SELECT current_user) IS NOT DISTINCT FROM 'postgres' THEN
     RETURN NEW;
   END IF;
 
-  IF ("public"."check_min_rights"('super_admin'::"public"."user_min_right", (select auth.uid()), NEW.org_id, NULL::character varying, NULL::bigint))
+  IF ("public"."check_min_rights"('super_admin'::"public"."user_min_right", (SELECT auth.uid()), NEW.org_id, NULL::character varying, NULL::bigint))
   THEN
     RETURN NEW;
   END IF;
@@ -448,7 +448,7 @@ BEGIN
         FROM cron.job 
         WHERE schedule = '5 seconds' OR schedule = '1 seconds' OR schedule = '10 seconds'
     ) 
-    AND end_time < now() - interval '1 hour';
+    AND end_time < NOW() - interval '1 hour';
 END;
 $$;
 
@@ -460,7 +460,7 @@ SET
 DECLARE
     queue_name text;
 BEGIN
-    -- Clean up messages older than 7 days from all queues
+    -- Clean up messages older than 7 days FROM all queues
     FOR queue_name IN (
         SELECT q.queue_name FROM pgmq.list_queues() q
     ) LOOP
@@ -479,9 +479,9 @@ ALTER FUNCTION "public"."cleanup_queue_messages" () OWNER TO "postgres";
 CREATE OR REPLACE FUNCTION "public"."convert_bytes_to_gb" ("bytes_value" double precision) RETURNS double precision LANGUAGE "plpgsql"
 SET
   search_path = '' AS $$
-Begin
+BEGIN
   RETURN bytes_value / 1024.0 / 1024.0 / 1024.0;
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."convert_bytes_to_gb" ("bytes_value" double precision) OWNER TO "postgres";
@@ -489,9 +489,9 @@ ALTER FUNCTION "public"."convert_bytes_to_gb" ("bytes_value" double precision) O
 CREATE OR REPLACE FUNCTION "public"."convert_bytes_to_mb" ("bytes_value" double precision) RETURNS double precision LANGUAGE "plpgsql"
 SET
   search_path = '' AS $$
-Begin
+BEGIN
   RETURN bytes_value / 1024.0 / 1024.0;
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."convert_bytes_to_mb" ("bytes_value" double precision) OWNER TO "postgres";
@@ -499,9 +499,9 @@ ALTER FUNCTION "public"."convert_bytes_to_mb" ("bytes_value" double precision) O
 CREATE OR REPLACE FUNCTION "public"."convert_gb_to_bytes" ("gb" double precision) RETURNS double precision LANGUAGE "plpgsql"
 SET
   search_path = '' AS $$
-Begin
+BEGIN
   RETURN gb * 1024 * 1024 * 1024;
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."convert_gb_to_bytes" ("gb" double precision) OWNER TO "postgres";
@@ -509,9 +509,9 @@ ALTER FUNCTION "public"."convert_gb_to_bytes" ("gb" double precision) OWNER TO "
 CREATE OR REPLACE FUNCTION "public"."convert_mb_to_bytes" ("gb" double precision) RETURNS double precision LANGUAGE "plpgsql"
 SET
   search_path = '' AS $$
-Begin
+BEGIN
   RETURN gb * 1024 * 1024;
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."convert_mb_to_bytes" ("gb" double precision) OWNER TO "postgres";
@@ -562,9 +562,9 @@ ALTER FUNCTION "public"."count_active_users" ("app_ids" character varying[]) OWN
 CREATE OR REPLACE FUNCTION "public"."count_all_need_upgrade" () RETURNS integer LANGUAGE "plpgsql"
 SET
   search_path = '' AS $$
-Begin
+BEGIN
   RETURN (SELECT COUNT(*) FROM public.stripe_info WHERE is_good_plan = false AND status = 'succeeded');
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."count_all_need_upgrade" () OWNER TO "postgres";
@@ -572,9 +572,9 @@ ALTER FUNCTION "public"."count_all_need_upgrade" () OWNER TO "postgres";
 CREATE OR REPLACE FUNCTION "public"."count_all_onboarded" () RETURNS integer LANGUAGE "plpgsql"
 SET
   search_path = '' AS $$
-Begin
+BEGIN
   RETURN (SELECT COUNT(DISTINCT owner_org) FROM public.apps);
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."count_all_onboarded" () OWNER TO "postgres";
@@ -679,11 +679,11 @@ ALTER FUNCTION "public"."delete_user" () OWNER TO "postgres";
 CREATE OR REPLACE FUNCTION "public"."exist_app_v2" ("appid" character varying) RETURNS boolean LANGUAGE "plpgsql"
 SET
   search_path = '' SECURITY DEFINER AS $$
-Begin
+BEGIN
   RETURN (SELECT EXISTS (SELECT 1
   FROM public.apps
   WHERE app_id=appid));
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."exist_app_v2" ("appid" character varying) OWNER TO "postgres";
@@ -695,12 +695,12 @@ CREATE OR REPLACE FUNCTION "public"."exist_app_versions" (
 ) RETURNS boolean LANGUAGE "plpgsql"
 SET
   search_path = '' AS $$
-Begin
+BEGIN
   RETURN (SELECT EXISTS (SELECT 1
   FROM public.app_versions
   WHERE app_id=appid
   AND name=name_version));
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."exist_app_versions" (
@@ -716,7 +716,7 @@ CREATE OR REPLACE FUNCTION "public"."find_best_plan_v3" (
 ) RETURNS character varying LANGUAGE "plpgsql"
 SET
   search_path = '' SECURITY DEFINER AS $$
-Begin
+BEGIN
   RETURN (SELECT name
   FROM public.plans
   WHERE plans.mau>=find_best_plan_v3.mau
@@ -725,7 +725,7 @@ Begin
     OR plans.name = 'Enterprise'
     ORDER BY plans.mau
     LIMIT 1);
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."find_best_plan_v3" (
@@ -764,7 +764,7 @@ ALTER FUNCTION "public"."find_fit_plan_v3" (
 CREATE OR REPLACE FUNCTION "public"."force_valid_user_id_on_app" () RETURNS "trigger" LANGUAGE "plpgsql"
 SET
   search_path = '' AS $$BEGIN
-  NEW.user_id = (select created_by FROM public.orgs where id = (NEW."owner_org"));
+  NEW.user_id = (SELECT created_by FROM public.orgs WHERE  id = (NEW."owner_org"));
 
    RETURN NEW;
 END;$$;
@@ -778,8 +778,8 @@ DECLARE
   org_record record;
 BEGIN
     -- Add management_email compared to old fn
-    INSERT INTO public.orgs (created_by, name, management_email) values (NEW.id, format('%s organization', NEW.first_name), NEW.email) RETURNING * into org_record;
-    -- we no longer insert into org_users here. There is a new trigger on "orgs"
+    INSERT INTO public.orgs (created_by, name, management_email) values (NEW.id, format('%s organization', NEW.first_name), NEW.email) RETURNING * INTO  org_record;
+    -- we no longer insert INTO  org_users here. There is a new trigger on "orgs"
     -- INSERT INTO public.org_users (user_id, org_id, user_right) values (NEW.id, org_record.id, 'super_admin'::"user_min_right");
 
     RETURN NEW;
@@ -924,15 +924,15 @@ CREATE OR REPLACE FUNCTION "public"."get_app_versions" (
 ) RETURNS integer LANGUAGE "plpgsql"
 SET
   search_path = '' SECURITY DEFINER AS $$
-Begin
+BEGIN
   RETURN (SELECT id
   FROM public.app_versions
   WHERE app_id=appid
   AND name=name_version
-  AND owner_org=(select public.get_user_main_org_id_by_app_id(appid))
+  AND owner_org=(SELECT public.get_user_main_org_id_by_app_id(appid))
   AND public.is_member_of_org(public.get_user_id(apikey), (SELECT public.get_user_main_org_id_by_app_id(appid)))
   );
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."get_app_versions" (
@@ -948,19 +948,19 @@ CREATE OR REPLACE FUNCTION "public"."get_current_plan_max_org" ("orgid" "uuid") 
 ) LANGUAGE "plpgsql"
 SET
   search_path = '' SECURITY DEFINER AS $$
-Begin
+BEGIN
   RETURN QUERY
   (SELECT plans.mau, plans.bandwidth, plans.storage
   FROM public.plans
     WHERE stripe_id=(
       SELECT product_id
       FROM public.stripe_info
-      where customer_id=(
+      WHERE  customer_id=(
         SELECT customer_id
         FROM public.orgs
-        where id=orgid)
+        WHERE  id=orgid)
   ));
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."get_current_plan_max_org" ("orgid" "uuid") OWNER TO "postgres";
@@ -968,15 +968,15 @@ ALTER FUNCTION "public"."get_current_plan_max_org" ("orgid" "uuid") OWNER TO "po
 CREATE OR REPLACE FUNCTION "public"."get_current_plan_name_org" ("orgid" "uuid") RETURNS character varying LANGUAGE "plpgsql"
 SET
   search_path = '' SECURITY DEFINER AS $$
-Begin
+BEGIN
   RETURN
   (SELECT name
   FROM public.plans
     WHERE stripe_id=(SELECT product_id
     FROM public.stripe_info
-    where customer_id=(SELECT customer_id FROM public.orgs where id=orgid)
+    WHERE customer_id=(SELECT customer_id FROM public.orgs WHERE id=orgid)
     ));
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."get_current_plan_name_org" ("orgid" "uuid") OWNER TO "postgres";
@@ -1035,10 +1035,10 @@ BEGIN
     anchor_day := COALESCE(stripe_info_row.subscription_anchor_start - date_trunc('MONTH', stripe_info_row.subscription_anchor_start), '0 DAYS'::INTERVAL);
 
     -- Determine the start date based on the anchor day and current date
-    IF anchor_day > now() - date_trunc('MONTH', now()) THEN
-        start_date := date_trunc('MONTH', now() - INTERVAL '1 MONTH') + anchor_day;
+    IF anchor_day > NOW() - date_trunc('MONTH', NOW()) THEN
+        start_date := date_trunc('MONTH', NOW() - INTERVAL '1 MONTH') + anchor_day;
     ELSE
-        start_date := date_trunc('MONTH', now()) + anchor_day;
+        start_date := date_trunc('MONTH', NOW()) + anchor_day;
     END IF;
 
     -- Calculate the end date
@@ -1135,17 +1135,17 @@ SET
   search_path = '' SECURITY DEFINER AS $$
 DECLARE
     auth_uid uuid;
-Begin
-  SELECT auth.uid() into auth_uid;
+BEGIN
+  SELECT auth.uid() INTO  auth_uid;
 
   -- JWT auth.uid is not null, return
   IF auth_uid IS NOT NULL THEN
-    return auth_uid;
+    RETURN  auth_uid;
   END IF;
 
   -- JWT is null
   RETURN NULL;
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."get_identity" () OWNER TO "postgres";
@@ -1156,8 +1156,8 @@ SET
 DECLARE
     api_key_text text;
     api_key record;
-Begin
-  SELECT "public"."get_apikey_header"() into api_key_text;
+BEGIN
+  SELECT "public"."get_apikey_header"() INTO  api_key_text;
 
   -- No api key found in headers, return
   IF api_key_text IS NULL THEN
@@ -1165,17 +1165,17 @@ Begin
   END IF;
 
   -- Fetch the api key
-  select * FROM public.apikeys
-  where key=api_key_text AND
+  SELECT * FROM public.apikeys
+  WHERE  key=api_key_text AND
   mode=ANY(keymode)
-  limit 1 into api_key;
+  limit 1 INTO  api_key;
 
   if api_key IS DISTINCT FROM NULL THEN
     RETURN api_key.user_id;
   END IF;
 
   RETURN NULL;
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."get_identity_apikey_only" ("keymode" "public"."key_mode" []) OWNER TO "postgres";
@@ -1187,14 +1187,14 @@ DECLARE
     auth_uid uuid;
     api_key_text text;
     api_key record;
-Begin
-  SELECT auth.uid() into auth_uid;
+BEGIN
+  SELECT auth.uid() INTO  auth_uid;
 
   IF auth_uid IS NOT NULL THEN
     RETURN auth_uid;
   END IF;
 
-  SELECT "public"."get_apikey_header"() into api_key_text;
+  SELECT "public"."get_apikey_header"() INTO  api_key_text;
 
   -- No api key found in headers, return
   IF api_key_text IS NULL THEN
@@ -1202,17 +1202,17 @@ Begin
   END IF;
 
   -- Fetch the api key
-  select * FROM public.apikeys
-  where key=api_key_text AND
+  SELECT * FROM public.apikeys
+  WHERE  key=api_key_text AND
   mode=ANY(keymode)
-  limit 1 into api_key;
+  limit 1 INTO  api_key;
 
   if api_key IS DISTINCT FROM  NULL THEN
     RETURN api_key.user_id;
   END IF;
 
   RETURN NULL;
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."get_identity" ("keymode" "public"."key_mode" []) OWNER TO "postgres";
@@ -1224,14 +1224,14 @@ DECLARE
     auth_uid uuid;
     api_key_text text;
     api_key record;
-Begin
-  SELECT auth.uid() into auth_uid;
+BEGIN
+  SELECT auth.uid() INTO  auth_uid;
 
   IF auth_uid IS NOT NULL THEN
     RETURN auth_uid;
   END IF;
 
-  SELECT "public"."get_apikey_header"() into api_key_text;
+  SELECT "public"."get_apikey_header"() INTO  api_key_text;
 
   -- No api key found in headers, return
   IF api_key_text IS NULL THEN
@@ -1239,10 +1239,10 @@ Begin
   END IF;
 
   -- Fetch the api key
-  select * FROM public.apikeys
-  where key=api_key_text AND
+  SELECT * FROM public.apikeys
+  WHERE  key=api_key_text AND
   mode=ANY(keymode)
-  limit 1 into api_key;
+  limit 1 INTO  api_key;
 
   if api_key IS DISTINCT FROM  NULL THEN
     IF COALESCE(array_length(api_key.limited_to_orgs, 1), 0) > 0 THEN
@@ -1254,7 +1254,7 @@ Begin
   END IF;
 
   RETURN NULL;
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."get_identity_org_allowed" ("keymode" "public"."key_mode" [], "org_id" "uuid") OWNER TO "postgres";
@@ -1270,14 +1270,14 @@ DECLARE
     auth_uid uuid;
     api_key_text text;
     api_key record;
-Begin
-  SELECT auth.uid() into auth_uid;
+BEGIN
+  SELECT auth.uid() INTO  auth_uid;
 
   IF auth_uid IS NOT NULL THEN
     RETURN auth_uid;
   END IF;
 
-  SELECT "public"."get_apikey_header"() into api_key_text;
+  SELECT "public"."get_apikey_header"() INTO  api_key_text;
 
   -- No api key found in headers, return
   IF api_key_text IS NULL THEN
@@ -1285,10 +1285,10 @@ Begin
   END IF;
 
   -- Fetch the api key
-  select * FROM public.apikeys
-  where key=api_key_text AND
+  SELECT * FROM public.apikeys
+  WHERE  key=api_key_text AND
   mode=ANY(keymode)
-  limit 1 into api_key;
+  limit 1 INTO  api_key;
 
   if api_key IS DISTINCT FROM  NULL THEN
     IF COALESCE(array_length(api_key.limited_to_orgs, 1), 0) > 0 THEN
@@ -1306,7 +1306,7 @@ Begin
   END IF;
 
   RETURN NULL;
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."get_identity_org_appid" (
@@ -1319,7 +1319,7 @@ CREATE OR REPLACE FUNCTION "public"."get_metered_usage" () RETURNS "public"."sta
 SET
   search_path = '' AS $$
 BEGIN
-    RETURN public.get_metered_usage((select auth.uid()));
+    RETURN public.get_metered_usage((SELECT auth.uid()));
 END;
 $$;
 
@@ -1455,12 +1455,12 @@ CREATE OR REPLACE FUNCTION "public"."get_org_members" ("guild_id" "uuid") RETURN
 SET
   search_path = '' SECURITY DEFINER AS $$
 begin
-  IF NOT public.check_min_rights('read'::"public"."user_min_right", (select auth.uid()), get_org_members.guild_id, NULL::character varying, NULL::bigint) THEN
+  IF NOT public.check_min_rights('read'::"public"."user_min_right", (SELECT auth.uid()), get_org_members.guild_id, NULL::character varying, NULL::bigint) THEN
     raise exception 'NO_RIGHTS';
   END IF;
 
-  return query select * FROM public.get_org_members((select auth.uid()), get_org_members.guild_id);
-End;
+  RETURN  query SELECT * FROM public.get_org_members((SELECT auth.uid()), get_org_members.guild_id);
+END;
 $$;
 
 ALTER FUNCTION "public"."get_org_members" ("guild_id" "uuid") OWNER TO "postgres";
@@ -1475,11 +1475,11 @@ CREATE OR REPLACE FUNCTION "public"."get_org_members" ("user_id" "uuid", "guild_
 SET
   search_path = '' SECURITY DEFINER AS $$
 begin
-  return query select o.id as aid, users.id as uid, users.email, users.image_url, o.user_right as role FROM public.org_users as o
+  RETURN  query SELECT o.id as aid, users.id as uid, users.email, users.image_url, o.user_right as role FROM public.org_users as o
   JOIN public.users on users.id = o.user_id
-  where o.org_id=get_org_members.guild_id
+  WHERE  o.org_id=get_org_members.guild_id
   AND public.is_member_of_org(users.id, o.org_id);
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."get_org_members" ("user_id" "uuid", "guild_id" "uuid") OWNER TO "postgres";
@@ -1487,12 +1487,12 @@ ALTER FUNCTION "public"."get_org_members" ("user_id" "uuid", "guild_id" "uuid") 
 CREATE OR REPLACE FUNCTION "public"."get_org_owner_id" ("apikey" "text", "app_id" "text") RETURNS "uuid" LANGUAGE "plpgsql"
 SET
   search_path = '' SECURITY DEFINER AS $$
-Declare
+DECLARE
  org_owner_id uuid;
  real_user_id uuid;
  org_id uuid;
-Begin
-  SELECT apps.user_id FROM public.apps WHERE apps.app_id=get_org_owner_id.app_id into org_owner_id;
+BEGIN
+  SELECT apps.user_id FROM public.apps WHERE apps.app_id=get_org_owner_id.app_id INTO  org_owner_id;
   SELECT public.get_user_main_org_id_by_app_id(app_id) INTO org_id;
 
   SELECT user_id
@@ -1506,7 +1506,7 @@ Begin
   END IF;
 
   RETURN org_owner_id;
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."get_org_owner_id" ("apikey" "text", "app_id" "text") OWNER TO "postgres";
@@ -1515,15 +1515,15 @@ CREATE OR REPLACE FUNCTION "public"."get_org_perm_for_apikey" ("apikey" "text", 
 SET
   search_path = '' SECURITY DEFINER AS $$
 <<get_org_perm_for_apikey>>
-Declare
+DECLARE
   apikey_user_id uuid;
   org_id uuid;
   user_perm "public"."user_min_right";
 BEGIN
-  SELECT public.get_user_id(apikey) into apikey_user_id;
+  SELECT public.get_user_id(apikey) INTO  apikey_user_id;
 
   IF apikey_user_id IS NULL THEN
-    return 'INVALID_APIKEY';
+    RETURN  'INVALID_APIKEY';
   END IF;
 
   SELECT owner_org FROM public.apps
@@ -1532,7 +1532,7 @@ BEGIN
   limit 1;
 
   IF org_id IS NULL THEN
-    return 'NO_APP';
+    RETURN  'NO_APP';
   END IF;
 
   SELECT user_right FROM public.org_users
@@ -1541,13 +1541,13 @@ BEGIN
   AND org_users.org_id=get_org_perm_for_apikey.org_id;
 
   IF user_perm IS NULL THEN
-    return 'perm_none';
+    RETURN  'perm_none';
   END IF;
 
-  -- For compatibility reasons if you are a super_admin we will return "owner"
+  -- For compatibility reasons if you are a super_admin we will RETURN  "owner"
   -- The old cli relies on this behaviour, on get_org_perm_for_apikey_v2 we will change that
   IF user_perm='super_admin'::"public"."user_min_right" THEN
-    return 'perm_owner';
+    RETURN  'perm_owner';
   END IF;
 
   RETURN format('perm_%s', user_perm);
@@ -1610,12 +1610,12 @@ DECLARE
   api_key record;
   user_id uuid;
 BEGIN
-  SELECT "public"."get_apikey_header"() into api_key_text;
+  SELECT "public"."get_apikey_header"() INTO  api_key_text;
   user_id := NULL;
 
   -- Check for API key first
   IF api_key_text IS NOT NULL THEN
-    SELECT * FROM public.apikeys WHERE key=api_key_text into api_key;
+    SELECT * FROM public.apikeys WHERE key=api_key_text INTO  api_key;
 
     IF api_key IS NULL THEN
       RAISE EXCEPTION 'Invalid API key provided';
@@ -1625,22 +1625,22 @@ BEGIN
 
     -- Check limited_to_orgs only if api_key exists and has restrictions
     IF COALESCE(array_length(api_key.limited_to_orgs, 1), 0) > 0 THEN
-      return query select orgs.* FROM public.get_orgs_v6(user_id) orgs
-      where orgs.gid = ANY(api_key.limited_to_orgs::uuid[]);
+      RETURN  query SELECT orgs.* FROM public.get_orgs_v6(user_id) orgs
+      WHERE  orgs.gid = ANY(api_key.limited_to_orgs::uuid[]);
       RETURN;
     END IF;
   END IF;
 
   -- If no valid API key user_id yet, try to get FROM public.identity
   IF user_id IS NULL THEN
-    SELECT public.get_identity() into user_id;
+    SELECT public.get_identity() INTO  user_id;
 
     IF user_id IS NULL THEN
       RAISE EXCEPTION 'No authentication provided - API key or valid session required';
     END IF;
   END IF;
 
-  return query select * FROM public.get_orgs_v6(user_id);
+  RETURN  query SELECT * FROM public.get_orgs_v6(user_id);
 END;
 $$;
 
@@ -1882,8 +1882,8 @@ BEGIN
         FROM
             public.version_usage
         WHERE
-            timestamp >= (date_trunc('minute', now()) - INTERVAL '10 minutes')
-            AND timestamp < (date_trunc('minute', now()) - INTERVAL '9 minutes')
+            timestamp >= (date_trunc('minute', NOW()) - INTERVAL '10 minutes')
+            AND timestamp < (date_trunc('minute', NOW()) - INTERVAL '9 minutes')
         GROUP BY
             version_usage.app_id
     )
@@ -1914,15 +1914,15 @@ ALTER FUNCTION "public"."get_update_stats" () OWNER TO "postgres";
 CREATE OR REPLACE FUNCTION "public"."get_user_id" ("apikey" "text") RETURNS "uuid" LANGUAGE "plpgsql"
 SET
   search_path = '' SECURITY DEFINER AS $$
-Declare
+DECLARE
  is_found uuid;
-Begin
+BEGIN
   SELECT user_id
   INTO is_found
   FROM public.apikeys
   WHERE key=apikey;
   RETURN is_found;
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."get_user_id" ("apikey" "text") OWNER TO "postgres";
@@ -1930,13 +1930,13 @@ ALTER FUNCTION "public"."get_user_id" ("apikey" "text") OWNER TO "postgres";
 CREATE OR REPLACE FUNCTION "public"."get_user_id" ("apikey" "text", "app_id" "text") RETURNS "uuid" LANGUAGE "plpgsql"
 SET
   search_path = '' SECURITY DEFINER AS $$
-Declare
+DECLARE
  real_user_id uuid;
-Begin
-  SELECT public.get_user_id(apikey) into real_user_id;
+BEGIN
+  SELECT public.get_user_id(apikey) INTO  real_user_id;
 
   RETURN real_user_id;
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."get_user_id" ("apikey" "text", "app_id" "text") OWNER TO "postgres";
@@ -1947,13 +1947,13 @@ SET
 DECLARE
   org_id uuid;
 begin
-  select orgs.id FROM public.orgs
-  into org_id
-  where orgs.created_by=get_user_main_org_id.user_id
+  SELECT orgs.id FROM public.orgs
+  INTO  org_id
+  WHERE  orgs.created_by=get_user_main_org_id.user_id
   limit 1;
 
-  return org_id;
-End;
+  RETURN  org_id;
+END;
 $$;
 
 ALTER FUNCTION "public"."get_user_main_org_id" ("user_id" "uuid") OWNER TO "postgres";
@@ -1964,13 +1964,13 @@ SET
 DECLARE
   org_id uuid;
 begin
-  select apps.owner_org FROM public.apps
-  into org_id
-  where ((apps.app_id)::text = (get_user_main_org_id_by_app_id.app_id)::text)
+  SELECT apps.owner_org FROM public.apps
+  INTO  org_id
+  WHERE  ((apps.app_id)::text = (get_user_main_org_id_by_app_id.app_id)::text)
   limit 1;
 
-  return org_id;
-End;
+  RETURN  org_id;
+END;
 $$;
 
 ALTER FUNCTION "public"."get_user_main_org_id_by_app_id" ("app_id" "text") OWNER TO "postgres";
@@ -2034,10 +2034,10 @@ BEGIN
   RETURN QUERY
   SELECT app_versions.* FROM public.app_versions
   LEFT JOIN public.app_versions_meta ON app_versions_meta.id=app_versions.id
-  where coalesce(app_versions_meta.size, 0) = 0
+  WHERE COALESCE(app_versions_meta.size, 0) = 0
   AND app_versions.deleted=false
   AND app_versions.storage_provider != 'external'
-  AND now() - app_versions.created_at > interval '120 seconds';
+  AND NOW() - app_versions.created_at > interval '120 seconds';
 END;
 $$;
 
@@ -2087,9 +2087,9 @@ CREATE OR REPLACE FUNCTION "public"."has_app_right" (
 ) RETURNS boolean LANGUAGE "plpgsql"
 SET
   search_path = '' SECURITY DEFINER AS $$
-Begin
-  RETURN public.has_app_right_userid("appid", "right", (select auth.uid()));
-End;
+BEGIN
+  RETURN public.has_app_right_userid("appid", "right", (SELECT auth.uid()));
+END;
 $$;
 
 ALTER FUNCTION "public"."has_app_right" (
@@ -2108,7 +2108,7 @@ SET
 DECLARE
   org_id uuid;
   api_key record;
-Begin
+BEGIN
   org_id := public.get_user_main_org_id_by_app_id(appid);
 
   SELECT * FROM public.apikeys WHERE key = apikey INTO api_key;
@@ -2125,7 +2125,7 @@ Begin
   END IF;
 
   RETURN (public.check_min_rights("right", userid, org_id, "appid", NULL::bigint));
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."has_app_right_apikey" (
@@ -2144,11 +2144,11 @@ SET
   search_path = '' SECURITY DEFINER AS $$
 DECLARE
   org_id uuid;
-Begin
+BEGIN
   org_id := public.get_user_main_org_id_by_app_id(appid);
 
   RETURN public.check_min_rights("right", userid, org_id, "appid", NULL::bigint);
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."has_app_right_userid" (
@@ -2164,26 +2164,26 @@ CREATE OR REPLACE FUNCTION "public"."invite_user_to_org" (
 ) RETURNS character varying LANGUAGE "plpgsql"
 SET
   search_path = '' SECURITY DEFINER AS $$
-Declare
+DECLARE
   org record;
   invited_user record;
   current_record record;
-Begin
+BEGIN
   SELECT * FROM public.orgs
   INTO org
   WHERE orgs.id=invite_user_to_org.org_id;
 
   IF org IS NULL THEN
-    return 'NO_ORG';
+    RETURN  'NO_ORG';
   END IF;
 
-  if NOT (public.check_min_rights('admin'::"public"."user_min_right", (select "public"."get_identity_org_allowed"('{read,upload,write,all}'::"public"."key_mode"[], invite_user_to_org.org_id)), invite_user_to_org.org_id, NULL::character varying, NULL::bigint)) THEN
-    return 'NO_RIGHTS';
+  if NOT (public.check_min_rights('admin'::"public"."user_min_right", (SELECT "public"."get_identity_org_allowed"('{read,upload,write,all}'::"public"."key_mode"[], invite_user_to_org.org_id)), invite_user_to_org.org_id, NULL::character varying, NULL::bigint)) THEN
+    RETURN  'NO_RIGHTS';
   END IF;
 
 
-  if NOT (public.check_min_rights('super_admin'::"public"."user_min_right", (select "public"."get_identity_org_allowed"('{read,upload,write,all}'::"public"."key_mode"[], invite_user_to_org.org_id)), invite_user_to_org.org_id, NULL::character varying, NULL::bigint) AND (invite_type is distinct from 'super_admin'::"public"."user_min_right" or invite_type is distinct from 'invite_super_admin'::"public"."user_min_right")) THEN
-    return 'NO_RIGHTS';
+  if NOT (public.check_min_rights('super_admin'::"public"."user_min_right", (SELECT "public"."get_identity_org_allowed"('{read,upload,write,all}'::"public"."key_mode"[], invite_user_to_org.org_id)), invite_user_to_org.org_id, NULL::character varying, NULL::bigint) AND (invite_type IS DISTINCT FROM 'super_admin'::"public"."user_min_right" or invite_type IS DISTINCT FROM 'invite_super_admin'::"public"."user_min_right")) THEN
+    RETURN  'NO_RIGHTS';
   END IF;
 
   SELECT users.id FROM public.users
@@ -2208,9 +2208,9 @@ Begin
       RETURN 'OK';
     END IF;
   ELSE
-    return 'NO_EMAIL';
+    RETURN  'NO_EMAIL';
   END IF;
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."invite_user_to_org" (
@@ -2223,7 +2223,7 @@ CREATE OR REPLACE FUNCTION "public"."is_admin" () RETURNS boolean LANGUAGE "plpg
 SET
   search_path = '' AS $$
 BEGIN
-    RETURN public.is_admin((select auth.uid()));
+    RETURN public.is_admin((SELECT auth.uid()));
 END;
 $$;
 
@@ -2256,9 +2256,9 @@ ALTER FUNCTION "public"."is_admin" ("userid" "uuid") OWNER TO "postgres";
 CREATE OR REPLACE FUNCTION "public"."is_allowed_action" ("apikey" "text", "appid" "text") RETURNS boolean LANGUAGE "plpgsql"
 SET
   search_path = '' AS $$
-Begin
-  RETURN public.is_allowed_action_org((select owner_org FROM public.apps where app_id=appid));
-End;
+BEGIN
+  RETURN public.is_allowed_action_org((SELECT owner_org FROM public.apps WHERE  app_id=appid));
+END;
 $$;
 
 ALTER FUNCTION "public"."is_allowed_action" ("apikey" "text", "appid" "text") OWNER TO "postgres";
@@ -2266,9 +2266,9 @@ ALTER FUNCTION "public"."is_allowed_action" ("apikey" "text", "appid" "text") OW
 CREATE OR REPLACE FUNCTION "public"."is_allowed_action_org" ("orgid" "uuid") RETURNS boolean LANGUAGE "plpgsql"
 SET
   search_path = '' SECURITY DEFINER AS $$
-Begin
+BEGIN
     RETURN public.is_paying_and_good_plan_org(orgid);
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."is_allowed_action_org" ("orgid" "uuid") OWNER TO "postgres";
@@ -2279,9 +2279,9 @@ CREATE OR REPLACE FUNCTION "public"."is_allowed_action_org_action" (
 ) RETURNS boolean LANGUAGE "plpgsql"
 SET
   search_path = '' SECURITY DEFINER AS $$
-Begin
+BEGIN
     RETURN public.is_paying_and_good_plan_org_action(orgid, actions);
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."is_allowed_action_org_action" (
@@ -2292,12 +2292,12 @@ ALTER FUNCTION "public"."is_allowed_action_org_action" (
 CREATE OR REPLACE FUNCTION "public"."is_allowed_capgkey" ("apikey" "text", "keymode" "public"."key_mode" []) RETURNS boolean LANGUAGE "plpgsql"
 SET
   search_path = '' SECURITY DEFINER AS $$
-Begin
+BEGIN
   RETURN (SELECT EXISTS (SELECT 1
   FROM public.apikeys
   WHERE key=apikey
   AND mode=ANY(keymode)));
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."is_allowed_capgkey" ("apikey" "text", "keymode" "public"."key_mode" []) OWNER TO "postgres";
@@ -2309,12 +2309,12 @@ CREATE OR REPLACE FUNCTION "public"."is_allowed_capgkey" (
 ) RETURNS boolean LANGUAGE "plpgsql"
 SET
   search_path = '' SECURITY DEFINER AS $$
-Begin
+BEGIN
   RETURN (SELECT EXISTS (SELECT 1
   FROM public.apikeys
   WHERE key=apikey
   AND mode=ANY(keymode))) AND public.is_app_owner(public.get_user_id(apikey), app_id);
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."is_allowed_capgkey" (
@@ -2327,7 +2327,7 @@ CREATE OR REPLACE FUNCTION "public"."is_app_owner" ("appid" character varying) R
 SET
   search_path = '' AS $$
 BEGIN
-    RETURN public.is_app_owner((select auth.uid()), appid);
+    RETURN public.is_app_owner((SELECT auth.uid()), appid);
 END;
 $$;
 
@@ -2336,9 +2336,9 @@ ALTER FUNCTION "public"."is_app_owner" ("appid" character varying) OWNER TO "pos
 CREATE OR REPLACE FUNCTION "public"."is_app_owner" ("apikey" "text", "appid" character varying) RETURNS boolean LANGUAGE "plpgsql"
 SET
   search_path = '' SECURITY DEFINER AS $$
-Begin
+BEGIN
   RETURN public.is_app_owner(public.get_user_id(apikey), appid);
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."is_app_owner" ("apikey" "text", "appid" character varying) OWNER TO "postgres";
@@ -2346,12 +2346,12 @@ ALTER FUNCTION "public"."is_app_owner" ("apikey" "text", "appid" character varyi
 CREATE OR REPLACE FUNCTION "public"."is_app_owner" ("userid" "uuid", "appid" character varying) RETURNS boolean LANGUAGE "plpgsql"
 SET
   search_path = '' SECURITY DEFINER AS $$
-Begin
+BEGIN
   RETURN (SELECT EXISTS (SELECT 1
   FROM public.apps
   WHERE app_id=appid
   AND user_id=userid));
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."is_app_owner" ("userid" "uuid", "appid" character varying) OWNER TO "postgres";
@@ -2371,12 +2371,12 @@ ALTER FUNCTION "public"."is_bandwidth_exceeded_by_org" ("org_id" "uuid") OWNER T
 CREATE OR REPLACE FUNCTION "public"."is_canceled_org" ("orgid" "uuid") RETURNS boolean LANGUAGE "plpgsql"
 SET
   search_path = '' SECURITY DEFINER AS $$
-Begin
+BEGIN
   RETURN (SELECT EXISTS (SELECT 1
   FROM public.stripe_info
-  where customer_id=(SELECT customer_id FROM public.orgs where id=orgid)
+  WHERE  customer_id=(SELECT customer_id FROM public.orgs WHERE  id=orgid)
   AND status = 'canceled'));
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."is_canceled_org" ("orgid" "uuid") OWNER TO "postgres";
@@ -2438,9 +2438,9 @@ ALTER FUNCTION "public"."is_mau_exceeded_by_org" ("org_id" "uuid") OWNER TO "pos
 CREATE OR REPLACE FUNCTION "public"."is_member_of_org" ("user_id" "uuid", "org_id" "uuid") RETURNS boolean LANGUAGE "plpgsql"
 SET
   search_path = '' SECURITY DEFINER AS $$
-Declare
+DECLARE
  is_found integer;
-Begin
+BEGIN
   SELECT count(*)
   INTO is_found
   FROM public.orgs
@@ -2448,7 +2448,7 @@ Begin
   WhERE org_users.user_id = is_member_of_org.user_id AND
   orgs.id = is_member_of_org.org_id;
   RETURN is_found != 0;
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."is_member_of_org" ("user_id" "uuid", "org_id" "uuid") OWNER TO "postgres";
@@ -2456,15 +2456,15 @@ ALTER FUNCTION "public"."is_member_of_org" ("user_id" "uuid", "org_id" "uuid") O
 CREATE OR REPLACE FUNCTION "public"."is_not_deleted" ("email_check" character varying) RETURNS boolean LANGUAGE "plpgsql"
 SET
   search_path = '' SECURITY DEFINER AS $$
-Declare
+DECLARE
  is_found integer;
-Begin
+BEGIN
   SELECT count(*)
   INTO is_found
   FROM public.deleted_account
   WHERE email=email_check;
   RETURN is_found = 0;
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."is_not_deleted" ("email_check" character varying) OWNER TO "postgres";
@@ -2482,13 +2482,13 @@ ALTER FUNCTION "public"."is_numeric" ("text") OWNER TO "postgres";
 CREATE OR REPLACE FUNCTION "public"."is_onboarded_org" ("orgid" "uuid") RETURNS boolean LANGUAGE "plpgsql"
 SET
   search_path = '' SECURITY DEFINER AS $$
-Begin
+BEGIN
   RETURN (SELECT EXISTS (SELECT 1
   FROM public.apps
   WHERE owner_org=orgid)) AND (SELECT EXISTS (SELECT 1
   FROM public.app_versions
   WHERE owner_org=orgid));
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."is_onboarded_org" ("orgid" "uuid") OWNER TO "postgres";
@@ -2496,9 +2496,9 @@ ALTER FUNCTION "public"."is_onboarded_org" ("orgid" "uuid") OWNER TO "postgres";
 CREATE OR REPLACE FUNCTION "public"."is_onboarding_needed_org" ("orgid" "uuid") RETURNS boolean LANGUAGE "plpgsql"
 SET
   search_path = '' SECURITY DEFINER AS $$
-Begin
+BEGIN
   RETURN (NOT public.is_onboarded_org(orgid)) AND public.is_trial_org(orgid) = 0;
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."is_onboarding_needed_org" ("orgid" "uuid") OWNER TO "postgres";
@@ -2529,17 +2529,17 @@ ALTER FUNCTION "public"."is_org_yearly" ("orgid" "uuid") OWNER TO "postgres";
 CREATE OR REPLACE FUNCTION "public"."is_paying_and_good_plan_org" ("orgid" "uuid") RETURNS boolean LANGUAGE "plpgsql"
 SET
   search_path = '' SECURITY DEFINER AS $$
-Begin
+BEGIN
   RETURN (SELECT EXISTS (SELECT 1
   FROM public.stripe_info
-  where customer_id=(SELECT customer_id FROM public.orgs where id=orgid)
+  WHERE  customer_id=(SELECT customer_id FROM public.orgs WHERE  id=orgid)
   AND (
     (status = 'succeeded' AND is_good_plan = true)
-    OR (trial_at::date - (now())::date > 0)
+    OR (trial_at::date - (NOW())::date > 0)
   )
   )
 );
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."is_paying_and_good_plan_org" ("orgid" "uuid") OWNER TO "postgres";
@@ -2551,7 +2551,7 @@ DECLARE org_customer_id text; result boolean;
 BEGIN
   SELECT o.customer_id INTO org_customer_id FROM public.orgs o WHERE o.id = orgid;
 
-  SELECT (si.trial_at > now())
+  SELECT (si.trial_at > NOW())
       OR (si.status = 'succeeded' AND NOT (
             (si.mau_exceeded AND 'mau' = ANY(actions)) OR
             (si.storage_exceeded AND 'storage' = ANY(actions)) OR
@@ -2573,12 +2573,12 @@ ALTER FUNCTION "public"."is_paying_and_good_plan_org_action" (
 CREATE OR REPLACE FUNCTION "public"."is_paying_org" ("orgid" "uuid") RETURNS boolean LANGUAGE "plpgsql"
 SET
   search_path = '' SECURITY DEFINER AS $$
-Begin
+BEGIN
   RETURN (SELECT EXISTS (SELECT 1
   FROM public.stripe_info
-  where customer_id=(SELECT customer_id FROM public.orgs where id=orgid)
+  WHERE  customer_id=(SELECT customer_id FROM public.orgs WHERE  id=orgid)
   AND status = 'succeeded'));
-End;
+END;
 $$;
 
 ALTER FUNCTION "public"."is_paying_org" ("orgid" "uuid") OWNER TO "postgres";
@@ -2598,11 +2598,11 @@ ALTER FUNCTION "public"."is_storage_exceeded_by_org" ("org_id" "uuid") OWNER TO 
 CREATE OR REPLACE FUNCTION "public"."is_trial_org" ("orgid" "uuid") RETURNS integer LANGUAGE "plpgsql"
 SET
   search_path = '' SECURITY DEFINER AS $$
-Begin
-  RETURN (SELECT GREATEST((trial_at::date - (now())::date), 0) AS days
+BEGIN
+  RETURN (SELECT GREATEST((trial_at::date - (NOW())::date), 0) AS days
   FROM public.stripe_info
-  where customer_id=(SELECT customer_id FROM public.orgs where id=orgid));
-End;
+  WHERE customer_id=(SELECT customer_id FROM public.orgs WHERE id=orgid));
+END;
 $$;
 
 ALTER FUNCTION "public"."is_trial_org" ("orgid" "uuid") OWNER TO "postgres";
@@ -2615,21 +2615,21 @@ DECLARE
     is_different boolean;
 BEGIN
     -- API key? We do not care
-    IF (select auth.uid()) IS NULL THEN
+    IF (SELECT auth.uid()) IS NULL THEN
         RETURN NEW;
     END IF;
 
     -- If the user has the 'admin' role then we do not care
-    IF public.check_min_rights('admin'::"public"."user_min_right", (select auth.uid()), OLD.owner_org, NULL::character varying, NULL::bigint) THEN
+    IF public.check_min_rights('admin'::"public"."user_min_right", (SELECT auth.uid()), OLD.owner_org, NULL::character varying, NULL::bigint) THEN
         RETURN NEW;
     END IF;
 
     for val in
-      select * from json_each_text(row_to_json(NEW))
+      SELECT * FROM json_each_text(row_to_json(NEW))
     loop
       -- raise warning '?? % % %', val.key, val.value, format('SELECT (NEW."%s" <> OLD."%s")', val.key, val.key);
 
-      EXECUTE format('SELECT ($1."%s" is distinct from $2."%s")', val.key, val.key) using NEW, OLD
+      EXECUTE format('SELECT ($1."%s" IS DISTINCT FROM $2."%s")', val.key, val.key) using NEW, OLD
       INTO is_different;
 
       IF is_different AND val.key <> 'version' AND val.key <> 'updated_at' THEN
@@ -3076,7 +3076,7 @@ BEGIN
             NEW.app_id,
             NEW.version,
             NEW.owner_org,
-            coalesce(public.get_identity()::uuid, NEW.created_by)
+            COALESCE(public.get_identity()::uuid, NEW.created_by)
         );
     END IF;
 
@@ -3091,7 +3091,7 @@ SET
   search_path = '' AS $$
 BEGIN
     DELETE FROM cron.job_run_details
-    WHERE end_time < now() - interval '1 day';
+    WHERE end_time < NOW() - interval '1 day';
 END;
 $$;
 
@@ -3157,7 +3157,7 @@ BEGIN
   END IF;
 
   -- Get the current user ID
-  v_user_id := (select auth.uid());
+  v_user_id := (SELECT auth.uid());
 
 if NOT (public.check_min_rights('super_admin'::"public"."user_min_right", v_user_id, v_old_org_id, NULL::character varying, NULL::bigint)) THEN
   RAISE EXCEPTION 'You are not authorized to transfer this app. (You don''t have super_admin rights on the old organization)';
@@ -3170,7 +3170,7 @@ END IF;
   -- Check if enough time has passed since last transfer
   IF v_last_transfer IS NOT NULL THEN
     v_last_transfer_date := (v_last_transfer->>'transferred_at')::timestamp;
-    IF v_last_transfer_date + interval '32 days' > now() THEN
+    IF v_last_transfer_date + interval '32 days' > NOW() THEN
       RAISE EXCEPTION 'Cannot transfer app. Must wait at least 32 days between transfers. Last transfer was on %', v_last_transfer_date;
     END IF;
   END IF;
@@ -3179,9 +3179,9 @@ END IF;
   UPDATE public.apps
   SET
       owner_org = p_new_org_id,
-      updated_at = now(),
+      updated_at = NOW(),
       transfer_history = COALESCE(transfer_history, '{}') || jsonb_build_object(
-          'transferred_at', now(),
+          'transferred_at', NOW(),
           'transferred_from', v_old_org_id,
           'transferred_to', p_new_org_id,
           'initiated_by', v_user_id
@@ -3263,7 +3263,7 @@ BEGIN
     SET deleted = true
     WHERE app_versions.deleted = false  -- Filter non-deleted first
       AND app_versions.created_at < (
-          SELECT now() - make_interval(secs => apps.retention)
+          SELECT NOW() - make_interval(secs => apps.retention)
           FROM public.apps
           WHERE apps.app_id = app_versions.app_id
       )
@@ -3278,28 +3278,29 @@ $$;
 
 ALTER FUNCTION "public"."update_app_versions_retention" () OWNER TO "postgres";
 
-CREATE OR REPLACE FUNCTION "public"."verify_mfa" () RETURNS boolean LANGUAGE "plpgsql"
-SET
-  search_path = '' SECURITY DEFINER AS $_$
-Begin
+CREATE OR REPLACE FUNCTION "public"."verify_mfa"() RETURNS boolean
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+BEGIN
   RETURN (
-    array[(select coalesce(auth.jwt()->>'aal', 'aal1'))] <@ (
-      select
-          case
-            when count(id) > 0 then array['aal2']
-            else array['aal1', 'aal2']
-          end as aal
-        from auth.mfa_factors
-        where (select auth.uid()) = user_id and status = 'verified'
+    array[(SELECT coalesce(auth.jwt()->>'aal', 'aal1'))] <@ (
+      SELECT
+          CASE
+            WHEN count(id) > 0 THEN array['aal2']
+            ELSE array['aal1', 'aal2']
+          END AS aal
+        FROM auth.mfa_factors
+        WHERE (SELECT auth.uid()) = user_id AND status = 'verified'
     )
   ) OR (
     EXISTS(
-      SELECT 1 FROM jsonb_array_elements((select auth.jwt())->'amr') AS amr_elem
+      SELECT 1 FROM jsonb_array_elements((SELECT auth.jwt())->'amr') AS amr_elem
       WHERE amr_elem->>'method' = 'otp'
     )
   );
-End;
-$_$;
+END;  
+$$;
 
 ALTER FUNCTION "public"."verify_mfa" () OWNER TO "postgres";
 
@@ -7053,7 +7054,7 @@ SELECT
   cron.schedule (
     'delete-job-run-details',
     '0 12 * * *',
-    'DELETE FROM cron.job_run_details WHERE end_time < now() - interval ''7 days'';'
+    'DELETE FROM cron.job_run_details WHERE end_time < NOW() - interval ''7 days'';'
   );
 
 SELECT

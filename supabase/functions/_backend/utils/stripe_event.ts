@@ -41,7 +41,6 @@ function subscriptionUpdated(c: Context, event: Stripe.CustomerSubscriptionCreat
   data.subscription_anchor_end = firstItem?.current_period_end
     ? new Date(firstItem.current_period_end * 1000).toISOString()
     : undefined
-  data.subscription_metered = res.meteredData
   data.price_id = subscription.items.data.length ? subscription.items.data[0].plan.id : undefined
   data.product_id = (subscription.items.data.length ? subscription.items.data[0].plan.product : undefined) as string
   if (event.type === 'customer.subscription.deleted') {
@@ -94,7 +93,6 @@ export function extractDataEvent(c: Context, event: Stripe.Event): StripeData {
     subscription_id: undefined,
     subscription_anchor_start: undefined,
     subscription_anchor_end: undefined,
-    subscription_metered: {} as MeteredData,
     customer_id: '',
     is_good_plan: true,
     mau_exceeded: false,

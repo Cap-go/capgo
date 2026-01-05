@@ -19,15 +19,15 @@ BEGIN
     "reauthentication_token", "reauthentication_sent_at", "is_sso_user", "deleted_at", "is_anonymous"
   ) VALUES (
     '00000000-0000-0000-0000-000000000000', user_id, 'authenticated', 'authenticated', user_email, 
-    '$2a$10$test_encrypted_password', now(), now(), 'test_token_' || user_id::text, now(), 
-    '', NULL, '', '', NULL, now(), '{"provider": "email", "providers": ["email"]}', 
-    '{"test_identifier": "test_deletion"}', 'f', now(), now(), NULL, NULL, 
+    '$2a$10$test_encrypted_password', NOW(), NOW(), 'test_token_' || user_id::text, NOW(), 
+    '', NULL, '', '', NULL, NOW(), '{"provider": "email", "providers": ["email"]}', 
+    '{"test_identifier": "test_deletion"}', 'f', NOW(), NOW(), NULL, NULL, 
     '', '', NULL, '', 0, NULL, '', NULL, false, NULL, false
   );
 
   -- Insert into public.users table
   INSERT INTO "public"."users" ("id", "email", "created_at", "updated_at") 
-  VALUES (user_id, user_email, now(), now());
+  VALUES (user_id, user_email, NOW(), NOW());
 END;
 $$;
 
@@ -93,7 +93,7 @@ public.to_delete_accounts (account_id, removal_date, removed_data)
 VALUES
 (
     '11111111-1111-1111-1111-111111111111'::UUID,
-    now() + INTERVAL '7 days',
+    NOW() + INTERVAL '7 days',
     '{"email": "future_delete@test.com", "apikeys": []}'::JSONB
 );
 
@@ -160,7 +160,7 @@ public.to_delete_accounts (account_id, removal_date, removed_data)
 VALUES
 (
     '22222222-2222-2222-2222-222222222222'::UUID,
-    now() - INTERVAL '1 day',
+    NOW() - INTERVAL '1 day',
     '{"email": "past_delete@test.com", "apikeys": []}'::JSONB
 );
 
@@ -254,12 +254,12 @@ public.to_delete_accounts (account_id, removal_date, removed_data)
 VALUES
 (
     '33333333-3333-3333-3333-333333333333'::UUID,
-    now() - INTERVAL '2 days',
+    NOW() - INTERVAL '2 days',
     '{"email": "multi_delete1@test.com", "apikeys": []}'::JSONB
 ),
 (
     '44444444-4444-4444-4444-444444444444'::UUID,
-    now() - INTERVAL '3 days',
+    NOW() - INTERVAL '3 days',
     '{"email": "multi_delete2@test.com", "apikeys": []}'::JSONB
 );
 
@@ -304,12 +304,12 @@ public.to_delete_accounts (account_id, removal_date, removed_data)
 VALUES
 (
     '55555555-5555-5555-5555-555555555555'::UUID,
-    now() + INTERVAL '1 day',
+    NOW() + INTERVAL '1 day',
     '{"email": "mixed_future@test.com", "apikeys": []}'::JSONB
 ),
 (
     '66666666-6666-6666-6666-666666666666'::UUID,
-    now() - INTERVAL '1 hour',
+    NOW() - INTERVAL '1 hour',
     '{"email": "mixed_past@test.com", "apikeys": []}'::JSONB
 );
 
@@ -373,7 +373,7 @@ public.to_delete_accounts (account_id, removal_date, removed_data)
 VALUES
 (
     '77777777-7777-7777-7777-777777777777'::UUID,
-    now() - INTERVAL '1 day',
+    NOW() - INTERVAL '1 day',
     '{"email": "error_test@test.com", "apikeys": []}'::JSONB
 );
 
@@ -425,8 +425,8 @@ VALUES
 (
     '88888888-8888-8888-8888-888888888888'::UUID,
     '88888888-8888-8888-8888-888888888888'::UUID,
-    now(),
-    now(),
+    NOW(),
+    NOW(),
     'Last Admin Org',
     'last_admin@test.com'
 );
@@ -459,8 +459,8 @@ VALUES
     '88888888-8888-8888-8888-888888888888'::UUID,
     'Last Admin App',
     '88888888-8888-8888-8888-888888888888'::UUID,
-    now(),
-    now()
+    NOW(),
+    NOW()
 );
 
 -- Create an app_version
@@ -481,8 +481,8 @@ VALUES
     '1.0.0',
     '88888888-8888-8888-8888-888888888888'::UUID,
     '88888888-8888-8888-8888-888888888888'::UUID,
-    now(),
-    now()
+    NOW(),
+    NOW()
 );
 
 -- Create a channel
@@ -503,8 +503,8 @@ VALUES
     'production',
     'com.last.admin',
     1001,
-    now(),
-    now(),
+    NOW(),
+    NOW(),
     '88888888-8888-8888-8888-888888888888'::UUID,
     '88888888-8888-8888-8888-888888888888'::UUID
 );
@@ -530,9 +530,9 @@ VALUES
     1001,
     '88888888-8888-8888-8888-888888888888'::UUID,
     '88888888-8888-8888-8888-888888888888'::UUID,
-    now(),
-    now(),
-    now()
+    NOW(),
+    NOW(),
+    NOW()
 );
 
 -- Mark user for deletion
@@ -541,7 +541,7 @@ public.to_delete_accounts (account_id, removal_date, removed_data)
 VALUES
 (
     '88888888-8888-8888-8888-888888888888'::UUID,
-    now() - INTERVAL '1 day',
+    NOW() - INTERVAL '1 day',
     '{"email": "last_admin@test.com", "apikeys": []}'::JSONB
 );
 
@@ -709,8 +709,8 @@ VALUES
 (
     '99999999-9999-9999-9999-999999999999'::UUID,
     '99999999-9999-9999-9999-999999999999'::UUID,
-    now(),
-    now(),
+    NOW(),
+    NOW(),
     'Shared Admin Org',
     'admin1@test.com'
 );
@@ -748,8 +748,8 @@ VALUES
     '99999999-9999-9999-9999-999999999999'::UUID,
     'Shared App',
     '99999999-9999-9999-9999-999999999999'::UUID,
-    now(),
-    now()
+    NOW(),
+    NOW()
 );
 
 INSERT INTO
@@ -769,8 +769,8 @@ VALUES
     '1.0.0',
     '99999999-9999-9999-9999-999999999999'::UUID,
     '99999999-9999-9999-9999-999999999999'::UUID,
-    now(),
-    now()
+    NOW(),
+    NOW()
 );
 
 INSERT INTO
@@ -790,8 +790,8 @@ VALUES
     'production',
     'com.shared.app',
     2001,
-    now(),
-    now(),
+    NOW(),
+    NOW(),
     '99999999-9999-9999-9999-999999999999'::UUID,
     '99999999-9999-9999-9999-999999999999'::UUID
 );
@@ -816,9 +816,9 @@ VALUES
     2001,
     '99999999-9999-9999-9999-999999999999'::UUID,
     '99999999-9999-9999-9999-999999999999'::UUID,
-    now(),
-    now(),
-    now()
+    NOW(),
+    NOW(),
+    NOW()
 );
 
 -- Mark admin1 for deletion
@@ -827,7 +827,7 @@ public.to_delete_accounts (account_id, removal_date, removed_data)
 VALUES
 (
     '99999999-9999-9999-9999-999999999999'::UUID,
-    now() - INTERVAL '1 day',
+    NOW() - INTERVAL '1 day',
     '{"email": "admin1@test.com", "apikeys": []}'::JSONB
 );
 
@@ -1037,8 +1037,8 @@ VALUES
 (
     'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'::UUID,
     'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'::UUID,
-    now(),
-    now(),
+    NOW(),
+    NOW(),
     'Audit Log Test Org',
     'audit_admin1@test.com'
 );
@@ -1105,7 +1105,7 @@ public.to_delete_accounts (account_id, removal_date, removed_data)
 VALUES
 (
     'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'::UUID,
-    now() - INTERVAL '1 day',
+    NOW() - INTERVAL '1 day',
     '{"email": "audit_admin1@test.com", "apikeys": []}'::JSONB
 );
 

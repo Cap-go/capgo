@@ -46,10 +46,10 @@ BEGIN
   WHERE o.id = orgid;
 
   -- Calculate current billing cycle dates based on anchor day
-  IF v_anchor_day > now() - date_trunc('MONTH', now()) THEN
-    v_start_date := (date_trunc('MONTH', now() - INTERVAL '1 MONTH') + v_anchor_day)::date;
+  IF v_anchor_day > NOW() - date_trunc('MONTH', NOW()) THEN
+    v_start_date := (date_trunc('MONTH', NOW() - INTERVAL '1 MONTH') + v_anchor_day)::date;
   ELSE
-    v_start_date := (date_trunc('MONTH', now()) + v_anchor_day)::date;
+    v_start_date := (date_trunc('MONTH', NOW()) + v_anchor_day)::date;
   END IF;
   v_end_date := (v_start_date + INTERVAL '1 MONTH')::date;
 
@@ -153,10 +153,10 @@ BEGIN
   WHERE o.id = orgid;
 
   -- Calculate current billing cycle dates based on anchor day
-  IF v_anchor_day > now() - date_trunc('MONTH', now()) THEN
-    v_start_date := (date_trunc('MONTH', now() - INTERVAL '1 MONTH') + v_anchor_day)::date;
+  IF v_anchor_day > NOW() - date_trunc('MONTH', NOW()) THEN
+    v_start_date := (date_trunc('MONTH', NOW() - INTERVAL '1 MONTH') + v_anchor_day)::date;
   ELSE
-    v_start_date := (date_trunc('MONTH', now()) + v_anchor_day)::date;
+    v_start_date := (date_trunc('MONTH', NOW()) + v_anchor_day)::date;
   END IF;
   v_end_date := (v_start_date + INTERVAL '1 MONTH')::date;
 
@@ -386,10 +386,10 @@ BEGIN
     WHERE o.id = org_id;
 
     -- Calculate current billing cycle dates based on anchor day
-    IF v_anchor_day > now() - date_trunc('MONTH', now()) THEN
-        v_start_date := (date_trunc('MONTH', now() - INTERVAL '1 MONTH') + v_anchor_day)::date;
+    IF v_anchor_day > NOW() - date_trunc('MONTH', NOW()) THEN
+        v_start_date := (date_trunc('MONTH', NOW() - INTERVAL '1 MONTH') + v_anchor_day)::date;
     ELSE
-        v_start_date := (date_trunc('MONTH', now()) + v_anchor_day)::date;
+        v_start_date := (date_trunc('MONTH', NOW()) + v_anchor_day)::date;
     END IF;
     v_end_date := (v_start_date + INTERVAL '1 MONTH')::date;
 
@@ -448,9 +448,9 @@ BEGIN
     JOIN public.stripe_info si ON o.customer_id = si.customer_id
     WHERE (
       (si.status = 'succeeded'
-        AND (si.canceled_at IS NULL OR si.canceled_at > now())
-        AND si.subscription_anchor_end > now())
-      OR si.trial_at > now()
+        AND (si.canceled_at IS NULL OR si.canceled_at > NOW())
+        AND si.subscription_anchor_end > NOW())
+      OR si.trial_at > NOW()
     )
   ),
   -- Calculate current billing cycle for each org (properly inlined get_cycle_info_org logic)
@@ -462,10 +462,10 @@ BEGIN
       -- Calculate cycle_start based on anchor day and current date
       CASE
         WHEN COALESCE(si.subscription_anchor_start - date_trunc('MONTH', si.subscription_anchor_start), '0 DAYS'::INTERVAL)
-             > now() - date_trunc('MONTH', now())
-        THEN date_trunc('MONTH', now() - INTERVAL '1 MONTH')
+             > NOW() - date_trunc('MONTH', NOW())
+        THEN date_trunc('MONTH', NOW() - INTERVAL '1 MONTH')
              + COALESCE(si.subscription_anchor_start - date_trunc('MONTH', si.subscription_anchor_start), '0 DAYS'::INTERVAL)
-        ELSE date_trunc('MONTH', now())
+        ELSE date_trunc('MONTH', NOW())
              + COALESCE(si.subscription_anchor_start - date_trunc('MONTH', si.subscription_anchor_start), '0 DAYS'::INTERVAL)
       END AS cycle_start
     FROM public.orgs o
@@ -480,9 +480,9 @@ BEGIN
     -- is_paying_org: status = 'succeeded'
     (si.status = 'succeeded') AS paying,
     -- is_trial_org: days left in trial
-    GREATEST(COALESCE((si.trial_at::date - now()::date), 0), 0)::integer AS trial_left,
+    GREATEST(COALESCE((si.trial_at::date - NOW()::date), 0), 0)::integer AS trial_left,
     -- is_allowed_action_org (= is_paying_and_good_plan_org): paying with good plan OR in trial
-    ((si.status = 'succeeded' AND si.is_good_plan = true) OR (si.trial_at::date - now()::date > 0)) AS can_use_more,
+    ((si.status = 'succeeded' AND si.is_good_plan = true) OR (si.trial_at::date - NOW()::date > 0)) AS can_use_more,
     -- is_canceled_org: status = 'canceled'
     (si.status = 'canceled') AS is_canceled,
     -- app_count
@@ -497,7 +497,7 @@ BEGIN
     -- get_next_stats_update_date (simplified - just add 4 min intervals based on position)
     CASE
       WHEN poo.id IS NOT NULL THEN
-        public.get_next_cron_time('0 3 * * *', now()) + make_interval(mins => poo.preceding_count::int * 4)
+        public.get_next_cron_time('0 3 * * *', NOW()) + make_interval(mins => poo.preceding_count::int * 4)
       ELSE NULL
     END AS next_stats_update_at,
     COALESCE(ucb.available_credits, 0) AS credit_available,

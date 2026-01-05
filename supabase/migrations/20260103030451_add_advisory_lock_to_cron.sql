@@ -35,11 +35,11 @@ BEGIN
   -- Wrap everything in a block so we can ensure the lock is released
   BEGIN
     -- Get current time components in UTC
-    current_hour := EXTRACT(HOUR FROM now());
-    current_minute := EXTRACT(MINUTE FROM now());
-    current_second := EXTRACT(SECOND FROM now());
-    current_dow := EXTRACT(DOW FROM now());
-    current_day := EXTRACT(DAY FROM now());
+    current_hour := EXTRACT(HOUR FROM NOW());
+    current_minute := EXTRACT(MINUTE FROM NOW());
+    current_second := EXTRACT(SECOND FROM NOW());
+    current_dow := EXTRACT(DOW FROM NOW());
+    current_day := EXTRACT(DAY FROM NOW());
 
     -- Loop through all enabled tasks
     FOR task IN SELECT * FROM public.cron_tasks WHERE enabled = true LOOP

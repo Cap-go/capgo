@@ -222,9 +222,9 @@ BEGIN
     JOIN public.stripe_info si ON o.customer_id = si.customer_id
     WHERE (
       (si.status = 'succeeded'
-        AND (si.canceled_at IS NULL OR si.canceled_at > now())
-        AND si.subscription_anchor_end > now())
-      OR si.trial_at > now()
+        AND (si.canceled_at IS NULL OR si.canceled_at > NOW())
+        AND si.subscription_anchor_end > NOW())
+      OR si.trial_at > NOW()
     )
   ),
   -- Calculate current billing cycle for each org
@@ -233,10 +233,10 @@ BEGIN
       o.id AS org_id,
       CASE
         WHEN COALESCE(si.subscription_anchor_start - date_trunc('MONTH', si.subscription_anchor_start), '0 DAYS'::INTERVAL)
-             > now() - date_trunc('MONTH', now())
-        THEN date_trunc('MONTH', now() - INTERVAL '1 MONTH')
+             > NOW() - date_trunc('MONTH', NOW())
+        THEN date_trunc('MONTH', NOW() - INTERVAL '1 MONTH')
              + COALESCE(si.subscription_anchor_start - date_trunc('MONTH', si.subscription_anchor_start), '0 DAYS'::INTERVAL)
-        ELSE date_trunc('MONTH', now())
+        ELSE date_trunc('MONTH', NOW())
              + COALESCE(si.subscription_anchor_start - date_trunc('MONTH', si.subscription_anchor_start), '0 DAYS'::INTERVAL)
       END AS cycle_start
     FROM public.orgs o
@@ -270,11 +270,11 @@ BEGIN
     END AS paying,
     CASE
       WHEN tfa.should_redact THEN 0
-      ELSE GREATEST(COALESCE((si.trial_at::date - now()::date), 0), 0)::integer
+      ELSE GREATEST(COALESCE((si.trial_at::date - NOW()::date), 0), 0)::integer
     END AS trial_left,
     CASE
       WHEN tfa.should_redact THEN false
-      ELSE ((si.status = 'succeeded' AND si.is_good_plan = true) OR (si.trial_at::date - now()::date > 0))
+      ELSE ((si.status = 'succeeded' AND si.is_good_plan = true) OR (si.trial_at::date - NOW()::date > 0))
     END AS can_use_more,
     CASE
       WHEN tfa.should_redact THEN false
@@ -303,7 +303,7 @@ BEGIN
     o.stats_updated_at,
     CASE
       WHEN poo.id IS NOT NULL THEN
-        public.get_next_cron_time('0 3 * * *', now()) + make_interval(mins => poo.preceding_count::int * 4)
+        public.get_next_cron_time('0 3 * * *', NOW()) + make_interval(mins => poo.preceding_count::int * 4)
       ELSE NULL
     END AS next_stats_update_at,
     COALESCE(ucb.available_credits, 0) AS credit_available,
@@ -451,9 +451,9 @@ BEGIN
     JOIN public.stripe_info si ON o.customer_id = si.customer_id
     WHERE (
       (si.status = 'succeeded'
-        AND (si.canceled_at IS NULL OR si.canceled_at > now())
-        AND si.subscription_anchor_end > now())
-      OR si.trial_at > now()
+        AND (si.canceled_at IS NULL OR si.canceled_at > NOW())
+        AND si.subscription_anchor_end > NOW())
+      OR si.trial_at > NOW()
     )
   ),
   billing_cycles AS (
@@ -461,10 +461,10 @@ BEGIN
       o.id AS org_id,
       CASE
         WHEN COALESCE(si.subscription_anchor_start - date_trunc('MONTH', si.subscription_anchor_start), '0 DAYS'::INTERVAL)
-             > now() - date_trunc('MONTH', now())
-        THEN date_trunc('MONTH', now() - INTERVAL '1 MONTH')
+             > NOW() - date_trunc('MONTH', NOW())
+        THEN date_trunc('MONTH', NOW() - INTERVAL '1 MONTH')
              + COALESCE(si.subscription_anchor_start - date_trunc('MONTH', si.subscription_anchor_start), '0 DAYS'::INTERVAL)
-        ELSE date_trunc('MONTH', now())
+        ELSE date_trunc('MONTH', NOW())
              + COALESCE(si.subscription_anchor_start - date_trunc('MONTH', si.subscription_anchor_start), '0 DAYS'::INTERVAL)
       END AS cycle_start
     FROM public.orgs o
@@ -492,11 +492,11 @@ BEGIN
     END AS paying,
     CASE
       WHEN tfa.should_redact THEN 0
-      ELSE GREATEST(COALESCE((si.trial_at::date - now()::date), 0), 0)::integer
+      ELSE GREATEST(COALESCE((si.trial_at::date - NOW()::date), 0), 0)::integer
     END AS trial_left,
     CASE
       WHEN tfa.should_redact THEN false
-      ELSE ((si.status = 'succeeded' AND si.is_good_plan = true) OR (si.trial_at::date - now()::date > 0))
+      ELSE ((si.status = 'succeeded' AND si.is_good_plan = true) OR (si.trial_at::date - NOW()::date > 0))
     END AS can_use_more,
     CASE
       WHEN tfa.should_redact THEN false
@@ -525,7 +525,7 @@ BEGIN
     o.stats_updated_at,
     CASE
       WHEN poo.id IS NOT NULL THEN
-        public.get_next_cron_time('0 3 * * *', now()) + make_interval(mins => poo.preceding_count::int * 4)
+        public.get_next_cron_time('0 3 * * *', NOW()) + make_interval(mins => poo.preceding_count::int * 4)
       ELSE NULL
     END AS next_stats_update_at,
     COALESCE(ucb.available_credits, 0) AS credit_available,

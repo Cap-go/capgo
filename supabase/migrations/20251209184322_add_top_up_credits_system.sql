@@ -67,7 +67,7 @@ DECLARE
   c_session_id_key CONSTANT text := 'sessionId';
   c_payment_intent_key CONSTANT text := 'paymentIntentId';
   v_request_role text := current_setting('request.jwt.claim.role', true);
-  v_effective_expires timestamptz := COALESCE(p_expires_at, now() + interval '1 year');
+  v_effective_expires timestamptz := COALESCE(p_expires_at, NOW() + interval '1 year');
   v_source_ref jsonb := p_source_ref;
   v_session_id text := NULLIF(v_source_ref ->> c_session_id_key, c_empty);
   v_payment_intent_id text := NULLIF(v_source_ref ->> c_payment_intent_key, c_empty);
@@ -109,7 +109,7 @@ BEGIN
       p_org_id,
       p_amount,
       0,
-      now(),
+      NOW(),
       v_effective_expires,
       COALESCE(NULLIF(p_source, c_empty), c_default_source),
       v_source_ref,
@@ -381,7 +381,7 @@ BEGIN
     SELECT *
     FROM public.usage_credit_grants
     WHERE org_id = p_org_id
-      AND expires_at >= now()
+      AND expires_at >= NOW()
       AND credits_consumed < credits_total
     ORDER BY expires_at ASC, granted_at ASC
     FOR UPDATE
@@ -420,7 +420,7 @@ BEGIN
     INTO v_balance
     FROM public.usage_credit_grants
     WHERE org_id = p_org_id
-      AND expires_at >= now();
+      AND expires_at >= NOW();
 
     INSERT INTO public.usage_credit_transactions (
       org_id,
@@ -438,7 +438,7 @@ BEGIN
       'deduction',
       -v_use,
       v_balance,
-      now(),
+      NOW(),
       format('Overage deduction for %s usage', p_metric::text),
       jsonb_build_object('overage_event_id', v_event_id, 'metric', p_metric::text)
     );
@@ -633,7 +633,7 @@ DECLARE
   v_percent_before numeric := 0;
   v_threshold integer;
   v_alert_cycle integer;
-  v_occurred_at timestamptz := COALESCE(NEW.occurred_at, now());
+  v_occurred_at timestamptz := COALESCE(NEW.occurred_at, NOW());
 BEGIN
   IF TG_OP <> 'INSERT' THEN
     RETURN COALESCE(NEW, OLD);
@@ -709,9 +709,9 @@ DECLARE
   current_second int;
 BEGIN
   -- Get current time components in UTC
-  current_hour := EXTRACT(HOUR FROM now());
-  current_minute := EXTRACT(MINUTE FROM now());
-  current_second := EXTRACT(SECOND FROM now());
+  current_hour := EXTRACT(HOUR FROM NOW());
+  current_minute := EXTRACT(MINUTE FROM NOW());
+  current_second := EXTRACT(SECOND FROM NOW());
 
   -- Every 10 seconds: High-frequency queues (at :00, :10, :20, :30, :40, :50)
   IF current_second % 10 = 0 THEN
@@ -856,13 +856,13 @@ BEGIN
   -- Daily at 12:00:00 - Noon tasks
   IF current_hour = 12 AND current_minute = 0 AND current_second = 0 THEN
     BEGIN
-      DELETE FROM cron.job_run_details WHERE end_time < now() - interval '7 days';
+      DELETE FROM cron.job_run_details WHERE end_time < NOW() - interval '7 days';
     EXCEPTION WHEN OTHERS THEN
       RAISE WARNING 'cleanup job_run_details failed: %', SQLERRM;
     END;
 
     -- Weekly stats email (every Saturday at noon)
-    IF EXTRACT(DOW FROM now()) = 6 THEN
+    IF EXTRACT(DOW FROM NOW()) = 6 THEN
       BEGIN
         PERFORM public.process_stats_email_weekly();
       EXCEPTION WHEN OTHERS THEN
@@ -871,7 +871,7 @@ BEGIN
     END IF;
 
     -- Monthly stats email (1st of month at noon)
-    IF EXTRACT(DAY FROM now()) = 1 THEN
+    IF EXTRACT(DAY FROM NOW()) = 1 THEN
       BEGIN
         PERFORM public.process_stats_email_monthly();
       EXCEPTION WHEN OTHERS THEN

@@ -12,8 +12,8 @@ END $$;
 -- Create entries in public.users for the test members
 INSERT INTO public.users (id, email, created_at, updated_at)
 VALUES
-    (tests.get_supabase_uid('test_2fa_user_v7'), '2fa_v7@test.com', now(), now()),
-    (tests.get_supabase_uid('test_no_2fa_user_v7'), 'no2fa_v7@test.com', now(), now())
+    (tests.get_supabase_uid('test_2fa_user_v7'), '2fa_v7@test.com', NOW(), NOW()),
+    (tests.get_supabase_uid('test_no_2fa_user_v7'), 'no2fa_v7@test.com', NOW(), NOW())
 ON CONFLICT (id) DO NOTHING;
 
 -- Create test orgs
@@ -71,8 +71,8 @@ BEGIN
         'Test TOTP V7',
         'totp'::auth.factor_type,
         'verified'::auth.factor_status,
-        now(),
-        now()
+        NOW(),
+        NOW()
     );
 END $$;
 
@@ -161,11 +161,11 @@ BEGIN
         'succeeded',
         p.stripe_id,
         p.price_m_id, -- monthly price
-        now() - INTERVAL '10 days',
-        now() + INTERVAL '20 days',
+        NOW() - INTERVAL '10 days',
+        NOW() + INTERVAL '20 days',
         true,
-        now(),
-        now()
+        NOW(),
+        NOW()
     FROM public.orgs o
     CROSS JOIN public.plans p
     WHERE o.id = test_org_id
@@ -173,7 +173,7 @@ BEGIN
     LIMIT 1
     ON CONFLICT (customer_id) DO UPDATE SET
         status = 'succeeded',
-        subscription_anchor_end = now() + INTERVAL '20 days',
+        subscription_anchor_end = NOW() + INTERVAL '20 days',
         is_good_plan = true;
 END $$;
 

@@ -32,7 +32,7 @@ ADD VALUE IF NOT EXISTS 'build_time';
 -- Platform multipliers: android=1x, ios=2x
 CREATE TABLE IF NOT EXISTS public.build_logs (
     id uuid DEFAULT extensions.uuid_generate_v4() NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    created_at timestamp with time zone DEFAULT NOW() NOT NULL,
     org_id uuid NOT NULL,
     user_id uuid,
     build_id character varying NOT NULL,
@@ -487,7 +487,7 @@ search_path = '' AS $$
 DECLARE org_customer_id text; result boolean;
 BEGIN
   SELECT o.customer_id INTO org_customer_id FROM public.orgs o WHERE o.id = orgid;
-  SELECT (si.trial_at > now()) OR (si.status = 'succeeded' AND NOT (
+  SELECT (si.trial_at > NOW()) OR (si.status = 'succeeded' AND NOT (
       (si.mau_exceeded AND 'mau' = ANY(actions)) OR (si.storage_exceeded AND 'storage' = ANY(actions)) OR
       (si.bandwidth_exceeded AND 'bandwidth' = ANY(actions)) OR (si.build_time_exceeded AND 'build_time' = ANY(actions))))
   INTO result FROM public.stripe_info si WHERE si.customer_id = org_customer_id LIMIT 1;
@@ -711,7 +711,7 @@ BEGIN
         OR cache_entry.start_date IS DISTINCT FROM get_app_metrics.start_date
         OR cache_entry.end_date IS DISTINCT FROM get_app_metrics.end_date
         OR cache_entry.cached_at IS NULL
-        OR cache_entry.cached_at < (now() - interval '5 minutes') THEN
+        OR cache_entry.cached_at < (NOW() - interval '5 minutes') THEN
         cache_entry := public.seed_get_app_metrics_caches(get_app_metrics.org_id, get_app_metrics.start_date, get_app_metrics.end_date);
     END IF;
 
