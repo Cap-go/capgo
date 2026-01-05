@@ -504,6 +504,19 @@ BEGIN
     INSERT INTO "public"."apikeys" ("id", "created_at", "user_id", "key", "mode", "updated_at", "name", "expires_at") VALUES
     (102, NOW(), '6aa76066-55ef-4238-ade6-0b32334a4097', 'expired-plain-key-for-test', 'all', NOW(), 'test expired plain', NOW() - INTERVAL '1 day');
 
+    -- Hashed API key for testing (hash of 'test-hashed-apikey-for-auth-test')
+    -- Used by 07_auth_functions.sql tests
+    INSERT INTO "public"."apikeys" ("id", "created_at", "user_id", "key", "key_hash", "mode", "updated_at", "name") VALUES
+    (100, NOW(), '6aa76066-55ef-4238-ade6-0b32334a4097', NULL, encode(extensions.digest('test-hashed-apikey-for-auth-test', 'sha256'), 'hex'), 'all', NOW(), 'test hashed all');
+
+    -- Expired hashed API key for testing (expired 1 day ago)
+    INSERT INTO "public"."apikeys" ("id", "created_at", "user_id", "key", "key_hash", "mode", "updated_at", "name", "expires_at") VALUES
+    (101, NOW(), '6aa76066-55ef-4238-ade6-0b32334a4097', NULL, encode(extensions.digest('expired-hashed-key-for-test', 'sha256'), 'hex'), 'all', NOW(), 'test expired hashed', NOW() - INTERVAL '1 day');
+
+    -- Expired plain API key for testing (expired 1 day ago)
+    INSERT INTO "public"."apikeys" ("id", "created_at", "user_id", "key", "mode", "updated_at", "name", "expires_at") VALUES
+    (102, NOW(), '6aa76066-55ef-4238-ade6-0b32334a4097', 'expired-plain-key-for-test', 'all', NOW(), 'test expired plain', NOW() - INTERVAL '1 day');
+
     INSERT INTO "public"."apps" ("created_at", "app_id", "icon_url", "name", "last_version", "updated_at", "owner_org", "user_id") VALUES
     (NOW(), 'com.demoadmin.app', '', 'Demo Admin app', '1.0.0', NOW(), '22dbad8a-b885-4309-9b3b-a09f8460fb6d', 'c591b04e-cf29-4945-b9a0-776d0672061a'),
     (NOW(), 'com.demo.app', '', 'Demo app', '1.0.0', NOW(), '046a36ac-e03c-4590-9257-bd6c9dba9ee8', '6aa76066-55ef-4238-ade6-0b32334a4097'),
