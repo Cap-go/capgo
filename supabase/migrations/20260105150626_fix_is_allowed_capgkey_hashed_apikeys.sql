@@ -10,10 +10,31 @@
 --
 -- This migration updates these functions to use find_apikey_by_value()
 -- which checks both plain and hashed keys, and adds expiration checking.
+--
+-- Also optimizes find_apikey_by_value to use a single query instead of two
+-- sequential queries for better performance.
 -- ============================================================================
 
 -- ============================================================================
--- Section 1: Update is_allowed_capgkey(apikey, keymode)
+-- Section 1: Optimize find_apikey_by_value to use single query
+-- ============================================================================
+-- The original implementation did two sequential queries. This optimization
+-- combines both checks into a single query using OR, which is more efficient
+-- as it only requires one database round-trip and PostgreSQL can potentially
+-- use index union optimization.
+
+CREATE OR REPLACE FUNCTION "public"."find_apikey_by_value"("key_value" "text") RETURNS SETOF "public"."apikeys"
+    LANGUAGE "sql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  SELECT * FROM public.apikeys
+  WHERE key = key_value
+     OR key_hash = encode(extensions.digest(key_value, 'sha256'), 'hex')
+  LIMIT 1;
+$$;
+
+-- ============================================================================
+-- Section 2: Update is_allowed_capgkey(apikey, keymode)
 -- ============================================================================
 
 CREATE OR REPLACE FUNCTION "public"."is_allowed_capgkey"("apikey" "text", "keymode" "public"."key_mode"[]) RETURNS boolean
@@ -40,7 +61,7 @@ END;
 $$;
 
 -- ============================================================================
--- Section 2: Update is_allowed_capgkey(apikey, keymode, app_id)
+-- Section 3: Update is_allowed_capgkey(apikey, keymode, app_id)
 -- ============================================================================
 
 CREATE OR REPLACE FUNCTION "public"."is_allowed_capgkey"("apikey" "text", "keymode" "public"."key_mode"[], "app_id" character varying) RETURNS boolean
@@ -73,7 +94,7 @@ END;
 $$;
 
 -- ============================================================================
--- Section 3: Update get_user_id(apikey) to support hashed keys
+-- Section 4: Update get_user_id(apikey) to support hashed keys
 -- ============================================================================
 
 CREATE OR REPLACE FUNCTION "public"."get_user_id"("apikey" "text") RETURNS "uuid"
