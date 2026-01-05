@@ -324,8 +324,7 @@ BEGIN
   FOR v_org IN 
     SELECT DISTINCT o.id, o.name
     FROM public.orgs o
-    WHERE o.sso_enabled = true 
-      AND v_domain = ANY(o.allowed_email_domains)
+    WHERE v_domain = ANY(o.allowed_email_domains)
       AND NOT EXISTS (
         SELECT 1 FROM public.org_users ou 
         WHERE ou.user_id = p_user_id AND ou.org_id = o.id
