@@ -2,13 +2,11 @@ import type { Context } from 'hono'
 import type { AuthInfo } from './hono.ts'
 import type { Database } from './supabase.types.ts'
 import { and, eq, inArray, isNull, or, sql } from 'drizzle-orm'
-import { hashApiKey } from './hash.ts'
 import { honoFactory, quickError } from './hono.ts'
 import { cloudlog } from './logging.ts'
 import { closeClient, getDrizzleClient, getPgClient, logPgError } from './pg.ts'
 import * as schema from './postgres_schema.ts'
 import { checkKey, checkKeyById, supabaseAdmin, supabaseClient } from './supabase.ts'
-import { isSafeAlphanumeric } from './utils.ts'
 
 // TODO: make universal middleware who
 //  Accept authorization header (JWT)
@@ -36,9 +34,24 @@ const notExpiredCondition = or(
   sql`${schema.apikeys.expires_at} > now()`,
 )
 
+// Type for the find_apikey_by_value result
+type FindApikeyByValueResult = {
+  id: number
+  created_at: string | null
+  user_id: string
+  key: string | null
+  key_hash: string | null
+  mode: Database['public']['Enums']['key_mode']
+  updated_at: string | null
+  name: string
+  limited_to_orgs: string[] | null
+  limited_to_apps: string[] | null
+  expires_at: string | null
+} & Record<string, unknown>
+
 /**
  * Check API key using Postgres/Drizzle instead of Supabase SDK
- * Expiration is checked directly in SQL query - no JS check needed
+ * Uses find_apikey_by_value SQL function to look up both plain-text and hashed keys
  */
 async function checkKeyPg(
   _c: Context,
@@ -46,49 +59,42 @@ async function checkKeyPg(
   rights: Database['public']['Enums']['key_mode'][],
   drizzleClient: ReturnType<typeof getDrizzleClient>,
 ): Promise<Database['public']['Tables']['apikeys']['Row'] | null> {
-  // Validate API key contains only safe characters (alphanumeric + dashes)
-  if (!isSafeAlphanumeric(keyString)) {
-    cloudlog({ requestId: _c.get('requestId'), message: 'Invalid apikey format (pg)', keyStringPrefix: keyString?.substring(0, 8) })
-    return null
-  }
-
   try {
-    // Compute hash upfront so we can check both plain-text and hashed keys in one query
-    const keyHash = await hashApiKey(keyString)
+    // Use find_apikey_by_value SQL function to look up both plain-text and hashed keys
+    const result = await drizzleClient.execute<FindApikeyByValueResult>(
+      sql`SELECT * FROM find_apikey_by_value(${keyString})`,
+    )
 
-    // Single query: match by plain-text key OR hashed key
-    // Expiration check is done in SQL: expires_at IS NULL OR expires_at > now()
-    const result = await drizzleClient
-      .select()
-      .from(schema.apikeys)
-      .where(and(
-        or(
-          eq(schema.apikeys.key, keyString),
-          eq(schema.apikeys.key_hash, keyHash),
-        ),
-        inArray(schema.apikeys.mode, rights),
-        notExpiredCondition,
-      ))
-      .limit(1)
-      .then(data => data[0])
-
-    if (!result) {
+    const apiKey = result.rows[0]
+    if (!apiKey) {
       cloudlog({ requestId: _c.get('requestId'), message: 'Invalid apikey (pg)', keyStringPrefix: keyString?.substring(0, 8), rights })
       return null
     }
 
-    // Convert to the expected format, ensuring arrays are properly handled
+    // Check if mode is allowed
+    if (!rights.includes(apiKey.mode)) {
+      cloudlog({ requestId: _c.get('requestId'), message: 'Invalid apikey mode (pg)', keyStringPrefix: keyString?.substring(0, 8), rights, mode: apiKey.mode })
+      return null
+    }
+
+    // Check if key is expired
+    if (apiKey.expires_at && new Date(apiKey.expires_at) < new Date()) {
+      cloudlog({ requestId: _c.get('requestId'), message: 'Apikey expired (pg)', keyStringPrefix: keyString?.substring(0, 8) })
+      return null
+    }
+
+    // Convert to the expected format
     return {
-      id: result.id,
-      created_at: result.created_at?.toISOString() || null,
-      user_id: result.user_id,
-      key: result.key,
-      mode: result.mode,
-      updated_at: result.updated_at?.toISOString() || null,
-      name: result.name,
-      limited_to_orgs: result.limited_to_orgs || [],
-      limited_to_apps: result.limited_to_apps || [],
-      expires_at: result.expires_at?.toISOString() || null,
+      id: apiKey.id,
+      created_at: apiKey.created_at,
+      user_id: apiKey.user_id,
+      key: apiKey.key,
+      mode: apiKey.mode,
+      updated_at: apiKey.updated_at,
+      name: apiKey.name,
+      limited_to_orgs: apiKey.limited_to_orgs || [],
+      limited_to_apps: apiKey.limited_to_apps || [],
+      expires_at: apiKey.expires_at,
     } as Database['public']['Tables']['apikeys']['Row']
   }
   catch (e: unknown) {
