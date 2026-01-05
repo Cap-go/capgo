@@ -251,12 +251,13 @@ describe('auto-join integration', () => {
       }
       else {
         // No user returned - check if there's a real error message
-        // Empty object {} means user likely exists (Supabase quirk on retry)
+        // Empty object {} or stringified "{}" means user likely exists (Supabase quirk on retry)
         const errorMsg = authUserError?.message
-        if (errorMsg) {
+        const isUsefulError = errorMsg && errorMsg.trim() !== '' && errorMsg !== '{}'
+        if (isUsefulError) {
           throw new Error(`Auth user creation failed: ${errorMsg}`)
         }
-        // No message means empty error object - fall through to catch for retry lookup
+        // No useful message means empty error object - fall through to catch for retry lookup
         throw new Error('User likely exists (empty error response)')
       }
     }
