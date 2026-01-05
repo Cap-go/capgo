@@ -228,28 +228,61 @@ describe('auto-join integration', () => {
 
     // Simulate new user signup with SSO metadata
     // Insert into auth.users first
-    const { error: authUserError, data: authUserData } = await getSupabaseClient().auth.admin.createUser({
-      email: testUserEmail,
-      email_confirm: true,
-      user_metadata: {
-        sso_provider_id: ssoProviderId,
-      },
-    })
+    let actualUserId: string | undefined
 
-    if (authUserError || !authUserData.user) {
-      throw new Error(`Auth user creation failed: ${authUserError?.message || 'No user returned'}`)
+    // Try to create user, if it already exists (retry scenario), use that ID
+    try {
+      const { error: authUserError, data: authUserData } = await getSupabaseClient().auth.admin.createUser({
+        email: testUserEmail,
+        email_confirm: true,
+        user_metadata: {
+          sso_provider_id: ssoProviderId,
+        },
+      })
+
+      if (authUserError || !authUserData.user) {
+        const errorMsg = authUserError?.message || JSON.stringify(authUserError) || 'No user returned'
+        throw new Error(`Auth user creation failed: ${errorMsg}`)
+      }
+
+      actualUserId = authUserData.user.id
+    }
+    catch (err: any) {
+      // If user already exists, find their ID
+      const { data, error } = await getSupabaseClient().auth.admin.listUsers()
+      if (error) {
+        throw new Error(`Failed to list users: ${error.message}`)
+      }
+      const existingUser = data?.users?.find(u => u.email === testUserEmail)
+      if (existingUser) {
+        actualUserId = existingUser.id
+      }
+      else {
+        throw err
+      }
     }
 
-    const actualUserId = authUserData.user.id
+    if (!actualUserId) {
+      throw new Error('Failed to get user ID')
+    }
 
     // Now insert into public.users (this is required for foreign keys)
-    const { error: publicUserError } = await getSupabaseClient().from('users').insert({
-      id: actualUserId,
-      email: testUserEmail,
-    })
+    // Skip if user already exists (retry scenario)
+    const { data: existingPublicUser } = await getSupabaseClient()
+      .from('users')
+      .select('id')
+      .eq('id', actualUserId)
+      .maybeSingle()
 
-    if (publicUserError) {
-      throw new Error(`Public user creation failed: ${publicUserError.message}`)
+    if (!existingPublicUser) {
+      const { error: publicUserError } = await getSupabaseClient().from('users').insert({
+        id: actualUserId,
+        email: testUserEmail,
+      })
+
+      if (publicUserError) {
+        throw new Error(`Public user creation failed: ${publicUserError.message}`)
+      }
     }
 
     // Manually enroll user (simulates what auto_enroll_sso_user does)
