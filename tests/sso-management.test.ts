@@ -250,20 +250,19 @@ describe('auto-join integration', () => {
     catch (err: any) {
       // If user already exists (retry scenario), skip user creation
       // The user will already have a public.users record and org_users enrollment from the first attempt
-      console.log('User creation failed (likely exists from retry), skipping user lookup')
+      console.log('User creation failed (likely exists from retry), looking up by email')
 
-      // Cleanup any partial org_users records and proceed
-      // Get user ID from existing org_users record if available
-      const { data: existingOrgUsers } = await getSupabaseClient()
-        .from('org_users')
-        .select('user_id')
-        .eq('org_id', orgId)
-        .limit(1)
+      // Look up the test user by email from public.users table (NOT org_users, which would return admin)
+      const { data: existingUser } = await getSupabaseClient()
+        .from('users')
+        .select('id')
+        .eq('email', testUserEmail)
+        .maybeSingle()
 
-      if (existingOrgUsers && existingOrgUsers.length > 0) {
-        actualUserId = existingOrgUsers[0].user_id
+      if (existingUser) {
+        actualUserId = existingUser.id
       } else {
-        // If we can't find the user, re-throw the original error
+        // If we can't find the user by email, re-throw the original error
         throw err
       }
     }
