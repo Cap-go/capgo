@@ -204,8 +204,8 @@ function stripHtml(html: string): string {
   // (e.g., "<scr<script>ipt>" could become "<script>" after partial removal)
   // This eliminates any possibility of incomplete sanitization
   return html
-    .replace(/[<>]/g, ' ')
-    .replace(/\s+/g, ' ')
+    .replaceAll(/[<>]/g, ' ')
+    .replaceAll(/\s+/g, ' ')
     .trim()
 }
 
