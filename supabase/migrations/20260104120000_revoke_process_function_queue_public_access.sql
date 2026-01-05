@@ -189,7 +189,6 @@ REVOKE ALL ON FUNCTION "public"."get_db_url"() FROM "service_role";
 REVOKE ALL ON FUNCTION "public"."get_customer_counts"() FROM "public";
 REVOKE ALL ON FUNCTION "public"."get_customer_counts"() FROM "anon";
 REVOKE ALL ON FUNCTION "public"."get_customer_counts"() FROM "authenticated";
-REVOKE ALL ON FUNCTION "public"."get_customer_counts"() FROM "service_role";
 
 REVOKE ALL ON FUNCTION "public"."get_update_stats"() FROM "public";
 REVOKE ALL ON FUNCTION "public"."get_update_stats"() FROM "anon";
