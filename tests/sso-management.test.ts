@@ -179,13 +179,15 @@ describe('auto-join integration', () => {
     const testEntityId = generateTestEntityId()
 
     // Setup org with SSO - manual DB inserts to bypass edge function
+    // All inserts ignore duplicate key errors to handle vitest retry scenarios
     const { error: stripeError } = await getSupabaseClient().from('stripe_info').insert({
       customer_id: customerId,
       status: 'succeeded',
       product_id: 'prod_LQIregjtNduh4q',
     })
 
-    if (stripeError) {
+    // Ignore duplicate key errors on retry
+    if (stripeError && !stripeError.message?.includes('duplicate') && stripeError.code !== '23505') {
       throw new Error(`stripe_info insert failed: ${stripeError.message}`)
     }
 
@@ -197,7 +199,8 @@ describe('auto-join integration', () => {
       customer_id: customerId,
     })
 
-    if (orgsError) {
+    // Ignore duplicate key errors on retry
+    if (orgsError && !orgsError.message?.includes('duplicate') && orgsError.code !== '23505') {
       throw new Error(`orgs insert failed: ${orgsError.message}`)
     }
 
@@ -207,7 +210,8 @@ describe('auto-join integration', () => {
       user_right: 'super_admin',
     })
 
-    if (orgUsersError) {
+    // Ignore duplicate key errors on retry
+    if (orgUsersError && !orgUsersError.message?.includes('duplicate') && orgUsersError.code !== '23505') {
       throw new Error(`org_users insert failed: ${orgUsersError.message}`)
     }
 
@@ -222,7 +226,8 @@ describe('auto-join integration', () => {
       verified: true,
     })
 
-    if (ssoError) {
+    // Ignore duplicate key errors on retry
+    if (ssoError && !ssoError.message?.includes('duplicate') && ssoError.code !== '23505') {
       throw new Error(`org_saml_connections insert failed: ${ssoError.message}`)
     }
 
@@ -240,26 +245,27 @@ describe('auto-join integration', () => {
         },
       })
 
-      // Check if error is meaningful (not empty object) and no user data
-      const hasRealError = authUserError && (authUserError.message || Object.keys(authUserError).length > 0)
-
-      if (hasRealError || !authUserData?.user) {
-        // If error is empty object {}, treat as "user exists" and fall through to catch
-        if (!authUserError?.message && (!authUserData?.user)) {
-          throw new Error('User likely exists (empty error response)')
-        }
-        const errorMsg = authUserError?.message || JSON.stringify(authUserError) || 'No user returned'
-        throw new Error(`Auth user creation failed: ${errorMsg}`)
+      // If we got a user back, use it
+      if (authUserData?.user) {
+        actualUserId = authUserData.user.id
       }
-
-      actualUserId = authUserData.user.id
+      else {
+        // No user returned - check if there's a real error message
+        // Empty object {} means user likely exists (Supabase quirk on retry)
+        const errorMsg = authUserError?.message
+        if (errorMsg) {
+          throw new Error(`Auth user creation failed: ${errorMsg}`)
+        }
+        // No message means empty error object - fall through to catch for retry lookup
+        throw new Error('User likely exists (empty error response)')
+      }
     }
     catch (err: any) {
       // If user already exists (retry scenario), skip user creation
       // The user will already have a public.users record and org_users enrollment from the first attempt
       console.log('User creation failed (likely exists from retry), looking up by email')
 
-      // Look up the test user by email from public.users table (NOT org_users, which would return admin)
+      // First try public.users table
       const { data: existingUser } = await getSupabaseClient()
         .from('users')
         .select('id')
@@ -268,9 +274,18 @@ describe('auto-join integration', () => {
 
       if (existingUser) {
         actualUserId = existingUser.id
-      } else {
-        // If we can't find the user by email, re-throw the original error
-        throw err
+      }
+      else {
+        // If not in public.users, try auth.users via admin API
+        const { data: authUsers } = await getSupabaseClient().auth.admin.listUsers()
+        const existingAuthUser = authUsers?.users?.find(u => u.email === testUserEmail)
+        if (existingAuthUser) {
+          actualUserId = existingAuthUser.id
+        }
+        else {
+          // If we can't find the user anywhere, re-throw the original error
+          throw err
+        }
       }
     }
 
@@ -292,7 +307,13 @@ describe('auto-join integration', () => {
         email: testUserEmail,
       })
 
-      if (publicUserError) {
+      // Ignore duplicate key errors on retry
+      const isPublicUserDuplicate = publicUserError && (
+        publicUserError.message?.includes('duplicate') ||
+        publicUserError.code === '23505'
+      )
+
+      if (publicUserError && !isPublicUserDuplicate) {
         throw new Error(`Public user creation failed: ${publicUserError.message}`)
       }
     }
