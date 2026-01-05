@@ -2,7 +2,7 @@
 BEGIN;
 
 
-SELECT plan(12);
+SELECT plan(7);
 
 -- Test get_total_app_storage_size_orgs
 SELECT
@@ -55,57 +55,6 @@ SELECT
         'SELECT get_total_storage_size_org(''00000000-0000-0000-0000-000000000000'')',
         $$VALUES (0::double precision)$$,
         'get_total_storage_size_org test - null org returns zero'
-    );
-
--- Test get_metered_usage
-SELECT tests.authenticate_as('test_admin');
-
-SELECT
-    is(
-        (
-            get_metered_usage('22dbad8a-b885-4309-9b3b-a09f8460fb6d')
-        ).mau >= 0,
-        true,
-        'get_metered_usage test - non-negative mau'
-    );
-
-SELECT
-    is(
-        (
-            get_metered_usage('22dbad8a-b885-4309-9b3b-a09f8460fb6d')
-        ).bandwidth >= 0,
-        true,
-        'get_metered_usage test - non-negative bandwidth'
-    );
-
--- Test get_metered_usage negative cases
-SELECT
-    is(
-        (
-            get_metered_usage('00000000-0000-0000-0000-000000000000')
-        ).mau,
-        0::bigint,
-        'get_metered_usage test - non-existent org returns zero mau'
-    );
-
-SELECT
-    is(
-        (
-            get_metered_usage('00000000-0000-0000-0000-000000000000')
-        ).bandwidth,
-        0::bigint,
-        'get_metered_usage test - non-existent org returns zero bandwidth'
-    );
-
-SELECT tests.clear_authentication();
-
--- Test get_metered_usage without authentication (should still work for valid org)
-SELECT
-    ok(
-        (
-            get_metered_usage('22dbad8a-b885-4309-9b3b-a09f8460fb6d')
-        ).mau >= 0,
-        'get_metered_usage test - works without authentication'
     );
 
 SELECT *

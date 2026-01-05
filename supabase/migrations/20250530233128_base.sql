@@ -448,7 +448,7 @@ BEGIN
         FROM cron.job 
         WHERE schedule = '5 seconds' OR schedule = '1 seconds' OR schedule = '10 seconds'
     ) 
-    AND end_time < now() - interval '1 hour';
+    AND end_time < NOW() - interval '1 hour';
 END;
 $$;
 
@@ -1035,10 +1035,10 @@ BEGIN
     anchor_day := COALESCE(stripe_info_row.subscription_anchor_start - date_trunc('MONTH', stripe_info_row.subscription_anchor_start), '0 DAYS'::INTERVAL);
 
     -- Determine the start date based on the anchor day and current date
-    IF anchor_day > now() - date_trunc('MONTH', now()) THEN
-        start_date := date_trunc('MONTH', now() - INTERVAL '1 MONTH') + anchor_day;
+    IF anchor_day > NOW() - date_trunc('MONTH', NOW()) THEN
+        start_date := date_trunc('MONTH', NOW() - INTERVAL '1 MONTH') + anchor_day;
     ELSE
-        start_date := date_trunc('MONTH', now()) + anchor_day;
+        start_date := date_trunc('MONTH', NOW()) + anchor_day;
     END IF;
 
     -- Calculate the end date
@@ -1882,8 +1882,8 @@ BEGIN
         FROM
             public.version_usage
         WHERE
-            timestamp >= (date_trunc('minute', now()) - INTERVAL '10 minutes')
-            AND timestamp < (date_trunc('minute', now()) - INTERVAL '9 minutes')
+            timestamp >= (date_trunc('minute', NOW()) - INTERVAL '10 minutes')
+            AND timestamp < (date_trunc('minute', NOW()) - INTERVAL '9 minutes')
         GROUP BY
             version_usage.app_id
     )
@@ -2034,10 +2034,10 @@ BEGIN
   RETURN QUERY
   SELECT app_versions.* FROM public.app_versions
   LEFT JOIN public.app_versions_meta ON app_versions_meta.id=app_versions.id
-  where coalesce(app_versions_meta.size, 0) = 0
+  WHERE COALESCE(app_versions_meta.size, 0) = 0
   AND app_versions.deleted=false
   AND app_versions.storage_provider != 'external'
-  AND now() - app_versions.created_at > interval '120 seconds';
+  AND NOW() - app_versions.created_at > interval '120 seconds';
 END;
 $$;
 
@@ -2535,7 +2535,7 @@ BEGIN
   where customer_id=(SELECT customer_id FROM public.orgs where id=orgid)
   AND (
     (status = 'succeeded' AND is_good_plan = true)
-    OR (trial_at::date - (now())::date > 0)
+    OR (trial_at::date - (NOW())::date > 0)
   )
   )
 );
@@ -2551,7 +2551,7 @@ DECLARE org_customer_id text; result boolean;
 BEGIN
   SELECT o.customer_id INTO org_customer_id FROM public.orgs o WHERE o.id = orgid;
 
-  SELECT (si.trial_at > now())
+  SELECT (si.trial_at > NOW())
       OR (si.status = 'succeeded' AND NOT (
             (si.mau_exceeded AND 'mau' = ANY(actions)) OR
             (si.storage_exceeded AND 'storage' = ANY(actions)) OR
@@ -2599,7 +2599,7 @@ CREATE OR REPLACE FUNCTION "public"."is_trial_org" ("orgid" "uuid") RETURNS inte
 SET
   search_path = '' SECURITY DEFINER AS $$
 BEGIN
-  RETURN (SELECT GREATEST((trial_at::date - (now())::date), 0) AS days
+  RETURN (SELECT GREATEST((trial_at::date - (NOW())::date), 0) AS days
   FROM public.stripe_info
   where customer_id=(SELECT customer_id FROM public.orgs where id=orgid));
 END;
@@ -3076,7 +3076,7 @@ BEGIN
             NEW.app_id,
             NEW.version,
             NEW.owner_org,
-            coalesce(public.get_identity()::uuid, NEW.created_by)
+            COALESCE(public.get_identity()::uuid, NEW.created_by)
         );
     END IF;
 
@@ -3091,7 +3091,7 @@ SET
   search_path = '' AS $$
 BEGIN
     DELETE FROM cron.job_run_details
-    WHERE end_time < now() - interval '1 day';
+    WHERE end_time < NOW() - interval '1 day';
 END;
 $$;
 
@@ -3170,7 +3170,7 @@ END IF;
   -- Check if enough time has passed since last transfer
   IF v_last_transfer IS NOT NULL THEN
     v_last_transfer_date := (v_last_transfer->>'transferred_at')::timestamp;
-    IF v_last_transfer_date + interval '32 days' > now() THEN
+    IF v_last_transfer_date + interval '32 days' > NOW() THEN
       RAISE EXCEPTION 'Cannot transfer app. Must wait at least 32 days between transfers. Last transfer was on %', v_last_transfer_date;
     END IF;
   END IF;
@@ -3179,9 +3179,9 @@ END IF;
   UPDATE public.apps
   SET
       owner_org = p_new_org_id,
-      updated_at = now(),
+      updated_at = NOW(),
       transfer_history = COALESCE(transfer_history, '{}') || jsonb_build_object(
-          'transferred_at', now(),
+          'transferred_at', NOW(),
           'transferred_from', v_old_org_id,
           'transferred_to', p_new_org_id,
           'initiated_by', v_user_id
@@ -3263,7 +3263,7 @@ BEGIN
     SET deleted = true
     WHERE app_versions.deleted = false  -- Filter non-deleted first
       AND app_versions.created_at < (
-          SELECT now() - make_interval(secs => apps.retention)
+          SELECT NOW() - make_interval(secs => apps.retention)
           FROM public.apps
           WHERE apps.app_id = app_versions.app_id
       )
@@ -3283,7 +3283,7 @@ SET
   search_path = '' SECURITY DEFINER AS $_$
 BEGIN
   RETURN (
-    array[(select coalesce(auth.jwt()->>'aal', 'aal1'))] <@ (
+    array[(select COALESCE(auth.jwt()->>'aal', 'aal1'))] <@ (
       select
           case
             when count(id) > 0 then array['aal2']
@@ -7053,7 +7053,7 @@ SELECT
   cron.schedule (
     'delete-job-run-details',
     '0 12 * * *',
-    'DELETE FROM cron.job_run_details WHERE end_time < now() - interval ''7 days'';'
+    'DELETE FROM cron.job_run_details WHERE end_time < NOW() - interval ''7 days'';'
   );
 
 SELECT

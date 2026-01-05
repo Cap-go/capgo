@@ -365,14 +365,14 @@ CREATE OR REPLACE FUNCTION "public"."accept_invitation_to_org"("org_id" "uuid") 
     AS $$
 Declare  
  invite record;
-Begin
+BEGIN
   SELECT org_users.* FROM public.org_users
   INTO invite
   WHERE org_users.org_id=accept_invitation_to_org.org_id and (select auth.uid())=org_users.user_id;
 
   IF invite IS NULL THEN
     return 'NO_INVITE';
-  else
+  ELSE
     IF NOT (invite.user_right::varchar ilike 'invite_'||'%') THEN
       return 'INVALID_ROLE';
     END IF;
@@ -382,8 +382,8 @@ Begin
     WHERE org_users.id=invite.id;
 
     return 'OK';
-  end if;
-End;
+  END IF;
+END;
 $$;
 
 
@@ -746,14 +746,16 @@ ALTER FUNCTION "public"."audit_log_trigger"() OWNER TO "postgres";
 CREATE OR REPLACE FUNCTION "public"."auto_apikey_name_by_id"() RETURNS "trigger"
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
-    AS $$BEGIN
+    AS $$
+BEGIN
 
   IF (NEW.name IS NOT DISTINCT FROM NULL) OR LENGTH(NEW.name) = 0 THEN
     NEW.name = format('Apikey %s', NEW.id);
   END IF;
 
   RETURN NEW;
-END;$$;
+END;
+$$;
 
 
 ALTER FUNCTION "public"."auto_apikey_name_by_id"() OWNER TO "postgres";
@@ -762,7 +764,8 @@ ALTER FUNCTION "public"."auto_apikey_name_by_id"() OWNER TO "postgres";
 CREATE OR REPLACE FUNCTION "public"."auto_owner_org_by_app_id"() RETURNS "trigger"
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
-    AS $$BEGIN
+    AS $$
+BEGIN
   IF NEW."app_id" is distinct from OLD."app_id" AND OLD."app_id" is distinct from NULL THEN
     RAISE EXCEPTION 'changing the app_id is not allowed';
   END IF;
@@ -770,7 +773,8 @@ CREATE OR REPLACE FUNCTION "public"."auto_owner_org_by_app_id"() RETURNS "trigge
   NEW.owner_org = public.get_user_main_org_id_by_app_id(NEW."app_id");
 
    RETURN NEW;
-END;$$;
+END;
+$$;
 
 
 ALTER FUNCTION "public"."auto_owner_org_by_app_id"() OWNER TO "postgres";
@@ -886,7 +890,8 @@ BEGIN
   AND orgs.id=OLD.org_id;
 
   RETURN OLD;
-END;$$;
+END;
+$$;
 
 
 ALTER FUNCTION "public"."check_if_org_can_exist"() OWNER TO "postgres";
@@ -1122,7 +1127,8 @@ ALTER FUNCTION "public"."check_org_members_password_policy"("org_id" "uuid") OWN
 CREATE OR REPLACE FUNCTION "public"."check_org_user_privileges"() RETURNS "trigger"
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
-    AS $$BEGIN
+    AS $$
+BEGIN
 
   -- here we check if the user is a service role in order to bypass this permission check
   IF (((SELECT auth.jwt() ->> 'role')='service_role') OR ((select current_user) IS NOT DISTINCT FROM 'postgres')) THEN
@@ -1147,7 +1153,8 @@ CREATE OR REPLACE FUNCTION "public"."check_org_user_privileges"() RETURNS "trigg
   END IF;
 
   RETURN NEW;
-END;$$;
+END;
+$$;
 
 
 ALTER FUNCTION "public"."check_org_user_privileges"() OWNER TO "postgres";
@@ -1293,9 +1300,9 @@ CREATE OR REPLACE FUNCTION "public"."convert_bytes_to_mb"("bytes_value" double p
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
     AS $$
-Begin
+BEGIN
   RETURN bytes_value / 1024.0 / 1024.0;
-End;
+END;
 $$;
 
 
@@ -1306,9 +1313,9 @@ CREATE OR REPLACE FUNCTION "public"."convert_gb_to_bytes"("gb" double precision)
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
     AS $$
-Begin
+BEGIN
   RETURN gb * 1024 * 1024 * 1024;
-End;
+END;
 $$;
 
 
@@ -1319,9 +1326,9 @@ CREATE OR REPLACE FUNCTION "public"."convert_mb_to_bytes"("gb" double precision)
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
     AS $$
-Begin
+BEGIN
   RETURN gb * 1024 * 1024;
-End;
+END;
 $$;
 
 
@@ -1375,9 +1382,9 @@ CREATE OR REPLACE FUNCTION "public"."count_all_need_upgrade"() RETURNS integer
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
     AS $$
-Begin
+BEGIN
   RETURN (SELECT COUNT(*) FROM public.stripe_info WHERE is_good_plan = false AND status = 'succeeded');
-End;  
+END;  
 $$;
 
 
@@ -1388,9 +1395,9 @@ CREATE OR REPLACE FUNCTION "public"."count_all_onboarded"() RETURNS integer
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
     AS $$
-Begin
+BEGIN
   RETURN (SELECT COUNT(DISTINCT owner_org) FROM public.apps);
-End;  
+END;  
 $$;
 
 
@@ -1796,11 +1803,11 @@ CREATE OR REPLACE FUNCTION "public"."exist_app_v2"("appid" character varying) RE
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
-Begin
+BEGIN
   RETURN (SELECT EXISTS (SELECT 1
   FROM public.apps
   WHERE app_id=appid));
-End;  
+END;  
 $$;
 
 
@@ -1811,12 +1818,12 @@ CREATE OR REPLACE FUNCTION "public"."exist_app_versions"("appid" character varyi
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
     AS $$
-Begin
+BEGIN
   RETURN (SELECT EXISTS (SELECT 1
   FROM public.app_versions
   WHERE app_id=appid
   AND name=name_version));
-End;  
+END;  
 $$;
 
 
@@ -1975,11 +1982,13 @@ ALTER FUNCTION "public"."find_fit_plan_v3"("mau" bigint, "bandwidth" bigint, "st
 CREATE OR REPLACE FUNCTION "public"."force_valid_user_id_on_app"() RETURNS "trigger"
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
-    AS $$BEGIN
+    AS $$
+BEGIN
   NEW.user_id = (select created_by FROM public.orgs where id = (NEW."owner_org"));
 
    RETURN NEW;
-END;$$;
+END;
+$$;
 
 
 ALTER FUNCTION "public"."force_valid_user_id_on_app"() OWNER TO "postgres";
@@ -2168,7 +2177,7 @@ CREATE OR REPLACE FUNCTION "public"."get_app_versions"("appid" character varying
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
-Begin
+BEGIN
   RETURN (SELECT id
   FROM public.app_versions
   WHERE app_id=appid
@@ -2176,7 +2185,7 @@ Begin
   AND owner_org=(select public.get_user_main_org_id_by_app_id(appid))
   AND public.is_member_of_org(public.get_user_id(apikey), (SELECT public.get_user_main_org_id_by_app_id(appid)))
   );
-End;  
+END;  
 $$;
 
 
@@ -2205,7 +2214,7 @@ CREATE OR REPLACE FUNCTION "public"."get_current_plan_name_org"("orgid" "uuid") 
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
-Begin
+BEGIN
   RETURN 
   (SELECT name
   FROM public.plans
@@ -2213,7 +2222,7 @@ Begin
     FROM public.stripe_info
     where customer_id=(SELECT customer_id FROM public.orgs where id=orgid)
     ));
-End;  
+END;  
 $$;
 
 
@@ -2361,7 +2370,7 @@ CREATE OR REPLACE FUNCTION "public"."get_identity"() RETURNS "uuid"
     AS $$
 DECLARE
     auth_uid uuid;
-Begin
+BEGIN
   SELECT auth.uid() into auth_uid;
 
   -- JWT auth.uid is not null, return
@@ -2371,7 +2380,7 @@ Begin
 
   -- JWT is null
   RETURN NULL;
-End;
+END;
 $$;
 
 
@@ -2386,7 +2395,7 @@ DECLARE
     auth_uid uuid;
     api_key_text text;
     api_key record;
-Begin
+BEGIN
   SELECT auth.uid() into auth_uid;
 
   IF auth_uid IS NOT NULL THEN
@@ -2414,7 +2423,7 @@ Begin
   END IF;
 
   RETURN NULL;
-End;
+END;
 $$;
 
 
@@ -2428,7 +2437,7 @@ CREATE OR REPLACE FUNCTION "public"."get_identity_apikey_only"("keymode" "public
 DECLARE
     api_key_text text;
     api_key record;
-Begin
+BEGIN
   SELECT "public"."get_apikey_header"() into api_key_text;
 
   IF api_key_text IS NULL THEN
@@ -2450,7 +2459,7 @@ Begin
   END IF;
 
   RETURN NULL;
-End;
+END;
 $$;
 
 
@@ -2465,7 +2474,7 @@ DECLARE
     auth_uid uuid;
     api_key_text text;
     api_key record;
-Begin
+BEGIN
   SELECT auth.uid() into auth_uid;
 
   IF auth_uid IS NOT NULL THEN
@@ -2504,7 +2513,7 @@ Begin
 
   PERFORM public.pg_log('deny: IDENTITY_ORG_NO_MATCH', jsonb_build_object('org_id', org_id));
   RETURN NULL;
-End;
+END;
 $$;
 
 
@@ -2519,7 +2528,7 @@ DECLARE
     auth_uid uuid;
     api_key_text text;
     api_key record;
-Begin
+BEGIN
   SELECT auth.uid() into auth_uid;
 
   IF auth_uid IS NOT NULL THEN
@@ -2566,7 +2575,7 @@ Begin
 
   PERFORM public.pg_log('deny: IDENTITY_APP_NO_MATCH', jsonb_build_object('org_id', org_id, 'app_id', app_id));
   RETURN NULL;
-End;
+END;
 $$;
 
 
@@ -2808,12 +2817,12 @@ CREATE OR REPLACE FUNCTION "public"."get_org_owner_id"("apikey" "text", "app_id"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
-Declare
+DECLARE
  org_owner_id uuid;
  real_user_id uuid;
  org_id uuid;
-Begin
-  SELECT apps.user_id FROM public.apps WHERE apps.app_id=get_org_owner_id.app_id into org_owner_id;
+BEGIN
+  SELECT apps.user_id FROM public.apps WHERE apps.app_id=get_org_owner_id.app_id INTO org_owner_id;
   SELECT public.get_user_main_org_id_by_app_id(app_id) INTO org_id;
 
   SELECT user_id
@@ -2828,7 +2837,7 @@ Begin
   END IF;
 
   RETURN org_owner_id;
-End;
+END;
 $$;
 
 
@@ -2840,16 +2849,16 @@ CREATE OR REPLACE FUNCTION "public"."get_org_perm_for_apikey"("apikey" "text", "
     SET "search_path" TO ''
     AS $$
 <<get_org_perm_for_apikey>>
-Declare
+DECLARE
   apikey_user_id uuid;
   org_id uuid;
   user_perm "public"."user_min_right";
 BEGIN
-  SELECT public.get_user_id(apikey) into apikey_user_id;
+  SELECT public.get_user_id(apikey) INTO apikey_user_id;
 
   IF apikey_user_id IS NULL THEN
     PERFORM public.pg_log('deny: INVALID_APIKEY', jsonb_build_object('app_id', get_org_perm_for_apikey.app_id));
-    return 'INVALID_APIKEY';
+    RETURN 'INVALID_APIKEY';
   END IF;
 
   SELECT owner_org FROM public.apps
@@ -2859,7 +2868,7 @@ BEGIN
 
   IF org_id IS NULL THEN
     PERFORM public.pg_log('deny: NO_APP', jsonb_build_object('app_id', get_org_perm_for_apikey.app_id));
-    return 'NO_APP';
+    RETURN 'NO_APP';
   END IF;
 
   SELECT user_right FROM public.org_users
@@ -2869,13 +2878,13 @@ BEGIN
 
   IF user_perm IS NULL THEN
     PERFORM public.pg_log('deny: perm_none', jsonb_build_object('org_id', org_id, 'apikey_user_id', apikey_user_id));
-    return 'perm_none';
+    RETURN 'perm_none';
   END IF;
 
   -- For compatibility reasons if you are a super_admin we will return "owner"
   -- The old cli relies on this behaviour, on get_org_perm_for_apikey_v2 we will change that
   IF user_perm='super_admin'::"public"."user_min_right" THEN
-    return 'perm_owner';
+    RETURN 'perm_owner';
   END IF;
 
   RETURN format('perm_%s', user_perm);
@@ -3603,15 +3612,15 @@ CREATE OR REPLACE FUNCTION "public"."get_user_id"("apikey" "text") RETURNS "uuid
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
-Declare  
+DECLARE  
  is_found uuid;
-Begin
+BEGIN
   SELECT user_id
   INTO is_found
   FROM public.apikeys
   WHERE key=apikey;
   RETURN is_found;
-End;  
+END;  
 $$;
 
 
@@ -3640,14 +3649,14 @@ CREATE OR REPLACE FUNCTION "public"."get_user_main_org_id"("user_id" "uuid") RET
     AS $$
 DECLARE
   org_id uuid;
-begin
-  select orgs.id FROM public.orgs
-  into org_id
-  where orgs.created_by=get_user_main_org_id.user_id
-  limit 1;
+BEGIN
+  SELECT orgs.id FROM public.orgs
+  INTO org_id
+  WHERE orgs.created_by=get_user_main_org_id.user_id
+  LIMIT 1;
 
   return org_id;
-End;
+END;
 $$;
 
 
@@ -3660,14 +3669,14 @@ CREATE OR REPLACE FUNCTION "public"."get_user_main_org_id_by_app_id"("app_id" "t
     AS $$
 DECLARE
   org_id uuid;
-begin
-  select apps.owner_org FROM public.apps
-  into org_id
-  where ((apps.app_id)::text = (get_user_main_org_id_by_app_id.app_id)::text)
-  limit 1;
+BEGIN
+  SELECT apps.owner_org FROM public.apps
+  INTO org_id
+  WHERE ((apps.app_id)::text = (get_user_main_org_id_by_app_id.app_id)::text)
+  LIMIT 1;
 
-  return org_id;
-End;
+  RETURN org_id;
+END;
 $$;
 
 
@@ -3791,9 +3800,9 @@ CREATE OR REPLACE FUNCTION "public"."has_app_right"("appid" character varying, "
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
-Begin
-  RETURN public.has_app_right_userid("appid", "right", (select auth.uid()));
-End;
+BEGIN
+  RETURN public.has_app_right_userid("appid", "right", (SELECT auth.uid()));
+END;
 $$;
 
 
@@ -3808,7 +3817,7 @@ DECLARE
   org_id uuid;
   api_key record;
   allowed boolean;
-Begin
+BEGIN
   org_id := public.get_user_main_org_id_by_app_id(appid);
 
   SELECT * FROM public.apikeys WHERE key = apikey INTO api_key;
@@ -3831,7 +3840,7 @@ Begin
     PERFORM public.pg_log('deny: HAS_APP_RIGHT_APIKEY', jsonb_build_object('appid', appid, 'org_id', org_id, 'right', "right"::text, 'userid', userid));
   END IF;
   RETURN allowed;
-End;
+END;
 $$;
 
 
@@ -3845,7 +3854,7 @@ CREATE OR REPLACE FUNCTION "public"."has_app_right_userid"("appid" character var
 DECLARE
   org_id uuid;
   allowed boolean;
-Begin
+BEGIN
   org_id := public.get_user_main_org_id_by_app_id(appid);
 
   allowed := public.check_min_rights("right", userid, org_id, "appid", NULL::bigint);
@@ -3853,7 +3862,7 @@ Begin
     PERFORM public.pg_log('deny: HAS_APP_RIGHT_USERID', jsonb_build_object('appid', appid, 'org_id', org_id, 'right', "right"::text, 'userid', userid));
   END IF;
   RETURN allowed;
-End;
+END;
 $$;
 
 
@@ -3956,9 +3965,9 @@ CREATE OR REPLACE FUNCTION "public"."is_allowed_action_org"("orgid" "uuid") RETU
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
-Begin
+BEGIN
     RETURN public.is_paying_and_good_plan_org(orgid);
-End;
+END;
 $$;
 
 
@@ -3969,9 +3978,9 @@ CREATE OR REPLACE FUNCTION "public"."is_allowed_action_org_action"("orgid" "uuid
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
-Begin
+BEGIN
     RETURN public.is_paying_and_good_plan_org_action(orgid, actions);
-End;
+END;
 $$;
 
 
@@ -3982,12 +3991,12 @@ CREATE OR REPLACE FUNCTION "public"."is_allowed_capgkey"("apikey" "text", "keymo
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
-Begin
+BEGIN
   RETURN (SELECT EXISTS (SELECT 1
   FROM public.apikeys
   WHERE key=apikey
   AND mode=ANY(keymode)));
-End;  
+END;  
 $$;
 
 
@@ -3998,12 +4007,12 @@ CREATE OR REPLACE FUNCTION "public"."is_allowed_capgkey"("apikey" "text", "keymo
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
-Begin
+BEGIN
   RETURN (SELECT EXISTS (SELECT 1
   FROM public.apikeys
   WHERE key=apikey
   AND mode=ANY(keymode))) AND public.is_app_owner(public.get_user_id(apikey), app_id);
-End;  
+END;  
 $$;
 
 
@@ -4046,9 +4055,9 @@ CREATE OR REPLACE FUNCTION "public"."is_app_owner"("apikey" "text", "appid" char
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
-Begin
+BEGIN
   RETURN public.is_app_owner(public.get_user_id(apikey), appid);
-End;
+END;
 $$;
 
 
@@ -4059,12 +4068,12 @@ CREATE OR REPLACE FUNCTION "public"."is_app_owner"("userid" "uuid", "appid" char
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
-Begin
+BEGIN
   RETURN (SELECT EXISTS (SELECT 1
   FROM public.apps
   WHERE app_id=appid
   AND user_id=userid));
-End;  
+END;  
 $$;
 
 
@@ -4104,12 +4113,12 @@ CREATE OR REPLACE FUNCTION "public"."is_canceled_org"("orgid" "uuid") RETURNS bo
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
-Begin
+BEGIN
   RETURN (SELECT EXISTS (SELECT 1
   FROM public.stripe_info
   where customer_id=(SELECT customer_id FROM public.orgs where id=orgid)
   AND status = 'canceled'));
-End;  
+END;  
 $$;
 
 
@@ -4194,9 +4203,9 @@ CREATE OR REPLACE FUNCTION "public"."is_member_of_org"("user_id" "uuid", "org_id
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
-Declare
+DECLARE
  is_found integer;
-Begin
+BEGIN
   SELECT count(*)
   INTO is_found
   FROM public.orgs
@@ -4204,7 +4213,7 @@ Begin
   WhERE org_users.user_id = is_member_of_org.user_id AND
   orgs.id = is_member_of_org.org_id;
   RETURN is_found != 0;
-End;
+END;
 $$;
 
 
@@ -4215,15 +4224,15 @@ CREATE OR REPLACE FUNCTION "public"."is_not_deleted"("email_check" character var
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
-Declare  
+DECLARE  
  is_found integer;
-Begin
+BEGIN
   SELECT count(*)
   INTO is_found
   FROM public.deleted_account
   WHERE email=email_check;
   RETURN is_found = 0;
-End; 
+END; 
 $$;
 
 
@@ -4247,13 +4256,13 @@ CREATE OR REPLACE FUNCTION "public"."is_onboarded_org"("orgid" "uuid") RETURNS b
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
-Begin
+BEGIN
   RETURN (SELECT EXISTS (SELECT 1
   FROM public.apps
   WHERE owner_org=orgid)) AND (SELECT EXISTS (SELECT 1
   FROM public.app_versions
   WHERE owner_org=orgid));
-End;
+END;
 $$;
 
 
@@ -4264,9 +4273,9 @@ CREATE OR REPLACE FUNCTION "public"."is_onboarding_needed_org"("orgid" "uuid") R
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
-Begin
+BEGIN
   RETURN (NOT public.is_onboarded_org(orgid)) AND public.is_trial_org(orgid) = 0;
-End;
+END;
 $$;
 
 
@@ -4303,7 +4312,7 @@ CREATE OR REPLACE FUNCTION "public"."is_paying_and_good_plan_org"("orgid" "uuid"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
-Begin
+BEGIN
   RETURN (SELECT EXISTS (SELECT 1
   FROM public.stripe_info
   where customer_id=(SELECT customer_id FROM public.orgs where id=orgid)
@@ -4313,7 +4322,7 @@ Begin
   )
   )
 );
-End;  
+END;  
 $$;
 
 
@@ -4343,12 +4352,12 @@ CREATE OR REPLACE FUNCTION "public"."is_paying_org"("orgid" "uuid") RETURNS bool
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
-Begin
+BEGIN
   RETURN (SELECT EXISTS (SELECT 1
   FROM public.stripe_info
-  where customer_id=(SELECT customer_id FROM public.orgs where id=orgid)
+  WHERE customer_id=(SELECT customer_id FROM public.orgs WHERE id=orgid)
   AND status = 'succeeded'));
-End;  
+END;  
 $$;
 
 
@@ -4374,11 +4383,11 @@ CREATE OR REPLACE FUNCTION "public"."is_trial_org"("orgid" "uuid") RETURNS integ
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
-Begin
+BEGIN
   RETURN (SELECT GREATEST((trial_at::date - (now())::date), 0) AS days
   FROM public.stripe_info
-  where customer_id=(SELECT customer_id FROM public.orgs where id=orgid));
-End;  
+  WHERE customer_id=(SELECT customer_id FROM public.orgs WHERE id=orgid));
+END;  
 $$;
 
 
@@ -6313,24 +6322,24 @@ CREATE OR REPLACE FUNCTION "public"."verify_mfa"() RETURNS boolean
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
-Begin
+BEGIN
   RETURN (
-    array[(select coalesce(auth.jwt()->>'aal', 'aal1'))] <@ (
-      select
-          case
-            when count(id) > 0 then array['aal2']
-            else array['aal1', 'aal2']
-          end as aal
-        from auth.mfa_factors
-        where (select auth.uid()) = user_id and status = 'verified'
+    array[(SELECT coalesce(auth.jwt()->>'aal', 'aal1'))] <@ (
+      SELECT
+          CASE
+            WHEN count(id) > 0 THEN array['aal2']
+            ELSE array['aal1', 'aal2']
+          END AS aal
+        FROM auth.mfa_factors
+        WHERE (SELECT auth.uid()) = user_id AND status = 'verified'
     )
   ) OR (
     EXISTS(
-      SELECT 1 FROM jsonb_array_elements((select auth.jwt())->'amr') AS amr_elem
+      SELECT 1 FROM jsonb_array_elements((SELECT auth.jwt())->'amr') AS amr_elem
       WHERE amr_elem->>'method' = 'otp'
     )
   );
-End;  
+END;  
 $$;
 
 

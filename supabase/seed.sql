@@ -218,7 +218,6 @@ BEGIN
       "price_id",
       "is_good_plan",
       "plan_usage",
-      "subscription_metered",
       "subscription_anchor_start",
       "subscription_anchor_end",
       "mau_exceeded",
@@ -226,11 +225,11 @@ BEGIN
       "storage_exceeded",
       "build_time_exceeded"
     ) VALUES
-    (now(), now(), 'sub_1', 'cus_Pa0k8TO6HVln6A', 'succeeded', 'prod_LQIregjtNduh4q', now() + interval '15 days', NULL, 't', 2, '{}', now() - interval '15 days', now() + interval '15 days', false, false, false, false),
-    (now(), now(), 'sub_2', 'cus_Q38uE91NP8Ufqc', 'succeeded', 'prod_LQIregjtNduh4q', now() + interval '15 days', NULL, 't', 2, '{}', now() - interval '15 days', now() + interval '15 days', false, false, false, false),
-    (now(), now(), 'sub_3', 'cus_Pa0f3M6UCQ8g5Q', 'succeeded', 'prod_LQIregjtNduh4q', now() + interval '15 days', NULL, 't', 2, '{}', now() - interval '15 days', now() + interval '15 days', false, false, false, false),
-    (now(), now(), 'sub_4', 'cus_NonOwner', 'succeeded', 'prod_LQIregjtNduh4q', now() + interval '15 days', NULL, 't', 2, '{}', now() - interval '15 days', now() + interval '15 days', false, false, false, false),
-    (now(), now(), 'sub_5', 'cus_StatsTest', 'succeeded', 'prod_LQIregjtNduh4q', now() + interval '15 days', NULL, 't', 2, '{}', now() - interval '15 days', now() + interval '15 days', false, false, false, false);
+    (now(), now(), 'sub_1', 'cus_Pa0k8TO6HVln6A', 'succeeded', 'prod_LQIregjtNduh4q', now() + interval '15 days', NULL, 't', 2, now() - interval '15 days', now() + interval '15 days', false, false, false, false),
+    (now(), now(), 'sub_2', 'cus_Q38uE91NP8Ufqc', 'succeeded', 'prod_LQIregjtNduh4q', now() + interval '15 days', NULL, 't', 2, now() - interval '15 days', now() + interval '15 days', false, false, false, false),
+    (now(), now(), 'sub_3', 'cus_Pa0f3M6UCQ8g5Q', 'succeeded', 'prod_LQIregjtNduh4q', now() + interval '15 days', NULL, 't', 2, now() - interval '15 days', now() + interval '15 days', false, false, false, false),
+    (now(), now(), 'sub_4', 'cus_NonOwner', 'succeeded', 'prod_LQIregjtNduh4q', now() + interval '15 days', NULL, 't', 2, now() - interval '15 days', now() + interval '15 days', false, false, false, false),
+    (now(), now(), 'sub_5', 'cus_StatsTest', 'succeeded', 'prod_LQIregjtNduh4q', now() + interval '15 days', NULL, 't', 2, now() - interval '15 days', now() + interval '15 days', false, false, false, false);
 
     -- Do not insert new orgs
     ALTER TABLE public.users DISABLE TRIGGER generate_org_on_user_create;
@@ -736,7 +735,6 @@ BEGIN
     trial_at,
     is_good_plan,
     plan_usage,
-    subscription_metered,
     subscription_anchor_start,
     subscription_anchor_end,
     mau_exceeded,
@@ -751,7 +749,6 @@ BEGIN
     now() + interval '15 days',
     true,
     2,
-    '{}'::json,
     now() - interval '15 days',
     now() + interval '15 days',
     false,
@@ -766,7 +763,6 @@ BEGIN
     trial_at = EXCLUDED.trial_at,
     is_good_plan = EXCLUDED.is_good_plan,
     plan_usage = EXCLUDED.plan_usage,
-    subscription_metered = EXCLUDED.subscription_metered,
     subscription_anchor_start = EXCLUDED.subscription_anchor_start,
     subscription_anchor_end = EXCLUDED.subscription_anchor_end,
     mau_exceeded = EXCLUDED.mau_exceeded,
