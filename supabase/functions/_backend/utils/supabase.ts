@@ -5,11 +5,10 @@ import type { Database } from './supabase.types.ts'
 import type { DeviceWithoutCreatedAt, Order, ReadDevicesParams, ReadStatsParams } from './types.ts'
 import { createClient } from '@supabase/supabase-js'
 import { buildNormalizedDeviceForWrite, hasComparableDeviceChanged } from './deviceComparison.ts'
-import { hashApiKey } from './hash.ts'
 import { simpleError } from './hono.ts'
 import { cloudlog, cloudlogErr } from './logging.ts'
 import { createCustomer } from './stripe.ts'
-import { getEnv, isSafeAlphanumeric } from './utils.ts'
+import { getEnv } from './utils.ts'
 
 const DEFAULT_LIMIT = 1000
 // Import Supabase client
@@ -1127,37 +1126,38 @@ export async function getUpdateStatsSB(c: Context): Promise<UpdateStats> {
 
 /**
  * Check API key by key string
- * Expiration is checked directly in SQL query: expires_at IS NULL OR expires_at > now()
+ * Uses find_apikey_by_value SQL function to look up both plain-text and hashed keys
+ * Expiration is checked after lookup
  */
 export async function checkKey(c: Context, authorization: string | undefined, supabase: SupabaseClient<Database>, allowed: Database['public']['Enums']['key_mode'][]): Promise<Database['public']['Tables']['apikeys']['Row'] | null> {
   if (!authorization)
     return null
 
-  // Validate API key contains only safe characters (alphanumeric + dashes)
-  if (!isSafeAlphanumeric(authorization)) {
-    cloudlog({ requestId: c.get('requestId'), message: 'Invalid apikey format', authorizationPrefix: authorization?.substring(0, 8) })
-    return null
-  }
-
   try {
-    const keyHash = await hashApiKey(authorization)
-
-    // Single query to check both plain-text key and hashed key
-    // Safe because both values contain only alphanumeric chars and dashes
+    // Use find_apikey_by_value SQL function to look up both plain-text and hashed keys
+    // RPC calls use parameterized queries, so SQL injection is not possible
     const { data, error } = await supabase
-      .from('apikeys')
-      .select()
-      .or(`key.eq.${authorization},key_hash.eq.${keyHash}`)
-      .in('mode', allowed)
-      .or('expires_at.is.null,expires_at.gt.now()')
+      .rpc('find_apikey_by_value', { key_value: authorization })
       .single()
 
-    if (data && !error) {
-      return data
+    if (error || !data) {
+      cloudlog({ requestId: c.get('requestId'), message: 'Invalid apikey', authorizationPrefix: authorization?.substring(0, 8), allowed, error })
+      return null
     }
 
-    cloudlog({ requestId: c.get('requestId'), message: 'Invalid apikey', authorizationPrefix: authorization?.substring(0, 8), allowed, error })
-    return null
+    // Check if mode is allowed
+    if (!allowed.includes(data.mode)) {
+      cloudlog({ requestId: c.get('requestId'), message: 'Invalid apikey mode', authorizationPrefix: authorization?.substring(0, 8), allowed, mode: data.mode })
+      return null
+    }
+
+    // Check if key is expired
+    if (data.expires_at && new Date(data.expires_at) < new Date()) {
+      cloudlog({ requestId: c.get('requestId'), message: 'Apikey expired', authorizationPrefix: authorization?.substring(0, 8) })
+      return null
+    }
+
+    return data
   }
   catch (error) {
     cloudlog({ requestId: c.get('requestId'), message: 'checkKey error', error })
