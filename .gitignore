@@ -48,6 +48,8 @@ cloudflare_workers_deno/.denoflare
 .dev.vars
 .vars
 src/types/supabase.types.ts
+src/typed-router.d.ts
+src/components.d.ts
 supabase/functions/_backend/utils/supabase.types.ts
 .env.alpha
 
