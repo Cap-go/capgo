@@ -22,10 +22,12 @@ beforeAll(async () => {
   testOrgId = orgData.id
 
   // Add test user as super_admin to the org
-  const { error: orgUserError } = await getSupabaseClient().from('org_users').insert({
+  const { error: orgUserError } = await getSupabaseClient().from('org_users').upsert({
     org_id: testOrgId,
     user_id: USER_ID,
     user_right: 'super_admin' as const,
+  }, {
+    onConflict: 'org_id,user_id',
   })
   if (orgUserError)
     throw orgUserError
