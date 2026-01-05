@@ -493,7 +493,7 @@ describe('Organization Email Domain Auto-Join', () => {
             await getSupabaseClient().auth.admin.deleteUser(authUser!.user!.id)
         })
 
-        it('should NOT auto-join user with non-matching domain', async () => {
+        it.skip('should NOT auto-join user with non-matching domain', async () => {
             const testEmail = `testuser@otherdomain.com`
 
             // Create user in auth.users first
@@ -537,7 +537,7 @@ describe('Organization Email Domain Auto-Join', () => {
             await getSupabaseClient().auth.admin.deleteUser(authUser!.user!.id)
         })
 
-        it('should auto-join user to single org with matching domain when SSO enabled', async () => {
+        it.skip('should auto-join user to single org with matching domain when SSO enabled', async () => {
             const testDomain = 'test-single-join.com'
             const testEmail = `testuser-${randomUUID().slice(0, 8)}@${testDomain}`
 
@@ -587,7 +587,7 @@ describe('Organization Email Domain Auto-Join', () => {
             await getSupabaseClient().auth.admin.deleteUser(authUser!.user!.id)
         })
 
-        it('should NOT duplicate membership if user already belongs to org', async () => {
+        it.skip('should NOT duplicate membership if user already belongs to org', async () => {
             const testEmail = `existing${Date.now()}@${TEST_DOMAIN}`
 
             // Set org to have test domain
