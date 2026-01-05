@@ -1,40 +1,9 @@
 import type { Ref } from 'vue'
+import type { Database } from '~/types/supabase.types'
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { useSupabase } from '~/services/supabase'
 import { useOrganizationStore } from './organization'
-
-export interface Webhook {
-  id: string
-  org_id: string
-  name: string
-  url: string
-  secret: string
-  enabled: boolean
-  events: string[]
-  created_at: string
-  updated_at: string
-  created_by: string | null
-}
-
-export interface WebhookDelivery {
-  id: string
-  webhook_id: string
-  org_id: string
-  audit_log_id: number | null
-  event_type: string
-  status: 'pending' | 'success' | 'failed'
-  request_payload: any
-  response_status: number | null
-  response_body: string | null
-  response_headers: Record<string, string> | null
-  attempt_count: number
-  max_attempts: number
-  next_retry_at: string | null
-  created_at: string
-  completed_at: string | null
-  duration_ms: number | null
-}
 
 export interface DeliveryPagination {
   page: number
@@ -66,8 +35,8 @@ const DELIVERIES_PER_PAGE = 50
 const supabase = useSupabase()
 
 export const useWebhooksStore = defineStore('webhooks', () => {
-  const webhooks: Ref<Webhook[]> = ref([])
-  const deliveries: Ref<WebhookDelivery[]> = ref([])
+  const webhooks: Ref<Database['public']['Tables']['webhooks']['Row'][]> = ref([])
+  const deliveries: Ref<Database['public']['Tables']['webhook_deliveries']['Row'][]> = ref([])
   const deliveryPagination: Ref<DeliveryPagination | null> = ref(null)
   const isLoading = ref(false)
   const isLoadingDeliveries = ref(false)

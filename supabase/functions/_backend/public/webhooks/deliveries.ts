@@ -1,6 +1,9 @@
 import type { Context } from 'hono'
 import type { AuthInfo, MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
+import type {
+  WebhookPayload,
+} from '../../utils/webhook.ts'
 import { z } from 'zod/mini'
 import { simpleError } from '../../utils/hono.ts'
 import { supabaseAdmin } from '../../utils/supabase.ts'
@@ -153,7 +156,7 @@ export async function retryDelivery(c: Context<MiddlewareKeyVariables, any, any>
     delivery.id,
     webhook.id,
     webhook.url,
-    delivery.request_payload,
+    delivery.request_payload as any as WebhookPayload,
   )
 
   return c.json({
