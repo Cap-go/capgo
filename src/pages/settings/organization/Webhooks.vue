@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Webhook } from '~/stores/webhooks'
+import type { Database } from '~/types/supabase.types'
 import { storeToRefs } from 'pinia'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -61,7 +61,7 @@ function openCreateForm() {
   showForm.value = true
 }
 
-function openEditForm(webhook: Webhook) {
+function openEditForm(webhook: Database['public']['Tables']['webhooks']['Row']) {
   if (!hasPermission.value) {
     toast.error(t('no-permission'))
     return
@@ -96,7 +96,7 @@ async function handleFormSubmit(data: { name: string, url: string, events: strin
   }
 }
 
-async function deleteWebhook(webhook: Webhook) {
+async function deleteWebhook(webhook: Database['public']['Tables']['webhooks']['Row']) {
   if (!hasPermission.value) {
     toast.error(t('no-permission'))
     return
@@ -127,7 +127,7 @@ async function deleteWebhook(webhook: Webhook) {
   })
 }
 
-async function testWebhook(webhook: Webhook) {
+async function testWebhook(webhook: Database['public']['Tables']['webhooks']['Row']) {
   if (!hasPermission.value) {
     toast.error(t('no-permission'))
     return
@@ -145,7 +145,7 @@ async function testWebhook(webhook: Webhook) {
   }
 }
 
-async function toggleWebhook(webhook: Webhook) {
+async function toggleWebhook(webhook: Database['public']['Tables']['webhooks']['Row']) {
   if (!hasPermission.value) {
     toast.error(t('no-permission'))
     return
@@ -161,7 +161,7 @@ async function toggleWebhook(webhook: Webhook) {
   }
 }
 
-function viewDeliveries(webhook: Webhook) {
+function viewDeliveries(webhook: Database['public']['Tables']['webhooks']['Row']) {
   selectedWebhookForLog.value = webhook
   showDeliveryLog.value = true
 }
@@ -273,7 +273,7 @@ function verifyWebhookSignature(req, secret) {
           </p>
           <button
             v-if="hasPermission"
-            class="mt-4 px-4 py-2 text-sm font-medium text-blue-600 border border-blue-600 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20"
+            class="px-4 py-2 mt-4 text-sm font-medium text-blue-600 border border-blue-600 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20"
             @click="openCreateForm"
           >
             {{ t('create-first-webhook') }}
@@ -304,7 +304,7 @@ function verifyWebhookSignature(req, secret) {
                     <h3 class="font-medium text-gray-900 dark:text-white">
                       {{ webhook.name }}
                     </h3>
-                    <p class="text-sm text-gray-500 dark:text-gray-400 truncate max-w-xs sm:max-w-md">
+                    <p class="max-w-xs text-sm text-gray-500 truncate dark:text-gray-400 sm:max-w-md">
                       {{ webhook.url }}
                     </p>
                   </div>
@@ -315,13 +315,13 @@ function verifyWebhookSignature(req, secret) {
                     <span
                       v-for="event in webhook.events.slice(0, 2)"
                       :key="event"
-                      class="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
+                      class="px-2 py-1 text-xs font-medium text-blue-800 bg-blue-100 rounded-full dark:bg-blue-900/30 dark:text-blue-300"
                     >
                       {{ getEventLabel(event) }}
                     </span>
                     <span
                       v-if="webhook.events.length > 2"
-                      class="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300"
+                      class="px-2 py-1 text-xs font-medium text-gray-600 bg-gray-100 rounded-full dark:bg-gray-700 dark:text-gray-300"
                     >
                       +{{ webhook.events.length - 2 }}
                     </span>
@@ -349,7 +349,7 @@ function verifyWebhookSignature(req, secret) {
                   <span
                     v-for="event in webhook.events"
                     :key="event"
-                    class="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
+                    class="px-2 py-1 text-xs font-medium text-blue-800 bg-blue-100 rounded-full dark:bg-blue-900/30 dark:text-blue-300"
                   >
                     {{ getEventLabel(event) }}
                   </span>
@@ -362,7 +362,7 @@ function verifyWebhookSignature(req, secret) {
                   {{ t('signing-secret') }}
                 </h4>
                 <div class="flex items-center gap-2">
-                  <code class="flex-1 px-3 py-2 text-sm font-mono bg-gray-100 dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 truncate">
+                  <code class="flex-1 px-3 py-2 font-mono text-sm text-gray-700 truncate bg-gray-100 border border-gray-200 rounded dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300">
                     {{ webhook.secret }}
                   </code>
                   <button
@@ -379,23 +379,23 @@ function verifyWebhookSignature(req, secret) {
 
                 <!-- Signature Verification Guide -->
                 <details class="mt-3">
-                  <summary class="text-xs font-medium text-blue-600 dark:text-blue-400 cursor-pointer hover:underline">
+                  <summary class="text-xs font-medium text-blue-600 cursor-pointer dark:text-blue-400 hover:underline">
                     {{ t('how-to-verify-signature') }}
                   </summary>
-                  <div class="mt-2 p-3 bg-gray-100 dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700">
-                    <p class="text-xs text-gray-600 dark:text-gray-400 mb-2">
+                  <div class="p-3 mt-2 bg-gray-100 border border-gray-200 rounded dark:bg-gray-800 dark:border-gray-700">
+                    <p class="mb-2 text-xs text-gray-600 dark:text-gray-400">
                       {{ t('signature-verification-intro') }}
                     </p>
-                    <ul class="text-xs text-gray-600 dark:text-gray-400 mb-3 list-disc list-inside space-y-1">
-                      <li><code class="px-1 bg-gray-200 dark:bg-gray-700 rounded">X-Capgo-Signature</code>: {{ t('header-signature-desc') }}</li>
-                      <li><code class="px-1 bg-gray-200 dark:bg-gray-700 rounded">X-Capgo-Timestamp</code>: {{ t('header-timestamp-desc') }}</li>
-                      <li><code class="px-1 bg-gray-200 dark:bg-gray-700 rounded">X-Capgo-Event</code>: {{ t('header-event-desc') }}</li>
-                      <li><code class="px-1 bg-gray-200 dark:bg-gray-700 rounded">X-Capgo-Event-ID</code>: {{ t('header-event-id-desc') }}</li>
+                    <ul class="mb-3 space-y-1 text-xs text-gray-600 list-disc list-inside dark:text-gray-400">
+                      <li><code class="px-1 bg-gray-200 rounded dark:bg-gray-700">X-Capgo-Signature</code>: {{ t('header-signature-desc') }}</li>
+                      <li><code class="px-1 bg-gray-200 rounded dark:bg-gray-700">X-Capgo-Timestamp</code>: {{ t('header-timestamp-desc') }}</li>
+                      <li><code class="px-1 bg-gray-200 rounded dark:bg-gray-700">X-Capgo-Event</code>: {{ t('header-event-desc') }}</li>
+                      <li><code class="px-1 bg-gray-200 rounded dark:bg-gray-700">X-Capgo-Event-ID</code>: {{ t('header-event-id-desc') }}</li>
                     </ul>
-                    <p class="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    <p class="mb-2 text-xs font-medium text-gray-700 dark:text-gray-300">
                       {{ t('signature-example-title') }}
                     </p>
-                    <pre class="text-xs bg-gray-900 text-gray-100 p-3 rounded overflow-x-auto"><code>{{ signatureVerificationCode }}</code></pre>
+                    <pre class="p-3 overflow-x-auto text-xs text-gray-100 bg-gray-900 rounded"><code>{{ signatureVerificationCode }}</code></pre>
                   </div>
                 </details>
               </div>
