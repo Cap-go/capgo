@@ -103,6 +103,8 @@ app.post('/', async (c) => {
 
   const userId = signInData.user.id
 
+  supabaseAdmin = useSupabaseAdmin(c)
+
   // Verify user is a member of this organization
   const { data: membership, error: memberError } = await supabaseAdmin
     .from('org_users')
@@ -139,8 +141,6 @@ app.post('/', async (c) => {
     cloudlog({ requestId: c.get('requestId'), context: 'validate_password_compliance - hash error', error: hashError?.message })
     return quickError(500, 'hash_failed', 'Failed to compute policy hash', { error: hashError?.message })
   }
-
-  supabaseAdmin = useSupabaseAdmin(c)
 
   // Upsert the compliance record
   const { error: upsertError } = await supabaseAdmin
