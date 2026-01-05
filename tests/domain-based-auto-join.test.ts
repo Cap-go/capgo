@@ -7,28 +7,6 @@ const TEST_ORG_ID = randomUUID()
 const TEST_ORG_NAME = `Auto-Join Test Org ${randomUUID()}`
 const TEST_CUSTOMER_ID = `cus_autojoin_${randomUUID()}`
 
-// Utility function to retry with exponential backoff
-async function retryWithBackoff<T>(
-    fn: () => Promise<T>,
-    maxRetries = 3,
-    delayMs = 100,
-): Promise<T> {
-    let lastError: Error | null = null
-    for (let i = 0; i < maxRetries; i++) {
-        try {
-            return await fn()
-        }
-        catch (error) {
-            lastError = error as Error
-            if (i < maxRetries - 1) {
-                const delay = delayMs * Math.pow(2, i)
-                await new Promise(resolve => setTimeout(resolve, delay))
-            }
-        }
-    }
-    throw lastError
-}
-
 // Utility function to create auth user with retry for 503 errors
 async function createAuthUserWithRetry(
     email: string,
