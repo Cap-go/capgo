@@ -35,7 +35,7 @@ const notExpiredCondition = or(
 )
 
 // Type for the find_apikey_by_value result
-interface FindApikeyByValueResult {
+type FindApikeyByValueResult = {
   id: number
   created_at: string | null
   user_id: string
@@ -47,7 +47,7 @@ interface FindApikeyByValueResult {
   limited_to_orgs: string[] | null
   limited_to_apps: string[] | null
   expires_at: string | null
-}
+} & Record<string, unknown>
 
 /**
  * Check API key using Postgres/Drizzle instead of Supabase SDK
