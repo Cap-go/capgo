@@ -300,18 +300,28 @@ describe('auto-join integration', () => {
       user_right: 'read',
     })
 
-    // Ignore "duplicate key" type errors on retry
-    if (enrollError && !enrollError.message?.includes('duplicate')) {
+    // Ignore "duplicate key" type errors on retry, also check for code 23505 (unique violation)
+    const isDuplicateError = enrollError && (
+      enrollError.message?.includes('duplicate') ||
+      enrollError.code === '23505' ||
+      enrollError.details?.includes('duplicate')
+    )
+
+    if (enrollError && !isDuplicateError) {
       throw new Error(`Manual enrollment failed: ${enrollError.message}`)
     }
 
-    // Check if user was enrolled
-    const { data: membership } = await getSupabaseClient()
+    // Check if user was enrolled - use maybeSingle() to avoid error when no rows exist
+    const { data: membership, error: membershipError } = await getSupabaseClient()
       .from('org_users')
       .select('*')
       .eq('user_id', actualUserId)
       .eq('org_id', orgId)
-      .single()
+      .maybeSingle()
+
+    if (membershipError) {
+      throw new Error(`Failed to check membership: ${membershipError.message}`)
+    }
 
     expect(membership).toBeTruthy()
     expect(membership!.user_right).toBe('read')
