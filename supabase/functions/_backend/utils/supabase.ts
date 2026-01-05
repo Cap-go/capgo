@@ -8,7 +8,7 @@ import { buildNormalizedDeviceForWrite, hasComparableDeviceChanged } from './dev
 import { simpleError } from './hono.ts'
 import { cloudlog, cloudlogErr } from './logging.ts'
 import { createCustomer } from './stripe.ts'
-import { getEnv, isSafeAlphanumeric } from './utils.ts'
+import { getEnv } from './utils.ts'
 
 const DEFAULT_LIMIT = 1000
 // Import Supabase client
@@ -1133,14 +1133,9 @@ export async function checkKey(c: Context, authorization: string | undefined, su
   if (!authorization)
     return null
 
-  // Validate API key contains only safe characters (alphanumeric + dashes)
-  if (!isSafeAlphanumeric(authorization)) {
-    cloudlog({ requestId: c.get('requestId'), message: 'Invalid apikey format', authorizationPrefix: authorization?.substring(0, 8) })
-    return null
-  }
-
   try {
     // Use find_apikey_by_value SQL function to look up both plain-text and hashed keys
+    // RPC calls use parameterized queries, so SQL injection is not possible
     const { data, error } = await supabase
       .rpc('find_apikey_by_value', { key_value: authorization })
       .single()
