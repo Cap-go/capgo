@@ -320,39 +320,9 @@ BEGIN
     RETURN;  -- SSO enrollment takes precedence
   END IF;
   
-  -- Priority 2: Domain-based enrollment (existing auto-join logic)
-  FOR v_org IN 
-    SELECT DISTINCT o.id, o.name
-    FROM public.orgs o
-    WHERE v_domain = ANY(o.allowed_email_domains)
-      AND NOT EXISTS (
-        SELECT 1 FROM public.org_users ou 
-        WHERE ou.user_id = p_user_id AND ou.org_id = o.id
-      )
-  LOOP
-    -- Add user to org with read permission
-    INSERT INTO public.org_users (user_id, org_id, user_right, created_at)
-    VALUES (p_user_id, v_org.id, 'read', now())
-    ON CONFLICT (user_id, org_id) DO NOTHING;
-    
-    -- Log domain-based auto-join
-    INSERT INTO public.sso_audit_logs (
-      user_id,
-      email,
-      event_type,
-      org_id,
-      metadata
-    ) VALUES (
-      p_user_id,
-      p_email,
-      'auto_join_success',
-      v_org.id,
-      jsonb_build_object(
-        'enrollment_method', 'domain_auto_join',
-        'domain', v_domain
-      )
-    );
-  END LOOP;
+  -- Priority 2: Domain-based enrollment via SAML domain mappings
+  -- Note: This is a placeholder - the actual implementation is in migration 20260106000000
+  -- Left empty to avoid referencing non-existent allowed_email_domains column
 END;
 $$;
 
