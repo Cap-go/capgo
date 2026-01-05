@@ -85,7 +85,7 @@ jobs:
           VITE_FIREBASE_CONFIG: ${{ secrets.VITE_FIREBASE_CONFIG }}
       - name: Generate AI changelog
         id: changelog
-        uses: mistricky/ccc@v0.2.5
+        uses: mistricky/ccc@v0.2.6
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           github_token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
