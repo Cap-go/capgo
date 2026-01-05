@@ -293,24 +293,15 @@ describe('auto-join integration', () => {
 
     // Manually enroll user (simulates what auto_enroll_sso_user does)
     // In production, auth.users trigger would call auto_enroll_sso_user automatically
-    // Skip if already enrolled (retry scenario)
-    const { data: existingEnrollment } = await getSupabaseClient()
-      .from('org_users')
-      .select('id')
-      .eq('user_id', actualUserId)
-      .eq('org_id', orgId)
-      .maybeSingle()
+    // Use upsert to handle both first attempt and retries gracefully
+    const { error: enrollError } = await getSupabaseClient().from('org_users').upsert({
+      user_id: actualUserId,
+      org_id: orgId,
+      user_right: 'read',
+    }, { onConflict: 'user_id,org_id' })
 
-    if (!existingEnrollment) {
-      const { error: enrollError } = await getSupabaseClient().from('org_users').insert({
-        user_id: actualUserId,
-        org_id: orgId,
-        user_right: 'read',
-      })
-
-      if (enrollError) {
-        throw new Error(`Manual enrollment failed: ${enrollError.message}`)
-      }
+    if (enrollError) {
+      throw new Error(`Manual enrollment failed: ${enrollError.message}`)
     }
 
     // Check if user was enrolled
