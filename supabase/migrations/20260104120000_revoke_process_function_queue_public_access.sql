@@ -157,3 +157,6 @@ REVOKE ALL ON FUNCTION "public"."mass_edit_queue_messages_cf_ids"("updates" "pub
 -- =============================================================================
 REVOKE ALL ON FUNCTION "public"."pg_log"("decision" "text", "input" "jsonb") FROM "anon";
 REVOKE ALL ON FUNCTION "public"."pg_log"("decision" "text", "input" "jsonb") FROM "authenticated";
+
+REVOKE ALL ON FUNCTION "public"."trigger_http_queue_post_to_function"() FROM "anon";
+REVOKE ALL ON FUNCTION "public"."trigger_http_queue_post_to_function"() FROM "authenticated";
