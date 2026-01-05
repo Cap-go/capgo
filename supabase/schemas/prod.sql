@@ -7409,9 +7409,9 @@ CREATE OR REPLACE FUNCTION "tests"."rls_enabled"("testing_schema" "text") RETURN
         (select
            	count(pc.relname)::integer
            from pg_class pc
-           join pg_namespace AS pn
-             on pn.oid = pc.relnamespace
-            and pn.nspname = rls_enabled.testing_schema
+           join pg_namespace
+             on pg_namespace.oid = pc.relnamespace
+            and pg_namespace.nspname = rls_enabled.testing_schema
            join pg_type pt on pt.oid = pc.reltype
            where relrowsecurity = FALSE)
         ,
@@ -7430,9 +7430,9 @@ CREATE OR REPLACE FUNCTION "tests"."rls_enabled"("testing_schema" "text", "testi
         (select
            	count(*)::integer
            from pg_class pc
-           join pg_namespace AS pn
-             on pn.oid = pc.relnamespace
-            and pn.nspname = rls_enabled.testing_schema
+           join pg_namespace
+             on pg_namespace.oid = pc.relnamespace
+            and pg_namespace.nspname = rls_enabled.testing_schema
             and pc.relname = rls_enabled.testing_table
            join pg_type pt on pt.oid = pc.reltype
            where relrowsecurity = TRUE),
