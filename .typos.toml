@@ -63,4 +63,5 @@ extend-exclude = [
 capgo = "capgo"
 forgr = "forgr"
 supabase = "supabase"
+pn = "pn"  # PostgreSQL alias for pg_namespace in auto-generated schemas
 # Add more project-specific terms as needed
