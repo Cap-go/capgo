@@ -87,7 +87,7 @@ async function authenticateUser(supabaseAdmin: any, mockResponse: MockSAMLRespon
 
     const { data: signInData, error: signInError } = await supabaseAdmin.auth.signInWithPassword({
       email: mockResponse.email,
-      password: 'testtest',
+      password: 'testtest', // NOSONAR - Mock SSO for local development only, not used in production
     })
 
     if (signInError || !signInData?.session) {
@@ -121,7 +121,7 @@ async function authenticateUser(supabaseAdmin: any, mockResponse: MockSAMLRespon
   }
 
   // User doesn't exist - create them using admin API (bypasses triggers)
-  const defaultPassword = 'testtest' // Use known password for testing
+  const defaultPassword = 'testtest' // NOSONAR - Mock SSO for local development only, not used in production
 
   const { data: createData, error: createError } = await supabaseAdmin.auth.admin.createUser({
     email: mockResponse.email,

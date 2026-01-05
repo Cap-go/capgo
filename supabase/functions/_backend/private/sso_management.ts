@@ -792,8 +792,8 @@ function validateMetadataURL(url: string): void {
       '127.0.0.1',
       '0.0.0.0',
       '::1',
-      '169.254.169.254', // AWS metadata service
-      '169.254.169.253', // AWS ECS metadata
+      '169.254.169.254', // NOSONAR - AWS metadata service IP intentionally blocked for SSRF protection
+      '169.254.169.253', // NOSONAR - AWS ECS metadata IP intentionally blocked for SSRF protection
     ]
 
     if (blockedHosts.includes(hostname)) {
@@ -1108,8 +1108,8 @@ export async function updateSAML(
     const eventType = update.enabled !== undefined
       ? (update.enabled ? 'provider_enabled' : 'provider_disabled')
       : (update.metadataUrl
-          ? 'metadata_updated'
-          : (update.domains ? 'domains_updated' : 'provider_updated'))
+        ? 'metadata_updated'
+        : (update.domains ? 'domains_updated' : 'provider_updated'))
 
     await logSSOAuditEvent(c, drizzleClient, {
       eventType,
@@ -1173,9 +1173,9 @@ export async function removeSAML(
     // Get associated domains before deletion
     const domains = connection
       ? await drizzleClient
-          .select({ domain: saml_domain_mappings.domain })
-          .from(saml_domain_mappings)
-          .where(eq(saml_domain_mappings.sso_connection_id, connection.id))
+        .select({ domain: saml_domain_mappings.domain })
+        .from(saml_domain_mappings)
+        .where(eq(saml_domain_mappings.sso_connection_id, connection.id))
       : []
 
     // Remove from Supabase Auth (GoTrue Admin API)
