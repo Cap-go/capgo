@@ -345,6 +345,7 @@ export async function createOneTimeCheckout(
       name: 'auto',
     },
     tax_id_collection: { enabled: true },
+    invoice_creation: { enabled: true },
     line_items: [
       {
         price: priceId,
