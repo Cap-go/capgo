@@ -104,15 +104,7 @@ async function authenticateUser(supabaseAdmin: any, mockResponse: MockSAMLRespon
       p_sso_provider_id: mockResponse.providerId,
     })
 
-    if (enrollError) {
-      // Continue despite enrollment error
-    }
-    else if (enrollResult && enrollResult.length > 0) {
-      // User auto-enrolled
-    }
-    else {
-      // No auto-enrollment needed
-    }
+    // Auto-enrollment handled silently - continue regardless of result
 
     return {
       accessToken: signInData.session.access_token,

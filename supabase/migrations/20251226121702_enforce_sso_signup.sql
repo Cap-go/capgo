@@ -15,7 +15,7 @@ BEGIN
   -- Extract domain from email
   v_domain := lower(split_part(p_email, '@', 2));
   
-  IF v_domain IS NULL OR v_domain = '' THEN
+  IF COALESCE(v_domain, '') = '' THEN
     RETURN false;
   END IF;
   
@@ -97,5 +97,11 @@ CREATE TRIGGER enforce_sso_domain_signup
   EXECUTE FUNCTION public.enforce_sso_for_domains();
 
 -- Grant necessary permissions
-GRANT EXECUTE ON FUNCTION public.check_sso_required_for_domain TO postgres, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.enforce_sso_for_domains TO postgres, supabase_auth_admin;
+GRANT
+EXECUTE ON FUNCTION public.check_sso_required_for_domain TO postgres,
+anon,
+authenticated;
+
+GRANT
+EXECUTE ON FUNCTION public.enforce_sso_for_domains TO postgres,
+supabase_auth_admin;
