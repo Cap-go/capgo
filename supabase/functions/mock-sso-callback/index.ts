@@ -98,13 +98,12 @@ async function authenticateUser(supabaseAdmin: any, mockResponse: MockSAMLRespon
     // Wait briefly to ensure public.users record exists (should already exist for existing users)
     await new Promise(resolve => setTimeout(resolve, 100))
 
-    const { data: enrollResult, error: enrollError } = await supabaseAdmin.rpc('auto_enroll_sso_user', {
+    // Auto-enrollment handled silently - continue regardless of result
+    await supabaseAdmin.rpc('auto_enroll_sso_user', {
       p_user_id: existingUser.id,
       p_email: mockResponse.email,
       p_sso_provider_id: mockResponse.providerId,
     })
-
-    // Auto-enrollment handled silently - continue regardless of result
 
     return {
       accessToken: signInData.session.access_token,
