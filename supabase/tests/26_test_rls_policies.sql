@@ -151,6 +151,7 @@ SELECT
         'public',
         'users',
         ARRAY[
+            'Allow org admin to select org member users',
             'Allow owner to insert own users',
             'Allow owner to select own user',
             'Allow owner to update own users',
@@ -194,7 +195,10 @@ SELECT
     policies_are(
         'public',
         'stripe_info',
-        ARRAY['Allow org member to select stripe_info'],
+        ARRAY[
+            'Allow org member to select stripe_info',
+            'Allow service_role full access to stripe_info'
+        ],
         'stripe_info should have correct policies'
     );
 
