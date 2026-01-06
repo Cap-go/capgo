@@ -281,8 +281,30 @@ Deno.serve(async (req) => {
   )
 })
 
+// Validate and constrain redirect targets to local dev origins only
+function sanitizeRedirectUrl(redirectUrl: string): string {
+  try {
+    const url = new URL(redirectUrl)
+    const allowedHosts = ['localhost', '127.0.0.1']
+    if (!['http:', 'https:'].includes(url.protocol)) {
+      return '/'
+    }
+    if (!allowedHosts.includes(url.hostname)) {
+      return '/'
+    }
+    return url.toString()
+  }
+  catch {
+    return '/'
+  }
+}
+
 // Render success page with auto-redirect
 function renderSuccessPage(email: string, redirectUrl: string): string {
+  const safeEmail = escapeHtml(email)
+  const safeRedirect = sanitizeRedirectUrl(redirectUrl)
+  const safeRedirectHtml = escapeHtml(safeRedirect)
+  const safeRedirectJs = JSON.stringify(safeRedirect)
   return `
 <!DOCTYPE html>
 <html>
@@ -345,13 +367,13 @@ function renderSuccessPage(email: string, redirectUrl: string): string {
       100% { transform: rotate(360deg); }
     }
   </style>
-  <meta http-equiv="refresh" content="2;url=${redirectUrl}">
+  <meta http-equiv="refresh" content="2;url=${safeRedirectHtml}">
 </head>
 <body>
   <div class="container">
     <div class="success-icon">✓</div>
     <h1>SSO Login Successful!</h1>
-    <p>Welcome, <span class="email">${email}</span></p>
+    <p>Welcome, <span class="email">${safeEmail}</span></p>
     <p>Redirecting you to the application...</p>
     <div class="loader"></div>
     <p style="font-size: 12px; margin-top: 20px;">
@@ -362,7 +384,7 @@ function renderSuccessPage(email: string, redirectUrl: string): string {
   <script>
     // Auto-redirect after 2 seconds
     setTimeout(() => {
-      window.location.href = '${redirectUrl}';
+      window.location.href = ${safeRedirectJs};
     }, 2000);
   </script>
 </body>
