@@ -66,7 +66,7 @@ export async function startBuild(
         app_id: appId,
         user_id: apikey.user_id,
       })
-      await markBuildAsFailed(c, jobId, errorMsg, apikey.key)
+      await markBuildAsFailed(c, jobId, errorMsg, apikey.key!)
       alreadyMarkedAsFailed = true
       throw simpleError('unauthorized', errorMsg)
     }
@@ -91,7 +91,7 @@ export async function startBuild(
       })
 
       // Update build_requests to mark as failed
-      await markBuildAsFailed(c, jobId, errorMsg, apikey.key)
+      await markBuildAsFailed(c, jobId, errorMsg, apikey.key!)
       alreadyMarkedAsFailed = true
       throw simpleError('builder_error', errorMsg)
     }
@@ -134,7 +134,7 @@ export async function startBuild(
     // Mark build as failed for any unexpected error (but only if not already marked)
     if (!alreadyMarkedAsFailed) {
       const errorMsg = error instanceof Error ? error.message : String(error)
-      await markBuildAsFailed(c, jobId, errorMsg, apikey.key)
+      await markBuildAsFailed(c, jobId, errorMsg, apikey.key!)
     }
     throw error
   }
