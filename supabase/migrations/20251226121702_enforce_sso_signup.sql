@@ -14,8 +14,12 @@ DECLARE
 BEGIN
   -- Extract domain from email
   v_domain := lower(split_part(p_email, '@', 2));
-  
-  IF COALESCE(v_domain, '') = '' THEN
+
+  IF v_domain IS NULL THEN
+    RETURN false;
+  END IF;
+
+  IF v_domain = '' THEN
     RETURN false;
   END IF;
   
