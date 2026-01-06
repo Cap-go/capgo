@@ -2,7 +2,7 @@ import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { simpleError } from '../../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../../utils/logging.ts'
-import { hasAppRightApikey, supabaseAdmin } from '../../utils/supabase.ts'
+import { hasAppRightApikey, supabaseApikey } from '../../utils/supabase.ts'
 import { getEnv } from '../../utils/utils.ts'
 
 /**
@@ -35,8 +35,10 @@ export async function tusProxy(
     throw simpleError('service_unavailable', 'Builder service not configured')
   }
 
+  // Use authenticated client for data queries - RLS will enforce access
+  const supabase = supabaseApikey(c, apikey.key)
+
   // Get build request to verify ownership
-  const supabase = supabaseAdmin(c)
   const { data: buildRequest, error: buildRequestError } = await supabase
     .from('build_requests')
     .select('app_id, owner_org, builder_job_id, upload_path')

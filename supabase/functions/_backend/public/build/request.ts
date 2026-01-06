@@ -2,7 +2,7 @@ import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { simpleError } from '../../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../../utils/logging.ts'
-import { hasAppRightApikey, supabaseAdmin } from '../../utils/supabase.ts'
+import { hasAppRightApikey, supabaseApikey } from '../../utils/supabase.ts'
 import { getEnv } from '../../utils/utils.ts'
 
 export interface RequestBuildBody {
@@ -87,8 +87,10 @@ export async function requestBuild(
     throw simpleError('unauthorized', 'You do not have permission to request builds for this app')
   }
 
+  // Use authenticated client for data queries - RLS will enforce access
+  const supabase = supabaseApikey(c, apikey.key)
+
   // Get org_id for the app to use as anonymized user ID
-  const supabase = supabaseAdmin(c)
   const { data: app, error: appError } = await supabase
     .from('apps')
     .select('owner_org')

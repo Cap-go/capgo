@@ -56,7 +56,7 @@ export const useWebhooksStore = defineStore('webhooks', () => {
 
     isLoading.value = true
     try {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('webhooks')
         .select('*')
         .eq('org_id', orgId)
@@ -91,7 +91,7 @@ export const useWebhooksStore = defineStore('webhooks', () => {
     }
 
     try {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('webhooks')
         .select('*')
         .eq('id', webhookId)
@@ -148,7 +148,7 @@ export const useWebhooksStore = defineStore('webhooks', () => {
     }
 
     try {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('webhooks')
         .insert({
           org_id: orgId,
@@ -221,7 +221,7 @@ export const useWebhooksStore = defineStore('webhooks', () => {
     }
 
     try {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('webhooks')
         .update(webhookData)
         .eq('id', webhookId)
@@ -261,7 +261,7 @@ export const useWebhooksStore = defineStore('webhooks', () => {
     }
 
     try {
-      const { error } = await (supabase as any)
+      const { error } = await supabase
         .from('webhooks')
         .delete()
         .eq('id', webhookId)
@@ -348,7 +348,7 @@ export const useWebhooksStore = defineStore('webhooks', () => {
       const from = page * DELIVERIES_PER_PAGE
       const to = (page + 1) * DELIVERIES_PER_PAGE - 1
 
-      let query = (supabase as any)
+      let query = supabase
         .from('webhook_deliveries')
         .select('*', { count: 'exact' })
         .eq('webhook_id', webhookId)

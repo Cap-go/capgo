@@ -73,7 +73,7 @@ app.post('/', async (c) => {
 
   const baseBody = baseValidationResult.data
 
-  const supabaseAdmin = useSupabaseAdmin(c)
+  const supabaseAdmin = useSupabaseAdmin(c)For iOS, we don't want different definitions. 
 
   // Get the invitation to find the org_id
   const { data: invitation, error: invitationError } = await supabaseAdmin.from('tmp_users')

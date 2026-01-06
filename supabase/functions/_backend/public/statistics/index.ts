@@ -6,7 +6,7 @@ import { z } from 'zod/mini'
 import { honoFactory, quickError, simpleError, useCors } from '../../utils/hono.ts'
 import { middlewareV2 } from '../../utils/hono_middleware.ts'
 import { cloudlog, cloudlogErr } from '../../utils/logging.ts'
-import { hasAppRight, hasAppRightApikey, hasOrgRight, supabaseAdmin } from '../../utils/supabase.ts'
+import { hasAppRight, hasAppRightApikey, hasOrgRight, supabaseApikey, supabaseClient } from '../../utils/supabase.ts'
 
 dayjs.extend(utc)
 
@@ -40,7 +40,20 @@ interface AppUsageByVersion {
   uninstall: number | null
 }
 
-async function checkOrganizationAccess(c: Context, orgId: string, supabase: ReturnType<typeof supabaseAdmin>) {
+// Helper to get authenticated supabase client based on auth type
+function getAuthenticatedSupabase(c: Context, auth: AuthInfo) {
+  if (auth.authType === 'apikey' && auth.apikey) {
+    return supabaseApikey(c, auth.apikey.key)
+  }
+  // JWT auth
+  const authorization = c.req.header('authorization')
+  if (!authorization) {
+    throw quickError(401, 'no_authorization', 'No authorization header')
+  }
+  return supabaseClient(c, authorization)
+}
+
+async function checkOrganizationAccess(c: Context, orgId: string, supabase: ReturnType<typeof supabaseClient>) {
   // Use the existing PostgreSQL function to check organization payment and plan status
   const { data: isPayingAndGoodPlan, error } = await supabase
     .rpc('is_paying_and_good_plan_org', { orgid: orgId })
@@ -63,7 +76,7 @@ async function checkOrganizationAccess(c: Context, orgId: string, supabase: Retu
   return { isPayingAndGoodPlan }
 }
 
-async function getNormalStats(c: Context, appId: string | null, ownerOrg: string | null, from: Date, to: Date, supabase: ReturnType<typeof supabaseAdmin>, isDashboard: boolean = false, includeBreakdown: boolean = false, noAccumulate: boolean = false) {
+async function getNormalStats(c: Context, appId: string | null, ownerOrg: string | null, from: Date, to: Date, supabase: ReturnType<typeof supabaseClient>, isDashboard: boolean = false, includeBreakdown: boolean = false, noAccumulate: boolean = false) {
   if (!appId && !ownerOrg)
     return { data: null, error: 'Invalid appId or ownerOrg' }
 
@@ -314,7 +327,7 @@ async function getNormalStats(c: Context, appId: string | null, ownerOrg: string
   return { data: finalStats.filter(x => !!x), error: null }
 }
 
-async function getBundleUsage(appId: string, from: Date, to: Date, shouldGetLatestVersion: boolean, supabase: ReturnType<typeof supabaseAdmin>) {
+async function getBundleUsage(appId: string, from: Date, to: Date, shouldGetLatestVersion: boolean, supabase: ReturnType<typeof supabaseClient>) {
   const { data: dailyVersion, error: dailyVersionError } = await supabase
     .from('daily_version')
     .select('date, app_id, version_id, install, uninstall')
@@ -550,7 +563,8 @@ app.get('/app/:app_id', async (c) => {
     throw quickError(401, 'no_access_to_app', 'No access to app', { data: auth.userId })
   }
 
-  const supabase = supabaseAdmin(c)
+  // Use authenticated client - RLS will enforce access
+  const supabase = getAuthenticatedSupabase(c, auth)
 
   // Get the organization ID for this app and check organization access
   const { data: app } = await supabase
@@ -576,9 +590,6 @@ app.get('/org/:org_id', async (c) => {
   const orgId = c.req.param('org_id')
   const query = c.req.query()
 
-  // Check if user has access to this organization
-  const supabase = supabaseAdmin(c)
-
   const bodyParsed = normalStatsSchema.safeParse(query)
   if (!bodyParsed.success) {
     throw simpleError('invalid_body', 'Invalid body', { error: bodyParsed.error })
@@ -598,6 +609,9 @@ app.get('/org/:org_id', async (c) => {
   if (auth.authType === 'apikey' && auth.apikey!.limited_to_apps && auth.apikey!.limited_to_apps.length > 0) {
     throw quickError(401, 'invalid_apikey', 'Invalid apikey', { data: auth.apikey!.key })
   }
+
+  // Use authenticated client - RLS will enforce access
+  const supabase = getAuthenticatedSupabase(c, auth)
 
   // Check organization payment status before returning stats
   if (auth.authType !== 'jwt')
@@ -633,7 +647,8 @@ app.get('/app/:app_id/bundle_usage', async (c) => {
     throw quickError(401, 'no_access_to_app', 'No access to app', { data: auth.userId })
   }
 
-  const supabase = supabaseAdmin(c)
+  // Use authenticated client - RLS will enforce access
+  const supabase = getAuthenticatedSupabase(c, auth)
 
   // Get the organization ID for this app and check organization access
   const { data: app } = await supabase
@@ -657,7 +672,8 @@ app.get('/app/:app_id/bundle_usage', async (c) => {
 
 app.get('/user', async (c) => {
   const auth = c.get('auth') as AuthInfo
-  const supabase = supabaseAdmin(c)
+  // Use authenticated client - RLS will enforce access
+  const supabase = getAuthenticatedSupabase(c, auth)
 
   const query = c.req.query()
   const bodyParsed = normalStatsSchema.safeParse(query)

@@ -5,7 +5,7 @@ import { getCookie, setCookie } from 'hono/cookie'
 import { Hono } from 'hono/tiny'
 import { simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
-import { hasAppRight, supabaseAdmin } from '../utils/supabase.ts'
+import { supabaseClient } from '../utils/supabase.ts'
 import { DEFAULT_RETRY_PARAMS, RetryBucket } from './retry.ts'
 
 // MIME type mapping for common file extensions
@@ -107,18 +107,11 @@ async function handlePreviewSubdomain(c: Context<MiddlewareKeyVariables>) {
   if (!token)
     return simpleError('cannot_find_authorization', 'Cannot find authorization. Pass token as query param on first request.')
 
-  const { data: auth, error: authError } = await supabaseAdmin(c).auth.getUser(token)
-  if (authError || !auth?.user?.id)
-    return simpleError('not_authorize', 'Not authorized')
-
-  const userId = auth.user.id
-
-  // Check user has read access to app
-  if (!(await hasAppRight(c, appId, userId, 'read')))
-    return simpleError('app_access_denied', 'You can\'t access this app', { app_id: appId })
+  // Use authenticated client - RLS will enforce access based on JWT
+  const supabase = supabaseClient(c, `Bearer ${token}`)
 
   // Get app settings to check if preview is enabled
-  const { data: appData, error: appError } = await supabaseAdmin(c)
+  const { data: appData, error: appError } = await supabase
     .from('apps')
     .select('allow_preview')
     .eq('app_id', appId)
@@ -133,7 +126,7 @@ async function handlePreviewSubdomain(c: Context<MiddlewareKeyVariables>) {
   }
 
   // Get bundle to check encryption and manifest
-  const { data: bundle, error: bundleError } = await supabaseAdmin(c)
+  const { data: bundle, error: bundleError } = await supabase
     .from('app_versions')
     .select('id, session_key, manifest_count')
     .eq('app_id', appId)
@@ -158,7 +151,7 @@ async function handlePreviewSubdomain(c: Context<MiddlewareKeyVariables>) {
   let manifestEntry: { s3_path: string, file_name: string } | null = null
 
   // Try exact match first
-  const { data: exactMatch, error: exactError } = await supabaseAdmin(c)
+  const { data: exactMatch, error: exactError } = await supabase
     .from('manifest')
     .select('s3_path, file_name')
     .eq('app_version_id', versionId)
@@ -176,7 +169,7 @@ async function handlePreviewSubdomain(c: Context<MiddlewareKeyVariables>) {
       if (tryPath === filePath)
         continue // Already tried exact match
 
-      const { data: prefixMatch, error: prefixError } = await supabaseAdmin(c)
+      const { data: prefixMatch, error: prefixError } = await supabase
         .from('manifest')
         .select('s3_path, file_name')
         .eq('app_version_id', versionId)

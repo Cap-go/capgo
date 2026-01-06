@@ -2,7 +2,7 @@ import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { z } from 'zod/mini'
 import { simpleError } from '../../utils/hono.ts'
-import { supabaseAdmin } from '../../utils/supabase.ts'
+import { supabaseApikey } from '../../utils/supabase.ts'
 import { checkWebhookPermission } from './index.ts'
 
 const bodySchema = z.object({
@@ -19,9 +19,12 @@ export async function deleteWebhook(c: Context, bodyRaw: any, apikey: Database['
 
   await checkWebhookPermission(c, body.orgId, apikey)
 
+  // Use authenticated client for data queries - RLS will enforce access
+  const supabase = supabaseApikey(c, apikey.key)
+
   // Verify webhook belongs to org
   // Note: Using type assertion as webhooks table types are not yet generated
-  const { data: existingWebhook, error: fetchError } = await (supabaseAdmin(c) as any)
+  const { data: existingWebhook, error: fetchError } = await (supabase as any)
     .from('webhooks')
     .select('id, org_id')
     .eq('id', body.webhookId)
@@ -36,7 +39,7 @@ export async function deleteWebhook(c: Context, bodyRaw: any, apikey: Database['
   }
 
   // Delete webhook (cascade will delete deliveries)
-  const { error } = await (supabaseAdmin(c) as any)
+  const { error } = await (supabase as any)
     .from('webhooks')
     .delete()
     .eq('id', body.webhookId)

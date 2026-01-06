@@ -4,7 +4,7 @@ import { Hono } from 'hono/tiny'
 import { middlewareAuth, parseBody, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../utils/logging.ts'
 import { createOneTimeCheckout, getStripe } from '../utils/stripe.ts'
-import { hasOrgRight, supabaseAdmin } from '../utils/supabase.ts'
+import { supabaseAdmin, supabaseClient } from '../utils/supabase.ts'
 import { getEnv } from '../utils/utils.ts'
 
 interface CreditStep {
@@ -69,8 +69,9 @@ const MAX_TOP_UP_QUANTITY = 100000
 
 type AppContext = Context<MiddlewareKeyVariables, any, any>
 
-async function getCreditTopUpProductId(c: AppContext, customerId: string): Promise<{ productId: string }> {
-  const { data: stripeInfo, error: stripeInfoError } = await supabaseAdmin(c)
+async function getCreditTopUpProductId(c: AppContext, customerId: string, token: string): Promise<{ productId: string }> {
+  const supabase = supabaseClient(c, token)
+  const { data: stripeInfo, error: stripeInfoError } = await supabase
     .from('stripe_info')
     .select('product_id')
     .eq('customer_id', customerId)
@@ -86,7 +87,7 @@ async function getCreditTopUpProductId(c: AppContext, customerId: string): Promi
     throw simpleError('credit_product_not_configured', 'Organization does not have a Stripe plan configured')
   }
 
-  const { data: plan, error: planError } = await supabaseAdmin(c)
+  const { data: plan, error: planError } = await supabase
     .from('plans')
     .select('credit_id, name')
     .eq('stripe_id', stripeInfo.product_id)
@@ -110,34 +111,24 @@ async function resolveOrgStripeContext(c: AppContext, orgId: string) {
   const rawAuthHeader = c.req.header('authorization')
     ?? c.req.header('Authorization')
     ?? c.get('authorization')
-  const tokenMatch = rawAuthHeader?.match(/^\s*Bearer\s+(\S+)\s*$/i)
-  const token = tokenMatch?.[1]
 
-  if (!token)
+  if (!rawAuthHeader)
     throw simpleError('not_authorized', 'Not authorized')
 
-  const { data: auth, error } = await supabaseAdmin(c).auth.getUser(token)
+  // Use authenticated client - RLS will enforce access based on JWT
+  const supabase = supabaseClient(c, rawAuthHeader)
 
-  if (error || !auth?.user?.id)
-    throw simpleError('not_authorized', 'Not authorized')
-
-  const userId = auth.user.id
-
-  if (!await hasOrgRight(c, orgId, userId, 'super_admin'))
-    throw simpleError('not_authorized', 'Not authorized')
-
-  const { data: org, error: orgError } = await supabaseAdmin(c)
+  // Get org - RLS will block if user doesn't have access
+  const { data: org, error: orgError } = await supabase
     .from('orgs')
     .select('customer_id')
     .eq('id', orgId)
     .single()
 
-  const customerId = org?.customer_id
+  if (orgError || !org?.customer_id)
+    throw simpleError('stripe_customer_missing', 'Organization does not have a Stripe customer or you don\'t have access')
 
-  if (orgError || !customerId)
-    throw simpleError('stripe_customer_missing', 'Organization does not have a Stripe customer')
-
-  return { customerId, userId }
+  return { customerId: org.customer_id, token: rawAuthHeader }
 }
 
 export const app = new Hono<MiddlewareKeyVariables>()
@@ -281,13 +272,13 @@ app.post('/start-top-up', middlewareAuth, async (c) => {
   if (!body.orgId)
     throw simpleError('missing_org_id', 'Organization id is required')
 
-  const { customerId, userId } = await resolveOrgStripeContext(c, body.orgId)
+  const { customerId, token } = await resolveOrgStripeContext(c, body.orgId)
 
   const baseUrl = getEnv(c, 'WEBAPP_URL')
   const successUrl = `${baseUrl}/settings/organization/credits?creditCheckout=success&session_id={CHECKOUT_SESSION_ID}`
   const cancelUrl = `${baseUrl}/settings/organization/credits?creditCheckout=cancelled`
 
-  const { productId } = await getCreditTopUpProductId(c, customerId)
+  const { productId } = await getCreditTopUpProductId(c, customerId, token)
 
   cloudlog({
     requestId: c.get('requestId'),
@@ -295,7 +286,6 @@ app.post('/start-top-up', middlewareAuth, async (c) => {
     orgId: body.orgId,
     quantity,
     productId,
-    userId,
   })
 
   const checkout = await createOneTimeCheckout(
@@ -316,7 +306,7 @@ app.post('/complete-top-up', middlewareAuth, async (c) => {
   if (!body.orgId || !body.sessionId)
     throw simpleError('missing_parameters', 'orgId and sessionId are required')
 
-  const { customerId } = await resolveOrgStripeContext(c, body.orgId)
+  const { customerId, token } = await resolveOrgStripeContext(c, body.orgId)
 
   const stripe = getStripe(c)
   const session = await stripe.checkout.sessions.retrieve(body.sessionId)
@@ -330,7 +320,7 @@ app.post('/complete-top-up', middlewareAuth, async (c) => {
   if (session.payment_status !== 'paid' || session.status !== 'complete')
     throw simpleError('session_not_paid', 'Checkout session is not paid')
 
-  const { productId } = await getCreditTopUpProductId(c, customerId)
+  const { productId } = await getCreditTopUpProductId(c, customerId, token)
   const paymentIntentId = typeof session.payment_intent === 'string'
     ? session.payment_intent
     : session.payment_intent?.id ?? null
@@ -359,11 +349,16 @@ app.post('/complete-top-up', middlewareAuth, async (c) => {
   if (creditQuantity <= 0)
     throw simpleError('credit_product_not_found', 'Checkout session does not include the credit product')
 
+  // Validate sessionId format to prevent injection (Stripe session IDs: cs_test_* or cs_live_*)
+  if (!/^cs_(test|live)_[a-zA-Z0-9]+$/.test(body.sessionId))
+    throw simpleError('invalid_session_id', 'Invalid session ID format')
+
   const sourceMatchFilters = [`source_ref->>sessionId.eq.${body.sessionId}`]
   if (paymentIntentId)
     sourceMatchFilters.push(`source_ref->>paymentIntentId.eq.${paymentIntentId}`)
 
-  const { data: existingTx, error: existingTxError } = await supabaseAdmin(c)
+  const supabase = supabaseClient(c, token)
+  const { data: existingTx, error: existingTxError } = await supabase
     .from('usage_credit_transactions')
     .select('id, grant_id, balance_after')
     .eq('org_id', body.orgId)
@@ -386,7 +381,7 @@ app.post('/complete-top-up', middlewareAuth, async (c) => {
   const matchedTx = existingTx?.[0]
 
   if (matchedTx) {
-    const { data: balance } = await supabaseAdmin(c)
+    const { data: balance } = await supabase
       .from('usage_credit_balances')
       .select('total_credits, available_credits, next_expiration')
       .eq('org_id', body.orgId)
@@ -426,7 +421,7 @@ app.post('/complete-top-up', middlewareAuth, async (c) => {
     itemsSummary,
   }
 
-  const { data: grant, error: rpcError } = await supabaseAdmin(c)
+  const { data: grant, error: rpcError } = await supabase
     .rpc('top_up_usage_credits', {
       p_org_id: body.orgId,
       p_amount: creditQuantity,
