@@ -39,6 +39,7 @@ export function getEndpointUrl(path: string): string {
 export const APIKEY_TEST_ALL = 'ae6e7458-c46d-4c00-aa3b-153b0b8520ea' // all key
 export const APIKEY_TEST_UPLOAD = 'c591b04e-cf29-4945-b9a0-776d0672061b' // upload key
 export const APIKEY_TEST2_ALL = 'ac4d9a98-ec25-4af8-933c-2aae4aa52b85' // test2 all key (dedicated for statistics)
+export const APIKEY_TEST_HASHED = 'test-hashed-apikey-for-auth-test' // hashed key (plain value, stored as SHA-256 hash in DB)
 export const ORG_ID = '046a36ac-e03c-4590-9257-bd6c9dba9ee8'
 export const STRIPE_INFO_CUSTOMER_ID = 'cus_Q38uE91NP8Ufqc' // Customer ID for ORG_ID
 export const NON_OWNER_ORG_ID = 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d'
