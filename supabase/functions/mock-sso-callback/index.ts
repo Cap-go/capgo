@@ -370,8 +370,20 @@ function renderSuccessPage(email: string, redirectUrl: string): string {
   `
 }
 
+// Basic HTML escape to avoid XSS when rendering user-provided content
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+    .replace(/\//g, '&#x2F;')
+}
+
 // Render error page
 function renderErrorPage(message: string): string {
+  const safeMessage = escapeHtml(message)
   return `
 <!DOCTYPE html>
 <html>
@@ -431,7 +443,7 @@ function renderErrorPage(message: string): string {
   <div class="container">
     <div class="error-icon">✕</div>
     <h1>SSO Error</h1>
-    <p>${message}</p>
+    <p>${safeMessage}</p>
     <a href="/sso-login" class="back-link">← Back to SSO Login</a>
   </div>
 </body>
