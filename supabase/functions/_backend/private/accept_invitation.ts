@@ -63,7 +63,8 @@ app.use('/', useCors)
 
 app.post('/', async (c) => {
   const rawBody = await parseBody<AcceptInvitation>(c)
-  cloudlog({ requestId: c.get('requestId'), context: 'accept_invitation raw body', rawBody })
+  const { password: _password, ...rawBodyWithoutPassword } = rawBody
+  cloudlog({ requestId: c.get('requestId'), context: 'accept_invitation raw body', rawBody: rawBodyWithoutPassword })
 
   // First, validate base schema (without password policy checks)
   const baseValidationResult = baseInvitationSchema.safeParse(rawBody)
@@ -124,7 +125,8 @@ app.post('/', async (c) => {
     ...baseBody,
     password: passwordValidationResult.data,
   }
-  cloudlog({ requestId: c.get('requestId'), context: 'accept_invitation validated body', body })
+  const { password: _pwd, ...bodyWithoutPassword } = body
+  cloudlog({ requestId: c.get('requestId'), context: 'accept_invitation validated body', body: bodyWithoutPassword })
 
   // here the real magic happens
   const { data: user, error: userError } = await supabaseAdmin.auth.admin.createUser({

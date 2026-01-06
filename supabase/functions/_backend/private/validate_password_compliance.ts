@@ -55,7 +55,8 @@ app.use('/', useCors)
 
 app.post('/', async (c) => {
   const rawBody = await parseBody<ValidatePasswordCompliance>(c)
-  cloudlog({ requestId: c.get('requestId'), context: 'validate_password_compliance raw body (password redacted)', rawBody: { ...rawBody, password: '***' } })
+  const { password: _password, ...rawBodyWithoutPassword } = rawBody
+  cloudlog({ requestId: c.get('requestId'), context: 'validate_password_compliance raw body', rawBody: rawBodyWithoutPassword })
 
   // Validate request body
   const validationResult = bodySchema.safeParse(rawBody)
