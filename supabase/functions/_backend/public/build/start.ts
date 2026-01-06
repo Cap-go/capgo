@@ -46,6 +46,7 @@ export async function startBuild(
   apikey: Database['public']['Tables']['apikeys']['Row'],
 ): Promise<Response> {
   let alreadyMarkedAsFailed = false
+  const apikeyKey = apikey.key!
 
   try {
     cloudlog({
@@ -57,7 +58,7 @@ export async function startBuild(
     })
 
     // Security: Check if user has write access to this app
-    if (!(await hasAppRightApikey(c, appId, apikey.user_id, 'write', apikey.key))) {
+    if (!(await hasAppRightApikey(c, appId, apikey.user_id, 'write', apikeyKey))) {
       const errorMsg = 'You do not have permission to start builds for this app'
       cloudlogErr({
         requestId: c.get('requestId'),
@@ -66,7 +67,7 @@ export async function startBuild(
         app_id: appId,
         user_id: apikey.user_id,
       })
-      await markBuildAsFailed(c, jobId, errorMsg, apikey.key)
+      await markBuildAsFailed(c, jobId, errorMsg, apikeyKey)
       alreadyMarkedAsFailed = true
       throw simpleError('unauthorized', errorMsg)
     }
@@ -91,7 +92,7 @@ export async function startBuild(
       })
 
       // Update build_requests to mark as failed
-      await markBuildAsFailed(c, jobId, errorMsg, apikey.key)
+      await markBuildAsFailed(c, jobId, errorMsg, apikeyKey)
       alreadyMarkedAsFailed = true
       throw simpleError('builder_error', errorMsg)
     }
@@ -107,7 +108,7 @@ export async function startBuild(
 
     // Update build_requests status to running
     // Use authenticated client - RLS will enforce access
-    const supabase = supabaseApikey(c, apikey.key)
+    const supabase = supabaseApikey(c, apikeyKey)
     const { error: updateError } = await supabase
       .from('build_requests')
       .update({
@@ -134,7 +135,7 @@ export async function startBuild(
     // Mark build as failed for any unexpected error (but only if not already marked)
     if (!alreadyMarkedAsFailed) {
       const errorMsg = error instanceof Error ? error.message : String(error)
-      await markBuildAsFailed(c, jobId, errorMsg, apikey.key)
+      await markBuildAsFailed(c, jobId, errorMsg, apikeyKey)
     }
     throw error
   }
