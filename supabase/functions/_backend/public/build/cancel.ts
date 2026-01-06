@@ -2,7 +2,7 @@ import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { simpleError } from '../../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../../utils/logging.ts'
-import { hasAppRightApikey, supabaseAdmin } from '../../utils/supabase.ts'
+import { hasAppRightApikey, supabaseApikey } from '../../utils/supabase.ts'
 import { getEnv } from '../../utils/utils.ts'
 
 export async function cancelBuild(
@@ -61,7 +61,8 @@ export async function cancelBuild(
   })
 
   // Update build_requests status to cancelled
-  const supabase = supabaseAdmin(c)
+  // Use authenticated client for data queries - RLS will enforce access
+  const supabase = supabaseApikey(c, apikey.key)
   const { error: updateError } = await supabase
     .from('build_requests')
     .update({

@@ -2,7 +2,7 @@ import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { BRES, simpleError } from '../../utils/hono.ts'
 import { cloudlog } from '../../utils/logging.ts'
-import { hasAppRightApikey, supabaseAdmin } from '../../utils/supabase.ts'
+import { hasAppRightApikey, supabaseAdmin, supabaseApikey } from '../../utils/supabase.ts'
 import { isValidAppId } from '../../utils/utils.ts'
 
 export async function deleteApp(c: Context, appId: string, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
@@ -16,8 +16,11 @@ export async function deleteApp(c: Context, appId: string, apikey: Database['pub
     throw simpleError('cannot_delete_app', 'You can\'t access this app', { app_id: appId })
   }
 
+  // Use authenticated client for data queries - RLS will enforce access
+  const supabase = supabaseApikey(c, apikey.key)
+
   // Get the app's owner_org for image cleanup
-  const { data: app } = await supabaseAdmin(c)
+  const { data: app } = await supabase
     .from('apps')
     .select('owner_org')
     .eq('app_id', appId)
@@ -25,6 +28,7 @@ export async function deleteApp(c: Context, appId: string, apikey: Database['pub
 
   // Delete app icon from storage before deleting the app
   // App icons are stored at: images/org/{org_id}/{app_id}/icon
+  // Note: Storage operations need admin access
   if (app?.owner_org) {
     try {
       const { data: files } = await supabaseAdmin(c)
@@ -46,103 +50,107 @@ export async function deleteApp(c: Context, appId: string, apikey: Database['pub
     }
   }
 
+  // Admin client for internal stats tables that have restrictive RLS policies
+  const admin = supabaseAdmin(c)
+
   // Run most deletions in parallel
   await Promise.all([
-    // Delete version related data
-    supabaseAdmin(c)
+    // Delete version related data (user-facing, has RLS)
+    supabase
       .from('app_versions_meta')
       .delete()
       .eq('app_id', appId),
 
-    // Delete daily version stats
-    supabaseAdmin(c)
+    // Delete daily version stats (internal, needs admin - only has SELECT RLS)
+    admin
       .from('daily_version')
       .delete()
       .eq('app_id', appId),
 
-    // Delete version usage
-    supabaseAdmin(c)
+    // Delete version usage (internal, needs admin)
+    admin
       .from('version_usage')
       .delete()
       .eq('app_id', appId),
 
     // Delete app related data
-    // Delete channel devices
-    supabaseAdmin(c)
+    // Delete channel devices (user-facing, has RLS)
+    supabase
       .from('channel_devices')
       .delete()
       .eq('app_id', appId),
 
-    // Delete channels
-    supabaseAdmin(c)
+    // Delete channels (user-facing, has RLS)
+    supabase
       .from('channels')
       .delete()
       .eq('app_id', appId),
 
-    // Delete devices
-    supabaseAdmin(c)
+    // Delete devices (user-facing, has RLS)
+    supabase
       .from('devices')
       .delete()
       .eq('app_id', appId),
 
-    // Delete usage stats
-    supabaseAdmin(c)
+    // Delete usage stats (internal, needs admin - has "Disable for all" policy)
+    admin
       .from('bandwidth_usage')
       .delete()
       .eq('app_id', appId),
 
-    supabaseAdmin(c)
+    admin
       .from('storage_usage')
       .delete()
       .eq('app_id', appId),
 
-    supabaseAdmin(c)
+    admin
       .from('device_usage')
       .delete()
       .eq('app_id', appId),
 
-    // Delete daily metrics
-    supabaseAdmin(c)
+    // Delete daily metrics (internal, needs admin)
+    admin
       .from('daily_mau')
       .delete()
       .eq('app_id', appId),
 
-    supabaseAdmin(c)
+    admin
       .from('daily_bandwidth')
       .delete()
       .eq('app_id', appId),
 
-    supabaseAdmin(c)
+    admin
       .from('daily_storage')
       .delete()
       .eq('app_id', appId),
 
-    // Delete stats
-    supabaseAdmin(c)
+    // Delete stats (internal, needs admin)
+    admin
       .from('stats')
       .delete()
       .eq('app_id', appId),
 
-    // Delete org_users with this app_id
-    supabaseAdmin(c)
+    // Delete org_users with this app_id (user-facing, has RLS)
+    supabase
       .from('org_users')
       .delete()
       .eq('app_id', appId),
 
-    supabaseAdmin(c)
+    // Delete deploy_history (has "Deny delete" policy, needs admin)
+    admin
       .from('deploy_history')
       .delete()
       .eq('app_id', appId),
   ])
 
-  // Delete versions (last)
-  await supabaseAdmin(c)
+  // Delete versions (last) - needs admin because no DELETE policy for anon role
+  await admin
     .from('app_versions')
     .delete()
     .eq('app_id', appId)
 
-  // Finally delete the app
-  const { error: dbError } = await supabaseAdmin(c)
+  // Finally delete the app - needs admin because no DELETE policy for anon role
+  const { error: dbError } = await admin
     .from('apps')
     .delete()
     .eq('app_id', appId)

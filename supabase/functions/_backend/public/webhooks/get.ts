@@ -2,7 +2,7 @@ import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { z } from 'zod/mini'
 import { simpleError } from '../../utils/hono.ts'
-import { supabaseAdmin } from '../../utils/supabase.ts'
+import { supabaseApikey } from '../../utils/supabase.ts'
 import { fetchLimit } from '../../utils/utils.ts'
 import { checkWebhookPermission } from './index.ts'
 
@@ -33,10 +33,13 @@ export async function get(c: Context, bodyRaw: any, apikey: Database['public']['
 
   await checkWebhookPermission(c, body.orgId, apikey)
 
+  // Use authenticated client for data queries - RLS will enforce access
+  const supabase = supabaseApikey(c, apikey.key)
+
   // Get single webhook
   // Note: Using type assertion as webhooks table types are not yet generated
   if (body.webhookId) {
-    const { data, error } = await (supabaseAdmin(c) as any)
+    const { data, error } = await (supabase as any)
       .from('webhooks')
       .select('*')
       .eq('id', body.webhookId)
@@ -53,7 +56,7 @@ export async function get(c: Context, bodyRaw: any, apikey: Database['public']['
     }
 
     // Get recent delivery stats for this webhook
-    const { data: stats } = await (supabaseAdmin(c) as any)
+    const { data: stats } = await (supabase as any)
       .from('webhook_deliveries')
       .select('status', { count: 'exact' })
       .eq('webhook_id', body.webhookId)
@@ -78,7 +81,7 @@ export async function get(c: Context, bodyRaw: any, apikey: Database['public']['
   const from = fetchOffset * fetchLimit
   const to = (fetchOffset + 1) * fetchLimit - 1
 
-  const { data, error } = await (supabaseAdmin(c) as any)
+  const { data, error } = await (supabase as any)
     .from('webhooks')
     .select('*')
     .eq('org_id', body.orgId)

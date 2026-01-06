@@ -3,7 +3,7 @@ import { Hono } from 'hono/tiny'
 import { getBundleUrl, getManifestUrl } from '../utils/downloadUrl.ts'
 import { middlewareAuth, parseBody, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
-import { hasAppRight, supabaseAdmin } from '../utils/supabase.ts'
+import { hasAppRight, supabaseAdmin, supabaseClient } from '../utils/supabase.ts'
 
 interface DataDownload {
   app_id: string
@@ -35,7 +35,10 @@ app.post('/', middlewareAuth, async (c) => {
   if (!(await hasAppRight(c, body.app_id, userId, 'read')))
     return simpleError('app_access_denied', 'You can\'t access this app', { app_id: body.app_id })
 
-  const { data: bundle, error: getBundleError } = await supabaseAdmin(c)
+  // Use authenticated client for data queries - RLS will enforce access
+  const supabase = supabaseClient(c, authorization)
+
+  const { data: bundle, error: getBundleError } = await supabase
     .from('app_versions')
     .select('*, owner_org ( created_by )')
     .eq('app_id', body.app_id)
@@ -53,7 +56,7 @@ app.post('/', middlewareAuth, async (c) => {
   }
 
   if (body.isManifest) {
-    const { data: manifest, error: getManifestError } = await supabaseAdmin(c)
+    const { data: manifest, error: getManifestError } = await supabase
       .from('manifest')
       .select('*')
       .eq('app_id', body.app_id)
