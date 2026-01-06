@@ -4,11 +4,12 @@ import { z } from 'zod/mini'
 import { parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
 import { middlewareV2 } from '../utils/hono_middleware.ts'
 import { createStatsDevices } from '../utils/stats.ts'
-import { supabaseAdmin as useSupabaseAdmin } from '../utils/supabase.ts'
+import { supabaseWithAuth } from '../utils/supabase.ts'
 
 const bodySchema = z.object({
   device_id: z.uuid(),
   app_id: z.string(),
+  org_id: z.string(),
   platform: z.enum(['ios', 'android']),
   version_name: z.string(),
 })
@@ -20,6 +21,7 @@ app.use('/', useCors)
 interface CreateDeviceBody {
   device_id: string
   app_id: string
+  org_id: string
   platform: string
   version_name: string
 }
@@ -35,25 +37,17 @@ app.post('/', middlewareV2(['all', 'write']), async (c) => {
 
   const safeBody = parsedBodyResult.data
 
-  const supabaseAdmin = useSupabaseAdmin(c)
-
-  const { data: appData, error: appError } = await supabaseAdmin.from('apps')
-    .select('owner_org')
-    .eq('app_id', safeBody.app_id)
-    .single()
-
-  if (appError) {
-    return quickError(404, 'app_not_found', 'App not found', { app_id: safeBody.app_id })
-  }
+  // Use authenticated client for data queries - RLS will enforce access
+  const supabase = supabaseWithAuth(c, auth)
 
   const userId = auth.userId
 
-  const userRight = await supabaseAdmin.rpc('check_min_rights', {
+  const userRight = await supabase.rpc('check_min_rights', {
     min_right: 'write',
-    org_id: appData.owner_org,
     user_id: userId,
     channel_id: null as any,
     app_id: safeBody.app_id,
+    org_id: safeBody.org_id,
   })
 
   if (userRight.error) {
@@ -62,6 +56,15 @@ app.post('/', middlewareV2(['all', 'write']), async (c) => {
 
   if (!userRight.data) {
     return quickError(401, 'not_authorized', 'Not authorized', { userId, appId: safeBody.app_id })
+  }
+
+  const { error: appError } = await supabase.from('apps')
+    .select('owner_org')
+    .eq('app_id', safeBody.app_id)
+    .single()
+
+  if (appError) {
+    return quickError(404, 'app_not_found', 'App not found', { app_id: safeBody.app_id })
   }
 
   await createStatsDevices(c, {

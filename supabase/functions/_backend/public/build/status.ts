@@ -2,7 +2,7 @@ import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { simpleError } from '../../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../../utils/logging.ts'
-import { hasAppRightApikey, recordBuildTime, supabaseAdmin } from '../../utils/supabase.ts'
+import { hasAppRightApikey, recordBuildTime, supabaseApikey } from '../../utils/supabase.ts'
 import { getEnv } from '../../utils/utils.ts'
 
 export interface BuildStatusParams {
@@ -34,8 +34,10 @@ export async function getBuildStatus(
     throw simpleError('unauthorized', 'You do not have permission to view builds for this app')
   }
 
+  // Use authenticated client for data queries - RLS will enforce access
+  const supabase = supabaseApikey(c, apikey.key)
+
   // Get app's org_id
-  const supabase = supabaseAdmin(c)
   const { data: app, error: appError } = await supabase
     .from('apps')
     .select('owner_org')

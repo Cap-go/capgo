@@ -2,7 +2,7 @@ import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { z } from 'zod/mini'
 import { simpleError } from '../../utils/hono.ts'
-import { supabaseAdmin } from '../../utils/supabase.ts'
+import { supabaseApikey } from '../../utils/supabase.ts'
 import { WEBHOOK_EVENT_TYPES } from '../../utils/webhook.ts'
 import { checkWebhookPermission } from './index.ts'
 
@@ -41,8 +41,10 @@ export async function post(c: Context, bodyRaw: any, apikey: Database['public'][
   }
 
   // Create webhook
+  // Use authenticated client for data queries - RLS will enforce access
   // Note: Using type assertion as webhooks table types are not yet generated
-  const { data, error } = await (supabaseAdmin(c) as any)
+  const supabase = supabaseApikey(c, apikey.key)
+  const { data, error } = await (supabase as any)
     .from('webhooks')
     .insert({
       org_id: body.orgId,

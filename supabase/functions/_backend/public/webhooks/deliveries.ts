@@ -6,7 +6,7 @@ import type {
 } from '../../utils/webhook.ts'
 import { z } from 'zod/mini'
 import { simpleError } from '../../utils/hono.ts'
-import { supabaseAdmin } from '../../utils/supabase.ts'
+import { supabaseApikey, supabaseWithAuth } from '../../utils/supabase.ts'
 import {
   getDeliveryById,
   getWebhookById,
@@ -37,9 +37,12 @@ export async function getDeliveries(c: Context<MiddlewareKeyVariables, any, any>
 
   await checkWebhookPermission(c, body.orgId, apikey)
 
+  // Use authenticated client for data queries - RLS will enforce access
+  const supabase = supabaseApikey(c, apikey.key)
+
   // Verify webhook belongs to org
   // Note: Using type assertion as webhooks table types are not yet generated
-  const { data: webhook, error: webhookError } = await (supabaseAdmin(c) as any)
+  const { data: webhook, error: webhookError } = await supabase
     .from('webhooks')
     .select('id, org_id')
     .eq('id', body.webhookId)
@@ -58,7 +61,7 @@ export async function getDeliveries(c: Context<MiddlewareKeyVariables, any, any>
   const from = page * DELIVERIES_PER_PAGE
   const to = (page + 1) * DELIVERIES_PER_PAGE - 1
 
-  let query = (supabaseAdmin(c) as any)
+  let query = supabase
     .from('webhook_deliveries')
     .select('*')
     .eq('webhook_id', body.webhookId)
@@ -77,7 +80,7 @@ export async function getDeliveries(c: Context<MiddlewareKeyVariables, any, any>
   }
 
   // Get total count for pagination (include status filter)
-  let countQuery = (supabaseAdmin(c) as any)
+  let countQuery = supabase
     .from('webhook_deliveries')
     .select('*', { count: 'exact', head: true })
     .eq('webhook_id', body.webhookId)
@@ -111,6 +114,9 @@ export async function retryDelivery(c: Context<MiddlewareKeyVariables, any, any>
 
   await checkWebhookPermissionV2(c, body.orgId, auth)
 
+  // Use authenticated client for data queries - RLS will enforce access
+  const supabase = supabaseWithAuth(c, auth)
+
   // Get delivery
   const delivery = await getDeliveryById(c, body.deliveryId)
   if (!delivery) {
@@ -137,7 +143,7 @@ export async function retryDelivery(c: Context<MiddlewareKeyVariables, any, any>
   }
 
   // Reset delivery status and queue for retry
-  await (supabaseAdmin(c) as any)
+  await supabase
     .from('webhook_deliveries')
     .update({
       status: 'pending',

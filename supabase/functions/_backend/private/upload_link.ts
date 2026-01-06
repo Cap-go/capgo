@@ -6,7 +6,7 @@ import { middlewareKey } from '../utils/hono_middleware.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { logsnag } from '../utils/logsnag.ts'
 import { s3 } from '../utils/s3.ts'
-import { hasAppRightApikey, supabaseAdmin } from '../utils/supabase.ts'
+import { hasAppRightApikey, supabaseApikey } from '../utils/supabase.ts'
 
 interface DataUpload {
   name: string
@@ -23,7 +23,7 @@ app.post('/', middlewareKey(['all', 'write', 'upload']), async (c) => {
   const capgkey = c.get('capgkey') as string
   cloudlog({ requestId: c.get('requestId'), message: 'apikey', apikey })
   cloudlog({ requestId: c.get('requestId'), message: 'capgkey', capgkey })
-  const { data: userId, error: _errorUserId } = await supabaseAdmin(c)
+  const { data: userId, error: _errorUserId } = await supabaseApikey(c, capgkey)
     .rpc('get_user_id', { apikey: capgkey, app_id: body.app_id })
   if (_errorUserId) {
     return quickError(404, 'user_not_found', 'Error User not found', { _errorUserId })
@@ -33,7 +33,7 @@ app.post('/', middlewareKey(['all', 'write', 'upload']), async (c) => {
     return simpleError('app_access_denied', 'You can\'t access this app', { app_id: body.app_id })
   }
 
-  const { data: app, error: errorApp } = await supabaseAdmin(c)
+  const { data: app, error: errorApp } = await supabaseApikey(c, capgkey)
     .from('apps')
     .select('app_id, owner_org')
     .eq('app_id', body.app_id)
@@ -43,7 +43,7 @@ app.post('/', middlewareKey(['all', 'write', 'upload']), async (c) => {
     return quickError(404, 'error_app_not_found', 'Error App not found', { errorApp })
   }
 
-  const { data: version, error: errorVersion } = await supabaseAdmin(c)
+  const { data: version, error: errorVersion } = await supabaseApikey(c, capgkey)
     .from('app_versions')
     .select('id, name')
     .eq('name', body.name)
@@ -85,7 +85,7 @@ app.post('/', middlewareKey(['all', 'write', 'upload']), async (c) => {
   cloudlog({ requestId: c.get('requestId'), message: 'url', filePath, url })
   const response = { url }
 
-  const { error: changeError } = await supabaseAdmin(c)
+  const { error: changeError } = await supabaseApikey(c, capgkey)
     .from('app_versions')
     .update({ r2_path: filePath })
     .eq('id', version.id)

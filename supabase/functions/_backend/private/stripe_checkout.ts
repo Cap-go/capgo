@@ -3,7 +3,7 @@ import { Hono } from 'hono/tiny'
 import { middlewareAuth, parseBody, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { createCheckout } from '../utils/stripe.ts'
-import { hasOrgRight, supabaseAdmin } from '../utils/supabase.ts'
+import { hasOrgRight, supabaseAdmin, supabaseClient } from '../utils/supabase.ts'
 import { getEnv } from '../utils/utils.ts'
 
 interface CheckoutData {
@@ -35,7 +35,10 @@ app.post('/', middlewareAuth, async (c) => {
     return simpleError('not_authorize', 'Not authorize')
     // get user from users
   cloudlog({ requestId: c.get('requestId'), message: 'auth', auth: auth.user.id })
-  const { data: org, error: dbError } = await supabaseAdmin(c)
+
+  // Use authenticated client for data queries - RLS will enforce access
+  const supabase = supabaseClient(c, authorization!)
+  const { data: org, error: dbError } = await supabase
     .from('orgs')
     .select('customer_id')
     .eq('id', body.orgId)

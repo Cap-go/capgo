@@ -128,6 +128,7 @@ async function customDeviceOverwritePart5(
     body: {
       device_id: deviceId,
       app_id: route.params.package as string,
+      org_id: channel.value?.owner_org ?? '',
       platform,
       version_name: channel.value?.version.name ?? 'unknown',
     },
