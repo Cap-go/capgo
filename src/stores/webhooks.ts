@@ -5,6 +5,8 @@ import { ref } from 'vue'
 import { useSupabase } from '~/services/supabase'
 import { useOrganizationStore } from './organization'
 
+export type Webhook = Database['public']['Tables']['webhooks']['Row']
+
 export interface DeliveryPagination {
   page: number
   per_page: number
