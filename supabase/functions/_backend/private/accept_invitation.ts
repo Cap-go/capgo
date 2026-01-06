@@ -74,7 +74,7 @@ app.post('/', async (c) => {
   const { password: _password, ...baseBodyWithoutPassword } = baseBody
   cloudlog({ requestId: c.get('requestId'), context: 'accept_invitation raw body', rawBody: baseBodyWithoutPassword })
 
-  const supabaseAdmin = useSupabaseAdmin(c)For iOS, we don't want different definitions. 
+  const supabaseAdmin = useSupabaseAdmin(c) 
 
   // Get the invitation to find the org_id
   const { data: invitation, error: invitationError } = await supabaseAdmin.from('tmp_users')
