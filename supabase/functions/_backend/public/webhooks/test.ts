@@ -2,7 +2,7 @@ import type { Context } from 'hono'
 import type { AuthInfo, MiddlewareKeyVariables } from '../../utils/hono.ts'
 import { z } from 'zod/mini'
 import { simpleError } from '../../utils/hono.ts'
-import { supabaseAdmin } from '../../utils/supabase.ts'
+import { supabaseWithAuth } from '../../utils/supabase.ts'
 import {
   createDeliveryRecord,
   createTestPayload,
@@ -25,9 +25,12 @@ export async function test(c: Context<MiddlewareKeyVariables, any, any>, bodyRaw
 
   await checkWebhookPermissionV2(c, body.orgId, auth)
 
+  // Use authenticated client for data queries - RLS will enforce access
+  const supabase = supabaseWithAuth(c, auth)
+
   // Get webhook
   // Note: Using type assertion as webhooks table types are not yet generated
-  const { data: webhook, error: fetchError } = await (supabaseAdmin(c) as any)
+  const { data: webhook, error: fetchError } = await supabase
     .from('webhooks')
     .select('*')
     .eq('id', body.webhookId)
@@ -72,7 +75,7 @@ export async function test(c: Context<MiddlewareKeyVariables, any, any>, bodyRaw
   )
 
   // Update attempt count
-  await (supabaseAdmin(c) as any)
+  await supabase
     .from('webhook_deliveries')
     .update({ attempt_count: 1 })
     .eq('id', delivery.id)

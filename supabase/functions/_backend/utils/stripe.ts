@@ -386,6 +386,7 @@ export async function createCustomer(c: Context, email: string, userId: string, 
   }
   if (baseConsoleUrl) {
     metadata.log_as = `${baseConsoleUrl}/log-as/${userId}`
+    // https://supabase.com/dashboard/project/xvwzpoazmxkqosrdewyv/editor/445780?schema=public&filter=customer_id%3Aeq%3Acus_LR8PMu6exnGSuZ
   }
   if (!existInEnv(c, 'STRIPE_SECRET_KEY')) {
     cloudlog({ requestId: c.get('requestId'), message: 'createCustomer no stripe key', email, userId, name })

@@ -71,7 +71,7 @@ export async function findWebhooksForEvent(
   c: Context,
   orgId: string,
   tableName: string,
-): Promise<Webhook[]> {
+) {
   // Note: Using type assertion as webhooks table types are not yet generated
   const { data: webhooks, error } = await supabaseAdmin(c)
     .from('webhooks')
@@ -350,7 +350,7 @@ export async function markDeliveryFailed(
 export async function getWebhookById(
   c: Context,
   webhookId: string,
-): Promise<Webhook | null> {
+) {
   const { data, error } = await supabaseAdmin(c)
     .from('webhooks')
     .select('*')
@@ -362,7 +362,7 @@ export async function getWebhookById(
     return null
   }
 
-  return data as Webhook
+  return data
 }
 
 /**

@@ -214,6 +214,11 @@ describe('[POST] /app operations with non-owner user', () => {
   afterAll(async () => {
     await resetAppData(APPNAME)
     await resetAppDataStats(APPNAME)
+    // Restore user rights back to 'read' to avoid polluting other tests
+    const supabase = getSupabaseClient()
+    await supabase.from('org_users').update({
+      user_right: 'read',
+    }).eq('org_id', NON_OWNER_ORG_ID).eq('user_id', USER_ID)
   })
 
   it('should not allow app creation in an organization where user has no write access', async () => {
