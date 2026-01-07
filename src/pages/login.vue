@@ -30,6 +30,9 @@ const router = useRouter()
 const { t } = useI18n()
 const captchaComponent = ref<InstanceType<typeof VueTurnstile> | null>(null)
 
+// Detect if user is being redirected from SSO
+const isFromSSO = ref(false)
+
 const version = import.meta.env.VITE_APP_VERSION
 
 const registerUrl = window.location.host === 'console.capgo.app' ? 'https://capgo.app/register/' : `/register/`
@@ -263,6 +266,12 @@ async function checkLogin() {
   const params = new URLSearchParams(parsedUrl.search)
   const accessToken = params.get('access_token')
   const refreshToken = params.get('refresh_token')
+  const fromSSO = params.get('from_sso')
+
+  // Set SSO redirect state
+  if (fromSSO === 'true') {
+    isFromSSO.value = true
+  }
 
   if (!!accessToken && !!refreshToken) {
     const res = await supabase.auth.setSession({
@@ -271,6 +280,7 @@ async function checkLogin() {
     })
     if (res.error) {
       console.error('Cannot set auth', res.error)
+      isFromSSO.value = false
       return
     }
     nextLogin()
@@ -332,7 +342,22 @@ onMounted(checkLogin)
         </p>
       </div>
 
-      <div v-if="statusAuth === 'login'" class="relative mx-auto mt-8 max-w-md md:mt-4">
+      <!-- Show loading message when redirected from SSO -->
+      <div v-if="isFromSSO" class="mx-auto mt-8 max-w-xl">
+        <div class="overflow-hidden bg-white rounded-md shadow-md dark:bg-slate-800">
+          <div class="py-12 px-4 text-center">
+            <div class="animate-spin inline-block w-8 h-8 border-4 border-current border-t-transparent text-blue-600 rounded-full" role="status" aria-label="loading">
+              <span class="sr-only">{{ t('loading') }}</span>
+            </div>
+            <p class="mt-4 text-gray-600 dark:text-gray-300">
+              {{ t('sso-signing-in', 'Signing you in...') }}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Show normal login message when not from SSO -->
+      <div v-if="statusAuth === 'login' && !isFromSSO" class="relative mx-auto mt-8 max-w-md md:mt-4">
         <div class="overflow-hidden bg-white rounded-md shadow-md dark:bg-slate-800">
           <div class="py-6 px-4 text-gray-500 sm:py-7 sm:px-8">
             <FormKit id="login-account" type="form" :actions="false" @submit="submit">
@@ -380,6 +405,16 @@ onMounted(checkLogin)
                   <p class="pt-2 text-gray-300">
                     {{ version }}
                   </p>
+                  <!-- SSO Login Option -->
+                  <div class="mb-2">
+                    <router-link
+                      to="/sso-login"
+                      data-test="sso-login-link"
+                      class="text-sm font-medium text-blue-500 transition-all duration-200 hover:text-blue-600 hover:underline focus:text-blue-600"
+                    >
+                      {{ t('sign-in-with-sso', 'Sign in with SSO') }}
+                    </router-link>
+                  </div>
                   <div class="">
                     <a
                       :href="registerUrl"
