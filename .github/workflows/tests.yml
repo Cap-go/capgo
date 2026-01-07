@@ -47,9 +47,8 @@ jobs:
       #   run: bunx playwright install
       - name: Lint
         run: bun lint && bun lint:backend
-      # TODO: Re-enable after fixing type generation (requires cloud Supabase access)
-      # - name: Typecheck
-      #   run: bun typecheck
+      - name: Typecheck
+        run: bun typecheck
       - name: Lint I18n
         run: bunx @inlang/cli lint --project project.inlang
       - name: Install Supabase CLI
@@ -87,9 +86,8 @@ jobs:
           # failure = exit-early or timeout
 
           working-directory: .
-      # TODO: Re-enable after fixing type generation (requires cloud Supabase access)
-      # - name: Run all backend and CLI tests
-      #   run: bun run test:all
+      - name: Run all backend and CLI tests
+        run: bun run test:all
         # TODO: enable these tests when they are stable
       # - uses: JarvusInnovations/background-action@v1
       #   name: Start Cloudflare Workers for testing
