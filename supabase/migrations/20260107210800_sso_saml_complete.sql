@@ -405,7 +405,19 @@ AS $$
 DECLARE
   v_org record;
   v_already_member boolean;
+  v_stored_email text;
 BEGIN
+  -- Validate caller identity: p_user_id must match authenticated user
+  IF p_user_id != auth.uid() THEN
+    RAISE EXCEPTION 'Unauthorized: user_id mismatch';
+  END IF;
+  
+  -- Validate email matches the stored email for this user
+  SELECT email INTO v_stored_email FROM auth.users WHERE id = p_user_id;
+  IF v_stored_email IS NULL OR lower(v_stored_email) != lower(p_email) THEN
+    RAISE EXCEPTION 'Unauthorized: email mismatch';
+  END IF;
+  
   -- Find organizations with this SSO provider that have auto-join enabled
   FOR v_org IN
     SELECT DISTINCT 
@@ -473,7 +485,19 @@ AS $$
 DECLARE
   v_domain text;
   v_org record;
+  v_stored_email text;
 BEGIN
+  -- Validate caller identity: p_user_id must match authenticated user
+  IF p_user_id != auth.uid() THEN
+    RAISE EXCEPTION 'Unauthorized: user_id mismatch';
+  END IF;
+  
+  -- Validate email matches the stored email for this user
+  SELECT email INTO v_stored_email FROM auth.users WHERE id = p_user_id;
+  IF v_stored_email IS NULL OR lower(v_stored_email) != lower(p_email) THEN
+    RAISE EXCEPTION 'Unauthorized: email mismatch';
+  END IF;
+  
   v_domain := lower(split_part(p_email, '@', 2));
   
   IF v_domain IS NULL OR v_domain = '' THEN
@@ -953,12 +977,8 @@ CREATE POLICY "Org admins can view org SSO audit logs"
     )
   );
 
--- System can insert audit logs (SECURITY DEFINER functions)
-CREATE POLICY "System can insert audit logs" ON public.sso_audit_logs FOR
-INSERT
-    TO authenticated
-WITH
-    CHECK (true);
+-- Note: No INSERT policy needed for sso_audit_logs since SECURITY DEFINER
+-- functions bypass RLS. Only service_role should insert directly.
 
 -- ============================================================================
 -- GRANTS: Ensure proper permissions
@@ -1001,11 +1021,14 @@ EXECUTE ON FUNCTION public.auto_enroll_sso_user TO authenticated;
 GRANT
 EXECUTE ON FUNCTION public.auto_join_user_to_orgs_by_email TO authenticated;
 
-GRANT
-EXECUTE ON FUNCTION public.trigger_auto_join_on_user_create TO authenticated;
+-- Revoke public/authenticated access to trigger functions (DB triggers only)
+REVOKE
+EXECUTE ON FUNCTION public.trigger_auto_join_on_user_create
+FROM PUBLIC;
 
-GRANT
-EXECUTE ON FUNCTION public.trigger_auto_join_on_user_update TO authenticated;
+REVOKE
+EXECUTE ON FUNCTION public.trigger_auto_join_on_user_update
+FROM PUBLIC;
 
 -- Grant special permissions to auth admin for trigger functions
 GRANT
