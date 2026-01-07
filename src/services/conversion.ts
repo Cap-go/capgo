@@ -45,10 +45,12 @@ export interface ChecksumInfo {
 
 /**
  * Detects the checksum algorithm type based on the hash string length.
- * SHA-256 = 64 hex characters (256 bits) - Default algorithm used by CLI
- * CRC32 = 8 hex characters (32 bits) - Legacy option, rarely used
+ * SHA-256 = 64 hex characters (256 bits)
+ * CRC32 = 8 hex characters (32 bits)
  *
- * Checksum verification requires plugin version > 4.4.0
+ * Algorithm selection in CLI:
+ * - SHA-256: Used with V2 encryption OR modern plugin versions (5.10.0+, 6.25.0+, 7.0.30+)
+ * - CRC32: Used with older plugin versions without V2 encryption
  */
 export function getChecksumInfo(checksum: string | null | undefined): ChecksumInfo {
   if (!checksum) {
@@ -62,24 +64,24 @@ export function getChecksumInfo(checksum: string | null | undefined): ChecksumIn
 
   const length = checksum.length
 
-  // SHA-256: Default algorithm, produces 64 hex characters
-  // Used for secure integrity verification of bundles
+  // SHA-256: 64 hex characters
+  // Used with V2 encryption or modern plugin versions (5.10.0+, 6.25.0+, 7.0.30+)
   if (length === 64) {
     return {
       type: 'sha256',
       label: 'SHA-256',
-      minPluginVersion: '>4.4.0',
+      minPluginVersion: '5.10.0 / 6.25.0 / 7.0.30',
       features: ['integrity-verification', 'corruption-detection', 'security'],
     }
   }
 
-  // CRC32: Legacy algorithm, produces 8 hex characters
-  // Faster but less secure, kept for backwards compatibility
+  // CRC32: 8 hex characters
+  // Used with older plugin versions without V2 encryption
   if (length === 8) {
     return {
       type: 'crc32',
       label: 'CRC32',
-      minPluginVersion: '>4.4.0',
+      minPluginVersion: '<5.10.0 / <6.25.0 / <7.0.30',
       features: ['fast-verification', 'corruption-detection'],
     }
   }
