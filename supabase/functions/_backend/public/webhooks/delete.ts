@@ -19,8 +19,8 @@ export async function deleteWebhook(c: Context, bodyRaw: any, apikey: Database['
 
   await checkWebhookPermission(c, body.orgId, apikey)
 
-  // Use authenticated client for data queries - RLS will enforce access
-  const supabase = supabaseApikey(c, apikey.key)
+  // Use authenticated client - RLS will enforce access
+  const supabase = supabaseApikey(c, c.get('capgkey') as string)
 
   // Verify webhook belongs to org
   // Note: Using type assertion as webhooks table types are not yet generated

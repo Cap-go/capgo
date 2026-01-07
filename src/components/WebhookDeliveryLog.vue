@@ -16,7 +16,7 @@ import Spinner from '~/components/Spinner.vue'
 import { useWebhooksStore } from '~/stores/webhooks'
 
 const props = defineProps<{
-  webhook: Webhook
+  webhook: Database['public']['Tables']['webhooks']['Row']
 }>()
 
 const emit = defineEmits<{

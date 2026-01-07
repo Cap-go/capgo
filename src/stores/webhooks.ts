@@ -81,7 +81,7 @@ export const useWebhooksStore = defineStore('webhooks', () => {
    * Get a single webhook
    * Uses direct Supabase SDK - RLS handles permissions
    */
-  async function getWebhook(webhookId: string): Promise<Webhook | null> {
+  async function getWebhook(webhookId: string): Promise<Database['public']['Tables']['webhooks']['Row'] | null> {
     const organizationStore = useOrganizationStore()
     const orgId = organizationStore.currentOrganization?.gid
 
@@ -119,7 +119,7 @@ export const useWebhooksStore = defineStore('webhooks', () => {
     name: string
     url: string
     events: string[]
-  }): Promise<{ success: boolean, webhook?: Webhook, error?: string }> {
+  }): Promise<{ success: boolean, webhook?: Database['public']['Tables']['webhooks']['Row'], error?: string }> {
     const organizationStore = useOrganizationStore()
     const orgId = organizationStore.currentOrganization?.gid
 
@@ -188,7 +188,7 @@ export const useWebhooksStore = defineStore('webhooks', () => {
       events: string[]
       enabled: boolean
     }>,
-  ): Promise<{ success: boolean, webhook?: Webhook, error?: string }> {
+  ): Promise<{ success: boolean, webhook?: Database['public']['Tables']['webhooks']['Row'], error?: string }> {
     const organizationStore = useOrganizationStore()
     const orgId = organizationStore.currentOrganization?.gid
 
