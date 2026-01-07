@@ -350,7 +350,7 @@ app.post('/complete-top-up', middlewareAuth, async (c) => {
     throw simpleError('credit_product_not_found', 'Checkout session does not include the credit product')
 
   // Validate sessionId format to prevent injection (Stripe session IDs: cs_test_* or cs_live_*)
-  if (!/^cs_(test|live)_[a-zA-Z0-9]+$/.test(body.sessionId))
+  if (!/^cs_(?:test|live)_[a-zA-Z0-9]+$/.test(body.sessionId))
     throw simpleError('invalid_session_id', 'Invalid session ID format')
 
   const sourceMatchFilters = [`source_ref->>sessionId.eq.${body.sessionId}`]
