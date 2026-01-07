@@ -5,6 +5,40 @@ import { cloudlog, cloudlogErr } from './logging.ts'
 import { supabaseAdmin } from './supabase.ts'
 import { existInEnv, getEnv } from './utils.ts'
 
+// Checks if SUPABASE_URL points to a local instance
+function isLocalSupabase(c: Context): boolean {
+  const supabaseUrl = getEnv(c, 'SUPABASE_URL')
+  if (!supabaseUrl)
+    return false
+  return supabaseUrl.includes('127.0.0.1') || supabaseUrl.includes('localhost')
+}
+
+// Extracts the Supabase project ID from SUPABASE_URL
+// e.g., "https://xvwzpoazmxkqosrdewyv.supabase.co" -> "xvwzpoazmxkqosrdewyv"
+function getSupabaseProjectId(c: Context): string | null {
+  const supabaseUrl = getEnv(c, 'SUPABASE_URL')
+  if (!supabaseUrl)
+    return null
+  return supabaseUrl.split('//')[1]?.split('.')[0]?.split(':')[0] || null
+}
+
+// Builds a Supabase dashboard link to the orgs table filtered by customer_id
+function buildSupabaseDashboardLink(c: Context, customerId: string): string | null {
+  const supabaseUrl = getEnv(c, 'SUPABASE_URL')
+  if (!supabaseUrl)
+    return null
+
+  // Local Supabase Studio runs on port 54323
+  if (isLocalSupabase(c))
+    return `http://127.0.0.1:54323/project/default/editor/445780?schema=public&filter=customer_id%3Aeq%3A${customerId}`
+
+  const projectId = getSupabaseProjectId(c)
+  if (!projectId)
+    return null
+  // 445780 is the orgs table ID in Supabase
+  return `https://supabase.com/dashboard/project/${projectId}/editor/445780?schema=public&filter=customer_id%3Aeq%3A${customerId}`
+}
+
 export type StripeEnvironment = 'live' | 'test'
 
 export function resolveStripeEnvironment(c: Context): StripeEnvironment {
@@ -386,7 +420,6 @@ export async function createCustomer(c: Context, email: string, userId: string, 
   }
   if (baseConsoleUrl) {
     metadata.log_as = `${baseConsoleUrl}/log-as/${userId}`
-    // https://supabase.com/dashboard/project/xvwzpoazmxkqosrdewyv/editor/445780?schema=public&filter=customer_id%3Aeq%3Acus_LR8PMu6exnGSuZ
   }
   if (!existInEnv(c, 'STRIPE_SECRET_KEY')) {
     cloudlog({ requestId: c.get('requestId'), message: 'createCustomer no stripe key', email, userId, name })
@@ -399,6 +432,12 @@ export async function createCustomer(c: Context, email: string, userId: string, 
     name,
     metadata,
   })
+  // Add supabase dashboard link with the real customer ID after creation
+  const supabaseLink = buildSupabaseDashboardLink(c, customer.id)
+  if (supabaseLink) {
+    metadata.supabase = supabaseLink
+    await getStripe(c).customers.update(customer.id, { metadata })
+  }
   return customer
 }
 
@@ -418,6 +457,10 @@ export async function ensureCustomerMetadata(c: Context, customerId: string, org
     if (baseConsoleUrl)
       metadata.log_as = `${baseConsoleUrl}/log-as/${userId}`
   }
+
+  const supabaseLink = buildSupabaseDashboardLink(c, customerId)
+  if (supabaseLink)
+    metadata.supabase = supabaseLink
 
   try {
     await getStripe(c).customers.update(customerId, { metadata })
