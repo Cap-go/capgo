@@ -17,6 +17,7 @@ export default antfu(
       '**/supabase.types*',
       'supabase/functions/_backend/scripts/*',
       'CHANGELOG.md',
+      'src/services/posthog.ts',
     ],
   },
   {
