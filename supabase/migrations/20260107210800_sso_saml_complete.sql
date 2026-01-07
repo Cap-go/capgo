@@ -212,7 +212,7 @@ DECLARE
 BEGIN
   v_domain := lower(split_part(p_email, '@', 2));
   
-  IF v_domain IS NULL OR v_domain = '' THEN
+  IF v_domain IS NULL OR LENGTH(v_domain) = 0 THEN
     RETURN false;
   END IF;
   
@@ -324,7 +324,7 @@ BEGIN
   -- Extract domain from email
   v_domain := lower(split_part(p_email, '@', 2));
   
-  IF v_domain IS NULL OR v_domain = '' THEN
+  IF v_domain IS NULL OR LENGTH(v_domain) = 0 THEN
     RETURN;
   END IF;
   
@@ -364,7 +364,7 @@ DECLARE
 BEGIN
   v_domain := lower(split_part(p_email, '@', 2));
   
-  IF v_domain IS NULL OR v_domain = '' THEN
+  IF v_domain IS NULL OR LENGTH(v_domain) = 0 THEN
     RETURN NULL;
   END IF;
   
@@ -476,7 +476,7 @@ DECLARE
 BEGIN
   v_domain := lower(split_part(p_email, '@', 2));
   
-  IF v_domain IS NULL OR v_domain = '' THEN
+  IF v_domain IS NULL OR LENGTH(v_domain) = 0 THEN
     RETURN;
   END IF;
   
