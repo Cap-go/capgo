@@ -11,8 +11,9 @@ export function posthogLoader(supaHost: string) {
     return
   posthog.init('phc_NXDyDajQaTQVwb25DEhIVZfxVUn4R0Y348Z7vWYHZUi', {
     api_host: 'https://psthg.digitalshift-ee.workers.dev/',
+    ui_host: 'https://eu.posthog.com',
     person_profiles: 'identified_only',
-    defaults: '2025-05-24',
+    defaults: '2025-11-30',
   })
 }
 
