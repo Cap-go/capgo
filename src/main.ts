@@ -51,7 +51,7 @@ window.addEventListener('unhandledrejection', (event) => {
   }
 })
 
-const guestPath = ['/login', '/delete_account', '/confirm-signup', '/forgot_password', '/resend_email', '/onboarding', '/register', '/invitation', '/scan']
+const guestPath = ['/login', '/delete_account', '/confirm-signup', '/forgot_password', '/resend_email', '/onboarding', '/register', '/invitation', '/scan', '/sso-login']
 
 getRemoteConfig()
 const app = createApp(App)

@@ -3,30 +3,54 @@ import { getRuntimeKey } from 'hono/adapter'
 import { cloudlogErr, serializeError } from './logging.ts'
 
 const CACHE_METHOD = 'GET'
+const CACHE_NAME = 'capgo-cache'
 
-type CacheLike = Cache & { default?: Cache }
+type CacheLike = CacheStorage & { default?: Cache }
 
-function resolveGlobalCache(): Cache | null {
+async function resolveGlobalCache(): Promise<Cache | null> {
   if (typeof caches === 'undefined')
     return null
 
-  const cacheStorage = caches as any as CacheLike
+  const cacheStorage = caches as unknown as CacheLike
+
+  // Cloudflare Workers (workerd) has caches.default which is already a Cache
   if (getRuntimeKey() === 'workerd' && cacheStorage.default)
     return cacheStorage.default
-  return cacheStorage
+
+  // For other environments (Deno, etc.), we need to open a named cache
+  // Check if caches.open is available (standard CacheStorage API)
+  if (typeof cacheStorage.open === 'function') {
+    try {
+      return await cacheStorage.open(CACHE_NAME)
+    }
+    catch {
+      // Cache API not fully supported in this environment
+      return null
+    }
+  }
+
+  return null
 }
 
 export type CacheKeyParams = Record<string, string>
 
 export class CacheHelper {
-  private cache: Cache | null
+  private cache: Cache | null = null
+  private cacheInitialized = false
 
-  constructor(private context: Context) {
-    this.cache = resolveGlobalCache()
+  constructor(private context: Context) { }
+
+  private async ensureCache(): Promise<Cache | null> {
+    if (!this.cacheInitialized) {
+      this.cache = await resolveGlobalCache()
+      this.cacheInitialized = true
+    }
+    return this.cache
   }
 
   get available() {
-    return this.cache !== null
+    // For sync check, assume available if caches exists
+    return typeof caches !== 'undefined'
   }
 
   buildRequest(path: string, params: CacheKeyParams = {}) {
@@ -40,10 +64,11 @@ export class CacheHelper {
   }
 
   async matchJson<T>(key: Request): Promise<T | null> {
-    if (!this.cache)
+    const cache = await this.ensureCache()
+    if (!cache)
       return null
     try {
-      const cachedResponse = await this.cache.match(key)
+      const cachedResponse = await cache.match(key)
       if (!cachedResponse)
         return null
       return await cachedResponse.json<T>()
@@ -55,7 +80,8 @@ export class CacheHelper {
   }
 
   async putJson(key: Request, payload: unknown, ttlSeconds: number) {
-    if (!this.cache)
+    const cache = await this.ensureCache()
+    if (!cache)
       return
     const headers = new Headers({
       'Content-Type': 'application/json',
@@ -63,7 +89,7 @@ export class CacheHelper {
     })
     const response = new Response(JSON.stringify(payload), { headers })
     try {
-      await this.cache.put(key, response.clone())
+      await cache.put(key, response.clone())
     }
     catch (error) {
       this.logCacheError('Error writing cached response', error)

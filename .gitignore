@@ -38,6 +38,13 @@ playwright/.auth
 CHANGELOG.md
 .history
 
+# Documentation and PR workspace files (not part of codebase)
+PR_DESCRIPTION.md
+SSO_IMPLEMENTATION_SUMMARY.md
+SSO_TEST_STATUS.md
+SSO_TESTING_GUIDE.md
+PR_CHECKLIST.md
+
 .env.dev
 cloudflare_workers_deno/cloudflare/*
 cloudflare_workers_deno/cloudflare_tests/*
@@ -63,6 +70,7 @@ internal/cloudflare/.env.prod
 scripts/local_cf_backend/spawn
 temp_cli_test
 internal/supabase/.env.prod
+supabase/.env
 cloudflare_workers/files/.wrangler/*
 cloudflare_workers/plugin/.wrangler/*
 tmp

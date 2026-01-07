@@ -36,74 +36,79 @@ const shouldBlockContent = computed(() => {
 const organizationTabs = ref<Tab[]>([...baseOrgTabs]) as Ref<Tab[]>
 
 watchEffect(() => {
-  // ensure usage/plans tabs based on permissions (keeps icons from base)
-  const needsUsage = organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['super_admin'])
-  const hasUsage = organizationTabs.value.find(tab => tab.key === '/settings/organization/usage')
-  if (needsUsage && !hasUsage) {
-    const base = baseOrgTabs.find(t => t.key === '/settings/organization/usage')
-    if (base)
-      organizationTabs.value.push({ ...base })
-  }
-  if (!needsUsage && hasUsage)
-    organizationTabs.value = organizationTabs.value.filter(tab => tab.key !== '/settings/organization/usage')
+  // Rebuild tabs array in correct order based on permissions
+  const newTabs: Tab[] = []
 
-  const needsCredits = organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['super_admin'])
-  const hasCredits = organizationTabs.value.find(tab => tab.key === '/settings/organization/credits')
+  // Always show general and members
+  const general = baseOrgTabs.find(t => t.key === '/settings/organization')
+  const members = baseOrgTabs.find(t => t.key === '/settings/organization/members')
+  if (general)
+    newTabs.push({ ...general })
 
-  if (needsCredits && !hasCredits) {
-    const base = baseOrgTabs.find(t => t.key === '/settings/organization/credits')
-    if (base)
-      organizationTabs.value.push({ ...base })
+  // Add SSO after general if user is super_admin
+  const needsSSO = organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['super_admin'])
+  if (needsSSO) {
+    const sso = baseOrgTabs.find(t => t.key === '/settings/organization/sso')
+    if (sso)
+      newTabs.push({ ...sso })
   }
 
-  if (!needsCredits && hasCredits)
-    organizationTabs.value = organizationTabs.value.filter(tab => tab.key !== '/settings/organization/credits')
+  // Add members
+  if (members)
+    newTabs.push({ ...members })
 
+  // Add plans if super_admin
   const needsPlans = organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['super_admin'])
-  const hasPlans = organizationTabs.value.find(tab => tab.key === '/settings/organization/plans')
-  if (needsPlans && !hasPlans) {
-    const base = baseOrgTabs.find(t => t.key === '/settings/organization/plans')
-    if (base)
-      organizationTabs.value.push({ ...base })
+  if (needsPlans) {
+    const plans = baseOrgTabs.find(t => t.key === '/settings/organization/plans')
+    if (plans)
+      newTabs.push({ ...plans })
   }
-  if (!needsPlans && hasPlans)
-    organizationTabs.value = organizationTabs.value.filter(tab => tab.key !== '/settings/organization/plans')
 
-  // Audit logs - visible only to super_admins
+  // Add usage if super_admin
+  const needsUsage = organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['super_admin'])
+  if (needsUsage) {
+    const usage = baseOrgTabs.find(t => t.key === '/settings/organization/usage')
+    if (usage)
+      newTabs.push({ ...usage })
+  }
+
+  // Add credits if super_admin
+  const needsCredits = organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['super_admin'])
+  if (needsCredits) {
+    const credits = baseOrgTabs.find(t => t.key === '/settings/organization/credits')
+    if (credits)
+      newTabs.push({ ...credits })
+  }
+
+  // Add audit logs if super_admin
   const needsAuditLogs = organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['super_admin'])
-  const hasAuditLogs = organizationTabs.value.find(tab => tab.key === '/settings/organization/audit-logs')
-  if (needsAuditLogs && !hasAuditLogs) {
-    const base = baseOrgTabs.find(t => t.key === '/settings/organization/audit-logs')
-    if (base)
-      organizationTabs.value.push({ ...base })
+  if (needsAuditLogs) {
+    const auditLogs = baseOrgTabs.find(t => t.key === '/settings/organization/audit-logs')
+    if (auditLogs)
+      newTabs.push({ ...auditLogs })
   }
-  if (!needsAuditLogs && hasAuditLogs)
-    organizationTabs.value = organizationTabs.value.filter(tab => tab.key !== '/settings/organization/audit-logs')
 
-  // Security - visible only to super_admins
+  // Add security if super_admin
   const needsSecurity = organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['super_admin'])
-  const hasSecurity = organizationTabs.value.find(tab => tab.key === '/settings/organization/security')
-  if (needsSecurity && !hasSecurity) {
-    const base = baseOrgTabs.find(t => t.key === '/settings/organization/security')
-    if (base)
-      organizationTabs.value.push({ ...base })
+  if (needsSecurity) {
+    const security = baseOrgTabs.find(t => t.key === '/settings/organization/security')
+    if (security)
+      newTabs.push({ ...security })
   }
-  if (!needsSecurity && hasSecurity)
-    organizationTabs.value = organizationTabs.value.filter(tab => tab.key !== '/settings/organization/security')
 
+  // Add billing if super_admin and not native platform
   if (!Capacitor.isNativePlatform()
-    && organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['super_admin'])
-    && !organizationTabs.value.find(tab => tab.key === '/billing')) {
-    organizationTabs.value.push({
+    && organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['super_admin'])) {
+    newTabs.push({
       label: 'billing',
       icon: IconBilling,
       key: '/billing',
       onClick: () => openPortal(organizationStore.currentOrganization?.gid ?? '', t),
     })
   }
-  else if (!organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['super_admin'])) {
-    organizationTabs.value = organizationTabs.value.filter(tab => tab.key !== '/billing')
-  }
+
+  organizationTabs.value = newTabs
 })
 
 const activePrimary = computed(() => {

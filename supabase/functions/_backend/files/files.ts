@@ -23,6 +23,44 @@ import { ALLOWED_HEADERS, ALLOWED_METHODS, EXPOSED_HEADERS, MAX_UPLOAD_LENGTH_BY
 const DO_CALL_TIMEOUT = 1000 * 60 * 30 // 20 minutes
 
 const ATTACHMENT_PREFIX = 'attachments'
+const FILES_CACHE_NAME = 'capgo-files-cache'
+
+// Cache singleton for lazy initialization
+let filesCache: Cache | null = null
+let filesCacheInitialized = false
+
+async function getFilesCache(): Promise<Cache | null> {
+  if (filesCacheInitialized) {
+    return filesCache
+  }
+
+  if (typeof caches === 'undefined') {
+    filesCacheInitialized = true
+    return null
+  }
+
+  const runtime = getRuntimeKey()
+
+  // Cloudflare Workers has caches.default
+  if (runtime === 'workerd') {
+    // @ts-expect-error - caches.default exists in workerd
+    filesCache = caches.default
+    filesCacheInitialized = true
+    return filesCache
+  }
+
+  // For other environments, open a named cache
+  try {
+    filesCache = await caches.open(FILES_CACHE_NAME)
+    filesCacheInitialized = true
+    return filesCache
+  }
+  catch {
+    // Cache API not fully supported
+    filesCacheInitialized = true
+    return null
+  }
+}
 
 export const app = new Hono<MiddlewareKeyVariables>()
 
@@ -64,16 +102,19 @@ async function getHandler(c: Context): Promise<Response> {
     return c.json({ error: 'not_found', message: 'Not found' }, 404)
   }
 
-  // Support for deno cache or CF cache do not remove this
-  // @ts-expect-error-next-line
-  const cache = getRuntimeKey() === 'workerd' ? caches.default : caches
+  // Support for deno cache or CF cache - use helper function for proper cache initialization
+  const cache = await getFilesCache()
   const cacheUrl = new URL(c.req.url)
   cacheUrl.searchParams.set('range', c.req.header('range') || '')
   const cacheKey = new Request(cacheUrl, c.req)
-  let response = await cache.match(cacheKey)
-  if (response != null) {
-    cloudlog({ requestId: c.get('requestId'), message: 'getHandler files cache hit' })
-    return response
+
+  // Only try cache operations if cache is available
+  if (cache) {
+    const cachedResponse = await cache.match(cacheKey)
+    if (cachedResponse != null) {
+      cloudlog({ requestId: c.get('requestId'), message: 'getHandler files cache hit' })
+      return cachedResponse
+    }
   }
 
   const rangeHeaderFromRequest = c.req.header('range')
@@ -110,15 +151,17 @@ async function getHandler(c: Context): Promise<Response> {
   if (object.range != null && c.req.header('range')) {
     cloudlog({ requestId: c.get('requestId'), message: 'getHandler files range request', range: rangeHeader(object.size, object.range) })
     headers.set('content-range', rangeHeader(object.size, object.range))
-    response = new Response(object.body, { headers, status: 206 })
-    return response
+    const rangeResponse = new Response(object.body, { headers, status: 206 })
+    return rangeResponse
   }
   headers.set('Content-Disposition', `attachment; filename="${object.key}"`)
-  response = new Response(object.body, { headers })
-  await backgroundTask(c, () => {
-    cloudlog({ requestId: c.get('requestId'), message: 'getHandler files cache saved', fileId: requestId })
-    cache.put(cacheKey, response.clone())
-  })
+  const response = new Response(object.body, { headers })
+  if (cache) {
+    await backgroundTask(c, () => {
+      cloudlog({ requestId: c.get('requestId'), message: 'getHandler files cache saved', fileId: requestId })
+      cache.put(cacheKey, response.clone())
+    })
+  }
   return response
 }
 

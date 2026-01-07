@@ -9,6 +9,11 @@ import { app as events } from '../../supabase/functions/_backend/private/events.
 import { app as log_as } from '../../supabase/functions/_backend/private/log_as.ts'
 import { app as plans } from '../../supabase/functions/_backend/private/plans.ts'
 import { app as publicStats } from '../../supabase/functions/_backend/private/public_stats.ts'
+import { app as sso_configure } from '../../supabase/functions/_backend/private/sso_configure.ts'
+import { app as sso_remove } from '../../supabase/functions/_backend/private/sso_remove.ts'
+import { app as sso_status } from '../../supabase/functions/_backend/private/sso_status.ts'
+import { app as sso_test } from '../../supabase/functions/_backend/private/sso_test.ts'
+import { app as sso_update } from '../../supabase/functions/_backend/private/sso_update.ts'
 import { app as stats_priv } from '../../supabase/functions/_backend/private/stats.ts'
 import { app as storeTop } from '../../supabase/functions/_backend/private/store_top.ts'
 import { app as stripe_checkout } from '../../supabase/functions/_backend/private/stripe_checkout.ts'
@@ -77,6 +82,11 @@ appPrivate.route('/stripe_portal', stripe_portal)
 appPrivate.route('/delete_failed_version', deleted_failed_version)
 appPrivate.route('/create_device', create_device)
 appPrivate.route('/events', events)
+appPrivate.route('/sso/configure', sso_configure)
+appPrivate.route('/sso/update', sso_update)
+appPrivate.route('/sso/remove', sso_remove)
+appPrivate.route('/sso/status', sso_status)
+appPrivate.route('/sso/test', sso_test)
 
 // Triggers
 const functionNameTriggers = 'triggers'
