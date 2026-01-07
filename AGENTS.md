@@ -22,6 +22,13 @@
 - do not create new cron jobs it's bad pattern instead update
   process_all_cron_tasks function in a new migration file to add your job if
   needed.
+- Never use the Supabase admin SDK (with service key) for user-facing APIs.
+  Always use the client SDK with user authentication so RLS policies are
+  enforced. The admin SDK should only be used when accessing data that is not
+  user-accessible or for internal operations (triggers, CRON jobs, etc.). When
+  admin access is unavoidable for a user-facing endpoint, sanitize all user
+  inputs carefully—the SDK is susceptible to PostgREST query injection (not SQL
+  injection, but filter/modifier injection via crafted parameters).
 
 ## Frontend Style
 
