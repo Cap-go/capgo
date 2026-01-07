@@ -4,11 +4,23 @@
  * These tests verify that the PostgreSQL RLS identity functions properly
  * support both plain and hashed API keys. This is critical for CLI usage
  * where the Supabase SDK is used directly with the capgkey header.
+ *
+ * IMPORTANT: This test uses a completely isolated user (USER_ID_RLS) with its own
+ * org and API key to prevent interference with other tests that create/delete API keys.
  */
 import { createClient } from '@supabase/supabase-js'
 import { Pool } from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { APP_NAME, BASE_URL, headers, ORG_ID, POSTGRES_URL, USER_ID } from './test-utils.ts'
+import { APIKEY_RLS_ALL, APP_NAME_RLS, BASE_URL, ORG_ID_RLS, POSTGRES_URL, USER_ID_RLS } from './test-utils.ts'
+
+// Use dedicated RLS test user's API key to avoid conflicts with other tests
+const headersRLS = {
+  'Content-Type': 'application/json',
+  'Authorization': APIKEY_RLS_ALL,
+}
+
+// Use dedicated RLS test user for complete isolation
+const RLS_TEST_USER_ID = USER_ID_RLS
 
 // Direct PostgreSQL connection for testing SQL functions
 let pool: Pool
@@ -31,7 +43,7 @@ async function execWithCapgkey(sql: string, capgkey: string): Promise<any> {
 async function createHashedApiKey(name: string): Promise<{ id: number, key: string, key_hash: string }> {
   const response = await fetch(`${BASE_URL}/apikey`, {
     method: 'POST',
-    headers,
+    headers: headersRLS,
     body: JSON.stringify({ name, hashed: true }),
   })
   if (response.status !== 200) {
@@ -45,7 +57,7 @@ async function createHashedApiKey(name: string): Promise<{ id: number, key: stri
 async function createPlainApiKey(name: string): Promise<{ id: number, key: string }> {
   const response = await fetch(`${BASE_URL}/apikey`, {
     method: 'POST',
-    headers,
+    headers: headersRLS,
     body: JSON.stringify({ name, hashed: false }),
   })
   if (response.status !== 200) {
@@ -59,7 +71,7 @@ async function createPlainApiKey(name: string): Promise<{ id: number, key: strin
 async function deleteApiKey(id: number): Promise<void> {
   await fetch(`${BASE_URL}/apikey/${id}`, {
     method: 'DELETE',
-    headers,
+    headers: headersRLS,
   })
 }
 
@@ -92,7 +104,7 @@ describe('get_identity() with hashed API keys', () => {
   beforeAll(async () => {
     hashedKey = await createHashedApiKey('test-hashed-rls-identity')
     plainKey = await createPlainApiKey('test-plain-rls-identity')
-  })
+  }, 60000) // Increase timeout for CI/parallel test runs
 
   afterAll(async () => {
     await deleteApiKey(hashedKey.id)
@@ -104,7 +116,7 @@ describe('get_identity() with hashed API keys', () => {
       `SELECT get_identity('{all,write,read,upload}'::key_mode[]) as user_id`,
       plainKey.key,
     )
-    expect(rows[0].user_id).toBe(USER_ID)
+    expect(rows[0].user_id).toBe(RLS_TEST_USER_ID)
   })
 
   it('returns user_id for hashed API key', async () => {
@@ -112,7 +124,7 @@ describe('get_identity() with hashed API keys', () => {
       `SELECT get_identity('{all,write,read,upload}'::key_mode[]) as user_id`,
       hashedKey.key, // The plain key value - DB should hash and match
     )
-    expect(rows[0].user_id).toBe(USER_ID)
+    expect(rows[0].user_id).toBe(RLS_TEST_USER_ID)
   })
 
   it('returns NULL for invalid API key', async () => {
@@ -168,7 +180,7 @@ describe('get_identity() with hashed API keys', () => {
       `SELECT get_identity('{all,write,read,upload}'::key_mode[]) as user_id`,
       futureKey.key,
     )
-    expect(rows[0].user_id).toBe(USER_ID)
+    expect(rows[0].user_id).toBe(RLS_TEST_USER_ID)
 
     await deleteApiKey(futureKey.id)
   })
@@ -179,7 +191,7 @@ describe('get_identity_apikey_only() with hashed API keys', () => {
 
   beforeAll(async () => {
     hashedKey = await createHashedApiKey('test-hashed-apikey-only')
-  })
+  }, 60000)
 
   afterAll(async () => {
     await deleteApiKey(hashedKey.id)
@@ -190,7 +202,7 @@ describe('get_identity_apikey_only() with hashed API keys', () => {
       `SELECT get_identity_apikey_only('{all,write,read,upload}'::key_mode[]) as user_id`,
       hashedKey.key,
     )
-    expect(rows[0].user_id).toBe(USER_ID)
+    expect(rows[0].user_id).toBe(RLS_TEST_USER_ID)
   })
 
   it('returns NULL for invalid API key', async () => {
@@ -221,7 +233,7 @@ describe('get_identity_org_allowed() with hashed API keys', () => {
     finally {
       client.release()
     }
-  })
+  }, 60000)
 
   afterAll(async () => {
     await deleteApiKey(hashedKey.id)
@@ -230,15 +242,15 @@ describe('get_identity_org_allowed() with hashed API keys', () => {
 
   it('returns user_id for hashed API key with matching org', async () => {
     const rows = await execWithCapgkey(
-      `SELECT get_identity_org_allowed('{all,write,read,upload}'::key_mode[], '${ORG_ID}'::uuid) as user_id`,
+      `SELECT get_identity_org_allowed('{all,write,read,upload}'::key_mode[], '${ORG_ID_RLS}'::uuid) as user_id`,
       hashedKey.key,
     )
-    expect(rows[0].user_id).toBe(USER_ID)
+    expect(rows[0].user_id).toBe(RLS_TEST_USER_ID)
   })
 
   it('returns NULL for hashed API key limited to different org', async () => {
     const rows = await execWithCapgkey(
-      `SELECT get_identity_org_allowed('{all,write,read,upload}'::key_mode[], '${ORG_ID}'::uuid) as user_id`,
+      `SELECT get_identity_org_allowed('{all,write,read,upload}'::key_mode[], '${ORG_ID_RLS}'::uuid) as user_id`,
       limitedKey.key,
     )
     expect(rows[0].user_id).toBeNull()
@@ -246,7 +258,7 @@ describe('get_identity_org_allowed() with hashed API keys', () => {
 
   it('returns NULL for invalid API key', async () => {
     const rows = await execWithCapgkey(
-      `SELECT get_identity_org_allowed('{all,write,read,upload}'::key_mode[], '${ORG_ID}'::uuid) as user_id`,
+      `SELECT get_identity_org_allowed('{all,write,read,upload}'::key_mode[], '${ORG_ID_RLS}'::uuid) as user_id`,
       'invalid-key',
     )
     expect(rows[0].user_id).toBeNull()
@@ -272,7 +284,7 @@ describe('get_identity_org_appid() with hashed API keys', () => {
     finally {
       client.release()
     }
-  })
+  }, 60000)
 
   afterAll(async () => {
     await deleteApiKey(hashedKey.id)
@@ -281,15 +293,15 @@ describe('get_identity_org_appid() with hashed API keys', () => {
 
   it('returns user_id for hashed API key with matching app', async () => {
     const rows = await execWithCapgkey(
-      `SELECT get_identity_org_appid('{all,write,read,upload}'::key_mode[], '${ORG_ID}'::uuid, '${APP_NAME}') as user_id`,
+      `SELECT get_identity_org_appid('{all,write,read,upload}'::key_mode[], '${ORG_ID_RLS}'::uuid, '${APP_NAME_RLS}') as user_id`,
       hashedKey.key,
     )
-    expect(rows[0].user_id).toBe(USER_ID)
+    expect(rows[0].user_id).toBe(RLS_TEST_USER_ID)
   })
 
   it('returns NULL for hashed API key limited to different app', async () => {
     const rows = await execWithCapgkey(
-      `SELECT get_identity_org_appid('{all,write,read,upload}'::key_mode[], '${ORG_ID}'::uuid, '${APP_NAME}') as user_id`,
+      `SELECT get_identity_org_appid('{all,write,read,upload}'::key_mode[], '${ORG_ID_RLS}'::uuid, '${APP_NAME_RLS}') as user_id`,
       appLimitedKey.key,
     )
     expect(rows[0].user_id).toBeNull()
@@ -297,7 +309,7 @@ describe('get_identity_org_appid() with hashed API keys', () => {
 
   it('returns NULL for invalid API key', async () => {
     const rows = await execWithCapgkey(
-      `SELECT get_identity_org_appid('{all,write,read,upload}'::key_mode[], '${ORG_ID}'::uuid, '${APP_NAME}') as user_id`,
+      `SELECT get_identity_org_appid('{all,write,read,upload}'::key_mode[], '${ORG_ID_RLS}'::uuid, '${APP_NAME_RLS}') as user_id`,
       'invalid-key',
     )
     expect(rows[0].user_id).toBeNull()
@@ -311,7 +323,7 @@ describe('find_apikey_by_value() function', () => {
   beforeAll(async () => {
     hashedKey = await createHashedApiKey('test-find-hashed')
     plainKey = await createPlainApiKey('test-find-plain')
-  })
+  }, 60000)
 
   afterAll(async () => {
     await deleteApiKey(hashedKey.id)
@@ -372,7 +384,7 @@ describe('RLS policies with hashed API keys (via Supabase SDK)', () => {
 
   beforeAll(async () => {
     hashedKey = await createHashedApiKey('test-rls-sdk-hashed')
-  })
+  }, 60000)
 
   afterAll(async () => {
     await deleteApiKey(hashedKey.id)

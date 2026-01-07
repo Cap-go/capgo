@@ -33,8 +33,8 @@ export async function get(c: Context, bodyRaw: any, apikey: Database['public']['
 
   await checkWebhookPermission(c, body.orgId, apikey)
 
-  // Use authenticated client for data queries - RLS will enforce access
-  const supabase = supabaseApikey(c, apikey.key)
+  // Use authenticated client - RLS will enforce access
+  const supabase = supabaseApikey(c, c.get('capgkey') as string)
 
   // Get single webhook
   // Note: Using type assertion as webhooks table types are not yet generated
