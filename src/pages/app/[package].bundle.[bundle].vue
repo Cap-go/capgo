@@ -14,7 +14,7 @@ import IconDocumentDuplicate from '~icons/heroicons/document-duplicate'
 import IconTrash from '~icons/heroicons/trash'
 import IconSearch from '~icons/ic/round-search?raw'
 import IconAlertCircle from '~icons/lucide/alert-circle'
-import { bytesToMbText } from '~/services/conversion'
+import { bytesToMbText, getChecksumInfo } from '~/services/conversion'
 import { formatDate, formatLocalDate } from '~/services/date'
 import { checkCompatibilityNativePackages, isCompatible, useSupabase } from '~/services/supabase'
 import { openVersion } from '~/services/versions'
@@ -154,6 +154,10 @@ const manifestSizeLabel = computed(() => {
   if (manifestSize.value !== null)
     return bytesToMbText(manifestSize.value)
   return t('metadata-not-found')
+})
+
+const checksumInfo = computed(() => {
+  return getChecksumInfo(version.value?.checksum)
 })
 
 async function getUnknownBundleId() {
@@ -734,6 +738,28 @@ async function deleteBundle() {
               >
                 <span class="flex items-center gap-2">
                   {{ hideString(version.checksum) }}
+                  <!-- Checksum type badge with tooltip -->
+                  <div class="relative group">
+                    <span
+                      class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full cursor-help"
+                      :class="{
+                        'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-200': checksumInfo.type === 'sha256',
+                        'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-200': checksumInfo.type === 'crc32',
+                        'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200': checksumInfo.type === 'unknown',
+                      }"
+                    >
+                      {{ checksumInfo.label }}
+                    </span>
+                    <!-- Tooltip -->
+                    <div class="absolute left-1/2 bottom-full mb-2 -translate-x-1/2 px-3 py-2 text-xs bg-gray-900 dark:bg-gray-700 text-white rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 whitespace-nowrap">
+                      <div class="font-medium mb-1">{{ t('checksum-type-info') }}</div>
+                      <div>{{ t('min-plugin-version') }}: {{ checksumInfo.minPluginVersion }}</div>
+                      <div v-if="checksumInfo.type === 'sha256'" class="text-blue-300 mt-1">{{ t('checksum-sha256-desc') }}</div>
+                      <div v-else-if="checksumInfo.type === 'crc32'" class="text-green-300 mt-1">{{ t('checksum-crc32-desc') }}</div>
+                      <!-- Tooltip arrow -->
+                      <div class="absolute left-1/2 top-full -translate-x-1/2 -mt-px border-4 border-transparent border-t-gray-900 dark:border-t-gray-700" />
+                    </div>
+                  </div>
                   <button
                     class="p-1 transition-colors border border-gray-200 rounded-md dark:border-gray-700 hover:bg-gray-50 hover:border-gray-300 dark:hover:border-gray-600 dark:hover:bg-gray-800"
                     @click="copyToast(version?.checksum ?? '')"

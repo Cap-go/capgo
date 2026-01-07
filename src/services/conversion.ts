@@ -33,3 +33,55 @@ export function getDaysBetweenDates(date1: string | Date, date2: string | Date) 
   const res = Math.round(Math.abs((firstDate.valueOf() - secondDate.valueOf()) / oneDay))
   return res
 }
+
+export type ChecksumType = 'sha256' | 'crc32' | 'unknown'
+
+export interface ChecksumInfo {
+  type: ChecksumType
+  label: string
+  minPluginVersion: string
+  features: string[]
+}
+
+/**
+ * Detects the checksum algorithm type based on the hash string length.
+ * SHA-256 = 64 hex characters (256 bits)
+ * CRC32 = 8 hex characters (32 bits)
+ */
+export function getChecksumInfo(checksum: string | null | undefined): ChecksumInfo {
+  if (!checksum) {
+    return {
+      type: 'unknown',
+      label: 'Unknown',
+      minPluginVersion: '-',
+      features: [],
+    }
+  }
+
+  const length = checksum.length
+
+  if (length === 64) {
+    return {
+      type: 'sha256',
+      label: 'SHA-256',
+      minPluginVersion: '4.4.0',
+      features: ['integrity-verification', 'corruption-detection', 'security'],
+    }
+  }
+
+  if (length === 8) {
+    return {
+      type: 'crc32',
+      label: 'CRC32',
+      minPluginVersion: '4.0.0',
+      features: ['fast-verification', 'corruption-detection'],
+    }
+  }
+
+  return {
+    type: 'unknown',
+    label: 'Unknown',
+    minPluginVersion: '-',
+    features: [],
+  }
+}
