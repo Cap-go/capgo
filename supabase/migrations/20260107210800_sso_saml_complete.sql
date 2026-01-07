@@ -729,7 +729,7 @@ BEGIN
   END IF;
   
   -- Validate entity_id format
-  IF NEW.entity_id IS NULL OR NEW.entity_id = '' THEN
+  IF NEW.entity_id IS NULL OR LENGTH(NEW.entity_id) = 0 THEN
     RAISE EXCEPTION 'entity_id is required';
   END IF;
   
