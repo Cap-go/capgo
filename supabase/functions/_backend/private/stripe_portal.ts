@@ -3,7 +3,7 @@ import { Hono } from 'hono/tiny'
 import { middlewareAuth, parseBody, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { createPortal } from '../utils/stripe.ts'
-import { hasOrgRight, supabaseAdmin, supabaseClient } from '../utils/supabase.ts'
+import { hasOrgRight, supabaseClient } from '../utils/supabase.ts'
 
 interface PortalData {
   callbackUrl: string
@@ -18,17 +18,18 @@ app.post('/', middlewareAuth, async (c) => {
   const body = await parseBody<PortalData>(c)
   cloudlog({ requestId: c.get('requestId'), message: 'post stripe portal body', body })
   const authorization = c.get('authorization')
-  const { data: auth, error } = await supabaseAdmin(c).auth.getUser(
-    authorization?.split('Bearer ')[1],
-  )
+  if (!authorization)
+    return simpleError('not_authorize', 'Not authorize')
 
+  // Use authenticated client - RLS will enforce access based on JWT
+  const supabase = supabaseClient(c, authorization)
+
+  // Get current user ID from JWT
+  const { data: auth, error } = await supabase.auth.getUser()
   if (error || !auth?.user?.id)
     return simpleError('not_authorize', 'Not authorize')
-    // get user from users
-  cloudlog({ requestId: c.get('requestId'), message: 'auth', auth: auth.user.id })
 
-  // Use authenticated client for data queries - RLS will enforce access
-  const supabase = supabaseClient(c, authorization!)
+  cloudlog({ requestId: c.get('requestId'), message: 'auth', auth: auth.user.id })
   const { data: org, error: dbError } = await supabase
     .from('orgs')
     .select('customer_id')

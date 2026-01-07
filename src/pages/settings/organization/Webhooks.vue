@@ -33,9 +33,9 @@ const { currentOrganization, currentRole } = storeToRefs(organizationStore)
 const { webhooks, isLoading } = storeToRefs(webhooksStore)
 
 const showForm = ref(false)
-const editingWebhook = ref<Webhook | null>(null)
+const editingWebhook = ref<Database['public']['Tables']['webhooks']['Row'] | null>(null)
 const showDeliveryLog = ref(false)
-const selectedWebhookForLog = ref<Webhook | null>(null)
+const selectedWebhookForLog = ref<Database['public']['Tables']['webhooks']['Row'] | null>(null)
 const testingWebhookId = ref<string | null>(null)
 const expandedWebhookId = ref<string | null>(null)
 

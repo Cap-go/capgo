@@ -3,7 +3,7 @@ import { Hono } from 'hono/tiny'
 import { getBundleUrl, getManifestUrl } from '../utils/downloadUrl.ts'
 import { middlewareAuth, parseBody, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
-import { hasAppRight, supabaseAdmin, supabaseClient } from '../utils/supabase.ts'
+import { hasAppRight, supabaseClient } from '../utils/supabase.ts'
 
 interface DataDownload {
   app_id: string
@@ -20,13 +20,15 @@ app.use('/', useCors)
 app.post('/', middlewareAuth, async (c) => {
   const body = await parseBody<DataDownload>(c)
   cloudlog({ requestId: c.get('requestId'), message: 'post download link body', body })
-  const authorization = c.req.header('authorization')
+  const authorization = c.get('authorization')
   if (!authorization)
     return simpleError('cannot_find_authorization', 'Cannot find authorization')
 
-  const { data: auth, error } = await supabaseAdmin(c).auth.getUser(
-    authorization?.split('Bearer ')[1],
-  )
+  // Use authenticated client - RLS will enforce access based on JWT
+  const supabase = supabaseClient(c, authorization)
+
+  // Get current user ID from JWT
+  const { data: auth, error } = await supabase.auth.getUser()
   if (error || !auth?.user?.id)
     return simpleError('not_authorize', 'Not authorize')
 
@@ -35,9 +37,6 @@ app.post('/', middlewareAuth, async (c) => {
   if (!(await hasAppRight(c, body.app_id, userId, 'read')))
     return simpleError('app_access_denied', 'You can\'t access this app', { app_id: body.app_id })
 
-  // Use authenticated client for data queries - RLS will enforce access
-  const supabase = supabaseClient(c, authorization)
-
   const { data: bundle, error: getBundleError } = await supabase
     .from('app_versions')
     .select('*, owner_org ( created_by )')
@@ -45,7 +44,7 @@ app.post('/', middlewareAuth, async (c) => {
     .eq('id', body.id)
     .single()
 
-  const ownerOrg = (bundle?.owner_org as any).created_by
+  const ownerOrg = bundle?.owner_org.created_by
 
   if (getBundleError) {
     return simpleError('cannot_get_bundle', 'Cannot get bundle', { getBundleError })

@@ -25,12 +25,12 @@ export async function test(c: Context<MiddlewareKeyVariables, any, any>, bodyRaw
 
   await checkWebhookPermissionV2(c, body.orgId, auth)
 
-  // Use authenticated client for data queries - RLS will enforce access
+  // Use authenticated client - RLS will enforce access
   const supabase = supabaseWithAuth(c, auth)
 
   // Get webhook
   // Note: Using type assertion as webhooks table types are not yet generated
-  const { data: webhook, error: fetchError } = await supabase
+  const { data: webhook, error: fetchError } = await (supabase as any)
     .from('webhooks')
     .select('*')
     .eq('id', body.webhookId)
@@ -75,7 +75,7 @@ export async function test(c: Context<MiddlewareKeyVariables, any, any>, bodyRaw
   )
 
   // Update attempt count
-  await supabase
+  await (supabase as any)
     .from('webhook_deliveries')
     .update({ attempt_count: 1 })
     .eq('id', delivery.id)
