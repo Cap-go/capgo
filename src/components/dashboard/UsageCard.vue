@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { getDaysInCurrentMonth } from '~/services/date'
 import {
   calculateDemoEvolution,
   DEMO_APP_NAMES,
