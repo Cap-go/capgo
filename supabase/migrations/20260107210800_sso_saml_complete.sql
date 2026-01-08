@@ -405,7 +405,19 @@ AS $$
 DECLARE
   v_org record;
   v_already_member boolean;
+  v_auth_email text;
 BEGIN
+  -- Authorization: reject calls where p_user_id does not match the authenticated user
+  IF p_user_id != auth.uid() THEN
+    RAISE EXCEPTION 'Unauthorized: cannot enroll other users (user_id mismatch)';
+  END IF;
+  
+  -- Email validation: ensure p_email matches the email in auth.users for p_user_id
+  SELECT email INTO v_auth_email FROM auth.users WHERE id = p_user_id;
+  IF v_auth_email IS NULL OR lower(v_auth_email) != lower(p_email) THEN
+    RAISE EXCEPTION 'Unauthorized: email mismatch for user';
+  END IF;
+  
   -- Find organizations with this SSO provider that have auto-join enabled
   FOR v_org IN
     SELECT DISTINCT 
@@ -473,7 +485,19 @@ AS $$
 DECLARE
   v_domain text;
   v_org record;
+  v_auth_email text;
 BEGIN
+  -- Authorization: reject calls where p_user_id does not match the authenticated user
+  IF p_user_id != auth.uid() THEN
+    RAISE EXCEPTION 'Unauthorized: cannot join other users to orgs (user_id mismatch)';
+  END IF;
+  
+  -- Email validation: ensure p_email matches the email in auth.users for p_user_id
+  SELECT email INTO v_auth_email FROM auth.users WHERE id = p_user_id;
+  IF v_auth_email IS NULL OR lower(v_auth_email) != lower(p_email) THEN
+    RAISE EXCEPTION 'Unauthorized: email mismatch for user';
+  END IF;
+  
   v_domain := lower(split_part(p_email, '@', 2));
   
   IF v_domain IS NULL OR LENGTH(v_domain) = 0 THEN
@@ -492,8 +516,10 @@ BEGIN
     SELECT DISTINCT o.id, o.name
     FROM public.orgs o
     INNER JOIN public.saml_domain_mappings sdm ON sdm.org_id = o.id
+    INNER JOIN public.org_saml_connections osc ON osc.org_id = o.id
     WHERE sdm.domain = v_domain
       AND sdm.verified = true
+      AND osc.auto_join_enabled = true
       AND NOT EXISTS (
         SELECT 1 FROM public.org_users ou 
         WHERE ou.user_id = p_user_id AND ou.org_id = o.id
@@ -953,12 +979,8 @@ CREATE POLICY "Org admins can view org SSO audit logs"
     )
   );
 
--- System can insert audit logs (SECURITY DEFINER functions)
-CREATE POLICY "System can insert audit logs" ON public.sso_audit_logs FOR
-INSERT
-    TO authenticated
-WITH
-    CHECK (true);
+-- NOTE: No INSERT policy needed - SECURITY DEFINER functions bypass RLS
+-- Removing overly permissive policy that allowed any authenticated user to insert audit logs
 
 -- ============================================================================
 -- GRANTS: Ensure proper permissions
