@@ -49,8 +49,8 @@ export interface ChecksumInfo {
  * CRC32 = 8 hex characters (32 bits)
  *
  * Algorithm selection in CLI:
- * - SHA-256: Used with V2 encryption OR modern plugin versions (5.10.0+, 6.25.0+, 7.0.30+)
- * - CRC32: Used with older plugin versions without V2 encryption
+ * - SHA-256: Used with V2 encryption OR v6+, v7+, v8+
+ * - CRC32: Used with v5 without V2 encryption
  */
 export function getChecksumInfo(checksum: string | null | undefined): ChecksumInfo {
   if (!checksum) {
@@ -65,23 +65,23 @@ export function getChecksumInfo(checksum: string | null | undefined): ChecksumIn
   const length = checksum.length
 
   // SHA-256: 64 hex characters
-  // Used with V2 encryption or modern plugin versions (5.10.0+, 6.25.0+, 7.0.30+)
+  // Used with V2 encryption OR plugin v6+, v7+, v8+
   if (length === 64) {
     return {
       type: 'sha256',
       label: 'SHA-256',
-      minPluginVersion: '5.10.0 / 6.25.0 / 7.0.30',
+      minPluginVersion: 'v5 + encryption, v6, v7, v8',
       features: ['integrity-verification', 'corruption-detection', 'security'],
     }
   }
 
   // CRC32: 8 hex characters
-  // Used with older plugin versions without V2 encryption
+  // Used with v5 without V2 encryption
   if (length === 8) {
     return {
       type: 'crc32',
       label: 'CRC32',
-      minPluginVersion: '<5.10.0 / <6.25.0 / <7.0.30',
+      minPluginVersion: 'v5 without encryption',
       features: ['fast-verification', 'corruption-detection'],
     }
   }
