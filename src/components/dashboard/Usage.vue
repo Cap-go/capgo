@@ -182,11 +182,13 @@ function clearDashboardParams() {
 // Function to reload all chart data
 async function reloadAllCharts() {
   // Force reload of main dashboard data
-  // Normalize dates to midnight (start of day) to ensure consistent date range
+  // End date should be end of today (23:59:59.999) to include today's data
   const last30DaysEnd = new Date()
-  last30DaysEnd.setHours(0, 0, 0, 0)
-  const last30DaysStart = new Date(last30DaysEnd)
-  last30DaysStart.setDate(last30DaysStart.getDate() - 29) // 30 days including today
+  last30DaysEnd.setHours(23, 59, 59, 999)
+  // Start date should be 29 days ago at midnight (to get 30 days total including today)
+  const last30DaysStart = new Date()
+  last30DaysStart.setHours(0, 0, 0, 0)
+  last30DaysStart.setDate(last30DaysStart.getDate() - 29)
 
   const orgId = organizationStore.currentOrganization?.gid
   if (orgId) {
@@ -287,11 +289,14 @@ function filterToBillingPeriod(fullData: { mau: number[], storage: number[], ban
 }
 
 async function getUsages(forceRefetch = false) {
-  // Always work with last 30 days of data - normalize first for consistency
+  // Always work with last 30 days of data
+  // End date should be end of today (23:59:59.999) to include today's data
   const last30DaysEnd = new Date()
-  last30DaysEnd.setHours(0, 0, 0, 0)
-  const last30DaysStart = new Date(last30DaysEnd)
-  last30DaysStart.setDate(last30DaysStart.getDate() - 29) // 30 days including today
+  last30DaysEnd.setHours(23, 59, 59, 999)
+  // Start date should be 29 days ago at midnight (to get 30 days total including today)
+  const last30DaysStart = new Date()
+  last30DaysStart.setHours(0, 0, 0, 0)
+  last30DaysStart.setDate(last30DaysStart.getDate() - 29)
 
   // Get billing period dates for filtering
   const billingStart = new Date(organizationStore.currentOrganization?.subscription_start ?? new Date())

@@ -191,10 +191,12 @@ export function createCustomTooltip(context: TooltipContext, isAccumulated: bool
     const chartLabels = chart.data?.labels || []
     const labelAtIndex = chartLabels[dataIndex]
     let formattedTitle: string
+    // Declare tooltipDate at higher scope so it's accessible for click handler
+    let tooltipDate: Date
 
     if (labelAtIndex !== undefined && dateStartOrUseBillingPeriod instanceof Date) {
       // Create date using the day number from the label and the month/year from billing start
-      const tooltipDate = new Date(dateStartOrUseBillingPeriod)
+      tooltipDate = new Date(dateStartOrUseBillingPeriod)
       const dayNumber = typeof labelAtIndex === 'number' ? labelAtIndex : Number.parseInt(String(labelAtIndex), 10)
       if (!Number.isNaN(dayNumber)) {
         // Handle month transitions - if label day is less than billing start day, it's next month
@@ -212,7 +214,7 @@ export function createCustomTooltip(context: TooltipContext, isAccumulated: bool
     }
     else {
       // Fallback to original calculation
-      const tooltipDate = getDateFromIndex(dataIndex, dateStartOrUseBillingPeriod)
+      tooltipDate = getDateFromIndex(dataIndex, dateStartOrUseBillingPeriod)
       formattedTitle = formatDateForTooltip(tooltipDate)
     }
 
