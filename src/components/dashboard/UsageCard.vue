@@ -10,6 +10,7 @@ import {
   generateDemoStorageData,
   getDemoDayCount,
 } from '~/services/demoChartData'
+import { useDashboardAppsStore } from '~/stores/dashboardApps'
 import ChartCard from './ChartCard.vue'
 import LineChartStats from './LineChartStats.vue'
 
@@ -46,18 +47,11 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
-})
-
-// Check if we have real data
-const hasRealData = computed(() => {
-  const dataArray = props.data as number[]
-  // Has data if there's at least one defined, non-zero value
-  const hasDefinedData = dataArray.some(val => val !== undefined && val !== null && val > 0)
-  // Or has data by app with at least one defined value
-  const hasAppData = props.dataByApp && Object.values(props.dataByApp).some((appValues: any) =>
-    appValues.some((val: any) => val !== undefined && val !== null && val > 0),
-  )
-  return hasDefinedData || hasAppData
+  // When true, show demo data (payment failed state)
+  forceDemo: {
+    type: Boolean,
+    default: false,
+  },
 })
 
 // Get the appropriate data generator based on chart type
@@ -88,8 +82,18 @@ const consistentDemoData = computed(() => {
 const demoData = computed(() => consistentDemoData.value.total)
 const demoDataByApp = computed(() => consistentDemoData.value.byApp)
 
-// Use real data or demo data
-const isDemoMode = computed(() => !hasRealData.value && !props.isLoading)
+// Demo mode: show demo data only when forceDemo is true OR user has no apps
+// If user has apps, ALWAYS show real data (even if empty)
+const dashboardAppsStore = useDashboardAppsStore()
+const isDemoMode = computed(() => {
+  if (props.forceDemo)
+    return true
+  // If user has apps, never show demo data
+  if (dashboardAppsStore.apps.length > 0)
+    return false
+  // No apps and store is loaded = show demo
+  return dashboardAppsStore.isLoaded
+})
 const effectiveData = computed(() => isDemoMode.value ? demoData.value : props.data as number[])
 const effectiveDataByApp = computed(() => isDemoMode.value ? demoDataByApp.value : props.dataByApp)
 const effectiveAppNames = computed(() => isDemoMode.value ? DEMO_APP_NAMES : props.appNames)
@@ -134,7 +138,15 @@ const lastDayEvolution = computed(() => {
   return ((lastValue - previousValue) / previousValue) * 100
 })
 
-const hasData = computed(() => effectiveData.value.length > 0)
+// Check if there's actual chart data (values in the array), not just a total
+// This handles cases like Storage where total can be > 0 but no activity in current period
+const hasChartData = computed(() => {
+  if (isDemoMode.value)
+    return true
+  const dataArray = effectiveData.value
+  // Check if any value in the array is defined and > 0
+  return dataArray.some(val => typeof val === 'number' && val > 0)
+})
 </script>
 
 <template>
@@ -143,7 +155,7 @@ const hasData = computed(() => effectiveData.value.length > 0)
     :total="total"
     :unit="unit"
     :last-day-evolution="lastDayEvolution"
-    :has-data="hasData"
+    :has-data="hasChartData"
     :is-loading="isLoading"
     :is-demo-data="isDemoMode"
   >

@@ -33,6 +33,10 @@ const props = defineProps({
     type: Number,
     default: 0,
   },
+  forceDemo: {
+    type: Boolean,
+    default: false,
+  },
 })
 
 // Helper function to filter 30-day data to billing period
@@ -91,9 +95,6 @@ const deploymentDataByApp = ref<{ [appId: string]: number[] }>({})
 const appNames = ref<{ [appId: string]: string }>({})
 const isLoading = ref(true)
 
-// Check if we have real data
-const hasRealData = computed(() => totalDeployments.value > 0)
-
 // Generate consistent demo data where total is derived from per-app breakdown
 const consistentDemoData = computed(() => {
   const days = getDemoDayCount(props.useBillingPeriod, deploymentData.value.length)
@@ -103,8 +104,17 @@ const consistentDemoData = computed(() => {
 const demoDeploymentData = computed(() => consistentDemoData.value.total)
 const demoDataByApp = computed(() => consistentDemoData.value.byApp)
 
-// Demo mode detection
-const isDemoMode = computed(() => !hasRealData.value && !isLoading.value)
+// Demo mode: show demo data only when forceDemo is true OR user has no apps
+// If user has apps, ALWAYS show real data (even if empty)
+const isDemoMode = computed(() => {
+  if (props.forceDemo)
+    return true
+  // If user has apps, never show demo data
+  if (dashboardAppsStore.apps.length > 0)
+    return false
+  // No apps and store is loaded = show demo
+  return dashboardAppsStore.isLoaded
+})
 
 // Effective values for display
 const effectiveDeploymentData = computed(() => isDemoMode.value ? demoDeploymentData.value : deploymentData.value)
