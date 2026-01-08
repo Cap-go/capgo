@@ -3,6 +3,8 @@ import { onUnmounted, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import arrowBack from '~icons/ion/arrow-back?width=2em&height=2em'
+import IconCheck from '~icons/lucide/check'
+import IconChevronDown from '~icons/lucide/chevron-down'
 import IconLoader from '~icons/lucide/loader-2'
 import InviteTeammateModal from '~/components/dashboard/InviteTeammateModal.vue'
 import { pushEvent } from '~/services/posthog'
@@ -53,6 +55,11 @@ const steps = ref<Step[]>([
   },
 ])
 const inviteModalRef = ref<InstanceType<typeof InviteTeammateModal> | null>(null)
+const prerequisitesOpen = ref(false)
+
+function togglePrerequisites() {
+  prerequisitesOpen.value = !prerequisitesOpen.value
+}
 
 function stepToName(stepNumber: number): string {
   switch (stepNumber) {
@@ -295,7 +302,49 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <div class="max-w-6xl mx-auto mt-12 sm:px-10">
+      <!-- Prerequisites Accordion -->
+      <div v-if="props.onboarding && step === 0" class="max-w-6xl mx-auto mt-8 sm:px-10">
+        <div class="overflow-hidden bg-white border border-gray-200 rounded-xl">
+          <button
+            type="button"
+            class="flex items-center justify-between w-full px-5 py-4 text-left transition-colors hover:bg-gray-50"
+            @click="togglePrerequisites"
+          >
+            <div class="flex items-center gap-3">
+              <span class="text-lg font-semibold text-gray-900 font-pj">{{ t('onboarding-prerequisites-title') }}</span>
+              <span class="text-sm text-gray-500">{{ t('onboarding-prerequisites-hint') }}</span>
+            </div>
+            <IconChevronDown
+              class="w-5 h-5 text-gray-500 transition-transform duration-200"
+              :class="{ 'rotate-180': prerequisitesOpen }"
+            />
+          </button>
+          <div
+            v-show="prerequisitesOpen"
+            class="px-5 pb-5 border-t border-gray-100"
+          >
+            <p class="mt-4 text-sm text-gray-600">
+              {{ t('onboarding-prerequisites-cli-desc') }}
+            </p>
+            <ul class="mt-4 space-y-3">
+              <li class="flex items-start gap-3">
+                <IconCheck class="w-5 h-5 mt-0.5 text-green-500 shrink-0" />
+                <span class="text-sm text-gray-700">{{ t('onboarding-prerequisites-runtime') }}</span>
+              </li>
+              <li class="flex items-start gap-3">
+                <IconCheck class="w-5 h-5 mt-0.5 text-green-500 shrink-0" />
+                <span class="text-sm text-gray-700">{{ t('onboarding-prerequisites-capacitor') }}</span>
+              </li>
+              <li class="flex items-start gap-3">
+                <IconCheck class="w-5 h-5 mt-0.5 text-green-500 shrink-0" />
+                <span class="text-sm text-gray-700">{{ t('onboarding-prerequisites-built') }}</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="max-w-6xl mx-auto sm:px-10" :class="[props.onboarding && step === 0 ? 'mt-6' : 'mt-12']">
         <template v-for="(s, i) in steps" :key="i">
           <div v-if="i > 0" class="w-1 h-10 mx-auto bg-gray-200" :class="[step !== i ? 'opacity-30' : '']" />
 
