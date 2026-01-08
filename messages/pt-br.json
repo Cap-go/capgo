@@ -178,7 +178,7 @@
   "allow-emulator": "Permita Emuladores",
   "allow-physical-device": "Permitir dispositivos físicos",
   "allow-preview": "Permitir visualização do pacote",
-  "allow-preview-help": "Quando ativado, os pacotes podem ser visualizados no painel usando um quadro de dispositivo incorporado.",
+  "allow-preview-help": "Torna a visualização do pacote acessível publicamente via link compartilhável",
   "allow-prod-build": "Permitir build de produção",
   "allow-prod-builds": "Permitir builds de produção",
   "already-account": "Você já tem uma conta?",

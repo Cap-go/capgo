@@ -178,7 +178,7 @@
   "allow-emulator": "Permetti Emulatori",
   "allow-physical-device": "Consenti dispositivi fisici",
   "allow-preview": "Consenti l'anteprima del pacchetto",
-  "allow-preview-help": "Quando attivato, i pacchetti possono essere visualizzati in anteprima nel cruscotto utilizzando una cornice di dispositivo incorporata.",
+  "allow-preview-help": "Rende l'anteprima del pacchetto accessibile pubblicamente tramite un link condivisibile",
   "allow-prod-build": "Consenti build di produzione",
   "allow-prod-builds": "Consenti build di produzione",
   "already-account": "Hai già un account?",

@@ -178,7 +178,7 @@
   "allow-emulator": "Emülatörlere İzin Ver",
   "allow-physical-device": "Fiziksel cihazlara izin ver",
   "allow-preview": "Paket önizlemesine izin ver",
-  "allow-preview-help": "Etkinleştirildiğinde, paketler gömülü bir cihaz çerçevesi kullanılarak kontrol panelinde önizlenebilir.",
+  "allow-preview-help": "Paket önizlemesini paylaşılabilir bir bağlantı ile herkese açık hale getirir",
   "allow-prod-build": "Prodüksiyon derlemesine izin ver",
   "allow-prod-builds": "Üretim derlemelerine izin ver",
   "already-account": "Zaten bir hesabınız var mı?",
