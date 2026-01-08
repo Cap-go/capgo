@@ -182,9 +182,10 @@ function clearDashboardParams() {
 // Function to reload all chart data
 async function reloadAllCharts() {
   // Force reload of main dashboard data
-  // End date should be end of today (23:59:59.999) to include today's data
+  // End date should be tomorrow at midnight to include all of today's data
   const last30DaysEnd = new Date()
-  last30DaysEnd.setHours(23, 59, 59, 999)
+  last30DaysEnd.setHours(0, 0, 0, 0)
+  last30DaysEnd.setDate(last30DaysEnd.getDate() + 1) // Tomorrow midnight
   // Start date should be 29 days ago at midnight (to get 30 days total including today)
   const last30DaysStart = new Date()
   last30DaysStart.setHours(0, 0, 0, 0)
@@ -290,9 +291,10 @@ function filterToBillingPeriod(fullData: { mau: number[], storage: number[], ban
 
 async function getUsages(forceRefetch = false) {
   // Always work with last 30 days of data
-  // End date should be end of today (23:59:59.999) to include today's data
+  // End date should be tomorrow at midnight to include all of today's data
   const last30DaysEnd = new Date()
-  last30DaysEnd.setHours(23, 59, 59, 999)
+  last30DaysEnd.setHours(0, 0, 0, 0)
+  last30DaysEnd.setDate(last30DaysEnd.getDate() + 1) // Tomorrow midnight
   // Start date should be 29 days ago at midnight (to get 30 days total including today)
   const last30DaysStart = new Date()
   last30DaysStart.setHours(0, 0, 0, 0)
