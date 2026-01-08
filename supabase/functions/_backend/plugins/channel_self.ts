@@ -23,7 +23,7 @@ const CHANNEL_SELF_MIN_V7 = '7.34.0'
 const CHANNEL_SELF_MIN_V8 = '8.0.0'
 
 z.config(z.locales.en())
-const devicePlatformScheme = z.literal(['ios', 'android', 'electron'])
+const devicePlatformScheme = z.enum(['ios', 'android', 'electron'])
 const PLAN_MAU_ACTIONS: Array<'mau'> = ['mau']
 const PLAN_ERROR = 'Cannot set channel, upgrade plan to continue to update'
 
@@ -212,7 +212,7 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
   let mainChannelName = null as string | null
   if (mainChannel && mainChannel.length > 0) {
     const devicePlatform = body.platform as Database['public']['Enums']['platform_os']
-    const finalChannel = mainChannel.find((channel: { name: string, ios: boolean, android: boolean }) => channel[devicePlatform])
+    const finalChannel = mainChannel.find((channel: { name: string, ios: boolean, android: boolean, electron: boolean }) => channel[devicePlatform])
     mainChannelName = (finalChannel !== undefined) ? finalChannel.name : null
   }
 
@@ -376,7 +376,7 @@ async function put(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient
 
   const finalChannel = defaultChannel
     ? dataChannel.find((channel: { name: string }) => channel.name === defaultChannel)
-    : dataChannel.find((channel: { ios: boolean, android: boolean }) => channel[devicePlatform.data])
+    : dataChannel.find((channel: { ios: boolean, android: boolean, electron: boolean }) => channel[devicePlatform.data])
 
   if (!finalChannel) {
     return simpleError200(c, 'channel_not_found', 'Cannot find channel')

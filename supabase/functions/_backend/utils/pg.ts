@@ -320,6 +320,7 @@ function getSchemaUpdatesAlias(includeMetadata = false) {
     disable_auto_update: channelAlias.disable_auto_update,
     ios: channelAlias.ios,
     android: channelAlias.android,
+    electron: channelAlias.electron,
     allow_device_self_set: channelAlias.allow_device_self_set,
     public: channelAlias.public,
   }
