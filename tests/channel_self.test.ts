@@ -354,7 +354,13 @@ describe('[GET] /channel_self tests', () => {
 
     expect(json).toBeDefined()
     expect(Array.isArray(json)).toBe(true)
-    // Electron should get channels that have electron=true
+
+    const channelNames = json.map(ch => ch.name)
+    expect(channelNames).toContain('production')
+    expect(channelNames).toContain('beta')
+    expect(channelNames).toContain('development')
+    expect(channelNames).toContain('no_access')
+    expect(json).toHaveLength(4)
   })
 
   it('[GET] should return public channels matching platform/device when self-set is disabled', async () => {
