@@ -684,6 +684,7 @@
   "device-pixel": "Piksel",
   "devices": "Perangkat",
   "devices-trend": "Tren Perangkat Aktif",
+  "device-platform-trend": "Tren Platform Perangkat (iOS vs Android)",
   "dialog-with-custom-input": "Dialog dengan Input Kustom",
   "did-not-recive-confirm-email": "Tidak menerima email konfirmasi?",
   "disable": "Nonaktifkan",

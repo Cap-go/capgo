@@ -684,6 +684,7 @@
   "device-pixel": "Piksel",
   "devices": "Cihazlar",
   "devices-trend": "Aktif Cihazlar Trendi",
+  "device-platform-trend": "Cihaz Platform Trendi (iOS vs Android)",
   "dialog-with-custom-input": "Özel Girişli Diyalog",
   "did-not-recive-confirm-email": "Onay e-postası almadınız mı?",
   "disable": "Devre dışı bırak",

@@ -684,6 +684,7 @@
   "device-pixel": "Пиксель",
   "devices": "Устройства",
   "devices-trend": "Тенденции активных устройств",
+  "device-platform-trend": "Тренд платформ устройств (iOS vs Android)",
   "dialog-with-custom-input": "Диалог с пользовательским вводом",
   "did-not-recive-confirm-email": "Не получили письмо с подтверждением?",
   "disable": "Отключить",
