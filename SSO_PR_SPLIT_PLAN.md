@@ -20,7 +20,7 @@ Your boss is right: this branch combines ~10k LOC across 61 files into a single 
 **Files to include:**
 
 ```
-supabase/migrations/20260107_sso_saml_complete.sql
+supabase/migrations/20260107210800_sso_saml_complete.sql
 ```
 
 **What to do:**
