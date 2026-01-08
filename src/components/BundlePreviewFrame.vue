@@ -6,7 +6,6 @@ import { useRoute } from 'vue-router'
 import IconExpand from '~icons/lucide/expand'
 import IconMinimize from '~icons/lucide/minimize-2'
 import IconSmartphone from '~icons/lucide/smartphone'
-import { defaultApiHost, useSupabase } from '~/services/supabase'
 
 const props = defineProps<{
   appId: string
@@ -15,7 +14,6 @@ const props = defineProps<{
 
 const { t } = useI18n()
 const route = useRoute()
-const supabase = useSupabase()
 
 // Device configurations
 const devices = {
@@ -38,22 +36,15 @@ const selectedDevice = ref<DeviceType>('iphone')
 const isFullscreen = ref(false)
 const qrCodeDataUrl = ref('')
 const isMobile = ref(false)
-const accessToken = ref('')
 
 // Check if we're on mobile and detect fullscreen query param
-onMounted(async () => {
+onMounted(() => {
   checkMobile()
   window.addEventListener('resize', checkMobile)
 
   // Check for fullscreen query param
   if (route.query.fullscreen === 'true') {
     isFullscreen.value = true
-  }
-
-  // Get access token for iframe auth
-  const { data: session } = await supabase.auth.getSession()
-  if (session?.session?.access_token) {
-    accessToken.value = session.session.access_token
   }
 
   generateQRCode()
@@ -73,13 +64,23 @@ function checkMobile() {
 
 const currentDevice = computed(() => devices[selectedDevice.value])
 
-// Build the preview URL with auth token
+// Build the preview URL using subdomain format (no auth - relies on obscure subdomain)
 const previewUrl = computed(() => {
-  // Use Cloudflare Workers Files endpoint for preview (has R2 bucket access for serving HTML files)
-  // Note: Preview does NOT work on Supabase Edge Functions due to platform limitations
-  // Pass token as query param since iframes can't send headers
-  const tokenParam = accessToken.value ? `?token=${accessToken.value}` : ''
-  return `${defaultApiHost}/files/preview/${props.appId}/${props.versionId}/${tokenParam}`
+  // Encode app_id: lowercase for DNS, replace . with __ (underscores work in practice)
+  const encodedAppId = props.appId.toLowerCase().replace(/\./g, '__')
+  const subdomain = `${encodedAppId}-${props.versionId}`
+  // Extract base domain from current host, default to capgo.app for localhost
+  // Preserve environment segments (e.g., 'dev' in console.dev.capgo.app)
+  const hostname = window.location.hostname
+  let baseDomain = 'capgo.app'
+  if (hostname.includes('.') && hostname !== '127.0.0.1') {
+    const hostParts = hostname.split('.')
+    // Check if hostname contains an env segment (dev, preprod, staging, etc.)
+    const envSegments = ['dev', 'preprod', 'staging']
+    const hasEnvSegment = hostParts.length > 2 && envSegments.some(env => hostParts.includes(env))
+    baseDomain = hasEnvSegment ? hostParts.slice(-3).join('.') : hostParts.slice(-2).join('.')
+  }
+  return `https://${subdomain}.preview.${baseDomain}/`
 })
 
 // Build URL for QR code (includes fullscreen param)
