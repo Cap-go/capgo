@@ -1134,5 +1134,14 @@
   "your-role-in-org": "您在组织中的角色",
   "your-settings": "您的设置",
   "your-usage": "您的使用情况：",
-  "zip-bundle": "ZIP应用程序包"
+  "zip-bundle": "ZIP应用程序包",
+  "role-app-developer": "应用开发者",
+  "role-app-uploader": "应用上传者",
+  "role-app-reader": "应用阅读者",
+  "remove-role": "删除角色",
+  "remove-role-confirm": "您要删除此用户对应用的访问权限吗？",
+  "role-org-super-admin": "超级管理员",
+  "role-org-admin": "管理员",
+  "role-org-billing-admin": "计费经理",
+  "role-org-member": "成员"
 }

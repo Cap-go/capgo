@@ -1134,5 +1134,14 @@
   "your-role-in-org": "Vai trò của bạn trong tổ chức",
   "your-settings": "Cài đặt của bạn",
   "your-usage": "Sử dụng của bạn:",
-  "zip-bundle": "Gói ứng dụng Zip"
+  "zip-bundle": "Gói ứng dụng Zip",
+  "role-app-developer": "Nhà phát triển ứng dụng",
+  "role-app-uploader": "Người tải lên ứng dụng",
+  "role-app-reader": "Người đọc ứng dụng",
+  "remove-role": "Xóa vai trò",
+  "remove-role-confirm": "Bạn có muốn xóa quyền truy cập của người dùng này vào ứng dụng không?",
+  "role-org-super-admin": "Quản trị viên cấp cao",
+  "role-org-admin": "Quản trị viên",
+  "role-org-billing-admin": "Quản lý thanh toán",
+  "role-org-member": "Thành viên"
 }

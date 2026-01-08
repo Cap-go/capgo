@@ -1134,5 +1134,14 @@
   "your-role-in-org": "Peran Anda dalam organisasi",
   "your-settings": "Pengaturan Anda",
   "your-usage": "Penggunaan Anda:",
-  "zip-bundle": "Paket bundel aplikasi Zip"
+  "zip-bundle": "Paket bundel aplikasi Zip",
+  "role-app-developer": "Pengembang Aplikasi",
+  "role-app-uploader": "Pengunggah Aplikasi",
+  "role-app-reader": "Pembaca Aplikasi",
+  "remove-role": "Hapus Peran",
+  "remove-role-confirm": "Apakah Anda ingin menghapus akses pengguna ini ke aplikasi?",
+  "role-org-super-admin": "Super Admin",
+  "role-org-admin": "Admin",
+  "role-org-billing-admin": "Manajer Penagihan",
+  "role-org-member": "Anggota"
 }

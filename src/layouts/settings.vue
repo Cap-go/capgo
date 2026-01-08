@@ -2,6 +2,7 @@
 import type { Ref } from 'vue'
 import type { Tab } from '~/components/comp_def'
 import { Capacitor } from '@capacitor/core'
+import { computedAsync } from '@vueuse/core'
 import { computed, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
@@ -10,6 +11,7 @@ import Tabs from '~/components/Tabs.vue'
 import { accountTabs } from '~/constants/accountTabs'
 import { organizationTabs as baseOrgTabs } from '~/constants/organizationTabs'
 import { settingsTabs } from '~/constants/settingsTabs'
+import { hasPermission } from '~/services/permissions'
 import { openPortal } from '~/services/stripe'
 import { useOrganizationStore } from '~/stores/organization'
 
@@ -21,32 +23,23 @@ const route = useRoute()
 // keep Tab icon typing (including ShallowRef) instead of Vue's UnwrapRef narrowing
 const organizationTabs = ref<Tab[]>([...baseOrgTabs]) as Ref<Tab[]>
 
+const canReadBilling = computedAsync(async () => {
+  const orgId = organizationStore.currentOrganization?.gid
+  if (!orgId)
+    return false
+  return await hasPermission('org.read_billing', { orgId })
+}, false)
+
+const canUpdateBilling = computedAsync(async () => {
+  const orgId = organizationStore.currentOrganization?.gid
+  if (!orgId)
+    return false
+  return await hasPermission('org.update_billing', { orgId })
+}, false)
+
 watchEffect(() => {
-  // RBAC tabs - show only when use_new_rbac is enabled
-  const useNewRbac = (organizationStore.currentOrganization as any)?.use_new_rbac
-  const hasGroups = organizationTabs.value.find(tab => tab.key === '/settings/organization/groups')
-  const hasRoleAssignments = organizationTabs.value.find(tab => tab.key === '/settings/organization/role-assignments')
-
-  if (useNewRbac && !hasGroups) {
-    const base = baseOrgTabs.find(t => t.key === '/settings/organization/groups')
-    if (base)
-      organizationTabs.value.splice(2, 0, { ...base })
-  }
-  if (!useNewRbac && hasGroups)
-    organizationTabs.value = organizationTabs.value.filter(tab => tab.key !== '/settings/organization/groups')
-
-  if (useNewRbac && !hasRoleAssignments) {
-    const base = baseOrgTabs.find(t => t.key === '/settings/organization/role-assignments')
-    if (base) {
-      const idx = organizationTabs.value.findIndex(t => t.key === '/settings/organization/groups')
-      organizationTabs.value.splice(idx >= 0 ? idx + 1 : 3, 0, { ...base })
-    }
-  }
-  if (!useNewRbac && hasRoleAssignments)
-    organizationTabs.value = organizationTabs.value.filter(tab => tab.key !== '/settings/organization/role-assignments')
-
   // ensure usage/plans tabs based on permissions (keeps icons from base)
-  const needsUsage = organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['super_admin'])
+  const needsUsage = canReadBilling.value
   const hasUsage = organizationTabs.value.find(tab => tab.key === '/settings/organization/usage')
   if (needsUsage && !hasUsage) {
     const base = baseOrgTabs.find(t => t.key === '/settings/organization/usage')
@@ -56,7 +49,7 @@ watchEffect(() => {
   if (!needsUsage && hasUsage)
     organizationTabs.value = organizationTabs.value.filter(tab => tab.key !== '/settings/organization/usage')
 
-  const needsCredits = organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['super_admin'])
+  const needsCredits = canUpdateBilling.value
   const hasCredits = organizationTabs.value.find(tab => tab.key === '/settings/organization/credits')
 
   if (needsCredits && !hasCredits) {
@@ -68,7 +61,7 @@ watchEffect(() => {
   if (!needsCredits && hasCredits)
     organizationTabs.value = organizationTabs.value.filter(tab => tab.key !== '/settings/organization/credits')
 
-  const needsPlans = organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['super_admin'])
+  const needsPlans = canUpdateBilling.value
   const hasPlans = organizationTabs.value.find(tab => tab.key === '/settings/organization/plans')
   if (needsPlans && !hasPlans) {
     const base = baseOrgTabs.find(t => t.key === '/settings/organization/plans')
@@ -78,8 +71,9 @@ watchEffect(() => {
   if (!needsPlans && hasPlans)
     organizationTabs.value = organizationTabs.value.filter(tab => tab.key !== '/settings/organization/plans')
 
+  // Check billing access - users with org.read_billing permission can access billing
   if (!Capacitor.isNativePlatform()
-    && organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['super_admin'])
+    && canReadBilling.value
     && !organizationTabs.value.find(tab => tab.key === '/billing')) {
     organizationTabs.value.push({
       label: 'billing',
@@ -88,7 +82,7 @@ watchEffect(() => {
       onClick: () => openPortal(organizationStore.currentOrganization?.gid ?? '', t),
     })
   }
-  else if (!organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['super_admin'])) {
+  else if (!canReadBilling.value) {
     organizationTabs.value = organizationTabs.value.filter(tab => tab.key !== '/billing')
   }
 })

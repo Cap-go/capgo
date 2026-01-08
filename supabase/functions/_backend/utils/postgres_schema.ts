@@ -135,12 +135,13 @@ export const org_users = pgTable('org_users', {
 // RBAC tables
 export const roles = pgTable('roles', {
   id: uuid('id').primaryKey().defaultRandom(),
-  family_name: text('family_name').notNull(),
   name: text('name').notNull(),
   scope_type: text('scope_type').notNull(),
   description: text('description'),
-  is_system: boolean('is_system').notNull().default(false),
+  priority_rank: bigint('priority_rank', { mode: 'number' }).notNull().default(0),
+  is_assignable: boolean('is_assignable').notNull().default(true),
   created_at: timestamp('created_at').notNull().defaultNow(),
+  created_by: uuid('created_by'),
 })
 
 export const groups = pgTable('groups', {
@@ -168,8 +169,8 @@ export const role_bindings = pgTable('role_bindings', {
   scope_type: text('scope_type').notNull(),
   org_id: uuid('org_id'),
   app_id: uuid('app_id'),
+  bundle_id: bigint('bundle_id', { mode: 'number' }),
   channel_id: uuid('channel_id'),
-  family_name: text('family_name').notNull(),
   granted_by: uuid('granted_by').notNull(),
   granted_at: timestamp('granted_at').notNull().defaultNow(),
   expires_at: timestamp('expires_at'),

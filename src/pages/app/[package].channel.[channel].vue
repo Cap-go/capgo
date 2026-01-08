@@ -1,8 +1,7 @@
 <script setup lang="ts">
-import type { OrganizationRole } from '~/stores/organization'
 import type { Database } from '~/types/supabase.types'
 import { FormKit } from '@formkit/vue'
-import { onClickOutside } from '@vueuse/core'
+import { computedAsync, onClickOutside } from '@vueuse/core'
 import { ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
@@ -13,12 +12,12 @@ import IconSearch from '~icons/ic/round-search?raw'
 import IconAlertCircle from '~icons/lucide/alert-circle'
 import IconDown from '~icons/material-symbols/keyboard-arrow-down-rounded'
 import { formatDate, formatLocalDate } from '~/services/date'
+import { hasPermission } from '~/services/permissions'
 import { checkCompatibilityNativePackages, isCompatible, useSupabase } from '~/services/supabase'
 import { isInternalVersionName } from '~/services/versions'
 import { useAppDetailStore } from '~/stores/appDetail'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useDisplayStore } from '~/stores/display'
-import { useOrganizationStore } from '~/stores/organization'
 
 interface Channel {
   version: Database['public']['Tables']['app_versions']['Row']
@@ -34,7 +33,6 @@ const route = useRoute('/app/[package].channel.[channel]')
 const router = useRouter()
 const dialogStore = useDialogV2Store()
 const displayStore = useDisplayStore()
-const organizationStore = useOrganizationStore()
 const appDetailStore = useAppDetailStore()
 const { t } = useI18n()
 const supabase = useSupabase()
@@ -42,7 +40,18 @@ const packageId = ref<string>('')
 const id = ref<number>(0)
 const loading = ref(true)
 const channel = ref<Database['public']['Tables']['channels']['Row'] & Channel>()
-const role = ref<OrganizationRole | null>(null)
+
+const canUpdateChannelSettings = computedAsync(async () => {
+  if (!packageId.value)
+    return false
+  return await hasPermission('channel.update_settings', { appId: packageId.value })
+}, false)
+
+const canPromoteBundle = computedAsync(async () => {
+  if (!packageId.value)
+    return false
+  return await hasPermission('channel.promote_bundle', { appId: packageId.value })
+}, false)
 
 // Auto update dropdown state
 const autoUpdateDropdown = useTemplateRef('autoUpdateDropdown')
@@ -120,7 +129,7 @@ async function getChannel(force = false) {
 }
 
 async function saveChannelChange(key: string, val: any) {
-  if (!organizationStore.hasPermissionsInRole(role.value, ['admin', 'super_admin'])) {
+  if (!canUpdateChannelSettings.value) {
     toast.error(t('no-permission'))
     return
   }
@@ -164,10 +173,6 @@ watchEffect(async () => {
     if (!channel.value?.name)
       displayStore.NavTitle = t('channel')
     displayStore.defaultBack = `/app/${route.params.package}/channels`
-
-    // Load role
-    await organizationStore.awaitInitialLoad()
-    role.value = await organizationStore.getCurrentRoleForApp(packageId.value)
   }
 })
 
@@ -248,7 +253,7 @@ async function getUnknownVersion(): Promise<number> {
 async function handleUnlink() {
   if (!channel.value || !main.auth)
     return
-  if (!organizationStore.hasPermissionsInRole(role.value, ['admin', 'super_admin', 'write'])) {
+  if (!canPromoteBundle.value) {
     toast.error(t('no-permission'))
     return
   }
@@ -275,7 +280,7 @@ async function handleUnlink() {
 }
 
 async function handleRevert() {
-  if (!organizationStore.hasPermissionsInRole(role.value, ['admin', 'super_admin', 'write'])) {
+  if (!canPromoteBundle.value) {
     toast.error(t('no-permission'))
     return
   }
@@ -430,7 +435,7 @@ function getAutoUpdateLabel(value: string) {
 }
 
 async function onSelectAutoUpdate(value: Database['public']['Enums']['disable_update']) {
-  if (!organizationStore.hasPermissionsInRole(role.value, ['admin', 'super_admin'])) {
+  if (!canUpdateChannelSettings.value) {
     toast.error(t('no-permission'))
     return false
   }

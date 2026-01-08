@@ -1134,5 +1134,14 @@
   "your-role-in-org": "組織におけるあなたの役割",
   "your-settings": "あなたの設定",
   "your-usage": "あなたの使用法：",
-  "zip-bundle": "Zipアプリバンドル"
+  "zip-bundle": "Zipアプリバンドル",
+  "role-app-developer": "アプリ開発者",
+  "role-app-uploader": "アプリアップローダー",
+  "role-app-reader": "アプリ読者",
+  "remove-role": "役割を削除",
+  "remove-role-confirm": "このユーザーのアプリへのアクセスを削除しますか？",
+  "role-org-super-admin": "スーパー管理者",
+  "role-org-admin": "管理者",
+  "role-org-billing-admin": "請求マネージャー",
+  "role-org-member": "メンバー"
 }

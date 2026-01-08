@@ -3,8 +3,9 @@ import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
 import { middlewareAuth, parseBody, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../utils/logging.ts'
+import { checkPermission } from '../utils/rbac.ts'
 import { createOneTimeCheckout, getStripe } from '../utils/stripe.ts'
-import { hasOrgRight, supabaseAdmin } from '../utils/supabase.ts'
+import { supabaseAdmin } from '../utils/supabase.ts'
 import { getEnv } from '../utils/utils.ts'
 
 interface CreditStep {
@@ -107,23 +108,14 @@ async function getCreditTopUpProductId(c: AppContext, customerId: string): Promi
 }
 
 async function resolveOrgStripeContext(c: AppContext, orgId: string) {
-  const rawAuthHeader = c.req.header('authorization')
-    ?? c.req.header('Authorization')
-    ?? c.get('authorization')
-  const tokenMatch = rawAuthHeader?.match(/^\s*Bearer\s+(\S+)\s*$/i)
-  const token = tokenMatch?.[1]
-
-  if (!token)
+  // Auth context is already set by middlewareAuth
+  const auth = c.get('auth')
+  if (!auth?.userId)
     throw simpleError('not_authorized', 'Not authorized')
 
-  const { data: auth, error } = await supabaseAdmin(c).auth.getUser(token)
+  const userId = auth.userId
 
-  if (error || !auth?.user?.id)
-    throw simpleError('not_authorized', 'Not authorized')
-
-  const userId = auth.user.id
-
-  if (!await hasOrgRight(c, orgId, userId, 'super_admin'))
+  if (!await checkPermission(c, 'org.update_billing', { orgId }))
     throw simpleError('not_authorized', 'Not authorized')
 
   const { data: org, error: orgError } = await supabaseAdmin(c)

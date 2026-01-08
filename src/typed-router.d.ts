@@ -352,13 +352,6 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
-    '/settings/organization/Groups': RouteRecordInfo<
-      '/settings/organization/Groups',
-      '/settings/organization/Groups',
-      Record<never, never>,
-      Record<never, never>,
-      | never
-    >,
     '/settings/organization/Members': RouteRecordInfo<
       '/settings/organization/Members',
       '/settings/organization/Members',
@@ -369,13 +362,6 @@ declare module 'vue-router/auto-routes' {
     '/settings/organization/Plans': RouteRecordInfo<
       '/settings/organization/Plans',
       '/settings/organization/Plans',
-      Record<never, never>,
-      Record<never, never>,
-      | never
-    >,
-    '/settings/organization/RoleAssignments': RouteRecordInfo<
-      '/settings/organization/RoleAssignments',
-      '/settings/organization/RoleAssignments',
       Record<never, never>,
       Record<never, never>,
       | never
@@ -689,12 +675,6 @@ declare module 'vue-router/auto-routes' {
       views:
         | never
     }
-    'src/pages/settings/organization/Groups.vue': {
-      routes:
-        | '/settings/organization/Groups'
-      views:
-        | never
-    }
     'src/pages/settings/organization/Members.vue': {
       routes:
         | '/settings/organization/Members'
@@ -704,12 +684,6 @@ declare module 'vue-router/auto-routes' {
     'src/pages/settings/organization/Plans.vue': {
       routes:
         | '/settings/organization/Plans'
-      views:
-        | never
-    }
-    'src/pages/settings/organization/RoleAssignments.vue': {
-      routes:
-        | '/settings/organization/RoleAssignments'
       views:
         | never
     }

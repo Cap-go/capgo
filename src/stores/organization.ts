@@ -13,6 +13,70 @@ export type OrganizationRole = Database['public']['Enums']['user_min_right'] | '
 export type ExtendedOrganizationMember = Concrete<Merge<ArrayElement<Database['public']['Functions']['get_org_members']['Returns']>, { id: number }>>
 export type ExtendedOrganizationMembers = ExtendedOrganizationMember[]
 
+// Nouveaux rôles RBAC
+export type RbacRoleName = 'org_super_admin' | 'org_admin' | 'org_billing_admin' | 'org_member' | 'app_admin' | 'app_developer' | 'app_uploader' | 'app_reader'
+
+// Mapping des nouveaux rôles RBAC vers les anciens rôles (pour compatibilité avec l'ancien système)
+export const RBAC_TO_LEGACY_ROLE_MAPPING: Record<RbacRoleName, OrganizationRole[]> = {
+  org_super_admin: ['super_admin', 'owner'],
+  org_admin: ['admin'],
+  org_billing_admin: ['admin'], // Billing admin maps to admin in legacy
+  org_member: ['read'],
+  app_admin: ['admin', 'write'], // App admin needs at least admin or write
+  app_developer: ['write'],
+  app_uploader: ['upload'],
+  app_reader: ['read'],
+}
+
+// Hiérarchie des rôles RBAC (un rôle inclut tous ceux en dessous)
+export const RBAC_ROLE_HIERARCHY: Record<RbacRoleName, RbacRoleName[]> = {
+  org_super_admin: ['org_super_admin', 'org_admin', 'org_member', 'app_admin', 'app_developer', 'app_uploader', 'app_reader'],
+  org_admin: ['org_admin', 'org_member', 'app_admin', 'app_developer', 'app_uploader', 'app_reader'],
+  org_billing_admin: ['org_billing_admin', 'org_member'],
+  org_member: ['org_member', 'app_reader'],
+  app_admin: ['app_admin', 'app_developer', 'app_uploader', 'app_reader'],
+  app_developer: ['app_developer', 'app_uploader', 'app_reader'],
+  app_uploader: ['app_uploader', 'app_reader'],
+  app_reader: ['app_reader'],
+}
+
+// Mapping des rôles RBAC d'organisation vers leurs clés de traduction i18n
+export const RBAC_ORG_ROLE_I18N_KEYS: Record<string, string> = {
+  org_super_admin: 'role-org-super-admin',
+  org_admin: 'role-org-admin',
+  org_billing_admin: 'role-org-billing-admin',
+  org_member: 'role-org-member',
+  app_developer: 'role-app-developer',
+  app_uploader: 'role-app-uploader',
+  app_reader: 'role-app-reader',
+}
+
+/**
+ * Obtient la clé i18n pour un rôle RBAC d'organisation
+ * @param role Le nom technique du rôle
+ * @returns La clé de traduction i18n, ou undefined si non mappé
+ */
+export function getRbacRoleI18nKey(role: string): string | undefined {
+  return RBAC_ORG_ROLE_I18N_KEYS[role]
+}
+
+interface RoleBinding {
+  id: string
+  principal_type: string
+  principal_id: string
+  role_id: string
+  role_name: string
+  scope_type: string
+  org_id: string | null
+  app_id: string | null
+  channel_id: string | null
+  granted_at: string
+  granted_by: string
+  expires_at: string | null
+  reason: string | null
+  is_direct: boolean
+}
+
 const supabase = useSupabase()
 const main = useMainStore()
 
@@ -21,6 +85,7 @@ export const useOrganizationStore = defineStore('organization', () => {
   const _organizationsByAppId: Ref<Map<string, Organization>> = ref(new Map())
   const _initialLoadPromise = ref(Promise.withResolvers())
   const _initialized = ref(false)
+  const _roleBindingsCache: Ref<Map<string, RoleBinding[]>> = ref(new Map()) // Cache des role_bindings par orgId
 
   const organizations: ComputedRef<Organization[]> = computed(
     () => {
@@ -151,8 +216,160 @@ export const useOrganizationStore = defineStore('organization', () => {
     return org.role as OrganizationRole
   }
 
-  const hasPermissionsInRole = (perm: OrganizationRole | null, perms: OrganizationRole[]): boolean => {
-    return (perm && perms.includes(perm)) ?? false
+  /**
+   * Récupère les role_bindings de l'utilisateur courant pour une organisation
+   */
+  const fetchRoleBindingsForOrg = async (orgId: string): Promise<RoleBinding[]> => {
+    // Vérifier le cache
+    if (_roleBindingsCache.value.has(orgId)) {
+      return _roleBindingsCache.value.get(orgId)!
+    }
+
+    try {
+      const userId = main.user?.id
+      if (!userId)
+        return []
+
+      // Utiliser la RPC sécurisée
+      const { data, error } = await supabase
+        .rpc('get_user_org_bindings_rbac', {
+          p_org_id: orgId,
+          p_user_id: userId,
+        })
+
+      if (error)
+        throw error
+
+      const userBindings = data || []
+
+      // Mettre en cache
+      _roleBindingsCache.value.set(orgId, userBindings)
+      return userBindings
+    }
+    catch (error: any) {
+      console.error('Error fetching role bindings:', error)
+      return []
+    }
+  }
+
+  /**
+   * Invalide le cache des role_bindings pour une org
+   */
+  const invalidateRoleBindingsCache = (orgId?: string) => {
+    if (orgId) {
+      _roleBindingsCache.value.delete(orgId)
+    }
+    else {
+      _roleBindingsCache.value.clear()
+    }
+  }
+
+  /**
+   * Vérifie si l'utilisateur a les permissions requises dans le nouveau système RBAC (synchrone, utilise le cache)
+   *
+   * ⚠️ FONCTION TEMPORAIRE - À remplacer par hasPermission() dans le futur
+   * Cette fonction vérifie les RÔLES. Dans un vrai système RBAC, on devrait vérifier les PERMISSIONS.
+   * Voir les commentaires dans hasPermissionsInRole() pour les détails de la migration.
+   */
+  const hasPermissionsInRbac = (orgId: string, requiredRoles: RbacRoleName[], appId?: string): boolean => {
+    const bindings = _roleBindingsCache.value.get(orgId) || []
+
+    if (bindings.length === 0)
+      return false
+
+    // Extraire les rôles de l'utilisateur
+    const userRoles = bindings
+      .filter((b) => {
+        // Filtrer par scope si appId est fourni
+        if (appId) {
+          return (b.scope_type === 'app' && b.app_id === appId) || b.scope_type === 'org'
+        }
+        return true
+      })
+      .map(b => b.role_name as RbacRoleName)
+
+    // Vérifier si l'un des rôles de l'utilisateur donne accès aux permissions requises
+    for (const userRole of userRoles) {
+      const impliedRoles = RBAC_ROLE_HIERARCHY[userRole] || [userRole]
+      if (requiredRoles.some(reqRole => impliedRoles.includes(reqRole))) {
+        return true
+      }
+    }
+
+    return false
+  }
+
+  /**
+   * Vérifie si l'utilisateur a les permissions requises.
+   * Détecte automatiquement si l'org utilise le nouveau RBAC ou l'ancien système.
+   * SYNCHRONE - les role_bindings sont pré-chargés lors du fetchOrganizations.
+   *
+   * ⚠️ FUTURE MIGRATION VERS UN SYSTÈME BASÉ SUR LES PERMISSIONS:
+   * Cette fonction vérifie actuellement les RÔLES (org_admin, app_developer, etc.)
+   * Dans le futur, pour supprimer complètement l'ancien système et avoir un vrai RBAC,
+   * il faudra migrer vers un système basé sur les PERMISSIONS au lieu des rôles.
+   *
+   * EXEMPLE DE MIGRATION:
+   * Au lieu de:
+   *   hasPermissionsInRole(role, ['org_admin', 'org_super_admin'])
+   *
+   * Il faudra:
+   *   hasPermission('org.settings.update', orgId)
+   *   hasPermission('app.bundles.delete', orgId, appId)
+   *   hasPermission('billing.view', orgId)
+   *
+   * Pour cela, créer:
+   * 1. Une table `permissions` (key, description, scope_type)
+   * 2. Une table `role_permissions` (role_id, permission_id) - déjà existe partiellement
+   * 3. Une fonction `hasPermission(permissionKey: string, orgId?: string, appId?: string): boolean`
+   *    qui:
+   *    - Récupère les role_bindings de l'utilisateur
+   *    - Pour chaque rôle, récupère les permissions associées (via role_permissions + hiérarchie)
+   *    - Vérifie si permissionKey est dans la liste
+   *
+   * AVANTAGES:
+   * - Plus besoin de lister tous les rôles possibles dans chaque check
+   * - Granularité fine (ex: 'billing.view' vs 'billing.update')
+   * - Facile d'ajouter de nouvelles permissions sans toucher au code
+   * - Système standard d'autorisation (permission-based access control)
+   *
+   * @param legacyRole Le rôle actuel dans l'ancien système (pour compatibilité, utilisé uniquement en mode legacy)
+   * @param requiredRoles Les rôles RBAC requis (org_admin, app_developer, etc.)
+   * @param orgId L'ID de l'organisation (optionnel, détecté via currentOrganization si absent)
+   * @param appId L'ID de l'app (optionnel, pour filtrer par scope app dans le nouveau RBAC)
+   */
+  const hasPermissionsInRole = (
+    legacyRole: OrganizationRole | null,
+    requiredRoles: RbacRoleName[],
+    orgId?: string,
+    appId?: string,
+  ): boolean => {
+    // Déterminer l'org à utiliser
+    let targetOrg: Organization | undefined
+    if (orgId) {
+      targetOrg = _organizations.value.get(orgId)
+    }
+    else if (currentOrganization.value) {
+      targetOrg = currentOrganization.value
+      orgId = currentOrganization.value.gid
+    }
+
+    // Vérifier si on utilise le nouveau RBAC
+    const useNewRbac = (targetOrg as any)?.use_new_rbac ?? false
+
+    if (useNewRbac && orgId) {
+      // Mode nouveau RBAC : consulter le cache des role_bindings
+      return hasPermissionsInRbac(orgId, requiredRoles, appId)
+    }
+
+    // Mode ancien système (legacy) : convertir les rôles RBAC requis en anciens rôles et vérifier
+    const legacyRolesRequired = new Set<OrganizationRole>()
+    for (const rbacRole of requiredRoles) {
+      const mappedLegacyRoles = RBAC_TO_LEGACY_ROLE_MAPPING[rbacRole] || []
+      mappedLegacyRoles.forEach(r => legacyRolesRequired.add(r))
+    }
+
+    return (legacyRole && Array.from(legacyRolesRequired).includes(legacyRole)) ?? false
   }
 
   const setCurrentOrganization = (id: string) => {
@@ -239,6 +456,26 @@ export const useOrganizationStore = defineStore('organization', () => {
 
     _organizations.value = new Map(mappedData.map(item => [item.gid, item]))
 
+    // Pré-charger les role_bindings pour les orgs qui utilisent le nouveau RBAC
+    const rbacOrgs = mappedData.filter(org => (org as any).use_new_rbac)
+    await Promise.all(rbacOrgs.map(async (org) => {
+      try {
+        // Utiliser la RPC sécurisée
+        const { data: bindingsData, error: bindingsError } = await supabase
+          .rpc('get_user_org_bindings_rbac', {
+            p_org_id: org.gid,
+            p_user_id: userId,
+          })
+
+        if (!bindingsError && bindingsData) {
+          _roleBindingsCache.value.set(org.gid, bindingsData)
+        }
+      }
+      catch (error) {
+        console.error(`Error preloading role_bindings for org ${org.gid}:`, error)
+      }
+    }))
+
     // Try to restore from localStorage first
     if (!currentOrganization.value) {
       const storedOrgId = localStorage.getItem(STORAGE_KEY)
@@ -308,6 +545,8 @@ export const useOrganizationStore = defineStore('organization', () => {
     getCurrentRole,
     getAllOrgs,
     hasPermissionsInRole,
+    fetchRoleBindingsForOrg,
+    invalidateRoleBindingsCache,
     fetchOrganizations,
     dedupFetchOrganizations,
     getOrgByAppId,

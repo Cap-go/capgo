@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import type { Database } from '~/types/supabase.types'
 import { Capacitor } from '@capacitor/core'
+import { computedAsync } from '@vueuse/core'
 import { storeToRefs } from 'pinia'
 import { computed, ref, watch, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
+import { hasPermission } from '~/services/permissions'
 import { openCheckout } from '~/services/stripe'
 import { getCreditUnitPricing, getCurrentPlanNameOrg } from '~/services/supabase'
 import { openSupport } from '~/services/support'
@@ -33,6 +35,12 @@ const isMobile = Capacitor.isNativePlatform()
 
 const { currentOrganization } = storeToRefs(organizationStore)
 const creditUnitPrices = ref<Partial<Record<Database['public']['Enums']['credit_metric_type'], number>>>({})
+
+const canUpdateBilling = computedAsync(async () => {
+  if (!currentOrganization.value)
+    return false
+  return await hasPermission('org.update_billing', { orgId: currentOrganization.value.gid })
+}, false)
 
 function planFeatures(plan: Database['public']['Tables']['plans']['Row']) {
   // Convert build time from seconds to hours or minutes for display
@@ -165,7 +173,7 @@ async function loadData(initial: boolean) {
 }
 
 watch(currentOrganization, async (newOrg, prevOrg) => {
-  if (!organizationStore.hasPermissionsInRole(await organizationStore.getCurrentRole(newOrg?.created_by ?? ''), ['super_admin'])) {
+  if (newOrg && !canUpdateBilling.value) {
     if (!initialLoad.value) {
       const orgsMap = organizationStore.getAllOrgs()
       const newOrg = [...orgsMap]

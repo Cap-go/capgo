@@ -3,6 +3,7 @@ import type { TableColumn } from '~/components/comp_def'
 import type { ExtendedOrganizationMember, ExtendedOrganizationMembers } from '~/stores/organization'
 import type { Database } from '~/types/supabase.types'
 
+import { computedAsync } from '@vueuse/core'
 import { storeToRefs } from 'pinia'
 import { computed, h, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -13,10 +14,11 @@ import IconSearch from '~icons/heroicons/magnifying-glass'
 import IconTrash from '~icons/heroicons/trash'
 import IconWrench from '~icons/heroicons/wrench'
 import Table from '~/components/Table.vue'
+import { hasPermission } from '~/services/permissions'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useMainStore } from '~/stores/main'
-import { useOrganizationStore } from '~/stores/organization'
+import { getRbacRoleI18nKey, useOrganizationStore } from '~/stores/organization'
 import DeleteOrgDialog from './DeleteOrgDialog.vue'
 
 const { t } = useI18n()
@@ -34,6 +36,7 @@ const dialogStore = useDialogV2Store()
 const emailInput = ref('')
 const displayStore = useDisplayStore()
 displayStore.NavTitle = t('members')
+const useNewRbac = ref(false)
 
 // Permission modal state
 const selectedPermission = ref<Database['public']['Enums']['user_min_right'] | undefined>()
@@ -47,6 +50,18 @@ const inviteUserFirstName = ref('')
 const inviteUserLastName = ref('')
 const inviteUserOrgId = ref('')
 const captchaToken = ref('')
+
+const canInviteUser = computedAsync(async () => {
+  if (!currentOrganization.value)
+    return false
+  return await hasPermission('org.invite_user', { orgId: currentOrganization.value.gid })
+}, false)
+
+const canUpdateUserRoles = computedAsync(async () => {
+  if (!currentOrganization.value)
+    return false
+  return await hasPermission('org.update_user_roles', { orgId: currentOrganization.value.gid })
+}, false)
 const captchaElement = ref<InstanceType<typeof VueTurnstile> | null>(null)
 const isSubmittingInvite = ref(false)
 const captchaKey = ref(import.meta.env.VITE_CAPTCHA_KEY)
@@ -64,6 +79,27 @@ const isInviteFormValid = computed(() => {
     && captchaToken.value !== ''
 })
 
+async function checkRbacEnabled() {
+  if (!currentOrganization.value)
+    return
+
+  try {
+    const { data, error } = await supabase
+      .from('orgs')
+      .select('use_new_rbac')
+      .eq('id', currentOrganization.value.gid)
+      .single()
+
+    if (error)
+      throw error
+
+    useNewRbac.value = (data as any)?.use_new_rbac || false
+  }
+  catch (error: any) {
+    console.error('Error checking RBAC status:', error)
+  }
+}
+
 const filteredMembers = computed(() => {
   if (!search.value)
     return members.value
@@ -76,18 +112,35 @@ const filteredMembers = computed(() => {
 })
 
 const permissionOptions = computed(() => {
-  const options = [
-    { label: t('key-read'), value: 'read' },
-    { label: t('key-upload'), value: 'upload' },
-    { label: t('key-write'), value: 'write' },
-    { label: t('key-admin'), value: 'admin' },
-  ]
+  if (useNewRbac.value) {
+    // Options RBAC
+    const options = [
+      { label: t('role-org-member'), value: 'org_member' },
+      { label: t('role-org-billing-admin'), value: 'org_billing_admin' },
+      { label: t('role-org-admin'), value: 'org_admin' },
+    ]
 
-  if (isSuperAdmin()) {
-    options.push({ label: t('key-super-admin'), value: 'super_admin' })
+    if (canUpdateUserRoles.value) {
+      options.push({ label: t('role-org-super-admin'), value: 'org_super_admin' })
+    }
+
+    return options
   }
+  else {
+    // Options legacy
+    const options = [
+      { label: t('key-read'), value: 'read' },
+      { label: t('key-upload'), value: 'upload' },
+      { label: t('key-write'), value: 'write' },
+      { label: t('key-admin'), value: 'admin' },
+    ]
 
-  return options
+    if (canUpdateUserRoles.value) {
+      options.push({ label: t('key-super-admin'), value: 'super_admin' })
+    }
+
+    return options
+  }
 })
 
 const membersOptions = computed(() => {
@@ -137,7 +190,13 @@ columns.value = [
     key: 'role',
     mobile: true,
     sortable: 'desc',
-    displayFunction: (member: ExtendedOrganizationMember) => member.role.replaceAll('_', ' '),
+    displayFunction: (member: ExtendedOrganizationMember) => {
+      if (useNewRbac.value) {
+        const i18nKey = getRbacRoleI18nKey(member.role)
+        return i18nKey ? t(i18nKey) : member.role.replaceAll('_', ' ')
+      }
+      return member.role.replaceAll('_', ' ')
+    },
   },
   {
     key: 'actions',
@@ -146,8 +205,8 @@ columns.value = [
     actions: computed(() => [
       {
         icon: IconWrench,
-        title: rbacSystemEnabled ? t('edit-role', 'Edit role') : t('edit-permission', 'Edit permission'),
-        visible: (member: ExtendedOrganizationMember) => canEdit(member),
+        title: rbacSystemEnabled ? t('edit-role', 'Edit role') : t('actions'),
+        visible: (member: ExtendedOrganizationMember) => canUpdateUserRoles.value && member.uid !== currentOrganization?.value?.created_by,
         onClick: (member: ExtendedOrganizationMember) => {
           changeMemberPermission(member)
         },
@@ -166,7 +225,36 @@ columns.value = [
 async function reloadData() {
   isLoading.value = true
   try {
-    members.value = await organizationStore.getMembers()
+    await checkRbacEnabled()
+
+    if (useNewRbac.value && currentOrganization.value) {
+      // Utiliser la RPC RBAC pour récupérer les membres
+      const { data: rbacMembers, error: rbError } = await supabase
+        .rpc('get_org_members_rbac', {
+          p_org_id: currentOrganization.value.gid,
+        })
+
+      if (rbError) {
+        console.error('Error fetching RBAC members:', rbError)
+        toast.error(t('error-fetching-members'))
+        return
+      }
+
+      // Mapper les données RBAC vers le format attendu par la table
+      members.value = (rbacMembers || []).map((member: any, index: number) => ({
+        id: index,
+        aid: 0, // N'existe plus dans le système RBAC pur
+        uid: member.user_id,
+        email: member.email,
+        image_url: member.image_url,
+        role: member.role_name,
+        is_tmp: false, // Les invitations RBAC seront gérées différemment
+      }))
+    }
+    else {
+      // Utiliser l'ancienne méthode pour les orgs sans RBAC
+      members.value = await organizationStore.getMembers()
+    }
   }
   catch (error) {
     console.error('Error reloading members:', error)
@@ -189,14 +277,14 @@ function validateEmail(email: string) {
     )
 }
 
-async function showPermModal(invite: boolean): Promise<Database['public']['Enums']['user_min_right'] | undefined> {
+async function showPermModal(invite: boolean): Promise<Database['public']['Enums']['user_min_right'] | string | undefined> {
   selectedPermission.value = undefined
   selectedPermissionForm.value = ''
   isInvitePermissionModal.value = invite
 
   dialogStore.openDialog({
-    title: rbacSystemEnabled ? t('select-user-role', 'Select a role') : t('select-user-perms'),
-    description: rbacSystemEnabled
+    title: useNewRbac.value ? t('select-user-role', 'Select a role') : t('select-user-perms'),
+    description: useNewRbac.value
       ? t('select-user-role-expanded', 'Choose the RBAC role to assign. Legacy roles remain visible during migration.')
       : t('select-user-perms-expanded'),
     size: 'lg',
@@ -225,7 +313,7 @@ async function showPermModal(invite: boolean): Promise<Database['public']['Enums
 }
 
 async function showInviteModal() {
-  if (!currentOrganization.value || (!organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['admin', 'super_admin']))) {
+  if (!currentOrganization.value || !canInviteUser.value) {
     toast.error(t('no-permission'))
     return
   }
@@ -517,15 +605,47 @@ async function deleteMember(member: ExtendedOrganizationMember) {
   _deleteMember(member)
 }
 
-async function _changeMemberPermission(member: ExtendedOrganizationMember, perm: Database['public']['Enums']['user_min_right']) {
+async function _changeMemberPermission(member: ExtendedOrganizationMember, perm: Database['public']['Enums']['user_min_right'] | string) {
   isLoading.value = true
   try {
-    if (member.is_tmp) {
-      // Handle modifying permissions for temporary users
+    if (useNewRbac.value && currentOrganization.value) {
+      // Utiliser la RPC RBAC pour mettre à jour le rôle
+      const { data, error } = await supabase.rpc('update_org_member_role', {
+        p_org_id: currentOrganization.value.gid,
+        p_user_id: member.uid,
+        p_new_role_name: perm as string,
+      })
+
+      if (error) {
+        console.error('Error updating RBAC role:', error)
+
+        // Gérer les erreurs spécifiques
+        if (error.message.includes('CANNOT_REMOVE_LAST_SUPER_ADMIN')) {
+          toast.error(t('cannot-remove-last-super-admin'))
+        }
+        else if (error.message.includes('CANNOT_CHANGE_OWNER_ROLE')) {
+          toast.error(t('cannot-change-owner-role'))
+        }
+        else if (error.message.includes('NO_PERMISSION_TO_UPDATE_ROLES')) {
+          toast.error(t('no-permission'))
+        }
+        else {
+          toast.error(`${t('cannot-change-permission')}: ${error.message}`)
+        }
+        return
+      }
+
+      if (data === 'OK') {
+        toast.success(t('permission-changed'))
+        await reloadData()
+      }
+    }
+    else if (member.is_tmp) {
+      // Handle modifying permissions for temporary users (legacy)
       const { data, error } = await supabase.rpc('modify_permissions_tmp', {
         email: member.email,
         org_id: currentOrganization.value?.gid ?? '',
-        new_role: perm,
+        new_role: perm as Database['public']['Enums']['user_min_right'],
       })
 
       if (error) {
@@ -545,8 +665,8 @@ async function _changeMemberPermission(member: ExtendedOrganizationMember, perm:
       await reloadData()
     }
     else {
-      // Handle regular users as before
-      const { error } = await supabase.from('org_users').update({ user_right: perm }).eq('id', member.aid)
+      // Handle regular users as before (legacy)
+      const { error } = await supabase.from('org_users').update({ user_right: perm as Database['public']['Enums']['user_min_right'] }).eq('id', member.aid)
       if (error) {
         console.error('Error changing permission: ', error)
         toast.error(`${t('cannot-change-permission')}: ${error.message}`)
@@ -567,7 +687,8 @@ async function _changeMemberPermission(member: ExtendedOrganizationMember, perm:
 }
 
 async function changeMemberPermission(member: ExtendedOrganizationMember) {
-  const perm = await showPermModal(member.role.includes('invite'))
+  const isInvite = member.role.includes('invite')
+  const perm = await showPermModal(isInvite)
 
   if (!perm) {
     console.log('Permission change cancelled.')
@@ -600,18 +721,6 @@ function acronym(email: string) {
   return res
 }
 
-function canEdit(member: ExtendedOrganizationMember) {
-  const role = organizationStore.currentRole
-  if (!role)
-    return false
-  return (organizationStore.hasPermissionsInRole(role, ['admin', 'super_admin'])) && (member.uid !== currentOrganization?.value?.created_by)
-}
-function isSuperAdmin() {
-  const role = organizationStore.currentRole
-  if (!role)
-    return false
-  return organizationStore.hasPermissionsInRole(role, ['super_admin'])
-}
 function canDelete(member: ExtendedOrganizationMember) {
   const role = organizationStore.currentRole
   const currentUserId = main.user?.id
@@ -628,8 +737,14 @@ function canDelete(member: ExtendedOrganizationMember) {
   return currentUserIsAdmin
 }
 
-function handlePermissionSelection(permission: Database['public']['Enums']['user_min_right'], invite: boolean) {
-  if (invite) {
+function handlePermissionSelection(permission: Database['public']['Enums']['user_min_right'] | string, invite: boolean) {
+  if (useNewRbac.value) {
+    // Pour RBAC, on utilise directement le nom du rôle (org_super_admin, org_admin, etc.)
+    // Les invitations RBAC ne nécessitent pas de préfixe 'invite_'
+    selectedPermission.value = permission as any
+  }
+  else if (invite) {
+    // Legacy: ajouter le préfixe invite_ pour les invitations
     switch (permission) {
       case 'read':
         selectedPermission.value = 'invite_read'

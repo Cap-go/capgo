@@ -7,6 +7,11 @@
 export {}
 declare global {
   const EffectScope: typeof import('vue').EffectScope
+  const LEGACY_TO_RBAC_ROLE_MAPPING: typeof import('./stores/organization').LEGACY_TO_RBAC_ROLE_MAPPING
+  const RBAC_ORG_ROLE_DISPLAY_NAMES: typeof import('./stores/organization').RBAC_ORG_ROLE_DISPLAY_NAMES
+  const RBAC_ORG_ROLE_I18N_KEYS: typeof import('./stores/organization').RBAC_ORG_ROLE_I18N_KEYS
+  const RBAC_ROLE_HIERARCHY: typeof import('./stores/organization').RBAC_ROLE_HIERARCHY
+  const RBAC_TO_LEGACY_ROLE_MAPPING: typeof import('./stores/organization').RBAC_TO_LEGACY_ROLE_MAPPING
   const asyncComputed: typeof import('@vueuse/core').asyncComputed
   const autoResetRef: typeof import('@vueuse/core').autoResetRef
   const computed: typeof import('vue').computed
@@ -37,6 +42,8 @@ declare global {
   const getCurrentInstance: typeof import('vue').getCurrentInstance
   const getCurrentScope: typeof import('vue').getCurrentScope
   const getCurrentWatcher: typeof import('vue').getCurrentWatcher
+  const getRbacRoleDisplayName: typeof import('./stores/organization').getRbacRoleDisplayName
+  const getRbacRoleI18nKey: typeof import('./stores/organization').getRbacRoleI18nKey
   const h: typeof import('vue').h
   const ignorableWatch: typeof import('@vueuse/core').ignorableWatch
   const inject: typeof import('vue').inject
@@ -327,7 +334,7 @@ declare global {
   export type { BreadcrumbItem } from './stores/display'
   import('./stores/display')
   // @ts-ignore
-  export type { Organization, OrganizationRole, ExtendedOrganizationMember, ExtendedOrganizationMembers } from './stores/organization'
+  export type { Organization, OrganizationRole, ExtendedOrganizationMember, ExtendedOrganizationMembers, RbacRoleName } from './stores/organization'
   import('./stores/organization')
 }
 
@@ -337,6 +344,9 @@ declare module 'vue' {
   interface GlobalComponents {}
   interface ComponentCustomProperties {
     readonly EffectScope: UnwrapRef<typeof import('vue')['EffectScope']>
+    readonly RBAC_ORG_ROLE_I18N_KEYS: UnwrapRef<typeof import('./stores/organization')['RBAC_ORG_ROLE_I18N_KEYS']>
+    readonly RBAC_ROLE_HIERARCHY: UnwrapRef<typeof import('./stores/organization')['RBAC_ROLE_HIERARCHY']>
+    readonly RBAC_TO_LEGACY_ROLE_MAPPING: UnwrapRef<typeof import('./stores/organization')['RBAC_TO_LEGACY_ROLE_MAPPING']>
     readonly asyncComputed: UnwrapRef<typeof import('@vueuse/core')['asyncComputed']>
     readonly autoResetRef: UnwrapRef<typeof import('@vueuse/core')['autoResetRef']>
     readonly computed: UnwrapRef<typeof import('vue')['computed']>
@@ -367,6 +377,7 @@ declare module 'vue' {
     readonly getCurrentInstance: UnwrapRef<typeof import('vue')['getCurrentInstance']>
     readonly getCurrentScope: UnwrapRef<typeof import('vue')['getCurrentScope']>
     readonly getCurrentWatcher: UnwrapRef<typeof import('vue')['getCurrentWatcher']>
+    readonly getRbacRoleI18nKey: UnwrapRef<typeof import('./stores/organization')['getRbacRoleI18nKey']>
     readonly h: UnwrapRef<typeof import('vue')['h']>
     readonly ignorableWatch: UnwrapRef<typeof import('@vueuse/core')['ignorableWatch']>
     readonly inject: UnwrapRef<typeof import('vue')['inject']>

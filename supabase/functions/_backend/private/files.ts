@@ -12,7 +12,8 @@ import { simpleError } from '../utils/hono.ts'
 import { middlewareKey } from '../utils/hono_middleware.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
-import { getAppByAppIdPg, getUserIdFromApikey, hasAppRightApikeyPg } from '../utils/pg_files.ts'
+import { getAppByAppIdPg, getUserIdFromApikey } from '../utils/pg_files.ts'
+import { checkPermissionPg } from '../utils/rbac.ts'
 import { createStatsBandwidth } from '../utils/stats.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 import { backgroundTask } from '../utils/utils.ts'
@@ -371,18 +372,17 @@ async function checkWriteAppAccess(c: Context, next: Next) {
 
     cloudlog({
       requestId: c.get('requestId'),
-      message: 'checkWriteAppAccess - checking app permissions via hasAppRightApikeyPg',
+      message: 'checkWriteAppAccess - checking app permissions via checkPermissionPg',
       userId,
       app_id,
     })
 
-    // Use the Postgres version of hasAppRightApikey
-    const requiredRight: Database['public']['Enums']['user_min_right'] = 'read'
-    const hasPermission = await hasAppRightApikeyPg(c, app_id, requiredRight, userId, capgkey, drizzleClient)
+    // Use the new RBAC permission check
+    const hasPermission = await checkPermissionPg(c, 'app.read_bundles', { appId: app_id }, drizzleClient, userId, capgkey)
 
     cloudlog({
       requestId: c.get('requestId'),
-      message: 'checkWriteAppAccess - hasAppRightApikeyPg result',
+      message: 'checkWriteAppAccess - checkPermissionPg result',
       hasPermission,
     })
 

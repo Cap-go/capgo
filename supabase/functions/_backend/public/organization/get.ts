@@ -1,8 +1,10 @@
 import type { Context } from 'hono'
+import type { MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
 import { z } from 'zod/mini'
 import { simpleError } from '../../utils/hono.ts'
-import { apikeyHasOrgRight, hasOrgRightApikey, supabaseApikey } from '../../utils/supabase.ts'
+import { checkPermission } from '../../utils/rbac.ts'
+import { supabaseApikey } from '../../utils/supabase.ts'
 import { fetchLimit } from '../../utils/utils.ts'
 
 const bodySchema = z.object({
@@ -20,21 +22,19 @@ const orgSchema = z.object({
   customer_id: z.nullable(z.string()),
 })
 
-export async function get(c: Context, bodyRaw: any, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
+export async function get(c: Context<MiddlewareKeyVariables>, bodyRaw: any, _apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
   const bodyParsed = bodySchema.safeParse(bodyRaw)
   if (!bodyParsed.success) {
     throw simpleError('invalid_body', 'Invalid body', { error: bodyParsed.error })
   }
   const body = bodyParsed.data
 
-  if (body.orgId && !(await hasOrgRightApikey(c, body.orgId, apikey.user_id, 'read', c.get('capgkey') as string))) {
+  // Auth context is already set by middlewareKey
+  if (body.orgId && !(await checkPermission(c, 'org.read', { orgId: body.orgId }))) {
     throw simpleError('invalid_org_id', 'You can\'t access this organization', { org_id: body.orgId })
   }
 
   if (body.orgId) {
-    if (!apikeyHasOrgRight(apikey, body.orgId)) {
-      throw simpleError('invalid_org_id', 'You can\'t access this organization', { org_id: body.orgId })
-    }
     const { data, error } = await supabaseApikey(c, c.get('capgkey') as string)
       .from('orgs')
       .select('*')

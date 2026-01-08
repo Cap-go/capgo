@@ -1134,5 +1134,14 @@
   "your-role-in-org": "Il tuo ruolo nell'organizzazione",
   "your-settings": "Le tue impostazioni",
   "your-usage": "Il tuo utilizzo:",
-  "zip-bundle": "Pacchetto app Zip"
+  "zip-bundle": "Pacchetto app Zip",
+  "role-app-developer": "Sviluppatore di app",
+  "role-app-uploader": "Caricatore di app",
+  "role-app-reader": "Lettore di app",
+  "remove-role": "Rimuovi ruolo",
+  "remove-role-confirm": "Vuoi rimuovere l'accesso di questo utente all'app?",
+  "role-org-super-admin": "Super Amministratore",
+  "role-org-admin": "Amministratore",
+  "role-org-billing-admin": "Gestore Fatturazione",
+  "role-org-member": "Membro"
 }

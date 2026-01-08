@@ -1,12 +1,108 @@
 import type { Context } from 'hono'
 import type { AuthInfo } from './hono.ts'
 import type { Database } from './supabase.types.ts'
-import { and, eq, inArray } from 'drizzle-orm'
+import { and, eq, inArray, sql } from 'drizzle-orm'
 import { honoFactory, quickError } from './hono.ts'
 import { cloudlog } from './logging.ts'
 import { closeClient, getDrizzleClient, getPgClient, logPgError } from './pg.ts'
 import * as schema from './postgres_schema.ts'
 import { checkKey, checkKeyById, supabaseAdmin, supabaseClient } from './supabase.ts'
+
+// =============================================================================
+// RBAC Context Middleware
+// =============================================================================
+
+/**
+ * Middleware that resolves and caches the RBAC feature flag for the current org.
+ * Should be used after authentication middleware and when orgId is known.
+ *
+ * Usage:
+ *   app.use('/app/*', middlewareV2(['all']), middlewareRbacContext())
+ *
+ * After this middleware runs:
+ *   - c.get('rbacEnabled') - boolean indicating if RBAC is enabled for the org
+ *   - c.get('resolvedOrgId') - the resolved org ID (if provided)
+ */
+export function middlewareRbacContext(options?: { orgIdResolver?: (c: Context) => string | null | Promise<string | null> }) {
+  return honoFactory.createMiddleware(async (c, next) => {
+    let orgId: string | null = null
+
+    // Try to resolve orgId from provided resolver
+    if (options?.orgIdResolver) {
+      const resolved = options.orgIdResolver(c)
+      orgId = resolved instanceof Promise ? await resolved : resolved
+    }
+
+    // If no orgId yet, try to get it from common sources
+    if (!orgId) {
+      // Try to get from query/body app_id and resolve to org
+      const appId = c.req.query('app_id') || (await c.req.json().catch(() => ({})))?.app_id
+      if (appId) {
+        let pgClient
+        try {
+          pgClient = getPgClient(c, true)
+          const drizzleClient = getDrizzleClient(pgClient)
+          const appResult = await drizzleClient
+            .select({ ownerOrg: schema.apps.owner_org })
+            .from(schema.apps)
+            .where(eq(schema.apps.app_id, appId))
+            .limit(1)
+          if (appResult.length > 0 && appResult[0].ownerOrg) {
+            orgId = appResult[0].ownerOrg
+          }
+        }
+        catch (e) {
+          logPgError(c, 'middlewareRbacContext:resolveAppOrg', e)
+        }
+        finally {
+          if (pgClient) {
+            closeClient(c, pgClient)
+          }
+        }
+      }
+    }
+
+    // If we have an orgId, check if RBAC is enabled
+    if (orgId) {
+      c.set('resolvedOrgId', orgId)
+      let pgClient
+      try {
+        pgClient = getPgClient(c, true)
+        const drizzleClient = getDrizzleClient(pgClient)
+        const result = await drizzleClient.execute(
+          sql`SELECT public.rbac_is_enabled_for_org(${orgId}::uuid) as enabled`,
+        )
+        const enabled = (result.rows[0] as any)?.enabled === true
+        c.set('rbacEnabled', enabled)
+
+        cloudlog({
+          requestId: c.get('requestId'),
+          message: 'middlewareRbacContext: resolved',
+          orgId,
+          rbacEnabled: enabled,
+        })
+      }
+      catch (e) {
+        logPgError(c, 'middlewareRbacContext:checkRbacEnabled', e)
+        c.set('rbacEnabled', false)
+      }
+      finally {
+        if (pgClient) {
+          closeClient(c, pgClient)
+        }
+      }
+    }
+    else {
+      c.set('rbacEnabled', false)
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'middlewareRbacContext: no orgId resolved, defaulting to legacy',
+      })
+    }
+
+    await next()
+  })
+}
 
 // TODO: make universal middleware who
 //  Accept authorization header (JWT)
@@ -243,6 +339,13 @@ export function middlewareKey(rights: Database['public']['Enums']['key_mode'][],
     c.set('apikey', apikey)
     c.set('capgkey', key)
 
+    // Set auth context for RBAC (can be overridden by subkey below)
+    c.set('auth', {
+      userId: apikey.user_id,
+      authType: 'apikey',
+      apikey,
+    } as AuthInfo)
+
     if (subkey_id) {
       let subkey: Database['public']['Tables']['apikeys']['Row'] | null = null
       let subkeyPgClient: ReturnType<typeof getPgClient> | null = null
@@ -277,8 +380,15 @@ export function middlewareKey(rights: Database['public']['Enums']['key_mode'][],
         cloudlog({ requestId: c.get('requestId'), message: 'Invalid subkey, no limited apps or orgs', subkey })
         return quickError(401, 'invalid_subkey', 'Invalid subkey, no limited apps or orgs')
       }
-      if (subkey)
+      if (subkey) {
         c.set('subkey', subkey)
+        // Override auth context with subkey for RBAC
+        c.set('auth', {
+          userId: apikey!.user_id,
+          authType: 'apikey',
+          apikey: subkey,
+        } as AuthInfo)
+      }
     }
     await next()
   })

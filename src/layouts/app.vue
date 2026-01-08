@@ -1,7 +1,6 @@
 <script setup lang="ts">
-import type { Ref } from 'vue'
 import type { Tab } from '~/components/comp_def'
-import { computed, ref, watchEffect } from 'vue'
+import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Tabs from '~/components/Tabs.vue'
 import { appTabs as baseAppTabs } from '~/constants/appTabs'
@@ -14,21 +13,15 @@ const router = useRouter()
 const route = useRoute()
 const organizationStore = useOrganizationStore()
 
-// Reactive tabs list that can be modified based on RBAC
-const appTabs = ref<Tab[]>([...baseAppTabs]) as Ref<Tab[]>
-
-watchEffect(() => {
-  // Show access tab only when RBAC is enabled
+// Compute tabs dynamically based on RBAC settings
+const appTabs = computed<Tab[]>(() => {
   const useNewRbac = (organizationStore.currentOrganization as any)?.use_new_rbac
-  const hasAccess = appTabs.value.find(tab => tab.label === 'access')
 
-  if (useNewRbac && !hasAccess) {
-    const base = baseAppTabs.find(t => t.label === 'access')
-    if (base)
-      appTabs.value.push({ ...base })
+  if (useNewRbac) {
+    return baseAppTabs
   }
-  if (!useNewRbac && hasAccess)
-    appTabs.value = appTabs.value.filter(tab => tab.label !== 'access')
+
+  return baseAppTabs.filter(t => t.label !== 'access')
 })
 
 // Detect resource type from route (channel, device, or bundle)

@@ -2,8 +2,9 @@ import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
 import { middlewareAuth, parseBody, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
+import { checkPermission } from '../utils/rbac.ts'
 import { createPortal } from '../utils/stripe.ts'
-import { hasOrgRight, supabaseAdmin } from '../utils/supabase.ts'
+import { supabaseAdmin } from '../utils/supabase.ts'
 
 interface PortalData {
   callbackUrl: string
@@ -17,15 +18,11 @@ app.use('/', useCors)
 app.post('/', middlewareAuth, async (c) => {
   const body = await parseBody<PortalData>(c)
   cloudlog({ requestId: c.get('requestId'), message: 'post stripe portal body', body })
-  const authorization = c.get('authorization')
-  const { data: auth, error } = await supabaseAdmin(c).auth.getUser(
-    authorization?.split('Bearer ')[1],
-  )
 
-  if (error || !auth?.user?.id)
-    return simpleError('not_authorize', 'Not authorize')
-    // get user from users
-  cloudlog({ requestId: c.get('requestId'), message: 'auth', auth: auth.user.id })
+  // Auth context is already set by middlewareAuth
+  const auth = c.get('auth')!
+  cloudlog({ requestId: c.get('requestId'), message: 'auth', auth: auth.userId })
+
   const { data: org, error: dbError } = await supabaseAdmin(c)
     .from('orgs')
     .select('customer_id')
@@ -36,7 +33,7 @@ app.post('/', middlewareAuth, async (c) => {
   if (!org.customer_id)
     return simpleError('no_customer', 'No customer')
 
-  if (!await hasOrgRight(c, body.orgId, auth.user.id, 'super_admin'))
+  if (!await checkPermission(c, 'org.update_billing', { orgId: body.orgId }))
     return simpleError('not_authorize', 'Not authorize')
 
   cloudlog({ requestId: c.get('requestId'), message: 'org', org })

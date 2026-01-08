@@ -17,8 +17,10 @@ export type Database = {
       apikeys: {
         Row: {
           created_at: string | null
+          expires_at: string | null
           id: number
-          key: string
+          key: string | null
+          key_hash: string | null
           limited_to_apps: string[] | null
           limited_to_orgs: string[] | null
           mode: Database["public"]["Enums"]["key_mode"]
@@ -28,8 +30,10 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          expires_at?: string | null
           id?: number
-          key: string
+          key?: string | null
+          key_hash?: string | null
           limited_to_apps?: string[] | null
           limited_to_orgs?: string[] | null
           mode: Database["public"]["Enums"]["key_mode"]
@@ -39,8 +43,10 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          expires_at?: string | null
           id?: number
-          key?: string
+          key?: string | null
+          key_hash?: string | null
           limited_to_apps?: string[] | null
           limited_to_orgs?: string[] | null
           mode?: Database["public"]["Enums"]["key_mode"]
@@ -240,6 +246,7 @@ export type Database = {
       }
       apps: {
         Row: {
+          allow_preview: boolean
           app_id: string
           channel_device_count: number
           created_at: string | null
@@ -257,6 +264,7 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          allow_preview?: boolean
           app_id: string
           channel_device_count?: number
           created_at?: string | null
@@ -274,6 +282,7 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          allow_preview?: boolean
           app_id?: string
           channel_device_count?: number
           created_at?: string | null
@@ -303,6 +312,60 @@ export type Database = {
             columns: ["owner_org"]
             isOneToOne: false
             referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      audit_logs: {
+        Row: {
+          changed_fields: string[] | null
+          created_at: string
+          id: number
+          new_record: Json | null
+          old_record: Json | null
+          operation: string
+          org_id: string
+          record_id: string
+          table_name: string
+          user_id: string | null
+        }
+        Insert: {
+          changed_fields?: string[] | null
+          created_at?: string
+          id?: number
+          new_record?: Json | null
+          old_record?: Json | null
+          operation: string
+          org_id: string
+          record_id: string
+          table_name: string
+          user_id?: string | null
+        }
+        Update: {
+          changed_fields?: string[] | null
+          created_at?: string
+          id?: number
+          new_record?: Json | null
+          old_record?: Json | null
+          operation?: string
+          org_id?: string
+          record_id?: string
+          table_name?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_logs_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "audit_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
             referencedColumns: ["id"]
           },
         ]
@@ -543,8 +606,10 @@ export type Database = {
       channels: {
         Row: {
           allow_dev: boolean
+          allow_device: boolean
           allow_device_self_set: boolean
           allow_emulator: boolean
+          allow_prod: boolean
           android: boolean
           app_id: string
           created_at: string
@@ -561,8 +626,10 @@ export type Database = {
         }
         Insert: {
           allow_dev?: boolean
+          allow_device?: boolean
           allow_device_self_set?: boolean
           allow_emulator?: boolean
+          allow_prod?: boolean
           android?: boolean
           app_id: string
           created_at?: string
@@ -579,8 +646,10 @@ export type Database = {
         }
         Update: {
           allow_dev?: boolean
+          allow_device?: boolean
           allow_device_self_set?: boolean
           allow_emulator?: boolean
+          allow_prod?: boolean
           android?: boolean
           app_id?: string
           created_at?: string
@@ -618,6 +687,69 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      cron_tasks: {
+        Row: {
+          batch_size: number | null
+          created_at: string
+          description: string | null
+          enabled: boolean
+          hour_interval: number | null
+          id: number
+          minute_interval: number | null
+          name: string
+          payload: Json | null
+          run_at_hour: number | null
+          run_at_minute: number | null
+          run_at_second: number | null
+          run_on_day: number | null
+          run_on_dow: number | null
+          second_interval: number | null
+          target: string
+          task_type: Database["public"]["Enums"]["cron_task_type"]
+          updated_at: string
+        }
+        Insert: {
+          batch_size?: number | null
+          created_at?: string
+          description?: string | null
+          enabled?: boolean
+          hour_interval?: number | null
+          id?: number
+          minute_interval?: number | null
+          name: string
+          payload?: Json | null
+          run_at_hour?: number | null
+          run_at_minute?: number | null
+          run_at_second?: number | null
+          run_on_day?: number | null
+          run_on_dow?: number | null
+          second_interval?: number | null
+          target: string
+          task_type?: Database["public"]["Enums"]["cron_task_type"]
+          updated_at?: string
+        }
+        Update: {
+          batch_size?: number | null
+          created_at?: string
+          description?: string | null
+          enabled?: boolean
+          hour_interval?: number | null
+          id?: number
+          minute_interval?: number | null
+          name?: string
+          payload?: Json | null
+          run_at_hour?: number | null
+          run_at_minute?: number | null
+          run_at_second?: number | null
+          run_on_day?: number | null
+          run_on_dow?: number | null
+          second_interval?: number | null
+          target?: string
+          task_type?: Database["public"]["Enums"]["cron_task_type"]
+          updated_at?: string
+        }
+        Relationships: []
       }
       daily_bandwidth: {
         Row: {
@@ -791,6 +923,7 @@ export type Database = {
           created_by: string
           deployed_at: string | null
           id: number
+          install_stats_email_sent_at: string | null
           owner_org: string
           updated_at: string | null
           version_id: number
@@ -802,6 +935,7 @@ export type Database = {
           created_by: string
           deployed_at?: string | null
           id?: number
+          install_stats_email_sent_at?: string | null
           owner_org: string
           updated_at?: string | null
           version_id: number
@@ -813,6 +947,7 @@ export type Database = {
           created_by?: string
           deployed_at?: string | null
           id?: number
+          install_stats_email_sent_at?: string | null
           owner_org?: string
           updated_at?: string | null
           version_id?: number
@@ -937,6 +1072,8 @@ export type Database = {
           credits_consumed: number
           date_id: string
           devices_last_month: number | null
+          devices_last_month_android: number | null
+          devices_last_month_ios: number | null
           mrr: number
           need_upgrade: number | null
           new_paying_orgs: number
@@ -982,6 +1119,8 @@ export type Database = {
           credits_consumed?: number
           date_id: string
           devices_last_month?: number | null
+          devices_last_month_android?: number | null
+          devices_last_month_ios?: number | null
           mrr?: number
           need_upgrade?: number | null
           new_paying_orgs?: number
@@ -1027,6 +1166,8 @@ export type Database = {
           credits_consumed?: number
           date_id?: string
           devices_last_month?: number | null
+          devices_last_month_android?: number | null
+          devices_last_month_ios?: number | null
           mrr?: number
           need_upgrade?: number | null
           new_paying_orgs?: number
@@ -1204,11 +1345,17 @@ export type Database = {
           created_at: string | null
           created_by: string
           customer_id: string | null
+          email_preferences: Json
+          enforce_hashed_api_keys: boolean
+          enforcing_2fa: boolean
           id: string
           last_stats_updated_at: string | null
           logo: string | null
           management_email: string
+          max_apikey_expiration_days: number | null
           name: string
+          password_policy_config: Json | null
+          require_apikey_expiration: boolean
           stats_updated_at: string | null
           updated_at: string | null
         }
@@ -1216,11 +1363,17 @@ export type Database = {
           created_at?: string | null
           created_by: string
           customer_id?: string | null
+          email_preferences?: Json
+          enforce_hashed_api_keys?: boolean
+          enforcing_2fa?: boolean
           id?: string
           last_stats_updated_at?: string | null
           logo?: string | null
           management_email: string
+          max_apikey_expiration_days?: number | null
           name: string
+          password_policy_config?: Json | null
+          require_apikey_expiration?: boolean
           stats_updated_at?: string | null
           updated_at?: string | null
         }
@@ -1228,11 +1381,17 @@ export type Database = {
           created_at?: string | null
           created_by?: string
           customer_id?: string | null
+          email_preferences?: Json
+          enforce_hashed_api_keys?: boolean
+          enforcing_2fa?: boolean
           id?: string
           last_stats_updated_at?: string | null
           logo?: string | null
           management_email?: string
+          max_apikey_expiration_days?: number | null
           name?: string
+          password_policy_config?: Json | null
+          require_apikey_expiration?: boolean
           stats_updated_at?: string | null
           updated_at?: string | null
         }
@@ -1380,7 +1539,6 @@ export type Database = {
           subscription_anchor_end: string
           subscription_anchor_start: string
           subscription_id: string | null
-          subscription_metered: Json
           trial_at: string
           updated_at: string
         }
@@ -1402,7 +1560,6 @@ export type Database = {
           subscription_anchor_end?: string
           subscription_anchor_start?: string
           subscription_id?: string | null
-          subscription_metered?: Json
           trial_at?: string
           updated_at?: string
         }
@@ -1424,7 +1581,6 @@ export type Database = {
           subscription_anchor_end?: string
           subscription_anchor_start?: string
           subscription_id?: string | null
-          subscription_metered?: Json
           trial_at?: string
           updated_at?: string
         }
@@ -1724,12 +1880,51 @@ export type Database = {
           },
         ]
       }
+      user_password_compliance: {
+        Row: {
+          created_at: string
+          id: number
+          org_id: string
+          policy_hash: string
+          updated_at: string
+          user_id: string
+          validated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: number
+          org_id: string
+          policy_hash: string
+          updated_at?: string
+          user_id: string
+          validated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: number
+          org_id?: string
+          policy_hash?: string
+          updated_at?: string
+          user_id?: string
+          validated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_password_compliance_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       users: {
         Row: {
           ban_time: string | null
           country: string | null
           created_at: string | null
           email: string
+          email_preferences: Json
           enable_notifications: boolean
           first_name: string | null
           id: string
@@ -1743,6 +1938,7 @@ export type Database = {
           country?: string | null
           created_at?: string | null
           email: string
+          email_preferences?: Json
           enable_notifications?: boolean
           first_name?: string | null
           id: string
@@ -1756,6 +1952,7 @@ export type Database = {
           country?: string | null
           created_at?: string | null
           email?: string
+          email_preferences?: Json
           enable_notifications?: boolean
           first_name?: string | null
           id?: string
@@ -1807,6 +2004,132 @@ export type Database = {
           version_id?: number
         }
         Relationships: []
+      }
+      webhook_deliveries: {
+        Row: {
+          attempt_count: number
+          audit_log_id: number | null
+          completed_at: string | null
+          created_at: string
+          duration_ms: number | null
+          event_type: string
+          id: string
+          max_attempts: number
+          next_retry_at: string | null
+          org_id: string
+          request_payload: Json
+          response_body: string | null
+          response_headers: Json | null
+          response_status: number | null
+          status: string
+          webhook_id: string
+        }
+        Insert: {
+          attempt_count?: number
+          audit_log_id?: number | null
+          completed_at?: string | null
+          created_at?: string
+          duration_ms?: number | null
+          event_type: string
+          id?: string
+          max_attempts?: number
+          next_retry_at?: string | null
+          org_id: string
+          request_payload: Json
+          response_body?: string | null
+          response_headers?: Json | null
+          response_status?: number | null
+          status?: string
+          webhook_id: string
+        }
+        Update: {
+          attempt_count?: number
+          audit_log_id?: number | null
+          completed_at?: string | null
+          created_at?: string
+          duration_ms?: number | null
+          event_type?: string
+          id?: string
+          max_attempts?: number
+          next_retry_at?: string | null
+          org_id?: string
+          request_payload?: Json
+          response_body?: string | null
+          response_headers?: Json | null
+          response_status?: number | null
+          status?: string
+          webhook_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "webhook_deliveries_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "webhook_deliveries_webhook_id_fkey"
+            columns: ["webhook_id"]
+            isOneToOne: false
+            referencedRelation: "webhooks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      webhooks: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          enabled: boolean
+          events: string[]
+          id: string
+          name: string
+          org_id: string
+          secret: string
+          updated_at: string
+          url: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          enabled?: boolean
+          events: string[]
+          id?: string
+          name: string
+          org_id: string
+          secret?: string
+          updated_at?: string
+          url: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          enabled?: boolean
+          events?: string[]
+          id?: string
+          name?: string
+          org_id?: string
+          secret?: string
+          updated_at?: string
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "webhooks_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "webhooks_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
@@ -1903,12 +2226,40 @@ export type Database = {
             }
             Returns: boolean
           }
+      check_org_hashed_key_enforcement: {
+        Args: {
+          apikey_row: Database["public"]["Tables"]["apikeys"]["Row"]
+          org_id: string
+        }
+        Returns: boolean
+      }
+      check_org_members_2fa_enabled: {
+        Args: { org_id: string }
+        Returns: {
+          "2fa_enabled": boolean
+          user_id: string
+        }[]
+      }
+      check_org_members_password_policy: {
+        Args: { org_id: string }
+        Returns: {
+          email: string
+          first_name: string
+          last_name: string
+          password_policy_compliant: boolean
+          user_id: string
+        }[]
+      }
       check_revert_to_builtin_version: {
         Args: { appid: string }
         Returns: number
       }
+      cleanup_expired_apikeys: { Args: never; Returns: undefined }
       cleanup_frequent_job_details: { Args: never; Returns: undefined }
+      cleanup_job_run_details_7days: { Args: never; Returns: undefined }
+      cleanup_old_audit_logs: { Args: never; Returns: undefined }
       cleanup_queue_messages: { Args: never; Returns: undefined }
+      cleanup_webhook_deliveries: { Args: never; Returns: undefined }
       convert_bytes_to_gb: { Args: { bytes_value: number }; Returns: number }
       convert_bytes_to_mb: { Args: { bytes_value: number }; Returns: number }
       convert_gb_to_bytes: { Args: { gb: number }; Returns: number }
@@ -1945,6 +2296,28 @@ export type Database = {
             Returns: boolean
           }
       expire_usage_credits: { Args: never; Returns: number }
+      find_apikey_by_value: {
+        Args: { key_value: string }
+        Returns: {
+          created_at: string | null
+          expires_at: string | null
+          id: number
+          key: string | null
+          key_hash: string | null
+          limited_to_apps: string[] | null
+          limited_to_orgs: string[] | null
+          mode: Database["public"]["Enums"]["key_mode"]
+          name: string
+          updated_at: string | null
+          user_id: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "apikeys"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       find_best_plan_v3: {
         Args: {
           bandwidth: number
@@ -2089,27 +2462,6 @@ export type Database = {
           role: Database["public"]["Enums"]["user_min_right"]
         }[]
       }
-      get_metered_usage:
-        | {
-            Args: never
-            Returns: Database["public"]["CompositeTypes"]["stats_table"]
-            SetofOptions: {
-              from: "*"
-              to: "stats_table"
-              isOneToOne: true
-              isSetofReturn: false
-            }
-          }
-        | {
-            Args: { orgid: string }
-            Returns: Database["public"]["CompositeTypes"]["stats_table"]
-            SetofOptions: {
-              from: "*"
-              to: "stats_table"
-              isOneToOne: true
-              isSetofReturn: false
-            }
-          }
       get_next_cron_time: {
         Args: { p_schedule: string; p_timestamp: string }
         Returns: string
@@ -2176,9 +2528,11 @@ export type Database = {
               is_yearly: boolean
               logo: string
               management_email: string
+              max_apikey_expiration_days: number
               name: string
               next_stats_update_at: string
               paying: boolean
+              require_apikey_expiration: boolean
               role: string
               stats_updated_at: string
               subscription_end: string
@@ -2200,9 +2554,11 @@ export type Database = {
               is_yearly: boolean
               logo: string
               management_email: string
+              max_apikey_expiration_days: number
               name: string
               next_stats_update_at: string
               paying: boolean
+              require_apikey_expiration: boolean
               role: string
               stats_updated_at: string
               subscription_end: string
@@ -2210,6 +2566,73 @@ export type Database = {
               trial_left: number
             }[]
           }
+      get_orgs_v7:
+        | {
+            Args: never
+            Returns: {
+              "2fa_has_access": boolean
+              app_count: number
+              can_use_more: boolean
+              created_by: string
+              credit_available: number
+              credit_next_expiration: string
+              credit_total: number
+              enforce_hashed_api_keys: boolean
+              enforcing_2fa: boolean
+              gid: string
+              is_canceled: boolean
+              is_yearly: boolean
+              logo: string
+              management_email: string
+              max_apikey_expiration_days: number
+              name: string
+              next_stats_update_at: string
+              password_has_access: boolean
+              password_policy_config: Json
+              paying: boolean
+              require_apikey_expiration: boolean
+              role: string
+              stats_updated_at: string
+              subscription_end: string
+              subscription_start: string
+              trial_left: number
+            }[]
+          }
+        | {
+            Args: { userid: string }
+            Returns: {
+              "2fa_has_access": boolean
+              app_count: number
+              can_use_more: boolean
+              created_by: string
+              credit_available: number
+              credit_next_expiration: string
+              credit_total: number
+              enforce_hashed_api_keys: boolean
+              enforcing_2fa: boolean
+              gid: string
+              is_canceled: boolean
+              is_yearly: boolean
+              logo: string
+              management_email: string
+              max_apikey_expiration_days: number
+              name: string
+              next_stats_update_at: string
+              password_has_access: boolean
+              password_policy_config: Json
+              paying: boolean
+              require_apikey_expiration: boolean
+              role: string
+              stats_updated_at: string
+              subscription_end: string
+              subscription_start: string
+              trial_left: number
+            }[]
+          }
+      get_password_policy_hash: {
+        Args: { policy_config: Json }
+        Returns: string
+      }
       get_plan_usage_percent_detailed:
         | {
             Args: { orgid: string }
@@ -2324,6 +2747,9 @@ export type Database = {
           open_app: number
         }[]
       }
+      has_2fa_enabled:
+        | { Args: never; Returns: boolean }
+        | { Args: { user_id: string }; Returns: boolean }
       has_app_right: {
         Args: {
           appid: string
@@ -2388,6 +2814,7 @@ export type Database = {
             }
             Returns: boolean
           }
+      is_apikey_expired: { Args: { key_expires_at: string }; Returns: boolean }
       is_app_owner:
         | { Args: { apikey: string; appid: string }; Returns: boolean }
         | { Args: { appid: string }; Returns: boolean }
@@ -2446,12 +2873,14 @@ export type Database = {
       pg_log: { Args: { decision: string; input?: Json }; Returns: undefined }
       process_admin_stats: { Args: never; Returns: undefined }
       process_all_cron_tasks: { Args: never; Returns: undefined }
+      process_billing_period_stats_email: { Args: never; Returns: undefined }
       process_channel_device_counts_queue: {
         Args: { batch_size?: number }
         Returns: number
       }
       process_cron_stats_jobs: { Args: never; Returns: undefined }
       process_cron_sync_sub_jobs: { Args: never; Returns: undefined }
+      process_deploy_install_stats_email: { Args: never; Returns: undefined }
       process_failed_uploads: { Args: never; Returns: undefined }
       process_free_trial_expired: { Args: never; Returns: undefined }
       process_function_queue:
@@ -2515,6 +2944,22 @@ export type Database = {
           p_user_id: string
         }
         Returns: string
+      }
+      reject_access_due_to_2fa: {
+        Args: { org_id: string; user_id: string }
+        Returns: boolean
+      }
+      reject_access_due_to_2fa_for_app: {
+        Args: { app_id: string }
+        Returns: boolean
+      }
+      reject_access_due_to_2fa_for_org: {
+        Args: { org_id: string }
+        Returns: boolean
+      }
+      reject_access_due_to_password_policy: {
+        Args: { org_id: string; user_id: string }
+        Returns: boolean
       }
       remove_old_jobs: { Args: never; Returns: undefined }
       rescind_invitation: {
@@ -2589,6 +3034,14 @@ export type Database = {
         Args: { p_app_id: string; p_size: number; p_version_id: number }
         Returns: boolean
       }
+      user_meets_password_policy: {
+        Args: { org_id: string; user_id: string }
+        Returns: boolean
+      }
+      verify_api_key_hash: {
+        Args: { plain_key: string; stored_hash: string }
+        Returns: boolean
+      }
       verify_mfa: { Args: never; Returns: boolean }
     }
     Enums: {
@@ -2601,6 +3054,7 @@ export type Database = {
         | "deduction"
         | "expiry"
         | "refund"
+      cron_task_type: "function" | "queue" | "function_queue"
       disable_update: "major" | "minor" | "patch" | "version_number" | "none"
       key_mode: "read" | "write" | "all" | "upload"
       platform_os: "ios" | "android"
@@ -2665,6 +3119,8 @@ export type Database = {
         | "download_manifest_brotli_fail"
         | "backend_refusal"
         | "download_0"
+        | "disableProdBuild"
+        | "disableDevice"
       stripe_status:
         | "created"
         | "succeeded"
@@ -2851,6 +3307,7 @@ export const Constants = {
         "expiry",
         "refund",
       ],
+      cron_task_type: ["function", "queue", "function_queue"],
       disable_update: ["major", "minor", "patch", "version_number", "none"],
       key_mode: ["read", "write", "all", "upload"],
       platform_os: ["ios", "android"],
@@ -2915,6 +3372,8 @@ export const Constants = {
         "download_manifest_brotli_fail",
         "backend_refusal",
         "download_0",
+        "disableProdBuild",
+        "disableDevice",
       ],
       stripe_status: [
         "created",

@@ -25,10 +25,12 @@
 
 import type { OrganizationRole } from '~/stores/organization'
 import type { Database } from '~/types/supabase.types'
+import { computedAsync } from '@vueuse/core'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import IconInfo from '~icons/lucide/info'
+import { hasPermission } from '~/services/permissions'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useOrganizationStore } from '~/stores/organization'
@@ -87,14 +89,14 @@ interface DeployTarget {
 }
 
 /**
- * Computed property that checks if the user has admin-level permissions.
- * Only users with admin, super_admin, or owner roles can see and use the banner.
- *
- * @returns {boolean} True if user has admin permissions, false otherwise
+ * Computed property that checks if the user has permission to promote bundles.
+ * Automatically updates when appId or userRole changes.
  */
-const hasAdminPermission = computed(() => {
-  return userRole.value ? organizationStore.hasPermissionsInRole(userRole.value, ['admin', 'super_admin']) : false
-})
+const hasAdminPermission = computedAsync(async () => {
+  if (!props.appId || !userRole.value)
+    return false
+  return await hasPermission('channel.promote_bundle', { appId: props.appId })
+}, false)
 
 const deployTargets = computed<DeployTarget[]>(() => {
   const bundle = latestBundle.value

@@ -3,7 +3,8 @@ import { Hono } from 'hono/tiny'
 import { getBundleUrl, getManifestUrl } from '../utils/downloadUrl.ts'
 import { middlewareAuth, parseBody, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
-import { hasAppRight, supabaseAdmin } from '../utils/supabase.ts'
+import { checkPermission } from '../utils/rbac.ts'
+import { supabaseAdmin } from '../utils/supabase.ts'
 
 interface DataDownload {
   app_id: string
@@ -20,20 +21,13 @@ app.use('/', useCors)
 app.post('/', middlewareAuth, async (c) => {
   const body = await parseBody<DataDownload>(c)
   cloudlog({ requestId: c.get('requestId'), message: 'post download link body', body })
-  const authorization = c.req.header('authorization')
-  if (!authorization)
-    return simpleError('cannot_find_authorization', 'Cannot find authorization')
 
-  const { data: auth, error } = await supabaseAdmin(c).auth.getUser(
-    authorization?.split('Bearer ')[1],
-  )
-  if (error || !auth?.user?.id)
-    return simpleError('not_authorize', 'Not authorize')
-
-  const userId = auth.user.id
-
-  if (!(await hasAppRight(c, body.app_id, userId, 'read')))
+  // Auth context is already set by middlewareAuth
+  if (!(await checkPermission(c, 'app.read_bundles', { appId: body.app_id })))
     return simpleError('app_access_denied', 'You can\'t access this app', { app_id: body.app_id })
+
+  const auth = c.get('auth')!
+  const userId = auth.userId
 
   const { data: bundle, error: getBundleError } = await supabaseAdmin(c)
     .from('app_versions')

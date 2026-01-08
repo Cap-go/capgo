@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import type { TableColumn, TableSort } from '~/components/comp_def'
 
+import { computedAsync } from '@vueuse/core'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import { formatDate } from '~/services/date'
+import { hasPermission } from '~/services/permissions'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useOrganizationStore } from '~/stores/organization'
@@ -39,6 +41,12 @@ const props = defineProps<{
   bundleId?: number
   appId: string
 }>()
+
+const canRollbackBundle = computedAsync(async () => {
+  if (!props.appId)
+    return false
+  return await hasPermission('channel.rollback_bundle', { appId: props.appId })
+}, false)
 
 const members = ref([] as ExtendedOrganizationMembers)
 const { t } = useI18n()
@@ -286,8 +294,7 @@ async function handleRollback(item: DeployHistory) {
 
   const channelId = props.channelId
 
-  const role = await organizationStore.getCurrentRoleForApp(props.appId)
-  if (!organizationStore.hasPermissionsInRole(role, ['admin', 'super_admin', 'write'])) {
+  if (!canRollbackBundle.value) {
     toast.error(t('no-permission'))
     return
   }

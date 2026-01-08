@@ -49,7 +49,7 @@ BEGIN
     TRUNCATE TABLE "public"."groups" RESTART IDENTITY CASCADE;
     -- Keep RBAC flags deterministic across test runs
     INSERT INTO public.rbac_settings (id, use_new_rbac)
-    VALUES (1, false)
+    VALUES (1, true)
     ON CONFLICT (id) DO UPDATE SET use_new_rbac = EXCLUDED.use_new_rbac, updated_at = now();
 
     -- Insert seed data

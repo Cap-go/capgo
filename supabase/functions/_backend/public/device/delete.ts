@@ -1,7 +1,8 @@
 import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { BRES, simpleError } from '../../utils/hono.ts'
-import { hasAppRightApikey, supabaseApikey } from '../../utils/supabase.ts'
+import { checkPermission } from '../../utils/rbac.ts'
+import { supabaseApikey } from '../../utils/supabase.ts'
 import { isValidAppId } from '../../utils/utils.ts'
 
 export interface DeviceLink {
@@ -17,7 +18,8 @@ export async function deleteOverride(c: Context, body: DeviceLink, apikey: Datab
   if (!isValidAppId(body.app_id)) {
     throw simpleError('invalid_app_id', 'App ID must be a reverse domain string', { app_id: body.app_id })
   }
-  if (!(await hasAppRightApikey(c, body.app_id, apikey.user_id, 'write', apikey.key))) {
+  // Auth context is already set by middlewareKey
+  if (!(await checkPermission(c, 'app.manage_devices', { appId: body.app_id }))) {
     throw simpleError('cannot_access_app', 'You can\'t access this app', { app_id: body.app_id })
   }
 

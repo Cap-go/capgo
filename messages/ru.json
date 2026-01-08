@@ -1134,5 +1134,14 @@
   "your-role-in-org": "Ваша роль в организации",
   "your-settings": "Ваши настройки",
   "your-usage": "Ваше использование:",
-  "zip-bundle": "Приложение в формате Zip"
+  "zip-bundle": "Приложение в формате Zip",
+  "role-app-developer": "Разработчик приложения",
+  "role-app-uploader": "Загрузчик приложения",
+  "role-app-reader": "Читатель приложения",
+  "remove-role": "Удалить роль",
+  "remove-role-confirm": "Хотите удалить доступ этого пользователя к приложению?",
+  "role-org-super-admin": "Суперадминистратор",
+  "role-org-admin": "Администратор",
+  "role-org-billing-admin": "Менеджер по выставлению счетов",
+  "role-org-member": "Участник"
 }

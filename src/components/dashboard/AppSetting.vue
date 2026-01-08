@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import type { OrganizationRole } from '~/stores/organization'
 import type { Database } from '~/types/supabase.types'
 import { Camera } from '@capacitor/camera'
 import { FormKit, FormKitMessages } from '@formkit/vue'
+import { computedAsync } from '@vueuse/core'
 import mime from 'mime'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
@@ -13,6 +13,7 @@ import transfer from '~icons/mingcute/transfer-horizontal-line?raw&width=36&heig
 import gearSix from '~icons/ph/gear-six?raw'
 import iconName from '~icons/ph/user?raw'
 import Toggle from '~/components/Toggle.vue'
+import { hasPermission } from '~/services/permissions'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 
@@ -24,7 +25,6 @@ const supabase = useSupabase()
 const appRef = ref<Database['public']['Tables']['apps']['Row'] & { owner_org: Database['public']['Tables']['orgs']['Row'] } | null>(null)
 const { t } = useI18n()
 const dialogStore = useDialogV2Store()
-const role = ref<OrganizationRole | null>(null)
 const forceBump = ref(0)
 const forceDownloadBump = ref(0)
 const organizationStore = useOrganizationStore()
@@ -38,6 +38,18 @@ const selectedCombinedChannel = ref('')
 const combinedSearch = ref('')
 const iosSearch = ref('')
 const androidSearch = ref('')
+
+const canUpdateSettings = computedAsync(async () => {
+  if (!appRef.value)
+    return false
+  return await hasPermission('app.update_settings', { appId: props.appId })
+}, false)
+
+const canDeleteApp = computedAsync(async () => {
+  if (!appRef.value)
+    return false
+  return await hasPermission('app.delete', { appId: props.appId })
+}, false)
 
 onMounted(async () => {
   isLoading.value = true
@@ -56,7 +68,6 @@ onMounted(async () => {
   }
 
   await organizationStore.awaitInitialLoad()
-  role.value = organizationStore.getCurrentRoleForApp(props.appId)
   appRef.value = data as any
   await loadChannels()
   isLoading.value = false
@@ -94,6 +105,11 @@ async function deleteApp() {
   if (await didCancel(t('app')))
     return
 
+  if (!canDeleteApp.value) {
+    toast.error(t('no-permission'))
+    return
+  }
+
   try {
     const org = organizationStore.getOrgByAppId(props.appId)
     const { error: errorIcon } = await supabase.storage
@@ -123,7 +139,7 @@ async function deleteApp() {
 
 async function submit(form: { app_name: string, retention: number, expose_metadata: boolean }) {
   isLoading.value = true
-  if (role.value && !organizationStore.hasPermissionsInRole(role.value, ['super_admin'])) {
+  if (!canUpdateSettings.value) {
     toast.error(t('no-permission'))
     isLoading.value = false
     return
@@ -262,7 +278,7 @@ const visibleUploadChannels = computed(() => {
 const uploadHasHidden = computed(() => !uploadSearch.value.trim() && filteredUploadChannels.value.length > 3)
 
 async function setDefaultChannel() {
-  if (!organizationStore.hasPermissionsInRole(role.value, ['admin', 'super_admin'])) {
+  if (!canUpdateSettings.value) {
     toast.error(t('no-permission'))
     return
   }
@@ -391,7 +407,7 @@ const downloadChannelLabel = computed(() => {
 })
 
 async function openDefaultDownloadChannelDialog() {
-  if (!organizationStore.hasPermissionsInRole(role.value, ['admin', 'super_admin'])) {
+  if (!canUpdateSettings.value) {
     toast.error(t('no-permission'))
     return
   }
@@ -596,15 +612,8 @@ function setUnifiedDownloadMode(unified: boolean) {
   }
 }
 
-const isSuperAdmin = computed(() => {
-  // TODO: check if that is smart to not let admins delete apps
-  if (!role.value)
-    return false
-  return organizationStore.hasPermissionsInRole(role.value as any, ['super_admin'])
-})
-
 async function editPhoto() {
-  if (role.value && !organizationStore.hasPermissionsInRole(role.value, ['super_admin'])) {
+  if (!canUpdateSettings.value) {
     toast.error(t('no-permission'))
     return
   }
@@ -792,7 +801,7 @@ async function transferAppOwnership() {
     return
 
   // Step 2: Organization selection
-  const superAdminOrganizations = organizationStore.organizations.filter(org => org.role === 'super_admin' && org.gid !== appRef.value?.owner_org.id)
+  const superAdminOrganizations = organizationStore.organizations.filter(org => org.role === 'org_super_admin' && org.gid !== appRef.value?.owner_org.id)
   if (superAdminOrganizations.length === 0) {
     toast.error(t('no-super-admin-organizations'))
     return
@@ -1014,7 +1023,7 @@ async function transferAppOwnership() {
       <footer>
         <div class="flex flex-col py-5 px-6 border-t dark:border-slate-600">
           <div class="flex self-end">
-            <button v-if="isSuperAdmin" type="button" class="p-2 text-red-600 rounded-lg border border-red-400 hover:text-white hover:bg-red-600" @click="deleteApp()">
+            <button v-if="canDeleteApp" type="button" class="p-2 text-red-600 rounded-lg border border-red-400 hover:text-white hover:bg-red-600" @click="deleteApp()">
               {{ t('delete-app') }}
             </button>
             <button

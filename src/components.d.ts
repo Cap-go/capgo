@@ -12,6 +12,7 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
+    AccessTable: typeof import('./components/tables/AccessTable.vue')['default']
     AdminFilterBar: typeof import('./components/admin/AdminFilterBar.vue')['default']
     AdminMultiLineChart: typeof import('./components/admin/AdminMultiLineChart.vue')['default']
     AdminStatsCard: typeof import('./components/admin/AdminStatsCard.vue')['default']
@@ -69,6 +70,7 @@ declare module 'vue' {
 
 // For TSX support
 declare global {
+  const AccessTable: typeof import('./components/tables/AccessTable.vue')['default']
   const AdminFilterBar: typeof import('./components/admin/AdminFilterBar.vue')['default']
   const AdminMultiLineChart: typeof import('./components/admin/AdminMultiLineChart.vue')['default']
   const AdminStatsCard: typeof import('./components/admin/AdminStatsCard.vue')['default']

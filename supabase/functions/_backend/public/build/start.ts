@@ -2,7 +2,8 @@ import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { simpleError } from '../../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../../utils/logging.ts'
-import { hasAppRightApikey, supabaseAdmin } from '../../utils/supabase.ts'
+import { checkPermission } from '../../utils/rbac.ts'
+import { supabaseAdmin } from '../../utils/supabase.ts'
 import { getEnv } from '../../utils/utils.ts'
 
 interface BuilderStartResponse {
@@ -55,8 +56,8 @@ export async function startBuild(
       user_id: apikey.user_id,
     })
 
-    // Security: Check if user has write access to this app
-    if (!(await hasAppRightApikey(c, appId, apikey.user_id, 'write', apikey.key))) {
+    // Security: Check if user has permission to manage builds (auth context set by middlewareKey)
+    if (!(await checkPermission(c, 'app.build_native', { appId }))) {
       const errorMsg = 'You do not have permission to start builds for this app'
       cloudlogErr({
         requestId: c.get('requestId'),

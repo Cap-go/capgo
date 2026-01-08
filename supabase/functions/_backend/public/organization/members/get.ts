@@ -1,9 +1,11 @@
 import type { Context } from 'hono'
+import type { MiddlewareKeyVariables } from '../../../utils/hono.ts'
 import type { Database } from '../../../utils/supabase.types.ts'
 import { z } from 'zod/mini'
 import { simpleError } from '../../../utils/hono.ts'
 import { cloudlog } from '../../../utils/logging.ts'
-import { apikeyHasOrgRight, hasOrgRightApikey, supabaseAdmin } from '../../../utils/supabase.ts'
+import { checkPermission } from '../../../utils/rbac.ts'
+import { supabaseAdmin } from '../../../utils/supabase.ts'
 
 const bodySchema = z.object({
   orgId: z.string(),
@@ -27,14 +29,15 @@ const memberSchema = z.array(z.object({
   ]),
 }))
 
-export async function get(c: Context, bodyRaw: any, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
+export async function get(c: Context<MiddlewareKeyVariables>, bodyRaw: any, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
   const bodyParsed = bodySchema.safeParse(bodyRaw)
   if (!bodyParsed.success) {
     throw simpleError('invalid_body', 'Invalid body', { error: bodyParsed.error })
   }
   const body = bodyParsed.data
 
-  if (!(await hasOrgRightApikey(c, body.orgId, apikey.user_id, 'read', c.get('capgkey') as string)) || !(apikeyHasOrgRight(apikey, body.orgId))) {
+  // Auth context is already set by middlewareKey
+  if (!(await checkPermission(c, 'org.read_members', { orgId: body.orgId }))) {
     throw simpleError('cannot_access_organization', 'You can\'t access this organization', { orgId: body.orgId })
   }
 

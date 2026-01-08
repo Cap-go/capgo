@@ -6,7 +6,8 @@ import { z } from 'zod/mini'
 import { honoFactory, quickError, simpleError, useCors } from '../../utils/hono.ts'
 import { middlewareV2 } from '../../utils/hono_middleware.ts'
 import { cloudlog, cloudlogErr } from '../../utils/logging.ts'
-import { hasAppRight, hasAppRightApikey, hasOrgRight, supabaseAdmin } from '../../utils/supabase.ts'
+import { checkPermission } from '../../utils/rbac.ts'
+import { supabaseAdmin } from '../../utils/supabase.ts'
 
 dayjs.extend(utc)
 
@@ -540,17 +541,13 @@ app.get('/app/:app_id', async (c) => {
   }
   const body = bodyParsed.data
 
-  const auth = c.get('auth') as AuthInfo
-  if (auth.authType === 'apikey') {
-    if (!await hasAppRightApikey(c, appId, auth.userId, 'read', auth.apikey!.key)) {
-      throw quickError(401, 'no_access_to_app', 'No access to app with this apikey', { data: auth })
-    }
-  }
-  else if (!await hasAppRight(c, appId, auth.userId, 'read')) {
-    throw quickError(401, 'no_access_to_app', 'No access to app', { data: auth.userId })
+  // Use unified RBAC permission check
+  if (!await checkPermission(c, 'app.read', { appId })) {
+    throw quickError(401, 'no_access_to_app', 'No access to app', { data: c.get('auth') })
   }
 
   const supabase = supabaseAdmin(c)
+  const auth = c.get('auth') as AuthInfo
 
   // Get the organization ID for this app and check organization access
   const { data: app } = await supabase
@@ -586,7 +583,8 @@ app.get('/org/:org_id', async (c) => {
   const body = bodyParsed.data
 
   const auth = c.get('auth') as AuthInfo
-  if (!(await hasOrgRight(c, orgId, auth.userId, 'read'))) {
+  // Use unified RBAC permission check
+  if (!(await checkPermission(c, 'org.read', { orgId }))) {
     throw quickError(401, 'no_access_to_organization', 'No access to organization', { data: auth.userId })
   }
   if (auth.authType === 'apikey' && auth.apikey!.limited_to_orgs && auth.apikey!.limited_to_orgs.length > 0) {
@@ -623,17 +621,13 @@ app.get('/app/:app_id/bundle_usage', async (c) => {
   }
   const body = bodyParsed.data
 
-  const auth = c.get('auth') as AuthInfo
-  if (auth.authType === 'apikey') {
-    if (!await hasAppRightApikey(c, appId, auth.userId, 'read', auth.apikey!.key)) {
-      throw quickError(401, 'no_access_to_app', 'No access to app with this apikey', { data: auth.apikey!.key })
-    }
-  }
-  else if (!await hasAppRight(c, appId, auth.userId, 'read')) {
-    throw quickError(401, 'no_access_to_app', 'No access to app', { data: auth.userId })
+  // Use unified RBAC permission check
+  if (!await checkPermission(c, 'app.read', { appId })) {
+    throw quickError(401, 'no_access_to_app', 'No access to app', { data: c.get('auth') })
   }
 
   const supabase = supabaseAdmin(c)
+  const auth = c.get('auth') as AuthInfo
 
   // Get the organization ID for this app and check organization access
   const { data: app } = await supabase
