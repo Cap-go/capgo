@@ -423,6 +423,10 @@ const processedChartData = computed<ChartData<'line'> | null>(() => {
 
 const hasData = computed(() => !!(processedChartData.value && processedChartData.value.datasets.length > 0))
 
+// Demo mode is ONLY enabled when forceDemo is true (payment failed)
+// Never auto-show demo data based on empty data - users with apps should see real (even if empty) data
+const isDemoMode = computed(() => props.forceDemo === true)
+
 const todayLineOptions = computed(() => {
   if (!props.useBillingPeriod || !currentRange.value)
     return { enabled: false }
@@ -513,7 +517,7 @@ async function loadData(forceRefetch = false) {
     return
   }
 
-  // If forceDemo is true, use demo data instead of fetching
+  // If forceDemo is true (payment failed), use demo data instead of fetching
   if (props.forceDemo) {
     const { startDate, endDate } = getDateRange()
     const days = Math.floor((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1
@@ -647,6 +651,7 @@ watch(
     :title="t('active_users_by_version')"
     :is-loading="isLoading"
     :has-data="hasData"
+    :is-demo-data="isDemoMode"
   >
     <template #header>
       <div class="flex items-start justify-between flex-1 gap-2">

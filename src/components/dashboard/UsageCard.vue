@@ -46,18 +46,11 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
-})
-
-// Check if we have real data
-const hasRealData = computed(() => {
-  const dataArray = props.data as number[]
-  // Has data if there's at least one defined, non-zero value
-  const hasDefinedData = dataArray.some(val => val !== undefined && val !== null && val > 0)
-  // Or has data by app with at least one defined value
-  const hasAppData = props.dataByApp && Object.values(props.dataByApp).some((appValues: any) =>
-    appValues.some((val: any) => val !== undefined && val !== null && val > 0),
-  )
-  return hasDefinedData || hasAppData
+  // When true, show demo data (payment failed state)
+  forceDemo: {
+    type: Boolean,
+    default: false,
+  },
 })
 
 // Get the appropriate data generator based on chart type
@@ -88,8 +81,9 @@ const consistentDemoData = computed(() => {
 const demoData = computed(() => consistentDemoData.value.total)
 const demoDataByApp = computed(() => consistentDemoData.value.byApp)
 
-// Use real data or demo data
-const isDemoMode = computed(() => !hasRealData.value && !props.isLoading)
+// Demo mode is ONLY enabled when forceDemo is true (payment failed)
+// Never auto-show demo data based on empty data - users with apps should see real (even if empty) data
+const isDemoMode = computed(() => props.forceDemo === true)
 const effectiveData = computed(() => isDemoMode.value ? demoData.value : props.data as number[])
 const effectiveDataByApp = computed(() => isDemoMode.value ? demoDataByApp.value : props.dataByApp)
 const effectiveAppNames = computed(() => isDemoMode.value ? DEMO_APP_NAMES : props.appNames)

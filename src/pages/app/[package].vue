@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import type { Database } from '~/types/supabase.types'
 import { computed, ref, watchEffect } from 'vue'
-import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
-import IconAlertCircle from '~icons/lucide/alert-circle'
+import AppNotFoundModal from '~/components/AppNotFoundModal.vue'
 import BundleUploadsCard from '~/components/dashboard/BundleUploadsCard.vue'
 import DeploymentBanner from '~/components/dashboard/DeploymentBanner.vue'
 import DeploymentStatsCard from '~/components/dashboard/DeploymentStatsCard.vue'
@@ -12,8 +11,6 @@ import { getCapgoVersion, useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
-
-const { t } = useI18n()
 
 const id = ref('')
 const route = useRoute('/app/[package]')
@@ -30,6 +27,7 @@ const supabase = useSupabase()
 const displayStore = useDisplayStore()
 const app = ref<Database['public']['Tables']['apps']['Row']>()
 const usageComponent = ref()
+const appNotFound = ref(false)
 
 // Check if user lacks security compliance (2FA or password)
 const lacksSecurityAccess = computed(() => {
@@ -44,14 +42,25 @@ const paymentFailed = computed(() => {
   return organizationStore.currentOrganizationFailed && !lacksSecurityAccess.value
 })
 
+// Should show blurred content with modal (either payment failed or app not found)
+const shouldBlurContent = computed(() => paymentFailed.value || appNotFound.value)
+
 async function loadAppInfo() {
   try {
-    const { data: dataApp } = await supabase
+    const { data: dataApp, error } = await supabase
       .from('apps')
       .select()
       .eq('app_id', id.value)
       .single()
-    app.value = dataApp || app.value
+
+    if (error || !dataApp) {
+      appNotFound.value = true
+      app.value = undefined
+      return
+    }
+
+    appNotFound.value = false
+    app.value = dataApp
     const promises = []
     capgoVersion.value = await getCapgoVersion(id.value, app.value?.last_version)
     updatesNb.value = await main.getTotalStatsByApp(id.value, organizationStore.currentOrganization?.subscription_start)
@@ -84,6 +93,8 @@ async function loadAppInfo() {
   }
   catch (error) {
     console.error(error)
+    appNotFound.value = true
+    app.value = undefined
   }
 }
 
@@ -112,15 +123,15 @@ watchEffect(async () => {
 
 <template>
   <div>
-    <div v-if="app || isLoading">
+    <div v-if="app || isLoading || appNotFound">
       <div class="relative w-full h-full px-4 pt-4 mb-8 overflow-x-hidden overflow-y-auto sm:px-6 lg:px-8 max-h-fit">
         <!-- Only show FailedCard for security access issues (2FA/password) -->
         <FailedCard v-if="lacksSecurityAccess" />
 
-        <!-- Content - blurred when payment failed -->
-        <div :class="{ 'blur-sm pointer-events-none select-none': paymentFailed }">
-          <DeploymentBanner v-if="!paymentFailed" :app-id="id" @deployed="refreshData" />
-          <Usage v-if="!lacksSecurityAccess" ref="usageComponent" :app-id="id" :force-demo="paymentFailed" />
+        <!-- Content - blurred when payment failed or app not found -->
+        <div :class="{ 'blur-sm pointer-events-none select-none': shouldBlurContent }">
+          <DeploymentBanner v-if="!shouldBlurContent" :app-id="id" @deployed="refreshData" />
+          <Usage v-if="!lacksSecurityAccess" ref="usageComponent" :app-id="id" :force-demo="shouldBlurContent" />
 
           <!-- Charts section -->
           <div class="grid grid-cols-1 gap-6 mb-6 sm:grid-cols-12 xl:grid-cols-12">
@@ -128,21 +139,21 @@ watchEffect(async () => {
               :app-id="id"
               :use-billing-period="usageComponent?.useBillingPeriod ?? true"
               :accumulated="(usageComponent?.useBillingPeriod ?? true) && (usageComponent?.showCumulative ?? false)"
-              :force-demo="paymentFailed"
+              :force-demo="shouldBlurContent"
               class="col-span-full sm:col-span-6 xl:col-span-4"
             />
             <UpdateStatsCard
               :app-id="id"
               :use-billing-period="usageComponent?.useBillingPeriod ?? true"
               :accumulated="(usageComponent?.useBillingPeriod ?? true) && (usageComponent?.showCumulative ?? false)"
-              :force-demo="paymentFailed"
+              :force-demo="shouldBlurContent"
               class="col-span-full sm:col-span-6 xl:col-span-4"
             />
             <DeploymentStatsCard
               :app-id="id"
               :use-billing-period="usageComponent?.useBillingPeriod ?? true"
               :accumulated="(usageComponent?.useBillingPeriod ?? true) && (usageComponent?.showCumulative ?? false)"
-              :force-demo="paymentFailed"
+              :force-demo="shouldBlurContent"
               class="col-span-full sm:col-span-6 xl:col-span-4"
             />
           </div>
@@ -150,19 +161,10 @@ watchEffect(async () => {
 
         <!-- Payment required overlay -->
         <PaymentRequiredModal v-if="paymentFailed" />
+
+        <!-- App not found overlay -->
+        <AppNotFoundModal v-if="appNotFound && !paymentFailed" />
       </div>
-    </div>
-    <div v-else class="flex flex-col justify-center items-center min-h-[50vh]">
-      <IconAlertCircle class="w-16 h-16 mb-4 text-destructive" />
-      <h2 class="text-xl font-semibold text-foreground">
-        {{ t('app-not-found') }}
-      </h2>
-      <p class="mt-2 text-muted-foreground">
-        {{ t('app-not-found-description') }}
-      </p>
-      <button class="mt-4 text-white d-btn d-btn-primary" @click="$router.push(`/app`)">
-        {{ t('back-to-apps') }}
-      </button>
     </div>
   </div>
 </template>

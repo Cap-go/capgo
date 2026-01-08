@@ -725,6 +725,7 @@ onMounted(() => {
       :data="mauData" :data-by-app="mauDataByApp" :app-names="appNames" :title="`${t('monthly-active')}`" :unit="t('units-users')"
       :use-billing-period="useBillingPeriod"
       :is-loading="isLoading"
+      :force-demo="forceDemo"
       class="col-span-full sm:col-span-6 xl:col-span-4"
     />
     <UsageCard
@@ -732,6 +733,7 @@ onMounted(() => {
       :title="t('Storage')" :unit="storageUnit"
       :use-billing-period="useBillingPeriod"
       :is-loading="isLoading"
+      :force-demo="forceDemo"
       class="col-span-full sm:col-span-6 xl:col-span-4"
     />
     <UsageCard
@@ -739,6 +741,7 @@ onMounted(() => {
       :title="t('Bandwidth')" :unit="t('units-gb')"
       :use-billing-period="useBillingPeriod"
       :is-loading="isLoading"
+      :force-demo="forceDemo"
       class="col-span-full sm:col-span-6 xl:col-span-4"
     />
     <DevicesStats v-show="appId" :use-billing-period="useBillingPeriod" :accumulated="useBillingPeriod && showCumulative" :reload-trigger="reloadTrigger" :force-demo="forceDemo" class="col-span-full sm:col-span-6 xl:col-span-4" />

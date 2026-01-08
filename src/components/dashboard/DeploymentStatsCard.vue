@@ -95,9 +95,6 @@ const deploymentDataByApp = ref<{ [appId: string]: number[] }>({})
 const appNames = ref<{ [appId: string]: string }>({})
 const isLoading = ref(true)
 
-// Check if we have real data
-const hasRealData = computed(() => totalDeployments.value > 0)
-
 // Generate consistent demo data where total is derived from per-app breakdown
 const consistentDemoData = computed(() => {
   const days = getDemoDayCount(props.useBillingPeriod, deploymentData.value.length)
@@ -107,8 +104,9 @@ const consistentDemoData = computed(() => {
 const demoDeploymentData = computed(() => consistentDemoData.value.total)
 const demoDataByApp = computed(() => consistentDemoData.value.byApp)
 
-// Demo mode detection - also force demo when forceDemo is true
-const isDemoMode = computed(() => props.forceDemo || (!hasRealData.value && !isLoading.value))
+// Demo mode is ONLY enabled when forceDemo is true (payment failed)
+// Never auto-show demo data based on empty data - users with apps should see real (even if empty) data
+const isDemoMode = computed(() => props.forceDemo === true)
 
 // Effective values for display
 const effectiveDeploymentData = computed(() => isDemoMode.value ? demoDeploymentData.value : deploymentData.value)

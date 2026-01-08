@@ -94,9 +94,6 @@ const currentCacheOrgId = ref<string | null>(null)
 // Cache for single app name to avoid refetching
 const singleAppNameCache = new Map<string, string>()
 
-// Check if we have real data
-const hasRealData = computed(() => total.value > 0)
-
 // Generate consistent demo data where total is derived from per-app breakdown
 const consistentDemoData = computed(() => {
   const days = getDemoDayCount(props.useBillingPeriod, bundleData.value.length)
@@ -106,8 +103,9 @@ const consistentDemoData = computed(() => {
 const demoBundleData = computed(() => consistentDemoData.value.total)
 const demoDataByApp = computed(() => consistentDemoData.value.byApp)
 
-// Demo mode detection - also force demo when forceDemo is true
-const isDemoMode = computed(() => props.forceDemo || (!hasRealData.value && !isLoading.value))
+// Demo mode is ONLY enabled when forceDemo is true (payment failed)
+// Never auto-show demo data based on empty data - users with apps should see real (even if empty) data
+const isDemoMode = computed(() => props.forceDemo === true)
 
 // Effective values for display
 const effectiveBundleData = computed(() => isDemoMode.value ? demoBundleData.value : bundleData.value)

@@ -79,16 +79,12 @@ const actionDisplayNames = computed(() => ({
   fail: capitalize(t('failed')),
 }))
 
-// Check if we have real data (at least one non-zero value)
-const hasRealData = computed(() => {
-  return totalInstalled.value > 0 || totalFailed.value > 0 || totalRequested.value > 0
-})
-
-// Generate demo data when no real data
+// Generate demo data when forceDemo is true
 const demoStats = computed(() => generateDemoUpdateStatsData(30))
 
-// Demo mode detection - also force demo when forceDemo is true
-const isDemoMode = computed(() => props.forceDemo || (!hasRealData.value && !isLoading.value))
+// Demo mode is ONLY enabled when forceDemo is true (payment failed)
+// Never auto-show demo data based on empty data - users with apps should see real (even if empty) data
+const isDemoMode = computed(() => props.forceDemo === true)
 
 // Effective values for display
 const effectiveChartData = computed(() => isDemoMode.value ? demoStats.value.total : chartUpdateData.value)
