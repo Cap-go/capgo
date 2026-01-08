@@ -57,7 +57,7 @@ function parsePreviewSubdomain(hostname: string): { appId: string, versionId: nu
   const appIdEncoded = subdomain.substring(0, lastHyphen)
   const versionIdStr = subdomain.substring(lastHyphen + 1)
 
-  // Decode app_id: replace __ with .
+  // Decode app_id: replace __ with . (frontend lowercases and encodes . as __)
   const appId = appIdEncoded.replace(/__/g, '.')
   const versionId = Number.parseInt(versionIdStr, 10)
 
@@ -98,11 +98,11 @@ async function handlePreviewSubdomain(c: Context<MiddlewareKeyVariables>) {
   // Security relies on the obscure subdomain format and the allow_preview setting
   const supabase = supabaseAdmin(c)
 
-  // Get app settings to check if preview is enabled
+  // Get app settings to check if preview is enabled (case-insensitive since frontend lowercases)
   const { data: appData, error: appError } = await supabase
     .from('apps')
-    .select('allow_preview')
-    .eq('app_id', appId)
+    .select('app_id, allow_preview')
+    .ilike('app_id', appId)
     .single()
 
   if (appError || !appData) {
@@ -113,11 +113,14 @@ async function handlePreviewSubdomain(c: Context<MiddlewareKeyVariables>) {
     return simpleError('preview_disabled', 'Preview is disabled for this app')
   }
 
+  // Use the actual app_id from DB (correctly cased) for subsequent queries
+  const actualAppId = appData.app_id
+
   // Get bundle to check encryption and manifest
   const { data: bundle, error: bundleError } = await supabase
     .from('app_versions')
     .select('id, session_key, manifest_count')
-    .eq('app_id', appId)
+    .eq('app_id', actualAppId)
     .eq('id', versionId)
     .single()
 

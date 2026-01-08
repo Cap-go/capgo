@@ -66,15 +66,19 @@ const currentDevice = computed(() => devices[selectedDevice.value])
 
 // Build the preview URL using subdomain format (no auth - relies on obscure subdomain)
 const previewUrl = computed(() => {
-  // Encode app_id: replace . with __
-  const encodedAppId = props.appId.replace(/\./g, '__')
+  // Encode app_id: lowercase for DNS, replace . with __ (underscores work in practice)
+  const encodedAppId = props.appId.toLowerCase().replace(/\./g, '__')
   const subdomain = `${encodedAppId}-${props.versionId}`
   // Extract base domain from current host, default to capgo.app for localhost
+  // Preserve environment segments (e.g., 'dev' in console.dev.capgo.app)
   const hostname = window.location.hostname
   let baseDomain = 'capgo.app'
   if (hostname.includes('.') && hostname !== '127.0.0.1') {
     const hostParts = hostname.split('.')
-    baseDomain = hostParts.slice(-2).join('.')
+    // Check if hostname contains an env segment (dev, preprod, staging, etc.)
+    const envSegments = ['dev', 'preprod', 'staging']
+    const hasEnvSegment = hostParts.length > 2 && envSegments.some(env => hostParts.includes(env))
+    baseDomain = hasEnvSegment ? hostParts.slice(-3).join('.') : hostParts.slice(-2).join('.')
   }
   return `https://${subdomain}.preview.${baseDomain}/`
 })
