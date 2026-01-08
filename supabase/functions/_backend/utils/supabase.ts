@@ -128,6 +128,99 @@ export async function getAppsFromSB(c: Context): Promise<string[]> {
   return apps
 }
 
+/**
+ * Validates public channel constraints:
+ * - Maximum 3 public channels per app
+ * - Maximum 1 public channel per platform (iOS, Android, Electron)
+ */
+async function validatePublicChannels(
+  c: Context,
+  appId: string,
+  channelName: string,
+  isPublic: boolean,
+  ios: boolean,
+  android: boolean,
+  electron: boolean,
+) {
+  // Only validate if the channel is being set to public
+  if (!isPublic) {
+    return
+  }
+
+  // Get all existing public channels for this app (excluding the current channel being updated)
+  const { data: publicChannels, error } = await supabaseAdmin(c)
+    .from('channels')
+    .select('id, name, ios, android, electron')
+    .eq('app_id', appId)
+    .eq('public', true)
+    .neq('name', channelName)
+
+  if (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error fetching public channels', error })
+    throw simpleError('db_error', 'Failed to validate public channels')
+  }
+
+  const existingPublicChannels = publicChannels || []
+
+  // Rule 1: Maximum 3 public channels per app
+  if (existingPublicChannels.length >= 3) {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'Maximum 3 public channels allowed per app',
+      appId,
+      existingCount: existingPublicChannels.length,
+    })
+    throw simpleError(
+      'max_public_channels',
+      'Maximum 3 public channels allowed per app. You can have one default channel for all platforms or up to three (one per platform: iOS, Android, Electron).',
+    )
+  }
+
+  // Rule 2: Maximum 1 public channel per platform
+  // Check for platform conflicts
+  for (const existingChannel of existingPublicChannels) {
+    if (ios && existingChannel.ios) {
+      cloudlogErr({
+        requestId: c.get('requestId'),
+        message: 'Platform conflict: iOS',
+        appId,
+        existingChannel: existingChannel.name,
+        newChannel: channelName,
+      })
+      throw simpleError(
+        'duplicate_platform_ios',
+        `Another public channel "${existingChannel.name}" already supports iOS platform. Only one public channel per platform is allowed.`,
+      )
+    }
+    if (android && existingChannel.android) {
+      cloudlogErr({
+        requestId: c.get('requestId'),
+        message: 'Platform conflict: Android',
+        appId,
+        existingChannel: existingChannel.name,
+        newChannel: channelName,
+      })
+      throw simpleError(
+        'duplicate_platform_android',
+        `Another public channel "${existingChannel.name}" already supports Android platform. Only one public channel per platform is allowed.`,
+      )
+    }
+    if (electron && existingChannel.electron) {
+      cloudlogErr({
+        requestId: c.get('requestId'),
+        message: 'Platform conflict: Electron',
+        appId,
+        existingChannel: existingChannel.name,
+        newChannel: channelName,
+      })
+      throw simpleError(
+        'duplicate_platform_electron',
+        `Another public channel "${existingChannel.name}" already supports Electron platform. Only one public channel per platform is allowed.`,
+      )
+    }
+  }
+}
+
 export async function updateOrCreateChannel(c: Context, update: Database['public']['Tables']['channels']['Insert']) {
   cloudlog({ requestId: c.get('requestId'), message: 'updateOrCreateChannel', update })
   if (!update.app_id || !update.name || !update.created_by) {
@@ -152,6 +245,30 @@ export async function updateOrCreateChannel(c: Context, update: Database['public
       return Promise.resolve({ error: null, requestId: c.get('requestId') })
     }
   }
+
+  // Validate public channel constraints before upserting
+  // For validation, use the final values that will be in the database after the update
+  // If a field is not provided in the update, use the existing value (or default for new channels)
+  // Default values for new channels match the database schema defaults
+  const DEFAULT_CHANNEL_PUBLIC = false
+  const DEFAULT_CHANNEL_IOS = true
+  const DEFAULT_CHANNEL_ANDROID = true
+  const DEFAULT_CHANNEL_ELECTRON = true
+  
+  const finalPublic = update.public !== undefined ? update.public : (existingChannel?.public ?? DEFAULT_CHANNEL_PUBLIC)
+  const finalIos = update.ios !== undefined ? update.ios : (existingChannel?.ios ?? DEFAULT_CHANNEL_IOS)
+  const finalAndroid = update.android !== undefined ? update.android : (existingChannel?.android ?? DEFAULT_CHANNEL_ANDROID)
+  const finalElectron = update.electron !== undefined ? update.electron : (existingChannel?.electron ?? DEFAULT_CHANNEL_ELECTRON)
+
+  await validatePublicChannels(
+    c,
+    update.app_id,
+    update.name,
+    finalPublic,
+    finalIos,
+    finalAndroid,
+    finalElectron,
+  )
 
   return supabaseAdmin(c)
     .from('channels')

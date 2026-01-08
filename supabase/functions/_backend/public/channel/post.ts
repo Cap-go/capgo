@@ -14,6 +14,7 @@ interface ChannelSet {
   disableAutoUpdate?: Database['public']['Enums']['disable_update']
   ios?: boolean
   android?: boolean
+  electron?: boolean
   allow_device_self_set?: boolean
   allow_emulator?: boolean
   allow_device?: boolean
@@ -65,6 +66,7 @@ export async function post(c: Context, body: ChannelSet, apikey: Database['publi
     ...(body.allow_prod == null ? {} : { allow_prod: body.allow_prod }),
     ...(body.ios == null ? {} : { ios: body.ios }),
     ...(body.android == null ? {} : { android: body.android }),
+    ...(body.electron == null ? {} : { electron: body.electron }),
     version: -1,
     owner_org: org.owner_org,
   }
