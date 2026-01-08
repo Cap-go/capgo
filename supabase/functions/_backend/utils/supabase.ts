@@ -137,10 +137,10 @@ async function validatePublicChannels(
   c: Context,
   appId: string,
   channelName: string,
-  isPublic: boolean | undefined,
-  ios: boolean | undefined,
-  android: boolean | undefined,
-  electron: boolean | undefined,
+  isPublic: boolean,
+  ios: boolean,
+  android: boolean,
+  electron: boolean,
 ) {
   // Only validate if the channel is being set to public
   if (!isPublic) {
@@ -177,14 +177,9 @@ async function validatePublicChannels(
   }
 
   // Rule 2: Maximum 1 public channel per platform
-  // Determine which platforms this channel will support
-  const newChannelIos = ios !== false // Default to true if not specified
-  const newChannelAndroid = android !== false // Default to true if not specified
-  const newChannelElectron = electron !== false // Default to true if not specified
-
   // Check for platform conflicts
   for (const existingChannel of existingPublicChannels) {
-    if (newChannelIos && existingChannel.ios) {
+    if (ios && existingChannel.ios) {
       cloudlogErr({
         requestId: c.get('requestId'),
         message: 'Platform conflict: iOS',
@@ -197,7 +192,7 @@ async function validatePublicChannels(
         `Another public channel "${existingChannel.name}" already supports iOS platform. Only one public channel per platform is allowed.`,
       )
     }
-    if (newChannelAndroid && existingChannel.android) {
+    if (android && existingChannel.android) {
       cloudlogErr({
         requestId: c.get('requestId'),
         message: 'Platform conflict: Android',
@@ -210,7 +205,7 @@ async function validatePublicChannels(
         `Another public channel "${existingChannel.name}" already supports Android platform. Only one public channel per platform is allowed.`,
       )
     }
-    if (newChannelElectron && existingChannel.electron) {
+    if (electron && existingChannel.electron) {
       cloudlogErr({
         requestId: c.get('requestId'),
         message: 'Platform conflict: Electron',
@@ -252,14 +247,21 @@ export async function updateOrCreateChannel(c: Context, update: Database['public
   }
 
   // Validate public channel constraints before upserting
+  // For validation, use the final values that will be in the database after the update
+  // If a field is not provided in the update, use the existing value (or default for new channels)
+  const finalPublic = update.public !== undefined ? update.public : (existingChannel?.public ?? false)
+  const finalIos = update.ios !== undefined ? update.ios : (existingChannel?.ios ?? true)
+  const finalAndroid = update.android !== undefined ? update.android : (existingChannel?.android ?? true)
+  const finalElectron = update.electron !== undefined ? update.electron : (existingChannel?.electron ?? true)
+
   await validatePublicChannels(
     c,
     update.app_id,
     update.name,
-    update.public,
-    update.ios,
-    update.android,
-    update.electron,
+    finalPublic,
+    finalIos,
+    finalAndroid,
+    finalElectron,
   )
 
   return supabaseAdmin(c)
