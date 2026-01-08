@@ -149,7 +149,7 @@ export async function updateWithPG(
     return simpleError200(c, 'missing_info', 'Cannot find device_id or app_id')
   }
 
-  await backgroundTask(c, createStatsMau(c, device_id, app_id, appOwner.owner_org))
+  await backgroundTask(c, createStatsMau(c, device_id, app_id, appOwner.owner_org, platform))
 
   cloudlog({ requestId: c.get('requestId'), message: 'vals', platform, device })
 
