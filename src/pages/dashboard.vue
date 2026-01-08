@@ -11,7 +11,6 @@ import { useOrganizationStore } from '~/stores/organization'
 const route = useRoute('/dashboard')
 const organizationStore = useOrganizationStore()
 const isLoading = ref(true)
-const stepsOpen = ref(false)
 const supabase = useSupabase()
 const { t } = useI18n()
 const displayStore = useDisplayStore()
@@ -26,6 +25,8 @@ const lacksSecurityAccess = computed(() => {
   const lacksPassword = org?.password_policy_config?.enabled && org?.password_has_access === false
   return lacks2FA || lacksPassword
 })
+
+const hasNoApps = computed(() => apps.value.length === 0 && !isLoading.value)
 
 async function getMyApps() {
   await organizationStore.awaitInitialLoad()
@@ -49,14 +50,7 @@ async function getMyApps() {
     .select()
     .eq('owner_org', currentGid)
 
-  if (data && data.length) {
-    apps.value = data
-    stepsOpen.value = false
-  }
-  else {
-    apps.value = []
-    stepsOpen.value = true
-  }
+  apps.value = data ?? []
 }
 
 watch(currentOrganization, async () => {
@@ -78,10 +72,32 @@ displayStore.defaultBack = '/app'
 <template>
   <div>
     <div class="overflow-hidden pb-4 h-full">
-      <div class="overflow-y-auto px-4 pt-2 mx-auto mb-8 w-full h-full sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
-        <WelcomeBanner v-if="apps.length === 0 && !lacksSecurityAccess" />
+      <div class="relative overflow-y-auto px-4 pt-2 mx-auto mb-8 w-full h-full sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
         <FailedCard />
-        <Usage v-if="!organizationStore.currentOrganizationFailed && !lacksSecurityAccess" />
+        <div :class="{ 'blur-sm pointer-events-none select-none': hasNoApps }">
+          <Usage v-if="!organizationStore.currentOrganizationFailed && !lacksSecurityAccess" />
+        </div>
+        <!-- Overlay for empty state -->
+        <div
+          v-if="hasNoApps && !lacksSecurityAccess"
+          class="flex absolute inset-0 z-10 flex-col justify-center items-center bg-white/60 dark:bg-gray-900/60"
+        >
+          <div class="p-8 text-center bg-white rounded-xl border shadow-lg dark:bg-gray-800 dark:border-gray-700">
+            <h2 class="mb-2 text-2xl font-bold text-gray-900 dark:text-white">
+              {{ t('no-apps-yet') }}
+            </h2>
+            <p class="mb-6 text-gray-600 dark:text-gray-400">
+              {{ t('add-your-first-app-to-see-dashboard') }}
+            </p>
+            <router-link
+              to="/app"
+              class="inline-flex gap-2 items-center px-6 py-3 text-white bg-blue-600 rounded-lg transition-colors hover:bg-blue-700"
+            >
+              <span class="i-heroicons-plus-circle text-xl" />
+              {{ t('add-app') }}
+            </router-link>
+          </div>
+        </div>
       </div>
     </div>
   </div>
