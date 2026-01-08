@@ -41,6 +41,7 @@ const version_meta = ref<Database['public']['Tables']['app_versions_meta']['Row'
 const showBundleMetadataInput = ref<boolean>(false)
 const hasManifest = ref<boolean>(false)
 const manifestSize = ref<number | null>(null)
+const showChecksumTooltip = ref(false)
 
 // Channel chooser state
 const selectedChannelForLink = ref<Database['public']['Tables']['channels']['Row'] | null>(null)
@@ -739,25 +740,32 @@ async function deleteBundle() {
                 <span class="flex items-center gap-2">
                   {{ hideString(version.checksum) }}
                   <!-- Checksum type badge with tooltip -->
-                  <div class="relative group">
-                    <span
+                  <div class="relative">
+                    <button
+                      type="button"
                       class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full cursor-help"
                       :class="{
                         'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-200': checksumInfo.type === 'sha256',
                         'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-200': checksumInfo.type === 'crc32',
                         'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200': checksumInfo.type === 'unknown',
                       }"
+                      @click="showChecksumTooltip = !showChecksumTooltip"
+                      @mouseenter="showChecksumTooltip = true"
+                      @mouseleave="showChecksumTooltip = false"
                     >
                       {{ checksumInfo.label }}
-                    </span>
+                    </button>
                     <!-- Tooltip -->
-                    <div class="absolute left-1/2 bottom-full mb-2 -translate-x-1/2 px-3 py-2 text-xs bg-gray-900 dark:bg-gray-700 text-white rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 whitespace-nowrap">
+                    <div
+                      v-show="showChecksumTooltip"
+                      class="absolute right-0 bottom-full mb-2 px-3 py-2 text-xs bg-gray-900 dark:bg-gray-700 text-white rounded-lg shadow-lg z-50 min-w-max"
+                    >
                       <div class="font-medium mb-1">{{ t('checksum-type-info') }}</div>
                       <div>{{ t('min-plugin-version') }}: {{ checksumInfo.minPluginVersion }}</div>
                       <div v-if="checksumInfo.type === 'sha256'" class="text-blue-300 mt-1">{{ t('checksum-sha256-desc') }}</div>
                       <div v-else-if="checksumInfo.type === 'crc32'" class="text-green-300 mt-1">{{ t('checksum-crc32-desc') }}</div>
                       <!-- Tooltip arrow -->
-                      <div class="absolute left-1/2 top-full -translate-x-1/2 -mt-px border-4 border-transparent border-t-gray-900 dark:border-t-gray-700" />
+                      <div class="absolute right-4 top-full -mt-px border-4 border-transparent border-t-gray-900 dark:border-t-gray-700" />
                     </div>
                   </div>
                   <button
