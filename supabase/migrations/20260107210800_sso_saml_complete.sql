@@ -516,7 +516,7 @@ BEGIN
     SELECT DISTINCT o.id, o.name
     FROM public.orgs o
     INNER JOIN public.saml_domain_mappings sdm ON sdm.org_id = o.id
-    INNER JOIN public.org_saml_connections osc ON osc.org_id = o.id
+    INNER JOIN public.org_saml_connections osc ON osc.id = sdm.sso_connection_id
     WHERE sdm.domain = v_domain
       AND sdm.verified = true
       AND osc.auto_join_enabled = true
