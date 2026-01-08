@@ -946,6 +946,7 @@
   "no-compatible-download-channel": "未找到兼容的频道。在设置默认值之前创建一个。",
   "no-credits-available": "还没有積分。购买積分包以扩展套餐用量。",
   "no-data": "没有数据",
+  "demo-data-indicator": "示例数据 - 添加应用以查看真实指标",
   "no-deliveries": "无投递",
   "no-deploy-history": "未找到此频道的部署历史记录",
   "no-device-data": "没有设备数据可用",

@@ -915,6 +915,7 @@
   "no-compatible-download-channel": "No compatible channels found. Create one before setting defaults.",
   "no-credits-available": "No credits yet. Purchase a pack to extend your plan usage.",
   "no-data": "No Data",
+  "demo-data-indicator": "Sample data - Add an app to see real metrics",
   "no-deploy-history": "No deployment history found for this channel",
   "no-device-data": "No device data available",
   "no-error-message": "No error message available",

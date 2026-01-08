@@ -946,6 +946,7 @@
   "no-compatible-download-channel": "Tidak ada saluran yang kompatibel ditemukan. Buatlah satu sebelum menetapkan default.",
   "no-credits-available": "Belum ada kredit. Beli paket untuk memperluas penggunaan paketmu.",
   "no-data": "Tidak Ada Data",
+  "demo-data-indicator": "Data contoh - Tambahkan aplikasi untuk melihat metrik sebenarnya",
   "no-deliveries": "Tidak ada pengiriman",
   "no-deploy-history": "Tidak ada riwayat penyebaran yang ditemukan untuk saluran ini",
   "no-device-data": "Tidak ada data perangkat tersedia",
