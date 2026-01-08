@@ -89,6 +89,12 @@ export async function updateWithPG(
     await setAppStatus(c, app_id, 'cancelled')
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot update, upgrade plan to continue to update', id: app_id })
     await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
+    // Send weekly notification about missing payment (not configurable - payment related)
+    await backgroundTask(c, sendNotifOrg(c, 'org:missing_payment', {
+      app_id,
+      device_id,
+      app_id_url: app_id,
+    }, appOwner.owner_org, app_id, '0 0 * * 1')) // Weekly on Monday
     return simpleError200(c, 'need_plan_upgrade', PLAN_ERROR)
   }
   await setAppStatus(c, app_id, 'cloud')
