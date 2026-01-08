@@ -178,7 +178,7 @@
   "allow-emulator": "Zezwalaj na emulatory",
   "allow-physical-device": "Zezwól na urządzenia fizyczne",
   "allow-preview": "Zezwól na podgląd pakietu",
-  "allow-preview-help": "Gdy jest włączony, pakiety można podglądać na pulpicie za pomocą wbudowanej ramki urządzenia.",
+  "allow-preview-help": "Udostępnia podgląd pakietu publicznie przez link do udostępnienia",
   "allow-prod-build": "Zezwól na wersję produkcyjną",
   "allow-prod-builds": "Zezwalaj na buildy produkcyjne",
   "already-account": "Masz już konto?",

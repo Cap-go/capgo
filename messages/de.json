@@ -178,7 +178,7 @@
   "allow-emulator": "Erlaube Emulatoren",
   "allow-physical-device": "Physische Geräte zulassen",
   "allow-preview": "Erlaube Bundle-Vorschau",
-  "allow-preview-help": "Wenn aktiviert, können Pakete im Dashboard mit einem eingebetteten Geräterahmen angezeigt werden.",
+  "allow-preview-help": "Macht die Bundle-Vorschau über einen teilbaren Link öffentlich zugänglich",
   "allow-prod-build": "Produktionsbuild zulassen",
   "allow-prod-builds": "Erlaube Prod Builds",
   "already-account": "Sie haben bereits ein Konto?",

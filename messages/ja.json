@@ -178,7 +178,7 @@
   "allow-emulator": "エミュレータを許可する",
   "allow-physical-device": "実機を許可",
   "allow-preview": "バンドルプレビューを許可する",
-  "allow-preview-help": "有効にすると、組み込みデバイスフレームを使用してダッシュボードでバンドルをプレビューできます。",
+  "allow-preview-help": "共有可能なリンクでバンドルプレビューを公開します",
   "allow-prod-build": "本番ビルドを許可",
   "allow-prod-builds": "本番ビルドを許可",
   "already-account": "すでにアカウントをお持ちですか？",
