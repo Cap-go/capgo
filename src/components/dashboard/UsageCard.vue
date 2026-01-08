@@ -138,7 +138,15 @@ const lastDayEvolution = computed(() => {
   return ((lastValue - previousValue) / previousValue) * 100
 })
 
-const hasData = computed(() => total.value > 0 || isDemoMode.value)
+// Check if there's actual chart data (values in the array), not just a total
+// This handles cases like Storage where total can be > 0 but no activity in current period
+const hasChartData = computed(() => {
+  if (isDemoMode.value)
+    return true
+  const dataArray = effectiveData.value
+  // Check if any value in the array is defined and > 0
+  return dataArray.some(val => typeof val === 'number' && val > 0)
+})
 </script>
 
 <template>
@@ -147,7 +155,7 @@ const hasData = computed(() => total.value > 0 || isDemoMode.value)
     :total="total"
     :unit="unit"
     :last-day-evolution="lastDayEvolution"
-    :has-data="hasData"
+    :has-data="hasChartData"
     :is-loading="isLoading"
     :is-demo-data="isDemoMode"
   >
