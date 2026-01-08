@@ -13,6 +13,7 @@ import { useChartData } from '~/services/chartDataService'
 import { createTooltipConfig, todayLinePlugin, verticalLinePlugin } from '~/services/chartTooltip'
 import { generateChartDayLabels, getChartDateRange, normalizeToStartOfDay } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
+import { useDashboardAppsStore } from '~/stores/dashboardApps'
 import { useOrganizationStore } from '~/stores/organization'
 import ChartCard from './ChartCard.vue'
 
@@ -423,9 +424,18 @@ const processedChartData = computed<ChartData<'line'> | null>(() => {
 
 const hasData = computed(() => !!(processedChartData.value && processedChartData.value.datasets.length > 0))
 
-// Demo mode is ONLY enabled when forceDemo is true (payment failed)
-// Never auto-show demo data based on empty data - users with apps should see real (even if empty) data
-const isDemoMode = computed(() => props.forceDemo === true)
+// Demo mode: show demo data only when forceDemo is true OR user has no apps
+// If user has apps, ALWAYS show real data (even if empty)
+const dashboardAppsStore = useDashboardAppsStore()
+const isDemoMode = computed(() => {
+  if (props.forceDemo)
+    return true
+  // If user has apps, never show demo data
+  if (dashboardAppsStore.apps.length > 0)
+    return false
+  // No apps and store is loaded = show demo
+  return dashboardAppsStore.isLoaded
+})
 
 const todayLineOptions = computed(() => {
   if (!props.useBillingPeriod || !currentRange.value)

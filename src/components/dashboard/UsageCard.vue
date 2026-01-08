@@ -10,6 +10,7 @@ import {
   generateDemoStorageData,
   getDemoDayCount,
 } from '~/services/demoChartData'
+import { useDashboardAppsStore } from '~/stores/dashboardApps'
 import ChartCard from './ChartCard.vue'
 import LineChartStats from './LineChartStats.vue'
 
@@ -81,9 +82,18 @@ const consistentDemoData = computed(() => {
 const demoData = computed(() => consistentDemoData.value.total)
 const demoDataByApp = computed(() => consistentDemoData.value.byApp)
 
-// Demo mode is ONLY enabled when forceDemo is true (payment failed)
-// Never auto-show demo data based on empty data - users with apps should see real (even if empty) data
-const isDemoMode = computed(() => props.forceDemo === true)
+// Demo mode: show demo data only when forceDemo is true OR user has no apps
+// If user has apps, ALWAYS show real data (even if empty)
+const dashboardAppsStore = useDashboardAppsStore()
+const isDemoMode = computed(() => {
+  if (props.forceDemo)
+    return true
+  // If user has apps, never show demo data
+  if (dashboardAppsStore.apps.length > 0)
+    return false
+  // No apps and store is loaded = show demo
+  return dashboardAppsStore.isLoaded
+})
 const effectiveData = computed(() => isDemoMode.value ? demoData.value : props.data as number[])
 const effectiveDataByApp = computed(() => isDemoMode.value ? demoDataByApp.value : props.dataByApp)
 const effectiveAppNames = computed(() => isDemoMode.value ? DEMO_APP_NAMES : props.appNames)

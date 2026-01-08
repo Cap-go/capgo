@@ -103,9 +103,18 @@ const consistentDemoData = computed(() => {
 const demoBundleData = computed(() => consistentDemoData.value.total)
 const demoDataByApp = computed(() => consistentDemoData.value.byApp)
 
-// Demo mode is ONLY enabled when forceDemo is true (payment failed)
-// Never auto-show demo data based on empty data - users with apps should see real (even if empty) data
-const isDemoMode = computed(() => props.forceDemo === true)
+// Demo mode: show demo data only when forceDemo is true OR user has no apps
+// If user has apps, ALWAYS show real data (even if empty)
+const isDemoMode = computed(() => {
+  if (props.forceDemo)
+    return true
+  // If user has apps, never show demo data
+  const dashboardAppsStore = useDashboardAppsStore()
+  if (dashboardAppsStore.apps.length > 0)
+    return false
+  // No apps and store is loaded = show demo
+  return dashboardAppsStore.isLoaded
+})
 
 // Effective values for display
 const effectiveBundleData = computed(() => isDemoMode.value ? demoBundleData.value : bundleData.value)
