@@ -2,7 +2,14 @@
 import colors from 'tailwindcss/colors'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { calculateDemoEvolution, calculateDemoTotal, DEMO_APP_NAMES, generateDemoDeploymentData } from '~/services/demoChartData'
+import {
+  calculateDemoEvolution,
+  calculateDemoTotal,
+  DEMO_APP_NAMES,
+  generateConsistentDemoData,
+  generateDemoDeploymentData,
+  getDemoDayCount,
+} from '~/services/demoChartData'
 import { useSupabase } from '~/services/supabase'
 import { useDashboardAppsStore } from '~/stores/dashboardApps'
 import { useOrganizationStore } from '~/stores/organization'
@@ -87,12 +94,14 @@ const isLoading = ref(true)
 // Check if we have real data
 const hasRealData = computed(() => totalDeployments.value > 0)
 
-// Generate demo data
-const demoDeploymentData = computed(() => generateDemoDeploymentData(30))
-const demoDataByApp = computed(() => ({
-  'demo-app-1': generateDemoDeploymentData(30),
-  'demo-app-2': generateDemoDeploymentData(30),
-}))
+// Generate consistent demo data where total is derived from per-app breakdown
+const consistentDemoData = computed(() => {
+  const days = getDemoDayCount(props.useBillingPeriod, deploymentData.value.length)
+  return generateConsistentDemoData(days, generateDemoDeploymentData)
+})
+
+const demoDeploymentData = computed(() => consistentDemoData.value.total)
+const demoDataByApp = computed(() => consistentDemoData.value.byApp)
 
 // Demo mode detection
 const isDemoMode = computed(() => !hasRealData.value && !isLoading.value)
