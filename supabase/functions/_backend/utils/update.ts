@@ -19,33 +19,33 @@ import { closeClient, getAppOwnerPostgres, getDrizzleClient, getPgClient, reques
 import { makeDevice } from './plugin_parser.ts'
 import { s3 } from './s3.ts'
 import { createStatsBandwidth, createStatsMau, createStatsVersion, onPremStats, sendStatsAndDevice } from './stats.ts'
-import { backgroundTask, BROTLI_MIN_UPDATER_VERSION_V7, fixSemver, isDeprecatedPluginVersion, isInternalVersionName } from './utils.ts'
+import { backgroundTask, BROTLI_MIN_UPDATER_VERSION_V5, BROTLI_MIN_UPDATER_VERSION_V6, BROTLI_MIN_UPDATER_VERSION_V7, fixSemver, isDeprecatedPluginVersion, isInternalVersionName } from './utils.ts'
 
 const PLAN_LIMIT: Array<'mau' | 'bandwidth' | 'storage'> = ['mau', 'bandwidth']
 const PLAN_ERROR = 'Cannot get update, upgrade plan to continue to update'
 
 export function resToVersion(plugin_version: string, signedURL: string, version: Database['public']['Tables']['app_versions']['Row'], manifest: ManifestEntry[], expose_metadata: boolean = false) {
+  const pluginVersion = parse(plugin_version)
   const res: {
     version: string
     url: string
-    session_key?: string
-    checksum?: string | null
+    session_key: string
+    checksum: string | null
     manifest?: ManifestEntry[]
     link?: string | null
     comment?: string | null
   } = {
     version: version.name,
     url: signedURL,
+    // session_key and checksum are always included since v4 is no longer supported
+    session_key: version.session_key ?? '',
+    checksum: version.checksum,
   }
-  const pluginVersion = parse(plugin_version)
-  if (greaterThan(pluginVersion, parse('4.13.0')))
-    res.session_key = version.session_key ?? ''
-  if (greaterThan(pluginVersion, parse('4.4.0')))
-    res.checksum = version.checksum
-  if (greaterThan(pluginVersion, parse('6.8.0')) && manifest.length > 0)
+  // manifest is supported in v5.10.0+, v6.25.0+, v7.0.35+, v8+
+  if (manifest.length > 0 && !isDeprecatedPluginVersion(pluginVersion, BROTLI_MIN_UPDATER_VERSION_V5, BROTLI_MIN_UPDATER_VERSION_V6, BROTLI_MIN_UPDATER_VERSION_V7))
     res.manifest = manifest
-  // Include link and comment for plugin v7.35.0+ (only if expose_metadata is enabled and they have values)
-  if (expose_metadata && greaterOrEqual(pluginVersion, parse('7.35.0'))) {
+  // Include link and comment for plugin v5.35.0+, v6.35.0+, v7.35.0+, v8.35.0+ (only if expose_metadata is enabled and they have values)
+  if (expose_metadata && !isDeprecatedPluginVersion(pluginVersion, '5.35.0', '6.35.0', '7.35.0', '8.35.0')) {
     if (version.link)
       res.link = version.link
     if (version.comment)
