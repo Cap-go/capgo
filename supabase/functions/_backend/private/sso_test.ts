@@ -20,16 +20,15 @@
  */
 
 import type { Context } from 'hono'
-import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { eq } from 'drizzle-orm'
-import { Hono } from 'hono'
 import { z } from 'zod'
-import { parseBody, simpleError, useCors } from '../utils/hono.ts'
+import { createHono, parseBody, simpleError, useCors } from '../utils/hono.ts'
 import { middlewareV2 } from '../utils/hono_middleware.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import { org_saml_connections, saml_domain_mappings } from '../utils/postgres_schema.ts'
 import { getEnv } from '../utils/utils.ts'
+import { version } from '../utils/version.ts'
 
 const testSSOSchema = z.object({
   orgId: z.string().uuid(),
@@ -171,7 +170,8 @@ async function verifyProviderInSupabaseAuth(
   }
 }
 
-export const app = new Hono<MiddlewareKeyVariables>()
+const functionName = 'sso_test'
+export const app = createHono(functionName, version)
 
 app.use('/', useCors)
 
@@ -404,7 +404,7 @@ app.post('/', middlewareV2(['read', 'write', 'all']), async (c) => {
     }
 
     // Validate the SAML metadata if we have it
-    const metadataValidation = metadataXml
+    const metadataValidation = metadataXml && config.entity_id
       ? await validateSAMLMetadata(metadataXml, config.entity_id)
       : { valid: false, errors: ['No metadata available'], warnings: [] }
 

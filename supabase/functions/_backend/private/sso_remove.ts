@@ -20,12 +20,11 @@
  * }
  */
 
-import type { MiddlewareKeyVariables } from '../utils/hono.ts'
-import { Hono } from 'hono'
 import { z } from 'zod'
-import { parseBody, simpleError, useCors } from '../utils/hono.ts'
+import { createHono, parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
 import { middlewareV2 } from '../utils/hono_middleware.ts'
 import { cloudlog } from '../utils/logging.ts'
+import { hasOrgRight } from '../utils/supabase.ts'
 import { removeSAML } from './sso_management.ts'
 
 const removeSchema = z.object({
@@ -33,7 +32,7 @@ const removeSchema = z.object({
   providerId: z.string().uuid(),
 })
 
-export const app = new Hono<MiddlewareKeyVariables>()
+export const app = createHono()
 
 app.use('/', useCors)
 
@@ -68,6 +67,18 @@ app.delete('/', middlewareV2(['all']), async (c) => {
     }
 
     const { orgId, providerId } = parsedBody.data
+
+    // Check super_admin permission BEFORE executing SSO removal
+    const hasPermission = await hasOrgRight(c, orgId, auth.userId, 'super_admin')
+    if (!hasPermission) {
+      cloudlog({
+        requestId,
+        message: '[SSO Remove] Permission denied - user is not super_admin',
+        userId: auth.userId,
+        orgId,
+      })
+      return quickError(403, 'insufficient_permissions', 'Only super administrators can remove SSO configuration')
+    }
 
     // Execute SSO removal
     await removeSAML(c, orgId, providerId)

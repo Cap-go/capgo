@@ -64,8 +64,22 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Extract domain from email
-    const domain = body.email.split('@')[1].toLowerCase()
+    // Extract and validate domain from email
+    const emailParts = body.email.split('@')
+    if (emailParts.length !== 2) {
+      return new Response(
+        JSON.stringify({ available: false, error: 'Invalid email format' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      )
+    }
+
+    const domain = emailParts[1].toLowerCase().trim()
+    if (!domain || domain.length === 0 || !domain.includes('.')) {
+      return new Response(
+        JSON.stringify({ available: false, error: 'Invalid email domain' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      )
+    }
 
     // Create Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
@@ -122,8 +136,11 @@ Deno.serve(async (req) => {
     )
   }
   catch (error: any) {
+    // Log error server-side but don't expose details to client
+    console.error('SSO check error:', error)
+
     return new Response(
-      JSON.stringify({ available: false, error: error.message }),
+      JSON.stringify({ available: false, error: 'Internal server error' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     )
   }

@@ -26,15 +26,15 @@
  * }
  */
 
-import type { MiddlewareKeyVariables } from '../utils/hono.ts'
-import { Hono } from 'hono'
-import { parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
+import { createHono, parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
 import { middlewareV2 } from '../utils/hono_middleware.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { hasOrgRight } from '../utils/supabase.ts'
+import { version } from '../utils/version.ts'
 import { configureSAML, ssoConfigSchema } from './sso_management.ts'
 
-export const app = new Hono<MiddlewareKeyVariables>()
+const functionName = 'sso_configure'
+export const app = createHono(functionName, version)
 
 app.use('/', useCors)
 

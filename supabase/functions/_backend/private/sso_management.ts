@@ -22,7 +22,6 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { eq } from 'drizzle-orm'
-import { Hono } from 'hono'
 import { z } from 'zod'
 import { middlewareAPISecret, parseBody, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
@@ -141,63 +140,98 @@ async function registerWithSupabaseAuth(
   }
 
   try {
-    // Call GoTrue Admin API to create SSO provider
+    // Call GoTrue Admin API to create SSO provider with timeout
     // Endpoint: POST /admin/sso/providers
-    const response = await fetch(`${supabaseUrl}/auth/v1/admin/sso/providers`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${serviceRoleKey}`,
-        'apikey': serviceRoleKey,
-      },
-      body: JSON.stringify(body),
-    })
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
 
-    if (!response.ok) {
-      const errorText = await response.text()
+    try {
+      const response = await fetch(`${supabaseUrl}/auth/v1/admin/sso/providers`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${serviceRoleKey}`,
+          'apikey': serviceRoleKey,
+        },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      })
+
+      clearTimeout(timeoutId)
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        cloudlog({
+          requestId,
+          message: '[SSO Auth] Failed to register with Supabase Auth',
+          status: response.status,
+          error: errorText,
+        })
+
+        // Parse error for better messaging
+        let errorMessage = 'Failed to register SSO provider with Supabase Auth'
+        let errorCode = 'sso_auth_registration_failed'
+        try {
+          const errorJson = JSON.parse(errorText)
+          errorMessage = errorJson.msg || errorJson.message || errorJson.error || errorMessage
+
+          // Check if this is a duplicate provider error
+          if (errorJson.error_code === 'saml_idp_already_exists') {
+            errorCode = 'sso_provider_already_exists'
+            errorMessage = 'An SSO provider with this Entity ID already exists. Please use a different Entity ID or update the existing provider.'
+          }
+        }
+        catch {
+          // Use default message
+        }
+
+        throw simpleError(errorCode, errorMessage, {
+          status: response.status,
+          details: errorText,
+        })
+      }
+
+      const result: GoTrueSSOProvider = await response.json()
+
       cloudlog({
         requestId,
-        message: '[SSO Auth] Failed to register with Supabase Auth',
-        status: response.status,
-        error: errorText,
+        message: '[SSO Auth] Successfully registered SAML provider',
+        providerId: result.id,
+        entityId: result.saml?.entity_id,
       })
 
-      // Parse error for better messaging
-      let errorMessage = 'Failed to register SSO provider with Supabase Auth'
-      let errorCode = 'sso_auth_registration_failed'
-      try {
-        const errorJson = JSON.parse(errorText)
-        errorMessage = errorJson.msg || errorJson.message || errorJson.error || errorMessage
-
-        // Check if this is a duplicate provider error
-        if (errorJson.error_code === 'saml_idp_already_exists') {
-          errorCode = 'sso_provider_already_exists'
-          errorMessage = 'An SSO provider with this Entity ID already exists. Please use a different Entity ID or update the existing provider.'
-        }
-      }
-      catch {
-        // Use default message
-      }
-
-      throw simpleError(errorCode, errorMessage, {
-        status: response.status,
-        details: errorText,
-      })
+      return result
     }
+    catch (error: any) {
+      if (error.name === 'AbortError') {
+        cloudlog({
+          requestId,
+          message: '[SSO Auth] Request timeout during SSO provider creation',
+        })
+        throw simpleError('sso_auth_timeout', 'Request to Supabase Auth timed out. Please try again.')
+      }
+      if (error.code === 'sso_auth_registration_failed') {
+        throw error
+      }
 
-    const result: GoTrueSSOProvider = await response.json()
+      cloudlog({
+        requestId,
+        message: '[SSO Auth] Exception during registration',
+        error: error.message,
+      })
 
-    cloudlog({
-      requestId,
-      message: '[SSO Auth] Successfully registered SAML provider',
-      providerId: result.id,
-      entityId: result.saml?.entity_id,
-    })
-
-    return result
+      throw simpleError('sso_auth_registration_error', `Failed to connect to Supabase Auth: ${error.message}`)
+    }
   }
   catch (error: any) {
-    if (error.code === 'sso_auth_registration_failed') {
+    if (error.name === 'AbortError') {
+      cloudlog({
+        requestId,
+        message: '[SSO Auth] Request timeout during SSO provider creation',
+      })
+      throw simpleError('sso_auth_timeout', 'Request to Supabase Auth timed out. Please try again.')
+    }
+    if (error.code === 'sso_auth_registration_failed' || error.code === 'sso_provider_already_exists') {
       throw error
     }
 
@@ -360,39 +394,72 @@ async function updateWithSupabaseAuth(
   }
 
   try {
-    const response = await fetch(`${supabaseUrl}/auth/v1/admin/sso/providers/${providerId}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${serviceRoleKey}`,
-        'apikey': serviceRoleKey,
-      },
-      body: JSON.stringify(body),
-    })
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
 
-    if (!response.ok) {
-      const errorText = await response.text()
+    try {
+      const response = await fetch(`${supabaseUrl}/auth/v1/admin/sso/providers/${providerId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${serviceRoleKey}`,
+          'apikey': serviceRoleKey,
+        },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      })
+
+      clearTimeout(timeoutId)
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        cloudlog({
+          requestId,
+          message: '[SSO Auth] Failed to update with Supabase Auth',
+          status: response.status,
+          error: errorText,
+        })
+        throw simpleError('sso_auth_error', `Failed to update SSO provider with Supabase Auth: ${errorText}`)
+      }
+
+      const provider: GoTrueSSOProvider = await response.json()
+
       cloudlog({
         requestId,
-        message: '[SSO Auth] Failed to update with Supabase Auth',
-        status: response.status,
-        error: errorText,
+        message: '[SSO Auth] Successfully updated SAML provider',
+        providerId: provider.id,
+        entityId: provider.saml?.entity_id,
       })
-      throw simpleError('sso_auth_error', `Failed to update SSO provider with Supabase Auth: ${errorText}`)
+
+      return provider
     }
-
-    const provider: GoTrueSSOProvider = await response.json()
-
-    cloudlog({
-      requestId,
-      message: '[SSO Auth] Successfully updated SAML provider',
-      providerId: provider.id,
-      entityId: provider.saml?.entity_id,
-    })
-
-    return provider
+    catch (error: any) {
+      if (error.name === 'AbortError') {
+        cloudlog({
+          requestId,
+          message: '[SSO Auth] Request timeout during SSO provider update',
+        })
+        throw simpleError('sso_auth_timeout', 'Request to Supabase Auth timed out. Please try again.')
+      }
+      if (error.code && error.message) {
+        throw error // Re-throw our error
+      }
+      cloudlog({
+        requestId,
+        message: '[SSO Auth] Exception during update',
+        error: error.message,
+      })
+      throw simpleError('sso_auth_error', `Failed to update SSO provider: ${error.message}`)
+    }
   }
   catch (error: any) {
+    if (error.name === 'AbortError') {
+      cloudlog({
+        requestId,
+        message: '[SSO Auth] Request timeout during SSO provider update',
+      })
+      throw simpleError('sso_auth_timeout', 'Request to Supabase Auth timed out. Please try again.')
+    }
     if (error.code && error.message) {
       throw error // Re-throw our error
     }
@@ -414,8 +481,8 @@ const domainSchema = z.string().regex(
 )
 
 const metadataUrlSchema = z.string().url().regex(
-  /^https?:\/\//,
-  'Metadata URL must use HTTP or HTTPS',
+  /^https:\/\//,
+  'Metadata URL must use HTTPS',
 )
 
 /**
@@ -555,72 +622,73 @@ async function checkDomainUniqueness(
   const requestId = c.get('requestId')
   const pgClient = getPgClient(c)
 
+  // Build list of all domains and root domains to check
+  const allDomainsToCheck: string[] = []
+  const domainToRootMap = new Map<string, string>()
+
   for (const domain of domains) {
     const rootDomain = extractRootDomain(domain)
+    allDomainsToCheck.push(domain)
+    domainToRootMap.set(domain, rootDomain)
 
-    cloudlog({
-      requestId,
-      message: 'Checking domain uniqueness',
-      domain,
-      rootDomain,
-      orgId: currentOrgId,
-    })
+    // Add root domain if it's different from the domain itself
+    if (domain !== rootDomain && !allDomainsToCheck.includes(rootDomain)) {
+      allDomainsToCheck.push(rootDomain)
+    }
+  }
 
-    // Check if this exact domain is already claimed by another org
-    const exactMatch = await pgClient.query(
-      `SELECT org_id, domain 
-       FROM saml_domain_mappings 
-       WHERE domain = $1 
-       AND org_id != $2
-       LIMIT 1`,
-      [domain, currentOrgId],
-    )
+  cloudlog({
+    requestId,
+    message: 'Checking domain uniqueness (batched)',
+    domains: allDomainsToCheck,
+    orgId: currentOrgId,
+  })
 
-    if (exactMatch.rows.length > 0) {
+  // Batch query: check all domains at once
+  const claimedDomains = await pgClient.query(
+    `SELECT org_id, domain 
+     FROM saml_domain_mappings 
+     WHERE domain = ANY($1) 
+     AND org_id != $2`,
+    [allDomainsToCheck, currentOrgId],
+  )
+
+  // Build a map of claimed domains for quick lookup
+  const claimedMap = new Map<string, string>()
+  for (const row of claimedDomains.rows) {
+    claimedMap.set(row.domain, row.org_id)
+  }
+
+  // Validate each requested domain
+  for (const domain of domains) {
+    const rootDomain = domainToRootMap.get(domain)!
+
+    // Check if this exact domain is already claimed
+    if (claimedMap.has(domain)) {
       throw simpleError('domain_already_claimed', `Domain ${domain} is already claimed by another organization`, {
         domain,
-        claimedBy: exactMatch.rows[0].org_id,
+        claimedBy: claimedMap.get(domain),
       })
     }
 
-    // If this is a root domain (no subdomain), check uniqueness
+    // If this is a root domain, it must be unique
     if (domain === rootDomain) {
-      // Root domain: check if ANY org has claimed it
-      const rootMatch = await pgClient.query(
-        `SELECT org_id, domain 
-         FROM saml_domain_mappings 
-         WHERE domain = $1 
-         AND org_id != $2
-         LIMIT 1`,
-        [rootDomain, currentOrgId],
-      )
-
-      if (rootMatch.rows.length > 0) {
+      if (claimedMap.has(rootDomain)) {
         throw simpleError('root_domain_already_claimed', `Root domain ${rootDomain} is already claimed by another organization. Consider using a subdomain like subdomain.${rootDomain}`, {
           domain: rootDomain,
-          claimedBy: rootMatch.rows[0].org_id,
+          claimedBy: claimedMap.get(rootDomain),
         })
       }
     }
     else {
-      // Subdomain: check if root domain is claimed by ANOTHER org
-      const rootOwnedByOther = await pgClient.query(
-        `SELECT org_id, domain 
-         FROM saml_domain_mappings 
-         WHERE domain = $1 
-         AND org_id != $2
-         LIMIT 1`,
-        [rootDomain, currentOrgId],
-      )
-
-      if (rootOwnedByOther.rows.length > 0) {
-        // Root is owned by another org - subdomain is allowed
+      // Subdomain: log if root is owned by another org (allowed)
+      if (claimedMap.has(rootDomain)) {
         cloudlog({
           requestId,
           message: 'Subdomain allowed - root owned by different org',
           subdomain: domain,
           rootDomain,
-          rootOwner: rootOwnedByOther.rows[0].org_id,
+          rootOwner: claimedMap.get(rootDomain),
         })
       }
     }

@@ -1,14 +1,16 @@
 /**
- * SSO Status Endpoint - GET /private/sso/status
+ * SSO Status Endpoint - POST /private/sso/status
  *
  * Retrieves SSO configuration status for an organization.
- * Requires read permissions or higher.
+ * Requires read permissions or higher for the organization.
  *
- * @endpoint GET /private/sso/status
- * @authentication JWT (requires read permissions)
+ * @endpoint POST /private/sso/status
+ * @authentication JWT (requires read permissions or higher)
  *
- * Query Parameters:
- * - orgId: string (UUID)
+ * Request Body:
+ * {
+ *   orgId: string (UUID)
+ * }
  *
  * Response:
  * {
@@ -26,19 +28,20 @@
  * }
  */
 
-import type { MiddlewareKeyVariables } from '../utils/hono.ts'
-import { Hono } from 'hono'
 import { z } from 'zod'
-import { parseBody, simpleError, useCors } from '../utils/hono.ts'
+import { createHono, parseBody, simpleError, useCors } from '../utils/hono.ts'
 import { middlewareV2 } from '../utils/hono_middleware.ts'
 import { cloudlog } from '../utils/logging.ts'
+import { hasOrgRight } from '../utils/supabase.ts'
+import { version } from '../utils/version.ts'
 import { getSSOStatus } from './sso_management.ts'
 
 const bodySchema = z.object({
   orgId: z.string().uuid(),
 })
 
-export const app = new Hono<MiddlewareKeyVariables>()
+const functionName = 'sso_status'
+export const app = createHono(functionName, version)
 
 app.use('/', useCors)
 
@@ -71,6 +74,18 @@ app.post('/', middlewareV2(['read', 'write', 'all']), async (c) => {
       message: '[SSO Status] Retrieving SSO status',
       orgId: parsedBody.data.orgId,
     })
+
+    // Check organization membership before allowing SSO status query
+    const hasPermission = await hasOrgRight(c, parsedBody.data.orgId, auth.userId, 'read')
+    if (!hasPermission) {
+      cloudlog({
+        requestId,
+        message: '[SSO Status] Access denied - user not member of organization',
+        userId: auth.userId,
+        orgId: parsedBody.data.orgId,
+      })
+      return simpleError('unauthorized', 'Organization access required')
+    }
 
     // Get SSO status
     const connections = await getSSOStatus(c, parsedBody.data.orgId)
