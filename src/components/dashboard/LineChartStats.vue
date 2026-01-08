@@ -383,12 +383,46 @@ const todayLineOptions = computed(() => {
   }
 })
 
+// Calculate appropriate Y-axis max based on actual data values
+const dataMax = computed(() => {
+  const allValues: number[] = []
+
+  // Collect values from main data
+  const mainData = accumulateData.value.filter((v): v is number => typeof v === 'number' && Number.isFinite(v))
+  allValues.push(...mainData)
+
+  // Collect values from per-app data
+  Object.values(props.dataByApp || {}).forEach((appData: any) => {
+    if (Array.isArray(appData)) {
+      const filtered = appData.filter((v): v is number => typeof v === 'number' && Number.isFinite(v))
+      allValues.push(...filtered)
+    }
+  })
+
+  if (allValues.length === 0)
+    return undefined
+
+  const max = Math.max(...allValues)
+  // Add 20% padding to the max so the line isn't at the very top
+  // Also ensure a minimum visible range
+  if (max <= 0)
+    return undefined
+
+  return max * 1.2
+})
+
 const chartOptions = computed<ChartOptions & { plugins: { inlineAnnotationPlugin: AnnotationOptions, todayLine?: any } }>(() => {
   const hasAppData = Object.keys(props.dataByApp || {}).length > 0
+  const scales = createStackedChartScales(isDark.value, hasAppData)
+
+  // If we have a calculated max, use it to ensure small values are visible
+  if (dataMax.value !== undefined) {
+    (scales.y as any).suggestedMax = dataMax.value
+  }
 
   return {
     maintainAspectRatio: false,
-    scales: createStackedChartScales(isDark.value, hasAppData),
+    scales,
     plugins: {
       inlineAnnotationPlugin: generateAnnotations.value,
       legend: createLegendConfig(isDark.value, hasAppData),
