@@ -182,8 +182,10 @@ function clearDashboardParams() {
 // Function to reload all chart data
 async function reloadAllCharts() {
   // Force reload of main dashboard data
+  // Normalize dates to midnight (start of day) to ensure consistent date range
   const last30DaysEnd = new Date()
-  const last30DaysStart = new Date()
+  last30DaysEnd.setHours(0, 0, 0, 0)
+  const last30DaysStart = new Date(last30DaysEnd)
   last30DaysStart.setDate(last30DaysStart.getDate() - 29) // 30 days including today
 
   const orgId = organizationStore.currentOrganization?.gid
