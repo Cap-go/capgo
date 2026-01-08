@@ -249,10 +249,16 @@ export async function updateOrCreateChannel(c: Context, update: Database['public
   // Validate public channel constraints before upserting
   // For validation, use the final values that will be in the database after the update
   // If a field is not provided in the update, use the existing value (or default for new channels)
-  const finalPublic = update.public !== undefined ? update.public : (existingChannel?.public ?? false)
-  const finalIos = update.ios !== undefined ? update.ios : (existingChannel?.ios ?? true)
-  const finalAndroid = update.android !== undefined ? update.android : (existingChannel?.android ?? true)
-  const finalElectron = update.electron !== undefined ? update.electron : (existingChannel?.electron ?? true)
+  // Default values for new channels match the database schema defaults
+  const DEFAULT_CHANNEL_PUBLIC = false
+  const DEFAULT_CHANNEL_IOS = true
+  const DEFAULT_CHANNEL_ANDROID = true
+  const DEFAULT_CHANNEL_ELECTRON = true
+  
+  const finalPublic = update.public !== undefined ? update.public : (existingChannel?.public ?? DEFAULT_CHANNEL_PUBLIC)
+  const finalIos = update.ios !== undefined ? update.ios : (existingChannel?.ios ?? DEFAULT_CHANNEL_IOS)
+  const finalAndroid = update.android !== undefined ? update.android : (existingChannel?.android ?? DEFAULT_CHANNEL_ANDROID)
+  const finalElectron = update.electron !== undefined ? update.electron : (existingChannel?.electron ?? DEFAULT_CHANNEL_ELECTRON)
 
   await validatePublicChannels(
     c,
