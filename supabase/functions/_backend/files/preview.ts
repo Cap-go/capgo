@@ -1,11 +1,10 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { getRuntimeKey } from 'hono/adapter'
-import { getCookie, setCookie } from 'hono/cookie'
 import { Hono } from 'hono/tiny'
 import { simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
-import { supabaseClient } from '../utils/supabase.ts'
+import { supabaseAdmin } from '../utils/supabase.ts'
 import { DEFAULT_RETRY_PARAMS, RetryBucket } from './retry.ts'
 
 // MIME type mapping for common file extensions
@@ -39,9 +38,6 @@ function getContentType(filePath: string): string {
   const ext = filePath.split('.').pop()?.toLowerCase() || ''
   return MIME_TYPES[ext] || 'application/octet-stream'
 }
-
-// Cookie name for storing the auth token
-const TOKEN_COOKIE_NAME = 'capgo_preview_token'
 
 // Parse subdomain format: {app_id_with_dots_as_underscores}-{version_id}.preview[.env].capgo.app
 // Example: ee__forgr__capacitor_go-222063.preview.capgo.app
@@ -98,17 +94,9 @@ async function handlePreviewSubdomain(c: Context<MiddlewareKeyVariables>) {
 
   cloudlog({ requestId: c.get('requestId'), message: 'preview subdomain request', hostname, appId, versionId, filePath })
 
-  // Accept token from: query param (first request), cookie (subsequent requests), or Authorization header
-  const authorization = c.req.header('authorization')
-  const tokenFromQuery = c.req.query('token')
-  const tokenFromCookie = getCookie(c, TOKEN_COOKIE_NAME)
-  const token = authorization?.split('Bearer ')[1] || tokenFromQuery || tokenFromCookie
-
-  if (!token)
-    return simpleError('cannot_find_authorization', 'Cannot find authorization. Pass token as query param on first request.')
-
-  // Use authenticated client - RLS will enforce access based on JWT
-  const supabase = supabaseClient(c, `Bearer ${token}`)
+  // Use admin client - preview is public when allow_preview is enabled
+  // Security relies on the obscure subdomain format and the allow_preview setting
+  const supabase = supabaseAdmin(c)
 
   // Get app settings to check if preview is enabled
   const { data: appData, error: appError } = await supabase
@@ -217,20 +205,6 @@ async function handlePreviewSubdomain(c: Context<MiddlewareKeyVariables>) {
     headers.set('X-Content-Type-Options', 'nosniff')
 
     cloudlog({ requestId: c.get('requestId'), message: 'serving preview file from R2 (subdomain)', filePath, contentType })
-
-    // If token came from query param, set it in a cookie for subsequent requests
-    // This allows assets to load without needing the token in every URL
-    if (tokenFromQuery && !tokenFromCookie) {
-      // Set cookie with same-site strict for security, httpOnly to prevent JS access
-      // Path=/ so it works for all paths in this subdomain
-      setCookie(c, TOKEN_COOKIE_NAME, token, {
-        path: '/',
-        httpOnly: true,
-        secure: true,
-        sameSite: 'Strict',
-        maxAge: 3600, // 1 hour, matches cache control
-      })
-    }
 
     return new Response(object.body, { headers })
   }

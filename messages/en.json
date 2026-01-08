@@ -1112,8 +1112,6 @@
   "fullscreen": "Full screen",
   "exit-fullscreen": "Exit full screen",
   "scan-qr-to-preview": "Scan to preview on your phone",
-  "preview-not-available-localhost": "Preview is not available on localhost",
-  "preview-deploy-to-test": "Deploy to a production environment to test the preview feature",
   "revert-channel-to-built-in-version": "Revert Channel to built in version",
   "revert-to-builtin": "Revert to builtin",
   "revert-to-builtin-confirm": "Are you sure that you want to revert to builtin version? While the channel is reverted, capgo will not distribute updates thru it.",

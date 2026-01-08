@@ -6,7 +6,6 @@ import { useRoute } from 'vue-router'
 import IconExpand from '~icons/lucide/expand'
 import IconMinimize from '~icons/lucide/minimize-2'
 import IconSmartphone from '~icons/lucide/smartphone'
-import { useSupabase } from '~/services/supabase'
 
 const props = defineProps<{
   appId: string
@@ -15,7 +14,6 @@ const props = defineProps<{
 
 const { t } = useI18n()
 const route = useRoute()
-const supabase = useSupabase()
 
 // Device configurations
 const devices = {
@@ -38,22 +36,15 @@ const selectedDevice = ref<DeviceType>('iphone')
 const isFullscreen = ref(false)
 const qrCodeDataUrl = ref('')
 const isMobile = ref(false)
-const accessToken = ref('')
 
 // Check if we're on mobile and detect fullscreen query param
-onMounted(async () => {
+onMounted(() => {
   checkMobile()
   window.addEventListener('resize', checkMobile)
 
   // Check for fullscreen query param
   if (route.query.fullscreen === 'true') {
     isFullscreen.value = true
-  }
-
-  // Get access token for iframe auth
-  const { data: session } = await supabase.auth.getSession()
-  if (session?.session?.access_token) {
-    accessToken.value = session.session.access_token
   }
 
   generateQRCode()
@@ -73,28 +64,19 @@ function checkMobile() {
 
 const currentDevice = computed(() => devices[selectedDevice.value])
 
-// Check if we're on a valid production domain (not localhost or IP)
-const isLocalhost = computed(() => {
-  const hostname = window.location.hostname
-  return hostname === 'localhost'
-    || hostname === '127.0.0.1'
-    || hostname.startsWith('192.168.')
-    || hostname.startsWith('10.')
-    || !hostname.includes('.')
-})
-
-// Build the preview URL with auth token using subdomain format
+// Build the preview URL using subdomain format (no auth - relies on obscure subdomain)
 const previewUrl = computed(() => {
-  if (isLocalhost.value)
-    return ''
   // Encode app_id: replace . with __
   const encodedAppId = props.appId.replace(/\./g, '__')
   const subdomain = `${encodedAppId}-${props.versionId}`
-  // Extract base domain from current host (e.g., capgo.app from web.capgo.app)
-  const hostParts = window.location.hostname.split('.')
-  const baseDomain = hostParts.slice(-2).join('.')
-  const tokenParam = accessToken.value ? `?token=${accessToken.value}` : ''
-  return `https://${subdomain}.preview.${baseDomain}/${tokenParam}`
+  // Extract base domain from current host, default to capgo.app for localhost
+  const hostname = window.location.hostname
+  let baseDomain = 'capgo.app'
+  if (hostname.includes('.') && hostname !== '127.0.0.1') {
+    const hostParts = hostname.split('.')
+    baseDomain = hostParts.slice(-2).join('.')
+  }
+  return `https://${subdomain}.preview.${baseDomain}/`
 })
 
 // Build URL for QR code (includes fullscreen param)
@@ -145,24 +127,8 @@ function toggleFullscreen() {
       <IconExpand v-else class="w-5 h-5" />
     </button>
 
-    <!-- Localhost warning -->
-    <div
-      v-if="isLocalhost"
-      class="flex items-center justify-center h-full"
-    >
-      <div class="text-center p-8 bg-yellow-50 dark:bg-yellow-900/20 rounded-xl border border-yellow-200 dark:border-yellow-800">
-        <p class="text-yellow-800 dark:text-yellow-200 text-lg font-medium">
-          {{ t('preview-not-available-localhost') }}
-        </p>
-        <p class="text-yellow-600 dark:text-yellow-400 text-sm mt-2">
-          {{ t('preview-deploy-to-test') }}
-        </p>
-      </div>
-    </div>
-
     <!-- Main content container -->
     <div
-      v-else
       class="flex items-center justify-center gap-8 h-full"
       :class="isFullscreen ? 'p-4' : ''"
     >
