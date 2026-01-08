@@ -379,7 +379,7 @@ export function requestInfosChannelPostgres(
   includeMetadata = false,
 ) {
   const { versionSelect, channelAlias, channelSelect, manifestSelect, versionAlias } = getSchemaUpdatesAlias(includeMetadata)
-  const platformQuery = platform === 'android' ? channelAlias.android : channelAlias.ios
+  const platformQuery = platform === 'android' ? channelAlias.android : platform === 'electron' ? channelAlias.electron : channelAlias.ios
   const baseSelect = {
     version: versionSelect,
     channels: channelSelect,
@@ -758,11 +758,11 @@ export async function getAppByIdPg(
 export async function getCompatibleChannelsPg(
   c: Context,
   appId: string,
-  platform: 'ios' | 'android',
+  platform: 'ios' | 'android' | 'electron',
   isEmulator: boolean,
   isProd: boolean,
   drizzleClient: ReturnType<typeof getDrizzleClient>,
-): Promise<{ id: number, name: string, allow_device_self_set: boolean, allow_emulator: boolean, allow_device: boolean, allow_dev: boolean, allow_prod: boolean, ios: boolean, android: boolean, public: boolean }[]> {
+): Promise<{ id: number, name: string, allow_device_self_set: boolean, allow_emulator: boolean, allow_device: boolean, allow_dev: boolean, allow_prod: boolean, ios: boolean, android: boolean, electron: boolean, public: boolean }[]> {
   try {
     const deviceCondition = isEmulator
       ? eq(schema.channels.allow_emulator, true)
@@ -770,6 +770,7 @@ export async function getCompatibleChannelsPg(
     const buildCondition = isProd
       ? eq(schema.channels.allow_prod, true)
       : eq(schema.channels.allow_dev, true)
+    const platformColumn = platform === 'ios' ? schema.channels.ios : platform === 'electron' ? schema.channels.electron : schema.channels.android
     const channels = await drizzleClient
       .select({
         id: schema.channels.id,
@@ -781,6 +782,7 @@ export async function getCompatibleChannelsPg(
         allow_prod: schema.channels.allow_prod,
         ios: schema.channels.ios,
         android: schema.channels.android,
+        electron: schema.channels.electron,
         public: schema.channels.public,
       })
       .from(schema.channels)
@@ -789,7 +791,7 @@ export async function getCompatibleChannelsPg(
         or(eq(schema.channels.allow_device_self_set, true), eq(schema.channels.public, true)),
         deviceCondition,
         buildCondition,
-        eq(platform === 'ios' ? schema.channels.ios : schema.channels.android, true),
+        eq(platformColumn, true),
       ))
     return channels
   }

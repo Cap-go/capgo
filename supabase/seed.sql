@@ -534,11 +534,12 @@ BEGIN
     (10, NOW(), 'com.demoadmin.app', NOW(), 'admin123', 1500000),
     (13, NOW(), 'com.stats.app', NOW(), 'stats123', 850000);
 
-    INSERT INTO "public"."channels" ("id", "created_at", "name", "app_id", "version", "updated_at", "public", "disable_auto_update_under_native", "disable_auto_update", "ios", "android", "allow_device_self_set", "allow_emulator", "allow_device", "allow_dev", "allow_prod", "created_by") VALUES
-    (1, NOW(), 'production', 'com.demo.app', 3, NOW(), 't', 't', 'major'::"public"."disable_update", 'f', 't', 't', 't', 't', 't', 't', '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid),
-    (2, NOW(), 'no_access', 'com.demo.app', 5, NOW(), 'f', 't', 'major'::"public"."disable_update", 't', 't', 't', 't', 't', 't', 't', '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid),
-    (3, NOW(), 'two_default', 'com.demo.app', 3, NOW(), 't', 't', 'major'::"public"."disable_update", 't', 'f', 't', 't', 't', 't', 't', '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid),
-    (4, NOW(), 'production', 'com.stats.app', 13, NOW(), 't', 't', 'major'::"public"."disable_update", 'f', 't', 't', 't', 't', 't', 't', '7a1b2c3d-4e5f-4a6b-7c8d-9e0f1a2b3c4d'::uuid);
+    INSERT INTO "public"."channels" ("id", "created_at", "name", "app_id", "version", "updated_at", "public", "disable_auto_update_under_native", "disable_auto_update", "ios", "android", "electron", "allow_device_self_set", "allow_emulator", "allow_device", "allow_dev", "allow_prod", "created_by") VALUES
+    (1, NOW(), 'production', 'com.demo.app', 3, NOW(), 't', 't', 'major'::"public"."disable_update", 'f', 't', 't', 't', 't', 't', 't', 't', '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid),
+    (2, NOW(), 'no_access', 'com.demo.app', 5, NOW(), 'f', 't', 'major'::"public"."disable_update", 't', 't', 't', 't', 't', 't', 't', 't', '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid),
+    (3, NOW(), 'two_default', 'com.demo.app', 3, NOW(), 't', 't', 'major'::"public"."disable_update", 't', 'f', 't', 't', 't', 't', 't', 't', '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid),
+    (4, NOW(), 'production', 'com.stats.app', 13, NOW(), 't', 't', 'major'::"public"."disable_update", 'f', 't', 't', 't', 't', 't', 't', 't', '7a1b2c3d-4e5f-4a6b-7c8d-9e0f1a2b3c4d'::uuid),
+    (5, NOW(), 'electron_only', 'com.demo.app', 3, NOW(), 'f', 't', 'major'::"public"."disable_update", 'f', 'f', 't', 't', 't', 't', 't', 't', '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid);
 
     INSERT INTO "public"."deploy_history" ("id", "created_at", "updated_at", "channel_id", "app_id", "version_id", "deployed_at", "owner_org", "created_by") VALUES
     (1, NOW() - interval '15 days', NOW() - interval '15 days', 1, 'com.demo.app', 3, NOW() - interval '15 days', '046a36ac-e03c-4590-9257-bd6c9dba9ee8'::uuid, '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid),
@@ -552,13 +553,14 @@ BEGIN
     (NOW(), '00000000-0000-0000-0000-000000000002', '1.0.1', 'com.demo.app', 'android', '4.15.3', '13', '1.0.1', 'test-device-2', 't', 'f'),
     (NOW(), '00000000-0000-0000-0000-000000000003', '1.361.0', 'com.demo.app', 'ios', '4.15.3', '15.0', '1.361.0', 'test-device-3', 'f', 't'),
     (NOW(), '00000000-0000-0000-0000-000000000004', '1.0.0', 'com.demoadmin.app', 'android', '4.15.3', '12', '1.0.0', 'admin-test-device', 't', 'f'),
-    (NOW(), '00000000-0000-0000-0000-000000000005', '1.0.0', 'com.stats.app', 'android', '4.15.3', '11', '1.0.0', 'stats-test-device', 't', 'f');
+    (NOW(), '00000000-0000-0000-0000-000000000005', '1.0.0', 'com.stats.app', 'android', '4.15.3', '11', '1.0.0', 'stats-test-device', 't', 'f'),
+    (NOW(), '00000000-0000-0000-0000-000000000006', '1.0.0', 'com.demo.app', 'electron', '7.0.0', 'Linux 5.15', '1.0.0', 'electron-test-device', 't', 'f');
 
     -- Drop replicated orgs but keet the the seed ones
     DELETE from "public"."orgs" where POSITION('organization' in orgs.name)=1;
     PERFORM setval('public.apikeys_id_seq', 111, false);
     PERFORM setval('public.app_versions_id_seq', 14, false);
-    PERFORM setval('public.channel_id_seq', 5, false);
+    PERFORM setval('public.channel_id_seq', 6, false);
     PERFORM setval('public.deploy_history_id_seq', 5, false);
 END;
 $_$;
@@ -750,7 +752,7 @@ DECLARE
     ELSE concat('Seeded Org ', p_app_id)
   END;
   builtin_version_id bigint; unknown_version_id bigint; v1_0_1_version_id bigint; v1_0_0_version_id bigint; v1_361_0_version_id bigint; v1_360_0_version_id bigint; v1_359_0_version_id bigint;
-  production_channel_id bigint; beta_channel_id bigint; development_channel_id bigint; no_access_channel_id bigint;
+  production_channel_id bigint; beta_channel_id bigint; development_channel_id bigint; no_access_channel_id bigint; electron_only_channel_id bigint;
 BEGIN
   PERFORM pg_advisory_xact_lock(hashtext(p_app_id));
   PERFORM public.reset_app_data(p_app_id);
@@ -851,16 +853,17 @@ BEGIN
   SELECT MAX(CASE WHEN name='builtin' THEN id END), MAX(CASE WHEN name='unknown' THEN id END), MAX(CASE WHEN name='1.0.1' THEN id END), MAX(CASE WHEN name='1.0.0' THEN id END), MAX(CASE WHEN name='1.361.0' THEN id END), MAX(CASE WHEN name='1.360.0' THEN id END), MAX(CASE WHEN name='1.359.0' THEN id END)
   INTO builtin_version_id, unknown_version_id, v1_0_1_version_id, v1_0_0_version_id, v1_361_0_version_id, v1_360_0_version_id, v1_359_0_version_id FROM version_inserts;
   WITH channel_inserts AS (
-    INSERT INTO public.channels (created_at, name, app_id, version, updated_at, public, disable_auto_update_under_native, disable_auto_update, ios, android, allow_device_self_set, allow_emulator, allow_device, allow_dev, allow_prod, created_by, owner_org)
+    INSERT INTO public.channels (created_at, name, app_id, version, updated_at, public, disable_auto_update_under_native, disable_auto_update, ios, android, electron, allow_device_self_set, allow_emulator, allow_device, allow_dev, allow_prod, created_by, owner_org)
     VALUES
-      (NOW(), 'production', p_app_id, v1_0_0_version_id, NOW(), 't', 't', 'major'::public.disable_update, 'f', 't', 't', 't', 't', 't', 't', user_id, org_id),
-      (NOW(), 'beta', p_app_id, v1_361_0_version_id, NOW(), 'f', 't', 'major'::public.disable_update, 't', 't', 't', 't', 't', 't', 't', user_id, org_id),
-      (NOW(), 'development', p_app_id, v1_359_0_version_id, NOW(), 't', 't', 'major'::public.disable_update, 't', 'f', 't', 't', 't', 't', 't', user_id, org_id),
-      (NOW(), 'no_access', p_app_id, v1_361_0_version_id, NOW(), 'f', 't', 'major'::public.disable_update, 'f', 'f', 't', 't', 't', 't', 't', user_id, org_id)
+      (NOW(), 'production', p_app_id, v1_0_0_version_id, NOW(), 't', 't', 'major'::public.disable_update, 'f', 't', 't', 't', 't', 't', 't', 't', user_id, org_id),
+      (NOW(), 'beta', p_app_id, v1_361_0_version_id, NOW(), 'f', 't', 'major'::public.disable_update, 't', 't', 't', 't', 't', 't', 't', 't', user_id, org_id),
+      (NOW(), 'development', p_app_id, v1_359_0_version_id, NOW(), 't', 't', 'major'::public.disable_update, 't', 'f', 'f', 't', 't', 't', 't', 't', user_id, org_id),
+      (NOW(), 'no_access', p_app_id, v1_361_0_version_id, NOW(), 'f', 't', 'major'::public.disable_update, 'f', 'f', 'f', 't', 't', 't', 't', 't', user_id, org_id),
+      (NOW(), 'electron_only', p_app_id, v1_360_0_version_id, NOW(), 'f', 't', 'major'::public.disable_update, 'f', 'f', 't', 't', 't', 't', 't', 't', user_id, org_id)
     RETURNING id, name
   )
-  SELECT MAX(CASE WHEN name='production' THEN id END), MAX(CASE WHEN name='beta' THEN id END), MAX(CASE WHEN name='development' THEN id END), MAX(CASE WHEN name='no_access' THEN id END)
-  INTO production_channel_id, beta_channel_id, development_channel_id, no_access_channel_id FROM channel_inserts;
+  SELECT MAX(CASE WHEN name='production' THEN id END), MAX(CASE WHEN name='beta' THEN id END), MAX(CASE WHEN name='development' THEN id END), MAX(CASE WHEN name='no_access' THEN id END), MAX(CASE WHEN name='electron_only' THEN id END)
+  INTO production_channel_id, beta_channel_id, development_channel_id, no_access_channel_id, electron_only_channel_id FROM channel_inserts;
   INSERT INTO public.deploy_history (created_at, updated_at, channel_id, app_id, version_id, deployed_at, owner_org, created_by)
   VALUES
     (NOW() - interval '15 days', NOW() - interval '15 days', production_channel_id, p_app_id, v1_0_0_version_id, NOW() - interval '15 days', org_id, user_id),

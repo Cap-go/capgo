@@ -23,7 +23,7 @@ const CHANNEL_SELF_MIN_V7 = '7.34.0'
 const CHANNEL_SELF_MIN_V8 = '8.0.0'
 
 z.config(z.locales.en())
-const devicePlatformScheme = z.literal(['ios', 'android'])
+const devicePlatformScheme = z.literal(['ios', 'android', 'electron'])
 const PLAN_MAU_ACTIONS: Array<'mau'> = ['mau']
 const PLAN_ERROR = 'Cannot set channel, upgrade plan to continue to update'
 
@@ -532,7 +532,7 @@ async function listCompatibleChannels(c: Context, drizzleClient: ReturnType<type
   await setAppStatus(c, app_id, 'cloud')
 
   // Channels compatible with platform/device/build AND (public OR allow_device_self_set)
-  const channels = await getCompatibleChannelsPg(c, app_id, platform as 'ios' | 'android', is_emulator!, is_prod!, drizzleClient as ReturnType<typeof getDrizzleClient>)
+  const channels = await getCompatibleChannelsPg(c, app_id, platform as 'ios' | 'android' | 'electron', is_emulator!, is_prod!, drizzleClient as ReturnType<typeof getDrizzleClient>)
 
   if (!channels || channels.length === 0) {
     return c.json([])

@@ -68,7 +68,7 @@ const userRole = ref<OrganizationRole | null>(null)
 const latestBundle = ref<Database['public']['Tables']['app_versions']['Row'] | null>(null)
 type DefaultChannel = Pick<
   Database['public']['Tables']['channels']['Row'],
-  'id' | 'name' | 'ios' | 'android' | 'public' | 'version'
+  'id' | 'name' | 'ios' | 'android' | 'electron' | 'public' | 'version'
 >
 
 /** Default channels configured for downloads (public channels) */
@@ -78,7 +78,7 @@ const selectedChannelIds = ref<number[]>([])
 
 const deployDialogId = 'deploy-default-channels'
 
-type PlatformKey = 'ios' | 'android'
+type PlatformKey = 'ios' | 'android' | 'electron'
 interface DeployTarget {
   id: number
   name: string
@@ -102,13 +102,14 @@ const deployTargets = computed<DeployTarget[]>(() => {
     return []
 
   return defaultChannels.value
-    .filter(channel => channel.ios || channel.android)
+    .filter(channel => channel.ios || channel.android || channel.electron)
     .map(channel => ({
       id: channel.id,
       name: channel.name,
       platforms: [
         ...(channel.ios ? ['ios'] as PlatformKey[] : []),
         ...(channel.android ? ['android'] as PlatformKey[] : []),
+        ...(channel.electron ? ['electron'] as PlatformKey[] : []),
       ],
       needsDeploy: channel.version !== bundle.id,
     }))
@@ -171,11 +172,11 @@ async function loadData() {
     // Step 2: Get default channels configuration (public download channels)
     const { data: publicChannels } = await supabase
       .from('channels')
-      .select('id, name, ios, android, public, version')
+      .select('id, name, ios, android, electron, public, version')
       .eq('app_id', props.appId)
       .eq('public', true)
 
-    defaultChannels.value = publicChannels?.filter(channel => channel.ios || channel.android) ?? []
+    defaultChannels.value = publicChannels?.filter(channel => channel.ios || channel.android || channel.electron) ?? []
     console.log('[DeploymentBanner] Default channels:', defaultChannels.value)
 
     // Step 3: Get latest bundle (excluding special bundle types)
@@ -305,13 +306,14 @@ function isTargetSelected(id: number) {
 }
 
 function getPlatformLabel(platforms: PlatformKey[]) {
-  if (platforms.includes('ios') && platforms.includes('android'))
-    return `${t('platform-ios')} & ${t('platform-android')}`
+  const labels: string[] = []
   if (platforms.includes('ios'))
-    return t('channel-platform-ios')
+    labels.push(t('platform-ios'))
   if (platforms.includes('android'))
-    return t('channel-platform-android')
-  return t('unknown')
+    labels.push(t('platform-android'))
+  if (platforms.includes('electron'))
+    labels.push(t('platform-electron'))
+  return labels.length > 0 ? labels.join(' & ') : t('unknown')
 }
 
 /**

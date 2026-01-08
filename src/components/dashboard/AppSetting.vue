@@ -31,7 +31,7 @@ const organizationStore = useOrganizationStore()
 const transferAppIdInput = ref('')
 const selectedChannel = ref('')
 const uploadSearch = ref('')
-const channels = ref<Array<{ id: number, name: string, ios: boolean, android: boolean, public: boolean }>>([])
+const channels = ref<Array<{ id: number, name: string, ios: boolean, android: boolean, electron: boolean, public: boolean }>>([])
 const selectedDownloadChannels = ref<{ ios: string, android: string }>({ ios: '', android: '' })
 const splitDownloadDefaults = ref(false)
 const selectedCombinedChannel = ref('')
@@ -235,7 +235,7 @@ async function updateAllowPreview(newAllowPreview: boolean) {
 async function loadChannels() {
   const { data, error } = await supabase
     .from('channels')
-    .select('id, name, ios, android, public')
+    .select('id, name, ios, android, electron, public')
     .eq('app_id', props.appId)
 
   if (error) {
