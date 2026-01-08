@@ -1072,6 +1072,8 @@ export type Database = {
           credits_consumed: number
           date_id: string
           devices_last_month: number | null
+          devices_last_month_android: number | null
+          devices_last_month_ios: number | null
           mrr: number
           need_upgrade: number | null
           new_paying_orgs: number
@@ -1117,6 +1119,8 @@ export type Database = {
           credits_consumed?: number
           date_id: string
           devices_last_month?: number | null
+          devices_last_month_android?: number | null
+          devices_last_month_ios?: number | null
           mrr?: number
           need_upgrade?: number | null
           new_paying_orgs?: number
@@ -1162,6 +1166,8 @@ export type Database = {
           credits_consumed?: number
           date_id?: string
           devices_last_month?: number | null
+          devices_last_month_android?: number | null
+          devices_last_month_ios?: number | null
           mrr?: number
           need_upgrade?: number | null
           new_paying_orgs?: number

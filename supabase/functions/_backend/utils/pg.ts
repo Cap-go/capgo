@@ -803,6 +803,8 @@ export interface AdminGlobalStatsTrend {
   plan_enterprise: number
   registers_today: number
   devices_last_month: number
+  devices_last_month_ios: number
+  devices_last_month_android: number
   stars: number
   need_upgrade: number
   paying_yearly: number
@@ -852,6 +854,8 @@ export async function getAdminGlobalStatsTrend(
         plan_enterprise::int,
         registers_today::int,
         devices_last_month::int,
+        COALESCE(devices_last_month_ios, 0)::int AS devices_last_month_ios,
+        COALESCE(devices_last_month_android, 0)::int AS devices_last_month_android,
         stars::int,
         need_upgrade::int,
         paying_yearly::int,
@@ -891,6 +895,8 @@ export async function getAdminGlobalStatsTrend(
       plan_enterprise: Number(row.plan_enterprise) || 0,
       registers_today: Number(row.registers_today) || 0,
       devices_last_month: Number(row.devices_last_month) || 0,
+      devices_last_month_ios: Number(row.devices_last_month_ios) || 0,
+      devices_last_month_android: Number(row.devices_last_month_android) || 0,
       stars: Number(row.stars) || 0,
       need_upgrade: Number(row.need_upgrade) || 0,
       paying_yearly: Number(row.paying_yearly) || 0,

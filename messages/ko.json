@@ -684,6 +684,7 @@
   "device-pixel": "픽셀",
   "devices": "장치들",
   "devices-trend": "활성 장치 추세",
+  "device-platform-trend": "기기 플랫폼 추세 (iOS vs Android)",
   "dialog-with-custom-input": "사용자 정의 입력 대화",
   "did-not-recive-confirm-email": "확인 이메일을 받지 못하셨나요?",
   "disable": "비활성화",

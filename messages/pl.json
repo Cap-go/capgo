@@ -684,6 +684,7 @@
   "device-pixel": "Piksel",
   "devices": "Urządzenia",
   "devices-trend": "Trend Urządzeń Aktywnych",
+  "device-platform-trend": "Trend Platform Urządzeń (iOS vs Android)",
   "dialog-with-custom-input": "Dialog z niestandardowym wprowadzaniem danych",
   "did-not-recive-confirm-email": "Nie otrzymałeś e-maila z potwierdzeniem?",
   "disable": "Wyłącz",
