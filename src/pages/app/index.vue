@@ -33,6 +33,46 @@ const lacksSecurityAccess = computed(() => {
   return lacks2FA || lacksPassword
 })
 
+// Payment failed state (subscription required)
+const paymentFailed = computed(() => {
+  return organizationStore.currentOrganizationFailed && !lacksSecurityAccess.value
+})
+
+// Demo apps for showing behind blur when payment fails
+const demoApps = [
+  {
+    app_id: 'com.demo.production',
+    name: 'Production App',
+    icon_url: '',
+    last_version: '2.1.0',
+    updated_at: new Date().toISOString(),
+    created_at: new Date().toISOString(),
+    owner_org: '',
+  },
+  {
+    app_id: 'com.demo.staging',
+    name: 'Staging App',
+    icon_url: '',
+    last_version: '2.2.0-beta',
+    updated_at: new Date(Date.now() - 86400000).toISOString(),
+    created_at: new Date().toISOString(),
+    owner_org: '',
+  },
+  {
+    app_id: 'com.demo.beta',
+    name: 'Beta App',
+    icon_url: '',
+    last_version: '3.0.0-alpha',
+    updated_at: new Date(Date.now() - 172800000).toISOString(),
+    created_at: new Date().toISOString(),
+    owner_org: '',
+  },
+] as Database['public']['Tables']['apps']['Row'][]
+
+// Apps to display - use demo apps when payment failed
+const displayApps = computed(() => paymentFailed.value ? demoApps : apps.value)
+const displayTotal = computed(() => paymentFailed.value ? demoApps.length : totalApps.value)
+
 async function NextStep(appId: string) {
   console.log('Navigating to app with ID:', appId)
   router.push(`/app/${appId}`)
@@ -127,24 +167,32 @@ displayStore.defaultBack = '/app'
       <FailedCard />
     </div>
     <div v-else-if="!isLoading">
-      <StepsApp v-if="stepsOpen" :onboarding="!apps.length" @done="NextStep" @close-step="stepsOpen = !stepsOpen" />
-      <div v-else class="overflow-hidden pb-4 h-full">
+      <!-- Show onboarding steps when no apps and no payment issue -->
+      <StepsApp v-if="stepsOpen && !paymentFailed" :onboarding="!apps.length" @done="NextStep" @close-step="stepsOpen = !stepsOpen" />
+      <div v-else class="relative overflow-hidden pb-4 h-full">
         <div class="overflow-y-auto px-0 pt-0 mx-auto mb-8 w-full h-full sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
-          <div class="flex overflow-hidden overflow-y-auto flex-col bg-white border shadow-lg md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900">
+          <!-- App table - blurred when payment failed -->
+          <div
+            :class="{ 'blur-sm pointer-events-none select-none': paymentFailed }"
+            class="flex overflow-hidden overflow-y-auto flex-col bg-white border shadow-lg md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900"
+          >
             <AppTable
               v-model:current-page="currentPage"
               v-model:search="searchQuery"
-              :apps="apps"
-              :total="totalApps"
-              :delete-button="true"
-              :server-side-pagination="true"
-              :is-loading="isTableLoading"
+              :apps="displayApps"
+              :total="displayTotal"
+              :delete-button="!paymentFailed"
+              :server-side-pagination="!paymentFailed"
+              :is-loading="isTableLoading && !paymentFailed"
               @add-app="stepsOpen = !stepsOpen"
               @reload="getMyApps()"
               @reset="getMyApps()"
             />
           </div>
         </div>
+
+        <!-- Payment required overlay -->
+        <PaymentRequiredModal v-if="paymentFailed" />
       </div>
     </div>
     <div v-else class="flex flex-col justify-center items-center h-full">

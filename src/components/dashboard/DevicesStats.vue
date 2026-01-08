@@ -29,6 +29,10 @@ const props = defineProps({
     type: Number,
     default: 0,
   },
+  forceDemo: {
+    type: Boolean,
+    default: false,
+  },
 })
 
 interface ChartDataset {

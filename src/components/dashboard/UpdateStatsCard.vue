@@ -30,6 +30,10 @@ const props = defineProps({
     type: Number,
     default: 0,
   },
+  forceDemo: {
+    type: Boolean,
+    default: false,
+  },
 })
 
 // Removed filterToBillingPeriod - no longer needed as we work with correct date range from the start
@@ -83,8 +87,8 @@ const hasRealData = computed(() => {
 // Generate demo data when no real data
 const demoStats = computed(() => generateDemoUpdateStatsData(30))
 
-// Demo mode detection
-const isDemoMode = computed(() => !hasRealData.value && !isLoading.value)
+// Demo mode detection - also force demo when forceDemo is true
+const isDemoMode = computed(() => props.forceDemo || (!hasRealData.value && !isLoading.value))
 
 // Effective values for display
 const effectiveChartData = computed(() => isDemoMode.value ? demoStats.value.total : chartUpdateData.value)
