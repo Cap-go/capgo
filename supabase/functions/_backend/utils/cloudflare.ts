@@ -803,6 +803,42 @@ export async function readLastMonthDevicesCF(c: Context): Promise<number> {
   return 0
 }
 
+export interface DevicesByPlatform {
+  total: number
+  ios: number
+  android: number
+}
+
+export async function readLastMonthDevicesByPlatformCF(c: Context): Promise<DevicesByPlatform> {
+  if (!c.env.DEVICE_INFO) {
+    return { total: 0, ios: 0, android: 0 }
+  }
+
+  const oneMonthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+  // Platform: double1 = 0 for android, 1 for ios
+  const query = `SELECT
+    COUNT(DISTINCT blob1) AS total,
+    COUNT(DISTINCT CASE WHEN double1 = 1 THEN blob1 END) AS ios,
+    COUNT(DISTINCT CASE WHEN double1 = 0 THEN blob1 END) AS android
+  FROM device_info
+  WHERE timestamp >= toDateTime('${formatDateCF(oneMonthAgo)}')
+    AND timestamp < now()`
+
+  cloudlog({ requestId: c.get('requestId'), message: 'readLastMonthDevicesByPlatformCF query', query })
+  try {
+    const res = await runQueryToCFA<{ total: number, ios: number, android: number }>(c, query)
+    return {
+      total: res[0]?.total || 0,
+      ios: res[0]?.ios || 0,
+      android: res[0]?.android || 0,
+    }
+  }
+  catch (e) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error reading last month devices by platform', error: serializeError(e) })
+  }
+  return { total: 0, ios: 0, android: 0 }
+}
+
 export async function getAppsToProcessCF(c: Context, flag: 'to_get_framework' | 'to_get_info' | 'to_get_similar', limit: number) {
   if (!c.env.DB_STOREAPPS)
     return Promise.resolve([] as StoreApp[])

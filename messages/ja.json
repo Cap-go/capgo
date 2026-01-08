@@ -684,6 +684,7 @@
   "device-pixel": "ピクセル",
   "devices": "デバイス",
   "devices-trend": "アクティブデバイスのトレンド",
+  "device-platform-trend": "デバイスプラットフォームトレンド（iOS vs Android）",
   "dialog-with-custom-input": "カスタム入力を使用したダイアログ",
   "did-not-recive-confirm-email": "確認メールが届きませんでしたか？",
   "disable": "無効にする",

@@ -684,6 +684,7 @@
   "device-pixel": "像素",
   "devices": "设备",
   "devices-trend": "活动设备趋势",
+  "device-platform-trend": "设备平台趋势（iOS vs Android）",
   "dialog-with-custom-input": "自定义输入的对话",
   "did-not-recive-confirm-email": "没有收到确认邮件吗？",
   "disable": "禁用",
