@@ -22,7 +22,7 @@ const CHANNEL_SELF_MIN_V7 = '7.34.0'
 const CHANNEL_SELF_MIN_V8 = '8.0.0'
 
 z.config(z.locales.en())
-const devicePlatformScheme = z.literal(['ios', 'android'])
+const devicePlatformScheme = z.literal(['ios', 'android', 'electron'])
 const PLAN_MAU_ACTIONS: Array<'mau'> = ['mau']
 const PLAN_ERROR = 'Cannot set channel, upgrade plan to continue to update'
 
@@ -205,7 +205,7 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
   let mainChannelName = null as string | null
   if (mainChannel && mainChannel.length > 0) {
     const devicePlatform = body.platform as Database['public']['Enums']['platform_os']
-    const finalChannel = mainChannel.find((channel: { name: string, ios: boolean, android: boolean }) => channel[devicePlatform])
+    const finalChannel = mainChannel.find((channel: { name: string, ios: boolean, android: boolean, electron: boolean }) => channel[devicePlatform])
     mainChannelName = (finalChannel !== undefined) ? finalChannel.name : null
   }
 
@@ -363,7 +363,7 @@ async function put(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient
 
   const finalChannel = defaultChannel
     ? dataChannel.find((channel: { name: string }) => channel.name === defaultChannel)
-    : dataChannel.find((channel: { ios: boolean, android: boolean }) => channel[devicePlatform.data])
+    : dataChannel.find((channel: { ios: boolean, android: boolean, electron: boolean }) => channel[devicePlatform.data])
 
   if (!finalChannel) {
     return simpleError200(c, 'channel_not_found', 'Cannot find channel')
@@ -507,7 +507,7 @@ async function listCompatibleChannels(c: Context, drizzleClient: ReturnType<type
   await setAppStatus(c, app_id, 'cloud')
 
   // Channels compatible with platform/device/build AND (public OR allow_device_self_set)
-  const channels = await getCompatibleChannelsPg(c, app_id, platform as 'ios' | 'android', is_emulator!, is_prod!, drizzleClient as ReturnType<typeof getDrizzleClient>)
+  const channels = await getCompatibleChannelsPg(c, app_id, platform as 'ios' | 'android' | 'electron', is_emulator!, is_prod!, drizzleClient as ReturnType<typeof getDrizzleClient>)
 
   if (!channels || channels.length === 0) {
     return c.json([])

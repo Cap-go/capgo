@@ -8,7 +8,7 @@ import { getEnv } from '../../utils/utils.ts'
 export interface BuildStatusParams {
   job_id: string
   app_id: string
-  platform: 'ios' | 'android'
+  platform: 'ios' | 'android' | 'electron'
 }
 
 interface BuilderStatusResponse {

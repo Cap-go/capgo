@@ -212,6 +212,7 @@ CREATE TABLE public.channels (
     disable_auto_update_under_native boolean DEFAULT true NOT NULL,
     ios boolean DEFAULT true NOT NULL,
     android boolean DEFAULT true NOT NULL,
+    electron boolean DEFAULT true NOT NULL,
     allow_device_self_set boolean DEFAULT false NOT NULL,
     allow_emulator boolean DEFAULT true NOT NULL,
     allow_dev boolean DEFAULT true NOT NULL,

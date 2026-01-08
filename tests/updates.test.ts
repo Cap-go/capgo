@@ -330,6 +330,17 @@ describe('[POST] /updates invalid data', () => {
     expect(json.error).toBe('missing_device_id')
   })
 
+  it('electron platform is accepted', async () => {
+    const baseData = { platform: 'electron' } as any
+
+    const response = await postUpdate(baseData)
+    expect(response.status).toBe(400)
+
+    const json = await response.json<UpdateRes>()
+    // Should be missing_device_id, not invalid_platform, proving electron is accepted
+    expect(json.error).toBe('missing_device_id')
+  })
+
   it('device_id and app_id combination not found', async () => {
     const baseData = getBaseData(APP_NAME_UPDATE)
     baseData.device_id = '00000000-0000-0000-1234-000000000000'

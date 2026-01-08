@@ -449,7 +449,7 @@ export async function recordBuildTime(
   orgId: string,
   userId: string,
   buildId: string,
-  platform: 'ios' | 'android',
+  platform: 'ios' | 'android' | 'electron',
   buildTimeSeconds: number,
 ): Promise<string | null> {
   try {

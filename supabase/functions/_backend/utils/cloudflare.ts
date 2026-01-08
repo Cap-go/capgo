@@ -188,8 +188,9 @@ export async function trackDevicesCF(c: Context, device: DeviceWithoutCreatedAt)
 
     // Write to Analytics Engine - this is the primary store now
     cloudlog({ requestId: c.get('requestId'), message: 'Writing to Analytics Engine DEVICE_INFO' })
-    // Platform: 0 = android, 1 = ios
-    const platformValue = comparableDevice.platform?.toLowerCase() === 'ios' ? 1 : 0
+    // Platform: 0 = android, 1 = ios, 2 = electron
+    const platformLower = comparableDevice.platform?.toLowerCase()
+    const platformValue = platformLower === 'ios' ? 1 : platformLower === 'electron' ? 2 : 0
     c.env.DEVICE_INFO.writeDataPoint({
       blobs: [
         device.device_id,
@@ -494,7 +495,7 @@ interface DeviceInfoCF {
   version_build: string
   default_channel: string
   key_id: string
-  platform: number // 0 = android, 1 = ios
+  platform: number // 0 = android, 1 = ios, 2 = electron
   is_prod: number // 0 or 1
   is_emulator: number // 0 or 1
   updated_at: string
@@ -577,12 +578,13 @@ LIMIT ${limit + 1}`
     cloudlog({ requestId: c.get('requestId'), message: 'readDevicesCF res', resLength: res.length })
 
     // Convert Analytics Engine results to Database device format
+    // Platform: 0 = android, 1 = ios, 2 = electron
     const results = res.map(row => ({
       app_id: params.app_id,
       device_id: row.device_id,
       version: null, // version ID not stored in Analytics Engine
       version_name: row.version_name || null,
-      platform: row.platform === 1 ? 'ios' : 'android',
+      platform: row.platform === 1 ? 'ios' : row.platform === 2 ? 'electron' : 'android',
       plugin_version: row.plugin_version,
       os_version: row.os_version,
       version_build: row.version_build,
@@ -1150,6 +1152,7 @@ export interface AdminPlatformOverview {
   total_bandwidth: number
   android_devices: number
   ios_devices: number
+  electron_devices: number
   total_devices: number
   period_start: string
   period_end: string
@@ -1370,9 +1373,11 @@ export async function getAdminPlatformOverview(
         AND timestamp < toDateTime('${formatDateCF(end_date)}')`
 
     // Query 4: Device platform distribution from DEVICE_INFO
+    // Platform: 0 = android, 1 = ios, 2 = electron
     const platformQuery = `SELECT
         sum(if(double1 = 0, 1, 0)) AS android_devices,
         sum(if(double1 = 1, 1, 0)) AS ios_devices,
+        sum(if(double1 = 2, 1, 0)) AS electron_devices,
         COUNT(DISTINCT blob1) AS total_devices
       FROM device_info
       WHERE timestamp >= toDateTime('${formatDateCF(start_date)}')
@@ -1397,7 +1402,7 @@ export async function getAdminPlatformOverview(
       c.env.DEVICE_USAGE ? runQueryToCFA<{ mau: number }>(c, mauQuery) : Promise.resolve([{ mau: 0 }]),
       c.env.APP_LOG ? runQueryToCFA<{ active_apps: number }>(c, appsQuery) : Promise.resolve([{ active_apps: 0 }]),
       c.env.BANDWIDTH_USAGE ? runQueryToCFA<{ total_bandwidth: number }>(c, bandwidthQuery) : Promise.resolve([{ total_bandwidth: 0 }]),
-      c.env.DEVICE_INFO ? runQueryToCFA<{ android_devices: number, ios_devices: number, total_devices: number }>(c, platformQuery) : Promise.resolve([{ android_devices: 0, ios_devices: 0, total_devices: 0 }]),
+      c.env.DEVICE_INFO ? runQueryToCFA<{ android_devices: number, ios_devices: number, electron_devices: number, total_devices: number }>(c, platformQuery) : Promise.resolve([{ android_devices: 0, ios_devices: 0, electron_devices: 0, total_devices: 0 }]),
       c.env.DEVICE_USAGE ? runQueryToCFA<{ active_orgs: number }>(c, orgsQuery) : Promise.resolve([{ active_orgs: 0 }]),
       c.env.VERSION_USAGE ? runQueryToCFA<{ installs: number, fails: number }>(c, successRateQuery) : Promise.resolve([{ installs: 0, fails: 0 }]),
     ])
@@ -1430,6 +1435,7 @@ export async function getAdminPlatformOverview(
       total_bandwidth: bandwidthResult[0]?.total_bandwidth || 0,
       android_devices: platformResult[0]?.android_devices || 0,
       ios_devices: platformResult[0]?.ios_devices || 0,
+      electron_devices: platformResult[0]?.electron_devices || 0,
       total_devices: platformResult[0]?.total_devices || 0,
       period_start: start_date,
       period_end: end_date,

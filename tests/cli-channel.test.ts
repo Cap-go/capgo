@@ -306,6 +306,46 @@ describe('tests CLI channel commands', () => {
       expect(data?.ios).toBe(true)
       expect(data?.android).toBe(true)
     })
+
+    it.concurrent('should set channel platform to electron', async () => {
+      const testChannelName = generateChannelName()
+      await createChannel(testChannelName, APPNAME)
+
+      const result = await createTestSDK().updateChannel({ channelId: testChannelName, appId: APPNAME, bundle: undefined, ...{ electron: true } })
+      expect(result.success).toBe(true)
+
+      // Verify in database
+      const { data, error } = await getSupabaseClient()
+        .from('channels')
+        .select('*')
+        .eq('name', testChannelName)
+        .eq('app_id', APPNAME)
+        .single()
+        .throwOnError()
+      expect(error).toBeNull()
+      expect(data?.electron).toBe(true)
+    })
+
+    it.concurrent('should set all platforms simultaneously', async () => {
+      const testChannelName = generateChannelName()
+      await createChannel(testChannelName, APPNAME)
+
+      const result = await createTestSDK().updateChannel({ channelId: testChannelName, appId: APPNAME, bundle: undefined, ...{ ios: true, android: true, electron: true } })
+      expect(result.success).toBe(true)
+
+      // Verify in database
+      const { data, error } = await getSupabaseClient()
+        .from('channels')
+        .select('*')
+        .eq('name', testChannelName)
+        .eq('app_id', APPNAME)
+        .single()
+        .throwOnError()
+      expect(error).toBeNull()
+      expect(data?.ios).toBe(true)
+      expect(data?.android).toBe(true)
+      expect(data?.electron).toBe(true)
+    })
   })
 
   describe.concurrent('channel self-assign operations', () => {

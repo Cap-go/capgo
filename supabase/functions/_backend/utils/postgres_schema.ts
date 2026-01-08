@@ -74,6 +74,7 @@ export const channels = pgTable('channels', {
   disable_auto_update: disableUpdatePgEnum('disable_auto_update').default('major').notNull(),
   ios: boolean('ios').default(true).notNull(),
   android: boolean('android').notNull().default(true),
+  electron: boolean('electron').notNull().default(true),
   allow_device_self_set: boolean('allow_device_self_set').default(false).notNull(),
   allow_emulator: boolean('allow_emulator').notNull().default(true),
   allow_device: boolean('allow_device').notNull().default(true),

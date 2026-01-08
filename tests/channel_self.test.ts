@@ -340,6 +340,23 @@ describe('[GET] /channel_self tests', () => {
     expect(json).toHaveLength(2)
   })
 
+  it('[GET] should return compatible channels for Electron', async () => {
+    await resetAndSeedAppData(APPNAME)
+
+    const data = getBaseData(APPNAME)
+    data.platform = 'electron'
+    data.is_emulator = false
+    data.is_prod = true
+    const response = await fetchGetChannels(data as any)
+
+    expect(response.ok).toBe(true)
+    const json = await response.json() as ChannelsListResponse
+
+    expect(json).toBeDefined()
+    expect(Array.isArray(json)).toBe(true)
+    // Electron should get channels that have electron=true
+  })
+
   it('[GET] should return public channels matching platform/device when self-set is disabled', async () => {
     await resetAndSeedAppData(APPNAME)
 

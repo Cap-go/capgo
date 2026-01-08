@@ -10,7 +10,7 @@ const bodySchema = z.object({
   device_id: z.uuid(),
   app_id: z.string(),
   org_id: z.string(),
-  platform: z.enum(['ios', 'android']),
+  platform: z.enum(['ios', 'android', 'electron']),
   version_name: z.string(),
 })
 

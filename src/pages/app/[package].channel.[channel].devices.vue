@@ -219,6 +219,7 @@ async function getChannel() {
           disable_auto_update,
           ios,
           android,
+          electron,
           updated_at
         `)
       .eq('id', id.value)

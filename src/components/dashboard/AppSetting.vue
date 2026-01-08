@@ -31,13 +31,14 @@ const organizationStore = useOrganizationStore()
 const transferAppIdInput = ref('')
 const selectedChannel = ref('')
 const uploadSearch = ref('')
-const channels = ref<Array<{ id: number, name: string, ios: boolean, android: boolean, public: boolean }>>([])
-const selectedDownloadChannels = ref<{ ios: string, android: string }>({ ios: '', android: '' })
+const channels = ref<Array<{ id: number, name: string, ios: boolean, android: boolean, electron: boolean, public: boolean }>>([])
+const selectedDownloadChannels = ref<{ ios: string, android: string, electron: string }>({ ios: '', android: '', electron: '' })
 const splitDownloadDefaults = ref(false)
 const selectedCombinedChannel = ref('')
 const combinedSearch = ref('')
 const iosSearch = ref('')
 const androidSearch = ref('')
+const electronSearch = ref('')
 
 onMounted(async () => {
   isLoading.value = true
@@ -235,7 +236,7 @@ async function updateAllowPreview(newAllowPreview: boolean) {
 async function loadChannels() {
   const { data, error } = await supabase
     .from('channels')
-    .select('id, name, ios, android, public')
+    .select('id, name, ios, android, electron, public')
     .eq('app_id', props.appId)
 
   if (error) {
@@ -249,9 +250,11 @@ async function loadChannels() {
 
 const iosChannels = computed(() => channels.value.filter(channel => channel.ios))
 const androidChannels = computed(() => channels.value.filter(channel => channel.android))
-const combinedOptions = computed(() => channels.value.filter(channel => channel.ios && channel.android))
-const iosSingleOptions = computed(() => channels.value.filter(channel => channel.ios && !channel.android))
-const androidSingleOptions = computed(() => channels.value.filter(channel => channel.android && !channel.ios))
+const electronChannels = computed(() => channels.value.filter(channel => channel.electron))
+const combinedOptions = computed(() => channels.value.filter(channel => channel.ios && channel.android && channel.electron))
+const iosSingleOptions = computed(() => channels.value.filter(channel => channel.ios && !channel.android && !channel.electron))
+const androidSingleOptions = computed(() => channels.value.filter(channel => channel.android && !channel.ios && !channel.electron))
+const electronSingleOptions = computed(() => channels.value.filter(channel => channel.electron && !channel.ios && !channel.android))
 const uploadChannelOptions = computed(() => {
   const seen = new Set<string>()
   return channels.value
@@ -352,8 +355,9 @@ async function setDefaultChannel() {
 
 const iosDefaultChannel = computed(() => channels.value.find(channel => channel.public && channel.ios) ?? null)
 const androidDefaultChannel = computed(() => channels.value.find(channel => channel.public && channel.android) ?? null)
+const electronDefaultChannel = computed(() => channels.value.find(channel => channel.public && channel.electron) ?? null)
 
-const canSplitDownloadDefaults = computed(() => iosSingleOptions.value.length > 0 || androidSingleOptions.value.length > 0)
+const canSplitDownloadDefaults = computed(() => iosSingleOptions.value.length > 0 || androidSingleOptions.value.length > 0 || electronSingleOptions.value.length > 0)
 const hasCombinedOptions = computed(() => combinedOptions.value.length > 0)
 
 function filterChannels(list: Array<{ id: number, name: string }>, search: string) {
@@ -375,17 +379,27 @@ const filteredAndroidSingleOptions = computed(() => filterChannels(androidSingle
 const visibleAndroidSingleOptions = computed(() => androidSearch.value.trim() ? filteredAndroidSingleOptions.value : filteredAndroidSingleOptions.value.slice(0, 3))
 const androidHasHidden = computed(() => !androidSearch.value.trim() && filteredAndroidSingleOptions.value.length > 3)
 
+const filteredElectronSingleOptions = computed(() => filterChannels(electronSingleOptions.value, electronSearch.value))
+const visibleElectronSingleOptions = computed(() => electronSearch.value.trim() ? filteredElectronSingleOptions.value : filteredElectronSingleOptions.value.slice(0, 3))
+const electronHasHidden = computed(() => !electronSearch.value.trim() && filteredElectronSingleOptions.value.length > 3)
+
 const downloadChannelWarning = computed(() => {
   const iosDefaults = channels.value.filter(channel => channel.public && channel.ios)
   const androidDefaults = channels.value.filter(channel => channel.public && channel.android)
+  const electronDefaults = channels.value.filter(channel => channel.public && channel.electron)
 
-  if (iosDefaults.length > 1 || androidDefaults.length > 1)
+  if (iosDefaults.length > 1 || androidDefaults.length > 1 || electronDefaults.length > 1)
     return t('default-download-channel-conflict')
 
   const iosDefault = iosDefaults[0]
   const androidDefault = androidDefaults[0]
+  const electronDefault = electronDefaults[0]
 
   if (iosDefault && androidDefault && iosDefault.id !== androidDefault.id && (iosDefault.android || androidDefault.ios))
+    return t('default-download-channel-conflict')
+  if (iosDefault && electronDefault && iosDefault.id !== electronDefault.id && (iosDefault.electron || electronDefault.ios))
+    return t('default-download-channel-conflict')
+  if (androidDefault && electronDefault && androidDefault.id !== electronDefault.id && (androidDefault.electron || electronDefault.android))
     return t('default-download-channel-conflict')
 
   return ''
@@ -397,18 +411,23 @@ const downloadChannelLabel = computed(() => {
 
   const iosDefault = iosDefaultChannel.value
   const androidDefault = androidDefaultChannel.value
+  const electronDefault = electronDefaultChannel.value
 
-  if (!iosDefault && !androidDefault)
+  if (!iosDefault && !androidDefault && !electronDefault)
     return t('default-download-channel-empty')
 
-  if (iosDefault && androidDefault && iosDefault.id === androidDefault.id) {
-    return `${iosDefault.name} (${t('platform-ios')} & ${t('platform-android')})`
+  // Check if all platforms share the same channel
+  const allSame = iosDefault && androidDefault && electronDefault
+    && iosDefault.id === androidDefault.id && iosDefault.id === electronDefault.id
+  if (allSame) {
+    return `${iosDefault.name} (${t('platform-ios')} & ${t('platform-android')} & ${t('platform-electron')})`
   }
 
   const iosLabel = iosDefault ? iosDefault.name : t('not-set')
   const androidLabel = androidDefault ? androidDefault.name : t('not-set')
+  const electronLabel = electronDefault ? electronDefault.name : t('not-set')
 
-  return `${t('platform-ios')}: ${iosLabel} • ${t('platform-android')}: ${androidLabel}`
+  return `${t('platform-ios')}: ${iosLabel} • ${t('platform-android')}: ${androidLabel} • ${t('platform-electron')}: ${electronLabel}`
 })
 
 async function openDefaultDownloadChannelDialog() {
@@ -427,12 +446,16 @@ async function openDefaultDownloadChannelDialog() {
   combinedSearch.value = ''
   iosSearch.value = ''
   androidSearch.value = ''
+  electronSearch.value = ''
 
   const sameDefaultChannel = iosDefaultChannel.value
     && androidDefaultChannel.value
+    && electronDefaultChannel.value
     && iosDefaultChannel.value.id === androidDefaultChannel.value.id
+    && iosDefaultChannel.value.id === electronDefaultChannel.value.id
     && iosDefaultChannel.value.ios
     && iosDefaultChannel.value.android
+    && iosDefaultChannel.value.electron
 
   if (hasCombinedOptions.value && (!canSplitDownloadDefaults.value || sameDefaultChannel))
     splitDownloadDefaults.value = false
@@ -440,17 +463,22 @@ async function openDefaultDownloadChannelDialog() {
     splitDownloadDefaults.value = true
   else if (iosDefaultChannel.value && androidDefaultChannel.value && iosDefaultChannel.value.id !== androidDefaultChannel.value.id)
     splitDownloadDefaults.value = true
+  else if (iosDefaultChannel.value && electronDefaultChannel.value && iosDefaultChannel.value.id !== electronDefaultChannel.value.id)
+    splitDownloadDefaults.value = true
+  else if (androidDefaultChannel.value && electronDefaultChannel.value && androidDefaultChannel.value.id !== electronDefaultChannel.value.id)
+    splitDownloadDefaults.value = true
   else
     splitDownloadDefaults.value = !hasCombinedOptions.value
 
   const combinedFallback = combinedOptions.value.find(channel =>
-    channel.id === iosDefaultChannel.value?.id || channel.id === androidDefaultChannel.value?.id,
+    channel.id === iosDefaultChannel.value?.id || channel.id === androidDefaultChannel.value?.id || channel.id === electronDefaultChannel.value?.id,
   ) ?? combinedOptions.value[0] ?? null
   selectedCombinedChannel.value = combinedFallback?.name ?? ''
 
   selectedDownloadChannels.value = {
     ios: iosSingleOptions.value.find(channel => channel.id === iosDefaultChannel.value?.id)?.name ?? '',
     android: androidSingleOptions.value.find(channel => channel.id === androidDefaultChannel.value?.id)?.name ?? '',
+    electron: electronSingleOptions.value.find(channel => channel.id === electronDefaultChannel.value?.id)?.name ?? '',
   }
 
   if (!splitDownloadDefaults.value && !selectedCombinedChannel.value && combinedFallback)
@@ -471,6 +499,7 @@ async function openDefaultDownloadChannelDialog() {
         handler: async () => {
           let iosChannel: (typeof channels.value)[number] | null = null
           let androidChannel: (typeof channels.value)[number] | null = null
+          let electronChannel: (typeof channels.value)[number] | null = null
 
           if (!splitDownloadDefaults.value) {
             if (!selectedCombinedChannel.value) {
@@ -484,10 +513,12 @@ async function openDefaultDownloadChannelDialog() {
             }
             iosChannel = combinedChannel
             androidChannel = combinedChannel
+            electronChannel = combinedChannel
           }
           else {
             const iosSelection = selectedDownloadChannels.value.ios
             const androidSelection = selectedDownloadChannels.value.android
+            const electronSelection = selectedDownloadChannels.value.electron
 
             if (!iosSelection && iosSingleOptions.value.length) {
               toast.error(t('please-select-channel-ios'))
@@ -499,25 +530,38 @@ async function openDefaultDownloadChannelDialog() {
               return false
             }
 
+            if (!electronSelection && electronSingleOptions.value.length) {
+              toast.error(t('please-select-channel-electron'))
+              return false
+            }
+
             iosChannel = iosSelection
               ? channels.value.find(channel => channel.name === iosSelection) ?? null
               : null
             androidChannel = androidSelection
               ? channels.value.find(channel => channel.name === androidSelection) ?? null
               : null
+            electronChannel = electronSelection
+              ? channels.value.find(channel => channel.name === electronSelection) ?? null
+              : null
 
-            if (iosChannel && (!iosChannel.ios || iosChannel.android)) {
+            if (iosChannel && (!iosChannel.ios || iosChannel.android || iosChannel.electron)) {
               toast.error(t('channel-not-compatible-with-ios'))
               return false
             }
 
-            if (androidChannel && (!androidChannel.android || androidChannel.ios)) {
+            if (androidChannel && (!androidChannel.android || androidChannel.ios || androidChannel.electron)) {
               toast.error(t('channel-not-compatible-with-android'))
+              return false
+            }
+
+            if (electronChannel && (!electronChannel.electron || electronChannel.ios || electronChannel.android)) {
+              toast.error(t('channel-not-compatible-with-electron'))
               return false
             }
           }
 
-          const idsToEnable = Array.from(new Set([iosChannel?.id, androidChannel?.id].filter((id): id is number => typeof id === 'number')))
+          const idsToEnable = Array.from(new Set([iosChannel?.id, androidChannel?.id, electronChannel?.id].filter((id): id is number => typeof id === 'number')))
 
           if (idsToEnable.length > 0) {
             const { error } = await supabase
@@ -563,12 +607,29 @@ async function openDefaultDownloadChannelDialog() {
             }
           }
 
+          if (electronChannels.value.length) {
+            const electronUpdate = supabase
+              .from('channels')
+              .update({ public: false })
+              .eq('app_id', props.appId)
+              .eq('electron', true)
+            if (electronChannel)
+              electronUpdate.neq('id', electronChannel.id)
+            const { error } = await electronUpdate
+            if (error) {
+              toast.error(t('cannot-change-default-download-channel'))
+              console.error(error)
+              return false
+            }
+          }
+
           const { error: hiddenError } = await supabase
             .from('channels')
             .update({ public: false })
             .eq('app_id', props.appId)
             .eq('ios', false)
             .eq('android', false)
+            .eq('electron', false)
 
           if (hiddenError) {
             toast.error(t('cannot-change-default-download-channel'))
@@ -600,7 +661,7 @@ function setUnifiedDownloadMode(unified: boolean) {
     }
     splitDownloadDefaults.value = false
     const fallback = combinedOptions.value.find(channel => channel.name === selectedCombinedChannel.value)
-      ?? combinedOptions.value.find(channel => channel.id === iosDefaultChannel.value?.id || channel.id === androidDefaultChannel.value?.id)
+      ?? combinedOptions.value.find(channel => channel.id === iosDefaultChannel.value?.id || channel.id === androidDefaultChannel.value?.id || channel.id === electronDefaultChannel.value?.id)
       ?? combinedOptions.value[0]
     selectedCombinedChannel.value = fallback?.name ?? ''
   }
@@ -613,6 +674,7 @@ function setUnifiedDownloadMode(unified: boolean) {
     selectedDownloadChannels.value = {
       ios: iosSingleOptions.value.find(channel => channel.id === iosDefaultChannel.value?.id)?.name ?? '',
       android: androidSingleOptions.value.find(channel => channel.id === androidDefaultChannel.value?.id)?.name ?? '',
+      electron: electronSingleOptions.value.find(channel => channel.id === electronDefaultChannel.value?.id)?.name ?? '',
     }
   }
 }
@@ -1264,6 +1326,47 @@ async function transferAppOwnership() {
               {{ androidSearch.trim() ? t('default-download-channel-no-results') : t('default-download-channel-android-only-empty') }}
             </div>
             <p v-if="androidHasHidden" class="text-xs text-slate-500 dark:text-slate-300">
+              {{ t('default-download-channel-more') }}
+            </p>
+          </div>
+
+          <div class="space-y-3">
+            <h3 class="text-sm font-semibold text-slate-800 dark:text-slate-100">
+              {{ t('default-download-channel-electron-only-title') }}
+            </h3>
+            <p class="text-xs text-slate-500 dark:text-slate-300">
+              {{ t('default-download-channel-electron-only-desc') }}
+            </p>
+            <input
+              v-if="electronSingleOptions.length"
+              v-model="electronSearch"
+              type="text"
+              :placeholder="t('default-download-channel-search-placeholder')"
+              class="py-2 px-3 w-full text-sm bg-white rounded-lg border focus:border-blue-500 focus:ring-2 border-slate-200 text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 focus:outline-hidden focus:ring-blue-500/20"
+            >
+            <div v-if="visibleElectronSingleOptions.length" class="space-y-2">
+              <label
+                v-for="channel in visibleElectronSingleOptions"
+                :key="`electron-${channel.id}`"
+                :for="`electron-channel-${channel.id}`"
+                class="flex gap-3 items-start p-3 rounded-lg border transition hover:border-blue-400 border-slate-200 dark:border-slate-700 dark:hover:border-blue-500"
+              >
+                <input
+                  :id="`electron-channel-${channel.id}`"
+                  v-model="selectedDownloadChannels.electron"
+                  type="radio"
+                  :value="channel.name"
+                  class="mt-1 radio radio-primary"
+                >
+                <div class="flex flex-col">
+                  <span class="text-sm font-medium">{{ channel.name }}</span>
+                </div>
+              </label>
+            </div>
+            <div v-else class="py-6 px-3 text-sm text-center rounded-lg border border-dashed border-slate-200 text-slate-500 dark:border-slate-700 dark:text-slate-300">
+              {{ electronSearch.trim() ? t('default-download-channel-no-results') : t('default-download-channel-electron-only-empty') }}
+            </div>
+            <p v-if="electronHasHidden" class="text-xs text-slate-500 dark:text-slate-300">
               {{ t('default-download-channel-more') }}
             </p>
           </div>

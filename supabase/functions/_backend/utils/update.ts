@@ -226,6 +226,14 @@ export async function updateWithPG(
         old: version_name,
       })
     }
+    if (!channelData.channels.electron && platform === 'electron') {
+      cloudlog({ requestId: c.get('requestId'), message: 'Cannot update, electron is disabled', id: device_id, date: new Date().toISOString() })
+      await sendStatsAndDevice(c, device, [{ action: 'disablePlatformElectron', versionName: version.name }])
+      return simpleError200(c, 'disabled_platform_electron', 'Cannot update, electron is disabled', {
+        version: version.name,
+        old: version_name,
+      })
+    }
     if (!isInternalVersionName(version.name) && channelData?.channels.disable_auto_update === 'major' && parse(version.name).major > parse(version_build).major) {
       cloudlog({ requestId: c.get('requestId'), message: 'Cannot upgrade major version', id: device_id, date: new Date().toISOString() })
       await sendStatsAndDevice(c, device, [{ action: 'disableAutoUpdateToMajor', versionName: version.name }])
