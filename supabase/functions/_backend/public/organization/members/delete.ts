@@ -21,6 +21,7 @@ export async function deleteMember(c: Context, bodyRaw: any, apikey: Database['p
     throw simpleError('cannot_access_organization', 'You can\'t access this organization', { orgId: body.orgId })
   }
 
+  // Use admin client to lookup user by email - RLS on users table prevents cross-user lookups
   const { data: userData, error: userError } = await supabaseAdmin(c)
     .from('users')
     .select('id')
@@ -31,6 +32,7 @@ export async function deleteMember(c: Context, bodyRaw: any, apikey: Database['p
     throw quickError(404, 'user_not_found', 'User not found', { error: userError })
   }
 
+  // Use authenticated client for the delete operation - RLS will enforce org access
   const supabase = supabaseApikey(c, c.get('capgkey') as string)
   cloudlog({ requestId: c.get('requestId'), message: 'userData.id', data: userData.id })
   cloudlog({ requestId: c.get('requestId'), message: 'body.orgId', data: body.orgId })

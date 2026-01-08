@@ -6,6 +6,7 @@ import ArrowDownOnSquareIcon from '~icons/heroicons/arrow-down-on-square'
 import GlobeAltIcon from '~icons/heroicons/globe-alt'
 import XCircleIcon from '~icons/heroicons/x-circle'
 import UpdateStatsChart from '~/components/dashboard/UpdateStatsChart.vue'
+import { calculateDemoEvolution, calculateDemoTotal, generateDemoUpdateStatsData } from '~/services/demoChartData'
 import { useSupabase } from '~/services/supabase'
 import { useDashboardAppsStore } from '~/stores/dashboardApps'
 import { useOrganizationStore } from '~/stores/organization'
@@ -28,6 +29,10 @@ const props = defineProps({
   reloadTrigger: {
     type: Number,
     default: 0,
+  },
+  forceDemo: {
+    type: Boolean,
+    default: false,
   },
 })
 
@@ -74,8 +79,36 @@ const actionDisplayNames = computed(() => ({
   fail: capitalize(t('failed')),
 }))
 
-const totalUpdates = computed(() => totalInstalled.value + totalFailed.value + totalRequested.value)
-const hasData = computed(() => chartUpdateData.value?.length > 0)
+// Check if we have real data (at least one non-zero value)
+const hasRealData = computed(() => {
+  return totalInstalled.value > 0 || totalFailed.value > 0 || totalRequested.value > 0
+})
+
+// Generate demo data when no real data
+const demoStats = computed(() => generateDemoUpdateStatsData(30))
+
+// Demo mode detection - also force demo when forceDemo is true
+const isDemoMode = computed(() => props.forceDemo || (!hasRealData.value && !isLoading.value))
+
+// Effective values for display
+const effectiveChartData = computed(() => isDemoMode.value ? demoStats.value.total : chartUpdateData.value)
+const effectiveChartDataByAction = computed(() => {
+  if (isDemoMode.value) {
+    return {
+      requested: demoStats.value.byAction.requested,
+      install: demoStats.value.byAction.install,
+      fail: demoStats.value.byAction.fail,
+    }
+  }
+  return chartUpdateDataByAction.value
+})
+const effectiveTotalInstalled = computed(() => isDemoMode.value ? calculateDemoTotal(demoStats.value.byAction.install) : totalInstalled.value)
+const effectiveTotalFailed = computed(() => isDemoMode.value ? calculateDemoTotal(demoStats.value.byAction.fail) : totalFailed.value)
+const effectiveTotalRequested = computed(() => isDemoMode.value ? calculateDemoTotal(demoStats.value.byAction.requested) : totalRequested.value)
+const effectiveTotalUpdates = computed(() => effectiveTotalInstalled.value + effectiveTotalFailed.value + effectiveTotalRequested.value)
+const effectiveLastDayEvolution = computed(() => isDemoMode.value ? calculateDemoEvolution(demoStats.value.total) : lastDayEvolution.value)
+
+const hasData = computed(() => effectiveChartData.value?.length > 0)
 
 async function calculateStats(forceRefetch = false) {
   const startTime = Date.now()
@@ -303,10 +336,11 @@ onMounted(async () => {
 <template>
   <ChartCard
     :title="t('update_statistics')"
-    :total="totalUpdates"
-    :last-day-evolution="lastDayEvolution"
+    :total="effectiveTotalUpdates"
+    :last-day-evolution="effectiveLastDayEvolution"
     :is-loading="isLoading"
     :has-data="hasData"
+    :is-demo-data="isDemoMode"
   >
     <template #header>
       <div class="flex flex-col gap-2 justify-between items-start">
@@ -318,30 +352,30 @@ onMounted(async () => {
             <div class="w-3 h-3 rounded-full" style="background-color: hsl(210, 65%, 55%)" />
             <div
               class="flex gap-1 items-center text-sm text-slate-600 dark:text-slate-300"
-              :aria-label="`${actionDisplayNames.requested}: ${totalRequested.toLocaleString()}`"
+              :aria-label="`${actionDisplayNames.requested}: ${effectiveTotalRequested.toLocaleString()}`"
             >
               <GlobeAltIcon class="w-4 h-4" aria-hidden="true" />
-              <span>{{ totalRequested.toLocaleString() }}</span>
+              <span>{{ effectiveTotalRequested.toLocaleString() }}</span>
             </div>
           </div>
           <div class="flex gap-2 items-center">
             <div class="w-3 h-3 rounded-full" style="background-color: hsl(135, 55%, 50%)" />
             <div
               class="flex gap-1 items-center text-sm text-slate-600 dark:text-slate-300"
-              :aria-label="`${actionDisplayNames.install}: ${totalInstalled.toLocaleString()}`"
+              :aria-label="`${actionDisplayNames.install}: ${effectiveTotalInstalled.toLocaleString()}`"
             >
               <ArrowDownOnSquareIcon class="w-4 h-4" aria-hidden="true" />
-              <span>{{ totalInstalled.toLocaleString() }}</span>
+              <span>{{ effectiveTotalInstalled.toLocaleString() }}</span>
             </div>
           </div>
           <div class="flex gap-2 items-center">
             <div class="w-3 h-3 rounded-full" style="background-color: hsl(0, 50%, 60%)" />
             <div
               class="flex gap-1 items-center text-sm text-slate-600 dark:text-slate-300"
-              :aria-label="`${actionDisplayNames.fail}: ${totalFailed.toLocaleString()}`"
+              :aria-label="`${actionDisplayNames.fail}: ${effectiveTotalFailed.toLocaleString()}`"
             >
               <XCircleIcon class="w-4 h-4" aria-hidden="true" />
-              <span>{{ totalFailed.toLocaleString() }}</span>
+              <span>{{ effectiveTotalFailed.toLocaleString() }}</span>
             </div>
           </div>
         </div>
@@ -349,13 +383,13 @@ onMounted(async () => {
     </template>
 
     <UpdateStatsChart
-      :key="JSON.stringify(chartUpdateDataByAction)"
+      :key="JSON.stringify(effectiveChartDataByAction)"
       :title="t('update_statistics')"
       :colors="colors.blue"
-      :data="chartUpdateData"
+      :data="effectiveChartData"
       :use-billing-period="useBillingPeriod"
       :accumulated="accumulated"
-      :data-by-app="chartUpdateDataByAction"
+      :data-by-app="effectiveChartDataByAction"
       :app-names="actionDisplayNames"
       :app-id="appId"
     />

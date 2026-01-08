@@ -5,7 +5,7 @@ import { middlewareKey } from '../utils/hono_middleware.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { logsnag } from '../utils/logsnag.ts'
 import { s3 } from '../utils/s3.ts'
-import { hasAppRightApikey, supabaseAdmin } from '../utils/supabase.ts'
+import { hasAppRightApikey, supabaseApikey } from '../utils/supabase.ts'
 
 interface DataUpload {
   app_id: string
@@ -21,7 +21,7 @@ app.delete('/', middlewareKey(['all', 'write', 'upload']), async (c) => {
   const capgkey = c.get('capgkey') as string
   cloudlog({ requestId: c.get('requestId'), message: 'apikey', apikey })
   cloudlog({ requestId: c.get('requestId'), message: 'capgkey', capgkey })
-  const { data: userId, error: _errorUserId } = await supabaseAdmin(c)
+  const { data: userId, error: _errorUserId } = await supabaseApikey(c, capgkey)
     .rpc('get_user_id', { apikey: capgkey, app_id: body.app_id })
   if (_errorUserId) {
     return quickError(404, 'user_not_found', 'Error User not found', { _errorUserId })
@@ -31,7 +31,7 @@ app.delete('/', middlewareKey(['all', 'write', 'upload']), async (c) => {
     return quickError(401, 'not_authorized', 'You can\'t access this app', { app_id: body.app_id })
   }
 
-  const { error: errorApp } = await supabaseAdmin(c)
+  const { error: errorApp } = await supabaseApikey(c, capgkey)
     .from('apps')
     .select('app_id, owner_org')
     .eq('app_id', body.app_id)
@@ -47,7 +47,7 @@ app.delete('/', middlewareKey(['all', 'write', 'upload']), async (c) => {
     return quickError(400, 'error_bundle_name_missing', 'Error bundle name missing', { body })
   }
 
-  const { data: version, error: errorVersion } = await supabaseAdmin(c)
+  const { data: version, error: errorVersion } = await supabaseApikey(c, capgkey)
     .from('app_versions')
     .select('*')
     .eq('name', body.name)
@@ -67,7 +67,7 @@ app.delete('/', middlewareKey(['all', 'write', 'upload']), async (c) => {
   }
 
   // delete the version
-  const { error: errorDelete } = await supabaseAdmin(c)
+  const { error: errorDelete } = await supabaseApikey(c, capgkey)
     .from('app_versions')
     .delete()
     .eq('id', version.id)

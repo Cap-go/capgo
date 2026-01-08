@@ -1,40 +1,9 @@
 import type { Ref } from 'vue'
+import type { Database } from '~/types/supabase.types'
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { useSupabase } from '~/services/supabase'
 import { useOrganizationStore } from './organization'
-
-export interface Webhook {
-  id: string
-  org_id: string
-  name: string
-  url: string
-  secret: string
-  enabled: boolean
-  events: string[]
-  created_at: string
-  updated_at: string
-  created_by: string | null
-}
-
-export interface WebhookDelivery {
-  id: string
-  webhook_id: string
-  org_id: string
-  audit_log_id: number | null
-  event_type: string
-  status: 'pending' | 'success' | 'failed'
-  request_payload: any
-  response_status: number | null
-  response_body: string | null
-  response_headers: Record<string, string> | null
-  attempt_count: number
-  max_attempts: number
-  next_retry_at: string | null
-  created_at: string
-  completed_at: string | null
-  duration_ms: number | null
-}
 
 export interface DeliveryPagination {
   page: number
@@ -66,8 +35,8 @@ const DELIVERIES_PER_PAGE = 50
 const supabase = useSupabase()
 
 export const useWebhooksStore = defineStore('webhooks', () => {
-  const webhooks: Ref<Webhook[]> = ref([])
-  const deliveries: Ref<WebhookDelivery[]> = ref([])
+  const webhooks: Ref<Database['public']['Tables']['webhooks']['Row'][]> = ref([])
+  const deliveries: Ref<Database['public']['Tables']['webhook_deliveries']['Row'][]> = ref([])
   const deliveryPagination: Ref<DeliveryPagination | null> = ref(null)
   const isLoading = ref(false)
   const isLoadingDeliveries = ref(false)
@@ -87,7 +56,7 @@ export const useWebhooksStore = defineStore('webhooks', () => {
 
     isLoading.value = true
     try {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('webhooks')
         .select('*')
         .eq('org_id', orgId)
@@ -112,7 +81,7 @@ export const useWebhooksStore = defineStore('webhooks', () => {
    * Get a single webhook
    * Uses direct Supabase SDK - RLS handles permissions
    */
-  async function getWebhook(webhookId: string): Promise<Webhook | null> {
+  async function getWebhook(webhookId: string): Promise<Database['public']['Tables']['webhooks']['Row'] | null> {
     const organizationStore = useOrganizationStore()
     const orgId = organizationStore.currentOrganization?.gid
 
@@ -122,7 +91,7 @@ export const useWebhooksStore = defineStore('webhooks', () => {
     }
 
     try {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('webhooks')
         .select('*')
         .eq('id', webhookId)
@@ -150,7 +119,7 @@ export const useWebhooksStore = defineStore('webhooks', () => {
     name: string
     url: string
     events: string[]
-  }): Promise<{ success: boolean, webhook?: Webhook, error?: string }> {
+  }): Promise<{ success: boolean, webhook?: Database['public']['Tables']['webhooks']['Row'], error?: string }> {
     const organizationStore = useOrganizationStore()
     const orgId = organizationStore.currentOrganization?.gid
 
@@ -179,7 +148,7 @@ export const useWebhooksStore = defineStore('webhooks', () => {
     }
 
     try {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('webhooks')
         .insert({
           org_id: orgId,
@@ -219,7 +188,7 @@ export const useWebhooksStore = defineStore('webhooks', () => {
       events: string[]
       enabled: boolean
     }>,
-  ): Promise<{ success: boolean, webhook?: Webhook, error?: string }> {
+  ): Promise<{ success: boolean, webhook?: Database['public']['Tables']['webhooks']['Row'], error?: string }> {
     const organizationStore = useOrganizationStore()
     const orgId = organizationStore.currentOrganization?.gid
 
@@ -252,7 +221,7 @@ export const useWebhooksStore = defineStore('webhooks', () => {
     }
 
     try {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('webhooks')
         .update(webhookData)
         .eq('id', webhookId)
@@ -292,7 +261,7 @@ export const useWebhooksStore = defineStore('webhooks', () => {
     }
 
     try {
-      const { error } = await (supabase as any)
+      const { error } = await supabase
         .from('webhooks')
         .delete()
         .eq('id', webhookId)
@@ -379,7 +348,7 @@ export const useWebhooksStore = defineStore('webhooks', () => {
       const from = page * DELIVERIES_PER_PAGE
       const to = (page + 1) * DELIVERIES_PER_PAGE - 1
 
-      let query = (supabase as any)
+      let query = supabase
         .from('webhook_deliveries')
         .select('*', { count: 'exact' })
         .eq('webhook_id', webhookId)

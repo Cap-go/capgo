@@ -39,17 +39,37 @@ export function getEndpointUrl(path: string): string {
 export const APIKEY_TEST_ALL = 'ae6e7458-c46d-4c00-aa3b-153b0b8520ea' // all key
 export const APIKEY_TEST_UPLOAD = 'c591b04e-cf29-4945-b9a0-776d0672061b' // upload key
 export const APIKEY_TEST2_ALL = 'ac4d9a98-ec25-4af8-933c-2aae4aa52b85' // test2 all key (dedicated for statistics)
+export const APIKEY_TEST_HASHED = 'test-hashed-apikey-for-auth-test' // hashed key (plain value, stored as SHA-256 hash in DB)
 export const ORG_ID = '046a36ac-e03c-4590-9257-bd6c9dba9ee8'
 export const STRIPE_INFO_CUSTOMER_ID = 'cus_Q38uE91NP8Ufqc' // Customer ID for ORG_ID
 export const NON_OWNER_ORG_ID = 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d'
 export const USER_ID = '6aa76066-55ef-4238-ade6-0b32334a4097'
 export const USER_ID_2 = '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5'
+export const ORG_ID_2 = '34a8c55d-2d0f-4652-a43f-684c7a9403ac' // Test2 org owned by USER_ID_2
+export const STRIPE_INFO_CUSTOMER_ID_2 = 'cus_Pa0f3M6UCQ8g5Q' // Customer ID for ORG_ID_2
 export const USER_ID_STATS = '7a1b2c3d-4e5f-4a6b-7c8d-9e0f1a2b3c4d' // Dedicated user for statistics tests
 export const ORG_ID_STATS = 'b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e' // Dedicated org for statistics tests
 export const APIKEY_STATS = '8b2c3d4e-5f6a-4c7b-8d9e-0f1a2b3c4d5e' // Dedicated API key for statistics tests
 export const APP_NAME_STATS = 'com.stats.app' // Dedicated app for statistics tests
+// Dedicated data for hashed-apikey-rls tests (isolated to prevent interference with API key tests)
+export const USER_ID_RLS = '8b2c3d4e-5f6a-4b7c-8d9e-0f1a2b3c4d5e'
+export const ORG_ID_RLS = 'c3d4e5f6-a7b8-4c9d-8e0f-1a2b3c4d5e6f'
+export const APIKEY_RLS_ALL = '9c3d4e5f-6a7b-4c8d-9e0f-1a2b3c4d5e6f'
+export const APP_NAME_RLS = 'com.rls.app'
 export const PLAN_ORG_ID = '0f2f8c2a-6a1d-4a6c-a9a8-b1b2c3d4e5f6'
 export const PLAN_STRIPE_CUSTOMER_ID = 'cus_plan_test_123456'
+// Dedicated data for build_time_tracking tests (isolated to prevent interference)
+// Note: UUIDs must be valid RFC 4122 (version 4 has variant bits 8-b at position 19)
+export const BUILD_TIME_ORG_ID = 'c3d4e5f6-a7b8-4c9d-8e1f-2a3b4c5d6e7f'
+export const BUILD_TIME_STRIPE_CUSTOMER_ID = 'cus_build_time_test_123'
+// Dedicated data for bundle-semver-validation tests (isolated to prevent interference)
+export const SEMVER_ORG_ID = 'd4e5f6a7-b8c9-4d0e-9f2a-3b4c5d6e7f80'
+export const SEMVER_STRIPE_CUSTOMER_ID = 'cus_semver_test_123'
+// Dedicated data for cli-hashed-apikey tests (isolated to prevent interference)
+export const CLI_HASHED_USER_ID = 'e5f6a7b8-c9d0-4e1f-8a2b-3c4d5e6f7a81'
+export const CLI_HASHED_ORG_ID = 'f6a7b8c9-d0e1-4f2a-9b3c-4d5e6f7a8b92'
+export const CLI_HASHED_APIKEY = 'a7b8c9d0-e1f2-4a3b-8c4d-5e6f7a8b9c03'
+export const CLI_HASHED_STRIPE_CUSTOMER_ID = 'cus_cli_hashed_test_123'
 export const USER_EMAIL = 'test@capgo.app'
 export const TEST_EMAIL = 'test@test.com'
 export const PRODUCT_ID = 'prod_LQIregjtNduh4q'

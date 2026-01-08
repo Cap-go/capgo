@@ -4,7 +4,7 @@ import { z } from 'zod/mini'
 import { parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
 import { middlewareV2 } from '../utils/hono_middleware.ts'
 import { updateCustomerEmail } from '../utils/stripe.ts'
-import { supabaseAdmin as useSupabaseAdmin } from '../utils/supabase.ts'
+import { supabaseWithAuth } from '../utils/supabase.ts'
 
 const bodySchema = z.object({
   email: z.email(),
@@ -26,9 +26,10 @@ app.post('/', middlewareV2(['all', 'write']), async (c) => {
 
   const safeBody = parsedBodyResult.data
 
-  const supabaseAdmin = await useSupabaseAdmin(c)
+  // Use authenticated client for data queries - RLS will enforce access
+  const supabase = supabaseWithAuth(c, auth)
 
-  const { data: organization, error: organizationError } = await supabaseAdmin.from('orgs')
+  const { data: organization, error: organizationError } = await supabase.from('orgs')
     .select('customer_id, management_email')
     .eq('id', safeBody.org_id)
     .single()
@@ -41,7 +42,7 @@ app.post('/', middlewareV2(['all', 'write']), async (c) => {
     return simpleError('org_does_not_have_customer', 'Organization does not have a customer id', { orgId: safeBody.org_id })
   }
 
-  const userRight = await supabaseAdmin.rpc('check_min_rights', {
+  const userRight = await supabase.rpc('check_min_rights', {
     min_right: 'super_admin',
     org_id: safeBody.org_id,
     user_id: auth.userId,
@@ -60,7 +61,7 @@ app.post('/', middlewareV2(['all', 'write']), async (c) => {
   await updateCustomerEmail(c, organization.customer_id, safeBody.email)
 
   // Update supabase
-  const { error: updateOrgErr } = await supabaseAdmin.from('orgs')
+  const { error: updateOrgErr } = await supabase.from('orgs')
     .update({ management_email: safeBody.email })
     .eq('id', safeBody.org_id)
 

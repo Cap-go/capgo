@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Webhook, WebhookDelivery } from '~/stores/webhooks'
+import type { Database } from '~/types/supabase.types'
 import { storeToRefs } from 'pinia'
 import { onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -16,7 +16,7 @@ import Spinner from '~/components/Spinner.vue'
 import { useWebhooksStore } from '~/stores/webhooks'
 
 const props = defineProps<{
-  webhook: Webhook
+  webhook: Database['public']['Tables']['webhooks']['Row']
 }>()
 
 const emit = defineEmits<{
@@ -65,7 +65,7 @@ function toggleExpand(deliveryId: string) {
   expandedDeliveryId.value = expandedDeliveryId.value === deliveryId ? null : deliveryId
 }
 
-async function retryDelivery(delivery: WebhookDelivery) {
+async function retryDelivery(delivery: Database['public']['Tables']['webhook_deliveries']['Row']) {
   retryingDeliveryId.value = delivery.id
   const result = await webhooksStore.retryDelivery(delivery.id)
   retryingDeliveryId.value = null
@@ -232,7 +232,7 @@ function formatJson(data: any): string {
                   >
                     {{ delivery.status }}
                   </span>
-                  <span class="text-sm font-medium text-gray-900 dark:text-white truncate">
+                  <span class="text-sm font-medium text-gray-900 truncate dark:text-white">
                     {{ delivery.event_type }}
                   </span>
                 </div>
@@ -274,7 +274,7 @@ function formatJson(data: any): string {
                 <h4 class="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
                   {{ t('request-payload') }}
                 </h4>
-                <pre class="p-3 overflow-x-auto text-xs bg-gray-800 rounded-lg text-gray-200 max-h-48">{{ formatJson(delivery.request_payload) }}</pre>
+                <pre class="p-3 overflow-x-auto text-xs text-gray-200 bg-gray-800 rounded-lg max-h-48">{{ formatJson(delivery.request_payload) }}</pre>
               </div>
 
               <!-- Response -->
@@ -282,7 +282,7 @@ function formatJson(data: any): string {
                 <h4 class="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
                   {{ t('response-body') }}
                 </h4>
-                <pre class="p-3 overflow-x-auto text-xs bg-gray-800 rounded-lg text-gray-200 max-h-48">{{ delivery.response_body }}</pre>
+                <pre class="p-3 overflow-x-auto text-xs text-gray-200 bg-gray-800 rounded-lg max-h-48">{{ delivery.response_body }}</pre>
               </div>
 
               <!-- Metadata -->

@@ -3,11 +3,8 @@
 import QRCode from 'qrcode'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRoute } from 'vue-router'
-import IconExpand from '~icons/lucide/expand'
-import IconMinimize from '~icons/lucide/minimize-2'
+import IconExternalLink from '~icons/lucide/external-link'
 import IconSmartphone from '~icons/lucide/smartphone'
-import { defaultApiHost, useSupabase } from '~/services/supabase'
 
 const props = defineProps<{
   appId: string
@@ -15,8 +12,6 @@ const props = defineProps<{
 }>()
 
 const { t } = useI18n()
-const route = useRoute()
-const supabase = useSupabase()
 
 // Device configurations
 const devices = {
@@ -36,27 +31,12 @@ const devices = {
 
 type DeviceType = keyof typeof devices
 const selectedDevice = ref<DeviceType>('iphone')
-const isFullscreen = ref(false)
 const qrCodeDataUrl = ref('')
 const isMobile = ref(false)
-const accessToken = ref('')
 
-// Check if we're on mobile and detect fullscreen query param
-onMounted(async () => {
+onMounted(() => {
   checkMobile()
   window.addEventListener('resize', checkMobile)
-
-  // Check for fullscreen query param
-  if (route.query.fullscreen === 'true') {
-    isFullscreen.value = true
-  }
-
-  // Get access token for iframe auth
-  const { data: session } = await supabase.auth.getSession()
-  if (session?.session?.access_token) {
-    accessToken.value = session.session.access_token
-  }
-
   generateQRCode()
 })
 
@@ -66,35 +46,33 @@ onUnmounted(() => {
 
 function checkMobile() {
   isMobile.value = window.innerWidth < 768
-  // On mobile, default to fullscreen
-  if (isMobile.value && !isFullscreen.value && route.query.fullscreen !== 'false') {
-    isFullscreen.value = true
-  }
 }
 
 const currentDevice = computed(() => devices[selectedDevice.value])
 
-// Build the preview URL with auth token
+// Build the preview URL using subdomain format (no auth - relies on obscure subdomain)
 const previewUrl = computed(() => {
-  // Use Cloudflare Workers Files endpoint for preview (has R2 bucket access for serving HTML files)
-  // Note: Preview does NOT work on Supabase Edge Functions due to platform limitations
-  // Pass token as query param since iframes can't send headers
-  const tokenParam = accessToken.value ? `?token=${accessToken.value}` : ''
-  return `${defaultApiHost}/files/preview/${props.appId}/${props.versionId}/${tokenParam}`
+  // Encode app_id: lowercase for DNS, replace . with __ (underscores work in practice)
+  const encodedAppId = props.appId.toLowerCase().replace(/\./g, '__')
+  const subdomain = `${encodedAppId}-${props.versionId}`
+  // Extract base domain from current host, default to capgo.app for localhost
+  // Preserve environment segments (e.g., 'dev' in console.dev.capgo.app)
+  const hostname = window.location.hostname
+  let baseDomain = 'capgo.app'
+  if (hostname.includes('.') && hostname !== '127.0.0.1') {
+    const hostParts = hostname.split('.')
+    // Check if hostname contains an env segment (dev, preprod, staging, etc.)
+    const envSegments = ['dev', 'preprod', 'staging']
+    const hasEnvSegment = hostParts.length > 2 && envSegments.some(env => hostParts.includes(env))
+    baseDomain = hasEnvSegment ? hostParts.slice(-3).join('.') : hostParts.slice(-2).join('.')
+  }
+  return `https://${subdomain}.preview.${baseDomain}/`
 })
 
-// Build URL for QR code (includes fullscreen param)
-const fullscreenPreviewUrl = computed(() => {
-  // Build the current page URL with fullscreen param
-  const currentUrl = new URL(window.location.href)
-  currentUrl.searchParams.set('fullscreen', 'true')
-  return currentUrl.toString()
-})
-
-// Generate QR code
+// Generate QR code linking to the preview URL
 async function generateQRCode() {
   try {
-    qrCodeDataUrl.value = await QRCode.toDataURL(fullscreenPreviewUrl.value, {
+    qrCodeDataUrl.value = await QRCode.toDataURL(previewUrl.value, {
       width: 150,
       margin: 2,
       color: {
@@ -109,40 +87,30 @@ async function generateQRCode() {
 }
 
 // Watch for URL changes to regenerate QR
-watch(fullscreenPreviewUrl, generateQRCode)
+watch(previewUrl, generateQRCode)
 
-function toggleFullscreen() {
-  isFullscreen.value = !isFullscreen.value
+function openExternal() {
+  window.open(previewUrl.value, '_blank')
 }
 </script>
 
 <template>
-  <div
-    class="relative w-full h-full"
-    :class="isFullscreen ? 'fixed inset-0 z-50 bg-black' : 'p-4 md:p-8'"
-  >
-    <!-- Fullscreen toggle button -->
+  <div class="relative w-full h-full p-4 md:p-8">
+    <!-- Open in external button -->
     <button
       class="absolute top-4 right-4 z-10 p-2 bg-white dark:bg-gray-800 rounded-lg shadow-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-      :title="isFullscreen ? t('exit-fullscreen') : t('fullscreen')"
-      @click="toggleFullscreen"
+      :title="t('open-in-external')"
+      @click="openExternal"
     >
-      <IconMinimize v-if="isFullscreen" class="w-5 h-5" />
-      <IconExpand v-else class="w-5 h-5" />
+      <IconExternalLink class="w-5 h-5" />
     </button>
 
     <!-- Main content container -->
-    <div
-      class="flex items-center justify-center gap-8 h-full"
-      :class="isFullscreen ? 'p-4' : ''"
-    >
-      <!-- Device frame (hidden in mobile fullscreen) -->
-      <div
-        v-if="!isFullscreen || !isMobile"
-        class="flex flex-col items-center"
-      >
+    <div class="flex items-center justify-center gap-8 h-full">
+      <!-- Device frame -->
+      <div class="flex flex-col items-center">
         <!-- Device selector -->
-        <div v-if="!isFullscreen" class="mb-4 flex items-center gap-2">
+        <div class="mb-4 flex items-center gap-2">
           <button
             class="flex items-center gap-2 px-3 py-2 text-sm rounded-lg border transition-colors"
             :class="selectedDevice === 'iphone'
@@ -171,7 +139,7 @@ function toggleFullscreen() {
           :class="currentDevice.frameClass"
           :style="{
             width: `${currentDevice.width + 24}px`,
-            height: isFullscreen ? '90vh' : `${Math.min(currentDevice.height + 24, 700)}px`,
+            height: `${Math.min(currentDevice.height + 24, 700)}px`,
           }"
         >
           <!-- Notch (for iPhone) -->
@@ -199,18 +167,9 @@ function toggleFullscreen() {
         </div>
       </div>
 
-      <!-- Fullscreen iframe (mobile) -->
-      <iframe
-        v-if="isFullscreen && isMobile"
-        :src="previewUrl"
-        class="w-full h-full border-0"
-        sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-        allow="accelerometer; camera; encrypted-media; geolocation; gyroscope; microphone"
-      />
-
-      <!-- QR Code section (desktop only, not in fullscreen) -->
+      <!-- QR Code section (desktop only) -->
       <div
-        v-if="!isFullscreen && !isMobile && qrCodeDataUrl"
+        v-if="!isMobile && qrCodeDataUrl"
         class="flex flex-col items-center p-6 bg-white dark:bg-gray-800 rounded-xl shadow-lg"
       >
         <img

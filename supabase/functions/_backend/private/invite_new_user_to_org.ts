@@ -7,7 +7,7 @@ import { z } from 'zod/mini'
 import { trackBentoEvent } from '../utils/bento.ts'
 import { middlewareAuth, parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
-import { hasOrgRight, supabaseAdmin } from '../utils/supabase.ts'
+import { supabaseClient } from '../utils/supabase.ts'
 import { getEnv } from '../utils/utils.ts'
 
 // Validate name to prevent HTML/script injection
@@ -44,23 +44,17 @@ async function validateInvite(c: Context, rawBody: any) {
   cloudlog({ requestId: c.get('requestId'), context: 'invite_new_user_to_org validated body', body })
 
   const authorization = c.get('authorization')
-  const { data: auth, error } = await supabaseAdmin(c).auth.getUser(
-    authorization?.split('Bearer ')[1],
-  )
-
-  if (error || !auth?.user?.id)
+  if (!authorization)
     return { message: 'not authorized', status: 401 }
-
-  // Verify the user has permission to invite
-  // inviting super_admin is only allowed for super_admin
-  if (!await hasOrgRight(c, body.org_id, auth.user.id, body.invite_type !== 'super_admin' ? 'admin' : 'super_admin'))
-    return { message: 'not authorized (insufficient permissions)', status: 403 }
 
   // Verify captcha token with Cloudflare Turnstile
   await verifyCaptchaToken(c, body.captcha_token)
 
+  // Use authenticated client - RLS will enforce access based on JWT
+  const supabase = supabaseClient(c, authorization)
+
   // Check if the user already exists
-  const { data: existingUser, error: userError } = await supabaseAdmin(c)
+  const { data: existingUser, error: userError } = await supabase
     .from('users')
     .select('*')
     .eq('email', body.email)
@@ -71,26 +65,34 @@ async function validateInvite(c: Context, rawBody: any) {
     return { message: 'Failed to invite user', error: 'User already exists', status: 500 }
   }
 
-  const { data: org, error: orgError } = await supabaseAdmin(c)
+  // Get org - RLS will block if user doesn't have access
+  const { data: org, error: orgError } = await supabase
     .from('orgs')
     .select('*')
     .eq('id', body.org_id)
     .single()
 
   if (orgError || !org) {
-    return { message: 'Failed to invite user', error: orgError.message, status: 500 }
+    return { message: 'Failed to invite user', error: orgError?.message ?? 'Organization not found', status: 500 }
   }
 
-  const { data: inviteCreatorUser, error: inviteCreatorUserError } = await supabaseAdmin(c)
+  // Get current user ID from JWT
+  const { data: authData, error: authError } = await supabase.auth.getUser()
+  if (authError || !authData?.user?.id) {
+    return { message: 'Failed to get current user', error: authError?.message, status: 500 }
+  }
+
+  // Get user details
+  const { data: inviteCreatorUser, error: inviteCreatorUserError } = await supabase
     .from('users')
     .select('*')
-    .eq('id', auth.user.id)
+    .eq('id', authData.user.id)
     .single()
 
   if (inviteCreatorUserError) {
     return { message: 'Failed to invite user', error: inviteCreatorUserError.message, status: 500 }
   }
-  return { inviteCreatorUser, org, body }
+  return { inviteCreatorUser, org, body, authorization }
 }
 
 app.post('/', middlewareAuth, async (c) => {
@@ -108,7 +110,10 @@ app.post('/', middlewareAuth, async (c) => {
   const inviteCreatorUser = res.inviteCreatorUser
   const org = res.org
 
-  const { data: existingInvitation } = await supabaseAdmin(c)
+  // Use authenticated client for data queries - RLS will enforce access
+  const supabase = supabaseClient(c, res.authorization!)
+
+  const { data: existingInvitation } = await supabase
     .from('tmp_users')
     .select('*')
     .eq('email', body.email)
@@ -122,7 +127,7 @@ app.post('/', middlewareAuth, async (c) => {
       return simpleError('user_already_invited', 'User already invited and it hasnt been 3 hours since the last invitation was cancelled')
     }
 
-    const { error: updateInvitationError, data: updatedInvitationData } = await supabaseAdmin(c)
+    const { error: updateInvitationError, data: updatedInvitationData } = await supabase
       .from('tmp_users')
       .update({
         cancelled_at: null,
@@ -141,7 +146,7 @@ app.post('/', middlewareAuth, async (c) => {
     newInvitation = updatedInvitationData
   }
   else {
-    const { error: createUserError, data: newInvitationData } = await supabaseAdmin(c).from('tmp_users').insert({
+    const { error: createUserError, data: newInvitationData } = await supabase.from('tmp_users').insert({
       email: body.email,
       org_id: body.org_id,
       role: body.invite_type,

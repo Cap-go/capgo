@@ -6,6 +6,9 @@ import { CapgoSDK } from '@capgo/cli/sdk'
 import { BASE_DEPENDENCIES, BASE_DEPENDENCIES_OLD, BASE_PACKAGE_JSON, TEMP_DIR_NAME } from './cli-utils'
 import { APIKEY_TEST_ALL } from './test-utils'
 
+// Path to the project's capacitor.config.ts that the SDK modifies during key generation
+const CAPACITOR_CONFIG_PATH = join(cwd(), 'capacitor.config.ts')
+
 // Supabase base URL (not including /functions/v1)
 const SUPABASE_URL = env.SUPABASE_URL || 'http://localhost:54321'
 const SUPABASE_ANON_KEY = env.SUPABASE_ANON_KEY || 'sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH'
@@ -160,9 +163,18 @@ export async function uploadBundleSDK(
 /**
  * Generate encryption keys using the SDK
  * Uses a queue to serialize operations (prevent concurrent conflicts when creating keys in project root)
+ *
+ * IMPORTANT: The SDK's generateEncryptionKeys() modifies the project's capacitor.config.ts
+ * to add the public key. This function backs up and restores the config file to prevent
+ * test pollution.
+ *
+ * Since tests run concurrently but key generation is serialized via the queue, we:
+ * 1. Back up the config at the start of each queued operation
+ * 2. Restore it at the end of each queued operation (in finally block)
+ * This ensures each test sees a clean config file.
  */
 export async function generateEncryptionKeysSDK(appId: string, force = true) {
-  const { existsSync, renameSync } = await import('node:fs')
+  const { existsSync, renameSync, readFileSync, writeFileSync } = await import('node:fs')
 
   // Queue this operation to run after previous ones complete
   const previousOperation = keyGenerationQueue
@@ -171,6 +183,13 @@ export async function generateEncryptionKeysSDK(appId: string, force = true) {
 
   // Wait for previous operation to finish
   await previousOperation
+
+  // Backup the capacitor.config.ts content AFTER waiting for the queue
+  // This ensures we get a clean config (either original or restored by previous operation)
+  let configBackup: string | null = null
+  if (existsSync(CAPACITOR_CONFIG_PATH)) {
+    configBackup = readFileSync(CAPACITOR_CONFIG_PATH, 'utf-8')
+  }
 
   try {
     const sdk = createTestSDK()
@@ -209,6 +228,21 @@ export async function generateEncryptionKeysSDK(appId: string, force = true) {
     return result
   }
   finally {
+    // Add a small delay to allow any async SDK operations to complete
+    // The SDK may be writing to the config file asynchronously
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    // Restore the capacitor.config.ts from our backup (SDK modified it with the public key)
+    if (configBackup !== null) {
+      try {
+        writeFileSync(CAPACITOR_CONFIG_PATH, configBackup)
+      }
+      catch {
+        // Best effort cleanup - don't fail the test if restore fails
+        console.warn('Warning: Failed to restore capacitor.config.ts from backup')
+      }
+    }
+
     // Signal that this operation is complete
     operationComplete!()
   }

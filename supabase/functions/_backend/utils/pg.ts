@@ -11,6 +11,16 @@ import { cloudlog, cloudlogErr } from './logging.ts'
 import * as schema from './postgres_schema.ts'
 import { withOptionalManifestSelect } from './queryHelpers.ts'
 
+// Replication lag threshold
+const REPLICATION_LAG_THRESHOLD_SECONDS = 180 // 3 minutes threshold
+
+type ReplicationStatus = 'ok' | 'lagging' | 'unknown'
+
+interface ReplicationLagStatus {
+  status: ReplicationStatus
+  max_lag_seconds: number | null
+}
+
 const PLAN_EXCEEDED_COLUMNS: Record<'mau' | 'storage' | 'bandwidth', string> = {
   mau: 'mau_exceeded',
   storage: 'storage_exceeded',
@@ -56,6 +66,118 @@ function fixSupabaseHost(host: string): string {
     return url.href
   }
   return host
+}
+
+/**
+ * Get the primary database URL for replication lag queries.
+ * This always returns the primary (non-replica) database connection.
+ */
+function getPrimaryDatabaseURL(c: Context): string | null {
+  // Prefer direct EU Hyperdrive (primary)
+  if (c.env.HYPERDRIVE_CAPGO_DIRECT_EU) {
+    return c.env.HYPERDRIVE_CAPGO_DIRECT_EU.connectionString
+  }
+  // Fallback to main Supabase pooler
+  if (existInEnv(c, 'MAIN_SUPABASE_DB_URL')) {
+    return getEnv(c, 'MAIN_SUPABASE_DB_URL')
+  }
+  // Fallback to direct Supabase connection
+  if (existInEnv(c, 'SUPABASE_DB_URL')) {
+    return fixSupabaseHost(getEnv(c, 'SUPABASE_DB_URL'))
+  }
+  return null
+}
+
+/**
+ * Query replication lag from the PRIMARY database.
+ * Uses Hyperdrive connection pooling (no additional caching needed).
+ */
+async function queryReplicationLag(c: Context): Promise<ReplicationLagStatus> {
+  const primaryDbUrl = getPrimaryDatabaseURL(c)
+  if (!primaryDbUrl) {
+    cloudlog({ requestId: c.get('requestId'), message: 'No primary database URL available for replication lag query' })
+    return {
+      status: 'unknown',
+      max_lag_seconds: null,
+    }
+  }
+
+  const pool = new Pool({
+    connectionString: primaryDbUrl,
+    max: 1,
+    idleTimeoutMillis: 5000,
+    connectionTimeoutMillis: 5000,
+  })
+
+  try {
+    // Query replication slots lag using WAL stats estimation
+    const query = `
+      WITH wal_stats AS (
+        SELECT
+          wal_bytes::numeric AS wal_bytes,
+          EXTRACT(EPOCH FROM (now() - stats_reset))::numeric AS seconds_since_reset
+        FROM pg_stat_wal
+      ),
+      slots AS (
+        SELECT
+          slot_name,
+          active,
+          pg_wal_lsn_diff(pg_current_wal_lsn(), confirmed_flush_lsn) AS lag_bytes
+        FROM pg_replication_slots
+        WHERE slot_type = 'logical'
+          AND slot_name !~ '^pg_[0-9]+_sync_[0-9]+_[0-9]+$'
+      )
+      SELECT
+        MAX(CASE
+          WHEN wal_stats.seconds_since_reset > 0
+            AND wal_stats.wal_bytes > 0
+            AND slots.lag_bytes IS NOT NULL
+            THEN (slots.lag_bytes / (wal_stats.wal_bytes / wal_stats.seconds_since_reset))
+          ELSE NULL
+        END) AS max_lag_seconds
+      FROM slots
+      CROSS JOIN wal_stats
+    `
+
+    const result = await pool.query(query)
+    const maxLagSeconds = result.rows[0]?.max_lag_seconds
+      ? Number(result.rows[0].max_lag_seconds)
+      : null
+
+    let status: ReplicationStatus = 'unknown'
+    if (maxLagSeconds !== null) {
+      status = maxLagSeconds > REPLICATION_LAG_THRESHOLD_SECONDS ? 'lagging' : 'ok'
+    }
+
+    cloudlog({ requestId: c.get('requestId'), message: 'Replication lag queried', status, maxLagSeconds })
+
+    return {
+      status,
+      max_lag_seconds: maxLagSeconds,
+    }
+  }
+  catch (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error querying replication lag', error })
+    return {
+      status: 'unknown',
+      max_lag_seconds: null,
+    }
+  }
+  finally {
+    await pool.end()
+  }
+}
+
+/**
+ * Set replication lag header on the response.
+ * Queries the primary database via Hyperdrive for current replication status.
+ */
+export async function setReplicationLagHeader(c: Context): Promise<void> {
+  const status = await queryReplicationLag(c)
+  c.header('X-Replication-Lag', status.status)
+  if (status.max_lag_seconds !== null) {
+    c.header('X-Replication-Lag-Seconds', String(Math.round(status.max_lag_seconds)))
+  }
 }
 
 export function getDatabaseURL(c: Context, readOnly = false): string {
@@ -803,6 +925,8 @@ export interface AdminGlobalStatsTrend {
   plan_enterprise: number
   registers_today: number
   devices_last_month: number
+  devices_last_month_ios: number
+  devices_last_month_android: number
   stars: number
   need_upgrade: number
   paying_yearly: number
@@ -852,6 +976,8 @@ export async function getAdminGlobalStatsTrend(
         plan_enterprise::int,
         registers_today::int,
         devices_last_month::int,
+        COALESCE(devices_last_month_ios, 0)::int AS devices_last_month_ios,
+        COALESCE(devices_last_month_android, 0)::int AS devices_last_month_android,
         stars::int,
         need_upgrade::int,
         paying_yearly::int,
@@ -891,6 +1017,8 @@ export async function getAdminGlobalStatsTrend(
       plan_enterprise: Number(row.plan_enterprise) || 0,
       registers_today: Number(row.registers_today) || 0,
       devices_last_month: Number(row.devices_last_month) || 0,
+      devices_last_month_ios: Number(row.devices_last_month_ios) || 0,
+      devices_last_month_android: Number(row.devices_last_month_android) || 0,
       stars: Number(row.stars) || 0,
       need_upgrade: Number(row.need_upgrade) || 0,
       paying_yearly: Number(row.paying_yearly) || 0,

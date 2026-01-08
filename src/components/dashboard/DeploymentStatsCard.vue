@@ -2,6 +2,14 @@
 import colors from 'tailwindcss/colors'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import {
+  calculateDemoEvolution,
+  calculateDemoTotal,
+  DEMO_APP_NAMES,
+  generateConsistentDemoData,
+  generateDemoDeploymentData,
+  getDemoDayCount,
+} from '~/services/demoChartData'
 import { useSupabase } from '~/services/supabase'
 import { useDashboardAppsStore } from '~/stores/dashboardApps'
 import { useOrganizationStore } from '~/stores/organization'
@@ -24,6 +32,10 @@ const props = defineProps({
   reloadTrigger: {
     type: Number,
     default: 0,
+  },
+  forceDemo: {
+    type: Boolean,
+    default: false,
   },
 })
 
@@ -82,7 +94,30 @@ const channelAppIds = ref<{ [channelId: string]: string }>({})
 const deploymentDataByApp = ref<{ [appId: string]: number[] }>({})
 const appNames = ref<{ [appId: string]: string }>({})
 const isLoading = ref(true)
-const hasData = computed(() => totalDeployments.value > 0)
+
+// Check if we have real data
+const hasRealData = computed(() => totalDeployments.value > 0)
+
+// Generate consistent demo data where total is derived from per-app breakdown
+const consistentDemoData = computed(() => {
+  const days = getDemoDayCount(props.useBillingPeriod, deploymentData.value.length)
+  return generateConsistentDemoData(days, generateDemoDeploymentData)
+})
+
+const demoDeploymentData = computed(() => consistentDemoData.value.total)
+const demoDataByApp = computed(() => consistentDemoData.value.byApp)
+
+// Demo mode detection - also force demo when forceDemo is true
+const isDemoMode = computed(() => props.forceDemo || (!hasRealData.value && !isLoading.value))
+
+// Effective values for display
+const effectiveDeploymentData = computed(() => isDemoMode.value ? demoDeploymentData.value : deploymentData.value)
+const effectiveDeploymentDataByApp = computed(() => isDemoMode.value ? demoDataByApp.value : deploymentDataByApp.value)
+const effectiveAppNames = computed(() => isDemoMode.value ? DEMO_APP_NAMES : appNames.value)
+const effectiveTotalDeployments = computed(() => isDemoMode.value ? calculateDemoTotal(demoDeploymentData.value) : totalDeployments.value)
+const effectiveLastDayEvolution = computed(() => isDemoMode.value ? calculateDemoEvolution(demoDeploymentData.value) : lastDayEvolution.value)
+
+const hasData = computed(() => effectiveTotalDeployments.value > 0 || isDemoMode.value)
 
 // Determine if we're in single app mode (show channels) or multi-app mode (show apps)
 const isSingleAppMode = computed(() => !!props.appId)
@@ -372,23 +407,24 @@ onMounted(async () => {
 <template>
   <ChartCard
     :title="t('deployment_statistics')"
-    :total="totalDeployments"
-    :last-day-evolution="lastDayEvolution"
+    :total="effectiveTotalDeployments"
+    :last-day-evolution="effectiveLastDayEvolution"
     :is-loading="isLoading"
     :has-data="hasData"
+    :is-demo-data="isDemoMode"
   >
     <DeploymentStatsChart
-      :key="isSingleAppMode ? JSON.stringify(deploymentDataByChannel) : JSON.stringify(deploymentDataByApp)"
+      :key="isSingleAppMode ? JSON.stringify(deploymentDataByChannel) : JSON.stringify(effectiveDeploymentDataByApp)"
       :title="t('deployment_statistics')"
       :colors="colors.blue"
-      :data="deploymentData"
+      :data="effectiveDeploymentData"
       :use-billing-period="useBillingPeriod"
       :accumulated="accumulated"
-      :data-by-channel="isSingleAppMode ? deploymentDataByChannel : {}"
-      :channel-names="isSingleAppMode ? channelNames : {}"
-      :channel-app-ids="isSingleAppMode ? channelAppIds : {}"
-      :data-by-app="!isSingleAppMode ? deploymentDataByApp : {}"
-      :app-names="!isSingleAppMode ? appNames : {}"
+      :data-by-channel="isSingleAppMode && !isDemoMode ? deploymentDataByChannel : {}"
+      :channel-names="isSingleAppMode && !isDemoMode ? channelNames : {}"
+      :channel-app-ids="isSingleAppMode && !isDemoMode ? channelAppIds : {}"
+      :data-by-app="!isSingleAppMode || isDemoMode ? effectiveDeploymentDataByApp : {}"
+      :app-names="!isSingleAppMode || isDemoMode ? effectiveAppNames : {}"
     />
   </ChartCard>
 </template>

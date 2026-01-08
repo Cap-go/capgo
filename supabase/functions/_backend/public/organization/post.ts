@@ -2,7 +2,7 @@ import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { z } from 'zod/mini'
 import { simpleError } from '../../utils/hono.ts'
-import { supabaseAdmin, supabaseApikey } from '../../utils/supabase.ts'
+import { supabaseApikey } from '../../utils/supabase.ts'
 
 const bodySchema = z.object({
   name: z.string().check(z.minLength(3)),
@@ -29,8 +29,8 @@ export async function post(c: Context, bodyRaw: any, apikey: Database['public'][
   if (errorOrg) {
     throw simpleError('cannot_create_org', 'Cannot create org', { error: errorOrg?.message })
   }
-  // We read with admin to avoid RLS issues as org_users are created asynchronously
-  const { data: dataOrg, error: errorOrg2 } = await supabaseAdmin(c)
+  // Read the created org - the insert trigger creates org_users so RLS should allow access
+  const { data: dataOrg, error: errorOrg2 } = await supabase
     .from('orgs')
     .select('id')
     .eq('created_by', apikey.user_id)
