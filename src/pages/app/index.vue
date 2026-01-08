@@ -39,6 +39,7 @@ const paymentFailed = computed(() => {
 })
 
 // Demo apps for showing behind blur when payment fails
+// Using any[] to avoid type instantiation depth issues with Database types
 const demoApps = [
   {
     app_id: 'com.demo.production',
@@ -67,10 +68,10 @@ const demoApps = [
     created_at: new Date().toISOString(),
     owner_org: '',
   },
-] as Database['public']['Tables']['apps']['Row'][]
+] as any[]
 
 // Apps to display - use demo apps when payment failed
-const displayApps = computed(() => paymentFailed.value ? demoApps : apps.value)
+const displayApps = computed(() => (paymentFailed.value ? demoApps : apps.value) as Database['public']['Tables']['apps']['Row'][])
 const displayTotal = computed(() => paymentFailed.value ? demoApps.length : totalApps.value)
 
 async function NextStep(appId: string) {
