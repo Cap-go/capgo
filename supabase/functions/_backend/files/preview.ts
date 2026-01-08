@@ -1,11 +1,10 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { getRuntimeKey } from 'hono/adapter'
-import { getCookie, setCookie } from 'hono/cookie'
 import { Hono } from 'hono/tiny'
 import { simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
-import { supabaseClient } from '../utils/supabase.ts'
+import { supabaseAdmin } from '../utils/supabase.ts'
 import { DEFAULT_RETRY_PARAMS, RetryBucket } from './retry.ts'
 
 // MIME type mapping for common file extensions
@@ -40,9 +39,6 @@ function getContentType(filePath: string): string {
   return MIME_TYPES[ext] || 'application/octet-stream'
 }
 
-// Cookie name for storing the auth token
-const TOKEN_COOKIE_NAME = 'capgo_preview_token'
-
 // Parse subdomain format: {app_id_with_dots_as_underscores}-{version_id}.preview[.env].capgo.app
 // Example: ee__forgr__capacitor_go-222063.preview.capgo.app
 function parsePreviewSubdomain(hostname: string): { appId: string, versionId: number } | null {
@@ -61,7 +57,7 @@ function parsePreviewSubdomain(hostname: string): { appId: string, versionId: nu
   const appIdEncoded = subdomain.substring(0, lastHyphen)
   const versionIdStr = subdomain.substring(lastHyphen + 1)
 
-  // Decode app_id: replace __ with .
+  // Decode app_id: replace __ with . (frontend lowercases and encodes . as __)
   const appId = appIdEncoded.replace(/__/g, '.')
   const versionId = Number.parseInt(versionIdStr, 10)
 
@@ -98,23 +94,15 @@ async function handlePreviewSubdomain(c: Context<MiddlewareKeyVariables>) {
 
   cloudlog({ requestId: c.get('requestId'), message: 'preview subdomain request', hostname, appId, versionId, filePath })
 
-  // Accept token from: query param (first request), cookie (subsequent requests), or Authorization header
-  const authorization = c.req.header('authorization')
-  const tokenFromQuery = c.req.query('token')
-  const tokenFromCookie = getCookie(c, TOKEN_COOKIE_NAME)
-  const token = authorization?.split('Bearer ')[1] || tokenFromQuery || tokenFromCookie
+  // Use admin client - preview is public when allow_preview is enabled
+  // Security relies on the obscure subdomain format and the allow_preview setting
+  const supabase = supabaseAdmin(c)
 
-  if (!token)
-    return simpleError('cannot_find_authorization', 'Cannot find authorization. Pass token as query param on first request.')
-
-  // Use authenticated client - RLS will enforce access based on JWT
-  const supabase = supabaseClient(c, `Bearer ${token}`)
-
-  // Get app settings to check if preview is enabled
+  // Get app settings to check if preview is enabled (case-insensitive since frontend lowercases)
   const { data: appData, error: appError } = await supabase
     .from('apps')
-    .select('allow_preview')
-    .eq('app_id', appId)
+    .select('app_id, allow_preview')
+    .ilike('app_id', appId)
     .single()
 
   if (appError || !appData) {
@@ -125,11 +113,14 @@ async function handlePreviewSubdomain(c: Context<MiddlewareKeyVariables>) {
     return simpleError('preview_disabled', 'Preview is disabled for this app')
   }
 
+  // Use the actual app_id from DB (correctly cased) for subsequent queries
+  const actualAppId = appData.app_id
+
   // Get bundle to check encryption and manifest
   const { data: bundle, error: bundleError } = await supabase
     .from('app_versions')
     .select('id, session_key, manifest_count')
-    .eq('app_id', appId)
+    .eq('app_id', actualAppId)
     .eq('id', versionId)
     .single()
 
@@ -217,20 +208,6 @@ async function handlePreviewSubdomain(c: Context<MiddlewareKeyVariables>) {
     headers.set('X-Content-Type-Options', 'nosniff')
 
     cloudlog({ requestId: c.get('requestId'), message: 'serving preview file from R2 (subdomain)', filePath, contentType })
-
-    // If token came from query param, set it in a cookie for subsequent requests
-    // This allows assets to load without needing the token in every URL
-    if (tokenFromQuery && !tokenFromCookie) {
-      // Set cookie with same-site strict for security, httpOnly to prevent JS access
-      // Path=/ so it works for all paths in this subdomain
-      setCookie(c, TOKEN_COOKIE_NAME, token, {
-        path: '/',
-        httpOnly: true,
-        secure: true,
-        sameSite: 'Strict',
-        maxAge: 3600, // 1 hour, matches cache control
-      })
-    }
 
     return new Response(object.body, { headers })
   }
