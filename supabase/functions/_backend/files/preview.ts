@@ -23,6 +23,11 @@ interface BundleInfoCache {
   isEncrypted: boolean
 }
 
+// Check if request is from a preview subdomain (*.preview[.env].capgo.app)
+export function isPreviewSubdomain(hostname: string): boolean {
+  return /^[^.]+\.preview(?:\.[^.]+)?\.(?:capgo\.app|usecapgo\.com)$/.test(hostname)
+}
+
 // Cache helpers for app preview authorization
 function buildPreviewAuthRequest(c: Context, appId: string) {
   const helper = new CacheHelper(c)
