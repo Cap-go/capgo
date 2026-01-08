@@ -739,6 +739,8 @@ COMMENT ON FUNCTION public.enforce_sso_for_domains IS 'Trigger function to enfor
 CREATE OR REPLACE FUNCTION public.validate_sso_configuration()
 RETURNS TRIGGER
 LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
 AS $$
 BEGIN
   -- Validate metadata exists
@@ -988,6 +990,9 @@ GRANT SELECT ON public.saml_domain_mappings TO authenticated, anon;
 
 GRANT SELECT ON public.sso_audit_logs TO authenticated;
 
+-- Grant INSERT on sso_audit_logs to postgres for SECURITY DEFINER trigger functions
+GRANT INSERT ON public.sso_audit_logs TO postgres;
+
 -- Grant function execution to authenticated users and anon for SSO detection
 GRANT EXECUTE ON FUNCTION public.check_sso_required_for_domain TO authenticated, anon;
 
@@ -1071,4 +1076,5 @@ $$;
 COMMENT ON FUNCTION public.cleanup_old_sso_audit_logs IS 'Cleans up SSO audit logs older than 90 days and anonymizes PII for deleted users. Run daily via cron for GDPR/CCPA compliance.';
 
 -- Grant execute to service_role for cron job
-GRANT EXECUTE ON FUNCTION public.cleanup_old_sso_audit_logs TO service_role;
+GRANT
+EXECUTE ON FUNCTION public.cleanup_old_sso_audit_logs TO service_role;
