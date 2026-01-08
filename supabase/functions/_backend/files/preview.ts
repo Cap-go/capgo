@@ -284,15 +284,6 @@ export async function handlePreviewRequest(c: Context<MiddlewareKeyVariables>): 
     cloudlog({ requestId: c.get('requestId'), message: 'found file with prefix', originalPath: filePath, foundPath: manifestEntry.file_name, isBrotli })
   }
 
-  // If the file is brotli compressed, redirect to public R2 URL
-  // Cloudflare Workers strip Content-Encoding: br header, but direct R2 serves it correctly
-  // No need to fetch the object, just redirect
-  if (isBrotli) {
-    const publicR2Url = `https://storage.capgo.app/${manifestEntry.s3_path}`
-    cloudlog({ requestId: c.get('requestId'), message: 'redirecting to R2 for brotli file', filePath: manifestEntry.file_name, publicR2Url })
-    return c.redirect(publicR2Url, 302)
-  }
-
   try {
     const object = await new RetryBucket(bucket, DEFAULT_RETRY_PARAMS).get(manifestEntry.s3_path)
     if (!object) {
@@ -308,7 +299,17 @@ export async function handlePreviewRequest(c: Context<MiddlewareKeyVariables>): 
     headers.set('Cache-Control', 'public, max-age=31536000, immutable') // Assets are immutable, cache forever
     headers.set('X-Content-Type-Options', 'nosniff')
 
-    cloudlog({ requestId: c.get('requestId'), message: 'serving preview file from R2 (subdomain)', filePath: manifestEntry.file_name, contentType })
+    cloudlog({ requestId: c.get('requestId'), message: 'serving preview file from R2 (subdomain)', filePath: manifestEntry.file_name, contentType, isBrotli })
+
+    // If the file is brotli compressed, decompress it before serving
+    // CLI compresses with node:zlib createBrotliCompress(), we decompress with brotliDecompressSync
+    // Cloudflare Workers strip Content-Encoding: br header so we must decompress server-side
+    if (isBrotli && object.body) {
+      const { brotliDecompressSync } = await import('node:zlib')
+      const compressedData = await object.arrayBuffer()
+      const decompressed = brotliDecompressSync(Buffer.from(compressedData))
+      return new Response(decompressed, { headers })
+    }
 
     return new Response(object.body, { headers })
   }
