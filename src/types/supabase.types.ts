@@ -1336,6 +1336,7 @@ export type Database = {
       }
       orgs: {
         Row: {
+          allowed_email_domains: string[] | null
           created_at: string | null
           created_by: string
           customer_id: string | null
@@ -1350,10 +1351,13 @@ export type Database = {
           name: string
           password_policy_config: Json | null
           require_apikey_expiration: boolean
+          sso_domain_keys: string[] | null
+          sso_enabled: boolean | null
           stats_updated_at: string | null
           updated_at: string | null
         }
         Insert: {
+          allowed_email_domains?: string[] | null
           created_at?: string | null
           created_by: string
           customer_id?: string | null
@@ -1368,10 +1372,13 @@ export type Database = {
           name: string
           password_policy_config?: Json | null
           require_apikey_expiration?: boolean
+          sso_domain_keys?: string[] | null
+          sso_enabled?: boolean | null
           stats_updated_at?: string | null
           updated_at?: string | null
         }
         Update: {
+          allowed_email_domains?: string[] | null
           created_at?: string | null
           created_by?: string
           customer_id?: string | null
@@ -1386,6 +1393,8 @@ export type Database = {
           name?: string
           password_policy_config?: Json | null
           require_apikey_expiration?: boolean
+          sso_domain_keys?: string[] | null
+          sso_enabled?: boolean | null
           stats_updated_at?: string | null
           updated_at?: string | null
         }
@@ -2189,6 +2198,10 @@ export type Database = {
           overage_unpaid: number
         }[]
       }
+      auto_join_user_to_orgs_by_email: {
+        Args: { p_email: string; p_user_id: string }
+        Returns: undefined
+      }
       calculate_credit_cost: {
         Args: {
           p_metric: Database["public"]["Enums"]["credit_metric_type"]
@@ -2290,6 +2303,7 @@ export type Database = {
             Returns: boolean
           }
       expire_usage_credits: { Args: never; Returns: number }
+      extract_email_domain: { Args: { email: string }; Returns: string }
       find_apikey_by_value: {
         Args: { key_value: string }
         Returns: {
@@ -2330,6 +2344,13 @@ export type Database = {
         }
         Returns: {
           name: string
+        }[]
+      }
+      find_orgs_by_email_domain: {
+        Args: { user_email: string }
+        Returns: {
+          org_id: string
+          org_name: string
         }[]
       }
       get_account_removal_date: { Args: { user_id: string }; Returns: string }
@@ -2584,7 +2605,6 @@ export type Database = {
               password_has_access: boolean
               password_policy_config: Json
               paying: boolean
-              require_apikey_expiration: boolean
               role: string
               stats_updated_at: string
               subscription_end: string
@@ -2615,7 +2635,6 @@ export type Database = {
               password_has_access: boolean
               password_policy_config: Json
               paying: boolean
-              require_apikey_expiration: boolean
               role: string
               stats_updated_at: string
               subscription_end: string
@@ -2817,6 +2836,7 @@ export type Database = {
         Args: { org_id: string }
         Returns: boolean
       }
+      is_blocked_email_domain: { Args: { domain: string }; Returns: boolean }
       is_build_time_exceeded_by_org: {
         Args: { org_id: string }
         Returns: boolean

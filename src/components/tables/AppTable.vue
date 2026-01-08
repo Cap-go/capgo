@@ -255,8 +255,8 @@ const filteredApps = computed(() => {
         @add="emit('addApp')"
         @reload="emit('reload')"
         @reset="emit('reset')"
-        @update:current-page="(page) => emit('update:currentPage', page)"
-        @update:search="(val) => emit('update:search', val)"
+        @update:current-page="(page: number) => emit('update:currentPage', page)"
+        @update:search="(val: string) => emit('update:search', val)"
       />
     </div>
   </div>

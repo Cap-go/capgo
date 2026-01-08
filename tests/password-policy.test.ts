@@ -32,10 +32,12 @@ beforeAll(async () => {
     throw error
 
   // Add user as member of the org
-  const { error: memberError } = await getSupabaseClient().from('org_users').insert({
+  const { error: memberError } = await getSupabaseClient().from('org_users').upsert({
     org_id: ORG_ID,
     user_id: USER_ID,
     user_right: 'super_admin',
+  }, {
+    onConflict: 'org_id,user_id',
   })
   if (memberError)
     throw memberError
@@ -379,10 +381,12 @@ describe('Password Policy Enforcement Integration', () => {
     })
 
     // Add user as member
-    await getSupabaseClient().from('org_users').insert({
+    await getSupabaseClient().from('org_users').upsert({
       org_id: orgWithPolicyId,
       user_id: USER_ID,
       user_right: 'super_admin',
+    }, {
+      onConflict: 'org_id,user_id',
     })
   })
 

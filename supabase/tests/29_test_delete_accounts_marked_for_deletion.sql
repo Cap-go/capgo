@@ -431,7 +431,7 @@ VALUES
     'last_admin@test.com'
 );
 
--- Add user as super_admin to the org
+-- Add user as super_admin to the org (ON CONFLICT for creator who is auto-added by trigger)
 INSERT INTO
 public.org_users (org_id, user_id, user_right)
 VALUES
@@ -439,7 +439,8 @@ VALUES
     '88888888-8888-8888-8888-888888888888'::UUID,
     '88888888-8888-8888-8888-888888888888'::UUID,
     'super_admin'::public.USER_MIN_RIGHT
-);
+)
+ON CONFLICT (org_id, user_id) DO UPDATE SET user_right = EXCLUDED.user_right;
 
 -- Create an app owned by this user
 INSERT INTO
@@ -715,7 +716,7 @@ VALUES
     'admin1@test.com'
 );
 
--- Add both users as super_admins
+-- Add both users as super_admins (ON CONFLICT for creator who is auto-added by trigger)
 INSERT INTO
 public.org_users (org_id, user_id, user_right)
 VALUES
@@ -728,7 +729,8 @@ VALUES
     '99999999-9999-9999-9999-999999999999'::UUID,
     'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'::UUID,
     'super_admin'::public.USER_MIN_RIGHT
-);
+)
+ON CONFLICT (org_id, user_id) DO UPDATE SET user_right = EXCLUDED.user_right;
 
 -- Create resources owned by admin1
 INSERT INTO
@@ -1043,7 +1045,7 @@ VALUES
     'audit_admin1@test.com'
 );
 
--- Add both users as super_admins
+-- Add both users as super_admins (ON CONFLICT for creator who is auto-added by trigger)
 INSERT INTO
 public.org_users (org_id, user_id, user_right)
 VALUES
@@ -1056,7 +1058,8 @@ VALUES
     'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'::UUID,
     'cccccccc-cccc-cccc-cccc-cccccccccccc'::UUID,
     'super_admin'::public.USER_MIN_RIGHT
-);
+)
+ON CONFLICT (org_id, user_id) DO UPDATE SET user_right = EXCLUDED.user_right;
 
 -- Manually insert audit log entries for admin1
 -- (Normally these would be created by triggers, but we insert directly for testing)

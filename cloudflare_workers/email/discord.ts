@@ -192,13 +192,20 @@ function truncateText(text: string, maxLength: number): string {
 
 /**
  * Basic HTML stripping (for simple cases)
+ *
+ * Removes all angle brackets to prevent any HTML injection, then normalizes whitespace.
+ * This is safe for Discord forum posts where we only need plain text content.
  */
 function stripHtml(html: string): string {
+  if (!html)
+    return ''
+
+  // Remove all angle brackets immediately to prevent HTML tag reconstruction
+  // (e.g., "<scr<script>ipt>" could become "<script>" after partial removal)
+  // This eliminates any possibility of incomplete sanitization
   return html
-    .replace(/<style[^>]*>.*?<\/style>/gis, '')
-    .replace(/<script[^>]*>.*?<\/script>/gis, '')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/\s+/g, ' ')
+    .replaceAll(/[<>]/g, ' ')
+    .replaceAll(/\s+/g, ' ')
     .trim()
 }
 

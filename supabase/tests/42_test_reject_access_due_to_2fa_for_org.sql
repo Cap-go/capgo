@@ -49,17 +49,19 @@ BEGIN
     INSERT INTO public.orgs (id, created_by, name, management_email, enforcing_2fa)
     VALUES (org_without_2fa_enforcement_id, test_2fa_user_id, 'No 2FA Org Direct', 'no2fa_org_direct@org.com', false);
 
-    -- Add members to org WITH 2FA enforcement
+    -- Add members to org WITH 2FA enforcement (ON CONFLICT for creator who is auto-added by trigger)
     INSERT INTO public.org_users (org_id, user_id, user_right)
     VALUES
         (org_with_2fa_enforcement_id, test_2fa_user_id, 'admin'::public.user_min_right),
-        (org_with_2fa_enforcement_id, test_no_2fa_user_id, 'read'::public.user_min_right);
+        (org_with_2fa_enforcement_id, test_no_2fa_user_id, 'read'::public.user_min_right)
+    ON CONFLICT (org_id, user_id) DO UPDATE SET user_right = EXCLUDED.user_right;
 
     -- Add members to org WITHOUT 2FA enforcement
     INSERT INTO public.org_users (org_id, user_id, user_right)
     VALUES
         (org_without_2fa_enforcement_id, test_2fa_user_id, 'admin'::public.user_min_right),
-        (org_without_2fa_enforcement_id, test_no_2fa_user_id, 'read'::public.user_min_right);
+        (org_without_2fa_enforcement_id, test_no_2fa_user_id, 'read'::public.user_min_right)
+    ON CONFLICT (org_id, user_id) DO UPDATE SET user_right = EXCLUDED.user_right;
 
     -- Store org IDs for later use
     PERFORM set_config('test.org_with_2fa_direct', org_with_2fa_enforcement_id::text, false);

@@ -302,10 +302,12 @@ describe('[DELETE] /organization/members', () => {
     expect(userData).toBeTruthy()
     expect(userData?.email).toBe(USER_ADMIN_EMAIL)
 
-    const { error } = await getSupabaseClient().from('org_users').insert({
+    const { error } = await getSupabaseClient().from('org_users').upsert({
       org_id: ORG_ID,
       user_id: userData!.id,
       user_right: 'invite_read',
+    }, {
+      onConflict: 'org_id,user_id',
     })
     expect(error).toBeNull()
 
