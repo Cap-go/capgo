@@ -112,7 +112,7 @@ const effectiveTotalRequested = computed(() => isDemoMode.value ? calculateDemoT
 const effectiveTotalUpdates = computed(() => effectiveTotalInstalled.value + effectiveTotalFailed.value + effectiveTotalRequested.value)
 const effectiveLastDayEvolution = computed(() => isDemoMode.value ? calculateDemoEvolution(demoStats.value.total) : lastDayEvolution.value)
 
-const hasData = computed(() => effectiveChartData.value?.length > 0)
+const hasData = computed(() => effectiveTotalUpdates.value > 0 || isDemoMode.value)
 
 async function calculateStats(forceRefetch = false) {
   const startTime = Date.now()

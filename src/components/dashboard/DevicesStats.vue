@@ -422,8 +422,6 @@ const processedChartData = computed<ChartData<'line'> | null>(() => {
   }
 })
 
-const hasData = computed(() => !!(processedChartData.value && processedChartData.value.datasets.length > 0))
-
 // Demo mode: show demo data only when forceDemo is true OR user has no apps
 // If user has apps, ALWAYS show real data (even if empty)
 const dashboardAppsStore = useDashboardAppsStore()
@@ -436,6 +434,8 @@ const isDemoMode = computed(() => {
   // No apps and store is loaded = show demo
   return dashboardAppsStore.isLoaded
 })
+
+const hasData = computed(() => !!(processedChartData.value && processedChartData.value.datasets.length > 0) || isDemoMode.value)
 
 const todayLineOptions = computed(() => {
   if (!props.useBillingPeriod || !currentRange.value)

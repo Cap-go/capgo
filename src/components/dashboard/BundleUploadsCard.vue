@@ -123,7 +123,7 @@ const effectiveAppNames = computed(() => isDemoMode.value ? DEMO_APP_NAMES : app
 const effectiveTotal = computed(() => isDemoMode.value ? calculateDemoTotal(demoBundleData.value) : total.value)
 const effectiveLastDayEvolution = computed(() => isDemoMode.value ? calculateDemoEvolution(demoBundleData.value) : lastDayEvolution.value)
 
-const hasData = computed(() => effectiveBundleData.value.length > 0)
+const hasData = computed(() => effectiveTotal.value > 0 || isDemoMode.value)
 
 async function calculateStats(forceRefetch = false) {
   const startTime = Date.now()

@@ -138,7 +138,7 @@ const lastDayEvolution = computed(() => {
   return ((lastValue - previousValue) / previousValue) * 100
 })
 
-const hasData = computed(() => effectiveData.value.length > 0)
+const hasData = computed(() => total.value > 0 || isDemoMode.value)
 </script>
 
 <template>
