@@ -33,6 +33,10 @@ const props = defineProps({
     type: Number,
     default: 0,
   },
+  forceDemo: {
+    type: Boolean,
+    default: false,
+  },
 })
 
 // Helper function to filter 30-day data to billing period
@@ -103,8 +107,8 @@ const consistentDemoData = computed(() => {
 const demoDeploymentData = computed(() => consistentDemoData.value.total)
 const demoDataByApp = computed(() => consistentDemoData.value.byApp)
 
-// Demo mode detection
-const isDemoMode = computed(() => !hasRealData.value && !isLoading.value)
+// Demo mode detection - also force demo when forceDemo is true
+const isDemoMode = computed(() => props.forceDemo || (!hasRealData.value && !isLoading.value))
 
 // Effective values for display
 const effectiveDeploymentData = computed(() => isDemoMode.value ? demoDeploymentData.value : deploymentData.value)
