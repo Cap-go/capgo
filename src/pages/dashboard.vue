@@ -26,7 +26,13 @@ const lacksSecurityAccess = computed(() => {
   return lacks2FA || lacksPassword
 })
 
-const hasNoApps = computed(() => apps.value.length === 0 && !isLoading.value)
+// Only show empty state overlay if user has no apps AND is not in a failed/restricted state
+const hasNoApps = computed(() => {
+  return apps.value.length === 0
+    && !isLoading.value
+    && !organizationStore.currentOrganizationFailed
+    && !lacksSecurityAccess.value
+})
 
 async function getMyApps() {
   await organizationStore.awaitInitialLoad()
@@ -77,9 +83,9 @@ displayStore.defaultBack = '/app'
         <div :class="{ 'blur-sm pointer-events-none select-none': hasNoApps }">
           <Usage v-if="!organizationStore.currentOrganizationFailed && !lacksSecurityAccess" />
         </div>
-        <!-- Overlay for empty state -->
+        <!-- Overlay for empty state (only shows when user has no apps and is in good standing) -->
         <div
-          v-if="hasNoApps && !lacksSecurityAccess"
+          v-if="hasNoApps"
           class="flex absolute inset-0 z-10 flex-col justify-center items-center bg-white/60 dark:bg-gray-900/60"
         >
           <div class="p-8 text-center bg-white rounded-xl border shadow-lg dark:bg-gray-800 dark:border-gray-700">
