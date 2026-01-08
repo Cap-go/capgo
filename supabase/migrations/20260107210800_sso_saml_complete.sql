@@ -661,7 +661,6 @@ DECLARE
   v_email text;
   v_domain text;
   v_sso_required boolean;
-  v_provider_count integer;
   v_metadata_provider_id uuid;
   v_metadata_allows boolean := false;
 BEGIN
@@ -713,16 +712,9 @@ BEGIN
     END IF;
   END IF;
 
-  -- Check if this is an SSO signup (will have provider info in auth.identities)
-  SELECT COUNT(*) INTO v_provider_count
-  FROM auth.identities
-  WHERE user_id = NEW.id
-    AND provider != 'email';
-
-  -- If signing up via SSO provider, allow it
-  IF v_provider_count > 0 THEN
-    RETURN NEW;
-  END IF;
+  -- NOTE: Cannot check auth.identities here - identity records are created AFTER user insert
+  -- in AFTER INSERT triggers, so NEW.id does not yet exist in auth.identities table.
+  -- We rely exclusively on the metadata-based validation above (sso_provider_id in raw_user_meta_data).
 
   -- Check if domain requires SSO
   v_sso_required := public.check_sso_required_for_domain(v_email);
@@ -1023,11 +1015,8 @@ EXECUTE ON FUNCTION public.auto_enroll_sso_user TO authenticated;
 GRANT
 EXECUTE ON FUNCTION public.auto_join_user_to_orgs_by_email TO authenticated;
 
-GRANT
-EXECUTE ON FUNCTION public.trigger_auto_join_on_user_create TO authenticated;
-
-GRANT
-EXECUTE ON FUNCTION public.trigger_auto_join_on_user_update TO authenticated;
+-- NOTE: Trigger functions should NOT be granted to authenticated - they are only called by DB triggers
+-- Only postgres and supabase_auth_admin (trigger context) should have EXECUTE permissions
 
 -- Grant special permissions to auth admin for trigger functions
 GRANT
