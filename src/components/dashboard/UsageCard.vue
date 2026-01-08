@@ -23,7 +23,7 @@ const props = defineProps({
   },
   data: {
     type: Array,
-    default: () => Array.from({ length: getDaysInCurrentMonth() }).fill(undefined) as number[],
+    default: undefined,
   },
   dataByApp: {
     type: Object,
@@ -39,13 +39,19 @@ const props = defineProps({
   },
 })
 
+const dataArray = computed(() => {
+  if (!props.data || props.data.length === 0) {
+    return Array.from({ length: getDaysInCurrentMonth() }).fill(undefined) as number[]
+  }
+  return props.data as number[]
+})
+
 const total = computed(() => {
-  const dataArray = props.data as number[]
-  const hasData = dataArray.some(val => val !== undefined)
+  const hasData = dataArray.value.some(val => val !== undefined)
   const sumValues = (values: number[]) => values.reduce((acc, val) => (typeof val === 'number' ? acc + val : acc), 0)
 
   if (hasData) {
-    return sumValues(dataArray)
+    return sumValues(dataArray.value)
   }
 
   if (props.dataByApp && Object.keys(props.dataByApp).length > 0) {

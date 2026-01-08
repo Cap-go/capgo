@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { DownloadEvent } from '@capgo/capacitor-updater'
+// @ts-expect-error @capacitor/barcode-scanner doesn't have TypeScript definitions
 import { CapacitorBarcodeScanner } from '@capacitor/barcode-scanner'
 import { CapacitorUpdater } from '@capgo/capacitor-updater'
 import { onMounted, onUnmounted, ref } from 'vue'
