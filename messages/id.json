@@ -178,7 +178,7 @@
   "allow-emulator": "Izinkan Emulator",
   "allow-physical-device": "Izinkan perangkat fisik",
   "allow-preview": "Izinkan pratinjau bundel",
-  "allow-preview-help": "Ketika diaktifkan, bundel dapat dipratinjau di dasbor menggunakan bingkai perangkat tertanam",
+  "allow-preview-help": "Membuat pratinjau bundel dapat diakses publik melalui tautan yang dapat dibagikan",
   "allow-prod-build": "Izinkan build produksi",
   "allow-prod-builds": "Izinkan build produksi",
   "already-account": "Anda sudah memiliki akun?",

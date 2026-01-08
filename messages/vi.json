@@ -178,7 +178,7 @@
   "allow-emulator": "Cho phép giả lập",
   "allow-physical-device": "Cho phép thiết bị vật lý",
   "allow-preview": "Cho phép xem trước gói sản phẩm",
-  "allow-preview-help": "Khi được kích hoạt, các gói có thể được xem trước trong bảng điều khiển bằng cách sử dụng khung thiết bị nhúng.",
+  "allow-preview-help": "Cho phép xem trước gói công khai qua liên kết có thể chia sẻ",
   "allow-prod-build": "Cho phép bản build sản xuất",
   "allow-prod-builds": "Cho phép bản dựng sản phẩm",
   "already-account": "Bạn đã có tài khoản chưa?",

@@ -178,7 +178,7 @@
   "allow-emulator": "Permettre les émulateurs",
   "allow-physical-device": "Autoriser les appareils physiques",
   "allow-preview": "Autoriser l'aperçu du bundle",
-  "allow-preview-help": "Lorsqu'il est activé, les bundles peuvent être prévisualisés dans le tableau de bord à l'aide d'un cadre de périphérique intégré.",
+  "allow-preview-help": "Rend l'aperçu du bundle accessible publiquement via un lien partageable",
   "allow-prod-build": "Autoriser les builds de production",
   "allow-prod-builds": "Autoriser les builds de production",
   "already-account": "Vous avez déjà un compte ?",

@@ -1111,7 +1111,7 @@
   "expose-metadata": "Expose bundle metadata to plugin",
   "expose-metadata-help": "When enabled, bundle link and comment fields will be sent to the Capacitor Updater plugin (requires plugin version 7.35.0 or higher)",
   "allow-preview": "Allow bundle preview",
-  "allow-preview-help": "When enabled, bundles can be previewed in the dashboard using an embedded device frame",
+  "allow-preview-help": "Makes bundle preview publicly accessible via a shareable link",
   "cannot-change-allow-preview": "Cannot change allow preview setting, please check the browser console",
   "changed-allow-preview": "Successfully changed allow preview setting",
   "preview-tab": "Preview",
