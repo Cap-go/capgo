@@ -15,7 +15,7 @@ import { getBundleUrl, getManifestUrl } from './downloadUrl.ts'
 import { simpleError200 } from './hono.ts'
 import { cloudlog } from './logging.ts'
 import { sendNotifOrg } from './notifications.ts'
-import { closeClient, getAppOwnerPostgres, getDrizzleClient, getPgClient, requestInfosPostgres } from './pg.ts'
+import { closeClient, getAppOwnerPostgres, getDrizzleClient, getPgClient, requestInfosPostgres, setReplicationLagHeader } from './pg.ts'
 import { makeDevice } from './plugin_parser.ts'
 import { s3 } from './s3.ts'
 import { createStatsBandwidth, createStatsMau, createStatsVersion, onPremStats, sendStatsAndDevice } from './stats.ts'
@@ -402,6 +402,9 @@ export async function updateWithPG(
 
 export async function update(c: Context, body: AppInfos) {
   const pgClient = getPgClient(c, true)
+
+  // Set replication lag header (uses cached status, non-blocking)
+  await setReplicationLagHeader(c)
 
   const drizzlePg = pgClient ? getDrizzleClient(pgClient) : (null as any)
   // Lazily create D1 client inside updateWithPG when actually used
