@@ -171,10 +171,53 @@ export const DEMO_APP_NAMES: { [key: string]: string } = {
 
 /**
  * Generate demo data broken down by fake apps
+ * @deprecated Use generateConsistentDemoData instead for consistent total/byApp data
  */
 export function generateDemoDataByApp(days: number = 30, dataGenerator: (days: number) => number[]): { [appId: string]: number[] } {
   return {
     'demo-app-1': dataGenerator(days),
     'demo-app-2': dataGenerator(days),
   }
+}
+
+/**
+ * Generate consistent demo data where the total is derived from the per-app breakdown.
+ * This ensures the chart totals match when displaying stacked per-app data.
+ */
+export function generateConsistentDemoData(
+  days: number,
+  dataGenerator: (days: number) => number[],
+): {
+  total: number[]
+  byApp: { [appId: string]: number[] }
+} {
+  // Generate per-app data first
+  const app1Data = dataGenerator(days)
+  const app2Data = dataGenerator(days)
+
+  // Derive total from per-app data (sum each day)
+  const total = app1Data.map((val, idx) => val + app2Data[idx])
+
+  return {
+    total,
+    byApp: {
+      'demo-app-1': app1Data,
+      'demo-app-2': app2Data,
+    },
+  }
+}
+
+/**
+ * Get the number of days for demo data based on chart mode.
+ * In billing period mode, use the data array length if available.
+ * In last-30-days mode, always use 30.
+ */
+export function getDemoDayCount(useBillingPeriod: boolean, existingDataLength?: number): number {
+  if (!useBillingPeriod) {
+    // Last 30 days mode always uses 30 data points
+    return 30
+  }
+
+  // In billing period mode, use existing data length if provided, otherwise default to 30
+  return existingDataLength && existingDataLength > 0 ? existingDataLength : 30
 }

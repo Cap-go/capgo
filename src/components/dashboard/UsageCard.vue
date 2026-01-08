@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { getDaysInCurrentMonth } from '~/services/date'
 import {
   calculateDemoEvolution,
   DEMO_APP_NAMES,
+  generateConsistentDemoData,
   generateDemoBandwidthData,
-  generateDemoDataByApp,
   generateDemoMauData,
   generateDemoStorageData,
+  getDemoDayCount,
 } from '~/services/demoChartData'
 import ChartCard from './ChartCard.vue'
 import LineChartStats from './LineChartStats.vue'
@@ -59,39 +59,33 @@ const hasRealData = computed(() => {
   return hasDefinedData || hasAppData
 })
 
-// Generate demo data based on title/type
-const demoData = computed(() => {
-  const days = getDaysInCurrentMonth()
-  const titleLower = props.title.toLowerCase()
-
+// Get the appropriate data generator based on chart type
+function getDataGenerator(title: string) {
+  const titleLower = title.toLowerCase()
   if (titleLower.includes('active') || titleLower.includes('mau') || titleLower.includes('user')) {
-    return generateDemoMauData(days)
+    return generateDemoMauData
   }
   if (titleLower.includes('storage')) {
-    return generateDemoStorageData(days)
+    return generateDemoStorageData
   }
   if (titleLower.includes('bandwidth')) {
-    return generateDemoBandwidthData(days)
+    return generateDemoBandwidthData
   }
-  // Default to MAU-like data
-  return generateDemoMauData(days)
+  return generateDemoMauData
+}
+
+// Generate consistent demo data where total is derived from per-app breakdown
+// Use existing data length or default based on billing period mode
+const consistentDemoData = computed(() => {
+  const dataLength = (props.data as number[]).length
+  const days = getDemoDayCount(props.useBillingPeriod, dataLength)
+  const generator = getDataGenerator(props.title)
+  return generateConsistentDemoData(days, generator)
 })
 
-const demoDataByApp = computed(() => {
-  const days = getDaysInCurrentMonth()
-  const titleLower = props.title.toLowerCase()
-
-  if (titleLower.includes('active') || titleLower.includes('mau') || titleLower.includes('user')) {
-    return generateDemoDataByApp(days, generateDemoMauData)
-  }
-  if (titleLower.includes('storage')) {
-    return generateDemoDataByApp(days, generateDemoStorageData)
-  }
-  if (titleLower.includes('bandwidth')) {
-    return generateDemoDataByApp(days, generateDemoBandwidthData)
-  }
-  return generateDemoDataByApp(days, generateDemoMauData)
-})
+// Demo data accessors that ensure consistency
+const demoData = computed(() => consistentDemoData.value.total)
+const demoDataByApp = computed(() => consistentDemoData.value.byApp)
 
 // Use real data or demo data
 const isDemoMode = computed(() => !hasRealData.value && !props.isLoading)
