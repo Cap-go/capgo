@@ -182,9 +182,14 @@ function clearDashboardParams() {
 // Function to reload all chart data
 async function reloadAllCharts() {
   // Force reload of main dashboard data
+  // End date should be tomorrow at midnight to include all of today's data
   const last30DaysEnd = new Date()
+  last30DaysEnd.setHours(0, 0, 0, 0)
+  last30DaysEnd.setDate(last30DaysEnd.getDate() + 1) // Tomorrow midnight
+  // Start date should be 29 days ago at midnight (to get 30 days total including today)
   const last30DaysStart = new Date()
-  last30DaysStart.setDate(last30DaysStart.getDate() - 29) // 30 days including today
+  last30DaysStart.setHours(0, 0, 0, 0)
+  last30DaysStart.setDate(last30DaysStart.getDate() - 29)
 
   const orgId = organizationStore.currentOrganization?.gid
   if (orgId) {
@@ -285,11 +290,15 @@ function filterToBillingPeriod(fullData: { mau: number[], storage: number[], ban
 }
 
 async function getUsages(forceRefetch = false) {
-  // Always work with last 30 days of data - normalize first for consistency
+  // Always work with last 30 days of data
+  // End date should be tomorrow at midnight to include all of today's data
   const last30DaysEnd = new Date()
   last30DaysEnd.setHours(0, 0, 0, 0)
-  const last30DaysStart = new Date(last30DaysEnd)
-  last30DaysStart.setDate(last30DaysStart.getDate() - 29) // 30 days including today
+  last30DaysEnd.setDate(last30DaysEnd.getDate() + 1) // Tomorrow midnight
+  // Start date should be 29 days ago at midnight (to get 30 days total including today)
+  const last30DaysStart = new Date()
+  last30DaysStart.setHours(0, 0, 0, 0)
+  last30DaysStart.setDate(last30DaysStart.getDate() - 29)
 
   // Get billing period dates for filtering
   const billingStart = new Date(organizationStore.currentOrganization?.subscription_start ?? new Date())
@@ -725,6 +734,7 @@ onMounted(() => {
       :data="mauData" :data-by-app="mauDataByApp" :app-names="appNames" :title="`${t('monthly-active')}`" :unit="t('units-users')"
       :use-billing-period="useBillingPeriod"
       :is-loading="isLoading"
+      :force-demo="forceDemo"
       class="col-span-full sm:col-span-6 xl:col-span-4"
     />
     <UsageCard
@@ -732,6 +742,7 @@ onMounted(() => {
       :title="t('Storage')" :unit="storageUnit"
       :use-billing-period="useBillingPeriod"
       :is-loading="isLoading"
+      :force-demo="forceDemo"
       class="col-span-full sm:col-span-6 xl:col-span-4"
     />
     <UsageCard
@@ -739,6 +750,7 @@ onMounted(() => {
       :title="t('Bandwidth')" :unit="t('units-gb')"
       :use-billing-period="useBillingPeriod"
       :is-loading="isLoading"
+      :force-demo="forceDemo"
       class="col-span-full sm:col-span-6 xl:col-span-4"
     />
     <DevicesStats v-show="appId" :use-billing-period="useBillingPeriod" :accumulated="useBillingPeriod && showCumulative" :reload-trigger="reloadTrigger" :force-demo="forceDemo" class="col-span-full sm:col-span-6 xl:col-span-4" />
