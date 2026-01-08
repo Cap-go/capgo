@@ -946,6 +946,7 @@
   "no-compatible-download-channel": "Uygun kanallar bulunamadı. Varsayılanları ayarlamadan önce bir tane oluşturun.",
   "no-credits-available": "Henüz kredi yok. Paket satın alarak plan kullanımını artırabilirsiniz.",
   "no-data": "Veri Yok",
+  "demo-data-indicator": "Örnek veri - Gerçek metrikleri görmek için bir uygulama ekleyin",
   "no-deliveries": "Teslimat yok",
   "no-deploy-history": "Bu kanal için hiçbir dağıtım geçmişi bulunamadı",
   "no-device-data": "Cihaz verisi mevcut değil",
