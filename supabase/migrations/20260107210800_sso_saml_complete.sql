@@ -1030,3 +1030,45 @@ supabase_auth_admin;
 GRANT
 EXECUTE ON FUNCTION public.trigger_auto_join_on_user_update TO postgres,
 supabase_auth_admin;
+
+-- ============================================================================
+-- FUNCTION: Cleanup old SSO audit logs (PII compliance)
+-- ============================================================================
+
+-- Function to cleanup old SSO audit logs for GDPR/CCPA compliance
+-- Removes logs older than 90 days and anonymizes PII for deleted users
+CREATE OR REPLACE FUNCTION public.cleanup_old_sso_audit_logs()
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_deleted_count integer;
+  v_anonymized_count integer;
+BEGIN
+  -- Delete audit logs older than 90 days (data retention policy)
+  DELETE FROM public.sso_audit_logs
+  WHERE timestamp < NOW() - INTERVAL '90 days';
+  
+  GET DIAGNOSTICS v_deleted_count = ROW_COUNT;
+  
+  -- Anonymize email addresses for deleted users (user_id IS NULL but email still exists)
+  -- This handles the case where user was deleted but their email remains in audit logs
+  UPDATE public.sso_audit_logs
+  SET email = 'deleted-user-' || id::text || '@anonymized.local'
+  WHERE user_id IS NULL 
+    AND email IS NOT NULL 
+    AND email NOT LIKE 'deleted-user-%@anonymized.local';
+  
+  GET DIAGNOSTICS v_anonymized_count = ROW_COUNT;
+  
+  RAISE NOTICE 'SSO audit log cleanup: deleted % old records, anonymized % emails for deleted users', 
+    v_deleted_count, v_anonymized_count;
+END;
+$$;
+
+COMMENT ON FUNCTION public.cleanup_old_sso_audit_logs IS 'Cleans up SSO audit logs older than 90 days and anonymizes PII for deleted users. Run daily via cron for GDPR/CCPA compliance.';
+
+-- Grant execute to service_role for cron job
+GRANT EXECUTE ON FUNCTION public.cleanup_old_sso_audit_logs TO service_role;
