@@ -624,13 +624,14 @@ export async function getMainChannelsPg(
   c: Context,
   appId: string,
   drizzleClient: ReturnType<typeof getDrizzleClient>,
-): Promise<{ name: string, ios: boolean, android: boolean }[]> {
+): Promise<{ name: string, ios: boolean, android: boolean, electron: boolean }[]> {
   try {
     const channels = await drizzleClient
       .select({
         name: schema.channels.name,
         ios: schema.channels.ios,
         android: schema.channels.android,
+        electron: schema.channels.electron,
       })
       .from(schema.channels)
       .where(and(
@@ -700,7 +701,7 @@ export async function getChannelsPg(
   appId: string,
   condition: { defaultChannel?: string } | { public: boolean },
   drizzleClient: ReturnType<typeof getDrizzleClient>,
-): Promise<{ id: number, name: string, ios: boolean, android: boolean, public: boolean }[]> {
+): Promise<{ id: number, name: string, ios: boolean, android: boolean, electron: boolean, public: boolean }[]> {
   try {
     const whereConditions = [eq(schema.channels.app_id, appId)]
 
@@ -717,6 +718,7 @@ export async function getChannelsPg(
         name: schema.channels.name,
         ios: schema.channels.ios,
         android: schema.channels.android,
+        electron: schema.channels.electron,
         public: schema.channels.public,
       })
       .from(schema.channels)
