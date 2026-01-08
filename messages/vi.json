@@ -936,6 +936,7 @@
   "no-compatible-download-channel": "Không tìm thấy kênh tương thích. Hãy tạo một cái trước khi đặt mặc định.",
   "no-credits-available": "Chưa có tín dụng. Mua gói để mở rộng mức sử dụng gói của bạn.",
   "no-data": "Không có dữ liệu",
+  "demo-data-indicator": "Dữ liệu mẫu - Thêm ứng dụng để xem số liệu thực",
   "no-deliveries": "Không có giao hàng",
   "no-deploy-history": "Không tìm thấy lịch sử triển khai cho kênh này",
   "no-device-data": "Không có dữ liệu thiết bị nào",

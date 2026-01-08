@@ -936,6 +936,7 @@
   "no-compatible-download-channel": "互換性のあるチャンネルが見つかりません。デフォルトを設定する前に作成してください。",
   "no-credits-available": "クレジットがまだありません。プランを拡張するにはパックを購入してください。",
   "no-data": "データなし",
+  "demo-data-indicator": "サンプルデータ - 実際の指標を見るにはアプリを追加してください",
   "no-deliveries": "配信なし",
   "no-deploy-history": "このチャンネルのデプロイ履歴が見つかりませんでした",
   "no-device-data": "デバイスのデータが利用できません",

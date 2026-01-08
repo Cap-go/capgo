@@ -936,6 +936,7 @@
   "no-compatible-download-channel": "Aucun canal compatible trouvé. Créez-en un avant de définir les valeurs par défaut.",
   "no-credits-available": "Pas encore de crédits. Achetez un pack pour étendre votre offre.",
   "no-data": "Aucune Donnée",
+  "demo-data-indicator": "Données d'exemple - Ajoutez une app pour voir les métriques réelles",
   "no-deliveries": "Aucune livraison",
   "no-deploy-history": "Aucun historique de déploiement trouvé pour cette chaîne",
   "no-device-data": "Aucune donnée de l'appareil disponible",
