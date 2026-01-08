@@ -162,7 +162,7 @@ export async function handlePreviewRequest(c: Context<MiddlewareKeyVariables>): 
 
   // Check cache for app preview authorization first
   let actualAppId: string
-  let cachedAuth = await getPreviewAuth(c, appId)
+  const cachedAuth = await getPreviewAuth(c, appId)
 
   if (cachedAuth) {
     if (!cachedAuth.allowPreview) {
