@@ -1,5 +1,6 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
+import { Buffer } from 'node:buffer'
 import { getRuntimeKey } from 'hono/adapter'
 import { CacheHelper } from '../utils/cache.ts'
 import { simpleError } from '../utils/hono.ts'
