@@ -2,6 +2,7 @@
 import colors from 'tailwindcss/colors'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { calculateDemoEvolution, calculateDemoTotal, DEMO_APP_NAMES, generateDemoBundleUploadsData } from '~/services/demoChartData'
 import { useSupabase } from '~/services/supabase'
 import { useDashboardAppsStore } from '~/stores/dashboardApps'
 import { useOrganizationStore } from '~/stores/organization'
@@ -82,7 +83,27 @@ const currentCacheOrgId = ref<string | null>(null)
 // Cache for single app name to avoid refetching
 const singleAppNameCache = new Map<string, string>()
 
-const hasData = computed(() => bundleData.value.length > 0)
+// Check if we have real data
+const hasRealData = computed(() => total.value > 0)
+
+// Generate demo data
+const demoBundleData = computed(() => generateDemoBundleUploadsData(30))
+const demoDataByApp = computed(() => ({
+  'demo-app-1': generateDemoBundleUploadsData(30),
+  'demo-app-2': generateDemoBundleUploadsData(30),
+}))
+
+// Demo mode detection
+const isDemoMode = computed(() => !hasRealData.value && !isLoading.value)
+
+// Effective values for display
+const effectiveBundleData = computed(() => isDemoMode.value ? demoBundleData.value : bundleData.value)
+const effectiveBundleDataByApp = computed(() => isDemoMode.value ? demoDataByApp.value : bundleDataByApp.value)
+const effectiveAppNames = computed(() => isDemoMode.value ? DEMO_APP_NAMES : appNames.value)
+const effectiveTotal = computed(() => isDemoMode.value ? calculateDemoTotal(demoBundleData.value) : total.value)
+const effectiveLastDayEvolution = computed(() => isDemoMode.value ? calculateDemoEvolution(demoBundleData.value) : lastDayEvolution.value)
+
+const hasData = computed(() => effectiveBundleData.value.length > 0)
 
 async function calculateStats(forceRefetch = false) {
   const startTime = Date.now()
@@ -294,20 +315,21 @@ onMounted(async () => {
 <template>
   <ChartCard
     :title="t('bundle_uploads')"
-    :total="total"
-    :last-day-evolution="lastDayEvolution"
+    :total="effectiveTotal"
+    :last-day-evolution="effectiveLastDayEvolution"
     :is-loading="isLoading"
     :has-data="hasData"
+    :is-demo-data="isDemoMode"
   >
     <BundleUploadsChart
-      :key="JSON.stringify(bundleDataByApp)"
+      :key="JSON.stringify(effectiveBundleDataByApp)"
       :title="t('bundle_uploads')"
       :colors="colors.violet"
-      :data="bundleData"
-      :data-by-app="bundleDataByApp"
+      :data="effectiveBundleData"
+      :data-by-app="effectiveBundleDataByApp"
       :use-billing-period="useBillingPeriod"
       :accumulated="accumulated"
-      :app-names="appNames"
+      :app-names="effectiveAppNames"
     />
   </ChartCard>
 </template>

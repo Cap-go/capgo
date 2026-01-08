@@ -1,6 +1,14 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { getDaysInCurrentMonth } from '~/services/date'
+import {
+  calculateDemoEvolution,
+  DEMO_APP_NAMES,
+  generateDemoBandwidthData,
+  generateDemoDataByApp,
+  generateDemoMauData,
+  generateDemoStorageData,
+} from '~/services/demoChartData'
 import ChartCard from './ChartCard.vue'
 import LineChartStats from './LineChartStats.vue'
 
@@ -39,8 +47,60 @@ const props = defineProps({
   },
 })
 
-const total = computed(() => {
+// Check if we have real data
+const hasRealData = computed(() => {
   const dataArray = props.data as number[]
+  // Has data if there's at least one defined, non-zero value
+  const hasDefinedData = dataArray.some(val => val !== undefined && val !== null && val > 0)
+  // Or has data by app with at least one defined value
+  const hasAppData = props.dataByApp && Object.values(props.dataByApp).some((appValues: any) =>
+    appValues.some((val: any) => val !== undefined && val !== null && val > 0),
+  )
+  return hasDefinedData || hasAppData
+})
+
+// Generate demo data based on title/type
+const demoData = computed(() => {
+  const days = getDaysInCurrentMonth()
+  const titleLower = props.title.toLowerCase()
+
+  if (titleLower.includes('active') || titleLower.includes('mau') || titleLower.includes('user')) {
+    return generateDemoMauData(days)
+  }
+  if (titleLower.includes('storage')) {
+    return generateDemoStorageData(days)
+  }
+  if (titleLower.includes('bandwidth')) {
+    return generateDemoBandwidthData(days)
+  }
+  // Default to MAU-like data
+  return generateDemoMauData(days)
+})
+
+const demoDataByApp = computed(() => {
+  const days = getDaysInCurrentMonth()
+  const titleLower = props.title.toLowerCase()
+
+  if (titleLower.includes('active') || titleLower.includes('mau') || titleLower.includes('user')) {
+    return generateDemoDataByApp(days, generateDemoMauData)
+  }
+  if (titleLower.includes('storage')) {
+    return generateDemoDataByApp(days, generateDemoStorageData)
+  }
+  if (titleLower.includes('bandwidth')) {
+    return generateDemoDataByApp(days, generateDemoBandwidthData)
+  }
+  return generateDemoDataByApp(days, generateDemoMauData)
+})
+
+// Use real data or demo data
+const isDemoMode = computed(() => !hasRealData.value && !props.isLoading)
+const effectiveData = computed(() => isDemoMode.value ? demoData.value : props.data as number[])
+const effectiveDataByApp = computed(() => isDemoMode.value ? demoDataByApp.value : props.dataByApp)
+const effectiveAppNames = computed(() => isDemoMode.value ? DEMO_APP_NAMES : props.appNames)
+
+const total = computed(() => {
+  const dataArray = effectiveData.value
   const hasData = dataArray.some(val => val !== undefined)
   const sumValues = (values: number[]) => values.reduce((acc, val) => (typeof val === 'number' ? acc + val : acc), 0)
 
@@ -48,8 +108,8 @@ const total = computed(() => {
     return sumValues(dataArray)
   }
 
-  if (props.dataByApp && Object.keys(props.dataByApp).length > 0) {
-    return Object.values(props.dataByApp).reduce((totalSum, appValues: any) => {
+  if (effectiveDataByApp.value && Object.keys(effectiveDataByApp.value).length > 0) {
+    return Object.values(effectiveDataByApp.value).reduce((totalSum, appValues: any) => {
       return totalSum + sumValues(appValues)
     }, 0)
   }
@@ -58,6 +118,10 @@ const total = computed(() => {
 })
 
 const lastDayEvolution = computed(() => {
+  if (isDemoMode.value) {
+    return calculateDemoEvolution(effectiveData.value)
+  }
+
   const arr = props.data as number[]
   const arrWithoutUndefined = arr.filter((val: any) => val !== undefined)
 
@@ -75,7 +139,7 @@ const lastDayEvolution = computed(() => {
   return ((lastValue - previousValue) / previousValue) * 100
 })
 
-const hasData = computed(() => (props.data as number[]).length > 0)
+const hasData = computed(() => effectiveData.value.length > 0)
 </script>
 
 <template>
@@ -86,15 +150,16 @@ const hasData = computed(() => (props.data as number[]).length > 0)
     :last-day-evolution="lastDayEvolution"
     :has-data="hasData"
     :is-loading="isLoading"
+    :is-demo-data="isDemoMode"
   >
     <LineChartStats
-      :key="`${useBillingPeriod}-${accumulated}`"
+      :key="`${useBillingPeriod}-${accumulated}-${isDemoMode}`"
       :title="title"
       :colors="colors"
-      :limits="limits"
-      :data="data"
-      :data-by-app="dataByApp"
-      :app-names="appNames"
+      :limits="isDemoMode ? {} : limits"
+      :data="effectiveData"
+      :data-by-app="effectiveDataByApp"
+      :app-names="effectiveAppNames"
       :accumulated="accumulated"
       :use-billing-period="useBillingPeriod"
     />
