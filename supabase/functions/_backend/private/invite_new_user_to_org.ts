@@ -7,7 +7,7 @@ import { z } from 'zod/mini'
 import { trackBentoEvent } from '../utils/bento.ts'
 import { middlewareAuth, parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
-import { supabaseClient } from '../utils/supabase.ts'
+import { hasOrgRight, supabaseClient } from '../utils/supabase.ts'
 import { getEnv } from '../utils/utils.ts'
 
 // Validate name to prevent HTML/script injection
@@ -48,7 +48,11 @@ async function validateInvite(c: Context, rawBody: any) {
     return { message: 'not authorized', status: 401 }
 
   // Verify captcha token with Cloudflare Turnstile
-  await verifyCaptchaToken(c, body.captcha_token)
+  const captchaResult = await verifyCaptchaToken(c, body.captcha_token)
+  if (captchaResult) {
+    // verifyCaptchaToken returns an error response on failure
+    return captchaResult
+  }
 
   // Use authenticated client - RLS will enforce access based on JWT
   const supabase = supabaseClient(c, authorization)
@@ -78,8 +82,15 @@ async function validateInvite(c: Context, rawBody: any) {
 
   // Get current user ID from JWT
   const { data: authData, error: authError } = await supabase.auth.getUser()
-  if (authError || !authData?.user?.id) {
-    return { message: 'Failed to get current user', error: authError?.message, status: 500 }
+
+  if (authError || !authData?.user) {
+    return { message: 'Failed to get user', error: authError?.message ?? 'User not found', status: 500 }
+  }
+
+  // Check if user has admin permission for the org
+  const hasAdmin = await hasOrgRight(c, body.org_id, authData.user.id, 'admin')
+  if (!hasAdmin) {
+    return { message: 'Insufficient permissions', error: 'You must be an admin to invite users', status: 403 }
   }
 
   // Get user details

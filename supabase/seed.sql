@@ -486,9 +486,11 @@ BEGIN
     -- Dedicated user and API key for statistics tests
     (14, NOW(), '7a1b2c3d-4e5f-4a6b-7c8d-9e0f1a2b3c4d', '8b2c3d4e-5f6a-4c7b-8d9e-0f1a2b3c4d5e', 'all', NOW(), 'stats test all'),
     -- Dedicated user and API key for RLS hashed apikey tests (isolated to prevent interference)
-    (15, NOW(), '8b2c3d4e-5f6a-4b7c-8d9e-0f1a2b3c4d5e', '9c3d4e5f-6a7b-4c8d-9e0f-1a2b3c4d5e6f', 'all', NOW(), 'rls test all'),
+    (15, NOW(), '8b2c3d4e-5f6a-4b7c-8d9e-0f1a2b3c4d5e', '9c3d4e5f-6a7b-4c8d-9e0f-1a2b3c4d5e6f', 'all', NOW(), 'rls test all');
+
     -- Dedicated user and API key for CLI hashed apikey tests (isolated to prevent interference)
     -- This is a hashed-only key (key=NULL, key_hash set) to test the key_hash lookup branch
+    INSERT INTO "public"."apikeys" ("id", "created_at", "user_id", "key", "key_hash", "mode", "updated_at", "name") VALUES
     (110, NOW(), 'e5f6a7b8-c9d0-4e1f-8a2b-3c4d5e6f7a81', NULL, encode(extensions.digest('a7b8c9d0-e1f2-4a3b-8c4d-5e6f7a8b9c03', 'sha256'), 'hex'), 'all', NOW(), 'cli hashed test all');
 
     -- Hashed API key for testing (hash of 'test-hashed-apikey-for-auth-test')

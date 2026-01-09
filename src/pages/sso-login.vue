@@ -32,19 +32,25 @@ async function continueWithSSO(form: { email: string }) {
 
     if (!hasSSO) {
       toast.error(t('sso-not-configured', 'SSO is not configured for this email domain. Please contact your administrator.'))
-      isLoading.value = false
       return
     }
 
-    // Initiate SSO authentication
-    const redirectTo = route.query.to && typeof route.query.to === 'string'
-      ? route.query.to
-      : '/dashboard'
+    // Validate and sanitize redirect path to prevent open redirects
+    let redirectTo = '/dashboard'
+    if (route.query.to && typeof route.query.to === 'string') {
+      const to = route.query.to
+      // Only allow relative paths starting with / and not containing protocol/host
+      if (to.startsWith('/') && !to.includes('//') && !to.startsWith('//')) {
+        redirectTo = to
+      }
+    }
 
     await initiateSSO(redirectTo, form.email)
   }
   catch {
     toast.error(t('sso-login-failed', 'Failed to initiate SSO login'))
+  }
+  finally {
     isLoading.value = false
   }
 }
@@ -143,7 +149,7 @@ function goBack() {
             <LangSelector />
           </div>
           <button class="p-2 mt-3 text-gray-500 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600" @click="openSupport">
-            {{ t("support") }}
+            {{ t('support') }}
           </button>
         </section>
       </div>
