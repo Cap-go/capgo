@@ -57,8 +57,8 @@ function sanitize(obj: any, seen = new WeakSet()): any {
   return sanitized
 }
 
-export function cloudlog(message: any) {
-  const safeMessage = typeof message === 'object' && message !== null ? sanitize(message) : message
+export function cloudlog(unsafeMessage: any) {
+  const safeMessage = typeof unsafeMessage === 'object' && unsafeMessage !== null ? sanitize(unsafeMessage) : unsafeMessage
 
   if (getRuntimeKey() === 'workerd') {
     console.log(safeMessage)
@@ -85,8 +85,8 @@ export function serializeError(err: unknown) {
   }
 }
 
-export function cloudlogErr(message: any) {
-  const safeMessage = typeof message === 'object' && message !== null ? sanitize(message) : message
+export function cloudlogErr(unsafeMessage: any) {
+  const safeMessage = typeof unsafeMessage === 'object' && unsafeMessage !== null ? sanitize(unsafeMessage) : unsafeMessage
 
   if (getRuntimeKey() === 'workerd') {
     console.error(safeMessage)
