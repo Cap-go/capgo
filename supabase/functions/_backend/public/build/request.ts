@@ -7,7 +7,7 @@ import { getEnv } from '../../utils/utils.ts'
 
 export interface RequestBuildBody {
   app_id: string
-  platform: 'ios' | 'android' | 'both'
+  platform: 'ios' | 'android'
   build_mode?: 'release' | 'debug'
   build_config?: Record<string, any>
   credentials?: Record<string, string>
@@ -61,7 +61,7 @@ export async function requestBuild(
     throw simpleError('missing_parameter', 'platform is required')
   }
 
-  if (!['ios', 'android', 'both'].includes(platform)) {
+  if (!['ios', 'android'].includes(platform)) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Invalid platform', platform })
     throw simpleError('invalid_parameter', 'platform must be ios or android')
   }
