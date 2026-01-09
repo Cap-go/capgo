@@ -8,7 +8,7 @@ import iconEmail from '~icons/oui/email?raw'
 import { useSSODetection } from '~/composables/useSSODetection'
 import { openSupport } from '~/services/support'
 
-const route = useRoute('/sso-login')
+const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
 const isLoading = ref(false)
