@@ -4,7 +4,7 @@ import { cloudlogErr, serializeError } from './logging.ts'
 
 const CACHE_METHOD = 'GET'
 
-type CacheLike = Cache & { default?: Cache }
+type CacheLike = Cache & { default?: Cache, open?: (cacheName: string) => Promise<Cache> }
 
 async function resolveGlobalCache(): Promise<Cache | null> {
   if (typeof caches === 'undefined')
