@@ -7,10 +7,30 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "14.1"
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
   }
   public: {
     Tables: {
@@ -425,15 +445,7 @@ export type Database = {
           platform?: string
           user_id?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "build_logs_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "orgs"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       build_requests: {
         Row: {
@@ -616,6 +628,7 @@ export type Database = {
           created_by: string
           disable_auto_update: Database["public"]["Enums"]["disable_update"]
           disable_auto_update_under_native: boolean
+          electron: boolean
           id: number
           ios: boolean
           name: string
@@ -636,6 +649,7 @@ export type Database = {
           created_by: string
           disable_auto_update?: Database["public"]["Enums"]["disable_update"]
           disable_auto_update_under_native?: boolean
+          electron?: boolean
           id?: number
           ios?: boolean
           name: string
@@ -656,6 +670,7 @@ export type Database = {
           created_by?: string
           disable_auto_update?: Database["public"]["Enums"]["disable_update"]
           disable_auto_update_under_native?: boolean
+          electron?: boolean
           id?: number
           ios?: boolean
           name?: string
@@ -1082,7 +1097,6 @@ export type Database = {
           paying: number | null
           paying_monthly: number | null
           paying_yearly: number | null
-          plan_enterprise: number | null
           plan_enterprise_monthly: number
           plan_enterprise_yearly: number
           plan_maker: number | null
@@ -1129,7 +1143,6 @@ export type Database = {
           paying?: number | null
           paying_monthly?: number | null
           paying_yearly?: number | null
-          plan_enterprise?: number | null
           plan_enterprise_monthly?: number
           plan_enterprise_yearly?: number
           plan_maker?: number | null
@@ -1176,7 +1189,6 @@ export type Database = {
           paying?: number | null
           paying_monthly?: number | null
           paying_yearly?: number | null
-          plan_enterprise?: number | null
           plan_enterprise_monthly?: number
           plan_enterprise_yearly?: number
           plan_maker?: number | null
@@ -2076,6 +2088,159 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      org_saml_connections: {
+        Row: {
+          id: string
+          org_id: string
+          sso_provider_id: string
+          provider_name: string
+          metadata_url: string | null
+          metadata_xml: string | null
+          entity_id: string
+          current_certificate: string | null
+          certificate_expires_at: string | null
+          certificate_last_checked: string | null
+          enabled: boolean
+          verified: boolean
+          auto_join_enabled: boolean
+          attribute_mapping: Json
+          created_at: string
+          updated_at: string
+          created_by: string | null
+        }
+        Insert: {
+          id?: string
+          org_id: string
+          sso_provider_id: string
+          provider_name: string
+          metadata_url?: string | null
+          metadata_xml?: string | null
+          entity_id: string
+          current_certificate?: string | null
+          certificate_expires_at?: string | null
+          certificate_last_checked?: string | null
+          enabled?: boolean
+          verified?: boolean
+          auto_join_enabled?: boolean
+          attribute_mapping?: Json
+          created_at?: string
+          updated_at?: string
+          created_by?: string | null
+        }
+        Update: {
+          id?: string
+          org_id?: string
+          sso_provider_id?: string
+          provider_name?: string
+          metadata_url?: string | null
+          metadata_xml?: string | null
+          entity_id?: string
+          current_certificate?: string | null
+          certificate_expires_at?: string | null
+          certificate_last_checked?: string | null
+          enabled?: boolean
+          verified?: boolean
+          auto_join_enabled?: boolean
+          attribute_mapping?: Json
+          created_at?: string
+          updated_at?: string
+          created_by?: string | null
+        }
+        Relationships: []
+      }
+      saml_domain_mappings: {
+        Row: {
+          id: string
+          domain: string
+          org_id: string
+          sso_connection_id: string
+          priority: number
+          verified: boolean
+          verification_code: string | null
+          verified_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          domain: string
+          org_id: string
+          sso_connection_id: string
+          priority?: number
+          verified?: boolean
+          verification_code?: string | null
+          verified_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          domain?: string
+          org_id?: string
+          sso_connection_id?: string
+          priority?: number
+          verified?: boolean
+          verification_code?: string | null
+          verified_at?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      sso_audit_logs: {
+        Row: {
+          id: string
+          timestamp: string
+          user_id: string | null
+          email: string | null
+          event_type: string
+          org_id: string | null
+          sso_provider_id: string | null
+          sso_connection_id: string | null
+          ip_address: string | null
+          user_agent: string | null
+          country: string | null
+          saml_assertion_id: string | null
+          saml_session_index: string | null
+          error_code: string | null
+          error_message: string | null
+          metadata: Json
+        }
+        Insert: {
+          id?: string
+          timestamp?: string
+          user_id?: string | null
+          email?: string | null
+          event_type: string
+          org_id?: string | null
+          sso_provider_id?: string | null
+          sso_connection_id?: string | null
+          ip_address?: string | null
+          user_agent?: string | null
+          country?: string | null
+          saml_assertion_id?: string | null
+          saml_session_index?: string | null
+          error_code?: string | null
+          error_message?: string | null
+          metadata?: Json
+        }
+        Update: {
+          id?: string
+          timestamp?: string
+          user_id?: string | null
+          email?: string | null
+          event_type?: string
+          org_id?: string | null
+          sso_provider_id?: string | null
+          sso_connection_id?: string | null
+          ip_address?: string | null
+          user_agent?: string | null
+          country?: string | null
+          saml_assertion_id?: string | null
+          saml_session_index?: string | null
+          error_code?: string | null
+          error_message?: string | null
+          metadata?: Json
+        }
+        Relationships: []
       }
       webhooks: {
         Row: {
@@ -3042,6 +3207,34 @@ export type Database = {
         Args: { plain_key: string; stored_hash: string }
         Returns: boolean
       }
+      auto_enroll_sso_user: {
+        Args: { p_user_id: string; p_email: string; p_sso_provider_id: string }
+        Returns: void
+      }
+      auto_join_user_to_orgs_by_email: {
+        Args: { p_user_id: string; p_email: string; p_sso_provider_id?: string | null }
+        Returns: void
+      }
+      lookup_sso_provider_by_domain: {
+        Args: { p_email: string }
+        Returns: {
+          provider_id: string
+          entity_id: string
+          org_id: string
+          org_name: string
+          provider_name: string
+          metadata_url: string | null
+          enabled: boolean
+        }[]
+      }
+      lookup_sso_provider_for_email: {
+        Args: { p_email: string }
+        Returns: string
+      }
+      check_org_sso_configured: {
+        Args: { p_org_id: string }
+        Returns: boolean
+      }
       verify_mfa: { Args: never; Returns: boolean }
     }
     Enums: {
@@ -3057,7 +3250,7 @@ export type Database = {
       cron_task_type: "function" | "queue" | "function_queue"
       disable_update: "major" | "minor" | "patch" | "version_number" | "none"
       key_mode: "read" | "write" | "all" | "upload"
-      platform_os: "ios" | "android"
+      platform_os: "ios" | "android" | "electron"
       stats_action:
         | "delete"
         | "reset"
@@ -3098,7 +3291,9 @@ export type Database = {
         | "disableAutoUpdateMetadata"
         | "disableAutoUpdateUnderNative"
         | "disableDevBuild"
+        | "disableProdBuild"
         | "disableEmulator"
+        | "disableDevice"
         | "cannotGetBundle"
         | "checksum_fail"
         | "NoChannelOrOverride"
@@ -3119,8 +3314,7 @@ export type Database = {
         | "download_manifest_brotli_fail"
         | "backend_refusal"
         | "download_0"
-        | "disableProdBuild"
-        | "disableDevice"
+        | "disablePlatformElectron"
       stripe_status:
         | "created"
         | "succeeded"
@@ -3295,6 +3489,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       action_type: ["mau", "storage", "bandwidth", "build_time"],
@@ -3310,7 +3507,7 @@ export const Constants = {
       cron_task_type: ["function", "queue", "function_queue"],
       disable_update: ["major", "minor", "patch", "version_number", "none"],
       key_mode: ["read", "write", "all", "upload"],
-      platform_os: ["ios", "android"],
+      platform_os: ["ios", "android", "electron"],
       stats_action: [
         "delete",
         "reset",
@@ -3351,7 +3548,9 @@ export const Constants = {
         "disableAutoUpdateMetadata",
         "disableAutoUpdateUnderNative",
         "disableDevBuild",
+        "disableProdBuild",
         "disableEmulator",
+        "disableDevice",
         "cannotGetBundle",
         "checksum_fail",
         "NoChannelOrOverride",
@@ -3372,8 +3571,7 @@ export const Constants = {
         "download_manifest_brotli_fail",
         "backend_refusal",
         "download_0",
-        "disableProdBuild",
-        "disableDevice",
+        "disablePlatformElectron",
       ],
       stripe_status: [
         "created",
@@ -3400,3 +3598,4 @@ export const Constants = {
     },
   },
 } as const
+

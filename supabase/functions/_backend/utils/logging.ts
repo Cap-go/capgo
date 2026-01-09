@@ -11,6 +11,9 @@ const SENSITIVE_FIELDS = new Set([
   'key',
   'user_id',
   'userid',
+  'authorization',
+  'cookie',
+  'set-cookie',
 ])
 const SENSITIVE_FIELDS_LOWER = new Set(Array.from(SENSITIVE_FIELDS).map(f => f.toLowerCase()))
 
@@ -21,13 +24,7 @@ const SENSITIVE_PATTERNS = [
   /ak_live_[a-zA-Z0-9]{24,}/g, // Generic API key live
   /ak_test_[a-zA-Z0-9]{24,}/g, // Generic API key test
   /Bearer\s+[\w.-]{20,}/gi, // Bearer tokens
-const SENSITIVE_PATTERNS = [
-  /sk_live_[a-zA-Z0-9]{24,}/g, // Stripe live secret key
-  /sk_test_[a-zA-Z0-9]{24,}/g, // Stripe test secret key
-  /ak_live_[a-zA-Z0-9]{24,}/g, // Generic API key live
-  /ak_test_[a-zA-Z0-9]{24,}/g, // Generic API key test
-  /Bearer\s+[\w.-]{20,}/gi, // Bearer tokens
-]
+  /[a-f0-9]{32,}/gi, // Long hex strings (likely keys/tokens) - case insensitive
 ]
 
 /**
@@ -40,6 +37,7 @@ function isSensitiveField(fieldName: string): boolean {
     || lower.includes('password')
     || lower.includes('secret')
     || lower.includes('token')
+    || lower.includes('key') // Catches capgkey, hashed_key, etc.
 }
 
 /**
@@ -59,7 +57,11 @@ function sanitizeErrorString(str: string | undefined): string | undefined {
  * Sanitize an object by redacting sensitive fields
  */
 function sanitize(obj: any, seen = new WeakSet()): any {
+  // Handle primitives - sanitize strings, return others as-is
   if (typeof obj !== 'object' || obj === null) {
+    if (typeof obj === 'string') {
+      return sanitizeErrorString(obj)
+    }
     return obj
   }
 
@@ -69,6 +71,7 @@ function sanitize(obj: any, seen = new WeakSet()): any {
       name: obj.name,
       message: sanitizeErrorString(obj.message),
       stack: sanitizeErrorString(obj.stack),
+      cause: obj.cause ? sanitize(obj.cause, seen) : undefined,
     }
   }
 
@@ -88,6 +91,9 @@ function sanitize(obj: any, seen = new WeakSet()): any {
     if (isSensitiveField(key)) {
       sanitized[key] = '[REDACTED]'
     }
+    else if (typeof value === 'string') {
+      sanitized[key] = sanitizeErrorString(value)
+    }
     else if (typeof value === 'object' && value !== null) {
       sanitized[key] = sanitize(value, seen)
     }
@@ -99,7 +105,8 @@ function sanitize(obj: any, seen = new WeakSet()): any {
 }
 
 export function cloudlog(unsafeMessage: any) {
-  const safeMessage = typeof unsafeMessage === 'object' && unsafeMessage !== null ? sanitize(unsafeMessage) : unsafeMessage
+  // Always sanitize all inputs before any branching
+  const safeMessage = sanitize(unsafeMessage)
 
   if (getRuntimeKey() === 'workerd') {
     console.log(safeMessage)
@@ -116,11 +123,26 @@ export function cloudlog(unsafeMessage: any) {
 
 export function serializeError(err: unknown) {
   if (err instanceof Error) {
+    let sanitizedCause: any
+    if (err.cause !== undefined) {
+      if (err.cause instanceof Error) {
+        // Recursively serialize and sanitize Error causes
+        sanitizedCause = sanitize(serializeError(err.cause))
+      }
+      else if (typeof err.cause === 'object' && err.cause !== null) {
+        // Sanitize object causes
+        sanitizedCause = sanitize(err.cause)
+      }
+      else {
+        // For primitives, convert to string and sanitize
+        sanitizedCause = sanitize(String(err.cause))
+      }
+    }
     return {
       name: err.name,
       message: sanitizeErrorString(err.message),
       stack: sanitizeErrorString(err.stack),
-      cause: err.cause ? sanitizeErrorString(String(err.cause)) : undefined,
+      cause: sanitizedCause,
     }
   }
   try {
@@ -143,7 +165,8 @@ export function serializeError(err: unknown) {
 }
 
 export function cloudlogErr(unsafeMessage: any) {
-  const safeMessage = typeof unsafeMessage === 'object' && unsafeMessage !== null ? sanitize(unsafeMessage) : unsafeMessage
+  // Always sanitize all inputs before any branching
+  const safeMessage = sanitize(unsafeMessage)
 
   if (getRuntimeKey() === 'workerd') {
     console.error(safeMessage)

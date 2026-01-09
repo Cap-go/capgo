@@ -177,7 +177,8 @@ async function foundAPIKey(c: Context, capgkeyString: string, rights: Database['
       return quickError(401, 'invalid_subkey', 'Invalid subkey')
     }
     if (subkey && subkey.user_id !== apikey.user_id) {
-      cloudlog({ requestId: c.get('requestId'), message: 'Subkey user_id does not match apikey user_id', subkey, apikey })
+      // Don't log full apikey/subkey objects to avoid sensitive data leakage
+      cloudlog({ requestId: c.get('requestId'), message: 'Subkey user_id does not match apikey user_id' })
       return quickError(401, 'invalid_subkey', 'Invalid subkey')
     }
     if (subkey?.limited_to_apps && subkey?.limited_to_apps.length === 0 && subkey?.limited_to_orgs && subkey?.limited_to_orgs.length === 0) {

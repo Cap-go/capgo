@@ -133,10 +133,7 @@ test.describe('sso login flow', () => {
   test('should detect sso for configured domain', async ({ page }) => {
     // Skip test if SSO test domain is not configured
     const testDomain = process.env.SSO_TEST_DOMAIN
-    if (!testDomain) {
-      test.skip(!process.env.SSO_TEST_DOMAIN, 'SSO_TEST_DOMAIN environment variable not set')
-      return
-    }
+    test.skip(!testDomain, 'SSO_TEST_DOMAIN environment variable not set')
 
     // Enter email with configured SSO domain
     const emailInput = page.locator('[data-test="email"]')

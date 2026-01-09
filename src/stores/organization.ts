@@ -19,13 +19,17 @@ export interface PasswordPolicyConfig {
 
 // Extended organization type with password policy and 2FA fields (from get_orgs_v7)
 // Note: Using get_orgs_v7 return type with explicit JSON parsing for password_policy_config
-type RawOrganization = ArrayElement<Database['public']['Functions']['get_orgs_v7']['Returns']>
+type GetOrgsV7Function = Database['public']['Functions']['get_orgs_v7']
+type RawOrganization = ArrayElement<
+  GetOrgsV7Function extends { Returns: infer R } ? R : never
+>
 export type Organization = Omit<RawOrganization, 'password_policy_config'> & {
   password_policy_config: PasswordPolicyConfig | null
 }
 export type OrganizationRole = Database['public']['Enums']['user_min_right'] | 'owner'
 export type ExtendedOrganizationMember = Concrete<Merge<ArrayElement<Database['public']['Functions']['get_org_members']['Returns']>, { id: number }>>
 export type ExtendedOrganizationMembers = ExtendedOrganizationMember[]
+export type PasswordPolicyCheckResult = ArrayElement<Database['public']['Functions']['check_org_members_password_policy']['Returns']>
 
 const supabase = useSupabase()
 const main = useMainStore()
@@ -259,14 +263,14 @@ export const useOrganizationStore = defineStore('organization', () => {
     }
 
     const organization = data
-      .filter(org => !org.role.includes('invite'))
-      .sort((a, b) => b.app_count - a.app_count)[0]
+      .filter((org: RawOrganization) => !org.role.includes('invite'))
+      .sort((a: RawOrganization, b: RawOrganization) => b.app_count - a.app_count)[0]
     if (!organization) {
       console.log('user has no main organization')
       throw error
     }
 
-    const mappedData = data.map((item, id) => {
+    const mappedData = data.map((item: RawOrganization, id: number) => {
       return {
         id,
         ...item,
@@ -274,20 +278,20 @@ export const useOrganizationStore = defineStore('organization', () => {
       } as Organization & { id: number }
     })
 
-    _organizations.value = new Map(mappedData.map(item => [item.gid, item as Organization]))
+    _organizations.value = new Map(mappedData.map((item: Organization & { id: number }) => [item.gid, item as Organization]))
 
     // Try to restore from localStorage first
     if (!currentOrganization.value) {
       const storedOrgId = localStorage.getItem(STORAGE_KEY)
       if (storedOrgId) {
-        const storedOrg = mappedData.find(org => org.gid === storedOrgId && !org.role.includes('invite'))
+        const storedOrg = mappedData.find((org: Organization & { id: number }) => org.gid === storedOrgId && !org.role.includes('invite'))
         if (storedOrg) {
           currentOrganization.value = storedOrg as Organization
         }
       }
     }
 
-    currentOrganization.value ??= mappedData.find(org => org.gid === organization.gid) as Organization | undefined
+    currentOrganization.value ??= mappedData.find((org: Organization & { id: number }) => org.gid === organization.gid) as Organization | undefined
     // Don't mark as failed if user lacks 2FA or password access - the data is redacted and unreliable
     const lacks2FAAccess = currentOrganization.value?.enforcing_2fa === true && currentOrganization.value?.['2fa_has_access'] === false
     const lacksPasswordAccess = currentOrganization.value?.password_policy_config?.enabled && currentOrganization.value?.password_has_access === false
@@ -321,8 +325,8 @@ export const useOrganizationStore = defineStore('organization', () => {
 
     return {
       totalUsers: data.length,
-      compliantUsers: data.filter(u => u.password_policy_compliant),
-      nonCompliantUsers: data.filter(u => !u.password_policy_compliant),
+      compliantUsers: data.filter((u: PasswordPolicyCheckResult) => u.password_policy_compliant),
+      nonCompliantUsers: data.filter((u: PasswordPolicyCheckResult) => !u.password_policy_compliant),
     }
   }
 

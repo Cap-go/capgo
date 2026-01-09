@@ -22,7 +22,7 @@ async function createChannel(channelName: string, appId: string) {
       .limit(1)
       .single()
 
-    versionId = versionData?.id || 1
+    versionId = versionData?.id ?? 1
     versionCache.set(appId, versionId)
   }
 

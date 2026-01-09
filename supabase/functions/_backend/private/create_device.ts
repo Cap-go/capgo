@@ -72,7 +72,6 @@ app.post('/', middlewareV2(['all', 'write']), async (c) => {
     return quickError(403, 'org_mismatch', 'App does not belong to provided organization', {
       app_id: safeBody.app_id,
       provided_org_id: safeBody.org_id,
-      actual_owner_org: app.owner_org,
     })
   }
 

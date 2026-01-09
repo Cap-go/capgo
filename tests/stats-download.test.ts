@@ -1,4 +1,4 @@
-import type { Database } from '../src/types/supabase.types.ts'
+import type { Database } from '../src/types/supabase.types'
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { ALLOWED_STATS_ACTIONS } from '../supabase/functions/_backend/plugins/stats_actions.ts'

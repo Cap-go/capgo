@@ -16,7 +16,8 @@ function validateMetadataURL(url: string): void {
     }
 
     // Block internal/localhost addresses
-    const hostname = parsed.hostname.toLowerCase()
+    // Strip square brackets from IPv6 hostnames (e.g., "[::1]" -> "::1")
+    const hostname = parsed.hostname.toLowerCase().replace(/^\[|\]$/g, '')
     const blockedHosts = [
       'localhost',
       '127.0.0.1',
@@ -30,8 +31,14 @@ function validateMetadataURL(url: string): void {
       throw new Error('SSRF protection: Cannot use internal/localhost addresses')
     }
 
-    // Block IPv6-mapped IPv4 addresses (e.g., ::ffff:127.0.0.1)
-    if (hostname.startsWith('::ffff:') || hostname.includes('[::ffff:')) {
+    // Block IPv6-mapped IPv4 addresses (e.g., ::ffff:127.0.0.1, [::ffff:127.0.0.1])
+    // Check for ::ffff: prefix and common mapped patterns
+    if (hostname.startsWith('::ffff:')) {
+      throw new Error('SSRF protection: Cannot use IPv6-mapped IPv4 addresses')
+    }
+    
+    // Also block bracketed forms that weren't normalized
+    if (parsed.hostname.toLowerCase().includes('[::ffff:')) {
       throw new Error('SSRF protection: Cannot use IPv6-mapped IPv4 addresses')
     }
 
@@ -87,6 +94,10 @@ describe('sso SSRF Protection Unit Tests', () => {
     expect(() => validateMetadataURL('https://localhost/metadata')).toThrow('internal/localhost')
     expect(() => validateMetadataURL('https://127.0.0.1/metadata')).toThrow('internal/localhost')
     expect(() => validateMetadataURL('https://0.0.0.0/metadata')).toThrow('internal/localhost')
+  })
+
+  it('should block bracketed IPv6 localhost', () => {
+    expect(() => validateMetadataURL('https://[::1]/metadata')).toThrow('internal/localhost')
   })
 
   it('should block AWS metadata service', () => {

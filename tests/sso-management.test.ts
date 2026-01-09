@@ -453,9 +453,16 @@ describe('auto-join integration', () => {
       }
 
       // Create domain mapping for auto-enrollment
-      const { error: domainError } = await getSupabaseClient().from('saml_domain_mappings').insert({
-        domain: TEST_DOMAIN,
-        org_id: TEST_SSO_ORG_ID,
+const { data: ssoConnectionData } = await getSupabaseClient()
+      .from('org_saml_connections')
+      .select('id')
+      .eq('org_id', TEST_SSO_ORG_ID)
+      .single()
+
+    const { error: domainError } = await getSupabaseClient().from('saml_domain_mappings').insert({
+      domain: TEST_DOMAIN,
+      org_id: TEST_SSO_ORG_ID,
+      sso_connection_id: ssoConnectionData?.id as string,
         verified: true,
       })
 
@@ -589,25 +596,25 @@ describe.skip('domain verification (mocked metadata fetch)', () => {
     const ssoProviderId = randomUUID()
     const testEntityId = generateTestEntityId()
 
-    const { error: ssoError } = await getSupabaseClient().from('org_saml_connections').insert({
+    const { data: ssoConnection, error: ssoError } = await getSupabaseClient().from('org_saml_connections').insert({
       org_id: orgId,
       sso_provider_id: ssoProviderId,
       provider_name: 'Test Provider',
       entity_id: testEntityId,
       metadata_xml: generateTestMetadataXml(testEntityId),
       enabled: true,
-    })
+    }).select('id').single()
 
-    if (ssoError) {
-      throw new Error(`SSO connection insert failed: ${ssoError.message}`)
+    if (ssoError || !ssoConnection) {
+      throw new Error(`SSO connection insert failed: ${ssoError?.message || 'No data returned'}`)
     }
 
     const { error: mappingError } = await getSupabaseClient().from('saml_domain_mappings').insert({
       domain,
       org_id: orgId,
-      sso_connection_id: ssoProviderId,
+      sso_connection_id: (ssoConnection as unknown as { id: string }).id,
       verified: true,
-    } as any)
+    })
 
     if (mappingError) {
       throw new Error(`Domain mapping insert failed: ${mappingError.message}`)
@@ -661,25 +668,25 @@ describe.skip('domain verification (mocked metadata fetch)', () => {
     const ssoProviderId = randomUUID()
     const testEntityId = `https://sso.test.com/${randomUUID()}`
 
-    const { error: ssoError } = await getSupabaseClient().from('org_saml_connections').insert({
+    const { data: ssoConnection, error: ssoError } = await getSupabaseClient().from('org_saml_connections').insert({
       org_id: orgId,
       sso_provider_id: ssoProviderId,
       provider_name: 'Test Provider',
       entity_id: testEntityId,
       metadata_xml: generateTestMetadataXml(testEntityId),
       enabled: true,
-    })
+    }).select('id').single()
 
-    if (ssoError) {
-      throw new Error(`SSO connection insert failed: ${ssoError.message}`)
+    if (ssoError || !ssoConnection) {
+      throw new Error(`SSO connection insert failed: ${ssoError?.message || 'No data returned'}`)
     }
 
     const { error: mappingError } = await getSupabaseClient().from('saml_domain_mappings').insert({
       domain,
       org_id: orgId,
-      sso_connection_id: ssoProviderId,
+      sso_connection_id: (ssoConnection as unknown as { id: string }).id,
       verified: true,
-    } as any)
+    })
 
     if (mappingError) {
       throw new Error(`Domain mapping insert failed: ${mappingError.message}`)
