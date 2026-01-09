@@ -1,7 +1,17 @@
 import { getRuntimeKey } from 'hono/adapter'
 
 // Sensitive field names that should be redacted from logs
-const SENSITIVE_FIELDS = new Set(['apikey', 'apiKey', 'apikeyUserId', 'password', 'secret', 'token', 'key'])
+const SENSITIVE_FIELDS = new Set([
+  'apikey',
+  'apiKey',
+  'apikeyUserId',
+  'password',
+  'secret',
+  'token',
+  'key',
+  'user_id',
+  'userid',
+])
 
 /**
  * Sanitize an object by redacting sensitive fields
