@@ -55,13 +55,11 @@ const dataArray = computed(() => {
   return props.data as number[]
 })
 
-const total = computed(() => {
-  const hasData = dataArray.value.some(val => val !== undefined)
 // Check if we have real data
 const hasRealData = computed(() => {
-  const dataArray = props.data as number[]
+  const arr = dataArray.value ?? []
   // Has data if there's at least one defined, non-zero value
-  const hasDefinedData = dataArray.some(val => val !== undefined && val !== null && val > 0)
+  const hasDefinedData = arr.some(val => val !== undefined && val !== null && val > 0)
   // Or has data by app with at least one defined value
   const hasAppData = props.dataByApp && Object.values(props.dataByApp).some((appValues: any) =>
     appValues.some((val: any) => val !== undefined && val !== null && val > 0),
@@ -87,7 +85,7 @@ function getDataGenerator(title: string) {
 // Generate consistent demo data where total is derived from per-app breakdown
 // Use existing data length or default based on billing period mode
 const consistentDemoData = computed(() => {
-  const dataLength = (props.data as number[]).length
+  const dataLength = dataArray.value?.length ?? 0
   const days = getDemoDayCount(props.useBillingPeriod, dataLength)
   const generator = getDataGenerator(props.title)
   return generateConsistentDemoData(days, generator)
@@ -99,17 +97,17 @@ const demoDataByApp = computed(() => consistentDemoData.value.byApp)
 
 // Use real data or demo data
 const isDemoMode = computed(() => !hasRealData.value && !props.isLoading)
-const effectiveData = computed(() => isDemoMode.value ? demoData.value : props.data as number[])
+const effectiveData = computed(() => isDemoMode.value ? demoData.value : dataArray.value)
 const effectiveDataByApp = computed(() => isDemoMode.value ? demoDataByApp.value : props.dataByApp)
 const effectiveAppNames = computed(() => isDemoMode.value ? DEMO_APP_NAMES : props.appNames)
 
 const total = computed(() => {
-  const dataArray = effectiveData.value
-  const hasData = dataArray.some(val => val !== undefined)
+  const arr = effectiveData.value
+  const hasData = arr.some(val => val !== undefined)
   const sumValues = (values: number[]) => values.reduce((acc, val) => (typeof val === 'number' ? acc + val : acc), 0)
 
   if (hasData) {
-    return sumValues(dataArray.value)
+    return sumValues(arr)
   }
 
   if (effectiveDataByApp.value && Object.keys(effectiveDataByApp.value).length > 0) {
@@ -144,6 +142,7 @@ const lastDayEvolution = computed(() => {
 })
 
 const hasData = computed(() => (dataArray.value?.length ?? 0) > 0 && dataArray.value.some(val => val !== undefined))
+
 </script>
 
 <template>
