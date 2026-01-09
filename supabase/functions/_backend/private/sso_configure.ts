@@ -43,7 +43,7 @@ app.post('/', middlewareV2(['all']), async (c) => {
   const requestId = c.get('requestId')
 
   if (!auth?.userId) {
-    return simpleError('unauthorized', 'Authentication required')
+    throw simpleError('unauthorized', 'Authentication required')
   }
 
   cloudlog({

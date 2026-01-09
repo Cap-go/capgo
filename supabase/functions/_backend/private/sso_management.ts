@@ -23,11 +23,12 @@ import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { eq } from 'drizzle-orm'
 import { z } from 'zod'
-import { middlewareAPISecret, parseBody, simpleError, useCors } from '../utils/hono.ts'
+import { createHono, middlewareAPISecret, parseBody, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import { org_saml_connections, orgs, saml_domain_mappings, sso_audit_logs } from '../utils/postgres_schema.ts'
 import { hasOrgRight } from '../utils/supabase.ts'
+import { getEnv } from '../utils/utils.ts'
 
 /**
  * =============================================================================
@@ -35,7 +36,7 @@ import { hasOrgRight } from '../utils/supabase.ts'
  * =============================================================================
  */
 
-import { getEnv } from '../utils/utils.ts'
+import { version } from '../utils/version.ts'
 
 /**
  * GoTrue Admin API Response for SSO Provider
@@ -139,89 +140,67 @@ async function registerWithSupabaseAuth(
     body.attribute_mapping = config.attributeMapping
   }
 
+  // Call GoTrue Admin API to create SSO provider with timeout
+  // Endpoint: POST /admin/sso/providers
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
+
   try {
-    // Call GoTrue Admin API to create SSO provider with timeout
-    // Endpoint: POST /admin/sso/providers
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
+    const response = await fetch(`${supabaseUrl}/auth/v1/admin/sso/providers`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${serviceRoleKey}`,
+        'apikey': serviceRoleKey,
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    })
 
-    try {
-      const response = await fetch(`${supabaseUrl}/auth/v1/admin/sso/providers`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${serviceRoleKey}`,
-          'apikey': serviceRoleKey,
-        },
-        body: JSON.stringify(body),
-        signal: controller.signal,
-      })
+    clearTimeout(timeoutId)
 
-      clearTimeout(timeoutId)
-
-      if (!response.ok) {
-        const errorText = await response.text()
-        cloudlog({
-          requestId,
-          message: '[SSO Auth] Failed to register with Supabase Auth',
-          status: response.status,
-          error: errorText,
-        })
-
-        // Parse error for better messaging
-        let errorMessage = 'Failed to register SSO provider with Supabase Auth'
-        let errorCode = 'sso_auth_registration_failed'
-        try {
-          const errorJson = JSON.parse(errorText)
-          errorMessage = errorJson.msg || errorJson.message || errorJson.error || errorMessage
-
-          // Check if this is a duplicate provider error
-          if (errorJson.error_code === 'saml_idp_already_exists') {
-            errorCode = 'sso_provider_already_exists'
-            errorMessage = 'An SSO provider with this Entity ID already exists. Please use a different Entity ID or update the existing provider.'
-          }
-        }
-        catch {
-          // Use default message
-        }
-
-        throw simpleError(errorCode, errorMessage, {
-          status: response.status,
-          details: errorText,
-        })
-      }
-
-      const result: GoTrueSSOProvider = await response.json()
-
+    if (!response.ok) {
+      const errorText = await response.text()
       cloudlog({
         requestId,
-        message: '[SSO Auth] Successfully registered SAML provider',
-        providerId: result.id,
-        entityId: result.saml?.entity_id,
+        message: '[SSO Auth] Failed to register with Supabase Auth',
+        status: response.status,
+        error: errorText,
       })
 
-      return result
-    }
-    catch (error: any) {
-      if (error.name === 'AbortError') {
-        cloudlog({
-          requestId,
-          message: '[SSO Auth] Request timeout during SSO provider creation',
-        })
-        throw simpleError('sso_auth_timeout', 'Request to Supabase Auth timed out. Please try again.')
+      // Parse error for better messaging
+      let errorMessage = 'Failed to register SSO provider with Supabase Auth'
+      let errorCode = 'sso_auth_registration_failed'
+      try {
+        const errorJson = JSON.parse(errorText)
+        errorMessage = errorJson.msg || errorJson.message || errorJson.error || errorMessage
+
+        // Check if this is a duplicate provider error
+        if (errorJson.error_code === 'saml_idp_already_exists') {
+          errorCode = 'sso_provider_already_exists'
+          errorMessage = 'An SSO provider with this Entity ID already exists. Please use a different Entity ID or update the existing provider.'
+        }
       }
-      if (error.code === 'sso_auth_registration_failed') {
-        throw error
+      catch {
+        // Use default message
       }
 
-      cloudlog({
-        requestId,
-        message: '[SSO Auth] Exception during registration',
-        error: error.message,
+      throw simpleError(errorCode, errorMessage, {
+        status: response.status,
+        details: errorText,
       })
-
-      throw simpleError('sso_auth_registration_error', `Failed to connect to Supabase Auth: ${error.message}`)
     }
+
+    const result: GoTrueSSOProvider = await response.json()
+
+    cloudlog({
+      requestId,
+      message: '[SSO Auth] Successfully registered SAML provider',
+      providerId: result.id,
+      entityId: result.saml?.entity_id,
+    })
+
+    return result
   }
   catch (error: any) {
     if (error.name === 'AbortError') {
@@ -393,64 +372,44 @@ async function updateWithSupabaseAuth(
     body.attribute_mapping = config.attributeMapping
   }
 
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
+
   try {
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
+    const response = await fetch(`${supabaseUrl}/auth/v1/admin/sso/providers/${providerId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${serviceRoleKey}`,
+        'apikey': serviceRoleKey,
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    })
 
-    try {
-      const response = await fetch(`${supabaseUrl}/auth/v1/admin/sso/providers/${providerId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${serviceRoleKey}`,
-          'apikey': serviceRoleKey,
-        },
-        body: JSON.stringify(body),
-        signal: controller.signal,
-      })
+    clearTimeout(timeoutId)
 
-      clearTimeout(timeoutId)
-
-      if (!response.ok) {
-        const errorText = await response.text()
-        cloudlog({
-          requestId,
-          message: '[SSO Auth] Failed to update with Supabase Auth',
-          status: response.status,
-          error: errorText,
-        })
-        throw simpleError('sso_auth_error', `Failed to update SSO provider with Supabase Auth: ${errorText}`)
-      }
-
-      const provider: GoTrueSSOProvider = await response.json()
-
+    if (!response.ok) {
+      const errorText = await response.text()
       cloudlog({
         requestId,
-        message: '[SSO Auth] Successfully updated SAML provider',
-        providerId: provider.id,
-        entityId: provider.saml?.entity_id,
+        message: '[SSO Auth] Failed to update with Supabase Auth',
+        status: response.status,
+        error: errorText,
       })
+      throw simpleError('sso_auth_error', `Failed to update SSO provider with Supabase Auth: ${errorText}`)
+    }
 
-      return provider
-    }
-    catch (error: any) {
-      if (error.name === 'AbortError') {
-        cloudlog({
-          requestId,
-          message: '[SSO Auth] Request timeout during SSO provider update',
-        })
-        throw simpleError('sso_auth_timeout', 'Request to Supabase Auth timed out. Please try again.')
-      }
-      if (error.code && error.message) {
-        throw error // Re-throw our error
-      }
-      cloudlog({
-        requestId,
-        message: '[SSO Auth] Exception during update',
-        error: error.message,
-      })
-      throw simpleError('sso_auth_error', `Failed to update SSO provider: ${error.message}`)
-    }
+    const provider: GoTrueSSOProvider = await response.json()
+
+    cloudlog({
+      requestId,
+      message: '[SSO Auth] Successfully updated SAML provider',
+      providerId: provider.id,
+      entityId: provider.saml?.entity_id,
+    })
+
+    return provider
   }
   catch (error: any) {
     if (error.name === 'AbortError') {
@@ -806,6 +765,7 @@ async function logSSOAuditEvent(
 
   try {
     await drizzleClient.insert(sso_audit_logs).values({
+      id: crypto.randomUUID(),
       event_type: event.eventType,
       org_id: event.orgId,
       sso_provider_id: event.ssoProviderId || null,
@@ -970,6 +930,7 @@ export async function configureSAML(
 
     // Store configuration in our database
     await drizzleClient.insert(org_saml_connections).values({
+      id: crypto.randomUUID(),
       org_id: config.orgId,
       sso_provider_id: authProvider.id,
       provider_name: providerName,
@@ -994,6 +955,7 @@ export async function configureSAML(
 
       for (let i = 0; i < domains.length; i++) {
         await drizzleClient.insert(saml_domain_mappings).values({
+          id: crypto.randomUUID(),
           domain: domains[i].toLowerCase(),
           org_id: config.orgId,
           sso_connection_id: connectionId,
@@ -1147,6 +1109,7 @@ export async function updateSAML(
       if (update.domains.length > 0) {
         for (let i = 0; i < update.domains.length; i++) {
           await drizzleClient.insert(saml_domain_mappings).values({
+            id: crypto.randomUUID(),
             domain: update.domains[i].toLowerCase(),
             org_id: existing[0].org_id,
             sso_connection_id: existing[0].id,
@@ -1349,7 +1312,7 @@ export async function getSSOStatus(
   }
 }
 
-export const app = new Hono<MiddlewareKeyVariables>()
+export const app = createHono('sso_management', version)
 
 app.use('/', useCors)
 
@@ -1443,6 +1406,17 @@ app.post('/update', middlewareAPISecret, async (c: Context<MiddlewareKeyVariable
       providerId: config.providerId,
     })
 
+    // Verify caller has super_admin permissions for the organization
+    const auth = c.get('auth')
+    if (!auth?.userId) {
+      throw simpleError('unauthorized', 'Authentication required', 401)
+    }
+
+    const hasPermission = await hasOrgRight(c, config.orgId, auth.userId, 'super_admin')
+    if (!hasPermission) {
+      throw simpleError('insufficient_permissions', 'Only super administrators can update SSO connections', 403)
+    }
+
     const response = await updateSAML(c, config)
     return c.json(response, 200)
   }
@@ -1473,6 +1447,19 @@ app.delete('/remove', middlewareAPISecret, async (c: Context<MiddlewareKeyVariab
       orgId: body.orgId,
       providerId: body.providerId,
     })
+
+    // Verify caller has super_admin permissions for the organization
+    const auth = c.get('auth')
+    if (!auth?.userId) {
+      await closeClient(c, pgClient)
+      throw simpleError('unauthorized', 'Authentication required', 401)
+    }
+
+    const hasPermission = await hasOrgRight(c, body.orgId, auth.userId, 'super_admin')
+    if (!hasPermission) {
+      await closeClient(c, pgClient)
+      throw simpleError('insufficient_permissions', 'Only super administrators can remove SSO connections', 403)
+    }
 
     const response = await removeSAML(c, body.orgId, body.providerId)
     return c.json(response, 200)

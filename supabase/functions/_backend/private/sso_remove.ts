@@ -25,6 +25,7 @@ import { createHono, parseBody, quickError, simpleError, useCors } from '../util
 import { middlewareV2 } from '../utils/hono_middleware.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { hasOrgRight } from '../utils/supabase.ts'
+import { version } from '../utils/version.ts'
 import { removeSAML } from './sso_management.ts'
 
 const removeSchema = z.object({
@@ -32,7 +33,8 @@ const removeSchema = z.object({
   providerId: z.string().uuid(),
 })
 
-export const app = createHono()
+const functionName = 'sso_remove'
+export const app = createHono(functionName, version)
 
 app.use('/', useCors)
 

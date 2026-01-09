@@ -25,7 +25,7 @@ import { z } from 'zod'
 import { createHono, parseBody, simpleError, useCors } from '../utils/hono.ts'
 import { middlewareV2 } from '../utils/hono_middleware.ts'
 import { cloudlog } from '../utils/logging.ts'
-import { getDrizzleClient, getPgClient } from '../utils/pg.ts'
+import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import { org_saml_connections, saml_domain_mappings } from '../utils/postgres_schema.ts'
 import { getEnv } from '../utils/utils.ts'
 import { version } from '../utils/version.ts'
@@ -145,13 +145,19 @@ async function verifyProviderInSupabaseAuth(
   }
 
   try {
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
+
     const response = await fetch(`${supabaseUrl}/auth/v1/admin/sso/providers/${providerId}`, {
       method: 'GET',
       headers: {
         Authorization: `Bearer ${serviceRoleKey}`,
         apikey: serviceRoleKey,
       },
+      signal: controller.signal,
     })
+
+    clearTimeout(timeoutId)
 
     if (response.status === 404) {
       return { exists: false, error: 'Provider not registered in Supabase Auth - SSO login will fail' }
@@ -187,6 +193,9 @@ app.post('/', middlewareV2(['read', 'write', 'all']), async (c) => {
     return simpleError('unauthorized', 'Authentication required')
   }
 
+  const pgClient = getPgClient(c, true)
+  const drizzleClient = getDrizzleClient(pgClient)
+
   try {
     const body = await parseBody<any>(c)
 
@@ -210,9 +219,6 @@ app.post('/', middlewareV2(['read', 'write', 'all']), async (c) => {
       message: '[SSO Test] Testing SSO configuration',
       orgId,
     })
-
-    const pgClient = getPgClient(c, true)
-    const drizzleClient = getDrizzleClient(pgClient)
 
     // Get SSO configuration
     const connections = await drizzleClient
@@ -479,5 +485,8 @@ app.post('/', middlewareV2(['read', 'write', 'all']), async (c) => {
       error: 'test_failed',
       message: error.message || 'Failed to test SSO configuration',
     }, 500)
+  }
+  finally {
+    await closeClient(c, pgClient)
   }
 })

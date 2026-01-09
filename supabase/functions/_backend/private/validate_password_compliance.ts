@@ -3,7 +3,7 @@ import { Hono } from 'hono/tiny'
 import { z } from 'zod/mini'
 import { parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
-import { supabaseClient, supabaseAdmin as useSupabaseAdmin } from '../utils/supabase.ts'
+import { emptySupabase, supabaseClient, supabaseAdmin as useSupabaseAdmin } from '../utils/supabase.ts'
 
 interface ValidatePasswordCompliance {
   email: string
@@ -64,7 +64,7 @@ app.post('/', async (c) => {
 
   const body = validationResult.data
   const { password: _password, ...bodyWithoutPassword } = body
-  cloudlog({ requestId: c.get('requestId'), context: 'validate_password_compliance raw body', rawBody: bodyWithoutPassword })
+  cloudlog({ requestId: c.get('requestId'), context: 'validate_password_compliance parsed body', parsedBody: bodyWithoutPassword })
   const supabaseAdmin = useSupabaseAdmin(c)
 
   // Get the org's password policy - need admin for initial lookup
@@ -92,8 +92,9 @@ app.post('/', async (c) => {
   }
 
   // Attempt to sign in with the provided credentials to verify password
-  // Note: signInWithPassword needs admin to work without session
-  const { data: signInData, error: signInError } = await supabaseAdmin.auth.signInWithPassword({
+  // Use anon client so RLS policies are enforced
+  const anonClient = emptySupabase(c)
+  const { data: signInData, error: signInError } = await anonClient.auth.signInWithPassword({
     email: body.email,
     password: body.password,
   })
@@ -105,12 +106,8 @@ app.post('/', async (c) => {
 
   const userId = signInData.user.id
 
-<<<<<<< HEAD
-  supabaseAdmin = useSupabaseAdmin(c)
-=======
   // Use authenticated client for subsequent queries - RLS will enforce access
   const supabase = supabaseClient(c, `Bearer ${signInData.session.access_token}`)
->>>>>>> origin/main
 
   // Verify user is a member of this organization
   const { data: membership, error: memberError } = await supabase

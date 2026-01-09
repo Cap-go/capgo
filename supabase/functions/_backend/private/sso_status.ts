@@ -96,10 +96,8 @@ app.post('/', middlewareV2(['read', 'write', 'all']), async (c) => {
       connectionCount: connections.length,
     })
 
-    // Return first connection only (one SSO config per org)
-    const config = connections[0] || null
-
-    return c.json(config)
+    // Return connections array as documented
+    return c.json({ status: 'ok', connections })
   }
   catch (error: any) {
     cloudlog({

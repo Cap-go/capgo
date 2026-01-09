@@ -307,7 +307,7 @@ onUnmounted(() => {
         <div class="overflow-hidden bg-white border border-gray-200 rounded-xl">
           <button
             type="button"
-            class="flex items-center justify-between w-full px-5 py-4 text-left transition-colors hover:bg-gray-50"
+            class="d-btn d-btn-ghost flex items-center justify-between w-full text-left justify-start"
             @click="togglePrerequisites"
           >
             <div class="flex items-center gap-3">

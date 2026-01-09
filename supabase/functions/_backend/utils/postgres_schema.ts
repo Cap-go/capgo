@@ -162,7 +162,7 @@ export const saml_domain_mappings = pgTable('saml_domain_mappings', {
   org_id: uuid('org_id').notNull(),
   sso_connection_id: uuid('sso_connection_id').notNull(),
   priority: integer('priority').notNull().default(0),
-  verified: boolean('verified').notNull().default(true),
+  verified: boolean('verified').notNull().default(false),
   verification_code: text('verification_code'),
   verified_at: timestamp('verified_at', { withTimezone: true }),
   created_at: timestamp('created_at', { withTimezone: true }).defaultNow(),
