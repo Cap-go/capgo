@@ -1,7 +1,6 @@
 import { randomUUID } from 'node:crypto'
-import { Pool } from 'pg'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
-import { getEndpointUrl, getSupabaseClient, headersInternal, POSTGRES_URL, USER_ADMIN_EMAIL, USER_ID } from './test-utils.ts'
+import { getEndpointUrl, getSupabaseClient, headersInternal, USER_ADMIN_EMAIL, USER_ID } from './test-utils.ts'
 
 const TEST_SSO_ORG_ID = randomUUID()
 const TEST_SSO_ORG_NAME = `SSO Test Org ${randomUUID()}`
@@ -101,27 +100,7 @@ async function getOrCreateTestAuthUser(email: string, metadata?: { sso_provider_
   }
 }
 
-// Postgres pool for direct database access (to disable triggers)
-let pgPool: Pool | null = null
-
 beforeAll(async () => {
-  // Disable expensive edge function triggers to prevent CPU time limits during tests
-  // These triggers use trigger_http_queue_post_to_function which sends HTTP requests
-  pgPool = new Pool({ connectionString: POSTGRES_URL })
-  try {
-    await pgPool.query(`
-      -- Disable edge function HTTP triggers
-      ALTER TABLE public.users DISABLE TRIGGER on_user_create;
-      ALTER TABLE public.users DISABLE TRIGGER on_user_update;
-      ALTER TABLE public.orgs DISABLE TRIGGER on_org_create;
-      ALTER TABLE public.orgs DISABLE TRIGGER on_organization_delete;
-    `)
-    console.log('✓ Disabled edge function triggers for testing')
-  }
-  catch (err: any) {
-    console.warn('Could not disable triggers:', err.message)
-  }
-
   // Clean up any existing test data from previous runs (idempotent)
   await getSupabaseClient().from('saml_domain_mappings').delete().eq('domain', TEST_DOMAIN)
   await getSupabaseClient().from('org_saml_connections').delete().eq('org_id', TEST_SSO_ORG_ID)
@@ -190,55 +169,6 @@ beforeAll(async () => {
 }, 120000)
 
 afterAll(async () => {
-  // Re-enable triggers with retry logic
-  if (pgPool) {
-    const maxRetries = 3
-    const retryDelay = 1000 // 1 second
-    let retryCount = 0
-    let success = false
-
-    while (retryCount < maxRetries && !success) {
-      try {
-        await pgPool.query(`
-          -- Re-enable edge function HTTP triggers
-          ALTER TABLE public.users ENABLE TRIGGER on_user_create;
-          ALTER TABLE public.users ENABLE TRIGGER on_user_update;
-          ALTER TABLE public.orgs ENABLE TRIGGER on_org_create;
-          ALTER TABLE public.orgs ENABLE TRIGGER on_organization_delete;
-        `)
-
-        // Verify triggers were actually enabled
-        const { rows } = await pgPool.query(`
-          SELECT tgname, tgenabled 
-          FROM pg_trigger 
-          WHERE tgname IN ('on_user_create', 'on_user_update', 'on_org_create', 'on_organization_delete')
-        `)
-
-        const allEnabled = rows.every((row: any) => row.tgenabled === 'O')
-        if (allEnabled) {
-          console.log('✓ Re-enabled edge function triggers')
-          success = true
-        }
-        else {
-          throw new Error('Not all triggers were enabled')
-        }
-      }
-      catch (err: any) {
-        retryCount++
-        if (retryCount < maxRetries) {
-          console.warn(`Failed to re-enable triggers (attempt ${retryCount}/${maxRetries}):`, err.message)
-          await new Promise(resolve => setTimeout(resolve, retryDelay * retryCount)) // Exponential backoff
-        }
-        else {
-          console.error('Could not re-enable triggers after max retries:', err.message)
-        }
-      }
-    }
-
-    await pgPool.end()
-    pgPool = null
-  }
-
   // Restore original Deno.Command
   if (originalDenoCommand && globalThis.Deno) {
     // @ts-expect-error - Restoring Deno.Command

@@ -3209,11 +3209,11 @@ export type Database = {
       }
       auto_enroll_sso_user: {
         Args: { p_user_id: string; p_email: string; p_sso_provider_id: string }
-        Returns: void
+        Returns: undefined
       }
       auto_join_user_to_orgs_by_email: {
         Args: { p_user_id: string; p_email: string; p_sso_provider_id?: string | null }
-        Returns: void
+        Returns: undefined
       }
       lookup_sso_provider_by_domain: {
         Args: { p_email: string }

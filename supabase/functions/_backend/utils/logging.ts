@@ -14,6 +14,7 @@ const SENSITIVE_FIELDS = new Set([
   'authorization',
   'cookie',
   'set-cookie',
+  'jwt',
 ])
 const SENSITIVE_FIELDS_LOWER = new Set(Array.from(SENSITIVE_FIELDS).map(f => f.toLowerCase()))
 
@@ -25,6 +26,7 @@ const SENSITIVE_PATTERNS = [
   /ak_test_[a-zA-Z0-9]{24,}/g, // Generic API key test
   /Bearer\s+[\w.-]{20,}/gi, // Bearer tokens
   /[a-f0-9]{32,}/gi, // Long hex strings (likely keys/tokens) - case insensitive
+  /[\w-]+\.[\w-]+\.[\w-]+={0,2}/g, // JWT/JWS (three base64url segments)
 ]
 
 /**
@@ -65,6 +67,12 @@ function sanitize(obj: any, seen = new WeakSet()): any {
     return obj
   }
 
+  // Cycle detection (must run before Error handling to prevent infinite loops)
+  if (seen.has(obj)) {
+    return '[Circular]'
+  }
+  seen.add(obj)
+
   // Handle Error instances
   if (obj instanceof Error) {
     return {
@@ -74,12 +82,6 @@ function sanitize(obj: any, seen = new WeakSet()): any {
       cause: obj.cause ? sanitize(obj.cause, seen) : undefined,
     }
   }
-
-  // Cycle detection
-  if (seen.has(obj)) {
-    return '[Circular]'
-  }
-  seen.add(obj)
 
   if (Array.isArray(obj)) {
     return obj.map(item => sanitize(item, seen))
@@ -121,13 +123,19 @@ export function cloudlog(unsafeMessage: any) {
   }
 }
 
-export function serializeError(err: unknown) {
+export function serializeError(err: unknown, seen = new WeakSet<object>()) {
+  if (typeof err === 'object' && err !== null) {
+    if (seen.has(err)) {
+      return { message: '[Circular]', stack: undefined, name: 'Error', cause: undefined }
+    }
+    seen.add(err)
+  }
   if (err instanceof Error) {
     let sanitizedCause: any
     if (err.cause !== undefined) {
       if (err.cause instanceof Error) {
         // Recursively serialize and sanitize Error causes
-        sanitizedCause = sanitize(serializeError(err.cause))
+        sanitizedCause = sanitize(serializeError(err.cause, seen))
       }
       else if (typeof err.cause === 'object' && err.cause !== null) {
         // Sanitize object causes

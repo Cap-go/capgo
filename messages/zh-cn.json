@@ -177,8 +177,6 @@
   "allow-device-to-self": "允许设备自我解除关联/关联",
   "allow-emulator": "允许模拟器",
   "allow-physical-device": "允许真机",
-  "allow-preview": "允许捆绑预览",
-  "allow-preview-help": "通过可分享的链接公开访问捆绑包预览",
   "allow-prod-build": "允许生产构建",
   "allow-prod-builds": "允许生产构建",
   "already-account": "你已经有一个账户了吗？",

@@ -422,15 +422,18 @@ BEGIN
       AND osc.auto_join_enabled = true  -- Only enroll if auto-join is enabled
   LOOP
     -- Check if already a member
-    SELECT EXISTS (
-      SELECT 1 FROM public.org_users 
-      WHERE user_id = p_user_id AND org_id = v_org.org_id
-    ) INTO v_already_member;
-    
-    IF NOT v_already_member THEN
-      -- Add user to organization with read permission
+    -- Add user to organization with read permission (idempotent - ON CONFLICT prevents race conditions)
       INSERT INTO public.org_users (user_id, org_id, user_right, created_at)
-      VALUES (p_user_id, v_org.org_id, 'read', now());
+      VALUES (p_user_id, v_org.org_id, 'read', now())
+      ON CONFLICT (user_id, org_id) DO NOTHING;
+      
+      -- Check if insertion was successful (for logging purposes)
+      SELECT EXISTS (
+        SELECT 1 FROM public.org_users 
+        WHERE user_id = p_user_id AND org_id = v_org.org_id
+      ) INTO v_already_member;
+      
+      IF v_already_member THEN
       
       -- Log the auto-enrollment
       INSERT INTO public.sso_audit_logs (
@@ -559,7 +562,7 @@ BEGIN
   END IF;
   
   -- Extract SSO provider ID from metadata
-  v_sso_provider_id := public.get_sso_provider_id_for_user(NEW.id);
+  v_sso_provider_id := public.get_sso_provider_id_for_user_internal(NEW.id);
   
   -- If no SSO provider, try looking it up by domain
   IF v_sso_provider_id IS NULL THEN
@@ -601,7 +604,7 @@ BEGIN
   END IF;
   
   -- Get SSO provider ID from user metadata
-  v_sso_provider_id := public.get_sso_provider_id_for_user(NEW.id);
+  v_sso_provider_id := public.get_sso_provider_id_for_user_internal(NEW.id);
   
   -- Only proceed with SSO auto-join if provider ID exists
   IF v_sso_provider_id IS NOT NULL THEN
@@ -984,8 +987,7 @@ GRANT
 EXECUTE ON FUNCTION public.check_org_sso_configured TO authenticated,
 anon;
 
-GRANT
-EXECUTE ON FUNCTION public.get_sso_provider_id_for_user TO authenticated;
+-- get_sso_provider_id_for_user remains internal-only (REVOKE applied earlier)
 
 GRANT
 EXECUTE ON FUNCTION public.org_has_sso_configured (uuid) TO authenticated;
