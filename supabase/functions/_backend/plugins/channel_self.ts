@@ -563,8 +563,8 @@ app.post('/', async (c) => {
   // POST has writes, so always create PG client (even if using D1 for reads)
   const pgClient = getPgClient(c)
 
-  // Set replication lag header (uses cached status, non-blocking)
-  await setReplicationLagHeader(c)
+  // Set replication lag header using the existing pool
+  await setReplicationLagHeader(c, pgClient)
 
   const bodyParsed = parsePluginBody<DeviceLink>(c, body, jsonRequestSchema)
   if (!bodyParsed.channel) {
@@ -591,8 +591,8 @@ app.put('/', async (c) => {
 
   const pgClient = getPgClient(c)
 
-  // Set replication lag header (uses cached status, non-blocking)
-  await setReplicationLagHeader(c)
+  // Set replication lag header using the existing pool
+  await setReplicationLagHeader(c, pgClient)
 
   const bodyParsed = parsePluginBody<DeviceLink>(c, body, jsonRequestSchema)
   let res
@@ -617,8 +617,8 @@ app.delete('/', async (c) => {
   // DELETE has writes, so always create PG client (even if using D1 for reads)
   const pgClient = getPgClient(c)
 
-  // Set replication lag header (uses cached status, non-blocking)
-  await setReplicationLagHeader(c)
+  // Set replication lag header using the existing pool
+  await setReplicationLagHeader(c, pgClient)
 
   const bodyParsed = parsePluginBody<DeviceLink>(c, body, jsonRequestSchema)
   let res
@@ -641,8 +641,8 @@ app.get('/', async (c) => {
 
   const pgClient = getPgClient(c, true)
 
-  // Set replication lag header (uses cached status, non-blocking)
-  await setReplicationLagHeader(c)
+  // Set replication lag header using the existing pool
+  await setReplicationLagHeader(c, pgClient)
 
   const bodyParsed = parsePluginBody<DeviceLink>(c, body, jsonRequestSchemaGet, false)
   let res
