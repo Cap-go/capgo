@@ -58,13 +58,17 @@ app.post('/', middlewareV2(['all', 'write']), async (c) => {
     return quickError(401, 'not_authorized', 'Not authorized', { userId, appId: safeBody.app_id })
   }
 
-  const { error: appError } = await supabase.from('apps')
+  const { data: app, error: appError } = await supabase.from('apps')
     .select('owner_org')
     .eq('app_id', safeBody.app_id)
     .single()
 
-  if (appError) {
+  if (appError || !app) {
     return quickError(404, 'app_not_found', 'App not found', { app_id: safeBody.app_id })
+  }
+
+  if (app.owner_org !== safeBody.org_id) {
+    return quickError(403, 'org_mismatch', 'App does not belong to the specified organization', { app_id: safeBody.app_id, org_id: safeBody.org_id })
   }
 
   await createStatsDevices(c, {

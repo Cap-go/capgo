@@ -24,17 +24,13 @@ async function continueWithSSO(form: { email: string }) {
     return
   }
 
-  console.log('🔵 SSO Login - Starting flow for:', form.email)
   isLoading.value = true
 
   try {
     // Check if SSO is available for this domain
-    console.log('🔵 SSO Login - Checking SSO availability...')
     const hasSSO = await checkSSO(form.email)
-    console.log('🔵 SSO Login - SSO available:', hasSSO)
 
     if (!hasSSO) {
-      console.error('❌ SSO Login - SSO not configured for this email domain')
       toast.error(t('sso-not-configured', 'SSO is not configured for this email domain. Please contact your administrator.'))
       isLoading.value = false
       return
@@ -45,12 +41,9 @@ async function continueWithSSO(form: { email: string }) {
       ? route.query.to
       : '/dashboard'
 
-    console.log('🔵 SSO Login - Initiating SSO with redirectTo:', redirectTo)
     await initiateSSO(redirectTo, form.email)
-    console.log('🔵 SSO Login - initiateSSO completed (should have redirected)')
   }
-  catch (error: any) {
-    console.error('❌ SSO login error:', error)
+  catch {
     toast.error(t('sso-login-failed', 'Failed to initiate SSO login'))
     isLoading.value = false
   }

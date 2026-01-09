@@ -38,7 +38,7 @@ export async function getDeliveries(c: Context<MiddlewareKeyVariables, any, any>
   await checkWebhookPermission(c, body.orgId, apikey)
 
   // Use authenticated client - RLS will enforce access
-  const supabase = supabaseApikey(c, c.get('capgkey') as string)
+  const supabase = supabaseApikey(c, c.get('capgkey'))
 
   // Verify webhook belongs to org
   // Note: Using type assertion as webhooks table types are not yet generated
