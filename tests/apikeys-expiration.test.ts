@@ -251,7 +251,7 @@ describe('[GET] /apikey with expiration info', () => {
   })
 })
 
-describe('Organization API key expiration policy', () => {
+describe('organization API key expiration policy', () => {
   it('fail to create api key without expiration for org requiring expiration', async () => {
     const response = await fetch(`${BASE_URL}/apikey`, {
       method: 'POST',
@@ -346,10 +346,12 @@ describe('[PUT] /organization with API key policy', () => {
       throw orgError
 
     // Add user as super_admin to be able to update the org
-    const { error: memberError } = await getSupabaseClient().from('org_users').insert({
+    const { error: memberError } = await getSupabaseClient().from('org_users').upsert({
       org_id: updateOrgId,
       user_id: USER_ID,
       user_right: 'super_admin',
+    }, {
+      onConflict: 'user_id,org_id',
     })
     if (memberError)
       throw memberError
@@ -439,7 +441,7 @@ describe('[PUT] /organization with API key policy', () => {
   })
 })
 
-describe('Expired API key rejection', () => {
+describe('expired API key rejection', () => {
   let expiredKeyValue: string
   let validKeyValue: string
 
@@ -457,9 +459,7 @@ describe('Expired API key rejection', () => {
     expiredKeyValue = data1.key
 
     // Manually set the key to expired (1 day ago)
-    const { error } = await getSupabaseClient().from('apikeys')
-      .update({ expires_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString() })
-      .eq('id', data1.id)
+    const { error } = await getSupabaseClient().from('apikeys').update({ expires_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString() }).eq('id', data1.id)
     if (error)
       throw error
 
@@ -500,8 +500,8 @@ describe('Expired API key rejection', () => {
   })
 })
 
-describe('API key expiration boundary conditions', () => {
-  it('API key expiring exactly at current time should be rejected', async () => {
+describe('api key expiration boundary conditions', () => {
+  it('api key expiring exactly at current time should be rejected', async () => {
     // Create an API key with future expiration
     const response = await fetch(`${BASE_URL}/apikey`, {
       method: 'POST',
@@ -515,9 +515,7 @@ describe('API key expiration boundary conditions', () => {
     expect(response.status).toBe(200)
 
     // Set expiration to exactly now (should be considered expired since condition is > now)
-    const { error } = await getSupabaseClient().from('apikeys')
-      .update({ expires_at: new Date().toISOString() })
-      .eq('id', data.id)
+    const { error } = await getSupabaseClient().from('apikeys').update({ expires_at: new Date().toISOString() }).eq('id', data.id)
     expect(error).toBeNull()
 
     // Wait a tiny bit to ensure we're past the exact timestamp
@@ -534,7 +532,7 @@ describe('API key expiration boundary conditions', () => {
     expect(authResponse.status).toBe(401)
   })
 
-  it('API key expiring 1 second in the future should still work', async () => {
+  it('api key expiring 1 second in the future should still work', async () => {
     // Create an API key with 1 second future expiration
     const futureDate = new Date(Date.now() + 5000).toISOString() // 5 seconds from now
     const response = await fetch(`${BASE_URL}/apikey`, {
@@ -565,7 +563,7 @@ describe('API key expiration boundary conditions', () => {
     })
   })
 
-  it('API key with null expiration should never expire', async () => {
+  it('api key with null expiration should never expire', async () => {
     // Create an API key without expiration
     const response = await fetch(`${BASE_URL}/apikey`, {
       method: 'POST',

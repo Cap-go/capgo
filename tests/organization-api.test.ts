@@ -302,10 +302,12 @@ describe('[DELETE] /organization/members', () => {
     expect(userData).toBeTruthy()
     expect(userData?.email).toBe(USER_ADMIN_EMAIL)
 
-    const { error } = await getSupabaseClient().from('org_users').insert({
+    const { error } = await getSupabaseClient().from('org_users').upsert({
       org_id: ORG_ID,
       user_id: userData!.id,
       user_right: 'invite_read',
+    }, {
+      onConflict: 'user_id,org_id',
     })
     expect(error).toBeNull()
 
@@ -593,10 +595,12 @@ describe('[DELETE] /organization', () => {
     }
 
     // Add test user as a member but not owner
-    const { error: memberError } = await getSupabaseClient().from('org_users').insert({
+    const { error: memberError } = await getSupabaseClient().from('org_users').upsert({
       org_id: id,
       user_id: USER_ID,
       user_right: 'admin', // Even with admin rights, shouldn't be able to delete
+    }, {
+      onConflict: 'user_id,org_id',
     })
     expect(memberError).toBeNull()
 

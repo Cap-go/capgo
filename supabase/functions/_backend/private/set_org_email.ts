@@ -28,6 +28,9 @@ app.post('/', middlewareV2(['all', 'write']), async (c) => {
 
   // Use authenticated client for data queries - RLS will enforce access
   const supabase = supabaseWithAuth(c, auth)
+  if (supabase instanceof Response) {
+    return supabase
+  }
 
   const { data: organization, error: organizationError } = await supabase.from('orgs')
     .select('customer_id, management_email')

@@ -439,7 +439,8 @@ VALUES
     '88888888-8888-8888-8888-888888888888'::UUID,
     '88888888-8888-8888-8888-888888888888'::UUID,
     'super_admin'::public.USER_MIN_RIGHT
-);
+)
+ON CONFLICT (user_id, org_id) DO NOTHING;
 
 -- Create an app owned by this user
 INSERT INTO
@@ -728,7 +729,8 @@ VALUES
     '99999999-9999-9999-9999-999999999999'::UUID,
     'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'::UUID,
     'super_admin'::public.USER_MIN_RIGHT
-);
+)
+ON CONFLICT (user_id, org_id) DO NOTHING;
 
 -- Create resources owned by admin1
 INSERT INTO
@@ -1056,7 +1058,8 @@ VALUES
     'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'::UUID,
     'cccccccc-cccc-cccc-cccc-cccccccccccc'::UUID,
     'super_admin'::public.USER_MIN_RIGHT
-);
+)
+ON CONFLICT (user_id, org_id) DO NOTHING;
 
 -- Manually insert audit log entries for admin1
 -- (Normally these would be created by triggers, but we insert directly for testing)
