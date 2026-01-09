@@ -56,9 +56,9 @@ const props = defineProps({
 
 const dataArray = computed(() => {
   if (!props.data || props.data.length === 0) {
-    return Array.from({ length: getDaysInCurrentMonth() }).fill(undefined) as number[]
+    return Array.from({ length: getDaysInCurrentMonth() }).fill(undefined) as (number | undefined)[]
   }
-  return props.data as number[]
+  return props.data as (number | undefined)[]
 })
 
 // Check if we have real data
