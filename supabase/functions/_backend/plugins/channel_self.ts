@@ -9,8 +9,9 @@ import { z } from 'zod/mini'
 import { getAppStatus, setAppStatus } from '../utils/appStatus.ts'
 import { BRES, parseBody, simpleError200, simpleRateLimit } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
+import { sendNotifOrg } from '../utils/notifications.ts'
 import { sendNotifToOrgMembers } from '../utils/org_email_notifications.ts'
-import { closeClient, deleteChannelDevicePg, getAppByIdPg, getAppOwnerPostgres, getAppVersionsByAppIdPg, getChannelByNamePg, getChannelDeviceOverridePg, getChannelsPg, getCompatibleChannelsPg, getDrizzleClient, getMainChannelsPg, getPgClient, upsertChannelDevicePg } from '../utils/pg.ts'
+import { closeClient, deleteChannelDevicePg, getAppByIdPg, getAppOwnerPostgres, getAppVersionsByAppIdPg, getChannelByNamePg, getChannelDeviceOverridePg, getChannelsPg, getCompatibleChannelsPg, getDrizzleClient, getMainChannelsPg, getPgClient, setReplicationLagHeader, upsertChannelDevicePg } from '../utils/pg.ts'
 import { convertQueryToBody, makeDevice, parsePluginBody } from '../utils/plugin_parser.ts'
 import { sendStatsAndDevice } from '../utils/stats.ts'
 import { backgroundTask, deviceIdRegex, INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, isDeprecatedPluginVersion, isLimited, MISSING_STRING_APP_ID, MISSING_STRING_DEVICE_ID, MISSING_STRING_VERSION_BUILD, MISSING_STRING_VERSION_NAME, NON_STRING_APP_ID, NON_STRING_DEVICE_ID, NON_STRING_VERSION_BUILD, NON_STRING_VERSION_NAME, reverseDomainRegex } from '../utils/utils.ts'
@@ -86,6 +87,12 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
     await setAppStatus(c, app_id, 'cancelled')
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot update, upgrade plan to continue to update', id: app_id })
     await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
+    // Send weekly notification about missing payment (not configurable - payment related)
+    backgroundTask(c, sendNotifOrg(c, 'org:missing_payment', {
+      app_id,
+      device_id,
+      app_id_url: app_id,
+    }, appOwner.owner_org, app_id, '0 0 * * 1')) // Weekly on Monday
     return simpleError200(c, 'need_plan_upgrade', PLAN_ERROR)
   }
 
@@ -282,6 +289,12 @@ async function put(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient
     await setAppStatus(c, app_id, 'cancelled')
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot update, upgrade plan to continue to update', id: app_id })
     await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
+    // Send weekly notification about missing payment (not configurable - payment related)
+    backgroundTask(c, sendNotifOrg(c, 'org:missing_payment', {
+      app_id,
+      device_id,
+      app_id_url: app_id,
+    }, appOwner.owner_org, app_id, '0 0 * * 1')) // Weekly on Monday
     return simpleError200(c, 'need_plan_upgrade', PLAN_ERROR)
   }
   await setAppStatus(c, app_id, 'cloud')
@@ -406,6 +419,12 @@ async function deleteOverride(c: Context, drizzleClient: ReturnType<typeof getDr
     await setAppStatus(c, app_id, 'cancelled')
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot update, upgrade plan to continue to update', id: app_id })
     await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
+    // Send weekly notification about missing payment (not configurable - payment related)
+    backgroundTask(c, sendNotifOrg(c, 'org:missing_payment', {
+      app_id,
+      device_id,
+      app_id_url: app_id,
+    }, appOwner.owner_org, app_id, '0 0 * * 1')) // Weekly on Monday
     return simpleError200(c, 'need_plan_upgrade', PLAN_ERROR)
   }
   await setAppStatus(c, app_id, 'cloud')
@@ -502,6 +521,12 @@ async function listCompatibleChannels(c: Context, drizzleClient: ReturnType<type
     await setAppStatus(c, app_id, 'cancelled')
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot update, upgrade plan to continue to update', id: app_id })
     await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
+    // Send weekly notification about missing payment (not configurable - payment related)
+    // Note: We don't have device_id in GET request for listing compatible channels
+    backgroundTask(c, sendNotifOrg(c, 'org:missing_payment', {
+      app_id,
+      app_id_url: app_id,
+    }, appOwner.owner_org, app_id, '0 0 * * 1')) // Weekly on Monday
     return simpleError200(c, 'need_plan_upgrade', PLAN_ERROR)
   }
   await setAppStatus(c, app_id, 'cloud')
@@ -538,6 +563,9 @@ app.post('/', async (c) => {
   // POST has writes, so always create PG client (even if using D1 for reads)
   const pgClient = getPgClient(c)
 
+  // Set replication lag header (uses cached status, non-blocking)
+  await setReplicationLagHeader(c)
+
   const bodyParsed = parsePluginBody<DeviceLink>(c, body, jsonRequestSchema)
   if (!bodyParsed.channel) {
     return simpleError200(c, 'missing_channel', 'Cannot find channel in body')
@@ -563,6 +591,9 @@ app.put('/', async (c) => {
 
   const pgClient = getPgClient(c)
 
+  // Set replication lag header (uses cached status, non-blocking)
+  await setReplicationLagHeader(c)
+
   const bodyParsed = parsePluginBody<DeviceLink>(c, body, jsonRequestSchema)
   let res
   try {
@@ -586,6 +617,9 @@ app.delete('/', async (c) => {
   // DELETE has writes, so always create PG client (even if using D1 for reads)
   const pgClient = getPgClient(c)
 
+  // Set replication lag header (uses cached status, non-blocking)
+  await setReplicationLagHeader(c)
+
   const bodyParsed = parsePluginBody<DeviceLink>(c, body, jsonRequestSchema)
   let res
   try {
@@ -606,6 +640,9 @@ app.get('/', async (c) => {
   }
 
   const pgClient = getPgClient(c, true)
+
+  // Set replication lag header (uses cached status, non-blocking)
+  await setReplicationLagHeader(c)
 
   const bodyParsed = parsePluginBody<DeviceLink>(c, body, jsonRequestSchemaGet, false)
   let res

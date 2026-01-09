@@ -1,8 +1,9 @@
 import type { Context } from 'hono'
+import type { DevicesByPlatform } from '../utils/cloudflare.ts'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
-import { readActiveAppsCF, readLastMonthDevicesCF, readLastMonthUpdatesCF } from '../utils/cloudflare.ts'
+import { readActiveAppsCF, readLastMonthDevicesByPlatformCF, readLastMonthDevicesCF, readLastMonthUpdatesCF } from '../utils/cloudflare.ts'
 import { BRES, middlewareAPISecret } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../utils/logging.ts'
 import { logsnag, logsnagInsights } from '../utils/logsnag.ts'
@@ -43,6 +44,7 @@ interface GlobalStats {
   plans: PromiseLike<PlanTotal>
   actives: Promise<Actives>
   devices_last_month: PromiseLike<number>
+  devices_by_platform: PromiseLike<DevicesByPlatform>
   registers_today: PromiseLike<number>
   bundle_storage_gb: PromiseLike<number>
   revenue: PromiseLike<PlanRevenue>
@@ -305,6 +307,7 @@ function getStats(c: Context): GlobalStats {
     }),
     updates_last_month: readLastMonthUpdatesCF(c),
     devices_last_month: readLastMonthDevicesCF(c),
+    devices_by_platform: readLastMonthDevicesByPlatformCF(c),
     registers_today: supabase
       .from('users')
       .select('id', { count: 'exact', head: true })
@@ -398,6 +401,7 @@ app.post('/', middlewareAPISecret, async (c) => {
     actives,
     updates_last_month,
     devices_last_month,
+    devices_by_platform,
     registers_today,
     bundle_storage_gb,
     success_rate,
@@ -420,6 +424,7 @@ app.post('/', middlewareAPISecret, async (c) => {
     res.actives,
     res.updates_last_month,
     res.devices_last_month,
+    res.devices_by_platform,
     res.registers_today,
     res.bundle_storage_gb,
     res.success_rate,
@@ -468,12 +473,15 @@ app.post('/', middlewareAPISecret, async (c) => {
     not_paying,
     updates_last_month,
     devices_last_month,
+    devices_last_month_ios: devices_by_platform.ios,
+    devices_last_month_android: devices_by_platform.android,
     registers_today,
     bundle_storage_gb,
     success_rate,
     plan_solo: plans.Solo,
     plan_maker: plans.Maker,
     plan_team: plans.Team,
+    plan_enterprise: plans.Enterprise || 0,
     // Revenue metrics
     mrr: revenue.mrr,
     total_revenue: revenue.total_revenue,
@@ -621,6 +629,16 @@ app.post('/', middlewareAPISecret, async (c) => {
       title: 'Orgs Enterprise Plan',
       value: `${((plans.Enterprise || 0) * 100 / customers.total).toFixed(0)}% - ${plans.Enterprise || 0}`,
       icon: '📈',
+    },
+    {
+      title: 'Devices iOS (30d)',
+      value: devices_by_platform.ios,
+      icon: '🍎',
+    },
+    {
+      title: 'Devices Android (30d)',
+      value: devices_by_platform.android,
+      icon: '🤖',
     },
   ]).catch((e) => {
     cloudlogErr({ requestId: c.get('requestId'), message: 'insights error', e })

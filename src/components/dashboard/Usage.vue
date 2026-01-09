@@ -12,6 +12,7 @@ import CalendarDaysIcon from '~icons/heroicons/calendar-days'
 import ChartBarIcon from '~icons/heroicons/chart-bar'
 import InformationInfo from '~icons/heroicons/information-circle'
 import { bytesToGb, getDaysBetweenDates } from '~/services/conversion'
+import { DEMO_APP_NAMES, generateDemoBandwidthData, generateDemoMauData, generateDemoStorageData } from '~/services/demoChartData'
 import { getPlans } from '~/services/supabase'
 import { useDashboardAppsStore } from '~/stores/dashboardApps'
 import { useDialogV2Store } from '~/stores/dialogv2'
@@ -23,6 +24,7 @@ import UsageCard from './UsageCard.vue'
 
 const props = defineProps<{
   appId?: string
+  forceDemo?: boolean
 }>()
 
 const plans = ref<Database['public']['Tables']['plans']['Row'][]>([])
@@ -180,9 +182,14 @@ function clearDashboardParams() {
 // Function to reload all chart data
 async function reloadAllCharts() {
   // Force reload of main dashboard data
+  // End date should be tomorrow at midnight to include all of today's data
   const last30DaysEnd = new Date()
+  last30DaysEnd.setHours(0, 0, 0, 0)
+  last30DaysEnd.setDate(last30DaysEnd.getDate() + 1) // Tomorrow midnight
+  // Start date should be 29 days ago at midnight (to get 30 days total including today)
   const last30DaysStart = new Date()
-  last30DaysStart.setDate(last30DaysStart.getDate() - 29) // 30 days including today
+  last30DaysStart.setHours(0, 0, 0, 0)
+  last30DaysStart.setDate(last30DaysStart.getDate() - 29)
 
   const orgId = organizationStore.currentOrganization?.gid
   if (orgId) {
@@ -283,11 +290,15 @@ function filterToBillingPeriod(fullData: { mau: number[], storage: number[], ban
 }
 
 async function getUsages(forceRefetch = false) {
-  // Always work with last 30 days of data - normalize first for consistency
+  // Always work with last 30 days of data
+  // End date should be tomorrow at midnight to include all of today's data
   const last30DaysEnd = new Date()
   last30DaysEnd.setHours(0, 0, 0, 0)
-  const last30DaysStart = new Date(last30DaysEnd)
-  last30DaysStart.setDate(last30DaysStart.getDate() - 29) // 30 days including today
+  last30DaysEnd.setDate(last30DaysEnd.getDate() + 1) // Tomorrow midnight
+  // Start date should be 29 days ago at midnight (to get 30 days total including today)
+  const last30DaysStart = new Date()
+  last30DaysStart.setHours(0, 0, 0, 0)
+  last30DaysStart.setDate(last30DaysStart.getDate() - 29)
 
   // Get billing period dates for filtering
   const billingStart = new Date(organizationStore.currentOrganization?.subscription_start ?? new Date())
@@ -466,6 +477,36 @@ async function getUsages(forceRefetch = false) {
   }
 }
 
+async function loadDemoData() {
+  // Generate demo data for payment failed state
+  const demoMau = generateDemoMauData(30)
+  const demoStorage = generateDemoStorageData(30).map(v => v / 1000) // Convert MB to GB
+  const demoBandwidth = generateDemoBandwidthData(30)
+
+  data.value = {
+    mau: demoMau,
+    storage: demoStorage,
+    bandwidth: demoBandwidth,
+  }
+
+  // Generate by-app breakdown for demo
+  dataByApp.value = {
+    mau: {
+      'demo-app-1': generateDemoMauData(30).map(v => Math.round(v * 0.6)),
+      'demo-app-2': generateDemoMauData(30).map(v => Math.round(v * 0.4)),
+    },
+    storage: {
+      'demo-app-1': generateDemoStorageData(30).map(v => v / 1000 * 0.6),
+      'demo-app-2': generateDemoStorageData(30).map(v => v / 1000 * 0.4),
+    },
+    bandwidth: {
+      'demo-app-1': generateDemoBandwidthData(30).map(v => v * 0.6),
+      'demo-app-2': generateDemoBandwidthData(30).map(v => v * 0.4),
+    },
+  }
+  appNames.value = DEMO_APP_NAMES
+}
+
 async function loadData() {
   const startTime = Date.now()
   isLoading.value = true
@@ -474,7 +515,14 @@ async function loadData() {
     plans.value.length = 0
     plans.value.push(...pls)
   })
-  await getUsages(true) // Initial load - force fetch
+
+  // If forceDemo is true, use demo data instead of fetching real data
+  if (props.forceDemo) {
+    await loadDemoData()
+  }
+  else {
+    await getUsages(true) // Initial load - force fetch
+  }
 
   // Ensure spinner shows for at least 300ms for better UX
   const elapsed = Date.now() - startTime
@@ -554,7 +602,11 @@ watch(() => route.query, (newQuery) => {
 }, { deep: true })
 
 onMounted(() => {
-  if (main.dashboardFetched) {
+  // If forceDemo is true, load immediately with demo data
+  if (props.forceDemo) {
+    loadData()
+  }
+  else if (main.dashboardFetched) {
     loadData()
   }
 })
@@ -682,6 +734,7 @@ onMounted(() => {
       :data="mauData" :data-by-app="mauDataByApp" :app-names="appNames" :title="`${t('monthly-active')}`" :unit="t('units-users')"
       :use-billing-period="useBillingPeriod"
       :is-loading="isLoading"
+      :force-demo="forceDemo"
       class="col-span-full sm:col-span-6 xl:col-span-4"
     />
     <UsageCard
@@ -689,6 +742,7 @@ onMounted(() => {
       :title="t('Storage')" :unit="storageUnit"
       :use-billing-period="useBillingPeriod"
       :is-loading="isLoading"
+      :force-demo="forceDemo"
       class="col-span-full sm:col-span-6 xl:col-span-4"
     />
     <UsageCard
@@ -696,11 +750,12 @@ onMounted(() => {
       :title="t('Bandwidth')" :unit="t('units-gb')"
       :use-billing-period="useBillingPeriod"
       :is-loading="isLoading"
+      :force-demo="forceDemo"
       class="col-span-full sm:col-span-6 xl:col-span-4"
     />
-    <DevicesStats v-show="appId" :use-billing-period="useBillingPeriod" :accumulated="useBillingPeriod && showCumulative" :reload-trigger="reloadTrigger" class="col-span-full sm:col-span-6 xl:col-span-4" />
-    <BundleUploadsCard v-show="!appId" :use-billing-period="useBillingPeriod" :accumulated="useBillingPeriod && showCumulative" :reload-trigger="reloadTrigger" class="col-span-full sm:col-span-6 xl:col-span-4" />
-    <UpdateStatsCard v-show="!appId" :use-billing-period="useBillingPeriod" :accumulated="useBillingPeriod && showCumulative" :reload-trigger="reloadTrigger" class="col-span-full sm:col-span-6 xl:col-span-4" />
-    <DeploymentStatsCard v-show="!appId" :use-billing-period="useBillingPeriod" :accumulated="useBillingPeriod && showCumulative" :reload-trigger="reloadTrigger" class="col-span-full sm:col-span-6 xl:col-span-4" />
+    <DevicesStats v-show="appId" :use-billing-period="useBillingPeriod" :accumulated="useBillingPeriod && showCumulative" :reload-trigger="reloadTrigger" :force-demo="forceDemo" class="col-span-full sm:col-span-6 xl:col-span-4" />
+    <BundleUploadsCard v-show="!appId" :use-billing-period="useBillingPeriod" :accumulated="useBillingPeriod && showCumulative" :reload-trigger="reloadTrigger" :force-demo="forceDemo" class="col-span-full sm:col-span-6 xl:col-span-4" />
+    <UpdateStatsCard v-show="!appId" :use-billing-period="useBillingPeriod" :accumulated="useBillingPeriod && showCumulative" :reload-trigger="reloadTrigger" :force-demo="forceDemo" class="col-span-full sm:col-span-6 xl:col-span-4" />
+    <DeploymentStatsCard v-show="!appId" :use-billing-period="useBillingPeriod" :accumulated="useBillingPeriod && showCumulative" :reload-trigger="reloadTrigger" :force-demo="forceDemo" class="col-span-full sm:col-span-6 xl:col-span-4" />
   </div>
 </template>

@@ -46,8 +46,9 @@ const TRACK_DEVICE_USAGE_CACHE_MAX_AGE_SECONDS = 29 * 24 * 60 * 60 // 29 days
  * @param device_id - Unique device identifier
  * @param app_id - Application identifier
  * @param org_id - Organization identifier (optional, defaults to empty string)
+ * @param platform - Device platform ('ios' or 'android')
  */
-export async function trackDeviceUsageCF(c: Context, device_id: string, app_id: string, org_id: string) {
+export async function trackDeviceUsageCF(c: Context, device_id: string, app_id: string, org_id: string, platform: string) {
   if (!c.env.DEVICE_USAGE)
     return
 
@@ -67,9 +68,13 @@ export async function trackDeviceUsageCF(c: Context, device_id: string, app_id: 
       }
     }
 
+    // Platform: 0 = android, 1 = ios
+    const platformValue = platform?.toLowerCase() === 'ios' ? 1 : 0
+
     // Write to Analytics Engine
     c.env.DEVICE_USAGE.writeDataPoint({
       blobs: [device_id, org_id],
+      doubles: [platformValue],
       indexes: [app_id],
     })
 
@@ -79,9 +84,12 @@ export async function trackDeviceUsageCF(c: Context, device_id: string, app_id: 
     }
   }
   catch {
+    // Platform: 0 = android, 1 = ios
+    const platformValue = platform?.toLowerCase() === 'ios' ? 1 : 0
     // On error, still try to write to Analytics Engine without caching
     c.env.DEVICE_USAGE.writeDataPoint({
       blobs: [device_id, org_id],
+      doubles: [platformValue],
       indexes: [app_id],
     })
   }
@@ -801,6 +809,42 @@ export async function readLastMonthDevicesCF(c: Context): Promise<number> {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Error reading last month devices', error: serializeError(e) })
   }
   return 0
+}
+
+export interface DevicesByPlatform {
+  total: number
+  ios: number
+  android: number
+}
+
+export async function readLastMonthDevicesByPlatformCF(c: Context): Promise<DevicesByPlatform> {
+  if (!c.env.DEVICE_USAGE) {
+    return { total: 0, ios: 0, android: 0 }
+  }
+
+  const oneMonthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+  // Platform: double1 = 0 for android, 1 for ios
+  const query = `SELECT
+    COUNT(DISTINCT blob1) AS total,
+    COUNT(DISTINCT CASE WHEN double1 = 1 THEN blob1 END) AS ios,
+    COUNT(DISTINCT CASE WHEN double1 = 0 THEN blob1 END) AS android
+  FROM device_usage
+  WHERE timestamp >= toDateTime('${formatDateCF(oneMonthAgo)}')
+    AND timestamp < now()`
+
+  cloudlog({ requestId: c.get('requestId'), message: 'readLastMonthDevicesByPlatformCF query', query })
+  try {
+    const res = await runQueryToCFA<{ total: number, ios: number, android: number }>(c, query)
+    return {
+      total: res[0]?.total || 0,
+      ios: res[0]?.ios || 0,
+      android: res[0]?.android || 0,
+    }
+  }
+  catch (e) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error reading last month devices by platform', error: serializeError(e) })
+  }
+  return { total: 0, ios: 0, android: 0 }
 }
 
 export async function getAppsToProcessCF(c: Context, flag: 'to_get_framework' | 'to_get_info' | 'to_get_similar', limit: number) {

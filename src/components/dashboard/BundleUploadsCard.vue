@@ -2,6 +2,14 @@
 import colors from 'tailwindcss/colors'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import {
+  calculateDemoEvolution,
+  calculateDemoTotal,
+  DEMO_APP_NAMES,
+  generateConsistentDemoData,
+  generateDemoBundleUploadsData,
+  getDemoDayCount,
+} from '~/services/demoChartData'
 import { useSupabase } from '~/services/supabase'
 import { useDashboardAppsStore } from '~/stores/dashboardApps'
 import { useOrganizationStore } from '~/stores/organization'
@@ -24,6 +32,10 @@ const props = defineProps({
   reloadTrigger: {
     type: Number,
     default: 0,
+  },
+  forceDemo: {
+    type: Boolean,
+    default: false,
   },
 })
 
@@ -82,7 +94,36 @@ const currentCacheOrgId = ref<string | null>(null)
 // Cache for single app name to avoid refetching
 const singleAppNameCache = new Map<string, string>()
 
-const hasData = computed(() => bundleData.value.length > 0)
+// Generate consistent demo data where total is derived from per-app breakdown
+const consistentDemoData = computed(() => {
+  const days = getDemoDayCount(props.useBillingPeriod, bundleData.value.length)
+  return generateConsistentDemoData(days, generateDemoBundleUploadsData)
+})
+
+const demoBundleData = computed(() => consistentDemoData.value.total)
+const demoDataByApp = computed(() => consistentDemoData.value.byApp)
+
+// Demo mode: show demo data only when forceDemo is true OR user has no apps
+// If user has apps, ALWAYS show real data (even if empty)
+const isDemoMode = computed(() => {
+  if (props.forceDemo)
+    return true
+  // If user has apps, never show demo data
+  const dashboardAppsStore = useDashboardAppsStore()
+  if (dashboardAppsStore.apps.length > 0)
+    return false
+  // No apps and store is loaded = show demo
+  return dashboardAppsStore.isLoaded
+})
+
+// Effective values for display
+const effectiveBundleData = computed(() => isDemoMode.value ? demoBundleData.value : bundleData.value)
+const effectiveBundleDataByApp = computed(() => isDemoMode.value ? demoDataByApp.value : bundleDataByApp.value)
+const effectiveAppNames = computed(() => isDemoMode.value ? DEMO_APP_NAMES : appNames.value)
+const effectiveTotal = computed(() => isDemoMode.value ? calculateDemoTotal(demoBundleData.value) : total.value)
+const effectiveLastDayEvolution = computed(() => isDemoMode.value ? calculateDemoEvolution(demoBundleData.value) : lastDayEvolution.value)
+
+const hasData = computed(() => effectiveTotal.value > 0 || isDemoMode.value)
 
 async function calculateStats(forceRefetch = false) {
   const startTime = Date.now()
@@ -294,20 +335,21 @@ onMounted(async () => {
 <template>
   <ChartCard
     :title="t('bundle_uploads')"
-    :total="total"
-    :last-day-evolution="lastDayEvolution"
+    :total="effectiveTotal"
+    :last-day-evolution="effectiveLastDayEvolution"
     :is-loading="isLoading"
     :has-data="hasData"
+    :is-demo-data="isDemoMode"
   >
     <BundleUploadsChart
-      :key="JSON.stringify(bundleDataByApp)"
+      :key="JSON.stringify(effectiveBundleDataByApp)"
       :title="t('bundle_uploads')"
       :colors="colors.violet"
-      :data="bundleData"
-      :data-by-app="bundleDataByApp"
+      :data="effectiveBundleData"
+      :data-by-app="effectiveBundleDataByApp"
       :use-billing-period="useBillingPeriod"
       :accumulated="accumulated"
-      :app-names="appNames"
+      :app-names="effectiveAppNames"
     />
   </ChartCard>
 </template>

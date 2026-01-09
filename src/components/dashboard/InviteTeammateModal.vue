@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import type VueTurnstile from 'vue-turnstile'
 import type { Database } from '~/types/supabase.types'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
+import VueTurnstile from 'vue-turnstile'
 import { useSupabase } from '~/services/supabase'
 import { sendEvent } from '~/services/tracking'
 import { useDialogV2Store } from '~/stores/dialogv2'
@@ -160,6 +160,11 @@ async function handleInviteSubmit() {
 
   if (!lastName) {
     toast.error(t('last-name-required', 'Last name is required'))
+    return
+  }
+
+  if (captchaKey.value && !inviteCaptchaToken.value) {
+    toast.error(t('captcha-required', 'Captcha verification is required'))
     return
   }
 
