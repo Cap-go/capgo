@@ -429,6 +429,12 @@ DECLARE
   v_org record;
   v_already_member boolean;
 BEGIN
+  -- Security: Only allow internal roles or the user themselves to enroll
+  IF session_user NOT IN ('postgres', 'supabase_auth_admin') AND 
+     (auth.uid() IS NULL OR auth.uid() != p_user_id) THEN
+    RAISE EXCEPTION 'Access denied: cannot enroll other users';
+  END IF;
+  
   -- Find organizations with this SSO provider that have auto-join enabled
   FOR v_org IN
     SELECT DISTINCT 
@@ -500,6 +506,12 @@ DECLARE
   v_domain text;
   v_org record;
 BEGIN
+  -- Security: Only allow internal roles or the user themselves to auto-join
+  IF session_user NOT IN ('postgres', 'supabase_auth_admin') AND 
+     (auth.uid() IS NULL OR auth.uid() != p_user_id) THEN
+    RAISE EXCEPTION 'Access denied: cannot enroll other users';
+  END IF;
+  
   v_domain := lower(split_part(p_email, '@', 2));
   
   IF v_domain IS NULL OR v_domain = '' THEN
@@ -558,6 +570,44 @@ END;
 $$;
 
 COMMENT ON FUNCTION public.auto_join_user_to_orgs_by_email IS 'Auto-enrolls users via SSO provider or SAML domain mappings. Does not use allowed_email_domains column.';
+
+-- ============================================================================
+-- INTERNAL HELPER FUNCTIONS (for triggers)
+-- ============================================================================
+
+-- Internal function to get SSO provider ID from user metadata (for trigger use only)
+CREATE OR REPLACE FUNCTION public.get_sso_provider_id_for_user_internal(p_user_id uuid)
+RETURNS uuid
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_provider_id uuid;
+BEGIN
+  -- Only internal roles (postgres, supabase_auth_admin) can execute
+  IF session_user NOT IN ('postgres', 'supabase_auth_admin') THEN
+    RAISE EXCEPTION 'Access denied: function is internal only';
+  END IF;
+  
+  SELECT (raw_app_meta_data->>'sso_provider_id')::uuid
+  INTO v_provider_id
+  FROM auth.users
+  WHERE id = p_user_id;
+  
+  IF v_provider_id IS NULL THEN
+    SELECT (raw_user_meta_data->>'sso_provider_id')::uuid
+    INTO v_provider_id
+    FROM auth.users
+    WHERE id = p_user_id;
+  END IF;
+  
+  RETURN v_provider_id;
+END;
+$$;
+
+COMMENT ON FUNCTION public.get_sso_provider_id_for_user_internal IS 'Internal function to extract SSO provider ID from user metadata (trigger use only)';
 
 -- ============================================================================
 -- TRIGGER FUNCTIONS: Auto-Join Logic (FINAL VERSION WITH ALL FIXES)
@@ -1007,6 +1057,27 @@ EXECUTE ON FUNCTION public.check_org_sso_configured TO authenticated,
 anon;
 
 -- get_sso_provider_id_for_user remains internal-only (REVOKE applied earlier)
+
+-- Grant internal functions to internal roles only (not to authenticated/anon)
+GRANT
+EXECUTE ON FUNCTION public.auto_enroll_sso_user TO postgres,
+supabase_auth_admin;
+
+GRANT
+EXECUTE ON FUNCTION public.auto_join_user_to_orgs_by_email TO postgres,
+supabase_auth_admin;
+
+GRANT
+EXECUTE ON FUNCTION public.get_sso_provider_id_for_user_internal TO postgres,
+supabase_auth_admin;
+
+GRANT
+EXECUTE ON FUNCTION public.trigger_auto_join_on_user_create TO postgres,
+supabase_auth_admin;
+
+GRANT
+EXECUTE ON FUNCTION public.trigger_auto_join_on_user_update TO postgres,
+supabase_auth_admin;
 
 GRANT
 EXECUTE ON FUNCTION public.org_has_sso_configured (uuid) TO authenticated;
