@@ -18,6 +18,14 @@ REVOKE
 EXECUTE ON FUNCTION public.auto_join_user_to_orgs_by_email
 FROM authenticated;
 
+REVOKE
+EXECUTE ON FUNCTION public.trigger_auto_join_on_user_create
+FROM authenticated;
+
+REVOKE
+EXECUTE ON FUNCTION public.trigger_auto_join_on_user_update
+FROM authenticated;
+
 -- Step 2: Add permission check to check_org_sso_configured
 -- Only allow checking SSO status for orgs where user is a member or for SSO detection flow
 CREATE OR REPLACE FUNCTION public.check_org_sso_configured(p_org_id uuid)
@@ -34,9 +42,9 @@ BEGIN
   -- Get current user ID (will be NULL for anon)
   v_user_id := auth.uid();
   
-  -- If called from trigger context or as admin, allow
-  IF v_user_id IS NULL OR v_user_id = '00000000-0000-0000-0000-000000000000'::uuid THEN
-    -- Allow for anon users during SSO detection flow
+  -- If called from trigger/anon context, allow
+  IF v_user_id IS NULL THEN
+    -- Allow for anon users and trigger contexts during SSO detection flow
     RETURN EXISTS (
       SELECT 1
       FROM public.org_saml_connections
@@ -112,7 +120,7 @@ GRANT
 EXECUTE ON FUNCTION public.get_sso_provider_id_for_user_internal TO postgres,
 supabase_auth_admin;
 
--- Step 4: Update triggers to use internal function
+-- Step 4: Update triggers to extract provider ID from NEW record
 CREATE OR REPLACE FUNCTION public.trigger_auto_join_on_user_create()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -129,8 +137,12 @@ BEGIN
     RETURN NEW;
   END IF;
   
-  -- Use internal variant that safely gets current user's metadata
-  v_sso_provider_id := public.get_sso_provider_id_for_user_internal();
+  -- Extract provider ID directly from NEW record (app_metadata first, then user_metadata)
+  v_sso_provider_id := (NEW.raw_app_meta_data->>'sso_provider_id')::uuid;
+  
+  IF v_sso_provider_id IS NULL THEN
+    v_sso_provider_id := (NEW.raw_user_meta_data->>'sso_provider_id')::uuid;
+  END IF;
   
   -- If no SSO provider in metadata, try domain lookup
   IF v_sso_provider_id IS NULL THEN
@@ -160,8 +172,12 @@ BEGIN
     RETURN NEW;
   END IF;
   
-  -- Use internal variant that safely gets current user's metadata
-  v_sso_provider_id := public.get_sso_provider_id_for_user_internal();
+  -- Extract provider ID directly from NEW record (app_metadata first, then user_metadata)
+  v_sso_provider_id := (NEW.raw_app_meta_data->>'sso_provider_id')::uuid;
+  
+  IF v_sso_provider_id IS NULL THEN
+    v_sso_provider_id := (NEW.raw_user_meta_data->>'sso_provider_id')::uuid;
+  END IF;
   
   -- If no SSO provider, try looking it up by domain
   IF v_sso_provider_id IS NULL THEN

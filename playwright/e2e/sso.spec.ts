@@ -213,7 +213,7 @@ test.describe('sso permission checks', () => {
 
     // Wait for either redirect or permission error to appear
     await Promise.race([
-      page.waitForURL(url => !url.includes('/sso'), { timeout: 3000 }).catch(() => {}),
+      page.waitForURL(url => !url.href.includes('/sso'), { timeout: 3000 }).catch(() => {}),
       page.locator('text=permission').waitFor({ state: 'visible', timeout: 3000 }).catch(() => {}),
     ])
 

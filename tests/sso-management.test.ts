@@ -38,7 +38,7 @@ const originalDenoCommand = (globalThis as any).Deno?.Command
 async function getOrCreateTestAuthUser(email: string, metadata?: { sso_provider_id?: string }): Promise<string | null> {
   try {
     // Try to create user
-    const { error: authUserError, data: authUserData } = await getSupabaseClient().auth.admin.createUser({
+    const { error: _authUserError, data: authUserData } = await getSupabaseClient().auth.admin.createUser({
       email,
       email_confirm: true,
       user_metadata: metadata || {},
@@ -51,7 +51,7 @@ async function getOrCreateTestAuthUser(email: string, metadata?: { sso_provider_
 
     // No user returned - try to find existing
     console.log('Auth admin API returned no user, searching for existing')
-    
+
     // Check public.users first
     const { data: existingUser } = await getSupabaseClient()
       .from('users')
@@ -77,7 +77,7 @@ async function getOrCreateTestAuthUser(email: string, metadata?: { sso_provider_
   }
   catch (err: any) {
     console.log('Auth user creation threw exception:', err.message)
-    
+
     // Try to find existing user
     const { data: existingUser } = await getSupabaseClient()
       .from('users')
@@ -206,19 +206,20 @@ afterAll(async () => {
           ALTER TABLE public.orgs ENABLE TRIGGER on_org_create;
           ALTER TABLE public.orgs ENABLE TRIGGER on_organization_delete;
         `)
-        
+
         // Verify triggers were actually enabled
         const { rows } = await pgPool.query(`
           SELECT tgname, tgenabled 
           FROM pg_trigger 
           WHERE tgname IN ('on_user_create', 'on_user_update', 'on_org_create', 'on_organization_delete')
         `)
-        
+
         const allEnabled = rows.every((row: any) => row.tgenabled === 'O')
         if (allEnabled) {
           console.log('✓ Re-enabled edge function triggers')
           success = true
-        } else {
+        }
+        else {
           throw new Error('Not all triggers were enabled')
         }
       }
@@ -227,12 +228,13 @@ afterAll(async () => {
         if (retryCount < maxRetries) {
           console.warn(`Failed to re-enable triggers (attempt ${retryCount}/${maxRetries}):`, err.message)
           await new Promise(resolve => setTimeout(resolve, retryDelay * retryCount)) // Exponential backoff
-        } else {
+        }
+        else {
           console.error('Could not re-enable triggers after max retries:', err.message)
         }
       }
     }
-    
+
     await pgPool.end()
     pgPool = null
   }
@@ -265,152 +267,165 @@ afterAll(async () => {
 describe('auto-join integration', () => {
   it('should auto-enroll new users with verified SSO domain on signup', async () => {
     // NOTE: Manually triggers auto-enrollment via RPC since test database doesn't have auth.users trigger active
-    const orgId = randomUUID()
-    const customerId = `cus_autojoin_${randomUUID()}`
-    const domain = `autojoin${randomUUID().slice(0, 8)}.com`
-    const testUserEmail = `testuser@${domain}`
-    const uniqueId = randomUUID().slice(0, 8)
-    const ssoProviderId = randomUUID()
-    const testEntityId = generateTestEntityId()
+    let orgId: string | undefined
+    let customerId: string | undefined
+    let actualUserId: string | null | undefined
 
-    // Setup org with SSO - manual DB inserts to bypass edge function
-    // All inserts ignore duplicate key errors to handle vitest retry scenarios
-    const { error: stripeError } = await getSupabaseClient().from('stripe_info').insert({
-      customer_id: customerId,
-      status: 'succeeded',
-      product_id: 'prod_LQIregjtNduh4q',
-    })
+    try {
+      orgId = randomUUID()
+      customerId = `cus_autojoin_${randomUUID()}`
+      const domain = `autojoin${randomUUID().slice(0, 8)}.com`
+      const testUserEmail = `testuser@${domain}`
+      const uniqueId = randomUUID().slice(0, 8)
+      const ssoProviderId = randomUUID()
+      const testEntityId = generateTestEntityId()
 
-    // Ignore duplicate key errors on retry
-    if (stripeError && !stripeError.message?.includes('duplicate') && stripeError.code !== '23505') {
-      throw new Error(`stripe_info insert failed: ${stripeError.message}`)
-    }
-
-    const { error: orgsError } = await getSupabaseClient().from('orgs').insert({
-      id: orgId,
-      name: `Auto-Join Test Org ${uniqueId}`,
-      management_email: USER_ADMIN_EMAIL,
-      created_by: USER_ID,
-      customer_id: customerId,
-    })
-
-    // Ignore duplicate key errors on retry
-    if (orgsError && !orgsError.message?.includes('duplicate') && orgsError.code !== '23505') {
-      throw new Error(`orgs insert failed: ${orgsError.message}`)
-    }
-
-    const { error: orgUsersError } = await getSupabaseClient().from('org_users').insert({
-      user_id: USER_ID,
-      org_id: orgId,
-      user_right: 'super_admin',
-    })
-
-    // Ignore duplicate key errors on retry
-    if (orgUsersError && !orgUsersError.message?.includes('duplicate') && orgUsersError.code !== '23505') {
-      throw new Error(`org_users insert failed: ${orgUsersError.message}`)
-    }
-
-    // Manually create SSO connection (bypass edge function to avoid timeouts)
-    const { error: ssoError } = await getSupabaseClient().from('org_saml_connections').insert({
-      org_id: orgId,
-      sso_provider_id: ssoProviderId,
-      provider_name: 'Test Provider',
-      entity_id: testEntityId,
-      metadata_xml: generateTestMetadataXml(testEntityId),
-      enabled: true,
-      verified: true,
-    })
-
-    // Ignore duplicate key errors on retry
-    if (ssoError && !ssoError.message?.includes('duplicate') && ssoError.code !== '23505') {
-      throw new Error(`org_saml_connections insert failed: ${ssoError.message}`)
-    }
-
-    // Create or get test user using helper
-    const actualUserId = await getOrCreateTestAuthUser(testUserEmail, {
-      sso_provider_id: ssoProviderId,
-    })
-
-    if (!actualUserId) {
-      console.log('Cannot create or find auth user - skipping test')
-      return
-    }
-
-    // Now insert into public.users (this is required for foreign keys)
-    // Skip if user already exists (retry scenario)
-    const { data: existingPublicUser } = await getSupabaseClient()
-      .from('users')
-      .select('id')
-      .eq('id', actualUserId)
-      .maybeSingle()
-
-    if (!existingPublicUser) {
-      const { error: publicUserError } = await getSupabaseClient().from('users').insert({
-        id: actualUserId,
-        email: testUserEmail,
+      // Setup org with SSO - manual DB inserts to bypass edge function
+      // All inserts ignore duplicate key errors to handle vitest retry scenarios
+      const { error: stripeError } = await getSupabaseClient().from('stripe_info').insert({
+        customer_id: customerId,
+        status: 'succeeded',
+        product_id: 'prod_LQIregjtNduh4q',
       })
 
       // Ignore duplicate key errors on retry
-      const isPublicUserDuplicate = publicUserError && (
-        publicUserError.message?.includes('duplicate')
-        || publicUserError.code === '23505'
+      if (stripeError && !stripeError.message?.includes('duplicate') && stripeError.code !== '23505') {
+        throw new Error(`stripe_info insert failed: ${stripeError.message}`)
+      }
+
+      const { error: orgsError } = await getSupabaseClient().from('orgs').insert({
+        id: orgId,
+        name: `Auto-Join Test Org ${uniqueId}`,
+        management_email: USER_ADMIN_EMAIL,
+        created_by: USER_ID,
+        customer_id: customerId,
+      })
+
+      // Ignore duplicate key errors on retry
+      if (orgsError && !orgsError.message?.includes('duplicate') && orgsError.code !== '23505') {
+        throw new Error(`orgs insert failed: ${orgsError.message}`)
+      }
+
+      const { error: orgUsersError } = await getSupabaseClient().from('org_users').insert({
+        user_id: USER_ID,
+        org_id: orgId,
+        user_right: 'super_admin',
+      })
+
+      // Ignore duplicate key errors on retry
+      if (orgUsersError && !orgUsersError.message?.includes('duplicate') && orgUsersError.code !== '23505') {
+        throw new Error(`org_users insert failed: ${orgUsersError.message}`)
+      }
+
+      // Manually create SSO connection (bypass edge function to avoid timeouts)
+      const { error: ssoError } = await getSupabaseClient().from('org_saml_connections').insert({
+        org_id: orgId,
+        sso_provider_id: ssoProviderId,
+        provider_name: 'Test Provider',
+        entity_id: testEntityId,
+        metadata_xml: generateTestMetadataXml(testEntityId),
+        enabled: true,
+        verified: true,
+      })
+
+      // Ignore duplicate key errors on retry
+      if (ssoError && !ssoError.message?.includes('duplicate') && ssoError.code !== '23505') {
+        throw new Error(`org_saml_connections insert failed: ${ssoError.message}`)
+      }
+
+      // Create or get test user using helper
+      actualUserId = await getOrCreateTestAuthUser(testUserEmail, {
+        sso_provider_id: ssoProviderId,
+      })
+
+      if (!actualUserId) {
+        console.log('Cannot create or find auth user - skipping test')
+        return
+      }
+
+      // Now insert into public.users (this is required for foreign keys)
+      // Skip if user already exists (retry scenario)
+      const { data: existingPublicUser } = await getSupabaseClient()
+        .from('users')
+        .select('id')
+        .eq('id', actualUserId)
+        .maybeSingle()
+
+      if (!existingPublicUser) {
+        const { error: publicUserError } = await getSupabaseClient().from('users').insert({
+          id: actualUserId,
+          email: testUserEmail,
+        })
+
+        // Ignore duplicate key errors on retry
+        const isPublicUserDuplicate = publicUserError && (
+          publicUserError.message?.includes('duplicate')
+          || publicUserError.code === '23505'
+        )
+
+        if (publicUserError && !isPublicUserDuplicate) {
+          throw new Error(`Public user creation failed: ${publicUserError.message}`)
+        }
+      }
+
+      // Manually enroll user (simulates what auto_enroll_sso_user does)
+      // In production, auth.users trigger would call auto_enroll_sso_user automatically
+      // Use insert but ignore if already exists (retry scenario)
+      const { error: enrollError } = await getSupabaseClient().from('org_users').insert({
+        user_id: actualUserId,
+        org_id: orgId,
+        user_right: 'read',
+      })
+
+      // Ignore "duplicate key" type errors on retry, also check for code 23505 (unique violation)
+      const isDuplicateError = enrollError && (
+        enrollError.message?.includes('duplicate')
+        || enrollError.code === '23505'
+        || enrollError.details?.includes('duplicate')
       )
 
-      if (publicUserError && !isPublicUserDuplicate) {
-        throw new Error(`Public user creation failed: ${publicUserError.message}`)
+      if (enrollError && !isDuplicateError) {
+        throw new Error(`Manual enrollment failed: ${enrollError.message}`)
+      }
+
+      // Check if user was enrolled - use limit(1) then maybeSingle() to avoid error when no rows exist
+      const { data: membership, error: membershipError } = await getSupabaseClient()
+        .from('org_users')
+        .select('*')
+        .eq('user_id', actualUserId)
+        .eq('org_id', orgId)
+        .limit(1)
+        .maybeSingle()
+
+      if (membershipError) {
+        throw new Error(`Failed to check membership: ${membershipError.message}`)
+      }
+
+      expect(membership).toBeTruthy()
+      expect(membership!.user_right).toBe('read')
+    }
+    finally {
+      // Cleanup - guaranteed to run even if test fails
+      if (actualUserId) {
+        try {
+          await getSupabaseClient().auth.admin.deleteUser(actualUserId)
+        }
+        catch (err) {
+          console.log('Could not delete auth user (may not exist):', err)
+        }
+        await getSupabaseClient().from('org_users').delete().eq('user_id', actualUserId)
+        await getSupabaseClient().from('users').delete().eq('id', actualUserId)
+      }
+      if (orgId) {
+        await getSupabaseClient().from('org_saml_connections').delete().eq('org_id', orgId)
+        await getSupabaseClient().from('saml_domain_mappings').delete().eq('org_id', orgId)
+        await getSupabaseClient().from('org_users').delete().eq('org_id', orgId)
+        await getSupabaseClient().from('orgs').delete().eq('id', orgId)
+      }
+      if (customerId) {
+        await getSupabaseClient().from('stripe_info').delete().eq('customer_id', customerId)
       }
     }
-
-    // Manually enroll user (simulates what auto_enroll_sso_user does)
-    // In production, auth.users trigger would call auto_enroll_sso_user automatically
-    // Use insert but ignore if already exists (retry scenario)
-    const { error: enrollError } = await getSupabaseClient().from('org_users').insert({
-      user_id: actualUserId,
-      org_id: orgId,
-      user_right: 'read',
-    })
-
-    // Ignore "duplicate key" type errors on retry, also check for code 23505 (unique violation)
-    const isDuplicateError = enrollError && (
-      enrollError.message?.includes('duplicate')
-      || enrollError.code === '23505'
-      || enrollError.details?.includes('duplicate')
-    )
-
-    if (enrollError && !isDuplicateError) {
-      throw new Error(`Manual enrollment failed: ${enrollError.message}`)
-    }
-
-    // Check if user was enrolled - use limit(1) then maybeSingle() to avoid error when no rows exist
-    const { data: membership, error: membershipError } = await getSupabaseClient()
-      .from('org_users')
-      .select('*')
-      .eq('user_id', actualUserId)
-      .eq('org_id', orgId)
-      .limit(1)
-      .maybeSingle()
-
-    if (membershipError) {
-      throw new Error(`Failed to check membership: ${membershipError.message}`)
-    }
-
-    expect(membership).toBeTruthy()
-    expect(membership!.user_right).toBe('read')
-
-    // Cleanup
-    try {
-      await getSupabaseClient().auth.admin.deleteUser(actualUserId)
-    }
-    catch (err) {
-      console.log('Could not delete auth user (may not exist):', err)
-    }
-    await getSupabaseClient().from('org_users').delete().eq('user_id', actualUserId)
-    await getSupabaseClient().from('users').delete().eq('id', actualUserId)
-    await getSupabaseClient().from('org_saml_connections').delete().eq('org_id', orgId)
-    await getSupabaseClient().from('saml_domain_mappings').delete().eq('org_id', orgId)
-    await getSupabaseClient().from('org_users').delete().eq('org_id', orgId)
-    await getSupabaseClient().from('orgs').delete().eq('id', orgId)
-    await getSupabaseClient().from('stripe_info').delete().eq('customer_id', customerId)
   }, 120000)
 
   it('should auto-enroll existing users on first SSO login', async () => {
@@ -449,7 +464,7 @@ describe('auto-join integration', () => {
       }
 
       // Create auth user
-      const { data: authUserData, error: authError } = await getSupabaseClient().auth.admin.createUser({
+      const { data: authUserData, error: _authError } = await getSupabaseClient().auth.admin.createUser({
         email: testUserEmail,
         email_confirm: true,
         user_metadata: {

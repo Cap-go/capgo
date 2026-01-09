@@ -14,6 +14,41 @@ const SENSITIVE_FIELDS = new Set([
 ])
 const SENSITIVE_FIELDS_LOWER = new Set(Array.from(SENSITIVE_FIELDS).map(f => f.toLowerCase()))
 
+// Patterns to redact from error strings (API keys, secrets, bearer tokens, etc.)
+const SENSITIVE_PATTERNS = [
+  /sk_live_[a-zA-Z0-9]{24,}/g, // Stripe live secret key
+  /sk_test_[a-zA-Z0-9]{24,}/g, // Stripe test secret key
+  /ak_live_[a-zA-Z0-9]{24,}/g, // Generic API key live
+  /ak_test_[a-zA-Z0-9]{24,}/g, // Generic API key test
+  /Bearer\s+[\w.-]{20,}/gi, // Bearer tokens
+  /[a-f0-9]{32,}/g, // Long hex strings (likely keys/tokens)
+]
+
+/**
+ * Check if a field name is sensitive (exact match or contains sensitive substrings)
+ */
+function isSensitiveField(fieldName: string): boolean {
+  const lower = fieldName.toLowerCase()
+  return SENSITIVE_FIELDS_LOWER.has(lower)
+    || lower.includes('apikey')
+    || lower.includes('password')
+    || lower.includes('secret')
+    || lower.includes('token')
+}
+
+/**
+ * Sanitize error strings by redacting sensitive patterns
+ */
+function sanitizeErrorString(str: string | undefined): string | undefined {
+  if (!str)
+    return str
+  let sanitized = str
+  for (const pattern of SENSITIVE_PATTERNS) {
+    sanitized = sanitized.replace(pattern, '[REDACTED]')
+  }
+  return sanitized
+}
+
 /**
  * Sanitize an object by redacting sensitive fields
  */
@@ -26,8 +61,8 @@ function sanitize(obj: any, seen = new WeakSet()): any {
   if (obj instanceof Error) {
     return {
       name: obj.name,
-      message: obj.message,
-      stack: obj.stack,
+      message: sanitizeErrorString(obj.message),
+      stack: sanitizeErrorString(obj.stack),
     }
   }
 
@@ -43,8 +78,8 @@ function sanitize(obj: any, seen = new WeakSet()): any {
 
   const sanitized: any = {}
   for (const [key, value] of Object.entries(obj)) {
-    // Case-insensitive sensitive field check
-    if (SENSITIVE_FIELDS_LOWER.has(key.toLowerCase())) {
+    // Check if field is sensitive (exact match or contains sensitive substrings)
+    if (isSensitiveField(key)) {
       sanitized[key] = '[REDACTED]'
     }
     else if (typeof value === 'object' && value !== null) {
