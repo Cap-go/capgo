@@ -178,7 +178,7 @@ app.post('/', middlewareAuth, async (c) => {
 async function verifyCaptchaToken(c: Context, token: string) {
   const captchaSecret = getEnv(c, 'CAPTCHA_SECRET_KEY')
   if (!captchaSecret) {
-    return simpleError('captcha_secret_key_not_set', 'CAPTCHA_SECRET_KEY not set')
+    throw simpleError('captcha_secret_key_not_set', 'CAPTCHA_SECRET_KEY not set')
   }
 
   // "/siteverify" API endpoint.
@@ -197,10 +197,10 @@ async function verifyCaptchaToken(c: Context, token: string) {
   const captchaResult = await result.json()
   const captchaResultData = captchaSchema.safeParse(captchaResult)
   if (!captchaResultData.success) {
-    return simpleError('invalid_captcha', 'Invalid captcha result')
+    throw simpleError('invalid_captcha', 'Invalid captcha result')
   }
   cloudlog({ requestId: c.get('requestId'), context: 'captcha_result', captchaResultData })
   if (captchaResultData.data.success !== true) {
-    return simpleError('invalid_captcha', 'Invalid captcha result')
+    throw simpleError('invalid_captcha', 'Invalid captcha result')
   }
 }
