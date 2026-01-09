@@ -21,7 +21,13 @@ const SENSITIVE_PATTERNS = [
   /ak_live_[a-zA-Z0-9]{24,}/g, // Generic API key live
   /ak_test_[a-zA-Z0-9]{24,}/g, // Generic API key test
   /Bearer\s+[\w.-]{20,}/gi, // Bearer tokens
-  /[a-f0-9]{32,}/g, // Long hex strings (likely keys/tokens)
+const SENSITIVE_PATTERNS = [
+  /sk_live_[a-zA-Z0-9]{24,}/g, // Stripe live secret key
+  /sk_test_[a-zA-Z0-9]{24,}/g, // Stripe test secret key
+  /ak_live_[a-zA-Z0-9]{24,}/g, // Generic API key live
+  /ak_test_[a-zA-Z0-9]{24,}/g, // Generic API key test
+  /Bearer\s+[\w.-]{20,}/gi, // Bearer tokens
+]
 ]
 
 /**
