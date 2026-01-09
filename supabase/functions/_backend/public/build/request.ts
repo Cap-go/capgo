@@ -63,7 +63,7 @@ export async function requestBuild(
 
   if (!['ios', 'android', 'both'].includes(platform)) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Invalid platform', platform })
-    throw simpleError('invalid_parameter', 'platform must be ios or android')
+    throw simpleError('invalid_parameter', 'platform must be ios, android, or both')
   }
 
   if (build_mode && !['release', 'debug'].includes(build_mode)) {
