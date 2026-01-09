@@ -138,11 +138,16 @@ export function serializeError(err: unknown, seen = new WeakSet<object>()) {
         sanitizedCause = sanitize(serializeError(err.cause, seen))
       }
       else if (typeof err.cause === 'object' && err.cause !== null) {
-        // Sanitize object causes
-        sanitizedCause = sanitize(err.cause)
+        // Sanitize object causes - use JSON.stringify to avoid [object Object]
+        try {
+          sanitizedCause = sanitize(JSON.stringify(err.cause))
+        }
+        catch {
+          sanitizedCause = sanitize('[Unserializable Object]')
+        }
       }
       else {
-        // For primitives, convert to string and sanitize
+        // For primitives (string, number, boolean), sanitize directly
         sanitizedCause = sanitize(String(err.cause))
       }
     }
