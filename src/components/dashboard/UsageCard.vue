@@ -46,6 +46,11 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  // When true, show demo data (payment failed state)
+  forceDemo: {
+    type: Boolean,
+    default: false,
+  },
 })
 
 const dataArray = computed(() => {
@@ -96,7 +101,7 @@ const demoData = computed(() => consistentDemoData.value.total)
 const demoDataByApp = computed(() => consistentDemoData.value.byApp)
 
 // Use real data or demo data
-const isDemoMode = computed(() => !hasRealData.value && !props.isLoading)
+const isDemoMode = computed(() => props.forceDemo || (!hasRealData.value && !props.isLoading))
 const effectiveData = computed(() => isDemoMode.value ? demoData.value : dataArray.value)
 const effectiveDataByApp = computed(() => isDemoMode.value ? demoDataByApp.value : props.dataByApp)
 const effectiveAppNames = computed(() => isDemoMode.value ? DEMO_APP_NAMES : props.appNames)
