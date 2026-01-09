@@ -2,12 +2,12 @@ import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { simpleError } from '../../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../../utils/logging.ts'
-import { hasAppRightApikey, supabaseApikey } from '../../utils/supabase.ts'
+import { hasAppRightApikey, supabaseAdmin, supabaseApikey } from '../../utils/supabase.ts'
 import { getEnv } from '../../utils/utils.ts'
 
 export interface RequestBuildBody {
   app_id: string
-  platform: 'ios' | 'android' | 'both'
+  platform: 'ios' | 'android'
   build_mode?: 'release' | 'debug'
   build_config?: Record<string, any>
   credentials?: Record<string, string>
@@ -61,7 +61,7 @@ export async function requestBuild(
     throw simpleError('missing_parameter', 'platform is required')
   }
 
-  if (!['ios', 'android', 'both'].includes(platform)) {
+  if (!['ios', 'android'].includes(platform)) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Invalid platform', platform })
     throw simpleError('invalid_parameter', 'platform must be ios or android')
   }
@@ -224,7 +224,8 @@ export async function requestBuild(
     builder_url: builderJob.uploadUrl,
   })
 
-  const { data: buildRequestRow, error: insertError } = await supabase
+  const supabaseAdminClient = supabaseAdmin(c)
+  const { data: buildRequestRow, error: insertError } = await supabaseAdminClient
     .from('build_requests')
     .insert({
       app_id,
