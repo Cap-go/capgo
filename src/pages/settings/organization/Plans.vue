@@ -251,9 +251,9 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
     return 'cursor-not-allowed bg-gray-500 dark:bg-gray-400 text-white'
   }
   if (isRecommended(p)) {
-    return 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-700 text-white'
+    return 'cursor-pointer bg-blue-600 hover:bg-blue-700 focus:ring-blue-700 text-white'
   }
-  return 'bg-black dark:bg-white dark:text-black hover:bg-gray-800 dark:hover:bg-gray-200 text-white dark:text-black'
+  return 'cursor-pointer bg-black dark:bg-white dark:text-black hover:bg-gray-800 dark:hover:bg-gray-200 text-white dark:text-black'
 }
 </script>
 

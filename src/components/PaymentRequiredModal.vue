@@ -1,0 +1,45 @@
+<script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
+
+const { t } = useI18n()
+const router = useRouter()
+
+function goToPlans() {
+  router.push('/settings/organization/plans')
+}
+</script>
+
+<template>
+  <div class="flex absolute inset-0 z-10 flex-col justify-center items-center bg-white/60 dark:bg-gray-900/60">
+    <div class="p-8 text-center bg-white rounded-xl border shadow-xl dark:bg-gray-800 border-amber-200 dark:border-amber-700">
+      <div class="flex justify-center mb-4">
+        <div class="flex justify-center items-center w-16 h-16 bg-amber-100 rounded-full dark:bg-amber-900/30">
+          <svg class="w-8 h-8 text-amber-500" viewBox="0 0 20 20" fill="currentColor">
+            <path
+              fill-rule="evenodd"
+              d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+              clip-rule="evenodd"
+            />
+          </svg>
+        </div>
+      </div>
+      <h2 class="mb-2 text-2xl font-bold text-gray-900 dark:text-white">
+        {{ t('subscription-required') }}
+      </h2>
+      <p class="mb-6 max-w-sm text-gray-600 dark:text-gray-400">
+        {{ t('plan-failed-description') }}
+      </p>
+      <button
+        class="inline-flex gap-2 items-center px-6 py-3 text-white bg-amber-500 rounded-lg transition-colors cursor-pointer hover:bg-amber-600 focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 focus:outline-none"
+        @click="goToPlans"
+      >
+        <svg class="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+          <path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4z" />
+          <path fill-rule="evenodd" d="M18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13a1 1 0 011-1h1a1 1 0 110 2H5a1 1 0 01-1-1zm5-1a1 1 0 100 2h1a1 1 0 100-2H9z" clip-rule="evenodd" />
+        </svg>
+        {{ t('plan-upgrade-v2') }}
+      </button>
+    </div>
+  </div>
+</template>

@@ -15,7 +15,7 @@ import { getBundleUrl, getManifestUrl } from './downloadUrl.ts'
 import { simpleError200 } from './hono.ts'
 import { cloudlog } from './logging.ts'
 import { sendNotifOrg } from './notifications.ts'
-import { closeClient, getAppOwnerPostgres, getDrizzleClient, getPgClient, requestInfosPostgres } from './pg.ts'
+import { closeClient, getAppOwnerPostgres, getDrizzleClient, getPgClient, requestInfosPostgres, setReplicationLagHeader } from './pg.ts'
 import { makeDevice } from './plugin_parser.ts'
 import { s3 } from './s3.ts'
 import { createStatsBandwidth, createStatsMau, createStatsVersion, onPremStats, sendStatsAndDevice } from './stats.ts'
@@ -89,6 +89,12 @@ export async function updateWithPG(
     await setAppStatus(c, app_id, 'cancelled')
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot update, upgrade plan to continue to update', id: app_id })
     await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
+    // Send weekly notification about missing payment (not configurable - payment related)
+    await backgroundTask(c, sendNotifOrg(c, 'org:missing_payment', {
+      app_id,
+      device_id,
+      app_id_url: app_id,
+    }, appOwner.owner_org, app_id, '0 0 * * 1')) // Weekly on Monday
     return simpleError200(c, 'need_plan_upgrade', PLAN_ERROR)
   }
   await setAppStatus(c, app_id, 'cloud')
@@ -402,6 +408,9 @@ export async function updateWithPG(
 
 export async function update(c: Context, body: AppInfos) {
   const pgClient = getPgClient(c, true)
+
+  // Set replication lag header (uses cached status, non-blocking)
+  await setReplicationLagHeader(c)
 
   const drizzlePg = pgClient ? getDrizzleClient(pgClient) : (null as any)
   // Lazily create D1 client inside updateWithPG when actually used

@@ -13,6 +13,7 @@ import { useChartData } from '~/services/chartDataService'
 import { createTooltipConfig, todayLinePlugin, verticalLinePlugin } from '~/services/chartTooltip'
 import { generateChartDayLabels, getChartDateRange, normalizeToStartOfDay } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
+import { useDashboardAppsStore } from '~/stores/dashboardApps'
 import { useOrganizationStore } from '~/stores/organization'
 import ChartCard from './ChartCard.vue'
 
@@ -29,7 +30,51 @@ const props = defineProps({
     type: Number,
     default: 0,
   },
+  forceDemo: {
+    type: Boolean,
+    default: false,
+  },
 })
+
+// Demo data generator for devices stats when forceDemo is true
+function generateDemoDevicesData(days: number): { labels: string[], datasets: { label: string, data: number[] }[] } {
+  const labels: string[] = []
+  const today = new Date()
+
+  for (let i = days - 1; i >= 0; i--) {
+    const date = new Date(today)
+    date.setDate(date.getDate() - i)
+    labels.push(date.toISOString().split('T')[0])
+  }
+
+  // Generate realistic version adoption data
+  // Simulate gradual migration from old version to new version
+  const oldVersionData: number[] = []
+  const newVersionData: number[] = []
+
+  for (let i = 0; i < days; i++) {
+    // Old version starts at ~85% and decreases
+    const oldBase = 85 - (i * 2.5)
+    const oldValue = Math.max(15, oldBase + (Math.random() * 5 - 2.5))
+
+    // New version starts at ~15% and increases
+    const newBase = 15 + (i * 2.5)
+    const newValue = Math.min(85, newBase + (Math.random() * 5 - 2.5))
+
+    // Normalize to ensure they roughly add up to 100%
+    const total = oldValue + newValue
+    oldVersionData.push(Math.round((oldValue / total) * 100 * 10) / 10)
+    newVersionData.push(Math.round((newValue / total) * 100 * 10) / 10)
+  }
+
+  return {
+    labels,
+    datasets: [
+      { label: '2.0.5', data: oldVersionData },
+      { label: '2.1.0', data: newVersionData },
+    ],
+  }
+}
 
 interface ChartDataset {
   label: string
@@ -93,10 +138,15 @@ async function navigateToBundle(versionName: string) {
 }
 
 // Click handler for tooltip items - navigates directly to bundle page
-const tooltipClickHandler = computed<TooltipClickHandler>(() => ({
-  onAppClick: navigateToBundle,
-  appIdByLabel: versionByLabel.value,
-}))
+// Disabled in demo mode to prevent navigation to non-existent bundles
+const tooltipClickHandler = computed<TooltipClickHandler | undefined>(() => {
+  if (props.forceDemo)
+    return undefined
+  return {
+    onAppClick: navigateToBundle,
+    appIdByLabel: versionByLabel.value,
+  }
+})
 const isLoading = ref(true)
 const currentRange = ref<{ startDate: Date, endDate: Date } | null>(null)
 let requestToken = 0
@@ -372,7 +422,20 @@ const processedChartData = computed<ChartData<'line'> | null>(() => {
   }
 })
 
-const hasData = computed(() => !!(processedChartData.value && processedChartData.value.datasets.length > 0))
+// Demo mode: show demo data only when forceDemo is true OR user has no apps
+// If user has apps, ALWAYS show real data (even if empty)
+const dashboardAppsStore = useDashboardAppsStore()
+const isDemoMode = computed(() => {
+  if (props.forceDemo)
+    return true
+  // If user has apps, never show demo data
+  if (dashboardAppsStore.apps.length > 0)
+    return false
+  // No apps and store is loaded = show demo
+  return dashboardAppsStore.isLoaded
+})
+
+const hasData = computed(() => !!(processedChartData.value && processedChartData.value.datasets.length > 0) || isDemoMode.value)
 
 const todayLineOptions = computed(() => {
   if (!props.useBillingPeriod || !currentRange.value)
@@ -464,6 +527,17 @@ async function loadData(forceRefetch = false) {
     return
   }
 
+  // If forceDemo is true (payment failed), use demo data instead of fetching
+  if (props.forceDemo) {
+    const { startDate, endDate } = getDateRange()
+    const days = Math.floor((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1
+    const demoData = generateDemoDevicesData(days)
+    rawChartData.value = demoData
+    currentRange.value = { startDate, endDate }
+    isLoading.value = false
+    return
+  }
+
   try {
     await organizationStore.dedupFetchOrganizations()
     await organizationStore.awaitInitialLoad()
@@ -540,6 +614,12 @@ watch(() => props.useBillingPeriod, async () => {
     await loadData(false) // Use cache if available
 })
 
+// Watch forceDemo changes - reload with demo data or real data
+watch(() => props.forceDemo, async () => {
+  if (appId.value)
+    await loadData(true) // Force reload to switch between demo/real data
+})
+
 // Watch for reload trigger - force refetch
 watch(() => props.reloadTrigger, async () => {
   if (appId.value)
@@ -581,6 +661,7 @@ watch(
     :title="t('active_users_by_version')"
     :is-loading="isLoading"
     :has-data="hasData"
+    :is-demo-data="isDemoMode"
   >
     <template #header>
       <div class="flex items-start justify-between flex-1 gap-2">

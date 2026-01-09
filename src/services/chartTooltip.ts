@@ -186,8 +186,37 @@ export function createCustomTooltip(context: TooltipContext, isAccumulated: bool
 
     // Calculate the formatted date title from the data index
     const dataIndex = dataPoints[0]?.dataIndex ?? 0
-    const tooltipDate = getDateFromIndex(dataIndex, dateStartOrUseBillingPeriod)
-    const formattedTitle = formatDateForTooltip(tooltipDate)
+    // Use the actual label from the chart for the tooltip title
+    // This ensures alignment between what's shown on the X-axis and the tooltip
+    const chartLabels = chart.data?.labels || []
+    const labelAtIndex = chartLabels[dataIndex]
+    let formattedTitle: string
+    // Declare tooltipDate at higher scope so it's accessible for click handler
+    let tooltipDate: Date
+
+    if (labelAtIndex !== undefined && dateStartOrUseBillingPeriod instanceof Date) {
+      // Create date using the day number from the label and the month/year from billing start
+      tooltipDate = new Date(dateStartOrUseBillingPeriod)
+      const dayNumber = typeof labelAtIndex === 'number' ? labelAtIndex : Number.parseInt(String(labelAtIndex), 10)
+      if (!Number.isNaN(dayNumber)) {
+        // Handle month transitions - if label day is less than billing start day, it's next month
+        const billingStartDay = dateStartOrUseBillingPeriod.getDate()
+        if (dayNumber < billingStartDay) {
+          // Next month
+          tooltipDate.setMonth(tooltipDate.getMonth() + 1)
+        }
+        tooltipDate.setDate(dayNumber)
+        formattedTitle = formatDateForTooltip(tooltipDate)
+      }
+      else {
+        formattedTitle = String(labelAtIndex)
+      }
+    }
+    else {
+      // Fallback to original calculation
+      tooltipDate = getDateFromIndex(dataIndex, dateStartOrUseBillingPeriod)
+      formattedTitle = formatDateForTooltip(tooltipDate)
+    }
 
     // Create an array of items with their values, colors, and labels
     const items: ProcessedTooltipItem[] = dataPoints.map((dataPoint, index) => {
@@ -308,35 +337,37 @@ export function createCustomTooltip(context: TooltipContext, isAccumulated: bool
  * @param tooltip Chart.js tooltip object
  */
 function positionTooltip(tooltipEl: HTMLElement, canvas: HTMLCanvasElement, tooltip: any) {
-  const canvasPosition = canvas.getBoundingClientRect()
-  const scrollTop = window.pageYOffset || document.documentElement.scrollTop
-  const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft
+  // Position relative to the canvas parent (which is where tooltip is appended)
+  // Use tooltip.caretX/Y directly since they're relative to the canvas
+  let left = tooltip.caretX
+  let top = tooltip.caretY
 
-  // Calculate preferred position
-  let left = canvasPosition.left + scrollLeft + tooltip.caretX
-  let top = canvasPosition.top + scrollTop + tooltip.caretY
+  // Get canvas dimensions for bounds checking
+  const canvasWidth = canvas.offsetWidth
+  const canvasHeight = canvas.offsetHeight
 
-  // Adjust position to keep tooltip in viewport
+  // Get tooltip dimensions
   const tooltipRect = tooltipEl.getBoundingClientRect()
-  const viewportWidth = window.innerWidth
-  const viewportHeight = window.innerHeight
+  const tooltipWidth = tooltipRect.width
+  const tooltipHeight = tooltipRect.height
 
-  // Horizontal positioning
-  if (left + tooltipRect.width / 2 > viewportWidth - 10) {
-    left = viewportWidth - tooltipRect.width - 10
-    tooltipEl.style.transform = 'translate(0, 0)'
+  // Horizontal positioning - keep tooltip within canvas bounds
+  // Center the tooltip on the caret position
+  if (left + tooltipWidth / 2 > canvasWidth - 10) {
+    // Too close to right edge - align right edge with canvas
+    left = canvasWidth - tooltipWidth / 2 - 10
   }
-  else if (left - tooltipRect.width / 2 < 10) {
-    left = 10
-    tooltipEl.style.transform = 'translate(0, 0)'
-  }
-  else {
-    tooltipEl.style.transform = 'translate(-50%, 0)'
+  else if (left - tooltipWidth / 2 < 10) {
+    // Too close to left edge - align left edge with padding
+    left = tooltipWidth / 2 + 10
   }
 
-  // Vertical positioning
-  if (top + tooltipRect.height > scrollTop + viewportHeight - 10) {
-    top = canvasPosition.top + scrollTop + tooltip.caretY - tooltipRect.height - 10
+  // Always use centered transform
+  tooltipEl.style.transform = 'translate(-50%, 0)'
+
+  // Vertical positioning - if tooltip would go below canvas, show above caret
+  if (top + tooltipHeight > canvasHeight - 10) {
+    top = tooltip.caretY - tooltipHeight - 10
   }
 
   // Apply position
