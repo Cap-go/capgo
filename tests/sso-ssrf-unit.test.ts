@@ -31,14 +31,17 @@ function validateMetadataURL(url: string): void {
       throw new Error('SSRF protection: Cannot use internal/localhost addresses')
     }
 
-    // Block IPv6-mapped IPv4 addresses (e.g., ::ffff:127.0.0.1, [::ffff:127.0.0.1])
-    // Check for ::ffff: prefix and common mapped patterns
-    if (hostname.startsWith('::ffff:')) {
+    // Block IPv6-mapped IPv4 addresses with comprehensive pattern matching
+    // Standard notation: ::ffff:192.168.1.1
+    if (/^::ffff:(\d{1,3}\.){3}\d{1,3}$/.test(hostname)) {
       throw new Error('SSRF protection: Cannot use IPv6-mapped IPv4 addresses')
     }
-    
-    // Also block bracketed forms that weren't normalized
+    // Bracketed notation: [::ffff:127.0.0.1]
     if (parsed.hostname.toLowerCase().includes('[::ffff:')) {
+      throw new Error('SSRF protection: Cannot use IPv6-mapped IPv4 addresses')
+    }
+    // Compressed notation starting with ::ffff:
+    if (hostname.startsWith('::ffff:')) {
       throw new Error('SSRF protection: Cannot use IPv6-mapped IPv4 addresses')
     }
 

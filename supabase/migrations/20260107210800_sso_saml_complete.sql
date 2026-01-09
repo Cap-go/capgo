@@ -574,41 +574,6 @@ COMMENT ON FUNCTION public.auto_join_user_to_orgs_by_email IS 'Auto-enrolls user
 -- ============================================================================
 -- INTERNAL HELPER FUNCTIONS (for triggers)
 -- ============================================================================
-
--- Internal function to get SSO provider ID from user metadata (for trigger use only)
-CREATE OR REPLACE FUNCTION public.get_sso_provider_id_for_user_internal(p_user_id uuid)
-RETURNS uuid
-LANGUAGE plpgsql
-STABLE
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE
-  v_provider_id uuid;
-BEGIN
-  -- Only internal roles (postgres, supabase_auth_admin) can execute
-  IF session_user NOT IN ('postgres', 'supabase_auth_admin') THEN
-    RAISE EXCEPTION 'Access denied: function is internal only';
-  END IF;
-  
-  SELECT (raw_app_meta_data->>'sso_provider_id')::uuid
-  INTO v_provider_id
-  FROM auth.users
-  WHERE id = p_user_id;
-  
-  IF v_provider_id IS NULL THEN
-    SELECT (raw_user_meta_data->>'sso_provider_id')::uuid
-    INTO v_provider_id
-    FROM auth.users
-    WHERE id = p_user_id;
-  END IF;
-  
-  RETURN v_provider_id;
-END;
-$$;
-
-COMMENT ON FUNCTION public.get_sso_provider_id_for_user_internal IS 'Internal function to extract SSO provider ID from user metadata (trigger use only)';
-
 -- ============================================================================
 -- TRIGGER FUNCTIONS: Auto-Join Logic (FINAL VERSION WITH ALL FIXES)
 -- ============================================================================
@@ -630,10 +595,22 @@ BEGIN
     RETURN NEW;
   END IF;
   
-  -- Extract SSO provider ID from metadata
-  v_sso_provider_id := public.get_sso_provider_id_for_user_internal(NEW.id);
+  -- Extract SSO provider ID directly from user metadata
+  BEGIN
+    v_sso_provider_id := NULLIF(NEW.raw_user_meta_data->>'sso_provider_id', '')::uuid;
+  EXCEPTION WHEN invalid_text_representation THEN
+    v_sso_provider_id := NULL;
+  END;
   
-  -- If no SSO provider, try looking it up by domain
+  IF v_sso_provider_id IS NULL THEN
+    BEGIN
+      v_sso_provider_id := NULLIF(NEW.raw_app_meta_data->>'sso_provider_id', '')::uuid;
+    EXCEPTION WHEN invalid_text_representation THEN
+      v_sso_provider_id := NULL;
+    END;
+  END IF;
+  
+  -- If no SSO provider in metadata, try looking it up by domain
   IF v_sso_provider_id IS NULL THEN
     v_sso_provider_id := public.lookup_sso_provider_for_email(v_email);
   END IF;
@@ -672,8 +649,20 @@ BEGIN
     RETURN NEW;
   END IF;
   
-  -- Get SSO provider ID from user metadata
-  v_sso_provider_id := public.get_sso_provider_id_for_user_internal(NEW.id);
+  -- Extract SSO provider ID directly from user metadata
+  BEGIN
+    v_sso_provider_id := NULLIF(NEW.raw_user_meta_data->>'sso_provider_id', '')::uuid;
+  EXCEPTION WHEN invalid_text_representation THEN
+    v_sso_provider_id := NULL;
+  END;
+  
+  IF v_sso_provider_id IS NULL THEN
+    BEGIN
+      v_sso_provider_id := NULLIF(NEW.raw_app_meta_data->>'sso_provider_id', '')::uuid;
+    EXCEPTION WHEN invalid_text_representation THEN
+      v_sso_provider_id := NULL;
+    END;
+  END IF;
   
   -- Only proceed with SSO auto-join if provider ID exists
   IF v_sso_provider_id IS NOT NULL THEN
@@ -799,6 +788,8 @@ COMMENT ON FUNCTION public.enforce_sso_for_domains IS 'Trigger function to enfor
 CREATE OR REPLACE FUNCTION public.validate_sso_configuration()
 RETURNS TRIGGER
 LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
 AS $$
 BEGIN
   -- Validate metadata exists
@@ -1065,10 +1056,6 @@ supabase_auth_admin;
 
 GRANT
 EXECUTE ON FUNCTION public.auto_join_user_to_orgs_by_email TO postgres,
-supabase_auth_admin;
-
-GRANT
-EXECUTE ON FUNCTION public.get_sso_provider_id_for_user_internal TO postgres,
 supabase_auth_admin;
 
 GRANT
