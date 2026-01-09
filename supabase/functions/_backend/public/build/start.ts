@@ -46,12 +46,9 @@ export async function startBuild(
   apikey: Database['public']['Tables']['apikeys']['Row'],
 ): Promise<Response> {
   let alreadyMarkedAsFailed = false
-  // API key may be NULL when hashed. Middleware already validated access.
-  // For build operations, we need the runtime key value.
+  // Use apikey.key directly - utilities like supabaseApikey() and hasAppRightApikey()
+  // have internal fallback logic to handle null/hashed keys
   const apikeyKey = apikey.key
-  if (!apikeyKey) {
-    throw simpleError('invalid_apikey', 'API key is missing or invalid. Build operations require a non-hashed API key.')
-  }
 
   try {
     cloudlog({

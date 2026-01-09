@@ -134,7 +134,7 @@ test.describe('sso login flow', () => {
     // Skip test if SSO test domain is not configured
     const testDomain = process.env.SSO_TEST_DOMAIN
     if (!testDomain) {
-      test.skip(true, 'SSO_TEST_DOMAIN environment variable not set')
+      test.skip(!process.env.SSO_TEST_DOMAIN, 'SSO_TEST_DOMAIN environment variable not set')
       return
     }
 
@@ -142,12 +142,11 @@ test.describe('sso login flow', () => {
     const emailInput = page.locator('[data-test="email"]')
     await emailInput.fill(`user@${testDomain}`)
 
-    // Wait for SSO detection
-    await page.waitForTimeout(500)
+    // Wait for SSO banner to appear (deterministic wait)
+    const ssoBanner = page.locator('[data-test="sso-banner"]')
+    await expect(ssoBanner).toBeVisible({ timeout: 5000 })
 
     // SSO banner must be visible for configured domain
-    const ssoBanner = page.locator('[data-test="sso-banner"]')
-    await expect(ssoBanner).toBeVisible()
     await expect(ssoBanner).toContainText('SSO available')
 
     // Verify SSO button appears
@@ -164,12 +163,9 @@ test.describe('sso login flow', () => {
       const emailInput = page.locator('[data-test="email"]')
       await emailInput.fill(`user@${domain}`)
 
-      // Wait for detection
-      await page.waitForTimeout(500)
-
-      // Should not show SSO banner
+      // SSO banner should not appear for public domains
       const ssoBanner = page.locator('[data-test="sso-banner"]')
-      await expect(ssoBanner).not.toBeVisible()
+      await expect(ssoBanner).not.toBeVisible({ timeout: 2000 })
     }
   })
 
@@ -177,9 +173,6 @@ test.describe('sso login flow', () => {
     // Even with SSO, users should be able to use password
     const emailInput = page.locator('[data-test="email"]')
     await emailInput.fill('user@example.com')
-
-    // Wait for detection
-    await page.waitForTimeout(500)
 
     // Password input and login button should always be available
     const passwordInput = page.locator('[data-test="password"]')
@@ -218,8 +211,12 @@ test.describe('sso permission checks', () => {
     // Try to directly access SSO page
     await page.goto('/settings/organization/sso')
 
-    // Should be redirected or show permission error
-    await page.waitForTimeout(1000)
+    // Wait for either redirect or permission error to appear
+    await Promise.race([
+      page.waitForURL(url => !url.includes('/sso'), { timeout: 3000 }).catch(() => {}),
+      page.locator('text=permission').waitFor({ state: 'visible', timeout: 3000 }).catch(() => {}),
+    ])
+
     const currentUrl = page.url()
     const isSSOPage = currentUrl.includes('/sso')
 

@@ -12,26 +12,43 @@ const SENSITIVE_FIELDS = new Set([
   'user_id',
   'userid',
 ])
+const SENSITIVE_FIELDS_LOWER = new Set(Array.from(SENSITIVE_FIELDS).map(f => f.toLowerCase()))
 
 /**
  * Sanitize an object by redacting sensitive fields
  */
-function sanitize(obj: any): any {
+function sanitize(obj: any, seen = new WeakSet()): any {
   if (typeof obj !== 'object' || obj === null) {
     return obj
   }
 
+  // Handle Error instances
+  if (obj instanceof Error) {
+    return {
+      name: obj.name,
+      message: obj.message,
+      stack: obj.stack,
+    }
+  }
+
+  // Cycle detection
+  if (seen.has(obj)) {
+    return '[Circular]'
+  }
+  seen.add(obj)
+
   if (Array.isArray(obj)) {
-    return obj.map(sanitize)
+    return obj.map(item => sanitize(item, seen))
   }
 
   const sanitized: any = {}
   for (const [key, value] of Object.entries(obj)) {
-    if (SENSITIVE_FIELDS.has(key)) {
+    // Case-insensitive sensitive field check
+    if (SENSITIVE_FIELDS_LOWER.has(key.toLowerCase())) {
       sanitized[key] = '[REDACTED]'
     }
     else if (typeof value === 'object' && value !== null) {
-      sanitized[key] = sanitize(value)
+      sanitized[key] = sanitize(value, seen)
     }
     else {
       sanitized[key] = value
