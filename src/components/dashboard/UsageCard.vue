@@ -10,7 +10,6 @@ import {
   generateDemoStorageData,
   getDemoDayCount,
 } from '~/services/demoChartData'
-import { useDashboardAppsStore } from '~/stores/dashboardApps'
 import ChartCard from './ChartCard.vue'
 import LineChartStats from './LineChartStats.vue'
 
@@ -146,9 +145,6 @@ const lastDayEvolution = computed(() => {
 
   return ((lastValue - previousValue) / previousValue) * 100
 })
-
-const hasData = computed(() => (dataArray.value?.length ?? 0) > 0 && dataArray.value.some(val => val !== undefined))
-
 </script>
 
 <template>
