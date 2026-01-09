@@ -595,10 +595,12 @@ describe('[DELETE] /organization', () => {
     }
 
     // Add test user as a member but not owner
-    const { error: memberError } = await getSupabaseClient().from('org_users').insert({
+    const { error: memberError } = await getSupabaseClient().from('org_users').upsert({
       org_id: id,
       user_id: USER_ID,
       user_right: 'admin', // Even with admin rights, shouldn't be able to delete
+    }, {
+      onConflict: 'user_id,org_id',
     })
     expect(memberError).toBeNull()
 

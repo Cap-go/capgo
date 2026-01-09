@@ -32,10 +32,12 @@ beforeAll(async () => {
     throw error
 
   // Add user as member of the org
-  const { error: memberError } = await getSupabaseClient().from('org_users').insert({
+  const { error: memberError } = await getSupabaseClient().from('org_users').upsert({
     org_id: ORG_ID,
     user_id: USER_ID,
     user_right: 'super_admin',
+  }, {
+    onConflict: 'user_id,org_id',
   })
   if (memberError)
     throw memberError
@@ -49,7 +51,7 @@ afterAll(async () => {
   await getSupabaseClient().from('stripe_info').delete().eq('customer_id', customerId)
 })
 
-describe('Password Policy Configuration via SDK', () => {
+describe('password Policy Configuration via SDK', () => {
   it('enable password policy with all requirements via direct update', async () => {
     const policyConfig = {
       enabled: true,
@@ -346,7 +348,7 @@ describe('[GET] /private/check_org_members_password_policy', () => {
   })
 })
 
-describe('Password Policy Enforcement Integration', () => {
+describe('password Policy Enforcement Integration', () => {
   const orgWithPolicyId = randomUUID()
   const orgWithPolicyName = `Pwd Policy Integration Org ${randomUUID()}`
   const orgWithPolicyCustomerId = `cus_pwd_int_${orgWithPolicyId}`
@@ -379,10 +381,12 @@ describe('Password Policy Enforcement Integration', () => {
     })
 
     // Add user as member
-    await getSupabaseClient().from('org_users').insert({
+    await getSupabaseClient().from('org_users').upsert({
       org_id: orgWithPolicyId,
       user_id: USER_ID,
       user_right: 'super_admin',
+    }, {
+      onConflict: 'user_id,org_id',
     })
   })
 

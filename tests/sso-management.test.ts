@@ -158,10 +158,12 @@ beforeAll(async () => {
     .maybeSingle()
 
   if (!existingOrgUser) {
-    const { error: orgUserError } = await getSupabaseClient().from('org_users').insert({
+    const { error: orgUserError } = await getSupabaseClient().from('org_users').upsert({
       user_id: USER_ID,
       org_id: TEST_SSO_ORG_ID,
       user_right: 'super_admin',
+    }, {
+      onConflict: 'user_id,org_id',
     })
     if (orgUserError)
       throw orgUserError
@@ -236,10 +238,12 @@ describe('auto-join integration', () => {
         throw new Error(`orgs insert failed: ${orgsError.message}`)
       }
 
-      const { error: orgUsersError } = await getSupabaseClient().from('org_users').insert({
+      const { error: orgUsersError } = await getSupabaseClient().from('org_users').upsert({
         user_id: USER_ID,
         org_id: orgId,
         user_right: 'super_admin',
+      }, {
+        onConflict: 'user_id,org_id',
       })
 
       // Ignore duplicate key errors on retry
@@ -300,11 +304,13 @@ describe('auto-join integration', () => {
 
       // Manually enroll user (simulates what auto_enroll_sso_user does)
       // In production, auth.users trigger would call auto_enroll_sso_user automatically
-      // Use insert but ignore if already exists (retry scenario)
-      const { error: enrollError } = await getSupabaseClient().from('org_users').insert({
+      // Use upsert to handle retry scenario
+      const { error: enrollError } = await getSupabaseClient().from('org_users').upsert({
         user_id: actualUserId,
         org_id: orgId,
         user_right: 'read',
+      }, {
+        onConflict: 'user_id,org_id',
       })
 
       // Ignore "duplicate key" type errors on retry, also check for code 23505 (unique violation)
@@ -383,16 +389,16 @@ describe('auto-join integration', () => {
       }
 
       // Create domain mapping for auto-enrollment
-const { data: ssoConnectionData } = await getSupabaseClient()
-      .from('org_saml_connections')
-      .select('id')
-      .eq('org_id', TEST_SSO_ORG_ID)
-      .single()
+      const { data: ssoConnectionData } = await getSupabaseClient()
+        .from('org_saml_connections')
+        .select('id')
+        .eq('org_id', TEST_SSO_ORG_ID)
+        .single()
 
-    const { error: domainError } = await getSupabaseClient().from('saml_domain_mappings').insert({
-      domain: TEST_DOMAIN,
-      org_id: TEST_SSO_ORG_ID,
-      sso_connection_id: ssoConnectionData?.id as string,
+      const { error: domainError } = await getSupabaseClient().from('saml_domain_mappings').insert({
+        domain: TEST_DOMAIN,
+        org_id: TEST_SSO_ORG_ID,
+        sso_connection_id: ssoConnectionData?.id as string,
         verified: true,
       })
 
@@ -513,10 +519,12 @@ describe.skip('domain verification (mocked metadata fetch)', () => {
       customer_id: customerId,
     })
 
-    await getSupabaseClient().from('org_users').insert({
+    await getSupabaseClient().from('org_users').upsert({
       user_id: USER_ID,
       org_id: orgId,
       user_right: 'super_admin',
+    }, {
+      onConflict: 'user_id,org_id',
     })
 
     // Wait for database to commit all the org setup
@@ -585,10 +593,12 @@ describe.skip('domain verification (mocked metadata fetch)', () => {
       customer_id: customerId,
     })
 
-    await getSupabaseClient().from('org_users').insert({
+    await getSupabaseClient().from('org_users').upsert({
       user_id: USER_ID,
       org_id: orgId,
       user_right: 'super_admin',
+    }, {
+      onConflict: 'user_id,org_id',
     })
 
     // Wait for database to commit all the org setup
@@ -667,10 +677,12 @@ describe.skip('domain verification', () => {
       customer_id: customerId,
     })
 
-    await getSupabaseClient().from('org_users').insert({
+    await getSupabaseClient().from('org_users').upsert({
       user_id: USER_ID,
       org_id: orgId,
       user_right: 'super_admin',
+    }, {
+      onConflict: 'user_id,org_id',
     })
 
     await fetch(getEndpointUrl('/private/sso/configure'), {
@@ -719,10 +731,12 @@ describe.skip('domain verification', () => {
       customer_id: customerId,
     })
 
-    await getSupabaseClient().from('org_users').insert({
+    await getSupabaseClient().from('org_users').upsert({
       user_id: USER_ID,
       org_id: orgId,
       user_right: 'super_admin',
+    }, {
+      onConflict: 'user_id,org_id',
     })
 
     await fetch(getEndpointUrl('/private/sso/configure'), {
@@ -779,10 +793,12 @@ describe.skip('domain verification', () => {
       customer_id: customerId,
     })
 
-    await getSupabaseClient().from('org_users').insert({
+    await getSupabaseClient().from('org_users').upsert({
       user_id: USER_ID,
       org_id: orgId,
       user_right: 'super_admin',
+    }, {
+      onConflict: 'user_id,org_id',
     })
 
     await fetch(getEndpointUrl('/private/sso/configure'), {
@@ -846,10 +862,12 @@ describe.skip('domain verification', () => {
       customer_id: customerId,
     })
 
-    await getSupabaseClient().from('org_users').insert({
+    await getSupabaseClient().from('org_users').upsert({
       user_id: USER_ID,
       org_id: orgId,
       user_right: 'super_admin',
+    }, {
+      onConflict: 'user_id,org_id',
     })
 
     await fetch(getEndpointUrl('/private/sso/configure'), {

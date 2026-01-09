@@ -346,10 +346,12 @@ describe('[PUT] /organization with API key policy', () => {
       throw orgError
 
     // Add user as super_admin to be able to update the org
-    const { error: memberError } = await getSupabaseClient().from('org_users').insert({
+    const { error: memberError } = await getSupabaseClient().from('org_users').upsert({
       org_id: updateOrgId,
       user_id: USER_ID,
       user_right: 'super_admin',
+    }, {
+      onConflict: 'user_id,org_id',
     })
     if (memberError)
       throw memberError
