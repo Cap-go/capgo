@@ -1322,62 +1322,55 @@ app.use('/', useCors)
  */
 app.post('/configure', middlewareAPISecret, async (c: Context<MiddlewareKeyVariables>) => {
   const requestId = c.get('requestId')
-  const pgClient = getPgClient(c, true)
 
-  try {
-    const body = await parseBody<z.infer<typeof ssoConfigSchema>>(c)
+  const body = await parseBody<z.infer<typeof ssoConfigSchema>>(c)
 
-    // Validate schema
-    const result = ssoConfigSchema.safeParse(body)
-    if (!result.success) {
-      throw simpleError('invalid_input', 'Invalid request body', { errors: result.error.issues })
-    }
-
-    const config = result.data
-
-    // Check permission early, before other validations
-    // Use userId from body if provided (for internal API calls), otherwise from auth context
-    const auth = c.get('auth')
-    const effectiveUserId = config.userId || auth?.userId
-    if (!effectiveUserId) {
-      throw simpleError('unauthorized', 'Authentication required - userId must be provided', 401)
-    }
-
-    cloudlog({
-      requestId,
-      message: '[SSO Configure] Checking permissions',
-      orgId: config.orgId,
-      effectiveUserId,
-      requiredRight: 'super_admin',
-    })
-
-    const hasPermission = await hasOrgRight(c, config.orgId, effectiveUserId, 'super_admin')
-
-    cloudlog({
-      requestId,
-      message: '[SSO Configure] Permission check result',
-      hasPermission,
-    })
-
-    if (!hasPermission) {
-      throw simpleError('insufficient_permissions', 'Only super administrators can configure SSO', 403)
-    }
-
-    cloudlog({
-      requestId,
-      message: '[SSO Configure] Request received',
-      orgId: config.orgId,
-      domains: config.domains || [],
-    })
-
-    // Pass userId to configureSAML
-    const response = await configureSAML(c, config, effectiveUserId)
-    return c.json(response, 200)
+  // Validate schema
+  const result = ssoConfigSchema.safeParse(body)
+  if (!result.success) {
+    throw simpleError('invalid_input', 'Invalid request body', { errors: result.error.issues })
   }
-  catch (error: any) {
-    await closeClient(c, pgClient)
-    throw error
+
+  const config = result.data
+
+  // Check permission early, before other validations
+  // Use userId from body if provided (for internal API calls), otherwise from auth context
+  const auth = c.get('auth')
+  const effectiveUserId = config.userId || auth?.userId
+  if (!effectiveUserId) {
+    throw simpleError('unauthorized', 'Authentication required - userId must be provided', 401)
   }
+
+  cloudlog({
+    requestId,
+    message: '[SSO Configure] Checking permissions',
+    orgId: config.orgId,
+    effectiveUserId,
+    requiredRight: 'super_admin',
+  })
+
+  const hasPermission = await hasOrgRight(c, config.orgId, effectiveUserId, 'super_admin')
+
+  cloudlog({
+    requestId,
+    message: '[SSO Configure] Permission check result',
+    hasPermission,
+  })
+
+  if (!hasPermission) {
+    throw simpleError('insufficient_permissions', 'Only super administrators can configure SSO', 403)
+  }
+
+  cloudlog({
+    requestId,
+    message: '[SSO Configure] Request received',
+    orgId: config.orgId,
+    domains: config.domains || [],
+  })
+
+  // Pass userId to configureSAML
+  const response = await configureSAML(c, config, effectiveUserId)
+  return c.json(response, 200)
 })
 
 /**

@@ -340,12 +340,18 @@ app.post('/', middlewareV2(['read', 'write', 'all']), async (c) => {
         url: config.metadata_url,
       })
 
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 5000) // 5 second timeout
+
       try {
         const metadataResponse = await fetch(config.metadata_url, {
           headers: {
             Accept: 'application/xml, text/xml',
           },
+          signal: controller.signal,
         })
+
+        clearTimeout(timeoutId)
 
         if (!metadataResponse.ok) {
           validationErrors.push(`Failed to fetch metadata: HTTP ${metadataResponse.status}`)
@@ -361,12 +367,25 @@ app.post('/', middlewareV2(['read', 'write', 'all']), async (c) => {
         }
       }
       catch (error: any) {
-        validationErrors.push(`Failed to fetch metadata from URL: ${error.message}`)
-        cloudlog({
-          requestId,
-          message: '[SSO Test] Failed to fetch metadata',
-          error: error.message,
-        })
+        clearTimeout(timeoutId)
+
+        if (error.name === 'AbortError') {
+          validationErrors.push('Failed to fetch metadata from URL: Request timed out after 5 seconds')
+          cloudlog({
+            requestId,
+            message: '[SSO Test] Metadata fetch timed out',
+            url: config.metadata_url,
+            timeout: '5s',
+          })
+        }
+        else {
+          validationErrors.push(`Failed to fetch metadata from URL: ${error.message}`)
+          cloudlog({
+            requestId,
+            message: '[SSO Test] Failed to fetch metadata',
+            error: error.message,
+          })
+        }
       }
     }
 

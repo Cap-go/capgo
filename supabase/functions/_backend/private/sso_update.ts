@@ -30,9 +30,11 @@ import { createHono, parseBody, quickError, simpleError, useCors } from '../util
 import { middlewareV2 } from '../utils/hono_middleware.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { hasOrgRight } from '../utils/supabase.ts'
+import { version } from '../utils/version.ts'
 import { ssoUpdateSchema, updateSAML } from './sso_management.ts'
 
-export const app = createHono()
+const functionName = 'sso_update'
+export const app = createHono(functionName, version)
 
 app.use('/', useCors)
 
