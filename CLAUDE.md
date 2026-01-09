@@ -140,6 +140,101 @@ testing against Cloudflare Workers.
 - Auto-generated types for Vue components and routes
 - Supabase types auto-generated via CLI
 
+## Database RLS Policies
+
+### Identity Functions for RLS - CRITICAL RULES
+
+**NEVER use `get_identity()` directly in RLS policies.**
+
+**ALWAYS use `get_identity_org_appid()` when app_id exists on the table.**
+
+```sql
+public.get_identity_org_appid(
+    '{read,upload,write,all}'::public.key_mode[],
+    owner_org,  -- or org_id
+    app_id
+)
+```
+
+**`get_identity_org_allowed()` is an ABSOLUTE LAST RESORT.** Only use it when:
+
+- The table genuinely has NO app_id column
+- There is NO way to join to get an app_id
+- You have exhausted all other options
+
+If you find yourself reaching for `get_identity_org_allowed()`, STOP and ask:
+"Is there ANY way to get an app_id here?" If yes, use `get_identity_org_appid()`.
+
+### RLS Pattern Examples
+
+```sql
+-- CORRECT: Table has app_id - use get_identity_org_appid
+CREATE POLICY "Allow org members to select build_requests"
+ON public.build_requests
+FOR SELECT
+TO authenticated, anon
+USING (
+    public.check_min_rights(
+        'read'::public.user_min_right,
+        public.get_identity_org_appid(
+            '{read,upload,write,all}'::public.key_mode[],
+            owner_org,
+            app_id
+        ),
+        owner_org,
+        app_id,
+        NULL::BIGINT
+    )
+);
+
+-- CORRECT: Table has no app_id but can JOIN to get it
+CREATE POLICY "Allow org members to select daily_build_time"
+ON public.daily_build_time
+FOR SELECT
+TO authenticated, anon
+USING (
+    EXISTS (
+        SELECT 1 FROM public.apps
+        WHERE apps.app_id = daily_build_time.app_id
+        AND public.check_min_rights(
+            'read'::public.user_min_right,
+            public.get_identity_org_appid(
+                '{read,upload,write,all}'::public.key_mode[],
+                apps.owner_org,
+                apps.app_id
+            ),
+            apps.owner_org,
+            apps.app_id,
+            NULL::BIGINT
+        )
+    )
+);
+
+-- LAST RESORT: Table has NO app_id and NO way to get one (e.g., build_logs)
+CREATE POLICY "Allow org members to select build_logs"
+ON public.build_logs
+FOR SELECT
+TO authenticated, anon
+USING (
+    public.check_min_rights(
+        'read'::public.user_min_right,
+        public.get_identity_org_allowed(
+            '{read,upload,write,all}'::public.key_mode[],
+            org_id
+        ),
+        org_id,
+        NULL::CHARACTER VARYING,
+        NULL::BIGINT
+    )
+);
+```
+
+Key points:
+
+- Use both `authenticated` and `anon` roles (anon enables API key auth)
+- Pass app_id to BOTH `get_identity_org_appid()` AND `check_min_rights()`
+- Reference apps, channels, app_versions tables for more examples
+
 ## Mobile Development
 
 ### Capacitor Configuration
@@ -148,6 +243,62 @@ testing against Cloudflare Workers.
 - Build command: `bun mobile` (builds and copies to platforms)
 - iOS/Android projects in respective platform directories
 - Uses Capacitor Updater plugin for OTA updates
+
+## Pull Request Guidelines
+
+### Required Sections
+
+Every pull request MUST include the following sections:
+
+1. **Summary** - Brief description of what changed
+2. **Motivation** - Why this change is needed
+3. **Business Impact** - How this affects Capgo's business, users, or revenue
+4. **Test Plan** - Checklist for testing the changes
+
+### AI-Generated Content Marking - MANDATORY
+
+**CRITICAL: ALL sections in a PR created by Claude Code MUST be marked with
+"(AI generated)".**
+
+Example:
+```markdown
+## Summary (AI generated)
+- Fixed the build system RLS policies
+
+## Motivation (AI generated)
+The native build system needed consistent RLS patterns...
+
+## Business Impact (AI generated)
+This enables revenue growth by providing a working build system...
+
+## Test Plan (AI generated)
+- [ ] Verify authenticated users can access build requests
+- [ ] Verify API key authentication works
+```
+
+**WARNING: Failure to mark AI-generated sections is a violation of transparency
+requirements. If you do not mark sections as "(AI generated)", you are doing it
+wrong and this is unacceptable behavior. You will be punished for not being
+transparent about AI-generated content. ALWAYS mark every section with
+"(AI generated)".**
+
+### PR Template
+
+```markdown
+## Summary (AI generated)
+- [Bullet points of changes]
+
+## Motivation (AI generated)
+[Why this change is needed]
+
+## Business Impact (AI generated)
+[How this affects Capgo - revenue, users, experience, etc.]
+
+## Test Plan (AI generated)
+- [ ] [Testing checklist]
+
+🤖 Generated with [Claude Code](https://claude.ai/code)
+```
 
 ## Deployment
 
