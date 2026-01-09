@@ -95,7 +95,18 @@ BEGIN
         BEGIN
           CASE task.task_type
             WHEN 'function' THEN
-              EXECUTE 'SELECT ' || task.target;
+              -- Whitelist allowed functions for security
+              IF task.target IN (
+                'public.cleanup_old_sso_audit_logs',
+                'public.cleanup_queue_messages',
+                'public.cleanup_old_audit_logs',
+                'public.process_stats_queue',
+                'public.send_stats_email'
+              ) THEN
+                EXECUTE 'SELECT ' || task.target;
+              ELSE
+                RAISE WARNING 'Unknown or unauthorized function: %', task.target;
+              END IF;
 
             WHEN 'queue' THEN
               PERFORM pgmq.send(
