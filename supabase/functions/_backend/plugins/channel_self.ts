@@ -212,7 +212,7 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
   let mainChannelName = null as string | null
   if (mainChannel && mainChannel.length > 0) {
     const devicePlatform = body.platform as Database['public']['Enums']['platform_os']
-    const finalChannel = mainChannel.find((channel: { name: string, ios: boolean, android: boolean }) => channel[devicePlatform])
+    const finalChannel = mainChannel.find((channel: { name: string, ios: boolean, android: boolean, electron?: boolean }) => channel[devicePlatform])
     mainChannelName = (finalChannel !== undefined) ? finalChannel.name : null
   }
 
