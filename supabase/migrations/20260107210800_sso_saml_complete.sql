@@ -210,9 +210,9 @@ DECLARE
   v_domain text;
   v_has_sso boolean;
 BEGIN
-  v_domain := lower(split_part(p_email, '@', 2));
+  v_domain := NULLIF(lower(split_part(p_email, '@', 2)), '');
   
-  IF v_domain IS NULL OR v_domain = '' THEN
+  IF v_domain IS NULL THEN
     RETURN false;
   END IF;
   
@@ -322,9 +322,9 @@ DECLARE
   v_domain text;
 BEGIN
   -- Extract domain from email
-  v_domain := lower(split_part(p_email, '@', 2));
+  v_domain := NULLIF(lower(split_part(p_email, '@', 2)), '');
   
-  IF v_domain IS NULL OR v_domain = '' THEN
+  IF v_domain IS NULL THEN
     RETURN;
   END IF;
   
@@ -362,9 +362,9 @@ DECLARE
   v_domain text;
   v_provider_id uuid;
 BEGIN
-  v_domain := lower(split_part(p_email, '@', 2));
+  v_domain := NULLIF(lower(split_part(p_email, '@', 2)), '');
   
-  IF v_domain IS NULL OR v_domain = '' THEN
+  IF v_domain IS NULL THEN
     RETURN NULL;
   END IF;
   
@@ -474,9 +474,9 @@ DECLARE
   v_domain text;
   v_org record;
 BEGIN
-  v_domain := lower(split_part(p_email, '@', 2));
+  v_domain := NULLIF(lower(split_part(p_email, '@', 2)), '');
   
-  IF v_domain IS NULL OR v_domain = '' THEN
+  IF v_domain IS NULL THEN
     RETURN;
   END IF;
   
