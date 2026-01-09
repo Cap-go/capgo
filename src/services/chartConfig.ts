@@ -5,6 +5,12 @@
 interface AxisConfig {
   grid?: {
     color: string
+    drawBorder?: boolean
+    borderColor?: string
+  }
+  border?: {
+    display?: boolean
+    color?: string
   }
   ticks?: {
     color: string
@@ -34,9 +40,14 @@ interface LegendConfig {
  * Creates standardized x-axis configuration
  */
 export function createXAxisConfig(isDark: boolean, options: { stacked?: boolean } = {}) {
+  const gridColor = isDark ? '#323e4e' : '#cad5e2'
   const config: AxisConfig = {
     grid: {
-      color: isDark ? '#323e4e' : '#cad5e2',
+      color: gridColor,
+    },
+    // Hide the axis border line (first vertical line) to match grid lines
+    border: {
+      display: false,
     },
     ticks: {
       color: isDark ? 'white' : 'black',
@@ -64,10 +75,15 @@ export function createYAxisConfig(
     tickCallback?: (value: string | number) => string
   } = {},
 ) {
+  const gridColor = isDark ? '#424e5f' : '#bfc9d6'
   const config: AxisConfig = {
     beginAtZero: true,
     grid: {
-      color: isDark ? '#424e5f' : '#bfc9d6',
+      color: gridColor,
+    },
+    // Hide the axis border line (bottom horizontal line) to match grid lines
+    border: {
+      display: false,
     },
     ticks: {
       color: isDark ? 'white' : 'black',

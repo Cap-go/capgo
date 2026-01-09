@@ -8,6 +8,9 @@ import { sendEmailToOrgMembers } from '../utils/org_email_notifications.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 import { backgroundTask } from '../utils/utils.ts'
 
+// Special bundle names that should not trigger email notifications
+const SKIP_EMAIL_BUNDLE_NAMES = ['unknown', 'builtin']
+
 export const app = new Hono<MiddlewareKeyVariables>()
 
 app.post('/', middlewareAPISecret, triggerValidator('app_versions', 'INSERT'), async (c) => {
@@ -19,6 +22,9 @@ app.post('/', middlewareAPISecret, triggerValidator('app_versions', 'INSERT'), a
     return simpleError('no_id', 'No id', { record })
   }
 
+  // Skip email notifications for special system bundles (unknown, builtin)
+  const shouldSkipNotifications = SKIP_EMAIL_BUNDLE_NAMES.includes(record.name)
+
   const { error: errorUpdate } = await supabaseAdmin(c)
     .from('apps')
     .update({
@@ -29,24 +35,26 @@ app.post('/', middlewareAPISecret, triggerValidator('app_versions', 'INSERT'), a
   if (errorUpdate)
     cloudlog({ requestId: c.get('requestId'), message: 'errorUpdate', errorUpdate })
 
-  const LogSnag = logsnag(c)
-  await backgroundTask(c, LogSnag.track({
-    channel: 'bundle-created',
-    event: 'Bundle Created',
-    icon: '🎉',
-    user_id: record.owner_org,
-    tags: {
+  if (!shouldSkipNotifications) {
+    const LogSnag = logsnag(c)
+    await backgroundTask(c, LogSnag.track({
+      channel: 'bundle-created',
+      event: 'Bundle Created',
+      icon: '🎉',
+      user_id: record.owner_org,
+      tags: {
+        app_id: record.app_id,
+        bundle_name: record.name,
+      },
+      notify: false,
+    }))
+    await backgroundTask(c, sendEmailToOrgMembers(c, 'bundle:created', 'bundle_created', {
+      org_id: record.owner_org,
       app_id: record.app_id,
       bundle_name: record.name,
-    },
-    notify: false,
-  }))
-  await backgroundTask(c, sendEmailToOrgMembers(c, 'bundle:created', 'bundle_created', {
-    org_id: record.owner_org,
-    app_id: record.app_id,
-    bundle_name: record.name,
-    bundle_id: record.id,
-  }, record.owner_org))
+      bundle_id: record.id,
+    }, record.owner_org))
+  }
 
   return c.json(BRES)
 })

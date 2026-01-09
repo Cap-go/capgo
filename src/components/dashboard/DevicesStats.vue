@@ -13,6 +13,7 @@ import { useChartData } from '~/services/chartDataService'
 import { createTooltipConfig, todayLinePlugin, verticalLinePlugin } from '~/services/chartTooltip'
 import { generateChartDayLabels, getChartDateRange, normalizeToStartOfDay } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
+import { useDashboardAppsStore } from '~/stores/dashboardApps'
 import { useOrganizationStore } from '~/stores/organization'
 import ChartCard from './ChartCard.vue'
 
@@ -421,7 +422,20 @@ const processedChartData = computed<ChartData<'line'> | null>(() => {
   }
 })
 
-const hasData = computed(() => !!(processedChartData.value && processedChartData.value.datasets.length > 0))
+// Demo mode: show demo data only when forceDemo is true OR user has no apps
+// If user has apps, ALWAYS show real data (even if empty)
+const dashboardAppsStore = useDashboardAppsStore()
+const isDemoMode = computed(() => {
+  if (props.forceDemo)
+    return true
+  // If user has apps, never show demo data
+  if (dashboardAppsStore.apps.length > 0)
+    return false
+  // No apps and store is loaded = show demo
+  return dashboardAppsStore.isLoaded
+})
+
+const hasData = computed(() => !!(processedChartData.value && processedChartData.value.datasets.length > 0) || isDemoMode.value)
 
 const todayLineOptions = computed(() => {
   if (!props.useBillingPeriod || !currentRange.value)
@@ -513,7 +527,7 @@ async function loadData(forceRefetch = false) {
     return
   }
 
-  // If forceDemo is true, use demo data instead of fetching
+  // If forceDemo is true (payment failed), use demo data instead of fetching
   if (props.forceDemo) {
     const { startDate, endDate } = getDateRange()
     const days = Math.floor((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1
@@ -647,6 +661,7 @@ watch(
     :title="t('active_users_by_version')"
     :is-loading="isLoading"
     :has-data="hasData"
+    :is-demo-data="isDemoMode"
   >
     <template #header>
       <div class="flex items-start justify-between flex-1 gap-2">

@@ -10,6 +10,7 @@ import {
   generateDemoStorageData,
   getDemoDayCount,
 } from '~/services/demoChartData'
+import { useDashboardAppsStore } from '~/stores/dashboardApps'
 import ChartCard from './ChartCard.vue'
 import LineChartStats from './LineChartStats.vue'
 
@@ -156,7 +157,7 @@ const hasData = computed(() => (dataArray.value?.length ?? 0) > 0 && dataArray.v
     :total="total"
     :unit="unit"
     :last-day-evolution="lastDayEvolution"
-    :has-data="hasData"
+    :has-data="hasChartData"
     :is-loading="isLoading"
     :is-demo-data="isDemoMode"
   >
