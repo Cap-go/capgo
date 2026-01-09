@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { Pool } from 'pg'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
-import { BASE_URL, getSupabaseClient, headersInternal, POSTGRES_URL, USER_ADMIN_EMAIL, USER_ID } from './test-utils.ts'
+import { getEndpointUrl, getSupabaseClient, headersInternal, POSTGRES_URL, USER_ADMIN_EMAIL, USER_ID } from './test-utils.ts'
 
 const TEST_SSO_ORG_ID = randomUUID()
 const TEST_SSO_ORG_NAME = `SSO Test Org ${randomUUID()}`
@@ -337,8 +337,8 @@ describe('auto-join integration', () => {
 
       // Ignore duplicate key errors on retry
       const isPublicUserDuplicate = publicUserError && (
-        publicUserError.message?.includes('duplicate') ||
-        publicUserError.code === '23505'
+        publicUserError.message?.includes('duplicate')
+        || publicUserError.code === '23505'
       )
 
       if (publicUserError && !isPublicUserDuplicate) {
@@ -357,9 +357,9 @@ describe('auto-join integration', () => {
 
     // Ignore "duplicate key" type errors on retry, also check for code 23505 (unique violation)
     const isDuplicateError = enrollError && (
-      enrollError.message?.includes('duplicate') ||
-      enrollError.code === '23505' ||
-      enrollError.details?.includes('duplicate')
+      enrollError.message?.includes('duplicate')
+      || enrollError.code === '23505'
+      || enrollError.details?.includes('duplicate')
     )
 
     if (enrollError && !isDuplicateError) {
@@ -401,7 +401,7 @@ describe('auto-join integration', () => {
   it('should auto-enroll existing users on first SSO login', async () => {
     const testIp = '203.0.113.42'
 
-    await fetch(`${BASE_URL}/private/sso/status`, {
+    await fetch(getEndpointUrl('/private/sso/status'), {
       method: 'POST',
       headers: {
         ...headersInternal,
@@ -609,7 +609,7 @@ describe.skip('domain verification', () => {
       user_right: 'super_admin',
     })
 
-    await fetch(`${BASE_URL}/private/sso/configure`, {
+    await fetch(getEndpointUrl('/private/sso/configure'), {
       method: 'POST',
       headers: headersInternal,
       body: JSON.stringify({
@@ -661,7 +661,7 @@ describe.skip('domain verification', () => {
       user_right: 'super_admin',
     })
 
-    await fetch(`${BASE_URL}/private/sso/configure`, {
+    await fetch(getEndpointUrl('/private/sso/configure'), {
       method: 'POST',
       headers: headersInternal,
       body: JSON.stringify({
@@ -721,7 +721,7 @@ describe.skip('domain verification', () => {
       user_right: 'super_admin',
     })
 
-    await fetch(`${BASE_URL}/private/sso/configure`, {
+    await fetch(getEndpointUrl('/private/sso/configure'), {
       method: 'POST',
       headers: headersInternal,
       body: JSON.stringify({
@@ -788,7 +788,7 @@ describe.skip('domain verification', () => {
       user_right: 'super_admin',
     })
 
-    await fetch(`${BASE_URL}/private/sso/configure`, {
+    await fetch(getEndpointUrl('/private/sso/configure'), {
       method: 'POST',
       headers: headersInternal,
       body: JSON.stringify({
@@ -799,7 +799,7 @@ describe.skip('domain verification', () => {
       }),
     })
 
-    const response = await fetch(`${BASE_URL}/private/sso/status`, {
+    const response = await fetch(getEndpointUrl('/private/sso/status'), {
       method: 'POST',
       headers: headersInternal,
       body: JSON.stringify({

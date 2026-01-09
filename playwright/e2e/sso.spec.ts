@@ -112,16 +112,16 @@ test.describe('sso configuration wizard', () => {
   })
 
   test('should show sso status when configuration exists', async ({ page }) => {
-    // If SSO is already configured, should see status banner
-    const statusBanner = page.locator('[data-test="sso-status"]')
-
-    // Check if status banner exists
-    const bannerExists = await statusBanner.count()
-
-    if (bannerExists > 0) {
-      // Verify banner shows enabled or disabled state
-      await expect(statusBanner).toContainText(/enabled|disabled/i)
+    // Skip test if SSO is not configured
+    if (!process.env.SSO_ENABLED) {
+      test.skip()
+      return
     }
+
+    // If SSO is configured, status banner must be visible
+    const statusBanner = page.locator('[data-test="sso-status"]')
+    await expect(statusBanner).toBeVisible()
+    await expect(statusBanner).toContainText(/enabled|disabled/i)
   })
 })
 
@@ -131,26 +131,28 @@ test.describe('sso login flow', () => {
   })
 
   test('should detect sso for configured domain', async ({ page }) => {
-    // Note: This test requires SSO to be configured for a test domain
-    // Enter email with SSO domain
+    // Skip test if SSO test domain is not configured
+    const testDomain = process.env.SSO_TEST_DOMAIN
+    if (!testDomain) {
+      test.skip(true, 'SSO_TEST_DOMAIN environment variable not set')
+      return
+    }
+
+    // Enter email with configured SSO domain
     const emailInput = page.locator('[data-test="email"]')
-    await emailInput.fill('user@sso-configured-domain.com')
+    await emailInput.fill(`user@${testDomain}`)
 
     // Wait for SSO detection
     await page.waitForTimeout(500)
 
-    // Should show SSO banner
+    // SSO banner must be visible for configured domain
     const ssoBanner = page.locator('[data-test="sso-banner"]')
-    const bannerVisible = await ssoBanner.isVisible().catch(() => false)
+    await expect(ssoBanner).toBeVisible()
+    await expect(ssoBanner).toContainText('SSO available')
 
-    // If SSO is configured for this domain, banner should appear
-    if (bannerVisible) {
-      await expect(ssoBanner).toContainText('SSO available')
-
-      // Verify SSO button appears
-      const ssoBtn = page.locator('button:has-text("Continue with SSO")')
-      await expect(ssoBtn).toBeVisible()
-    }
+    // Verify SSO button appears
+    const ssoBtn = page.locator('button:has-text("Continue with SSO")')
+    await expect(ssoBtn).toBeVisible()
   })
 
   test('should not detect sso for public email domains', async ({ page }) => {

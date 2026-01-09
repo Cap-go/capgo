@@ -44,7 +44,7 @@ app.post('/', middlewareAuth, async (c) => {
     .eq('id', body.id)
     .single()
 
-  const ownerOrg = bundle?.owner_org.created_by
+  const ownerOrg = bundle?.owner_org?.created_by
 
   if (getBundleError) {
     return simpleError('cannot_get_bundle', 'Cannot get bundle', { getBundleError })

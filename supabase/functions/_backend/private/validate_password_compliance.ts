@@ -104,8 +104,6 @@ app.post('/', async (c) => {
 
   const userId = signInData.user.id
 
-  supabaseAdmin = useSupabaseAdmin(c)
-
   // Verify user is a member of this organization
   const { data: membership, error: memberError } = await supabaseAdmin
     .from('org_users')

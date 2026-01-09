@@ -1,16 +1,48 @@
 import { getRuntimeKey } from 'hono/adapter'
 
-export function cloudlog(message: any) {
-  if (getRuntimeKey() === 'workerd') {
-    console.log(message)
+// Sensitive field names that should be redacted from logs
+const SENSITIVE_FIELDS = new Set(['apikey', 'apiKey', 'apikeyUserId', 'password', 'secret', 'token', 'key'])
+
+/**
+ * Sanitize an object by redacting sensitive fields
+ */
+function sanitize(obj: any): any {
+  if (typeof obj !== 'object' || obj === null) {
+    return obj
   }
-  else if (typeof message === 'object' && message !== null) {
-    const entries = Object.entries(message)
+
+  if (Array.isArray(obj)) {
+    return obj.map(sanitize)
+  }
+
+  const sanitized: any = {}
+  for (const [key, value] of Object.entries(obj)) {
+    if (SENSITIVE_FIELDS.has(key)) {
+      sanitized[key] = '[REDACTED]'
+    }
+    else if (typeof value === 'object' && value !== null) {
+      sanitized[key] = sanitize(value)
+    }
+    else {
+      sanitized[key] = value
+    }
+  }
+  return sanitized
+}
+
+export function cloudlog(message: any) {
+  const safeMessage = typeof message === 'object' && message !== null ? sanitize(message) : message
+
+  if (getRuntimeKey() === 'workerd') {
+    console.log(safeMessage)
+  }
+  else if (typeof safeMessage === 'object' && safeMessage !== null) {
+    const entries = Object.entries(safeMessage)
     const logArgs = entries.flatMap(([key, value]) => [key, value])
     console.log(...logArgs)
   }
   else {
-    console.log(message)
+    console.log(safeMessage)
   }
 }
 
@@ -27,15 +59,17 @@ export function serializeError(err: unknown) {
 }
 
 export function cloudlogErr(message: any) {
+  const safeMessage = typeof message === 'object' && message !== null ? sanitize(message) : message
+
   if (getRuntimeKey() === 'workerd') {
-    console.error(message)
+    console.error(safeMessage)
   }
-  else if (typeof message === 'object' && message !== null) {
-    const entries = Object.entries(message)
+  else if (typeof safeMessage === 'object' && safeMessage !== null) {
+    const entries = Object.entries(safeMessage)
     const logArgs = entries.flatMap(([key, value]) => [key, value])
     console.error(...logArgs)
   }
   else {
-    console.error(message)
+    console.error(safeMessage)
   }
 }
