@@ -399,32 +399,129 @@ describe('auto-join integration', () => {
   }, 120000)
 
   it('should auto-enroll existing users on first SSO login', async () => {
-    const testIp = '203.0.113.42'
+    // Create a test user for auto-enrollment testing
+    const testUserEmail = `sso-test-${randomUUID()}@${TEST_DOMAIN}`
+    const ssoProviderId = randomUUID()
+    const testEntityId = generateTestEntityId()
+    let testUserId: string | undefined
 
-    await fetch(getEndpointUrl('/private/sso/status'), {
-      method: 'POST',
-      headers: {
-        ...headersInternal,
-        'x-forwarded-for': testIp,
-      },
-      body: JSON.stringify({
-        orgId: TEST_SSO_ORG_ID,
-      }),
-    })
+    try {
+      // Create SSO connection for the test org with auto_join enabled
+      const { error: ssoError } = await getSupabaseClient().from('org_saml_connections').insert({
+        org_id: TEST_SSO_ORG_ID,
+        sso_provider_id: ssoProviderId,
+        provider_name: 'Test SSO Provider',
+        entity_id: testEntityId,
+        metadata_xml: generateTestMetadataXml(testEntityId),
+        enabled: true,
+        verified: true,
+        auto_join_enabled: true, // Enable auto-join
+      })
 
-    // Check audit logs for view event
-    const { data: auditLogs } = await getSupabaseClient()
-      .from('sso_audit_logs')
-      .select('*')
-      .eq('org_id', TEST_SSO_ORG_ID)
-      .eq('event_type', 'sso_config_viewed')
-      .order('created_at', { ascending: false })
-      .limit(1)
+      if (ssoError && !ssoError.message?.includes('duplicate') && ssoError.code !== '23505') {
+        throw new Error(`SSO connection creation failed: ${ssoError.message}`)
+      }
 
-    if (auditLogs && auditLogs.length > 0) {
-      const log = auditLogs[0]
-      expect(log.ip_address).toBeDefined()
-      // IP might be captured from different headers depending on environment
+      // Create domain mapping for auto-enrollment
+      const { error: domainError } = await getSupabaseClient().from('saml_domain_mappings').insert({
+        domain: TEST_DOMAIN,
+        org_id: TEST_SSO_ORG_ID,
+        verified: true,
+      })
+
+      if (domainError && !domainError.message?.includes('duplicate') && domainError.code !== '23505') {
+        throw new Error(`Domain mapping creation failed: ${domainError.message}`)
+      }
+
+      // Create auth user
+      const { data: authUserData, error: authError } = await getSupabaseClient().auth.admin.createUser({
+        email: testUserEmail,
+        email_confirm: true,
+        user_metadata: {
+          sso_provider_id: ssoProviderId,
+        },
+      })
+
+      if (authUserData?.user) {
+        testUserId = authUserData.user.id
+      }
+      else {
+        // Try to find existing user
+        const { data: existingUser } = await getSupabaseClient()
+          .from('users')
+          .select('id')
+          .eq('email', testUserEmail)
+          .maybeSingle()
+
+        if (existingUser) {
+          testUserId = existingUser.id
+        }
+        else {
+          console.log('Could not create auth user, skipping test')
+          return
+        }
+      }
+
+      // Ensure user exists in public.users table
+      const { error: publicUserError } = await getSupabaseClient().from('users').upsert({
+        id: testUserId,
+        email: testUserEmail,
+      }, { onConflict: 'id' })
+
+      if (publicUserError && !publicUserError.message?.includes('duplicate')) {
+        throw new Error(`Public user creation failed: ${publicUserError.message}`)
+      }
+
+      // Manually trigger auto-enrollment (simulates SSO login trigger)
+      await getSupabaseClient().rpc('auto_enroll_sso_user', {
+        p_user_id: testUserId,
+        p_email: testUserEmail,
+        p_sso_provider_id: ssoProviderId,
+      })
+
+      // Verify user was auto-enrolled in the organization
+      const { data: enrollment, error: enrollmentError } = await getSupabaseClient()
+        .from('org_users')
+        .select('*')
+        .eq('org_id', TEST_SSO_ORG_ID)
+        .eq('user_id', testUserId)
+        .maybeSingle()
+
+      if (enrollmentError) {
+        throw new Error(`Failed to check enrollment: ${enrollmentError.message}`)
+      }
+
+      // Assert enrollment occurred
+      expect(enrollment).toBeTruthy()
+      expect(enrollment!.user_right).toBe('read') // Default enrollment role
+
+      // Verify audit log was created
+      const { data: auditLogs } = await getSupabaseClient()
+        .from('sso_audit_logs')
+        .select('*')
+        .eq('org_id', TEST_SSO_ORG_ID)
+        .eq('user_id', testUserId)
+        .eq('event_type', 'auto_join_success')
+        .order('created_at', { ascending: false })
+        .limit(1)
+
+      expect(auditLogs).toBeTruthy()
+      expect(auditLogs!.length).toBeGreaterThan(0)
+    }
+    finally {
+      // Cleanup
+      if (testUserId) {
+        try {
+          await getSupabaseClient().auth.admin.deleteUser(testUserId)
+        }
+        catch (err) {
+          console.log('Could not delete auth user:', err)
+        }
+        await getSupabaseClient().from('org_users').delete().eq('user_id', testUserId)
+        await getSupabaseClient().from('users').delete().eq('id', testUserId)
+      }
+      await getSupabaseClient().from('saml_domain_mappings').delete().eq('org_id', TEST_SSO_ORG_ID).eq('domain', TEST_DOMAIN)
+      await getSupabaseClient().from('org_saml_connections').delete().eq('org_id', TEST_SSO_ORG_ID).eq('sso_provider_id', ssoProviderId)
     }
   }, 120000)
 })
