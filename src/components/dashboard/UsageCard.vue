@@ -109,15 +109,15 @@ const effectiveAppNames = computed(() => isDemoMode.value ? DEMO_APP_NAMES : pro
 const total = computed(() => {
   const arr = effectiveData.value
   const hasData = arr.some(val => val !== undefined)
-  const sumValues = (values: number[]) => values.reduce((acc, val) => (typeof val === 'number' ? acc + val : acc), 0)
+  const sumValues = (values: (number | undefined)[]): number => values.reduce<number>((acc, val) => (typeof val === 'number' ? acc + val : acc), 0)
 
   if (hasData) {
     return sumValues(arr)
   }
 
   if (effectiveDataByApp.value && Object.keys(effectiveDataByApp.value).length > 0) {
-    return Object.values(effectiveDataByApp.value).reduce((totalSum, appValues: any) => {
-      return totalSum + sumValues(appValues)
+    return Object.values(effectiveDataByApp.value).reduce((totalSum: number, appValues: any) => {
+      return totalSum + sumValues(appValues as (number | undefined)[])
     }, 0)
   }
 
@@ -126,7 +126,7 @@ const total = computed(() => {
 
 const lastDayEvolution = computed(() => {
   if (isDemoMode.value) {
-    return calculateDemoEvolution(effectiveData.value)
+    return calculateDemoEvolution(effectiveData.value.filter((v): v is number => typeof v === 'number'))
   }
 
   const arr = dataArray.value ?? []
@@ -144,6 +144,11 @@ const lastDayEvolution = computed(() => {
   }
 
   return ((lastValue - previousValue) / previousValue) * 100
+})
+
+const hasChartData = computed(() => {
+  const arr = effectiveData.value
+  return arr.some(val => val !== undefined && val !== null && val > 0)
 })
 </script>
 
