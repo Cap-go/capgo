@@ -19,14 +19,18 @@ const SENSITIVE_FIELDS = new Set([
 const SENSITIVE_FIELDS_LOWER = new Set(Array.from(SENSITIVE_FIELDS).map(f => f.toLowerCase()))
 
 // Patterns to redact from error strings (API keys, secrets, bearer tokens, etc.)
+// All patterns use bounded quantifiers to prevent ReDoS attacks
 const SENSITIVE_PATTERNS = [
-  /sk_live_[a-zA-Z0-9]{24,}/g, // Stripe live secret key
-  /sk_test_[a-zA-Z0-9]{24,}/g, // Stripe test secret key
-  /ak_live_[a-zA-Z0-9]{24,}/g, // Generic API key live
-  /ak_test_[a-zA-Z0-9]{24,}/g, // Generic API key test
-  /Bearer\s+[\w.-]{20,}/gi, // Bearer tokens
-  /[a-f0-9]{32,}/gi, // Long hex strings (likely keys/tokens) - case insensitive
-  /[\w-]+\.[\w-]+\.[\w-]+={0,2}/g, // JWT/JWS (three base64url segments)
+  /sk_live_[a-zA-Z0-9]{24,99}/g, // Stripe live secret key (bounded length)
+  /sk_test_[a-zA-Z0-9]{24,99}/g, // Stripe test secret key (bounded length)
+  /ak_live_[a-zA-Z0-9]{24,99}/g, // Generic API key live (bounded length)
+  /ak_test_[a-zA-Z0-9]{24,99}/g, // Generic API key test (bounded length)
+  // eslint-disable-next-line regexp/prefer-w -- Using explicit char class with bounds to prevent ReDoS
+  /Bearer\s+[a-z0-9_.-]{20,500}/gi, // Bearer tokens (bounded, case-insensitive)
+  /[a-f0-9]{32,128}/gi, // Long hex strings (bounded length to prevent ReDoS)
+  // JWT pattern: bounded segments to prevent backtracking attacks
+  // eslint-disable-next-line regexp/prefer-w -- Using explicit char class with bounds to prevent ReDoS
+  /[a-z0-9_-]{20,200}\.[a-z0-9_-]{4,100}\.[a-z0-9_-]{20,200}={0,2}/gi, // JWT/JWS (bounded segments)
 ]
 
 /**
