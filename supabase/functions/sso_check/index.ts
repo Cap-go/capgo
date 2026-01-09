@@ -20,6 +20,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js'
+import { cloudlog } from '../_backend/utils/logging.ts'
 
 interface SSOCheckRequest {
   email: string
@@ -137,7 +138,7 @@ Deno.serve(async (req) => {
   }
   catch (error: any) {
     // Log error server-side but don't expose details to client
-    console.error('SSO check error:', error)
+    cloudlog({ context: 'sso_check_error', error: error?.message || String(error) })
 
     return new Response(
       JSON.stringify({ available: false, error: 'Internal server error' }),
