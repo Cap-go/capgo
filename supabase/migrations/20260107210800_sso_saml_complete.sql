@@ -308,6 +308,8 @@ CREATE OR REPLACE FUNCTION public.org_has_sso_configured(p_org_id uuid)
 RETURNS boolean
 LANGUAGE plpgsql
 STABLE
+SECURITY DEFINER
+SET search_path = public
 AS $$
 BEGIN
   RETURN EXISTS (
@@ -446,19 +448,18 @@ BEGIN
       AND osc.enabled = true
       AND osc.auto_join_enabled = true  -- Only enroll if auto-join is enabled
   LOOP
-    -- Check if already a member
-    -- Add user to organization with read permission (idempotent - ON CONFLICT prevents race conditions)
+    -- Check if user is already a member (before attempting insert)
+    SELECT EXISTS (
+      SELECT 1 FROM public.org_users 
+      WHERE user_id = p_user_id AND org_id = v_org.org_id
+    ) INTO v_already_member;
+    
+    -- Only insert and log if user is NOT already a member
+    IF NOT v_already_member THEN
+      -- Add user to organization with read permission (idempotent - ON CONFLICT prevents race conditions)
       INSERT INTO public.org_users (user_id, org_id, user_right, created_at)
       VALUES (p_user_id, v_org.org_id, 'read', now())
       ON CONFLICT (user_id, org_id) DO NOTHING;
-      
-      -- Check if insertion was successful (for logging purposes)
-      SELECT EXISTS (
-        SELECT 1 FROM public.org_users 
-        WHERE user_id = p_user_id AND org_id = v_org.org_id
-      ) INTO v_already_member;
-      
-      IF v_already_member THEN
       
       -- Log the auto-enrollment
       INSERT INTO public.sso_audit_logs (
@@ -533,20 +534,17 @@ BEGIN
     INNER JOIN public.org_saml_connections osc ON osc.org_id = o.id
     WHERE sdm.domain = v_domain
       AND sdm.verified = true
+      AND osc.enabled = true
       AND osc.auto_join_enabled = true
       AND NOT EXISTS (
         SELECT 1 FROM public.org_users ou 
         WHERE ou.user_id = p_user_id AND ou.org_id = o.id
       )
   LOOP
-    -- Add user to org with read permission
-    -- Use conditional INSERT to avoid conflicts
+    -- Add user to org with read permission (idempotent - ON CONFLICT prevents race conditions)
     INSERT INTO public.org_users (user_id, org_id, user_right, created_at)
-    SELECT p_user_id, v_org.id, 'read', now()
-    WHERE NOT EXISTS (
-      SELECT 1 FROM public.org_users ou
-      WHERE ou.user_id = p_user_id AND ou.org_id = v_org.id
-    );
+    VALUES (p_user_id, v_org.id, 'read', now())
+    ON CONFLICT (user_id, org_id) DO NOTHING;
     
     -- Log domain-based auto-join
     INSERT INTO public.sso_audit_logs (
@@ -923,7 +921,7 @@ DROP POLICY IF EXISTS "System can insert audit logs" ON public.sso_audit_logs;
 CREATE POLICY "Super admins can manage SSO connections"
   ON public.org_saml_connections
   FOR ALL
-  TO authenticated
+  TO authenticated, anon
   USING (
     public.check_min_rights(
       'super_admin'::public.user_min_right,
@@ -947,7 +945,7 @@ CREATE POLICY "Super admins can manage SSO connections"
 CREATE POLICY "Org members can read SSO status"
   ON public.org_saml_connections
   FOR SELECT
-  TO authenticated
+  TO authenticated, anon
   USING (
     public.check_min_rights(
       'read'::public.user_min_right,

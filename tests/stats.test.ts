@@ -1,4 +1,4 @@
-import type { Database } from '../src/types/supabase.types'
+import type { Database } from '~/types/supabase.types'
 import { randomUUID } from 'node:crypto'
 import { env } from 'node:process'
 
