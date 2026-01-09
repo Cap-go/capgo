@@ -126,7 +126,7 @@ const lastDayEvolution = computed(() => {
     return calculateDemoEvolution(effectiveData.value)
   }
 
-  const arr = props.data as number[]
+  const arr = dataArray.value ?? []
   const arrWithoutUndefined = arr.filter((val: any) => val !== undefined)
 
   if (arrWithoutUndefined.length < 2) {
@@ -143,7 +143,7 @@ const lastDayEvolution = computed(() => {
   return ((lastValue - previousValue) / previousValue) * 100
 })
 
-const hasData = computed(() => effectiveData.value.length > 0)
+const hasData = computed(() => (dataArray.value?.length ?? 0) > 0 && dataArray.value.some(val => val !== undefined))
 </script>
 
 <template>

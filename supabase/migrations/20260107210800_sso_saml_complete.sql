@@ -389,7 +389,8 @@ COMMENT ON FUNCTION public.lookup_sso_provider_for_email IS 'Returns the SSO pro
 -- ============================================================================
 
 -- Function to auto-enroll SSO-authenticated user to their organization
-CREATE OR REPLACE FUNCTION public.auto_enroll_sso_user(
+-- Internal version for triggers (no auth check)
+CREATE OR REPLACE FUNCTION internal_auto_enroll_sso_user(
   p_user_id uuid,
   p_email text,
   p_sso_provider_id uuid
@@ -405,18 +406,8 @@ AS $$
 DECLARE
   v_org record;
   v_already_member boolean;
-  v_auth_email text;
 BEGIN
-  -- Authorization: reject calls where p_user_id does not match the authenticated user
-  IF p_user_id != auth.uid() THEN
-    RAISE EXCEPTION 'Unauthorized: cannot enroll other users (user_id mismatch)';
-  END IF;
-  
-  -- Email validation: ensure p_email matches the email in auth.users for p_user_id
-  SELECT email INTO v_auth_email FROM auth.users WHERE id = p_user_id;
-  IF v_auth_email IS NULL OR lower(v_auth_email) != lower(p_email) THEN
-    RAISE EXCEPTION 'Unauthorized: email mismatch for user';
-  END IF;
+  -- No auth.uid() check - this is an internal function for triggers
   
   -- Find organizations with this SSO provider that have auto-join enabled
   FOR v_org IN
@@ -469,7 +460,42 @@ BEGIN
 END;
 $$;
 
-COMMENT ON FUNCTION public.auto_enroll_sso_user IS 'Automatically enrolls SSO user to their organization ONLY if both SSO enabled AND auto_join_enabled = true';
+COMMENT ON FUNCTION internal_auto_enroll_sso_user IS 'Internal function for triggers: Automatically enrolls SSO user to their organization ONLY if both SSO enabled AND auto_join_enabled = true';
+
+-- Public version for user calls (with auth check)
+CREATE OR REPLACE FUNCTION public.auto_enroll_sso_user(
+  p_user_id uuid,
+  p_email text,
+  p_sso_provider_id uuid
+)
+RETURNS TABLE (
+  enrolled_org_id uuid,
+  org_name text
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_auth_email text;
+BEGIN
+  -- Authorization: reject calls where p_user_id does not match the authenticated user
+  IF p_user_id != auth.uid() THEN
+    RAISE EXCEPTION 'Unauthorized: cannot enroll other users (user_id mismatch)';
+  END IF;
+  
+  -- Email validation: ensure p_email matches the email in auth.users for p_user_id
+  SELECT email INTO v_auth_email FROM auth.users WHERE id = p_user_id;
+  IF v_auth_email IS NULL OR lower(v_auth_email) != lower(p_email) THEN
+    RAISE EXCEPTION 'Unauthorized: email mismatch for user';
+  END IF;
+  
+  -- Call internal version to perform enrollment
+  RETURN QUERY SELECT * FROM internal_auto_enroll_sso_user(p_user_id, p_email, p_sso_provider_id);
+END;
+$$;
+
+COMMENT ON FUNCTION public.auto_enroll_sso_user IS 'Public function: Automatically enrolls SSO user to their organization ONLY if both SSO enabled AND auto_join_enabled = true';
 
 -- Function to auto-join users by email using saml_domain_mappings
 CREATE OR REPLACE FUNCTION public.auto_join_user_to_orgs_by_email(
@@ -487,8 +513,8 @@ DECLARE
   v_org record;
   v_auth_email text;
 BEGIN
-  -- Authorization: reject calls where p_user_id does not match the authenticated user
-  IF p_user_id != auth.uid() THEN
+  -- Authorization: allow if user_id matches OR caller has service_role privileges
+  IF p_user_id != auth.uid() AND auth.jwt() ->> 'role' != 'service_role' THEN
     RAISE EXCEPTION 'Unauthorized: cannot join other users to orgs (user_id mismatch)';
   END IF;
   
@@ -506,7 +532,7 @@ BEGIN
   
   -- Priority 1: SSO provider-based enrollment (strongest binding)
   IF p_sso_provider_id IS NOT NULL THEN
-    PERFORM public.auto_enroll_sso_user(p_user_id, p_email, p_sso_provider_id);
+    PERFORM internal_auto_enroll_sso_user(p_user_id, p_email, p_sso_provider_id);
     RETURN;  -- SSO enrollment takes precedence
   END IF;
   
