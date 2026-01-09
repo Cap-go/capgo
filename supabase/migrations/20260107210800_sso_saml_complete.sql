@@ -261,24 +261,51 @@ SET search_path = public
 AS $$
 DECLARE
   v_provider_id uuid;
+  v_provider_str text;
 BEGIN
-  SELECT (raw_app_meta_data->>'sso_provider_id')::uuid
-  INTO v_provider_id
-  FROM auth.users
-  WHERE id = p_user_id;
-  
-  IF v_provider_id IS NULL THEN
-    SELECT (raw_user_meta_data->>'sso_provider_id')::uuid
-    INTO v_provider_id
+  -- Authorization: only allow reading own data unless called by system
+  -- Triggers run as SECURITY DEFINER so they bypass this check
+  IF auth.uid() IS NOT NULL AND auth.uid() != p_user_id THEN
+    RETURN NULL;
+  END IF;
+
+  -- Try raw_app_meta_data first (set by Supabase Auth during SSO login)
+  BEGIN
+    SELECT NULLIF(raw_app_meta_data->>'sso_provider_id', '')
+    INTO v_provider_str
     FROM auth.users
     WHERE id = p_user_id;
+    
+    IF v_provider_str IS NOT NULL THEN
+      v_provider_id := v_provider_str::uuid;
+    END IF;
+  EXCEPTION WHEN invalid_text_representation THEN
+    -- Invalid UUID format in app metadata, ignore
+    v_provider_id := NULL;
+  END;
+  
+  -- Fallback to raw_user_meta_data if not found
+  IF v_provider_id IS NULL THEN
+    BEGIN
+      SELECT NULLIF(raw_user_meta_data->>'sso_provider_id', '')
+      INTO v_provider_str
+      FROM auth.users
+      WHERE id = p_user_id;
+      
+      IF v_provider_str IS NOT NULL THEN
+        v_provider_id := v_provider_str::uuid;
+      END IF;
+    EXCEPTION WHEN invalid_text_representation THEN
+      -- Invalid UUID format in user metadata, ignore
+      v_provider_id := NULL;
+    END;
   END IF;
   
   RETURN v_provider_id;
 END;
 $$;
 
-COMMENT ON FUNCTION public.get_sso_provider_id_for_user IS 'Retrieves SSO provider ID from user metadata';
+COMMENT ON FUNCTION public.get_sso_provider_id_for_user IS 'Retrieves SSO provider ID from user metadata. Only callable by the user themselves or system triggers.';
 
 -- Helper function to check if org already has SSO configured
 CREATE OR REPLACE FUNCTION public.org_has_sso_configured(p_org_id uuid)
