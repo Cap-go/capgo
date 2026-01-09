@@ -176,7 +176,7 @@ describe('[GET] /organization/audit', () => {
   })
 })
 
-describe('Audit log triggers', () => {
+describe('audit log triggers', () => {
   it('organization UPDATE creates audit log with changed_fields', async () => {
     const newName = `Updated Audit Organization ${randomUUID()}`
 
@@ -337,7 +337,7 @@ describe('Audit log triggers', () => {
 
 // These tests verify that audit logs are created when using API key authentication
 // This was a bug where CLI/API users were not logged because get_identity() didn't check API keys
-describe('Audit logs for app_versions via API key', () => {
+describe('audit logs for app_versions via API key', () => {
   const testVersionName = `99.0.0-audit-test-${randomUUID()}`
   let createdVersionId: number | null = null
 
