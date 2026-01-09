@@ -2,7 +2,7 @@ import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { simpleError } from '../../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../../utils/logging.ts'
-import { hasAppRightApikey, supabaseApikey } from '../../utils/supabase.ts'
+import { hasAppRightApikey, supabaseApikey, supabaseAdmin } from '../../utils/supabase.ts'
 import { getEnv } from '../../utils/utils.ts'
 
 export interface RequestBuildBody {
@@ -224,7 +224,8 @@ export async function requestBuild(
     builder_url: builderJob.uploadUrl,
   })
 
-  const { data: buildRequestRow, error: insertError } = await supabase
+  const supabaseAdminClient = supabaseAdmin(c)
+  const { data: buildRequestRow, error: insertError } = await supabaseAdminClient
     .from('build_requests')
     .insert({
       app_id,
