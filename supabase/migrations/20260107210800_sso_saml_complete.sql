@@ -194,6 +194,25 @@ WHERE
     event_type = 'login_failed';
 
 -- ============================================================================
+-- CONSTRAINTS for org_users table
+-- ============================================================================
+
+-- Ensure a user cannot be added to the same org multiple times
+-- This is required for ON CONFLICT in auto_enroll_sso_user function
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint 
+    WHERE conname = 'org_users_user_org_unique'
+  ) THEN
+    ALTER TABLE public.org_users
+    ADD CONSTRAINT org_users_user_org_unique UNIQUE (user_id, org_id);
+
+END IF;
+
+END $$;
+
+-- ============================================================================
 -- HELPER FUNCTIONS
 -- ============================================================================
 
