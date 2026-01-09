@@ -410,7 +410,7 @@ export async function update(c: Context, body: AppInfos) {
   const pgClient = getPgClient(c, true)
 
   // Set replication lag header (uses cached status, non-blocking)
-  await setReplicationLagHeader(c)
+  await setReplicationLagHeader(c, pgClient)
 
   const drizzlePg = pgClient ? getDrizzleClient(pgClient) : (null as any)
   // Lazily create D1 client inside updateWithPG when actually used
