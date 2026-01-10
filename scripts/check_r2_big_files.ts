@@ -633,7 +633,7 @@ export function getDatabaseURL(): string {
 
 export function getPgClient(c: Context) {
     const dbUrl = getDatabaseURL()
-    console.log({ message: 'getPgClient', dbUrl })
+    console.log({ message: 'getPgClient connected' })
     return new Pool({
         connectionString: dbUrl,
         max: 1,
