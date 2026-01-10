@@ -600,8 +600,7 @@ app.put('/', async (c) => {
     res = await put(c, getDrizzleClient(pgClient as any), bodyParsed)
   }
   finally {
-    if (!pgClient)
-      await closeClient(c, pgClient)
+    await closeClient(c, pgClient)
   }
   return res
 })
@@ -650,8 +649,7 @@ app.get('/', async (c) => {
     res = await listCompatibleChannels(c, getDrizzleClient(pgClient as any), bodyParsed)
   }
   finally {
-    if (!pgClient)
-      await closeClient(c, pgClient)
+    await closeClient(c, pgClient)
   }
   return res
 })
