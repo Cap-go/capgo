@@ -534,7 +534,9 @@ const isAdding = computed(() => props.isLoading || pendingAdd.value)
               v-for="(col, i) in columns" :key="i" scope="col" class="px-4 py-1 md:py-3 md:px-6" :class="{
                 'cursor-pointer': col.sortable,
                 'hidden md:table-cell': !col.mobile,
-              }" @click="sortClick(i)"
+              }"
+              :aria-sort="col.sortable === 'asc' ? 'ascending' : col.sortable === 'desc' ? 'descending' : col.sortable ? 'none' : undefined"
+              @click="sortClick(i)"
             >
               <div class="flex items-center first-letter:uppercase">
                 {{ col.label }}

@@ -45,6 +45,9 @@ onMounted(() => {
 
       <!-- Dialog -->
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="dialog-title"
         class="overflow-y-auto relative mx-4 w-full bg-white rounded-lg shadow-xl max-h-[90vh] dark:bg-base-200"
         :class="[
           sizeClasses[dialogStore.dialogOptions?.size || 'md'],
@@ -53,6 +56,7 @@ onMounted(() => {
         <!-- Close button -->
         <button
           v-if="!dialogStore.dialogOptions?.preventAccidentalClose"
+          aria-label="Close dialog"
           class="absolute z-10 text-2xl text-black top-4 right-4 dark:text-white hover:text-white hover:bg-gray-500 d-btn d-btn-sm d-btn-circle d-btn-ghost dark:hover:bg-gray-500"
           @click="close()"
         >
@@ -61,7 +65,7 @@ onMounted(() => {
 
         <!-- Header -->
         <div v-if="dialogStore.dialogOptions?.title" class="px-6 pt-6 pb-2">
-          <h3 class="text-lg font-bold text-gray-900 dark:text-white">
+          <h3 id="dialog-title" class="text-lg font-bold text-gray-900 dark:text-white">
             {{ dialogStore.dialogOptions.title }}
           </h3>
         </div>
