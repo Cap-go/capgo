@@ -1,6 +1,7 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Buffer } from 'node:buffer'
+import { brotliDecompressSync } from 'node:zlib'
 import { getRuntimeKey } from 'hono/adapter'
 import { CacheHelper } from '../utils/cache.ts'
 import { simpleError } from '../utils/hono.ts'
@@ -8,7 +9,6 @@ import { cloudlog } from '../utils/logging.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 import { backgroundTask } from '../utils/utils.ts'
 import { DEFAULT_RETRY_PARAMS, RetryBucket } from './retry.ts'
-
 // Cache settings
 const PREVIEW_AUTH_CACHE_PATH = '/.preview-auth'
 const PREVIEW_AUTH_CACHE_TTL_SECONDS = 60
@@ -311,7 +311,6 @@ export async function handlePreviewRequest(c: Context<MiddlewareKeyVariables>): 
     // CLI compresses with node:zlib createBrotliCompress(), we decompress with brotliDecompressSync
     // Cloudflare Workers strip Content-Encoding: br header so we must decompress server-side
     if (isBrotli && object.body) {
-      const { brotliDecompressSync } = await import('node:zlib')
       const compressedData = await object.arrayBuffer()
       const decompressed = brotliDecompressSync(Buffer.from(compressedData))
       return new Response(decompressed, { headers })
