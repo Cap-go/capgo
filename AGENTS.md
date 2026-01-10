@@ -124,6 +124,53 @@ testing against Cloudflare Workers.
 - Database trigger tests
 - Integration tests with external services
 
+### CRITICAL: Test Isolation for Parallel Execution
+
+**ALL TEST FILES RUN IN PARALLEL.** Tests within the same file run sequentially (unless explicitly configured otherwise), but different test files execute simultaneously. You MUST design tests accordingly.
+
+**Maximize parallelism:** Use `it.concurrent()` instead of `it()` to run tests in parallel within the same file. More parallel tests = faster CI/CD.
+
+When creating tests that interact with shared resources (users, apps, orgs, devices, channels, bundles, etc.), follow these rules:
+
+**You CAN reuse existing seed data IF:**
+- You only READ the data, not modify it
+- You create your OWN child resources under it (e.g., reuse a user but create your own app/org for that user)
+- The parent resource is not modified by your test or other tests
+
+**You MUST create dedicated seed data IF:**
+- Your test MODIFIES the resource (update, delete, change settings)
+- Other tests also modify that same resource
+- The resource state matters for your test assertions
+
+**Guidelines:**
+1. **Create dedicated seed data when needed** - Add new test-specific entries in `supabase/seed.sql` with unique identifiers
+2. **Use unique naming conventions** - Prefix test data with the test file name or feature being tested (e.g., `test_my_feature_user@capgo.app`, `com.test.myfeature.app`)
+3. **Clean up is NOT enough** - Even with cleanup, parallel test files might try to use the data simultaneously
+
+**Examples of what breaks parallel test files:**
+- Modifying the default `test@capgo.app` user's settings
+- Deleting or updating the default app `com.demo.app`
+- Changing org settings on the shared test org
+- Using hardcoded IDs that other test files also modify
+
+**Examples of safe reuse:**
+- Using `test@capgo.app` to create a NEW app specific to your test (user is not modified)
+- Reading from shared orgs without modifying them
+- Creating new channels/bundles under your own dedicated app
+
+**When you need isolation, create dedicated seed data:**
+```sql
+-- In seed.sql, add dedicated test data for your test file:
+INSERT INTO auth.users (id, email, ...) VALUES
+  ('unique-uuid-for-my-test', 'my_feature_test@capgo.app', ...);
+INSERT INTO public.apps (app_id, owner_org, ...) VALUES
+  ('com.test.myfeature.app', 'my-test-org-id', ...);
+```
+
+Then in your test file, use ONLY these dedicated resources for modifications.
+
+**If your test breaks other tests in CI/CD, it is YOUR responsibility to fix it by creating isolated seed data.**
+
 ## Code Style and Conventions
 
 ### ESLint Configuration
