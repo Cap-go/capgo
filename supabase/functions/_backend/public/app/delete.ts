@@ -176,6 +176,7 @@ export async function deleteApp(c: Context, appId: string, apikey: Database['pub
 
   if (failures.length > 0) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Some delete operations failed', app_id: appId, failures })
+    throw simpleError('delete_cleanup_failed', 'Some cleanup operations failed during app deletion', { app_id: appId, failures })
   }
 
   // Delete versions (last) - needs admin because no DELETE policy for anon role
