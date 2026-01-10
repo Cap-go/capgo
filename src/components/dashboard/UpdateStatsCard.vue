@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import colors from 'tailwindcss/colors'
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, shallowRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import ArrowDownOnSquareIcon from '~icons/heroicons/arrow-down-on-square'
 import GlobeAltIcon from '~icons/heroicons/globe-alt'
@@ -52,7 +52,8 @@ const appNames = ref<{ [appId: string]: string }>({})
 const isLoading = ref(true)
 
 // Per-org cache for raw API data, keyed by "orgId:billingMode"
-const cacheByOrgAndMode = new Map<string, any[]>()
+// Using shallowRef for Vue reactivity - cache invalidates properly on org changes
+const cacheByOrgAndMode = shallowRef(new Map<string, any[]>())
 // Track current org for change detection
 const currentCacheOrgId = ref<string | null>(null)
 
@@ -199,7 +200,7 @@ async function calculateStats(forceRefetch = false) {
 
     // Check per-org cache - only use if not forcing refetch
     let data: any[] | null = null
-    const cachedData = cacheByOrgAndMode.get(cacheKey)
+    const cachedData = cacheByOrgAndMode.value.get(cacheKey)
 
     if (cachedData && !forceRefetch) {
       data = cachedData
@@ -215,9 +216,9 @@ async function calculateStats(forceRefetch = false) {
         .order('date')
       data = result.data
 
-      // Store in per-org cache
+      // Store in per-org cache (immutable update for reactivity)
       if (data) {
-        cacheByOrgAndMode.set(cacheKey, data)
+        cacheByOrgAndMode.value = new Map([...cacheByOrgAndMode.value, [cacheKey, data]])
       }
     }
 
