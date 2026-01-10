@@ -1,5 +1,5 @@
+import type { AuthChangeEvent, Subscription } from '@supabase/supabase-js'
 import type { ComputedRef, Ref, WatchStopHandle } from 'vue'
-import type { Subscription } from '@supabase/supabase-js'
 import type { ArrayElement, Concrete, Merge } from '~/services/types'
 import type { Database } from '~/types/supabase.types'
 import { defineStore } from 'pinia'
@@ -246,7 +246,7 @@ export const useOrganizationStore = defineStore('organization', () => {
       _initialized.value = true
       // Clean up existing auth subscription if any
       _authSubscription?.unsubscribe()
-      const listener = supabase.auth.onAuthStateChange((event: any) => {
+      const listener = supabase.auth.onAuthStateChange((event: AuthChangeEvent) => {
         if (event === 'SIGNED_OUT') {
           // Clean up auth subscription
           _authSubscription?.unsubscribe()
