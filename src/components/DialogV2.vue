@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, watch } from 'vue'
+import { onMounted, onUnmounted, watch } from 'vue'
 import { useDialogV2Store } from '~/stores/dialogv2'
 
 const dialogStore = useDialogV2Store()
@@ -16,20 +16,30 @@ function close(button?: any) {
   dialogStore.closeDialog(button)
 }
 
+// Named handler for cleanup
+function handleKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape' && dialogStore.showDialog && !dialogStore.dialogOptions?.preventAccidentalClose) {
+    dialogStore.closeDialog()
+  }
+}
+
+let unwatchRoute: (() => void) | undefined
+
 onMounted(() => {
   // Close dialog on route change
-  watch(route, () => {
+  unwatchRoute = watch(route, () => {
     if (dialogStore.showDialog) {
       dialogStore.closeDialog()
     }
   })
 
   // Close dialog on Escape key
-  addEventListener('keydown', (event: KeyboardEvent) => {
-    if (event.key === 'Escape' && dialogStore.showDialog && !dialogStore.dialogOptions?.preventAccidentalClose) {
-      dialogStore.closeDialog()
-    }
-  })
+  window.addEventListener('keydown', handleKeydown)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleKeydown)
+  unwatchRoute?.()
 })
 </script>
 
