@@ -451,7 +451,7 @@ async function checkWriteAppAccess(c: Context, next: Next) {
   }
   finally {
     // Always close the connection
-    await backgroundTask(c, closeClient(c, pgClient))
+    await closeClient(c, pgClient)
   }
 
   await next()
