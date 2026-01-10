@@ -1,4 +1,5 @@
 import type { Database } from '~/types/supabase.types'
+import { useDebounceFn } from '@vueuse/core'
 import { acceptHMRUpdate, defineStore } from 'pinia'
 import { ref, watch } from 'vue'
 import { useSupabase } from '~/services/supabase'
@@ -44,24 +45,6 @@ export const useDisplayStore = defineStore('display', () => {
       pendingFetches.clear()
       currentCacheOrgId.value = newOrgId
     }
-  }
-
-  function setChannelName(id: string, name: string) {
-    channelNameCache.value.set(id, name)
-    if (lastPath.value)
-      updatePathTitle(lastPath.value)
-  }
-
-  function setBundleName(id: string, name: string) {
-    bundleNameCache.value.set(id, name)
-    if (lastPath.value)
-      updatePathTitle(lastPath.value)
-  }
-
-  function setDeviceName(id: string, name: string) {
-    deviceNameCache.value.set(id, name)
-    if (lastPath.value)
-      updatePathTitle(lastPath.value)
   }
 
   function getPrettyName(segment: string, index: number, allSegments: string[]): string {
@@ -123,8 +106,33 @@ export const useDisplayStore = defineStore('display', () => {
     return false
   }
 
+  // Debounced breadcrumb computation to prevent recursive watch triggers
+  const debouncedComputeBreadcrumbs = useDebounceFn(() => {
+    if (lastPath.value)
+      computeBreadcrumbs(lastPath.value)
+  }, 50)
+
+  function setChannelName(id: string, name: string) {
+    channelNameCache.value.set(id, name)
+    debouncedComputeBreadcrumbs()
+  }
+
+  function setBundleName(id: string, name: string) {
+    bundleNameCache.value.set(id, name)
+    debouncedComputeBreadcrumbs()
+  }
+
+  function setDeviceName(id: string, name: string) {
+    deviceNameCache.value.set(id, name)
+    debouncedComputeBreadcrumbs()
+  }
+
   function updatePathTitle(path: string) {
     lastPath.value = path
+    debouncedComputeBreadcrumbs()
+  }
+
+  function computeBreadcrumbs(path: string) {
     const splitPath = path.split('/').filter(Boolean)
 
     const breadcrumbs: BreadcrumbItem[] = []
@@ -164,8 +172,7 @@ export const useDisplayStore = defineStore('display', () => {
           }
           finally {
             pendingFetches.delete(appId)
-            if (lastPath.value)
-              updatePathTitle(lastPath.value)
+            debouncedComputeBreadcrumbs()
           }
         })()
         pendingFetches.set(appId, fetchPromise)
@@ -284,13 +291,12 @@ export const useDisplayStore = defineStore('display', () => {
   }
 
   watch(NavTitle, () => {
-    if (lastPath.value)
-      updatePathTitle(lastPath.value)
+    debouncedComputeBreadcrumbs()
   })
 
   watch(resolverReady, (ready) => {
-    if (ready && lastPath.value)
-      updatePathTitle(lastPath.value)
+    if (ready)
+      debouncedComputeBreadcrumbs()
   })
 
   return {
