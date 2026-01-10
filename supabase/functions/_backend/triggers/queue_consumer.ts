@@ -27,7 +27,7 @@ interface Message {
   msg_id: number
   read_ct: number
   message: {
-    payload: any
+    payload: unknown
     function_name: string
     function_type: 'cloudflare' | 'cloudflare_pp' | '' | null | undefined
   }
@@ -234,7 +234,7 @@ export async function http_post_helper(
   c: Context,
   function_name: string,
   function_type: string | null | undefined,
-  body: any,
+  body: unknown,
   cfId: string,
 ): Promise<Response> {
   const headers = {
