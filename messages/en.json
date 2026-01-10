@@ -982,6 +982,7 @@
   "org-notification-updated": "Organization notification preferences updated",
   "org-notification-update-failed": "Failed to update organization notification preferences",
   "ok": "OK",
+  "onboarding": "Onboarding",
   "old-onboarding-mode": "old onboarding",
   "onboarding-invite-option-cta": "Invite a technical teammate",
   "onboarding-invite-option-dialog-desc": "We will email them detailed instructions to create the first app for this organization.",

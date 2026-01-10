@@ -71,34 +71,24 @@ export const useDisplayStore = defineStore('display', () => {
     if (previousSegment === 'p')
       return segment
 
-    switch (segment) {
-      case 'dashboard':
-        return 'Dashboard'
-      case 'app':
-        return 'apps'
-      case 'settings':
-        return 'settings'
-      case 'organization':
-        return 'organization'
-      case 'onboarding':
-        return 'onboarding'
-      case 'channel':
-        return 'channels'
-      case 'bundle':
-        return 'bundles'
-      case 'device':
-        return 'devices'
-      case 'd':
-        return 'devices'
-      case 'changepassword':
-        return 'password'
-      case 'account':
-        return 'account'
-      case 'notifications':
-        return 'notifications'
-      default:
-        return segment.charAt(0).toUpperCase() + segment.slice(1)
+    // These keys must match entries in messages/*.json locale files
+    // Translation is handled by Navbar.vue using t(breadcrumb.name)
+    const breadcrumbKeys: Record<string, string> = {
+      dashboard: 'dashboard',
+      app: 'apps',
+      settings: 'settings',
+      organization: 'organization',
+      onboarding: 'onboarding',
+      channel: 'channels',
+      bundle: 'bundles',
+      device: 'devices',
+      d: 'devices',
+      changepassword: 'password',
+      account: 'account',
+      notifications: 'notifications',
     }
+
+    return breadcrumbKeys[segment] ?? segment
   }
 
   function isValidClickableSegment(segment: string, index: number, totalLength: number, allSegments: string[]): boolean {
