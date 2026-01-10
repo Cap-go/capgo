@@ -730,7 +730,7 @@ onMounted(() => {
     :class="appId ? 'xl:grid-cols-16' : 'xl:grid-cols-12'"
   >
     <UsageCard
-      id="mau-stat" :limits="allLimits.mau" :colors="colors.emerald" :accumulated="useBillingPeriod && showCumulative"
+      id="mau-stat" :limits="allLimits.mau" :colors="colors.cyan" :accumulated="useBillingPeriod && showCumulative"
       :data="mauData" :data-by-app="mauDataByApp" :app-names="appNames" :title="`${t('monthly-active')}`" :unit="t('units-users')"
       :use-billing-period="useBillingPeriod"
       :is-loading="isLoading"
