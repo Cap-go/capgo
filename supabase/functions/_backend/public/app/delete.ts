@@ -1,7 +1,7 @@
 import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { BRES, simpleError } from '../../utils/hono.ts'
-import { cloudlog, cloudlogErr } from '../../utils/logging.ts'
+import { cloudlog } from '../../utils/logging.ts'
 import { hasAppRightApikey, supabaseAdmin, supabaseApikey } from '../../utils/supabase.ts'
 import { isValidAppId } from '../../utils/utils.ts'
 
@@ -53,26 +53,8 @@ export async function deleteApp(c: Context, appId: string, apikey: Database['pub
   // Admin client for internal stats tables that have restrictive RLS policies
   const admin = supabaseAdmin(c)
 
-  // Run most deletions in parallel with error tracking
-  const operationNames = [
-    'app_versions_meta',
-    'daily_version',
-    'version_usage',
-    'channel_devices',
-    'channels',
-    'devices',
-    'bandwidth_usage',
-    'storage_usage',
-    'device_usage',
-    'daily_mau',
-    'daily_bandwidth',
-    'daily_storage',
-    'stats',
-    'org_users',
-    'deploy_history',
-  ]
-
-  const results = await Promise.allSettled([
+  // Run most deletions in parallel
+  await Promise.all([
     // Delete version related data (user-facing, has RLS)
     supabase
       .from('app_versions_meta')
@@ -160,24 +142,6 @@ export async function deleteApp(c: Context, appId: string, apikey: Database['pub
       .delete()
       .eq('app_id', appId),
   ])
-
-  // Check for failures (both rejected promises and Supabase errors)
-  const failures = results
-    .map((result, i) => {
-      if (result.status === 'rejected') {
-        return { op: operationNames[i], error: result.reason }
-      }
-      if (result.status === 'fulfilled' && result.value.error) {
-        return { op: operationNames[i], error: result.value.error }
-      }
-      return null
-    })
-    .filter(Boolean)
-
-  if (failures.length > 0) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Some delete operations failed', app_id: appId, failures })
-    throw simpleError('delete_cleanup_failed', 'Some cleanup operations failed during app deletion', { app_id: appId, failures })
-  }
 
   // Delete versions (last) - needs admin because no DELETE policy for anon role
   await admin

@@ -45,7 +45,7 @@ app.post('/', middlewareV2(['all', 'write']), async (c) => {
   const userRight = await supabase.rpc('check_min_rights', {
     min_right: 'write',
     user_id: userId,
-    channel_id: null as unknown as number,
+    channel_id: null as any,
     app_id: safeBody.app_id,
     org_id: safeBody.org_id,
   })

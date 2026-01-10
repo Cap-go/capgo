@@ -1,5 +1,4 @@
 import type { Database } from '~/types/supabase.types'
-import { useDebounceFn } from '@vueuse/core'
 import { acceptHMRUpdate, defineStore } from 'pinia'
 import { ref, watch } from 'vue'
 import { useSupabase } from '~/services/supabase'
@@ -47,6 +46,24 @@ export const useDisplayStore = defineStore('display', () => {
     }
   }
 
+  function setChannelName(id: string, name: string) {
+    channelNameCache.value.set(id, name)
+    if (lastPath.value)
+      updatePathTitle(lastPath.value)
+  }
+
+  function setBundleName(id: string, name: string) {
+    bundleNameCache.value.set(id, name)
+    if (lastPath.value)
+      updatePathTitle(lastPath.value)
+  }
+
+  function setDeviceName(id: string, name: string) {
+    deviceNameCache.value.set(id, name)
+    if (lastPath.value)
+      updatePathTitle(lastPath.value)
+  }
+
   function getPrettyName(segment: string, index: number, allSegments: string[]): string {
     const previousSegment = allSegments[index - 1]
 
@@ -54,24 +71,34 @@ export const useDisplayStore = defineStore('display', () => {
     if (previousSegment === 'p')
       return segment
 
-    // These keys must match entries in messages/*.json locale files
-    // Translation is handled by Navbar.vue using t(breadcrumb.name)
-    const breadcrumbKeys: Record<string, string> = {
-      dashboard: 'dashboard',
-      app: 'apps',
-      settings: 'settings',
-      organization: 'organization',
-      onboarding: 'onboarding',
-      channel: 'channels',
-      bundle: 'bundles',
-      device: 'devices',
-      d: 'devices',
-      changepassword: 'password',
-      account: 'account',
-      notifications: 'notifications',
+    switch (segment) {
+      case 'dashboard':
+        return 'Dashboard'
+      case 'app':
+        return 'apps'
+      case 'settings':
+        return 'settings'
+      case 'organization':
+        return 'organization'
+      case 'onboarding':
+        return 'onboarding'
+      case 'channel':
+        return 'channels'
+      case 'bundle':
+        return 'bundles'
+      case 'device':
+        return 'devices'
+      case 'd':
+        return 'devices'
+      case 'changepassword':
+        return 'password'
+      case 'account':
+        return 'account'
+      case 'notifications':
+        return 'notifications'
+      default:
+        return segment.charAt(0).toUpperCase() + segment.slice(1)
     }
-
-    return breadcrumbKeys[segment] ?? segment
   }
 
   function isValidClickableSegment(segment: string, index: number, totalLength: number, allSegments: string[]): boolean {
@@ -106,33 +133,8 @@ export const useDisplayStore = defineStore('display', () => {
     return false
   }
 
-  // Debounced breadcrumb computation to prevent recursive watch triggers
-  const debouncedComputeBreadcrumbs = useDebounceFn(() => {
-    if (lastPath.value)
-      computeBreadcrumbs(lastPath.value)
-  }, 50)
-
-  function setChannelName(id: string, name: string) {
-    channelNameCache.value.set(id, name)
-    debouncedComputeBreadcrumbs()
-  }
-
-  function setBundleName(id: string, name: string) {
-    bundleNameCache.value.set(id, name)
-    debouncedComputeBreadcrumbs()
-  }
-
-  function setDeviceName(id: string, name: string) {
-    deviceNameCache.value.set(id, name)
-    debouncedComputeBreadcrumbs()
-  }
-
   function updatePathTitle(path: string) {
     lastPath.value = path
-    debouncedComputeBreadcrumbs()
-  }
-
-  function computeBreadcrumbs(path: string) {
     const splitPath = path.split('/').filter(Boolean)
 
     const breadcrumbs: BreadcrumbItem[] = []
@@ -172,7 +174,8 @@ export const useDisplayStore = defineStore('display', () => {
           }
           finally {
             pendingFetches.delete(appId)
-            debouncedComputeBreadcrumbs()
+            if (lastPath.value)
+              updatePathTitle(lastPath.value)
           }
         })()
         pendingFetches.set(appId, fetchPromise)
@@ -291,12 +294,13 @@ export const useDisplayStore = defineStore('display', () => {
   }
 
   watch(NavTitle, () => {
-    debouncedComputeBreadcrumbs()
+    if (lastPath.value)
+      updatePathTitle(lastPath.value)
   })
 
   watch(resolverReady, (ready) => {
-    if (ready)
-      debouncedComputeBreadcrumbs()
+    if (ready && lastPath.value)
+      updatePathTitle(lastPath.value)
   })
 
   return {

@@ -46,8 +46,8 @@ app.post('/', middlewareV2(['all', 'write']), async (c) => {
     min_right: 'super_admin',
     org_id: safeBody.org_id,
     user_id: auth.userId,
-    channel_id: null as unknown as number,
-    app_id: null as unknown as string,
+    channel_id: null as any,
+    app_id: null as any,
   })
 
   if (userRight.error) {

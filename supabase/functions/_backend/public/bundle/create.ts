@@ -1,7 +1,7 @@
 import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { simpleError } from '../../utils/hono.ts'
-import { hasAppRightApikey, supabaseApikey } from '../../utils/supabase.ts'
+import { hasAppRightApikey, supabaseAdmin, supabaseApikey } from '../../utils/supabase.ts'
 import { isValidAppId, isValidSemver } from '../../utils/utils.ts'
 
 interface CreateBundleBody {
@@ -10,6 +10,7 @@ interface CreateBundleBody {
   external_url: string
   checksum: string
   session_key?: string
+  key_id?: string
 }
 
 function validateUrlFormat(url: string) {
@@ -128,10 +129,19 @@ function validateUrlFormat(url: string) {
 //   }
 // }
 
-async function getAppOrganization(c: Context, apikey: Database['public']['Tables']['apikeys']['Row'], appId: string): Promise<string> {
-  const { data: app, error: appError } = await supabaseApikey(c, apikey.key)
+interface AppWithOrg {
+  owner_org: string
+  orgs: {
+    enforce_encrypted_bundles: boolean
+    required_encryption_key: string | null
+  }
+}
+
+async function getAppOrganization(c: Context, appId: string): Promise<AppWithOrg> {
+  // Use supabaseAdmin to access org security settings (RLS bypass needed for enforcement check)
+  const { data: app, error: appError } = await supabaseAdmin(c)
     .from('apps')
-    .select('owner_org')
+    .select('owner_org, orgs!inner(enforce_encrypted_bundles, required_encryption_key)')
     .eq('app_id', appId)
     .single()
 
@@ -139,7 +149,7 @@ async function getAppOrganization(c: Context, apikey: Database['public']['Tables
     throw simpleError('cannot_find_app', 'Cannot find app', { supabaseError: appError })
   }
 
-  return app.owner_org
+  return app as unknown as AppWithOrg
 }
 
 async function checkVersionExists(c: Context, appId: string, apikey: Database['public']['Tables']['apikeys']['Row'], version: string): Promise<void> {
@@ -156,6 +166,43 @@ async function checkVersionExists(c: Context, appId: string, apikey: Database['p
   }
 }
 
+function checkEncryptedBundleEnforcement(appWithOrg: AppWithOrg, sessionKey: string | undefined, keyId: string | undefined): void {
+  // If org doesn't enforce encrypted bundles, allow
+  if (!appWithOrg.orgs.enforce_encrypted_bundles) {
+    return
+  }
+
+  // Check if bundle is encrypted (has a non-empty session_key)
+  if (!sessionKey || sessionKey === '') {
+    throw simpleError('encryption_required', 'This organization requires all bundles to be encrypted. Please upload an encrypted bundle with a session_key.', {
+      enforce_encrypted_bundles: true,
+    })
+  }
+
+  // If org requires a specific encryption key, check it matches
+  const requiredKey = appWithOrg.orgs.required_encryption_key
+  if (requiredKey && requiredKey !== '') {
+    // Bundle must have a key_id
+    if (!keyId || keyId === '') {
+      throw simpleError('encryption_key_required', 'This organization requires bundles to be encrypted with a specific key. The uploaded bundle does not have a key_id.', {
+        enforce_encrypted_bundles: true,
+        required_encryption_key: true,
+      })
+    }
+
+    // Check if the key_id matches the required key (compare first N characters)
+    // key_id is 20 chars, required_encryption_key is up to 21 chars
+    const matches = keyId === requiredKey.substring(0, 20) || keyId.substring(0, requiredKey.length) === requiredKey
+    if (!matches) {
+      throw simpleError('encryption_key_mismatch', 'This organization requires bundles to be encrypted with a specific key. The uploaded bundle was encrypted with a different key.', {
+        enforce_encrypted_bundles: true,
+        required_encryption_key: true,
+        expected_key_prefix: `${requiredKey.substring(0, 4)}...`,
+      })
+    }
+  }
+}
+
 async function insertBundle(c: Context, body: CreateBundleBody, ownerOrg: string, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<any> {
   const { data: newBundle, error: createError } = await supabaseApikey(c, apikey.key)
     .from('app_versions')
@@ -164,6 +211,7 @@ async function insertBundle(c: Context, body: CreateBundleBody, ownerOrg: string
       checksum: body.checksum,
       name: body.version,
       ...(body.session_key && { session_key: body.session_key }),
+      ...(body.key_id && { key_id: body.key_id }),
       external_url: body.external_url,
       storage_provider: 'external',
       owner_org: ownerOrg,
@@ -205,10 +253,14 @@ export async function createBundle(c: Context, body: CreateBundleBody, apikey: D
   validateUrlFormat(body.external_url)
   // await verifyUrlAccessibility(body.external_url)
 
-  const ownerOrg = await getAppOrganization(c, apikey, body.app_id)
+  const appWithOrg = await getAppOrganization(c, body.app_id)
+
+  // Check encrypted bundle enforcement
+  checkEncryptedBundleEnforcement(appWithOrg, body.session_key, body.key_id)
+
   await checkVersionExists(c, body.app_id, apikey, body.version)
 
-  const newBundle = await insertBundle(c, body, ownerOrg, apikey)
+  const newBundle = await insertBundle(c, body, appWithOrg.owner_org, apikey)
 
   return c.json({
     status: 'success',

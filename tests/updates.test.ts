@@ -181,6 +181,8 @@ describe('manifest bundle count gating', () => {
   function makeUpdatePayload() {
     const baseData = getBaseData(APP_NAME_UPDATE)
     baseData.version_name = '1.1.0'
+    // Manifest support requires plugin_version >= 7.0.35 for v7
+    baseData.plugin_version = '7.1.0'
     return baseData
   }
 

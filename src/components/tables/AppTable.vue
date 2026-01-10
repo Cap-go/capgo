@@ -11,22 +11,6 @@ import { useSupabase } from '~/services/supabase'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
 
-type AppRow = Database['public']['Tables']['apps']['Row']
-
-// Simplified app type for display with MAU - avoids recursive Json type issues
-interface AppWithMau {
-  app_id: string
-  name: string | null
-  icon_url: string
-  last_version: string | null
-  updated_at: string | null
-  created_at: string | null
-  owner_org: string
-  retention: number
-  mau: number
-  [key: string]: unknown
-}
-
 const props = defineProps<{
   apps: (Database['public']['Tables']['apps']['Row'])[]
   deleteButton: boolean
@@ -54,7 +38,7 @@ const main = useMainStore()
 const organizationStore = useOrganizationStore()
 
 // Create enriched apps with MAU data
-const appsWithMau = ref<AppWithMau[]>([])
+const appsWithMau = ref<any[]>([])
 const mauDataLoaded = ref(false)
 
 async function loadMauNumbers() {
@@ -62,15 +46,17 @@ async function loadMauNumbers() {
   await main.awaitInitialLoad()
 
   // Map apps with their MAU values from the dashboard (last 30 days)
-  const appsList = props.apps as AppRow[]
-  appsWithMau.value = appsList.map((app) => {
+  appsWithMau.value = props.apps.map((app: any) => {
     // Get the app's dashboard data
     const appDashboard = main.dashboardByapp.filter(d => d.app_id === app.app_id)
 
     // Accumulate MAU values for the last 30 days (same default as usage charts)
     const mau = appDashboard.reduce((acc, entry) => acc + (entry.mau ?? 0), 0)
 
-    return Object.assign({}, app, { mau }) as AppWithMau
+    return {
+      ...app,
+      mau,
+    }
   })
 
   mauDataLoaded.value = true
@@ -175,14 +161,14 @@ async function openOneVersion(app: Database['public']['Tables']['apps']['Row']) 
 }
 
 // Filter apps based on search term
-const filteredApps = computed((): (AppRow | AppWithMau)[] => {
+const filteredApps = computed(() => {
   // If MAU data isn't loaded yet, return original apps
   if (!mauDataLoaded.value) {
     // Return original apps while MAU is loading (without MAU column being sortable)
-    return props.apps
+    return props.apps as any[]
   }
 
-  let apps: AppWithMau[] = appsWithMau.value
+  let apps = appsWithMau.value
 
   // Apply search filter (only for client-side pagination)
   if (!props.serverSidePagination && internalSearch.value) {
