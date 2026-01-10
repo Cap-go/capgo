@@ -16,7 +16,7 @@ app.post('/', middlewareAPISecret, triggerValidator('deploy_history', 'INSERT'),
 
   if (!record.id) {
     cloudlog({ requestId: c.get('requestId'), message: 'No id' })
-    return simpleError('no_id', 'No id', { record })
+    throw simpleError('no_id', 'No id', { record })
   }
 
   // Check if the channel is public

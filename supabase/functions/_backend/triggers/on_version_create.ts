@@ -19,7 +19,7 @@ app.post('/', middlewareAPISecret, triggerValidator('app_versions', 'INSERT'), a
 
   if (!record.id) {
     cloudlog({ requestId: c.get('requestId'), message: 'No id' })
-    return simpleError('no_id', 'No id', { record })
+    throw simpleError('no_id', 'No id', { record })
   }
 
   // Skip email notifications for special system bundles (unknown, builtin)

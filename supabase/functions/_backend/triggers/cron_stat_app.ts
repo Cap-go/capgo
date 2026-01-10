@@ -19,9 +19,9 @@ app.post('/', middlewareAPISecret, async (c) => {
   const body = await parseBody<DataToGet>(c)
   cloudlog({ requestId: c.get('requestId'), message: 'post cron_stat_app body', body })
   if (!body.appId)
-    return simpleError('no_appId', 'No appId', { body })
+    throw simpleError('no_appId', 'No appId', { body })
   if (!body.orgId)
-    return simpleError('no_orgId', 'No orgId', { body })
+    throw simpleError('no_orgId', 'No orgId', { body })
 
   const supabase = supabaseAdmin(c)
 
@@ -38,7 +38,7 @@ app.post('/', middlewareAPISecret, async (c) => {
   const cycleInfoData = await supabase.rpc('get_cycle_info_org', { orgid: body.orgId }).single()
   const cycleInfo = cycleInfoData.data
   if (!cycleInfo?.subscription_anchor_start || !cycleInfo?.subscription_anchor_end)
-    return simpleError('cannot_get_cycle_info', 'Cannot get cycle info', { cycleInfoData })
+    throw simpleError('cannot_get_cycle_info', 'Cannot get cycle info', { cycleInfoData })
 
   cloudlog({ requestId: c.get('requestId'), message: 'cycleInfo', cycleInfo })
   const startDate = cycleInfo.subscription_anchor_start

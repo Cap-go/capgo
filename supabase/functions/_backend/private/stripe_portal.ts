@@ -19,7 +19,7 @@ app.post('/', middlewareAuth, async (c) => {
   cloudlog({ requestId: c.get('requestId'), message: 'post stripe portal body', body })
   const authorization = c.get('authorization')
   if (!authorization)
-    return simpleError('not_authorize', 'Not authorize')
+    throw simpleError('not_authorize', 'Not authorize')
 
   // Use authenticated client - RLS will enforce access based on JWT
   const supabase = supabaseClient(c, authorization)
@@ -27,7 +27,7 @@ app.post('/', middlewareAuth, async (c) => {
   // Get current user ID from JWT
   const { data: auth, error } = await supabase.auth.getUser()
   if (error || !auth?.user?.id)
-    return simpleError('not_authorize', 'Not authorize')
+    throw simpleError('not_authorize', 'Not authorize')
 
   cloudlog({ requestId: c.get('requestId'), message: 'auth', auth: auth.user.id })
   const { data: org, error: dbError } = await supabase
@@ -36,12 +36,12 @@ app.post('/', middlewareAuth, async (c) => {
     .eq('id', body.orgId)
     .single()
   if (dbError || !org)
-    return simpleError('not_authorize', 'Not authorize')
+    throw simpleError('not_authorize', 'Not authorize')
   if (!org.customer_id)
-    return simpleError('no_customer', 'No customer')
+    throw simpleError('no_customer', 'No customer')
 
   if (!await hasOrgRight(c, body.orgId, auth.user.id, 'super_admin'))
-    return simpleError('not_authorize', 'Not authorize')
+    throw simpleError('not_authorize', 'Not authorize')
 
   cloudlog({ requestId: c.get('requestId'), message: 'org', org })
   const link = await createPortal(c, org.customer_id, body.callbackUrl)

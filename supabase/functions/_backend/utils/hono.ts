@@ -57,12 +57,12 @@ export function triggerValidator(
 
     if (body.table !== String(table)) {
       cloudlog({ requestId: c.get('requestId'), message: `Not ${String(table)}` })
-      return simpleError('table_not_match', 'Not table', { body })
+      throw simpleError('table_not_match', 'Not table', { body })
     }
 
     if (body.type !== type) {
       cloudlog({ requestId: c.get('requestId'), message: `Not ${type}` })
-      return simpleError('type_not_match', 'Not type', { body })
+      throw simpleError('type_not_match', 'Not type', { body })
     }
 
     // Store the validated body in context for next middleware
@@ -77,7 +77,7 @@ export function triggerValidator(
       c.set('oldRecord', body.old_record)
     }
     else {
-      return simpleError('invalid_payload', 'Invalid payload', { body })
+      throw simpleError('invalid_payload', 'Invalid payload', { body })
     }
 
     await next()
@@ -97,7 +97,7 @@ export async function getBodyOrQuery<T>(c: Context<MiddlewareKeyVariables, any, 
   }
   if (!body || Object.keys(body).length === 0) {
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot find body', query: c.req.query() })
-    return simpleError('invalid_json_parse_body', 'Invalid JSON body')
+    throw simpleError('invalid_json_parse_body', 'Invalid JSON body')
   }
   if ((body as any).device_id) {
     (body as any).device_id = (body as any).device_id.toLowerCase()
@@ -109,7 +109,7 @@ export const middlewareAuth = honoFactory.createMiddleware(async (c, next) => {
   const authorization = c.req.header('authorization')
   if (!authorization) {
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot find authorization', query: c.req.query() })
-    return simpleError('cannot_find_authorization', 'Cannot find authorization')
+    throw simpleError('cannot_find_authorization', 'Cannot find authorization')
   }
   c.set('authorization', authorization)
   await next()
@@ -122,11 +122,11 @@ export const middlewareAPISecret = honoFactory.createMiddleware(async (c, next) 
   // timingSafeEqual is here to prevent a timing attack
   if (!authorizationSecret || !API_SECRET) {
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot find authorizationSecret or API_SECRET', query: c.req.query() })
-    return simpleError('cannot_find_authorization_secret', 'Cannot find authorization')
+    throw simpleError('cannot_find_authorization_secret', 'Cannot find authorization')
   }
   if (!await timingSafeEqual(authorizationSecret, API_SECRET)) {
     cloudlog({ requestId: c.get('requestId'), message: 'Invalid API secret', query: c.req.query() })
-    return simpleError('invalid_api_secret', 'Invalid API secret')
+    throw simpleError('invalid_api_secret', 'Invalid API secret')
   }
   c.set('APISecret', authorizationSecret)
   await next()
@@ -251,7 +251,7 @@ export function simpleError(errorCode: string, message: string, moreInfo: any = 
 export function parseBody<T>(c: Context) {
   return c.req.json<T>()
     .catch((e) => {
-      return simpleError('invalid_json_parse_body', 'Invalid JSON body', { e })
+      throw simpleError('invalid_json_parse_body', 'Invalid JSON body', { e })
     })
     .then((body) => {
       if ((body as any).device_id) {

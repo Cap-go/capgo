@@ -57,7 +57,7 @@ async function invoiceUpcoming(c: Context, LogSnag: ReturnType<typeof logsnag>, 
       .eq('stripe_id', stripeData.data.product_id)
       .single()
     if (!plan) {
-      return simpleError('failed_to_get_plan', 'failed to get plan', { stripeData })
+      throw simpleError('failed_to_get_plan', 'failed to get plan', { stripeData })
     }
     planName = plan.name
     if (plan.price_y_id === stripeData.data.price_id) {
@@ -179,10 +179,10 @@ async function getOrg(c: Context, stripeData: StripeData) {
     .eq('customer_id', stripeData.data.customer_id)
     .single()
   if (dbError) {
-    return simpleError('webhook_error_no_org_found', 'Webhook Error: no org found')
+    throw simpleError('webhook_error_no_org_found', 'Webhook Error: no org found')
   }
   if (!org) {
-    return simpleError('webhook_error_no_org_found', 'Webhook Error: no org found')
+    throw simpleError('webhook_error_no_org_found', 'Webhook Error: no org found')
   }
   return org
 }
@@ -229,7 +229,7 @@ app.post('/', middlewareStripeWebhook(), async (c) => {
     .single()
 
   if (!customer) {
-    return simpleError('no_customer_found', 'no customer found', { stripeData })
+    throw simpleError('no_customer_found', 'no customer found', { stripeData })
   }
 
   if (stripeEvent.type === 'customer.source.expiring') {
