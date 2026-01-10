@@ -1,6 +1,7 @@
 import type { Context } from 'hono'
 import { trackBentoEvent } from './bento.ts'
 import { cloudlog } from './logging.ts'
+import { sendNotifOrg } from './notifications.ts'
 import { supabaseAdmin } from './supabase.ts'
 import { backgroundTask } from './utils.ts'
 
@@ -249,9 +250,6 @@ export async function sendNotifToOrgMembers(
   uniqId: string,
   cron: string,
 ): Promise<boolean> {
-  // Import dynamically to avoid circular dependency
-  const { sendNotifOrg } = await import('./notifications.ts')
-
   // Get the org's info including management email
   const org = await getOrgInfo(c, orgId)
   if (!org) {
