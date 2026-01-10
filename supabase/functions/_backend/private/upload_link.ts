@@ -30,7 +30,7 @@ app.post('/', middlewareKey(['all', 'write', 'upload']), async (c) => {
   }
 
   if (!(await hasAppRightApikey(c, body.app_id, userId, 'read', capgkey))) {
-    return simpleError('app_access_denied', 'You can\'t access this app', { app_id: body.app_id })
+    throw simpleError('app_access_denied', 'You can\'t access this app', { app_id: body.app_id })
   }
 
   const { data: app, error: errorApp } = await supabaseApikey(c, capgkey)
@@ -65,12 +65,12 @@ app.post('/', middlewareKey(['all', 'write', 'upload']), async (c) => {
   // check if object exist in r2
   const exist = await s3.checkIfExist(c, filePath)
   if (exist) {
-    return simpleError('error_already_exist', 'Error already exist', { exist })
+    throw simpleError('error_already_exist', 'Error already exist', { exist })
   }
 
   const url = await s3.getUploadUrl(c, filePath)
   if (!url) {
-    return simpleError('cannot_get_upload_link', 'Cannot get upload link', { url })
+    throw simpleError('cannot_get_upload_link', 'Cannot get upload link', { url })
   }
 
   const LogSnag = logsnag(c)
@@ -91,7 +91,7 @@ app.post('/', middlewareKey(['all', 'write', 'upload']), async (c) => {
     .eq('id', version.id)
 
   if (changeError) {
-    return simpleError('cannot_update_supabase', 'Cannot update supabase', { changeError })
+    throw simpleError('cannot_update_supabase', 'Cannot update supabase', { changeError })
   }
 
   return c.json(response)

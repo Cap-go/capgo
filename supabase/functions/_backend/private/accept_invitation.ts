@@ -67,7 +67,7 @@ app.post('/', async (c) => {
   // First, validate base schema (without password policy checks)
   const baseValidationResult = baseInvitationSchema.safeParse(rawBody)
   if (!baseValidationResult.success) {
-    return simpleError('invalid_json_body', 'Invalid request', { errors: z.prettifyError(baseValidationResult.error) })
+    throw simpleError('invalid_json_body', 'Invalid request', { errors: z.prettifyError(baseValidationResult.error) })
   }
 
   const baseBody = baseValidationResult.data
@@ -110,7 +110,7 @@ app.post('/', async (c) => {
   const passwordSchema = buildPasswordSchema(passwordPolicy)
   const passwordValidationResult = passwordSchema.safeParse(baseBody.password)
   if (!passwordValidationResult.success) {
-    return simpleError('invalid_password', 'Password does not meet requirements', {
+    throw simpleError('invalid_password', 'Password does not meet requirements', {
       errors: z.prettifyError(passwordValidationResult.error),
       policy: {
         min_length: passwordPolicy.min_length,

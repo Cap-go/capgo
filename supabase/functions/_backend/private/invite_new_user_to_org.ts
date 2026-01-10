@@ -37,7 +37,7 @@ async function validateInvite(c: Context, rawBody: any) {
   // Validate the request body using Zod
   const validationResult = inviteUserSchema.safeParse(rawBody)
   if (!validationResult.success) {
-    return simpleError('invalid_request', 'Invalid request', { errors: z.prettifyError(validationResult.error) })
+    throw simpleError('invalid_request', 'Invalid request', { errors: z.prettifyError(validationResult.error) })
   }
 
   const body = validationResult.data
@@ -101,7 +101,7 @@ app.post('/', middlewareAuth, async (c) => {
 
   const res = await validateInvite(c, rawBody)
   if (!res.inviteCreatorUser) {
-    return simpleError('failed_to_invite_user', 'Failed to invite user', { }, res.error ?? 'Failed to invite user')
+    throw simpleError('failed_to_invite_user', 'Failed to invite user', { }, res.error ?? 'Failed to invite user')
   }
   if (!res.org) {
     return quickError(404, 'organization_not_found', 'Organization not found')
@@ -124,7 +124,7 @@ app.post('/', middlewareAuth, async (c) => {
   if (existingInvitation) {
     const nowMinusThreeHours = dayjs().subtract(3, 'hours')
     if (!dayjs(nowMinusThreeHours).isAfter(dayjs(existingInvitation.cancelled_at))) {
-      return simpleError('user_already_invited', 'User already invited and it hasnt been 3 hours since the last invitation was cancelled')
+      throw simpleError('user_already_invited', 'User already invited and it hasnt been 3 hours since the last invitation was cancelled')
     }
 
     const { error: updateInvitationError, data: updatedInvitationData } = await supabase
@@ -140,7 +140,7 @@ app.post('/', middlewareAuth, async (c) => {
       .single()
 
     if (updateInvitationError) {
-      return simpleError('failed_to_invite_user', 'Failed to invite user', { }, updateInvitationError.message)
+      throw simpleError('failed_to_invite_user', 'Failed to invite user', { }, updateInvitationError.message)
     }
 
     newInvitation = updatedInvitationData
@@ -155,7 +155,7 @@ app.post('/', middlewareAuth, async (c) => {
     }).select('*').single()
 
     if (createUserError) {
-      return simpleError('failed_to_invite_user', 'Failed to invite user', { }, createUserError.message)
+      throw simpleError('failed_to_invite_user', 'Failed to invite user', { }, createUserError.message)
     }
 
     newInvitation = newInvitationData
@@ -169,7 +169,7 @@ app.post('/', middlewareAuth, async (c) => {
     invited_last_name: `${body.last_name}`,
   }, 'org:invite_new_capgo_user_to_org')
   if (!bentoEvent) {
-    return simpleError('failed_to_invite_user', 'Failed to invite user', { }, 'Failed to track bento event')
+    throw simpleError('failed_to_invite_user', 'Failed to invite user', { }, 'Failed to track bento event')
   }
   return c.json({ status: 'User invited successfully' })
 })
@@ -178,7 +178,7 @@ app.post('/', middlewareAuth, async (c) => {
 async function verifyCaptchaToken(c: Context, token: string) {
   const captchaSecret = getEnv(c, 'CAPTCHA_SECRET_KEY')
   if (!captchaSecret) {
-    return simpleError('captcha_secret_key_not_set', 'CAPTCHA_SECRET_KEY not set')
+    throw simpleError('captcha_secret_key_not_set', 'CAPTCHA_SECRET_KEY not set')
   }
 
   // "/siteverify" API endpoint.
@@ -197,10 +197,10 @@ async function verifyCaptchaToken(c: Context, token: string) {
   const captchaResult = await result.json()
   const captchaResultData = captchaSchema.safeParse(captchaResult)
   if (!captchaResultData.success) {
-    return simpleError('invalid_captcha', 'Invalid captcha result')
+    throw simpleError('invalid_captcha', 'Invalid captcha result')
   }
   cloudlog({ requestId: c.get('requestId'), context: 'captcha_result', captchaResultData })
   if (captchaResultData.data.success !== true) {
-    return simpleError('invalid_captcha', 'Invalid captcha result')
+    throw simpleError('invalid_captcha', 'Invalid captcha result')
   }
 }

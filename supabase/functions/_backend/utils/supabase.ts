@@ -56,7 +56,7 @@ export function supabaseWithAuth(c: Context, auth: AuthInfo) {
     return supabaseApikey(c, auth.apikey.key)
   }
   else {
-    return simpleError('not_authorized', 'Not authorized')
+    throw simpleError('not_authorized', 'Not authorized')
   }
 }
 

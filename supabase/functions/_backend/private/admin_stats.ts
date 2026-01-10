@@ -30,12 +30,12 @@ app.post('/', middlewareAuth, async (c) => {
   const authToken = c.req.header('authorization')
 
   if (!authToken)
-    return simpleError('not_authorize', 'Not authorize')
+    throw simpleError('not_authorize', 'Not authorize')
 
   const body = await parseBody<AdminStatsBody>(c)
   const parsedBodyResult = bodySchema.safeParse(body)
   if (!parsedBodyResult.success) {
-    return simpleError('invalid_json_body', 'Invalid json body', { body, parsedBodyResult })
+    throw simpleError('invalid_json_body', 'Invalid json body', { body, parsedBodyResult })
   }
 
   // Verify user is admin
@@ -44,12 +44,12 @@ app.post('/', middlewareAuth, async (c) => {
 
   if (adminError) {
     cloudlog({ requestId: c.get('requestId'), message: 'is_admin_error', error: adminError })
-    return simpleError('is_admin_error', 'Is admin error', { adminError })
+    throw simpleError('is_admin_error', 'Is admin error', { adminError })
   }
 
   if (!isAdmin) {
     cloudlog({ requestId: c.get('requestId'), message: 'not_admin', body })
-    return simpleError('not_admin', 'Not admin - only admin users can access platform statistics')
+    throw simpleError('not_admin', 'Not admin - only admin users can access platform statistics')
   }
 
   // Use body directly since it has the full interface type
@@ -126,7 +126,7 @@ app.post('/', middlewareAuth, async (c) => {
         break
 
       default:
-        return simpleError('invalid_metric_category', 'Invalid metric category', { metric_category })
+        throw simpleError('invalid_metric_category', 'Invalid metric category', { metric_category })
     }
 
     return c.json({
@@ -141,6 +141,6 @@ app.post('/', middlewareAuth, async (c) => {
   }
   catch (error) {
     cloudlog({ requestId: c.get('requestId'), message: 'admin_stats_error', error })
-    return simpleError('admin_stats_error', 'Error fetching admin statistics', { error })
+    throw simpleError('admin_stats_error', 'Error fetching admin statistics', { error })
   }
 })
