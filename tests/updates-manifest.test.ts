@@ -104,7 +104,7 @@ afterAll(async () => {
 
 describe('update manifest scenarios', () => {
   it('manifest update', async () => {
-    // test manifest update working with plugin version > 6.8.0
+    // test manifest update working with plugin version >= 6.25.0
     const baseData = getBaseData(APPNAME)
     // Get the version ID for 1.0.0
     const { data: versionData, error: versionError } = await getSupabaseClient()
@@ -123,7 +123,7 @@ describe('update manifest scenarios', () => {
     await insertManifestEntries(versionData.id)
 
     baseData.version_name = '1.1.0'
-    baseData.plugin_version = '6.8.1'
+    baseData.plugin_version = '6.25.0'
     const response = await postUpdate(baseData)
     expect(response.status).toBe(200)
     const json = await response.json<UpdateRes>()
@@ -185,7 +185,7 @@ describe('update manifest scenarios', () => {
     await getSupabaseClient().from('apps').update({ manifest_bundle_count: 0 }).eq('app_id', APPNAME)
 
     baseData.version_name = '1.1.0'
-    baseData.plugin_version = '6.8.1'
+    baseData.plugin_version = '6.25.0'
     const response = await postUpdate(baseData)
     expect(response.status).toBe(200)
     const json = await response.json<UpdateRes>()
@@ -217,7 +217,7 @@ describe('update manifest scenarios', () => {
     }
 
     baseData.version_name = '1.1.0'
-    baseData.plugin_version = '6.8.1'
+    baseData.plugin_version = '6.25.0'
     const response = await postUpdate(baseData)
     expect(response.status).toBe(200)
     const json = await response.json<UpdateRes>()

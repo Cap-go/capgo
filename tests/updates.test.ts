@@ -181,6 +181,8 @@ describe('manifest bundle count gating', () => {
   function makeUpdatePayload() {
     const baseData = getBaseData(APP_NAME_UPDATE)
     baseData.version_name = '1.1.0'
+    // Use a version that supports manifest fetching (>= 7.0.35)
+    baseData.plugin_version = '7.0.35'
     return baseData
   }
 
