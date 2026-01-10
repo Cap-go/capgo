@@ -8,6 +8,28 @@ import { useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 import { useOrganizationStore } from '~/stores/organization'
 
+type AppRow = Database['public']['Tables']['apps']['Row']
+
+// Demo app interface - simplified without recursive Json type
+interface DemoApp {
+  app_id: string
+  name: string
+  icon_url: string
+  last_version: string
+  updated_at: string
+  created_at: string
+  owner_org: string
+  retention: number
+  default_upload_channel: string
+  allow_preview: boolean
+  channel_device_count: number
+  expose_metadata: boolean
+  id: string | null
+  manifest_bundle_count: number
+  transfer_history: null
+  user_id: string | null
+}
+
 const route = useRoute('/app/')
 const router = useRouter()
 const organizationStore = useOrganizationStore()
@@ -17,7 +39,7 @@ const stepsOpen = ref(false)
 const supabase = useSupabase()
 const { t } = useI18n()
 const displayStore = useDisplayStore()
-const apps = ref<Database['public']['Tables']['apps']['Row'][]>([])
+const apps = ref<AppRow[]>([])
 const currentPage = ref(1)
 const pageSize = 10
 const totalApps = ref(0)
@@ -39,8 +61,7 @@ const paymentFailed = computed(() => {
 })
 
 // Demo apps for showing behind blur when payment fails
-// Using any[] to avoid type instantiation depth issues with Database types
-const demoApps = [
+const demoApps: DemoApp[] = [
   {
     app_id: 'com.demo.production',
     name: 'Production App',
@@ -49,6 +70,15 @@ const demoApps = [
     updated_at: new Date().toISOString(),
     created_at: new Date().toISOString(),
     owner_org: '',
+    retention: 0,
+    default_upload_channel: '',
+    allow_preview: false,
+    channel_device_count: 0,
+    expose_metadata: false,
+    id: null,
+    manifest_bundle_count: 0,
+    transfer_history: null,
+    user_id: null,
   },
   {
     app_id: 'com.demo.staging',
@@ -58,6 +88,15 @@ const demoApps = [
     updated_at: new Date(Date.now() - 86400000).toISOString(),
     created_at: new Date().toISOString(),
     owner_org: '',
+    retention: 0,
+    default_upload_channel: '',
+    allow_preview: false,
+    channel_device_count: 0,
+    expose_metadata: false,
+    id: null,
+    manifest_bundle_count: 0,
+    transfer_history: null,
+    user_id: null,
   },
   {
     app_id: 'com.demo.beta',
@@ -67,11 +106,24 @@ const demoApps = [
     updated_at: new Date(Date.now() - 172800000).toISOString(),
     created_at: new Date().toISOString(),
     owner_org: '',
+    retention: 0,
+    default_upload_channel: '',
+    allow_preview: false,
+    channel_device_count: 0,
+    expose_metadata: false,
+    id: null,
+    manifest_bundle_count: 0,
+    transfer_history: null,
+    user_id: null,
   },
-] as any[]
+]
 
 // Apps to display - use demo apps when payment failed
-const displayApps = computed(() => (paymentFailed.value ? demoApps : apps.value) as Database['public']['Tables']['apps']['Row'][])
+// Using ref to avoid recursive type instantiation issues with Json type in computed
+const displayApps = ref<AppRow[]>([])
+watchEffect(() => {
+  displayApps.value = paymentFailed.value ? demoApps as unknown as AppRow[] : apps.value
+})
 const displayTotal = computed(() => paymentFailed.value ? demoApps.length : totalApps.value)
 
 async function NextStep(appId: string) {

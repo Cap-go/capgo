@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { DialogV2Button } from '~/stores/dialogv2'
 import { onMounted, onUnmounted, watch } from 'vue'
 import { useDialogV2Store } from '~/stores/dialogv2'
 
@@ -12,7 +13,7 @@ const sizeClasses = {
   xl: 'max-w-xl',
 }
 
-function close(button?: any) {
+function close(button?: DialogV2Button) {
   dialogStore.closeDialog(button)
 }
 
