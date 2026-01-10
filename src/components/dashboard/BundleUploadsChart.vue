@@ -73,17 +73,43 @@ Chart.register(
   LinearScale,
 )
 
-// Generate infinite distinct pastel colors starting with blue
+// Check if a hue is in the red or green range (reserved for UpdateStats)
+function isReservedHue(hue: number): boolean {
+  // Red range: 0-30 and 330-360
+  // Green range: 90-160
+  return (hue >= 0 && hue <= 30) || (hue >= 330 && hue <= 360) || (hue >= 90 && hue <= 160)
+}
+
+// Get the nth safe hue that skips red/green colors
+function getSafeHue(targetIndex: number): number {
+  let i = 0
+  let safeCount = 0
+
+  while (safeCount <= targetIndex && i < targetIndex * 3 + 10) {
+    const hue = (210 + i * 137.508) % 360
+    i++
+
+    if (!isReservedHue(hue)) {
+      if (safeCount === targetIndex)
+        return hue
+      safeCount++
+    }
+  }
+
+  // Fallback to blue if we somehow can't find enough safe hues
+  return 210
+}
+
+// Generate infinite distinct pastel colors starting with blue, skipping red/green
 function generateAppColors(appCount: number) {
   const colors = []
 
-  for (let i = 0; i < appCount; i++) {
-    // Start with blue (210°) and use golden ratio for distribution
-    const hue = (210 + i * 137.508) % 360 // Start at blue, then golden angle
+  for (let colorIndex = 0; colorIndex < appCount; colorIndex++) {
+    const hue = getSafeHue(colorIndex)
 
     // Use pastel-friendly saturation and lightness values
-    const saturation = 50 + (i % 3) * 8 // 50%, 58%, 66% - softer colors
-    const lightness = 60 + (i % 4) * 5 // 60%, 65%, 70%, 75% - lighter, more pastel
+    const saturation = 50 + (colorIndex % 3) * 8 // 50%, 58%, 66% - softer colors
+    const lightness = 60 + (colorIndex % 4) * 5 // 60%, 65%, 70%, 75% - lighter, more pastel
 
     const backgroundColor = `hsla(${hue}, ${saturation}%, ${lightness}%, 0.8)`
 
@@ -206,8 +232,8 @@ const chartData = computed<ChartData<any>>(() => {
     // Process data for cumulative mode
     if (props.accumulated) {
       processed = transformSeries(appData, true, labelCount)
-      // Use LineChartStats color scheme for line mode
-      const hue = (210 + index * 137.508) % 360
+      // Use safe hue that skips red/green (reserved for UpdateStats)
+      const hue = getSafeHue(index)
       const saturation = 50 + (index % 3) * 8
       const lightness = 60 + (index % 4) * 5
       borderColor = `hsl(${hue}, ${saturation + 15}%, ${lightness - 15}%)`

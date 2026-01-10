@@ -671,7 +671,7 @@ watch(
 
         <div class="flex flex-col items-end text-right shrink-0">
           <div
-            class="inline-flex items-center justify-center px-2 py-1 text-xs font-bold text-white rounded-full shadow-lg whitespace-nowrap bg-emerald-500"
+            class="inline-flex items-center justify-center px-2 py-1 text-xs font-bold text-white rounded-full shadow-lg whitespace-nowrap bg-cyan-500"
           >
             {{ latestVersionPercentageDisplay }}
           </div>
