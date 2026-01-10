@@ -1,3 +1,4 @@
+import type { WatchStopHandle } from 'vue'
 import { acceptHMRUpdate, defineStore } from 'pinia'
 
 export interface DialogV2Button {
@@ -23,6 +24,9 @@ export const useDialogV2Store = defineStore('dialogv2', () => {
   const dialogOptions = ref<DialogV2Options>({})
   const dialogCanceled = ref(false)
   const lastButtonRole = ref('')
+
+  // Store the dismiss watcher cleanup function
+  let _unwatchDismiss: WatchStopHandle | null = null
 
   const openDialog = (options: DialogV2Options) => {
     dialogOptions.value = options
@@ -60,10 +64,21 @@ export const useDialogV2Store = defineStore('dialogv2', () => {
 
   const onDialogDismiss = (): Promise<boolean> => {
     return new Promise((resolve) => {
-      const unwatch = watch(showDialog, (val) => {
+      // Clean up any existing dismiss watcher
+      _unwatchDismiss?.()
+
+      // If dialog is already closed, resolve immediately
+      if (!showDialog.value) {
+        _unwatchDismiss = null
+        resolve(dialogCanceled.value)
+        return
+      }
+
+      _unwatchDismiss = watch(showDialog, (val) => {
         if (!val) {
+          _unwatchDismiss?.()
+          _unwatchDismiss = null
           resolve(dialogCanceled.value)
-          unwatch()
         }
       })
     })
