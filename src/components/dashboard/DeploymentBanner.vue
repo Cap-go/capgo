@@ -15,7 +15,7 @@
  * - Real-time state updates
  *
  * Security:
- * - Only visible to users with admin, super_admin, or owner roles
+ * - Only visible to users with admin or super_admin roles
  * - Requires explicit confirmation before deployment
  * - Validates channel and bundle existence before showing
  *
@@ -88,7 +88,7 @@ interface DeployTarget {
 
 /**
  * Computed property that checks if the user has admin-level permissions.
- * Only users with admin, super_admin, or owner roles can see and use the banner.
+ * Only users with admin or super_admin roles can see and use the banner.
  *
  * @returns {boolean} True if user has admin permissions, false otherwise
  */

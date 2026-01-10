@@ -569,6 +569,7 @@ async function openDefaultDownloadChannelDialog() {
             .eq('app_id', props.appId)
             .eq('ios', false)
             .eq('android', false)
+            .eq('electron', false)
 
           if (hiddenError) {
             toast.error(t('cannot-change-default-download-channel'))
