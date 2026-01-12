@@ -616,6 +616,7 @@ export type Database = {
           created_by: string
           disable_auto_update: Database["public"]["Enums"]["disable_update"]
           disable_auto_update_under_native: boolean
+          electron: boolean
           id: number
           ios: boolean
           name: string
@@ -636,6 +637,7 @@ export type Database = {
           created_by: string
           disable_auto_update?: Database["public"]["Enums"]["disable_update"]
           disable_auto_update_under_native?: boolean
+          electron?: boolean
           id?: number
           ios?: boolean
           name: string
@@ -656,6 +658,7 @@ export type Database = {
           created_by?: string
           disable_auto_update?: Database["public"]["Enums"]["disable_update"]
           disable_auto_update_under_native?: boolean
+          electron?: boolean
           id?: number
           ios?: boolean
           name?: string
@@ -3084,7 +3087,7 @@ export type Database = {
       cron_task_type: "function" | "queue" | "function_queue"
       disable_update: "major" | "minor" | "patch" | "version_number" | "none"
       key_mode: "read" | "write" | "all" | "upload"
-      platform_os: "ios" | "android"
+      platform_os: "ios" | "android" | "electron"
       stats_action:
         | "delete"
         | "reset"
@@ -3148,6 +3151,7 @@ export type Database = {
         | "download_0"
         | "disableProdBuild"
         | "disableDevice"
+        | "disablePlatformElectron"
       stripe_status:
         | "created"
         | "succeeded"
@@ -3337,7 +3341,7 @@ export const Constants = {
       cron_task_type: ["function", "queue", "function_queue"],
       disable_update: ["major", "minor", "patch", "version_number", "none"],
       key_mode: ["read", "write", "all", "upload"],
-      platform_os: ["ios", "android"],
+      platform_os: ["ios", "android", "electron"],
       stats_action: [
         "delete",
         "reset",
@@ -3401,6 +3405,7 @@ export const Constants = {
         "download_0",
         "disableProdBuild",
         "disableDevice",
+        "disablePlatformElectron",
       ],
       stripe_status: [
         "created",
