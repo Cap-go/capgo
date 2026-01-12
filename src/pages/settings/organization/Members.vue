@@ -63,6 +63,21 @@ const isInviteFormValid = computed(() => {
     && captchaToken.value !== ''
 })
 
+const isInviteNewUserDialogOpen = ref(false)
+
+function updateInviteNewUserButton() {
+  const buttons = dialogStore.dialogOptions?.buttons
+  if (!buttons)
+    return
+  const submitButton = buttons.find(b => b.id === 'invite-new-user-send')
+  if (!submitButton)
+    return
+  submitButton.disabled = isSubmittingInvite.value || !isInviteFormValid.value
+  submitButton.text = isSubmittingInvite.value
+    ? t('sending-invitation', 'Sending invitation...')
+    : t('send-invitation', 'Send Invitation')
+}
+
 const filteredMembers = computed(() => {
   if (!search.value)
     return members.value
@@ -176,6 +191,12 @@ async function reloadData() {
 }
 
 watch(currentOrganization, reloadData)
+
+watch([isInviteFormValid, isSubmittingInvite, isInviteNewUserDialogOpen], ([_valid, _submitting, open]) => {
+  if (!open)
+    return
+  updateInviteNewUserButton()
+}, { immediate: true })
 
 onMounted(reloadData)
 
@@ -707,6 +728,7 @@ async function showInviteNewUserDialog(email: string, roleType: Database['public
   inviteUserLastName.value = ''
   captchaToken.value = ''
   isSubmittingInvite.value = false
+  isInviteNewUserDialogOpen.value = true
 
   // Reset captcha if available
   if (captchaElement.value) {
@@ -723,14 +745,20 @@ async function showInviteNewUserDialog(email: string, roleType: Database['public
         role: 'cancel',
       },
       {
+        id: 'invite-new-user-send',
         text: t('send-invitation', 'Send Invitation'),
         role: 'primary',
+        preventClose: true,
         handler: handleInviteNewUserSubmit,
       },
     ],
   })
 
+  // Disable button initially since captcha won't be ready
+  updateInviteNewUserButton()
+
   await dialogStore.onDialogDismiss()
+  isInviteNewUserDialogOpen.value = false
 }
 
 async function handleInviteNewUserSubmit() {
@@ -780,6 +808,8 @@ async function handleInviteNewUserSubmit() {
     // Refresh the members list
     await reloadData()
 
+    // Close the dialog on success
+    dialogStore.closeDialog()
     return true // Success
   }
   catch (error) {

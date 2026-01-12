@@ -83,7 +83,8 @@ function updateInviteDialogButton(loading: boolean) {
   const submitButton = buttons.find(button => button.id === 'invite-send')
   if (!submitButton)
     return
-  submitButton.disabled = loading
+  const captchaNotReady = captchaKey.value && !inviteCaptchaToken.value
+  submitButton.disabled = loading || captchaNotReady
   submitButton.text = loading
     ? t('sending-invitation')
     : t('send-invitation')
@@ -232,7 +233,7 @@ async function handleInviteSubmit() {
   }
 }
 
-watch([isInviting, isInviteDialogOpen], ([loading, open]) => {
+watch([isInviting, isInviteDialogOpen, inviteCaptchaToken], ([loading, open]) => {
   if (!open)
     return
 
