@@ -413,6 +413,55 @@ describe('[GET] /channel_self tests', () => {
     expect(androidChannelNames).not.toContain('development')
     expect(androidChannelNames).not.toContain('no_access')
     expect(androidJson).toHaveLength(2)
+
+    // Request Electron channels - real device (is_emulator=false)
+    data.platform = 'electron'
+    data.is_emulator = false
+    data.is_prod = true
+    const electronResponse = await fetchGetChannels(data as any)
+
+    expect(electronResponse.ok).toBe(true)
+    const electronJson = await electronResponse.json() as ChannelsListResponse
+
+    const electronChannelNames = electronJson.map(ch => ch.name)
+    // electron_only channel has electron=true, ios=false, android=false
+    // beta channel has electron=true, ios=true, android=true
+    // production has electron=true, ios=false, android=true
+    // development has electron=false
+    // no_access has electron=false
+    expect(electronChannelNames).toContain('electron_only')
+    expect(electronChannelNames).toContain('beta')
+    expect(electronChannelNames).toContain('production')
+    expect(electronChannelNames).not.toContain('development')
+    expect(electronChannelNames).not.toContain('no_access')
+    expect(electronJson).toHaveLength(3)
+  })
+
+  it('[GET] should return compatible channels for Electron', async () => {
+    await resetAndSeedAppData(APPNAME)
+
+    const data = getBaseData(APPNAME)
+    data.platform = 'electron'
+    data.is_emulator = false
+    data.is_prod = true
+    const response = await fetchGetChannels(data as any)
+
+    expect(response.ok).toBe(true)
+    const json = await response.json<ChannelsListResponse>()
+
+    expect(json).toBeDefined()
+    expect(Array.isArray(json)).toBe(true)
+
+    const channelNames = json.map(ch => ch.name)
+    // electron_only is electron-only channel (electron=true, allow_device_self_set=true)
+    // beta has electron=true and allow_device_self_set=true
+    // production has electron=true but is_public=true
+    expect(channelNames).toContain('electron_only')
+    expect(channelNames).toContain('beta')
+    expect(channelNames).toContain('production')
+    expect(channelNames).not.toContain('development') // electron=false
+    expect(channelNames).not.toContain('no_access') // electron=false
+    expect(json).toHaveLength(3)
   })
 
   it('[GET] should filter channels based on emulator compatibility', async () => {
