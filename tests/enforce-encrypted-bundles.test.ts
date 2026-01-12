@@ -108,7 +108,7 @@ describe('[Encrypted Bundles Enforcement]', () => {
 
       // The API should reject this request
       expect(response.ok).toBe(false)
-      const data = await response.json()
+      const data = await response.json() as { error: string }
       expect(data.error).toContain('encryption')
 
       // Reset enforcement
