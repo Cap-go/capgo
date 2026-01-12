@@ -30,11 +30,11 @@ app.post('/', middlewareAPISecret, async (c) => {
   const orgId = payload.org_id
 
   if (!orgId || Number.isNaN(threshold))
-    return simpleError('invalid_payload', 'Missing orgId or threshold in alert payload', { payload })
+    throw simpleError('invalid_payload', 'Missing orgId or threshold in alert payload', { payload })
 
   const eventName = EVENT_BY_THRESHOLD[threshold]
   if (!eventName)
-    return simpleError('unsupported_threshold', 'Threshold not supported', { threshold, payload })
+    throw simpleError('unsupported_threshold', 'Threshold not supported', { threshold, payload })
 
   const percentUsed = Math.min(
     100,

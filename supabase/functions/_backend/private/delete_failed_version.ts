@@ -56,13 +56,13 @@ app.delete('/', middlewareKey(['all', 'write', 'upload']), async (c) => {
     .eq('deleted', false)
     .single()
   if (errorVersion) {
-    return simpleError('error_already_deleted', 'Already deleted', { errorVersion })
+    throw simpleError('error_already_deleted', 'Already deleted', { errorVersion })
   }
   // check if object exist in r2
   if (version.r2_path) {
     const exist = await s3.checkIfExist(c, version.r2_path)
     if (exist) {
-      return simpleError('error_already_uploaded_to_s3', 'Error already uploaded to S3, delete is unsafe use the webapp to delete it')
+      throw simpleError('error_already_uploaded_to_s3', 'Error already uploaded to S3, delete is unsafe use the webapp to delete it')
     }
   }
 
@@ -73,7 +73,7 @@ app.delete('/', middlewareKey(['all', 'write', 'upload']), async (c) => {
     .eq('id', version.id)
     .single()
   if (errorDelete) {
-    return simpleError('error_deleting_version', 'Error deleting version', { errorDelete })
+    throw simpleError('error_deleting_version', 'Error deleting version', { errorDelete })
   }
 
   const LogSnag = logsnag(c)

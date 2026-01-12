@@ -32,7 +32,7 @@ app.post('/', middlewareV2(['all', 'write']), async (c) => {
   const body = await parseBody<CreateDeviceBody>(c)
   const parsedBodyResult = bodySchema.safeParse(body)
   if (!parsedBodyResult.success) {
-    return simpleError('invalid_json_body', 'Invalid JSON body', { body, parsedBodyResult })
+    throw simpleError('invalid_json_body', 'Invalid JSON body', { body, parsedBodyResult })
   }
 
   const safeBody = parsedBodyResult.data
@@ -51,7 +51,7 @@ app.post('/', middlewareV2(['all', 'write']), async (c) => {
   })
 
   if (userRight.error) {
-    return simpleError('internal_auth_error', 'Cannot get user right', { userRight })
+    throw simpleError('internal_auth_error', 'Cannot get user right', { userRight })
   }
 
   if (!userRight.data) {

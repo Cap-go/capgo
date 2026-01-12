@@ -10,7 +10,7 @@ import { supabaseAdmin } from '../utils/supabase.ts'
 async function updateManifestSize(c: Context, record: Database['public']['Tables']['manifest']['Row']) {
   if (!record.s3_path) {
     cloudlog({ requestId: c.get('requestId'), message: 'No s3 path', id: record.id })
-    return simpleError('no_s3_path', 'No s3 path', { record })
+    throw simpleError('no_s3_path', 'No s3 path', { record })
   }
 
   const size = await s3.getSize(c, record.s3_path)
@@ -34,7 +34,7 @@ app.post('/', middlewareAPISecret, triggerValidator('manifest', 'INSERT'), (c) =
 
   if (!record.app_version_id || !record.s3_path) {
     cloudlog({ requestId: c.get('requestId'), message: 'no app_version_id or s3_path' })
-    return simpleError('no_app_version_id_or_s3_path', 'No app_version_id or s3_path', { record })
+    throw simpleError('no_app_version_id_or_s3_path', 'No app_version_id or s3_path', { record })
   }
 
   return updateManifestSize(c, record)

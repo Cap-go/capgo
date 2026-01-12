@@ -177,7 +177,7 @@ async function uploadHandler(c: Context) {
 
   if (durableObjNs == null) {
     cloudlog({ requestId: c.get('requestId'), message: 'files durableObjNs is null' })
-    return simpleError('invalid_bucket_configuration', 'Invalid bucket configuration')
+    throw simpleError('invalid_bucket_configuration', 'Invalid bucket configuration')
   }
 
   const handler = durableObjNs.get(durableObjNs.idFromName(normalizedRequestId))

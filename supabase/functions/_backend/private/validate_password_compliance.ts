@@ -59,7 +59,7 @@ app.post('/', async (c) => {
   // Validate request body
   const validationResult = bodySchema.safeParse(rawBody)
   if (!validationResult.success) {
-    return simpleError('invalid_body', 'Invalid request body', { errors: z.prettifyError(validationResult.error) })
+    throw simpleError('invalid_body', 'Invalid request body', { errors: z.prettifyError(validationResult.error) })
   }
 
   const body = validationResult.data
@@ -124,7 +124,7 @@ app.post('/', async (c) => {
   const policyCheck = passwordMeetsPolicy(body.password, policy)
 
   if (!policyCheck.valid) {
-    return simpleError('password_does_not_meet_policy', 'Your current password does not meet the organization requirements', {
+    throw simpleError('password_does_not_meet_policy', 'Your current password does not meet the organization requirements', {
       errors: policyCheck.errors,
       policy: {
         min_length: policy.min_length,

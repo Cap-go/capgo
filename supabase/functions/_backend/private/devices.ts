@@ -31,7 +31,7 @@ app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
   cloudlog({ requestId: c.get('requestId'), message: 'post devices body', body })
   const auth = c.get('auth') as AuthInfo
   if (!(await hasAppRight(c, body.appId, auth.userId, 'read'))) {
-    return simpleError('app_access_denied', 'You can\'t access this app', { app_id: body.appId })
+    throw simpleError('app_access_denied', 'You can\'t access this app', { app_id: body.appId })
   }
   const devicesIds = body.devicesId ?? body.deviceIds ?? []
   if (body.count)

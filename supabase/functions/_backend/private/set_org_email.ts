@@ -21,7 +21,7 @@ app.post('/', middlewareV2(['all', 'write']), async (c) => {
   const body = await parseBody<any>(c)
   const parsedBodyResult = bodySchema.safeParse(body)
   if (!parsedBodyResult.success) {
-    return simpleError('invalid_json_body', 'Invalid json body', { body, parsedBodyResult })
+    throw simpleError('invalid_json_body', 'Invalid json body', { body, parsedBodyResult })
   }
 
   const safeBody = parsedBodyResult.data
@@ -35,11 +35,11 @@ app.post('/', middlewareV2(['all', 'write']), async (c) => {
     .single()
 
   if (!organization || organizationError) {
-    return simpleError('get_org_internal_error', 'Get org internal error', { organizationError })
+    throw simpleError('get_org_internal_error', 'Get org internal error', { organizationError })
   }
 
   if (!organization.customer_id) {
-    return simpleError('org_does_not_have_customer', 'Organization does not have a customer id', { orgId: safeBody.org_id })
+    throw simpleError('org_does_not_have_customer', 'Organization does not have a customer id', { orgId: safeBody.org_id })
   }
 
   const userRight = await supabase.rpc('check_min_rights', {
@@ -51,7 +51,7 @@ app.post('/', middlewareV2(['all', 'write']), async (c) => {
   })
 
   if (userRight.error) {
-    return simpleError('internal_auth_error', 'Internal auth error', { userRight })
+    throw simpleError('internal_auth_error', 'Internal auth error', { userRight })
   }
 
   if (!userRight.data) {
@@ -68,7 +68,7 @@ app.post('/', middlewareV2(['all', 'write']), async (c) => {
   if (updateOrgErr) {
     // revert stripe
     await updateCustomerEmail(c, organization.customer_id, organization.management_email)
-    return simpleError('critical_error', 'Critical error', { updateOrgErr })
+    throw simpleError('critical_error', 'Critical error', { updateOrgErr })
   }
 
   return c.body(null, 204) // No content

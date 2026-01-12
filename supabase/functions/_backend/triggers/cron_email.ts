@@ -126,20 +126,20 @@ app.post('/', middlewareAPISecret, async (c) => {
   }>(c)
 
   if (!email || !type) {
-    return simpleError('missing_email_type', 'Missing email or type', { email, type })
+    throw simpleError('missing_email_type', 'Missing email or type', { email, type })
   }
 
   // billing_period_stats uses orgId instead of appId
   if (type === 'billing_period_stats') {
     if (!orgId) {
-      return simpleError('missing_orgId', 'Missing orgId for billing_period_stats', { email, type })
+      throw simpleError('missing_orgId', 'Missing orgId for billing_period_stats', { email, type })
     }
     return await handleBillingPeriodStats(c, email, orgId, cycleStart, cycleEnd)
   }
 
   // All other types require appId
   if (!appId) {
-    return simpleError('missing_appId', 'Missing appId', { email, type })
+    throw simpleError('missing_appId', 'Missing appId', { email, type })
   }
 
   // check if email exists
@@ -149,7 +149,7 @@ app.post('/', middlewareAPISecret, async (c) => {
     .eq('email', email)
     .single()
   if (userError || !user)
-    return simpleError('user_not_found', 'User not found', { email, userError })
+    throw simpleError('user_not_found', 'User not found', { email, userError })
 
   if (type === 'weekly_install_stats') {
     return await handleWeeklyInstallStats(c, email, appId)
@@ -172,7 +172,7 @@ app.post('/', middlewareAPISecret, async (c) => {
     })
   }
   else {
-    return simpleError('invalid_stats_type', 'Invalid stats type', { email, appId, type })
+    throw simpleError('invalid_stats_type', 'Invalid stats type', { email, appId, type })
   }
 })
 
@@ -191,7 +191,7 @@ async function handleWeeklyInstallStats(c: Context, email: string, appId: string
   }).single()
 
   if (!weeklyStats || generateStatsError) {
-    return simpleError('cannot_generate_stats', 'Cannot generate stats', { error: generateStatsError })
+    throw simpleError('cannot_generate_stats', 'Cannot generate stats', { error: generateStatsError })
   }
 
   if (weeklyStats.all_updates === 0) {
@@ -320,7 +320,7 @@ async function handleDeployInstallStats(
   }
 
   if (!versionId) {
-    return simpleError('missing_version_id', 'Missing versionId', { appId, deployId })
+    throw simpleError('missing_version_id', 'Missing versionId', { appId, deployId })
   }
 
   let deployTime = deployedAt ? new Date(deployedAt) : null
@@ -332,12 +332,12 @@ async function handleDeployInstallStats(
         .eq('id', deployId)
         .single()
       if (deployError || !deploy?.deployed_at) {
-        return simpleError('missing_deployed_at', 'Missing deployedAt', { appId, deployId, deployError })
+        throw simpleError('missing_deployed_at', 'Missing deployedAt', { appId, deployId, deployError })
       }
       deployTime = new Date(deploy.deployed_at)
     }
     else {
-      return simpleError('missing_deployed_at', 'Missing deployedAt', { appId, deployId, versionId })
+      throw simpleError('missing_deployed_at', 'Missing deployedAt', { appId, deployId, versionId })
     }
   }
 
@@ -406,7 +406,7 @@ async function handleBillingPeriodStats(c: Context, email: string, orgId: string
     .single()
 
   if (orgError || !org) {
-    return simpleError('org_not_found', 'Organization not found', { orgId, orgError })
+    throw simpleError('org_not_found', 'Organization not found', { orgId, orgError })
   }
 
   // Use cycle dates passed from the SQL function if available,
@@ -427,7 +427,7 @@ async function handleBillingPeriodStats(c: Context, email: string, orgId: string
 
     if (cycleError || !cycleInfo) {
       cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot get cycle info', error: cycleError, metadata: { orgId, email } })
-      return simpleError('cannot_get_cycle_info', 'Cannot get cycle info', { error: cycleError })
+      throw simpleError('cannot_get_cycle_info', 'Cannot get cycle info', { error: cycleError })
     }
 
     startDate = new Date(cycleInfo.subscription_anchor_start).toISOString().split('T')[0]
@@ -445,7 +445,7 @@ async function handleBillingPeriodStats(c: Context, email: string, orgId: string
 
   if (metricsError) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot get total metrics', error: metricsError, metadata: { orgId, email } })
-    return simpleError('cannot_get_metrics', 'Cannot get metrics', { error: metricsError })
+    throw simpleError('cannot_get_metrics', 'Cannot get metrics', { error: metricsError })
   }
 
   // Get credits used in the billing period

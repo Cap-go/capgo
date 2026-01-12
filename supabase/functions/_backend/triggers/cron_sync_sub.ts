@@ -15,7 +15,7 @@ app.post('/', middlewareAPISecret, async (c) => {
   const body = await parseBody<OrgToGet>(c)
   cloudlog({ requestId: c.get('requestId'), message: 'post cron_sync_sub body', body })
   if (!body.orgId)
-    return simpleError('no_orgId', 'No orgId', { body })
+    throw simpleError('no_orgId', 'No orgId', { body })
 
   await syncSubscriptionAndEvents(c, body.orgId)
 
