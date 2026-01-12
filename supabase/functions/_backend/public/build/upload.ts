@@ -2,7 +2,8 @@ import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { simpleError } from '../../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../../utils/logging.ts'
-import { hasAppRightApikey, supabaseApikey } from '../../utils/supabase.ts'
+import { supabaseApikey } from '../../utils/supabase.ts'
+import { checkPermission } from '../../utils/rbac.ts'
 import { getEnv } from '../../utils/utils.ts'
 
 /**
@@ -55,8 +56,8 @@ export async function tusProxy(
     throw simpleError('not_found', 'Build request not found')
   }
 
-  // Check if user has access to this app
-  if (!(await hasAppRightApikey(c, buildRequest.app_id, apikey.user_id, 'write', apikey.key))) {
+  // Check if user has permission to upload for this build (auth context set by middlewareKey)
+  if (!(await checkPermission(c, 'app.build_native', { appId: buildRequest.app_id }))) {
     cloudlogErr({
       requestId: c.get('requestId'),
       message: 'Unauthorized TUS upload',

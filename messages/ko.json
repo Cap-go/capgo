@@ -1451,5 +1451,14 @@
   "your-role-in-org": "조직에서의 당신의 역할",
   "your-settings": "당신의 설정",
   "your-usage": "당신의 사용량:",
-  "zip-bundle": "지프 앱 번들"
+  "zip-bundle": "지프 앱 번들",
+  "role-app-developer": "앱 개발자",
+  "role-app-uploader": "앱 업로더",
+  "role-app-reader": "앱 리더",
+  "remove-role": "역할 제거",
+  "remove-role-confirm": "이 사용자의 앱 접근 권한을 제거하시겠습니까?",
+  "role-org-super-admin": "슈퍼 관리자",
+  "role-org-admin": "관리자",
+  "role-org-billing-admin": "청구 관리자",
+  "role-org-member": "회원"
 }

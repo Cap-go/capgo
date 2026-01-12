@@ -1451,5 +1451,14 @@
   "your-role-in-org": "संगठन में आपकी भूमिका",
   "your-settings": "आपकी सेटिंग्स",
   "your-usage": "आपका उपयोग:",
-  "zip-bundle": "ज़िप ऐप बंडल"
+  "zip-bundle": "ज़िप ऐप बंडल",
+  "role-app-developer": "ऐप डेवलपर",
+  "role-app-uploader": "ऐप अपलोडर",
+  "role-app-reader": "ऐप पाठक",
+  "remove-role": "भूमिका हटाएं",
+  "remove-role-confirm": "क्या आप इस उपयोगकर्ता की ऐप तक पहुंच हटाना चाहते हैं?",
+  "role-org-super-admin": "सुपर व्यवस्थापक",
+  "role-org-admin": "व्यवस्थापक",
+  "role-org-billing-admin": "बिलिंग प्रबंधक",
+  "role-org-member": "सदस्य"
 }

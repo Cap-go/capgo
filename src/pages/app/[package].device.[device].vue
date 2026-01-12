@@ -1,8 +1,7 @@
 <script setup lang="ts">
-import type { OrganizationRole } from '~/stores/organization'
 import type { Database } from '~/types/supabase.types'
 import { greaterThan, parse } from '@std/semver'
-import { onClickOutside } from '@vueuse/core'
+import { computedAsync, onClickOutside } from '@vueuse/core'
 import { ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
@@ -14,6 +13,7 @@ import IconAlertCircle from '~icons/lucide/alert-circle'
 import IconDown from '~icons/material-symbols/keyboard-arrow-down-rounded'
 import { useDeviceUpdateFormat } from '~/composables/useDeviceUpdateFormat'
 import { formatDate } from '~/services/date'
+import { hasPermission } from '~/services/permissions'
 import { defaultApiHost, useSupabase } from '~/services/supabase'
 import { useAppDetailStore } from '~/stores/appDetail'
 import { useDisplayStore } from '~/stores/display'
@@ -37,8 +37,13 @@ const organizationStore = useOrganizationStore()
 const device = ref<Database['public']['Tables']['devices']['Row']>()
 const channels = ref<(Database['public']['Tables']['channels']['Row'] & Channel)[]>([])
 const channelDevice = ref<Database['public']['Tables']['channels']['Row']>()
-const role = ref<OrganizationRole | null>(null)
 const reloadCount = ref(0)
+
+const canManageDevices = computedAsync(async () => {
+  if (!packageId.value)
+    return false
+  return await hasPermission('app.manage_devices', { appId: packageId.value })
+}, false)
 
 const revertToNativeVersion = ref<Database['public']['Functions']['check_revert_to_builtin_version']['Returns'] | null>(null)
 
@@ -196,11 +201,6 @@ async function getDevice() {
   }
 }
 
-async function getOrgRole() {
-  await organizationStore.awaitInitialLoad()
-  role.value = await organizationStore.getCurrentRoleForApp(packageId.value)
-}
-
 function minVersion(val: string, min = '4.6.99') {
   return greaterThan(parse(val), parse(min))
 }
@@ -226,7 +226,6 @@ async function loadData() {
     getDevice(),
     getChannelOverride(),
     getChannels(),
-    getOrgRole(),
     loadRevertToNativeVersion(),
   ])
   reloadCount.value += 1
@@ -262,9 +261,7 @@ function closeChannelDropdown() {
   }
 }
 async function onSelectChannel(value: string) {
-  const hasPerm = organizationStore.hasPermissionsInRole(role.value, ['admin', 'super_admin', 'write'])
-
-  if (!hasPerm) {
+  if (!canManageDevices.value) {
     toast.error(t('no-permission'))
     return
   }

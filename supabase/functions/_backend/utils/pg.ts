@@ -59,8 +59,8 @@ export function selectOne(pgClient: ReturnType<typeof getPgClient>) {
 
 function fixSupabaseHost(host: string): string {
   if (host.includes('postgres:postgres@supabase_db_')) {
-  // Supabase adds a prefix to the hostname that breaks connection in local docker
-  // e.g. "supabase_db_NAME:5432" -> "db:5432"
+    // Supabase adds a prefix to the hostname that breaks connection in local docker
+    // e.g. "supabase_db_NAME:5432" -> "db:5432"
     const url = URL.parse(host)!
     url.hostname = url.hostname.split('_')[1]
     return url.href
@@ -395,14 +395,14 @@ export function requestInfosChannelPostgres(
     : baseQuery)
     .where(!defaultChannel
       ? and(
-          eq(channelAlias.public, true),
-          eq(channelAlias.app_id, app_id),
-          eq(platformQuery, true),
-        )
+        eq(channelAlias.public, true),
+        eq(channelAlias.app_id, app_id),
+        eq(platformQuery, true),
+      )
       : and(
-          eq(channelAlias.app_id, app_id),
-          eq(channelAlias.name, defaultChannel),
-        ),
+        eq(channelAlias.app_id, app_id),
+        eq(channelAlias.name, defaultChannel),
+      ),
     )
     .groupBy(channelAlias.id, versionAlias.id)
     .limit(1)
@@ -429,9 +429,9 @@ export function requestInfosPostgres(
   const channelDevice = shouldQueryChannelOverride
     ? requestInfosChannelDevicePostgres(c, app_id, device_id, drizzleClient, shouldFetchManifest, includeMetadata)
     : Promise.resolve(undefined).then(() => {
-        cloudlog({ requestId: c.get('requestId'), message: 'Skipping channel device override query' })
-        return null
-      })
+      cloudlog({ requestId: c.get('requestId'), message: 'Skipping channel device override query' })
+      return null
+    })
   const channel = requestInfosChannelPostgres(c, platform, app_id, defaultChannel, drizzleClient, shouldFetchManifest, includeMetadata)
 
   return Promise.all([channelDevice, channel])

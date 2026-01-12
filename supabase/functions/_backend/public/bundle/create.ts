@@ -1,7 +1,9 @@
 import type { Context } from 'hono'
+import type { MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
 import { simpleError } from '../../utils/hono.ts'
-import { hasAppRightApikey, supabaseAdmin, supabaseApikey } from '../../utils/supabase.ts'
+import { checkPermission } from '../../utils/rbac.ts'
+import { supabaseAdmin, supabaseApikey } from '../../utils/supabase.ts'
 import { isValidAppId, isValidSemver } from '../../utils/utils.ts'
 
 interface CreateBundleBody {
@@ -227,7 +229,7 @@ async function insertBundle(c: Context, body: CreateBundleBody, ownerOrg: string
   return newBundle
 }
 
-export async function createBundle(c: Context, body: CreateBundleBody, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
+export async function createBundle(c: Context<MiddlewareKeyVariables>, body: CreateBundleBody, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
   if (!body.app_id) {
     throw simpleError('missing_app_id', 'Missing required fields: app_id', { app_id: body.app_id })
   }
@@ -246,7 +248,8 @@ export async function createBundle(c: Context, body: CreateBundleBody, apikey: D
   if (!isValidSemver(body.version)) {
     throw simpleError('invalid_version_format', 'Version must be valid semver format (e.g., 1.0.0, 1.0.0-alpha.1)', { version: body.version })
   }
-  if (!(await hasAppRightApikey(c, body.app_id, apikey.user_id, 'write', apikey.key))) {
+  // Auth context is already set by middlewareKey
+  if (!(await checkPermission(c, 'app.upload_bundle', { appId: body.app_id }))) {
     throw simpleError('cannot_create_bundle', 'You can\'t access this app', { app_id: body.app_id })
   }
 

@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { FormKit } from '@formkit/vue'
 import { FunctionsHttpError } from '@supabase/supabase-js'
+import { computedAsync } from '@vueuse/core'
 import { storeToRefs } from 'pinia'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import iconEmail from '~icons/heroicons/envelope?raw'
 import iconName from '~icons/heroicons/user?raw'
+import { hasPermission } from '~/services/permissions'
 import { pickPhoto, takePhoto } from '~/services/photos'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
@@ -38,8 +40,14 @@ watch(currentOrganization, (newOrg) => {
   }
 })
 
+const canUpdateOrgSettings = computedAsync(async () => {
+  if (!currentOrganization.value)
+    return false
+  return await hasPermission('org.update_settings', { orgId: currentOrganization.value.gid })
+}, false)
+
 async function presentActionSheet() {
-  if (!currentOrganization.value || (!organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['admin', 'super_admin']))) {
+  if (!currentOrganization.value || !canUpdateOrgSettings.value) {
     toast.error(t('no-permission'))
     return
   }
@@ -113,7 +121,7 @@ async function updateEmail(form: { email: string }) {
 }
 
 async function saveChanges(form: { orgName: string, email: string }) {
-  if (!currentOrganization.value || (!organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['admin', 'super_admin']))) {
+  if (!currentOrganization.value || !canUpdateOrgSettings.value) {
     toast.error(t('no-permission'))
     return
   }
@@ -160,10 +168,6 @@ async function saveChanges(form: { orgName: string, email: string }) {
   if (!hasErrored)
     toast.success(t('org-changes-saved'))
 }
-
-const hasOrgPerm = computed(() => {
-  return organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['admin', 'super_admin'])
-})
 
 const acronym = computed(() => {
   let res = 'N/A'
@@ -249,7 +253,7 @@ async function copyOrganizationId() {
                 name="orgName"
                 autocomplete="given-name"
                 :prefix-icon="iconName"
-                :disabled="!hasOrgPerm"
+                :disabled="!canUpdateOrgSettings"
                 :value="orgName"
                 validation="required:trim"
                 enterkeyhint="next"
@@ -263,7 +267,7 @@ async function copyOrganizationId() {
                 name="email"
                 :prefix-icon="iconEmail"
                 autocomplete="given-name"
-                :disabled="!hasOrgPerm"
+                :disabled="!canUpdateOrgSettings"
                 :value="email"
                 validation="required:trim" enterkeyhint="next"
                 autofocus

@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import type { Ref } from 'vue'
 import type { TableColumn } from '../comp_def'
-import type { OrganizationRole } from '~/stores/organization'
 import type { Database } from '~/types/supabase.types'
 import { Capacitor } from '@capacitor/core'
+import { computedAsync } from '@vueuse/core'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
@@ -12,9 +12,9 @@ import IconSettings from '~icons/heroicons/cog-8-tooth'
 import IconTrash from '~icons/heroicons/trash'
 import { bytesToMbText } from '~/services/conversion'
 import { formatDate } from '~/services/date'
+import { hasPermission } from '~/services/permissions'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
-import { useOrganizationStore } from '~/stores/organization'
 
 const props = defineProps<{
   appId: string
@@ -26,7 +26,12 @@ const emit = defineEmits<{
 
 type Element = Database['public']['Tables']['app_versions']['Row'] & Database['public']['Tables']['app_versions_meta']['Row']
 
-const role = ref<OrganizationRole | null>(null)
+const canDeleteBundle = computedAsync(async () => {
+  if (!props.appId)
+    return false
+  return await hasPermission('bundle.delete', { appId: props.appId })
+}, false)
+
 const isMobile = Capacitor.isNativePlatform()
 const offset = 10
 const { t } = useI18n()
@@ -35,7 +40,6 @@ const autoShowSteps = ref(false)
 const dialogStore = useDialogV2Store()
 const supabase = useSupabase()
 const router = useRouter()
-const organizationStore = useOrganizationStore()
 const total = ref(0)
 const totalAllBundles = ref<number | null>(null)
 const search = ref('')
@@ -94,7 +98,7 @@ async function showDeletionMethodDialog(): Promise<DeletionMethod> {
         text: t('unsafe'),
         role: 'danger',
         handler: async () => {
-          if (!organizationStore.hasPermissionsInRole(await organizationStore.getCurrentRoleForApp(props.appId), ['super_admin'])) {
+          if (!canDeleteBundle.value) {
             toast.error(t('no-permission-ask-super-admin'))
             return false
           }
@@ -460,7 +464,7 @@ columns.value = [
       },
       {
         icon: IconTrash,
-        visible: () => role.value ? organizationStore.hasPermissionsInRole(role.value, ['admin', 'write', 'super_admin']) : false,
+        visible: () => canDeleteBundle.value,
         onClick: (elem: Element) => deleteOne(elem),
       },
     ],
@@ -473,7 +477,6 @@ async function reload() {
   try {
     await Promise.all([getData(), updateOverallBundlesCount()])
     applyAutoOnboardingState()
-    role.value = await organizationStore.getCurrentRoleForApp(props.appId)
   }
   catch (error) {
     console.error(error)
@@ -486,7 +489,7 @@ async function reload() {
 
 async function massDelete() {
   console.log('massDelete')
-  if (role.value && !organizationStore.hasPermissionsInRole(role.value, ['admin', 'write', 'super_admin'])) {
+  if (!canDeleteBundle.value) {
     toast.error(t('no-permission'))
     return
   }
@@ -605,7 +608,6 @@ function applyAutoOnboardingState() {
 
 watch(props, async () => {
   await refreshData()
-  role.value = await organizationStore.getCurrentRoleForApp(props.appId)
 })
 
 watch(showSteps, (newValue) => {

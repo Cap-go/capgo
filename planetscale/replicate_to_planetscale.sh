@@ -82,7 +82,7 @@ echo "SOURCE_PASSWORD: $SOURCE_PASSWORD"
 echo "HOST: $SOURCE_HOST"
 echo "PORT: $SOURCE_PORT"
 echo "DB: $SOURCE_DB"
-# exit() 
+# exit()
 # Restore file
 DUMP_FILE='data_replicate.dump'
 

@@ -7,12 +7,14 @@ import { app as deleted_failed_version } from '../_backend/private/delete_failed
 import { app as devices_priv } from '../_backend/private/devices.ts'
 import { app as download_link } from '../_backend/private/download_link.ts'
 import { app as events } from '../_backend/private/events.ts'
+import { app as groups } from '../_backend/private/groups.ts'
 import { app as invite_new_user_to_org } from '../_backend/private/invite_new_user_to_org.ts'
 import { app as latency } from '../_backend/private/latency.ts'
 import { app as log_as } from '../_backend/private/log_as.ts'
 // Webapps API
 import { app as plans } from '../_backend/private/plans.ts'
 import { app as publicStats } from '../_backend/private/public_stats.ts'
+import { app as role_bindings } from '../_backend/private/role_bindings.ts'
 import { app as set_org_email } from '../_backend/private/set_org_email.ts'
 import { app as stats_priv } from '../_backend/private/stats.ts'
 import { app as storeTop } from '../_backend/private/store_top.ts'
@@ -46,6 +48,8 @@ appGlobal.route('/delete_failed_version', deleted_failed_version)
 appGlobal.route('/set_org_email', set_org_email)
 appGlobal.route('/latency', latency)
 appGlobal.route('/events', events)
+appGlobal.route('/groups', groups)
+appGlobal.route('/role_bindings', role_bindings)
 appGlobal.route('/invite_new_user_to_org', invite_new_user_to_org)
 appGlobal.route('/accept_invitation', accept_invitation)
 appGlobal.route('/validate_password_compliance', validate_password_compliance)

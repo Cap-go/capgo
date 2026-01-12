@@ -138,3 +138,66 @@ export const org_users = pgTable('org_users', {
   channel_id: bigint('channel_id', { mode: 'number' }),
   user_right: userMinRightPgEnum('user_right'),
 })
+
+// RBAC tables
+export const roles = pgTable('roles', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: text('name').notNull(),
+  scope_type: text('scope_type').notNull(),
+  description: text('description'),
+  priority_rank: bigint('priority_rank', { mode: 'number' }).notNull().default(0),
+  is_assignable: boolean('is_assignable').notNull().default(true),
+  created_at: timestamp('created_at').notNull().defaultNow(),
+  created_by: uuid('created_by'),
+})
+
+export const groups = pgTable('groups', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  org_id: uuid('org_id').notNull(),
+  name: text('name').notNull(),
+  description: text('description'),
+  is_system: boolean('is_system').notNull().default(false),
+  created_by: uuid('created_by'),
+  created_at: timestamp('created_at').notNull().defaultNow(),
+})
+
+export const group_members = pgTable('group_members', {
+  group_id: uuid('group_id').notNull(),
+  user_id: uuid('user_id').notNull(),
+  added_by: uuid('added_by'),
+  added_at: timestamp('added_at').notNull().defaultNow(),
+})
+
+export const role_bindings = pgTable('role_bindings', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  principal_type: text('principal_type').notNull(),
+  principal_id: uuid('principal_id').notNull(),
+  role_id: uuid('role_id').notNull(),
+  scope_type: text('scope_type').notNull(),
+  org_id: uuid('org_id'),
+  app_id: uuid('app_id'),
+  bundle_id: bigint('bundle_id', { mode: 'number' }),
+  channel_id: uuid('channel_id'),
+  granted_by: uuid('granted_by').notNull(),
+  granted_at: timestamp('granted_at').notNull().defaultNow(),
+  expires_at: timestamp('expires_at'),
+  reason: text('reason'),
+  is_direct: boolean('is_direct').notNull().default(true),
+})
+
+// Export all tables as schema object for convenience
+export const schema = {
+  apps,
+  app_versions,
+  manifest,
+  channels,
+  channel_devices,
+  orgs,
+  stripe_info,
+  apikeys,
+  org_users,
+  roles,
+  groups,
+  group_members,
+  role_bindings,
+}

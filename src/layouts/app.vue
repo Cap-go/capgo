@@ -3,13 +3,26 @@ import type { Tab } from '~/components/comp_def'
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Tabs from '~/components/Tabs.vue'
-import { appTabs } from '~/constants/appTabs'
+import { appTabs as baseAppTabs } from '~/constants/appTabs'
 import { bundleTabs } from '~/constants/bundleTabs'
 import { channelTabs } from '~/constants/channelTabs'
 import { deviceTabs } from '~/constants/deviceTabs'
+import { useOrganizationStore } from '~/stores/organization'
 
 const router = useRouter()
 const route = useRoute()
+const organizationStore = useOrganizationStore()
+
+// Compute tabs dynamically based on RBAC settings
+const appTabs = computed<Tab[]>(() => {
+  const useNewRbac = (organizationStore.currentOrganization as any)?.use_new_rbac
+
+  if (useNewRbac) {
+    return baseAppTabs
+  }
+
+  return baseAppTabs.filter(t => t.label !== 'access')
+})
 
 // Detect resource type from route (channel, device, or bundle)
 const resourceType = computed(() => {
@@ -38,9 +51,9 @@ const resourceId = computed(() => {
 // Generate tabs with full paths for the current app
 const tabs = computed<Tab[]>(() => {
   if (!appId.value)
-    return appTabs
+    return appTabs.value
 
-  return appTabs.map(tab => ({
+  return appTabs.value.map(tab => ({
     ...tab,
     key: tab.key ? `/app/${appId.value}${tab.key}` : `/app/${appId.value}`,
   }))

@@ -100,6 +100,13 @@ declare module 'vue-router/auto-routes' {
       { package: ParamValue<false> },
       | never
     >,
+    '/app/[package].access': RouteRecordInfo<
+      '/app/[package].access',
+      '/app/:package/access',
+      { package: ParamValue<true> },
+      { package: ParamValue<false> },
+      | never
+    >,
     '/app/[package].builds': RouteRecordInfo<
       '/app/[package].builds',
       '/app/:package/builds',
@@ -491,6 +498,12 @@ declare module 'vue-router/auto-routes' {
     'src/pages/app/[package].vue': {
       routes:
         | '/app/[package]'
+      views:
+        | never
+    }
+    'src/pages/app/[package].access.vue': {
+      routes:
+        | '/app/[package].access'
       views:
         | never
     }
