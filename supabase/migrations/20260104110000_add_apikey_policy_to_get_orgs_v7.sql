@@ -34,7 +34,9 @@ RETURNS TABLE (
     password_policy_config jsonb,
     password_has_access boolean,
     require_apikey_expiration boolean,
-    max_apikey_expiration_days integer
+    max_apikey_expiration_days integer,
+    enforce_encrypted_bundles boolean,
+    required_encryption_key character varying
 ) LANGUAGE plpgsql STABLE SECURITY DEFINER
 SET search_path = '' AS $$
 BEGIN
@@ -158,7 +160,9 @@ BEGIN
     ppa.password_policy_config,
     ppa.password_has_access,
     o.require_apikey_expiration,
-    o.max_apikey_expiration_days
+    o.max_apikey_expiration_days,
+    o.enforce_encrypted_bundles,
+    o.required_encryption_key
   FROM public.orgs o
   JOIN public.org_users ou ON ou.user_id = userid AND o.id = ou.org_id
   JOIN two_fa_access tfa ON tfa.org_id = o.id
@@ -211,7 +215,9 @@ RETURNS TABLE (
     password_policy_config jsonb,
     password_has_access boolean,
     require_apikey_expiration boolean,
-    max_apikey_expiration_days integer
+    max_apikey_expiration_days integer,
+    enforce_encrypted_bundles boolean,
+    required_encryption_key character varying
 ) LANGUAGE plpgsql
 SET search_path = '' SECURITY DEFINER AS $$
 DECLARE
