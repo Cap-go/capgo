@@ -289,8 +289,8 @@ export async function hasOrgRight(c: Context, orgId: string, userId: string, rig
     min_right: right,
     org_id: orgId,
     user_id: userId,
-    channel_id: null as any,
-    app_id: null as any,
+    channel_id: null as unknown as number,
+    app_id: null as unknown as string,
   })
 
   cloudlog({ requestId: c.get('requestId'), message: 'check_min_rights (hasOrgRight)', userRight })
@@ -308,8 +308,8 @@ export async function hasOrgRightApikey(c: Context, orgId: string, userId: strin
     min_right: right,
     org_id: orgId,
     user_id: userId,
-    channel_id: null as any,
-    app_id: null as any,
+    channel_id: null as unknown as number,
+    app_id: null as unknown as string,
   })
 
   cloudlog({ requestId: c.get('requestId'), message: 'check_min_rights (hasOrgRight)', userRight })

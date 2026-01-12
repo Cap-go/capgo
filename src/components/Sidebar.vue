@@ -126,7 +126,7 @@ const tabs = computed<Tab[]>(() => {
       </div>
 
       <!-- Navigation -->
-      <div class="flex-1 px-3 py-4 space-y-4 overflow-y-auto lg:py-6 lg:px-6">
+      <nav role="navigation" aria-label="Main navigation" class="flex-1 px-3 py-4 space-y-4 overflow-y-auto lg:py-6 lg:px-6">
         <div>
           <h3 class="mb-3 text-xs font-semibold uppercase lg:mb-4 lg:tracking-wider text-slate-500 lg:text-slate-500">
             {{ t('pages') }}
@@ -156,7 +156,7 @@ const tabs = computed<Tab[]>(() => {
             </li>
           </ul>
         </div>
-      </div>
+      </nav>
 
       <!-- User menu -->
       <div class="pt-4 mt-auto lg:pt-6 lg:mt-0 lg:border-t shrink-0 lg:border-slate-700">

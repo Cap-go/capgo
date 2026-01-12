@@ -7,7 +7,7 @@ import { z } from 'zod/mini'
 import { trackBentoEvent } from '../utils/bento.ts'
 import { middlewareAuth, parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
-import { supabaseClient } from '../utils/supabase.ts'
+import { supabaseAdmin, supabaseClient } from '../utils/supabase.ts'
 import { getEnv } from '../utils/utils.ts'
 
 // Validate name to prevent HTML/script injection
@@ -110,10 +110,10 @@ app.post('/', middlewareAuth, async (c) => {
   const inviteCreatorUser = res.inviteCreatorUser
   const org = res.org
 
-  // Use authenticated client for data queries - RLS will enforce access
-  const supabase = supabaseClient(c, res.authorization!)
+  // Use admin client for tmp_users operations since RLS blocks all access on that table
+  const supabaseAdminClient = supabaseAdmin(c)
 
-  const { data: existingInvitation } = await supabase
+  const { data: existingInvitation } = await supabaseAdminClient
     .from('tmp_users')
     .select('*')
     .eq('email', body.email)
@@ -127,7 +127,7 @@ app.post('/', middlewareAuth, async (c) => {
       throw simpleError('user_already_invited', 'User already invited and it hasnt been 3 hours since the last invitation was cancelled')
     }
 
-    const { error: updateInvitationError, data: updatedInvitationData } = await supabase
+    const { error: updateInvitationError, data: updatedInvitationData } = await supabaseAdminClient
       .from('tmp_users')
       .update({
         cancelled_at: null,
@@ -146,7 +146,7 @@ app.post('/', middlewareAuth, async (c) => {
     newInvitation = updatedInvitationData
   }
   else {
-    const { error: createUserError, data: newInvitationData } = await supabase.from('tmp_users').insert({
+    const { error: createUserError, data: newInvitationData } = await supabaseAdminClient.from('tmp_users').insert({
       email: body.email,
       org_id: body.org_id,
       role: body.invite_type,

@@ -1,4 +1,4 @@
-import type { User } from '@supabase/supabase-js'
+import type { AuthChangeEvent, User } from '@supabase/supabase-js'
 import type { AppUsageByApp, AppUsageGlobal } from './../services/supabase'
 import type { Database } from '~/types/supabase.types'
 import { acceptHMRUpdate, defineStore } from 'pinia'
@@ -42,7 +42,7 @@ export const useMainStore = defineStore('main', () => {
   const totalDevices = ref<number>(0)
   const totalStorage = ref<number>(0)
   const dashboardFetched = ref<boolean>(false)
-  const _initialLoadPromise = ref(Promise.withResolvers())
+  const _initialLoadPromise = ref(Promise.withResolvers<boolean>())
 
   const totalDownload = ref<number>(0)
 
@@ -50,7 +50,7 @@ export const useMainStore = defineStore('main', () => {
     return new Promise<void>((resolve) => {
       const supabase = useSupabase()
       const config = getLocalConfig()
-      const listener = supabase.auth.onAuthStateChange((event: any) => {
+      const listener = supabase.auth.onAuthStateChange((event: AuthChangeEvent) => {
         if (event === 'SIGNED_OUT') {
           listener.data.subscription.unsubscribe()
           auth.value = undefined
@@ -115,6 +115,8 @@ export const useMainStore = defineStore('main', () => {
     }
     catch (error) {
       _initialLoadPromise.value.reject(error)
+      // Reset the promise so subsequent calls can succeed
+      _initialLoadPromise.value = Promise.withResolvers<boolean>()
       throw error
     }
   }

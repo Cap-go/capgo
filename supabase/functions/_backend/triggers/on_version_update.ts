@@ -4,7 +4,7 @@ import type { Database } from '../utils/supabase.types.ts'
 import { eq } from 'drizzle-orm'
 import { Hono } from 'hono/tiny'
 import { BRES, middlewareAPISecret, triggerValidator } from '../utils/hono.ts'
-import { cloudlog } from '../utils/logging.ts'
+import { cloudlog, cloudlogErr } from '../utils/logging.ts'
 import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import { manifest } from '../utils/postgres_schema.ts'
 import { getPath, s3 } from '../utils/s3.ts'
@@ -184,7 +184,12 @@ async function deleteManifest(c: Context, record: Database['public']['Tables']['
             }))
         }
       }
-      await backgroundTask(c, Promise.all(promisesDeleteS3))
+      const results = await Promise.allSettled(promisesDeleteS3)
+      const failures = results.filter(r => r.status === 'rejected')
+      if (failures.length) {
+        cloudlogErr({ requestId: c.get('requestId'), message: 'Some S3 deletions failed', count: failures.length, errors: failures.map(f => (f as PromiseRejectedResult).reason) })
+      }
+      await backgroundTask(c, Promise.resolve())
 
       // After deleting manifest entries, update manifest_count and decrement manifest_bundle_count
       const updatePgClient = getPgClient(c, false)
