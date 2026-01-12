@@ -46,7 +46,12 @@ export async function startBuild(
   apikey: Database['public']['Tables']['apikeys']['Row'],
 ): Promise<Response> {
   let alreadyMarkedAsFailed = false
-  const apikeyKey = apikey.key!
+  const apikeyKey = apikey.key
+
+  // Validate API key is not null (hashed-only keys cannot start builds)
+  if (!apikeyKey) {
+    throw simpleError('invalid_apikey', 'API key is missing or invalid. Build operations require a non-hashed API key.')
+  }
 
   try {
     cloudlog({

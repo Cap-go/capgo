@@ -8,6 +8,17 @@ import { closeClient, getDrizzleClient, getPgClient, logPgError } from './pg.ts'
 import * as schema from './postgres_schema.ts'
 import { checkKey, checkKeyById, supabaseAdmin, supabaseClient } from './supabase.ts'
 
+// Redact sensitive keys for logging (show first 8 chars only)
+function redactKey(key: string | undefined | null): string {
+  if (!key)
+    return '[none]'
+
+  if (key.length <= 8)
+    return '[redacted]'
+
+  return `${key.substring(0, 8)}...`
+}
+
 // TODO: make universal middleware who
 //  Accept authorization header (JWT)
 //  Accept capgkey header (legacy apikey header name for CLI)
@@ -153,10 +164,10 @@ async function checkKeyByIdPg(
 async function foundAPIKey(c: Context, capgkeyString: string, rights: Database['public']['Enums']['key_mode'][]) {
   const subkey_id = c.req.header('x-limited-key-id') ? Number(c.req.header('x-limited-key-id')) : null
 
-  cloudlog({ requestId: c.get('requestId'), message: 'Capgkey provided', capgkeyString })
+  cloudlog({ requestId: c.get('requestId'), message: 'Capgkey provided', capgkey: redactKey(capgkeyString) })
   const apikey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKey(c, capgkeyString, supabaseAdmin(c), rights)
   if (!apikey) {
-    cloudlog({ requestId: c.get('requestId'), message: 'Invalid apikey', capgkeyString, rights })
+    cloudlog({ requestId: c.get('requestId'), message: 'Invalid apikey', capgkey: redactKey(capgkeyString), rights })
     return quickError(401, 'invalid_apikey', 'Invalid apikey')
   }
   c.set('auth', {
@@ -171,17 +182,17 @@ async function foundAPIKey(c: Context, capgkeyString: string, rights: Database['
   if (subkey_id) {
     cloudlog({ requestId: c.get('requestId'), message: 'Subkey id provided', subkey_id })
     const subkey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKeyById(c, subkey_id, supabaseAdmin(c), rights)
-    cloudlog({ requestId: c.get('requestId'), message: 'Subkey', subkey })
+    cloudlog({ requestId: c.get('requestId'), message: 'Subkey', subkeyId: subkey?.id, subkeyUserId: subkey?.user_id })
     if (!subkey) {
       cloudlog({ requestId: c.get('requestId'), message: 'Invalid subkey', subkey_id })
       return quickError(401, 'invalid_subkey', 'Invalid subkey')
     }
     if (subkey && subkey.user_id !== apikey.user_id) {
-      cloudlog({ requestId: c.get('requestId'), message: 'Subkey user_id does not match apikey user_id', subkey, apikey })
+      cloudlog({ requestId: c.get('requestId'), message: 'Subkey user_id does not match apikey user_id', subkeyUserId: subkey.user_id, apikeyUserId: apikey.user_id })
       return quickError(401, 'invalid_subkey', 'Invalid subkey')
     }
     if (subkey?.limited_to_apps && subkey?.limited_to_apps.length === 0 && subkey?.limited_to_orgs && subkey?.limited_to_orgs.length === 0) {
-      cloudlog({ requestId: c.get('requestId'), message: 'Invalid subkey, no limited apps or orgs', subkey })
+      cloudlog({ requestId: c.get('requestId'), message: 'Invalid subkey, no limited apps or orgs', subkeyId: subkey.id })
       return quickError(401, 'invalid_subkey', 'Invalid subkey, no limited apps or orgs')
     }
     if (subkey) {
@@ -196,7 +207,7 @@ async function foundAPIKey(c: Context, capgkeyString: string, rights: Database['
 }
 
 async function foundJWT(c: Context, jwt: string) {
-  cloudlog({ requestId: c.get('requestId'), message: 'JWT provided', jwt })
+  cloudlog({ requestId: c.get('requestId'), message: 'JWT provided', jwt: redactKey(jwt) })
   const supabaseJWT = supabaseClient(c, jwt)
   const { data: user, error: userError } = await supabaseJWT.auth.getUser()
   if (userError) {
@@ -218,7 +229,7 @@ export function middlewareV2(rights: Database['public']['Enums']['key_mode'][]) 
     // make sure jwt is valid otherwise it means it was an apikey and you need to set it in capgkey_string
     // if jwt is uuid, it means it was an apikey and you need to set it in capgkey_string
     if (jwt && isUUID(jwt)) {
-      cloudlog({ requestId: c.get('requestId'), message: 'Setting apikey in capgkey_string', jwt })
+      cloudlog({ requestId: c.get('requestId'), message: 'Setting apikey in capgkey_string', apikey: redactKey(jwt) })
       capgkey = jwt
       jwt = undefined
     }
@@ -278,7 +289,7 @@ export function middlewareKey(rights: Database['public']['Enums']['key_mode'][],
     }
 
     if (!apikey) {
-      cloudlog({ requestId: c.get('requestId'), message: 'Invalid apikey', key, method: c.req.method, url: c.req.url })
+      cloudlog({ requestId: c.get('requestId'), message: 'Invalid apikey', key: redactKey(key), method: c.req.method, url: c.req.url })
       return quickError(401, 'invalid_apikey', 'Invalid apikey')
     }
     c.set('apikey', apikey)

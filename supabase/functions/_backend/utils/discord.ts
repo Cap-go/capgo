@@ -10,6 +10,11 @@ const REMOVED_FIELDS = ['password']
 // Fields that should show first 4 and last 4 characters
 const PARTIALLY_REDACTED_FIELDS = ['secret', 'token', 'apikey', 'api_key', 'authorization', 'credential', 'private_key']
 
+// Escape regex metacharacters to prevent ReDoS
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
 // Partially redact a value - show first 4 and last 4 characters
 function partialRedact(value: string): string {
   if (value.length <= 8) {
@@ -24,8 +29,10 @@ function sanitizeSensitiveFromString(str: string): string {
 
   // Completely remove password fields (including the key)
   for (const field of REMOVED_FIELDS) {
-    // Remove "password":"value", or "password": "value" (with optional trailing comma)
-    const jsonRegexWithComma = new RegExp(`"${field}"\\s*:\\s*"[^"]*"\\s*,?\\s*`, 'gi')
+    // Handle escaped quotes within values by using a non-greedy match that stops at unescaped quotes
+    // Match "field":"value" where value can contain \" but not standalone "
+    const escapedField = escapeRegex(field)
+    const jsonRegexWithComma = new RegExp(`"${escapedField}"\\s*:\\s*"(?:[^"\\\\]|\\\\.)*"\\s*,?\\s*`, 'gi')
     result = result.replace(jsonRegexWithComma, '')
     // Clean up any resulting double commas or leading/trailing commas in objects
     result = result.replace(/,\s*,/g, ',')
@@ -35,7 +42,9 @@ function sanitizeSensitiveFromString(str: string): string {
 
   // Partially redact other sensitive fields (show first 4 and last 4 chars)
   for (const field of PARTIALLY_REDACTED_FIELDS) {
-    const jsonRegex = new RegExp(`("${field}"\\s*:\\s*)"([^"]*)"`, 'gi')
+    // Updated regex to handle escaped quotes within values
+    const escapedField = escapeRegex(field)
+    const jsonRegex = new RegExp(`("${escapedField}"\\s*:\\s*)"((?:[^"\\\\]|\\\\.)*)"`, 'gi')
     result = result.replace(jsonRegex, (_match, prefix, value) => {
       return `${prefix}"${partialRedact(value)}"`
     })

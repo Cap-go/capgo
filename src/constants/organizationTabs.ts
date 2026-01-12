@@ -6,10 +6,12 @@ import IconCredits from '~icons/heroicons/currency-dollar'
 import IconWebhook from '~icons/heroicons/globe-alt'
 import IconInfo from '~icons/heroicons/information-circle'
 import IconSecurity from '~icons/heroicons/shield-check'
+import IconShield from '~icons/heroicons/shield-exclamation'
 import IconUsers from '~icons/heroicons/users'
 
 export const organizationTabs: Tab[] = [
   { label: 'general', key: '/settings/organization', icon: IconInfo },
+  { label: 'sso', key: '/settings/organization/sso', icon: IconShield },
   { label: 'members', key: '/settings/organization/members', icon: IconUsers },
   // Security tab is added dynamically in settings.vue for super_admins only
   { label: 'security', key: '/settings/organization/security', icon: IconSecurity },
