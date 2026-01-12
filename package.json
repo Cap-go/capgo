@@ -238,7 +238,7 @@
     "eslint": "9.39.2",
     "eslint-plugin-format": "^1.0.2",
     "husky": "^9.1.7",
-    "sass": "1.97.1",
+    "sass": "1.97.2",
     "tailwindcss": "^4.1.17",
     "typescript": "5.9.3",
     "unplugin-auto-import": "^20.2.0",
