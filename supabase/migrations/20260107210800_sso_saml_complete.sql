@@ -36,7 +36,7 @@ certificate_expires_at timestamptz,
 certificate_last_checked timestamptz DEFAULT now(),
 
 -- Status Flags
-enabled boolean NOT NULL DEFAULT false,
+enabled boolean NOT NULL DEFAULT true,
 verified boolean NOT NULL DEFAULT false,
 auto_join_enabled boolean NOT NULL DEFAULT false, -- Controls automatic enrollment
 

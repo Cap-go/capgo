@@ -27,11 +27,13 @@ import { middlewareV2 } from '../utils/hono_middleware.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import { org_saml_connections, saml_domain_mappings } from '../utils/postgres_schema.ts'
+import { hasOrgRight } from '../utils/supabase.ts'
 import { getEnv } from '../utils/utils.ts'
 import { version } from '../utils/version.ts'
 
 const testSSOSchema = z.object({
   orgId: z.string().uuid(),
+  applyFixes: z.boolean().optional().default(false), // Opt-in for state changes (enable + verified + entity_id update)
 })
 
 /**
@@ -207,12 +209,28 @@ app.post('/', middlewareV2(['read', 'write', 'all']), async (c) => {
         message: '[SSO Test] Invalid request body',
         errors: parsedBody.error.issues,
       })
-      return simpleError('invalid_json_body', 'orgId is required and must be a valid UUID', {
+      return simpleError('invalid_json_body', 'orgId and applyFixes are required fields', {
         errors: parsedBody.error.issues,
       })
     }
 
-    const { orgId } = parsedBody.data
+    const { orgId, applyFixes } = parsedBody.data
+
+    // SECURITY: Verify caller has super_admin rights for this org
+    // This endpoint can read + write SSO config, so we need strict authorization
+    const hasPermission = await hasOrgRight(c, orgId, auth.userId, 'super_admin')
+    if (!hasPermission) {
+      cloudlog({
+        requestId,
+        message: '[SSO Test] Insufficient permissions',
+        orgId,
+        userId: auth.userId,
+      })
+      return c.json({
+        error: 'insufficient_permissions',
+        message: 'Only super administrators can test SSO configuration',
+      }, 403)
+    }
 
     cloudlog({
       requestId,
@@ -334,63 +352,134 @@ app.post('/', middlewareV2(['read', 'write', 'all']), async (c) => {
     let metadataXml = config.metadata_xml
 
     if (!metadataXml && config.metadata_url) {
-      cloudlog({
-        requestId,
-        message: '[SSO Test] Fetching metadata from URL',
-        url: config.metadata_url,
-      })
+      // SECURITY: Validate metadata URL before fetching (SSRF protection)
+      const metadataUrl = config.metadata_url.trim()
 
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 5000) // 5 second timeout
-
+      // Re-validate URL format (defense-in-depth against legacy data or manual DB edits)
       try {
-        const metadataResponse = await fetch(config.metadata_url, {
-          headers: {
-            Accept: 'application/xml, text/xml',
-          },
-          signal: controller.signal,
-        })
+        const url = new URL(metadataUrl)
 
-        clearTimeout(timeoutId)
-
-        if (!metadataResponse.ok) {
-          validationErrors.push(`Failed to fetch metadata: HTTP ${metadataResponse.status}`)
-        }
-        else {
-          metadataXml = await metadataResponse.text()
-
+        // Block private network ranges
+        const hostname = url.hostname.toLowerCase()
+        if (
+          hostname === 'localhost'
+          || hostname === '127.0.0.1'
+          || hostname === '0.0.0.0'
+          || hostname.startsWith('192.168.')
+          || hostname.startsWith('10.')
+          || hostname.startsWith('172.16.')
+          || hostname.startsWith('172.17.')
+          || hostname.startsWith('172.18.')
+          || hostname.startsWith('172.19.')
+          || hostname.startsWith('172.20.')
+          || hostname.startsWith('172.21.')
+          || hostname.startsWith('172.22.')
+          || hostname.startsWith('172.23.')
+          || hostname.startsWith('172.24.')
+          || hostname.startsWith('172.25.')
+          || hostname.startsWith('172.26.')
+          || hostname.startsWith('172.27.')
+          || hostname.startsWith('172.28.')
+          || hostname.startsWith('172.29.')
+          || hostname.startsWith('172.30.')
+          || hostname.startsWith('172.31.')
+          || hostname === '[::]'
+          || hostname === '[::1]'
+        ) {
+          validationErrors.push('Metadata URL cannot point to private network addresses')
           cloudlog({
             requestId,
-            message: '[SSO Test] Metadata fetched successfully',
-            size: metadataXml.length,
+            message: '[SSO Test] Blocked private network URL',
+            url: hostname,
           })
+        }
+        else if (url.protocol !== 'https:' && url.protocol !== 'http:') {
+          validationErrors.push('Metadata URL must use HTTP or HTTPS protocol')
         }
       }
       catch (error: any) {
-        clearTimeout(timeoutId)
+        validationErrors.push(`Invalid metadata URL format: ${error.message}`)
+      }
 
-        if (error.name === 'AbortError') {
-          validationErrors.push('Failed to fetch metadata from URL: Request timed out after 5 seconds')
-          cloudlog({
-            requestId,
-            message: '[SSO Test] Metadata fetch timed out',
-            url: config.metadata_url,
-            timeout: '5s',
+      if (validationErrors.length === 0) {
+        cloudlog({
+          requestId,
+          message: '[SSO Test] Fetching metadata from URL',
+          url: metadataUrl,
+        })
+
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 5000) // 5 second timeout
+
+        try {
+          const metadataResponse = await fetch(metadataUrl, {
+            headers: {
+              Accept: 'application/xml, text/xml',
+            },
+            signal: controller.signal,
           })
+
+          clearTimeout(timeoutId)
+
+          if (!metadataResponse.ok) {
+            validationErrors.push(`Failed to fetch metadata: HTTP ${metadataResponse.status}`)
+          }
+          else {
+            // SECURITY: Limit response size to prevent memory blowup (5MB max)
+            const contentLength = metadataResponse.headers.get('content-length')
+            if (contentLength && Number.parseInt(contentLength) > 5 * 1024 * 1024) {
+              validationErrors.push('Metadata file too large (max 5MB)')
+              cloudlog({
+                requestId,
+                message: '[SSO Test] Metadata file too large',
+                size: contentLength,
+              })
+            }
+            else {
+              metadataXml = await metadataResponse.text()
+
+              // Double-check size after download
+              if (metadataXml.length > 5 * 1024 * 1024) {
+                validationErrors.push('Metadata file too large (max 5MB)')
+                metadataXml = ''
+              }
+              else {
+                cloudlog({
+                  requestId,
+                  message: '[SSO Test] Metadata fetched successfully',
+                  size: metadataXml.length,
+                })
+              }
+            }
+          }
         }
-        else {
-          validationErrors.push(`Failed to fetch metadata from URL: ${error.message}`)
-          cloudlog({
-            requestId,
-            message: '[SSO Test] Failed to fetch metadata',
-            error: error.message,
-          })
+        catch (error: any) {
+          clearTimeout(timeoutId)
+
+          if (error.name === 'AbortError') {
+            validationErrors.push('Failed to fetch metadata from URL: Request timed out after 5 seconds')
+            cloudlog({
+              requestId,
+              message: '[SSO Test] Metadata fetch timed out',
+              url: metadataUrl,
+              timeout: '5s',
+            })
+          }
+          else {
+            validationErrors.push(`Failed to fetch metadata from URL: ${error.message}`)
+            cloudlog({
+              requestId,
+              message: '[SSO Test] Failed to fetch metadata',
+              error: error.message,
+            })
+          }
         }
       }
     }
 
     // If entity_id is placeholder and we have metadata, extract and update it
-    if (metadataXml && config.entity_id === 'https://example.com/saml/entity') {
+    // ONLY if applyFixes is true (opt-in state changes)
+    if (applyFixes && metadataXml && config.entity_id === 'https://example.com/saml/entity') {
       const entityIdMatch = metadataXml.match(/entityID=["']([^"']+)["']/)
       if (entityIdMatch && entityIdMatch[1]) {
         const actualEntityId = entityIdMatch[1]
@@ -413,11 +502,11 @@ app.post('/', middlewareV2(['read', 'write', 'all']), async (c) => {
       }
     }
 
-    // Ensure SSO is enabled (default behavior)
-    if (!config.enabled) {
+    // Ensure SSO is enabled ONLY if applyFixes is true (opt-in state changes)
+    if (applyFixes && !config.enabled) {
       cloudlog({
         requestId,
-        message: '[SSO Test] Enabling SSO (should be enabled by default)',
+        message: '[SSO Test] Enabling SSO (applyFixes=true)',
       })
 
       await drizzleClient
@@ -426,6 +515,9 @@ app.post('/', middlewareV2(['read', 'write', 'all']), async (c) => {
         .where(eq(org_saml_connections.id, config.id))
 
       config.enabled = true
+    }
+    else if (!applyFixes && !config.enabled) {
+      validationWarnings.push('SSO is currently disabled. Set applyFixes=true to enable it during testing.')
     }
 
     // Validate the SAML metadata if we have it
@@ -459,16 +551,24 @@ app.post('/', middlewareV2(['read', 'write', 'all']), async (c) => {
       warnings: metadataValidation.warnings,
     })
 
-    // Mark as verified when test passes
-    await drizzleClient
-      .update(org_saml_connections)
-      .set({ verified: true })
-      .where(eq(org_saml_connections.id, config.id))
+    // Mark as verified when test passes ONLY if applyFixes is true (opt-in state changes)
+    if (applyFixes) {
+      await drizzleClient
+        .update(org_saml_connections)
+        .set({ verified: true })
+        .where(eq(org_saml_connections.id, config.id))
 
-    cloudlog({
-      requestId,
-      message: '[SSO Test] Marked connection as verified',
-    })
+      cloudlog({
+        requestId,
+        message: '[SSO Test] Marked connection as verified (applyFixes=true)',
+      })
+    }
+    else {
+      cloudlog({
+        requestId,
+        message: '[SSO Test] Validation passed but not marking as verified (applyFixes=false)',
+      })
+    }
 
     // Combine all warnings
     const allWarnings = [...validationWarnings, ...metadataValidation.warnings]
