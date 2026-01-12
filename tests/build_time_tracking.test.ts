@@ -1,27 +1,30 @@
 import { randomUUID } from 'node:crypto'
-import { afterAll, beforeEach, describe, expect, it } from 'vitest'
-import { BASE_URL, fetchWithRetry, getSupabaseClient, ORG_ID, PRODUCT_ID, resetAndSeedAppDataStats, resetAppData, resetAppDataStats, STRIPE_INFO_CUSTOMER_ID, TEST_EMAIL, USER_ID } from './test-utils.ts'
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { BASE_URL, fetchWithRetry, getSupabaseClient, PRODUCT_ID, resetAndSeedAppDataStats, resetAppData, resetAppDataStats, TEST_EMAIL, USER_ID } from './test-utils.ts'
 
-const id = randomUUID()
-const APPNAME = `com.cp.${id}`
+// Generate unique IDs per test run to avoid conflicts with parallel test runs
+const testRunId = randomUUID()
+const ORG_ID = testRunId // Use UUID directly as org_id
+const STRIPE_CUSTOMER_ID = `cus_build_time_${testRunId.slice(0, 8)}`
+const APPNAME = `com.build_time.${testRunId.slice(0, 8)}`
 const headers = {
   'Content-Type': 'application/json',
   'apisecret': 'testsecret',
 }
 
-beforeEach(async () => {
-  await resetAndSeedAppDataStats(APPNAME)
+beforeAll(async () => {
   const supabase = getSupabaseClient()
 
-  const { error } = await supabase
+  // Create dedicated stripe_info for build time tests
+  const { error: stripeError } = await supabase
     .from('stripe_info')
     .upsert([
       {
-        subscription_id: 'sub_2',
-        customer_id: STRIPE_INFO_CUSTOMER_ID,
+        subscription_id: 'sub_build_time_test',
+        customer_id: STRIPE_CUSTOMER_ID,
         status: 'succeeded' as const,
         product_id: PRODUCT_ID,
-        trial_at: new Date(0).toISOString(),
+        trial_at: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
         is_good_plan: true,
         plan_usage: 2,
         subscription_anchor_start: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
@@ -32,14 +35,15 @@ beforeEach(async () => {
         build_time_exceeded: false,
       },
     ], { onConflict: 'customer_id' })
-  if (error)
-    throw error
+  if (stripeError)
+    throw stripeError
 
+  // Create dedicated org for build time tests
   const { error: orgError } = await supabase.from('orgs').upsert([
     {
       id: ORG_ID,
-      customer_id: STRIPE_INFO_CUSTOMER_ID,
-      name: 'Test Org Build Time',
+      customer_id: STRIPE_CUSTOMER_ID,
+      name: 'Build Time Test Org',
       created_by: USER_ID,
       management_email: TEST_EMAIL,
     },
@@ -47,6 +51,54 @@ beforeEach(async () => {
   if (orgError)
     throw orgError
 
+  // Ensure user is member of org (check first, then insert)
+  const { data: existingOrgUser } = await supabase
+    .from('org_users')
+    .select('id')
+    .eq('org_id', ORG_ID)
+    .eq('user_id', USER_ID)
+    .maybeSingle()
+
+  if (!existingOrgUser) {
+    const { error: orgUserError } = await supabase.from('org_users').insert([
+      {
+        org_id: ORG_ID,
+        user_id: USER_ID,
+        user_right: 'super_admin',
+      },
+    ])
+    if (orgUserError)
+      throw orgUserError
+  }
+})
+
+beforeEach(async () => {
+  await resetAndSeedAppDataStats(APPNAME)
+  const supabase = getSupabaseClient()
+
+  // Reset stripe_info to clean state before each test
+  const { error } = await supabase
+    .from('stripe_info')
+    .update({
+      status: 'succeeded' as const,
+      product_id: PRODUCT_ID,
+      trial_at: new Date(0).toISOString(),
+      is_good_plan: true,
+      plan_usage: 2,
+      subscription_metered: {},
+      subscription_anchor_start: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
+      subscription_anchor_end: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
+      mau_exceeded: false,
+      storage_exceeded: false,
+      bandwidth_exceeded: false,
+      build_time_exceeded: false,
+      plan_calculated_at: null,
+    })
+    .eq('customer_id', STRIPE_CUSTOMER_ID)
+  if (error)
+    throw error
+
+  // Create app for this test
   const { error: appError } = await supabase.from('apps').upsert([
     {
       owner_org: ORG_ID,
@@ -58,40 +110,39 @@ beforeEach(async () => {
   if (appError)
     throw appError
 
-  // Reset build_logs for this org
-  const { error: buildTimeError } = await supabase
-    .from('build_logs')
-    .delete()
-    .eq('org_id', ORG_ID)
-  expect(buildTimeError).toBeFalsy()
+  // Create an app_version to make the org "onboarded"
+  // (is_onboarded_org requires both an app AND an app_version)
+  const { error: versionError } = await supabase.from('app_versions').upsert([
+    {
+      app_id: APPNAME,
+      name: '1.0.0',
+      owner_org: ORG_ID,
+      user_id: USER_ID,
+      storage_provider: 'r2-direct',
+    },
+  ], { onConflict: 'app_id,name' })
+  if (versionError)
+    throw versionError
 
-  // Clear app metrics cache
-  const { error: appMetricsCacheError } = await supabase
-    .from('app_metrics_cache')
-    .delete()
-    .eq('org_id', ORG_ID)
-  expect(appMetricsCacheError).toBeFalsy()
+  // Reset build_logs for this org
+  await supabase.from('build_logs').delete().eq('org_id', ORG_ID)
+
+  // Clear app metrics cache for this org
+  await supabase.from('app_metrics_cache').delete().eq('org_id', ORG_ID)
+
+  // Clear daily_build_time for all apps in this org
+  const { data: orgApps } = await supabase.from('apps').select('app_id').eq('owner_org', ORG_ID)
+  if (orgApps) {
+    for (const app of orgApps) {
+      await supabase.from('daily_build_time').delete().eq('app_id', app.app_id)
+    }
+  }
 
   // Clear all credit-related data for this org
-  await supabase
-    .from('usage_credit_consumptions')
-    .delete()
-    .eq('org_id', ORG_ID)
-
-  await supabase
-    .from('usage_overage_events')
-    .delete()
-    .eq('org_id', ORG_ID)
-
-  await supabase
-    .from('usage_credit_transactions')
-    .delete()
-    .eq('org_id', ORG_ID)
-
-  await supabase
-    .from('usage_credit_grants')
-    .delete()
-    .eq('org_id', ORG_ID)
+  await supabase.from('usage_credit_consumptions').delete().eq('org_id', ORG_ID)
+  await supabase.from('usage_overage_events').delete().eq('org_id', ORG_ID)
+  await supabase.from('usage_credit_transactions').delete().eq('org_id', ORG_ID)
+  await supabase.from('usage_credit_grants').delete().eq('org_id', ORG_ID)
 })
 
 afterAll(async () => {
@@ -99,25 +150,19 @@ afterAll(async () => {
   await resetAppDataStats(APPNAME)
   const supabase = getSupabaseClient()
 
-  // Clean up build logs
-  await supabase
-    .from('build_logs')
-    .delete()
-    .eq('org_id', ORG_ID)
+  // Clean up all data for dedicated org
+  await supabase.from('build_logs').delete().eq('org_id', ORG_ID)
+  await supabase.from('daily_build_time').delete().eq('app_id', APPNAME)
+  await supabase.from('app_versions').delete().eq('owner_org', ORG_ID)
+  await supabase.from('apps').delete().eq('owner_org', ORG_ID)
+  await supabase.from('org_users').delete().eq('org_id', ORG_ID)
+  await supabase.from('orgs').delete().eq('id', ORG_ID)
+  await supabase.from('stripe_info').delete().eq('customer_id', STRIPE_CUSTOMER_ID)
 })
 
 describe('build Time Tracking System', () => {
   it('should handle too big build time correctly', async () => {
     const supabase = getSupabaseClient()
-
-    // Get all apps owned by this org and clear their daily_build_time data
-    // This is necessary because get_total_metrics aggregates across all apps in the org
-    const { data: orgApps } = await supabase.from('apps').select('app_id').eq('owner_org', ORG_ID)
-    if (orgApps) {
-      for (const app of orgApps) {
-        await supabase.from('daily_build_time').delete().eq('app_id', app.app_id)
-      }
-    }
 
     // Insert high build time usage directly into daily_build_time
     // (get_total_metrics reads from daily_build_time, not build_logs)
@@ -136,7 +181,7 @@ describe('build Time Tracking System', () => {
     const { error } = await supabase
       .from('stripe_info')
       .update({ is_good_plan: true, trial_at: new Date(0).toISOString() })
-      .eq('customer_id', STRIPE_INFO_CUSTOMER_ID)
+      .eq('customer_id', STRIPE_CUSTOMER_ID)
     if (error)
       throw error
 
@@ -162,7 +207,7 @@ describe('build Time Tracking System', () => {
     const { data: stripeInfoData } = await supabase
       .from('stripe_info')
       .select('*')
-      .eq('customer_id', STRIPE_INFO_CUSTOMER_ID)
+      .eq('customer_id', STRIPE_CUSTOMER_ID)
       .single()
     console.log('Stripe info after cron:', stripeInfoData)
     expect(stripeInfoData?.is_good_plan).toBe(false)
@@ -197,7 +242,7 @@ describe('build Time Tracking System', () => {
     const { error: setExceededError } = await supabase
       .from('stripe_info')
       .update({ build_time_exceeded: true })
-      .eq('customer_id', STRIPE_INFO_CUSTOMER_ID)
+      .eq('customer_id', STRIPE_CUSTOMER_ID)
     expect(setExceededError).toBeFalsy()
 
     // Verify build time is exceeded
@@ -217,7 +262,7 @@ describe('build Time Tracking System', () => {
     const { error: resetFlagError } = await supabase
       .from('stripe_info')
       .update({ build_time_exceeded: false })
-      .eq('customer_id', STRIPE_INFO_CUSTOMER_ID)
+      .eq('customer_id', STRIPE_CUSTOMER_ID)
     expect(resetFlagError).toBeFalsy()
 
     // Verify build time is no longer exceeded

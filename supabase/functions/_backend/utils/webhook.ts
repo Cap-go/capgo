@@ -1,5 +1,4 @@
 import type { Context } from 'hono'
-import type { Json } from './supabase.types.ts'
 import { cloudlog, cloudlogErr, serializeError } from './logging.ts'
 import { closeClient, getPgClient } from './pg.ts'
 import { supabaseAdmin } from './supabase.ts'
@@ -14,8 +13,8 @@ export interface WebhookPayload {
     table: string
     operation: string
     record_id: string
-    old_record: Json | null
-    new_record: Json | null
+    old_record: any | null
+    new_record: any | null
     changed_fields: string[] | null
   }
 }
@@ -27,8 +26,8 @@ export interface AuditLogData {
   operation: string
   org_id: string
   record_id: string
-  old_record: Json | null
-  new_record: Json | null
+  old_record: any | null
+  new_record: any | null
   changed_fields: string[] | null
   user_id: string | null
   created_at: string
@@ -108,7 +107,7 @@ export async function createDeliveryRecord(
       org_id: orgId,
       audit_log_id: auditLogId,
       event_type: eventType,
-      request_payload: payload as unknown as Json,
+      request_payload: payload as any,
       status: 'pending',
     })
     .select()

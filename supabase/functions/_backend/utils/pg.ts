@@ -189,7 +189,7 @@ export function getPgClient(c: Context, readOnly = false) {
   const requestId = c.get('requestId')
   const appName = c.res.headers.get('X-Worker-Source') ?? 'unknown source'
   const dbName = c.res.headers.get('X-Database-Source') ?? 'unknown source'
-  cloudlog({ requestId, message: 'DB connection established', dbName, appName })
+  cloudlog({ requestId, message: 'SUPABASE_DB_URL', dbUrl, dbName, appName })
 
   const isPooler = dbName.startsWith('sb_pooler')
   const options = {
@@ -289,8 +289,6 @@ export function getAlias() {
 function getSchemaUpdatesAlias(includeMetadata = false) {
   const { versionAlias, channelDevicesAlias, channelAlias } = getAlias()
 
-  // Drizzle's dynamic select construction requires flexible typing for conditional field addition
-  // and proper type inference in downstream query results
   const versionSelect: any = {
     id: sql<number>`${versionAlias.id}`.as('vid'),
     name: sql<string>`${versionAlias.name}`.as('vname'),
@@ -810,12 +808,6 @@ export interface AdminDeploymentsTrend {
   deployments: number
 }
 
-// Raw row type from SQL query
-interface AdminDeploymentsTrendRow {
-  date: Date | string
-  deployments: number
-}
-
 export async function getAdminDeploymentsTrend(
   c: Context,
   start_date: string,
@@ -842,7 +834,7 @@ export async function getAdminDeploymentsTrend(
 
     const result = await drizzleClient.execute(query)
 
-    const data: AdminDeploymentsTrend[] = (result.rows as unknown as AdminDeploymentsTrendRow[]).map(row => ({
+    const data: AdminDeploymentsTrend[] = result.rows.map((row: any) => ({
       date: row.date instanceof Date ? row.date.toISOString().split('T')[0] : row.date,
       deployments: Number(row.deployments),
     }))

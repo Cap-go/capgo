@@ -1,5 +1,4 @@
-import type { AuthChangeEvent, Subscription } from '@supabase/supabase-js'
-import type { ComputedRef, Ref, WatchStopHandle } from 'vue'
+import type { ComputedRef, Ref } from 'vue'
 import type { ArrayElement, Concrete, Merge } from '~/services/types'
 import type { Database } from '~/types/supabase.types'
 import { defineStore } from 'pinia'
@@ -34,13 +33,8 @@ const main = useMainStore()
 export const useOrganizationStore = defineStore('organization', () => {
   const _organizations: Ref<Map<string, Organization>> = ref(new Map())
   const _organizationsByAppId: Ref<Map<string, Organization>> = ref(new Map())
-  const _initialLoadPromise = ref(Promise.withResolvers<boolean>())
+  const _initialLoadPromise = ref(Promise.withResolvers())
   const _initialized = ref(false)
-
-  // Store cleanup functions
-  let _unwatchCurrentOrganization: WatchStopHandle | null = null
-  let _unwatchOrganizations: WatchStopHandle | null = null
-  let _authSubscription: Subscription | null = null
 
   const organizations: ComputedRef<Organization[]> = computed(
     () => {
@@ -80,8 +74,7 @@ export const useOrganizationStore = defineStore('organization', () => {
 
   const STORAGE_KEY = 'capgo_current_org_id'
 
-  // Store watch cleanup function (called on sign-out if needed)
-  _unwatchCurrentOrganization = watch(currentOrganization, async (currentOrganizationRaw, oldOrganization) => {
+  watch(currentOrganization, async (currentOrganizationRaw, oldOrganization) => {
     if (!currentOrganizationRaw) {
       currentRole.value = null
       localStorage.removeItem(STORAGE_KEY)
@@ -129,8 +122,7 @@ export const useOrganizationStore = defineStore('organization', () => {
     }
   })
 
-  // Store watch cleanup function (called on sign-out if needed)
-  _unwatchOrganizations = watch(_organizations, async (organizationsMap) => {
+  watch(_organizations, async (organizationsMap) => {
     // Only run once - if we already have the app-to-org mapping, skip
     if (_organizationsByAppId.value.size > 0)
       return
@@ -243,27 +235,17 @@ export const useOrganizationStore = defineStore('organization', () => {
       return
 
     if (!_initialized.value) {
-      _initialized.value = true
-      // Clean up existing auth subscription if any
-      _authSubscription?.unsubscribe()
-      const listener = supabase.auth.onAuthStateChange((event: AuthChangeEvent) => {
+      const listener = supabase.auth.onAuthStateChange((event: any) => {
         if (event === 'SIGNED_OUT') {
-          // Clean up auth subscription
-          _authSubscription?.unsubscribe()
-          _authSubscription = null
-          // Clean up watchers to prevent callbacks on stale state
-          _unwatchCurrentOrganization?.()
-          _unwatchOrganizations?.()
-          // Reset state
+          listener.data.subscription.unsubscribe()
+          // Remove all from orgs
           _organizations.value = new Map()
           _organizationsByAppId.value = new Map()
-          _initialLoadPromise.value = Promise.withResolvers<boolean>()
+          _initialLoadPromise.value = Promise.withResolvers()
           currentOrganization.value = undefined
           currentRole.value = null
-          _initialized.value = false
         }
       })
-      _authSubscription = listener.data.subscription
     }
 
     // We have RLS that ensure that we only select rows where we are member or owner
