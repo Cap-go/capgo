@@ -30,7 +30,7 @@ app.post('/', middlewareAuth, async (c) => {
   const authToken = c.req.header('authorization')
 
   if (!authToken)
-    throw simpleError('not_authorize', 'Not authorize')
+    throw simpleError('not_authorized', 'Not authorized')
 
   const body = await parseBody<AdminStatsBody>(c)
   const parsedBodyResult = bodySchema.safeParse(body)

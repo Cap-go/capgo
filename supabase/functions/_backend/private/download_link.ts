@@ -30,7 +30,7 @@ app.post('/', middlewareAuth, async (c) => {
   // Get current user ID from JWT
   const { data: auth, error } = await supabase.auth.getUser()
   if (error || !auth?.user?.id)
-    throw simpleError('not_authorize', 'Not authorize')
+    throw simpleError('not_authorized', 'Not authorized')
 
   const userId = auth.user.id
 
