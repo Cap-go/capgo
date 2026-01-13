@@ -42,6 +42,29 @@ export const RBAC_TO_LEGACY_ROLE_MAPPING: Record<RbacRoleName, OrganizationRole[
   app_reader: ['read'],
 }
 
+// Reverse mapping for legacy -> RBAC (partial because invite_* roles have no RBAC equivalent)
+export const LEGACY_TO_RBAC_ROLE_MAPPING: Partial<Record<OrganizationRole, RbacRoleName[]>> = Object.entries(RBAC_TO_LEGACY_ROLE_MAPPING)
+  .reduce<Partial<Record<OrganizationRole, RbacRoleName[]>>>((acc, [rbacRole, legacyRoles]) => {
+    for (const legacyRole of legacyRoles) {
+      if (!acc[legacyRole])
+        acc[legacyRole] = []
+      acc[legacyRole]?.push(rbacRole as RbacRoleName)
+    }
+    return acc
+  }, {})
+
+// Display labels for RBAC roles (fallback when i18n is not available)
+export const RBAC_ORG_ROLE_DISPLAY_NAMES: Record<RbacRoleName, string> = {
+  org_super_admin: 'Super Admin',
+  org_admin: 'Admin',
+  org_billing_admin: 'Billing Manager',
+  org_member: 'Member',
+  app_admin: 'App Admin',
+  app_developer: 'App Developer',
+  app_uploader: 'App Uploader',
+  app_reader: 'App Reader',
+}
+
 // Hiérarchie des rôles RBAC (un rôle inclut tous ceux en dessous)
 export const RBAC_ROLE_HIERARCHY: Record<RbacRoleName, RbacRoleName[]> = {
   org_super_admin: ['org_super_admin', 'org_admin', 'org_member', 'app_admin', 'app_developer', 'app_uploader', 'app_reader'],
@@ -72,6 +95,13 @@ export const RBAC_ORG_ROLE_I18N_KEYS: Record<string, string> = {
  */
 export function getRbacRoleI18nKey(role: string): string | undefined {
   return RBAC_ORG_ROLE_I18N_KEYS[role]
+}
+
+/**
+ * Get a human-friendly display label for an RBAC role.
+ */
+export function getRbacRoleDisplayName(role: string): string {
+  return RBAC_ORG_ROLE_DISPLAY_NAMES[role as RbacRoleName] || role
 }
 
 interface RoleBinding {
