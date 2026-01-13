@@ -1,6 +1,520 @@
 -- supabase/migrations/20251222140030_rbac_system.sql
 -- This preserves the original behavior while making the rollout atomic for new environments.
 
+-- 0) RBAC literal constants (avoid repeated string literals across the migration)
+-- START RBAC CONSTANTS
+CREATE OR REPLACE FUNCTION public.rbac_scope_platform() RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'platform'::text $$;
+
+CREATE OR REPLACE FUNCTION public.rbac_scope_org() RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'org'::text $$;
+
+CREATE OR REPLACE FUNCTION public.rbac_scope_app() RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'app'::text $$;
+
+CREATE OR REPLACE FUNCTION public.rbac_scope_bundle() RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'bundle'::text $$;
+
+CREATE OR REPLACE FUNCTION public.rbac_scope_channel() RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'channel'::text $$;
+
+CREATE OR REPLACE FUNCTION public.rbac_principal_user() RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'user'::text $$;
+
+CREATE OR REPLACE FUNCTION public.rbac_principal_group() RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'group'::text $$;
+
+CREATE OR REPLACE FUNCTION public.rbac_principal_apikey() RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'apikey'::text $$;
+
+CREATE OR REPLACE FUNCTION public.rbac_right_super_admin() RETURNS public.user_min_right
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'super_admin'::public.user_min_right $$;
+
+CREATE OR REPLACE FUNCTION public.rbac_right_admin() RETURNS public.user_min_right
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'admin'::public.user_min_right $$;
+
+CREATE OR REPLACE FUNCTION public.rbac_right_write() RETURNS public.user_min_right
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'write'::public.user_min_right $$;
+
+CREATE OR REPLACE FUNCTION public.rbac_right_upload() RETURNS public.user_min_right
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'upload'::public.user_min_right $$;
+
+CREATE OR REPLACE FUNCTION public.rbac_right_read() RETURNS public.user_min_right
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'read'::public.user_min_right $$;
+
+CREATE OR REPLACE FUNCTION public.rbac_right_invite_super_admin() RETURNS public.user_min_right
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'invite_super_admin'::public.user_min_right $$;
+
+CREATE OR REPLACE FUNCTION public.rbac_right_invite_admin() RETURNS public.user_min_right
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'invite_admin'::public.user_min_right $$;
+
+CREATE OR REPLACE FUNCTION public.rbac_right_invite_write() RETURNS public.user_min_right
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'invite_write'::public.user_min_right $$;
+
+CREATE OR REPLACE FUNCTION public.rbac_right_invite_upload() RETURNS public.user_min_right
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'invite_upload'::public.user_min_right $$;
+
+CREATE OR REPLACE FUNCTION public.rbac_role_platform_super_admin() RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'platform_super_admin'::text $$;
+
+CREATE OR REPLACE FUNCTION public.rbac_role_org_super_admin() RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'org_super_admin'::text $$;
+
+CREATE OR REPLACE FUNCTION public.rbac_role_org_admin() RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'org_admin'::text $$;
+
+CREATE OR REPLACE FUNCTION public.rbac_role_org_billing_admin() RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'org_billing_admin'::text $$;
+
+CREATE OR REPLACE FUNCTION public.rbac_role_org_member() RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'org_member'::text $$;
+
+CREATE OR REPLACE FUNCTION public.rbac_role_app_admin() RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'app_admin'::text $$;
+
+CREATE OR REPLACE FUNCTION public.rbac_role_app_developer() RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'app_developer'::text $$;
+
+CREATE OR REPLACE FUNCTION public.rbac_role_app_uploader() RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'app_uploader'::text $$;
+
+CREATE OR REPLACE FUNCTION public.rbac_role_app_reader() RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'app_reader'::text $$;
+
+CREATE OR REPLACE FUNCTION public.rbac_role_bundle_admin() RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'bundle_admin'::text $$;
+
+CREATE OR REPLACE FUNCTION public.rbac_role_bundle_reader() RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'bundle_reader'::text $$;
+
+CREATE OR REPLACE FUNCTION public.rbac_role_channel_admin() RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'channel_admin'::text $$;
+
+CREATE OR REPLACE FUNCTION public.rbac_role_channel_reader() RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'channel_reader'::text $$;
+
+CREATE OR REPLACE FUNCTION public.rbac_perm_org_read() RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'org.read'::text $$;
+
+CREATE OR REPLACE FUNCTION public.rbac_perm_org_update_settings() RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'org.update_settings'::text $$;
+
+CREATE OR REPLACE FUNCTION public.rbac_perm_org_read_members() RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'org.read_members'::text $$;
+
+CREATE OR REPLACE FUNCTION public.rbac_perm_org_invite_user() RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'org.invite_user'::text $$;
+
+CREATE OR REPLACE FUNCTION public.rbac_perm_org_update_user_roles() RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'org.update_user_roles'::text $$;
+
+CREATE OR REPLACE FUNCTION public.rbac_perm_org_read_billing() RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'org.read_billing'::text $$;
+
+CREATE OR REPLACE FUNCTION public.rbac_perm_org_update_billing() RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'org.update_billing'::text $$;
+
+CREATE OR REPLACE FUNCTION public.rbac_perm_org_read_invoices() RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'org.read_invoices'::text $$;
+
+CREATE OR REPLACE FUNCTION public.rbac_perm_org_read_audit() RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'org.read_audit'::text $$;
+
+CREATE OR REPLACE FUNCTION public.rbac_perm_org_read_billing_audit() RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'org.read_billing_audit'::text $$;
+
+CREATE OR REPLACE FUNCTION public.rbac_perm_app_read() RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'app.read'::text $$;
+
+CREATE OR REPLACE FUNCTION public.rbac_perm_app_update_settings() RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'app.update_settings'::text $$;
+
+CREATE OR REPLACE FUNCTION public.rbac_perm_app_delete() RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'app.delete'::text $$;
+
+CREATE OR REPLACE FUNCTION public.rbac_perm_app_read_bundles() RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'app.read_bundles'::text $$;
+
+CREATE OR REPLACE FUNCTION public.rbac_perm_app_upload_bundle() RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'app.upload_bundle'::text $$;
+
+CREATE OR REPLACE FUNCTION public.rbac_perm_app_create_channel() RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'app.create_channel'::text $$;
+
+CREATE OR REPLACE FUNCTION public.rbac_perm_app_read_channels() RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'app.read_channels'::text $$;
+
+CREATE OR REPLACE FUNCTION public.rbac_perm_app_read_logs() RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'app.read_logs'::text $$;
+
+CREATE OR REPLACE FUNCTION public.rbac_perm_app_manage_devices() RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'app.manage_devices'::text $$;
+
+CREATE OR REPLACE FUNCTION public.rbac_perm_app_read_devices() RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'app.read_devices'::text $$;
+
+CREATE OR REPLACE FUNCTION public.rbac_perm_app_build_native() RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'app.build_native'::text $$;
+
+CREATE OR REPLACE FUNCTION public.rbac_perm_app_read_audit() RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'app.read_audit'::text $$;
+
+CREATE OR REPLACE FUNCTION public.rbac_perm_app_update_user_roles() RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'app.update_user_roles'::text $$;
+
+CREATE OR REPLACE FUNCTION public.rbac_perm_bundle_delete() RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'bundle.delete'::text $$;
+
+CREATE OR REPLACE FUNCTION public.rbac_perm_bundle_read() RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'bundle.read'::text $$;
+
+CREATE OR REPLACE FUNCTION public.rbac_perm_bundle_update() RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'bundle.update'::text $$;
+
+CREATE OR REPLACE FUNCTION public.rbac_perm_channel_read() RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'channel.read'::text $$;
+
+CREATE OR REPLACE FUNCTION public.rbac_perm_channel_update_settings() RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'channel.update_settings'::text $$;
+
+CREATE OR REPLACE FUNCTION public.rbac_perm_channel_delete() RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'channel.delete'::text $$;
+
+CREATE OR REPLACE FUNCTION public.rbac_perm_channel_read_history() RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'channel.read_history'::text $$;
+
+CREATE OR REPLACE FUNCTION public.rbac_perm_channel_promote_bundle() RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'channel.promote_bundle'::text $$;
+
+CREATE OR REPLACE FUNCTION public.rbac_perm_channel_rollback_bundle() RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'channel.rollback_bundle'::text $$;
+
+CREATE OR REPLACE FUNCTION public.rbac_perm_channel_manage_forced_devices() RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'channel.manage_forced_devices'::text $$;
+
+CREATE OR REPLACE FUNCTION public.rbac_perm_channel_read_forced_devices() RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'channel.read_forced_devices'::text $$;
+
+CREATE OR REPLACE FUNCTION public.rbac_perm_channel_read_audit() RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'channel.read_audit'::text $$;
+
+CREATE OR REPLACE FUNCTION public.rbac_perm_platform_impersonate_user() RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'platform.impersonate_user'::text $$;
+
+CREATE OR REPLACE FUNCTION public.rbac_perm_platform_manage_orgs_any() RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'platform.manage_orgs_any'::text $$;
+
+CREATE OR REPLACE FUNCTION public.rbac_perm_platform_manage_apps_any() RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'platform.manage_apps_any'::text $$;
+
+CREATE OR REPLACE FUNCTION public.rbac_perm_platform_manage_channels_any() RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'platform.manage_channels_any'::text $$;
+
+CREATE OR REPLACE FUNCTION public.rbac_perm_platform_run_maintenance_jobs() RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'platform.run_maintenance_jobs'::text $$;
+
+CREATE OR REPLACE FUNCTION public.rbac_perm_platform_delete_orphan_users() RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'platform.delete_orphan_users'::text $$;
+
+CREATE OR REPLACE FUNCTION public.rbac_perm_platform_read_all_audit() RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'platform.read_all_audit'::text $$;
+
+CREATE OR REPLACE FUNCTION public.rbac_perm_platform_db_break_glass() RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'platform.db_break_glass'::text $$;
+-- END RBAC CONSTANTS
+
 -- 1) Feature flag and supporting identifiers
 ALTER TABLE public.orgs
 ADD COLUMN IF NOT EXISTS use_new_rbac boolean NOT NULL DEFAULT false;
@@ -79,7 +593,7 @@ COMMENT ON COLUMN public.apps.id IS 'UUID scope id for RBAC (app-level roles ref
 CREATE TABLE IF NOT EXISTS public.roles (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   name text UNIQUE NOT NULL,
-  scope_type text NOT NULL CHECK (scope_type IN ('platform', 'org', 'app', 'bundle', 'channel')),
+  scope_type text NOT NULL CHECK (scope_type IN (public.rbac_scope_platform(), public.rbac_scope_org(), public.rbac_scope_app(), public.rbac_scope_bundle(), public.rbac_scope_channel())),
   description text,
   priority_rank int NOT NULL DEFAULT 0,
   is_assignable boolean NOT NULL DEFAULT true,
@@ -91,7 +605,7 @@ COMMENT ON TABLE public.roles IS 'Canonical RBAC roles. Scope_type indicates the
 CREATE TABLE IF NOT EXISTS public.permissions (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   key text UNIQUE NOT NULL,
-  scope_type text NOT NULL CHECK (scope_type IN ('platform', 'org', 'app', 'channel')),
+  scope_type text NOT NULL CHECK (scope_type IN (public.rbac_scope_platform(), public.rbac_scope_org(), public.rbac_scope_app(), public.rbac_scope_channel())),
   description text,
   created_at timestamptz NOT NULL DEFAULT now()
 );
@@ -135,10 +649,10 @@ COMMENT ON TABLE public.group_members IS 'Membership join table linking users to
 
 CREATE TABLE IF NOT EXISTS public.role_bindings (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  principal_type text NOT NULL CHECK (principal_type IN ('user', 'group', 'apikey')),
+  principal_type text NOT NULL CHECK (principal_type IN (public.rbac_principal_user(), public.rbac_principal_group(), public.rbac_principal_apikey())),
   principal_id uuid NOT NULL,
   role_id uuid NOT NULL REFERENCES public.roles(id) ON DELETE CASCADE,
-  scope_type text NOT NULL CHECK (scope_type IN ('platform', 'org', 'app', 'bundle', 'channel')),
+  scope_type text NOT NULL CHECK (scope_type IN (public.rbac_scope_platform(), public.rbac_scope_org(), public.rbac_scope_app(), public.rbac_scope_bundle(), public.rbac_scope_channel())),
   org_id uuid NULL REFERENCES public.orgs(id) ON DELETE CASCADE,
   app_id uuid NULL REFERENCES public.apps(id) ON DELETE CASCADE,
   bundle_id bigint NULL REFERENCES public.app_versions(id) ON DELETE CASCADE,
@@ -149,11 +663,11 @@ CREATE TABLE IF NOT EXISTS public.role_bindings (
   reason text NULL,
   is_direct boolean NOT NULL DEFAULT true,
   CHECK (
-    (scope_type = 'platform' AND org_id IS NULL AND app_id IS NULL AND bundle_id IS NULL AND channel_id IS NULL) OR
-    (scope_type = 'org' AND org_id IS NOT NULL AND app_id IS NULL AND bundle_id IS NULL AND channel_id IS NULL) OR
-    (scope_type = 'app' AND org_id IS NOT NULL AND app_id IS NOT NULL AND bundle_id IS NULL AND channel_id IS NULL) OR
-    (scope_type = 'bundle' AND org_id IS NOT NULL AND app_id IS NOT NULL AND bundle_id IS NOT NULL AND channel_id IS NULL) OR
-    (scope_type = 'channel' AND org_id IS NOT NULL AND app_id IS NOT NULL AND bundle_id IS NULL AND channel_id IS NOT NULL)
+    (scope_type = public.rbac_scope_platform() AND org_id IS NULL AND app_id IS NULL AND bundle_id IS NULL AND channel_id IS NULL) OR
+    (scope_type = public.rbac_scope_org() AND org_id IS NOT NULL AND app_id IS NULL AND bundle_id IS NULL AND channel_id IS NULL) OR
+    (scope_type = public.rbac_scope_app() AND org_id IS NOT NULL AND app_id IS NOT NULL AND bundle_id IS NULL AND channel_id IS NULL) OR
+    (scope_type = public.rbac_scope_bundle() AND org_id IS NOT NULL AND app_id IS NOT NULL AND bundle_id IS NOT NULL AND channel_id IS NULL) OR
+    (scope_type = public.rbac_scope_channel() AND org_id IS NOT NULL AND app_id IS NOT NULL AND bundle_id IS NULL AND channel_id IS NOT NULL)
   )
 );
 COMMENT ON TABLE public.role_bindings IS 'Assign roles to principals at a scope. SSD: only one role per scope_type per scope/principal.';
@@ -161,19 +675,19 @@ COMMENT ON TABLE public.role_bindings IS 'Assign roles to principals at a scope.
 -- SSD: only one role per scope_type per scope/principal.
 CREATE UNIQUE INDEX IF NOT EXISTS role_bindings_platform_scope_uniq
   ON public.role_bindings (principal_type, principal_id, scope_type)
-  WHERE scope_type = 'platform';
+  WHERE scope_type = public.rbac_scope_platform();
 CREATE UNIQUE INDEX IF NOT EXISTS role_bindings_org_scope_uniq
   ON public.role_bindings (principal_type, principal_id, org_id, scope_type)
-  WHERE scope_type = 'org';
+  WHERE scope_type = public.rbac_scope_org();
 CREATE UNIQUE INDEX IF NOT EXISTS role_bindings_app_scope_uniq
   ON public.role_bindings (principal_type, principal_id, app_id, scope_type)
-  WHERE scope_type = 'app';
+  WHERE scope_type = public.rbac_scope_app();
 CREATE UNIQUE INDEX IF NOT EXISTS role_bindings_bundle_scope_uniq
   ON public.role_bindings (principal_type, principal_id, bundle_id, scope_type)
-  WHERE scope_type = 'bundle';
+  WHERE scope_type = public.rbac_scope_bundle();
 CREATE UNIQUE INDEX IF NOT EXISTS role_bindings_channel_scope_uniq
   ON public.role_bindings (principal_type, principal_id, channel_id, scope_type)
-  WHERE scope_type = 'channel';
+  WHERE scope_type = public.rbac_scope_channel();
 
 CREATE INDEX IF NOT EXISTS role_bindings_principal_scope_idx
   ON public.role_bindings (principal_type, principal_id, scope_type, org_id, app_id, channel_id);
@@ -186,69 +700,69 @@ CREATE INDEX IF NOT EXISTS role_bindings_scope_idx
 INSERT INTO public.permissions (key, scope_type, description)
 VALUES
   -- Org permissions
-  ('org.read', 'org', 'Read org level settings and metadata'),
-  ('org.update_settings', 'org', 'Update org configuration/settings'),
-  ('org.read_members', 'org', 'Read org membership list'),
-  ('org.invite_user', 'org', 'Invite or add members to org'),
-  ('org.update_user_roles', 'org', 'Change org/member roles'),
-  ('org.read_billing', 'org', 'Read org billing settings'),
-  ('org.update_billing', 'org', 'Update org billing settings'),
-  ('org.read_invoices', 'org', 'Read invoices'),
-  ('org.read_audit', 'org', 'Read org-level audit trail'),
-  ('org.read_billing_audit', 'org', 'Read billing/audit details'),
+  (public.rbac_perm_org_read(), public.rbac_scope_org(), 'Read org level settings and metadata'),
+  (public.rbac_perm_org_update_settings(), public.rbac_scope_org(), 'Update org configuration/settings'),
+  (public.rbac_perm_org_read_members(), public.rbac_scope_org(), 'Read org membership list'),
+  (public.rbac_perm_org_invite_user(), public.rbac_scope_org(), 'Invite or add members to org'),
+  (public.rbac_perm_org_update_user_roles(), public.rbac_scope_org(), 'Change org/member roles'),
+  (public.rbac_perm_org_read_billing(), public.rbac_scope_org(), 'Read org billing settings'),
+  (public.rbac_perm_org_update_billing(), public.rbac_scope_org(), 'Update org billing settings'),
+  (public.rbac_perm_org_read_invoices(), public.rbac_scope_org(), 'Read invoices'),
+  (public.rbac_perm_org_read_audit(), public.rbac_scope_org(), 'Read org-level audit trail'),
+  (public.rbac_perm_org_read_billing_audit(), public.rbac_scope_org(), 'Read billing/audit details'),
   -- App permissions
-  ('app.read', 'app', 'Read app metadata'),
-  ('app.update_settings', 'app', 'Update app settings'),
-  ('app.delete', 'app', 'Delete an app'),
-  ('app.read_bundles', 'app', 'Read app bundle metadata'),
-  ('app.upload_bundle', 'app', 'Upload a bundle'),
-  ('app.create_channel', 'app', 'Create channels'),
-  ('app.read_channels', 'app', 'List/read channels'),
-  ('app.read_logs', 'app', 'Read app logs/metrics'),
-  ('app.manage_devices', 'app', 'Manage devices at app scope'),
-  ('app.read_devices', 'app', 'Read devices at app scope'),
-  ('app.build_native', 'app', 'Trigger native builds'),
-  ('app.read_audit', 'app', 'Read app-level audit trail'),
-  ('app.update_user_roles', 'app', 'Update user roles for this app'),
+  (public.rbac_perm_app_read(), public.rbac_scope_app(), 'Read app metadata'),
+  (public.rbac_perm_app_update_settings(), public.rbac_scope_app(), 'Update app settings'),
+  (public.rbac_perm_app_delete(), public.rbac_scope_app(), 'Delete an app'),
+  (public.rbac_perm_app_read_bundles(), public.rbac_scope_app(), 'Read app bundle metadata'),
+  (public.rbac_perm_app_upload_bundle(), public.rbac_scope_app(), 'Upload a bundle'),
+  (public.rbac_perm_app_create_channel(), public.rbac_scope_app(), 'Create channels'),
+  (public.rbac_perm_app_read_channels(), public.rbac_scope_app(), 'List/read channels'),
+  (public.rbac_perm_app_read_logs(), public.rbac_scope_app(), 'Read app logs/metrics'),
+  (public.rbac_perm_app_manage_devices(), public.rbac_scope_app(), 'Manage devices at app scope'),
+  (public.rbac_perm_app_read_devices(), public.rbac_scope_app(), 'Read devices at app scope'),
+  (public.rbac_perm_app_build_native(), public.rbac_scope_app(), 'Trigger native builds'),
+  (public.rbac_perm_app_read_audit(), public.rbac_scope_app(), 'Read app-level audit trail'),
+  (public.rbac_perm_app_update_user_roles(), public.rbac_scope_app(), 'Update user roles for this app'),
   -- Bundle permissions
-  ('bundle.delete', 'app', 'Delete a bundle'),
+  (public.rbac_perm_bundle_delete(), public.rbac_scope_app(), 'Delete a bundle'),
   -- Channel permissions
-  ('channel.read', 'channel', 'Read channel metadata'),
-  ('channel.update_settings', 'channel', 'Update channel settings'),
-  ('channel.delete', 'channel', 'Delete a channel'),
-  ('channel.read_history', 'channel', 'Read deploy history'),
-  ('channel.promote_bundle', 'channel', 'Promote bundle to channel'),
-  ('channel.rollback_bundle', 'channel', 'Rollback bundle on channel'),
-  ('channel.manage_forced_devices', 'channel', 'Manage forced devices'),
-  ('channel.read_forced_devices', 'channel', 'Read forced devices'),
-  ('channel.read_audit', 'channel', 'Read channel-level audit'),
+  (public.rbac_perm_channel_read(), public.rbac_scope_channel(), 'Read channel metadata'),
+  (public.rbac_perm_channel_update_settings(), public.rbac_scope_channel(), 'Update channel settings'),
+  (public.rbac_perm_channel_delete(), public.rbac_scope_channel(), 'Delete a channel'),
+  (public.rbac_perm_channel_read_history(), public.rbac_scope_channel(), 'Read deploy history'),
+  (public.rbac_perm_channel_promote_bundle(), public.rbac_scope_channel(), 'Promote bundle to channel'),
+  (public.rbac_perm_channel_rollback_bundle(), public.rbac_scope_channel(), 'Rollback bundle on channel'),
+  (public.rbac_perm_channel_manage_forced_devices(), public.rbac_scope_channel(), 'Manage forced devices'),
+  (public.rbac_perm_channel_read_forced_devices(), public.rbac_scope_channel(), 'Read forced devices'),
+  (public.rbac_perm_channel_read_audit(), public.rbac_scope_channel(), 'Read channel-level audit'),
   -- Platform permissions
-  ('platform.impersonate_user', 'platform', 'Support/impersonation'),
-  ('platform.manage_orgs_any', 'platform', 'Administer any org'),
-  ('platform.manage_apps_any', 'platform', 'Administer any app'),
-  ('platform.manage_channels_any', 'platform', 'Administer any channel'),
-  ('platform.run_maintenance_jobs', 'platform', 'Run maintenance/ops jobs'),
-  ('platform.delete_orphan_users', 'platform', 'Delete orphan users'),
-  ('platform.read_all_audit', 'platform', 'Read all audit trails'),
-  ('platform.db_break_glass', 'platform', 'Emergency direct DB access')
+  (public.rbac_perm_platform_impersonate_user(), public.rbac_scope_platform(), 'Support/impersonation'),
+  (public.rbac_perm_platform_manage_orgs_any(), public.rbac_scope_platform(), 'Administer any org'),
+  (public.rbac_perm_platform_manage_apps_any(), public.rbac_scope_platform(), 'Administer any app'),
+  (public.rbac_perm_platform_manage_channels_any(), public.rbac_scope_platform(), 'Administer any channel'),
+  (public.rbac_perm_platform_run_maintenance_jobs(), public.rbac_scope_platform(), 'Run maintenance/ops jobs'),
+  (public.rbac_perm_platform_delete_orphan_users(), public.rbac_scope_platform(), 'Delete orphan users'),
+  (public.rbac_perm_platform_read_all_audit(), public.rbac_scope_platform(), 'Read all audit trails'),
+  (public.rbac_perm_platform_db_break_glass(), public.rbac_scope_platform(), 'Emergency direct DB access')
 ON CONFLICT (key) DO NOTHING;
 
 -- 4) Seed priority roles
 INSERT INTO public.roles (name, scope_type, description, priority_rank, is_assignable, created_by)
 VALUES
-  ('platform_super_admin', 'platform', 'Full platform control (not assignable to customers)', 100, false, NULL),
-  ('org_super_admin', 'org', 'Super admin for an org (same permissions as org_admin)', 95, true, NULL),
-  ('org_admin', 'org', 'Full org administration', 90, true, NULL),
-  ('org_billing_admin', 'org', 'Billing-only administrator for an org', 80, true, NULL),
-  ('org_member', 'org', 'Basic org member: read-only access to org and all apps', 75, true, NULL),
-  ('app_admin', 'app', 'Full administration of an app', 70, true, NULL),
-  ('app_developer', 'app', 'Developer access: upload bundles, manage devices, but no destructive operations', 68, true, NULL),
-  ('app_uploader', 'app', 'Upload-only access: read app data and upload bundles', 66, true, NULL),
-  ('app_reader', 'app', 'Read-only access to an app', 65, true, NULL),
-  ('bundle_admin', 'bundle', 'Full administration of a bundle', 62, true, NULL),
-  ('bundle_reader', 'bundle', 'Read-only access to a bundle', 61, true, NULL),
-  ('channel_admin', 'channel', 'Full administration of a channel', 60, true, NULL),
-  ('channel_reader', 'channel', 'Read-only access to a channel', 55, true, NULL)
+  (public.rbac_role_platform_super_admin(), public.rbac_scope_platform(), 'Full platform control (not assignable to customers)', 100, false, NULL),
+  (public.rbac_role_org_super_admin(), public.rbac_scope_org(), 'Super admin for an org (same permissions as org_admin)', 95, true, NULL),
+  (public.rbac_role_org_admin(), public.rbac_scope_org(), 'Full org administration', 90, true, NULL),
+  (public.rbac_role_org_billing_admin(), public.rbac_scope_org(), 'Billing-only administrator for an org', 80, true, NULL),
+  (public.rbac_role_org_member(), public.rbac_scope_org(), 'Basic org member: read-only access to org and all apps', 75, true, NULL),
+  (public.rbac_role_app_admin(), public.rbac_scope_app(), 'Full administration of an app', 70, true, NULL),
+  (public.rbac_role_app_developer(), public.rbac_scope_app(), 'Developer access: upload bundles, manage devices, but no destructive operations', 68, true, NULL),
+  (public.rbac_role_app_uploader(), public.rbac_scope_app(), 'Upload-only access: read app data and upload bundles', 66, true, NULL),
+  (public.rbac_role_app_reader(), public.rbac_scope_app(), 'Read-only access to an app', 65, true, NULL),
+  (public.rbac_role_bundle_admin(), public.rbac_scope_bundle(), 'Full administration of a bundle', 62, true, NULL),
+  (public.rbac_role_bundle_reader(), public.rbac_scope_bundle(), 'Read-only access to a bundle', 61, true, NULL),
+  (public.rbac_role_channel_admin(), public.rbac_scope_channel(), 'Full administration of a channel', 60, true, NULL),
+  (public.rbac_role_channel_reader(), public.rbac_scope_channel(), 'Read-only access to a channel', 55, true, NULL)
 ON CONFLICT (name) DO NOTHING;
 
 -- 5) Attach permissions to roles
@@ -257,7 +771,7 @@ INSERT INTO public.role_permissions (role_id, permission_id)
 SELECT r.id, p.id
 FROM public.roles r
 JOIN public.permissions p ON TRUE
-WHERE r.name = 'platform_super_admin'
+WHERE r.name = public.rbac_role_platform_super_admin()
 ON CONFLICT DO NOTHING;
 
 -- org_admin: org management, member/role management, and delegated app/channel control (no billing updates, no deletions)
@@ -265,17 +779,17 @@ INSERT INTO public.role_permissions (role_id, permission_id)
 SELECT r.id, p.id
 FROM public.roles r
 JOIN public.permissions p ON p.key IN (
-  'org.read', 'org.update_settings', 'org.read_members', 'org.invite_user', 'org.update_user_roles',
-  'org.read_billing', 'org.read_invoices', 'org.read_audit', 'org.read_billing_audit',
+  public.rbac_perm_org_read(), public.rbac_perm_org_update_settings(), public.rbac_perm_org_read_members(), public.rbac_perm_org_invite_user(), public.rbac_perm_org_update_user_roles(),
+  public.rbac_perm_org_read_billing(), public.rbac_perm_org_read_invoices(), public.rbac_perm_org_read_audit(), public.rbac_perm_org_read_billing_audit(),
   -- app/channel control granted at org scope (no deletions)
-  'app.read', 'app.update_settings', 'app.read_bundles', 'app.upload_bundle',
-  'app.create_channel', 'app.read_channels', 'app.read_logs', 'app.manage_devices',
-  'app.read_devices', 'app.build_native', 'app.read_audit', 'app.update_user_roles',
-  'channel.read', 'channel.update_settings', 'channel.read_history',
-  'channel.promote_bundle', 'channel.rollback_bundle', 'channel.manage_forced_devices',
-  'channel.read_forced_devices', 'channel.read_audit'
+  public.rbac_perm_app_read(), public.rbac_perm_app_update_settings(), public.rbac_perm_app_read_bundles(), public.rbac_perm_app_upload_bundle(),
+  public.rbac_perm_app_create_channel(), public.rbac_perm_app_read_channels(), public.rbac_perm_app_read_logs(), public.rbac_perm_app_manage_devices(),
+  public.rbac_perm_app_read_devices(), public.rbac_perm_app_build_native(), public.rbac_perm_app_read_audit(), public.rbac_perm_app_update_user_roles(),
+  public.rbac_perm_channel_read(), public.rbac_perm_channel_update_settings(), public.rbac_perm_channel_read_history(),
+  public.rbac_perm_channel_promote_bundle(), public.rbac_perm_channel_rollback_bundle(), public.rbac_perm_channel_manage_forced_devices(),
+  public.rbac_perm_channel_read_forced_devices(), public.rbac_perm_channel_read_audit()
 )
-WHERE r.name = 'org_admin'
+WHERE r.name = public.rbac_role_org_admin()
 ON CONFLICT DO NOTHING;
 
 -- org_super_admin: same permissions as org_admin plus app destructive operations and billing
@@ -283,18 +797,18 @@ INSERT INTO public.role_permissions (role_id, permission_id)
 SELECT r.id, p.id
 FROM public.roles r
 JOIN public.permissions p ON p.key IN (
-  'org.read', 'org.update_settings', 'org.read_members', 'org.invite_user', 'org.update_user_roles',
-  'org.read_billing', 'org.update_billing', 'org.read_invoices', 'org.read_audit', 'org.read_billing_audit',
+  public.rbac_perm_org_read(), public.rbac_perm_org_update_settings(), public.rbac_perm_org_read_members(), public.rbac_perm_org_invite_user(), public.rbac_perm_org_update_user_roles(),
+  public.rbac_perm_org_read_billing(), public.rbac_perm_org_update_billing(), public.rbac_perm_org_read_invoices(), public.rbac_perm_org_read_audit(), public.rbac_perm_org_read_billing_audit(),
   -- app/channel control granted at org scope (including deletions)
-  'app.read', 'app.update_settings', 'app.delete', 'app.read_bundles', 'app.upload_bundle',
-  'app.create_channel', 'app.read_channels', 'app.read_logs', 'app.manage_devices',
-  'app.read_devices', 'app.build_native', 'app.read_audit', 'app.update_user_roles',
-  'bundle.delete',
-  'channel.read', 'channel.update_settings', 'channel.delete', 'channel.read_history',
-  'channel.promote_bundle', 'channel.rollback_bundle', 'channel.manage_forced_devices',
-  'channel.read_forced_devices', 'channel.read_audit'
+  public.rbac_perm_app_read(), public.rbac_perm_app_update_settings(), public.rbac_perm_app_delete(), public.rbac_perm_app_read_bundles(), public.rbac_perm_app_upload_bundle(),
+  public.rbac_perm_app_create_channel(), public.rbac_perm_app_read_channels(), public.rbac_perm_app_read_logs(), public.rbac_perm_app_manage_devices(),
+  public.rbac_perm_app_read_devices(), public.rbac_perm_app_build_native(), public.rbac_perm_app_read_audit(), public.rbac_perm_app_update_user_roles(),
+  public.rbac_perm_bundle_delete(),
+  public.rbac_perm_channel_read(), public.rbac_perm_channel_update_settings(), public.rbac_perm_channel_delete(), public.rbac_perm_channel_read_history(),
+  public.rbac_perm_channel_promote_bundle(), public.rbac_perm_channel_rollback_bundle(), public.rbac_perm_channel_manage_forced_devices(),
+  public.rbac_perm_channel_read_forced_devices(), public.rbac_perm_channel_read_audit()
 )
-WHERE r.name = 'org_super_admin'
+WHERE r.name = public.rbac_role_org_super_admin()
 ON CONFLICT DO NOTHING;
 
 -- org_billing_admin: restricted to billing views/updates
@@ -302,9 +816,9 @@ INSERT INTO public.role_permissions (role_id, permission_id)
 SELECT r.id, p.id
 FROM public.roles r
 JOIN public.permissions p ON p.key IN (
-  'org.read', 'org.read_billing', 'org.update_billing', 'org.read_invoices', 'org.read_billing_audit'
+  public.rbac_perm_org_read(), public.rbac_perm_org_read_billing(), public.rbac_perm_org_update_billing(), public.rbac_perm_org_read_invoices(), public.rbac_perm_org_read_billing_audit()
 )
-WHERE r.name = 'org_billing_admin'
+WHERE r.name = public.rbac_role_org_billing_admin()
 ON CONFLICT DO NOTHING;
 
 -- org_member: basic member with read-only access to org and all apps (for self-service and visibility)
@@ -313,15 +827,15 @@ SELECT r.id, p.id
 FROM public.roles r
 JOIN public.permissions p ON p.key IN (
   -- Org permissions: read metadata and members (allows self-service removal)
-  'org.read', 'org.read_members',
+  public.rbac_perm_org_read(), public.rbac_perm_org_read_members(),
   -- App permissions: read-only access to all apps in org
-  'app.read', 'app.list_bundles', 'app.list_channels', 'app.read_logs', 'app.read_devices', 'app.read_audit',
+  public.rbac_perm_app_read(), 'app.list_bundles', 'app.list_channels', public.rbac_perm_app_read_logs(), public.rbac_perm_app_read_devices(), public.rbac_perm_app_read_audit(),
   -- Bundle permissions: read-only
-  'bundle.read',
+  public.rbac_perm_bundle_read(),
   -- Channel permissions: read-only
-  'channel.read', 'channel.read_history', 'channel.read_forced_devices', 'channel.read_audit'
+  public.rbac_perm_channel_read(), public.rbac_perm_channel_read_history(), public.rbac_perm_channel_read_forced_devices(), public.rbac_perm_channel_read_audit()
 )
-WHERE r.name = 'org_member'
+WHERE r.name = public.rbac_role_org_member()
 ON CONFLICT DO NOTHING;
 
 -- app_admin: full control of app + channels under that app
@@ -329,15 +843,15 @@ INSERT INTO public.role_permissions (role_id, permission_id)
 SELECT r.id, p.id
 FROM public.roles r
 JOIN public.permissions p ON p.key IN (
-  'app.read', 'app.update_settings', 'app.read_bundles', 'app.upload_bundle',
-  'app.create_channel', 'app.read_channels', 'app.read_logs', 'app.manage_devices',
-  'app.read_devices', 'app.build_native', 'app.read_audit', 'app.update_user_roles',
-  'bundle.delete',
-  'channel.read', 'channel.update_settings', 'channel.delete', 'channel.read_history',
-  'channel.promote_bundle', 'channel.rollback_bundle', 'channel.manage_forced_devices',
-  'channel.read_forced_devices', 'channel.read_audit'
+  public.rbac_perm_app_read(), public.rbac_perm_app_update_settings(), public.rbac_perm_app_read_bundles(), public.rbac_perm_app_upload_bundle(),
+  public.rbac_perm_app_create_channel(), public.rbac_perm_app_read_channels(), public.rbac_perm_app_read_logs(), public.rbac_perm_app_manage_devices(),
+  public.rbac_perm_app_read_devices(), public.rbac_perm_app_build_native(), public.rbac_perm_app_read_audit(), public.rbac_perm_app_update_user_roles(),
+  public.rbac_perm_bundle_delete(),
+  public.rbac_perm_channel_read(), public.rbac_perm_channel_update_settings(), public.rbac_perm_channel_delete(), public.rbac_perm_channel_read_history(),
+  public.rbac_perm_channel_promote_bundle(), public.rbac_perm_channel_rollback_bundle(), public.rbac_perm_channel_manage_forced_devices(),
+  public.rbac_perm_channel_read_forced_devices(), public.rbac_perm_channel_read_audit()
 )
-WHERE r.name = 'app_admin'
+WHERE r.name = public.rbac_role_app_admin()
 ON CONFLICT DO NOTHING;
 
 -- app_developer: can upload, manage devices, build, update channels but no deletion or creation
@@ -345,12 +859,12 @@ INSERT INTO public.role_permissions (role_id, permission_id)
 SELECT r.id, p.id
 FROM public.roles r
 JOIN public.permissions p ON p.key IN (
-  'app.read', 'app.read_bundles', 'app.upload_bundle', 'app.read_channels', 'app.read_logs',
-  'app.manage_devices', 'app.read_devices', 'app.build_native', 'app.read_audit',
-  'channel.read', 'channel.update_settings', 'channel.read_history', 'channel.promote_bundle',
-  'channel.rollback_bundle', 'channel.manage_forced_devices', 'channel.read_forced_devices', 'channel.read_audit'
+  public.rbac_perm_app_read(), public.rbac_perm_app_read_bundles(), public.rbac_perm_app_upload_bundle(), public.rbac_perm_app_read_channels(), public.rbac_perm_app_read_logs(),
+  public.rbac_perm_app_manage_devices(), public.rbac_perm_app_read_devices(), public.rbac_perm_app_build_native(), public.rbac_perm_app_read_audit(),
+  public.rbac_perm_channel_read(), public.rbac_perm_channel_update_settings(), public.rbac_perm_channel_read_history(), public.rbac_perm_channel_promote_bundle(),
+  public.rbac_perm_channel_rollback_bundle(), public.rbac_perm_channel_manage_forced_devices(), public.rbac_perm_channel_read_forced_devices(), public.rbac_perm_channel_read_audit()
 )
-WHERE r.name = 'app_developer'
+WHERE r.name = public.rbac_role_app_developer()
 ON CONFLICT DO NOTHING;
 
 -- app_uploader: read access + upload bundle only
@@ -358,9 +872,9 @@ INSERT INTO public.role_permissions (role_id, permission_id)
 SELECT r.id, p.id
 FROM public.roles r
 JOIN public.permissions p ON p.key IN (
-  'app.read', 'app.read_bundles', 'app.upload_bundle', 'app.read_channels', 'app.read_logs', 'app.read_devices', 'app.read_audit'
+  public.rbac_perm_app_read(), public.rbac_perm_app_read_bundles(), public.rbac_perm_app_upload_bundle(), public.rbac_perm_app_read_channels(), public.rbac_perm_app_read_logs(), public.rbac_perm_app_read_devices(), public.rbac_perm_app_read_audit()
 )
-WHERE r.name = 'app_uploader'
+WHERE r.name = public.rbac_role_app_uploader()
 ON CONFLICT DO NOTHING;
 
 -- channel_admin: full control of a channel
@@ -368,11 +882,11 @@ INSERT INTO public.role_permissions (role_id, permission_id)
 SELECT r.id, p.id
 FROM public.roles r
 JOIN public.permissions p ON p.key IN (
-  'channel.read', 'channel.update_settings', 'channel.delete', 'channel.read_history',
-  'channel.promote_bundle', 'channel.rollback_bundle', 'channel.manage_forced_devices',
-  'channel.read_forced_devices', 'channel.read_audit'
+  public.rbac_perm_channel_read(), public.rbac_perm_channel_update_settings(), public.rbac_perm_channel_delete(), public.rbac_perm_channel_read_history(),
+  public.rbac_perm_channel_promote_bundle(), public.rbac_perm_channel_rollback_bundle(), public.rbac_perm_channel_manage_forced_devices(),
+  public.rbac_perm_channel_read_forced_devices(), public.rbac_perm_channel_read_audit()
 )
-WHERE r.name = 'channel_admin'
+WHERE r.name = public.rbac_role_channel_admin()
 ON CONFLICT DO NOTHING;
 
 -- app_reader: read-only access to app
@@ -380,9 +894,9 @@ INSERT INTO public.role_permissions (role_id, permission_id)
 SELECT r.id, p.id
 FROM public.roles r
 JOIN public.permissions p ON p.key IN (
-  'app.read', 'app.read_bundles', 'app.read_channels', 'app.read_logs', 'app.read_devices', 'app.read_audit'
+  public.rbac_perm_app_read(), public.rbac_perm_app_read_bundles(), public.rbac_perm_app_read_channels(), public.rbac_perm_app_read_logs(), public.rbac_perm_app_read_devices(), public.rbac_perm_app_read_audit()
 )
-WHERE r.name = 'app_reader'
+WHERE r.name = public.rbac_role_app_reader()
 ON CONFLICT DO NOTHING;
 
 -- channel_reader: read-only access to channel
@@ -390,9 +904,9 @@ INSERT INTO public.role_permissions (role_id, permission_id)
 SELECT r.id, p.id
 FROM public.roles r
 JOIN public.permissions p ON p.key IN (
-  'channel.read', 'channel.read_history', 'channel.read_forced_devices', 'channel.read_audit'
+  public.rbac_perm_channel_read(), public.rbac_perm_channel_read_history(), public.rbac_perm_channel_read_forced_devices(), public.rbac_perm_channel_read_audit()
 )
-WHERE r.name = 'channel_reader'
+WHERE r.name = public.rbac_role_channel_reader()
 ON CONFLICT DO NOTHING;
 
 -- bundle_admin: full control of a bundle
@@ -400,9 +914,9 @@ INSERT INTO public.role_permissions (role_id, permission_id)
 SELECT r.id, p.id
 FROM public.roles r
 JOIN public.permissions p ON p.key IN (
-  'bundle.read', 'bundle.update', 'bundle.delete'
+  public.rbac_perm_bundle_read(), public.rbac_perm_bundle_update(), public.rbac_perm_bundle_delete()
 )
-WHERE r.name = 'bundle_admin'
+WHERE r.name = public.rbac_role_bundle_admin()
 ON CONFLICT DO NOTHING;
 
 -- bundle_reader: read-only access to bundle
@@ -410,9 +924,9 @@ INSERT INTO public.role_permissions (role_id, permission_id)
 SELECT r.id, p.id
 FROM public.roles r
 JOIN public.permissions p ON p.key IN (
-  'bundle.read'
+  public.rbac_perm_bundle_read()
 )
-WHERE r.name = 'bundle_reader'
+WHERE r.name = public.rbac_role_bundle_reader()
 ON CONFLICT DO NOTHING;
 
 -- 6) Role hierarchy (explicit inheritance)
@@ -420,58 +934,58 @@ ON CONFLICT DO NOTHING;
 INSERT INTO public.role_hierarchy (parent_role_id, child_role_id)
 SELECT parent.id, child.id
 FROM public.roles parent, public.roles child
-WHERE parent.name = 'org_super_admin' AND child.name = 'org_admin'
+WHERE parent.name = public.rbac_role_org_super_admin() AND child.name = public.rbac_role_org_admin()
 ON CONFLICT DO NOTHING;
 
 INSERT INTO public.role_hierarchy (parent_role_id, child_role_id)
 SELECT parent.id, child.id
 FROM public.roles parent, public.roles child
-WHERE parent.name = 'org_admin' AND child.name = 'app_admin'
+WHERE parent.name = public.rbac_role_org_admin() AND child.name = public.rbac_role_app_admin()
 ON CONFLICT DO NOTHING;
 
 -- App hierarchy
 INSERT INTO public.role_hierarchy (parent_role_id, child_role_id)
 SELECT parent.id, child.id
 FROM public.roles parent, public.roles child
-WHERE parent.name = 'app_admin' AND child.name = 'app_developer'
+WHERE parent.name = public.rbac_role_app_admin() AND child.name = public.rbac_role_app_developer()
 ON CONFLICT DO NOTHING;
 
 INSERT INTO public.role_hierarchy (parent_role_id, child_role_id)
 SELECT parent.id, child.id
 FROM public.roles parent, public.roles child
-WHERE parent.name = 'app_developer' AND child.name = 'app_uploader'
+WHERE parent.name = public.rbac_role_app_developer() AND child.name = public.rbac_role_app_uploader()
 ON CONFLICT DO NOTHING;
 
 INSERT INTO public.role_hierarchy (parent_role_id, child_role_id)
 SELECT parent.id, child.id
 FROM public.roles parent, public.roles child
-WHERE parent.name = 'app_uploader' AND child.name = 'app_reader'
+WHERE parent.name = public.rbac_role_app_uploader() AND child.name = public.rbac_role_app_reader()
 ON CONFLICT DO NOTHING;
 
 INSERT INTO public.role_hierarchy (parent_role_id, child_role_id)
 SELECT parent.id, child.id
 FROM public.roles parent, public.roles child
-WHERE parent.name = 'app_admin' AND child.name = 'bundle_admin'
+WHERE parent.name = public.rbac_role_app_admin() AND child.name = public.rbac_role_bundle_admin()
 ON CONFLICT DO NOTHING;
 
 INSERT INTO public.role_hierarchy (parent_role_id, child_role_id)
 SELECT parent.id, child.id
 FROM public.roles parent, public.roles child
-WHERE parent.name = 'app_admin' AND child.name = 'channel_admin'
+WHERE parent.name = public.rbac_role_app_admin() AND child.name = public.rbac_role_channel_admin()
 ON CONFLICT DO NOTHING;
 
 -- Bundle hierarchy
 INSERT INTO public.role_hierarchy (parent_role_id, child_role_id)
 SELECT parent.id, child.id
 FROM public.roles parent, public.roles child
-WHERE parent.name = 'bundle_admin' AND child.name = 'bundle_reader'
+WHERE parent.name = public.rbac_role_bundle_admin() AND child.name = public.rbac_role_bundle_reader()
 ON CONFLICT DO NOTHING;
 
 -- Channel hierarchy
 INSERT INTO public.role_hierarchy (parent_role_id, child_role_id)
 SELECT parent.id, child.id
 FROM public.roles parent, public.roles child
-WHERE parent.name = 'channel_admin' AND child.name = 'channel_reader'
+WHERE parent.name = public.rbac_role_channel_admin() AND child.name = public.rbac_role_channel_reader()
 ON CONFLICT DO NOTHING;
 
 -- 7) Helper: feature flag resolution
@@ -497,29 +1011,29 @@ LANGUAGE plpgsql
 SET search_path = ''
 IMMUTABLE AS $$
 BEGIN
-  IF p_scope = 'org' THEN
-    IF p_min_right IN ('super_admin', 'admin', 'invite_super_admin', 'invite_admin') THEN
-      RETURN 'org.update_user_roles';
-    ELSIF p_min_right IN ('write', 'upload', 'invite_write', 'invite_upload') THEN
-      RETURN 'org.update_settings';
+  IF p_scope = public.rbac_scope_org() THEN
+    IF p_min_right IN (public.rbac_right_super_admin(), public.rbac_right_admin(), public.rbac_right_invite_super_admin(), public.rbac_right_invite_admin()) THEN
+      RETURN public.rbac_perm_org_update_user_roles();
+    ELSIF p_min_right IN (public.rbac_right_write(), public.rbac_right_upload(), public.rbac_right_invite_write(), public.rbac_right_invite_upload()) THEN
+      RETURN public.rbac_perm_org_update_settings();
     ELSE
-      RETURN 'org.read';
+      RETURN public.rbac_perm_org_read();
     END IF;
-  ELSIF p_scope = 'app' THEN
-    IF p_min_right IN ('super_admin', 'admin', 'invite_super_admin', 'invite_admin', 'write', 'invite_write') THEN
-      RETURN 'app.update_settings';
-    ELSIF p_min_right IN ('upload', 'invite_upload') THEN
-      RETURN 'app.upload_bundle';
+  ELSIF p_scope = public.rbac_scope_app() THEN
+    IF p_min_right IN (public.rbac_right_super_admin(), public.rbac_right_admin(), public.rbac_right_invite_super_admin(), public.rbac_right_invite_admin(), public.rbac_right_write(), public.rbac_right_invite_write()) THEN
+      RETURN public.rbac_perm_app_update_settings();
+    ELSIF p_min_right IN (public.rbac_right_upload(), public.rbac_right_invite_upload()) THEN
+      RETURN public.rbac_perm_app_upload_bundle();
     ELSE
-      RETURN 'app.read';
+      RETURN public.rbac_perm_app_read();
     END IF;
-  ELSIF p_scope = 'channel' THEN
-    IF p_min_right IN ('super_admin', 'admin', 'invite_super_admin', 'invite_admin', 'write', 'invite_write') THEN
-      RETURN 'channel.update_settings';
-    ELSIF p_min_right IN ('upload', 'invite_upload') THEN
-      RETURN 'channel.promote_bundle';
+  ELSIF p_scope = public.rbac_scope_channel() THEN
+    IF p_min_right IN (public.rbac_right_super_admin(), public.rbac_right_admin(), public.rbac_right_invite_super_admin(), public.rbac_right_invite_admin(), public.rbac_right_write(), public.rbac_right_invite_write()) THEN
+      RETURN public.rbac_perm_channel_update_settings();
+    ELSIF p_min_right IN (public.rbac_right_upload(), public.rbac_right_invite_upload()) THEN
+      RETURN public.rbac_perm_channel_promote_bundle();
     ELSE
-      RETURN 'channel.read';
+      RETURN public.rbac_perm_channel_read();
     END IF;
   END IF;
 
@@ -577,23 +1091,23 @@ BEGIN
   END IF;
 
   WITH RECURSIVE scope_catalog AS (
-    SELECT 'platform'::text AS scope_type, NULL::uuid AS org_id, NULL::uuid AS app_id, NULL::uuid AS channel_id
+    SELECT public.rbac_scope_platform()::text AS scope_type, NULL::uuid AS org_id, NULL::uuid AS app_id, NULL::uuid AS channel_id
     UNION ALL
-    SELECT 'org', v_org_id, NULL::uuid, NULL::uuid WHERE v_org_id IS NOT NULL
+    SELECT public.rbac_scope_org(), v_org_id, NULL::uuid, NULL::uuid WHERE v_org_id IS NOT NULL
     UNION ALL
-    SELECT 'app', v_org_id, v_app_uuid, NULL::uuid WHERE v_app_uuid IS NOT NULL
+    SELECT public.rbac_scope_app(), v_org_id, v_app_uuid, NULL::uuid WHERE v_app_uuid IS NOT NULL
     UNION ALL
-    SELECT 'channel', v_org_id, v_app_uuid, v_channel_uuid WHERE v_channel_uuid IS NOT NULL
+    SELECT public.rbac_scope_channel(), v_org_id, v_app_uuid, v_channel_uuid WHERE v_channel_uuid IS NOT NULL
   ),
   direct_roles AS (
     SELECT rb.role_id
     FROM scope_catalog s
     JOIN public.role_bindings rb ON rb.scope_type = s.scope_type
       AND (
-        (rb.scope_type = 'platform') OR
-        (rb.scope_type = 'org' AND rb.org_id = s.org_id) OR
-        (rb.scope_type = 'app' AND rb.app_id = s.app_id) OR
-        (rb.scope_type = 'channel' AND rb.channel_id = s.channel_id)
+        (rb.scope_type = public.rbac_scope_platform()) OR
+        (rb.scope_type = public.rbac_scope_org() AND rb.org_id = s.org_id) OR
+        (rb.scope_type = public.rbac_scope_app() AND rb.app_id = s.app_id) OR
+        (rb.scope_type = public.rbac_scope_channel() AND rb.channel_id = s.channel_id)
       )
     WHERE rb.principal_type = p_principal_type
       AND rb.principal_id = p_principal_id
@@ -604,13 +1118,13 @@ BEGIN
     FROM scope_catalog s
     JOIN public.group_members gm ON gm.user_id = p_principal_id
     JOIN public.groups g ON g.id = gm.group_id
-    JOIN public.role_bindings rb ON rb.principal_type = 'group' AND rb.principal_id = gm.group_id
-    WHERE p_principal_type = 'user'
+    JOIN public.role_bindings rb ON rb.principal_type = public.rbac_principal_group() AND rb.principal_id = gm.group_id
+    WHERE p_principal_type = public.rbac_principal_user()
       AND rb.scope_type = s.scope_type
       AND (
-        (rb.scope_type = 'org' AND rb.org_id = s.org_id) OR
-        (rb.scope_type = 'app' AND rb.app_id = s.app_id) OR
-        (rb.scope_type = 'channel' AND rb.channel_id = s.channel_id)
+        (rb.scope_type = public.rbac_scope_org() AND rb.org_id = s.org_id) OR
+        (rb.scope_type = public.rbac_scope_app() AND rb.app_id = s.app_id) OR
+        (rb.scope_type = public.rbac_scope_channel() AND rb.channel_id = s.channel_id)
       )
       AND (v_org_id IS NULL OR g.org_id = v_org_id)
       AND (rb.expires_at IS NULL OR rb.expires_at > now())
@@ -727,17 +1241,17 @@ BEGIN
   END IF;
 
   IF channel_id IS NOT NULL THEN
-    v_scope := 'channel';
+    v_scope := public.rbac_scope_channel();
   ELSIF app_id IS NOT NULL THEN
-    v_scope := 'app';
+    v_scope := public.rbac_scope_app();
   ELSE
-    v_scope := 'org';
+    v_scope := public.rbac_scope_org();
   END IF;
 
   v_perm := public.rbac_permission_for_legacy(min_right, v_scope);
 
   IF user_id IS NOT NULL THEN
-    v_allowed := public.rbac_has_permission('user', user_id, v_perm, v_effective_org_id, app_id, channel_id);
+    v_allowed := public.rbac_has_permission(public.rbac_principal_user(), user_id, v_perm, v_effective_org_id, app_id, channel_id);
   END IF;
 
   -- Also consider apikey principal when RBAC is enabled (API keys can hold roles directly).
@@ -746,7 +1260,7 @@ BEGIN
     IF v_apikey IS NOT NULL THEN
       SELECT rbac_id INTO v_apikey_principal FROM public.apikeys WHERE key = v_apikey LIMIT 1;
       IF v_apikey_principal IS NOT NULL THEN
-        v_allowed := public.rbac_has_permission('apikey', v_apikey_principal, v_perm, v_effective_org_id, app_id, channel_id);
+        v_allowed := public.rbac_has_permission(public.rbac_principal_apikey(), v_apikey_principal, v_perm, v_effective_org_id, app_id, channel_id);
       END IF;
     END IF;
   END IF;
@@ -829,8 +1343,8 @@ BEGIN
   END IF;
 
   IF use_rbac THEN
-    perm_key := public.rbac_permission_for_legacy("right", 'app');
-    allowed := public.rbac_has_permission('apikey', api_key.rbac_id, perm_key, org_id, "appid", NULL::bigint);
+    perm_key := public.rbac_permission_for_legacy("right", public.rbac_scope_app());
+    allowed := public.rbac_has_permission(public.rbac_principal_apikey(), api_key.rbac_id, perm_key, org_id, "appid", NULL::bigint);
   ELSE
     allowed := public.check_min_rights("right", "userid", org_id, "appid", NULL::bigint);
   END IF;
@@ -857,29 +1371,29 @@ BEGIN
     RETURN NULL;
   ELSIF p_app_id IS NOT NULL THEN
     -- App-level legacy mapping to RBAC roles
-    IF p_user_right >= 'admin'::public.user_min_right THEN
-      RETURN 'app_admin';
-    ELSIF p_user_right = 'write'::public.user_min_right THEN
-      RETURN 'app_developer';
-    ELSIF p_user_right = 'upload'::public.user_min_right THEN
-      RETURN 'app_uploader';
-    ELSIF p_user_right = 'read'::public.user_min_right THEN
-      RETURN 'app_reader';
+    IF p_user_right >= public.rbac_right_admin()::public.user_min_right THEN
+      RETURN public.rbac_role_app_admin();
+    ELSIF p_user_right = public.rbac_right_write()::public.user_min_right THEN
+      RETURN public.rbac_role_app_developer();
+    ELSIF p_user_right = public.rbac_right_upload()::public.user_min_right THEN
+      RETURN public.rbac_role_app_uploader();
+    ELSIF p_user_right = public.rbac_right_read()::public.user_min_right THEN
+      RETURN public.rbac_role_app_reader();
     END IF;
     RETURN NULL;
   ELSE
     -- Org-level legacy mapping
-    IF p_user_right >= 'super_admin'::public.user_min_right THEN
-      RETURN 'org_super_admin';
-    ELSIF p_user_right >= 'admin'::public.user_min_right THEN
-      RETURN 'org_admin';
-    ELSIF p_user_right = 'write'::public.user_min_right THEN
+    IF p_user_right >= public.rbac_right_super_admin()::public.user_min_right THEN
+      RETURN public.rbac_role_org_super_admin();
+    ELSIF p_user_right >= public.rbac_right_admin()::public.user_min_right THEN
+      RETURN public.rbac_role_org_admin();
+    ELSIF p_user_right = public.rbac_right_write()::public.user_min_right THEN
       -- Org-level write creates org_member + app_developer for each app
       RETURN 'org_member + app_developer(per-app)';
-    ELSIF p_user_right = 'upload'::public.user_min_right THEN
+    ELSIF p_user_right = public.rbac_right_upload()::public.user_min_right THEN
       -- Org-level upload creates org_member + app_uploader for each app
       RETURN 'org_member + app_uploader(per-app)';
-    ELSIF p_user_right = 'read'::public.user_min_right THEN
+    ELSIF p_user_right = public.rbac_right_read()::public.user_min_right THEN
       -- Org-level read creates org_member + app_reader for each app
       RETURN 'org_member + app_reader(per-app)';
     END IF;
@@ -913,6 +1427,7 @@ DECLARE
   v_skipped_count int := 0;
   v_error_count int := 0;
   v_errors jsonb := '[]'::jsonb;
+  v_migration_reason text := 'Migrated from org_users (legacy)';
 BEGIN
   -- Use provided granted_by or find org owner
   IF p_granted_by IS NULL THEN
@@ -922,7 +1437,7 @@ BEGIN
       SELECT user_id INTO v_granted_by
       FROM public.org_users
       WHERE org_id = p_org_id
-        AND user_right >= 'admin'::public.user_min_right
+        AND user_right >= public.rbac_right_admin()::public.user_min_right
         AND app_id IS NULL
         AND channel_id IS NULL
       ORDER BY created_at ASC
@@ -944,17 +1459,17 @@ BEGIN
     BEGIN
       -- Special handling for org-level read/upload/write: create org_member + app-level roles
       IF v_org_user.app_id IS NULL AND v_org_user.channel_id IS NULL
-         AND v_org_user.user_right IN ('read', 'upload', 'write') THEN
+         AND v_org_user.user_right IN (public.rbac_right_read(), public.rbac_right_upload(), public.rbac_right_write()) THEN
 
         -- 1) Create org_member binding
-        SELECT id INTO v_role_id FROM public.roles WHERE name = 'org_member' LIMIT 1;
+        SELECT id INTO v_role_id FROM public.roles WHERE name = public.rbac_role_org_member() LIMIT 1;
         IF v_role_id IS NOT NULL THEN
           -- Check if org_member binding already exists
           SELECT id INTO v_binding_id FROM public.role_bindings
-          WHERE principal_type = 'user'
+          WHERE principal_type = public.rbac_principal_user()
             AND principal_id = v_org_user.user_id
             AND role_id = v_role_id
-            AND scope_type = 'org'
+            AND scope_type = public.rbac_scope_org()
             AND org_id = p_org_id
           LIMIT 1;
 
@@ -963,20 +1478,20 @@ BEGIN
               principal_type, principal_id, role_id, scope_type, org_id,
               granted_by, granted_at, reason, is_direct
             ) VALUES (
-              'user', v_org_user.user_id, v_role_id, 'org', p_org_id,
-              v_granted_by, now(), 'Migrated from org_users (legacy)', true
+              public.rbac_principal_user(), v_org_user.user_id, v_role_id, public.rbac_scope_org(), p_org_id,
+              v_granted_by, now(), v_migration_reason, true
             );
             v_migrated_count := v_migrated_count + 1;
           END IF;
         END IF;
 
         -- 2) Determine app-level role based on user_right
-        IF v_org_user.user_right = 'read' THEN
-          v_app_role_name := 'app_reader';
-        ELSIF v_org_user.user_right = 'upload' THEN
-          v_app_role_name := 'app_uploader';
-        ELSIF v_org_user.user_right = 'write' THEN
-          v_app_role_name := 'app_developer';
+        IF v_org_user.user_right = public.rbac_right_read() THEN
+          v_app_role_name := public.rbac_role_app_reader();
+        ELSIF v_org_user.user_right = public.rbac_right_upload() THEN
+          v_app_role_name := public.rbac_role_app_uploader();
+        ELSIF v_org_user.user_right = public.rbac_right_write() THEN
+          v_app_role_name := public.rbac_role_app_developer();
         END IF;
 
         SELECT id INTO v_app_role_id FROM public.roles WHERE name = v_app_role_name LIMIT 1;
@@ -996,10 +1511,10 @@ BEGIN
         LOOP
           -- Check if app binding already exists
           SELECT id INTO v_binding_id FROM public.role_bindings
-          WHERE principal_type = 'user'
+          WHERE principal_type = public.rbac_principal_user()
             AND principal_id = v_org_user.user_id
             AND role_id = v_app_role_id
-            AND scope_type = 'app'
+            AND scope_type = public.rbac_scope_app()
             AND app_id = v_app.id
           LIMIT 1;
 
@@ -1008,8 +1523,8 @@ BEGIN
               principal_type, principal_id, role_id, scope_type, org_id, app_id,
               granted_by, granted_at, reason, is_direct
             ) VALUES (
-              'user', v_org_user.user_id, v_app_role_id, 'app', p_org_id, v_app.id,
-              v_granted_by, now(), 'Migrated from org_users (legacy)', true
+              public.rbac_principal_user(), v_org_user.user_id, v_app_role_id, public.rbac_scope_app(), p_org_id, v_app.id,
+              v_granted_by, now(), v_migration_reason, true
             );
             v_migrated_count := v_migrated_count + 1;
           ELSE
@@ -1056,7 +1571,7 @@ BEGIN
 
       -- Determine scope type and resolve IDs
       IF v_org_user.channel_id IS NOT NULL THEN
-        v_scope_type := 'channel';
+        v_scope_type := public.rbac_scope_channel();
         SELECT id INTO v_app_uuid FROM public.apps
         WHERE app_id = v_org_user.app_id LIMIT 1;
         SELECT rbac_id INTO v_channel_uuid FROM public.channels
@@ -1073,7 +1588,7 @@ BEGIN
           CONTINUE;
         END IF;
       ELSIF v_org_user.app_id IS NOT NULL THEN
-        v_scope_type := 'app';
+        v_scope_type := public.rbac_scope_app();
         SELECT id INTO v_app_uuid FROM public.apps
         WHERE app_id = v_org_user.app_id LIMIT 1;
         v_channel_uuid := NULL;
@@ -1088,14 +1603,14 @@ BEGIN
           CONTINUE;
         END IF;
       ELSE
-        v_scope_type := 'org';
+        v_scope_type := public.rbac_scope_org();
         v_app_uuid := NULL;
         v_channel_uuid := NULL;
       END IF;
 
       -- Check if binding already exists (idempotency)
       SELECT id INTO v_binding_id FROM public.role_bindings
-      WHERE principal_type = 'user'
+      WHERE principal_type = public.rbac_principal_user()
         AND principal_id = v_org_user.user_id
         AND role_id = v_role_id
         AND scope_type = v_scope_type
@@ -1123,7 +1638,7 @@ BEGIN
         reason,
         is_direct
       ) VALUES (
-        'user',
+        public.rbac_principal_user(),
         v_org_user.user_id,
         v_role_id,
         v_scope_type,
@@ -1132,7 +1647,7 @@ BEGIN
         v_channel_uuid,
         v_granted_by,
         now(),
-        'Migrated from org_users (legacy)',
+        v_migration_reason,
         true
       );
 
@@ -1226,9 +1741,9 @@ BEGIN
     ou.channel_id,
     public.rbac_legacy_role_hint(ou.user_right, ou.app_id, ou.channel_id) AS suggested_role,
     CASE
-      WHEN ou.channel_id IS NOT NULL THEN 'channel'
-      WHEN ou.app_id IS NOT NULL THEN 'app'
-      ELSE 'org'
+      WHEN ou.channel_id IS NOT NULL THEN public.rbac_scope_channel()
+      WHEN ou.app_id IS NOT NULL THEN public.rbac_scope_app()
+      ELSE public.rbac_scope_org()
     END AS scope_type,
     public.rbac_legacy_role_hint(ou.user_right, ou.app_id, ou.channel_id) IS NOT NULL AS will_migrate,
     CASE
@@ -1251,11 +1766,12 @@ SET search_path = ''
 SECURITY DEFINER AS $$
 DECLARE
   v_deleted_count int;
+  v_migration_reason text := 'Migrated from org_users (legacy)';
 BEGIN
   -- Delete all role_bindings that were migrated from org_users
   DELETE FROM public.role_bindings
   WHERE org_id = p_org_id
-    AND reason = 'Migrated from org_users (legacy)'
+    AND reason = v_migration_reason
     AND is_direct = true;
 
   GET DIAGNOSTICS v_deleted_count = ROW_COUNT;
@@ -1297,15 +1813,15 @@ BEGIN
     RETURN 'NO_ORG';
   END IF;
 
-  -- Check if user has at least 'admin' rights
-  IF NOT public.check_min_rights('admin'::public.user_min_right, calling_user_id, invite_user_to_org.org_id, NULL::varchar, NULL::bigint) THEN
+  -- Check if user has at least public.rbac_right_admin() rights
+  IF NOT public.check_min_rights(public.rbac_right_admin()::public.user_min_right, calling_user_id, invite_user_to_org.org_id, NULL::varchar, NULL::bigint) THEN
     PERFORM public.pg_log('deny: NO_RIGHTS_ADMIN', jsonb_build_object('org_id', invite_user_to_org.org_id, 'email', invite_user_to_org.email, 'invite_type', invite_user_to_org.invite_type, 'calling_user', calling_user_id));
     RETURN 'NO_RIGHTS';
   END IF;
 
   -- If inviting as super_admin, caller must be super_admin
-  IF (invite_type = 'super_admin'::public.user_min_right OR invite_type = 'invite_super_admin'::public.user_min_right) THEN
-    IF NOT public.check_min_rights('super_admin'::public.user_min_right, calling_user_id, invite_user_to_org.org_id, NULL::varchar, NULL::bigint) THEN
+  IF (invite_type = public.rbac_right_super_admin()::public.user_min_right OR invite_type = public.rbac_right_invite_super_admin()::public.user_min_right) THEN
+    IF NOT public.check_min_rights(public.rbac_right_super_admin()::public.user_min_right, calling_user_id, invite_user_to_org.org_id, NULL::varchar, NULL::bigint) THEN
       PERFORM public.pg_log('deny: NO_RIGHTS_SUPER_ADMIN', jsonb_build_object('org_id', invite_user_to_org.org_id, 'email', invite_user_to_org.email, 'invite_type', invite_user_to_org.invite_type, 'calling_user', calling_user_id));
       RETURN 'NO_RIGHTS';
     END IF;
@@ -1514,7 +2030,7 @@ BEGIN
     -- Direct role bindings on org scope
     SELECT rb.org_id
     FROM public.role_bindings rb
-    WHERE rb.principal_type = 'user'
+    WHERE rb.principal_type = public.rbac_principal_user()
       AND rb.principal_id = user_id
       AND rb.org_id IS NOT NULL
       AND (rb.expires_at IS NULL OR rb.expires_at > now())
@@ -1523,7 +2039,7 @@ BEGIN
     SELECT rb.org_id
     FROM public.role_bindings rb
     JOIN public.group_members gm ON gm.group_id = rb.principal_id
-    WHERE rb.principal_type = 'group'
+    WHERE rb.principal_type = public.rbac_principal_group()
       AND gm.user_id = user_id
       AND rb.org_id IS NOT NULL
       AND (rb.expires_at IS NULL OR rb.expires_at > now())
@@ -1532,7 +2048,7 @@ BEGIN
     SELECT apps.owner_org
     FROM public.role_bindings rb
     JOIN public.apps ON apps.id = rb.app_id
-    WHERE rb.principal_type = 'user'
+    WHERE rb.principal_type = public.rbac_principal_user()
       AND rb.principal_id = user_id
       AND rb.app_id IS NOT NULL
       AND (rb.expires_at IS NULL OR rb.expires_at > now())
@@ -1542,7 +2058,7 @@ BEGIN
     FROM public.role_bindings rb
     JOIN public.apps ON apps.id = rb.app_id
     JOIN public.group_members gm ON gm.group_id = rb.principal_id
-    WHERE rb.principal_type = 'group'
+    WHERE rb.principal_type = public.rbac_principal_group()
       AND gm.user_id = user_id
       AND rb.app_id IS NOT NULL
       AND (rb.expires_at IS NULL OR rb.expires_at > now())
@@ -1552,7 +2068,7 @@ BEGIN
     FROM public.role_bindings rb
     JOIN public.channels ch ON ch.rbac_id = rb.channel_id
     JOIN public.apps ON apps.app_id = ch.app_id
-    WHERE rb.principal_type = 'user'
+    WHERE rb.principal_type = public.rbac_principal_user()
       AND rb.principal_id = user_id
       AND rb.channel_id IS NOT NULL
       AND (rb.expires_at IS NULL OR rb.expires_at > now())
@@ -1563,7 +2079,7 @@ BEGIN
     JOIN public.channels ch ON ch.rbac_id = rb.channel_id
     JOIN public.apps ON apps.app_id = ch.app_id
     JOIN public.group_members gm ON gm.group_id = rb.principal_id
-    WHERE rb.principal_type = 'group'
+    WHERE rb.principal_type = public.rbac_principal_group()
       AND gm.user_id = user_id
       AND rb.channel_id IS NOT NULL
       AND (rb.expires_at IS NULL OR rb.expires_at > now())
@@ -1632,10 +2148,10 @@ BEGIN
       SELECT 1
       FROM public.role_bindings rb
       JOIN public.roles r ON r.id = rb.role_id
-      WHERE rb.principal_type = 'user'
+      WHERE rb.principal_type = public.rbac_principal_user()
         AND rb.principal_id = userid
-        AND rb.scope_type = 'platform'
-        AND r.name = 'platform_super_admin'
+        AND rb.scope_type = public.rbac_scope_platform()
+        AND r.name = public.rbac_role_platform_super_admin()
     ) INTO has_platform_admin;
 
     -- In RBAC mode: admin if EITHER in vault list OR has platform role
@@ -1746,14 +2262,14 @@ CREATE POLICY groups_write_org_admin ON public.groups
   TO authenticated
   USING (
     -- User has admin rights in the org
-    public.check_min_rights('admin'::public.user_min_right, auth.uid(), org_id, NULL::varchar, NULL::bigint)
+    public.check_min_rights(public.rbac_right_admin()::public.user_min_right, auth.uid(), org_id, NULL::varchar, NULL::bigint)
     OR
     -- User is platform admin
     public.is_admin(auth.uid())
   )
   WITH CHECK (
     -- User has admin rights in the org
-    public.check_min_rights('admin'::public.user_min_right, auth.uid(), org_id, NULL::varchar, NULL::bigint)
+    public.check_min_rights(public.rbac_right_admin()::public.user_min_right, auth.uid(), org_id, NULL::varchar, NULL::bigint)
     OR
     -- User is platform admin
     public.is_admin(auth.uid())
@@ -1787,7 +2303,7 @@ CREATE POLICY group_members_write_org_admin ON public.group_members
       SELECT 1 FROM public.groups
       WHERE groups.id = group_members.group_id
         AND (
-          public.check_min_rights('admin'::public.user_min_right, auth.uid(), groups.org_id, NULL::varchar, NULL::bigint)
+          public.check_min_rights(public.rbac_right_admin()::public.user_min_right, auth.uid(), groups.org_id, NULL::varchar, NULL::bigint)
           OR public.is_admin(auth.uid())
         )
     )
@@ -1798,7 +2314,7 @@ CREATE POLICY group_members_write_org_admin ON public.group_members
       SELECT 1 FROM public.groups
       WHERE groups.id = group_members.group_id
         AND (
-          public.check_min_rights('admin'::public.user_min_right, auth.uid(), groups.org_id, NULL::varchar, NULL::bigint)
+          public.check_min_rights(public.rbac_right_admin()::public.user_min_right, auth.uid(), groups.org_id, NULL::varchar, NULL::bigint)
           OR public.is_admin(auth.uid())
         )
     )
@@ -1812,17 +2328,17 @@ CREATE POLICY role_bindings_read_scope_member ON public.role_bindings
   TO authenticated
   USING (
     -- Platform scope: admin only
-    (scope_type = 'platform' AND public.is_admin(auth.uid()))
+    (scope_type = public.rbac_scope_platform() AND public.is_admin(auth.uid()))
     OR
     -- Org scope: org member
-    (scope_type = 'org' AND EXISTS (
+    (scope_type = public.rbac_scope_org() AND EXISTS (
       SELECT 1 FROM public.org_users
       WHERE org_users.org_id = role_bindings.org_id
         AND org_users.user_id = auth.uid()
     ))
     OR
     -- App scope: org member (app belongs to org)
-    (scope_type = 'app' AND EXISTS (
+    (scope_type = public.rbac_scope_app() AND EXISTS (
       SELECT 1 FROM public.apps
       JOIN public.org_users ON org_users.org_id = apps.owner_org
       WHERE apps.id = role_bindings.app_id
@@ -1830,7 +2346,7 @@ CREATE POLICY role_bindings_read_scope_member ON public.role_bindings
     ))
     OR
     -- Channel scope: org member (channel belongs to app belongs to org)
-    (scope_type = 'channel' AND EXISTS (
+    (scope_type = public.rbac_scope_channel() AND EXISTS (
       SELECT 1 FROM public.channels
       JOIN public.apps ON apps.app_id = channels.app_id
       JOIN public.org_users ON org_users.org_id = apps.owner_org
@@ -1847,24 +2363,24 @@ CREATE POLICY role_bindings_write_scope_admin ON public.role_bindings
   TO authenticated
   USING (
     -- Platform scope: admin only
-    (scope_type = 'platform' AND public.is_admin(auth.uid()))
+    (scope_type = public.rbac_scope_platform() AND public.is_admin(auth.uid()))
     OR
     -- Org scope: org admin
-    (scope_type = 'org' AND public.check_min_rights('admin'::public.user_min_right, auth.uid(), org_id, NULL::varchar, NULL::bigint))
+    (scope_type = public.rbac_scope_org() AND public.check_min_rights(public.rbac_right_admin()::public.user_min_right, auth.uid(), org_id, NULL::varchar, NULL::bigint))
     OR
     -- App scope: app admin
-    (scope_type = 'app' AND EXISTS (
+    (scope_type = public.rbac_scope_app() AND EXISTS (
       SELECT 1 FROM public.apps
       WHERE apps.id = role_bindings.app_id
-        AND public.check_min_rights('admin'::public.user_min_right, auth.uid(), apps.owner_org, apps.app_id, NULL::bigint)
+        AND public.check_min_rights(public.rbac_right_admin()::public.user_min_right, auth.uid(), apps.owner_org, apps.app_id, NULL::bigint)
     ))
     OR
     -- Channel scope: channel admin
-    (scope_type = 'channel' AND EXISTS (
+    (scope_type = public.rbac_scope_channel() AND EXISTS (
       SELECT 1 FROM public.channels
       JOIN public.apps ON apps.app_id = channels.app_id
       WHERE channels.rbac_id = role_bindings.channel_id
-        AND public.check_min_rights('admin'::public.user_min_right, auth.uid(), apps.owner_org, channels.app_id, channels.id)
+        AND public.check_min_rights(public.rbac_right_admin()::public.user_min_right, auth.uid(), apps.owner_org, channels.app_id, channels.id)
     ))
     OR
     -- Platform admin can write all
@@ -1872,21 +2388,21 @@ CREATE POLICY role_bindings_write_scope_admin ON public.role_bindings
   )
   WITH CHECK (
     -- Same as USING clause
-    (scope_type = 'platform' AND public.is_admin(auth.uid()))
+    (scope_type = public.rbac_scope_platform() AND public.is_admin(auth.uid()))
     OR
-    (scope_type = 'org' AND public.check_min_rights('admin'::public.user_min_right, auth.uid(), org_id, NULL::varchar, NULL::bigint))
+    (scope_type = public.rbac_scope_org() AND public.check_min_rights(public.rbac_right_admin()::public.user_min_right, auth.uid(), org_id, NULL::varchar, NULL::bigint))
     OR
-    (scope_type = 'app' AND EXISTS (
+    (scope_type = public.rbac_scope_app() AND EXISTS (
       SELECT 1 FROM public.apps
       WHERE apps.id = role_bindings.app_id
-        AND public.check_min_rights('admin'::public.user_min_right, auth.uid(), apps.owner_org, apps.app_id, NULL::bigint)
+        AND public.check_min_rights(public.rbac_right_admin()::public.user_min_right, auth.uid(), apps.owner_org, apps.app_id, NULL::bigint)
     ))
     OR
-    (scope_type = 'channel' AND EXISTS (
+    (scope_type = public.rbac_scope_channel() AND EXISTS (
       SELECT 1 FROM public.channels
       JOIN public.apps ON apps.app_id = channels.app_id
       WHERE channels.rbac_id = role_bindings.channel_id
-        AND public.check_min_rights('admin'::public.user_min_right, auth.uid(), apps.owner_org, channels.app_id, channels.id)
+        AND public.check_min_rights(public.rbac_right_admin()::public.user_min_right, auth.uid(), apps.owner_org, channels.app_id, channels.id)
     ))
     OR
     public.is_admin(auth.uid())
@@ -1971,12 +2487,12 @@ DECLARE
 BEGIN
   -- Create org_users entry (legacy system)
   INSERT INTO public.org_users (user_id, org_id, user_right)
-  VALUES (NEW.created_by, NEW.id, 'super_admin'::"public"."user_min_right");
+  VALUES (NEW.created_by, NEW.id, public.rbac_right_super_admin()::"public"."user_min_right");
 
   -- Get the org_super_admin role ID for role_bindings
   SELECT id INTO org_super_admin_role_id
   FROM public.roles
-  WHERE name = 'org_super_admin'
+  WHERE name = public.rbac_role_org_super_admin()
   LIMIT 1;
 
   -- Create role_bindings entry (new RBAC system) if role exists
@@ -1992,10 +2508,10 @@ BEGIN
       reason,
       is_direct
     ) VALUES (
-      'user',
+      public.rbac_principal_user(),
       NEW.created_by,
       org_super_admin_role_id,
-      'org',
+      public.rbac_scope_org(),
       NEW.id,
       NEW.created_by, -- The user grants themselves super_admin on their own org
       now(),
@@ -2031,16 +2547,17 @@ DECLARE
   v_app_uuid uuid;
   v_channel_uuid uuid;
   v_granted_by uuid;
+  v_sync_reason text := 'Synced from org_users';
 BEGIN
   v_granted_by := COALESCE(auth.uid(), NEW.user_id);
 
   -- Handle org-level rights (no app_id, no channel_id)
   IF NEW.app_id IS NULL AND NEW.channel_id IS NULL THEN
     -- For super_admin and admin: create org-level binding directly
-    IF NEW.user_right IN ('super_admin', 'admin') THEN
+    IF NEW.user_right IN (public.rbac_right_super_admin(), public.rbac_right_admin()) THEN
       CASE NEW.user_right
-        WHEN 'super_admin' THEN role_name_to_bind := 'org_super_admin';
-        WHEN 'admin' THEN role_name_to_bind := 'org_admin';
+        WHEN public.rbac_right_super_admin() THEN role_name_to_bind := public.rbac_role_org_super_admin();
+        WHEN public.rbac_right_admin() THEN role_name_to_bind := public.rbac_role_org_admin();
       END CASE;
 
       SELECT id INTO role_id_to_bind FROM public.roles WHERE name = role_name_to_bind LIMIT 1;
@@ -2050,30 +2567,30 @@ BEGIN
           principal_type, principal_id, role_id, scope_type, org_id,
           granted_by, granted_at, reason, is_direct
         ) VALUES (
-          'user', NEW.user_id, role_id_to_bind, 'org', NEW.org_id,
-          v_granted_by, now(), 'Synced from org_users', true
+          public.rbac_principal_user(), NEW.user_id, role_id_to_bind, public.rbac_scope_org(), NEW.org_id,
+          v_granted_by, now(), v_sync_reason, true
         ) ON CONFLICT DO NOTHING;
       END IF;
 
     -- For read/upload/write at org level: create org_member + app-level roles for each app
-    ELSIF NEW.user_right IN ('read', 'upload', 'write') THEN
+    ELSIF NEW.user_right IN (public.rbac_right_read(), public.rbac_right_upload(), public.rbac_right_write()) THEN
       -- 1) Create org_member binding at org level
-      SELECT id INTO org_member_role_id FROM public.roles WHERE name = 'org_member' LIMIT 1;
+      SELECT id INTO org_member_role_id FROM public.roles WHERE name = public.rbac_role_org_member() LIMIT 1;
       IF org_member_role_id IS NOT NULL THEN
         INSERT INTO public.role_bindings (
           principal_type, principal_id, role_id, scope_type, org_id,
           granted_by, granted_at, reason, is_direct
         ) VALUES (
-          'user', NEW.user_id, org_member_role_id, 'org', NEW.org_id,
-          v_granted_by, now(), 'Synced from org_users', true
+          public.rbac_principal_user(), NEW.user_id, org_member_role_id, public.rbac_scope_org(), NEW.org_id,
+          v_granted_by, now(), v_sync_reason, true
         ) ON CONFLICT DO NOTHING;
       END IF;
 
       -- 2) Determine app-level role based on user_right
       CASE NEW.user_right
-        WHEN 'read' THEN app_role_name := 'app_reader';
-        WHEN 'upload' THEN app_role_name := 'app_uploader';
-        WHEN 'write' THEN app_role_name := 'app_developer';
+        WHEN public.rbac_right_read() THEN app_role_name := public.rbac_role_app_reader();
+        WHEN public.rbac_right_upload() THEN app_role_name := public.rbac_role_app_uploader();
+        WHEN public.rbac_right_write() THEN app_role_name := public.rbac_role_app_developer();
       END CASE;
 
       SELECT id INTO app_role_id FROM public.roles WHERE name = app_role_name LIMIT 1;
@@ -2086,8 +2603,8 @@ BEGIN
             principal_type, principal_id, role_id, scope_type, org_id, app_id,
             granted_by, granted_at, reason, is_direct
           ) VALUES (
-            'user', NEW.user_id, app_role_id, 'app', NEW.org_id, v_app.id,
-            v_granted_by, now(), 'Synced from org_users', true
+            public.rbac_principal_user(), NEW.user_id, app_role_id, public.rbac_scope_app(), NEW.org_id, v_app.id,
+            v_granted_by, now(), v_sync_reason, true
           ) ON CONFLICT DO NOTHING;
         END LOOP;
       END IF;
@@ -2096,12 +2613,12 @@ BEGIN
   -- Handle app-level rights (has app_id, no channel_id)
   ELSIF NEW.app_id IS NOT NULL AND NEW.channel_id IS NULL THEN
     CASE NEW.user_right
-      WHEN 'super_admin' THEN role_name_to_bind := 'app_admin';
-      WHEN 'admin' THEN role_name_to_bind := 'app_admin';
-      WHEN 'write' THEN role_name_to_bind := 'app_developer';
-      WHEN 'upload' THEN role_name_to_bind := 'app_uploader';
-      WHEN 'read' THEN role_name_to_bind := 'app_reader';
-      ELSE role_name_to_bind := 'app_reader';
+      WHEN public.rbac_right_super_admin() THEN role_name_to_bind := public.rbac_role_app_admin();
+      WHEN public.rbac_right_admin() THEN role_name_to_bind := public.rbac_role_app_admin();
+      WHEN public.rbac_right_write() THEN role_name_to_bind := public.rbac_role_app_developer();
+      WHEN public.rbac_right_upload() THEN role_name_to_bind := public.rbac_role_app_uploader();
+      WHEN public.rbac_right_read() THEN role_name_to_bind := public.rbac_role_app_reader();
+      ELSE role_name_to_bind := public.rbac_role_app_reader();
     END CASE;
 
     SELECT id INTO role_id_to_bind FROM public.roles WHERE name = role_name_to_bind LIMIT 1;
@@ -2112,20 +2629,20 @@ BEGIN
         principal_type, principal_id, role_id, scope_type, org_id, app_id,
         granted_by, granted_at, reason, is_direct
       ) VALUES (
-        'user', NEW.user_id, role_id_to_bind, 'app', NEW.org_id, v_app_uuid,
-        v_granted_by, now(), 'Synced from org_users', true
+        public.rbac_principal_user(), NEW.user_id, role_id_to_bind, public.rbac_scope_app(), NEW.org_id, v_app_uuid,
+        v_granted_by, now(), v_sync_reason, true
       ) ON CONFLICT DO NOTHING;
     END IF;
 
   -- Handle channel-level rights (has app_id and channel_id)
   ELSIF NEW.app_id IS NOT NULL AND NEW.channel_id IS NOT NULL THEN
     CASE NEW.user_right
-      WHEN 'super_admin' THEN role_name_to_bind := 'channel_admin';
-      WHEN 'admin' THEN role_name_to_bind := 'channel_admin';
-      WHEN 'write' THEN role_name_to_bind := 'channel_developer';
-      WHEN 'upload' THEN role_name_to_bind := 'channel_uploader';
-      WHEN 'read' THEN role_name_to_bind := 'channel_reader';
-      ELSE role_name_to_bind := 'channel_reader';
+      WHEN public.rbac_right_super_admin() THEN role_name_to_bind := public.rbac_role_channel_admin();
+      WHEN public.rbac_right_admin() THEN role_name_to_bind := public.rbac_role_channel_admin();
+      WHEN public.rbac_right_write() THEN role_name_to_bind := 'channel_developer';
+      WHEN public.rbac_right_upload() THEN role_name_to_bind := 'channel_uploader';
+      WHEN public.rbac_right_read() THEN role_name_to_bind := public.rbac_role_channel_reader();
+      ELSE role_name_to_bind := public.rbac_role_channel_reader();
     END CASE;
 
     SELECT id INTO role_id_to_bind FROM public.roles WHERE name = role_name_to_bind LIMIT 1;
@@ -2137,8 +2654,8 @@ BEGIN
         principal_type, principal_id, role_id, scope_type, org_id, app_id, channel_id,
         granted_by, granted_at, reason, is_direct
       ) VALUES (
-        'user', NEW.user_id, role_id_to_bind, 'channel', NEW.org_id, v_app_uuid, v_channel_uuid,
-        v_granted_by, now(), 'Synced from org_users', true
+        public.rbac_principal_user(), NEW.user_id, role_id_to_bind, public.rbac_scope_channel(), NEW.org_id, v_app_uuid, v_channel_uuid,
+        v_granted_by, now(), v_sync_reason, true
       ) ON CONFLICT DO NOTHING;
     END IF;
   END IF;
@@ -2184,6 +2701,7 @@ DECLARE
   org_member_role_id uuid;
   v_app RECORD;
   v_granted_by uuid;
+  v_update_reason text := 'Updated from org_users';
 BEGIN
   -- Only process if user_right actually changed
   IF OLD.user_right = NEW.user_right THEN
@@ -2199,46 +2717,46 @@ BEGIN
 
   -- Map old user_right to role names
   CASE OLD.user_right
-    WHEN 'super_admin' THEN
-      old_org_role_name := 'org_super_admin';
+    WHEN public.rbac_right_super_admin() THEN
+      old_org_role_name := public.rbac_role_org_super_admin();
       old_app_role_name := NULL;
-    WHEN 'admin' THEN
-      old_org_role_name := 'org_admin';
+    WHEN public.rbac_right_admin() THEN
+      old_org_role_name := public.rbac_role_org_admin();
       old_app_role_name := NULL;
-    WHEN 'write' THEN
-      old_org_role_name := 'org_member';
-      old_app_role_name := 'app_developer';
-    WHEN 'upload' THEN
-      old_org_role_name := 'org_member';
-      old_app_role_name := 'app_uploader';
-    WHEN 'read' THEN
-      old_org_role_name := 'org_member';
-      old_app_role_name := 'app_reader';
+    WHEN public.rbac_right_write() THEN
+      old_org_role_name := public.rbac_role_org_member();
+      old_app_role_name := public.rbac_role_app_developer();
+    WHEN public.rbac_right_upload() THEN
+      old_org_role_name := public.rbac_role_org_member();
+      old_app_role_name := public.rbac_role_app_uploader();
+    WHEN public.rbac_right_read() THEN
+      old_org_role_name := public.rbac_role_org_member();
+      old_app_role_name := public.rbac_role_app_reader();
   END CASE;
 
   -- Map new user_right to role names
   CASE NEW.user_right
-    WHEN 'super_admin' THEN
-      new_org_role_name := 'org_super_admin';
+    WHEN public.rbac_right_super_admin() THEN
+      new_org_role_name := public.rbac_role_org_super_admin();
       new_app_role_name := NULL;
-    WHEN 'admin' THEN
-      new_org_role_name := 'org_admin';
+    WHEN public.rbac_right_admin() THEN
+      new_org_role_name := public.rbac_role_org_admin();
       new_app_role_name := NULL;
-    WHEN 'write' THEN
-      new_org_role_name := 'org_member';
-      new_app_role_name := 'app_developer';
-    WHEN 'upload' THEN
-      new_org_role_name := 'org_member';
-      new_app_role_name := 'app_uploader';
-    WHEN 'read' THEN
-      new_org_role_name := 'org_member';
-      new_app_role_name := 'app_reader';
+    WHEN public.rbac_right_write() THEN
+      new_org_role_name := public.rbac_role_org_member();
+      new_app_role_name := public.rbac_role_app_developer();
+    WHEN public.rbac_right_upload() THEN
+      new_org_role_name := public.rbac_role_org_member();
+      new_app_role_name := public.rbac_role_app_uploader();
+    WHEN public.rbac_right_read() THEN
+      new_org_role_name := public.rbac_role_org_member();
+      new_app_role_name := public.rbac_role_app_reader();
   END CASE;
 
   -- Get role IDs
   SELECT id INTO old_org_role_id FROM public.roles WHERE name = old_org_role_name LIMIT 1;
   SELECT id INTO new_org_role_id FROM public.roles WHERE name = new_org_role_name LIMIT 1;
-  SELECT id INTO org_member_role_id FROM public.roles WHERE name = 'org_member' LIMIT 1;
+  SELECT id INTO org_member_role_id FROM public.roles WHERE name = public.rbac_role_org_member() LIMIT 1;
 
   IF old_app_role_name IS NOT NULL THEN
     SELECT id INTO old_app_role_id FROM public.roles WHERE name = old_app_role_name LIMIT 1;
@@ -2250,18 +2768,18 @@ BEGIN
 
   -- Delete old org-level binding
   DELETE FROM public.role_bindings
-  WHERE principal_type = 'user'
+  WHERE principal_type = public.rbac_principal_user()
     AND principal_id = NEW.user_id
-    AND scope_type = 'org'
+    AND scope_type = public.rbac_scope_org()
     AND org_id = NEW.org_id
     AND role_id = old_org_role_id;
 
   -- Delete old app-level bindings (for read/upload/write users)
   IF old_app_role_id IS NOT NULL THEN
     DELETE FROM public.role_bindings
-    WHERE principal_type = 'user'
+    WHERE principal_type = public.rbac_principal_user()
       AND principal_id = NEW.user_id
-      AND scope_type = 'app'
+      AND scope_type = public.rbac_scope_app()
       AND org_id = NEW.org_id
       AND role_id = old_app_role_id;
   END IF;
@@ -2272,8 +2790,8 @@ BEGIN
       principal_type, principal_id, role_id, scope_type, org_id,
       granted_by, granted_at, reason, is_direct
     ) VALUES (
-      'user', NEW.user_id, new_org_role_id, 'org', NEW.org_id,
-      v_granted_by, now(), 'Updated from org_users', true
+      public.rbac_principal_user(), NEW.user_id, new_org_role_id, public.rbac_scope_org(), NEW.org_id,
+      v_granted_by, now(), v_update_reason, true
     ) ON CONFLICT DO NOTHING;
   END IF;
 
@@ -2285,34 +2803,34 @@ BEGIN
         principal_type, principal_id, role_id, scope_type, org_id, app_id,
         granted_by, granted_at, reason, is_direct
       ) VALUES (
-        'user', NEW.user_id, new_app_role_id, 'app', NEW.org_id, v_app.id,
-        v_granted_by, now(), 'Updated from org_users', true
+        public.rbac_principal_user(), NEW.user_id, new_app_role_id, public.rbac_scope_app(), NEW.org_id, v_app.id,
+        v_granted_by, now(), v_update_reason, true
       ) ON CONFLICT DO NOTHING;
     END LOOP;
   END IF;
 
   -- Handle transition from admin/super_admin to read/upload/write:
   -- Need to also delete any old org_member binding that might exist
-  IF OLD.user_right IN ('super_admin', 'admin') AND NEW.user_right IN ('read', 'upload', 'write') THEN
+  IF OLD.user_right IN (public.rbac_right_super_admin(), public.rbac_right_admin()) AND NEW.user_right IN (public.rbac_right_read(), public.rbac_right_upload(), public.rbac_right_write()) THEN
     -- No additional cleanup needed, old org-level binding already deleted above
     NULL;
   END IF;
 
   -- Handle transition from read/upload/write to admin/super_admin:
   -- Need to delete the org_member binding
-  IF OLD.user_right IN ('read', 'upload', 'write') AND NEW.user_right IN ('super_admin', 'admin') THEN
+  IF OLD.user_right IN (public.rbac_right_read(), public.rbac_right_upload(), public.rbac_right_write()) AND NEW.user_right IN (public.rbac_right_super_admin(), public.rbac_right_admin()) THEN
     DELETE FROM public.role_bindings
-    WHERE principal_type = 'user'
+    WHERE principal_type = public.rbac_principal_user()
       AND principal_id = NEW.user_id
-      AND scope_type = 'org'
+      AND scope_type = public.rbac_scope_org()
       AND org_id = NEW.org_id
       AND role_id = org_member_role_id;
 
     -- Also delete any remaining app-level bindings
     DELETE FROM public.role_bindings
-    WHERE principal_type = 'user'
+    WHERE principal_type = public.rbac_principal_user()
       AND principal_id = NEW.user_id
-      AND scope_type = 'app'
+      AND scope_type = public.rbac_scope_app()
       AND org_id = NEW.org_id;
   END IF;
 
@@ -2350,11 +2868,11 @@ AS $$
     SELECT 1
     FROM public.role_bindings rb
     INNER JOIN public.roles r ON rb.role_id = r.id
-    WHERE rb.principal_type = 'user'
+    WHERE rb.principal_type = public.rbac_principal_user()
       AND rb.principal_id = p_user_id
       AND rb.org_id = p_org_id
-      AND rb.scope_type = 'org'
-      AND r.name IN ('platform_super_admin', 'org_super_admin', 'org_admin')
+      AND rb.scope_type = public.rbac_scope_org()
+      AND r.name IN (public.rbac_role_platform_super_admin(), public.rbac_role_org_super_admin(), public.rbac_role_org_admin())
   );
 $$;
 
@@ -2372,11 +2890,11 @@ AS $$
     SELECT 1
     FROM public.role_bindings rb
     INNER JOIN public.roles r ON rb.role_id = r.id
-    WHERE rb.principal_type = 'user'
+    WHERE rb.principal_type = public.rbac_principal_user()
       AND rb.principal_id = p_user_id
       AND rb.app_id = p_app_id
-      AND rb.scope_type = 'app'
-      AND r.name IN ('app_admin', 'org_super_admin', 'org_admin', 'platform_super_admin')
+      AND rb.scope_type = public.rbac_scope_app()
+      AND r.name IN (public.rbac_role_app_admin(), public.rbac_role_org_super_admin(), public.rbac_role_org_admin(), public.rbac_role_platform_super_admin())
   );
 $$;
 
@@ -2393,10 +2911,10 @@ AS $$
   SELECT EXISTS (
     SELECT 1
     FROM public.role_bindings rb
-    WHERE rb.principal_type = 'user'
+    WHERE rb.principal_type = public.rbac_principal_user()
       AND rb.principal_id = p_user_id
       AND rb.app_id = p_app_id
-      AND rb.scope_type = 'app'
+      AND rb.scope_type = public.rbac_scope_app()
   );
 $$;
 
@@ -2426,9 +2944,9 @@ BEGIN
 
   -- Use rbac_has_permission to check the permission
   RETURN public.rbac_has_permission(
-    'user',
+    public.rbac_principal_user(),
     p_user_id,
-    'app.update_user_roles',
+    public.rbac_perm_app_update_user_roles(),
     v_org_id,
     v_app_id_varchar,
     NULL
@@ -2449,10 +2967,10 @@ USING (
   public.is_user_org_admin(auth.uid(), org_id)
   OR
   -- App admins can see bindings for their apps
-  (scope_type = 'app' AND public.is_user_app_admin(auth.uid(), app_id))
+  (scope_type = public.rbac_scope_app() AND public.is_user_app_admin(auth.uid(), app_id))
   OR
   -- Users with a role in the app can see other app members
-  (scope_type = 'app' AND app_id IS NOT NULL AND public.user_has_role_in_app(auth.uid(), app_id))
+  (scope_type = public.rbac_scope_app() AND app_id IS NOT NULL AND public.user_has_role_in_app(auth.uid(), app_id))
 );
 
 COMMENT ON POLICY "Allow viewing role bindings with permission" ON public.role_bindings IS
@@ -2465,10 +2983,10 @@ FOR DELETE
 TO authenticated
 USING (
   -- Users with app.update_user_roles can delete bindings for the app
-  (scope_type = 'app' AND public.user_has_app_update_user_roles(auth.uid(), app_id))
+  (scope_type = public.rbac_scope_app() AND public.user_has_app_update_user_roles(auth.uid(), app_id))
   OR
   -- Users can remove themselves from an app
-  (scope_type = 'app' AND principal_type = 'user' AND principal_id = auth.uid())
+  (scope_type = public.rbac_scope_app() AND principal_type = public.rbac_principal_user() AND principal_id = auth.uid())
 );
 
 COMMENT ON POLICY "Allow admins to delete manageable role bindings" ON public.role_bindings IS
@@ -2495,7 +3013,7 @@ SET search_path = ''
 AS $$
 BEGIN
   -- Check if user has permission to view org members
-  IF NOT public.rbac_check_permission_direct('org.read', auth.uid(), p_org_id, NULL, NULL) THEN
+  IF NOT public.rbac_check_permission_direct(public.rbac_perm_org_read(), auth.uid(), p_org_id, NULL, NULL) THEN
     RAISE EXCEPTION 'NO_PERMISSION_TO_VIEW_MEMBERS';
   END IF;
 
@@ -2511,17 +3029,17 @@ BEGIN
     rb.granted_at
   FROM public.users u
   INNER JOIN public.role_bindings rb ON rb.principal_id = u.id
-    AND rb.principal_type = 'user'
-    AND rb.scope_type = 'org'
+    AND rb.principal_type = public.rbac_principal_user()
+    AND rb.scope_type = public.rbac_scope_org()
     AND rb.org_id = p_org_id
   INNER JOIN public.roles r ON rb.role_id = r.id
-  WHERE r.scope_type = 'org' AND r.name LIKE 'org_%'
+  WHERE r.scope_type = public.rbac_scope_org() AND r.name LIKE 'org_%'
   ORDER BY
     CASE r.name
-      WHEN 'org_super_admin' THEN 1
-      WHEN 'org_admin' THEN 2
-      WHEN 'org_billing_admin' THEN 3
-      WHEN 'org_member' THEN 4
+      WHEN public.rbac_role_org_super_admin() THEN 1
+      WHEN public.rbac_role_org_admin() THEN 2
+      WHEN public.rbac_role_org_billing_admin() THEN 3
+      WHEN public.rbac_role_org_member() THEN 4
       ELSE 5
     END,
     u.email;
@@ -2552,7 +3070,7 @@ DECLARE
   v_role_family text;
 BEGIN
   -- Check if user has permission to update roles
-  IF NOT public.rbac_check_permission_direct('org.update_user_roles', auth.uid(), p_org_id, NULL, NULL) THEN
+  IF NOT public.rbac_check_permission_direct(public.rbac_perm_org_update_user_roles(), auth.uid(), p_org_id, NULL, NULL) THEN
     RAISE EXCEPTION 'NO_PERMISSION_TO_UPDATE_ROLES';
   END IF;
 
@@ -2576,7 +3094,7 @@ BEGIN
     RAISE EXCEPTION 'ROLE_NOT_FOUND';
   END IF;
 
-  IF v_role_family != 'org' THEN
+  IF v_role_family != public.rbac_scope_org() THEN
     RAISE EXCEPTION 'ROLE_MUST_BE_ORG_LEVEL';
   END IF;
 
@@ -2586,21 +3104,21 @@ BEGIN
     FROM public.role_bindings rb
     INNER JOIN public.roles r ON rb.role_id = r.id
     WHERE rb.principal_id = p_user_id
-      AND rb.principal_type = 'user'
-      AND rb.scope_type = 'org'
+      AND rb.principal_type = public.rbac_principal_user()
+      AND rb.scope_type = public.rbac_scope_org()
       AND rb.org_id = p_org_id
-      AND r.name = 'org_super_admin'
+      AND r.name = public.rbac_role_org_super_admin()
   ) THEN
     -- Count super admins in this org
     IF (
       SELECT COUNT(*)
       FROM public.role_bindings rb
       INNER JOIN public.roles r ON rb.role_id = r.id
-      WHERE rb.scope_type = 'org'
+      WHERE rb.scope_type = public.rbac_scope_org()
         AND rb.org_id = p_org_id
-        AND rb.principal_type = 'user'
-        AND r.name = 'org_super_admin'
-    ) <= 1 AND p_new_role_name != 'org_super_admin' THEN
+        AND rb.principal_type = public.rbac_principal_user()
+        AND r.name = public.rbac_role_org_super_admin()
+    ) <= 1 AND p_new_role_name != public.rbac_role_org_super_admin() THEN
       RAISE EXCEPTION 'CANNOT_REMOVE_LAST_SUPER_ADMIN';
     END IF;
   END IF;
@@ -2610,10 +3128,10 @@ BEGIN
   FROM public.role_bindings rb
   INNER JOIN public.roles r ON rb.role_id = r.id
   WHERE rb.principal_id = p_user_id
-    AND rb.principal_type = 'user'
-    AND rb.scope_type = 'org'
+    AND rb.principal_type = public.rbac_principal_user()
+    AND rb.scope_type = public.rbac_scope_org()
     AND rb.org_id = p_org_id
-    AND r.scope_type = 'org'
+    AND r.scope_type = public.rbac_scope_org()
   LIMIT 1;
 
   -- Delete existing org-level role binding if it exists
@@ -2636,10 +3154,10 @@ BEGIN
     reason,
     is_direct
   ) VALUES (
-    'user',
+    public.rbac_principal_user(),
     p_user_id,
     v_new_role_id,
-    'org',
+    public.rbac_scope_org(),
     p_org_id,
     NULL,
     NULL,
@@ -2668,7 +3186,7 @@ DECLARE
   v_org_created_by uuid;
 BEGIN
   -- Check if user has permission to update roles
-  IF NOT public.rbac_check_permission_direct('org.update_user_roles', auth.uid(), p_org_id, NULL, NULL) THEN
+  IF NOT public.rbac_check_permission_direct(public.rbac_perm_org_update_user_roles(), auth.uid(), p_org_id, NULL, NULL) THEN
     RAISE EXCEPTION 'NO_PERMISSION_TO_UPDATE_ROLES';
   END IF;
 
@@ -2688,20 +3206,20 @@ BEGIN
     FROM public.role_bindings rb
     INNER JOIN public.roles r ON rb.role_id = r.id
     WHERE rb.principal_id = p_user_id
-      AND rb.principal_type = 'user'
-      AND rb.scope_type = 'org'
+      AND rb.principal_type = public.rbac_principal_user()
+      AND rb.scope_type = public.rbac_scope_org()
       AND rb.org_id = p_org_id
-      AND r.name = 'org_super_admin'
+      AND r.name = public.rbac_role_org_super_admin()
   ) THEN
     -- Count super admins in this org
     IF (
       SELECT COUNT(*)
       FROM public.role_bindings rb
       INNER JOIN public.roles r ON rb.role_id = r.id
-      WHERE rb.scope_type = 'org'
+      WHERE rb.scope_type = public.rbac_scope_org()
         AND rb.org_id = p_org_id
-        AND rb.principal_type = 'user'
-        AND r.name = 'org_super_admin'
+        AND rb.principal_type = public.rbac_principal_user()
+        AND r.name = public.rbac_role_org_super_admin()
     ) <= 1 THEN
       RAISE EXCEPTION 'CANNOT_REMOVE_LAST_SUPER_ADMIN';
     END IF;
@@ -2712,10 +3230,10 @@ BEGIN
   FROM public.role_bindings rb
   INNER JOIN public.roles r ON rb.role_id = r.id
   WHERE rb.principal_id = p_user_id
-    AND rb.principal_type = 'user'
-    AND rb.scope_type = 'org'
+    AND rb.principal_type = public.rbac_principal_user()
+    AND rb.scope_type = public.rbac_scope_org()
     AND rb.org_id = p_org_id
-    AND r.scope_type = 'org'
+    AND r.scope_type = public.rbac_scope_org()
   LIMIT 1;
 
   -- Delete existing org-level role binding if it exists
@@ -2779,7 +3297,7 @@ BEGIN
   END IF;
 
   -- Check if user has permission to view app access
-  IF NOT public.rbac_check_permission_direct('app.read', auth.uid(), v_org_id, v_app_id_string, NULL::bigint) THEN
+  IF NOT public.rbac_check_permission_direct(public.rbac_perm_app_read(), auth.uid(), v_org_id, v_app_id_string, NULL::bigint) THEN
     RAISE EXCEPTION 'NO_PERMISSION_TO_VIEW_ACCESS';
   END IF;
 
@@ -2790,8 +3308,8 @@ BEGIN
     rb.principal_type,
     rb.principal_id,
     CASE
-      WHEN rb.principal_type = 'user' THEN u.email
-      WHEN rb.principal_type = 'group' THEN g.name
+      WHEN rb.principal_type = public.rbac_principal_user() THEN u.email
+      WHEN rb.principal_type = public.rbac_principal_group() THEN g.name
       ELSE rb.principal_id::text
     END as principal_name,
     rb.role_id,
@@ -2804,9 +3322,9 @@ BEGIN
     rb.is_direct
   FROM public.role_bindings rb
   INNER JOIN public.roles r ON rb.role_id = r.id
-  LEFT JOIN public.users u ON rb.principal_type = 'user' AND rb.principal_id = u.id
-  LEFT JOIN public.groups g ON rb.principal_type = 'group' AND rb.principal_id = g.id
-  WHERE rb.scope_type = 'app'
+  LEFT JOIN public.users u ON rb.principal_type = public.rbac_principal_user() AND rb.principal_id = u.id
+  LEFT JOIN public.groups g ON rb.principal_type = public.rbac_principal_group() AND rb.principal_id = g.id
+  WHERE rb.scope_type = public.rbac_scope_app()
     AND rb.app_id = p_app_id
   ORDER BY rb.granted_at DESC;
 END;
@@ -2824,7 +3342,7 @@ SET search_path = ''
 AS $$
 BEGIN
   -- Check if user has permission to view org or if it's their own bindings
-  IF auth.uid() != p_user_id AND NOT public.rbac_check_permission_direct('org.read', auth.uid(), p_org_id, NULL::text, NULL::bigint) THEN
+  IF auth.uid() != p_user_id AND NOT public.rbac_check_permission_direct(public.rbac_perm_org_read(), auth.uid(), p_org_id, NULL::text, NULL::bigint) THEN
     RAISE EXCEPTION 'NO_PERMISSION_TO_VIEW_BINDINGS';
   END IF;
 
@@ -2847,18 +3365,18 @@ BEGIN
     rb.reason,
     rb.is_direct,
     CASE
-      WHEN rb.principal_type = 'user' THEN u.email
-      WHEN rb.principal_type = 'group' THEN g.name
+      WHEN rb.principal_type = public.rbac_principal_user() THEN u.email
+      WHEN rb.principal_type = public.rbac_principal_group() THEN g.name
       ELSE rb.principal_id::text
     END as principal_name,
     u.email as user_email,
     g.name as group_name
   FROM public.role_bindings rb
   INNER JOIN public.roles r ON rb.role_id = r.id
-  LEFT JOIN public.users u ON rb.principal_type = 'user' AND rb.principal_id = u.id
-  LEFT JOIN public.groups g ON rb.principal_type = 'group' AND rb.principal_id = g.id
+  LEFT JOIN public.users u ON rb.principal_type = public.rbac_principal_user() AND rb.principal_id = u.id
+  LEFT JOIN public.groups g ON rb.principal_type = public.rbac_principal_group() AND rb.principal_id = g.id
   WHERE rb.org_id = p_org_id
-    AND rb.principal_type = 'user'
+    AND rb.principal_type = public.rbac_principal_user()
     AND rb.principal_id = p_user_id
   ORDER BY rb.granted_at DESC;
 END;
@@ -2875,7 +3393,7 @@ $$;
 -- When RBAC is disabled: Maps the permission to a legacy min_right and uses check_min_rights_legacy
 --
 -- Parameters:
---   p_permission_key: RBAC permission (e.g., 'app.upload_bundle', 'channel.promote_bundle')
+--   p_permission_key: RBAC permission (e.g., public.rbac_perm_app_upload_bundle(), public.rbac_perm_channel_promote_bundle())
 --   p_user_id: The user to check permissions for
 --   p_org_id: Organization ID (can be NULL if derivable from app/channel)
 --   p_app_id: App ID (varchar, e.g., 'com.example.app')
@@ -2928,7 +3446,7 @@ BEGIN
   IF v_use_rbac THEN
     -- RBAC path: Check user permission directly
     IF p_user_id IS NOT NULL THEN
-      v_allowed := public.rbac_has_permission('user', p_user_id, p_permission_key, v_effective_org_id, p_app_id, p_channel_id);
+      v_allowed := public.rbac_has_permission(public.rbac_principal_user(), p_user_id, p_permission_key, v_effective_org_id, p_app_id, p_channel_id);
     END IF;
 
     -- If user doesn't have permission, check apikey permission
@@ -2939,7 +3457,7 @@ BEGIN
       LIMIT 1;
 
       IF v_apikey_principal IS NOT NULL THEN
-        v_allowed := public.rbac_has_permission('apikey', v_apikey_principal, p_permission_key, v_effective_org_id, p_app_id, p_channel_id);
+        v_allowed := public.rbac_has_permission(public.rbac_principal_apikey(), v_apikey_principal, p_permission_key, v_effective_org_id, p_app_id, p_channel_id);
       END IF;
     END IF;
 
@@ -2959,13 +3477,13 @@ BEGIN
     -- Legacy path: Map permission to min_right and use legacy check
     -- Determine scope from permission prefix
     IF p_permission_key LIKE 'channel.%' THEN
-      v_scope := 'channel';
+      v_scope := public.rbac_scope_channel();
     ELSIF p_permission_key LIKE 'app.%' OR p_permission_key LIKE 'bundle.%' THEN
-      v_scope := 'app';
+      v_scope := public.rbac_scope_app();
     ELSIF p_permission_key LIKE 'org.%' THEN
-      v_scope := 'org';
+      v_scope := public.rbac_scope_org();
     ELSE
-      v_scope := 'org'; -- Default fallback
+      v_scope := public.rbac_scope_org(); -- Default fallback
     END IF;
 
     -- Map permission to legacy right using reverse lookup
@@ -3044,55 +3562,55 @@ BEGIN
   -- Map permissions to their legacy equivalents
   -- This mapping should match PERMISSION_TO_LEGACY_RIGHT in utils/rbac.ts
   CASE p_permission_key
-    -- Read permissions -> 'read'
-    WHEN 'org.read' THEN RETURN 'read';
-    WHEN 'org.read_members' THEN RETURN 'read';
-    WHEN 'app.read' THEN RETURN 'read';
-    WHEN 'app.read_bundles' THEN RETURN 'read';
-    WHEN 'app.read_channels' THEN RETURN 'read';
-    WHEN 'app.read_logs' THEN RETURN 'read';
-    WHEN 'app.read_devices' THEN RETURN 'read';
-    WHEN 'channel.read' THEN RETURN 'read';
-    WHEN 'channel.read_history' THEN RETURN 'read';
-    WHEN 'channel.read_forced_devices' THEN RETURN 'read';
+    -- Read permissions -> public.rbac_right_read()
+    WHEN public.rbac_perm_org_read() THEN RETURN public.rbac_right_read();
+    WHEN public.rbac_perm_org_read_members() THEN RETURN public.rbac_right_read();
+    WHEN public.rbac_perm_app_read() THEN RETURN public.rbac_right_read();
+    WHEN public.rbac_perm_app_read_bundles() THEN RETURN public.rbac_right_read();
+    WHEN public.rbac_perm_app_read_channels() THEN RETURN public.rbac_right_read();
+    WHEN public.rbac_perm_app_read_logs() THEN RETURN public.rbac_right_read();
+    WHEN public.rbac_perm_app_read_devices() THEN RETURN public.rbac_right_read();
+    WHEN public.rbac_perm_channel_read() THEN RETURN public.rbac_right_read();
+    WHEN public.rbac_perm_channel_read_history() THEN RETURN public.rbac_right_read();
+    WHEN public.rbac_perm_channel_read_forced_devices() THEN RETURN public.rbac_right_read();
 
-    -- Upload permissions -> 'upload'
-    WHEN 'app.upload_bundle' THEN RETURN 'upload';
+    -- Upload permissions -> public.rbac_right_upload()
+    WHEN public.rbac_perm_app_upload_bundle() THEN RETURN public.rbac_right_upload();
 
-    -- Write permissions -> 'write'
-    WHEN 'app.update_settings' THEN RETURN 'write';
-    WHEN 'app.create_channel' THEN RETURN 'write';
-    WHEN 'app.manage_devices' THEN RETURN 'write';
-    WHEN 'app.build_native' THEN RETURN 'write';
-    WHEN 'channel.update_settings' THEN RETURN 'write';
-    WHEN 'channel.promote_bundle' THEN RETURN 'write';
-    WHEN 'channel.rollback_bundle' THEN RETURN 'write';
-    WHEN 'channel.manage_forced_devices' THEN RETURN 'write';
+    -- Write permissions -> public.rbac_right_write()
+    WHEN public.rbac_perm_app_update_settings() THEN RETURN public.rbac_right_write();
+    WHEN public.rbac_perm_app_create_channel() THEN RETURN public.rbac_right_write();
+    WHEN public.rbac_perm_app_manage_devices() THEN RETURN public.rbac_right_write();
+    WHEN public.rbac_perm_app_build_native() THEN RETURN public.rbac_right_write();
+    WHEN public.rbac_perm_channel_update_settings() THEN RETURN public.rbac_right_write();
+    WHEN public.rbac_perm_channel_promote_bundle() THEN RETURN public.rbac_right_write();
+    WHEN public.rbac_perm_channel_rollback_bundle() THEN RETURN public.rbac_right_write();
+    WHEN public.rbac_perm_channel_manage_forced_devices() THEN RETURN public.rbac_right_write();
 
-    -- Admin permissions -> 'admin'
-    WHEN 'org.update_settings' THEN RETURN 'admin';
-    WHEN 'org.invite_user' THEN RETURN 'admin';
-    WHEN 'org.read_billing' THEN RETURN 'admin';
-    WHEN 'org.read_invoices' THEN RETURN 'admin';
-    WHEN 'org.read_audit' THEN RETURN 'admin';
-    WHEN 'app.delete' THEN RETURN 'admin';
-    WHEN 'app.read_audit' THEN RETURN 'admin';
-    WHEN 'bundle.delete' THEN RETURN 'admin';
-    WHEN 'channel.delete' THEN RETURN 'admin';
-    WHEN 'channel.read_audit' THEN RETURN 'admin';
+    -- Admin permissions -> public.rbac_right_admin()
+    WHEN public.rbac_perm_org_update_settings() THEN RETURN public.rbac_right_admin();
+    WHEN public.rbac_perm_org_invite_user() THEN RETURN public.rbac_right_admin();
+    WHEN public.rbac_perm_org_read_billing() THEN RETURN public.rbac_right_admin();
+    WHEN public.rbac_perm_org_read_invoices() THEN RETURN public.rbac_right_admin();
+    WHEN public.rbac_perm_org_read_audit() THEN RETURN public.rbac_right_admin();
+    WHEN public.rbac_perm_app_delete() THEN RETURN public.rbac_right_admin();
+    WHEN public.rbac_perm_app_read_audit() THEN RETURN public.rbac_right_admin();
+    WHEN public.rbac_perm_bundle_delete() THEN RETURN public.rbac_right_admin();
+    WHEN public.rbac_perm_channel_delete() THEN RETURN public.rbac_right_admin();
+    WHEN public.rbac_perm_channel_read_audit() THEN RETURN public.rbac_right_admin();
 
-    -- Super admin permissions -> 'super_admin'
-    WHEN 'org.update_user_roles' THEN RETURN 'super_admin';
-    WHEN 'org.update_billing' THEN RETURN 'super_admin';
-    WHEN 'org.read_billing_audit' THEN RETURN 'super_admin';
-    WHEN 'platform.impersonate_user' THEN RETURN 'super_admin';
-    WHEN 'platform.manage_orgs_any' THEN RETURN 'super_admin';
-    WHEN 'platform.manage_apps_any' THEN RETURN 'super_admin';
-    WHEN 'platform.manage_channels_any' THEN RETURN 'super_admin';
-    WHEN 'platform.run_maintenance_jobs' THEN RETURN 'super_admin';
-    WHEN 'platform.delete_orphan_users' THEN RETURN 'super_admin';
-    WHEN 'platform.read_all_audit' THEN RETURN 'super_admin';
-    WHEN 'platform.db_break_glass' THEN RETURN 'super_admin';
+    -- Super admin permissions -> public.rbac_right_super_admin()
+    WHEN public.rbac_perm_org_update_user_roles() THEN RETURN public.rbac_right_super_admin();
+    WHEN public.rbac_perm_org_update_billing() THEN RETURN public.rbac_right_super_admin();
+    WHEN public.rbac_perm_org_read_billing_audit() THEN RETURN public.rbac_right_super_admin();
+    WHEN public.rbac_perm_platform_impersonate_user() THEN RETURN public.rbac_right_super_admin();
+    WHEN public.rbac_perm_platform_manage_orgs_any() THEN RETURN public.rbac_right_super_admin();
+    WHEN public.rbac_perm_platform_manage_apps_any() THEN RETURN public.rbac_right_super_admin();
+    WHEN public.rbac_perm_platform_manage_channels_any() THEN RETURN public.rbac_right_super_admin();
+    WHEN public.rbac_perm_platform_run_maintenance_jobs() THEN RETURN public.rbac_right_super_admin();
+    WHEN public.rbac_perm_platform_delete_orphan_users() THEN RETURN public.rbac_right_super_admin();
+    WHEN public.rbac_perm_platform_read_all_audit() THEN RETURN public.rbac_right_super_admin();
+    WHEN public.rbac_perm_platform_db_break_glass() THEN RETURN public.rbac_right_super_admin();
 
     ELSE RETURN NULL; -- Unknown permission
   END CASE;
