@@ -2212,10 +2212,10 @@ COMMENT ON TRIGGER sync_org_user_role_binding_on_update ON public.org_users IS
   'Ensures role_bindings are updated automatically when org_users permissions are changed.';
 
 -- =============================================================================
--- Vue enrichie des role_bindings pour l'interface d'administration
+-- Enriched role_bindings view for the admin interface
 -- =============================================================================
 
--- Fonction helper pour vérifier si un utilisateur est admin d'une org (sans récursion RLS)
+-- Helper function to check if a user is an org admin (avoid RLS recursion)
 CREATE OR REPLACE FUNCTION public.is_user_org_admin(p_user_id uuid, p_org_id uuid)
 RETURNS boolean
 LANGUAGE sql
@@ -2235,9 +2235,9 @@ AS $$
 $$;
 
 COMMENT ON FUNCTION public.is_user_org_admin(uuid, uuid) IS
-  'Vérifie si un utilisateur a un rôle admin dans une organisation (contourne RLS pour éviter récursion)';
+  'Checks whether a user has an admin role in an organization (bypasses RLS to avoid recursion).';
 
--- Fonction helper pour vérifier si un utilisateur est admin d'une app (sans récursion RLS)
+-- Helper function to check if a user is an app admin (avoid RLS recursion)
 CREATE OR REPLACE FUNCTION public.is_user_app_admin(p_user_id uuid, p_app_id uuid)
 RETURNS boolean
 LANGUAGE sql
@@ -2257,9 +2257,9 @@ AS $$
 $$;
 
 COMMENT ON FUNCTION public.is_user_app_admin(uuid, uuid) IS
-  'Vérifie si un utilisateur a un rôle admin pour une app (contourne RLS pour éviter récursion)';
+  'Checks whether a user has an admin role for an app (bypasses RLS to avoid recursion).';
 
--- Fonction helper pour vérifier si un utilisateur a un rôle dans une app (sans récursion RLS)
+-- Helper function to check if a user has a role in an app (avoid RLS recursion)
 CREATE OR REPLACE FUNCTION public.user_has_role_in_app(p_user_id uuid, p_app_id uuid)
 RETURNS boolean
 LANGUAGE sql
@@ -2277,9 +2277,9 @@ AS $$
 $$;
 
 COMMENT ON FUNCTION public.user_has_role_in_app(uuid, uuid) IS
-  'Vérifie si un utilisateur a un rôle dans une app (contourne RLS pour éviter récursion)';
+  'Checks whether a user has a role in an app (bypasses RLS to avoid recursion).';
 
--- Fonction helper pour vérifier si un utilisateur a la permission app.update_user_roles
+-- Helper function to check if a user has app.update_user_roles permission
 CREATE OR REPLACE FUNCTION public.user_has_app_update_user_roles(p_user_id uuid, p_app_id uuid)
 RETURNS boolean
 LANGUAGE plpgsql
@@ -2290,7 +2290,7 @@ DECLARE
   v_app_id_varchar text;
   v_org_id uuid;
 BEGIN
-  -- Récupérer l'app_id varchar et l'org_id depuis la table apps
+  -- Fetch app_id varchar and org_id from apps table
   SELECT app_id, owner_org INTO v_app_id_varchar, v_org_id
   FROM public.apps
   WHERE id = p_app_id
@@ -2300,7 +2300,7 @@ BEGIN
     RETURN false;
   END IF;
 
-  -- Utiliser rbac_has_permission pour vérifier la permission
+  -- Use rbac_has_permission to check the permission
   RETURN public.rbac_has_permission(
     'user',
     p_user_id,
@@ -2313,9 +2313,9 @@ END;
 $$;
 
 COMMENT ON FUNCTION public.user_has_app_update_user_roles(uuid, uuid) IS
-  'Vérifie si un utilisateur a la permission app.update_user_roles (contourne RLS pour éviter récursion)';
+  'Checks whether a user has app.update_user_roles permission (bypasses RLS to avoid recursion).';
 
--- Vue qui joint role_bindings avec les informations des utilisateurs et groupes
+-- View that joins role_bindings with user and group information
 CREATE OR REPLACE VIEW public.role_bindings_view AS
 SELECT
   rb.id,
@@ -2333,15 +2333,15 @@ SELECT
   rb.expires_at,
   rb.reason,
   rb.is_direct,
-  -- Informations du principal (user ou group)
+  -- Principal info (user or group)
   CASE
     WHEN rb.principal_type = 'user' THEN u.email
     WHEN rb.principal_type = 'group' THEN g.name
     ELSE rb.principal_id::text
   END as principal_name,
-  -- Email de l'utilisateur (si principal_type = 'user')
+  -- User email (if principal_type = 'user')
   u.email as user_email,
-  -- Nom du groupe (si principal_type = 'group')
+  -- Group name (if principal_type = 'group')
   g.name as group_name
 FROM public.role_bindings rb
 INNER JOIN public.roles r ON rb.role_id = r.id
@@ -2349,45 +2349,45 @@ LEFT JOIN public.users u ON rb.principal_type = 'user' AND rb.principal_id = u.i
 LEFT JOIN public.groups g ON rb.principal_type = 'group' AND rb.principal_id = g.id;
 
 COMMENT ON VIEW public.role_bindings_view IS
-  'Vue enrichie des role_bindings avec emails et noms. Accessible aux admins ayant permission de gérer les accès.';
+  'Enriched role_bindings view with emails and names. Accessible to admins with access management permission.';
 
--- Utiliser security_definer pour que la vue contourne RLS sur users et groups
+-- Use security_invoker = off so the view bypasses RLS on users and groups
 ALTER VIEW public.role_bindings_view SET (security_invoker = off);
 
--- Policy SELECT: vérifie les droits admin ou si l'utilisateur a un rôle dans l'app
+-- Policy SELECT: check admin rights or role in the app
 CREATE POLICY "Allow viewing role bindings with permission"
 ON public.role_bindings
 FOR SELECT
 TO authenticated
 USING (
-  -- Org admin peut voir tous les bindings de son org
+  -- Org admins can see all bindings in their org
   public.is_user_org_admin(auth.uid(), org_id)
   OR
-  -- App admin peut voir les bindings de ses apps
+  -- App admins can see bindings for their apps
   (scope_type = 'app' AND public.is_user_app_admin(auth.uid(), app_id))
   OR
-  -- Utilisateur avec un rôle dans l'app peut voir les autres membres de l'app
+  -- Users with a role in the app can see other app members
   (scope_type = 'app' AND app_id IS NOT NULL AND public.user_has_role_in_app(auth.uid(), app_id))
 );
 
 COMMENT ON POLICY "Allow viewing role bindings with permission" ON public.role_bindings IS
-  'Permet de voir les role bindings si l''utilisateur est admin ou a un rôle dans l''app.';
+  'Allows viewing role bindings if the user is admin or has a role in the app.';
 
--- Policy DELETE: utilise les fonctions helper pour éviter la récursion
+-- Policy DELETE: use helper functions to avoid recursion
 CREATE POLICY "Allow admins to delete manageable role bindings"
 ON public.role_bindings
 FOR DELETE
 TO authenticated
 USING (
-  -- User avec permission app.update_user_roles peut supprimer les bindings de l'app
+  -- Users with app.update_user_roles can delete bindings for the app
   (scope_type = 'app' AND public.user_has_app_update_user_roles(auth.uid(), app_id))
   OR
-  -- L'utilisateur peut se retirer lui-même d'une app
+  -- Users can remove themselves from an app
   (scope_type = 'app' AND principal_type = 'user' AND principal_id = auth.uid())
 );
 
 COMMENT ON POLICY "Allow admins to delete manageable role bindings" ON public.role_bindings IS
-  'Permet aux users avec permission app.update_user_roles et à l''utilisateur lui-même de supprimer les role bindings.';
+  'Allows users with app.update_user_roles permission and the user themselves to delete role bindings.';
 
 -- =============================================================================
 -- RPCs for RBAC Member Management
