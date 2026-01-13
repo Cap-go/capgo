@@ -2,7 +2,7 @@
  * RBAC Permission System - Frontend
  *
  * This module provides the frontend interface to the backend RBAC permission system.
- * It calls the SQL function rbac_check_permission_direct() which automatically routes
+ * It calls the SQL function rbac_check_permission() which automatically routes
  * between legacy (org_users) and new RBAC (role_bindings) systems based on the org's
  * use_new_rbac flag.
  *
@@ -88,7 +88,7 @@ export interface PermissionScope {
 /**
  * Main permission check function.
  *
- * Calls the SQL function rbac_check_permission_direct() which automatically
+ * Calls the SQL function rbac_check_permission() which automatically
  * routes between legacy (check_min_rights) and RBAC systems based on the org's
  * feature flag.
  *
@@ -135,13 +135,11 @@ export async function hasPermission(
   }
 
   try {
-    const { data, error } = await supabase.rpc('rbac_check_permission_direct', {
+    const { data, error } = await supabase.rpc('rbac_check_permission', {
       p_permission_key: permission,
-      p_user_id: userId,
       p_org_id: scope.orgId ?? null,
       p_app_id: scope.appId ?? null,
       p_channel_id: scope.channelId ?? null,
-      p_apikey: null, // Frontend always checks user permissions, not API key
     })
 
     if (error) {

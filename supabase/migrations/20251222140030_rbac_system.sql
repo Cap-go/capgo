@@ -2859,6 +2859,39 @@ COMMENT ON FUNCTION public.rbac_check_permission_direct(text, uuid, uuid, charac
   'Direct RBAC permission check with automatic legacy fallback based on org feature flag. Use this from application code for explicit permission checks.';
 
 -- =============================================================================
+-- rbac_check_permission: Public wrapper for authenticated users
+-- =============================================================================
+-- Uses auth.uid() and delegates to rbac_check_permission_direct.
+
+CREATE OR REPLACE FUNCTION public.rbac_check_permission(
+  p_permission_key text,
+  p_org_id uuid DEFAULT NULL,
+  p_app_id character varying DEFAULT NULL,
+  p_channel_id bigint DEFAULT NULL
+) RETURNS boolean
+LANGUAGE plpgsql
+SET search_path = ''
+SECURITY DEFINER AS $$
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RETURN false;
+  END IF;
+
+  RETURN public.rbac_check_permission_direct(
+    p_permission_key,
+    auth.uid(),
+    p_org_id,
+    p_app_id,
+    p_channel_id,
+    NULL
+  );
+END;
+$$;
+
+COMMENT ON FUNCTION public.rbac_check_permission(text, uuid, character varying, bigint) IS
+  'Public RBAC permission check for authenticated users. Uses auth.uid() and delegates to rbac_check_permission_direct.';
+
+-- =============================================================================
 -- rbac_legacy_right_for_permission: Reverse mapping from permission to legacy min_right
 -- =============================================================================
 -- This is the inverse of rbac_permission_for_legacy, used when we need to fall back
@@ -2933,7 +2966,10 @@ COMMENT ON FUNCTION public.rbac_legacy_right_for_permission(text) IS
   'Maps RBAC permission keys to legacy user_min_right values for fallback checks.';
 
 -- Grant execute permissions for new functions
-GRANT EXECUTE ON FUNCTION public.rbac_check_permission_direct(text, uuid, uuid, character varying, bigint, text) TO authenticated;
+REVOKE ALL ON FUNCTION public.rbac_check_permission_direct(text, uuid, uuid, character varying, bigint, text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.rbac_check_permission_direct(text, uuid, uuid, character varying, bigint, text) FROM anon;
+REVOKE ALL ON FUNCTION public.rbac_check_permission_direct(text, uuid, uuid, character varying, bigint, text) FROM authenticated;
 GRANT EXECUTE ON FUNCTION public.rbac_check_permission_direct(text, uuid, uuid, character varying, bigint, text) TO service_role;
+GRANT EXECUTE ON FUNCTION public.rbac_check_permission(text, uuid, character varying, bigint) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.rbac_legacy_right_for_permission(text) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.rbac_legacy_right_for_permission(text) TO service_role;

@@ -794,9 +794,40 @@ User "Bob" has role app_developer on app "com.example.mobile"
 - Recursive CTE limited in depth (max ~5-6 levels)
 - Application-level caching (backend)
 
-### 4. `rbac_check_permission_direct()` - Unified entry point
+### 4. `rbac_check_permission()` - Public entry point (authenticated)
 
-**Main function** used by the backend to check permissions.
+**Public function** used by client RPCs. It uses `auth.uid()` and delegates to the internal function.
+
+```sql
+CREATE OR REPLACE FUNCTION public.rbac_check_permission(
+  p_permission_key text,        -- 'app.upload_bundle'
+  p_org_id uuid DEFAULT NULL,   -- Optional
+  p_app_id varchar DEFAULT NULL, -- Optional
+  p_channel_id bigint DEFAULT NULL -- Optional
+) RETURNS boolean
+LANGUAGE plpgsql
+SET search_path = ''
+SECURITY DEFINER AS $$
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RETURN false;
+  END IF;
+
+  RETURN public.rbac_check_permission_direct(
+    p_permission_key,
+    auth.uid(),
+    p_org_id,
+    p_app_id,
+    p_channel_id,
+    NULL
+  );
+END;
+$$;
+```
+
+#### `rbac_check_permission_direct()` - Internal entry point (service_role only)
+
+**Internal function** used by backend/service_role to check permissions for arbitrary users or API keys.
 
 ```sql
 CREATE OR REPLACE FUNCTION public.rbac_check_permission_direct(
@@ -923,16 +954,15 @@ $$;
 
 **Recommended usage**:
 ```sql
--- Check if a user can upload a bundle
-SELECT rbac_check_permission_direct(
+-- Authenticated user (client RPC)
+SELECT rbac_check_permission(
   'app.upload_bundle',
-  'user-uuid'::uuid,
   NULL, -- org_id will be derived
   'com.example.app',
   NULL
 );
 
--- Check if an API key can promote a bundle
+-- Service role / backend API key
 SELECT rbac_check_permission_direct(
   'channel.promote_bundle',
   NULL::uuid,
@@ -1289,8 +1319,20 @@ rbac_has_permission(
 - User has `app_developer` on app `X` -> can do `app.upload_bundle` only on app `X`
 - User has `app_uploader` in org `A` -> can upload to all apps in org `A` (if the binding is at org level)
 
-#### `rbac_check_permission_direct()` - Unified entry point
-**Convenience wrapper** that automatically detects whether to use RBAC or legacy:
+#### `rbac_check_permission()` - Public entry point (authenticated)
+**Convenience wrapper** that uses `auth.uid()` and delegates to the internal function:
+
+```sql
+rbac_check_permission(
+  p_permission_key text,
+  p_org_id uuid,
+  p_app_id varchar,
+  p_channel_id bigint
+) RETURNS boolean
+```
+
+#### `rbac_check_permission_direct()` - Internal entry point (service_role only)
+Used by backend/service_role to check permissions for arbitrary users or API keys.
 
 ```sql
 rbac_check_permission_direct(
@@ -1303,7 +1345,7 @@ rbac_check_permission_direct(
 ) RETURNS boolean
 ```
 
-**Logic**:
+**Logic** (applies to the internal function and therefore the wrapper):
 1. Derive `org_id` from `app_id` or `channel_id` if missing
 2. Check the org `use_new_rbac` flag (via `rbac_is_enabled_for_org()`)
 3. **If RBAC enabled**: call `rbac_has_permission()` directly
@@ -1413,13 +1455,11 @@ export async function hasPermission(
   scope: PermissionScope
 ): Promise<boolean> {
   try {
-    const { data, error } = await supabase.rpc('rbac_check_permission_direct', {
+    const { data, error } = await supabase.rpc('rbac_check_permission', {
       p_permission_key: permission,
-      p_user_id: supabase.auth.user()?.id || null,
       p_org_id: scope.orgId || null,
       p_app_id: scope.appId || null,
       p_channel_id: scope.channelId || null,
-      p_apikey: null, // Frontend never uses API keys
     })
 
     if (error) {
@@ -1737,14 +1777,12 @@ ORDER BY depth, name;
 #### 5. Manually test a permission
 
 ```sql
--- Check if a user can upload to an app
-SELECT rbac_check_permission_direct(
+-- Check if the authenticated user can upload to an app
+SELECT rbac_check_permission(
   'app.upload_bundle',              -- permission
-  'user-uuid'::uuid,                -- user_id
   NULL::uuid,                       -- org_id (derived from app_id)
   'com.example.app',                -- app_id
-  NULL::bigint,                     -- channel_id
-  NULL                              -- apikey
+  NULL::bigint                      -- channel_id
 ) as has_permission;
 
 -- Check if an API key can promote on a channel
@@ -2115,15 +2153,14 @@ onMounted(async () => {
 
 | File | Description |
 |---------|-------------|
-| [supabase/migrations/20251222140030_rbac_system.sql](supabase/migrations/20251222140030_rbac_system.sql) | Main RBAC migration (tables + seed) |
-| [supabase/migrations/20260106133353_rbac_check_permission_direct.sql](supabase/migrations/20260106133353_rbac_check_permission_direct.sql) | `rbac_check_permission_direct()` function |
+| [supabase/migrations/20251222140030_rbac_system.sql](supabase/migrations/20251222140030_rbac_system.sql) | RBAC schema + permission checks (includes public wrapper + grants) |
 | [supabase/functions/_backend/utils/rbac.ts](supabase/functions/_backend/utils/rbac.ts) | TypeScript backend wrapper |
 | [src/services/permissions.ts](src/services/permissions.ts) | Frontend permissions service |
 | [src/stores/organization.ts](src/stores/organization.ts) | Organization store (legacy `hasPermissionsInRole`) |
 
 ### Related migrations
 
-- `20251222140030_rbac_system.sql` - Complete RBAC system
+- `20251222140030_rbac_system.sql` - Complete RBAC system (including public wrapper + grant restrictions)
 
 ### External documentation
 
