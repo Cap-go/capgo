@@ -703,77 +703,93 @@ async function deleteMember(member: ExtendedOrganizationMember) {
   _deleteMember(member)
 }
 
+function handleRbacRoleUpdateError(error: { message?: string }) {
+  if (error.message?.includes('CANNOT_REMOVE_LAST_SUPER_ADMIN')) {
+    toast.error(t('cannot-remove-last-super-admin'))
+  }
+  else if (error.message?.includes('CANNOT_CHANGE_OWNER_ROLE')) {
+    toast.error(t('cannot-change-owner-role'))
+  }
+  else if (error.message?.includes('NO_PERMISSION_TO_UPDATE_ROLES')) {
+    toast.error(t('no-permission'))
+  }
+  else {
+    toast.error(`${t('cannot-change-permission')}: ${error.message ?? t('unexpected-response')}`)
+  }
+}
+
+async function updateRbacMemberRole(member: ExtendedOrganizationMember, perm: string) {
+  const { data, error } = await supabase.rpc('update_org_member_role', {
+    p_org_id: currentOrganization.value?.gid ?? '',
+    p_user_id: member.uid,
+    p_new_role_name: perm,
+  })
+
+  if (error) {
+    console.error('Error updating RBAC role:', error)
+    handleRbacRoleUpdateError(error)
+    return
+  }
+
+  if (data === 'OK') {
+    toast.success(t('permission-changed'))
+    await reloadData()
+  }
+}
+
+async function updateTmpMemberRole(member: ExtendedOrganizationMember, perm: Database['public']['Enums']['user_min_right']) {
+  const { data, error } = await supabase.rpc('modify_permissions_tmp', {
+    email: member.email,
+    org_id: currentOrganization.value?.gid ?? '',
+    new_role: perm,
+  })
+
+  if (error) {
+    console.error('Error changing permission for invitation: ', error)
+    toast.error(`${t('cannot-change-permission')}: ${error.message}`)
+    return
+  }
+
+  if (data === 'OK') {
+    toast.success(t('permission-changed'))
+  }
+  else {
+    toast.warning(`${t('unexpected-response')}: ${data}`)
+  }
+
+  await reloadData()
+}
+
+async function updateLegacyMemberRole(member: ExtendedOrganizationMember, perm: Database['public']['Enums']['user_min_right']) {
+  const { error } = await supabase
+    .from('org_users')
+    .update({ user_right: perm })
+    .eq('id', member.aid)
+
+  if (error) {
+    console.error('Error changing permission: ', error)
+    toast.error(`${t('cannot-change-permission')}: ${error.message}`)
+    return
+  }
+
+  toast.success(t('permission-changed'))
+  await reloadData()
+}
+
 async function _changeMemberPermission(member: ExtendedOrganizationMember, perm: Database['public']['Enums']['user_min_right'] | string) {
   isLoading.value = true
   try {
     if (useNewRbac.value && currentOrganization.value) {
-      // Utiliser la RPC RBAC pour mettre à jour le rôle
-      const { data, error } = await supabase.rpc('update_org_member_role', {
-        p_org_id: currentOrganization.value.gid,
-        p_user_id: member.uid,
-        p_new_role_name: perm as string,
-      })
-
-      if (error) {
-        console.error('Error updating RBAC role:', error)
-
-        // Gérer les erreurs spécifiques
-        if (error.message.includes('CANNOT_REMOVE_LAST_SUPER_ADMIN')) {
-          toast.error(t('cannot-remove-last-super-admin'))
-        }
-        else if (error.message.includes('CANNOT_CHANGE_OWNER_ROLE')) {
-          toast.error(t('cannot-change-owner-role'))
-        }
-        else if (error.message.includes('NO_PERMISSION_TO_UPDATE_ROLES')) {
-          toast.error(t('no-permission'))
-        }
-        else {
-          toast.error(`${t('cannot-change-permission')}: ${error.message}`)
-        }
-        return
-      }
-
-      if (data === 'OK') {
-        toast.success(t('permission-changed'))
-        await reloadData()
-      }
+      await updateRbacMemberRole(member, perm as string)
+      return
     }
-    else if (member.is_tmp) {
-      // Handle modifying permissions for temporary users (legacy)
-      const { data, error } = await supabase.rpc('modify_permissions_tmp', {
-        email: member.email,
-        org_id: currentOrganization.value?.gid ?? '',
-        new_role: perm as Database['public']['Enums']['user_min_right'],
-      })
 
-      if (error) {
-        console.error('Error changing permission for invitation: ', error)
-        toast.error(`${t('cannot-change-permission')}: ${error.message}`)
-        return
-      }
-
-      // Handle response codes
-      if (data === 'OK') {
-        toast.success(t('permission-changed'))
-      }
-      else {
-        toast.warning(`${t('unexpected-response')}: ${data}`)
-      }
-
-      await reloadData()
+    if (member.is_tmp) {
+      await updateTmpMemberRole(member, perm as Database['public']['Enums']['user_min_right'])
+      return
     }
-    else {
-      // Handle regular users as before (legacy)
-      const { error } = await supabase.from('org_users').update({ user_right: perm as Database['public']['Enums']['user_min_right'] }).eq('id', member.aid)
-      if (error) {
-        console.error('Error changing permission: ', error)
-        toast.error(`${t('cannot-change-permission')}: ${error.message}`)
-        return
-      }
 
-      toast.success(t('permission-changed'))
-      await reloadData()
-    }
+    await updateLegacyMemberRole(member, perm as Database['public']['Enums']['user_min_right'])
   }
   catch (error) {
     console.error('Permission change failed:', error)
@@ -991,7 +1007,7 @@ async function handleInviteNewUserSubmit() {
           {{ t('members') }}
         </h2>
       </div>
-      <div v-if="rbacSystemEnabled" class="mb-4 d-alert d-alert-info gap-3 items-start">
+      <div v-if="rbacSystemEnabled && useNewRbac.value" class="mb-4 d-alert d-alert-info gap-3 items-start">
         <IconInformation class="w-6 h-6 text-sky-400 shrink-0" />
         <div class="text-sm text-slate-100">
           <p class="font-semibold">

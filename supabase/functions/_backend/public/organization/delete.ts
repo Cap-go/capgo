@@ -10,6 +10,46 @@ interface DeleteOrganizationParams {
   orgId?: string
 }
 
+type StorageBucket = ReturnType<ReturnType<typeof supabaseAdmin>['storage']['from']>
+
+async function deleteOrgImages(c: Context<MiddlewareKeyVariables>, orgId: string) {
+  try {
+    const storage = supabaseAdmin(c).storage.from('images')
+    const requestId = c.get('requestId')
+    const { data: entries } = await storage.list(`org/${orgId}`)
+
+    if (!entries?.length) {
+      return
+    }
+
+    for (const entry of entries) {
+      if (entry.id === null) {
+        await deleteOrgAppImages(storage, orgId, entry.name, requestId)
+        continue
+      }
+
+      await storage.remove([`org/${orgId}/${entry.name}`])
+    }
+
+    cloudlog({ requestId, message: 'deleted all org images', org_id: orgId })
+  }
+  catch (error) {
+    cloudlog({ requestId: c.get('requestId'), message: 'error deleting org images', error, org_id: orgId })
+  }
+}
+
+async function deleteOrgAppImages(storage: StorageBucket, orgId: string, folderName: string, requestId?: string) {
+  const { data: appFiles } = await storage.list(`org/${orgId}/${folderName}`)
+
+  if (!appFiles?.length) {
+    return
+  }
+
+  const filePaths = appFiles.map(file => `org/${orgId}/${folderName}/${file.name}`)
+  await storage.remove(filePaths)
+  cloudlog({ requestId, message: 'deleted org app images', count: appFiles.length, folder: folderName })
+}
+
 export async function deleteOrg(c: Context<MiddlewareKeyVariables>, body: DeleteOrganizationParams, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
   const orgId = body.orgId
 
@@ -23,48 +63,7 @@ export async function deleteOrg(c: Context<MiddlewareKeyVariables>, body: Delete
     throw quickError(403, 'invalid_org_id', 'You can\'t delete this organization', { org_id: orgId })
   }
 
-  // Delete all organization images from storage before deleting the org
-  // Organization images are stored at: images/org/{org_id}/*
-  try {
-    // List all files under the org folder recursively
-    const { data: folders } = await supabaseAdmin(c)
-      .storage
-      .from('images')
-      .list(`org/${orgId}`)
-
-    if (folders && folders.length > 0) {
-      // For each subfolder (app_id), list and delete files
-      for (const folder of folders) {
-        if (folder.id === null) {
-          // This is a directory (app folder), list its contents
-          const { data: appFiles } = await supabaseAdmin(c)
-            .storage
-            .from('images')
-            .list(`org/${orgId}/${folder.name}`)
-
-          if (appFiles && appFiles.length > 0) {
-            const filePaths = appFiles.map(file => `org/${orgId}/${folder.name}/${file.name}`)
-            await supabaseAdmin(c)
-              .storage
-              .from('images')
-              .remove(filePaths)
-            cloudlog({ requestId: c.get('requestId'), message: 'deleted org app images', count: appFiles.length, folder: folder.name })
-          }
-        }
-        else {
-          // This is a file directly in the org folder
-          await supabaseAdmin(c)
-            .storage
-            .from('images')
-            .remove([`org/${orgId}/${folder.name}`])
-        }
-      }
-      cloudlog({ requestId: c.get('requestId'), message: 'deleted all org images', org_id: orgId })
-    }
-  }
-  catch (error) {
-    cloudlog({ requestId: c.get('requestId'), message: 'error deleting org images', error, org_id: orgId })
-  }
+  await deleteOrgImages(c, orgId)
 
   const { error } = await supabaseApikey(c, apikey.key)
     .from('orgs')

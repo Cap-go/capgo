@@ -8,6 +8,21 @@ import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import { checkPermission } from '../utils/rbac.ts'
 import { schema } from '../utils/postgres_schema.ts'
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+function isUuid(value: string | undefined): value is string {
+  return !!value && UUID_REGEX.test(value)
+}
+
+async function parseJsonBody(c: Context<MiddlewareKeyVariables>) {
+  try {
+    return { ok: true as const, data: await c.req.json() }
+  }
+  catch {
+    return { ok: false as const, error: 'Invalid JSON body' }
+  }
+}
+
 export const app = new Hono<MiddlewareKeyVariables>()
 
 app.use('/', useCors)
@@ -20,6 +35,10 @@ app.get('/:org_id', async (c: Context<MiddlewareKeyVariables>) => {
 
   if (!userId) {
     return c.json({ error: 'Unauthorized' }, 401)
+  }
+
+  if (!isUuid(orgId)) {
+    return c.json({ error: 'Invalid org_id' }, 400)
   }
 
   if (!(await checkPermission(c, 'org.read_members', { orgId }))) {
@@ -66,15 +85,24 @@ app.get('/:org_id', async (c: Context<MiddlewareKeyVariables>) => {
 app.post('/:org_id', async (c: Context<MiddlewareKeyVariables>) => {
   const orgId = c.req.param('org_id')
   const userId = c.get('auth')?.userId
-  const body = await c.req.json()
 
   if (!userId) {
     return c.json({ error: 'Unauthorized' }, 401)
   }
 
+  if (!isUuid(orgId)) {
+    return c.json({ error: 'Invalid org_id' }, 400)
+  }
+
   if (!(await checkPermission(c, 'org.update_user_roles', { orgId }))) {
     return c.json({ error: 'Forbidden - Admin rights required' }, 403)
   }
+
+  const parsedBody = await parseJsonBody(c)
+  if (!parsedBody.ok) {
+    return c.json({ error: parsedBody.error }, 400)
+  }
+  const body = parsedBody.data
 
   const { name, description } = body
 
@@ -121,13 +149,14 @@ app.post('/:org_id', async (c: Context<MiddlewareKeyVariables>) => {
 app.put('/:group_id', async (c: Context<MiddlewareKeyVariables>) => {
   const groupId = c.req.param('group_id')
   const userId = c.get('auth')?.userId
-  const body = await c.req.json()
 
   if (!userId) {
     return c.json({ error: 'Unauthorized' }, 401)
   }
 
-  const { name, description } = body
+  if (!isUuid(groupId)) {
+    return c.json({ error: 'Invalid group_id' }, 400)
+  }
 
   let pgClient
   try {
@@ -152,6 +181,12 @@ app.put('/:group_id', async (c: Context<MiddlewareKeyVariables>) => {
     if (!(await checkPermission(c, 'org.update_user_roles', { orgId: group.org_id }))) {
       return c.json({ error: 'Forbidden - Admin rights required' }, 403)
     }
+
+    const parsedBody = await parseJsonBody(c)
+    if (!parsedBody.ok) {
+      return c.json({ error: parsedBody.error }, 400)
+    }
+    const { name, description } = parsedBody.data
 
     // Mettre à jour
     const [updated] = await drizzle
@@ -190,6 +225,10 @@ app.delete('/:group_id', async (c: Context<MiddlewareKeyVariables>) => {
     return c.json({ error: 'Unauthorized' }, 401)
   }
 
+  if (!isUuid(groupId)) {
+    return c.json({ error: 'Invalid group_id' }, 400)
+  }
+
   let pgClient
   try {
     pgClient = getPgClient(c)
@@ -214,7 +253,16 @@ app.delete('/:group_id', async (c: Context<MiddlewareKeyVariables>) => {
       return c.json({ error: 'Forbidden - Admin rights required' }, 403)
     }
 
-    // Supprimer (cascade supprimera group_members et role_bindings)
+    // Supprimer (cascade supprimera group_members, role_bindings nettoyés explicitement)
+    await drizzle
+      .delete(schema.role_bindings)
+      .where(
+        and(
+          eq(schema.role_bindings.principal_type, 'group'),
+          eq(schema.role_bindings.principal_id, groupId),
+        ),
+      )
+
     await drizzle
       .delete(schema.groups)
       .where(eq(schema.groups.id, groupId))
@@ -244,6 +292,10 @@ app.get('/:group_id/members', async (c: Context<MiddlewareKeyVariables>) => {
 
   if (!userId) {
     return c.json({ error: 'Unauthorized' }, 401)
+  }
+
+  if (!isUuid(groupId)) {
+    return c.json({ error: 'Invalid group_id' }, 400)
   }
 
   let pgClient
@@ -300,16 +352,13 @@ app.get('/:group_id/members', async (c: Context<MiddlewareKeyVariables>) => {
 app.post('/:group_id/members', async (c: Context<MiddlewareKeyVariables>) => {
   const groupId = c.req.param('group_id')
   const userId = c.get('auth')?.userId
-  const body = await c.req.json()
 
   if (!userId) {
     return c.json({ error: 'Unauthorized' }, 401)
   }
 
-  const { user_id: targetUserId } = body
-
-  if (!targetUserId) {
-    return c.json({ error: 'user_id is required' }, 400)
+  if (!isUuid(groupId)) {
+    return c.json({ error: 'Invalid group_id' }, 400)
   }
 
   let pgClient
@@ -330,6 +379,21 @@ app.post('/:group_id/members', async (c: Context<MiddlewareKeyVariables>) => {
 
     if (!(await checkPermission(c, 'org.update_user_roles', { orgId: group.org_id }))) {
       return c.json({ error: 'Forbidden - Admin rights required' }, 403)
+    }
+
+    const parsedBody = await parseJsonBody(c)
+    if (!parsedBody.ok) {
+      return c.json({ error: parsedBody.error }, 400)
+    }
+
+    const { user_id: targetUserId } = parsedBody.data
+
+    if (!targetUserId) {
+      return c.json({ error: 'user_id is required' }, 400)
+    }
+
+    if (!isUuid(targetUserId)) {
+      return c.json({ error: 'Invalid user_id' }, 400)
     }
 
     // Vérifier que le target user fait partie de l'org
@@ -400,6 +464,14 @@ app.delete('/:group_id/members/:user_id', async (c: Context<MiddlewareKeyVariabl
 
   if (!userId) {
     return c.json({ error: 'Unauthorized' }, 401)
+  }
+
+  if (!isUuid(groupId)) {
+    return c.json({ error: 'Invalid group_id' }, 400)
+  }
+
+  if (!isUuid(targetUserId)) {
+    return c.json({ error: 'Invalid user_id' }, 400)
   }
 
   let pgClient
