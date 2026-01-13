@@ -29,14 +29,13 @@ export function middlewareRbacContext(options?: { orgIdResolver?: (c: Context) =
 
     // Try to resolve orgId from provided resolver
     if (options?.orgIdResolver) {
-      const resolved = options.orgIdResolver(c)
-      orgId = resolved instanceof Promise ? await resolved : resolved
+      orgId = await Promise.resolve(options.orgIdResolver(c))
     }
 
     // If no orgId yet, try to get it from common sources
     if (!orgId) {
       // Try to get from query/body app_id and resolve to org
-      const appId = c.req.query('app_id') || (await c.req.json().catch(() => ({})))?.app_id
+      const appId = c.req.query('app_id') || (await c.req.raw.clone().json().catch(() => ({})))?.app_id
       if (appId) {
         let pgClient
         try {
@@ -56,7 +55,7 @@ export function middlewareRbacContext(options?: { orgIdResolver?: (c: Context) =
         }
         finally {
           if (pgClient) {
-            closeClient(c, pgClient)
+            await closeClient(c, pgClient)
           }
         }
       }
@@ -88,7 +87,7 @@ export function middlewareRbacContext(options?: { orgIdResolver?: (c: Context) =
       }
       finally {
         if (pgClient) {
-          closeClient(c, pgClient)
+          await closeClient(c, pgClient)
         }
       }
     }
