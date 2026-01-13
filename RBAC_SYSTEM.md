@@ -622,9 +622,6 @@ The system defines **40+ atomic permissions** organized by scope.
 ---
 
 ## SQL Functions
----
-
-## SQL Functions
 
 ### 1. `rbac_is_enabled_for_org()` - RBAC Flag Check
 
