@@ -3,7 +3,7 @@ import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { and, eq } from 'drizzle-orm'
 import { Hono } from 'hono/tiny'
 import { middlewareAuth, useCors } from '../utils/hono.ts'
-import { getDrizzleClient } from '../utils/pg.ts'
+import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import { checkPermission } from '../utils/rbac.ts'
 import { schema } from '../utils/postgres_schema.ts'
 
@@ -25,8 +25,10 @@ app.get('/:org_id', async (c: Context<MiddlewareKeyVariables>) => {
     return c.json({ error: 'Forbidden' }, 403)
   }
 
+  let pgClient
   try {
-    const drizzle = await getDrizzleClient(c)
+    pgClient = getPgClient(c)
+    const drizzle = getDrizzleClient(pgClient)
 
     // Récupérer les groupes
     const groups = await drizzle
@@ -46,6 +48,11 @@ app.get('/:org_id', async (c: Context<MiddlewareKeyVariables>) => {
   catch (error) {
     console.error('Error fetching groups:', error)
     return c.json({ error: 'Internal server error' }, 500)
+  }
+  finally {
+    if (pgClient) {
+      await closeClient(c, pgClient)
+    }
   }
 })
 
@@ -69,8 +76,10 @@ app.post('/:org_id', async (c: Context<MiddlewareKeyVariables>) => {
     return c.json({ error: 'Name is required' }, 400)
   }
 
+  let pgClient
   try {
-    const drizzle = await getDrizzleClient(c)
+    pgClient = getPgClient(c)
+    const drizzle = getDrizzleClient(pgClient)
 
     // Créer le groupe
     const [group] = await drizzle
@@ -90,6 +99,11 @@ app.post('/:org_id', async (c: Context<MiddlewareKeyVariables>) => {
     console.error('Error creating group:', error)
     return c.json({ error: 'Internal server error' }, 500)
   }
+  finally {
+    if (pgClient) {
+      await closeClient(c, pgClient)
+    }
+  }
 })
 
 // PUT /private/groups/:group_id - Modifier un groupe
@@ -104,8 +118,10 @@ app.put('/:group_id', async (c: Context<MiddlewareKeyVariables>) => {
 
   const { name, description } = body
 
+  let pgClient
   try {
-    const drizzle = await getDrizzleClient(c)
+    pgClient = getPgClient(c)
+    const drizzle = getDrizzleClient(pgClient)
 
     // Récupérer le groupe et vérifier l'accès
     const [group] = await drizzle
@@ -142,6 +158,11 @@ app.put('/:group_id', async (c: Context<MiddlewareKeyVariables>) => {
     console.error('Error updating group:', error)
     return c.json({ error: 'Internal server error' }, 500)
   }
+  finally {
+    if (pgClient) {
+      await closeClient(c, pgClient)
+    }
+  }
 })
 
 // DELETE /private/groups/:group_id - Supprimer un groupe
@@ -153,8 +174,10 @@ app.delete('/:group_id', async (c: Context<MiddlewareKeyVariables>) => {
     return c.json({ error: 'Unauthorized' }, 401)
   }
 
+  let pgClient
   try {
-    const drizzle = await getDrizzleClient(c)
+    pgClient = getPgClient(c)
+    const drizzle = getDrizzleClient(pgClient)
 
     // Récupérer le groupe et vérifier l'accès
     const [group] = await drizzle
@@ -186,6 +209,11 @@ app.delete('/:group_id', async (c: Context<MiddlewareKeyVariables>) => {
     console.error('Error deleting group:', error)
     return c.json({ error: 'Internal server error' }, 500)
   }
+  finally {
+    if (pgClient) {
+      await closeClient(c, pgClient)
+    }
+  }
 })
 
 // GET /private/groups/:group_id/members - Membres d'un groupe
@@ -197,8 +225,10 @@ app.get('/:group_id/members', async (c: Context<MiddlewareKeyVariables>) => {
     return c.json({ error: 'Unauthorized' }, 401)
   }
 
+  let pgClient
   try {
-    const drizzle = await getDrizzleClient(c)
+    pgClient = getPgClient(c)
+    const drizzle = getDrizzleClient(pgClient)
 
     // Récupérer le groupe et vérifier l'accès
     const [group] = await drizzle
@@ -233,6 +263,11 @@ app.get('/:group_id/members', async (c: Context<MiddlewareKeyVariables>) => {
     console.error('Error fetching group members:', error)
     return c.json({ error: 'Internal server error' }, 500)
   }
+  finally {
+    if (pgClient) {
+      await closeClient(c, pgClient)
+    }
+  }
 })
 
 // POST /private/groups/:group_id/members - Ajouter un membre
@@ -251,8 +286,10 @@ app.post('/:group_id/members', async (c: Context<MiddlewareKeyVariables>) => {
     return c.json({ error: 'user_id is required' }, 400)
   }
 
+  let pgClient
   try {
-    const drizzle = await getDrizzleClient(c)
+    pgClient = getPgClient(c)
+    const drizzle = getDrizzleClient(pgClient)
 
     // Récupérer le groupe et vérifier l'accès
     const [group] = await drizzle
@@ -316,6 +353,11 @@ app.post('/:group_id/members', async (c: Context<MiddlewareKeyVariables>) => {
     console.error('Error adding group member:', error)
     return c.json({ error: 'Internal server error' }, 500)
   }
+  finally {
+    if (pgClient) {
+      await closeClient(c, pgClient)
+    }
+  }
 })
 
 // DELETE /private/groups/:group_id/members/:user_id - Retirer un membre
@@ -328,8 +370,10 @@ app.delete('/:group_id/members/:user_id', async (c: Context<MiddlewareKeyVariabl
     return c.json({ error: 'Unauthorized' }, 401)
   }
 
+  let pgClient
   try {
-    const drizzle = await getDrizzleClient(c)
+    pgClient = getPgClient(c)
+    const drizzle = getDrizzleClient(pgClient)
 
     // Récupérer le groupe et vérifier l'accès
     const [group] = await drizzle
@@ -361,5 +405,10 @@ app.delete('/:group_id/members/:user_id', async (c: Context<MiddlewareKeyVariabl
   catch (error) {
     console.error('Error removing group member:', error)
     return c.json({ error: 'Internal server error' }, 500)
+  }
+  finally {
+    if (pgClient) {
+      await closeClient(c, pgClient)
+    }
   }
 })
