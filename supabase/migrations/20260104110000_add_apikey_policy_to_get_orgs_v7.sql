@@ -179,13 +179,13 @@ $$;
 ALTER FUNCTION public.get_orgs_v7(uuid) OWNER TO "postgres";
 
 -- Revoke from public roles (security: prevents users from querying other users' orgs)
-REVOKE ALL ON FUNCTION public.get_orgs_v7(uuid) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.get_orgs_v7(uuid) FROM "anon";
-REVOKE ALL ON FUNCTION public.get_orgs_v7(uuid) FROM "authenticated";
+REVOKE ALL ON FUNCTION public.get_orgs_v7(uuid) FROM public;
+REVOKE ALL ON FUNCTION public.get_orgs_v7(uuid) FROM anon;
+REVOKE ALL ON FUNCTION public.get_orgs_v7(uuid) FROM authenticated;
 
 -- Grant only to postgres and service_role (private function)
-GRANT EXECUTE ON FUNCTION public.get_orgs_v7(uuid) TO "postgres";
-GRANT EXECUTE ON FUNCTION public.get_orgs_v7(uuid) TO "service_role";
+GRANT EXECUTE ON FUNCTION public.get_orgs_v7(uuid) TO postgres;
+GRANT EXECUTE ON FUNCTION public.get_orgs_v7(uuid) TO service_role;
 
 -- Update the get_orgs_v7() wrapper function with updated return type
 CREATE OR REPLACE FUNCTION public.get_orgs_v7()
@@ -268,6 +268,6 @@ $$;
 
 ALTER FUNCTION public.get_orgs_v7() OWNER TO "postgres";
 
-GRANT ALL ON FUNCTION public.get_orgs_v7() TO "anon";
-GRANT ALL ON FUNCTION public.get_orgs_v7() TO "authenticated";
-GRANT ALL ON FUNCTION public.get_orgs_v7() TO "service_role";
+GRANT ALL ON FUNCTION public.get_orgs_v7() TO anon;
+GRANT ALL ON FUNCTION public.get_orgs_v7() TO authenticated;
+GRANT ALL ON FUNCTION public.get_orgs_v7() TO service_role;

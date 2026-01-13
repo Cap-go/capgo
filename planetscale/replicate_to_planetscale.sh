@@ -21,8 +21,12 @@ else
 fi
 
 # Select which region to use (change this to switch regions)
-SELECTED_REGION="PLANETSCALE_OC"
+SELECTED_REGION="PLANETSCALE_NA"
 DB_T="${!SELECTED_REGION}"
+
+# Set to true to only recreate the subscription (keeps existing data/schema)
+# Set to false for full reset (drops schema, reimports, recreates subscription)
+SUBSCRIPTION_ONLY=false
 
 if [[ -z "$DB_T" ]]; then
   echo "Error: $SELECTED_REGION not found in $ENV_FILE"
@@ -148,21 +152,24 @@ psql-17 "$TARGET_DB_URL" -v ON_ERROR_STOP=0 <<SQL
 DROP SUBSCRIPTION IF EXISTS ${SUBSCRIPTION_NAME};
 SQL
 
-echo "==> Cleaning up public schema on target..."
-psql-17 "$TARGET_DB_URL" -v ON_ERROR_STOP=1 <<'SQL'
+# Build source DB URL for direct connection
+SOURCE_DB_URL="postgresql://${SOURCE_USER}:${SOURCE_PASSWORD}@${SOURCE_HOST}:${SOURCE_PORT}/${SOURCE_DB}?sslmode=${SOURCE_SSLMODE}"
+
+if [[ "$SUBSCRIPTION_ONLY" == "true" ]]; then
+  echo "==> SUBSCRIPTION_ONLY mode: skipping schema reset, only recreating subscription"
+else
+  echo "==> Cleaning up public schema on target..."
+  psql-17 "$TARGET_DB_URL" -v ON_ERROR_STOP=1 <<'SQL'
 DROP SCHEMA IF EXISTS public CASCADE;
 CREATE SCHEMA public;
 GRANT ALL ON SCHEMA public TO PUBLIC;
 SQL
 
-echo "==> Importing schema into target..."
-psql-17 "$TARGET_DB_URL" -v ON_ERROR_STOP=1 -f "schema_replicate.sql"
+  echo "==> Importing schema into target..."
+  psql-17 "$TARGET_DB_URL" -v ON_ERROR_STOP=1 -f "schema_replicate.sql"
 
-# Build source DB URL for direct connection
-SOURCE_DB_URL="postgresql://${SOURCE_USER}:${SOURCE_PASSWORD}@${SOURCE_HOST}:${SOURCE_PORT}/${SOURCE_DB}?sslmode=${SOURCE_SSLMODE}"
-
-echo "==> Dropping existing replication slot on source if exists..."
-psql-17 "$SOURCE_DB_URL" -v ON_ERROR_STOP=0 <<SQL
+  echo "==> Dropping existing replication slot on source if exists..."
+  psql-17 "$SOURCE_DB_URL" -v ON_ERROR_STOP=0 <<SQL
 DO \$\$
 DECLARE
   slot_exists boolean;
@@ -198,21 +205,61 @@ BEGIN
 END
 \$\$;
 SQL
+fi
 
 echo "==> Creating subscription on target..."
-SQL_QUERY_SUB="CREATE SUBSCRIPTION ${SUBSCRIPTION_NAME}
+# TCP keepalive settings to detect dead connections and reconnect:
+# - keepalives=1: enable TCP keepalives
+# - keepalives_idle=10: send keepalive after 10s of idle
+# - keepalives_interval=5: retry every 5s if no response
+# - keepalives_count=3: after 3 failed probes, close dead connection and reconnect
+# - connect_timeout=10: fail fast on initial connection
+# Note: disable_on_error=false ensures subscription retries indefinitely
+
+if [[ "$SUBSCRIPTION_ONLY" == "true" ]]; then
+  # Reuse existing slot, don't copy data (already have it)
+  SQL_QUERY_SUB="CREATE SUBSCRIPTION ${SUBSCRIPTION_NAME}
 CONNECTION 'host=${SOURCE_HOST}
             port=${SOURCE_PORT}
             dbname=${SOURCE_DB}
             user=${SOURCE_USER}
             password=${SOURCE_PASSWORD}
-            sslmode=${SOURCE_SSLMODE}'
+            sslmode=${SOURCE_SSLMODE}
+            connect_timeout=10
+            keepalives=1
+            keepalives_idle=10
+            keepalives_interval=5
+            keepalives_count=3'
+PUBLICATION ${PUBLICATION_NAME}
+WITH (
+  copy_data = false,
+  create_slot = false,
+  slot_name = '${SUBSCRIPTION_NAME}',
+  enabled = true,
+  disable_on_error = false
+);"
+else
+  # Full setup: copy data and create new slot
+  SQL_QUERY_SUB="CREATE SUBSCRIPTION ${SUBSCRIPTION_NAME}
+CONNECTION 'host=${SOURCE_HOST}
+            port=${SOURCE_PORT}
+            dbname=${SOURCE_DB}
+            user=${SOURCE_USER}
+            password=${SOURCE_PASSWORD}
+            sslmode=${SOURCE_SSLMODE}
+            connect_timeout=10
+            keepalives=1
+            keepalives_idle=10
+            keepalives_interval=5
+            keepalives_count=3'
 PUBLICATION ${PUBLICATION_NAME}
 WITH (
   copy_data = true,
   create_slot = true,
-  enabled = true
+  enabled = true,
+  disable_on_error = false
 );"
+fi
 echo "Subscription creation SQL:"
 echo "$SQL_QUERY_SUB"
 psql-17 "$TARGET_DB_URL" -v ON_ERROR_STOP=1 <<SQL

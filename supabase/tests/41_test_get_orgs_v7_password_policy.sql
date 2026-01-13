@@ -15,14 +15,14 @@ VALUES
 (
     tests.get_supabase_uid('test_pwd_compliant_v7'),
     'pwd_compliant_v7@test.com',
-    NOW(),
-    NOW()
+    now(),
+    now()
 ),
 (
     tests.get_supabase_uid('test_pwd_noncompliant_v7'),
     'pwd_noncompliant_v7@test.com',
-    NOW(),
-    NOW()
+    now(),
+    now()
 )
 ON CONFLICT (id) DO NOTHING;
 

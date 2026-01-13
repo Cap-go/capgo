@@ -15,14 +15,14 @@ VALUES
 (
     tests.get_supabase_uid('test_2fa_user_reject'),
     '2fa_reject@test.com',
-    NOW(),
-    NOW()
+    now(),
+    now()
 ),
 (
     tests.get_supabase_uid('test_no_2fa_user_reject'),
     'no2fa_reject@test.com',
-    NOW(),
-    NOW()
+    now(),
+    now()
 )
 ON CONFLICT (id) DO NOTHING;
 
