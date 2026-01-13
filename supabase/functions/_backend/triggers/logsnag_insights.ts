@@ -1,9 +1,9 @@
 import type { Context } from 'hono'
-import type { DevicesByPlatform } from '../utils/cloudflare.ts'
+import type { DevicesByPlatform, PluginBreakdownResult } from '../utils/cloudflare.ts'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
-import { readActiveAppsCF, readLastMonthDevicesByPlatformCF, readLastMonthDevicesCF, readLastMonthUpdatesCF } from '../utils/cloudflare.ts'
+import { getPluginBreakdownCF, readActiveAppsCF, readLastMonthDevicesByPlatformCF, readLastMonthDevicesCF, readLastMonthUpdatesCF } from '../utils/cloudflare.ts'
 import { BRES, middlewareAPISecret } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../utils/logging.ts'
 import { logsnag, logsnagInsights } from '../utils/logsnag.ts'
@@ -52,6 +52,7 @@ interface GlobalStats {
   canceled_orgs: PromiseLike<number>
   credits_bought: PromiseLike<number>
   credits_consumed: PromiseLike<number>
+  plugin_breakdown: PromiseLike<PluginBreakdownResult>
 }
 
 function getTodayDateId(): string {
@@ -380,6 +381,7 @@ function getStats(c: Context): GlobalStats {
         }
         return (res.data || []).reduce((sum, row) => sum + (Number(row.credits_used) || 0), 0)
       }),
+    plugin_breakdown: getPluginBreakdownCF(c),
   }
 }
 
@@ -410,6 +412,7 @@ app.post('/', middlewareAPISecret, async (c) => {
     canceled_orgs,
     credits_bought,
     credits_consumed,
+    plugin_breakdown,
   ] = await Promise.all([
     res.apps,
     res.updates,
@@ -433,6 +436,7 @@ app.post('/', middlewareAPISecret, async (c) => {
     res.canceled_orgs,
     res.credits_bought,
     res.credits_consumed,
+    res.plugin_breakdown,
   ])
   const not_paying = users - customers.total - plans.Trial
   cloudlog({
@@ -503,6 +507,9 @@ app.post('/', middlewareAPISecret, async (c) => {
     // Credits tracking (round to integers for bigint column)
     credits_bought: Math.round(credits_bought),
     credits_consumed: Math.round(credits_consumed),
+    // Plugin version breakdown (percentage per version)
+    plugin_version_breakdown: plugin_breakdown.version_breakdown,
+    plugin_major_breakdown: plugin_breakdown.major_breakdown,
   }
   cloudlog({ requestId: c.get('requestId'), message: 'newData', newData })
   const { error } = await supabaseAdmin(c)

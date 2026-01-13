@@ -1797,3 +1797,86 @@ ORDER BY date ASC`
     return []
   }
 }
+
+// Plugin Version Breakdown
+export interface PluginVersionBreakdown {
+  [version: string]: number // percentage (0-100)
+}
+
+export interface PluginBreakdownResult {
+  version_breakdown: PluginVersionBreakdown // Full version breakdown (e.g., {"6.2.5": 45.2})
+  major_breakdown: PluginVersionBreakdown // Major version breakdown (e.g., {"6": 75.3})
+}
+
+/**
+ * Get plugin version breakdown for global stats
+ * Returns percentage breakdown of plugin versions installed on devices (last 30 days)
+ */
+export async function getPluginBreakdownCF(c: Context): Promise<PluginBreakdownResult> {
+  if (!c.env.DEVICE_INFO)
+    return { version_breakdown: {}, major_breakdown: {} }
+
+  const last30d = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+
+  // Query unique devices with their plugin version (blob3)
+  // Use argMax to get the latest plugin_version per device
+  const query = `SELECT
+    argMax(blob3, timestamp) AS plugin_version,
+    COUNT(DISTINCT blob1) AS device_count
+  FROM device_info
+  WHERE timestamp >= toDateTime('${formatDateCF(last30d)}')
+    AND timestamp < now()
+    AND blob3 != ''
+  GROUP BY blob1
+  HAVING plugin_version != ''`
+
+  cloudlog({ requestId: c.get('requestId'), message: 'getPluginBreakdownCF query', query })
+
+  try {
+    const result = await runQueryToCFA<{ plugin_version: string, device_count: number }>(c, query)
+
+    if (result.length === 0)
+      return { version_breakdown: {}, major_breakdown: {} }
+
+    // Aggregate by full version
+    const versionCounts = new Map<string, number>()
+    for (const row of result) {
+      const version = row.plugin_version
+      versionCounts.set(version, (versionCounts.get(version) || 0) + row.device_count)
+    }
+
+    // Calculate total devices
+    const total = Array.from(versionCounts.values()).reduce((sum, count) => sum + count, 0)
+
+    if (total === 0)
+      return { version_breakdown: {}, major_breakdown: {} }
+
+    // Calculate full version breakdown
+    const version_breakdown: PluginVersionBreakdown = {}
+    const majorCounts = new Map<string, number>()
+
+    for (const [version, count] of versionCounts) {
+      const percentage = Number(((count / total) * 100).toFixed(2))
+      version_breakdown[version] = percentage
+
+      // Extract major version (first number before first dot)
+      const major = version.split('.')[0]
+      if (major) {
+        majorCounts.set(major, (majorCounts.get(major) || 0) + count)
+      }
+    }
+
+    // Calculate major version breakdown
+    const major_breakdown: PluginVersionBreakdown = {}
+    for (const [major, count] of majorCounts) {
+      const percentage = Number(((count / total) * 100).toFixed(2))
+      major_breakdown[major] = percentage
+    }
+
+    return { version_breakdown, major_breakdown }
+  }
+  catch (e) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error in getPluginBreakdownCF', error: serializeError(e) })
+    return { version_breakdown: {}, major_breakdown: {} }
+  }
+}
