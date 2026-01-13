@@ -3,6 +3,7 @@ import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { and, eq } from 'drizzle-orm'
 import { Hono } from 'hono/tiny'
 import { middlewareAuth, useCors } from '../utils/hono.ts'
+import { cloudlogErr } from '../utils/logging.ts'
 import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import { checkPermission } from '../utils/rbac.ts'
 import { schema } from '../utils/postgres_schema.ts'
@@ -46,7 +47,12 @@ app.get('/:org_id', async (c: Context<MiddlewareKeyVariables>) => {
     return c.json(groups)
   }
   catch (error) {
-    console.error('Error fetching groups:', error)
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'groups_fetch_failed',
+      orgId,
+      error,
+    })
     return c.json({ error: 'Internal server error' }, 500)
   }
   finally {
@@ -96,7 +102,12 @@ app.post('/:org_id', async (c: Context<MiddlewareKeyVariables>) => {
     return c.json(group)
   }
   catch (error) {
-    console.error('Error creating group:', error)
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'group_create_failed',
+      orgId,
+      error,
+    })
     return c.json({ error: 'Internal server error' }, 500)
   }
   finally {
@@ -155,7 +166,12 @@ app.put('/:group_id', async (c: Context<MiddlewareKeyVariables>) => {
     return c.json(updated)
   }
   catch (error) {
-    console.error('Error updating group:', error)
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'group_update_failed',
+      groupId,
+      error,
+    })
     return c.json({ error: 'Internal server error' }, 500)
   }
   finally {
@@ -206,7 +222,12 @@ app.delete('/:group_id', async (c: Context<MiddlewareKeyVariables>) => {
     return c.json({ success: true })
   }
   catch (error) {
-    console.error('Error deleting group:', error)
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'group_delete_failed',
+      groupId,
+      error,
+    })
     return c.json({ error: 'Internal server error' }, 500)
   }
   finally {
@@ -260,7 +281,12 @@ app.get('/:group_id/members', async (c: Context<MiddlewareKeyVariables>) => {
     return c.json(members)
   }
   catch (error) {
-    console.error('Error fetching group members:', error)
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'group_members_fetch_failed',
+      groupId,
+      error,
+    })
     return c.json({ error: 'Internal server error' }, 500)
   }
   finally {
@@ -350,7 +376,13 @@ app.post('/:group_id/members', async (c: Context<MiddlewareKeyVariables>) => {
     return c.json(member || { message: 'User already in group' })
   }
   catch (error) {
-    console.error('Error adding group member:', error)
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'group_member_add_failed',
+      groupId,
+      targetUserId,
+      error,
+    })
     return c.json({ error: 'Internal server error' }, 500)
   }
   finally {
@@ -403,7 +435,13 @@ app.delete('/:group_id/members/:user_id', async (c: Context<MiddlewareKeyVariabl
     return c.json({ success: true })
   }
   catch (error) {
-    console.error('Error removing group member:', error)
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'group_member_remove_failed',
+      groupId,
+      targetUserId,
+      error,
+    })
     return c.json({ error: 'Internal server error' }, 500)
   }
   finally {
