@@ -264,7 +264,7 @@ describe('delta manifest scenarios', () => {
     await resetAndSeedAppData(DELTA_APPNAME)
     const supabase = getSupabaseClient()
 
-    // Get version IDs for old (1.0.0) and new (1.361.0) versions
+    // Get version IDs for old (1.359.0) and new (1.0.0) versions
     // Note: resetAndSeedAppData creates versions 1.0.0, 1.0.1, 1.359.0, 1.360.0, 1.361.0
     // The production channel points to version 1.0.0 by default
     const { data: oldVersion } = await supabase
@@ -396,22 +396,25 @@ describe('delta manifest scenarios', () => {
       ])
     }
 
-    const baseData = getBaseData(DELTA_APPNAME)
-    baseData.version_name = '1.0.1' // Device has identical manifest
-    baseData.plugin_version = '7.1.0'
+    try {
+      const baseData = getBaseData(DELTA_APPNAME)
+      baseData.version_name = '1.0.1' // Device has identical manifest
+      baseData.plugin_version = '7.1.0'
 
-    const response = await postUpdate(baseData)
-    expect(response.status).toBe(200)
-    const json = await response.json<UpdateRes>()
+      const response = await postUpdate(baseData)
+      expect(response.status).toBe(200)
+      const json = await response.json<UpdateRes>()
 
-    // When all files are identical, delta should be empty
-    expect(json.manifest).toBeDefined()
-    expect(json.manifest?.length).toBe(0)
-
-    // Clean up: remove the manifest entries we just added
-    if (identicalVersion) {
-      await supabase.from('manifest').delete().eq('app_version_id', identicalVersion.id)
-      await supabase.from('app_versions').update({ manifest_count: 0 }).eq('id', identicalVersion.id)
+      // When all files are identical, delta should be empty
+      expect(json.manifest).toBeDefined()
+      expect(json.manifest?.length).toBe(0)
+    }
+    finally {
+      // Clean up: remove the manifest entries we just added
+      if (identicalVersion) {
+        await supabase.from('manifest').delete().eq('app_version_id', identicalVersion.id)
+        await supabase.from('app_versions').update({ manifest_count: 0 }).eq('id', identicalVersion.id)
+      }
     }
   })
 })

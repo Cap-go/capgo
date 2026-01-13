@@ -534,6 +534,7 @@ export async function getVersionIdByName(
   appId: string,
   versionName: string,
   drizzleClient: ReturnType<typeof getDrizzleClient>,
+  allowedDeleted?: boolean,
 ): Promise<number | null> {
   try {
     // Return null for internal version names
@@ -546,6 +547,7 @@ export async function getVersionIdByName(
       .where(and(
         eq(schema.app_versions.app_id, appId),
         eq(schema.app_versions.name, versionName),
+        ...(allowedDeleted !== undefined ? [eq(schema.app_versions.deleted, allowedDeleted)] : []),
       ))
       .limit(1)
       .then(data => data[0])
