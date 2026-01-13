@@ -167,12 +167,14 @@ async function deleteManifest(c: Context, record: Database['public']['Tables']['
             .neq('app_version_id', record.id)
             .then((v) => {
               const count = v.count ?? 0
-              if (!count) {
+              if (count) {
+                // Other versions still use this file, only delete from database
                 return supabaseAdmin(c)
                   .from('manifest')
                   .delete()
                   .eq('id', entry.id)
               }
+              // No other versions use this file, delete from S3 AND database
               cloudlog({ requestId: c.get('requestId'), message: 'deleted manifest file from S3', s3_path: entry.s3_path })
               return Promise.all([
                 s3.deleteObject(c, entry.s3_path),
