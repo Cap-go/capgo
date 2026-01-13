@@ -21,7 +21,7 @@ else
 fi
 
 # Select which region to use (change this to switch regions)
-SELECTED_REGION="PLANETSCALE_SA"
+SELECTED_REGION="PLANETSCALE_AS_JAPAN"
 DB_T="${!SELECTED_REGION}"
 
 # Set to true to only recreate the subscription (keeps existing data/schema)
@@ -305,45 +305,30 @@ else
     fi
   }
 
-  # Function to dump a single table (can run in background)
+  # Function to dump a single table using COPY (fast CSV export)
   dump_table() {
     local table_name=$1
-    local dump_file="${DUMP_DIR}/${table_name}.dump"
+    local dump_file="${DUMP_DIR}/${table_name}.csv.gz"
 
     if is_dump_fresh "$dump_file"; then
       echo "    [${table_name}] Using cached dump"
       return 0
     fi
 
-    echo "    [${table_name}] Dumping..."
-    PGPASSWORD="${SOURCE_PASSWORD}" pg_dump-17 \
-      -h "${SOURCE_HOST}" \
-      -p "${SOURCE_PORT}" \
-      -U "${SOURCE_USER}" \
-      -d "${SOURCE_DB}" \
-      --format=custom \
-      --compress=4 \
-      --data-only \
-      --table="public.${table_name}" \
-      -f "$dump_file"
+    echo "    [${table_name}] Dumping via COPY..."
+    psql-17 "$SOURCE_DB_URL" -c "\\COPY public.${table_name} TO STDOUT WITH (FORMAT csv, HEADER)" | gzip > "$dump_file"
     echo "    [${table_name}] Dump complete: $(du -h "$dump_file" | cut -f1)"
   }
 
-  # Function to restore a single table
+  # Function to restore a single table using COPY (fast bulk insert)
   restore_table() {
     local table_name=$1
-    local dump_file="${DUMP_DIR}/${table_name}.dump"
+    local dump_file="${DUMP_DIR}/${table_name}.csv.gz"
 
-    echo "    [${table_name}] Restoring..."
-    # Use --single-transaction=false to continue on duplicate key errors
-    # Duplicates are safe to ignore - they mean the row was already replicated
-    pg_restore-17 \
-      -d "$TARGET_DB_URL" \
-      --data-only \
-      --disable-triggers \
-      --no-owner \
-      --no-privileges \
-      "$dump_file" || echo "    [${table_name}] Some rows skipped (already exist via replication)"
+    echo "    [${table_name}] Restoring via COPY..."
+    # Truncate first to avoid duplicates, then COPY (much faster than row-by-row)
+    psql-17 "$TARGET_DB_URL" -c "TRUNCATE TABLE public.${table_name};"
+    gunzip -c "$dump_file" | psql-17 "$TARGET_DB_URL" -c "\\COPY public.${table_name} FROM STDIN WITH (FORMAT csv, HEADER)"
 
     COUNT=$(psql-17 "$TARGET_DB_URL" -t -A -c "SELECT COUNT(*) FROM public.${table_name};")
     echo "    [${table_name}] Restored: ${COUNT} rows"

@@ -1,3 +1,4 @@
 # Ignore all dump files
 *.sql
 *.dump
+*.csv.gz
