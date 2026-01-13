@@ -57,10 +57,10 @@ const canDeleteChannel = computedAsync(async () => {
   return await checkPermissions('channel.delete', { appId: props.appId })
 }, false)
 
-const canUpdateChannel = computedAsync(async () => {
+const canCreateChannel = computedAsync(async () => {
   if (!props.appId)
     return false
-  return await checkPermissions('channel.update_settings', { appId: props.appId })
+  return await checkPermissions('app.create_channel', { appId: props.appId })
 }, false)
 
 const currentVersionsNumber = computed(() => {
@@ -300,7 +300,7 @@ async function reload() {
   }
 }
 async function showAddModal() {
-  if (!currentOrganization.value || !canUpdateChannel.value) {
+  if (!currentOrganization.value || !canCreateChannel.value) {
     toast.error(t('no-permission'))
     return
   }
