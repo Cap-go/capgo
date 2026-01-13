@@ -8,6 +8,12 @@ import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import { checkPermission } from '../utils/rbac.ts'
 import { schema } from '../utils/postgres_schema.ts'
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+function isUuid(value: string | undefined): value is string {
+  return !!value && UUID_REGEX.test(value)
+}
+
 export const app = new Hono<MiddlewareKeyVariables>()
 
 app.use('/', useCors)
@@ -20,6 +26,10 @@ app.get('/:org_id', async (c: Context<MiddlewareKeyVariables>) => {
 
   if (!userId) {
     return c.json({ error: 'Unauthorized' }, 401)
+  }
+
+  if (!isUuid(orgId)) {
+    return c.json({ error: 'Invalid org_id' }, 400)
   }
 
   if (!(await checkPermission(c, 'org.read_members', { orgId }))) {
@@ -70,6 +80,10 @@ app.post('/:org_id', async (c: Context<MiddlewareKeyVariables>) => {
 
   if (!userId) {
     return c.json({ error: 'Unauthorized' }, 401)
+  }
+
+  if (!isUuid(orgId)) {
+    return c.json({ error: 'Invalid org_id' }, 400)
   }
 
   if (!(await checkPermission(c, 'org.update_user_roles', { orgId }))) {
@@ -125,6 +139,10 @@ app.put('/:group_id', async (c: Context<MiddlewareKeyVariables>) => {
 
   if (!userId) {
     return c.json({ error: 'Unauthorized' }, 401)
+  }
+
+  if (!isUuid(groupId)) {
+    return c.json({ error: 'Invalid group_id' }, 400)
   }
 
   const { name, description } = body
@@ -190,6 +208,10 @@ app.delete('/:group_id', async (c: Context<MiddlewareKeyVariables>) => {
     return c.json({ error: 'Unauthorized' }, 401)
   }
 
+  if (!isUuid(groupId)) {
+    return c.json({ error: 'Invalid group_id' }, 400)
+  }
+
   let pgClient
   try {
     pgClient = getPgClient(c)
@@ -244,6 +266,10 @@ app.get('/:group_id/members', async (c: Context<MiddlewareKeyVariables>) => {
 
   if (!userId) {
     return c.json({ error: 'Unauthorized' }, 401)
+  }
+
+  if (!isUuid(groupId)) {
+    return c.json({ error: 'Invalid group_id' }, 400)
   }
 
   let pgClient
@@ -310,6 +336,14 @@ app.post('/:group_id/members', async (c: Context<MiddlewareKeyVariables>) => {
 
   if (!targetUserId) {
     return c.json({ error: 'user_id is required' }, 400)
+  }
+
+  if (!isUuid(groupId)) {
+    return c.json({ error: 'Invalid group_id' }, 400)
+  }
+
+  if (!isUuid(targetUserId)) {
+    return c.json({ error: 'Invalid user_id' }, 400)
   }
 
   let pgClient
@@ -400,6 +434,14 @@ app.delete('/:group_id/members/:user_id', async (c: Context<MiddlewareKeyVariabl
 
   if (!userId) {
     return c.json({ error: 'Unauthorized' }, 401)
+  }
+
+  if (!isUuid(groupId)) {
+    return c.json({ error: 'Invalid group_id' }, 400)
+  }
+
+  if (!isUuid(targetUserId)) {
+    return c.json({ error: 'Invalid user_id' }, 400)
   }
 
   let pgClient
