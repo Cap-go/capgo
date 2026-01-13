@@ -7,10 +7,136 @@ import { getDrizzleClient } from '../utils/pg.ts'
 import { checkPermission } from '../utils/rbac.ts'
 import { schema } from '../utils/postgres_schema.ts'
 
+const PRINCIPAL_TYPES = ['user', 'group', 'apikey'] as const
+const SCOPE_TYPES = ['platform', 'org', 'app', 'channel'] as const
+
+type RoleBindingBody = {
+  principal_type: (typeof PRINCIPAL_TYPES)[number]
+  principal_id: string
+  role_name: string
+  scope_type: (typeof SCOPE_TYPES)[number]
+  org_id: string
+  app_id?: string
+  channel_id?: number
+  reason?: string
+}
+
+type ValidationResult<T> = { ok: true, data: T } | { ok: false, status: number, error: string }
+
 export const app = new Hono<MiddlewareKeyVariables>()
 
 app.use('/', useCors)
 app.use('/', middlewareAuth)
+
+function parseRoleBindingBody(body: any): ValidationResult<RoleBindingBody> {
+  const {
+    principal_type,
+    principal_id,
+    role_name,
+    scope_type,
+    org_id,
+    app_id,
+    channel_id,
+    reason,
+  } = body ?? {}
+
+  if (!principal_type || !principal_id || !role_name || !scope_type || !org_id) {
+    return { ok: false, status: 400, error: 'Missing required fields' }
+  }
+
+  if (!PRINCIPAL_TYPES.includes(principal_type)) {
+    return { ok: false, status: 400, error: 'Invalid principal_type' }
+  }
+
+  if (!SCOPE_TYPES.includes(scope_type)) {
+    return { ok: false, status: 400, error: 'Invalid scope_type' }
+  }
+
+  return {
+    ok: true,
+    data: {
+      principal_type,
+      principal_id,
+      role_name,
+      scope_type,
+      org_id,
+      app_id,
+      channel_id,
+      reason,
+    },
+  }
+}
+
+function validateScope(scopeType: RoleBindingBody['scope_type'], appId?: string, channelId?: number): ValidationResult<null> {
+  if (scopeType === 'app' && !appId) {
+    return { ok: false, status: 400, error: 'app_id required for app scope' }
+  }
+  if (scopeType === 'channel' && (!appId || !channelId)) {
+    return { ok: false, status: 400, error: 'app_id and channel_id required for channel scope' }
+  }
+  return { ok: true, data: null }
+}
+
+async function validatePrincipalAccess(
+  drizzle: ReturnType<typeof getDrizzleClient>,
+  principalType: RoleBindingBody['principal_type'],
+  principalId: string,
+  orgId: string,
+): Promise<ValidationResult<null>> {
+  if (principalType === 'user') {
+    const targetRbacAccess = await drizzle
+      .select({ id: schema.role_bindings.id })
+      .from(schema.role_bindings)
+      .where(
+        and(
+          eq(schema.role_bindings.principal_type, 'user'),
+          eq(schema.role_bindings.principal_id, principalId),
+          eq(schema.role_bindings.org_id, orgId),
+        ),
+      )
+      .limit(1)
+
+    if (targetRbacAccess.length) {
+      return { ok: true, data: null }
+    }
+
+    const targetLegacyAccess = await drizzle
+      .select({ id: schema.org_users.id })
+      .from(schema.org_users)
+      .where(
+        and(
+          eq(schema.org_users.user_id, principalId),
+          eq(schema.org_users.org_id, orgId),
+        ),
+      )
+      .limit(1)
+
+    if (!targetLegacyAccess.length) {
+      return { ok: false, status: 400, error: 'User is not a member of this org' }
+    }
+
+    return { ok: true, data: null }
+  }
+
+  if (principalType === 'group') {
+    const [group] = await drizzle
+      .select()
+      .from(schema.groups)
+      .where(
+        and(
+          eq(schema.groups.id, principalId),
+          eq(schema.groups.org_id, orgId),
+        ),
+      )
+      .limit(1)
+
+    if (!group) {
+      return { ok: false, status: 400, error: 'Group not found in this org' }
+    }
+  }
+
+  return { ok: true, data: null }
+}
 
 // GET /private/role_bindings/:org_id - Liste des bindings d'un org
 app.get('/:org_id', async (c: Context<MiddlewareKeyVariables>) => {
@@ -69,6 +195,11 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
     return c.json({ error: 'Unauthorized' }, 401)
   }
 
+  const parsedBody = parseRoleBindingBody(body)
+  if (!parsedBody.ok) {
+    return c.json({ error: parsedBody.error }, parsedBody.status)
+  }
+
   const {
     principal_type,
     principal_id,
@@ -78,20 +209,7 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
     app_id,
     channel_id,
     reason,
-  } = body
-
-  // Validation
-  if (!principal_type || !principal_id || !role_name || !scope_type || !org_id) {
-    return c.json({ error: 'Missing required fields' }, 400)
-  }
-
-  if (!['user', 'group', 'apikey'].includes(principal_type)) {
-    return c.json({ error: 'Invalid principal_type' }, 400)
-  }
-
-  if (!['platform', 'org', 'app', 'channel'].includes(scope_type)) {
-    return c.json({ error: 'Invalid scope_type' }, 400)
-  }
+  } = parsedBody.data
 
   try {
     const drizzle = await getDrizzleClient(c)
@@ -115,62 +233,14 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
       return c.json({ error: 'Role is not assignable' }, 403)
     }
 
-    // Vérifier la cohérence du scope
-    if (scope_type === 'app' && !app_id) {
-      return c.json({ error: 'app_id required for app scope' }, 400)
-    }
-    if (scope_type === 'channel' && (!app_id || !channel_id)) {
-      return c.json({ error: 'app_id and channel_id required for channel scope' }, 400)
+    const scopeValidation = validateScope(scope_type, app_id, channel_id)
+    if (!scopeValidation.ok) {
+      return c.json({ error: scopeValidation.error }, scopeValidation.status)
     }
 
-    // Si principal_type est user, vérifier qu'il fait partie de l'org
-    if (principal_type === 'user') {
-      const targetRbacAccess = await drizzle
-        .select({ id: schema.role_bindings.id })
-        .from(schema.role_bindings)
-        .where(
-          and(
-            eq(schema.role_bindings.principal_type, 'user'),
-            eq(schema.role_bindings.principal_id, principal_id),
-            eq(schema.role_bindings.org_id, org_id),
-          ),
-        )
-        .limit(1)
-
-      if (!targetRbacAccess.length) {
-        const targetLegacyAccess = await drizzle
-          .select({ id: schema.org_users.id })
-          .from(schema.org_users)
-          .where(
-            and(
-              eq(schema.org_users.user_id, principal_id),
-              eq(schema.org_users.org_id, org_id),
-            ),
-          )
-          .limit(1)
-
-        if (!targetLegacyAccess.length) {
-          return c.json({ error: 'User is not a member of this org' }, 400)
-        }
-      }
-    }
-
-    // Si principal_type est group, vérifier qu'il appartient à l'org
-    if (principal_type === 'group') {
-      const [group] = await drizzle
-        .select()
-        .from(schema.groups)
-        .where(
-          and(
-            eq(schema.groups.id, principal_id),
-            eq(schema.groups.org_id, org_id),
-          ),
-        )
-        .limit(1)
-
-      if (!group) {
-        return c.json({ error: 'Group not found in this org' }, 400)
-      }
+    const principalValidation = await validatePrincipalAccess(drizzle, principal_type, principal_id, org_id)
+    if (!principalValidation.ok) {
+      return c.json({ error: principalValidation.error }, principalValidation.status)
     }
 
     // Créer le binding
