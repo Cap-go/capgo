@@ -310,7 +310,7 @@ describe('delta manifest scenarios', () => {
     await resetAppDataStats(DELTA_APPNAME)
   })
 
-  it('returns delta manifest with only changed/new files', async () => {
+  it.concurrent('returns delta manifest with only changed/new files', async () => {
     // Request update from old version (1.359.0) to new version (1.0.0)
     // Should only return file_b.js (changed hash) and file_c.js (new file)
     // file_a.js should be excluded because it has the same hash
@@ -341,7 +341,7 @@ describe('delta manifest scenarios', () => {
     expect(fileC?.file_hash).toBe('hash_new_4')
   })
 
-  it('returns full manifest for first install (builtin version)', async () => {
+  it.concurrent('returns full manifest for first install (builtin version)', async () => {
     // When device is on 'builtin', it should receive full manifest (all 3 files)
     const baseData = getBaseData(DELTA_APPNAME)
     baseData.version_name = 'builtin' // First install
@@ -358,7 +358,7 @@ describe('delta manifest scenarios', () => {
     expect(fileNames).toEqual(['file_a.js', 'file_b.js', 'file_c.js'])
   })
 
-  it('returns full manifest when old version does not exist', async () => {
+  it.concurrent('returns full manifest when old version does not exist', async () => {
     // When device's version doesn't exist in DB, should return full manifest
     const baseData = getBaseData(DELTA_APPNAME)
     baseData.version_name = '99.99.99' // Non-existent version
@@ -375,6 +375,7 @@ describe('delta manifest scenarios', () => {
     expect(fileNames).toEqual(['file_a.js', 'file_b.js', 'file_c.js'])
   })
 
+  // This test modifies data (inserts manifest entries for version 1.0.1), so it runs sequentially
   it('returns empty manifest when all files are identical', async () => {
     // Create a scenario where old and new versions have identical manifests
     const supabase = getSupabaseClient()
