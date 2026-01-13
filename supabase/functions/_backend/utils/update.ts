@@ -198,6 +198,17 @@ export async function updateWithPG(
   const manifestEntries = (channelOverride?.manifestEntries ?? channelData?.manifestEntries ?? []) as Partial<Database['public']['Tables']['manifest']['Row']>[]
   // device.version = versionData ? versionData.id : version.id
 
+  // Check if device is already on the latest version BEFORE checking for missing bundle
+  // This must come first because delta manifest calculation may return empty manifest
+  // when device is already on target version (all files match), which would incorrectly
+  // trigger the no_bundle error for manifest-only bundles
+  if (version_name === version.name) {
+    cloudlog({ requestId: c.get('requestId'), message: 'No new version available', id: device_id, version_name, version: version.name, date: new Date().toISOString() })
+    // TODO: check why this event is send with wrong version_name
+    await sendStatsAndDevice(c, device, [{ action: 'noNew', versionName: version.name }])
+    return simpleError200(c, 'no_new_version_available', 'No new version available')
+  }
+
   // TODO: find better solution to check if device is from apple or google, currently not working in
 
   if (!version.external_url && !version.r2_path && !isInternalVersionName(version.name) && (!manifestEntries || manifestEntries.length === 0)) {
@@ -216,14 +227,6 @@ export async function updateWithPG(
       deviceKeyId: body.key_id,
       bundleKeyId: version.key_id,
     })
-  }
-
-  // cloudlog(c.get('requestId'), 'signedURL', device_id, version_name, version.name)
-  if (version_name === version.name) {
-    cloudlog({ requestId: c.get('requestId'), message: 'No new version available', id: device_id, version_name, version: version.name, date: new Date().toISOString() })
-    // TODO: check why this event is send with wrong version_name
-    await sendStatsAndDevice(c, device, [{ action: 'noNew', versionName: version.name }])
-    return simpleError200(c, 'no_new_version_available', 'No new version available')
   }
 
   if (channelData) {
