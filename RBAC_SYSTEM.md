@@ -1293,17 +1293,23 @@ export async function hasPermission(
   scope: PermissionScope
 ): Promise<boolean> {
   try {
-    const { data, error } = await supabase.rpc('rbac_check_permission_direct', {
+    const { data: auth, error } = await supabase.auth.getUser()
+    const userId = auth?.user?.id || null
+
+    if (error)
+      console.error('[hasPermission] getUser error:', error)
+
+    const { data, error: rpcError } = await supabase.rpc('rbac_check_permission_direct', {
       p_permission_key: permission,
-      p_user_id: supabase.auth.user()?.id || null,
+      p_user_id: userId,
       p_org_id: scope.orgId || null,
       p_app_id: scope.appId || null,
       p_channel_id: scope.channelId || null,
       p_apikey: null, // Frontend never uses API keys
     })
 
-    if (error) {
-      console.error('[hasPermission] RPC error:', error)
+    if (rpcError) {
+      console.error('[hasPermission] RPC error:', rpcError)
       return false
     }
 
