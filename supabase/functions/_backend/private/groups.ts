@@ -14,6 +14,15 @@ function isUuid(value: string | undefined): value is string {
   return !!value && UUID_REGEX.test(value)
 }
 
+async function parseJsonBody(c: Context<MiddlewareKeyVariables>) {
+  try {
+    return { ok: true as const, data: await c.req.json() }
+  }
+  catch {
+    return { ok: false as const, error: 'Invalid JSON body' }
+  }
+}
+
 export const app = new Hono<MiddlewareKeyVariables>()
 
 app.use('/', useCors)
@@ -76,7 +85,6 @@ app.get('/:org_id', async (c: Context<MiddlewareKeyVariables>) => {
 app.post('/:org_id', async (c: Context<MiddlewareKeyVariables>) => {
   const orgId = c.req.param('org_id')
   const userId = c.get('auth')?.userId
-  const body = await c.req.json()
 
   if (!userId) {
     return c.json({ error: 'Unauthorized' }, 401)
@@ -89,6 +97,12 @@ app.post('/:org_id', async (c: Context<MiddlewareKeyVariables>) => {
   if (!(await checkPermission(c, 'org.update_user_roles', { orgId }))) {
     return c.json({ error: 'Forbidden - Admin rights required' }, 403)
   }
+
+  const parsedBody = await parseJsonBody(c)
+  if (!parsedBody.ok) {
+    return c.json({ error: parsedBody.error }, 400)
+  }
+  const body = parsedBody.data
 
   const { name, description } = body
 
@@ -135,7 +149,6 @@ app.post('/:org_id', async (c: Context<MiddlewareKeyVariables>) => {
 app.put('/:group_id', async (c: Context<MiddlewareKeyVariables>) => {
   const groupId = c.req.param('group_id')
   const userId = c.get('auth')?.userId
-  const body = await c.req.json()
 
   if (!userId) {
     return c.json({ error: 'Unauthorized' }, 401)
@@ -144,8 +157,6 @@ app.put('/:group_id', async (c: Context<MiddlewareKeyVariables>) => {
   if (!isUuid(groupId)) {
     return c.json({ error: 'Invalid group_id' }, 400)
   }
-
-  const { name, description } = body
 
   let pgClient
   try {
@@ -170,6 +181,12 @@ app.put('/:group_id', async (c: Context<MiddlewareKeyVariables>) => {
     if (!(await checkPermission(c, 'org.update_user_roles', { orgId: group.org_id }))) {
       return c.json({ error: 'Forbidden - Admin rights required' }, 403)
     }
+
+    const parsedBody = await parseJsonBody(c)
+    if (!parsedBody.ok) {
+      return c.json({ error: parsedBody.error }, 400)
+    }
+    const { name, description } = parsedBody.data
 
     // Mettre à jour
     const [updated] = await drizzle
@@ -326,24 +343,13 @@ app.get('/:group_id/members', async (c: Context<MiddlewareKeyVariables>) => {
 app.post('/:group_id/members', async (c: Context<MiddlewareKeyVariables>) => {
   const groupId = c.req.param('group_id')
   const userId = c.get('auth')?.userId
-  const body = await c.req.json()
 
   if (!userId) {
     return c.json({ error: 'Unauthorized' }, 401)
   }
 
-  const { user_id: targetUserId } = body
-
-  if (!targetUserId) {
-    return c.json({ error: 'user_id is required' }, 400)
-  }
-
   if (!isUuid(groupId)) {
     return c.json({ error: 'Invalid group_id' }, 400)
-  }
-
-  if (!isUuid(targetUserId)) {
-    return c.json({ error: 'Invalid user_id' }, 400)
   }
 
   let pgClient
@@ -364,6 +370,21 @@ app.post('/:group_id/members', async (c: Context<MiddlewareKeyVariables>) => {
 
     if (!(await checkPermission(c, 'org.update_user_roles', { orgId: group.org_id }))) {
       return c.json({ error: 'Forbidden - Admin rights required' }, 403)
+    }
+
+    const parsedBody = await parseJsonBody(c)
+    if (!parsedBody.ok) {
+      return c.json({ error: parsedBody.error }, 400)
+    }
+
+    const { user_id: targetUserId } = parsedBody.data
+
+    if (!targetUserId) {
+      return c.json({ error: 'user_id is required' }, 400)
+    }
+
+    if (!isUuid(targetUserId)) {
+      return c.json({ error: 'Invalid user_id' }, 400)
     }
 
     // Vérifier que le target user fait partie de l'org
