@@ -7,6 +7,7 @@ import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import IconTrash from '~icons/heroicons/trash'
 import IconWrench from '~icons/heroicons/wrench'
+import DataTable from '~/components/Table.vue'
 import { formatDate } from '~/services/date'
 import { checkPermissions } from '~/services/permissions'
 import { useSupabase } from '~/services/supabase'
@@ -330,7 +331,7 @@ watch(dynamicColumns, (newCols) => {
 
 <template>
   <div class="flex flex-col overflow-hidden overflow-y-auto bg-white border shadow-lg md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900">
-    <Table
+    <DataTable
       v-model:columns="columns"
       v-model:current-page="currentPage"
       v-model:search="search"

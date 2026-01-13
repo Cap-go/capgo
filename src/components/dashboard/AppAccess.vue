@@ -8,7 +8,7 @@ import IconLock from '~icons/heroicons/lock-closed'
 import IconPlus from '~icons/heroicons/plus'
 import IconShield from '~icons/heroicons/shield-check'
 import IconTrash from '~icons/heroicons/trash'
-import Table from '~/components/Table.vue'
+import DataTable from '~/components/Table.vue'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 
@@ -425,7 +425,7 @@ onMounted(async () => {
     </div>
 
     <!-- Role bindings table -->
-    <Table
+    <DataTable
       v-if="useNewRbac"
       :columns="columns"
       :element-list="filteredBindings"
@@ -470,7 +470,7 @@ onMounted(async () => {
           <IconTrash class="size-4" />
         </button>
       </template>
-    </Table>
+    </DataTable>
 
     <!-- Assign Role Modal -->
     <dialog :open="isAssignRoleModalOpen" class="modal" @close="isAssignRoleModalOpen = false">
