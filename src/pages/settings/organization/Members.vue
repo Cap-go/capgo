@@ -256,9 +256,9 @@ async function reloadData() {
       }
 
       // Mapper les données RBAC vers le format attendu par la table
-      members.value = (rbacMembers || []).map((member: any, index: number) => ({
-        id: index,
-        aid: 0, // N'existe plus dans le système RBAC pur
+      members.value = (rbacMembers || []).map((member: any) => ({
+        id: member.user_id,
+        aid: -1, // RBAC-only member (no legacy org_users id)
         uid: member.user_id,
         email: member.email,
         image_url: member.image_url,
@@ -609,7 +609,19 @@ async function _deleteMember(member: ExtendedOrganizationMember) {
       await rescindInvitation(member.email)
     }
     else {
-      const { error } = await supabase.from('org_users').delete().eq('id', member.aid)
+      const { error } = member.aid === -1
+        ? await supabase
+          .from('role_bindings')
+          .delete()
+          .eq('principal_type', 'user')
+          .eq('principal_id', member.uid)
+          .eq('scope_type', 'org')
+          .eq('org_id', currentOrganization.value?.gid ?? '')
+        : await supabase
+          .from('org_users')
+          .delete()
+          .eq('id', member.aid)
+
       if (error) {
         console.error('Error deleting member: ', error)
         toast.error(`${t('cannot-delete-member')}: ${error.message}`)
