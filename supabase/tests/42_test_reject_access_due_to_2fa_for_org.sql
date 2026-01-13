@@ -65,9 +65,10 @@ BEGIN
     PERFORM set_config('test.org_with_2fa_direct', org_with_2fa_enforcement_id::text, false);
     PERFORM set_config('test.org_without_2fa_direct', org_without_2fa_enforcement_id::text, false);
 
-    -- Create API key for test_2fa_user_org
-    INSERT INTO public.apikeys (user_id, key, mode, name)
+    -- Create API key for test_2fa_user_org (use high IDs to avoid conflicts)
+    INSERT INTO public.apikeys (id, user_id, key, mode, name)
     VALUES (
+        9003,
         test_2fa_user_id,
         'test-2fa-apikey-for-org',
         'all'::public.key_mode,
@@ -75,8 +76,9 @@ BEGIN
     );
 
     -- Create API key for test_no_2fa_user_org
-    INSERT INTO public.apikeys (user_id, key, mode, name)
+    INSERT INTO public.apikeys (id, user_id, key, mode, name)
     VALUES (
+        9004,
         test_no_2fa_user_id,
         'test-no2fa-apikey-for-org',
         'all'::public.key_mode,
@@ -84,8 +86,9 @@ BEGIN
     );
 
     -- Create org-limited API key for test_2fa_user_org (limited to org_without_2fa_enforcement only)
-    INSERT INTO public.apikeys (user_id, key, mode, name, limited_to_orgs)
+    INSERT INTO public.apikeys (id, user_id, key, mode, name, limited_to_orgs)
     VALUES (
+        9005,
         test_2fa_user_id,
         'test-2fa-apikey-org-limited',
         'all'::public.key_mode,
