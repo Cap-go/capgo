@@ -1146,54 +1146,54 @@ export async function checkPermissionsBatch(
 ---
 
 ## Frontend Integration
-- `org.update_settings` - Modifier les paramètres org
-- `org.invite_user` - Inviter des membres
-- `org.update_user_roles` - Gérer les rôles des membres
-- `org.read_billing` - Voir les infos de facturation
-- `org.update_billing` - Modifier la facturation
-- `org.read_invoices` - Voir les factures
-- `org.read_audit` - Voir les logs d'audit
-- `org.read_billing_audit` - Voir l'audit facturation
+- `org.update_settings` - Update org settings
+- `org.invite_user` - Invite members
+- `org.update_user_roles` - Manage member roles
+- `org.read_billing` - View billing info
+- `org.update_billing` - Update billing
+- `org.read_invoices` - View invoices
+- `org.read_audit` - View audit logs
+- `org.read_billing_audit` - View billing audit logs
 
 **App permissions** (scope: 'app')
-- `app.read` - Voir les infos de l'app
-- `app.update_settings` - Modifier les paramètres app
-- `app.delete` - Supprimer l'app
-- `app.read_bundles` - Voir les bundles
-- `app.list_bundles` - Lister les bundles
-- `app.upload_bundle` - Uploader des bundles
-- `app.create_channel` - Créer des channels
-- `app.read_channels` - Voir les channels
-- `app.list_channels` - Lister les channels
-- `app.read_logs` - Voir les logs
-- `app.manage_devices` - Gérer les devices
-- `app.read_devices` - Voir les devices
-- `app.build_native` - Builder des versions natives
-- `app.read_audit` - Voir l'audit app
-- `app.update_user_roles` - Gérer les rôles utilisateurs pour cette app
+- `app.read` - View app details
+- `app.update_settings` - Update app settings
+- `app.delete` - Delete app
+- `app.read_bundles` - View bundles
+- `app.list_bundles` - List bundles
+- `app.upload_bundle` - Upload bundles
+- `app.create_channel` - Create channels
+- `app.read_channels` - View channels
+- `app.list_channels` - List channels
+- `app.read_logs` - View logs
+- `app.manage_devices` - Manage devices
+- `app.read_devices` - View devices
+- `app.build_native` - Build native versions
+- `app.read_audit` - View app audit logs
+- `app.update_user_roles` - Manage app user roles
 
 **Bundle permissions** (scope: 'bundle')
-- `bundle.read` - Lire les métadonnées d'un bundle
-- `bundle.update` - Modifier un bundle
-- `bundle.delete` - Supprimer un bundle
+- `bundle.read` - Read bundle metadata
+- `bundle.update` - Update bundle
+- `bundle.delete` - Delete bundle
 
 **Channel permissions** (scope: 'channel')
-- `channel.read` - Voir un channel
-- `channel.update_settings` - Modifier les paramètres channel
-- `channel.delete` - Supprimer un channel
-- `channel.read_history` - Voir l'historique
-- `channel.promote_bundle` - Promouvoir un bundle
-- `channel.rollback_bundle` - Rollback un bundle
-- `channel.manage_forced_devices` - Gérer les devices forcés
-- `channel.read_forced_devices` - Voir les devices forcés
-- `channel.read_audit` - Voir l'audit channel
+- `channel.read` - View channel
+- `channel.update_settings` - Update channel settings
+- `channel.delete` - Delete channel
+- `channel.read_history` - View deployment history
+- `channel.promote_bundle` - Promote bundle
+- `channel.rollback_bundle` - Roll back bundle
+- `channel.manage_forced_devices` - Manage forced devices
+- `channel.read_forced_devices` - View forced devices
+- `channel.read_audit` - View channel audit logs
 
 **Platform permissions** (scope: 'platform' - usage interne uniquement)
-- `platform.impersonate_user` - Se faire passer pour un user
-- `platform.manage_orgs_any` - Gérer n'importe quelle org
-- `platform.manage_apps_any` - Gérer n'importe quelle app
-- `platform.manage_channels_any` - Gérer n'importe quel channel
-- `platform.run_maintenance_jobs` - Lancer des jobs de maintenance
+- `platform.impersonate_user` - Impersonate a user
+- `platform.manage_orgs_any` - Manage any org
+- `platform.manage_apps_any` - Manage any app
+- `platform.manage_channels_any` - Manage any channel
+- `platform.run_maintenance_jobs` - Run maintenance jobs
 - `platform.delete_orphan_users` - Delete orphan users
 - `platform.read_all_audit` - View all audit logs
 - `platform.db_break_glass` - Break-glass DB access
