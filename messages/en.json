@@ -1513,7 +1513,6 @@
   "no-role-bindings": "No role assignments found",
   "user": "User",
   "group": "Group",
-  "Access": "Access",
   "role-app-admin": "App Admin",
   "role-app-developer": "App Developer",
   "role-app-uploader": "App Uploader",

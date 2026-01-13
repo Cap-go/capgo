@@ -1489,7 +1489,6 @@
   "no-role-bindings": "Aucune attribution de rôle trouvée",
   "user": "Utilisateur",
   "group": "Groupe",
-  "Access": "Accès",
   "role-app-admin": "Administrateur d'application",
   "role-app-developer": "Développeur d'application",
   "role-app-uploader": "Uploadeur d'application",
