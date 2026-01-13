@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict cqtlSuKBeUODjZGKspQIwwGBQg69ooTNucTqHSpHF7RbhKPGMLtQw4qaBgjWNo9
+\restrict 2AWJUYdcncAXOBjcSviWtq99n4Ctkbp2zlSHUoyIWK2Q2kir5PoFeRHmTRfhB2Y
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.7 (Homebrew)
@@ -82,13 +82,13 @@ $$;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict cqtlSuKBeUODjZGKspQIwwGBQg69ooTNucTqHSpHF7RbhKPGMLtQw4qaBgjWNo9
+\unrestrict 2AWJUYdcncAXOBjcSviWtq99n4Ctkbp2zlSHUoyIWK2Q2kir5PoFeRHmTRfhB2Y
 
 --
 -- PostgreSQL database dump
 --
 
-\restrict 98eL5D7XEvAkho181dICYtWsgFMID4zZyBQhp3FDih2mfDPHEZte471xF31P6Ir
+\restrict yo5W7cTAuNiKRBNEyQ4lm98Ap4AgkcmMXSwestu6tfzyBXm0aEi6pUeBhk7XFxM
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.7 (Homebrew)
@@ -220,7 +220,8 @@ CREATE TABLE public.channels (
     owner_org uuid NOT NULL,
     created_by uuid NOT NULL,
     allow_device boolean DEFAULT true NOT NULL,
-    allow_prod boolean DEFAULT true NOT NULL
+    allow_prod boolean DEFAULT true NOT NULL,
+    electron boolean DEFAULT true NOT NULL
 );
 
 ALTER TABLE ONLY public.channels REPLICA IDENTITY FULL;
@@ -327,7 +328,9 @@ CREATE TABLE public.orgs (
     password_policy_config jsonb,
     enforce_hashed_api_keys boolean DEFAULT false NOT NULL,
     require_apikey_expiration boolean DEFAULT false NOT NULL,
-    max_apikey_expiration_days integer
+    max_apikey_expiration_days integer,
+    enforce_encrypted_bundles boolean DEFAULT false NOT NULL,
+    required_encryption_key character varying(21) DEFAULT NULL::character varying
 );
 
 ALTER TABLE ONLY public.orgs REPLICA IDENTITY FULL;
@@ -506,6 +509,20 @@ ALTER TABLE ONLY public.channels
 
 ALTER TABLE ONLY public.orgs
     ADD CONSTRAINT unique_name_created_by UNIQUE (name, created_by);
+
+
+--
+-- Name: app_versions_cli_version_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX app_versions_cli_version_idx ON public.app_versions USING btree (cli_version);
+
+
+--
+-- Name: channel_devices_device_id_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX channel_devices_device_id_idx ON public.channel_devices USING btree (device_id);
 
 
 --
@@ -757,5 +774,5 @@ CREATE INDEX si_customer_status_trial_idx ON public.stripe_info USING btree (cus
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 98eL5D7XEvAkho181dICYtWsgFMID4zZyBQhp3FDih2mfDPHEZte471xF31P6Ir
+\unrestrict yo5W7cTAuNiKRBNEyQ4lm98Ap4AgkcmMXSwestu6tfzyBXm0aEi6pUeBhk7XFxM
 
