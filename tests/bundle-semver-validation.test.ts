@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { BASE_URL, getSupabaseClient, headers, ORG_ID, resetAndSeedAppData, resetAppData, SEMVER_ORG_ID, SEMVER_STRIPE_CUSTOMER_ID, USER_ID } from './test-utils.ts'
+import { BASE_URL, getSupabaseClient, headers, resetAndSeedAppData, resetAppData, SEMVER_ORG_ID, SEMVER_STRIPE_CUSTOMER_ID, USER_ID } from './test-utils.ts'
 
 const id = randomUUID()
 const APPNAME = `com.bundle.semver.${id}`
