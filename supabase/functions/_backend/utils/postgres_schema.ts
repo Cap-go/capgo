@@ -1,4 +1,4 @@
-import { bigint, boolean, integer, jsonb, pgEnum, pgTable, serial, text, timestamp, uuid, varchar } from 'drizzle-orm/pg-core'
+import { bigint, boolean, integer, jsonb, pgEnum, pgTable, primaryKey, serial, text, timestamp, uuid, varchar } from 'drizzle-orm/pg-core'
 
 // do_not_change
 
@@ -176,12 +176,18 @@ export const groups = pgTable('groups', {
   created_at: timestamp('created_at').notNull().defaultNow(),
 })
 
-export const group_members = pgTable('group_members', {
-  group_id: uuid('group_id').notNull(),
-  user_id: uuid('user_id').notNull(),
-  added_by: uuid('added_by'),
-  added_at: timestamp('added_at').notNull().defaultNow(),
-})
+export const group_members = pgTable(
+  'group_members',
+  {
+    group_id: uuid('group_id').notNull(),
+    user_id: uuid('user_id').notNull(),
+    added_by: uuid('added_by'),
+    added_at: timestamp('added_at').notNull().defaultNow(),
+  },
+  t => ({
+    pk: primaryKey({ columns: [t.group_id, t.user_id] }),
+  }),
+)
 
 export const role_bindings = pgTable('role_bindings', {
   id: uuid('id').primaryKey().defaultRandom(),
