@@ -112,18 +112,18 @@ async function insertMultipleManifestEntries(appVersionId: number, entries: { fi
   const supabase = getSupabaseClient()
   // First, delete any existing manifest entries for this version
   await supabase.from('manifest').delete().eq('app_version_id', appVersionId)
-  // Insert all manifest entries
-  for (const entry of entries) {
-    const { error } = await supabase.from('manifest').insert({
+  // Insert all manifest entries in a single batch
+  const { error } = await supabase.from('manifest').insert(
+    entries.map(entry => ({
       app_version_id: appVersionId,
       file_name: entry.file_name,
       s3_path: entry.s3_path,
       file_hash: entry.file_hash,
       file_size: 100,
-    })
-    if (error)
-      throw new Error(`Failed to insert manifest entry: ${error.message}`)
-  }
+    })),
+  )
+  if (error)
+    throw new Error(`Failed to insert manifest entries: ${error.message}`)
 
   // Update the manifest_count on the version
   await supabase.from('app_versions').update({ manifest_count: entries.length }).eq('id', appVersionId)
