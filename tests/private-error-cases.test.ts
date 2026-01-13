@@ -1,39 +1,50 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { APIKEY_STATS, BASE_URL, getSupabaseClient, headers, NON_OWNER_ORG_ID, resetAndSeedAppData, resetAppData, TEST_EMAIL, USER_ID } from './test-utils.ts'
+import { APIKEY_STATS, BASE_URL, getSupabaseClient, headers, NON_OWNER_ORG_ID, PRIVATE_ERROR_ORG_ID, resetAndSeedAppData, resetAppData, TEST_EMAIL, USER_ID } from './test-utils.ts'
 
 const id = randomUUID()
 const APPNAME = `com.private.error.${id}`
-let testOrgId: string
+// Use dedicated org ID to prevent conflicts with parallel tests
+const testOrgId = PRIVATE_ERROR_ORG_ID
 
 beforeAll(async () => {
   await resetAndSeedAppData(APPNAME)
 
-  // Create test organization (without a customer_id)
-  const { data: orgData, error: orgError } = await getSupabaseClient().from('orgs').insert({
-    id: randomUUID(),
-    name: `Test Private Error Org ${id}`,
+  // Create test organization (without a customer_id) using dedicated ID
+  // Use upsert to avoid conflicts when tests run in parallel
+  const { error: orgError } = await getSupabaseClient().from('orgs').upsert({
+    id: testOrgId,
+    name: `Test Private Error Org`,
     management_email: TEST_EMAIL,
     created_by: USER_ID,
-  }).select().single()
+    // Intentionally no customer_id to test error cases
+  }, { onConflict: 'id' })
 
   if (orgError)
     throw orgError
-  testOrgId = orgData.id
 
-  // Add test user as super_admin to the org
-  const { error: orgUserError } = await getSupabaseClient().from('org_users').insert({
-    org_id: testOrgId,
-    user_id: USER_ID,
-    user_right: 'super_admin' as const,
-  })
-  if (orgUserError)
-    throw orgUserError
+  // Add test user as super_admin to the org (check first to handle parallel runs)
+  const { data: existingOrgUser } = await getSupabaseClient()
+    .from('org_users')
+    .select('id')
+    .eq('org_id', testOrgId)
+    .eq('user_id', USER_ID)
+    .maybeSingle()
+
+  if (!existingOrgUser) {
+    const { error: orgUserError } = await getSupabaseClient().from('org_users').insert({
+      org_id: testOrgId,
+      user_id: USER_ID,
+      user_right: 'super_admin' as const,
+    })
+    if (orgUserError)
+      throw orgUserError
+  }
 })
 
 afterAll(async () => {
   await resetAppData(APPNAME)
-  await getSupabaseClient().from('orgs').delete().eq('id', testOrgId)
+  // Don't delete the org - it uses a fixed ID and other tests may need it
 })
 
 describe('[POST] /private/create_device - Error Cases', () => {
@@ -196,7 +207,7 @@ describe('[POST] /private/download_link - Error Cases', () => {
 
     expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('not_authorize')
+    expect(data.error).toBe('not_authorized')
   })
 
   it('should return 400 when user cannot access app', async () => {
@@ -211,7 +222,7 @@ describe('[POST] /private/download_link - Error Cases', () => {
 
     expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('not_authorize')
+    expect(data.error).toBe('not_authorized')
   })
 })
 

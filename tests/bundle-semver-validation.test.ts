@@ -1,34 +1,16 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { BASE_URL, getSupabaseClient, headers, resetAndSeedAppData, resetAppData, TEST_EMAIL, USER_ID } from './test-utils.ts'
+import { BASE_URL, getSupabaseClient, headers, ORG_ID, resetAndSeedAppData, resetAppData, SEMVER_ORG_ID, SEMVER_STRIPE_CUSTOMER_ID, USER_ID } from './test-utils.ts'
 
 const id = randomUUID()
 const APPNAME = `com.bundle.semver.${id}`
-let testOrgId: string
 
 beforeAll(async () => {
-  await resetAndSeedAppData(APPNAME)
-
-  // Create test organization
-  const { data: orgData, error: orgError } = await getSupabaseClient().from('orgs').insert({
-    id: randomUUID(),
-    name: `Test Bundle Semver Org ${id}`,
-    management_email: TEST_EMAIL,
-    created_by: USER_ID,
-  }).select().single()
-
-  if (orgError)
-    throw orgError
-  testOrgId = orgData.id
-
-  // Create test app
-  await getSupabaseClient().from('apps').insert({
-    id: randomUUID(),
-    app_id: APPNAME,
-    name: `Test Bundle Semver App`,
-    checksum: 'a1b2c3d4e5f6789abcdef123456789abcdef123456789abcdef123456789abcd',
-    icon_url: 'https://example.com/icon.png',
-    owner_org: testOrgId,
+  // Use dedicated semver test org and stripe info for isolation
+  await resetAndSeedAppData(APPNAME, {
+    orgId: SEMVER_ORG_ID,
+    userId: USER_ID,
+    stripeCustomerId: SEMVER_STRIPE_CUSTOMER_ID,
   })
 })
 
@@ -40,7 +22,6 @@ afterAll(async () => {
     .eq('app_id', APPNAME)
 
   await resetAppData(APPNAME)
-  await getSupabaseClient().from('orgs').delete().eq('id', testOrgId)
 })
 
 describe('[POST] /bundle - Semver Validation', () => {

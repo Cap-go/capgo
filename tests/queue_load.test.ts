@@ -13,6 +13,7 @@ const queueName = 'test_queue_consumer'
 
 beforeAll(async () => {
   // Clean up any existing messages in the test queue
+  // Count before cleanup for debugging
   await pool.query(`DELETE FROM pgmq.q_${queueName}`)
   await pool.query(`DELETE FROM pgmq.a_${queueName}`)
 })
@@ -78,6 +79,10 @@ describe('queue Load Test', () => {
   })
 
   it('should handle multiple queue messages simultaneously', async () => {
+    // Clean queue before adding messages (in case other tests added messages)
+    await pool.query(`DELETE FROM pgmq.q_${queueName}`)
+    await pool.query(`DELETE FROM pgmq.a_${queueName}`)
+
     // Add fake messages directly to test queue using pgmq.send
     for (let i = 0; i < 10; i++) {
       const fakeMessage = {
