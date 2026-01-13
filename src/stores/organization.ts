@@ -315,7 +315,7 @@ export const useOrganizationStore = defineStore('organization', () => {
   }
 
   /**
-   * Invalide le cache des role_bindings pour une org
+   * Invalidate the role_bindings cache for an org.
    */
   const invalidateRoleBindingsCache = (orgId?: string) => {
     if (orgId) {
@@ -327,11 +327,11 @@ export const useOrganizationStore = defineStore('organization', () => {
   }
 
   /**
-   * Vérifie si l'utilisateur a les permissions requises dans le nouveau système RBAC (synchrone, utilise le cache)
+   * Check whether the user has the required access in the new RBAC system (sync, cached).
    *
-   * ⚠️ FONCTION TEMPORAIRE - À remplacer par hasPermission() dans le futur
-   * Cette fonction vérifie les RÔLES. Dans un vrai système RBAC, on devrait vérifier les PERMISSIONS.
-   * Voir les commentaires dans hasPermissionsInRole() pour les détails de la migration.
+   * ⚠️ TEMPORARY FUNCTION - Replace with hasPermission() later.
+   * This function checks ROLES. In a real RBAC system, we should check PERMISSIONS.
+   * See hasPermissionsInRole() comments for migration details.
    */
   const hasPermissionsInRbac = (orgId: string, requiredRoles: RbacRoleName[], appId?: string): boolean => {
     const bindings = _roleBindingsCache.value.get(orgId) || []
@@ -362,43 +362,42 @@ export const useOrganizationStore = defineStore('organization', () => {
   }
 
   /**
-   * Vérifie si l'utilisateur a les permissions requises.
-   * Détecte automatiquement si l'org utilise le nouveau RBAC ou l'ancien système.
-   * SYNCHRONE - les role_bindings sont pré-chargés lors du fetchOrganizations.
+   * Check whether the user has the required access.
+   * Automatically detects whether the org uses the new RBAC or the legacy system.
+   * SYNCHRONOUS - role_bindings are preloaded during fetchOrganizations.
    *
-   * ⚠️ FUTURE MIGRATION VERS UN SYSTÈME BASÉ SUR LES PERMISSIONS:
-   * Cette fonction vérifie actuellement les RÔLES (org_admin, app_developer, etc.)
-   * Dans le futur, pour supprimer complètement l'ancien système et avoir un vrai RBAC,
-   * il faudra migrer vers un système basé sur les PERMISSIONS au lieu des rôles.
+   * ⚠️ FUTURE MIGRATION TO A PERMISSION-BASED SYSTEM:
+   * This function currently checks ROLES (org_admin, app_developer, etc.).
+   * To fully migrate to RBAC, we should check PERMISSIONS instead of roles.
    *
-   * EXEMPLE DE MIGRATION:
-   * Au lieu de:
+   * MIGRATION EXAMPLE:
+   * Instead of:
    *   hasPermissionsInRole(role, ['org_admin', 'org_super_admin'])
    *
-   * Il faudra:
-   *   hasPermission('org.settings.update', orgId)
-   *   hasPermission('app.bundles.delete', orgId, appId)
-   *   hasPermission('billing.view', orgId)
+   * Use:
+   *   hasPermission('org.update_settings', { orgId })
+   *   hasPermission('app.delete', { orgId, appId })
+   *   hasPermission('org.read_billing', { orgId })
    *
-   * Pour cela, créer:
-   * 1. Une table `permissions` (key, description, scope_type)
-   * 2. Une table `role_permissions` (role_id, permission_id) - déjà existe partiellement
-   * 3. Une fonction `hasPermission(permissionKey: string, orgId?: string, appId?: string): boolean`
-   *    qui:
-   *    - Récupère les role_bindings de l'utilisateur
-   *    - Pour chaque rôle, récupère les permissions associées (via role_permissions + hiérarchie)
-   *    - Vérifie si permissionKey est dans la liste
+   * To do this, create:
+   * 1. A `permissions` table (key, description, scope_type)
+   * 2. A `role_permissions` table (role_id, permission_id) - already partially exists
+   * 3. A `hasPermission(permissionKey: string, orgId?: string, appId?: string): boolean` function
+   *    that:
+   *    - Fetches user role_bindings
+   *    - Resolves permissions per role (role_permissions + hierarchy)
+   *    - Checks whether permissionKey is in the resolved set
    *
-   * AVANTAGES:
-   * - Plus besoin de lister tous les rôles possibles dans chaque check
-   * - Granularité fine (ex: 'billing.view' vs 'billing.update')
-   * - Facile d'ajouter de nouvelles permissions sans toucher au code
-   * - Système standard d'autorisation (permission-based access control)
+   * BENEFITS:
+   * - No need to list every possible role in each check
+   * - Fine-grained access control (e.g., 'org.read_billing' vs 'org.update_billing')
+   * - Easy to add permissions without code changes
+   * - Standard authorization model (permission-based access control)
    *
-   * @param legacyRole Le rôle actuel dans l'ancien système (pour compatibilité, utilisé uniquement en mode legacy)
-   * @param requiredRoles Les rôles RBAC requis (org_admin, app_developer, etc.)
-   * @param orgId L'ID de l'organisation (optionnel, détecté via currentOrganization si absent)
-   * @param appId L'ID de l'app (optionnel, pour filtrer par scope app dans le nouveau RBAC)
+   * @param legacyRole Current legacy role (compatibility only, used only in legacy mode)
+   * @param requiredRoles Required RBAC roles (org_admin, app_developer, etc.)
+   * @param orgId Organization ID (optional, inferred from currentOrganization if missing)
+   * @param appId App ID (optional, filters by app scope in new RBAC)
    */
   const hasPermissionsInRole = (
     legacyRole: OrganizationRole | null,
