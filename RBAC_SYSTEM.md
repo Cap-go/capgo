@@ -1,62 +1,62 @@
-# Système RBAC Capgo - Documentation Technique Complète
+# Capgo RBAC System - Complete Technical Documentation
 
-Ce document explique en détail le système de permissions RBAC (Role-Based Access Control) de Capgo, permettant un contrôle d'accès granulaire aux ressources de la plateforme.
+This document explains in detail the Capgo RBAC (Role-Based Access Control) permission system, enabling granular access control to platform resources.
 
-## Table des matières
+## Table of Contents
 
-1. [Vue d'ensemble](#vue-densemble)
-2. [Architecture du système](#architecture-du-système)
-3. [Tables de la base de données](#tables-de-la-base-de-données)
-4. [Rôles disponibles](#rôles-disponibles)
-5. [Permissions disponibles](#permissions-disponibles)
-6. [Fonctions SQL](#fonctions-sql)
-7. [Intégration backend](#intégration-backend)
-8. [Intégration frontend](#intégration-frontend)
-9. [Debugging et troubleshooting](#debugging-et-troubleshooting)
-10. [Bonnes pratiques](#bonnes-pratiques)
+1. [Overview](#overview)
+2. [System Architecture](#system-architecture)
+3. [Database Tables](#database-tables)
+4. [Available Roles](#available-roles)
+5. [Available Permissions](#available-permissions)
+6. [SQL Functions](#sql-functions)
+7. [Backend Integration](#backend-integration)
+8. [Frontend Integration](#frontend-integration)
+9. [Debugging and Troubleshooting](#debugging-and-troubleshooting)
+10. [Best Practices](#best-practices)
 
 ---
 
-## Vue d'ensemble
+## Overview
 
-Capgo utilise un système **hybride** qui supporte deux modes de gestion des permissions :
+Capgo uses a **hybrid** system that supports two permission management modes:
 
-### Système Legacy (ancien)
-- **Table principale** : `org_users`
-- **Rôles simples** : `super_admin`, `admin`, `write`, `upload`, `read`
-- **Limitation** : un seul rôle par utilisateur par organisation
-- **Granularité** : limitée, pas de contrôle au niveau app/channel individuel
+### Legacy System (old)
+- **Main table**: `org_users`
+- **Simple roles**: `super_admin`, `admin`, `write`, `upload`, `read`
+- **Limitation**: one role per user per organization
+- **Granularity**: limited, no control at individual app/channel level
 
-### Système RBAC (nouveau)
-- **Tables principales** : `roles`, `permissions`, `role_bindings`, `role_permissions`
-- **Rôles multiples** : un utilisateur peut avoir plusieurs rôles à différents scopes
-- **Granularité fine** : permissions au niveau org, app, channel, et bundle
-- **Flexibilité** : ajout/modification de permissions sans changement de code
+### RBAC System (new)
+- **Main tables**: `roles`, `permissions`, `role_bindings`, `role_permissions`
+- **Multiple roles**: a user can have multiple roles at different scopes
+- **Fine granularity**: permissions at org, app, channel, and bundle level
+- **Flexibility**: add/modify permissions without code changes
 
-### Basculement automatique
+### Automatic Switching
 
-Le système bascule automatiquement entre legacy et RBAC via :
-- **Flag au niveau org** : colonne `use_new_rbac` dans la table `orgs`
-- **Flag global** : table `rbac_settings` (singleton) pour activer RBAC pour toutes les orgs
-- **Auto-détection** : la fonction `rbac_is_enabled_for_org()` vérifie les deux flags
+The system automatically switches between legacy and RBAC via:
+- **Org-level flag**: `use_new_rbac` column in the `orgs` table
+- **Global flag**: `rbac_settings` table (singleton) to enable RBAC for all orgs
+- **Auto-detection**: the `rbac_is_enabled_for_org()` function checks both flags
 
 ```sql
--- L'org utilise RBAC si :
--- 1. orgs.use_new_rbac = true OU
+-- The org uses RBAC if:
+-- 1. orgs.use_new_rbac = true OR
 -- 2. rbac_settings.use_new_rbac = true
 SELECT rbac_is_enabled_for_org('org-uuid');
 ```
 
 ---
 
-## Architecture du système
+## System Architecture
 
-Le système RBAC de Capgo suit le modèle standard RBAC avec des extensions pour le multi-scope :
+Capgo's RBAC system follows the standard RBAC model with extensions for multi-scope:
 
 ```
 ┌─────────────┐     ┌──────────────┐     ┌──────────────┐
 │  Principal  │────▶│ Role Binding │────▶│     Role     │
-│ (User/API)  │     │  (au scope)  │     │              │
+│ (User/API)  │     │  (at scope)  │     │              │
 └─────────────┘     └──────────────┘     └──────┬───────┘
                                                  │
                                                  │
@@ -69,35 +69,35 @@ Le système RBAC de Capgo suit le modèle standard RBAC avec des extensions pour
                                           └───────────────┘
 ```
 
-### Concepts clés
+### Key Concepts
 
-1. **Principal** : L'entité qui effectue l'action
-   - User (utilisateur authentifié)
-   - API Key (clé API)
-   - Group (groupe d'utilisateurs)
+1. **Principal**: The entity performing the action
+   - User (authenticated user)
+   - API Key
+   - Group (user group)
 
-2. **Role** : Ensemble cohérent de permissions
-   - Exemple : `org_admin`, `app_developer`, `app_uploader`
-   - Défini pour un scope spécifique (platform, org, app, channel, bundle)
+2. **Role**: Consistent set of permissions
+   - Example: `org_admin`, `app_developer`, `app_uploader`
+   - Defined for a specific scope (platform, org, app, channel, bundle)
 
-3. **Permission** : Action atomique autorisée
-   - Exemple : `app.upload_bundle`, `channel.promote_bundle`
-   - Granularité fine pour un contrôle précis
+3. **Permission**: Atomic authorized action
+   - Example: `app.upload_bundle`, `channel.promote_bundle`
+   - Fine granularity for precise control
 
-4. **Role Binding** : Attribution d'un rôle à un principal dans un scope
-   - Exemple : User X a le rôle `app_developer` sur l'app Y
-   - Un principal peut avoir plusieurs bindings à différents scopes
+4. **Role Binding**: Assignment of a role to a principal in a scope
+   - Example: User X has the `app_developer` role on app Y
+   - A principal can have multiple bindings at different scopes
 
-5. **Scope** : Niveau de la hiérarchie où s'applique le binding
-   - `platform` : Toute la plateforme (admins Capgo uniquement)
-   - `org` : Organisation (s'applique à toutes les apps de l'org)
-   - `app` : Application spécifique
-   - `channel` : Channel spécifique
-   - `bundle` : Bundle spécifique
+5. **Scope**: Level in the hierarchy where the binding applies
+   - `platform`: Entire platform (Capgo admins only)
+   - `org`: Organization (applies to all apps in the org)
+   - `app`: Specific application
+   - `channel`: Specific channel
+   - `bundle`: Specific bundle
 
-### Hiérarchie des scopes
+### Scope Hierarchy
 
-Les permissions se propagent vers le bas dans la hiérarchie :
+Permissions propagate downward in the hierarchy:
 
 ```
 Platform (global)
@@ -111,18 +111,18 @@ Platform (global)
                     └─▶ Bundle
 ```
 
-**Exemple de propagation** :
-- User avec `org_admin` au niveau org → accès à toutes les apps de cette org
-- User avec `app_developer` au niveau app → accès à tous les channels de cette app
-- User avec `channel_admin` au niveau channel → accès seulement à ce channel
+**Propagation example**:
+- User with `org_admin` at org level → access to all apps in this org
+- User with `app_developer` at app level → access to all channels in this app
+- User with `channel_admin` at channel level → access only to this channel
 
 ---
 
-## Tables de la base de données
+## Database Tables
 
-### 1. `roles` - Définition des rôles
+### 1. `roles` - Role Definition
 
-Stocke tous les rôles disponibles dans le système.
+Stores all available roles in the system.
 
 ```sql
 CREATE TABLE public.roles (
@@ -137,19 +137,19 @@ CREATE TABLE public.roles (
 );
 ```
 
-**Colonnes importantes** :
-- `name` : Nom unique du rôle (ex: `org_admin`)
-- `scope_type` : Niveau natif du rôle (où il peut être assigné)
-- `priority_rank` : Ordre de priorité (plus élevé = plus de permissions)
-- `is_assignable` : Si `false`, ne peut pas être assigné aux clients (usage interne)
+**Important columns**:
+- `name`: Unique role name (e.g., `org_admin`)
+- `scope_type`: Native level of the role (where it can be assigned)
+- `priority_rank`: Priority order (higher = more permissions)
+- `is_assignable`: If `false`, cannot be assigned to customers (internal use)
 
-**Index** :
-- Primary key sur `id`
-- Unique sur `name`
+**Indexes**:
+- Primary key on `id`
+- Unique on `name`
 
-### 2. `permissions` - Actions atomiques
+### 2. `permissions` - Atomic Actions
 
-Définit toutes les permissions disponibles.
+Defines all available permissions.
 
 ```sql
 CREATE TABLE public.permissions (
@@ -161,17 +161,17 @@ CREATE TABLE public.permissions (
 );
 ```
 
-**Colonnes importantes** :
-- `key` : Identifiant unique de la permission (ex: `app.upload_bundle`)
-- `scope_type` : Scope minimal requis pour cette permission
-- `description` : Explication de l'action autorisée
+**Important columns**:
+- `key`: Unique permission identifier (e.g., `app.upload_bundle`)
+- `scope_type`: Minimum scope required for this permission
+- `description`: Explanation of the authorized action
 
-**Convention de nommage** : `{scope}.{action}`
-- Exemples : `org.read`, `app.update_settings`, `channel.promote_bundle`
+**Naming convention**: `{scope}.{action}`
+- Examples: `org.read`, `app.update_settings`, `channel.promote_bundle`
 
-### 3. `role_permissions` - Mapping rôle → permissions
+### 3. `role_permissions` - Role → Permissions Mapping
 
-Table de liaison entre rôles et permissions.
+Junction table between roles and permissions.
 
 ```sql
 CREATE TABLE public.role_permissions (
@@ -181,14 +181,14 @@ CREATE TABLE public.role_permissions (
 );
 ```
 
-**Utilisation** :
-- Définit quelles permissions sont accordées à chaque rôle
-- Un rôle peut avoir plusieurs permissions
-- Une permission peut appartenir à plusieurs rôles
+**Usage**:
+- Defines which permissions are granted to each role
+- A role can have multiple permissions
+- A permission can belong to multiple roles
 
-### 4. `role_bindings` - Attribution des rôles
+### 4. `role_bindings` - Role Assignment
 
-Assigne des rôles aux principals dans des scopes spécifiques.
+Assigns roles to principals in specific scopes.
 
 ```sql
 CREATE TABLE public.role_bindings (
@@ -216,21 +216,21 @@ CREATE TABLE public.role_bindings (
 );
 ```
 
-**Colonnes importantes** :
-- `principal_type` / `principal_id` : Qui reçoit le rôle (user, group, apikey)
-- `role_id` : Quel rôle est assigné
-- `scope_type` : À quel niveau (org, app, channel, etc.)
-- `org_id` / `app_id` / `channel_id` / `bundle_id` : Identifiants du scope
-- `granted_by` : Qui a accordé ce rôle (audit)
-- `expires_at` : Date d'expiration optionnelle
-- `is_direct` : Si `true`, assigné manuellement; si `false`, hérité
+**Important columns**:
+- `principal_type` / `principal_id`: Who receives the role (user, group, apikey)
+- `role_id`: Which role is assigned
+- `scope_type`: At what level (org, app, channel, etc.)
+- `org_id` / `app_id` / `channel_id` / `bundle_id`: Scope identifiers
+- `granted_by`: Who granted this role (audit)
+- `expires_at`: Optional expiration date
+- `is_direct`: If `true`, manually assigned; if `false`, inherited
 
-**Contraintes d'intégrité** :
-- **SSD (Static Separation of Duty)** : Un principal ne peut avoir qu'un seul rôle par scope
-  - Exemple : User X ne peut pas être à la fois `org_admin` ET `org_member` dans la même org
-  - Implémenté via index uniques sur `(principal_type, principal_id, scope_type, {scope_id})`
+**Integrity constraints**:
+- **SSD (Static Separation of Duty)**: A principal can only have one role per scope
+  - Example: User X cannot be both `org_admin` AND `org_member` in the same org
+  - Implemented via unique indexes on `(principal_type, principal_id, scope_type, {scope_id})`
 
-**Index** :
+**Indexes**:
 ```sql
 -- SSD enforcement
 CREATE UNIQUE INDEX role_bindings_platform_scope_uniq
@@ -258,9 +258,9 @@ CREATE INDEX role_bindings_principal_scope_idx
   ON role_bindings (principal_type, principal_id, scope_type, org_id, app_id, channel_id);
 ```
 
-### 5. `role_hierarchy` - Héritage entre rôles
+### 5. `role_hierarchy` - Role Inheritance
 
-Définit les relations parent-enfant entre rôles.
+Defines parent-child relationships between roles.
 
 ```sql
 CREATE TABLE public.role_hierarchy (
@@ -271,11 +271,11 @@ CREATE TABLE public.role_hierarchy (
 );
 ```
 
-**Utilisation** :
-- Un rôle parent hérite automatiquement de toutes les permissions de ses enfants
-- Permet de simplifier la gestion : `org_admin` hérite de tous les rôles app_*
+**Usage**:
+- A parent role automatically inherits all permissions from its children
+- Simplifies management: `org_admin` inherits from all app_* roles
 
-**Exemples d'héritage** :
+**Inheritance examples**:
 ```
 org_super_admin ──▶ org_admin ──▶ app_admin ──▶ app_developer ──▶ app_uploader ──▶ app_reader
                                        │
@@ -284,9 +284,9 @@ org_super_admin ──▶ org_admin ──▶ app_admin ──▶ app_developer 
                                        └──▶ channel_admin ──▶ channel_reader
 ```
 
-### 6. `groups` - Groupes d'utilisateurs
+### 6. `groups` - User Groups
 
-Permet de regrouper des utilisateurs pour une gestion simplifiée.
+Allows grouping users for simplified management.
 
 ```sql
 CREATE TABLE public.groups (
@@ -301,12 +301,12 @@ CREATE TABLE public.groups (
 );
 ```
 
-**Utilisation** :
-- Créer des groupes au niveau org (ex: "Équipe Backend", "Admins")
-- Assigner un rôle au groupe au lieu d'utilisateurs individuels
-- Tous les membres du groupe héritent automatiquement du rôle
+**Usage**:
+- Create groups at org level (e.g., "Backend Team", "Admins")
+- Assign a role to the group instead of individual users
+- All group members automatically inherit the role
 
-### 7. `group_members` - Membres des groupes
+### 7. `group_members` - Group Members
 
 ```sql
 CREATE TABLE public.group_members (
@@ -318,9 +318,9 @@ CREATE TABLE public.group_members (
 );
 ```
 
-### 8. `rbac_settings` - Configuration globale
+### 8. `rbac_settings` - Global Configuration
 
-Table singleton pour activer RBAC globalement.
+Singleton table to globally enable RBAC.
 
 ```sql
 CREATE TABLE public.rbac_settings (
@@ -331,192 +331,188 @@ CREATE TABLE public.rbac_settings (
 );
 ```
 
-**Utilisation** :
-- Une seule ligne avec `id = 1`
-- Si `use_new_rbac = true`, RBAC activé pour TOUTES les orgs (sauf si override au niveau org)
+**Usage**:
+- Single row with `id = 1`
+- If `use_new_rbac = true`, RBAC enabled for ALL orgs (unless overridden at org level)
 
-### 9. Tables auxiliaires
+### 9. Auxiliary Tables
 
 #### `orgs.use_new_rbac`
 ```sql
 ALTER TABLE public.orgs
 ADD COLUMN use_new_rbac boolean NOT NULL DEFAULT false;
 ```
-- Flag au niveau org pour activer RBAC pour une org spécifique
+- Org-level flag to enable RBAC for a specific org
 
 #### `apikeys.rbac_id`
 ```sql
 ALTER TABLE public.apikeys
 ADD COLUMN rbac_id uuid DEFAULT gen_random_uuid() UNIQUE NOT NULL;
 ```
-- UUID stable pour référencer les API keys dans `role_bindings`
+- Stable UUID to reference API keys in `role_bindings`
 
 #### `channels.rbac_id`
 ```sql
 ALTER TABLE public.channels
 ADD COLUMN rbac_id uuid DEFAULT gen_random_uuid() UNIQUE NOT NULL;
 ```
-- UUID stable pour référencer les channels dans `role_bindings`
+- Stable UUID to reference channels in `role_bindings`
 
-#### `apps.id` (constraint ajoutée)
+#### `apps.id` (constraint added)
 ```sql
 ALTER TABLE public.apps
 ADD CONSTRAINT apps_id_unique UNIQUE (id);
 ```
-- `apps.id` était déjà présent mais pas unique; contrainte ajoutée pour RBAC
+- `apps.id` was already present but not unique; constraint added for RBAC
 
 ---
 
-## Rôles disponibles
+## Available Roles
 
----
+The system defines 13 predefined roles covering all hierarchy levels.
 
-## Rôles disponibles
-
-Le système définit 13 rôles prédéfinis couvrant tous les niveaux de la hiérarchie.
-
-### Rôles Platform (usage interne uniquement)
+### Platform Roles (internal use only)
 
 #### `platform_super_admin`
-- **Scope** : `platform`
-- **Assignable** : ❌ Non (équipe Capgo uniquement)
-- **Priority rank** : 100
-- **Permissions** : TOUTES les permissions de la plateforme
-- **Usage** : Admins Capgo pour maintenance, support, opérations d'urgence
+- **Scope**: `platform`
+- **Assignable**: ❌ No (Capgo team only)
+- **Priority rank**: 100
+- **Permissions**: ALL platform permissions
+- **Usage**: Capgo admins for maintenance, support, emergency operations
 
-### Rôles Organization
+### Organization Roles
 
 #### `org_super_admin`
-- **Scope** : `org`
-- **Assignable** : ✅ Oui
-- **Priority rank** : 95
-- **Permissions** :
-  - **Org** : read, update_settings, read_members, invite_user, update_user_roles, read_billing, **update_billing**, read_invoices, read_audit, read_billing_audit
-  - **App** : read, update_settings, **delete**, read_bundles, upload_bundle, create_channel, read_channels, read_logs, manage_devices, read_devices, build_native, read_audit, update_user_roles
-  - **Channel** : read, update_settings, **delete**, read_history, promote_bundle, rollback_bundle, manage_forced_devices, read_forced_devices, read_audit
-  - **Bundle** : **delete**
-- **Usage** : Propriétaire de l'organisation, accès total incluant facturation et suppressions
-- **Différence avec org_admin** : Peut modifier la facturation et supprimer apps/channels
+- **Scope**: `org`
+- **Assignable**: ✅ Yes
+- **Priority rank**: 95
+- **Permissions**:
+  - **Org**: read, update_settings, read_members, invite_user, update_user_roles, read_billing, **update_billing**, read_invoices, read_audit, read_billing_audit
+  - **App**: read, update_settings, **delete**, read_bundles, upload_bundle, create_channel, read_channels, read_logs, manage_devices, read_devices, build_native, read_audit, update_user_roles
+  - **Channel**: read, update_settings, **delete**, read_history, promote_bundle, rollback_bundle, manage_forced_devices, read_forced_devices, read_audit
+  - **Bundle**: **delete**
+- **Usage**: Organization owner, full access including billing and deletions
+- **Difference from org_admin**: Can modify billing and delete apps/channels
 
 #### `org_admin`
-- **Scope** : `org`
-- **Assignable** : ✅ Oui
-- **Priority rank** : 90
-- **Permissions** :
-  - **Org** : read, update_settings, read_members, invite_user, update_user_roles, read_billing, read_invoices, read_audit, read_billing_audit
-  - **App** : read, update_settings, read_bundles, upload_bundle, create_channel, read_channels, read_logs, manage_devices, read_devices, build_native, read_audit, update_user_roles
-  - **Channel** : read, update_settings, read_history, promote_bundle, rollback_bundle, manage_forced_devices, read_forced_devices, read_audit
-- **Usage** : Administrateur de l'organisation, gestion complète sauf facturation et suppressions
-- **Limitations** : Ne peut pas modifier la facturation ni supprimer apps/channels
+- **Scope**: `org`
+- **Assignable**: ✅ Yes
+- **Priority rank**: 90
+- **Permissions**:
+  - **Org**: read, update_settings, read_members, invite_user, update_user_roles, read_billing, read_invoices, read_audit, read_billing_audit
+  - **App**: read, update_settings, read_bundles, upload_bundle, create_channel, read_channels, read_logs, manage_devices, read_devices, build_native, read_audit, update_user_roles
+  - **Channel**: read, update_settings, read_history, promote_bundle, rollback_bundle, manage_forced_devices, read_forced_devices, read_audit
+- **Usage**: Organization administrator, full management except billing and deletions
+- **Limitations**: Cannot modify billing or delete apps/channels
 
 #### `org_billing_admin`
-- **Scope** : `org`
-- **Assignable** : ✅ Oui
-- **Priority rank** : 80
-- **Permissions** :
-  - **Org** : read, read_billing, **update_billing**, read_invoices, read_billing_audit
-- **Usage** : Accès limité à la facturation uniquement (comptabilité, finance)
-- **Cas d'usage** : Équipe finance qui doit gérer les paiements sans accès aux apps
+- **Scope**: `org`
+- **Assignable**: ✅ Yes
+- **Priority rank**: 80
+- **Permissions**:
+  - **Org**: read, read_billing, **update_billing**, read_invoices, read_billing_audit
+- **Usage**: Limited access to billing only (accounting, finance)
+- **Use case**: Finance team that needs to manage payments without app access
 
 #### `org_member`
-- **Scope** : `org`
-- **Assignable** : ✅ Oui
-- **Priority rank** : 75
-- **Permissions** :
-  - **Org** : read, read_members
-  - **App** : read, list_bundles, list_channels, read_logs, read_devices, read_audit
-  - **Channel** : read, read_history, read_forced_devices, read_audit
-  - **Bundle** : read
-- **Usage** : Membre de base, lecture seule sur toute l'org
-- **Cas d'usage** : Observateurs, stakeholders, QA avec visibilité mais sans pouvoir de modification
+- **Scope**: `org`
+- **Assignable**: ✅ Yes
+- **Priority rank**: 75
+- **Permissions**:
+  - **Org**: read, read_members
+  - **App**: read, list_bundles, list_channels, read_logs, read_devices, read_audit
+  - **Channel**: read, read_history, read_forced_devices, read_audit
+  - **Bundle**: read
+- **Usage**: Basic member, read-only across the entire org
+- **Use case**: Observers, stakeholders, QA with visibility but no modification power
 
-### Rôles Application
+### Application Roles
 
 #### `app_admin`
-- **Scope** : `app`
-- **Assignable** : ✅ Oui
-- **Priority rank** : 70
-- **Permissions** :
-  - **App** : read, update_settings, read_bundles, upload_bundle, create_channel, read_channels, read_logs, manage_devices, read_devices, build_native, read_audit, update_user_roles
-  - **Channel** : read, update_settings, **delete**, read_history, promote_bundle, rollback_bundle, manage_forced_devices, read_forced_devices, read_audit
-  - **Bundle** : **delete**
-- **Usage** : Admin complet d'une app spécifique (peut supprimer channels)
-- **Héritage** : Hérite de app_developer, app_uploader, app_reader, bundle_admin, channel_admin
+- **Scope**: `app`
+- **Assignable**: ✅ Yes
+- **Priority rank**: 70
+- **Permissions**:
+  - **App**: read, update_settings, read_bundles, upload_bundle, create_channel, read_channels, read_logs, manage_devices, read_devices, build_native, read_audit, update_user_roles
+  - **Channel**: read, update_settings, **delete**, read_history, promote_bundle, rollback_bundle, manage_forced_devices, read_forced_devices, read_audit
+  - **Bundle**: **delete**
+- **Usage**: Full admin of a specific app (can delete channels)
+- **Inheritance**: Inherits from app_developer, app_uploader, app_reader, bundle_admin, channel_admin
 
 #### `app_developer`
-- **Scope** : `app`
-- **Assignable** : ✅ Oui
-- **Priority rank** : 68
-- **Permissions** :
-  - **App** : read, read_bundles, upload_bundle, read_channels, read_logs, manage_devices, read_devices, build_native, read_audit
-  - **Channel** : read, update_settings, read_history, promote_bundle, rollback_bundle, manage_forced_devices, read_forced_devices, read_audit
-- **Usage** : Développeur avec accès complet sauf suppressions
-- **Limitations** : Ne peut pas créer de nouveaux channels ni supprimer channels/bundles
-- **Héritage** : Hérite de app_uploader, app_reader
+- **Scope**: `app`
+- **Assignable**: ✅ Yes
+- **Priority rank**: 68
+- **Permissions**:
+  - **App**: read, read_bundles, upload_bundle, read_channels, read_logs, manage_devices, read_devices, build_native, read_audit
+  - **Channel**: read, update_settings, read_history, promote_bundle, rollback_bundle, manage_forced_devices, read_forced_devices, read_audit
+- **Usage**: Developer with full access except deletions
+- **Limitations**: Cannot create new channels or delete channels/bundles
+- **Inheritance**: Inherits from app_uploader, app_reader
 
 #### `app_uploader`
-- **Scope** : `app`
-- **Assignable** : ✅ Oui
-- **Priority rank** : 66
-- **Permissions** :
-  - **App** : read, read_bundles, upload_bundle, read_channels, read_logs, read_devices, read_audit
-- **Usage** : CI/CD, upload de bundles uniquement
-- **Cas d'usage** : Clés API pour pipelines d'intégration continue
-- **Héritage** : Hérite de app_reader
+- **Scope**: `app`
+- **Assignable**: ✅ Yes
+- **Priority rank**: 66
+- **Permissions**:
+  - **App**: read, read_bundles, upload_bundle, read_channels, read_logs, read_devices, read_audit
+- **Usage**: CI/CD, bundle upload only
+- **Use case**: API keys for continuous integration pipelines
+- **Inheritance**: Inherits from app_reader
 
 #### `app_reader`
-- **Scope** : `app`
-- **Assignable** : ✅ Oui
-- **Priority rank** : 65
-- **Permissions** :
-  - **App** : read, read_bundles, read_channels, read_logs, read_devices, read_audit
-- **Usage** : Lecture seule sur une app spécifique
-- **Cas d'usage** : Auditeurs, stakeholders externes
+- **Scope**: `app`
+- **Assignable**: ✅ Yes
+- **Priority rank**: 65
+- **Permissions**:
+  - **App**: read, read_bundles, read_channels, read_logs, read_devices, read_audit
+- **Usage**: Read-only on a specific app
+- **Use case**: Auditors, external stakeholders
 
-### Rôles Channel
+### Channel Roles
 
 #### `channel_admin`
-- **Scope** : `channel`
-- **Assignable** : ✅ Oui
-- **Priority rank** : 60
-- **Permissions** :
-  - **Channel** : read, update_settings, **delete**, read_history, promote_bundle, rollback_bundle, manage_forced_devices, read_forced_devices, read_audit
-- **Usage** : Admin complet d'un channel spécifique
-- **Héritage** : Hérite de channel_reader
+- **Scope**: `channel`
+- **Assignable**: ✅ Yes
+- **Priority rank**: 60
+- **Permissions**:
+  - **Channel**: read, update_settings, **delete**, read_history, promote_bundle, rollback_bundle, manage_forced_devices, read_forced_devices, read_audit
+- **Usage**: Full admin of a specific channel
+- **Inheritance**: Inherits from channel_reader
 
 #### `channel_reader`
-- **Scope** : `channel`
-- **Assignable** : ✅ Oui
-- **Priority rank** : 55
-- **Permissions** :
-  - **Channel** : read, read_history, read_forced_devices, read_audit
-- **Usage** : Lecture seule sur un channel spécifique
+- **Scope**: `channel`
+- **Assignable**: ✅ Yes
+- **Priority rank**: 55
+- **Permissions**:
+  - **Channel**: read, read_history, read_forced_devices, read_audit
+- **Usage**: Read-only on a specific channel
 
-### Rôles Bundle
+### Bundle Roles
 
 #### `bundle_admin`
-- **Scope** : `bundle`
-- **Assignable** : ✅ Oui
-- **Priority rank** : 62
-- **Permissions** :
-  - **Bundle** : read, update, **delete**
-- **Usage** : Gestion complète d'un bundle spécifique
-- **Héritage** : Hérite de bundle_reader
+- **Scope**: `bundle`
+- **Assignable**: ✅ Yes
+- **Priority rank**: 62
+- **Permissions**:
+  - **Bundle**: read, update, **delete**
+- **Usage**: Full management of a specific bundle
+- **Inheritance**: Inherits from bundle_reader
 
 #### `bundle_reader`
-- **Scope** : `bundle`
-- **Assignable** : ✅ Oui
-- **Priority rank** : 61
-- **Permissions** :
-  - **Bundle** : read
-- **Usage** : Lecture seule sur un bundle spécifique
+- **Scope**: `bundle`
+- **Assignable**: ✅ Yes
+- **Priority rank**: 61
+- **Permissions**:
+  - **Bundle**: read
+- **Usage**: Read-only on a specific bundle
 
-### Hiérarchie complète des rôles
+### Complete Role Hierarchy
 
 ```
 platform_super_admin (platform, rank 100)
     │
-    └─▶ TOUTES les permissions
+    └─▶ ALL permissions
 
 org_super_admin (org, rank 95)
     │
@@ -540,99 +536,99 @@ org_super_admin (org, rank 95)
             │
             └─▶ org_member (org, rank 75)
 
-org_billing_admin (org, rank 80) [pas d'héritage]
+org_billing_admin (org, rank 80) [no inheritance]
 ```
 
 ---
 
-## Permissions disponibles
+## Available Permissions
 
-Le système définit **40+ permissions atomiques** organisées par scope.
+The system defines **40+ atomic permissions** organized by scope.
 
-### Permissions Organization (scope: `org`)
+### Organization Permissions (scope: `org`)
 
-| Permission | Description | Rôles ayant cette permission |
+| Permission | Description | Roles with this permission |
 |-----------|-------------|------------------------------|
-| `org.read` | Voir les infos de l'organisation | org_super_admin, org_admin, org_billing_admin, org_member |
-| `org.update_settings` | Modifier les paramètres org | org_super_admin, org_admin |
-| `org.read_members` | Voir la liste des membres | org_super_admin, org_admin, org_member |
-| `org.invite_user` | Inviter des membres | org_super_admin, org_admin |
-| `org.update_user_roles` | Gérer les rôles des membres | org_super_admin, org_admin |
-| `org.read_billing` | Voir les infos de facturation | org_super_admin, org_admin, org_billing_admin |
-| `org.update_billing` | Modifier la facturation | org_super_admin, org_billing_admin |
-| `org.read_invoices` | Voir les factures | org_super_admin, org_admin, org_billing_admin |
-| `org.read_audit` | Voir les logs d'audit org | org_super_admin, org_admin |
-| `org.read_billing_audit` | Voir l'audit facturation | org_super_admin, org_admin, org_billing_admin |
+| `org.read` | View organization info | org_super_admin, org_admin, org_billing_admin, org_member |
+| `org.update_settings` | Modify org settings | org_super_admin, org_admin |
+| `org.read_members` | View member list | org_super_admin, org_admin, org_member |
+| `org.invite_user` | Invite members | org_super_admin, org_admin |
+| `org.update_user_roles` | Manage member roles | org_super_admin, org_admin |
+| `org.read_billing` | View billing info | org_super_admin, org_admin, org_billing_admin |
+| `org.update_billing` | Modify billing | org_super_admin, org_billing_admin |
+| `org.read_invoices` | View invoices | org_super_admin, org_admin, org_billing_admin |
+| `org.read_audit` | View org audit logs | org_super_admin, org_admin |
+| `org.read_billing_audit` | View billing audit | org_super_admin, org_admin, org_billing_admin |
 
-### Permissions Application (scope: `app`)
+### Application Permissions (scope: `app`)
 
-| Permission | Description | Rôles ayant cette permission |
+| Permission | Description | Roles with this permission |
 |-----------|-------------|------------------------------|
-| `app.read` | Voir les infos de l'app | Tous les rôles app_*, org_admin, org_super_admin, org_member |
-| `app.update_settings` | Modifier les paramètres app | app_admin, org_admin, org_super_admin |
-| `app.delete` | Supprimer l'app | org_super_admin uniquement |
-| `app.read_bundles` | Voir les métadonnées bundles | app_admin, app_developer, app_uploader, app_reader, org_admin, org_super_admin |
-| `app.list_bundles` | Lister les bundles | org_member |
-| `app.upload_bundle` | Uploader des bundles | app_admin, app_developer, app_uploader, org_admin, org_super_admin |
-| `app.create_channel` | Créer des channels | app_admin, org_admin, org_super_admin |
-| `app.read_channels` | Voir les channels | app_admin, app_developer, app_uploader, app_reader, org_admin, org_super_admin |
-| `app.list_channels` | Lister les channels | org_member |
-| `app.read_logs` | Voir les logs | app_admin, app_developer, app_uploader, app_reader, org_admin, org_super_admin, org_member |
-| `app.manage_devices` | Gérer les devices | app_admin, app_developer, org_admin, org_super_admin |
-| `app.read_devices` | Voir les devices | Tous les rôles app_*, org_admin, org_super_admin, org_member |
-| `app.build_native` | Builder des versions natives | app_admin, app_developer, org_admin, org_super_admin |
-| `app.read_audit` | Voir l'audit app | Tous les rôles app_*, org_admin, org_super_admin, org_member |
-| `app.update_user_roles` | Gérer les rôles users pour cette app | app_admin, org_admin, org_super_admin |
+| `app.read` | View app info | All app_* roles, org_admin, org_super_admin, org_member |
+| `app.update_settings` | Modify app settings | app_admin, org_admin, org_super_admin |
+| `app.delete` | Delete app | org_super_admin only |
+| `app.read_bundles` | View bundle metadata | app_admin, app_developer, app_uploader, app_reader, org_admin, org_super_admin |
+| `app.list_bundles` | List bundles | org_member |
+| `app.upload_bundle` | Upload bundles | app_admin, app_developer, app_uploader, org_admin, org_super_admin |
+| `app.create_channel` | Create channels | app_admin, org_admin, org_super_admin |
+| `app.read_channels` | View channels | app_admin, app_developer, app_uploader, app_reader, org_admin, org_super_admin |
+| `app.list_channels` | List channels | org_member |
+| `app.read_logs` | View logs | app_admin, app_developer, app_uploader, app_reader, org_admin, org_super_admin, org_member |
+| `app.manage_devices` | Manage devices | app_admin, app_developer, org_admin, org_super_admin |
+| `app.read_devices` | View devices | All app_* roles, org_admin, org_super_admin, org_member |
+| `app.build_native` | Build native versions | app_admin, app_developer, org_admin, org_super_admin |
+| `app.read_audit` | View app audit | All app_* roles, org_admin, org_super_admin, org_member |
+| `app.update_user_roles` | Manage user roles for this app | app_admin, org_admin, org_super_admin |
 
-### Permissions Bundle (scope: `app`)
+### Bundle Permissions (scope: `app`)
 
-**Note** : Les permissions bundle ont un scope `app` car elles requièrent le contexte de l'app.
+**Note**: Bundle permissions have `app` scope because they require the app context.
 
-| Permission | Description | Rôles ayant cette permission |
+| Permission | Description | Roles with this permission |
 |-----------|-------------|------------------------------|
-| `bundle.read` | Lire les métadonnées bundle | bundle_admin, bundle_reader, org_member |
-| `bundle.update` | Modifier un bundle | bundle_admin |
-| `bundle.delete` | Supprimer un bundle | bundle_admin, app_admin, org_admin, org_super_admin |
+| `bundle.read` | Read bundle metadata | bundle_admin, bundle_reader, org_member |
+| `bundle.update` | Modify a bundle | bundle_admin |
+| `bundle.delete` | Delete a bundle | bundle_admin, app_admin, org_admin, org_super_admin |
 
-### Permissions Channel (scope: `channel`)
+### Channel Permissions (scope: `channel`)
 
-| Permission | Description | Rôles ayant cette permission |
+| Permission | Description | Roles with this permission |
 |-----------|-------------|------------------------------|
-| `channel.read` | Voir un channel | Tous les rôles channel_*, app_admin, app_developer, org_admin, org_super_admin, org_member |
-| `channel.update_settings` | Modifier les paramètres channel | channel_admin, app_admin, app_developer, org_admin, org_super_admin |
-| `channel.delete` | Supprimer un channel | channel_admin, app_admin, org_admin, org_super_admin |
-| `channel.read_history` | Voir l'historique de déploiement | Tous les rôles channel_*, app_admin, app_developer, org_admin, org_super_admin, org_member |
-| `channel.promote_bundle` | Promouvoir un bundle | channel_admin, app_admin, app_developer, org_admin, org_super_admin |
-| `channel.rollback_bundle` | Rollback un bundle | channel_admin, app_admin, app_developer, org_admin, org_super_admin |
-| `channel.manage_forced_devices` | Gérer les devices forcés | channel_admin, app_admin, app_developer, org_admin, org_super_admin |
-| `channel.read_forced_devices` | Voir les devices forcés | Tous les rôles channel_*, app_admin, app_developer, org_admin, org_super_admin, org_member |
-| `channel.read_audit` | Voir l'audit channel | Tous les rôles channel_*, app_admin, app_developer, org_admin, org_super_admin, org_member |
+| `channel.read` | View a channel | All channel_* roles, app_admin, app_developer, org_admin, org_super_admin, org_member |
+| `channel.update_settings` | Modify channel settings | channel_admin, app_admin, app_developer, org_admin, org_super_admin |
+| `channel.delete` | Delete a channel | channel_admin, app_admin, org_admin, org_super_admin |
+| `channel.read_history` | View deployment history | All channel_* roles, app_admin, app_developer, org_admin, org_super_admin, org_member |
+| `channel.promote_bundle` | Promote a bundle | channel_admin, app_admin, app_developer, org_admin, org_super_admin |
+| `channel.rollback_bundle` | Rollback a bundle | channel_admin, app_admin, app_developer, org_admin, org_super_admin |
+| `channel.manage_forced_devices` | Manage forced devices | channel_admin, app_admin, app_developer, org_admin, org_super_admin |
+| `channel.read_forced_devices` | View forced devices | All channel_* roles, app_admin, app_developer, org_admin, org_super_admin, org_member |
+| `channel.read_audit` | View channel audit | All channel_* roles, app_admin, app_developer, org_admin, org_super_admin, org_member |
 
-### Permissions Platform (scope: `platform`)
+### Platform Permissions (scope: `platform`)
 
-**Usage interne uniquement** - Réservées à l'équipe Capgo.
+**Internal use only** - Reserved for Capgo team.
 
 | Permission | Description |
 |-----------|-------------|
-| `platform.impersonate_user` | Se faire passer pour un user (support) |
-| `platform.manage_orgs_any` | Gérer n'importe quelle org |
-| `platform.manage_apps_any` | Gérer n'importe quelle app |
-| `platform.manage_channels_any` | Gérer n'importe quel channel |
-| `platform.run_maintenance_jobs` | Lancer des jobs de maintenance |
-| `platform.delete_orphan_users` | Supprimer les users orphelins |
-| `platform.read_all_audit` | Voir tous les logs d'audit |
-| `platform.db_break_glass` | Accès break-glass à la DB (urgences) |
+| `platform.impersonate_user` | Impersonate a user (support) |
+| `platform.manage_orgs_any` | Manage any org |
+| `platform.manage_apps_any` | Manage any app |
+| `platform.manage_channels_any` | Manage any channel |
+| `platform.run_maintenance_jobs` | Run maintenance jobs |
+| `platform.delete_orphan_users` | Delete orphan users |
+| `platform.read_all_audit` | View all audit logs |
+| `platform.db_break_glass` | Break-glass DB access (emergencies) |
 
 ---
 
-## Fonctions SQL
+## SQL Functions
 ---
 
-## Fonctions SQL
+## SQL Functions
 
-### 1. `rbac_is_enabled_for_org()` - Vérification du flag RBAC
+### 1. `rbac_is_enabled_for_org()` - RBAC Flag Check
 
-Détermine si RBAC est activé pour une organisation donnée.
+Determines if RBAC is enabled for a given organization.
 
 ```sql
 CREATE OR REPLACE FUNCTION public.rbac_is_enabled_for_org(p_org_id uuid)
@@ -652,19 +648,19 @@ END;
 $$;
 ```
 
-**Comportement** :
-- Retourne `true` si `orgs.use_new_rbac = true` OU `rbac_settings.use_new_rbac = true`
-- Retourne `false` par défaut (mode legacy)
+**Behavior**:
+- Returns `true` if `orgs.use_new_rbac = true` OR `rbac_settings.use_new_rbac = true`
+- Returns `false` by default (legacy mode)
 
-**Usage** :
+**Usage**:
 ```sql
 SELECT rbac_is_enabled_for_org('550e8400-e29b-41d4-a716-446655440000');
--- true si RBAC activé, false sinon
+-- true if RBAC enabled, false otherwise
 ```
 
-### 2. `rbac_permission_for_legacy()` - Mapping legacy → RBAC
+### 2. `rbac_permission_for_legacy()` - Legacy → RBAC Mapping
 
-Convertit un `min_right` legacy vers une permission RBAC équivalente.
+Converts a legacy `min_right` to an equivalent RBAC permission.
 
 ```sql
 CREATE OR REPLACE FUNCTION public.rbac_permission_for_legacy(
@@ -706,9 +702,9 @@ END;
 $$;
 ```
 
-**Table de mapping** :
+**Mapping table**:
 
-| Min Right (legacy) | Scope | Permission RBAC |
+| Min Right (legacy) | Scope | RBAC Permission |
 |-------------------|-------|-----------------|
 | super_admin, admin | org | org.update_user_roles |
 | write, upload | org | org.update_settings |
@@ -720,92 +716,92 @@ $$;
 | upload | channel | channel.promote_bundle |
 | read | channel | channel.read |
 
-### 3. `rbac_has_permission()` - Résolution de permissions RBAC
+### 3. `rbac_has_permission()` - RBAC Permission Resolution
 
-**Fonction cœur** du système qui vérifie si un principal a une permission donnée.
+**Core function** of the system that checks if a principal has a given permission.
 
 ```sql
 CREATE OR REPLACE FUNCTION public.rbac_has_permission(
-  p_principal_type text,      -- 'user' ou 'apikey' ou 'group'
-  p_principal_id uuid,        -- UUID du principal
+  p_principal_type text,      -- 'user' or 'apikey' or 'group'
+  p_principal_id uuid,        -- Principal UUID
   p_permission_key text,      -- 'app.upload_bundle'
-  p_org_id uuid,              -- Optionnel, dérivé si NULL
+  p_org_id uuid,              -- Optional, derived if NULL
   p_app_id character varying, -- App ID (string)
   p_channel_id bigint         -- Channel ID (integer)
 ) RETURNS boolean
 LANGUAGE plpgsql
 SET search_path = ''
 SECURITY DEFINER AS $$
--- [Voir implémentation complète dans la migration]
+-- [See complete implementation in migration]
 $$;
 ```
 
-**Algorithme détaillé** :
+**Detailed algorithm**:
 
-1. **Résolution des identifiants**
-   - Convertit `app_id` (string) vers `app.id` (uuid)
-   - Récupère `channel.rbac_id` (uuid) depuis `channel_id` (bigint)
-   - Dérive `org_id` depuis app ou channel si non fourni
+1. **Identifier resolution**
+   - Converts `app_id` (string) to `app.id` (uuid)
+   - Retrieves `channel.rbac_id` (uuid) from `channel_id` (bigint)
+   - Derives `org_id` from app or channel if not provided
 
-2. **Construction du catalogue de scopes**
+2. **Scope catalog construction**
    ```sql
    scope_catalog:
-     - platform (si applicable)
-     - org (si org_id fourni)
-     - app (si app_id fourni)
-     - channel (si channel_id fourni)
+     - platform (if applicable)
+     - org (if org_id provided)
+     - app (if app_id provided)
+     - channel (if channel_id provided)
    ```
 
-3. **Collecte des role_bindings directs**
-   - Trouve tous les bindings du principal dans les scopes applicables
-   - Exemple : User X avec `app_developer` sur app Y
+3. **Collect direct role_bindings**
+   - Finds all principal bindings in applicable scopes
+   - Example: User X with `app_developer` on app Y
 
-4. **Expansion de la hiérarchie de rôles**
-   - Utilise CTE récursif pour suivre `role_hierarchy`
-   - Si User a `app_admin`, inclut automatiquement `app_developer`, `app_uploader`, `app_reader`
+4. **Role hierarchy expansion**
+   - Uses recursive CTE to follow `role_hierarchy`
+   - If User has `app_admin`, automatically includes `app_developer`, `app_uploader`, `app_reader`
 
-5. **Collecte des permissions**
-   - Joint avec `role_permissions` pour obtenir toutes les permissions des rôles
-   - Déduplique les permissions
+5. **Permission collection**
+   - Joins with `role_permissions` to get all permissions from roles
+   - Deduplicates permissions
 
-6. **Vérification du scope**
-   - Une permission donnée au niveau org s'applique à toutes les apps de cette org
-   - Une permission donnée au niveau app s'applique à tous les channels de cette app
-   - **Propagation descendante uniquement** (pas de remontée)
+6. **Scope verification**
+   - A permission given at org level applies to all apps in that org
+   - A permission given at app level applies to all channels in that app
+   - **Downward propagation only** (no upward propagation)
 
-7. **Retour**
-   - `true` si permission trouvée dans le set collecté
-   - `false` sinon
+7. **Return**
+   - `true` if permission found in collected set
+   - `false` otherwise
 
-**Exemple de propagation** :
+**Propagation example**:
 ```
-User "Alice" a le rôle org_admin dans org "Acme Corp"
-  → Alice a app.upload_bundle au niveau org
-    → Alice peut uploader sur TOUTES les apps de "Acme Corp"
+User "Alice" has org_admin role in org "Acme Corp"
+  → Alice has app.upload_bundle at org level
+    → Alice can upload to ALL apps in "Acme Corp"
 
-User "Bob" a le rôle app_developer sur app "com.example.mobile"
-  → Bob a channel.promote_bundle au niveau app
-    → Bob peut promouvoir sur TOUS les channels de "com.example.mobile"
-    → Bob ne peut PAS promouvoir sur d'autres apps
+User "Bob" has app_developer role on app "com.example.mobile"
+  → Bob has channel.promote_bundle at app level
+    → Bob can promote on ALL channels of "com.example.mobile"
+    → Bob CANNOT promote on other apps
 ```
 
-**Performance** :
-- Index optimisés sur `role_bindings` pour lookup rapide
-- CTE récursif limité en profondeur (max ~5-6 niveaux)
-- Cache des résultats au niveau application (backend)
+**Performance**:
+- Optimized indexes on `role_bindings` for fast lookup
+- Recursive CTE limited in depth (max ~5-6 levels)
+- Result caching at application level (backend)
 
-### 4. `rbac_check_permission_direct()` - Point d'entrée unifié
+### 4. `rbac_check_permission_direct()` - Unified Entry Point
 
-**Fonction principale** utilisée par le backend pour vérifier les permissions.
+**Main function** used by the backend to check permissions.
 
 ```sql
 CREATE OR REPLACE FUNCTION public.rbac_check_permission_direct(
   p_permission_key text,        -- 'app.upload_bundle'
   p_user_id uuid,               -- User UUID
-  p_org_id uuid DEFAULT NULL,   -- Optionnel
-  p_app_id varchar DEFAULT NULL, -- Optionnel
-  p_channel_id bigint DEFAULT NULL, -- Optionnel
-  p_apikey text DEFAULT NULL    -- Optionnel (mutually exclusive with user_id)
+  p_org_id uuid DEFAULT NULL,   -- Optional
+  p_app_id varchar DEFAULT NULL, -- Optional
+  p_channel_id bigint DEFAULT NULL, -- Optional
+  p_apikey text DEFAULT NULL    -- Optional (mutually exclusive with user_id)
 ) RETURNS boolean
 LANGUAGE plpgsql
 SET search_path = ''
@@ -816,14 +812,14 @@ DECLARE
   v_principal_id uuid;
   v_apikey_rbac_id uuid;
 BEGIN
-  -- Déterminer le principal
+  -- Determine principal
   IF p_apikey IS NOT NULL THEN
     SELECT rbac_id, owner_org INTO v_apikey_rbac_id, v_org_id
     FROM public.apikeys
     WHERE key = p_apikey;
 
     IF v_apikey_rbac_id IS NULL THEN
-      RETURN false; -- API key invalide
+      RETURN false; -- Invalid API key
     END IF;
 
     v_principal_type := 'apikey';
@@ -833,7 +829,7 @@ BEGIN
     v_principal_id := p_user_id;
   END IF;
 
-  -- Dériver org_id si nécessaire
+  -- Derive org_id if necessary
   IF v_org_id IS NULL AND p_app_id IS NOT NULL THEN
     SELECT owner_org INTO v_org_id FROM public.apps WHERE app_id = p_app_id LIMIT 1;
   END IF;
@@ -842,9 +838,9 @@ BEGIN
     SELECT owner_org INTO v_org_id FROM public.channels WHERE id = p_channel_id LIMIT 1;
   END IF;
 
-  -- Vérifier si RBAC est activé
+  -- Check if RBAC is enabled
   IF rbac_is_enabled_for_org(v_org_id) THEN
-    -- Nouveau système RBAC
+    -- New RBAC system
     RETURN rbac_has_permission(
       v_principal_type,
       v_principal_id,
@@ -854,12 +850,12 @@ BEGIN
       p_channel_id
     );
   ELSE
-    -- Legacy système via check_min_rights
+    -- Legacy system via check_min_rights
     DECLARE
       v_min_right public.user_min_right;
       v_scope text;
     BEGIN
-      -- Dériver scope depuis les paramètres
+      -- Derive scope from parameters
       IF p_channel_id IS NOT NULL THEN
         v_scope := 'channel';
       ELSIF p_app_id IS NOT NULL THEN
@@ -868,8 +864,8 @@ BEGIN
         v_scope := 'org';
       END IF;
 
-      -- Mapper permission → min_right legacy
-      -- (logique inverse de rbac_permission_for_legacy)
+      -- Map permission → legacy min_right
+      -- (inverse logic of rbac_permission_for_legacy)
       IF p_permission_key LIKE 'org.%' THEN
         IF p_permission_key IN ('org.update_user_roles', 'org.update_settings') THEN
           v_min_right := 'admin';
@@ -897,10 +893,10 @@ BEGIN
           v_min_right := 'read';
         END IF;
       ELSE
-        v_min_right := 'admin'; -- Par défaut, requiert admin
+        v_min_right := 'admin'; -- Default, requires admin
       END IF;
 
-      -- Appeler la fonction legacy
+      -- Call legacy function
       RETURN check_min_rights_legacy(
         v_min_right,
         p_user_id,
@@ -914,25 +910,25 @@ END;
 $$;
 ```
 
-**Avantages** :
-- ✅ Single source of truth pour la vérification de permissions
-- ✅ Routing automatique legacy/RBAC selon le flag org
-- ✅ Dérivation automatique de `org_id` depuis app/channel
-- ✅ Support des API keys et users
-- ✅ Fallback gracieux vers legacy si RBAC non activé
+**Advantages**:
+- ✅ Single source of truth for permission checking
+- ✅ Automatic legacy/RBAC routing based on org flag
+- ✅ Automatic `org_id` derivation from app/channel
+- ✅ Support for API keys and users
+- ✅ Graceful fallback to legacy if RBAC not enabled
 
-**Usage recommandé** :
+**Recommended usage**:
 ```sql
--- Vérifier si un user peut uploader un bundle
+-- Check if a user can upload a bundle
 SELECT rbac_check_permission_direct(
   'app.upload_bundle',
   'user-uuid'::uuid,
-  NULL, -- org_id sera dérivé
+  NULL, -- org_id will be derived
   'com.example.app',
   NULL
 );
 
--- Vérifier si une API key peut promouvoir un bundle
+-- Check if an API key can promote a bundle
 SELECT rbac_check_permission_direct(
   'channel.promote_bundle',
   NULL::uuid,
@@ -945,13 +941,13 @@ SELECT rbac_check_permission_direct(
 
 ---
 
-## Intégration backend
+## Backend Integration
 
-### TypeScript - Wrapper `checkPermission()`
+### TypeScript - `checkPermission()` Wrapper
 
-Le backend utilise un wrapper TypeScript pour simplifier l'utilisation.
+The backend uses a TypeScript wrapper to simplify usage.
 
-**Fichier** : [supabase/functions/_backend/utils/rbac.ts](supabase/functions/_backend/utils/rbac.ts)
+**File**: [supabase/functions/_backend/utils/rbac.ts](supabase/functions/_backend/utils/rbac.ts)
 
 ```typescript
 import type { Context } from 'hono'
@@ -1047,7 +1043,7 @@ export async function requirePermission(
 }
 ```
 
-**Usage dans un endpoint** :
+**Usage in an endpoint**:
 
 ```typescript
 import { checkPermission, requirePermission } from '../utils/rbac.ts'
@@ -1055,49 +1051,49 @@ import { createHono, simpleError } from '../utils/hono.ts'
 
 const app = createHono()
 
-// Exemple 1: Check avec gestion manuelle
+// Example 1: Check with manual handling
 app.post('/bundle/upload', middlewareKey(['all', 'write', 'upload']), async (c) => {
   const body = await c.req.json()
 
-  // Vérifier la permission
+  // Check permission
   if (!(await checkPermission(c, 'app.upload_bundle', { appId: body.app_id }))) {
     return simpleError('app_access_denied', 'You cannot upload to this app')
   }
 
-  // ... logique d'upload
+  // ... upload logic
   return c.json({ success: true })
 })
 
-// Exemple 2: Require avec throw automatique
+// Example 2: Require with automatic throw
 app.delete('/app/:appId', middlewareAuth, async (c) => {
   const appId = c.req.param('appId')
 
-  // Throw 403 si permission refusée
+  // Throw 403 if permission denied
   await requirePermission(c, 'app.delete', { appId })
 
-  // ... logique de suppression
+  // ... deletion logic
   return c.json({ success: true })
 })
 
-// Exemple 3: Channel-level permission (auto-dérive appId et orgId)
+// Example 3: Channel-level permission (auto-derives appId and orgId)
 app.post('/channel/:channelId/promote', middlewareKey(['all', 'upload']), async (c) => {
   const channelId = Number.parseInt(c.req.param('channelId'))
 
   await requirePermission(c, 'channel.promote_bundle', { channelId })
 
-  // ... logique de promotion
+  // ... promotion logic
   return c.json({ success: true })
 })
 ```
 
-**Avantages** :
-- ✅ **Type-safe** : `Permission` type strict avec autocomplete
-- ✅ **Auto-routing** : legacy/RBAC selon flag org (transparent)
-- ✅ **Logging** : logs automatiques dans CloudFlare/Supabase
-- ✅ **Fail-closed** : retourne `false` en cas d'erreur (sécurisé)
-- ✅ **Context-aware** : utilise automatiquement `c.get('auth')` et `c.get('apikey')`
+**Advantages**:
+- ✅ **Type-safe**: Strict `Permission` type with autocomplete
+- ✅ **Auto-routing**: Legacy/RBAC based on org flag (transparent)
+- ✅ **Logging**: Automatic logs in CloudFlare/Supabase
+- ✅ **Fail-closed**: Returns `false` on error (secure)
+- ✅ **Context-aware**: Automatically uses `c.get('auth')` and `c.get('apikey')`
 
-### Helpers additionnels
+### Additional Helpers
 
 ```typescript
 /**
@@ -1152,7 +1148,7 @@ export async function checkPermissionsBatch(
 
 ---
 
-## Intégration frontend
+## Frontend Integration
 - `org.update_settings` - Modifier les paramètres org
 - `org.invite_user` - Inviter des membres
 - `org.update_user_roles` - Gérer les rôles des membres
@@ -1201,45 +1197,45 @@ export async function checkPermissionsBatch(
 - `platform.manage_apps_any` - Gérer n'importe quelle app
 - `platform.manage_channels_any` - Gérer n'importe quel channel
 - `platform.run_maintenance_jobs` - Lancer des jobs de maintenance
-- `platform.delete_orphan_users` - Supprimer les users orphelins
-- `platform.read_all_audit` - Voir tous les logs d'audit
-- `platform.db_break_glass` - Accès break-glass à la DB
+- `platform.delete_orphan_users` - Delete orphan users
+- `platform.read_all_audit` - View all audit logs
+- `platform.db_break_glass` - Break-glass DB access
 
-#### `role_permissions` - Mapping rôle → permissions
-Cette table définit quelles permissions sont accordées à chaque rôle.
+#### `role_permissions` - Role → Permissions Mapping
+This table defines which permissions are granted to each role.
 
-**Exemple pour `org_admin`** :
+**Example for `org_admin`**:
 - `org.read`, `org.update_settings`, `org.read_members`, `org.invite_user`
-- Toutes les permissions `app.*` (read, update_settings, delete, upload_bundle, update_user_roles, etc.)
-- Toutes les permissions `channel.*` (read, update_settings, delete, promote_bundle, etc.)
-- Toutes les permissions `bundle.*` (delete)
+- All `app.*` permissions (read, update_settings, delete, upload_bundle, update_user_roles, etc.)
+- All `channel.*` permissions (read, update_settings, delete, promote_bundle, etc.)
+- All `bundle.*` permissions (delete)
 
-**Exemple pour `app_developer`** :
+**Example for `app_developer`**:
 - `app.read`, `app.update_settings`, `app.upload_bundle`, `app.create_channel`
 - `channel.read`, `channel.update_settings`, `channel.promote_bundle`
 - `bundle.delete`
 
-**Exemple pour `app_uploader`** :
+**Example for `app_uploader`**:
 - `app.read`, `app.read_bundles`, `app.upload_bundle`, `app.read_channels`, `app.read_logs`, `app.read_devices`, `app.read_audit`
 
-**Exemple pour `org_member`** :
+**Example for `org_member`**:
 - `org.read`, `org.read_members`
 - `app.read`, `app.list_bundles`, `app.list_channels`, `app.read_logs`, `app.read_devices`, `app.read_audit`
 - `bundle.read`
 - `channel.read`, `channel.read_history`, `channel.read_forced_devices`, `channel.read_audit`
 
-**Exemple pour `bundle_admin`** :
+**Example for `bundle_admin`**:
 - `bundle.read`, `bundle.update`, `bundle.delete`
 
-**Exemple pour `bundle_reader`** :
+**Example for `bundle_reader`**:
 - `bundle.read`
 
-#### `role_bindings` - Attribution des rôles aux utilisateurs
+#### `role_bindings` - Role Assignment to Users
 ```sql
 CREATE TABLE role_bindings (
   id uuid PRIMARY KEY,
-  principal_type text NOT NULL,  -- 'user' ou 'group' ou 'apikey'
-  principal_id uuid NOT NULL,    -- user.id ou group.id ou apikey.rbac_id
+  principal_type text NOT NULL,  -- 'user' or 'group' or 'apikey'
+  principal_id uuid NOT NULL,    -- user.id or group.id or apikey.rbac_id
   role_id uuid NOT NULL REFERENCES roles(id),
   org_id uuid REFERENCES orgs(id),
   app_id varchar REFERENCES apps(app_id),
@@ -1247,29 +1243,29 @@ CREATE TABLE role_bindings (
 );
 ```
 
-**Exemples** :
-- User `uuid-123` a le rôle `org_admin` dans l'org `org-abc`
-- User `uuid-123` a le rôle `app_developer` sur l'app `com.example.app`
-- API key `key-789` a le rôle `app_uploader` sur l'app `com.example.app`
+**Examples**:
+- User `uuid-123` has the `org_admin` role in org `org-abc`
+- User `uuid-123` has the `app_developer` role on app `com.example.app`
+- API key `key-789` has the `app_uploader` role on app `com.example.app`
 
-#### `role_hierarchy` - Héritage entre rôles
-Définit qu'un rôle peut hériter des permissions d'autres rôles :
-- `org_super_admin` hérite de tous les rôles (org_admin, org_billing_admin, org_member, tous les app_*)
-- `org_admin` hérite de tous les rôles app_* et org_member
-- `app_admin` hérite de app_developer, app_uploader, app_reader
+#### `role_hierarchy` - Role Inheritance
+Defines that a role can inherit permissions from other roles:
+- `org_super_admin` inherits from all roles (org_admin, org_billing_admin, org_member, all app_*)
+- `org_admin` inherits from all app_* roles and org_member
+- `app_admin` inherits from app_developer, app_uploader, app_reader
 
-#### `groups` et `group_members` - Groupes d'utilisateurs
-Permet d'attribuer des rôles à un groupe au lieu d'utilisateurs individuels.
+#### `groups` and `group_members` - User Groups
+Allows assigning roles to a group instead of individual users.
 
-### 2. Fonctions SQL
+### 2. SQL Functions
 
-#### `rbac_has_permission()` - Résolution de permissions
-**Fonction principale** qui vérifie si un principal (user/apikey) a une permission donnée :
+#### `rbac_has_permission()` - Permission Resolution
+**Main function** that checks if a principal (user/apikey) has a given permission:
 
 ```sql
 rbac_has_permission(
-  p_principal_type text,    -- 'user' ou 'apikey'
-  p_principal_id uuid,      -- user.id ou apikey.rbac_id
+  p_principal_type text,    -- 'user' or 'apikey'
+  p_principal_id uuid,      -- user.id or apikey.rbac_id
   p_permission_key text,    -- 'app.upload_bundle'
   p_org_id uuid,
   p_app_id varchar,
@@ -1277,20 +1273,20 @@ rbac_has_permission(
 ) RETURNS boolean
 ```
 
-**Algorithme** :
-1. **Collecte les role_bindings** du principal dans le scope demandé
-2. **Expand la hiérarchie** : ajoute les rôles hérités via `role_hierarchy`
-3. **Collecte les permissions** via `role_permissions` pour tous les rôles
-4. **Vérifie le scope** : une permission `app.*` donnée au niveau org s'applique à toutes les apps de cette org
-5. Retourne `true` si la permission est trouvée, `false` sinon
+**Algorithm**:
+1. **Collects role_bindings** of the principal in the requested scope
+2. **Expands the hierarchy**: adds inherited roles via `role_hierarchy`
+3. **Collects permissions** via `role_permissions` for all roles
+4. **Checks scope**: an `app.*` permission given at org level applies to all apps in that org
+5. Returns `true` if the permission is found, `false` otherwise
 
-**Exemples de scope awareness** :
-- User a `org_admin` dans org `A` → peut faire toutes les actions `app.*` sur les apps de org `A`
-- User a `app_developer` sur app `X` → peut faire `app.upload_bundle` seulement sur app `X`
-- User a `app_uploader` dans org `A` → peut upload sur toutes les apps de org `A` (si le binding est au niveau org)
+**Scope awareness examples**:
+- User has `org_admin` in org `A` → can perform all `app.*` actions on apps in org `A`
+- User has `app_developer` on app `X` → can perform `app.upload_bundle` only on app `X`
+- User has `app_uploader` in org `A` → can upload to all apps in org `A` (if binding is at org level)
 
-#### `rbac_check_permission_direct()` - Point d'entrée unifié
-**Wrapper pratique** qui détecte automatiquement si on doit utiliser RBAC ou legacy :
+#### `rbac_check_permission_direct()` - Unified Entry Point
+**Convenient wrapper** that automatically detects whether to use RBAC or legacy:
 
 ```sql
 rbac_check_permission_direct(
@@ -1303,58 +1299,58 @@ rbac_check_permission_direct(
 ) RETURNS boolean
 ```
 
-**Logique** :
-1. Dérive `org_id` depuis `app_id` ou `channel_id` si manquant
-2. Vérifie le flag `use_new_rbac` de l'org (via `rbac_is_enabled_for_org()`)
-3. **Si RBAC activé** : appelle `rbac_has_permission()` directement
-4. **Si legacy** : mappe la permission vers un `min_right` (via `rbac_permission_for_legacy()`) et appelle `check_min_rights_legacy()`
+**Logic**:
+1. Derives `org_id` from `app_id` or `channel_id` if missing
+2. Checks the org's `use_new_rbac` flag (via `rbac_is_enabled_for_org()`)
+3. **If RBAC enabled**: calls `rbac_has_permission()` directly
+4. **If legacy**: maps the permission to a `min_right` (via `rbac_permission_for_legacy()`) and calls `check_min_rights_legacy()`
 
-**Exemples de mapping legacy** :
+**Legacy mapping examples**:
 - `app.upload_bundle` → `min_right='upload'` + scope='app'
 - `app.update_settings` → `min_right='write'` + scope='app'
 - `org.invite_user` → `min_right='admin'` + scope='org'
 
 ---
 
-## Intégration frontend
+## Frontend Integration
 
-### Ancien système (toujours utilisé) - `hasPermissionsInRole()`
+### Old System (still used) - `hasPermissionsInRole()`
 
-**Fichier** : [src/stores/organization.ts](src/stores/organization.ts)
+**File**: [src/stores/organization.ts](src/stores/organization.ts)
 
-Le store organisation expose des helpers pour vérifier les rôles :
+The organization store exposes helpers to check roles:
 
 ```typescript
 import { useOrganizationStore } from '~/stores/organization'
 
 const orgStore = useOrganizationStore()
 
-// Vérifier si l'user a un des rôles requis
+// Check if user has one of the required roles
 if (orgStore.hasPermissionsInRole('admin', ['org_admin', 'org_super_admin'], orgId)) {
   // Show admin UI
 }
 
-// Vérifier au niveau app
+// Check at app level
 if (orgStore.hasPermissionsInRole('write', ['app_developer', 'org_admin'], orgId, appId)) {
   // Allow editing
 }
 ```
 
-**Comportement** :
-- Si `use_new_rbac` activé : vérifie les `role_bindings` chargés en cache
-- Si legacy : vérifie `org_users.user_right`
+**Behavior**:
+- If `use_new_rbac` enabled: checks cached `role_bindings`
+- If legacy: checks `org_users.user_right`
 
-**Limitations** :
-- ❌ Vérifie des **noms de rôles**, pas des permissions granulaires
-- ❌ Logique de mapping dupliquée frontend/backend
-- ❌ Cache peut être obsolète (nécessite refresh manuel)
-- ❌ Pas flexible : changement d'accès = changement de code Vue
+**Limitations**:
+- ❌ Checks **role names**, not granular permissions
+- ❌ Duplicated mapping logic frontend/backend
+- ❌ Cache can be stale (requires manual refresh)
+- ❌ Not flexible: access change = Vue code change
 
-### Nouveau système (recommandé) - `hasPermission()`
+### New System (recommended) - `hasPermission()`
 
-**Fichier** : [src/services/permissions.ts](src/services/permissions.ts)
+**File**: [src/services/permissions.ts](src/services/permissions.ts)
 
-Le nouveau service appelle directement le backend pour vérifier les permissions.
+The new service directly calls the backend to check permissions.
 
 ```typescript
 import { hasPermission, hasAnyPermission, hasAllPermissions } from '~/services/permissions'
@@ -1371,32 +1367,32 @@ if (canInvite) {
   // Show invite button
 }
 
-// Check channel permission (backend auto-dérive appId et orgId)
+// Check channel permission (backend auto-derives appId and orgId)
 const canPromote = await hasPermission('channel.promote_bundle', { channelId: 123 })
 if (canPromote) {
   // Allow promotion
 }
 
-// OR logic - au moins une permission
+// OR logic - at least one permission
 const canAccessBilling = await hasAnyPermission(
   ['org.read_billing', 'org.update_billing'],
   { orgId }
 )
 
-// AND logic - toutes les permissions
+// AND logic - all permissions
 const canFullyManageApp = await hasAllPermissions(
   ['app.update_settings', 'app.delete', 'app.update_user_roles'],
   { appId }
 )
 ```
 
-**Implémentation** :
+**Implementation**:
 
 ```typescript
 // src/services/permissions.ts
 import { supabase } from '~/services/supabase'
 
-export type Permission = // ... (même type que backend)
+export type Permission = // ... (same type as backend)
 
 export interface PermissionScope {
   orgId?: string
@@ -1518,7 +1514,7 @@ onMounted(async () => {
 </template>
 ```
 
-**Pattern recommandé : Computed avec cache** :
+**Recommended pattern: Computed with cache**:
 
 ```vue
 <script setup lang="ts">
@@ -1527,7 +1523,7 @@ import { hasPermission } from '~/services/permissions'
 
 const props = defineProps<{ appId: string }>()
 
-// Cache les résultats
+// Cache results
 const permissions = ref<Record<string, boolean>>({})
 
 watchEffect(async () => {
@@ -1552,7 +1548,7 @@ const canDelete = computed(() => permissions.value.canDelete)
 </template>
 ```
 
-### Composable réutilisable
+### Reusable Composable
 
 ```typescript
 // src/composables/usePermissions.ts
@@ -1616,50 +1612,50 @@ const { permissions, loading, has } = usePermissions(
 </template>
 ```
 
-## Mapping actuel : Rôles → Permissions
+## Current Mapping: Roles → Permissions
 
-Pour faciliter la migration, voici le mapping entre les checks de rôles actuels et les permissions équivalentes :
+To facilitate migration, here's the mapping between current role checks and equivalent permissions:
 
 ### Organization-level checks
-| Check actuel | Permission équivalente | Notes |
+| Current check | Equivalent permission | Notes |
 |-------------|----------------------|-------|
-| `hasPermissionsInRole('admin', ['org_admin', 'org_super_admin'])` | `hasPermission('org.update_settings')` | Modification des paramètres org |
-| `hasPermissionsInRole('admin', ['org_super_admin'])` | `hasPermission('org.update_user_roles')` | Gestion des rôles membres |
-| `hasPermissionsInRole('admin', ['org_admin', 'org_billing_admin'])` | `hasPermission('org.read_billing')` | Accès à la facturation |
+| `hasPermissionsInRole('admin', ['org_admin', 'org_super_admin'])` | `hasPermission('org.update_settings')` | Modify org settings |
+| `hasPermissionsInRole('admin', ['org_super_admin'])` | `hasPermission('org.update_user_roles')` | Manage member roles |
+| `hasPermissionsInRole('admin', ['org_admin', 'org_billing_admin'])` | `hasPermission('org.read_billing')` | Access billing |
 
 ### App-level checks
-| Check actuel | Permission équivalente | Notes |
+| Current check | Equivalent permission | Notes |
 |-------------|----------------------|-------|
-| `hasPermissionsInRole('write', ['app_developer', 'org_admin'])` | `hasPermission('app.update_settings')` | Modification settings app |
-| `hasPermissionsInRole('upload', ['app_uploader', 'app_developer'])` | `hasPermission('app.upload_bundle')` | Upload de bundles |
-| `hasPermissionsInRole('admin', ['org_super_admin'])` | `hasPermission('app.delete')` | Suppression d'app |
-| `hasPermissionsInRole('admin', ['app_admin', 'org_admin'])` | `hasPermission('app.update_user_roles')` | Gestion des accès app |
+| `hasPermissionsInRole('write', ['app_developer', 'org_admin'])` | `hasPermission('app.update_settings')` | Modify app settings |
+| `hasPermissionsInRole('upload', ['app_uploader', 'app_developer'])` | `hasPermission('app.upload_bundle')` | Upload bundles |
+| `hasPermissionsInRole('admin', ['org_super_admin'])` | `hasPermission('app.delete')` | Delete app |
+| `hasPermissionsInRole('admin', ['app_admin', 'org_admin'])` | `hasPermission('app.update_user_roles')` | Manage app access |
 
 ### Channel-level checks
-| Check actuel | Permission équivalente | Notes |
+| Current check | Equivalent permission | Notes |
 |-------------|----------------------|-------|
-| `hasPermissionsInRole('write', ['app_developer', 'org_admin'])` | `hasPermission('channel.update_settings')` | Modification channel |
-| `hasPermissionsInRole('upload', ['app_uploader'])` | `hasPermission('channel.promote_bundle')` | Promotion de bundle |
+| `hasPermissionsInRole('write', ['app_developer', 'org_admin'])` | `hasPermission('channel.update_settings')` | Modify channel |
+| `hasPermissionsInRole('upload', ['app_uploader'])` | `hasPermission('channel.promote_bundle')` | Promote bundle |
 
 ### Bundle operations
-| Check actuel | Permission équivalente | Notes |
+| Current check | Equivalent permission | Notes |
 |-------------|----------------------|-------|
-| `hasPermissionsInRole('admin', ['org_admin', 'org_super_admin'])` | `hasPermission('bundle.delete')` | Suppression de bundle |
+| `hasPermissionsInRole('admin', ['org_admin', 'org_super_admin'])` | `hasPermission('bundle.delete')` | Delete bundle |
 
 ---
 
-## Debugging et troubleshooting
+## Debugging and Troubleshooting
 
-### Vérifications SQL courantes
+### Common SQL Checks
 
-#### 1. Vérifier si RBAC est activé pour une org
+#### 1. Check if RBAC is enabled for an org
 
 ```sql
 SELECT rbac_is_enabled_for_org('org-uid');
--- true si RBAC activé, false si legacy
+-- true if RBAC enabled, false if legacy
 ```
 
-#### 2. Voir tous les role_bindings d'un user
+#### 2. View all role_bindings for a user
 
 ```sql
 SELECT
@@ -1684,7 +1680,7 @@ WHERE rb.principal_type = 'user'
 ORDER BY rb.granted_at DESC;
 ```
 
-#### 3. Voir toutes les permissions d'un rôle
+#### 3. View all permissions for a role
 
 ```sql
 SELECT
@@ -1700,12 +1696,12 @@ WHERE r.name = 'org_admin'
 ORDER BY p.key;
 ```
 
-#### 4. Voir la hiérarchie d'un rôle
+#### 4. View role hierarchy
 
 ```sql
--- Rôles dont hérite org_admin
+-- Roles inherited by org_admin
 WITH RECURSIVE role_tree AS (
-  -- Rôle de départ
+  -- Starting role
   SELECT
     id,
     name,
@@ -1716,7 +1712,7 @@ WITH RECURSIVE role_tree AS (
 
   UNION ALL
 
-  -- Rôles enfants (récursif)
+  -- Child roles (recursive)
   SELECT
     r.id,
     r.name,
@@ -1734,23 +1730,23 @@ FROM role_tree
 ORDER BY depth, name;
 ```
 
-#### 5. Tester manuellement une permission
+#### 5. Manually test a permission
 
 ```sql
--- Vérifier si un user peut uploader sur une app
+-- Check if a user can upload to an app
 SELECT rbac_check_permission_direct(
   'app.upload_bundle',              -- permission
   'user-uuid'::uuid,                -- user_id
-  NULL::uuid,                       -- org_id (sera dérivé depuis app_id)
+  NULL::uuid,                       -- org_id (will be derived from app_id)
   'com.example.app',                -- app_id
   NULL::bigint,                     -- channel_id
   NULL                              -- apikey
 ) as has_permission;
 
--- Vérifier si une API key peut promouvoir sur un channel
+-- Check if an API key can promote on a channel
 SELECT rbac_check_permission_direct(
   'channel.promote_bundle',
-  NULL::uuid,                       -- user_id (NULL car API key)
+  NULL::uuid,                       -- user_id (NULL because API key)
   NULL::uuid,
   NULL,
   123,                              -- channel_id
@@ -1758,7 +1754,7 @@ SELECT rbac_check_permission_direct(
 ) as has_permission;
 ```
 
-#### 6. Voir tous les membres d'une org avec leurs rôles
+#### 6. View all members of an org with their roles
 
 ```sql
 SELECT
@@ -1786,7 +1782,7 @@ WHERE rb.principal_type = 'user'
 ORDER BY u.email, rb.granted_at DESC;
 ```
 
-#### 7. Auditer qui a accordé quels rôles
+#### 7. Audit who granted which roles
 
 ```sql
 SELECT
@@ -1805,10 +1801,10 @@ WHERE rb.org_id = 'org-uuid'::uuid
 ORDER BY rb.granted_at DESC;
 ```
 
-#### 8. Trouver les permissions manquantes pour un rôle
+#### 8. Find missing permissions for a role
 
 ```sql
--- Permissions que org_member devrait avoir mais n'a pas
+-- Permissions that org_member should have but doesn't
 SELECT DISTINCT p.key, p.description
 FROM permissions p
 WHERE p.scope_type IN ('org', 'app', 'channel')
@@ -1822,11 +1818,11 @@ WHERE p.scope_type IN ('org', 'app', 'channel')
 ORDER BY p.key;
 ```
 
-### Logs backend
+### Backend Logs
 
-#### Rechercher dans les logs CloudFlare/Supabase
+#### Search in CloudFlare/Supabase logs
 
-**Patterns de recherche** :
+**Search patterns**:
 ```
 rbac_check: app.upload_bundle GRANTED
 rbac_check: app.upload_bundle DENIED
@@ -1835,7 +1831,7 @@ RBAC_CHECK_PERM_NO_KEY
 rbac_has_permission: checking permission
 ```
 
-**Exemple de log** :
+**Log example**:
 ```json
 {
   "requestId": "req_abc123",
@@ -1847,12 +1843,12 @@ rbac_has_permission: checking permission
 }
 ```
 
-#### Activer le debug verbose (développement local)
+#### Enable verbose debugging (local development)
 
 ```typescript
 // supabase/functions/_backend/utils/rbac.ts
 
-// Décommenter ces lignes pour debug verbose :
+// Uncomment these lines for verbose debug:
 cloudlog({
   requestId,
   message: `rbac_has_permission: checking ${permission}`,
@@ -1862,53 +1858,53 @@ cloudlog({
 })
 ```
 
-### Frontend debugging
+### Frontend Debugging
 
-#### Activer les logs dans la console
+#### Enable console logs
 
 ```typescript
-// Activer les logs dans la console
+// Enable console logs
 const allowed = await hasPermission('app.upload_bundle', { appId })
-// Chercher dans console: [hasPermission] RPC error
+// Search in console: [hasPermission] RPC error
 ```
 
-## Bonnes pratiques
+## Best Practices
 
 ### Backend
 
-#### ✅ Toujours utiliser `checkPermission()` au lieu de `check_min_rights_legacy()`
+#### ✅ Always use `checkPermission()` instead of `check_min_rights_legacy()`
 
-**Mauvais** :
+**Bad**:
 ```typescript
 const allowed = await check_min_rights_legacy('upload', userId, orgId, appId)
 ```
 
-**Bon** :
+**Good**:
 ```typescript
 const allowed = await checkPermission(c, 'app.upload_bundle', { appId })
 ```
 
-**Raison** : Routing automatique legacy/RBAC, logs structurés, type-safety
+**Reason**: Automatic legacy/RBAC routing, structured logs, type-safety
 
-#### ✅ Spécifier la permission la plus précise possible
+#### ✅ Specify the most precise permission possible
 
-**Moins bon** :
+**Less good**:
 ```typescript
-// Trop large
+// Too broad
 await checkPermission(c, 'app.update_settings', { appId })
 ```
 
-**Meilleur** :
+**Better**:
 ```typescript
-// Précis selon l'action
+// Precise to the action
 await checkPermission(c, 'app.upload_bundle', { appId })
 await checkPermission(c, 'channel.promote_bundle', { channelId })
 await checkPermission(c, 'bundle.delete', { appId, bundleId })
 ```
 
-**Raison** : Permet un contrôle d'accès plus fin, facilite l'audit
+**Reason**: Allows finer access control, facilitates audit
 
-#### ✅ Logger les refus de permission pour l'audit
+#### ✅ Log permission denials for audit
 
 ```typescript
 const allowed = await checkPermission(c, 'app.delete', { appId })
@@ -1925,52 +1921,52 @@ if (!allowed) {
 }
 ```
 
-**Raison** : Aide à détecter les tentatives d'accès non autorisé, audit de sécurité
+**Reason**: Helps detect unauthorized access attempts, security audit
 
-#### ✅ Utiliser `requirePermission()` pour les endpoints critiques
+#### ✅ Use `requirePermission()` for critical endpoints
 
 ```typescript
-// Auto-throw 403 si permission refusée
+// Auto-throw 403 if permission denied
 app.delete('/app/:appId', middlewareAuth, async (c) => {
   const appId = c.req.param('appId')
 
   await requirePermission(c, 'app.delete', { appId })
 
-  // ... logique de suppression
-  // Pas besoin de check manuel
+  // ... deletion logic
+  // No need for manual check
 })
 ```
 
-**Raison** : Code plus concis, gestion d'erreur cohérente
+**Reason**: More concise code, consistent error handling
 
-#### ✅ Vérifier les permissions au bon niveau de granularité
+#### ✅ Check permissions at the right granularity level
 
 ```typescript
-// Si l'action concerne un channel, vérifier au niveau channel
+// If action concerns a channel, check at channel level
 await checkPermission(c, 'channel.promote_bundle', { channelId })
 
-// Pas au niveau app (trop large)
+// Not at app level (too broad)
 await checkPermission(c, 'app.upload_bundle', { appId }) // ❌
 ```
 
-**Raison** : Respecte le principe du moindre privilège
+**Reason**: Respects principle of least privilege
 
-#### ❌ Ne pas cacher les erreurs de permission
+#### ❌ Don't hide permission errors
 
-**Mauvais** :
+**Bad**:
 ```typescript
 const allowed = await checkPermission(c, 'app.upload_bundle', { appId })
 if (!allowed) {
-  // Erreur générique
+  // Generic error
   return c.json({ error: 'Something went wrong' }, 500)
 }
 ```
 
-**Bon** :
+**Good**:
 ```typescript
 const allowed = await checkPermission(c, 'app.upload_bundle', { appId })
 if (!allowed) {
-  // Message clair
+  // Clear message
   return c.json({
     error: 'access_denied',
     message: 'You do not have permission to upload bundles to this app',
@@ -1979,80 +1975,80 @@ if (!allowed) {
 }
 ```
 
-**Raison** : Facilite le debugging pour les développeurs, clarté pour l'utilisateur
+**Reason**: Facilitates debugging for developers, clarity for users
 
 ### Frontend
 
-#### ✅ Utiliser `hasPermission()` pour les nouveaux checks
+#### ✅ Use `hasPermission()` for new checks
 
-**Ancien (à éviter)** :
+**Old (avoid)**:
 ```typescript
 if (orgStore.hasPermissionsInRole('admin', ['org_admin', 'org_super_admin'], orgId)) {
   // Show UI
 }
 ```
 
-**Nouveau (recommandé)** :
+**New (recommended)**:
 ```typescript
 if (await hasPermission('org.update_settings', { orgId })) {
   // Show UI
 }
 ```
 
-**Raison** : Single source of truth (backend), type-safety, flexibilité
+**Reason**: Single source of truth (backend), type-safety, flexibility
 
-#### ✅ Cacher les UI inaccessibles plutôt que les disabled
+#### ✅ Hide inaccessible UI rather than disabling
 
-**Moins bon** :
+**Less good**:
 ```vue
 <button :disabled="!canUpload" @click="upload">
   Upload Bundle
 </button>
 ```
 
-**Meilleur** :
+**Better**:
 ```vue
 <button v-if="canUpload" @click="upload">
   Upload Bundle
 </button>
 ```
 
-**Raison** : Meilleure UX (pas de boutons frustrés), moins de surface d'attaque
+**Reason**: Better UX (no frustrating buttons), smaller attack surface
 
-#### ✅ Vérifier la permission juste avant l'action (pas seulement au mount)
+#### ✅ Check permission just before action (not only on mount)
 
 ```typescript
 async function uploadBundle() {
-  // Re-check avant l'action critique
+  // Re-check before critical action
   if (!(await hasPermission('app.upload_bundle', { appId }))) {
     showToast('You no longer have permission to upload', 'error')
     return
   }
 
-  // ... logique d'upload
+  // ... upload logic
 }
 ```
 
-**Raison** : Les permissions peuvent changer (révoquées par un admin), évite les race conditions
+**Reason**: Permissions can change (revoked by admin), avoids race conditions
 
-#### ✅ Utiliser un composable pour les checks répétitifs
+#### ✅ Use a composable for repetitive checks
 
 ```typescript
-// Composable réutilisable
+// Reusable composable
 const { permissions, loading, has } = usePermissions(
   ['app.upload_bundle', 'app.update_settings', 'app.delete'],
   { appId }
 )
 
-// Usage simple dans le template
+// Simple usage in template
 <button v-if="has('app.upload_bundle')">Upload</button>
 ```
 
-**Raison** : DRY, performance (batch checks), meilleure lisibilité
+**Reason**: DRY, performance (batch checks), better readability
 
-#### ❌ Ne pas cacher d'erreur : informer l'utilisateur clairement
+#### ❌ Don't hide errors: inform user clearly
 
-**Mauvais** :
+**Bad**:
 ```typescript
 async function deleteApp() {
   if (!(await hasPermission('app.delete', { appId }))) {
@@ -2063,7 +2059,7 @@ async function deleteApp() {
 }
 ```
 
-**Bon** :
+**Good**:
 ```typescript
 async function deleteApp() {
   if (!(await hasPermission('app.delete', { appId }))) {
@@ -2074,9 +2070,9 @@ async function deleteApp() {
 }
 ```
 
-**Raison** : Transparence pour l'utilisateur, aide à comprendre pourquoi l'action a échoué
+**Reason**: Transparency for user, helps understand why action failed
 
-#### ✅ Précharger les permissions au mount pour éviter les flickerings
+#### ✅ Preload permissions on mount to avoid flickering
 
 ```vue
 <script setup lang="ts">
@@ -2101,31 +2097,31 @@ onMounted(async () => {
 </template>
 ```
 
-**Raison** : Évite le flash de contenu (CLS), meilleure UX
+**Reason**: Avoids content flash (CLS), better UX
 
 ### Database
-- ✅ Toujours créer une nouvelle migration pour les changements de permissions
-- ✅ Ne jamais modifier directement `role_permissions` en production
-- ✅ Tester les changements de permissions sur l'environnement de dev d'abord
-- ✅ Documenter les raisons des changements de permissions dans les migrations
+- ✅ Always create a new migration for permission changes
+- ✅ Never directly modify `role_permissions` in production
+- ✅ Test permission changes on dev environment first
+- ✅ Document reasons for permission changes in migrations
 
-## Références
+## References
 
-### Fichiers clés
+### Key Files
 
-| Fichier | Description |
+| File | Description |
 |---------|-------------|
-| [supabase/migrations/20251222140030_rbac_system.sql](supabase/migrations/20251222140030_rbac_system.sql) | Migration principale RBAC (tables + seed) |
-| [supabase/migrations/20260106133353_rbac_check_permission_direct.sql](supabase/migrations/20260106133353_rbac_check_permission_direct.sql) | Fonction `rbac_check_permission_direct()` |
-| [supabase/functions/_backend/utils/rbac.ts](supabase/functions/_backend/utils/rbac.ts) | Wrapper TypeScript backend |
-| [src/services/permissions.ts](src/services/permissions.ts) | Service permissions frontend |
-| [src/stores/organization.ts](src/stores/organization.ts) | Store organisation (legacy `hasPermissionsInRole`) |
+| [supabase/migrations/20251222140030_rbac_system.sql](supabase/migrations/20251222140030_rbac_system.sql) | Main RBAC migration (tables + seed) |
+| [supabase/migrations/20260106133353_rbac_check_permission_direct.sql](supabase/migrations/20260106133353_rbac_check_permission_direct.sql) | `rbac_check_permission_direct()` function |
+| [supabase/functions/_backend/utils/rbac.ts](supabase/functions/_backend/utils/rbac.ts) | Backend TypeScript wrapper |
+| [src/services/permissions.ts](src/services/permissions.ts) | Frontend permissions service |
+| [src/stores/organization.ts](src/stores/organization.ts) | Organization store (legacy `hasPermissionsInRole`) |
 
-### Migrations liées
+### Related Migrations
 
-- `20251222140030_rbac_system.sql` - Système RBAC complet
+- `20251222140030_rbac_system.sql` - Complete RBAC system
 
-### Documentation externe
+### External Documentation
 
 - [RBAC Wikipedia](https://en.wikipedia.org/wiki/Role-based_access_control)
 - [NIST RBAC Model](https://csrc.nist.gov/projects/role-based-access-control)
