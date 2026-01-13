@@ -1133,7 +1133,7 @@ app.post('/channel/:channelId/promote', middlewareKey(['all', 'upload']), async 
 /**
  * Check if principal has ANY of the given permissions (OR logic)
  */
-export async function hasAnyPermission(
+export async function checkAnyPermission(
   c: Context<MiddlewareKeyVariables>,
   permissions: Permission[],
   scope: PermissionScope
@@ -1149,7 +1149,7 @@ export async function hasAnyPermission(
 /**
  * Check if principal has ALL of the given permissions (AND logic)
  */
-export async function hasAllPermissions(
+export async function checkPermissions(
   c: Context<MiddlewareKeyVariables>,
   permissions: Permission[],
   scope: PermissionScope
@@ -1360,23 +1360,23 @@ rbac_check_permission_direct(
 
 ## Frontend Integration
 
-### Legacy system (still used) - `hasPermissionsInRole()`
+### Legacy system (removed) - `hasPermissionsInRole()`
 
 **File**: [src/stores/organization.ts](src/stores/organization.ts)
 
-The organization store exposes helpers to check roles:
+The organization store previously exposed helpers to check roles (legacy-only; removed in favor of `checkPermissions()`):
 
 ```typescript
 import { useOrganizationStore } from '~/stores/organization'
 
 const orgStore = useOrganizationStore()
 
-// Check if the user has one of the required roles
+// Legacy role check (avoid in new code)
 if (orgStore.hasPermissionsInRole('admin', ['org_admin', 'org_super_admin'], orgId)) {
   // Show admin UI
 }
 
-// Check at app level
+// Legacy role check at app level (avoid in new code)
 if (orgStore.hasPermissionsInRole('write', ['app_developer', 'org_admin'], orgId, appId)) {
   // Allow editing
 }
@@ -1392,41 +1392,42 @@ if (orgStore.hasPermissionsInRole('write', ['app_developer', 'org_admin'], orgId
 - Cache can be stale (requires manual refresh)
 - Not flexible: access changes require Vue code changes
 
-### New system (recommended) - `hasPermission()`
+### New system (recommended) - `checkPermissions()`
 
 **File**: [src/services/permissions.ts](src/services/permissions.ts)
 
-The new service calls the backend directly to check permissions.
+The new service calls the backend directly to check permissions (single source of truth).
 
 ```typescript
-import { hasPermission, hasAnyPermission, hasAllPermissions } from '~/services/permissions'
+import { checkPermissions } from '~/services/permissions'
 
 // Simple permission check
-const canUpload = await hasPermission('app.upload_bundle', { appId: 'com.example.app' })
+const canUpload = await checkPermissions('app.upload_bundle', { appId: 'com.example.app' })
 if (canUpload) {
   // Show upload button
 }
 
 // Check org permission
-const canInvite = await hasPermission('org.invite_user', { orgId })
+const canInvite = await checkPermissions('org.invite_user', { orgId })
 if (canInvite) {
   // Show invite button
 }
 
 // Check channel permission (backend auto-derives appId and orgId)
-const canPromote = await hasPermission('channel.promote_bundle', { channelId: 123 })
+const canPromote = await checkPermissions('channel.promote_bundle', { channelId: 123 })
 if (canPromote) {
   // Allow promotion
 }
 
 // OR logic - at least one permission
-const canAccessBilling = await hasAnyPermission(
+const canAccessBilling = await checkPermissions(
   ['org.read_billing', 'org.update_billing'],
-  { orgId }
+  { orgId },
+  { mode: 'any' }
 )
 
 // AND logic - all permissions
-const canFullyManageApp = await hasAllPermissions(
+const canFullyManageApp = await checkPermissions(
   ['app.update_settings', 'app.delete', 'app.update_user_roles'],
   { appId }
 )
@@ -1446,9 +1447,15 @@ export interface PermissionScope {
   channelId?: number
 }
 
+export type PermissionCheckMode = 'all' | 'any'
+
+export interface CheckPermissionsOptions {
+  mode?: PermissionCheckMode
+}
+
 /**
- * Check if current user has permission
- * Calls backend RPC (single source of truth)
+ * Low-level single-permission check (RPC wrapper).
+ * Prefer checkPermissions() for new usage.
  */
 export async function hasPermission(
   permission: Permission,
@@ -1474,42 +1481,32 @@ export async function hasPermission(
   }
 }
 
-export async function hasAnyPermission(
-  permissions: Permission[],
-  scope: PermissionScope
+/**
+ * Main permission check (ALL/ANY semantics).
+ */
+export async function checkPermissions(
+  permissions: Permission | Permission[],
+  scope: PermissionScope,
+  options: CheckPermissionsOptions = {}
 ): Promise<boolean> {
-  for (const perm of permissions) {
-    if (await hasPermission(perm, scope))
-      return true
-  }
-  return false
-}
+  const perms = Array.isArray(permissions) ? permissions : [permissions]
+  if (perms.length === 0)
+    return false
 
-export async function hasAllPermissions(
-  permissions: Permission[],
-  scope: PermissionScope
-): Promise<boolean> {
-  for (const perm of permissions) {
+  const mode = options.mode ?? 'all'
+  if (mode === 'any') {
+    for (const perm of perms) {
+      if (await hasPermission(perm, scope))
+        return true
+    }
+    return false
+  }
+
+  for (const perm of perms) {
     if (!(await hasPermission(perm, scope)))
       return false
   }
   return true
-}
-
-/**
- * Batch check for performance (multiple permissions at once)
- */
-export async function checkPermissionsBatch(
-  checks: Array<{ permission: Permission; scope: PermissionScope }>
-): Promise<Record<Permission, boolean>> {
-  const results: Record<string, boolean> = {}
-
-  // Note: Could be optimized with a batch RPC, but currently sequential
-  for (const check of checks) {
-    results[check.permission] = await hasPermission(check.permission, check.scope)
-  }
-
-  return results
 }
 ```
 
@@ -1530,7 +1527,7 @@ export async function checkPermissionsBatch(
 ```vue
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { hasPermission } from '~/services/permissions'
+import { checkPermissions } from '~/services/permissions'
 
 const props = defineProps<{
   appId: string
@@ -1540,8 +1537,8 @@ const canUpload = ref(false)
 const canDeleteApp = ref(false)
 
 onMounted(async () => {
-  canUpload.value = await hasPermission('app.upload_bundle', { appId: props.appId })
-  canDeleteApp.value = await hasPermission('app.delete', { appId: props.appId })
+  canUpload.value = await checkPermissions('app.upload_bundle', { appId: props.appId })
+  canDeleteApp.value = await checkPermissions('app.delete', { appId: props.appId })
 })
 </script>
 
@@ -1563,7 +1560,7 @@ onMounted(async () => {
 ```vue
 <script setup lang="ts">
 import { ref, computed, watchEffect } from 'vue'
-import { hasPermission } from '~/services/permissions'
+import { checkPermissions } from '~/services/permissions'
 
 const props = defineProps<{ appId: string }>()
 
@@ -1572,9 +1569,9 @@ const permissions = ref<Record<string, boolean>>({})
 
 watchEffect(async () => {
   permissions.value = {
-    canUpload: await hasPermission('app.upload_bundle', { appId: props.appId }),
-    canUpdate: await hasPermission('app.update_settings', { appId: props.appId }),
-    canDelete: await hasPermission('app.delete', { appId: props.appId }),
+    canUpload: await checkPermissions('app.upload_bundle', { appId: props.appId }),
+    canUpdate: await checkPermissions('app.update_settings', { appId: props.appId }),
+    canDelete: await checkPermissions('app.delete', { appId: props.appId }),
   }
 })
 
@@ -1597,7 +1594,7 @@ const canDelete = computed(() => permissions.value.canDelete)
 ```typescript
 // src/composables/usePermissions.ts
 import { ref, watch } from 'vue'
-import { hasPermission, type Permission, type PermissionScope } from '~/services/permissions'
+import { checkPermissions, type Permission, type PermissionScope } from '~/services/permissions'
 
 export function usePermissions(
   permissionsToCheck: Permission[],
@@ -1611,7 +1608,7 @@ export function usePermissions(
     const results: Record<string, boolean> = {}
 
     for (const perm of permissionsToCheck) {
-      results[perm] = await hasPermission(perm, scope)
+      results[perm] = await checkPermissions(perm, scope)
     }
 
     permissions.value = results
@@ -1663,28 +1660,28 @@ To ease migration, here is the mapping between current role checks and equivalen
 ### Organization-level checks
 | Current check | Equivalent permission | Notes |
 |-------------|-----------------------|-------|
-| `hasPermissionsInRole('admin', ['org_admin', 'org_super_admin'])` | `hasPermission('org.update_settings')` | Update org settings |
-| `hasPermissionsInRole('admin', ['org_super_admin'])` | `hasPermission('org.update_user_roles')` | Manage member roles |
-| `hasPermissionsInRole('admin', ['org_admin', 'org_billing_admin'])` | `hasPermission('org.read_billing')` | Billing access |
+| `hasPermissionsInRole('admin', ['org_admin', 'org_super_admin'])` | `checkPermissions('org.update_settings')` | Update org settings |
+| `hasPermissionsInRole('admin', ['org_super_admin'])` | `checkPermissions('org.update_user_roles')` | Manage member roles |
+| `hasPermissionsInRole('admin', ['org_admin', 'org_billing_admin'])` | `checkPermissions('org.read_billing')` | Billing access |
 
 ### App-level checks
 | Current check | Equivalent permission | Notes |
 |-------------|-----------------------|-------|
-| `hasPermissionsInRole('write', ['app_developer', 'org_admin'])` | `hasPermission('app.update_settings')` | Update app settings |
-| `hasPermissionsInRole('upload', ['app_uploader', 'app_developer'])` | `hasPermission('app.upload_bundle')` | Upload bundles |
-| `hasPermissionsInRole('admin', ['org_super_admin'])` | `hasPermission('app.delete')` | Delete app |
-| `hasPermissionsInRole('admin', ['app_admin', 'org_admin'])` | `hasPermission('app.update_user_roles')` | Manage app access |
+| `hasPermissionsInRole('write', ['app_developer', 'org_admin'])` | `checkPermissions('app.update_settings')` | Update app settings |
+| `hasPermissionsInRole('upload', ['app_uploader', 'app_developer'])` | `checkPermissions('app.upload_bundle')` | Upload bundles |
+| `hasPermissionsInRole('admin', ['org_super_admin'])` | `checkPermissions('app.delete')` | Delete app |
+| `hasPermissionsInRole('admin', ['app_admin', 'org_admin'])` | `checkPermissions('app.update_user_roles')` | Manage app access |
 
 ### Channel-level checks
 | Current check | Equivalent permission | Notes |
 |-------------|-----------------------|-------|
-| `hasPermissionsInRole('write', ['app_developer', 'org_admin'])` | `hasPermission('channel.update_settings')` | Update channel |
-| `hasPermissionsInRole('upload', ['app_uploader'])` | `hasPermission('channel.promote_bundle')` | Promote bundle |
+| `hasPermissionsInRole('write', ['app_developer', 'org_admin'])` | `checkPermissions('channel.update_settings')` | Update channel |
+| `hasPermissionsInRole('upload', ['app_uploader'])` | `checkPermissions('channel.promote_bundle')` | Promote bundle |
 
 ### Bundle operations
 | Current check | Equivalent permission | Notes |
 |-------------|-----------------------|-------|
-| `hasPermissionsInRole('admin', ['org_admin', 'org_super_admin'])` | `hasPermission('bundle.delete')` | Delete bundle |
+| `hasPermissionsInRole('admin', ['org_admin', 'org_super_admin'])` | `checkPermissions('bundle.delete')` | Delete bundle |
 
 ---
 
@@ -1906,7 +1903,7 @@ cloudlog({
 
 ```typescript
 // Enable logs in the console
-const allowed = await hasPermission('app.upload_bundle', { appId })
+const allowed = await checkPermissions('app.upload_bundle', { appId })
 // Search in console: [hasPermission] RPC error
 ```
 
@@ -2021,7 +2018,7 @@ if (!allowed) {
 
 ### Frontend
 
-#### Use `hasPermission()` for new checks
+#### Use `checkPermissions()` for new checks
 
 **Legacy (avoid)**:
 ```typescript
@@ -2032,7 +2029,7 @@ if (orgStore.hasPermissionsInRole('admin', ['org_admin', 'org_super_admin'], org
 
 **Recommended**:
 ```typescript
-if (await hasPermission('org.update_settings', { orgId })) {
+if (await checkPermissions('org.update_settings', { orgId })) {
   // Show UI
 }
 ```
@@ -2062,7 +2059,7 @@ if (await hasPermission('org.update_settings', { orgId })) {
 ```typescript
 async function uploadBundle() {
   // Re-check before critical action
-  if (!(await hasPermission('app.upload_bundle', { appId }))) {
+  if (!(await checkPermissions('app.upload_bundle', { appId }))) {
     showToast('You no longer have permission to upload', 'error')
     return
   }
@@ -2086,14 +2083,14 @@ const { permissions, loading, has } = usePermissions(
 <button v-if="has('app.upload_bundle')">Upload</button>
 ```
 
-**Reason**: DRY, performance (batch checks), readability
+**Reason**: DRY, readability
 
 #### Do not hide errors: inform the user clearly
 
 **Bad**:
 ```typescript
 async function deleteApp() {
-  if (!(await hasPermission('app.delete', { appId }))) {
+  if (!(await checkPermissions('app.delete', { appId }))) {
     // Silent fail
     return
   }
@@ -2104,7 +2101,7 @@ async function deleteApp() {
 **Good**:
 ```typescript
 async function deleteApp() {
-  if (!(await hasPermission('app.delete', { appId }))) {
+  if (!(await checkPermissions('app.delete', { appId }))) {
     showToast('You do not have permission to delete this app', 'error')
     return
   }
@@ -2124,7 +2121,7 @@ const canUpload = ref(false)
 const loading = ref(true)
 
 onMounted(async () => {
-  canUpload.value = await hasPermission('app.upload_bundle', { appId })
+  canUpload.value = await checkPermissions('app.upload_bundle', { appId })
   loading.value = false
 })
 </script>
@@ -2156,7 +2153,7 @@ onMounted(async () => {
 | [supabase/migrations/20251222140030_rbac_system.sql](supabase/migrations/20251222140030_rbac_system.sql) | RBAC schema + permission checks (includes public wrapper + grants) |
 | [supabase/functions/_backend/utils/rbac.ts](supabase/functions/_backend/utils/rbac.ts) | TypeScript backend wrapper |
 | [src/services/permissions.ts](src/services/permissions.ts) | Frontend permissions service |
-| [src/stores/organization.ts](src/stores/organization.ts) | Organization store (legacy `hasPermissionsInRole`) |
+| [src/stores/organization.ts](src/stores/organization.ts) | Organization store (org + member helpers) |
 
 ### Related migrations
 
