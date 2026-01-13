@@ -98,6 +98,8 @@ async function checkRbacEnabled() {
   catch (error: any) {
     console.error('Error checking RBAC status:', error)
   }
+}
+
 const isInviteNewUserDialogOpen = ref(false)
 
 function updateInviteNewUserButton() {
