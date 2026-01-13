@@ -4,6 +4,7 @@ import { and, eq } from 'drizzle-orm'
 import { Hono } from 'hono/tiny'
 import { middlewareAuth, useCors } from '../utils/hono.ts'
 import { getDrizzleClient } from '../utils/pg.ts'
+import { checkPermission } from '../utils/rbac.ts'
 import { schema } from '../utils/postgres_schema.ts'
 
 export const app = new Hono<MiddlewareKeyVariables>()
@@ -20,24 +21,12 @@ app.get('/:org_id', async (c: Context<MiddlewareKeyVariables>) => {
     return c.json({ error: 'Unauthorized' }, 401)
   }
 
+  if (!(await checkPermission(c, 'org.read_members', { orgId }))) {
+    return c.json({ error: 'Forbidden' }, 403)
+  }
+
   try {
     const drizzle = await getDrizzleClient(c)
-
-    // Vérifier que l'utilisateur a accès à cet org
-    const orgAccess = await drizzle
-      .select()
-      .from(schema.org_users)
-      .where(
-        and(
-          eq(schema.org_users.user_id, userId),
-          eq(schema.org_users.org_id, orgId),
-        ),
-      )
-      .limit(1)
-
-    if (!orgAccess.length) {
-      return c.json({ error: 'Forbidden' }, 403)
-    }
 
     // Récupérer les groupes
     const groups = await drizzle
@@ -70,6 +59,10 @@ app.post('/:org_id', async (c: Context<MiddlewareKeyVariables>) => {
     return c.json({ error: 'Unauthorized' }, 401)
   }
 
+  if (!(await checkPermission(c, 'org.update_user_roles', { orgId }))) {
+    return c.json({ error: 'Forbidden - Admin rights required' }, 403)
+  }
+
   const { name, description } = body
 
   if (!name) {
@@ -78,22 +71,6 @@ app.post('/:org_id', async (c: Context<MiddlewareKeyVariables>) => {
 
   try {
     const drizzle = await getDrizzleClient(c)
-
-    // Vérifier les droits admin
-    const orgAccess = await drizzle
-      .select()
-      .from(schema.org_users)
-      .where(
-        and(
-          eq(schema.org_users.user_id, userId),
-          eq(schema.org_users.org_id, orgId),
-        ),
-      )
-      .limit(1)
-
-    if (!orgAccess.length || orgAccess[0].user_right < 'admin') {
-      return c.json({ error: 'Forbidden - Admin rights required' }, 403)
-    }
 
     // Créer le groupe
     const [group] = await drizzle
@@ -145,19 +122,7 @@ app.put('/:group_id', async (c: Context<MiddlewareKeyVariables>) => {
       return c.json({ error: 'Cannot modify system group' }, 403)
     }
 
-    // Vérifier les droits admin sur l'org
-    const orgAccess = await drizzle
-      .select()
-      .from(schema.org_users)
-      .where(
-        and(
-          eq(schema.org_users.user_id, userId),
-          eq(schema.org_users.org_id, group.org_id),
-        ),
-      )
-      .limit(1)
-
-    if (!orgAccess.length || orgAccess[0].user_right < 'admin') {
+    if (!(await checkPermission(c, 'org.update_user_roles', { orgId: group.org_id }))) {
       return c.json({ error: 'Forbidden - Admin rights required' }, 403)
     }
 
@@ -206,19 +171,7 @@ app.delete('/:group_id', async (c: Context<MiddlewareKeyVariables>) => {
       return c.json({ error: 'Cannot delete system group' }, 403)
     }
 
-    // Vérifier les droits admin sur l'org
-    const orgAccess = await drizzle
-      .select()
-      .from(schema.org_users)
-      .where(
-        and(
-          eq(schema.org_users.user_id, userId),
-          eq(schema.org_users.org_id, group.org_id),
-        ),
-      )
-      .limit(1)
-
-    if (!orgAccess.length || orgAccess[0].user_right < 'admin') {
+    if (!(await checkPermission(c, 'org.update_user_roles', { orgId: group.org_id }))) {
       return c.json({ error: 'Forbidden - Admin rights required' }, 403)
     }
 
@@ -258,19 +211,7 @@ app.get('/:group_id/members', async (c: Context<MiddlewareKeyVariables>) => {
       return c.json({ error: 'Group not found' }, 404)
     }
 
-    // Vérifier l'accès à l'org
-    const orgAccess = await drizzle
-      .select()
-      .from(schema.org_users)
-      .where(
-        and(
-          eq(schema.org_users.user_id, userId),
-          eq(schema.org_users.org_id, group.org_id),
-        ),
-      )
-      .limit(1)
-
-    if (!orgAccess.length) {
+    if (!(await checkPermission(c, 'org.read_members', { orgId: group.org_id }))) {
       return c.json({ error: 'Forbidden' }, 403)
     }
 
@@ -324,36 +265,38 @@ app.post('/:group_id/members', async (c: Context<MiddlewareKeyVariables>) => {
       return c.json({ error: 'Group not found' }, 404)
     }
 
-    // Vérifier les droits admin sur l'org
-    const orgAccess = await drizzle
-      .select()
-      .from(schema.org_users)
-      .where(
-        and(
-          eq(schema.org_users.user_id, userId),
-          eq(schema.org_users.org_id, group.org_id),
-        ),
-      )
-      .limit(1)
-
-    if (!orgAccess.length || orgAccess[0].user_right < 'admin') {
+    if (!(await checkPermission(c, 'org.update_user_roles', { orgId: group.org_id }))) {
       return c.json({ error: 'Forbidden - Admin rights required' }, 403)
     }
 
     // Vérifier que le target user fait partie de l'org
-    const targetOrgAccess = await drizzle
-      .select()
-      .from(schema.org_users)
+    const targetRbacAccess = await drizzle
+      .select({ id: schema.role_bindings.id })
+      .from(schema.role_bindings)
       .where(
         and(
-          eq(schema.org_users.user_id, targetUserId),
-          eq(schema.org_users.org_id, group.org_id),
+          eq(schema.role_bindings.principal_type, 'user'),
+          eq(schema.role_bindings.principal_id, targetUserId),
+          eq(schema.role_bindings.org_id, group.org_id),
         ),
       )
       .limit(1)
 
-    if (!targetOrgAccess.length) {
-      return c.json({ error: 'User is not a member of this org' }, 400)
+    if (!targetRbacAccess.length) {
+      const targetLegacyAccess = await drizzle
+        .select({ id: schema.org_users.id })
+        .from(schema.org_users)
+        .where(
+          and(
+            eq(schema.org_users.user_id, targetUserId),
+            eq(schema.org_users.org_id, group.org_id),
+          ),
+        )
+        .limit(1)
+
+      if (!targetLegacyAccess.length) {
+        return c.json({ error: 'User is not a member of this org' }, 400)
+      }
     }
 
     // Ajouter le membre (ON CONFLICT DO NOTHING pour idempotence)
@@ -399,19 +342,7 @@ app.delete('/:group_id/members/:user_id', async (c: Context<MiddlewareKeyVariabl
       return c.json({ error: 'Group not found' }, 404)
     }
 
-    // Vérifier les droits admin sur l'org
-    const orgAccess = await drizzle
-      .select()
-      .from(schema.org_users)
-      .where(
-        and(
-          eq(schema.org_users.user_id, userId),
-          eq(schema.org_users.org_id, group.org_id),
-        ),
-      )
-      .limit(1)
-
-    if (!orgAccess.length || orgAccess[0].user_right < 'admin') {
+    if (!(await checkPermission(c, 'org.update_user_roles', { orgId: group.org_id }))) {
       return c.json({ error: 'Forbidden - Admin rights required' }, 403)
     }
 
