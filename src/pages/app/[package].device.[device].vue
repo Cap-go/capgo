@@ -13,7 +13,7 @@ import IconAlertCircle from '~icons/lucide/alert-circle'
 import IconDown from '~icons/material-symbols/keyboard-arrow-down-rounded'
 import { useDeviceUpdateFormat } from '~/composables/useDeviceUpdateFormat'
 import { formatDate } from '~/services/date'
-import { hasPermission } from '~/services/permissions'
+import { checkPermissions } from '~/services/permissions'
 import { defaultApiHost, useSupabase } from '~/services/supabase'
 import { useAppDetailStore } from '~/stores/appDetail'
 import { useDisplayStore } from '~/stores/display'
@@ -42,7 +42,7 @@ const reloadCount = ref(0)
 const canManageDevices = computedAsync(async () => {
   if (!packageId.value)
     return false
-  return await hasPermission('app.manage_devices', { appId: packageId.value })
+  return await checkPermissions('app.manage_devices', { appId: packageId.value })
 }, false)
 
 const revertToNativeVersion = ref<Database['public']['Functions']['check_revert_to_builtin_version']['Returns'] | null>(null)

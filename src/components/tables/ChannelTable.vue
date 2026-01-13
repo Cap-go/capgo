@@ -12,7 +12,7 @@ import { toast } from 'vue-sonner'
 import IconSettings from '~icons/heroicons/cog-8-tooth'
 import IconTrash from '~icons/heroicons/trash'
 import { formatDate } from '~/services/date'
-import { hasPermission } from '~/services/permissions'
+import { checkPermissions } from '~/services/permissions'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useMainStore } from '~/stores/main'
@@ -54,13 +54,13 @@ const newChannelName = ref('')
 const canDeleteChannel = computedAsync(async () => {
   if (!props.appId)
     return false
-  return await hasPermission('channel.delete', { appId: props.appId })
+  return await checkPermissions('channel.delete', { appId: props.appId })
 }, false)
 
 const canUpdateChannel = computedAsync(async () => {
   if (!props.appId)
     return false
-  return await hasPermission('channel.update_settings', { appId: props.appId })
+  return await checkPermissions('channel.update_settings', { appId: props.appId })
 }, false)
 
 const currentVersionsNumber = computed(() => {

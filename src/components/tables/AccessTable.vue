@@ -8,7 +8,7 @@ import { toast } from 'vue-sonner'
 import IconTrash from '~icons/heroicons/trash'
 import IconWrench from '~icons/heroicons/wrench'
 import { formatDate } from '~/services/date'
-import { hasPermission } from '~/services/permissions'
+import { checkPermissions } from '~/services/permissions'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 
@@ -70,7 +70,7 @@ async function loadAppInfo() {
 
     // Vérifier la permission app.update_user_roles
     if (app.value?.app_id) {
-      canUpdateUserRoles.value = await hasPermission('app.update_user_roles', { appId: app.value.app_id })
+      canUpdateUserRoles.value = await checkPermissions('app.update_user_roles', { appId: app.value.app_id })
     }
   }
   catch (error) {

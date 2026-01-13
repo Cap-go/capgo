@@ -15,7 +15,7 @@ import IconAlertCircle from '~icons/lucide/alert-circle'
 import IconWarning from '~icons/lucide/alert-triangle'
 import IconDown from '~icons/material-symbols/keyboard-arrow-down-rounded'
 import { formatDate, formatLocalDate } from '~/services/date'
-import { hasPermission } from '~/services/permissions'
+import { checkPermissions } from '~/services/permissions'
 import { checkCompatibilityNativePackages, defaultApiHost, isCompatible, useSupabase } from '~/services/supabase'
 import { isInternalVersionName } from '~/services/versions'
 import { useAppDetailStore } from '~/stores/appDetail'
@@ -47,13 +47,13 @@ const channel = ref<Database['public']['Tables']['channels']['Row'] & Channel>()
 const canUpdateChannelSettings = computedAsync(async () => {
   if (!packageId.value)
     return false
-  return await hasPermission('channel.update_settings', { appId: packageId.value })
+  return await checkPermissions('channel.update_settings', { appId: packageId.value })
 }, false)
 
 const canPromoteBundle = computedAsync(async () => {
   if (!packageId.value)
     return false
-  return await hasPermission('channel.promote_bundle', { appId: packageId.value })
+  return await checkPermissions('channel.promote_bundle', { appId: packageId.value })
 }, false)
 
 const showDebugSection = ref(false)

@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import type { Database } from '~/types/supabase.types'
+import { computedAsync } from '@vueuse/core'
 import { storeToRefs } from 'pinia'
-import { computed, onMounted, ref, watch } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import IconBeaker from '~icons/heroicons/beaker'
@@ -16,6 +17,7 @@ import IconX from '~icons/heroicons/x-circle'
 import Spinner from '~/components/Spinner.vue'
 import WebhookDeliveryLog from '~/components/WebhookDeliveryLog.vue'
 import WebhookForm from '~/components/WebhookForm.vue'
+import { checkPermissions } from '~/services/permissions'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useDisplayStore } from '~/stores/display'
 import { useOrganizationStore } from '~/stores/organization'
@@ -29,7 +31,7 @@ const dialogStore = useDialogV2Store()
 
 displayStore.NavTitle = t('webhooks')
 
-const { currentOrganization, currentRole } = storeToRefs(organizationStore)
+const { currentOrganization } = storeToRefs(organizationStore)
 const { webhooks, isLoading } = storeToRefs(webhooksStore)
 
 const showForm = ref(false)
@@ -39,9 +41,12 @@ const selectedWebhookForLog = ref<Database['public']['Tables']['webhooks']['Row'
 const testingWebhookId = ref<string | null>(null)
 const expandedWebhookId = ref<string | null>(null)
 
-const hasPermission = computed(() => {
-  return organizationStore.hasPermissionsInRole(currentRole.value, ['admin', 'super_admin'])
-})
+const canManageWebhooks = computedAsync(async () => {
+  const orgId = currentOrganization.value?.gid
+  if (!orgId)
+    return false
+  return await checkPermissions('org.update_settings', { orgId })
+}, false)
 
 onMounted(async () => {
   await organizationStore.dedupFetchOrganizations()
@@ -53,7 +58,7 @@ watch(currentOrganization, async () => {
 })
 
 function openCreateForm() {
-  if (!hasPermission.value) {
+  if (!canManageWebhooks.value) {
     toast.error(t('no-permission'))
     return
   }
@@ -62,7 +67,7 @@ function openCreateForm() {
 }
 
 function openEditForm(webhook: Database['public']['Tables']['webhooks']['Row']) {
-  if (!hasPermission.value) {
+  if (!canManageWebhooks.value) {
     toast.error(t('no-permission'))
     return
   }
@@ -97,7 +102,7 @@ async function handleFormSubmit(data: { name: string, url: string, events: strin
 }
 
 async function deleteWebhook(webhook: Database['public']['Tables']['webhooks']['Row']) {
-  if (!hasPermission.value) {
+  if (!canManageWebhooks.value) {
     toast.error(t('no-permission'))
     return
   }
@@ -128,7 +133,7 @@ async function deleteWebhook(webhook: Database['public']['Tables']['webhooks']['
 }
 
 async function testWebhook(webhook: Database['public']['Tables']['webhooks']['Row']) {
-  if (!hasPermission.value) {
+  if (!canManageWebhooks.value) {
     toast.error(t('no-permission'))
     return
   }
@@ -146,7 +151,7 @@ async function testWebhook(webhook: Database['public']['Tables']['webhooks']['Ro
 }
 
 async function toggleWebhook(webhook: Database['public']['Tables']['webhooks']['Row']) {
-  if (!hasPermission.value) {
+  if (!canManageWebhooks.value) {
     toast.error(t('no-permission'))
     return
   }
@@ -241,7 +246,7 @@ function verifyWebhookSignature(req, secret) {
             </p>
           </div>
           <button
-            v-if="hasPermission"
+            v-if="canManageWebhooks"
             class="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 dark:focus:ring-blue-800"
             @click="openCreateForm"
           >
@@ -272,7 +277,7 @@ function verifyWebhookSignature(req, secret) {
             {{ t('no-webhooks-description') }}
           </p>
           <button
-            v-if="hasPermission"
+            v-if="canManageWebhooks"
             class="px-4 py-2 mt-4 text-sm font-medium text-blue-600 border border-blue-600 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20"
             @click="openCreateForm"
           >
@@ -425,7 +430,7 @@ function verifyWebhookSignature(req, secret) {
                   {{ t('view-deliveries') }}
                 </button>
                 <button
-                  v-if="hasPermission"
+                  v-if="canManageWebhooks"
                   class="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700"
                   @click.stop="toggleWebhook(webhook)"
                 >
@@ -434,7 +439,7 @@ function verifyWebhookSignature(req, secret) {
                   {{ webhook.enabled ? t('disable') : t('enable') }}
                 </button>
                 <button
-                  v-if="hasPermission"
+                  v-if="canManageWebhooks"
                   class="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700"
                   @click.stop="openEditForm(webhook)"
                 >
@@ -442,7 +447,7 @@ function verifyWebhookSignature(req, secret) {
                   {{ t('edit') }}
                 </button>
                 <button
-                  v-if="hasPermission"
+                  v-if="canManageWebhooks"
                   class="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-red-600 bg-white border border-red-300 rounded-lg hover:bg-red-50 dark:bg-gray-800 dark:border-red-600 dark:hover:bg-red-900/20"
                   @click.stop="deleteWebhook(webhook)"
                 >

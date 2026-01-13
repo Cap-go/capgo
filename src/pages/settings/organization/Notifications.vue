@@ -1,8 +1,10 @@
 <script setup lang="ts">
+import { computedAsync } from '@vueuse/core'
 import { storeToRefs } from 'pinia'
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
+import { checkPermissions } from '~/services/permissions'
 import { useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 import { useOrganizationStore } from '~/stores/organization'
@@ -45,9 +47,12 @@ function getEmailPref(key: EmailPreferenceKey): boolean {
 }
 
 // Check if user has permission to edit org settings
-const hasOrgPerm = computed(() => {
-  return organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['admin', 'super_admin'])
-})
+const hasOrgPerm = computedAsync(async () => {
+  const orgId = currentOrganization.value?.gid
+  if (!orgId)
+    return false
+  return await checkPermissions('org.update_settings', { orgId })
+}, false)
 
 async function toggleEmailPref(key: EmailPreferenceKey) {
   if (!currentOrganization.value?.gid || !hasOrgPerm.value) {

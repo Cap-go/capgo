@@ -12,7 +12,7 @@ import Tabs from '~/components/Tabs.vue'
 import { accountTabs } from '~/constants/accountTabs'
 import { organizationTabs as baseOrgTabs } from '~/constants/organizationTabs'
 import { settingsTabs } from '~/constants/settingsTabs'
-import { hasPermission } from '~/services/permissions'
+import { checkPermissions } from '~/services/permissions'
 import { openPortal } from '~/services/stripe'
 import { useOrganizationStore } from '~/stores/organization'
 
@@ -41,14 +41,28 @@ const canReadBilling = computedAsync(async () => {
   const orgId = organizationStore.currentOrganization?.gid
   if (!orgId)
     return false
-  return await hasPermission('org.read_billing', { orgId })
+  return await checkPermissions('org.read_billing', { orgId })
 }, false)
 
 const canUpdateBilling = computedAsync(async () => {
   const orgId = organizationStore.currentOrganization?.gid
   if (!orgId)
     return false
-  return await hasPermission('org.update_billing', { orgId })
+  return await checkPermissions('org.update_billing', { orgId })
+}, false)
+
+const canReadAuditLogs = computedAsync(async () => {
+  const orgId = organizationStore.currentOrganization?.gid
+  if (!orgId)
+    return false
+  return await checkPermissions('org.read_audit', { orgId })
+}, false)
+
+const canManageSecurity = computedAsync(async () => {
+  const orgId = organizationStore.currentOrganization?.gid
+  if (!orgId)
+    return false
+  return await checkPermissions('org.update_settings', { orgId })
 }, false)
 
 watchEffect(() => {
@@ -86,7 +100,7 @@ watchEffect(() => {
     organizationTabs.value = organizationTabs.value.filter(tab => tab.key !== '/settings/organization/plans')
 
   // Audit logs - visible only to super_admins
-  const needsAuditLogs = organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['super_admin'])
+  const needsAuditLogs = canReadAuditLogs.value
   const hasAuditLogs = organizationTabs.value.find(tab => tab.key === '/settings/organization/audit-logs')
   if (needsAuditLogs && !hasAuditLogs) {
     const base = baseOrgTabs.find(t => t.key === '/settings/organization/audit-logs')
@@ -97,7 +111,7 @@ watchEffect(() => {
     organizationTabs.value = organizationTabs.value.filter(tab => tab.key !== '/settings/organization/audit-logs')
 
   // Security - visible only to super_admins
-  const needsSecurity = organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['super_admin'])
+  const needsSecurity = canManageSecurity.value
   const hasSecurity = organizationTabs.value.find(tab => tab.key === '/settings/organization/security')
   if (needsSecurity && !hasSecurity) {
     const base = baseOrgTabs.find(t => t.key === '/settings/organization/security')

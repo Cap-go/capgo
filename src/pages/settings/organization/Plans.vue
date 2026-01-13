@@ -7,7 +7,7 @@ import { computed, ref, watch, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import CreditsCta from '~/components/CreditsCta.vue'
-import { hasPermission } from '~/services/permissions'
+import { checkPermissions } from '~/services/permissions'
 import { openCheckout } from '~/services/stripe'
 import { getCreditUnitPricing, getCurrentPlanNameOrg } from '~/services/supabase'
 import { openSupport } from '~/services/support'
@@ -40,7 +40,7 @@ const creditUnitPrices = ref<Partial<Record<Database['public']['Enums']['credit_
 const canUpdateBilling = computedAsync(async () => {
   if (!currentOrganization.value)
     return false
-  return await hasPermission('org.update_billing', { orgId: currentOrganization.value.gid })
+  return await checkPermissions('org.update_billing', { orgId: currentOrganization.value.gid })
 }, false)
 
 function planFeatures(plan: Database['public']['Tables']['plans']['Row']) {
