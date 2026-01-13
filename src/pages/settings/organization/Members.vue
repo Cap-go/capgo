@@ -609,23 +609,52 @@ async function _deleteMember(member: ExtendedOrganizationMember) {
       await rescindInvitation(member.email)
     }
     else {
-      const { error } = member.aid === -1
-        ? await supabase
-          .from('role_bindings')
-          .delete()
-          .eq('principal_type', 'user')
-          .eq('principal_id', member.uid)
-          .eq('scope_type', 'org')
-          .eq('org_id', currentOrganization.value?.gid ?? '')
-        : await supabase
+      if (member.aid === -1) {
+        const orgId = currentOrganization.value?.gid
+        if (!orgId) {
+          toast.error(t('cannot-delete-member'))
+          return
+        }
+
+        const { data, error } = await supabase.rpc('delete_org_member_role', {
+          p_org_id: orgId,
+          p_user_id: member.uid,
+        })
+
+        if (error) {
+          console.error('Error deleting RBAC member: ', error)
+          if (error.message.includes('CANNOT_REMOVE_LAST_SUPER_ADMIN')) {
+            toast.error(t('cannot-remove-last-super-admin'))
+          }
+          else if (error.message.includes('CANNOT_CHANGE_OWNER_ROLE')) {
+            toast.error(t('cannot-change-owner-role'))
+          }
+          else if (error.message.includes('NO_PERMISSION_TO_UPDATE_ROLES')) {
+            toast.error(t('no-permission'))
+          }
+          else {
+            toast.error(`${t('cannot-delete-member')}: ${error.message}`)
+          }
+          return
+        }
+
+        if (data !== 'OK') {
+          console.error('Unexpected RPC response:', data)
+          toast.error(t('cannot-delete-member'))
+          return
+        }
+      }
+      else {
+        const { error } = await supabase
           .from('org_users')
           .delete()
           .eq('id', member.aid)
 
-      if (error) {
-        console.error('Error deleting member: ', error)
-        toast.error(`${t('cannot-delete-member')}: ${error.message}`)
-        return
+        if (error) {
+          console.error('Error deleting member: ', error)
+          toast.error(`${t('cannot-delete-member')}: ${error.message}`)
+          return
+        }
       }
 
       toast.success(t('member-deleted'))
