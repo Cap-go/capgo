@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
 # -------- Config (edit these) --------
 # Load PlanetScale connection strings from .env.prod
 ENV_FILE="$(dirname "$0")/../internal/cloudflare/.env.prod"
@@ -20,13 +22,43 @@ else
   exit 1
 fi
 
-# Select which region to use (change this to switch regions)
-SELECTED_REGION="PLANETSCALE_AS_JAPAN"
+# Region selection
+echo ""
+echo "Select PlanetScale region:"
+echo "  1) NA (North America)"
+echo "  2) EU (Europe)"
+echo "  3) SA (South America)"
+echo "  4) OC (Oceania)"
+echo "  5) AS_INDIA (Asia - India)"
+echo "  6) AS_JAPAN (Asia - Japan)"
+echo ""
+read -rp "Enter choice [1-6]: " REGION_CHOICE
+
+case "$REGION_CHOICE" in
+  1) SELECTED_REGION="PLANETSCALE_NA" ;;
+  2) SELECTED_REGION="PLANETSCALE_EU" ;;
+  3) SELECTED_REGION="PLANETSCALE_SA" ;;
+  4) SELECTED_REGION="PLANETSCALE_OC" ;;
+  5) SELECTED_REGION="PLANETSCALE_AS_INDIA" ;;
+  6) SELECTED_REGION="PLANETSCALE_AS_JAPAN" ;;
+  *) echo "Invalid choice"; exit 1 ;;
+esac
+
 DB_T="${!SELECTED_REGION}"
 
-# Set to true to only recreate the subscription (keeps existing data/schema)
-# Set to false for full reset (drops schema, reimports, recreates subscription)
-SUBSCRIPTION_ONLY=false
+# Ask about reset mode
+echo ""
+echo "Reset mode:"
+echo "  1) Full reset (drops schema, reimports data, recreates subscription)"
+echo "  2) Subscription only (keeps existing data/schema, just recreates subscription)"
+echo ""
+read -rp "Enter choice [1-2]: " RESET_CHOICE
+
+case "$RESET_CHOICE" in
+  1) SUBSCRIPTION_ONLY=false ;;
+  2) SUBSCRIPTION_ONLY=true ;;
+  *) echo "Invalid choice"; exit 1 ;;
+esac
 
 if [[ -z "$DB_T" ]]; then
   echo "Error: $SELECTED_REGION not found in $ENV_FILE"
@@ -269,8 +301,7 @@ CONNECTION '${CONNECTION_STRING}'
 PUBLICATION ${PUBLICATION_NAME}
 WITH (
   copy_data = false,
-  create_slot = false,
-  slot_name = '${SUBSCRIPTION_NAME}',
+  create_slot = true,
   enabled = true,
   disable_on_error = false
 );
@@ -325,10 +356,31 @@ else
     local table_name=$1
     local dump_file="${DUMP_DIR}/${table_name}.csv.gz"
 
-    echo "    [${table_name}] Restoring via COPY..."
-    # Truncate first to avoid duplicates, then COPY (much faster than row-by-row)
+    echo "    [${table_name}] Dropping indexes..."
+    # Get and drop all indexes (except primary key and unique constraints)
+    psql-17 "$TARGET_DB_URL" -t -A -c "
+      SELECT 'DROP INDEX IF EXISTS \"' || i.indexname || '\";'
+      FROM pg_indexes i
+      LEFT JOIN pg_constraint c ON c.conname = i.indexname
+      WHERE i.tablename = '${table_name}'
+        AND i.schemaname = 'public'
+        AND i.indexname NOT LIKE '%_pkey'
+        AND c.conname IS NULL
+    " | psql-17 "$TARGET_DB_URL" 2>/dev/null || true
+
+    echo "    [${table_name}] Truncating and loading via COPY..."
     psql-17 "$TARGET_DB_URL" -c "TRUNCATE TABLE public.${table_name};"
     gunzip -c "$dump_file" | psql-17 "$TARGET_DB_URL" -c "\\COPY public.${table_name} FROM STDIN WITH (FORMAT csv, HEADER)"
+
+    echo "    [${table_name}] Recreating indexes..."
+    # Extract multi-line index definitions from schema file and execute them
+    awk "/CREATE (UNIQUE )?INDEX.*ON public\.${table_name}/,/;/" "${SCRIPT_DIR}/schema_replicate.sql" | \
+      awk 'BEGIN{RS=";"} /CREATE.*INDEX/{print $0 ";"}' | while read -r idx_sql; do
+      if [[ -n "$idx_sql" ]]; then
+        echo "      Creating index..."
+        psql-17 "$TARGET_DB_URL" -c "$idx_sql" 2>/dev/null || true
+      fi
+    done
 
     COUNT=$(psql-17 "$TARGET_DB_URL" -t -A -c "SELECT COUNT(*) FROM public.${table_name};")
     echo "    [${table_name}] Restored: ${COUNT} rows"
