@@ -16,7 +16,7 @@ import IconSearch from '~icons/ic/round-search?raw'
 import IconAlertCircle from '~icons/lucide/alert-circle'
 import { bytesToMbText, getChecksumInfo } from '~/services/conversion'
 import { formatDate, formatLocalDate } from '~/services/date'
-import { hasPermission } from '~/services/permissions'
+import { checkPermissions } from '~/services/permissions'
 import { checkCompatibilityNativePackages, isCompatible, useSupabase } from '~/services/supabase'
 import { openVersion } from '~/services/versions'
 import { useDialogV2Store } from '~/stores/dialogv2'
@@ -75,13 +75,13 @@ watch(() => channels.value, () => {
 const canPromoteBundle = computedAsync(async () => {
   if (!version.value?.app_id)
     return false
-  return await hasPermission('channel.promote_bundle', { appId: version.value.app_id })
+  return await checkPermissions('channel.promote_bundle', { appId: version.value.app_id })
 }, false)
 
 const canDeleteBundle = computedAsync(async () => {
   if (!version.value?.app_id)
     return false
-  return await hasPermission('bundle.delete', { appId: version.value.app_id })
+  return await checkPermissions('bundle.delete', { appId: version.value.app_id })
 }, false)
 
 // Function to open link in a new tab

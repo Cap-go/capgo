@@ -13,7 +13,7 @@ import transfer from '~icons/mingcute/transfer-horizontal-line?raw&width=36&heig
 import gearSix from '~icons/ph/gear-six?raw'
 import iconName from '~icons/ph/user?raw'
 import Toggle from '~/components/Toggle.vue'
-import { hasPermission } from '~/services/permissions'
+import { checkPermissions } from '~/services/permissions'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 
@@ -42,13 +42,13 @@ const androidSearch = ref('')
 const canUpdateSettings = computedAsync(async () => {
   if (!appRef.value)
     return false
-  return await hasPermission('app.update_settings', { appId: props.appId })
+  return await checkPermissions('app.update_settings', { appId: props.appId })
 }, false)
 
 const canDeleteApp = computedAsync(async () => {
   if (!appRef.value)
     return false
-  return await hasPermission('app.delete', { appId: props.appId })
+  return await checkPermissions('app.delete', { appId: props.appId })
 }, false)
 
 onMounted(async () => {

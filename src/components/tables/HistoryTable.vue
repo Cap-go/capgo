@@ -6,7 +6,7 @@ import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import { formatDate } from '~/services/date'
-import { hasPermission } from '~/services/permissions'
+import { checkPermissions } from '~/services/permissions'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useOrganizationStore } from '~/stores/organization'
@@ -47,7 +47,7 @@ const props = defineProps<{
 const canRollbackBundle = computedAsync(async () => {
   if (!props.appId)
     return false
-  return await hasPermission('channel.rollback_bundle', { appId: props.appId })
+  return await checkPermissions('channel.rollback_bundle', { appId: props.appId })
 }, false)
 
 const members = ref([] as ExtendedOrganizationMembers)

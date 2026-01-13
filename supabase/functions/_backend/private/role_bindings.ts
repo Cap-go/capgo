@@ -4,6 +4,7 @@ import { and, eq } from 'drizzle-orm'
 import { Hono } from 'hono/tiny'
 import { middlewareAuth, useCors } from '../utils/hono.ts'
 import { getDrizzleClient } from '../utils/pg.ts'
+import { checkPermission } from '../utils/rbac.ts'
 import { schema } from '../utils/postgres_schema.ts'
 
 export const app = new Hono<MiddlewareKeyVariables>()
@@ -23,19 +24,7 @@ app.get('/:org_id', async (c: Context<MiddlewareKeyVariables>) => {
   try {
     const drizzle = await getDrizzleClient(c)
 
-    // Vérifier que l'utilisateur a accès à cet org
-    const orgAccess = await drizzle
-      .select()
-      .from(schema.org_users)
-      .where(
-        and(
-          eq(schema.org_users.user_id, userId),
-          eq(schema.org_users.org_id, orgId),
-        ),
-      )
-      .limit(1)
-
-    if (!orgAccess.length) {
+    if (!(await checkPermission(c, 'org.read_members', { orgId }))) {
       return c.json({ error: 'Forbidden' }, 403)
     }
 
@@ -107,19 +96,7 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
   try {
     const drizzle = await getDrizzleClient(c)
 
-    // Vérifier les droits admin sur l'org
-    const orgAccess = await drizzle
-      .select()
-      .from(schema.org_users)
-      .where(
-        and(
-          eq(schema.org_users.user_id, userId),
-          eq(schema.org_users.org_id, org_id),
-        ),
-      )
-      .limit(1)
-
-    if (!orgAccess.length || orgAccess[0].user_right < 'admin') {
+    if (!(await checkPermission(c, 'org.update_user_roles', { orgId: org_id }))) {
       return c.json({ error: 'Forbidden - Admin rights required' }, 403)
     }
 
@@ -148,19 +125,33 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
 
     // Si principal_type est user, vérifier qu'il fait partie de l'org
     if (principal_type === 'user') {
-      const targetOrgAccess = await drizzle
-        .select()
-        .from(schema.org_users)
+      const targetRbacAccess = await drizzle
+        .select({ id: schema.role_bindings.id })
+        .from(schema.role_bindings)
         .where(
           and(
-            eq(schema.org_users.user_id, principal_id),
-            eq(schema.org_users.org_id, org_id),
+            eq(schema.role_bindings.principal_type, 'user'),
+            eq(schema.role_bindings.principal_id, principal_id),
+            eq(schema.role_bindings.org_id, org_id),
           ),
         )
         .limit(1)
 
-      if (!targetOrgAccess.length) {
-        return c.json({ error: 'User is not a member of this org' }, 400)
+      if (!targetRbacAccess.length) {
+        const targetLegacyAccess = await drizzle
+          .select({ id: schema.org_users.id })
+          .from(schema.org_users)
+          .where(
+            and(
+              eq(schema.org_users.user_id, principal_id),
+              eq(schema.org_users.org_id, org_id),
+            ),
+          )
+          .limit(1)
+
+        if (!targetLegacyAccess.length) {
+          return c.json({ error: 'User is not a member of this org' }, 400)
+        }
       }
     }
 
@@ -236,19 +227,7 @@ app.delete('/:binding_id', async (c: Context<MiddlewareKeyVariables>) => {
       return c.json({ error: 'Role binding not found' }, 404)
     }
 
-    // Vérifier les droits admin sur l'org
-    const orgAccess = await drizzle
-      .select()
-      .from(schema.org_users)
-      .where(
-        and(
-          eq(schema.org_users.user_id, userId),
-          eq(schema.org_users.org_id, binding.org_id),
-        ),
-      )
-      .limit(1)
-
-    if (!orgAccess.length || orgAccess[0].user_right < 'admin') {
+    if (!(await checkPermission(c, 'org.update_user_roles', { orgId: binding.org_id }))) {
       return c.json({ error: 'Forbidden - Admin rights required' }, 403)
     }
 

@@ -14,7 +14,7 @@ import IconSearch from '~icons/heroicons/magnifying-glass'
 import IconTrash from '~icons/heroicons/trash'
 import IconWrench from '~icons/heroicons/wrench'
 import Table from '~/components/Table.vue'
-import { hasPermission } from '~/services/permissions'
+import { checkPermissions } from '~/services/permissions'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useMainStore } from '~/stores/main'
@@ -54,13 +54,13 @@ const captchaToken = ref('')
 const canInviteUser = computedAsync(async () => {
   if (!currentOrganization.value)
     return false
-  return await hasPermission('org.invite_user', { orgId: currentOrganization.value.gid })
+  return await checkPermissions('org.invite_user', { orgId: currentOrganization.value.gid })
 }, false)
 
 const canUpdateUserRoles = computedAsync(async () => {
   if (!currentOrganization.value)
     return false
-  return await hasPermission('org.update_user_roles', { orgId: currentOrganization.value.gid })
+  return await checkPermissions('org.update_user_roles', { orgId: currentOrganization.value.gid })
 }, false)
 const captchaElement = ref<InstanceType<typeof VueTurnstile> | null>(null)
 const isSubmittingInvite = ref(false)
@@ -98,6 +98,8 @@ async function checkRbacEnabled() {
   catch (error: any) {
     console.error('Error checking RBAC status:', error)
   }
+}
+
 const isInviteNewUserDialogOpen = ref(false)
 
 function updateInviteNewUserButton() {

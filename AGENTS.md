@@ -187,6 +187,11 @@ Then in your test file, use ONLY these dedicated resources for modifications.
 - Auto-generated types for Vue components and routes
 - Supabase types auto-generated via CLI
 
+### Commit Messages
+
+- Follow Conventional Commits v1.0.0 (https://www.conventionalcommits.org/en/v1.0.0/).
+- Use a clear type and scope when helpful (e.g., `docs: ...`, `feat(api): ...`, `fix(frontend): ...`).
+
 ## Supabase Best Practices
 
 - Always cover database changes with Postgres-level tests and complement them

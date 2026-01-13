@@ -8,7 +8,7 @@ import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import iconEmail from '~icons/heroicons/envelope?raw'
 import iconName from '~icons/heroicons/user?raw'
-import { hasPermission } from '~/services/permissions'
+import { checkPermissions } from '~/services/permissions'
 import { pickPhoto, takePhoto } from '~/services/photos'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
@@ -43,7 +43,7 @@ watch(currentOrganization, (newOrg) => {
 const canUpdateOrgSettings = computedAsync(async () => {
   if (!currentOrganization.value)
     return false
-  return await hasPermission('org.update_settings', { orgId: currentOrganization.value.gid })
+  return await checkPermissions('org.update_settings', { orgId: currentOrganization.value.gid })
 }, false)
 
 async function presentActionSheet() {

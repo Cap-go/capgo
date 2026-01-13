@@ -30,7 +30,7 @@ import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import IconInfo from '~icons/lucide/info'
-import { hasPermission } from '~/services/permissions'
+import { checkPermissions } from '~/services/permissions'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useOrganizationStore } from '~/stores/organization'
@@ -97,7 +97,7 @@ interface DeployTarget {
 const hasAdminPermission = computedAsync(async () => {
   if (!props.appId || !userRole.value)
     return false
-  return await hasPermission('channel.promote_bundle', { appId: props.appId })
+  return await checkPermissions('channel.promote_bundle', { appId: props.appId })
 }, false)
 
 const deployTargets = computed<DeployTarget[]>(() => {

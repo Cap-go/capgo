@@ -12,7 +12,7 @@ import IconSettings from '~icons/heroicons/cog-8-tooth'
 import IconTrash from '~icons/heroicons/trash'
 import { bytesToMbText } from '~/services/conversion'
 import { formatDate } from '~/services/date'
-import { hasPermission } from '~/services/permissions'
+import { checkPermissions } from '~/services/permissions'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 
@@ -29,7 +29,7 @@ type Element = Database['public']['Tables']['app_versions']['Row'] & Database['p
 const canDeleteBundle = computedAsync(async () => {
   if (!props.appId)
     return false
-  return await hasPermission('bundle.delete', { appId: props.appId })
+  return await checkPermissions('bundle.delete', { appId: props.appId })
 }, false)
 
 const isMobile = Capacitor.isNativePlatform()

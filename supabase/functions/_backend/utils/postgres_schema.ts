@@ -1,4 +1,4 @@
-import { bigint, boolean, integer, pgEnum, pgTable, serial, text, timestamp, uuid, varchar } from 'drizzle-orm/pg-core'
+import { bigint, boolean, integer, jsonb, pgEnum, pgTable, serial, text, timestamp, uuid, varchar } from 'drizzle-orm/pg-core'
 
 // do_not_change
 
@@ -93,7 +93,7 @@ export const channel_devices = pgTable('channel_devices', {
 })
 
 export const orgs = pgTable('orgs', {
-  id: uuid('id').notNull(),
+  id: uuid('id').primaryKey().notNull(),
   created_by: uuid('created_by').notNull(),
   logo: text('logo'),
   name: text('name').notNull(),
@@ -101,6 +101,21 @@ export const orgs = pgTable('orgs', {
   customer_id: text('customer_id'),
   require_apikey_expiration: boolean('require_apikey_expiration').notNull().default(false),
   max_apikey_expiration_days: integer('max_apikey_expiration_days'),
+})
+
+export const users = pgTable('users', {
+  created_at: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  image_url: varchar('image_url'),
+  first_name: varchar('first_name'),
+  last_name: varchar('last_name'),
+  country: varchar('country'),
+  email: varchar('email').notNull(),
+  id: uuid('id').notNull(),
+  updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+  enable_notifications: boolean('enable_notifications').notNull().default(true),
+  opt_for_newsletters: boolean('opt_for_newsletters').notNull().default(true),
+  ban_time: timestamp('ban_time', { withTimezone: true }),
+  email_preferences: jsonb('email_preferences').notNull(),
 })
 
 export const stripe_info = pgTable('stripe_info', {
@@ -193,6 +208,7 @@ export const schema = {
   channels,
   channel_devices,
   orgs,
+  users,
   stripe_info,
   apikeys,
   org_users,

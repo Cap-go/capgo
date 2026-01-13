@@ -10,7 +10,12 @@ interface BuilderStartResponse {
   status: string
 }
 
-async function markBuildAsFailed(c: Context, jobId: string, errorMessage: string, apikeyKey: string): Promise<void> {
+async function markBuildAsFailed(
+  c: Context,
+  jobId: string,
+  errorMessage: string,
+  apikeyKey: string,
+): Promise<void> {
   // Use authenticated client - RLS will enforce access
   const supabase = supabaseApikey(c, apikeyKey)
   const { error: updateError } = await supabase
@@ -47,7 +52,7 @@ export async function startBuild(
   apikey: Database['public']['Tables']['apikeys']['Row'],
 ): Promise<Response> {
   let alreadyMarkedAsFailed = false
-  const apikeyKey = apikey.key!
+  const apikeyKey = apikey.key ?? c.get('capgkey') ?? apikey.hashed_key ?? null
 
   try {
     cloudlog({
@@ -57,6 +62,18 @@ export async function startBuild(
       app_id: appId,
       user_id: apikey.user_id,
     })
+
+    if (!apikeyKey) {
+      const errorMsg = 'No API key available to start build'
+      cloudlogErr({
+        requestId: c.get('requestId'),
+        message: 'Missing API key for start build',
+        job_id: jobId,
+        app_id: appId,
+        user_id: apikey.user_id,
+      })
+      throw simpleError('not_authorized', errorMsg)
+    }
 
     // Security: Check if user has permission to manage builds (auth context set by middlewareKey)
     if (!(await checkPermission(c, 'app.build_native', { appId }))) {
@@ -134,7 +151,7 @@ export async function startBuild(
   }
   catch (error) {
     // Mark build as failed for any unexpected error (but only if not already marked)
-    if (!alreadyMarkedAsFailed) {
+    if (!alreadyMarkedAsFailed && apikeyKey) {
       const errorMsg = error instanceof Error ? error.message : String(error)
       await markBuildAsFailed(c, jobId, errorMsg, apikeyKey)
     }

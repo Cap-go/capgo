@@ -46,13 +46,17 @@ async function validateInvite(c: Context, rawBody: any) {
 
   const authorization = c.get('authorization')
   if (!authorization)
-    return { message: 'not authorized', status: 401 }
+    return quickError(401, 'not_authorized', 'Not authorized')
 
   // Verify the user has permission to invite
   // inviting super_admin requires org.update_user_roles, other roles require org.invite_user
   const requiredPermission = body.invite_type === 'super_admin' ? 'org.update_user_roles' : 'org.invite_user'
-  if (!await checkPermission(c, requiredPermission, { orgId: body.org_id }))
-    return { message: 'not authorized (insufficient permissions)', status: 403 }
+  if (!await checkPermission(c, requiredPermission, { orgId: body.org_id })) {
+    return quickError(403, 'not_authorized', 'Not authorized', {
+      requiredPermission,
+      orgId: body.org_id,
+    })
+  }
 
   // Verify captcha token with Cloudflare Turnstile
   await verifyCaptchaToken(c, body.captcha_token)

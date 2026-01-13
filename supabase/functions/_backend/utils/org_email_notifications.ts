@@ -81,54 +81,117 @@ async function getEligibleOrgMemberEmails(
   orgId: string,
   preferenceKey: EmailPreferenceKey,
 ): Promise<string[]> {
-  // email_preferences is a JSONB column added in migration 20251228064121
-  const { data: members, error } = await supabaseAdmin(c)
+  const adminRoleNames = ['org_admin', 'org_super_admin']
+  const now = new Date()
+  const userIds = new Set<string>()
+
+  const { data: legacyMembers, error: legacyError } = await supabaseAdmin(c)
     .from('org_users')
-    .select(`
-      user_id,
-      user_right,
-      users!inner (
-        email
-      )
-    `)
+    .select('user_id')
     .eq('org_id', orgId)
     .in('user_right', ['admin', 'super_admin'])
-    .is('app_id', null) // org-level membership only, not app-specific
+    .is('app_id', null)
 
-  if (error || !members) {
-    cloudlog({ requestId: c.get('requestId'), message: 'getEligibleOrgMemberEmails error', orgId, error })
-    return []
+  if (legacyError) {
+    cloudlog({ requestId: c.get('requestId'), message: 'getEligibleOrgMemberEmails legacy error', orgId, error: legacyError })
   }
-
-  // Fetch user email_preferences separately since it might not be in generated types yet
-  const userIds = members.map(m => m.user_id)
-  const { data: users } = await supabaseAdmin(c)
-    .from('users')
-    .select('id, email, email_preferences')
-    .in('id', userIds)
-
-  const userPrefsMap = new Map<string, EmailPreferences>()
-  if (users) {
-    for (const user of users) {
-      const prefs = ((user as any).email_preferences as EmailPreferences | null) ?? {}
-      userPrefsMap.set(user.id, prefs)
+  else {
+    for (const member of legacyMembers ?? []) {
+      if (member.user_id)
+        userIds.add(member.user_id)
     }
   }
 
-  const eligibleEmails: string[] = []
+  const { data: rbacUserBindings, error: rbacUserError } = await supabaseAdmin(c)
+    .from('role_bindings')
+    .select('principal_id, expires_at, roles!inner(name)')
+    .eq('org_id', orgId)
+    .eq('principal_type', 'user')
+    .eq('scope_type', 'org')
+    .in('roles.name', adminRoleNames)
 
-  for (const member of members) {
-    const userRow = (member as any).users
-    if (!userRow?.email)
+  if (rbacUserError) {
+    cloudlog({ requestId: c.get('requestId'), message: 'getEligibleOrgMemberEmails rbac user error', orgId, error: rbacUserError })
+  }
+  else {
+    for (const binding of rbacUserBindings ?? []) {
+      const expiresAt = (binding as any).expires_at as string | null | undefined
+      if (expiresAt && new Date(expiresAt) <= now)
+        continue
+      const principalId = (binding as any).principal_id as string | null | undefined
+      if (principalId)
+        userIds.add(principalId)
+    }
+  }
+
+  const { data: rbacGroupBindings, error: rbacGroupError } = await supabaseAdmin(c)
+    .from('role_bindings')
+    .select('principal_id, expires_at, roles!inner(name)')
+    .eq('org_id', orgId)
+    .eq('principal_type', 'group')
+    .eq('scope_type', 'org')
+    .in('roles.name', adminRoleNames)
+
+  if (rbacGroupError) {
+    cloudlog({ requestId: c.get('requestId'), message: 'getEligibleOrgMemberEmails rbac group error', orgId, error: rbacGroupError })
+  }
+  else {
+    const groupIds = (rbacGroupBindings ?? [])
+      .filter((binding) => {
+        const expiresAt = (binding as any).expires_at as string | null | undefined
+        return !expiresAt || new Date(expiresAt) > now
+      })
+      .map(binding => (binding as any).principal_id as string | null | undefined)
+      .filter((groupId): groupId is string => Boolean(groupId))
+
+    if (groupIds.length > 0) {
+      const { data: groupMembers, error: groupError } = await supabaseAdmin(c)
+        .from('group_members')
+        .select('user_id')
+        .in('group_id', groupIds)
+
+      if (groupError) {
+        cloudlog({ requestId: c.get('requestId'), message: 'getEligibleOrgMemberEmails group members error', orgId, error: groupError })
+      }
+      else {
+        for (const member of groupMembers ?? []) {
+          if (member.user_id)
+            userIds.add(member.user_id)
+        }
+      }
+    }
+  }
+
+  const userIdList = Array.from(userIds)
+  if (userIdList.length === 0) {
+    return []
+  }
+
+  const { data: users, error: usersError } = await supabaseAdmin(c)
+    .from('users')
+    .select('id, email, email_preferences')
+    .in('id', userIdList)
+
+  if (usersError || !users) {
+    cloudlog({ requestId: c.get('requestId'), message: 'getEligibleOrgMemberEmails users error', orgId, error: usersError })
+    return []
+  }
+
+  const eligibleEmails: string[] = []
+  const emailSet = new Set<string>()
+
+  for (const user of users) {
+    const email = (user as any).email as string | null | undefined
+    if (!email || emailSet.has(email))
       continue
 
-    // Default to true if email_preferences is null or the key doesn't exist
-    const prefs = userPrefsMap.get(member.user_id) ?? {}
+    const prefs = ((user as any).email_preferences as EmailPreferences | null) ?? {}
     const prefValue = prefs[preferenceKey]
     const isEnabled = prefValue === undefined ? true : prefValue
 
     if (isEnabled) {
-      eligibleEmails.push(userRow.email)
+      emailSet.add(email)
+      eligibleEmails.push(email)
     }
   }
 
