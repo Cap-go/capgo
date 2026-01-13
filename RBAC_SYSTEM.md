@@ -1188,7 +1188,7 @@ export async function checkPermissionsBatch(
 - `channel.read_forced_devices` - View forced devices
 - `channel.read_audit` - View channel audit logs
 
-**Platform permissions** (scope: 'platform' - usage interne uniquement)
+**Platform permissions** (scope: 'platform' - internal use only)
 - `platform.impersonate_user` - Impersonate a user
 - `platform.manage_orgs_any` - Manage any org
 - `platform.manage_apps_any` - Manage any app
@@ -1197,6 +1197,304 @@ export async function checkPermissionsBatch(
 - `platform.delete_orphan_users` - Delete orphan users
 - `platform.read_all_audit` - View all audit logs
 - `platform.db_break_glass` - Break-glass DB access
+
+### Old System (still used) - `hasPermissionsInRole()`
+
+**File**: [src/stores/organization.ts](src/stores/organization.ts)
+
+The organization store exposes helpers to check roles:
+
+```typescript
+import { useOrganizationStore } from '~/stores/organization'
+
+const orgStore = useOrganizationStore()
+
+// Check if user has one of the required roles
+if (orgStore.hasPermissionsInRole('admin', ['org_admin', 'org_super_admin'], orgId)) {
+  // Show admin UI
+}
+
+// Check at app level
+if (orgStore.hasPermissionsInRole('write', ['app_developer', 'org_admin'], orgId, appId)) {
+  // Allow editing
+}
+```
+
+**Behavior**:
+- If `use_new_rbac` enabled: checks cached `role_bindings`
+- If legacy: checks `org_users.user_right`
+
+**Limitations**:
+- ❌ Checks **role names**, not granular permissions
+- ❌ Duplicated mapping logic frontend/backend
+- ❌ Cache can be stale (requires manual refresh)
+- ❌ Not flexible: access change = Vue code change
+
+### New System (recommended) - `hasPermission()`
+
+**File**: [src/services/permissions.ts](src/services/permissions.ts)
+
+The new service directly calls the backend to check permissions.
+
+```typescript
+import { hasPermission, hasAnyPermission, hasAllPermissions } from '~/services/permissions'
+
+// Simple permission check
+const canUpload = await hasPermission('app.upload_bundle', { appId: 'com.example.app' })
+if (canUpload) {
+  // Show upload button
+}
+
+// Check org permission
+const canInvite = await hasPermission('org.invite_user', { orgId })
+if (canInvite) {
+  // Show invite button
+}
+
+// Check channel permission (backend auto-derives appId and orgId)
+const canPromote = await hasPermission('channel.promote_bundle', { channelId: 123 })
+if (canPromote) {
+  // Allow promotion
+}
+
+// OR logic - at least one permission
+const canAccessBilling = await hasAnyPermission(
+  ['org.read_billing', 'org.update_billing'],
+  { orgId }
+)
+
+// AND logic - all permissions
+const canFullyManageApp = await hasAllPermissions(
+  ['app.update_settings', 'app.delete', 'app.update_user_roles'],
+  { appId }
+)
+```
+
+**Implementation**:
+
+```typescript
+// src/services/permissions.ts
+import { supabase } from '~/services/supabase'
+
+export type Permission = // ... (same type as backend)
+
+export interface PermissionScope {
+  orgId?: string
+  appId?: string
+  channelId?: number
+}
+
+/**
+ * Check if current user has permission
+ * Calls backend RPC (single source of truth)
+ */
+export async function hasPermission(
+  permission: Permission,
+  scope: PermissionScope
+): Promise<boolean> {
+  try {
+    const { data, error } = await supabase.rpc('rbac_check_permission_direct', {
+      p_permission_key: permission,
+      p_user_id: supabase.auth.user()?.id || null,
+      p_org_id: scope.orgId || null,
+      p_app_id: scope.appId || null,
+      p_channel_id: scope.channelId || null,
+      p_apikey: null, // Frontend never uses API keys
+    })
+
+    if (error) {
+      console.error('[hasPermission] RPC error:', error)
+      return false
+    }
+
+    return data === true
+  } catch (err) {
+    console.error('[hasPermission] Exception:', err)
+    return false
+  }
+}
+
+export async function hasAnyPermission(
+  permissions: Permission[],
+  scope: PermissionScope
+): Promise<boolean> {
+  for (const perm of permissions) {
+    if (await hasPermission(perm, scope))
+      return true
+  }
+  return false
+}
+
+export async function hasAllPermissions(
+  permissions: Permission[],
+  scope: PermissionScope
+): Promise<boolean> {
+  for (const perm of permissions) {
+    if (!(await hasPermission(perm, scope)))
+      return false
+  }
+  return true
+}
+
+/**
+ * Batch check for performance (multiple permissions at once)
+ */
+export async function checkPermissionsBatch(
+  checks: Array<{ permission: Permission; scope: PermissionScope }>
+): Promise<Record<Permission, boolean>> {
+  const results: Record<string, boolean> = {}
+
+  // Note: Could be optimized with a batch RPC, but currently sequential.
+  for (const check of checks) {
+    results[check.permission] = await hasPermission(check.permission, check.scope)
+  }
+
+  return results
+}
+```
+
+**Benefits**:
+- ✅ **Single source of truth**: calls the backend directly
+- ✅ **Auto-routing**: legacy/RBAC handled server-side (transparent)
+- ✅ **Type-safe**: strict `Permission` type with autocomplete
+- ✅ **Flexible**: permission changes in DB, no frontend deploy needed
+- ✅ **Always up to date**: no stale cache
+- ✅ **Audit**: all checks logged server-side
+
+**Tradeoffs**:
+- ⚠️ Async (requires `await`)
+- ⚠️ Network overhead (negligible in practice)
+
+### Usage in Vue components
+
+```vue
+<script setup lang="ts">
+import { ref, onMounted } from 'vue'
+import { hasPermission } from '~/services/permissions'
+
+const props = defineProps<{
+  appId: string
+}>()
+
+const canUpload = ref(false)
+const canDeleteApp = ref(false)
+
+onMounted(async () => {
+  canUpload.value = await hasPermission('app.upload_bundle', { appId: props.appId })
+  canDeleteApp.value = await hasPermission('app.delete', { appId: props.appId })
+})
+</script>
+
+<template>
+  <div>
+    <button v-if="canUpload" @click="uploadBundle">
+      Upload Bundle
+    </button>
+
+    <button v-if="canDeleteApp" @click="deleteApp" class="btn-danger">
+      Delete App
+    </button>
+  </div>
+</template>
+```
+
+**Recommended pattern: Computed with cache**:
+
+```vue
+<script setup lang="ts">
+import { ref, computed, watchEffect } from 'vue'
+import { hasPermission } from '~/services/permissions'
+
+const props = defineProps<{ appId: string }>()
+
+// Cache results
+const permissions = ref<Record<string, boolean>>({})
+
+watchEffect(async () => {
+  permissions.value = {
+    canUpload: await hasPermission('app.upload_bundle', { appId: props.appId }),
+    canUpdate: await hasPermission('app.update_settings', { appId: props.appId }),
+    canDelete: await hasPermission('app.delete', { appId: props.appId }),
+  }
+})
+
+const canUpload = computed(() => permissions.value.canUpload)
+const canUpdate = computed(() => permissions.value.canUpdate)
+const canDelete = computed(() => permissions.value.canDelete)
+</script>
+
+<template>
+  <div>
+    <button v-if="canUpload">Upload</button>
+    <button v-if="canUpdate">Update Settings</button>
+    <button v-if="canDelete">Delete</button>
+  </div>
+</template>
+```
+
+### Reusable Composable
+
+```typescript
+// src/composables/usePermissions.ts
+import { ref, watch } from 'vue'
+import { hasPermission, type Permission, type PermissionScope } from '~/services/permissions'
+
+export function usePermissions(
+  permissionsToCheck: Permission[],
+  scope: PermissionScope
+) {
+  const permissions = ref<Record<Permission, boolean>>({})
+  const loading = ref(true)
+
+  async function checkAll() {
+    loading.value = true
+    const results: Record<string, boolean> = {}
+
+    for (const perm of permissionsToCheck) {
+      results[perm] = await hasPermission(perm, scope)
+    }
+
+    permissions.value = results
+    loading.value = false
+  }
+
+  // Re-check when scope changes
+  watch(() => scope, checkAll, { immediate: true, deep: true })
+
+  return {
+    permissions,
+    loading,
+    has: (perm: Permission) => permissions.value[perm] || false,
+    refresh: checkAll,
+  }
+}
+```
+
+**Usage example**:
+
+```vue
+<script setup lang="ts">
+import { usePermissions } from '~/composables/usePermissions'
+
+const props = defineProps<{ appId: string }>()
+
+const { permissions, loading, has } = usePermissions(
+  ['app.upload_bundle', 'app.update_settings', 'app.delete'],
+  { appId: props.appId }
+)
+</script>
+
+<template>
+  <div v-if="!loading">
+    <button v-if="has('app.upload_bundle')">Upload</button>
+    <button v-if="has('app.update_settings')">Settings</button>
+    <button v-if="has('app.delete')">Delete</button>
+  </div>
+  <div v-else>
+    Loading permissions...
+  </div>
+</template>
+```
 
 #### `role_permissions` - Role → Permissions Mapping
 This table defines which permissions are granted to each role.
@@ -1308,306 +1606,6 @@ rbac_check_permission_direct(
 - `org.invite_user` → `min_right='admin'` + scope='org'
 
 ---
-
-## Frontend Integration
-
-### Old System (still used) - `hasPermissionsInRole()`
-
-**File**: [src/stores/organization.ts](src/stores/organization.ts)
-
-The organization store exposes helpers to check roles:
-
-```typescript
-import { useOrganizationStore } from '~/stores/organization'
-
-const orgStore = useOrganizationStore()
-
-// Check if user has one of the required roles
-if (orgStore.hasPermissionsInRole('admin', ['org_admin', 'org_super_admin'], orgId)) {
-  // Show admin UI
-}
-
-// Check at app level
-if (orgStore.hasPermissionsInRole('write', ['app_developer', 'org_admin'], orgId, appId)) {
-  // Allow editing
-}
-```
-
-**Behavior**:
-- If `use_new_rbac` enabled: checks cached `role_bindings`
-- If legacy: checks `org_users.user_right`
-
-**Limitations**:
-- ❌ Checks **role names**, not granular permissions
-- ❌ Duplicated mapping logic frontend/backend
-- ❌ Cache can be stale (requires manual refresh)
-- ❌ Not flexible: access change = Vue code change
-
-### New System (recommended) - `hasPermission()`
-
-**File**: [src/services/permissions.ts](src/services/permissions.ts)
-
-The new service directly calls the backend to check permissions.
-
-```typescript
-import { hasPermission, hasAnyPermission, hasAllPermissions } from '~/services/permissions'
-
-// Simple permission check
-const canUpload = await hasPermission('app.upload_bundle', { appId: 'com.example.app' })
-if (canUpload) {
-  // Show upload button
-}
-
-// Check org permission
-const canInvite = await hasPermission('org.invite_user', { orgId })
-if (canInvite) {
-  // Show invite button
-}
-
-// Check channel permission (backend auto-derives appId and orgId)
-const canPromote = await hasPermission('channel.promote_bundle', { channelId: 123 })
-if (canPromote) {
-  // Allow promotion
-}
-
-// OR logic - at least one permission
-const canAccessBilling = await hasAnyPermission(
-  ['org.read_billing', 'org.update_billing'],
-  { orgId }
-)
-
-// AND logic - all permissions
-const canFullyManageApp = await hasAllPermissions(
-  ['app.update_settings', 'app.delete', 'app.update_user_roles'],
-  { appId }
-)
-```
-
-**Implementation**:
-
-```typescript
-// src/services/permissions.ts
-import { supabase } from '~/services/supabase'
-
-export type Permission = // ... (same type as backend)
-
-export interface PermissionScope {
-  orgId?: string
-  appId?: string
-  channelId?: number
-}
-
-/**
- * Check if current user has permission
- * Calls backend RPC (single source of truth)
- */
-export async function hasPermission(
-  permission: Permission,
-  scope: PermissionScope
-): Promise<boolean> {
-  try {
-    const { data, error } = await supabase.rpc('rbac_check_permission_direct', {
-      p_permission_key: permission,
-      p_user_id: supabase.auth.user()?.id || null,
-      p_org_id: scope.orgId || null,
-      p_app_id: scope.appId || null,
-      p_channel_id: scope.channelId || null,
-      p_apikey: null, // Frontend n'utilise jamais d'API key
-    })
-
-    if (error) {
-      console.error('[hasPermission] RPC error:', error)
-      return false
-    }
-
-    return data === true
-  } catch (err) {
-    console.error('[hasPermission] Exception:', err)
-    return false
-  }
-}
-
-export async function hasAnyPermission(
-  permissions: Permission[],
-  scope: PermissionScope
-): Promise<boolean> {
-  for (const perm of permissions) {
-    if (await hasPermission(perm, scope))
-      return true
-  }
-  return false
-}
-
-export async function hasAllPermissions(
-  permissions: Permission[],
-  scope: PermissionScope
-): Promise<boolean> {
-  for (const perm of permissions) {
-    if (!(await hasPermission(perm, scope)))
-      return false
-  }
-  return true
-}
-
-/**
- * Batch check for performance (multiple permissions at once)
- */
-export async function checkPermissionsBatch(
-  checks: Array<{ permission: Permission; scope: PermissionScope }>
-): Promise<Record<Permission, boolean>> {
-  const results: Record<string, boolean> = {}
-
-  // Note: On pourrait optimiser avec un RPC batch, mais pour l'instant séquentiel
-  for (const check of checks) {
-    results[check.permission] = await hasPermission(check.permission, check.scope)
-  }
-
-  return results
-}
-```
-
-**Avantages** :
-- ✅ **Single source of truth** : appelle le backend directement
-- ✅ **Auto-routing** : legacy/RBAC géré côté serveur (transparent)
-- ✅ **Type-safe** : type `Permission` strict avec autocomplete
-- ✅ **Flexible** : changements de permissions en DB, pas de déploiement frontend
-- ✅ **Toujours à jour** : pas de cache obsolète
-- ✅ **Audit** : tous les checks loggés côté backend
-
-**Inconvénients** :
-- ⚠️ Asynchrone (requiert `await`)
-- ⚠️ Overhead réseau (mais négligeable en pratique)
-
-### Usage dans les composants Vue
-
-```vue
-<script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { hasPermission } from '~/services/permissions'
-
-const props = defineProps<{
-  appId: string
-}>()
-
-const canUpload = ref(false)
-const canDeleteApp = ref(false)
-
-onMounted(async () => {
-  canUpload.value = await hasPermission('app.upload_bundle', { appId: props.appId })
-  canDeleteApp.value = await hasPermission('app.delete', { appId: props.appId })
-})
-</script>
-
-<template>
-  <div>
-    <button v-if="canUpload" @click="uploadBundle">
-      Upload Bundle
-    </button>
-
-    <button v-if="canDeleteApp" @click="deleteApp" class="btn-danger">
-      Delete App
-    </button>
-  </div>
-</template>
-```
-
-**Recommended pattern: Computed with cache**:
-
-```vue
-<script setup lang="ts">
-import { ref, computed, watchEffect } from 'vue'
-import { hasPermission } from '~/services/permissions'
-
-const props = defineProps<{ appId: string }>()
-
-// Cache results
-const permissions = ref<Record<string, boolean>>({})
-
-watchEffect(async () => {
-  permissions.value = {
-    canUpload: await hasPermission('app.upload_bundle', { appId: props.appId }),
-    canUpdate: await hasPermission('app.update_settings', { appId: props.appId }),
-    canDelete: await hasPermission('app.delete', { appId: props.appId }),
-  }
-})
-
-const canUpload = computed(() => permissions.value.canUpload)
-const canUpdate = computed(() => permissions.value.canUpdate)
-const canDelete = computed(() => permissions.value.canDelete)
-</script>
-
-<template>
-  <div>
-    <button v-if="canUpload">Upload</button>
-    <button v-if="canUpdate">Update Settings</button>
-    <button v-if="canDelete">Delete</button>
-  </div>
-</template>
-```
-
-### Reusable Composable
-
-```typescript
-// src/composables/usePermissions.ts
-import { ref, watch } from 'vue'
-import { hasPermission, type Permission, type PermissionScope } from '~/services/permissions'
-
-export function usePermissions(
-  permissionsToCheck: Permission[],
-  scope: PermissionScope
-) {
-  const permissions = ref<Record<Permission, boolean>>({})
-  const loading = ref(true)
-
-  async function checkAll() {
-    loading.value = true
-    const results: Record<string, boolean> = {}
-
-    for (const perm of permissionsToCheck) {
-      results[perm] = await hasPermission(perm, scope)
-    }
-
-    permissions.value = results
-    loading.value = false
-  }
-
-  // Re-check when scope changes
-  watch(() => scope, checkAll, { immediate: true, deep: true })
-
-  return {
-    permissions,
-    loading,
-    has: (perm: Permission) => permissions.value[perm] || false,
-    refresh: checkAll,
-  }
-}
-```
-
-**Usage** :
-
-```vue
-<script setup lang="ts">
-import { usePermissions } from '~/composables/usePermissions'
-
-const props = defineProps<{ appId: string }>()
-
-const { permissions, loading, has } = usePermissions(
-  ['app.upload_bundle', 'app.update_settings', 'app.delete'],
-  { appId: props.appId }
-)
-</script>
-
-<template>
-  <div v-if="!loading">
-    <button v-if="has('app.upload_bundle')">Upload</button>
-    <button v-if="has('app.update_settings')">Settings</button>
-    <button v-if="has('app.delete')">Delete</button>
-  </div>
-  <div v-else>
-    Loading permissions...
-  </div>
-</template>
-```
 
 ## Current Mapping: Roles → Permissions
 
