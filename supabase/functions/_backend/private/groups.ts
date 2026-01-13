@@ -253,7 +253,16 @@ app.delete('/:group_id', async (c: Context<MiddlewareKeyVariables>) => {
       return c.json({ error: 'Forbidden - Admin rights required' }, 403)
     }
 
-    // Supprimer (cascade supprimera group_members et role_bindings)
+    // Supprimer (cascade supprimera group_members, role_bindings nettoyés explicitement)
+    await drizzle
+      .delete(schema.role_bindings)
+      .where(
+        and(
+          eq(schema.role_bindings.principal_type, 'group'),
+          eq(schema.role_bindings.principal_id, groupId),
+        ),
+      )
+
     await drizzle
       .delete(schema.groups)
       .where(eq(schema.groups.id, groupId))
