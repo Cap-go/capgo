@@ -21,7 +21,7 @@ else
 fi
 
 # Select which region to use (change this to switch regions)
-SELECTED_REGION="PLANETSCALE_EU"
+SELECTED_REGION="PLANETSCALE_OC"
 DB_T="${!SELECTED_REGION}"
 
 if [[ -z "$DB_T" ]]; then
@@ -163,8 +163,40 @@ SOURCE_DB_URL="postgresql://${SOURCE_USER}:${SOURCE_PASSWORD}@${SOURCE_HOST}:${S
 
 echo "==> Dropping existing replication slot on source if exists..."
 psql-17 "$SOURCE_DB_URL" -v ON_ERROR_STOP=0 <<SQL
-SELECT pg_drop_replication_slot('${SUBSCRIPTION_NAME}')
-WHERE EXISTS (SELECT 1 FROM pg_replication_slots WHERE slot_name = '${SUBSCRIPTION_NAME}');
+DO \$\$
+DECLARE
+  slot_exists boolean;
+  slot_active boolean;
+BEGIN
+  -- Check if slot exists
+  SELECT EXISTS(SELECT 1 FROM pg_replication_slots WHERE slot_name = '${SUBSCRIPTION_NAME}') INTO slot_exists;
+
+  IF slot_exists THEN
+    -- Check if slot is active (being used by a sync process)
+    SELECT active INTO slot_active FROM pg_replication_slots WHERE slot_name = '${SUBSCRIPTION_NAME}';
+
+    IF slot_active THEN
+      RAISE NOTICE 'Slot ${SUBSCRIPTION_NAME} is active, terminating connections...';
+      -- Terminate any backend using this slot
+      PERFORM pg_terminate_backend(active_pid)
+      FROM pg_replication_slots
+      WHERE slot_name = '${SUBSCRIPTION_NAME}' AND active_pid IS NOT NULL;
+      -- Wait for termination
+      PERFORM pg_sleep(2);
+    END IF;
+
+    -- Now drop the slot
+    BEGIN
+      PERFORM pg_drop_replication_slot('${SUBSCRIPTION_NAME}');
+      RAISE NOTICE 'Dropped replication slot ${SUBSCRIPTION_NAME}';
+    EXCEPTION WHEN OTHERS THEN
+      RAISE NOTICE 'Could not drop slot: %', SQLERRM;
+    END;
+  ELSE
+    RAISE NOTICE 'Replication slot ${SUBSCRIPTION_NAME} does not exist';
+  END IF;
+END
+\$\$;
 SQL
 
 echo "==> Creating subscription on target..."
