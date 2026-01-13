@@ -2427,40 +2427,7 @@ BEGIN
   -- Use rbac_has_permission to check the permission
   RETURN public.rbac_has_permission(
     'user',
-    p_user_id,
-    'app.update_user_roles',
-    v_org_id,
-    v_app_id_varchar,
-    NULL
-  );
-END;
-$$;
-
-COMMENT ON FUNCTION public.user_has_app_update_user_roles(uuid, uuid) IS
-  'Checks whether a user has app.update_user_roles permission (bypasses RLS to avoid recursion).';
-
--- View that joins role_bindings with user and group information
-CREATE OR REPLACE VIEW public.role_bindings_view AS
-SELECT
-  rb.id,
-  rb.principal_type,
-  rb.principal_id,
-  rb.role_id,
-  r.name as role_name,
-  r.description as role_description,
-  rb.scope_type,
-  rb.org_id,
-  rb.app_id,
-  rb.channel_id,
-  rb.granted_at,
-  rb.granted_by,
-  rb.expires_at,
-  rb.reason,
-  rb.is_direct,
-  -- Principal info (user or group)
-  CASE
-    WHEN rb.principal_type = 'user' THEN u.email
-    WHEN rb.principal_type = 'group' THEN g.name
+  WHEN rb.principal_type = 'group' THEN g.name
     ELSE rb.principal_id::text
   END as principal_name,
   -- User email (if principal_type = 'user')
@@ -2472,11 +2439,12 @@ INNER JOIN public.roles r ON rb.role_id = r.id
 LEFT JOIN public.users u ON rb.principal_type = 'user' AND rb.principal_id = u.id
 LEFT JOIN public.groups g ON rb.principal_type = 'group' AND rb.principal_id = g.id;
 
-COMMENT ON VIEW public.role_bindings_view IS
-  'Enriched role_bindings view with emails and names. Accessible to admins with access management permission.';
+END;
+$$;
 
--- Use security_invoker = off so the view bypasses RLS on users and groups
-ALTER VIEW public.role_bindings_view SET (security_invoker = off);
+COMMENT ON FUNCTION public.user_has_app_update_user_roles(uuid, uuid) IS
+  'Checks whether a user has app.update_user_roles permission (bypasses RLS to avoid recursion).';
+
 
 -- Policy SELECT: check admin rights or role in the app
 CREATE POLICY "Allow viewing role bindings with permission"
@@ -2775,28 +2743,6 @@ GRANT EXECUTE ON FUNCTION "public"."get_app_access_rbac"(uuid) TO "authenticated
 COMMENT ON FUNCTION "public"."get_app_access_rbac"(uuid) IS
   'Retrieves all access bindings for an app with permission checks. Requires app.read permission.';
 
--- Function to get user org bindings (replaces role_bindings_view for organization store)
-CREATE OR REPLACE FUNCTION "public"."get_user_org_bindings_rbac"(p_org_id uuid, p_user_id uuid)
-RETURNS TABLE (
-  id uuid,
-  principal_type text,
-  principal_id uuid,
-  role_id uuid,
-  role_name text,
-  role_description text,
-  scope_type text,
-  org_id uuid,
-  app_id uuid,
-  channel_id uuid,
-  granted_at timestamptz,
-  granted_by uuid,
-  expires_at timestamptz,
-  reason text,
-  is_direct boolean,
-  principal_name text,
-  user_email character varying,
-  group_name text
-)
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
@@ -2842,15 +2788,6 @@ BEGIN
   ORDER BY rb.granted_at DESC;
 END;
 $$;
-
-ALTER FUNCTION "public"."get_user_org_bindings_rbac"(uuid, uuid) OWNER TO "postgres";
-GRANT EXECUTE ON FUNCTION "public"."get_user_org_bindings_rbac"(uuid, uuid) TO "authenticated";
-
-COMMENT ON FUNCTION "public"."get_user_org_bindings_rbac"(uuid, uuid) IS
-  'Retrieves all role bindings for a user in an org with permission checks. Users can view their own bindings or org.read permission required.';
-
--- Drop the old view as it's now replaced by secure RPCs
-DROP VIEW IF EXISTS public.role_bindings_view;
 
 -- =============================================================================
 -- rbac_check_permission_direct: Check RBAC permission with automatic legacy fallback
