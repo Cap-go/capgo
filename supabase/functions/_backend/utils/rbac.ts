@@ -57,6 +57,7 @@ export type Permission
   | 'app.read_devices'
   | 'app.build_native'
   | 'app.read_audit'
+  | 'app.update_user_roles'
   // Bundle permissions
   | 'bundle.delete'
   // Channel permissions
@@ -136,6 +137,7 @@ const PERMISSION_TO_LEGACY_RIGHT: Record<Permission, Database['public']['Enums']
   'app.read_devices': 'read',
   'app.build_native': 'write',
   'app.read_audit': 'admin',
+  'app.update_user_roles': 'admin',
   // Bundle permissions
   'bundle.delete': 'admin',
   // Channel permissions
