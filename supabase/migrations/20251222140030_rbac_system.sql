@@ -1470,6 +1470,130 @@ $$;
 COMMENT ON FUNCTION public.get_orgs_v6(uuid) IS 'Get organizations for a user, including use_new_rbac flag for per-org RBAC rollout';
 COMMENT ON FUNCTION public.get_orgs_v6() IS 'Get organizations for authenticated user or API key, including use_new_rbac flag';
 
+-- 16b) RBAC-aware org id list for user or API key
+CREATE OR REPLACE FUNCTION "public"."get_user_org_ids"() RETURNS TABLE (
+  "org_id" "uuid"
+) LANGUAGE "plpgsql"
+SET search_path = '' SECURITY DEFINER AS $$
+DECLARE
+  api_key_text text;
+  api_key record;
+  user_id uuid;
+  limited_orgs uuid[];
+  has_limited_orgs boolean := false;
+BEGIN
+  SELECT "public"."get_apikey_header"() into api_key_text;
+  user_id := NULL;
+
+  -- Check for API key first
+  IF api_key_text IS NOT NULL THEN
+    SELECT * FROM public.apikeys WHERE key=api_key_text into api_key;
+
+    IF api_key IS NULL THEN
+      PERFORM public.pg_log('deny: INVALID_API_KEY', jsonb_build_object('source', 'header'));
+      RAISE EXCEPTION 'Invalid API key provided';
+    END IF;
+
+    user_id := api_key.user_id;
+    limited_orgs := api_key.limited_to_orgs;
+    has_limited_orgs := COALESCE(array_length(limited_orgs, 1), 0) > 0;
+  END IF;
+
+  -- If no valid API key user_id yet, try to get FROM public.identity
+  IF user_id IS NULL THEN
+    SELECT public.get_identity() into user_id;
+
+    IF user_id IS NULL THEN
+      PERFORM public.pg_log('deny: UNAUTHENTICATED', '{}'::jsonb);
+      RAISE EXCEPTION 'No authentication provided - API key or valid session required';
+    END IF;
+  END IF;
+
+  RETURN QUERY
+  WITH role_orgs AS (
+    -- Direct role bindings on org scope
+    SELECT rb.org_id
+    FROM public.role_bindings rb
+    WHERE rb.principal_type = 'user'
+      AND rb.principal_id = user_id
+      AND rb.org_id IS NOT NULL
+      AND (rb.expires_at IS NULL OR rb.expires_at > now())
+    UNION
+    -- Group role bindings on org scope
+    SELECT rb.org_id
+    FROM public.role_bindings rb
+    JOIN public.group_members gm ON gm.group_id = rb.principal_id
+    WHERE rb.principal_type = 'group'
+      AND gm.user_id = user_id
+      AND rb.org_id IS NOT NULL
+      AND (rb.expires_at IS NULL OR rb.expires_at > now())
+    UNION
+    -- App scope bindings (user)
+    SELECT apps.owner_org
+    FROM public.role_bindings rb
+    JOIN public.apps ON apps.id = rb.app_id
+    WHERE rb.principal_type = 'user'
+      AND rb.principal_id = user_id
+      AND rb.app_id IS NOT NULL
+      AND (rb.expires_at IS NULL OR rb.expires_at > now())
+    UNION
+    -- App scope bindings (group)
+    SELECT apps.owner_org
+    FROM public.role_bindings rb
+    JOIN public.apps ON apps.id = rb.app_id
+    JOIN public.group_members gm ON gm.group_id = rb.principal_id
+    WHERE rb.principal_type = 'group'
+      AND gm.user_id = user_id
+      AND rb.app_id IS NOT NULL
+      AND (rb.expires_at IS NULL OR rb.expires_at > now())
+    UNION
+    -- Channel scope bindings (user)
+    SELECT apps.owner_org
+    FROM public.role_bindings rb
+    JOIN public.channels ch ON ch.rbac_id = rb.channel_id
+    JOIN public.apps ON apps.app_id = ch.app_id
+    WHERE rb.principal_type = 'user'
+      AND rb.principal_id = user_id
+      AND rb.channel_id IS NOT NULL
+      AND (rb.expires_at IS NULL OR rb.expires_at > now())
+    UNION
+    -- Channel scope bindings (group)
+    SELECT apps.owner_org
+    FROM public.role_bindings rb
+    JOIN public.channels ch ON ch.rbac_id = rb.channel_id
+    JOIN public.apps ON apps.app_id = ch.app_id
+    JOIN public.group_members gm ON gm.group_id = rb.principal_id
+    WHERE rb.principal_type = 'group'
+      AND gm.user_id = user_id
+      AND rb.channel_id IS NOT NULL
+      AND (rb.expires_at IS NULL OR rb.expires_at > now())
+  ),
+  legacy_orgs AS (
+    SELECT org_users.org_id
+    FROM public.org_users
+    WHERE org_users.user_id = user_id
+  ),
+  all_orgs AS (
+    SELECT org_id FROM legacy_orgs
+    UNION
+    SELECT org_id FROM role_orgs
+  )
+  SELECT org_id
+  FROM all_orgs
+  WHERE org_id IS NOT NULL
+    AND (
+      NOT has_limited_orgs
+      OR org_id = ANY(limited_orgs)
+    );
+END;
+$$;
+
+ALTER FUNCTION "public"."get_user_org_ids"() OWNER TO "postgres";
+GRANT EXECUTE ON FUNCTION "public"."get_user_org_ids"() TO "authenticated";
+
+COMMENT ON FUNCTION public.get_user_org_ids() IS
+  'RBAC/legacy-aware org id list for authenticated user or API key (includes org_users and role_bindings membership).';
+
 -- ============================================================================
 -- RBAC-AWARE is_admin() OVERRIDE
 -- ============================================================================
