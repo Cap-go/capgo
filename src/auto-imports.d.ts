@@ -8,11 +8,7 @@ export { }
 declare global {
   const EffectScope: typeof import('vue').EffectScope
   const WEBHOOK_EVENT_TYPES: typeof import('./stores/webhooks').WEBHOOK_EVENT_TYPES
-  const LEGACY_TO_RBAC_ROLE_MAPPING: typeof import('./stores/organization').LEGACY_TO_RBAC_ROLE_MAPPING
-  const RBAC_ORG_ROLE_DISPLAY_NAMES: typeof import('./stores/organization').RBAC_ORG_ROLE_DISPLAY_NAMES
   const RBAC_ORG_ROLE_I18N_KEYS: typeof import('./stores/organization').RBAC_ORG_ROLE_I18N_KEYS
-  const RBAC_ROLE_HIERARCHY: typeof import('./stores/organization').RBAC_ROLE_HIERARCHY
-  const RBAC_TO_LEGACY_ROLE_MAPPING: typeof import('./stores/organization').RBAC_TO_LEGACY_ROLE_MAPPING
   const asyncComputed: typeof import('@vueuse/core').asyncComputed
   const autoResetRef: typeof import('@vueuse/core').autoResetRef
   const computed: typeof import('vue').computed
@@ -43,7 +39,6 @@ declare global {
   const getCurrentInstance: typeof import('vue').getCurrentInstance
   const getCurrentScope: typeof import('vue').getCurrentScope
   const getCurrentWatcher: typeof import('vue').getCurrentWatcher
-  const getRbacRoleDisplayName: typeof import('./stores/organization').getRbacRoleDisplayName
   const getRbacRoleI18nKey: typeof import('./stores/organization').getRbacRoleI18nKey
   const h: typeof import('vue').h
   const ignorableWatch: typeof import('@vueuse/core').ignorableWatch
@@ -351,8 +346,6 @@ declare module 'vue' {
     readonly EffectScope: UnwrapRef<typeof import('vue')['EffectScope']>
     readonly WEBHOOK_EVENT_TYPES: UnwrapRef<typeof import('./stores/webhooks')['WEBHOOK_EVENT_TYPES']>
     readonly RBAC_ORG_ROLE_I18N_KEYS: UnwrapRef<typeof import('./stores/organization')['RBAC_ORG_ROLE_I18N_KEYS']>
-    readonly RBAC_ROLE_HIERARCHY: UnwrapRef<typeof import('./stores/organization')['RBAC_ROLE_HIERARCHY']>
-    readonly RBAC_TO_LEGACY_ROLE_MAPPING: UnwrapRef<typeof import('./stores/organization')['RBAC_TO_LEGACY_ROLE_MAPPING']>
     readonly asyncComputed: UnwrapRef<typeof import('@vueuse/core')['asyncComputed']>
     readonly autoResetRef: UnwrapRef<typeof import('@vueuse/core')['autoResetRef']>
     readonly computed: UnwrapRef<typeof import('vue')['computed']>
