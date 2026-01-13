@@ -110,7 +110,7 @@ export const users = pgTable('users', {
   last_name: varchar('last_name'),
   country: varchar('country'),
   email: varchar('email').notNull(),
-  id: uuid('id').notNull(),
+  id: uuid('id').primaryKey().notNull(),
   updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow(),
   enable_notifications: boolean('enable_notifications').notNull().default(true),
   opt_for_newsletters: boolean('opt_for_newsletters').notNull().default(true),
