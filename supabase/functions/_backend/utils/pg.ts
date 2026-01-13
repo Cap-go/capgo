@@ -290,7 +290,7 @@ export function getAlias() {
   return { versionAlias, channelDevicesAlias, channelAlias }
 }
 
-function getSchemaUpdatesAlias(includeMetadata = false) {
+function getSchemaUpdatesAlias(includeMetadata = false, oldVersionId?: number | null) {
   const { versionAlias, channelDevicesAlias, channelAlias } = getAlias()
 
   const versionSelect: any = {
@@ -326,7 +326,24 @@ function getSchemaUpdatesAlias(includeMetadata = false) {
     allow_device_self_set: channelAlias.allow_device_self_set,
     public: channelAlias.public,
   }
-  const manifestSelect = sql<{ file_name: string, file_hash: string, s3_path: string }[]>`COALESCE(json_agg(
+  // Delta manifest: when oldVersionId is provided, exclude files that exist identically in old version
+  const manifestSelect = oldVersionId
+    ? sql<{ file_name: string, file_hash: string, s3_path: string }[]>`COALESCE(json_agg(
+        json_build_object(
+          'file_name', ${schema.manifest.file_name},
+          'file_hash', ${schema.manifest.file_hash},
+          's3_path', ${schema.manifest.s3_path}
+        )
+      ) FILTER (
+        WHERE ${schema.manifest.file_name} IS NOT NULL
+        AND NOT EXISTS (
+          SELECT 1 FROM ${schema.manifest} AS old_m
+          WHERE old_m.app_version_id = ${oldVersionId}
+          AND old_m.file_name = ${schema.manifest.file_name}
+          AND old_m.file_hash = ${schema.manifest.file_hash}
+        )
+      ), '[]'::json)`
+    : sql<{ file_name: string, file_hash: string, s3_path: string }[]>`COALESCE(json_agg(
         json_build_object(
           'file_name', ${schema.manifest.file_name},
           'file_hash', ${schema.manifest.file_hash},
@@ -343,8 +360,9 @@ export function requestInfosChannelDevicePostgres(
   drizzleClient: ReturnType<typeof getDrizzleClient>,
   includeManifest: boolean,
   includeMetadata = false,
+  oldVersionId?: number | null,
 ) {
-  const { versionSelect, channelDevicesAlias, channelAlias, channelSelect, manifestSelect, versionAlias } = getSchemaUpdatesAlias(includeMetadata)
+  const { versionSelect, channelDevicesAlias, channelAlias, channelSelect, manifestSelect, versionAlias } = getSchemaUpdatesAlias(includeMetadata, oldVersionId)
   const baseSelect = {
     channel_devices: {
       device_id: channelDevicesAlias.device_id,
@@ -380,8 +398,9 @@ export function requestInfosChannelPostgres(
   drizzleClient: ReturnType<typeof getDrizzleClient>,
   includeManifest: boolean,
   includeMetadata = false,
+  oldVersionId?: number | null,
 ) {
-  const { versionSelect, channelAlias, channelSelect, manifestSelect, versionAlias } = getSchemaUpdatesAlias(includeMetadata)
+  const { versionSelect, channelAlias, channelSelect, manifestSelect, versionAlias } = getSchemaUpdatesAlias(includeMetadata, oldVersionId)
   const platformQuery = platform === 'android' ? channelAlias.android : platform === 'electron' ? channelAlias.electron : channelAlias.ios
   const baseSelect = {
     version: versionSelect,
@@ -427,18 +446,18 @@ export function requestInfosPostgres(
   channelDeviceCount?: number | null,
   manifestBundleCount?: number | null,
   includeMetadata = false,
+  oldVersionId?: number | null,
 ) {
   const shouldQueryChannelOverride = channelDeviceCount === undefined || channelDeviceCount === null ? true : channelDeviceCount > 0
   const shouldFetchManifest = manifestBundleCount === undefined || manifestBundleCount === null ? true : manifestBundleCount > 0
 
   const channelDevice = shouldQueryChannelOverride
-    ? requestInfosChannelDevicePostgres(c, app_id, device_id, drizzleClient, shouldFetchManifest, includeMetadata)
-    : Promise.resolve(undefined)
-        .then(() => {
-          cloudlog({ requestId: c.get('requestId'), message: 'Skipping channel device override query' })
-          return null
-        })
-  const channel = requestInfosChannelPostgres(c, platform, app_id, defaultChannel, drizzleClient, shouldFetchManifest, includeMetadata)
+    ? requestInfosChannelDevicePostgres(c, app_id, device_id, drizzleClient, shouldFetchManifest, includeMetadata, oldVersionId)
+    : Promise.resolve(undefined).then(() => {
+        cloudlog({ requestId: c.get('requestId'), message: 'Skipping channel device override query' })
+        return null
+      })
+  const channel = requestInfosChannelPostgres(c, platform, app_id, defaultChannel, drizzleClient, shouldFetchManifest, includeMetadata, oldVersionId)
 
   return Promise.all([channelDevice, channel])
     .then(([channelOverride, channelData]) => ({ channelData, channelOverride }))
@@ -512,6 +531,35 @@ export async function getAppVersionPostgres(
   }
   catch (e: unknown) {
     logPgError(c, 'getAppVersionPostgres', e)
+    return null
+  }
+}
+
+export async function getVersionIdByName(
+  c: Context,
+  appId: string,
+  versionName: string,
+  drizzleClient: ReturnType<typeof getDrizzleClient>,
+): Promise<number | null> {
+  try {
+    // Return null for internal version names
+    if (!versionName || versionName === 'builtin' || versionName === 'unknown')
+      return null
+
+    const result = await drizzleClient
+      .select({ id: schema.app_versions.id })
+      .from(schema.app_versions)
+      .where(and(
+        eq(schema.app_versions.app_id, appId),
+        eq(schema.app_versions.name, versionName),
+      ))
+      .limit(1)
+      .then(data => data[0])
+
+    return result?.id ?? null
+  }
+  catch (e: unknown) {
+    logPgError(c, 'getVersionIdByName', e)
     return null
   }
 }
