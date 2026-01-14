@@ -1,6 +1,14 @@
 import type { DiscordAPIMessage, DiscordEmbed, DiscordMessage, DiscordThread, EmailAttachment, Env, ParsedEmail } from './types'
+import TurndownService from 'turndown'
 
 const DISCORD_API_BASE = 'https://discord.com/api/v10'
+
+// Initialize Turndown for HTML to Markdown conversion
+const turndownService = new TurndownService({
+  headingStyle: 'atx',
+  bulletListMarker: '-',
+  codeBlockStyle: 'fenced',
+})
 const DISCORD_MAX_FILE_SIZE = 25 * 1024 * 1024 // 25MB - Discord's limit for bots
 
 /**
@@ -351,15 +359,55 @@ function truncateText(text: string, maxLength: number): string {
 }
 
 /**
- * Basic HTML stripping (for simple cases)
+ * Converts HTML to Markdown using Turndown
+ * Discord supports Markdown formatting, so this preserves structure nicely
  */
 function stripHtml(html: string): string {
-  return html
-    .replace(/<style[^>]*>.*?<\/style>/gis, '')
-    .replace(/<script[^>]*>.*?<\/script>/gis, '')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
+  if (!html || html.trim().length === 0) {
+    return ''
+  }
+
+  try {
+    // Use Turndown to convert HTML to Markdown
+    const markdown = turndownService.turndown(html)
+
+    // Clean up whitespace while preserving intentional line breaks
+    return markdown
+      .split('\n')
+      .map(line => line.trimEnd())
+      .join('\n')
+      // Collapse multiple newlines to max two
+      .replace(/\n{3,}/g, '\n\n')
+      .trim()
+  }
+  catch (error) {
+    console.error('Error converting HTML to Markdown:', error)
+    // Fallback: use character-by-character approach to strip all HTML safely
+    return stripTagsSafely(html)
+  }
+}
+
+/**
+ * Strips HTML tags using a character-by-character approach
+ * This avoids regex-based sanitization vulnerabilities
+ */
+function stripTagsSafely(html: string): string {
+  const result: string[] = []
+  let inTag = false
+
+  for (const char of html) {
+    if (char === '<') {
+      inTag = true
+    }
+    else if (char === '>') {
+      inTag = false
+    }
+    else if (!inTag) {
+      result.push(char)
+    }
+  }
+
+  return result.join('').trim()
 }
 
 /**

@@ -287,28 +287,104 @@ function decodeContent(content: string, part: string): string {
   const encodingMatch = part.match(/Content-Transfer-Encoding:\s*([^\r\n]+)/i)
   const encoding = encodingMatch?.[1]?.toLowerCase().trim()
 
+  // Get charset from Content-Type header
+  const charsetMatch = part.match(/charset=["']?([^"';\s\r\n]+)["']?/i)
+  const charset = charsetMatch?.[1]?.toLowerCase() || 'utf-8'
+
   switch (encoding) {
     case 'base64':
       try {
-        return atob(content.replace(/\s/g, ''))
+        return decodeBase64Utf8(content.replace(/\s/g, ''), charset)
       }
       catch {
         return content
       }
     case 'quoted-printable':
-      return decodeQuotedPrintable(content)
+      return decodeQuotedPrintable(content, charset)
     default:
       return content
   }
 }
 
 /**
- * Decodes quoted-printable content
+ * Decodes base64 content to UTF-8 string
+ * atob() only decodes to Latin-1, so we need to handle UTF-8 properly
  */
-function decodeQuotedPrintable(content: string): string {
-  return content
-    .replace(/=\r?\n/g, '') // Soft line breaks
-    .replace(/=([0-9A-F]{2})/gi, (_, hex) => String.fromCharCode(Number.parseInt(hex, 16)))
+function decodeBase64Utf8(base64: string, charset: string = 'utf-8'): string {
+  try {
+    // Decode base64 to binary string
+    const binaryStr = atob(base64)
+
+    // Convert binary string to Uint8Array
+    const bytes = new Uint8Array(binaryStr.length)
+    for (let i = 0; i < binaryStr.length; i++) {
+      bytes[i] = binaryStr.charCodeAt(i)
+    }
+
+    // Decode bytes using TextDecoder with appropriate charset
+    const decoder = new TextDecoder(charset)
+    return decoder.decode(bytes)
+  }
+  catch {
+    // Fallback to simple atob if TextDecoder fails
+    return atob(base64)
+  }
+}
+
+/**
+ * Decodes quoted-printable content with proper UTF-8 support
+ * Quoted-printable encodes each byte separately, so UTF-8 multi-byte
+ * characters appear as multiple =XX sequences (e.g., "é" = =C3=A9)
+ */
+function decodeQuotedPrintable(content: string, charset: string = 'utf-8'): string {
+  // First, remove soft line breaks
+  const cleaned = content.replace(/=\r?\n/g, '')
+
+  // Collect bytes from =XX sequences
+  const bytes: number[] = []
+  let result = ''
+  let i = 0
+
+  while (i < cleaned.length) {
+    if (cleaned[i] === '=' && i + 2 < cleaned.length) {
+      const hex = cleaned.substring(i + 1, i + 3)
+      if (/^[0-9A-Fa-f]{2}$/.test(hex)) {
+        bytes.push(Number.parseInt(hex, 16))
+        i += 3
+        continue
+      }
+    }
+
+    // Flush any accumulated bytes before adding plain text
+    if (bytes.length > 0) {
+      result += decodeBytes(bytes, charset)
+      bytes.length = 0
+    }
+
+    result += cleaned[i]
+    i++
+  }
+
+  // Flush remaining bytes
+  if (bytes.length > 0) {
+    result += decodeBytes(bytes, charset)
+  }
+
+  return result
+}
+
+/**
+ * Decodes a byte array to string using the specified charset
+ */
+function decodeBytes(bytes: number[], charset: string): string {
+  try {
+    const decoder = new TextDecoder(charset)
+    return decoder.decode(new Uint8Array(bytes))
+  }
+  catch {
+    // Fallback: decode each byte as Latin-1
+    return bytes.map(b => String.fromCharCode(b)).join('')
+  }
 }
 
 /**
