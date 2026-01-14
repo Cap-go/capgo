@@ -199,40 +199,46 @@ function stripHtml(html: string): string {
 
   // Remove dangerous elements in a loop to handle nested/malformed tags
   // e.g., <scr<script>ipt> becomes <script> after first pass
+  // Use [^>]* for closing tags to match variants like </script\t\n bar>
   let previousText: string
   do {
     previousText = text
-    // Remove style blocks (allow whitespace in closing tag: </style >)
-    text = text.replace(/<style\b[^>]*>[\s\S]*?<\/style\s*>/gi, '')
-    // Remove script blocks (allow whitespace in closing tag: </script >)
-    text = text.replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, '')
+    // Remove style blocks (closing tag can have any content before >)
+    text = text.replace(/<style\b[^>]*>[\s\S]*?<\/style[^>]*>/gi, '')
+    // Remove script blocks (closing tag can have any content before >)
+    text = text.replace(/<script\b[^>]*>[\s\S]*?<\/script[^>]*>/gi, '')
     // Remove HTML comments (handle malformed: <!-- ... --->)
     text = text.replace(/<!--[\s\S]*?--+>/g, '')
+    // Remove unclosed comments
+    text = text.replace(/<!--[\s\S]*/gi, '')
     // Remove any remaining unclosed script/style tags
     text = text.replace(/<script\b[^>]*>[\s\S]*/gi, '')
     text = text.replace(/<style\b[^>]*>[\s\S]*/gi, '')
+    // Remove orphaned closing tags
+    text = text.replace(/<\/script[^>]*>/gi, '')
+    text = text.replace(/<\/style[^>]*>/gi, '')
   } while (text !== previousText)
 
   // Handle line breaks
   text = text.replace(/<br\s*\/?>/gi, '\n')
 
   // Handle block-level elements with double newlines
-  text = text.replace(/<\/(p|div|h[1-6]|article|section|header|footer|main|aside|nav|blockquote|pre)\s*>/gi, '\n\n')
+  text = text.replace(/<\/(p|div|h[1-6]|article|section|header|footer|main|aside|nav|blockquote|pre)[^>]*>/gi, '\n\n')
   text = text.replace(/<(p|div|h[1-6]|article|section|header|footer|main|aside|nav|blockquote|pre)\b[^>]*>/gi, '')
 
   // Handle list items
   text = text.replace(/<li\b[^>]*>/gi, '\n• ')
-  text = text.replace(/<\/li\s*>/gi, '')
+  text = text.replace(/<\/li[^>]*>/gi, '')
 
   // Handle table rows
   text = text.replace(/<tr\b[^>]*>/gi, '\n')
-  text = text.replace(/<\/tr\s*>/gi, '')
+  text = text.replace(/<\/tr[^>]*>/gi, '')
 
   // Handle table cells with spacing
   text = text.replace(/<td\b[^>]*>/gi, ' ')
-  text = text.replace(/<\/td\s*>/gi, ' | ')
+  text = text.replace(/<\/td[^>]*>/gi, ' | ')
   text = text.replace(/<th\b[^>]*>/gi, ' ')
-  text = text.replace(/<\/th\s*>/gi, ' | ')
+  text = text.replace(/<\/th[^>]*>/gi, ' | ')
 
   // Remove all remaining HTML tags in a loop to handle nested tags
   do {
@@ -240,22 +246,25 @@ function stripHtml(html: string): string {
     text = text.replace(/<[^>]*>/g, '')
   } while (text !== previousText)
 
-  // Decode HTML entities first
+  // Decode HTML entities
   text = decodeHtmlEntities(text)
 
   // After entity decoding, some < or > might have been introduced
   // Run tag removal again to catch any decoded tags
   do {
     previousText = text
-    text = text.replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, '')
-    text = text.replace(/<style\b[^>]*>[\s\S]*?<\/style\s*>/gi, '')
+    text = text.replace(/<script\b[^>]*>[\s\S]*?<\/script[^>]*>/gi, '')
+    text = text.replace(/<\/script[^>]*>/gi, '')
+    text = text.replace(/<style\b[^>]*>[\s\S]*?<\/style[^>]*>/gi, '')
+    text = text.replace(/<\/style[^>]*>/gi, '')
     text = text.replace(/<!--[\s\S]*?--+>/g, '')
+    text = text.replace(/<!--[\s\S]*/gi, '')
     text = text.replace(/<[^>]*>/g, '')
   } while (text !== previousText)
 
-  // Final safety: escape any remaining angle brackets
-  // These are literal < > characters that should be displayed as text
-  text = text.replace(/</g, '\u003C').replace(/>/g, '\u003E')
+  // Final safety: remove any remaining angle brackets entirely
+  // Discord is plain text so these would just be confusing characters
+  text = text.replace(/[<>]/g, '')
 
   // Clean up whitespace while preserving intentional line breaks
   text = text
@@ -314,9 +323,16 @@ function decodeHtmlEntities(text: string): string {
   }
 
   // Replace numeric entities (&#123; or &#x1F600;)
+  // Validate code points to prevent RangeError from invalid values
   result = result
-    .replace(/&#(\d+);/g, (_, code) => String.fromCodePoint(Number.parseInt(code, 10)))
-    .replace(/&#x([0-9a-fA-F]+);/g, (_, code) => String.fromCodePoint(Number.parseInt(code, 16)))
+    .replace(/&#(\d+);/g, (match, code) => {
+      const codePoint = Number.parseInt(code, 10)
+      return codePoint >= 0 && codePoint <= 0x10FFFF ? String.fromCodePoint(codePoint) : match
+    })
+    .replace(/&#x([0-9a-fA-F]+);/g, (match, code) => {
+      const codePoint = Number.parseInt(code, 16)
+      return codePoint >= 0 && codePoint <= 0x10FFFF ? String.fromCodePoint(codePoint) : match
+    })
 
   return result
 }
