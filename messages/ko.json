@@ -1192,7 +1192,7 @@
   "request-payload": "요청 페이로드",
   "requested": "요청된",
   "require-apikey-expiration": "API 키에 만료일 필수 설정",
-  "require-apikey-expiration-description": "활성화하면 이 조직의 모든 API 키에 만료일이 있어야 합니다",
+  "require-apikey-expiration-description": "활성화하면 만료일이 있는 API 키만 이 조직에 접근할 수 있습니다",
   "require-number": "숫자 필수",
   "require-special-character": "특수문자 필수",
   "require-uppercase": "대문자 필수",

@@ -1192,7 +1192,7 @@
   "request-payload": "Contenu de la requête",
   "requested": "demandé",
   "require-apikey-expiration": "Exiger que les clés API aient une date d'expiration",
-  "require-apikey-expiration-description": "Lorsqu'activé, toutes les clés API de cette organisation doivent avoir une date d'expiration",
+  "require-apikey-expiration-description": "Lorsqu'activé, seules les clés API avec une date d'expiration peuvent accéder à cette organisation",
   "require-number": "Exiger un chiffre",
   "require-special-character": "Exiger un caractère spécial",
   "require-uppercase": "Exiger une majuscule",

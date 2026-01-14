@@ -1192,7 +1192,7 @@
   "request-payload": "अनुरोध पेलोड",
   "requested": "अनुरोध किया",
   "require-apikey-expiration": "API कुंजियों के लिए समाप्ति तिथि अनिवार्य करें",
-  "require-apikey-expiration-description": "जब सक्षम होता है, इस संगठन के सभी API कुंजियों में समाप्ति तिथि होनी चाहिए",
+  "require-apikey-expiration-description": "जब सक्षम होता है, केवल समाप्ति तिथि वाली API कुंजियां ही इस संगठन तक पहुंच सकती हैं",
   "require-number": "अंक आवश्यक",
   "require-special-character": "विशेष अक्षर आवश्यक",
   "require-uppercase": "बड़ा अक्षर आवश्यक",

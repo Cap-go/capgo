@@ -1192,7 +1192,7 @@
   "request-payload": "Anforderungslast",
   "requested": "angefordert",
   "require-apikey-expiration": "API-Schlüssel müssen ein Ablaufdatum haben",
-  "require-apikey-expiration-description": "Wenn aktiviert, müssen alle API-Schlüssel für diese Organisation ein Ablaufdatum haben",
+  "require-apikey-expiration-description": "Wenn aktiviert, können nur API-Schlüssel mit Ablaufdatum auf diese Organisation zugreifen",
   "require-number": "Benötige Nummer",
   "require-special-character": "Benötigen Sie ein Sonderzeichen",
   "require-uppercase": "Benötigen Großbuchstaben",
