@@ -1,6 +1,6 @@
 import type { EmailAttachment, Env, ParsedEmail } from './types'
 
-export type EmailCategory = 'support' | 'sales' | 'query' | 'spam' | 'other'
+export type EmailCategory = 'support' | 'sales' | 'query' | 'spam' | 'other' | 'backlink'
 
 export interface ClassificationResult {
   category: EmailCategory
@@ -107,13 +107,24 @@ Classify the following email into one of these categories:
 1. **support** - Customer needs help with a problem, bug report, technical issue, or account issue related to Capgo's mobile app update platform
 2. **sales** - Inquiry about pricing, purchasing, features, demos, or becoming a Capgo customer
 3. **query** - General question, information request, or feedback about Capgo's services
-4. **spam** - Spam, marketing emails, phishing attempts, suspicious links, promotional content, or unsolicited bulk email
-5. **other** - Automated messages (auto-replies, bounce messages), unsubscribe requests, or emails completely unrelated to Capgo's mobile app platform (e.g., industrial equipment, physical products, unrelated services)
+4. **backlink** - Requests for backlinks, guest posts, blog article collaborations, link exchanges, SEO partnerships, content placement, sponsored posts, or any link-building related requests
+5. **spam** - Spam, marketing emails, phishing attempts, suspicious links, promotional content, or unsolicited bulk email
+6. **other** - Automated messages (auto-replies, bounce messages), unsubscribe requests, or emails completely unrelated to Capgo's mobile app platform (e.g., industrial equipment, physical products, unrelated services)
 
 **IMPORTANT**:
+- If the email mentions backlinks, guest posts, blog articles, link exchange, SEO collaboration, content placement, or sponsored posts, classify as "backlink"
 - If the email is completely unrelated to mobile apps, software development, or Capgo's services (e.g., requests for physical products, industrial equipment, unrelated business services), classify as "spam"
 - If there are any indicators of spam, phishing, or unsolicited marketing, classify as "spam"
 - These emails should NOT be processed
+
+Backlink request indicators include:
+- Mentions of "backlink", "guest post", "guest article", "link exchange"
+- Offers to write blog posts or articles for your website
+- Requests to place links in existing content
+- SEO collaboration or partnership proposals
+- Sponsored post or content placement requests
+- Mentions of Domain Authority (DA), Domain Rating (DR), or PageRank
+- Offers of "dofollow" links
 
 Spam indicators include:
 - Suspicious links or attachments
@@ -138,7 +149,7 @@ ${bodyPreview}
 
 Respond in the following JSON format only (no other text):
 {
-  "category": "support|sales|query|spam|other",
+  "category": "support|sales|query|backlink|spam|other",
   "confidence": 0.0-1.0,
   "reason": "brief explanation"
 }
@@ -147,6 +158,9 @@ Examples:
 - "My app is crashing" → support
 - "How much does the enterprise plan cost?" → sales
 - "What features do you support?" → query
+- "I'd like to write a guest post for your blog" → backlink
+- "We offer high DA backlinks for your website" → backlink
+- "Can we exchange links between our sites?" → backlink
 - "URGENT: Click here to claim your prize!" → spam
 - "Unsubscribe me" → other
 - "[AUTO-REPLY] Out of office" → other
@@ -170,8 +184,8 @@ function parseClassificationResponse(response: string): ClassificationResult {
     const category = parsed.category as EmailCategory
     const confidence = Number(parsed.confidence) || 0
 
-    // Only process support, sales, and query emails (NOT spam or other)
-    const shouldProcess = ['support', 'sales', 'query'].includes(category)
+    // Only process support, sales, query, and backlink emails (NOT spam or other)
+    const shouldProcess = ['support', 'sales', 'query', 'backlink'].includes(category)
 
     return {
       category,
@@ -284,6 +298,34 @@ export function classifyEmailHeuristic(email: ParsedEmail): ClassificationResult
       confidence: 0.95,
       shouldProcess: false,
       reason: 'Unsubscribe request detected',
+    }
+  }
+
+  // Check for backlink/guest post patterns
+  const backlinkPatterns = [
+    /backlink/i,
+    /guest\s*post/i,
+    /guest\s*article/i,
+    /link\s*exchange/i,
+    /link\s*building/i,
+    /seo\s*collaboration/i,
+    /sponsored\s*post/i,
+    /content\s*placement/i,
+    /domain\s*authority/i,
+    /dofollow/i,
+    /write\s*(a|an)?\s*article\s*for\s*(your|the)\s*(blog|site|website)/i,
+    /publish\s*(a|an)?\s*article/i,
+    /contribute\s*to\s*your\s*blog/i,
+  ]
+
+  for (const pattern of backlinkPatterns) {
+    if (pattern.test(combined)) {
+      return {
+        category: 'backlink',
+        confidence: 0.9,
+        shouldProcess: true,
+        reason: 'Backlink/guest post request detected',
+      }
     }
   }
 
@@ -706,5 +748,191 @@ function classifyAttachmentHeuristic(attachment: EmailAttachment): AttachmentCla
     attachment,
     isUseful: true,
     reason: 'Unknown content type, keeping by default',
+  }
+}
+
+export interface BacklinkAutoReply {
+  subject: string
+  text: string
+  html: string
+}
+
+/**
+ * Generates an AI-powered auto-reply for backlink/guest post requests
+ * The reply explains our backlink policy and asks for relevance proof
+ */
+export async function generateBacklinkAutoReply(
+  env: Env,
+  email: ParsedEmail,
+): Promise<BacklinkAutoReply> {
+  console.log('🤖 generateBacklinkAutoReply: Generating AI auto-reply for backlink request...')
+
+  try {
+    const prompt = buildBacklinkReplyPrompt(email)
+    console.log(`   Prompt length: ${prompt.length} characters`)
+
+    console.log('🌐 Calling Anthropic API for backlink auto-reply...')
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': env.ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-3-5-haiku-latest',
+        max_tokens: 1000,
+        messages: [
+          {
+            role: 'user',
+            content: prompt,
+          },
+        ],
+      }),
+    })
+
+    console.log(`📡 Anthropic API response status: ${response.status}`)
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('❌ Claude API error:', response.status, errorText)
+      return getDefaultBacklinkReply(email)
+    }
+
+    const data = await response.json() as any
+    const content = data.content[0].text
+    console.log(`✅ Claude response received`)
+
+    // Parse the AI response
+    return parseBacklinkReplyResponse(content, email)
+  }
+  catch (error) {
+    console.error('Error generating backlink auto-reply:', error)
+    return getDefaultBacklinkReply(email)
+  }
+}
+
+/**
+ * Builds the prompt for generating backlink auto-reply
+ */
+function buildBacklinkReplyPrompt(email: ParsedEmail): string {
+  const bodyPreview = truncateText(email.body.text || email.body.html || '', 1500)
+  const senderName = email.from.name || email.from.email.split('@')[0]
+
+  return `You are responding on behalf of Capgo (https://capgo.app), a live update platform for mobile apps.
+
+Someone has sent an email requesting a backlink, guest post, or link exchange opportunity. Write a professional and friendly response that:
+
+1. Thanks them for reaching out
+2. Explains our backlink/collaboration policy:
+   - For FREE backlinks/guest posts: We only do it if they can provide a backlink to one of our blog articles in return (reciprocal link exchange)
+   - For PAID link placements: We only accept if the website is relevant to our niche (mobile app development, Capacitor, React Native, mobile DevOps, app deployment, etc.)
+3. Ask them to prove their relevance to our niche by providing:
+   - Their website URL
+   - Examples of their existing content related to mobile development
+   - Their website traffic/audience demographics
+   - The specific page where they would place our backlink (for exchanges)
+4. Keep it polite but make it clear we're selective about partnerships
+5. Sign off professionally
+
+ORIGINAL EMAIL:
+From: ${senderName} <${email.from.email}>
+Subject: ${email.subject}
+Body:
+${bodyPreview}
+
+Respond in JSON format:
+{
+  "subject": "Re: [original subject]",
+  "text": "Plain text version of the reply",
+  "html": "HTML formatted version (use <p>, <ul>, <li> tags for structure)"
+}
+
+Make the response personal and reference specifics from their email when possible. Keep it concise but thorough (200-300 words).`
+}
+
+/**
+ * Parses the AI response for backlink auto-reply
+ */
+function parseBacklinkReplyResponse(response: string, email: ParsedEmail): BacklinkAutoReply {
+  try {
+    const jsonMatch = response.match(/\{[\s\S]*\}/)
+    if (!jsonMatch) {
+      throw new Error('No JSON found in response')
+    }
+
+    const parsed = JSON.parse(jsonMatch[0])
+    return {
+      subject: parsed.subject || `Re: ${email.subject}`,
+      text: parsed.text || getDefaultBacklinkReply(email).text,
+      html: parsed.html || getDefaultBacklinkReply(email).html,
+    }
+  }
+  catch (error) {
+    console.error('Error parsing backlink reply response:', error)
+    return getDefaultBacklinkReply(email)
+  }
+}
+
+/**
+ * Returns a default backlink reply when AI fails
+ */
+function getDefaultBacklinkReply(email: ParsedEmail): BacklinkAutoReply {
+  const senderName = email.from.name || email.from.email.split('@')[0]
+
+  const text = `Hi ${senderName},
+
+Thank you for reaching out about a potential collaboration with Capgo.
+
+We receive many backlink and guest post requests, and we have a specific policy for handling them:
+
+**For Free Backlink Exchanges:**
+We're happy to exchange backlinks, but only on a reciprocal basis. If you'd like us to include a link to your content, we ask that you also include a backlink to one of our blog articles on your site.
+
+**For Paid Link Placements:**
+We only accept paid placements from websites that are relevant to our niche (mobile app development, Capacitor, React Native, app deployment, mobile DevOps, etc.).
+
+To move forward, please provide:
+1. Your website URL
+2. Examples of existing content related to mobile development
+3. Your website traffic and audience demographics
+4. The specific page where you would place our backlink (for exchanges)
+
+Once we have this information, we can evaluate if there's a good fit for collaboration.
+
+Best regards,
+The Capgo Team
+https://capgo.app`
+
+  const html = `<p>Hi ${senderName},</p>
+
+<p>Thank you for reaching out about a potential collaboration with Capgo.</p>
+
+<p>We receive many backlink and guest post requests, and we have a specific policy for handling them:</p>
+
+<p><strong>For Free Backlink Exchanges:</strong><br>
+We're happy to exchange backlinks, but only on a reciprocal basis. If you'd like us to include a link to your content, we ask that you also include a backlink to one of our blog articles on your site.</p>
+
+<p><strong>For Paid Link Placements:</strong><br>
+We only accept paid placements from websites that are relevant to our niche (mobile app development, Capacitor, React Native, app deployment, mobile DevOps, etc.).</p>
+
+<p>To move forward, please provide:</p>
+<ul>
+  <li>Your website URL</li>
+  <li>Examples of existing content related to mobile development</li>
+  <li>Your website traffic and audience demographics</li>
+  <li>The specific page where you would place our backlink (for exchanges)</li>
+</ul>
+
+<p>Once we have this information, we can evaluate if there's a good fit for collaboration.</p>
+
+<p>Best regards,<br>
+The Capgo Team<br>
+<a href="https://capgo.app">https://capgo.app</a></p>`
+
+  return {
+    subject: `Re: ${email.subject}`,
+    text,
+    html,
   }
 }
