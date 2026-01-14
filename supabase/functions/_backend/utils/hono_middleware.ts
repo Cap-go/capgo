@@ -378,13 +378,7 @@ async function resolveSubkey(
   }
   finally {
     if (subkeyPgClient) {
-      subkeyPgClient.end().catch((err) => {
-        cloudlog({
-          requestId: c.get('requestId'),
-          message: 'middlewareKey - Subkey PG connection close error',
-          error: err instanceof Error ? err.message : String(err),
-        })
-      })
+      await closeClient(c, subkeyPgClient)
     }
   }
 }
