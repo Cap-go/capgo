@@ -186,6 +186,34 @@ CREATE TABLE public.role_permissions (
 - A role can have multiple permissions
 - A permission can belong to multiple roles
 
+**Examples**:
+
+**Example for `org_admin`**:
+- `org.read`, `org.update_settings`, `org.read_members`, `org.invite_user`
+- All `app.*` permissions (read, update_settings, delete, upload_bundle, update_user_roles, etc.)
+- All `channel.*` permissions (read, update_settings, delete, promote_bundle, etc.)
+- All `bundle.*` permissions (delete)
+
+**Example for `app_developer`**:
+- `app.read`, `app.update_settings`, `app.upload_bundle`, `app.create_channel`
+- `channel.read`, `channel.update_settings`, `channel.promote_bundle`
+- `bundle.delete`
+
+**Example for `app_uploader`**:
+- `app.read`, `app.read_bundles`, `app.upload_bundle`, `app.read_channels`, `app.read_logs`, `app.read_devices`, `app.read_audit`
+
+**Example for `org_member`**:
+- `org.read`, `org.read_members`
+- `app.read`, `app.list_bundles`, `app.list_channels`, `app.read_logs`, `app.read_devices`, `app.read_audit`
+- `bundle.read`
+- `channel.read`, `channel.read_history`, `channel.read_forced_devices`, `channel.read_audit`
+
+**Example for `bundle_admin`**:
+- `bundle.read`, `bundle.update`, `bundle.delete`
+
+**Example for `bundle_reader`**:
+- `bundle.read`
+
 ### 4. `role_bindings` - Role Assignment
 
 Assigns roles to principals in specific scopes.
@@ -1146,57 +1174,7 @@ export async function checkPermissionsBatch(
 ---
 
 ## Frontend Integration
-- `org.update_settings` - Update org settings
-- `org.invite_user` - Invite members
-- `org.update_user_roles` - Manage member roles
-- `org.read_billing` - View billing info
-- `org.update_billing` - Update billing
-- `org.read_invoices` - View invoices
-- `org.read_audit` - View audit logs
-- `org.read_billing_audit` - View billing audit logs
-
-**App permissions** (scope: 'app')
-- `app.read` - View app details
-- `app.update_settings` - Update app settings
-- `app.delete` - Delete app
-- `app.read_bundles` - View bundles
-- `app.list_bundles` - List bundles
-- `app.upload_bundle` - Upload bundles
-- `app.create_channel` - Create channels
-- `app.read_channels` - View channels
-- `app.list_channels` - List channels
-- `app.read_logs` - View logs
-- `app.manage_devices` - Manage devices
-- `app.read_devices` - View devices
-- `app.build_native` - Build native versions
-- `app.read_audit` - View app audit logs
-- `app.update_user_roles` - Manage app user roles
-
-**Bundle permissions** (scope: 'bundle')
-- `bundle.read` - Read bundle metadata
-- `bundle.update` - Update bundle
-- `bundle.delete` - Delete bundle
-
-**Channel permissions** (scope: 'channel')
-- `channel.read` - View channel
-- `channel.update_settings` - Update channel settings
-- `channel.delete` - Delete channel
-- `channel.read_history` - View deployment history
-- `channel.promote_bundle` - Promote bundle
-- `channel.rollback_bundle` - Roll back bundle
-- `channel.manage_forced_devices` - Manage forced devices
-- `channel.read_forced_devices` - View forced devices
-- `channel.read_audit` - View channel audit logs
-
-**Platform permissions** (scope: 'platform' - internal use only)
-- `platform.impersonate_user` - Impersonate a user
-- `platform.manage_orgs_any` - Manage any org
-- `platform.manage_apps_any` - Manage any app
-- `platform.manage_channels_any` - Manage any channel
-- `platform.run_maintenance_jobs` - Run maintenance jobs
-- `platform.delete_orphan_users` - Delete orphan users
-- `platform.read_all_audit` - View all audit logs
-- `platform.db_break_glass` - Break-glass DB access
+Use the canonical permissions tables in the [Available Permissions](#available-permissions) section when wiring frontend checks, so new org/app/bundle/channel/platform permissions stay consistent across the UI.
 
 ### Old System (still used) - `hasPermissionsInRole()`
 
@@ -1502,118 +1480,11 @@ const { permissions, loading, has } = usePermissions(
 </template>
 ```
 
-#### `role_permissions` - Role → Permissions Mapping
-This table defines which permissions are granted to each role.
-
-**Example for `org_admin`**:
-- `org.read`, `org.update_settings`, `org.read_members`, `org.invite_user`
-- All `app.*` permissions (read, update_settings, delete, upload_bundle, update_user_roles, etc.)
-- All `channel.*` permissions (read, update_settings, delete, promote_bundle, etc.)
-- All `bundle.*` permissions (delete)
-
-**Example for `app_developer`**:
-- `app.read`, `app.update_settings`, `app.upload_bundle`, `app.create_channel`
-- `channel.read`, `channel.update_settings`, `channel.promote_bundle`
-- `bundle.delete`
-
-**Example for `app_uploader`**:
-- `app.read`, `app.read_bundles`, `app.upload_bundle`, `app.read_channels`, `app.read_logs`, `app.read_devices`, `app.read_audit`
-
-**Example for `org_member`**:
-- `org.read`, `org.read_members`
-- `app.read`, `app.list_bundles`, `app.list_channels`, `app.read_logs`, `app.read_devices`, `app.read_audit`
-- `bundle.read`
-- `channel.read`, `channel.read_history`, `channel.read_forced_devices`, `channel.read_audit`
-
-**Example for `bundle_admin`**:
-- `bundle.read`, `bundle.update`, `bundle.delete`
-
-**Example for `bundle_reader`**:
-- `bundle.read`
-
-#### `role_bindings` - Role Assignment to Users
-```sql
-CREATE TABLE role_bindings (
-  id uuid PRIMARY KEY,
-  principal_type text NOT NULL,  -- 'user' or 'group' or 'apikey'
-  principal_id uuid NOT NULL,    -- user.id or group.id or apikey.rbac_id
-  role_id uuid NOT NULL REFERENCES roles(id),
-  org_id uuid REFERENCES orgs(id),
-  app_id varchar REFERENCES apps(app_id),
-  channel_id bigint REFERENCES channels(id)
-);
-```
-
-**Examples**:
-- User `uuid-123` has the `org_admin` role in org `org-abc`
-- User `uuid-123` has the `app_developer` role on app `com.example.app`
-- API key `key-789` has the `app_uploader` role on app `com.example.app`
-
-#### `role_hierarchy` - Role Inheritance
-Defines that a role can inherit permissions from other roles:
-- `org_super_admin` inherits from all roles (org_admin, org_billing_admin, org_member, all app_*)
-- `org_admin` inherits from all app_* roles and org_member
-- `app_admin` inherits from app_developer, app_uploader, app_reader
-
-#### `groups` and `group_members` - User Groups
-Allows assigning roles to a group instead of individual users.
-
-### 2. SQL Functions
-
-#### `rbac_has_permission()` - Permission Resolution
-**Main function** that checks if a principal (user/apikey) has a given permission:
-
-```sql
-rbac_has_permission(
-  p_principal_type text,    -- 'user' or 'apikey'
-  p_principal_id uuid,      -- user.id or apikey.rbac_id
-  p_permission_key text,    -- 'app.upload_bundle'
-  p_org_id uuid,
-  p_app_id varchar,
-  p_channel_id bigint
-) RETURNS boolean
-```
-
-**Algorithm**:
-1. **Collects role_bindings** of the principal in the requested scope
-2. **Expands the hierarchy**: adds inherited roles via `role_hierarchy`
-3. **Collects permissions** via `role_permissions` for all roles
-4. **Checks scope**: an `app.*` permission given at org level applies to all apps in that org
-5. Returns `true` if the permission is found, `false` otherwise
-
-**Scope awareness examples**:
-- User has `org_admin` in org `A` → can perform all `app.*` actions on apps in org `A`
-- User has `app_developer` on app `X` → can perform `app.upload_bundle` only on app `X`
-- User has `app_uploader` in org `A` → can upload to all apps in org `A` (if binding is at org level)
-
-#### `rbac_check_permission_direct()` - Unified Entry Point
-**Convenient wrapper** that automatically detects whether to use RBAC or legacy:
-
-```sql
-rbac_check_permission_direct(
-  p_permission_key text,
-  p_user_id uuid,
-  p_org_id uuid,
-  p_app_id varchar,
-  p_channel_id bigint,
-  p_apikey text DEFAULT NULL
-) RETURNS boolean
-```
-
-**Logic**:
-1. Derives `org_id` from `app_id` or `channel_id` if missing
-2. Checks the org's `use_new_rbac` flag (via `rbac_is_enabled_for_org()`)
-3. **If RBAC enabled**: calls `rbac_has_permission()` directly
-4. **If legacy**: maps the permission to a `min_right` (via `rbac_permission_for_legacy()`) and calls `check_min_rights_legacy()`
-
-**Legacy mapping examples**:
-- `app.upload_bundle` → `min_right='upload'` + scope='app'
-- `app.update_settings` → `min_right='write'` + scope='app'
-- `org.invite_user` → `min_right='admin'` + scope='org'
-
 ---
 
-## Current Mapping: Roles → Permissions
+## Debugging and Troubleshooting
+
+### Current Mapping: Roles → Permissions
 
 To facilitate migration, here's the mapping between current role checks and equivalent permissions:
 
@@ -1642,10 +1513,6 @@ To facilitate migration, here's the mapping between current role checks and equi
 | Current check | Equivalent permission | Notes |
 |-------------|----------------------|-------|
 | `hasPermissionsInRole('admin', ['org_admin', 'org_super_admin'])` | `hasPermission('bundle.delete')` | Delete bundle |
-
----
-
-## Debugging and Troubleshooting
 
 ### Common SQL Checks
 
