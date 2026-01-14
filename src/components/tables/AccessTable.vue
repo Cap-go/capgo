@@ -145,9 +145,17 @@ async function showRoleModal(element: Element): Promise<string | undefined> {
 }
 
 async function changeUserRole(element: Element) {
+  if (!canUpdateUserRoles.value)
+    return
+
   const newRoleName = await showRoleModal(element)
 
   if (!newRoleName || newRoleName === element.role_name) {
+    return
+  }
+
+  const isValidRole = appRoleOptions.value.some((option) => option.value === newRoleName)
+  if (!isValidRole) {
     return
   }
 
