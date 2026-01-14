@@ -91,6 +91,7 @@ async function updateOrg(
     .update(updateFields)
     .eq('id', orgId)
     .select()
+    .single()
 
   if (error) {
     throw simpleError('cannot_update_org', 'Cannot update org', { error: error.message })
