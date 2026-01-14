@@ -152,7 +152,7 @@ async function changeUserRole(element: Element) {
   try {
     // Récupérer l'UUID du nouveau rôle depuis la table roles
     const { data: roleData, error: roleError } = await supabase
-      .from('roles' as any)
+      .from('roles')
       .select('id')
       .eq('name', newRoleName)
       .single()
@@ -164,7 +164,7 @@ async function changeUserRole(element: Element) {
 
     // Mettre à jour le role_id existant
     const { error: updateError } = await supabase
-      .from('role_bindings' as any)
+      .from('role_bindings')
       .update({
         role_id: roleData.id,
       })
@@ -209,7 +209,7 @@ async function deleteElement(element: Element) {
   try {
     // Suppression directe via RLS
     const { error } = await supabase
-      .from('role_bindings' as any)
+      .from('role_bindings')
       .delete()
       .eq('id', element.id)
 
