@@ -184,26 +184,23 @@ async function changeUserRole(element: Element) {
 }
 
 async function deleteElement(element: Element) {
-  const shouldDelete = await new Promise<boolean>((resolve) => {
-    dialogStore.openDialog({
-      title: t('remove-role'),
-      description: t('remove-role-confirm'),
-      buttons: [
-        {
-          text: t('button-cancel'),
-          role: 'cancel',
-          handler: () => resolve(false),
-        },
-        {
-          text: t('remove'),
-          role: 'danger',
-          handler: () => resolve(true),
-        },
-      ],
-    })
+  dialogStore.openDialog({
+    title: t('remove-role'),
+    description: t('remove-role-confirm'),
+    buttons: [
+      {
+        text: t('button-cancel'),
+        role: 'cancel',
+      },
+      {
+        text: t('remove'),
+        role: 'danger',
+      },
+    ],
   })
 
-  if (!shouldDelete)
+  const wasCanceled = await dialogStore.onDialogDismiss()
+  if (wasCanceled || dialogStore.lastButtonRole !== 'danger')
     return
 
   isLoading.value = true
