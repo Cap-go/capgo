@@ -172,34 +172,70 @@ async function fetchAppRoleBindings() {
     const appBindings = data.filter((b: RoleBinding) =>
       b.scope_type === 'app' && b.app_id === props.appId)
 
-    // Enrich bindings with principal names
-    const enrichedBindings = await Promise.all(
-      appBindings.map(async (binding: RoleBinding) => {
-        let principal_email = ''
-        let group_name = ''
+    const userIds = new Set<string>()
+    const groupIds = new Set<string>()
 
-        if (binding.principal_type === 'user') {
-          const { data: userData } = await supabase
-            .from('users')
-            .select('email')
-            .eq('id', binding.principal_id)
-            .single()
-          principal_email = userData?.email || binding.principal_id
-        }
-        else if (binding.principal_type === 'group') {
-          const { data: groupData } = await supabase.functions.invoke(`private/groups/${binding.principal_id}`, {
-            method: 'GET',
-          })
-          group_name = groupData?.name || binding.principal_id
-        }
+    for (const binding of appBindings) {
+      if (binding.principal_type === 'user') {
+        userIds.add(binding.principal_id)
+      }
+      else if (binding.principal_type === 'group') {
+        groupIds.add(binding.principal_id)
+      }
+    }
 
-        return {
-          ...binding,
-          principal_email,
-          group_name,
-        }
-      }),
-    )
+    type UserEmailRow = { id: string, email: string | null }
+    type GroupNameRow = { id: string, name: string | null }
+
+    const usersPromise = userIds.size
+      ? supabase
+          .from('users')
+          .select('id, email')
+          .in('id', Array.from(userIds))
+      : Promise.resolve({ data: [] as UserEmailRow[], error: null })
+
+    const groupsPromise = groupIds.size
+      ? supabase
+          .from('groups')
+          .select('id, name')
+          .in('id', Array.from(groupIds))
+      : Promise.resolve({ data: [] as GroupNameRow[], error: null })
+
+    const [usersResult, groupsResult] = await Promise.all([usersPromise, groupsPromise])
+
+    if (usersResult.error) {
+      console.error('Error fetching users for role bindings:', usersResult.error)
+    }
+
+    if (groupsResult.error) {
+      console.error('Error fetching groups for role bindings:', groupsResult.error)
+    }
+
+    const userEmailById = new Map<string, string>()
+    for (const user of usersResult.data ?? []) {
+      userEmailById.set(user.id, user.email || user.id)
+    }
+
+    const groupNameById = new Map<string, string>()
+    for (const group of groupsResult.data ?? []) {
+      groupNameById.set(group.id, group.name || group.id)
+    }
+
+    const enrichedBindings = appBindings.map((binding: RoleBinding) => {
+      const principal_email = binding.principal_type === 'user'
+        ? userEmailById.get(binding.principal_id) || binding.principal_id
+        : ''
+
+      const group_name = binding.principal_type === 'group'
+        ? groupNameById.get(binding.principal_id) || binding.principal_id
+        : ''
+
+      return {
+        ...binding,
+        principal_email,
+        group_name,
+      }
+    })
 
     roleBindings.value = enrichedBindings
   }
@@ -358,7 +394,7 @@ async function removeRoleBinding(bindingId: string) {
   }
 }
 
-watch(() => props.appId, async () => {
+async function loadAppAccess() {
   await fetchAppDetails()
   await checkRbacEnabled()
   if (useNewRbac.value) {
@@ -369,19 +405,14 @@ watch(() => props.appId, async () => {
       fetchAvailableGroups(),
     ])
   }
+}
+
+watch(() => props.appId, async () => {
+  await loadAppAccess()
 })
 
 onMounted(async () => {
-  await fetchAppDetails()
-  await checkRbacEnabled()
-  if (useNewRbac.value) {
-    await Promise.all([
-      fetchAppRoleBindings(),
-      fetchAvailableAppRoles(),
-      fetchAvailableMembers(),
-      fetchAvailableGroups(),
-    ])
-  }
+  await loadAppAccess()
 })
 </script>
 
