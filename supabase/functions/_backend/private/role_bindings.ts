@@ -1,11 +1,12 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { and, eq } from 'drizzle-orm'
-import { Hono } from 'hono/tiny'
-import { middlewareAuth, useCors } from '../utils/hono.ts'
-import { getDrizzleClient } from '../utils/pg.ts'
+import { createHono, middlewareAuth, useCors } from '../utils/hono.ts'
+import { cloudlog, cloudlogErr } from '../utils/logging.ts'
+import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import { checkPermission } from '../utils/rbac.ts'
 import { schema } from '../utils/postgres_schema.ts'
+import { version } from '../utils/version.ts'
 
 const PRINCIPAL_TYPES = ['user', 'group', 'apikey'] as const
 const SCOPE_TYPES = ['platform', 'org', 'app', 'channel'] as const
@@ -23,7 +24,7 @@ type RoleBindingBody = {
 
 type ValidationResult<T> = { ok: true, data: T } | { ok: false, status: number, error: string }
 
-export const app = new Hono<MiddlewareKeyVariables>()
+export const app = createHono('', version)
 
 app.use('/', useCors)
 app.use('/', middlewareAuth)
@@ -147,8 +148,10 @@ app.get('/:org_id', async (c: Context<MiddlewareKeyVariables>) => {
     return c.json({ error: 'Unauthorized' }, 401)
   }
 
+  let pgClient
   try {
-    const drizzle = await getDrizzleClient(c)
+    pgClient = getPgClient(c)
+    const drizzle = getDrizzleClient(pgClient)
 
     if (!(await checkPermission(c, 'org.read_members', { orgId }))) {
       return c.json({ error: 'Forbidden' }, 403)
@@ -178,11 +181,28 @@ app.get('/:org_id', async (c: Context<MiddlewareKeyVariables>) => {
       .where(eq(schema.role_bindings.org_id, orgId))
       .orderBy(schema.role_bindings.granted_at)
 
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'role_bindings_fetch',
+      orgId,
+      count: bindings.length,
+    })
+
     return c.json(bindings)
   }
   catch (error) {
-    console.error('Error fetching role bindings:', error)
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'role_bindings_fetch_failed',
+      orgId,
+      error,
+    })
     return c.json({ error: 'Internal server error' }, 500)
+  }
+  finally {
+    if (pgClient) {
+      await closeClient(c, pgClient)
+    }
   }
 })
 
@@ -211,8 +231,10 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
     reason,
   } = parsedBody.data
 
+  let pgClient
   try {
-    const drizzle = await getDrizzleClient(c)
+    pgClient = getPgClient(c)
+    const drizzle = getDrizzleClient(pgClient)
 
     if (!(await checkPermission(c, 'org.update_user_roles', { orgId: org_id }))) {
       return c.json({ error: 'Forbidden - Admin rights required' }, 403)
@@ -260,10 +282,48 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
       })
       .returning()
 
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'role_binding_created',
+      orgId: org_id,
+      bindingId: binding?.id,
+      principal_type,
+      principal_id,
+      role_id: role.id,
+      scope_type,
+      app_id,
+      channel_id,
+      granted_by: userId,
+    })
+
     return c.json(binding)
   }
   catch (error: any) {
-    console.error('Error creating role binding:', error)
+    if (error?.code === '23505') {
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'role_binding_duplicate',
+        orgId: org_id,
+        principal_type,
+        principal_id,
+        scope_type,
+        app_id,
+        channel_id,
+      })
+    }
+    else {
+      cloudlogErr({
+        requestId: c.get('requestId'),
+        message: 'role_binding_create_failed',
+        orgId: org_id,
+        principal_type,
+        principal_id,
+        scope_type,
+        app_id,
+        channel_id,
+        error,
+      })
+    }
 
     // Gestion des erreurs de contrainte unique (SSD)
     if (error?.code === '23505') {
@@ -271,6 +331,11 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
     }
 
     return c.json({ error: 'Internal server error' }, 500)
+  }
+  finally {
+    if (pgClient) {
+      await closeClient(c, pgClient)
+    }
   }
 })
 
@@ -283,8 +348,10 @@ app.delete('/:binding_id', async (c: Context<MiddlewareKeyVariables>) => {
     return c.json({ error: 'Unauthorized' }, 401)
   }
 
+  let pgClient
   try {
-    const drizzle = await getDrizzleClient(c)
+    pgClient = getPgClient(c)
+    const drizzle = getDrizzleClient(pgClient)
 
     // Récupérer le binding et vérifier l'accès
     const [binding] = await drizzle
@@ -306,10 +373,33 @@ app.delete('/:binding_id', async (c: Context<MiddlewareKeyVariables>) => {
       .delete(schema.role_bindings)
       .where(eq(schema.role_bindings.id, bindingId))
 
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'role_binding_deleted',
+      bindingId,
+      orgId: binding.org_id,
+      principal_type: binding.principal_type,
+      principal_id: binding.principal_id,
+      role_id: binding.role_id,
+      scope_type: binding.scope_type,
+      app_id: binding.app_id,
+      channel_id: binding.channel_id,
+    })
+
     return c.json({ success: true })
   }
   catch (error) {
-    console.error('Error deleting role binding:', error)
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'role_binding_delete_failed',
+      bindingId,
+      error,
+    })
     return c.json({ error: 'Internal server error' }, 500)
+  }
+  finally {
+    if (pgClient) {
+      await closeClient(c, pgClient)
+    }
   }
 })
