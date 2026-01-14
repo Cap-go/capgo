@@ -1,4 +1,4 @@
-import type { Env, ParsedEmail } from './types'
+import type { EmailAttachment, Env, ParsedEmail } from './types'
 
 export type EmailCategory = 'support' | 'sales' | 'query' | 'spam' | 'other'
 
@@ -7,6 +7,17 @@ export interface ClassificationResult {
   confidence: number
   shouldProcess: boolean
   reason?: string
+}
+
+export interface AttachmentClassification {
+  attachment: EmailAttachment
+  isUseful: boolean
+  reason: string
+}
+
+export interface AttachmentFilterResult {
+  usefulAttachments: EmailAttachment[]
+  filteredOut: AttachmentClassification[]
 }
 
 /**
@@ -347,5 +358,353 @@ export function classifyEmailHeuristic(email: ParsedEmail): ClassificationResult
     confidence: 0.3,
     shouldProcess: true,
     reason: 'No clear category, defaulting to query',
+  }
+}
+
+/**
+ * Filters attachments using AI to keep only useful ones
+ * Filters out tracking pixels, signature images, marketing content, etc.
+ */
+export async function filterAttachmentsWithAI(
+  env: Env,
+  attachments: EmailAttachment[],
+): Promise<AttachmentFilterResult> {
+  console.log('🧠 filterAttachmentsWithAI: Starting AI attachment filtering...')
+  console.log(`   Total attachments to filter: ${attachments.length}`)
+
+  if (attachments.length === 0) {
+    return { usefulAttachments: [], filteredOut: [] }
+  }
+
+  // First, apply heuristic pre-filtering to reduce API calls
+  const heuristicResult = filterAttachmentsHeuristic(attachments)
+  console.log(`   Heuristic pre-filter: ${heuristicResult.filteredOut.length} obviously useless attachments`)
+
+  // If all attachments are filtered out by heuristics, skip AI
+  if (heuristicResult.usefulAttachments.length === 0) {
+    console.log('   All attachments filtered by heuristics, skipping AI')
+    return heuristicResult
+  }
+
+  // For remaining attachments, use AI for more nuanced filtering
+  const remainingAttachments = heuristicResult.usefulAttachments
+  console.log(`   Remaining attachments for AI analysis: ${remainingAttachments.length}`)
+
+  try {
+    const prompt = buildAttachmentFilterPrompt(remainingAttachments)
+    console.log(`   Prompt length: ${prompt.length} characters`)
+
+    console.log('🌐 Calling Anthropic API for attachment filtering...')
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': env.ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-3-5-haiku-latest',
+        max_tokens: 500,
+        messages: [
+          {
+            role: 'user',
+            content: prompt,
+          },
+        ],
+      }),
+    })
+
+    console.log(`📡 Anthropic API response status: ${response.status}`)
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('❌ Claude API error:', response.status, errorText)
+      // On error, keep all attachments that passed heuristics
+      return heuristicResult
+    }
+
+    const data = await response.json() as any
+    const content = data.content[0].text
+    console.log(`✅ Claude response received: "${content}"`)
+
+    // Parse the AI response
+    const aiClassifications = parseAttachmentFilterResponse(content, remainingAttachments)
+
+    // Combine AI results with heuristic filtered ones
+    const usefulFromAI = aiClassifications.filter(c => c.isUseful).map(c => c.attachment)
+    const filteredByAI = aiClassifications.filter(c => !c.isUseful)
+
+    console.log(`📊 AI filtering result: ${usefulFromAI.length} useful, ${filteredByAI.length} filtered`)
+
+    return {
+      usefulAttachments: usefulFromAI,
+      filteredOut: [...heuristicResult.filteredOut, ...filteredByAI],
+    }
+  }
+  catch (error) {
+    console.error('Error filtering attachments with AI:', error)
+    // On error, keep all attachments that passed heuristics
+    return heuristicResult
+  }
+}
+
+/**
+ * Builds the prompt for attachment filtering
+ */
+function buildAttachmentFilterPrompt(attachments: EmailAttachment[]): string {
+  const attachmentList = attachments.map((att, i) => {
+    const sizeKB = (att.size / 1024).toFixed(1)
+    return `${i + 1}. Filename: "${att.filename}", Type: ${att.contentType}, Size: ${sizeKB}KB`
+  }).join('\n')
+
+  return `You are an email attachment filter for a customer support system.
+
+Analyze these email attachments and determine which ones are USEFUL for customer support.
+
+**FILTER OUT (not useful):**
+- Tracking pixels (tiny 1x1 images, usually named with random IDs)
+- Email signature images (logo.png, signature.png, company logos)
+- Social media icons (facebook.png, twitter.png, linkedin.png, etc.)
+- Marketing banners and promotional images
+- Spacer images (spacer.gif, blank.gif)
+- Email template elements (header.png, footer.png, divider.png)
+- Generic icons (icon-*.png, *.ico files)
+- Images with names like: pixel, tracker, beacon, spacer, blank, logo, sig, signature, banner, ad
+- Very small images (under 5KB unless they're documents)
+
+**KEEP (useful):**
+- Screenshots (usually larger, may have "screen", "capture", "screenshot" in name)
+- User-provided documents (PDF, DOC, DOCX, XLS, XLSX, CSV, TXT)
+- Error logs or crash reports
+- App-related images the user is sharing for support
+- Larger images that could be screenshots or important visuals (>50KB)
+- ZIP files with user data
+
+Attachments to analyze:
+${attachmentList}
+
+Respond in JSON format with an array of decisions:
+{
+  "decisions": [
+    { "index": 1, "useful": true, "reason": "Screenshot of error" },
+    { "index": 2, "useful": false, "reason": "Company logo in signature" }
+  ]
+}
+
+Only output the JSON, nothing else.`
+}
+
+/**
+ * Parses the AI response for attachment filtering
+ */
+function parseAttachmentFilterResponse(
+  response: string,
+  attachments: EmailAttachment[],
+): AttachmentClassification[] {
+  try {
+    const jsonMatch = response.match(/\{[\s\S]*\}/)
+    if (!jsonMatch) {
+      throw new Error('No JSON found in response')
+    }
+
+    const parsed = JSON.parse(jsonMatch[0])
+    const decisions = parsed.decisions as Array<{ index: number, useful: boolean, reason: string }>
+
+    return attachments.map((attachment, i) => {
+      const decision = decisions.find(d => d.index === i + 1)
+      if (decision) {
+        return {
+          attachment,
+          isUseful: decision.useful,
+          reason: decision.reason,
+        }
+      }
+      // If AI didn't provide a decision, keep the attachment
+      return {
+        attachment,
+        isUseful: true,
+        reason: 'No AI decision, keeping by default',
+      }
+    })
+  }
+  catch (error) {
+    console.error('Error parsing attachment filter response:', error)
+    // On parse error, keep all attachments
+    return attachments.map(attachment => ({
+      attachment,
+      isUseful: true,
+      reason: 'Parse error, keeping by default',
+    }))
+  }
+}
+
+/**
+ * Heuristic-based attachment filtering (fast, no API call)
+ * Used for obvious cases and as a pre-filter before AI
+ */
+export function filterAttachmentsHeuristic(
+  attachments: EmailAttachment[],
+): AttachmentFilterResult {
+  const usefulAttachments: EmailAttachment[] = []
+  const filteredOut: AttachmentClassification[] = []
+
+  for (const attachment of attachments) {
+    const classification = classifyAttachmentHeuristic(attachment)
+    if (classification.isUseful) {
+      usefulAttachments.push(attachment)
+    }
+    else {
+      filteredOut.push(classification)
+    }
+  }
+
+  return { usefulAttachments, filteredOut }
+}
+
+/**
+ * Classifies a single attachment using heuristics
+ */
+function classifyAttachmentHeuristic(attachment: EmailAttachment): AttachmentClassification {
+  const filename = attachment.filename.toLowerCase()
+  const contentType = attachment.contentType.toLowerCase()
+  const size = attachment.size
+
+  // Documents are always useful
+  const documentTypes = [
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument',
+    'application/vnd.ms-excel',
+    'text/plain',
+    'text/csv',
+    'application/zip',
+    'application/x-zip',
+    'application/json',
+    'application/xml',
+    'text/xml',
+  ]
+
+  for (const docType of documentTypes) {
+    if (contentType.includes(docType)) {
+      return {
+        attachment,
+        isUseful: true,
+        reason: 'Document file',
+      }
+    }
+  }
+
+  // Check for document extensions
+  const docExtensions = ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.csv', '.txt', '.zip', '.json', '.xml', '.log']
+  for (const ext of docExtensions) {
+    if (filename.endsWith(ext)) {
+      return {
+        attachment,
+        isUseful: true,
+        reason: 'Document file by extension',
+      }
+    }
+  }
+
+  // For images, apply filtering rules
+  if (contentType.startsWith('image/')) {
+    // Tracking pixels - very small images
+    if (size < 1000) { // Under 1KB
+      return {
+        attachment,
+        isUseful: false,
+        reason: 'Tracking pixel (image under 1KB)',
+      }
+    }
+
+    // Signature/logo patterns
+    const signaturePatterns = [
+      /logo/i,
+      /signature/i,
+      /^sig[_-]/i,
+      /banner/i,
+      /header/i,
+      /footer/i,
+      /icon[_-]/i,
+      /spacer/i,
+      /blank/i,
+      /pixel/i,
+      /tracker/i,
+      /beacon/i,
+      /divider/i,
+      /separator/i,
+      /facebook/i,
+      /twitter/i,
+      /linkedin/i,
+      /instagram/i,
+      /youtube/i,
+      /social/i,
+      /email[_-]?icon/i,
+      /mail[_-]?icon/i,
+    ]
+
+    for (const pattern of signaturePatterns) {
+      if (pattern.test(filename)) {
+        return {
+          attachment,
+          isUseful: false,
+          reason: `Email signature/marketing element (matches: ${pattern})`,
+        }
+      }
+    }
+
+    // Small images with generic names are likely signature elements
+    if (size < 10000) { // Under 10KB
+      const genericImagePatterns = [
+        /^img[_-]?\d/i,
+        /^image[_-]?\d/i,
+        /^[a-f0-9]{8,}/i, // Random hex IDs
+        /^\d+\.(?:png|jpg|gif)$/i, // Just numbers as filename
+        /^(?:un)?named/i,
+        /^cid:/i,
+      ]
+
+      for (const pattern of genericImagePatterns) {
+        if (pattern.test(filename)) {
+          return {
+            attachment,
+            isUseful: false,
+            reason: `Generic small image (${(size / 1024).toFixed(1)}KB)`,
+          }
+        }
+      }
+    }
+
+    // Larger images are likely screenshots or user content
+    if (size > 50000) { // Over 50KB
+      return {
+        attachment,
+        isUseful: true,
+        reason: 'Large image (likely screenshot or user content)',
+      }
+    }
+
+    // Screenshot indicators
+    if (/screen|capture|screenshot|snap/i.test(filename)) {
+      return {
+        attachment,
+        isUseful: true,
+        reason: 'Screenshot by filename',
+      }
+    }
+
+    // Medium-sized images - let AI decide
+    return {
+      attachment,
+      isUseful: true, // Keep for AI to review
+      reason: 'Medium image - needs AI review',
+    }
+  }
+
+  // Unknown content type - keep it
+  return {
+    attachment,
+    isUseful: true,
+    reason: 'Unknown content type, keeping by default',
   }
 }
