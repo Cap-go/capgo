@@ -434,10 +434,16 @@ export function middlewareV2(rights: Database['public']['Enums']['key_mode'][]) 
   return honoFactory.createMiddleware(async (c, next) => {
     const { jwt, capgkey } = resolveAuthHeaders(c)
     if (jwt) {
-      await foundJWT(c, jwt)
+      const res = await foundJWT(c, jwt)
+      if (res) {
+        return res
+      }
     }
     else if (capgkey) {
-      await foundAPIKey(c, capgkey, rights)
+      const res = await foundAPIKey(c, capgkey, rights)
+      if (res) {
+        return res
+      }
     }
     else {
       cloudlog({ requestId: c.get('requestId'), message: 'No apikey or subkey provided' })
