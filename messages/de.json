@@ -1214,6 +1214,7 @@
   "revert-to-builtin": "Zurück zu eingebaut",
   "revert-to-builtin-confirm": "Sind Sie sicher, dass Sie zur eingebauten Version zurückkehren möchten? Während der Kanal zurückgesetzt wird, verteilt capgo keine Updates darüber.",
   "role": "Rolle",
+  "select-role": "App-Rolle auswählen",
   "select-user-role": "Rolle auswählen",
   "select-user-role-expanded": "Wähle die zuzuweisende RBAC-Rolle. Legacy-Rollen bleiben während der Migration sichtbar.",
   "cannot-remove-last-super-admin": "Der letzte Super-Administrator kann nicht entfernt werden.",

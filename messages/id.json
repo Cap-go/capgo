@@ -1214,6 +1214,7 @@
   "revert-to-builtin": "Kembali ke bawaan",
   "revert-to-builtin-confirm": "Apakah Anda yakin ingin kembali ke versi bawaan? Selama saluran dikembalikan, capgo tidak akan mendistribusikan pembaruan melaluinya.",
   "role": "Peran",
+  "select-role": "Pilih peran aplikasi",
   "select-user-role": "Pilih peran",
   "select-user-role-expanded": "Pilih peran RBAC untuk ditetapkan. Peran lama tetap terlihat selama migrasi.",
   "cannot-remove-last-super-admin": "Anda tidak dapat menghapus super admin terakhir.",

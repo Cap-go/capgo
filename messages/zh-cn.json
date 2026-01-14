@@ -1214,6 +1214,7 @@
   "revert-to-builtin": "还原为内置",
   "revert-to-builtin-confirm": "确定要恢复到内置版本吗？当通道恢复时，Capgo 将不会通过它分发更新。",
   "role": "角色",
+  "select-role": "选择应用角色",
   "select-user-role": "选择角色",
   "select-user-role-expanded": "选择要分配的 RBAC 角色。迁移期间会保留旧角色显示。",
   "cannot-remove-last-super-admin": "不能移除最后一个超级管理员。",

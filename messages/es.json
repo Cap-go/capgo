@@ -1214,6 +1214,7 @@
   "revert-to-builtin": "Revertir a incorporado",
   "revert-to-builtin-confirm": "¿Estás seguro de que quieres volver a la versión incorporada? Mientras el canal esté revertido, capgo no distribuirá actualizaciones a través de él.",
   "role": "Rol",
+  "select-role": "Seleccionar un rol de la aplicación",
   "select-user-role": "Seleccionar un rol",
   "select-user-role-expanded": "Elige el rol RBAC a asignar. Los roles heredados siguen visibles durante la migración.",
   "cannot-remove-last-super-admin": "No puedes eliminar al último superadministrador.",

@@ -1492,7 +1492,7 @@
   "select-user": "Select a user",
   "select-group": "Select a group",
   "select-app": "Select an application",
-  "select-role": "Select a role",
+  "select-role": "Select an app role",
   "select-user-role": "Select a role",
   "select-user-role-expanded": "Choose the RBAC role to assign. Legacy roles remain visible during migration.",
   "cannot-remove-last-super-admin": "You cannot remove the last super admin.",

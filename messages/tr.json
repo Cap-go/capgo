@@ -1214,6 +1214,7 @@
   "revert-to-builtin": "Yerleşik duruma geri dön",
   "revert-to-builtin-confirm": "Yerleşik sürüme geri dönmek istediğinizden emin misiniz? Kanal geri alındığında, capgo güncellemeleri bu kanaldan dağıtmayacak.",
   "role": "Rol",
+  "select-role": "Uygulama rolü seç",
   "select-user-role": "Rol seç",
   "select-user-role-expanded": "Atanacak RBAC rolünü seçin. Eski roller geçiş sırasında görünür kalır.",
   "cannot-remove-last-super-admin": "Son süper yöneticiyi kaldıramazsınız.",

@@ -1214,6 +1214,7 @@
   "revert-to-builtin": "Quay lại tính năng cơ bản",
   "revert-to-builtin-confirm": "Bạn có chắc chắn muốn quay lại phiên bản tích hợp không? Trong khi kênh đang được hoàn nguyên, capgo sẽ không phân phối cập nhật qua nó.",
   "role": "Vai trò",
+  "select-role": "Chọn vai trò ứng dụng",
   "select-user-role": "Chọn vai trò",
   "select-user-role-expanded": "Chọn vai trò RBAC để gán. Các vai trò kế thừa vẫn hiển thị trong quá trình di chuyển.",
   "cannot-remove-last-super-admin": "Bạn không thể xóa quản trị viên cấp cao cuối cùng.",

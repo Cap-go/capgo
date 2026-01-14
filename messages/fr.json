@@ -1468,7 +1468,7 @@
   "select-user": "Sélectionner un utilisateur",
   "select-group": "Sélectionner un groupe",
   "select-app": "Sélectionner une application",
-  "select-role": "Sélectionner un rôle",
+  "select-role": "Sélectionner un rôle d'application",
   "select-user-role": "Sélectionner un rôle",
   "select-user-role-expanded": "Choisissez le rôle RBAC à attribuer. Les rôles hérités restent visibles pendant la migration.",
   "cannot-remove-last-super-admin": "Vous ne pouvez pas supprimer le dernier super administrateur.",
