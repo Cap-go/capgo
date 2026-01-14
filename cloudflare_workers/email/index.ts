@@ -1,5 +1,5 @@
 import type { EmailMessage, Env, ParsedEmail, ThreadMapping } from './types'
-import { classifyEmail, classifyEmailHeuristic } from './classifier'
+import { classifyEmail, classifyEmailHeuristic, filterAttachmentsHeuristic, filterAttachmentsWithAI } from './classifier'
 import { createForumThread, getThreadMessages, postToThread } from './discord'
 import { extractThreadId, getAllPotentialThreadIds, parseEmail } from './email-parser'
 import { formatDiscordMessageAsEmail, sendEmail } from './email-sender'
@@ -204,6 +204,31 @@ async function handleNewEmail(env: Env, email: ParsedEmail, category?: string): 
   console.log(`   From: ${email.from.email}`)
   console.log(`   Attachments: ${email.attachments?.length || 0}`)
 
+  // Filter attachments to keep only useful ones (no tracking pixels, signature images, etc.)
+  if (email.attachments && email.attachments.length > 0) {
+    console.log(`🔍 Filtering attachments...`)
+    const useAI = env.USE_AI_CLASSIFICATION !== 'false'
+
+    const filterResult = useAI
+      ? await filterAttachmentsWithAI(env, email.attachments)
+      : filterAttachmentsHeuristic(email.attachments)
+
+    console.log(`📊 Attachment filtering result:`)
+    console.log(`   - Useful: ${filterResult.usefulAttachments.length}`)
+    console.log(`   - Filtered out: ${filterResult.filteredOut.length}`)
+
+    for (const filtered of filterResult.filteredOut) {
+      console.log(`   ❌ Filtered: ${filtered.attachment.filename} - ${filtered.reason}`)
+    }
+
+    for (const useful of filterResult.usefulAttachments) {
+      console.log(`   ✅ Keeping: ${useful.filename}`)
+    }
+
+    // Update email with filtered attachments
+    email.attachments = filterResult.usefulAttachments
+  }
+
   // Create a new forum thread - attachments will be uploaded directly to Discord
   console.log(`🔵 Calling createForumThread...`)
   const thread = await createForumThread(env, email, categoryPrefix)
@@ -238,6 +263,31 @@ async function handleNewEmail(env: Env, email: ParsedEmail, category?: string): 
 async function handleEmailReply(env: Env, email: ParsedEmail, _threadId: string): Promise<void> {
   console.log('Processing email reply - checking all potential thread IDs')
   console.log(`   Attachments: ${email.attachments?.length || 0}`)
+
+  // Filter attachments to keep only useful ones (no tracking pixels, signature images, etc.)
+  if (email.attachments && email.attachments.length > 0) {
+    console.log(`🔍 Filtering attachments for reply...`)
+    const useAI = env.USE_AI_CLASSIFICATION !== 'false'
+
+    const filterResult = useAI
+      ? await filterAttachmentsWithAI(env, email.attachments)
+      : filterAttachmentsHeuristic(email.attachments)
+
+    console.log(`📊 Attachment filtering result:`)
+    console.log(`   - Useful: ${filterResult.usefulAttachments.length}`)
+    console.log(`   - Filtered out: ${filterResult.filteredOut.length}`)
+
+    for (const filtered of filterResult.filteredOut) {
+      console.log(`   ❌ Filtered: ${filtered.attachment.filename} - ${filtered.reason}`)
+    }
+
+    for (const useful of filterResult.usefulAttachments) {
+      console.log(`   ✅ Keeping: ${useful.filename}`)
+    }
+
+    // Update email with filtered attachments
+    email.attachments = filterResult.usefulAttachments
+  }
 
   // Get all potential thread IDs from References and In-Reply-To headers
   const allPotentialIds = getAllPotentialThreadIds(email)
