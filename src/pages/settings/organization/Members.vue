@@ -1007,7 +1007,7 @@ async function handleInviteNewUserSubmit() {
           {{ t('members') }}
         </h2>
       </div>
-      <div v-if="rbacSystemEnabled && useNewRbac.value" class="mb-4 d-alert d-alert-info gap-3 items-start">
+      <div v-if="rbacSystemEnabled && useNewRbac" class="mb-4 d-alert d-alert-info gap-3 items-start">
         <IconInformation class="w-6 h-6 text-sky-400 shrink-0" />
         <div class="text-sm text-slate-100">
           <p class="font-semibold">
