@@ -1192,7 +1192,7 @@
   "request-payload": "Payload da requisição",
   "requested": "solicitado",
   "require-apikey-expiration": "Exigir que as chaves API tenham uma data de expiração",
-  "require-apikey-expiration-description": "Quando habilitado, todas as chaves API desta organização devem ter uma data de expiração",
+  "require-apikey-expiration-description": "Quando habilitado, apenas chaves API com data de expiração podem acessar esta organização",
   "require-number": "Exigir número",
   "require-special-character": "Exigir caractere especial",
   "require-uppercase": "Exigir maiúscula",

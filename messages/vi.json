@@ -1192,7 +1192,7 @@
   "request-payload": "Payload yêu cầu",
   "requested": "đã yêu cầu",
   "require-apikey-expiration": "Yêu cầu khóa API phải có ngày hết hạn",
-  "require-apikey-expiration-description": "Khi được bật, tất cả các khóa API của tổ chức này phải có ngày hết hạn",
+  "require-apikey-expiration-description": "Khi được bật, chỉ những khóa API có ngày hết hạn mới có thể truy cập tổ chức này",
   "require-number": "Yêu cầu số",
   "require-special-character": "Yêu cầu ký tự đặc biệt",
   "require-uppercase": "Yêu cầu chữ hoa",
