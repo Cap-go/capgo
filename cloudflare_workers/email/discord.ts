@@ -382,9 +382,32 @@ function stripHtml(html: string): string {
   }
   catch (error) {
     console.error('Error converting HTML to Markdown:', error)
-    // Fallback: strip tags manually if Turndown fails
-    return html.replace(/<[^>]*>/g, '').trim()
+    // Fallback: use character-by-character approach to strip all HTML safely
+    return stripTagsSafely(html)
   }
+}
+
+/**
+ * Strips HTML tags using a character-by-character approach
+ * This avoids regex-based sanitization vulnerabilities
+ */
+function stripTagsSafely(html: string): string {
+  const result: string[] = []
+  let inTag = false
+
+  for (const char of html) {
+    if (char === '<') {
+      inTag = true
+    }
+    else if (char === '>') {
+      inTag = false
+    }
+    else if (!inTag) {
+      result.push(char)
+    }
+  }
+
+  return result.join('').trim()
 }
 
 /**
