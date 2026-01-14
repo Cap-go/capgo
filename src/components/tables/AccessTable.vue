@@ -133,10 +133,11 @@ async function showRoleModal(element: Element): Promise<string | undefined> {
     ],
   })
 
+  const roleSnapshot = selectedRole.value
   if (await dialogStore.onDialogDismiss()) {
     return undefined
   }
-  return selectedRole.value
+  return roleSnapshot
 }
 
 async function changeUserRole(element: Element) {
