@@ -159,31 +159,32 @@ async function deleteManifest(c: Context, record: Database['public']['Tables']['
       const promisesDeleteS3 = []
       for (const entry of manifestEntries) {
         if (entry.s3_path) {
-          promisesDeleteS3.push(supabaseAdmin(c)
-            .from('manifest')
-            .select('*', { count: 'exact', head: true })
-            .eq('file_name', entry.file_name)
-            .eq('file_hash', entry.file_hash)
-            .neq('app_version_id', record.id)
-            .then((v) => {
-              const count = v.count ?? 0
-              if (count) {
-                // Other versions still use this file, only delete from database
+          promisesDeleteS3.push(
+            // First delete the manifest row from database
+            supabaseAdmin(c)
+              .from('manifest')
+              .delete()
+              .eq('id', entry.id)
+              .then(() => {
+                // After deleting, check if any other rows still reference this file
+                // This avoids race condition where concurrent deletes both skip S3 cleanup
                 return supabaseAdmin(c)
                   .from('manifest')
-                  .delete()
-                  .eq('id', entry.id)
-              }
-              // No other versions use this file, delete from S3 AND database
-              cloudlog({ requestId: c.get('requestId'), message: 'deleted manifest file from S3', s3_path: entry.s3_path })
-              return Promise.all([
-                s3.deleteObject(c, entry.s3_path),
-                supabaseAdmin(c)
-                  .from('manifest')
-                  .delete()
-                  .eq('id', entry.id),
-              ]) as any
-            }))
+                  .select('*', { count: 'exact', head: true })
+                  .eq('file_name', entry.file_name)
+                  .eq('file_hash', entry.file_hash)
+              })
+              .then((v) => {
+                const count = v.count ?? 0
+                if (count) {
+                  // Other versions still use this file, S3 cleanup not needed
+                  return
+                }
+                // No other versions use this file, delete from S3
+                cloudlog({ requestId: c.get('requestId'), message: 'deleted manifest file from S3', s3_path: entry.s3_path })
+                return s3.deleteObject(c, entry.s3_path)
+              }),
+          )
         }
       }
       await backgroundTask(c, Promise.all(promisesDeleteS3))
