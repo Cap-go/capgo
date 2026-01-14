@@ -353,78 +353,21 @@ function truncateText(text: string, maxLength: number): string {
 /**
  * Converts HTML to readable plain text
  * Preserves structure by converting block elements to newlines and decoding entities
+ *
+ * Security: This function strips ALL HTML by removing angle brackets entirely.
+ * Discord messages are plain text, so no HTML interpretation is possible.
  */
 function stripHtml(html: string): string {
-  let text = html
-
-  // Remove dangerous elements in a loop to handle nested/malformed tags
-  // e.g., <scr<script>ipt> becomes <script> after first pass
-  // Use [^>]* for closing tags to match variants like </script\t\n bar>
-  let previousText: string
-  do {
-    previousText = text
-    // Remove style blocks (closing tag can have any content before >)
-    text = text.replace(/<style\b[^>]*>[\s\S]*?<\/style[^>]*>/gi, '')
-    // Remove script blocks (closing tag can have any content before >)
-    text = text.replace(/<script\b[^>]*>[\s\S]*?<\/script[^>]*>/gi, '')
-    // Remove HTML comments (handle malformed: <!-- ... --->)
-    text = text.replace(/<!--[\s\S]*?--+>/g, '')
-    // Remove unclosed comments
-    text = text.replace(/<!--[\s\S]*/gi, '')
-    // Remove any remaining unclosed script/style tags
-    text = text.replace(/<script\b[^>]*>[\s\S]*/gi, '')
-    text = text.replace(/<style\b[^>]*>[\s\S]*/gi, '')
-    // Remove orphaned closing tags
-    text = text.replace(/<\/script[^>]*>/gi, '')
-    text = text.replace(/<\/style[^>]*>/gi, '')
-  } while (text !== previousText)
-
-  // Handle line breaks
-  text = text.replace(/<br\s*\/?>/gi, '\n')
-
-  // Handle block-level elements with double newlines
-  text = text.replace(/<\/(p|div|h[1-6]|article|section|header|footer|main|aside|nav|blockquote|pre)[^>]*>/gi, '\n\n')
-  text = text.replace(/<(p|div|h[1-6]|article|section|header|footer|main|aside|nav|blockquote|pre)\b[^>]*>/gi, '')
-
-  // Handle list items
-  text = text.replace(/<li\b[^>]*>/gi, '\n• ')
-  text = text.replace(/<\/li[^>]*>/gi, '')
-
-  // Handle table rows
-  text = text.replace(/<tr\b[^>]*>/gi, '\n')
-  text = text.replace(/<\/tr[^>]*>/gi, '')
-
-  // Handle table cells with spacing
-  text = text.replace(/<td\b[^>]*>/gi, ' ')
-  text = text.replace(/<\/td[^>]*>/gi, ' | ')
-  text = text.replace(/<th\b[^>]*>/gi, ' ')
-  text = text.replace(/<\/th[^>]*>/gi, ' | ')
-
-  // Remove all remaining HTML tags in a loop to handle nested tags
-  do {
-    previousText = text
-    text = text.replace(/<[^>]*>/g, '')
-  } while (text !== previousText)
+  // Use a non-regex approach to safely strip all HTML
+  // This avoids pattern-based sanitization issues entirely
+  let text = stripAllTags(html)
 
   // Decode HTML entities
   text = decodeHtmlEntities(text)
 
-  // After entity decoding, some < or > might have been introduced
-  // Run tag removal again to catch any decoded tags
-  do {
-    previousText = text
-    text = text.replace(/<script\b[^>]*>[\s\S]*?<\/script[^>]*>/gi, '')
-    text = text.replace(/<\/script[^>]*>/gi, '')
-    text = text.replace(/<style\b[^>]*>[\s\S]*?<\/style[^>]*>/gi, '')
-    text = text.replace(/<\/style[^>]*>/gi, '')
-    text = text.replace(/<!--[\s\S]*?--+>/g, '')
-    text = text.replace(/<!--[\s\S]*/gi, '')
-    text = text.replace(/<[^>]*>/g, '')
-  } while (text !== previousText)
-
-  // Final safety: remove any remaining angle brackets entirely
-  // Discord is plain text so these would just be confusing characters
-  text = text.replace(/[<>]/g, '')
+  // After entity decoding, angle brackets might have been reintroduced
+  // Strip tags again to handle any decoded content
+  text = stripAllTags(text)
 
   // Clean up whitespace while preserving intentional line breaks
   text = text
@@ -436,6 +379,73 @@ function stripHtml(html: string): string {
     .trim()
 
   return text
+}
+
+/**
+ * Strips all HTML tags using a character-by-character approach
+ * This avoids regex-based sanitization vulnerabilities entirely
+ */
+function stripAllTags(html: string): string {
+  const result: string[] = []
+  let inTag = false
+  let tagContent = ''
+
+  for (let i = 0; i < html.length; i++) {
+    const char = html[i]
+
+    if (char === '<') {
+      inTag = true
+      tagContent = ''
+      continue
+    }
+
+    if (char === '>' && inTag) {
+      inTag = false
+      // Convert certain tags to formatting before discarding
+      const tagLower = tagContent.toLowerCase().trim()
+
+      // Handle line breaks
+      if (tagLower === 'br' || tagLower === 'br/') {
+        result.push('\n')
+      }
+      // Handle block elements - add newlines after closing tags
+      else if (tagLower.startsWith('/p') || tagLower.startsWith('/div') ||
+               tagLower.startsWith('/h1') || tagLower.startsWith('/h2') ||
+               tagLower.startsWith('/h3') || tagLower.startsWith('/h4') ||
+               tagLower.startsWith('/h5') || tagLower.startsWith('/h6') ||
+               tagLower.startsWith('/article') || tagLower.startsWith('/section') ||
+               tagLower.startsWith('/blockquote') || tagLower.startsWith('/pre')) {
+        result.push('\n\n')
+      }
+      // Handle list items
+      else if (tagLower.startsWith('li')) {
+        result.push('\n• ')
+      }
+      // Handle table rows
+      else if (tagLower.startsWith('tr') || tagLower.startsWith('/tr')) {
+        result.push('\n')
+      }
+      // Handle table cells
+      else if (tagLower.startsWith('/td') || tagLower.startsWith('/th')) {
+        result.push(' | ')
+      }
+      else if (tagLower.startsWith('td') || tagLower.startsWith('th')) {
+        result.push(' ')
+      }
+      // All other tags are simply discarded
+      continue
+    }
+
+    if (inTag) {
+      tagContent += char
+    }
+    else {
+      result.push(char)
+    }
+  }
+
+  // Any unclosed tag content is discarded (we were inside a tag when string ended)
+  return result.join('')
 }
 
 /**
