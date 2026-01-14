@@ -1,5 +1,4 @@
 import type { Context } from 'hono'
-import type { AuthInfo } from './hono.ts'
 import type { Database } from './supabase.types.ts'
 import { and, eq, inArray, isNull, or, sql } from 'drizzle-orm'
 import { honoFactory, quickError } from './hono.ts'
@@ -147,6 +146,13 @@ function isUUID(str: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str)
 }
 
+function maskSecret(value?: string | null) {
+  if (!value) {
+    return undefined
+  }
+  return `${value.slice(0, 8)}...`
+}
+
 /**
  * SQL condition for non-expired API keys: expires_at IS NULL OR expires_at > now()
  */
@@ -281,7 +287,8 @@ function setApiKeyAuthContext(c: Context, apikey: Database['public']['Tables']['
     userId: apikey.user_id,
     authType: 'apikey',
     apikey,
-  } as AuthInfo)
+    jwt: null,
+  })
   c.set('apikey', apikey)
   c.set('capgkey', keyString)
 }
@@ -291,7 +298,8 @@ function setSubkeyAuthContext(c: Context, userId: string, subkey: Database['publ
     userId,
     authType: 'apikey',
     apikey: subkey,
-  } as AuthInfo)
+    jwt: null,
+  })
   c.set('subkey', subkey)
 }
 
@@ -303,7 +311,12 @@ function hasEmptySubkeyLimits(subkey: Database['public']['Tables']['apikeys']['R
 
 function validateSubkeyLimits(c: Context, subkey: Database['public']['Tables']['apikeys']['Row']) {
   if (hasEmptySubkeyLimits(subkey)) {
-    cloudlog({ requestId: c.get('requestId'), message: 'Invalid subkey, no limited apps or orgs', subkey })
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'Invalid subkey, no limited apps or orgs',
+      subkeyId: subkey.id,
+      subkeyUserId: subkey.user_id,
+    })
     return quickError(401, 'invalid_subkey', 'Invalid subkey, no limited apps or orgs')
   }
   return null
@@ -311,7 +324,14 @@ function validateSubkeyLimits(c: Context, subkey: Database['public']['Tables']['
 
 function validateSubkeyUser(c: Context, subkey: Database['public']['Tables']['apikeys']['Row'], apikey: Database['public']['Tables']['apikeys']['Row']) {
   if (subkey.user_id !== apikey.user_id) {
-    cloudlog({ requestId: c.get('requestId'), message: 'Subkey user_id does not match apikey user_id', subkey, apikey })
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'Subkey user_id does not match apikey user_id',
+      subkeyId: subkey.id,
+      subkeyUserId: subkey.user_id,
+      apikeyId: apikey.id,
+      apikeyUserId: apikey.user_id,
+    })
     return quickError(401, 'invalid_subkey', 'Invalid subkey')
   }
   return null
@@ -322,7 +342,7 @@ function resolveAuthHeaders(c: Context) {
   let capgkey = c.req.header('capgkey') ?? c.req.header('x-api-key')
 
   if (jwt && isUUID(jwt)) {
-    cloudlog({ requestId: c.get('requestId'), message: 'Setting apikey in capgkey_string', jwt })
+    cloudlog({ requestId: c.get('requestId'), message: 'Setting apikey in capgkey_string', jwtPrefix: maskSecret(jwt) })
     capgkey = jwt
     jwt = undefined
   }
@@ -386,10 +406,10 @@ async function resolveSubkey(
 async function foundAPIKey(c: Context, capgkeyString: string, rights: Database['public']['Enums']['key_mode'][]) {
   const subkey_id = getSubkeyId(c)
 
-  cloudlog({ requestId: c.get('requestId'), message: 'Capgkey provided', capgkeyString })
+  cloudlog({ requestId: c.get('requestId'), message: 'Capgkey provided', capgkeyPrefix: maskSecret(capgkeyString) })
   const apikey = await resolveApiKey(c, capgkeyString, rights, false)
   if (!apikey) {
-    cloudlog({ requestId: c.get('requestId'), message: 'Invalid apikey', capgkeyString, rights })
+    cloudlog({ requestId: c.get('requestId'), message: 'Invalid apikey', capgkeyPrefix: maskSecret(capgkeyString), rights })
     return quickError(401, 'invalid_apikey', 'Invalid apikey')
   }
   // Store the original key string for hashed key authentication
@@ -398,11 +418,16 @@ async function foundAPIKey(c: Context, capgkeyString: string, rights: Database['
   if (subkey_id) {
     cloudlog({ requestId: c.get('requestId'), message: 'Subkey id provided', subkey_id })
     const subkey = await resolveSubkey(c, subkey_id, rights, false)
-    cloudlog({ requestId: c.get('requestId'), message: 'Subkey', subkey })
     if (!subkey) {
       cloudlog({ requestId: c.get('requestId'), message: 'Invalid subkey', subkey_id })
       return quickError(401, 'invalid_subkey', 'Invalid subkey')
     }
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'Subkey resolved',
+      subkeyId: subkey.id,
+      subkeyUserId: subkey.user_id,
+    })
     const userError = validateSubkeyUser(c, subkey, apikey)
     if (userError) {
       return userError
@@ -416,18 +441,24 @@ async function foundAPIKey(c: Context, capgkeyString: string, rights: Database['
 }
 
 async function foundJWT(c: Context, jwt: string) {
-  cloudlog({ requestId: c.get('requestId'), message: 'JWT provided', jwt })
+  cloudlog({ requestId: c.get('requestId'), message: 'JWT provided', jwtPrefix: maskSecret(jwt) })
   const supabaseJWT = supabaseClient(c, jwt)
   const { data: user, error: userError } = await supabaseJWT.auth.getUser()
   if (userError) {
     cloudlog({ requestId: c.get('requestId'), message: 'Invalid JWT', userError })
     return quickError(401, 'invalid_jwt', 'Invalid JWT')
   }
+  const userId = user.user?.id
+  if (!userId) {
+    cloudlog({ requestId: c.get('requestId'), message: 'Invalid JWT user', userError })
+    return quickError(401, 'invalid_jwt', 'Invalid JWT')
+  }
   c.set('auth', {
-    userId: user.user?.id,
+    userId,
     authType: 'jwt',
     jwt,
-  } as AuthInfo)
+    apikey: null,
+  })
 }
 
 export function middlewareV2(rights: Database['public']['Enums']['key_mode'][]) {
@@ -476,7 +507,7 @@ export function middlewareKey(rights: Database['public']['Enums']['key_mode'][],
     const apikey = await resolveApiKey(c, key, rights, usePostgres)
 
     if (!apikey) {
-      cloudlog({ requestId: c.get('requestId'), message: 'Invalid apikey', key, method: c.req.method, url: c.req.url })
+      cloudlog({ requestId: c.get('requestId'), message: 'Invalid apikey', keyPrefix: maskSecret(key), method: c.req.method, url: c.req.url })
       return quickError(401, 'invalid_apikey', 'Invalid apikey')
     }
     // Set auth context for RBAC (can be overridden by subkey below)

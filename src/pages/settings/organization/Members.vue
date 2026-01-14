@@ -80,6 +80,7 @@ const isInviteFormValid = computed(() => {
 })
 
 async function checkRbacEnabled() {
+  useNewRbac.value = false
   if (!currentOrganization.value)
     return
 
@@ -96,6 +97,7 @@ async function checkRbacEnabled() {
     useNewRbac.value = (data as any)?.use_new_rbac || false
   }
   catch (error: any) {
+    useNewRbac.value = false
     console.error('Error checking RBAC status:', error)
   }
 }

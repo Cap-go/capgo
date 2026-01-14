@@ -13,52 +13,84 @@ interface DeleteOrganizationParams {
 type StorageBucket = ReturnType<ReturnType<typeof supabaseAdmin>['storage']['from']>
 
 async function deleteOrgImages(c: Context<MiddlewareKeyVariables>, orgId: string) {
-  try {
-    const storage = supabaseAdmin(c).storage.from('images')
-    const requestId = c.get('requestId')
-    const { data: entries } = await storage.list(`org/${orgId}`)
+  const storage = supabaseAdmin(c).storage.from('images')
+  const requestId = c.get('requestId')
+  const { data: entries, error: listError } = await storage.list(`org/${orgId}`)
 
-    if (!entries?.length) {
-      return
-    }
-
-    for (const entry of entries) {
-      try {
-        if (entry.id === null) {
-          await deleteOrgAppImages(storage, orgId, entry.name, requestId)
-          continue
-        }
-
-        await storage.remove([`org/${orgId}/${entry.name}`])
-      }
-      catch (error) {
-        cloudlog({
-          requestId,
-          message: 'error deleting org image entry',
-          org_id: orgId,
-          entry: entry.name,
-          error,
-        })
-      }
-    }
-
-    cloudlog({ requestId, message: 'deleted all org images', org_id: orgId })
-  }
-  catch (error) {
-    cloudlog({ requestId: c.get('requestId'), message: 'error deleting org images', error, org_id: orgId })
-  }
-}
-
-async function deleteOrgAppImages(storage: StorageBucket, orgId: string, folderName: string, requestId?: string) {
-  const { data: appFiles } = await storage.list(`org/${orgId}/${folderName}`)
-
-  if (!appFiles?.length) {
+  if (listError) {
+    cloudlog({
+      requestId,
+      message: 'error listing org images',
+      org_id: orgId,
+      folder: `org/${orgId}`,
+      error: listError,
+    })
     return
   }
 
-  const filePaths = appFiles.map(file => `org/${orgId}/${folderName}/${file.name}`)
-  await storage.remove(filePaths)
+  if (!entries?.length) {
+    return
+  }
+
+  for (const entry of entries) {
+    if (entry.id === null) {
+      const ok = await deleteOrgAppImages(storage, orgId, entry.name, requestId)
+      if (!ok) {
+        return
+      }
+      continue
+    }
+
+    const { error: removeError } = await storage.remove([`org/${orgId}/${entry.name}`])
+    if (removeError) {
+      cloudlog({
+        requestId,
+        message: 'error deleting org image entry',
+        org_id: orgId,
+        entry: entry.name,
+        error: removeError,
+      })
+      return
+    }
+  }
+
+  cloudlog({ requestId, message: 'deleted all org images', org_id: orgId })
+}
+
+async function deleteOrgAppImages(storage: StorageBucket, orgId: string, folderName: string, requestId?: string) {
+  const folderPath = `org/${orgId}/${folderName}`
+  const { data: appFiles, error: listError } = await storage.list(folderPath)
+
+  if (listError) {
+    cloudlog({
+      requestId,
+      message: 'error listing org app images',
+      org_id: orgId,
+      folder: folderName,
+      error: listError,
+    })
+    return false
+  }
+
+  if (!appFiles?.length) {
+    return true
+  }
+
+  const filePaths = appFiles.map(file => `${folderPath}/${file.name}`)
+  const { error: removeError } = await storage.remove(filePaths)
+  if (removeError) {
+    cloudlog({
+      requestId,
+      message: 'error deleting org app images',
+      org_id: orgId,
+      folder: folderName,
+      error: removeError,
+    })
+    return false
+  }
+
   cloudlog({ requestId, message: 'deleted org app images', count: appFiles.length, folder: folderName })
+  return true
 }
 
 export async function deleteOrg(c: Context<MiddlewareKeyVariables>, body: DeleteOrganizationParams, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {

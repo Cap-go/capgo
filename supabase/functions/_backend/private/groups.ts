@@ -1,12 +1,12 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { and, eq } from 'drizzle-orm'
-import { Hono } from 'hono/tiny'
-import { middlewareAuth, useCors } from '../utils/hono.ts'
+import { createHono, middlewareAuth, useCors } from '../utils/hono.ts'
 import { cloudlogErr } from '../utils/logging.ts'
 import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import { checkPermission } from '../utils/rbac.ts'
 import { schema } from '../utils/postgres_schema.ts'
+import { version } from '../utils/version.ts'
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -23,7 +23,7 @@ async function parseJsonBody(c: Context<MiddlewareKeyVariables>) {
   }
 }
 
-export const app = new Hono<MiddlewareKeyVariables>()
+export const app = createHono('', version)
 
 app.use('/', useCors)
 app.use('/', middlewareAuth)
@@ -159,6 +159,7 @@ app.put('/:group_id', async (c: Context<MiddlewareKeyVariables>) => {
   }
 
   let pgClient
+  let targetUserId: string | undefined
   try {
     pgClient = getPgClient(c)
     const drizzle = getDrizzleClient(pgClient)
@@ -388,7 +389,7 @@ app.post('/:group_id/members', async (c: Context<MiddlewareKeyVariables>) => {
       return c.json({ error: parsedBody.error }, 400)
     }
 
-    const { user_id: targetUserId } = parsedBody.data
+    targetUserId = parsedBody.data?.user_id
 
     if (!targetUserId) {
       return c.json({ error: 'user_id is required' }, 400)

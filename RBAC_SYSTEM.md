@@ -44,7 +44,7 @@ The system automatically switches between legacy and RBAC via:
 -- The org uses RBAC if:
 -- 1. orgs.use_new_rbac = true OR
 -- 2. rbac_settings.use_new_rbac = true
-SELECT rbac_is_enabled_for_org('org-uuid');
+SELECT rbac_is_enabled_for_org('123e4567-e89b-12d3-a456-426614174000');
 ```
 
 ---
@@ -53,7 +53,7 @@ SELECT rbac_is_enabled_for_org('org-uuid');
 
 Capgo's RBAC system follows the standard RBAC model with extensions for multi-scope:
 
-```
+```text
 ┌─────────────┐     ┌──────────────┐     ┌──────────────┐
 │  Principal  │────▶│ Role Binding │────▶│     Role     │
 │ (User/API)  │     │  (at scope)  │     │              │
@@ -99,7 +99,7 @@ Capgo's RBAC system follows the standard RBAC model with extensions for multi-sc
 
 Permissions propagate downward in the hierarchy:
 
-```
+```text
 Platform (global)
     │
     └─▶ Organization
@@ -304,7 +304,7 @@ CREATE TABLE public.role_hierarchy (
 - Simplifies management: `org_admin` inherits from all app_* roles
 
 **Inheritance examples**:
-```
+```text
 org_super_admin ──▶ org_admin ──▶ app_admin ──▶ app_developer ──▶ app_uploader ──▶ app_reader
                                        │
                                        ├──▶ bundle_admin ──▶ bundle_reader
@@ -537,7 +537,7 @@ The system defines 13 predefined roles covering all hierarchy levels.
 
 ### Complete Role Hierarchy
 
-```
+```text
 platform_super_admin (platform, rank 100)
     │
     └─▶ ALL permissions
@@ -799,7 +799,7 @@ $$;
    - `false` otherwise
 
 **Propagation example**:
-```
+```text
 User "Alice" has org_admin role in org "Acme Corp"
   → Alice has app.upload_bundle at org level
     → Alice can upload to ALL apps in "Acme Corp"
@@ -818,6 +818,8 @@ User "Bob" has app_developer role on app "com.example.mobile"
 ### 4. `rbac_check_permission_direct()` - Unified Entry Point
 
 **Main function** used by the backend to check permissions.
+
+**Frontend note**: `rbac_check_permission_direct()` is backend/service-role only. Client code must use `rbac_check_permission()`, which enforces user context via `auth.uid()` automatically and does **not** accept a user id.
 
 ```sql
 CREATE OR REPLACE FUNCTION public.rbac_check_permission_direct(
@@ -944,7 +946,7 @@ $$;
 
 **Recommended usage**:
 ```sql
--- Check if a user can upload a bundle
+-- Backend/service-role: user id is supplied explicitly
 SELECT rbac_check_permission_direct(
   'app.upload_bundle',
   'user-uuid'::uuid,
@@ -953,7 +955,7 @@ SELECT rbac_check_permission_direct(
   NULL
 );
 
--- Check if an API key can promote a bundle
+-- Backend/service-role: API key context
 SELECT rbac_check_permission_direct(
   'channel.promote_bundle',
   NULL::uuid,
@@ -961,6 +963,14 @@ SELECT rbac_check_permission_direct(
   NULL,
   123, -- channel_id
   'apikey-string'
+);
+
+-- Frontend/authenticated user: user id enforced by auth.uid()
+SELECT rbac_check_permission(
+  'app.upload_bundle',
+  NULL, -- org_id (derived if app_id provided)
+  'com.example.app',
+  NULL
 );
 ```
 
@@ -1264,26 +1274,18 @@ export interface PermissionScope {
 
 /**
  * Check if current user has permission
- * Calls backend RPC (single source of truth)
+ * Calls backend RPC (single source of truth, uses auth.uid())
  */
 export async function hasPermission(
   permission: Permission,
   scope: PermissionScope
 ): Promise<boolean> {
   try {
-    const { data: auth, error } = await supabase.auth.getUser()
-    const userId = auth?.user?.id || null
-
-    if (error)
-      console.error('[hasPermission] getUser error:', error)
-
-    const { data, error: rpcError } = await supabase.rpc('rbac_check_permission_direct', {
+    const { data, error: rpcError } = await supabase.rpc('rbac_check_permission', {
       p_permission_key: permission,
-      p_user_id: userId,
       p_org_id: scope.orgId || null,
       p_app_id: scope.appId || null,
       p_channel_id: scope.channelId || null,
-      p_apikey: null, // Frontend never uses API keys
     })
 
     if (rpcError) {
@@ -1489,6 +1491,7 @@ const { permissions, loading, has } = usePermissions(
 To facilitate migration, here's the mapping between current role checks and equivalent permissions:
 
 ### Organization-level checks
+
 | Current check | Equivalent permission | Notes |
 |-------------|----------------------|-------|
 | `hasPermissionsInRole('admin', ['org_admin', 'org_super_admin'])` | `hasPermission('org.update_settings')` | Modify org settings |
@@ -1496,6 +1499,7 @@ To facilitate migration, here's the mapping between current role checks and equi
 | `hasPermissionsInRole('admin', ['org_admin', 'org_billing_admin'])` | `hasPermission('org.read_billing')` | Access billing |
 
 ### App-level checks
+
 | Current check | Equivalent permission | Notes |
 |-------------|----------------------|-------|
 | `hasPermissionsInRole('write', ['app_developer', 'org_admin'])` | `hasPermission('app.update_settings')` | Modify app settings |
@@ -1504,12 +1508,14 @@ To facilitate migration, here's the mapping between current role checks and equi
 | `hasPermissionsInRole('admin', ['app_admin', 'org_admin'])` | `hasPermission('app.update_user_roles')` | Manage app access |
 
 ### Channel-level checks
+
 | Current check | Equivalent permission | Notes |
 |-------------|----------------------|-------|
 | `hasPermissionsInRole('write', ['app_developer', 'org_admin'])` | `hasPermission('channel.update_settings')` | Modify channel |
 | `hasPermissionsInRole('upload', ['app_uploader'])` | `hasPermission('channel.promote_bundle')` | Promote bundle |
 
 ### Bundle operations
+
 | Current check | Equivalent permission | Notes |
 |-------------|----------------------|-------|
 | `hasPermissionsInRole('admin', ['org_admin', 'org_super_admin'])` | `hasPermission('bundle.delete')` | Delete bundle |
@@ -1519,7 +1525,7 @@ To facilitate migration, here's the mapping between current role checks and equi
 #### 1. Check if RBAC is enabled for an org
 
 ```sql
-SELECT rbac_is_enabled_for_org('org-uid');
+SELECT rbac_is_enabled_for_org('123e4567-e89b-12d3-a456-426614174000');
 -- true if RBAC enabled, false if legacy
 ```
 
@@ -1646,7 +1652,7 @@ LEFT JOIN apps a ON rb.app_id = a.id
 LEFT JOIN channels c ON rb.channel_id = c.rbac_id
 LEFT JOIN users granted_by_user ON rb.granted_by = granted_by_user.id
 WHERE rb.principal_type = 'user'
-  AND rb.org_id = 'org-uuid'::uuid
+  AND rb.org_id = '123e4567-e89b-12d3-a456-426614174000'::uuid
 ORDER BY u.email, rb.granted_at DESC;
 ```
 
@@ -1664,7 +1670,7 @@ FROM role_bindings rb
 JOIN roles r ON rb.role_id = r.id
 JOIN users granted_by_user ON rb.granted_by = granted_by_user.id
 JOIN users recipient_user ON rb.principal_id = recipient_user.id
-WHERE rb.org_id = 'org-uuid'::uuid
+WHERE rb.org_id = '123e4567-e89b-12d3-a456-426614174000'::uuid
   AND rb.granted_at > NOW() - INTERVAL '30 days'
 ORDER BY rb.granted_at DESC;
 ```
@@ -1691,7 +1697,7 @@ ORDER BY p.key;
 #### Search in CloudFlare/Supabase logs
 
 **Search patterns**:
-```
+```text
 rbac_check: app.upload_bundle GRANTED
 rbac_check: app.upload_bundle DENIED
 RBAC_CHECK_PERM_DIRECT
@@ -1705,7 +1711,7 @@ rbac_has_permission: checking permission
   "requestId": "req_abc123",
   "message": "rbac_check: app.upload_bundle GRANTED",
   "userId": "user-uuid",
-  "orgId": "org-uuid",
+  "orgId": "123e4567-e89b-12d3-a456-426614174000",
   "appId": "com.example.app",
   "timestamp": "2026-01-08T10:30:00Z"
 }
