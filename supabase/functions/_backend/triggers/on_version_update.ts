@@ -165,7 +165,11 @@ async function deleteManifest(c: Context, record: Database['public']['Tables']['
               .from('manifest')
               .delete()
               .eq('id', entry.id)
-              .then(() => {
+              .then(({ error: deleteError }) => {
+                if (deleteError) {
+                  cloudlog({ requestId: c.get('requestId'), message: 'error deleting manifest row', id: entry.id, error: deleteError })
+                  return null // Signal to skip S3 cleanup
+                }
                 // After deleting, check if any other rows still reference this file
                 // This avoids race condition where concurrent deletes both skip S3 cleanup
                 return supabaseAdmin(c)
@@ -175,6 +179,12 @@ async function deleteManifest(c: Context, record: Database['public']['Tables']['
                   .eq('file_hash', entry.file_hash)
               })
               .then((v) => {
+                if (!v)
+                  return // Delete failed, skip S3 cleanup
+                if (v.error) {
+                  cloudlog({ requestId: c.get('requestId'), message: 'error checking manifest references', error: v.error })
+                  return // Don't delete S3 if we can't confirm no other references
+                }
                 const count = v.count ?? 0
                 if (count) {
                   // Other versions still use this file, S3 cleanup not needed
