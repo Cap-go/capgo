@@ -1,9 +1,87 @@
-import type { DiscordAPIMessage, DiscordEmbed, DiscordMessage, DiscordThread, Env, ParsedEmail } from './types'
+import type { DiscordAPIMessage, DiscordEmbed, DiscordMessage, DiscordThread, EmailAttachment, Env, ParsedEmail } from './types'
 
 const DISCORD_API_BASE = 'https://discord.com/api/v10'
+const DISCORD_MAX_FILE_SIZE = 25 * 1024 * 1024 // 25MB - Discord's limit for bots
+
+/**
+ * Creates a Discord message with attachments using multipart/form-data
+ * This uploads files directly to Discord (for files under 25MB)
+ */
+async function createDiscordMessageWithAttachments(
+  url: string,
+  botToken: string,
+  payload: Record<string, unknown>,
+  attachments: EmailAttachment[],
+): Promise<Response> {
+  // Filter attachments that can be uploaded directly to Discord (under 25MB)
+  const uploadableAttachments = attachments.filter(a => a.size <= DISCORD_MAX_FILE_SIZE)
+
+  // Log skipped attachments
+  const skippedAttachments = attachments.filter(a => a.size > DISCORD_MAX_FILE_SIZE)
+  if (skippedAttachments.length > 0) {
+    console.warn(`⚠️  Skipping ${skippedAttachments.length} attachment(s) over 25MB Discord limit:`)
+    for (const att of skippedAttachments) {
+      console.warn(`   - ${att.filename} (${formatFileSize(att.size)})`)
+    }
+  }
+
+  if (uploadableAttachments.length === 0) {
+    // No attachments to upload, use regular JSON request
+    return fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bot ${botToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    })
+  }
+
+  // Create multipart form data
+  const formData = new FormData()
+
+  // Add the JSON payload
+  formData.append('payload_json', JSON.stringify(payload))
+
+  // Add each attachment as a file
+  for (let i = 0; i < uploadableAttachments.length; i++) {
+    const attachment = uploadableAttachments[i]
+
+    // Convert content to Blob
+    let blob: Blob
+    if (attachment.content instanceof ArrayBuffer) {
+      blob = new Blob([attachment.content], { type: attachment.contentType })
+    }
+    else if (typeof attachment.content === 'string') {
+      const binaryString = atob(attachment.content)
+      const bytes = new Uint8Array(binaryString.length)
+      for (let j = 0; j < binaryString.length; j++) {
+        bytes[j] = binaryString.charCodeAt(j)
+      }
+      blob = new Blob([bytes], { type: attachment.contentType })
+    }
+    else {
+      continue
+    }
+
+    formData.append(`files[${i}]`, blob, attachment.filename)
+  }
+
+  console.log(`📤 Uploading ${uploadableAttachments.length} attachment(s) directly to Discord`)
+
+  return fetch(url, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bot ${botToken}`,
+      // Don't set Content-Type - fetch will set it automatically with boundary
+    },
+    body: formData,
+  })
+}
 
 /**
  * Creates a new forum post (thread) in Discord
+ * Uploads attachments directly to Discord (files under 25MB)
  */
 export async function createForumThread(
   env: Env,
@@ -14,6 +92,7 @@ export async function createForumThread(
   console.log(`   Forum Channel ID: ${env.DISCORD_FORUM_CHANNEL_ID}`)
   console.log(`   Bot Token present: ${!!env.DISCORD_BOT_TOKEN}`)
   console.log(`   Bot Token length: ${env.DISCORD_BOT_TOKEN?.length || 0}`)
+  console.log(`   Attachments: ${email.attachments?.length || 0} from email`)
 
   const url = `${DISCORD_API_BASE}/channels/${env.DISCORD_FORUM_CHANNEL_ID}/threads`
   console.log(`   Discord API URL: ${url}`)
@@ -32,15 +111,28 @@ export async function createForumThread(
   console.log(`   Thread name: "${threadName}"`)
   console.log(`   Truncated name: "${truncatedName}"`)
 
+  // Prepare payload
+  const messagePayload: Record<string, unknown> = {
+    content: message.content,
+    embeds: message.embeds,
+    allowed_mentions: {
+      parse: [],
+    },
+  }
+
+  // If we have attachments to upload directly to Discord, add attachment references
+  const attachmentsToUpload = email.attachments?.filter(a => a.size <= DISCORD_MAX_FILE_SIZE) || []
+  if (attachmentsToUpload.length > 0) {
+    messagePayload.attachments = attachmentsToUpload.map((att, i) => ({
+      id: i,
+      filename: att.filename,
+      description: `Email attachment: ${att.filename}`,
+    }))
+  }
+
   const payload = {
     name: truncatedName,
-    message: {
-      content: message.content,
-      embeds: message.embeds,
-      allowed_mentions: {
-        parse: [],
-      },
-    },
+    message: messagePayload,
     auto_archive_duration: 10080, // 7 days
   }
 
@@ -48,14 +140,28 @@ export async function createForumThread(
 
   try {
     console.log('🌐 Sending request to Discord API...')
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bot ${env.DISCORD_BOT_TOKEN}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-    })
+
+    let response: Response
+    if (attachmentsToUpload.length > 0) {
+      // Use multipart/form-data to upload files directly to Discord
+      response = await createDiscordMessageWithAttachments(
+        url,
+        env.DISCORD_BOT_TOKEN,
+        payload,
+        attachmentsToUpload,
+      )
+    }
+    else {
+      // Regular JSON request
+      response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bot ${env.DISCORD_BOT_TOKEN}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      })
+    }
 
     console.log(`📡 Discord API response status: ${response.status} ${response.statusText}`)
 
@@ -86,7 +192,7 @@ export async function createForumThread(
 
 /**
  * Posts a message to an existing Discord thread
- * Only sends the email body text, no embeds (those are only for the initial thread creation)
+ * Uploads attachments directly to Discord (files under 25MB)
  */
 export async function postToThread(
   env: Env,
@@ -99,20 +205,46 @@ export async function postToThread(
   const bodyText = email.body.text || stripHtml(email.body.html || '')
   const content = bodyText.trim() || '(Empty message)'
 
+  // Prepare payload
+  const payload: Record<string, unknown> = {
+    content,
+    allowed_mentions: {
+      parse: [],
+    },
+  }
+
+  // If we have attachments to upload directly to Discord, add attachment references
+  const attachmentsToUpload = email.attachments?.filter(a => a.size <= DISCORD_MAX_FILE_SIZE) || []
+  if (attachmentsToUpload.length > 0) {
+    payload.attachments = attachmentsToUpload.map((att, i) => ({
+      id: i,
+      filename: att.filename,
+      description: `Email attachment: ${att.filename}`,
+    }))
+  }
+
   try {
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bot ${env.DISCORD_BOT_TOKEN}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        content,
-        allowed_mentions: {
-          parse: [],
+    let response: Response
+
+    if (attachmentsToUpload.length > 0) {
+      // Upload files directly to Discord
+      response = await createDiscordMessageWithAttachments(
+        url,
+        env.DISCORD_BOT_TOKEN,
+        payload,
+        attachmentsToUpload,
+      )
+    }
+    else {
+      response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bot ${env.DISCORD_BOT_TOKEN}`,
+          'Content-Type': 'application/json',
         },
-      }),
-    })
+        body: JSON.stringify(payload),
+      })
+    }
 
     if (!response.ok) {
       const error = await response.text()
@@ -130,6 +262,7 @@ export async function postToThread(
 
 /**
  * Formats an email for display in Discord
+ * Attachments are uploaded separately via multipart/form-data, Discord will display them
  */
 function formatEmailForDiscord(email: ParsedEmail): DiscordMessage {
   const fromText = email.from.name
@@ -140,35 +273,62 @@ function formatEmailForDiscord(email: ParsedEmail): DiscordMessage {
   const bodyText = email.body.text || stripHtml(email.body.html || '')
   const truncatedBody = truncateText(bodyText, 1800)
 
+  // Build fields array
+  const fields: Array<{ name: string, value: string, inline?: boolean }> = [
+    {
+      name: 'From',
+      value: fromText,
+      inline: true,
+    },
+    {
+      name: 'To',
+      value: email.to,
+      inline: true,
+    },
+  ]
+
+  // Note attachments in the embed if there are any
+  const attachments = email.attachments || []
+  if (attachments.length > 0) {
+    const attachmentList = attachments
+      .map(a => `• ${a.filename} (${formatFileSize(a.size)})`)
+      .join('\n')
+    fields.push({
+      name: `📎 ${attachments.length} Attachment${attachments.length > 1 ? 's' : ''}`,
+      value: attachmentList,
+      inline: false,
+    })
+  }
+
   const embed: DiscordEmbed = {
     title: email.subject || 'No Subject',
     description: truncatedBody,
     color: 0x5865F2, // Discord blurple
-    fields: [
-      {
-        name: 'From',
-        value: fromText,
-        inline: true,
-      },
-      {
-        name: 'To',
-        value: email.to,
-        inline: true,
-      },
-    ],
+    fields,
     footer: {
       text: `Message ID: ${email.messageId}`,
     },
     timestamp: email.date?.toISOString() || new Date().toISOString(),
   }
 
+  const content = `📧 New email from ${email.from.email}`
+
   return {
-    content: `📧 New email from ${email.from.email}`,
+    content,
     embeds: [embed],
     allowed_mentions: {
       parse: [],
     },
   }
+}
+
+/**
+ * Formats file size in human readable format
+ */
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
 /**

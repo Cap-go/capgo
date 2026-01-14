@@ -1,4 +1,4 @@
-import type { EmailMessage, ParsedEmail } from './types'
+import type { EmailAttachment, EmailMessage, ParsedEmail } from './types'
 
 /**
  * Parses an incoming email message
@@ -32,7 +32,7 @@ export function parseEmail(message: EmailMessage, rawEmailText?: string): Parsed
   // Parse body (this is simplified - in production you'd use a proper MIME parser)
   // Use provided rawEmailText if available, otherwise try message.raw
   const rawText = rawEmailText || (typeof message.raw === 'string' ? message.raw : '')
-  const body = parseEmailBody(rawText)
+  const { body, attachments } = parseEmailBodyAndAttachments(rawText)
 
   return {
     from,
@@ -43,6 +43,7 @@ export function parseEmail(message: EmailMessage, rawEmailText?: string): Parsed
     messageId,
     references,
     date,
+    attachments,
   }
 }
 
@@ -84,22 +85,25 @@ function parseEmailAddress(addressHeader: string): { email: string, name?: strin
 }
 
 /**
- * Simple email body parser
+ * Simple email body and attachment parser
  * Note: For production, consider using a library like mailparser or postal-mime
  */
-function parseEmailBody(rawEmail: string | any): { text?: string, html?: string } {
+function parseEmailBodyAndAttachments(rawEmail: string | any): {
+  body: { text?: string, html?: string }
+  attachments: EmailAttachment[]
+} {
   const body: { text?: string, html?: string } = {}
+  const attachments: EmailAttachment[] = []
 
   // Ensure rawEmail is a string
   if (typeof rawEmail !== 'string') {
     console.warn('⚠️  rawEmail is not a string:', typeof rawEmail)
-    // Try to extract text from headers or return empty body
-    return { text: '' }
+    return { body: { text: '' }, attachments: [] }
   }
 
   if (!rawEmail || rawEmail.length === 0) {
     console.warn('⚠️  rawEmail is empty')
-    return { text: '' }
+    return { body: { text: '' }, attachments: [] }
   }
 
   // Simple boundary detection for multipart messages
@@ -111,26 +115,169 @@ function parseEmailBody(rawEmail: string | any): { text?: string, html?: string 
     const parts = rawEmail.split(new RegExp(`--${escapeRegex(boundary)}`))
 
     for (const part of parts) {
-      if (part.includes('Content-Type: text/plain')) {
-        const textMatch = part.match(/\r?\n\r?\n([\s\S]+)/)
-        if (textMatch)
-          body.text = decodeContent(textMatch[1].trim(), part)
+      // Skip empty parts and the final boundary marker
+      if (!part.trim() || part.trim() === '--') {
+        continue
       }
-      else if (part.includes('Content-Type: text/html')) {
+
+      // Parse Content-Type header from this part
+      const contentTypeMatch = part.match(/Content-Type:\s*([^;\r\n]+)/i)
+      const contentType = contentTypeMatch?.[1]?.trim().toLowerCase() || ''
+
+      // Parse Content-Disposition header
+      const contentDispositionMatch = part.match(/Content-Disposition:\s*([^;\r\n]+)/i)
+      const contentDisposition = contentDispositionMatch?.[1]?.trim().toLowerCase() || ''
+
+      // Check for nested multipart (e.g., multipart/alternative inside multipart/mixed)
+      if (contentType.startsWith('multipart/')) {
+        const nestedBoundaryMatch = part.match(/boundary="?([^"\s;]+)"?/i)
+        if (nestedBoundaryMatch) {
+          const nestedResult = parseEmailBodyAndAttachments(part)
+          if (nestedResult.body.text && !body.text) {
+            body.text = nestedResult.body.text
+          }
+          if (nestedResult.body.html && !body.html) {
+            body.html = nestedResult.body.html
+          }
+          attachments.push(...nestedResult.attachments)
+        }
+        continue
+      }
+
+      // Check if this is an attachment or inline content
+      const isAttachment = contentDisposition === 'attachment'
+      const isInlineImage = contentDisposition === 'inline' && contentType.startsWith('image/')
+
+      if (isAttachment || isInlineImage) {
+        // Extract attachment
+        const attachment = parseAttachmentPart(part, contentType)
+        if (attachment) {
+          attachments.push(attachment)
+          console.log(`📎 Found attachment: ${attachment.filename} (${attachment.contentType}, ${attachment.size} bytes)`)
+        }
+      }
+      else if (contentType === 'text/plain' || part.includes('Content-Type: text/plain')) {
+        const textMatch = part.match(/\r?\n\r?\n([\s\S]+)/)
+        if (textMatch) {
+          body.text = decodeContent(textMatch[1].trim(), part)
+        }
+      }
+      else if (contentType === 'text/html' || part.includes('Content-Type: text/html')) {
         const htmlMatch = part.match(/\r?\n\r?\n([\s\S]+)/)
-        if (htmlMatch)
+        if (htmlMatch) {
           body.html = decodeContent(htmlMatch[1].trim(), part)
+        }
+      }
+      else if (contentType.startsWith('image/') || contentType.startsWith('application/')) {
+        // This might be an inline image without explicit disposition
+        const attachment = parseAttachmentPart(part, contentType)
+        if (attachment) {
+          attachments.push(attachment)
+          console.log(`📎 Found inline content: ${attachment.filename} (${attachment.contentType}, ${attachment.size} bytes)`)
+        }
       }
     }
   }
   else {
     // Simple plain text email
     const bodyMatch = rawEmail.match(/\r?\n\r?\n([\s\S]+)$/)
-    if (bodyMatch)
+    if (bodyMatch) {
       body.text = bodyMatch[1].trim()
+    }
   }
 
-  return body
+  console.log(`📧 Parsed email: ${attachments.length} attachment(s) found`)
+  return { body, attachments }
+}
+
+/**
+ * Parses an attachment part from a MIME multipart section
+ */
+function parseAttachmentPart(part: string, contentType: string): EmailAttachment | null {
+  // Extract filename from Content-Disposition or Content-Type
+  let filename = 'attachment'
+
+  // Try Content-Disposition first
+  const dispositionFilenameMatch = part.match(/Content-Disposition:[^\r\n]*filename="?([^"\r\n;]+)"?/i)
+  if (dispositionFilenameMatch) {
+    filename = dispositionFilenameMatch[1].trim()
+  }
+  else {
+    // Try Content-Type name parameter
+    const contentTypeNameMatch = part.match(/Content-Type:[^\r\n]*name="?([^"\r\n;]+)"?/i)
+    if (contentTypeNameMatch) {
+      filename = contentTypeNameMatch[1].trim()
+    }
+    else {
+      // Generate filename based on content type
+      const ext = getExtensionForContentType(contentType)
+      filename = `attachment${ext}`
+    }
+  }
+
+  // Extract the content (after headers)
+  const contentMatch = part.match(/\r?\n\r?\n([\s\S]+)/)
+  if (!contentMatch) {
+    return null
+  }
+
+  let content = contentMatch[1].trim()
+
+  // Decode the content based on encoding
+  const encodingMatch = part.match(/Content-Transfer-Encoding:\s*([^\r\n]+)/i)
+  const encoding = encodingMatch?.[1]?.toLowerCase().trim() || ''
+
+  let binaryContent: ArrayBuffer
+
+  if (encoding === 'base64') {
+    try {
+      // Remove whitespace and decode base64
+      const cleanBase64 = content.replace(/\s/g, '')
+      const binaryString = atob(cleanBase64)
+      const bytes = new Uint8Array(binaryString.length)
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i)
+      }
+      binaryContent = bytes.buffer
+    }
+    catch (error) {
+      console.error('❌ Failed to decode base64 attachment:', error)
+      return null
+    }
+  }
+  else {
+    // For other encodings, convert string to ArrayBuffer
+    const encoder = new TextEncoder()
+    binaryContent = encoder.encode(content).buffer
+  }
+
+  return {
+    filename,
+    contentType: contentType || 'application/octet-stream',
+    content: binaryContent,
+    size: binaryContent.byteLength,
+  }
+}
+
+/**
+ * Gets file extension for a content type
+ */
+function getExtensionForContentType(contentType: string): string {
+  const typeMap: Record<string, string> = {
+    'image/jpeg': '.jpg',
+    'image/jpg': '.jpg',
+    'image/png': '.png',
+    'image/gif': '.gif',
+    'image/webp': '.webp',
+    'image/svg+xml': '.svg',
+    'application/pdf': '.pdf',
+    'application/zip': '.zip',
+    'application/json': '.json',
+    'text/plain': '.txt',
+    'text/html': '.html',
+    'text/csv': '.csv',
+  }
+  return typeMap[contentType] || ''
 }
 
 /**
