@@ -7,7 +7,7 @@
 // Read more: https://github.com/vuejs/core/pull/3399
 import { GlobalComponents } from 'vue'
 
-export { }
+export {}
 
 /* prettier-ignore */
 declare module 'vue' {
@@ -84,8 +84,8 @@ declare global {
   const AdminMultiLineChart: typeof import('./components/admin/AdminMultiLineChart.vue')['default']
   const AdminStatsCard: typeof import('./components/admin/AdminStatsCard.vue')['default']
   const AdminTrendChart: typeof import('./components/admin/AdminTrendChart.vue')['default']
-  const AppNotFoundModal: typeof import('./components/AppNotFoundModal.vue')['default']
   const AppAccess: typeof import('./components/dashboard/AppAccess.vue')['default']
+  const AppNotFoundModal: typeof import('./components/AppNotFoundModal.vue')['default']
   const AppSetting: typeof import('./components/dashboard/AppSetting.vue')['default']
   const AppTable: typeof import('./components/tables/AppTable.vue')['default']
   const AuditLogTable: typeof import('./components/tables/AuditLogTable.vue')['default']
