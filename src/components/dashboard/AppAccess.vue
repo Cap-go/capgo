@@ -1,6 +1,7 @@
 <script setup lang="ts">
+import type { Ref } from 'vue'
 import type { TableColumn } from '~/components/comp_def'
-import { computed, onMounted, ref, watch, Ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import IconInformation from '~icons/heroicons/information-circle'
@@ -186,8 +187,15 @@ async function fetchAppRoleBindings() {
       }
     }
 
-    type UserEmailRow = { id: string, email: string | null }
-    type GroupNameRow = { id: string, name: string | null }
+    interface UserEmailRow {
+      id: string
+      email: string | null
+    }
+
+    interface GroupNameRow {
+      id: string
+      name: string | null
+    }
 
     const usersPromise = userIds.size
       ? supabase

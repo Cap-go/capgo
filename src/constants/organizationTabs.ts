@@ -6,7 +6,6 @@ import IconCredits from '~icons/heroicons/currency-dollar'
 import IconWebhook from '~icons/heroicons/globe-alt'
 import IconInfo from '~icons/heroicons/information-circle'
 import IconSecurity from '~icons/heroicons/shield-check'
-import IconShield from '~icons/heroicons/shield-check'
 import IconUserGroup from '~icons/heroicons/user-group'
 import IconUsers from '~icons/heroicons/users'
 
@@ -17,7 +16,7 @@ export const organizationTabs: Tab[] = [
   { label: 'security', key: '/settings/organization/security', icon: IconSecurity },
   { label: 'audit-logs', key: '/settings/organization/auditlogs', icon: IconAudit },
   { label: 'groups', key: '/settings/organization/groups', icon: IconUserGroup },
-  { label: 'role-assignments', key: '/settings/organization/role-assignments', icon: IconShield },
+  { label: 'role-assignments', key: '/settings/organization/role-assignments', icon: IconSecurity },
   { label: 'plans', key: '/settings/organization/plans', icon: IconPlan },
   { label: 'usage', key: '/settings/organization/usage', icon: IconChart },
   { label: 'credits', key: '/settings/organization/credits', icon: IconCredits },
