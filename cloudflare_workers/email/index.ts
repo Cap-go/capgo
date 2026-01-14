@@ -79,7 +79,16 @@ export default {
         hasBody: !!parsedEmail.body.text || !!parsedEmail.body.html,
         bodyTextLength: parsedEmail.body.text?.length || 0,
         bodyHtmlLength: parsedEmail.body.html?.length || 0,
+        attachmentCount: parsedEmail.attachments?.length || 0,
       })
+
+      // Log attachments if present
+      if (parsedEmail.attachments && parsedEmail.attachments.length > 0) {
+        console.log('📎 Attachments found:')
+        for (const att of parsedEmail.attachments) {
+          console.log(`   - ${att.filename} (${att.contentType}, ${att.size} bytes)`)
+        }
+      }
 
       // Log email body content for debugging
       if (parsedEmail.body.text) {
@@ -193,8 +202,9 @@ async function handleNewEmail(env: Env, email: ParsedEmail, category?: string): 
   console.log(`   Prefix: "${categoryPrefix}"`)
   console.log(`   Subject: "${email.subject}"`)
   console.log(`   From: ${email.from.email}`)
+  console.log(`   Attachments: ${email.attachments?.length || 0}`)
 
-  // Create a new forum thread
+  // Create a new forum thread - attachments will be uploaded directly to Discord
   console.log(`🔵 Calling createForumThread...`)
   const thread = await createForumThread(env, email, categoryPrefix)
 
@@ -227,6 +237,7 @@ async function handleNewEmail(env: Env, email: ParsedEmail, category?: string): 
  */
 async function handleEmailReply(env: Env, email: ParsedEmail, _threadId: string): Promise<void> {
   console.log('Processing email reply - checking all potential thread IDs')
+  console.log(`   Attachments: ${email.attachments?.length || 0}`)
 
   // Get all potential thread IDs from References and In-Reply-To headers
   const allPotentialIds = getAllPotentialThreadIds(email)
@@ -254,7 +265,7 @@ async function handleEmailReply(env: Env, email: ParsedEmail, _threadId: string)
 
   console.log('Found existing Discord thread:', mapping.discordThreadId)
 
-  // Post to the existing thread
+  // Post to the existing thread - attachments will be uploaded directly to Discord
   const success = await postToThread(env, mapping.discordThreadId, email)
 
   if (success) {
