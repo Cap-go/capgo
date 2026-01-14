@@ -155,11 +155,18 @@ function parseEmailAddress(addressHeader: string): { email: string, name?: strin
  * Note: For production, consider using a library like mailparser or postal-mime
  * @param rawEmail The raw email text (body only, headers may be separate)
  * @param headerBoundary Optional boundary extracted from Content-Type header
+ * @param depth Current recursion depth to prevent infinite loops
  */
-function parseEmailBodyAndAttachments(rawEmail: string | any, headerBoundary?: string): {
+function parseEmailBodyAndAttachments(rawEmail: string | any, headerBoundary?: string, depth: number = 0): {
   body: { text?: string, html?: string }
   attachments: EmailAttachment[]
 } {
+  // Prevent infinite recursion
+  const MAX_DEPTH = 10
+  if (depth > MAX_DEPTH) {
+    console.warn(`⚠️  Maximum parsing depth (${MAX_DEPTH}) exceeded, stopping recursion`)
+    return { body: { text: '' }, attachments: [] }
+  }
   const body: { text?: string, html?: string } = {}
   const attachments: EmailAttachment[] = []
 
@@ -205,7 +212,9 @@ function parseEmailBodyAndAttachments(rawEmail: string | any, headerBoundary?: s
       if (contentType.startsWith('multipart/')) {
         const nestedBoundaryMatch = part.match(/boundary="?([^"\s;]+)"?/i)
         if (nestedBoundaryMatch) {
-          const nestedResult = parseEmailBodyAndAttachments(part)
+          const nestedBoundary = nestedBoundaryMatch[1]
+          // Pass the nested boundary explicitly and increment depth to prevent infinite recursion
+          const nestedResult = parseEmailBodyAndAttachments(part, nestedBoundary, depth + 1)
           if (nestedResult.body.text && !body.text) {
             body.text = nestedResult.body.text
           }
