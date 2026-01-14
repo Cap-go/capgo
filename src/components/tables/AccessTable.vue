@@ -111,6 +111,7 @@ async function showRoleModal(element: Element): Promise<string | undefined> {
   selectedRole.value = element.role_name
 
   dialogStore.openDialog({
+    id: 'select-app-role',
     title: t('select-app-role'),
     description: t('select-role'),
     size: 'lg',
@@ -345,7 +346,7 @@ watch(dynamicColumns, (newCols) => {
 
   <!-- Teleport pour la modale de sélection du rôle -->
   <Teleport
-    v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('select-app-role')"
+    v-if="dialogStore.showDialog && dialogStore.dialogOptions?.id === 'select-app-role'"
     defer
     to="#dialog-v2-content"
   >
