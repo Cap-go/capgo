@@ -67,7 +67,8 @@ async function loadAppInfo() {
       .select()
       .eq('app_id', props.appId)
       .single()
-    app.value = dataApp || app.value
+    app.value = dataApp ?? undefined
+    canUpdateUserRoles.value = false
 
     // Vérifier la permission app.update_user_roles
     if (app.value?.app_id) {
@@ -76,6 +77,8 @@ async function loadAppInfo() {
   }
   catch (error) {
     console.error('Error loading app info:', error)
+    app.value = undefined
+    canUpdateUserRoles.value = false
   }
 }
 
