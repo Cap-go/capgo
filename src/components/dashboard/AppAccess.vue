@@ -508,6 +508,7 @@ onMounted(async () => {
 
       <template #actions="{ row }">
         <button
+          v-if="canAssignRoles"
           class="d-btn d-btn-sm d-btn-ghost text-error"
           :title="t('remove')"
           @click="removeRoleBinding(row.id)"
