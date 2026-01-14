@@ -196,32 +196,66 @@ function truncateText(text: string, maxLength: number): string {
  */
 function stripHtml(html: string): string {
   let text = html
-    // Remove style and script blocks
-    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-    // Remove HTML comments
-    .replace(/<!--[\s\S]*?-->/g, '')
-    // Handle line breaks
-    .replace(/<br\s*\/?>/gi, '\n')
-    // Handle block-level elements with double newlines
-    .replace(/<\/(p|div|h[1-6]|article|section|header|footer|main|aside|nav|blockquote|pre)>/gi, '\n\n')
-    .replace(/<(p|div|h[1-6]|article|section|header|footer|main|aside|nav|blockquote|pre)[^>]*>/gi, '')
-    // Handle list items
-    .replace(/<li[^>]*>/gi, '\n• ')
-    .replace(/<\/li>/gi, '')
-    // Handle table rows
-    .replace(/<tr[^>]*>/gi, '\n')
-    .replace(/<\/tr>/gi, '')
-    // Handle table cells with spacing
-    .replace(/<td[^>]*>/gi, ' ')
-    .replace(/<\/td>/gi, ' | ')
-    .replace(/<th[^>]*>/gi, ' ')
-    .replace(/<\/th>/gi, ' | ')
-    // Remove remaining HTML tags
-    .replace(/<[^>]+>/g, '')
 
-  // Decode HTML entities
+  // Remove dangerous elements in a loop to handle nested/malformed tags
+  // e.g., <scr<script>ipt> becomes <script> after first pass
+  let previousText: string
+  do {
+    previousText = text
+    // Remove style blocks (allow whitespace in closing tag: </style >)
+    text = text.replace(/<style\b[^>]*>[\s\S]*?<\/style\s*>/gi, '')
+    // Remove script blocks (allow whitespace in closing tag: </script >)
+    text = text.replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, '')
+    // Remove HTML comments (handle malformed: <!-- ... --->)
+    text = text.replace(/<!--[\s\S]*?--+>/g, '')
+    // Remove any remaining unclosed script/style tags
+    text = text.replace(/<script\b[^>]*>[\s\S]*/gi, '')
+    text = text.replace(/<style\b[^>]*>[\s\S]*/gi, '')
+  } while (text !== previousText)
+
+  // Handle line breaks
+  text = text.replace(/<br\s*\/?>/gi, '\n')
+
+  // Handle block-level elements with double newlines
+  text = text.replace(/<\/(p|div|h[1-6]|article|section|header|footer|main|aside|nav|blockquote|pre)\s*>/gi, '\n\n')
+  text = text.replace(/<(p|div|h[1-6]|article|section|header|footer|main|aside|nav|blockquote|pre)\b[^>]*>/gi, '')
+
+  // Handle list items
+  text = text.replace(/<li\b[^>]*>/gi, '\n• ')
+  text = text.replace(/<\/li\s*>/gi, '')
+
+  // Handle table rows
+  text = text.replace(/<tr\b[^>]*>/gi, '\n')
+  text = text.replace(/<\/tr\s*>/gi, '')
+
+  // Handle table cells with spacing
+  text = text.replace(/<td\b[^>]*>/gi, ' ')
+  text = text.replace(/<\/td\s*>/gi, ' | ')
+  text = text.replace(/<th\b[^>]*>/gi, ' ')
+  text = text.replace(/<\/th\s*>/gi, ' | ')
+
+  // Remove all remaining HTML tags in a loop to handle nested tags
+  do {
+    previousText = text
+    text = text.replace(/<[^>]*>/g, '')
+  } while (text !== previousText)
+
+  // Decode HTML entities first
   text = decodeHtmlEntities(text)
+
+  // After entity decoding, some < or > might have been introduced
+  // Run tag removal again to catch any decoded tags
+  do {
+    previousText = text
+    text = text.replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, '')
+    text = text.replace(/<style\b[^>]*>[\s\S]*?<\/style\s*>/gi, '')
+    text = text.replace(/<!--[\s\S]*?--+>/g, '')
+    text = text.replace(/<[^>]*>/g, '')
+  } while (text !== previousText)
+
+  // Final safety: escape any remaining angle brackets
+  // These are literal < > characters that should be displayed as text
+  text = text.replace(/</g, '\u003C').replace(/>/g, '\u003E')
 
   // Clean up whitespace while preserving intentional line breaks
   text = text
