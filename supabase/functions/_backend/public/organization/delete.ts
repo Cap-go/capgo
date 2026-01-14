@@ -23,12 +23,23 @@ async function deleteOrgImages(c: Context<MiddlewareKeyVariables>, orgId: string
     }
 
     for (const entry of entries) {
-      if (entry.id === null) {
-        await deleteOrgAppImages(storage, orgId, entry.name, requestId)
-        continue
-      }
+      try {
+        if (entry.id === null) {
+          await deleteOrgAppImages(storage, orgId, entry.name, requestId)
+          continue
+        }
 
-      await storage.remove([`org/${orgId}/${entry.name}`])
+        await storage.remove([`org/${orgId}/${entry.name}`])
+      }
+      catch (error) {
+        cloudlog({
+          requestId,
+          message: 'error deleting org image entry',
+          org_id: orgId,
+          entry: entry.name,
+          error,
+        })
+      }
     }
 
     cloudlog({ requestId, message: 'deleted all org images', org_id: orgId })
