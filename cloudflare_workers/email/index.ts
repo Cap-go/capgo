@@ -1,5 +1,5 @@
 import type { EmailMessage, Env, ParsedEmail, ThreadMapping } from './types'
-import { classifyEmail, classifyEmailHeuristic, filterAttachmentsHeuristic, filterAttachmentsWithAI } from './classifier'
+import { classifyEmail, classifyEmailHeuristic, filterAttachmentsHeuristic, filterAttachmentsWithAI, generateBacklinkAutoReply } from './classifier'
 import { createForumThread, getThreadMessages, postToThread } from './discord'
 import { extractThreadId, getAllPotentialThreadIds, parseEmail } from './email-parser'
 import { formatDiscordMessageAsEmail, sendEmail } from './email-sender'
@@ -135,9 +135,16 @@ export default {
         })
 
         if (classification.shouldProcess) {
-          // Only process support, sales, and query emails
-          console.log(`✅ Email WILL BE PROCESSED (category: ${classification.category})`)
-          await handleNewEmail(env, parsedEmail, classification.category)
+          // Handle backlink requests with auto-reply
+          if (classification.category === 'backlink') {
+            console.log(`📧 BACKLINK request detected - sending auto-reply`)
+            await handleBacklinkEmail(env, parsedEmail)
+          }
+          else {
+            // Process support, sales, and query emails via Discord
+            console.log(`✅ Email WILL BE PROCESSED (category: ${classification.category})`)
+            await handleNewEmail(env, parsedEmail, classification.category)
+          }
         }
         else {
           console.log(`⏭️  Email IGNORED (category: ${classification.category}):`, classification.reason)
@@ -255,6 +262,46 @@ async function handleNewEmail(env: Env, email: ParsedEmail, category?: string): 
   )
 
   console.log('Stored thread mapping')
+}
+
+/**
+ * Handles backlink/guest post requests by sending an AI-generated auto-reply
+ */
+async function handleBacklinkEmail(env: Env, email: ParsedEmail): Promise<void> {
+  console.log(`📝 handleBacklinkEmail: Processing backlink request`)
+  console.log(`   From: ${email.from.email}`)
+  console.log(`   Subject: "${email.subject}"`)
+
+  try {
+    // Generate AI auto-reply
+    const autoReply = await generateBacklinkAutoReply(env, email)
+    console.log(`   Generated reply subject: "${autoReply.subject}"`)
+
+    // Generate a unique Message-ID for this outgoing email
+    const ourMessageId = generateMessageId(env.EMAIL_FROM_ADDRESS, Date.now())
+    console.log(`   Generated Message-ID: ${ourMessageId}`)
+
+    // Send the auto-reply
+    const success = await sendEmail(env, {
+      to: email.from.email,
+      subject: autoReply.subject,
+      text: autoReply.text,
+      html: autoReply.html,
+      inReplyTo: email.messageId,
+      references: [email.messageId],
+      messageId: ourMessageId,
+    })
+
+    if (success) {
+      console.log(`✅ Backlink auto-reply sent successfully to ${email.from.email}`)
+    }
+    else {
+      console.error(`❌ Failed to send backlink auto-reply`)
+    }
+  }
+  catch (error) {
+    console.error('❌ Error handling backlink email:', error)
+  }
 }
 
 /**
