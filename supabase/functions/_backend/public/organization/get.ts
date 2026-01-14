@@ -100,7 +100,7 @@ async function fetchOrgs(
 
 export async function get(c: Context<MiddlewareKeyVariables>, bodyRaw: any, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
   const body = parseBody(bodyRaw)
-  const supabase = supabaseApikey(c, c.get('capgkey') as string)
+  const supabase = supabaseApikey(c, apikey.key)
 
   // Auth context is already set by middlewareKey
   if (body.orgId) {
