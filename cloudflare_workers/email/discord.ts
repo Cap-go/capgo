@@ -191,15 +191,100 @@ function truncateText(text: string, maxLength: number): string {
 }
 
 /**
- * Basic HTML stripping (for simple cases)
+ * Converts HTML to readable plain text
+ * Preserves structure by converting block elements to newlines and decoding entities
  */
 function stripHtml(html: string): string {
-  return html
-    .replace(/<style[^>]*>.*?<\/style>/gis, '')
-    .replace(/<script[^>]*>.*?<\/script>/gis, '')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/\s+/g, ' ')
+  let text = html
+    // Remove style and script blocks
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+    // Remove HTML comments
+    .replace(/<!--[\s\S]*?-->/g, '')
+    // Handle line breaks
+    .replace(/<br\s*\/?>/gi, '\n')
+    // Handle block-level elements with double newlines
+    .replace(/<\/(p|div|h[1-6]|article|section|header|footer|main|aside|nav|blockquote|pre)>/gi, '\n\n')
+    .replace(/<(p|div|h[1-6]|article|section|header|footer|main|aside|nav|blockquote|pre)[^>]*>/gi, '')
+    // Handle list items
+    .replace(/<li[^>]*>/gi, '\n• ')
+    .replace(/<\/li>/gi, '')
+    // Handle table rows
+    .replace(/<tr[^>]*>/gi, '\n')
+    .replace(/<\/tr>/gi, '')
+    // Handle table cells with spacing
+    .replace(/<td[^>]*>/gi, ' ')
+    .replace(/<\/td>/gi, ' | ')
+    .replace(/<th[^>]*>/gi, ' ')
+    .replace(/<\/th>/gi, ' | ')
+    // Remove remaining HTML tags
+    .replace(/<[^>]+>/g, '')
+
+  // Decode HTML entities
+  text = decodeHtmlEntities(text)
+
+  // Clean up whitespace while preserving intentional line breaks
+  text = text
+    .split('\n')
+    .map(line => line.replace(/\s+/g, ' ').trim())
+    .join('\n')
+    // Collapse multiple newlines to max two
+    .replace(/\n{3,}/g, '\n\n')
     .trim()
+
+  return text
+}
+
+/**
+ * Decodes common HTML entities to their character equivalents
+ */
+function decodeHtmlEntities(text: string): string {
+  // Replace named entities using a map
+  // Use Unicode escape sequences for special quotes to avoid encoding issues
+  const entityMap: [string, string][] = [
+    ['&nbsp;', ' '],
+    ['&amp;', '&'],
+    ['&lt;', '<'],
+    ['&gt;', '>'],
+    ['&quot;', '"'],
+    ['&#39;', "'"],
+    ['&apos;', "'"],
+    ['&mdash;', '\u2014'], // —
+    ['&ndash;', '\u2013'], // –
+    ['&hellip;', '\u2026'], // …
+    ['&lsquo;', '\u2018'], // '
+    ['&rsquo;', '\u2019'], // '
+    ['&ldquo;', '\u201C'], // "
+    ['&rdquo;', '\u201D'], // "
+    ['&bull;', '\u2022'], // •
+    ['&middot;', '\u00B7'], // ·
+    ['&copy;', '\u00A9'], // ©
+    ['&reg;', '\u00AE'], // ®
+    ['&trade;', '\u2122'], // ™
+    ['&euro;', '\u20AC'], // €
+    ['&pound;', '\u00A3'], // £
+    ['&yen;', '\u00A5'], // ¥
+    ['&cent;', '\u00A2'], // ¢
+    ['&deg;', '\u00B0'], // °
+    ['&times;', '\u00D7'], // ×
+    ['&divide;', '\u00F7'], // ÷
+    ['&plusmn;', '\u00B1'], // ±
+    ['&frac12;', '\u00BD'], // ½
+    ['&frac14;', '\u00BC'], // ¼
+    ['&frac34;', '\u00BE'], // ¾
+  ]
+
+  let result = text
+  for (const [entity, char] of entityMap) {
+    result = result.split(entity).join(char)
+  }
+
+  // Replace numeric entities (&#123; or &#x1F600;)
+  result = result
+    .replace(/&#(\d+);/g, (_, code) => String.fromCodePoint(Number.parseInt(code, 10)))
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, code) => String.fromCodePoint(Number.parseInt(code, 16)))
+
+  return result
 }
 
 /**
