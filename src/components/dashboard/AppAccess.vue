@@ -9,6 +9,7 @@ import IconPlus from '~icons/heroicons/plus'
 import IconShield from '~icons/heroicons/shield-check'
 import IconTrash from '~icons/heroicons/trash'
 import DataTable from '~/components/Table.vue'
+import { checkPermissions } from '~/services/permissions'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 
@@ -56,6 +57,7 @@ const availableAppRoles = ref<Role[]>([])
 const search = ref('')
 const currentPage = ref(1)
 const useNewRbac = ref(false)
+const canAssignRoles = ref(false)
 const ownerOrg = ref<string>('')
 
 // Assign role modal state
@@ -397,6 +399,18 @@ async function removeRoleBinding(bindingId: string) {
 async function loadAppAccess() {
   await fetchAppDetails()
   await checkRbacEnabled()
+  if (props.appId) {
+    try {
+      canAssignRoles.value = await checkPermissions('app.update_user_roles', { appId: props.appId })
+    }
+    catch (error: any) {
+      console.error('Error checking app role permissions:', error)
+      canAssignRoles.value = false
+    }
+  }
+  else {
+    canAssignRoles.value = false
+  }
   if (useNewRbac.value) {
     await Promise.all([
       fetchAppRoleBindings(),
@@ -436,7 +450,7 @@ onMounted(async () => {
         </p>
       </div>
       <button
-        v-if="useNewRbac"
+        v-if="useNewRbac && canAssignRoles"
         class="d-btn d-btn-primary"
         @click="openAssignRoleModal"
       >
