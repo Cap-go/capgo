@@ -1,6 +1,14 @@
 import type { DiscordAPIMessage, DiscordEmbed, DiscordMessage, DiscordThread, EmailAttachment, Env, ParsedEmail } from './types'
+import TurndownService from 'turndown'
 
 const DISCORD_API_BASE = 'https://discord.com/api/v10'
+
+// Initialize Turndown for HTML to Markdown conversion
+const turndownService = new TurndownService({
+  headingStyle: 'atx',
+  bulletListMarker: '-',
+  codeBlockStyle: 'fenced',
+})
 const DISCORD_MAX_FILE_SIZE = 25 * 1024 * 1024 // 25MB - Discord's limit for bots
 
 /**
@@ -351,160 +359,32 @@ function truncateText(text: string, maxLength: number): string {
 }
 
 /**
- * Converts HTML to readable plain text
- * Preserves structure by converting block elements to newlines and decoding entities
- *
- * Security: This function strips ALL HTML by removing angle brackets entirely.
- * Discord messages are plain text, so no HTML interpretation is possible.
+ * Converts HTML to Markdown using Turndown
+ * Discord supports Markdown formatting, so this preserves structure nicely
  */
 function stripHtml(html: string): string {
-  // Use a non-regex approach to safely strip all HTML
-  // This avoids pattern-based sanitization issues entirely
-  let text = stripAllTags(html)
-
-  // Decode HTML entities
-  text = decodeHtmlEntities(text)
-
-  // After entity decoding, angle brackets might have been reintroduced
-  // Strip tags again to handle any decoded content
-  text = stripAllTags(text)
-
-  // Clean up whitespace while preserving intentional line breaks
-  text = text
-    .split('\n')
-    .map(line => line.replace(/\s+/g, ' ').trim())
-    .join('\n')
-    // Collapse multiple newlines to max two
-    .replace(/\n{3,}/g, '\n\n')
-    .trim()
-
-  return text
-}
-
-/**
- * Strips all HTML tags using a character-by-character approach
- * This avoids regex-based sanitization vulnerabilities entirely
- */
-function stripAllTags(html: string): string {
-  const result: string[] = []
-  let inTag = false
-  let tagContent = ''
-
-  for (let i = 0; i < html.length; i++) {
-    const char = html[i]
-
-    if (char === '<') {
-      inTag = true
-      tagContent = ''
-      continue
-    }
-
-    if (char === '>' && inTag) {
-      inTag = false
-      // Convert certain tags to formatting before discarding
-      const tagLower = tagContent.toLowerCase().trim()
-
-      // Handle line breaks
-      if (tagLower === 'br' || tagLower === 'br/') {
-        result.push('\n')
-      }
-      // Handle block elements - add newlines after closing tags
-      else if (tagLower.startsWith('/p') || tagLower.startsWith('/div') ||
-               tagLower.startsWith('/h1') || tagLower.startsWith('/h2') ||
-               tagLower.startsWith('/h3') || tagLower.startsWith('/h4') ||
-               tagLower.startsWith('/h5') || tagLower.startsWith('/h6') ||
-               tagLower.startsWith('/article') || tagLower.startsWith('/section') ||
-               tagLower.startsWith('/blockquote') || tagLower.startsWith('/pre')) {
-        result.push('\n\n')
-      }
-      // Handle list items
-      else if (tagLower.startsWith('li')) {
-        result.push('\n• ')
-      }
-      // Handle table rows
-      else if (tagLower.startsWith('tr') || tagLower.startsWith('/tr')) {
-        result.push('\n')
-      }
-      // Handle table cells
-      else if (tagLower.startsWith('/td') || tagLower.startsWith('/th')) {
-        result.push(' | ')
-      }
-      else if (tagLower.startsWith('td') || tagLower.startsWith('th')) {
-        result.push(' ')
-      }
-      // All other tags are simply discarded
-      continue
-    }
-
-    if (inTag) {
-      tagContent += char
-    }
-    else {
-      result.push(char)
-    }
+  if (!html || html.trim().length === 0) {
+    return ''
   }
 
-  // Any unclosed tag content is discarded (we were inside a tag when string ended)
-  return result.join('')
-}
+  try {
+    // Use Turndown to convert HTML to Markdown
+    const markdown = turndownService.turndown(html)
 
-/**
- * Decodes common HTML entities to their character equivalents
- */
-function decodeHtmlEntities(text: string): string {
-  // Replace named entities using a map
-  // Use Unicode escape sequences for special quotes to avoid encoding issues
-  const entityMap: [string, string][] = [
-    ['&nbsp;', ' '],
-    ['&amp;', '&'],
-    ['&lt;', '<'],
-    ['&gt;', '>'],
-    ['&quot;', '"'],
-    ['&#39;', "'"],
-    ['&apos;', "'"],
-    ['&mdash;', '\u2014'], // —
-    ['&ndash;', '\u2013'], // –
-    ['&hellip;', '\u2026'], // …
-    ['&lsquo;', '\u2018'], // '
-    ['&rsquo;', '\u2019'], // '
-    ['&ldquo;', '\u201C'], // "
-    ['&rdquo;', '\u201D'], // "
-    ['&bull;', '\u2022'], // •
-    ['&middot;', '\u00B7'], // ·
-    ['&copy;', '\u00A9'], // ©
-    ['&reg;', '\u00AE'], // ®
-    ['&trade;', '\u2122'], // ™
-    ['&euro;', '\u20AC'], // €
-    ['&pound;', '\u00A3'], // £
-    ['&yen;', '\u00A5'], // ¥
-    ['&cent;', '\u00A2'], // ¢
-    ['&deg;', '\u00B0'], // °
-    ['&times;', '\u00D7'], // ×
-    ['&divide;', '\u00F7'], // ÷
-    ['&plusmn;', '\u00B1'], // ±
-    ['&frac12;', '\u00BD'], // ½
-    ['&frac14;', '\u00BC'], // ¼
-    ['&frac34;', '\u00BE'], // ¾
-  ]
-
-  let result = text
-  for (const [entity, char] of entityMap) {
-    result = result.split(entity).join(char)
+    // Clean up whitespace while preserving intentional line breaks
+    return markdown
+      .split('\n')
+      .map(line => line.trimEnd())
+      .join('\n')
+      // Collapse multiple newlines to max two
+      .replace(/\n{3,}/g, '\n\n')
+      .trim()
   }
-
-  // Replace numeric entities (&#123; or &#x1F600;)
-  // Validate code points to prevent RangeError from invalid values
-  result = result
-    .replace(/&#(\d+);/g, (match, code) => {
-      const codePoint = Number.parseInt(code, 10)
-      return codePoint >= 0 && codePoint <= 0x10FFFF ? String.fromCodePoint(codePoint) : match
-    })
-    .replace(/&#x([0-9a-fA-F]+);/g, (match, code) => {
-      const codePoint = Number.parseInt(code, 16)
-      return codePoint >= 0 && codePoint <= 0x10FFFF ? String.fromCodePoint(codePoint) : match
-    })
-
-  return result
+  catch (error) {
+    console.error('Error converting HTML to Markdown:', error)
+    // Fallback: strip tags manually if Turndown fails
+    return html.replace(/<[^>]*>/g, '').trim()
+  }
 }
 
 /**
