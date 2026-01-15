@@ -3,6 +3,7 @@ import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { and, eq } from 'drizzle-orm'
 import { Hono } from 'hono/tiny'
 import { middlewareAuth, useCors } from '../utils/hono.ts'
+import { cloudlogErr } from '../utils/logging.ts'
 import { getDrizzleClient } from '../utils/pg.ts'
 import { schema } from '../utils/postgres_schema.ts'
 
@@ -40,7 +41,12 @@ app.get('/', async (c: Context<MiddlewareKeyVariables>) => {
     return c.json(roles)
   }
   catch (error) {
-    console.error('Error fetching roles:', error)
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'roles_fetch_failed',
+      userId,
+      error,
+    })
     return c.json({ error: 'Internal server error' }, 500)
   }
 })
@@ -84,7 +90,13 @@ app.get('/:scope_type', async (c: Context<MiddlewareKeyVariables>) => {
     return c.json(roles)
   }
   catch (error) {
-    console.error('Error fetching roles by scope:', error)
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'roles_fetch_by_scope_failed',
+      userId,
+      scopeType,
+      error,
+    })
     return c.json({ error: 'Internal server error' }, 500)
   }
 })
