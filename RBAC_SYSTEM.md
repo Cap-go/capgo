@@ -1086,11 +1086,12 @@ export async function checkPermission(
   const auth = c.get('auth')
   const apikey = c.get('apikey')
 
+  let pgClient
   try {
     const userId = auth?.userId || null
     const apikeyString = apikey?.key || null
 
-    const pgClient = await getPgClient()
+    pgClient = getPgClient(c, true)
     const result = await pgClient`
       SELECT rbac_check_permission_direct(
         ${permission},
@@ -1124,7 +1125,9 @@ export async function checkPermission(
     })
     return false // Fail closed
   } finally {
-    await closeClient()
+    if (pgClient) {
+      await closeClient(c, pgClient)
+    }
   }
 }
 
