@@ -1085,6 +1085,8 @@ export type Database = {
           paying: number | null
           paying_monthly: number | null
           paying_yearly: number | null
+          plugin_version_breakdown: Json
+          plugin_major_breakdown: Json
           plan_enterprise: number | null
           plan_enterprise_monthly: number
           plan_enterprise_yearly: number
@@ -1132,6 +1134,8 @@ export type Database = {
           paying?: number | null
           paying_monthly?: number | null
           paying_yearly?: number | null
+          plugin_version_breakdown?: Json
+          plugin_major_breakdown?: Json
           plan_enterprise?: number | null
           plan_enterprise_monthly?: number
           plan_enterprise_yearly?: number
@@ -1179,6 +1183,8 @@ export type Database = {
           paying?: number | null
           paying_monthly?: number | null
           paying_yearly?: number | null
+          plugin_version_breakdown?: Json
+          plugin_major_breakdown?: Json
           plan_enterprise?: number | null
           plan_enterprise_monthly?: number
           plan_enterprise_yearly?: number
