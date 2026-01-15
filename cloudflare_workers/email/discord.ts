@@ -380,6 +380,8 @@ function truncateText(text: string, maxLength: number): string {
 
 /**
  * Cleans up email body text by removing any MIME boundaries or headers that leaked through
+ * Note: Does NOT strip HTML tags or decode entities - that's handled by stripHtml for HTML content
+ * Plain text content may legitimately contain <email@example.com> or code snippets
  */
 function cleanEmailBody(text: string): string {
   if (!text) return ''
@@ -400,12 +402,6 @@ function cleanEmailBody(text: string): string {
   // Remove charset declarations
   cleaned = cleaned.replace(/charset="?[^"\s;]+"?/gi, '')
 
-  // Strip any remaining HTML tags
-  cleaned = stripTagsSafely(cleaned)
-
-  // Decode HTML entities
-  cleaned = decodeHtmlEntities(cleaned)
-
   // Clean up excessive whitespace
   cleaned = cleaned
     .split('\n')
@@ -425,18 +421,20 @@ function cleanEmailBody(text: string): string {
 
 /**
  * Decodes common HTML entities
+ * Note: &amp; is decoded LAST to prevent double-unescaping (e.g., &amp;lt; → &lt; → <)
  */
 function decodeHtmlEntities(text: string): string {
   return text
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
-    .replace(/&amp;/g, '&')
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
     .replace(/&nbsp;/g, ' ')
     // Handle numeric entities
     .replace(/&#(\d+);/g, (_, num) => String.fromCharCode(Number.parseInt(num, 10)))
     .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCharCode(Number.parseInt(hex, 16)))
+    // Decode &amp; LAST to prevent double-unescaping
+    .replace(/&amp;/g, '&')
 }
 
 /**

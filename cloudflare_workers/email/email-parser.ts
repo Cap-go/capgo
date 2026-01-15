@@ -81,11 +81,23 @@ function decodeRfc2047(text: string): string {
         return decodeBase64Utf8(encoded, charset.toLowerCase())
       }
       else if (encoding.toUpperCase() === 'Q') {
-        // Quoted-printable encoding
-        const decoded = encoded
+        // Q-encoding: decode to bytes first, then decode with proper charset
+        // This handles multi-byte UTF-8 sequences like =C3=A9 for "é"
+        const byteString = encoded
           .replace(/_/g, ' ')
           .replace(/=([0-9A-Fa-f]{2})/g, (_: string, hex: string) => String.fromCharCode(Number.parseInt(hex, 16)))
-        return decoded
+
+        // Convert to byte array and decode with proper charset
+        try {
+          const bytes = new Uint8Array(byteString.length)
+          for (let i = 0; i < byteString.length; i++) {
+            bytes[i] = byteString.charCodeAt(i)
+          }
+          return new TextDecoder(charset.toLowerCase()).decode(bytes)
+        }
+        catch {
+          return byteString
+        }
       }
     }
     catch {
