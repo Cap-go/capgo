@@ -19,6 +19,16 @@ const isOrgUnpaid = computed(() => {
   return organizationStore.currentOrganizationFailed
 })
 
+// Check if we're on the info page (which should not show the payment modal)
+const isOnInfoPage = computed(() => {
+  return route.path.endsWith('/info')
+})
+
+// Show payment overlay only when org is unpaid AND not on info page
+const showPaymentOverlay = computed(() => {
+  return isOrgUnpaid.value && !isOnInfoPage.value
+})
+
 // Detect resource type from route (channel, device, or bundle)
 const resourceType = computed(() => {
   if (route.path.includes('/channel/'))
@@ -139,11 +149,11 @@ function handleSecondaryTab(key: string) {
     <main class="relative flex flex-1 w-full min-h-0 mt-0 overflow-hidden bg-blue-50 dark:bg-slate-800/40">
       <div
         class="flex-1 w-full min-h-0 mx-auto overflow-y-auto"
-        :class="{ 'blur-sm pointer-events-none select-none': isOrgUnpaid }"
+        :class="{ 'blur-sm pointer-events-none select-none': showPaymentOverlay }"
       >
         <RouterView class="w-full" />
       </div>
-      <PaymentRequiredModal v-if="isOrgUnpaid" />
+      <PaymentRequiredModal v-if="showPaymentOverlay" />
     </main>
   </div>
 </template>
