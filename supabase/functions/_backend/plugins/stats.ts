@@ -6,7 +6,7 @@ import { greaterOrEqual, parse } from '@std/semver'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod/mini'
 import { getAppStatus, setAppStatus } from '../utils/appStatus.ts'
-import { BRES, parseBody, simpleError200, simpleRateLimit } from '../utils/hono.ts'
+import { BRES, simpleError, simpleError200, simpleRateLimit } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { sendNotifOrg } from '../utils/notifications.ts'
 import { sendNotifToOrgMembers } from '../utils/org_email_notifications.ts'
@@ -19,6 +19,13 @@ import { ALLOWED_STATS_ACTIONS } from './stats_actions.ts'
 z.config(z.locales.en())
 
 const PLAN_ERROR = 'Cannot send stats, upgrade plan to continue to update'
+
+export interface BatchStatsResult {
+  status: 'ok' | 'error'
+  error?: string
+  message?: string
+  index?: number
+}
 
 export const jsonRequestSchema = z.object({
   app_id: z.string({
@@ -51,23 +58,32 @@ export const jsonRequestSchema = z.object({
   key_id: z.optional(z.string().check(z.maxLength(20))),
 })
 
-async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient>, body: AppStats) {
+interface PostResult {
+  success: boolean
+  error?: string
+  message?: string
+  isOnprem?: boolean
+}
+
+async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient>, body: AppStats): Promise<PostResult> {
   const device = makeDevice(body)
   const { app_id, action, version_name, old_version_name, plugin_version } = body
 
   const planActions: Array<'mau' | 'bandwidth'> = ['mau', 'bandwidth']
   const cachedStatus = await getAppStatus(c, app_id)
   if (cachedStatus === 'onprem') {
-    return onPremStats(c, app_id, action, device)
+    await onPremStats(c, app_id, action, device)
+    return { success: true, isOnprem: true }
   }
   if (cachedStatus === 'cancelled') {
     await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
-    return simpleError200(c, 'need_plan_upgrade', PLAN_ERROR)
+    return { success: false, error: 'need_plan_upgrade', message: PLAN_ERROR }
   }
   const appOwner = await getAppOwnerPostgres(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>, planActions)
   if (!appOwner) {
     await setAppStatus(c, app_id, 'onprem')
-    return onPremStats(c, app_id, action, device)
+    await onPremStats(c, app_id, action, device)
+    return { success: true, isOnprem: true }
   }
   if (!appOwner.plan_valid) {
     await setAppStatus(c, app_id, 'cancelled')
@@ -79,7 +95,7 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
       device_id: body.device_id,
       app_id_url: app_id,
     }, appOwner.owner_org, app_id, '0 0 * * 1')) // Weekly on Monday
-    return simpleError200(c, 'need_plan_upgrade', 'Cannot update, upgrade plan to continue to update')
+    return { success: false, error: 'need_plan_upgrade', message: 'Cannot update, upgrade plan to continue to update' }
   }
   await setAppStatus(c, app_id, 'cloud')
   const statsActions: StatsActions[] = []
@@ -101,7 +117,7 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
       cloudlog({ requestId: c.get('requestId'), message: `Version name ${version_name} not found, using unknown instead`, app_id, version_name })
     }
     else {
-      return simpleError200(c, 'version_not_found', 'Version not found', { app_id, version_name })
+      return { success: false, error: 'version_not_found', message: 'Version not found' }
     }
   }
   // device.version = appVersion.id
@@ -137,23 +153,98 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
   // Don't update device record on failure actions - the version_name in the request
   // is the failed version, not the actual running version on the device
   await sendStatsAndDevice(c, device, statsActions, action.endsWith('_fail'))
-  return c.json(BRES)
+  return { success: true }
 }
 
 export const app = new Hono<MiddlewareKeyVariables>()
 
-app.post('/', async (c) => {
-  const body = await parseBody<AppStats>(c)
-  if (isLimited(c, body.app_id)) {
-    return simpleRateLimit(body)
+async function parseBodyRaw(c: Context): Promise<AppStats | AppStats[]> {
+  try {
+    const body = await c.req.json<AppStats | AppStats[]>()
+    // Normalize device_id to lowercase for both single and array
+    if (Array.isArray(body)) {
+      for (const item of body) {
+        if (item.device_id) {
+          item.device_id = item.device_id.toLowerCase()
+        }
+      }
+    }
+    else if (body.device_id) {
+      body.device_id = body.device_id.toLowerCase()
+    }
+    return body
   }
-  const pgClient = getPgClient(c, true)
+  catch (e) {
+    throw simpleError('invalid_json_parse_body', 'Invalid JSON body', { e })
+  }
+}
 
-  const bodyParsed = parsePluginBody<AppStats>(c, body, jsonRequestSchema)
-  const res = await post(c, getDrizzleClient(pgClient!), bodyParsed)
-  if (pgClient)
-    await closeClient(c, pgClient)
-  return res
+app.post('/', async (c) => {
+  const body = await parseBodyRaw(c)
+  const isBatch = Array.isArray(body)
+  const events = isBatch ? body : [body]
+
+  // Handle empty batch early - no need to acquire DB connection
+  if (isBatch && events.length === 0) {
+    return c.json({ status: 'ok', results: [] })
+  }
+
+  // Rate limit check on first event's app_id (all events in batch should be from same app)
+  if (isLimited(c, events[0].app_id)) {
+    return simpleRateLimit({ app_id: events[0].app_id })
+  }
+
+  const pgClient = getPgClient(c, true)
+  const drizzleClient = getDrizzleClient(pgClient!)
+
+  try {
+    const results: BatchStatsResult[] = []
+
+    for (let i = 0; i < events.length; i++) {
+      const event = events[i]
+      try {
+        const bodyParsed = parsePluginBody<AppStats>(c, event, jsonRequestSchema)
+        const result = await post(c, drizzleClient, bodyParsed)
+
+        if (result.success) {
+          results.push({ status: 'ok', index: i })
+        }
+        else {
+          results.push({
+            status: 'error',
+            error: result.error,
+            message: result.message,
+            index: i,
+          })
+        }
+      }
+      catch (e) {
+        const err = e as Error & { cause?: { error?: string } }
+        results.push({
+          status: 'error',
+          error: err?.cause?.error || 'processing_error',
+          message: err?.message || 'Error processing event',
+          index: i,
+        })
+      }
+    }
+
+    // For single event, return simple response for backward compatibility
+    if (!isBatch) {
+      const result = results[0]
+      if (result.status === 'ok') {
+        return c.json(BRES)
+      }
+      return simpleError200(c, result.error!, result.message!)
+    }
+
+    // For batch, return array of results
+    return c.json({ status: 'ok', results })
+  }
+  finally {
+    if (pgClient)
+      await closeClient(c, pgClient)
+  }
 })
 
 app.get('/', (c) => {
