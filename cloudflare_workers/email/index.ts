@@ -1,5 +1,5 @@
 import type { EmailMessage, Env, ParsedEmail, ThreadMapping } from './types'
-import { classifyEmail, classifyEmailHeuristic, filterAttachmentsHeuristic, filterAttachmentsWithAI, generateBacklinkAutoReply } from './classifier'
+import { classifyEmail, classifyEmailHeuristic, filterAttachmentsHeuristic, filterAttachmentsWithAI, generateBacklinkAutoReply, generateSecurityAutoReply } from './classifier'
 import { createForumThread, getThreadMessages, postToThread } from './discord'
 import { extractThreadId, getAllPotentialThreadIds, parseEmail } from './email-parser'
 import { formatDiscordMessageAsEmail, sendEmail } from './email-sender'
@@ -51,7 +51,8 @@ export default {
 
           while (true) {
             const { done, value } = await reader.read()
-            if (done) break
+            if (done)
+              break
             chunks.push(decoder.decode(value, { stream: true }))
           }
 
@@ -140,6 +141,11 @@ export default {
             console.log(`📧 BACKLINK request detected - sending auto-reply`)
             await handleBacklinkEmail(env, parsedEmail)
           }
+          // Handle generic security reports with auto-reply
+          else if (classification.category === 'security') {
+            console.log(`🔒 SECURITY report detected (generic/vague) - sending auto-reply with requirements`)
+            await handleSecurityEmail(env, parsedEmail)
+          }
           else {
             // Process support, sales, and query emails via Discord
             console.log(`✅ Email WILL BE PROCESSED (category: ${classification.category})`)
@@ -163,7 +169,7 @@ export default {
     }
   },
 
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, _env: Env): Promise<Response> {
     const url = new URL(request.url)
 
     // Health check endpoint
@@ -301,6 +307,47 @@ async function handleBacklinkEmail(env: Env, email: ParsedEmail): Promise<void> 
   }
   catch (error) {
     console.error('❌ Error handling backlink email:', error)
+  }
+}
+
+/**
+ * Handles generic security vulnerability reports by sending an auto-reply
+ * explaining our requirements for valid, specific reports
+ */
+async function handleSecurityEmail(env: Env, email: ParsedEmail): Promise<void> {
+  console.log(`🔒 handleSecurityEmail: Processing generic security report`)
+  console.log(`   From: ${email.from.email}`)
+  console.log(`   Subject: "${email.subject}"`)
+
+  try {
+    // Generate AI auto-reply
+    const autoReply = await generateSecurityAutoReply(env, email)
+    console.log(`   Generated reply subject: "${autoReply.subject}"`)
+
+    // Generate a unique Message-ID for this outgoing email
+    const ourMessageId = generateMessageId(env.EMAIL_FROM_ADDRESS, Date.now())
+    console.log(`   Generated Message-ID: ${ourMessageId}`)
+
+    // Send the auto-reply
+    const success = await sendEmail(env, {
+      to: email.from.email,
+      subject: autoReply.subject,
+      text: autoReply.text,
+      html: autoReply.html,
+      inReplyTo: email.messageId,
+      references: [email.messageId],
+      messageId: ourMessageId,
+    })
+
+    if (success) {
+      console.log(`✅ Security auto-reply sent successfully to ${email.from.email}`)
+    }
+    else {
+      console.error(`❌ Failed to send security auto-reply`)
+    }
+  }
+  catch (error) {
+    console.error('❌ Error handling security email:', error)
   }
 }
 
