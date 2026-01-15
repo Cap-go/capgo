@@ -1192,7 +1192,7 @@
   "request-payload": "İstek yükü",
   "requested": "talep edilen",
   "require-apikey-expiration": "API anahtarlarının son kullanma tarihi olmasını zorunlu kıl",
-  "require-apikey-expiration-description": "Etkinleştirildiğinde, bu kuruluşun tüm API anahtarlarının bir son kullanma tarihi olması gerekir",
+  "require-apikey-expiration-description": "Etkinleştirildiğinde, yalnızca son kullanma tarihi olan API anahtarları bu kuruluşa erişebilir",
   "require-number": "Rakam gerekli",
   "require-special-character": "Özel karakter gerekli",
   "require-uppercase": "Büyük harf gerekli",

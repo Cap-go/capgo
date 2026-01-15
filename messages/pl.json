@@ -1192,7 +1192,7 @@
   "request-payload": "Ładunek żądania",
   "requested": "żądany",
   "require-apikey-expiration": "Wymagaj daty wygaśnięcia dla kluczy API",
-  "require-apikey-expiration-description": "Po włączeniu wszystkie klucze API dla tej organizacji muszą mieć datę wygaśnięcia",
+  "require-apikey-expiration-description": "Po włączeniu tylko klucze API z datą wygaśnięcia mogą uzyskać dostęp do tej organizacji",
   "require-number": "Wymagaj cyfry",
   "require-special-character": "Wymagaj znaku specjalnego",
   "require-uppercase": "Wymagaj wielkiej litery",

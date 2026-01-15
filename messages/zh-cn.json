@@ -1192,7 +1192,7 @@
   "request-payload": "请求载荷",
   "requested": "请求的",
   "require-apikey-expiration": "要求API密钥必须设置过期日期",
-  "require-apikey-expiration-description": "启用后，此组织的所有API密钥必须设置过期日期",
+  "require-apikey-expiration-description": "启用后，只有设置了过期日期的API密钥才能访问此组织",
   "require-number": "要求数字",
   "require-special-character": "要求特殊字符",
   "require-uppercase": "要求大写字母",

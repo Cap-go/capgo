@@ -790,9 +790,7 @@ function confirmTransferAppOwnership(org: Organization) {
 }
 
 async function transferAppOwnership() {
-  const transferHistory: { transferred_at: string }[] = (appRef.value as any) ?? []
-  if (!transferHistory || transferHistory.length === 0)
-    return
+  const transferHistory: { transferred_at: string }[] = ((appRef.value as any)?.transfer_history as any) ?? []
   const lastTransfer = transferHistory.length > 0
     ? transferHistory.sort((a, b) =>
       new Date(b.transferred_at).getTime() - new Date(a.transferred_at).getTime(),
@@ -838,7 +836,8 @@ async function transferAppOwnership() {
       ...superAdminOrganizations.map(org => ({
         text: org.name,
         role: 'secondary' as const,
-        handler: async () => {
+        preventClose: true,
+        handler: () => {
           confirmTransferAppOwnership(org)
         },
       })),

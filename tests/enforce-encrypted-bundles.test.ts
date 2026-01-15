@@ -46,7 +46,7 @@ afterAll(async () => {
 })
 
 describe('[Encrypted Bundles Enforcement]', () => {
-  describe('Org Setting Management', () => {
+  describe('org Setting Management', () => {
     it('should have enforce_encrypted_bundles = false by default', async () => {
       const { data, error } = await getSupabaseClient()
         .from('orgs')
@@ -85,7 +85,7 @@ describe('[Encrypted Bundles Enforcement]', () => {
     })
   })
 
-  describe('API Bundle Creation Enforcement', () => {
+  describe('aPI Bundle Creation Enforcement', () => {
     it('should reject unencrypted bundle via API when enforcement is enabled', async () => {
       // Enable enforcement
       await getSupabaseClient()
@@ -101,7 +101,7 @@ describe('[Encrypted Bundles Enforcement]', () => {
           app_id: APP_NAME_ENCRYPTED,
           version: '1.0.0-unencrypted-api-test',
           checksum: 'a1b2c3d4e5f6789abcdef123456789abcdef123456789abcdef123456789abcd',
-          storage_provider: 'r2',
+          external_url: 'https://example.com/bundle-unencrypted.zip',
           // No session_key - should be rejected
         }),
       })
@@ -133,7 +133,7 @@ describe('[Encrypted Bundles Enforcement]', () => {
           app_id: APP_NAME_ENCRYPTED,
           version: '1.0.0-encrypted-api-test',
           checksum: 'b2c3d4e5f6789abcdef123456789abcdef123456789abcdef123456789abcde',
-          storage_provider: 'r2',
+          external_url: 'https://example.com/bundle-encrypted.zip',
           session_key: 'encrypted-session-key-for-api-test',
         }),
       })
@@ -163,7 +163,7 @@ describe('[Encrypted Bundles Enforcement]', () => {
           app_id: APP_NAME_ENCRYPTED,
           version: '1.0.0-no-enforcement-api-test',
           checksum: 'c3d4e5f6789abcdef123456789abcdef123456789abcdef123456789abcdef1',
-          storage_provider: 'r2',
+          external_url: 'https://example.com/bundle-no-enforcement.zip',
           // No session_key - should be allowed since enforcement is disabled
         }),
       })
@@ -173,7 +173,7 @@ describe('[Encrypted Bundles Enforcement]', () => {
     })
   })
 
-  describe('Database Trigger Enforcement', () => {
+  describe('database Trigger Enforcement', () => {
     it('should reject direct insert of unencrypted bundle via trigger', async () => {
       // Enable enforcement
       await getSupabaseClient()
@@ -261,7 +261,7 @@ describe('[Encrypted Bundles Enforcement]', () => {
     })
   })
 
-  describe('Helper Functions', () => {
+  describe('helper Functions', () => {
     it('is_bundle_encrypted should return false for null session_key', async () => {
       const { data, error } = await getSupabaseClient()
         .rpc('is_bundle_encrypted', { session_key: null as unknown as string })

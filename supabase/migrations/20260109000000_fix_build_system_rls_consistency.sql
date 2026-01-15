@@ -27,13 +27,13 @@ USING (
     public.check_min_rights(
         'read'::public.user_min_right,
         public.get_identity_org_appid(
-            '{read,upload,write,all}'::public.key_mode[],
+            '{read,upload,write,all}'::public.key_mode [],
             owner_org,
             app_id
         ),
         owner_org,
         app_id,
-        NULL::BIGINT
+        NULL::bigint
     )
 );
 
@@ -53,12 +53,12 @@ USING (
     public.check_min_rights(
         'read'::public.user_min_right,
         public.get_identity_org_allowed(
-            '{read,upload,write,all}'::public.key_mode[],
+            '{read,upload,write,all}'::public.key_mode [],
             org_id
         ),
         org_id,
-        NULL::CHARACTER VARYING,
-        NULL::BIGINT
+        NULL::character varying,
+        NULL::bigint
     )
 );
 
@@ -79,17 +79,18 @@ USING (
     EXISTS (
         SELECT 1
         FROM public.apps
-        WHERE apps.app_id = daily_build_time.app_id
-        AND public.check_min_rights(
-            'read'::public.user_min_right,
-            public.get_identity_org_appid(
-                '{read,upload,write,all}'::public.key_mode[],
+        WHERE
+            apps.app_id = daily_build_time.app_id
+            AND public.check_min_rights(
+                'read'::public.user_min_right,
+                public.get_identity_org_appid(
+                    '{read,upload,write,all}'::public.key_mode [],
+                    apps.owner_org,
+                    apps.app_id
+                ),
                 apps.owner_org,
-                apps.app_id
-            ),
-            apps.owner_org,
-            apps.app_id,
-            NULL::BIGINT
-        )
+                apps.app_id,
+                NULL::bigint
+            )
     )
 );

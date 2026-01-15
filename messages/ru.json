@@ -1192,7 +1192,7 @@
   "request-payload": "Тело запроса",
   "requested": "запрошенный",
   "require-apikey-expiration": "Требовать дату истечения для API-ключей",
-  "require-apikey-expiration-description": "При включении все API-ключи для этой организации должны иметь дату истечения",
+  "require-apikey-expiration-description": "При включении только API-ключи с датой истечения могут получить доступ к этой организации",
   "require-number": "Требовать цифру",
   "require-special-character": "Требовать специальный символ",
   "require-uppercase": "Требовать заглавную букву",

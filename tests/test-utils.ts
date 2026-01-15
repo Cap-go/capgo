@@ -65,6 +65,9 @@ export const BUILD_TIME_STRIPE_CUSTOMER_ID = 'cus_build_time_test_123'
 // Dedicated data for bundle-semver-validation tests (isolated to prevent interference)
 export const SEMVER_ORG_ID = 'd4e5f6a7-b8c9-4d0e-9f2a-3b4c5d6e7f80'
 export const SEMVER_STRIPE_CUSTOMER_ID = 'cus_semver_test_123'
+// Dedicated data for private-error-cases tests (isolated to prevent interference)
+// This org intentionally has NO customer_id to test error cases
+export const PRIVATE_ERROR_ORG_ID = 'e5f6a7b8-c9d0-4e1f-9a2b-3c4d5e6f7a82'
 // Dedicated data for cli-hashed-apikey tests (isolated to prevent interference)
 export const CLI_HASHED_USER_ID = 'e5f6a7b8-c9d0-4e1f-8a2b-3c4d5e6f7a81'
 export const CLI_HASHED_ORG_ID = 'f6a7b8c9-d0e1-4f2a-9b3c-4d5e6f7a8b92'

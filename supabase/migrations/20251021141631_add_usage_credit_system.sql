@@ -401,9 +401,9 @@ $$;
 CREATE VIEW public.usage_credit_balances AS
 SELECT
     org_id,
-    sum(greatest(credits_total, 0)) AS total_credits,
-    sum(
-        greatest(
+    SUM(GREATEST(credits_total, 0)) AS total_credits,
+    SUM(
+        GREATEST(
             CASE
                 WHEN
                     expires_at >= NOW()
@@ -413,7 +413,7 @@ SELECT
             0
         )
     ) AS available_credits,
-    min(CASE WHEN credits_total - credits_consumed > 0 THEN expires_at END)
+    MIN(CASE WHEN credits_total - credits_consumed > 0 THEN expires_at END)
         AS next_expiration
 FROM public.usage_credit_grants
 GROUP BY org_id;

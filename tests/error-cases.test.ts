@@ -265,7 +265,7 @@ describe('private Endpoint Error Cases', () => {
     })
     expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('not_authorize')
+    expect(data.error).toBe('not_authorized')
   })
 
   it('should return 400 for stripe_checkout without org_id', async () => {

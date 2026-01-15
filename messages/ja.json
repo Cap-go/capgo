@@ -1192,7 +1192,7 @@
   "request-payload": "リクエストペイロード",
   "requested": "要求された",
   "require-apikey-expiration": "APIキーに有効期限を必須にする",
-  "require-apikey-expiration-description": "有効にすると、この組織のすべてのAPIキーに有効期限が必要になります",
+  "require-apikey-expiration-description": "有効にすると、有効期限が設定されたAPIキーのみがこの組織にアクセスできます",
   "require-number": "数字を必須にする",
   "require-special-character": "特殊文字を必須にする",
   "require-uppercase": "大文字を必須にする",

@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict cqtlSuKBeUODjZGKspQIwwGBQg69ooTNucTqHSpHF7RbhKPGMLtQw4qaBgjWNo9
+\restrict 2AWJUYdcncAXOBjcSviWtq99n4Ctkbp2zlSHUoyIWK2Q2kir5PoFeRHmTRfhB2Y
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.7 (Homebrew)
@@ -26,9 +26,9 @@ CREATE TYPE public.disable_update AS ENUM (
 --
 
 CREATE TYPE public.manifest_entry AS (
-	file_name character varying,
-	s3_path character varying,
-	file_hash character varying
+    file_name character varying,
+    s3_path character varying,
+    file_hash character varying
 );
 
 
@@ -69,9 +69,9 @@ CREATE TYPE public.user_min_right AS ENUM (
 --
 
 CREATE FUNCTION public.one_month_ahead() RETURNS timestamp without time zone
-    LANGUAGE plpgsql
-    SET search_path TO ''
-    AS $$
+LANGUAGE plpgsql
+SET search_path TO ''
+AS $$
 BEGIN
    RETURN NOW() + INTERVAL '1 month';
 END;
@@ -82,18 +82,16 @@ $$;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict cqtlSuKBeUODjZGKspQIwwGBQg69ooTNucTqHSpHF7RbhKPGMLtQw4qaBgjWNo9
+\unrestrict 2AWJUYdcncAXOBjcSviWtq99n4Ctkbp2zlSHUoyIWK2Q2kir5PoFeRHmTRfhB2Y
 
 --
 -- PostgreSQL database dump
 --
 
-\restrict 98eL5D7XEvAkho181dICYtWsgFMID4zZyBQhp3FDih2mfDPHEZte471xF31P6Ir
+\restrict yo5W7cTAuNiKRBNEyQ4lm98Ap4AgkcmMXSwestu6tfzyBXm0aEi6pUeBhk7XFxM
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.7 (Homebrew)
-
-
 
 
 --
@@ -112,11 +110,11 @@ CREATE TABLE public.app_versions (
     session_key character varying,
     storage_provider text DEFAULT 'r2'::text NOT NULL,
     min_update_version character varying,
-    native_packages jsonb[],
+    native_packages jsonb [],
     owner_org uuid NOT NULL,
     user_id uuid,
     r2_path character varying,
-    manifest public.manifest_entry[],
+    manifest public.manifest_entry [],
     link text,
     comment text,
     manifest_count integer DEFAULT 0 NOT NULL,
@@ -157,7 +155,7 @@ CREATE TABLE public.apps (
     retention bigint DEFAULT '2592000'::bigint NOT NULL,
     owner_org uuid NOT NULL,
     default_upload_channel character varying DEFAULT 'production'::character varying NOT NULL,
-    transfer_history jsonb[] DEFAULT '{}'::jsonb[],
+    transfer_history jsonb [] DEFAULT '{}'::jsonb [],
     channel_device_count bigint DEFAULT 0 NOT NULL,
     manifest_bundle_count bigint DEFAULT 0 NOT NULL,
     expose_metadata boolean DEFAULT false NOT NULL,
@@ -220,7 +218,8 @@ CREATE TABLE public.channels (
     owner_org uuid NOT NULL,
     created_by uuid NOT NULL,
     allow_device boolean DEFAULT true NOT NULL,
-    allow_prod boolean DEFAULT true NOT NULL
+    allow_prod boolean DEFAULT true NOT NULL,
+    electron boolean DEFAULT true NOT NULL
 );
 
 ALTER TABLE ONLY public.channels REPLICA IDENTITY FULL;
@@ -252,7 +251,10 @@ CREATE TABLE public.manifest (
     file_hash character varying NOT NULL,
     file_size bigint DEFAULT 0
 )
-WITH (autovacuum_vacuum_scale_factor='0.05', autovacuum_analyze_scale_factor='0.02');
+WITH (
+    autovacuum_vacuum_scale_factor = '0.05',
+    autovacuum_analyze_scale_factor = '0.02'
+);
 
 ALTER TABLE ONLY public.manifest REPLICA IDENTITY FULL;
 
@@ -262,12 +264,12 @@ ALTER TABLE ONLY public.manifest REPLICA IDENTITY FULL;
 --
 
 CREATE SEQUENCE public.manifest_id_seq
-    AS integer
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
+AS integer
+START WITH 1
+INCREMENT BY 1
+NO MINVALUE
+NO MAXVALUE
+CACHE 1;
 
 
 --
@@ -327,7 +329,11 @@ CREATE TABLE public.orgs (
     password_policy_config jsonb,
     enforce_hashed_api_keys boolean DEFAULT false NOT NULL,
     require_apikey_expiration boolean DEFAULT false NOT NULL,
-    max_apikey_expiration_days integer
+    max_apikey_expiration_days integer,
+    enforce_encrypted_bundles boolean DEFAULT false NOT NULL,
+    required_encryption_key character varying(
+        21
+    ) DEFAULT null::character varying
 );
 
 ALTER TABLE ONLY public.orgs REPLICA IDENTITY FULL;
@@ -367,12 +373,12 @@ ALTER TABLE ONLY public.stripe_info REPLICA IDENTITY FULL;
 --
 
 CREATE SEQUENCE public.stripe_info_id_seq
-    AS integer
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
+AS integer
+START WITH 1
+INCREMENT BY 1
+NO MINVALUE
+NO MAXVALUE
+CACHE 1;
 
 
 --
@@ -386,14 +392,18 @@ ALTER SEQUENCE public.stripe_info_id_seq OWNED BY public.stripe_info.id;
 -- Name: manifest id; Type: DEFAULT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.manifest ALTER COLUMN id SET DEFAULT nextval('public.manifest_id_seq'::regclass);
+ALTER TABLE ONLY public.manifest ALTER COLUMN id SET DEFAULT nextval(
+    'public.manifest_id_seq'::regclass
+);
 
 
 --
 -- Name: stripe_info id; Type: DEFAULT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.stripe_info ALTER COLUMN id SET DEFAULT nextval('public.stripe_info_id_seq'::regclass);
+ALTER TABLE ONLY public.stripe_info ALTER COLUMN id SET DEFAULT nextval(
+    'public.stripe_info_id_seq'::regclass
+);
 
 
 --
@@ -401,7 +411,7 @@ ALTER TABLE ONLY public.stripe_info ALTER COLUMN id SET DEFAULT nextval('public.
 --
 
 ALTER TABLE ONLY public.app_versions
-    ADD CONSTRAINT app_versions_name_app_id_key UNIQUE (name, app_id);
+ADD CONSTRAINT app_versions_name_app_id_key UNIQUE (name, app_id);
 
 
 --
@@ -409,7 +419,7 @@ ALTER TABLE ONLY public.app_versions
 --
 
 ALTER TABLE ONLY public.app_versions
-    ADD CONSTRAINT app_versions_pkey PRIMARY KEY (id);
+ADD CONSTRAINT app_versions_pkey PRIMARY KEY (id);
 
 
 --
@@ -417,7 +427,7 @@ ALTER TABLE ONLY public.app_versions
 --
 
 ALTER TABLE ONLY public.apps
-    ADD CONSTRAINT apps_pkey PRIMARY KEY (app_id);
+ADD CONSTRAINT apps_pkey PRIMARY KEY (app_id);
 
 
 --
@@ -425,7 +435,7 @@ ALTER TABLE ONLY public.apps
 --
 
 ALTER TABLE ONLY public.channel_devices
-    ADD CONSTRAINT channel_devices_app_id_device_id_key UNIQUE (app_id, device_id);
+ADD CONSTRAINT channel_devices_app_id_device_id_key UNIQUE (app_id, device_id);
 
 
 --
@@ -433,7 +443,7 @@ ALTER TABLE ONLY public.channel_devices
 --
 
 ALTER TABLE ONLY public.channel_devices
-    ADD CONSTRAINT channel_devices_pkey PRIMARY KEY (id);
+ADD CONSTRAINT channel_devices_pkey PRIMARY KEY (id);
 
 
 --
@@ -441,7 +451,7 @@ ALTER TABLE ONLY public.channel_devices
 --
 
 ALTER TABLE ONLY public.channels
-    ADD CONSTRAINT channel_pkey PRIMARY KEY (id);
+ADD CONSTRAINT channel_pkey PRIMARY KEY (id);
 
 
 --
@@ -449,7 +459,7 @@ ALTER TABLE ONLY public.channels
 --
 
 ALTER TABLE ONLY public.manifest
-    ADD CONSTRAINT manifest_pkey PRIMARY KEY (id);
+ADD CONSTRAINT manifest_pkey PRIMARY KEY (id);
 
 
 --
@@ -457,7 +467,7 @@ ALTER TABLE ONLY public.manifest
 --
 
 ALTER TABLE ONLY public.org_users
-    ADD CONSTRAINT org_users_pkey PRIMARY KEY (id);
+ADD CONSTRAINT org_users_pkey PRIMARY KEY (id);
 
 
 --
@@ -465,7 +475,7 @@ ALTER TABLE ONLY public.org_users
 --
 
 ALTER TABLE ONLY public.orgs
-    ADD CONSTRAINT orgs_pkey PRIMARY KEY (id);
+ADD CONSTRAINT orgs_pkey PRIMARY KEY (id);
 
 
 --
@@ -473,7 +483,7 @@ ALTER TABLE ONLY public.orgs
 --
 
 ALTER TABLE ONLY public.stripe_info
-    ADD CONSTRAINT stripe_info_pkey PRIMARY KEY (customer_id);
+ADD CONSTRAINT stripe_info_pkey PRIMARY KEY (customer_id);
 
 
 --
@@ -481,7 +491,7 @@ ALTER TABLE ONLY public.stripe_info
 --
 
 ALTER TABLE ONLY public.orgs
-    ADD CONSTRAINT "unique customer_id on orgs" UNIQUE (customer_id);
+ADD CONSTRAINT "unique customer_id on orgs" UNIQUE (customer_id);
 
 
 --
@@ -489,7 +499,7 @@ ALTER TABLE ONLY public.orgs
 --
 
 ALTER TABLE ONLY public.channel_devices
-    ADD CONSTRAINT unique_device_app UNIQUE (device_id, app_id);
+ADD CONSTRAINT unique_device_app UNIQUE (device_id, app_id);
 
 
 --
@@ -497,7 +507,7 @@ ALTER TABLE ONLY public.channel_devices
 --
 
 ALTER TABLE ONLY public.channels
-    ADD CONSTRAINT unique_name_app_id UNIQUE (name, app_id);
+ADD CONSTRAINT unique_name_app_id UNIQUE (name, app_id);
 
 
 --
@@ -505,14 +515,34 @@ ALTER TABLE ONLY public.channels
 --
 
 ALTER TABLE ONLY public.orgs
-    ADD CONSTRAINT unique_name_created_by UNIQUE (name, created_by);
+ADD CONSTRAINT unique_name_created_by UNIQUE (name, created_by);
+
+
+--
+-- Name: app_versions_cli_version_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX app_versions_cli_version_idx ON public.app_versions USING btree (
+    cli_version
+);
+
+
+--
+-- Name: channel_devices_device_id_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX channel_devices_device_id_idx ON public.channel_devices USING btree (
+    device_id
+);
 
 
 --
 -- Name: finx_app_versions_owner_org; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX finx_app_versions_owner_org ON public.app_versions USING btree (owner_org);
+CREATE INDEX finx_app_versions_owner_org ON public.app_versions USING btree (
+    owner_org
+);
 
 
 --
@@ -533,14 +563,18 @@ CREATE INDEX finx_apps_user_id ON public.apps USING btree (user_id);
 -- Name: finx_channel_devices_channel_id; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX finx_channel_devices_channel_id ON public.channel_devices USING btree (channel_id);
+CREATE INDEX finx_channel_devices_channel_id ON public.channel_devices USING btree (
+    channel_id
+);
 
 
 --
 -- Name: finx_channel_devices_owner_org; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX finx_channel_devices_owner_org ON public.channel_devices USING btree (owner_org);
+CREATE INDEX finx_channel_devices_owner_org ON public.channel_devices USING btree (
+    owner_org
+);
 
 
 --
@@ -568,7 +602,9 @@ CREATE INDEX finx_channels_version ON public.channels USING btree (version);
 -- Name: finx_org_users_channel_id; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX finx_org_users_channel_id ON public.org_users USING btree (channel_id);
+CREATE INDEX finx_org_users_channel_id ON public.org_users USING btree (
+    channel_id
+);
 
 
 --
@@ -596,42 +632,54 @@ CREATE INDEX finx_orgs_created_by ON public.orgs USING btree (created_by);
 -- Name: finx_orgs_stripe_info; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX finx_orgs_stripe_info ON public.stripe_info USING btree (product_id);
+CREATE INDEX finx_orgs_stripe_info ON public.stripe_info USING btree (
+    product_id
+);
 
 
 --
 -- Name: idx_app_id_app_versions; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_app_id_app_versions ON public.app_versions USING btree (app_id);
+CREATE INDEX idx_app_id_app_versions ON public.app_versions USING btree (
+    app_id
+);
 
 
 --
 -- Name: idx_app_id_name_app_versions; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_app_id_name_app_versions ON public.app_versions USING btree (app_id, name);
+CREATE INDEX idx_app_id_name_app_versions ON public.app_versions USING btree (
+    app_id, name
+);
 
 
 --
 -- Name: idx_app_versions_created_at; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_app_versions_created_at ON public.app_versions USING btree (created_at);
+CREATE INDEX idx_app_versions_created_at ON public.app_versions USING btree (
+    created_at
+);
 
 
 --
 -- Name: idx_app_versions_created_at_app_id; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_app_versions_created_at_app_id ON public.app_versions USING btree (created_at, app_id);
+CREATE INDEX idx_app_versions_created_at_app_id ON public.app_versions USING btree (
+    created_at, app_id
+);
 
 
 --
 -- Name: idx_app_versions_deleted; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_app_versions_deleted ON public.app_versions USING btree (deleted);
+CREATE INDEX idx_app_versions_deleted ON public.app_versions USING btree (
+    deleted
+);
 
 
 --
@@ -652,56 +700,72 @@ CREATE INDEX idx_app_versions_name ON public.app_versions USING btree (name);
 -- Name: idx_app_versions_owner_org_not_deleted; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_app_versions_owner_org_not_deleted ON public.app_versions USING btree (owner_org) WHERE (deleted = false);
+CREATE INDEX idx_app_versions_owner_org_not_deleted ON public.app_versions USING btree (
+    owner_org
+) WHERE (deleted = false);
 
 
 --
 -- Name: idx_app_versions_retention_cleanup; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_app_versions_retention_cleanup ON public.app_versions USING btree (deleted, created_at, app_id) WHERE (deleted = false);
+CREATE INDEX idx_app_versions_retention_cleanup ON public.app_versions USING btree (
+    deleted, created_at, app_id
+) WHERE (deleted = false);
 
 
 --
 -- Name: idx_channels_app_id_name; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_channels_app_id_name ON public.channels USING btree (app_id, name);
+CREATE INDEX idx_channels_app_id_name ON public.channels USING btree (
+    app_id, name
+);
 
 
 --
 -- Name: idx_channels_app_id_version; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_channels_app_id_version ON public.channels USING btree (app_id, version);
+CREATE INDEX idx_channels_app_id_version ON public.channels USING btree (
+    app_id, version
+);
 
 
 --
 -- Name: idx_channels_public_app_id_android; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_channels_public_app_id_android ON public.channels USING btree (public, app_id, android);
+CREATE INDEX idx_channels_public_app_id_android ON public.channels USING btree (
+    public, app_id, android
+);
 
 
 --
 -- Name: idx_channels_public_app_id_ios; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_channels_public_app_id_ios ON public.channels USING btree (public, app_id, ios);
+CREATE INDEX idx_channels_public_app_id_ios ON public.channels USING btree (
+    public, app_id, ios
+);
 
 
 --
 -- Name: idx_manifest_app_version_id; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_manifest_app_version_id ON public.manifest USING btree (app_version_id);
+CREATE INDEX idx_manifest_app_version_id ON public.manifest USING btree (
+    app_version_id
+);
 
 
 --
 -- Name: idx_manifest_file_name_hash_version; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_manifest_file_name_hash_version ON public.manifest USING btree (file_name, file_hash, app_version_id);
+CREATE INDEX idx_manifest_file_name_hash_version ON public.manifest USING btree (
+    file_name, file_hash, app_version_id
+);
 
 
 --
@@ -715,21 +779,27 @@ CREATE INDEX idx_orgs_customer_id ON public.orgs USING btree (customer_id);
 -- Name: idx_orgs_email_preferences; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_orgs_email_preferences ON public.orgs USING gin (email_preferences);
+CREATE INDEX idx_orgs_email_preferences ON public.orgs USING gin (
+    email_preferences
+);
 
 
 --
 -- Name: idx_stripe_info_customer_covering; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_stripe_info_customer_covering ON public.stripe_info USING btree (customer_id) INCLUDE (product_id, subscription_anchor_start, subscription_anchor_end);
+CREATE INDEX idx_stripe_info_customer_covering ON public.stripe_info USING btree (
+    customer_id
+) INCLUDE (product_id, subscription_anchor_start, subscription_anchor_end);
 
 
 --
 -- Name: idx_stripe_info_trial; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_stripe_info_trial ON public.stripe_info USING btree (trial_at) WHERE (trial_at IS NOT NULL);
+CREATE INDEX idx_stripe_info_trial ON public.stripe_info USING btree (
+    trial_at
+) WHERE (trial_at IS NOT null);
 
 
 --
@@ -743,19 +813,24 @@ CREATE INDEX org_users_app_id_idx ON public.org_users USING btree (app_id);
 -- Name: si_customer_cover_uidx; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX si_customer_cover_uidx ON public.stripe_info USING btree (customer_id) INCLUDE (status, trial_at, mau_exceeded, storage_exceeded, bandwidth_exceeded);
+CREATE UNIQUE INDEX si_customer_cover_uidx ON public.stripe_info USING btree (
+    customer_id
+) INCLUDE (
+    status, trial_at, mau_exceeded, storage_exceeded, bandwidth_exceeded
+);
 
 
 --
 -- Name: si_customer_status_trial_idx; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX si_customer_status_trial_idx ON public.stripe_info USING btree (customer_id, status, trial_at) INCLUDE (mau_exceeded, storage_exceeded, bandwidth_exceeded);
+CREATE INDEX si_customer_status_trial_idx ON public.stripe_info USING btree (
+    customer_id, status, trial_at
+) INCLUDE (mau_exceeded, storage_exceeded, bandwidth_exceeded);
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 98eL5D7XEvAkho181dICYtWsgFMID4zZyBQhp3FDih2mfDPHEZte471xF31P6Ir
-
+\unrestrict yo5W7cTAuNiKRBNEyQ4lm98Ap4AgkcmMXSwestu6tfzyBXm0aEi6pUeBhk7XFxM

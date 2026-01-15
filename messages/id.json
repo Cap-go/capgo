@@ -1192,7 +1192,7 @@
   "request-payload": "Payload permintaan",
   "requested": "diminta",
   "require-apikey-expiration": "Wajibkan kunci API memiliki tanggal kedaluwarsa",
-  "require-apikey-expiration-description": "Jika diaktifkan, semua kunci API untuk organisasi ini harus memiliki tanggal kedaluwarsa",
+  "require-apikey-expiration-description": "Jika diaktifkan, hanya kunci API dengan tanggal kedaluwarsa yang dapat mengakses organisasi ini",
   "require-number": "Wajib angka",
   "require-special-character": "Wajib karakter khusus",
   "require-uppercase": "Wajib huruf kapital",

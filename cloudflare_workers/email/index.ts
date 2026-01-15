@@ -1,5 +1,5 @@
 import type { EmailMessage, Env, ParsedEmail, ThreadMapping } from './types'
-import { classifyEmail, classifyEmailHeuristic } from './classifier'
+import { classifyEmail, classifyEmailHeuristic, filterAttachmentsHeuristic, filterAttachmentsWithAI, generateBacklinkAutoReply } from './classifier'
 import { createForumThread, getThreadMessages, postToThread } from './discord'
 import { extractThreadId, getAllPotentialThreadIds, parseEmail } from './email-parser'
 import { formatDiscordMessageAsEmail, sendEmail } from './email-sender'
@@ -79,7 +79,16 @@ export default {
         hasBody: !!parsedEmail.body.text || !!parsedEmail.body.html,
         bodyTextLength: parsedEmail.body.text?.length || 0,
         bodyHtmlLength: parsedEmail.body.html?.length || 0,
+        attachmentCount: parsedEmail.attachments?.length || 0,
       })
+
+      // Log attachments if present
+      if (parsedEmail.attachments && parsedEmail.attachments.length > 0) {
+        console.log('📎 Attachments found:')
+        for (const att of parsedEmail.attachments) {
+          console.log(`   - ${att.filename} (${att.contentType}, ${att.size} bytes)`)
+        }
+      }
 
       // Log email body content for debugging
       if (parsedEmail.body.text) {
@@ -126,9 +135,16 @@ export default {
         })
 
         if (classification.shouldProcess) {
-          // Only process support, sales, and query emails
-          console.log(`✅ Email WILL BE PROCESSED (category: ${classification.category})`)
-          await handleNewEmail(env, parsedEmail, classification.category)
+          // Handle backlink requests with auto-reply
+          if (classification.category === 'backlink') {
+            console.log(`📧 BACKLINK request detected - sending auto-reply`)
+            await handleBacklinkEmail(env, parsedEmail)
+          }
+          else {
+            // Process support, sales, and query emails via Discord
+            console.log(`✅ Email WILL BE PROCESSED (category: ${classification.category})`)
+            await handleNewEmail(env, parsedEmail, classification.category)
+          }
         }
         else {
           console.log(`⏭️  Email IGNORED (category: ${classification.category}):`, classification.reason)
@@ -193,8 +209,34 @@ async function handleNewEmail(env: Env, email: ParsedEmail, category?: string): 
   console.log(`   Prefix: "${categoryPrefix}"`)
   console.log(`   Subject: "${email.subject}"`)
   console.log(`   From: ${email.from.email}`)
+  console.log(`   Attachments: ${email.attachments?.length || 0}`)
 
-  // Create a new forum thread
+  // Filter attachments to keep only useful ones (no tracking pixels, signature images, etc.)
+  if (email.attachments && email.attachments.length > 0) {
+    console.log(`🔍 Filtering attachments...`)
+    const useAI = env.USE_AI_CLASSIFICATION !== 'false'
+
+    const filterResult = useAI
+      ? await filterAttachmentsWithAI(env, email.attachments)
+      : filterAttachmentsHeuristic(email.attachments)
+
+    console.log(`📊 Attachment filtering result:`)
+    console.log(`   - Useful: ${filterResult.usefulAttachments.length}`)
+    console.log(`   - Filtered out: ${filterResult.filteredOut.length}`)
+
+    for (const filtered of filterResult.filteredOut) {
+      console.log(`   ❌ Filtered: ${filtered.attachment.filename} - ${filtered.reason}`)
+    }
+
+    for (const useful of filterResult.usefulAttachments) {
+      console.log(`   ✅ Keeping: ${useful.filename}`)
+    }
+
+    // Update email with filtered attachments
+    email.attachments = filterResult.usefulAttachments
+  }
+
+  // Create a new forum thread - attachments will be uploaded directly to Discord
   console.log(`🔵 Calling createForumThread...`)
   const thread = await createForumThread(env, email, categoryPrefix)
 
@@ -223,10 +265,76 @@ async function handleNewEmail(env: Env, email: ParsedEmail, category?: string): 
 }
 
 /**
+ * Handles backlink/guest post requests by sending an AI-generated auto-reply
+ */
+async function handleBacklinkEmail(env: Env, email: ParsedEmail): Promise<void> {
+  console.log(`📝 handleBacklinkEmail: Processing backlink request`)
+  console.log(`   From: ${email.from.email}`)
+  console.log(`   Subject: "${email.subject}"`)
+
+  try {
+    // Generate AI auto-reply
+    const autoReply = await generateBacklinkAutoReply(env, email)
+    console.log(`   Generated reply subject: "${autoReply.subject}"`)
+
+    // Generate a unique Message-ID for this outgoing email
+    const ourMessageId = generateMessageId(env.EMAIL_FROM_ADDRESS, Date.now())
+    console.log(`   Generated Message-ID: ${ourMessageId}`)
+
+    // Send the auto-reply
+    const success = await sendEmail(env, {
+      to: email.from.email,
+      subject: autoReply.subject,
+      text: autoReply.text,
+      html: autoReply.html,
+      inReplyTo: email.messageId,
+      references: [email.messageId],
+      messageId: ourMessageId,
+    })
+
+    if (success) {
+      console.log(`✅ Backlink auto-reply sent successfully to ${email.from.email}`)
+    }
+    else {
+      console.error(`❌ Failed to send backlink auto-reply`)
+    }
+  }
+  catch (error) {
+    console.error('❌ Error handling backlink email:', error)
+  }
+}
+
+/**
  * Handles an email reply by posting to existing Discord thread
  */
 async function handleEmailReply(env: Env, email: ParsedEmail, _threadId: string): Promise<void> {
   console.log('Processing email reply - checking all potential thread IDs')
+  console.log(`   Attachments: ${email.attachments?.length || 0}`)
+
+  // Filter attachments to keep only useful ones (no tracking pixels, signature images, etc.)
+  if (email.attachments && email.attachments.length > 0) {
+    console.log(`🔍 Filtering attachments for reply...`)
+    const useAI = env.USE_AI_CLASSIFICATION !== 'false'
+
+    const filterResult = useAI
+      ? await filterAttachmentsWithAI(env, email.attachments)
+      : filterAttachmentsHeuristic(email.attachments)
+
+    console.log(`📊 Attachment filtering result:`)
+    console.log(`   - Useful: ${filterResult.usefulAttachments.length}`)
+    console.log(`   - Filtered out: ${filterResult.filteredOut.length}`)
+
+    for (const filtered of filterResult.filteredOut) {
+      console.log(`   ❌ Filtered: ${filtered.attachment.filename} - ${filtered.reason}`)
+    }
+
+    for (const useful of filterResult.usefulAttachments) {
+      console.log(`   ✅ Keeping: ${useful.filename}`)
+    }
+
+    // Update email with filtered attachments
+    email.attachments = filterResult.usefulAttachments
+  }
 
   // Get all potential thread IDs from References and In-Reply-To headers
   const allPotentialIds = getAllPotentialThreadIds(email)
@@ -254,7 +362,7 @@ async function handleEmailReply(env: Env, email: ParsedEmail, _threadId: string)
 
   console.log('Found existing Discord thread:', mapping.discordThreadId)
 
-  // Post to the existing thread
+  // Post to the existing thread - attachments will be uploaded directly to Discord
   const success = await postToThread(env, mapping.discordThreadId, email)
 
   if (success) {

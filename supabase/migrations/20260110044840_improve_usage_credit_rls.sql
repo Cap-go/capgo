@@ -32,12 +32,12 @@ USING (
     public.check_min_rights(
         'admin'::public.user_min_right,
         public.get_identity_org_allowed(
-            '{read,upload,write,all}'::public.key_mode[],
+            '{read,upload,write,all}'::public.key_mode [],
             org_id
         ),
         org_id,
-        NULL::CHARACTER VARYING,
-        NULL::BIGINT
+        NULL::character varying,
+        NULL::bigint
     )
 );
 
@@ -57,12 +57,12 @@ USING (
     public.check_min_rights(
         'admin'::public.user_min_right,
         public.get_identity_org_allowed(
-            '{read,upload,write,all}'::public.key_mode[],
+            '{read,upload,write,all}'::public.key_mode [],
             org_id
         ),
         org_id,
-        NULL::CHARACTER VARYING,
-        NULL::BIGINT
+        NULL::character varying,
+        NULL::bigint
     )
 );
 
@@ -82,12 +82,12 @@ USING (
     public.check_min_rights(
         'admin'::public.user_min_right,
         public.get_identity_org_allowed(
-            '{read,upload,write,all}'::public.key_mode[],
+            '{read,upload,write,all}'::public.key_mode [],
             org_id
         ),
         org_id,
-        NULL::CHARACTER VARYING,
-        NULL::BIGINT
+        NULL::character varying,
+        NULL::bigint
     )
 );
 
@@ -107,11 +107,11 @@ USING (
     public.check_min_rights(
         'admin'::public.user_min_right,
         public.get_identity_org_allowed(
-            '{read,upload,write,all}'::public.key_mode[],
+            '{read,upload,write,all}'::public.key_mode [],
             org_id
         ),
         org_id,
-        NULL::CHARACTER VARYING,
-        NULL::BIGINT
+        NULL::character varying,
+        NULL::bigint
     )
 );

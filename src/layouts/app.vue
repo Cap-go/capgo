@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { Tab } from '~/components/comp_def'
-import { computed } from 'vue'
+import { computed, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Tabs from '~/components/Tabs.vue'
 import { appTabs as baseAppTabs } from '~/constants/appTabs'
@@ -22,6 +22,11 @@ const appTabs = computed<Tab[]>(() => {
   }
 
   return baseAppTabs.filter(t => t.label !== 'access')
+})
+
+// Check if org payment has failed - only show info tab in this case
+const isOrgUnpaid = computed(() => {
+  return organizationStore.currentOrganizationFailed
 })
 
 // Detect resource type from route (channel, device, or bundle)
@@ -49,11 +54,17 @@ const resourceId = computed(() => {
 })
 
 // Generate tabs with full paths for the current app
+// When org is unpaid, only show the info tab
 const tabs = computed<Tab[]>(() => {
   if (!appId.value)
     return appTabs.value
 
-  return appTabs.value.map(tab => ({
+  // Filter tabs when org is unpaid - only show info tab
+  const availableTabs = isOrgUnpaid.value
+    ? appTabs.value.filter(tab => tab.key === '/info')
+    : appTabs.value
+
+  return availableTabs.map(tab => ({
     ...tab,
     key: tab.key ? `/app/${appId.value}${tab.key}` : `/app/${appId.value}`,
   }))
@@ -67,7 +78,12 @@ const tabsConfig: Record<string, Tab[]> = {
 }
 
 // Generate secondary tabs with full paths for the current resource
+// No secondary tabs when org is unpaid (user can only access app info)
 const secondaryTabs = computed<Tab[]>(() => {
+  // No secondary tabs when org is unpaid
+  if (isOrgUnpaid.value)
+    return []
+
   if (!appId.value || !resourceId.value || !resourceType.value)
     return []
 
@@ -128,6 +144,20 @@ function handleTab(key: string) {
 function handleSecondaryTab(key: string) {
   router.push(key)
 }
+
+// Redirect to info page if user tries to access non-info pages when org is unpaid
+watchEffect(() => {
+  if (!isOrgUnpaid.value || !appId.value)
+    return
+
+  const path = route.path
+  const infoPath = `/app/${appId.value}/info`
+
+  // If user is on any app page that's not the info page, redirect to info
+  if (path.startsWith(`/app/${appId.value}`) && path !== infoPath) {
+    router.replace(infoPath)
+  }
+})
 </script>
 
 <template>
