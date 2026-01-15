@@ -40,6 +40,7 @@ export const app_versions = pgTable('app_versions', {
   user_id: uuid('user_id'),
   updated_at: timestamp('updated_at').defaultNow(),
   deleted: boolean('deleted').default(false),
+  deleted_at: timestamp('deleted_at'),
   external_url: varchar('external_url'),
   checksum: varchar('checksum'),
   session_key: varchar('session_key'),

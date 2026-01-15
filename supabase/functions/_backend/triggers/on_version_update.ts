@@ -291,8 +291,8 @@ app.post('/', middlewareAPISecret, triggerValidator('app_versions', 'UPDATE'), (
     cloudlog({ requestId: c.get('requestId'), message: 'no r2_path and no manifest, skipping update', record })
     return c.json(BRES)
   }
-  // // check if not deleted it's present in s3 storage
-  if (record.deleted && record.deleted !== oldRecord.deleted)
+  // check if version was soft-deleted (deleted_at was set)
+  if (record.deleted_at && record.deleted_at !== oldRecord.deleted_at)
     return deleteIt(c, record)
 
   cloudlog({ requestId: c.get('requestId'), message: 'Update but not deleted' })
