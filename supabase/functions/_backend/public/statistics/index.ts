@@ -685,7 +685,7 @@ app.get('/user', async (c) => {
 
   const orgIds = Array.from(new Set((orgs ?? []).map(org => org.org_id)))
 
-  cloudlogErr({ requestId: c.get('requestId'), message: 'orgs', data: orgIds })
+  cloudlog({ requestId: c.get('requestId'), message: 'orgs', data: orgIds })
 
   if (orgIds.length === 0) {
     throw quickError(401, 'no_organizations_found', 'No organizations found', { data: auth.userId })
