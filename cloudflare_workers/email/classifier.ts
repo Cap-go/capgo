@@ -387,6 +387,9 @@ export function classifyEmailHeuristic(email: ParsedEmail): ClassificationResult
       /\.ts:\d+/i, // File:line references
       /\.js:\d+/i,
       /line\s*\d+/i, // "line 42" style references
+      /\/api\/[a-z]/i, // API endpoint references like /api/uploads
+      /https?:\/\/capgo\.app\/[a-z]/i, // Specific capgo.app URLs with paths
+      /https?:\/\/[a-z]+\.capgo\.app/i, // Subdomains like api.capgo.app
     ]
 
     let isValidReport = false
