@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import type { TableColumn } from '~/components/comp_def'
 import type { Database } from '~/types/supabase.types'
+import { FormKit } from '@formkit/vue'
+import { useDebounceFn } from '@vueuse/core'
 import { computed, h, ref, watch, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
-import { useDebounceFn } from '@vueuse/core'
-import { FormKit } from '@formkit/vue'
-import IconAlertCircle from '~icons/lucide/alert-circle'
 import IconDown from '~icons/ic/round-keyboard-arrow-down'
 import IconSearch from '~icons/ic/round-search?raw'
+import IconAlertCircle from '~icons/lucide/alert-circle'
 import { bytesToMbText } from '~/services/conversion'
 import { formatLocalDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
@@ -452,13 +452,17 @@ watchEffect(async () => {
 
                 <div class="grid w-full grid-cols-2 gap-4 text-right md:w-auto md:text-left">
                   <div class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
-                    <div class="uppercase tracking-wide">{{ t('manifest-summary-files') }}</div>
+                    <div class="uppercase tracking-wide">
+                      {{ t('manifest-summary-files') }}
+                    </div>
                     <div class="text-lg font-semibold text-slate-900 dark:text-white">
                       {{ summaryEntries.length }}
                     </div>
                   </div>
                   <div class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
-                    <div class="uppercase tracking-wide">{{ t('size') }}</div>
+                    <div class="uppercase tracking-wide">
+                      {{ t('size') }}
+                    </div>
                     <div class="text-lg font-semibold text-slate-900 dark:text-white">
                       {{ summarySizeLabel }}
                     </div>

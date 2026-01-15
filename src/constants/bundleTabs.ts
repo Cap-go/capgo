@@ -1,6 +1,6 @@
 import type { Tab } from '~/components/comp_def'
-import IconHistory from '~icons/heroicons/clock'
 import IconManifest from '~icons/heroicons/clipboard-document-list'
+import IconHistory from '~icons/heroicons/clock'
 import IconEye from '~icons/heroicons/eye'
 import IconInfo from '~icons/heroicons/information-circle'
 import IconPuzzle from '~icons/heroicons/puzzle-piece'
