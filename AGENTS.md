@@ -193,7 +193,7 @@ Then in your test file, use ONLY these dedicated resources for modifications.
 
 ### Commit Messages
 
-- Follow Conventional Commits v1.0.0 (https://www.conventionalcommits.org/en/v1.0.0/).
+- Follow Conventional Commits v1.0.0 (<https://www.conventionalcommits.org/en/v1.0.0/>).
 - Use a clear type and scope when helpful (e.g., `docs: ...`, `feat(api): ...`, `fix(frontend): ...`).
 
 ## Supabase Best Practices
