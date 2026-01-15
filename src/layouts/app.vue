@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import type { Tab } from '~/components/comp_def'
-import { computed, watchEffect } from 'vue'
+import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import PaymentRequiredModal from '~/components/PaymentRequiredModal.vue'
 import Tabs from '~/components/Tabs.vue'
 import { appTabs } from '~/constants/appTabs'
 import { bundleTabs } from '~/constants/bundleTabs'
@@ -13,7 +14,7 @@ const router = useRouter()
 const route = useRoute()
 const organizationStore = useOrganizationStore()
 
-// Check if org payment has failed - only show info tab in this case
+// Check if org payment has failed - show blur overlay with modal
 const isOrgUnpaid = computed(() => {
   return organizationStore.currentOrganizationFailed
 })
@@ -43,17 +44,11 @@ const resourceId = computed(() => {
 })
 
 // Generate tabs with full paths for the current app
-// When org is unpaid, only show the info tab
 const tabs = computed<Tab[]>(() => {
   if (!appId.value)
     return appTabs
 
-  // Filter tabs when org is unpaid - only show info tab
-  const availableTabs = isOrgUnpaid.value
-    ? appTabs.filter(tab => tab.key === '/info')
-    : appTabs
-
-  return availableTabs.map(tab => ({
+  return appTabs.map(tab => ({
     ...tab,
     key: tab.key ? `/app/${appId.value}${tab.key}` : `/app/${appId.value}`,
   }))
@@ -67,12 +62,7 @@ const tabsConfig: Record<string, Tab[]> = {
 }
 
 // Generate secondary tabs with full paths for the current resource
-// No secondary tabs when org is unpaid (user can only access app info)
 const secondaryTabs = computed<Tab[]>(() => {
-  // No secondary tabs when org is unpaid
-  if (isOrgUnpaid.value)
-    return []
-
   if (!appId.value || !resourceId.value || !resourceType.value)
     return []
 
@@ -133,20 +123,6 @@ function handleTab(key: string) {
 function handleSecondaryTab(key: string) {
   router.push(key)
 }
-
-// Redirect to info page if user tries to access non-info pages when org is unpaid
-watchEffect(() => {
-  if (!isOrgUnpaid.value || !appId.value)
-    return
-
-  const path = route.path
-  const infoPath = `/app/${appId.value}/info`
-
-  // If user is on any app page that's not the info page, redirect to info
-  if (path.startsWith(`/app/${appId.value}`) && path !== infoPath) {
-    router.replace(infoPath)
-  }
-})
 </script>
 
 <template>
@@ -160,10 +136,14 @@ watchEffect(() => {
       @update:active-tab="handleTab"
       @update:secondary-active-tab="handleSecondaryTab"
     />
-    <main class="flex flex-1 w-full min-h-0 mt-0 overflow-hidden bg-blue-50 dark:bg-slate-800/40">
-      <div class="flex-1 w-full min-h-0 mx-auto overflow-y-auto">
+    <main class="relative flex flex-1 w-full min-h-0 mt-0 overflow-hidden bg-blue-50 dark:bg-slate-800/40">
+      <div
+        class="flex-1 w-full min-h-0 mx-auto overflow-y-auto"
+        :class="{ 'blur-sm pointer-events-none select-none': isOrgUnpaid }"
+      >
         <RouterView class="w-full" />
       </div>
+      <PaymentRequiredModal v-if="isOrgUnpaid" />
     </main>
   </div>
 </template>
