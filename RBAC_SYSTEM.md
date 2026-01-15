@@ -422,7 +422,7 @@ The system defines 13 predefined roles covering all hierarchy levels.
   - **Channel**: read, update_settings, **delete**, read_history, promote_bundle, rollback_bundle, manage_forced_devices, read_forced_devices, read_audit
   - **Bundle**: **delete**
 - **Usage**: Organization owner, full access including billing and deletions
-- **Difference from org_admin**: Can modify billing and delete apps/channels
+- **Difference from org_admin**: Can modify billing and delete apps
 
 #### `org_admin`
 - **Scope**: `org`
@@ -431,9 +431,9 @@ The system defines 13 predefined roles covering all hierarchy levels.
 - **Permissions**:
   - **Org**: read, update_settings, read_members, invite_user, update_user_roles, read_billing, read_invoices, read_audit, read_billing_audit
   - **App**: read, update_settings, read_bundles, upload_bundle, create_channel, read_channels, read_logs, manage_devices, read_devices, build_native, read_audit, update_user_roles
-  - **Channel**: read, update_settings, read_history, promote_bundle, rollback_bundle, manage_forced_devices, read_forced_devices, read_audit
+  - **Channel**: read, update_settings, delete, read_history, promote_bundle, rollback_bundle, manage_forced_devices, read_forced_devices, read_audit
 - **Usage**: Organization administrator, full management except billing and deletions
-- **Limitations**: Cannot modify billing or delete apps/channels
+- **Limitations**: Cannot modify billing or delete apps
 
 #### `org_billing_admin`
 - **Scope**: `org`
