@@ -1,6 +1,6 @@
 import type { EmailAttachment, Env, ParsedEmail } from './types'
 
-export type EmailCategory = 'support' | 'sales' | 'query' | 'spam' | 'other' | 'backlink'
+export type EmailCategory = 'support' | 'sales' | 'query' | 'spam' | 'other' | 'backlink' | 'security'
 
 export interface ClassificationResult {
   category: EmailCategory
@@ -108,14 +108,16 @@ Classify the following email into one of these categories:
 2. **sales** - Inquiry about pricing, purchasing, features, demos, or becoming a Capgo customer
 3. **query** - General question, information request, or feedback about Capgo's services
 4. **backlink** - Requests for backlinks, guest posts, blog article collaborations, link exchanges, SEO partnerships, content placement, sponsored posts, or any link-building related requests
-5. **spam** - Spam, marketing emails, phishing attempts, suspicious links, promotional content, or unsolicited bulk email
-6. **other** - Automated messages (auto-replies, bounce messages), unsubscribe requests, or emails completely unrelated to Capgo's mobile app platform (e.g., industrial equipment, physical products, unrelated services)
+5. **security** - Generic/vague security vulnerability reports that don't reference specific code, endpoints, or reproducible steps in our codebase. These are often automated scanner reports or bounty hunters sending mass reports without actual research.
+6. **spam** - Spam, marketing emails, phishing attempts, suspicious links, promotional content, or unsolicited bulk email
+7. **other** - Automated messages (auto-replies, bounce messages), unsubscribe requests, or emails completely unrelated to Capgo's mobile app platform (e.g., industrial equipment, physical products, unrelated services)
 
 **IMPORTANT**:
 - If the email mentions backlinks, guest posts, blog articles, link exchange, SEO collaboration, content placement, or sponsored posts, classify as "backlink"
 - If the email is completely unrelated to mobile apps, software development, or Capgo's services (e.g., requests for physical products, industrial equipment, unrelated business services), classify as "spam"
 - If there are any indicators of spam, phishing, or unsolicited marketing, classify as "spam"
-- These emails should NOT be processed
+- If the email reports a security vulnerability BUT is vague, generic, or doesn't reference specific code/endpoints in our GitHub repos, classify as "security" (we auto-reply with our security policy)
+- These emails should NOT be processed (except security which gets an auto-reply)
 
 Backlink request indicators include:
 - Mentions of "backlink", "guest post", "guest article", "link exchange"
@@ -125,6 +127,17 @@ Backlink request indicators include:
 - Sponsored post or content placement requests
 - Mentions of Domain Authority (DA), Domain Rating (DR), or PageRank
 - Offers of "dofollow" links
+
+Generic security report indicators (classify as "security"):
+- Claims of vulnerabilities without specific file paths, endpoints, or code references
+- Mentions of CWE numbers, OWASP, CVE without pointing to specific vulnerable code in our repos
+- Generic vulnerability types like "XSS", "SQL injection", "Prototype Pollution" without proof of impact
+- Reports about third-party services (jQuery, Supabase, etc.) that we don't directly control
+- No reference to our GitHub repositories (https://github.com/cap-go/capgo or https://github.com/cap-go/website)
+- Generic "security researcher" introductions followed by vague findings
+- Reports that suggest running console commands without showing actual exploitation
+- Automated scanner output without manual verification
+- Note: If a security report IS specific and references actual code in our GitHub repos, classify as "support"
 
 Spam indicators include:
 - Suspicious links or attachments
@@ -149,7 +162,7 @@ ${bodyPreview}
 
 Respond in the following JSON format only (no other text):
 {
-  "category": "support|sales|query|backlink|spam|other",
+  "category": "support|sales|query|backlink|security|spam|other",
   "confidence": 0.0-1.0,
   "reason": "brief explanation"
 }
@@ -161,6 +174,10 @@ Examples:
 - "I'd like to write a guest post for your blog" → backlink
 - "We offer high DA backlinks for your website" → backlink
 - "Can we exchange links between our sites?" → backlink
+- "I found a Prototype Pollution vulnerability (CWE 1321) on your website" → security (vague, no specific code)
+- "Security researcher here, I found XSS on capgo.app" without specific endpoint → security
+- "Your site uses jQuery which has vulnerabilities" → security (third-party, not our code)
+- "I found a bug in supabase/functions/_backend/public/upload.ts line 42" → support (specific code reference)
 - "URGENT: Click here to claim your prize!" → spam
 - "Unsubscribe me" → other
 - "[AUTO-REPLY] Out of office" → other
@@ -184,8 +201,8 @@ function parseClassificationResponse(response: string): ClassificationResult {
     const category = parsed.category as EmailCategory
     const confidence = Number(parsed.confidence) || 0
 
-    // Only process support, sales, query, and backlink emails (NOT spam or other)
-    const shouldProcess = ['support', 'sales', 'query', 'backlink'].includes(category)
+    // Only process support, sales, query, backlink, and security emails (NOT spam or other)
+    const shouldProcess = ['support', 'sales', 'query', 'backlink', 'security'].includes(category)
 
     return {
       category,
@@ -313,8 +330,8 @@ export function classifyEmailHeuristic(email: ParsedEmail): ClassificationResult
     /content\s*placement/i,
     /domain\s*authority/i,
     /dofollow/i,
-    /write\s*(a|an)?\s*article\s*for\s*(your|the)\s*(blog|site|website)/i,
-    /publish\s*(a|an)?\s*article/i,
+    /write\s*(?:(a|an)\s*)?article\s*for\s*(your|the)\s*(blog|site|website)/i,
+    /publish\s*(?:(a|an)\s*)?article/i,
     /contribute\s*to\s*your\s*blog/i,
   ]
 
@@ -329,22 +346,117 @@ export function classifyEmailHeuristic(email: ParsedEmail): ClassificationResult
     }
   }
 
+  // Check for generic security vulnerability reports
+  // These are vague reports that don't reference specific code in our GitHub repos
+  const securityIndicatorPatterns = [
+    /security\s*researcher/i,
+    /vulnerability\s*(report|disclosure|found|identified|discovered)/i,
+    /cwe[\s-]*\d+/i,
+    /owasp/i,
+    /prototype\s*pollution/i,
+    /xss\s*(vulnerability|attack|found)/i,
+    /sql\s*injection/i,
+    /cross[\s-]*site\s*scripting/i,
+    /remote\s*code\s*execution/i,
+    /bug\s*bounty/i,
+    /responsible\s*disclosure/i,
+    /security\s*bug/i,
+    /security\s*issue/i,
+    /security\s*flaw/i,
+  ]
+
+  // Check if it looks like a security report
+  let isSecurityReport = false
+  for (const pattern of securityIndicatorPatterns) {
+    if (pattern.test(combined)) {
+      isSecurityReport = true
+      break
+    }
+  }
+
+  // If it's a security report, check if it references our actual code
+  if (isSecurityReport) {
+    // Patterns that indicate a VALID, specific security report
+    const validSecurityReportPatterns = [
+      /github\.com\/cap-go/i, // References our GitHub repos
+      /cap-go\/capgo/i,
+      /cap-go\/website/i,
+      /supabase\/functions\/_backend/i, // References our backend code
+      /cloudflare_workers/i, // References our workers
+      /src\/[a-z]+/i, // References source directories with paths
+      /\.ts:\d+/i, // File:line references
+      /\.js:\d+/i,
+      /line\s*\d+/i, // "line 42" style references
+      /\/api\/[a-z]/i, // API endpoint references like /api/uploads
+      /https?:\/\/capgo\.app\/[a-z]/i, // Specific capgo.app URLs with paths
+      /https?:\/\/[a-z]+\.capgo\.app/i, // Subdomains like api.capgo.app
+    ]
+
+    let isValidReport = false
+    for (const pattern of validSecurityReportPatterns) {
+      if (pattern.test(combined)) {
+        isValidReport = true
+        break
+      }
+    }
+
+    // If it's a vague security report without specific code references
+    if (!isValidReport) {
+      return {
+        category: 'security',
+        confidence: 0.85,
+        shouldProcess: true,
+        reason: 'Generic security report without specific code references',
+      }
+    }
+    // If it's a valid, specific security report, treat it as support
+  }
+
   // Support keywords
   const supportKeywords = [
-    'error', 'bug', 'crash', 'broken', 'not working', 'issue', 'problem',
-    'help', 'support', 'fix', 'unable', 'can\'t', 'won\'t', 'doesn\'t work',
+    'error',
+    'bug',
+    'crash',
+    'broken',
+    'not working',
+    'issue',
+    'problem',
+    'help',
+    'support',
+    'fix',
+    'unable',
+    'can\'t',
+    'won\'t',
+    'doesn\'t work',
   ]
 
   // Sales keywords
   const salesKeywords = [
-    'price', 'pricing', 'cost', 'purchase', 'buy', 'enterprise', 'demo',
-    'trial', 'plan', 'subscription', 'quote', 'sales',
+    'price',
+    'pricing',
+    'cost',
+    'purchase',
+    'buy',
+    'enterprise',
+    'demo',
+    'trial',
+    'plan',
+    'subscription',
+    'quote',
+    'sales',
   ]
 
   // Query keywords
   const queryKeywords = [
-    'how to', 'can i', 'is it possible', 'what is', 'documentation',
-    'guide', 'tutorial', 'question', 'wondering',
+    'how to',
+    'can i',
+    'is it possible',
+    'what is',
+    'documentation',
+    'guide',
+    'tutorial',
+    'question',
+    'wondering',
   ]
 
   let supportScore = 0
@@ -727,7 +839,7 @@ function classifyAttachmentHeuristic(attachment: EmailAttachment): AttachmentCla
     }
 
     // Screenshot indicators
-    if (/screen|capture|screenshot|snap/i.test(filename)) {
+    if (/screenshot|capture|snap/i.test(filename)) {
       return {
         attachment,
         isUseful: true,
@@ -928,6 +1040,214 @@ We only accept paid placements from websites that are relevant to our niche (mob
 
 <p>Best regards,<br>
 The Capgo Team<br>
+<a href="https://capgo.app">https://capgo.app</a></p>`
+
+  return {
+    subject: `Re: ${email.subject}`,
+    text,
+    html,
+  }
+}
+
+export interface SecurityAutoReply {
+  subject: string
+  text: string
+  html: string
+}
+
+/**
+ * Generates an auto-reply for generic security vulnerability reports
+ * Explains our security policy and requirements for valid reports
+ */
+export async function generateSecurityAutoReply(
+  env: Env,
+  email: ParsedEmail,
+): Promise<SecurityAutoReply> {
+  console.log('🔒 generateSecurityAutoReply: Generating auto-reply for generic security report...')
+
+  try {
+    const prompt = buildSecurityReplyPrompt(email)
+    console.log(`   Prompt length: ${prompt.length} characters`)
+
+    console.log('🌐 Calling Anthropic API for security auto-reply...')
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': env.ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-3-5-haiku-latest',
+        max_tokens: 1000,
+        messages: [
+          {
+            role: 'user',
+            content: prompt,
+          },
+        ],
+      }),
+    })
+
+    console.log(`📡 Anthropic API response status: ${response.status}`)
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('❌ Claude API error:', response.status, errorText)
+      return getDefaultSecurityReply(email)
+    }
+
+    const data = await response.json() as any
+    const content = data.content[0].text
+    console.log(`✅ Claude response received`)
+
+    return parseSecurityReplyResponse(content, email)
+  }
+  catch (error) {
+    console.error('Error generating security auto-reply:', error)
+    return getDefaultSecurityReply(email)
+  }
+}
+
+/**
+ * Builds the prompt for generating security auto-reply
+ */
+function buildSecurityReplyPrompt(email: ParsedEmail): string {
+  const bodyPreview = truncateText(email.body.text || email.body.html || '', 1500)
+  const senderName = email.from.name || email.from.email.split('@')[0]
+
+  return `You are responding on behalf of Capgo (https://capgo.app), a live update platform for Capacitor mobile apps.
+
+Someone has sent a security vulnerability report, but it appears to be generic or vague - it doesn't reference specific code in our codebase. Write a professional response that:
+
+1. Thanks them for their security interest
+2. Mentions that we DO PAY for valid, specific security reports that identify real vulnerabilities in our code
+3. Explains our security report policy - we need SPECIFIC, ACTIONABLE reports:
+   - Reports must reference specific files, functions, or endpoints in our GitHub repositories
+   - Our main repo: https://github.com/cap-go/capgo
+   - Our website repo: https://github.com/cap-go/website
+   - Generic vulnerability scanner output is not helpful
+4. Clarifies what is OUT OF SCOPE (we don't pay for these):
+   - Supabase authentication, Supabase APIs, or any Supabase-related issues - Supabase is a third-party service, report those to Supabase directly
+   - Reports about third-party libraries we don't use (e.g., jQuery - we don't use jQuery)
+   - Cloudflare, or other third-party infrastructure - report those to the respective providers
+   - Generic findings without proof of concept or specific code references
+   - Automated scanner results without manual verification
+5. Explains what a VALID report (that we pay for) should include:
+   - Specific file path and line numbers in our GitHub repos
+   - Step-by-step reproduction instructions
+   - Proof of concept demonstrating actual impact on OUR code
+   - The actual exploitable endpoint or code path in our repositories
+6. Invite them to resubmit if they can provide specific details pointing to our actual code
+7. Keep it professional but firm - we value security and reward valid reports, but need actionable information
+
+ORIGINAL EMAIL:
+From: ${senderName} <${email.from.email}>
+Subject: ${email.subject}
+Body:
+${bodyPreview}
+
+Respond in JSON format:
+{
+  "subject": "Re: [original subject]",
+  "text": "Plain text version of the reply",
+  "html": "HTML formatted version (use <p>, <ul>, <li> tags for structure)"
+}
+
+Keep it concise (150-250 words). Be respectful but clear about our requirements.`
+}
+
+/**
+ * Parses the AI response for security auto-reply
+ */
+function parseSecurityReplyResponse(response: string, email: ParsedEmail): SecurityAutoReply {
+  try {
+    const jsonMatch = response.match(/\{[\s\S]*\}/)
+    if (!jsonMatch) {
+      throw new Error('No JSON found in response')
+    }
+
+    const parsed = JSON.parse(jsonMatch[0])
+    return {
+      subject: parsed.subject || `Re: ${email.subject}`,
+      text: parsed.text || getDefaultSecurityReply(email).text,
+      html: parsed.html || getDefaultSecurityReply(email).html,
+    }
+  }
+  catch (error) {
+    console.error('Error parsing security reply response:', error)
+    return getDefaultSecurityReply(email)
+  }
+}
+
+/**
+ * Returns a default security reply when AI fails
+ */
+function getDefaultSecurityReply(email: ParsedEmail): SecurityAutoReply {
+  const senderName = email.from.name || email.from.email.split('@')[0]
+
+  const text = `Hi ${senderName},
+
+Thank you for reaching out about potential security concerns with Capgo.
+
+We take security seriously and we DO PAY for valid security reports that identify real vulnerabilities in our code. However, to investigate a report effectively, we need specific, actionable information. Unfortunately, your report appears to be generic and doesn't reference specific code in our codebase.
+
+**What we need for a valid security report (that we pay for):**
+- Specific file paths and line numbers in our GitHub repositories
+- Step-by-step reproduction instructions
+- Proof of concept demonstrating actual impact on OUR code
+- The actual exploitable endpoint or code path in our repositories
+
+**Our repositories:**
+- Main application: https://github.com/cap-go/capgo
+- Website: https://github.com/cap-go/website
+
+**What is OUT OF SCOPE (we don't pay for these):**
+- Supabase authentication, APIs, or any Supabase-related issues - Supabase is a third-party service, please report those to Supabase directly
+- Third-party libraries we don't use (e.g., jQuery - we don't use jQuery)
+- Cloudflare or other third-party infrastructure - please report those to the respective providers
+- Generic scanner output without manual verification
+- Theoretical vulnerabilities without proof of concept in our specific codebase
+
+If you have identified a genuine vulnerability in our code, please resubmit with specific references to files and functions in our GitHub repositories, along with clear reproduction steps. We reward valid reports!
+
+Best regards,
+The Capgo Security Team
+https://capgo.app`
+
+  const html = `<p>Hi ${senderName},</p>
+
+<p>Thank you for reaching out about potential security concerns with Capgo.</p>
+
+<p>We take security seriously and <strong>we DO PAY for valid security reports</strong> that identify real vulnerabilities in our code. However, to investigate a report effectively, we need specific, actionable information. Unfortunately, your report appears to be generic and doesn't reference specific code in our codebase.</p>
+
+<p><strong>What we need for a valid security report (that we pay for):</strong></p>
+<ul>
+  <li>Specific file paths and line numbers in our GitHub repositories</li>
+  <li>Step-by-step reproduction instructions</li>
+  <li>Proof of concept demonstrating actual impact on OUR code</li>
+  <li>The actual exploitable endpoint or code path in our repositories</li>
+</ul>
+
+<p><strong>Our repositories:</strong></p>
+<ul>
+  <li>Main application: <a href="https://github.com/cap-go/capgo">https://github.com/cap-go/capgo</a></li>
+  <li>Website: <a href="https://github.com/cap-go/website">https://github.com/cap-go/website</a></li>
+</ul>
+
+<p><strong>What is OUT OF SCOPE (we don't pay for these):</strong></p>
+<ul>
+  <li>Supabase authentication, APIs, or any Supabase-related issues - Supabase is a third-party service, please report those to Supabase directly</li>
+  <li>Third-party libraries we don't use (e.g., jQuery - we don't use jQuery)</li>
+  <li>Cloudflare or other third-party infrastructure - please report those to the respective providers</li>
+  <li>Generic scanner output without manual verification</li>
+  <li>Theoretical vulnerabilities without proof of concept in our specific codebase</li>
+</ul>
+
+<p>If you have identified a genuine vulnerability in our code, please resubmit with specific references to files and functions in our GitHub repositories, along with clear reproduction steps. <strong>We reward valid reports!</strong></p>
+
+<p>Best regards,<br>
+The Capgo Security Team<br>
 <a href="https://capgo.app">https://capgo.app</a></p>`
 
   return {

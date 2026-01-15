@@ -1,6 +1,7 @@
 # Capgo Email-to-Discord Setup
 
 This guide is specific to the Capgo production setup with:
+
 - **Primary Domain**: `capgo.app` (ForwardEmail.net for SMTP)
 - **Secondary Domain**: `usecapgo.com` (Cloudflare Email Routing)
 
@@ -155,6 +156,7 @@ wrangler deploy --env prod
 ```
 
 You should see:
+
 ```
 ✨ Successfully deployed capgo_email-prod
    URL: https://email.capgo.app
@@ -172,6 +174,7 @@ Body: This is a test to see if the Capgo email worker is working!
 ```
 
 **Expected Result:**
+
 1. ForwardEmail.net forwards to `support@usecapgo.com`
 2. Cloudflare Email Routing triggers `capgo_email-prod` worker
 3. Claude AI classifies the email (likely as [QUERY] or [SUPPORT])
@@ -183,6 +186,7 @@ Body: This is a test to see if the Capgo email worker is working!
 Reply to your test email from your email client.
 
 **Expected Result:**
+
 - Worker detects `In-Reply-To` header
 - Reply is posted to existing Discord thread (no new thread created)
 
@@ -191,21 +195,22 @@ Reply to your test email from your email client.
 Reply in the Discord thread.
 
 **Expected Result:**
+
 - Email sent from `support@capgo.app` (your primary domain)
 - Proper threading headers maintained
 - Appears as reply in email client
 
 ## Environment Variables Summary
 
-| Variable | Value | Purpose |
-|----------|-------|---------|
-| `DISCORD_BOT_TOKEN` | `MTIzNDU2...` | Discord bot authentication |
-| `DISCORD_GUILD_ID` | `123456789...` | Your Discord server ID |
-| `DISCORD_FORUM_CHANNEL_ID` | `987654321...` | Private forum channel ID |
-| `ANTHROPIC_API_KEY` | `sk-ant-api03-...` | Claude AI classification |
-| `RESEND_API_KEY` | `re_123abc...` | Resend email sending |
-| `EMAIL_FROM_ADDRESS` | `support@capgo.app` | Primary domain (reply FROM address) |
-| `EMAIL_FROM_NAME` | `Capgo Support Team` | Display name |
+| Variable                   | Value                | Purpose                             |
+| -------------------------- | -------------------- | ----------------------------------- |
+| `DISCORD_BOT_TOKEN`        | `MTIzNDU2...`        | Discord bot authentication          |
+| `DISCORD_GUILD_ID`         | `123456789...`       | Your Discord server ID              |
+| `DISCORD_FORUM_CHANNEL_ID` | `987654321...`       | Private forum channel ID            |
+| `ANTHROPIC_API_KEY`        | `sk-ant-api03-...`   | Claude AI classification            |
+| `RESEND_API_KEY`           | `re_123abc...`       | Resend email sending                |
+| `EMAIL_FROM_ADDRESS`       | `support@capgo.app`  | Primary domain (reply FROM address) |
+| `EMAIL_FROM_NAME`          | `Capgo Support Team` | Display name                        |
 
 ## Monitoring
 
@@ -232,21 +237,25 @@ wrangler deployments list --env prod
 ### Emails Not Arriving at Discord
 
 **Check ForwardEmail.net:**
+
 1. Log in to ForwardEmail.net
 2. Check forwarding logs
 3. Verify `support@capgo.app` → `support@usecapgo.com` rule is active
 
 **Check Cloudflare Email Routing:**
+
 1. Go to Cloudflare Dashboard → `usecapgo.com` → Email
 2. Verify routing rule: `support@usecapgo.com` → Worker: `capgo_email-prod`
 3. Check Email Routing logs
 
 **Check Worker Logs:**
+
 ```bash
 wrangler tail --env prod
 ```
 
 Look for:
+
 - "Received email from: ..."
 - "Email classification: ..."
 - "Creating new Discord thread..."
@@ -254,11 +263,13 @@ Look for:
 ### Discord Thread Not Created
 
 **Verify Bot Permissions:**
+
 1. In Discord, go to Server Settings → Integrations
 2. Find "Capgo Email Bot"
 3. Verify it has access to the forum channel
 
 **Check Classification:**
+
 - Email might be classified as "other" (spam/auto-reply)
 - Check logs: `wrangler tail --env prod`
 - If needed, disable AI: `wrangler secret put USE_AI_CLASSIFICATION --env prod` → Enter: `false`
@@ -266,11 +277,13 @@ Look for:
 ### Replies Not Sending
 
 **Verify Resend Domain:**
+
 1. Go to Resend dashboard → Domains
 2. Ensure `capgo.app` is verified (green checkmark)
 3. Check API key is valid
 
 **Check Worker Logs:**
+
 ```bash
 wrangler tail --env prod
 ```
@@ -297,6 +310,7 @@ Look for Resend errors.
 ## Support
 
 For issues:
+
 1. Check worker logs: `wrangler tail --env prod`
 2. Review [README.md](./README.md) for detailed documentation
 3. Check [MULTI_DOMAIN_SETUP.md](./MULTI_DOMAIN_SETUP.md) for architecture details

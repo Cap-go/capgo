@@ -13,7 +13,7 @@ The worker runs on a schedule (cron trigger) every 2 minutes:
 ```jsonc
 {
   "triggers": {
-    "crons": ["*/2 * * * *"]  // Every 2 minutes
+    "crons": ["*/2 * * * *"] // Every 2 minutes
   }
 }
 ```
@@ -124,18 +124,21 @@ const messages = await getThreadMessages(env, mapping.discordThreadId, 10)
 ### Discord replies not sending?
 
 1. **Check cron is running:**
+
    ```bash
    wrangler tail --env prod
    # Should see "⏰ SCHEDULED WORKER" every 2 minutes
    ```
 
 2. **Check Resend API key:**
+
    ```bash
    wrangler secret list --env prod
    # Should show RESEND_API_KEY
    ```
 
 3. **Check thread mappings:**
+
    ```bash
    wrangler kv:key list --namespace-id 83eebe9478db4d91851a3a0aa137ec72
    # Should see keys like: thread:email:987654321
@@ -160,16 +163,19 @@ const messages = await getThreadMessages(env, mapping.discordThreadId, 10)
 ## Cost Considerations
 
 **Cloudflare Workers:**
+
 - First 100,000 requests/day: Free
 - Cron triggers count as requests: ~720/day (every 2 minutes)
 - Well within free tier ✅
 
 **Discord API:**
+
 - Rate limit: 50 requests per second per token
 - We make ~1-2 requests per cron run
 - Well within limits ✅
 
 **Resend:**
+
 - 3,000 emails/month free
 - $0.001 per email after that
 - For support emails, likely within free tier ✅

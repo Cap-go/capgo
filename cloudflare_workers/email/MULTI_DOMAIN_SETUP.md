@@ -29,10 +29,12 @@ Cloudflare Email Worker → Discord
 You have two options:
 
 **Option A: Subdomain (Recommended)**
+
 - Add a subdomain to your existing domain: `email-worker.yourdomain.com`
 - Cloudflare supports Email Routing on subdomains
 
 **Option B: Separate Domain**
+
 - Use a completely separate domain: `yourdomain-email.com`
 - Must be added to your Cloudflare account
 
@@ -58,6 +60,7 @@ Forward to: support@email-worker.yourdomain.com
 ```
 
 **Other Email Providers:**
+
 - **Google Workspace**: Use Email Forwarding in Gmail settings
 - **Microsoft 365**: Use Mail Flow Rules (Transport Rules)
 - **cPanel/DirectAdmin**: Use Email Forwarders
@@ -68,11 +71,13 @@ Forward to: support@email-worker.yourdomain.com
 **Important**: When replying from Discord, you want emails to come **from** your primary domain (`support@yourdomain.com`), not the secondary domain.
 
 In Resend dashboard:
+
 1. Add and verify your **primary domain** (`yourdomain.com`)
 2. Add DNS records as instructed
 3. Use `support@yourdomain.com` as `EMAIL_FROM_ADDRESS`
 
 **Environment Variable:**
+
 ```bash
 EMAIL_FROM_ADDRESS=support@yourdomain.com  # Your primary domain
 EMAIL_FROM_NAME="Support Team"
@@ -101,6 +106,7 @@ EMAIL_FROM_NAME="Support Team"
 ## Email Threading Preservation
 
 ForwardEmail.net (and most forwarding services) preserve critical headers:
+
 - ✅ `From` - Original sender
 - ✅ `Message-ID` - Unique message identifier
 - ✅ `In-Reply-To` - Thread parent reference
@@ -119,6 +125,7 @@ echo "Test email from ForwardEmail setup" | mail -s "Test Email" support@yourdom
 ```
 
 **Expected Result:**
+
 - Email arrives at ForwardEmail.net
 - Forwards to `support@email-worker.yourdomain.com`
 - Worker creates Discord thread with [QUERY] or [SUPPORT] prefix
@@ -132,6 +139,7 @@ echo "Test email from ForwardEmail setup" | mail -s "Test Email" support@yourdom
 ```
 
 **Expected Result:**
+
 - Worker detects it's a reply
 - Posts to existing Discord thread (doesn't create new one)
 
@@ -141,6 +149,7 @@ echo "Test email from ForwardEmail setup" | mail -s "Test Email" support@yourdom
 2. Check your email inbox
 
 **Expected Result:**
+
 - Email comes from `support@yourdomain.com` (your primary domain)
 - Has proper threading headers
 - Appears as a reply in your email client
@@ -161,6 +170,7 @@ echo "Test email from ForwardEmail setup" | mail -s "Test Email" support@yourdom
 ### Original Sender Not Preserved
 
 Some email providers modify the `From` header. Check if yours supports these headers:
+
 - `X-Original-From`
 - `X-Forwarded-For`
 - `Reply-To`
@@ -188,6 +198,7 @@ wrangler secret put EMAIL_FROM_ADDRESS
 ### Resend Domain Not Verified
 
 You must verify your **primary domain** in Resend:
+
 1. Go to Resend dashboard → Domains
 2. Add `yourdomain.com`
 3. Add the DNS records they provide
@@ -198,6 +209,7 @@ You must verify your **primary domain** in Resend:
 You can forward multiple addresses to the same worker:
 
 **ForwardEmail.net Configuration:**
+
 ```
 support@yourdomain.com   → support@email-worker.yourdomain.com
 sales@yourdomain.com     → sales@email-worker.yourdomain.com
@@ -205,6 +217,7 @@ info@yourdomain.com      → info@email-worker.yourdomain.com
 ```
 
 **Cloudflare Email Routing:**
+
 ```
 support@email-worker.yourdomain.com → Worker: capgo_email
 sales@email-worker.yourdomain.com   → Worker: capgo_email
