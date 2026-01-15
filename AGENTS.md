@@ -187,6 +187,10 @@ Then in your test file, use ONLY these dedicated resources for modifications.
 - Auto-generated types for Vue components and routes
 - Supabase types auto-generated via CLI
 
+### Comments
+
+- All code comments must be in English, regardless of the chat language.
+
 ### Commit Messages
 
 - Follow Conventional Commits v1.0.0 (https://www.conventionalcommits.org/en/v1.0.0/).

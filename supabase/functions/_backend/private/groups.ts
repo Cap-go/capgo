@@ -28,7 +28,7 @@ export const app = createHono('', version)
 app.use('/', useCors)
 app.use('/', middlewareAuth)
 
-// GET /private/groups/:org_id - Liste des groupes d'un org
+// GET /private/groups/:org_id - List groups for an org
 app.get('/:org_id', async (c: Context<MiddlewareKeyVariables>) => {
   const orgId = c.req.param('org_id')
   const userId = c.get('auth')?.userId
@@ -50,7 +50,7 @@ app.get('/:org_id', async (c: Context<MiddlewareKeyVariables>) => {
     pgClient = getPgClient(c)
     const drizzle = getDrizzleClient(pgClient)
 
-    // Récupérer les groupes
+    // Fetch groups
     const groups = await drizzle
       .select({
         id: schema.groups.id,
@@ -81,7 +81,7 @@ app.get('/:org_id', async (c: Context<MiddlewareKeyVariables>) => {
   }
 })
 
-// POST /private/groups/:org_id - Créer un groupe
+// POST /private/groups/:org_id - Create a group
 app.post('/:org_id', async (c: Context<MiddlewareKeyVariables>) => {
   const orgId = c.req.param('org_id')
   const userId = c.get('auth')?.userId
@@ -115,7 +115,7 @@ app.post('/:org_id', async (c: Context<MiddlewareKeyVariables>) => {
     pgClient = getPgClient(c)
     const drizzle = getDrizzleClient(pgClient)
 
-    // Créer le groupe
+    // Create the group
     const [group] = await drizzle
       .insert(schema.groups)
       .values({
@@ -145,7 +145,7 @@ app.post('/:org_id', async (c: Context<MiddlewareKeyVariables>) => {
   }
 })
 
-// PUT /private/groups/:group_id - Modifier un groupe
+// PUT /private/groups/:group_id - Update a group
 app.put('/:group_id', async (c: Context<MiddlewareKeyVariables>) => {
   const groupId = c.req.param('group_id')
   const userId = c.get('auth')?.userId
@@ -163,7 +163,7 @@ app.put('/:group_id', async (c: Context<MiddlewareKeyVariables>) => {
     pgClient = getPgClient(c)
     const drizzle = getDrizzleClient(pgClient)
 
-    // Récupérer le groupe et vérifier l'accès
+    // Fetch the group and verify access
     const [group] = await drizzle
       .select()
       .from(schema.groups)
@@ -188,7 +188,7 @@ app.put('/:group_id', async (c: Context<MiddlewareKeyVariables>) => {
     }
     const { name, description } = parsedBody.data
 
-    // Mettre à jour
+    // Update
     const [updated] = await drizzle
       .update(schema.groups)
       .set({
@@ -216,7 +216,7 @@ app.put('/:group_id', async (c: Context<MiddlewareKeyVariables>) => {
   }
 })
 
-// DELETE /private/groups/:group_id - Supprimer un groupe
+// DELETE /private/groups/:group_id - Delete a group
 app.delete('/:group_id', async (c: Context<MiddlewareKeyVariables>) => {
   const groupId = c.req.param('group_id')
   const userId = c.get('auth')?.userId
@@ -234,7 +234,7 @@ app.delete('/:group_id', async (c: Context<MiddlewareKeyVariables>) => {
     pgClient = getPgClient(c)
     const drizzle = getDrizzleClient(pgClient)
 
-    // Récupérer le groupe et vérifier l'accès
+    // Fetch the group and verify access
     const [group] = await drizzle
       .select()
       .from(schema.groups)
@@ -253,7 +253,7 @@ app.delete('/:group_id', async (c: Context<MiddlewareKeyVariables>) => {
       return c.json({ error: 'Forbidden - Admin rights required' }, 403)
     }
 
-    // Supprimer de façon atomique (cascade supprimera group_members)
+    // Delete atomically (cascade removes group_members)
     await drizzle.transaction(async (tx) => {
       await tx
         .delete(schema.role_bindings)
@@ -287,7 +287,7 @@ app.delete('/:group_id', async (c: Context<MiddlewareKeyVariables>) => {
   }
 })
 
-// GET /private/groups/:group_id/members - Membres d'un groupe
+// GET /private/groups/:group_id/members - Group members
 app.get('/:group_id/members', async (c: Context<MiddlewareKeyVariables>) => {
   const groupId = c.req.param('group_id')
   const userId = c.get('auth')?.userId
@@ -305,7 +305,7 @@ app.get('/:group_id/members', async (c: Context<MiddlewareKeyVariables>) => {
     pgClient = getPgClient(c)
     const drizzle = getDrizzleClient(pgClient)
 
-    // Récupérer le groupe et vérifier l'accès
+    // Fetch the group and verify access
     const [group] = await drizzle
       .select()
       .from(schema.groups)
@@ -320,7 +320,7 @@ app.get('/:group_id/members', async (c: Context<MiddlewareKeyVariables>) => {
       return c.json({ error: 'Forbidden' }, 403)
     }
 
-    // Récupérer les membres avec leurs infos
+    // Fetch members with details
     const members = await drizzle
       .select({
         user_id: schema.group_members.user_id,
@@ -350,7 +350,7 @@ app.get('/:group_id/members', async (c: Context<MiddlewareKeyVariables>) => {
   }
 })
 
-// POST /private/groups/:group_id/members - Ajouter un membre
+// POST /private/groups/:group_id/members - Add a member
 app.post('/:group_id/members', async (c: Context<MiddlewareKeyVariables>) => {
   const groupId = c.req.param('group_id')
   const userId = c.get('auth')?.userId
@@ -368,7 +368,7 @@ app.post('/:group_id/members', async (c: Context<MiddlewareKeyVariables>) => {
     pgClient = getPgClient(c)
     const drizzle = getDrizzleClient(pgClient)
 
-    // Récupérer le groupe et vérifier l'accès
+    // Fetch the group and verify access
     const [group] = await drizzle
       .select()
       .from(schema.groups)
@@ -398,7 +398,7 @@ app.post('/:group_id/members', async (c: Context<MiddlewareKeyVariables>) => {
       return c.json({ error: 'Invalid user_id' }, 400)
     }
 
-    // Vérifier que le target user fait partie de l'org
+    // Verify the target user belongs to the org
     const targetRbacAccess = await drizzle
       .select({ id: schema.role_bindings.id })
       .from(schema.role_bindings)
@@ -428,7 +428,7 @@ app.post('/:group_id/members', async (c: Context<MiddlewareKeyVariables>) => {
       }
     }
 
-    // Ajouter le membre (ON CONFLICT DO NOTHING pour idempotence)
+    // Add member (ON CONFLICT DO NOTHING for idempotency)
     const [member] = await drizzle
       .insert(schema.group_members)
       .values({
@@ -458,7 +458,7 @@ app.post('/:group_id/members', async (c: Context<MiddlewareKeyVariables>) => {
   }
 })
 
-// DELETE /private/groups/:group_id/members/:user_id - Retirer un membre
+// DELETE /private/groups/:group_id/members/:user_id - Remove a member
 app.delete('/:group_id/members/:user_id', async (c: Context<MiddlewareKeyVariables>) => {
   const groupId = c.req.param('group_id')
   const targetUserId = c.req.param('user_id')
@@ -481,7 +481,7 @@ app.delete('/:group_id/members/:user_id', async (c: Context<MiddlewareKeyVariabl
     pgClient = getPgClient(c)
     const drizzle = getDrizzleClient(pgClient)
 
-    // Récupérer le groupe et vérifier l'accès
+    // Fetch the group and verify access
     const [group] = await drizzle
       .select()
       .from(schema.groups)
@@ -496,7 +496,7 @@ app.delete('/:group_id/members/:user_id', async (c: Context<MiddlewareKeyVariabl
       return c.json({ error: 'Forbidden - Admin rights required' }, 403)
     }
 
-    // Retirer le membre
+    // Remove the member
     await drizzle
       .delete(schema.group_members)
       .where(

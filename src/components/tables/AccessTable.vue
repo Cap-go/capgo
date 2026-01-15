@@ -53,7 +53,7 @@ const currentPage = ref(1)
 const canUpdateUserRoles = ref(false)
 const selectedRole = ref('')
 
-// Définir les options de rôles d'application
+// Define app role options
 const appRoleOptions = computed(() => [
   { label: t('role-app-developer'), value: 'app_developer' },
   { label: t('role-app-uploader'), value: 'app_uploader' },
@@ -70,7 +70,7 @@ async function loadAppInfo() {
     app.value = dataApp ?? undefined
     canUpdateUserRoles.value = false
 
-    // Vérifier la permission app.update_user_roles
+    // Check app.update_user_roles permission
     if (app.value?.app_id) {
       canUpdateUserRoles.value = await checkPermissions('app.update_user_roles', { appId: app.value.app_id })
     }
@@ -88,7 +88,7 @@ async function fetchData() {
 
   isLoading.value = true
   try {
-    // Utilise la RPC sécurisée pour récupérer les accès
+    // Use the secure RPC to fetch access
     const { data, error } = await supabase
       .rpc('get_app_access_rbac', {
         p_app_id: app.value.id,
@@ -97,7 +97,7 @@ async function fetchData() {
     if (error)
       throw error
 
-    // Les données sont déjà enrichies par la RPC
+    // Data is already enriched by the RPC
     elements.value = (data as any) || []
     total.value = data?.length || 0
   }
@@ -161,7 +161,7 @@ async function changeUserRole(element: Element) {
 
   isLoading.value = true
   try {
-    // Récupérer l'UUID du nouveau rôle depuis la table roles
+    // Fetch the new role UUID from the roles table
     const { data: roleData, error: roleError } = await supabase
       .from('roles')
       .select('id')
@@ -173,7 +173,7 @@ async function changeUserRole(element: Element) {
       throw new Error('Role not found')
     }
 
-    // Mettre à jour le role_id existant
+    // Update the existing role_id
     const { error: updateError } = await supabase
       .from('role_bindings')
       .update({
@@ -218,7 +218,7 @@ async function deleteElement(element: Element) {
 
   isLoading.value = true
   try {
-    // Suppression directe via RLS
+    // Delete directly via RLS
     const { error } = await supabase
       .from('role_bindings')
       .delete()
@@ -262,7 +262,7 @@ watch(() => props.appId, async () => {
   await refreshData()
 }, { immediate: true })
 
-// Filtrer les éléments en fonction de la recherche
+// Filter items based on the search query
 const filteredElements = computed(() => {
   if (!search.value)
     return elements.value
@@ -312,7 +312,7 @@ const dynamicColumns = computed<TableColumn[]>(() => {
     },
   ]
 
-  // Ajouter les colonnes actions seulement si l'utilisateur a la permission
+  // Add action columns only if the user has permission
   if (canUpdateUserRoles.value) {
     baseColumns.push({
       key: 'actions',
@@ -333,7 +333,7 @@ const dynamicColumns = computed<TableColumn[]>(() => {
   return baseColumns
 })
 
-// Synchroniser les colonnes dynamiques avec la ref columns
+// Sync dynamic columns with the columns ref
 watch(dynamicColumns, (newCols) => {
   columns.value = newCols
 }, { immediate: true })
@@ -355,7 +355,7 @@ watch(dynamicColumns, (newCols) => {
     />
   </div>
 
-  <!-- Teleport pour la modale de sélection du rôle -->
+  <!-- Teleport for the role selection modal -->
   <Teleport
     v-if="dialogStore.showDialog && dialogStore.dialogOptions?.id === 'select-app-role'"
     defer
