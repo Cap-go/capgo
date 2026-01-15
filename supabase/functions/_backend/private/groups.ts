@@ -46,7 +46,6 @@ app.get('/:org_id', async (c: Context<MiddlewareKeyVariables>) => {
   }
 
   let pgClient
-  let targetUserId: string | undefined
   try {
     pgClient = getPgClient(c)
     const drizzle = getDrizzleClient(pgClient)
