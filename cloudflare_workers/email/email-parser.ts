@@ -62,7 +62,8 @@ export function parseEmail(message: EmailMessage, rawEmailText?: string): Parsed
  * Extracts boundary from a Content-Type header value
  */
 function extractBoundaryFromHeader(contentType: string): string | undefined {
-  if (!contentType) return undefined
+  if (!contentType)
+    return undefined
 
   const boundaryMatch = contentType.match(/boundary="?([^"\s;]+)"?/i)
   return boundaryMatch?.[1]
@@ -72,7 +73,8 @@ function extractBoundaryFromHeader(contentType: string): string | undefined {
  * Decodes RFC 2047 encoded words (like =?UTF-8?Q?...?= or =?UTF-8?B?...?=)
  */
 function decodeRfc2047(text: string): string {
-  if (!text.includes('=?')) return text
+  if (!text.includes('=?'))
+    return text
 
   return text.replace(/=\?([^?]+)\?([BQ])\?([^?]*)\?=/gi, (_, charset, encoding, encoded) => {
     try {
@@ -85,7 +87,7 @@ function decodeRfc2047(text: string): string {
         // This handles multi-byte UTF-8 sequences like =C3=A9 for "é"
         const byteString = encoded
           .replace(/_/g, ' ')
-          .replace(/=([0-9A-Fa-f]{2})/g, (_: string, hex: string) => String.fromCharCode(Number.parseInt(hex, 16)))
+          .replace(/=([0-9A-F]{2})/gi, (_: string, hex: string) => String.fromCharCode(Number.parseInt(hex, 16)))
 
         // Convert to byte array and decode with proper charset
         try {
@@ -332,7 +334,7 @@ function parseAttachmentPart(part: string, contentType: string): EmailAttachment
     return null
   }
 
-  let content = contentMatch[1].trim()
+  const content = contentMatch[1].trim()
 
   // Decode the content based on encoding
   const encodingMatch = part.match(/Content-Transfer-Encoding:\s*([^\r\n]+)/i)
@@ -399,7 +401,7 @@ function decodeContent(content: string, part: string): string {
   const encoding = encodingMatch?.[1]?.toLowerCase().trim()
 
   // Get charset from Content-Type header
-  const charsetMatch = part.match(/charset=["']?([^"';\s\r\n]+)["']?/i)
+  const charsetMatch = part.match(/charset=["']?([^"';\s]+)["']?/i)
   const charset = charsetMatch?.[1]?.toLowerCase() || 'utf-8'
 
   switch (encoding) {
@@ -434,7 +436,7 @@ function decodeQuotedPrintable(content: string, charset: string = 'utf-8'): stri
   while (i < cleaned.length) {
     if (cleaned[i] === '=' && i + 2 < cleaned.length) {
       const hex = cleaned.substring(i + 1, i + 3)
-      if (/^[0-9A-Fa-f]{2}$/.test(hex)) {
+      if (/^[0-9A-F]{2}$/i.test(hex)) {
         bytes.push(Number.parseInt(hex, 16))
         i += 3
         continue

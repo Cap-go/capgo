@@ -354,8 +354,10 @@ function formatEmailForDiscord(email: ParsedEmail): DiscordMessage {
  * Formats file size in human readable format
  */
 function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  if (bytes < 1024)
+    return `${bytes} B`
+  if (bytes < 1024 * 1024)
+    return `${(bytes / 1024).toFixed(1)} KB`
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
@@ -384,20 +386,21 @@ function truncateText(text: string, maxLength: number): string {
  * Plain text content may legitimately contain <email@example.com> or code snippets
  */
 function cleanEmailBody(text: string): string {
-  if (!text) return ''
+  if (!text)
+    return ''
 
   // Remove MIME boundaries (lines starting with --)
   // These look like: --0000000000001fc4d80648616a21
-  let cleaned = text.replace(/^--[a-zA-Z0-9_-]+$/gm, '')
+  let cleaned = text.replace(/^--[\w-]+$/gm, '')
 
   // Remove Content-Type headers
-  cleaned = cleaned.replace(/^Content-Type:\s*[^\n]+$/gim, '')
+  cleaned = cleaned.replace(/^Content-Type:\s*(?:\S[^\n]*|[\t\v\f\r \xA0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000\uFEFF])$/gim, '')
 
   // Remove Content-Transfer-Encoding headers
-  cleaned = cleaned.replace(/^Content-Transfer-Encoding:\s*[^\n]+$/gim, '')
+  cleaned = cleaned.replace(/^Content-Transfer-Encoding:\s*(?:\S[^\n]*|[\t\v\f\r \xA0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000\uFEFF])$/gim, '')
 
   // Remove Content-Disposition headers
-  cleaned = cleaned.replace(/^Content-Disposition:\s*[^\n]+$/gim, '')
+  cleaned = cleaned.replace(/^Content-Disposition:\s*(?:\S[^\n]*|[\t\v\f\r \xA0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000\uFEFF])$/gim, '')
 
   // Remove charset declarations
   cleaned = cleaned.replace(/charset="?[^"\s;]+"?/gi, '')
@@ -408,9 +411,11 @@ function cleanEmailBody(text: string): string {
     .map(line => line.trim())
     .filter((line, index, arr) => {
       // Remove empty lines at start
-      if (index === 0 && line === '') return false
+      if (index === 0 && line === '')
+        return false
       // Remove consecutive empty lines (keep max 1)
-      if (line === '' && arr[index - 1]?.trim() === '') return false
+      if (line === '' && arr[index - 1]?.trim() === '')
+        return false
       return true
     })
     .join('\n')
@@ -428,7 +433,7 @@ function decodeHtmlEntities(text: string): string {
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
+    .replace(/&#39;/g, '\'')
     .replace(/&nbsp;/g, ' ')
     // Handle numeric entities
     .replace(/&#(\d+);/g, (_, num) => String.fromCharCode(Number.parseInt(num, 10)))

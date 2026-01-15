@@ -155,7 +155,8 @@ You can route different email addresses to the same worker but use different FRO
 // In the worker, detect which address was used
 if (message.to === 'sales@yourdomain.com') {
   env.EMAIL_FROM_ADDRESS = 'sales@yourdomain.com'
-} else if (message.to === 'support@yourdomain.com') {
+}
+else if (message.to === 'support@yourdomain.com') {
   env.EMAIL_FROM_ADDRESS = 'support@yourdomain.com'
 }
 ```
@@ -171,6 +172,7 @@ if (message.to === 'sales@yourdomain.com') {
 5. Select this worker (`capgo_email`)
 
 Example routing rule:
+
 ```
 support@yourdomain.com → Worker: capgo_email
 ```
@@ -180,6 +182,7 @@ support@yourdomain.com → Worker: capgo_email
 If your primary domain already has MX records configured (e.g., for Google Workspace, ForwardEmail.net, or other email services), you can use a secondary domain or subdomain for Cloudflare Email Routing.
 
 **Quick Setup:**
+
 1. Set up Cloudflare Email Routing on a secondary domain/subdomain (e.g., `email-worker.yourdomain.com`)
 2. Configure your existing email service to forward emails to the secondary domain
 3. Configure Resend to send from your **primary domain**
@@ -187,6 +190,7 @@ If your primary domain already has MX records configured (e.g., for Google Works
 **📖 See [MULTI_DOMAIN_SETUP.md](./MULTI_DOMAIN_SETUP.md) for detailed instructions**
 
 This setup works perfectly with services like:
+
 - ForwardEmail.net
 - ImprovMX
 - Google Workspace
@@ -198,6 +202,7 @@ This setup works perfectly with services like:
 The worker automatically polls Discord every 2 minutes to check for new messages in threads and sends them as email replies.
 
 **How it works:**
+
 1. Every 2 minutes, the scheduled worker runs (configured via cron trigger)
 2. It checks all active Discord threads for new messages
 3. When it finds a message from a human (not the bot), it sends an email reply to the original sender
@@ -208,7 +213,7 @@ The worker automatically polls Discord every 2 minutes to check for new messages
 ```jsonc
 {
   "triggers": {
-    "crons": ["*/2 * * * *"]  // Every 2 minutes
+    "crons": ["*/2 * * * *"] // Every 2 minutes
   }
 }
 ```
@@ -279,12 +284,14 @@ TTL: 30 days (auto-renewed on each message)
 The worker uses **Claude 3.5 Haiku** to intelligently classify incoming emails:
 
 **Categories:**
+
 - **support** - Bug reports, technical issues, help requests → [SUPPORT] prefix
 - **sales** - Pricing inquiries, demos, purchasing questions → [SALES] prefix
 - **query** - General questions, feature requests, feedback → [QUERY] prefix
 - **other** - Spam, auto-replies, unrelated content → **Ignored (not posted to Discord)**
 
 **How it works:**
+
 1. New email arrives (not a reply)
 2. Claude AI analyzes the subject and body
 3. Email is classified with confidence score
@@ -295,6 +302,7 @@ The worker uses **Claude 3.5 Haiku** to intelligently classify incoming emails:
 If AI classification is disabled (`USE_AI_CLASSIFICATION=false`) or unavailable, the worker uses keyword-based heuristic classification as a backup.
 
 **Benefits:**
+
 - Reduces noise in Discord by filtering spam and auto-replies
 - Automatically categorizes emails for easy team routing
 - Learns from context, not just keywords
@@ -360,6 +368,7 @@ wrangler tail --env preprod
 ### Analytics
 
 Check the Cloudflare Dashboard for:
+
 - Email routing metrics
 - Worker invocations
 - Error rates
@@ -427,11 +436,13 @@ Handles incoming emails from Cloudflare Email Routing.
 ### HTTP Endpoints
 
 #### `GET /health`
+
 Health check endpoint.
 
 **Response**: `200 OK`
 
 #### `POST /discord-webhook`
+
 Webhook endpoint for Discord messages.
 
 **Body**: Discord webhook payload
@@ -445,6 +456,7 @@ Same as the parent project.
 ## Support
 
 For issues or questions:
+
 1. Check the [troubleshooting section](#troubleshooting)
 2. Review worker logs with `wrangler tail`
 3. Open an issue in the repository
