@@ -752,6 +752,7 @@ CREATE OR REPLACE FUNCTION public.rbac_has_permission(
   p_permission_key text,      -- 'app.upload_bundle'
   p_org_id uuid,              -- Optional, derived if NULL
   p_app_id character varying, -- App ID (string)
+  p_bundle_id bigint,         -- Bundle ID (integer)
   p_channel_id bigint         -- Channel ID (integer)
 ) RETURNS boolean
 LANGUAGE plpgsql
@@ -765,20 +766,23 @@ $$;
 
 1. **Identifier resolution**
    - Converts `app_id` (string) to `app.id` (uuid)
+   - Resolves `bundle_id` to its `app_id` and `org_id` when provided
    - Retrieves `channel.rbac_id` (uuid) from `channel_id` (bigint)
-   - Derives `org_id` from app or channel if not provided
+   - Derives `org_id` from app, bundle, or channel if not provided
 
 2. **Scope catalog construction**
    ```sql
    scope_catalog:
      - platform (if applicable)
      - org (if org_id provided)
-     - app (if app_id provided)
+     - app (if app_id provided or derived from bundle)
+     - bundle (if bundle_id provided; scope_type='bundle', scope_id=p_bundle_id)
      - channel (if channel_id provided)
    ```
 
 3. **Collect direct role_bindings**
    - Finds all principal bindings in applicable scopes
+   - Includes bundle-scoped bindings where `role_bindings.bundle_id` matches `p_bundle_id`
    - Example: User X with `app_developer` on app Y
 
 4. **Role hierarchy expansion**
@@ -791,7 +795,8 @@ $$;
 
 6. **Scope verification**
    - A permission given at org level applies to all apps in that org
-   - A permission given at app level applies to all channels in that app
+   - A permission given at app level applies to all channels and bundles in that app
+   - A permission given at bundle level applies only to that bundle
    - **Downward propagation only** (no upward propagation)
 
 7. **Return**
@@ -827,6 +832,7 @@ CREATE OR REPLACE FUNCTION public.rbac_check_permission_direct(
   p_user_id uuid,               -- User UUID
   p_org_id uuid DEFAULT NULL,   -- Optional
   p_app_id varchar DEFAULT NULL, -- Optional
+  p_bundle_id bigint DEFAULT NULL, -- Optional
   p_channel_id bigint DEFAULT NULL, -- Optional
   p_apikey text DEFAULT NULL    -- Optional (mutually exclusive with user_id)
 ) RETURNS boolean
@@ -864,6 +870,13 @@ BEGIN
   IF v_org_id IS NULL AND p_channel_id IS NOT NULL THEN
     SELECT owner_org INTO v_org_id FROM public.channels WHERE id = p_channel_id LIMIT 1;
   END IF;
+  IF v_org_id IS NULL AND p_bundle_id IS NOT NULL THEN
+    SELECT apps.owner_org INTO v_org_id
+    FROM public.app_versions av
+    JOIN public.apps apps ON apps.id = av.app_id
+    WHERE av.id = p_bundle_id
+    LIMIT 1;
+  END IF;
 
   -- Check if RBAC is enabled
   IF rbac_is_enabled_for_org(v_org_id) THEN
@@ -874,6 +887,7 @@ BEGIN
       p_permission_key,
       v_org_id,
       p_app_id,
+      p_bundle_id,
       p_channel_id
     );
   ELSE
@@ -885,6 +899,8 @@ BEGIN
       -- Derive scope from parameters
       IF p_channel_id IS NOT NULL THEN
         v_scope := 'channel';
+      ELSIF p_bundle_id IS NOT NULL THEN
+        v_scope := 'bundle';
       ELSIF p_app_id IS NOT NULL THEN
         v_scope := 'app';
       ELSE
@@ -937,10 +953,40 @@ END;
 $$;
 ```
 
+**Public wrapper (client-safe)**:
+```sql
+CREATE OR REPLACE FUNCTION public.rbac_check_permission(
+  p_permission_key text,
+  p_org_id uuid DEFAULT NULL,
+  p_app_id varchar DEFAULT NULL,
+  p_bundle_id bigint DEFAULT NULL,
+  p_channel_id bigint DEFAULT NULL
+) RETURNS boolean
+LANGUAGE plpgsql
+SET search_path = ''
+SECURITY DEFINER AS $$
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RETURN false;
+  END IF;
+
+  RETURN public.rbac_check_permission_direct(
+    p_permission_key,
+    auth.uid(),
+    p_org_id,
+    p_app_id,
+    p_bundle_id,
+    p_channel_id,
+    NULL
+  );
+END;
+$$;
+```
+
 **Advantages**:
 - ✅ Single source of truth for permission checking
 - ✅ Automatic legacy/RBAC routing based on org flag
-- ✅ Automatic `org_id` derivation from app/channel
+- ✅ Automatic `org_id` derivation from app/channel/bundle
 - ✅ Support for API keys and users
 - ✅ Graceful fallback to legacy if RBAC not enabled
 
@@ -952,7 +998,8 @@ SELECT rbac_check_permission_direct(
   'user-uuid'::uuid,
   NULL, -- org_id will be derived
   'com.example.app',
-  NULL
+  NULL, -- bundle_id
+  NULL  -- channel_id
 );
 
 -- Backend/service-role: API key context
@@ -961,6 +1008,7 @@ SELECT rbac_check_permission_direct(
   NULL::uuid,
   NULL,
   NULL,
+  NULL, -- bundle_id
   123, -- channel_id
   'apikey-string'
 );
@@ -970,7 +1018,8 @@ SELECT rbac_check_permission(
   'app.upload_bundle',
   NULL, -- org_id (derived if app_id provided)
   'com.example.app',
-  NULL
+  NULL, -- bundle_id
+  NULL  -- channel_id
 );
 ```
 
@@ -1001,6 +1050,7 @@ export type Permission
 export interface PermissionScope {
   orgId?: string
   appId?: string
+  bundleId?: number
   channelId?: number
 }
 
@@ -1009,7 +1059,7 @@ export interface PermissionScope {
  *
  * @param c Hono context (must have auth middleware)
  * @param permission Permission key (e.g., 'app.upload_bundle')
- * @param scope Scope identifiers (orgId, appId, channelId)
+ * @param scope Scope identifiers (orgId, appId, bundleId, channelId)
  * @returns Promise<boolean> - true if allowed, false otherwise
  */
 export async function checkPermission(
@@ -1032,6 +1082,7 @@ export async function checkPermission(
         ${userId}::uuid,
         ${scope.orgId || null}::uuid,
         ${scope.appId || null}::varchar,
+        ${scope.bundleId || null}::bigint,
         ${scope.channelId || null}::bigint,
         ${apikeyString}
       ) as allowed
@@ -1045,6 +1096,7 @@ export async function checkPermission(
       userId,
       orgId: scope.orgId,
       appId: scope.appId,
+      bundleId: scope.bundleId,
       channelId: scope.channelId,
     })
 
@@ -1269,6 +1321,7 @@ export type Permission = // ... (same type as backend)
 export interface PermissionScope {
   orgId?: string
   appId?: string
+  bundleId?: number
   channelId?: number
 }
 
@@ -1285,6 +1338,7 @@ export async function hasPermission(
       p_permission_key: permission,
       p_org_id: scope.orgId || null,
       p_app_id: scope.appId || null,
+      p_bundle_id: scope.bundleId || null,
       p_channel_id: scope.channelId || null,
     })
 
@@ -1328,7 +1382,7 @@ export async function hasAllPermissions(
 export async function checkPermissionsBatch(
   checks: Array<{ permission: Permission; scope: PermissionScope }>
 ): Promise<Record<Permission, boolean>> {
-  const results: Record<string, boolean> = {}
+  const results: Record<Permission, boolean> = {} as Record<Permission, boolean>
 
   // Note: Could be optimized with a batch RPC, but currently sequential.
   for (const check of checks) {
@@ -1429,12 +1483,12 @@ export function usePermissions(
   permissionsToCheck: Permission[],
   scope: PermissionScope
 ) {
-  const permissions = ref<Record<Permission, boolean>>({})
+  const permissions = ref<Record<Permission, boolean>>({} as Record<Permission, boolean>)
   const loading = ref(true)
 
   async function checkAll() {
     loading.value = true
-    const results: Record<string, boolean> = {}
+    const results: Record<Permission, boolean> = {} as Record<Permission, boolean>
 
     for (const perm of permissionsToCheck) {
       results[perm] = await hasPermission(perm, scope)
@@ -1613,6 +1667,7 @@ SELECT rbac_check_permission_direct(
   'user-uuid'::uuid,                -- user_id
   NULL::uuid,                       -- org_id (will be derived from app_id)
   'com.example.app',                -- app_id
+  NULL::bigint,                     -- bundle_id
   NULL::bigint,                     -- channel_id
   NULL                              -- apikey
 ) as has_permission;
@@ -1623,6 +1678,7 @@ SELECT rbac_check_permission_direct(
   NULL::uuid,                       -- user_id (NULL because API key)
   NULL::uuid,
   NULL,
+  NULL::bigint,                     -- bundle_id
   123,                              -- channel_id
   'cap_1234567890abcdef'            -- apikey
 ) as has_permission;
@@ -1727,7 +1783,7 @@ cloudlog({
   requestId,
   message: `rbac_has_permission: checking ${permission}`,
   principal: { type: principalType, id: principalId },
-  scope: { orgId, appId, channelId },
+  scope: { orgId, appId, bundleId, channelId },
   raw_result: result,
 })
 ```

@@ -147,7 +147,7 @@
   "alert-accept-inviation": "Accetti l'invito a %ORG%?",
   "alert-add-new-key": "Seleziona il nuovo tipo di chiave API",
   "alert-cannot-delete-owner-body": "Questo utente è l'ultimo super amministratore di questa organizzazione, non è possibile eliminarlo. \nÈ possibile assegnare il ruolo di super amministratore a un altro utente o eliminare l'organizzazione.",
-  "alert-cannot-delete-owner-title": "Impossibile eliminare l'ultimo utente super admin",
+  "alert-cannot-delete-owner-title": "Impossibile eliminare l'ultimo utente super amministratore",
   "alert-confirm-appid-limit": "Limita la chiave API a certe applicazioni",
   "alert-confirm-appid-limit-message": "Seleziona le app a cui avrà accesso questa chiave API",
   "alert-confirm-delete": "Conferma Eliminazione",

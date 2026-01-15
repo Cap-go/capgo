@@ -12,7 +12,7 @@ interface DeleteOrganizationParams {
 
 type StorageBucket = ReturnType<ReturnType<typeof supabaseAdmin>['storage']['from']>
 
-async function deleteOrgImages(c: Context<MiddlewareKeyVariables>, orgId: string) {
+async function deleteOrgImages(c: Context<MiddlewareKeyVariables>, orgId: string): Promise<boolean> {
   const storage = supabaseAdmin(c).storage.from('images')
   const requestId = c.get('requestId')
   const { data: entries, error: listError } = await storage.list(`org/${orgId}`)
@@ -25,18 +25,18 @@ async function deleteOrgImages(c: Context<MiddlewareKeyVariables>, orgId: string
       folder: `org/${orgId}`,
       error: listError,
     })
-    return
+    return false
   }
 
   if (!entries?.length) {
-    return
+    return true
   }
 
   for (const entry of entries) {
     if (entry.id === null) {
       const ok = await deleteOrgAppImages(storage, orgId, entry.name, requestId)
       if (!ok) {
-        return
+        return false
       }
       continue
     }
@@ -50,11 +50,12 @@ async function deleteOrgImages(c: Context<MiddlewareKeyVariables>, orgId: string
         entry: entry.name,
         error: removeError,
       })
-      return
+      return false
     }
   }
 
   cloudlog({ requestId, message: 'deleted all org images', org_id: orgId })
+  return true
 }
 
 async function deleteOrgAppImages(storage: StorageBucket, orgId: string, folderName: string, requestId?: string) {
@@ -106,7 +107,10 @@ export async function deleteOrg(c: Context<MiddlewareKeyVariables>, body: Delete
     throw quickError(403, 'invalid_org_id', 'You can\'t delete this organization', { org_id: orgId })
   }
 
-  await deleteOrgImages(c, orgId)
+  const imagesDeleted = await deleteOrgImages(c, orgId)
+  if (!imagesDeleted) {
+    throw simpleError('cannot_delete_org_images', 'Failed to delete organization images', { org_id: orgId })
+  }
 
   const { error } = await supabaseApikey(c, apikey.key)
     .from('orgs')
