@@ -210,7 +210,17 @@ export async function postToThread(
   const url = `${DISCORD_API_BASE}/channels/${threadId}/messages`
 
   // For follow-up messages, just send the plain text body
-  const bodyText = email.body.text || stripHtml(email.body.html || '')
+  let bodyText = email.body.text || ''
+
+  // If text body is empty or looks like it contains MIME boundaries, try HTML
+  const hasMimeBoundaries = bodyText.includes('--') && bodyText.includes('Content-Type:')
+  if (!bodyText || hasMimeBoundaries) {
+    bodyText = stripHtml(email.body.html || '')
+  }
+
+  // Clean up any MIME boundaries, headers, and HTML that leaked through
+  bodyText = cleanEmailBody(bodyText)
+
   const content = bodyText.trim() || '(Empty message)'
 
   // Prepare payload
@@ -277,9 +287,19 @@ function formatEmailForDiscord(email: ParsedEmail): DiscordMessage {
     ? `**${email.from.name}** <${email.from.email}>`
     : `**${email.from.email}**`
 
-  // Extract plain text body or convert HTML
-  const bodyText = email.body.text || stripHtml(email.body.html || '')
-  const truncatedBody = truncateText(bodyText, 1800)
+  // Extract plain text body or convert HTML, then clean up any MIME artifacts
+  let bodyText = email.body.text || ''
+
+  // If text body is empty or looks like it contains MIME boundaries, try HTML
+  const hasMimeBoundaries = bodyText.includes('--') && bodyText.includes('Content-Type:')
+  if (!bodyText || hasMimeBoundaries) {
+    bodyText = stripHtml(email.body.html || '')
+  }
+
+  // Clean up any MIME boundaries, headers, and HTML that leaked through
+  bodyText = cleanEmailBody(bodyText)
+
+  const truncatedBody = truncateText(bodyText, 1800) || '(Empty message)'
 
   // Build fields array
   const fields: Array<{ name: string, value: string, inline?: boolean }> = [
@@ -359,6 +379,65 @@ function truncateText(text: string, maxLength: number): string {
 }
 
 /**
+ * Cleans up email body text by removing any MIME boundaries or headers that leaked through
+ * Note: Does NOT strip HTML tags or decode entities - that's handled by stripHtml for HTML content
+ * Plain text content may legitimately contain <email@example.com> or code snippets
+ */
+function cleanEmailBody(text: string): string {
+  if (!text) return ''
+
+  // Remove MIME boundaries (lines starting with --)
+  // These look like: --0000000000001fc4d80648616a21
+  let cleaned = text.replace(/^--[a-zA-Z0-9_-]+$/gm, '')
+
+  // Remove Content-Type headers
+  cleaned = cleaned.replace(/^Content-Type:\s*[^\n]+$/gim, '')
+
+  // Remove Content-Transfer-Encoding headers
+  cleaned = cleaned.replace(/^Content-Transfer-Encoding:\s*[^\n]+$/gim, '')
+
+  // Remove Content-Disposition headers
+  cleaned = cleaned.replace(/^Content-Disposition:\s*[^\n]+$/gim, '')
+
+  // Remove charset declarations
+  cleaned = cleaned.replace(/charset="?[^"\s;]+"?/gi, '')
+
+  // Clean up excessive whitespace
+  cleaned = cleaned
+    .split('\n')
+    .map(line => line.trim())
+    .filter((line, index, arr) => {
+      // Remove empty lines at start
+      if (index === 0 && line === '') return false
+      // Remove consecutive empty lines (keep max 1)
+      if (line === '' && arr[index - 1]?.trim() === '') return false
+      return true
+    })
+    .join('\n')
+    .trim()
+
+  return cleaned
+}
+
+/**
+ * Decodes common HTML entities
+ * Note: &amp; is decoded LAST to prevent double-unescaping (e.g., &amp;lt; → &lt; → <)
+ */
+function decodeHtmlEntities(text: string): string {
+  return text
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, ' ')
+    // Handle numeric entities
+    .replace(/&#(\d+);/g, (_, num) => String.fromCharCode(Number.parseInt(num, 10)))
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCharCode(Number.parseInt(hex, 16)))
+    // Decode &amp; LAST to prevent double-unescaping
+    .replace(/&amp;/g, '&')
+}
+
+/**
  * Converts HTML to Markdown using Turndown
  * Discord supports Markdown formatting, so this preserves structure nicely
  */
@@ -369,7 +448,10 @@ function stripHtml(html: string): string {
 
   try {
     // Use Turndown to convert HTML to Markdown
-    const markdown = turndownService.turndown(html)
+    let markdown = turndownService.turndown(html)
+
+    // Decode HTML entities that might remain
+    markdown = decodeHtmlEntities(markdown)
 
     // Clean up whitespace while preserving intentional line breaks
     return markdown
@@ -383,7 +465,9 @@ function stripHtml(html: string): string {
   catch (error) {
     console.error('Error converting HTML to Markdown:', error)
     // Fallback: use character-by-character approach to strip all HTML safely
-    return stripTagsSafely(html)
+    let result = stripTagsSafely(html)
+    result = decodeHtmlEntities(result)
+    return result
   }
 }
 
