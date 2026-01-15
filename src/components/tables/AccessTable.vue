@@ -154,7 +154,7 @@ async function changeUserRole(element: Element) {
     return
   }
 
-  const isValidRole = appRoleOptions.value.some((option) => option.value === newRoleName)
+  const isValidRole = appRoleOptions.value.some(option => option.value === newRoleName)
   if (!isValidRole) {
     return
   }
