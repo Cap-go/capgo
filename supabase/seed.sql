@@ -483,7 +483,6 @@ BEGIN
     ('f6a7b8c9-d0e1-4f2a-9b3c-4d5e6f7a8b92', 'e5f6a7b8-c9d0-4e1f-8a2b-3c4d5e6f7a81', 'super_admin'::"public"."user_min_right", null, null),
     ('046a36ac-e03c-4590-9257-bd6c9dba9ee8', 'c591b04e-cf29-4945-b9a0-776d0672061a', 'admin'::"public"."user_min_right", null, null),
     ('34a8c55d-2d0f-4652-a43f-684c7a9403ac', '6aa76066-55ef-4238-ade6-0b32334a4097', 'write'::"public"."user_min_right", null, null),
-    ('a7b8c9d0-e1f2-4a3b-9c4d-5e6f7a8b9ca4', 'f6a7b8c9-d0e1-4f2a-9b3c-4d5e6f708193', 'super_admin'::"public"."user_min_right", null, null);
     ('a7b8c9d0-e1f2-4a3b-9c4d-5e6f7a8b9ca4', 'f6a7b8c9-d0e1-4f2a-9b3c-4d5e6f708193', 'super_admin'::"public"."user_min_right", null, null),
     ('e5f6a7b8-c9d0-4e1f-9a2b-3c4d5e6f7a82', '6aa76066-55ef-4238-ade6-0b32334a4097', 'super_admin'::"public"."user_min_right", null, null);
 
