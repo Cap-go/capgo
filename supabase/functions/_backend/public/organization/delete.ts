@@ -103,7 +103,7 @@ export async function deleteOrg(c: Context<MiddlewareKeyVariables>, body: Delete
 
   // Check if user has right to delete the organization (requires super_admin equivalent)
   // Auth context is already set by middlewareKey
-  if (!(await checkPermission(c, 'org.update_settings', { orgId }))) {
+  if (!(await checkPermission(c, 'org.delete', { orgId }))) {
     throw quickError(403, 'invalid_org_id', 'You can\'t delete this organization', { org_id: orgId })
   }
 

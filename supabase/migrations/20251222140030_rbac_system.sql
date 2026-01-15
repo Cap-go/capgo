@@ -227,6 +227,13 @@ PARALLEL SAFE
 SET search_path = ''
 AS $$ SELECT 'org.update_settings'::text $$;
 
+CREATE OR REPLACE FUNCTION public.rbac_perm_org_delete() RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'org.delete'::text $$;
+
 CREATE OR REPLACE FUNCTION public.rbac_perm_org_read_members() RETURNS text
 LANGUAGE sql
 IMMUTABLE
@@ -703,6 +710,7 @@ VALUES
   -- Org permissions
   (public.rbac_perm_org_read(), public.rbac_scope_org(), 'Read org level settings and metadata'),
   (public.rbac_perm_org_update_settings(), public.rbac_scope_org(), 'Update org configuration/settings'),
+  (public.rbac_perm_org_delete(), public.rbac_scope_org(), 'Delete an organization'),
   (public.rbac_perm_org_read_members(), public.rbac_scope_org(), 'Read org membership list'),
   (public.rbac_perm_org_invite_user(), public.rbac_scope_org(), 'Invite or add members to org'),
   (public.rbac_perm_org_update_user_roles(), public.rbac_scope_org(), 'Change org/member roles'),
@@ -798,7 +806,7 @@ INSERT INTO public.role_permissions (role_id, permission_id)
 SELECT r.id, p.id
 FROM public.roles r
 JOIN public.permissions p ON p.key IN (
-  public.rbac_perm_org_read(), public.rbac_perm_org_update_settings(), public.rbac_perm_org_read_members(), public.rbac_perm_org_invite_user(), public.rbac_perm_org_update_user_roles(),
+  public.rbac_perm_org_read(), public.rbac_perm_org_update_settings(), public.rbac_perm_org_delete(), public.rbac_perm_org_read_members(), public.rbac_perm_org_invite_user(), public.rbac_perm_org_update_user_roles(),
   public.rbac_perm_org_read_billing(), public.rbac_perm_org_update_billing(), public.rbac_perm_org_read_invoices(), public.rbac_perm_org_read_audit(), public.rbac_perm_org_read_billing_audit(),
   -- app/channel control granted at org scope (including deletions)
   public.rbac_perm_app_read(), public.rbac_perm_app_update_settings(), public.rbac_perm_app_delete(), public.rbac_perm_app_read_bundles(), public.rbac_perm_app_upload_bundle(),
@@ -3337,6 +3345,27 @@ GRANT EXECUTE ON FUNCTION "public"."get_app_access_rbac"(uuid) TO "authenticated
 COMMENT ON FUNCTION "public"."get_app_access_rbac"(uuid) IS
   'Retrieves all access bindings for an app with permission checks. Requires app.read permission.';
 
+CREATE OR REPLACE FUNCTION "public"."get_org_user_access_rbac"(p_user_id uuid, p_org_id uuid)
+RETURNS TABLE (
+  id uuid,
+  principal_type text,
+  principal_id uuid,
+  role_id uuid,
+  role_name text,
+  role_description text,
+  scope_type text,
+  org_id uuid,
+  app_id uuid,
+  channel_id uuid,
+  granted_at timestamptz,
+  granted_by uuid,
+  expires_at timestamptz,
+  reason text,
+  is_direct boolean,
+  principal_name text,
+  user_email text,
+  group_name text
+)
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
@@ -3604,6 +3633,7 @@ BEGIN
     WHEN public.rbac_perm_org_update_user_roles() THEN RETURN public.rbac_right_super_admin();
     WHEN public.rbac_perm_org_update_billing() THEN RETURN public.rbac_right_super_admin();
     WHEN public.rbac_perm_org_read_billing_audit() THEN RETURN public.rbac_right_super_admin();
+    WHEN public.rbac_perm_org_delete() THEN RETURN public.rbac_right_super_admin();
     WHEN public.rbac_perm_platform_impersonate_user() THEN RETURN public.rbac_right_super_admin();
     WHEN public.rbac_perm_platform_manage_orgs_any() THEN RETURN public.rbac_right_super_admin();
     WHEN public.rbac_perm_platform_manage_apps_any() THEN RETURN public.rbac_right_super_admin();
