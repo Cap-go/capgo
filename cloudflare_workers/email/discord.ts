@@ -1,4 +1,5 @@
 import type { DiscordAPIMessage, DiscordEmbed, DiscordMessage, DiscordThread, EmailAttachment, Env, ParsedEmail } from './types'
+import { uploadLargeAttachment } from './r2-storage'
 import TurndownService from 'turndown'
 
 const DISCORD_API_BASE = 'https://discord.com/api/v10'
@@ -12,6 +13,53 @@ const turndownService = new TurndownService({
 const DISCORD_MAX_FILE_SIZE = 25 * 1024 * 1024 // 25MB - Discord's limit for bots
 
 /**
+ * Result of processing attachments for Discord
+ */
+interface ProcessedAttachments {
+  // Attachments that can be uploaded directly to Discord (<25MB)
+  discordAttachments: EmailAttachment[]
+  // URLs for large attachments uploaded to R2
+  r2Links: Array<{ filename: string, url: string, size: number }>
+}
+
+/**
+ * Processes attachments - uploads large ones to R2, keeps small ones for Discord
+ */
+async function processAttachmentsForDiscord(
+  env: Env,
+  attachments: EmailAttachment[],
+  emailMessageId: string,
+): Promise<ProcessedAttachments> {
+  const discordAttachments: EmailAttachment[] = []
+  const r2Links: Array<{ filename: string, url: string, size: number }> = []
+
+  for (const attachment of attachments) {
+    if (attachment.size <= DISCORD_MAX_FILE_SIZE) {
+      // Small enough for Discord
+      discordAttachments.push(attachment)
+    }
+    else {
+      // Too large for Discord - upload to R2
+      console.log(`📦 Uploading large attachment to R2: ${attachment.filename} (${formatFileSize(attachment.size)})`)
+      const url = await uploadLargeAttachment(env, attachment, emailMessageId)
+      if (url) {
+        r2Links.push({
+          filename: attachment.filename,
+          url,
+          size: attachment.size,
+        })
+        console.log(`✅ Large attachment uploaded to R2: ${url}`)
+      }
+      else {
+        console.error(`❌ Failed to upload large attachment to R2: ${attachment.filename}`)
+      }
+    }
+  }
+
+  return { discordAttachments, r2Links }
+}
+
+/**
  * Creates a Discord message with attachments using multipart/form-data
  * This uploads files directly to Discord (for files under 25MB)
  */
@@ -21,19 +69,7 @@ async function createDiscordMessageWithAttachments(
   payload: Record<string, unknown>,
   attachments: EmailAttachment[],
 ): Promise<Response> {
-  // Filter attachments that can be uploaded directly to Discord (under 25MB)
-  const uploadableAttachments = attachments.filter(a => a.size <= DISCORD_MAX_FILE_SIZE)
-
-  // Log skipped attachments
-  const skippedAttachments = attachments.filter(a => a.size > DISCORD_MAX_FILE_SIZE)
-  if (skippedAttachments.length > 0) {
-    console.warn(`⚠️  Skipping ${skippedAttachments.length} attachment(s) over 25MB Discord limit:`)
-    for (const att of skippedAttachments) {
-      console.warn(`   - ${att.filename} (${formatFileSize(att.size)})`)
-    }
-  }
-
-  if (uploadableAttachments.length === 0) {
+  if (attachments.length === 0) {
     // No attachments to upload, use regular JSON request
     return fetch(url, {
       method: 'POST',
@@ -52,8 +88,8 @@ async function createDiscordMessageWithAttachments(
   formData.append('payload_json', JSON.stringify(payload))
 
   // Add each attachment as a file
-  for (let i = 0; i < uploadableAttachments.length; i++) {
-    const attachment = uploadableAttachments[i]
+  for (let i = 0; i < attachments.length; i++) {
+    const attachment = attachments[i]
 
     // Convert content to Blob
     let blob: Blob
@@ -75,7 +111,7 @@ async function createDiscordMessageWithAttachments(
     formData.append(`files[${i}]`, blob, attachment.filename)
   }
 
-  console.log(`📤 Uploading ${uploadableAttachments.length} attachment(s) directly to Discord`)
+  console.log(`📤 Uploading ${attachments.length} attachment(s) directly to Discord`)
 
   return fetch(url, {
     method: 'POST',
@@ -89,7 +125,8 @@ async function createDiscordMessageWithAttachments(
 
 /**
  * Creates a new forum post (thread) in Discord
- * Uploads attachments directly to Discord (files under 25MB)
+ * Small attachments (<25MB) are uploaded directly to Discord
+ * Large attachments (>=25MB) are uploaded to R2 with private links
  */
 export async function createForumThread(
   env: Env,
@@ -105,8 +142,18 @@ export async function createForumThread(
   const url = `${DISCORD_API_BASE}/channels/${env.DISCORD_FORUM_CHANNEL_ID}/threads`
   console.log(`   Discord API URL: ${url}`)
 
-  // Create the initial message content
-  const message = formatEmailForDiscord(email)
+  // Process attachments - upload large ones to R2, keep small ones for Discord
+  const { discordAttachments, r2Links } = await processAttachmentsForDiscord(
+    env,
+    email.attachments || [],
+    email.messageId,
+  )
+
+  console.log(`   Discord attachments: ${discordAttachments.length}`)
+  console.log(`   R2 links: ${r2Links.length}`)
+
+  // Create the initial message content with R2 links if any
+  const message = formatEmailForDiscord(email, r2Links)
   console.log(`   Message content length: ${message.content.length}`)
   console.log(`   Number of embeds: ${message.embeds?.length || 0}`)
 
@@ -129,9 +176,8 @@ export async function createForumThread(
   }
 
   // If we have attachments to upload directly to Discord, add attachment references
-  const attachmentsToUpload = email.attachments?.filter(a => a.size <= DISCORD_MAX_FILE_SIZE) || []
-  if (attachmentsToUpload.length > 0) {
-    messagePayload.attachments = attachmentsToUpload.map((att, i) => ({
+  if (discordAttachments.length > 0) {
+    messagePayload.attachments = discordAttachments.map((att, i) => ({
       id: i,
       filename: att.filename,
       description: `Email attachment: ${att.filename}`,
@@ -150,13 +196,13 @@ export async function createForumThread(
     console.log('🌐 Sending request to Discord API...')
 
     let response: Response
-    if (attachmentsToUpload.length > 0) {
+    if (discordAttachments.length > 0) {
       // Use multipart/form-data to upload files directly to Discord
       response = await createDiscordMessageWithAttachments(
         url,
         env.DISCORD_BOT_TOKEN,
         payload,
-        attachmentsToUpload,
+        discordAttachments,
       )
     }
     else {
@@ -200,7 +246,8 @@ export async function createForumThread(
 
 /**
  * Posts a message to an existing Discord thread
- * Uploads attachments directly to Discord (files under 25MB)
+ * Small attachments (<25MB) are uploaded directly to Discord
+ * Large attachments (>=25MB) are uploaded to R2 with private links
  */
 export async function postToThread(
   env: Env,
@@ -208,6 +255,13 @@ export async function postToThread(
   email: ParsedEmail,
 ): Promise<boolean> {
   const url = `${DISCORD_API_BASE}/channels/${threadId}/messages`
+
+  // Process attachments - upload large ones to R2, keep small ones for Discord
+  const { discordAttachments, r2Links } = await processAttachmentsForDiscord(
+    env,
+    email.attachments || [],
+    email.messageId,
+  )
 
   // For follow-up messages, just send the plain text body
   let bodyText = email.body.text || ''
@@ -221,7 +275,15 @@ export async function postToThread(
   // Clean up any MIME boundaries, headers, and HTML that leaked through
   bodyText = cleanEmailBody(bodyText)
 
-  const content = bodyText.trim() || '(Empty message)'
+  let content = bodyText.trim() || '(Empty message)'
+
+  // Add R2 links to the message if there are any large attachments
+  if (r2Links.length > 0) {
+    content += '\n\n📎 **Large Attachments** (expires in 7 days):'
+    for (const link of r2Links) {
+      content += `\n• [${link.filename}](${link.url}) (${formatFileSize(link.size)})`
+    }
+  }
 
   // Prepare payload
   const payload: Record<string, unknown> = {
@@ -232,9 +294,8 @@ export async function postToThread(
   }
 
   // If we have attachments to upload directly to Discord, add attachment references
-  const attachmentsToUpload = email.attachments?.filter(a => a.size <= DISCORD_MAX_FILE_SIZE) || []
-  if (attachmentsToUpload.length > 0) {
-    payload.attachments = attachmentsToUpload.map((att, i) => ({
+  if (discordAttachments.length > 0) {
+    payload.attachments = discordAttachments.map((att, i) => ({
       id: i,
       filename: att.filename,
       description: `Email attachment: ${att.filename}`,
@@ -244,13 +305,13 @@ export async function postToThread(
   try {
     let response: Response
 
-    if (attachmentsToUpload.length > 0) {
+    if (discordAttachments.length > 0) {
       // Upload files directly to Discord
       response = await createDiscordMessageWithAttachments(
         url,
         env.DISCORD_BOT_TOKEN,
         payload,
-        attachmentsToUpload,
+        discordAttachments,
       )
     }
     else {
@@ -281,8 +342,12 @@ export async function postToThread(
 /**
  * Formats an email for display in Discord
  * Attachments are uploaded separately via multipart/form-data, Discord will display them
+ * Large attachments uploaded to R2 are shown as links
  */
-function formatEmailForDiscord(email: ParsedEmail): DiscordMessage {
+function formatEmailForDiscord(
+  email: ParsedEmail,
+  r2Links: Array<{ filename: string, url: string, size: number }> = [],
+): DiscordMessage {
   const fromText = email.from.name
     ? `**${email.from.name}** <${email.from.email}>`
     : `**${email.from.email}**`
@@ -315,15 +380,28 @@ function formatEmailForDiscord(email: ParsedEmail): DiscordMessage {
     },
   ]
 
-  // Note attachments in the embed if there are any
+  // Note attachments in the embed if there are any (small ones uploaded to Discord)
   const attachments = email.attachments || []
-  if (attachments.length > 0) {
-    const attachmentList = attachments
+  const smallAttachments = attachments.filter(a => a.size <= DISCORD_MAX_FILE_SIZE)
+  if (smallAttachments.length > 0) {
+    const attachmentList = smallAttachments
       .map(a => `• ${a.filename} (${formatFileSize(a.size)})`)
       .join('\n')
     fields.push({
-      name: `📎 ${attachments.length} Attachment${attachments.length > 1 ? 's' : ''}`,
+      name: `📎 ${smallAttachments.length} Attachment${smallAttachments.length > 1 ? 's' : ''}`,
       value: attachmentList,
+      inline: false,
+    })
+  }
+
+  // Add R2 links for large attachments
+  if (r2Links.length > 0) {
+    const r2LinksList = r2Links
+      .map(link => `• [${link.filename}](${link.url}) (${formatFileSize(link.size)})`)
+      .join('\n')
+    fields.push({
+      name: `📦 ${r2Links.length} Large Attachment${r2Links.length > 1 ? 's' : ''} (expires in 7 days)`,
+      value: r2LinksList,
       inline: false,
     })
   }

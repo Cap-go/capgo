@@ -3,6 +3,7 @@ import { classifyEmail, classifyEmailHeuristic, filterAttachmentsHeuristic, filt
 import { createForumThread, getThreadMessages, postToThread } from './discord'
 import { extractThreadId, getAllPotentialThreadIds, parseEmail } from './email-parser'
 import { formatDiscordMessageAsEmail, sendEmail } from './email-sender'
+import { serveR2File } from './r2-storage'
 import { deleteThreadMapping, getAllThreadMappings, getDiscordThreadId, refreshThreadMapping, storeThreadMapping } from './storage'
 
 /**
@@ -175,6 +176,14 @@ export default {
     // Health check endpoint
     if (url.pathname === '/health' || url.pathname === '/ok') {
       return new Response('OK', { status: 200 })
+    }
+
+    // Serve files from R2 storage
+    // URL format: /files/{fileKey}/{filename}
+    const filesMatch = url.pathname.match(/^\/files\/([^/]+)\/(.+)$/)
+    if (filesMatch) {
+      const [, fileKey, filename] = filesMatch
+      return serveR2File(env, fileKey, decodeURIComponent(filename))
     }
 
     return new Response('Not Found', { status: 404 })
