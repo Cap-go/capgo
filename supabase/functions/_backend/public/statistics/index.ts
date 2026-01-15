@@ -6,8 +6,8 @@ import { z } from 'zod/mini'
 import { honoFactory, quickError, simpleError, useCors } from '../../utils/hono.ts'
 import { middlewareV2 } from '../../utils/hono_middleware.ts'
 import { cloudlog, cloudlogErr } from '../../utils/logging.ts'
-import { supabaseApikey, supabaseClient } from '../../utils/supabase.ts'
 import { checkPermission } from '../../utils/rbac.ts'
+import { supabaseApikey, supabaseClient } from '../../utils/supabase.ts'
 
 dayjs.extend(utc)
 

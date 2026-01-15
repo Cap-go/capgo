@@ -3,8 +3,8 @@ import type { MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
 import { quickError, simpleError } from '../../utils/hono.ts'
 import { cloudlog } from '../../utils/logging.ts'
-import { supabaseAdmin, supabaseApikey } from '../../utils/supabase.ts'
 import { checkPermission } from '../../utils/rbac.ts'
+import { supabaseAdmin, supabaseApikey } from '../../utils/supabase.ts'
 
 interface DeleteOrganizationParams {
   orgId?: string

@@ -11,16 +11,16 @@ import { backgroundTask } from './utils.ts'
  */
 export type EmailPreferenceKey
   = | 'usage_limit'
-  | 'credit_usage'
-  | 'onboarding'
-  | 'weekly_stats'
-  | 'monthly_stats'
-  | 'billing_period_stats'
-  | 'deploy_stats_24h'
-  | 'bundle_created'
-  | 'bundle_deployed'
-  | 'device_error'
-  | 'channel_self_rejected'
+    | 'credit_usage'
+    | 'onboarding'
+    | 'weekly_stats'
+    | 'monthly_stats'
+    | 'billing_period_stats'
+    | 'deploy_stats_24h'
+    | 'bundle_created'
+    | 'bundle_deployed'
+    | 'device_error'
+    | 'channel_self_rejected'
 
 export interface EmailPreferences {
   usage_limit?: boolean

@@ -10,13 +10,13 @@ import { supabaseAdmin } from '../utils/supabase.ts'
 
 export const app = new Hono<MiddlewareKeyVariables>()
 
-type RbacBinding = {
+interface RbacBinding {
   org_id?: string | null
   principal_id?: string | null
   expires_at?: string | null
 }
 
-type GroupMember = {
+interface GroupMember {
   group_id?: string | null
   user_id?: string | null
 }

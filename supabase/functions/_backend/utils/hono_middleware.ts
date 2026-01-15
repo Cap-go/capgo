@@ -11,7 +11,7 @@ import { checkKey, checkKeyById, supabaseAdmin, supabaseClient } from './supabas
 // RBAC Context Middleware
 // =============================================================================
 
-type RbacContextOptions = {
+interface RbacContextOptions {
   orgIdResolver?: (c: Context) => string | null | Promise<string | null>
 }
 

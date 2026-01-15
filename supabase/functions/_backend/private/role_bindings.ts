@@ -4,14 +4,14 @@ import { and, eq } from 'drizzle-orm'
 import { createHono, middlewareAuth, useCors } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../utils/logging.ts'
 import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
-import { checkPermission } from '../utils/rbac.ts'
 import { schema } from '../utils/postgres_schema.ts'
+import { checkPermission } from '../utils/rbac.ts'
 import { version } from '../utils/version.ts'
 
 const PRINCIPAL_TYPES = ['user', 'group', 'apikey'] as const
 const SCOPE_TYPES = ['platform', 'org', 'app', 'channel'] as const
 
-type RoleBindingBody = {
+interface RoleBindingBody {
   principal_type: (typeof PRINCIPAL_TYPES)[number]
   principal_id: string
   role_name: string

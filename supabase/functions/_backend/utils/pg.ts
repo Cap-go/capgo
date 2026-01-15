@@ -393,16 +393,17 @@ export function requestInfosChannelPostgres(
   const channelQuery = (includeManifest
     ? baseQuery.leftJoin(schema.manifest, eq(schema.manifest.app_version_id, versionAlias.id))
     : baseQuery)
-    .where(!defaultChannel
-      ? and(
-        eq(channelAlias.public, true),
-        eq(channelAlias.app_id, app_id),
-        eq(platformQuery, true),
-      )
-      : and(
-        eq(channelAlias.app_id, app_id),
-        eq(channelAlias.name, defaultChannel),
-      ),
+    .where(
+      !defaultChannel
+        ? and(
+            eq(channelAlias.public, true),
+            eq(channelAlias.app_id, app_id),
+            eq(platformQuery, true),
+          )
+        : and(
+            eq(channelAlias.app_id, app_id),
+            eq(channelAlias.name, defaultChannel),
+          ),
     )
     .groupBy(channelAlias.id, versionAlias.id)
     .limit(1)
@@ -428,10 +429,11 @@ export function requestInfosPostgres(
 
   const channelDevice = shouldQueryChannelOverride
     ? requestInfosChannelDevicePostgres(c, app_id, device_id, drizzleClient, shouldFetchManifest, includeMetadata)
-    : Promise.resolve(undefined).then(() => {
-      cloudlog({ requestId: c.get('requestId'), message: 'Skipping channel device override query' })
-      return null
-    })
+    : Promise.resolve(undefined)
+        .then(() => {
+          cloudlog({ requestId: c.get('requestId'), message: 'Skipping channel device override query' })
+          return null
+        })
   const channel = requestInfosChannelPostgres(c, platform, app_id, defaultChannel, drizzleClient, shouldFetchManifest, includeMetadata)
 
   return Promise.all([channelDevice, channel])
