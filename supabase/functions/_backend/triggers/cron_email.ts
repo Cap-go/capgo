@@ -115,6 +115,10 @@ app.post('/', middlewareAPISecret, async (c) => {
     deployedAt,
     cycleStart,
     cycleEnd,
+    totalInstalls,
+    totalFails,
+    failPercentage,
+    reportDate,
   } = await parseBody<{
     email: string
     appId?: string
@@ -130,6 +134,10 @@ app.post('/', middlewareAPISecret, async (c) => {
     deployedAt?: string
     cycleStart?: string
     cycleEnd?: string
+    totalInstalls?: number
+    totalFails?: number
+    failPercentage?: number
+    reportDate?: string
   }>(c)
 
   if (!email || !type) {
@@ -176,6 +184,18 @@ app.post('/', middlewareAPISecret, async (c) => {
       platform,
       appName,
       deployedAt,
+    })
+  }
+  else if (type === 'daily_fail_ratio') {
+    return await handleDailyFailRatio(c, {
+      email,
+      appId,
+      orgId,
+      appName,
+      totalInstalls,
+      totalFails,
+      failPercentage,
+      reportDate,
     })
   }
   else {
@@ -576,6 +596,65 @@ async function handleBillingPeriodStats(c: Context, email: string, orgId: string
   }
 
   await trackBentoEvent(c, email, metadata, 'org:billing_period_stats')
+
+  return c.json(BRES)
+}
+
+async function handleDailyFailRatio(
+  c: Context,
+  payload: {
+    email: string
+    appId?: string
+    orgId?: string
+    appName?: string
+    totalInstalls?: number
+    totalFails?: number
+    failPercentage?: number
+    reportDate?: string
+  },
+) {
+  const {
+    email,
+    appId,
+    orgId,
+    appName,
+    totalInstalls,
+    totalFails,
+    failPercentage,
+    reportDate,
+  } = payload
+
+  if (!appId) {
+    throw simpleError('missing_app_id', 'Missing appId for daily_fail_ratio', { email })
+  }
+
+  // Check if user has daily_fail_ratio preference enabled
+  const isEnabled = await isEmailPreferenceEnabled(c, email, 'daily_fail_ratio')
+  if (!isEnabled) {
+    cloudlog({ requestId: c.get('requestId'), message: 'Daily fail ratio email disabled for user', email, appId })
+    return c.json({ status: 'Email preference disabled' }, 200)
+  }
+
+  const metadata = {
+    app_id: appId,
+    org_id: orgId ?? '',
+    app_name: appName ?? '',
+    total_installs: (totalInstalls ?? 0).toString(),
+    total_fails: (totalFails ?? 0).toString(),
+    fail_percentage: (failPercentage ?? 0).toString(),
+    report_date: reportDate ?? '',
+    success_percentage: (100 - (failPercentage ?? 0)).toFixed(2),
+  }
+
+  await trackBentoEvent(c, email, metadata, 'app:daily_fail_ratio')
+
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: 'Daily fail ratio email sent',
+    email,
+    appId,
+    failPercentage,
+  })
 
   return c.json(BRES)
 }
