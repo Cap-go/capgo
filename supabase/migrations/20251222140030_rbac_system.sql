@@ -605,7 +605,8 @@ COMMENT ON TABLE public.roles IS 'Canonical RBAC roles. Scope_type indicates the
 CREATE TABLE IF NOT EXISTS public.permissions (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   key text UNIQUE NOT NULL,
-  scope_type text NOT NULL CHECK (scope_type IN (public.rbac_scope_platform(), public.rbac_scope_org(), public.rbac_scope_app(), public.rbac_scope_channel())),
+  scope_type text NOT NULL CHECK (scope_type IN (public.rbac_scope_platform(), public.rbac_scope_org(), public.rbac_scope_app(), public.rbac_scope_bundle(), public.rbac_scope_channel())),
+  bundle_id bigint NULL REFERENCES public.app_versions(id) ON DELETE CASCADE,
   description text,
   created_at timestamptz NOT NULL DEFAULT now()
 );

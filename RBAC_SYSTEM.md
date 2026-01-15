@@ -155,7 +155,8 @@ Defines all available permissions.
 CREATE TABLE public.permissions (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   key text UNIQUE NOT NULL,
-  scope_type text NOT NULL CHECK (scope_type IN ('platform', 'org', 'app', 'channel')),
+  scope_type text NOT NULL CHECK (scope_type IN ('platform', 'org', 'app', 'bundle', 'channel')),
+  bundle_id bigint NULL REFERENCES public.app_versions(id) ON DELETE CASCADE,
   description text,
   created_at timestamptz NOT NULL DEFAULT now()
 );
@@ -164,6 +165,7 @@ CREATE TABLE public.permissions (
 **Important columns**:
 - `key`: Unique permission identifier (e.g., `app.upload_bundle`)
 - `scope_type`: Minimum scope required for this permission
+- `bundle_id`: Optional bundle reference when scope is `bundle`
 - `description`: Explanation of the authorized action
 
 **Naming convention**: `{scope}.{action}`
