@@ -24,7 +24,9 @@ export async function deleteBundle(c: Context, body: GetLatest, apikey: Database
   if (body.version) {
     const { data, error: dbError } = await supabaseApikey(c, apikey.key)
       .from('app_versions')
-      .update({ deleted: true })
+      .update({
+        deleted: true,
+      })
       .eq('app_id', body.app_id)
       .eq('name', body.version)
       .select()
@@ -36,7 +38,9 @@ export async function deleteBundle(c: Context, body: GetLatest, apikey: Database
   else {
     const { error: dbError } = await supabaseApikey(c, apikey.key)
       .from('app_versions')
-      .update({ deleted: true })
+      .update({
+        deleted: true,
+      })
       .eq('app_id', body.app_id)
     if (dbError) {
       throw simpleError('cannot_delete_all_version', 'Cannot delete all version', { supabaseError: dbError })
