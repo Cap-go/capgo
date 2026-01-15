@@ -21,6 +21,7 @@ export interface Env {
 
   // Environment
   ENV_NAME?: string
+  EMAIL_WORKER_URL?: string // Base URL for R2 file links (defaults to https://email.capgo.app)
 }
 
 export interface EmailMessage {

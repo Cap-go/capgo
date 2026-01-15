@@ -102,7 +102,7 @@ export async function uploadLargeAttachment(
 export async function serveR2File(
   env: Env,
   fileKey: string,
-  filename: string,
+  _filename: string,
 ): Promise<Response> {
   try {
     // Check if file metadata exists and hasn't expired
@@ -118,13 +118,13 @@ export async function serveR2File(
 
     // Double-check expiration (KV TTL should handle this, but be safe)
     if (Date.now() > metadata.expiresAt) {
-      // Clean up expired file
-      await cleanupExpiredFile(env, fileKey, filename)
+      // Clean up expired file using the stored filename from metadata
+      await cleanupExpiredFile(env, fileKey, metadata.originalFilename)
       return new Response('File has expired', { status: 410 })
     }
 
-    // Fetch from R2
-    const r2Key = `attachments/${fileKey}/${filename}`
+    // Fetch from R2 using the original filename from metadata to avoid URL encoding mismatches
+    const r2Key = `attachments/${fileKey}/${metadata.originalFilename}`
     const object = await env.EMAIL_ATTACHMENTS.get(r2Key)
 
     if (!object) {
@@ -169,9 +169,10 @@ async function cleanupExpiredFile(
 
 /**
  * Gets the base URL for the worker
+ * Uses EMAIL_WORKER_URL env var if set, otherwise defaults to prod
  */
-function getBaseUrl(_env: Env): string {
-  return 'https://email.capgo.app'
+function getBaseUrl(env: Env): string {
+  return env.EMAIL_WORKER_URL || 'https://email.capgo.app'
 }
 
 /**
