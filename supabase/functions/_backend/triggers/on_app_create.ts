@@ -2,6 +2,7 @@ import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
 import { trackBentoEvent } from '../utils/bento.ts'
+import { createIfNotExistStoreInfo } from '../utils/cloudflare.ts'
 import { BRES, middlewareAPISecret, simpleError, triggerValidator } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { logsnag } from '../utils/logsnag.ts'
@@ -65,8 +66,14 @@ app.post('/', middlewareAPISecret, triggerValidator('apps', 'INSERT'), async (c)
         org_id: record.owner_org,
         org_name: data.name,
         app_name: record.name,
-      }, 'app:created') as any
+      }, 'app:created')
     }))
-
+  await backgroundTask(c, createIfNotExistStoreInfo(c, {
+    app_id: record.app_id,
+    updates: 1,
+    onprem: true,
+    capacitor: true,
+    capgo: true,
+  }))
   return c.json(BRES)
 })
