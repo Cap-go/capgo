@@ -5,9 +5,11 @@
 ALTER TABLE public.app_versions
 ADD COLUMN IF NOT EXISTS deleted_at timestamp with time zone DEFAULT NULL;
 
--- Step 2: Migrate existing deleted versions (set deleted_at = created_at for old data)
+-- Step 2: Migrate existing deleted versions
+-- Use updated_at (which was set by previous retention logic) instead of created_at
+-- to avoid premature hard-deletion of recently-deleted old versions
 UPDATE public.app_versions
-SET deleted_at = created_at
+SET deleted_at = updated_at
 WHERE deleted = true AND deleted_at IS NULL;
 
 -- Step 3: Add index for cleanup queries

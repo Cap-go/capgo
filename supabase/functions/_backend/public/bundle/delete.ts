@@ -26,6 +26,7 @@ export async function deleteBundle(c: Context, body: GetLatest, apikey: Database
       .from('app_versions')
       .update({
         deleted: true,
+        deleted_at: new Date().toISOString(),
       })
       .eq('app_id', body.app_id)
       .eq('name', body.version)
@@ -40,6 +41,7 @@ export async function deleteBundle(c: Context, body: GetLatest, apikey: Database
       .from('app_versions')
       .update({
         deleted: true,
+        deleted_at: new Date().toISOString(),
       })
       .eq('app_id', body.app_id)
     if (dbError) {
