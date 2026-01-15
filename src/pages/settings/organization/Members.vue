@@ -3,6 +3,7 @@ import type { TableColumn } from '~/components/comp_def'
 import type { ExtendedOrganizationMember, ExtendedOrganizationMembers } from '~/stores/organization'
 import type { Database } from '~/types/supabase.types'
 
+import { computedAsync } from '@vueuse/core'
 import { storeToRefs } from 'pinia'
 import { computed, h, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -13,10 +14,11 @@ import IconSearch from '~icons/heroicons/magnifying-glass'
 import IconTrash from '~icons/heroicons/trash'
 import IconWrench from '~icons/heroicons/wrench'
 import Table from '~/components/Table.vue'
+import { checkPermissions } from '~/services/permissions'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useMainStore } from '~/stores/main'
-import { useOrganizationStore } from '~/stores/organization'
+import { getRbacRoleI18nKey, useOrganizationStore } from '~/stores/organization'
 import DeleteOrgDialog from './DeleteOrgDialog.vue'
 
 const { t } = useI18n()
@@ -29,10 +31,12 @@ const search = ref('')
 const columns: Ref<TableColumn[]> = ref<TableColumn[]>([])
 const isLoading = ref(false)
 const currentPage = ref(1)
+const rbacSystemEnabled = import.meta.env.VITE_FEATURE_RBAC_SYSTEM === 'true'
 const dialogStore = useDialogV2Store()
 const emailInput = ref('')
 const displayStore = useDisplayStore()
 displayStore.NavTitle = t('members')
+const useNewRbac = ref(false)
 
 // Permission modal state
 const selectedPermission = ref<Database['public']['Enums']['user_min_right'] | undefined>()
@@ -46,6 +50,18 @@ const inviteUserFirstName = ref('')
 const inviteUserLastName = ref('')
 const inviteUserOrgId = ref('')
 const captchaToken = ref('')
+
+const canInviteUser = computedAsync(async () => {
+  if (!currentOrganization.value)
+    return false
+  return await checkPermissions('org.invite_user', { orgId: currentOrganization.value.gid })
+}, false)
+
+const canUpdateUserRoles = computedAsync(async () => {
+  if (!currentOrganization.value)
+    return false
+  return await checkPermissions('org.update_user_roles', { orgId: currentOrganization.value.gid })
+}, false)
 const captchaElement = ref<InstanceType<typeof VueTurnstile> | null>(null)
 const isSubmittingInvite = ref(false)
 const captchaKey = ref(import.meta.env.VITE_CAPTCHA_KEY)
@@ -62,6 +78,29 @@ const isInviteFormValid = computed(() => {
     && inviteUserLastName.value.trim() !== ''
     && captchaToken.value !== ''
 })
+
+async function checkRbacEnabled() {
+  useNewRbac.value = false
+  if (!currentOrganization.value)
+    return
+
+  try {
+    const { data, error } = await supabase
+      .from('orgs')
+      .select('use_new_rbac')
+      .eq('id', currentOrganization.value.gid)
+      .single()
+
+    if (error)
+      throw error
+
+    useNewRbac.value = (data as any)?.use_new_rbac || false
+  }
+  catch (error: any) {
+    useNewRbac.value = false
+    console.error('Error checking RBAC status:', error)
+  }
+}
 
 const isInviteNewUserDialogOpen = ref(false)
 
@@ -90,18 +129,35 @@ const filteredMembers = computed(() => {
 })
 
 const permissionOptions = computed(() => {
-  const options = [
-    { label: t('key-read'), value: 'read' },
-    { label: t('key-upload'), value: 'upload' },
-    { label: t('key-write'), value: 'write' },
-    { label: t('key-admin'), value: 'admin' },
-  ]
+  if (useNewRbac.value) {
+    // Options RBAC
+    const options = [
+      { label: t('role-org-member'), value: 'org_member' },
+      { label: t('role-org-billing-admin'), value: 'org_billing_admin' },
+      { label: t('role-org-admin'), value: 'org_admin' },
+    ]
 
-  if (isSuperAdmin()) {
-    options.push({ label: t('key-super-admin'), value: 'super_admin' })
+    if (canUpdateUserRoles.value) {
+      options.push({ label: t('role-org-super-admin'), value: 'org_super_admin' })
+    }
+
+    return options
   }
+  else {
+    // Options legacy
+    const options = [
+      { label: t('key-read'), value: 'read' },
+      { label: t('key-upload'), value: 'upload' },
+      { label: t('key-write'), value: 'write' },
+      { label: t('key-admin'), value: 'admin' },
+    ]
 
-  return options
+    if (canUpdateUserRoles.value) {
+      options.push({ label: t('key-super-admin'), value: 'super_admin' })
+    }
+
+    return options
+  }
 })
 
 const membersOptions = computed(() => {
@@ -151,7 +207,13 @@ columns.value = [
     key: 'role',
     mobile: true,
     sortable: 'desc',
-    displayFunction: (member: ExtendedOrganizationMember) => member.role.replaceAll('_', ' '),
+    displayFunction: (member: ExtendedOrganizationMember) => {
+      if (useNewRbac.value) {
+        const i18nKey = getRbacRoleI18nKey(member.role)
+        return i18nKey ? t(i18nKey) : member.role.replaceAll('_', ' ')
+      }
+      return member.role.replaceAll('_', ' ')
+    },
   },
   {
     key: 'actions',
@@ -160,7 +222,8 @@ columns.value = [
     actions: computed(() => [
       {
         icon: IconWrench,
-        visible: (member: ExtendedOrganizationMember) => canEdit(member),
+        title: rbacSystemEnabled ? t('edit-role', 'Edit role') : t('actions'),
+        visible: (member: ExtendedOrganizationMember) => canUpdateUserRoles.value && member.uid !== currentOrganization?.value?.created_by,
         onClick: (member: ExtendedOrganizationMember) => {
           changeMemberPermission(member)
         },
@@ -179,7 +242,36 @@ columns.value = [
 async function reloadData() {
   isLoading.value = true
   try {
-    members.value = await organizationStore.getMembers()
+    await checkRbacEnabled()
+
+    if (useNewRbac.value && currentOrganization.value) {
+      // Utiliser la RPC RBAC pour récupérer les membres
+      const { data: rbacMembers, error: rbError } = await supabase
+        .rpc('get_org_members_rbac', {
+          p_org_id: currentOrganization.value.gid,
+        })
+
+      if (rbError) {
+        console.error('Error fetching RBAC members:', rbError)
+        toast.error(t('error-fetching-members'))
+        return
+      }
+
+      // Mapper les données RBAC vers le format attendu par la table
+      members.value = (rbacMembers || []).map((member: any) => ({
+        id: member.user_id,
+        aid: -1, // RBAC-only member (no legacy org_users id)
+        uid: member.user_id,
+        email: member.email,
+        image_url: member.image_url,
+        role: member.role_name,
+        is_tmp: false, // Les invitations RBAC seront gérées différemment
+      }))
+    }
+    else {
+      // Utiliser l'ancienne méthode pour les orgs sans RBAC
+      members.value = await organizationStore.getMembers()
+    }
   }
   catch (error) {
     console.error('Error reloading members:', error)
@@ -227,8 +319,10 @@ async function showPermModal(invite: boolean, onConfirm?: (permission: Database[
   }
 
   dialogStore.openDialog({
-    title: t('select-user-perms'),
-    description: t('select-user-perms-expanded'),
+    title: useNewRbac.value ? t('select-user-role', 'Select a role') : t('select-user-perms'),
+    description: useNewRbac.value
+      ? t('select-user-role-expanded', 'Choose the RBAC role to assign. Legacy roles remain visible during migration.')
+      : t('select-user-perms-expanded'),
     size: 'lg',
     preventAccidentalClose: !!onConfirm,
     buttons: [
@@ -272,7 +366,7 @@ async function showPermModal(invite: boolean, onConfirm?: (permission: Database[
 }
 
 async function showInviteModal() {
-  if (!currentOrganization.value || (!organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['admin', 'super_admin']))) {
+  if (!currentOrganization.value || !canInviteUser.value) {
     toast.error(t('no-permission'))
     return
   }
@@ -517,11 +611,52 @@ async function _deleteMember(member: ExtendedOrganizationMember) {
       await rescindInvitation(member.email)
     }
     else {
-      const { error } = await supabase.from('org_users').delete().eq('id', member.aid)
-      if (error) {
-        console.error('Error deleting member: ', error)
-        toast.error(`${t('cannot-delete-member')}: ${error.message}`)
-        return
+      if (member.aid === -1) {
+        const orgId = currentOrganization.value?.gid
+        if (!orgId) {
+          toast.error(t('cannot-delete-member'))
+          return
+        }
+
+        const { data, error } = await supabase.rpc('delete_org_member_role', {
+          p_org_id: orgId,
+          p_user_id: member.uid,
+        })
+
+        if (error) {
+          console.error('Error deleting RBAC member: ', error)
+          if (error.message.includes('CANNOT_REMOVE_LAST_SUPER_ADMIN')) {
+            toast.error(t('cannot-remove-last-super-admin'))
+          }
+          else if (error.message.includes('CANNOT_CHANGE_OWNER_ROLE')) {
+            toast.error(t('cannot-change-owner-role'))
+          }
+          else if (error.message.includes('NO_PERMISSION_TO_UPDATE_ROLES')) {
+            toast.error(t('no-permission'))
+          }
+          else {
+            toast.error(`${t('cannot-delete-member')}: ${error.message}`)
+          }
+          return
+        }
+
+        if (data !== 'OK') {
+          console.error('Unexpected RPC response:', data)
+          toast.error(t('cannot-delete-member'))
+          return
+        }
+      }
+      else {
+        const { error } = await supabase
+          .from('org_users')
+          .delete()
+          .eq('id', member.aid)
+
+        if (error) {
+          console.error('Error deleting member: ', error)
+          toast.error(`${t('cannot-delete-member')}: ${error.message}`)
+          return
+        }
       }
 
       toast.success(t('member-deleted'))
@@ -570,45 +705,93 @@ async function deleteMember(member: ExtendedOrganizationMember) {
   _deleteMember(member)
 }
 
-async function _changeMemberPermission(member: ExtendedOrganizationMember, perm: Database['public']['Enums']['user_min_right']) {
+function handleRbacRoleUpdateError(error: { message?: string }) {
+  if (error.message?.includes('CANNOT_REMOVE_LAST_SUPER_ADMIN')) {
+    toast.error(t('cannot-remove-last-super-admin'))
+  }
+  else if (error.message?.includes('CANNOT_CHANGE_OWNER_ROLE')) {
+    toast.error(t('cannot-change-owner-role'))
+  }
+  else if (error.message?.includes('NO_PERMISSION_TO_UPDATE_ROLES')) {
+    toast.error(t('no-permission'))
+  }
+  else {
+    toast.error(`${t('cannot-change-permission')}: ${error.message ?? t('unexpected-response')}`)
+  }
+}
+
+async function updateRbacMemberRole(member: ExtendedOrganizationMember, perm: string) {
+  const { data, error } = await supabase.rpc('update_org_member_role', {
+    p_org_id: currentOrganization.value?.gid ?? '',
+    p_user_id: member.uid,
+    p_new_role_name: perm,
+  })
+
+  if (error) {
+    console.error('Error updating RBAC role:', error)
+    handleRbacRoleUpdateError(error)
+    return
+  }
+
+  if (data === 'OK') {
+    toast.success(t('permission-changed'))
+    await reloadData()
+  }
+}
+
+async function updateTmpMemberRole(member: ExtendedOrganizationMember, perm: Database['public']['Enums']['user_min_right']) {
+  const { data, error } = await supabase.rpc('modify_permissions_tmp', {
+    email: member.email,
+    org_id: currentOrganization.value?.gid ?? '',
+    new_role: perm,
+  })
+
+  if (error) {
+    console.error('Error changing permission for invitation: ', error)
+    toast.error(`${t('cannot-change-permission')}: ${error.message}`)
+    return
+  }
+
+  if (data === 'OK') {
+    toast.success(t('permission-changed'))
+  }
+  else {
+    toast.warning(`${t('unexpected-response')}: ${data}`)
+  }
+
+  await reloadData()
+}
+
+async function updateLegacyMemberRole(member: ExtendedOrganizationMember, perm: Database['public']['Enums']['user_min_right']) {
+  const { error } = await supabase
+    .from('org_users')
+    .update({ user_right: perm })
+    .eq('id', member.aid)
+
+  if (error) {
+    console.error('Error changing permission: ', error)
+    toast.error(`${t('cannot-change-permission')}: ${error.message}`)
+    return
+  }
+
+  toast.success(t('permission-changed'))
+  await reloadData()
+}
+
+async function _changeMemberPermission(member: ExtendedOrganizationMember, perm: Database['public']['Enums']['user_min_right'] | string) {
   isLoading.value = true
   try {
+    if (useNewRbac.value && currentOrganization.value) {
+      await updateRbacMemberRole(member, perm as string)
+      return
+    }
+
     if (member.is_tmp) {
-      // Handle modifying permissions for temporary users
-      const { data, error } = await supabase.rpc('modify_permissions_tmp', {
-        email: member.email,
-        org_id: currentOrganization.value?.gid ?? '',
-        new_role: perm,
-      })
-
-      if (error) {
-        console.error('Error changing permission for invitation: ', error)
-        toast.error(`${t('cannot-change-permission')}: ${error.message}`)
-        return
-      }
-
-      // Handle response codes
-      if (data === 'OK') {
-        toast.success(t('permission-changed'))
-      }
-      else {
-        toast.warning(`${t('unexpected-response')}: ${data}`)
-      }
-
-      await reloadData()
+      await updateTmpMemberRole(member, perm as Database['public']['Enums']['user_min_right'])
+      return
     }
-    else {
-      // Handle regular users as before
-      const { error } = await supabase.from('org_users').update({ user_right: perm }).eq('id', member.aid)
-      if (error) {
-        console.error('Error changing permission: ', error)
-        toast.error(`${t('cannot-change-permission')}: ${error.message}`)
-        return
-      }
 
-      toast.success(t('permission-changed'))
-      await reloadData()
-    }
+    await updateLegacyMemberRole(member, perm as Database['public']['Enums']['user_min_right'])
   }
   catch (error) {
     console.error('Permission change failed:', error)
@@ -620,7 +803,8 @@ async function _changeMemberPermission(member: ExtendedOrganizationMember, perm:
 }
 
 async function changeMemberPermission(member: ExtendedOrganizationMember) {
-  const perm = await showPermModal(member.role.includes('invite'))
+  const isInvite = member.role.includes('invite')
+  const perm = await showPermModal(isInvite)
 
   if (!perm) {
     console.log('Permission change cancelled.')
@@ -653,18 +837,6 @@ function acronym(email: string) {
   return res
 }
 
-function canEdit(member: ExtendedOrganizationMember) {
-  const role = organizationStore.currentRole
-  if (!role)
-    return false
-  return (organizationStore.hasPermissionsInRole(role, ['admin', 'super_admin'])) && (member.uid !== currentOrganization?.value?.created_by)
-}
-function isSuperAdmin() {
-  const role = organizationStore.currentRole
-  if (!role)
-    return false
-  return organizationStore.hasPermissionsInRole(role, ['super_admin'])
-}
 function canDelete(member: ExtendedOrganizationMember) {
   const role = organizationStore.currentRole
   const currentUserId = main.user?.id
@@ -681,8 +853,14 @@ function canDelete(member: ExtendedOrganizationMember) {
   return currentUserIsAdmin
 }
 
-function handlePermissionSelection(permission: Database['public']['Enums']['user_min_right'], invite: boolean) {
-  if (invite) {
+function handlePermissionSelection(permission: Database['public']['Enums']['user_min_right'] | string, invite: boolean) {
+  if (useNewRbac.value) {
+    // Pour RBAC, on utilise directement le nom du rôle (org_super_admin, org_admin, etc.)
+    // Les invitations RBAC ne nécessitent pas de préfixe 'invite_'
+    selectedPermission.value = permission as any
+  }
+  else if (invite) {
+    // Legacy: ajouter le préfixe invite_ pour les invitations
     switch (permission) {
       case 'read':
         selectedPermission.value = 'invite_read'
@@ -831,6 +1009,17 @@ async function handleInviteNewUserSubmit() {
           {{ t('members') }}
         </h2>
       </div>
+      <div v-if="rbacSystemEnabled && useNewRbac" class="mb-4 d-alert d-alert-info gap-3 items-start">
+        <IconInformation class="w-6 h-6 text-sky-400 shrink-0" />
+        <div class="text-sm text-slate-100">
+          <p class="font-semibold">
+            {{ t('rbac-system-enabled', 'RBAC role management preview') }}
+          </p>
+          <p class="text-slate-200">
+            {{ t('rbac-system-enabled-body', 'Editing roles here will use the RBAC system. Legacy roles stay visible during migration.') }}
+          </p>
+        </div>
+      </div>
       <Table
         v-model:columns="columns"
         v-model:current-page="currentPage"
@@ -949,7 +1138,11 @@ async function handleInviteNewUserSubmit() {
     </Teleport>
 
     <!-- Teleport for permission selection modal -->
-    <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('select-user-perms')" defer to="#dialog-v2-content">
+    <Teleport
+      v-if="dialogStore.showDialog && (dialogStore.dialogOptions?.title === t('select-user-perms') || dialogStore.dialogOptions?.title === t('select-user-role', 'Select a role'))"
+      defer
+      to="#dialog-v2-content"
+    >
       <div class="w-full">
         <div class="p-4 border rounded-lg dark:border-gray-600">
           <div class="space-y-3">

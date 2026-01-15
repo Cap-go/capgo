@@ -1,7 +1,9 @@
 import type { Context } from 'hono'
+import type { MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
 import { quickError, simpleError } from '../../utils/hono.ts'
-import { hasOrgRightApikey, supabaseApikey } from '../../utils/supabase.ts'
+import { checkPermission } from '../../utils/rbac.ts'
+import { supabaseApikey } from '../../utils/supabase.ts'
 import { isValidAppId } from '../../utils/utils.ts'
 
 export interface CreateApp {
@@ -11,7 +13,7 @@ export interface CreateApp {
   icon?: string
 }
 
-export async function post(c: Context, body: CreateApp, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
+export async function post(c: Context<MiddlewareKeyVariables>, body: CreateApp, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
   if (!body.app_id) {
     throw simpleError('missing_app_id', 'Missing app_id', { body })
   }
@@ -22,9 +24,8 @@ export async function post(c: Context, body: CreateApp, apikey: Database['public
     throw simpleError('missing_name', 'Missing name', { body })
   }
 
-  // Check if the user is allowed to create an app in this organization
-  const userId = apikey.user_id
-  if (body.owner_org && !(await hasOrgRightApikey(c, body.owner_org, userId, 'write', c.get('capgkey') as string))) {
+  // Check if the user is allowed to create an app in this organization (auth context set by middlewareKey)
+  if (body.owner_org && !(await checkPermission(c, 'org.update_settings', { orgId: body.owner_org }))) {
     throw quickError(403, 'cannot_access_organization', 'You can\'t access this organization', { org_id: body.owner_org })
   }
 

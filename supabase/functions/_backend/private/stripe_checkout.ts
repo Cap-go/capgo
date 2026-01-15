@@ -2,8 +2,9 @@ import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
 import { middlewareAuth, parseBody, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
+import { checkPermission } from '../utils/rbac.ts'
 import { createCheckout } from '../utils/stripe.ts'
-import { hasOrgRight, supabaseClient } from '../utils/supabase.ts'
+import { supabaseClient } from '../utils/supabase.ts'
 import { getEnv } from '../utils/utils.ts'
 
 interface CheckoutData {
@@ -50,8 +51,8 @@ app.post('/', middlewareAuth, async (c) => {
   if (!org.customer_id)
     throw simpleError('no_customer', 'No customer')
 
-  if (!await hasOrgRight(c, body.orgId, auth.user.id, 'super_admin'))
-    throw simpleError('not_authorized', 'Not authorized')
+  if (!await checkPermission(c, 'org.update_billing', { orgId: body.orgId }))
+    throw simpleError('not_authorize', 'Not authorize')
 
   cloudlog({ requestId: c.get('requestId'), message: 'user', org })
   const checkout = await createCheckout(c, org.customer_id, body.recurrence ?? 'month', body.priceId ?? 'price_1KkINoGH46eYKnWwwEi97h1B', body.successUrl ?? `${getEnv(c, 'WEBAPP_URL')}/app/usage`, body.cancelUrl ?? `${getEnv(c, 'WEBAPP_URL')}/app/usage`, body.clientReferenceId, body.attributionId)

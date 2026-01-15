@@ -24,8 +24,29 @@ export type Organization = Omit<RawOrganization, 'password_policy_config'> & {
   password_policy_config: PasswordPolicyConfig | null
 }
 export type OrganizationRole = Database['public']['Enums']['user_min_right'] | 'owner'
-export type ExtendedOrganizationMember = Concrete<Merge<ArrayElement<Database['public']['Functions']['get_org_members']['Returns']>, { id: number }>>
+export type ExtendedOrganizationMember = Concrete<Merge<ArrayElement<Database['public']['Functions']['get_org_members']['Returns']>, { id: number | string }>>
 export type ExtendedOrganizationMembers = ExtendedOrganizationMember[]
+
+// Mapping des rôles RBAC d'organisation vers leurs clés de traduction i18n
+export const RBAC_ORG_ROLE_I18N_KEYS: Record<string, string> = {
+  org_super_admin: 'role-org-super-admin',
+  org_admin: 'role-org-admin',
+  org_billing_admin: 'role-org-billing-admin',
+  org_member: 'role-org-member',
+  app_admin: 'role-app-admin',
+  app_developer: 'role-app-developer',
+  app_uploader: 'role-app-uploader',
+  app_reader: 'role-app-reader',
+}
+
+/**
+ * Obtient la clé i18n pour un rôle RBAC d'organisation
+ * @param role Le nom technique du rôle
+ * @returns La clé de traduction i18n, ou undefined si non mappé
+ */
+export function getRbacRoleI18nKey(role: string): string | undefined {
+  return RBAC_ORG_ROLE_I18N_KEYS[role]
+}
 
 const supabase = useSupabase()
 const main = useMainStore()
@@ -183,10 +204,6 @@ export const useOrganizationStore = defineStore('organization', () => {
     return org.role as OrganizationRole
   }
 
-  const hasPermissionsInRole = (perm: OrganizationRole | null, perms: OrganizationRole[]): boolean => {
-    return (perm && perms.includes(perm)) ?? false
-  }
-
   const setCurrentOrganization = (id: string) => {
     currentOrganization.value = organizations.value.find(org => org.gid === id)
   }
@@ -326,17 +343,6 @@ export const useOrganizationStore = defineStore('organization', () => {
     }
   }
 
-  // Get current org's password policy status
-  const getPasswordPolicyStatus = () => {
-    if (!currentOrganization.value)
-      return null
-    return {
-      hasPolicy: !!currentOrganization.value.password_policy_config?.enabled,
-      isCompliant: currentOrganization.value.password_has_access ?? true,
-      config: currentOrganization.value.password_policy_config,
-    }
-  }
-
   const deleteOrganization = async (orgId: string) => {
     // Validate input
     if (!orgId || typeof orgId !== 'string' || orgId.trim() === '') {
@@ -379,15 +385,12 @@ export const useOrganizationStore = defineStore('organization', () => {
     setCurrentOrganizationToFirst,
     getMembers,
     getCurrentRoleForApp,
-    getCurrentRole,
     getAllOrgs,
-    hasPermissionsInRole,
     fetchOrganizations,
     dedupFetchOrganizations,
     getOrgByAppId,
     awaitInitialLoad,
     deleteOrganization,
     checkPasswordPolicyImpact,
-    getPasswordPolicyStatus,
   }
 })

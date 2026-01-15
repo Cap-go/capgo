@@ -2,7 +2,7 @@ import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { simpleError } from '../../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../../utils/logging.ts'
-import { hasAppRightApikey } from '../../utils/supabase.ts'
+import { checkPermission } from '../../utils/rbac.ts'
 import { getEnv } from '../../utils/utils.ts'
 
 async function cancelBuildOnDisconnect(
@@ -71,8 +71,8 @@ export async function streamBuildLogs(
     user_id: apikey.user_id,
   })
 
-  // Security: Check if user has read access to this app
-  if (!(await hasAppRightApikey(c, appId, apikey.user_id, 'read', apikey.key))) {
+  // Security: Check if user has read access to this app (auth context set by middlewareKey)
+  if (!(await checkPermission(c, 'app.read_logs', { appId }))) {
     cloudlogErr({
       requestId: c.get('requestId'),
       message: 'Unauthorized logs request',

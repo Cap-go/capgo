@@ -4,6 +4,7 @@ import IconHistory from '~icons/heroicons/clock'
 import IconCog from '~icons/heroicons/cog-6-tooth'
 import IconCube from '~icons/heroicons/cube'
 import IconDevice from '~icons/heroicons/device-phone-mobile'
+import IconShield from '~icons/heroicons/shield-check'
 import IconChannel from '~icons/heroicons/signal'
 import IconBuild from '~icons/heroicons/wrench-screwdriver'
 
@@ -15,4 +16,5 @@ export const appTabs: Tab[] = [
   { label: 'devices', icon: IconDevice, key: '/devices' },
   { label: 'logs', icon: IconHistory, key: '/logs' },
   { label: 'builds', icon: IconBuild, key: '/builds' },
+  { label: 'access', icon: IconShield, key: '/access' },
 ]

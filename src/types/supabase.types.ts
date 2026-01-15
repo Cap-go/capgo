@@ -7,30 +7,10 @@ export type Json =
   | Json[]
 
 export type Database = {
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "14.1"
   }
   public: {
     Tables: {
@@ -445,7 +425,15 @@ export type Database = {
           platform?: string
           user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "build_logs_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       build_requests: {
         Row: {
@@ -1097,6 +1085,7 @@ export type Database = {
           paying: number | null
           paying_monthly: number | null
           paying_yearly: number | null
+          plan_enterprise: number | null
           plan_enterprise_monthly: number
           plan_enterprise_yearly: number
           plan_maker: number | null
@@ -1143,6 +1132,7 @@ export type Database = {
           paying?: number | null
           paying_monthly?: number | null
           paying_yearly?: number | null
+          plan_enterprise?: number | null
           plan_enterprise_monthly?: number
           plan_enterprise_yearly?: number
           plan_maker?: number | null
@@ -1189,6 +1179,7 @@ export type Database = {
           paying?: number | null
           paying_monthly?: number | null
           paying_yearly?: number | null
+          plan_enterprise?: number | null
           plan_enterprise_monthly?: number
           plan_enterprise_yearly?: number
           plan_maker?: number | null
@@ -2292,20 +2283,20 @@ export type Database = {
       }
       count_active_users: { Args: { app_ids: string[] }; Returns: number }
       count_all_need_upgrade: { Args: never; Returns: number }
-      count_non_compliant_bundles: {
-        Args: { org_id: string; required_key?: string }
-        Returns: {
-          non_encrypted_count: number
-          wrong_key_count: number
-          total_non_compliant: number
-        }[]
-      }
       count_all_onboarded: { Args: never; Returns: number }
       count_all_plans_v2: {
         Args: never
         Returns: {
           count: number
           plan_name: string
+        }[]
+      }
+      count_non_compliant_bundles: {
+        Args: { org_id: string; required_key?: string }
+        Returns: {
+          non_encrypted_count: number
+          total_non_compliant: number
+          wrong_key_count: number
         }[]
       }
       delete_accounts_marked_for_deletion: {
@@ -2316,6 +2307,10 @@ export type Database = {
         }[]
       }
       delete_http_response: { Args: { request_id: number }; Returns: undefined }
+      delete_non_compliant_bundles: {
+        Args: { org_id: string; required_key?: string }
+        Returns: number
+      }
       delete_old_deleted_apps: { Args: never; Returns: undefined }
       delete_user: { Args: never; Returns: undefined }
       exist_app_v2: { Args: { appid: string }; Returns: boolean }
@@ -2325,10 +2320,6 @@ export type Database = {
             Args: { apikey: string; appid: string; name_version: string }
             Returns: boolean
           }
-      delete_non_compliant_bundles: {
-        Args: { org_id: string; required_key?: string }
-        Returns: number
-      }
       expire_usage_credits: { Args: never; Returns: number }
       find_apikey_by_value: {
         Args: { key_value: string }
@@ -3137,9 +3128,7 @@ export type Database = {
         | "disableAutoUpdateMetadata"
         | "disableAutoUpdateUnderNative"
         | "disableDevBuild"
-        | "disableProdBuild"
         | "disableEmulator"
-        | "disableDevice"
         | "cannotGetBundle"
         | "checksum_fail"
         | "NoChannelOrOverride"
@@ -3160,6 +3149,8 @@ export type Database = {
         | "download_manifest_brotli_fail"
         | "backend_refusal"
         | "download_0"
+        | "disableProdBuild"
+        | "disableDevice"
         | "disablePlatformElectron"
       stripe_status:
         | "created"
@@ -3335,9 +3326,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
       action_type: ["mau", "storage", "bandwidth", "build_time"],
@@ -3394,9 +3382,7 @@ export const Constants = {
         "disableAutoUpdateMetadata",
         "disableAutoUpdateUnderNative",
         "disableDevBuild",
-        "disableProdBuild",
         "disableEmulator",
-        "disableDevice",
         "cannotGetBundle",
         "checksum_fail",
         "NoChannelOrOverride",
@@ -3417,6 +3403,8 @@ export const Constants = {
         "download_manifest_brotli_fail",
         "backend_refusal",
         "download_0",
+        "disableProdBuild",
+        "disableDevice",
         "disablePlatformElectron",
       ],
       stripe_status: [
@@ -3444,4 +3432,3 @@ export const Constants = {
     },
   },
 } as const
-

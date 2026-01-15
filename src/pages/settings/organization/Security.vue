@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computedAsync } from '@vueuse/core'
 import { storeToRefs } from 'pinia'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -10,6 +11,7 @@ import IconKey from '~icons/heroicons/key'
 import IconLock from '~icons/heroicons/lock-closed'
 import IconShield from '~icons/heroicons/shield-check'
 import IconUser from '~icons/heroicons/user'
+import { checkPermissions } from '~/services/permissions'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useDisplayStore } from '~/stores/display'
@@ -78,9 +80,12 @@ const nonCompliantPasswordMembers = ref<MemberWithPasswordPolicyStatus[]>([])
 const requireApikeyExpiration = ref(false)
 const maxApikeyExpirationDays = ref<number | null>(null)
 
-const hasOrgPerm = computed(() => {
-  return organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['super_admin'])
-})
+const hasOrgPerm = computedAsync(async () => {
+  const orgId = currentOrganization.value?.gid
+  if (!orgId)
+    return false
+  return await checkPermissions('org.update_settings', { orgId })
+}, false)
 
 const compliantMembersCount = computed(() => {
   return membersWithMfaStatus.value.filter(m => m.has_2fa && !m.is_tmp).length

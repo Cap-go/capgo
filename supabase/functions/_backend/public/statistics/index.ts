@@ -6,7 +6,8 @@ import { z } from 'zod/mini'
 import { honoFactory, quickError, simpleError, useCors } from '../../utils/hono.ts'
 import { middlewareV2 } from '../../utils/hono_middleware.ts'
 import { cloudlog, cloudlogErr } from '../../utils/logging.ts'
-import { hasAppRight, hasAppRightApikey, hasOrgRight, supabaseApikey, supabaseClient } from '../../utils/supabase.ts'
+import { checkPermission } from '../../utils/rbac.ts'
+import { supabaseApikey, supabaseClient } from '../../utils/supabase.ts'
 
 dayjs.extend(utc)
 
@@ -552,15 +553,11 @@ app.get('/app/:app_id', async (c) => {
     throw simpleError('invalid_body', 'Invalid body', { error: bodyParsed.error })
   }
   const body = bodyParsed.data
-
   const auth = c.get('auth') as AuthInfo
-  if (auth.authType === 'apikey') {
-    if (!await hasAppRightApikey(c, appId, auth.userId, 'read', auth.apikey!.key)) {
-      throw quickError(401, 'no_access_to_app', 'No access to app with this apikey', { data: auth })
-    }
-  }
-  else if (!await hasAppRight(c, appId, auth.userId, 'read')) {
-    throw quickError(401, 'no_access_to_app', 'No access to app', { data: auth.userId })
+
+  // Use unified RBAC permission check
+  if (!await checkPermission(c, 'app.read', { appId })) {
+    throw quickError(401, 'no_access_to_app', 'No access to app', { data: c.get('auth') })
   }
 
   // Use authenticated client - RLS will enforce access
@@ -597,7 +594,8 @@ app.get('/org/:org_id', async (c) => {
   const body = bodyParsed.data
 
   const auth = c.get('auth') as AuthInfo
-  if (!(await hasOrgRight(c, orgId, auth.userId, 'read'))) {
+  // Use unified RBAC permission check
+  if (!(await checkPermission(c, 'org.read', { orgId }))) {
     throw quickError(401, 'no_access_to_organization', 'No access to organization', { data: auth.userId })
   }
   if (auth.authType === 'apikey' && auth.apikey!.limited_to_orgs && auth.apikey!.limited_to_orgs.length > 0) {
@@ -636,15 +634,11 @@ app.get('/app/:app_id/bundle_usage', async (c) => {
     throw simpleError('invalid_body', 'Invalid body', { error: bodyParsed.error })
   }
   const body = bodyParsed.data
-
   const auth = c.get('auth') as AuthInfo
-  if (auth.authType === 'apikey') {
-    if (!await hasAppRightApikey(c, appId, auth.userId, 'read', auth.apikey!.key)) {
-      throw quickError(401, 'no_access_to_app', 'No access to app with this apikey', { data: auth.apikey!.key })
-    }
-  }
-  else if (!await hasAppRight(c, appId, auth.userId, 'read')) {
-    throw quickError(401, 'no_access_to_app', 'No access to app', { data: auth.userId })
+
+  // Use unified RBAC permission check
+  if (!await checkPermission(c, 'app.read', { appId })) {
+    throw quickError(401, 'no_access_to_app', 'No access to app', { data: c.get('auth') })
   }
 
   // Use authenticated client - RLS will enforce access
@@ -682,29 +676,25 @@ app.get('/user', async (c) => {
   }
   const body = bodyParsed.data
 
-  const orgsReq = supabase.from('org_users').select('*').eq('user_id', auth.userId)
-  if (auth.authType === 'apikey' && auth.apikey!.limited_to_orgs && auth.apikey!.limited_to_orgs.length > 0) {
-    orgsReq.in('org_id', auth.apikey!.limited_to_orgs)
-  }
-  const orgs = await orgsReq
-  if (orgs.error) {
-    throw quickError(404, 'user_not_found', 'User not found', { error: orgs.error })
+  const { data: orgs, error: orgsError } = await supabase
+    .rpc('get_user_org_ids')
+
+  if (orgsError) {
+    throw quickError(404, 'user_not_found', 'User not found', { error: orgsError })
   }
 
-  cloudlogErr({ requestId: c.get('requestId'), message: 'orgs', data: orgs.data })
+  const orgIds = Array.from(new Set((orgs ?? []).map(org => org.org_id)))
 
-  // Deduplicate organizations by org_id using Set for better performance
-  const uniqueOrgs = Array.from(
-    new Map(orgs.data.map(org => [org.org_id, org])).values(),
-  )
-  if (uniqueOrgs.length === 0) {
+  cloudlogErr({ requestId: c.get('requestId'), message: 'orgs', data: orgIds })
+
+  if (orgIds.length === 0) {
     throw quickError(401, 'no_organizations_found', 'No organizations found', { data: auth.userId })
   }
 
   // Check organization payment status for each organization before returning stats
-  for (const org of uniqueOrgs) {
+  for (const orgId of orgIds) {
     if (auth.authType !== 'jwt')
-      await checkOrganizationAccess(c, org.org_id, supabase)
+      await checkOrganizationAccess(c, orgId, supabase)
   }
 
   let stats: Array<{ data: any, error: any }> = []
@@ -712,7 +702,7 @@ app.get('/user', async (c) => {
     stats = await Promise.all(auth.apikey!.limited_to_apps.map(appId => getNormalStats(c, appId, null, body.from, body.to, supabase, auth.authType === 'jwt', false, body.noAccumulate ?? false)))
   }
   else {
-    stats = await Promise.all(uniqueOrgs.map(org => getNormalStats(c, null, org.org_id, body.from, body.to, supabase, auth.authType === 'jwt', false, body.noAccumulate ?? false)))
+    stats = await Promise.all(orgIds.map(orgId => getNormalStats(c, null, orgId, body.from, body.to, supabase, auth.authType === 'jwt', false, body.noAccumulate ?? false)))
   }
 
   const errors = stats.filter(stat => stat.error).map(stat => stat.error)

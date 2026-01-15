@@ -2289,20 +2289,20 @@ export type Database = {
       }
       count_active_users: { Args: { app_ids: string[] }; Returns: number }
       count_all_need_upgrade: { Args: never; Returns: number }
-      count_non_compliant_bundles: {
-        Args: { org_id: string; required_key?: string }
-        Returns: {
-          non_encrypted_count: number
-          wrong_key_count: number
-          total_non_compliant: number
-        }[]
-      }
       count_all_onboarded: { Args: never; Returns: number }
       count_all_plans_v2: {
         Args: never
         Returns: {
           count: number
           plan_name: string
+        }[]
+      }
+      count_non_compliant_bundles: {
+        Args: { org_id: string; required_key?: string }
+        Returns: {
+          non_encrypted_count: number
+          total_non_compliant: number
+          wrong_key_count: number
         }[]
       }
       delete_accounts_marked_for_deletion: {
@@ -2313,6 +2313,10 @@ export type Database = {
         }[]
       }
       delete_http_response: { Args: { request_id: number }; Returns: undefined }
+      delete_non_compliant_bundles: {
+        Args: { org_id: string; required_key?: string }
+        Returns: number
+      }
       delete_old_deleted_apps: { Args: never; Returns: undefined }
       delete_user: { Args: never; Returns: undefined }
       exist_app_v2: { Args: { appid: string }; Returns: boolean }
@@ -2322,10 +2326,6 @@ export type Database = {
             Args: { apikey: string; appid: string; name_version: string }
             Returns: boolean
           }
-      delete_non_compliant_bundles: {
-        Args: { org_id: string; required_key?: string }
-        Returns: number
-      }
       expire_usage_credits: { Args: never; Returns: number }
       find_apikey_by_value: {
         Args: { key_value: string }

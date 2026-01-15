@@ -1,8 +1,10 @@
 import type { Context } from 'hono'
+import type { MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
 import { z } from 'zod/mini'
 import { quickError, simpleError } from '../../utils/hono.ts'
-import { apikeyHasOrgRightWithPolicy, hasOrgRightApikey, supabaseApikey } from '../../utils/supabase.ts'
+import { checkPermission } from '../../utils/rbac.ts'
+import { apikeyHasOrgRightWithPolicy, supabaseApikey } from '../../utils/supabase.ts'
 import { fetchLimit } from '../../utils/utils.ts'
 
 const bodySchema = z.object({
@@ -20,57 +22,93 @@ const orgSchema = z.object({
   customer_id: z.nullable(z.string()),
 })
 
-export async function get(c: Context, bodyRaw: any, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
+function parseBody(bodyRaw: unknown) {
   const bodyParsed = bodySchema.safeParse(bodyRaw)
   if (!bodyParsed.success) {
     throw simpleError('invalid_body', 'Invalid body', { error: bodyParsed.error })
   }
-  const body = bodyParsed.data
-  const supabase = supabaseApikey(c, c.get('capgkey') as string)
+  return bodyParsed.data
+}
 
-  if (body.orgId && !(await hasOrgRightApikey(c, body.orgId, apikey.user_id, 'read', c.get('capgkey') as string))) {
-    throw simpleError('invalid_org_id', 'You can\'t access this organization', { org_id: body.orgId })
+function parseOrg(data: unknown) {
+  const dataParsed = orgSchema.safeParse(data)
+  if (!dataParsed.success) {
+    throw simpleError('cannot_parse_organization', 'Cannot parse organization', { error: dataParsed.error })
+  }
+  return dataParsed.data
+}
+
+function parseOrgs(data: unknown) {
+  const dataParsed = z.array(orgSchema).safeParse(data)
+  if (!dataParsed.success) {
+    throw simpleError('cannot_parse_organizations', 'Cannot parse organizations', { error: dataParsed.error })
+  }
+  return dataParsed.data
+}
+
+async function ensureOrgAccess(
+  c: Context<MiddlewareKeyVariables>,
+  apikey: Database['public']['Tables']['apikeys']['Row'],
+  orgId: string,
+  supabase: ReturnType<typeof supabaseApikey>,
+) {
+  if (!(await checkPermission(c, 'org.read', { orgId }))) {
+    throw simpleError('invalid_org_id', 'You can\'t access this organization', { org_id: orgId })
   }
 
+  const orgCheck = await apikeyHasOrgRightWithPolicy(c, apikey, orgId, supabase)
+  if (orgCheck.valid) {
+    return
+  }
+  if (orgCheck.error === 'org_requires_expiring_key') {
+    throw quickError(401, 'org_requires_expiring_key', 'This organization requires API keys with an expiration date. Please use a different key or update this key with an expiration date.')
+  }
+  throw simpleError('invalid_org_id', 'You can\'t access this organization', { org_id: orgId })
+}
+
+async function fetchOrg(
+  supabase: ReturnType<typeof supabaseApikey>,
+  orgId: string,
+) {
+  const { data, error } = await supabase
+    .from('orgs')
+    .select('*')
+    .eq('id', orgId)
+    .single()
+  if (error) {
+    throw simpleError('cannot_get_organization', 'Cannot get organization', { error })
+  }
+  return parseOrg(data)
+}
+
+async function fetchOrgs(
+  supabase: ReturnType<typeof supabaseApikey>,
+  page?: number,
+) {
+  const fetchOffset = page ?? 0
+  const from = fetchOffset * fetchLimit
+  const to = (fetchOffset + 1) * fetchLimit - 1
+  const { data, error } = await supabase
+    .from('orgs')
+    .select('*')
+    .range(from, to)
+  if (error) {
+    throw simpleError('cannot_get_organizations', 'Cannot get organizations', { error })
+  }
+  return parseOrgs(data)
+}
+
+export async function get(c: Context<MiddlewareKeyVariables>, bodyRaw: any, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
+  const body = parseBody(bodyRaw)
+  const supabase = supabaseApikey(c, apikey.key)
+
+  // Auth context is already set by middlewareKey
   if (body.orgId) {
-    // Check org access AND policy requirements
-    const orgCheck = await apikeyHasOrgRightWithPolicy(c, apikey, body.orgId, supabase)
-    if (!orgCheck.valid) {
-      if (orgCheck.error === 'org_requires_expiring_key') {
-        throw quickError(401, 'org_requires_expiring_key', 'This organization requires API keys with an expiration date. Please use a different key or update this key with an expiration date.')
-      }
-      throw simpleError('invalid_org_id', 'You can\'t access this organization', { org_id: body.orgId })
-    }
-    const { data, error } = await supabase
-      .from('orgs')
-      .select('*')
-      .eq('id', body.orgId)
-      .single()
-    if (error) {
-      throw simpleError('cannot_get_organization', 'Cannot get organization', { error })
-    }
-    const dataParsed = orgSchema.safeParse(data)
-    if (!dataParsed.success) {
-      throw simpleError('cannot_parse_organization', 'Cannot parse organization', { error: dataParsed.error })
-    }
-    return c.json(dataParsed.data)
+    await ensureOrgAccess(c, apikey, body.orgId, supabase)
+    const org = await fetchOrg(supabase, body.orgId)
+    return c.json(org)
   }
-  else {
-    const fetchOffset = body.page ?? 0
-    const from = fetchOffset * fetchLimit
-    const to = (fetchOffset + 1) * fetchLimit - 1
 
-    const { data, error } = await supabase
-      .from('orgs')
-      .select('*')
-      .range(from, to)
-    if (error) {
-      throw simpleError('cannot_get_organizations', 'Cannot get organizations', { error })
-    }
-    const dataParsed = z.array(orgSchema).safeParse(data)
-    if (!dataParsed.success) {
-      throw simpleError('cannot_parse_organizations', 'Cannot parse organizations', { error: dataParsed.error })
-    }
-    return c.json(dataParsed.data)
-  }
+  const orgs = await fetchOrgs(supabase, body.page)
+  return c.json(orgs)
 }

@@ -1,7 +1,9 @@
 import type { Context } from 'hono'
+import type { MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
 import { quickError, simpleError } from '../../utils/hono.ts'
-import { hasAppRightApikey, supabaseApikey } from '../../utils/supabase.ts'
+import { checkPermission } from '../../utils/rbac.ts'
+import { supabaseApikey } from '../../utils/supabase.ts'
 import { isValidAppId } from '../../utils/utils.ts'
 
 interface SetChannelBody {
@@ -10,7 +12,7 @@ interface SetChannelBody {
   channel_id: number
 }
 
-export async function setChannel(c: Context, body: SetChannelBody, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
+export async function setChannel(c: Context<MiddlewareKeyVariables>, body: SetChannelBody, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
   if (!body.app_id || !body.version_id || !body.channel_id) {
     throw simpleError('missing_required_fields', 'Missing required fields', { app_id: body.app_id, version_id: body.version_id, channel_id: body.channel_id })
   }
@@ -19,8 +21,8 @@ export async function setChannel(c: Context, body: SetChannelBody, apikey: Datab
     throw simpleError('invalid_app_id', 'App ID must be a reverse domain string', { app_id: body.app_id })
   }
 
-  // Check API key permissions
-  if (!(await hasAppRightApikey(c, body.app_id, apikey.user_id, 'write', apikey.key))) {
+  // Auth context is already set by middlewareKey
+  if (!(await checkPermission(c, 'channel.promote_bundle', { appId: body.app_id }))) {
     throw simpleError('cannot_access_app', 'You can\'t access this app', { app_id: body.app_id })
   }
 

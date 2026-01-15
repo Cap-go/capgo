@@ -3,7 +3,7 @@ import type { Tab } from '~/components/comp_def'
 import { computed, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Tabs from '~/components/Tabs.vue'
-import { appTabs } from '~/constants/appTabs'
+import { appTabs as baseAppTabs } from '~/constants/appTabs'
 import { bundleTabs } from '~/constants/bundleTabs'
 import { channelTabs } from '~/constants/channelTabs'
 import { deviceTabs } from '~/constants/deviceTabs'
@@ -12,6 +12,17 @@ import { useOrganizationStore } from '~/stores/organization'
 const router = useRouter()
 const route = useRoute()
 const organizationStore = useOrganizationStore()
+
+// Compute tabs dynamically based on RBAC settings
+const appTabs = computed<Tab[]>(() => {
+  const useNewRbac = (organizationStore.currentOrganization as any)?.use_new_rbac
+
+  if (useNewRbac) {
+    return baseAppTabs
+  }
+
+  return baseAppTabs.filter(t => t.label !== 'access')
+})
 
 // Check if org payment has failed - only show info tab in this case
 const isOrgUnpaid = computed(() => {
@@ -46,12 +57,12 @@ const resourceId = computed(() => {
 // When org is unpaid, only show the info tab
 const tabs = computed<Tab[]>(() => {
   if (!appId.value)
-    return appTabs
+    return appTabs.value
 
   // Filter tabs when org is unpaid - only show info tab
   const availableTabs = isOrgUnpaid.value
-    ? appTabs.filter(tab => tab.key === '/info')
-    : appTabs
+    ? appTabs.value.filter(tab => tab.key === '/info')
+    : appTabs.value
 
   return availableTabs.map(tab => ({
     ...tab,

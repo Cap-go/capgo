@@ -7,6 +7,7 @@ import { z } from 'zod/mini'
 import { trackBentoEvent } from '../utils/bento.ts'
 import { middlewareAuth, parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
+import { checkPermission } from '../utils/rbac.ts'
 import { supabaseAdmin, supabaseClient } from '../utils/supabase.ts'
 import { getEnv } from '../utils/utils.ts'
 
@@ -45,7 +46,17 @@ async function validateInvite(c: Context, rawBody: any) {
 
   const authorization = c.get('authorization')
   if (!authorization)
-    return { message: 'not authorized', status: 401 }
+    return quickError(401, 'not_authorized', 'Not authorized')
+
+  // Verify the user has permission to invite
+  // inviting super_admin requires org.update_user_roles, other roles require org.invite_user
+  const requiredPermission = body.invite_type === 'super_admin' ? 'org.update_user_roles' : 'org.invite_user'
+  if (!await checkPermission(c, requiredPermission, { orgId: body.org_id })) {
+    return quickError(403, 'not_authorized', 'Not authorized', {
+      requiredPermission,
+      orgId: body.org_id,
+    })
+  }
 
   // Verify captcha token with Cloudflare Turnstile
   await verifyCaptchaToken(c, body.captcha_token)
@@ -101,7 +112,7 @@ app.post('/', middlewareAuth, async (c) => {
 
   const res = await validateInvite(c, rawBody)
   if (!res.inviteCreatorUser) {
-    throw simpleError('failed_to_invite_user', 'Failed to invite user', { }, res.error ?? 'Failed to invite user')
+    throw simpleError('failed_to_invite_user', 'Failed to invite user', {}, res.error ?? 'Failed to invite user')
   }
   if (!res.org) {
     return quickError(404, 'organization_not_found', 'Organization not found')
@@ -140,7 +151,7 @@ app.post('/', middlewareAuth, async (c) => {
       .single()
 
     if (updateInvitationError) {
-      throw simpleError('failed_to_invite_user', 'Failed to invite user', { }, updateInvitationError.message)
+      throw simpleError('failed_to_invite_user', 'Failed to invite user', {}, updateInvitationError.message)
     }
 
     newInvitation = updatedInvitationData
@@ -155,7 +166,7 @@ app.post('/', middlewareAuth, async (c) => {
     }).select('*').single()
 
     if (createUserError) {
-      throw simpleError('failed_to_invite_user', 'Failed to invite user', { }, createUserError.message)
+      throw simpleError('failed_to_invite_user', 'Failed to invite user', {}, createUserError.message)
     }
 
     newInvitation = newInvitationData
@@ -169,7 +180,7 @@ app.post('/', middlewareAuth, async (c) => {
     invited_last_name: `${body.last_name}`,
   }, 'org:invite_new_capgo_user_to_org')
   if (!bentoEvent) {
-    throw simpleError('failed_to_invite_user', 'Failed to invite user', { }, 'Failed to track bento event')
+    throw simpleError('failed_to_invite_user', 'Failed to invite user', {}, 'Failed to track bento event')
   }
   return c.json({ status: 'User invited successfully' })
 })

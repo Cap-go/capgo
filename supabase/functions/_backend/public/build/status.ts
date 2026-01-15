@@ -2,7 +2,8 @@ import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { simpleError } from '../../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../../utils/logging.ts'
-import { hasAppRightApikey, recordBuildTime, supabaseApikey } from '../../utils/supabase.ts'
+import { checkPermission } from '../../utils/rbac.ts'
+import { recordBuildTime, supabaseApikey } from '../../utils/supabase.ts'
 import { getEnv } from '../../utils/utils.ts'
 
 export interface BuildStatusParams {
@@ -29,8 +30,8 @@ export async function getBuildStatus(
 ): Promise<Response> {
   const { job_id, app_id, platform } = params
 
-  // Security: Check if user has read access to this app
-  if (!(await hasAppRightApikey(c, app_id, apikey.user_id, 'read', apikey.key))) {
+  // Security: Check if user has read access to this app (auth context set by middlewareKey)
+  if (!(await checkPermission(c, 'app.read', { appId: app_id }))) {
     throw simpleError('unauthorized', 'You do not have permission to view builds for this app')
   }
 
