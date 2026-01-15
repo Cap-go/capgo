@@ -828,6 +828,19 @@ User "Bob" has app_developer role on app "com.example.mobile"
 
 **Frontend note**: `rbac_check_permission_direct()` is backend/service-role only. Client code must use `rbac_check_permission()`, which enforces user context via `auth.uid()` automatically and does **not** accept a user id.
 
+**Access control (public wrapper / private inner function)**:
+- `rbac_check_permission_direct(...)` is **private** and must only be granted to `service_role` (never `public`/`authenticated`).
+- `rbac_check_permission(...)` is the **public wrapper** for client usage; it enforces user context via `auth.uid()`.
+
+**Recommended GRANT statements**:
+```sql
+REVOKE ALL ON FUNCTION public.rbac_check_permission_direct(text, uuid, uuid, character varying, bigint, bigint, text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.rbac_check_permission_direct(text, uuid, uuid, character varying, bigint, bigint, text) FROM anon;
+REVOKE ALL ON FUNCTION public.rbac_check_permission_direct(text, uuid, uuid, character varying, bigint, bigint, text) FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.rbac_check_permission_direct(text, uuid, uuid, character varying, bigint, bigint, text) TO service_role;
+GRANT EXECUTE ON FUNCTION public.rbac_check_permission(text, uuid, character varying, bigint, bigint) TO authenticated;
+```
+
 ```sql
 CREATE OR REPLACE FUNCTION public.rbac_check_permission_direct(
   p_permission_key text,        -- 'app.upload_bundle'
