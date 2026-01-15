@@ -1033,14 +1033,11 @@ BEGIN
     -- Migrate org_users to RBAC role_bindings for all test orgs
     RAISE NOTICE 'Migrating org_users to RBAC role_bindings...';
 
-    SELECT public.rbac_migrate_org_users_to_bindings('22dbad8a-b885-4309-9b3b-a09f8460fb6d'::uuid) INTO v_migration_result;
-    RAISE NOTICE 'Admin org migration: %', v_migration_result;
-
-    SELECT public.rbac_migrate_org_users_to_bindings('046a36ac-e03c-4590-9257-bd6c9dba9ee8'::uuid) INTO v_migration_result;
-    RAISE NOTICE 'Demo org migration: %', v_migration_result;
-
-    SELECT public.rbac_migrate_org_users_to_bindings('34a8c55d-2d0f-4652-a43f-684c7a9403ac'::uuid) INTO v_migration_result;
-    RAISE NOTICE 'Test2 org migration: %', v_migration_result;
+    FOR v_org IN SELECT id, name FROM public.orgs ORDER BY created_at
+    LOOP
+        SELECT public.rbac_migrate_org_users_to_bindings(v_org.id) INTO v_migration_result;
+        RAISE NOTICE 'Org [%] "%": %', v_org.id, v_org.name, v_migration_result;
+    END LOOP;
 
     RAISE NOTICE 'RBAC migration completed successfully';
 EXCEPTION WHEN OTHERS THEN
