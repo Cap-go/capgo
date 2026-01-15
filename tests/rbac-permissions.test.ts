@@ -10,7 +10,6 @@ import { ORG_ID, POSTGRES_URL, USER_ID } from './test-utils'
 
 // Test constants
 const TEST_APP_ID = 'com.demo.app'
-const TEST_RBAC_ORG_ID = '22222222-2222-4222-8222-222222222222' // RBAC-enabled test org from seed
 
 describe('RBAC Permission System', () => {
   let pool: Pool
