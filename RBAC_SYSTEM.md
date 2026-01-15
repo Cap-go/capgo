@@ -1010,7 +1010,7 @@ $$;
 -- Backend/service-role: user id is supplied explicitly
 SELECT rbac_check_permission_direct(
   'app.upload_bundle',
-  'user-uuid'::uuid,
+  '123e4567-e89b-12d3-a456-426614174000'::uuid,
   NULL, -- org_id will be derived
   'com.example.app',
   NULL, -- bundle_id
@@ -1619,7 +1619,7 @@ LEFT JOIN apps a ON rb.app_id = a.id
 LEFT JOIN channels c ON rb.channel_id = c.rbac_id
 LEFT JOIN users u ON rb.granted_by = u.id
 WHERE rb.principal_type = 'user'
-  AND rb.principal_id = 'user-uuid'::uuid
+  AND rb.principal_id = '123e4567-e89b-12d3-a456-426614174000'::uuid
 ORDER BY rb.granted_at DESC;
 ```
 
@@ -1679,7 +1679,7 @@ ORDER BY depth, name;
 -- Check if a user can upload to an app
 SELECT rbac_check_permission_direct(
   'app.upload_bundle',              -- permission
-  'user-uuid'::uuid,                -- user_id
+  '123e4567-e89b-12d3-a456-426614174000'::uuid,                -- user_id
   NULL::uuid,                       -- org_id (will be derived from app_id)
   'com.example.app',                -- app_id
   NULL::bigint,                     -- bundle_id
