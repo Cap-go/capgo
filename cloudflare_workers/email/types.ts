@@ -2,6 +2,9 @@ export interface Env {
   // KV Namespace for storing email-to-Discord thread mappings
   EMAIL_THREAD_MAPPING: KVNamespace
 
+  // R2 Bucket for storing large email attachments
+  EMAIL_ATTACHMENTS: R2Bucket
+
   // Discord Configuration
   DISCORD_BOT_TOKEN: string
   DISCORD_GUILD_ID: string
