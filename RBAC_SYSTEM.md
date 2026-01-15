@@ -610,9 +610,9 @@ The system defines **40+ atomic permissions** organized by scope.
 | `app.read_audit` | View app audit | All app_* roles, org_admin, org_super_admin, org_member |
 | `app.update_user_roles` | Manage user roles for this app | app_admin, org_admin, org_super_admin |
 
-### Bundle Permissions (scope: `app`)
+### Bundle Permissions (scope: `bundle`)
 
-**Note**: Bundle permissions have `app` scope because they require the app context.
+**Note**: Bundle permissions use `bundle` scope with `role_bindings.scope_type = 'bundle'`. When `p_bundle_id` is provided, the resolver derives the app/org context from the bundle and includes bundle-scoped bindings where `role_bindings.bundle_id` matches `p_bundle_id`.
 
 | Permission | Description | Roles with this permission |
 |-----------|-------------|------------------------------|
