@@ -2913,11 +2913,41 @@ COMMENT ON FUNCTION public.is_user_app_admin(uuid, uuid) IS
 -- Helper function to check if a user has a role in an app (avoid RLS recursion)
 CREATE OR REPLACE FUNCTION public.user_has_role_in_app(p_user_id uuid, p_app_id uuid)
 RETURNS boolean
-LANGUAGE sql
+LANGUAGE plpgsql
 SECURITY DEFINER
 STABLE
+SET search_path = ''
 AS $$
-  SELECT EXISTS (
+DECLARE
+  v_caller_id uuid := auth.uid();
+  v_org_id uuid;
+BEGIN
+  IF v_caller_id IS NULL THEN
+    RETURN false;
+  END IF;
+
+  IF v_caller_id <> p_user_id THEN
+    SELECT owner_org INTO v_org_id
+    FROM public.apps
+    WHERE id = p_app_id
+    LIMIT 1;
+
+    IF v_org_id IS NULL THEN
+      RETURN false;
+    END IF;
+
+    IF NOT EXISTS (
+      SELECT 1
+      FROM public.role_bindings rb
+      WHERE rb.principal_type = public.rbac_principal_user()
+        AND rb.principal_id = v_caller_id
+        AND (rb.org_id = v_org_id OR rb.app_id = p_app_id)
+    ) THEN
+      RETURN false;
+    END IF;
+  END IF;
+
+  RETURN EXISTS (
     SELECT 1
     FROM public.role_bindings rb
     WHERE rb.principal_type = public.rbac_principal_user()
@@ -2925,6 +2955,7 @@ AS $$
       AND rb.app_id = p_app_id
       AND rb.scope_type = public.rbac_scope_app()
   );
+END;
 $$;
 
 COMMENT ON FUNCTION public.user_has_role_in_app(uuid, uuid) IS
@@ -2936,11 +2967,17 @@ RETURNS boolean
 LANGUAGE plpgsql
 SECURITY DEFINER
 STABLE
+SET search_path = ''
 AS $$
 DECLARE
   v_app_id_varchar text;
   v_org_id uuid;
+  v_caller_id uuid := auth.uid();
 BEGIN
+  IF v_caller_id IS NULL THEN
+    RETURN false;
+  END IF;
+
   -- Fetch app_id varchar and org_id from apps table
   SELECT app_id, owner_org INTO v_app_id_varchar, v_org_id
   FROM public.apps
@@ -2949,6 +2986,18 @@ BEGIN
 
   IF v_app_id_varchar IS NULL OR v_org_id IS NULL THEN
     RETURN false;
+  END IF;
+
+  IF v_caller_id <> p_user_id THEN
+    IF NOT EXISTS (
+      SELECT 1
+      FROM public.role_bindings rb
+      WHERE rb.principal_type = public.rbac_principal_user()
+        AND rb.principal_id = v_caller_id
+        AND (rb.org_id = v_org_id OR rb.app_id = p_app_id)
+    ) THEN
+      RETURN false;
+    END IF;
   END IF;
 
   -- Use rbac_has_permission to check the permission
@@ -2965,6 +3014,16 @@ $$;
 
 COMMENT ON FUNCTION public.user_has_app_update_user_roles(uuid, uuid) IS
   'Checks whether a user has app.update_user_roles permission (bypasses RLS to avoid recursion).';
+
+REVOKE ALL ON FUNCTION public.user_has_role_in_app(uuid, uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.user_has_role_in_app(uuid, uuid) FROM anon;
+GRANT EXECUTE ON FUNCTION public.user_has_role_in_app(uuid, uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.user_has_role_in_app(uuid, uuid) TO service_role;
+
+REVOKE ALL ON FUNCTION public.user_has_app_update_user_roles(uuid, uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.user_has_app_update_user_roles(uuid, uuid) FROM anon;
+GRANT EXECUTE ON FUNCTION public.user_has_app_update_user_roles(uuid, uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.user_has_app_update_user_roles(uuid, uuid) TO service_role;
 
 -- Policy SELECT: check admin rights or role in the app
 CREATE POLICY "Allow viewing role bindings with permission"

@@ -557,7 +557,7 @@ app.get('/app/:app_id', async (c) => {
 
   // Use unified RBAC permission check
   if (!await checkPermission(c, 'app.read', { appId })) {
-    throw quickError(401, 'no_access_to_app', 'No access to app', { data: c.get('auth') })
+    throw quickError(401, 'no_access_to_app', 'No access to app', { data: auth?.userId ?? null })
   }
 
   // Use authenticated client - RLS will enforce access
@@ -638,7 +638,7 @@ app.get('/app/:app_id/bundle_usage', async (c) => {
 
   // Use unified RBAC permission check
   if (!await checkPermission(c, 'app.read', { appId })) {
-    throw quickError(401, 'no_access_to_app', 'No access to app', { data: c.get('auth') })
+    throw quickError(401, 'no_access_to_app', 'No access to app', { data: auth?.userId ?? null })
   }
 
   // Use authenticated client - RLS will enforce access
