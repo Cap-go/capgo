@@ -189,7 +189,15 @@ app.post('/', async (c) => {
     return c.json({ status: 'ok', results: [] })
   }
 
-  const firstAppId = events[0].app_id
+  // Early validation of first event's app_id before using it in checks
+  const firstEvent = events[0]
+  if (!firstEvent.app_id || typeof firstEvent.app_id !== 'string') {
+    throw simpleError('invalid_app_id', MISSING_STRING_APP_ID)
+  }
+  if (!reverseDomainRegex.test(firstEvent.app_id)) {
+    throw simpleError('invalid_app_id', INVALID_STRING_APP_ID)
+  }
+  const firstAppId = firstEvent.app_id
 
   // Validate all events in batch have the same app_id to prevent rate limit bypass
   if (isBatch) {
@@ -209,6 +217,17 @@ app.post('/', async (c) => {
   const drizzleClient = getDrizzleClient(pgClient!)
 
   try {
+    // For single event, process directly and let errors propagate for proper status codes
+    if (!isBatch) {
+      const bodyParsed = parsePluginBody<AppStats>(c, events[0], jsonRequestSchema)
+      const result = await post(c, drizzleClient, bodyParsed)
+      if (result.success) {
+        return c.json(BRES)
+      }
+      return simpleError200(c, result.error!, result.message!)
+    }
+
+    // For batch, collect results and handle errors per event
     const results: BatchStatsResult[] = []
 
     for (let i = 0; i < events.length; i++) {
@@ -238,15 +257,6 @@ app.post('/', async (c) => {
           index: i,
         })
       }
-    }
-
-    // For single event, return simple response for backward compatibility
-    if (!isBatch) {
-      const result = results[0]
-      if (result.status === 'ok') {
-        return c.json(BRES)
-      }
-      return simpleError200(c, result.error!, result.message!)
     }
 
     // For batch, return array of results
