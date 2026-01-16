@@ -6,6 +6,9 @@ import { formatDiscordMessageAsEmail, sendEmail } from './email-sender'
 import { serveR2File } from './r2-storage'
 import { deleteThreadMapping, getAllThreadMappings, getDiscordThreadId, refreshThreadMapping, storeThreadMapping } from './storage'
 
+// Set to true to enable verbose debug logging
+const debugLog = false
+
 /**
  * Generates a unique message ID for an email
  */
@@ -190,22 +193,25 @@ export default {
   },
 
   async scheduled(event: ScheduledEvent, env: Env): Promise<void> {
-    console.log('====================================')
-    console.log('⏰ SCHEDULED WORKER: Polling Discord for new messages')
-    console.log('====================================')
+    if (debugLog) {
+      console.log('⏰ SCHEDULED WORKER: Polling Discord for new messages')
+    }
 
     try {
       // Get all thread mappings from KV
       const mappings = await getAllThreadMappings(env)
-      console.log(`📋 Found ${mappings.length} active thread mappings`)
+
+      if (debugLog) {
+        console.log(`📋 Found ${mappings.length} active thread mappings`)
+      }
 
       for (const mapping of mappings) {
         await processThreadForNewMessages(env, mapping)
       }
 
-      console.log('====================================')
-      console.log('✅ SCHEDULED WORKER: Polling complete')
-      console.log('====================================')
+      if (debugLog) {
+        console.log('✅ SCHEDULED WORKER: Polling complete')
+      }
     }
     catch (error) {
       console.error('❌ ERROR in scheduled worker:', error)
@@ -435,57 +441,69 @@ async function handleEmailReply(env: Env, email: ParsedEmail, _threadId: string)
  * Process a single thread to check for new messages and send emails
  */
 async function processThreadForNewMessages(env: Env, mapping: ThreadMapping): Promise<void> {
-  console.log(`🔍 Checking thread ${mapping.discordThreadId} for new messages`)
-  console.log(`   Thread info:`)
-  console.log(`   - Subject: ${mapping.subject}`)
-  console.log(`   - Original sender: ${mapping.originalSender}`)
-  console.log(`   - Email message ID: ${mapping.emailMessageId}`)
+  if (debugLog) {
+    console.log(`🔍 Checking thread ${mapping.discordThreadId} for new messages`)
+    console.log(`   Thread info:`)
+    console.log(`   - Subject: ${mapping.subject}`)
+    console.log(`   - Original sender: ${mapping.originalSender}`)
+    console.log(`   - Email message ID: ${mapping.emailMessageId}`)
+  }
 
   // Get the last processed message ID from KV
   const lastMessageKey = `last-message:${mapping.discordThreadId}`
   const lastMessageId = await env.EMAIL_THREAD_MAPPING.get(lastMessageKey)
-  console.log(`   - Last processed message ID: ${lastMessageId || 'none'}`)
+
+  if (debugLog) {
+    console.log(`   - Last processed message ID: ${lastMessageId || 'none'}`)
+    console.log(`   Fetching recent messages from Discord...`)
+  }
 
   // Fetch recent messages from Discord
-  console.log(`   Fetching recent messages from Discord...`)
-  const messages = await getThreadMessages(env, mapping.discordThreadId, 10)
+  const messages = await getThreadMessages(env, mapping.discordThreadId, 10, debugLog)
 
   // Check if thread was deleted (404)
   if (messages === null) {
-    console.log(`   🗑️  Thread was deleted - cleaning up mapping`)
+    console.log(`🗑️  Thread ${mapping.discordThreadId} was deleted - cleaning up mapping`)
     await deleteThreadMapping(env, mapping.emailMessageId)
     // Also delete the last-message tracking
     await env.EMAIL_THREAD_MAPPING.delete(lastMessageKey)
     return
   }
 
-  console.log(`   - Fetched ${messages.length} total message(s) from Discord`)
+  if (debugLog) {
+    console.log(`   - Fetched ${messages.length} total message(s) from Discord`)
+  }
 
   if (messages.length === 0) {
-    console.log(`   ⚠️  No messages found in thread`)
+    if (debugLog) {
+      console.log(`   ⚠️  No messages found in thread`)
+    }
     return
   }
 
   // Log all messages for debugging
-  console.log(`   All messages in thread:`)
-  for (const msg of messages) {
-    console.log(`   - ID: ${msg.id}, Author: ${msg.author?.username || 'unknown'}, Bot: ${msg.author?.bot || false}, Content length: ${msg.content?.length || 0}`)
+  if (debugLog) {
+    console.log(`   All messages in thread:`)
+    for (const msg of messages) {
+      console.log(`   - ID: ${msg.id}, Author: ${msg.author?.username || 'unknown'}, Bot: ${msg.author?.bot || false}, Content length: ${msg.content?.length || 0}`)
+    }
   }
 
   // Filter out bot messages and messages we've already processed
   const humanMessages = messages.filter(msg => !msg.author.bot)
-  console.log(`   - ${humanMessages.length} human message(s) (filtered out ${messages.length - humanMessages.length} bot messages)`)
-
   const newMessages = humanMessages
     .filter(msg => !lastMessageId || msg.id > lastMessageId)
     .reverse() // Process oldest first
 
-  console.log(`   - ${newMessages.length} new message(s) to process`)
-
+  // Nothing to process - stay silent
   if (newMessages.length === 0) {
-    console.log(`   ✅ No new messages to process`)
     return
   }
+
+  // We have new messages - now log details
+  console.log(`📬 Thread ${mapping.discordThreadId}: ${newMessages.length} new message(s) to process`)
+  console.log(`   Subject: ${mapping.subject}`)
+  console.log(`   Original sender: ${mapping.originalSender}`)
 
   // Process each new message
   for (const message of newMessages) {

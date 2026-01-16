@@ -1,6 +1,6 @@
 import type { DiscordAPIMessage, DiscordEmbed, DiscordMessage, DiscordThread, EmailAttachment, Env, ParsedEmail } from './types'
-import { uploadLargeAttachment } from './r2-storage'
 import TurndownService from 'turndown'
+import { uploadLargeAttachment } from './r2-storage'
 
 const DISCORD_API_BASE = 'https://discord.com/api/v10'
 
@@ -584,20 +584,21 @@ export async function getThreadMessages(
   env: Env,
   threadId: string,
   limit: number = 50,
+  debugLog: boolean = false,
 ): Promise<DiscordAPIMessage[] | null> {
   const url = `${DISCORD_API_BASE}/channels/${threadId}/messages?limit=${limit}`
 
   try {
-    console.log(`🔵 Fetching messages from Discord thread ${threadId}`)
-    console.log(`   URL: ${url}`)
+    if (debugLog) {
+      console.log(`🔵 Fetching messages from Discord thread ${threadId}`)
+      console.log(`   URL: ${url}`)
+    }
 
     const response = await fetch(url, {
       headers: {
         Authorization: `Bot ${env.DISCORD_BOT_TOKEN}`,
       },
     })
-
-    console.log(`   Response status: ${response.status}`)
 
     if (!response.ok) {
       const errorText = await response.text()
@@ -614,19 +615,20 @@ export async function getThreadMessages(
     }
 
     const messages = await response.json() as DiscordAPIMessage[]
-    console.log(`   Fetched ${messages.length} message(s)`, messages)
 
-    // Log full message objects for debugging
-    for (const msg of messages) {
-      console.log(`   Message ${msg.id}:`)
-      console.log(`     - Type: ${msg.type}`)
-      console.log(`     - Author: ${msg.author?.username} (ID: ${msg.author?.id}, Bot: ${msg.author?.bot})`)
-      console.log(`     - Content: "${msg.content}"`)
-      console.log(`     - Content length: ${msg.content?.length || 0}`)
-      console.log(`     - Timestamp: ${msg.timestamp}`)
-      console.log(`     - Has embeds: ${msg.embeds?.length > 0}`)
-      console.log(`     - Has attachments: ${msg.attachments?.length > 0}`)
-      console.log(`     - Raw message keys: ${Object.keys(msg).join(', ')}`)
+    if (debugLog) {
+      console.log(`   Fetched ${messages.length} message(s)`)
+      for (const msg of messages) {
+        console.log(`   Message ${msg.id}:`)
+        console.log(`     - Type: ${msg.type}`)
+        console.log(`     - Author: ${msg.author?.username} (ID: ${msg.author?.id}, Bot: ${msg.author?.bot})`)
+        console.log(`     - Content: "${msg.content}"`)
+        console.log(`     - Content length: ${msg.content?.length || 0}`)
+        console.log(`     - Timestamp: ${msg.timestamp}`)
+        console.log(`     - Has embeds: ${msg.embeds?.length > 0}`)
+        console.log(`     - Has attachments: ${msg.attachments?.length > 0}`)
+        console.log(`     - Raw message keys: ${Object.keys(msg).join(', ')}`)
+      }
     }
 
     // Check if all messages have empty content - indicates missing Message Content Intent
