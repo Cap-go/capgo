@@ -494,6 +494,20 @@ async function processThreadForNewMessages(env: Env, mapping: ThreadMapping): Pr
     console.log(`   - Raw content: "${message.content}"`)
     console.log(`   - Content length: ${message.content?.length || 0} characters`)
 
+    // Skip messages that contain Discord user mentions (internal discussions)
+    // Discord user mentions look like <@123456789012345678> or <@!123456789012345678>
+    const discordMentionPattern = /<@!?\d{17,20}>/
+    if (discordMentionPattern.test(message.content || '')) {
+      console.log(`   ⏭️  Skipping message ${message.id} - contains Discord user mention (internal discussion)`)
+      // Still track this message ID so we don't keep retrying it
+      await env.EMAIL_THREAD_MAPPING.put(
+        lastMessageKey,
+        message.id,
+        { expirationTtl: 60 * 60 * 24 * 30 }, // 30 days
+      )
+      continue
+    }
+
     // Skip messages with empty content
     if (!message.content || message.content.trim().length === 0) {
       console.error(`   ⚠️  Skipping message ${message.id} - empty content`)
