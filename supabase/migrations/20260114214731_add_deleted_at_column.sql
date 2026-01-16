@@ -1,6 +1,5 @@
 -- Add deleted_at column to track when versions were soft-deleted
 -- This replaces using updated_at which is unreliable (touched by many operations)
-
 -- Step 1: Add deleted_at column
 ALTER TABLE public.app_versions
 ADD COLUMN IF NOT EXISTS deleted_at timestamp with time zone DEFAULT NULL;
@@ -9,21 +8,22 @@ ADD COLUMN IF NOT EXISTS deleted_at timestamp with time zone DEFAULT NULL;
 -- Use updated_at (which was set by previous retention logic) instead of created_at
 -- to avoid premature hard-deletion of recently-deleted old versions
 UPDATE public.app_versions
-SET deleted_at = updated_at
-WHERE deleted = true AND deleted_at IS NULL;
+SET
+  deleted_at = updated_at
+WHERE
+  deleted = true
+  AND deleted_at IS NULL;
 
 -- Step 3: Add index for cleanup queries
-CREATE INDEX IF NOT EXISTS idx_app_versions_deleted_at
-  ON public.app_versions (deleted_at)
-  WHERE deleted_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_app_versions_deleted_at ON public.app_versions (deleted_at)
+WHERE
+  deleted_at IS NOT NULL;
 
 -- Step 4: Create trigger function to automatically set deleted_at when deleted becomes true
 -- This ensures deleted_at is always set correctly, regardless of how the deletion happens
-CREATE OR REPLACE FUNCTION public.set_deleted_at_on_soft_delete()
-RETURNS TRIGGER
-LANGUAGE plpgsql
-SET search_path = ''
-AS $$
+CREATE OR REPLACE FUNCTION public.set_deleted_at_on_soft_delete () RETURNS TRIGGER LANGUAGE plpgsql
+SET
+  search_path = '' AS $$
 BEGIN
   -- Only set deleted_at when deleted changes from false to true
   -- and deleted_at is not already set (allows manual override if needed)
@@ -36,10 +36,10 @@ $$;
 
 -- Step 5: Create trigger on app_versions table
 DROP TRIGGER IF EXISTS set_deleted_at_trigger ON public.app_versions;
-CREATE TRIGGER set_deleted_at_trigger
-  BEFORE UPDATE ON public.app_versions
-  FOR EACH ROW
-  EXECUTE FUNCTION public.set_deleted_at_on_soft_delete();
+
+CREATE TRIGGER set_deleted_at_trigger BEFORE
+UPDATE ON public.app_versions FOR EACH ROW
+EXECUTE FUNCTION public.set_deleted_at_on_soft_delete ();
 
 -- Step 6: Simplify retention function - trigger handles deleted_at automatically
 CREATE OR REPLACE FUNCTION "public"."update_app_versions_retention" () RETURNS void LANGUAGE "plpgsql"
@@ -80,7 +80,7 @@ BEGIN
     -- 4. NOT currently linked to any channel (safety check)
     DELETE FROM "public"."app_versions"
     WHERE deleted_at IS NOT NULL
-      AND deleted_at < NOW() - INTERVAL '1 year'
+      AND deleted_at < NOW() - INTERVAL '3 months'
       AND name NOT IN ('builtin', 'unknown')
       AND NOT EXISTS (
         SELECT 1 FROM "public"."channels"
