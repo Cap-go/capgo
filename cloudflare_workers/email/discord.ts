@@ -1,4 +1,4 @@
-import type { DiscordAPIMessage, DiscordEmbed, DiscordMessage, DiscordThread, EmailAttachment, Env, ParsedEmail } from './types'
+import type { CustomerInfo, DiscordAPIMessage, DiscordEmbed, DiscordMessage, DiscordThread, EmailAttachment, Env, ParsedEmail } from './types'
 import { uploadLargeAttachment } from './r2-storage'
 import TurndownService from 'turndown'
 
@@ -132,12 +132,14 @@ export async function createForumThread(
   env: Env,
   email: ParsedEmail,
   categoryPrefix?: string,
+  customerInfo?: CustomerInfo | null,
 ): Promise<DiscordThread | null> {
   console.log('🟣 createForumThread: Starting...')
   console.log(`   Forum Channel ID: ${env.DISCORD_FORUM_CHANNEL_ID}`)
   console.log(`   Bot Token present: ${!!env.DISCORD_BOT_TOKEN}`)
   console.log(`   Bot Token length: ${env.DISCORD_BOT_TOKEN?.length || 0}`)
   console.log(`   Attachments: ${email.attachments?.length || 0} from email`)
+  console.log(`   Customer info: ${customerInfo ? `${customerInfo.orgName || 'N/A'} (${customerInfo.userId})` : 'not found'}`)
 
   const url = `${DISCORD_API_BASE}/channels/${env.DISCORD_FORUM_CHANNEL_ID}/threads`
   console.log(`   Discord API URL: ${url}`)
@@ -152,8 +154,8 @@ export async function createForumThread(
   console.log(`   Discord attachments: ${discordAttachments.length}`)
   console.log(`   R2 links: ${r2Links.length}`)
 
-  // Create the initial message content with R2 links if any
-  const message = formatEmailForDiscord(email, r2Links)
+  // Create the initial message content with R2 links and customer info
+  const message = formatEmailForDiscord(email, customerInfo, r2Links)
   console.log(`   Message content length: ${message.content.length}`)
   console.log(`   Number of embeds: ${message.embeds?.length || 0}`)
 
@@ -346,6 +348,7 @@ export async function postToThread(
  */
 function formatEmailForDiscord(
   email: ParsedEmail,
+  customerInfo?: CustomerInfo | null,
   r2Links: Array<{ filename: string, url: string, size: number }> = [],
 ): DiscordMessage {
   const fromText = email.from.name
@@ -380,6 +383,55 @@ function formatEmailForDiscord(
     },
   ]
 
+  // Add customer info if available
+  if (customerInfo) {
+    // Add customer name if available
+    const customerName = [customerInfo.firstName, customerInfo.lastName]
+      .filter(Boolean)
+      .join(' ')
+
+    if (customerName || customerInfo.orgName) {
+      fields.push({
+        name: '👤 Customer',
+        value: customerName || customerInfo.orgName || 'Unknown',
+        inline: true,
+      })
+    }
+
+    // Add organization info
+    if (customerInfo.orgName) {
+      fields.push({
+        name: '🏢 Organization',
+        value: customerInfo.orgName,
+        inline: true,
+      })
+    }
+
+    // Add user ID for easy lookup
+    fields.push({
+      name: '🔗 User ID',
+      value: `\`${customerInfo.userId}\``,
+      inline: true,
+    })
+
+    // Add Stripe customer ID if available
+    if (customerInfo.stripeCustomerId) {
+      fields.push({
+        name: '💳 Stripe',
+        value: `\`${customerInfo.stripeCustomerId}\``,
+        inline: true,
+      })
+    }
+  }
+  else {
+    // Mark as unknown customer
+    fields.push({
+      name: '👤 Customer',
+      value: '_Not found in database_',
+      inline: true,
+    })
+  }
+
   // Note attachments in the embed if there are any (small ones uploaded to Discord)
   const attachments = email.attachments || []
   const smallAttachments = attachments.filter(a => a.size <= DISCORD_MAX_FILE_SIZE)
@@ -409,7 +461,7 @@ function formatEmailForDiscord(
   const embed: DiscordEmbed = {
     title: email.subject || 'No Subject',
     description: truncatedBody,
-    color: 0x5865F2, // Discord blurple
+    color: customerInfo ? 0x00D26A : 0x5865F2, // Green if customer found, blurple otherwise
     fields,
     footer: {
       text: `Message ID: ${email.messageId}`,
@@ -417,7 +469,18 @@ function formatEmailForDiscord(
     timestamp: email.date?.toISOString() || new Date().toISOString(),
   }
 
-  const content = `📧 New email from ${email.from.email}`
+  // Add organization logo as thumbnail if available
+  if (customerInfo?.orgLogo) {
+    embed.thumbnail = {
+      url: customerInfo.orgLogo,
+    }
+  }
+
+  // Build content with customer context
+  let content = `📧 New email from ${email.from.email}`
+  if (customerInfo?.orgName) {
+    content = `📧 New email from **${customerInfo.orgName}** (${email.from.email})`
+  }
 
   return {
     content,

@@ -1,10 +1,11 @@
-import type { EmailMessage, Env, ParsedEmail, ThreadMapping } from './types'
+import type { CustomerInfo, EmailMessage, Env, ParsedEmail, ThreadMapping } from './types'
 import { classifyEmail, classifyEmailHeuristic, filterAttachmentsHeuristic, filterAttachmentsWithAI, generateBacklinkAutoReply, generateSecurityAutoReply } from './classifier'
 import { createForumThread, getThreadMessages, postToThread } from './discord'
 import { extractThreadId, getAllPotentialThreadIds, parseEmail } from './email-parser'
 import { formatDiscordMessageAsEmail, sendEmail } from './email-sender'
 import { serveR2File } from './r2-storage'
 import { deleteThreadMapping, getAllThreadMappings, getDiscordThreadId, refreshThreadMapping, storeThreadMapping } from './storage'
+import { lookupCustomerByEmail } from './supabase'
 
 /**
  * Generates a unique message ID for an email
@@ -226,6 +227,22 @@ async function handleNewEmail(env: Env, email: ParsedEmail, category?: string): 
   console.log(`   From: ${email.from.email}`)
   console.log(`   Attachments: ${email.attachments?.length || 0}`)
 
+  // Look up customer info from Supabase
+  console.log(`👤 Looking up customer info...`)
+  let customerInfo: CustomerInfo | null = null
+  try {
+    customerInfo = await lookupCustomerByEmail(env, email.from.email)
+    if (customerInfo) {
+      console.log(`✅ Customer found: ${customerInfo.orgName || customerInfo.userId}`)
+    }
+    else {
+      console.log(`⚠️  Customer not found in database`)
+    }
+  }
+  catch (error) {
+    console.error(`❌ Error looking up customer:`, error)
+  }
+
   // Filter attachments to keep only useful ones (no tracking pixels, signature images, etc.)
   if (email.attachments && email.attachments.length > 0) {
     console.log(`🔍 Filtering attachments...`)
@@ -253,7 +270,7 @@ async function handleNewEmail(env: Env, email: ParsedEmail, category?: string): 
 
   // Create a new forum thread - attachments will be uploaded directly to Discord
   console.log(`🔵 Calling createForumThread...`)
-  const thread = await createForumThread(env, email, categoryPrefix)
+  const thread = await createForumThread(env, email, categoryPrefix, customerInfo)
 
   if (!thread) {
     console.error('❌ Failed to create Discord thread - received null/undefined')

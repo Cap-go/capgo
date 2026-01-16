@@ -19,9 +19,25 @@ export interface Env {
   ANTHROPIC_API_KEY: string
   USE_AI_CLASSIFICATION?: string // "true" or "false", defaults to "true"
 
+  // Supabase Configuration (for customer lookup)
+  SUPABASE_URL?: string
+  SUPABASE_SERVICE_ROLE_KEY?: string
+
   // Environment
   ENV_NAME?: string
   EMAIL_WORKER_URL?: string // Base URL for R2 file links (defaults to https://email.capgo.app)
+}
+
+export interface CustomerInfo {
+  userId: string
+  email: string
+  firstName: string | null
+  lastName: string | null
+  userImageUrl: string | null
+  orgId?: string
+  orgName?: string
+  orgLogo?: string | null
+  stripeCustomerId?: string | null
 }
 
 export interface EmailMessage {
