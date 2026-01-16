@@ -825,21 +825,28 @@ export async function readLastMonthDevicesByPlatformCF(c: Context): Promise<Devi
 
   const oneMonthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
   // Platform: double1 = 0 for android, 1 for ios
-  const query = `SELECT
-    COUNT(DISTINCT blob1) AS total,
-    COUNT(DISTINCT CASE WHEN double1 = 1 THEN blob1 END) AS ios,
-    COUNT(DISTINCT CASE WHEN double1 = 0 THEN blob1 END) AS android
-  FROM device_usage
-  WHERE timestamp >= toDateTime('${formatDateCF(oneMonthAgo)}')
-    AND timestamp < now()`
+  const baseWhere = `timestamp >= toDateTime('${formatDateCF(oneMonthAgo)}') AND timestamp < now()`
+  const totalQuery = `SELECT COUNT(DISTINCT blob1) AS total FROM device_usage WHERE ${baseWhere}`
+  const iosQuery = `SELECT COUNT(DISTINCT blob1) AS ios FROM device_usage WHERE ${baseWhere} AND double1 = 1`
+  const androidQuery = `SELECT COUNT(DISTINCT blob1) AS android FROM device_usage WHERE ${baseWhere} AND double1 = 0`
 
-  cloudlog({ requestId: c.get('requestId'), message: 'readLastMonthDevicesByPlatformCF query', query })
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: 'readLastMonthDevicesByPlatformCF queries',
+    totalQuery,
+    iosQuery,
+    androidQuery,
+  })
   try {
-    const res = await runQueryToCFA<{ total: number, ios: number, android: number }>(c, query)
+    const [totalRes, iosRes, androidRes] = await Promise.all([
+      runQueryToCFA<{ total: number }>(c, totalQuery),
+      runQueryToCFA<{ ios: number }>(c, iosQuery),
+      runQueryToCFA<{ android: number }>(c, androidQuery),
+    ])
     return {
-      total: res[0]?.total || 0,
-      ios: res[0]?.ios || 0,
-      android: res[0]?.android || 0,
+      total: totalRes[0]?.total || 0,
+      ios: iosRes[0]?.ios || 0,
+      android: androidRes[0]?.android || 0,
     }
   }
   catch (e) {
@@ -1818,17 +1825,23 @@ export async function getPluginBreakdownCF(c: Context): Promise<PluginBreakdownR
 
   const last30d = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
 
-  // Query unique devices with their plugin version (blob3)
-  // Use argMax to get the latest plugin_version per device
+  // Query latest plugin_version per device, then aggregate counts by version
+  // Using a subquery keeps the result set small (one row per version).
   const query = `SELECT
-    argMax(blob3, timestamp) AS plugin_version,
-    COUNT(DISTINCT blob1) AS device_count
-  FROM device_info
-  WHERE timestamp >= toDateTime('${formatDateCF(last30d)}')
-    AND timestamp < now()
-    AND blob3 != ''
-  GROUP BY blob1
-  HAVING plugin_version != ''`
+    plugin_version,
+    count() AS device_count
+  FROM (
+    SELECT
+      argMax(blob3, timestamp) AS plugin_version,
+      blob1 AS device_id
+    FROM device_info
+    WHERE timestamp >= toDateTime('${formatDateCF(last30d)}')
+      AND timestamp < now()
+      AND blob3 != ''
+    GROUP BY blob1
+  )
+  WHERE plugin_version != ''
+  GROUP BY plugin_version`
 
   cloudlog({ requestId: c.get('requestId'), message: 'getPluginBreakdownCF query', query })
 
