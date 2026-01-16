@@ -1,7 +1,7 @@
 BEGIN;
 
 
-SELECT plan(12);
+SELECT plan(15);
 
 CREATE OR REPLACE FUNCTION my_tests() RETURNS SETOF TEXT AS $$
 DECLARE
@@ -199,9 +199,44 @@ RETURN NEXT IS (
 
 -- Test 12: New old version should be deleted
 RETURN NEXT IS (
-    (SELECT deleted FROM app_versions WHERE name = '1.0.another.old' AND app_id = test_app_id), 
-    true, 
+    (SELECT deleted FROM app_versions WHERE name = '1.0.another.old' AND app_id = test_app_id),
+    true,
     'New old version should be deleted by retention function'
+);
+
+-- Test 13: deleted_at should be set when version is soft-deleted
+RETURN NEXT IS (
+    (SELECT deleted_at FROM app_versions WHERE id = version_id_old) IS NOT NULL,
+    true,
+    'deleted_at should be set when version is soft-deleted'
+);
+
+-- Test 14 & 15: builtin and unknown versions should NEVER be hard-deleted
+-- Create builtin/unknown versions with old deleted_at
+INSERT INTO app_versions (app_id, name, deleted, deleted_at, storage_provider, owner_org)
+VALUES (test_app_id, 'builtin', true, '2020-01-01'::timestamp, 'r2',
+        (SELECT owner_org FROM apps WHERE app_id = test_app_id));
+
+INSERT INTO app_versions (app_id, name, deleted, deleted_at, storage_provider, owner_org)
+VALUES (test_app_id, 'unknown', true, '2020-01-01'::timestamp, 'r2',
+        (SELECT owner_org FROM apps WHERE app_id = test_app_id));
+
+-- Run hard-delete function
+ALTER function delete_old_deleted_versions() SET search_path = test_overrides, public, pg_temp, pg_catalog;
+PERFORM delete_old_deleted_versions();
+
+-- Test 14: builtin version should never be hard-deleted
+RETURN NEXT IS (
+    (SELECT COUNT(*) FROM app_versions WHERE name = 'builtin' AND app_id = test_app_id) > 0,
+    true,
+    'builtin version should never be hard-deleted'
+);
+
+-- Test 15: unknown version should never be hard-deleted
+RETURN NEXT IS (
+    (SELECT COUNT(*) FROM app_versions WHERE name = 'unknown' AND app_id = test_app_id) > 0,
+    true,
+    'unknown version should never be hard-deleted'
 );
 
 END;
