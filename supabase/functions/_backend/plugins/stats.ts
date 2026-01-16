@@ -189,9 +189,20 @@ app.post('/', async (c) => {
     return c.json({ status: 'ok', results: [] })
   }
 
-  // Rate limit check on first event's app_id (all events in batch should be from same app)
-  if (isLimited(c, events[0].app_id)) {
-    return simpleRateLimit({ app_id: events[0].app_id })
+  const firstAppId = events[0].app_id
+
+  // Validate all events in batch have the same app_id to prevent rate limit bypass
+  if (isBatch) {
+    for (let i = 1; i < events.length; i++) {
+      if (events[i].app_id !== firstAppId) {
+        return simpleError200(c, 'mixed_app_ids', 'All events in a batch must have the same app_id')
+      }
+    }
+  }
+
+  // Rate limit check on app_id (all events share the same app)
+  if (isLimited(c, firstAppId)) {
+    return simpleRateLimit({ app_id: firstAppId })
   }
 
   const pgClient = getPgClient(c, true)

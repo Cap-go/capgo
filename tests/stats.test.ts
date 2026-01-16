@@ -381,8 +381,12 @@ interface BatchStatsRes {
   }>
 }
 
-describe('[POST] /stats batch operations', () => {
-  it('should handle batch of events', async () => {
+// Test batch operations - concurrent for Supabase, sequential for Cloudflare (due to D1 sync)
+const batchTestDescribe = USE_CLOUDFLARE ? describe : describe.concurrent
+const batchTestIt = USE_CLOUDFLARE ? it : it.concurrent
+
+batchTestDescribe('[POST] /stats batch operations', () => {
+  batchTestIt('should handle batch of events', async () => {
     const uuid1 = randomUUID().toLowerCase()
     const uuid2 = randomUUID().toLowerCase()
 
@@ -439,7 +443,7 @@ describe('[POST] /stats batch operations', () => {
     await getSupabaseClient().from('devices').delete().eq('device_id', uuid2).eq('app_id', APP_NAME_STATS)
   })
 
-  it('should handle batch with partial failures', async () => {
+  batchTestIt('should handle batch with partial failures', async () => {
     const uuid1 = randomUUID().toLowerCase()
     const uuid2 = randomUUID().toLowerCase()
 
@@ -489,7 +493,7 @@ describe('[POST] /stats batch operations', () => {
     await getSupabaseClient().from('devices').delete().eq('device_id', uuid1).eq('app_id', APP_NAME_STATS)
   })
 
-  it('should handle empty batch', async () => {
+  batchTestIt('should handle empty batch', async () => {
     const response = await postStats([])
     expect(response.status).toBe(200)
 
@@ -499,7 +503,7 @@ describe('[POST] /stats batch operations', () => {
     expect(responseData.results).toHaveLength(0)
   })
 
-  it('single event should still return simple response for backward compatibility', async () => {
+  batchTestIt('single event should still return simple response for backward compatibility', async () => {
     const uuid = randomUUID().toLowerCase()
     const baseData = getBaseData(APP_NAME_STATS) as StatsPayload
     baseData.device_id = uuid
@@ -521,7 +525,7 @@ describe('[POST] /stats batch operations', () => {
     await getSupabaseClient().from('devices').delete().eq('device_id', uuid).eq('app_id', APP_NAME_STATS)
   })
 
-  it('should handle batch with same device multiple actions', async () => {
+  batchTestIt('should handle batch with same device multiple actions', async () => {
     const uuid = randomUUID().toLowerCase()
 
     const baseData1 = getBaseData(APP_NAME_STATS) as StatsPayload
@@ -562,5 +566,33 @@ describe('[POST] /stats batch operations', () => {
 
     // Clean up
     await getSupabaseClient().from('devices').delete().eq('device_id', uuid).eq('app_id', APP_NAME_STATS)
+  })
+
+  batchTestIt('should reject batch with mixed app_ids', async () => {
+    const uuid1 = randomUUID().toLowerCase()
+    const uuid2 = randomUUID().toLowerCase()
+
+    const baseData1 = getBaseData(APP_NAME_STATS) as StatsPayload
+    baseData1.device_id = uuid1
+    baseData1.action = 'get'
+    baseData1.version_build = getVersionFromAction('get')
+    const version1 = await createAppVersions(baseData1.version_build, APP_NAME_STATS)
+    baseData1.version_name = version1.name
+
+    // Second event has different app_id
+    const baseData2 = getBaseData(APP_NAME_STATS) as StatsPayload
+    baseData2.device_id = uuid2
+    baseData2.app_id = 'com.different.app'
+    baseData2.action = 'get'
+    baseData2.version_build = getVersionFromAction('get')
+    baseData2.version_name = version1.name
+
+    // Send batch request with mixed app_ids
+    const response = await postStats([baseData1, baseData2])
+    expect(response.status).toBe(200)
+
+    const responseData = await response.json<StatsRes>()
+    expect(responseData.error).toBe('mixed_app_ids')
+    expect(responseData.message).toBe('All events in a batch must have the same app_id')
   })
 })
