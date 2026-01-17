@@ -118,7 +118,7 @@ const chartOptions = computed<ChartOptions<'bar'>>(() => ({
       },
       ticks: {
         color: isDark.value ? '#9ca3af' : '#6b7280',
-        callback: (value) => `${value}%`,
+        callback: value => `${value}%`,
       },
     },
     y: {
