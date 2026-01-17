@@ -595,4 +595,43 @@ batchTestDescribe('[POST] /stats batch operations', () => {
     expect(responseData.error).toBe('mixed_app_ids')
     expect(responseData.message).toBe('All events in a batch must have the same app_id')
   })
+
+  batchTestIt('should return on_premise_app error for batch with non-existent app', async () => {
+    const uuid1 = randomUUID().toLowerCase()
+    const uuid2 = randomUUID().toLowerCase()
+
+    // Use app_id that doesn't exist in the system (triggers onprem detection)
+    const baseData1: StatsPayload = {
+      app_id: 'does.not.exist',
+      device_id: uuid1,
+      platform: 'ios',
+      version_name: '1.0.0',
+      version_os: '14.0',
+      is_emulator: false,
+      is_prod: true,
+      action: 'get',
+      version_build: '1.0.0',
+      plugin_version: '7.0.0',
+    }
+
+    const baseData2: StatsPayload = {
+      ...baseData1,
+      device_id: uuid2,
+    }
+
+    // Send batch request with non-existent app
+    const response = await postStats([baseData1, baseData2])
+    expect(response.status).toBe(200)
+
+    const responseData = await response.json<BatchStatsRes>()
+    expect(responseData.status).toBe('ok')
+    expect(responseData.results).toBeDefined()
+    expect(responseData.results).toHaveLength(2)
+
+    // Both events should return on_premise_app error
+    expect(responseData.results![0].status).toBe('error')
+    expect(responseData.results![0].error).toBe('on_premise_app')
+    expect(responseData.results![1].status).toBe('error')
+    expect(responseData.results![1].error).toBe('on_premise_app')
+  })
 })

@@ -164,12 +164,12 @@ async function parseBodyRaw(c: Context): Promise<AppStats | AppStats[]> {
     // Normalize device_id to lowercase for both single and array
     if (Array.isArray(body)) {
       for (const item of body) {
-        if (item.device_id) {
+        if (typeof item.device_id === 'string') {
           item.device_id = item.device_id.toLowerCase()
         }
       }
     }
-    else if (body.device_id) {
+    else if (typeof body.device_id === 'string') {
       body.device_id = body.device_id.toLowerCase()
     }
     return body
@@ -199,10 +199,20 @@ app.post('/', async (c) => {
   }
   const firstAppId = firstEvent.app_id
 
-  // Validate all events in batch have the same app_id to prevent rate limit bypass
+  // Validate all events in batch have valid app_ids and they all match
   if (isBatch) {
     for (let i = 1; i < events.length; i++) {
-      if (events[i].app_id !== firstAppId) {
+      const currentAppId = events[i].app_id
+
+      // Ensure each event has a valid string app_id in reverse-domain format
+      if (!currentAppId || typeof currentAppId !== 'string') {
+        return simpleError200(c, 'invalid_app_id', MISSING_STRING_APP_ID)
+      }
+      if (!reverseDomainRegex.test(currentAppId)) {
+        return simpleError200(c, 'invalid_app_id', INVALID_STRING_APP_ID)
+      }
+
+      if (currentAppId !== firstAppId) {
         return simpleError200(c, 'mixed_app_ids', 'All events in a batch must have the same app_id')
       }
     }
@@ -221,6 +231,9 @@ app.post('/', async (c) => {
     if (!isBatch) {
       const bodyParsed = parsePluginBody<AppStats>(c, events[0], jsonRequestSchema)
       const result = await post(c, drizzleClient, bodyParsed)
+      if (result.isOnprem) {
+        return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
+      }
       if (result.success) {
         return c.json(BRES)
       }
@@ -236,7 +249,15 @@ app.post('/', async (c) => {
         const bodyParsed = parsePluginBody<AppStats>(c, event, jsonRequestSchema)
         const result = await post(c, drizzleClient, bodyParsed)
 
-        if (result.success) {
+        if (result.isOnprem) {
+          results.push({
+            status: 'error',
+            error: 'on_premise_app',
+            message: 'On-premise app detected',
+            index: i,
+          })
+        }
+        else if (result.success) {
           results.push({ status: 'ok', index: i })
         }
         else {
