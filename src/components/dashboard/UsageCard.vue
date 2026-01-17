@@ -10,7 +10,6 @@ import {
   generateDemoStorageData,
   getDemoDayCount,
 } from '~/services/demoChartData'
-import { useDashboardAppsStore } from '~/stores/dashboardApps'
 import ChartCard from './ChartCard.vue'
 import LineChartStats from './LineChartStats.vue'
 
@@ -33,7 +32,7 @@ const props = defineProps({
   },
   data: {
     type: Array,
-    default: () => Array.from({ length: getDaysInCurrentMonth() }).fill(undefined) as number[],
+    default: undefined,
   },
   dataByApp: {
     type: Object,
@@ -54,6 +53,25 @@ const props = defineProps({
   },
 })
 
+const dataArray = computed(() => {
+  if (!props.data || props.data.length === 0) {
+    return Array.from({ length: getDaysInCurrentMonth() }).fill(undefined) as (number | undefined)[]
+  }
+  return props.data as (number | undefined)[]
+})
+
+// Check if we have real data
+const hasRealData = computed(() => {
+  const arr = dataArray.value ?? []
+  // Has data if there's at least one defined, non-zero value
+  const hasDefinedData = arr.some(val => val !== undefined && val !== null && val > 0)
+  // Or has data by app with at least one defined value
+  const hasAppData = props.dataByApp && Object.values(props.dataByApp).some((appValues: any) =>
+    appValues.some((val: any) => val !== undefined && val !== null && val > 0),
+  )
+  return hasDefinedData || hasAppData
+})
+
 // Get the appropriate data generator based on chart type
 function getDataGenerator(title: string) {
   const titleLower = title.toLowerCase()
@@ -72,7 +90,7 @@ function getDataGenerator(title: string) {
 // Generate consistent demo data where total is derived from per-app breakdown
 // Use existing data length or default based on billing period mode
 const consistentDemoData = computed(() => {
-  const dataLength = (props.data as number[]).length
+  const dataLength = dataArray.value?.length ?? 0
   const days = getDemoDayCount(props.useBillingPeriod, dataLength)
   const generator = getDataGenerator(props.title)
   return generateConsistentDemoData(days, generator)
@@ -82,34 +100,24 @@ const consistentDemoData = computed(() => {
 const demoData = computed(() => consistentDemoData.value.total)
 const demoDataByApp = computed(() => consistentDemoData.value.byApp)
 
-// Demo mode: show demo data only when forceDemo is true OR user has no apps
-// If user has apps, ALWAYS show real data (even if empty)
-const dashboardAppsStore = useDashboardAppsStore()
-const isDemoMode = computed(() => {
-  if (props.forceDemo)
-    return true
-  // If user has apps, never show demo data
-  if (dashboardAppsStore.apps.length > 0)
-    return false
-  // No apps and store is loaded = show demo
-  return dashboardAppsStore.isLoaded
-})
-const effectiveData = computed(() => isDemoMode.value ? demoData.value : props.data as number[])
+// Use real data or demo data
+const isDemoMode = computed(() => props.forceDemo || (!hasRealData.value && !props.isLoading))
+const effectiveData = computed(() => isDemoMode.value ? demoData.value : dataArray.value)
 const effectiveDataByApp = computed(() => isDemoMode.value ? demoDataByApp.value : props.dataByApp)
 const effectiveAppNames = computed(() => isDemoMode.value ? DEMO_APP_NAMES : props.appNames)
 
 const total = computed(() => {
-  const dataArray = effectiveData.value
-  const hasData = dataArray.some(val => val !== undefined)
-  const sumValues = (values: number[]) => values.reduce((acc, val) => (typeof val === 'number' ? acc + val : acc), 0)
+  const arr = effectiveData.value
+  const hasData = arr.some(val => val !== undefined)
+  const sumValues = (values: (number | undefined)[]): number => values.reduce<number>((acc, val) => (typeof val === 'number' ? acc + val : acc), 0)
 
   if (hasData) {
-    return sumValues(dataArray)
+    return sumValues(arr)
   }
 
   if (effectiveDataByApp.value && Object.keys(effectiveDataByApp.value).length > 0) {
-    return Object.values(effectiveDataByApp.value).reduce((totalSum, appValues: any) => {
-      return totalSum + sumValues(appValues)
+    return Object.values(effectiveDataByApp.value).reduce((totalSum: number, appValues: any) => {
+      return totalSum + sumValues(appValues as (number | undefined)[])
     }, 0)
   }
 
@@ -118,10 +126,10 @@ const total = computed(() => {
 
 const lastDayEvolution = computed(() => {
   if (isDemoMode.value) {
-    return calculateDemoEvolution(effectiveData.value)
+    return calculateDemoEvolution(effectiveData.value.filter((v): v is number => typeof v === 'number'))
   }
 
-  const arr = props.data as number[]
+  const arr = dataArray.value ?? []
   const arrWithoutUndefined = arr.filter((val: any) => val !== undefined)
 
   if (arrWithoutUndefined.length < 2) {
@@ -138,14 +146,9 @@ const lastDayEvolution = computed(() => {
   return ((lastValue - previousValue) / previousValue) * 100
 })
 
-// Check if there's actual chart data (values in the array), not just a total
-// This handles cases like Storage where total can be > 0 but no activity in current period
 const hasChartData = computed(() => {
-  if (isDemoMode.value)
-    return true
-  const dataArray = effectiveData.value
-  // Check if any value in the array is defined and > 0
-  return dataArray.some(val => typeof val === 'number' && val > 0)
+  const arr = effectiveData.value
+  return arr.some(val => val !== undefined && val !== null && val > 0)
 })
 </script>
 
