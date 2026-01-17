@@ -799,12 +799,18 @@ export async function readLastMonthUpdatesCF(c: Context) {
 export async function readLastMonthDevicesCF(c: Context): Promise<number> {
   if (!c.env.DEVICE_USAGE)
     return 0
-  const query = `SELECT COUNT(DISTINCT blob1) AS total FROM device_usage WHERE timestamp >= toDateTime('${formatDateCF(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10))}') AND timestamp < now()`
+  const query = `SELECT
+    index1 AS app_id,
+    COUNT(DISTINCT blob1) AS total
+  FROM device_usage
+  WHERE timestamp >= toDateTime('${formatDateCF(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10))}')
+    AND timestamp < now()
+  GROUP BY index1`
 
   cloudlog({ requestId: c.get('requestId'), message: 'readLastMonthDevicesCF query', query })
   try {
-    const res = await runQueryToCFA<{ total: number }>(c, query)
-    return res[0].total
+    const res = await runQueryToCFA<{ app_id: string, total: number }>(c, query)
+    return res.reduce((sum, row) => sum + (row.total || 0), 0)
   }
   catch (e) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Error reading last month devices', error: serializeError(e) })
@@ -826,27 +832,29 @@ export async function readLastMonthDevicesByPlatformCF(c: Context): Promise<Devi
   const oneMonthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
   // Platform: double1 = 0 for android, 1 for ios
   const baseWhere = `timestamp >= toDateTime('${formatDateCF(oneMonthAgo)}') AND timestamp < now()`
-  const totalQuery = `SELECT COUNT(DISTINCT blob1) AS total FROM device_usage WHERE ${baseWhere}`
-  const iosQuery = `SELECT COUNT(DISTINCT blob1) AS ios FROM device_usage WHERE ${baseWhere} AND double1 = 1`
-  const androidQuery = `SELECT COUNT(DISTINCT blob1) AS android FROM device_usage WHERE ${baseWhere} AND double1 = 0`
+  const totalQuery = `SELECT index1 AS app_id, COUNT(DISTINCT blob1) AS total FROM device_usage WHERE ${baseWhere} GROUP BY index1`
+  const platformQuery = `SELECT index1 AS app_id, double1 AS platform, COUNT(DISTINCT blob1) AS total FROM device_usage WHERE ${baseWhere} GROUP BY index1, double1`
 
-  cloudlog({
-    requestId: c.get('requestId'),
-    message: 'readLastMonthDevicesByPlatformCF queries',
-    totalQuery,
-    iosQuery,
-    androidQuery,
-  })
+  cloudlog({ requestId: c.get('requestId'), message: 'readLastMonthDevicesByPlatformCF queries', totalQuery, platformQuery })
   try {
-    const [totalRes, iosRes, androidRes] = await Promise.all([
-      runQueryToCFA<{ total: number }>(c, totalQuery),
-      runQueryToCFA<{ ios: number }>(c, iosQuery),
-      runQueryToCFA<{ android: number }>(c, androidQuery),
+    const [totalRes, platformRes] = await Promise.all([
+      runQueryToCFA<{ app_id: string, total: number }>(c, totalQuery),
+      runQueryToCFA<{ app_id: string, platform: number, total: number }>(c, platformQuery),
     ])
+
+    const total = totalRes.reduce((sum, row) => sum + (row.total || 0), 0)
+    let ios = 0
+    let android = 0
+    platformRes.forEach((row) => {
+      if (row.platform === 1)
+        ios += row.total || 0
+      else if (row.platform === 0)
+        android += row.total || 0
+    })
     return {
-      total: totalRes[0]?.total || 0,
-      ios: iosRes[0]?.ios || 0,
-      android: androidRes[0]?.android || 0,
+      total,
+      ios,
+      android,
     }
   }
   catch (e) {
