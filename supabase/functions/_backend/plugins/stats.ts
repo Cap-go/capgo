@@ -25,6 +25,7 @@ export interface BatchStatsResult {
   error?: string
   message?: string
   index?: number
+  moreInfo?: Record<string, unknown>
 }
 
 export const jsonRequestSchema = z.object({
@@ -63,6 +64,7 @@ interface PostResult {
   error?: string
   message?: string
   isOnprem?: boolean
+  moreInfo?: Record<string, unknown>
 }
 
 async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient>, body: AppStats): Promise<PostResult> {
@@ -117,7 +119,7 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
       cloudlog({ requestId: c.get('requestId'), message: `Version name ${version_name} not found, using unknown instead`, app_id, version_name })
     }
     else {
-      return { success: false, error: 'version_not_found', message: 'Version not found' }
+      return { success: false, error: 'version_not_found', message: 'Version not found', moreInfo: { app_id, version_name } }
     }
   }
   // device.version = appVersion.id
@@ -237,7 +239,7 @@ app.post('/', async (c) => {
       if (result.success) {
         return c.json(BRES)
       }
-      return simpleError200(c, result.error!, result.message!)
+      return simpleError200(c, result.error!, result.message!, result.moreInfo)
     }
 
     // For batch, collect results and handle errors per event
@@ -266,6 +268,7 @@ app.post('/', async (c) => {
             error: result.error,
             message: result.message,
             index: i,
+            moreInfo: result.moreInfo,
           })
         }
       }
