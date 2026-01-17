@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { BASE_URL, getSupabaseClient, ORG_ID, resetAndSeedAppData, resetAndSeedAppDataStats, resetAppData, resetAppDataStats, USER_ID } from './test-utils.ts'
+import { BASE_URL, ORG_ID_CRON_INTEGRATION, STRIPE_CUSTOMER_ID_CRON_INTEGRATION, getSupabaseClient, resetAndSeedAppData, resetAndSeedAppDataStats, resetAppData, resetAppDataStats, USER_ID } from './test-utils.ts'
 
 const appId = `com.cron.${randomUUID().slice(0, 8)}`
 
@@ -11,7 +11,10 @@ const triggerHeaders = {
 
 describe('[Integration] cron_stat_app -> cron_stat_org flow', () => {
   beforeAll(async () => {
-    await resetAndSeedAppData(appId)
+    await resetAndSeedAppData(appId, {
+      orgId: ORG_ID_CRON_INTEGRATION,
+      stripeCustomerId: STRIPE_CUSTOMER_ID_CRON_INTEGRATION,
+    })
     await resetAndSeedAppDataStats(appId)
 
     const supabase = getSupabaseClient()
@@ -20,14 +23,14 @@ describe('[Integration] cron_stat_app -> cron_stat_org flow', () => {
     await supabase
       .from('orgs')
       .update({ stats_updated_at: null })
-      .eq('id', ORG_ID)
+      .eq('id', ORG_ID_CRON_INTEGRATION)
       .throwOnError()
 
     // Reset plan calculated timestamp
     await supabase
       .from('stripe_info')
       .update({ plan_calculated_at: null })
-      .eq('customer_id', 'cus_Pa0k8TO6HVln6A') // From seed data
+      .eq('customer_id', STRIPE_CUSTOMER_ID_CRON_INTEGRATION)
       .throwOnError()
   })
 
@@ -43,7 +46,7 @@ describe('[Integration] cron_stat_app -> cron_stat_org flow', () => {
     const { data: orgData } = await supabase
       .from('orgs')
       .select('customer_id')
-      .eq('id', ORG_ID)
+      .eq('id', ORG_ID_CRON_INTEGRATION)
       .single()
       .throwOnError()
 
@@ -78,7 +81,7 @@ describe('[Integration] cron_stat_app -> cron_stat_org flow', () => {
       headers: triggerHeaders,
       body: JSON.stringify({
         appId,
-        orgId: ORG_ID,
+        orgId: ORG_ID_CRON_INTEGRATION,
       }),
     })
 
@@ -90,7 +93,7 @@ describe('[Integration] cron_stat_app -> cron_stat_org flow', () => {
     const { data: org } = await supabase
       .from('orgs')
       .select('stats_updated_at')
-      .eq('id', ORG_ID)
+      .eq('id', ORG_ID_CRON_INTEGRATION)
       .single()
       .throwOnError()
 
@@ -104,7 +107,7 @@ describe('[Integration] cron_stat_app -> cron_stat_org flow', () => {
       method: 'POST',
       headers: triggerHeaders,
       body: JSON.stringify({
-        orgId: ORG_ID,
+        orgId: ORG_ID_CRON_INTEGRATION,
         customerId: orgData.customer_id,
       }),
     })
@@ -136,7 +139,7 @@ describe('[Integration] cron_stat_app -> cron_stat_org flow', () => {
     const { data: orgData } = await supabase
       .from('orgs')
       .select('customer_id')
-      .eq('id', ORG_ID)
+      .eq('id', ORG_ID_CRON_INTEGRATION)
       .single()
       .throwOnError()
 
@@ -156,7 +159,7 @@ describe('[Integration] cron_stat_app -> cron_stat_org flow', () => {
 
     // Call the queue function directly (simulating what cron_stat_app does)
     const { error } = await supabase.rpc('queue_cron_stat_org_for_org', {
-      org_id: ORG_ID,
+      org_id: ORG_ID_CRON_INTEGRATION,
       customer_id: orgData.customer_id,
     })
 
@@ -185,7 +188,7 @@ describe('[Integration] cron_stat_app -> cron_stat_org flow', () => {
     const { data: orgData } = await supabase
       .from('orgs')
       .select('customer_id')
-      .eq('id', ORG_ID)
+      .eq('id', ORG_ID_CRON_INTEGRATION)
       .single()
       .throwOnError()
 
@@ -205,7 +208,7 @@ describe('[Integration] cron_stat_app -> cron_stat_org flow', () => {
 
     // Call the queue function directly
     const { error } = await supabase.rpc('queue_cron_stat_org_for_org', {
-      org_id: ORG_ID,
+      org_id: ORG_ID_CRON_INTEGRATION,
       customer_id: orgData.customer_id,
     })
 
@@ -216,7 +219,7 @@ describe('[Integration] cron_stat_app -> cron_stat_org flow', () => {
       method: 'POST',
       headers: triggerHeaders,
       body: JSON.stringify({
-        orgId: ORG_ID,
+        orgId: ORG_ID_CRON_INTEGRATION,
         customerId: orgData.customer_id,
       }),
     })

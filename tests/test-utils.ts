@@ -47,6 +47,21 @@ export const USER_ID = '6aa76066-55ef-4238-ade6-0b32334a4097'
 export const USER_ID_2 = '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5'
 export const ORG_ID_2 = '34a8c55d-2d0f-4652-a43f-684c7a9403ac' // Test2 org owned by USER_ID_2
 export const STRIPE_INFO_CUSTOMER_ID_2 = 'cus_Pa0f3M6UCQ8g5Q' // Customer ID for ORG_ID_2
+// Dedicated data for email preference tests (isolated to prevent interference)
+export const USER_ID_EMAIL_PREFS = '9f1a2b3c-4d5e-4f60-8a7b-1c2d3e4f5061'
+export const USER_EMAIL_EMAIL_PREFS = 'emailprefs@capgo.app'
+export const ORG_ID_EMAIL_PREFS = 'aa1b2c3d-4e5f-4a60-9b7c-1d2e3f4a5061'
+export const STRIPE_CUSTOMER_ID_EMAIL_PREFS = 'cus_email_prefs_test_123'
+// Dedicated data for cron/queue tests (isolated per file)
+export const ORG_ID_CRON_APP = 'b1c2d3e4-f5a6-4b70-8c9d-0e1f2a3b4c5d'
+export const STRIPE_CUSTOMER_ID_CRON_APP = 'cus_cron_app_test_123'
+export const ORG_ID_CRON_INTEGRATION = 'c2d3e4f5-a6b7-4c80-9d0e-1f2a3b4c5d6e'
+export const STRIPE_CUSTOMER_ID_CRON_INTEGRATION = 'cus_cron_integration_test_123'
+export const ORG_ID_CRON_QUEUE = 'd3e4f5a6-b7c8-4d90-8e1f-2a3b4c5d6e7f'
+export const STRIPE_CUSTOMER_ID_CRON_QUEUE = 'cus_cron_queue_test_123'
+// Dedicated data for overage tracking tests (isolated)
+export const ORG_ID_OVERAGE = 'e4f5a6b7-c8d9-4ea0-9f1a-2b3c4d5e6f70'
+export const STRIPE_CUSTOMER_ID_OVERAGE = 'cus_overage_test_123'
 export const USER_ID_STATS = '7a1b2c3d-4e5f-4a6b-7c8d-9e0f1a2b3c4d' // Dedicated user for statistics tests
 export const ORG_ID_STATS = 'b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e' // Dedicated org for statistics tests
 export const APIKEY_STATS = '8b2c3d4e-5f6a-4c7b-8d9e-0f1a2b3c4d5e' // Dedicated API key for statistics tests
