@@ -986,3 +986,91 @@ export async function getAdminGlobalStatsTrend(
     return []
   }
 }
+
+export interface AdminPluginBreakdown {
+  date: string | null
+  devices_last_month: number
+  devices_last_month_ios: number
+  devices_last_month_android: number
+  version_breakdown: Record<string, number>
+  major_breakdown: Record<string, number>
+}
+
+function parseBreakdownJson(value: unknown): Record<string, number> {
+  if (!value)
+    return {}
+  if (typeof value === 'string') {
+    try {
+      return JSON.parse(value) as Record<string, number>
+    }
+    catch {
+      return {}
+    }
+  }
+  if (typeof value === 'object')
+    return value as Record<string, number>
+  return {}
+}
+
+export async function getAdminPluginBreakdown(
+  c: Context,
+  start_date: string,
+  end_date: string,
+): Promise<AdminPluginBreakdown> {
+  try {
+    const pgClient = getPgClient(c, true)
+    const drizzleClient = getDrizzleClient(pgClient)
+
+    const startDateOnly = start_date.split('T')[0]
+    const endDateOnly = end_date.split('T')[0]
+
+    const query = sql`
+      SELECT
+        date_id AS date,
+        COALESCE(devices_last_month, 0)::int AS devices_last_month,
+        COALESCE(devices_last_month_ios, 0)::int AS devices_last_month_ios,
+        COALESCE(devices_last_month_android, 0)::int AS devices_last_month_android,
+        plugin_version_breakdown,
+        plugin_major_breakdown
+      FROM global_stats
+      WHERE date_id >= ${startDateOnly}
+        AND date_id <= ${endDateOnly}
+      ORDER BY date_id DESC
+      LIMIT 1
+    `
+
+    const result = await drizzleClient.execute(query)
+    const row = result.rows[0] as any | undefined
+
+    if (!row) {
+      return {
+        date: null,
+        devices_last_month: 0,
+        devices_last_month_ios: 0,
+        devices_last_month_android: 0,
+        version_breakdown: {},
+        major_breakdown: {},
+      }
+    }
+
+    return {
+      date: row.date ?? null,
+      devices_last_month: Number(row.devices_last_month) || 0,
+      devices_last_month_ios: Number(row.devices_last_month_ios) || 0,
+      devices_last_month_android: Number(row.devices_last_month_android) || 0,
+      version_breakdown: parseBreakdownJson(row.plugin_version_breakdown),
+      major_breakdown: parseBreakdownJson(row.plugin_major_breakdown),
+    }
+  }
+  catch (e: unknown) {
+    logPgError(c, 'getAdminPluginBreakdown', e)
+    return {
+      date: null,
+      devices_last_month: 0,
+      devices_last_month_ios: 0,
+      devices_last_month_android: 0,
+      version_breakdown: {},
+      major_breakdown: {},
+    }
+  }
+}

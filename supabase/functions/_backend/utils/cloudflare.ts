@@ -1870,7 +1870,9 @@ export async function getPluginBreakdownCF(c: Context): Promise<PluginBreakdownR
 
     for (const [version, count] of versionCounts) {
       const percentage = Number(((count / total) * 100).toFixed(2))
-      version_breakdown[version] = percentage
+      if (percentage > 0) {
+        version_breakdown[version] = percentage
+      }
 
       // Extract major version (first number before first dot)
       const major = version.split('.')[0]
@@ -1883,7 +1885,8 @@ export async function getPluginBreakdownCF(c: Context): Promise<PluginBreakdownR
     const major_breakdown: PluginVersionBreakdown = {}
     for (const [major, count] of majorCounts) {
       const percentage = Number(((count / total) * 100).toFixed(2))
-      major_breakdown[major] = percentage
+      if (percentage > 0)
+        major_breakdown[major] = percentage
     }
 
     return { version_breakdown, major_breakdown }

@@ -51,6 +51,13 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    '/admin/dashboard/plugins': RouteRecordInfo<
+      '/admin/dashboard/plugins',
+      '/admin/dashboard/plugins',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
     '/admin/dashboard/replication': RouteRecordInfo<
       '/admin/dashboard/replication',
       '/admin/dashboard/replication',
@@ -456,6 +463,12 @@ declare module 'vue-router/auto-routes' {
     'src/pages/admin/dashboard/performance.vue': {
       routes:
         | '/admin/dashboard/performance'
+      views:
+        | never
+    }
+    'src/pages/admin/dashboard/plugins.vue': {
+      routes:
+        | '/admin/dashboard/plugins'
       views:
         | never
     }

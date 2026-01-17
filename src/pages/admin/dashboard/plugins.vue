@@ -1,0 +1,208 @@
+<route lang="yaml">
+meta:
+  layout: admin
+</route>
+
+<script setup lang="ts">
+import { computed, onMounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
+import AdminBarChart from '~/components/admin/AdminBarChart.vue'
+import AdminFilterBar from '~/components/admin/AdminFilterBar.vue'
+import AdminStatsCard from '~/components/admin/AdminStatsCard.vue'
+import ChartCard from '~/components/dashboard/ChartCard.vue'
+import Spinner from '~/components/Spinner.vue'
+import { useAdminDashboardStore } from '~/stores/adminDashboard'
+import { useDisplayStore } from '~/stores/display'
+import { useMainStore } from '~/stores/main'
+
+interface PluginBreakdownData {
+  date: string | null
+  devices_last_month: number
+  devices_last_month_ios: number
+  devices_last_month_android: number
+  version_breakdown: Record<string, number>
+  major_breakdown: Record<string, number>
+}
+
+const { t } = useI18n()
+const displayStore = useDisplayStore()
+const mainStore = useMainStore()
+const adminStore = useAdminDashboardStore()
+const router = useRouter()
+const isLoading = ref(true)
+const isLoadingBreakdown = ref(false)
+
+const pluginBreakdown = ref<PluginBreakdownData | null>(null)
+
+async function loadPluginBreakdown() {
+  isLoadingBreakdown.value = true
+  try {
+    const data = await adminStore.fetchStats('plugin_breakdown')
+    pluginBreakdown.value = data || null
+  }
+  catch (error) {
+    console.error('[Admin Dashboard Plugins] Error loading plugin breakdown:', error)
+    pluginBreakdown.value = null
+  }
+  finally {
+    isLoadingBreakdown.value = false
+  }
+}
+
+const devicesTotal = computed(() => pluginBreakdown.value?.devices_last_month || 0)
+const devicesIos = computed(() => pluginBreakdown.value?.devices_last_month_ios || 0)
+const devicesAndroid = computed(() => pluginBreakdown.value?.devices_last_month_android || 0)
+const snapshotDate = computed(() => pluginBreakdown.value?.date || '-')
+
+const versionEntries = computed(() => {
+  const breakdown = pluginBreakdown.value?.version_breakdown ?? {}
+  return Object.entries(breakdown)
+    .map(([version, percent]) => ({
+      version,
+      percent: Number(percent) || 0,
+    }))
+    .filter(entry => entry.percent > 0)
+    .sort((a, b) => b.percent - a.percent)
+})
+
+const majorEntries = computed(() => {
+  const breakdown = pluginBreakdown.value?.major_breakdown ?? {}
+  return Object.entries(breakdown)
+    .map(([version, percent]) => ({
+      version,
+      percent: Number(percent) || 0,
+    }))
+    .filter(entry => entry.percent > 0)
+    .sort((a, b) => b.percent - a.percent)
+})
+
+const versionLabels = computed(() => versionEntries.value.map(entry => entry.version))
+const versionValues = computed(() => versionEntries.value.map(entry => entry.percent))
+const majorLabels = computed(() => majorEntries.value.map(entry => entry.version))
+const majorValues = computed(() => majorEntries.value.map(entry => entry.percent))
+
+const hasVersionData = computed(() => versionEntries.value.length > 0)
+const hasMajorData = computed(() => majorEntries.value.length > 0)
+
+watch(() => adminStore.activeDateRange, () => {
+  loadPluginBreakdown()
+}, { deep: true })
+
+watch(() => adminStore.refreshTrigger, () => {
+  loadPluginBreakdown()
+})
+
+onMounted(async () => {
+  if (!mainStore.isAdmin) {
+    console.error('Non-admin user attempted to access admin dashboard')
+    router.push('/dashboard')
+    return
+  }
+
+  isLoading.value = true
+  await loadPluginBreakdown()
+  isLoading.value = false
+
+  displayStore.NavTitle = t('plugins')
+})
+
+displayStore.NavTitle = t('plugins')
+displayStore.defaultBack = '/dashboard'
+</script>
+
+<template>
+  <div>
+    <div class="h-full pb-4 overflow-hidden">
+      <div class="w-full h-full px-4 pt-2 mx-auto mb-8 overflow-y-auto sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
+        <AdminFilterBar />
+
+        <div v-if="isLoading" class="flex items-center justify-center min-h-screen">
+          <Spinner size="w-24 h-24" />
+        </div>
+
+        <div v-else class="space-y-6">
+          <div class="grid grid-cols-1 gap-6 md:grid-cols-3">
+            <AdminStatsCard
+              title="Active devices (30d)"
+              :value="devicesTotal"
+              color-class="text-primary"
+              :is-loading="isLoadingBreakdown"
+              subtitle="All platforms"
+            />
+            <AdminStatsCard
+              title="iOS devices (30d)"
+              :value="devicesIos"
+              color-class="text-[#119eff]"
+              :is-loading="isLoadingBreakdown"
+              subtitle="Active iOS devices"
+            />
+            <AdminStatsCard
+              title="Android devices (30d)"
+              :value="devicesAndroid"
+              color-class="text-emerald-500"
+              :is-loading="isLoadingBreakdown"
+              subtitle="Active Android devices"
+            />
+          </div>
+
+          <div class="grid grid-cols-1 gap-6 xl:grid-cols-2">
+            <ChartCard
+              title="Plugin Versions"
+              :total="devicesTotal"
+              unit="devices"
+              :is-loading="isLoadingBreakdown"
+              :has-data="hasVersionData"
+              no-data-message="No plugin version data available"
+            >
+              <template #header>
+                <div class="flex flex-col gap-1">
+                  <h2 class="text-2xl font-semibold leading-tight dark:text-white text-slate-600">
+                    Plugin Versions
+                  </h2>
+                  <p class="text-xs text-slate-500 dark:text-slate-400">
+                    Latest snapshot: {{ snapshotDate }}
+                  </p>
+                </div>
+              </template>
+              <AdminBarChart
+                :labels="versionLabels"
+                :values="versionValues"
+                label="Device Share"
+                :total="devicesTotal"
+                :is-loading="isLoadingBreakdown"
+              />
+            </ChartCard>
+
+            <ChartCard
+              title="Major Versions"
+              :total="devicesTotal"
+              unit="devices"
+              :is-loading="isLoadingBreakdown"
+              :has-data="hasMajorData"
+              no-data-message="No major version data available"
+            >
+              <template #header>
+                <div class="flex flex-col gap-1">
+                  <h2 class="text-2xl font-semibold leading-tight dark:text-white text-slate-600">
+                    Major Versions
+                  </h2>
+                  <p class="text-xs text-slate-500 dark:text-slate-400">
+                    Latest snapshot: {{ snapshotDate }}
+                  </p>
+                </div>
+              </template>
+              <AdminBarChart
+                :labels="majorLabels"
+                :values="majorValues"
+                label="Device Share"
+                :total="devicesTotal"
+                :is-loading="isLoadingBreakdown"
+              />
+            </ChartCard>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
