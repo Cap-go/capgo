@@ -721,7 +721,6 @@ export async function getDefaultPlan(c: Context) {
 
 export async function createStripeCustomer(c: Context, org: Database['public']['Tables']['orgs']['Row']) {
   const customer = await createCustomer(c, org.management_email, org.created_by, org.id, org.name)
-  // create date + 15 days
   const trial_at = new Date()
   trial_at.setDate(trial_at.getDate() + 15)
   const soloPlan = await getDefaultPlan(c)
@@ -749,6 +748,34 @@ export async function createStripeCustomer(c: Context, org: Database['public']['
   if (updateUserError)
     cloudlog({ requestId: c.get('requestId'), message: 'updateUserError', updateUserError })
   cloudlog({ requestId: c.get('requestId'), message: 'stripe_info done' })
+}
+
+export async function finalizePendingStripeCustomer(c: Context, org: Database['public']['Tables']['orgs']['Row']) {
+  const pendingCustomerId = org.customer_id
+  if (!pendingCustomerId?.startsWith('pending_')) {
+    cloudlog({ requestId: c.get('requestId'), message: 'finalizePendingStripeCustomer: not a pending customer_id', pendingCustomerId })
+    return
+  }
+
+  await createStripeCustomer(c, { ...org, customer_id: null })
+
+  const { data: updatedOrg } = await supabaseAdmin(c)
+    .from('orgs')
+    .select('customer_id')
+    .eq('id', org.id)
+    .single()
+
+  if (!updatedOrg?.customer_id || updatedOrg.customer_id.startsWith('pending_')) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'finalizePendingStripeCustomer: org still has pending customer_id, skipping delete' })
+    return
+  }
+
+  const { error: deleteError } = await supabaseAdmin(c)
+    .from('stripe_info')
+    .delete()
+    .eq('customer_id', pendingCustomerId)
+  if (deleteError)
+    cloudlogErr({ requestId: c.get('requestId'), message: 'finalizePendingStripeCustomer: orphan pending stripe_info', deleteError })
 }
 
 export function trackBandwidthUsageSB(

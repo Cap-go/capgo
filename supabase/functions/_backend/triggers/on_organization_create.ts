@@ -5,7 +5,7 @@ import { trackBentoEvent } from '../utils/bento.ts'
 import { BRES, middlewareAPISecret, simpleError, triggerValidator } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { logsnag } from '../utils/logsnag.ts'
-import { createStripeCustomer } from '../utils/supabase.ts'
+import { createStripeCustomer, finalizePendingStripeCustomer } from '../utils/supabase.ts'
 import { backgroundTask } from '../utils/utils.ts'
 
 export const app = new Hono<MiddlewareKeyVariables>()
@@ -19,8 +19,12 @@ app.post('/', middlewareAPISecret, triggerValidator('orgs', 'INSERT'), async (c)
     throw simpleError('no_id', 'No id', { record })
   }
 
-  if (!record.customer_id)
-    await createStripeCustomer(c, record as any)
+  if (!record.customer_id) {
+    await createStripeCustomer(c, record)
+  }
+  else if (record.customer_id.startsWith('pending_')) {
+    await finalizePendingStripeCustomer(c, record)
+  }
 
   const LogSnag = logsnag(c)
   await backgroundTask(c, LogSnag.track({
