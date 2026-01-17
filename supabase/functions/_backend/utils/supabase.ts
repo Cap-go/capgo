@@ -1204,7 +1204,7 @@ export function validateExpirationDate(expiresAt: string | null | undefined): vo
   if (Number.isNaN(expirationDate.getTime())) {
     throw simpleError('invalid_expiration_date', 'Invalid expiration date format')
   }
-  if (expirationDate <= new Date()) {
+  if (expirationDate < new Date()) {
     throw simpleError('invalid_expiration_date', 'Expiration date must be in the future')
   }
 }
