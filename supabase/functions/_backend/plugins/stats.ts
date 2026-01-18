@@ -164,15 +164,16 @@ async function parseBodyRaw(c: Context): Promise<AppStats | AppStats[]> {
   try {
     const body = await c.req.json<AppStats | AppStats[]>()
     // Normalize device_id to lowercase for both single and array
+    // Guard against non-object items to allow per-item validation errors
     if (Array.isArray(body)) {
       for (const item of body) {
-        if (typeof item.device_id === 'string') {
-          item.device_id = item.device_id.toLowerCase()
+        if (item && typeof item === 'object' && typeof (item as AppStats).device_id === 'string') {
+          (item as AppStats).device_id = (item as AppStats).device_id.toLowerCase()
         }
       }
     }
-    else if (typeof body.device_id === 'string') {
-      body.device_id = body.device_id.toLowerCase()
+    else if (body && typeof body === 'object' && typeof (body as AppStats).device_id === 'string') {
+      (body as AppStats).device_id = (body as AppStats).device_id.toLowerCase()
     }
     return body
   }
@@ -192,19 +193,20 @@ app.post('/', async (c) => {
   }
 
   // Early validation of first event's app_id before using it in checks
+  // Use optional chaining to safely handle null/primitive items
   const firstEvent = events[0]
-  if (!firstEvent.app_id || typeof firstEvent.app_id !== 'string') {
+  const firstAppId = (firstEvent as AppStats | null | undefined)?.app_id
+  if (!firstAppId || typeof firstAppId !== 'string') {
     throw simpleError('invalid_app_id', MISSING_STRING_APP_ID)
   }
-  if (!reverseDomainRegex.test(firstEvent.app_id)) {
+  if (!reverseDomainRegex.test(firstAppId)) {
     throw simpleError('invalid_app_id', INVALID_STRING_APP_ID)
   }
-  const firstAppId = firstEvent.app_id
 
   // Validate all events in batch have valid app_ids and they all match
   if (isBatch) {
     for (let i = 1; i < events.length; i++) {
-      const currentAppId = events[i].app_id
+      const currentAppId = (events[i] as AppStats | null | undefined)?.app_id
 
       // Ensure each event has a valid string app_id in reverse-domain format
       if (!currentAppId || typeof currentAppId !== 'string') {
