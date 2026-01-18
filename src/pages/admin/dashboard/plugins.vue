@@ -4,6 +4,7 @@ meta:
 </route>
 
 <script setup lang="ts">
+import { FormKit } from '@formkit/vue'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
@@ -34,6 +35,9 @@ const isLoading = ref(true)
 const isLoadingBreakdown = ref(false)
 
 const pluginBreakdown = ref<PluginBreakdownData | null>(null)
+const thresholdSelection = ref<'0' | '0.1' | '0.5' | '1' | '2' | '5' | 'custom'>('1')
+const customThreshold = ref(1)
+const maxVersionRows = 20
 
 async function loadPluginBreakdown() {
   isLoadingBreakdown.value = true
@@ -55,6 +59,12 @@ const devicesIos = computed(() => pluginBreakdown.value?.devices_last_month_ios 
 const devicesAndroid = computed(() => pluginBreakdown.value?.devices_last_month_android || 0)
 const snapshotDate = computed(() => pluginBreakdown.value?.date || '-')
 
+const thresholdValue = computed(() => {
+  const raw = thresholdSelection.value === 'custom' ? customThreshold.value : Number(thresholdSelection.value)
+  const value = Number.isFinite(raw) ? raw : 0
+  return Math.min(100, Math.max(0, value))
+})
+
 const versionEntries = computed(() => {
   const breakdown = pluginBreakdown.value?.version_breakdown ?? {}
   return Object.entries(breakdown)
@@ -62,8 +72,9 @@ const versionEntries = computed(() => {
       version,
       percent: Number(percent) || 0,
     }))
-    .filter(entry => entry.percent > 0)
+    .filter(entry => entry.percent > thresholdValue.value)
     .sort((a, b) => b.percent - a.percent)
+    .slice(0, maxVersionRows)
 })
 
 const majorEntries = computed(() => {
@@ -85,12 +96,20 @@ const majorValues = computed(() => majorEntries.value.map(entry => entry.percent
 const hasVersionData = computed(() => versionEntries.value.length > 0)
 const hasMajorData = computed(() => majorEntries.value.length > 0)
 
+const versionCountTotal = computed(() => Object.keys(pluginBreakdown.value?.version_breakdown ?? {}).length)
+const versionCountShown = computed(() => versionEntries.value.length)
+
 watch(() => adminStore.activeDateRange, () => {
   loadPluginBreakdown()
 }, { deep: true })
 
 watch(() => adminStore.refreshTrigger, () => {
   loadPluginBreakdown()
+})
+
+watch(thresholdSelection, (value) => {
+  if (value !== 'custom')
+    customThreshold.value = Number(value) || 0
 })
 
 onMounted(async () => {
@@ -156,13 +175,48 @@ displayStore.defaultBack = '/dashboard'
               no-data-message="No plugin version data available"
             >
               <template #header>
-                <div class="flex flex-col gap-1">
-                  <h2 class="text-2xl font-semibold leading-tight dark:text-white text-slate-600">
-                    Plugin Versions
-                  </h2>
-                  <p class="text-xs text-slate-500 dark:text-slate-400">
-                    Latest snapshot: {{ snapshotDate }}
-                  </p>
+                <div class="flex flex-col gap-3">
+                  <div class="flex flex-col gap-1">
+                    <h2 class="text-2xl font-semibold leading-tight dark:text-white text-slate-600">
+                      Plugin Versions
+                    </h2>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">
+                      Latest snapshot: {{ snapshotDate }}
+                    </p>
+                  </div>
+                  <div class="flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                    <span>Min share</span>
+                    <FormKit
+                      v-model="thresholdSelection"
+                      type="select"
+                      :options="[
+                        { label: '0%', value: '0' },
+                        { label: '0.1%', value: '0.1' },
+                        { label: '0.5%', value: '0.5' },
+                        { label: '1%', value: '1' },
+                        { label: '2%', value: '2' },
+                        { label: '5%', value: '5' },
+                        { label: 'Custom', value: 'custom' },
+                      ]"
+                      :classes="{ outer: 'mb-0! w-[92px]', input: 'd-select d-select-sm' }"
+                    />
+                    <div v-if="thresholdSelection === 'custom'" class="flex items-center gap-1">
+                      <FormKit
+                        v-model="customThreshold"
+                        type="number"
+                        number="float"
+                        :min="0"
+                        :max="100"
+                        :step="0.1"
+                        :classes="{ outer: 'mb-0! w-[80px]', input: 'd-input d-input-sm' }"
+                      />
+                      <span>%</span>
+                    </div>
+                    <span>Top {{ maxVersionRows }}</span>
+                    <span v-if="versionCountTotal" class="text-[11px]">
+                      (showing {{ versionCountShown }} of {{ versionCountTotal }})
+                    </span>
+                  </div>
                 </div>
               </template>
               <AdminBarChart
