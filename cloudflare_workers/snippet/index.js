@@ -71,7 +71,8 @@ async function isHealthy(colo, workerUrl) {
 // On-prem caching helper functions
 function matchesEndpoint(pathname, endpoint) {
   // More precise matching to avoid false positives (e.g., '/api/updates_history' matching '/updates')
-  return pathname === endpoint || pathname.startsWith(`${endpoint}/`) || pathname.startsWith(`${endpoint}?`)
+  // Note: pathname never includes query strings (those are in url.search), so we only check exact match and path prefix
+  return pathname === endpoint || pathname.startsWith(`${endpoint}/`)
 }
 
 function getEndpointName(pathname) {
@@ -597,10 +598,8 @@ export default {
             const responseBody = await responseClone.json()
 
             if (isOnPremResponse(response.status, responseBody)) {
-              // Cache the on-prem response with error handling
-              setOnPremCache(appId, endpoint, method, responseBody, response.status).catch((error) => {
-                console.log(`Failed to set on-prem cache for ${appId}/${endpoint}/${method}: ${error && error.message ? error.message : String(error)}`)
-              })
+              // Cache the on-prem response (fire-and-forget, errors handled internally)
+              setOnPremCache(appId, endpoint, method, responseBody, response.status)
 
               // Return a new response, preserving original headers and adding on-prem headers
               const newHeaders = new Headers(response.headers)
@@ -615,7 +614,7 @@ export default {
             }
           }
           catch {
-            // If response is not JSON or parsing fails, just return original
+            // Response is not JSON or parsing failed - skip on-prem cache check and return original response
           }
         }
 
