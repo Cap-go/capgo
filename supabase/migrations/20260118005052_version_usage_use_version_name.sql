@@ -81,6 +81,27 @@ $$;
 CREATE INDEX IF NOT EXISTS "idx_version_usage_version_name" ON "public"."version_usage" ("version_name");
 CREATE INDEX IF NOT EXISTS "idx_daily_version_version_name" ON "public"."daily_version" ("version_name");
 
+-- 5b. Deduplicate daily_version rows that would violate the new unique constraint
+-- We aggregate metrics across duplicates so no data is lost when collapsing rows
+WITH dedup AS (
+  SELECT
+    app_id,
+    date,
+    version_name,
+    MIN(version_id) AS version_id,
+    SUM(get) AS get,
+    SUM(fail) AS fail,
+    SUM(install) AS install,
+    SUM(uninstall) AS uninstall
+  FROM public.daily_version
+  GROUP BY app_id, date, version_name
+), deleted AS (
+  DELETE FROM public.daily_version RETURNING 1
+)
+INSERT INTO public.daily_version (app_id, date, version_name, version_id, get, fail, install, uninstall)
+SELECT app_id, date, version_name, version_id, get, fail, install, uninstall
+FROM dedup;
+
 -- 6. Add unique constraint on (app_id, date, version_name) for upsert operations
 -- This constraint replaces the old primary key and will be used for ON CONFLICT
 ALTER TABLE "public"."daily_version" ADD CONSTRAINT "daily_version_app_date_version_name_key" UNIQUE ("app_id", "date", "version_name");
