@@ -20,8 +20,8 @@ interface RateLimitEntry {
 
 function buildOperationRateRequest(c: Context, appId: string, deviceId: string, operation: ChannelSelfOperation) {
   const helper = new CacheHelper(c)
-  if (!helper.available)
-    return null
+  // Note: We don't check helper.available here because it's set asynchronously.
+  // The matchJson/putJson methods internally await cache initialization via ensureCache().
   return {
     helper,
     request: helper.buildRequest(CHANNEL_SELF_OP_RATE_PATH, {
@@ -34,8 +34,8 @@ function buildOperationRateRequest(c: Context, appId: string, deviceId: string, 
 
 function buildSameSetRequest(c: Context, appId: string, deviceId: string, channel: string) {
   const helper = new CacheHelper(c)
-  if (!helper.available)
-    return null
+  // Note: We don't check helper.available here because it's set asynchronously.
+  // The matchJson/putJson methods internally await cache initialization via ensureCache().
   return {
     helper,
     request: helper.buildRequest(CHANNEL_SELF_SAME_SET_PATH, {
@@ -64,23 +64,19 @@ export async function isChannelSelfRateLimited(
 ): Promise<boolean> {
   // Check operation-level rate limit (1 request per second per device+app+operation)
   const opRateEntry = buildOperationRateRequest(c, appId, deviceId, operation)
-  if (opRateEntry) {
-    const cached = await opRateEntry.helper.matchJson<RateLimitEntry>(opRateEntry.request)
-    if (cached) {
-      // Device has made the same operation within the last second - rate limit
-      return true
-    }
+  const cached = await opRateEntry.helper.matchJson<RateLimitEntry>(opRateEntry.request)
+  if (cached) {
+    // Device has made the same operation within the last second - rate limit
+    return true
   }
 
   // For 'set' operation: also check same-set rate limit (same device+app+channel within 60 seconds)
   if (operation === 'set' && channel) {
     const sameSetEntry = buildSameSetRequest(c, appId, deviceId, channel)
-    if (sameSetEntry) {
-      const cached = await sameSetEntry.helper.matchJson<RateLimitEntry>(sameSetEntry.request)
-      if (cached) {
-        // Same exact set was done within the last 60 seconds - rate limit
-        return true
-      }
+    const cachedSet = await sameSetEntry.helper.matchJson<RateLimitEntry>(sameSetEntry.request)
+    if (cachedSet) {
+      // Same exact set was done within the last 60 seconds - rate limit
+      return true
     }
   }
 
@@ -88,8 +84,11 @@ export async function isChannelSelfRateLimited(
 }
 
 /**
- * Record a successful channel operation for rate limiting purposes.
- * This should be called after a successful operation.
+ * Record a channel operation for rate limiting purposes.
+ * This is called after processing a request to prevent abuse.
+ *
+ * Note: This records ALL requests (not just successful ones) to prevent
+ * abuse through repeated invalid requests. This is intentional for spam protection.
  */
 export async function recordChannelSelfRequest(
   c: Context,
@@ -103,15 +102,11 @@ export async function recordChannelSelfRequest(
 
   // Record operation-level rate limit (1 second TTL)
   const opRateEntry = buildOperationRateRequest(c, appId, deviceId, operation)
-  if (opRateEntry) {
-    await opRateEntry.helper.putJson(opRateEntry.request, entry, OP_RATE_TTL_SECONDS)
-  }
+  await opRateEntry.helper.putJson(opRateEntry.request, entry, OP_RATE_TTL_SECONDS)
 
   // For 'set' operation: also record same-set rate limit (60 seconds TTL)
   if (operation === 'set' && channel) {
     const sameSetEntry = buildSameSetRequest(c, appId, deviceId, channel)
-    if (sameSetEntry) {
-      await sameSetEntry.helper.putJson(sameSetEntry.request, entry, SAME_SET_RATE_TTL_SECONDS)
-    }
+    await sameSetEntry.helper.putJson(sameSetEntry.request, entry, SAME_SET_RATE_TTL_SECONDS)
   }
 }
