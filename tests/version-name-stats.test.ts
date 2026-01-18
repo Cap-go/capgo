@@ -8,7 +8,7 @@
  */
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { BASE_URL, getSupabaseClient, PRODUCT_ID } from './test-utils.ts'
+import { getEndpointUrl, getSupabaseClient, PRODUCT_ID } from './test-utils.ts'
 
 // Use dedicated org for this test to avoid interference
 const globalId = randomUUID()
@@ -154,7 +154,7 @@ describe('version_name statistics tracking', () => {
     }
 
     // Trigger cron_stat_app
-    const response = await fetch(`${BASE_URL}/triggers/cron_stat_app`, {
+    const response = await fetch(getEndpointUrl('/triggers/cron_stat_app'), {
       method: 'POST',
       headers: triggerHeaders,
       body: JSON.stringify({
