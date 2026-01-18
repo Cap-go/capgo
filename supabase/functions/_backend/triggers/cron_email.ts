@@ -378,8 +378,11 @@ async function handleDeployInstallStats(
   const windowStart = deployTime.toISOString()
   const windowEnd = new Date(deployTime.getTime() + 24 * 60 * 60 * 1000).toISOString()
   const versionStats = await readStatsVersion(c, appId, windowStart, windowEnd)
+  // Filter by version_name (new format) OR version_id as string (old Cloudflare format)
+  // This handles backwards compatibility during the transition period
+  const versionIdStr = versionId ? String(versionId) : null
   const installs = versionStats
-    .filter(row => Number(row.version_id) === Number(versionId))
+    .filter(row => row.version_name === versionName || (versionIdStr && row.version_name === versionIdStr))
     .reduce((sum, row) => sum + (row.install ?? 0), 0)
 
   const metadata = {

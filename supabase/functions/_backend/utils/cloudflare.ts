@@ -2,7 +2,7 @@ import type { AnalyticsEngineDataPoint, D1Database, Hyperdrive } from '@cloudfla
 import type { Context } from 'hono'
 import type { DeviceComparable } from './deviceComparison.ts'
 import type { Database } from './supabase.types.ts'
-import type { DeviceRes, DeviceWithoutCreatedAt, ReadDevicesParams, ReadStatsParams } from './types.ts'
+import type { DeviceRes, DeviceWithoutCreatedAt, ReadDevicesParams, ReadStatsParams, VersionUsage } from './types.ts'
 import dayjs from 'dayjs'
 import { CacheHelper } from './cache.ts'
 import { hasComparableDeviceChanged, toComparableDevice } from './deviceComparison.ts'
@@ -108,12 +108,12 @@ export function trackBandwidthUsageCF(c: Context, device_id: string, app_id: str
   return Promise.resolve()
 }
 
-export function trackVersionUsageCF(c: Context, version_id: number, app_id: string, action: string) {
+export function trackVersionUsageCF(c: Context, version_name: string, app_id: string, action: string) {
   if (!c.env.VERSION_USAGE)
     return Promise.resolve()
 
   c.env.VERSION_USAGE.writeDataPoint({
-    blobs: [app_id, version_id, action],
+    blobs: [app_id, version_name, action],
     indexes: [app_id],
   })
 
@@ -437,22 +437,14 @@ interface StoreApp {
   developer_id?: string // Optional as it's not NOT NULL
 }
 
-interface VersionUsageCF {
-  date: string
-  app_id: string
-  version_id: number
-  get: number
-  fail: number
-  install: number
-  uninstall: number
-}
-
-export async function readStatsVersionCF(c: Context, app_id: string, period_start: string, period_end: string) {
+export async function readStatsVersionCF(c: Context, app_id: string, period_start: string, period_end: string): Promise<VersionUsage[]> {
   if (!c.env.VERSION_USAGE)
-    return [] as VersionUsageCF[]
+    return []
+  // Note: blob2 contains version_name for new data and version_id (numeric) for old data
+  // The cron job handles backwards compatibility by detecting numeric values
   const query = `SELECT
   blob1 as app_id,
-  blob2 as version_id,
+  blob2 as version_name,
   formatDateTime(toStartOfInterval(timestamp, INTERVAL '1' DAY), '%Y-%m-%d') AS date,
   sum(if(blob3 = 'get', 1, 0)) AS get,
   sum(if(blob3 = 'fail', 1, 0)) AS fail,
@@ -463,17 +455,17 @@ WHERE
   app_id = '${app_id}'
   AND timestamp >= toDateTime('${formatDateCF(period_start)}')
   AND timestamp < toDateTime('${formatDateCF(period_end)}')
-GROUP BY date, app_id, version_id
+GROUP BY date, app_id, version_name
 ORDER BY date`
 
   cloudlog({ requestId: c.get('requestId'), message: 'readStatsVersionCF query', query })
   try {
-    return await runQueryToCFA<VersionUsageCF>(c, query)
+    return await runQueryToCFA<VersionUsage>(c, query)
   }
   catch (e) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Error reading version usage', error: serializeError(e), query })
   }
-  return [] as VersionUsageCF[]
+  return []
 }
 
 export async function countDevicesCF(c: Context, app_id: string, customIdMode: boolean) {
