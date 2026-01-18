@@ -63,7 +63,7 @@ export const jsonRequestSchemaGet = z.looseObject({
 async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient>, body: DeviceLink): Promise<Response> {
   cloudlog({ requestId: c.get('requestId'), message: 'post channel self body', body })
   const device = makeDevice(body)
-  const { app_id, version_name, device_id, channel } = body
+  const { app_id, device_id, channel } = body
 
   const cachedStatus = await getAppStatus(c, app_id)
   if (cachedStatus === 'onprem') {
@@ -250,7 +250,7 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
 async function put(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient>, body: DeviceLink): Promise<Response> {
   cloudlog({ requestId: c.get('requestId'), message: 'put channel self body', body })
   const device = makeDevice(body)
-  const { app_id, version_name, defaultChannel, device_id } = body
+  const { app_id, defaultChannel, device_id } = body
 
   // Check if app exists first - Read operation can use v2 flag
   const cachedStatus = await getAppStatus(c, app_id)
