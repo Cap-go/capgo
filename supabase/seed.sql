@@ -665,17 +665,17 @@ BEGIN
         current_version_id := 3;
       END IF;
 
-      INSERT INTO public.daily_version (date, app_id, version_id, get, fail, install, uninstall)
-      VALUES (curr_date, 'com.demo.app', previous_version_id, FLOOR(RANDOM() * 100) + 1, FLOOR(RANDOM() * 10) + 1, 0, previous_install * random_daily_change);
+      INSERT INTO public.daily_version (date, app_id, version_id, version_name, get, fail, install, uninstall)
+      VALUES (curr_date, 'com.demo.app', previous_version_id, CASE WHEN previous_version_id = 3 THEN '1.0.0' ELSE '1.0.1' END, FLOOR(RANDOM() * 100) + 1, FLOOR(RANDOM() * 10) + 1, 0, previous_install * random_daily_change);
 
-      INSERT INTO public.daily_version (date, app_id, version_id, get, fail, install, uninstall)
-      VALUES (curr_date, 'com.demo.app', current_version_id, FLOOR(RANDOM() * 100) + 1, FLOOR(RANDOM() * 10) + 1, previous_install * random_daily_change, 0);
+      INSERT INTO public.daily_version (date, app_id, version_id, version_name, get, fail, install, uninstall)
+      VALUES (curr_date, 'com.demo.app', current_version_id, CASE WHEN current_version_id = 3 THEN '1.0.0' ELSE '1.0.1' END, FLOOR(RANDOM() * 100) + 1, FLOOR(RANDOM() * 10) + 1, previous_install * random_daily_change, 0);
       previous_version_id := current_version_id;
       previous_install := previous_install * random_daily_change;
     ELSE
       previous_install := FLOOR(RANDOM() * 50000) + 1;
-      INSERT INTO public.daily_version (date, app_id, version_id, get, fail, install, uninstall)
-      VALUES (curr_date, 'com.demo.app', current_version_id, FLOOR(RANDOM() * 100) + 1, FLOOR(RANDOM() * 10) + 1, previous_install, 0);
+      INSERT INTO public.daily_version (date, app_id, version_id, version_name, get, fail, install, uninstall)
+      VALUES (curr_date, 'com.demo.app', current_version_id, CASE WHEN current_version_id = 3 THEN '1.0.0' ELSE '1.0.1' END, FLOOR(RANDOM() * 100) + 1, FLOOR(RANDOM() * 10) + 1, previous_install, 0);
     END IF;
 
     curr_date := curr_date + INTERVAL '1 day';
@@ -685,12 +685,12 @@ BEGIN
   curr_date := start_date::DATE + INTERVAL '5 days'; -- Start 5 days later for variety
   WHILE curr_date <= end_date::DATE LOOP
     -- Add data for com.demoadmin.app
-    INSERT INTO public.daily_version (date, app_id, version_id, get, fail, install, uninstall)
-    VALUES (curr_date, 'com.demoadmin.app', 10, FLOOR(RANDOM() * 30) + 5, FLOOR(RANDOM() * 3) + 0, FLOOR(RANDOM() * 20) + 3, 0);
+    INSERT INTO public.daily_version (date, app_id, version_id, version_name, get, fail, install, uninstall)
+    VALUES (curr_date, 'com.demoadmin.app', 10, '1.0.0', FLOOR(RANDOM() * 30) + 5, FLOOR(RANDOM() * 3) + 0, FLOOR(RANDOM() * 20) + 3, 0);
 
     -- Add data for com.stats.app
-    INSERT INTO public.daily_version (date, app_id, version_id, get, fail, install, uninstall)
-    VALUES (curr_date, 'com.stats.app', 13, FLOOR(RANDOM() * 25) + 8, FLOOR(RANDOM() * 2) + 0, FLOOR(RANDOM() * 15) + 2, 0);
+    INSERT INTO public.daily_version (date, app_id, version_id, version_name, get, fail, install, uninstall)
+    VALUES (curr_date, 'com.stats.app', 13, '1.0.0', FLOOR(RANDOM() * 25) + 8, FLOOR(RANDOM() * 2) + 0, FLOOR(RANDOM() * 15) + 2, 0);
 
     curr_date := curr_date + INTERVAL '1 day';
   END LOOP;
@@ -1003,8 +1003,8 @@ BEGIN
     INSERT INTO public.daily_storage (app_id, date, storage) VALUES (p_app_id, curr_date, random_storage);
     INSERT INTO public.daily_build_time (app_id, date, build_time_unit, build_count)
     VALUES (p_app_id, curr_date, FLOOR(RANDOM() * 7200) + 300, FLOOR(RANDOM() * 10) + 1);
-    INSERT INTO public.daily_version (date, app_id, version_id, get, fail, install, uninstall)
-    VALUES (curr_date, p_app_id, random_version_id, FLOOR(RANDOM() * 100) + 1, FLOOR(RANDOM() * 10) + 1, FLOOR(RANDOM() * 50) + 1, FLOOR(RANDOM() * 20) + 1);
+    INSERT INTO public.daily_version (date, app_id, version_id, version_name, get, fail, install, uninstall)
+    VALUES (curr_date, p_app_id, random_version_id, '1.0.0', FLOOR(RANDOM() * 100) + 1, FLOOR(RANDOM() * 10) + 1, FLOOR(RANDOM() * 50) + 1, FLOOR(RANDOM() * 20) + 1);
     curr_date := curr_date + INTERVAL '1 day';
   END LOOP;
   INSERT INTO public.storage_usage (device_id, app_id, file_size) SELECT random_uuid, p_app_id, FLOOR(RANDOM() * 10485760) - 5242880 FROM generate_series(1, 20);
