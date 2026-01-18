@@ -92,6 +92,7 @@ describe('version_name statistics tracking', () => {
         app_id: appId,
         version: versionId,
         created_by: '6aa76066-55ef-4238-ade6-0b32334a4097',
+        owner_org: ORG_ID_VERSION_NAME,
       })
       .throwOnError()
   })
@@ -221,7 +222,7 @@ describe('version_name statistics tracking', () => {
     const today = new Date().toISOString().split('T')[0]
 
     // First insert
-    const { error: insertError1 } = await (supabase.from('daily_version') as any)
+    const { error: insertError1 } = await supabase.from('daily_version')
       .upsert({
         app_id: appId,
         date: today,
@@ -235,7 +236,7 @@ describe('version_name statistics tracking', () => {
     expect(insertError1).toBeNull()
 
     // Second upsert with same key should update
-    const { error: insertError2 } = await (supabase.from('daily_version') as any)
+    const { error: insertError2 } = await supabase.from('daily_version')
       .upsert({
         app_id: appId,
         date: today,
@@ -277,7 +278,7 @@ describe('version_name statistics tracking', () => {
       .throwOnError()
 
     // Insert daily_version for version 2
-    await (supabase.from('daily_version') as any)
+    await supabase.from('daily_version')
       .upsert({
         app_id: appId,
         date: today,

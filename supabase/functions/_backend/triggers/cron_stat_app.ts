@@ -129,8 +129,7 @@ app.post('/', middlewareAPISecret, async (c) => {
       .upsert(storage, { onConflict: 'app_id,date' })
       .eq('app_id', body.appId)
       .throwOnError(),
-    // eslint-disable-next-line ts/no-explicit-any
-    (supabase.from('daily_version') as any)
+    supabase.from('daily_version')
       .upsert(resolvedVersionUsage, { onConflict: 'app_id,date,version_name' })
       .eq('app_id', body.appId)
       .throwOnError(),

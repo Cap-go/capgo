@@ -857,7 +857,8 @@ export type Database = {
           get: number | null
           install: number | null
           uninstall: number | null
-          version_id: number
+          version_id: number | null
+          version_name: string
         }
         Insert: {
           app_id: string
@@ -866,7 +867,8 @@ export type Database = {
           get?: number | null
           install?: number | null
           uninstall?: number | null
-          version_id: number
+          version_id?: number | null
+          version_name: string
         }
         Update: {
           app_id?: string
@@ -875,7 +877,8 @@ export type Database = {
           get?: number | null
           install?: number | null
           uninstall?: number | null
-          version_id?: number
+          version_id?: number | null
+          version_name?: string
         }
         Relationships: []
       }
@@ -2007,19 +2010,22 @@ export type Database = {
           action: Database["public"]["Enums"]["version_action"]
           app_id: string
           timestamp: string
-          version_id: number
+          version_id: number | null
+          version_name: string | null
         }
         Insert: {
           action: Database["public"]["Enums"]["version_action"]
           app_id: string
           timestamp?: string
-          version_id: number
+          version_id?: number | null
+          version_name?: string | null
         }
         Update: {
           action?: Database["public"]["Enums"]["version_action"]
           app_id?: string
           timestamp?: string
-          version_id?: number
+          version_id?: number | null
+          version_name?: string | null
         }
         Relationships: []
       }
@@ -2972,7 +2978,7 @@ export type Database = {
           get: number
           install: number
           uninstall: number
-          version_id: number
+          version_name: string
         }[]
       }
       record_build_time: {
