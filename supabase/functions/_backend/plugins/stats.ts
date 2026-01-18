@@ -9,7 +9,6 @@ import { getAppStatus, setAppStatus } from '../utils/appStatus.ts'
 import { BRES, simpleError, simpleError200, simpleRateLimit } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { sendNotifOrg } from '../utils/notifications.ts'
-import { sendNotifToOrgMembers } from '../utils/org_email_notifications.ts'
 import { closeClient, getAppOwnerPostgres, getAppVersionPostgres, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import { makeDevice, parsePluginBody } from '../utils/plugin_parser.ts'
 import { createStatsVersion, onPremStats, sendStatsAndDevice } from '../utils/stats.ts'
@@ -142,12 +141,8 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
     if (shouldCountDownloadFail) {
       await createStatsVersion(c, appVersion.id, app_id, 'fail')
       cloudlog({ requestId: c.get('requestId'), message: 'FAIL!' })
-      await sendNotifToOrgMembers(c, 'user:update_fail', 'device_error', {
-        app_id,
-        device_id: body.device_id,
-        version_id: appVersion.id,
-        app_id_url: app_id,
-      }, appVersion.owner_org, app_id, '0 0 * * 1')
+      // Daily fail ratio emails are now sent via cron job that checks aggregate stats
+      // instead of per-device notifications. See process_daily_fail_ratio_email.
     }
   }
   statsActions.push({ action: action as Database['public']['Enums']['stats_action'] })
