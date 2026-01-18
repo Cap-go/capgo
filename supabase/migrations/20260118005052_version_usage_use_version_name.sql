@@ -13,6 +13,20 @@ SET version_name = av.name
 FROM "public"."app_versions" av
 WHERE dv.version_id = av.id AND dv.version_name IS NULL;
 
+-- 3b. Set 'unknown' for any rows that couldn't be backfilled (deleted versions)
+UPDATE "public"."daily_version"
+SET version_name = 'unknown'
+WHERE version_name IS NULL;
+
+-- 3c. Make version_name NOT NULL now that all rows have a value
+ALTER TABLE "public"."daily_version" ALTER COLUMN "version_name" SET NOT NULL;
+
+-- 3d. Make version_id nullable for new data (which only has version_name)
+ALTER TABLE "public"."daily_version" ALTER COLUMN "version_id" DROP NOT NULL;
+
+-- 3e. Drop old primary key (uses version_id which will now be optional)
+ALTER TABLE "public"."daily_version" DROP CONSTRAINT IF EXISTS "daily_version_pkey";
+
 -- 4. Drop and recreate read_version_usage function with new return type (version_name instead of version_id)
 -- PostgreSQL doesn't allow changing return type with CREATE OR REPLACE, so we must drop first
 DROP FUNCTION IF EXISTS "public"."read_version_usage"(character varying, timestamp without time zone, timestamp without time zone);
@@ -62,6 +76,5 @@ CREATE INDEX IF NOT EXISTS "idx_version_usage_version_name" ON "public"."version
 CREATE INDEX IF NOT EXISTS "idx_daily_version_version_name" ON "public"."daily_version" ("version_name");
 
 -- 6. Add unique constraint on (app_id, date, version_name) for upsert operations
--- First drop the old primary key constraint since we're changing the conflict key
--- Note: We keep version_id for backwards compatibility but add version_name as unique
-CREATE UNIQUE INDEX IF NOT EXISTS "idx_daily_version_app_date_version_name_unique" ON "public"."daily_version" ("app_id", "date", "version_name") WHERE "version_name" IS NOT NULL;
+-- This constraint replaces the old primary key and will be used for ON CONFLICT
+ALTER TABLE "public"."daily_version" ADD CONSTRAINT "daily_version_app_date_version_name_key" UNIQUE ("app_id", "date", "version_name");
