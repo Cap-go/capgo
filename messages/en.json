@@ -209,6 +209,8 @@
   "open-source-updates": "Open Source Updates",
   "devices-trend": "Active Devices Trend",
   "device-platform-trend": "Device Platform Trend (iOS vs Android)",
+  "builds-trend": "Native Builds Trend (Total, iOS, Android)",
+  "builds-last-month-trend": "Native Builds Last 30 Days (Total, iOS, Android)",
   "github-stars-trend": "GitHub Stars Trend",
   "need-upgrade-trend": "Organizations Needing Upgrade",
   "revenue": "Revenue",

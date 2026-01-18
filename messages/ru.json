@@ -699,6 +699,8 @@
   "device-not-found-description": "Это устройство не удалось найти. Возможно, оно было удалено или у вас нет доступа к нему.",
   "device-pixel": "Pixel",
   "device-platform-trend": "Тренд платформ устройств (iOS vs Android)",
+  "builds-trend": "Тренд нативных сборок (Всего, iOS, Android)",
+  "builds-last-month-trend": "Нативные сборки за последние 30 дней (Всего, iOS, Android)",
   "devices": "Устройства",
   "devices-trend": "Тенденции активных устройств",
   "dialog-with-custom-input": "Диалог с пользовательским вводом",

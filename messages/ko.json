@@ -699,6 +699,8 @@
   "device-not-found-description": "이 장치를 찾을 수 없습니다. 삭제되었거나 접근 권한이 없을 수 있습니다.",
   "device-pixel": "Pixel",
   "device-platform-trend": "기기 플랫폼 추세 (iOS vs Android)",
+  "builds-trend": "네이티브 빌드 추세 (전체, iOS, Android)",
+  "builds-last-month-trend": "네이티브 빌드 최근 30일 (전체, iOS, Android)",
   "devices": "장치들",
   "devices-trend": "활성 장치 추세",
   "dialog-with-custom-input": "사용자 정의 입력 대화",

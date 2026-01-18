@@ -7,30 +7,10 @@ export type Json =
   | Json[]
 
 export type Database = {
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "14.1"
   }
   public: {
     Tables: {
@@ -127,6 +107,7 @@ export type Database = {
           comment: string | null
           created_at: string | null
           deleted: boolean
+          deleted_at: string | null
           external_url: string | null
           id: number
           key_id: string | null
@@ -152,6 +133,7 @@ export type Database = {
           comment?: string | null
           created_at?: string | null
           deleted?: boolean
+          deleted_at?: string | null
           external_url?: string | null
           id?: number
           key_id?: string | null
@@ -177,6 +159,7 @@ export type Database = {
           comment?: string | null
           created_at?: string | null
           deleted?: boolean
+          deleted_at?: string | null
           external_url?: string | null
           id?: number
           key_id?: string | null
@@ -445,7 +428,15 @@ export type Database = {
           platform?: string
           user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "build_logs_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       build_requests: {
         Row: {
@@ -1100,6 +1091,7 @@ export type Database = {
           paying: number | null
           paying_monthly: number | null
           paying_yearly: number | null
+          plan_enterprise: number | null
           plan_enterprise_monthly: number
           plan_enterprise_yearly: number
           plan_maker: number | null
@@ -1111,6 +1103,8 @@ export type Database = {
           plan_team: number | null
           plan_team_monthly: number
           plan_team_yearly: number
+          plugin_major_breakdown: Json
+          plugin_version_breakdown: Json
           registers_today: number
           revenue_enterprise: number
           revenue_maker: number
@@ -1146,6 +1140,7 @@ export type Database = {
           paying?: number | null
           paying_monthly?: number | null
           paying_yearly?: number | null
+          plan_enterprise?: number | null
           plan_enterprise_monthly?: number
           plan_enterprise_yearly?: number
           plan_maker?: number | null
@@ -1157,6 +1152,8 @@ export type Database = {
           plan_team?: number | null
           plan_team_monthly?: number
           plan_team_yearly?: number
+          plugin_major_breakdown?: Json
+          plugin_version_breakdown?: Json
           registers_today?: number
           revenue_enterprise?: number
           revenue_maker?: number
@@ -1192,6 +1189,7 @@ export type Database = {
           paying?: number | null
           paying_monthly?: number | null
           paying_yearly?: number | null
+          plan_enterprise?: number | null
           plan_enterprise_monthly?: number
           plan_enterprise_yearly?: number
           plan_maker?: number | null
@@ -1203,6 +1201,8 @@ export type Database = {
           plan_team?: number | null
           plan_team_monthly?: number
           plan_team_yearly?: number
+          plugin_major_breakdown?: Json
+          plugin_version_breakdown?: Json
           registers_today?: number
           revenue_enterprise?: number
           revenue_maker?: number
@@ -2286,6 +2286,7 @@ export type Database = {
       cleanup_frequent_job_details: { Args: never; Returns: undefined }
       cleanup_job_run_details_7days: { Args: never; Returns: undefined }
       cleanup_old_audit_logs: { Args: never; Returns: undefined }
+      cleanup_old_channel_devices: { Args: never; Returns: undefined }
       cleanup_queue_messages: { Args: never; Returns: undefined }
       cleanup_webhook_deliveries: { Args: never; Returns: undefined }
       convert_bytes_to_gb: { Args: { bytes_value: number }; Returns: number }
@@ -2298,20 +2299,20 @@ export type Database = {
       }
       count_active_users: { Args: { app_ids: string[] }; Returns: number }
       count_all_need_upgrade: { Args: never; Returns: number }
-      count_non_compliant_bundles: {
-        Args: { org_id: string; required_key?: string }
-        Returns: {
-          non_encrypted_count: number
-          wrong_key_count: number
-          total_non_compliant: number
-        }[]
-      }
       count_all_onboarded: { Args: never; Returns: number }
       count_all_plans_v2: {
         Args: never
         Returns: {
           count: number
           plan_name: string
+        }[]
+      }
+      count_non_compliant_bundles: {
+        Args: { org_id: string; required_key?: string }
+        Returns: {
+          non_encrypted_count: number
+          total_non_compliant: number
+          wrong_key_count: number
         }[]
       }
       delete_accounts_marked_for_deletion: {
@@ -2322,7 +2323,12 @@ export type Database = {
         }[]
       }
       delete_http_response: { Args: { request_id: number }; Returns: undefined }
+      delete_non_compliant_bundles: {
+        Args: { org_id: string; required_key?: string }
+        Returns: number
+      }
       delete_old_deleted_apps: { Args: never; Returns: undefined }
+      delete_old_deleted_versions: { Args: never; Returns: undefined }
       delete_user: { Args: never; Returns: undefined }
       exist_app_v2: { Args: { appid: string }; Returns: boolean }
       exist_app_versions:
@@ -2331,10 +2337,6 @@ export type Database = {
             Args: { apikey: string; appid: string; name_version: string }
             Returns: boolean
           }
-      delete_non_compliant_bundles: {
-        Args: { org_id: string; required_key?: string }
-        Returns: number
-      }
       expire_usage_credits: { Args: never; Returns: number }
       find_apikey_by_value: {
         Args: { key_value: string }
@@ -2632,7 +2634,7 @@ export type Database = {
               password_policy_config: Json
               paying: boolean
               require_apikey_expiration: boolean
-              required_encryption_key: string | null
+              required_encryption_key: string
               role: string
               stats_updated_at: string
               subscription_end: string
@@ -2665,7 +2667,7 @@ export type Database = {
               password_policy_config: Json
               paying: boolean
               require_apikey_expiration: boolean
-              required_encryption_key: string | null
+              required_encryption_key: string
               role: string
               stats_updated_at: string
               subscription_end: string
@@ -2758,6 +2760,7 @@ export type Database = {
           comment: string | null
           created_at: string | null
           deleted: boolean
+          deleted_at: string | null
           external_url: string | null
           id: number
           key_id: string | null
@@ -2925,6 +2928,7 @@ export type Database = {
       }
       process_cron_stats_jobs: { Args: never; Returns: undefined }
       process_cron_sync_sub_jobs: { Args: never; Returns: undefined }
+      process_daily_fail_ratio_email: { Args: never; Returns: undefined }
       process_deploy_install_stats_email: { Args: never; Returns: undefined }
       process_failed_uploads: { Args: never; Returns: undefined }
       process_free_trial_expired: { Args: never; Returns: undefined }
@@ -3143,9 +3147,7 @@ export type Database = {
         | "disableAutoUpdateMetadata"
         | "disableAutoUpdateUnderNative"
         | "disableDevBuild"
-        | "disableProdBuild"
         | "disableEmulator"
-        | "disableDevice"
         | "cannotGetBundle"
         | "checksum_fail"
         | "NoChannelOrOverride"
@@ -3166,6 +3168,8 @@ export type Database = {
         | "download_manifest_brotli_fail"
         | "backend_refusal"
         | "download_0"
+        | "disableProdBuild"
+        | "disableDevice"
         | "disablePlatformElectron"
       stripe_status:
         | "created"
@@ -3341,9 +3345,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
       action_type: ["mau", "storage", "bandwidth", "build_time"],
@@ -3400,9 +3401,7 @@ export const Constants = {
         "disableAutoUpdateMetadata",
         "disableAutoUpdateUnderNative",
         "disableDevBuild",
-        "disableProdBuild",
         "disableEmulator",
-        "disableDevice",
         "cannotGetBundle",
         "checksum_fail",
         "NoChannelOrOverride",
@@ -3423,6 +3422,8 @@ export const Constants = {
         "download_manifest_brotli_fail",
         "backend_refusal",
         "download_0",
+        "disableProdBuild",
+        "disableDevice",
         "disablePlatformElectron",
       ],
       stripe_status: [
@@ -3450,4 +3451,3 @@ export const Constants = {
     },
   },
 } as const
-

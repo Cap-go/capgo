@@ -699,6 +699,8 @@
   "device-not-found-description": "यह उपकरण नहीं मिल सका। हो सकता है कि इसे हटा दिया गया हो या फिर आपके पास इसे प्राप्त करने की क्षमता नहीं हो।",
   "device-pixel": "Pixel",
   "device-platform-trend": "डिवाइस प्लेटफ़ॉर्म ट्रेंड (iOS vs Android)",
+  "builds-trend": "नेटिव बिल्ड्स ट्रेंड (कुल, iOS, Android)",
+  "builds-last-month-trend": "नेटिव बिल्ड्स पिछले 30 दिन (कुल, iOS, Android)",
   "devices": "उपकरण",
   "devices-trend": "सक्रिय उपकरणों का ट्रेंड",
   "dialog-with-custom-input": "कस्टम इनपुट के साथ संवाद",

@@ -699,6 +699,8 @@
   "device-not-found-description": "このデバイスは見つかりませんでした。削除された可能性があるか、またはアクセス権限がない可能性があります。",
   "device-pixel": "Pixel",
   "device-platform-trend": "デバイスプラットフォームトレンド（iOS vs Android）",
+  "builds-trend": "ネイティブビルドトレンド（合計、iOS、Android）",
+  "builds-last-month-trend": "ネイティブビルド過去30日間（合計、iOS、Android）",
   "devices": "デバイス",
   "devices-trend": "アクティブデバイスのトレンド",
   "dialog-with-custom-input": "カスタム入力を使用したダイアログ",

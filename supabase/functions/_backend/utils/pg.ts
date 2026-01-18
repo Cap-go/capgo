@@ -883,6 +883,12 @@ export interface AdminGlobalStatsTrend {
   revenue_maker: number
   revenue_team: number
   revenue_enterprise: number
+  builds_total: number
+  builds_ios: number
+  builds_android: number
+  builds_last_month: number
+  builds_last_month_ios: number
+  builds_last_month_android: number
 }
 
 export async function getAdminGlobalStatsTrend(
@@ -933,7 +939,13 @@ export async function getAdminGlobalStatsTrend(
         revenue_solo::float,
         revenue_maker::float,
         revenue_team::float,
-        revenue_enterprise::float
+        revenue_enterprise::float,
+        COALESCE(builds_total, 0)::int AS builds_total,
+        COALESCE(builds_ios, 0)::int AS builds_ios,
+        COALESCE(builds_android, 0)::int AS builds_android,
+        COALESCE(builds_last_month, 0)::int AS builds_last_month,
+        COALESCE(builds_last_month_ios, 0)::int AS builds_last_month_ios,
+        COALESCE(builds_last_month_android, 0)::int AS builds_last_month_android
       FROM global_stats
       WHERE date_id >= ${startDateOnly}
         AND date_id <= ${endDateOnly}
@@ -975,6 +987,12 @@ export async function getAdminGlobalStatsTrend(
       revenue_maker: Number(row.revenue_maker) || 0,
       revenue_team: Number(row.revenue_team) || 0,
       revenue_enterprise: Number(row.revenue_enterprise) || 0,
+      builds_total: Number(row.builds_total) || 0,
+      builds_ios: Number(row.builds_ios) || 0,
+      builds_android: Number(row.builds_android) || 0,
+      builds_last_month: Number(row.builds_last_month) || 0,
+      builds_last_month_ios: Number(row.builds_last_month_ios) || 0,
+      builds_last_month_android: Number(row.builds_last_month_android) || 0,
     }))
 
     cloudlog({ requestId: c.get('requestId'), message: 'getAdminGlobalStatsTrend result', resultCount: data.length })
