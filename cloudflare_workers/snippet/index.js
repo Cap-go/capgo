@@ -69,31 +69,37 @@ async function isHealthy(colo, workerUrl) {
 }
 
 // On-prem caching helper functions
+function matchesEndpoint(pathname, endpoint) {
+  // More precise matching to avoid false positives (e.g., '/api/updates_history' matching '/updates')
+  return pathname === endpoint || pathname.startsWith(`${endpoint}/`) || pathname.startsWith(`${endpoint}?`)
+}
+
 function getEndpointName(pathname) {
-  if (pathname.includes('/updates'))
+  if (matchesEndpoint(pathname, '/updates'))
     return 'updates'
-  if (pathname.includes('/stats'))
+  if (matchesEndpoint(pathname, '/stats'))
     return 'stats'
-  if (pathname.includes('/channel_self'))
+  if (matchesEndpoint(pathname, '/channel_self'))
     return 'channel_self'
   return 'unknown'
 }
 
 function isCacheableEndpoint(pathname) {
-  return ONPREM_CACHEABLE_ENDPOINTS.some(ep => pathname.includes(ep))
+  return ONPREM_CACHEABLE_ENDPOINTS.some(ep => matchesEndpoint(pathname, ep))
 }
 
-function buildOnPremCacheKey(appId, endpoint) {
-  return `${ONPREM_CACHE_KEY_PREFIX}${encodeURIComponent(appId)}/${endpoint}`
+function buildOnPremCacheKey(appId, endpoint, method) {
+  // Include HTTP method in cache key to avoid collisions between different request types
+  return `${ONPREM_CACHE_KEY_PREFIX}${encodeURIComponent(appId)}/${endpoint}/${method}`
 }
 
-async function getOnPremCache(appId, endpoint) {
+async function getOnPremCache(appId, endpoint, method) {
   try {
     const cache = caches.default
-    const key = buildOnPremCacheKey(appId, endpoint)
+    const key = buildOnPremCacheKey(appId, endpoint, method)
     const cached = await cache.match(key)
     if (cached) {
-      console.log(`On-prem cache HIT for ${appId}/${endpoint}`)
+      console.log(`On-prem cache HIT for ${appId}/${endpoint}/${method}`)
       return cached.clone()
     }
     return null
@@ -103,10 +109,10 @@ async function getOnPremCache(appId, endpoint) {
   }
 }
 
-async function setOnPremCache(appId, endpoint, responseBody, status) {
+async function setOnPremCache(appId, endpoint, method, responseBody, status) {
   try {
     const cache = caches.default
-    const key = buildOnPremCacheKey(appId, endpoint)
+    const key = buildOnPremCacheKey(appId, endpoint, method)
     const response = new Response(JSON.stringify(responseBody), {
       status,
       headers: {
@@ -117,7 +123,7 @@ async function setOnPremCache(appId, endpoint, responseBody, status) {
       },
     })
     await cache.put(key, response)
-    console.log(`On-prem cache SET for ${appId}/${endpoint} (${ONPREM_CACHE_TTL_SECONDS}s TTL)`)
+    console.log(`On-prem cache SET for ${appId}/${endpoint}/${method} (${ONPREM_CACHE_TTL_SECONDS}s TTL)`)
   }
   catch (e) {
     console.log(`Failed to cache on-prem response: ${e.message}`)
@@ -137,7 +143,7 @@ function isOnPremResponse(status, responseBody) {
 async function extractAppId(request, url) {
   const method = request.method
   // For GET and DELETE on /channel_self, app_id is in query params
-  if ((method === 'DELETE' || method === 'GET') && url.pathname.includes('/channel_self')) {
+  if ((method === 'DELETE' || method === 'GET') && matchesEndpoint(url.pathname, '/channel_self')) {
     return url.searchParams.get('app_id')
   }
   // For POST and PUT methods, app_id is in the body
@@ -151,12 +157,15 @@ async function extractAppId(request, url) {
       return null
     }
   }
+  // For other HTTP methods (PATCH, OPTIONS, HEAD, etc.), on-prem caching is
+  // intentionally skipped as these endpoints don't use those methods
   return null
 }
 
 export default {
   async fetch(request) {
     const url = new URL(request.url)
+    const method = request.method
 
     // Check on-prem cache for cacheable endpoints BEFORE routing to workers
     let appId = null
@@ -166,7 +175,7 @@ export default {
       appId = await extractAppId(request, url)
 
       if (appId) {
-        const cachedResponse = await getOnPremCache(appId, endpoint)
+        const cachedResponse = await getOnPremCache(appId, endpoint, method)
         if (cachedResponse) {
           return cachedResponse
         }
@@ -588,17 +597,20 @@ export default {
             const responseBody = await responseClone.json()
 
             if (isOnPremResponse(response.status, responseBody)) {
-              // Cache the on-prem response (don't await - do it in background)
-              setOnPremCache(appId, endpoint, responseBody, response.status)
+              // Cache the on-prem response with error handling
+              setOnPremCache(appId, endpoint, method, responseBody, response.status).catch((error) => {
+                console.log(`Failed to set on-prem cache for ${appId}/${endpoint}/${method}: ${error && error.message ? error.message : String(error)}`)
+              })
 
-              // Return a new response with the on-prem headers
+              // Return a new response, preserving original headers and adding on-prem headers
+              const newHeaders = new Headers(response.headers)
+              newHeaders.set('Content-Type', 'application/json')
+              newHeaders.set('X-Onprem-Cached', 'false')
+              newHeaders.set('X-Onprem-App-Id', appId)
+
               return new Response(JSON.stringify(responseBody), {
                 status: response.status,
-                headers: {
-                  'Content-Type': 'application/json',
-                  'X-Onprem-Cached': 'false',
-                  'X-Onprem-App-Id': appId,
-                },
+                headers: newHeaders,
               })
             }
           }
