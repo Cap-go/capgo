@@ -21,11 +21,11 @@ WHERE version_name IS NULL;
 -- 3c. Make version_name NOT NULL now that all rows have a value
 ALTER TABLE "public"."daily_version" ALTER COLUMN "version_name" SET NOT NULL;
 
--- 3d. Make version_id nullable for new data (which only has version_name)
-ALTER TABLE "public"."daily_version" ALTER COLUMN "version_id" DROP NOT NULL;
-
--- 3e. Drop old primary key (uses version_id which will now be optional)
+-- 3d. Drop old primary key FIRST (must be done before making version_id nullable)
 ALTER TABLE "public"."daily_version" DROP CONSTRAINT IF EXISTS "daily_version_pkey";
+
+-- 3e. Make version_id nullable for new data (which only has version_name)
+ALTER TABLE "public"."daily_version" ALTER COLUMN "version_id" DROP NOT NULL;
 
 -- 4. Drop and recreate read_version_usage function with new return type (version_name instead of version_id)
 -- PostgreSQL doesn't allow changing return type with CREATE OR REPLACE, so we must drop first
