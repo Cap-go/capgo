@@ -699,6 +699,8 @@
   "device-not-found-description": "Thiết bị này không thể tìm thấy. Có thể nó đã bị xóa hoặc bạn có thể không có quyền truy cập vào nó.",
   "device-pixel": "Pixel",
   "device-platform-trend": "Xu hướng Nền tảng Thiết bị (iOS vs Android)",
+  "builds-trend": "Xu hướng Build Gốc (Tổng, iOS, Android)",
+  "builds-last-month-trend": "Build Gốc 30 Ngày Gần Đây (Tổng, iOS, Android)",
   "devices": "Thiết bị",
   "devices-trend": "Xu hướng Thiết bị Hoạt động",
   "dialog-with-custom-input": "Hội thoại với Đầu vào Tùy chỉnh",

@@ -699,6 +699,8 @@
   "device-not-found-description": "找不到此设备。可能已被删除，或者您可能无法访问它。",
   "device-pixel": "Pixel",
   "device-platform-trend": "设备平台趋势（iOS vs Android）",
+  "builds-trend": "原生构建趋势（总计、iOS、Android）",
+  "builds-last-month-trend": "原生构建最近30天（总计、iOS、Android）",
   "devices": "设备",
   "devices-trend": "活动设备趋势",
   "dialog-with-custom-input": "自定义输入的对话",

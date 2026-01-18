@@ -699,6 +699,8 @@
   "device-not-found-description": "Este dispositivo no pudo ser encontrado. Podría haber sido eliminado o es posible que no tengas acceso a él.",
   "device-pixel": "Pixel",
   "device-platform-trend": "Tendencia de Plataforma de Dispositivos (iOS vs Android)",
+  "builds-trend": "Tendencia de Compilaciones Nativas (Total, iOS, Android)",
+  "builds-last-month-trend": "Compilaciones Nativas Últimos 30 Días (Total, iOS, Android)",
   "devices": "Dispositivos",
   "devices-trend": "Tendencia de Dispositivos Activos",
   "dialog-with-custom-input": "Diálogo con Entrada Personalizada",

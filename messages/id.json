@@ -699,6 +699,8 @@
   "device-not-found-description": "Perangkat ini tidak dapat ditemukan. Mungkin telah dihapus atau Anda mungkin tidak memiliki akses kepadanya.",
   "device-pixel": "Pixel",
   "device-platform-trend": "Tren Platform Perangkat (iOS vs Android)",
+  "builds-trend": "Tren Build Native (Total, iOS, Android)",
+  "builds-last-month-trend": "Build Native 30 Hari Terakhir (Total, iOS, Android)",
   "devices": "Perangkat",
   "devices-trend": "Tren Perangkat Aktif",
   "dialog-with-custom-input": "Dialog dengan Input Kustom",

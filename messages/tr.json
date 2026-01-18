@@ -699,6 +699,8 @@
   "device-not-found-description": "Bu cihaz bulunamadı. Silinmiş olabilir veya erişiminiz olmayabilir.",
   "device-pixel": "Pixel",
   "device-platform-trend": "Cihaz Platform Trendi (iOS vs Android)",
+  "builds-trend": "Yerel Derleme Trendi (Toplam, iOS, Android)",
+  "builds-last-month-trend": "Yerel Derleme Son 30 Gün (Toplam, iOS, Android)",
   "devices": "Cihazlar",
   "devices-trend": "Aktif Cihazlar Trendi",
   "dialog-with-custom-input": "Özel Girişli Diyalog",
