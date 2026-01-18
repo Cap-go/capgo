@@ -7,6 +7,7 @@ import { parse } from '@std/semver'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod/mini'
 import { getAppStatus, setAppStatus } from '../utils/appStatus.ts'
+import { isChannelSelfRateLimited, recordChannelSelfRequest } from '../utils/channelSelfRateLimit.ts'
 import { BRES, parseBody, simpleError200, simpleRateLimit } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { sendNotifOrg } from '../utils/notifications.ts'
@@ -528,16 +529,24 @@ app.post('/', async (c) => {
     return simpleRateLimit(body)
   }
 
+  const bodyParsed = parsePluginBody<DeviceLink>(c, body, jsonRequestSchema)
+  if (!bodyParsed.channel) {
+    return simpleError200(c, 'missing_channel', 'Cannot find channel in body')
+  }
+
+  // Rate limit: max 1 set per second per device+app, and same set max once per 60 seconds
+  const isRateLimited = await isChannelSelfRateLimited(c, bodyParsed.app_id, bodyParsed.device_id, 'set', bodyParsed.channel)
+  if (isRateLimited) {
+    cloudlog({ requestId: c.get('requestId'), message: 'Channel self set rate limited', app_id: bodyParsed.app_id, device_id: bodyParsed.device_id, channel: bodyParsed.channel })
+    return simpleRateLimit({ app_id: bodyParsed.app_id, device_id: bodyParsed.device_id })
+  }
+
   // POST has writes, so always create PG client (even if using D1 for reads)
   const pgClient = getPgClient(c)
 
   // Set replication lag header using the existing pool
   await setReplicationLagHeader(c, pgClient)
 
-  const bodyParsed = parsePluginBody<DeviceLink>(c, body, jsonRequestSchema)
-  if (!bodyParsed.channel) {
-    return simpleError200(c, 'missing_channel', 'Cannot find channel in body')
-  }
   let res
   try {
     res = await post(c, getDrizzleClient(pgClient), bodyParsed)
@@ -545,6 +554,11 @@ app.post('/', async (c) => {
   finally {
     await closeClient(c, pgClient)
   }
+
+  // Record the request for rate limiting (only after successful processing)
+  // Do this in background to not block the response
+  backgroundTask(c, recordChannelSelfRequest(c, bodyParsed.app_id, bodyParsed.device_id, 'set', bodyParsed.channel))
+
   return res
 })
 
@@ -557,12 +571,20 @@ app.put('/', async (c) => {
     return simpleRateLimit(body)
   }
 
+  const bodyParsed = parsePluginBody<DeviceLink>(c, body, jsonRequestSchema)
+
+  // Rate limit: max 1 get per second per device+app
+  const isRateLimited = await isChannelSelfRateLimited(c, bodyParsed.app_id, bodyParsed.device_id, 'get')
+  if (isRateLimited) {
+    cloudlog({ requestId: c.get('requestId'), message: 'Channel self get rate limited', app_id: bodyParsed.app_id, device_id: bodyParsed.device_id })
+    return simpleRateLimit({ app_id: bodyParsed.app_id, device_id: bodyParsed.device_id })
+  }
+
   const pgClient = getPgClient(c)
 
   // Set replication lag header using the existing pool
   await setReplicationLagHeader(c, pgClient)
 
-  const bodyParsed = parsePluginBody<DeviceLink>(c, body, jsonRequestSchema)
   let res
   try {
     res = await put(c, getDrizzleClient(pgClient as any), bodyParsed)
@@ -570,6 +592,10 @@ app.put('/', async (c) => {
   finally {
     await closeClient(c, pgClient)
   }
+
+  // Record the request for rate limiting
+  backgroundTask(c, recordChannelSelfRequest(c, bodyParsed.app_id, bodyParsed.device_id, 'get'))
+
   return res
 })
 
@@ -581,13 +607,21 @@ app.delete('/', async (c) => {
     return simpleRateLimit(body)
   }
 
+  const bodyParsed = parsePluginBody<DeviceLink>(c, body, jsonRequestSchema)
+
+  // Rate limit: max 1 delete per second per device+app
+  const isRateLimited = await isChannelSelfRateLimited(c, bodyParsed.app_id, bodyParsed.device_id, 'delete')
+  if (isRateLimited) {
+    cloudlog({ requestId: c.get('requestId'), message: 'Channel self delete rate limited', app_id: bodyParsed.app_id, device_id: bodyParsed.device_id })
+    return simpleRateLimit({ app_id: bodyParsed.app_id, device_id: bodyParsed.device_id })
+  }
+
   // DELETE has writes, so always create PG client (even if using D1 for reads)
   const pgClient = getPgClient(c)
 
   // Set replication lag header using the existing pool
   await setReplicationLagHeader(c, pgClient)
 
-  const bodyParsed = parsePluginBody<DeviceLink>(c, body, jsonRequestSchema)
   let res
   try {
     res = await deleteOverride(c, getDrizzleClient(pgClient), bodyParsed)
@@ -595,6 +629,10 @@ app.delete('/', async (c) => {
   finally {
     await closeClient(c, pgClient)
   }
+
+  // Record the request for rate limiting
+  backgroundTask(c, recordChannelSelfRequest(c, bodyParsed.app_id, bodyParsed.device_id, 'delete'))
+
   return res
 })
 
@@ -606,12 +644,22 @@ app.get('/', async (c) => {
     return simpleRateLimit(body)
   }
 
+  const bodyParsed = parsePluginBody<DeviceLink>(c, body, jsonRequestSchemaGet, false)
+
+  // Rate limit: max 1 list per second per device+app (if device_id is provided)
+  if (body.device_id) {
+    const isRateLimited = await isChannelSelfRateLimited(c, bodyParsed.app_id, body.device_id, 'list')
+    if (isRateLimited) {
+      cloudlog({ requestId: c.get('requestId'), message: 'Channel self list rate limited', app_id: bodyParsed.app_id, device_id: body.device_id })
+      return simpleRateLimit({ app_id: bodyParsed.app_id, device_id: body.device_id })
+    }
+  }
+
   const pgClient = getPgClient(c, true)
 
   // Set replication lag header using the existing pool
   await setReplicationLagHeader(c, pgClient)
 
-  const bodyParsed = parsePluginBody<DeviceLink>(c, body, jsonRequestSchemaGet, false)
   let res
   try {
     res = await listCompatibleChannels(c, getDrizzleClient(pgClient as any), bodyParsed)
@@ -619,5 +667,11 @@ app.get('/', async (c) => {
   finally {
     await closeClient(c, pgClient)
   }
+
+  // Record the request for rate limiting (if device_id is provided)
+  if (body.device_id) {
+    backgroundTask(c, recordChannelSelfRequest(c, bodyParsed.app_id, body.device_id, 'list'))
+  }
+
   return res
 })
