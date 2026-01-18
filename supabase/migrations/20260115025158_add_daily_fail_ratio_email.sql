@@ -29,8 +29,9 @@ BEGIN
         ds.app_id,
         ds.total_installs,
         ds.total_fails,
+        -- Cap fail_percentage at 100 to handle edge cases where fails > installs
         CASE
-          WHEN ds.total_installs > 0 THEN ROUND((ds.total_fails::numeric / ds.total_installs::numeric) * 100, 2)
+          WHEN ds.total_installs > 0 THEN LEAST(ROUND((ds.total_fails::numeric / ds.total_installs::numeric) * 100, 2), 100)
           ELSE 0
         END AS fail_percentage,
         a.owner_org
@@ -52,24 +53,34 @@ BEGIN
     )
     SELECT * FROM with_org_email
   LOOP
-    -- Queue email for each app with high fail ratio
-    PERFORM pgmq.send('cron_email',
-      jsonb_build_object(
-        'function_name', 'cron_email',
-        'function_type', 'cloudflare',
-        'payload', jsonb_build_object(
-          'email', record.management_email,
-          'appId', record.app_id,
-          'orgId', record.owner_org,
-          'type', 'daily_fail_ratio',
-          'appName', record.app_name,
-          'totalInstalls', record.total_installs,
-          'totalFails', record.total_fails,
-          'failPercentage', record.fail_percentage,
-          'reportDate', (CURRENT_DATE - INTERVAL '1 day')::text
+    -- Queue email for each app with high fail ratio (with error handling)
+    BEGIN
+      PERFORM pgmq.send('cron_email',
+        jsonb_build_object(
+          'function_name', 'cron_email',
+          'function_type', 'cloudflare',
+          'payload', jsonb_build_object(
+            'email', record.management_email,
+            'appId', record.app_id,
+            'orgId', record.owner_org,
+            'type', 'daily_fail_ratio',
+            'appName', record.app_name,
+            'totalInstalls', record.total_installs,
+            'totalFails', record.total_fails,
+            'failPercentage', record.fail_percentage,
+            'reportDate', (CURRENT_DATE - INTERVAL '1 day')::text
+          )
         )
-      )
-    );
+      );
+    EXCEPTION
+      WHEN OTHERS THEN
+        RAISE WARNING 'process_daily_fail_ratio_email: failed to queue email for app_id %, org_id %, email %: % (%)',
+          record.app_id,
+          record.owner_org,
+          record.management_email,
+          SQLERRM,
+          SQLSTATE;
+    END;
   END LOOP;
 END;
 $$;
@@ -120,3 +131,15 @@ ON CONFLICT (name) DO UPDATE SET
     run_at_minute = EXCLUDED.run_at_minute,
     run_at_second = EXCLUDED.run_at_second,
     updated_at = NOW();
+
+-- Backfill daily_fail_ratio preference for existing users who have email_preferences set
+UPDATE public.users
+SET email_preferences = email_preferences || '{"daily_fail_ratio": true}'::jsonb
+WHERE email_preferences IS NOT NULL
+  AND NOT (email_preferences ? 'daily_fail_ratio');
+
+-- Backfill daily_fail_ratio preference for existing orgs who have email_preferences set
+UPDATE public.orgs
+SET email_preferences = email_preferences || '{"daily_fail_ratio": true}'::jsonb
+WHERE email_preferences IS NOT NULL
+  AND NOT (email_preferences ? 'daily_fail_ratio');

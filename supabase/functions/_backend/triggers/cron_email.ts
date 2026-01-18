@@ -152,6 +152,24 @@ app.post('/', middlewareAPISecret, async (c) => {
     return await handleBillingPeriodStats(c, email, orgId, cycleStart, cycleEnd)
   }
 
+  // daily_fail_ratio sends to management_email which may not be a registered user
+  // Handle before user existence check (similar to billing_period_stats)
+  if (type === 'daily_fail_ratio') {
+    if (!appId) {
+      throw simpleError('missing_appId', 'Missing appId for daily_fail_ratio', { email, type })
+    }
+    return await handleDailyFailRatio(c, {
+      email,
+      appId,
+      orgId,
+      appName,
+      totalInstalls,
+      totalFails,
+      failPercentage,
+      reportDate,
+    })
+  }
+
   // All other types require appId
   if (!appId) {
     throw simpleError('missing_appId', 'Missing appId', { email, type })
@@ -184,18 +202,6 @@ app.post('/', middlewareAPISecret, async (c) => {
       platform,
       appName,
       deployedAt,
-    })
-  }
-  else if (type === 'daily_fail_ratio') {
-    return await handleDailyFailRatio(c, {
-      email,
-      appId,
-      orgId,
-      appName,
-      totalInstalls,
-      totalFails,
-      failPercentage,
-      reportDate,
     })
   }
   else {
@@ -635,15 +641,21 @@ async function handleDailyFailRatio(
     return c.json({ status: 'Email preference disabled' }, 200)
   }
 
+  // Safely handle numeric values and clamp percentages to valid range
+  const safeFailPercentage = typeof failPercentage === 'number' && Number.isFinite(failPercentage)
+    ? Math.min(Math.max(failPercentage, 0), 100)
+    : 0
+  const safeSuccessPercentage = Math.max(100 - safeFailPercentage, 0)
+
   const metadata = {
     app_id: appId,
     org_id: orgId ?? '',
     app_name: appName ?? '',
     total_installs: (totalInstalls ?? 0).toString(),
     total_fails: (totalFails ?? 0).toString(),
-    fail_percentage: (failPercentage ?? 0).toString(),
+    fail_percentage: safeFailPercentage.toFixed(2),
     report_date: reportDate ?? '',
-    success_percentage: (100 - (failPercentage ?? 0)).toFixed(2),
+    success_percentage: safeSuccessPercentage.toFixed(2),
   }
 
   await trackBentoEvent(c, email, metadata, 'app:daily_fail_ratio')
