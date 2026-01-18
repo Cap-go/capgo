@@ -15,7 +15,7 @@ import { getBundleUrl, getManifestUrl } from './downloadUrl.ts'
 import { simpleError200 } from './hono.ts'
 import { cloudlog } from './logging.ts'
 import { sendNotifOrg } from './notifications.ts'
-import { closeClient, getAppOwnerPostgres, getDrizzleClient, getPgClient, requestInfosPostgres, setReplicationLagHeader } from './pg.ts'
+import { closeClient, getAppOwnerPostgres, getDrizzleClient, getPgClient, getVersionIdByName, requestInfosPostgres, setReplicationLagHeader } from './pg.ts'
 import { makeDevice } from './plugin_parser.ts'
 import { s3 } from './s3.ts'
 import { createStatsBandwidth, createStatsMau, createStatsVersion, onPremStats, sendStatsAndDevice } from './stats.ts'
@@ -162,7 +162,21 @@ export async function updateWithPG(
   // Only query link/comment if plugin supports it (v5.35.0+, v6.35.0+, v7.35.0+, v8.35.0+) AND app has expose_metadata enabled
   const needsMetadata = appOwner.expose_metadata && !isDeprecatedPluginVersion(pluginVersion, '5.35.0', '6.35.0', '7.35.0', '8.35.0')
 
-  const requestedInto = await requestInfosPostgres(c, platform, app_id, device_id, defaultChannel, drizzleClient, channelDeviceCount, manifestBundleCount, needsMetadata)
+  // Look up old version ID for delta manifest calculation
+  // Only do this if we're fetching manifest entries
+  let oldVersionId: number | null = null
+  if (fetchManifestEntries && version_name && version_name !== 'builtin' && version_name !== 'unknown') {
+    oldVersionId = await getVersionIdByName(c, app_id, version_name, drizzleClient)
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'Delta manifest lookup',
+      version_name,
+      oldVersionId,
+      fetchManifestEntries,
+    })
+  }
+
+  const requestedInto = await requestInfosPostgres(c, platform, app_id, device_id, defaultChannel, drizzleClient, channelDeviceCount, manifestBundleCount, needsMetadata, oldVersionId)
   const { channelOverride } = requestedInto
   let { channelData } = requestedInto
   cloudlog({ requestId: c.get('requestId'), message: `channelData exists ? ${channelData !== undefined}, channelOverride exists ? ${channelOverride !== undefined}` })
@@ -185,6 +199,17 @@ export async function updateWithPG(
   const manifestEntries = (channelOverride?.manifestEntries ?? channelData?.manifestEntries ?? []) as Partial<Database['public']['Tables']['manifest']['Row']>[]
   // device.version = versionData ? versionData.id : version.id
 
+  // Check if device is already on the latest version BEFORE checking for missing bundle
+  // This must come first because delta manifest calculation may return empty manifest
+  // when device is already on target version (all files match), which would incorrectly
+  // trigger the no_bundle error for manifest-only bundles
+  if (version_name === version.name) {
+    cloudlog({ requestId: c.get('requestId'), message: 'No new version available', id: device_id, version_name, version: version.name, date: new Date().toISOString() })
+    // TODO: check why this event is send with wrong version_name
+    await sendStatsAndDevice(c, device, [{ action: 'noNew', versionName: version.name }])
+    return simpleError200(c, 'no_new_version_available', 'No new version available')
+  }
+
   // TODO: find better solution to check if device is from apple or google, currently not working in
 
   if (!version.external_url && !version.r2_path && !isInternalVersionName(version.name) && (!manifestEntries || manifestEntries.length === 0)) {
@@ -203,14 +228,6 @@ export async function updateWithPG(
       deviceKeyId: body.key_id,
       bundleKeyId: version.key_id,
     })
-  }
-
-  // cloudlog(c.get('requestId'), 'signedURL', device_id, version_name, version.name)
-  if (version_name === version.name) {
-    cloudlog({ requestId: c.get('requestId'), message: 'No new version available', id: device_id, version_name, version: version.name, date: new Date().toISOString() })
-    // TODO: check why this event is send with wrong version_name
-    await sendStatsAndDevice(c, device, [{ action: 'noNew', versionName: version.name }])
-    return simpleError200(c, 'no_new_version_available', 'No new version available')
   }
 
   if (channelData) {
