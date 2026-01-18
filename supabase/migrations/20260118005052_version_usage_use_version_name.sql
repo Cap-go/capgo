@@ -4,6 +4,12 @@
 -- 1. Add version_name column to version_usage table (nullable for backwards compatibility with old data)
 ALTER TABLE "public"."version_usage" ADD COLUMN IF NOT EXISTS "version_name" character varying(255);
 
+-- 1b. Drop version_usage primary key (required before making version_id nullable)
+ALTER TABLE "public"."version_usage" DROP CONSTRAINT IF EXISTS "version_usage_pkey";
+
+-- 1c. Make version_id nullable in version_usage (new data uses version_name instead)
+ALTER TABLE "public"."version_usage" ALTER COLUMN "version_id" DROP NOT NULL;
+
 -- 2. Add version_name column to daily_version table (nullable for backwards compatibility with old data)
 ALTER TABLE "public"."daily_version" ADD COLUMN IF NOT EXISTS "version_name" character varying(255);
 
