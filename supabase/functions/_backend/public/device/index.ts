@@ -29,7 +29,7 @@ app.post('/', middlewareKey(['all', 'write']), async (c) => {
 
   const res = await post(c, body, apikey)
 
-  // Record the request for rate limiting (only if channel was being set)
+  // Record the request for rate limiting (all requests, not just successful ones, to prevent abuse through repeated invalid requests)
   if (body.device_id && body.app_id && body.channel) {
     backgroundTask(c, recordChannelSelfRequest(c, body.app_id, body.device_id, 'set', body.channel))
   }
@@ -54,7 +54,7 @@ app.get('/', middlewareKey(['all', 'write', 'read']), async (c) => {
 
   const res = await get(c, body, apikey)
 
-  // Record the request for rate limiting
+  // Record the request for rate limiting (all requests, not just successful ones, to prevent abuse through repeated invalid requests)
   if (body.device_id && body.app_id) {
     backgroundTask(c, recordChannelSelfRequest(c, body.app_id, body.device_id, 'get'))
   }
@@ -79,7 +79,7 @@ app.delete('/', middlewareKey(['all', 'write']), async (c) => {
 
   const res = await deleteOverride(c, body, apikey)
 
-  // Record the request for rate limiting
+  // Record the request for rate limiting (all requests, not just successful ones, to prevent abuse through repeated invalid requests)
   if (body.device_id && body.app_id) {
     backgroundTask(c, recordChannelSelfRequest(c, body.app_id, body.device_id, 'delete'))
   }

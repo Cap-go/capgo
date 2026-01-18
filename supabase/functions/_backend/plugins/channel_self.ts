@@ -555,8 +555,7 @@ app.post('/', async (c) => {
     await closeClient(c, pgClient)
   }
 
-  // Record the request for rate limiting (only after successful processing)
-  // Do this in background to not block the response
+  // Record the request for rate limiting (all requests, not just successful ones, to prevent abuse)
   backgroundTask(c, recordChannelSelfRequest(c, bodyParsed.app_id, bodyParsed.device_id, 'set', bodyParsed.channel))
 
   return res
@@ -593,7 +592,7 @@ app.put('/', async (c) => {
     await closeClient(c, pgClient)
   }
 
-  // Record the request for rate limiting
+  // Record the request for rate limiting (all requests to prevent abuse)
   backgroundTask(c, recordChannelSelfRequest(c, bodyParsed.app_id, bodyParsed.device_id, 'get'))
 
   return res
@@ -630,7 +629,7 @@ app.delete('/', async (c) => {
     await closeClient(c, pgClient)
   }
 
-  // Record the request for rate limiting
+  // Record the request for rate limiting (all requests to prevent abuse)
   backgroundTask(c, recordChannelSelfRequest(c, bodyParsed.app_id, bodyParsed.device_id, 'delete'))
 
   return res
@@ -668,7 +667,9 @@ app.get('/', async (c) => {
     await closeClient(c, pgClient)
   }
 
-  // Record the request for rate limiting (if device_id is provided)
+  // Record the request for rate limiting (all requests to prevent abuse, if device_id is provided)
+  // Note: body.device_id is used since jsonRequestSchemaGet doesn't include device_id,
+  // but parsePluginBody lowercases it in the body object before validation
   if (body.device_id) {
     backgroundTask(c, recordChannelSelfRequest(c, bodyParsed.app_id, body.device_id, 'list'))
   }
