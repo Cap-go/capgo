@@ -582,7 +582,7 @@ displayStore.defaultBack = '/dashboard'
                   0
                 </p>
                 <p v-if="latestGlobalStats && latestGlobalStats.builds_total" class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                  {{ ((latestGlobalStats.builds_ios || 0) / latestGlobalStats.builds_total * 100).toFixed(1) }}% of total
+                  {{ latestGlobalStats.builds_total > 0 ? ((latestGlobalStats.builds_ios || 0) / latestGlobalStats.builds_total * 100).toFixed(1) : '0.0' }}% of total
                 </p>
               </div>
             </div>
@@ -610,7 +610,7 @@ displayStore.defaultBack = '/dashboard'
                   0
                 </p>
                 <p v-if="latestGlobalStats && latestGlobalStats.builds_total" class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                  {{ ((latestGlobalStats.builds_android || 0) / latestGlobalStats.builds_total * 100).toFixed(1) }}% of total
+                  {{ latestGlobalStats.builds_total > 0 ? ((latestGlobalStats.builds_android || 0) / latestGlobalStats.builds_total * 100).toFixed(1) : '0.0' }}% of total
                 </p>
               </div>
             </div>
@@ -669,7 +669,7 @@ displayStore.defaultBack = '/dashboard'
                   0
                 </p>
                 <p v-if="latestGlobalStats && latestGlobalStats.builds_last_month" class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                  {{ ((latestGlobalStats.builds_last_month_ios || 0) / latestGlobalStats.builds_last_month * 100).toFixed(1) }}% of last month
+                  {{ latestGlobalStats.builds_last_month > 0 ? ((latestGlobalStats.builds_last_month_ios || 0) / latestGlobalStats.builds_last_month * 100).toFixed(1) : '0.0' }}% of last month
                 </p>
               </div>
             </div>
@@ -697,7 +697,7 @@ displayStore.defaultBack = '/dashboard'
                   0
                 </p>
                 <p v-if="latestGlobalStats && latestGlobalStats.builds_last_month" class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                  {{ ((latestGlobalStats.builds_last_month_android || 0) / latestGlobalStats.builds_last_month * 100).toFixed(1) }}% of last month
+                  {{ latestGlobalStats.builds_last_month > 0 ? ((latestGlobalStats.builds_last_month_android || 0) / latestGlobalStats.builds_last_month * 100).toFixed(1) : '0.0' }}% of last month
                 </p>
               </div>
             </div>

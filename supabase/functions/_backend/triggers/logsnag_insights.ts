@@ -264,74 +264,50 @@ async function getBuildStats(c: Context): Promise<BuildStats> {
   const last30days = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
 
   try {
-    // Count total builds (all time)
-    const { count: totalCount, error: totalError } = await supabase
-      .from('build_logs')
-      .select('*', { count: 'exact', head: true })
+    // Run all count queries in parallel for better performance
+    const [
+      totalResult,
+      iosResult,
+      androidResult,
+      lastMonthTotalResult,
+      lastMonthIosResult,
+      lastMonthAndroidResult,
+    ] = await Promise.all([
+      // Count total builds (all time)
+      supabase.from('build_logs').select('*', { count: 'exact', head: true }),
+      // Count iOS builds (all time)
+      supabase.from('build_logs').select('*', { count: 'exact', head: true }).eq('platform', 'ios'),
+      // Count Android builds (all time)
+      supabase.from('build_logs').select('*', { count: 'exact', head: true }).eq('platform', 'android'),
+      // Count total builds (last 30 days)
+      supabase.from('build_logs').select('*', { count: 'exact', head: true }).gte('created_at', last30days),
+      // Count iOS builds (last 30 days)
+      supabase.from('build_logs').select('*', { count: 'exact', head: true }).eq('platform', 'ios').gte('created_at', last30days),
+      // Count Android builds (last 30 days)
+      supabase.from('build_logs').select('*', { count: 'exact', head: true }).eq('platform', 'android').gte('created_at', last30days),
+    ])
 
-    if (totalError) {
-      cloudlogErr({ requestId: c.get('requestId'), message: 'getBuildStats total error', error: totalError })
-    }
-
-    // Count iOS builds (all time)
-    const { count: iosCount, error: iosError } = await supabase
-      .from('build_logs')
-      .select('*', { count: 'exact', head: true })
-      .eq('platform', 'ios')
-
-    if (iosError) {
-      cloudlogErr({ requestId: c.get('requestId'), message: 'getBuildStats iOS error', error: iosError })
-    }
-
-    // Count Android builds (all time)
-    const { count: androidCount, error: androidError } = await supabase
-      .from('build_logs')
-      .select('*', { count: 'exact', head: true })
-      .eq('platform', 'android')
-
-    if (androidError) {
-      cloudlogErr({ requestId: c.get('requestId'), message: 'getBuildStats Android error', error: androidError })
-    }
-
-    // Count total builds (last 30 days)
-    const { count: lastMonthTotal, error: lastMonthTotalError } = await supabase
-      .from('build_logs')
-      .select('*', { count: 'exact', head: true })
-      .gte('created_at', last30days)
-
-    if (lastMonthTotalError) {
-      cloudlogErr({ requestId: c.get('requestId'), message: 'getBuildStats lastMonthTotal error', error: lastMonthTotalError })
-    }
-
-    // Count iOS builds (last 30 days)
-    const { count: lastMonthIos, error: lastMonthIosError } = await supabase
-      .from('build_logs')
-      .select('*', { count: 'exact', head: true })
-      .eq('platform', 'ios')
-      .gte('created_at', last30days)
-
-    if (lastMonthIosError) {
-      cloudlogErr({ requestId: c.get('requestId'), message: 'getBuildStats lastMonthIos error', error: lastMonthIosError })
-    }
-
-    // Count Android builds (last 30 days)
-    const { count: lastMonthAndroid, error: lastMonthAndroidError } = await supabase
-      .from('build_logs')
-      .select('*', { count: 'exact', head: true })
-      .eq('platform', 'android')
-      .gte('created_at', last30days)
-
-    if (lastMonthAndroidError) {
-      cloudlogErr({ requestId: c.get('requestId'), message: 'getBuildStats lastMonthAndroid error', error: lastMonthAndroidError })
-    }
+    // Log any errors
+    if (totalResult.error)
+      cloudlogErr({ requestId: c.get('requestId'), message: 'getBuildStats total error', error: totalResult.error })
+    if (iosResult.error)
+      cloudlogErr({ requestId: c.get('requestId'), message: 'getBuildStats iOS error', error: iosResult.error })
+    if (androidResult.error)
+      cloudlogErr({ requestId: c.get('requestId'), message: 'getBuildStats Android error', error: androidResult.error })
+    if (lastMonthTotalResult.error)
+      cloudlogErr({ requestId: c.get('requestId'), message: 'getBuildStats lastMonthTotal error', error: lastMonthTotalResult.error })
+    if (lastMonthIosResult.error)
+      cloudlogErr({ requestId: c.get('requestId'), message: 'getBuildStats lastMonthIos error', error: lastMonthIosResult.error })
+    if (lastMonthAndroidResult.error)
+      cloudlogErr({ requestId: c.get('requestId'), message: 'getBuildStats lastMonthAndroid error', error: lastMonthAndroidResult.error })
 
     return {
-      total: totalCount ?? 0,
-      ios: iosCount ?? 0,
-      android: androidCount ?? 0,
-      last_month: lastMonthTotal ?? 0,
-      last_month_ios: lastMonthIos ?? 0,
-      last_month_android: lastMonthAndroid ?? 0,
+      total: totalResult.count ?? 0,
+      ios: iosResult.count ?? 0,
+      android: androidResult.count ?? 0,
+      last_month: lastMonthTotalResult.count ?? 0,
+      last_month_ios: lastMonthIosResult.count ?? 0,
+      last_month_android: lastMonthAndroidResult.count ?? 0,
     }
   }
   catch (e) {
