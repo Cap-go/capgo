@@ -189,25 +189,16 @@ describe('invalids /channel_self tests', () => {
   })
 
   it('[PUT] with a version that does not exist', async () => {
+    // Version check was removed from channel_self - devices with unknown versions can still get channel info
     const data = getBaseData(APPNAME)
     data.version_name = `1.0.${Math.floor(Math.random() * 10000000)}`
 
-    const { error } = await getSupabaseClient().from('app_versions').update({ name: 'build_not_in' }).eq('name', 'builtin').eq('app_id', APPNAME).select('id').single()
+    const response = await fetchEndpoint('PUT', data)
+    expect(response.status).toBe(200)
 
-    expect(error).toBeNull()
-
-    try {
-      const response = await fetchEndpoint('PUT', data)
-      expect(response.status).toBe(200)
-
-      const responseError = await getResponseErrorCode(response)
-      expect(responseError).toBe('version_error')
-    }
-    finally {
-      const { error } = await getSupabaseClient().from('app_versions').update({ name: 'builtin' }).eq('name', 'build_not_in').eq('app_id', APPNAME).select('id').single()
-
-      expect(error).toBeNull()
-    }
+    const responseJSON = await response.json<{ channel: string, status: string }>()
+    expect(responseJSON.channel).toBeTruthy()
+    expect(responseJSON.status).toBe('default')
   })
 
   it('[DELETE] invalid semver', async () => {
