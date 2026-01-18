@@ -13,9 +13,13 @@ SET version_name = av.name
 FROM "public"."app_versions" av
 WHERE dv.version_id = av.id AND dv.version_name IS NULL;
 
--- 4. Update the read_version_usage function to return version_name
+-- 4. Drop and recreate read_version_usage function with new return type (version_name instead of version_id)
+-- PostgreSQL doesn't allow changing return type with CREATE OR REPLACE, so we must drop first
+DROP FUNCTION IF EXISTS "public"."read_version_usage"(character varying, timestamp without time zone, timestamp without time zone);
+
+-- Recreate function with version_name in return type
 -- It now handles both old data (with version_id) and new data (with version_name)
-CREATE OR REPLACE FUNCTION "public"."read_version_usage"(
+CREATE FUNCTION "public"."read_version_usage"(
     "p_app_id" character varying,
     "p_period_start" timestamp without time zone,
     "p_period_end" timestamp without time zone
