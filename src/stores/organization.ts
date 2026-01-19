@@ -98,21 +98,29 @@ export const useOrganizationStore = defineStore('organization', () => {
     if (pollData) {
       try {
         const parsed = JSON.parse(pollData)
-        if (parsed.orgId === orgId) {
-          pollStart = parsed.start
-          // If we've been polling for more than the timeout, give up
-          if (Date.now() - pollStart > POLL_TIMEOUT_MS) {
-            localStorage.removeItem(NEW_ORG_POLL_KEY)
-            isNewOrganizationLoading.value = false
-            return
+        // Validate the parsed data structure
+        if (parsed && typeof parsed === 'object' && typeof parsed.orgId === 'string' && typeof parsed.start === 'number') {
+          if (parsed.orgId === orgId) {
+            pollStart = parsed.start
+            // If we've been polling for more than the timeout, give up
+            if (Date.now() - pollStart > POLL_TIMEOUT_MS) {
+              localStorage.removeItem(NEW_ORG_POLL_KEY)
+              isNewOrganizationLoading.value = false
+              return
+            }
+          }
+          else {
+            // Different org, reset
+            pollStart = Date.now()
           }
         }
         else {
-          // Different org, reset
+          // Invalid data structure, reset
           pollStart = Date.now()
         }
       }
       catch {
+        // Invalid JSON or other error, reset
         pollStart = Date.now()
       }
     }
@@ -121,6 +129,8 @@ export const useOrganizationStore = defineStore('organization', () => {
     isNewOrganizationLoading.value = true
 
     // Poll at configured interval
+    // Note: Using recursive setTimeout is safer than setInterval for async operations
+    // as it ensures one poll completes before the next starts
     pollTimeout.value = setTimeout(async () => {
       await fetchOrganizations()
       const org = _organizations.value.get(orgId)
