@@ -209,10 +209,17 @@ app.get('/:org_id', async (c: Context<MiddlewareKeyVariables>) => {
 // POST /private/role_bindings - Assign a role
 app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
   const userId = c.get('auth')?.userId
-  const body = await c.req.json()
 
   if (!userId) {
     return c.json({ error: 'Unauthorized' }, 401)
+  }
+
+  let body
+  try {
+    body = await c.req.json()
+  }
+  catch {
+    return c.json({ error: 'Invalid JSON' }, 400)
   }
 
   const parsedBody = parseRoleBindingBody(body)
