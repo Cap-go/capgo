@@ -665,22 +665,14 @@ async function copyCurlCommand() {
                 </div>
               </div>
             </InfoRow>
-            <InfoRow label="iOS">
+            <InfoRow
+              v-for="platform in ['ios', 'android', 'electron'] as const"
+              :key="platform"
+              :label="platform.charAt(0).toUpperCase() + platform.slice(1)"
+            >
               <Toggle
-                :value="channel?.ios"
-                @change="saveChannelChange('ios', !channel?.ios)"
-              />
-            </InfoRow>
-            <InfoRow label="Android">
-              <Toggle
-                :value="channel?.android"
-                @change="saveChannelChange('android', !channel?.android)"
-              />
-            </InfoRow>
-            <InfoRow label="Electron">
-              <Toggle
-                :value="channel?.electron"
-                @change="saveChannelChange('electron', !channel?.electron)"
+                :value="channel?.[platform]"
+                @change="saveChannelChange(platform, !channel?.[platform])"
               />
             </InfoRow>
             <InfoRow :label="t('disable-auto-downgra')">
