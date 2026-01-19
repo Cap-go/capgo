@@ -880,7 +880,7 @@ function handlePermissionSelection(permission: Database['public']['Enums']['user
     }
   }
   else {
-    selectedPermission.value = permission
+    selectedPermission.value = permission as any
   }
 }
 

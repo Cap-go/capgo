@@ -52,7 +52,7 @@ export async function startBuild(
   apikey: Database['public']['Tables']['apikeys']['Row'],
 ): Promise<Response> {
   let alreadyMarkedAsFailed = false
-  const apikeyKey = apikey.key ?? c.get('capgkey') ?? apikey.hashed_key ?? null
+  const apikeyKey = apikey.key ?? c.get('capgkey') ?? apikey.key_hash ?? null
 
   try {
     cloudlog({

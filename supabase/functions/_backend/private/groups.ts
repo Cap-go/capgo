@@ -364,6 +364,7 @@ app.post('/:group_id/members', async (c: Context<MiddlewareKeyVariables>) => {
   }
 
   let pgClient
+  let targetUserId: string | undefined
   try {
     pgClient = getPgClient(c)
     const drizzle = getDrizzleClient(pgClient)

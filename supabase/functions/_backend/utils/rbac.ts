@@ -35,6 +35,7 @@ import { closeClient, getDrizzleClient, getPgClient, logPgError } from './pg.ts'
 export type Permission
   = | 'org.read'
     | 'org.update_settings'
+    | 'org.delete'
     | 'org.read_members'
     | 'org.invite_user'
     | 'org.update_user_roles'
@@ -115,6 +116,7 @@ const PERMISSION_TO_LEGACY_RIGHT: Record<Permission, Database['public']['Enums']
   // Org permissions
   'org.read': 'read',
   'org.update_settings': 'admin',
+  'org.delete': 'super_admin',
   'org.read_members': 'read',
   'org.invite_user': 'admin',
   'org.update_user_roles': 'super_admin',

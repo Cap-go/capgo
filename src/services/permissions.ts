@@ -113,9 +113,9 @@ export async function hasPermission(
   try {
     const { data, error } = await supabase.rpc('rbac_check_permission', {
       p_permission_key: permission,
-      p_org_id: scope.orgId ?? null,
-      p_app_id: scope.appId ?? null,
-      p_channel_id: scope.channelId ?? null,
+      p_org_id: scope.orgId ?? undefined,
+      p_app_id: scope.appId ?? undefined,
+      p_channel_id: scope.channelId ?? undefined,
     })
 
     if (error) {

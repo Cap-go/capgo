@@ -217,7 +217,7 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
 
   const parsedBody = parseRoleBindingBody(body)
   if (!parsedBody.ok) {
-    return c.json({ error: parsedBody.error }, parsedBody.status)
+    return c.json({ error: parsedBody.error }, parsedBody.status as any)
   }
 
   const {
@@ -257,12 +257,12 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
 
     const scopeValidation = validateScope(scope_type, app_id, channel_id)
     if (!scopeValidation.ok) {
-      return c.json({ error: scopeValidation.error }, scopeValidation.status)
+      return c.json({ error: scopeValidation.error }, scopeValidation.status as any)
     }
 
     const principalValidation = await validatePrincipalAccess(drizzle, principal_type, principal_id, org_id)
     if (!principalValidation.ok) {
-      return c.json({ error: principalValidation.error }, principalValidation.status)
+      return c.json({ error: principalValidation.error }, principalValidation.status as any)
     }
 
     // Créer le binding
@@ -364,7 +364,7 @@ app.delete('/:binding_id', async (c: Context<MiddlewareKeyVariables>) => {
       return c.json({ error: 'Role binding not found' }, 404)
     }
 
-    if (!(await checkPermission(c, 'org.update_user_roles', { orgId: binding.org_id }))) {
+    if (!(await checkPermission(c, 'org.update_user_roles', { orgId: binding.org_id ?? undefined }))) {
       return c.json({ error: 'Forbidden - Admin rights required' }, 403)
     }
 

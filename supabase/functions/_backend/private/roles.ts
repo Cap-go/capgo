@@ -4,7 +4,7 @@ import { and, eq } from 'drizzle-orm'
 import { Hono } from 'hono/tiny'
 import { middlewareAuth, useCors } from '../utils/hono.ts'
 import { cloudlogErr } from '../utils/logging.ts'
-import { getDrizzleClient } from '../utils/pg.ts'
+import { getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import { schema } from '../utils/postgres_schema.ts'
 
 export const app = new Hono<MiddlewareKeyVariables>()
@@ -21,7 +21,8 @@ app.get('/', async (c: Context<MiddlewareKeyVariables>) => {
   }
 
   try {
-    const drizzle = await getDrizzleClient(c)
+    const pgClient = getPgClient(c)
+    const drizzle = getDrizzleClient(pgClient)
 
     // Récupérer tous les rôles assignables
     const roles = await drizzle
@@ -30,7 +31,6 @@ app.get('/', async (c: Context<MiddlewareKeyVariables>) => {
         name: schema.roles.name,
         scope_type: schema.roles.scope_type,
         description: schema.roles.description,
-        family_name: schema.roles.family_name,
         priority_rank: schema.roles.priority_rank,
         is_assignable: schema.roles.is_assignable,
       })
@@ -65,7 +65,8 @@ app.get('/:scope_type', async (c: Context<MiddlewareKeyVariables>) => {
   }
 
   try {
-    const drizzle = await getDrizzleClient(c)
+    const pgClient = getPgClient(c)
+    const drizzle = getDrizzleClient(pgClient)
 
     // Récupérer les rôles pour ce scope
     const roles = await drizzle
@@ -74,7 +75,6 @@ app.get('/:scope_type', async (c: Context<MiddlewareKeyVariables>) => {
         name: schema.roles.name,
         scope_type: schema.roles.scope_type,
         description: schema.roles.description,
-        family_name: schema.roles.family_name,
         priority_rank: schema.roles.priority_rank,
         is_assignable: schema.roles.is_assignable,
       })

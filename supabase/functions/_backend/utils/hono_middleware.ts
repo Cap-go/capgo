@@ -22,8 +22,8 @@ async function getAppIdFromRequest(c: Context) {
   if (queryAppId) {
     return queryAppId
   }
-  const body = await c.req.raw.clone().json().catch(() => ({}))
-  return body?.app_id ?? null
+  const body = await c.req.raw.clone().json().catch(() => ({ app_id: null })) as { app_id: string | null }
+  return body.app_id ?? null
 }
 
 async function fetchOrgIdFromAppId(c: Context, appId: string) {
