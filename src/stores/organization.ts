@@ -132,14 +132,22 @@ export const useOrganizationStore = defineStore('organization', () => {
     // Note: Using recursive setTimeout is safer than setInterval for async operations
     // as it ensures one poll completes before the next starts
     pollTimeout.value = setTimeout(async () => {
-      await fetchOrganizations()
-      const org = _organizations.value.get(orgId)
-      if (org && isWaitingForStripeInfo(org)) {
-        // Still waiting, poll again
-        await pollForStripeInfo(orgId)
+      try {
+        await fetchOrganizations()
+        const org = _organizations.value.get(orgId)
+        if (org && isWaitingForStripeInfo(org)) {
+          // Still waiting, poll again (timeout check happens at start of next call)
+          await pollForStripeInfo(orgId)
+        }
+        else {
+          // Stripe info created or org changed
+          localStorage.removeItem(NEW_ORG_POLL_KEY)
+          isNewOrganizationLoading.value = false
+        }
       }
-      else {
-        // Stripe info created or org changed
+      catch (error) {
+        // If fetch fails, stop polling to avoid infinite errors
+        console.error('Failed to fetch organizations during polling:', error)
         localStorage.removeItem(NEW_ORG_POLL_KEY)
         isNewOrganizationLoading.value = false
       }
