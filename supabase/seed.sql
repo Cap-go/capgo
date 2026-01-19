@@ -1033,6 +1033,180 @@ BEGIN
     PERFORM public.reset_and_seed_stats_data();
     PERFORM public.reset_and_seed_app_stats_data('com.stats.app');
 
+    -- Repopulate RBAC permissions (wiped by TRUNCATE auth.users CASCADE)
+    -- The CASCADE from auth.users -> apps -> app_versions -> permissions clears this table
+    RAISE NOTICE 'Repopulating RBAC permissions and role_permissions...';
+
+    INSERT INTO public.permissions (key, scope_type, description)
+    VALUES
+      (public.rbac_perm_org_read(), public.rbac_scope_org(), 'Read org level settings and metadata'),
+      (public.rbac_perm_org_update_settings(), public.rbac_scope_org(), 'Update org configuration/settings'),
+      (public.rbac_perm_org_delete(), public.rbac_scope_org(), 'Delete an organization'),
+      (public.rbac_perm_org_read_members(), public.rbac_scope_org(), 'Read org membership list'),
+      (public.rbac_perm_org_invite_user(), public.rbac_scope_org(), 'Invite or add members to org'),
+      (public.rbac_perm_org_update_user_roles(), public.rbac_scope_org(), 'Change org/member roles'),
+      (public.rbac_perm_org_read_billing(), public.rbac_scope_org(), 'Read org billing settings'),
+      (public.rbac_perm_org_update_billing(), public.rbac_scope_org(), 'Update org billing settings'),
+      (public.rbac_perm_org_read_invoices(), public.rbac_scope_org(), 'Read invoices'),
+      (public.rbac_perm_org_read_audit(), public.rbac_scope_org(), 'Read org-level audit trail'),
+      (public.rbac_perm_org_read_billing_audit(), public.rbac_scope_org(), 'Read billing/audit details'),
+      (public.rbac_perm_app_read(), public.rbac_scope_app(), 'Read app metadata'),
+      (public.rbac_perm_app_update_settings(), public.rbac_scope_app(), 'Update app settings'),
+      (public.rbac_perm_app_delete(), public.rbac_scope_app(), 'Delete an app'),
+      (public.rbac_perm_app_read_bundles(), public.rbac_scope_app(), 'Read app bundle metadata'),
+      (public.rbac_perm_app_upload_bundle(), public.rbac_scope_app(), 'Upload a bundle'),
+      (public.rbac_perm_app_create_channel(), public.rbac_scope_app(), 'Create channels'),
+      (public.rbac_perm_app_read_channels(), public.rbac_scope_app(), 'List/read channels'),
+      (public.rbac_perm_app_read_logs(), public.rbac_scope_app(), 'Read app logs/metrics'),
+      (public.rbac_perm_app_manage_devices(), public.rbac_scope_app(), 'Manage devices at app scope'),
+      (public.rbac_perm_app_read_devices(), public.rbac_scope_app(), 'Read devices at app scope'),
+      (public.rbac_perm_app_build_native(), public.rbac_scope_app(), 'Trigger native builds'),
+      (public.rbac_perm_app_read_audit(), public.rbac_scope_app(), 'Read app-level audit trail'),
+      (public.rbac_perm_app_update_user_roles(), public.rbac_scope_app(), 'Update user roles for this app'),
+      (public.rbac_perm_bundle_delete(), public.rbac_scope_app(), 'Delete a bundle'),
+      (public.rbac_perm_channel_read(), public.rbac_scope_channel(), 'Read channel metadata'),
+      (public.rbac_perm_channel_update_settings(), public.rbac_scope_channel(), 'Update channel settings'),
+      (public.rbac_perm_channel_delete(), public.rbac_scope_channel(), 'Delete a channel'),
+      (public.rbac_perm_channel_read_history(), public.rbac_scope_channel(), 'Read deploy history'),
+      (public.rbac_perm_channel_promote_bundle(), public.rbac_scope_channel(), 'Promote bundle to channel'),
+      (public.rbac_perm_channel_rollback_bundle(), public.rbac_scope_channel(), 'Rollback bundle on channel'),
+      (public.rbac_perm_channel_manage_forced_devices(), public.rbac_scope_channel(), 'Manage forced devices'),
+      (public.rbac_perm_channel_read_forced_devices(), public.rbac_scope_channel(), 'Read forced devices'),
+      (public.rbac_perm_channel_read_audit(), public.rbac_scope_channel(), 'Read channel-level audit'),
+      (public.rbac_perm_platform_impersonate_user(), public.rbac_scope_platform(), 'Support/impersonation'),
+      (public.rbac_perm_platform_manage_orgs_any(), public.rbac_scope_platform(), 'Administer any org'),
+      (public.rbac_perm_platform_manage_apps_any(), public.rbac_scope_platform(), 'Administer any app'),
+      (public.rbac_perm_platform_manage_channels_any(), public.rbac_scope_platform(), 'Administer any channel'),
+      (public.rbac_perm_platform_run_maintenance_jobs(), public.rbac_scope_platform(), 'Run maintenance/ops jobs'),
+      (public.rbac_perm_platform_delete_orphan_users(), public.rbac_scope_platform(), 'Delete orphan users'),
+      (public.rbac_perm_platform_read_all_audit(), public.rbac_scope_platform(), 'Read all audit trails'),
+      (public.rbac_perm_platform_db_break_glass(), public.rbac_scope_platform(), 'Emergency direct DB access')
+    ON CONFLICT (key) DO NOTHING;
+
+    -- Attach permissions to roles
+    -- platform_super_admin: full control
+    INSERT INTO public.role_permissions (role_id, permission_id)
+    SELECT r.id, p.id FROM public.roles r JOIN public.permissions p ON TRUE
+    WHERE r.name = public.rbac_role_platform_super_admin()
+    ON CONFLICT DO NOTHING;
+
+    -- org_super_admin: full org + app + channel control
+    INSERT INTO public.role_permissions (role_id, permission_id)
+    SELECT r.id, p.id FROM public.roles r
+    JOIN public.permissions p ON p.key IN (
+      public.rbac_perm_org_read(), public.rbac_perm_org_update_settings(), public.rbac_perm_org_delete(), public.rbac_perm_org_read_members(), public.rbac_perm_org_invite_user(), public.rbac_perm_org_update_user_roles(),
+      public.rbac_perm_org_read_billing(), public.rbac_perm_org_update_billing(), public.rbac_perm_org_read_invoices(), public.rbac_perm_org_read_audit(), public.rbac_perm_org_read_billing_audit(),
+      public.rbac_perm_app_read(), public.rbac_perm_app_update_settings(), public.rbac_perm_app_delete(), public.rbac_perm_app_read_bundles(), public.rbac_perm_app_upload_bundle(),
+      public.rbac_perm_app_create_channel(), public.rbac_perm_app_read_channels(), public.rbac_perm_app_read_logs(), public.rbac_perm_app_manage_devices(), public.rbac_perm_app_read_devices(),
+      public.rbac_perm_app_build_native(), public.rbac_perm_app_read_audit(), public.rbac_perm_app_update_user_roles(), public.rbac_perm_bundle_delete(),
+      public.rbac_perm_channel_read(), public.rbac_perm_channel_update_settings(), public.rbac_perm_channel_delete(), public.rbac_perm_channel_read_history(),
+      public.rbac_perm_channel_promote_bundle(), public.rbac_perm_channel_rollback_bundle(), public.rbac_perm_channel_manage_forced_devices(), public.rbac_perm_channel_read_forced_devices(), public.rbac_perm_channel_read_audit()
+    )
+    WHERE r.name = public.rbac_role_org_super_admin()
+    ON CONFLICT DO NOTHING;
+
+    -- org_admin: org management without billing updates or deletions
+    INSERT INTO public.role_permissions (role_id, permission_id)
+    SELECT r.id, p.id FROM public.roles r
+    JOIN public.permissions p ON p.key IN (
+      public.rbac_perm_org_read(), public.rbac_perm_org_update_settings(), public.rbac_perm_org_read_members(), public.rbac_perm_org_invite_user(), public.rbac_perm_org_update_user_roles(),
+      public.rbac_perm_org_read_billing(), public.rbac_perm_org_read_invoices(), public.rbac_perm_org_read_audit(), public.rbac_perm_org_read_billing_audit(),
+      public.rbac_perm_app_read(), public.rbac_perm_app_update_settings(), public.rbac_perm_app_read_bundles(), public.rbac_perm_app_upload_bundle(),
+      public.rbac_perm_app_create_channel(), public.rbac_perm_app_read_channels(), public.rbac_perm_app_read_logs(), public.rbac_perm_app_manage_devices(), public.rbac_perm_app_read_devices(),
+      public.rbac_perm_app_build_native(), public.rbac_perm_app_read_audit(), public.rbac_perm_app_update_user_roles(),
+      public.rbac_perm_channel_read(), public.rbac_perm_channel_update_settings(), public.rbac_perm_channel_read_history(),
+      public.rbac_perm_channel_promote_bundle(), public.rbac_perm_channel_rollback_bundle(), public.rbac_perm_channel_manage_forced_devices(), public.rbac_perm_channel_read_forced_devices(), public.rbac_perm_channel_read_audit()
+    )
+    WHERE r.name = public.rbac_role_org_admin()
+    ON CONFLICT DO NOTHING;
+
+    -- org_billing_admin: billing only
+    INSERT INTO public.role_permissions (role_id, permission_id)
+    SELECT r.id, p.id FROM public.roles r
+    JOIN public.permissions p ON p.key IN (
+      public.rbac_perm_org_read(), public.rbac_perm_org_read_billing(), public.rbac_perm_org_update_billing(), public.rbac_perm_org_read_invoices(), public.rbac_perm_org_read_billing_audit()
+    )
+    WHERE r.name = public.rbac_role_org_billing_admin()
+    ON CONFLICT DO NOTHING;
+
+    -- org_member: read-only access
+    INSERT INTO public.role_permissions (role_id, permission_id)
+    SELECT r.id, p.id FROM public.roles r
+    JOIN public.permissions p ON p.key IN (
+      public.rbac_perm_org_read(), public.rbac_perm_org_read_members(),
+      public.rbac_perm_app_read(), public.rbac_perm_app_read_bundles(), public.rbac_perm_app_read_channels(), public.rbac_perm_app_read_logs(), public.rbac_perm_app_read_devices(), public.rbac_perm_app_read_audit(),
+      public.rbac_perm_channel_read(), public.rbac_perm_channel_read_history(), public.rbac_perm_channel_read_forced_devices(), public.rbac_perm_channel_read_audit()
+    )
+    WHERE r.name = public.rbac_role_org_member()
+    ON CONFLICT DO NOTHING;
+
+    -- app_admin: full app control
+    INSERT INTO public.role_permissions (role_id, permission_id)
+    SELECT r.id, p.id FROM public.roles r
+    JOIN public.permissions p ON p.key IN (
+      public.rbac_perm_app_read(), public.rbac_perm_app_update_settings(), public.rbac_perm_app_read_bundles(), public.rbac_perm_app_upload_bundle(),
+      public.rbac_perm_app_create_channel(), public.rbac_perm_app_read_channels(), public.rbac_perm_app_read_logs(), public.rbac_perm_app_manage_devices(),
+      public.rbac_perm_app_read_devices(), public.rbac_perm_app_build_native(), public.rbac_perm_app_read_audit(), public.rbac_perm_app_update_user_roles(), public.rbac_perm_bundle_delete(),
+      public.rbac_perm_channel_read(), public.rbac_perm_channel_update_settings(), public.rbac_perm_channel_delete(), public.rbac_perm_channel_read_history(),
+      public.rbac_perm_channel_promote_bundle(), public.rbac_perm_channel_rollback_bundle(), public.rbac_perm_channel_manage_forced_devices(), public.rbac_perm_channel_read_forced_devices(), public.rbac_perm_channel_read_audit()
+    )
+    WHERE r.name = public.rbac_role_app_admin()
+    ON CONFLICT DO NOTHING;
+
+    -- app_developer: upload, manage devices, but no deletion
+    INSERT INTO public.role_permissions (role_id, permission_id)
+    SELECT r.id, p.id FROM public.roles r
+    JOIN public.permissions p ON p.key IN (
+      public.rbac_perm_app_read(), public.rbac_perm_app_read_bundles(), public.rbac_perm_app_upload_bundle(), public.rbac_perm_app_read_channels(), public.rbac_perm_app_read_logs(),
+      public.rbac_perm_app_manage_devices(), public.rbac_perm_app_read_devices(), public.rbac_perm_app_build_native(), public.rbac_perm_app_read_audit(),
+      public.rbac_perm_channel_read(), public.rbac_perm_channel_update_settings(), public.rbac_perm_channel_read_history(),
+      public.rbac_perm_channel_promote_bundle(), public.rbac_perm_channel_rollback_bundle(), public.rbac_perm_channel_manage_forced_devices(), public.rbac_perm_channel_read_forced_devices(), public.rbac_perm_channel_read_audit()
+    )
+    WHERE r.name = public.rbac_role_app_developer()
+    ON CONFLICT DO NOTHING;
+
+    -- app_uploader: upload only
+    INSERT INTO public.role_permissions (role_id, permission_id)
+    SELECT r.id, p.id FROM public.roles r
+    JOIN public.permissions p ON p.key IN (
+      public.rbac_perm_app_read(), public.rbac_perm_app_read_bundles(), public.rbac_perm_app_upload_bundle(), public.rbac_perm_app_read_channels(), public.rbac_perm_app_read_logs(), public.rbac_perm_app_read_devices(), public.rbac_perm_app_read_audit()
+    )
+    WHERE r.name = public.rbac_role_app_uploader()
+    ON CONFLICT DO NOTHING;
+
+    -- app_reader: read-only
+    INSERT INTO public.role_permissions (role_id, permission_id)
+    SELECT r.id, p.id FROM public.roles r
+    JOIN public.permissions p ON p.key IN (
+      public.rbac_perm_app_read(), public.rbac_perm_app_read_bundles(), public.rbac_perm_app_read_channels(), public.rbac_perm_app_read_logs(), public.rbac_perm_app_read_devices(), public.rbac_perm_app_read_audit()
+    )
+    WHERE r.name = public.rbac_role_app_reader()
+    ON CONFLICT DO NOTHING;
+
+    -- channel_admin: full channel control
+    INSERT INTO public.role_permissions (role_id, permission_id)
+    SELECT r.id, p.id FROM public.roles r
+    JOIN public.permissions p ON p.key IN (
+      public.rbac_perm_channel_read(), public.rbac_perm_channel_update_settings(), public.rbac_perm_channel_delete(), public.rbac_perm_channel_read_history(),
+      public.rbac_perm_channel_promote_bundle(), public.rbac_perm_channel_rollback_bundle(), public.rbac_perm_channel_manage_forced_devices(),
+      public.rbac_perm_channel_read_forced_devices(), public.rbac_perm_channel_read_audit()
+    )
+    WHERE r.name = public.rbac_role_channel_admin()
+    ON CONFLICT DO NOTHING;
+
+    -- channel_reader: read-only
+    INSERT INTO public.role_permissions (role_id, permission_id)
+    SELECT r.id, p.id FROM public.roles r
+    JOIN public.permissions p ON p.key IN (
+      public.rbac_perm_channel_read(), public.rbac_perm_channel_read_history(), public.rbac_perm_channel_read_forced_devices(), public.rbac_perm_channel_read_audit()
+    )
+    WHERE r.name = public.rbac_role_channel_reader()
+    ON CONFLICT DO NOTHING;
+
+    RAISE NOTICE 'RBAC permissions populated: % permissions, % role_permissions',
+      (SELECT COUNT(*) FROM public.permissions),
+      (SELECT COUNT(*) FROM public.role_permissions);
+
     -- Migrate org_users to RBAC role_bindings for all test orgs
     RAISE NOTICE 'Migrating org_users to RBAC role_bindings...';
 
