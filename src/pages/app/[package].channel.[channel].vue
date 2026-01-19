@@ -668,7 +668,7 @@ async function copyCurlCommand() {
             <InfoRow
               v-for="platform in ['ios', 'android', 'electron'] as const"
               :key="platform"
-              :label="platform.charAt(0).toUpperCase() + platform.slice(1)"
+              :label="t(`platform-${platform}`)"
             >
               <Toggle
                 :value="channel?.[platform]"
