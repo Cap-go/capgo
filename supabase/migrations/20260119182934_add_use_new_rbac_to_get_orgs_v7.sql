@@ -150,9 +150,18 @@ BEGIN
         public.get_next_cron_time('0 3 * * *', NOW()) + make_interval(mins => poo.preceding_count::int * 4)
       ELSE NULL
     END AS next_stats_update_at,
-    COALESCE(ucb.available_credits, 0) AS credit_available,
-    COALESCE(ucb.total_credits, 0) AS credit_total,
-    ucb.next_expiration AS credit_next_expiration,
+    CASE
+      WHEN tfa.should_redact_2fa OR ppa.should_redact_password THEN NULL::numeric
+      ELSE COALESCE(ucb.available_credits, 0)
+    END AS credit_available,
+    CASE
+      WHEN tfa.should_redact_2fa OR ppa.should_redact_password THEN NULL::numeric
+      ELSE COALESCE(ucb.total_credits, 0)
+    END AS credit_total,
+    CASE
+      WHEN tfa.should_redact_2fa OR ppa.should_redact_password THEN NULL::timestamptz
+      ELSE ucb.next_expiration
+    END AS credit_next_expiration,
     tfa.enforcing_2fa,
     tfa."2fa_has_access",
     o.enforce_hashed_api_keys,
