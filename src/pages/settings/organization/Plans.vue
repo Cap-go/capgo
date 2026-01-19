@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import type { Database } from '~/types/supabase.types'
 import { Capacitor } from '@capacitor/core'
-import { computedAsync } from '@vueuse/core'
 import { storeToRefs } from 'pinia'
 import { computed, ref, watch, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -36,13 +35,6 @@ const isMobile = Capacitor.isNativePlatform()
 
 const { currentOrganization } = storeToRefs(organizationStore)
 const creditUnitPrices = ref<Partial<Record<Database['public']['Enums']['credit_metric_type'], number>>>({})
-
-const canUpdateBilling = computedAsync(async () => {
-  if (!currentOrganization.value)
-    return false
-  return await checkPermissions('org.update_billing', { orgId: currentOrganization.value.gid })
-}, false)
-
 function planFeatures(plan: Database['public']['Tables']['plans']['Row']) {
   // Convert build time from seconds to hours or minutes for display
   const buildTimeSeconds = plan.build_time_unit || 0
@@ -217,34 +209,40 @@ async function loadData(initial: boolean) {
 }
 
 watch(currentOrganization, async (newOrg, prevOrg) => {
-  if (newOrg && !canUpdateBilling.value) {
-    if (!initialLoad.value) {
-      const orgsMap = organizationStore.getAllOrgs()
-      const newOrg = [...orgsMap]
-        .map(([_, a]) => a)
-        .filter(org => org.role.includes('super_admin'))
-        .sort((a, b) => b.app_count - a.app_count)[0]
+  if (newOrg) {
+    // Check permission directly instead of relying on computedAsync default
+    const hasUpdateBillingPermission = await checkPermissions('org.update_billing', { orgId: newOrg.gid })
 
-      if (newOrg) {
-        organizationStore.setCurrentOrganization(newOrg.gid)
-        return
+    if (!hasUpdateBillingPermission) {
+      if (!initialLoad.value) {
+        const orgsMap = organizationStore.getAllOrgs()
+        const newOrg = [...orgsMap]
+          .map(([_, a]) => a)
+          .filter(org => org.role.includes('super_admin'))
+          .sort((a, b) => b.app_count - a.app_count)[0]
+
+        if (newOrg) {
+          organizationStore.setCurrentOrganization(newOrg.gid)
+          return
+        }
       }
-    }
 
-    dialogStore.openDialog({
-      title: t('cannot-view-plans'),
-      description: `${t('plans-super-only')}`,
-      buttons: [
-        {
-          text: t('ok'),
-        },
-      ],
-    })
-    await dialogStore.onDialogDismiss()
-    if (!prevOrg)
-      router.push('/app')
-    else
-      organizationStore.setCurrentOrganization(prevOrg.gid)
+      dialogStore.openDialog({
+        title: t('cannot-view-plans'),
+        description: `${t('plans-super-only')}`,
+        buttons: [
+          {
+            text: t('ok'),
+          },
+        ],
+      })
+      await dialogStore.onDialogDismiss()
+      if (!prevOrg)
+        router.push('/app')
+      else
+        organizationStore.setCurrentOrganization(prevOrg.gid)
+      return
+    }
   }
 
   await loadData(false)
@@ -264,6 +262,37 @@ watchEffect(async () => {
       if (route.query.oid && typeof route.query.oid === 'string') {
         await organizationStore.awaitInitialLoad()
         organizationStore.setCurrentOrganization(route.query.oid)
+      }
+
+      // Check permission on initial load
+      if (currentOrganization.value) {
+        const hasUpdateBillingPermission = await checkPermissions('org.update_billing', { orgId: currentOrganization.value.gid })
+
+        if (!hasUpdateBillingPermission) {
+          const orgsMap = organizationStore.getAllOrgs()
+          const newOrg = [...orgsMap]
+            .map(([_, a]) => a)
+            .filter(org => org.role.includes('super_admin'))
+            .sort((a, b) => b.app_count - a.app_count)[0]
+
+          if (newOrg) {
+            organizationStore.setCurrentOrganization(newOrg.gid)
+            return
+          }
+
+          dialogStore.openDialog({
+            title: t('cannot-view-plans'),
+            description: `${t('plans-super-only')}`,
+            buttons: [
+              {
+                text: t('ok'),
+              },
+            ],
+          })
+          await dialogStore.onDialogDismiss()
+          router.push('/app')
+          return
+        }
       }
 
       loadData(true)
