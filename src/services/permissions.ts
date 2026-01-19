@@ -52,6 +52,7 @@ export type Permission
     | 'app.build_native'
     | 'app.read_audit'
     | 'app.update_user_roles'
+    | 'app.transfer'
   // Bundle permissions
     | 'bundle.delete'
   // Channel permissions

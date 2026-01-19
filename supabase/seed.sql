@@ -1080,6 +1080,7 @@ BEGIN
       (public.rbac_perm_app_build_native(), public.rbac_scope_app(), 'Trigger native builds'),
       (public.rbac_perm_app_read_audit(), public.rbac_scope_app(), 'Read app-level audit trail'),
       (public.rbac_perm_app_update_user_roles(), public.rbac_scope_app(), 'Update user roles for this app'),
+      (public.rbac_perm_app_transfer(), public.rbac_scope_app(), 'Transfer app to another organization'),
       (public.rbac_perm_bundle_delete(), public.rbac_scope_app(), 'Delete a bundle'),
       (public.rbac_perm_channel_read(), public.rbac_scope_channel(), 'Read channel metadata'),
       (public.rbac_perm_channel_update_settings(), public.rbac_scope_channel(), 'Update channel settings'),
@@ -1115,7 +1116,7 @@ BEGIN
       public.rbac_perm_org_read_billing(), public.rbac_perm_org_update_billing(), public.rbac_perm_org_read_invoices(), public.rbac_perm_org_read_audit(), public.rbac_perm_org_read_billing_audit(),
       public.rbac_perm_app_read(), public.rbac_perm_app_update_settings(), public.rbac_perm_app_delete(), public.rbac_perm_app_read_bundles(), public.rbac_perm_app_upload_bundle(),
       public.rbac_perm_app_create_channel(), public.rbac_perm_app_read_channels(), public.rbac_perm_app_read_logs(), public.rbac_perm_app_manage_devices(), public.rbac_perm_app_read_devices(),
-      public.rbac_perm_app_build_native(), public.rbac_perm_app_read_audit(), public.rbac_perm_app_update_user_roles(), public.rbac_perm_bundle_delete(),
+      public.rbac_perm_app_build_native(), public.rbac_perm_app_read_audit(), public.rbac_perm_app_update_user_roles(), public.rbac_perm_app_transfer(), public.rbac_perm_bundle_delete(),
       public.rbac_perm_channel_read(), public.rbac_perm_channel_update_settings(), public.rbac_perm_channel_delete(), public.rbac_perm_channel_read_history(),
       public.rbac_perm_channel_promote_bundle(), public.rbac_perm_channel_rollback_bundle(), public.rbac_perm_channel_manage_forced_devices(), public.rbac_perm_channel_read_forced_devices(), public.rbac_perm_channel_read_audit()
     )

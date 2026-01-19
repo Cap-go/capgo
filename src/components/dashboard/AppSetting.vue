@@ -844,6 +844,13 @@ async function transferAppOwnership() {
     return
   }
 
+  // Check if user has permission to transfer this app
+  const canTransfer = await checkPermissions('app.transfer', { appId: props.appId })
+  if (!canTransfer) {
+    toast.error(t('no-permission'))
+    return
+  }
+
   // Step 1: Initial confirmation
   dialogStore.openDialog({
     title: t('transfer-app-ownership'),
@@ -863,9 +870,17 @@ async function transferAppOwnership() {
   if (await dialogStore.onDialogDismiss())
     return
 
-  // Step 2: Organization selection
-  const superAdminOrganizations = organizationStore.organizations.filter(org => org.role === 'org_super_admin' && org.gid !== appRef.value?.owner_org.id)
-  if (superAdminOrganizations.length === 0) {
+  // Step 2: Organization selection - filter orgs where user has transfer permission
+  const destinationOrgs = await Promise.all(
+    organizationStore.organizations
+      .filter(org => org.gid !== appRef.value?.owner_org.id)
+      .map(async (org) => {
+        const hasTransferPermission = await checkPermissions('app.transfer', { orgId: org.gid })
+        return hasTransferPermission ? org : null
+      }),
+  ).then(results => results.filter((org): org is NonNullable<typeof org> => org !== null))
+
+  if (destinationOrgs.length === 0) {
     toast.error(t('no-super-admin-organizations'))
     return
   }
@@ -876,7 +891,7 @@ async function transferAppOwnership() {
     size: 'xl',
     preventAccidentalClose: true,
     buttons: [
-      ...superAdminOrganizations.map(org => ({
+      ...destinationOrgs.map(org => ({
         text: org.name,
         role: 'secondary' as const,
         preventClose: true,

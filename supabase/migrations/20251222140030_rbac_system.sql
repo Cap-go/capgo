@@ -381,6 +381,13 @@ PARALLEL SAFE
 SET search_path = ''
 AS $$ SELECT 'app.update_user_roles'::text $$;
 
+CREATE OR REPLACE FUNCTION public.rbac_perm_app_transfer() RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'app.transfer'::text $$;
+
 CREATE OR REPLACE FUNCTION public.rbac_perm_bundle_delete() RETURNS text
 LANGUAGE sql
 IMMUTABLE
@@ -733,6 +740,7 @@ VALUES
   (public.rbac_perm_app_build_native(), public.rbac_scope_app(), 'Trigger native builds'),
   (public.rbac_perm_app_read_audit(), public.rbac_scope_app(), 'Read app-level audit trail'),
   (public.rbac_perm_app_update_user_roles(), public.rbac_scope_app(), 'Update user roles for this app'),
+  (public.rbac_perm_app_transfer(), public.rbac_scope_app(), 'Transfer app to another organization'),
   -- Bundle permissions
   (public.rbac_perm_bundle_delete(), public.rbac_scope_app(), 'Delete a bundle'),
   -- Channel permissions
@@ -812,6 +820,7 @@ JOIN public.permissions p ON p.key IN (
   public.rbac_perm_app_read(), public.rbac_perm_app_update_settings(), public.rbac_perm_app_delete(), public.rbac_perm_app_read_bundles(), public.rbac_perm_app_upload_bundle(),
   public.rbac_perm_app_create_channel(), public.rbac_perm_app_read_channels(), public.rbac_perm_app_read_logs(), public.rbac_perm_app_manage_devices(),
   public.rbac_perm_app_read_devices(), public.rbac_perm_app_build_native(), public.rbac_perm_app_read_audit(), public.rbac_perm_app_update_user_roles(),
+  public.rbac_perm_app_transfer(),
   public.rbac_perm_bundle_delete(),
   public.rbac_perm_channel_read(), public.rbac_perm_channel_update_settings(), public.rbac_perm_channel_delete(), public.rbac_perm_channel_read_history(),
   public.rbac_perm_channel_promote_bundle(), public.rbac_perm_channel_rollback_bundle(), public.rbac_perm_channel_manage_forced_devices(),
@@ -3693,6 +3702,7 @@ BEGIN
     WHEN public.rbac_perm_org_update_billing() THEN RETURN public.rbac_right_super_admin();
     WHEN public.rbac_perm_org_read_billing_audit() THEN RETURN public.rbac_right_super_admin();
     WHEN public.rbac_perm_org_delete() THEN RETURN public.rbac_right_super_admin();
+    WHEN public.rbac_perm_app_transfer() THEN RETURN public.rbac_right_super_admin();
     WHEN public.rbac_perm_platform_impersonate_user() THEN RETURN public.rbac_right_super_admin();
     WHEN public.rbac_perm_platform_manage_orgs_any() THEN RETURN public.rbac_right_super_admin();
     WHEN public.rbac_perm_platform_manage_apps_any() THEN RETURN public.rbac_right_super_admin();
