@@ -351,6 +351,7 @@ watch(dynamicColumns, (newCols) => {
       :element-list="filteredElements"
       :is-loading="isLoading"
       :search-placeholder="t('search-role-bindings')"
+      :auto-reload="false"
       @reload="reload()"
       @reset="refreshData()"
     />
