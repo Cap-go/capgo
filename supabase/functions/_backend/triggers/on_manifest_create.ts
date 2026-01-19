@@ -23,8 +23,10 @@ async function updateManifestSize(c: Context, record: Database['public']['Tables
     .from('manifest')
     .update({ file_size: size })
     .eq('id', record.id)
-  if (updateError)
+  if (updateError) {
     cloudlog({ requestId: c.get('requestId'), message: 'error update manifest size', error: updateError })
+    throw simpleError('manifest_update_failed', 'Failed to update manifest file_size', { record, updateError })
+  }
 
   return c.json(BRES)
 }
