@@ -428,7 +428,7 @@ describe('[PUT] /organization', () => {
     })
     const safe = type.safeParse(await response.json())
     expect(safe.success).toBe(true)
-    expect(safe.data?.id).toBeDefined()
+    expect(safe.data?.id).toBe(ORG_ID)
 
     const { data, error } = await getSupabaseClient().from('orgs').select().eq('id', ORG_ID).single()
     expect(error).toBeNull()
@@ -637,7 +637,7 @@ describe('[PUT] /organization - enforce_hashed_api_keys setting', () => {
     })
     expect(response.status).toBe(200)
     const responseData = await response.json() as { id: string, data: any }
-    expect(responseData.id).toBeDefined()
+    expect(responseData.id).toBe(ORG_ID)
 
     // Verify the setting was updated
     const { data, error } = await getSupabaseClient().from('orgs').select('enforce_hashed_api_keys').eq('id', ORG_ID).single()
@@ -662,7 +662,7 @@ describe('[PUT] /organization - enforce_hashed_api_keys setting', () => {
     })
     expect(response.status).toBe(200)
     const responseData = await response.json() as { id: string, data: any }
-    expect(responseData.id).toBeDefined()
+    expect(responseData.id).toBe(ORG_ID)
 
     // Verify the setting was updated
     const { data, error } = await getSupabaseClient().from('orgs').select('enforce_hashed_api_keys').eq('id', ORG_ID).single()
