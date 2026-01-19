@@ -1,10 +1,8 @@
 BEGIN;
 
--- RBAC Phase 1 sanity checks (feature flag + role bindings)
 SELECT plan(6);
 
 -- Test fixtures
--- Use seeded users to avoid recreating auth rows
 WITH seed_data AS (
   SELECT
     'c591b04e-cf29-4945-b9a0-776d0672061a'::uuid AS admin_user,
@@ -137,12 +135,13 @@ UPDATE public.rbac_settings SET use_new_rbac = false, updated_at = now() WHERE i
 -- 1) Legacy path still works when RBAC flag is off
 SELECT
   ok(
-    public.check_min_rights(
-      'admin'::public.user_min_right,
+    public.rbac_check_permission_direct(
+      'org.update_settings',
       '6aa76066-55ef-4238-ade6-0b32334a4097',
       '11111111-1111-4111-8111-111111111111',
       NULL::varchar,
-      NULL::bigint
+      NULL::bigint,
+      NULL::varchar
     ),
     'Legacy org_users rights honored when RBAC disabled'
   );
@@ -153,30 +152,32 @@ UPDATE public.rbac_settings SET use_new_rbac = true, updated_at = now() WHERE id
 -- 2) RBAC grants org_admin via role_binding (no org_users row)
 SELECT
   ok(
-    public.check_min_rights(
-      'admin'::public.user_min_right,
+    public.rbac_check_permission_direct(
+      'org.update_user_roles',
       '6aa76066-55ef-4238-ade6-0b32334a4097',
       '22222222-2222-4222-8222-222222222222',
       NULL::varchar,
-      NULL::bigint
+      NULL::bigint,
+      NULL::varchar
     ),
-    'RBAC org_admin binding grants admin org rights'
+    'RBAC org_admin binding grants org.update_user_roles permission'
   );
 
 -- 3) Hierarchy: org_admin inherits channel permissions
 SELECT
   ok(
-    public.check_min_rights(
-      'write'::public.user_min_right,
+    public.rbac_check_permission_direct(
+      'channel.update_settings',
       '6aa76066-55ef-4238-ade6-0b32334a4097',
       '22222222-2222-4222-8222-222222222222',
       'com.rbac.new',
-      9876500001
+      9876500001,
+      NULL::varchar
     ),
-    'Org admin role cascades to channel-level write permission'
+    'Org admin role cascades to channel-level permissions'
   );
 
--- 4) SSD: cannot add another role in same family for same principal/scope
+-- 4) SSD: cannot add another role in same scope for same principal
 SELECT
   throws_ok(
     $q$
@@ -192,13 +193,15 @@ SELECT
 -- 5) API key bindings honored under RBAC
 SELECT
   ok(
-    public.has_app_right_apikey(
-      'com.rbac.new',
-      'write'::public.user_min_right,
+    public.rbac_check_permission_direct(
+      'app.update_settings',
       '6aa76066-55ef-4238-ade6-0b32334a4097',
+      NULL::uuid,
+      'com.rbac.new',
+      NULL::bigint,
       'rbac-test-key'
     ),
-    'App admin binding on apikey grants write/app-admin level access'
+    'App admin binding on apikey grants app.update_settings permission'
   );
 
 -- 6) Disabling RBAC removes RBAC-granted access when no legacy rights exist
@@ -207,12 +210,13 @@ UPDATE public.orgs SET use_new_rbac = false WHERE id = '22222222-2222-4222-8222-
 
 SELECT
   ok(
-    NOT public.check_min_rights(
-      'admin'::public.user_min_right,
+    NOT public.rbac_check_permission_direct(
+      'org.update_user_roles',
       '6aa76066-55ef-4238-ade6-0b32334a4097',
       '22222222-2222-4222-8222-222222222222',
       NULL::varchar,
-      NULL::bigint
+      NULL::bigint,
+      NULL::varchar
     ),
     'RBAC-disabled org falls back to legacy (no rights without org_users row)'
   );

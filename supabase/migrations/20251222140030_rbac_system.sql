@@ -2750,6 +2750,26 @@ BEGIN
     WHEN public.rbac_right_read() THEN
       old_org_role_name := public.rbac_role_org_member();
       old_app_role_name := public.rbac_role_app_reader();
+    WHEN 'invite_super_admin'::public.user_min_right THEN
+      -- Invite roles don't have role_bindings yet; they're pending invitations
+      old_org_role_name := NULL;
+      old_app_role_name := NULL;
+    WHEN 'invite_admin'::public.user_min_right THEN
+      old_org_role_name := NULL;
+      old_app_role_name := NULL;
+    WHEN 'invite_write'::public.user_min_right THEN
+      old_org_role_name := NULL;
+      old_app_role_name := NULL;
+    WHEN 'invite_upload'::public.user_min_right THEN
+      old_org_role_name := NULL;
+      old_app_role_name := NULL;
+    WHEN 'invite_read'::public.user_min_right THEN
+      old_org_role_name := NULL;
+      old_app_role_name := NULL;
+    ELSE
+      -- Handle any unexpected values by logging and returning unchanged
+      RAISE WARNING 'Unexpected OLD.user_right value: %, skipping role binding sync', OLD.user_right;
+      RETURN NEW;
   END CASE;
 
   -- Map new user_right to role names
@@ -2769,11 +2789,36 @@ BEGIN
     WHEN public.rbac_right_read() THEN
       new_org_role_name := public.rbac_role_org_member();
       new_app_role_name := public.rbac_role_app_reader();
+    WHEN 'invite_super_admin'::public.user_min_right THEN
+      -- Invite roles don't create role_bindings yet; they're pending invitations
+      new_org_role_name := NULL;
+      new_app_role_name := NULL;
+    WHEN 'invite_admin'::public.user_min_right THEN
+      new_org_role_name := NULL;
+      new_app_role_name := NULL;
+    WHEN 'invite_write'::public.user_min_right THEN
+      new_org_role_name := NULL;
+      new_app_role_name := NULL;
+    WHEN 'invite_upload'::public.user_min_right THEN
+      new_org_role_name := NULL;
+      new_app_role_name := NULL;
+    WHEN 'invite_read'::public.user_min_right THEN
+      new_org_role_name := NULL;
+      new_app_role_name := NULL;
+    ELSE
+      -- Handle any unexpected values by logging and returning unchanged
+      RAISE WARNING 'Unexpected NEW.user_right value: %, skipping role binding sync', NEW.user_right;
+      RETURN NEW;
   END CASE;
 
   -- Get role IDs
-  SELECT id INTO old_org_role_id FROM public.roles WHERE name = old_org_role_name LIMIT 1;
-  SELECT id INTO new_org_role_id FROM public.roles WHERE name = new_org_role_name LIMIT 1;
+  IF old_org_role_name IS NOT NULL THEN
+    SELECT id INTO old_org_role_id FROM public.roles WHERE name = old_org_role_name LIMIT 1;
+  END IF;
+  
+  IF new_org_role_name IS NOT NULL THEN
+    SELECT id INTO new_org_role_id FROM public.roles WHERE name = new_org_role_name LIMIT 1;
+  END IF;
   SELECT id INTO org_member_role_id FROM public.roles WHERE name = public.rbac_role_org_member() LIMIT 1;
 
   IF old_app_role_name IS NOT NULL THEN
@@ -2784,13 +2829,15 @@ BEGIN
     SELECT id INTO new_app_role_id FROM public.roles WHERE name = new_app_role_name LIMIT 1;
   END IF;
 
-  -- Delete old org-level binding
-  DELETE FROM public.role_bindings
-  WHERE principal_type = public.rbac_principal_user()
-    AND principal_id = NEW.user_id
-    AND scope_type = public.rbac_scope_org()
-    AND org_id = NEW.org_id
-    AND role_id = old_org_role_id;
+  -- Delete old org-level binding (only if there was a role)
+  IF old_org_role_id IS NOT NULL THEN
+    DELETE FROM public.role_bindings
+    WHERE principal_type = public.rbac_principal_user()
+      AND principal_id = NEW.user_id
+      AND scope_type = public.rbac_scope_org()
+      AND org_id = NEW.org_id
+      AND role_id = old_org_role_id;
+  END IF;
 
   -- Delete old app-level bindings (for read/upload/write users)
   IF old_app_role_id IS NOT NULL THEN
@@ -2837,12 +2884,14 @@ BEGIN
   -- Handle transition from read/upload/write to admin/super_admin:
   -- Need to delete the org_member binding
   IF OLD.user_right IN (public.rbac_right_read(), public.rbac_right_upload(), public.rbac_right_write()) AND NEW.user_right IN (public.rbac_right_super_admin(), public.rbac_right_admin()) THEN
-    DELETE FROM public.role_bindings
-    WHERE principal_type = public.rbac_principal_user()
-      AND principal_id = NEW.user_id
-      AND scope_type = public.rbac_scope_org()
-      AND org_id = NEW.org_id
-      AND role_id = org_member_role_id;
+    IF org_member_role_id IS NOT NULL THEN
+      DELETE FROM public.role_bindings
+      WHERE principal_type = public.rbac_principal_user()
+        AND principal_id = NEW.user_id
+        AND scope_type = public.rbac_scope_org()
+        AND org_id = NEW.org_id
+        AND role_id = org_member_role_id;
+    END IF;
 
     -- Also delete any remaining app-level bindings
     DELETE FROM public.role_bindings
@@ -3793,30 +3842,6 @@ BEGIN
   WHERE app_id = p_app_id;
 
   UPDATE public.channels
-  SET owner_org = p_new_org_id
-  WHERE app_id = p_app_id;
-
-  UPDATE public.devices
-  SET owner_org = p_new_org_id
-  WHERE app_id = p_app_id;
-
-  UPDATE public.devices_override
-  SET owner_org = p_new_org_id
-  WHERE app_id = p_app_id;
-
-  UPDATE public.daily_bandwidth
-  SET owner_org = p_new_org_id
-  WHERE app_id = p_app_id;
-
-  UPDATE public.daily_mau
-  SET owner_org = p_new_org_id
-  WHERE app_id = p_app_id;
-
-  UPDATE public.daily_storage
-  SET owner_org = p_new_org_id
-  WHERE app_id = p_app_id;
-
-  UPDATE public.daily_version
   SET owner_org = p_new_org_id
   WHERE app_id = p_app_id;
 

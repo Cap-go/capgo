@@ -174,8 +174,8 @@ BEGIN
     o.use_new_rbac
   FROM public.orgs o
   JOIN public.org_users ou ON ou.user_id = userid AND o.id = ou.org_id
-  JOIN two_fa_access tfa ON tfa.org_id = o.id AND NOT tfa.should_redact_2fa
-  JOIN password_policy_access ppa ON ppa.org_id = o.id AND NOT ppa.should_redact_password
+  LEFT JOIN two_fa_access tfa ON tfa.org_id = o.id
+  LEFT JOIN password_policy_access ppa ON ppa.org_id = o.id
   LEFT JOIN public.stripe_info si ON o.customer_id = si.customer_id
   LEFT JOIN public.plans p ON si.product_id = p.stripe_id
   LEFT JOIN app_counts ac ON ac.owner_org = o.id
