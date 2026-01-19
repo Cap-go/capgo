@@ -71,5 +71,5 @@ export async function put(c: Context, bodyRaw: any, apikey: Database['public']['
   if (errorOrg) {
     throw simpleError('cannot_update_org', 'Cannot update org', { error: errorOrg.message })
   }
-  return c.json({ status: 'Organization updated', id: data.id, data: dataOrg }, 200)
+  return c.json({ id: data.id, data: dataOrg })
 }

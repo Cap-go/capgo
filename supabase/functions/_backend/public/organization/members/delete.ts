@@ -1,7 +1,7 @@
 import type { Context } from 'hono'
 import type { Database } from '../../../utils/supabase.types.ts'
 import { z } from 'zod/mini'
-import { quickError, simpleError } from '../../../utils/hono.ts'
+import { BRES, quickError, simpleError } from '../../../utils/hono.ts'
 import { cloudlog } from '../../../utils/logging.ts'
 import { apikeyHasOrgRight, hasOrgRightApikey, supabaseAdmin, supabaseApikey } from '../../../utils/supabase.ts'
 
@@ -46,5 +46,5 @@ export async function deleteMember(c: Context, bodyRaw: any, apikey: Database['p
     throw simpleError('error_deleting_user_from_organization', 'Error deleting user from organization', { error })
   }
   cloudlog({ requestId: c.get('requestId'), message: 'User deleted from organization', data: { user_id: userData.id, org_id: body.orgId } })
-  return c.json({ status: 'OK' }, 200)
+  return c.json(BRES)
 }

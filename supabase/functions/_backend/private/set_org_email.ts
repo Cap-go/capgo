@@ -1,7 +1,7 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod/mini'
-import { parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
+import { BRES, parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
 import { middlewareV2 } from '../utils/hono_middleware.ts'
 import { updateCustomerEmail } from '../utils/stripe.ts'
 import { supabaseWithAuth } from '../utils/supabase.ts'
@@ -71,5 +71,5 @@ app.post('/', middlewareV2(['all', 'write']), async (c) => {
     throw simpleError('critical_error', 'Critical error', { updateOrgErr })
   }
 
-  return c.body(null, 204) // No content
+  return c.json(BRES)
 })
