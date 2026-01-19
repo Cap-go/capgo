@@ -71,13 +71,76 @@ export const useOrganizationStore = defineStore('organization', () => {
   const currentOrganization = ref<Organization | undefined>(undefined)
   const currentOrganizationFailed = ref(false)
   const currentRole = ref<OrganizationRole | null>(null)
+  const isNewOrganizationLoading = ref(false)
 
   const STORAGE_KEY = 'capgo_current_org_id'
+  const NEW_ORG_POLL_KEY = 'capgo_new_org_poll'
+
+  // Helper function to check if org appears to be newly created and waiting for stripe_info
+  const isWaitingForStripeInfo = (org: Organization): boolean => {
+    return !org.paying && (org.trial_left ?? 0) === 0
+  }
+
+  // Poll for stripe_info creation if org appears newly created
+  let pollTimeout: ReturnType<typeof setTimeout> | null = null
+  const pollForStripeInfo = async (orgId: string) => {
+    if (pollTimeout)
+      clearTimeout(pollTimeout)
+
+    // Check if we've been polling for this org
+    const pollData = localStorage.getItem(NEW_ORG_POLL_KEY)
+    let pollStart = Date.now()
+    if (pollData) {
+      try {
+        const parsed = JSON.parse(pollData)
+        if (parsed.orgId === orgId) {
+          pollStart = parsed.start
+          // If we've been polling for more than 2 minutes, give up
+          if (Date.now() - pollStart > 120000) {
+            localStorage.removeItem(NEW_ORG_POLL_KEY)
+            isNewOrganizationLoading.value = false
+            return
+          }
+        }
+        else {
+          // Different org, reset
+          pollStart = Date.now()
+        }
+      }
+      catch {
+        pollStart = Date.now()
+      }
+    }
+
+    localStorage.setItem(NEW_ORG_POLL_KEY, JSON.stringify({ orgId, start: pollStart }))
+    isNewOrganizationLoading.value = true
+
+    // Poll every 3 seconds
+    pollTimeout = setTimeout(async () => {
+      await fetchOrganizations()
+      const org = _organizations.value.get(orgId)
+      if (org && isWaitingForStripeInfo(org)) {
+        // Still waiting, poll again
+        await pollForStripeInfo(orgId)
+      }
+      else {
+        // Stripe info created or org changed
+        localStorage.removeItem(NEW_ORG_POLL_KEY)
+        isNewOrganizationLoading.value = false
+      }
+    }, 3000)
+  }
 
   watch(currentOrganization, async (currentOrganizationRaw, oldOrganization) => {
     if (!currentOrganizationRaw) {
       currentRole.value = null
       localStorage.removeItem(STORAGE_KEY)
+      if (pollTimeout) {
+        clearTimeout(pollTimeout)
+        pollTimeout = null
+      }
+      localStorage.removeItem(NEW_ORG_POLL_KEY)
+      isNewOrganizationLoading.value = false
       return
     }
 
@@ -90,7 +153,22 @@ export const useOrganizationStore = defineStore('organization', () => {
       currentOrganizationFailed.value = false
     }
     else {
-      currentOrganizationFailed.value = !(!!currentOrganizationRaw.paying || (currentOrganizationRaw.trial_left ?? 0) > 0)
+      const orgIsWaiting = isWaitingForStripeInfo(currentOrganizationRaw)
+      currentOrganizationFailed.value = orgIsWaiting ? false : !(!!currentOrganizationRaw.paying || (currentOrganizationRaw.trial_left ?? 0) > 0)
+
+      // If org appears newly created (no trial, not paying), start polling
+      if (orgIsWaiting && !isNewOrganizationLoading.value) {
+        await pollForStripeInfo(currentOrganizationRaw.gid)
+      }
+      else if (!orgIsWaiting && isNewOrganizationLoading.value) {
+        // Stripe info was created, stop polling
+        if (pollTimeout) {
+          clearTimeout(pollTimeout)
+          pollTimeout = null
+        }
+        localStorage.removeItem(NEW_ORG_POLL_KEY)
+        isNewOrganizationLoading.value = false
+      }
     }
 
     // Clear caches when org changes to prevent showing stale data from other orgs
@@ -374,6 +452,7 @@ export const useOrganizationStore = defineStore('organization', () => {
     currentOrganization,
     currentOrganizationFailed,
     currentRole,
+    isNewOrganizationLoading,
     setCurrentOrganization,
     setCurrentOrganizationToMain,
     setCurrentOrganizationToFirst,

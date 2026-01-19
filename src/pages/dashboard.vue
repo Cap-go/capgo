@@ -16,7 +16,7 @@ const { t } = useI18n()
 const displayStore = useDisplayStore()
 const apps = ref<Database['public']['Tables']['apps']['Row'][]>([])
 
-const { currentOrganization } = storeToRefs(organizationStore)
+const { currentOrganization, isNewOrganizationLoading } = storeToRefs(organizationStore)
 
 // Check if user lacks security compliance (2FA or password) - don't load data in this case
 const lacksSecurityAccess = computed(() => {
@@ -32,15 +32,16 @@ const hasNoApps = computed(() => {
     && !isLoading.value
     && !organizationStore.currentOrganizationFailed
     && !lacksSecurityAccess.value
+    && !isNewOrganizationLoading.value
 })
 
-// Payment failed state (subscription required)
+// Payment failed state (subscription required) - but not if we're waiting for new org setup
 const paymentFailed = computed(() => {
-  return organizationStore.currentOrganizationFailed && !lacksSecurityAccess.value
+  return organizationStore.currentOrganizationFailed && !lacksSecurityAccess.value && !isNewOrganizationLoading.value
 })
 
 // Should blur the content (either no apps OR payment failed)
-const shouldBlurContent = computed(() => hasNoApps.value || paymentFailed.value)
+const shouldBlurContent = computed(() => hasNoApps.value || paymentFailed.value || isNewOrganizationLoading.value)
 
 async function getMyApps() {
   await organizationStore.awaitInitialLoad()
@@ -93,6 +94,29 @@ displayStore.defaultBack = '/app'
         <!-- Dashboard content - blurred when no apps or payment failed -->
         <div :class="{ 'blur-sm pointer-events-none select-none': shouldBlurContent }">
           <Usage v-if="!lacksSecurityAccess" :force-demo="paymentFailed" />
+        </div>
+
+        <!-- Overlay for new organization loading (waiting for trial setup) -->
+        <div
+          v-if="isNewOrganizationLoading"
+          class="flex absolute inset-0 z-10 flex-col justify-center items-center bg-white/60 dark:bg-gray-900/60"
+        >
+          <div class="p-8 text-center bg-white rounded-xl border shadow-lg dark:bg-gray-800 dark:border-gray-700">
+            <div class="flex justify-center mb-4">
+              <div class="flex justify-center items-center w-16 h-16 bg-blue-100 rounded-full dark:bg-blue-900/30">
+                <Spinner size="w-8 h-8" color="fill-blue-500 text-blue-200" />
+              </div>
+            </div>
+            <h2 class="mb-2 text-2xl font-bold text-gray-900 dark:text-white">
+              {{ t('setting-up-account') }}
+            </h2>
+            <p class="mb-2 text-gray-600 dark:text-gray-400">
+              {{ t('initializing-trial') }}
+            </p>
+            <p class="text-sm text-gray-500 dark:text-gray-500">
+              {{ t('this-takes-few-seconds') }}
+            </p>
+          </div>
         </div>
 
         <!-- Overlay for empty state (no apps) -->
