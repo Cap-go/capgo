@@ -1,6 +1,10 @@
 import { randomUUID } from 'node:crypto'
+import { env } from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { BASE_URL, getBaseData, headers, PLUGIN_BASE_URL, resetAndSeedAppData, resetAppData, resetAppDataStats } from './test-utils.ts'
+
+// Rate limiting uses Cloudflare Workers Cache API, which isn't available in Supabase Edge Functions
+const USE_CLOUDFLARE = env.USE_CLOUDFLARE_WORKERS === 'true'
 
 const id = randomUUID()
 const APPNAME = `com.ratelimit.${id}`
@@ -93,7 +97,9 @@ afterAll(async () => {
   await resetAppDataStats(APPNAME)
 })
 
-describe('channel_self rate limiting', () => {
+// Skip all rate limiting tests when not running against Cloudflare Workers
+// because the Cache API used for rate limiting isn't available in Supabase Edge Functions
+describe.skipIf(!USE_CLOUDFLARE)('channel_self rate limiting', () => {
   testRateLimitBehavior('[POST] set operation', async (deviceId) => {
     const data = getBaseData(APPNAME)
     data.device_id = deviceId
@@ -191,7 +197,7 @@ describe('channel_self rate limiting', () => {
   })
 })
 
-describe('device API rate limiting', () => {
+describe.skipIf(!USE_CLOUDFLARE)('device API rate limiting', () => {
   testRateLimitBehavior('[POST] set operation', async (deviceId) => {
     return fetchDeviceApi('POST', { app_id: APPNAME, device_id: deviceId, channel: 'production' })
   })
