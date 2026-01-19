@@ -19,7 +19,8 @@ app.post('/', middlewareKey(['all', 'write']), async (c) => {
   cloudlog({ requestId: c.get('requestId'), message: 'apikey', apikey })
 
   // Rate limit: max 1 set per second per device+app, and same channel set max once per 60 seconds
-  if (body.device_id && body.app_id && body.channel) {
+  // Note: We check device_id && app_id only (not channel) so op-level rate limiting applies even for invalid requests
+  if (body.device_id && body.app_id) {
     const isRateLimited = await isChannelSelfRateLimited(c, body.app_id, body.device_id, 'set', body.channel)
     if (isRateLimited) {
       cloudlog({ requestId: c.get('requestId'), message: 'Device API set rate limited', app_id: body.app_id, device_id: body.device_id, channel: body.channel })
@@ -30,7 +31,7 @@ app.post('/', middlewareKey(['all', 'write']), async (c) => {
   const res = await post(c, body, apikey)
 
   // Record the request for rate limiting (all requests, not just successful ones, to prevent abuse through repeated invalid requests)
-  if (body.device_id && body.app_id && body.channel) {
+  if (body.device_id && body.app_id) {
     backgroundTask(c, recordChannelSelfRequest(c, body.app_id, body.device_id, 'set', body.channel))
   }
 
