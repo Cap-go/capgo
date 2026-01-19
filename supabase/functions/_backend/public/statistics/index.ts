@@ -590,7 +590,7 @@ app.get('/org/:org_id', async (c) => {
   const auth = c.get('auth') as AuthInfo
   // Use unified RBAC permission check
   if (!(await checkPermission(c, 'org.read', { orgId }))) {
-    throw quickError(401, 'no_access_to_organization', 'No access to organization', { data: auth.userId })
+    throw quickError(401, 'no_access_to_organization', 'No access to organization', { data: auth?.userId ?? null })
   }
   if (auth.authType === 'apikey' && auth.apikey!.limited_to_orgs && auth.apikey!.limited_to_orgs.length > 0) {
     if (!auth.apikey!.limited_to_orgs.includes(orgId)) {
@@ -682,7 +682,7 @@ app.get('/user', async (c) => {
   cloudlog({ requestId: c.get('requestId'), message: 'orgs', data: orgIds })
 
   if (orgIds.length === 0) {
-    throw quickError(401, 'no_organizations_found', 'No organizations found', { data: auth.userId })
+    throw quickError(401, 'no_organizations_found', 'No organizations found', { data: auth?.userId ?? null })
   }
 
   // Check organization payment status for each organization before returning stats
