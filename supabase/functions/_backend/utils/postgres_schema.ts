@@ -210,7 +210,7 @@ export const role_bindings = pgTable('role_bindings', {
   org_id: uuid('org_id'),
   app_id: uuid('app_id'),
   bundle_id: bigint('bundle_id', { mode: 'number' }),
-  channel_id: uuid('channel_id'),
+  channel_id: bigint('channel_id', { mode: 'number' }),
   granted_by: uuid('granted_by').notNull(),
   granted_at: timestamp('granted_at').notNull().defaultNow(),
   expires_at: timestamp('expires_at'),
