@@ -2,11 +2,13 @@ import type { Context } from 'hono'
 import type { AuthInfo } from './hono.ts'
 import type { Database } from './supabase.types.ts'
 import { and, eq, inArray, isNull, or, sql } from 'drizzle-orm'
-import { honoFactory, quickError } from './hono.ts'
+import { honoFactory, quickError, simpleRateLimit } from './hono.ts'
 import { cloudlog } from './logging.ts'
 import { closeClient, getDrizzleClient, getPgClient, logPgError } from './pg.ts'
 import * as schema from './postgres_schema.ts'
+import { clearFailedAuth, isAPIKeyRateLimited, isIPRateLimited, recordAPIKeyUsage, recordFailedAuth } from './rate_limit.ts'
 import { checkKey, checkKeyById, supabaseAdmin, supabaseClient } from './supabase.ts'
+import { backgroundTask } from './utils.ts'
 
 // TODO: make universal middleware who
 //  Accept authorization header (JWT)
@@ -157,8 +159,23 @@ async function foundAPIKey(c: Context, capgkeyString: string, rights: Database['
   const apikey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKey(c, capgkeyString, supabaseAdmin(c), rights)
   if (!apikey) {
     cloudlog({ requestId: c.get('requestId'), message: 'Invalid apikey', capgkeyString, rights })
+    // Record failed auth attempt - await to ensure accurate counting
+    await recordFailedAuth(c)
     return quickError(401, 'invalid_apikey', 'Invalid apikey')
   }
+
+  // Clear failed auth attempts on successful auth
+  backgroundTask(c, clearFailedAuth(c))
+
+  // Record API usage first, then check if rate limited
+  await recordAPIKeyUsage(c, apikey.id)
+
+  // Check if API key is rate limited after recording usage
+  const apiKeyRateLimited = await isAPIKeyRateLimited(c, apikey.id)
+  if (apiKeyRateLimited) {
+    return simpleRateLimit({ reason: 'api_key_rate_limit_exceeded', apikey_id: apikey.id })
+  }
+
   c.set('auth', {
     userId: apikey.user_id,
     authType: 'apikey',
@@ -201,8 +218,12 @@ async function foundJWT(c: Context, jwt: string) {
   const { data: user, error: userError } = await supabaseJWT.auth.getUser()
   if (userError) {
     cloudlog({ requestId: c.get('requestId'), message: 'Invalid JWT', userError })
+    // Record failed auth attempt - await to ensure accurate counting
+    await recordFailedAuth(c)
     return quickError(401, 'invalid_jwt', 'Invalid JWT')
   }
+  // Clear failed auth attempts on successful JWT auth (background is fine for clearing)
+  backgroundTask(c, clearFailedAuth(c))
   c.set('auth', {
     userId: user.user?.id,
     authType: 'jwt',
@@ -212,6 +233,12 @@ async function foundJWT(c: Context, jwt: string) {
 
 export function middlewareV2(rights: Database['public']['Enums']['key_mode'][]) {
   return honoFactory.createMiddleware(async (c, next) => {
+    // Check if IP is rate limited due to failed auth attempts
+    const ipRateLimited = await isIPRateLimited(c)
+    if (ipRateLimited) {
+      return simpleRateLimit({ reason: 'too_many_failed_auth_attempts' })
+    }
+
     let jwt = c.req.header('authorization')
     let capgkey = c.req.header('capgkey') ?? c.req.header('x-api-key')
 
@@ -230,6 +257,8 @@ export function middlewareV2(rights: Database['public']['Enums']['key_mode'][]) 
     }
     else {
       cloudlog({ requestId: c.get('requestId'), message: 'No apikey or subkey provided' })
+      // Record failed auth attempt - await to ensure accurate counting
+      await recordFailedAuth(c)
       return quickError(401, 'no_jwt_apikey_or_subkey', 'No JWT, apikey or subkey provided')
     }
     await next()
@@ -238,6 +267,12 @@ export function middlewareV2(rights: Database['public']['Enums']['key_mode'][]) 
 
 export function middlewareKey(rights: Database['public']['Enums']['key_mode'][], usePostgres = false) {
   const subMiddlewareKey = honoFactory.createMiddleware(async (c, next) => {
+    // Check if IP is rate limited due to failed auth attempts
+    const ipRateLimited = await isIPRateLimited(c)
+    if (ipRateLimited) {
+      return simpleRateLimit({ reason: 'too_many_failed_auth_attempts' })
+    }
+
     const capgkey_string = c.req.header('capgkey')
     const apikey_string = c.req.header('authorization')
     const subkey_id = c.req.header('x-limited-key-id') ? Number(c.req.header('x-limited-key-id')) : null
@@ -255,6 +290,8 @@ export function middlewareKey(rights: Database['public']['Enums']['key_mode'][],
     })
     if (!key) {
       cloudlog({ requestId: c.get('requestId'), message: 'No key provided', method: c.req.method, url: c.req.url })
+      // Record failed auth attempt - await to ensure accurate counting
+      await recordFailedAuth(c)
       return quickError(401, 'no_key_provided', 'No key provided')
     }
 
@@ -279,8 +316,23 @@ export function middlewareKey(rights: Database['public']['Enums']['key_mode'][],
 
     if (!apikey) {
       cloudlog({ requestId: c.get('requestId'), message: 'Invalid apikey', key, method: c.req.method, url: c.req.url })
+      // Record failed auth attempt - await to ensure accurate counting
+      await recordFailedAuth(c)
       return quickError(401, 'invalid_apikey', 'Invalid apikey')
     }
+
+    // Clear failed auth attempts on successful auth (background is fine for clearing)
+    backgroundTask(c, clearFailedAuth(c))
+
+    // Record API usage first, then check if rate limited
+    await recordAPIKeyUsage(c, apikey.id)
+
+    // Check if API key is rate limited after recording usage
+    const apiKeyRateLimited = await isAPIKeyRateLimited(c, apikey.id)
+    if (apiKeyRateLimited) {
+      return simpleRateLimit({ reason: 'api_key_rate_limit_exceeded', apikey_id: apikey.id })
+    }
+
     c.set('apikey', apikey)
     c.set('capgkey', key)
 
