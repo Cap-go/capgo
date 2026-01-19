@@ -86,12 +86,10 @@ async function getHandler(c: Context): Promise<Response> {
       return c.json({ error: 'not_found', message: 'Not found' }, 404)
     }
     const fileSize = objectInfo.size
-    await saveBandwidthUsage(c, fileSize)
     const rangeMatch = rangeHeaderFromRequest.match(/bytes=(\d+)-(\d*)/)
     if (rangeMatch) {
       const rangeStart = Number.parseInt(rangeMatch[1])
       if (rangeStart >= fileSize) {
-        // Return a 206 Partial Content with an empty body and appropriate Content-Range header for zero-length range
         const emptyHeaders = new Headers()
         emptyHeaders.set('Content-Range', `bytes */${fileSize}`)
         return new Response(new Uint8Array(0), { status: 206, headers: emptyHeaders })
@@ -106,7 +104,8 @@ async function getHandler(c: Context): Promise<Response> {
     cloudlog({ requestId: c.get('requestId'), message: 'getHandler files object is null' })
     return c.json({ error: 'not_found', message: 'Not found' }, 404)
   }
-  await saveBandwidthUsage(c, object.size)
+  const bytesTransferred = calculateBytesTransferred(object.size, object.range)
+  await saveBandwidthUsage(c, bytesTransferred)
   const headers = objectHeaders(object)
   if (object.range != null && c.req.header('range')) {
     cloudlog({ requestId: c.get('requestId'), message: 'getHandler files range request', range: rangeHeader(object.size, object.range) })
@@ -153,6 +152,23 @@ function rangeHeader(objLen: number, r2Range: R2Range): string {
     startIndexInclusive = objLen - r2Range.suffix
   }
   return `bytes ${startIndexInclusive}-${endIndexInclusive}/${objLen}`
+}
+
+function calculateBytesTransferred(objLen: number, r2Range: R2Range | undefined): number {
+  if (!r2Range)
+    return objLen
+  let startIndexInclusive = 0
+  let endIndexInclusive = objLen - 1
+  if ('offset' in r2Range && r2Range.offset != null) {
+    startIndexInclusive = r2Range.offset
+  }
+  if ('length' in r2Range && r2Range.length != null) {
+    endIndexInclusive = startIndexInclusive + r2Range.length - 1
+  }
+  if ('suffix' in r2Range) {
+    startIndexInclusive = objLen - r2Range.suffix
+  }
+  return endIndexInclusive - startIndexInclusive + 1
 }
 
 function optionsHandler(c: Context) {

@@ -51,6 +51,13 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    '/admin/dashboard/plugins': RouteRecordInfo<
+      '/admin/dashboard/plugins',
+      '/admin/dashboard/plugins',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
     '/admin/dashboard/replication': RouteRecordInfo<
       '/admin/dashboard/replication',
       '/admin/dashboard/replication',
@@ -131,6 +138,13 @@ declare module 'vue-router/auto-routes' {
     '/app/[package].bundle.[bundle].history': RouteRecordInfo<
       '/app/[package].bundle.[bundle].history',
       '/app/:package/bundle/:bundle/history',
+      { package: ParamValue<true>, bundle: ParamValue<true> },
+      { package: ParamValue<false>, bundle: ParamValue<false> },
+      | never
+    >,
+    '/app/[package].bundle.[bundle].manifest': RouteRecordInfo<
+      '/app/[package].bundle.[bundle].manifest',
+      '/app/:package/bundle/:bundle/manifest',
       { package: ParamValue<true>, bundle: ParamValue<true> },
       { package: ParamValue<false>, bundle: ParamValue<false> },
       | never
@@ -459,6 +473,12 @@ declare module 'vue-router/auto-routes' {
       views:
         | never
     }
+    'src/pages/admin/dashboard/plugins.vue': {
+      routes:
+        | '/admin/dashboard/plugins'
+      views:
+        | never
+    }
     'src/pages/admin/dashboard/replication.vue': {
       routes:
         | '/admin/dashboard/replication'
@@ -528,6 +548,12 @@ declare module 'vue-router/auto-routes' {
     'src/pages/app/[package].bundle.[bundle].history.vue': {
       routes:
         | '/app/[package].bundle.[bundle].history'
+      views:
+        | never
+    }
+    'src/pages/app/[package].bundle.[bundle].manifest.vue': {
+      routes:
+        | '/app/[package].bundle.[bundle].manifest'
       views:
         | never
     }

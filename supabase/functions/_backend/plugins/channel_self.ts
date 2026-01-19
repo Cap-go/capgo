@@ -7,11 +7,12 @@ import { parse } from '@std/semver'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod/mini'
 import { getAppStatus, setAppStatus } from '../utils/appStatus.ts'
+import { isChannelSelfRateLimited, recordChannelSelfRequest } from '../utils/channelSelfRateLimit.ts'
 import { BRES, parseBody, simpleError200, simpleRateLimit } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { sendNotifOrg } from '../utils/notifications.ts'
 import { sendNotifToOrgMembers } from '../utils/org_email_notifications.ts'
-import { closeClient, deleteChannelDevicePg, getAppByIdPg, getAppOwnerPostgres, getAppVersionsByAppIdPg, getChannelByNamePg, getChannelDeviceOverridePg, getChannelsPg, getCompatibleChannelsPg, getDrizzleClient, getMainChannelsPg, getPgClient, setReplicationLagHeader, upsertChannelDevicePg } from '../utils/pg.ts'
+import { closeClient, deleteChannelDevicePg, getAppByIdPg, getAppOwnerPostgres, getChannelByNamePg, getChannelDeviceOverridePg, getChannelsPg, getCompatibleChannelsPg, getDrizzleClient, getMainChannelsPg, getPgClient, setReplicationLagHeader, upsertChannelDevicePg } from '../utils/pg.ts'
 import { convertQueryToBody, makeDevice, parsePluginBody } from '../utils/plugin_parser.ts'
 import { sendStatsAndDevice } from '../utils/stats.ts'
 import { backgroundTask, deviceIdRegex, INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, isDeprecatedPluginVersion, isLimited, MISSING_STRING_APP_ID, MISSING_STRING_DEVICE_ID, MISSING_STRING_VERSION_BUILD, MISSING_STRING_VERSION_NAME, NON_STRING_APP_ID, NON_STRING_DEVICE_ID, NON_STRING_VERSION_BUILD, NON_STRING_VERSION_NAME, reverseDomainRegex } from '../utils/utils.ts'
@@ -63,7 +64,7 @@ export const jsonRequestSchemaGet = z.looseObject({
 async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient>, body: DeviceLink): Promise<Response> {
   cloudlog({ requestId: c.get('requestId'), message: 'post channel self body', body })
   const device = makeDevice(body)
-  const { app_id, version_name, device_id, channel } = body
+  const { app_id, device_id, channel } = body
 
   const cachedStatus = await getAppStatus(c, app_id)
   if (cachedStatus === 'onprem') {
@@ -97,22 +98,6 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
   }
 
   await setAppStatus(c, app_id, 'cloud')
-
-  // Read operations can use v2 flag
-  const versions = await getAppVersionsByAppIdPg(c, app_id, version_name, drizzleClient as ReturnType<typeof getDrizzleClient>, PLAN_MAU_ACTIONS)
-
-  if (!versions || versions.length === 0) {
-    return simpleError200(c, 'version_error', `Version ${version_name} doesn't exist, and no builtin version`, { version_name })
-  }
-  if (!versions[0].plan_valid) {
-    return simpleError200(c, 'action_not_allowed', 'Action not allowed')
-  }
-  const version = versions.length === 2
-    ? versions.find((v: { name: string }) => v.name !== 'builtin')
-    : versions[0]
-  if (!version) {
-    return simpleError200(c, 'version_error', `Version ${version_name} doesn't exist, and no builtin version`)
-  }
 
   // Read operations can use v2 flag
   const dataChannelOverride = await getChannelDeviceOverridePg(c, app_id, device_id, drizzleClient as ReturnType<typeof getDrizzleClient>)
@@ -266,7 +251,7 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
 async function put(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient>, body: DeviceLink): Promise<Response> {
   cloudlog({ requestId: c.get('requestId'), message: 'put channel self body', body })
   const device = makeDevice(body)
-  const { app_id, version_name, defaultChannel, device_id } = body
+  const { app_id, defaultChannel, device_id } = body
 
   // Check if app exists first - Read operation can use v2 flag
   const cachedStatus = await getAppStatus(c, app_id)
@@ -337,22 +322,6 @@ async function put(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient
   }
 
   // Old behavior (< v7.34.0): Query channel_devices table
-  // Read operations can use v2 flag
-  const versions = await getAppVersionsByAppIdPg(c, app_id, version_name, drizzleClient as ReturnType<typeof getDrizzleClient>, PLAN_MAU_ACTIONS)
-
-  if (!versions || versions.length === 0) {
-    return simpleError200(c, 'version_error', `Version ${version_name} doesn't exist, and no builtin version`, { version_name })
-  }
-  if (!versions[0].plan_valid) {
-    return simpleError200(c, 'action_not_allowed', 'Action not allowed')
-  }
-  const version = versions.length === 2
-    ? versions.find((v: { name: string }) => v.name !== 'builtin')
-    : versions[0]
-  if (!version) {
-    return simpleError200(c, 'version_error', `Version ${version_name} doesn't exist, and no builtin version`)
-  }
-
   // Read operations can use v2 flag
   const dataChannel = await getChannelsPg(c, app_id, defaultChannel ? { defaultChannel } : { public: true }, drizzleClient as ReturnType<typeof getDrizzleClient>)
 
@@ -560,16 +529,24 @@ app.post('/', async (c) => {
     return simpleRateLimit(body)
   }
 
+  const bodyParsed = parsePluginBody<DeviceLink>(c, body, jsonRequestSchema)
+  if (!bodyParsed.channel) {
+    return simpleError200(c, 'missing_channel', 'Cannot find channel in body')
+  }
+
+  // Rate limit: max 1 set per second per device+app, and same set max once per 60 seconds
+  const isRateLimited = await isChannelSelfRateLimited(c, bodyParsed.app_id, bodyParsed.device_id, 'set', bodyParsed.channel)
+  if (isRateLimited) {
+    cloudlog({ requestId: c.get('requestId'), message: 'Channel self set rate limited', app_id: bodyParsed.app_id, device_id: bodyParsed.device_id, channel: bodyParsed.channel })
+    return simpleRateLimit({ app_id: bodyParsed.app_id, device_id: bodyParsed.device_id })
+  }
+
   // POST has writes, so always create PG client (even if using D1 for reads)
   const pgClient = getPgClient(c)
 
   // Set replication lag header using the existing pool
   await setReplicationLagHeader(c, pgClient)
 
-  const bodyParsed = parsePluginBody<DeviceLink>(c, body, jsonRequestSchema)
-  if (!bodyParsed.channel) {
-    return simpleError200(c, 'missing_channel', 'Cannot find channel in body')
-  }
   let res
   try {
     res = await post(c, getDrizzleClient(pgClient), bodyParsed)
@@ -577,6 +554,10 @@ app.post('/', async (c) => {
   finally {
     await closeClient(c, pgClient)
   }
+
+  // Record the request for rate limiting (all requests, not just successful ones, to prevent abuse)
+  backgroundTask(c, recordChannelSelfRequest(c, bodyParsed.app_id, bodyParsed.device_id, 'set', bodyParsed.channel))
+
   return res
 })
 
@@ -589,12 +570,20 @@ app.put('/', async (c) => {
     return simpleRateLimit(body)
   }
 
+  const bodyParsed = parsePluginBody<DeviceLink>(c, body, jsonRequestSchema)
+
+  // Rate limit: max 1 get per second per device+app
+  const isRateLimited = await isChannelSelfRateLimited(c, bodyParsed.app_id, bodyParsed.device_id, 'get')
+  if (isRateLimited) {
+    cloudlog({ requestId: c.get('requestId'), message: 'Channel self get rate limited', app_id: bodyParsed.app_id, device_id: bodyParsed.device_id })
+    return simpleRateLimit({ app_id: bodyParsed.app_id, device_id: bodyParsed.device_id })
+  }
+
   const pgClient = getPgClient(c)
 
   // Set replication lag header using the existing pool
   await setReplicationLagHeader(c, pgClient)
 
-  const bodyParsed = parsePluginBody<DeviceLink>(c, body, jsonRequestSchema)
   let res
   try {
     res = await put(c, getDrizzleClient(pgClient as any), bodyParsed)
@@ -602,6 +591,10 @@ app.put('/', async (c) => {
   finally {
     await closeClient(c, pgClient)
   }
+
+  // Record the request for rate limiting (all requests to prevent abuse)
+  backgroundTask(c, recordChannelSelfRequest(c, bodyParsed.app_id, bodyParsed.device_id, 'get'))
+
   return res
 })
 
@@ -613,13 +606,21 @@ app.delete('/', async (c) => {
     return simpleRateLimit(body)
   }
 
+  const bodyParsed = parsePluginBody<DeviceLink>(c, body, jsonRequestSchema)
+
+  // Rate limit: max 1 delete per second per device+app
+  const isRateLimited = await isChannelSelfRateLimited(c, bodyParsed.app_id, bodyParsed.device_id, 'delete')
+  if (isRateLimited) {
+    cloudlog({ requestId: c.get('requestId'), message: 'Channel self delete rate limited', app_id: bodyParsed.app_id, device_id: bodyParsed.device_id })
+    return simpleRateLimit({ app_id: bodyParsed.app_id, device_id: bodyParsed.device_id })
+  }
+
   // DELETE has writes, so always create PG client (even if using D1 for reads)
   const pgClient = getPgClient(c)
 
   // Set replication lag header using the existing pool
   await setReplicationLagHeader(c, pgClient)
 
-  const bodyParsed = parsePluginBody<DeviceLink>(c, body, jsonRequestSchema)
   let res
   try {
     res = await deleteOverride(c, getDrizzleClient(pgClient), bodyParsed)
@@ -627,6 +628,10 @@ app.delete('/', async (c) => {
   finally {
     await closeClient(c, pgClient)
   }
+
+  // Record the request for rate limiting (all requests to prevent abuse)
+  backgroundTask(c, recordChannelSelfRequest(c, bodyParsed.app_id, bodyParsed.device_id, 'delete'))
+
   return res
 })
 
@@ -638,12 +643,22 @@ app.get('/', async (c) => {
     return simpleRateLimit(body)
   }
 
+  const bodyParsed = parsePluginBody<DeviceLink>(c, body, jsonRequestSchemaGet, false)
+
+  // Rate limit: max 1 list per second per device+app (if device_id is provided)
+  if (body.device_id) {
+    const isRateLimited = await isChannelSelfRateLimited(c, bodyParsed.app_id, body.device_id, 'list')
+    if (isRateLimited) {
+      cloudlog({ requestId: c.get('requestId'), message: 'Channel self list rate limited', app_id: bodyParsed.app_id, device_id: body.device_id })
+      return simpleRateLimit({ app_id: bodyParsed.app_id, device_id: body.device_id })
+    }
+  }
+
   const pgClient = getPgClient(c, true)
 
   // Set replication lag header using the existing pool
   await setReplicationLagHeader(c, pgClient)
 
-  const bodyParsed = parsePluginBody<DeviceLink>(c, body, jsonRequestSchemaGet, false)
   let res
   try {
     res = await listCompatibleChannels(c, getDrizzleClient(pgClient as any), bodyParsed)
@@ -651,5 +666,13 @@ app.get('/', async (c) => {
   finally {
     await closeClient(c, pgClient)
   }
+
+  // Record the request for rate limiting (all requests to prevent abuse, if device_id is provided)
+  // Note: body.device_id is used since jsonRequestSchemaGet doesn't include device_id,
+  // but parsePluginBody lowercases it in the body object before validation
+  if (body.device_id) {
+    backgroundTask(c, recordChannelSelfRequest(c, bodyParsed.app_id, body.device_id, 'list'))
+  }
+
   return res
 })

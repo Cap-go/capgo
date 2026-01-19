@@ -2,7 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Context } from 'hono'
 import type { AuthInfo, MiddlewareKeyVariables } from './hono.ts'
 import type { Database } from './supabase.types.ts'
-import type { DeviceWithoutCreatedAt, Order, ReadDevicesParams, ReadStatsParams } from './types.ts'
+import type { DeviceWithoutCreatedAt, Order, ReadDevicesParams, ReadStatsParams, VersionUsage } from './types.ts'
 import { createClient } from '@supabase/supabase-js'
 import { buildNormalizedDeviceForWrite, hasComparableDeviceChanged } from './deviceComparison.ts'
 import { simpleError } from './hono.ts'
@@ -770,18 +770,19 @@ export function trackBandwidthUsageSB(
 
 export function trackVersionUsageSB(
   c: Context,
-  versionId: number,
+  versionName: string,
   appId: string,
   action: Database['public']['Enums']['version_action'],
 ) {
+  // Type cast needed: version_usage table now has version_name but auto-generated types are stale
   return supabaseAdmin(c)
     .from('version_usage')
     .insert([
       {
-        version_id: versionId,
+        version_name: versionName,
         app_id: appId,
         action,
-      },
+      } as unknown as { version_id: number, app_id: string, action: typeof action },
     ])
 }
 
@@ -894,10 +895,11 @@ export async function readStatsStorageSB(c: Context, app_id: string, period_star
   return data ?? []
 }
 
-export async function readStatsVersionSB(c: Context, app_id: string, period_start: string, period_end: string) {
+export async function readStatsVersionSB(c: Context, app_id: string, period_start: string, period_end: string): Promise<VersionUsage[]> {
   const { data } = await supabaseAdmin(c)
     .rpc('read_version_usage', { p_app_id: app_id, p_period_start: period_start, p_period_end: period_end })
-  return data ?? []
+  // Cast to VersionUsage[] - the SQL function returns version_name but auto-generated types are stale
+  return (data ?? []) as unknown as VersionUsage[]
 }
 
 export async function readStatsSB(c: Context, params: ReadStatsParams) {

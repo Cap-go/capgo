@@ -21,6 +21,7 @@ export type EmailPreferenceKey
     | 'bundle_deployed'
     | 'device_error'
     | 'channel_self_rejected'
+    | 'daily_fail_ratio'
 
 export interface EmailPreferences {
   usage_limit?: boolean
@@ -34,6 +35,7 @@ export interface EmailPreferences {
   bundle_deployed?: boolean
   device_error?: boolean
   channel_self_rejected?: boolean
+  daily_fail_ratio?: boolean
 }
 
 interface OrgWithPreferences {

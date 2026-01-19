@@ -172,7 +172,7 @@ export interface AppUsageByApp {
 export interface AppUsageByVersion {
   date: string
   app_id: string
-  version_id: number
+  version_name: string
   install: number | null
   uninstall: number | null
 }
@@ -267,19 +267,22 @@ export async function getVersionNames(appId: string, versionIds: number[]): Prom
 }
 
 export async function getDailyVersion(appId: string, startDate?: string, endDate?: string): Promise<AppUsageByVersion[]> {
+  // Query uses version_name column - cast needed because auto-generated types are stale
   const { data, error } = await useSupabase()
     .from('daily_version')
-    .select('date, app_id, version_id, install, uninstall')
+    .select('date, app_id, version_name, install, uninstall')
     .eq('app_id', appId)
     .gte('date', startDate)
     .lte('date', endDate)
+    .not('version_name', 'is', null)
     .order('date', { ascending: true })
 
   if (error || !data) {
     console.error('Error fetching data from daily_version:', error)
     return []
   }
-  return data
+  // Cast to our interface - the SQL table has version_name but auto-generated types are stale
+  return data as unknown as AppUsageByVersion[]
 }
 
 export async function getTotalAppStorage(orgId?: string, appid?: string): Promise<number> {

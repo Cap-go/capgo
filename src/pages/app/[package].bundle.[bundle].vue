@@ -39,7 +39,6 @@ const channel = ref<(Database['public']['Tables']['channels']['Row'])>()
 const version_meta = ref<Database['public']['Tables']['app_versions_meta']['Row']>()
 const showBundleMetadataInput = ref<boolean>(false)
 const hasManifest = ref<boolean>(false)
-const manifestSize = ref<number | null>(null)
 const showChecksumTooltip = ref(false)
 
 // Channel chooser state
@@ -147,12 +146,6 @@ const zipSizeLabel = computed(() => {
     return bytesToMbText(version_meta.value.size)
   if (version.value?.external_url)
     return t('stored-externally')
-  return t('metadata-not-found')
-})
-
-const manifestSizeLabel = computed(() => {
-  if (manifestSize.value !== null)
-    return bytesToMbText(manifestSize.value)
   return t('metadata-not-found')
 })
 
@@ -388,7 +381,6 @@ async function getVersion() {
   if (!id.value)
     return
   try {
-    manifestSize.value = null
     const { data } = await supabase
       .from('app_versions')
       .select()
@@ -408,23 +400,6 @@ async function getVersion() {
       version_meta.value = dataVersionsMeta
 
     hasManifest.value = data.manifest_count > 0
-    if (hasManifest.value) {
-      const { data: manifestEntries } = await supabase
-        .from('manifest')
-        .select('file_size')
-        .eq('app_version_id', data.id)
-      if (manifestEntries && manifestEntries.length > 0) {
-        let total = 0
-        let hasSize = false
-        for (const entry of manifestEntries) {
-          if (typeof entry.file_size === 'number' && entry.file_size > 0) {
-            total += entry.file_size
-            hasSize = true
-          }
-        }
-        manifestSize.value = hasSize ? total : null
-      }
-    }
     version.value = data
     if (version.value?.name)
       displayStore.setBundleName(String(version.value.id), version.value.name)
@@ -877,10 +852,10 @@ async function deleteBundle() {
                 </span>
               </InfoRow>
               <!-- manifest -->
-              <InfoRow :label="t('manifest')" :is-link="false">
+              <InfoRow :label="t('manifest')" :is-link="hasManifest" @click="hasManifest ? router.push(`/app/${packageId}/bundle/${version?.id}/manifest`) : null">
                 <span class="flex items-center gap-2">
                   <template v-if="hasManifest">
-                    {{ manifestSizeLabel }}
+                    {{ t('open') }}
                   </template>
                   <template v-else>
                     {{ t('no-manifest-bundle') }}

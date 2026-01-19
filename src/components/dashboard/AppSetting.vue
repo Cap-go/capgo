@@ -51,6 +51,48 @@ const canDeleteApp = computedAsync(async () => {
   return await checkPermissions('app.delete', { appId: props.appId })
 }, false)
 
+// Retention presets (value in seconds)
+const RETENTION_PRESETS = [
+  { value: 0, labelKey: 'retention-immediate' },
+  { value: 604800, labelKey: 'retention-7-days' },
+  { value: 2592000, labelKey: 'retention-30-days' },
+  { value: 7776000, labelKey: 'retention-90-days' },
+  { value: 15552000, labelKey: 'retention-6-months' },
+  { value: 31536000, labelKey: 'retention-1-year' },
+  { value: 63113904, labelKey: 'retention-never' },
+  { value: -1, labelKey: 'retention-custom' },
+]
+
+const selectedRetentionPreset = ref<number>(2592000)
+const customRetentionValue = ref<number>(0)
+
+const isCustomRetention = computed(() => selectedRetentionPreset.value === -1)
+
+const retentionOptions = computed(() => {
+  return RETENTION_PRESETS.map(preset => ({
+    label: t(preset.labelKey),
+    value: preset.value,
+  }))
+})
+
+const effectiveRetentionValue = computed(() => {
+  return selectedRetentionPreset.value === -1
+    ? customRetentionValue.value
+    : selectedRetentionPreset.value
+})
+
+function initializeRetentionPreset() {
+  const current = appRef.value?.retention ?? 2592000
+  const preset = RETENTION_PRESETS.find(p => p.value !== -1 && p.value === current)
+  if (preset) {
+    selectedRetentionPreset.value = preset.value
+  }
+  else {
+    selectedRetentionPreset.value = -1
+    customRetentionValue.value = current
+  }
+}
+
 onMounted(async () => {
   isLoading.value = true
 
@@ -69,6 +111,7 @@ onMounted(async () => {
 
   await organizationStore.awaitInitialLoad()
   appRef.value = data as any
+  initializeRetentionPreset()
   await loadChannels()
   isLoading.value = false
   isFirstLoading.value = false
@@ -137,7 +180,7 @@ async function deleteApp() {
   }
 }
 
-async function submit(form: { app_name: string, retention: number, expose_metadata: boolean, allow_preview: boolean }) {
+async function submit(form: { app_name: string, expose_metadata: boolean, allow_preview: boolean }) {
   isLoading.value = true
   if (!canUpdateSettings.value) {
     toast.error(t('no-permission'))
@@ -153,7 +196,7 @@ async function submit(form: { app_name: string, retention: number, expose_metada
   }
 
   try {
-    await updateAppRetention(form.retention)
+    await updateAppRetention(effectiveRetentionValue.value)
   }
   catch (error) {
     toast.error(error as string)
@@ -207,7 +250,7 @@ async function updateAppRetention(newRetention: number) {
     return Promise.reject(t('retention-cannot-be-negative'))
   }
 
-  if (newRetention >= 63113904) {
+  if (newRetention > 63113904) {
     return Promise.reject(t('retention-to-big'))
   }
 
@@ -990,14 +1033,34 @@ async function transferAppOwnership() {
                   </template>
                 </FormKit>
               </div>
+              <!-- Bundle Retention Setting -->
               <FormKit
-                type="number"
-                number="integer"
-                name="retention"
+                v-model="selectedRetentionPreset"
+                type="select"
+                name="retention_preset"
                 :prefix-icon="gearSix"
-                :value="appRef?.retention ?? 0"
-                :label="t('retention')"
+                :label="t('retention-label')"
+                :options="retentionOptions"
               />
+              <div v-if="isCustomRetention">
+                <FormKit
+                  v-model="customRetentionValue"
+                  type="number"
+                  number="integer"
+                  name="custom_retention"
+                  :prefix-icon="gearSix"
+                  :label="t('retention-custom-value')"
+                  :help="t('retention-custom-help')"
+                  :min="0"
+                  :max="63113903"
+                />
+              </div>
+              <p v-if="effectiveRetentionValue === 0" class="text-xs font-medium text-amber-600 dark:text-amber-400">
+                {{ t('retention-immediate-warning') }}
+              </p>
+              <p v-if="effectiveRetentionValue >= 63113904" class="text-xs font-medium text-blue-600 dark:text-blue-400">
+                {{ t('retention-never-info') }}
+              </p>
               <FormKit
                 type="checkbox"
                 name="expose_metadata"
