@@ -2,7 +2,7 @@ import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../../../utils/hono.ts'
 import type { Database } from '../../../utils/supabase.types.ts'
 import { z } from 'zod/mini'
-import { simpleError } from '../../../utils/hono.ts'
+import { BRES, simpleError } from '../../../utils/hono.ts'
 import { cloudlog } from '../../../utils/logging.ts'
 import { checkPermission } from '../../../utils/rbac.ts'
 import { supabaseApikey } from '../../../utils/supabase.ts'
@@ -46,5 +46,5 @@ export async function post(c: Context<MiddlewareKeyVariables>, bodyRaw: any, _ap
     throw simpleError('error_inviting_user_to_organization', 'Error inviting user to organization', { data })
   }
   cloudlog({ requestId: c.get('requestId'), message: 'User invited to organization', data: { email: body.email, org_id: body.orgId } })
-  return c.json({ status: data }, 200)
+  return c.json(BRES)
 }

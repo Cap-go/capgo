@@ -5,7 +5,7 @@ import dayjs from 'dayjs'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod/mini'
 import { trackBentoEvent } from '../utils/bento.ts'
-import { middlewareAuth, parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
+import { BRES, middlewareAuth, parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { checkPermission } from '../utils/rbac.ts'
 import { supabaseAdmin, supabaseClient } from '../utils/supabase.ts'
@@ -182,7 +182,7 @@ app.post('/', middlewareAuth, async (c) => {
   if (!bentoEvent) {
     throw simpleError('failed_to_invite_user', 'Failed to invite user', {}, 'Failed to track bento event')
   }
-  return c.json({ status: 'User invited successfully' })
+  return c.json(BRES)
 })
 
 // Function to verify Cloudflare Turnstile token

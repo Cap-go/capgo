@@ -1,6 +1,6 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
-import { parseBody, quickError, simpleError } from '../utils/hono.ts'
+import { BRES, parseBody, quickError, simpleError } from '../utils/hono.ts'
 import { middlewareKey } from '../utils/hono_middleware.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { logsnag } from '../utils/logsnag.ts'
@@ -87,5 +87,5 @@ app.delete('/', middlewareKey(['all', 'write', 'upload']), async (c) => {
   })
 
   cloudlog({ requestId: c.get('requestId'), message: 'delete version', id: version.id })
-  return c.json({ status: 'Version deleted' })
+  return c.json(BRES)
 })

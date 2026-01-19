@@ -39,5 +39,5 @@ export async function post(c: Context, bodyRaw: any, apikey: Database['public'][
   if (errorOrg2 || !dataOrg) {
     throw simpleError('cannot_get_org', 'Cannot get created org', { error: errorOrg2?.message })
   }
-  return c.json({ status: 'Organization created', id: dataOrg.id }, 200)
+  return c.json({ id: dataOrg.id })
 }

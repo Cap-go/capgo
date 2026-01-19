@@ -1,7 +1,7 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
-import { quickError, simpleError } from '../../utils/hono.ts'
+import { BRES, quickError, simpleError } from '../../utils/hono.ts'
 import { cloudlog } from '../../utils/logging.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { supabaseAdmin, supabaseApikey } from '../../utils/supabase.ts'
@@ -121,5 +121,5 @@ export async function deleteOrg(c: Context<MiddlewareKeyVariables>, body: Delete
     throw simpleError('cannot_delete_organization', 'Cannot delete organization', { error })
   }
 
-  return c.json({ status: 'Organization deleted' })
+  return c.json(BRES)
 }

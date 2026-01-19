@@ -1,4 +1,4 @@
-import { getBodyOrQuery, honoFactory, simpleError } from '../../utils/hono.ts'
+import { BRES, getBodyOrQuery, honoFactory, simpleError } from '../../utils/hono.ts'
 import { middlewareKey } from '../../utils/hono_middleware.ts'
 import { supabaseApikey } from '../../utils/supabase.ts'
 import { isValidAppId } from '../../utils/utils.ts'
@@ -60,5 +60,5 @@ app.post('/', middlewareKey(['all', 'write']), async (c) => {
     throw simpleError('cannot_update_version_metadata', 'Cannot update version metadata', { supabaseError: updateError })
   }
 
-  return c.json({ status: 'success' })
+  return c.json(BRES)
 })

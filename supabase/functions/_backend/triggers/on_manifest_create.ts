@@ -14,13 +14,18 @@ async function updateManifestSize(c: Context, record: Database['public']['Tables
   }
 
   const size = await s3.getSize(c, record.s3_path)
-  if (size) {
-    const { error: updateError } = await supabaseAdmin(c)
-      .from('manifest')
-      .update({ file_size: size })
-      .eq('id', record.id)
-    if (updateError)
-      cloudlog({ requestId: c.get('requestId'), message: 'error update manifest size', error: updateError })
+  if (size === 0) {
+    cloudlog({ requestId: c.get('requestId'), message: 'getSize returned 0, will retry', id: record.id, s3_path: record.s3_path })
+    throw simpleError('file_size_zero', 'File size is 0, retrying', { record })
+  }
+
+  const { error: updateError } = await supabaseAdmin(c)
+    .from('manifest')
+    .update({ file_size: size })
+    .eq('id', record.id)
+  if (updateError) {
+    cloudlog({ requestId: c.get('requestId'), message: 'error update manifest size', error: updateError })
+    throw simpleError('manifest_update_failed', 'Failed to update manifest file_size', { record, updateError })
   }
 
   return c.json(BRES)

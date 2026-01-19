@@ -57,11 +57,11 @@ async function fetchUser(
   supabase: ReturnType<typeof supabaseApikey>,
   userId: string,
 ) {
-  const { data, error } = await supabase.from('users').select('*').eq('id', userId).single()
+  const { data: _data, error } = await supabase.from('users').select('*').eq('id', userId).single()
   if (error) {
     throw simpleError('cannot_get_user', 'Cannot get user', { error: error.message })
   }
-  return data
+  return _data
 }
 
 function buildUpdateFields(body: z.infer<typeof bodySchema>) {
