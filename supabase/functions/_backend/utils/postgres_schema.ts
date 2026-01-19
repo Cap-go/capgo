@@ -116,7 +116,18 @@ export const users = pgTable('users', {
   enable_notifications: boolean('enable_notifications').notNull().default(true),
   opt_for_newsletters: boolean('opt_for_newsletters').notNull().default(true),
   ban_time: timestamp('ban_time', { withTimezone: true }),
-  email_preferences: jsonb('email_preferences').notNull(),
+  email_preferences: jsonb('email_preferences').notNull().default({
+    usage_limit: true,
+    credit_usage: true,
+    onboarding: true,
+    weekly_stats: true,
+    monthly_stats: true,
+    deploy_stats_24h: true,
+    bundle_created: true,
+    bundle_deployed: true,
+    device_error: true,
+    channel_self_rejected: true,
+  }),
 })
 
 export const stripe_info = pgTable('stripe_info', {
