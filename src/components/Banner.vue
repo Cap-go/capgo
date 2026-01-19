@@ -71,6 +71,10 @@ const bannerText = computed(() => {
   if (lacksSecurityAccess.value)
     return null
 
+  // Don't show banner while we're waiting for new org setup
+  if (organizationStore.isNewOrganizationLoading)
+    return null
+
   if (organizationStore.currentOrganizationFailed)
     return t('subscription-required')
 

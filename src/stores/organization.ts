@@ -77,8 +77,9 @@ export const useOrganizationStore = defineStore('organization', () => {
   const NEW_ORG_POLL_KEY = 'capgo_new_org_poll'
 
   // Helper function to check if org appears to be newly created and waiting for stripe_info
+  // Only treat as "waiting" if trial_left is 0, not paying, AND has 0 apps (likely brand new)
   const isWaitingForStripeInfo = (org: Organization): boolean => {
-    return !org.paying && (org.trial_left ?? 0) === 0
+    return !org.paying && (org.trial_left ?? 0) === 0 && (org.app_count ?? 0) === 0
   }
 
   // Poll for stripe_info creation if org appears newly created
