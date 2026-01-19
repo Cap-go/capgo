@@ -3020,6 +3020,7 @@ export type Database = {
               subscription_end: string
               subscription_start: string
               trial_left: number
+              use_new_rbac: boolean
             }[]
           }
         | {
@@ -3053,6 +3054,7 @@ export type Database = {
               subscription_end: string
               subscription_start: string
               trial_left: number
+              use_new_rbac: boolean
             }[]
           }
       get_password_policy_hash: {
@@ -3582,6 +3584,25 @@ export type Database = {
         Args: { email: string; org_id: string }
         Returns: string
       }
+      reset_and_seed_app_data: {
+        Args: {
+          p_admin_user_id?: string
+          p_app_id: string
+          p_org_id?: string
+          p_plan_product_id?: string
+          p_stripe_customer_id?: string
+          p_user_id?: string
+        }
+        Returns: undefined
+      }
+      reset_and_seed_app_stats_data: {
+        Args: { p_app_id: string }
+        Returns: undefined
+      }
+      reset_and_seed_data: { Args: never; Returns: undefined }
+      reset_and_seed_stats_data: { Args: never; Returns: undefined }
+      reset_app_data: { Args: { p_app_id: string }; Returns: undefined }
+      reset_app_stats_data: { Args: { p_app_id: string }; Returns: undefined }
       seed_get_app_metrics_caches: {
         Args: { p_end_date: string; p_org_id: string; p_start_date: string }
         Returns: {
