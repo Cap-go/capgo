@@ -139,7 +139,7 @@ async function validatePrincipalAccess(
   return { ok: true, data: null }
 }
 
-// GET /private/role_bindings/:org_id - Liste des bindings d'un org
+// GET /private/role_bindings/:org_id - List role bindings for an org
 app.get('/:org_id', async (c: Context<MiddlewareKeyVariables>) => {
   const orgId = c.req.param('org_id')
   const userId = c.get('auth')?.userId
@@ -157,7 +157,7 @@ app.get('/:org_id', async (c: Context<MiddlewareKeyVariables>) => {
       return c.json({ error: 'Forbidden' }, 403)
     }
 
-    // Récupérer tous les bindings de l'org avec les infos associées
+    // Retrieve all role bindings for the org with associated info
     const bindings = await drizzle
       .select({
         id: schema.role_bindings.id,
@@ -206,7 +206,7 @@ app.get('/:org_id', async (c: Context<MiddlewareKeyVariables>) => {
   }
 })
 
-// POST /private/role_bindings - Assigner un rôle
+// POST /private/role_bindings - Assign a role
 app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
   const userId = c.get('auth')?.userId
   const body = await c.req.json()
@@ -240,7 +240,7 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
       return c.json({ error: 'Forbidden - Admin rights required' }, 403)
     }
 
-    // Récupérer le rôle par son nom
+    // Retrieve the role by name
     const [role] = await drizzle
       .select()
       .from(schema.roles)
@@ -265,7 +265,7 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
       return c.json({ error: principalValidation.error }, principalValidation.status as any)
     }
 
-    // Créer le binding
+    // Create the binding
     const [binding] = await drizzle
       .insert(schema.role_bindings)
       .values({
@@ -325,7 +325,7 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
       })
     }
 
-    // Gestion des erreurs de contrainte unique (SSD)
+    // Handle unique constraint errors (SSD)
     if (error?.code === '23505') {
       return c.json({ error: 'User already has a role in this family at this scope' }, 409)
     }
@@ -339,7 +339,7 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
   }
 })
 
-// DELETE /private/role_bindings/:binding_id - Retirer un rôle
+// DELETE /private/role_bindings/:binding_id - Remove a role
 app.delete('/:binding_id', async (c: Context<MiddlewareKeyVariables>) => {
   const bindingId = c.req.param('binding_id')
   const userId = c.get('auth')?.userId
@@ -353,7 +353,7 @@ app.delete('/:binding_id', async (c: Context<MiddlewareKeyVariables>) => {
     pgClient = getPgClient(c)
     const drizzle = getDrizzleClient(pgClient)
 
-    // Récupérer le binding et vérifier l'accès
+    // Retrieve the binding and verify access
     const [binding] = await drizzle
       .select()
       .from(schema.role_bindings)
@@ -368,7 +368,7 @@ app.delete('/:binding_id', async (c: Context<MiddlewareKeyVariables>) => {
       return c.json({ error: 'Forbidden - Admin rights required' }, 403)
     }
 
-    // Supprimer le binding
+    // Delete the binding
     await drizzle
       .delete(schema.role_bindings)
       .where(eq(schema.role_bindings.id, bindingId))
