@@ -1,7 +1,5 @@
 BEGIN;
 
-CREATE EXTENSION "basejump-supabase_test_helpers";
-
 -- RBAC Phase 1 sanity checks (feature flag + role bindings)
 SELECT plan(6);
 
@@ -82,10 +80,21 @@ WITH seed_data AS (
     'rbac-test-key'::text AS api_key_value
 )
 INSERT INTO public.apikeys (user_id, key, mode, name)
-SELECT member_user, api_key_value, 'all'::public.key_mode, 'rbac-test-apikey' FROM seed_data
-ON CONFLICT (key) DO NOTHING;
+SELECT member_user, api_key_value, 'all'::public.key_mode, 'rbac-test-apikey' FROM seed_data;
 
 -- RBAC bindings (org_admin to user, app_admin to apikey)
+WITH seed_data AS (
+  SELECT
+    '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid AS member_user,
+    'c591b04e-cf29-4945-b9a0-776d0672061a'::uuid AS admin_user,
+    '22222222-2222-4222-8222-222222222222'::uuid AS org_rbac
+)
+DELETE FROM public.role_bindings
+WHERE principal_type = 'user' 
+  AND principal_id = (SELECT member_user FROM seed_data)
+  AND scope_type = 'org'
+  AND org_id = (SELECT org_rbac FROM seed_data);
+
 WITH seed_data AS (
   SELECT
     '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid AS member_user,
@@ -95,8 +104,19 @@ WITH seed_data AS (
 INSERT INTO public.role_bindings (principal_type, principal_id, role_id, scope_type, org_id, granted_by)
 SELECT 'user', member_user, r.id, 'org', org_rbac, admin_user
 FROM public.roles r, seed_data
-WHERE r.name = 'org_admin'
-ON CONFLICT DO NOTHING;
+WHERE r.name = 'org_admin';
+
+WITH seed_data AS (
+  SELECT
+    'rbac-test-key'::text AS api_key_value,
+    'c591b04e-cf29-4945-b9a0-776d0672061a'::uuid AS admin_user,
+    '22222222-2222-4222-8222-222222222222'::uuid AS org_rbac
+)
+DELETE FROM public.role_bindings
+WHERE principal_type = 'apikey'
+  AND principal_id IN (SELECT rbac_id FROM public.apikeys WHERE key = (SELECT api_key_value FROM seed_data))
+  AND scope_type = 'app'
+  AND app_id IN (SELECT id FROM public.apps WHERE app_id = 'com.rbac.new');
 
 WITH seed_data AS (
   SELECT
@@ -109,8 +129,7 @@ SELECT 'apikey', api.rbac_id, r.id, 'app', org_rbac, a.id, admin_user
 FROM public.apikeys api, public.roles r, public.apps a, seed_data
 WHERE api.key = api_key_value
   AND r.name = 'app_admin'
-  AND a.app_id = 'com.rbac.new'
-ON CONFLICT DO NOTHING;
+  AND a.app_id = 'com.rbac.new';
 
 -- Ensure global flag is off by default; org-level flag drives RBAC for rbac org
 UPDATE public.rbac_settings SET use_new_rbac = false, updated_at = now() WHERE id = 1;
@@ -166,8 +185,8 @@ SELECT
       FROM public.roles r
       WHERE r.name = 'org_billing_admin';
     $q$,
-    'duplicate key value violates unique constraint "role_bindings_org_family_uniq"',
-    'SSD unique index blocks multiple org_base roles for same org/principal'
+    'duplicate key value violates unique constraint "role_bindings_org_scope_uniq"',
+    'SSD unique index blocks multiple org roles for same org/principal'
   );
 
 -- 5) API key bindings honored under RBAC

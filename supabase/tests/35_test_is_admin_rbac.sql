@@ -40,7 +40,6 @@ INSERT INTO public.role_bindings (
     principal_id,
     role_id,
     scope_type,
-    family_name,
     granted_by
 )
 SELECT
@@ -48,7 +47,6 @@ SELECT
     'c591b04e-cf29-4945-b9a0-776d0672061a',
     r.id,
     'platform',
-    'platform_base',
     'c591b04e-cf29-4945-b9a0-776d0672061a'
 FROM public.roles r
 WHERE r.name = 'platform_super_admin';

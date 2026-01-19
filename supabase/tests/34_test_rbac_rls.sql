@@ -70,12 +70,18 @@ SELECT ok(
 -- 7) User can see role_bindings for their org
 SELECT tests.authenticate_as('test_admin');
 -- Create a test role and binding
-INSERT INTO public.roles (id, name, scope_type, family_name, is_priority, priority_rank)
-VALUES ('11111111-1111-1111-1111-111111111111', 'test_role_rls', 'org', 'test_family', true, 10)
+INSERT INTO public.roles (id, name, scope_type, priority_rank)
+VALUES ('11111111-1111-1111-1111-111111111111', 'test_role_rls', 'org', 10)
 ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO public.role_bindings (principal_type, principal_id, role_id, scope_type, org_id, family_name, granted_by)
-VALUES ('user', '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5', '11111111-1111-1111-1111-111111111111', 'org', '046a36ac-e03c-4590-9257-bd6c9dba9ee8', 'test_family', 'c591b04e-cf29-4945-b9a0-776d0672061a');
+DELETE FROM public.role_bindings
+WHERE principal_type = 'user'
+  AND principal_id = '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5'
+  AND scope_type = 'org'
+  AND org_id = '046a36ac-e03c-4590-9257-bd6c9dba9ee8';
+
+INSERT INTO public.role_bindings (principal_type, principal_id, role_id, scope_type, org_id, granted_by)
+VALUES ('user', '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5', '11111111-1111-1111-1111-111111111111', 'org', '046a36ac-e03c-4590-9257-bd6c9dba9ee8', 'c591b04e-cf29-4945-b9a0-776d0672061a');
 
 -- Check test user can see their role binding
 SELECT tests.authenticate_as('test_user');
@@ -91,8 +97,14 @@ SELECT ok(
 
 -- 8) User cannot see role_bindings from other orgs
 SELECT tests.authenticate_as('test_admin');
-INSERT INTO public.role_bindings (principal_type, principal_id, role_id, scope_type, org_id, family_name, granted_by)
-VALUES ('user', 'c591b04e-cf29-4945-b9a0-776d0672061a', '11111111-1111-1111-1111-111111111111', 'org', '22dbad8a-b885-4309-9b3b-a09f8460fb6d', 'test_family', 'c591b04e-cf29-4945-b9a0-776d0672061a');
+DELETE FROM public.role_bindings
+WHERE principal_type = 'user'
+  AND principal_id = 'c591b04e-cf29-4945-b9a0-776d0672061a'
+  AND scope_type = 'org'
+  AND org_id = '22dbad8a-b885-4309-9b3b-a09f8460fb6d';
+
+INSERT INTO public.role_bindings (principal_type, principal_id, role_id, scope_type, org_id, granted_by)
+VALUES ('user', 'c591b04e-cf29-4945-b9a0-776d0672061a', '11111111-1111-1111-1111-111111111111', 'org', '22dbad8a-b885-4309-9b3b-a09f8460fb6d', 'c591b04e-cf29-4945-b9a0-776d0672061a');
 
 SELECT tests.authenticate_as('test_user');
 SELECT ok(
@@ -116,8 +128,8 @@ UPDATE public.rbac_settings SET use_new_rbac = false WHERE id = 1;
 
 -- 10) Test admin can create and modify roles
 SELECT tests.authenticate_as('test_admin');
-INSERT INTO public.roles (id, name, scope_type, family_name, is_priority, priority_rank)
-VALUES ('22222222-2222-2222-2222-222222222222', 'admin_test_role', 'org', 'admin_family', true, 20);
+INSERT INTO public.roles (id, name, scope_type, priority_rank)
+VALUES ('22222222-2222-2222-2222-222222222222', 'admin_test_role', 'org', 20);
 
 SELECT ok(
     EXISTS (SELECT 1 FROM public.roles WHERE id = '22222222-2222-2222-2222-222222222222'),
