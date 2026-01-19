@@ -75,6 +75,8 @@ export const useOrganizationStore = defineStore('organization', () => {
 
   const STORAGE_KEY = 'capgo_current_org_id'
   const NEW_ORG_POLL_KEY = 'capgo_new_org_poll'
+  const POLL_INTERVAL_MS = 3000 // Poll every 3 seconds
+  const POLL_TIMEOUT_MS = 120000 // Give up after 2 minutes
 
   // Helper function to check if org appears to be newly created and waiting for stripe_info
   // Only treat as "waiting" if trial_left is 0, not paying, AND has 0 apps (likely brand new)
@@ -82,11 +84,13 @@ export const useOrganizationStore = defineStore('organization', () => {
     return !org.paying && (org.trial_left ?? 0) === 0 && (org.app_count ?? 0) === 0
   }
 
+  // Poll timeout ref to track the polling timer
+  const pollTimeout = ref<ReturnType<typeof setTimeout> | null>(null)
+
   // Poll for stripe_info creation if org appears newly created
-  let pollTimeout: ReturnType<typeof setTimeout> | null = null
   const pollForStripeInfo = async (orgId: string) => {
-    if (pollTimeout)
-      clearTimeout(pollTimeout)
+    if (pollTimeout.value)
+      clearTimeout(pollTimeout.value)
 
     // Check if we've been polling for this org
     const pollData = localStorage.getItem(NEW_ORG_POLL_KEY)
@@ -96,8 +100,8 @@ export const useOrganizationStore = defineStore('organization', () => {
         const parsed = JSON.parse(pollData)
         if (parsed.orgId === orgId) {
           pollStart = parsed.start
-          // If we've been polling for more than 2 minutes, give up
-          if (Date.now() - pollStart > 120000) {
+          // If we've been polling for more than the timeout, give up
+          if (Date.now() - pollStart > POLL_TIMEOUT_MS) {
             localStorage.removeItem(NEW_ORG_POLL_KEY)
             isNewOrganizationLoading.value = false
             return
@@ -116,8 +120,8 @@ export const useOrganizationStore = defineStore('organization', () => {
     localStorage.setItem(NEW_ORG_POLL_KEY, JSON.stringify({ orgId, start: pollStart }))
     isNewOrganizationLoading.value = true
 
-    // Poll every 3 seconds
-    pollTimeout = setTimeout(async () => {
+    // Poll at configured interval
+    pollTimeout.value = setTimeout(async () => {
       await fetchOrganizations()
       const org = _organizations.value.get(orgId)
       if (org && isWaitingForStripeInfo(org)) {
@@ -129,16 +133,16 @@ export const useOrganizationStore = defineStore('organization', () => {
         localStorage.removeItem(NEW_ORG_POLL_KEY)
         isNewOrganizationLoading.value = false
       }
-    }, 3000)
+    }, POLL_INTERVAL_MS)
   }
 
   watch(currentOrganization, async (currentOrganizationRaw, oldOrganization) => {
     if (!currentOrganizationRaw) {
       currentRole.value = null
       localStorage.removeItem(STORAGE_KEY)
-      if (pollTimeout) {
-        clearTimeout(pollTimeout)
-        pollTimeout = null
+      if (pollTimeout.value) {
+        clearTimeout(pollTimeout.value)
+        pollTimeout.value = null
       }
       localStorage.removeItem(NEW_ORG_POLL_KEY)
       isNewOrganizationLoading.value = false
@@ -163,9 +167,9 @@ export const useOrganizationStore = defineStore('organization', () => {
       }
       else if (!orgIsWaiting && isNewOrganizationLoading.value) {
         // Stripe info was created, stop polling
-        if (pollTimeout) {
-          clearTimeout(pollTimeout)
-          pollTimeout = null
+        if (pollTimeout.value) {
+          clearTimeout(pollTimeout.value)
+          pollTimeout.value = null
         }
         localStorage.removeItem(NEW_ORG_POLL_KEY)
         isNewOrganizationLoading.value = false
