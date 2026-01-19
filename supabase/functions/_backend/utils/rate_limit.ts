@@ -13,12 +13,12 @@ const DEFAULT_API_KEY_RATE_LIMIT = 2000 // 2000 requests per minute per API key 
 
 interface RateLimitData {
   count: number
-  firstAttempt: number
 }
 
 /**
- * Get the client IP address from the request
- * Cloudflare Workers provide the client IP in cf-connecting-ip header
+ * Get the client IP address from the request.
+ * Cloudflare Workers provide the client IP in cf-connecting-ip header.
+ * Returns 'unknown' if no IP headers are found - callers should handle this case.
  */
 export function getClientIP(c: Context): string {
   // Cloudflare Workers provide the real client IP
@@ -38,23 +38,32 @@ export function getClientIP(c: Context): string {
   if (realIp)
     return realIp
 
-  // If no IP headers found, use a default (shouldn't happen in production)
+  // If no IP headers found, return unknown
+  // Note: In production behind Cloudflare, cf-connecting-ip should always be present
   return 'unknown'
 }
 
 /**
- * Check if an IP is rate limited due to failed authentication attempts
- * Returns true if the IP should be blocked
+ * Check if an IP is rate limited due to failed authentication attempts.
+ * Returns true if the IP should be blocked.
+ * Note: If cache is unavailable, rate limiting fails open (returns false) to avoid blocking legitimate traffic.
  */
 export async function isIPRateLimited(c: Context): Promise<boolean> {
   const ip = getClientIP(c)
-  if (ip === 'unknown')
+  if (ip === 'unknown') {
+    // Log warning but don't block - in production behind Cloudflare this shouldn't happen
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'Rate limit check skipped: unknown IP (missing cf-connecting-ip header)',
+    })
     return false
+  }
 
   const cacheHelper = new CacheHelper(c)
   const cacheKey = cacheHelper.buildRequest('/rate-limit/failed-auth', { ip })
   const data = await cacheHelper.matchJson<RateLimitData>(cacheKey)
 
+  // If no data or cache unavailable, fail open (don't block)
   if (!data)
     return false
 
@@ -75,22 +84,26 @@ export async function isIPRateLimited(c: Context): Promise<boolean> {
 }
 
 /**
- * Record a failed authentication attempt for an IP
- * After 3 failures (configurable), the IP will be rate limited
+ * Record a failed authentication attempt for an IP.
+ * After reaching the configured limit (default 20), the IP will be rate limited.
+ * This should be awaited to ensure accurate counting before returning error responses.
  */
 export async function recordFailedAuth(c: Context): Promise<void> {
   const ip = getClientIP(c)
-  if (ip === 'unknown')
+  if (ip === 'unknown') {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'Failed auth not recorded: unknown IP',
+    })
     return
+  }
 
   const cacheHelper = new CacheHelper(c)
   const cacheKey = cacheHelper.buildRequest('/rate-limit/failed-auth', { ip })
   const existingData = await cacheHelper.matchJson<RateLimitData>(cacheKey)
 
-  const now = Date.now()
   const newData: RateLimitData = {
     count: (existingData?.count ?? 0) + 1,
-    firstAttempt: existingData?.firstAttempt ?? now,
   }
 
   await cacheHelper.putJson(cacheKey, newData, FAILED_AUTH_TTL)
@@ -104,7 +117,8 @@ export async function recordFailedAuth(c: Context): Promise<void> {
 }
 
 /**
- * Clear failed auth attempts for an IP after successful authentication
+ * Clear failed auth attempts for an IP after successful authentication.
+ * Uses a 60 second TTL to ensure cache consistency across Cloudflare edge nodes.
  */
 export async function clearFailedAuth(c: Context): Promise<void> {
   const ip = getClientIP(c)
@@ -115,19 +129,21 @@ export async function clearFailedAuth(c: Context): Promise<void> {
   const cacheKey = cacheHelper.buildRequest('/rate-limit/failed-auth', { ip })
 
   // Set count to 0 to effectively clear the rate limit
-  // We keep a minimal TTL to let the cache entry expire naturally
-  await cacheHelper.putJson(cacheKey, { count: 0, firstAttempt: Date.now() }, 1)
+  // Use 60s TTL for cache consistency across Cloudflare edge nodes
+  await cacheHelper.putJson(cacheKey, { count: 0 }, 60)
 }
 
 /**
- * Check if an API key is rate limited
- * Returns true if the API key has exceeded its rate limit
+ * Check if an API key is rate limited.
+ * Returns true if the API key has exceeded its configured rate limit.
+ * Note: If cache is unavailable, rate limiting fails open (returns false).
  */
 export async function isAPIKeyRateLimited(c: Context, apiKeyId: number): Promise<boolean> {
   const cacheHelper = new CacheHelper(c)
   const cacheKey = cacheHelper.buildRequest('/rate-limit/apikey', { id: String(apiKeyId) })
   const data = await cacheHelper.matchJson<RateLimitData>(cacheKey)
 
+  // If no data or cache unavailable, fail open (don't block)
   if (!data)
     return false
 
@@ -148,25 +164,24 @@ export async function isAPIKeyRateLimited(c: Context, apiKeyId: number): Promise
 }
 
 /**
- * Record an API call for rate limiting purposes
- * Tracks the number of calls per API key within a time window
+ * Record an API call for rate limiting purposes.
+ * Tracks the number of calls per API key within the configured time window.
+ * This should be awaited to ensure accurate counting before checking limits.
  */
 export async function recordAPIKeyUsage(c: Context, apiKeyId: number): Promise<void> {
   const cacheHelper = new CacheHelper(c)
   const cacheKey = cacheHelper.buildRequest('/rate-limit/apikey', { id: String(apiKeyId) })
   const existingData = await cacheHelper.matchJson<RateLimitData>(cacheKey)
 
-  const now = Date.now()
   const newData: RateLimitData = {
     count: (existingData?.count ?? 0) + 1,
-    firstAttempt: existingData?.firstAttempt ?? now,
   }
 
   await cacheHelper.putJson(cacheKey, newData, API_KEY_RATE_LIMIT_TTL)
 }
 
 /**
- * Get the failed auth limit from environment or use default
+ * Get the failed auth limit from environment or use default (20).
  */
 function getFailedAuthLimit(c: Context): number {
   const envLimit = getEnv(c, 'RATE_LIMIT_FAILED_AUTH')
@@ -179,7 +194,7 @@ function getFailedAuthLimit(c: Context): number {
 }
 
 /**
- * Get the API key rate limit from environment or use default
+ * Get the API key rate limit from environment or use default (2000/minute).
  */
 function getAPIKeyRateLimit(c: Context): number {
   const envLimit = getEnv(c, 'RATE_LIMIT_API_KEY')
@@ -189,15 +204,4 @@ function getAPIKeyRateLimit(c: Context): number {
       return parsed
   }
   return DEFAULT_API_KEY_RATE_LIMIT
-}
-
-/**
- * Get rate limit information for headers
- */
-export function getRateLimitHeaders(remaining: number, limit: number, resetTime: number): Record<string, string> {
-  return {
-    'X-RateLimit-Limit': String(limit),
-    'X-RateLimit-Remaining': String(Math.max(0, remaining)),
-    'X-RateLimit-Reset': String(resetTime),
-  }
 }

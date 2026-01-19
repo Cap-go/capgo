@@ -159,20 +159,22 @@ async function foundAPIKey(c: Context, capgkeyString: string, rights: Database['
   const apikey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKey(c, capgkeyString, supabaseAdmin(c), rights)
   if (!apikey) {
     cloudlog({ requestId: c.get('requestId'), message: 'Invalid apikey', capgkeyString, rights })
-    // Record failed auth attempt for invalid API key
-    backgroundTask(c, recordFailedAuth(c))
+    // Record failed auth attempt - await to ensure accurate counting
+    await recordFailedAuth(c)
     return quickError(401, 'invalid_apikey', 'Invalid apikey')
   }
 
-  // Check if API key is rate limited
+  // Clear failed auth attempts on successful auth
+  backgroundTask(c, clearFailedAuth(c))
+
+  // Record API usage first, then check if rate limited
+  await recordAPIKeyUsage(c, apikey.id)
+
+  // Check if API key is rate limited after recording usage
   const apiKeyRateLimited = await isAPIKeyRateLimited(c, apikey.id)
   if (apiKeyRateLimited) {
     return simpleRateLimit({ reason: 'api_key_rate_limit_exceeded', apikey_id: apikey.id })
   }
-
-  // Clear failed auth attempts on successful auth and record API usage
-  backgroundTask(c, clearFailedAuth(c))
-  backgroundTask(c, recordAPIKeyUsage(c, apikey.id))
 
   c.set('auth', {
     userId: apikey.user_id,
@@ -216,11 +218,11 @@ async function foundJWT(c: Context, jwt: string) {
   const { data: user, error: userError } = await supabaseJWT.auth.getUser()
   if (userError) {
     cloudlog({ requestId: c.get('requestId'), message: 'Invalid JWT', userError })
-    // Record failed auth attempt for invalid JWT
-    backgroundTask(c, recordFailedAuth(c))
+    // Record failed auth attempt - await to ensure accurate counting
+    await recordFailedAuth(c)
     return quickError(401, 'invalid_jwt', 'Invalid JWT')
   }
-  // Clear failed auth attempts on successful JWT auth
+  // Clear failed auth attempts on successful JWT auth (background is fine for clearing)
   backgroundTask(c, clearFailedAuth(c))
   c.set('auth', {
     userId: user.user?.id,
@@ -255,8 +257,8 @@ export function middlewareV2(rights: Database['public']['Enums']['key_mode'][]) 
     }
     else {
       cloudlog({ requestId: c.get('requestId'), message: 'No apikey or subkey provided' })
-      // Record failed auth attempt for missing credentials
-      backgroundTask(c, recordFailedAuth(c))
+      // Record failed auth attempt - await to ensure accurate counting
+      await recordFailedAuth(c)
       return quickError(401, 'no_jwt_apikey_or_subkey', 'No JWT, apikey or subkey provided')
     }
     await next()
@@ -288,8 +290,8 @@ export function middlewareKey(rights: Database['public']['Enums']['key_mode'][],
     })
     if (!key) {
       cloudlog({ requestId: c.get('requestId'), message: 'No key provided', method: c.req.method, url: c.req.url })
-      // Record failed auth attempt for missing key
-      backgroundTask(c, recordFailedAuth(c))
+      // Record failed auth attempt - await to ensure accurate counting
+      await recordFailedAuth(c)
       return quickError(401, 'no_key_provided', 'No key provided')
     }
 
@@ -314,20 +316,22 @@ export function middlewareKey(rights: Database['public']['Enums']['key_mode'][],
 
     if (!apikey) {
       cloudlog({ requestId: c.get('requestId'), message: 'Invalid apikey', key, method: c.req.method, url: c.req.url })
-      // Record failed auth attempt for invalid API key
-      backgroundTask(c, recordFailedAuth(c))
+      // Record failed auth attempt - await to ensure accurate counting
+      await recordFailedAuth(c)
       return quickError(401, 'invalid_apikey', 'Invalid apikey')
     }
 
-    // Check if API key is rate limited
+    // Clear failed auth attempts on successful auth (background is fine for clearing)
+    backgroundTask(c, clearFailedAuth(c))
+
+    // Record API usage first, then check if rate limited
+    await recordAPIKeyUsage(c, apikey.id)
+
+    // Check if API key is rate limited after recording usage
     const apiKeyRateLimited = await isAPIKeyRateLimited(c, apikey.id)
     if (apiKeyRateLimited) {
       return simpleRateLimit({ reason: 'api_key_rate_limit_exceeded', apikey_id: apikey.id })
     }
-
-    // Clear failed auth attempts on successful auth and record API usage
-    backgroundTask(c, clearFailedAuth(c))
-    backgroundTask(c, recordAPIKeyUsage(c, apikey.id))
 
     c.set('apikey', apikey)
     c.set('capgkey', key)
