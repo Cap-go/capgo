@@ -1,7 +1,7 @@
 import type { Context } from 'hono'
 import type { Database } from '../../../utils/supabase.types.ts'
 import { z } from 'zod/mini'
-import { simpleError } from '../../../utils/hono.ts'
+import { BRES, simpleError } from '../../../utils/hono.ts'
 import { cloudlog } from '../../../utils/logging.ts'
 import { apikeyHasOrgRight, hasOrgRightApikey, supabaseApikey } from '../../../utils/supabase.ts'
 
@@ -43,5 +43,5 @@ export async function post(c: Context, bodyRaw: any, apikey: Database['public'][
     throw simpleError('error_inviting_user_to_organization', 'Error inviting user to organization', { data })
   }
   cloudlog({ requestId: c.get('requestId'), message: 'User invited to organization', data: { email: body.email, org_id: body.orgId } })
-  return c.json({ status: data }, 200)
+  return c.json(BRES)
 }

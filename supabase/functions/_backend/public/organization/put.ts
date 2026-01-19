@@ -42,7 +42,7 @@ export async function put(c: Context, bodyRaw: any, apikey: Database['public']['
     }
   }
 
-  const { data, error } = await supabase.from('users').select('*').eq('id', userId).single()
+  const { data: _data, error } = await supabase.from('users').select('*').eq('id', userId).single()
   if (error) {
     throw simpleError('cannot_get_user', 'Cannot get user', { error: error.message })
   }
@@ -71,5 +71,5 @@ export async function put(c: Context, bodyRaw: any, apikey: Database['public']['
   if (errorOrg) {
     throw simpleError('cannot_update_org', 'Cannot update org', { error: errorOrg.message })
   }
-  return c.json({ status: 'Organization updated', id: data.id, data: dataOrg }, 200)
+  return c.json({ id: body.orgId, data: dataOrg })
 }
