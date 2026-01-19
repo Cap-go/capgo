@@ -14,12 +14,14 @@ import { organizationTabs as baseOrgTabs } from '~/constants/organizationTabs'
 import { settingsTabs } from '~/constants/settingsTabs'
 import { checkPermissions } from '~/services/permissions'
 import { openPortal } from '~/services/stripe'
+import { useSupabase } from '~/services/supabase'
 import { useOrganizationStore } from '~/stores/organization'
 
 const { t } = useI18n()
 const organizationStore = useOrganizationStore()
 const router = useRouter()
 const route = useRoute()
+const supabase = useSupabase()
 
 // Check if user needs to setup 2FA or update password for organization access
 const needsSecurityCompliance = computed(() => {
@@ -63,6 +65,29 @@ const canManageSecurity = computedAsync(async () => {
   if (!orgId)
     return false
   return await checkPermissions('org.update_settings', { orgId })
+}, false)
+
+// Check if RBAC is enabled for the current organization
+const isRbacEnabled = computedAsync(async () => {
+  const orgId = organizationStore.currentOrganization?.gid
+  if (!orgId)
+    return false
+
+  try {
+    const { data, error } = await supabase
+      .from('orgs')
+      .select('use_new_rbac')
+      .eq('id', orgId)
+      .single()
+
+    if (error)
+      return false
+
+    return (data as any)?.use_new_rbac || false
+  }
+  catch {
+    return false
+  }
 }, false)
 
 watchEffect(() => {
@@ -120,6 +145,17 @@ watchEffect(() => {
   }
   if (!needsSecurity && hasSecurity)
     organizationTabs.value = organizationTabs.value.filter(tab => tab.key !== '/settings/organization/security')
+
+  // Role assignments - visible only when RBAC is enabled for the organization
+  const needsRoleAssignments = isRbacEnabled.value && canManageSecurity.value
+  const hasRoleAssignments = organizationTabs.value.find(tab => tab.key === '/settings/organization/role-assignments')
+  if (needsRoleAssignments && !hasRoleAssignments) {
+    const base = baseOrgTabs.find(t => t.key === '/settings/organization/role-assignments')
+    if (base)
+      organizationTabs.value.push({ ...base })
+  }
+  if (!needsRoleAssignments && hasRoleAssignments)
+    organizationTabs.value = organizationTabs.value.filter(tab => tab.key !== '/settings/organization/role-assignments')
 
   // Check billing access - users with org.read_billing permission can access billing
   if (!Capacitor.isNativePlatform()

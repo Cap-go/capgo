@@ -15,8 +15,8 @@ export const organizationTabs: Tab[] = [
   // Security tab is added dynamically in settings.vue for super_admins only
   { label: 'security', key: '/settings/organization/security', icon: IconSecurity },
   { label: 'audit-logs', key: '/settings/organization/auditlogs', icon: IconAudit },
-  { label: 'groups', key: '/settings/organization/groups', icon: IconUserGroup },
-  { label: 'role-assignments', key: '/settings/organization/role-assignments', icon: IconSecurity },
+  // Role assignments tab is added dynamically in settings.vue when RBAC is enabled
+  { label: 'role-assignments', key: '/settings/organization/role-assignments', icon: IconUserGroup },
   { label: 'plans', key: '/settings/organization/plans', icon: IconPlan },
   { label: 'usage', key: '/settings/organization/usage', icon: IconChart },
   { label: 'credits', key: '/settings/organization/credits', icon: IconCredits },

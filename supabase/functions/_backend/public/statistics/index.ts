@@ -9,6 +9,11 @@ import { cloudlog, cloudlogErr } from '../../utils/logging.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { supabaseApikey, supabaseClient } from '../../utils/supabase.ts'
 
+// TODO: Investigate why statistics endpoint returns 401 when RBAC is enabled globally.
+// The checkPermission call fails for JWT auth even when user has proper org_users membership.
+// Likely issue with rbac_check_permission_direct not finding role_bindings after migration.
+// See seed.sql use_new_rbac setting - currently disabled as workaround.
+
 dayjs.extend(utc)
 
 export const app = honoFactory.createApp()
