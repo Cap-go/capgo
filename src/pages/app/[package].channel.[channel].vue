@@ -102,6 +102,7 @@ async function getChannel(force = false) {
           disable_auto_update,
           ios,
           android,
+          electron,
           updated_at
         `)
       .eq('id', id.value)
@@ -668,6 +669,12 @@ async function copyCurlCommand() {
               <Toggle
                 :value="channel?.android"
                 @change="saveChannelChange('android', !channel?.android)"
+              />
+            </InfoRow>
+            <InfoRow label="Electron">
+              <Toggle
+                :value="channel?.electron"
+                @change="saveChannelChange('electron', !channel?.electron)"
               />
             </InfoRow>
             <InfoRow :label="t('disable-auto-downgra')">
