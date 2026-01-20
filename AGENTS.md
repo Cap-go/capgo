@@ -79,6 +79,18 @@ testing against Cloudflare Workers.
   - `triggers/` - Database triggers and CRON functions
   - `utils/` - Shared utilities and database schemas
 
+### HTTP Response Conventions
+
+All API endpoints must follow these response patterns:
+
+- **Success with data:** `return c.json(data)` or `return c.json(data, 200)`
+- **Success without data:** `return c.json(BRES)` where `BRES = { status: 'ok' }` (import
+  from `utils/hono.ts`)
+- **Errors:** Use `return simpleError()` or `return quickError(status, ...)` (import from
+  `utils/hono.ts`)
+
+Do NOT use `c.body(null, 204)` for success responses. Always return JSON for consistency.
+
 ### Key Frontend Directories
 
 - **`src/components/`** - Reusable Vue components

@@ -49,7 +49,7 @@ describe('[POST] /bundle/metadata operations', () => {
 
     const data = await response.json() as { status: string }
     expect(response.status).toBe(200)
-    expect(data.status).toBe('success')
+    expect(data.status).toBe('ok')
 
     // Verify the data was updated in the database
     const supabase = getSupabaseClient()

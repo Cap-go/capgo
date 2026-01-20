@@ -107,7 +107,59 @@ async function getSignedUrl(c: Context, fileId: string, expirySeconds: number) {
 async function getSize(c: Context, fileId: string) {
   const client = initS3(c)
   try {
-    const file = await client.statObject(fileId)
+    // Ask Cloudflare/R2 for the raw object (no brotli/gzip) so Content-Length is preserved.
+    const file = await client.statObject(fileId, {
+      headers: { 'Accept-Encoding': 'identity' },
+    })
+
+    let size = Number.isFinite(file.size) ? file.size : 0
+    cloudlog({ requestId: c.get('requestId'), message: 'getSize head result', fileId, headSize: size, headRawSize: file.size })
+
+    // Fallback: some proxied HEAD responses still omit Content-Length (size becomes NaN)
+    if (!size) {
+      try {
+        const url = await client.getPresignedUrl('GET', fileId, {
+          parameters: { 'x-id': 'GetObject' },
+        })
+        const res = await fetch(url, {
+          method: 'GET',
+          headers: {
+            'Range': 'bytes=0-0', // minimal range; forces Content-Range with total length
+            'Accept-Encoding': 'identity',
+          },
+        })
+
+        const contentRange = res.headers.get('content-range') || res.headers.get('Content-Range')
+        const contentLength = res.headers.get('content-length') || res.headers.get('Content-Length')
+
+        cloudlog({
+          requestId: c.get('requestId'),
+          message: 'getSize fallback headers',
+          fileId,
+          status: res.status,
+          contentRange,
+          contentLength,
+        })
+
+        if (contentRange && contentRange.includes('/')) {
+          const total = Number.parseInt(contentRange.split('/').at(1) ?? '0', 10)
+          if (Number.isFinite(total) && total > 0)
+            size = total
+        }
+
+        if (!size && contentLength) {
+          const len = Number.parseInt(contentLength, 10)
+          if (Number.isFinite(len) && len > 0)
+            size = len
+        }
+
+        cloudlog({ requestId: c.get('requestId'), message: 'getSize fallback parsed', fileId, sizeAfterFallback: size })
+      }
+      catch (fallbackError) {
+        cloudlog({ requestId: c.get('requestId'), message: 'getSize fallback failed', fileId, fallbackError })
+      }
+    }
+
     cloudlog({
       requestId: c.get('requestId'),
       message: 'getSize',
@@ -115,8 +167,9 @@ async function getSize(c: Context, fileId: string) {
       fileId,
       bucket: getEnv(c, 'S3_BUCKET'),
       endpoint: getEnv(c, 'S3_ENDPOINT'),
+      finalSize: size,
     })
-    return file.size ?? 0
+    return size
   }
   catch (error) {
     cloudlog({ requestId: c.get('requestId'), message: 'getSize', error })
