@@ -53,17 +53,6 @@ function validateMaxExpirationDays(maxDays?: number | null) {
   }
 }
 
-async function fetchUser(
-  supabase: ReturnType<typeof supabaseApikey>,
-  userId: string,
-) {
-  const { data: _data, error } = await supabase.from('users').select('*').eq('id', userId).single()
-  if (error) {
-    throw simpleError('cannot_get_user', 'Cannot get user', { error: error.message })
-  }
-  return _data
-}
-
 function buildUpdateFields(body: z.infer<typeof bodySchema>) {
   const updateFields: Partial<Database['public']['Tables']['orgs']['Update']> = {}
   if (body.name !== undefined)
@@ -102,15 +91,13 @@ async function updateOrg(
 
 export async function put(c: Context<MiddlewareKeyVariables>, bodyRaw: any, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
   const body = parseBody(bodyRaw)
-  const userId = apikey.user_id
   const supabase = supabaseApikey(c, apikey.key)
 
   // Auth context is already set by middlewareKey
   await ensureOrgAccess(c, apikey, body.orgId, supabase)
   validateMaxExpirationDays(body.max_apikey_expiration_days)
-  const user = await fetchUser(supabase, userId)
   const updateFields = buildUpdateFields(body)
   const dataOrg = await updateOrg(supabase, body.orgId, updateFields)
 
-  return c.json({ status: 'Organization updated', id: user.id, data: dataOrg }, 200)
+  return c.json({ status: 'Organization updated', id: dataOrg.id, data: dataOrg }, 200)
 }
