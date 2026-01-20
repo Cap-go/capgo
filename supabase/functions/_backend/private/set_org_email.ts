@@ -32,13 +32,13 @@ app.post('/', middlewareV2(['all', 'write']), async (c) => {
   const { data: organization, error: organizationError } = await supabase.from('orgs')
     .select('customer_id, management_email')
     .eq('id', safeBody.org_id)
-    .single()
+    .maybeSingle()
+
+  if (organizationError) {
+    return quickError(500, 'internal_error', 'Failed to fetch organization', { orgId: safeBody.org_id, organizationError })
+  }
 
   if (!organization) {
-    if (organizationError) {
-      // RLS might have blocked access - return not_authorized instead of internal error
-      return quickError(401, 'not_authorized', 'Not authorized to access this organization', { orgId: safeBody.org_id })
-    }
     throw simpleError('org_not_found', 'Organization not found', { orgId: safeBody.org_id })
   }
 

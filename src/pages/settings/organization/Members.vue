@@ -79,6 +79,21 @@ const isInviteFormValid = computed(() => {
     && captchaToken.value !== ''
 })
 
+function mapRbacRoleToLegacy(role: string): Database['public']['Enums']['user_min_right'] {
+  switch (role) {
+    case 'org_member':
+      return 'read'
+    case 'org_billing_admin':
+      return 'admin'
+    case 'org_admin':
+      return 'write'
+    case 'org_super_admin':
+      return 'super_admin'
+    default:
+      return role as Database['public']['Enums']['user_min_right']
+  }
+}
+
 async function checkRbacEnabled() {
   useNewRbac.value = false
   if (!currentOrganization.value)
@@ -423,7 +438,7 @@ async function showInviteModal() {
   })
 }
 
-async function sendInvitation(email: string, type: Database['public']['Enums']['user_min_right']): Promise<boolean> {
+async function sendInvitation(email: string, type: Database['public']['Enums']['user_min_right'] | string): Promise<boolean> {
   console.log(`Invite ${email} with perm ${type}`)
 
   const orgId = currentOrganization.value?.gid
@@ -432,12 +447,16 @@ async function sendInvitation(email: string, type: Database['public']['Enums']['
     return false
   }
 
+  const inviteType = useNewRbac.value
+    ? mapRbacRoleToLegacy(type)
+    : type as Database['public']['Enums']['user_min_right']
+
   isLoading.value = true
   try {
     const { data, error } = await supabase.rpc('invite_user_to_org', {
       email,
       org_id: orgId,
-      invite_type: type,
+      invite_type: inviteType,
     })
 
     if (error) {
@@ -446,7 +465,7 @@ async function sendInvitation(email: string, type: Database['public']['Enums']['
       return false
     }
 
-    const success = await handleSendInvitationOutput(data, email, type)
+    const success = await handleSendInvitationOutput(data, email, inviteType)
     if (success) {
       await reloadData()
     }
