@@ -634,7 +634,6 @@ DECLARE
   previous_version_id BIGINT := 3;
   current_version_id BIGINT := 4;
   demo_org_id uuid := '046a36ac-e03c-4590-9257-bd6c9dba9ee8'::uuid;
-  i INTEGER;
 BEGIN
   -- Truncate all tables
   TRUNCATE TABLE public.daily_mau, public.daily_bandwidth, public.daily_storage, public.daily_version, public.storage_usage, public.version_usage, public.device_usage, public.bandwidth_usage, public.devices, public.stats;

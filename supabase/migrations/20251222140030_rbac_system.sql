@@ -2012,12 +2012,12 @@ SET search_path = '' SECURITY DEFINER AS $$
 DECLARE
   api_key_text text;
   api_key record;
-  user_id uuid;
+  v_user_id uuid;
   limited_orgs uuid[];
   has_limited_orgs boolean := false;
 BEGIN
   SELECT "public"."get_apikey_header"() into api_key_text;
-  user_id := NULL;
+  v_user_id := NULL;
 
   -- Check for API key first
   IF api_key_text IS NOT NULL THEN
@@ -2028,16 +2028,16 @@ BEGIN
       RAISE EXCEPTION 'Invalid API key provided';
     END IF;
 
-    user_id := api_key.user_id;
+    v_user_id := api_key.user_id;
     limited_orgs := api_key.limited_to_orgs;
     has_limited_orgs := COALESCE(array_length(limited_orgs, 1), 0) > 0;
   END IF;
 
-  -- If no valid API key user_id yet, try to get FROM public.identity
-  IF user_id IS NULL THEN
-    SELECT public.get_identity() into user_id;
+  -- If no valid API key v_user_id yet, try to get FROM public.identity
+  IF v_user_id IS NULL THEN
+    SELECT public.get_identity() into v_user_id;
 
-    IF user_id IS NULL THEN
+    IF v_user_id IS NULL THEN
       PERFORM public.pg_log('deny: UNAUTHENTICATED', '{}'::jsonb);
       RAISE EXCEPTION 'No authentication provided - API key or valid session required';
     END IF;
@@ -2046,78 +2046,78 @@ BEGIN
   RETURN QUERY
   WITH role_orgs AS (
     -- Direct role bindings on org scope
-    SELECT rb.org_id
+    SELECT rb.org_id AS org_uuid
     FROM public.role_bindings rb
     WHERE rb.principal_type = public.rbac_principal_user()
-      AND rb.principal_id = user_id
+      AND rb.principal_id = v_user_id
       AND rb.org_id IS NOT NULL
       AND (rb.expires_at IS NULL OR rb.expires_at > now())
     UNION
     -- Group role bindings on org scope
-    SELECT rb.org_id
+    SELECT rb.org_id AS org_uuid
     FROM public.role_bindings rb
     JOIN public.group_members gm ON gm.group_id = rb.principal_id
     WHERE rb.principal_type = public.rbac_principal_group()
-      AND gm.user_id = user_id
+      AND gm.user_id = v_user_id
       AND rb.org_id IS NOT NULL
       AND (rb.expires_at IS NULL OR rb.expires_at > now())
     UNION
     -- App scope bindings (user)
-    SELECT apps.owner_org
+    SELECT apps.owner_org AS org_uuid
     FROM public.role_bindings rb
     JOIN public.apps ON apps.id = rb.app_id
     WHERE rb.principal_type = public.rbac_principal_user()
-      AND rb.principal_id = user_id
+      AND rb.principal_id = v_user_id
       AND rb.app_id IS NOT NULL
       AND (rb.expires_at IS NULL OR rb.expires_at > now())
     UNION
     -- App scope bindings (group)
-    SELECT apps.owner_org
+    SELECT apps.owner_org AS org_uuid
     FROM public.role_bindings rb
     JOIN public.apps ON apps.id = rb.app_id
     JOIN public.group_members gm ON gm.group_id = rb.principal_id
     WHERE rb.principal_type = public.rbac_principal_group()
-      AND gm.user_id = user_id
+      AND gm.user_id = v_user_id
       AND rb.app_id IS NOT NULL
       AND (rb.expires_at IS NULL OR rb.expires_at > now())
     UNION
     -- Channel scope bindings (user)
-    SELECT apps.owner_org
+    SELECT apps.owner_org AS org_uuid
     FROM public.role_bindings rb
     JOIN public.channels ch ON ch.rbac_id = rb.channel_id
     JOIN public.apps ON apps.app_id = ch.app_id
     WHERE rb.principal_type = public.rbac_principal_user()
-      AND rb.principal_id = user_id
+      AND rb.principal_id = v_user_id
       AND rb.channel_id IS NOT NULL
       AND (rb.expires_at IS NULL OR rb.expires_at > now())
     UNION
     -- Channel scope bindings (group)
-    SELECT apps.owner_org
+    SELECT apps.owner_org AS org_uuid
     FROM public.role_bindings rb
     JOIN public.channels ch ON ch.rbac_id = rb.channel_id
     JOIN public.apps ON apps.app_id = ch.app_id
     JOIN public.group_members gm ON gm.group_id = rb.principal_id
     WHERE rb.principal_type = public.rbac_principal_group()
-      AND gm.user_id = user_id
+      AND gm.user_id = v_user_id
       AND rb.channel_id IS NOT NULL
       AND (rb.expires_at IS NULL OR rb.expires_at > now())
   ),
   legacy_orgs AS (
-    SELECT org_users.org_id
+    SELECT org_users.org_id AS org_uuid
     FROM public.org_users
-    WHERE org_users.user_id = user_id
+    WHERE org_users.user_id = v_user_id
   ),
   all_orgs AS (
-    SELECT org_id FROM legacy_orgs
+    SELECT org_uuid FROM legacy_orgs
     UNION
-    SELECT org_id FROM role_orgs
+    SELECT org_uuid FROM role_orgs
   )
-  SELECT org_id
-  FROM all_orgs
-  WHERE org_id IS NOT NULL
+  SELECT ao.org_uuid AS org_id
+  FROM all_orgs ao
+  WHERE ao.org_uuid IS NOT NULL
     AND (
       NOT has_limited_orgs
-      OR org_id = ANY(limited_orgs)
+      OR ao.org_uuid = ANY(limited_orgs)
     );
 END;
 $$;
@@ -3512,12 +3512,12 @@ BEGIN
     rb.reason,
     rb.is_direct,
     CASE
-      WHEN rb.principal_type = public.rbac_principal_user() THEN u.email
-      WHEN rb.principal_type = public.rbac_principal_group() THEN g.name
+      WHEN rb.principal_type = public.rbac_principal_user() THEN u.email::text
+      WHEN rb.principal_type = public.rbac_principal_group() THEN g.name::text
       ELSE rb.principal_id::text
     END as principal_name,
-    u.email as user_email,
-    g.name as group_name
+    u.email::text as user_email,
+    g.name::text as group_name
   FROM public.role_bindings rb
   INNER JOIN public.roles r ON rb.role_id = r.id
   LEFT JOIN public.users u ON rb.principal_type = public.rbac_principal_user() AND rb.principal_id = u.id
@@ -3563,7 +3563,6 @@ DECLARE
   v_use_rbac boolean;
   v_effective_org_id uuid := p_org_id;
   v_legacy_right public.user_min_right;
-  v_scope text;
   v_apikey_principal uuid;
 BEGIN
   -- Validate permission key
@@ -3623,16 +3622,6 @@ BEGIN
   ELSE
     -- Legacy path: Map permission to min_right and use legacy check
     -- Determine scope from permission prefix
-    IF p_permission_key LIKE 'channel.%' THEN
-      v_scope := public.rbac_scope_channel();
-    ELSIF p_permission_key LIKE 'app.%' OR p_permission_key LIKE 'bundle.%' THEN
-      v_scope := public.rbac_scope_app();
-    ELSIF p_permission_key LIKE 'org.%' THEN
-      v_scope := public.rbac_scope_org();
-    ELSE
-      v_scope := public.rbac_scope_org(); -- Default fallback
-    END IF;
-
     -- Map permission to legacy right using reverse lookup
     v_legacy_right := public.rbac_legacy_right_for_permission(p_permission_key);
 
