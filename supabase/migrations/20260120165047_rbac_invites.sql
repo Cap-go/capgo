@@ -899,7 +899,7 @@ BEGIN
       AND (rb.expires_at IS NULL OR rb.expires_at > now())
   ),
   rbac_org_roles AS (
-    SELECT org_id, (ARRAY_AGG(name ORDER BY priority_rank DESC))[1] AS role_name
+    SELECT org_id, (ARRAY_AGG(rbac_roles.name ORDER BY rbac_roles.priority_rank DESC))[1] AS role_name
     FROM rbac_roles
     GROUP BY org_id
   ),
