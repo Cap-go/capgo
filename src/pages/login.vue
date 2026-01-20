@@ -305,7 +305,7 @@ async function goback() {
 
   if (error) {
     toast.error(t('cannot-sign-off'))
-    console.error('cannot log of', error)
+    console.error('cannot log off', error)
     return
   }
 
