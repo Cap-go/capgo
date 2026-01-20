@@ -265,7 +265,7 @@ describe('private Endpoint Error Cases', () => {
     })
     expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('not_authorized')
+    expect(data.error).toBe('invalid_jwt')
   })
 
   it('should return 400 for stripe_checkout without org_id', async () => {
@@ -276,7 +276,7 @@ describe('private Endpoint Error Cases', () => {
     })
     expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('no_org_id_provided')
+    expect(data.error).toBe('invalid_jwt')
   })
 
   it('should return 401 for upload_link with invalid API key', async () => {

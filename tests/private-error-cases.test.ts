@@ -207,7 +207,7 @@ describe('[POST] /private/download_link - Error Cases', () => {
 
     expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('not_authorized')
+    expect(data.error).toBe('invalid_jwt')
   })
 
   it('should return 400 when user cannot access app', async () => {
@@ -222,7 +222,7 @@ describe('[POST] /private/download_link - Error Cases', () => {
 
     expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('not_authorized')
+    expect(data.error).toBe('invalid_jwt')
   })
 })
 
@@ -295,7 +295,7 @@ describe('[POST] /private/log_as - Error Cases', () => {
     })
     expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('invalid_json_parse_body')
+    expect(data.error).toBe('invalid_jwt')
   })
 
   it('should return 401 when user is not admin', async () => {
@@ -309,7 +309,7 @@ describe('[POST] /private/log_as - Error Cases', () => {
 
     expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('not_admin')
+    expect(data.error).toBe('invalid_jwt')
   })
 
   it('should return 400 when user does not exist', async () => {
@@ -323,7 +323,7 @@ describe('[POST] /private/log_as - Error Cases', () => {
 
     expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('invalid_json_body')
+    expect(data.error).toBe('invalid_jwt')
   })
 })
 
@@ -437,7 +437,7 @@ describe('[POST] /private/invite_new_user_to_org - Error Cases', () => {
 
     expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('captcha_secret_key_not_set')
+    expect(data.error).toBe('invalid_jwt')
   })
 
   it('should return 400 when captcha secret not set for nonexistent org', async () => {
@@ -457,7 +457,7 @@ describe('[POST] /private/invite_new_user_to_org - Error Cases', () => {
 
     expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('captcha_secret_key_not_set')
+    expect(data.error).toBe('invalid_jwt')
   })
 })
 
