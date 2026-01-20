@@ -304,7 +304,7 @@ async function goback() {
   const { error } = await supabase.auth.signOut()
 
   if (error) {
-    toast.error(t('cannots-sign-off'))
+    toast.error(t('cannot-sign-off'))
     console.error('cannot log of', error)
     return
   }

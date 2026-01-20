@@ -364,7 +364,7 @@
   "cannot-view-plans": "Planlar sayfasını görüntüleyemiyor",
   "cannot-view-usage": "Kullanım sayfasını görüntüleyemiyor",
   "cannot_invite_user_without_account": "Hesabı olmayan kullanıcıyı davet edemezsiniz",
-  "cannots-sign-off": "Oturumu kapatamıyor",
+  "cannot-sign-off": "Oturumu kapatamıyor",
   "captcha": "Captcha",
   "captcha-fail": "Captcha doğrulaması başarısız oldu",
   "captcha-new-user-org-tooltip": "Bunu, davet etmeye çalıştığınız kullanıcının bir Capgo hesabı olmadığı için ihtiyacınız var. \nCapgo, bir tane oluşturmak ve organizasyona katılmak için ona bir bağlantı içeren bir e-posta gönderecek, ancak sistemin kötüye kullanılmasını önlemek için captcha'yı çözmeniz ve bazı ek detayları sağlamanız gerekiyor.",

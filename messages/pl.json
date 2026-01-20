@@ -364,7 +364,7 @@
   "cannot-view-plans": "Nie można wyświetlić strony z planami",
   "cannot-view-usage": "Nie można wyświetlić strony z użyciem",
   "cannot_invite_user_without_account": "Nie można zaprosić użytkownika bez konta",
-  "cannots-sign-off": "Nie można się wylogować",
+  "cannot-sign-off": "Nie można się wylogować",
   "captcha": "Captcha",
   "captcha-fail": "Walidacja Captcha nie powiodła się",
   "captcha-new-user-org-tooltip": "Potrzebujesz tego, ponieważ użytkownik, którego próbujesz zaprosić, nie ma konta w Capgo.\nCapgo wyśle mu e-mail z linkiem do utworzenia konta i dołączenia do organizacji, ale musisz rozwiązać captcha i podać dodatkowe szczegóły, aby zapobiec nadużyciom systemu.",

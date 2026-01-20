@@ -400,7 +400,7 @@
   "cannot-view-plans": "Cannot view the plans page",
   "cannot-view-usage": "Cannot view the usage page",
   "cannot_invite_user_without_account": "Cannot invite user without account",
-  "cannots-sign-off": "Cannot log of",
+  "cannot-sign-off": "Cannot log of",
   "captcha": "Captcha",
   "captcha-fail": "Captcha validation failed",
   "captcha-new-user-org-tooltip": "You need this because the user that you are trying to invite doesn't have a Capgo account.\nCapgo will send him and email with a link to create one and join the organization, but you need to solve the captcha and provide some extra details in order to prevent abuse of the system.",
