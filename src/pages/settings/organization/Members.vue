@@ -301,8 +301,13 @@ function validateEmail(email: string) {
 }
 
 async function showPermModal(invite: boolean, onConfirm?: (permission: Database['public']['Enums']['user_min_right']) => Promise<boolean>, currentRole?: string): Promise<Database['public']['Enums']['user_min_right'] | undefined> {
-  selectedPermission.value = currentRole as Database['public']['Enums']['user_min_right'] | undefined
-  selectedPermissionForm.value = currentRole || ''
+  const initialRole = useNewRbac.value
+    ? (currentRole ? currentRole.trim().toLowerCase().replace(/\s+/g, '_') : '')
+    : (currentRole ?? '')
+  selectedPermission.value = initialRole
+    ? initialRole as Database['public']['Enums']['user_min_right']
+    : undefined
+  selectedPermissionForm.value = initialRole
   isInvitePermissionModal.value = invite
 
   const confirmButtonId = 'perm-confirm-button'
