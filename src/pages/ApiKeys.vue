@@ -12,6 +12,7 @@ import IconArrowPath from '~icons/heroicons/arrow-path'
 import IconCalendar from '~icons/heroicons/calendar'
 import IconClipboard from '~icons/heroicons/clipboard-document'
 import IconPencil from '~icons/heroicons/pencil'
+import IconShieldCheck from '~icons/heroicons/shield-check'
 import IconTrash from '~icons/heroicons/trash'
 import Table from '~/components/Table.vue'
 import { formatLocalDate } from '~/services/date'
@@ -33,6 +34,44 @@ const supabase = useSupabase()
 const keys = ref<Database['public']['Tables']['apikeys']['Row'][]>([])
 const organizationStore = useOrganizationStore()
 const columns: Ref<TableColumn[]> = ref<TableColumn[]>([])
+
+// RBAC state
+const useNewRbac = ref(false)
+
+// Role binding types
+interface RoleBinding {
+  binding_id: string
+  role_id: string
+  role_name: string
+  role_description: string | null
+  scope_type: string
+  org_id: string | null
+  org_name: string | null
+  app_id: string | null
+  app_name: string | null
+  channel_id: string | null
+  granted_at: string
+  expires_at: string | null
+}
+
+interface AvailableRole {
+  role_id: string
+  role_name: string
+  role_description: string | null
+  scope_type: string
+  priority_rank: number
+}
+
+// Cache for role bindings per API key
+const roleBindingsCache = ref(new Map<number, RoleBinding[]>())
+const selectedApiKeyForRoles = ref<Database['public']['Tables']['apikeys']['Row'] | null>(null)
+const currentApiKeyRoles = ref<RoleBinding[]>([])
+const availableRoles = ref<AvailableRole[]>([])
+const selectedRoleForAssignment = ref('')
+const selectedScopeType = ref('org')
+const selectedOrgForRole = ref('')
+const selectedAppForRole = ref<string | null>(null)
+const isLoadingRoles = ref(false)
 
 // State for change name dialog
 const newApiKeyName = ref('')
@@ -187,6 +226,201 @@ async function fetchOrgAndAppNames() {
   }
 }
 
+// RBAC helper functions
+async function checkRbacEnabled() {
+  // Check if at least one org has RBAC enabled
+  const { data } = await supabase
+    .from('orgs')
+    .select('use_new_rbac')
+    .limit(10)
+
+  useNewRbac.value = data?.some(o => (o as any).use_new_rbac) || false
+}
+
+async function getRoleBindingsForApiKey(apikeyId: number): Promise<RoleBinding[]> {
+  // Check cache first
+  if (roleBindingsCache.value.has(apikeyId)) {
+    return roleBindingsCache.value.get(apikeyId) || []
+  }
+
+  try {
+    const { data, error } = await supabase.rpc('get_apikey_role_bindings', {
+      p_apikey_id: apikeyId,
+    })
+
+    if (error) {
+      console.error('Error fetching role bindings:', error)
+      return []
+    }
+
+    const bindings = (data || []) as RoleBinding[]
+    roleBindingsCache.value.set(apikeyId, bindings)
+    return bindings
+  }
+  catch (err) {
+    console.error('Error fetching role bindings:', err)
+    return []
+  }
+}
+
+async function getAvailableRolesForScope(scopeType: string): Promise<AvailableRole[]> {
+  try {
+    const { data, error } = await supabase.rpc('get_available_roles_for_apikey', {
+      p_scope_type: scopeType,
+    })
+
+    if (error) {
+      console.error('Error fetching available roles:', error)
+      return []
+    }
+
+    return (data || []) as AvailableRole[]
+  }
+  catch (err) {
+    console.error('Error fetching available roles:', err)
+    return []
+  }
+}
+
+function formatRoleBindings(bindings: RoleBinding[]): string {
+  if (!bindings || bindings.length === 0) {
+    return t('no-roles-assigned')
+  }
+
+  return bindings.map((b) => {
+    const roleName = b.role_name.replace(/_/g, ' ')
+    const scope = b.org_name || b.app_name || ''
+    return scope ? `${roleName} (${scope})` : roleName
+  }).join(', ')
+}
+
+async function openRoleManagementModal(apikey: Database['public']['Tables']['apikeys']['Row']) {
+  selectedApiKeyForRoles.value = apikey
+  isLoadingRoles.value = true
+  selectedRoleForAssignment.value = ''
+  selectedScopeType.value = 'org'
+  selectedOrgForRole.value = ''
+  selectedAppForRole.value = null
+
+  // Fetch current roles for this API key
+  currentApiKeyRoles.value = await getRoleBindingsForApiKey(apikey.id)
+
+  // Fetch available roles for org scope by default
+  availableRoles.value = await getAvailableRolesForScope('org')
+
+  isLoadingRoles.value = false
+
+  dialogStore.openDialog({
+    title: t('manage-api-key-roles'),
+    description: t('manage-api-key-roles-description', { name: apikey.name }),
+    size: 'xl',
+    buttons: [
+      {
+        text: t('close'),
+        role: 'cancel',
+      },
+    ],
+  })
+}
+
+async function assignRoleToApiKey() {
+  if (!selectedApiKeyForRoles.value || !selectedRoleForAssignment.value || !selectedOrgForRole.value) {
+    toast.error(t('please-select-all-fields'))
+    return
+  }
+
+  isLoadingRoles.value = true
+
+  try {
+    const { data, error } = await supabase.rpc('assign_apikey_role', {
+      p_apikey_id: selectedApiKeyForRoles.value.id,
+      p_role_name: selectedRoleForAssignment.value,
+      p_scope_type: selectedScopeType.value,
+      p_org_id: selectedOrgForRole.value,
+      p_app_id: selectedAppForRole.value,
+    })
+
+    if (error) {
+      console.error('Error assigning role:', error)
+      if (error.message.includes('NO_PERMISSION_TO_ASSIGN_ROLES')) {
+        toast.error(t('no-permission-to-assign-roles'))
+      }
+      else if (error.message.includes('ROLE_SCOPE_MISMATCH')) {
+        toast.error(t('role-scope-mismatch'))
+      }
+      else {
+        toast.error(t('error-assigning-role'))
+      }
+      return
+    }
+
+    if ((data as any)?.status === 'OK') {
+      toast.success(t('role-assigned-success'))
+      // Clear cache and refresh
+      roleBindingsCache.value.delete(selectedApiKeyForRoles.value.id)
+      currentApiKeyRoles.value = await getRoleBindingsForApiKey(selectedApiKeyForRoles.value.id)
+      // Reset selection
+      selectedRoleForAssignment.value = ''
+    }
+  }
+  catch (err) {
+    console.error('Error assigning role:', err)
+    toast.error(t('error-assigning-role'))
+  }
+  finally {
+    isLoadingRoles.value = false
+  }
+}
+
+async function deleteRoleFromApiKey(bindingId: string) {
+  if (!selectedApiKeyForRoles.value) {
+    return
+  }
+
+  isLoadingRoles.value = true
+
+  try {
+    const { data, error } = await supabase.rpc('delete_apikey_role', {
+      p_apikey_id: selectedApiKeyForRoles.value.id,
+      p_binding_id: bindingId,
+    })
+
+    if (error) {
+      console.error('Error deleting role:', error)
+      if (error.message.includes('NO_PERMISSION_TO_DELETE_ROLES')) {
+        toast.error(t('no-permission-to-delete-roles'))
+      }
+      else {
+        toast.error(t('error-deleting-role'))
+      }
+      return
+    }
+
+    if (data === 'OK') {
+      toast.success(t('role-removed-success'))
+      // Clear cache and refresh
+      roleBindingsCache.value.delete(selectedApiKeyForRoles.value.id)
+      currentApiKeyRoles.value = await getRoleBindingsForApiKey(selectedApiKeyForRoles.value.id)
+    }
+  }
+  catch (err) {
+    console.error('Error deleting role:', err)
+    toast.error(t('error-deleting-role'))
+  }
+  finally {
+    isLoadingRoles.value = false
+  }
+}
+
+// Watch scope type changes to refresh available roles
+watch(selectedScopeType, async (newScope) => {
+  if (newScope) {
+    availableRoles.value = await getAvailableRolesForScope(newScope)
+    selectedRoleForAssignment.value = ''
+  }
+})
+
+
 const searchQuery = ref('')
 
 const filteredAndSortedKeys = computed(() => {
@@ -327,6 +561,11 @@ columns.value = [
       {
         icon: IconPencil,
         onClick: (key: Database['public']['Tables']['apikeys']['Row']) => changeName(key),
+      },
+      {
+        icon: IconShieldCheck,
+        visible: () => useNewRbac.value,
+        onClick: (key: Database['public']['Tables']['apikeys']['Row']) => openRoleManagementModal(key),
       },
       {
         icon: IconArrowPath,
@@ -818,6 +1057,7 @@ watch(() => limitToOrgCheckbox.value, (newVal) => {
 
 displayStore.NavTitle = t('api-keys')
 displayStore.defaultBack = '/app'
+checkRbacEnabled()
 getKeys()
 </script>
 
