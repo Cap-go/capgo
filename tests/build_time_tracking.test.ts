@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { BASE_URL, fetchWithRetry, getSupabaseClient, PRODUCT_ID, resetAppData, resetAppDataStats, TEST_EMAIL, USER_ID } from './test-utils.ts'
+import { fetchWithRetry, getEndpointUrl, getSupabaseClient, PRODUCT_ID, resetAppData, resetAppDataStats, TEST_EMAIL, USER_ID } from './test-utils.ts'
 
 // Generate unique IDs per test run to avoid conflicts with parallel test runs
 const testRunId = randomUUID()
@@ -22,7 +22,7 @@ beforeAll(async () => {
   const { error: stripeError } = await supabase
     .from('stripe_info')
     .insert({
-      subscription_id: 'sub_build_time_test',
+      subscription_id: `sub_build_time_test_${testRunId.slice(0, 8)}`,
       customer_id: STRIPE_CUSTOMER_ID,
       status: 'succeeded' as const,
       product_id: PRODUCT_ID,
@@ -166,7 +166,7 @@ describe('build Time Tracking System', () => {
     // Verify our inserted build time is the only one (should be exactly 36000)
     expect((totalMetrics as any)?.[0]?.build_time_unit).toBe(36000)
 
-    const response = await fetchWithRetry(`${BASE_URL}/triggers/cron_stat_org`, {
+    const response = await fetchWithRetry(getEndpointUrl('/triggers/cron_stat_org'), {
       method: 'POST',
       headers,
       body: JSON.stringify({ orgId: ORG_ID }),

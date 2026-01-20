@@ -808,7 +808,7 @@ async function _changeMemberPermission(member: ExtendedOrganizationMember, perm:
 }
 
 async function changeMemberPermission(member: ExtendedOrganizationMember) {
-  const isInvite = member.role.includes('invite')
+  const isInvite = !useNewRbac.value && member.role.includes('invite')
   const perm = await showPermModal(isInvite, undefined, member.role)
 
   if (!perm) {
