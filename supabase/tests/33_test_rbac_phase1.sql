@@ -90,8 +90,8 @@ WITH seed_data AS (
     '44444444-4444-4444-8444-444444444444'::uuid AS member_user,
     'rbac-test-key-phase1'::text AS api_key_value
 )
-INSERT INTO public.apikeys (user_id, key, mode, name)
-SELECT member_user, api_key_value, 'all'::public.key_mode, 'rbac-test-apikey' FROM seed_data;
+INSERT INTO public.apikeys (id, user_id, key, mode, name)
+SELECT 33001, member_user, api_key_value, 'all'::public.key_mode, 'rbac-test-apikey' FROM seed_data;
 
 -- RBAC bindings (org_admin to user, app_admin to apikey)
 WITH seed_data AS (
