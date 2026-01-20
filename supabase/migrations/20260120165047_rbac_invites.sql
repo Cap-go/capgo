@@ -811,21 +811,24 @@ BEGIN
       AND tmp.cancelled_at IS NULL
       AND tmp.created_at > (CURRENT_TIMESTAMP - INTERVAL '7 days')
   )
-  SELECT * FROM rbac_members
-  UNION ALL
-  SELECT * FROM legacy_invites
-  UNION ALL
-  SELECT * FROM tmp_invites
+  SELECT *
+  FROM (
+    SELECT * FROM rbac_members
+    UNION ALL
+    SELECT * FROM legacy_invites
+    UNION ALL
+    SELECT * FROM tmp_invites
+  ) AS combined
   ORDER BY
-    is_invite,
-    CASE role_name
+    combined.is_invite,
+    CASE combined.role_name
       WHEN public.rbac_role_org_super_admin() THEN 1
       WHEN public.rbac_role_org_admin() THEN 2
       WHEN public.rbac_role_org_billing_admin() THEN 3
       WHEN public.rbac_role_org_member() THEN 4
       ELSE 5
     END,
-    email;
+    combined.email;
 END;
 $$;
 
