@@ -300,9 +300,9 @@ function validateEmail(email: string) {
     )
 }
 
-async function showPermModal(invite: boolean, onConfirm?: (permission: Database['public']['Enums']['user_min_right']) => Promise<boolean>): Promise<Database['public']['Enums']['user_min_right'] | undefined> {
-  selectedPermission.value = undefined
-  selectedPermissionForm.value = ''
+async function showPermModal(invite: boolean, onConfirm?: (permission: Database['public']['Enums']['user_min_right']) => Promise<boolean>, currentRole?: string): Promise<Database['public']['Enums']['user_min_right'] | undefined> {
+  selectedPermission.value = currentRole as Database['public']['Enums']['user_min_right'] | undefined
+  selectedPermissionForm.value = currentRole || ''
   isInvitePermissionModal.value = invite
 
   const confirmButtonId = 'perm-confirm-button'
@@ -804,7 +804,7 @@ async function _changeMemberPermission(member: ExtendedOrganizationMember, perm:
 
 async function changeMemberPermission(member: ExtendedOrganizationMember) {
   const isInvite = member.role.includes('invite')
-  const perm = await showPermModal(isInvite)
+  const perm = await showPermModal(isInvite, undefined, member.role)
 
   if (!perm) {
     console.log('Permission change cancelled.')

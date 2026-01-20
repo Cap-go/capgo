@@ -7,17 +7,30 @@ const APPNAME = `com.private.error.${id}`
 // Use unique org ID per test run to prevent conflicts with parallel tests
 const testOrgId = randomUUID()
 const testOrgEmail = `test-private-error-${id}@capgo.app`
+const testCustomerId = `cus_test_${id}`
 
 beforeAll(async () => {
   await resetAndSeedAppData(APPNAME)
 
-  // Create unique test organization (without a customer_id) for this test run
+  // Create stripe_info for this test org (so user can access it via RLS)
+  const { error: stripeError } = await getSupabaseClient().from('stripe_info').insert({
+    customer_id: testCustomerId,
+    status: 'succeeded',
+    product_id: 'prod_LQIregjtNduh4q',
+    subscription_id: `sub_${id}`,
+    trial_at: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
+    is_good_plan: true,
+  })
+  if (stripeError)
+    throw stripeError
+
+  // Create unique test organization (WITH a customer_id so RLS allows access)
   const { error: orgError } = await getSupabaseClient().from('orgs').insert({
     id: testOrgId,
     name: `Test Private Error Org ${id}`,
     management_email: testOrgEmail,
     created_by: USER_ID,
-    // Intentionally no customer_id to test error cases
+    customer_id: testCustomerId,
   })
 
   if (orgError)
@@ -39,6 +52,7 @@ afterAll(async () => {
   // Clean up the unique test organization
   await getSupabaseClient().from('org_users').delete().eq('org_id', testOrgId)
   await getSupabaseClient().from('orgs').delete().eq('id', testOrgId)
+  await getSupabaseClient().from('stripe_info').delete().eq('customer_id', testCustomerId)
 })
 
 describe('[POST] /private/create_device - Error Cases', () => {
@@ -351,6 +365,9 @@ describe('[POST] /private/set_org_email - Error Cases', () => {
   })
 
   it('should return 400 when org does not have customer', async () => {
+    // Temporarily remove customer_id from the org to test the error case
+    await getSupabaseClient().from('orgs').update({ customer_id: null }).eq('id', testOrgId)
+
     const response = await fetch(`${BASE_URL}/private/set_org_email`, {
       method: 'POST',
       headers,
@@ -363,6 +380,9 @@ describe('[POST] /private/set_org_email - Error Cases', () => {
     expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
     expect(data.error).toBe('org_does_not_have_customer')
+
+    // Restore customer_id for other tests
+    await getSupabaseClient().from('orgs').update({ customer_id: testCustomerId }).eq('id', testOrgId)
   })
 
   it('should return 403 when not authorized for org', async () => {

@@ -34,8 +34,12 @@ app.post('/', middlewareV2(['all', 'write']), async (c) => {
     .eq('id', safeBody.org_id)
     .single()
 
-  if (!organization || organizationError) {
-    throw simpleError('get_org_internal_error', 'Get org internal error', { organizationError })
+  if (!organization) {
+    if (organizationError) {
+      // RLS might have blocked access - return not_authorized instead of internal error
+      return quickError(401, 'not_authorized', 'Not authorized to access this organization', { orgId: safeBody.org_id })
+    }
+    throw simpleError('org_not_found', 'Organization not found', { orgId: safeBody.org_id })
   }
 
   if (!organization.customer_id) {
