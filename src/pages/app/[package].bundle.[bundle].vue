@@ -14,7 +14,7 @@ import IconDocumentDuplicate from '~icons/heroicons/document-duplicate'
 import IconTrash from '~icons/heroicons/trash'
 import IconSearch from '~icons/ic/round-search?raw'
 import IconAlertCircle from '~icons/lucide/alert-circle'
-import { bytesToMbText, getChecksumInfo } from '~/services/conversion'
+import { formatBytes, getChecksumInfo } from '~/services/conversion'
 import { formatDate, formatLocalDate } from '~/services/date'
 import { checkCompatibilityNativePackages, isCompatible, useSupabase } from '~/services/supabase'
 import { openVersion } from '~/services/versions'
@@ -144,7 +144,7 @@ const hasZip = computed(() => {
 
 const zipSizeLabel = computed(() => {
   if (version_meta.value?.size)
-    return bytesToMbText(version_meta.value.size)
+    return formatBytes(version_meta.value.size)
   if (version.value?.external_url)
     return t('stored-externally')
   return t('metadata-not-found')
