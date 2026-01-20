@@ -9,7 +9,7 @@ import { useRoute, useRouter } from 'vue-router'
 import IconDown from '~icons/ic/round-keyboard-arrow-down'
 import IconSearch from '~icons/ic/round-search?raw'
 import IconAlertCircle from '~icons/lucide/alert-circle'
-import { bytesToMbText } from '~/services/conversion'
+import { formatBytes } from '~/services/conversion'
 import { formatLocalDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
@@ -69,7 +69,7 @@ const columns = ref<TableColumn[]>([
     mobile: false,
     displayFunction: (item: ManifestEntry) => {
       if (typeof item.file_size === 'number' && item.file_size > 0)
-        return bytesToMbText(item.file_size)
+        return formatBytes(item.file_size)
       return t('metadata-not-found')
     },
   },
@@ -123,7 +123,7 @@ const total = computed(() => displayEntries.value.length)
 
 const summarySizeLabel = computed(() => {
   if (summaryEntries.value.length === 0)
-    return bytesToMbText(0)
+    return formatBytes(0)
   let totalSize = 0
   let hasSize = false
   for (const entry of summaryEntries.value) {
@@ -132,7 +132,7 @@ const summarySizeLabel = computed(() => {
       hasSize = true
     }
   }
-  return hasSize ? bytesToMbText(totalSize) : t('metadata-not-found')
+  return hasSize ? formatBytes(totalSize) : t('metadata-not-found')
 })
 
 const compareStatusMessage = computed(() => {
