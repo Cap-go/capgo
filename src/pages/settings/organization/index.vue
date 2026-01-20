@@ -183,7 +183,8 @@ const acronym = computed(() => {
 })
 
 function canDeleteOrg() {
-  return currentOrganization.value?.role === 'super_admin'
+  const role = currentOrganization.value?.role
+  return (role === 'super_admin' || role === 'org_super_admin')
     && organizationStore.organizations.length > 1
 }
 

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { TableColumn } from '~/components/comp_def'
-import type { ExtendedOrganizationMember, ExtendedOrganizationMembers } from '~/stores/organization'
+import type { ExtendedOrganizationMember } from '~/stores/organization'
 import type { Database } from '~/types/supabase.types'
 
 import { computedAsync } from '@vueuse/core'
@@ -38,8 +38,11 @@ const displayStore = useDisplayStore()
 displayStore.NavTitle = t('members')
 const useNewRbac = ref(false)
 
+type OrganizationMemberRow = ExtendedOrganizationMember & { is_invite?: boolean }
+type OrganizationMemberRows = OrganizationMemberRow[]
+
 // Permission modal state
-const selectedPermission = ref<Database['public']['Enums']['user_min_right'] | undefined>()
+const selectedPermission = ref<Database['public']['Enums']['user_min_right'] | string | undefined>()
 const selectedPermissionForm = ref('')
 const isInvitePermissionModal = ref(false)
 
@@ -71,7 +74,7 @@ const dialogRef = ref()
 const selectedUserToDelegateAdmin = ref()
 const searchUserForAdminDelegation = ref('')
 
-const members = ref([] as ExtendedOrganizationMembers)
+const members = ref([] as OrganizationMemberRows)
 
 const isInviteFormValid = computed(() => {
   return inviteUserFirstName.value.trim() !== ''
@@ -79,19 +82,16 @@ const isInviteFormValid = computed(() => {
     && captchaToken.value !== ''
 })
 
-function mapRbacRoleToLegacy(role: string): Database['public']['Enums']['user_min_right'] {
-  switch (role) {
-    case 'org_member':
-      return 'read'
-    case 'org_billing_admin':
-      return 'admin'
-    case 'org_admin':
-      return 'write'
-    case 'org_super_admin':
-      return 'super_admin'
-    default:
-      return role as Database['public']['Enums']['user_min_right']
-  }
+const rbacSuperAdminRole = 'org_super_admin'
+
+function isSuperAdminRole(role: string | undefined) {
+  if (!role)
+    return false
+  return role === 'super_admin' || role === rbacSuperAdminRole
+}
+
+function isInviteMember(member: OrganizationMemberRow) {
+  return !!member.is_invite || member.is_tmp || member.role.includes('invite')
 }
 
 async function checkRbacEnabled() {
@@ -182,7 +182,7 @@ const membersOptions = computed(() => {
 
   const searchLower = searchUserForAdminDelegation.value.toLowerCase()
   const options = members.value
-    .filter(m => m.role !== 'super_admin')
+    .filter(m => !isSuperAdminRole(m.role))
     .filter(m => m.email.toLowerCase().includes(searchLower))
     .map((m) => {
       return { label: m.email, value: m.id }
@@ -198,7 +198,7 @@ columns.value = [
     mobile: true,
     sortable: true,
     head: true,
-    renderFunction: (member: ExtendedOrganizationMember) => {
+    renderFunction: (member: OrganizationMemberRow) => {
       const avatar = member.image_url
         ? h('img', {
             src: member.image_url,
@@ -222,10 +222,11 @@ columns.value = [
     key: 'role',
     mobile: true,
     sortable: 'desc',
-    displayFunction: (member: ExtendedOrganizationMember) => {
+    displayFunction: (member: OrganizationMemberRow) => {
       if (useNewRbac.value) {
-        const i18nKey = getRbacRoleI18nKey(member.role)
-        return i18nKey ? t(i18nKey) : member.role.replaceAll('_', ' ')
+        const normalizedRole = member.role.replace(/^invite_/, '')
+        const i18nKey = getRbacRoleI18nKey(normalizedRole)
+        return i18nKey ? t(i18nKey) : normalizedRole.replaceAll('_', ' ')
       }
       return member.role.replaceAll('_', ' ')
     },
@@ -238,15 +239,15 @@ columns.value = [
       {
         icon: IconWrench,
         title: rbacSystemEnabled ? t('edit-role', 'Edit role') : t('actions'),
-        visible: (member: ExtendedOrganizationMember) => canUpdateUserRoles.value && member.uid !== currentOrganization?.value?.created_by,
-        onClick: (member: ExtendedOrganizationMember) => {
+        visible: (member: OrganizationMemberRow) => canUpdateUserRoles.value && member.uid !== currentOrganization?.value?.created_by,
+        onClick: (member: OrganizationMemberRow) => {
           changeMemberPermission(member)
         },
       },
       {
         icon: IconTrash,
-        visible: (member: ExtendedOrganizationMember) => canDelete(member),
-        onClick: (member: ExtendedOrganizationMember) => {
+        visible: (member: OrganizationMemberRow) => canDelete(member),
+        onClick: (member: OrganizationMemberRow) => {
           deleteMember(member)
         },
       },
@@ -273,15 +274,23 @@ async function reloadData() {
       }
 
       // Mapper les données RBAC vers le format attendu par la table
-      members.value = (rbacMembers || []).map((member: any) => ({
-        id: member.user_id,
-        aid: -1, // RBAC-only member (no legacy org_users id)
-        uid: member.user_id,
-        email: member.email,
-        image_url: member.image_url,
-        role: member.role_name,
-        is_tmp: false, // Les invitations RBAC seront gérées différemment
-      }))
+      members.value = (rbacMembers || []).map((member: any) => {
+        const isInvite = member.is_invite === true
+        const isTmp = member.is_tmp === true
+        const orgUserId = member.org_user_id
+        const hasOrgUserInvite = isInvite && !isTmp && Number.isFinite(orgUserId)
+
+        return {
+          id: member.user_id,
+          aid: hasOrgUserInvite ? orgUserId : -1,
+          uid: member.user_id,
+          email: member.email,
+          image_url: member.image_url ?? '',
+          role: member.role_name,
+          is_tmp: isTmp,
+          is_invite: isInvite,
+        }
+      })
     }
     else {
       // Utiliser l'ancienne méthode pour les orgs sans RBAC
@@ -315,9 +324,10 @@ function validateEmail(email: string) {
     )
 }
 
-async function showPermModal(invite: boolean, onConfirm?: (permission: Database['public']['Enums']['user_min_right']) => Promise<boolean>, currentRole?: string): Promise<Database['public']['Enums']['user_min_right'] | undefined> {
+async function showPermModal(invite: boolean, onConfirm?: (permission: Database['public']['Enums']['user_min_right'] | string) => Promise<boolean>, currentRole?: string): Promise<Database['public']['Enums']['user_min_right'] | string | undefined> {
+  const normalizedRole = currentRole?.replace(/^invite_/, '')
   const initialRole = useNewRbac.value
-    ? (currentRole ? currentRole.trim().toLowerCase().replace(/\s+/g, '_') : '')
+    ? (normalizedRole ? normalizedRole.trim().toLowerCase().replace(/\s+/g, '_') : '')
     : (currentRole ?? '')
   selectedPermission.value = initialRole
     ? initialRole as Database['public']['Enums']['user_min_right']
@@ -447,17 +457,19 @@ async function sendInvitation(email: string, type: Database['public']['Enums']['
     return false
   }
 
-  const inviteType = useNewRbac.value
-    ? mapRbacRoleToLegacy(type)
-    : type as Database['public']['Enums']['user_min_right']
-
   isLoading.value = true
   try {
-    const { data, error } = await supabase.rpc('invite_user_to_org', {
-      email,
-      org_id: orgId,
-      invite_type: inviteType,
-    })
+    const { data, error } = useNewRbac.value
+      ? await supabase.rpc('invite_user_to_org_rbac', {
+          email,
+          org_id: orgId,
+          role_name: type,
+        })
+      : await supabase.rpc('invite_user_to_org', {
+          email,
+          org_id: orgId,
+          invite_type: type as Database['public']['Enums']['user_min_right'],
+        })
 
     if (error) {
       console.error('Error inviting user:', error)
@@ -465,7 +477,7 @@ async function sendInvitation(email: string, type: Database['public']['Enums']['
       return false
     }
 
-    const success = await handleSendInvitationOutput(data, email, inviteType)
+    const success = await handleSendInvitationOutput(data, email, type)
     if (success) {
       await reloadData()
     }
@@ -481,7 +493,7 @@ async function sendInvitation(email: string, type: Database['public']['Enums']['
   }
 }
 
-async function handleSendInvitationOutput(output: string, email: string, type: Database['public']['Enums']['user_min_right']): Promise<boolean> {
+async function handleSendInvitationOutput(output: string, email: string, type: Database['public']['Enums']['user_min_right'] | string): Promise<boolean> {
   console.log('Output: ', output)
   if (!output)
     return false
@@ -509,6 +521,18 @@ async function handleSendInvitationOutput(output: string, email: string, type: D
   }
   else if (output === 'CAN_NOT_INVITE_OWNER') {
     toast.error(t('cannot-invite-owner'))
+    return false
+  }
+  else if (output === 'NO_RIGHTS' || output === 'NO_RIGHTS_FOR_SUPER_ADMIN') {
+    toast.error(t('no-permission'))
+    return false
+  }
+  else if (output === 'RBAC_NOT_ENABLED') {
+    toast.error(t('invitation-failed'))
+    return false
+  }
+  else if (output === 'ROLE_NOT_FOUND') {
+    toast.error(t('invitation-failed'))
     return false
   }
   else {
@@ -606,7 +630,7 @@ async function cannotDeleteOwner() {
                   // get member from id
                   const selectedUser = members.value.filter(m => m.id === selectedUserToDelegateAdmin.value)[0]
                   // set user to super admin
-                  _changeMemberPermission(selectedUser, 'super_admin')
+                  _changeMemberPermission(selectedUser, useNewRbac.value ? rbacSuperAdminRole : 'super_admin')
                   selectedUserToDelegateAdmin.value = null
                   // get current member
                   const currentMember = members.value.filter(m => m.uid === main.user?.id)[0]
@@ -626,7 +650,7 @@ async function cannotDeleteOwner() {
   })
 }
 
-async function _deleteMember(member: ExtendedOrganizationMember) {
+async function _deleteMember(member: OrganizationMemberRow) {
   isLoading.value = true
 
   try {
@@ -709,9 +733,9 @@ async function _deleteMember(member: ExtendedOrganizationMember) {
   }
 }
 
-async function deleteMember(member: ExtendedOrganizationMember) {
-  const numberOfSuperAdmins = members.value.filter(m => m.role === 'super_admin').length
-  if (numberOfSuperAdmins === 1 && member.role === 'super_admin') {
+async function deleteMember(member: OrganizationMemberRow) {
+  const numberOfSuperAdmins = members.value.filter(m => !isInviteMember(m) && isSuperAdminRole(m.role)).length
+  if (numberOfSuperAdmins === 1 && !isInviteMember(member) && isSuperAdminRole(member.role)) {
     await cannotDeleteOwner()
     return
   }
@@ -744,7 +768,25 @@ function handleRbacRoleUpdateError(error: { message?: string }) {
   }
 }
 
-async function updateRbacMemberRole(member: ExtendedOrganizationMember, perm: string) {
+function handleRbacInviteUpdateError(error: { message?: string }) {
+  if (error.message?.includes('NO_PERMISSION_TO_UPDATE_ROLES')) {
+    toast.error(t('no-permission'))
+  }
+  else if (error.message?.includes('NO_INVITATION')) {
+    toast.error(t('cannot-change-permission'))
+  }
+  else if (error.message?.includes('ROLE_NOT_FOUND')) {
+    toast.error(t('cannot-change-permission'))
+  }
+  else if (error.message?.includes('RBAC_NOT_ENABLED')) {
+    toast.error(t('cannot-change-permission'))
+  }
+  else {
+    toast.error(`${t('cannot-change-permission')}: ${error.message ?? t('unexpected-response')}`)
+  }
+}
+
+async function updateRbacMemberRole(member: OrganizationMemberRow, perm: string) {
   const { data, error } = await supabase.rpc('update_org_member_role', {
     p_org_id: currentOrganization.value?.gid ?? '',
     p_user_id: member.uid,
@@ -763,7 +805,38 @@ async function updateRbacMemberRole(member: ExtendedOrganizationMember, perm: st
   }
 }
 
-async function updateTmpMemberRole(member: ExtendedOrganizationMember, perm: Database['public']['Enums']['user_min_right']) {
+async function updateRbacInviteRole(member: OrganizationMemberRow, perm: string) {
+  const orgId = currentOrganization.value?.gid ?? ''
+  if (!orgId) {
+    toast.error(t('cannot-change-permission'))
+    return
+  }
+
+  const { data, error } = member.is_tmp
+    ? await supabase.rpc('update_tmp_invite_role_rbac', {
+        p_org_id: orgId,
+        p_email: member.email,
+        p_new_role_name: perm,
+      })
+    : await supabase.rpc('update_org_invite_role_rbac', {
+        p_org_id: orgId,
+        p_user_id: member.uid,
+        p_new_role_name: perm,
+      })
+
+  if (error) {
+    console.error('Error updating RBAC invite role:', error)
+    handleRbacInviteUpdateError(error)
+    return
+  }
+
+  if (data === 'OK') {
+    toast.success(t('permission-changed'))
+    await reloadData()
+  }
+}
+
+async function updateTmpMemberRole(member: OrganizationMemberRow, perm: Database['public']['Enums']['user_min_right']) {
   const { data, error } = await supabase.rpc('modify_permissions_tmp', {
     email: member.email,
     org_id: currentOrganization.value?.gid ?? '',
@@ -786,7 +859,7 @@ async function updateTmpMemberRole(member: ExtendedOrganizationMember, perm: Dat
   await reloadData()
 }
 
-async function updateLegacyMemberRole(member: ExtendedOrganizationMember, perm: Database['public']['Enums']['user_min_right']) {
+async function updateLegacyMemberRole(member: OrganizationMemberRow, perm: Database['public']['Enums']['user_min_right']) {
   const { error } = await supabase
     .from('org_users')
     .update({ user_right: perm })
@@ -802,11 +875,16 @@ async function updateLegacyMemberRole(member: ExtendedOrganizationMember, perm: 
   await reloadData()
 }
 
-async function _changeMemberPermission(member: ExtendedOrganizationMember, perm: Database['public']['Enums']['user_min_right'] | string) {
+async function _changeMemberPermission(member: OrganizationMemberRow, perm: Database['public']['Enums']['user_min_right'] | string) {
   isLoading.value = true
   try {
     if (useNewRbac.value && currentOrganization.value) {
-      await updateRbacMemberRole(member, perm as string)
+      if (isInviteMember(member)) {
+        await updateRbacInviteRole(member, perm as string)
+      }
+      else {
+        await updateRbacMemberRole(member, perm as string)
+      }
       return
     }
 
@@ -826,8 +904,8 @@ async function _changeMemberPermission(member: ExtendedOrganizationMember, perm:
   }
 }
 
-async function changeMemberPermission(member: ExtendedOrganizationMember) {
-  const isInvite = !useNewRbac.value && member.role.includes('invite')
+async function changeMemberPermission(member: OrganizationMemberRow) {
+  const isInvite = useNewRbac.value ? isInviteMember(member) : member.role.includes('invite')
   const perm = await showPermModal(isInvite, undefined, member.role)
 
   if (!perm) {
@@ -861,7 +939,7 @@ function acronym(email: string) {
   return res
 }
 
-function canDelete(member: ExtendedOrganizationMember) {
+function canDelete(member: OrganizationMemberRow) {
   const role = organizationStore.currentRole
   const currentUserId = main.user?.id
   if (!role || !currentUserId)
@@ -872,7 +950,10 @@ function canDelete(member: ExtendedOrganizationMember) {
   if (isSelf)
     return true
 
-  const currentUserIsAdmin = role === 'admin' || role === 'super_admin'
+  const currentUserIsAdmin = role === 'admin'
+    || role === 'super_admin'
+    || role === 'org_admin'
+    || role === rbacSuperAdminRole
 
   return currentUserIsAdmin
 }
@@ -911,8 +992,7 @@ function handlePermissionSelection(permission: Database['public']['Enums']['user
 function handleFormKitPermissionSelection(value: string | undefined) {
   if (!value)
     return
-  const permission = value as Database['public']['Enums']['user_min_right']
-  handlePermissionSelection(permission, isInvitePermissionModal.value)
+  handlePermissionSelection(value, isInvitePermissionModal.value)
 }
 
 function delegateSuperAdmin(value: unknown) {
@@ -921,7 +1001,7 @@ function delegateSuperAdmin(value: unknown) {
   selectedUserToDelegateAdmin.value = value
 }
 
-async function showInviteNewUserDialog(email: string, roleType: Database['public']['Enums']['user_min_right']) {
+async function showInviteNewUserDialog(email: string, roleType: Database['public']['Enums']['user_min_right'] | string) {
   // Reset form state
   inviteUserEmail.value = email
   inviteUserRole.value = roleType.replace(/_/g, ' ')

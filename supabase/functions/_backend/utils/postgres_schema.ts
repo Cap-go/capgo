@@ -165,6 +165,7 @@ export const org_users = pgTable('org_users', {
   app_id: varchar('app_id'),
   channel_id: bigint('channel_id', { mode: 'number' }),
   user_right: userMinRightPgEnum('user_right'),
+  rbac_role_name: text('rbac_role_name'),
 })
 
 // RBAC tables

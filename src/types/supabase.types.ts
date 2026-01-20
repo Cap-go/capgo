@@ -1407,6 +1407,7 @@ export type Database = {
           created_at: string | null
           id: number
           org_id: string
+          rbac_role_name: string | null
           updated_at: string | null
           user_id: string
           user_right: Database["public"]["Enums"]["user_min_right"] | null
@@ -1417,6 +1418,7 @@ export type Database = {
           created_at?: string | null
           id?: number
           org_id: string
+          rbac_role_name?: string | null
           updated_at?: string | null
           user_id: string
           user_right?: Database["public"]["Enums"]["user_min_right"] | null
@@ -1427,6 +1429,7 @@ export type Database = {
           created_at?: string | null
           id?: number
           org_id?: string
+          rbac_role_name?: string | null
           updated_at?: string | null
           user_id?: string
           user_right?: Database["public"]["Enums"]["user_min_right"] | null
@@ -1972,6 +1975,7 @@ export type Database = {
           invite_magic_string: string
           last_name: string
           org_id: string
+          rbac_role_name: string | null
           role: Database["public"]["Enums"]["user_min_right"]
           updated_at: string
         }
@@ -1985,6 +1989,7 @@ export type Database = {
           invite_magic_string?: string
           last_name: string
           org_id: string
+          rbac_role_name?: string | null
           role: Database["public"]["Enums"]["user_min_right"]
           updated_at?: string
         }
@@ -1998,6 +2003,7 @@ export type Database = {
           invite_magic_string?: string
           last_name?: string
           org_id?: string
+          rbac_role_name?: string | null
           role?: Database["public"]["Enums"]["user_min_right"]
           updated_at?: string
         }
@@ -2879,7 +2885,7 @@ export type Database = {
         Returns: {
           org_logo: string
           org_name: string
-          role: Database["public"]["Enums"]["user_min_right"]
+          role: string
         }[]
       }
       get_next_cron_time: {
@@ -2928,6 +2934,9 @@ export type Database = {
           email: string
           granted_at: string
           image_url: string
+          is_invite: boolean
+          is_tmp: boolean
+          org_user_id: number
           role_id: string
           role_name: string
           user_id: string
@@ -3250,6 +3259,10 @@ export type Database = {
         }
         Returns: string
       }
+      invite_user_to_org_rbac: {
+        Args: { email: string; org_id: string; role_name: string }
+        Returns: string
+      }
       is_account_disabled: { Args: { user_id: string }; Returns: boolean }
       is_admin:
         | { Args: never; Returns: boolean }
@@ -3413,6 +3426,10 @@ export type Database = {
         Returns: boolean
       }
       rbac_is_enabled_for_org: { Args: { p_org_id: string }; Returns: boolean }
+      rbac_legacy_right_for_org_role: {
+        Args: { p_role_name: string }
+        Returns: Database["public"]["Enums"]["user_min_right"]
+      }
       rbac_legacy_right_for_permission: {
         Args: { p_permission_key: string }
         Returns: Database["public"]["Enums"]["user_min_right"]
@@ -3439,6 +3456,7 @@ export type Database = {
       rbac_perm_app_read_channels: { Args: never; Returns: string }
       rbac_perm_app_read_devices: { Args: never; Returns: string }
       rbac_perm_app_read_logs: { Args: never; Returns: string }
+      rbac_perm_app_transfer: { Args: never; Returns: string }
       rbac_perm_app_update_settings: { Args: never; Returns: string }
       rbac_perm_app_update_user_roles: { Args: never; Returns: string }
       rbac_perm_app_upload_bundle: { Args: never; Returns: string }
@@ -3702,8 +3720,16 @@ export type Database = {
         Returns: Database["public"]["Enums"]["user_min_right"]
       }
       update_app_versions_retention: { Args: never; Returns: undefined }
+      update_org_invite_role_rbac: {
+        Args: { p_new_role_name: string; p_org_id: string; p_user_id: string }
+        Returns: string
+      }
       update_org_member_role: {
         Args: { p_new_role_name: string; p_org_id: string; p_user_id: string }
+        Returns: string
+      }
+      update_tmp_invite_role_rbac: {
+        Args: { p_email: string; p_new_role_name: string; p_org_id: string }
         Returns: string
       }
       upsert_version_meta: {

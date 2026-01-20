@@ -23,7 +23,13 @@ type RawOrganization = ArrayElement<Database['public']['Functions']['get_orgs_v7
 export type Organization = Omit<RawOrganization, 'password_policy_config'> & {
   password_policy_config: PasswordPolicyConfig | null
 }
-export type OrganizationRole = Database['public']['Enums']['user_min_right'] | 'owner'
+export type OrganizationRole
+  = Database['public']['Enums']['user_min_right']
+    | 'owner'
+    | 'org_member'
+    | 'org_billing_admin'
+    | 'org_admin'
+    | 'org_super_admin'
 export type ExtendedOrganizationMember = Concrete<Merge<ArrayElement<Database['public']['Functions']['get_org_members']['Returns']>, { id: number | string }>>
 export type ExtendedOrganizationMembers = ExtendedOrganizationMember[]
 

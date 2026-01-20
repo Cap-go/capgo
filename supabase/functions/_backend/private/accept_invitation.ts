@@ -21,6 +21,13 @@ interface PasswordPolicy {
   require_special: boolean
 }
 
+const rbacRoleToLegacy: Record<string, 'read' | 'admin' | 'super_admin'> = {
+  org_member: 'read',
+  org_billing_admin: 'read',
+  org_admin: 'admin',
+  org_super_admin: 'super_admin',
+}
+
 // Default password policy (when org has no policy set)
 const DEFAULT_PASSWORD_POLICY: PasswordPolicy = {
   enabled: true,
@@ -92,7 +99,7 @@ app.post('/', async (c) => {
 
   // Get the org's password policy
   const { data: org, error: orgError } = await supabaseAdmin.from('orgs')
-    .select('password_policy_config')
+    .select('password_policy_config, use_new_rbac')
     .eq('id', invitation.org_id)
     .single()
 
@@ -177,14 +184,68 @@ app.post('/', async (c) => {
     return quickError(500, 'failed_to_accept_invitation', 'Failed to accept invitation delete tmp_users', { error: tmpUserDeleteError.message })
   }
 
+  const rbacRoleName = invitation.rbac_role_name
+  const useRbacInvite = org?.use_new_rbac === true && rbacRoleName !== null
+  const legacyRight = useRbacInvite
+    ? rbacRoleToLegacy[rbacRoleName] ?? 'read'
+    : invitation.role
+
   const { error: insertIntoMainTableError } = await supabaseAdmin.from('org_users').insert({
     user_id: user.user.id,
     org_id: invitation.org_id,
-    user_right: invitation.role,
+    user_right: legacyRight,
+    rbac_role_name: useRbacInvite ? rbacRoleName : null,
   })
 
   if (insertIntoMainTableError) {
     return quickError(500, 'failed_to_accept_invitation', 'Failed to accept invitation insert into org_users', { error: insertIntoMainTableError.message })
+  }
+
+  if (useRbacInvite) {
+    if (!rbacRoleName) {
+      return quickError(500, 'failed_to_accept_invitation', 'Failed to resolve RBAC role', { error: 'Missing RBAC role name' })
+    }
+
+    const { data: role, error: roleError } = await supabaseAdmin
+      .from('roles')
+      .select('id')
+      .eq('name', rbacRoleName)
+      .eq('scope_type', 'org')
+      .single()
+
+    if (roleError || !role) {
+      return quickError(500, 'failed_to_accept_invitation', 'Failed to resolve RBAC role', { error: roleError?.message ?? 'Role not found' })
+    }
+
+    const { error: deleteBindingError } = await supabaseAdmin
+      .from('role_bindings')
+      .delete()
+      .eq('principal_type', 'user')
+      .eq('principal_id', user.user.id)
+      .eq('scope_type', 'org')
+      .eq('org_id', invitation.org_id)
+
+    if (deleteBindingError) {
+      return quickError(500, 'failed_to_accept_invitation', 'Failed to clear existing RBAC role bindings', { error: deleteBindingError.message })
+    }
+
+    const { error: insertBindingError } = await supabaseAdmin
+      .from('role_bindings')
+      .insert({
+        principal_type: 'user',
+        principal_id: user.user.id,
+        role_id: role.id,
+        scope_type: 'org',
+        org_id: invitation.org_id,
+        granted_by: user.user.id,
+        granted_at: new Date().toISOString(),
+        reason: 'Accepted invitation',
+        is_direct: true,
+      })
+
+    if (insertBindingError) {
+      return quickError(500, 'failed_to_accept_invitation', 'Failed to create RBAC role binding', { error: insertBindingError.message })
+    }
   }
 
   return c.json({
