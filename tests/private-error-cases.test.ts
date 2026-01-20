@@ -1,50 +1,44 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { APIKEY_STATS, BASE_URL, getSupabaseClient, headers, NON_OWNER_ORG_ID, PRIVATE_ERROR_ORG_ID, resetAndSeedAppData, resetAppData, TEST_EMAIL, USER_ID } from './test-utils.ts'
+import { APIKEY_STATS, BASE_URL, getSupabaseClient, headers, NON_OWNER_ORG_ID, resetAndSeedAppData, resetAppData, USER_ID } from './test-utils.ts'
 
 const id = randomUUID()
 const APPNAME = `com.private.error.${id}`
-// Use dedicated org ID to prevent conflicts with parallel tests
-const testOrgId = PRIVATE_ERROR_ORG_ID
+// Use unique org ID per test run to prevent conflicts with parallel tests
+const testOrgId = randomUUID()
+const testOrgEmail = `test-private-error-${id}@capgo.app`
 
 beforeAll(async () => {
   await resetAndSeedAppData(APPNAME)
 
-  // Create test organization (without a customer_id) using dedicated ID
-  // Use upsert to avoid conflicts when tests run in parallel
-  const { error: orgError } = await getSupabaseClient().from('orgs').upsert({
+  // Create unique test organization (without a customer_id) for this test run
+  const { error: orgError } = await getSupabaseClient().from('orgs').insert({
     id: testOrgId,
-    name: `Test Private Error Org`,
-    management_email: TEST_EMAIL,
+    name: `Test Private Error Org ${id}`,
+    management_email: testOrgEmail,
     created_by: USER_ID,
     // Intentionally no customer_id to test error cases
-  }, { onConflict: 'id' })
+  })
 
   if (orgError)
     throw orgError
 
-  // Add test user as super_admin to the org (check first to handle parallel runs)
-  const { data: existingOrgUser } = await getSupabaseClient()
-    .from('org_users')
-    .select('id')
-    .eq('org_id', testOrgId)
-    .eq('user_id', USER_ID)
-    .maybeSingle()
-
-  if (!existingOrgUser) {
-    const { error: orgUserError } = await getSupabaseClient().from('org_users').insert({
-      org_id: testOrgId,
-      user_id: USER_ID,
-      user_right: 'super_admin' as const,
-    })
-    if (orgUserError)
-      throw orgUserError
-  }
+  // Add test user as super_admin to the org
+  const { error: orgUserError } = await getSupabaseClient().from('org_users').insert({
+    org_id: testOrgId,
+    user_id: USER_ID,
+    user_right: 'super_admin' as const,
+  })
+  if (orgUserError)
+    throw orgUserError
 })
 
 afterAll(async () => {
   await resetAppData(APPNAME)
-  // Don't delete the org - it uses a fixed ID and other tests may need it
+  
+  // Clean up the unique test organization
+  await getSupabaseClient().from('org_users').delete().eq('org_id', testOrgId)
+  await getSupabaseClient().from('orgs').delete().eq('id', testOrgId)
 })
 
 describe('[POST] /private/create_device - Error Cases', () => {
