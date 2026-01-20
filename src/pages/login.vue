@@ -162,7 +162,7 @@ async function submit(form: { email: string, password: string, code: string }) {
     const verify = await supabase.auth.mfa.verify({
       factorId: mfaLoginFactor.value!.id!,
       challengeId: mfaChallengeId.value!,
-      code: form.code.replace(' ', ''),
+      code: form.code.replaceAll(' ', ''),
     })
 
     if (verify.error) {
