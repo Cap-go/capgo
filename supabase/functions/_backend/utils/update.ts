@@ -12,7 +12,7 @@ import {
 import { getRuntimeKey } from 'hono/adapter'
 import { getAppStatus, setAppStatus } from './appStatus.ts'
 import { getBundleUrl, getManifestUrl } from './downloadUrl.ts'
-import { simpleError200 } from './hono.ts'
+import { simpleError200, simpleErrorWithStatus } from './hono.ts'
 import { cloudlog } from './logging.ts'
 import { sendNotifOrg } from './notifications.ts'
 import { closeClient, getAppOwnerPostgres, getDrizzleClient, getPgClient, requestInfosPostgres, setReplicationLagHeader } from './pg.ts'
@@ -78,7 +78,7 @@ export async function updateWithPG(
   if (cachedStatus === 'cancelled') {
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot update, upgrade plan to continue to update', id: app_id })
     await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
-    return simpleError200(c, 'need_plan_upgrade', PLAN_ERROR)
+    return simpleErrorWithStatus(c, 429, 'need_plan_upgrade', PLAN_ERROR)
   }
   const appOwner = await getAppOwnerPostgres(c, app_id, drizzleClient, PLAN_LIMIT)
   if (!appOwner) {
@@ -95,7 +95,7 @@ export async function updateWithPG(
       device_id,
       app_id_url: app_id,
     }, appOwner.owner_org, app_id, '0 0 * * 1')) // Weekly on Monday
-    return simpleError200(c, 'need_plan_upgrade', PLAN_ERROR)
+    return simpleErrorWithStatus(c, 429, 'need_plan_upgrade', PLAN_ERROR)
   }
   await setAppStatus(c, app_id, 'cloud')
   const channelDeviceCount = appOwner.channel_device_count ?? 0

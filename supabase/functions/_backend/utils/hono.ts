@@ -211,7 +211,10 @@ export interface SimpleErrorResponse {
 }
 
 export function simpleError200(c: Context, errorCode: string, message: string, moreInfo: any = {}) {
-  const status = 200
+  return simpleErrorWithStatus(c, 200, errorCode, message, moreInfo)
+}
+
+export function simpleErrorWithStatus(c: Context, status: number, errorCode: string, message: string, moreInfo: any = {}) {
   const res: SimpleErrorResponse = {
     error: errorCode,
     message,
