@@ -364,7 +364,7 @@
   "cannot-view-plans": "プランページを表示できません",
   "cannot-view-usage": "使用ページを表示できません",
   "cannot_invite_user_without_account": "アカウントがないユーザーを招待することはできません",
-  "cannots-sign-off": "ログオフできません",
+  "cannot-sign-off": "ログオフできません",
   "captcha": "キャプチャ",
   "captcha-fail": "Captchaの検証に失敗しました",
   "captcha-new-user-org-tooltip": "あなたが招待しようとしているユーザーはCapgoアカウントを持っていないため、これが必要です。\nCapgoは彼にメールを送り、アカウントを作成して組織に参加するリンクを提供しますが、システムの乱用を防ぐためにはキャプチャを解決し、さらなる詳細情報を提供する必要があります。",

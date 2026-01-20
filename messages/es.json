@@ -364,7 +364,7 @@
   "cannot-view-plans": "No puede ver la página de planes",
   "cannot-view-usage": "No puede ver la página de uso",
   "cannot_invite_user_without_account": "No se puede invitar a un usuario sin cuenta",
-  "cannots-sign-off": "No puede cerrar sesión",
+  "cannot-sign-off": "No puede cerrar sesión",
   "captcha": "Captcha",
   "captcha-fail": "La validación de Captcha falló",
   "captcha-new-user-org-tooltip": "Necesitas esto porque el usuario al que estás intentando invitar no tiene una cuenta de Capgo.\nCapgo le enviará un correo electrónico con un enlace para crear una y unirse a la organización, pero necesitas resolver el captcha y proporcionar algunos detalles adicionales para prevenir el abuso del sistema.",
