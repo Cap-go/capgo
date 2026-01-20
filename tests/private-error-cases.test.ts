@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { APIKEY_STATS, BASE_URL, getSupabaseClient, headers, NON_OWNER_ORG_ID, resetAndSeedAppData, resetAppData, USER_ID } from './test-utils.ts'
+import { APIKEY_STATS, getEndpointUrl, getSupabaseClient, headers, NON_OWNER_ORG_ID, resetAndSeedAppData, resetAppData, USER_ID } from './test-utils.ts'
 
 const id = randomUUID()
 const APPNAME = `com.private.error.${id}`
@@ -57,7 +57,7 @@ afterAll(async () => {
 
 describe('[POST] /private/create_device - Error Cases', () => {
   it('should return 400 when not authorized', async () => {
-    const response = await fetch(`${BASE_URL}/private/create_device`, {
+    const response = await fetch(getEndpointUrl('/private/create_device'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -77,7 +77,7 @@ describe('[POST] /private/create_device - Error Cases', () => {
   })
 
   it('should return 400 for invalid JSON body', async () => {
-    const response = await fetch(`${BASE_URL}/private/create_device`, {
+    const response = await fetch(getEndpointUrl('/private/create_device'), {
       method: 'POST',
       headers,
       body: 'invalid json',
@@ -89,7 +89,7 @@ describe('[POST] /private/create_device - Error Cases', () => {
 
   it('should return 404 when app not found', async () => {
     // Use testOrgId where user has super_admin rights to properly test app not found
-    const response = await fetch(`${BASE_URL}/private/create_device`, {
+    const response = await fetch(getEndpointUrl('/private/create_device'), {
       method: 'POST',
       headers,
       body: JSON.stringify({
@@ -106,7 +106,7 @@ describe('[POST] /private/create_device - Error Cases', () => {
   })
 
   it('should return 401 when not authorized for specific app', async () => {
-    const response = await fetch(`${BASE_URL}/private/create_device`, {
+    const response = await fetch(getEndpointUrl('/private/create_device'), {
       method: 'POST',
       headers,
       body: JSON.stringify({
@@ -126,7 +126,7 @@ describe('[POST] /private/create_device - Error Cases', () => {
 
 describe('[POST] /private/upload_link - Error Cases', () => {
   it('should return 500 when user not found', async () => {
-    const response = await fetch(`${BASE_URL}/private/upload_link`, {
+    const response = await fetch(getEndpointUrl('/private/upload_link'), {
       method: 'POST',
       headers,
       body: JSON.stringify({
@@ -140,7 +140,7 @@ describe('[POST] /private/upload_link - Error Cases', () => {
   })
 
   it('should return 400 when user cannot access app', async () => {
-    const response = await fetch(`${BASE_URL}/private/upload_link`, {
+    const response = await fetch(getEndpointUrl('/private/upload_link'), {
       method: 'POST',
       headers,
       body: JSON.stringify({
@@ -155,7 +155,7 @@ describe('[POST] /private/upload_link - Error Cases', () => {
   })
 
   it('should return 500 when app not found', async () => {
-    const response = await fetch(`${BASE_URL}/private/upload_link`, {
+    const response = await fetch(getEndpointUrl('/private/upload_link'), {
       method: 'POST',
       headers,
       body: JSON.stringify({
@@ -170,7 +170,7 @@ describe('[POST] /private/upload_link - Error Cases', () => {
   })
 
   it('should return 500 when version already exists', async () => {
-    const response = await fetch(`${BASE_URL}/private/upload_link`, {
+    const response = await fetch(getEndpointUrl('/private/upload_link'), {
       method: 'POST',
       headers,
       body: JSON.stringify({
@@ -187,7 +187,7 @@ describe('[POST] /private/upload_link - Error Cases', () => {
 
 describe('[POST] /private/download_link - Error Cases', () => {
   it('should return 400 when authorization cannot be found', async () => {
-    const response = await fetch(`${BASE_URL}/private/download_link`, {
+    const response = await fetch(getEndpointUrl('/private/download_link'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -204,7 +204,7 @@ describe('[POST] /private/download_link - Error Cases', () => {
   })
 
   it('should return 400 when not authorized', async () => {
-    const response = await fetch(`${BASE_URL}/private/download_link`, {
+    const response = await fetch(getEndpointUrl('/private/download_link'), {
       method: 'POST',
       headers,
       body: JSON.stringify({
@@ -219,7 +219,7 @@ describe('[POST] /private/download_link - Error Cases', () => {
   })
 
   it('should return 400 when user cannot access app', async () => {
-    const response = await fetch(`${BASE_URL}/private/download_link`, {
+    const response = await fetch(getEndpointUrl('/private/download_link'), {
       method: 'POST',
       headers,
       body: JSON.stringify({
@@ -236,7 +236,7 @@ describe('[POST] /private/download_link - Error Cases', () => {
 
 describe('[POST] /private/delete_failed_version - Error Cases', () => {
   it('should return 500 when user not found', async () => {
-    const response = await fetch(`${BASE_URL}/private/delete_failed_version`, {
+    const response = await fetch(getEndpointUrl('/private/delete_failed_version'), {
       method: 'DELETE',
       headers,
       body: JSON.stringify({
@@ -250,7 +250,7 @@ describe('[POST] /private/delete_failed_version - Error Cases', () => {
   })
 
   it('should return 401 when user cannot access app', async () => {
-    const response = await fetch(`${BASE_URL}/private/delete_failed_version`, {
+    const response = await fetch(getEndpointUrl('/private/delete_failed_version'), {
       method: 'DELETE',
       headers,
       body: JSON.stringify({
@@ -264,7 +264,7 @@ describe('[POST] /private/delete_failed_version - Error Cases', () => {
   })
 
   it('should return 500 when app_id or bundle name missing', async () => {
-    const response = await fetch(`${BASE_URL}/private/delete_failed_version`, {
+    const response = await fetch(getEndpointUrl('/private/delete_failed_version'), {
       method: 'DELETE',
       headers,
       body: JSON.stringify({
@@ -280,7 +280,7 @@ describe('[POST] /private/delete_failed_version - Error Cases', () => {
 
 describe('[POST] /private/log_as - Error Cases', () => {
   it('should return 400 when not authorized', async () => {
-    const response = await fetch(`${BASE_URL}/private/log_as`, {
+    const response = await fetch(getEndpointUrl('/private/log_as'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -296,7 +296,7 @@ describe('[POST] /private/log_as - Error Cases', () => {
   })
 
   it('should return 400 for invalid JSON body', async () => {
-    const response = await fetch(`${BASE_URL}/private/log_as`, {
+    const response = await fetch(getEndpointUrl('/private/log_as'), {
       method: 'POST',
       headers,
       body: 'invalid json',
@@ -307,7 +307,7 @@ describe('[POST] /private/log_as - Error Cases', () => {
   })
 
   it('should return 401 when user is not admin', async () => {
-    const response = await fetch(`${BASE_URL}/private/log_as`, {
+    const response = await fetch(getEndpointUrl('/private/log_as'), {
       method: 'POST',
       headers,
       body: JSON.stringify({
@@ -321,7 +321,7 @@ describe('[POST] /private/log_as - Error Cases', () => {
   })
 
   it('should return 400 when user does not exist', async () => {
-    const response = await fetch(`${BASE_URL}/private/log_as`, {
+    const response = await fetch(getEndpointUrl('/private/log_as'), {
       method: 'POST',
       headers,
       body: JSON.stringify({
@@ -337,7 +337,7 @@ describe('[POST] /private/log_as - Error Cases', () => {
 
 describe('[POST] /private/set_org_email - Error Cases', () => {
   it('should return 401 when not authorized', async () => {
-    const response = await fetch(`${BASE_URL}/private/set_org_email`, {
+    const response = await fetch(getEndpointUrl('/private/set_org_email'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -354,7 +354,7 @@ describe('[POST] /private/set_org_email - Error Cases', () => {
   })
 
   it('should return 400 for invalid JSON body', async () => {
-    const response = await fetch(`${BASE_URL}/private/set_org_email`, {
+    const response = await fetch(getEndpointUrl('/private/set_org_email'), {
       method: 'POST',
       headers,
       body: 'invalid json',
@@ -368,7 +368,7 @@ describe('[POST] /private/set_org_email - Error Cases', () => {
     // Temporarily remove customer_id from the org to test the error case
     await getSupabaseClient().from('orgs').update({ customer_id: null }).eq('id', testOrgId)
 
-    const response = await fetch(`${BASE_URL}/private/set_org_email`, {
+    const response = await fetch(getEndpointUrl('/private/set_org_email'), {
       method: 'POST',
       headers,
       body: JSON.stringify({
@@ -386,7 +386,7 @@ describe('[POST] /private/set_org_email - Error Cases', () => {
   })
 
   it('should return 403 when not authorized for org', async () => {
-    const response = await fetch(`${BASE_URL}/private/set_org_email`, {
+    const response = await fetch(getEndpointUrl('/private/set_org_email'), {
       method: 'POST',
       headers,
       body: JSON.stringify({
@@ -403,7 +403,7 @@ describe('[POST] /private/set_org_email - Error Cases', () => {
 
 describe('[POST] /private/accept_invitation - Error Cases', () => {
   it('should return 400 for invalid request', async () => {
-    const response = await fetch(`${BASE_URL}/private/accept_invitation`, {
+    const response = await fetch(getEndpointUrl('/private/accept_invitation'), {
       method: 'POST',
       headers,
       body: JSON.stringify({
@@ -416,7 +416,7 @@ describe('[POST] /private/accept_invitation - Error Cases', () => {
   })
 
   it('should return 404 when invitation not found', async () => {
-    const response = await fetch(`${BASE_URL}/private/accept_invitation`, {
+    const response = await fetch(getEndpointUrl('/private/accept_invitation'), {
       method: 'POST',
       headers,
       body: JSON.stringify({
@@ -436,7 +436,7 @@ describe('[POST] /private/accept_invitation - Error Cases', () => {
 describe('[POST] /private/invite_new_user_to_org - Error Cases', () => {
   it('should return 400 when captcha secret key is not set', async () => {
     // Captcha validation runs before invite logic, so without CAPTCHA_SECRET_KEY, it fails early
-    const response = await fetch(`${BASE_URL}/private/invite_new_user_to_org`, {
+    const response = await fetch(getEndpointUrl('/private/invite_new_user_to_org'), {
       method: 'POST',
       headers,
       body: JSON.stringify({
@@ -456,7 +456,7 @@ describe('[POST] /private/invite_new_user_to_org - Error Cases', () => {
 
   it('should return 400 when captcha secret not set for nonexistent org', async () => {
     // Even with invalid org, captcha validation runs first
-    const response = await fetch(`${BASE_URL}/private/invite_new_user_to_org`, {
+    const response = await fetch(getEndpointUrl('/private/invite_new_user_to_org'), {
       method: 'POST',
       headers,
       body: JSON.stringify({
@@ -477,7 +477,7 @@ describe('[POST] /private/invite_new_user_to_org - Error Cases', () => {
 
 describe('[POST] /private/stats - Error Cases', () => {
   it('should return 400 when user not found', async () => {
-    const response = await fetch(`${BASE_URL}/private/stats`, {
+    const response = await fetch(getEndpointUrl('/private/stats'), {
       method: 'POST',
       headers,
       body: JSON.stringify({
@@ -490,7 +490,7 @@ describe('[POST] /private/stats - Error Cases', () => {
   })
 
   it('should return 400 when user cannot access app', async () => {
-    const response = await fetch(`${BASE_URL}/private/stats`, {
+    const response = await fetch(getEndpointUrl('/private/stats'), {
       method: 'POST',
       headers,
       body: JSON.stringify({
@@ -504,7 +504,7 @@ describe('[POST] /private/stats - Error Cases', () => {
   })
 
   it('should work when used with APIKEY', async () => {
-    const response = await fetch(`${BASE_URL}/private/stats`, {
+    const response = await fetch(getEndpointUrl('/private/stats'), {
       method: 'POST',
       headers,
       body: JSON.stringify({
@@ -519,7 +519,7 @@ describe('[POST] /private/stats - Error Cases', () => {
   })
 
   it('should return 400 when wrong auth', async () => {
-    const response = await fetch(`${BASE_URL}/private/stats`, {
+    const response = await fetch(getEndpointUrl('/private/stats'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -534,7 +534,7 @@ describe('[POST] /private/stats - Error Cases', () => {
     expect(data.error).toBe('app_access_denied')
   })
   it('should return 401 when no auth', async () => {
-    const response = await fetch(`${BASE_URL}/private/stats`, {
+    const response = await fetch(getEndpointUrl('/private/stats'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -552,7 +552,7 @@ describe('[POST] /private/stats - Error Cases', () => {
 
 describe('[POST] /private/plans - Error Cases', () => {
   it('should return 500 when plans cannot be retrieved', async () => {
-    const response = await fetch(`${BASE_URL}/private/plans`, {
+    const response = await fetch(getEndpointUrl('/private/plans'), {
       method: 'GET',
       headers,
     })
@@ -565,7 +565,7 @@ describe('[POST] /private/plans - Error Cases', () => {
 
 describe('[POST] /private/latency - Error Cases', () => {
   it('should return 400 when latency post fails', async () => {
-    const response = await fetch(`${BASE_URL}/private/latency`, {
+    const response = await fetch(getEndpointUrl('/private/latency'), {
       method: 'GET',
       headers,
     })
@@ -578,7 +578,7 @@ describe('[POST] /private/latency - Error Cases', () => {
 
 describe('[POST] /private/config - Error Cases', () => {
   it('should return 500 when config cannot be retrieved', async () => {
-    const response = await fetch(`${BASE_URL}/private/config`, {
+    const response = await fetch(getEndpointUrl('/private/config'), {
       method: 'GET',
       headers,
     })
