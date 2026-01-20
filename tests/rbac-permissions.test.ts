@@ -46,11 +46,8 @@ describe('RBAC Permission System', () => {
   describe('rbac_check_permission_direct SQL function', () => {
     describe('Legacy mode (use_new_rbac = false)', () => {
       beforeEach(async () => {
-        // Ensure legacy mode for default org
-        await query(`
-          UPDATE public.rbac_settings SET use_new_rbac = false WHERE id = 1;
-          UPDATE public.orgs SET use_new_rbac = false WHERE id = $1;
-        `, [ORG_ID])
+        await query(`UPDATE public.rbac_settings SET use_new_rbac = false WHERE id = 1`)
+        await query(`UPDATE public.orgs SET use_new_rbac = false WHERE id = $1`, [ORG_ID])
       })
 
       it('should allow read permission for user with read right', async () => {
@@ -150,11 +147,8 @@ describe('RBAC Permission System', () => {
 
     describe('Feature flag routing', () => {
       it('should use legacy for orgs without RBAC flag', async () => {
-        // Disable RBAC for the org
-        await query(`
-          UPDATE public.orgs SET use_new_rbac = false WHERE id = $1;
-          UPDATE public.rbac_settings SET use_new_rbac = false WHERE id = 1;
-        `, [ORG_ID])
+        await query(`UPDATE public.orgs SET use_new_rbac = false WHERE id = $1`, [ORG_ID])
+        await query(`UPDATE public.rbac_settings SET use_new_rbac = false WHERE id = 1`)
 
         const result = await query(`
           SELECT public.rbac_check_permission_direct(
@@ -259,10 +253,8 @@ describe('RBAC Permission System', () => {
       })
 
       it('should return false when both flags are disabled', async () => {
-        await query(`
-          UPDATE public.rbac_settings SET use_new_rbac = false WHERE id = 1;
-          UPDATE public.orgs SET use_new_rbac = false WHERE id = $1;
-        `, [ORG_ID])
+        await query(`UPDATE public.rbac_settings SET use_new_rbac = false WHERE id = 1`)
+        await query(`UPDATE public.orgs SET use_new_rbac = false WHERE id = $1`, [ORG_ID])
 
         const result = await query(`
           SELECT public.rbac_is_enabled_for_org($1::uuid) as enabled
