@@ -2,17 +2,30 @@ BEGIN;
 
 SELECT plan(6);
 
--- Test fixtures
+-- Test fixtures - DEDICATED DATA FOR TEST ISOLATION (parallel test execution)
+-- Create dedicated test users to avoid conflicts with other parallel tests
+INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, created_at, updated_at, raw_user_meta_data)
+VALUES 
+  ('33333333-3333-4333-8333-333333333333', 'rbac_phase1_admin@test.local', crypt('testpass', gen_salt('bf')), NOW(), NOW(), NOW(), '{}'),
+  ('44444444-4444-4444-8444-444444444444', 'rbac_phase1_member@test.local', crypt('testpass', gen_salt('bf')), NOW(), NOW(), NOW(), '{}')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.users (id, email, created_at, updated_at)
+VALUES
+  ('33333333-3333-4333-8333-333333333333', 'rbac_phase1_admin@test.local', NOW(), NOW()),
+  ('44444444-4444-4444-8444-444444444444', 'rbac_phase1_member@test.local', NOW(), NOW())
+ON CONFLICT (id) DO NOTHING;
+
 WITH seed_data AS (
   SELECT
-    'c591b04e-cf29-4945-b9a0-776d0672061a'::uuid AS admin_user,
-    '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid AS member_user,
+    '33333333-3333-4333-8333-333333333333'::uuid AS admin_user,
+    '44444444-4444-4444-8444-444444444444'::uuid AS member_user,
     '11111111-1111-4111-8111-111111111111'::uuid AS org_legacy,
     '22222222-2222-4222-8222-222222222222'::uuid AS org_rbac,
     'com.rbac.legacy'::text AS app_legacy,
     'com.rbac.new'::text AS app_rbac,
     9876500001::bigint AS channel_rbac_id,
-    'rbac-test-key'::text AS api_key_value
+    'rbac-test-key-phase1'::text AS api_key_value
 )
 INSERT INTO public.orgs (id, created_by, name, management_email, use_new_rbac)
 SELECT org_legacy, admin_user, 'Legacy Org (RBAC off)', 'legacy-rbac@example.com', false FROM seed_data
@@ -20,7 +33,7 @@ ON CONFLICT (id) DO NOTHING;
 
 WITH seed_data AS (
   SELECT
-    'c591b04e-cf29-4945-b9a0-776d0672061a'::uuid AS admin_user,
+    '33333333-3333-4333-8333-333333333333'::uuid AS admin_user,
     '22222222-2222-4222-8222-222222222222'::uuid AS org_rbac
 )
 INSERT INTO public.orgs (id, created_by, name, management_email, use_new_rbac)
@@ -30,8 +43,8 @@ ON CONFLICT (id) DO NOTHING;
 -- Legacy app + membership (exercises fallback path)
 WITH seed_data AS (
   SELECT
-    'c591b04e-cf29-4945-b9a0-776d0672061a'::uuid AS admin_user,
-    '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid AS member_user,
+    '33333333-3333-4333-8333-333333333333'::uuid AS admin_user,
+    '44444444-4444-4444-8444-444444444444'::uuid AS member_user,
     '11111111-1111-4111-8111-111111111111'::uuid AS org_legacy,
     'com.rbac.legacy'::text AS app_legacy
 )
@@ -41,7 +54,7 @@ ON CONFLICT (app_id) DO NOTHING;
 
 WITH seed_data AS (
   SELECT
-    '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid AS member_user,
+    '44444444-4444-4444-8444-444444444444'::uuid AS member_user,
     '11111111-1111-4111-8111-111111111111'::uuid AS org_legacy
 )
 INSERT INTO public.org_users (user_id, org_id, user_right)
@@ -51,7 +64,7 @@ ON CONFLICT DO NOTHING;
 -- RBAC app + channel
 WITH seed_data AS (
   SELECT
-    'c591b04e-cf29-4945-b9a0-776d0672061a'::uuid AS admin_user,
+    '33333333-3333-4333-8333-333333333333'::uuid AS admin_user,
     '22222222-2222-4222-8222-222222222222'::uuid AS org_rbac,
     'com.rbac.new'::text AS app_rbac
 )
@@ -61,7 +74,7 @@ ON CONFLICT (app_id) DO NOTHING;
 
 WITH seed_data AS (
   SELECT
-    'c591b04e-cf29-4945-b9a0-776d0672061a'::uuid AS admin_user,
+    '33333333-3333-4333-8333-333333333333'::uuid AS admin_user,
     '22222222-2222-4222-8222-222222222222'::uuid AS org_rbac,
     'com.rbac.new'::text AS app_rbac,
     9876500001::bigint AS channel_rbac_id
@@ -74,8 +87,8 @@ ON CONFLICT (id) DO NOTHING;
 -- API key principal for RBAC app
 WITH seed_data AS (
   SELECT
-    '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid AS member_user,
-    'rbac-test-key'::text AS api_key_value
+    '44444444-4444-4444-8444-444444444444'::uuid AS member_user,
+    'rbac-test-key-phase1'::text AS api_key_value
 )
 INSERT INTO public.apikeys (user_id, key, mode, name)
 SELECT member_user, api_key_value, 'all'::public.key_mode, 'rbac-test-apikey' FROM seed_data;
@@ -83,8 +96,8 @@ SELECT member_user, api_key_value, 'all'::public.key_mode, 'rbac-test-apikey' FR
 -- RBAC bindings (org_admin to user, app_admin to apikey)
 WITH seed_data AS (
   SELECT
-    '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid AS member_user,
-    'c591b04e-cf29-4945-b9a0-776d0672061a'::uuid AS admin_user,
+    '44444444-4444-4444-8444-444444444444'::uuid AS member_user,
+    '33333333-3333-4333-8333-333333333333'::uuid AS admin_user,
     '22222222-2222-4222-8222-222222222222'::uuid AS org_rbac
 )
 DELETE FROM public.role_bindings
@@ -95,8 +108,8 @@ WHERE principal_type = 'user'
 
 WITH seed_data AS (
   SELECT
-    '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid AS member_user,
-    'c591b04e-cf29-4945-b9a0-776d0672061a'::uuid AS admin_user,
+    '44444444-4444-4444-8444-444444444444'::uuid AS member_user,
+    '33333333-3333-4333-8333-333333333333'::uuid AS admin_user,
     '22222222-2222-4222-8222-222222222222'::uuid AS org_rbac
 )
 INSERT INTO public.role_bindings (principal_type, principal_id, role_id, scope_type, org_id, granted_by)
@@ -106,8 +119,8 @@ WHERE r.name = 'org_admin';
 
 WITH seed_data AS (
   SELECT
-    'rbac-test-key'::text AS api_key_value,
-    'c591b04e-cf29-4945-b9a0-776d0672061a'::uuid AS admin_user,
+    'rbac-test-key-phase1'::text AS api_key_value,
+    '33333333-3333-4333-8333-333333333333'::uuid AS admin_user,
     '22222222-2222-4222-8222-222222222222'::uuid AS org_rbac
 )
 DELETE FROM public.role_bindings
@@ -118,8 +131,8 @@ WHERE principal_type = 'apikey'
 
 WITH seed_data AS (
   SELECT
-    'rbac-test-key'::text AS api_key_value,
-    'c591b04e-cf29-4945-b9a0-776d0672061a'::uuid AS admin_user,
+    'rbac-test-key-phase1'::text AS api_key_value,
+    '33333333-3333-4333-8333-333333333333'::uuid AS admin_user,
     '22222222-2222-4222-8222-222222222222'::uuid AS org_rbac
 )
 INSERT INTO public.role_bindings (principal_type, principal_id, role_id, scope_type, org_id, app_id, granted_by)
@@ -129,15 +142,12 @@ WHERE api.key = api_key_value
   AND r.name = 'app_admin'
   AND a.app_id = 'com.rbac.new';
 
--- Ensure global flag is off by default; org-level flag drives RBAC for rbac org
-UPDATE public.rbac_settings SET use_new_rbac = false, updated_at = now() WHERE id = 1;
-
 -- 1) Legacy path still works when RBAC flag is off
 SELECT
   ok(
     public.rbac_check_permission_direct(
       'org.update_settings',
-      '6aa76066-55ef-4238-ade6-0b32334a4097',
+      '44444444-4444-4444-8444-444444444444',
       '11111111-1111-4111-8111-111111111111',
       NULL::varchar,
       NULL::bigint,
@@ -146,15 +156,12 @@ SELECT
     'Legacy org_users rights honored when RBAC disabled'
   );
 
--- Flip global flag on; org_rbac also has org-level flag set
-UPDATE public.rbac_settings SET use_new_rbac = true, updated_at = now() WHERE id = 1;
-
 -- 2) RBAC grants org_admin via role_binding (no org_users row)
 SELECT
   ok(
     public.rbac_check_permission_direct(
       'org.update_user_roles',
-      '6aa76066-55ef-4238-ade6-0b32334a4097',
+      '44444444-4444-4444-8444-444444444444',
       '22222222-2222-4222-8222-222222222222',
       NULL::varchar,
       NULL::bigint,
@@ -168,7 +175,7 @@ SELECT
   ok(
     public.rbac_check_permission_direct(
       'channel.update_settings',
-      '6aa76066-55ef-4238-ade6-0b32334a4097',
+      '44444444-4444-4444-8444-444444444444',
       '22222222-2222-4222-8222-222222222222',
       'com.rbac.new',
       9876500001,
@@ -182,7 +189,7 @@ SELECT
   throws_ok(
     $q$
       INSERT INTO public.role_bindings (principal_type, principal_id, role_id, scope_type, org_id, granted_by)
-      SELECT 'user', '6aa76066-55ef-4238-ade6-0b32334a4097', r.id, 'org', '22222222-2222-4222-8222-222222222222', 'c591b04e-cf29-4945-b9a0-776d0672061a'
+      SELECT 'user', '44444444-4444-4444-8444-444444444444', r.id, 'org', '22222222-2222-4222-8222-222222222222', '33333333-3333-4333-8333-333333333333'
       FROM public.roles r
       WHERE r.name = 'org_billing_admin';
     $q$,
@@ -195,24 +202,23 @@ SELECT
   ok(
     public.rbac_check_permission_direct(
       'app.update_settings',
-      '6aa76066-55ef-4238-ade6-0b32334a4097',
+      '44444444-4444-4444-8444-444444444444',
       NULL::uuid,
       'com.rbac.new',
       NULL::bigint,
-      'rbac-test-key'
+      'rbac-test-key-phase1'
     ),
     'App admin binding on apikey grants app.update_settings permission'
   );
 
 -- 6) Disabling RBAC removes RBAC-granted access when no legacy rights exist
-UPDATE public.rbac_settings SET use_new_rbac = false, updated_at = now() WHERE id = 1;
 UPDATE public.orgs SET use_new_rbac = false WHERE id = '22222222-2222-4222-8222-222222222222';
 
 SELECT
   ok(
     NOT public.rbac_check_permission_direct(
       'org.update_user_roles',
-      '6aa76066-55ef-4238-ade6-0b32334a4097',
+      '44444444-4444-4444-8444-444444444444',
       '22222222-2222-4222-8222-222222222222',
       NULL::varchar,
       NULL::bigint,
