@@ -8,7 +8,7 @@ import { Hono } from 'hono/tiny'
 import { z } from 'zod/mini'
 import { getAppStatus, setAppStatus } from '../utils/appStatus.ts'
 import { isChannelSelfRateLimited, recordChannelSelfRequest } from '../utils/channelSelfRateLimit.ts'
-import { BRES, parseBody, simpleError200, simpleRateLimit } from '../utils/hono.ts'
+import { BRES, parseBody, simpleError200, simpleErrorWithStatus, simpleRateLimit } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { sendNotifOrg } from '../utils/notifications.ts'
 import { sendNotifToOrgMembers } from '../utils/org_email_notifications.ts'
@@ -73,7 +73,7 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
   }
   if (cachedStatus === 'cancelled') {
     await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
-    return simpleError200(c, 'need_plan_upgrade', PLAN_ERROR)
+    return simpleErrorWithStatus(c, 429, 'need_plan_upgrade', PLAN_ERROR)
   }
   // Check if app exists first - Read operation can use v2 flag
   const appOwner = await getAppOwnerPostgres(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>, PLAN_MAU_ACTIONS)
@@ -94,7 +94,7 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
       device_id,
       app_id_url: app_id,
     }, appOwner.owner_org, app_id, '0 0 * * 1')) // Weekly on Monday
-    return simpleError200(c, 'need_plan_upgrade', PLAN_ERROR)
+    return simpleErrorWithStatus(c, 429, 'need_plan_upgrade', PLAN_ERROR)
   }
 
   await setAppStatus(c, app_id, 'cloud')
@@ -261,7 +261,7 @@ async function put(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient
   }
   if (cachedStatus === 'cancelled') {
     await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
-    return simpleError200(c, 'need_plan_upgrade', PLAN_ERROR)
+    return simpleErrorWithStatus(c, 429, 'need_plan_upgrade', PLAN_ERROR)
   }
   const appOwner = await getAppOwnerPostgres(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>, PLAN_MAU_ACTIONS)
 
@@ -280,7 +280,7 @@ async function put(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient
       device_id,
       app_id_url: app_id,
     }, appOwner.owner_org, app_id, '0 0 * * 1')) // Weekly on Monday
-    return simpleError200(c, 'need_plan_upgrade', PLAN_ERROR)
+    return simpleErrorWithStatus(c, 429, 'need_plan_upgrade', PLAN_ERROR)
   }
   await setAppStatus(c, app_id, 'cloud')
 
@@ -375,7 +375,7 @@ async function deleteOverride(c: Context, drizzleClient: ReturnType<typeof getDr
   }
   if (cachedStatus === 'cancelled') {
     await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
-    return simpleError200(c, 'need_plan_upgrade', PLAN_ERROR)
+    return simpleErrorWithStatus(c, 429, 'need_plan_upgrade', PLAN_ERROR)
   }
   const appOwner = await getAppOwnerPostgres(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>, PLAN_MAU_ACTIONS)
 
@@ -394,7 +394,7 @@ async function deleteOverride(c: Context, drizzleClient: ReturnType<typeof getDr
       device_id,
       app_id_url: app_id,
     }, appOwner.owner_org, app_id, '0 0 * * 1')) // Weekly on Monday
-    return simpleError200(c, 'need_plan_upgrade', PLAN_ERROR)
+    return simpleErrorWithStatus(c, 429, 'need_plan_upgrade', PLAN_ERROR)
   }
   await setAppStatus(c, app_id, 'cloud')
 
@@ -477,7 +477,7 @@ async function listCompatibleChannels(c: Context, drizzleClient: ReturnType<type
   }
   if (cachedStatus === 'cancelled') {
     await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
-    return simpleError200(c, 'need_plan_upgrade', PLAN_ERROR)
+    return simpleErrorWithStatus(c, 429, 'need_plan_upgrade', PLAN_ERROR)
   }
   const appOwner = await getAppOwnerPostgres(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>, PLAN_MAU_ACTIONS)
 
@@ -496,7 +496,7 @@ async function listCompatibleChannels(c: Context, drizzleClient: ReturnType<type
       app_id,
       app_id_url: app_id,
     }, appOwner.owner_org, app_id, '0 0 * * 1')) // Weekly on Monday
-    return simpleError200(c, 'need_plan_upgrade', PLAN_ERROR)
+    return simpleErrorWithStatus(c, 429, 'need_plan_upgrade', PLAN_ERROR)
   }
   await setAppStatus(c, app_id, 'cloud')
 

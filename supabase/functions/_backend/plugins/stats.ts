@@ -6,7 +6,7 @@ import { greaterOrEqual, parse } from '@std/semver'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod/mini'
 import { getAppStatus, setAppStatus } from '../utils/appStatus.ts'
-import { BRES, simpleError, simpleError200, simpleRateLimit } from '../utils/hono.ts'
+import { BRES, simpleError, simpleError200, simpleErrorWithStatus, simpleRateLimit } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { sendNotifOrg } from '../utils/notifications.ts'
 import { closeClient, getAppOwnerPostgres, getAppVersionPostgres, getDrizzleClient, getPgClient } from '../utils/pg.ts'
@@ -238,6 +238,9 @@ app.post('/', async (c) => {
       if (result.success) {
         return c.json(BRES)
       }
+      if (result.error === 'need_plan_upgrade') {
+        return simpleErrorWithStatus(c, 429, result.error, result.message!, result.moreInfo)
+      }
       return simpleError200(c, result.error!, result.message!, result.moreInfo)
     }
 
@@ -260,6 +263,9 @@ app.post('/', async (c) => {
         }
         else if (result.success) {
           results.push({ status: 'ok', index: i })
+        }
+        else if (result.error === 'need_plan_upgrade') {
+          return simpleErrorWithStatus(c, 429, result.error, result.message!, result.moreInfo)
         }
         else {
           results.push({

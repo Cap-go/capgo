@@ -1,4 +1,5 @@
 import type { Context } from 'hono'
+import type { ContentfulStatusCode } from 'hono/utils/http-status'
 import type { Bindings } from './cloudflare.ts'
 import type { DeletePayload, InsertPayload, UpdatePayload } from './supabase.ts'
 import type { Database } from './supabase.types.ts'
@@ -211,7 +212,10 @@ export interface SimpleErrorResponse {
 }
 
 export function simpleError200(c: Context, errorCode: string, message: string, moreInfo: any = {}) {
-  const status = 200
+  return simpleErrorWithStatus(c, 200, errorCode, message, moreInfo)
+}
+
+export function simpleErrorWithStatus(c: Context, status: ContentfulStatusCode, errorCode: string, message: string, moreInfo: any = {}) {
   const res: SimpleErrorResponse = {
     error: errorCode,
     message,
