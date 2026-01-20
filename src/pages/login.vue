@@ -50,7 +50,7 @@ async function checkMfa() {
   const { data: mfaFactors, error: mfaError } = await supabase.auth.mfa.listFactors()
   if (mfaError) {
     setErrors('login-account', ['See browser console'], {})
-    console.error('Cannot getm MFA factors', mfaError)
+    console.error('Cannot get MFA factors', mfaError)
     return
   }
 
@@ -188,7 +188,7 @@ async function checkAuthUser() {
     const { data: mfaFactors, error } = await supabase.auth.mfa.listFactors()
     if (error) {
       setErrors('login-account', ['See browser console'], {})
-      console.error('Cannot getm MFA factors', error)
+      console.error('Cannot get MFA factors', error)
       return
     }
 
