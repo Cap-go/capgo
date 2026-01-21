@@ -362,7 +362,7 @@ BEGIN
     WHERE principal_type = public.rbac_principal_user()
       AND principal_id = invite.user_id
       AND scope_type = public.rbac_scope_org()
-      AND org_id = invite.org_id;
+      AND role_bindings.org_id = invite.org_id;
 
     INSERT INTO public.role_bindings (
       principal_type,
