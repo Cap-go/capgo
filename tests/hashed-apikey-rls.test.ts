@@ -24,6 +24,7 @@ const RLS_TEST_USER_ID = USER_ID_RLS
 
 // Direct PostgreSQL connection for testing SQL functions
 let pool: Pool
+let originalEnforcing2fa: boolean | null = null
 
 // Helper to execute SQL with capgkey header set
 async function execWithCapgkey(sql: string, capgkey: string): Promise<any> {
@@ -91,9 +92,36 @@ async function setApiKeyExpiration(id: number, expiresAt: Date | null): Promise<
 
 beforeAll(async () => {
   pool = new Pool({ connectionString: POSTGRES_URL })
+  const client = await pool.connect()
+  try {
+    const { rows } = await client.query(
+      'SELECT enforcing_2fa FROM orgs WHERE id = $1',
+      [ORG_ID_RLS],
+    )
+    originalEnforcing2fa = rows[0]?.enforcing_2fa ?? null
+    await client.query(
+      'UPDATE orgs SET enforcing_2fa = false WHERE id = $1',
+      [ORG_ID_RLS],
+    )
+  }
+  finally {
+    client.release()
+  }
 })
 
 afterAll(async () => {
+  if (originalEnforcing2fa !== null) {
+    const client = await pool.connect()
+    try {
+      await client.query(
+        'UPDATE orgs SET enforcing_2fa = $1 WHERE id = $2',
+        [originalEnforcing2fa, ORG_ID_RLS],
+      )
+    }
+    finally {
+      client.release()
+    }
+  }
   await pool.end()
 })
 
