@@ -10,7 +10,7 @@ import { getAppStatus, setAppStatus } from '../utils/appStatus.ts'
 import { isChannelSelfRateLimited, recordChannelSelfRequest } from '../utils/channelSelfRateLimit.ts'
 import { BRES, parseBody, simpleError200, simpleErrorWithStatus, simpleRateLimit } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
-import { sendNotifOrg } from '../utils/notifications.ts'
+import { sendNotifOrgCached } from '../utils/notifications.ts'
 import { sendNotifToOrgMembers } from '../utils/org_email_notifications.ts'
 import { closeClient, deleteChannelDevicePg, getAppByIdPg, getAppOwnerPostgres, getChannelByNamePg, getChannelDeviceOverridePg, getChannelsPg, getCompatibleChannelsPg, getDrizzleClient, getMainChannelsPg, getPgClient, setReplicationLagHeader, upsertChannelDevicePg } from '../utils/pg.ts'
 import { convertQueryToBody, makeDevice, parsePluginBody } from '../utils/plugin_parser.ts'
@@ -89,7 +89,7 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot update, upgrade plan to continue to update', id: app_id })
     await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
     // Send weekly notification about missing payment (not configurable - payment related)
-    backgroundTask(c, sendNotifOrg(c, 'org:missing_payment', {
+    backgroundTask(c, sendNotifOrgCached(c, 'org:missing_payment', {
       app_id,
       device_id,
       app_id_url: app_id,
@@ -275,7 +275,7 @@ async function put(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot update, upgrade plan to continue to update', id: app_id })
     await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
     // Send weekly notification about missing payment (not configurable - payment related)
-    backgroundTask(c, sendNotifOrg(c, 'org:missing_payment', {
+    backgroundTask(c, sendNotifOrgCached(c, 'org:missing_payment', {
       app_id,
       device_id,
       app_id_url: app_id,
@@ -389,7 +389,7 @@ async function deleteOverride(c: Context, drizzleClient: ReturnType<typeof getDr
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot update, upgrade plan to continue to update', id: app_id })
     await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
     // Send weekly notification about missing payment (not configurable - payment related)
-    backgroundTask(c, sendNotifOrg(c, 'org:missing_payment', {
+    backgroundTask(c, sendNotifOrgCached(c, 'org:missing_payment', {
       app_id,
       device_id,
       app_id_url: app_id,
@@ -492,7 +492,7 @@ async function listCompatibleChannels(c: Context, drizzleClient: ReturnType<type
     await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
     // Send weekly notification about missing payment (not configurable - payment related)
     // Note: We don't have device_id in GET request for listing compatible channels
-    backgroundTask(c, sendNotifOrg(c, 'org:missing_payment', {
+    backgroundTask(c, sendNotifOrgCached(c, 'org:missing_payment', {
       app_id,
       app_id_url: app_id,
     }, appOwner.owner_org, app_id, '0 0 * * 1')) // Weekly on Monday
