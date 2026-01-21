@@ -3,12 +3,15 @@ import type Stripe from 'stripe'
 import type { MiddlewareKeyVariablesStripe } from '../utils/hono_middleware_stripe.ts'
 import type { StripeData } from '../utils/stripe.ts'
 import type { Database } from '../utils/supabase.types.ts'
+import { eq } from 'drizzle-orm'
 import { Hono } from 'hono/tiny'
 import { addTagBento, trackBentoEvent } from '../utils/bento.ts'
 import { BRES, quickError, simpleError } from '../utils/hono.ts'
 import { middlewareStripeWebhook } from '../utils/hono_middleware_stripe.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { logsnag } from '../utils/logsnag.ts'
+import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
+import * as schema from '../utils/postgres_schema.ts'
 import { ensureCustomerMetadata, getStripe } from '../utils/stripe.ts'
 import { customerToSegmentOrg, supabaseAdmin } from '../utils/supabase.ts'
 
@@ -31,40 +34,62 @@ function isCheckoutSessionEvent(event: Stripe.Event) {
 }
 
 async function getCreditTopUpProductIdFromCustomer(c: Context, customerId: string): Promise<string> {
-  const { data: stripeInfo, error: stripeInfoError } = await supabaseAdmin(c)
-    .from('stripe_info')
-    .select('product_id')
-    .eq('customer_id', customerId)
-    .single()
+  const pgClient = getPgClient(c, true)
+  const drizzleClient = getDrizzleClient(pgClient)
 
-  if (stripeInfoError || !stripeInfo?.product_id) {
-    cloudlog({
-      requestId: c.get('requestId'),
-      message: 'credit_plan_missing',
-      customerId,
-      error: stripeInfoError,
-    })
-    throw simpleError('credit_product_not_configured', 'Organization does not have a Stripe plan configured')
+  try {
+    let stripeInfoError: unknown | null = null
+    let stripeInfo: { product_id: string | null } | undefined
+    try {
+      [stripeInfo] = await drizzleClient
+        .select({ product_id: schema.stripe_info.product_id })
+        .from(schema.stripe_info)
+        .where(eq(schema.stripe_info.customer_id, customerId))
+        .limit(1)
+    }
+    catch (error) {
+      stripeInfoError = error
+    }
+
+    if (stripeInfoError || !stripeInfo?.product_id) {
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'credit_plan_missing',
+        customerId,
+        error: stripeInfoError,
+      })
+      throw simpleError('credit_product_not_configured', 'Organization does not have a Stripe plan configured')
+    }
+
+    let planError: unknown | null = null
+    let plan: { credit_id: string | null } | undefined
+    try {
+      [plan] = await drizzleClient
+        .select({ credit_id: schema.plans.credit_id })
+        .from(schema.plans)
+        .where(eq(schema.plans.stripe_id, stripeInfo.product_id))
+        .limit(1)
+    }
+    catch (error) {
+      planError = error
+    }
+
+    if (planError || !plan?.credit_id) {
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'credit_top_up_product_missing',
+        customerId,
+        planStripeId: stripeInfo.product_id,
+        error: planError,
+      })
+      throw simpleError('credit_product_not_configured', 'Credit product is not configured for this plan')
+    }
+
+    return plan.credit_id
   }
-
-  const { data: plan, error: planError } = await supabaseAdmin(c)
-    .from('plans')
-    .select('credit_id, name')
-    .eq('stripe_id', stripeInfo.product_id)
-    .single()
-
-  if (planError || !plan?.credit_id) {
-    cloudlog({
-      requestId: c.get('requestId'),
-      message: 'credit_top_up_product_missing',
-      customerId,
-      planStripeId: stripeInfo.product_id,
-      error: planError,
-    })
-    throw simpleError('credit_product_not_configured', 'Credit product is not configured for this plan')
+  finally {
+    closeClient(c, pgClient)
   }
-
-  return plan.credit_id
 }
 
 async function handleCheckoutSessionCompleted(
