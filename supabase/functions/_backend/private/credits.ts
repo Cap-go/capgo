@@ -3,6 +3,7 @@ import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
 import { middlewareAuth, parseBody, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../utils/logging.ts'
+import { checkPermission } from '../utils/rbac.ts'
 import { createOneTimeCheckout, getStripe } from '../utils/stripe.ts'
 import { supabaseAdmin, supabaseClient } from '../utils/supabase.ts'
 import { getEnv } from '../utils/utils.ts'
@@ -113,6 +114,9 @@ async function resolveOrgStripeContext(c: AppContext, orgId: string) {
     ?? c.get('authorization')
 
   if (!rawAuthHeader)
+    throw simpleError('not_authorized', 'Not authorized')
+
+  if (!await checkPermission(c, 'org.update_billing', { orgId }))
     throw simpleError('not_authorized', 'Not authorized')
 
   // Use authenticated client - RLS will enforce access based on JWT

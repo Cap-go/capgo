@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import {
   APP_NAME,
+  fetchWithRetry,
   getBaseData,
   getEndpointUrl,
   getSupabaseClient,
@@ -42,7 +43,7 @@ describe('expose_metadata feature', () => {
 
   describe('[PUT] /app - expose_metadata field', () => {
     it('should set expose_metadata to true via API', async () => {
-      const response = await fetch(`${getEndpointUrl('/app')}/${APP_NAME_METADATA}`, {
+      const response = await fetchWithRetry(`${getEndpointUrl('/app')}/${APP_NAME_METADATA}`, {
         method: 'PUT',
         headers,
         body: JSON.stringify({
@@ -72,9 +73,9 @@ describe('expose_metadata feature', () => {
         .update({ expose_metadata: true })
         .eq('app_id', APP_NAME_METADATA)
 
-      
+
       // Then set to false via API
-      const response = await fetch(`${getEndpointUrl('/app')}/${APP_NAME_METADATA}`, {
+      const response = await fetchWithRetry(`${getEndpointUrl('/app')}/${APP_NAME_METADATA}`, {
         method: 'PUT',
         headers,
         body: JSON.stringify({
@@ -100,7 +101,7 @@ describe('expose_metadata feature', () => {
     it('should default expose_metadata to false for new apps', async () => {
       const newAppId = `${APP_NAME}.${randomUUID()}`
 
-      const createResponse = await fetch(`${getEndpointUrl('/app')}`, {
+      const createResponse = await fetchWithRetry(`${getEndpointUrl('/app')}`, {
         method: 'POST',
         headers,
         body: JSON.stringify({
@@ -375,7 +376,7 @@ describe('expose_metadata feature', () => {
           .update({ expose_metadata: true })
           .eq('app_id', APP_NAME_METADATA)
 
-        
+
         const baseData = getBaseData(APP_NAME_METADATA)
         baseData.version_name = '1.1.0'
         baseData.plugin_version = '5.35.0'
@@ -403,7 +404,7 @@ describe('expose_metadata feature', () => {
           .delete()
           .eq('id', newVersion!.id)
 
-              }
+      }
     })
 
     it('should expose metadata with only link when comment is null', async () => {
@@ -423,7 +424,7 @@ describe('expose_metadata feature', () => {
           .update({ expose_metadata: true })
           .eq('app_id', APP_NAME_METADATA)
 
-        
+
         const baseData = getBaseData(APP_NAME_METADATA)
         baseData.version_name = '1.1.0'
         baseData.plugin_version = '5.35.0'
@@ -449,7 +450,7 @@ describe('expose_metadata feature', () => {
           .eq('app_id', APP_NAME_METADATA)
           .eq('name', '1.0.0')
 
-              }
+      }
     })
 
     it('should expose metadata with only comment when link is null', async () => {
@@ -495,7 +496,7 @@ describe('expose_metadata feature', () => {
           .eq('app_id', APP_NAME_METADATA)
           .eq('name', '1.0.0')
 
-              }
+      }
     })
   })
 

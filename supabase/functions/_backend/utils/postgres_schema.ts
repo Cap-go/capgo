@@ -1,4 +1,4 @@
-import { bigint, boolean, integer, pgEnum, pgTable, serial, text, timestamp, uuid, varchar } from 'drizzle-orm/pg-core'
+import { bigint, boolean, integer, jsonb, pgEnum, pgTable, primaryKey, serial, text, timestamp, uuid, varchar } from 'drizzle-orm/pg-core'
 
 // do_not_change
 
@@ -94,7 +94,7 @@ export const channel_devices = pgTable('channel_devices', {
 })
 
 export const orgs = pgTable('orgs', {
-  id: uuid('id').notNull(),
+  id: uuid('id').primaryKey().notNull(),
   created_by: uuid('created_by').notNull(),
   logo: text('logo'),
   name: text('name').notNull(),
@@ -102,6 +102,43 @@ export const orgs = pgTable('orgs', {
   customer_id: text('customer_id'),
   require_apikey_expiration: boolean('require_apikey_expiration').notNull().default(false),
   max_apikey_expiration_days: integer('max_apikey_expiration_days'),
+  email_preferences: jsonb('email_preferences'),
+})
+
+export const notifications = pgTable('notifications', {
+  created_at: timestamp('created_at').defaultNow(),
+  updated_at: timestamp('updated_at').defaultNow(),
+  last_send_at: timestamp('last_send_at').notNull().defaultNow(),
+  total_send: bigint('total_send', { mode: 'number' }).notNull().default(1),
+  owner_org: uuid('owner_org').notNull(),
+  event: varchar('event', { length: 255 }).notNull(),
+  uniq_id: varchar('uniq_id', { length: 255 }).notNull(),
+})
+
+export const users = pgTable('users', {
+  created_at: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  image_url: varchar('image_url'),
+  first_name: varchar('first_name'),
+  last_name: varchar('last_name'),
+  country: varchar('country'),
+  email: varchar('email').notNull(),
+  id: uuid('id').primaryKey().notNull(),
+  updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+  enable_notifications: boolean('enable_notifications').notNull().default(true),
+  opt_for_newsletters: boolean('opt_for_newsletters').notNull().default(true),
+  ban_time: timestamp('ban_time', { withTimezone: true }),
+  email_preferences: jsonb('email_preferences').notNull().default({
+    usage_limit: true,
+    credit_usage: true,
+    onboarding: true,
+    weekly_stats: true,
+    monthly_stats: true,
+    deploy_stats_24h: true,
+    bundle_created: true,
+    bundle_deployed: true,
+    device_error: true,
+    channel_self_rejected: true,
+  }),
 })
 
 export const stripe_info = pgTable('stripe_info', {
@@ -127,6 +164,7 @@ export const apikeys = pgTable('apikeys', {
   limited_to_orgs: uuid('limited_to_orgs').array(),
   limited_to_apps: varchar('limited_to_apps').array(),
   expires_at: timestamp('expires_at', { withTimezone: true }),
+  rbac_id: uuid('rbac_id').notNull(),
 })
 
 export const org_users = pgTable('org_users', {
@@ -138,4 +176,75 @@ export const org_users = pgTable('org_users', {
   app_id: varchar('app_id'),
   channel_id: bigint('channel_id', { mode: 'number' }),
   user_right: userMinRightPgEnum('user_right'),
+  rbac_role_name: text('rbac_role_name'),
 })
+
+// RBAC tables
+export const roles = pgTable('roles', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: text('name').notNull(),
+  scope_type: text('scope_type').notNull(),
+  description: text('description'),
+  priority_rank: bigint('priority_rank', { mode: 'number' }).notNull().default(0),
+  is_assignable: boolean('is_assignable').notNull().default(true),
+  created_at: timestamp('created_at').notNull().defaultNow(),
+  created_by: uuid('created_by'),
+})
+
+export const groups = pgTable('groups', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  org_id: uuid('org_id').notNull(),
+  name: text('name').notNull(),
+  description: text('description'),
+  is_system: boolean('is_system').notNull().default(false),
+  created_by: uuid('created_by'),
+  created_at: timestamp('created_at').notNull().defaultNow(),
+})
+
+export const group_members = pgTable(
+  'group_members',
+  {
+    group_id: uuid('group_id').notNull(),
+    user_id: uuid('user_id').notNull(),
+    added_by: uuid('added_by'),
+    added_at: timestamp('added_at').notNull().defaultNow(),
+  },
+  t => ({
+    pk: primaryKey({ columns: [t.group_id, t.user_id] }),
+  }),
+)
+
+export const role_bindings = pgTable('role_bindings', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  principal_type: text('principal_type').notNull(),
+  principal_id: uuid('principal_id').notNull(),
+  role_id: uuid('role_id').notNull(),
+  scope_type: text('scope_type').notNull(),
+  org_id: uuid('org_id'),
+  app_id: uuid('app_id'),
+  bundle_id: bigint('bundle_id', { mode: 'number' }),
+  channel_id: bigint('channel_id', { mode: 'number' }),
+  granted_by: uuid('granted_by').notNull(),
+  granted_at: timestamp('granted_at').notNull().defaultNow(),
+  expires_at: timestamp('expires_at'),
+  reason: text('reason'),
+  is_direct: boolean('is_direct').notNull().default(true),
+})
+
+// Export all tables as schema object for convenience
+export const schema = {
+  apps,
+  app_versions,
+  manifest,
+  channels,
+  channel_devices,
+  orgs,
+  users,
+  stripe_info,
+  apikeys,
+  org_users,
+  roles,
+  groups,
+  group_members,
+  role_bindings,
+}

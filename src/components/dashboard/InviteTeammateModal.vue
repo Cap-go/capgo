@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { Database } from '~/types/supabase.types'
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import VueTurnstile from 'vue-turnstile'
@@ -23,7 +23,8 @@ const inviteCaptchaToken = ref('')
 const inviteCaptchaElement = ref<InstanceType<typeof VueTurnstile> | null>(null)
 const captchaKey = ref(import.meta.env.VITE_CAPTCHA_KEY)
 const isInviting = ref(false)
-const inviteRole: Database['public']['Enums']['user_min_right'] = 'admin'
+const useRbacInvites = computed(() => organizationStore.currentOrganization?.use_new_rbac === true)
+const inviteRole = computed(() => (useRbacInvites.value ? 'org_admin' : 'admin'))
 
 // Dialog state tracking
 const isEmailDialogOpen = ref(false)
@@ -184,12 +185,27 @@ async function handleEmailSubmit() {
   updateEmailDialogButton(true)
 
   try {
-    const { data, error } = await supabase
-      .rpc('invite_user_to_org', {
+    let data: string | null = null
+    let error: unknown = null
+
+    if (useRbacInvites.value) {
+      const result = await supabase.rpc('invite_user_to_org_rbac', {
         email,
         org_id: orgId,
-        invite_type: inviteRole,
+        role_name: inviteRole.value,
       })
+      data = result.data
+      error = result.error
+    }
+    else {
+      const result = await supabase.rpc('invite_user_to_org', {
+        email,
+        org_id: orgId,
+        invite_type: inviteRole.value as Database['public']['Enums']['user_min_right'],
+      })
+      data = result.data
+      error = result.error
+    }
 
     if (error) {
       console.error('Error inviting user:', error)
@@ -226,6 +242,9 @@ async function handleEmailSubmit() {
     }
     else if (data === 'CAN_NOT_INVITE_OWNER') {
       toast.error(t('cannot-invite-owner', 'You cannot invite the owner of the account'))
+    }
+    else if (data === 'RBAC_NOT_ENABLED' || data === 'ROLE_NOT_FOUND') {
+      toast.error(t('invitation-failed', 'Invitation failed'))
     }
     else if (data === 'NO_RIGHTS') {
       toast.error(t('no-permission', 'You do not have permission to invite members'))
@@ -276,7 +295,7 @@ async function handleFullDetailsSubmit() {
       body: {
         email,
         org_id: orgId,
-        invite_type: inviteRole,
+        invite_type: inviteRole.value,
         captcha_token: inviteCaptchaToken.value,
         first_name: firstName,
         last_name: lastName,

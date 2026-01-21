@@ -79,6 +79,18 @@ testing against Cloudflare Workers.
   - `triggers/` - Database triggers and CRON functions
   - `utils/` - Shared utilities and database schemas
 
+### HTTP Response Conventions
+
+All API endpoints must follow these response patterns:
+
+- **Success with data:** `return c.json(data)` or `return c.json(data, 200)`
+- **Success without data:** `return c.json(BRES)` where `BRES = { status: 'ok' }` (import
+  from `utils/hono.ts`)
+- **Errors:** Use `return simpleError()` or `return quickError(status, ...)` (import from
+  `utils/hono.ts`)
+
+Do NOT use `c.body(null, 204)` for success responses. Always return JSON for consistency.
+
 ### Key Frontend Directories
 
 - **`src/components/`** - Reusable Vue components
@@ -186,6 +198,15 @@ Then in your test file, use ONLY these dedicated resources for modifications.
 - Path aliases: `~/` maps to `src/`
 - Auto-generated types for Vue components and routes
 - Supabase types auto-generated via CLI
+
+### Comments
+
+- All code comments must be in English, regardless of the chat language.
+
+### Commit Messages
+
+- Follow Conventional Commits v1.0.0 (<https://www.conventionalcommits.org/en/v1.0.0/>).
+- Use a clear type and scope when helpful (e.g., `docs: ...`, `feat(api): ...`, `fix(frontend): ...`).
 
 ## Supabase Best Practices
 

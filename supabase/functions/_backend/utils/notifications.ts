@@ -1,12 +1,66 @@
 import type { Context } from 'hono'
+import type { getDrizzleClient } from './pg.ts'
 import { parseCronExpression } from 'cron-schedule'
 import dayjs from 'dayjs'
+import { and, eq } from 'drizzle-orm'
 import { trackBentoEvent } from './bento.ts'
+import { CacheHelper } from './cache.ts'
 import { cloudlog } from './logging.ts'
+import { logPgError } from './pg.ts'
+import * as schema from './postgres_schema.ts'
 import { supabaseAdmin } from './supabase.ts'
+import { backgroundTask } from './utils.ts'
 
 interface EventData {
   [key: string]: any
+}
+
+const NOTIF_CACHE_PATH = '/.notif-sendable'
+
+interface NotifCachePayload {
+  sendable: boolean
+}
+
+function buildNotifCacheRequest(c: Context, orgId: string, eventName: string, uniqId: string) {
+  const helper = new CacheHelper(c)
+  if (!helper.available)
+    return null
+  return {
+    helper,
+    request: helper.buildRequest(NOTIF_CACHE_PATH, { org_id: orgId, event: eventName, uniq_id: uniqId }),
+  }
+}
+
+async function getNotifCacheStatus(c: Context, orgId: string, eventName: string, uniqId: string): Promise<boolean | null> {
+  const cacheEntry = buildNotifCacheRequest(c, orgId, eventName, uniqId)
+  if (!cacheEntry)
+    return null
+  const payload = await cacheEntry.helper.matchJson<NotifCachePayload>(cacheEntry.request)
+  if (!payload)
+    return null
+  return payload.sendable
+}
+
+function setNotifCacheStatus(c: Context, orgId: string, eventName: string, uniqId: string, sendable: boolean, ttlSeconds: number) {
+  return backgroundTask(c, async () => {
+    const cacheEntry = buildNotifCacheRequest(c, orgId, eventName, uniqId)
+    if (!cacheEntry)
+      return
+    await cacheEntry.helper.putJson(cacheEntry.request, { sendable }, ttlSeconds)
+  })
+}
+
+/**
+ * Calculate seconds until the next cron window opens based on last send time.
+ */
+function getSecondsUntilNextCronWindow(lastSendAt: string, cron: string): number {
+  const interval = parseCronExpression(cron)
+  const lastSendDate = new Date(lastSendAt)
+  const now = new Date()
+  const nextDate = interval.getNextDate(lastSendDate)
+  const diffMs = nextDate.getTime() - now.getTime()
+  // Return at least 1 second, and cap at reasonable max (1 week)
+  return Math.max(1, Math.min(Math.ceil(diffMs / 1000), 604800))
 }
 
 function isSendable(c: Context, last: string, cron: string) {
@@ -21,27 +75,51 @@ function isSendable(c: Context, last: string, cron: string) {
   // return false
 }
 
-export async function sendNotifOrg(c: Context, eventName: string, eventData: EventData, orgId: string, uniqId: string, cron: string) {
-  // Get org info
-  const { data: org, error: orgError } = await supabaseAdmin(c)
-    .from('orgs')
-    .select()
-    .eq('id', orgId)
-    .single()
+/**
+ * Get notification from database using drizzle (read replica)
+ */
+async function getNotification(
+  c: Context,
+  drizzleClient: ReturnType<typeof getDrizzleClient>,
+  orgId: string,
+  eventName: string,
+  uniqId: string,
+): Promise<{ last_send_at: Date, total_send: number } | null> {
+  try {
+    const notif = await drizzleClient
+      .select({
+        last_send_at: schema.notifications.last_send_at,
+        total_send: schema.notifications.total_send,
+      })
+      .from(schema.notifications)
+      .where(and(
+        eq(schema.notifications.owner_org, orgId),
+        eq(schema.notifications.event, eventName),
+        eq(schema.notifications.uniq_id, uniqId),
+      ))
+      .limit(1)
+      .then(data => data[0])
 
-  if (!org || orgError) {
-    cloudlog({ requestId: c.get('requestId'), message: 'org not found', orgId })
-    return false
+    return notif ?? null
   }
+  catch (e: unknown) {
+    logPgError(c, 'getNotification', e)
+    return null
+  }
+}
 
-  // Check if notification has already been sent
-  const { data: notif } = await supabaseAdmin(c)
-    .from('notifications')
-    .select()
-    .eq('owner_org', org.id)
-    .eq('event', eventName)
-    .eq('uniq_id', uniqId)
-    .single()
+export async function sendNotifOrg(
+  c: Context,
+  eventName: string,
+  eventData: EventData,
+  orgId: string,
+  uniqId: string,
+  cron: string,
+  managementEmail: string,
+  drizzleClient: ReturnType<typeof getDrizzleClient>,
+) {
+  // Check if notification has already been sent (read from replica)
+  const notif = await getNotification(c, drizzleClient, orgId, eventName, uniqId)
 
   let shouldSend = false
   let isFirstSend = false
@@ -74,9 +152,10 @@ export async function sendNotifOrg(c: Context, eventName: string, eventData: Eve
   }
   else {
     // Notification exists, check if sendable
-    if (!isSendable(c, notif.last_send_at, cron)) {
+    const lastSendAtStr = notif.last_send_at.toISOString()
+    if (!isSendable(c, lastSendAtStr, cron)) {
       cloudlog({ requestId: c.get('requestId'), message: 'notif already sent', event: eventName, orgId })
-      return false
+      return { sent: false, lastSendAt: lastSendAtStr }
     }
 
     // Atomically update ONLY if timestamp hasn't changed (optimistic locking to prevent race)
@@ -89,7 +168,7 @@ export async function sendNotifOrg(c: Context, eventName: string, eventData: Eve
       .eq('event', eventName)
       .eq('uniq_id', uniqId)
       .eq('owner_org', orgId)
-      .eq('last_send_at', notif.last_send_at) // Optimistic lock: only update if timestamp unchanged
+      .eq('last_send_at', lastSendAtStr) // Optimistic lock: only update if timestamp unchanged
       .select()
 
     // Only send if we successfully claimed it (update succeeded)
@@ -103,14 +182,14 @@ export async function sendNotifOrg(c: Context, eventName: string, eventData: Eve
   // Only send if we successfully claimed the notification
   if (shouldSend) {
     cloudlog({ requestId: c.get('requestId'), message: isFirstSend ? 'notif never sent' : 'notif ready to sent', event: eventName, uniqId })
-    const res = await trackBentoEvent(c, org.management_email, eventData, eventName)
+    const res = await trackBentoEvent(c, managementEmail, eventData, eventName)
     if (!res) {
-      cloudlog({ requestId: c.get('requestId'), message: 'trackEvent failed', eventName, email: org.management_email, eventData })
+      cloudlog({ requestId: c.get('requestId'), message: 'trackEvent failed', eventName, email: managementEmail, eventData })
       // Note: We already claimed it in DB, but email failed. On next attempt, cron will determine if we retry.
       return false
     }
 
-    cloudlog({ requestId: c.get('requestId'), message: 'send notif done', eventName, email: org.management_email })
+    cloudlog({ requestId: c.get('requestId'), message: 'send notif done', eventName, email: managementEmail })
     return true
   }
 
@@ -120,3 +199,44 @@ export async function sendNotifOrg(c: Context, eventName: string, eventData: Eve
 // dayjs subtract one week
 // const last_send_at = dayjs().subtract(1, 'week').toISOString()
 // cloudlog(c.get('requestId'), 'isSendable', isSendable(last_send_at, '0 0 1 * *'))
+
+/**
+ * Cached version of sendNotifOrg that checks cache before querying the database.
+ * If a notification was recently checked and found to be "not sendable", the cached
+ * result is returned immediately without hitting the database.
+ *
+ * The cache TTL is calculated based on the cron schedule and last send time,
+ * so the cache expires exactly when the notification becomes sendable again.
+ */
+export async function sendNotifOrgCached(
+  c: Context,
+  eventName: string,
+  eventData: EventData,
+  orgId: string,
+  uniqId: string,
+  cron: string,
+  managementEmail: string,
+  drizzleClient: ReturnType<typeof getDrizzleClient>,
+): Promise<boolean> {
+  // Check cache first - if we recently checked and it wasn't sendable, skip DB query
+  const cachedSendable = await getNotifCacheStatus(c, orgId, eventName, uniqId)
+  if (cachedSendable === false) {
+    cloudlog({ requestId: c.get('requestId'), message: 'notif cache hit - not sendable', event: eventName, orgId, uniqId })
+    return false
+  }
+
+  // Cache miss, call the actual function
+  const result = await sendNotifOrg(c, eventName, eventData, orgId, uniqId, cron, managementEmail, drizzleClient)
+
+  // Handle the "not sendable" case with lastSendAt for proper TTL calculation
+  if (typeof result === 'object' && result.sent === false && result.lastSendAt) {
+    const ttlSeconds = getSecondsUntilNextCronWindow(result.lastSendAt, cron)
+    cloudlog({ requestId: c.get('requestId'), message: 'notif caching not sendable', event: eventName, orgId, ttlSeconds })
+    setNotifCacheStatus(c, orgId, eventName, uniqId, false, ttlSeconds)
+    return false
+  }
+
+  // For other cases (true/false), just return the boolean result
+  // No need to cache "sent=true" as next check should query DB anyway
+  return result === true
+}

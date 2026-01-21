@@ -59,8 +59,8 @@ export function selectOne(pgClient: ReturnType<typeof getPgClient>) {
 
 function fixSupabaseHost(host: string): string {
   if (host.includes('postgres:postgres@supabase_db_')) {
-  // Supabase adds a prefix to the hostname that breaks connection in local docker
-  // e.g. "supabase_db_NAME:5432" -> "db:5432"
+    // Supabase adds a prefix to the hostname that breaks connection in local docker
+    // e.g. "supabase_db_NAME:5432" -> "db:5432"
     const url = URL.parse(host)!
     url.hostname = url.hostname.split('_')[1]
     return url.href
@@ -393,16 +393,17 @@ export function requestInfosChannelPostgres(
   const channelQuery = (includeManifest
     ? baseQuery.leftJoin(schema.manifest, eq(schema.manifest.app_version_id, versionAlias.id))
     : baseQuery)
-    .where(!defaultChannel
-      ? and(
-          eq(channelAlias.public, true),
-          eq(channelAlias.app_id, app_id),
-          eq(platformQuery, true),
-        )
-      : and(
-          eq(channelAlias.app_id, app_id),
-          eq(channelAlias.name, defaultChannel),
-        ),
+    .where(
+      !defaultChannel
+        ? and(
+            eq(channelAlias.public, true),
+            eq(channelAlias.app_id, app_id),
+            eq(platformQuery, true),
+          )
+        : and(
+            eq(channelAlias.app_id, app_id),
+            eq(channelAlias.name, defaultChannel),
+          ),
     )
     .groupBy(channelAlias.id, versionAlias.id)
     .limit(1)
@@ -428,10 +429,11 @@ export function requestInfosPostgres(
 
   const channelDevice = shouldQueryChannelOverride
     ? requestInfosChannelDevicePostgres(c, app_id, device_id, drizzleClient, shouldFetchManifest, includeMetadata)
-    : Promise.resolve(undefined).then(() => {
-        cloudlog({ requestId: c.get('requestId'), message: 'Skipping channel device override query' })
-        return null
-      })
+    : Promise.resolve(undefined)
+        .then(() => {
+          cloudlog({ requestId: c.get('requestId'), message: 'Skipping channel device override query' })
+          return null
+        })
   const channel = requestInfosChannelPostgres(c, platform, app_id, defaultChannel, drizzleClient, shouldFetchManifest, includeMetadata)
 
   return Promise.all([channelDevice, channel])
@@ -447,7 +449,7 @@ export async function getAppOwnerPostgres(
   appId: string,
   drizzleClient: ReturnType<typeof getDrizzleClient>,
   actions: ('mau' | 'storage' | 'bandwidth')[] = [],
-): Promise<{ owner_org: string, orgs: { created_by: string, id: string }, plan_valid: boolean, channel_device_count: number, manifest_bundle_count: number, expose_metadata: boolean } | null> {
+): Promise<{ owner_org: string, orgs: { created_by: string, id: string, management_email: string }, plan_valid: boolean, channel_device_count: number, manifest_bundle_count: number, expose_metadata: boolean } | null> {
   try {
     if (actions.length === 0)
       return null
@@ -464,6 +466,7 @@ export async function getAppOwnerPostgres(
         orgs: {
           created_by: orgAlias.created_by,
           id: orgAlias.id,
+          management_email: orgAlias.management_email,
         },
       })
       .from(schema.apps)

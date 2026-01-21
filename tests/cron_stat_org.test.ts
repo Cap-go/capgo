@@ -209,7 +209,7 @@ describe('[POST] /triggers/cron_stat_org', () => {
     const baseData = getBaseData(APPNAME)
     const updateResponse = await postUpdate(baseData)
 
-    expect(updateResponse.status).toBe(200)
+    expect(updateResponse.status).toBe(429)
     expect(await updateResponse.json<{ error: string }>().then(data => data.error)).toEqual('need_plan_upgrade')
   })
 

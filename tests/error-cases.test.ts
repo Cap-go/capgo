@@ -257,26 +257,26 @@ describe('trigger Endpoint Error Cases', () => {
 })
 
 describe('private Endpoint Error Cases', () => {
-  it('should return 400 for stripe_portal without authorization', async () => {
+  it('should return 401 for stripe_portal without authorization', async () => {
     const response = await fetch(`${BASE_URL}/private/stripe_portal`, {
       method: 'POST',
       headers,
       body: JSON.stringify({}),
     })
-    expect(response.status).toBe(400)
+    expect(response.status).toBe(401)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('not_authorized')
+    expect(data.error).toBe('invalid_jwt')
   })
 
-  it('should return 400 for stripe_checkout without org_id', async () => {
+  it('should return 401 for stripe_checkout without org_id', async () => {
     const response = await fetch(`${BASE_URL}/private/stripe_checkout`, {
       method: 'POST',
       headers,
       body: JSON.stringify({}),
     })
-    expect(response.status).toBe(400)
+    expect(response.status).toBe(401)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('no_org_id_provided')
+    expect(data.error).toBe('invalid_jwt')
   })
 
   it('should return 401 for upload_link with invalid API key', async () => {

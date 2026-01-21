@@ -56,6 +56,7 @@ TABLES=(
   "channels"
   "channel_devices"
   "manifest"
+  "notifications"
 )
 
 echo ""

@@ -89,7 +89,7 @@ async function step2(form: { password: string, password_confirm: string }) {
             const { data: _verify, error: errorVerify } = await supabase.auth.mfa.verify({
               factorId: factor.id,
               challengeId: challenge.id,
-              code: mfaCode.value.replace(' ', ''),
+              code: mfaCode.value.replaceAll(' ', ''),
             })
             if (errorVerify) {
               toast.error(t('invalid-mfa-code'))

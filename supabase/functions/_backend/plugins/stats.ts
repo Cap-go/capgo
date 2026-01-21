@@ -6,9 +6,9 @@ import { greaterOrEqual, parse } from '@std/semver'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod/mini'
 import { getAppStatus, setAppStatus } from '../utils/appStatus.ts'
-import { BRES, simpleError, simpleError200, simpleRateLimit } from '../utils/hono.ts'
+import { BRES, simpleError, simpleError200, simpleErrorWithStatus, simpleRateLimit } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
-import { sendNotifOrg } from '../utils/notifications.ts'
+import { sendNotifOrgCached } from '../utils/notifications.ts'
 import { closeClient, getAppOwnerPostgres, getAppVersionPostgres, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import { makeDevice, parsePluginBody } from '../utils/plugin_parser.ts'
 import { createStatsVersion, onPremStats, sendStatsAndDevice } from '../utils/stats.ts'
@@ -91,11 +91,11 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot update, upgrade plan to continue to update', id: app_id })
     await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
     // Send weekly notification about missing payment (not configurable - payment related)
-    backgroundTask(c, sendNotifOrg(c, 'org:missing_payment', {
+    backgroundTask(c, sendNotifOrgCached(c, 'org:missing_payment', {
       app_id,
       device_id: body.device_id,
       app_id_url: app_id,
-    }, appOwner.owner_org, app_id, '0 0 * * 1')) // Weekly on Monday
+    }, appOwner.owner_org, app_id, '0 0 * * 1', appOwner.orgs.management_email, drizzleClient)) // Weekly on Monday
     return { success: false, error: 'need_plan_upgrade', message: 'Cannot update, upgrade plan to continue to update' }
   }
   await setAppStatus(c, app_id, 'cloud')
@@ -238,6 +238,9 @@ app.post('/', async (c) => {
       if (result.success) {
         return c.json(BRES)
       }
+      if (result.error === 'need_plan_upgrade') {
+        return simpleErrorWithStatus(c, 429, result.error, result.message!, result.moreInfo)
+      }
       return simpleError200(c, result.error!, result.message!, result.moreInfo)
     }
 
@@ -260,6 +263,9 @@ app.post('/', async (c) => {
         }
         else if (result.success) {
           results.push({ status: 'ok', index: i })
+        }
+        else if (result.error === 'need_plan_upgrade') {
+          return simpleErrorWithStatus(c, 429, result.error, result.message!, result.moreInfo)
         }
         else {
           results.push({

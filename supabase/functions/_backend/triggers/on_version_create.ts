@@ -5,6 +5,7 @@ import { BRES, middlewareAPISecret, simpleError, triggerValidator } from '../uti
 import { cloudlog } from '../utils/logging.ts'
 import { logsnag } from '../utils/logsnag.ts'
 import { sendEmailToOrgMembers } from '../utils/org_email_notifications.ts'
+import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 import { backgroundTask } from '../utils/utils.ts'
 
@@ -48,12 +49,19 @@ app.post('/', middlewareAPISecret, triggerValidator('app_versions', 'INSERT'), a
       },
       notify: false,
     }))
-    await backgroundTask(c, sendEmailToOrgMembers(c, 'bundle:created', 'bundle_created', {
-      org_id: record.owner_org,
-      app_id: record.app_id,
-      bundle_name: record.name,
-      bundle_id: record.id,
-    }, record.owner_org))
+    const pgClient = getPgClient(c, true)
+    const drizzleClient = getDrizzleClient(pgClient)
+    try {
+      await backgroundTask(c, sendEmailToOrgMembers(c, 'bundle:created', 'bundle_created', {
+        org_id: record.owner_org,
+        app_id: record.app_id,
+        bundle_name: record.name,
+        bundle_id: record.id,
+      }, record.owner_org, drizzleClient))
+    }
+    finally {
+      closeClient(c, pgClient)
+    }
   }
 
   return c.json(BRES)
