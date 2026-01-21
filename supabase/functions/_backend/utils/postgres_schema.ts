@@ -102,6 +102,17 @@ export const orgs = pgTable('orgs', {
   customer_id: text('customer_id'),
   require_apikey_expiration: boolean('require_apikey_expiration').notNull().default(false),
   max_apikey_expiration_days: integer('max_apikey_expiration_days'),
+  email_preferences: jsonb('email_preferences'),
+})
+
+export const notifications = pgTable('notifications', {
+  created_at: timestamp('created_at').defaultNow(),
+  updated_at: timestamp('updated_at').defaultNow(),
+  last_send_at: timestamp('last_send_at').notNull().defaultNow(),
+  total_send: bigint('total_send', { mode: 'number' }).notNull().default(1),
+  owner_org: uuid('owner_org').notNull(),
+  event: varchar('event', { length: 255 }).notNull(),
+  uniq_id: varchar('uniq_id', { length: 255 }).notNull(),
 })
 
 export const users = pgTable('users', {

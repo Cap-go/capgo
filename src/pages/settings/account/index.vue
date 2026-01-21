@@ -508,7 +508,7 @@ async function handleMfa() {
         id: 'verify',
         handler: async () => {
           // User has clicked the "verify button - let's check"
-          const verifyCode = mfaVerificationCode.value.replace(' ', '')
+          const verifyCode = mfaVerificationCode.value.replaceAll(' ', '')
 
           const { data: challenge, error: challengeError } = await supabase.auth.mfa.challenge({ factorId: data.id })
 
@@ -545,7 +545,7 @@ async function handleMfa() {
 onMounted(async () => {
   const { data: mfaFactors, error } = await supabase.auth.mfa.listFactors()
   if (error) {
-    console.error('Cannot getm MFA factors', error)
+    console.error('Cannot get MFA factors', error)
     return
   }
 

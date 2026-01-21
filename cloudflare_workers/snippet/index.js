@@ -16,6 +16,8 @@ const CIRCUIT_RESET_MS = 5 * 60 * 1000 // 5 minutes before retrying unhealthy wo
 // TTL doubles with each confirmed on-prem response, up to max
 const ONPREM_CACHE_TTL_MIN_SECONDS = 60 // Start at 1 minute
 const ONPREM_CACHE_TTL_MAX_SECONDS = 7 * 24 * 60 * 60 // Max 7 days
+// Plan-upgrade caching configuration (fixed short TTL)
+const PLAN_UPGRADE_CACHE_TTL_SECONDS = 5 * 60 // 5 minutes
 
 // Helper to build cache keys using actual hostname to avoid DNS lookups on fake .internal domains
 function getCircuitBreakerCacheKey(hostname, colo, workerUrl) {
@@ -29,6 +31,10 @@ function getOnPremCacheKey(hostname, appId, endpoint, method) {
 function getOnPremTtlKey(hostname, appId) {
   // Separate key to track TTL progression - survives cache expiration
   return `https://${hostname}/__internal__/onprem-ttl/${encodeURIComponent(appId)}`
+}
+
+function getPlanUpgradeCacheKey(hostname, appId, endpoint, method) {
+  return `https://${hostname}/__internal__/plan-upgrade-cache/${encodeURIComponent(appId)}/${endpoint}/${method}`
 }
 
 // Endpoints that should be checked for on-prem caching
@@ -120,6 +126,22 @@ async function getOnPremCache(hostname, appId, endpoint, method) {
   }
 }
 
+async function getPlanUpgradeCache(hostname, appId, endpoint, method) {
+  try {
+    const cache = caches.default
+    const key = getPlanUpgradeCacheKey(hostname, appId, endpoint, method)
+    const cached = await cache.match(key)
+    if (cached) {
+      console.log(`Plan-upgrade cache HIT for ${appId}/${endpoint}/${method}`)
+      return cached.clone()
+    }
+    return null
+  }
+  catch {
+    return null
+  }
+}
+
 async function getStoredTtl(hostname, appId) {
   try {
     const cache = caches.default
@@ -188,6 +210,32 @@ function isOnPremResponse(status, responseBody) {
   return false
 }
 
+function isPlanUpgradeResponse(status, responseBody) {
+  return status === 429 && responseBody && responseBody.error === 'need_plan_upgrade'
+}
+
+async function setPlanUpgradeCache(hostname, appId, endpoint, method, responseBody, status) {
+  try {
+    const cache = caches.default
+    const key = getPlanUpgradeCacheKey(hostname, appId, endpoint, method)
+    const response = new Response(JSON.stringify(responseBody), {
+      status,
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': `max-age=${PLAN_UPGRADE_CACHE_TTL_SECONDS}`,
+        'X-Plan-Upgrade-Cached': 'true',
+        'X-Plan-Upgrade-App-Id': appId,
+        'X-Plan-Upgrade-Ttl': String(PLAN_UPGRADE_CACHE_TTL_SECONDS),
+      },
+    })
+    await cache.put(key, response)
+    console.log(`Plan-upgrade cache SET for ${appId}/${endpoint}/${method} (${PLAN_UPGRADE_CACHE_TTL_SECONDS}s TTL)`)
+  }
+  catch (e) {
+    console.log(`Failed to cache plan-upgrade response: ${e.message}`)
+  }
+}
+
 async function extractAppId(request, url) {
   const method = request.method
   // For GET and DELETE on /channel_self, app_id is in query params
@@ -224,6 +272,10 @@ export default {
       appId = await extractAppId(request, url)
 
       if (appId) {
+        const cachedPlanUpgrade = await getPlanUpgradeCache(hostname, appId, endpoint, method)
+        if (cachedPlanUpgrade) {
+          return cachedPlanUpgrade
+        }
         const cachedResponse = await getOnPremCache(hostname, appId, endpoint, method)
         if (cachedResponse) {
           return cachedResponse
@@ -654,6 +706,21 @@ export default {
               newHeaders.set('Content-Type', 'application/json')
               newHeaders.set('X-Onprem-Cached', 'false')
               newHeaders.set('X-Onprem-App-Id', appId)
+
+              return new Response(JSON.stringify(responseBody), {
+                status: response.status,
+                headers: newHeaders,
+              })
+            }
+
+            if (isPlanUpgradeResponse(response.status, responseBody)) {
+              // Cache plan-upgrade responses for a short TTL to reduce burst traffic
+              setPlanUpgradeCache(hostname, appId, endpoint, method, responseBody, response.status)
+
+              const newHeaders = new Headers(response.headers)
+              newHeaders.set('Content-Type', 'application/json')
+              newHeaders.set('X-Plan-Upgrade-Cached', 'false')
+              newHeaders.set('X-Plan-Upgrade-App-Id', appId)
 
               return new Response(JSON.stringify(responseBody), {
                 status: response.status,

@@ -449,7 +449,7 @@ export async function getAppOwnerPostgres(
   appId: string,
   drizzleClient: ReturnType<typeof getDrizzleClient>,
   actions: ('mau' | 'storage' | 'bandwidth')[] = [],
-): Promise<{ owner_org: string, orgs: { created_by: string, id: string }, plan_valid: boolean, channel_device_count: number, manifest_bundle_count: number, expose_metadata: boolean } | null> {
+): Promise<{ owner_org: string, orgs: { created_by: string, id: string, management_email: string }, plan_valid: boolean, channel_device_count: number, manifest_bundle_count: number, expose_metadata: boolean } | null> {
   try {
     if (actions.length === 0)
       return null
@@ -466,6 +466,7 @@ export async function getAppOwnerPostgres(
         orgs: {
           created_by: orgAlias.created_by,
           id: orgAlias.id,
+          management_email: orgAlias.management_email,
         },
       })
       .from(schema.apps)

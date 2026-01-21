@@ -28,6 +28,7 @@ TABLES=(
   "channels"
   "channel_devices"
   "manifest"
+  "notifications"
 )
 
 # Region selection

@@ -10,7 +10,7 @@ import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import IconSettings from '~icons/heroicons/cog-8-tooth'
 import IconTrash from '~icons/heroicons/trash'
-import { bytesToMbText } from '~/services/conversion'
+import { formatBytes } from '~/services/conversion'
 import { formatDate } from '~/services/date'
 import { checkPermissions } from '~/services/permissions'
 import { useSupabase } from '~/services/supabase'
@@ -444,7 +444,7 @@ columns.value = [
     sortable: true,
     displayFunction: (elem: Element) => {
       if (elem.size)
-        return bytesToMbText(elem.size)
+        return formatBytes(elem.size)
       else if (elem.external_url)
         return t('stored-externally')
       else if (elem.deleted)

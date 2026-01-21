@@ -1,9 +1,64 @@
 import type { Context } from 'hono'
+import type { getDrizzleClient } from './pg.ts'
+import { parseCronExpression } from 'cron-schedule'
+import { eq } from 'drizzle-orm'
 import { trackBentoEvent } from './bento.ts'
+import { CacheHelper } from './cache.ts'
 import { cloudlog } from './logging.ts'
 import { sendNotifOrg } from './notifications.ts'
+import { getDrizzleClient as getDrizzle, getPgClient, logPgError } from './pg.ts'
+import * as schema from './postgres_schema.ts'
 import { supabaseAdmin } from './supabase.ts'
 import { backgroundTask } from './utils.ts'
+
+// Cache path for org member notifications (separate from single-email notifications)
+const NOTIF_ORG_MEMBERS_CACHE_PATH = '/.notif-org-members-sendable'
+
+interface NotifCachePayload {
+  sendable: boolean
+}
+
+function buildOrgMembersNotifCacheRequest(c: Context, orgId: string, eventName: string, uniqId: string) {
+  const helper = new CacheHelper(c)
+  if (!helper.available)
+    return null
+  return {
+    helper,
+    request: helper.buildRequest(NOTIF_ORG_MEMBERS_CACHE_PATH, { org_id: orgId, event: eventName, uniq_id: uniqId }),
+  }
+}
+
+async function getOrgMembersNotifCacheStatus(c: Context, orgId: string, eventName: string, uniqId: string): Promise<boolean | null> {
+  const cacheEntry = buildOrgMembersNotifCacheRequest(c, orgId, eventName, uniqId)
+  if (!cacheEntry)
+    return null
+  const payload = await cacheEntry.helper.matchJson<NotifCachePayload>(cacheEntry.request)
+  if (!payload)
+    return null
+  return payload.sendable
+}
+
+function setOrgMembersNotifCacheStatus(c: Context, orgId: string, eventName: string, uniqId: string, sendable: boolean, ttlSeconds: number) {
+  return backgroundTask(c, async () => {
+    const cacheEntry = buildOrgMembersNotifCacheRequest(c, orgId, eventName, uniqId)
+    if (!cacheEntry)
+      return
+    await cacheEntry.helper.putJson(cacheEntry.request, { sendable }, ttlSeconds)
+  })
+}
+
+/**
+ * Calculate seconds until the next cron window opens based on last send time.
+ */
+function getSecondsUntilNextCronWindow(lastSendAt: string, cron: string): number {
+  const interval = parseCronExpression(cron)
+  const lastSendDate = new Date(lastSendAt)
+  const now = new Date()
+  const nextDate = interval.getNextDate(lastSendDate)
+  const diffMs = nextDate.getTime() - now.getTime()
+  // Return at least 1 second, and cap at reasonable max (1 week)
+  return Math.max(1, Math.min(Math.ceil(diffMs / 1000), 604800))
+}
 
 /**
  * Email preference keys that map to the JSONB email_preferences column in both users and orgs tables.
@@ -44,25 +99,38 @@ interface OrgWithPreferences {
 }
 
 /**
- * Get org info including management_email and email_preferences
+ * Get org info including management_email and email_preferences using drizzle client
  */
-async function getOrgInfo(c: Context, orgId: string): Promise<OrgWithPreferences | null> {
-  const { data: org, error } = await supabaseAdmin(c)
-    .from('orgs')
-    .select('management_email, email_preferences')
-    .eq('id', orgId)
-    .single()
+async function getOrgInfoWithClient(
+  c: Context,
+  orgId: string,
+  drizzleClient: ReturnType<typeof getDrizzleClient>,
+): Promise<OrgWithPreferences | null> {
+  try {
+    const org = await drizzleClient
+      .select({
+        management_email: schema.orgs.management_email,
+        email_preferences: schema.orgs.email_preferences,
+      })
+      .from(schema.orgs)
+      .where(eq(schema.orgs.id, orgId))
+      .limit(1)
+      .then(data => data[0])
 
-  if (error || !org) {
-    cloudlog({ requestId: c.get('requestId'), message: 'getOrgInfo error', orgId, error })
+    if (!org) {
+      cloudlog({ requestId: c.get('requestId'), message: 'getOrgInfo not found', orgId })
+      return null
+    }
+
+    return {
+      management_email: org.management_email,
+      email_preferences: (org.email_preferences as EmailPreferences | null) ?? {},
+    }
+  }
+  catch (e: unknown) {
+    logPgError(c, 'getOrgInfo', e)
     return null
   }
-
-  // email_preferences may not be in generated types yet
-  const orgWithPrefs = org as OrgWithPreferences
-  orgWithPrefs.email_preferences = ((org as any).email_preferences as EmailPreferences | null) ?? {}
-
-  return orgWithPrefs
 }
 
 /**
@@ -209,11 +277,12 @@ async function getAllEligibleEmails(
   c: Context,
   orgId: string,
   preferenceKey: EmailPreferenceKey,
-): Promise<{ adminEmails: string[], managementEmail: string | null }> {
+  drizzleClient: ReturnType<typeof getDrizzleClient>,
+): Promise<{ adminEmails: string[], managementEmail: string | null, org: OrgWithPreferences | null }> {
   // Get org info
-  const org = await getOrgInfo(c, orgId)
+  const org = await getOrgInfoWithClient(c, orgId, drizzleClient)
   if (!org) {
-    return { adminEmails: [], managementEmail: null }
+    return { adminEmails: [], managementEmail: null, org: null }
   }
 
   // Get eligible admin emails
@@ -233,7 +302,7 @@ async function getAllEligibleEmails(
     }
   }
 
-  return { adminEmails, managementEmail }
+  return { adminEmails, managementEmail, org }
 }
 
 /**
@@ -253,8 +322,10 @@ export async function sendEmailToOrgMembers(
   preferenceKey: EmailPreferenceKey,
   eventData: Record<string, any>,
   orgId: string,
+  drizzleClient?: ReturnType<typeof getDrizzleClient>,
 ): Promise<number> {
-  const { adminEmails, managementEmail } = await getAllEligibleEmails(c, orgId, preferenceKey)
+  const client = drizzleClient ?? getDrizzle(getPgClient(c, true))
+  const { adminEmails, managementEmail } = await getAllEligibleEmails(c, orgId, preferenceKey, client)
 
   // Combine all emails (admin emails + management email if applicable)
   const allEmails = [...adminEmails]
@@ -304,7 +375,7 @@ export async function sendEmailToOrgMembers(
  * @param orgId - The organization ID
  * @param uniqId - Unique identifier for this notification instance (for deduplication)
  * @param cron - Cron expression for rate limiting (e.g., '0 0 * * 1' for weekly)
- * @returns true if emails were sent, false if throttled or no recipients
+ * @returns true if emails were sent, { sent: false, lastSendAt } if throttled, false if error
  */
 export async function sendNotifToOrgMembers(
   c: Context,
@@ -314,9 +385,11 @@ export async function sendNotifToOrgMembers(
   orgId: string,
   uniqId: string,
   cron: string,
-): Promise<boolean> {
-  // Get the org's info including management email
-  const org = await getOrgInfo(c, orgId)
+  drizzleClient: ReturnType<typeof getDrizzleClient>,
+): Promise<boolean | { sent: false, lastSendAt: string }> {
+  // Get all eligible emails (includes org info)
+  const { adminEmails, managementEmail, org } = await getAllEligibleEmails(c, orgId, preferenceKey, drizzleClient)
+
   if (!org) {
     cloudlog({ requestId: c.get('requestId'), message: 'sendNotifToOrgMembers: org not found', orgId })
     return false
@@ -324,15 +397,17 @@ export async function sendNotifToOrgMembers(
 
   // Use sendNotifOrg to handle the notification table logic (throttling/deduplication)
   // It will send to the org's management_email, but we also need to send to other eligible members
-  const orgEmailSent = await sendNotifOrg(c, eventName, eventData, orgId, uniqId, cron)
+  const orgEmailSent = await sendNotifOrg(c, eventName, eventData, orgId, uniqId, cron, org.management_email, drizzleClient)
 
-  if (!orgEmailSent) {
-    // Notification was throttled or already sent
-    return false
+  // Handle the "not sendable" case - propagate lastSendAt for caching
+  if (typeof orgEmailSent === 'object' && orgEmailSent.sent === false && orgEmailSent.lastSendAt) {
+    return { sent: false, lastSendAt: orgEmailSent.lastSendAt }
   }
 
-  // Get all eligible emails
-  const { adminEmails, managementEmail } = await getAllEligibleEmails(c, orgId, preferenceKey)
+  if (orgEmailSent !== true) {
+    // Notification was throttled, race lost, or error
+    return false
+  }
 
   // sendNotifOrg already sent to management_email, so filter it out from admin emails
   // to avoid duplicate sends
@@ -358,4 +433,45 @@ export async function sendNotifToOrgMembers(
   })
 
   return true
+}
+
+/**
+ * Cached version of sendNotifToOrgMembers that checks cache before querying the database.
+ * If a notification was recently checked and found to be "not sendable", the cached
+ * result is returned immediately without hitting the database.
+ *
+ * The cache TTL is calculated based on the cron schedule and last send time,
+ * so the cache expires exactly when the notification becomes sendable again.
+ */
+export async function sendNotifToOrgMembersCached(
+  c: Context,
+  eventName: string,
+  preferenceKey: EmailPreferenceKey,
+  eventData: Record<string, any>,
+  orgId: string,
+  uniqId: string,
+  cron: string,
+  drizzleClient: ReturnType<typeof getDrizzleClient>,
+): Promise<boolean> {
+  // Check cache first - if we recently checked and it wasn't sendable, skip DB query
+  const cachedSendable = await getOrgMembersNotifCacheStatus(c, orgId, eventName, uniqId)
+  if (cachedSendable === false) {
+    cloudlog({ requestId: c.get('requestId'), message: 'sendNotifToOrgMembers cache hit - not sendable', event: eventName, orgId, uniqId })
+    return false
+  }
+
+  // Cache miss, call the actual function
+  const result = await sendNotifToOrgMembers(c, eventName, preferenceKey, eventData, orgId, uniqId, cron, drizzleClient)
+
+  // Handle the "not sendable" case with lastSendAt for proper TTL calculation
+  if (typeof result === 'object' && result.sent === false && result.lastSendAt) {
+    const ttlSeconds = getSecondsUntilNextCronWindow(result.lastSendAt, cron)
+    cloudlog({ requestId: c.get('requestId'), message: 'sendNotifToOrgMembers caching not sendable', event: eventName, orgId, ttlSeconds })
+    setOrgMembersNotifCacheStatus(c, orgId, eventName, uniqId, false, ttlSeconds)
+    return false
+  }
+
+  // For other cases (true/false), just return the boolean result
+  // No need to cache "sent=true" as next check should query DB anyway
+  return result === true
 }

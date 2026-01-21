@@ -1,4 +1,5 @@
 import type { Context } from 'hono'
+import type { getDrizzleClient } from './pg.ts'
 import type { PlanUsage } from './supabase.ts'
 import type { Database } from './supabase.types.ts'
 import { quickError } from './hono.ts'
@@ -181,7 +182,7 @@ async function userAbovePlan(c: Context, org: {
   stripe_info: {
     subscription_id: string | null
   } | null
-}, orgId: string, is_good_plan: boolean): Promise<boolean> {
+}, orgId: string, is_good_plan: boolean, drizzleClient: ReturnType<typeof getDrizzleClient>): Promise<boolean> {
   cloudlog({ requestId: c.get('requestId'), message: 'userAbovePlan', orgId, is_good_plan })
   const totalStats = await getTotalStats(c, orgId)
   const currentPlanName = await getCurrentPlanNameOrg(c, orgId)
@@ -269,7 +270,7 @@ async function userAbovePlan(c: Context, org: {
   }
 
   const bestPlanKey = bestPlan.toLowerCase().replace(' ', '_')
-  const sent = await sendNotifToOrgMembers(c, `user:upgrade_to_${bestPlanKey}`, 'usage_limit', { best_plan: bestPlanKey, plan_name: currentPlanName }, orgId, orgId, '0 0 * * 1')
+  const sent = await sendNotifToOrgMembers(c, `user:upgrade_to_${bestPlanKey}`, 'usage_limit', { best_plan: bestPlanKey, plan_name: currentPlanName }, orgId, orgId, '0 0 * * 1', drizzleClient)
   if (sent) {
     cloudlog({ requestId: c.get('requestId'), message: `user:upgrade_to_${bestPlanKey}`, orgId })
     await logsnag(c).track({
@@ -284,7 +285,7 @@ async function userAbovePlan(c: Context, org: {
   return true
 }
 
-async function userIsAtPlanUsage(c: Context, orgId: string, percentUsage: PlanUsage) {
+async function userIsAtPlanUsage(c: Context, orgId: string, percentUsage: PlanUsage, drizzleClient: ReturnType<typeof getDrizzleClient>) {
   // Reset exceeded flags if plan is good
   await set_mau_exceeded(c, orgId, false)
   await set_storage_exceeded(c, orgId, false)
@@ -294,7 +295,7 @@ async function userIsAtPlanUsage(c: Context, orgId: string, percentUsage: PlanUs
   // check if user is at more than 90%, 50% or 70% of plan usage
   if (percentUsage.total_percent >= 90) {
     // cron every month
-    const sent = await sendNotifToOrgMembers(c, 'user:usage_90_percent_of_plan', 'usage_limit', { percent: percentUsage }, orgId, orgId, '0 0 1 * *')
+    const sent = await sendNotifToOrgMembers(c, 'user:usage_90_percent_of_plan', 'usage_limit', { percent: percentUsage }, orgId, orgId, '0 0 1 * *', drizzleClient)
     if (sent) {
       await logsnag(c).track({
         channel: 'usage',
@@ -307,7 +308,7 @@ async function userIsAtPlanUsage(c: Context, orgId: string, percentUsage: PlanUs
   }
   else if (percentUsage.total_percent >= 70) {
     // cron every month
-    const sent = await sendNotifToOrgMembers(c, 'user:usage_70_percent_of_plan', 'usage_limit', { percent: percentUsage }, orgId, orgId, '0 0 1 * *')
+    const sent = await sendNotifToOrgMembers(c, 'user:usage_70_percent_of_plan', 'usage_limit', { percent: percentUsage }, orgId, orgId, '0 0 1 * *', drizzleClient)
     if (sent) {
       await logsnag(c).track({
         channel: 'usage',
@@ -319,7 +320,7 @@ async function userIsAtPlanUsage(c: Context, orgId: string, percentUsage: PlanUs
     }
   }
   else if (percentUsage.total_percent >= 50) {
-    const sent = await sendNotifToOrgMembers(c, 'user:usage_50_percent_of_plan', 'usage_limit', { percent: percentUsage }, orgId, orgId, '0 0 1 * *')
+    const sent = await sendNotifToOrgMembers(c, 'user:usage_50_percent_of_plan', 'usage_limit', { percent: percentUsage }, orgId, orgId, '0 0 1 * *', drizzleClient)
     if (sent) {
       await logsnag(c).track({
         channel: 'usage',
@@ -374,18 +375,18 @@ export async function calculatePlanStatus(c: Context, orgId: string) {
 }
 
 // Handle notifications and events based on org status
-export async function handleOrgNotificationsAndEvents(c: Context, org: any, orgId: string, is_good_plan: boolean, percentUsage: PlanUsage): Promise<boolean> {
+export async function handleOrgNotificationsAndEvents(c: Context, org: any, orgId: string, is_good_plan: boolean, percentUsage: PlanUsage, drizzleClient: ReturnType<typeof getDrizzleClient>): Promise<boolean> {
   const is_onboarded = await isOnboardedOrg(c, orgId)
   const is_onboarding_needed = await isOnboardingNeeded(c, orgId)
 
   let finalIsGoodPlan = is_good_plan
 
   if (!is_good_plan && is_onboarded) {
-    const needsUpgrade = await userAbovePlan(c, org, orgId, is_good_plan)
+    const needsUpgrade = await userAbovePlan(c, org, orgId, is_good_plan, drizzleClient)
     finalIsGoodPlan = !needsUpgrade
   }
   else if (!is_onboarded && is_onboarding_needed) {
-    const sent = await sendNotifToOrgMembers(c, 'user:need_onboarding', 'onboarding', {}, orgId, orgId, '0 0 1 * *')
+    const sent = await sendNotifToOrgMembers(c, 'user:need_onboarding', 'onboarding', {}, orgId, orgId, '0 0 1 * *', drizzleClient)
     if (sent) {
       await logsnag(c).track({
         channel: 'usage',
@@ -397,7 +398,7 @@ export async function handleOrgNotificationsAndEvents(c: Context, org: any, orgI
     }
   }
   else if (is_good_plan && is_onboarded) {
-    await userIsAtPlanUsage(c, orgId, percentUsage)
+    await userIsAtPlanUsage(c, orgId, percentUsage, drizzleClient)
     finalIsGoodPlan = true
   }
 
@@ -417,7 +418,7 @@ export async function updatePlanStatus(c: Context, org: any, is_good_plan: boole
 }
 
 // New function for cron_stat_org - handles is_good_plan + plan % + exceeded flags
-export async function checkPlanStatusOnly(c: Context, orgId: string): Promise<void> {
+export async function checkPlanStatusOnly(c: Context, orgId: string, drizzleClient: ReturnType<typeof getDrizzleClient>): Promise<void> {
   const org = await getOrgWithCustomerInfo(c, orgId)
 
   // Handle trial organizations
@@ -429,12 +430,12 @@ export async function checkPlanStatusOnly(c: Context, orgId: string): Promise<vo
   const { is_good_plan, percentUsage } = await calculatePlanStatus(c, orgId)
 
   // Update plan status in database
-  const finalIsGoodPlan = await handleOrgNotificationsAndEvents(c, org, orgId, is_good_plan, percentUsage)
+  const finalIsGoodPlan = await handleOrgNotificationsAndEvents(c, org, orgId, is_good_plan, percentUsage, drizzleClient)
   await updatePlanStatus(c, org, finalIsGoodPlan, percentUsage)
 }
 
 // New function for cron_sync_sub - handles subscription sync + events
-export async function syncSubscriptionAndEvents(c: Context, orgId: string): Promise<void> {
+export async function syncSubscriptionAndEvents(c: Context, orgId: string, drizzleClient: ReturnType<typeof getDrizzleClient>): Promise<void> {
   const org = await getOrgWithCustomerInfo(c, orgId)
 
   // Sync subscription data with Stripe
@@ -449,5 +450,5 @@ export async function syncSubscriptionAndEvents(c: Context, orgId: string): Prom
   const { is_good_plan, percentUsage } = await calculatePlanStatus(c, orgId)
 
   // Handle notifications and events
-  await handleOrgNotificationsAndEvents(c, org, orgId, is_good_plan, percentUsage)
+  await handleOrgNotificationsAndEvents(c, org, orgId, is_good_plan, percentUsage, drizzleClient)
 }

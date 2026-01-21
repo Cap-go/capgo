@@ -8,10 +8,10 @@ import { Hono } from 'hono/tiny'
 import { z } from 'zod/mini'
 import { getAppStatus, setAppStatus } from '../utils/appStatus.ts'
 import { isChannelSelfRateLimited, recordChannelSelfRequest } from '../utils/channelSelfRateLimit.ts'
-import { BRES, parseBody, simpleError200, simpleRateLimit } from '../utils/hono.ts'
+import { BRES, parseBody, simpleError200, simpleErrorWithStatus, simpleRateLimit } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
-import { sendNotifOrg } from '../utils/notifications.ts'
-import { sendNotifToOrgMembers } from '../utils/org_email_notifications.ts'
+import { sendNotifOrgCached } from '../utils/notifications.ts'
+import { sendNotifToOrgMembersCached } from '../utils/org_email_notifications.ts'
 import { closeClient, deleteChannelDevicePg, getAppByIdPg, getAppOwnerPostgres, getChannelByNamePg, getChannelDeviceOverridePg, getChannelsPg, getCompatibleChannelsPg, getDrizzleClient, getMainChannelsPg, getPgClient, setReplicationLagHeader, upsertChannelDevicePg } from '../utils/pg.ts'
 import { convertQueryToBody, makeDevice, parsePluginBody } from '../utils/plugin_parser.ts'
 import { sendStatsAndDevice } from '../utils/stats.ts'
@@ -73,7 +73,7 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
   }
   if (cachedStatus === 'cancelled') {
     await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
-    return simpleError200(c, 'need_plan_upgrade', PLAN_ERROR)
+    return simpleErrorWithStatus(c, 429, 'need_plan_upgrade', PLAN_ERROR)
   }
   // Check if app exists first - Read operation can use v2 flag
   const appOwner = await getAppOwnerPostgres(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>, PLAN_MAU_ACTIONS)
@@ -89,12 +89,12 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot update, upgrade plan to continue to update', id: app_id })
     await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
     // Send weekly notification about missing payment (not configurable - payment related)
-    backgroundTask(c, sendNotifOrg(c, 'org:missing_payment', {
+    backgroundTask(c, sendNotifOrgCached(c, 'org:missing_payment', {
       app_id,
       device_id,
       app_id_url: app_id,
-    }, appOwner.owner_org, app_id, '0 0 * * 1')) // Weekly on Monday
-    return simpleError200(c, 'need_plan_upgrade', PLAN_ERROR)
+    }, appOwner.owner_org, app_id, '0 0 * * 1', appOwner.orgs.management_email, drizzleClient)) // Weekly on Monday
+    return simpleErrorWithStatus(c, 429, 'need_plan_upgrade', PLAN_ERROR)
   }
 
   await setAppStatus(c, app_id, 'cloud')
@@ -107,7 +107,7 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
   }
   if (dataChannelOverride && !dataChannelOverride.channel_id.allow_device_self_set) {
     // Send weekly notification to org about self-assignment rejection
-    backgroundTask(c, sendNotifToOrgMembers(
+    backgroundTask(c, sendNotifToOrgMembersCached(
       c,
       'device:channel_self_set_rejected',
       'channel_self_rejected',
@@ -120,6 +120,7 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
       appOwner.owner_org,
       `${app_id}`,
       '0 0 * * 0', // Weekly on Sunday at midnight
+      drizzleClient,
     ))
     return simpleError200(c, 'cannot_override', 'Cannot change device override current channel don\'t allow it')
   }
@@ -133,7 +134,7 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
 
   if (!dataChannel.allow_device_self_set) {
     // Send weekly notification to org about self-assignment rejection
-    backgroundTask(c, sendNotifToOrgMembers(
+    backgroundTask(c, sendNotifToOrgMembersCached(
       c,
       'device:channel_self_set_rejected',
       'channel_self_rejected',
@@ -144,6 +145,7 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
       appOwner.owner_org,
       `${app_id}`,
       '0 0 * * 0', // Weekly on Sunday at midnight
+      drizzleClient,
     ))
     if (dataChannel.public) {
       return simpleError200(
@@ -261,7 +263,7 @@ async function put(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient
   }
   if (cachedStatus === 'cancelled') {
     await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
-    return simpleError200(c, 'need_plan_upgrade', PLAN_ERROR)
+    return simpleErrorWithStatus(c, 429, 'need_plan_upgrade', PLAN_ERROR)
   }
   const appOwner = await getAppOwnerPostgres(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>, PLAN_MAU_ACTIONS)
 
@@ -275,12 +277,12 @@ async function put(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot update, upgrade plan to continue to update', id: app_id })
     await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
     // Send weekly notification about missing payment (not configurable - payment related)
-    backgroundTask(c, sendNotifOrg(c, 'org:missing_payment', {
+    backgroundTask(c, sendNotifOrgCached(c, 'org:missing_payment', {
       app_id,
       device_id,
       app_id_url: app_id,
-    }, appOwner.owner_org, app_id, '0 0 * * 1')) // Weekly on Monday
-    return simpleError200(c, 'need_plan_upgrade', PLAN_ERROR)
+    }, appOwner.owner_org, app_id, '0 0 * * 1', appOwner.orgs.management_email, drizzleClient)) // Weekly on Monday
+    return simpleErrorWithStatus(c, 429, 'need_plan_upgrade', PLAN_ERROR)
   }
   await setAppStatus(c, app_id, 'cloud')
 
@@ -375,7 +377,7 @@ async function deleteOverride(c: Context, drizzleClient: ReturnType<typeof getDr
   }
   if (cachedStatus === 'cancelled') {
     await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
-    return simpleError200(c, 'need_plan_upgrade', PLAN_ERROR)
+    return simpleErrorWithStatus(c, 429, 'need_plan_upgrade', PLAN_ERROR)
   }
   const appOwner = await getAppOwnerPostgres(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>, PLAN_MAU_ACTIONS)
 
@@ -389,12 +391,12 @@ async function deleteOverride(c: Context, drizzleClient: ReturnType<typeof getDr
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot update, upgrade plan to continue to update', id: app_id })
     await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
     // Send weekly notification about missing payment (not configurable - payment related)
-    backgroundTask(c, sendNotifOrg(c, 'org:missing_payment', {
+    backgroundTask(c, sendNotifOrgCached(c, 'org:missing_payment', {
       app_id,
       device_id,
       app_id_url: app_id,
-    }, appOwner.owner_org, app_id, '0 0 * * 1')) // Weekly on Monday
-    return simpleError200(c, 'need_plan_upgrade', PLAN_ERROR)
+    }, appOwner.owner_org, app_id, '0 0 * * 1', appOwner.orgs.management_email, drizzleClient)) // Weekly on Monday
+    return simpleErrorWithStatus(c, 429, 'need_plan_upgrade', PLAN_ERROR)
   }
   await setAppStatus(c, app_id, 'cloud')
 
@@ -432,7 +434,7 @@ async function deleteOverride(c: Context, drizzleClient: ReturnType<typeof getDr
 
   if (!dataChannelOverride.channel_id.allow_device_self_set) {
     // Send weekly notification to org about self-assignment rejection
-    backgroundTask(c, sendNotifToOrgMembers(
+    backgroundTask(c, sendNotifToOrgMembersCached(
       c,
       'device:channel_self_set_rejected',
       'channel_self_rejected',
@@ -443,6 +445,7 @@ async function deleteOverride(c: Context, drizzleClient: ReturnType<typeof getDr
       appOwner.owner_org,
       `${app_id}`,
       '0 0 * * 0', // Weekly on Sunday at midnight
+      drizzleClient,
     ))
     return simpleError200(c, 'cannot_override', 'Cannot change device override current channel don\'t allow it')
   }
@@ -477,7 +480,7 @@ async function listCompatibleChannels(c: Context, drizzleClient: ReturnType<type
   }
   if (cachedStatus === 'cancelled') {
     await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
-    return simpleError200(c, 'need_plan_upgrade', PLAN_ERROR)
+    return simpleErrorWithStatus(c, 429, 'need_plan_upgrade', PLAN_ERROR)
   }
   const appOwner = await getAppOwnerPostgres(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>, PLAN_MAU_ACTIONS)
 
@@ -492,11 +495,11 @@ async function listCompatibleChannels(c: Context, drizzleClient: ReturnType<type
     await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
     // Send weekly notification about missing payment (not configurable - payment related)
     // Note: We don't have device_id in GET request for listing compatible channels
-    backgroundTask(c, sendNotifOrg(c, 'org:missing_payment', {
+    backgroundTask(c, sendNotifOrgCached(c, 'org:missing_payment', {
       app_id,
       app_id_url: app_id,
-    }, appOwner.owner_org, app_id, '0 0 * * 1')) // Weekly on Monday
-    return simpleError200(c, 'need_plan_upgrade', PLAN_ERROR)
+    }, appOwner.owner_org, app_id, '0 0 * * 1', appOwner.orgs.management_email, drizzleClient)) // Weekly on Monday
+    return simpleErrorWithStatus(c, 429, 'need_plan_upgrade', PLAN_ERROR)
   }
   await setAppStatus(c, app_id, 'cloud')
 
