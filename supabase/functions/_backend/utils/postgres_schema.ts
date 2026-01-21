@@ -118,12 +118,20 @@ export const notifications = pgTable('notifications', {
 export const stripe_info = pgTable('stripe_info', {
   id: bigint('id', { mode: 'number' }).primaryKey().notNull(),
   customer_id: text('customer_id'),
+  product_id: varchar('product_id'),
   status: text('status'),
   trial_at: text('trial_at'),
   is_good_plan: boolean('is_good_plan'),
   mau_exceeded: boolean('mau_exceeded'),
   storage_exceeded: boolean('storage_exceeded'),
   bandwidth_exceeded: boolean('bandwidth_exceeded'),
+})
+
+export const plans = pgTable('plans', {
+  id: uuid('id').primaryKey().notNull(),
+  name: varchar('name').notNull(),
+  stripe_id: varchar('stripe_id').notNull(),
+  credit_id: text('credit_id').notNull(),
 })
 
 export const apikeys = pgTable('apikeys', {
