@@ -195,17 +195,7 @@ app.post('/', async (c) => {
   const legacyRight = useRbacInvite
     ? rbacRoleToLegacy[rbacRoleNameValue] ?? 'read'
     : invitation.role
-
-  const { error: insertIntoMainTableError } = await supabaseAdmin.from('org_users').insert({
-    user_id: user.user.id,
-    org_id: invitation.org_id,
-    user_right: legacyRight,
-    rbac_role_name: useRbacInvite ? rbacRoleName : null,
-  })
-
-  if (insertIntoMainTableError) {
-    return quickError(500, 'failed_to_accept_invitation', 'Failed to accept invitation insert into org_users', { error: insertIntoMainTableError.message })
-  }
+  let rbacRoleId: string | null = null
 
   if (useRbacInvite) {
     const { data: role, error: roleError } = await supabaseAdmin
@@ -219,6 +209,21 @@ app.post('/', async (c) => {
       return quickError(500, 'failed_to_accept_invitation', 'Failed to resolve RBAC role', { error: roleError?.message ?? 'Role not found' })
     }
 
+    rbacRoleId = role.id
+  }
+
+  const { error: insertIntoMainTableError } = await supabaseAdmin.from('org_users').insert({
+    user_id: user.user.id,
+    org_id: invitation.org_id,
+    user_right: legacyRight,
+    rbac_role_name: useRbacInvite ? rbacRoleName : null,
+  })
+
+  if (insertIntoMainTableError) {
+    return quickError(500, 'failed_to_accept_invitation', 'Failed to accept invitation insert into org_users', { error: insertIntoMainTableError.message })
+  }
+
+  if (useRbacInvite) {
     const { error: deleteBindingError } = await supabaseAdmin
       .from('role_bindings')
       .delete()
@@ -251,7 +256,7 @@ app.post('/', async (c) => {
       .insert({
         principal_type: 'user',
         principal_id: user.user.id,
-        role_id: role.id,
+        role_id: rbacRoleId as string,
         scope_type: 'org',
         org_id: invitation.org_id,
         granted_by: user.user.id,
