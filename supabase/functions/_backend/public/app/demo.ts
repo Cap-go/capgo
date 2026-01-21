@@ -5,10 +5,20 @@ import { simpleError } from '../../utils/hono.ts'
 import { cloudlog } from '../../utils/logging.ts'
 import { hasOrgRight, supabaseAdmin, updateOrCreateChannel } from '../../utils/supabase.ts'
 
+/** Request body for creating a demo app */
 export interface CreateDemoApp {
   owner_org: string
 }
 
+/**
+ * Creates a demo app for non-technical users during onboarding.
+ * Demo apps are identified by the 'com.capdemo.' prefix in their app_id
+ * and are automatically deleted after 14 days.
+ *
+ * @param c - Hono context with middleware key variables
+ * @param body - Request body containing owner_org
+ * @returns Response with app_id and success message
+ */
 export async function createDemoApp(c: Context<MiddlewareKeyVariables>, body: CreateDemoApp): Promise<Response> {
   const requestId = c.get('requestId')
   const auth = c.get('auth') as AuthInfo | undefined
