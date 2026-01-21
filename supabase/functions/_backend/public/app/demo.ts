@@ -27,18 +27,15 @@ export async function createDemoApp(c: Context<MiddlewareKeyVariables>, body: Cr
     throw simpleError('cannot_access_organization', 'You can\'t access this organization', { org_id: body.owner_org })
   }
 
-  // Generate a unique demo app_id
+  // Generate a unique demo app_id with com.demo. prefix
+  // This prefix is used to identify demo apps for email skipping and auto-deletion
   const shortId = crypto.randomUUID().slice(0, 8)
   const appId = `com.demo.${shortId}.app`
 
-  // Calculate expiry date (14 days from now)
-  const expiresAt = new Date()
-  expiresAt.setDate(expiresAt.getDate() + 14)
+  cloudlog({ requestId, message: 'Creating demo app', appId, owner_org: body.owner_org })
 
-  cloudlog({ requestId, message: 'Creating demo app', appId, owner_org: body.owner_org, expires_at: expiresAt.toISOString() })
-
-  // Create the app with is_demo flag and expiry date
-  // Use admin client to set the demo fields (RLS doesn't expose these to regular users)
+  // Create the demo app - identified by the com.demo. prefix in app_id
+  // Auto-deletion after 14 days uses created_at timestamp
   const supabase = supabaseAdmin(c)
   const appInsert: Database['public']['Tables']['apps']['Insert'] = {
     owner_org: body.owner_org,
@@ -47,8 +44,6 @@ export async function createDemoApp(c: Context<MiddlewareKeyVariables>, body: Cr
     name: 'Demo App',
     retention: 2592000,
     default_upload_channel: 'production',
-    is_demo: true,
-    demo_expires_at: expiresAt.toISOString(),
   }
 
   const { data: appData, error: appError } = await supabase

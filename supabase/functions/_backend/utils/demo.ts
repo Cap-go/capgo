@@ -1,26 +1,16 @@
-import type { Context } from 'hono'
-import { cloudlog } from './logging.ts'
-import { supabaseAdmin } from './supabase.ts'
+/**
+ * Demo app prefix used to identify demo apps.
+ * Demo apps are created for non-technical users during onboarding and are auto-deleted after 14 days.
+ */
+export const DEMO_APP_PREFIX = 'com.demo.'
 
 /**
- * Check if an app is a demo app.
- * Demo apps are created for non-technical users during onboarding and are auto-deleted after 14 days.
+ * Check if an app is a demo app by checking if the app_id starts with the demo prefix.
+ * No database query needed - just a simple string check.
  *
- * @param c - Hono context
  * @param appId - The app_id to check
- * @returns true if the app is a demo app, false otherwise (including on error)
+ * @returns true if the app is a demo app
  */
-export async function isAppDemo(c: Context, appId: string): Promise<boolean> {
-  const { data: appData, error } = await supabaseAdmin(c)
-    .from('apps')
-    .select('is_demo')
-    .eq('app_id', appId)
-    .single()
-
-  if (error) {
-    cloudlog({ requestId: c.get('requestId'), message: 'Error checking demo app status', appId, error })
-    return false
-  }
-
-  return appData?.is_demo === true
+export function isAppDemo(appId: string): boolean {
+  return appId.startsWith(DEMO_APP_PREFIX)
 }

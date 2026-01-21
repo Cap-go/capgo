@@ -1,14 +1,6 @@
--- Add demo app support with auto-deletion after 14 days
--- Demo apps allow non-technical users to explore Capgo without CLI setup
-
--- Add is_demo column to apps table
-ALTER TABLE public.apps ADD COLUMN IF NOT EXISTS is_demo boolean DEFAULT false NOT NULL;
-
--- Add demo_expires_at column to apps table (only set for demo apps)
-ALTER TABLE public.apps ADD COLUMN IF NOT EXISTS demo_expires_at timestamp with time zone;
-
--- Add index for efficient cleanup query
-CREATE INDEX IF NOT EXISTS idx_apps_demo_expires_at ON public.apps (demo_expires_at) WHERE demo_expires_at IS NOT NULL;
+-- Auto-delete demo apps after 14 days
+-- Demo apps are identified by app_id starting with 'com.demo.'
+-- Uses existing created_at column to determine age
 
 -- Create the cleanup function for expired demo apps
 -- This function mirrors the cleanup logic from the deleteApp TypeScript function
@@ -24,16 +16,15 @@ BEGIN
     -- Log start of cleanup
     RAISE NOTICE 'cleanup_expired_demo_apps: Starting cleanup of expired demo apps';
 
-    -- Process each expired demo app
+    -- Process each expired demo app (app_id starts with 'com.demo.' and older than 14 days)
     FOR app_record IN
-        SELECT app_id, owner_org, name, demo_expires_at
+        SELECT app_id, owner_org, name, created_at
         FROM public.apps
-        WHERE is_demo = true
-          AND demo_expires_at IS NOT NULL
-          AND demo_expires_at < NOW()
+        WHERE app_id LIKE 'com.demo.%'
+          AND created_at < NOW() - INTERVAL '14 days'
     LOOP
-        RAISE NOTICE 'cleanup_expired_demo_apps: Deleting expired demo app % (org: %, expired: %)',
-            app_record.app_id, app_record.owner_org, app_record.demo_expires_at;
+        RAISE NOTICE 'cleanup_expired_demo_apps: Deleting expired demo app % (org: %, created: %)',
+            app_record.app_id, app_record.owner_org, app_record.created_at;
 
         -- Delete related data first (these tables may not have CASCADE on FK)
         -- This mirrors the deleteApp TypeScript function logic
@@ -102,7 +93,7 @@ INSERT INTO public.cron_tasks (
     run_on_day
 ) VALUES (
     'cleanup_expired_demo_apps',
-    'Delete demo apps that have expired (14 days after creation)',
+    'Delete demo apps (app_id starts with com.demo.) older than 14 days',
     'function',
     'public.cleanup_expired_demo_apps()',
     null,  -- batch_size not needed for function type
@@ -123,7 +114,3 @@ ON CONFLICT (name) DO UPDATE SET
     run_at_minute = EXCLUDED.run_at_minute,
     run_at_second = EXCLUDED.run_at_second,
     updated_at = NOW();
-
--- Add comment explaining the columns
-COMMENT ON COLUMN public.apps.is_demo IS 'Whether this app is a demo app created for non-technical users during onboarding';
-COMMENT ON COLUMN public.apps.demo_expires_at IS 'When this demo app will be automatically deleted (14 days after creation for demo apps)';

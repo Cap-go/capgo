@@ -47,8 +47,8 @@ app.post('/', middlewareAPISecret, triggerValidator('deploy_history', 'INSERT'),
       return c.json(BRES)
     }
 
-    // Check if this is a demo app - skip notifications for demo apps
-    if (await isAppDemo(c, record.app_id)) {
+    // Check if this is a demo app (identified by com.demo. prefix) - skip notifications
+    if (isAppDemo(record.app_id)) {
       cloudlog({ requestId: c.get('requestId'), message: 'Demo app detected, skipping deploy notifications' })
       return c.json(BRES)
     }
