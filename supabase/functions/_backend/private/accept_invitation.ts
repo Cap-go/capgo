@@ -226,6 +226,17 @@ app.post('/', async (c) => {
       .eq('org_id', invitation.org_id)
 
     if (deleteBindingError) {
+      const { error: rollbackError } = await supabaseAdmin
+        .from('org_users')
+        .delete()
+        .eq('user_id', user.user.id)
+        .eq('org_id', invitation.org_id)
+
+      if (rollbackError) {
+        console.error('Failed to rollback org_users after RBAC binding cleanup failure', rollbackError)
+        return quickError(500, 'failed_to_accept_invitation', 'Failed to rollback org_users after RBAC binding cleanup failure', { error: rollbackError.message })
+      }
+
       return quickError(500, 'failed_to_accept_invitation', 'Failed to clear existing RBAC role bindings', { error: deleteBindingError.message })
     }
 
@@ -244,6 +255,17 @@ app.post('/', async (c) => {
       })
 
     if (insertBindingError) {
+      const { error: rollbackError } = await supabaseAdmin
+        .from('org_users')
+        .delete()
+        .eq('user_id', user.user.id)
+        .eq('org_id', invitation.org_id)
+
+      if (rollbackError) {
+        console.error('Failed to rollback org_users after RBAC binding insert failure', rollbackError)
+        return quickError(500, 'failed_to_accept_invitation', 'Failed to rollback org_users after RBAC binding insert failure', { error: rollbackError.message })
+      }
+
       return quickError(500, 'failed_to_accept_invitation', 'Failed to create RBAC role binding', { error: insertBindingError.message })
     }
   }

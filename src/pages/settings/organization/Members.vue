@@ -278,11 +278,11 @@ async function reloadData() {
         const isInvite = member.is_invite === true
         const isTmp = member.is_tmp === true
         const orgUserId = member.org_user_id
-        const hasOrgUserInvite = isInvite && !isTmp && Number.isFinite(orgUserId)
+        const hasOrgUserInvite = isInvite && !isTmp && orgUserId != null && orgUserId !== ''
 
         return {
           id: member.user_id,
-          aid: hasOrgUserInvite ? orgUserId : -1,
+          aid: hasOrgUserInvite ? Number(orgUserId) : -1,
           uid: member.user_id,
           email: member.email,
           image_url: member.image_url ?? '',
@@ -768,22 +768,28 @@ function handleRbacRoleUpdateError(error: { message?: string }) {
   }
 }
 
-function handleRbacInviteUpdateError(error: { message?: string }) {
+function handleRbacInviteUpdateError(error: { message?: string }, options: { toast?: boolean } = {}) {
+  const rawMessage = error.message ?? t('unexpected-response')
+  let toastMessage = ''
   if (error.message?.includes('NO_PERMISSION_TO_UPDATE_ROLES')) {
-    toast.error(t('no-permission'))
+    toastMessage = t('no-permission')
   }
   else if (error.message?.includes('NO_INVITATION')) {
-    toast.error(t('cannot-change-permission'))
+    toastMessage = t('cannot-change-permission')
   }
   else if (error.message?.includes('ROLE_NOT_FOUND')) {
-    toast.error(t('cannot-change-permission'))
+    toastMessage = t('cannot-change-permission')
   }
   else if (error.message?.includes('RBAC_NOT_ENABLED')) {
-    toast.error(t('cannot-change-permission'))
+    toastMessage = t('cannot-change-permission')
   }
   else {
-    toast.error(`${t('cannot-change-permission')}: ${error.message ?? t('unexpected-response')}`)
+    toastMessage = `${t('cannot-change-permission')}: ${rawMessage}`
   }
+  if (options.toast !== false) {
+    toast.error(toastMessage)
+  }
+  return toastMessage
 }
 
 async function updateRbacMemberRole(member: OrganizationMemberRow, perm: string) {
@@ -833,6 +839,14 @@ async function updateRbacInviteRole(member: OrganizationMemberRow, perm: string)
   if (data === 'OK') {
     toast.success(t('permission-changed'))
     await reloadData()
+    return
+  }
+
+  if (data) {
+    const responseMessage = typeof data === 'string' ? data : JSON.stringify(data)
+    console.warn('Unexpected RBAC invite update response:', responseMessage)
+    const toastMessage = handleRbacInviteUpdateError({ message: responseMessage }, { toast: false })
+    toast.error(toastMessage)
   }
 }
 

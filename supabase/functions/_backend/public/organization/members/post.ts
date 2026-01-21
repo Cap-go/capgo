@@ -24,8 +24,9 @@ const inviteBodySchema = z.object({
 })
 
 const rbacInviteRoles = ['org_member', 'org_billing_admin', 'org_admin', 'org_super_admin'] as const
+const _legacyInviteRoles = ['read', 'upload', 'write', 'admin', 'super_admin'] as const
 
-type LegacyInviteRole = 'read' | 'upload' | 'write' | 'admin' | 'super_admin'
+type LegacyInviteRole = (typeof _legacyInviteRoles)[number]
 type RbacInviteRole = (typeof rbacInviteRoles)[number]
 
 const legacyToRbac: Partial<Record<LegacyInviteRole, RbacInviteRole>> = {
