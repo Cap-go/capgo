@@ -1,8 +1,10 @@
 import type { Database } from '../../utils/supabase.types.ts'
+import type { CreateDemoApp } from './demo.ts'
 import type { CreateApp } from './post.ts'
 import { getBodyOrQuery, honoFactory } from '../../utils/hono.ts'
 import { middlewareKey } from '../../utils/hono_middleware.ts'
 import { deleteApp } from './delete.ts'
+import { createDemoApp } from './demo.ts'
 import { get, getAll } from './get.ts'
 import { post } from './post.ts'
 import { put } from './put.ts'
@@ -53,4 +55,10 @@ app.delete('/:id', middlewareKey(['all', 'write']), async (c) => {
   const subkey = c.get('subkey') as Database['public']['Tables']['apikeys']['Row'] | undefined
   const keyToUse = subkey || apikey
   return deleteApp(c, id, keyToUse)
+})
+
+app.post('/demo', middlewareKey(['all', 'write']), async (c) => {
+  const body = await getBodyOrQuery<CreateDemoApp>(c)
+  const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
+  return createDemoApp(c, body, apikey)
 })
