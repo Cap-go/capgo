@@ -288,6 +288,8 @@ export type Database = {
           transfer_history: Json[] | null
           updated_at: string | null
           user_id: string | null
+          is_demo: boolean
+          demo_expires_at: string | null
         }
         Insert: {
           allow_preview?: boolean
@@ -306,6 +308,8 @@ export type Database = {
           transfer_history?: Json[] | null
           updated_at?: string | null
           user_id?: string | null
+          is_demo?: boolean
+          demo_expires_at?: string | null
         }
         Update: {
           allow_preview?: boolean
@@ -324,6 +328,8 @@ export type Database = {
           transfer_history?: Json[] | null
           updated_at?: string | null
           user_id?: string | null
+          is_demo?: boolean
+          demo_expires_at?: string | null
         }
         Relationships: [
           {
