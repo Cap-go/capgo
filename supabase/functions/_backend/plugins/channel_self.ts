@@ -11,7 +11,7 @@ import { isChannelSelfRateLimited, recordChannelSelfRequest } from '../utils/cha
 import { BRES, parseBody, simpleError200, simpleErrorWithStatus, simpleRateLimit } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { sendNotifOrgCached } from '../utils/notifications.ts'
-import { sendNotifToOrgMembers } from '../utils/org_email_notifications.ts'
+import { sendNotifToOrgMembersCached } from '../utils/org_email_notifications.ts'
 import { closeClient, deleteChannelDevicePg, getAppByIdPg, getAppOwnerPostgres, getChannelByNamePg, getChannelDeviceOverridePg, getChannelsPg, getCompatibleChannelsPg, getDrizzleClient, getMainChannelsPg, getPgClient, setReplicationLagHeader, upsertChannelDevicePg } from '../utils/pg.ts'
 import { convertQueryToBody, makeDevice, parsePluginBody } from '../utils/plugin_parser.ts'
 import { sendStatsAndDevice } from '../utils/stats.ts'
@@ -107,7 +107,7 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
   }
   if (dataChannelOverride && !dataChannelOverride.channel_id.allow_device_self_set) {
     // Send weekly notification to org about self-assignment rejection
-    backgroundTask(c, sendNotifToOrgMembers(
+    backgroundTask(c, sendNotifToOrgMembersCached(
       c,
       'device:channel_self_set_rejected',
       'channel_self_rejected',
@@ -133,7 +133,7 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
 
   if (!dataChannel.allow_device_self_set) {
     // Send weekly notification to org about self-assignment rejection
-    backgroundTask(c, sendNotifToOrgMembers(
+    backgroundTask(c, sendNotifToOrgMembersCached(
       c,
       'device:channel_self_set_rejected',
       'channel_self_rejected',
@@ -432,7 +432,7 @@ async function deleteOverride(c: Context, drizzleClient: ReturnType<typeof getDr
 
   if (!dataChannelOverride.channel_id.allow_device_self_set) {
     // Send weekly notification to org about self-assignment rejection
-    backgroundTask(c, sendNotifToOrgMembers(
+    backgroundTask(c, sendNotifToOrgMembersCached(
       c,
       'device:channel_self_set_rejected',
       'channel_self_rejected',
