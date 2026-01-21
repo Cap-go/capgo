@@ -56,7 +56,7 @@ afterAll(async () => {
 })
 
 describe('[POST] /private/create_device - Error Cases', () => {
-  it('should return 400 when not authorized', async () => {
+  it('should return 401 when not authorized', async () => {
     const response = await fetch(getEndpointUrl('/private/create_device'), {
       method: 'POST',
       headers: {
@@ -82,7 +82,7 @@ describe('[POST] /private/create_device - Error Cases', () => {
       headers,
       body: 'invalid json',
     })
-    expect(response.status).toBe(400)
+    expect(response.status).toBe(401)
     const data = await response.json() as { error: string }
     expect(data.error).toBe('invalid_json_parse_body')
   })
@@ -139,7 +139,7 @@ describe('[POST] /private/upload_link - Error Cases', () => {
     expect(data.error).toBe('app_access_denied')
   })
 
-  it('should return 400 when user cannot access app', async () => {
+  it('should return 401 when user cannot access app', async () => {
     const response = await fetch(getEndpointUrl('/private/upload_link'), {
       method: 'POST',
       headers,
@@ -149,7 +149,7 @@ describe('[POST] /private/upload_link - Error Cases', () => {
       }),
     })
 
-    expect(response.status).toBe(400)
+    expect(response.status).toBe(401)
     const data = await response.json() as { error: string }
     expect(data.error).toBe('app_access_denied')
   })
@@ -203,7 +203,7 @@ describe('[POST] /private/download_link - Error Cases', () => {
     expect(data.error).toBe('cannot_find_authorization')
   })
 
-  it('should return 400 when not authorized', async () => {
+  it('should return 401 when not authorized', async () => {
     const response = await fetch(getEndpointUrl('/private/download_link'), {
       method: 'POST',
       headers,
@@ -213,12 +213,12 @@ describe('[POST] /private/download_link - Error Cases', () => {
       }),
     })
 
-    expect(response.status).toBe(400)
+    expect(response.status).toBe(401)
     const data = await response.json() as { error: string }
     expect(data.error).toBe('invalid_jwt')
   })
 
-  it('should return 400 when user cannot access app', async () => {
+  it('should return 401 when user cannot access app', async () => {
     const response = await fetch(getEndpointUrl('/private/download_link'), {
       method: 'POST',
       headers,
@@ -228,7 +228,7 @@ describe('[POST] /private/download_link - Error Cases', () => {
       }),
     })
 
-    expect(response.status).toBe(400)
+    expect(response.status).toBe(401)
     const data = await response.json() as { error: string }
     expect(data.error).toBe('invalid_jwt')
   })
@@ -295,18 +295,18 @@ describe('[POST] /private/log_as - Error Cases', () => {
     expect(data.error).toBe('cannot_find_authorization')
   })
 
-  it('should return 400 for invalid JSON body', async () => {
+  it('should return 401 for invalid JWT with malformed body', async () => {
     const response = await fetch(getEndpointUrl('/private/log_as'), {
       method: 'POST',
       headers,
       body: 'invalid json',
     })
-    expect(response.status).toBe(400)
+    expect(response.status).toBe(401)
     const data = await response.json() as { error: string }
     expect(data.error).toBe('invalid_jwt')
   })
 
-  it('should return 401 when user is not admin', async () => {
+  it('should return 401 when JWT is invalid', async () => {
     const response = await fetch(getEndpointUrl('/private/log_as'), {
       method: 'POST',
       headers,
@@ -315,12 +315,12 @@ describe('[POST] /private/log_as - Error Cases', () => {
       }),
     })
 
-    expect(response.status).toBe(400)
+    expect(response.status).toBe(401)
     const data = await response.json() as { error: string }
     expect(data.error).toBe('invalid_jwt')
   })
 
-  it('should return 400 when user does not exist', async () => {
+  it('should return 401 when JWT is invalid for unknown user', async () => {
     const response = await fetch(getEndpointUrl('/private/log_as'), {
       method: 'POST',
       headers,
@@ -329,7 +329,7 @@ describe('[POST] /private/log_as - Error Cases', () => {
       }),
     })
 
-    expect(response.status).toBe(400)
+    expect(response.status).toBe(401)
     const data = await response.json() as { error: string }
     expect(data.error).toBe('invalid_jwt')
   })
@@ -434,8 +434,8 @@ describe('[POST] /private/accept_invitation - Error Cases', () => {
 })
 
 describe('[POST] /private/invite_new_user_to_org - Error Cases', () => {
-  it('should return 400 when captcha secret key is not set', async () => {
-    // Captcha validation runs before invite logic, so without CAPTCHA_SECRET_KEY, it fails early
+  it('should return 401 when JWT is invalid before captcha validation', async () => {
+    // Auth validation runs before captcha verification.
     const response = await fetch(getEndpointUrl('/private/invite_new_user_to_org'), {
       method: 'POST',
       headers,
@@ -449,13 +449,13 @@ describe('[POST] /private/invite_new_user_to_org - Error Cases', () => {
       }),
     })
 
-    expect(response.status).toBe(400)
+    expect(response.status).toBe(401)
     const data = await response.json() as { error: string }
     expect(data.error).toBe('invalid_jwt')
   })
 
-  it('should return 400 when captcha secret not set for nonexistent org', async () => {
-    // Even with invalid org, captcha validation runs first
+  it('should return 401 when JWT is invalid for nonexistent org', async () => {
+    // Auth validation runs before org lookup or captcha verification.
     const response = await fetch(getEndpointUrl('/private/invite_new_user_to_org'), {
       method: 'POST',
       headers,
@@ -469,7 +469,7 @@ describe('[POST] /private/invite_new_user_to_org - Error Cases', () => {
       }),
     })
 
-    expect(response.status).toBe(400)
+    expect(response.status).toBe(401)
     const data = await response.json() as { error: string }
     expect(data.error).toBe('invalid_jwt')
   })
