@@ -24,7 +24,21 @@ app.post('/', middlewareAPISecret, triggerValidator('app_versions', 'INSERT'), a
   }
 
   // Skip email notifications for special system bundles (unknown, builtin)
-  const shouldSkipNotifications = SKIP_EMAIL_BUNDLE_NAMES.includes(record.name)
+  let shouldSkipNotifications = SKIP_EMAIL_BUNDLE_NAMES.includes(record.name)
+
+  // Also skip notifications for demo apps
+  if (!shouldSkipNotifications) {
+    const { data: appData } = await supabaseAdmin(c)
+      .from('apps')
+      .select('is_demo')
+      .eq('app_id', record.app_id)
+      .single()
+
+    if (appData?.is_demo) {
+      cloudlog({ requestId: c.get('requestId'), message: 'Demo app detected, skipping email notifications' })
+      shouldSkipNotifications = true
+    }
+  }
 
   const { error: errorUpdate } = await supabaseAdmin(c)
     .from('apps')

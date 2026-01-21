@@ -46,6 +46,19 @@ app.post('/', middlewareAPISecret, triggerValidator('deploy_history', 'INSERT'),
       return c.json(BRES)
     }
 
+    // Check if this is a demo app - skip notifications for demo apps
+    const { data: appData } = await supabaseAdmin(c)
+      .from('apps')
+      .select('is_demo')
+      .eq('app_id', record.app_id)
+      .single()
+
+    const isDemo = appData?.is_demo === true
+    if (isDemo) {
+      cloudlog({ requestId: c.get('requestId'), message: 'Demo app detected, skipping deploy notifications' })
+      return c.json(BRES)
+    }
+
     const LogSnag = logsnag(c)
     await backgroundTask(c, LogSnag.track({
       channel: 'bundle-deployed',
