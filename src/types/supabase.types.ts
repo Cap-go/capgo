@@ -277,9 +277,11 @@ export type Database = {
           channel_device_count: number
           created_at: string | null
           default_upload_channel: string
+          demo_expires_at: string | null
           expose_metadata: boolean
           icon_url: string
           id: string | null
+          is_demo: boolean
           last_version: string | null
           manifest_bundle_count: number
           name: string | null
@@ -295,9 +297,11 @@ export type Database = {
           channel_device_count?: number
           created_at?: string | null
           default_upload_channel?: string
+          demo_expires_at?: string | null
           expose_metadata?: boolean
           icon_url: string
           id?: string | null
+          is_demo?: boolean
           last_version?: string | null
           manifest_bundle_count?: number
           name?: string | null
@@ -313,9 +317,11 @@ export type Database = {
           channel_device_count?: number
           created_at?: string | null
           default_upload_channel?: string
+          demo_expires_at?: string | null
           expose_metadata?: boolean
           icon_url?: string
           id?: string | null
+          is_demo?: boolean
           last_version?: string | null
           manifest_bundle_count?: number
           name?: string | null
