@@ -6,7 +6,7 @@ meta:
 <script setup lang="ts">
 import { FormKit } from '@formkit/vue'
 import dayjs from 'dayjs'
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
@@ -80,12 +80,13 @@ const recentGrants = ref<AdminGrant[]>([])
 const isLoadingGrants = ref(false)
 
 let searchDebounce: ReturnType<typeof setTimeout> | null = null
+let currentSearchQuery = '' // Track current query to avoid race conditions
 
-const expiresAt = computed(() => {
+function getExpiresAt() {
   if (expiresInMonths.value <= 0)
     return null
   return dayjs().add(expiresInMonths.value, 'month').toISOString()
-})
+}
 
 function formatCredits(value: number) {
   return new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)
@@ -101,6 +102,7 @@ async function searchOrgs(query: string) {
     return
   }
 
+  currentSearchQuery = query
   isSearching.value = true
 
   try {
@@ -116,14 +118,22 @@ async function searchOrgs(query: string) {
     }
 
     const result = await response.json() as { orgs?: OrgSearchResult[] }
-    searchResults.value = result.orgs || []
+    // Only update results if this is still the current search query
+    if (currentSearchQuery === query) {
+      searchResults.value = result.orgs || []
+    }
   }
   catch (error) {
     console.error('Search error:', error)
-    searchResults.value = []
+    if (currentSearchQuery === query) {
+      searchResults.value = []
+      toast.error(t('admin-credits-search-error'))
+    }
   }
   finally {
-    isSearching.value = false
+    if (currentSearchQuery === query) {
+      isSearching.value = false
+    }
   }
 }
 
@@ -169,6 +179,7 @@ async function loadOrgBalance(orgId: string) {
   catch (error) {
     console.error('Balance load error:', error)
     orgBalance.value = null
+    toast.error(t('admin-credits-balance-error'))
   }
   finally {
     isLoadingBalance.value = false
@@ -198,7 +209,7 @@ async function grantCredits() {
         org_id: selectedOrg.value.id,
         amount: creditAmount.value,
         notes: creditNotes.value || undefined,
-        expires_at: expiresAt.value,
+        expires_at: getExpiresAt(),
       }),
     })
 
@@ -249,6 +260,7 @@ async function loadRecentGrants() {
   catch (error) {
     console.error('Grants load error:', error)
     recentGrants.value = []
+    toast.error(t('admin-credits-grants-load-error'))
   }
   finally {
     isLoadingGrants.value = false
@@ -256,6 +268,13 @@ async function loadRecentGrants() {
 }
 
 watch(searchQuery, handleSearchInput)
+
+onUnmounted(() => {
+  if (searchDebounce) {
+    clearTimeout(searchDebounce)
+    searchDebounce = null
+  }
+})
 
 onMounted(async () => {
   if (!mainStore.isAdmin) {

@@ -70,7 +70,7 @@ app.post('/grant', middlewareAuth, async (c) => {
     throw simpleError('invalid_json_body', 'Invalid request body', { body, parsedBodyResult })
   }
 
-  const { org_id, amount, notes, expires_at } = body
+  const { org_id, amount, notes, expires_at } = parsedBodyResult.data
 
   cloudlog({
     requestId: c.get('requestId'),
@@ -115,7 +115,6 @@ app.post('/grant', middlewareAuth, async (c) => {
       p_notes: notes || `Admin grant by ${userId}`,
       p_source_ref: sourceRef,
     })
-    .single()
 
   if (rpcError) {
     cloudlogErr({
@@ -171,11 +170,28 @@ app.get('/search-orgs', middlewareAuth, async (c) => {
 
   const adminSupabase = supabaseAdmin(c)
 
-  // Search by name, email, or exact ID match
+  // Escape special characters to avoid breaking the PostgREST filter grammar
+  const sanitizedSearchTerm = searchTerm.replace(/[%_,()]/g, c => `\\${c}`)
+  const ilikePattern = `%${sanitizedSearchTerm}%`
+
+  // Check if searchTerm is a valid UUID for id.eq filter
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  const isValidUuid = uuidRegex.test(searchTerm)
+
+  // Build filter: always search by name and email, only add id.eq if it's a valid UUID
+  const filterParts = [
+    `name.ilike.${ilikePattern}`,
+    `management_email.ilike.${ilikePattern}`,
+  ]
+  if (isValidUuid) {
+    filterParts.push(`id.eq.${searchTerm}`)
+  }
+
+  // Search by name, email, or exact ID match (only if valid UUID)
   const { data: orgs, error } = await adminSupabase
     .from('orgs')
     .select('id, name, management_email, created_at')
-    .or(`name.ilike.%${searchTerm}%,management_email.ilike.%${searchTerm}%,id.eq.${searchTerm}`)
+    .or(filterParts.join(','))
     .order('name')
     .limit(20)
 
