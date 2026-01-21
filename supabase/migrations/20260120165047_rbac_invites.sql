@@ -1,13 +1,15 @@
 -- RBAC-native invite support
 
 ALTER TABLE public.tmp_users
-  ADD COLUMN IF NOT EXISTS rbac_role_name text;
+ADD COLUMN IF NOT EXISTS rbac_role_name text;
 
 ALTER TABLE public.org_users
-  ADD COLUMN IF NOT EXISTS rbac_role_name text;
+ADD COLUMN IF NOT EXISTS rbac_role_name text;
 
 -- Map RBAC org roles to legacy user_min_right for compatibility paths
-CREATE OR REPLACE FUNCTION public.rbac_legacy_right_for_org_role(p_role_name text)
+CREATE OR REPLACE FUNCTION public.rbac_legacy_right_for_org_role(
+    p_role_name text
+)
 RETURNS public.user_min_right
 LANGUAGE plpgsql
 SET search_path = ''
@@ -24,20 +26,27 @@ END;
 $$;
 
 COMMENT ON FUNCTION public.rbac_legacy_right_for_org_role(text) IS
-  'Maps RBAC org role names to legacy user_min_right values for compatibility with legacy tables and RLS.';
+$$
+Maps RBAC org role names to legacy user_min_right values for compatibility with
+legacy tables and RLS.
+$$;
 
 ALTER FUNCTION public.rbac_legacy_right_for_org_role(text) OWNER TO postgres;
-GRANT EXECUTE ON FUNCTION public.rbac_legacy_right_for_org_role(text) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.rbac_legacy_right_for_org_role(text) TO service_role;
+GRANT EXECUTE ON FUNCTION public.rbac_legacy_right_for_org_role(
+    text
+) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.rbac_legacy_right_for_org_role(
+    text
+) TO service_role;
 
 -- RBAC-aware invite lookup (returns RBAC role name when available)
 DROP FUNCTION IF EXISTS public.get_invite_by_magic_lookup(text);
 
 CREATE OR REPLACE FUNCTION public.get_invite_by_magic_lookup(lookup text)
 RETURNS TABLE (
-  org_name text,
-  org_logo text,
-  role text
+    org_name text,
+    org_logo text,
+    role text
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -58,14 +67,16 @@ $$;
 
 ALTER FUNCTION public.get_invite_by_magic_lookup(text) OWNER TO postgres;
 GRANT ALL ON FUNCTION public.get_invite_by_magic_lookup(text) TO service_role;
-GRANT EXECUTE ON FUNCTION public.get_invite_by_magic_lookup(text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.get_invite_by_magic_lookup(
+    text
+) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.get_invite_by_magic_lookup(text) TO anon;
 
 -- RBAC-native invite for existing users (keeps legacy invite flow)
 CREATE OR REPLACE FUNCTION public.invite_user_to_org_rbac(
-  email varchar,
-  org_id uuid,
-  role_name text
+    email varchar,
+    org_id uuid,
+    role_name text
 ) RETURNS varchar
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -154,17 +165,26 @@ END;
 $$;
 
 COMMENT ON FUNCTION public.invite_user_to_org_rbac(varchar, uuid, text) IS
-  'Invite a user to an organization using RBAC roles while preserving legacy invite flow.';
+$$
+Invite a user to an organization using RBAC roles while preserving legacy invite
+flow.
+$$;
 
-ALTER FUNCTION public.invite_user_to_org_rbac(varchar, uuid, text) OWNER TO postgres;
-GRANT EXECUTE ON FUNCTION public.invite_user_to_org_rbac(varchar, uuid, text) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.invite_user_to_org_rbac(varchar, uuid, text) TO service_role;
+ALTER FUNCTION public.invite_user_to_org_rbac(
+    varchar, uuid, text
+) OWNER TO postgres;
+GRANT EXECUTE ON FUNCTION public.invite_user_to_org_rbac(
+    varchar, uuid, text
+) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.invite_user_to_org_rbac(
+    varchar, uuid, text
+) TO service_role;
 
 -- Update invite role for existing-user invitations (RBAC)
 CREATE OR REPLACE FUNCTION public.update_org_invite_role_rbac(
-  p_org_id uuid,
-  p_user_id uuid,
-  p_new_role_name text
+    p_org_id uuid,
+    p_user_id uuid,
+    p_new_role_name text
 ) RETURNS text
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -218,15 +238,21 @@ BEGIN
 END;
 $$;
 
-ALTER FUNCTION public.update_org_invite_role_rbac(uuid, uuid, text) OWNER TO postgres;
-GRANT EXECUTE ON FUNCTION public.update_org_invite_role_rbac(uuid, uuid, text) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.update_org_invite_role_rbac(uuid, uuid, text) TO service_role;
+ALTER FUNCTION public.update_org_invite_role_rbac(
+    uuid, uuid, text
+) OWNER TO postgres;
+GRANT EXECUTE ON FUNCTION public.update_org_invite_role_rbac(
+    uuid, uuid, text
+) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.update_org_invite_role_rbac(
+    uuid, uuid, text
+) TO service_role;
 
 -- Update invite role for new-user invitations (RBAC)
 CREATE OR REPLACE FUNCTION public.update_tmp_invite_role_rbac(
-  p_org_id uuid,
-  p_email text,
-  p_new_role_name text
+    p_org_id uuid,
+    p_email text,
+    p_new_role_name text
 ) RETURNS text
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -278,9 +304,15 @@ BEGIN
 END;
 $$;
 
-ALTER FUNCTION public.update_tmp_invite_role_rbac(uuid, text, text) OWNER TO postgres;
-GRANT EXECUTE ON FUNCTION public.update_tmp_invite_role_rbac(uuid, text, text) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.update_tmp_invite_role_rbac(uuid, text, text) TO service_role;
+ALTER FUNCTION public.update_tmp_invite_role_rbac(
+    uuid, text, text
+) OWNER TO postgres;
+GRANT EXECUTE ON FUNCTION public.update_tmp_invite_role_rbac(
+    uuid, text, text
+) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.update_tmp_invite_role_rbac(
+    uuid, text, text
+) TO service_role;
 
 -- RBAC-aware accept invitation for existing users
 CREATE OR REPLACE FUNCTION public.accept_invitation_to_org(org_id uuid)
@@ -372,7 +404,8 @@ $$;
 ALTER FUNCTION public.accept_invitation_to_org(uuid) OWNER TO postgres;
 
 -- Sync org_users inserts to role_bindings, skipping RBAC-managed rows
-CREATE OR REPLACE FUNCTION public.sync_org_user_to_role_binding() RETURNS trigger
+CREATE OR REPLACE FUNCTION public.sync_org_user_to_role_binding()
+RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = ''
 AS $$
@@ -512,7 +545,8 @@ $$;
 ALTER FUNCTION public.sync_org_user_to_role_binding() OWNER TO postgres;
 
 -- Sync org_users updates to role_bindings, skipping RBAC-managed rows
-CREATE OR REPLACE FUNCTION public.sync_org_user_role_binding_on_update() RETURNS trigger
+CREATE OR REPLACE FUNCTION public.sync_org_user_role_binding_on_update()
+RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = ''
 AS $$
@@ -721,16 +755,16 @@ DROP FUNCTION IF EXISTS public.get_org_members_rbac(uuid);
 
 CREATE OR REPLACE FUNCTION public.get_org_members_rbac(p_org_id uuid)
 RETURNS TABLE (
-  user_id uuid,
-  email character varying,
-  image_url character varying,
-  role_name text,
-  role_id uuid,
-  binding_id uuid,
-  granted_at timestamptz,
-  is_invite boolean,
-  is_tmp boolean,
-  org_user_id bigint
+    user_id uuid,
+    email character varying,
+    image_url character varying,
+    role_name text,
+    role_id uuid,
+    binding_id uuid,
+    granted_at timestamptz,
+    is_invite boolean,
+    is_tmp boolean,
+    org_user_id bigint
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -836,7 +870,10 @@ ALTER FUNCTION public.get_org_members_rbac(uuid) OWNER TO postgres;
 GRANT EXECUTE ON FUNCTION public.get_org_members_rbac(uuid) TO authenticated;
 
 COMMENT ON FUNCTION public.get_org_members_rbac(uuid) IS
-  'Returns organization members and pending invites with their RBAC roles. Requires org.read permission.';
+$$
+Returns organization members and pending invites with their RBAC roles. Requires
+org.read permission.
+$$;
 
 -- RBAC-aware org list with RBAC roles when enabled
 DROP FUNCTION IF EXISTS public.get_orgs_v7(uuid);
