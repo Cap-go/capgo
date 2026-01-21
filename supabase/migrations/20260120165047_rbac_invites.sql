@@ -193,6 +193,7 @@ DECLARE
   role_id uuid;
   legacy_right public.user_min_right;
   invite_right public.user_min_right;
+  api_key_text text;
 BEGIN
   IF NOT public.rbac_is_enabled_for_org(p_org_id) THEN
     RAISE EXCEPTION 'RBAC_NOT_ENABLED';
@@ -209,12 +210,14 @@ BEGIN
     RAISE EXCEPTION 'ROLE_NOT_FOUND';
   END IF;
 
+  SELECT public.get_apikey_header() INTO api_key_text;
+
   IF p_new_role_name = public.rbac_role_org_super_admin() THEN
-    IF NOT public.rbac_check_permission_direct(public.rbac_perm_org_update_user_roles(), auth.uid(), p_org_id, NULL, NULL) THEN
+    IF NOT public.rbac_check_permission_direct(public.rbac_perm_org_update_user_roles(), auth.uid(), p_org_id, NULL, NULL, api_key_text) THEN
       RAISE EXCEPTION 'NO_PERMISSION_TO_UPDATE_ROLES';
     END IF;
   ELSE
-    IF NOT public.rbac_check_permission_direct(public.rbac_perm_org_invite_user(), auth.uid(), p_org_id, NULL, NULL) THEN
+    IF NOT public.rbac_check_permission_direct(public.rbac_perm_org_invite_user(), auth.uid(), p_org_id, NULL, NULL, api_key_text) THEN
       RAISE EXCEPTION 'NO_PERMISSION_TO_UPDATE_ROLES';
     END IF;
   END IF;
@@ -260,6 +263,7 @@ SET search_path = '' AS $$
 DECLARE
   role_id uuid;
   legacy_right public.user_min_right;
+  api_key_text text;
 BEGIN
   IF NOT public.rbac_is_enabled_for_org(p_org_id) THEN
     RAISE EXCEPTION 'RBAC_NOT_ENABLED';
@@ -276,12 +280,14 @@ BEGIN
     RAISE EXCEPTION 'ROLE_NOT_FOUND';
   END IF;
 
+  SELECT public.get_apikey_header() INTO api_key_text;
+
   IF p_new_role_name = public.rbac_role_org_super_admin() THEN
-    IF NOT public.rbac_check_permission_direct(public.rbac_perm_org_update_user_roles(), auth.uid(), p_org_id, NULL, NULL) THEN
+    IF NOT public.rbac_check_permission_direct(public.rbac_perm_org_update_user_roles(), auth.uid(), p_org_id, NULL, NULL, api_key_text) THEN
       RAISE EXCEPTION 'NO_PERMISSION_TO_UPDATE_ROLES';
     END IF;
   ELSE
-    IF NOT public.rbac_check_permission_direct(public.rbac_perm_org_invite_user(), auth.uid(), p_org_id, NULL, NULL) THEN
+    IF NOT public.rbac_check_permission_direct(public.rbac_perm_org_invite_user(), auth.uid(), p_org_id, NULL, NULL, api_key_text) THEN
       RAISE EXCEPTION 'NO_PERMISSION_TO_UPDATE_ROLES';
     END IF;
   END IF;
@@ -770,8 +776,12 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
 AS $$
+DECLARE
+  api_key_text text;
 BEGIN
-  IF NOT public.rbac_check_permission_direct(public.rbac_perm_org_read(), auth.uid(), p_org_id, NULL, NULL) THEN
+  SELECT public.get_apikey_header() INTO api_key_text;
+
+  IF NOT public.rbac_check_permission_direct(public.rbac_perm_org_read(), auth.uid(), p_org_id, NULL, NULL, api_key_text) THEN
     RAISE EXCEPTION 'NO_PERMISSION_TO_VIEW_MEMBERS';
   END IF;
 
