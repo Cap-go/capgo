@@ -139,7 +139,7 @@ describe('[POST] /private/upload_link - Error Cases', () => {
     expect(data.error).toBe('app_access_denied')
   })
 
-  it('should return 401 when user cannot access app', async () => {
+  it('should return 400 when user cannot access app', async () => {
     const response = await fetch(getEndpointUrl('/private/upload_link'), {
       method: 'POST',
       headers,
@@ -149,7 +149,7 @@ describe('[POST] /private/upload_link - Error Cases', () => {
       }),
     })
 
-    expect(response.status).toBe(401)
+    expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
     expect(data.error).toBe('app_access_denied')
   })
