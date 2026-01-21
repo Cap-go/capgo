@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(26);
+SELECT plan(25);
 
 -- Create test users
 DO $$
@@ -242,16 +242,6 @@ SELECT
     );
 
 -- Test 24: User WITHOUT 2FA does not see the org when 2FA is enforced
-SELECT
-    ok(
-        (
-            SELECT
-                (SELECT gid FROM public.get_orgs_v7(tests.get_supabase_uid('test_no_2fa_user_v7')) WHERE gid = current_setting('test.org_with_2fa_v7')::uuid) IS NULL
-        ),
-        'get_orgs_v7 test - user without 2FA does not see org when 2FA is enforced'
-    );
-
--- Test 25: User WITHOUT 2FA does not see the org when 2FA is enforced
 SELECT
     ok(
         (

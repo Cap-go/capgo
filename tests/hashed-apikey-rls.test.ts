@@ -11,7 +11,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { Pool } from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { APIKEY_RLS_ALL, APP_NAME_RLS, BASE_URL, ORG_ID_RLS, POSTGRES_URL, USER_ID_RLS } from './test-utils.ts'
+import { APIKEY_RLS_ALL, APP_NAME_RLS, BASE_URL, ORG_ID_2FA_TEST, ORG_ID_RLS, POSTGRES_URL, USER_ID_RLS } from './test-utils.ts'
 
 // Use dedicated RLS test user's API key to avoid conflicts with other tests
 const headersRLS = {
@@ -96,12 +96,12 @@ beforeAll(async () => {
   try {
     const { rows } = await client.query(
       'SELECT enforcing_2fa FROM orgs WHERE id = $1',
-      [ORG_ID_RLS],
+      [ORG_ID_2FA_TEST],
     )
     originalEnforcing2fa = rows[0]?.enforcing_2fa ?? null
     await client.query(
       'UPDATE orgs SET enforcing_2fa = false WHERE id = $1',
-      [ORG_ID_RLS],
+      [ORG_ID_2FA_TEST],
     )
   }
   finally {
@@ -115,7 +115,7 @@ afterAll(async () => {
     try {
       await client.query(
         'UPDATE orgs SET enforcing_2fa = $1 WHERE id = $2',
-        [originalEnforcing2fa, ORG_ID_RLS],
+        [originalEnforcing2fa, ORG_ID_2FA_TEST],
       )
     }
     finally {
