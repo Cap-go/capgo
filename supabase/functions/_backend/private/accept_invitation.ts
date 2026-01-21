@@ -2,7 +2,7 @@ import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod/mini'
 import { parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
-import { cloudlog } from '../utils/logging.ts'
+import { cloudlog, cloudlogErr, serializeError } from '../utils/logging.ts'
 import { emptySupabase, supabaseAdmin as useSupabaseAdmin } from '../utils/supabase.ts'
 import { syncUserPreferenceTags } from '../utils/user_preferences.ts'
 
@@ -233,7 +233,11 @@ app.post('/', async (c) => {
         .eq('org_id', invitation.org_id)
 
       if (rollbackError) {
-        console.error('Failed to rollback org_users after RBAC binding cleanup failure', rollbackError)
+        cloudlogErr({
+          requestId: c.get('requestId'),
+          message: 'Failed to rollback org_users after RBAC binding cleanup failure',
+          error: serializeError(rollbackError),
+        })
         return quickError(500, 'failed_to_accept_invitation', 'Failed to rollback org_users after RBAC binding cleanup failure', { error: rollbackError.message })
       }
 
@@ -262,7 +266,11 @@ app.post('/', async (c) => {
         .eq('org_id', invitation.org_id)
 
       if (rollbackError) {
-        console.error('Failed to rollback org_users after RBAC binding insert failure', rollbackError)
+        cloudlogErr({
+          requestId: c.get('requestId'),
+          message: 'Failed to rollback org_users after RBAC binding insert failure',
+          error: serializeError(rollbackError),
+        })
         return quickError(500, 'failed_to_accept_invitation', 'Failed to rollback org_users after RBAC binding insert failure', { error: rollbackError.message })
       }
 
