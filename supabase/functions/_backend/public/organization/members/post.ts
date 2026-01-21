@@ -49,7 +49,7 @@ export async function post(c: Context<MiddlewareKeyVariables>, bodyRaw: any, _ap
     throw simpleError('cannot_access_organization', 'You can\'t access this organization', { orgId: body.orgId })
   }
 
-  const supabase = supabaseApikey(c, c.get('capgkey') as string)
+  const supabase = supabaseApikey(c, _apikey?.key)
 
   const { data: org, error: orgError } = await supabase
     .from('orgs')

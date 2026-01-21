@@ -91,7 +91,11 @@ function isSuperAdminRole(role: string | undefined) {
 }
 
 function isInviteMember(member: OrganizationMemberRow) {
-  return !!member.is_invite || member.is_tmp || member.role.includes('invite')
+  if (member.is_invite || member.is_tmp)
+    return true
+  if (typeof member.role === 'string')
+    return member.role.includes('invite')
+  return false
 }
 
 async function checkRbacEnabled() {
