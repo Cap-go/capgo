@@ -27,7 +27,7 @@ app.post('/', middlewareAPISecret, triggerValidator('app_versions', 'INSERT'), a
   // Skip email notifications for special system bundles (unknown, builtin)
   let shouldSkipNotifications = SKIP_EMAIL_BUNDLE_NAMES.includes(record.name)
 
-  // Also skip notifications for demo apps (identified by com.demo. prefix)
+  // Also skip notifications for demo apps (identified by com.capdemo. prefix)
   if (!shouldSkipNotifications && isAppDemo(record.app_id)) {
     cloudlog({ requestId: c.get('requestId'), message: 'Demo app detected, skipping email notifications' })
     shouldSkipNotifications = true

@@ -27,14 +27,14 @@ export async function createDemoApp(c: Context<MiddlewareKeyVariables>, body: Cr
     throw simpleError('cannot_access_organization', 'You can\'t access this organization', { org_id: body.owner_org })
   }
 
-  // Generate a unique demo app_id with com.demo. prefix
+  // Generate a unique demo app_id with com.capdemo. prefix
   // This prefix is used to identify demo apps for email skipping and auto-deletion
   const shortId = crypto.randomUUID().slice(0, 8)
-  const appId = `com.demo.${shortId}.app`
+  const appId = `com.capdemo.${shortId}.app`
 
   cloudlog({ requestId, message: 'Creating demo app', appId, owner_org: body.owner_org })
 
-  // Create the demo app - identified by the com.demo. prefix in app_id
+  // Create the demo app - identified by the com.capdemo. prefix in app_id
   // Auto-deletion after 14 days uses created_at timestamp
   const supabase = supabaseAdmin(c)
   const appInsert: Database['public']['Tables']['apps']['Insert'] = {

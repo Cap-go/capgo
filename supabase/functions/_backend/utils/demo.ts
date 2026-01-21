@@ -2,7 +2,7 @@
  * Demo app prefix used to identify demo apps.
  * Demo apps are created for non-technical users during onboarding and are auto-deleted after 14 days.
  */
-export const DEMO_APP_PREFIX = 'com.demo.'
+export const DEMO_APP_PREFIX = 'com.capdemo.'
 
 /**
  * Check if an app is a demo app by checking if the app_id starts with the demo prefix.

@@ -1,5 +1,5 @@
 -- Auto-delete demo apps after 14 days
--- Demo apps are identified by app_id starting with 'com.demo.'
+-- Demo apps are identified by app_id starting with 'com.capdemo.'
 -- Uses existing created_at column to determine age
 
 -- Create the cleanup function for expired demo apps
@@ -16,11 +16,11 @@ BEGIN
     -- Log start of cleanup
     RAISE NOTICE 'cleanup_expired_demo_apps: Starting cleanup of expired demo apps';
 
-    -- Process each expired demo app (app_id starts with 'com.demo.' and older than 14 days)
+    -- Process each expired demo app (app_id starts with 'com.capdemo.' and older than 14 days)
     FOR app_record IN
         SELECT app_id, owner_org, name, created_at
         FROM public.apps
-        WHERE app_id LIKE 'com.demo.%'
+        WHERE app_id LIKE 'com.capdemo.%'
           AND created_at < NOW() - INTERVAL '14 days'
     LOOP
         RAISE NOTICE 'cleanup_expired_demo_apps: Deleting expired demo app % (org: %, created: %)',
@@ -93,7 +93,7 @@ INSERT INTO public.cron_tasks (
     run_on_day
 ) VALUES (
     'cleanup_expired_demo_apps',
-    'Delete demo apps (app_id starts with com.demo.) older than 14 days',
+    'Delete demo apps (app_id starts with com.capdemo.) older than 14 days',
     'function',
     'public.cleanup_expired_demo_apps()',
     null,  -- batch_size not needed for function type
