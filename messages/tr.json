@@ -512,7 +512,7 @@
   "admin-credits-search-placeholder": "Ad, e-posta veya kuruluş ID'sine göre ara...",
   "admin-credits-current-balance": "Mevcut Bakiye",
   "admin-credits-no-balance": "Henüz kredi yok",
-  "admin-credits-expires": "Sonraki son kullanma",
+  "admin-credits-expires": "Sonraki son kullanma tarihi",
   "admin-credits-amount-label": "Kredi Miktarı",
   "admin-credits-amount-required": "Lütfen geçerli bir kredi miktarı girin",
   "admin-credits-expires-months": "Sona erme süresi (ay)",

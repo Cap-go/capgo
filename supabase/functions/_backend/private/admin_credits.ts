@@ -1,10 +1,10 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
-import { Hono } from 'hono/tiny'
 import { z } from 'zod/mini'
-import { middlewareAuth, parseBody, simpleError, useCors } from '../utils/hono.ts'
+import { createHono, middlewareAuth, parseBody, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../utils/logging.ts'
 import { supabaseAdmin, supabaseClient } from '../utils/supabase.ts'
+import { version } from '../utils/version.ts'
 
 type AppContext = Context<MiddlewareKeyVariables, any, any>
 
@@ -45,7 +45,7 @@ async function verifyAdmin(c: AppContext, authToken: string): Promise<{ isAdmin:
   return { isAdmin: !!isAdmin, userId: user.id }
 }
 
-export const app = new Hono<MiddlewareKeyVariables>()
+export const app = createHono('', version)
 
 app.use('*', useCors)
 
