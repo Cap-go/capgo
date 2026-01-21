@@ -44,7 +44,7 @@ onMounted(async () => {
         {{ t('admin-only-access') }}
       </h2>
       <p class="mb-4 text-gray-600 dark:text-gray-400">
-        {{ t('admin-only-billing-description') }}
+        {{ t('admin-only-description') }}
       </p>
       <div v-if="isLoading" class="flex justify-center py-2">
         <div class="w-6 h-6 rounded-full border-2 border-blue-500 border-t-transparent animate-spin" />

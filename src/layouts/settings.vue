@@ -23,11 +23,8 @@ const route = useRoute()
 // Modal state for non-admin billing access (triggered by billing tab click)
 const showBillingModal = ref(false)
 
-// Routes that require super_admin access
+// Routes that require super_admin access (security-sensitive settings)
 const adminOnlyRoutes = [
-  '/settings/organization/usage',
-  '/settings/organization/plans',
-  '/settings/organization/credits',
   '/settings/organization/audit-logs',
   '/settings/organization/auditlogs',
   '/settings/organization/security',

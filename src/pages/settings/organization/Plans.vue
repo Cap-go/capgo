@@ -32,6 +32,11 @@ const organizationStore = useOrganizationStore()
 const dialogStore = useDialogV2Store()
 const isMobile = Capacitor.isNativePlatform()
 
+// Check if user is super_admin
+const isSuperAdmin = computed(() => {
+  return organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['super_admin'])
+})
+
 const { currentOrganization } = storeToRefs(organizationStore)
 const creditUnitPrices = ref<Partial<Record<Database['public']['Enums']['credit_metric_type'], number>>>({})
 
@@ -273,6 +278,8 @@ watchEffect(async () => {
 function buttonName(p: Database['public']['Tables']['plans']['Row']) {
   if (isMobile)
     return t('check-on-web')
+  if (!isSuperAdmin.value)
+    return t('admin-required')
   if (currentPlan.value?.name === p.name && currentOrganization.value?.paying && currentOrganization.value?.is_yearly === isYearly.value) {
     return t('Current')
   }
@@ -283,7 +290,8 @@ function buttonName(p: Database['public']['Tables']['plans']['Row']) {
 }
 
 function isDisabled(plan: Database['public']['Tables']['plans']['Row']) {
-  return (currentPlan.value?.name === plan.name && currentOrganization.value?.paying && currentOrganization.value?.is_yearly === isYearly.value) || isMobile
+  // Disabled if: current plan (already subscribed), mobile, or not admin
+  return (currentPlan.value?.name === plan.name && currentOrganization.value?.paying && currentOrganization.value?.is_yearly === isYearly.value) || isMobile || !isSuperAdmin.value
 }
 
 function isRecommended(p: Database['public']['Tables']['plans']['Row']) {
