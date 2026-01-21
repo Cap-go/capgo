@@ -1,6 +1,7 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
+import { isAppDemo } from '../utils/demo.ts'
 import { BRES, middlewareAPISecret, simpleError, triggerValidator } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { logsnag } from '../utils/logsnag.ts'
@@ -47,14 +48,7 @@ app.post('/', middlewareAPISecret, triggerValidator('deploy_history', 'INSERT'),
     }
 
     // Check if this is a demo app - skip notifications for demo apps
-    const { data: appData } = await supabaseAdmin(c)
-      .from('apps')
-      .select('is_demo')
-      .eq('app_id', record.app_id)
-      .single()
-
-    const isDemo = appData?.is_demo === true
-    if (isDemo) {
+    if (await isAppDemo(c, record.app_id)) {
       cloudlog({ requestId: c.get('requestId'), message: 'Demo app detected, skipping deploy notifications' })
       return c.json(BRES)
     }

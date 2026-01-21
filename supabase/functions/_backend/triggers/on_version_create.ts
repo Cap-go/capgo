@@ -1,6 +1,7 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
+import { isAppDemo } from '../utils/demo.ts'
 import { BRES, middlewareAPISecret, simpleError, triggerValidator } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { logsnag } from '../utils/logsnag.ts'
@@ -27,17 +28,9 @@ app.post('/', middlewareAPISecret, triggerValidator('app_versions', 'INSERT'), a
   let shouldSkipNotifications = SKIP_EMAIL_BUNDLE_NAMES.includes(record.name)
 
   // Also skip notifications for demo apps
-  if (!shouldSkipNotifications) {
-    const { data: appData } = await supabaseAdmin(c)
-      .from('apps')
-      .select('is_demo')
-      .eq('app_id', record.app_id)
-      .single()
-
-    if (appData?.is_demo) {
-      cloudlog({ requestId: c.get('requestId'), message: 'Demo app detected, skipping email notifications' })
-      shouldSkipNotifications = true
-    }
+  if (!shouldSkipNotifications && await isAppDemo(c, record.app_id)) {
+    cloudlog({ requestId: c.get('requestId'), message: 'Demo app detected, skipping email notifications' })
+    shouldSkipNotifications = true
   }
 
   const { error: errorUpdate } = await supabaseAdmin(c)

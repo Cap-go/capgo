@@ -1,23 +1,29 @@
 import type { Context } from 'hono'
+import type { AuthInfo, MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
 import { simpleError } from '../../utils/hono.ts'
 import { cloudlog } from '../../utils/logging.ts'
-import { hasOrgRightApikey, supabaseAdmin, updateOrCreateChannel } from '../../utils/supabase.ts'
+import { hasOrgRight, supabaseAdmin, updateOrCreateChannel } from '../../utils/supabase.ts'
 
 export interface CreateDemoApp {
   owner_org: string
 }
 
-export async function createDemoApp(c: Context, body: CreateDemoApp, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
+export async function createDemoApp(c: Context<MiddlewareKeyVariables>, body: CreateDemoApp): Promise<Response> {
   const requestId = c.get('requestId')
+  const auth = c.get('auth') as AuthInfo | undefined
+
+  if (!auth?.userId) {
+    throw simpleError('not_authenticated', 'Not authenticated')
+  }
 
   if (!body.owner_org) {
     throw simpleError('missing_owner_org', 'Missing owner_org', { body })
   }
 
   // Check if the user is allowed to create an app in this organization
-  const userId = apikey.user_id
-  if (!(await hasOrgRightApikey(c, body.owner_org, userId, 'write', c.get('capgkey') as string))) {
+  // Use hasOrgRight which works with supabaseAdmin (bypasses RLS after auth verification)
+  if (!(await hasOrgRight(c, body.owner_org, auth.userId, 'write'))) {
     throw simpleError('cannot_access_organization', 'You can\'t access this organization', { org_id: body.owner_org })
   }
 
@@ -34,7 +40,7 @@ export async function createDemoApp(c: Context, body: CreateDemoApp, apikey: Dat
   // Create the app with is_demo flag and expiry date
   // Use admin client to set the demo fields (RLS doesn't expose these to regular users)
   const supabase = supabaseAdmin(c)
-  const appInsert = {
+  const appInsert: Database['public']['Tables']['apps']['Insert'] = {
     owner_org: body.owner_org,
     app_id: appId,
     icon_url: '',
@@ -47,7 +53,7 @@ export async function createDemoApp(c: Context, body: CreateDemoApp, apikey: Dat
 
   const { data: appData, error: appError } = await supabase
     .from('apps')
-    .insert(appInsert as any) // Type assertion needed until types are regenerated
+    .insert(appInsert)
     .select()
     .single()
 
@@ -58,8 +64,9 @@ export async function createDemoApp(c: Context, body: CreateDemoApp, apikey: Dat
 
   cloudlog({ requestId, message: 'Demo app created', appData })
 
-  // Create the default versions (unknown and builtin) - same as on_app_create trigger
-  // We do this directly to ensure we have the version IDs immediately
+  // Create the default versions (unknown and builtin)
+  // The on_app_create trigger also creates these, but we do it here to ensure
+  // we have the version IDs immediately for channel creation
   const { data: versionsData, error: versionsError } = await supabase
     .from('app_versions')
     .upsert([
@@ -82,8 +89,9 @@ export async function createDemoApp(c: Context, body: CreateDemoApp, apikey: Dat
     cloudlog({ requestId, message: 'Error creating default versions', error: versionsError })
     // Don't fail - the trigger might have already created them
   }
-
-  cloudlog({ requestId, message: 'Default versions created', versionsData })
+  else {
+    cloudlog({ requestId, message: 'Default versions created', versionsData })
+  }
 
   // Get the 'unknown' version ID to use for the channel
   const { data: unknownVersion, error: unknownVersionError } = await supabase
@@ -103,7 +111,7 @@ export async function createDemoApp(c: Context, body: CreateDemoApp, apikey: Dat
 
   // Create the production channel pointing to 'unknown' version
   const channelInsert: Database['public']['Tables']['channels']['Insert'] = {
-    created_by: apikey.user_id,
+    created_by: auth.userId,
     app_id: appId,
     name: 'production',
     public: true,
@@ -121,7 +129,13 @@ export async function createDemoApp(c: Context, body: CreateDemoApp, apikey: Dat
     owner_org: body.owner_org,
   }
 
-  await updateOrCreateChannel(c, channelInsert)
+  try {
+    await updateOrCreateChannel(c, channelInsert)
+  }
+  catch (error) {
+    cloudlog({ requestId, message: 'Error creating production channel for demo app', error })
+    throw simpleError('cannot_create_production_channel', 'Cannot create production channel for demo app', { error })
+  }
 
   cloudlog({ requestId, message: 'Production channel created for demo app' })
 

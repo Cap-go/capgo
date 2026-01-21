@@ -2,7 +2,7 @@ import type { Database } from '../../utils/supabase.types.ts'
 import type { CreateDemoApp } from './demo.ts'
 import type { CreateApp } from './post.ts'
 import { getBodyOrQuery, honoFactory } from '../../utils/hono.ts'
-import { middlewareKey } from '../../utils/hono_middleware.ts'
+import { middlewareKey, middlewareV2 } from '../../utils/hono_middleware.ts'
 import { deleteApp } from './delete.ts'
 import { createDemoApp } from './demo.ts'
 import { get, getAll } from './get.ts'
@@ -57,8 +57,8 @@ app.delete('/:id', middlewareKey(['all', 'write']), async (c) => {
   return deleteApp(c, id, keyToUse)
 })
 
-app.post('/demo', middlewareKey(['all', 'write']), async (c) => {
+// Demo app creation supports both JWT (browser) and API key authentication
+app.post('/demo', middlewareV2(['all', 'write']), async (c) => {
   const body = await getBodyOrQuery<CreateDemoApp>(c)
-  const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
-  return createDemoApp(c, body, apikey)
+  return createDemoApp(c, body)
 })
