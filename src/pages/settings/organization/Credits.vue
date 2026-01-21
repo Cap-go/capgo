@@ -13,6 +13,7 @@ import ChevronDownIcon from '~icons/heroicons/chevron-down'
 import CloudIcon from '~icons/heroicons/cloud'
 import ScaleIcon from '~icons/heroicons/scale'
 import UserGroupIcon from '~icons/heroicons/user-group'
+import AdminOnlyModal from '~/components/AdminOnlyModal.vue'
 import { completeCreditTopUp, startCreditTopUp } from '~/services/stripe'
 import { useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
@@ -70,6 +71,9 @@ const displayStore = useDisplayStore()
 const isSuperAdmin = computed(() => {
   return organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['super_admin'])
 })
+
+// Modal state for non-admin access
+const showAdminModal = ref(false)
 
 const transactions = ref<UsageCreditLedgerRow[]>([])
 const pricingSteps = ref<PricingStep[]>([])
@@ -524,9 +528,11 @@ async function loadPricingSteps() {
 }
 
 async function handleBuyCredits() {
-  // Guard against non-admin form submissions (e.g., via Enter key)
-  if (!isSuperAdmin.value)
+  // Show admin modal for non-admins instead of blocking
+  if (!isSuperAdmin.value) {
+    showAdminModal.value = true
     return
+  }
   if (!currentOrganization.value?.gid)
     return
   if (!isTopUpQuantityValid.value || topUpQuantity.value === null) {
@@ -723,7 +729,6 @@ watch(() => currentOrganization.value?.gid, async (newOrgId: string | undefined,
                   :class="topUpQuantity === amount
                     ? 'border border-blue-600 bg-blue-600 text-white hover:border-blue-700 hover:bg-blue-700 dark:border-blue-500 dark:bg-blue-500 dark:hover:border-blue-400 dark:hover:bg-blue-500/90'
                     : 'border border-blue-200 bg-white text-blue-700 hover:border-blue-400 hover:bg-blue-50 dark:border-blue-500/60 dark:bg-gray-900 dark:text-blue-200 dark:hover:border-blue-400 dark:hover:bg-blue-900/40'"
-                  :disabled="!isSuperAdmin"
                   @click="selectTopUpQuantity(amount)"
                 >
                   ${{ amount }}
@@ -732,12 +737,12 @@ watch(() => currentOrganization.value?.gid, async (newOrgId: string | undefined,
             </div>
             <button
               type="submit"
-              :disabled="isProcessingCheckout || !isTopUpQuantityValid || !isSuperAdmin"
-              :class="{ 'opacity-75 pointer-events-none': isProcessingCheckout || !isTopUpQuantityValid || !isSuperAdmin }"
+              :disabled="isProcessingCheckout || !isTopUpQuantityValid"
+              :class="{ 'opacity-75 pointer-events-none': isProcessingCheckout || !isTopUpQuantityValid }"
               class="inline-flex w-full justify-center items-center py-2 px-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-sm font-semibold rounded-lg transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5 disabled:opacity-60 disabled:cursor-not-allowed sm:w-auto"
             >
               <Spinner v-if="isProcessingCheckout" size="w-4 h-4" class="mr-2" color="white" />
-              <span>{{ isSuperAdmin ? t('buy-credits') : t('admin-required') }}</span>
+              <span>{{ t('buy-credits') }}</span>
             </button>
             <div class="text-xs opacity-90 space-y-1 font-medium text-gray-900 dark:text-white">
               <p>
@@ -949,6 +954,8 @@ watch(() => currentOrganization.value?.gid, async (newOrgId: string | undefined,
         </div>
       </div>
     </div>
+    <!-- Admin-only modal for non-admin credit purchase attempts -->
+    <AdminOnlyModal v-if="showAdminModal" @click="showAdminModal = false" />
   </div>
 </template>
 

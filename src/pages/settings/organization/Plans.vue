@@ -5,6 +5,7 @@ import { storeToRefs } from 'pinia'
 import { computed, ref, watch, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
+import AdminOnlyModal from '~/components/AdminOnlyModal.vue'
 import CreditsCta from '~/components/CreditsCta.vue'
 import { openCheckout } from '~/services/stripe'
 import { getCreditUnitPricing, getCurrentPlanNameOrg } from '~/services/supabase'
@@ -36,6 +37,9 @@ const isMobile = Capacitor.isNativePlatform()
 const isSuperAdmin = computed(() => {
   return organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['super_admin'])
 })
+
+// Modal state for non-admin access
+const showAdminModal = ref(false)
 
 const { currentOrganization } = storeToRefs(organizationStore)
 const creditUnitPrices = ref<Partial<Record<Database['public']['Enums']['credit_metric_type'], number>>>({})
@@ -100,6 +104,12 @@ watch(() => main.bestPlan, (newBestPlan) => {
 const isTrial = computed(() => currentOrganization?.value ? (!currentOrganization?.value.paying && (currentOrganization?.value.trial_left ?? 0) > 0) : false)
 
 async function openChangePlan(plan: Database['public']['Tables']['plans']['Row'], index: number) {
+  // Show admin modal for non-admins instead of blocking
+  if (!isSuperAdmin.value) {
+    showAdminModal.value = true
+    return
+  }
+
   // Check if user has apps in this organization
   if (currentOrganization.value?.app_count === 0) {
     // Get other organizations where user is admin and has apps
@@ -278,8 +288,6 @@ watchEffect(async () => {
 function buttonName(p: Database['public']['Tables']['plans']['Row']) {
   if (isMobile)
     return t('check-on-web')
-  if (!isSuperAdmin.value)
-    return t('admin-required')
   if (currentPlan.value?.name === p.name && currentOrganization.value?.paying && currentOrganization.value?.is_yearly === isYearly.value) {
     return t('Current')
   }
@@ -290,8 +298,8 @@ function buttonName(p: Database['public']['Tables']['plans']['Row']) {
 }
 
 function isDisabled(plan: Database['public']['Tables']['plans']['Row']) {
-  // Disabled if: current plan (already subscribed), mobile, or not admin
-  return (currentPlan.value?.name === plan.name && currentOrganization.value?.paying && currentOrganization.value?.is_yearly === isYearly.value) || isMobile || !isSuperAdmin.value
+  // Disabled if: current plan (already subscribed) or mobile
+  return (currentPlan.value?.name === plan.name && currentOrganization.value?.paying && currentOrganization.value?.is_yearly === isYearly.value) || isMobile
 }
 
 function isRecommended(p: Database['public']['Tables']['plans']['Row']) {
@@ -454,6 +462,9 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
         </router-link>
       </div>
     </div>
+
+    <!-- Admin-only modal for non-admin users -->
+    <AdminOnlyModal v-if="showAdminModal" @click="showAdminModal = false" />
   </div>
 </template>
 
