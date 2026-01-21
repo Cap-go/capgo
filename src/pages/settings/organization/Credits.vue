@@ -13,6 +13,7 @@ import ChevronDownIcon from '~icons/heroicons/chevron-down'
 import CloudIcon from '~icons/heroicons/cloud'
 import ScaleIcon from '~icons/heroicons/scale'
 import UserGroupIcon from '~icons/heroicons/user-group'
+import AdminOnlyModal from '~/components/AdminOnlyModal.vue'
 import { completeCreditTopUp, startCreditTopUp } from '~/services/stripe'
 import { useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
@@ -65,6 +66,14 @@ const supabase = useSupabase()
 const organizationStore = useOrganizationStore()
 const { currentOrganization } = storeToRefs(organizationStore)
 const displayStore = useDisplayStore()
+
+// Check if user is super_admin
+const isSuperAdmin = computed(() => {
+  return organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['super_admin'])
+})
+
+// Modal state for non-admin access
+const showAdminModal = ref(false)
 
 const transactions = ref<UsageCreditLedgerRow[]>([])
 const pricingSteps = ref<PricingStep[]>([])
@@ -519,6 +528,11 @@ async function loadPricingSteps() {
 }
 
 async function handleBuyCredits() {
+  // Show admin modal for non-admins instead of blocking
+  if (!isSuperAdmin.value) {
+    showAdminModal.value = true
+    return
+  }
   if (!currentOrganization.value?.gid)
     return
   if (!isTopUpQuantityValid.value || topUpQuantity.value === null) {
@@ -940,6 +954,8 @@ watch(() => currentOrganization.value?.gid, async (newOrgId: string | undefined,
         </div>
       </div>
     </div>
+    <!-- Admin-only modal for non-admin credit purchase attempts -->
+    <AdminOnlyModal v-if="showAdminModal" @click="showAdminModal = false" />
   </div>
 </template>
 

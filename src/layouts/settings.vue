@@ -7,6 +7,7 @@ import { computed, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import IconBilling from '~icons/mingcute/bill-fill'
+import AdminOnlyModal from '~/components/AdminOnlyModal.vue'
 import FailedCard from '~/components/FailedCard.vue'
 import Tabs from '~/components/Tabs.vue'
 import { accountTabs } from '~/constants/accountTabs'
@@ -20,6 +21,32 @@ const { t } = useI18n()
 const organizationStore = useOrganizationStore()
 const router = useRouter()
 const route = useRoute()
+
+// Modal state for non-admin billing access (triggered by billing tab click)
+const showBillingModal = ref(false)
+
+// Routes that require super_admin access (security-sensitive settings)
+const adminOnlyRoutes = [
+  '/settings/organization/audit-logs',
+  '/settings/organization/auditlogs',
+  '/settings/organization/security',
+]
+
+// Check if user is super_admin
+const isSuperAdmin = computed(() => {
+  return organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['super_admin'])
+})
+
+// Check if current route is admin-only and user is not admin
+const isOnAdminOnlyRoute = computed(() => {
+  const path = route.path.replace(/\/$/, '')
+  return adminOnlyRoutes.some(r => path === r || path.startsWith(`${r}/`))
+})
+
+// Show admin-only modal when non-admin is on admin-only route
+const showAdminOnlyModal = computed(() => {
+  return !isSuperAdmin.value && isOnAdminOnlyRoute.value
+})
 
 // Check if user needs to setup 2FA or update password for organization access
 const needsSecurityCompliance = computed(() => {
@@ -129,7 +156,15 @@ watchEffect(() => {
       label: 'billing',
       icon: IconBilling,
       key: '/billing',
-      onClick: () => openPortal(organizationStore.currentOrganization?.gid ?? '', t),
+      onClick: () => {
+        // Check permissions at click time to handle role changes
+        if (organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['super_admin'])) {
+          openPortal(organizationStore.currentOrganization?.gid ?? '', t)
+        }
+        else {
+          showBillingModal.value = true
+        }
+      },
     })
   }
   else if (!canReadBilling.value) {
@@ -190,12 +225,19 @@ function handleSecondary(val: string) {
       @update:active-tab="handlePrimary"
       @update:secondary-active-tab="handleSecondary"
     />
-    <main class="flex flex-1 w-full min-h-0 mt-0 overflow-hidden bg-blue-50 dark:bg-slate-800/40">
-      <div class="flex-1 w-full min-h-0 px-0 pt-0 mx-auto mb-8 overflow-y-auto sm:px-6 md:pt-16 lg:px-8 max-w-9xl">
+    <main class="flex relative flex-1 w-full min-h-0 mt-0 overflow-hidden bg-blue-50 dark:bg-slate-800/40">
+      <div
+        class="flex-1 w-full min-h-0 px-0 pt-0 mx-auto mb-8 overflow-y-auto sm:px-6 md:pt-16 lg:px-8 max-w-9xl"
+        :class="{ 'blur-sm pointer-events-none select-none': showAdminOnlyModal }"
+      >
         <!-- Show FailedCard instead of normal content when security compliance is required -->
         <FailedCard v-if="shouldBlockContent" />
         <RouterView v-else class="w-full" />
       </div>
+      <!-- Admin-only modal for admin-only routes -->
+      <AdminOnlyModal v-if="showAdminOnlyModal" />
+      <!-- Admin-only modal for billing tab click -->
+      <AdminOnlyModal v-if="showBillingModal" @click="showBillingModal = false" />
     </main>
   </div>
 </template>
