@@ -122,6 +122,11 @@ export function extractDataEvent(c: Context, event: Stripe.Event): StripeData {
   else if (event.type === 'invoice.upcoming') {
     data = invoiceUpcoming(event, data)
   }
+  else if (event.type === 'checkout.session.completed' || event.type === 'checkout.session.async_payment_succeeded') {
+    const session = event.data.object as Stripe.Checkout.Session
+    data.customer_id = String(session.customer ?? '')
+    data.status = 'succeeded'
+  }
   else {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Other event', event })
   }
