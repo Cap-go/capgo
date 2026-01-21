@@ -36,7 +36,8 @@ const isMobile = Capacitor.isNativePlatform()
 
 // Check if user is super_admin
 const isSuperAdmin = computed(() => {
-  return organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['super_admin'])
+  const orgId = organizationStore.currentOrganization?.gid
+  return organizationStore.hasPermissionsInRole('super_admin', ['org_super_admin'], orgId)
 })
 
 // Modal state for non-admin access
