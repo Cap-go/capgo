@@ -524,6 +524,9 @@ async function loadPricingSteps() {
 }
 
 async function handleBuyCredits() {
+  // Guard against non-admin form submissions (e.g., via Enter key)
+  if (!isSuperAdmin.value)
+    return
   if (!currentOrganization.value?.gid)
     return
   if (!isTopUpQuantityValid.value || topUpQuantity.value === null) {
