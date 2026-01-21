@@ -82,7 +82,7 @@ describe('[POST] /private/create_device - Error Cases', () => {
       headers,
       body: 'invalid json',
     })
-    expect(response.status).toBe(401)
+    expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
     expect(data.error).toBe('invalid_json_parse_body')
   })
