@@ -1,9 +1,60 @@
 import type { Context } from 'hono'
+import { parseCronExpression } from 'cron-schedule'
 import { trackBentoEvent } from './bento.ts'
+import { CacheHelper } from './cache.ts'
 import { cloudlog } from './logging.ts'
 import { sendNotifOrg } from './notifications.ts'
 import { supabaseAdmin } from './supabase.ts'
 import { backgroundTask } from './utils.ts'
+
+// Cache path for org member notifications (separate from single-email notifications)
+const NOTIF_ORG_MEMBERS_CACHE_PATH = '/.notif-org-members-sendable'
+
+interface NotifCachePayload {
+  sendable: boolean
+}
+
+function buildOrgMembersNotifCacheRequest(c: Context, orgId: string, eventName: string, uniqId: string) {
+  const helper = new CacheHelper(c)
+  if (!helper.available)
+    return null
+  return {
+    helper,
+    request: helper.buildRequest(NOTIF_ORG_MEMBERS_CACHE_PATH, { org_id: orgId, event: eventName, uniq_id: uniqId }),
+  }
+}
+
+async function getOrgMembersNotifCacheStatus(c: Context, orgId: string, eventName: string, uniqId: string): Promise<boolean | null> {
+  const cacheEntry = buildOrgMembersNotifCacheRequest(c, orgId, eventName, uniqId)
+  if (!cacheEntry)
+    return null
+  const payload = await cacheEntry.helper.matchJson<NotifCachePayload>(cacheEntry.request)
+  if (!payload)
+    return null
+  return payload.sendable
+}
+
+function setOrgMembersNotifCacheStatus(c: Context, orgId: string, eventName: string, uniqId: string, sendable: boolean, ttlSeconds: number) {
+  return backgroundTask(c, async () => {
+    const cacheEntry = buildOrgMembersNotifCacheRequest(c, orgId, eventName, uniqId)
+    if (!cacheEntry)
+      return
+    await cacheEntry.helper.putJson(cacheEntry.request, { sendable }, ttlSeconds)
+  })
+}
+
+/**
+ * Calculate seconds until the next cron window opens based on last send time.
+ */
+function getSecondsUntilNextCronWindow(lastSendAt: string, cron: string): number {
+  const interval = parseCronExpression(cron)
+  const lastSendDate = new Date(lastSendAt)
+  const now = new Date()
+  const nextDate = interval.getNextDate(lastSendDate)
+  const diffMs = nextDate.getTime() - now.getTime()
+  // Return at least 1 second, and cap at reasonable max (1 week)
+  return Math.max(1, Math.min(Math.ceil(diffMs / 1000), 604800))
+}
 
 /**
  * Email preference keys that map to the JSONB email_preferences column in both users and orgs tables.
@@ -241,7 +292,7 @@ export async function sendEmailToOrgMembers(
  * @param orgId - The organization ID
  * @param uniqId - Unique identifier for this notification instance (for deduplication)
  * @param cron - Cron expression for rate limiting (e.g., '0 0 * * 1' for weekly)
- * @returns true if emails were sent, false if throttled or no recipients
+ * @returns true if emails were sent, { sent: false, lastSendAt } if throttled, false if error
  */
 export async function sendNotifToOrgMembers(
   c: Context,
@@ -251,7 +302,7 @@ export async function sendNotifToOrgMembers(
   orgId: string,
   uniqId: string,
   cron: string,
-): Promise<boolean> {
+): Promise<boolean | { sent: false, lastSendAt: string }> {
   // Get the org's info including management email
   const org = await getOrgInfo(c, orgId)
   if (!org) {
@@ -263,8 +314,13 @@ export async function sendNotifToOrgMembers(
   // It will send to the org's management_email, but we also need to send to other eligible members
   const orgEmailSent = await sendNotifOrg(c, eventName, eventData, orgId, uniqId, cron)
 
-  if (!orgEmailSent) {
-    // Notification was throttled or already sent
+  // Handle the "not sendable" case - propagate lastSendAt for caching
+  if (typeof orgEmailSent === 'object' && orgEmailSent.sent === false && orgEmailSent.lastSendAt) {
+    return { sent: false, lastSendAt: orgEmailSent.lastSendAt }
+  }
+
+  if (orgEmailSent !== true) {
+    // Notification was throttled, race lost, or error
     return false
   }
 
@@ -295,4 +351,44 @@ export async function sendNotifToOrgMembers(
   })
 
   return true
+}
+
+/**
+ * Cached version of sendNotifToOrgMembers that checks cache before querying the database.
+ * If a notification was recently checked and found to be "not sendable", the cached
+ * result is returned immediately without hitting the database.
+ *
+ * The cache TTL is calculated based on the cron schedule and last send time,
+ * so the cache expires exactly when the notification becomes sendable again.
+ */
+export async function sendNotifToOrgMembersCached(
+  c: Context,
+  eventName: string,
+  preferenceKey: EmailPreferenceKey,
+  eventData: Record<string, any>,
+  orgId: string,
+  uniqId: string,
+  cron: string,
+): Promise<boolean> {
+  // Check cache first - if we recently checked and it wasn't sendable, skip DB query
+  const cachedSendable = await getOrgMembersNotifCacheStatus(c, orgId, eventName, uniqId)
+  if (cachedSendable === false) {
+    cloudlog({ requestId: c.get('requestId'), message: 'sendNotifToOrgMembers cache hit - not sendable', event: eventName, orgId, uniqId })
+    return false
+  }
+
+  // Cache miss, call the actual function
+  const result = await sendNotifToOrgMembers(c, eventName, preferenceKey, eventData, orgId, uniqId, cron)
+
+  // Handle the "not sendable" case with lastSendAt for proper TTL calculation
+  if (typeof result === 'object' && result.sent === false && result.lastSendAt) {
+    const ttlSeconds = getSecondsUntilNextCronWindow(result.lastSendAt, cron)
+    cloudlog({ requestId: c.get('requestId'), message: 'sendNotifToOrgMembers caching not sendable', event: eventName, orgId, ttlSeconds })
+    setOrgMembersNotifCacheStatus(c, orgId, eventName, uniqId, false, ttlSeconds)
+    return false
+  }
+
+  // For other cases (true/false), just return the boolean result
+  // No need to cache "sent=true" as next check should query DB anyway
+  return result === true
 }
