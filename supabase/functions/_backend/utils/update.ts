@@ -94,7 +94,7 @@ export async function updateWithPG(
       app_id,
       device_id,
       app_id_url: app_id,
-    }, appOwner.owner_org, app_id, '0 0 * * 1', appOwner.orgs.management_email)) // Weekly on Monday
+    }, appOwner.owner_org, app_id, '0 0 * * 1', appOwner.orgs.management_email, drizzleClient)) // Weekly on Monday
     return simpleErrorWithStatus(c, 429, 'need_plan_upgrade', PLAN_ERROR)
   }
   await setAppStatus(c, app_id, 'cloud')
@@ -126,7 +126,7 @@ export async function updateWithPG(
       device_id,
       version_id: version_build,
       app_id_url: app_id,
-    }, appOwner.owner_org, app_id, '0 0 * * 1', appOwner.orgs.management_email))
+    }, appOwner.owner_org, app_id, '0 0 * * 1', appOwner.orgs.management_email, drizzleClient))
     return simpleError200(c, 'semver_error', `Native version: ${body.version_build} doesn't follow semver convention, please check https://capgo.app/semver_tester/ to learn more about semver usage in Capgo`)
   }
   // Reject v4 completely - it's no longer supported
@@ -137,7 +137,7 @@ export async function updateWithPG(
       device_id,
       version_id: version_build,
       app_id_url: app_id,
-    }, appOwner.owner_org, app_id, '0 0 * * 1', appOwner.orgs.management_email))
+    }, appOwner.owner_org, app_id, '0 0 * * 1', appOwner.orgs.management_email, drizzleClient))
     await sendStatsAndDevice(c, device, [{ action: 'backend_refusal' }])
     return simpleError200(c, 'unsupported_plugin_version', `Plugin version ${plugin_version} (v4) is no longer supported. Please upgrade to v5.10.0 or later.`)
   }
@@ -149,7 +149,7 @@ export async function updateWithPG(
       device_id,
       version_id: version_build,
       app_id_url: app_id,
-    }, appOwner.owner_org, app_id, '0 0 * * 1', appOwner.orgs.management_email))
+    }, appOwner.owner_org, app_id, '0 0 * * 1', appOwner.orgs.management_email, drizzleClient))
   }
   if (!app_id || !device_id || !version_build || !version_name || !platform) {
     return simpleError200(c, 'missing_info', 'Cannot find device_id or app_id')

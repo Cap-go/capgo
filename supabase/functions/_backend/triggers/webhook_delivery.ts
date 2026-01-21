@@ -4,6 +4,7 @@ import { Hono } from 'hono/tiny'
 import { BRES, middlewareAPISecret } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr, serializeError } from '../utils/logging.ts'
 import { sendNotifOrg } from '../utils/notifications.ts'
+import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import { backgroundTask } from '../utils/utils.ts'
 import {
   deliverWebhook,
@@ -166,30 +167,38 @@ app.post('/', middlewareAPISecret, async (c) => {
 
       // Send failure notification via Bento (webhook already fetched above)
       if (webhook) {
-        await backgroundTask(c, sendNotifOrg(
-          c,
-          'webhook:delivery_failed',
-          {
-            webhook_name: webhook.name,
-            webhook_url: webhook.url,
-            event_type: deliveryData.payload.event,
-            attempts: attemptCount,
-            last_error: result.body?.slice(0, 500) || 'Unknown error',
-            delivery_id: deliveryData.delivery_id,
-          },
-          webhook.org_id,
-          `webhook_failure_${webhook.id}_${deliveryData.payload.event_id}`,
-          '0 0 * * *', // Rate limit to once per day per webhook+event
-          webhook.orgs.management_email,
-        ))
+        const pgClient = getPgClient(c, true)
+        const drizzleClient = getDrizzleClient(pgClient)
+        try {
+          await backgroundTask(c, sendNotifOrg(
+            c,
+            'webhook:delivery_failed',
+            {
+              webhook_name: webhook.name,
+              webhook_url: webhook.url,
+              event_type: deliveryData.payload.event,
+              attempts: attemptCount,
+              last_error: result.body?.slice(0, 500) || 'Unknown error',
+              delivery_id: deliveryData.delivery_id,
+            },
+            webhook.org_id,
+            `webhook_failure_${webhook.id}_${deliveryData.payload.event_id}`,
+            '0 0 * * *', // Rate limit to once per day per webhook+event
+            webhook.orgs.management_email,
+            drizzleClient,
+          ))
 
-        cloudlog({
-          requestId: c.get('requestId'),
-          message: 'Sent webhook failure notification',
-          webhookId: webhook.id,
-          webhookName: webhook.name,
-          orgId: webhook.org_id,
-        })
+          cloudlog({
+            requestId: c.get('requestId'),
+            message: 'Sent webhook failure notification',
+            webhookId: webhook.id,
+            webhookName: webhook.name,
+            orgId: webhook.org_id,
+          })
+        }
+        finally {
+          closeClient(c, pgClient)
+        }
       }
     }
 

@@ -95,7 +95,7 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
       app_id,
       device_id: body.device_id,
       app_id_url: app_id,
-    }, appOwner.owner_org, app_id, '0 0 * * 1', appOwner.orgs.management_email)) // Weekly on Monday
+    }, appOwner.owner_org, app_id, '0 0 * * 1', appOwner.orgs.management_email, drizzleClient)) // Weekly on Monday
     return { success: false, error: 'need_plan_upgrade', message: 'Cannot update, upgrade plan to continue to update' }
   }
   await setAppStatus(c, app_id, 'cloud')

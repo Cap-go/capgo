@@ -2,7 +2,7 @@
 set -euo pipefail
 # https://planetscale.com/docs/postgres/imports/postgres-migrate-walstream
 # CREATE PUBLICATION planetscale_replicate FOR TABLE
-#      apps, app_versions, manifest, channels, channel_devices, orgs, stripe_info, org_users;
+#      apps, app_versions, manifest, channels, channel_devices, orgs, stripe_info, org_userss, notifications;
 
 DUMP_FILE="schema_replicate.dump"
 LIST_FILE="schema_replicate.list"
@@ -30,6 +30,7 @@ pg_dump-17 -Fc --schema-only \
   --table=manifest \
   --table=channels \
   --table=orgs \
+  --table=notifications \
   --table=stripe_info \
   --table=org_users \
   "$DB_SB" > "$DUMP_FILE"

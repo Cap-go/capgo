@@ -1,9 +1,13 @@
 import type { Context } from 'hono'
+import type { getDrizzleClient } from './pg.ts'
 import { parseCronExpression } from 'cron-schedule'
 import dayjs from 'dayjs'
+import { and, eq } from 'drizzle-orm'
 import { trackBentoEvent } from './bento.ts'
 import { CacheHelper } from './cache.ts'
 import { cloudlog } from './logging.ts'
+import { logPgError } from './pg.ts'
+import * as schema from './postgres_schema.ts'
 import { supabaseAdmin } from './supabase.ts'
 import { backgroundTask } from './utils.ts'
 
@@ -71,15 +75,51 @@ function isSendable(c: Context, last: string, cron: string) {
   // return false
 }
 
-export async function sendNotifOrg(c: Context, eventName: string, eventData: EventData, orgId: string, uniqId: string, cron: string, managementEmail: string) {
-  // Check if notification has already been sent
-  const { data: notif } = await supabaseAdmin(c)
-    .from('notifications')
-    .select()
-    .eq('owner_org', orgId)
-    .eq('event', eventName)
-    .eq('uniq_id', uniqId)
-    .single()
+/**
+ * Get notification from database using drizzle (read replica)
+ */
+async function getNotification(
+  c: Context,
+  drizzleClient: ReturnType<typeof getDrizzleClient>,
+  orgId: string,
+  eventName: string,
+  uniqId: string,
+): Promise<{ last_send_at: Date, total_send: number } | null> {
+  try {
+    const notif = await drizzleClient
+      .select({
+        last_send_at: schema.notifications.last_send_at,
+        total_send: schema.notifications.total_send,
+      })
+      .from(schema.notifications)
+      .where(and(
+        eq(schema.notifications.owner_org, orgId),
+        eq(schema.notifications.event, eventName),
+        eq(schema.notifications.uniq_id, uniqId),
+      ))
+      .limit(1)
+      .then(data => data[0])
+
+    return notif ?? null
+  }
+  catch (e: unknown) {
+    logPgError(c, 'getNotification', e)
+    return null
+  }
+}
+
+export async function sendNotifOrg(
+  c: Context,
+  eventName: string,
+  eventData: EventData,
+  orgId: string,
+  uniqId: string,
+  cron: string,
+  managementEmail: string,
+  drizzleClient: ReturnType<typeof getDrizzleClient>,
+) {
+  // Check if notification has already been sent (read from replica)
+  const notif = await getNotification(c, drizzleClient, orgId, eventName, uniqId)
 
   let shouldSend = false
   let isFirstSend = false
@@ -112,9 +152,10 @@ export async function sendNotifOrg(c: Context, eventName: string, eventData: Eve
   }
   else {
     // Notification exists, check if sendable
-    if (!isSendable(c, notif.last_send_at, cron)) {
+    const lastSendAtStr = notif.last_send_at.toISOString()
+    if (!isSendable(c, lastSendAtStr, cron)) {
       cloudlog({ requestId: c.get('requestId'), message: 'notif already sent', event: eventName, orgId })
-      return { sent: false, lastSendAt: notif.last_send_at }
+      return { sent: false, lastSendAt: lastSendAtStr }
     }
 
     // Atomically update ONLY if timestamp hasn't changed (optimistic locking to prevent race)
@@ -127,7 +168,7 @@ export async function sendNotifOrg(c: Context, eventName: string, eventData: Eve
       .eq('event', eventName)
       .eq('uniq_id', uniqId)
       .eq('owner_org', orgId)
-      .eq('last_send_at', notif.last_send_at) // Optimistic lock: only update if timestamp unchanged
+      .eq('last_send_at', lastSendAtStr) // Optimistic lock: only update if timestamp unchanged
       .select()
 
     // Only send if we successfully claimed it (update succeeded)
@@ -167,7 +208,16 @@ export async function sendNotifOrg(c: Context, eventName: string, eventData: Eve
  * The cache TTL is calculated based on the cron schedule and last send time,
  * so the cache expires exactly when the notification becomes sendable again.
  */
-export async function sendNotifOrgCached(c: Context, eventName: string, eventData: EventData, orgId: string, uniqId: string, cron: string, managementEmail: string): Promise<boolean> {
+export async function sendNotifOrgCached(
+  c: Context,
+  eventName: string,
+  eventData: EventData,
+  orgId: string,
+  uniqId: string,
+  cron: string,
+  managementEmail: string,
+  drizzleClient: ReturnType<typeof getDrizzleClient>,
+): Promise<boolean> {
   // Check cache first - if we recently checked and it wasn't sendable, skip DB query
   const cachedSendable = await getNotifCacheStatus(c, orgId, eventName, uniqId)
   if (cachedSendable === false) {
@@ -176,7 +226,7 @@ export async function sendNotifOrgCached(c: Context, eventName: string, eventDat
   }
 
   // Cache miss, call the actual function
-  const result = await sendNotifOrg(c, eventName, eventData, orgId, uniqId, cron, managementEmail)
+  const result = await sendNotifOrg(c, eventName, eventData, orgId, uniqId, cron, managementEmail, drizzleClient)
 
   // Handle the "not sendable" case with lastSendAt for proper TTL calculation
   if (typeof result === 'object' && result.sent === false && result.lastSendAt) {

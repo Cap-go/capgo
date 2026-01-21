@@ -134,7 +134,8 @@ PRIORITY_TABLES=(
   "org_users"
   "apps"
   "app_versions"
-  "channels"
+  "channels",
+  "notifications"
 )
 # Phase 2: Large tables that can sync later
 DEFERRED_TABLES=(

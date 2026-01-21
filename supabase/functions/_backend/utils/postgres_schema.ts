@@ -105,6 +105,16 @@ export const orgs = pgTable('orgs', {
   email_preferences: jsonb('email_preferences'),
 })
 
+export const notifications = pgTable('notifications', {
+  created_at: timestamp('created_at').defaultNow(),
+  updated_at: timestamp('updated_at').defaultNow(),
+  last_send_at: timestamp('last_send_at').notNull().defaultNow(),
+  total_send: bigint('total_send', { mode: 'number' }).notNull().default(1),
+  owner_org: uuid('owner_org').notNull(),
+  event: varchar('event', { length: 255 }).notNull(),
+  uniq_id: varchar('uniq_id', { length: 255 }).notNull(),
+})
+
 export const stripe_info = pgTable('stripe_info', {
   id: bigint('id', { mode: 'number' }).primaryKey().notNull(),
   customer_id: text('customer_id'),

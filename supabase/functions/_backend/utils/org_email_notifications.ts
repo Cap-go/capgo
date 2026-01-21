@@ -334,7 +334,7 @@ export async function sendNotifToOrgMembers(
 
   // Use sendNotifOrg to handle the notification table logic (throttling/deduplication)
   // It will send to the org's management_email, but we also need to send to other eligible members
-  const orgEmailSent = await sendNotifOrg(c, eventName, eventData, orgId, uniqId, cron, org.management_email)
+  const orgEmailSent = await sendNotifOrg(c, eventName, eventData, orgId, uniqId, cron, org.management_email, drizzleClient)
 
   // Handle the "not sendable" case - propagate lastSendAt for caching
   if (typeof orgEmailSent === 'object' && orgEmailSent.sent === false && orgEmailSent.lastSendAt) {
