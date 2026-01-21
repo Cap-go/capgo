@@ -2,6 +2,7 @@ import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
 import { BRES, middlewareAPISecret, parseBody, simpleError } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
+import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import { checkPlanStatusOnly } from '../utils/plans.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 
@@ -18,19 +19,26 @@ app.post('/', middlewareAPISecret, async (c) => {
   if (!body.orgId)
     throw simpleError('no_orgId', 'No orgId', { body })
 
-  await checkPlanStatusOnly(c, body.orgId)
+  const pgClient = getPgClient(c, true)
+  const drizzleClient = getDrizzleClient(pgClient)
+  try {
+    await checkPlanStatusOnly(c, body.orgId, drizzleClient)
 
-  // Update plan_calculated_at timestamp if we have customerId
-  if (body.customerId) {
-    const supabase = supabaseAdmin(c)
-    await supabase
-      .from('stripe_info')
-      .update({ plan_calculated_at: new Date().toISOString() })
-      .eq('customer_id', body.customerId)
-      .throwOnError()
+    // Update plan_calculated_at timestamp if we have customerId
+    if (body.customerId) {
+      const supabase = supabaseAdmin(c)
+      await supabase
+        .from('stripe_info')
+        .update({ plan_calculated_at: new Date().toISOString() })
+        .eq('customer_id', body.customerId)
+        .throwOnError()
 
-    cloudlog({ requestId: c.get('requestId'), message: 'plan calculated timestamp updated', customerId: body.customerId })
+      cloudlog({ requestId: c.get('requestId'), message: 'plan calculated timestamp updated', customerId: body.customerId })
+    }
+
+    return c.json(BRES)
   }
-
-  return c.json(BRES)
+  finally {
+    closeClient(c, pgClient)
+  }
 })

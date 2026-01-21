@@ -1,9 +1,13 @@
 import type { Context } from 'hono'
+import type { getDrizzleClient } from './pg.ts'
 import { parseCronExpression } from 'cron-schedule'
+import { eq } from 'drizzle-orm'
 import { trackBentoEvent } from './bento.ts'
 import { CacheHelper } from './cache.ts'
 import { cloudlog } from './logging.ts'
 import { sendNotifOrg } from './notifications.ts'
+import { getDrizzleClient as getDrizzle, getPgClient, logPgError } from './pg.ts'
+import * as schema from './postgres_schema.ts'
 import { supabaseAdmin } from './supabase.ts'
 import { backgroundTask } from './utils.ts'
 
@@ -95,25 +99,38 @@ interface OrgWithPreferences {
 }
 
 /**
- * Get org info including management_email and email_preferences
+ * Get org info including management_email and email_preferences using drizzle client
  */
-async function getOrgInfo(c: Context, orgId: string): Promise<OrgWithPreferences | null> {
-  const { data: org, error } = await supabaseAdmin(c)
-    .from('orgs')
-    .select('management_email, email_preferences')
-    .eq('id', orgId)
-    .single()
+async function getOrgInfoWithClient(
+  c: Context,
+  orgId: string,
+  drizzleClient: ReturnType<typeof getDrizzleClient>,
+): Promise<OrgWithPreferences | null> {
+  try {
+    const org = await drizzleClient
+      .select({
+        management_email: schema.orgs.management_email,
+        email_preferences: schema.orgs.email_preferences,
+      })
+      .from(schema.orgs)
+      .where(eq(schema.orgs.id, orgId))
+      .limit(1)
+      .then(data => data[0])
 
-  if (error || !org) {
-    cloudlog({ requestId: c.get('requestId'), message: 'getOrgInfo error', orgId, error })
+    if (!org) {
+      cloudlog({ requestId: c.get('requestId'), message: 'getOrgInfo not found', orgId })
+      return null
+    }
+
+    return {
+      management_email: org.management_email,
+      email_preferences: (org.email_preferences as EmailPreferences | null) ?? {},
+    }
+  }
+  catch (e: unknown) {
+    logPgError(c, 'getOrgInfo', e)
     return null
   }
-
-  // email_preferences may not be in generated types yet
-  const orgWithPrefs = org as OrgWithPreferences
-  orgWithPrefs.email_preferences = ((org as any).email_preferences as EmailPreferences | null) ?? {}
-
-  return orgWithPrefs
 }
 
 /**
@@ -197,11 +214,12 @@ async function getAllEligibleEmails(
   c: Context,
   orgId: string,
   preferenceKey: EmailPreferenceKey,
-): Promise<{ adminEmails: string[], managementEmail: string | null }> {
+  drizzleClient: ReturnType<typeof getDrizzleClient>,
+): Promise<{ adminEmails: string[], managementEmail: string | null, org: OrgWithPreferences | null }> {
   // Get org info
-  const org = await getOrgInfo(c, orgId)
+  const org = await getOrgInfoWithClient(c, orgId, drizzleClient)
   if (!org) {
-    return { adminEmails: [], managementEmail: null }
+    return { adminEmails: [], managementEmail: null, org: null }
   }
 
   // Get eligible admin emails
@@ -221,7 +239,7 @@ async function getAllEligibleEmails(
     }
   }
 
-  return { adminEmails, managementEmail }
+  return { adminEmails, managementEmail, org }
 }
 
 /**
@@ -241,8 +259,10 @@ export async function sendEmailToOrgMembers(
   preferenceKey: EmailPreferenceKey,
   eventData: Record<string, any>,
   orgId: string,
+  drizzleClient?: ReturnType<typeof getDrizzleClient>,
 ): Promise<number> {
-  const { adminEmails, managementEmail } = await getAllEligibleEmails(c, orgId, preferenceKey)
+  const client = drizzleClient ?? getDrizzle(getPgClient(c, true))
+  const { adminEmails, managementEmail } = await getAllEligibleEmails(c, orgId, preferenceKey, client)
 
   // Combine all emails (admin emails + management email if applicable)
   const allEmails = [...adminEmails]
@@ -302,9 +322,11 @@ export async function sendNotifToOrgMembers(
   orgId: string,
   uniqId: string,
   cron: string,
+  drizzleClient: ReturnType<typeof getDrizzleClient>,
 ): Promise<boolean | { sent: false, lastSendAt: string }> {
-  // Get the org's info including management email
-  const org = await getOrgInfo(c, orgId)
+  // Get all eligible emails (includes org info)
+  const { adminEmails, managementEmail, org } = await getAllEligibleEmails(c, orgId, preferenceKey, drizzleClient)
+
   if (!org) {
     cloudlog({ requestId: c.get('requestId'), message: 'sendNotifToOrgMembers: org not found', orgId })
     return false
@@ -312,7 +334,7 @@ export async function sendNotifToOrgMembers(
 
   // Use sendNotifOrg to handle the notification table logic (throttling/deduplication)
   // It will send to the org's management_email, but we also need to send to other eligible members
-  const orgEmailSent = await sendNotifOrg(c, eventName, eventData, orgId, uniqId, cron)
+  const orgEmailSent = await sendNotifOrg(c, eventName, eventData, orgId, uniqId, cron, org.management_email)
 
   // Handle the "not sendable" case - propagate lastSendAt for caching
   if (typeof orgEmailSent === 'object' && orgEmailSent.sent === false && orgEmailSent.lastSendAt) {
@@ -323,9 +345,6 @@ export async function sendNotifToOrgMembers(
     // Notification was throttled, race lost, or error
     return false
   }
-
-  // Get all eligible emails
-  const { adminEmails, managementEmail } = await getAllEligibleEmails(c, orgId, preferenceKey)
 
   // sendNotifOrg already sent to management_email, so filter it out from admin emails
   // to avoid duplicate sends
@@ -369,6 +388,7 @@ export async function sendNotifToOrgMembersCached(
   orgId: string,
   uniqId: string,
   cron: string,
+  drizzleClient: ReturnType<typeof getDrizzleClient>,
 ): Promise<boolean> {
   // Check cache first - if we recently checked and it wasn't sendable, skip DB query
   const cachedSendable = await getOrgMembersNotifCacheStatus(c, orgId, eventName, uniqId)
@@ -378,7 +398,7 @@ export async function sendNotifToOrgMembersCached(
   }
 
   // Cache miss, call the actual function
-  const result = await sendNotifToOrgMembers(c, eventName, preferenceKey, eventData, orgId, uniqId, cron)
+  const result = await sendNotifToOrgMembers(c, eventName, preferenceKey, eventData, orgId, uniqId, cron, drizzleClient)
 
   // Handle the "not sendable" case with lastSendAt for proper TTL calculation
   if (typeof result === 'object' && result.sent === false && result.lastSendAt) {

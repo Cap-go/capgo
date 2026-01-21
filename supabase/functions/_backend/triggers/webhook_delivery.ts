@@ -180,6 +180,7 @@ app.post('/', middlewareAPISecret, async (c) => {
           webhook.org_id,
           `webhook_failure_${webhook.id}_${deliveryData.payload.event_id}`,
           '0 0 * * *', // Rate limit to once per day per webhook+event
+          webhook.orgs.management_email,
         ))
 
         cloudlog({

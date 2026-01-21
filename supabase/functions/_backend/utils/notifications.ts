@@ -71,24 +71,12 @@ function isSendable(c: Context, last: string, cron: string) {
   // return false
 }
 
-export async function sendNotifOrg(c: Context, eventName: string, eventData: EventData, orgId: string, uniqId: string, cron: string) {
-  // Get org info
-  const { data: org, error: orgError } = await supabaseAdmin(c)
-    .from('orgs')
-    .select()
-    .eq('id', orgId)
-    .single()
-
-  if (!org || orgError) {
-    cloudlog({ requestId: c.get('requestId'), message: 'org not found', orgId })
-    return false
-  }
-
+export async function sendNotifOrg(c: Context, eventName: string, eventData: EventData, orgId: string, uniqId: string, cron: string, managementEmail: string) {
   // Check if notification has already been sent
   const { data: notif } = await supabaseAdmin(c)
     .from('notifications')
     .select()
-    .eq('owner_org', org.id)
+    .eq('owner_org', orgId)
     .eq('event', eventName)
     .eq('uniq_id', uniqId)
     .single()
@@ -153,14 +141,14 @@ export async function sendNotifOrg(c: Context, eventName: string, eventData: Eve
   // Only send if we successfully claimed the notification
   if (shouldSend) {
     cloudlog({ requestId: c.get('requestId'), message: isFirstSend ? 'notif never sent' : 'notif ready to sent', event: eventName, uniqId })
-    const res = await trackBentoEvent(c, org.management_email, eventData, eventName)
+    const res = await trackBentoEvent(c, managementEmail, eventData, eventName)
     if (!res) {
-      cloudlog({ requestId: c.get('requestId'), message: 'trackEvent failed', eventName, email: org.management_email, eventData })
+      cloudlog({ requestId: c.get('requestId'), message: 'trackEvent failed', eventName, email: managementEmail, eventData })
       // Note: We already claimed it in DB, but email failed. On next attempt, cron will determine if we retry.
       return false
     }
 
-    cloudlog({ requestId: c.get('requestId'), message: 'send notif done', eventName, email: org.management_email })
+    cloudlog({ requestId: c.get('requestId'), message: 'send notif done', eventName, email: managementEmail })
     return true
   }
 
@@ -179,7 +167,7 @@ export async function sendNotifOrg(c: Context, eventName: string, eventData: Eve
  * The cache TTL is calculated based on the cron schedule and last send time,
  * so the cache expires exactly when the notification becomes sendable again.
  */
-export async function sendNotifOrgCached(c: Context, eventName: string, eventData: EventData, orgId: string, uniqId: string, cron: string): Promise<boolean> {
+export async function sendNotifOrgCached(c: Context, eventName: string, eventData: EventData, orgId: string, uniqId: string, cron: string, managementEmail: string): Promise<boolean> {
   // Check cache first - if we recently checked and it wasn't sendable, skip DB query
   const cachedSendable = await getNotifCacheStatus(c, orgId, eventName, uniqId)
   if (cachedSendable === false) {
@@ -188,7 +176,7 @@ export async function sendNotifOrgCached(c: Context, eventName: string, eventDat
   }
 
   // Cache miss, call the actual function
-  const result = await sendNotifOrg(c, eventName, eventData, orgId, uniqId, cron)
+  const result = await sendNotifOrg(c, eventName, eventData, orgId, uniqId, cron, managementEmail)
 
   // Handle the "not sendable" case with lastSendAt for proper TTL calculation
   if (typeof result === 'object' && result.sent === false && result.lastSendAt) {

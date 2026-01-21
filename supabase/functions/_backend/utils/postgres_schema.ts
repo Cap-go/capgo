@@ -1,4 +1,4 @@
-import { bigint, boolean, integer, pgEnum, pgTable, serial, text, timestamp, uuid, varchar } from 'drizzle-orm/pg-core'
+import { bigint, boolean, integer, jsonb, pgEnum, pgTable, serial, text, timestamp, uuid, varchar } from 'drizzle-orm/pg-core'
 
 // do_not_change
 
@@ -102,6 +102,7 @@ export const orgs = pgTable('orgs', {
   customer_id: text('customer_id'),
   require_apikey_expiration: boolean('require_apikey_expiration').notNull().default(false),
   max_apikey_expiration_days: integer('max_apikey_expiration_days'),
+  email_preferences: jsonb('email_preferences'),
 })
 
 export const stripe_info = pgTable('stripe_info', {

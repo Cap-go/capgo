@@ -93,7 +93,7 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
       app_id,
       device_id,
       app_id_url: app_id,
-    }, appOwner.owner_org, app_id, '0 0 * * 1')) // Weekly on Monday
+    }, appOwner.owner_org, app_id, '0 0 * * 1', appOwner.orgs.management_email)) // Weekly on Monday
     return simpleErrorWithStatus(c, 429, 'need_plan_upgrade', PLAN_ERROR)
   }
 
@@ -120,6 +120,7 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
       appOwner.owner_org,
       `${app_id}`,
       '0 0 * * 0', // Weekly on Sunday at midnight
+      drizzleClient,
     ))
     return simpleError200(c, 'cannot_override', 'Cannot change device override current channel don\'t allow it')
   }
@@ -144,6 +145,7 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
       appOwner.owner_org,
       `${app_id}`,
       '0 0 * * 0', // Weekly on Sunday at midnight
+      drizzleClient,
     ))
     if (dataChannel.public) {
       return simpleError200(
@@ -279,7 +281,7 @@ async function put(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient
       app_id,
       device_id,
       app_id_url: app_id,
-    }, appOwner.owner_org, app_id, '0 0 * * 1')) // Weekly on Monday
+    }, appOwner.owner_org, app_id, '0 0 * * 1', appOwner.orgs.management_email)) // Weekly on Monday
     return simpleErrorWithStatus(c, 429, 'need_plan_upgrade', PLAN_ERROR)
   }
   await setAppStatus(c, app_id, 'cloud')
@@ -393,7 +395,7 @@ async function deleteOverride(c: Context, drizzleClient: ReturnType<typeof getDr
       app_id,
       device_id,
       app_id_url: app_id,
-    }, appOwner.owner_org, app_id, '0 0 * * 1')) // Weekly on Monday
+    }, appOwner.owner_org, app_id, '0 0 * * 1', appOwner.orgs.management_email)) // Weekly on Monday
     return simpleErrorWithStatus(c, 429, 'need_plan_upgrade', PLAN_ERROR)
   }
   await setAppStatus(c, app_id, 'cloud')
@@ -443,6 +445,7 @@ async function deleteOverride(c: Context, drizzleClient: ReturnType<typeof getDr
       appOwner.owner_org,
       `${app_id}`,
       '0 0 * * 0', // Weekly on Sunday at midnight
+      drizzleClient,
     ))
     return simpleError200(c, 'cannot_override', 'Cannot change device override current channel don\'t allow it')
   }
@@ -495,7 +498,7 @@ async function listCompatibleChannels(c: Context, drizzleClient: ReturnType<type
     backgroundTask(c, sendNotifOrgCached(c, 'org:missing_payment', {
       app_id,
       app_id_url: app_id,
-    }, appOwner.owner_org, app_id, '0 0 * * 1')) // Weekly on Monday
+    }, appOwner.owner_org, app_id, '0 0 * * 1', appOwner.orgs.management_email)) // Weekly on Monday
     return simpleErrorWithStatus(c, 429, 'need_plan_upgrade', PLAN_ERROR)
   }
   await setAppStatus(c, app_id, 'cloud')
