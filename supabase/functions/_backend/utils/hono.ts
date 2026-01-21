@@ -123,7 +123,7 @@ export const middlewareAuth = honoFactory.createMiddleware(async (c, next) => {
   const { data: authData, error: authError } = await supabase.auth.getUser()
   if (authError || !authData.user) {
     cloudlog({ requestId: c.get('requestId'), message: 'Invalid JWT', error: authError })
-    return simpleError('invalid_jwt', 'Invalid JWT')
+    throw simpleError('invalid_jwt', 'Invalid JWT')
   }
 
   // Set auth context for RBAC
@@ -270,6 +270,9 @@ export function simpleRateLimit(moreInfo: any = {}, cause?: any): never {
 }
 
 export function simpleError(errorCode: string, message: string, moreInfo: any = {}, cause?: any): never {
+  if (errorCode === 'invalid_jwt') {
+    return quickError(401, errorCode, message, moreInfo, cause)
+  }
   return quickError(400, errorCode, message, moreInfo, cause)
 }
 

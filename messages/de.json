@@ -1266,7 +1266,7 @@
   "role": "Rolle",
   "select-role": "App-Rolle auswählen",
   "select-user-role": "Rolle auswählen",
-  "select-user-role-expanded": "Wähle die zuzuweisende RBAC-Rolle. Legacy-Rollen bleiben während der Migration sichtbar.",
+  "select-user-role-expanded": "Wählen Sie die zuzuweisende RBAC-Rolle. Legacy-Rollen bleiben während der Migration sichtbar.",
   "rbac-not-enabled-for-org": "RBAC ist für diese Organisation nicht aktiviert.",
   "rbac-system-enabled": "RBAC-Rollenverwaltung (Vorschau)",
   "rbac-system-enabled-body": "Das Bearbeiten von Rollen hier verwendet das RBAC-System. Legacy-Rollen bleiben während der Migration sichtbar.",
