@@ -14,7 +14,7 @@ import { getAppStatus, setAppStatus } from './appStatus.ts'
 import { getBundleUrl, getManifestUrl } from './downloadUrl.ts'
 import { simpleError200, simpleErrorWithStatus } from './hono.ts'
 import { cloudlog } from './logging.ts'
-import { sendNotifOrg } from './notifications.ts'
+import { sendNotifOrgCached } from './notifications.ts'
 import { closeClient, getAppOwnerPostgres, getDrizzleClient, getPgClient, requestInfosPostgres, setReplicationLagHeader } from './pg.ts'
 import { makeDevice } from './plugin_parser.ts'
 import { s3 } from './s3.ts'
@@ -90,7 +90,7 @@ export async function updateWithPG(
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot update, upgrade plan to continue to update', id: app_id })
     await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
     // Send weekly notification about missing payment (not configurable - payment related)
-    await backgroundTask(c, sendNotifOrg(c, 'org:missing_payment', {
+    await backgroundTask(c, sendNotifOrgCached(c, 'org:missing_payment', {
       app_id,
       device_id,
       app_id_url: app_id,
@@ -121,7 +121,7 @@ export async function updateWithPG(
   const coerce = tryParse(fixSemver(body.version_build))
   if (!coerce) {
     // get app owner with app_id
-    await backgroundTask(c, sendNotifOrg(c, 'user:semver_issue', {
+    await backgroundTask(c, sendNotifOrgCached(c, 'user:semver_issue', {
       app_id,
       device_id,
       version_id: version_build,
@@ -132,7 +132,7 @@ export async function updateWithPG(
   // Reject v4 completely - it's no longer supported
   if (pluginVersion.major === 4) {
     cloudlog({ requestId: c.get('requestId'), message: 'Plugin version 4.x is no longer supported', plugin_version, app_id })
-    await backgroundTask(c, sendNotifOrg(c, 'user:plugin_issue', {
+    await backgroundTask(c, sendNotifOrgCached(c, 'user:plugin_issue', {
       app_id,
       device_id,
       version_id: version_build,
@@ -144,7 +144,7 @@ export async function updateWithPG(
 
   // Check if plugin_version is deprecated and send notification
   if (isDeprecated) {
-    await backgroundTask(c, sendNotifOrg(c, 'user:plugin_issue', {
+    await backgroundTask(c, sendNotifOrgCached(c, 'user:plugin_issue', {
       app_id,
       device_id,
       version_id: version_build,

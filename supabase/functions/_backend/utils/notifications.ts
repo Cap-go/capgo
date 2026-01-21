@@ -2,11 +2,61 @@ import type { Context } from 'hono'
 import { parseCronExpression } from 'cron-schedule'
 import dayjs from 'dayjs'
 import { trackBentoEvent } from './bento.ts'
+import { CacheHelper } from './cache.ts'
 import { cloudlog } from './logging.ts'
 import { supabaseAdmin } from './supabase.ts'
+import { backgroundTask } from './utils.ts'
 
 interface EventData {
   [key: string]: any
+}
+
+const NOTIF_CACHE_PATH = '/.notif-sendable'
+
+interface NotifCachePayload {
+  sendable: boolean
+}
+
+function buildNotifCacheRequest(c: Context, orgId: string, eventName: string, uniqId: string) {
+  const helper = new CacheHelper(c)
+  if (!helper.available)
+    return null
+  return {
+    helper,
+    request: helper.buildRequest(NOTIF_CACHE_PATH, { org_id: orgId, event: eventName, uniq_id: uniqId }),
+  }
+}
+
+async function getNotifCacheStatus(c: Context, orgId: string, eventName: string, uniqId: string): Promise<boolean | null> {
+  const cacheEntry = buildNotifCacheRequest(c, orgId, eventName, uniqId)
+  if (!cacheEntry)
+    return null
+  const payload = await cacheEntry.helper.matchJson<NotifCachePayload>(cacheEntry.request)
+  if (!payload)
+    return null
+  return payload.sendable
+}
+
+function setNotifCacheStatus(c: Context, orgId: string, eventName: string, uniqId: string, sendable: boolean, ttlSeconds: number) {
+  return backgroundTask(c, async () => {
+    const cacheEntry = buildNotifCacheRequest(c, orgId, eventName, uniqId)
+    if (!cacheEntry)
+      return
+    await cacheEntry.helper.putJson(cacheEntry.request, { sendable }, ttlSeconds)
+  })
+}
+
+/**
+ * Calculate seconds until the next cron window opens based on last send time.
+ */
+function getSecondsUntilNextCronWindow(lastSendAt: string, cron: string): number {
+  const interval = parseCronExpression(cron)
+  const lastSendDate = new Date(lastSendAt)
+  const now = new Date()
+  const nextDate = interval.getNextDate(lastSendDate)
+  const diffMs = nextDate.getTime() - now.getTime()
+  // Return at least 1 second, and cap at reasonable max (1 week)
+  return Math.max(1, Math.min(Math.ceil(diffMs / 1000), 604800))
 }
 
 function isSendable(c: Context, last: string, cron: string) {
@@ -76,7 +126,7 @@ export async function sendNotifOrg(c: Context, eventName: string, eventData: Eve
     // Notification exists, check if sendable
     if (!isSendable(c, notif.last_send_at, cron)) {
       cloudlog({ requestId: c.get('requestId'), message: 'notif already sent', event: eventName, orgId })
-      return false
+      return { sent: false, lastSendAt: notif.last_send_at }
     }
 
     // Atomically update ONLY if timestamp hasn't changed (optimistic locking to prevent race)
@@ -120,3 +170,35 @@ export async function sendNotifOrg(c: Context, eventName: string, eventData: Eve
 // dayjs subtract one week
 // const last_send_at = dayjs().subtract(1, 'week').toISOString()
 // cloudlog(c.get('requestId'), 'isSendable', isSendable(last_send_at, '0 0 1 * *'))
+
+/**
+ * Cached version of sendNotifOrg that checks cache before querying the database.
+ * If a notification was recently checked and found to be "not sendable", the cached
+ * result is returned immediately without hitting the database.
+ *
+ * The cache TTL is calculated based on the cron schedule and last send time,
+ * so the cache expires exactly when the notification becomes sendable again.
+ */
+export async function sendNotifOrgCached(c: Context, eventName: string, eventData: EventData, orgId: string, uniqId: string, cron: string): Promise<boolean> {
+  // Check cache first - if we recently checked and it wasn't sendable, skip DB query
+  const cachedSendable = await getNotifCacheStatus(c, orgId, eventName, uniqId)
+  if (cachedSendable === false) {
+    cloudlog({ requestId: c.get('requestId'), message: 'notif cache hit - not sendable', event: eventName, orgId, uniqId })
+    return false
+  }
+
+  // Cache miss, call the actual function
+  const result = await sendNotifOrg(c, eventName, eventData, orgId, uniqId, cron)
+
+  // Handle the "not sendable" case with lastSendAt for proper TTL calculation
+  if (typeof result === 'object' && result.sent === false && result.lastSendAt) {
+    const ttlSeconds = getSecondsUntilNextCronWindow(result.lastSendAt, cron)
+    cloudlog({ requestId: c.get('requestId'), message: 'notif caching not sendable', event: eventName, orgId, ttlSeconds })
+    setNotifCacheStatus(c, orgId, eventName, uniqId, false, ttlSeconds)
+    return false
+  }
+
+  // For other cases (true/false), just return the boolean result
+  // No need to cache "sent=true" as next check should query DB anyway
+  return result === true
+}

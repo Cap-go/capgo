@@ -8,7 +8,7 @@ import { z } from 'zod/mini'
 import { getAppStatus, setAppStatus } from '../utils/appStatus.ts'
 import { BRES, simpleError, simpleError200, simpleErrorWithStatus, simpleRateLimit } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
-import { sendNotifOrg } from '../utils/notifications.ts'
+import { sendNotifOrgCached } from '../utils/notifications.ts'
 import { closeClient, getAppOwnerPostgres, getAppVersionPostgres, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import { makeDevice, parsePluginBody } from '../utils/plugin_parser.ts'
 import { createStatsVersion, onPremStats, sendStatsAndDevice } from '../utils/stats.ts'
@@ -91,7 +91,7 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot update, upgrade plan to continue to update', id: app_id })
     await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
     // Send weekly notification about missing payment (not configurable - payment related)
-    backgroundTask(c, sendNotifOrg(c, 'org:missing_payment', {
+    backgroundTask(c, sendNotifOrgCached(c, 'org:missing_payment', {
       app_id,
       device_id: body.device_id,
       app_id_url: app_id,
