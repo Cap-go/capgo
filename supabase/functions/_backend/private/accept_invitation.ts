@@ -191,8 +191,9 @@ app.post('/', async (c) => {
     return quickError(500, 'failed_to_accept_invitation', 'Failed to resolve RBAC role', { error: 'Missing RBAC role name' })
   }
 
+  const rbacRoleNameValue = rbacRoleName ?? ''
   const legacyRight = useRbacInvite
-    ? rbacRoleToLegacy[rbacRoleName ?? ''] ?? 'read'
+    ? rbacRoleToLegacy[rbacRoleNameValue] ?? 'read'
     : invitation.role
 
   const { error: insertIntoMainTableError } = await supabaseAdmin.from('org_users').insert({
@@ -210,7 +211,7 @@ app.post('/', async (c) => {
     const { data: role, error: roleError } = await supabaseAdmin
       .from('roles')
       .select('id')
-      .eq('name', rbacRoleName)
+      .eq('name', rbacRoleNameValue)
       .eq('scope_type', 'org')
       .single()
 
