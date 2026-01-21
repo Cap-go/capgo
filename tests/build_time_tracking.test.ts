@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { BASE_URL, fetchWithRetry, getSupabaseClient, PRODUCT_ID, resetAndSeedAppDataStats, resetAppData, resetAppDataStats, TEST_EMAIL, USER_ID } from './test-utils.ts'
+import { fetchWithRetry, getEndpointUrl, getSupabaseClient, PRODUCT_ID, resetAppData, resetAppDataStats, TEST_EMAIL, USER_ID } from './test-utils.ts'
 
 // Generate unique IDs per test run to avoid conflicts with parallel test runs
 const testRunId = randomUUID()
@@ -15,66 +15,61 @@ const headers = {
 beforeAll(async () => {
   const supabase = getSupabaseClient()
 
-  // Create dedicated stripe_info for build time tests
+  await supabase.from('stripe_info').delete().eq('customer_id', STRIPE_CUSTOMER_ID)
+  await supabase.from('org_users').delete().eq('org_id', ORG_ID)
+  await supabase.from('orgs').delete().eq('id', ORG_ID)
+
   const { error: stripeError } = await supabase
     .from('stripe_info')
-    .upsert([
-      {
-        subscription_id: 'sub_build_time_test',
-        customer_id: STRIPE_CUSTOMER_ID,
-        status: 'succeeded' as const,
-        product_id: PRODUCT_ID,
-        trial_at: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
-        is_good_plan: true,
-        plan_usage: 2,
-        subscription_anchor_start: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
-        subscription_anchor_end: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
-        mau_exceeded: false,
-        storage_exceeded: false,
-        bandwidth_exceeded: false,
-        build_time_exceeded: false,
-      },
-    ], { onConflict: 'customer_id' })
+    .insert({
+      subscription_id: `sub_build_time_test_${testRunId.slice(0, 8)}`,
+      customer_id: STRIPE_CUSTOMER_ID,
+      status: 'succeeded' as const,
+      product_id: PRODUCT_ID,
+      trial_at: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
+      is_good_plan: true,
+      plan_usage: 2,
+      subscription_anchor_start: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
+      subscription_anchor_end: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
+      mau_exceeded: false,
+      storage_exceeded: false,
+      bandwidth_exceeded: false,
+      build_time_exceeded: false,
+    })
   if (stripeError)
     throw stripeError
 
-  // Create dedicated org for build time tests
-  const { error: orgError } = await supabase.from('orgs').upsert([
-    {
-      id: ORG_ID,
-      customer_id: STRIPE_CUSTOMER_ID,
-      name: 'Build Time Test Org',
-      created_by: USER_ID,
-      management_email: TEST_EMAIL,
-    },
-  ], { onConflict: 'id' })
+  const { error: orgError } = await supabase.from('orgs').insert({
+    id: ORG_ID,
+    customer_id: STRIPE_CUSTOMER_ID,
+    name: `Build Time Test Org ${testRunId.slice(0, 8)}`,
+    created_by: USER_ID,
+    management_email: TEST_EMAIL,
+  })
   if (orgError)
     throw orgError
 
-  // Ensure user is member of org (check first, then insert)
-  const { data: existingOrgUser } = await supabase
-    .from('org_users')
-    .select('id')
-    .eq('org_id', ORG_ID)
-    .eq('user_id', USER_ID)
-    .maybeSingle()
-
-  if (!existingOrgUser) {
-    const { error: orgUserError } = await supabase.from('org_users').insert([
-      {
-        org_id: ORG_ID,
-        user_id: USER_ID,
-        user_right: 'super_admin',
-      },
-    ])
-    if (orgUserError)
-      throw orgUserError
-  }
+  const { error: orgUserError } = await supabase.from('org_users').insert({
+    org_id: ORG_ID,
+    user_id: USER_ID,
+    user_right: 'super_admin',
+  })
+  if (orgUserError)
+    throw orgUserError
 })
 
 beforeEach(async () => {
-  await resetAndSeedAppDataStats(APPNAME)
   const supabase = getSupabaseClient()
+
+  await supabase.from('daily_build_time').delete().eq('app_id', APPNAME)
+  await supabase.from('build_logs').delete().eq('org_id', ORG_ID)
+  await supabase.from('app_metrics_cache').delete().eq('org_id', ORG_ID)
+  await supabase.from('usage_credit_consumptions').delete().eq('org_id', ORG_ID)
+  await supabase.from('usage_overage_events').delete().eq('org_id', ORG_ID)
+  await supabase.from('usage_credit_transactions').delete().eq('org_id', ORG_ID)
+  await supabase.from('usage_credit_grants').delete().eq('org_id', ORG_ID)
+  await supabase.from('app_versions').delete().eq('app_id', APPNAME)
+  await supabase.from('apps').delete().eq('app_id', APPNAME)
 
   // Reset stripe_info to clean state before each test
   const { error } = await supabase
@@ -98,20 +93,19 @@ beforeEach(async () => {
     throw error
 
   // Create app for this test
-  const { error: appError } = await supabase.from('apps').upsert([
+  const { error: appError } = await supabase.from('apps').insert([
     {
       owner_org: ORG_ID,
       name: 'Test App Build Time',
       app_id: APPNAME,
       icon_url: 'https://example.com/icon.png',
     },
-  ], { onConflict: 'app_id' })
+  ])
   if (appError)
     throw appError
 
   // Create an app_version to make the org "onboarded"
-  // (is_onboarded_org requires both an app AND an app_version)
-  const { error: versionError } = await supabase.from('app_versions').upsert([
+  const { error: versionError } = await supabase.from('app_versions').insert([
     {
       app_id: APPNAME,
       name: '1.0.0',
@@ -119,29 +113,9 @@ beforeEach(async () => {
       user_id: USER_ID,
       storage_provider: 'r2-direct',
     },
-  ], { onConflict: 'app_id,name' })
+  ])
   if (versionError)
     throw versionError
-
-  // Reset build_logs for this org
-  await supabase.from('build_logs').delete().eq('org_id', ORG_ID)
-
-  // Clear app metrics cache for this org
-  await supabase.from('app_metrics_cache').delete().eq('org_id', ORG_ID)
-
-  // Clear daily_build_time for all apps in this org
-  const { data: orgApps } = await supabase.from('apps').select('app_id').eq('owner_org', ORG_ID)
-  if (orgApps) {
-    for (const app of orgApps) {
-      await supabase.from('daily_build_time').delete().eq('app_id', app.app_id)
-    }
-  }
-
-  // Clear all credit-related data for this org
-  await supabase.from('usage_credit_consumptions').delete().eq('org_id', ORG_ID)
-  await supabase.from('usage_overage_events').delete().eq('org_id', ORG_ID)
-  await supabase.from('usage_credit_transactions').delete().eq('org_id', ORG_ID)
-  await supabase.from('usage_credit_grants').delete().eq('org_id', ORG_ID)
 })
 
 afterAll(async () => {
@@ -192,7 +166,7 @@ describe('build Time Tracking System', () => {
     // Verify our inserted build time is the only one (should be exactly 36000)
     expect((totalMetrics as any)?.[0]?.build_time_unit).toBe(36000)
 
-    const response = await fetchWithRetry(`${BASE_URL}/triggers/cron_stat_org`, {
+    const response = await fetchWithRetry(getEndpointUrl('/triggers/cron_stat_org'), {
       method: 'POST',
       headers,
       body: JSON.stringify({ orgId: ORG_ID }),

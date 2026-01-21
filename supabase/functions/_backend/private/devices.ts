@@ -1,11 +1,11 @@
-import type { AuthInfo, MiddlewareKeyVariables } from '../utils/hono.ts'
+import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Order } from '../utils/types.ts'
 import { Hono } from 'hono/tiny'
 import { parseBody, simpleError, useCors } from '../utils/hono.ts'
 import { middlewareV2 } from '../utils/hono_middleware.ts'
 import { cloudlog } from '../utils/logging.ts'
+import { checkPermission } from '../utils/rbac.ts'
 import { countDevices, readDevices } from '../utils/stats.ts'
-import { hasAppRight } from '../utils/supabase.ts'
 
 interface DataDevice {
   appId: string
@@ -29,8 +29,7 @@ app.use('/', useCors)
 app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
   const body = await parseBody<DataDevice>(c)
   cloudlog({ requestId: c.get('requestId'), message: 'post devices body', body })
-  const auth = c.get('auth') as AuthInfo
-  if (!(await hasAppRight(c, body.appId, auth.userId, 'read'))) {
+  if (!(await checkPermission(c, 'app.read_devices', { appId: body.appId }))) {
     throw simpleError('app_access_denied', 'You can\'t access this app', { app_id: body.appId })
   }
   const devicesIds = body.devicesId ?? body.deviceIds ?? []

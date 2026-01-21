@@ -71,6 +71,9 @@ export const USER_ID_RLS = '8b2c3d4e-5f6a-4b7c-8d9e-0f1a2b3c4d5e'
 export const ORG_ID_RLS = 'c3d4e5f6-a7b8-4c9d-8e0f-1a2b3c4d5e6f'
 export const APIKEY_RLS_ALL = '9c3d4e5f-6a7b-4c8d-9e0f-1a2b3c4d5e6f'
 export const APP_NAME_RLS = 'com.rls.app'
+// Dedicated org for 2FA enforcement toggles in hashed-apikey-rls tests
+export const ORG_ID_2FA_TEST = 'd5e6f7a8-b9c0-4d1e-8f2a-3b4c5d6e7f80'
+export const STRIPE_CUSTOMER_ID_2FA_TEST = 'cus_2fa_rls_test_123'
 export const PLAN_ORG_ID = '0f2f8c2a-6a1d-4a6c-a9a8-b1b2c3d4e5f6'
 export const PLAN_STRIPE_CUSTOMER_ID = 'cus_plan_test_123456'
 // Dedicated data for build_time_tracking tests (isolated to prevent interference)

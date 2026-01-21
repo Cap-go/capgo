@@ -7,6 +7,7 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import AdminOnlyModal from '~/components/AdminOnlyModal.vue'
 import CreditsCta from '~/components/CreditsCta.vue'
+import { checkPermissions } from '~/services/permissions'
 import { openCheckout } from '~/services/stripe'
 import { getCreditUnitPricing, getCurrentPlanNameOrg } from '~/services/supabase'
 import { openSupport } from '~/services/support'
@@ -35,7 +36,8 @@ const isMobile = Capacitor.isNativePlatform()
 
 // Check if user is super_admin
 const isSuperAdmin = computed(() => {
-  return organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['super_admin'])
+  const orgId = organizationStore.currentOrganization?.gid
+  return organizationStore.hasPermissionsInRole('super_admin', ['org_super_admin'], orgId)
 })
 
 // Modal state for non-admin access
@@ -43,7 +45,6 @@ const showAdminModal = ref(false)
 
 const { currentOrganization } = storeToRefs(organizationStore)
 const creditUnitPrices = ref<Partial<Record<Database['public']['Enums']['credit_metric_type'], number>>>({})
-
 function planFeatures(plan: Database['public']['Tables']['plans']['Row']) {
   // Convert build time from seconds to hours or minutes for display
   const buildTimeSeconds = plan.build_time_unit || 0
@@ -224,34 +225,40 @@ async function loadData(initial: boolean) {
 }
 
 watch(currentOrganization, async (newOrg, prevOrg) => {
-  if (!organizationStore.hasPermissionsInRole(await organizationStore.getCurrentRole(newOrg?.created_by ?? ''), ['super_admin'])) {
-    if (!initialLoad.value) {
-      const orgsMap = organizationStore.getAllOrgs()
-      const newOrg = [...orgsMap]
-        .map(([_, a]) => a)
-        .filter(org => org.role.includes('super_admin'))
-        .sort((a, b) => b.app_count - a.app_count)[0]
+  if (newOrg) {
+    // Check permission directly instead of relying on computedAsync default
+    const hasUpdateBillingPermission = await checkPermissions('org.update_billing', { orgId: newOrg.gid })
 
-      if (newOrg) {
-        organizationStore.setCurrentOrganization(newOrg.gid)
-        return
+    if (!hasUpdateBillingPermission) {
+      if (!initialLoad.value) {
+        const orgsMap = organizationStore.getAllOrgs()
+        const newOrg = [...orgsMap]
+          .map(([_, a]) => a)
+          .filter(org => org.role.includes('super_admin'))
+          .sort((a, b) => b.app_count - a.app_count)[0]
+
+        if (newOrg) {
+          organizationStore.setCurrentOrganization(newOrg.gid)
+          return
+        }
       }
-    }
 
-    dialogStore.openDialog({
-      title: t('cannot-view-plans'),
-      description: `${t('plans-super-only')}`,
-      buttons: [
-        {
-          text: t('ok'),
-        },
-      ],
-    })
-    await dialogStore.onDialogDismiss()
-    if (!prevOrg)
-      router.push('/app')
-    else
-      organizationStore.setCurrentOrganization(prevOrg.gid)
+      dialogStore.openDialog({
+        title: t('cannot-view-plans'),
+        description: `${t('plans-super-only')}`,
+        buttons: [
+          {
+            text: t('ok'),
+          },
+        ],
+      })
+      await dialogStore.onDialogDismiss()
+      if (!prevOrg)
+        router.push('/app')
+      else
+        organizationStore.setCurrentOrganization(prevOrg.gid)
+      return
+    }
   }
 
   await loadData(false)
@@ -271,6 +278,37 @@ watchEffect(async () => {
       if (route.query.oid && typeof route.query.oid === 'string') {
         await organizationStore.awaitInitialLoad()
         organizationStore.setCurrentOrganization(route.query.oid)
+      }
+
+      // Check permission on initial load
+      if (currentOrganization.value) {
+        const hasUpdateBillingPermission = await checkPermissions('org.update_billing', { orgId: currentOrganization.value.gid })
+
+        if (!hasUpdateBillingPermission) {
+          const orgsMap = organizationStore.getAllOrgs()
+          const newOrg = [...orgsMap]
+            .map(([_, a]) => a)
+            .filter(org => org.role.includes('super_admin'))
+            .sort((a, b) => b.app_count - a.app_count)[0]
+
+          if (newOrg) {
+            organizationStore.setCurrentOrganization(newOrg.gid)
+            return
+          }
+
+          dialogStore.openDialog({
+            title: t('cannot-view-plans'),
+            description: `${t('plans-super-only')}`,
+            buttons: [
+              {
+                text: t('ok'),
+              },
+            ],
+          })
+          await dialogStore.onDialogDismiss()
+          router.push('/app')
+          return
+        }
       }
 
       loadData(true)

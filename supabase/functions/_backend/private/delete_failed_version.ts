@@ -4,8 +4,9 @@ import { BRES, parseBody, quickError, simpleError } from '../utils/hono.ts'
 import { middlewareKey } from '../utils/hono_middleware.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { logsnag } from '../utils/logsnag.ts'
+import { checkPermission } from '../utils/rbac.ts'
 import { s3 } from '../utils/s3.ts'
-import { hasAppRightApikey, supabaseApikey } from '../utils/supabase.ts'
+import { supabaseApikey } from '../utils/supabase.ts'
 
 interface DataUpload {
   app_id: string
@@ -21,13 +22,14 @@ app.delete('/', middlewareKey(['all', 'write', 'upload']), async (c) => {
   const capgkey = c.get('capgkey') as string
   cloudlog({ requestId: c.get('requestId'), message: 'apikey', apikey })
   cloudlog({ requestId: c.get('requestId'), message: 'capgkey', capgkey })
-  const { data: userId, error: _errorUserId } = await supabaseApikey(c, capgkey)
+  const { data: _userId, error: _errorUserId } = await supabaseApikey(c, capgkey)
     .rpc('get_user_id', { apikey: capgkey, app_id: body.app_id })
   if (_errorUserId) {
     return quickError(404, 'user_not_found', 'Error User not found', { _errorUserId })
   }
 
-  if (!(await hasAppRightApikey(c, body.app_id, userId, 'read', capgkey))) {
+  // Auth context is already set by middlewareKey
+  if (!(await checkPermission(c, 'bundle.delete', { appId: body.app_id }))) {
     return quickError(401, 'not_authorized', 'You can\'t access this app', { app_id: body.app_id })
   }
 

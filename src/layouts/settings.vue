@@ -2,6 +2,7 @@
 import type { Ref } from 'vue'
 import type { Tab } from '~/components/comp_def'
 import { Capacitor } from '@capacitor/core'
+import { computedAsync } from '@vueuse/core'
 import { computed, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
@@ -12,6 +13,7 @@ import Tabs from '~/components/Tabs.vue'
 import { accountTabs } from '~/constants/accountTabs'
 import { organizationTabs as baseOrgTabs } from '~/constants/organizationTabs'
 import { settingsTabs } from '~/constants/settingsTabs'
+import { checkPermissions } from '~/services/permissions'
 import { openPortal } from '~/services/stripe'
 import { useOrganizationStore } from '~/stores/organization'
 
@@ -32,7 +34,8 @@ const adminOnlyRoutes = [
 
 // Check if user is super_admin
 const isSuperAdmin = computed(() => {
-  return organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['super_admin'])
+  const orgId = organizationStore.currentOrganization?.gid
+  return organizationStore.hasPermissionsInRole('super_admin', ['org_super_admin'], orgId)
 })
 
 // Check if current route is admin-only and user is not admin
@@ -62,16 +65,101 @@ const shouldBlockContent = computed(() => {
 // keep Tab icon typing (including ShallowRef) instead of Vue's UnwrapRef narrowing
 const organizationTabs = ref<Tab[]>([...baseOrgTabs]) as Ref<Tab[]>
 
+const canReadBilling = computedAsync(async () => {
+  const orgId = organizationStore.currentOrganization?.gid
+  if (!orgId)
+    return false
+  return await checkPermissions('org.read_billing', { orgId })
+}, false)
+
+const canUpdateBilling = computedAsync(async () => {
+  const orgId = organizationStore.currentOrganization?.gid
+  if (!orgId)
+    return false
+  return await checkPermissions('org.update_billing', { orgId })
+}, false)
+
+const canReadAuditLogs = computedAsync(async () => {
+  const orgId = organizationStore.currentOrganization?.gid
+  if (!orgId)
+    return false
+  return await checkPermissions('org.read_audit', { orgId })
+}, false)
+
+const canManageSecurity = computedAsync(async () => {
+  const orgId = organizationStore.currentOrganization?.gid
+  if (!orgId)
+    return false
+  return await checkPermissions('org.update_settings', { orgId })
+}, false)
+
 watchEffect(() => {
-  // Billing tab - always show on web, with different behavior for non-admins
-  if (!Capacitor.isNativePlatform() && !organizationTabs.value.find(tab => tab.key === '/billing')) {
+  // ensure usage/plans tabs based on permissions (keeps icons from base)
+  const needsUsage = canReadBilling.value
+  const hasUsage = organizationTabs.value.find(tab => tab.key === '/settings/organization/usage')
+  if (needsUsage && !hasUsage) {
+    const base = baseOrgTabs.find(t => t.key === '/settings/organization/usage')
+    if (base)
+      organizationTabs.value.push({ ...base })
+  }
+  if (!needsUsage && hasUsage)
+    organizationTabs.value = organizationTabs.value.filter(tab => tab.key !== '/settings/organization/usage')
+
+  const needsCredits = canUpdateBilling.value
+  const hasCredits = organizationTabs.value.find(tab => tab.key === '/settings/organization/credits')
+
+  if (needsCredits && !hasCredits) {
+    const base = baseOrgTabs.find(t => t.key === '/settings/organization/credits')
+    if (base)
+      organizationTabs.value.push({ ...base })
+  }
+
+  if (!needsCredits && hasCredits)
+    organizationTabs.value = organizationTabs.value.filter(tab => tab.key !== '/settings/organization/credits')
+
+  const needsPlans = canUpdateBilling.value
+  const hasPlans = organizationTabs.value.find(tab => tab.key === '/settings/organization/plans')
+  if (needsPlans && !hasPlans) {
+    const base = baseOrgTabs.find(t => t.key === '/settings/organization/plans')
+    if (base)
+      organizationTabs.value.push({ ...base })
+  }
+  if (!needsPlans && hasPlans)
+    organizationTabs.value = organizationTabs.value.filter(tab => tab.key !== '/settings/organization/plans')
+
+  // Audit logs - visible only to super_admins
+  const needsAuditLogs = canReadAuditLogs.value
+  const hasAuditLogs = organizationTabs.value.find(tab => tab.key === '/settings/organization/audit-logs')
+  if (needsAuditLogs && !hasAuditLogs) {
+    const base = baseOrgTabs.find(t => t.key === '/settings/organization/audit-logs')
+    if (base)
+      organizationTabs.value.push({ ...base })
+  }
+  if (!needsAuditLogs && hasAuditLogs)
+    organizationTabs.value = organizationTabs.value.filter(tab => tab.key !== '/settings/organization/audit-logs')
+
+  // Security - visible only to super_admins
+  const needsSecurity = canManageSecurity.value
+  const hasSecurity = organizationTabs.value.find(tab => tab.key === '/settings/organization/security')
+  if (needsSecurity && !hasSecurity) {
+    const base = baseOrgTabs.find(t => t.key === '/settings/organization/security')
+    if (base)
+      organizationTabs.value.push({ ...base })
+  }
+  if (!needsSecurity && hasSecurity)
+    organizationTabs.value = organizationTabs.value.filter(tab => tab.key !== '/settings/organization/security')
+
+  // Check billing access - users with org.read_billing permission can access billing
+  if (!Capacitor.isNativePlatform()
+    && canReadBilling.value
+    && !organizationTabs.value.find(tab => tab.key === '/billing')) {
     organizationTabs.value.push({
       label: 'billing',
       icon: IconBilling,
       key: '/billing',
       onClick: () => {
         // Check permissions at click time to handle role changes
-        if (organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['super_admin'])) {
+        if (organizationStore.hasPermissionsInRole('super_admin', ['org_super_admin'], organizationStore.currentOrganization?.gid)) {
           openPortal(organizationStore.currentOrganization?.gid ?? '', t)
         }
         else {
@@ -79,6 +167,9 @@ watchEffect(() => {
         }
       },
     })
+  }
+  else if (!canReadBilling.value) {
+    organizationTabs.value = organizationTabs.value.filter(tab => tab.key !== '/billing')
   }
 })
 

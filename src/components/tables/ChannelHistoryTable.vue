@@ -5,6 +5,7 @@ import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import { formatDate } from '~/services/date'
+import { checkPermissions } from '~/services/permissions'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useOrganizationStore } from '~/stores/organization'
@@ -354,8 +355,11 @@ async function handleRollback(item: HistoryEntry) {
   if (!item.bundle?.id || !props.channelId)
     return
 
-  const role = await organizationStore.getCurrentRoleForApp(props.appId)
-  if (!organizationStore.hasPermissionsInRole(role, ['admin', 'super_admin', 'write'])) {
+  const canRollback = await checkPermissions('channel.rollback_bundle', {
+    appId: props.appId,
+    channelId: props.channelId,
+  })
+  if (!canRollback) {
     toast.error(t('no-permission'))
     return
   }

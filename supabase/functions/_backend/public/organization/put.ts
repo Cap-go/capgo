@@ -1,8 +1,10 @@
 import type { Context } from 'hono'
+import type { MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
 import { z } from 'zod/mini'
 import { quickError, simpleError } from '../../utils/hono.ts'
-import { apikeyHasOrgRightWithPolicy, hasOrgRightApikey, supabaseApikey } from '../../utils/supabase.ts'
+import { checkPermission } from '../../utils/rbac.ts'
+import { apikeyHasOrgRightWithPolicy, supabaseApikey } from '../../utils/supabase.ts'
 
 const bodySchema = z.object({
   orgId: z.string(),
@@ -13,41 +15,45 @@ const bodySchema = z.object({
   max_apikey_expiration_days: z.optional(z.nullable(z.number())),
   enforce_hashed_api_keys: z.optional(z.boolean()),
 })
-export async function put(c: Context, bodyRaw: any, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
+
+function parseBody(bodyRaw: unknown) {
   const bodyParsed = bodySchema.safeParse(bodyRaw)
   if (!bodyParsed.success) {
     throw simpleError('invalid_body', 'Invalid body', { error: bodyParsed.error })
   }
-  const body = bodyParsed.data
-  const userId = apikey.user_id
-  const supabase = supabaseApikey(c, apikey.key)
+  return bodyParsed.data
+}
 
-  if (!(await hasOrgRightApikey(c, body.orgId, apikey.user_id, 'admin', c.get('capgkey') as string))) {
-    throw simpleError('cannot_access_organization', 'You can\'t access this organization', { orgId: body.orgId })
+async function ensureOrgAccess(
+  c: Context<MiddlewareKeyVariables>,
+  apikey: Database['public']['Tables']['apikeys']['Row'],
+  orgId: string,
+  supabase: ReturnType<typeof supabaseApikey>,
+) {
+  if (!(await checkPermission(c, 'org.update_settings', { orgId }))) {
+    throw simpleError('cannot_access_organization', 'You can\'t access this organization', { orgId })
   }
 
-  // Check org access AND policy requirements
-  const orgCheck = await apikeyHasOrgRightWithPolicy(c, apikey, body.orgId, supabase)
-  if (!orgCheck.valid) {
-    if (orgCheck.error === 'org_requires_expiring_key') {
-      throw quickError(401, 'org_requires_expiring_key', 'This organization requires API keys with an expiration date. Please use a different key or update this key with an expiration date.')
-    }
-    throw simpleError('cannot_access_organization', 'You can\'t access this organization', { orgId: body.orgId })
+  const orgCheck = await apikeyHasOrgRightWithPolicy(c, apikey, orgId, supabase)
+  if (orgCheck.valid) {
+    return
   }
-
-  // Validate max_apikey_expiration_days if provided
-  if (body.max_apikey_expiration_days !== undefined && body.max_apikey_expiration_days !== null) {
-    if (body.max_apikey_expiration_days < 1 || body.max_apikey_expiration_days > 365) {
-      throw simpleError('invalid_max_expiration_days', 'Maximum expiration days must be between 1 and 365')
-    }
+  if (orgCheck.error === 'org_requires_expiring_key') {
+    throw quickError(401, 'org_requires_expiring_key', 'This organization requires API keys with an expiration date. Please use a different key or update this key with an expiration date.')
   }
+  throw simpleError('cannot_access_organization', 'You can\'t access this organization', { orgId })
+}
 
-  const { data: _data, error } = await supabase.from('users').select('*').eq('id', userId).single()
-  if (error) {
-    throw simpleError('cannot_get_user', 'Cannot get user', { error: error.message })
+function validateMaxExpirationDays(maxDays?: number | null) {
+  if (maxDays === undefined || maxDays === null) {
+    return
   }
+  if (maxDays < 1 || maxDays > 365) {
+    throw simpleError('invalid_max_expiration_days', 'Maximum expiration days must be between 1 and 365')
+  }
+}
 
-  // Build update object, only including fields that were provided
+function buildUpdateFields(body: z.infer<typeof bodySchema>) {
   const updateFields: Partial<Database['public']['Tables']['orgs']['Update']> = {}
   if (body.name !== undefined)
     updateFields.name = body.name
@@ -61,15 +67,37 @@ export async function put(c: Context, bodyRaw: any, apikey: Database['public']['
     updateFields.max_apikey_expiration_days = body.max_apikey_expiration_days
   if (body.enforce_hashed_api_keys !== undefined)
     updateFields.enforce_hashed_api_keys = body.enforce_hashed_api_keys
+  return updateFields
+}
 
-  const { error: errorOrg, data: dataOrg } = await supabase
+async function updateOrg(
+  supabase: ReturnType<typeof supabaseApikey>,
+  orgId: string,
+  updateFields: Partial<Database['public']['Tables']['orgs']['Update']>,
+) {
+  const { error, data } = await supabase
     .from('orgs')
     .update(updateFields)
-    .eq('id', body.orgId)
+    .eq('id', orgId)
     .select()
+    .single()
 
-  if (errorOrg) {
-    throw simpleError('cannot_update_org', 'Cannot update org', { error: errorOrg.message })
+  if (error) {
+    throw simpleError('cannot_update_org', 'Cannot update org', { error: error.message })
   }
-  return c.json({ id: body.orgId, data: dataOrg })
+
+  return data
+}
+
+export async function put(c: Context<MiddlewareKeyVariables>, bodyRaw: any, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
+  const body = parseBody(bodyRaw)
+  const supabase = supabaseApikey(c, apikey.key)
+
+  // Auth context is already set by middlewareKey
+  await ensureOrgAccess(c, apikey, body.orgId, supabase)
+  validateMaxExpirationDays(body.max_apikey_expiration_days)
+  const updateFields = buildUpdateFields(body)
+  const dataOrg = await updateOrg(supabase, body.orgId, updateFields)
+
+  return c.json({ status: 'Organization updated', id: dataOrg.id, data: dataOrg }, 200)
 }

@@ -1,5 +1,4 @@
 import type { Context } from 'hono'
-import type { AuthInfo } from './hono.ts'
 import type { Database } from './supabase.types.ts'
 import { and, eq, inArray, isNull, or, sql } from 'drizzle-orm'
 import { honoFactory, quickError, simpleRateLimit } from './hono.ts'
@@ -9,6 +8,127 @@ import * as schema from './postgres_schema.ts'
 import { clearFailedAuth, isAPIKeyRateLimited, isIPRateLimited, recordAPIKeyUsage, recordFailedAuth } from './rate_limit.ts'
 import { checkKey, checkKeyById, supabaseAdmin, supabaseClient } from './supabase.ts'
 import { backgroundTask } from './utils.ts'
+
+// =============================================================================
+// RBAC Context Middleware
+// =============================================================================
+
+interface RbacContextOptions {
+  orgIdResolver?: (c: Context) => string | null | Promise<string | null>
+}
+
+async function getAppIdFromRequest(c: Context) {
+  const queryAppId = c.req.query('app_id')
+  if (queryAppId) {
+    return queryAppId
+  }
+  const body = await c.req.raw.clone().json().catch(() => ({ app_id: null })) as { app_id: string | null }
+  return body.app_id ?? null
+}
+
+async function fetchOrgIdFromAppId(c: Context, appId: string) {
+  let pgClient
+  try {
+    pgClient = getPgClient(c, true)
+    const drizzleClient = getDrizzleClient(pgClient)
+    const appResult = await drizzleClient
+      .select({ ownerOrg: schema.apps.owner_org })
+      .from(schema.apps)
+      .where(eq(schema.apps.app_id, appId))
+      .limit(1)
+    if (appResult.length > 0 && appResult[0].ownerOrg) {
+      return appResult[0].ownerOrg
+    }
+  }
+  catch (e) {
+    logPgError(c, 'middlewareRbacContext:resolveAppOrg', e)
+  }
+  finally {
+    if (pgClient) {
+      await closeClient(c, pgClient)
+    }
+  }
+  return null
+}
+
+async function resolveOrgIdForRbac(c: Context, options?: RbacContextOptions) {
+  if (options?.orgIdResolver) {
+    const orgId = await Promise.resolve(options.orgIdResolver(c))
+    if (orgId) {
+      return orgId
+    }
+  }
+
+  const appId = await getAppIdFromRequest(c)
+  if (!appId) {
+    return null
+  }
+
+  return fetchOrgIdFromAppId(c, appId)
+}
+
+async function setRbacContextForOrg(c: Context, orgId: string) {
+  c.set('resolvedOrgId', orgId)
+  let pgClient
+  try {
+    pgClient = getPgClient(c, true)
+    const drizzleClient = getDrizzleClient(pgClient)
+    const result = await drizzleClient.execute(
+      sql`SELECT public.rbac_is_enabled_for_org(${orgId}::uuid) as enabled`,
+    )
+    const enabled = (result.rows[0] as any)?.enabled === true
+    c.set('rbacEnabled', enabled)
+
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'middlewareRbacContext: resolved',
+      orgId,
+      rbacEnabled: enabled,
+    })
+  }
+  catch (e) {
+    logPgError(c, 'middlewareRbacContext:checkRbacEnabled', e)
+    c.set('rbacEnabled', false)
+  }
+  finally {
+    if (pgClient) {
+      await closeClient(c, pgClient)
+    }
+  }
+}
+
+function setRbacContextLegacy(c: Context) {
+  c.set('rbacEnabled', false)
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: 'middlewareRbacContext: no orgId resolved, defaulting to legacy',
+  })
+}
+
+/**
+ * Middleware that resolves and caches the RBAC feature flag for the current org.
+ * Should be used after authentication middleware and when orgId is known.
+ *
+ * Usage:
+ *   app.use('/app/*', middlewareV2(['all']), middlewareRbacContext())
+ *
+ * After this middleware runs:
+ *   - c.get('rbacEnabled') - boolean indicating if RBAC is enabled for the org
+ *   - c.get('resolvedOrgId') - the resolved org ID (if provided)
+ */
+export function middlewareRbacContext(options?: RbacContextOptions) {
+  return honoFactory.createMiddleware(async (c, next) => {
+    const orgId = await resolveOrgIdForRbac(c, options)
+    if (orgId) {
+      await setRbacContextForOrg(c, orgId)
+    }
+    else {
+      setRbacContextLegacy(c)
+    }
+
+    await next()
+  })
+}
 
 // TODO: make universal middleware who
 //  Accept authorization header (JWT)
@@ -26,6 +146,13 @@ import { backgroundTask } from './utils.ts'
 
 function isUUID(str: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str)
+}
+
+function maskSecret(value?: string | null) {
+  if (!value) {
+    return undefined
+  }
+  return `${value.slice(0, 8)}...`
 }
 
 /**
@@ -152,13 +279,139 @@ async function checkKeyByIdPg(
   }
 }
 
-async function foundAPIKey(c: Context, capgkeyString: string, rights: Database['public']['Enums']['key_mode'][]) {
-  const subkey_id = c.req.header('x-limited-key-id') ? Number(c.req.header('x-limited-key-id')) : null
+function getSubkeyId(c: Context) {
+  const headerValue = c.req.header('x-limited-key-id')
+  return headerValue ? Number(headerValue) : null
+}
 
-  cloudlog({ requestId: c.get('requestId'), message: 'Capgkey provided', capgkeyString })
-  const apikey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKey(c, capgkeyString, supabaseAdmin(c), rights)
+function setApiKeyAuthContext(c: Context, apikey: Database['public']['Tables']['apikeys']['Row'], keyString: string) {
+  c.set('auth', {
+    userId: apikey.user_id,
+    authType: 'apikey',
+    apikey,
+    jwt: null,
+  })
+  c.set('apikey', apikey)
+  c.set('capgkey', keyString)
+}
+
+function setSubkeyAuthContext(c: Context, userId: string, subkey: Database['public']['Tables']['apikeys']['Row']) {
+  c.set('auth', {
+    userId,
+    authType: 'apikey',
+    apikey: subkey,
+    jwt: null,
+  })
+  c.set('subkey', subkey)
+}
+
+function hasEmptySubkeyLimits(subkey: Database['public']['Tables']['apikeys']['Row']) {
+  const apps = subkey.limited_to_apps
+  const orgs = subkey.limited_to_orgs
+  return Array.isArray(apps) && apps.length === 0 && Array.isArray(orgs) && orgs.length === 0
+}
+
+function validateSubkeyLimits(c: Context, subkey: Database['public']['Tables']['apikeys']['Row']) {
+  if (hasEmptySubkeyLimits(subkey)) {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'Invalid subkey, no limited apps or orgs',
+      subkeyId: subkey.id,
+      subkeyUserId: subkey.user_id,
+    })
+    return quickError(401, 'invalid_subkey', 'Invalid subkey, no limited apps or orgs')
+  }
+  return null
+}
+
+function validateSubkeyUser(c: Context, subkey: Database['public']['Tables']['apikeys']['Row'], apikey: Database['public']['Tables']['apikeys']['Row']) {
+  if (subkey.user_id !== apikey.user_id) {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'Subkey user_id does not match apikey user_id',
+      subkeyId: subkey.id,
+      subkeyUserId: subkey.user_id,
+      apikeyId: apikey.id,
+      apikeyUserId: apikey.user_id,
+    })
+    return quickError(401, 'invalid_subkey', 'Invalid subkey')
+  }
+  return null
+}
+
+function resolveAuthHeaders(c: Context) {
+  let jwt = c.req.header('authorization')
+  let capgkey = c.req.header('capgkey') ?? c.req.header('x-api-key')
+
+  if (jwt && isUUID(jwt)) {
+    cloudlog({ requestId: c.get('requestId'), message: 'Setting apikey in capgkey_string', jwtPrefix: maskSecret(jwt) })
+    capgkey = jwt
+    jwt = undefined
+  }
+
+  return { jwt, capgkey }
+}
+
+function resolveKeyHeaders(c: Context) {
+  const capgkeyString = c.req.header('capgkey')
+  const apikeyString = c.req.header('authorization')
+  const key = capgkeyString ?? apikeyString
+  return { capgkeyString, apikeyString, key }
+}
+
+async function resolveApiKey(
+  c: Context,
+  key: string,
+  rights: Database['public']['Enums']['key_mode'][],
+  usePostgres: boolean,
+) {
+  if (!usePostgres) {
+    return checkKey(c, key, supabaseAdmin(c), rights)
+  }
+
+  let pgClient: ReturnType<typeof getPgClient> | null = null
+  try {
+    pgClient = getPgClient(c, true)
+    const drizzleClient = getDrizzleClient(pgClient)
+    return await checkKeyPg(c, key, rights, drizzleClient)
+  }
+  finally {
+    if (pgClient) {
+      await closeClient(c, pgClient)
+    }
+  }
+}
+
+async function resolveSubkey(
+  c: Context,
+  subkeyId: number,
+  rights: Database['public']['Enums']['key_mode'][],
+  usePostgres: boolean,
+) {
+  if (!usePostgres) {
+    return checkKeyById(c, subkeyId, supabaseAdmin(c), rights)
+  }
+
+  let subkeyPgClient: ReturnType<typeof getPgClient> | null = null
+  try {
+    subkeyPgClient = getPgClient(c, true)
+    const drizzleClient = getDrizzleClient(subkeyPgClient)
+    return await checkKeyByIdPg(c, subkeyId, rights, drizzleClient)
+  }
+  finally {
+    if (subkeyPgClient) {
+      await closeClient(c, subkeyPgClient)
+    }
+  }
+}
+
+async function foundAPIKey(c: Context, capgkeyString: string, rights: Database['public']['Enums']['key_mode'][]) {
+  const subkey_id = getSubkeyId(c)
+
+  cloudlog({ requestId: c.get('requestId'), message: 'Capgkey provided', capgkeyPrefix: maskSecret(capgkeyString) })
+  const apikey = await resolveApiKey(c, capgkeyString, rights, false)
   if (!apikey) {
-    cloudlog({ requestId: c.get('requestId'), message: 'Invalid apikey', capgkeyString, rights })
+    cloudlog({ requestId: c.get('requestId'), message: 'Invalid apikey', capgkeyPrefix: maskSecret(capgkeyString), rights })
     // Record failed auth attempt - await to ensure accurate counting
     await recordFailedAuth(c)
     return quickError(401, 'invalid_apikey', 'Invalid apikey')
@@ -176,44 +429,36 @@ async function foundAPIKey(c: Context, capgkeyString: string, rights: Database['
     return simpleRateLimit({ reason: 'api_key_rate_limit_exceeded', apikey_id: apikey.id })
   }
 
-  c.set('auth', {
-    userId: apikey.user_id,
-    authType: 'apikey',
-    apikey,
-  } as AuthInfo)
-  c.set('apikey', apikey)
   // Store the original key string for hashed key authentication
   // This is needed because hashed keys have key=null in the database
-  c.set('capgkey', capgkeyString)
+  setApiKeyAuthContext(c, apikey, capgkeyString)
   if (subkey_id) {
     cloudlog({ requestId: c.get('requestId'), message: 'Subkey id provided', subkey_id })
-    const subkey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKeyById(c, subkey_id, supabaseAdmin(c), rights)
-    cloudlog({ requestId: c.get('requestId'), message: 'Subkey', subkey })
+    const subkey = await resolveSubkey(c, subkey_id, rights, false)
     if (!subkey) {
       cloudlog({ requestId: c.get('requestId'), message: 'Invalid subkey', subkey_id })
       return quickError(401, 'invalid_subkey', 'Invalid subkey')
     }
-    if (subkey && subkey.user_id !== apikey.user_id) {
-      cloudlog({ requestId: c.get('requestId'), message: 'Subkey user_id does not match apikey user_id', subkey, apikey })
-      return quickError(401, 'invalid_subkey', 'Invalid subkey')
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'Subkey resolved',
+      subkeyId: subkey.id,
+      subkeyUserId: subkey.user_id,
+    })
+    const userError = validateSubkeyUser(c, subkey, apikey)
+    if (userError) {
+      return userError
     }
-    if (subkey?.limited_to_apps && subkey?.limited_to_apps.length === 0 && subkey?.limited_to_orgs && subkey?.limited_to_orgs.length === 0) {
-      cloudlog({ requestId: c.get('requestId'), message: 'Invalid subkey, no limited apps or orgs', subkey })
-      return quickError(401, 'invalid_subkey', 'Invalid subkey, no limited apps or orgs')
+    const limitError = validateSubkeyLimits(c, subkey)
+    if (limitError) {
+      return limitError
     }
-    if (subkey) {
-      c.set('auth', {
-        userId: apikey.user_id,
-        authType: 'apikey',
-        apikey: subkey,
-      } as AuthInfo)
-      c.set('subkey', subkey)
-    }
+    setSubkeyAuthContext(c, apikey.user_id, subkey)
   }
 }
 
 async function foundJWT(c: Context, jwt: string) {
-  cloudlog({ requestId: c.get('requestId'), message: 'JWT provided', jwt })
+  cloudlog({ requestId: c.get('requestId'), message: 'JWT provided', jwtPrefix: maskSecret(jwt) })
   const supabaseJWT = supabaseClient(c, jwt)
   const { data: user, error: userError } = await supabaseJWT.auth.getUser()
   if (userError) {
@@ -222,13 +467,23 @@ async function foundJWT(c: Context, jwt: string) {
     await recordFailedAuth(c)
     return quickError(401, 'invalid_jwt', 'Invalid JWT')
   }
+  const userId = user.user?.id
+  if (!userId) {
+    cloudlog({ requestId: c.get('requestId'), message: 'Invalid JWT user', userError })
+    // Record failed auth attempt - await to ensure accurate counting
+    await recordFailedAuth(c)
+    return quickError(401, 'invalid_jwt', 'Invalid JWT')
+  }
+
   // Clear failed auth attempts on successful JWT auth (background is fine for clearing)
   backgroundTask(c, clearFailedAuth(c))
+
   c.set('auth', {
-    userId: user.user?.id,
+    userId,
     authType: 'jwt',
     jwt,
-  } as AuthInfo)
+    apikey: null,
+  })
 }
 
 export function middlewareV2(rights: Database['public']['Enums']['key_mode'][]) {
@@ -239,21 +494,18 @@ export function middlewareV2(rights: Database['public']['Enums']['key_mode'][]) 
       return simpleRateLimit({ reason: 'too_many_failed_auth_attempts' })
     }
 
-    let jwt = c.req.header('authorization')
-    let capgkey = c.req.header('capgkey') ?? c.req.header('x-api-key')
-
-    // make sure jwt is valid otherwise it means it was an apikey and you need to set it in capgkey_string
-    // if jwt is uuid, it means it was an apikey and you need to set it in capgkey_string
-    if (jwt && isUUID(jwt)) {
-      cloudlog({ requestId: c.get('requestId'), message: 'Setting apikey in capgkey_string', jwt })
-      capgkey = jwt
-      jwt = undefined
-    }
+    const { jwt, capgkey } = resolveAuthHeaders(c)
     if (jwt) {
-      await foundJWT(c, jwt)
+      const res = await foundJWT(c, jwt)
+      if (res) {
+        return res
+      }
     }
     else if (capgkey) {
-      await foundAPIKey(c, capgkey, rights)
+      const res = await foundAPIKey(c, capgkey, rights)
+      if (res) {
+        return res
+      }
     }
     else {
       cloudlog({ requestId: c.get('requestId'), message: 'No apikey or subkey provided' })
@@ -273,18 +525,16 @@ export function middlewareKey(rights: Database['public']['Enums']['key_mode'][],
       return simpleRateLimit({ reason: 'too_many_failed_auth_attempts' })
     }
 
-    const capgkey_string = c.req.header('capgkey')
-    const apikey_string = c.req.header('authorization')
-    const subkey_id = c.req.header('x-limited-key-id') ? Number(c.req.header('x-limited-key-id')) : null
-    const key = capgkey_string ?? apikey_string
+    const { capgkeyString, apikeyString, key } = resolveKeyHeaders(c)
+    const subkey_id = getSubkeyId(c)
 
     cloudlog({
       requestId: c.get('requestId'),
       message: 'middlewareKey - checking authorization',
       method: c.req.method,
       url: c.req.url,
-      hasCapgkey: !!capgkey_string,
-      hasAuthorization: !!apikey_string,
+      hasCapgkey: !!capgkeyString,
+      hasAuthorization: !!apikeyString,
       hasKey: !!key,
       usePostgres,
     })
@@ -295,27 +545,10 @@ export function middlewareKey(rights: Database['public']['Enums']['key_mode'][],
       return quickError(401, 'no_key_provided', 'No key provided')
     }
 
-    let apikey: Database['public']['Tables']['apikeys']['Row'] | null = null
-    let pgClient: ReturnType<typeof getPgClient> | null = null
-
-    if (usePostgres) {
-      try {
-        pgClient = getPgClient(c, true) // read-only query
-        const drizzleClient = getDrizzleClient(pgClient)
-        apikey = await checkKeyPg(c, key, rights, drizzleClient)
-      }
-      finally {
-        if (pgClient) {
-          await closeClient(c, pgClient)
-        }
-      }
-    }
-    else {
-      apikey = await checkKey(c, key, supabaseAdmin(c), rights)
-    }
+    const apikey = await resolveApiKey(c, key, rights, usePostgres)
 
     if (!apikey) {
-      cloudlog({ requestId: c.get('requestId'), message: 'Invalid apikey', key, method: c.req.method, url: c.req.url })
+      cloudlog({ requestId: c.get('requestId'), message: 'Invalid apikey', keyPrefix: maskSecret(key), method: c.req.method, url: c.req.url })
       // Record failed auth attempt - await to ensure accurate counting
       await recordFailedAuth(c)
       return quickError(401, 'invalid_apikey', 'Invalid apikey')
@@ -333,45 +566,22 @@ export function middlewareKey(rights: Database['public']['Enums']['key_mode'][],
       return simpleRateLimit({ reason: 'api_key_rate_limit_exceeded', apikey_id: apikey.id })
     }
 
-    c.set('apikey', apikey)
-    c.set('capgkey', key)
+    // Set auth context for RBAC (can be overridden by subkey below)
+    setApiKeyAuthContext(c, apikey, key)
 
     if (subkey_id) {
-      let subkey: Database['public']['Tables']['apikeys']['Row'] | null = null
-      let subkeyPgClient: ReturnType<typeof getPgClient> | null = null
-
-      if (usePostgres) {
-        try {
-          subkeyPgClient = getPgClient(c, true)
-          const drizzleClient = getDrizzleClient(subkeyPgClient)
-          subkey = await checkKeyByIdPg(c, subkey_id, rights, drizzleClient)
-        }
-        finally {
-          if (subkeyPgClient) {
-            subkeyPgClient.end().catch((err) => {
-              cloudlog({
-                requestId: c.get('requestId'),
-                message: 'middlewareKey - Subkey PG connection close error',
-                error: err instanceof Error ? err.message : String(err),
-              })
-            })
-          }
-        }
-      }
-      else {
-        subkey = await checkKeyById(c, subkey_id, supabaseAdmin(c), rights)
-      }
+      const subkey = await resolveSubkey(c, subkey_id, rights, usePostgres)
 
       if (!subkey) {
         cloudlog({ requestId: c.get('requestId'), message: 'Invalid subkey', subkey_id })
         return quickError(401, 'invalid_subkey', 'Invalid subkey')
       }
-      if (subkey?.limited_to_apps && subkey?.limited_to_apps.length === 0 && subkey?.limited_to_orgs && subkey?.limited_to_orgs.length === 0) {
-        cloudlog({ requestId: c.get('requestId'), message: 'Invalid subkey, no limited apps or orgs', subkey })
-        return quickError(401, 'invalid_subkey', 'Invalid subkey, no limited apps or orgs')
+      const limitError = validateSubkeyLimits(c, subkey)
+      if (limitError) {
+        return limitError
       }
-      if (subkey)
-        c.set('subkey', subkey)
+      // Override auth context with subkey for RBAC
+      setSubkeyAuthContext(c, apikey.user_id, subkey)
     }
     await next()
   })

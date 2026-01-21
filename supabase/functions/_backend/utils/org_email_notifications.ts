@@ -1,14 +1,12 @@
 import type { Context } from 'hono'
-import type { getDrizzleClient } from './pg.ts'
 import { parseCronExpression } from 'cron-schedule'
-import { eq } from 'drizzle-orm'
+import { and, eq, inArray, isNull } from 'drizzle-orm'
 import { trackBentoEvent } from './bento.ts'
 import { CacheHelper } from './cache.ts'
 import { cloudlog } from './logging.ts'
 import { sendNotifOrg } from './notifications.ts'
-import { getDrizzleClient as getDrizzle, getPgClient, logPgError } from './pg.ts'
+import { closeClient, getDrizzleClient, getPgClient, logPgError } from './pg.ts'
 import * as schema from './postgres_schema.ts'
-import { supabaseAdmin } from './supabase.ts'
 import { backgroundTask } from './utils.ts'
 
 // Cache path for org member notifications (separate from single-email notifications)
@@ -151,58 +149,171 @@ async function getEligibleOrgMemberEmails(
   orgId: string,
   preferenceKey: EmailPreferenceKey,
 ): Promise<string[]> {
-  // email_preferences is a JSONB column added in migration 20251228064121
-  const { data: members, error } = await supabaseAdmin(c)
-    .from('org_users')
-    .select(`
-      user_id,
-      user_right,
-      users!inner (
-        email
-      )
-    `)
-    .eq('org_id', orgId)
-    .in('user_right', ['admin', 'super_admin'])
-    .is('app_id', null) // org-level membership only, not app-specific
+  const adminRoleNames = ['org_admin', 'org_super_admin']
+  const now = new Date()
+  const userIds = new Set<string>()
 
-  if (error || !members) {
-    cloudlog({ requestId: c.get('requestId'), message: 'getEligibleOrgMemberEmails error', orgId, error })
+  let pgClient: ReturnType<typeof getPgClient> | null = null
+  try {
+    pgClient = getPgClient(c, true)
+    const drizzle = getDrizzleClient(pgClient)
+
+    let legacyMembers: { user_id: string | null }[] = []
+    try {
+      legacyMembers = await drizzle
+        .select({ user_id: schema.org_users.user_id })
+        .from(schema.org_users)
+        .where(
+          and(
+            eq(schema.org_users.org_id, orgId),
+            inArray(schema.org_users.user_right, ['admin', 'super_admin']),
+            isNull(schema.org_users.app_id),
+          ),
+        )
+    }
+    catch (error) {
+      cloudlog({ requestId: c.get('requestId'), message: 'getEligibleOrgMemberEmails legacy error', orgId, error })
+    }
+
+    for (const member of legacyMembers ?? []) {
+      if (member.user_id)
+        userIds.add(member.user_id)
+    }
+
+    let rbacUserBindings: { principal_id: string | null, expires_at: Date | null }[] = []
+    try {
+      rbacUserBindings = await drizzle
+        .select({
+          principal_id: schema.role_bindings.principal_id,
+          expires_at: schema.role_bindings.expires_at,
+        })
+        .from(schema.role_bindings)
+        .innerJoin(schema.roles, eq(schema.role_bindings.role_id, schema.roles.id))
+        .where(
+          and(
+            eq(schema.role_bindings.org_id, orgId),
+            eq(schema.role_bindings.principal_type, 'user'),
+            eq(schema.role_bindings.scope_type, 'org'),
+            inArray(schema.roles.name, adminRoleNames),
+          ),
+        )
+    }
+    catch (error) {
+      cloudlog({ requestId: c.get('requestId'), message: 'getEligibleOrgMemberEmails rbac user error', orgId, error })
+    }
+
+    for (const binding of rbacUserBindings ?? []) {
+      const expiresAt = binding.expires_at ? new Date(binding.expires_at) : null
+      if (expiresAt && expiresAt <= now)
+        continue
+      const principalId = binding.principal_id
+      if (principalId)
+        userIds.add(principalId)
+    }
+
+    let rbacGroupBindings: { principal_id: string | null, expires_at: Date | null }[] = []
+    try {
+      rbacGroupBindings = await drizzle
+        .select({
+          principal_id: schema.role_bindings.principal_id,
+          expires_at: schema.role_bindings.expires_at,
+        })
+        .from(schema.role_bindings)
+        .innerJoin(schema.roles, eq(schema.role_bindings.role_id, schema.roles.id))
+        .where(
+          and(
+            eq(schema.role_bindings.org_id, orgId),
+            eq(schema.role_bindings.principal_type, 'group'),
+            eq(schema.role_bindings.scope_type, 'org'),
+            inArray(schema.roles.name, adminRoleNames),
+          ),
+        )
+    }
+    catch (error) {
+      cloudlog({ requestId: c.get('requestId'), message: 'getEligibleOrgMemberEmails rbac group error', orgId, error })
+    }
+
+    const groupIds = (rbacGroupBindings ?? [])
+      .filter((binding) => {
+        const expiresAt = binding.expires_at ? new Date(binding.expires_at) : null
+        return !expiresAt || expiresAt > now
+      })
+      .map(binding => binding.principal_id)
+      .filter((groupId): groupId is string => Boolean(groupId))
+
+    if (groupIds.length > 0) {
+      let groupMembers: { user_id: string | null }[] = []
+      try {
+        groupMembers = await drizzle
+          .select({ user_id: schema.group_members.user_id })
+          .from(schema.group_members)
+          .where(inArray(schema.group_members.group_id, groupIds))
+      }
+      catch (error) {
+        cloudlog({ requestId: c.get('requestId'), message: 'getEligibleOrgMemberEmails group members error', orgId, error })
+      }
+
+      for (const member of groupMembers ?? []) {
+        if (member.user_id)
+          userIds.add(member.user_id)
+      }
+    }
+
+    const userIdList = Array.from(userIds)
+    if (userIdList.length === 0) {
+      return []
+    }
+
+    let users: { id: string, email: string, email_preferences: unknown }[] = []
+    try {
+      users = await drizzle
+        .select({
+          id: schema.users.id,
+          email: schema.users.email,
+          email_preferences: schema.users.email_preferences,
+        })
+        .from(schema.users)
+        .where(inArray(schema.users.id, userIdList))
+    }
+    catch (error) {
+      cloudlog({ requestId: c.get('requestId'), message: 'getEligibleOrgMemberEmails users error', orgId, error })
+      return []
+    }
+
+    if (!users) {
+      cloudlog({ requestId: c.get('requestId'), message: 'getEligibleOrgMemberEmails users error', orgId, error: 'No users returned' })
+      return []
+    }
+
+    const eligibleEmails: string[] = []
+    const emailSet = new Set<string>()
+
+    for (const user of users) {
+      const email = user.email as string | null | undefined
+      if (!email || emailSet.has(email))
+        continue
+
+      const prefs = (user.email_preferences as EmailPreferences | null) ?? {}
+      const prefValue = prefs[preferenceKey]
+      const isEnabled = prefValue === undefined ? true : prefValue
+
+      if (isEnabled) {
+        emailSet.add(email)
+        eligibleEmails.push(email)
+      }
+    }
+
+    return eligibleEmails
+  }
+  catch (error) {
+    cloudlog({ requestId: c.get('requestId'), message: 'getEligibleOrgMemberEmails users error', orgId, error })
     return []
   }
-
-  // Fetch user email_preferences separately since it might not be in generated types yet
-  const userIds = members.map(m => m.user_id)
-  const { data: users } = await supabaseAdmin(c)
-    .from('users')
-    .select('id, email, email_preferences')
-    .in('id', userIds)
-
-  const userPrefsMap = new Map<string, EmailPreferences>()
-  if (users) {
-    for (const user of users) {
-      const prefs = ((user as any).email_preferences as EmailPreferences | null) ?? {}
-      userPrefsMap.set(user.id, prefs)
+  finally {
+    if (pgClient) {
+      await closeClient(c, pgClient)
     }
   }
-
-  const eligibleEmails: string[] = []
-
-  for (const member of members) {
-    const userRow = (member as any).users
-    if (!userRow?.email)
-      continue
-
-    // Default to true if email_preferences is null or the key doesn't exist
-    const prefs = userPrefsMap.get(member.user_id) ?? {}
-    const prefValue = prefs[preferenceKey]
-    const isEnabled = prefValue === undefined ? true : prefValue
-
-    if (isEnabled) {
-      eligibleEmails.push(userRow.email)
-    }
-  }
-
-  return eligibleEmails
 }
 
 /**
@@ -261,7 +372,7 @@ export async function sendEmailToOrgMembers(
   orgId: string,
   drizzleClient?: ReturnType<typeof getDrizzleClient>,
 ): Promise<number> {
-  const client = drizzleClient ?? getDrizzle(getPgClient(c, true))
+  const client = drizzleClient ?? getDrizzleClient(getPgClient(c, true))
   const { adminEmails, managementEmail } = await getAllEligibleEmails(c, orgId, preferenceKey, client)
 
   // Combine all emails (admin emails + management email if applicable)

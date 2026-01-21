@@ -32,10 +32,14 @@ app.post('/', middlewareV2(['all', 'write']), async (c) => {
   const { data: organization, error: organizationError } = await supabase.from('orgs')
     .select('customer_id, management_email')
     .eq('id', safeBody.org_id)
-    .single()
+    .maybeSingle()
 
-  if (!organization || organizationError) {
-    throw simpleError('get_org_internal_error', 'Get org internal error', { organizationError })
+  if (organizationError) {
+    return quickError(500, 'internal_error', 'Failed to fetch organization', { orgId: safeBody.org_id, organizationError })
+  }
+
+  if (!organization) {
+    throw simpleError('org_not_found', 'Organization not found', { orgId: safeBody.org_id })
   }
 
   if (!organization.customer_id) {

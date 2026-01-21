@@ -38,6 +38,9 @@ export interface MiddlewareKeyVariables {
     subkey?: Database['public']['Tables']['apikeys']['Row']
     webhookBody?: any
     oldRecord?: any
+    // RBAC context variables
+    rbacEnabled?: boolean
+    resolvedOrgId?: string
   }
 }
 
@@ -113,6 +116,24 @@ export const middlewareAuth = honoFactory.createMiddleware(async (c, next) => {
     throw simpleError('cannot_find_authorization', 'Cannot find authorization')
   }
   c.set('authorization', authorization)
+
+  // Validate JWT and set auth context
+  const { supabaseClient: supabaseClientFn } = await import('./supabase.ts')
+  const supabase = supabaseClientFn(c, authorization)
+  const { data: authData, error: authError } = await supabase.auth.getUser()
+  if (authError || !authData.user) {
+    cloudlog({ requestId: c.get('requestId'), message: 'Invalid JWT', error: authError })
+    throw simpleError('invalid_jwt', 'Invalid JWT')
+  }
+
+  // Set auth context for RBAC
+  c.set('auth', {
+    userId: authData.user.id,
+    authType: 'jwt',
+    apikey: null,
+    jwt: authorization,
+  } as AuthInfo)
+
   await next()
 })
 
@@ -249,6 +270,9 @@ export function simpleRateLimit(moreInfo: any = {}, cause?: any): never {
 }
 
 export function simpleError(errorCode: string, message: string, moreInfo: any = {}, cause?: any): never {
+  if (errorCode === 'invalid_jwt') {
+    return quickError(401, errorCode, message, moreInfo, cause)
+  }
   return quickError(400, errorCode, message, moreInfo, cause)
 }
 
