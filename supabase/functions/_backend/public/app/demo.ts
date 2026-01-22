@@ -246,6 +246,43 @@ export async function createDemoApp(c: Context<MiddlewareKeyVariables>, body: Cr
 
   const versionMap = new Map(allVersions.map(v => [v.name, v.id]))
 
+  // Insert manifest entries into the manifest table for each version
+  // This is required for the bundle file list to show in the UI
+  const manifestInserts: Database['public']['Tables']['manifest']['Insert'][] = []
+
+  for (const version of demoVersions) {
+    if (version.name === 'unknown' || version.name === 'builtin')
+      continue
+
+    const versionId = versionMap.get(version.name)
+    if (!versionId)
+      continue
+
+    const manifestEntries = getDemoManifest(version.name, appId)
+    for (const entry of manifestEntries) {
+      manifestInserts.push({
+        app_version_id: versionId,
+        file_name: entry.file_name,
+        file_hash: entry.file_hash,
+        s3_path: entry.s3_path,
+        file_size: Math.floor(Math.random() * 500000) + 10000, // Random size between 10KB and 510KB
+      })
+    }
+  }
+
+  if (manifestInserts.length > 0) {
+    const { error: manifestError } = await supabase
+      .from('manifest')
+      .insert(manifestInserts)
+
+    if (manifestError) {
+      cloudlog({ requestId, message: 'Error creating manifest entries', error: manifestError })
+    }
+    else {
+      cloudlog({ requestId, message: 'Manifest entries created', count: manifestInserts.length })
+    }
+  }
+
   // Demo channels configuration
   const demoChannels: DemoChannel[] = [
     { name: 'production', public: true },
