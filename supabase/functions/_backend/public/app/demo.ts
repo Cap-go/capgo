@@ -254,6 +254,10 @@ export async function createDemoApp(c: Context<MiddlewareKeyVariables>, body: Cr
 
   cloudlog({ requestId, message: 'Creating demo app with demo data', appId, owner_org: body.owner_org })
 
+  // RLS bypass needed: Demo app creation inserts into multiple tables (apps, app_versions,
+  // channels, devices, daily_mau, daily_bandwidth, daily_storage, daily_version, build_requests,
+  // manifest, deploy_history) where RLS policies may not grant direct user insert access.
+  // Authorization is enforced at endpoint level via hasOrgRight check above.
   const supabase = supabaseAdmin(c)
 
   // Create the demo app

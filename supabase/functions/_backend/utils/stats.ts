@@ -6,7 +6,7 @@ import { countDevicesCF, countUpdatesFromLogsCF, countUpdatesFromLogsExternalCF,
 import { isAppDemo } from './demo.ts'
 import { simpleError200 } from './hono.ts'
 import { cloudlog } from './logging.ts'
-import { countDevicesSB, getAppsFromSB, getUpdateStatsSB, readBandwidthUsageSB, readDevicesSB, readDeviceUsageSB, readStatsSB, readStatsStorageSB, readStatsVersionSB, supabaseAdmin, trackBandwidthUsageSB, trackDevicesSB, trackDeviceUsageSB, trackLogsSB, trackMetaSB, trackVersionUsageSB } from './supabase.ts'
+import { countDevicesSB, getAppsFromSB, getUpdateStatsSB, readBandwidthUsageSB, readDevicesSB, readDeviceUsageSB, readStatsSB, readStatsStorageSB, readStatsVersionSB, supabaseWithAuth, trackBandwidthUsageSB, trackDevicesSB, trackDeviceUsageSB, trackLogsSB, trackMetaSB, trackVersionUsageSB } from './supabase.ts'
 import { DEFAULT_LIMIT } from './types.ts'
 import { backgroundTask } from './utils.ts'
 
@@ -138,11 +138,33 @@ interface DemoLogEntry {
 }
 
 /**
+ * Parse a date value that may be in milliseconds (number) or ISO string format.
+ * @param value - Date value as string (ms timestamp or ISO format)
+ * @returns Parsed timestamp in milliseconds, or undefined if invalid
+ */
+function parseDateMs(value?: string): number | undefined {
+  if (!value)
+    return undefined
+  const asNumber = Number(value)
+  if (Number.isFinite(asNumber))
+    return asNumber
+  const parsed = Date.parse(value)
+  return Number.isNaN(parsed) ? undefined : parsed
+}
+
+/**
  * Generate fake log entries for demo apps.
  * Creates realistic-looking logs within the requested time range.
+ * @param c - Hono context
+ * @param params - Stats query parameters
+ * @returns Array of demo log entries
  */
 async function generateDemoLogs(c: Context, params: ReadStatsParams): Promise<DemoLogEntry[]> {
-  const supabase = supabaseAdmin(c)
+  // Use authenticated client to respect RLS policies
+  const auth = c.get('auth')
+  if (!auth)
+    return []
+  const supabase = supabaseWithAuth(c, auth)
 
   // Get the demo devices for this app
   const { data: devices } = await supabase
@@ -174,13 +196,16 @@ async function generateDemoLogs(c: Context, params: ReadStatsParams): Promise<De
     ['ping'],
   ]
 
-  // Parse time range (frontend sends timestamps in milliseconds)
-  const rangeEnd = params.end_date ? Number(params.end_date) : Date.now()
-  const rangeStart = params.start_date ? Number(params.start_date) : rangeEnd - 60 * 60 * 1000 // Default 1 hour
+  // Parse time range - supports both millisecond timestamps and ISO strings
+  const parsedEnd = parseDateMs(params.end_date) ?? Date.now()
+  const parsedStart = parseDateMs(params.start_date) ?? parsedEnd - 60 * 60 * 1000 // Default 1 hour
+  // Normalize range in case start/end are reversed
+  const rangeStart = Math.min(parsedStart, parsedEnd)
+  const rangeEnd = Math.max(parsedStart, parsedEnd)
 
   // Generate logs within the time range
   const logs: DemoLogEntry[] = []
-  const timeSpan = rangeEnd - rangeStart
+  const timeSpan = Math.max(0, rangeEnd - rangeStart)
   const numSequences = Math.min(20, Math.max(5, Math.floor(timeSpan / (5 * 60 * 1000)))) // One sequence every ~5 minutes
 
   for (let i = 0; i < numSequences; i++) {
@@ -229,8 +254,8 @@ async function generateDemoLogs(c: Context, params: ReadStatsParams): Promise<De
   // Sort by created_at descending (most recent first)
   logs.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
 
-  // Apply limit
-  const limit = params.limit || 50
+  // Apply limit (use ?? to respect explicit 0)
+  const limit = params.limit ?? 50
   return logs.slice(0, limit)
 }
 
