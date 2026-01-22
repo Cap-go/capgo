@@ -1,4 +1,5 @@
 import { env } from 'node:process'
+import { app as admin_credits } from '../../supabase/functions/_backend/private/admin_credits.ts'
 import { app as admin_stats } from '../../supabase/functions/_backend/private/admin_stats.ts'
 import { app as config } from '../../supabase/functions/_backend/private/config.ts'
 import { app as create_device } from '../../supabase/functions/_backend/private/create_device.ts'
@@ -71,6 +72,7 @@ appPrivate.route('/website_stats', publicStats)
 appPrivate.route('/config', config)
 appPrivate.route('/devices', devices_priv)
 appPrivate.route('/log_as', log_as)
+appPrivate.route('/admin_credits', admin_credits)
 appPrivate.route('/admin_stats', admin_stats)
 appPrivate.route('/stats', stats_priv)
 appPrivate.route('/stripe_checkout', stripe_checkout)
