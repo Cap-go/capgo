@@ -110,6 +110,13 @@ const diffEntries = computed(() => {
   return manifestEntries.value.filter(entry => compareMap.get(entry.file_name) !== entry.file_hash)
 })
 
+const unchangedEntries = computed(() => {
+  if (!compareVersionId.value)
+    return []
+  const compareMap = new Map(compareManifestEntries.value.map(entry => [entry.file_name, entry.file_hash]))
+  return manifestEntries.value.filter(entry => compareMap.get(entry.file_name) === entry.file_hash)
+})
+
 const summaryEntries = computed(() => (compareVersionId.value ? diffEntries.value : manifestEntries.value))
 const searchLower = computed(() => search.value.trim().toLowerCase())
 
@@ -121,19 +128,23 @@ const displayEntries = computed(() => {
 
 const total = computed(() => displayEntries.value.length)
 
-const summarySizeLabel = computed(() => {
-  if (summaryEntries.value.length === 0)
+function formatSizeLabel(entries: ManifestEntry[]): string {
+  if (entries.length === 0)
     return formatBytes(0)
   let totalSize = 0
   let hasSize = false
-  for (const entry of summaryEntries.value) {
+  for (const entry of entries) {
     if (typeof entry.file_size === 'number' && entry.file_size > 0) {
       totalSize += entry.file_size
       hasSize = true
     }
   }
   return hasSize ? formatBytes(totalSize) : t('metadata-not-found')
-})
+}
+
+const downloadSizeLabel = computed(() => formatSizeLabel(diffEntries.value))
+const unchangedSizeLabel = computed(() => formatSizeLabel(unchangedEntries.value))
+const totalBundleSizeLabel = computed(() => formatSizeLabel(manifestEntries.value))
 
 const compareStatusMessage = computed(() => {
   if (!manifestEntries.value.length)
@@ -146,8 +157,12 @@ const compareStatusMessage = computed(() => {
   if (compareManifestEntries.value.length === 0)
     return t('manifest-status-compare-empty', { bundle: compareName })
   if (diffEntries.value.length === 0)
-    return t('manifest-diff-empty')
-  return t('manifest-status-diff', { bundle: compareName, count: diffEntries.value.length })
+    return t('manifest-diff-empty', { unchanged: unchangedEntries.value.length })
+  return t('manifest-status-diff', {
+    bundle: compareName,
+    count: diffEntries.value.length,
+    unchanged: unchangedEntries.value.length,
+  })
 })
 
 const compareOptionsLabel = computed(() => {
@@ -450,13 +465,14 @@ watchEffect(async () => {
                   </div>
                 </div>
 
-                <div class="grid w-full grid-cols-2 gap-4 text-right md:w-auto md:text-left">
+                <!-- Summary cards: show different layout when comparing vs not -->
+                <div v-if="!compareVersionId" class="grid w-full grid-cols-2 gap-4 text-right md:w-auto md:text-left">
                   <div class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
                     <div class="uppercase tracking-wide">
                       {{ t('manifest-summary-files') }}
                     </div>
                     <div class="text-lg font-semibold text-slate-900 dark:text-white">
-                      {{ summaryEntries.length }}
+                      {{ manifestEntries.length }}
                     </div>
                   </div>
                   <div class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
@@ -464,7 +480,44 @@ watchEffect(async () => {
                       {{ t('size') }}
                     </div>
                     <div class="text-lg font-semibold text-slate-900 dark:text-white">
-                      {{ summarySizeLabel }}
+                      {{ totalBundleSizeLabel }}
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Comparison mode: show download vs unchanged stats -->
+                <div v-else class="grid w-full grid-cols-2 gap-3 text-right md:w-auto md:grid-cols-4 md:text-left">
+                  <!-- To download -->
+                  <div class="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                    <div class="uppercase tracking-wide">
+                      {{ t('manifest-to-download') }}
+                    </div>
+                    <div class="text-lg font-semibold text-emerald-900 dark:text-emerald-100">
+                      {{ diffEntries.length }} {{ t('manifest-files-short') }}
+                    </div>
+                    <div class="text-sm font-medium">
+                      {{ downloadSizeLabel }}
+                    </div>
+                  </div>
+                  <!-- Already cached / unchanged -->
+                  <div class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+                    <div class="uppercase tracking-wide">
+                      {{ t('manifest-already-cached') }}
+                    </div>
+                    <div class="text-lg font-semibold text-slate-900 dark:text-white">
+                      {{ unchangedEntries.length }} {{ t('manifest-files-short') }}
+                    </div>
+                    <div class="text-sm font-medium">
+                      {{ unchangedSizeLabel }}
+                    </div>
+                  </div>
+                  <!-- Total bundle -->
+                  <div class="col-span-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400 md:col-span-2">
+                    <div class="uppercase tracking-wide">
+                      {{ t('manifest-total-bundle') }}
+                    </div>
+                    <div class="text-base font-semibold text-slate-700 dark:text-slate-200">
+                      {{ manifestEntries.length }} {{ t('manifest-files-short') }} · {{ totalBundleSizeLabel }}
                     </div>
                   </div>
                 </div>
