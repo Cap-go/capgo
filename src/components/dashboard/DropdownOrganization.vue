@@ -196,33 +196,37 @@ function onOrgItemClick(org: Organization, e: MouseEvent) {
         </div>
         <IconDown class="w-6 h-6 ml-1 fill-current shrink-0 text-slate-400" />
       </summary>
-      <ul class="p-2 w-52 shadow cursor-pointer d-dropdown-content bg-[#1a1d24] rounded-box z-1 text-white" @click="closeDropdown()">
-        <li
-          v-for="org in organizationStore.organizations"
-          :key="org.gid"
-          class="block px-1 my-1 rounded-lg"
-          :class="isSelected(org) ? 'bg-gray-700' : 'hover:bg-gray-600'"
-        >
-          <a
-            class="flex items-center justify-between px-3 py-3 text-white rounded-md"
-            :class="isSelected(org) ? 'cursor-default' : 'cursor-pointer'"
-            :aria-current="isSelected(org) ? 'true' : undefined"
-            @click="onOrgItemClick(org, $event)"
+      <div class="flex flex-col w-52 max-h-[60vh] shadow d-dropdown-content bg-[#1a1d24] rounded-box z-1 text-white" @click="closeDropdown()">
+        <ul class="flex-1 overflow-y-auto p-2 cursor-pointer">
+          <li
+            v-for="org in organizationStore.organizations"
+            :key="org.gid"
+            class="block px-1 my-1 rounded-lg"
+            :class="isSelected(org) ? 'bg-gray-700' : 'hover:bg-gray-600'"
           >
-            <span class="truncate">{{ org.name }}</span>
-            <div class="flex items-center gap-2">
-              <div v-if="org.role.startsWith('invite')" class="w-3 h-3 bg-red-500 rounded-full" />
-            </div>
-          </a>
-        </li>
-        <li class="block p-px rounded-lg from-cyan-500 to-purple-500 bg-linear-to-r">
-          <a
-            class="flex justify-center items-center py-3 px-3 text-center text-white rounded-lg bg-[#1a1d24] hover:bg-gray-600"
-            @click="createNewOrg"
-          >{{ t('add-organization') }}
-          </a>
-        </li>
-      </ul>
+            <a
+              class="flex items-center justify-between px-3 py-3 text-white rounded-md"
+              :class="isSelected(org) ? 'cursor-default' : 'cursor-pointer'"
+              :aria-current="isSelected(org) ? 'true' : undefined"
+              @click="onOrgItemClick(org, $event)"
+            >
+              <span class="truncate">{{ org.name }}</span>
+              <div class="flex items-center gap-2">
+                <div v-if="org.role.startsWith('invite')" class="w-3 h-3 bg-red-500 rounded-full" />
+              </div>
+            </a>
+          </li>
+        </ul>
+        <div class="p-2 border-t border-gray-700">
+          <div class="block p-px rounded-lg from-cyan-500 to-purple-500 bg-linear-to-r">
+            <a
+              class="flex justify-center items-center py-3 px-3 text-center text-white rounded-lg bg-[#1a1d24] hover:bg-gray-600 cursor-pointer"
+              @click="createNewOrg"
+            >{{ t('add-organization') }}
+            </a>
+          </div>
+        </div>
+      </div>
     </details>
     <div v-show="!currentOrganization" class="p-px rounded-lg from-cyan-500 to-purple-500 bg-linear-to-r">
       <button class="block w-full text-white d-btn d-btn-outline bg-slate-800 d-btn-sm" @click="createNewOrg">
