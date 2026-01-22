@@ -29,6 +29,7 @@ interface DemoManifestEntry {
   file_name: string
   s3_path: string
   file_hash: string
+  file_size: number
 }
 
 /**
@@ -62,38 +63,130 @@ function getDemoNativePackages(versionName: string): DemoNativePackage[] {
 }
 
 /**
+ * SHA256 hashes and sizes for demo files.
+ * These demonstrate the differential update feature:
+ * - STABLE files: Same hash across all versions (vendor.js, polyfills.js, static assets)
+ *   These don't need to be re-downloaded when updating
+ * - CHANGING files: Different hash per version (main.js, index.html, styles.css)
+ *   These are the files that get downloaded during an update
+ *
+ * Format: Real SHA256 hashes (64 hex characters)
+ */
+const DEMO_FILE_HASHES = {
+  // Files that NEVER change between versions (third-party libs, static assets)
+  // When comparing versions, these show as "unchanged" - no download needed
+  stable: {
+    'vendor.js': { hash: 'a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456', size: 847293 }, // ~827KB - large vendor bundle
+    'polyfills.js': { hash: 'b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef1234567a', size: 124567 }, // ~122KB
+    'assets/logo.png': { hash: 'c3d4e5f6789012345678901234567890abcdef1234567890abcdef1234567ab1', size: 45234 }, // ~44KB
+    'assets/icon.svg': { hash: 'd4e5f6789012345678901234567890abcdef1234567890abcdef1234567ab12c', size: 2847 }, // ~2.8KB
+  },
+
+  // Files that CHANGE with each version (app code, styles)
+  // When comparing versions, these show as "modified" - need download
+  changing: {
+    'index.html': {
+      size: 4523, // ~4.4KB
+      versions: {
+        '1.0.0': 'e5f6789012345678901234567890abcdef1234567890abcdef1234567ab12cd1',
+        '1.0.1': 'e5f6789012345678901234567890abcdef1234567890abcdef1234567ab12cd2',
+        '1.1.0': 'e5f6789012345678901234567890abcdef1234567890abcdef1234567ab12cd3',
+        '1.1.1': 'e5f6789012345678901234567890abcdef1234567890abcdef1234567ab12cd4',
+        '1.2.0': 'e5f6789012345678901234567890abcdef1234567890abcdef1234567ab12cd5',
+      },
+    },
+    'main.js': {
+      size: 523847, // ~512KB - main application bundle
+      versions: {
+        '1.0.0': 'f6789012345678901234567890abcdef1234567890abcdef1234567ab12cd1e1',
+        '1.0.1': 'f6789012345678901234567890abcdef1234567890abcdef1234567ab12cd1e2',
+        '1.1.0': 'f6789012345678901234567890abcdef1234567890abcdef1234567ab12cd1e3',
+        '1.1.1': 'f6789012345678901234567890abcdef1234567890abcdef1234567ab12cd1e4',
+        '1.2.0': 'f6789012345678901234567890abcdef1234567890abcdef1234567ab12cd1e5',
+      },
+    },
+    'styles.css': {
+      size: 87234, // ~85KB
+      versions: {
+        '1.0.0': '789012345678901234567890abcdef1234567890abcdef1234567ab12cd1e2f1',
+        '1.0.1': '789012345678901234567890abcdef1234567890abcdef1234567ab12cd1e2f1', // Same as 1.0.0 (hotfix didn't change styles)
+        '1.1.0': '789012345678901234567890abcdef1234567890abcdef1234567ab12cd1e2f2', // Changed in 1.1.0
+        '1.1.1': '789012345678901234567890abcdef1234567890abcdef1234567ab12cd1e2f2', // Same as 1.1.0
+        '1.2.0': '789012345678901234567890abcdef1234567890abcdef1234567ab12cd1e2f3', // Changed in 1.2.0
+      },
+    },
+  },
+
+  // Files added in specific versions (new features)
+  added: {
+    'assets/dark-theme.css': {
+      minVersion: '1.1.0',
+      hash: '89012345678901234567890abcdef1234567890abcdef1234567ab12cd1e2f3a',
+      size: 23456, // ~23KB
+    },
+    'assets/dashboard.js': {
+      minVersion: '1.2.0',
+      hash: '9012345678901234567890abcdef1234567890abcdef1234567ab12cd1e2f3ab',
+      size: 156234, // ~153KB
+    },
+    'assets/charts.js': {
+      minVersion: '1.2.0',
+      hash: '012345678901234567890abcdef1234567890abcdef1234567ab12cd1e2f3abc',
+      size: 98765, // ~96KB
+    },
+  },
+} as const
+
+/**
  * Generate demo manifest entries (files in the bundle)
+ * Demonstrates differential updates:
+ * - Stable files have same hash across versions (no re-download needed)
+ * - Changing files have different hashes (will be downloaded on update)
+ * - New files are only present in versions >= their minVersion
+ *
  * @param versionName - Version name
  * @param appId - App ID for generating s3 paths
- * @returns Array of manifest entries
+ * @returns Array of manifest entries with SHA256 hashes
  */
 function getDemoManifest(versionName: string, appId: string): DemoManifestEntry[] {
-  // Common web app files
-  const baseFiles: DemoManifestEntry[] = [
-    { file_name: 'index.html', s3_path: `demo/${appId}/${versionName}/index.html`, file_hash: `${versionName}-index` },
-    { file_name: 'main.js', s3_path: `demo/${appId}/${versionName}/main.js`, file_hash: `${versionName}-main` },
-    { file_name: 'vendor.js', s3_path: `demo/${appId}/${versionName}/vendor.js`, file_hash: `${versionName}-vendor` },
-    { file_name: 'styles.css', s3_path: `demo/${appId}/${versionName}/styles.css`, file_hash: `${versionName}-styles` },
-    { file_name: 'polyfills.js', s3_path: `demo/${appId}/${versionName}/polyfills.js`, file_hash: `${versionName}-polyfills` },
-  ]
+  const entries: DemoManifestEntry[] = []
 
-  // Add assets folder files
-  const assets: DemoManifestEntry[] = [
-    { file_name: 'assets/logo.png', s3_path: `demo/${appId}/${versionName}/assets/logo.png`, file_hash: `${versionName}-logo` },
-    { file_name: 'assets/icon.svg', s3_path: `demo/${appId}/${versionName}/assets/icon.svg`, file_hash: `${versionName}-icon` },
-  ]
-
-  // Add more files in later versions (simulating feature additions)
-  if (versionName >= '1.1.0') {
-    assets.push({ file_name: 'assets/dark-theme.css', s3_path: `demo/${appId}/${versionName}/assets/dark-theme.css`, file_hash: `${versionName}-dark` })
+  // Add stable files (same hash for all versions - no update needed)
+  for (const [fileName, fileInfo] of Object.entries(DEMO_FILE_HASHES.stable)) {
+    entries.push({
+      file_name: fileName,
+      s3_path: `demo/${appId}/${versionName}/${fileName}`,
+      file_hash: fileInfo.hash,
+      file_size: fileInfo.size,
+    })
   }
 
-  if (versionName >= '1.2.0') {
-    assets.push({ file_name: 'assets/dashboard.js', s3_path: `demo/${appId}/${versionName}/assets/dashboard.js`, file_hash: `${versionName}-dashboard` })
-    assets.push({ file_name: 'assets/charts.js', s3_path: `demo/${appId}/${versionName}/assets/charts.js`, file_hash: `${versionName}-charts` })
+  // Add changing files (different hash per version - will be updated)
+  for (const [fileName, fileConfig] of Object.entries(DEMO_FILE_HASHES.changing)) {
+    const hash = fileConfig.versions[versionName as keyof typeof fileConfig.versions]
+    if (hash) {
+      entries.push({
+        file_name: fileName,
+        s3_path: `demo/${appId}/${versionName}/${fileName}`,
+        file_hash: hash,
+        file_size: fileConfig.size,
+      })
+    }
   }
 
-  return [...baseFiles, ...assets]
+  // Add files that were introduced in specific versions
+  for (const [fileName, config] of Object.entries(DEMO_FILE_HASHES.added)) {
+    if (versionName >= config.minVersion) {
+      entries.push({
+        file_name: fileName,
+        s3_path: `demo/${appId}/${versionName}/${fileName}`,
+        file_hash: config.hash,
+        file_size: config.size,
+      })
+    }
+  }
+
+  return entries
 }
 
 /** Demo channel configuration */
@@ -265,7 +358,7 @@ export async function createDemoApp(c: Context<MiddlewareKeyVariables>, body: Cr
         file_name: entry.file_name,
         file_hash: entry.file_hash,
         s3_path: entry.s3_path,
-        file_size: Math.floor(Math.random() * 500000) + 10000, // Random size between 10KB and 510KB
+        file_size: entry.file_size,
       })
     }
   }
