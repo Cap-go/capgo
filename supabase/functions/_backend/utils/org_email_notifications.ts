@@ -5,7 +5,7 @@ import { trackBentoEvent } from './bento.ts'
 import { CacheHelper } from './cache.ts'
 import { cloudlog } from './logging.ts'
 import { sendNotifOrg } from './notifications.ts'
-import { closeClient, getDrizzleClient, getPgClient, logPgError } from './pg.ts'
+import { getDrizzleClient, getPgClient, logPgError } from './pg.ts'
 import * as schema from './postgres_schema.ts'
 import { backgroundTask } from './utils.ts'
 
@@ -148,15 +148,13 @@ async function getEligibleOrgMemberEmails(
   c: Context,
   orgId: string,
   preferenceKey: EmailPreferenceKey,
+  drizzle: ReturnType<typeof getDrizzleClient>,
 ): Promise<string[]> {
   const adminRoleNames = ['org_admin', 'org_super_admin']
   const now = new Date()
   const userIds = new Set<string>()
 
-  let pgClient: ReturnType<typeof getPgClient> | null = null
   try {
-    pgClient = getPgClient(c, true)
-    const drizzle = getDrizzleClient(pgClient)
 
     let legacyMembers: { user_id: string | null }[] = []
     try {
@@ -309,11 +307,6 @@ async function getEligibleOrgMemberEmails(
     cloudlog({ requestId: c.get('requestId'), message: 'getEligibleOrgMemberEmails users error', orgId, error })
     return []
   }
-  finally {
-    if (pgClient) {
-      await closeClient(c, pgClient)
-    }
-  }
 }
 
 /**
@@ -334,7 +327,7 @@ async function getAllEligibleEmails(
   }
 
   // Get eligible admin emails
-  const adminEmails = await getEligibleOrgMemberEmails(c, orgId, preferenceKey)
+  const adminEmails = await getEligibleOrgMemberEmails(c, orgId, preferenceKey, drizzleClient)
 
   // Check if management_email should receive the notification:
   // 1. Must be different from all admin emails
