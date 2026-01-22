@@ -155,7 +155,6 @@ async function getEligibleOrgMemberEmails(
   const userIds = new Set<string>()
 
   try {
-
     let legacyMembers: { user_id: string | null }[] = []
     try {
       legacyMembers = await drizzle

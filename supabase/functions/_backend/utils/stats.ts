@@ -3,9 +3,10 @@ import type { Database } from './supabase.types.ts'
 import type { DeviceRes, DeviceWithoutCreatedAt, ReadDevicesParams, ReadDevicesResponse, ReadStatsParams, StatsActions, VersionUsage } from './types.ts'
 import { getRuntimeKey } from 'hono/adapter'
 import { countDevicesCF, countUpdatesFromLogsCF, countUpdatesFromLogsExternalCF, createIfNotExistStoreInfo, getAppsFromCF, getUpdateStatsCF, readBandwidthUsageCF, readDevicesCF, readDeviceUsageCF, readStatsCF, readStatsVersionCF, trackBandwidthUsageCF, trackDevicesCF, trackDeviceUsageCF, trackLogsCF, trackLogsCFExternal, trackVersionUsageCF, updateStoreApp } from './cloudflare.ts'
+import { isAppDemo } from './demo.ts'
 import { simpleError200 } from './hono.ts'
 import { cloudlog } from './logging.ts'
-import { countDevicesSB, getAppsFromSB, getUpdateStatsSB, readBandwidthUsageSB, readDevicesSB, readDeviceUsageSB, readStatsSB, readStatsStorageSB, readStatsVersionSB, trackBandwidthUsageSB, trackDevicesSB, trackDeviceUsageSB, trackLogsSB, trackMetaSB, trackVersionUsageSB } from './supabase.ts'
+import { countDevicesSB, getAppsFromSB, getUpdateStatsSB, readBandwidthUsageSB, readDevicesSB, readDeviceUsageSB, readStatsSB, readStatsStorageSB, readStatsVersionSB, supabaseWithAuth, trackBandwidthUsageSB, trackDevicesSB, trackDeviceUsageSB, trackLogsSB, trackMetaSB, trackVersionUsageSB } from './supabase.ts'
 import { DEFAULT_LIMIT } from './types.ts'
 import { backgroundTask } from './utils.ts'
 
@@ -125,7 +126,145 @@ export function readStatsVersion(c: Context, app_id: string, start_date: string,
   return readStatsVersionCF(c, app_id, start_date, end_date)
 }
 
-export function readStats(c: Context, params: ReadStatsParams) {
+/**
+ * Demo log entry type matching both Cloudflare and Supabase response formats.
+ */
+interface DemoLogEntry {
+  app_id: string
+  device_id: string
+  action: string
+  version_name: string
+  created_at: string
+}
+
+/**
+ * Parse a date value that may be in milliseconds (number) or ISO string format.
+ * @param value - Date value as string (ms timestamp or ISO format)
+ * @returns Parsed timestamp in milliseconds, or undefined if invalid
+ */
+function parseDateMs(value?: string): number | undefined {
+  if (!value)
+    return undefined
+  const asNumber = Number(value)
+  if (Number.isFinite(asNumber))
+    return asNumber
+  const parsed = Date.parse(value)
+  return Number.isNaN(parsed) ? undefined : parsed
+}
+
+/**
+ * Generate fake log entries for demo apps.
+ * Creates realistic-looking logs within the requested time range.
+ * @param c - Hono context
+ * @param params - Stats query parameters
+ * @returns Array of demo log entries
+ */
+async function generateDemoLogs(c: Context, params: ReadStatsParams): Promise<DemoLogEntry[]> {
+  // Use authenticated client to respect RLS policies
+  const auth = c.get('auth')
+  if (!auth)
+    return []
+  const supabase = supabaseWithAuth(c, auth)
+
+  // Get the demo devices for this app
+  const { data: devices } = await supabase
+    .from('devices')
+    .select('device_id, version:app_versions(name)')
+    .eq('app_id', params.app_id)
+    .limit(10)
+
+  if (!devices || devices.length === 0) {
+    return []
+  }
+
+  // Demo version progression over time
+  const demoVersions = ['1.0.0', '1.0.1', '1.1.0', '1.1.1', '1.2.0']
+
+  // Demo action sequences that simulate realistic app behavior
+  const actionSequences = [
+    // Normal update flow
+    ['get', 'download_10', 'download_50', 'download_complete', 'set'],
+    // Quick update
+    ['get', 'download_complete', 'set'],
+    // App lifecycle events
+    ['app_moved_to_background', 'app_moved_to_foreground', 'get'],
+    // No update needed
+    ['get', 'noNew'],
+    // Channel check
+    ['getChannel', 'get', 'download_complete', 'set'],
+    // Ping
+    ['ping'],
+  ]
+
+  // Parse time range - supports both millisecond timestamps and ISO strings
+  const parsedEnd = parseDateMs(params.end_date) ?? Date.now()
+  const parsedStart = parseDateMs(params.start_date) ?? parsedEnd - 60 * 60 * 1000 // Default 1 hour
+  // Normalize range in case start/end are reversed
+  const rangeStart = Math.min(parsedStart, parsedEnd)
+  const rangeEnd = Math.max(parsedStart, parsedEnd)
+
+  // Generate logs within the time range
+  const logs: DemoLogEntry[] = []
+  const timeSpan = Math.max(0, rangeEnd - rangeStart)
+  const numSequences = Math.min(20, Math.max(5, Math.floor(timeSpan / (5 * 60 * 1000)))) // One sequence every ~5 minutes
+
+  for (let i = 0; i < numSequences; i++) {
+    const device = devices[i % devices.length]
+    const sequence = actionSequences[i % actionSequences.length]
+    // Use the device's current version or pick from demo versions
+    const versionName = (device.version as any)?.name || demoVersions[Math.floor(Math.random() * demoVersions.length)]
+
+    // Calculate base time for this sequence
+    const sequenceStartTime = rangeStart + (timeSpan * i / numSequences)
+
+    // Add logs for each action in the sequence
+    for (let j = 0; j < sequence.length; j++) {
+      const action = sequence[j]
+
+      // Apply action filter if provided
+      if (params.actions && params.actions.length > 0 && !params.actions.includes(action)) {
+        continue
+      }
+
+      // Apply device filter if provided
+      if (params.deviceIds && params.deviceIds.length > 0 && !params.deviceIds.includes(device.device_id)) {
+        continue
+      }
+
+      // Apply search filter if provided
+      if (params.search) {
+        const searchLower = params.search.toLowerCase()
+        if (!device.device_id.toLowerCase().includes(searchLower) && !versionName.toLowerCase().includes(searchLower)) {
+          continue
+        }
+      }
+
+      const logTime = new Date(sequenceStartTime + (j * 1000)) // 1 second between actions in sequence
+
+      logs.push({
+        app_id: params.app_id,
+        device_id: device.device_id,
+        action,
+        version_name: versionName,
+        created_at: logTime.toISOString(),
+      })
+    }
+  }
+
+  // Sort by created_at descending (most recent first)
+  logs.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+
+  // Apply limit (use ?? to respect explicit 0)
+  const limit = params.limit ?? 50
+  return logs.slice(0, limit)
+}
+
+export async function readStats(c: Context, params: ReadStatsParams) {
+  // For demo apps, generate fake logs instead of querying real data
+  if (isAppDemo(params.app_id)) {
+    return generateDemoLogs(c, params)
+  }
+
   if (!c.env.APP_LOG)
     return readStatsSB(c, params)
   return readStatsCF(c, params)

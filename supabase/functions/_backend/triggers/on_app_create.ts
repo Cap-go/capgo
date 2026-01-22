@@ -12,7 +12,7 @@ import { backgroundTask } from '../utils/utils.ts'
 export const app = new Hono<MiddlewareKeyVariables>()
 
 app.post('/', middlewareAPISecret, triggerValidator('apps', 'INSERT'), async (c) => {
-  const record = c.get('webhookBody') as Database['public']['Tables']['apps']['Row']
+  const record = c.get('webhookBody') as Database['public']['Tables']['apps']['Row'] & { is_demo?: boolean }
   cloudlog({ requestId: c.get('requestId'), message: 'record', record })
 
   if (!record.id) {
@@ -20,14 +20,21 @@ app.post('/', middlewareAPISecret, triggerValidator('apps', 'INSERT'), async (c)
     throw simpleError('no_id', 'No id', { record })
   }
 
+  // Check if this is a demo app - skip onboarding emails and store info for demo apps
+  const isDemo = record.is_demo === true
+  if (isDemo) {
+    cloudlog({ requestId: c.get('requestId'), message: 'Demo app detected, skipping onboarding emails and store info' })
+  }
+
   const LogSnag = logsnag(c)
   await backgroundTask(c, LogSnag.track({
     channel: 'app-created',
-    event: 'App Created',
-    icon: '🎉',
+    event: isDemo ? 'Demo App Created' : 'App Created',
+    icon: isDemo ? '🎮' : '🎉',
     user_id: record.owner_org,
     tags: {
       app_id: record.app_id,
+      is_demo: isDemo ? 'true' : 'false',
     },
     notify: false,
   }))
@@ -53,27 +60,32 @@ app.post('/', middlewareAPISecret, triggerValidator('apps', 'INSERT'), async (c)
   if (dbVersionError) {
     cloudlog({ requestId: c.get('requestId'), message: 'Error creating default versions', dbVersionError })
   }
-  await backgroundTask(c, supabase
-    .from('orgs')
-    .select('*')
-    .eq('id', record.owner_org)
-    .single()
-    .then(({ data, error }) => {
-      if (error || !data) {
-        throw simpleError('error_fetching_organization', 'Error fetching organization', { error })
-      }
-      return trackBentoEvent(c, data.management_email, {
-        org_id: record.owner_org,
-        org_name: data.name,
-        app_name: record.name,
-      }, 'app:created')
+
+  // Skip onboarding emails for demo apps
+  if (!isDemo) {
+    await backgroundTask(c, supabase
+      .from('orgs')
+      .select('*')
+      .eq('id', record.owner_org)
+      .single()
+      .then(({ data, error }) => {
+        if (error || !data) {
+          throw simpleError('error_fetching_organization', 'Error fetching organization', { error })
+        }
+        return trackBentoEvent(c, data.management_email, {
+          org_id: record.owner_org,
+          org_name: data.name,
+          app_name: record.name,
+        }, 'app:created')
+      }))
+    await backgroundTask(c, createIfNotExistStoreInfo(c, {
+      app_id: record.app_id,
+      updates: 1,
+      onprem: true,
+      capacitor: true,
+      capgo: true,
     }))
-  await backgroundTask(c, createIfNotExistStoreInfo(c, {
-    app_id: record.app_id,
-    updates: 1,
-    onprem: true,
-    capacitor: true,
-    capgo: true,
-  }))
+  }
+
   return c.json(BRES)
 })

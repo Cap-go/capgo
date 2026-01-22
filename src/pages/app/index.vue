@@ -35,7 +35,10 @@ const lacksSecurityAccess = computed(() => {
 
 async function NextStep(appId: string) {
   console.log('Navigating to app with ID:', appId)
-  router.push(`/app/${appId}`)
+  // Small delay to ensure database writes are committed before fetching dashboard data
+  await new Promise(resolve => setTimeout(resolve, 500))
+  // Add refresh=true to force dashboard to fetch fresh data (skip cache)
+  router.push(`/app/${appId}?refresh=true`)
 }
 async function getMyApps() {
   isTableLoading.value = true
