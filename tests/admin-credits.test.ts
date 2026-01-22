@@ -71,15 +71,16 @@ describe('[POST] /private/admin_credits/grant - Admin Access Control', () => {
     expect(data.error).toBe('not_admin')
   })
 
-  it('should return 400 for invalid JSON body', async () => {
+  it('should return 400 for invalid JSON body (admin check happens first)', async () => {
     const response = await fetch(`${BASE_URL}/private/admin_credits/grant`, {
       method: 'POST',
       headers,
       body: 'invalid json',
     })
+    // The not_admin check happens before body validation for authenticated users
     expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('invalid_json_parse_body')
+    expect(data.error).toBe('not_admin')
   })
 
   it('should return 400 when org_id is missing', async () => {

@@ -1,9 +1,10 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { z } from 'zod/mini'
-import { createHono, middlewareAuth, parseBody, simpleError, useCors } from '../utils/hono.ts'
+import { createHono, parseBody, simpleError, useCors } from '../utils/hono.ts'
+import { middlewareV2 } from '../utils/hono_middleware.ts'
 import { cloudlog, cloudlogErr } from '../utils/logging.ts'
-import { supabaseAdmin, supabaseClient } from '../utils/supabase.ts'
+import { supabaseAdmin } from '../utils/supabase.ts'
 import { version } from '../utils/version.ts'
 
 type AppContext = Context<MiddlewareKeyVariables, any, any>
@@ -26,23 +27,25 @@ interface SearchOrgsQuery {
   q?: string
 }
 
-async function verifyAdmin(c: AppContext, authToken: string): Promise<{ isAdmin: boolean, userId: string | null }> {
-  const supabase = supabaseClient(c, authToken)
-  const { data: { user }, error: userError } = await supabase.auth.getUser()
-
-  if (userError || !user) {
-    cloudlog({ requestId: c.get('requestId'), message: 'admin_verify_no_user', error: userError })
+async function verifyAdmin(c: AppContext): Promise<{ isAdmin: boolean, userId: string | null }> {
+  const auth = c.get('auth')
+  if (!auth || !auth.userId) {
+    cloudlog({ requestId: c.get('requestId'), message: 'admin_verify_no_auth' })
     return { isAdmin: false, userId: null }
   }
 
-  const { data: isAdmin, error: adminError } = await supabase.rpc('is_admin')
+  const userId = auth.userId
+  const adminSupabase = supabaseAdmin(c)
+
+  // Use admin client to check if user is admin (using the is_admin(userid) variant)
+  const { data: isAdmin, error: adminError } = await adminSupabase.rpc('is_admin', { userid: userId })
 
   if (adminError) {
     cloudlog({ requestId: c.get('requestId'), message: 'is_admin_error', error: adminError })
-    return { isAdmin: false, userId: user.id }
+    return { isAdmin: false, userId }
   }
 
-  return { isAdmin: !!isAdmin, userId: user.id }
+  return { isAdmin: !!isAdmin, userId }
 }
 
 export const app = createHono('', version)
@@ -50,13 +53,8 @@ export const app = createHono('', version)
 app.use('*', useCors)
 
 // Grant credits to an organization (admin only)
-app.post('/grant', middlewareAuth, async (c) => {
-  const authToken = c.req.header('authorization')
-
-  if (!authToken)
-    throw simpleError('not_authorized', 'Not authorized')
-
-  const { isAdmin, userId } = await verifyAdmin(c, authToken)
+app.post('/grant', middlewareV2(['all']), async (c) => {
+  const { isAdmin, userId } = await verifyAdmin(c)
 
   if (!isAdmin) {
     cloudlog({ requestId: c.get('requestId'), message: 'not_admin_grant_attempt', userId })
@@ -149,13 +147,8 @@ app.post('/grant', middlewareAuth, async (c) => {
 })
 
 // Search organizations (admin only)
-app.get('/search-orgs', middlewareAuth, async (c) => {
-  const authToken = c.req.header('authorization')
-
-  if (!authToken)
-    throw simpleError('not_authorized', 'Not authorized')
-
-  const { isAdmin } = await verifyAdmin(c, authToken)
+app.get('/search-orgs', middlewareV2(['all']), async (c) => {
+  const { isAdmin } = await verifyAdmin(c)
 
   if (!isAdmin) {
     throw simpleError('not_admin', 'Only admin users can search organizations')
@@ -209,13 +202,8 @@ app.get('/search-orgs', middlewareAuth, async (c) => {
 })
 
 // Get org credit balance (admin only)
-app.get('/org-balance/:orgId', middlewareAuth, async (c) => {
-  const authToken = c.req.header('authorization')
-
-  if (!authToken)
-    throw simpleError('not_authorized', 'Not authorized')
-
-  const { isAdmin } = await verifyAdmin(c, authToken)
+app.get('/org-balance/:orgId', middlewareV2(['all']), async (c) => {
+  const { isAdmin } = await verifyAdmin(c)
 
   if (!isAdmin) {
     throw simpleError('not_admin', 'Only admin users can view organization balances')
@@ -251,13 +239,8 @@ app.get('/org-balance/:orgId', middlewareAuth, async (c) => {
 })
 
 // Get recent admin grants (admin only)
-app.get('/grants-history', middlewareAuth, async (c) => {
-  const authToken = c.req.header('authorization')
-
-  if (!authToken)
-    throw simpleError('not_authorized', 'Not authorized')
-
-  const { isAdmin } = await verifyAdmin(c, authToken)
+app.get('/grants-history', middlewareV2(['all']), async (c) => {
+  const { isAdmin } = await verifyAdmin(c)
 
   if (!isAdmin) {
     throw simpleError('not_admin', 'Only admin users can view grant history')

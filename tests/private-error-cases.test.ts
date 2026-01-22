@@ -198,9 +198,9 @@ describe('[POST] /private/download_link - Error Cases', () => {
         version: '1.0.0',
       }),
     })
-    expect(response.status).toBe(400)
+    expect(response.status).toBe(401)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('cannot_find_authorization')
+    expect(data.error).toBe('no_jwt_apikey_or_subkey')
   })
 
   it('should return 401 when not authorized', async () => {
@@ -279,7 +279,7 @@ describe('[POST] /private/delete_failed_version - Error Cases', () => {
 })
 
 describe('[POST] /private/log_as - Error Cases', () => {
-  it('should return 400 when not authorized', async () => {
+  it('should return 401 when not authorized', async () => {
     const response = await fetch(getEndpointUrl('/private/log_as'), {
       method: 'POST',
       headers: {
@@ -290,9 +290,9 @@ describe('[POST] /private/log_as - Error Cases', () => {
         user_id: randomUUID(),
       }),
     })
-    expect(response.status).toBe(400)
+    expect(response.status).toBe(401)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('cannot_find_authorization')
+    expect(data.error).toBe('no_jwt_apikey_or_subkey')
   })
 
   it('should return 401 for invalid JWT with malformed body', async () => {

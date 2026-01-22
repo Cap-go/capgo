@@ -113,7 +113,7 @@ export const middlewareAuth = honoFactory.createMiddleware(async (c, next) => {
   const authorization = c.req.header('authorization')
   if (!authorization) {
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot find authorization', query: c.req.query() })
-    throw simpleError('cannot_find_authorization', 'Cannot find authorization')
+    return quickError(401, 'no_jwt_apikey_or_subkey', 'No JWT, apikey or subkey provided')
   }
   c.set('authorization', authorization)
 
