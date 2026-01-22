@@ -1,7 +1,7 @@
 import type { Database } from '../../utils/supabase.types.ts'
 import type { CreateDemoApp } from './demo.ts'
 import type { CreateApp } from './post.ts'
-import { getBodyOrQuery, honoFactory } from '../../utils/hono.ts'
+import { getBodyOrQuery, honoFactory, useCors } from '../../utils/hono.ts'
 import { middlewareKey, middlewareV2 } from '../../utils/hono_middleware.ts'
 import { deleteApp } from './delete.ts'
 import { createDemoApp } from './demo.ts'
@@ -10,6 +10,9 @@ import { post } from './post.ts'
 import { put } from './put.ts'
 
 export const app = honoFactory.createApp()
+
+// Enable CORS for /demo route (browser requests need OPTIONS preflight)
+app.use('/demo', useCors)
 
 app.get('/', middlewareKey(['all', 'read']), async (c) => {
   const pageQuery = c.req.query('page')
