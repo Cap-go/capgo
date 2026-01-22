@@ -8,7 +8,7 @@ ALTER TYPE "public"."platform_os" ADD VALUE IF NOT EXISTS 'electron';
 ALTER TABLE "public"."channels" ADD COLUMN IF NOT EXISTS "electron" boolean DEFAULT true NOT NULL;
 
 -- Step 3: Create index for electron channel queries (similar to ios/android indexes)
-CREATE INDEX IF NOT EXISTS "idx_channels_public_app_id_electron" ON "public"."channels" USING btree ("app_id") WHERE (("public" = true) AND ("electron" = true));
+CREATE INDEX IF NOT EXISTS "idx_channels_public_app_id_electron" ON "public"."channels" USING btree ("public", "app_id", "electron");
 
 -- Step 4: Update build_requests platform check constraint to include 'electron'
 ALTER TABLE "public"."build_requests" DROP CONSTRAINT IF EXISTS "build_requests_platform_check";
